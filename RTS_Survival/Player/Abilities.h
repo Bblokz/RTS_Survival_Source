@@ -46,12 +46,12 @@ enum class EAbilityID : uint8
 	IdRepair,
 	IdReturnToBase,
 	IdAircraftOwnerNotExpanded,
-        IdEnterCargo,
-        IdExitCargo,
-        IdEnableResourceConversion,
-        IdDisableResourceConversion,
-        IdCapture,
-        IdReinforceSquad,
+	IdEnterCargo,
+	IdExitCargo,
+	IdEnableResourceConversion,
+	IdDisableResourceConversion,
+	IdCapture,
+	IdReinforceSquad,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
@@ -61,7 +61,7 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdNoAbility: return TEXT("No Ability");
 	case EAbilityID::IdIdle: return TEXT("Idle");
 	case EAbilityID::IdAttack: return TEXT("Attack");
-		case EAbilityID::IdGeneral_Confirm: return TEXT("Confirm");
+	case EAbilityID::IdGeneral_Confirm: return TEXT("Confirm");
 	case EAbilityID::IdAttackGround: return TEXT("AttackGround");
 	case EAbilityID::IdMove: return TEXT("Move");
 	case EAbilityID::IdPatrol: return TEXT("Patrol");
@@ -82,19 +82,19 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdScavenge: return TEXT("Scavenge");
 	case EAbilityID::IdDigIn: return TEXT("Dig In");
 	case EAbilityID::IdBreakCover: return TEXT("Break Cover");
-		case EAbilityID::IdCapture: return TEXT("Capture");
+	case EAbilityID::IdCapture: return TEXT("Capture");
 	case EAbilityID::IdFireRockets: return TEXT("Fire Rockets");
 	case EAbilityID::IdCancelRocketFire: return TEXT("Cancel Rocket Fire");
 	case EAbilityID::IdRocketsReloading: return TEXT("Rockets Reloading");
 	case EAbilityID::IdRepair: return TEXT("Repair");
 	case EAbilityID::IdReturnToBase: return TEXT("Back To Base");
-		case EAbilityID::IdEnterCargo: return TEXT("Enter Cargo");
-		case EAbilityID::IdExitCargo: return TEXT("Exit Cargo");
-		case EAbilityID::IdAircraftOwnerNotExpanded: return TEXT("Aircraft Owner Not Expanded");
+	case EAbilityID::IdEnterCargo: return TEXT("Enter Cargo");
+	case EAbilityID::IdExitCargo: return TEXT("Exit Cargo");
+	case EAbilityID::IdAircraftOwnerNotExpanded: return TEXT("Aircraft Owner Not Expanded");
 	case EAbilityID::IdNoAbility_MoveCloserToTarget: return TEXT("Move Closer To Target");
-        case EAbilityID::IdDisableResourceConversion: return TEXT("Disable Resource Conversion");
-        case EAbilityID::IdEnableResourceConversion: return TEXT("Enable Resource Conversion");
-        case EAbilityID::IdReinforceSquad: return TEXT("Reinforce Squad");
-        default: return TEXT("Unknown Ability");
-        }
+	case EAbilityID::IdDisableResourceConversion: return TEXT("Disable Resource Conversion");
+	case EAbilityID::IdEnableResourceConversion: return TEXT("Enable Resource Conversion");
+	case EAbilityID::IdReinforceSquad: return TEXT("Reinforce Squad");
+	default: return TEXT("Unknown Ability");
+	}
 }

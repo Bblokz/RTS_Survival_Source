@@ -24,6 +24,7 @@ public:
          * @param InMeshComponent Mesh component that owns the socket.
          * @param InSocketName Socket name on the mesh to use for reinforcements.
          */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
         void InitReinforcementPoint(UMeshComponent* InMeshComponent, const FName& InSocketName);
 
         /**
