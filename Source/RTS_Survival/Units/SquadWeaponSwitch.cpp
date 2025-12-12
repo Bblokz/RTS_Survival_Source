@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponSystems.h"
 
@@ -25,6 +26,7 @@ void FSquadWeaponSwitch::HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied)
 
         if (not IsValid(UnitThatDied))
         {
+                RTSFunctionLibrary::ReportError("Invalid UnitThatDied in FSquadWeaponSwitch::HandleWeaponSwitchOnUnitDeath");
                 return;
         }
 
@@ -34,7 +36,12 @@ void FSquadWeaponSwitch::HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied)
                 return;
         }
 
-        TrySwapWeapons(UnitThatDied, LowestValueUnit);
+        if (not TrySwapWeapons(UnitThatDied, LowestValueUnit))
+        {
+                const FString TargetName = IsValid(LowestValueUnit) ? LowestValueUnit->GetName() : FString("InvalidTargetUnit");
+                RTSFunctionLibrary::ReportError("Failed to swap weapons between dead unit " + UnitThatDied->GetName()
+                        + " and target unit " + TargetName);
+        }
 }
 
 bool FSquadWeaponSwitch::GetIsValidSquadController() const
@@ -43,6 +50,7 @@ bool FSquadWeaponSwitch::GetIsValidSquadController() const
         {
                 return true;
         }
+        RTSFunctionLibrary::ReportError("M_SquadController is not valid in FSquadWeaponSwitch::GetIsValidSquadController");
         return false;
 }
 
@@ -84,6 +92,9 @@ bool FSquadWeaponSwitch::TrySwapWeapons(ASquadUnit* UnitThatDied, ASquadUnit* Ta
 {
         if (not IsValid(UnitThatDied) || not IsValid(TargetUnit))
         {
+                const FString DeadUnitName = IsValid(UnitThatDied) ? UnitThatDied->GetName() : FString("InvalidDeadUnit");
+                const FString TargetName = IsValid(TargetUnit) ? TargetUnit->GetName() : FString("InvalidTargetUnit");
+                RTSFunctionLibrary::ReportError("Cannot swap weapons between " + DeadUnitName + " and " + TargetName);
                 return false;
         }
 
@@ -129,6 +140,8 @@ int32 FSquadWeaponSwitch::GetWeaponValueForUnit(const ASquadUnit* SquadUnit) con
 {
         if (not GetIsValidWeaponState(SquadUnit))
         {
+                const FString ErrorUnitName = IsValid(SquadUnit) ? SquadUnit->GetName() : FString("InvalidSquadUnit");
+                RTSFunctionLibrary::ReportError("Invalid weapon state when fetching weapon value for unit " + ErrorUnitName);
                 return -1;
         }
 
