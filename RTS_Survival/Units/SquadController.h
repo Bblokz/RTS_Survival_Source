@@ -26,6 +26,7 @@ enum class ESquadSubtype : uint8;
 class AItemsMaster;
 class ASquadUnit;
 class ACPPController;
+class AWeaponPickup;
 class UHealthComponent;
 class URTSComponent;
 class AScavengeableObject;
@@ -553,11 +554,35 @@ private:
 	 */
 	float GetDistanceToActor(TObjectPtr<AActor> TargetActor);
 
-	// Directly call the start pick up function for the target item instead of waiting for unit movement.
-	// Will also call done executing command for this pickup command.
-	void OnItemCloseEnoughInstantPickup();
+        // Directly call the start pick up function for the target item instead of waiting for unit movement.
+        // Will also call done executing command for this pickup command.
+        void OnItemCloseEnoughInstantPickup();
 
-	void CheckCloseEnoughToItemPickupAnyway();
+        void CheckCloseEnoughToItemPickupAnyway();
+
+        bool GetIsValidWeaponPickup(AWeaponPickup* TargetWeaponItem) const;
+
+        /**
+         * @brief Finds the eligible squad unit with the lowest weapon value for a pickup.
+         * @return Unit to receive the pickup; nullptr when none are eligible.
+         */
+        TObjectPtr<ASquadUnit> FindSquadUnitWithLowestWeaponValueForPickup();
+
+        /**
+         * @brief Checks if the provided squad unit can pick up a weapon.
+         * @param SquadUnit Squad unit evaluated for eligibility.
+         * @return True when the unit can receive a weapon pickup.
+         */
+        bool CanSquadUnitPickupWeapon(const ASquadUnit* SquadUnit) const;
+
+        /**
+         * @brief Fetches the current weapon value of a squad unit using Global_GetWeaponValue.
+         * @param SquadUnit Squad unit to evaluate.
+         * @return Weapon value for comparison; Max int when the value cannot be determined.
+         */
+        int32 GetWeaponValueForSquadUnit(const ASquadUnit* SquadUnit) const;
+
+        bool IsPickupWeaponCommandActive(const AWeaponPickup* TargetWeaponItem) const;
 
 	/**
 	 * @brief Move the squad to the provided location, attempts to path find once using the squad otherwise units use
