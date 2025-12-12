@@ -1,0 +1,38 @@
+﻿Team weapons in my game will be a separate actor derived from
+AEmbeddedTurretsMaster so they can get a controller for if they need to have movement too.
+With this design document i will layout the requirements needed for the team weapons in my game. Team weapons for mortars,
+mgs and at guns; we will start with the at gun first.
+currently the game only has 'regular' squads which have a squad controller that issues order to squad units.
+the main difference with team weapons will be that they have an extra team weapon pawn which can require setting
+up deployment by a few of the squad members before it can fire.
+
+look through the squad controller code and derive a new TeamWeaponController from it.
+ the team weapon pawn needs to have a few configs, put these in a struct so it is easy to expand upon later:
+ - a yaw setting that defines the min and max yaw for the arc the weapon can reach; if it is zero the
+ weapon can turn the full 360 degrees this will be set on the embedded turrets master ; make sure that the embedded turret respects the limits. 
+ - it needs to include from weapon owner like the infantry weapon does and support all the setups for
+ different weapon types.
+ - it needs a setting for DeploymentTime this is a float and determines how long it takes for the weapon to 
+ be ready to fire after being placed.
+ - the squad needs to wait the same time when they want to move and the weapon needs to be undeployed.
+ - a setting that defines how many of the squad units will be direct operators of the team weapon; the other squad units will just
+ be defending the squad but not deploying or operating the team weapon.
+
+Define the general logic for squads using team weapons in the TeamWeaponController but define another controller from that
+for at weapons, called CarriedAtSquadController
+so it is the same for the team weapon pawn; define a general one and derive from  that the
+CarriedAtWeapon class.
+
+make sure the weapon is fully functional and that the place and pick up logic works well.
+make sure that the weapon will only trigger the underlaying uweapon state to fire if the current target is within the arc
+that the weapon can reach.
+make sure only player actions of moving the squad can turn the weapon; if a current target is not within reach then
+search for a new one (see the infantry weapon later for how to implement a weapon owner) in this case the TeamWeaponController
+will be the weapon owner; that logic is directed from the squad.
+
+make sure that the n squad units operating the team weapon cannot use their regular weapon (hide their main weapon)
+while they are operating the weapon.
+as you can see the squad controller has a function that is called when a squad unit dies; override this in the team weapon squad
+to drive the logic of updating who controls the team weapon; when a contorller dies he needs to be replaced and 
+when enough infantry died so we can no longer 
+operate this weapon; then the weapon will be left vacant.

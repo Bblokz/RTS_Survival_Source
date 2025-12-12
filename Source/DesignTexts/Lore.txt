@@ -1,0 +1,140 @@
+﻿2 Lore Introduction
+
+In the waning months of the Second World War, a desperate race to harness the destruc-
+tive might of atomic energy forever altered the course of human history. In September of
+1944, a few days after the first successful V2 rocket attacks from Germany against London
+Soviet spies successfully infiltrated Germany’s V2 rocket program, capturing intelligence
+and technological blueprints.
+With this stolen knowledge, Soviet engineers developed an intercontinental ballistic mis-
+sile capable of delivering payloads across vast distances. While in complete secrecy, Soviet
+scientists were at that time nearly completed with their atomic weapon program, ultima-
+tely mounting these onto their adapted V2 rockets. Meanwhile, the Western Allies and
+Germans frantically pursued their atomic programs but failed to complete their develop-
+ments in time.
+This technological edge made the war decisively one-sided. Only the Soviet Union suc-
+cessfully developed nuclear weapons, which they first unleashed against Germany.
+Following this Soviets declared war on Japan in August 1945, invading Japanese-held
+territories in Manchuria and northern China. Escalating hostilities between the two po-
+wers intensified after Japan refused unconditional surrender, mobilising defensive efforts
+and initiating preemptive strikes against Soviet positions in East Asia. In response, Sta-
+lin authorised the use of nuclear weapons against Japan, devastating major cities and
+military installations, effectively ending Japanese resistance and completing Soviet domi-
+nance across Eurasia.
+Determined to end the war swiftly and decisively, Soviet leadership saw the Axis po-
+wers’ defeat as merely the first step toward establishing global dominance. As mistrust
+and ideological tensions escalated rapidly between the Soviet Union and Western Allies,
+the Soviets preemptively struck the American and British and French forces to elimi-
+nate potential future threats. What followed was massive devastation—cities reduced to
+rubble, armies annihilated, and humanity plunged into a catastrophic state.
+
+2.1 Radixite Birth
+
+The Soviets failed to anticipate the catastrophic environmental repercussions of their
+nuclear bombardments. The detonations released enormous amounts of radioactive ma-
+terial into the atmosphere, reducing sunlight and initially leading scientists to predict a
+nuclear winter. Yet, something unexpected occurred—the nuclear detonations and sub-
+sequent radiation created unique geological and atmospheric conditions that birthed a
+new crystalline substance: Radixite. These luminous crystals released heat and energy,
+counteracting the cooling effects scientists had anticipated. Instead of plunging into a
+prolonged winter, the Earth’s climate warmed dramatically, transforming landscapes into
+barren, Mars-like deserts perpetually engulfed by intense dust storms. Radixite became
+the catalyst for this radical and enduring climatic shift.
+
+2.2 How Sovjet Russia became a main power
+
+The Russians fared relatively well, primarily due to their distance from the blasts and
+their vast, sparsely populated territories and extensive underground bunkers, initially con-
+structed to withstand conventional warfare. These isolated facilities, many deep within
+Siberia and other remote regions, shielded significant numbers of their population and
+military infrastructure from direct nuclear impacts.
+
+2.3 How Nomads Emerged
+
+Decades later, the survivors emerged into a transformed world. Civilization as it once was
+lay in ruin; remnants of former greatness—twisted, rusted steel skeletons of buildings,
+scattered vehicle parts, and World War II artefacts—were strewn across the wasteland.
+Amidst these radiant ruins, factions began to form anew, driven by the desperate need
+to control precious resources.
+The Russians, having weathered the storm better than most, consolidated power within
+formidable, concrete-reinforced bases. They leveraged their surviving technology and su-
+perior numbers, becoming the dominant force in this harsh new world. With no central
+authority left standing, scattered groups of German and Western Allies survivors adap-
+ted to nomadic lifestyles, scavenging for essential resources—particularly the valuable
+Radixite crystals.
+Now, the world is on the brink of a renewed conflict. The Russian leadership, aware
+of the destabilising effects of nuclear weaponry, prefers to rely on conventional military
+might to maintain control. Fearful of causing further environmental catastrophe, they
+refrain from deploying nuclear arsenals—at least for now.
+
+characters:
+🔶 1. The Hazmat Trooper — “The Canary”
+
+Role: Early-game presence, frontline scout, first taste of Soviet power.
+Personality: Loyal but shaken; indoctrinated but still human.
+
+Backstory
+Originally a cleanup soldier assigned to Radixite extraction sites.
+Saw entire units collapse from exposure; his suit is both his armor and his prison.
+Taught to fear the outside world more than the Soviets themselves.
+Believes deeply that he’s serving “the last real government on Earth.”
+
+Traits
+
+Cautious, paranoid, always scanning the horizon.
+Constantly checking his suit seals, muttering radiation readings under his breath.
+Obeys orders instantly — fear of punishment is immense.
+
+Narrative Purpose
+Introduces players to the aesthetic and danger of Soviet-controlled zones.
+Provides small hints that the Soviets are hiding something massive:
+“Strange readings again… probably just those… machines they’re building.”
+
+🔶 2. The Cyborg Soldier — “Unit-7 / The Iron Warden”
+
+Role: Mid-game antagonist, symbol of Soviet transhumanism.
+Personality: Cold, mission-focused, stripped of identity.
+
+Backstory
+Former elite soldier who volunteered (or was coerced) into the Soviet cybernetics program.
+His limbs and organs were replaced after Radixite exposure nearly killed him.
+Now controlled by a neural inhibitor — but fragments of his old self sometimes leak through.
+
+Traits
+Precise movements, unnatural posture.
+Voice has slight metallic distortion.
+Sometimes hesitates when facing civilians or resistance fighters — memory echoes.
+
+Narrative Seeds
+He references Projekt 24 without naming it:
+“Our enhancements are nothing compared to what comes next.”
+“The Commander says the machines will make us obsolete. I hope that is true.”
+
+Purpose
+Represents the moral decay of Soviet experimentation.
+Builds tension toward the bigger reveal of Projekt 24.
+
+🔶 3. The Cortex Commander — “Marshal Korovin”
+
+Role: Main antagonist, leader of the Soviet Remnant.
+Personality: Calculated, authoritarian, visionary but blinded by ideology.
+
+Backstory
+One of the original Soviet military scientists.
+Exposed to radiation early in the war—saved by experimental cybernetic implants.
+His enhanced cortex allows him to process battlefield data in real time.
+Believes the Soviets saved the world by being the only surviving organized nation.
+Sees all nomads as destabilizing threats.
+
+Traits
+Calm, unnervingly confident.
+Speaks slowly but with absolute authority.
+Half his skull is reinforced plate; cybernetic eye tracks everything.
+
+Motivation
+He believes in a future where humanity survives through order and machinery, not chaos.
+Link to Projekt 24
+He authorized it.
+
+One of his lines foreshadows it:
+“Steel does not tire. Steel does not doubt. Steel will rebuild what flesh destroyed.”
+“When Projekt 24 marches… balance will return to the world.”

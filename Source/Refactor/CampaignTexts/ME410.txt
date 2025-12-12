@@ -1,0 +1,131 @@
+﻿Location:
+Bohemian forest. Czech republic
+
+1. Destroy nearby anti-air defenses
+
+
+2. Call in Ju 87 Stuka strikes to break forward Russian defenses
+
+
+3. Seize the radar base + hangar (unlock ME 410)
+
+
+4. Build air-support infrastructure
+
+
+5. Use ME 410 aircraft to destroy 2–3 fortified Russian bases
+
+
+6. Win by wiping out all remaining armored forces in the region
+
+Phase 1 – Clear the Skies
+
+Goal: Destroy enemy anti-air installations (AA cannons, old SAMs)
+Mechanics:
+
+Spread-out AA gun positions around hills and forest clearings
+
+Each AA site is guarded by infantry and light armor
+
+Optional: use stealth or multiple flanks to approach them
+
+
+Why:
+This opens the skies and enables Stuka airstrikes later in the mission
+
+
+---
+
+🔸 Phase 2 – Call the Bombers
+
+Goal: Use existing Ju 87 Stukas to break entrenched Russian defenses guarding the radar base
+Mechanics:
+
+Player calls in targeted dive bombings on bunkers, pillboxes, and trenches
+
+These defenses are too costly to take head-on otherwise
+
+You must place observers or advance close enough to mark targets
+
+
+Outcome:
+With defenses broken, the path to the radar base opens
+
+
+---
+
+🔸 Phase 3 – Seize the Radar and Hangar Complex
+
+Goal: Capture the old radar complex and overgrown hangar
+Gameplay:
+
+Light skirmish at the radar station
+
+Hangar is intact but locked — engineers needed to cut into it
+
+ME 410 prototype and damaged units found inside
+
+
+Outcome:
+
+ME 410 is unlocked for production
+
+Hangar becomes available for air unit deployment
+
+
+
+---
+
+🔸 Phase 4 – Establish Your Air Base
+
+Goal: Build support structures to produce and maintain ME 410 aircraft
+Mechanics:
+
+Radar Control Tower (must be online for target designation)
+
+Airstrip expansion (possibly limited to 2–3 aircraft max at once for balance)
+
+Aircraft must refuel and rearm at the base
+
+
+Bonus:
+
+Optional upgrade to radar allows longer-range strikes or stealth recon
+
+
+
+---
+
+🔸 Phase 5 – Seek and Destroy
+
+Goal: Destroy the heavily defended Russian bases nearby
+Setup:
+
+At least 2 fortified bases, each with different threats:
+
+1. Tank Depot – heavy armor, fuel depots (good CAS targets)
+
+
+2. Artillery Nest – long-range fire support, vulnerable to bombing
+
+
+3. (Optional) Command Post – well-defended, but gives tech blueprints if captured
+
+
+
+
+Gameplay:
+
+Player uses ME 410s to weaken defenses before ground assault
+
+Combined arms encouraged (air + infantry + light armor)
+
+
+
+---
+
+🔸 Phase 6 – Victory
+
+Goal: Destroy all Russian military presence in the region
+Trigger: All bases destroyed OR command center neutralized
+

@@ -1,0 +1,155 @@
+﻿Whenever you work on unreal engine c++ code for me there are rules you have to follow.
+Ensure to follow the following coding style instructions when writing or refactoring code.
+
+
+0) Whenever an IsValid(obj) is used where all the code is in the body of the if statement,
+refactor it into an early return with not IsValid(obj) at the beginning of the function.
+Note that if there was an else clause with some code, you should move that code to the body of the new if statement.
+
+0.5) Take note of the following example regarding pointers in a class that often need to be used:
+in my controller I have this private member: 
+	UPROPERTY()
+	UPlayerResourceManager* M_PlayerResourceManager;
+A design choice for this project is to not let the program crash but instead log an error if a pointer is null, using RTSFunctionLibrary::ReportError.
+so for member pointers, i will often declare a function like this:
+bool ACPPController::GetIsValidPlayerResourceManager() const
+{
+	if (IsValid(M_PlayerResourceManager))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerResourceManager",
+	                                                      "GetIsValidPlayerResourceManager", this);
+	return false;
+}
+IF you see that IsValid(M_SomePointerMember) or for WeakPointers M_SomePointerMember.IsValid() is used, 
+Then add a function like this to the class and use it instead of IsValid or M_SomePointerMember.IsValid().
+Also if the original function that used the IsValid check had some ErrorReport-ing that should after the refactor be removed
+as I expect you to have added the error report to the new function. This also helps with code readability.
+
+1) Use early return to reduce nesting and other extraction methods as much as possible to make sure the code does not go beyond 2 levels of nesting
+unless not possible.
+
+3) if a loop body is a lot of lines, consider extracting it into a function.
+
+4) Break up functions that are more than 60 lines into smaller functions. However, do not do this blindly.
+Only break up parts that are logically separate and can be named well. If this is not possible, keep the function as is.
+
+5) whenever you create a new function make sure it has good naming and is not too long.
+
+6) In header files; If a function has multiple parameters and is complex enough, we consider it a candidate for
+doxygen comments. In that case: add an @brief with max 3 following lines of description, and @param for each parameter.
+Make sure to use @return if non void and use max 2 lines to explain the different return values.
+Never comment something that is already clear from the name of a function or a parameter name; always add comments to explain why something is done.
+
+6.5) In header files; private members always need to start with M_VarName unless it is a boolean then it will be bM_BooleanName
+
+7) In header files; if a variable is used in complex ways make sure to put a // comment above it to explain what it is used for.
+Never comment variables that are clear from their name.
+
+8) In header files; if a class declaration has no doxygen comments above it add it in the following format:
+@brief with max 3 following lines of description, make sure this description explains how a class is used not what it is.
+if the class has any thing that needs to be set up from blueprint, by blueprint calling some functions add it like this:
+@note FunctionName: call in blueprint to set up etc.
+@note FunctionName2: call in blueprint to set up etc.
+make sure to use a new line with @note in the class declaration for each function that needs to be called from blueprint.
+Never do this for optional functions that are not needed to be called from blueprint.
+
+9) For switch statements: if a case has more than 3 lines of code then extract it into a function.
+Make sure to use proper naming.
+
+10) Make sure any code you add is const-correct.
+
+11) The code makes use of unreal engine coding standards so any {} should always be on a new line.
+
+12) Sometimes BeginPlay Functions are very long. If you cut them up with sub functions that are only called in begin play
+then call those functions BeginPlay_InitName so it is clear what logic gets intialized in BeginPlay.
+Small example of how i want that:
+void ASquadUnit::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Find the child weapon actor component.
+	BeginPlay_SetupChildActorWeaponComp();
+	// Set up a timer with lambda to update the speed of the unit on the anim instance periodically.
+	BeginPlay_SetupUpdateAnimSpeed();
+	
+	// ...
+}
+Where:
+
+void ASquadUnit::BeginPlay_SetupUpdateAnimSpeed()
+{
+	FTimerDelegate TimerDelUpdateAnim;
+	TimerDelUpdateAnim.BindLambda([this]()
+	{
+		if (!IsValid(AnimBp_SquadUnit))
+		{
+			return;
+		}
+		AnimBp_SquadUnit->UpdateAnimState(GetVelocity());
+	});
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(M_TimerHandleUpdateAnim, TimerDelUpdateAnim,
+		                                  DeveloperSettings::Optimisation::UpdateSquadAnimInterval, true);
+	}
+}
+You can do something similar for other large functions that need to be cut up or for example PostInitializeComponents which
+usually has several separate steps. In this way it is clear in the header which subfunctions go where.
+
+13) Use not instead of ! in if statements.
+
+14) Always make sure variables are in CammelCase.
+and follow the unreal engine naming conventions so AActor or FStruct.
+in addition, make sure that private members always start with M_ and for booleans use
+bM_ as prefix.
+
+15) Avoid magic numbers by using constants always declare these at the lowest scope possible.
+if it is needed over several classes then put it in a namespace with an appropriate name.
+
+16) Do not use short, or very sparse variable names; it is usually better to have a longer more descriptive name.
+
+17) Always verify the safety of the pointers used in the code. Use UPROPERTY() with TObjectPtr<> for UActorComponent derivatives
+on the actor that implements them. If we are in an object that is not the object that directly implements the UActorComponent then use 
+a UPROPERTY TWeakObjectPtr<>. For other UObject derivatives use UPROPERTY with TObjectPtr<> if the object is owned by the class
+and if not; the object belongs to something external to our UObject, Actor or custom struct? Then use TWeakObjectPtr<> with UPROPERTY.
+
+18) Always make sure the way delegates with timers are setup is safe; use WeakObjectPointers for captures if reasonable.
+
+19) Always keep my comments do not remove them unless they are now wrong or misleading due to a refactor; in that case
+update them to be correct. Keep in mind rule 8 for the header files here; refactor the comments in line with those rules
+for doxygen comments in the headers.
+
+20) Whenever there are 4 or more variables related to the same logic inside a class consider making a struct for them.
+the following example is a perfect candidate and I want you to implement similar structs when you see a similar situation:
+we had:    
+// Flag to indicate if the progress bar is paused
+bool bIsPaused;
+// Time when the progress bar was paused
+float M_PausedTime;
+// Accumulated paused duration
+float M_TotalPausedDuration;
+bool bM_WasHiddenByPause = false;
+and so made the struct:
+USTRUCT()
+struct FPauseStateTimedProgressBar
+{
+	GENERATED_BODY()
+
+    // Flag to indicate if the progress bar is paused
+    bool bIsPaused;
+
+    // Time when the progress bar was paused
+    float M_PausedTime;
+
+    // Accumulated paused duration
+    float M_TotalPausedDuration;
+
+	bool bM_WasHiddenByPause = false;
+	
+};
+
+IF the struct is only used by one class you can declare it in the same .h otherwise put it in its own file.
+Make sure that the name of the struct makes also clear that it is part of this class apart from 
+being descriptive of what it is.

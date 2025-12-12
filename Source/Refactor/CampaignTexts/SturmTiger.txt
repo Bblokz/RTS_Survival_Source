@@ -1,0 +1,52 @@
+﻿LOCATION:
+Edersee dam or rur dam
+
+ON WORLD MAP:
+Dam for point of interest.
+NEW UNIT: sturm tiger
+
+Bonus objective:
+Weapon bp (2x) repair the pz III flamm wrecks.
+
+🟫 Terrain & Environment
+
+Steep forested hills overlooking the dam and valley.
+
+Cracked concrete roads winding through abandoned German towns.
+
+Collapsed bridges and landslides block direct paths.
+
+Burnt pine forests and charred tank wrecks from earlier conflicts.
+
+Dark water reservoir with debris, rusted buoys, and sunken boats.
+
+Autumn mist rising off the river, obscuring long-range vision.
+
+Old Wehrmacht bunkers partly buried in mud and moss.
+
+Power pylons and cables slumped over cliffs and shattered transformers.
+
+Phase 1:
+CRD has fortified checkpoints and small bases leading to an abandoned German storage depot containing the SturmTiger.
+
+The SturmTiger must be found and repaired.
+
+Phase 2: control the high ground 
+The dam is defended heavily by dug in tank destroyers. Artillery batteries and bunkers.
+
+Meanwhile: a convoy bringing rhe rockets ammo needs to be protected and safely arrive ar rhe player HQ otherwise rhe mission is lost.
+
+Phase 3 breach rhe dam:
+The CDR will throw everything they have at the player to protect the dam.
+
+Several timers with enemy reinforcements.
+
+The sturm tiger musr get in position to fire 3 times ar the dam
+
+A dam hp bar should be in screen space
+Of the dam's health.
+
+Post destruction cinematic.
+
+
+

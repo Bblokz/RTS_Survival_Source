@@ -1,0 +1,281 @@
+﻿1. Harz Mountains (central Germany)
+
+Location Strengths:
+The Harz is a rugged mountain region historically used by partisans and resistance fighters for hiding and operations during both WWII and the Cold War. It's remote, forested, and full of natural cover, with many caves and abandoned mines.
+
+Bonus: improved scavenging rewards.
+Bonus expansion: Archive Scanner Array
+
+Slot Type: Intelligence Center / Command Node
+
+Effect: Increases chance to recover any blueprint by +10% during scavenging operations.
+
+Ability Unlock: Scan Cache Site — once every few minutes, reveals nearby POIs likely to hold blueprints.
+
+Mission outline:
+-Start at a ridge overlooking the valley where the old base is located.
+First team up with the resistance fighters nearby
+Logging Camp Ambush: Resistance is pinned by Russian patrols.
+
+Optional destroy the russian base from which paterolls emerge
+
+-after saving the resistance fighters the player can go to the outpost near the original base to hack the terminal to open the gates
+Or to save rhe snipers hidden in a small village bearby.
+
+-terminal hacking. 
+Scavs have to enter a specific building after which a timer is displayed.
+The building is lightly defended
+After the timer starts some russian patrols will attack the area and the player needs to defend it.
+
+-recovering the base
+After entering through the gate the player gains control over the base.
+Now enemy enemy radio is intercepted and attackwaves start.
+
+The player wins by destroying the enemy's bases: stopping the attack waves
+
+
+2. Ruhr Area (Western Germany, industrial heartland)
+
+The Ruhr was the industrial engine of Germany, full of factories, steelworks, rail hubs, and power plants. In a post-apocalyptic context, this area would offer a treasure trove of salvageable equipment and technical infrastructure.
+
+the Ruhr is densely populated and industrial, which makes it both a dangerous and valuable place to start for a resistance movement.
+
+Bonus: lower cost for light vehicles.
+Effect: Building multiple of the same unit in a row gets cheaper by 5% per unit (up to 20%).
+
+Phase 1 – Power to the Rails
+
+Start Situation:
+
+Begin on the outskirts of a ruined rail yard outside the main city
+
+The HQ is sealed inside a walled industrial zone with collapsed entrances and wreckage
+
+
+Objective:
+
+Reactivate a derelict power substation nearby to enable access to the rail lines leading to the HQ
+
+
+Gameplay:
+
+Capture the substation (lightly defended by Russian forces using it as a forward listening post)
+
+Scavenger or engineer must interact with a power relay node
+
+Once power is restored, spotlights flicker on and tracks become powered again
+
+
+Optional:
+
+Explore nearby scrapyard for early vehicle parts or blueprint cache guarded by enemy scavengers
+
+Phase 2- Bring in the Iron Horse
+
+Narrative Trigger:
+
+> “If we get that old train engine moving, we can blast through the wreckage blocking the northern access. There’s no other way in.”
+
+Objective:
+
+Find fuel, and escort a surviving armored train engine to the HQ’s northern gate
+
+Player must guard the train while scavengers refuel it with fuel cells from nearby depots
+
+
+Gameplay:
+
+The engine is inside a train hangar guarded by Russians
+
+Player must:
+
+1. Scavenge 3 fuel cell crates
+
+
+2. Clear the tracks manually, destroy rubble
+
+
+3. Protect the engine from ambushes while moving
+
+
+Result:
+
+Train crashes through rubble, opening access to the HQ yard (the base)
+
+ Phase 4 – Revive the Machine
+
+Objective:
+
+Reactivate the vehicle production line and logistics terminal
+
+
+Gameplay:
+
+Engineers repair the automated crane gantry and refinery pipelines
+After that is done the player can create vehicles from that building.
+
+⚔️ Phase 5 – Burn the Wires
+
+Narrative:
+
+Russian command sends in air-transported reinforcements and armor
+
+They’re using 2 radio posts to coordinate the sector
+
+
+Final Objective:
+
+Destroy the 2 Russian forward bases directing the attacks
+
+
+3. Bavarian Alps (Southern Germany, near Austrian border)
+
+Location Strengths:
+Remote, mountainous, and culturally distinct, Bavaria offers natural defenses and 8deep rural loyalties. The Alps also offer potential access to isolated caches or hidden bunkers from WWII.
+
+Bonus: thougher infantry units: increased health.
+Ability Unlock: “Hold the Line” – increases defense while stationary by 20%.
+
+Phase 1 – The Long Climb
+
+Start Situation:
+Though infantry units and scavengers, no vehicles.
+
+The HQ is a WW2-era alpine bunker carved into a cliff, assumed sealed and unreachable.
+
+It's been spotted again via recon — but access must be earned the hard way: on foot, through the hills.
+
+Phase 2 – The Hidden Network
+
+Narrative Trigger:
+
+> “The mountain isn’t empty. There are holdouts still up here. Old comrades. If we light the signal fires, they’ll know we’re back.”
+
+
+
+Objective:
+
+Signal the resistance outposts via mountain beacons
+
+
+Gameplay:
+
+2–3 beacon towers exist across the peaks.
+
+When engineers reach and power each beacon:
+
+A nearby hidden guerrilla squad emerges to join the player (e.g., flamethrower team, MG nest crew, or hardened alpine riflemen).
+
+Beacon lighting reveals enemy patrols on nearby ridgelines.
+
+
+
+Optional:
+
+Light all 3 beacons for a mortar support unlock at HQ once restored
+
+🏰 Phase 3 – Stone and Steel
+
+Narrative:
+
+You’ve reached the old bunker — it’s overgrown, cracked, but still intact.
+
+A Russian alpine unit has set up inside, using it as a listening post and artillery spotting point.
+
+
+Objective:
+
+Storm the bunker and clear out enemy forces
+
+
+Gameplay:
+
+Tight corridors, trench tunnels, reinforced doorways
+
+Russian defenders include:
+
+Elite grenadiers
+
+MGs set into pre-war pillboxes
+
+Snipers on ledges
+
+
+
+After Control Is Gained:
+
+Engineers must restart manual hand-crank power systems inside.
+
+HQ becomes operational with:
+
+Infantry training camp
+
+Supply depot
+
+Watchtower expansion slots
+
+
+Phase 4 – Narrow Roads, Wide Guns
+
+Narrative:
+
+Radio chatter reveals a Russian artillery convoy is en route to establish a forward siege base in the region
+
+
+Objective:
+
+Intercept and destroy the convoy before it sets up
+
+
+Gameplay:
+
+Timer starts: 7–10 minutes
+
+Convoy will move up mountain roads (marked on the map)
+
+Player must:
+
+Set ambushes
+
+Place mines
+
+Use terrain chokepoints to destroy:
+
+Fuel trucks
+
+Supply APC
+
+One towed field gun or halftrack
+
+
+
+
+Optional:
+
+If player destroys the whole convoy before it deploys: unlocks artillery blueprints
+
+If convoy sets up: player must assault fortified position later
+
+
+Narrative:
+
+> “With the artillery down and the passes ours, we hold the line now. For real this time.”
+
+
+
+Final Objective:
+
+Repel final Russian counterattack wave attempting to retake the bunker
+
+
+Gameplay:
+
+Player uses new defensive structures, high-ground watchtowers, and guerilla units
+
+Terrain-based boosts apply:
+
+Infantry hold stronger in cover or higher elevation
+
+
+Player can call in alpine mortar barrage or booby-trapped avalanche trigger (scripted environmental trap)
+

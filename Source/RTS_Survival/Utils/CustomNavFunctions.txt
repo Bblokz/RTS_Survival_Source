@@ -1,0 +1,320 @@
+﻿void FNavMeshPath::RTSOffsetFromCorners(FVector::FReal Distance)
+{
+	SCOPE_CYCLE_COUNTER(STAT_Navigation_OffsetFromCorners);
+
+	const ARecastNavMesh* MyOwner = Cast<ARecastNavMesh>(GetNavigationDataUsed());
+	if (MyOwner == nullptr || PathPoints.Num() == 0 || PathPoints.Num() > 100)
+	{
+		// skip it, there is not need to offset that path from performance point of view
+		return;
+	}
+
+#if DEBUG_DRAW_OFFSET
+	GInternalDebugWorld_ = MyOwner->GetWorld();
+	FlushDebugStrings(GInternalDebugWorld_);
+	FlushPersistentDebugLines(GInternalDebugWorld_);
+#endif
+
+	if (bCorridorEdgesGenerated == false)
+	{
+		GeneratePathCorridorEdges();
+	}
+	const FVector::FReal DistanceSq = Distance * Distance;
+	int32 CurrentEdge = 0;
+	bool bNeedToCopyResults = false;
+	int32 SingleNodePassCount = 0;
+
+	FNavPathPoint* PathPoint = PathPoints.GetData();
+	// it's possible we'll be inserting points into the path, so we need to buffer the result
+	TArray<FPathPointInfo> FirstPassPoints;
+	FirstPassPoints.Reserve(PathPoints.Num() + 2);
+	FirstPassPoints.Add(FPathPointInfo(*PathPoint, FVector::ZeroVector, FVector::ZeroVector));
+	++PathPoint;
+
+	// for every point on path find a related corridor edge
+	for (int32 PathNodeIndex = 1; PathNodeIndex < PathPoints.Num() - 1 && CurrentEdge < PathCorridorEdges.Num();)
+	{
+		/* Here, the function is specifically looking for off-mesh connections (like jumps or drops)
+		 * using the RECAST_STRAIGHTPATH_OFFMESH_CONNECTION flag.
+		 * If such a connection is detected between two path points, it adds these points as they are,
+		 * without modification, and then skips to the next relevant path point
+		 * by incrementing PathNodeIndex and PathPoint accordingly.
+		 */
+		if (FNavMeshNodeFlags(PathPoint->Flags).PathFlags & RECAST_STRAIGHTPATH_OFFMESH_CONNECTION)
+		{
+			// put both ends
+			FirstPassPoints.Add(FPathPointInfo(*PathPoint, FVector(0), FVector(0)));
+			FirstPassPoints.Add(FPathPointInfo(*(PathPoint + 1), FVector(0), FVector(0)));
+			PathNodeIndex += 2;
+			PathPoint += 2;
+			continue;
+		}
+
+		int32 CloserPoint = -1;
+		/*CurrentEdge is an index pointing to the current corridor edge being considered.
+		 *The corridor edges represent the boundaries of the navigation path corridor and
+		 *are usually derived from the nav mesh. Each edge is a segment between two navigation mesh vertices.*/
+		const FNavigationPortalEdge* Edge = &PathCorridorEdges[CurrentEdge];
+		for (int32 EdgeIndex = CurrentEdge; EdgeIndex < PathCorridorEdges.Num(); ++Edge, ++EdgeIndex)
+		{
+			/*Here, DistToSequence calculates the squared distance from the current path point to the segment
+			 *defined by Edge->Left and Edge->Right.
+			 *These Left and Right points are the vertices of the corridor edge.
+			 *The function checks if the path point is near/On this edge*/
+			const FVector::FReal DistToSequence = FMath::PointDistToSegmentSquared(
+				PathPoint->Location, Edge->Left, Edge->Right);
+			if (DistToSequence <= FMath::Square(KINDA_SMALL_NUMBER))
+			{
+				// We have found the corridor edge we are on, now we need to determine which end of the edge we are closer to
+				const FVector::FReal LeftDistanceSq = FVector::DistSquared(PathPoint->Location, Edge->Left);
+				const FVector::FReal RightDistanceSq = FVector::DistSquared(PathPoint->Location, Edge->Right);
+				if (LeftDistanceSq > DistanceSq && RightDistanceSq > DistanceSq)
+				{
+					// skip edge as we are too far from either end of the segment.
+					++CurrentEdge;
+				}
+				else
+				{
+					CloserPoint = LeftDistanceSq < RightDistanceSq ? 0 : 1;
+					CurrentEdge = EdgeIndex;
+				}
+				break;
+			}
+		}
+#if DEBUG_DRAW_OFFSET
+		DrawDebugLine(GInternalDebugWorld_, Edge->Left, Edge->Right, FColor::White, true, 3.f, 0, 10.0f);
+		DrawDebugPoint(GInternalDebugWorld_, Edge->Left + FVector(0, 0, 5), 20.0f, FColor::Blue, true, 3.f);
+		DrawDebugPoint(GInternalDebugWorld_, Edge->Right + FVector(0, 0, 5), 20.0f, FColor::Purple, true, 3.f);
+#endif
+		/*
+		* CloserPoint: This variable holds the index (either 0 or 1)
+		* indicating whether the left or right point of the edge is closer to the path point.
+		*  CurrentEdge: This is now set to the index of the corridor edge
+		*  that was found to be relevant to the current path point.*/
+
+		if (CloserPoint >= 0)
+		{
+			bNeedToCopyResults = true;
+
+			Edge = &PathCorridorEdges[CurrentEdge];
+			const FVector::FReal AdjustedDistance = FPlatformMath::Min(Edge->GetLength() / 2, Distance);
+
+			FNavPathPoint NewPathPoint = *PathPoint;
+			const FVector EdgePt0 = Edge->GetPoint(CloserPoint);
+			const FVector EdgePt1 = Edge->GetPoint((CloserPoint + 1) % 2);
+			const FVector EdgeDir = EdgePt1 - EdgePt0;
+			const FVector NavigableEdgeOffset = EdgeDir.GetSafeNormal() * Distance;
+
+#if DEBUG_DRAW_OFFSET
+			DrawDebugDirectionalArrow(GInternalDebugWorld_, NewPathPoint.Location + FVector(0, 0, 5),
+			                          NewPathPoint.Location + FVector(0, 0, 5) + NavigableEdgeOffset * 2, 2,
+			                          FColor::Orange, false, 3.f, 0, 10.0f);
+#endif
+			
+			// Try to directly offset the point with Distanc
+			if (MyOwner->IsSegmentOnNavmesh(EdgePt0 + 0.2 * NavigableEdgeOffset, EdgePt0 + NavigableEdgeOffset * 2))
+			{
+				NewPathPoint.Location = EdgePt0 + NavigableEdgeOffset;
+			}
+			else
+			{
+#if DEBUG_DRAW_OFFSET
+				DrawDebugString(GInternalDebugWorld_, PathPoint->Location + FVector(45, 45, 0),
+								FString::Printf(TEXT("Custom Offset Not Navigable; adjust! %d"), PathNodeIndex), NULL,
+								FColor::Red, 3.f);
+#endif
+				
+				NewPathPoint.Location = EdgePt0 + EdgeDir.GetSafeNormal() * AdjustedDistance;
+			}
+
+			NewPathPoint.NodeRef = Edge->ToRef;
+			FirstPassPoints.Add(FPathPointInfo(NewPathPoint, EdgePt0, EdgePt1));
+
+			++CurrentEdge;
+			++SingleNodePassCount;
+		}
+		else
+		{
+			if (SingleNodePassCount == 0)
+			{
+				// store unchanged
+				FirstPassPoints.Add(FPathPointInfo(*PathPoint, FVector(0), FVector(0)));
+			}
+			else
+			{
+				SingleNodePassCount = 0;
+			}
+
+			++PathNodeIndex;
+			++PathPoint;
+		}
+	}
+
+	if (bNeedToCopyResults)
+	{
+		FNavPathPoint EndPt = PathPoints.Last();
+
+		PathPoints.Reset();
+		for (int32 Index = 0; Index < FirstPassPoints.Num(); ++Index)
+		{
+			PathPoints.Add(FirstPassPoints[Index].Point);
+		}
+
+		PathPoints.Add(EndPt);
+	}
+	if (PathPoints.Num() < 4)
+	{
+		return;
+	}
+	// Cleanup closely spaced points before applying Bézier curve smoothing
+	const float MaxPointDistance = 100.0f; // Maximum allowed distance to consider merging points
+	TArray<FNavPathPoint> CleanedPathPoints;
+	CleanedPathPoints.Reserve(PathPoints.Num());
+
+	for (int i = 0; i < PathPoints.Num(); ++i)
+	{
+		if (i < PathPoints.Num() - 1)
+		{
+			FVector CurrentLocation = PathPoints[i].Location;
+			FVector NextLocation = PathPoints[i + 1].Location;
+			float DistanceBetweenPoints = FVector::Dist(CurrentLocation, NextLocation);
+
+			if (DistanceBetweenPoints < MaxPointDistance)
+			{
+				// Merge points by averaging their locations
+				FVector MergedLocation = (CurrentLocation + NextLocation) / 2.0f;
+				FNavPathPoint MergedPoint;
+				MergedPoint.Location = MergedLocation;
+				MergedPoint.NodeRef = PathPoints[i].NodeRef;
+
+				// Add the merged point
+				CleanedPathPoints.Add(MergedPoint);
+
+				// Skip the next point because it has been merged
+				i++;
+				continue;
+			}
+		}
+		// Add the current point if no merging occurs
+		CleanedPathPoints.Add(PathPoints[i]);
+	}
+
+	// Replace old path points with cleaned-up points before applying curves
+	PathPoints = CleanedPathPoints;
+#if DEBUG_DRAW_OFFSET
+	// Debug: Draw new offset path points in red
+	for (const FNavPathPoint& NewPathPoint : PathPoints)
+	{
+		DrawDebugSphere(GInternalDebugWorld_, NewPathPoint.Location, 20.0f, 12, FColor::Red, false, 3.0f);
+	}
+#endif
+	
+	bool bUseBezierCurve = false;
+	if (bUseBezierCurve)
+	{
+		TArray<FNavPathPoint> SmoothedPathPoints;
+		// Angle in degrees
+		const float AngleThreshold = 50.0;
+		const float MaxAngle = 180;
+		const int MinPoints = 2;
+		const int MaxPoints = 8;
+		// Adjust this factor to control the "height" of the curve
+		const float OffsetFactor = 1;
+
+		bool lastSegmentWasCurved = false;
+		for (int i = 0; i < PathPoints.Num() - 1; ++i)
+		{
+			FVector A = PathPoints[i].Location;
+			FVector B = PathPoints[i + 1].Location;
+
+			if (i < PathPoints.Num() - 2)
+			{
+				FVector C = PathPoints[i + 2].Location;
+				FVector AB = (B - A).GetSafeNormal();
+				FVector BC = (C - B).GetSafeNormal();
+				float DotProduct = FVector::DotProduct(AB, BC);
+				float Angle = FMath::Acos(DotProduct) * 180.0f / PI;
+
+				if (Angle > AngleThreshold)
+				{
+					// Calculate normals to AB and BC
+					FVector ABNormal = FVector::CrossProduct(AB, FVector::UpVector).GetSafeNormal();
+					FVector BCNormal = FVector::CrossProduct(BC, FVector::UpVector).GetSafeNormal();
+
+					// Set control points along the normals, moved outward by the OffsetFactor * Distance
+					FVector Control1 = B + ABNormal * (Distance * OffsetFactor);
+					FVector Control2 = B + BCNormal * (Distance * OffsetFactor);
+
+					int NumPoints = FMath::RoundToInt(FMath::GetMappedRangeValueClamped(
+						FVector2D(AngleThreshold, MaxAngle), FVector2D(MinPoints, MaxPoints), Angle));
+
+
+					TArray<FVector> BezierPoints = CalculateBezierPoints(A, Control1, Control2, C, NumPoints);
+
+					if (!lastSegmentWasCurved)
+					{
+						// Safe to append all points as our begin point was not part of the previous curve
+						SmoothedPathPoints.Append(BezierPoints);
+					}
+					else
+					{
+						// Skip the first point to avoid duplication.
+						BezierPoints.RemoveAt(0);
+						SmoothedPathPoints.Append(BezierPoints);
+					}
+					lastSegmentWasCurved = true;
+					// Skip the next point as it's part of the curve handled
+					i++;
+					continue;
+				}
+			}
+			// If not part of a curve or no curve started
+			if (!lastSegmentWasCurved)
+			{
+				SmoothedPathPoints.Add(PathPoints[i]);
+			}
+			lastSegmentWasCurved = false;
+		}
+
+		// Always add the last point if not already added
+		if (!lastSegmentWasCurved || SmoothedPathPoints.Last().Location != PathPoints.Last().Location)
+		{
+			SmoothedPathPoints.Add(PathPoints.Last());
+		}
+
+		PathPoints = SmoothedPathPoints;
+#if DEBUG_DRAW_OFFSET
+		// Debug: Draw new offset path points in purple
+		for (const FNavPathPoint& NewPathPoint : PathPoints)
+		{
+			DrawDebugSphere(GInternalDebugWorld_, NewPathPoint.Location, 10.0f, 12, FColor::Purple, false, 3.0f);
+		}
+#endif
+	}
+}
+
+TArray<FVector> FNavMeshPath::CalculateBezierPoints(const FVector& Start, const FVector& Control1,
+                                                    const FVector& Control2, const FVector& End, int32 NumberOfPoints)
+{
+	TArray<FVector> BezierPoints;
+	float T = 0.0;
+	const float Step = 1.0 / NumberOfPoints;
+
+	for (int i = 0; i <= NumberOfPoints; ++i, T += Step)
+	{
+		const float U = 1 - T;
+		const float TT = T * T;
+		const float UU = U * U;
+		const float Uuu = UU * U;
+		const float Ttt = TT * T;
+
+		FVector Point = Uuu * Start;
+		Point += 3 * UU * T * Control1;
+		Point += 3 * U * TT * Control2;
+		Point += Ttt * End;
+
+		BezierPoints.Add(Point);
+	}
+
+	return BezierPoints;
+}

@@ -1,0 +1,48 @@
+﻿📍 Mission: Black Gold Burnout
+New unit: flame troopers.
+
+Location: Ploiești, Romania — heavily industrial oil zone, shattered infrastructure, CRD defenses.
+Objective: Completely destroy the Ploiești fuel depot to cripple Russian operations in southern Europe.
+
+🏕️ Player Landing Zone (SW of Map)
+
+Sheltered in a dry canal bed surrounded by rusted pumping equipment and burnt trees.
+
+Mobile HQ deploys here.
+
+Terrain provides natural chokepoints for defense.
+
+
+🪨 Nearby Resources:
+
+Radixite Field: Just west of the starting area, among broken storage tanks and a collapsed derrick. Mid-risk — occasionally patrolled by a light CRD scout car.
+
+Metal Cache: Southeast of the player’s landing zone, in the remains of a scrapped refinery. Guarded by a few CRD conscripts and a static MG nest.
+
+Vehicle Parts: Scattered across an abandoned repair yard to the northeast, near a shattered pipeline. The yard is occupied by light Russian vehicles — a good early raid opportunity.
+
+
+Phase 1: Controlled Sabotage
+
+Objective: Destroy 4 critical pipeline valve structures to start a cascading fuel fire.
+
+Pipelines are spread across a grid of shattered industrial blocks.
+
+Phase 2: Timed Destruction
+
+Objective: Destroy a central pressure regulation tower within 8 minutes of the last pipe sabotage.
+
+The tower is located on a hill overlooking the depot, guarded by garrisoned buildings, AA guns, and a small tank platoon.
+
+The timer starts as soon as the fourth pipe is destroyed.
+
+If the timer runs out, the tower overloads and disperses pressure across auxiliary systems
+
+Phase 3: Main Depot Annihilation
+
+Objective: Destroy the central fuel depot complex.
+
+Surrounded by concrete walls, flame towers, and defensive emplacements.
+
+The player must either go for a frontal breach or exploit one of the destroyed pipeline tunnels as an alternate route.
+

@@ -1,0 +1,86 @@
+﻿Here are the instructions for generating Doxygen documentation for the project,
+these need to be followed at all times.
+
+the doxygen comment format is as follows:
+/**
+* @brief
+* // more lines here for the description if needed but always keep the space between the @brief and the first param
+*
+* @param 
+* // More @params here
+* @pre Not always needed but if a function has a specific precondition which cannot be obtained from the @brief then note it here.
+* @post Not always needed but if a function has a specific postcondition which cannot be obtained from the @brief then note it here.
+* @note For any notes that are not pre or post conditions. usually used for things that are complicated and need more documentation.
+* @note the note lines will always use a new @note on each line to make sure the enters are kept in the doxygen output.
+* @return The return value of the function. If the function is void then this line should not be present.
+*/
+
+For functions that return a boolean and are relatively short make sure to just clarify the
+ @return and nothing else in the doxygen comment
+ 
+ example:
+
+
+bool UPlayerAudioController::IsSameAudioTypePlayingAndNotFinished(const ERTSVoiceLine VoiceLineType, const float Now)
+{
+	if (VoiceLineType == M_CurrentVoiceLineType)
+	{
+		if (const float* CooldownEnd = M_PlayCooldownEndTimes.Find(VoiceLineType))
+		{
+			if (Now < *CooldownEnd)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+ with doxygen:
+ 
+	/** @return Whether this voice line type is already playing and should block the new one on a not force play*/
+	bool IsSameAudioTypePlayingAndNotFinished(const ERTSVoiceLine VoiceLineType, const float Now);
+
+
+
+For doxygen above classes i like you to use @note with filling like **** etc.
+to make clear where a new section of the documentation starts.
+
+some examples:
+	/**
+	 * @brief Move the squad to the provided location, attempts to path find once using the squad otherwise units use
+	 * self path finding.
+	 * 
+	 * @param MoveToLocation The location to move to.
+	 * @param AbilityID For what ability this move to command is.
+	 * @post The active ability ID is set on each squad unit and a call back is bound on when the move is completed.
+	 */
+	void GeneralMoveToForAbility(const FVector& MoveToLocation, EAbilityID AbilityID);
+	
+	Example on how to document classes:
+	
+/**
+ * @brief Keeps track of the currently active missions with the active array.
+ * Missions can have sub missions and can be added dynamically at runtime.
+ * @note Overview of mission lifecycle:
+ * @note - On BP the mission widget manager is created.
+ * @note - Then we activate each mission set from the BP instance.
+ * @note - OnActivate starts the loading which uses a set loading time by the user.
+ * @note - When the loading is done the mission notifies the Start of the mission on this manager
+ * and asks for a free mission widget.
+ * @note - OnMissionCompleted Removes the active mission and plays the mission completed sound, idem for failed.
+ * @note ******************************
+ * @note On text only missions:
+ * @note - There are special types of missions that will only have the mission UI with a next button.
+ * @note - Those missions are instantly completed and do not play sound by clicking the next button on them.
+ * @note - This is handled through the weak ptr to the mission object that is stored on the mission widget after init.
+ * @note ******************************
+ * @note On Triggers for missions:
+ * @note - If a trigger is specified then the start function of the mission will enable the tick on the trigger but not
+ * init the mission UI until the trigger is activated.
+ * @note - Triggers do also support the start delay that can be specified; when not zero, after trigger activation,
+ * we use a timer to call the final part of the start function to update the UI.
+ */
+UCLASS()
+class RTS_SURVIVAL_API AMissionManager : public AActor
+
+	

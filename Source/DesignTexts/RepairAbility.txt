@@ -1,0 +1,14 @@
+﻿Targets: hp actor friendly, hp pawn friendly.
+
+exe repair squad controller:
+init repair object.
+init bisbusyreparing = false
+units completed = 0
+ExeRepair_StartOrMoveToRepari:
+see if close enough -> StartRepair.
+else GeneralMoveToForAbility Repair with location of repair actor.
+
+on move completed with ability repari:
+M_RepairCOmponent->MoveToRepairObjectCompleted.
+
+

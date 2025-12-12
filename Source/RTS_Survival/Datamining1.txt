@@ -1,0 +1,28 @@
+right now when i add a new EAbilityID to the list of abilities i need to do quite a bit of work in the Icommands interface before empty methods that can
+be implemente per unit that implements the interface are available for them and i can actually start working on the ability.
+
+here is roughly what i need to do:
+add a public function:
+UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError MYNEWABILITY_NAME(const bool bSetUnitToIdle, POSSIBLE_ABILITY_PARAMETERS);
+	and implement an empty method in the .cpp file.
+
+add protected functions:
+virtual void ExecuteMYNEWABILITY_NAME(POSSIBLE_ABILITY_PARAMETERS);
+virtual void TerminateMYNEWABILITY_NAME();	
+
+in the void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand) add a new case to the switch for this ability
+and providing the POSSIBLE_ABILITY_PARAMETERS to the ExecuteMYNEWABILITY_NAME function.
+
+
+in the void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
+add a new terminate case for this ability that calls TerminateMYNEWABILITY_NAME();
+
+is there a way to automate this process more so i have less work to do when adding a new ability?
+We need to ensure that this potential refactor is COMPLETELY non-destrutive in the sense that the way abilties are added right now and queued and terminated etc
+is not affected.
+
+provide the full new .h and .cpp files for the ICommands interface with the changes needed to make this process more automatic.
+make sure to keep my code standard which is UE code standard so indent { and use const correctness.
+
+also keep my comments and commenting style.

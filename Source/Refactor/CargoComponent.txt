@@ -1,0 +1,101 @@
+﻿you are going to write the code for two new components and the integration of it with my squads.
+make sure to follow the coding standard at the end!
+
+In my game squads of squad units are controller by squad controllers. as you can see they propagate the orders
+issued to the individual squad units and depending on the order they keep count of how many units have completed the order.
+so that only once everyone has finished the order the squad controller can continue with the next order.
+each order or command comes from an interface and has a Execute[CommandName] that is called when the command is activated
+from the queue. once the squad is finished it called DoneExecutingCommand with the command ID. 
+and then the interface calls the terminate[CommandName] function to reset any logic used by the now finished command.
+
+Squad controllers will have an UCargoSquad component that manages whether a squad is inside cargo 
+(a building or maybe a half track)
+we want to drive as much of the cargo logic in that component as possible to not bloat the squad controller with more code.
+make sure we also add an init function on that component that is called from the squad controller at begin play.
+in that init function provide the refernce to the controller for further logic. also add the controller in the c tor to the squad
+controller
+
+in a seperate file we get the enum:
+ESquadCargoState
+None
+Free
+Inside
+
+
+UCargoSquad : public ActorComp
+public api:
+GetIsInsideCargo
+
+private
+ESquadCargoState M_SquadCargoState
+
+the second component for buidlings and or half tracks that have cargo
+UCargo: public ActorComponent
+
+this component will look for the cargo slots at its setup cargo function, this function expects a mesh component ptr
+which we will cache as a weak ptr. look for all sockets on the mesh containing cargo (case does not matter)
+this function also expect and integer denoting how many squads it supports.
+ 
+EnterCargo will be a new Command in the TCommand queue. With an actor target (we assume this actor has the cargo component) 
+the execute cargo command will call the ExecuteEnterCargo on the CargoSquad component
+make sure the component has a IsEnterCargoRequestValid that checks if the actor is valid and if the cargo comp it has
+is valid if not use RTSFunctionLibrary::ReportError (const fstring)
+On the execute of it we move the squad to the entrance once move is complete we Request can enter cargo on the targeted cargo component.
+Now the cargo comp checks if it has any vacancies left and if not the squad will terminate the command by calling done executing command with EAbilityID::ID_Cargo.
+the vacancy check will go as follows: if we have no more squad slots we fail instantly.
+otherwise it will go through and we save which squadunit of the squad goes to which socket.
+when ever a squad is allowed in (has a vacancy) then always try to distribute the squad units to sockets that have no
+squad units regisered yet. this means we really cache squads in 2 ways; 1- the vacancies counting how many squads are in there.
+and 2- which sockets are occupied by which squad units.
+for both of these make structs. that contain and manage the data.
+
+if a squad is allowed in and there are not more empty sockets then rtsfunctionlibrary print string a warning message and
+reuse sockets in a round robin fashion.
+
+now go through the following edge cases and make sure you solve the properly; also when going through the context code and realising
+there is a case i missed report that back to be and tell me how you fixed it.  
+-> Enter cargo command when already in cargo:
+- if in the same cargo instantly finish
+- if in a different cargo then go out first
+
+-> attack actor command to an actor that is in range of where the squad is right now;
+the squad can stay inside the propagation of the attack command will lead to the actors attacking from inside the cargo building;
+otherwise first exit cargo and then attack.
+
+there needs to be a public function on the UCargoSquad called CheckCargoState which will be caled with the eabilityID of the new command
+that checks the state; if that new command requires the squad to be outside of the cargo and the squad is inside then it will instantly
+teleport the squad units to exit cargo so that when the other command continues executing this after this call the squad is already outisde.
+
+regarding moving to the entry;
+the cargo component wil at its setup funciton also look for a socket with entrance in it, there may be several of these so we keep an array of all 
+the socket names with the entries. when the squad wants to mvoe to the entrnce provide the squad with the one closest to the location of the squad controller
+
+note on squad units that are in cargo:
+these units need to be able to animate and rotate like they do for firiing at enemies but Their movement should be disabled 
+obviously when they exit cargo that should be undone. But solve this in an elegant way and explain how you did it.
+
+
+Note that for exiting cargo and entering cargo we should have different commands with different EAbilitIDs because those
+help drive the UI and give the player then the possiblity to exit squads out of buildings.
+we have the following funciton in the interface the squad controller uses:
+bool ICommands::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
+	if (UnitCommandData->GetIsPrimarySelected())
+	{
+		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+	}
+	return bIsAbilitySwapped;
+}
+
+use this to swap from enter cargo to exit cargo once the squad is inside (also error report if not possible)
+and so, when the unit is asked to exit cargo we swap from exit cargo to enter cargo.
+note that in the case we exit cargo for for example a move command; then we do not call execute exit cargo as that would lead
+to a done executing command and terminate exit cargo call which would mess up the command queue (as this would be seen as 
+done with the movement command that required this exit!) instead, in this case, just exit manually but do make sure
+to swap the abilities properly.

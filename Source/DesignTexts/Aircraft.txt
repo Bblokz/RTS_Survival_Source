@@ -1,0 +1,4126 @@
+﻿
+In my game i want to implement aircraft incredibly similar to how it is implemented in the game command and conquer; 
+where a building can only ever train
+as many aircraft as spaces it has left to store them. we will identify those spaces with sockets (see later in this text).
+the idea is that because aircraft already have weapons with limited munitions they can only replenish those when back at the base.
+The following design document is quite long and I want you to analyse everything carefully before starting to implement it.
+after i explained the design the current code context will be given followed by the rules for coding.
+
+the aircraft in my game are set up to use VTO and will also use the vertical movement for landing.
+
+we create a component that on blueprint level will be added to nomadic trucks that (when they are expanded into a building) support
+aircraft to land on their building.
+Note that not all nomadic vehicles are expected to have this component. some of them will have the pointer set to null;
+the idea is that the vehicles implemented in blueprints that do support aircraft will provide the component
+ if they have one we set the pointer to it in the post initialize components of the nomadic vehicle.
+We call the component AircraftOwnerComp
+
+The idea is that one of the responsiblities of this component is to add the anmiateable roof to the nomadic vehicle's bulding mesh.
+this means the component will open and close the aircraft bays by playing different animations for the different sockets.
+the animation blueprint used for the skeletal mesh of the roof is a derivation of UAirBaseAnimInstance, more on this later.
+
+the component will be setup with a public Init function that takes in a UMeshComponent ptr which will be the mesh of the building;
+we look for sockets called Landing* so could be Landing_0 Landing_1 etc.. this function will also be blueprintcallable but not blueprintable
+Because nomadic vehicles can elect to pack up and start moving at any time; by which they remove their building mesh, we need to make sure that
+we support cleaning up the roof. I want this to ONLY be allowed when all aircraft are airborne or being trained ( in case of aircraft that are still being trained; the training component
+already supports nomadic movement and will simply pause when we are converting back to trucks).
+for this we will add bool GetCanPackup() and void ForceAllAircraftVTO() as well as void PackupAirbase();to the publc interface of the component, more on this later.
+If there are still aircraft inside the building? then we force them to VTO and only after they have take off we let the nomadic vehicle know and pack up.
+
+
+in the OnTrainingComplete implementation of the nomadic vehicle we can use the FTrainingOption to find out if we just 
+trained an aircraft.
+Specifically when the EAllUnitType is set to UNType_Aircraft if so we should call a separate function on the component
+(if this nomadic vehicle has a valid AircraftOwner component, if not report error with RTSFuncionLibrary::ReportError
+(const FString) as in that case the nomadic vehicle should not be able to train any aircraft at all.)
+
+on this component the aircraft and the socket that aircraft uses needs to be stored. We will store the aircraft as a TWeakObjectPtr<AAircraftMaster>
+note that the aircraft is derived from AHpPawnMaster which in the public has the following:
+DECLARE_MULTICAST_DELEGATE(FOnUnitDies);
+with in public:
+	// Delegate called when the unit dies.
+	FOnUnitDies OnUnitDies;
+where:
+DECLARE_MULTICAST_DELEGATE(FOnUnitDies);
+
+When we have created the aircraft in OnTrainingComplete (cast the SpawnedUnit to AAircraftMaster) we will bind a function on the AircraftOwner component
+to this delegate to keep track.
+
+i also expect there to be a public bool function called IsAirBaseFull which returns true if all sockets are occupied.
+Note that even if an aircraft is not yet back at base but is still alive it keeps it socket occupied; only after the aircraft dies will the socket be free again.
+
+
+the aircraft and the component need to be able to communicate in different ways; set a weak object ptr reference to the AircraftOwner on the aircraft when it is created.
+then when the aircraft starts VTO it will call OnAircraftRequestVTO (AAircraftMaster* Aircraft)
+the same for when the aircraft wants to land for this we will call OnAircraftRequestToLand (AAircraftMaster* Aircraft)
+now for aircraft landing add a new function to the aircraft master that starts navigating to the base; we call it StartNavigatingToBase
+and for this we also need to add a new struct to the aircraft commands data .h file; inthere we keep track of the the different datas that
+are needed for actions/commands the aircraft is executing.
+
+the aircraft is issued the command to return to base through the ICommands interface and already has empty methods for starting that command
+and a terminate version of the command:
+
+	virtual void ExecuteReturnToBase() override;
+	virtual void TerminateReturnToBase() override;
+	
+note that we also call the terminate of the command after the command is completed ( by design)
+to keep track of the state of a socket on the owner easily we will keep track of an enum for each socket:
+(note that this is already defined in AircraftSocketState.h)
+EAircraftSocketState
+{
+	None,
+	Open,
+	// When animating from closed to open.
+	Opening	
+	Closed,
+	// When animating from opened to closed.
+	Closing
+}
+
+
+This is some of the data i want in one struct to be configure in the blueprint instance of this component make sure it is all configuarable in blueprint defaults;
+add the appropriate UPROPERTY macros to make this happen.
+FAircraftOwnerSettings
+{
+	// How long it takes the aircraft socket position to animate from closed to open.
+	float OpenAircraftSocketAnimTime 
+
+	// How long it takes the aircraft socket position to animate from open to closed
+	float CloseAircraftSocketAnimTime	
+	
+	// the mesh we attach to the provided UMeshComponent of the init function, this will control the dynamic animatedable roofs.
+    USkeletalMesh* AircraftRoofMesh;
+    
+    // a class for the animation bluepint, derived from UAirBaseAnimInstance
+    UAirBaseAnimInstance* AircraftRoofAnimBPClass;
+    
+    // relative to the buildingmesh.
+    FVector AircraftRoofMeshRelativeLocation;
+}
+
+lets put the start of the public interface of the AircraftOwner as this:
+
+// Called by nomadic vehicle when expanded; will create the roof as per our component settings.
+void InitAirbase(UMeshComponent* BuilidngMesh);
+
+// Whether all aircraft are VTO or training meaning no aircraft is currently inside the base.
+bool GetCanPackup() const;
+
+// Force any aircraft that are currently inside the base to VTO; this will only be called when the nomadic vehicle is packing up.
+// and while that is happening we then lift off the aircraft.
+void ForceAllAircraftVTO();
+
+// called by the nomadic vehicle when packing up; clears the animated roof. 
+// @pre the nomadic vehicle has already called ForceAllAircraftVTO in case GetCanPackup returned false.
+void PackupAirbase();
+
+// Used when opening the UI for the training component; is the user allowed to train new aircraft?
+// this will return false when all sockets are already reserved (either by parked aircraft, flying aircraft that will return to the socket, or
+// aircraft already in the training queue.)
+// can also be used to check if the airfield is full.
+bool IsAirBaseFull() const;
+// Called as soon as the user has decided to add a new aircraft to the queue.
+// This type will be assigned to the first available socket
+// return true if we could indeed assign this aircraft type.
+bool OnAircraftTrainingStart(const EAircraftSubType AircraftType);
+// Called as soon as aircraft training was cancelled; this means we need to update the socket marking as free again for
+// the first pending socket that was assigned to this type.
+void OnAircraftTrainingCancelled(const EAircraftSubType AircraftType);
+// We set the aircraft to the position of the right socket ( the socket its type was assigned to) and 
+// we let the aircraft know its aircraft owner component and socket.
+// note that multiple aircraft of the same type could be queued; OnAircraftTrainingStart being called multiple times with the same type
+// before any training finished. in this case simply supply the first pending socket.
+bool OnAircraftTrained(AAircraftMaster* TrainedAircraft, const EAircraftSubType AircraftType)
+// called by the aircraft when it wants to lift off, we respond with calling VTOGranted on the aircraft when its bay is openend.
+OnAircraftRequestVTO(AAircraftMaster* Aircraft)
+// Called by aircraft that wants to land; we may have to wait till the animation to open is complete.
+// If this aircraft is not yet known to this component,  and we
+// do have a non-full airbase, then we register this aircraft with the component at one of the vacant sockets and 
+// also call a funtion on the aircraft called void ChangeAircraftOwner (aircraftownercomp) where, if a previous owner was set
+// WE MAKE SURE to mark the socket the aircraft used there as vacant (an aircraft can never occupy two owners or two sockets)
+// also set the component on this aircraft so that if the play atempts to land i
+OnAircraftRequestToLand(AAircraftMaster* Aircraft)
+
+
+extra context on how I want the roof animations to work with aircraft VTO landing and takeoff:
+note that the UAirBaseAnimInstance already supports the EAircraftSocketState and in particular has in public:
+	void PlayMontageForState(const EAircraftSocketState NewState, const int32 SocketIndex, const float PlayTime);
+this what we need to call with Opening in case the state of our socket is not yet on Open, we use the component settings for the playtime.
+after that is done ONLY then do we allow the aircraft to take off, in between it will have to wait.
+
+note that this does require some change in teh aircraft master TakeOffFromGround function as right now it just calls this if it is not take off yet ( right now
+i have not airbases implemented and just tested their vto by taking off from the ground directly):
+void AAircraftMaster::TakeOffFromGround()
+{
+	if (not EnsureAircraftMovementIsValid())
+	{
+		return;
+	}
+
+	M_AircraftLandedData.LandedPosition = GetActorLocation();
+	const float Apex = M_AircraftMovementSettings.TakeOffHeight;
+	const float GroundZ = M_AircraftLandedData.LandedPosition.Z;
+
+	M_AircraftLandedData.TargetAirborneHeight = GroundZ + Apex;
+	M_AircraftLandedData.LandedRotation = GetActorRotation();
+	SetVtoTimer(M_AircraftMovementSettings.VtoPrepareTime);
+	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	{
+		const FVector TargetLocation = FVector(GetActorLocation().X, GetActorLocation().Y, GroundZ + Apex);
+		// Draw sphere at location with z apex
+		DrawDebugSphere(GetWorld(), TargetLocation, 50.f, 12, FColor::Cyan,
+		                false, 20.f, 0, 1.f);
+	}
+}
+
+basically we want to first check if we have an Owner, it will still be possible to have orphan aircraft that have no owner and just take off from the ground. 
+if we have an owner then we request the vto and if not we Immediately start the VTO Logic:
+	M_AircraftLandedData.LandedPosition = GetActorLocation();
+	const float Apex = M_AircraftMovementSettings.TakeOffHeight;
+	const float GroundZ = M_AircraftLandedData.LandedPosition.Z;
+	// etc
+	but do put all that in a new function called StartVTO so we can call it here directly if we have no owner or after the owner has opened the bay for us.
+
+Now for landing; we start landing after we reached the base in the StartNavigatingToBase function,
+we then first request to land on the owner; if the socket for this aircraft is not yet open we wait till it is open and then land.
+make sure to also call OnStartLanding on the aircraft animation instance once we do start landing you do not need to know what this animation instance does exaclty but i will provide you
+with the public interface;
+
+UCLASS()
+class RTS_SURVIVAL_API UAircraftAnimInstance : public UAnimInstance
+{
+	GENERATED_BODY()
+
+public:
+	void UpdateAnim(const FRotator TargetRotator,
+		const float MovementSpeed);
+	void SetMaxMovementSpeed(const float MaxMovementSpeed);
+	void OnPrepareVto();
+	void OnWaitForLanding();
+	void OnStartLanding();
+// ...
+};
+
+Here is the rest of the code context; and what is already implemented:
+
+
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Animation/AnimInstance.h"
+#include "RTS_Survival/Units/Aircraft/AirBase/AircraftSocketState/AircraftSocketState.h"
+
+#include "UAirBaseAnimInstance.generated.h"
+
+
+// Keeps no internal state of any of the aircraft sockets; only plays specific animations depending on the state provided.
+// Expects the user to set as many animations in CurrentAnimSequencesForSockets as there are supported sockets in the airbase.
+UCLASS()
+class RTS_SURVIVAL_API UAirBaseAnimInstance : public UAnimInstance
+{
+	GENERATED_BODY()
+
+public:
+	// May later be expanded with supplying an AircraftOwner if needed.
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void InitAirbaseAnimInstance(const int32 ExpectedAmountOfSocketsSupported);
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetAnimationSequenceForState(const EAircraftSocketState NewState, const int32 SocketIndex);
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void PlayMontageForState(const EAircraftSocketState NewState, const int32 SocketIndex, const float PlayTime);
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TArray<UAnimSequence*> OpenAnimSequenceForSockets;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TArray<UAnimSequence*> ClosedAnimSequenceForSockets;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TArray<UAnimMontage*> ClosedToOpenMontagesForSockets;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TArray<UAnimMontage*> OpenToClosedMontagesForSockets;
+
+	// The sequence set for the index that identifies the socket.
+	// Set these at the start to closed animations (no aircraft)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TArray<UAnimSequence*> CurrentAnimSequencesForSockets;
+
+private:
+	bool EnsureValidIndexForSocket(const EAircraftSocketState NewState, const int32 SocketIndex) const;
+
+	void ReportErrorInvalidSocketIndex(const int32 SocketIndex, const FString& ContextText) const;
+
+	// Validates animations; reports error if any are null.
+	void ValidateData(const int32 AmountSupportedSockets);
+
+};
+
+#pragma once
+
+
+#include "CoreMinimal.h"
+
+#include "AircraftSocketState.generated.h"
+
+
+// The amount of aircraft supported by an airbase is defined by the number of aircraft sockets.
+// Each Aircraft socket can play animations on a skeletal mesh to open and or close the bay the aircraft resides in
+UENUM(BlueprintType)
+enum class EAircraftSocketState: uint8
+{
+	None,
+	Open,
+	// Playing montage from Closed to Open
+	Opening,
+	Closed,
+	// Playing montage from Open to Closed
+	Closing
+};
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AircraftCommandsData/AircraftCommandsData.h"
+#include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
+#include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
+#include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
+#include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
+
+#include "AAircraftMaster.generated.h"
+
+
+class UAircraftAnimInstance;
+class UAircraftWeapon;
+class UAircraftMovement;
+
+UCLASS()
+class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterface
+{
+	GENERATED_BODY()
+	AAircraftMaster(const FObjectInitializer& ObjectInitializer);
+
+	UFUNCTION(BlueprintCallable)
+	void TakeOffFromGround();
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void BeginDestroy() override;
+	virtual void PostInitializeComponents() override;
+
+	// --------------------------
+	// -- Start Blueprint Updates
+	// --------------------------
+	UFUNCTION(BlueprintImplementableEvent, Category="VTO")
+	void BP_OnPrepareVto();
+	UFUNCTION(BlueprintImplementableEvent, Category="VTO")
+	void BP_OnVtoStart();
+	UFUNCTION(BlueprintImplementableEvent, Category="VTO")
+	void BP_OnVtoCompleted();
+	UFUNCTION(BlueprintImplementableEvent, Category="Landing")
+	void BP_OnLandingStart();
+	UFUNCTION(BlueprintImplementableEvent, Category="Landing")
+	void BP_OnLandingCompleted();
+	// --------------------------
+	// -- END Blueprint Updates
+	// --------------------------
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void InitAircraft(
+		UDecalComponent* SelectionDecal);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FAircraftMovementData M_AircraftMovementSettings;
+
+	virtual void Tick(float DeltaSeconds) override;
+
+	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
+	virtual void TerminateMoveCommand() override;
+
+	virtual void ExecuteAttackCommand(AActor* TargetActor) override;
+	virtual void TerminateAttackCommand() override;
+
+	virtual void ExecuteReturnToBase() override;
+	virtual void TerminateReturnToBase() override;
+
+	// Setup subtype and weapons on the aircraft.
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_BeginplayInitAircraft();
+
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<UAircraftWeapon> M_AircraftWeapon;
+	
+
+	// ----------------- START EXPERIENCE INTERFACE -----------------
+	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
+	TObjectPtr<URTSExperienceComp> ExperienceComponent;
+
+	virtual URTSExperienceComp* GetExperienceComponent() const override final;
+	virtual void OnUnitLevelUp() override final;
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnUnitLevelUp();
+
+	// todo call this once weapons are implemented.
+	virtual void OnAnyActorKilledByAircraft(AActor* KilledActor);
+
+	// ----------------- END EXPERIENCE INTERFACE -----------------
+
+private:
+
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> M_AircraftMesh;
+	bool EnsureAircraftMeshIsValid() const;
+
+	UPROPERTY()
+	TObjectPtr<UAircraftAnimInstance> M_AnimInstAircraft;
+	bool EnsureAnimInstanceIsValid()const;
+
+	UPROPERTY()
+	TObjectPtr<UBombComponent> M_AircraftBombComponent;
+	bool EnsureBombComponentIsValid()const;
+	
+	// Never update directly always use Update Landed State.
+	EAircraftLandingState M_LandedState = EAircraftLandingState::None;
+	void UpdateLandedState(const EAircraftLandingState NewState);
+	EAircraftMovementState M_MovementState = EAircraftMovementState::None;
+
+	// Will be projected to the ground below the aircraft.
+	UPROPERTY()
+	TObjectPtr<UDecalComponent> M_SelectionDecal;
+
+	UPROPERTY()
+	TObjectPtr<UAircraftMovement> M_AircraftMovement;
+
+	// Keeps track of from where the aircraft took of and with what rotation.
+	// ALso caches the calculated z value above this position the aircraft needs to reach before being tagged
+	// as airborne.
+	UPROPERTY()
+	FAircraftLandedData M_AircraftLandedData;
+
+	/** Tracks the idle‐circle center & angle once we go idle */
+	UPROPERTY()
+	FAircraftIdleData M_AircraftIdleData;
+
+	/** Cached parameters for the current Move-To command */
+	UPROPERTY()
+	FAAircraftMoveData M_AircraftMoveData;
+
+	UPROPERTY()
+	FAAircraftAttackData M_AircraftAttackData;
+
+	// Queued action after lift-off
+	EPostLiftOffAction M_PendingPostLiftOffAction = EPostLiftOffAction::Idle;
+
+	// Dispatches Move/Attack/Idle once VTO is done
+	void IssuePostLifOffAction();
+
+	void Tick_ProjectDecalToLandscape(const float DeltaTime);
+
+	void Tick_VerticalTakeOff(float DeltaTime);
+	void InitIdleCircleFromCurrentPose();
+	/** @brief Called each frame when idle and we want to circle */
+	void Tick_IdleCircling(float DeltaTime);
+
+	struct FIssuedActionsState
+	{
+		bool bM_AreWeaponsActive = false;
+		bool bM_AreBombsActive = false;
+	};
+
+	FIssuedActionsState IssuedActionsState;
+
+	
+	// -------------------------------------------------------------
+	// ----------------------- VTO Start -----------------------
+	// -------------------------------------------------------------
+	void SetVtoTimer(const float TimeTillStartVto);
+	void OnVtoCompleted(const float TargetZ);
+	
+	// -------------------------------------------------------------
+	// ----------------------- VTO END-----------------------
+	// -------------------------------------------------------------
+	void PostInit_InitWeaponInitAnim();
+
+	// -------------------------------------------------------------
+	// ----------------------- Move To Start -----------------------
+	// -------------------------------------------------------------
+	/** 
+	 * @brief Start path finding to saved move to location.
+	 */
+	void StartMoveTo();
+
+	FVector OnMoveStartGetLocationAndRotation(FRotator& OutRotation, const FVector& CurrentLocation, const FRotator& CurrentRotation);
+
+	/** Called each frame while moving to a ground click */
+	void Tick_MoveTo(float DeltaTime);
+	float GetMoveToZValue() const;
+
+	float GetRatioSegmentCompleted(const FVector& StartSegment, const FVector& EndSegment,
+	                               float& OutDistanceToNext) const;
+
+	/**
+	 * @brief Prevents further overshooting by adjusting the location passed and alters the rotation of the future target point
+	 * to help the aircraft get back on track.
+	 * @param InOvershotPoint The point we overshot at which we will change the location to the current location to ensure
+	 * we calculate the distance correctly from our overshot location. 
+	 * @param InFutureTargetPoint The point to adjust the future rotation for to help navigate the aircraft back on track. 
+	 */
+	void OnPointOvershot_AdjustFutureRotation(FAircraftPathPoint& InOvershotPoint,
+	                                          FAircraftPathPoint& InFutureTargetPoint) const;
+
+	/** Cleanup & switch back to idle once Move-To completes */
+	void CleanUpMoveAndSwitchToIdle();
+	void OnMoveCompleted();
+	// -------------------------------------------------------------
+	// ----------------------- Move To END -----------------------
+	// -------------------------------------------------------------
+
+	// -------------------------------------------------------------
+	// ----------------------- Attack move Start -----------------------
+	// -------------------------------------------------------------
+	/**
+	 * @brief Start attack path finding to the target actor.
+	 */
+	void StartAttackActor();
+
+	void Tick_AttackMove(float DeltaTime);
+	void AttackMove_IssueActionForNewTargetPoint(const FAircraftPathPoint& NextPoint);
+	void StopIssuedActionForNewType(const EAirPathPointType NewType);
+	void StopBombThrowing();
+	void StartWeaponFire();
+	void FireAttachedWeapons() const;
+	void StartBombThrowing(AActor* TargetActor);
+	void StopWeaponFire();
+	static bool GetIsHomingTargetLocation(
+		const FAircraftPathPoint& NextPoint,
+		const bool bIsMovingToFinalPoint);
+	void OnAttackMoveCompleted();
+	void CleanUpAttackAndSwitchToIdle();
+
+
+	void BeginPlay_InitAircraft();
+	void BeginPlay_PropagateStateToAircraftWeapon() const;
+
+	// -------------------------------------------------------------
+	// ----------------------- Attack move END ----------------------- 
+	// -------------------------------------------------------------
+	bool EnsureAircraftMovementIsValid() const;
+	bool EnsureSelectionDecalIsValid() const;
+	bool EnsureExperienceComponentIsValid() const;
+
+	/**
+	 * @brief True if we should simply hover (no movement) when idle.
+	 */
+	bool IsIdleHover() const;
+	void OnLandscapeTraceHit(const FHitResult& TraceHit) const;
+
+	void SetToIdle();
+
+
+	bool EnsureAircraftWeaponIsValid() const;
+
+	void UpdateAircraftWeaponWithLandedState() const;
+};
+#include "AAircraftMaster.h"
+
+#include "RTS_Survival/Units/Aircraft/AircaftHelpers/FRTSAircraftHelpers.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMovement/AircraftMovement.h"
+#include "Components/DecalComponent.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/UnitData/AircraftData.h"
+#include "RTS_Survival/Units/Aircraft/AircraftAnimInstance/AircraftAnimInstance.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
+
+AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
+	: ASelectablePawnMaster(ObjectInitializer)
+{
+	M_AircraftMovement = CreateDefaultSubobject<UAircraftMovement>(TEXT("AircraftMovement"));
+	ExperienceComponent = CreateDefaultSubobject<URTSExperienceComp>(TEXT("ExperienceComponent"));
+	M_AircraftMoveData.Path.Owner = this;
+	M_AircraftAttackData.Path.Owner = this;
+	M_AircraftWeapon = CreateDefaultSubobject<UAircraftWeapon>(TEXT("AircraftWeapon"));
+}
+
+
+void AAircraftMaster::BeginPlay()
+{
+	M_AircraftMoveData.Path.Owner = this;
+	M_AircraftAttackData.Path.Owner = this;
+	Super::BeginPlay();
+	// Will set the subtype.
+	BP_BeginplayInitAircraft();
+	// After the bp has set the type.
+	BeginPlay_InitAircraft();
+	// Make sure the aircraft weapon knows if we are airborne or landed.
+	BeginPlay_PropagateStateToAircraftWeapon();
+}
+
+void AAircraftMaster::BeginDestroy()
+{
+	Super::BeginDestroy();
+	const UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(M_AircraftLandedData.Vto_PrepareHandle);
+	}
+}
+
+void AAircraftMaster::PostInitializeComponents()
+{
+	// Will setup selection component and fow component.
+	Super::PostInitializeComponents();
+	M_AircraftMesh = FindComponentByClass<USkeletalMeshComponent>();
+
+	if (M_AircraftMovementSettings.bM_StartedAsLanded)
+	{
+		UpdateLandedState(EAircraftLandingState::Landed);
+	}
+	else
+	{
+		UpdateLandedState(EAircraftLandingState::Airborne);
+		M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	}
+
+	// was: M_MovementState = EAircraftMovementState::Idle;
+	SetToIdle();
+
+	PostInit_InitWeaponInitAnim();
+	if (EnsureAnimInstanceIsValid())
+	{
+		M_AnimInstAircraft->SetMaxMovementSpeed(M_AircraftMovementSettings.MaxMoveSpeed);
+	}
+}
+
+
+void AAircraftMaster::InitAircraft(UDecalComponent* SelectionDecal)
+{
+	M_SelectionDecal = SelectionDecal;
+	if (not IsValid(SelectionDecal))
+	{
+		RTSFunctionLibrary::ReportError("SelectionDecal is not valid on " + GetName() +
+			". Ensure to provdie a valid on for AircraftMaster::InitAircraft.");
+		return;
+	}
+}
+
+void AAircraftMaster::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (not M_AnimInstAircraft || not M_AircraftMovement)
+	{
+		RTSFunctionLibrary::PrintString("Aircraft tick failed: movement or anim instance not set correctly");
+		return;
+	}
+	Tick_ProjectDecalToLandscape(DeltaTime);
+	M_AnimInstAircraft->UpdateAnim(GetActorRotation(), GetVelocity().Size());
+
+	if (M_LandedState == EAircraftLandingState::VerticalTakeOff)
+	{
+		Tick_VerticalTakeOff(DeltaTime);
+		return;
+	}
+	if (M_MovementState == EAircraftMovementState::MovingTo)
+	{
+		Tick_MoveTo(DeltaTime);
+		return;
+	}
+	if (M_MovementState == EAircraftMovementState::AttackMove)
+	{
+		Tick_AttackMove(DeltaTime);
+		return;
+	}
+	if (M_LandedState == EAircraftLandingState::Airborne)
+	{
+		if (IsIdleHover())
+		{
+			// Hovering aircraft does not move, so we do not need to tick the movement component.
+			return;
+		}
+		Tick_IdleCircling(DeltaTime);
+	}
+}
+
+void AAircraftMaster::ExecuteMoveCommand(const FVector MoveToLocation)
+{
+	Super::ExecuteMoveCommand(MoveToLocation);
+
+	const FVector FlightTarget(
+		MoveToLocation.X,
+		MoveToLocation.Y,
+		GetMoveToZValue()
+	);
+	M_AircraftMoveData.SetTargetPoint(FlightTarget);
+
+	if (M_LandedState != EAircraftLandingState::Airborne)
+	{
+		M_PendingPostLiftOffAction = EPostLiftOffAction::Move;
+		if (M_LandedState == EAircraftLandingState::Landed)
+		{
+			TakeOffFromGround();
+		}
+		return;
+	}
+	StartMoveTo();
+}
+
+
+void AAircraftMaster::TerminateMoveCommand()
+{
+	Super::TerminateMoveCommand();
+
+	// Cancel any queued move
+	M_AircraftMoveData.Reset();
+	M_PendingPostLiftOffAction = EPostLiftOffAction::Idle;
+
+	// If we were already en route, abort and go back to idle
+	if (M_MovementState == EAircraftMovementState::MovingTo)
+	{
+		CleanUpMoveAndSwitchToIdle();
+	}
+}
+
+void AAircraftMaster::ExecuteAttackCommand(AActor* TargetActor)
+{
+	Super::ExecuteAttackCommand(TargetActor);
+	M_AircraftAttackData.TargetActor = TargetActor;
+
+	if (M_LandedState != EAircraftLandingState::Airborne)
+	{
+		M_PendingPostLiftOffAction = EPostLiftOffAction::Attack;
+		if (M_LandedState == EAircraftLandingState::Landed)
+		{
+			TakeOffFromGround();
+		}
+		return;
+	}
+
+	StartAttackActor();
+}
+
+
+void AAircraftMaster::TerminateAttackCommand()
+{
+	// Cancel any queued attack 
+	M_AircraftAttackData.Reset();
+	M_PendingPostLiftOffAction = EPostLiftOffAction::Idle;
+
+	// If we were already attacking, abort and go back to idle
+	if (M_MovementState == EAircraftMovementState::AttackMove)
+	{
+		CleanUpAttackAndSwitchToIdle();
+	}
+}
+
+void AAircraftMaster::ExecuteReturnToBase()
+{
+}
+
+void AAircraftMaster::TerminateReturnToBase()
+{
+}
+
+void AAircraftMaster::TakeOffFromGround()
+{
+	if (not EnsureAircraftMovementIsValid())
+	{
+		return;
+	}
+
+	M_AircraftLandedData.LandedPosition = GetActorLocation();
+	const float Apex = M_AircraftMovementSettings.TakeOffHeight;
+	const float GroundZ = M_AircraftLandedData.LandedPosition.Z;
+
+	M_AircraftLandedData.TargetAirborneHeight = GroundZ + Apex;
+	M_AircraftLandedData.LandedRotation = GetActorRotation();
+	SetVtoTimer(M_AircraftMovementSettings.VtoPrepareTime);
+	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	{
+		const FVector TargetLocation = FVector(GetActorLocation().X, GetActorLocation().Y, GroundZ + Apex);
+		// Draw sphere at location with z apex
+		DrawDebugSphere(GetWorld(), TargetLocation, 50.f, 12, FColor::Cyan,
+		                false, 20.f, 0, 1.f);
+	}
+}
+
+URTSExperienceComp* AAircraftMaster::GetExperienceComponent() const
+{
+	return ExperienceComponent;
+}
+
+void AAircraftMaster::OnUnitLevelUp()
+{
+	BP_OnUnitLevelUp();
+}
+
+void AAircraftMaster::OnAnyActorKilledByAircraft(AActor* KilledActor)
+{
+	IExpOnKilledActor(KilledActor);
+}
+
+void AAircraftMaster::OnVtoCompleted(const float TargetZ)
+{
+	UpdateLandedState(EAircraftLandingState::Airborne);
+	BP_OnVtoCompleted();
+	SetActorLocation({GetActorLocation().X, GetActorLocation().Y, TargetZ});
+	M_AircraftMovement->OnVerticalTakeOffCompleted();
+
+	FRTSAircraftHelpers::AircraftDebug(TEXT("Vertical Takeoff Complete"), FColor::Green);
+	IssuePostLifOffAction();
+}
+
+void AAircraftMaster::PostInit_InitWeaponInitAnim()
+{
+	if (not EnsureAircraftMeshIsValid())
+	{
+		return;
+	}
+	const auto Instance = M_AircraftMesh->GetAnimInstance();
+	if (not Instance)
+	{
+		RTSFunctionLibrary::ReportError("Invalid anim instance on aircraft");
+		return;
+	}
+	UAircraftAnimInstance* AircraftAnimInst = Cast<UAircraftAnimInstance>(Instance);
+	M_AnimInstAircraft = AircraftAnimInst;
+	(void)EnsureAnimInstanceIsValid();
+	if (not EnsureAircraftWeaponIsValid())
+	{
+		return;
+	}
+	M_AircraftWeapon->InitAircraftWeaponComponent(this, M_AircraftMesh);
+	// Find bomb component
+	M_AircraftBombComponent = FindComponentByClass<UBombComponent>();
+	// Error check.
+	(void)EnsureBombComponentIsValid();
+}
+
+void AAircraftMaster::UpdateLandedState(const EAircraftLandingState NewState)
+{
+	M_LandedState = NewState;
+	UpdateAircraftWeaponWithLandedState();
+}
+
+
+void AAircraftMaster::CleanUpMoveAndSwitchToIdle()
+{
+	SetToIdle();
+	FRTSAircraftHelpers::AircraftDebug(TEXT("Move-To Complete"), FColor::Yellow);
+}
+
+void AAircraftMaster::OnMoveCompleted()
+{
+	DoneExecutingCommand(EAbilityID::IdMove);
+}
+
+void AAircraftMaster::StartMoveTo()
+{
+	M_AircraftMoveData.Path.Owner = this;
+	M_MovementState = EAircraftMovementState::MovingTo;
+	FRotator StartRotation;
+	const FVector StartLocation = OnMoveStartGetLocationAndRotation(StartRotation, GetActorLocation(),
+	                                                                GetActorRotation());
+	M_AircraftMoveData.StartPathFinding(StartLocation, StartRotation,
+	                                    M_AircraftMovementSettings.BezierCurveSettings,
+	                                    M_AircraftMovementSettings.DeadZoneSettings);
+
+	M_AircraftMovement->MaxSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
+	M_AircraftMovement->Acceleration = M_AircraftMovementSettings.Acceleration;
+	M_AircraftMovement->Deceleration = M_AircraftMovementSettings.Deceleration;
+
+	FRTSAircraftHelpers::AircraftDebug(TEXT("Beginning Move-To via Spline"), FColor::Cyan);
+}
+
+FVector AAircraftMaster::OnMoveStartGetLocationAndRotation(
+	FRotator& OutRotation,
+	const FVector& CurrentLocation,
+	const FRotator& CurrentRotation)
+{
+	if (FMath::IsNearlyZero(M_AircraftLandedData.TargetAirborneHeight))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Target Airborne Height is zero in AAircraftMaster::OnMoveStartGetLocationAndRotation. "
+			"Ensure to set the target airborne height before calling this function.");
+		M_AircraftLandedData.TargetAirborneHeight = M_AircraftMovementSettings.TakeOffHeight;
+	}
+	const float DeltaZ = M_AircraftLandedData.TargetAirborneHeight - CurrentLocation.Z;
+	FVector OutLocation;
+
+	if (FMath::Abs(DeltaZ) > 1.f)
+	{
+		// --- Height recovery path ---
+
+		// Use IdleBankAngle as the recovery pitch magnitude.
+		// Clamp to a safe range so tan() is well-behaved.
+		const float MinPitchDeg = 1.f; // avoid tan(0)
+		const float MaxPitchDeg = 85.f; // avoid near-vertical
+		const float RecoveryPitchAbs =
+			FMath::Clamp(FMath::Abs(M_AircraftMovementSettings.IdleBankAngle), MinPitchDeg, MaxPitchDeg);
+
+		// tan(theta) = |DeltaZ| / HorizontalDistance  ->  HorizontalDistance = |DeltaZ| / tan(theta)
+		const float PitchRad = FMath::DegreesToRadians(RecoveryPitchAbs);
+		const float TanPitch = FMath::Max(FMath::Tan(PitchRad), KINDA_SMALL_NUMBER);
+		const float HorizontalDistance = FMath::Abs(DeltaZ) / TanPitch;
+
+		// Decide which global axis we travel along (X or Y) based on which one the yaw is most aligned with.
+		const float YawRad = FMath::DegreesToRadians(CurrentRotation.Yaw);
+		const float CosYaw = FMath::Cos(YawRad); // alignment with +X
+		const float SinYaw = FMath::Sin(YawRad); // alignment with +Y
+
+		OutLocation = CurrentLocation;
+
+		if (FMath::Abs(CosYaw) >= FMath::Abs(SinYaw))
+		{
+			// Move purely along world X. Sign matches facing (forward/back along X).
+			const float DirX = FMath::Sign(CosYaw);
+			OutLocation.X += DirX * HorizontalDistance;
+		}
+		else
+		{
+			// Move purely along world Y. Sign matches facing (forward/back along Y).
+			const float DirY = FMath::Sign(SinYaw);
+			OutLocation.Y += DirY * HorizontalDistance;
+		}
+
+		// Snap Z to target height.
+		OutLocation.Z = M_AircraftLandedData.TargetAirborneHeight;
+
+		// Keep yaw, zero roll, apply pitch that points toward the target height.
+		// Note: In UE, negative pitch looks "up" and positive looks "down".
+		OutRotation = CurrentRotation;
+		OutRotation.Roll = 0.f;
+		OutRotation.Pitch = (DeltaZ > 0.f) ? -RecoveryPitchAbs : RecoveryPitchAbs;
+
+		return OutLocation;
+	}
+	OutLocation = CurrentLocation;
+	OutLocation.Z = M_AircraftLandedData.TargetAirborneHeight;
+	OutRotation = CurrentRotation;
+	OutRotation.Pitch = 0.f;
+	return OutLocation;
+}
+
+void AAircraftMaster::StartAttackActor()
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	if (not M_AircraftAttackData.IsTargetActorVisible(RTSComponent->GetOwningPlayer()))
+	{
+		DoneExecutingCommand(EAbilityID::IdAttack);
+		return;
+	}
+
+	FRotator StartRotation;
+	const FVector StartLocation = OnMoveStartGetLocationAndRotation(StartRotation, GetActorLocation(),
+	                                                                GetActorRotation());
+	M_MovementState = EAircraftMovementState::AttackMove;
+	M_AircraftMovement->MaxSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
+	M_AircraftMovement->Acceleration = M_AircraftMovementSettings.Acceleration;
+	M_AircraftMovement->Deceleration = M_AircraftMovementSettings.Deceleration;
+	M_AircraftAttackData.StartPathFinding(StartLocation, StartRotation,
+	                                      M_AircraftMovementSettings.BezierCurveSettings,
+	                                      M_AircraftMovementSettings.AttackMoveSettings,
+	                                      M_AircraftMovementSettings.DeadZoneSettings);
+	constexpr int32 TargetPointIndex = 1;
+	if (M_AircraftAttackData.Path.PathPoints.IsValidIndex(TargetPointIndex))
+	{
+		AttackMove_IssueActionForNewTargetPoint(M_AircraftAttackData.Path.PathPoints[TargetPointIndex]);
+	}
+}
+
+
+void AAircraftMaster::IssuePostLifOffAction()
+{
+	switch (M_PendingPostLiftOffAction)
+	{
+	case EPostLiftOffAction::Move:
+		StartMoveTo();
+		break;
+
+	case EPostLiftOffAction::Attack:
+		StartAttackActor();
+		break;
+
+	default:
+		SetToIdle();
+		break;
+	}
+	M_PendingPostLiftOffAction = EPostLiftOffAction::Idle;
+}
+
+
+void AAircraftMaster::Tick_ProjectDecalToLandscape(const float DeltaTime)
+{
+	if (not EnsureSelectionDecalIsValid() || not GetWorld())
+	{
+		return;
+	}
+	const float DeltaZ = M_AircraftMovementSettings.TakeOffHeight * 2;
+	const FVector CurrentLocation = GetActorLocation();
+	const FVector ProjectionLocation = FVector(CurrentLocation.X, CurrentLocation.Y, CurrentLocation.Z - DeltaZ);
+	// Line trace to the ECC_Landscape to find the ground below the aircraft.
+	FCollisionQueryParams TraceParams(FName(TEXT("SelectionDecalTrace")), false, nullptr);
+	TraceParams.bReturnPhysicalMaterial = false;
+
+	// Define the delegate using a lambda
+	FTraceDelegate TraceDelegate;
+	TWeakObjectPtr<AAircraftMaster> WeakThis(this);
+	auto OnAsyncTrace = [WeakThis](const FTraceHandle& TraceHandle,
+	                               FTraceDatum& TraceDatum)-> void
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		if (TraceDatum.OutHits.IsEmpty())
+		{
+			FRTSAircraftHelpers::AircraftDebug("Could not hit landscape when tracing for selection decal position!"
+				"trace datum (async trace) is empty.");
+			return;
+		}
+		WeakThis->OnLandscapeTraceHit(TraceDatum.OutHits[0]);
+	};
+	TraceDelegate.BindLambda(OnAsyncTrace);
+
+	// Perform the async trace
+	GetWorld()->AsyncLineTraceByChannel(
+		EAsyncTraceType::Single,
+		CurrentLocation,
+		ProjectionLocation,
+		COLLISION_TRACE_LANDSCAPE,
+		TraceParams,
+		FCollisionResponseParams::DefaultResponseParam,
+		&TraceDelegate
+	);
+}
+
+void AAircraftMaster::Tick_VerticalTakeOff(float DeltaTime)
+{
+	if (not EnsureAircraftMovementIsValid())
+	{
+		return;
+	}
+
+	const float CurrentZ = GetActorLocation().Z;
+	const float TargetZ = M_AircraftLandedData.TargetAirborneHeight;
+	const float Acceleration = M_AircraftMovementSettings.VerticalAcceleration;
+	const float MaxSpeed = M_AircraftMovementSettings.MaxVerticalTakeOffSpeed;
+
+	const bool bReached = M_AircraftMovement->TickVerticalTakeOff(DeltaTime, CurrentZ, TargetZ, Acceleration, MaxSpeed);
+	if (bReached)
+	{
+		OnVtoCompleted(TargetZ);
+	}
+}
+
+void AAircraftMaster::InitIdleCircleFromCurrentPose()
+{
+	// Center the circle around current location
+	M_AircraftIdleData.CenterPoint = GetActorLocation();
+
+	// Choose CW/CCW to minimize roll change from current roll
+	const FRotator Rot = GetActorRotation();
+	const float BankTargetLeft = M_AircraftMovementSettings.IdleBankAngle; // + roll
+	const float BankTargetRight = -M_AircraftMovementSettings.IdleBankAngle; // - roll
+	const float DistLeft = FMath::Abs(BankTargetLeft - Rot.Roll);
+	const float DistRight = FMath::Abs(BankTargetRight - Rot.Roll);
+	const float TurnSign = (DistLeft <= DistRight) ? 1.f : -1.f;
+
+	// Start angle so the first tangent matches current forward (zero initial bank jerk)
+	const float YawRad = FMath::DegreesToRadians(Rot.Yaw);
+	M_AircraftIdleData.CurrentAngle = TurnSign * YawRad;
+}
+
+void AAircraftMaster::Tick_IdleCircling(float DeltaTime)
+{
+	if (not EnsureAircraftMovementIsValid())
+	{
+		return;
+	}
+
+	// Circle parameters
+	const float Radius = M_AircraftMovementSettings.IdleRadius;
+	float& Angle = M_AircraftIdleData.CurrentAngle;          // sign encodes CW/CCW
+	const FVector Center = M_AircraftIdleData.CenterPoint;
+	const float MovementSpeed = M_AircraftMovementSettings.MaxMoveSpeed *
+	                            M_AircraftMovementSettings.IdleMovementSpeedMlt;
+
+	// --- Grace period scale (0..1), ramps from GraceMinSteerScale -> 1 over GraceTotalDuration
+	float SteerScale = 1.f;
+	if (M_AircraftIdleData.GraceTimeRemaining > 0.f &&
+	    M_AircraftIdleData.GraceTotalDuration > KINDA_SMALL_NUMBER)
+	{
+		const float t = 1.f - (M_AircraftIdleData.GraceTimeRemaining / M_AircraftIdleData.GraceTotalDuration);
+		SteerScale = FMath::Lerp(M_AircraftIdleData.GraceMinSteerScale, 1.f, t);
+		M_AircraftIdleData.GraceTimeRemaining = FMath::Max(0.f, M_AircraftIdleData.GraceTimeRemaining - DeltaTime);
+	}
+
+	// Angular speed and signed integration (CW if Angle<0, CCW if Angle>=0)
+	const float FullCircleTime = (2.f * PI * Radius) / FMath::Max(MovementSpeed, KINDA_SMALL_NUMBER);
+	const float AngularSpeed   = (2.f * PI) / FMath::Max(FullCircleTime, KINDA_SMALL_NUMBER);
+	const float TurnSign       = (Angle >= 0.f) ? 1.f : -1.f;
+
+	// During grace, advance the sweep more slowly
+	Angle += TurnSign * AngularSpeed * SteerScale * DeltaTime;
+
+	// Next target point on circle at our altitude
+	const FVector CurrentLoc = GetActorLocation();
+	const FVector NextPoint(
+		Center.X + Radius * FMath::Cos(Angle),
+		Center.Y + Radius * FMath::Sin(Angle),
+		CurrentLoc.Z
+	);
+	const FVector Dir = (NextPoint - CurrentLoc).GetSafeNormal();
+
+	// Build desired rotation
+	FRotator DesiredRot;
+	DesiredRot.Yaw = Dir.Rotation().Yaw;
+	DesiredRot.Pitch = 0.f;
+
+	// Gracefully ramp roll toward signed idle bank
+	const float TargetRoll = (M_AircraftMovementSettings.IdleBankAngle * TurnSign) * SteerScale;
+	const float BaseInterpSpeed = M_AircraftMovementSettings.BankInterpSpeed;
+	// Reduce rotation interpolation aggressiveness during grace (but keep a small floor)
+	const float InterpSpeed = FMath::Max(0.25f, BaseInterpSpeed * SteerScale);
+	const float NewRoll = FMath::FInterpTo(GetActorRotation().Roll, TargetRoll, DeltaTime, InterpSpeed);
+	DesiredRot.Roll = NewRoll;
+
+	// Apply movement + rotation smoothing (scale steering force during grace)
+	M_AircraftMovement->AddInputVector(Dir * SteerScale);
+	const FRotator CurrentRot = GetActorRotation();
+	const FRotator NewRotation = FMath::RInterpTo(CurrentRot, DesiredRot, DeltaTime, InterpSpeed);
+	SetActorRotation(NewRotation);
+}
+
+void AAircraftMaster::SetVtoTimer(const float TimeTillStartVto)
+{
+	if (not GetWorld())
+	{
+		return;
+	}
+	M_AircraftLandedData.Vto_PrepareHandle.Invalidate();
+	FRTSAircraftHelpers::AircraftDebug(TEXT("Initiating Vertical Takeoff"), FColor::Cyan);
+	BP_OnPrepareVto();
+
+	if (TimeTillStartVto <= 0.f)
+	{
+		// Instantly start VTO -> EAircraftLandingState::VerticalTakeOff tells tick to start.
+		UpdateLandedState(EAircraftLandingState::VerticalTakeOff);
+		BP_OnVtoStart();
+		return;
+	}
+	TWeakObjectPtr<AAircraftMaster> WeakThis(this);
+	auto OnVtoPrepComplete = [WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		// start VTO -> EAircraftLandingState::VerticalTakeOff tells tick to start.
+		WeakThis->UpdateLandedState(EAircraftLandingState::VerticalTakeOff);
+		WeakThis->BP_OnVtoStart();
+	};
+	FTimerDelegate VtoPrepDelegate;
+	VtoPrepDelegate.BindLambda(OnVtoPrepComplete);
+	GetWorld()->GetTimerManager().SetTimer(
+		M_AircraftLandedData.Vto_PrepareHandle,
+		VtoPrepDelegate,
+		TimeTillStartVto, false);
+}
+
+
+void AAircraftMaster::Tick_MoveTo(const float DeltaTime)
+{
+	auto& Path = M_AircraftMoveData.Path;
+	auto& Points = Path.PathPoints;
+	int32& CurrentPathIndex = Path.CurrentPathIndex;
+	const int32 MaxIndex = Points.Num() - 1;
+
+	// if we have no more segments left, bail
+	if (CurrentPathIndex >= MaxIndex)
+	{
+		RTSFunctionLibrary::ReportError("index out of bounds in AAircraftMaster::Tick_MoveTo. ");
+		return;
+	}
+
+	const FVector PrevLoc = Points[CurrentPathIndex].Location;
+	const FVector NextLoc = Points[CurrentPathIndex + 1].Location;
+	float DistanceToNext;
+	const float Ratio = GetRatioSegmentCompleted(PrevLoc, NextLoc, DistanceToNext);
+
+	// if we’re within acceptance radius or fully past it, advance to the next point
+	if (DistanceToNext <= M_AircraftMovementSettings.PathPointAcceptanceRadius || Ratio >= 1.f)
+	{
+		const bool bIsNotFinalSegment = (CurrentPathIndex + 1 < MaxIndex);
+		if (Ratio >= 1 && bIsNotFinalSegment)
+		{
+			OnPointOvershot_AdjustFutureRotation(Path.PathPoints[CurrentPathIndex + 1],
+			                                     Path.PathPoints[CurrentPathIndex + 2]);
+		}
+		// reset segment start rotation so next segment blends smoothly
+		CurrentPathIndex++;
+		// if that was the last index, we’re done
+		if (CurrentPathIndex >= MaxIndex)
+		{
+			OnMoveCompleted();
+			return;
+		}
+		return;
+	}
+
+	const FAircraftPathPoint NextPoint = Points[CurrentPathIndex + 1];
+	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime);
+}
+
+void AAircraftMaster::Tick_AttackMove(const float DeltaTime)
+{
+	auto& Path = M_AircraftAttackData.Path;
+	auto& Points = Path.PathPoints;
+	int32& CurrentPathIndex = Path.CurrentPathIndex;
+	const int32 MaxIndex = Points.Num() - 1;
+
+	// if we have no more segments left, bail
+	if (CurrentPathIndex >= MaxIndex)
+	{
+		RTSFunctionLibrary::ReportError("index out of bounds in AAircraftMaster::Tick_AttackMove. ");
+		return;
+	}
+
+	const FVector PrevLoc = Points[CurrentPathIndex].Location;
+	const FVector NextLoc = Points[CurrentPathIndex + 1].Location;
+	float DistanceToNext;
+	const float Ratio = GetRatioSegmentCompleted(PrevLoc, NextLoc, DistanceToNext);
+
+
+	// if we’re within acceptance radius or fully past it, advance to the next point
+	if (DistanceToNext <= M_AircraftMovementSettings.PathPointAcceptanceRadius || Ratio >= 1.f)
+	{
+		const bool bIsNotFinalSegment = (CurrentPathIndex + 1 < MaxIndex);
+		if (Ratio >= 1 && bIsNotFinalSegment)
+		{
+			OnPointOvershot_AdjustFutureRotation(Path.PathPoints[CurrentPathIndex + 1],
+			                                     Path.PathPoints[CurrentPathIndex + 2]);
+		}
+		CurrentPathIndex++;
+		// if that was the last index, we’re done
+		if (CurrentPathIndex >= MaxIndex)
+		{
+			OnAttackMoveCompleted();
+			return;
+		}
+		// We finished going from prev to next, in the next tick the next point will be the new prev and index + 1
+		// will be the new next point.
+		const int32 NewTargetPointIndex = CurrentPathIndex + 1;
+		if (NewTargetPointIndex <= MaxIndex)
+		{
+			AttackMove_IssueActionForNewTargetPoint(Points[NewTargetPointIndex]);
+		}
+		return;
+	}
+	const FAircraftPathPoint NextPoint = Points[CurrentPathIndex + 1];
+	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime);
+}
+
+void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPathPoint& NextPoint)
+{
+	EAirPathPointType NewPointType = NextPoint.PointType;
+	switch (NewPointType)
+	{
+	case EAirPathPointType::Regular:
+		break;
+	case EAirPathPointType::Bezier:
+		break;
+	case EAirPathPointType::AttackDive:
+		StartWeaponFire();
+		break;
+	case EAirPathPointType::GetOutOfDive:
+		StartBombThrowing(M_AircraftAttackData.TargetActor);
+		break;
+	}
+	StopIssuedActionForNewType(NewPointType);
+}
+
+void AAircraftMaster::StopIssuedActionForNewType(const EAirPathPointType NewType)
+{
+	const bool bIsInDive = NewType == EAirPathPointType::AttackDive;
+	const bool bIsGettingOutOfDive = NewType == EAirPathPointType::GetOutOfDive;
+	if (IssuedActionsState.bM_AreBombsActive && not bIsGettingOutOfDive)
+	{
+		StopBombThrowing();
+	}
+	if (IssuedActionsState.bM_AreWeaponsActive && not bIsInDive)
+	{
+		StopWeaponFire();
+	}
+}
+
+void AAircraftMaster::StopBombThrowing()
+{
+	if (not EnsureBombComponentIsValid())
+	{
+		return;
+	}
+	M_AircraftBombComponent->StopThrowingBombs();
+	IssuedActionsState.bM_AreBombsActive = false;
+}
+
+void AAircraftMaster::StartWeaponFire()
+{
+	FRTSAircraftHelpers::AircraftDebug("fire weapons", FColor::Purple);
+	FireAttachedWeapons();
+	IssuedActionsState.bM_AreWeaponsActive = true;
+}
+
+void AAircraftMaster::FireAttachedWeapons() const
+{
+	if (not EnsureAircraftWeaponIsValid())
+	{
+		return;
+	}
+	M_AircraftWeapon->AllWeaponsFire(M_AircraftAttackData.TargetActor);
+}
+
+void AAircraftMaster::StartBombThrowing(AActor* TargetActor)
+{
+	if (not EnsureBombComponentIsValid())
+	{
+		return;
+	}
+	M_AircraftBombComponent->StartThrowingBombs(TargetActor);
+	IssuedActionsState.bM_AreBombsActive = true;
+}
+
+void AAircraftMaster::StopWeaponFire()
+{
+	FRTSAircraftHelpers::AircraftDebug("Stop fire", FColor::Purple);
+	if (not EnsureAircraftWeaponIsValid())
+	{
+		return;
+	}
+	M_AircraftWeapon->AllWeaponsStopFire(true, true);
+	IssuedActionsState.bM_AreWeaponsActive = false;
+}
+
+
+bool AAircraftMaster::GetIsHomingTargetLocation(const FAircraftPathPoint& NextPoint,
+                                                const bool bIsMovingToFinalPoint)
+{
+	if (bIsMovingToFinalPoint)
+	{
+		return true;
+	}
+	// if( NextPoint.IsHomingPoint())
+	// {
+	// 	return true;
+	// }
+	const bool bIsAttackDive = NextPoint.PointType == EAirPathPointType::AttackDive;
+	const bool bIsOutOfDive = NextPoint.PointType == EAirPathPointType::GetOutOfDive;
+	return bIsAttackDive || bIsOutOfDive;
+}
+
+void AAircraftMaster::OnAttackMoveCompleted()
+{
+	FRTSAircraftHelpers::AircraftDebug("Attack Move path completed", FColor::Green);
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	if (not M_AircraftAttackData.IsTargetActorVisible(RTSComponent->GetOwningPlayer()))
+	{
+		FRTSAircraftHelpers::AircraftDebug("Target no longer visible or valid; done with attack command.");
+		DoneExecutingCommand(EAbilityID::IdAttack);
+		return;
+	}
+	StartAttackActor();
+}
+
+void AAircraftMaster::CleanUpAttackAndSwitchToIdle()
+{
+	SetToIdle();
+	FRTSAircraftHelpers::AircraftDebug(TEXT("Attack command Complete"), FColor::Yellow);
+}
+
+float AAircraftMaster::GetMoveToZValue() const
+{
+	switch (M_LandedState)
+	{
+	case EAircraftLandingState::None:
+		return GetActorLocation().Z + M_AircraftMovementSettings.TakeOffHeight;
+	case EAircraftLandingState::Landed:
+		// Calculate airborne height.
+		return GetActorLocation().Z + M_AircraftMovementSettings.TakeOffHeight;
+	case EAircraftLandingState::VerticalTakeOff:
+		// Use the target airborne height as that is the height from which we will start flying.
+		return M_AircraftLandedData.TargetAirborneHeight;
+	case EAircraftLandingState::Airborne:
+		// Use the target airborne height as that is the height from which we will start flying.
+		return M_AircraftLandedData.TargetAirborneHeight;
+	case EAircraftLandingState::VerticalLanding:
+		//todo when implementating landing logic; is this the best way of doing this?
+		return M_AircraftLandedData.LandedPosition.Z + M_AircraftMovementSettings.TakeOffHeight;
+	}
+	RTSFunctionLibrary::ReportError("GetMoveToZValue called with invalid M_LandedState on " + GetName() +
+		". Returning default value.");
+	return M_AircraftLandedData.LandedPosition.Z + M_AircraftMovementSettings.TakeOffHeight;
+}
+
+float AAircraftMaster::GetRatioSegmentCompleted(const FVector& StartSegment, const FVector& EndSegment,
+                                                float& OutDistanceToNext) const
+{
+	// how far along that segment are we?
+	const float SegmentLen = FVector::Dist(StartSegment, EndSegment);
+	const float Travelled = FVector::Dist(GetActorLocation(), StartSegment);
+	OutDistanceToNext = FVector::Dist(GetActorLocation(), EndSegment);
+	const float Ratio = (SegmentLen > KINDA_SMALL_NUMBER)
+		                    ? FMath::Clamp(Travelled / SegmentLen, 0.f, 1.f)
+		                    : 1.f;
+
+	// if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	// {
+	// 	const FString DebugString = "Ratio = " + FString::SanitizeFloat(Ratio) + "\n segmentlength: " +
+	// 		FString::SanitizeFloat(SegmentLen) +
+	// 		"\n travelled: " + FString::SanitizeFloat(Travelled) +
+	// 		"\n Vel : " + FString::SanitizeFloat(GetVelocity().Length());
+	// 	FRTSAircraftHelpers::AircraftDebug(DebugString);
+	// }
+	return Ratio;
+}
+
+void AAircraftMaster::OnPointOvershot_AdjustFutureRotation(
+	FAircraftPathPoint& InOvershotPoint,
+	FAircraftPathPoint& InFutureTargetPoint) const
+{
+	const FVector AircraftLocation = GetActorLocation();
+	// Set to current to calculate future distances correctly from the point moved to the overshot location.
+	InOvershotPoint.Location = AircraftLocation;
+
+	// Save the roll as it may be designed in for example a bezier point.
+	const float Roll = InFutureTargetPoint.Roll;
+	// Help the aircraft get back on track by adjusting the rotation.
+	FRotator Rot = UKismetMathLibrary::FindLookAtRotation(
+		AircraftLocation,
+		InFutureTargetPoint.Location);
+	// Set the designed roll back to the future rotation.
+	InFutureTargetPoint.Roll = Roll + Rot.Roll;
+}
+
+void AAircraftMaster::BeginPlay_InitAircraft()
+{
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	if (not GameState || not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	EAircraftSubtype AircraftSubtype = RTSComponent->GetSubtypeAsAircraftSubtype();
+	const uint8 OwningPlayer = RTSComponent->GetOwningPlayer();
+	const FAircraftData AircraftData = GameState->GetAircraftDataOfPlayer(AircraftSubtype, OwningPlayer);
+	UnitCommandData->SetAbilities(AircraftData.Abilities);
+
+	if (FowComponent)
+	{
+		FowComponent->SetVisionRadius(AircraftData.VisionRadius);
+	}
+	if (HealthComponent)
+	{
+		HealthComponent->InitHealthAndResistance(AircraftData.ResistancesAndDamageMlt, AircraftData.MaxHealth);
+	}
+	if (EnsureExperienceComponentIsValid())
+	{
+		const FTrainingOption UnitTypeAndSubtype = FTrainingOption(
+			RTSComponent->GetUnitType(),
+			static_cast<uint8>(AircraftSubtype)
+		);
+		ExperienceComponent->InitExperienceComponent(this, UnitTypeAndSubtype, OwningPlayer);
+	}
+	if (EnsureBombComponentIsValid())
+	{
+		M_AircraftBombComponent->InitBombComponent(M_AircraftMesh, RTSComponent->GetOwningPlayer());
+	}
+}
+
+void AAircraftMaster::BeginPlay_PropagateStateToAircraftWeapon() const
+{
+	UpdateAircraftWeaponWithLandedState();
+}
+
+
+bool AAircraftMaster::EnsureAircraftMovementIsValid() const
+{
+	if (not IsValid(M_AircraftMovement))
+	{
+		RTSFunctionLibrary::ReportError("AircraftMovement is not valid on " + GetName() +
+			". Ensure that the AircraftMovement component is added and initialised correctly.");
+		return false;
+	}
+	return true;
+}
+
+bool AAircraftMaster::EnsureSelectionDecalIsValid() const
+{
+	if (not IsValid(M_SelectionDecal))
+	{
+		return false;
+	}
+	return true;
+}
+
+bool AAircraftMaster::EnsureExperienceComponentIsValid() const
+{
+	if (not IsValid(ExperienceComponent))
+	{
+		RTSFunctionLibrary::ReportError("ExperienceComponent is not valid on " + GetName() +
+			". Ensure that the ExperienceComponent is added and initialised correctly.");
+		return false;
+	}
+	return true;
+}
+
+bool AAircraftMaster::IsIdleHover() const
+{
+	return M_AircraftMovementSettings.AirborneBehavior == EAircraftAirborneBehavior::Hover;
+}
+
+void AAircraftMaster::OnLandscapeTraceHit(const FHitResult& TraceHit) const
+{
+	if (not M_SelectionDecal)
+	{
+		return;
+	}
+	M_SelectionDecal->SetWorldLocation(TraceHit.Location);
+}
+
+void AAircraftMaster::SetToIdle()
+{
+	M_MovementState = EAircraftMovementState::Idle;
+	InitIdleCircleFromCurrentPose();
+	
+	// Configure soft-entry into idle circling
+	M_AircraftIdleData.GraceTotalDuration = 0.8f; // seconds
+	M_AircraftIdleData.GraceTimeRemaining = 0.8f; // start full
+	M_AircraftIdleData.GraceMinSteerScale = 0.35f; // softer steering at start
+}
+
+
+bool AAircraftMaster::EnsureAircraftMeshIsValid() const
+{
+	if (not IsValid(M_AircraftMesh))
+	{
+		RTSFunctionLibrary::ReportError("AircraftMesh is not valid on " + GetName() +
+			". Ensure that the AircraftMesh component is added and initialised correctly.");
+		return false;
+	}
+	return true;
+}
+
+bool AAircraftMaster::EnsureAnimInstanceIsValid() const
+{
+	if (not IsValid(M_AnimInstAircraft))
+	{
+		RTSFunctionLibrary::ReportError("Anim instance is not set on aircraft!"
+			"Ensure that the anim instance on the sk mesh derives"
+			"from the correct base class!");
+		return false;
+	}
+	return true;
+}
+
+bool AAircraftMaster::EnsureBombComponentIsValid() const
+{
+	if (not IsValid(M_AircraftBombComponent))
+	{
+		RTSFunctionLibrary::ReportError("no valid bomb component on aircraft: " + GetName());
+		return false;
+	}
+	return true;
+}
+
+bool AAircraftMaster::EnsureAircraftWeaponIsValid() const
+{
+	if (not IsValid(M_AircraftWeapon))
+	{
+		RTSFunctionLibrary::ReportError("AircraftWeapon is not valid on " + GetName() +
+			". Ensure that the AircraftWeapon component is added and initialised correctly.");
+		return false;
+	}
+	return true;
+}
+
+
+void AAircraftMaster::UpdateAircraftWeaponWithLandedState() const
+{
+	if (not EnsureAircraftWeaponIsValid())
+	{
+		return;
+	}
+	M_AircraftWeapon->UpdateLandedState(M_LandedState);
+}
+// Copyright Bas Blokzijl - All rights reserved.
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AINomadicVehicle.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
+#include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
+#include "RTS_Survival/Buildings/BuildingAttachments/BuildingAttachments.h"
+#include "RTS_Survival/Game/GameState/GameResourceManager/GetTargetResourceThread/FGetAsyncResource.h"
+#include "RTS_Survival/GameUI/TrainingUI/Interface/Trainer.h"
+#include "RTS_Survival/RTSComponents/SelectionDecalSettings/SelectionDecalSettings.h"
+// For the resource storage visualisation TMaps.
+#include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageLevel.h"
+#include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
+
+#include "NomadicVehicle.generated.h"
+
+class UResourceDropOff;
+class UBoxComponent;
+class UBuildRadiusComp;
+class UEnergyComp;
+class RTS_SURVIVAL_API UBuildingExpansionOwnerComp;
+// Forward declarations.
+class RTS_SURVIVAL_API UTimeProgressBarWidget;
+
+DECLARE_MULTICAST_DELEGATE(FOnNomadConvertToBuilding);
+DECLARE_MULTICAST_DELEGATE(FOnNomadConvertToVehicle);
+
+
+UENUM()
+enum class ENomadStatus
+{
+	Truck,
+	Building,
+	// Rotating to align with the building location.
+	CreatingBuildingRotating,
+	// Animating the truck expanding.
+	CreatingBuildingTruckAnim,
+	// Animating the building mesh construction.
+	CreatingBuildingMeshAnim,
+	CreatingTruck
+};
+
+
+/**
+ * @brief A vehicle that can deploy into a building and pack it up back into a vehicle.
+ * @note Set "Allow CPUAccess" in the static mesh editor for the building mesh to allow for smoke effects.
+ * @note ---------------------------------------------------------------
+ * @note Follow the conversion path:
+ * @note 1) StartBuildingConstruction BP: OnMoveTruckToBuildingLocationBP
+ * @note The truck is now moved to the building location and the chasis teleported
+ * @note 2) OnFinishedStandaloneRotation
+ * @note The truck is now aligned with the building location.
+ * @note 3) BP: BeginBuildingTruckAnimationMontage
+ * @note This starts the montage animation in the blueprint.
+ * @note 4) OnTruckMontageFinished BP: BPOnStartMeshAnimation
+ * @note Now starts the material animation using timers.
+ * @note 5) FinishedConvertingToBuilding.
+ * Creates building attachments and opens command queue again.
+ * @note ---------------------------------------------------------------
+ * @note Keeps the EAbilityID::IdCreateBuilding in the queue during the whole process.
+ * @note Sets truck to StopCommandsUntilCancel after rotating in place for the corrrect building angle.
+ * @note the building process is always cancelled with the terminate command that
+ * @note is associated with the EAbilityID::IdCreateBuilding.
+ * @note ---------------------------------------------------------------
+ * @note for building acceptance radius see AAINomadicVehicle::ConstructionAcceptanceRad.
+ * @note ---------------------------------------------------------------
+ * @note For training make sure that the bp overwrites the gettraining component function.
+ * @note ---------------------------------------------------------------
+ * @note Energy, ResourceDropOff, and Radii Components are automatically set on PostInitializeComponents.
+ * @note ---------------------------------------------------------------
+ * @note ---- On Resource Storage ----
+ * @note The resource visualisation is Restored once the vehicle finished converting into a building.
+ * @note The resource visualisation is Destroyed once the vehicle finished converting into a truck.
+ */
+UCLASS()
+class RTS_SURVIVAL_API ANomadicVehicle : public ATrackedTankMaster, public IBuildingExpansionOwner,
+		public ITrainer
+{
+	GENERATED_BODY()
+
+public:
+	ANomadicVehicle(const FObjectInitializer& ObjectInitializer);
+
+	// Delegate called when converting to building.
+	FOnNomadConvertToBuilding OnNomadConvertToBuilding;
+	// Delegate called when converting to vehicle.
+	FOnNomadConvertToVehicle OnNomadConvertToVehicle;
+	
+	/**
+	 * @brief Starts the building construction process.
+	 * 
+	 * This function initiates the process of constructing a building by rotating the vehicle to the 
+	 * correct orientation and preparing it for the building phase.
+	 * 
+	 * @note This function is the first step in the building construction sequence.
+	 */
+	void StartBuildingConstruction();
+
+	virtual float GetBxpExpansionRange() const override;
+	virtual FVector GetBxpOwnerLocation() const override;
+
+	/** @return Whether this truck is movable and not a stationary base. */
+	inline bool GetIsInTruckMode() const { return M_NomadStatus == ENomadStatus::Truck; }
+
+	inline ENomadStatus GetNomadicStatus() const { return M_NomadStatus; }
+	inline UBuildRadiusComp* GetBuildRadiusComp() const { return M_RadiusComp.Get(); }
+
+	/** @return The preview mesh of the building that this unit constructs. */
+	inline UStaticMesh* GetPreviewMesh() const { return M_PreviewMesh; }
+
+	void SetStaticPreviewMesh(AStaticPreviewMesh* NewStaticPreviewMesh);
+
+	float GetTotalConstructionTime() const { return M_ConstructionMontageTime + M_MeshAnimationTime; }
+
+	float GetTotalConvertToVehicleTime() const { return M_ConvertToVehicleTime; }
+
+	/**
+	 * @brief overwrite from IBuildingExpansionOwner.
+	 * @return Whether the building is in a state in which expanding is possible.
+	 */
+	virtual bool IsBuildingAbleToExpand() const override final;
+
+	/** @return the Trainer component of this nomadic vehicle.
+	 * Allowed to return null to indicate that this vehicle cannot train.
+	 */
+	virtual UTrainerComponent* GetTrainerComponent() override;
+
+	UResourceDropOff* GetResourceDropOff() const { return M_ResourceDropOff; }
+
+	void SetAINomadicVehicle(AAINomadicVehicle* NewAINomadicVehicle);
+
+	// from IBuidling Expansion owner.
+	virtual UStaticMeshComponent* GetAttachToMeshComponent() const override final;
+	virtual TArray<UStaticMeshSocket*> GetFreeSocketList(const int32 ExpansionSlotToIgnore) const override final;
+
+	virtual float GetUnitRepairRadius() override;
+
+
+
+protected:
+	/**
+	 * @brief Initializes the NomadicVehicle.
+	 * @param NewPreviewMesh The mesh used to choose the building location.
+	 * @param NewBuildingMesh The actual high poly mesh of the building.
+	 * @param NewConstructionAnimationMaterial The material used to animate the building construction.
+	 * @param SmokeSystems The smoke systems to spawn when the building is being constructed.
+	 * @param NewConstructionFrames The amount of frames in the construction animation.
+	 * @param NewConstructionMontageTime The amount of time spend on montage.
+	 * @param NewMeshAnimationTime The amount of time spend on mesh animation.
+	 * @param NewConvertToVehicleTime How long it takes to convert from a building back to a vehicle.
+	 * @param NewAmountSmokesCovertToVehicle How many smokes to spawn when converting to a vehicle.
+	 * @param NewAttachmentsToSpawn The attachments to spawn once the building is constructed.
+	 * @param NewNiagaraAttachmentsToSpawn The niagara attachments to spawn once the building is constructed.
+	 * @param NewSoundAttachmentsToSpawn The sound attachments to spawn once the building is constructed.
+	 * @param NewConversionSmokeRadius In how big of a circle surrounding the vehicle we create smokes when starting conversion.
+	 * @param NewConversionProgressBar The progress bar to display the conversion progress which is a derived blueprint
+	 * of which the cpp class is UTimeProgressBarWidget.
+	 * @param NewTruckUIOffset The offset to apply to the truck UI elements when converting to a vehicle.
+	 * @param NewSelectionDecalSettings To define decal size, offset and materials when switching between truck and building.
+	 * @param NewExpansionBuildRadius
+	 * @param NewBuildingMeshComponent
+	 * @param NewBuildingNavModifiers
+	 * @note Truck selection materials are set on the selection component.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ReferenceCasts")
+	void InitNomadicVehicle(UStaticMesh* NewPreviewMesh, UStaticMesh* NewBuildingMesh,
+	                        UMaterialInstance* NewConstructionAnimationMaterial,
+	                        TArray<UNiagaraSystem*> SmokeSystems,
+	                        const float NewConstructionFrames,
+	                        const float NewConstructionMontageTime,
+	                        const float NewMeshAnimationTime,
+	                        const float NewConvertToVehicleTime,
+	                        const int NewAmountSmokesCovertToVehicle,
+	                        TArray<FBuildingAttachment> NewAttachmentsToSpawn,
+	                        TArray<FBuildingNiagaraAttachment> NewNiagaraAttachmentsToSpawn,
+	                        TArray<FBuildingSoundAttachment> NewSoundAttachmentsToSpawn,
+	                        TArray<FBuildingNavModifierAttachment> NewBuildingNavModifiers,
+	                        const float NewConversionSmokeRadius,
+	                        UTimeProgressBarWidget* NewConversionProgressBar,
+	                        const FVector NewTruckUIOffset,
+	                        const FSelectionDecalSettings NewSelectionDecalSettings,
+	                        const float NewExpansionBuildRadius,
+	                        TArray<USoundCue*> NewConstructionSounds, UStaticMeshComponent* NewBuildingMeshComponent);
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bStartAsConvertedToBuilding = false;
+
+
+	virtual void BeginPlay() override;
+	virtual void BeginDestroy() override;
+	virtual void PostInitializeComponents() override;
+
+	UFUNCTION(BlueprintCallable,NotBlueprintable)
+	void SetupMountCollision(UMeshComponent* MountMesh);
+
+	// From IBuildingExpansionOwner.
+	virtual UBuildingExpansionOwnerComp& GetBuildingExpansionData() const override final;
+
+	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
+	virtual void OnUnitIdleAndNoNewCommands() override final;
+	virtual void TerminateMoveCommand() override;
+
+	UPROPERTY(BlueprintReadWrite)
+	float TruckMaxHealth;
+
+	UPROPERTY(BlueprintReadWrite)
+	float BuildingMaxHealth;
+
+
+	// Static Mesh for the building representation
+	UPROPERTY()
+	UStaticMeshComponent* BuildingMeshComponent;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	UStaticMeshComponent* GetBuildingMeshComponent() const { return BuildingMeshComponent; }
+
+	/**
+	 * @brief Creates a building with the provided rotation at the provided location.
+	 * @param BuildingLocation The location to place the building.
+	 * @param BuildingRotation The Rotation to place the building with.
+	 */
+	virtual void ExecuteCreateBuildingCommand(
+		const FVector BuildingLocation,
+		const FRotator BuildingRotation) override final;
+
+
+	/** @brief Stops the building creation command and associated logic. */
+	virtual void TerminateCreateBuildingCommand() override final;
+
+	virtual void ExecuteConvertToVehicleCommand() override final;
+
+	virtual void TerminateConvertToVehicleCommand() override final;
+
+	/**
+	 * @brief Executes the create building command in the blueprint by activating BT.
+	 * @param BuildingLocation The location to place the building.
+	 * @param BuildingRotation The Rotation to place the building with.
+	 */
+	UFUNCTION(BlueprintImplementableEvent)
+	void CreateBuildingAtLocationBP(
+		const FVector BuildingLocation,
+		const FRotator BuildingRotation);
+
+	/**
+	 * @brief Called when the truck has completed moving to the building location and is now getting ready to rotate towards the
+	 * direction of the building. (before montage is played)
+	 * @param BuildingLocation The location where the building will be placed.
+	 */
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnMoveTruckToBuildingLocationBP(const FVector BuildingLocation);
+
+	/** @brief Signals the start of building construction in the blueprint. */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "BuildingInConstruction")
+	void BeginBuildingTruckAnimationMontage();
+
+	// Stops the montage of the truck expanding.
+	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent, Category = "BuildingInConstruction")
+	void BPStopTruckAnimationMontage();
+
+	/**
+	 * @brief Called when the truck montage animation is finished.
+	 * 
+	 * This function is triggered after the truck's building animation montage is complete. It hides the 
+	 * truck mesh, shows the building mesh, and starts the building material animation.
+	 * 
+	 * @note This function is the third step in the building construction sequence.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "BuildingInConstruction")
+	void OnTruckMontageFinished();
+
+	// Called When the truck starts the material animation
+	UFUNCTION(BlueprintImplementableEvent, Category = "BuildingInConstruction")
+	void BPOnStartMeshAnimation();
+
+	/**
+	 * @brief Handles actions after standalone rotation is completed.
+	 * 
+	 * This function is called when the vehicle has finished rotating to the correct orientation for building. 
+	 * It then starts the animation and progress bar for building construction.
+	 * 
+	 * @note This function is the second step in the building construction sequence.
+	 */
+	virtual void OnFinishedStandaloneRotation() override final;
+
+	/**
+	 * @brief Handles logic when the mesh animation was stopped due to cancel building.
+	 * Sets truck attachments to visible if needed.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Truck")
+	void OnMeshAnimationCancelled();
+
+	// The play rate on the montage.
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "BuildingInConstruction")
+	float GetConstructionTimeInPlayRate() const;
+
+	// For any bp specific logic like attached crystals.
+	UFUNCTION(BlueprintImplementableEvent, Category = "ConvertToBuilding")
+	void BP_OnFinishedConvertingToBuilding();
+
+	// For any bp specific logic like attached crystals.
+	UFUNCTION(BlueprintImplementableEvent, Category = "ConvertToBuilding")
+	void BP_OnStartedConvertingToVehicle();
+
+	// For any bp specific logic like attached crystals.
+	UFUNCTION(BlueprintImplementableEvent, Category = "ConvertToBuilding")
+	void BP_OnCancelledConvertingToVehicle();
+
+	UFUNCTION(BlueprintImplementableEvent, Category="ConvertToTruck")
+	void BP_OnFinishedConvertingToVehicle();
+
+	UPROPERTY(BlueprintReadOnly)
+	UBuildingExpansionOwnerComp* BuildingExpansionComponent;
+
+	virtual void SetupChassisMeshCollision() override;
+
+	// ------------------------------ Trainer functions ------------------------------
+	/**
+	 * @brief Called when training of an option is started.
+	 * @param StartedOption What is being trained.
+	 */
+	virtual void OnTrainingStarted(const FTrainingOption& StartedOption) override;
+
+	// Bp event for on instance basis as it is possible for a nomadic vehicle to not have this component.
+	UFUNCTION(BlueprintNativeEvent, Category = "Trainer")
+	UTrainerComponent* BP_GetTrainerComponent() const;
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Trainer")
+	void BpOnTrainingStarted(const FTrainingOption& StartedOption);
+
+	/**
+	 * @brief Called when training of an option is completed.
+	 * @param CompletedOption What is completed.
+	 * @param SpawnedUnit The unit that was spawned.
+	 */
+	virtual void OnTrainingComplete(
+		const FTrainingOption& CompletedOption,
+		AActor* SpawnedUnit) override;
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Trainer")
+	void BPOnTrainingComplete(const FTrainingOption& CompletedOption);
+
+
+	/**
+	 * @brief Called when the training of an option is cancelled.
+	 * @param CancelledOption The option that was cancelled.
+	 */
+	virtual void OnTrainingCancelled(const FTrainingOption& CancelledOption) override;
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Trainer")
+	void BPOnTrainingCancelled(const FTrainingOption& CancelledOption);
+
+	// ------------------------------ End Trainer functions ------------------------------
+
+	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
+	AAINomadicVehicle* AINomadicVehicle;
+
+	UFUNCTION(BlueprintImplementableEvent, Category="OnSpawn")
+	void BPOnRTSUnitSpawned(const bool bSetDisabled);
+
+
+	// ------------------------------ Harvesting and Resources ------------------------------
+
+	virtual void
+	OnResourceStorageChanged(int32 PercentageResourcesFilled, const ERTSResourceType ResourceType) override;
+
+
+	/**
+	 * @brief Setup to enable resource storage visualization on this nomadic vehicle
+	 * @param HighToLowLevelsPerResource Mapping from resource to levels of storage for that resource.
+	 * @param ResourceToSocketMap Mapping from resource to the socket at wich the resource's storage needs to be placed.
+	 *
+	 * @note For each resource type supported HighToLowLevelsPerResource contains the array of levels from high to low
+	 * for that resource, Where each level is an integer determining the percentage of resources
+	 * filled at which the mesh is placed.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void InitResourceStorageLevels(
+		TMap<ERTSResourceType, FResourceStorageLevels> HighToLowLevelsPerResource,
+		TMap<ERTSResourceType, FName> ResourceToSocketMap);
+
+private:
+	/** For each resource type supported this map contains the array of levels from high to low for that resource,
+	*  Where each level is an integer determining the percentage of resources filled at which the mesh is placed.
+	* @note The resource visualisation is Restored once the vehicle finished converting into a building.
+	* @note The resource visualisation is Destroyed once the vehicle finished converting into a truck.
+	*/
+	TMap<ERTSResourceType, FResourceStorageLevels> M_HighToLowLevelsPerResource;
+
+	// Maps the resource type provided to the mesh component to place the storage level for that resource.
+	TMap<ERTSResourceType, TWeakObjectPtr<UStaticMeshComponent>> M_ResourceLevelComponents;
+
+	// Provides the socket name for the resource on the Building Mesh.
+	TMap<ERTSResourceType, FName> M_ResourceToSocketMap;
+
+	/**
+	 * @brief Updates the resource visuals for the provided resource type, May create a new mesh component to hold the resource visual.
+	 * @param ResourceType The type of resource to update the visuals for.
+	 * @param PercentageResourcesFilled The percentage of resources filled.
+	 */
+	void UpdateResourceVisualsForType(const ERTSResourceType ResourceType, const int32 PercentageResourcesFilled);
+	/**
+	 * @brief Sets the mesh on the resource storage visualization component.
+	 * @param Mesh The mesh to use.
+	 * @param ResourceType What type of resource to set the mesh for.
+	 */
+	void SetResourceMeshVisual(UStaticMesh* Mesh, const ERTSResourceType ResourceType);
+
+	/**
+	 * @brief Called by SetResourceMeshVisual if the component is not valid; creates a component on the BuildingMesh
+	 * for the provided type.
+	 * @param ResourceType The type to create the component for.
+	 */
+	void CreateResourceStorageMeshComponent(const ERTSResourceType ResourceType);
+	/**
+	 * @brief Destroys all resource storage mesh components.
+	 * @pre The resource storage visuals need to be destroyed.
+	 */
+	void DestroyAllResourceStorageMeshComponents();
+
+	/**
+	 * @brief Updates each resource storage visualisation component with the mesh accruing to the percentage filled.
+	 * @pre The resource visualisation was destroyed and needs to be restored.
+	 * @note Does not create a mesh component for a resource of which the percentage filled is 0.
+	 */
+	void RestoreResourceStorageVisualisation();
+
+
+	// The mesh used as building preview.
+	UPROPERTY()
+	UStaticMesh* M_PreviewMesh;
+
+	// The complete (high poly) mesh of the building.
+	UPROPERTY()
+	UStaticMesh* M_BuildingMesh;
+
+	// Whether the vehicle is a stationary base or movable.
+	UPROPERTY()
+	ENomadStatus M_NomadStatus;
+
+	// A reference to the static preview that is placed when the building location is determined.
+	UPROPERTY()
+	AStaticPreviewMesh* M_StaticPreviewMesh;
+
+	// The transform of the preview mesh used to place the building.
+	UPROPERTY()
+	FTransform M_BuildingTransform;
+
+	// The material used to animate the building construction.
+	UPROPERTY()
+	UMaterialInstance* M_ConstructionAnimationMaterial;
+
+	// Amount of time spend on montage.
+	UPROPERTY()
+	float M_ConstructionMontageTime;
+
+	// Amount of time spend on mesh animation.
+	UPROPERTY()
+	float M_MeshAnimationTime;
+
+	// How many frames are in the montage.
+	UPROPERTY()
+	float M_ConstructionFrames;
+
+	// How long it takes to convert from a building back to a vehicle.
+	UPROPERTY()
+	float M_ConvertToVehicleTime;
+
+	/**
+	 * @brief Disables the building component and enables the vehicle mesh.
+	 */
+	void OnFinishedConvertingToVehicle();
+
+	UPROPERTY()
+	FTimerHandle ConvertToVehicleTimerHandle;
+
+	/**
+	 * @brief Finishes the conversion to building process.
+	 * 
+	 * This function is called when the building construction is fully completed. It stops the progress bar, 
+	 * enables the command queue, and creates building attachments.
+	 * 
+	 * @note This function is the fourth and final step in the building construction sequence.
+	 */
+	void OnFinishedConvertingToBuilding();
+
+	// Cache for original materials of the building mesh
+	// Always empty by calling ResetCachedMaterials as the index also needs to be reset!
+	UPROPERTY()
+	TArray<UMaterialInterface*> M_CachedOriginalMaterials;
+
+	// Timer handle for reapplying materials
+	FTimerHandle MaterialReapplyTimerHandle;
+
+	// To save original materials of the building mesh.
+	void CacheOriginalMaterials();
+
+	/**
+	 * Applies construction material to all non truck material slots.
+	 * @return The amount of materials that occur in both the truck and the building and are excluded.
+	 * from the construction material animation.
+	 * @param bOnlyCalculateExcludedMaterials Whether to only calculate the excluded materials and do not
+	 * change any materials on the building mesh.
+	 */
+	uint32 ApplyConstructionMaterial(const bool bOnlyCalculateExcludedMaterials) const;
+
+	// Called by timer to reapply original materials one by one.
+	void ReapplyOriginalMaterial();
+
+	// To stop reapplying materials and finish building.
+	void FinishReapplyingMaterials();
+
+	/**
+	 * Calculates the mean location of the material at the provided index.
+	 * @param MaterialIndex The index of the material to calculate the mean location for.
+	 * @param VertexPositions The vertex positions of the building mesh for this material.
+	 * @param TransformOfBuildingMesh The transform of the building mesh.
+	 * @return The mean location of the material.
+	 */
+	FVector CalculateMeanMaterialLocation(const int32 MaterialIndex,
+	                                      const TArray<FVector3f>& VertexPositions,
+	                                      const FTransform& TransformOfBuildingMesh) const;
+
+	/**
+	 * Computes the size (extent) of each mesh part associated with a material index.
+	 * It's used to determine the relative scale for the smoke effects.
+	 * @param VertexPositions 
+	 * @return The size of the mesh part.
+	 */
+	FVector CalculateMeshPartSize(const TArray<FVector3f>& VertexPositions) const;
+
+	// The current material index to reapply a material to.
+	UPROPERTY()
+	int32 M_MaterialIndex;
+
+	UPROPERTY()
+	TArray<FTransform> M_CreateSmokeTransforms;
+
+	/**
+	 * @brief Creates an array of smoke locations for all materials, uses async to find material means.
+	 * @note Requires the final mesh of the BuildingMeshComponent to be set to "Allow CPUAccess" in the static mesh editor.
+	 */
+	void InitSmokeLocations();
+
+	// Calculates random locations in the box of the building mesh to spawn smoke at.
+	void SetSmokeLocationsToRandomInBox();
+
+	UPROPERTY()
+	// The smoke system(s) to spawn when the building is being constructed.
+	TArray<UNiagaraSystem*> M_SmokeSystems;
+
+	// Spawns a smoke system at the provided location.
+	void CreateRandomSmokeSystemAtTransform(const FTransform& Transform) const;
+
+	void CancelBuildingMeshAnimation();
+
+	// Attaches all the attachments to the building mesh.
+	void CreateBuildingAttachments();
+
+	/**
+	 * @brief Goes through the array of BuildingAttachments and spawns them.
+	 * @pre assumes BuildingMeshComponent is valid.
+	 */
+	void CreateChildActorAttachments();
+
+	/**
+	 * @brief Goes through the array of Niagara attachments and spawns them.
+	 * @pre Assumes BuildingMeshComponent is valid.
+	 */
+	void CreateNiagaraAttachments();
+
+	/**
+	 * @brief Goes through the array of sound attachments and spawns them.
+	 * @pre Assumes BuildingMeshComponent is valid.
+	 */
+	void CreateSoundAttachments();
+
+	// Destroys all building attachments.
+	void DestroyAllBuildingAttachments();
+
+	// The spawned attachments to destroy when the building is destroyed.
+	UPROPERTY()
+	TArray<AActor*> M_SpawnedAttachments;
+
+	// Array collection of attachments to spawn once the building is constructed.
+	UPROPERTY()
+	TArray<FBuildingAttachment> M_AttachmentsToSpawn;
+
+	// Array collection of niagara attachments to spawn once the building is constructed.
+	UPROPERTY()
+	TArray<FBuildingNiagaraAttachment> M_NiagaraAttachmentsToSpawn;
+
+	// Array collection of sound attachments to spawn once the building is constructed.
+	UPROPERTY()
+	TArray<FBuildingSoundAttachment> M_SoundAttachmentsToSpawn;
+
+	UPROPERTY()
+	TArray<FBuildingNavModifierAttachment> M_NavModifierAttachmentsToSpawn;
+
+	// Keeps track of the currently attached nav modifiers.
+	UPROPERTY()
+	TArray<UBoxComponent*> M_AttachedNavModifiers;
+
+	/** Creates nav modifier attachments */
+	void CreateNavModifierAttachments();
+
+	/** Destroys nav modifier attachments */
+	void DestroyNavModifierAttachments();
+
+	// Keeps track of the currently attached niagara particle systems.
+	UPROPERTY()
+	TArray<UNiagaraComponent*> M_SpawnedNiagaraSystems;
+
+	// Keeps track of the currently attached sound cues.
+	UPROPERTY()
+	TArray<UAudioComponent*> M_SpawnedSoundCues;
+
+	// Also resets the class-global material index.
+	void ResetCachedMaterials();
+
+	// Creates the smoke for the vehicle conversion.
+	void CreateSmokeForVehicleConversion() const;
+
+	UPROPERTY()
+	int M_AmountSmokesCovertToVehicle;
+
+	// Instantly sets all the building materials on the building mesh to the material array saved
+	// in the cache.
+	void SetAllBuildingMaterialsToCache();
+
+	// In how big of a circle surrounding the vehicle we create smokes when starting conversion.
+	UPROPERTY()
+	float M_ConversionSmokeRadius;
+
+	UPROPERTY()
+	UTimeProgressBarWidget* M_ConversionProgressBar;
+
+	/**
+	 * @brief Starts the mesh material animation.
+	 * @param Interval The interval in seconds between updating each material slot.
+	 */
+	void SetAnimationTimer(const float Interval);
+
+	/**
+	 * @brief Applies local offset to the truck UI elements depending on the conversion.
+	 * @param bMoveToBuildingPosition If true move the UI elements to the truck position,
+	 * otherwise move them to the building position.
+	 */
+	void MoveTruckUIWithLocalOffsets(const bool bMoveToBuildingPosition);
+
+	void OnConvertToBuilding_PlacePackedBxps();
+
+	// The offset the user wants from the base of the building mesh.
+	FVector M_DesiredTruckUIOffset;
+
+	// Stores the locations of the truck UI elements.
+	TPair<FVector, FVector> M_TruckUIElementLocations;
+
+	UPROPERTY()
+	FSelectionDecalSettings M_SelectionDecalSettings;
+
+	FName M_TrainingSpawnSocketName;
+
+	// May not be set if the vehicle does not provide a build radius.
+	UPROPERTY()
+	TObjectPtr<UBuildRadiusComp> M_RadiusComp;
+
+	// May not be set if the vehicle does not consume nor provide energy in building mode. 
+	UPROPERTY()
+	TObjectPtr<UEnergyComp> M_EnergyComp;
+
+	// The drop off component that can be added to grandchild derived blueprints, is automatically set on
+	// PostInitializeComponents.
+	UPROPERTY()
+	UResourceDropOff* M_ResourceDropOff;
+
+
+	void AdjustSelectionDecalToConversion(const bool bSetToBuildingPosition) const;
+
+	/**
+	 * @brief Handles physics, visibility, collision and overlaps for the chaos vehicle.
+	 * @param bDisable Whether to disable or enable the chaos vehicle mesh.
+	 */
+	void SetDisableChaosVehicleMesh(const bool bDisable);
+
+	/**
+	 * @brief Sets the training to enabled if this nomadic vehicle has a training component.
+	 * @param bSetEnabled Whether to enable training.
+	 * @post If we have a training component the training UI is hidden when we are primary selected.
+	 * @post The flag is set on the training component and the queue paused if disabled.
+	 */
+	void SetTrainingEnabled(const bool bSetEnabled);
+
+	void AdjustMaxHealthForConversion(const bool bSetToTruckMaxHealth) const;
+
+	UPROPERTY()
+	float M_ExpansionBuildRadius;
+
+	UPROPERTY()
+	TArray<USoundCue*> M_ConstructionSounds;
+
+	int32 M_LastPlayedSoundIndex;
+
+	void PlayRandomConstructionSound();
+
+	// Activate or Deactivates the resource drop off component if this vehicle has one.
+	void SetResourceDropOffActive(const bool bIsActive);
+	// Activate or Deactivate the energy component if this vehicle has one.
+	void SetEnergyComponentActive(const bool bIsActive);
+	// Activate or Deactive the radius component if this vehicle has one.
+	void SetRadiusComponentActive(const bool bIsActive);
+
+	void StartAsConvertedBuilding();
+};
+// Copyright Bas Blokzijl - All rights reserved.
+#include "NomadicVehicle.h"
+
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/BuildRadiusComp/BuildRadiusComp.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpOwnerComp/BuildingExpansionOwnerComp.h"
+#include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/Player/CPPController.h"
+
+#include "Components/AudioComponent.h"
+#include "ExpansionRadius/ExpansionRadiusComp.h"
+#include "RTS_Survival/Buildings/EnergyComponent/EnergyComp.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
+#include "RTS_Survival/Player/PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
+#include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
+#include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageLevel.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/SelectionComponent.h"
+#include "Sound/SoundCue.h"
+#include "RTS_Survival/RTSComponents/TimeProgressBarWidget.h"
+#include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
+#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+
+ANomadicVehicle::ANomadicVehicle(const FObjectInitializer& ObjectInitializer)
+	: ATrackedTankMaster(ObjectInitializer),
+	  M_PreviewMesh(NULL),
+	  M_BuildingMesh(NULL),
+	  M_NomadStatus(ENomadStatus::Truck),
+	  M_StaticPreviewMesh(NULL),
+	  M_BuildingTransform(FTransform::Identity),
+	  M_ConstructionAnimationMaterial(NULL),
+	  M_ConstructionMontageTime(20.f),
+	  M_MeshAnimationTime(20.f),
+	  M_ConstructionFrames(30.f),
+	  M_ConvertToVehicleTime(20.f),
+	  M_MaterialIndex(0),
+	  M_AmountSmokesCovertToVehicle(0),
+	  M_ConversionSmokeRadius(100.f),
+	  M_DesiredTruckUIOffset(FVector::ZeroVector)
+{
+	M_NomadStatus = ENomadStatus::Truck;
+	BuildingExpansionComponent = CreateDefaultSubobject<
+		UBuildingExpansionOwnerComp>(TEXT("BuildingExpansionComponent"));
+	if (!IsValid(BuildingExpansionComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "BuildingExpansionComponent", "ANomadicVehicle");
+	}
+}
+
+static void DebugSocketsPreCheck(TArray<UStaticMeshSocket*> FoundSockets, TArray<FName> OccupiedSocketNames)
+{
+	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	{
+		FString Message = "Before filtering occupied sockets we have:";
+		for (auto eachFound : FoundSockets)
+		{
+			if (not eachFound)
+			{
+				continue;
+			}
+			Message += "\n Found Socket Name: " + eachFound->SocketName.ToString();
+		}
+		Message += "\n\nOccupied Socket Names:";
+		for (auto eachOccupied : OccupiedSocketNames)
+		{
+			Message += "\n Occupied Socket Name: " + eachOccupied.ToString();
+		}
+		RTSFunctionLibrary::DisplayNotification(FText::FromString(Message));
+	}
+}
+
+static void DebugFreeSockets(TArray<UStaticMeshSocket*> FreeSockets)
+{
+	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	{
+		FString Message = "Free sockets found: ";
+		for (auto eachFree : FreeSockets)
+		{
+			if (not eachFree)
+			{
+				continue;
+			}
+			Message += "\n Free Socket Name: " + eachFree->SocketName.ToString();
+		}
+		RTSFunctionLibrary::DisplayNotification(FText::FromString(Message));
+	}
+}
+
+void ANomadicVehicle::SetStaticPreviewMesh(AStaticPreviewMesh* NewStaticPreviewMesh)
+{
+	if (IsValid(M_StaticPreviewMesh))
+	{
+		M_StaticPreviewMesh->Destroy();
+	}
+	M_StaticPreviewMesh = NewStaticPreviewMesh;
+}
+
+UBuildingExpansionOwnerComp& ANomadicVehicle::GetBuildingExpansionData() const
+{
+	return *BuildingExpansionComponent;
+}
+
+bool ANomadicVehicle::IsBuildingAbleToExpand() const
+{
+	if (M_NomadStatus == ENomadStatus::Building)
+	{
+		return true;
+	}
+	return false;
+}
+
+void ANomadicVehicle::InitNomadicVehicle(
+	UStaticMesh* NewPreviewMesh,
+	UStaticMesh* NewBuildingMesh,
+	UMaterialInstance* NewConstructionAnimationMaterial,
+	TArray<UNiagaraSystem*> SmokeSystems,
+	const float NewConstructionFrames,
+	const float NewConstructionMontageTime,
+	const float NewMeshAnimationTime,
+	const float NewConvertToVehicleTime,
+	const int NewAmountSmokesCovertToVehicle,
+	TArray<FBuildingAttachment> NewAttachmentsToSpawn,
+	TArray<FBuildingNiagaraAttachment> NewNiagaraAttachmentsToSpawn,
+	TArray<FBuildingSoundAttachment> NewSoundAttachmentsToSpawn,
+	TArray<FBuildingNavModifierAttachment> NewBuildingNavModifiers,
+	const float NewConversionSmokeRadius,
+	UTimeProgressBarWidget* NewConversionProgressBar,
+	const FVector NewTruckUIOffset,
+	const FSelectionDecalSettings NewSelectionDecalSettings,
+	const float NewExpansionBuildRadius,
+	TArray<USoundCue*> NewConstructionSounds, UStaticMeshComponent* NewBuildingMeshComponent)
+{
+	if (IsValid(NewPreviewMesh))
+	{
+		M_PreviewMesh = NewPreviewMesh;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "NewPreviewMesh", "InitNomadicVehicle");
+	}
+
+	if (IsValid(NewBuildingMeshComponent))
+	{
+		BuildingMeshComponent = NewBuildingMeshComponent;
+		BuildingMeshComponent->SetVisibility(false);
+		BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		if (IsValid(RTSComponent))
+		{
+			FRTS_CollisionSetup::SetupBuildingCollision(BuildingMeshComponent, RTSComponent->GetOwningPlayer());
+		}
+		else
+		{
+			RTSFunctionLibrary::ReportError(
+				"Failed to initialize building collision settings on nomadic vehicle BuildingMeshComponent because"
+				"the RTS component is not valid!"
+				"\n Vehicle: " + GetName());
+		}
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "NewBuildingMeshComponent", "InitNomadicVehicle");
+	}
+
+
+	if (IsValid(NewBuildingMesh))
+	{
+		M_BuildingMesh = NewBuildingMesh;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "NewBuildingMesh", "InitNomadicVehicle");
+	}
+	if (IsValid(NewConstructionAnimationMaterial))
+	{
+		M_ConstructionAnimationMaterial = NewConstructionAnimationMaterial;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "NewConstructionAnimationMaterial",
+		                                                  "InitNomadicVehicle");
+	}
+
+
+	M_SmokeSystems = SmokeSystems;
+	if (NewConstructionFrames <= 0.f)
+	{
+		M_ConstructionFrames = 30.f;
+	}
+	else
+	{
+		M_ConstructionFrames = NewConstructionFrames;
+	}
+	if (NewConstructionMontageTime <= 0.f)
+	{
+		M_ConstructionMontageTime = 20.f;
+	}
+	else
+	{
+		M_ConstructionMontageTime = NewConstructionMontageTime;
+	}
+	if (NewMeshAnimationTime <= 0.f)
+	{
+		M_MeshAnimationTime = 30.f;
+	}
+	else
+	{
+		M_MeshAnimationTime = NewMeshAnimationTime;
+	}
+	if (NewConvertToVehicleTime <= 0.f)
+	{
+		M_ConvertToVehicleTime = 20.f;
+	}
+	else
+	{
+		M_ConvertToVehicleTime = NewConvertToVehicleTime;
+	}
+	M_AmountSmokesCovertToVehicle = NewAmountSmokesCovertToVehicle;
+	M_AttachmentsToSpawn = NewAttachmentsToSpawn;
+	M_NiagaraAttachmentsToSpawn = NewNiagaraAttachmentsToSpawn;
+	M_SoundAttachmentsToSpawn = NewSoundAttachmentsToSpawn;
+	if (NewConversionSmokeRadius <= 0.f)
+	{
+		M_ConversionSmokeRadius = 100.f;
+	}
+	else
+	{
+		M_ConversionSmokeRadius = NewConversionSmokeRadius;
+	}
+	M_ConversionProgressBar = NewConversionProgressBar;
+	M_DesiredTruckUIOffset = NewTruckUIOffset;
+	M_SelectionDecalSettings = NewSelectionDecalSettings;
+	M_ExpansionBuildRadius = NewExpansionBuildRadius;
+	M_NavModifierAttachmentsToSpawn = NewBuildingNavModifiers;
+	for (auto EachNewConstructionSound : NewConstructionSounds)
+	{
+		if (IsValid(EachNewConstructionSound))
+		{
+			M_ConstructionSounds.Add(EachNewConstructionSound);
+		}
+	}
+}
+
+void ANomadicVehicle::BeginPlay()
+{
+	Super::BeginPlay();
+	if (IsValid(M_RadiusComp))
+	{
+		if (UPlayerBuildRadiusManager* PlayerBuildRadiusManager = FRTS_Statics::GetPlayerBuildRadiusManager(this))
+		{
+			PlayerBuildRadiusManager->RegisterBuildRadiusComponent(M_RadiusComp);
+		}
+		else
+		{
+			RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "PlayerBuildRadiusManager",
+			                                                      "ANomadicVehicle::BeginPlay", this);
+		}
+	}
+	if (bStartAsConvertedToBuilding)
+	{
+		StartAsConvertedBuilding();
+	}
+}
+
+void ANomadicVehicle::BeginDestroy()
+{
+	if (IsValid(M_RadiusComp))
+	{
+		if (UPlayerBuildRadiusManager* PlayerBuildRadiusManager = FRTS_Statics::GetPlayerBuildRadiusManager(this))
+		{
+			PlayerBuildRadiusManager->UnregisterBuildRadiusComponent(M_RadiusComp);
+		}
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		World->GetTimerManager().ClearTimer(ConvertToVehicleTimerHandle);
+	}
+	Super::BeginDestroy();
+}
+
+void ANomadicVehicle::PostInitializeComponents()
+{
+	// Inits components
+	Super::PostInitializeComponents();
+	// find if we have a UBuildRadiusComp component.
+	if (UBuildRadiusComp* RadiusComp = FindComponentByClass<UBuildRadiusComp>())
+	{
+		M_RadiusComp = RadiusComp;
+	}
+	if (UEnergyComp* EnergyComp = FindComponentByClass<UEnergyComp>())
+	{
+		M_EnergyComp = EnergyComp;
+	}
+	if (UResourceDropOff* ResourceDropOff = FindComponentByClass<UResourceDropOff>())
+	{
+		M_ResourceDropOff = ResourceDropOff;
+		// Start inactive as a truck cannot have resources being dropped off.
+		M_ResourceDropOff->SetIsDropOffActive(false);
+	}
+}
+
+void ANomadicVehicle::SetupMountCollision(UMeshComponent* MountMesh)
+{
+	FRTS_CollisionSetup::SetupCollisionForNomadicMount(MountMesh);
+}
+
+void ANomadicVehicle::ExecuteMoveCommand(const FVector MoveToLocation)
+{
+	if (M_NomadStatus == ENomadStatus::Truck)
+	{
+		// Executes move command in bp and sets gears in ChaosVehicle.
+		// Sets turrets to autoEngage enemies in TankMaster.
+		Super::ExecuteMoveCommand(MoveToLocation);
+	}
+	else
+	{
+		// todo warning unit not able to move.
+		DoneExecutingCommand(EAbilityID::IdMove);
+	}
+}
+
+void ANomadicVehicle::OnUnitIdleAndNoNewCommands()
+{
+	// Manual broadcast instead of using super call as tank master does the rotation logic differently and calling super
+	// would result in conflicting rotation logic.
+	OnUnitIdleAndNoNewCommandsDelegate.Broadcast();
+	if (not GetIsSpawning())
+	{
+		if (M_NomadStatus == ENomadStatus::Truck)
+		{
+			// Only affect navmesh if we are a truck.
+			if (IsValid(RTSNavCollision))
+			{
+				RTSNavCollision->EnableAffectNavmesh(true);
+			}
+			else
+			{
+				RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "RTSNavCollision",
+				                                                      "ANomadicVehicle::OnUnitIdleAndNoNewCommands",
+				                                                      this);
+			}
+		}
+	}
+	// do the tank master logic by hand as we do not want to call super due to the nomad status related logic.
+	if (not bWasLastMovementReverse && M_NomadStatus == ENomadStatus::Truck)
+	{
+		// We finished our chain of commands and ended in a non-reverse movement; rotate towards the movement direction.
+		RotateTowardsFinalMovementRotation();
+		return;
+	}
+	// In this case we have finished the chain of commands with possibly a movement command at the end, however,
+	// this command ended in a reverse movement and thus we do not want the vehicle to rotate; reset.
+	ResetRotateTowardsFinalMovementRotation();
+}
+
+void ANomadicVehicle::TerminateMoveCommand()
+{
+	Super::TerminateMoveCommand();
+}
+
+
+void ANomadicVehicle::ExecuteCreateBuildingCommand(const FVector BuildingLocation, const FRotator BuildingRotation)
+{
+	if (GetIsValidRTSNavCollision())
+	{
+		RTSNavCollision->EnableAffectNavmesh(false);
+	}
+	CreateBuildingAtLocationBP(BuildingLocation, BuildingRotation);
+}
+
+// Step 1
+void ANomadicVehicle::StartBuildingConstruction()
+{
+	if (IsValid(M_StaticPreviewMesh) && IsValid(AINomadicVehicle) && IsValid(ChassisMesh))
+	{
+		OnNomadConvertToBuilding.Broadcast();
+		M_NomadStatus = ENomadStatus::CreatingBuildingRotating;
+		// Save the preview transform.
+		M_BuildingTransform = M_StaticPreviewMesh->GetTransform();
+		// Destroy after start mesh animation as we need the preview mesh to block other buildings.
+		M_StaticPreviewMesh->SetActorHiddenInGame(true);
+		AINomadicVehicle->StopBehaviourTree();
+		// teleport to the building location.
+		FHitResult HitResult;
+		DrawDebugSphere(GetWorld(), M_BuildingTransform.GetLocation(), 100.f, 12, FColor::Red, false, 5.f);
+		ChassisMesh->SetWorldLocation(M_BuildingTransform.GetLocation(), false, &HitResult,
+		                              ETeleportType::TeleportPhysics);
+		// Standalone rotation without command queue.
+		ExecuteRotateTowardsCommand(M_BuildingTransform.Rotator(), false);
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			this,
+			"M_StaticPreviewMesh, AINomadicVehicle or ChassisMesh",
+			"ANomadicVehicle::StartBuildingConstruction");
+	}
+}
+
+float ANomadicVehicle::GetBxpExpansionRange() const
+{
+	return M_ExpansionBuildRadius;
+}
+
+FVector ANomadicVehicle::GetBxpOwnerLocation() const
+{
+	return GetActorLocation();
+}
+
+// Step 2
+void ANomadicVehicle::OnFinishedStandaloneRotation()
+{
+	if (IsValid(M_ConversionProgressBar))
+	{
+		RTSFunctionLibrary::PrintString("Finished standalone rotation");
+		M_NomadStatus = ENomadStatus::CreatingBuildingTruckAnim;
+		M_ConversionProgressBar->StartProgressBar(GetTotalConstructionTime());
+
+		CreateSmokeForVehicleConversion();
+
+		// Prevents any further commands from being executed called with true.
+		// See OnBuildingFinished.
+		SetCommandQueueEnabled(false);
+		// Start the full timer of montage and building animation.
+		// Propagate start building to blueprint.
+		BeginBuildingTruckAnimationMontage();
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			this,
+			"M_ConversionProgressBar",
+			"ANomadicVehicle::OnFinishedStandaloneRotation");
+	}
+}
+
+
+// Step 3
+void ANomadicVehicle::OnTruckMontageFinished()
+{
+	const UWorld* World = GetWorld();
+	if (World && IsValid(BuildingMeshComponent))
+	{
+		// Hide the vehicle mesh
+		SetDisableChaosVehicleMesh(true);
+		M_NomadStatus = ENomadStatus::CreatingBuildingMeshAnim;
+
+		// Set transform of the building mesh to the transform of the preview mesh.
+		// BuildingMeshComponent->SetWorldTransform(m_BuildingTransform);
+		BuildingMeshComponent->SetWorldRotation(M_BuildingTransform.Rotator());
+
+		// Cleanup preview mesh as now the collision of the building mesh will take over.
+		if (IsValid(M_StaticPreviewMesh))
+		{
+			M_StaticPreviewMesh->Destroy();
+		}
+
+		// Show the building mesh.
+		BuildingMeshComponent->SetStaticMesh(M_BuildingMesh);
+		BuildingMeshComponent->SetVisibility(true);
+		BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+		// Offset the truck UI.
+		MoveTruckUIWithLocalOffsets(true);
+
+		// Cache original materials
+		CacheOriginalMaterials();
+		// Init smoke locations for material animation.
+		InitSmokeLocations();
+
+		// Set decal to buildig mode
+		AdjustSelectionDecalToConversion(true);
+
+		// apply construction materials and calculate amount materials to exclude.
+		const uint32 AmountMaterialsToExclude = ApplyConstructionMaterial(false);
+		RTSFunctionLibrary::PrintString(
+			"\n\nMaterials to exclude::" + FString::FromInt(AmountMaterialsToExclude) + "\n\n");
+
+		// Start timer to reapply original materials
+		const float Interval = M_MeshAnimationTime / (M_CachedOriginalMaterials.Num() - AmountMaterialsToExclude);
+		SetAnimationTimer(Interval);
+		BPOnStartMeshAnimation();
+	}
+}
+
+// Step 4
+void ANomadicVehicle::OnFinishedConvertingToBuilding()
+{
+	OnConvertToBuilding_PlacePackedBxps();
+	// This evaluating to false is not an error as not all nomadic vehicles have a build radius component.
+	if (IsValid(M_RadiusComp))
+	{
+		M_RadiusComp->SetEnabled(true);
+	}
+	if (IsValid(M_EnergyComp))
+	{
+		M_EnergyComp->SetEnabled(true);
+	}
+	// Allow Resources to be dropped off now.
+	SetResourceDropOffActive(true);
+	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController))
+	{
+		M_NomadStatus = ENomadStatus::Building;
+		// Stop before the training component uses the same progress bar.
+		M_ConversionProgressBar->StopProgressBar();
+		// Open command queue by calling cancel.
+		SetCommandQueueEnabled(true);
+		CreateBuildingAttachments();
+		PlayerController->TruckConverted(this, true);
+		// If we have a trainer comp, set the training to be enabled.
+		// This component will now use the progress bar.
+		SetTrainingEnabled(true);
+		// Set max health to building health.
+		AdjustMaxHealthForConversion(false);
+		// Restore any resource visualisation of resources stored in the DropOff Component.
+		RestoreResourceStorageVisualisation();
+		// Propagate to blueprints.
+		BP_OnFinishedConvertingToBuilding();
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("M_ConversionProgressBar or PlayerController is null!"
+			"\n In function: ANomadicVehicle::OnBuildingFinished"
+			"For nomadic vehicle: " + GetName());
+	}
+}
+
+
+void ANomadicVehicle::TerminateCreateBuildingCommand()
+{
+	Super::TerminateCreateBuildingCommand();
+	if (IsValid(PlayerController) && IsValid(M_ConversionProgressBar) && IsValid(AINomadicVehicle))
+	{
+		M_ConversionProgressBar->StopProgressBar();
+		switch (M_NomadStatus)
+		{
+		case ENomadStatus::Truck:
+			RTSFunctionLibrary::PrintString("terminate building command as truck");
+			AINomadicVehicle->StopBehaviourTree();
+			if (M_StaticPreviewMesh)
+			{
+				M_StaticPreviewMesh->SetActorEnableCollision(false);
+				M_StaticPreviewMesh->SetActorHiddenInGame(true);
+				M_StaticPreviewMesh->Destroy();
+				M_StaticPreviewMesh = nullptr;
+			}
+			break;
+		case ENomadStatus::CreatingBuildingRotating:
+			// Note that BT and static preview are already stopped/destroyed.
+			StopRotating();
+			RTSFunctionLibrary::PrintString("terminate building command as ROTATING creating building");
+			M_NomadStatus = ENomadStatus::Truck;
+			break;
+		case ENomadStatus::CreatingBuildingTruckAnim:
+			BPStopTruckAnimationMontage();
+			RTSFunctionLibrary::PrintString("terminate building command as MONTAGE");
+			M_NomadStatus = ENomadStatus::Truck;
+			break;
+		case ENomadStatus::CreatingBuildingMeshAnim:
+			RTSFunctionLibrary::PrintString("terminate building command as MESH ANIMATION");
+			CancelBuildingMeshAnimation();
+		// Set decal to truck mode
+			AdjustSelectionDecalToConversion(false);
+			M_NomadStatus = ENomadStatus::Truck;
+			break;
+		case ENomadStatus::Building:
+			break;
+		default:
+			RTSFunctionLibrary::PrintString("cancel building command but is not building!");
+		}
+
+		// Only show conversion to construct building if the vehicle did cancel the building command
+		// NOT if the vehicle ended the construction command and is now a building.
+		if (PlayerController && PlayerController->GetMainMenuUI() && M_NomadStatus == ENomadStatus::Truck)
+		{
+			// Only show the construct building button if this unit is the primary selected unit.
+			PlayerController->GetMainMenuUI()->RequestShowConstructBuilding(this);
+		}
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("M_ConversionProgressBar, PlayerController or AINomadicVehicle is null!"
+			"\n In function: ANomadicVehicle::TerminateCreateBuildingCommand"
+			"For nomadic vehicle: " + GetName());
+	}
+}
+
+void ANomadicVehicle::ExecuteConvertToVehicleCommand()
+{
+	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController))
+	{
+		M_NomadStatus = ENomadStatus::CreatingTruck;
+
+		OnNomadConvertToVehicle.Broadcast();
+
+		// Starts animations for packing up expansions.
+		StartPackUpAllExpansions(M_ConvertToVehicleTime);
+
+		// Prevents any further commands from being added to the queue until called with true.
+		// See finished converting to vehicle.
+		SetCommandQueueEnabled(false);
+
+		// Disable Training if this nomadic vehicle has a training component.
+		// This component will now no longer use the progress bar; make sure this happens before the bar is set
+		// for the conversion by the vehicle.
+		SetTrainingEnabled(false);
+
+		// Save the building materials to reapply to the mesh after deconstruction is complete.
+		CacheOriginalMaterials();
+
+		CreateSmokeForVehicleConversion();
+		DestroyAllBuildingAttachments();
+
+		// Disable DropOff of resources.
+		SetResourceDropOffActive(false);
+
+		// check if smoke systems are initiated
+		uint8 ZeroCounter = 0;
+		for (auto SmokeLocation : M_CreateSmokeTransforms)
+		{
+			if (SmokeLocation.Equals(FTransform::Identity))
+			{
+				ZeroCounter++;
+			}
+			if (ZeroCounter > 1)
+			{
+				// Init smoke locations for material animation.
+				InitSmokeLocations();
+				break;
+			}
+		}
+		// don't apply construction materials but only calculate the amount of materials to exclude.
+		const uint32 AmountMaterialsToExclude = ApplyConstructionMaterial(true);
+		RTSFunctionLibrary::PrintString(
+			"\n\nMaterials to exclude::" + FString::FromInt(AmountMaterialsToExclude) + "\n\n");
+
+		// We now reapply construction materials from the top of the array.
+		M_MaterialIndex = M_CachedOriginalMaterials.Num() - 1;
+
+		// After training component stopped using it.
+		M_ConversionProgressBar->StartProgressBar(M_ConvertToVehicleTime);
+
+		// Start timer to reapply construction materials, m_NomadStatus is used to determine if we are creating the truck or the building.
+		const float Interval = M_ConvertToVehicleTime / (M_CachedOriginalMaterials.Num() - AmountMaterialsToExclude);
+		SetAnimationTimer(Interval);
+		if (PlayerController->GetMainMenuUI())
+		{
+			PlayerController->GetMainMenuUI()->RequestShowCancelVehicleConversion(this);
+		}
+		// Propagate to blueprints.
+		BP_OnStartedConvertingToVehicle();
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("M_ConversionProgressBar or PlayerController is null!"
+			"\n In function: ANomadicVehicle::ExecuteConvertToVehicleCommand"
+			"For nomadic vehicle: " + GetName());
+	}
+}
+
+void ANomadicVehicle::TerminateConvertToVehicleCommand()
+{
+	if (IsValid(PlayerController) && IsValid(M_ConversionProgressBar))
+	{
+		if (M_NomadStatus != ENomadStatus::CreatingTruck)
+		{
+			return;
+		}
+
+		M_NomadStatus = ENomadStatus::Building;
+		M_ConversionProgressBar->StopProgressBar();
+		const UWorld* World = GetWorld();
+		if (World)
+		{
+			World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		}
+		// set building materials to original materials before construction materials were applied.
+		SetAllBuildingMaterialsToCache();
+		// Reset index and cache.
+		ResetCachedMaterials();
+
+		if (PlayerController->GetMainMenuUI())
+		{
+			// Only show the convert to vehicle button if this unit is the primary selected unit.
+			PlayerController->GetMainMenuUI()->RequestShowConvertToVehicle(this);
+		}
+		// Propagate to possible bxps to cancel the packing.
+		CancelPackUpExpansions();
+		// Create the building attachments again.
+		CreateBuildingAttachments();
+
+		SetCommandQueueEnabled(true);
+		// Note that the progressbar is already stopped for the nomadic truck so now the training component can use it.
+		SetTrainingEnabled(true);
+		// Enable DropOff of resources.
+		SetResourceDropOffActive(true);
+		// Propagate to Blueprints.
+		BP_OnCancelledConvertingToVehicle();
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("M_ConversionProgressBar or PlayerController is null!"
+			"\n In function: ANomadicVehicle::TerminateConvertToVehicleCommand"
+			"For nomadic vehicle: " + GetName());
+	}
+}
+
+void ANomadicVehicle::CreateSmokeForVehicleConversion() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const FVector Center = GetActorLocation();
+	const FVector BaseScale = FVector(1.f);
+	const float Z = Center.Z; // Use the Z coordinate of the actor's location for all smoke effects
+
+	for (int32 i = 0; i < M_AmountSmokesCovertToVehicle; ++i)
+	{
+		// Calculate angle for this smoke effect
+		const float Angle = (360.f / M_AmountSmokesCovertToVehicle) * i;
+		const float Radians = FMath::DegreesToRadians(Angle);
+
+		// Calculate x and y position for smoke effect in the circle
+		const float X = Center.X + M_ConversionSmokeRadius * FMath::Cos(Radians);
+		const float Y = Center.Y + M_ConversionSmokeRadius * FMath::Sin(Radians);
+		const FVector SmokeLocation = FVector(X, Y, Z);
+		// 20% variability in scale.
+		const FVector SmokeScale = BaseScale + FVector(FMath::RandRange(-0.2f, 0.2f),
+		                                               FMath::RandRange(-0.2f, 0.2f),
+		                                               FMath::RandRange(-0.2f, 0.2f));
+
+		// Spawn smoke effect at this location
+		CreateRandomSmokeSystemAtTransform(FTransform(FRotator::ZeroRotator, SmokeLocation, SmokeScale));
+	}
+}
+
+void ANomadicVehicle::SetAllBuildingMaterialsToCache()
+{
+	if (IsValid(BuildingMeshComponent))
+	{
+		for (int Index = 0; Index < M_CachedOriginalMaterials.Num(); ++Index)
+		{
+			BuildingMeshComponent->SetMaterial(Index, M_CachedOriginalMaterials[Index]);
+		}
+	}
+}
+
+void ANomadicVehicle::SetAnimationTimer(const float Interval)
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		World->GetTimerManager().SetTimer(MaterialReapplyTimerHandle, this, &ANomadicVehicle::ReapplyOriginalMaterial,
+		                                  Interval, true);
+	}
+}
+
+void ANomadicVehicle::MoveTruckUIWithLocalOffsets(const bool bMoveToBuildingPosition)
+{
+	if (IsValid(M_ConversionProgressBar) && IsValid(HealthComponent))
+	{
+		if (M_DesiredTruckUIOffset.Equals(FVector::ZeroVector))
+		{
+			return;
+		}
+		if (bMoveToBuildingPosition)
+		{
+			// Calculate the offset to apply to the UI components based on the building mesh
+			const FVector DesiredLocation = BuildingMeshComponent->GetRelativeLocation() + M_DesiredTruckUIOffset;
+			// Save components original locations
+			M_TruckUIElementLocations.Key = HealthComponent->GetLocalLocation();
+			M_TruckUIElementLocations.Value = M_ConversionProgressBar->GetLocalLocation();
+			const float ZDifference = M_TruckUIElementLocations.Key.Z - M_TruckUIElementLocations.Value.Z;
+			HealthComponent->SetLocalLocation(DesiredLocation);
+			M_ConversionProgressBar->SetLocalLocation(DesiredLocation + FVector(0.f, 0.f, ZDifference));
+		}
+		else
+		{
+			HealthComponent->SetLocalLocation(M_TruckUIElementLocations.Key);
+			M_ConversionProgressBar->SetLocalLocation(M_TruckUIElementLocations.Value);
+		}
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("M_ConversionProgressBar or HealthComponent is null!"
+			"\n In function: ANomadicVehicle::MoveTruckUIWithLocalOffsets"
+			"For nomadic vehicle: " + GetName());
+	}
+}
+
+void ANomadicVehicle::OnConvertToBuilding_PlacePackedBxps()
+{
+	TScriptInterface<IBuildingExpansionOwner> BxpOwnerSmartPointer = this;
+	if (not BxpOwnerSmartPointer || not GetIsValidPlayerControler())
+	{
+		return;
+	}
+	// Uses the async spawner to batch load all of the building expansions that are packed and attached.
+	BxpOwnerSmartPointer->BatchAsyncLoadAttachedPackedBxps(
+		PlayerController,
+		BxpOwnerSmartPointer);
+}
+
+void ANomadicVehicle::AdjustSelectionDecalToConversion(const bool bSetToBuildingPosition) const
+{
+	if (IsValid(SelectionComponent))
+	{
+		const TPair<UMaterialInterface*, UMaterialInterface*> Materials = SelectionComponent->GetMaterials();
+		// Update with the other set of matierals.
+		SelectionComponent->UpdateSelectionMaterials(M_SelectionDecalSettings.State2_SelectionDecalMat,
+		                                             M_SelectionDecalSettings.Sate2_DeselectionDecalMat);
+		// Save the previous set of materials.
+		M_SelectionDecalSettings.State2_SelectionDecalMat = Materials.Key;
+		M_SelectionDecalSettings.Sate2_DeselectionDecalMat = Materials.Value;
+		if (bSetToBuildingPosition)
+		{
+			SelectionComponent->UpdateDecalScale(M_SelectionDecalSettings.State2_SelectionDecalSize);
+			SelectionComponent->SetDecalRelativeLocation(M_SelectionDecalSettings.State2_DecalPosition);
+			SelectionComponent->UpdateSelectionArea(
+				M_SelectionDecalSettings.State2_AreaSize,
+				M_SelectionDecalSettings.State2_AreaPosition);
+		}
+		else
+		{
+			SelectionComponent->UpdateDecalScale(M_SelectionDecalSettings.State1_SelectionDecalSize);
+			SelectionComponent->SetDecalRelativeLocation(M_SelectionDecalSettings.State1_DecalPosition);
+			SelectionComponent->UpdateSelectionArea(
+				M_SelectionDecalSettings.State1_AreaSize,
+				M_SelectionDecalSettings.State1_AreaPosition);
+		}
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("SelectionComponent is null!"
+			"\n In function: ANomadicVehicle::AdjustSelectionDecalToConversion"
+			"For nomadic vehicle: " + GetName());
+	}
+}
+
+// Converted to vehicle
+void ANomadicVehicle::OnFinishedConvertingToVehicle()
+{
+	// Evaluating to false is not an error as not all nomadic vehicles have build radii.
+	if (IsValid(M_RadiusComp))
+	{
+		M_RadiusComp->SetEnabled(false);
+	}
+	// idem for energy comp
+	if (IsValid(M_EnergyComp))
+	{
+		M_EnergyComp->SetEnabled(false);
+	}
+	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController) && IsValid(BuildingMeshComponent))
+	{
+		M_NomadStatus = ENomadStatus::Truck;
+		// Pack up all building expansions.
+		FinishPackUpAllExpansions();
+
+		M_ConversionProgressBar->StopProgressBar();
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		}
+		// Show the vehicle mesh
+		SetDisableChaosVehicleMesh(false);
+
+		// hide the building mesh.
+		BuildingMeshComponent->SetVisibility(false);
+		BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		// set building materials to original materials before construction materials were applied.
+		SetAllBuildingMaterialsToCache();
+		// Reset index and cache.
+		ResetCachedMaterials();
+
+		// free up the command queue, important to call this after the status is set to truck as otherwise the
+		// terminate conversion command will trigger because enableing the queue will clear it first -> Sets unit to idle.
+		SetCommandQueueEnabled(true);
+
+		if (PlayerController && PlayerController->GetMainMenuUI())
+		{
+			// Update Game UI.
+			PlayerController->TruckConverted(this, false);
+		}
+
+		// Move Truck UI back in place.
+		MoveTruckUIWithLocalOffsets(false);
+
+		// Set decal to truck mode.
+		AdjustSelectionDecalToConversion(false);
+
+		// Set max health to vehicle health.
+		AdjustMaxHealthForConversion(true);
+
+		// Destroy any resource visualisation.
+		DestroyAllResourceStorageMeshComponents();
+
+		BP_OnFinishedConvertingToVehicle();
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("M_ConversionProgressBar, PlayerController or BuildingMeshComponent is null!"
+			"\n In function: ANomadicVehicle::OnFinishedConvertingToVehicle"
+			"For nomadic vehicle: " + GetName());
+	}
+}
+
+void ANomadicVehicle::SetDisableChaosVehicleMesh(const bool bDisable)
+{
+	if (IsValid(ChassisMesh))
+	{
+		ChassisMesh->SetVisibility(!bDisable);
+		ChassisMesh->SetGenerateOverlapEvents(!bDisable);
+		ChassisMesh->SetSimulatePhysics(!bDisable);
+		ChassisMesh->SetCollisionEnabled(
+			bDisable ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+	}
+}
+
+void ANomadicVehicle::SetTrainingEnabled(const bool bSetEnabled)
+{
+	UTrainerComponent* TrainingComp = GetTrainerComponent();
+	if (IsValid(TrainingComp))
+	{
+		TrainingComp->SetTrainingEnabled(bSetEnabled);
+	}
+}
+
+void ANomadicVehicle::AdjustMaxHealthForConversion(const bool bSetToTruckMaxHealth) const
+{
+	if (!IsValid(HealthComponent))
+	{
+		return;
+	}
+	if (bSetToTruckMaxHealth)
+	{
+		HealthComponent->SetMaxHealth(TruckMaxHealth);
+	}
+	else
+	{
+		HealthComponent->SetMaxHealth(BuildingMaxHealth);
+	}
+}
+
+void ANomadicVehicle::PlayRandomConstructionSound()
+{
+	USoundAttenuation* Auten = RTSFunctionLibrary::CreateSoundAttenuation(4000);
+	if (M_ConstructionSounds.Num() > 0 && PlayerController)
+	{
+		int32 RandomIndex;
+		do
+		{
+			RandomIndex = FMath::RandRange(0, M_ConstructionSounds.Num() - 1);
+		}
+		while (RandomIndex == M_LastPlayedSoundIndex && M_ConstructionSounds.Num() > 1);
+
+		M_LastPlayedSoundIndex = RandomIndex;
+		USoundCue* RandomSound = M_ConstructionSounds[RandomIndex];
+		UGameplayStatics::PlaySoundAtLocation(this, RandomSound, GetActorLocation(), FRotator::ZeroRotator, 1.0f, 1.0f,
+		                                      0.0f, Auten, nullptr, nullptr);
+	}
+}
+
+void ANomadicVehicle::SetResourceDropOffActive(const bool bIsActive)
+{
+	if (IsValid(M_ResourceDropOff))
+	{
+		M_ResourceDropOff->SetIsDropOffActive(bIsActive);
+	}
+}
+
+void ANomadicVehicle::SetEnergyComponentActive(const bool bIsActive)
+{
+	if (IsValid(M_EnergyComp))
+	{
+		M_EnergyComp->SetEnabled(bIsActive);
+	}
+}
+
+void ANomadicVehicle::SetRadiusComponentActive(const bool bIsActive)
+{
+	if (IsValid(M_RadiusComp))
+	{
+		M_RadiusComp->SetEnabled(bIsActive);
+	}
+}
+
+void ANomadicVehicle::StartAsConvertedBuilding()
+{
+	OnFinishedStandaloneRotation();
+}
+
+float ANomadicVehicle::GetConstructionTimeInPlayRate() const
+{
+	// Assume AnimationFPS is the frame rate the animation was authored at.
+	constexpr float AnimationFPS = 30.f;
+	const float MontageDuration = M_ConstructionFrames / AnimationFPS;
+
+	// Calculate the play rate required to play the montage over m_ConstructionTime seconds.
+	const float PlayRate = MontageDuration / M_ConstructionMontageTime;
+	return PlayRate;
+}
+
+UTrainerComponent* ANomadicVehicle::GetTrainerComponent()
+{
+	return BP_GetTrainerComponent();
+}
+
+void ANomadicVehicle::SetAINomadicVehicle(AAINomadicVehicle* NewAINomadicVehicle)
+{
+	if (IsValid(NewAINomadicVehicle))
+	{
+		AINomadicVehicle = NewAINomadicVehicle;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "AINomadicVehicle", "SetAINomadicVehicle");
+	}
+}
+
+UStaticMeshComponent* ANomadicVehicle::GetAttachToMeshComponent() const
+{
+	return BuildingMeshComponent;
+}
+
+TArray<UStaticMeshSocket*> ANomadicVehicle::GetFreeSocketList(const int32 ExpansionSlotToIgnore) const
+{
+	using DeveloperSettings::GamePlay::Construction::BxpSocketTrigger;
+	if (not IsValid(M_BuildingMesh))
+	{
+		const FString ActorName = GetName();
+		RTSFunctionLibrary::ReportError("No building mesh component found for vehicle: " + ActorName +
+			"\n Cannot get free sockets for attachments. Please ensure the building mesh component is set correctly.");
+		return TArray<UStaticMeshSocket*>();
+	}
+
+	TArray<UStaticMeshSocket*> SocketList;
+
+	TArray<UStaticMeshSocket*> MeshSockets = M_BuildingMesh->Sockets;
+	for (UStaticMeshSocket* MeshSocket : MeshSockets)
+	{
+		if (!MeshSocket) continue;
+
+		// Convert socket name to string and check if it contains the trigger
+		if (MeshSocket->SocketName.ToString().Contains(BxpSocketTrigger))
+		{
+			SocketList.Add(MeshSocket);
+		}
+	}
+	if (SocketList.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError("On Nomadic vehicle with building mesh component: " + GetName() +
+			"No valid sockets were found!"
+			"\n Socket needs to contain: " + BxpSocketTrigger);
+		return TArray<UStaticMeshSocket*>();
+	}
+	TArray<UStaticMeshSocket*> NonOccupiedSockets;
+	TArray<FName> OccupiedSocketNames = GetOccupiedSocketNames(ExpansionSlotToIgnore);
+	DebugSocketsPreCheck(SocketList, OccupiedSocketNames);
+	for (auto EachSocket : SocketList)
+	{
+		if (not EachSocket)
+		{
+			continue;
+		}
+		const bool bIsOccupied = OccupiedSocketNames.Contains(EachSocket->SocketName);
+		if (bIsOccupied)
+		{
+			OccupiedSocketNames.Remove(EachSocket->SocketName);
+		}
+		else
+		{
+			NonOccupiedSockets.Add(EachSocket);
+		}
+	}
+	DebugFreeSockets(NonOccupiedSockets);
+	return NonOccupiedSockets;
+}
+
+float ANomadicVehicle::GetUnitRepairRadius()
+{
+	if (M_NomadStatus == ENomadStatus::Building)
+	{
+		if (!IsValid(M_BuildingMesh))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Attempted to get repair radius of nomadic vehicle in building mode "
+				"but the building mesh is not valid!");
+			return Super::GetUnitRepairRadius();
+		}
+
+		// Pull the box half-extents (X,Y,Z) from the mesh bounds
+		// Return the average over x and y.
+		const FVector HalfExtents = M_BuildingMesh->GetBounds().BoxExtent;
+		const float AvgXYRadius = 0.5f * (HalfExtents.X + HalfExtents.Y);
+		return AvgXYRadius;
+	}
+
+	return Super::GetUnitRepairRadius();
+}
+
+
+void ANomadicVehicle::OnTrainingStarted(const FTrainingOption& StartedOption)
+{
+	BpOnTrainingStarted(StartedOption);
+}
+
+UTrainerComponent* ANomadicVehicle::BP_GetTrainerComponent_Implementation() const
+{
+	return nullptr;
+}
+
+void ANomadicVehicle::OnTrainingComplete(
+	const FTrainingOption& CompletedOption,
+	AActor* SpawnedUnit)
+{
+	BPOnTrainingComplete(CompletedOption);
+}
+
+void ANomadicVehicle::OnTrainingCancelled(const FTrainingOption& CancelledOption)
+{
+	BPOnTrainingCancelled(CancelledOption);
+}
+
+
+void ANomadicVehicle::OnResourceStorageChanged(int32 PercentageResourcesFilled, const ERTSResourceType ResourceType)
+{
+	if (M_NomadStatus == ENomadStatus::Building)
+	{
+		UpdateResourceVisualsForType(ResourceType, PercentageResourcesFilled);
+		OnResourceStorageChangedBP(PercentageResourcesFilled, ResourceType);
+	}
+}
+
+void ANomadicVehicle::InitResourceStorageLevels(
+	const TMap<ERTSResourceType, FResourceStorageLevels> HighToLowLevelsPerResource,
+	const TMap<ERTSResourceType, FName> ResourceToSocketMap)
+{
+	M_HighToLowLevelsPerResource = HighToLowLevelsPerResource;
+	M_ResourceToSocketMap = ResourceToSocketMap;
+
+	TArray<ERTSResourceType> ResourcesToCheck = {
+		ERTSResourceType::Resource_Radixite,
+		ERTSResourceType::Resource_Metal,
+		ERTSResourceType::Resource_VehicleParts
+	};
+	for (auto EachSupportedResource : ResourcesToCheck)
+	{
+		if (M_HighToLowLevelsPerResource.Find(EachSupportedResource)
+			&& !M_ResourceToSocketMap.Find(EachSupportedResource))
+		{
+			RTSFunctionLibrary::ReportError(
+				"ResourceToSocketMap is missing a key for a supported resource type in "
+				"InitResourceStorageLevels for nomadic vehicle: " + GetName() +
+				"\n Missing socket resource type: " + UEnum::GetValueAsString(EachSupportedResource));
+		}
+		if (!M_HighToLowLevelsPerResource.Find(EachSupportedResource)
+			&& M_ResourceToSocketMap.Find(EachSupportedResource))
+		{
+			RTSFunctionLibrary::ReportError(
+				"HighToLowLevelsPerResource is missing a key for a supported resource type in "
+				"InitResourceStorageLevels for nomadic vehicle: " + GetName() +
+				"\n Missing storage levels resource type: " + UEnum::GetValueAsString(EachSupportedResource));
+		}
+	}
+
+	for (auto& EachResource : M_HighToLowLevelsPerResource)
+	{
+		// Ensure all mesh references are valid
+		for (auto EachLevel : EachResource.Value.StorageLevels)
+		{
+			if (!IsValid(EachLevel.Mesh))
+			{
+				RTSFunctionLibrary::ReportError("Mesh reference is not valid for a storage level in "
+					"InitResourceStorageLevels for nomadic vehicle: " + GetName() +
+					"\n Resource type: " + UEnum::GetValueAsString(EachResource.Key) +
+					"\n Level: " + FString::FromInt(EachLevel.Level));
+			}
+		}
+
+		// Sort levels from highest to lowest
+		TArray<FStorageMeshLevel>& Levels = EachResource.Value.StorageLevels;
+		Levels.Sort([](const FStorageMeshLevel& A, const FStorageMeshLevel& B)
+		{
+			return A.Level > B.Level; // descending
+		});
+
+		// Verify after sorting that the highest is at index 0
+		for (int32 i = 0; i < Levels.Num() - 1; ++i)
+		{
+			if (Levels[i].Level < Levels[i + 1].Level)
+			{
+				RTSFunctionLibrary::ReportError(
+					"Failed to sort storage levels from high to low in "
+					"InitResourceStorageLevels for nomadic vehicle: " + GetName() +
+					"\n Resource type: " + UEnum::GetValueAsString(EachResource.Key) +
+					"\n Found " + FString::FromInt(Levels[i].Level) + " < " +
+					FString::FromInt(Levels[i + 1].Level));
+			}
+		}
+	}
+}
+
+void ANomadicVehicle::UpdateResourceVisualsForType(const ERTSResourceType ResourceType,
+                                                   const int32 PercentageResourcesFilled)
+{
+	UStaticMesh* MeshForLevel = nullptr;
+	if (not M_HighToLowLevelsPerResource.Find(ResourceType))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot update resource visuals on nomadic vehicle as provided type is not supported!"
+			"\n type: " + UEnum::GetValueAsString(ResourceType) +
+			"\n On Nomadic Vehicle: " + GetName());
+		return;
+	}
+	const FResourceStorageLevels ResourceLevelContainer = M_HighToLowLevelsPerResource[ResourceType];
+	for (auto EachLevel : ResourceLevelContainer.StorageLevels)
+	{
+		if (PercentageResourcesFilled >= EachLevel.Level)
+		{
+			// Set to highest possible level.
+			MeshForLevel = EachLevel.Mesh;
+			break;
+		}
+	}
+	// Creates a component on the building mesh if not yet registered.
+	SetResourceMeshVisual(MeshForLevel, ResourceType);
+}
+
+void ANomadicVehicle::SetResourceMeshVisual(UStaticMesh* Mesh, const ERTSResourceType ResourceType)
+{
+	if (not M_ResourceLevelComponents.Find(ResourceType))
+	{
+		CreateResourceStorageMeshComponent(ResourceType);
+	}
+	M_ResourceLevelComponents[ResourceType]->SetStaticMesh(Mesh);
+}
+
+void ANomadicVehicle::CreateResourceStorageMeshComponent(const ERTSResourceType ResourceType)
+{
+	if (M_ResourceLevelComponents.Find(ResourceType))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Resource Storage Mesh Component is already created for ResourceType: " + UEnum::GetValueAsString(
+				ResourceType)
+			+ "\n On Nomadic Vehicle: " + GetName() +
+			"\n At function CreateResourceStorageMeshComponent");
+		return;
+	}
+	if (not M_ResourceToSocketMap.Find(ResourceType))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Attempted to create resource visualization component for ResourceType: " + UEnum::GetValueAsString(
+				ResourceType)
+			+ " but no socket name was found in the ResourceToSocketMap!"
+			"\n On Nomadic Vehicle: " + GetName());
+		return;
+	}
+	const FName SocketName = M_ResourceToSocketMap[ResourceType];
+	if (not IsValid(BuildingMeshComponent) || not BuildingMeshComponent->DoesSocketExist(SocketName))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Attempted to create resource visualization component for ResourceType: " + UEnum::GetValueAsString(
+				ResourceType)
+			+ " but the socket name was not found on the building mesh component!"
+			"\n On Nomadic Vehicle: " + GetName());
+		return;
+	}
+	UStaticMeshComponent* NewMeshComp = NewObject<UStaticMeshComponent>(this, UStaticMeshComponent::StaticClass());
+	if (!IsValid(NewMeshComp))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create resource mesh component!"
+			"\n On nomadic vehicle: " + GetName());
+		return;
+	}
+
+
+	NewMeshComp->AttachToComponent(
+		BuildingMeshComponent,
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		SocketName
+	);
+
+	NewMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	NewMeshComp->SetCanEverAffectNavigation(false);
+	NewMeshComp->RegisterComponent();
+	M_ResourceLevelComponents.Add(ResourceType, NewMeshComp);
+}
+
+void ANomadicVehicle::DestroyAllResourceStorageMeshComponents()
+{
+	for (auto EachComponent : M_ResourceLevelComponents)
+	{
+		if (EachComponent.Value.IsValid())
+		{
+			EachComponent.Value->DestroyComponent();
+			continue;
+		}
+		RTSFunctionLibrary::ReportError("Attempted to call DestroyComponent on ResourceStorageVisualization Component"
+			"but it was already Invalid!"
+			"\n On Nomadic Vehicle: " + GetName());
+	}
+	M_ResourceLevelComponents.Empty();
+}
+
+void ANomadicVehicle::RestoreResourceStorageVisualisation()
+{
+	if (not IsValid(M_ResourceDropOff))
+	{
+		// This nomadic vehicle is not a DropOff
+		return;
+	}
+	// For each resource in the DropOffComponent restore the visualisation of the resource.
+	TMap<ERTSResourceType, FHarvesterCargoSlot> Capacity = M_ResourceDropOff->GetResourceDropOffCapacity();
+	for (auto EachCargoSlot : Capacity)
+	{
+		const int32 Percentage = EachCargoSlot.Value.GetPercentageFilled();
+		if (Percentage >= 0)
+		{
+			UpdateResourceVisualsForType(EachCargoSlot.Key, Percentage);
+		}
+	}
+}
+
+void ANomadicVehicle::SetupChassisMeshCollision()
+{
+	if (IsValid(RTSComponent))
+	{
+		if (RTSComponent->GetOwningPlayer() == 1)
+		{
+			FRTS_CollisionSetup::SetupNomadicMvtPlayer(ChassisMesh);
+		}
+		else
+		{
+			FRTS_CollisionSetup::SetupNomadicMvtEnemy(ChassisMesh);
+		}
+	}
+}
+
+
+void ANomadicVehicle::CacheOriginalMaterials()
+{
+	if (IsValid(BuildingMeshComponent))
+	{
+		ResetCachedMaterials();
+		if (BuildingMeshComponent)
+		{
+			for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
+			{
+				M_CachedOriginalMaterials.Add(BuildingMeshComponent->GetMaterial(i));
+			}
+		}
+	}
+}
+
+uint32 ANomadicVehicle::ApplyConstructionMaterial(const bool bOnlyCalculateExcludedMaterials) const
+{
+	uint32 AmountBuildingTruckMaterials = 0;
+	if (!(IsValid(BuildingMeshComponent) && IsValid(M_ConstructionAnimationMaterial) && IsValid(ChassisMesh)))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "BuildingMeshComponent, M_ConstructionAnimationMaterial "
+		                                             "or ChassisMesh",
+		                                             "ApplyConstructionMaterial");
+		return AmountBuildingTruckMaterials;
+	}
+	for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
+	{
+		// Don't apply construction material to materials that are part of the truck.
+		if (!ChassisMesh->GetMaterials().Contains(BuildingMeshComponent->GetMaterial(i)))
+		{
+			if (!bOnlyCalculateExcludedMaterials)
+			{
+				BuildingMeshComponent->SetMaterial(i, M_ConstructionAnimationMaterial);
+			}
+		}
+		else
+		{
+			// Count the amount of materials that are part of the truck and the building.
+			AmountBuildingTruckMaterials++;
+		}
+	}
+	return AmountBuildingTruckMaterials;
+}
+
+void ANomadicVehicle::ReapplyOriginalMaterial()
+{
+	if (!IsValid(BuildingMeshComponent) && IsValid(ChassisMesh) && IsValid(M_ConstructionAnimationMaterial))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			this, "BuildingMeshComponent, ChassisMesh or M_ConstructionAnimationMaterial",
+			"ReapplyOriginalMaterial");
+		return;
+	}
+	// If we are creating the truck we reverse apply construction materials to the building mesh.
+	if (M_NomadStatus == ENomadStatus::CreatingTruck)
+	{
+		if (M_MaterialIndex != 0)
+		{
+			if (ChassisMesh->GetMaterials().Contains(M_CachedOriginalMaterials[M_MaterialIndex]))
+			{
+				// This material is part of the truck, not the animation, skip it.
+				M_MaterialIndex--;
+				// Retry.
+				ReapplyOriginalMaterial();
+			}
+			else
+			{
+				BuildingMeshComponent->SetMaterial(M_MaterialIndex, M_ConstructionAnimationMaterial);
+				CreateRandomSmokeSystemAtTransform(M_CreateSmokeTransforms[M_MaterialIndex]);
+				M_MaterialIndex--;
+				PlayRandomConstructionSound();
+			}
+		}
+		else
+		{
+			OnFinishedConvertingToVehicle();
+		}
+	}
+	else
+	{
+		if (M_MaterialIndex < M_CachedOriginalMaterials.Num())
+		{
+			if (ChassisMesh->GetMaterials().Contains(M_CachedOriginalMaterials[M_MaterialIndex]))
+			{
+				// This material is part of the truck, not the animation, skip it.
+				M_MaterialIndex++;
+				// Retry.
+				ReapplyOriginalMaterial();
+			}
+			else
+			{
+				// We have an unique building material slot to apply the original material to.
+				BuildingMeshComponent->SetMaterial(M_MaterialIndex, M_CachedOriginalMaterials[M_MaterialIndex]);
+				CreateRandomSmokeSystemAtTransform(M_CreateSmokeTransforms[M_MaterialIndex]);
+				M_MaterialIndex++;
+				PlayRandomConstructionSound();
+			}
+		}
+		else
+		{
+			FinishReapplyingMaterials();
+		}
+	}
+}
+
+void ANomadicVehicle::FinishReapplyingMaterials()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		OnFinishedConvertingToBuilding();
+		// Empty the cached materials and reset the index.
+		ResetCachedMaterials();
+	}
+}
+
+FVector ANomadicVehicle::CalculateMeanMaterialLocation(
+	const int32 MaterialIndex,
+	const TArray<FVector3f>& VertexPositions,
+	const FTransform& TransformOfBuildingMesh) const
+{
+	FVector3f MeanLocation = FVector3f::ZeroVector;
+	int32 VertexCount = VertexPositions.Num();
+
+	for (const FVector3f& Position : VertexPositions)
+	{
+		MeanLocation += Position;
+	}
+
+	if (VertexCount > 0)
+	{
+		MeanLocation /= VertexCount;
+	}
+
+	// Convert MeanLocation to FVector for returning, and transform to world space.
+	return TransformOfBuildingMesh.TransformPosition((FVector)MeanLocation);
+}
+
+FVector ANomadicVehicle::CalculateMeshPartSize(const TArray<FVector3f>& VertexPositions) const
+{
+	FVector Min(FLT_MAX);
+	FVector Max(-FLT_MAX);
+
+	for (const FVector3f& Position : VertexPositions)
+	{
+		// Convert to FVector
+		FVector ConvertedPosition = FVector(Position);
+		Min = Min.ComponentMin(ConvertedPosition);
+		Min = Min.ComponentMin(ConvertedPosition);
+		Max = Max.ComponentMax(ConvertedPosition);
+	}
+
+	// Size vector of the mesh part
+	return Max - Min;
+}
+
+void ANomadicVehicle::InitSmokeLocations()
+{
+	if (IsValid(BuildingMeshComponent) && BuildingMeshComponent->GetStaticMesh())
+	{
+		SetSmokeLocationsToRandomInBox();
+		// Save guard to check if the mesh allows CPU access otherwise it breaks shipped builds.
+		if (BuildingMeshComponent->GetStaticMesh()->bAllowCPUAccess)
+		{
+			FStaticMeshLODResources& LODResources = BuildingMeshComponent->GetStaticMesh()->GetRenderData()->
+			                                                               LODResources[0];
+			FIndexArrayView Indices = LODResources.IndexBuffer.GetArrayView();
+			TArray<TArray<FVector3f>> VertexPositionsByMaterial;
+			VertexPositionsByMaterial.SetNum(BuildingMeshComponent->GetNumMaterials());
+
+			TArray<float> MeshPartSizes;
+			MeshPartSizes.SetNum(BuildingMeshComponent->GetNumMaterials());
+			float MaxPartSize = 0;
+
+			// Collect vertices and calculate mesh part sizes. REQUIRES "Allow CPUAccess" in the static mesh editor.
+			for (int32 SectionIndex = 0; SectionIndex < LODResources.Sections.Num(); ++SectionIndex)
+			{
+				const FStaticMeshSection& Section = LODResources.Sections[SectionIndex];
+				TArray<FVector3f> PartVertices;
+
+				for (uint32 i = Section.FirstIndex; i < Section.FirstIndex + Section.NumTriangles * 3; i++)
+				{
+					PartVertices.Add(LODResources.VertexBuffers.PositionVertexBuffer.VertexPosition(Indices[i]));
+				}
+
+				FVector PartSize = CalculateMeshPartSize(PartVertices);
+				MeshPartSizes[Section.MaterialIndex] = PartSize.Size();
+
+				MaxPartSize = FMath::Max(MaxPartSize, MeshPartSizes[Section.MaterialIndex]);
+				VertexPositionsByMaterial[Section.MaterialIndex] = MoveTemp(PartVertices);
+			}
+
+			const FTransform ComponentTransform = BuildingMeshComponent->GetComponentTransform();
+			FVector OriginLocation = ComponentTransform.GetLocation();
+			RTSFunctionLibrary::PrintString("InitSmokeLocations:: Before AsyncTask");
+			// A weak pointer to this object to prevent a dangling pointer in the async task.
+			TWeakObjectPtr<ANomadicVehicle> WeakThis(this);
+			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [WeakThis, VertexPositionsByMaterial,
+				          ComponentTransform, OriginLocation, MeshPartSizes, MaxPartSize]()
+			          {
+				          RTSFunctionLibrary::PrintString("InitSmokeLocations:: At async task");
+				          TArray<FTransform> CalculatedTransforms;
+				          for (int32 i = 0; i < VertexPositionsByMaterial.Num(); ++i)
+				          {
+					          FVector MeanLocation = WeakThis->CalculateMeanMaterialLocation(
+						          i, VertexPositionsByMaterial[i], ComponentTransform);
+					          // Normalize scale factor based on the largest part
+					          const float ScaleFactor = FMath::Max(2 * (MeshPartSizes[i] / MaxPartSize), 0.33);
+
+					          FRotator Rotation = (MeanLocation - OriginLocation).Rotation();
+					          FTransform Transform(Rotation, MeanLocation,
+					                               FVector(ScaleFactor, ScaleFactor, ScaleFactor));
+					          CalculatedTransforms.Add(Transform);
+				          }
+				          AsyncTask(ENamedThreads::GameThread, [WeakThis, CalculatedTransforms]()
+				          {
+					          // Check if the object still exists we cannot access members, for that we need the strong pointer.
+					          if (WeakThis.IsValid())
+					          {
+						          ANomadicVehicle* StrongThis = WeakThis.Get();
+						          StrongThis->M_CreateSmokeTransforms = CalculatedTransforms;
+						          RTSFunctionLibrary::PrintString("InitSmokeLocations:: Rewrite back to game thread");
+					          }
+				          });
+			          });
+		}
+		else
+		{
+			RTSFunctionLibrary::ReportError("Mesh is not CPU Accessible, cannot calculate smoke locations.");
+		}
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("Building Mesh component or static mesh is not set on vehicle: " + GetName());
+	}
+}
+
+void ANomadicVehicle::SetSmokeLocationsToRandomInBox()
+{
+	if (IsValid(BuildingMeshComponent))
+	{
+		const FBoxSphereBounds MeshBounds = BuildingMeshComponent->CalcBounds(
+			BuildingMeshComponent->GetComponentTransform());
+		const FBox Box = MeshBounds.GetBox();
+		const int32 NumMaterials = BuildingMeshComponent->GetNumMaterials();
+
+		M_CreateSmokeTransforms.Init(FTransform::Identity, NumMaterials);
+		for (FTransform& Transform : M_CreateSmokeTransforms)
+		{
+			Transform.SetLocation(FMath::RandPointInBox(Box));
+		}
+	}
+}
+
+void ANomadicVehicle::CreateRandomSmokeSystemAtTransform(const FTransform& Transform) const
+{
+	if (M_SmokeSystems.Num() == 0)
+	{
+		// No smoke systems are available
+		return;
+	}
+
+	// Randomly select a smoke system from the array
+	UNiagaraSystem* SelectedSystem = M_SmokeSystems[FMath::RandRange(0, M_SmokeSystems.Num() - 1)];
+	if (SelectedSystem)
+	{
+		// Spawn the Niagara system using the provided transform
+		const UWorld* World = GetWorld();
+		if (World)
+		{
+			// Spawn the system at the transform's location, using its rotation
+			UNiagaraComponent* NiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+				World, SelectedSystem, Transform.GetLocation(), Transform.GetRotation().Rotator(),
+				Transform.GetScale3D(), true, true, ENCPoolMethod::AutoRelease, true);
+		}
+	}
+}
+
+void ANomadicVehicle::CancelBuildingMeshAnimation()
+{
+	if (IsValid(BuildingMeshComponent))
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		}
+		// Reapply original materials to the building mesh for a possible later animation.
+		for (int32 i = 0; i < M_CachedOriginalMaterials.Num(); ++i)
+		{
+			BuildingMeshComponent->SetMaterial(i, M_CachedOriginalMaterials[i]);
+		}
+		ResetCachedMaterials();
+
+		// Show the vehicle mesh.
+		SetDisableChaosVehicleMesh(false);
+
+		// hide the building mesh.
+		BuildingMeshComponent->SetVisibility(false);
+		BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		// Move Truck UI back in place.
+		MoveTruckUIWithLocalOffsets(false);
+
+		// Add any attachments back on the vehicle.
+		OnMeshAnimationCancelled();
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "BuildingMeshComponent", "CancelBuildingMeshAnimation");
+	}
+}
+
+void ANomadicVehicle::CreateBuildingAttachments()
+{
+	if (!IsValid(BuildingMeshComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "BuildingMeshComponent", "CreateBuildingAttachments");
+		return;
+	}
+	CreateChildActorAttachments();
+	CreateNiagaraAttachments();
+	CreateSoundAttachments();
+	CreateNavModifierAttachments();
+}
+
+void ANomadicVehicle::CreateChildActorAttachments()
+
+{
+	for (const auto& [ActorToSpawn, SocketName, Scale] : M_AttachmentsToSpawn)
+	{
+		if (ActorToSpawn)
+		{
+			// Attempt to get the transform of the specified socket
+			FTransform SocketTransform;
+			if (!BuildingMeshComponent->DoesSocketExist(SocketName) ||
+				!(SocketTransform = BuildingMeshComponent->GetSocketTransform(SocketName,
+				                                                              ERelativeTransformSpace::RTS_World))
+				.IsValid())
+			{
+				continue;
+			}
+
+			AActor* SpawnedActor = nullptr;
+			if (UWorld* World = GetWorld())
+			{
+				// Spawn the actor at the socket's location and orientation
+				SpawnedActor = World->SpawnActor<AActor>(ActorToSpawn,
+				                                         SocketTransform.GetLocation(),
+				                                         SocketTransform.GetRotation().Rotator());
+			}
+			if (SpawnedActor)
+			{
+				// Attach it to the BuildingMeshComponent at the specified socket
+				SpawnedActor->AttachToComponent(BuildingMeshComponent,
+				                                FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				                                SocketName);
+				SpawnedActor->SetActorScale3D(Scale);
+				M_SpawnedAttachments.Add(SpawnedActor);
+			}
+		}
+	}
+}
+
+void ANomadicVehicle::CreateNiagaraAttachments()
+{
+	// Handle Niagara system attachments
+	for (const auto& [NiagaraSystemToSpawn, SocketName, Scale] : M_NiagaraAttachmentsToSpawn)
+	{
+		FTransform SocketTransform = BuildingMeshComponent->GetSocketTransform(
+			SocketName, ERelativeTransformSpace::RTS_World);
+		if (SocketTransform.IsValid())
+		{
+			UNiagaraComponent* SpawnedSystem = UNiagaraFunctionLibrary::SpawnSystemAttached(
+				NiagaraSystemToSpawn, BuildingMeshComponent, SocketName, FVector(0), FRotator(0),
+				Scale, EAttachLocation::SnapToTarget, true, ENCPoolMethod::None, true, true);
+			if (SpawnedSystem)
+			{
+				M_SpawnedNiagaraSystems.Add(SpawnedSystem);
+				SpawnedSystem->SetWorldScale3D(Scale);
+			}
+		}
+	}
+}
+
+void ANomadicVehicle::CreateSoundAttachments()
+{
+	// Handle sound cue attachments
+	for (const FBuildingSoundAttachment& Attachment : M_SoundAttachmentsToSpawn)
+	{
+		FTransform SocketTransform = BuildingMeshComponent->GetSocketTransform(
+			Attachment.SocketName, ERelativeTransformSpace::RTS_World);
+		if (SocketTransform.IsValid())
+		{
+			UAudioComponent* AudioComponent = UGameplayStatics::SpawnSoundAttached(
+				Attachment.SoundCueToSpawn, BuildingMeshComponent, Attachment.SocketName,
+				SocketTransform.GetLocation(), SocketTransform.GetRotation().Rotator(),
+				EAttachLocation::SnapToTarget); // Assuming Scale.X is used for volume or range scaling.
+			if (AudioComponent)
+			{
+				M_SpawnedSoundCues.Add(AudioComponent);
+			}
+		}
+	}
+}
+
+void ANomadicVehicle::CreateNavModifierAttachments()
+{
+	if (!IsValid(BuildingMeshComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "BuildingMeshComponent", "CreateNavModifierAttachments");
+		return;
+	}
+
+	for (const FBuildingNavModifierAttachment& Attachment : M_NavModifierAttachmentsToSpawn)
+	{
+		if (!BuildingMeshComponent->DoesSocketExist(Attachment.SocketName))
+		{
+			RTSFunctionLibrary::PrintString(
+				"Socket not valid for NavModifierAttachment: " + Attachment.SocketName.ToString());
+			continue;
+		}
+
+		// Create a new Box Component
+		UBoxComponent* BoxComponent = NewObject<UBoxComponent>(this);
+		if (BoxComponent)
+		{
+			BoxComponent->AttachToComponent(
+				BuildingMeshComponent,
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				Attachment.SocketName);
+			BoxComponent->SetRelativeScale3D(FVector(1.0f)); // Set to default scale
+			BoxComponent->SetBoxExtent(Attachment.Scale * 50.f); // Because BoxExtent is half the size
+			BoxComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			BoxComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+			// Block the Pawn channel to prevent navigation
+			BoxComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+			// Set up to affect navigation
+			BoxComponent->SetCanEverAffectNavigation(true);
+			BoxComponent->bDynamicObstacle = true;
+			BoxComponent->RegisterComponent();
+
+			M_AttachedNavModifiers.Add(BoxComponent);
+		}
+	}
+}
+
+void ANomadicVehicle::DestroyNavModifierAttachments()
+{
+	for (UBoxComponent* BoxComponent : M_AttachedNavModifiers)
+	{
+		if (IsValid(BoxComponent))
+		{
+			BoxComponent->DestroyComponent();
+		}
+	}
+	M_AttachedNavModifiers.Empty();
+}
+
+void ANomadicVehicle::DestroyAllBuildingAttachments()
+{
+	// Iterate over all the spawned attachment actors and destroy them
+	for (AActor* SpawnedActor : M_SpawnedAttachments)
+	{
+		if (IsValid(SpawnedActor))
+		{
+			SpawnedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+			SpawnedActor->Destroy();
+		}
+	}
+	M_SpawnedAttachments.Empty();
+
+	for (const auto NiagaraSystem : M_SpawnedNiagaraSystems)
+	{
+		if (IsValid(NiagaraSystem))
+		{
+			NiagaraSystem->DestroyComponent();
+		}
+	}
+	M_SpawnedNiagaraSystems.Empty();
+
+	for (const auto Sound : M_SpawnedSoundCues)
+	{
+		if (IsValid(Sound))
+		{
+			Sound->DestroyComponent();
+		}
+	}
+	DestroyNavModifierAttachments();
+}
+
+
+void ANomadicVehicle::ResetCachedMaterials()
+{
+	M_CachedOriginalMaterials.Empty();
+	M_MaterialIndex = 0;
+}

@@ -1,0 +1,36 @@
+﻿I want you to create a new worldsubsystem for managing 'animated' widget texts that are pooled to 32 instances by default.
+my MODULE_API will be RTS_SURVIVAL_API
+the requirements for these widgets are the following:
+they have a public function that takes a string and puts it in the widget richtext block, this same public
+function needs to expose some useful variables for configuring when this text is line broken and how it is alighned.
+it will also have a struct param of type FRTSVerticalAnimTextSettings that will configure:
+- how long the text is visible at full opacity
+- how long the fade out time is
+- what the delta Z is that the text moves up (during both the visible and fade out time combined)
+
+also note that all the widgets will  have to live in screen space widget components.
+
+we will call the new widget class UW_RTSVerticalAnimatedText
+
+each of these widget will also have a bool bM_IsDormant that is true when the widget is not in use and false when it is in use.
+we will use this in the pooling system.
+the world subsystem will expose a pointer to this manager object that is simply a UObject derived called UAnimatedTextWidgetPoolManager
+through a ufunction also acessible in blueprints.
+this world subsystem will automatically create this object once the world is loaded and destroy it when the world is unloaded.
+after it is created it will call init on it which will spawn the pool of to be used widgets for this we expect that the actual class to use for the widgets
+is a blueprint derived from the UW_RTSVerticalAnimatedText class since this specific class needs to be known before the game starts define
+UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Animated Text"))
+class RTS_SURVIVAL_API UAnimatedTextSettings : public UDeveloperSettings
+
+so we can specify the speicfic derived widget in the project settings!
+Whenever someting is not set or cannot be created report errors with RTSFunctionLibrary::ReportError(const FString)
+
+Widget type/class : a very simple widget that has a rich text block bind widget 
+ool expansion policy: What happens if all 32 pooled widgets are in use and a new request comes in?
+in that case we issue a warning with RTSFunctionLibrary::ReportWarning(FString) and then we will reuse the widget 
+that has been active the longest. ( save the time stamp of when a widget was activated in a member variable of the widget class)
+
+Reset/recycle logic: When a widget finishes animating that is the fade is completed too ( opague + fade time) it will set itself to dormant.
+
+tick management: the wigets will have tick disabled; implement a custom tick function on the pool manager
+that controls all the animations of the active widgets; obviously this will ignore the dormant widgets.

@@ -1,0 +1,51 @@
+﻿
+---- Setting: ----
+Golden-brown fields stretch out beneath overcast skies, stalks of dead grain swaying in dry wind.
+
+Abandoned villages with collapsed red-brick homes and overgrown dirt roads.
+
+Cracked bunkers and shattered concrete lie half-buried in tall yellowing grass.
+
+Rusting German vehicles and burned-out CRD armor dot the hillsides.
+
+Leafless trees and blackened forests, scorched during earlier fighting.
+
+Rail lines twisted like scars, with shattered freight cars frozen in time.
+
+Orange fog and dust from distant bombardments hang low in the valleys.
+
+Buzzing insects and the sound of creaking metal replace signs of life.
+
+Crows circle silently overhead, perching on rusted radio towers and pillboxes.
+
+Long shadows stretch over earthworks, broken fences, and the cracked husks of silos.
+
+---- END SETTING----
+
+Phase1: repair old base and recover jagdpanthers.
+Limited resources to train extra Scavs: choose between repairing bunkers or jagdpanthers (after they are recovered they are not full health)
+
+🔧 Jagdpanther 1 and 2 – Workshop Lockdown
+
+Located in a sealed underground repair bay.
+
+The player must restore power to the bay via an old fuel generator.
+
+After power-up, automated bay doors rise, and engineers begin the recovery process.
+
+Enemy scouting squads will try to interrupt the process—defend until complete.
+
+🔧 Jagdpanther 3 – Submerged in Rubble
+
+Buried beneath a collapsed ammunition warehouse on the edge of the base.
+Use harvesters to extract.
+
+Phase 2: defend against increasing amounts of enemy waves.
+
+Phase 3: final wave: heavy tanks.
+
+****** BONUS OBJECTIVE ******
+Repair 3 bunkers for construction blueprints.
+Recover the Stugs (3) at a nearby field to gain tank blueprints.
+
+
