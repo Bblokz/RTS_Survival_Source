@@ -24,7 +24,8 @@ namespace
         constexpr int32 ReinforcementCostRoundingIncrement = 5;
 }
 
-USquadReinforcementComponent::USquadReinforcementComponent(): bM_IsActivated(false), M_MaxSquadUnits(0)
+USquadReinforcementComponent::USquadReinforcementComponent(): bM_IsActivated(false), M_MaxSquadUnits(0),
+        bM_HasMissingSquadMembers(false), bM_ReinforcementAbilityAdded(false)
 {
         PrimaryComponentTick.bCanEverTick = false;
         PrimaryComponentTick.bStartWithTickEnabled = false;
@@ -38,21 +39,21 @@ void USquadReinforcementComponent::BeginPlay()
 
 void USquadReinforcementComponent::ActivateReinforcements(const bool bActivate)
 {
-        if (bActivate)
+        bM_IsActivated = bActivate;
+        if (not bM_IsActivated)
         {
-                if (bM_IsActivated)
-                {
-                        return;
-                }
-                AddReinforcementAbility();
+                RemoveReinforcementAbility();
                 return;
         }
 
-        if (not bM_IsActivated)
-        {
-                return;
-        }
-        RemoveReinforcementAbility();
+        UpdateMissingSquadMemberState();
+        RefreshReinforcementAbility();
+}
+
+void USquadReinforcementComponent::NotifySquadMembershipChanged()
+{
+        UpdateMissingSquadMemberState();
+        RefreshReinforcementAbility();
 }
 
 void USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementPoint)
@@ -97,6 +98,7 @@ void USquadReinforcementComponent::BeginPlay_InitSquadDataSnapshot()
                 M_InitialSquadUnitClasses.Add(SoftClass.LoadSynchronous());
         }
         M_MaxSquadUnits = M_InitialSquadUnitClasses.Num();
+        UpdateMissingSquadMemberState();
 }
 
 bool USquadReinforcementComponent::GetIsValidSquadController()
@@ -162,6 +164,10 @@ bool USquadReinforcementComponent::EnsureAbilityArraySized()
 
 void USquadReinforcementComponent::AddReinforcementAbility()
 {
+        if (bM_ReinforcementAbilityAdded)
+        {
+                return;
+        }
         if (not EnsureAbilityArraySized())
         {
                 return;
@@ -171,7 +177,7 @@ void USquadReinforcementComponent::AddReinforcementAbility()
         if (CurrentAbilities.IsValidIndex(ReinforcementAbilityIndex) &&
                 CurrentAbilities[ReinforcementAbilityIndex] == EAbilityID::IdReinforceSquad)
         {
-                bM_IsActivated = true;
+                bM_ReinforcementAbilityAdded = true;
                 return;
         }
         if (CurrentAbilities.IsValidIndex(ReinforcementAbilityIndex) &&
@@ -185,7 +191,7 @@ void USquadReinforcementComponent::AddReinforcementAbility()
         {
                 return;
         }
-        bM_IsActivated = true;
+        bM_ReinforcementAbilityAdded = true;
 }
 
 void USquadReinforcementComponent::RemoveReinforcementAbility()
@@ -194,11 +200,54 @@ void USquadReinforcementComponent::RemoveReinforcementAbility()
         {
                 return;
         }
+        const TArray<EAbilityID> CurrentAbilities = M_SquadController->GetUnitAbilities();
+        if (CurrentAbilities.IsValidIndex(ReinforcementAbilityIndex) &&
+                CurrentAbilities[ReinforcementAbilityIndex] != EAbilityID::IdReinforceSquad)
+        {
+                bM_ReinforcementAbilityAdded = false;
+                return;
+        }
         if (not M_SquadController->RemoveAbility(EAbilityID::IdReinforceSquad))
         {
                 return;
         }
-        bM_IsActivated = false;
+        bM_ReinforcementAbilityAdded = false;
+}
+
+void USquadReinforcementComponent::RefreshReinforcementAbility()
+{
+        if (not bM_IsActivated)
+        {
+                RemoveReinforcementAbility();
+                return;
+        }
+
+        if (not bM_HasMissingSquadMembers)
+        {
+                RemoveReinforcementAbility();
+                return;
+        }
+
+        AddReinforcementAbility();
+}
+
+void USquadReinforcementComponent::UpdateMissingSquadMemberState()
+{
+        bM_HasMissingSquadMembers = DoesSquadNeedReinforcement();
+}
+
+bool USquadReinforcementComponent::DoesSquadNeedReinforcement() const
+{
+        if (not M_SquadController.IsValid())
+        {
+                return false;
+        }
+        if (M_MaxSquadUnits <= 0)
+        {
+                return false;
+        }
+
+        return M_SquadController->GetSquadUnitsCount() < M_MaxSquadUnits;
 }
 
 bool USquadReinforcementComponent::CanProcessReinforcement(UReinforcementPoint* ReinforcementPoint,

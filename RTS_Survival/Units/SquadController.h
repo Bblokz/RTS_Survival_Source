@@ -243,6 +243,12 @@ public:
          */
         void RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit);
 
+        /**
+         * @brief Accessor for the reinforcement component managing this squad.
+         * @return Reinforcement component or nullptr when missing.
+         */
+        TObjectPtr<USquadReinforcementComponent> GetSquadReinforcementComponent() const;
+
 	inline URTSComponent* GetRTSComponent() const { return RTSComponent; }
 
 	inline AItemsMaster* GetTargetPickupItem() const { return M_TargetPickupItemState.M_TargetPickupItem; }
@@ -474,10 +480,12 @@ private:
 
 	// Contains the data for the commands that this unit can execute using the ICommands interface.
 	// Needs to be accessible by derived classes to get data like current command.
-	UPROPERTY()
-	UCommandData* M_UnitCommandData;
+        UPROPERTY()
+        UCommandData* M_UnitCommandData;
 
-	bool GetIsValidSquadUnit(const ASquadUnit* Unit) const;
+        bool GetIsValidSquadUnit(const ASquadUnit* Unit) const;
+        bool GetIsValidSquadReinforcementComponent() const;
+        void UpdateReinforcementAvailability();
 	bool GetIsValidPlayerController();
 
 	void BeginPlay_SetupPlayerController();

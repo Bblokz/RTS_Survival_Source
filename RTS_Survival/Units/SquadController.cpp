@@ -372,16 +372,18 @@ void ASquadController::UnitInSquadDied(ASquadUnit* UnitDied, const bool bUnitSel
 		M_UnitsCompletedCommand = M_TSquadUnits.Num();
 	}
 
-	const bool bHadCargoSquadInside = IsValid(CargoSquad) && CargoSquad->GetIsInsideCargo();
-	if (bHadCargoSquadInside)
-	{
-		CargoSquad->OnUnitDiedWhileInside(UnitDied);
-	}
+        const bool bHadCargoSquadInside = IsValid(CargoSquad) && CargoSquad->GetIsInsideCargo();
+        if (bHadCargoSquadInside)
+        {
+                CargoSquad->OnUnitDiedWhileInside(UnitDied);
+        }
 
-	// If there are still units left, no squad-wide cleanup is needed.
-	if (M_TSquadUnits.Num() > 0)
-	{
-		return;
+        UpdateReinforcementAvailability();
+
+        // If there are still units left, no squad-wide cleanup is needed.
+        if (M_TSquadUnits.Num() > 0)
+        {
+                return;
 	}
 
 	// At this point the squad is empty; if we were inside cargo, free that state.
@@ -1926,6 +1928,16 @@ void ASquadController::RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit)
                 return;
         }
         M_TSquadUnits.Add(ReinforcedUnit);
+        UpdateReinforcementAvailability();
+}
+
+TObjectPtr<USquadReinforcementComponent> ASquadController::GetSquadReinforcementComponent() const
+{
+        if (not GetIsValidSquadReinforcementComponent())
+        {
+                return nullptr;
+        }
+        return SquadReinforcement;
 }
 
 
@@ -2203,12 +2215,34 @@ void ASquadController::SetWeaponIcon(const EWeaponName HighestValuedWeapon)
 
 bool ASquadController::GetIsValidSquadUnit(const ASquadUnit* Unit) const
 {
-	if (!IsValid(Unit))
-	{
-		RTSFunctionLibrary::ReportError("Squad Unit is null when trying to accesss from array in SquadController!");
-		return false;
-	}
-	return true;
+        if (!IsValid(Unit))
+        {
+                RTSFunctionLibrary::ReportError("Squad Unit is null when trying to accesss from array in SquadController!");
+                return false;
+        }
+        return true;
+}
+
+bool ASquadController::GetIsValidSquadReinforcementComponent() const
+{
+        if (IsValid(SquadReinforcement))
+        {
+                return true;
+        }
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised(this,
+                                                               "SquadReinforcement",
+                                                               "ASquadController::GetIsValidSquadReinforcementComponent",
+                                                               this);
+        return false;
+}
+
+void ASquadController::UpdateReinforcementAvailability()
+{
+        if (not GetIsValidSquadReinforcementComponent())
+        {
+                return;
+        }
+        SquadReinforcement->NotifySquadMembershipChanged();
 }
 
 bool ASquadController::GetIsValidPlayerController()

@@ -50,6 +50,11 @@ public:
         void ActivateReinforcements(const bool bActivate);
 
         /**
+         * @brief Update reinforcement availability when squad composition changes.
+         */
+        void NotifySquadMembershipChanged();
+
+        /**
          * @brief Reinforce missing units at the provided reinforcement point.
          * @param ReinforcementPoint Point that provides the spawn location.
          */
@@ -67,6 +72,9 @@ private:
         bool EnsureAbilityArraySized();
         void AddReinforcementAbility();
         void RemoveReinforcementAbility();
+        void RefreshReinforcementAbility();
+        void UpdateMissingSquadMemberState();
+        bool DoesSquadNeedReinforcement() const;
 
         /**
          * @brief Validate if reinforcement can proceed and gather missing units/location.
@@ -117,4 +125,8 @@ private:
 
         UPROPERTY()
         FReinforcementRequestState M_ReinforcementRequestState;
+
+        bool bM_HasMissingSquadMembers;
+
+        bool bM_ReinforcementAbilityAdded;
 };

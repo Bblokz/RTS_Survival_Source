@@ -2,6 +2,7 @@
 
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -412,6 +413,31 @@ void FRTS_CollisionSetup::SetupInfantryCapsuleCollision(UCapsuleComponent* Capsu
 	}
 	RTSFunctionLibrary::ReportError("Invalid Capsule Component for Infantry Capsule Collision Setup."
 		"\n see RTSFunctionLibrary::SetupInfantryCapsuleCollision");
+}
+
+void FRTS_CollisionSetup::SetupTriggerOverlapCollision(UPrimitiveComponent* TriggerComponent,
+        ETriggerOverlapLogic TriggerLogic)
+{
+        if (IsValid(TriggerComponent))
+        {
+                TriggerComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+                TriggerComponent->SetCollisionObjectType(ECC_WorldDynamic);
+                TriggerComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+                TriggerComponent->SetGenerateOverlapEvents(true);
+                TriggerComponent->SetCanEverAffectNavigation(false);
+
+                if (TriggerLogic == ETriggerOverlapLogic::OverlapPlayer || TriggerLogic == ETriggerOverlapLogic::OverlapBoth)
+                {
+                        TriggerComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
+                }
+                if (TriggerLogic == ETriggerOverlapLogic::OverlapEnemy || TriggerLogic == ETriggerOverlapLogic::OverlapBoth)
+                {
+                        TriggerComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
+                }
+                return;
+        }
+        RTSFunctionLibrary::ReportError("Invalid trigger component provided for overlap setup.",
+                "\nFRTS_CollisionSetup::SetupTriggerOverlapCollision");
 }
 
 void FRTS_CollisionSetup::SetupScavengeableObjectCollision(UStaticMeshComponent* ScavengeableObjectMesh)
