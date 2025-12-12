@@ -3,9 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Behaviours/Lifetime/BehaviourLifeTime.h"
-#include "Behaviours/StackRule/BehaviourStackRule.h"
-#include "Behaviours/UI/BehaviourUIData.h"
+#include "Lifetime/BehaviourLifeTime.h"
+#include "StackRule/BehaviourStackRule.h"
+#include "Icons/BehaviourIcon.h"
 
 #include "Behaviour.generated.h"
 
