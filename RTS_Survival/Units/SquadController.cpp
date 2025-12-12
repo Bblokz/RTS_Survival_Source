@@ -30,6 +30,7 @@
 #include "Squads/SquadUnit/SquadUnit.h"
 #include "Squads/SquadUnit/AISquadUnit/AISquadUnit.h"
 #include "Squads/SquadUnitHpComp/SquadUnitHealthComponent.h"
+#include "Weapons/WeaponData/WeaponData.h"
 
 FSquadStartGameAction::FSquadStartGameAction()
 {
@@ -1595,50 +1596,123 @@ void ASquadController::StopMovement()
 void ASquadController::StartPickupWeapon(AWeaponPickup* TargetWeaponItem)
 {
 	// TargetWeaponItem == pickup item saved at this squad controller has already been checked at the item itself.
-	if (not IsValid(RTSComponent) || not IsValid(TargetWeaponItem) || not TargetWeaponItem->EnsurePickupInitialized())
-	{
-		return;
-	}
-	const EAbilityID CurrentAbility = M_UnitCommandData->GetCurrentlyActiveCommandType();
-	if (CurrentAbility != EAbilityID::IdPickupItem)
-	{
-		const FString ItemName = TargetWeaponItem->GetName();
-		RTSFunctionLibrary::ReportError(
-			"Pickup item of name: " + ItemName + " is not the current command type for squad: " + GetName() +
-			"\n But did trigger a StartPickupWeapon!");
-		return;
-	}
-	bool HasValidSecondaryWeaponComponent = false;
-	TObjectPtr<ASquadUnit> SquadUnitWithNoSecondary = nullptr;
-	for (auto EachSquadUnit : M_TSquadUnits)
-	{
-		if (not GetIsValidSquadUnit(EachSquadUnit))
-		{
-			continue;
-		}
-		const bool bHasSecondaryWeapon = EachSquadUnit->GetHasSecondaryWeapon(HasValidSecondaryWeaponComponent);
-		if (!bHasSecondaryWeapon && HasValidSecondaryWeaponComponent)
-		{
-			if (!EachSquadUnit->bM_IsSwitchingWeapon)
-			{
-				// no secondary weapon mounted yet but does have a component to do so.
-				// Also this unit is not already busy switching
-				SquadUnitWithNoSecondary = EachSquadUnit;
-				break;
-			}
-			RTSFunctionLibrary::PrintString(
-				"Skipped unit for pickup as the unit is busy with switching weapons!!!.", FColor::Red);
-		}
-	}
-	if (SquadUnitWithNoSecondary)
-	{
-		// Calls Destroy and SetItemDisabled on the pick up to make sure only this unit can pick it up.
-		SquadUnitWithNoSecondary->StartPickupWeapon(TargetWeaponItem);
-		OnWeaponPickup.Broadcast();
-		return;
-	}
-	// todo in game visual feedback that no unit can pick up the weapon.
-	RTSFunctionLibrary::ReportError("No squad unit found with place for a second weapon on squad " + GetName());
+        if (not GetIsValidRTSComponent() || not GetIsValidWeaponPickup(TargetWeaponItem))
+        {
+                return;
+        }
+
+        if (not IsPickupWeaponCommandActive(TargetWeaponItem))
+        {
+                return;
+        }
+
+        TObjectPtr<ASquadUnit> SquadUnitWithLowestWeaponValue = FindSquadUnitWithLowestWeaponValueForPickup();
+        if (not SquadUnitWithLowestWeaponValue)
+        {
+                // todo in game visual feedback that no unit can pick up the weapon.
+                RTSFunctionLibrary::ReportError("No squad unit found with place for a second weapon on squad " + GetName());
+                return;
+        }
+
+        // Calls Destroy and SetItemDisabled on the pick up to make sure only this unit can pick it up.
+        SquadUnitWithLowestWeaponValue->StartPickupWeapon(TargetWeaponItem);
+        OnWeaponPickup.Broadcast();
+}
+
+bool ASquadController::GetIsValidWeaponPickup(AWeaponPickup* TargetWeaponItem) const
+{
+        if (not IsValid(TargetWeaponItem))
+        {
+                return false;
+        }
+
+        return TargetWeaponItem->EnsurePickupInitialized();
+}
+
+bool ASquadController::IsPickupWeaponCommandActive(const AWeaponPickup* TargetWeaponItem) const
+{
+        const EAbilityID CurrentAbility = M_UnitCommandData->GetCurrentlyActiveCommandType();
+        if (CurrentAbility == EAbilityID::IdPickupItem)
+        {
+                return true;
+        }
+
+        const FString ItemName = IsValid(TargetWeaponItem) ? TargetWeaponItem->GetName() : "null";
+        RTSFunctionLibrary::ReportError(
+                "Pickup item of name: " + ItemName + " is not the current command type for squad: " + GetName() +
+                "\n But did trigger a StartPickupWeapon!");
+        return false;
+}
+
+TObjectPtr<ASquadUnit> ASquadController::FindSquadUnitWithLowestWeaponValueForPickup()
+{
+        TObjectPtr<ASquadUnit> SquadUnitWithLowestWeaponValue = nullptr;
+        int32 LowestWeaponValue = TNumericLimits<int32>::Max();
+        for (ASquadUnit* SquadUnit : M_TSquadUnits)
+        {
+                if (not CanSquadUnitPickupWeapon(SquadUnit))
+                {
+                        continue;
+                }
+
+                const int32 WeaponValue = GetWeaponValueForSquadUnit(SquadUnit);
+                if (WeaponValue >= LowestWeaponValue)
+                {
+                        continue;
+                }
+
+                LowestWeaponValue = WeaponValue;
+                SquadUnitWithLowestWeaponValue = SquadUnit;
+        }
+
+        return SquadUnitWithLowestWeaponValue;
+}
+
+bool ASquadController::CanSquadUnitPickupWeapon(const ASquadUnit* SquadUnit) const
+{
+        if (not GetIsValidSquadUnit(SquadUnit))
+        {
+                return false;
+        }
+
+        bool bHasValidSecondaryWeaponComponent = false;
+        const bool bHasSecondaryWeapon = SquadUnit->GetHasSecondaryWeapon(bHasValidSecondaryWeaponComponent);
+        if (not bHasValidSecondaryWeaponComponent)
+        {
+                return false;
+        }
+
+        if (bHasSecondaryWeapon)
+        {
+                return false;
+        }
+
+        if (SquadUnit->bM_IsSwitchingWeapon)
+        {
+                RTSFunctionLibrary::PrintString(
+                        "Skipped unit for pickup as the unit is busy with switching weapons!!!.", FColor::Red);
+                return false;
+        }
+
+        return true;
+}
+
+int32 ASquadController::GetWeaponValueForSquadUnit(const ASquadUnit* SquadUnit) const
+{
+        if (not GetIsValidSquadUnit(SquadUnit))
+        {
+                return TNumericLimits<int32>::Max();
+        }
+
+        const UWeaponState* WeaponState = SquadUnit->GetWeaponState();
+        if (not IsValid(WeaponState))
+        {
+                RTSFunctionLibrary::ReportError(
+                        "Squad unit weapon state invalid when selecting pickup target for squad: " + GetName());
+                return TNumericLimits<int32>::Max();
+        }
+
+        return Global_GetWeaponValue(WeaponState->GetRawWeaponData().WeaponName);
 }
 
 bool ASquadController::ExeScav_EnsureValidObj(const AScavengeableObject* ScavengeableObject)
