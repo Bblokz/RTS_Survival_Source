@@ -22,6 +22,7 @@ namespace
 {
         constexpr float ReinforcementProgressOffsetZ = 500.0f;
         constexpr float ReinforcementProgressScale = 1.0f;
+        constexpr int32 ReinforcementCostRoundingIncrement = 5;
 }
 
 USquadReinforcementComponent::USquadReinforcementComponent(): bM_IsActivated(false), M_MaxSquadUnits(0)
@@ -57,21 +58,9 @@ void USquadReinforcementComponent::ActivateReinforcements(const bool bActivate)
 
 void USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementPoint)
 {
-        if (not bM_IsActivated)
-        {
-                return;
-        }
-        if (M_ReinforcementRequestState.bM_IsInProgress)
-        {
-                return;
-        }
-        if (not GetIsReinforcementAllowed(ReinforcementPoint))
-        {
-                return;
-        }
-
         TArray<TSubclassOf<ASquadUnit>> MissingUnitClasses;
-        if (not GetMissingUnitClasses(MissingUnitClasses))
+        FVector ReinforcementLocation = FVector::ZeroVector;
+        if (not CanProcessReinforcement(ReinforcementPoint, MissingUnitClasses, ReinforcementLocation))
         {
                 return;
         }
@@ -83,34 +72,8 @@ void USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementP
                 return;
         }
 
-        bool bHasValidLocation = false;
-        const FVector ReinforcementLocation = ReinforcementPoint->GetReinforcementLocation(bHasValidLocation);
-        if (not bHasValidLocation)
+        if (not TryPayReinforcementCost(ReinforcementCost))
         {
-                return;
-        }
-
-        UPlayerResourceManager* ResourceManager = nullptr;
-        if (not TryGetResourceManager(ResourceManager))
-        {
-                return;
-        }
-
-        const EPlayerError PaymentError = ResourceManager->GetCanPayForCost(ReinforcementCost);
-        if (PaymentError != EPlayerError::Error_None)
-        {
-                if (ACPPController* PlayerController = FRTS_Statics::GetRTSController(this))
-                {
-                        PlayerController->DisplayErrorMessage(PaymentError);
-                }
-                return;
-        }
-
-        const bool bPaid = ResourceManager->PayForCosts(ReinforcementCost);
-        if (not bPaid)
-        {
-                RTSFunctionLibrary::ReportError("Failed to pay reinforcement costs despite validation.",
-                        "\nUSquadReinforcementComponent::Reinforce");
                 return;
         }
 
@@ -238,6 +201,31 @@ void USquadReinforcementComponent::RemoveReinforcementAbility()
         bM_IsActivated = false;
 }
 
+bool USquadReinforcementComponent::CanProcessReinforcement(UReinforcementPoint* ReinforcementPoint,
+        TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses, FVector& OutReinforcementLocation)
+{
+        if (not bM_IsActivated)
+        {
+                return false;
+        }
+        if (M_ReinforcementRequestState.bM_IsInProgress)
+        {
+                return false;
+        }
+        if (not GetIsReinforcementAllowed(ReinforcementPoint))
+        {
+                return false;
+        }
+        if (not GetMissingUnitClasses(OutMissingUnitClasses))
+        {
+                return false;
+        }
+
+        bool bHasValidLocation = false;
+        OutReinforcementLocation = ReinforcementPoint->GetReinforcementLocation(bHasValidLocation);
+        return bHasValidLocation;
+}
+
 bool USquadReinforcementComponent::GetIsReinforcementAllowed(UReinforcementPoint* ReinforcementPoint)
 {
         if (not GetIsValidSquadController())
@@ -264,7 +252,7 @@ bool USquadReinforcementComponent::GetIsReinforcementAllowed(UReinforcementPoint
 }
 
 bool USquadReinforcementComponent::TryResolveReinforcementCost(const int32 MissingUnits,
-                                                               TMap<ERTSResourceType, int32>& OutCost)
+        TMap<ERTSResourceType, int32>& OutCost)
 {
         if (MissingUnits <= 0)
         {
@@ -275,6 +263,8 @@ bool USquadReinforcementComponent::TryResolveReinforcementCost(const int32 Missi
                 return false;
         }
         OutCost.Reset();
+        const int32 ClampedMaxSquadUnits = FMath::Max(M_MaxSquadUnits, 1);
+        const float MissingRatio = static_cast<float>(MissingUnits) / static_cast<float>(ClampedMaxSquadUnits);
         bool bIsValidData = false;
         const FSquadData SquadData = FRTS_Statics::BP_GetSquadDataOfPlayer(
                 M_SquadController->RTSComponent->GetOwningPlayer(),
@@ -290,9 +280,43 @@ bool USquadReinforcementComponent::TryResolveReinforcementCost(const int32 Missi
 
         for (const auto& CostPair : SquadData.Cost.ResourceCosts)
         {
-                OutCost.Add(CostPair.Key, CostPair.Value * MissingUnits);
+                const float ScaledCost = static_cast<float>(CostPair.Value) * MissingRatio;
+                const int32 RoundedCost = FMath::CeilToInt(ScaledCost / ReinforcementCostRoundingIncrement)
+                        * ReinforcementCostRoundingIncrement;
+                if (RoundedCost > 0)
+                {
+                        OutCost.Add(CostPair.Key, RoundedCost);
+                }
         }
-        return true;
+        return OutCost.Num() > 0;
+}
+
+bool USquadReinforcementComponent::TryPayReinforcementCost(const TMap<ERTSResourceType, int32>& ReinforcementCost) const
+{
+        UPlayerResourceManager* ResourceManager = nullptr;
+        if (not TryGetResourceManager(ResourceManager))
+        {
+                return false;
+        }
+
+        const EPlayerError PaymentError = ResourceManager->GetCanPayForCost(ReinforcementCost);
+        if (PaymentError != EPlayerError::Error_None)
+        {
+                if (ACPPController* PlayerController = FRTS_Statics::GetRTSController(this))
+                {
+                        PlayerController->DisplayErrorMessage(PaymentError);
+                }
+                return false;
+        }
+
+        const bool bPaid = ResourceManager->PayForCosts(ReinforcementCost);
+        if (bPaid)
+        {
+                return true;
+        }
+        RTSFunctionLibrary::ReportError("Failed to pay reinforcement costs despite validation.",
+                "\nUSquadReinforcementComponent::TryPayReinforcementCost");
+        return false;
 }
 
 bool USquadReinforcementComponent::TryGetResourceManager(UPlayerResourceManager*& OutManager) const

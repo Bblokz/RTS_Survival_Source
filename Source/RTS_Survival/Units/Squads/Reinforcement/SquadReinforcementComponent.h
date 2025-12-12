@@ -67,8 +67,33 @@ private:
         bool EnsureAbilityArraySized();
         void AddReinforcementAbility();
         void RemoveReinforcementAbility();
-        bool GetIsReinforcementAllowed(UReinforcementPoint* ReinforcementPoint);
+
+        /**
+         * @brief Validate if reinforcement can proceed and gather missing units/location.
+         * @param ReinforcementPoint Source point for reinforcements.
+         * @param OutMissingUnitClasses Missing unit classes for respawn.
+         * @param OutReinforcementLocation Location to spawn reinforcements.
+         * @return True when the request can proceed and the location is valid.
+         */
+        bool CanProcessReinforcement(UReinforcementPoint* ReinforcementPoint,
+                                     TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses,
+                                     FVector& OutReinforcementLocation);
+
+        /**
+         * @brief Resolve reinforcement cost based on missing units ratio.
+         * @param MissingUnits Number of units that need replacement.
+         * @param OutCost Computed resource cost rounded up to multiples of five.
+         * @return True when cost data could be resolved.
+         */
         bool TryResolveReinforcementCost(const int32 MissingUnits, TMap<ERTSResourceType, int32>& OutCost);
+
+        /**
+         * @brief Attempt to pay the computed reinforcement cost.
+         * @param ReinforcementCost Resource map to charge.
+         * @return True when payment succeeds.
+         */
+        bool TryPayReinforcementCost(const TMap<ERTSResourceType, int32>& ReinforcementCost) const;
+
         bool TryGetResourceManager(UPlayerResourceManager*& OutManager) const;
         bool TryGetTrainingMenuManager(UTrainingMenuManager*& OutMenuManager) const;
         float CalculateReinforcementTime(const int32 MissingUnits) const;
