@@ -23,6 +23,7 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "Squads/SquadControllerHpComp/USquadHealthComponent.h"
 #include "Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIcons.h"
 #include "Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIconSettings/SquadWeaponIconSettings.h"
@@ -171,18 +172,20 @@ bool FSquadStartGameAction::ExecuteStartAbility() const
 		break;
 	case EAbilityID::IdAircraftOwnerNotExpanded:
 		break;
-	case EAbilityID::IdEnterCargo:
-		return M_MySquad->EnterCargo(TargetActor, true) == ECommandQueueError::NoError;
-	case EAbilityID::IdExitCargo:
-		break;
-	case EAbilityID::IdEnableResourceConversion:
-		break;
-	case EAbilityID::IdDisableResourceConversion:
-		break;
-	case EAbilityID::IdCapture:
-		return M_MySquad->CaptureActor(TargetActor, true) == ECommandQueueError::NoError;
-	}
-	return true;
+        case EAbilityID::IdEnterCargo:
+                return M_MySquad->EnterCargo(TargetActor, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdExitCargo:
+                break;
+        case EAbilityID::IdEnableResourceConversion:
+                break;
+        case EAbilityID::IdDisableResourceConversion:
+                break;
+        case EAbilityID::IdCapture:
+                return M_MySquad->CaptureActor(TargetActor, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdReinforceSquad:
+                break;
+        }
+        return true;
 }
 
 FTargetPickupItemState::FTargetPickupItemState()
@@ -222,6 +225,8 @@ ASquadController::ASquadController(): PlayerController(nullptr), RTSComponent(nu
 
         // NEW: create the cargo squad component so all cargo logic lives outside the controller.
         CargoSquad = CreateDefaultSubobject<UCargoSquad>(TEXT("CargoSquad"));
+
+        SquadReinforcement = CreateDefaultSubobject<USquadReinforcementComponent>(TEXT("SquadReinforcement"));
 
         M_SquadWeaponSwitch.Init(this);
 }
@@ -1824,11 +1829,39 @@ FVector ASquadController::FindIdealSpawnLocation()
 }
 
 
+void ASquadController::BeginReinforcementSpawnGrid(const FVector& OriginLocation)
+{
+        StartGeneratingSpawnLocations(OriginLocation);
+}
+
+FVector ASquadController::GetNextReinforcementSpawnLocation()
+{
+        return FindIdealSpawnLocation();
+}
+
+void ASquadController::RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit)
+{
+        if (not IsValid(ReinforcedUnit))
+        {
+                RTSFunctionLibrary::ReportError(TEXT("Attempted to register invalid reinforced unit."),
+                        TEXT("\nASquadController::RegisterReinforcedUnit"));
+                return;
+        }
+
+        if (M_TSquadUnits.Contains(ReinforcedUnit))
+        {
+                return;
+        }
+
+        M_TSquadUnits.Add(ReinforcedUnit);
+}
+
+
 void ASquadController::StartGeneratingSpawnLocations(const FVector& GridOriginLocation)
 {
-	M_SpawnIndex = 0;
-	M_GridOriginLocation = GridOriginLocation;
-	M_GridSize = 250.0f;
+        M_SpawnIndex = 0;
+        M_GridOriginLocation = GridOriginLocation;
+        M_GridSize = 250.0f;
 
 	const float HalfGridSize = M_GridSize / 2.0f;
 	const float MaxRandomOffset = M_GridSize * 0.33f;

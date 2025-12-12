@@ -46,11 +46,12 @@ enum class EAbilityID : uint8
 	IdRepair,
 	IdReturnToBase,
 	IdAircraftOwnerNotExpanded,
-	IdEnterCargo,
-	IdExitCargo,
-	IdEnableResourceConversion,
-	IdDisableResourceConversion,
-	IdCapture,
+        IdEnterCargo,
+        IdExitCargo,
+        IdEnableResourceConversion,
+        IdDisableResourceConversion,
+        IdCapture,
+        IdReinforceSquad,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
@@ -91,8 +92,9 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 		case EAbilityID::IdExitCargo: return TEXT("Exit Cargo");
 		case EAbilityID::IdAircraftOwnerNotExpanded: return TEXT("Aircraft Owner Not Expanded");
 	case EAbilityID::IdNoAbility_MoveCloserToTarget: return TEXT("Move Closer To Target");
-	case EAbilityID::IdDisableResourceConversion: return TEXT("Disable Resource Conversion");
-	case EAbilityID::IdEnableResourceConversion: return TEXT("Enable Resource Conversion");
-	default: return TEXT("Unknown Ability");
-	}
+        case EAbilityID::IdDisableResourceConversion: return TEXT("Disable Resource Conversion");
+        case EAbilityID::IdEnableResourceConversion: return TEXT("Enable Resource Conversion");
+        case EAbilityID::IdReinforceSquad: return TEXT("Reinforce Squad");
+        default: return TEXT("Unknown Ability");
+        }
 }
