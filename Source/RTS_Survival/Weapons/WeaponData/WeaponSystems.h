@@ -193,9 +193,9 @@ enum class
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 {
-	switch (WeaponName)
-	{
-	case EWeaponName::T26_Mg: return "7.62 DT";
+        switch (WeaponName)
+        {
+        case EWeaponName::T26_Mg: return "7.62 DT";
 	case EWeaponName::MP46: return "MP46";
 	case EWeaponName::F_35_76MM: return "F-35";
 	case EWeaponName::BK_5_50MM: return "BK 5";
@@ -316,10 +316,34 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::PPS_43_7_62MM:
 		return "PPS-43";
 
-	case EWeaponName::DEFAULT_WEAPON: return "Default Weapon";
-	default:
-		return "NoWpTranslation";
-	}
+        case EWeaponName::DEFAULT_WEAPON: return "Default Weapon";
+        default:
+                return "NoWpTranslation";
+        }
+}
+
+static bool Global_IsRifle(const EWeaponName WeaponName)
+{
+        switch (WeaponName)
+        {
+        case EWeaponName::GerRailGun:
+        case EWeaponName::RailGunY:
+        case EWeaponName::SVT_40_7_62MM:
+        case EWeaponName::Fedrov_Avtomat:
+        case EWeaponName::FG_42_7_92MM:
+        case EWeaponName::STG44_7_92MM:
+        case EWeaponName::Kar_98k:
+        case EWeaponName::Mosin:
+        case EWeaponName::Mauser:
+        case EWeaponName::SKS:
+        case EWeaponName::PTRS_50MM:
+        case EWeaponName::PTRS_41_14_5MM:
+        case EWeaponName::PanzerRifle_50mm:
+        case EWeaponName::PTRS_X_Tishina:
+                return true;
+        default:
+                return false;
+        }
 }
 
 static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
