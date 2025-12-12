@@ -22,6 +22,7 @@
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Game/GameState/UnitDataHelpers/UnitDataHelpers.h"
 #include "RTS_Survival/PickupItems/Items/WeaponPickUp/WeaponPickup.h"
+#include "Components/ChildActorComponent.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
@@ -1122,18 +1123,79 @@ void ASquadUnit::SetupWeapon(AInfantryWeaponMaster* NewWeapon)
 
 void ASquadUnit::TerminatePickupWeapon()
 {
-	// Stop any movement towards the weapon item.
-	// Also unbinds the OnMoveCompleted function.
-	StopMovementAndClearPath();
+        // Stop any movement towards the weapon item.
+        // Also unbinds the OnMoveCompleted function.
+        StopMovementAndClearPath();
 
-	M_ActiveCommand = EAbilityID::IdIdle;
+        M_ActiveCommand = EAbilityID::IdIdle;
+}
+
+bool ASquadUnit::SwapWeaponsWithUnit(ASquadUnit* OtherUnit)
+{
+        if (not IsValid(OtherUnit))
+        {
+                return false;
+        }
+
+        if (not GetIsValidChildWeaponActor())
+        {
+                return false;
+        }
+
+        if (not OtherUnit->GetIsValidChildWeaponActor())
+        {
+                return false;
+        }
+
+        UChildActorComponent* OtherChildWeapon = OtherUnit->M_ChildWeaponComp;
+
+        const TSubclassOf<AActor> ThisWeaponClass = M_ChildWeaponComp->GetChildActorClass();
+        const TSubclassOf<AActor> OtherWeaponClass = OtherChildWeapon->GetChildActorClass();
+
+        M_ChildWeaponComp->DestroyChildActor();
+        OtherChildWeapon->DestroyChildActor();
+
+        M_ChildWeaponComp->SetChildActorClass(OtherWeaponClass);
+        M_ChildWeaponComp->CreateChildActor();
+
+        OtherChildWeapon->SetChildActorClass(ThisWeaponClass);
+        OtherChildWeapon->CreateChildActor();
+
+        SetupSwappedWeapon(Cast<AInfantryWeaponMaster>(M_ChildWeaponComp->GetChildActor()));
+        OtherUnit->SetupSwappedWeapon(Cast<AInfantryWeaponMaster>(OtherChildWeapon->GetChildActor()));
+
+        return GetIsValidWeapon() && OtherUnit->GetIsValidWeapon();
+}
+
+void ASquadUnit::SetupSwappedWeapon(AInfantryWeaponMaster* NewWeapon)
+{
+        SetupWeapon(NewWeapon);
+
+        if (not IsValid(NewWeapon))
+        {
+                return;
+        }
+
+        NewWeapon->SetupOwner(this);
+
+        if (IsValid(RTSComponent))
+        {
+                NewWeapon->SetOwningPlayer(RTSComponent->GetOwningPlayer());
+        }
+
+        NewWeapon->DisableWeaponSearch(true);
+
+        if (IsValid(AnimBp_SquadUnit))
+        {
+                AnimBp_SquadUnit->SetWeaponAimOffset(NewWeapon->GetAimOffsetType());
+        }
 }
 
 void ASquadUnit::SetWeaponToAutoEngageTargets(const bool bUseLastTarget)
 {
-	if (not GetIsValidWeapon())
-	{
-		return;
+        if (not GetIsValidWeapon())
+        {
+                return;
 	}
 	M_InfantryWeapon->SetAutoEngageTargets(bUseLastTarget);
 }
@@ -1576,10 +1638,11 @@ void ASquadUnit::UnitDies_HandleSelectionAndCommand(bool& OutIsSelected)
 
 void ASquadUnit::UnitDies_RemoveFromSquadController(bool bIsSelected)
 {
-	if (IsValid(M_SquadController))
-	{
-		M_SquadController->UnitInSquadDied(this, bIsSelected);
-	}
+        if (IsValid(M_SquadController))
+        {
+                M_SquadController->HandleWeaponSwitchOnUnitDeath(this);
+                M_SquadController->UnitInSquadDied(this, bIsSelected);
+        }
 }
 
 void ASquadUnit::UnitDies_NotifyAnimInstance()

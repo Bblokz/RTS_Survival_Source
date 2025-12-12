@@ -210,18 +210,20 @@ FCaptureState::FCaptureState()
 
 ASquadController::ASquadController(): PlayerController(nullptr), RTSComponent(nullptr)
 {
-	using DeveloperSettings::GamePlay::Navigation::SqPathFinding_OffsetDistance;
-	using DeveloperSettings::GamePlay::Navigation::SqPathFinding_FinalDestSpread;
-	M_SqPath_Offsets = {
+        using DeveloperSettings::GamePlay::Navigation::SqPathFinding_OffsetDistance;
+        using DeveloperSettings::GamePlay::Navigation::SqPathFinding_FinalDestSpread;
+        M_SqPath_Offsets = {
 		FVector(SqPathFinding_OffsetDistance, 0, 0), FVector(-SqPathFinding_OffsetDistance, 0, 0),
 		FVector(0, SqPathFinding_OffsetDistance, 0), FVector(0, -SqPathFinding_OffsetDistance, 0),
 		FVector(SqPathFinding_OffsetDistance, SqPathFinding_OffsetDistance, 0),
 		FVector(-SqPathFinding_OffsetDistance, -SqPathFinding_OffsetDistance, 0),
 	};
-	ExperienceComponent = CreateDefaultSubobject<URTSExperienceComp>(TEXT("ExperienceComponent"));
+        ExperienceComponent = CreateDefaultSubobject<URTSExperienceComp>(TEXT("ExperienceComponent"));
 
-	// NEW: create the cargo squad component so all cargo logic lives outside the controller.
-	CargoSquad = CreateDefaultSubobject<UCargoSquad>(TEXT("CargoSquad"));
+        // NEW: create the cargo squad component so all cargo logic lives outside the controller.
+        CargoSquad = CreateDefaultSubobject<UCargoSquad>(TEXT("CargoSquad"));
+
+        M_SquadWeaponSwitch.Init(this);
 }
 
 void ASquadController::RequestSquadMoveForAbility(const FVector& MoveToLocation, const EAbilityID AbilityID)
@@ -331,9 +333,9 @@ bool ASquadController::GetIsScavenger()
 
 bool ASquadController::GetIsRepairUnit()
 {
-	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
-	{
-		if (GetIsValidSquadUnit(SquadUnit) && SquadUnit->GetHasValidRepairComp())
+        for (const ASquadUnit* SquadUnit : M_TSquadUnits)
+        {
+                if (GetIsValidSquadUnit(SquadUnit) && SquadUnit->GetHasValidRepairComp())
 		{
 			return true;
 		}
@@ -343,14 +345,20 @@ bool ASquadController::GetIsRepairUnit()
 
 float ASquadController::GetUnitRepairRadius()
 {
-	RTSFunctionLibrary::ReportError("Calling Get Unit repair radius on a squad controller!");
-	return 100.f;
+        RTSFunctionLibrary::ReportError("Calling Get Unit repair radius on a squad controller!");
+        return 100.f;
+}
+
+
+void ASquadController::HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied)
+{
+        M_SquadWeaponSwitch.HandleWeaponSwitchOnUnitDeath(UnitThatDied);
 }
 
 
 void ASquadController::UnitInSquadDied(ASquadUnit* UnitDied, const bool bUnitSelected)
 {
-	M_TSquadUnits.Remove(UnitDied);
+        M_TSquadUnits.Remove(UnitDied);
 
 	// Adjust the completed command count if necessary.
 	if (M_UnitsCompletedCommand > M_TSquadUnits.Num())
