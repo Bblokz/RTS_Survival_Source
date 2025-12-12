@@ -13,7 +13,6 @@
 #include "RTS_Survival/UnitData/SquadData.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
@@ -106,8 +105,9 @@ bool USquadReinforcementComponent::GetIsValidSquadController()
         {
                 return true;
         }
-        RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController",
-                "GetIsValidSquadController", GetOwner());
+        const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : FString("InvalidOwner");
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController" ,
+                "GetIsValidSquadController" + OwnerName);
         return false;
 }
 
@@ -143,7 +143,7 @@ bool USquadReinforcementComponent::EnsureAbilityArraySized()
         const int32 MaxAbilities = DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI;
         if (DesiredNum > MaxAbilities)
         {
-                RTSFunctionLibrary::ReportError("Reinforcement ability index exceeds max abilities.",
+                RTSFunctionLibrary::ReportError("Reinforcement ability index exceeds max abilities."
                         "\nUSquadReinforcementComponent::EnsureAbilityArraySized");
                 return false;
         }
@@ -177,7 +177,7 @@ void USquadReinforcementComponent::AddReinforcementAbility()
         if (CurrentAbilities.IsValidIndex(ReinforcementAbilityIndex) &&
                 CurrentAbilities[ReinforcementAbilityIndex] != EAbilityID::IdNoAbility)
         {
-                RTSFunctionLibrary::ReportError("Reinforcement ability slot already occupied.",
+                RTSFunctionLibrary::ReportError("Reinforcement ability slot already occupied." 
                         "\nUSquadReinforcementComponent::AddReinforcementAbility");
                 return;
         }
@@ -234,13 +234,13 @@ bool USquadReinforcementComponent::GetIsReinforcementAllowed(UReinforcementPoint
         }
         if (not IsValid(ReinforcementPoint))
         {
-                RTSFunctionLibrary::ReportError("Reinforcement point is null in Reinforce call.",
+                RTSFunctionLibrary::ReportError("Reinforcement point is null in Reinforce call."
                         "\nUSquadReinforcementComponent::GetIsReinforcementAllowed");
                 return false;
         }
         if (M_MaxSquadUnits <= 0)
         {
-                RTSFunctionLibrary::ReportError("Max squad units not initialised for reinforcement.",
+                RTSFunctionLibrary::ReportError("Max squad units not initialised for reinforcement."
                         "\nUSquadReinforcementComponent::GetIsReinforcementAllowed");
                 return false;
         }
@@ -273,7 +273,7 @@ bool USquadReinforcementComponent::TryResolveReinforcementCost(const int32 Missi
                 bIsValidData);
         if (not bIsValidData)
         {
-                RTSFunctionLibrary::ReportError("Unable to retrieve squad data for reinforcement cost.",
+                RTSFunctionLibrary::ReportError("Unable to retrieve squad data for reinforcement cost."
                         "\nUSquadReinforcementComponent::TryResolveReinforcementCost");
                 return false;
         }
@@ -314,7 +314,7 @@ bool USquadReinforcementComponent::TryPayReinforcementCost(const TMap<ERTSResour
         {
                 return true;
         }
-        RTSFunctionLibrary::ReportError("Failed to pay reinforcement costs despite validation.",
+        RTSFunctionLibrary::ReportError("Failed to pay reinforcement costs despite validation."
                 "\nUSquadReinforcementComponent::TryPayReinforcementCost");
         return false;
 }
@@ -326,7 +326,7 @@ bool USquadReinforcementComponent::TryGetResourceManager(UPlayerResourceManager*
         {
                 return true;
         }
-        RTSFunctionLibrary::ReportError("PlayerResourceManager not valid for reinforcement payment.",
+        RTSFunctionLibrary::ReportError("PlayerResourceManager not valid for reinforcement payment."
                 "\nUSquadReinforcementComponent::TryGetResourceManager");
         return false;
 }
@@ -338,7 +338,7 @@ bool USquadReinforcementComponent::TryGetTrainingMenuManager(UTrainingMenuManage
         {
                 return true;
         }
-        RTSFunctionLibrary::ReportError("TrainingMenuManager not valid while calculating reinforcement time.",
+        RTSFunctionLibrary::ReportError("TrainingMenuManager not valid while calculating reinforcement time."
                 "\nUSquadReinforcementComponent::TryGetTrainingMenuManager");
         return false;
 }
@@ -456,7 +456,7 @@ void USquadReinforcementComponent::SpawnMissingUnits()
         UWorld* World = GetWorld();
         if (not World)
         {
-                RTSFunctionLibrary::ReportError(TEXT("World is invalid while spawning reinforcements."),
+                RTSFunctionLibrary::ReportError(TEXT("World is invalid while spawning reinforcements.")
                         TEXT("\nUSquadReinforcementComponent::SpawnMissingUnits"));
                 return;
         }
@@ -480,7 +480,7 @@ void USquadReinforcementComponent::SpawnMissingUnits()
                         FRotator::ZeroRotator, SpawnParameters);
                 if (not IsValid(SpawnedUnit))
                 {
-                        RTSFunctionLibrary::ReportError("Failed to spawn squad unit during reinforcement.",
+                        RTSFunctionLibrary::ReportError("Failed to spawn squad unit during reinforcement."
                                 "\nUSquadReinforcementComponent::SpawnMissingUnits");
                         continue;
                 }

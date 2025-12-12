@@ -3,7 +3,7 @@
 #include "ReinforcementPoint.h"
 
 #include "Components/MeshComponent.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UReinforcementPoint::UReinforcementPoint()
 {

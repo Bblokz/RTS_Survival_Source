@@ -1843,16 +1843,14 @@ void ASquadController::RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit)
 {
         if (not IsValid(ReinforcedUnit))
         {
-                RTSFunctionLibrary::ReportError(TEXT("Attempted to register invalid reinforced unit."),
-                        TEXT("\nASquadController::RegisterReinforcedUnit"));
+	        RTSFunctionLibrary::ReportError(TEXT("Attempted to register invalid reinforced unit." 
+                        "\nASquadController::RegisterReinforcedUnit"));
                 return;
         }
-
         if (M_TSquadUnits.Contains(ReinforcedUnit))
         {
                 return;
         }
-
         M_TSquadUnits.Add(ReinforcedUnit);
 }
 

@@ -78,6 +78,7 @@ private:
         bool CanProcessReinforcement(UReinforcementPoint* ReinforcementPoint,
                                      TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses,
                                      FVector& OutReinforcementLocation);
+        bool GetIsReinforcementAllowed(UReinforcementPoint* ReinforcementPoint);
 
         /**
          * @brief Resolve reinforcement cost based on missing units ratio.

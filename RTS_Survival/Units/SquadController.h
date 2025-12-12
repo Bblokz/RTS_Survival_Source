@@ -13,9 +13,9 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
-#include "SquadWeaponSwitch.h"
 #include "SquadControllerDataCallback/SquadControllerDataCallback.h"
 #include "Squads/SquadPathFinding/SquadPathFindingError.h"
+#include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
 enum class EWeaponName : uint8;
@@ -177,6 +177,7 @@ public:
         friend class RTS_SURVIVAL_API AScavengeableObject;
         friend class RTS_SURVIVAL_API URepairComponent;
         friend class RTS_SURVIVAL_API UCargoSquad;
+	friend class RTS_SURVIVAL_API USquadReinforcementComponent;
         ASquadController();
 	/**
 	 * @brief Request squad move using the controller's coordinated pathing for a specific ability.
