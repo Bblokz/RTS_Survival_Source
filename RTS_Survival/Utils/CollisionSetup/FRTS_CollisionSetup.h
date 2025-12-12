@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/BoxComponent.h"
+#include "TriggerOverlapLogic.h"
 
 class UCapsuleComponent;
 
@@ -53,9 +54,16 @@ public:
 	static void SetupCollisionForHullMountedWeapon(UMeshComponent* MeshComponent);
 
 	// ----------------- Collision Setup Infantry -----------------
-	static void SetupInfantryWeaponCollision(UStaticMeshComponent* WeaponMesh);
+        static void SetupInfantryWeaponCollision(UStaticMeshComponent* WeaponMesh);
 
-	static void SetupInfantryCapsuleCollision(UCapsuleComponent* CapsuleComponent, const int OwningPlayer);
+        static void SetupInfantryCapsuleCollision(UCapsuleComponent* CapsuleComponent, const int OwningPlayer);
+
+        /**
+         * @brief Configure overlap-only collision for trigger components.
+         * @param TriggerComponent Component to configure collision on.
+         * @param TriggerLogic Target overlap channels for players or enemies.
+         */
+        static void SetupTriggerOverlapCollision(UPrimitiveComponent* TriggerComponent, ETriggerOverlapLogic TriggerLogic);
 
 	// ----------------- Collision setup static objects -----------------
 	// if bnNoCollision is true, the object will have no except for player mouse interactions.
