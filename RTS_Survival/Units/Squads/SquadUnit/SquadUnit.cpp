@@ -1118,6 +1118,7 @@ void ASquadUnit::SetupWeapon(AInfantryWeaponMaster* NewWeapon)
 	if (IsValid(NewWeapon))
 	{
 		M_InfantryWeapon = NewWeapon;
+	M_ChildWeaponComp = FindComponentByClass<UChildActorComponent>();
 	}
 }
 

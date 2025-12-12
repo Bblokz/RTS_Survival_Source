@@ -511,7 +511,7 @@ public:
 
 	/** @return The weapon data of this weapon disregarding any changes that are made to fired projectiles by the
 	 * shell type, only returns pure primitive weapon data values. */
-	const FWeaponData& GetRawWeaponData();
+	const FWeaponData& GetRawWeaponData() const;
 
 	inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
 

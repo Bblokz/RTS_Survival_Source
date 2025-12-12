@@ -186,6 +186,10 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	// To call the movement functions.
 	friend class URepairComponent;
 	friend class UScavengerComponent;
+	// to call on Squad unit spawned.
+	friend class USquadReinforcementComponent;
+	// for weapon swapping.
+	friend struct FSquadWeaponSwitch;
 
 public:
 	ASquadUnit(const FObjectInitializer& ObjectInitializer);

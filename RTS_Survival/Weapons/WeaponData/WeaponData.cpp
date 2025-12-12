@@ -836,7 +836,7 @@ bool UWeaponState::IsWeaponFullyLoaded() const
 	return M_CurrentMagCapacity == WeaponData.MagCapacity;
 }
 
-const FWeaponData& UWeaponState::GetRawWeaponData()
+const FWeaponData& UWeaponState::GetRawWeaponData() const
 {
 	return WeaponData;
 }
