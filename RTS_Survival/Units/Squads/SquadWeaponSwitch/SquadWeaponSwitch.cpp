@@ -7,6 +7,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponSystems.h"
+#include "HAL/NumericLimits.h"
 
 FSquadWeaponSwitch::FSquadWeaponSwitch()
 {
@@ -68,7 +69,7 @@ bool FSquadWeaponSwitch::TryFindUnitWithLowestWeaponValue(const ASquadUnit* Unit
                 return false;
         }
 
-        int32 LowestWeaponValue = DeadUnitWeaponValue;
+        int32 LowestWeaponValue = TNumericLimits<int32>::Max();
         for (ASquadUnit* SquadUnit : M_SquadController->M_TSquadUnits)
         {
                 if (SquadUnit == UnitThatDied)
@@ -98,7 +99,14 @@ bool FSquadWeaponSwitch::TrySwapWeapons(ASquadUnit* UnitThatDied, ASquadUnit* Ta
                 return false;
         }
 
-        return UnitThatDied->SwapWeaponsWithUnit(TargetUnit);
+        const bool bSwapSuccessful = UnitThatDied->SwapWeaponsWithUnit(TargetUnit);
+        if (not bSwapSuccessful)
+        {
+                return false;
+        }
+
+        TargetUnit->SetWeaponToAutoEngageTargets(false);
+        return true;
 }
 
 bool FSquadWeaponSwitch::ShouldSwapWithCandidate(const ASquadUnit* UnitThatDied, const ASquadUnit* CandidateUnit,
