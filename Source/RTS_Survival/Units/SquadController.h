@@ -13,6 +13,7 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
+#include "SquadWeaponSwitch.h"
 #include "SquadControllerDataCallback/SquadControllerDataCallback.h"
 #include "Squads/SquadPathFinding/SquadPathFindingError.h"
 #include "SquadController.generated.h"
@@ -28,6 +29,7 @@ class ACPPController;
 class UHealthComponent;
 class URTSComponent;
 class AScavengeableObject;
+struct FSquadWeaponSwitch;
 
 // Will only start to exe the action once the squad is fully loaded.
 USTRUCT()
@@ -166,14 +168,15 @@ class RTS_SURVIVAL_API ASquadController : public AActor, public ICommands,
                                           public IRTSUnit, public IExperienceInterface,
 public IHealthBarOwner
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
 public:
-	friend class RTS_SURVIVAL_API AWeaponPickup;
-	friend class RTS_SURVIVAL_API AScavengeableObject;
-	friend class RTS_SURVIVAL_API URepairComponent;
-	friend class RTS_SURVIVAL_API UCargoSquad;
-	ASquadController();
+        friend struct FSquadWeaponSwitch;
+        friend class RTS_SURVIVAL_API AWeaponPickup;
+        friend class RTS_SURVIVAL_API AScavengeableObject;
+        friend class RTS_SURVIVAL_API URepairComponent;
+        friend class RTS_SURVIVAL_API UCargoSquad;
+        ASquadController();
 	/**
 	 * @brief Request squad move using the controller's coordinated pathing for a specific ability.
 	 * @param MoveToLocation Destination to move.
@@ -242,7 +245,13 @@ public:
 	// Called once one of the units arrives at the capture actor.
 	void OnSquadUnitArrivedAtCaptureActor();
 
-	inline int GetSquadUnitsCount() const { return M_TSquadUnits.Num(); }
+        inline int GetSquadUnitsCount() const { return M_TSquadUnits.Num(); }
+
+        /**
+         * @brief Handles switching weapons between squad units when one dies.
+         * @param UnitThatDied The unit that initiated the death event.
+         */
+        void HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied);
 
 	virtual void
 	OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo) override;
@@ -413,8 +422,11 @@ private:
 	UPROPERTY()
 	TObjectPtr<UCargoSquad> CargoSquad;
 
-	UPROPERTY()
-	FSquadStartGameAction M_SquadStartGameAction;
+        UPROPERTY()
+        FSquadStartGameAction M_SquadStartGameAction;
+
+        UPROPERTY()
+        FSquadWeaponSwitch M_SquadWeaponSwitch;
 
 	void InitSquadData_InitExperienceComponent();
 

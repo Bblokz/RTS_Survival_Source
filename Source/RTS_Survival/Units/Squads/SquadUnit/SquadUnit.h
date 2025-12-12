@@ -396,7 +396,14 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetupWeapon(AInfantryWeaponMaster* NewWeapon);
 
-	void TerminatePickupWeapon();
+        void TerminatePickupWeapon();
+
+        /**
+         * @brief Exchanges the primary weapon child actor with another squad unit.
+         * @param OtherUnit The unit to swap weapons with.
+         * @return True when both units had valid weapons and the swap completed.
+         */
+        bool SwapWeaponsWithUnit(ASquadUnit* OtherUnit);
 
 	/**
 	 * @brief Sets the infantry weapon to automatically engage targets in range.
@@ -511,7 +518,9 @@ private:
 	void OnMoveCompleted_Capture() const;
 	void OnMoveCompleted_MoveCloserToTarget();
 
-	void DetermineDeathVoiceLine();
+        void DetermineDeathVoiceLine();
+
+        void SetupSwappedWeapon(AInfantryWeaponMaster* NewWeapon);
 
 	/** The infantry weapon assigned to this squad unit. */
 	UPROPERTY()
