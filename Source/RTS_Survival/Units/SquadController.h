@@ -30,6 +30,7 @@ class UHealthComponent;
 class URTSComponent;
 class AScavengeableObject;
 struct FSquadWeaponSwitch;
+class USquadReinforcementComponent;
 
 // Will only start to exe the action once the squad is fully loaded.
 USTRUCT()
@@ -220,7 +221,25 @@ public:
 	void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected);
 
 	// Checks if all squad units did complete the command; if so, calls DoneExecutingCommand with the CompletedAbilityID.
-	void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID);
+        void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID);
+
+        /**
+         * @brief Initialise spawn grid for reinforcing units around the provided location.
+         * @param OriginLocation Center location used for spawn grid.
+         */
+        void BeginReinforcementSpawnGrid(const FVector& OriginLocation);
+
+        /**
+         * @brief Fetch next formation point for a reinforced squad unit.
+         * @return Projected location on the navmesh.
+         */
+        FVector GetNextReinforcementSpawnLocation();
+
+        /**
+         * @brief Register a newly spawned reinforcement unit with this squad.
+         * @param ReinforcedUnit Newly spawned squad unit.
+         */
+        void RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit);
 
 	inline URTSComponent* GetRTSComponent() const { return RTSComponent; }
 
@@ -418,9 +437,13 @@ protected:
 	void StartScavengeObject(AScavengeableObject* ScavengeableObject);
 
 private:
-	/** Cargo manager component for this squad. */
-	UPROPERTY()
-	TObjectPtr<UCargoSquad> CargoSquad;
+        /** Cargo manager component for this squad. */
+        UPROPERTY()
+        TObjectPtr<UCargoSquad> CargoSquad;
+
+        /** Handles reinforcement activation and spawning missing squad units. */
+        UPROPERTY()
+        TObjectPtr<USquadReinforcementComponent> SquadReinforcement;
 
         UPROPERTY()
         FSquadStartGameAction M_SquadStartGameAction;
