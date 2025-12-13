@@ -436,7 +436,7 @@ void FRTS_CollisionSetup::SetupTriggerOverlapCollision(UPrimitiveComponent* Trig
                 }
                 return;
         }
-        RTSFunctionLibrary::ReportError("Invalid trigger component provided for overlap setup.",
+        RTSFunctionLibrary::ReportError("Invalid trigger component provided for overlap setup."
                 "\nFRTS_CollisionSetup::SetupTriggerOverlapCollision");
 }
 
