@@ -21,6 +21,4 @@ public:
 
 protected:
         virtual bool CheckRequirement(UWeaponState* WeaponState) const override;
-        virtual void ApplyBehaviourToWeapon(UWeaponState* WeaponState) override;
-        virtual void RemoveBehaviourFromWeapon(UWeaponState* WeaponState) override;
 };

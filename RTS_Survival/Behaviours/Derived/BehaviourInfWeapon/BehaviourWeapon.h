@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Behaviours/Behaviour.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "TimerManager.h"
 
 #include "BehaviourWeapon.generated.h"
@@ -42,6 +43,9 @@ protected:
 
         /** @brief Hook executed when a new stack is added; override for stack-specific logic. */
         virtual void OnWeaponBehaviourStack(UWeaponState* WeaponState);
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Attributes")
+        FBehaviourWeaponAttributes BehaviourWeaponAttributes;
 
 private:
         void PostBeginPlayLogicInitialized();

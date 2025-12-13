@@ -27,6 +27,30 @@ enum class EWeaponName : uint8;
 enum class EWeaponFireMode : uint8;
 class RTS_SURVIVAL_API IWeaponOwner;
 
+/**
+ * @brief Behaviour-driven attribute adjustments applied to weapon data.
+ */
+USTRUCT(BlueprintType)
+struct FBehaviourWeaponAttributes
+{
+        GENERATED_BODY()
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        float Damage = 0.0f;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        float Range = 0.0f;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        float ReloadSpeed = 0.0f;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        int32 Accuracy = 0;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        int32 MagSize = 0;
+};
+
 
 // Used by the health component to notify when the health bar UI needs to change the shell type icon.
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnShellTypeChanged, EWeaponShellType);
@@ -60,7 +84,7 @@ enum class EWeaponLaunchSettingsType : uint8
 USTRUCT()
 struct FWeaponData
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
 	UPROPERTY()
 	EWeaponName WeaponName = EWeaponName::DEFAULT_WEAPON;
@@ -118,9 +142,9 @@ struct FWeaponData
 	UPROPERTY()
 	int32 CooldownFlux = 0;
 
-	// Accuracy rating of the weapon, ranging from 1 to 100 (100 indicating perfect accuracy).
-	UPROPERTY()
-	int32 Accuracy = 0;
+        // Accuracy rating of the weapon, ranging from 1 to 100 (100 indicating perfect accuracy).
+        UPROPERTY()
+        int32 Accuracy = 0;
 
 	// Range of the Area of Effect (AOE) explosion in centimeters, applicable for AOE-enabled projectiles.
 	UPROPERTY()
@@ -138,8 +162,11 @@ struct FWeaponData
 	UPROPERTY()
 	float ShrapnelPen = 0.0f;
 
-	UPROPERTY()
-	float ProjectileMovementSpeed = 6000;
+        UPROPERTY()
+        float ProjectileMovementSpeed = 6000;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        FBehaviourWeaponAttributes BehaviourAttributes;
 
 	void CopyWeaponDataValues(const FWeaponData* WeaponData);
 };
@@ -509,13 +536,20 @@ public:
 	void ForceInstantReload();
 	bool IsWeaponFullyLoaded() const;
 
-	/** @return The weapon data of this weapon disregarding any changes that are made to fired projectiles by the
-	 * shell type, only returns pure primitive weapon data values. */
-	const FWeaponData& GetRawWeaponData() const;
+        /** @return The weapon data of this weapon disregarding any changes that are made to fired projectiles by the
+         * shell type, only returns pure primitive weapon data values. */
+        const FWeaponData& GetRawWeaponData() const;
 
-	inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
+        inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
 
-	FWeaponData* GetWeaponDataToUpgrade();
+        FWeaponData* GetWeaponDataToUpgrade();
+
+        /**
+         * @brief Apply or remove behaviour-driven weapon attribute modifications.
+         * @param BehaviourWeaponAttributes Incoming attribute deltas provided by a behaviour.
+         * @param bAddUpgrade When true apply the upgrade, otherwise remove it.
+         */
+        void Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade = true);
 
 	/** @return The weapon data of this weapon, values adjusted for the type of selected shell. */
 	FWeaponData GetWeaponDataAdjustedForShellType() const;
