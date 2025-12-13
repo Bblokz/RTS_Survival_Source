@@ -10,6 +10,7 @@
 #include "Behaviour.generated.h"
 
 class UBehaviourComp;
+class AActor;
 
 /**
 * @brief Base behaviour class driving gameplay modifiers managed by BehaviourComp.
@@ -44,9 +45,12 @@ class RTS_SURVIVAL_API UBehaviour : public UObject
 	bool HasExpired() const;
 	bool IsSameBehaviour(const UBehaviour& OtherBehaviour) const;
 	
-	protected:
-	virtual void OnStack(UBehaviour* StackedBehaviour);
-	virtual bool IsSameAs(const UBehaviour* OtherBehaviour) const;
+        protected:
+        virtual void OnStack(UBehaviour* StackedBehaviour);
+        virtual bool IsSameAs(const UBehaviour* OtherBehaviour) const;
+
+        UBehaviourComp* GetOwningBehaviourComp() const;
+        AActor* GetOwningActor() const;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour")
 	EBehaviourLifeTime BehaviourLifeTime = EBehaviourLifeTime::None;

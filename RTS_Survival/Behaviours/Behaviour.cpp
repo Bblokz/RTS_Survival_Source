@@ -2,6 +2,7 @@
 
 #include "Behaviour.h"
 #include "BehaviourComp.h"
+#include "GameFramework/Actor.h"
 
 UBehaviour::UBehaviour()
 {
@@ -93,5 +94,21 @@ void UBehaviour::OnStack(UBehaviour* StackedBehaviour)
 
 bool UBehaviour::IsSameAs(const UBehaviour* OtherBehaviour) const
 {
-	return OtherBehaviour != nullptr;
+        return OtherBehaviour != nullptr;
+}
+
+UBehaviourComp* UBehaviour::GetOwningBehaviourComp() const
+{
+        return M_OwningComponent.Get();
+}
+
+AActor* UBehaviour::GetOwningActor() const
+{
+        const UBehaviourComp* BehaviourComponent = GetOwningBehaviourComp();
+        if (BehaviourComponent == nullptr)
+        {
+                return nullptr;
+        }
+
+        return BehaviourComponent->GetOwner();
 }
