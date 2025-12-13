@@ -30,11 +30,12 @@
 #include "Squads/SquadUnit/SquadUnit.h"
 #include "Squads/SquadUnit/AISquadUnit/AISquadUnit.h"
 #include "Squads/SquadUnitHpComp/SquadUnitHealthComponent.h"
-#include "Weapons/WeaponData/WeaponData.h"
 
 FSquadStartGameAction::FSquadStartGameAction()
 {
 }
+
+
 
 void FSquadStartGameAction::InitStartGameAction(const EAbilityID InAbilityID, AActor* InTargetActor,
                                                 const FVector& InTargetLocation, ASquadController* InMySquad)
@@ -231,6 +232,21 @@ ASquadController::ASquadController(): PlayerController(nullptr), RTSComponent(nu
 
         M_SquadWeaponSwitch.Init(this);
 }
+
+
+TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad() 
+{
+	TArray<UWeaponState*> Weapons;
+	for (const auto EachSquadUnit : GetSquadUnitsChecked())
+	{
+		if (auto EachWeaponState = EachSquadUnit->GetWeaponState())
+		{
+			Weapons.Add(EachWeaponState);
+		}
+	}
+	return Weapons;
+}
+
 
 void ASquadController::RequestSquadMoveForAbility(const FVector& MoveToLocation, const EAbilityID AbilityID)
 {

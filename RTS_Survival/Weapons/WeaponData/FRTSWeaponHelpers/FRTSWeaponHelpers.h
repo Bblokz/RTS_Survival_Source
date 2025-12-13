@@ -4,6 +4,9 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 
+class UBombComponent;
+class AAircraftMaster;
+class ATankMaster;
 enum class ERTSDeathType : uint8;
 class ASmallArmsProjectileManager;
 class UWeaponState;
@@ -12,6 +15,11 @@ class UArmorCalculation;
 namespace FRTSWeaponHelpers
 {
 	UArmorCalculation* GetArmorAndActorOrParentFromHit(const FHitResult& HitResult, AActor*& OutHitActor);
+
+	static TArray<UWeaponState*> GetWeaponsMountedOnTank(const ATankMaster* Tank);
+	
+static TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
+                                                                    UBombComponent*& OutBombCompPtr) ;
 
 	AActor* GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor);
 

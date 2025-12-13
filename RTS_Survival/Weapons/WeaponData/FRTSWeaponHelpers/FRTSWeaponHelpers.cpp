@@ -2,8 +2,10 @@
 
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiProjectileWeapon/UWeaponStateMultiProjectile.h"
@@ -20,6 +22,59 @@ UArmorCalculation* FRTSWeaponHelpers::GetArmorAndActorOrParentFromHit(const FHit
 		OutHitActor = HitResult.GetActor()->GetParentActor();
 	}
 	return ArmorCalculationComp;
+}
+
+TArray<UWeaponState*> FRTSWeaponHelpers::GetWeaponsMountedOnTank(const ATankMaster* Tank)
+{
+	TArray<UWeaponState*> Weapons;
+	for (const auto EachTurret : Tank->GetTurrets())
+	{
+		if (not IsValid(EachTurret))
+		{
+			continue;
+		}
+		for (auto EachWeaponState : EachTurret->GetWeapons())
+		{
+			Weapons.Add(EachWeaponState);
+		}
+	}
+	for (const auto EachHullWeapon : Tank->GetHullWeapons())
+	{
+		if (not IsValid(EachHullWeapon))
+		{
+			continue;
+		}
+		for (auto EachHullWeaponState : EachHullWeapon->GetWeapons())
+		{
+			Weapons.Add(EachHullWeaponState);
+		}
+	}
+	return Weapons;
+	
+}
+
+TArray<UWeaponState*> FRTSWeaponHelpers::GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
+	UBombComponent*& OutBombCompPtr)
+{
+	if (not IsValid(Aircraft))
+	{
+		return TArray<UWeaponState*>();
+	}
+	TArray<UWeaponState*> Weapons;
+	for (const auto EachWeaponState : Aircraft->GetAllAircraftWeapons())
+	{
+		if (not IsValid(EachWeaponState))
+		{
+			continue;
+		}
+		Weapons.Add(EachWeaponState);
+	}
+	if (IsValid(Aircraft->GetBombComponent()))
+	{
+		OutBombCompPtr = Aircraft->GetBombComponent();
+	}
+	return Weapons;
+	
 }
 
 AActor* FRTSWeaponHelpers::GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor)

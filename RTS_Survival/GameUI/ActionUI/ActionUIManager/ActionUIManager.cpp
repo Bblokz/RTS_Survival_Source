@@ -20,6 +20,7 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 void UActionUIManager::InitActionUIManager(
 	TArray<UW_WeaponItem*> TWeaponUIItemsInMenu,
@@ -285,7 +286,7 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 
 	if (const ATankMaster* Tank = Cast<ATankMaster>(SelectedActor); IsValid(Tank))
 	{
-		Weapons = GetWeaponsMountedOnTank(Tank);
+		Weapons = FRTSWeaponHelpers::GetWeaponsMountedOnTank(Tank);
 		return PropagateWeaponDataToUI(Weapons);
 	}
 	if (ASquadController* SquadController = Cast<ASquadController>(SelectedActor); IsValid(SquadController))
@@ -516,66 +517,15 @@ void UActionUIManager::SetAmmoPickerVisiblity(const bool bVisible) const
 		this, "M_AmmoPicker", "SetAmmoPickerVisiblity");
 }
 
-TArray<UWeaponState*> UActionUIManager::GetWeaponsMountedOnTank(const ATankMaster* Tank) const
-{
-	TArray<UWeaponState*> Weapons;
-	for (const auto EachTurret : Tank->GetTurrets())
-	{
-		if (not IsValid(EachTurret))
-		{
-			continue;
-		}
-		for (auto EachWeaponState : EachTurret->GetWeapons())
-		{
-			Weapons.Add(EachWeaponState);
-		}
-	}
-	for (const auto EachHullWeapon : Tank->GetHullWeapons())
-	{
-		if (not IsValid(EachHullWeapon))
-		{
-			continue;
-		}
-		for (auto EachHullWeaponState : EachHullWeapon->GetWeapons())
-		{
-			Weapons.Add(EachHullWeaponState);
-		}
-	}
-	return Weapons;
-}
 
-TArray<UWeaponState*> UActionUIManager::GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
-                                                                    UBombComponent*& OutBombCompPtr) const
-{
-	if (not IsValid(Aircraft))
-	{
-		return TArray<UWeaponState*>();
-	}
-	TArray<UWeaponState*> Weapons;
-	for (const auto EachWeaponState : Aircraft->GetAllAircraftWeapons())
-	{
-		if (not IsValid(EachWeaponState))
-		{
-			continue;
-		}
-		Weapons.Add(EachWeaponState);
-	}
-	if (IsValid(Aircraft->GetBombComponent()))
-	{
-		OutBombCompPtr = Aircraft->GetBombComponent();
-	}
-	return Weapons;
-}
+
 
 TArray<UWeaponState*> UActionUIManager::GetWeaponsOfSquad(ASquadController* SquadController) const
 {
 	TArray<UWeaponState*> Weapons;
-	for (const auto EachSquadUnit : SquadController->GetSquadUnitsChecked())
+	if(IsValid(SquadController))
 	{
-		if (auto EachWeaponState = EachSquadUnit->GetWeaponState())
-		{
-			Weapons.Add(EachWeaponState);
-		}
+		return SquadController->GetWeaponsOfSquad();
 	}
 	return Weapons;
 }

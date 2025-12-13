@@ -180,6 +180,9 @@ public:
         friend class RTS_SURVIVAL_API UCargoSquad;
 	friend class RTS_SURVIVAL_API USquadReinforcementComponent;
         ASquadController();
+
+	
+	 TArray<UWeaponState*> GetWeaponsOfSquad() ;
 	/**
 	 * @brief Request squad move using the controller's coordinated pathing for a specific ability.
 	 * @param MoveToLocation Destination to move.

@@ -188,7 +188,6 @@ private:
 
 	void SetAmmoPickerVisiblity(const bool bVisible) const;
 
-	TArray<UWeaponState*> GetWeaponsMountedOnTank(const ATankMaster* Tank) const;
 	TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft, UBombComponent*& OutBombCompPtr)const;
 	TArray<UWeaponState*> GetWeaponsOfSquad(ASquadController* SquadController) const;
 

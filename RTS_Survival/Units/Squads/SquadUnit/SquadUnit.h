@@ -241,7 +241,7 @@ public:
 	 * @brief Returns whether the unit has a secondary weapon stored already
 	 * @param OutIsSecondaryWpCompValid Whether the secondary weapon component is valid.
 	 */
-	bool GetHasSecondaryWeapon(bool& OutIsSecondaryWpCompValid);
+	bool GetHasSecondaryWeapon(bool& OutIsSecondaryWpCompValid) const;
 
 	/** @return The socket to attach the secondary weapon mesh to. */
 	FName GetSecondaryWeaponSocketName() const { return SecondaryWeaponSocketName; }
