@@ -16,10 +16,10 @@ namespace FRTSWeaponHelpers
 {
 	UArmorCalculation* GetArmorAndActorOrParentFromHit(const FHitResult& HitResult, AActor*& OutHitActor);
 
-	static TArray<UWeaponState*> GetWeaponsMountedOnTank(const ATankMaster* Tank);
-	
-static TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
-                                                                    UBombComponent*& OutBombCompPtr) ;
+	TArray<UWeaponState*> GetWeaponsMountedOnTank(const ATankMaster* Tank);
+
+	TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
+	                                                         UBombComponent*& OutBombCompPtr);
 
 	AActor* GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor);
 
@@ -40,6 +40,7 @@ static TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* 
 		}
 		return OutHitActor;
 	}
+
 	ERTSDeathType TranslateDamageIntoDeathType(const ERTSDamageType DamageType);
 
 	bool GetAdjustedRangeIfFlameThrowerPresent(const TArray<UWeaponState*>& Weapons, float& OutAdjustedRange);

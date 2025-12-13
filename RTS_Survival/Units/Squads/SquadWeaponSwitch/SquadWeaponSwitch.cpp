@@ -7,7 +7,6 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponSystems.h"
-#include "HAL/NumericLimits.h"
 
 FSquadWeaponSwitch::FSquadWeaponSwitch()
 {

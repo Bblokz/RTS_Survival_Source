@@ -33,22 +33,22 @@ class RTS_SURVIVAL_API IWeaponOwner;
 USTRUCT(BlueprintType)
 struct FBehaviourWeaponAttributes
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
-        UPROPERTY(BlueprintReadWrite, EditAnywhere)
-        float Damage = 0.0f;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float Damage = 0.0f;
 
-        UPROPERTY(BlueprintReadWrite, EditAnywhere)
-        float Range = 0.0f;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float Range = 0.0f;
 
-        UPROPERTY(BlueprintReadWrite, EditAnywhere)
-        float ReloadSpeed = 0.0f;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ReloadSpeed = 0.0f;
 
-        UPROPERTY(BlueprintReadWrite, EditAnywhere)
-        int32 Accuracy = 0;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 Accuracy = 0;
 
-        UPROPERTY(BlueprintReadWrite, EditAnywhere)
-        int32 MagSize = 0;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 MagSize = 0;
 };
 
 
@@ -84,7 +84,7 @@ enum class EWeaponLaunchSettingsType : uint8
 USTRUCT()
 struct FWeaponData
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
 	UPROPERTY()
 	EWeaponName WeaponName = EWeaponName::DEFAULT_WEAPON;
@@ -142,9 +142,9 @@ struct FWeaponData
 	UPROPERTY()
 	int32 CooldownFlux = 0;
 
-        // Accuracy rating of the weapon, ranging from 1 to 100 (100 indicating perfect accuracy).
-        UPROPERTY()
-        int32 Accuracy = 0;
+	// Accuracy rating of the weapon, ranging from 1 to 100 (100 indicating perfect accuracy).
+	UPROPERTY()
+	int32 Accuracy = 0;
 
 	// Range of the Area of Effect (AOE) explosion in centimeters, applicable for AOE-enabled projectiles.
 	UPROPERTY()
@@ -162,11 +162,11 @@ struct FWeaponData
 	UPROPERTY()
 	float ShrapnelPen = 0.0f;
 
-        UPROPERTY()
-        float ProjectileMovementSpeed = 6000;
+	UPROPERTY()
+	float ProjectileMovementSpeed = 6000;
 
-        UPROPERTY(BlueprintReadWrite, EditAnywhere)
-        FBehaviourWeaponAttributes BehaviourAttributes;
+	UPROPERTY()
+	FBehaviourWeaponAttributes BehaviourAttributes;
 
 	void CopyWeaponDataValues(const FWeaponData* WeaponData);
 };
@@ -224,19 +224,19 @@ struct FShellVfxOverwrites
 	// The impact data used by HE And HEAT shells when bouncing.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FRTSSurfaceImpactData HeAndHeat_BounceOverWriteData;
-	
+
 	void HandleWeaponShellChange(const EWeaponShellType OldType,
-		const EWeaponShellType NewType,
-		USoundCue*& OutBounceSound,
-		UNiagaraSystem*& OutBounceVfx,
-		TMap<ERTSSurfaceType, FRTSSurfaceImpactData>& OutImpacts);
+	                             const EWeaponShellType NewType,
+	                             USoundCue*& OutBounceSound,
+	                             UNiagaraSystem*& OutBounceVfx,
+	                             TMap<ERTSSurfaceType, FRTSSurfaceImpactData>& OutImpacts);
 
 	bool GetIsUsingHeBounceOverwrite() const { return bIsUsingHeBounceOverwrite; }
 
 private:
 	// When an overwrite shell data is used the regular AP data is stored here.
 	UPROPERTY()
-		TMap<ERTSSurfaceType, FRTSSurfaceImpactData> M_CachedAPImpacts;
+	TMap<ERTSSurfaceType, FRTSSurfaceImpactData> M_CachedAPImpacts;
 	// When an overwrite shell data is used the regular AP data is stored here.
 	UPROPERTY()
 	FRTSSurfaceImpactData M_CachedAPBounce;
@@ -244,16 +244,16 @@ private:
 	bool bIsApStored = false;
 	bool bIsUsingHeBounceOverwrite = false;
 
-	bool UsesAPImpacts(const EWeaponShellType Type)const ;
-	bool GetShellUsesHeImpacts(const EWeaponShellType ShellType)const ;
+	bool UsesAPImpacts(const EWeaponShellType Type) const;
+	bool GetShellUsesHeImpacts(const EWeaponShellType ShellType) const;
 	void SetOutEffectsToUseHeAndHeat(TMap<ERTSSurfaceType, FRTSSurfaceImpactData>& OutImpacts) const;
 	void SetBounceToHeAndHeat(USoundCue*& BounceSound, UNiagaraSystem*& BounceSystem);
 
-	bool HasAnyHeAndHeatOverwrites()const;
+	bool HasAnyHeAndHeatOverwrites() const;
 	void RestoreImpactsWithStoredAP(
-			USoundCue*& OutBounceSound,
-        		UNiagaraSystem*& OutBounceVfx,
-        		TMap<ERTSSurfaceType, FRTSSurfaceImpactData>& OutImpacts);
+		USoundCue*& OutBounceSound,
+		UNiagaraSystem*& OutBounceVfx,
+		TMap<ERTSSurfaceType, FRTSSurfaceImpactData>& OutImpacts);
 };
 
 /**
@@ -280,7 +280,7 @@ struct FWeaponVFX
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TMap<ERTSSurfaceType, FRTSSurfaceImpactData> SurfaceImpactEffects;
-	
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FShellVfxOverwrites ShellSpecificVfxOverwrites;
 
@@ -427,7 +427,7 @@ public:
 		UNiagaraSystem* NiagaraSystem,
 		const FVector& NiagaraScale,
 		USoundBase* Sound, const bool bIsUsingHEBounceOverwrite);
-	
+
 	void Cleanup();
 
 	/** Heuristic to size pool based on weapon stats. */
@@ -490,6 +490,7 @@ class RTS_SURVIVAL_API UWeaponState : public UObject
 
 	// To use the pooling impacts.
 	friend RTS_SURVIVAL_API AProjectile;
+
 public:
 	UWeaponState();
 	// Virtual destructor for inheritance
@@ -536,20 +537,20 @@ public:
 	void ForceInstantReload();
 	bool IsWeaponFullyLoaded() const;
 
-        /** @return The weapon data of this weapon disregarding any changes that are made to fired projectiles by the
-         * shell type, only returns pure primitive weapon data values. */
-        const FWeaponData& GetRawWeaponData() const;
+	/** @return The weapon data of this weapon disregarding any changes that are made to fired projectiles by the
+	 * shell type, only returns pure primitive weapon data values. */
+	const FWeaponData& GetRawWeaponData() const;
 
-        inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
+	inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
 
-        FWeaponData* GetWeaponDataToUpgrade();
+	FWeaponData* GetWeaponDataToUpgrade();
 
-        /**
-         * @brief Apply or remove behaviour-driven weapon attribute modifications.
-         * @param BehaviourWeaponAttributes Incoming attribute deltas provided by a behaviour.
-         * @param bAddUpgrade When true apply the upgrade, otherwise remove it.
-         */
-        void Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade = true);
+	/**
+	 * @brief Apply or remove behaviour-driven weapon attribute modifications.
+	 * @param BehaviourWeaponAttributes Incoming attribute deltas provided by a behaviour.
+	 * @param bAddUpgrade When true apply the upgrade, otherwise remove it.
+	 */
+	void Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade = true);
 
 	/** @return The weapon data of this weapon, values adjusted for the type of selected shell. */
 	FWeaponData GetWeaponDataAdjustedForShellType() const;
@@ -714,7 +715,7 @@ protected:
 	// Whether this weapon is mounted on an aircraft; if so it uses a different accuracy calculation.
 	UPROPERTY()
 	bool bIsAircraftWeapon = false;
-	
+
 	UPROPERTY()
 	TArray<AActor*> ActorsToIgnore;
 
@@ -722,7 +723,7 @@ private:
 	// Pools world-space impact Niagara & audio per-weapon. NEW
 	UPROPERTY()
 	FWeaponImpactPool M_ImpactPool;
-	
+
 
 	// ---------------------------- NIAGARA LAUNCH CACHING ------------------------------------
 	/**
@@ -742,8 +743,8 @@ private:
 	/** Initialize static (one-time) launch VFX parameters on a newly created Niagara component. */
 	void InitializeLaunchNiagaraStaticParams(UNiagaraComponent* NiagaraComp) const;
 
-	void SetColorByShellTypeInitParams(UNiagaraComponent* NiagaraComp)const;
-	void SetDirectLifeTimeSizeScaleInitParams(UNiagaraComponent* NiagaraComp)const;
+	void SetColorByShellTypeInitParams(UNiagaraComponent* NiagaraComp) const;
+	void SetDirectLifeTimeSizeScaleInitParams(UNiagaraComponent* NiagaraComp) const;
 
 	/**
 	 * @brief If the current WeaponData.ShellType differs from the last applied, push the new

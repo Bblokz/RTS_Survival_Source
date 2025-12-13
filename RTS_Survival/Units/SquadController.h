@@ -18,6 +18,7 @@
 #include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
+class UWeaponState;
 enum class EWeaponName : uint8;
 class USquadHealthComponent;
 class UCargoSquad;
@@ -584,7 +585,7 @@ private:
          * @param SquadUnit Squad unit evaluated for eligibility.
          * @return True when the unit can receive a weapon pickup.
          */
-        bool CanSquadUnitPickupWeapon(const ASquadUnit* SquadUnit) const;
+        bool CanSquadUnitPickupWeapon(ASquadUnit* SquadUnit) const;
 
         /**
          * @brief Fetches the current weapon value of a squad unit using Global_GetWeaponValue.

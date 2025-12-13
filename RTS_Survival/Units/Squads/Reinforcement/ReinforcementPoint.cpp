@@ -65,7 +65,7 @@ void UReinforcementPoint::CreateReinforcementTriggerSphere(const float Activatio
         AActor* OwnerActor = GetOwner();
         if (not IsValid(OwnerActor))
         {
-                RTSFunctionLibrary::ReportError("Reinforcement point has no valid owner for trigger creation.",
+                RTSFunctionLibrary::ReportError("Reinforcement point has no valid owner for trigger creation."
                         "\nUReinforcementPoint::CreateReinforcementTriggerSphere");
                 return;
         }
@@ -73,7 +73,7 @@ void UReinforcementPoint::CreateReinforcementTriggerSphere(const float Activatio
         M_ReinforcementTriggerSphere = NewObject<USphereComponent>(OwnerActor, TEXT("ReinforcementTriggerSphere"));
         if (not IsValid(M_ReinforcementTriggerSphere))
         {
-                RTSFunctionLibrary::ReportError("Failed to create reinforcement trigger sphere component.",
+                RTSFunctionLibrary::ReportError("Failed to create reinforcement trigger sphere component."
                         "\nUReinforcementPoint::CreateReinforcementTriggerSphere");
                 return;
         }

@@ -1686,7 +1686,7 @@ TObjectPtr<ASquadUnit> ASquadController::FindSquadUnitWithLowestWeaponValueForPi
         return SquadUnitWithLowestWeaponValue;
 }
 
-bool ASquadController::CanSquadUnitPickupWeapon(const ASquadUnit* SquadUnit) const
+bool ASquadController::CanSquadUnitPickupWeapon(ASquadUnit* SquadUnit) const
 {
         if (not GetIsValidSquadUnit(SquadUnit))
         {

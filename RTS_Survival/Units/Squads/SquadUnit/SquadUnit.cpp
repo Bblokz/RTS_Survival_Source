@@ -505,7 +505,7 @@ UWeaponState* ASquadUnit::GetWeaponState() const
 }
 
 
-bool ASquadUnit::GetHasSecondaryWeapon(bool& OutIsSecondaryWpCompValid) const
+bool ASquadUnit::GetHasSecondaryWeapon(bool& OutIsSecondaryWpCompValid)
 {
 	if (!GetIsValidSecondaryWeapon())
 	{

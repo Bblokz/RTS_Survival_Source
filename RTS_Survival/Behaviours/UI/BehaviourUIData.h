@@ -3,7 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Behaviours/Icons/BehaviourIcon.h"
+
+#include "RTS_Survival/Behaviours/Icons/BehaviourIcon.h"
 
 #include "BehaviourUIData.generated.h"
 
