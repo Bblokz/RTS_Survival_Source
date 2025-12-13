@@ -70,14 +70,27 @@ bool UBehaviourWeapon::CheckRequirement(UWeaponState* WeaponState) const
 
 void UBehaviourWeapon::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
 {
+        if (WeaponState == nullptr)
+        {
+                return;
+        }
+
+        WeaponState->Upgrade(BehaviourWeaponAttributes);
 }
 
 void UBehaviourWeapon::RemoveBehaviourFromWeapon(UWeaponState* WeaponState)
 {
+        if (WeaponState == nullptr)
+        {
+                return;
+        }
+
+        WeaponState->Upgrade(BehaviourWeaponAttributes, false);
 }
 
 void UBehaviourWeapon::OnWeaponBehaviourStack(UWeaponState* WeaponState)
 {
+        ApplyBehaviourToWeapon(WeaponState);
 }
 
 void UBehaviourWeapon::PostBeginPlayLogicInitialized()

@@ -133,11 +133,12 @@ void FWeaponData::CopyWeaponDataValues(const FWeaponData* const WeaponData)
 	BaseCooldown = WeaponData->BaseCooldown;
 	CooldownFlux = WeaponData->CooldownFlux;
 	Accuracy = WeaponData->Accuracy;
-	ShrapnelRange = WeaponData->ShrapnelRange;
-	ShrapnelDamage = WeaponData->ShrapnelDamage;
-	ShrapnelParticles = WeaponData->ShrapnelParticles;
-	ShrapnelPen = WeaponData->ShrapnelPen;
-	ProjectileMovementSpeed = WeaponData->ProjectileMovementSpeed; // ← add
+        ShrapnelRange = WeaponData->ShrapnelRange;
+        ShrapnelDamage = WeaponData->ShrapnelDamage;
+        ShrapnelParticles = WeaponData->ShrapnelParticles;
+        ShrapnelPen = WeaponData->ShrapnelPen;
+        ProjectileMovementSpeed = WeaponData->ProjectileMovementSpeed; // ← add
+        BehaviourAttributes = WeaponData->BehaviourAttributes;
 }
 
 bool FLaunchEffectSettings::HasLaunchSettings() const
@@ -843,14 +844,46 @@ const FWeaponData& UWeaponState::GetRawWeaponData() const
 
 FWeaponData* UWeaponState::GetWeaponDataToUpgrade()
 {
-	return &WeaponData;
+        return &WeaponData;
+}
+
+void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade)
+{
+        WeaponData.BaseDamage -= WeaponData.BehaviourAttributes.Damage;
+        WeaponData.Range -= WeaponData.BehaviourAttributes.Range;
+        WeaponData.ReloadSpeed -= WeaponData.BehaviourAttributes.ReloadSpeed;
+        WeaponData.Accuracy -= WeaponData.BehaviourAttributes.Accuracy;
+        WeaponData.MagCapacity -= WeaponData.BehaviourAttributes.MagSize;
+
+        if (bAddUpgrade)
+        {
+                WeaponData.BehaviourAttributes.Damage += BehaviourWeaponAttributes.Damage;
+                WeaponData.BehaviourAttributes.Range += BehaviourWeaponAttributes.Range;
+                WeaponData.BehaviourAttributes.ReloadSpeed += BehaviourWeaponAttributes.ReloadSpeed;
+                WeaponData.BehaviourAttributes.Accuracy += BehaviourWeaponAttributes.Accuracy;
+                WeaponData.BehaviourAttributes.MagSize += BehaviourWeaponAttributes.MagSize;
+        }
+        else
+        {
+                WeaponData.BehaviourAttributes.Damage -= BehaviourWeaponAttributes.Damage;
+                WeaponData.BehaviourAttributes.Range -= BehaviourWeaponAttributes.Range;
+                WeaponData.BehaviourAttributes.ReloadSpeed -= BehaviourWeaponAttributes.ReloadSpeed;
+                WeaponData.BehaviourAttributes.Accuracy -= BehaviourWeaponAttributes.Accuracy;
+                WeaponData.BehaviourAttributes.MagSize -= BehaviourWeaponAttributes.MagSize;
+        }
+
+        WeaponData.BaseDamage += WeaponData.BehaviourAttributes.Damage;
+        WeaponData.Range += WeaponData.BehaviourAttributes.Range;
+        WeaponData.ReloadSpeed += WeaponData.BehaviourAttributes.ReloadSpeed;
+        WeaponData.Accuracy += WeaponData.BehaviourAttributes.Accuracy;
+        WeaponData.MagCapacity += WeaponData.BehaviourAttributes.MagSize;
 }
 
 FWeaponData UWeaponState::GetWeaponDataAdjustedForShellType() const
 {
-	if (WeaponData.ShellType == EWeaponShellType::Shell_APHE || WeaponData.ShellType == EWeaponShellType::Shell_AP)
-	{
-		return WeaponData;
+        if (WeaponData.ShellType == EWeaponShellType::Shell_APHE || WeaponData.ShellType == EWeaponShellType::Shell_AP)
+        {
+                return WeaponData;
 	}
 	return GLOBAL_GetWeaponDataForShellType(WeaponData);
 }
