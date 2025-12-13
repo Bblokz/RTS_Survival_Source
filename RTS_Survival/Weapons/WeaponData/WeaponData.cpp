@@ -849,34 +849,42 @@ FWeaponData* UWeaponState::GetWeaponDataToUpgrade()
 
 void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade)
 {
-        WeaponData.BaseDamage -= WeaponData.BehaviourAttributes.Damage;
-        WeaponData.Range -= WeaponData.BehaviourAttributes.Range;
-        WeaponData.ReloadSpeed -= WeaponData.BehaviourAttributes.ReloadSpeed;
-        WeaponData.Accuracy -= WeaponData.BehaviourAttributes.Accuracy;
-        WeaponData.MagCapacity -= WeaponData.BehaviourAttributes.MagSize;
+        FWeaponData* WeaponDataToUpgrade = GetWeaponDataToUpgrade();
+        if (WeaponDataToUpgrade == nullptr)
+        {
+                return;
+        }
+
+        FBehaviourWeaponAttributes& CurrentBehaviourAttributes = WeaponDataToUpgrade->BehaviourAttributes;
+
+        WeaponDataToUpgrade->BaseDamage -= CurrentBehaviourAttributes.Damage;
+        WeaponDataToUpgrade->Range -= CurrentBehaviourAttributes.Range;
+        WeaponDataToUpgrade->ReloadSpeed -= CurrentBehaviourAttributes.ReloadSpeed;
+        WeaponDataToUpgrade->Accuracy -= CurrentBehaviourAttributes.Accuracy;
+        WeaponDataToUpgrade->MagCapacity -= CurrentBehaviourAttributes.MagSize;
 
         if (bAddUpgrade)
         {
-                WeaponData.BehaviourAttributes.Damage += BehaviourWeaponAttributes.Damage;
-                WeaponData.BehaviourAttributes.Range += BehaviourWeaponAttributes.Range;
-                WeaponData.BehaviourAttributes.ReloadSpeed += BehaviourWeaponAttributes.ReloadSpeed;
-                WeaponData.BehaviourAttributes.Accuracy += BehaviourWeaponAttributes.Accuracy;
-                WeaponData.BehaviourAttributes.MagSize += BehaviourWeaponAttributes.MagSize;
+                CurrentBehaviourAttributes.Damage += BehaviourWeaponAttributes.Damage;
+                CurrentBehaviourAttributes.Range += BehaviourWeaponAttributes.Range;
+                CurrentBehaviourAttributes.ReloadSpeed += BehaviourWeaponAttributes.ReloadSpeed;
+                CurrentBehaviourAttributes.Accuracy += BehaviourWeaponAttributes.Accuracy;
+                CurrentBehaviourAttributes.MagSize += BehaviourWeaponAttributes.MagSize;
         }
         else
         {
-                WeaponData.BehaviourAttributes.Damage -= BehaviourWeaponAttributes.Damage;
-                WeaponData.BehaviourAttributes.Range -= BehaviourWeaponAttributes.Range;
-                WeaponData.BehaviourAttributes.ReloadSpeed -= BehaviourWeaponAttributes.ReloadSpeed;
-                WeaponData.BehaviourAttributes.Accuracy -= BehaviourWeaponAttributes.Accuracy;
-                WeaponData.BehaviourAttributes.MagSize -= BehaviourWeaponAttributes.MagSize;
+                CurrentBehaviourAttributes.Damage -= BehaviourWeaponAttributes.Damage;
+                CurrentBehaviourAttributes.Range -= BehaviourWeaponAttributes.Range;
+                CurrentBehaviourAttributes.ReloadSpeed -= BehaviourWeaponAttributes.ReloadSpeed;
+                CurrentBehaviourAttributes.Accuracy -= BehaviourWeaponAttributes.Accuracy;
+                CurrentBehaviourAttributes.MagSize -= BehaviourWeaponAttributes.MagSize;
         }
 
-        WeaponData.BaseDamage += WeaponData.BehaviourAttributes.Damage;
-        WeaponData.Range += WeaponData.BehaviourAttributes.Range;
-        WeaponData.ReloadSpeed += WeaponData.BehaviourAttributes.ReloadSpeed;
-        WeaponData.Accuracy += WeaponData.BehaviourAttributes.Accuracy;
-        WeaponData.MagCapacity += WeaponData.BehaviourAttributes.MagSize;
+        WeaponDataToUpgrade->BaseDamage += CurrentBehaviourAttributes.Damage;
+        WeaponDataToUpgrade->Range += CurrentBehaviourAttributes.Range;
+        WeaponDataToUpgrade->ReloadSpeed += CurrentBehaviourAttributes.ReloadSpeed;
+        WeaponDataToUpgrade->Accuracy += CurrentBehaviourAttributes.Accuracy;
+        WeaponDataToUpgrade->MagCapacity += CurrentBehaviourAttributes.MagSize;
 }
 
 FWeaponData UWeaponState::GetWeaponDataAdjustedForShellType() const
