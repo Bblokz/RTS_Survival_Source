@@ -2147,9 +2147,9 @@ void ASquadController::InitSquadData_SetValues(const float MaxWalkSpeed, const f
 	SetSquadVisionRange(VisionRadius);
 }
 
-void ASquadController::InitSquadData_SetAbilities(const TArray<EAbilityID>& Abilities)
+void ASquadController::InitSquadData_SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 {
-	InitAbilityArray(Abilities);
+        InitAbilityArray(Abilities);
 }
 
 void ASquadController::OnRepairUnitNotValidForRepairs()

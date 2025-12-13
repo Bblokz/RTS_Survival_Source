@@ -6,6 +6,7 @@
 #include "ArmorAndResistanceData.h"
 #include "UnitCost.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/RTSExperienceLevels.h"
 #include "VehicleData.generated.h"
 
@@ -40,8 +41,8 @@ struct FTankData
 	UPROPERTY(BlueprintReadOnly)
 	FUnitCost Cost;
 
-	UPROPERTY(BlueprintReadOnly)
-	TArray<EAbilityID> Abilities;
+        UPROPERTY(BlueprintReadOnly)
+        TArray<FUnitAbilityEntry> Abilities;
 
 	UPROPERTY()
 	float ExperienceWorth = 0.0f;

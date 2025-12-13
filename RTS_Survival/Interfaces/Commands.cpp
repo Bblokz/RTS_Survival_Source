@@ -39,26 +39,42 @@ void UCommandData::BeginDestroy()
 }
 
 
+void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
+{
+	TArray<FUnitAbilityEntry> ValidAbilities = Abilities;
+	if (Abilities.Num() > DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI)
+	{
+		RTSFunctionLibrary::ReportError("The number of abilities exceeds the maximum allowed for the Action UI.",
+				"UCommandData::SetAbilities");
+		ValidAbilities.SetNum(DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI);
+	}
+	M_Abilities = ValidAbilities;
+}
+
+TArray<EAbilityID> UCommandData::GetAbilityIds(const bool bExcludeNoAbility) const
+{
+        return ExtractAbilityIdsFromEntries(M_Abilities, bExcludeNoAbility);
+}
+
 bool UCommandData::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
 {
-	const int32 Index = M_Abilities.IndexOfByKey(OldAbility);
+	const int32 Index = GetAbilityIndexById(OldAbility);
 	if (Index != INDEX_NONE)
 	{
-		M_Abilities[Index] = NewAbility;
+		M_Abilities[Index] = CreateAbilityEntryFromId(NewAbility);
 		return true;
 	}
 
 	return false;
 }
 
-bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE)
+bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 {
 	if (NewAbility == EAbilityID::IdNoAbility)
 	{
 		return false;
 	}
-	// Make sure the ability does not already exist!
-	if (M_Abilities.Contains(NewAbility))
+	if (GetAbilityIndexById(NewAbility) != INDEX_NONE)
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(NewAbility) +
@@ -68,28 +84,26 @@ bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex =
 
 	if (AtIndex == INDEX_NONE)
 	{
-		// find first empty slot.
 		for (int32 i = 0; i < M_Abilities.Num(); i++)
 		{
-			if (M_Abilities[i] == EAbilityID::IdNoAbility)
+			if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
 			{
-				M_Abilities[i] = NewAbility;
+				M_Abilities[i] = CreateAbilityEntryFromId(NewAbility);
 				return true;
 			}
 		}
-		// If we did not find an empty slot, we cannot add the ability.
 		return false;
 	}
 	if (AtIndex >= 0 && AtIndex < M_Abilities.Num())
 	{
-		if (M_Abilities[AtIndex] != EAbilityID::IdNoAbility)
+		if (M_Abilities[AtIndex].AbilityId != EAbilityID::IdNoAbility)
 		{
 			RTSFunctionLibrary::ReportError(
 				TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
 				TEXT(" in UCommandData::AddAbility"));
 			return false;
 		}
-		M_Abilities[AtIndex] = NewAbility;
+		M_Abilities[AtIndex] = CreateAbilityEntryFromId(NewAbility);
 		return true;
 	}
 	RTSFunctionLibrary::ReportError(
@@ -105,10 +119,10 @@ bool UCommandData::RemoveAbility(const EAbilityID AbilityToRemove)
 		return false;
 	}
 
-	const int32 Index = M_Abilities.IndexOfByKey(AbilityToRemove);
+	const int32 Index = GetAbilityIndexById(AbilityToRemove);
 	if (Index != INDEX_NONE)
 	{
-		M_Abilities[Index] = EAbilityID::IdNoAbility;
+		M_Abilities[Index] = FUnitAbilityEntry();
 		return true;
 	}
 
@@ -118,15 +132,22 @@ bool UCommandData::RemoveAbility(const EAbilityID AbilityToRemove)
 	return false;
 }
 
+int32 UCommandData::GetAbilityIndexById(const EAbilityID AbilityId) const
+{
+	return M_Abilities.IndexOfByPredicate([AbilityId](const FUnitAbilityEntry& AbilityEntry)
+	{
+		return AbilityEntry.AbilityId == AbilityId;
+	});
+}
 
 void UCommandData::InitCommandData(ICommands* Owner)
 {
-	if (!Owner)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Attempted to setup command data with a nullptr owner.")
-			TEXT("at function UCommandData::InitCommandData"));
-		return;
-	}
+        if (not Owner)
+        {
+                RTSFunctionLibrary::ReportError(TEXT("Attempted to setup command data with a nullptr owner.")
+                        TEXT("at function UCommandData::InitCommandData"));
+                return;
+        }
 
 	M_Owner = Owner;
 	bM_IsCommandQueueEnabled = true;
@@ -158,10 +179,10 @@ bool UCommandData::GetIsQueueFull() const
 
 void UCommandData::PrintCommands() const
 {
-	if (!M_Owner)
-	{
-		return;
-	}
+        if (not M_Owner)
+        {
+                return;
+        }
 
 	FString DebugString = "Command queue (size=" + FString::FromInt(NumCommands) + "):";
 
@@ -485,7 +506,7 @@ void ICommands::SetIsSpawning(const bool bIsSpawning)
 	}
 }
 
-void ICommands::InitAbilityArray(const TArray<EAbilityID>& Abilities)
+void ICommands::InitAbilityArray(const TArray<FUnitAbilityEntry>& Abilities)
 {
 	if (UCommandData* UnitCommandData = GetIsValidCommandData())
 	{
@@ -493,16 +514,30 @@ void ICommands::InitAbilityArray(const TArray<EAbilityID>& Abilities)
 	}
 }
 
-TArray<EAbilityID> ICommands::GetUnitAbilities()
+void ICommands::InitAbilityArray(const TArray<EAbilityID>& Abilities)
+{
+	InitAbilityArray(ConvertAbilityIdsToEntries(Abilities));
+}
+
+TArray<FUnitAbilityEntry> ICommands::GetUnitAbilityEntries()
 {
 	if (const UCommandData* UnitCommandData = GetIsValidCommandData())
 	{
 		return UnitCommandData->GetAbilities();
 	}
+	return TArray<FUnitAbilityEntry>();
+}
+
+TArray<EAbilityID> ICommands::GetUnitAbilities()
+{
+	if (const UCommandData* UnitCommandData = GetIsValidCommandData())
+	{
+		return UnitCommandData->GetAbilityIds();
+	}
 	return TArray<EAbilityID>();
 }
 
-void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
+void ICommands::SetUnitAbilitiesRunTime(const TArray<FUnitAbilityEntry>& Abilities)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not UnitCommandData)
@@ -516,9 +551,14 @@ void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
 	}
 }
 
+void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
+{
+        SetUnitAbilitiesRunTime(ConvertAbilityIdsToEntries(Abilities));
+}
+
 bool ICommands::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 {
-	UCommandData* UnitCommandData = GetIsValidCommandData();
+        UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not UnitCommandData)
 	{
 		return false;
@@ -563,11 +603,11 @@ bool ICommands::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbi
 
 bool ICommands::HasAbility(const EAbilityID AbilityToCheck)
 {
-	if (UCommandData* UnitCommandData = GetIsValidCommandData())
-	{
-		return UnitCommandData->GetAbilities().Contains(AbilityToCheck);
-	}
-	return false;
+        if (UCommandData* UnitCommandData = GetIsValidCommandData())
+        {
+                return UnitCommandData->GetAbilityIds().Contains(AbilityToCheck);
+        }
+        return false;
 }
 
 

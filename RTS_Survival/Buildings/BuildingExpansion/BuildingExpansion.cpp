@@ -386,10 +386,10 @@ void ABuildingExpansion::CollapseMesh(UGeometryCollectionComponent* GeoCollapseC
 }
 
 void ABuildingExpansion::InitBuildingExpansion(
-	TArray<EAbilityID> Abilities,
-	UStaticMesh* NewConstructionMesh,
-	UStaticMesh* NewBuildingMesh,
-	UTimeProgressBarWidget* NewProgressBar,
+        TArray<FUnitAbilityEntry> Abilities,
+        UStaticMesh* NewConstructionMesh,
+        UStaticMesh* NewBuildingMesh,
+        UTimeProgressBarWidget* NewProgressBar,
 	const float NewBuildingTime,
 	TArray<UNiagaraSystem*> SmokeSystems,
 	const int NewAmountSmokes,
