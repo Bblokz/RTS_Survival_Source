@@ -20,6 +20,7 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -740,7 +741,7 @@ void ASquadController::SetSquadVisionRange(const float NewVision)
 
 void ASquadController::PostInitializeComponents()
 {
-	Super::PostInitializeComponents();
+        Super::PostInitializeComponents();
 
 	SquadHealthComponent = FindComponentByClass<USquadHealthComponent>();
 	if (!IsValid(SquadHealthComponent))
@@ -758,14 +759,27 @@ void ASquadController::PostInitializeComponents()
 		                                             "ASquadController::PostInitializeComponents");
 	}
 	// Pass on a reference to self so the CommandData can access the interface.
-	M_UnitCommandData = NewObject<UCommandData>(this);
-	M_UnitCommandData->InitCommandData(this);
-	UObject* Outer = M_UnitCommandData->GetOuter();
-	if (Outer != this)
-	{
-		RTSFunctionLibrary::ReportError("The outer on this CommandData is not set to this object."
-			"\n ASquadController::PostInitializeComponents");
-	}
+        M_UnitCommandData = NewObject<UCommandData>(this);
+        M_UnitCommandData->InitCommandData(this);
+        UObject* Outer = M_UnitCommandData->GetOuter();
+        if (Outer != this)
+        {
+                RTSFunctionLibrary::ReportError("The outer on this CommandData is not set to this object."
+                        "\n ASquadController::PostInitializeComponents");
+        }
+
+        PostInitializeComponents_SetupGrenadeComponent();
+}
+
+void ASquadController::PostInitializeComponents_SetupGrenadeComponent()
+{
+        M_GrenadeComponent = FindComponentByClass<UGrenadeComponent>();
+        if (not GetIsValidGrenadeComponent())
+        {
+                return;
+        }
+
+        M_GrenadeComponent->Init(this);
 }
 
 void ASquadController::SetUnitToIdleSpecificLogic()
@@ -1524,22 +1538,56 @@ void ASquadController::ExecuteRepairCommand(AActor* TargetActor)
 
 void ASquadController::TerminateRepairCommand()
 {
-	M_RepairState.Reset();
-	EnsureSquadUnitsValid();
-	for (const auto EachUnit : M_TSquadUnits)
+        M_RepairState.Reset();
+        EnsureSquadUnitsValid();
+        for (const auto EachUnit : M_TSquadUnits)
 	{
 		URepairComponent* RepairComp = EachUnit->GetRepairComponent();
 		if (RepairComp)
 		{
-			RepairComp->TerminateRepair();
-		}
-	}
+                        RepairComp->TerminateRepair();
+                }
+        }
+}
+
+void ASquadController::ExecuteThrowGrenadeCommand(const FVector TargetLocation)
+{
+        if (not GetIsValidGrenadeComponent())
+        {
+                DoneExecutingCommand(EAbilityID::IdThrowGrenade);
+                return;
+        }
+
+        M_GrenadeComponent->ExecuteThrowGrenade(TargetLocation);
+}
+
+void ASquadController::TerminateThrowGrenadeCommand()
+{
+        if (GetIsValidGrenadeComponent())
+        {
+                M_GrenadeComponent->TerminateThrowGrenade();
+        }
+        DoneExecutingCommand(EAbilityID::IdThrowGrenade);
+}
+
+void ASquadController::ExecuteCancelThrowGrenadeCommand()
+{
+        if (GetIsValidGrenadeComponent())
+        {
+                M_GrenadeComponent->CancelThrowGrenade();
+        }
+        DoneExecutingCommand(EAbilityID::IdCancelThrowGrenade);
+}
+
+void ASquadController::TerminateCancelThrowGrenadeCommand()
+{
+        DoneExecutingCommand(EAbilityID::IdCancelThrowGrenade);
 }
 
 void ASquadController::ExecuteEnterCargoCommand(AActor* CarrierActor)
 {
-	// Start the cargo enter flow on the component. This will:
-	// - validate the target cargo
+        // Start the cargo enter flow on the component. This will:
+        // - validate the target cargo
 	// - path the squad to the closest entrance with Ability = IdEnterCargo
 	// - when all units finish that move, call UCargoSquad::OnEnterCargo_MoveToEntranceCompleted(),
 	//   which seats/attaches everyone and calls DoneExecutingCommand(IdEnterCargo).
@@ -1954,6 +2002,11 @@ TObjectPtr<USquadReinforcementComponent> ASquadController::GetSquadReinforcement
                 return nullptr;
         }
         return SquadReinforcement;
+}
+
+bool ASquadController::GetIsValidGrenadeComponent() const
+{
+        return IsValid(M_GrenadeComponent);
 }
 
 
