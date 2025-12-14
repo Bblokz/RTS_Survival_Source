@@ -10,7 +10,7 @@ namespace BehaviourRifleAccuracyConstants
 
 UBehaviourRifleAccuracy::UBehaviourRifleAccuracy()
 {
-        BehaviourLifeTime = EBehaviourLifeTime::None;
+        BehaviourLifeTime = EBehaviourLifeTime::Permanent;
         M_MaxStackCount = BehaviourRifleAccuracyConstants::MaxStackCount;
         BehaviourWeaponAttributes.Accuracy = BehaviourRifleAccuracyConstants::AccuracyBonus;
 }

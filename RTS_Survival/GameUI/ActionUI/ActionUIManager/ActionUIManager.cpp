@@ -280,7 +280,7 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 	if (const AAircraftMaster* Aircraft = Cast<AAircraftMaster>(SelectedActor); IsValid(Aircraft))
 	{
 		UBombComponent* BombComp = nullptr;
-		Weapons = GetWeaponsMountedOnAircraft(Aircraft, BombComp);
+		Weapons = FRTSWeaponHelpers::GetWeaponsMountedOnAircraft(Aircraft, BombComp);
 		return PropagateWeaponDataToUI(Weapons, BombComp);
 	}
 

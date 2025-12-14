@@ -18,6 +18,7 @@
 #include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
+class UBehaviourComp;
 class UWeaponState;
 enum class EWeaponName : uint8;
 class USquadHealthComponent;
@@ -209,6 +210,7 @@ public:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	USquadHealthComponent* SquadHealthComponent;
+	
 
 	bool GetIsValidSquadHealthComponent() const;
 
@@ -319,6 +321,11 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference")
 	TObjectPtr<URTSComponent> RTSComponent;
 
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
+	UBehaviourComp* BehaviourComponent;
+
+	bool GetIsValidBehaviourComponent()const;
+	
 	bool GetIsValidRTSComponent() const;
 	bool EnsureValidExperienceComponent();
 
