@@ -39,16 +39,16 @@ enum class EAbilityID : uint8
 	IdPickupItem,
 	IdScavenge,
 	IdDigIn,
-        IdBreakCover,
-        IdFireRockets,
-        IdCancelRocketFire,
-        IdRocketsReloading,
-        IdThrowGrenade,
-        IdCancelThrowGrenade,
-        IdGrenadesResupplying,
-        IdRepair,
-        IdReturnToBase,
-        IdAircraftOwnerNotExpanded,
+	IdBreakCover,
+	IdFireRockets,
+	IdCancelRocketFire,
+	IdRocketsReloading,
+	IdThrowGrenade,
+	IdCancelThrowGrenade,
+	IdGrenadesResupplying,
+	IdRepair,
+	IdReturnToBase,
+	IdAircraftOwnerNotExpanded,
 	IdEnterCargo,
 	IdExitCargo,
 	IdEnableResourceConversion,
@@ -84,17 +84,17 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdPickupItem: return TEXT("Pickup Item");
 	case EAbilityID::IdScavenge: return TEXT("Scavenge");
 	case EAbilityID::IdDigIn: return TEXT("Dig In");
-        case EAbilityID::IdBreakCover: return TEXT("Break Cover");
-        case EAbilityID::IdCapture: return TEXT("Capture");
-        case EAbilityID::IdFireRockets: return TEXT("Fire Rockets");
-        case EAbilityID::IdCancelRocketFire: return TEXT("Cancel Rocket Fire");
-        case EAbilityID::IdRocketsReloading: return TEXT("Rockets Reloading");
-        case EAbilityID::IdThrowGrenade: return TEXT("Throw Grenade");
-        case EAbilityID::IdCancelThrowGrenade: return TEXT("Cancel Grenade Ability");
-        case EAbilityID::IdGrenadesResupplying: return TEXT("Grenades Resupplying");
-        case EAbilityID::IdRepair: return TEXT("Repair");
-        case EAbilityID::IdReturnToBase: return TEXT("Back To Base");
-        case EAbilityID::IdEnterCargo: return TEXT("Enter Cargo");
+	case EAbilityID::IdBreakCover: return TEXT("Break Cover");
+	case EAbilityID::IdCapture: return TEXT("Capture");
+	case EAbilityID::IdFireRockets: return TEXT("Fire Rockets");
+	case EAbilityID::IdCancelRocketFire: return TEXT("Cancel Rocket Fire");
+	case EAbilityID::IdRocketsReloading: return TEXT("Rockets Reloading");
+	case EAbilityID::IdThrowGrenade: return TEXT("Throw Grenade");
+	case EAbilityID::IdCancelThrowGrenade: return TEXT("Cancel Grenade Ability");
+	case EAbilityID::IdGrenadesResupplying: return TEXT("Grenades Resupplying");
+	case EAbilityID::IdRepair: return TEXT("Repair");
+	case EAbilityID::IdReturnToBase: return TEXT("Back To Base");
+	case EAbilityID::IdEnterCargo: return TEXT("Enter Cargo");
 	case EAbilityID::IdExitCargo: return TEXT("Exit Cargo");
 	case EAbilityID::IdAircraftOwnerNotExpanded: return TEXT("Aircraft Owner Not Expanded");
 	case EAbilityID::IdNoAbility_MoveCloserToTarget: return TEXT("Move Closer To Target");

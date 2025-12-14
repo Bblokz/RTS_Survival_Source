@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Player/Abilities.h"
-#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.generated.h"
+#include "GrenadeComponent.generated.h"
 
 class UNiagaraSystem;
 class USoundBase;

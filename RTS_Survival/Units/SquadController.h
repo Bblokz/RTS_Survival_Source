@@ -181,6 +181,7 @@ public:
         friend class RTS_SURVIVAL_API AScavengeableObject;
         friend class RTS_SURVIVAL_API URepairComponent;
         friend class RTS_SURVIVAL_API UCargoSquad;
+	friend class RTS_SURVIVAL_API UGrenadeComponent;
 	friend class RTS_SURVIVAL_API USquadReinforcementComponent;
         ASquadController();
 
