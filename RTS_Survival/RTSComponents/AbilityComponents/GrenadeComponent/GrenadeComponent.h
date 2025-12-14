@@ -174,10 +174,14 @@ private:
         void ResetCooldown();
         bool CanUseGrenades() const;
         AGrenadeActor* AcquireGrenade();
+        AGrenadeActor* SpawnFallbackGrenade();
         void DestroyGrenadePool();
         void SetAbilityToResupplying();
         void SetAbilityToThrowGrenade();
         void SetAbilityToCancel();
         void ReportIllegalStateTransition(const FString& FromState, const FString& ToState) const;
+        bool GetIsValidRTSComponent() const;
+
+        int32 M_OwningPlayer;
 };
 

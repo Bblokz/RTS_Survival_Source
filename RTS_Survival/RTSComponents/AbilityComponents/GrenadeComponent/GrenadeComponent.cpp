@@ -159,6 +159,7 @@ FVector AGrenadeActor::CalculateArcLocation(const float Alpha) const
 UGrenadeComponent::UGrenadeComponent()
         : M_AbilityState(EGrenadeAbilityState::NotActive)
         , M_GrenadesRemaining(0)
+        , M_OwningPlayer(INDEX_NONE)
 {
         PrimaryComponentTick.bCanEverTick = false;
 }
@@ -230,6 +231,16 @@ bool UGrenadeComponent::GetIsValidSquadController() const
         return M_SquadController.IsValid();
 }
 
+bool UGrenadeComponent::GetIsValidRTSComponent() const
+{
+        if (not M_RTSComponent.IsValid())
+        {
+                RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_RTSComponent", __func__, this);
+                return false;
+        }
+        return true;
+}
+
 void UGrenadeComponent::BeginPlay_CacheOwningPlayer()
 {
         if (not GetIsValidSquadController())
@@ -237,6 +248,12 @@ void UGrenadeComponent::BeginPlay_CacheOwningPlayer()
                 return;
         }
         M_RTSComponent = M_SquadController->GetRTSComponent();
+        if (not GetIsValidRTSComponent())
+        {
+                return;
+        }
+
+        M_OwningPlayer = M_RTSComponent->GetOwningPlayer();
 }
 
 void UGrenadeComponent::BeginPlay_CreateGrenadePool()
@@ -255,7 +272,11 @@ void UGrenadeComponent::BeginPlay_CreateGrenadePool()
                         if (IsValid(NewGrenade))
                         {
                                 M_GrenadePool.Add(NewGrenade);
+                                continue;
                         }
+
+                        RTSFunctionLibrary::ReportError("Failed to spawn grenade actor during pool creation.",
+                                                        __func__, this);
                 }
         }
 }
@@ -281,18 +302,38 @@ void UGrenadeComponent::ExecuteThrowGrenade_MoveOrThrow(const FVector& TargetLoc
 
 void UGrenadeComponent::StartThrowSequence(const FVector& TargetLocation)
 {
+        if (M_AbilityState == EGrenadeAbilityState::MovingToThrowPosition)
+        {
+                ReportIllegalStateTransition(TEXT("MovingToThrowPosition"), TEXT("Throwing"));
+        }
+
         M_AbilityState = EGrenadeAbilityState::Throwing;
         SetAbilityToResupplying();
         StartCooldown();
         M_GrenadesRemaining = FMath::Max(0, M_GrenadesRemaining - 1);
 
+        if (M_OwningPlayer == INDEX_NONE)
+        {
+                RTSFunctionLibrary::ReportError(TEXT("Owning player not cached before grenade throw."), __func__, this);
+        }
+
         for (int32 i = 0; i < M_Settings.SquadUnitsThrowing; ++i)
         {
-                if (AGrenadeActor* Grenade = AcquireGrenade())
+                AGrenadeActor* Grenade = AcquireGrenade();
+                if (not IsValid(Grenade))
                 {
-                        const FVector StartLocation = GetOwner()->GetActorLocation();
-                        Grenade->ThrowAndExplode(M_Settings, StartLocation, TargetLocation, -1, M_Settings.GrenadeMesh);
+                        Grenade = SpawnFallbackGrenade();
                 }
+
+                if (not IsValid(Grenade))
+                {
+                        RTSFunctionLibrary::ReportError(
+                                TEXT("No grenade available to throw after attempting fallback spawn."), __func__, this);
+                        continue;
+                }
+
+                const FVector StartLocation = GetOwner()->GetActorLocation();
+                Grenade->ThrowAndExplode(M_Settings, StartLocation, TargetLocation, M_OwningPlayer, M_Settings.GrenadeMesh);
         }
 
         OnThrowFinished();
@@ -300,6 +341,11 @@ void UGrenadeComponent::StartThrowSequence(const FVector& TargetLocation)
 
 void UGrenadeComponent::OnThrowFinished()
 {
+        if (M_AbilityState != EGrenadeAbilityState::Throwing)
+        {
+                ReportIllegalStateTransition(UEnum::GetValueAsString(M_AbilityState), TEXT("ResupplyingGrenades"));
+        }
+
         M_AbilityState = EGrenadeAbilityState::ResupplyingGrenades;
         if (GetIsValidSquadController())
         {
@@ -322,6 +368,15 @@ void UGrenadeComponent::StartCooldown()
 
 void UGrenadeComponent::ResetCooldown()
 {
+        if (M_AbilityState == EGrenadeAbilityState::MovingToThrowPosition)
+        {
+                ReportIllegalStateTransition(TEXT("MovingToThrowPosition"), TEXT("NotActive"));
+        }
+        if (M_AbilityState == EGrenadeAbilityState::Throwing)
+        {
+                ReportIllegalStateTransition(TEXT("Throwing"), TEXT("NotActive"));
+        }
+
         M_GrenadesRemaining = M_Settings.GrenadesPerSquad;
         M_AbilityState = EGrenadeAbilityState::NotActive;
         SetAbilityToThrowGrenade();
@@ -345,6 +400,25 @@ AGrenadeActor* UGrenadeComponent::AcquireGrenade()
                         return Grenade.Get();
                 }
         }
+
+        RTSFunctionLibrary::ReportError("Grenade pool exhausted or invalid when attempting to acquire a grenade.",
+                                        __func__, this);
+        return nullptr;
+}
+
+AGrenadeActor* UGrenadeComponent::SpawnFallbackGrenade()
+{
+        if (UWorld* World = GetWorld())
+        {
+                AGrenadeActor* FallbackGrenade = World->SpawnActor<AGrenadeActor>();
+                if (IsValid(FallbackGrenade))
+                {
+                        M_GrenadePool.Add(FallbackGrenade);
+                        return FallbackGrenade;
+                }
+        }
+
+        RTSFunctionLibrary::ReportError("Failed to spawn fallback grenade actor.", __func__, this);
         return nullptr;
 }
 

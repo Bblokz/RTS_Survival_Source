@@ -1567,7 +1567,6 @@ void ASquadController::TerminateThrowGrenadeCommand()
         {
                 M_GrenadeComponent->TerminateThrowGrenade();
         }
-        DoneExecutingCommand(EAbilityID::IdThrowGrenade);
 }
 
 void ASquadController::ExecuteCancelThrowGrenadeCommand()
@@ -1581,7 +1580,6 @@ void ASquadController::ExecuteCancelThrowGrenadeCommand()
 
 void ASquadController::TerminateCancelThrowGrenadeCommand()
 {
-        DoneExecutingCommand(EAbilityID::IdCancelThrowGrenade);
 }
 
 void ASquadController::ExecuteEnterCargoCommand(AActor* CarrierActor)
