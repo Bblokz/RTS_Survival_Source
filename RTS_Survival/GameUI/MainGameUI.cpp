@@ -1029,12 +1029,12 @@ bool UMainGameUI::SetupWeaponUIForSelected(AActor* PrimarySelected)
 }
 
 bool UMainGameUI::SetupUnitActionUIForUnit(
-	const TArray<EAbilityID>& TAbilities,
-	EAllUnitType PrimaryUnitType,
-	AActor* PrimarySelected,
-	const ENomadicSubtype NomadicSubtype,
-	const ETankSubtype TankSubtype,
-	const ESquadSubtype SquadSubtype,
+        const TArray<FUnitAbilityEntry>& TAbilities,
+        EAllUnitType PrimaryUnitType,
+        AActor* PrimarySelected,
+        const ENomadicSubtype NomadicSubtype,
+        const ETankSubtype TankSubtype,
+        const ESquadSubtype SquadSubtype,
 	const EBuildingExpansionType BxpSubtype) const
 {
 	if (not GetIsValidActionUIManager())

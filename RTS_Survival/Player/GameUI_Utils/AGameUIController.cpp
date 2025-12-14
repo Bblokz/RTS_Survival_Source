@@ -50,15 +50,17 @@ namespace SelectionUIRebuilder
 
 
 AGameUIController::AGameUIController()
-	: M_THierarchyGameUI(),
-	  M_ActiveGameUIArrayIndex(0),
-	  M_PlayerController(nullptr),
-	  M_currentGameUIState()
+        : M_THierarchyGameUI(),
+          M_ActiveGameUIArrayIndex(0),
+          M_PlayerController(nullptr),
+          M_currentGameUIState()
 {
-	for (int i = 0; i < 12; ++i)
-	{
-		M_AbilityArrayWithEmptyAbilities.Add(EAbilityID::IdNoAbility);
-	}
+        const TArray<EAbilityID> EmptyAbilityIds = {
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        };
+        M_AbilityArrayWithEmptyAbilities = ConvertAbilityIdsToEntries(EmptyAbilityIds);
 }
 
 void AGameUIController::ForEachPrimarySameType(const TFunctionRef<void(AActor&)>& Func)
@@ -587,13 +589,13 @@ void AGameUIController::SetUpActionUIForUnit(
 	const EAllUnitType PrimaryUnitType,
 	AActor* PrimaryUnit)
 {
-	if (GetIsValidMainGameUI())
-	{
-		const TArray<EAbilityID> UnitAbilities = GetPrimarySelectedAbilityArray();
-		OutGameUIParameters.bShowActionUIAbilities = M_MainGameUI->SetupUnitActionUIForUnit(
-			UnitAbilities, PrimaryUnitType, PrimaryUnit, OutGameUIParameters.NomadicSubtype,
-			OutGameUIParameters.TankSubtype, OutGameUIParameters.SquadSubtype, OutGameUIParameters.BxpSubtype);
-	}
+        if (GetIsValidMainGameUI())
+        {
+                const TArray<FUnitAbilityEntry> UnitAbilities = GetPrimarySelectedAbilityArray();
+                OutGameUIParameters.bShowActionUIAbilities = M_MainGameUI->SetupUnitActionUIForUnit(
+                        UnitAbilities, PrimaryUnitType, PrimaryUnit, OutGameUIParameters.NomadicSubtype,
+                        OutGameUIParameters.TankSubtype, OutGameUIParameters.SquadSubtype, OutGameUIParameters.BxpSubtype);
+        }
 }
 
 void AGameUIController::RefreshGameUI(
@@ -674,23 +676,23 @@ const FSelectionData AGameUIController::GetActiveSelectionData() const
 	return FSelectionData();
 }
 
-TArray<EAbilityID> AGameUIController::GetPrimaryUnitAbilities(
-	AActor* PrimarySelectedUnit) const
+TArray<FUnitAbilityEntry> AGameUIController::GetPrimaryUnitAbilities(
+        AActor* PrimarySelectedUnit) const
 {
-	if (not IsValid(PrimarySelectedUnit))
-	{
-		return M_AbilityArrayWithEmptyAbilities;
-	}
+        if (not IsValid(PrimarySelectedUnit))
+        {
+                return M_AbilityArrayWithEmptyAbilities;
+        }
 	ICommands* UnitCommands = Cast<ICommands>(PrimarySelectedUnit);
 	if (not UnitCommands)
 	{
 		RTSFunctionLibrary::ReportError(
-			"Selected valid actor that cannot be casted to ICommands in GetPrimaryUnitAbilities in"
-			"GameUIController.cpp"
-			"\n Will set empty ability array for actor: " + PrimarySelectedUnit->GetName());
-		return M_AbilityArrayWithEmptyAbilities;
-	}
-	return UnitCommands->GetUnitAbilities();
+                        "Selected valid actor that cannot be casted to ICommands in GetPrimaryUnitAbilities in"
+                        "GameUIController.cpp"
+                        "\n Will set empty ability array for actor: " + PrimarySelectedUnit->GetName());
+                return M_AbilityArrayWithEmptyAbilities;
+        }
+        return UnitCommands->GetUnitAbilityEntries();
 }
 
 void AGameUIController::EnsureProvidedArraysAreValid(
@@ -1084,18 +1086,18 @@ AActor* AGameUIController::GetPrimarySelectedUnit(
 	return nullptr;
 }
 
-TArray<EAbilityID> AGameUIController::GetPrimarySelectedAbilityArray()
+TArray<FUnitAbilityEntry> AGameUIController::GetPrimarySelectedAbilityArray()
 {
-	return GetPrimaryUnitAbilities(M_currentGameUIState.PrimarySelectedUnit);
+        return GetPrimaryUnitAbilities(M_currentGameUIState.PrimarySelectedUnit);
 }
 
 EAbilityID AGameUIController::GetActiveAbility(const int ButtonIndex)
 {
-	TArray<EAbilityID> TAbilities = GetPrimarySelectedAbilityArray();
-	if (TAbilities.IsValidIndex(ButtonIndex))
-	{
-		return TAbilities[ButtonIndex];
-	}
+        const TArray<FUnitAbilityEntry> Abilities = GetPrimarySelectedAbilityArray();
+        if (Abilities.IsValidIndex(ButtonIndex))
+        {
+                return Abilities[ButtonIndex].AbilityId;
+        }
 	const FString PrimaryUnitName = M_currentGameUIState.PrimarySelectedUnit
 		                                ? M_currentGameUIState.PrimarySelectedUnit->GetName()
 		                                : "No Primary Unit";

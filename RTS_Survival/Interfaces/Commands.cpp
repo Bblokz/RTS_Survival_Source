@@ -58,56 +58,66 @@ TArray<EAbilityID> UCommandData::GetAbilityIds(const bool bExcludeNoAbility) con
 
 bool UCommandData::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
 {
-	const int32 Index = GetAbilityIndexById(OldAbility);
-	if (Index != INDEX_NONE)
-	{
-		M_Abilities[Index] = CreateAbilityEntryFromId(NewAbility);
-		return true;
-	}
+        return SwapAbility(OldAbility, CreateAbilityEntryFromId(NewAbility));
+}
 
-	return false;
+bool UCommandData::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility)
+{
+        const int32 Index = GetAbilityIndexById(OldAbility);
+        if (Index != INDEX_NONE)
+        {
+                M_Abilities[Index] = NewAbility;
+                return true;
+        }
+
+        return false;
 }
 
 bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 {
-	if (NewAbility == EAbilityID::IdNoAbility)
-	{
-		return false;
-	}
-	if (GetAbilityIndexById(NewAbility) != INDEX_NONE)
-	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(NewAbility) +
-			TEXT(" in UCommandData::AddAbility"));
-		return false;
-	}
+        return AddAbility(CreateAbilityEntryFromId(NewAbility), AtIndex);
+}
 
-	if (AtIndex == INDEX_NONE)
+bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex)
+{
+        if (NewAbility.AbilityId == EAbilityID::IdNoAbility)
+        {
+                return false;
+        }
+        if (GetAbilityIndexById(NewAbility.AbilityId) != INDEX_NONE)
+        {
+                RTSFunctionLibrary::ReportError(
+                        TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(NewAbility.AbilityId) +
+                        TEXT(" in UCommandData::AddAbility"));
+                return false;
+        }
+
+        if (AtIndex == INDEX_NONE)
 	{
 		for (int32 i = 0; i < M_Abilities.Num(); i++)
 		{
-			if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
-			{
-				M_Abilities[i] = CreateAbilityEntryFromId(NewAbility);
-				return true;
-			}
-		}
-		return false;
-	}
-	if (AtIndex >= 0 && AtIndex < M_Abilities.Num())
-	{
-		if (M_Abilities[AtIndex].AbilityId != EAbilityID::IdNoAbility)
-		{
-			RTSFunctionLibrary::ReportError(
-				TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
-				TEXT(" in UCommandData::AddAbility"));
-			return false;
-		}
-		M_Abilities[AtIndex] = CreateAbilityEntryFromId(NewAbility);
-		return true;
-	}
-	RTSFunctionLibrary::ReportError(
-		TEXT("Attempted to add ability at invalid index: ") + FString::FromInt(AtIndex) +
+                        if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
+                        {
+                                M_Abilities[i] = NewAbility;
+                                return true;
+                        }
+                }
+                return false;
+        }
+        if (AtIndex >= 0 && AtIndex < M_Abilities.Num())
+        {
+                if (M_Abilities[AtIndex].AbilityId != EAbilityID::IdNoAbility)
+                {
+                        RTSFunctionLibrary::ReportError(
+                                TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
+                                TEXT(" in UCommandData::AddAbility"));
+                        return false;
+                }
+                M_Abilities[AtIndex] = NewAbility;
+                return true;
+        }
+        RTSFunctionLibrary::ReportError(
+                TEXT("Attempted to add ability at invalid index: ") + FString::FromInt(AtIndex) +
 		TEXT(" in UCommandData::AddAbility"));
 	return false;
 }
@@ -559,16 +569,31 @@ void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
 bool ICommands::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 {
         UCommandData* UnitCommandData = GetIsValidCommandData();
-	if (not UnitCommandData)
-	{
-		return false;
-	}
-	const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
-	return bAdded;
+        if (not UnitCommandData)
+        {
+                return false;
+        }
+        const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
+        if (UnitCommandData->GetIsPrimarySelected())
+        {
+                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+        }
+        return bAdded;
+}
+
+bool ICommands::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex)
+{
+        UCommandData* UnitCommandData = GetIsValidCommandData();
+        if (not UnitCommandData)
+        {
+                return false;
+        }
+        const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
+        if (UnitCommandData->GetIsPrimarySelected())
+        {
+                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+        }
+        return bAdded;
 }
 
 bool ICommands::RemoveAbility(const EAbilityID AbilityToRemove)
@@ -588,17 +613,32 @@ bool ICommands::RemoveAbility(const EAbilityID AbilityToRemove)
 
 bool ICommands::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
 {
-	UCommandData* UnitCommandData = GetIsValidCommandData();
-	if (not UnitCommandData)
-	{
-		return false;
-	}
-	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
-	return bIsAbilitySwapped;
+        UCommandData* UnitCommandData = GetIsValidCommandData();
+        if (not UnitCommandData)
+        {
+                return false;
+        }
+        const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
+        if (UnitCommandData->GetIsPrimarySelected())
+        {
+                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+        }
+        return bIsAbilitySwapped;
+}
+
+bool ICommands::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility)
+{
+        UCommandData* UnitCommandData = GetIsValidCommandData();
+        if (not UnitCommandData)
+        {
+                return false;
+        }
+        const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
+        if (UnitCommandData->GetIsPrimarySelected())
+        {
+                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+        }
+        return bIsAbilitySwapped;
 }
 
 bool ICommands::HasAbility(const EAbilityID AbilityToCheck)

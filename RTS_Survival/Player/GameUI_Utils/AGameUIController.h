@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameUIState/GameUIState.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 
 
@@ -137,7 +138,7 @@ public:
 	 * @brief Obtain the unit abilities of the primary selected unit.
 	 * @return The EAbility Array.
 	 */
-	TArray<EAbilityID> GetPrimarySelectedAbilityArray();
+        TArray<FUnitAbilityEntry> GetPrimarySelectedAbilityArray();
 
 	/**
 	 * @param ButtonIndex The index of the actionUI button that was clicked.
@@ -319,7 +320,7 @@ private:
 
 	bool GetIsValidMainGameUI();
 
-	TArray<EAbilityID> M_AbilityArrayWithEmptyAbilities;
+        TArray<FUnitAbilityEntry> M_AbilityArrayWithEmptyAbilities;
 
 	/**
  * @brief Retrieves the selection data of the currently active unit in the hierarchy.
@@ -331,7 +332,7 @@ private:
 	 * @brief This is a helper function that will cast the primary selected unit against the selection types
 	 * to find the rts components with the ability array that can then be stored in the GameUIState.
 	 */
-	TArray<EAbilityID> GetPrimaryUnitAbilities(AActor* PrimarySelectedUnit) const;
+        TArray<FUnitAbilityEntry> GetPrimaryUnitAbilities(AActor* PrimarySelectedUnit) const;
 
 	void EnsureProvidedArraysAreValid(
 		TArray<ASelectablePawnMaster*>* TPlayerSelectedPawnMasters,

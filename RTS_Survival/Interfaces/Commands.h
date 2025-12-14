@@ -109,14 +109,16 @@ public:
         void SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
 
         bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+        bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
 
-	/**
-	 * 
-	 * @param NewAbility Ability to add. 
-	 * @param AtIndex Optional: provide a specific index to add the ability to.
-	 * @return Whether we could add the ability to an empty slot in the array. 
-	 */
-	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex);
+        /**
+         *
+         * @param NewAbility Ability to add.
+         * @param AtIndex Optional: provide a specific index to add the ability to.
+         * @return Whether we could add the ability to an empty slot in the array.
+         */
+        bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex);
+        bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
 
@@ -311,7 +313,8 @@ public:
 	 * @param AtIndex Optional: provide a specific index to add the ability to.
 	 * @return Whether we could add the ability to an empty slot in the array. 
 	 */
-	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE);
+        bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE);
+        bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex = INDEX_NONE);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
 
@@ -321,7 +324,8 @@ public:
 	 * @param NewAbility The ability to swap in. 
 	 * @return Whether the swap was successful.
 	 */
-	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+        bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+        bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
 
 
 	bool HasAbility(const EAbilityID AbilityToCheck);
