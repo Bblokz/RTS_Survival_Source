@@ -27,6 +27,7 @@ class URTSExperienceComp;
 enum class ESquadSubtype : uint8;
 class AItemsMaster;
 class ASquadUnit;
+class UGrenadeComponent;
 class ACPPController;
 class AWeaponPickup;
 class UHealthComponent;
@@ -255,6 +256,8 @@ public:
          */
         TObjectPtr<USquadReinforcementComponent> GetSquadReinforcementComponent() const;
 
+        bool GetIsValidGrenadeComponent() const;
+
 	inline URTSComponent* GetRTSComponent() const { return RTSComponent; }
 
 	inline AItemsMaster* GetTargetPickupItem() const { return M_TargetPickupItemState.M_TargetPickupItem; }
@@ -426,11 +429,16 @@ protected:
 	/** @brief Run when the unit finished their move command.*/
 	virtual void TerminateRotateTowardsCommand() override;
 
-	virtual void ExecuteScavengeObject(AActor* TargetObject) override;
-	virtual void TerminateScavengeObject() override;
+        virtual void ExecuteScavengeObject(AActor* TargetObject) override;
+        virtual void TerminateScavengeObject() override;
 
-	virtual void ExecuteRepairCommand(AActor* TargetActor) override;
-	virtual void TerminateRepairCommand() override;
+        virtual void ExecuteRepairCommand(AActor* TargetActor) override;
+        virtual void TerminateRepairCommand() override;
+
+        virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation) override;
+        virtual void TerminateThrowGrenadeCommand() override;
+        virtual void ExecuteCancelThrowGrenadeCommand() override;
+        virtual void TerminateCancelThrowGrenadeCommand() override;
 
 	virtual void ExecuteEnterCargoCommand(AActor* CarrierActor) override;
 	virtual void TerminateEnterCargoCommand() override;
@@ -463,6 +471,9 @@ private:
         /** Handles reinforcement activation and spawning missing squad units. */
         UPROPERTY()
         TObjectPtr<USquadReinforcementComponent> SquadReinforcement;
+
+        UPROPERTY()
+        TObjectPtr<UGrenadeComponent> M_GrenadeComponent;
 
         UPROPERTY()
         FSquadStartGameAction M_SquadStartGameAction;
@@ -499,7 +510,8 @@ private:
         void UpdateReinforcementAvailability();
 	bool GetIsValidPlayerController();
 
-	void BeginPlay_SetupPlayerController();
+        void BeginPlay_SetupPlayerController();
+        void PostInitializeComponents_SetupGrenadeComponent();
 
 	int M_UnitsCompletedCommand = 0;
 
