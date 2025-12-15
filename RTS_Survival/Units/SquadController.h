@@ -35,6 +35,9 @@ class URTSComponent;
 class AScavengeableObject;
 struct FSquadWeaponSwitch;
 class USquadReinforcementComponent;
+class USoundBase;
+class USoundAttenuation;
+class USoundConcurrency;
 
 // Will only start to exe the action once the squad is fully loaded.
 USTRUCT()
@@ -136,7 +139,7 @@ struct FRepairState
 USTRUCT()
 struct FCaptureState
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
 	FCaptureState();
 
@@ -150,8 +153,23 @@ struct FCaptureState
 	AActor* M_TargetCaptureActor = nullptr;
 
 	// True once a capture has started (units have been committed).
-	UPROPERTY()
-	bool bIsCaptureInProgress = false;
+        UPROPERTY()
+        bool bIsCaptureInProgress = false;
+};
+
+USTRUCT(BlueprintType)
+struct FPickupSoundSettings
+{
+        GENERATED_BODY()
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
+        TObjectPtr<USoundBase> PickupSound = nullptr;
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
+        TObjectPtr<USoundAttenuation> PickupSoundAttenuation = nullptr;
+
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
+        TObjectPtr<USoundConcurrency> PickupSoundConcurrency = nullptr;
 };
 
 
@@ -314,12 +332,15 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetSquadStartGameAction(AActor* TargetActor, const FVector TargetLocation, const EAbilityID StartGameAbility);
 
-	/** Array of soft class references to squad units */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad")
-	TArray<TSoftClassPtr<ASquadUnit>> SquadUnitClasses;
+        /** Array of soft class references to squad units */
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad")
+        TArray<TSoftClassPtr<ASquadUnit>> SquadUnitClasses;
 
-	UPROPERTY(BlueprintReadWrite, Category = "ReferenceCasts")
-	TObjectPtr<ACPPController> PlayerController;
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
+        FPickupSoundSettings PickupSoundSettings;
+
+        UPROPERTY(BlueprintReadWrite, Category = "ReferenceCasts")
+        TObjectPtr<ACPPController> PlayerController;
 
 	// Contains OwningPlayer and UnitType.
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference")
@@ -615,6 +636,8 @@ private:
         int32 GetWeaponValueForSquadUnit(const ASquadUnit* SquadUnit) const;
 
         bool IsPickupWeaponCommandActive(const AWeaponPickup* TargetWeaponItem) const;
+
+        void PlayPickupSound(const ASquadUnit* SquadUnit) const;
 
 	/**
 	 * @brief Move the squad to the provided location, attempts to path find once using the squad otherwise units use
