@@ -41,6 +41,10 @@ struct FBehaviourWeaponAttributes
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float Range = 0.0f;
 
+	// Base cooldown time between individual shots, measured in seconds.
+	UPROPERTY(BlueprintReadOnly)
+	float BaseCooldown = 0.0f;
+	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float ReloadSpeed = 0.0f;
 
@@ -49,6 +53,36 @@ struct FBehaviourWeaponAttributes
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	int32 MagSize = 0;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ArmorPenetration = 0.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float TnTGrams = 0.0f;
+	
+	// Range of the Area of Effect (AOE) explosion in centimeters, applicable for AOE-enabled projectiles.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ShrapnelRange = 0.0f;
+
+	// Damage dealt by each projectile in an AOE attack, relevant for AOE-enabled projectiles.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ShrapnelDamage = 0.0f;
+
+	// Number of shrapnel particles generated in an AOE attack, applicable for AOE-enabled projectiles.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 ShrapnelParticles = 0;
+
+	// Factor used for armor penetration calculations before damage application in AOE attacks.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ShrapnelPen = 0.0f;
+	
+	// The angle cone of the flame weapon in degrees.
+	UPROPERTY(BlueprintReadOnly)
+	float FlameAngle = 0.f;
+	
+	// Used by flame and laser weapons for damage per burst (one full iteration).
+	UPROPERTY(BlueprintReadOnly)
+	int32 DamageTicks = 0;
 };
 
 
