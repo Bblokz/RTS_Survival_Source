@@ -385,6 +385,7 @@ void UMainGameUI::SetBottomUIPanel(const EShowBottomRightUIPanel NewBottomRightU
 void UMainGameUI::InitMainGameUI_InitActionAndWeaponUI(const FActionUIContainer& ActionUIContainerWidgets,
                                                        const FInit_WeaponUI& WeaponUIWidgets,
                                                        const FInit_ActionUI& ActionUIWidgets,
+                                                       const FInit_BehaviourUI& BehaviourUIWidgets,
                                                        ACPPController* PlayerController)
 {
 	M_ActionUIManager = NewObject<UActionUIManager>();
@@ -404,7 +405,7 @@ void UMainGameUI::InitMainGameUI_InitActionAndWeaponUI(const FActionUIContainer&
 		WeaponUIWidgets.WeaponDescription,
 		ActionUIContainerWidgets,
 		ActionUIWidgets.SelectedUnitDescription,
-		ActionUIWidgets.ActionUIDescription);
+		ActionUIWidgets.ActionUIDescription, TODO);
 }
 
 void UMainGameUI::InitMainGameUI_InitBuildingUI(UW_BottomCenterUI* NewBottomCenterUI,
@@ -1274,7 +1275,8 @@ void UMainGameUI::InitMainGameUI(
 	UW_TrainingDescription* NewTrainingDescription,
 	UW_ControlGroups* NewControlGroups,
 	UW_ArchiveNotificationHolder* NewArchiveNotificiationHolder, UW_BottomCenterUI* NewBottomCenterUI,
-	UW_Portrait* NewPortrait)
+	UW_Portrait* NewPortrait,
+	FInit_BehaviourUI BehaviourUIWidgets)
 
 {
 	// M_TItemBuildingExpansionWidgets = NewBuildingExpansionWidgets;
@@ -1300,7 +1302,7 @@ void UMainGameUI::InitMainGameUI(
 	}
 	InitMainGameUI_InitActionAndWeaponUI(
 		ActionUIContainerWidgets,
-		WeaponUIWidgets, ActionUIWidgets, NewPlayerController);
+		WeaponUIWidgets, ActionUIWidgets, BehaviourUIWidgets, NewPlayerController);
 
 	if (IsValid(NewTrainingDescription))
 	{

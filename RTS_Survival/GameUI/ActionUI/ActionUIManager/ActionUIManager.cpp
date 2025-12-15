@@ -2,6 +2,8 @@
 #include "UObject/Object.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/W_WeaponItem.h"
 #include "Components/CanvasPanel.h"
+#include "RTS_Survival/Behaviours/UI/BehaviourContainer/W_BehaviourContainer.h"
+#include "RTS_Survival/Behaviours/UI/BehaviourDescription/W_BehaviourDescription.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/GameUI/ActionUI/ItemActionUI/W_ItemActionUI.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/AmmoButton/W_AmmoPicker.h"
@@ -33,7 +35,8 @@ void UActionUIManager::InitActionUIManager(
 	FActionUIContainer
 	ActionUIContainerWidgets,
 	UW_SelectedUnitDescription* SelectedUnitDescriptionWidget,
-	UUserWidget* ActionUIDescriptionWidget)
+	UUserWidget* ActionUIDescriptionWidget,
+	FInit_BehaviourUI BehaviourUIWidgets)
 {
 	if (TWeaponUIItemsInMenu.Num() == 0)
 	{
@@ -126,6 +129,7 @@ void UActionUIManager::HideAllHoverInfoWidgets() const
 	SetWeaponDescriptionVisibility(false);
 	SetSelectedUnitDescriptionVisibility(false);
 	SetActionUIDescriptionWidgetVisibility(false);
+	SetBehaviourDescriptionVisibility(false);
 }
 
 void UActionUIManager::HideAmmoPicker() const
@@ -235,6 +239,11 @@ void UActionUIManager::OnShellTypeSelected(const EWeaponShellType SelectedShellT
 		return;
 	}
 	M_PlayerController->PlayVoiceLine(M_LastSelectedActor.Get(), GetVoiceLineForShell(SelectedShellType), false, true);
+	if(GetIsValidBehaviourContainer())
+	{
+		// After picking ammo the ammo picker is no longer visible and we can show the behaviour container again.
+		BehaviourContainer->OnAmmoPickerVisiblityChange(false);
+	}
 }
 
 void UActionUIManager::RequestUpdateAbilityUIForPrimary(ICommands* RequestingUnit)
@@ -410,6 +419,44 @@ bool UActionUIManager::GetIsValidPlayerController() const
 	return false;
 }
 
+bool UActionUIManager::GetIsValidBehaviourContainer() const
+{
+	if(not IsValid(BehaviourContainer))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this, "BehaviourContainer", "GetIsValidBehaviourContainer");
+		return false;
+	}
+	return true;
+}
+
+bool UActionUIManager::GetIsValidBehaviourDescription() const
+{
+	if(not IsValid(BehaviourDescription))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this, "BehaviourDescription", "GetIsValidBehaviourDescription");
+		return false;
+	}
+	return true;
+}
+
+void UActionUIManager::SetBehaviourDescriptionVisibility(const bool bVisible) const
+{
+	if(not GetIsValidBehaviourDescription())
+	{
+		return;
+	}
+	if(bVisible)
+	{
+		BehaviourDescription->SetVisibility(ESlateVisibility::Visible);
+	}
+	else
+	{
+		BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
+	}
+}
+
 bool UActionUIManager::PropagateWeaponDataToUI(TArray<UWeaponState*> WeaponStates, UBombComponent* BombComponent)
 {
 	bool bInitializeBombDescription = IsValid(BombComponent);
@@ -580,4 +627,21 @@ void UActionUIManager::RegisterPrimarySelected(AActor* NewPrimarySelected)
 bool UActionUIManager::GetIsCurrentPrimarySelectedValid() const
 {
 	return M_PrimarySelectedUnit.IsValid();
+}
+
+void UActionUIManager::InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* PlayerController,
+	const FInit_BehaviourUI& BehaviourUIWidgets)
+{
+	if (not IsValid(MainGameUI))
+	{
+		RTSFunctionLibrary::ReportNullErrorInitialisation(this,
+		                                                  "MainGameUI", "UActionUIManager::InitBehaviourUI");
+		return;
+	}
+
+	BehaviourContainer = BehaviourUIWidgets.BehaviourContainer;
+	(void)GetIsValidBehaviourContainer();
+	BehaviourDescription = BehaviourUIWidgets.BehaviourDescription;
+	(void)GetIsValidBehaviourDescription();
+	BehaviourContainer->
 }

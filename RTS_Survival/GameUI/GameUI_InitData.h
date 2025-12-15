@@ -3,6 +3,8 @@
 
 #include "GameUI_InitData.generated.h"
 
+class UW_BehaviourDescription;
+class UW_BehaviourContainer;
 class UW_SelectedUnitDescription;
 class UW_AmmoPicker;
 class UW_SelectedUnitInfo;
@@ -25,6 +27,20 @@ struct FInit_WeaponUI
 	UW_AmmoPicker* AmmoPicker = nullptr;
 };
 
+
+USTRUCT(Blueprintable)
+struct FInit_BehaviourUI
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UW_BehaviourContainer* BehaviourContainer = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UW_BehaviourDescription* BehaviourDescription = nullptr;
+	
+};
+
 USTRUCT(Blueprintable)
 struct FInit_ActionUI
 {
@@ -41,4 +57,7 @@ struct FInit_ActionUI
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TArray<UW_ItemActionUI*> ActionUIElementsInMenu = {};
+	
 };
+
+
