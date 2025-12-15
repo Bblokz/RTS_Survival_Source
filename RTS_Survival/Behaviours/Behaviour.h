@@ -16,7 +16,7 @@ class AActor;
 /**
 * @brief Base behaviour class driving gameplay modifiers managed by BehaviourComp.
 */
-UCLASS()
+UCLASS(Blueprintable)
 class RTS_SURVIVAL_API UBehaviour : public UObject
 {
 	GENERATED_BODY()

@@ -11,11 +11,11 @@
 USTRUCT()
 struct FBehaviourUIData
 {
-GENERATED_BODY()
+	GENERATED_BODY()
 
-UPROPERTY()
-EBehaviourIcon BehaviourIcon = EBehaviourIcon::None;
+	UPROPERTY()
+	EBehaviourIcon BehaviourIcon = EBehaviourIcon::None;
 
-UPROPERTY()
-FString DisplayText;
+	UPROPERTY()
+	FString DisplayText;
 };

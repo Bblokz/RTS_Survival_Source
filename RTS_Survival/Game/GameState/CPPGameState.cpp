@@ -1302,7 +1302,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.MagCapacity = 5;
 	WeaponData.ReloadSpeed = 6.f;
 	SetSmallArmsCooldown(WeaponData, 1.5f);
-	WeaponData.Accuracy = RifleAccuracy + 10;
+	WeaponData.Accuracy = RifleAccuracy ;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;

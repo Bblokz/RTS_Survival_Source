@@ -11,7 +11,7 @@ class UWeaponState;
 /**
  * @brief Permanent rifle-specific behaviour that boosts weapon accuracy.
  */
-UCLASS()
+UCLASS(Blueprintable)
 class RTS_SURVIVAL_API UBehaviourRifleAccuracy : public UBehaviourWeapon
 {
         GENERATED_BODY()
