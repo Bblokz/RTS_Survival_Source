@@ -37,6 +37,8 @@ public:
 	*/
 	void GetUIData(FBehaviourUIData& OutUIData) const;
 
+	FBehaviourUIData GetUIData() const;
+
 	EBehaviourLifeTime GetLifeTimeType() const;
 	EBehaviourStackRule GetStackRule() const;
 	int32 GetMaxStackCount() const;
@@ -70,6 +72,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|UI")
 	EBehaviourIcon BehaviourIcon = EBehaviourIcon::None;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|UI")
+	FString M_TitleText;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|UI")
 	FString M_DisplayText;
 

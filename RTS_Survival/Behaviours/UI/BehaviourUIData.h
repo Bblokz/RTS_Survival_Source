@@ -17,5 +17,17 @@ struct FBehaviourUIData
 	EBehaviourIcon BehaviourIcon = EBehaviourIcon::None;
 
 	UPROPERTY()
-	FString DisplayText;
+	FString TitleText;
+
+	UPROPERTY()
+	FString DescriptionText;
+	
+	UPROPERTY()
+	EBehaviourLifeTime LifeTimeType = EBehaviourLifeTime::None;
+
+	UPROPERTY()
+	float TotalLifeTime = 0.f;
+	
+	UPROPERTY()
+	EBuffDebuffType BuffDebuffType = EBuffDebuffType::Neutral;
 };

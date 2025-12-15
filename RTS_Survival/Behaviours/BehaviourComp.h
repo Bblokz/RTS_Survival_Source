@@ -51,6 +51,9 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void DebugDrawBehaviours(const float DurationSeconds) const;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	TArray<TObjectPtr<UBehaviour>> GetBehaviours() const { return M_Behaviours; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
