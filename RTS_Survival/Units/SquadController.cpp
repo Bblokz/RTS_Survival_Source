@@ -25,6 +25,10 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundAttenuation.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundConcurrency.h"
 #include "Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "Squads/SquadControllerHpComp/USquadHealthComponent.h"
 #include "Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIcons.h"
@@ -1695,18 +1699,44 @@ void ASquadController::StartPickupWeapon(AWeaponPickup* TargetWeaponItem)
 		// todo in game visual feedback that no unit can pick up the weapon.
 		RTSFunctionLibrary::ReportError("No squad unit found with place for a second weapon on squad " + GetName());
 		return;
-	}
+        }
 
-	// Calls Destroy and SetItemDisabled on the pick up to make sure only this unit can pick it up.
-	SquadUnitWithLowestWeaponValue->StartPickupWeapon(TargetWeaponItem);
-	OnWeaponPickup.Broadcast();
+        // Calls Destroy and SetItemDisabled on the pick up to make sure only this unit can pick it up.
+        SquadUnitWithLowestWeaponValue->StartPickupWeapon(TargetWeaponItem);
+        PlayPickupSound(SquadUnitWithLowestWeaponValue);
+        OnWeaponPickup.Broadcast();
+}
+
+void ASquadController::PlayPickupSound(const ASquadUnit* SquadUnit) const
+{
+        if (not IsValid(PickupSoundSettings.PickupSound))
+        {
+                return;
+        }
+
+        UWorld* World = GetWorld();
+        if (not World)
+        {
+                return;
+        }
+
+        const FVector SoundLocation = IsValid(SquadUnit) ? SquadUnit->GetActorLocation() : GetActorLocation();
+        UGameplayStatics::SpawnSoundAtLocation(World,
+                                               PickupSoundSettings.PickupSound,
+                                               SoundLocation,
+                                               FRotator::ZeroRotator,
+                                               1.0f,
+                                               1.0f,
+                                               0.0f,
+                                               PickupSoundSettings.PickupSoundAttenuation,
+                                               PickupSoundSettings.PickupSoundConcurrency);
 }
 
 bool ASquadController::GetIsValidWeaponPickup(AWeaponPickup* TargetWeaponItem) const
 {
-	if (not IsValid(TargetWeaponItem))
-	{
-		return false;
+        if (not IsValid(TargetWeaponItem))
+        {
+                return false;
 	}
 
 	return TargetWeaponItem->EnsurePickupInitialized();
