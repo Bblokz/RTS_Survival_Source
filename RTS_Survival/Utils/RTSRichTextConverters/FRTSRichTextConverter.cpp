@@ -82,6 +82,11 @@ FString FRTSRichTextConverter::MakeRTSRich(const FString& InString, const ERTSRi
 	return GetRTSRichTextTag(RichTextType) + InString + "</>";
 }
 
+FText FRTSRichTextConverter::MakeRTSRichText(const FString& InString, const ERTSRichText RichTextType)
+{
+	return FText::FromString(GetRTSRichTextTag(RichTextType) + InString + "</>");
+}
+
 FString FRTSRichTextConverter::MakeStringDamageType(const FString& InString, const EDamageText DamageTextType)
 {
 	return GetDamageTextTag(DamageTextType) + InString + "</>";

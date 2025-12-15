@@ -55,7 +55,8 @@ enum class ERTSRichText : uint8
 	Text_NewBad,
 	Text_NewGood,
 	Text_Exp,
-	Text_Seats
+	Text_Seats,
+	Text_Cursive,
 };
 
 
@@ -71,6 +72,7 @@ public:
 
 	// adds <[ERTSRichText]? </> tags to the string.
 	static FString MakeRTSRich(const FString& InString, const ERTSRichText RichTextType);
+	static FText MakeRTSRichText(const FString& InString, const ERTSRichText RichTextType);
 
 	static FString MakeStringDamageType(const FString& InString, const EDamageText DamageTextType);
 	static FString MakeDamageTypeString_ForWeaponDmgType(const FString& InString, const ERTSDamageType DamageType );
@@ -173,6 +175,8 @@ private:
 			return "<Text_Exp>";
 			case ERTSRichText::Text_Seats:
 				return "<Text_Seats>";
+		case ERTSRichText::Text_Cursive:
+			return "<Text_Cursive>";
 		default:
 			return "";
 		}
