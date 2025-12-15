@@ -384,8 +384,18 @@ FString UW_WeaponDescription::Line_WeaponsCountIfMulti() const
 
 FString UW_WeaponDescription::Line_Ticks() const
 {
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.DamageTicks> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.DamageTicks< 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	return TEXT("Ticks: ")
-		+ GetRTSRich(FString::FromInt(WeaponDescription.DamageTicks), ERTSRichText::Text_Armor)
+		+ GetRTSRich(FString::FromInt(WeaponDescription.DamageTicks), TextTypeBuffAdjusted)
 		+ TEXT("\n");
 }
 
