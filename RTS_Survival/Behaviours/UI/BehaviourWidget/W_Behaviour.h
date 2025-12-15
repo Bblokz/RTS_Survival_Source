@@ -6,10 +6,13 @@
 #include "Blueprint/UserWidget.h"
 #include "W_Behaviour.generated.h"
 
+struct FBehaviourUIData;
 class UButton;
 class UImage;
 class UW_BehaviourContainer;
 class UMainGameUI;
+
+
 /**
  * 
  */
@@ -18,8 +21,8 @@ class RTS_SURVIVAL_API UW_Behaviour : public UUserWidget
 {
 	GENERATED_BODY()
 
-void InitBehaviourWidget(UMainGameUI* InMainGameUI, UW_BehaviourContainer* InBehaviourContainer );
-
+void InitBehaviourWidget(UW_BehaviourContainer* InBehaviourContainer);
+void SetupBehaviourWidget(const FBehaviourUIData& InBehaviourUIData );
 protected:
 	UPROPERTY(meta = (BindWidget))
 	UImage* BehaviourImage;

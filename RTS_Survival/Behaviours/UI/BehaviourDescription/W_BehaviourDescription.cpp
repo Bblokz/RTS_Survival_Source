@@ -18,6 +18,7 @@ void UW_BehaviourDescription::SetupDescription(const FBehaviourUIData& InBehavio
 	DescriptionBox->SetText(FText::FromString(InBehaviourUIData.DescriptionText));
 	TitleBox->SetText(FText::FromString(InBehaviourUIData.TitleText));
 	SetupLifeTimeDescription(InBehaviourUIData);
+	SetupStyle(InBehaviourUIData);
 }
 
 void UW_BehaviourDescription::SetupLifeTimeDescription(const FBehaviourUIData& InBehaviourUIData) const
