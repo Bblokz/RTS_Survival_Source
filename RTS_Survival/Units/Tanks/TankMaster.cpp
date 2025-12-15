@@ -6,6 +6,7 @@
 #include "AITankMaster.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
@@ -196,6 +197,9 @@ void ATankMaster::PostInitializeComponents()
 			                                          "ATankMaster::PostInitializeComponents");
 		}
 	}
+	UBehaviourComp* BehaviourComp = FindComponentByClass<UBehaviourComp>();
+	BehaviourComponent = BehaviourComp;
+	(void)GetIsValidBehaviourComponent();
 }
 
 void ATankMaster::SetTurretsToAutoEngage(const bool bUseLastTarget)
@@ -258,6 +262,17 @@ void ATankMaster::SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshToSe
 	FRTS_CollisionSetup::SetupCollisionForMeshAttachedToTracks(MeshToSetup, bOwnedByPlayer1);
 }
 
+
+bool ATankMaster::GetIsValidBehaviourComponent() const
+{
+	if(not IsValid(BehaviourComponent))
+	{
+		RTSFunctionLibrary::ReportError("Invalid Behaviour Component on unit: " + GetName() +
+			"\n ATankMaster::GetIsValidBehaviourComponent");
+		return false;
+	}
+	return true;
+}
 
 void ATankMaster::OnUnitIdleAndNoNewCommands()
 {

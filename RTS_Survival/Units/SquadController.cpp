@@ -639,9 +639,10 @@ void ASquadController::SetSquadStartGameAction(AActor* TargetActor, const FVecto
 
 bool ASquadController::GetIsValidBehaviourComponent() const
 {
-	if(not IsValid(BehaviourComponent))
+	if (not IsValid(BehaviourComponent))
 	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "BehaviourComponent", "ASquadController::GetIsValidBehaviourComponent");
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "BehaviourComponent",
+		                                             "ASquadController::GetIsValidBehaviourComponent");
 		return false;
 	}
 	return true;
@@ -755,7 +756,7 @@ void ASquadController::SetSquadVisionRange(const float NewVision)
 
 void ASquadController::PostInitializeComponents()
 {
-        Super::PostInitializeComponents();
+	Super::PostInitializeComponents();
 
 	SquadHealthComponent = FindComponentByClass<USquadHealthComponent>();
 	if (!IsValid(SquadHealthComponent))
@@ -772,37 +773,38 @@ void ASquadController::PostInitializeComponents()
 		                                             "RTSComponent",
 		                                             "ASquadController::PostInitializeComponents");
 	}
-	
+
 	UBehaviourComp* FoundBehaviourComp = FindComponentByClass<UBehaviourComp>();
-	if(not IsValid(FoundBehaviourComp))
+	if (not IsValid(FoundBehaviourComp))
 	{
 		RTSFunctionLibrary::ReportNullErrorComponent(this,
-		                                          "BehaviourComponent",
-		                                            "ASquadController::PostInitializeComponents");
+		                                             "BehaviourComponent",
+		                                             "ASquadController::PostInitializeComponents");
 	}
-	
-	// Pass on a reference to self so the CommandData can access the interface.
-        M_UnitCommandData = NewObject<UCommandData>(this);
-        M_UnitCommandData->InitCommandData(this);
-        UObject* Outer = M_UnitCommandData->GetOuter();
-        if (Outer != this)
-        {
-                RTSFunctionLibrary::ReportError("The outer on this CommandData is not set to this object."
-                        "\n ASquadController::PostInitializeComponents");
-        }
+	BehaviourComponent = FoundBehaviourComp;
 
-        PostInitializeComponents_SetupGrenadeComponent();
+	// Pass on a reference to self so the CommandData can access the interface.
+	M_UnitCommandData = NewObject<UCommandData>(this);
+	M_UnitCommandData->InitCommandData(this);
+	UObject* Outer = M_UnitCommandData->GetOuter();
+	if (Outer != this)
+	{
+		RTSFunctionLibrary::ReportError("The outer on this CommandData is not set to this object."
+			"\n ASquadController::PostInitializeComponents");
+	}
+
+	PostInitializeComponents_SetupGrenadeComponent();
 }
 
 void ASquadController::PostInitializeComponents_SetupGrenadeComponent()
 {
-        M_GrenadeComponent = FindComponentByClass<UGrenadeComponent>();
-        if (not GetIsValidGrenadeComponent())
-        {
-                return;
-        }
+	M_GrenadeComponent = FindComponentByClass<UGrenadeComponent>();
+	if (not GetIsValidGrenadeComponent())
+	{
+		return;
+	}
 
-        M_GrenadeComponent->Init(this);
+	M_GrenadeComponent->Init(this);
 }
 
 void ASquadController::SetUnitToIdleSpecificLogic()
@@ -1561,44 +1563,44 @@ void ASquadController::ExecuteRepairCommand(AActor* TargetActor)
 
 void ASquadController::TerminateRepairCommand()
 {
-        M_RepairState.Reset();
-        EnsureSquadUnitsValid();
-        for (const auto EachUnit : M_TSquadUnits)
+	M_RepairState.Reset();
+	EnsureSquadUnitsValid();
+	for (const auto EachUnit : M_TSquadUnits)
 	{
 		URepairComponent* RepairComp = EachUnit->GetRepairComponent();
 		if (RepairComp)
 		{
-                        RepairComp->TerminateRepair();
-                }
-        }
+			RepairComp->TerminateRepair();
+		}
+	}
 }
 
 void ASquadController::ExecuteThrowGrenadeCommand(const FVector TargetLocation)
 {
-        if (not GetIsValidGrenadeComponent())
-        {
-                DoneExecutingCommand(EAbilityID::IdThrowGrenade);
-                return;
-        }
+	if (not GetIsValidGrenadeComponent())
+	{
+		DoneExecutingCommand(EAbilityID::IdThrowGrenade);
+		return;
+	}
 
-        M_GrenadeComponent->ExecuteThrowGrenade(TargetLocation);
+	M_GrenadeComponent->ExecuteThrowGrenade(TargetLocation);
 }
 
 void ASquadController::TerminateThrowGrenadeCommand()
 {
-        if (GetIsValidGrenadeComponent())
-        {
-                M_GrenadeComponent->TerminateThrowGrenade();
-        }
+	if (GetIsValidGrenadeComponent())
+	{
+		M_GrenadeComponent->TerminateThrowGrenade();
+	}
 }
 
 void ASquadController::ExecuteCancelThrowGrenadeCommand()
 {
-        if (GetIsValidGrenadeComponent())
-        {
-                M_GrenadeComponent->CancelThrowGrenade();
-        }
-        DoneExecutingCommand(EAbilityID::IdCancelThrowGrenade);
+	if (GetIsValidGrenadeComponent())
+	{
+		M_GrenadeComponent->CancelThrowGrenade();
+	}
+	DoneExecutingCommand(EAbilityID::IdCancelThrowGrenade);
 }
 
 void ASquadController::TerminateCancelThrowGrenadeCommand()
@@ -1607,8 +1609,8 @@ void ASquadController::TerminateCancelThrowGrenadeCommand()
 
 void ASquadController::ExecuteEnterCargoCommand(AActor* CarrierActor)
 {
-        // Start the cargo enter flow on the component. This will:
-        // - validate the target cargo
+	// Start the cargo enter flow on the component. This will:
+	// - validate the target cargo
 	// - path the squad to the closest entrance with Ability = IdEnterCargo
 	// - when all units finish that move, call UCargoSquad::OnEnterCargo_MoveToEntranceCompleted(),
 	//   which seats/attaches everyone and calls DoneExecutingCommand(IdEnterCargo).
@@ -1699,44 +1701,44 @@ void ASquadController::StartPickupWeapon(AWeaponPickup* TargetWeaponItem)
 		// todo in game visual feedback that no unit can pick up the weapon.
 		RTSFunctionLibrary::ReportError("No squad unit found with place for a second weapon on squad " + GetName());
 		return;
-        }
+	}
 
-        // Calls Destroy and SetItemDisabled on the pick up to make sure only this unit can pick it up.
-        SquadUnitWithLowestWeaponValue->StartPickupWeapon(TargetWeaponItem);
-        PlayPickupSound(SquadUnitWithLowestWeaponValue);
-        OnWeaponPickup.Broadcast();
+	// Calls Destroy and SetItemDisabled on the pick up to make sure only this unit can pick it up.
+	SquadUnitWithLowestWeaponValue->StartPickupWeapon(TargetWeaponItem);
+	PlayPickupSound(SquadUnitWithLowestWeaponValue);
+	OnWeaponPickup.Broadcast();
 }
 
 void ASquadController::PlayPickupSound(const ASquadUnit* SquadUnit) const
 {
-        if (not IsValid(PickupSoundSettings.PickupSound))
-        {
-                return;
-        }
+	if (not IsValid(PickupSoundSettings.PickupSound))
+	{
+		return;
+	}
 
-        UWorld* World = GetWorld();
-        if (not World)
-        {
-                return;
-        }
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
 
-        const FVector SoundLocation = IsValid(SquadUnit) ? SquadUnit->GetActorLocation() : GetActorLocation();
-        UGameplayStatics::SpawnSoundAtLocation(World,
-                                               PickupSoundSettings.PickupSound,
-                                               SoundLocation,
-                                               FRotator::ZeroRotator,
-                                               1.0f,
-                                               1.0f,
-                                               0.0f,
-                                               PickupSoundSettings.PickupSoundAttenuation,
-                                               PickupSoundSettings.PickupSoundConcurrency);
+	const FVector SoundLocation = IsValid(SquadUnit) ? SquadUnit->GetActorLocation() : GetActorLocation();
+	UGameplayStatics::SpawnSoundAtLocation(World,
+	                                       PickupSoundSettings.PickupSound,
+	                                       SoundLocation,
+	                                       FRotator::ZeroRotator,
+	                                       1.0f,
+	                                       1.0f,
+	                                       0.0f,
+	                                       PickupSoundSettings.PickupSoundAttenuation,
+	                                       PickupSoundSettings.PickupSoundConcurrency);
 }
 
 bool ASquadController::GetIsValidWeaponPickup(AWeaponPickup* TargetWeaponItem) const
 {
-        if (not IsValid(TargetWeaponItem))
-        {
-                return false;
+	if (not IsValid(TargetWeaponItem))
+	{
+		return false;
 	}
 
 	return TargetWeaponItem->EnsurePickupInitialized();
@@ -2053,7 +2055,7 @@ TObjectPtr<USquadReinforcementComponent> ASquadController::GetSquadReinforcement
 
 bool ASquadController::GetIsValidGrenadeComponent() const
 {
-        return IsValid(M_GrenadeComponent);
+	return IsValid(M_GrenadeComponent);
 }
 
 

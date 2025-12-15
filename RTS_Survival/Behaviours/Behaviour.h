@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BuffDebuffType/BuffDebuffType.h"
 #include "Lifetime/BehaviourLifeTime.h"
 #include "StackRule/BehaviourStackRule.h"
 #include "Icons/BehaviourIcon.h"
@@ -71,6 +72,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|UI")
 	FString M_DisplayText;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|UI")
+	EBuffDebuffType M_BuffType = EBuffDebuffType::Neutral;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour")
 	float M_LifeTimeDuration = 0.f;
