@@ -106,6 +106,11 @@ protected:
         FBehaviourWeaponMultipliers BehaviourWeaponMultipliers;
 
 private:
+        FBehaviourWeaponAttributes CalculateBehaviourAttributesWithMultipliers(UWeaponState* WeaponState) const;
+        void CacheAppliedAttributes(UWeaponState* WeaponState, const FBehaviourWeaponAttributes& AppliedAttributes);
+        bool TryGetCachedAttributes(UWeaponState* WeaponState, FBehaviourWeaponAttributes& OutCachedAttributes) const;
+        void ClearCachedAttributesForWeapon(UWeaponState* WeaponState);
+
         void PostBeginPlayLogicInitialized();
         void ApplyBehaviourToMountedWeapons(const TArray<UWeaponState*>& Weapons);
         void RemoveBehaviourFromTrackedWeapons();
@@ -123,6 +128,9 @@ private:
 
         UPROPERTY()
         TArray<TWeakObjectPtr<UWeaponState>> M_AffectedWeapons;
+
+        UPROPERTY()
+        TMap<TWeakObjectPtr<UWeaponState>, FBehaviourWeaponAttributes> M_AppliedAttributesPerWeapon;
 
         FTimerHandle M_PostBeginPlayTimerHandle;
         bool bM_HasInitializedPostBeginPlayLogic = false;
