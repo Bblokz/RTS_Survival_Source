@@ -7,42 +7,52 @@
 #include "W_BehaviourContainer.generated.h"
 
 class UW_Behaviour;
+class UBehaviour;
 class UBehaviourComp;
 class UActionUIManager;
 class UW_BehaviourDescription;
 class UMainGameUI;
 class UButton;
 class UImage;
+struct FBehaviourUIData;
 /**
- * 
+ * @brief Widget that groups behaviour entries and manages description visibility.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_BehaviourContainer : public UUserWidget
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
 public:
 	void InitBehaviourContainer(UW_BehaviourDescription* InBehaviourDescription, UActionUIManager* InActionUIManger);
 
 	void OnAmmoPickerVisiblityChange(const bool bIsVisible);
 
-	void SetupBehaviourContainerForSelectedUnit(UBehaviourComp* PrimarySelectedBehaviourComp);
+        void SetupBehaviourContainerForSelectedUnit(UBehaviourComp* PrimarySelectedBehaviourComp);
+
+        void OnBehaviourHovered(const bool bIsHovering, const FBehaviourUIData& BehaviourUIData);
 
 private:
-	UPROPERTY()
-	UActionUIManager* M_ActionUIManager = nullptr;
-	bool GetIsValidActionUIManager()const;
-	
-	UPROPERTY()
-	UW_BehaviourDescription* M_BehaviourDescription = nullptr;
-	bool GetIsValidBehaviourDescription()const;
+        UPROPERTY()
+        TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
+        bool GetIsValidActionUIManager() const;
 
-	UPROPERTY()
-	TWeakObjectPtr<UBehaviourComp> M_PrimaryBehaviourComponent;
+        UPROPERTY()
+        TWeakObjectPtr<UW_BehaviourDescription> M_BehaviourDescription;
+        bool GetIsValidBehaviourDescription() const;
 
-	// Only visible if behaviour component is valid and there are any active behaviours.
-	bool NeedsVisibility() const;
+        UPROPERTY()
+        TWeakObjectPtr<UBehaviourComp> M_PrimaryBehaviourComponent;
 
-	UPROPERTY()
-	TArray<UW_Behaviour> M_BehaviourWidgets;
+        // Only visible if behaviour component is valid and there are any active behaviours.
+        bool NeedsVisibility() const;
+
+        UPROPERTY()
+        TArray<TObjectPtr<UW_Behaviour>> M_BehaviourWidgets;
+
+        void CollectBehaviourWidgets();
+
+        void HideUnusedBehaviourWidgets(const int32 StartIndex);
+
+        void SetupBehavioursOnWidgets(const TArray<TObjectPtr<UBehaviour>>& Behaviours);
 };

@@ -195,11 +195,13 @@ private:
      * registers it with the UI manager so that it can update the UI.
      * @param PrimarySelectedActor The currently selected actor.
      */
-	void SetupExperienceComponent(const AActor* PrimarySelectedActor);
+        void SetupExperienceComponent(const AActor* PrimarySelectedActor);
 
-	void SetAmmoPickerVisiblity(const bool bVisible) const;
+        void SetAmmoPickerVisiblity(const bool bVisible) const;
 
-	TArray<UWeaponState*> GetWeaponsOfSquad(ASquadController* SquadController) const;
+        void SetupBehaviourUIForSelectedActor(AActor* SelectedActor) const;
+
+        TArray<UWeaponState*> GetWeaponsOfSquad(ASquadController* SquadController) const;
 
 	bool UpdateAbilitiesUI(const TArray<EAbilityID>& InAbilitiesOfPrimary);
 

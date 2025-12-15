@@ -395,17 +395,18 @@ void UMainGameUI::InitMainGameUI_InitActionAndWeaponUI(const FActionUIContainer&
 		return;
 	}
 	// Sets the ammo picker on each weapon element as well as the reference to the weapon description widget.
-	M_ActionUIManager->InitActionUIManager(
-		WeaponUIWidgets.WeaponUIElements,
-		this,
-		ActionUIWidgets.ActionUIElementsInMenu,
-		PlayerController,
-		ActionUIWidgets.SelectedUnitInfo,
-		WeaponUIWidgets.AmmoPicker,
-		WeaponUIWidgets.WeaponDescription,
-		ActionUIContainerWidgets,
-		ActionUIWidgets.SelectedUnitDescription,
-		ActionUIWidgets.ActionUIDescription, TODO);
+        M_ActionUIManager->InitActionUIManager(
+                WeaponUIWidgets.WeaponUIElements,
+                this,
+                ActionUIWidgets.ActionUIElementsInMenu,
+                PlayerController,
+                ActionUIWidgets.SelectedUnitInfo,
+                WeaponUIWidgets.AmmoPicker,
+                WeaponUIWidgets.WeaponDescription,
+                ActionUIContainerWidgets,
+                ActionUIWidgets.SelectedUnitDescription,
+                ActionUIWidgets.ActionUIDescription,
+                BehaviourUIWidgets);
 }
 
 void UMainGameUI::InitMainGameUI_InitBuildingUI(UW_BottomCenterUI* NewBottomCenterUI,

@@ -4,6 +4,7 @@
 #include "Components/CanvasPanel.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourContainer/W_BehaviourContainer.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourDescription/W_BehaviourDescription.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/GameUI/ActionUI/ItemActionUI/W_ItemActionUI.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/AmmoButton/W_AmmoPicker.h"
@@ -111,12 +112,14 @@ void UActionUIManager::InitActionUIManager(
 		M_SelectedUnitInfo->InitSelectedUnitInfo(SelectedUnitDescriptionWidget, this);
 		SetSelectedUnitDescriptionVisibility(false);
 	}
-	M_ActionUIDescriptionWidget = ActionUIDescriptionWidget;
-	if (GetIsValidActionUIDescriptionWidget())
-	{
-		SetActionUIDescriptionWidgetVisibility(false);
-	}
-	M_PlayerController = PlayerController;
+        M_ActionUIDescriptionWidget = ActionUIDescriptionWidget;
+        if (GetIsValidActionUIDescriptionWidget())
+        {
+                SetActionUIDescriptionWidgetVisibility(false);
+        }
+        M_PlayerController = PlayerController;
+
+        InitBehaviourUI(MainGameUI, PlayerController, BehaviourUIWidgets);
 }
 
 void UActionUIManager::SetActionUIVisibility(const bool bShowActionUI) const
@@ -277,15 +280,16 @@ void UActionUIManager::SetWeaponUIVisibility(const bool bVisible)
 
 bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 {
-	if (not IsValid(SelectedActor))
-	{
-		SetWeaponUIVisibility(false);
-		// On UI reload make sure to hide the ammo picker.
-		SetAmmoPickerVisiblity(false);
-		return false;
-	}
-	TArray<UWeaponState*> Weapons;
-	M_LastSelectedActor = SelectedActor;
+        if (not IsValid(SelectedActor))
+        {
+                SetWeaponUIVisibility(false);
+                // On UI reload make sure to hide the ammo picker.
+                SetAmmoPickerVisiblity(false);
+                SetupBehaviourUIForSelectedActor(nullptr);
+                return false;
+        }
+        TArray<UWeaponState*> Weapons;
+        M_LastSelectedActor = SelectedActor;
 	if (const AAircraftMaster* Aircraft = Cast<AAircraftMaster>(SelectedActor); IsValid(Aircraft))
 	{
 		UBombComponent* BombComp = nullptr;
@@ -315,23 +319,24 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 }
 
 bool UActionUIManager::SetUpActionUIForSelectedActor(
-	const TArray<EAbilityID>& TAbilities,
-	const EAllUnitType PrimaryUnitType,
-	const ENomadicSubtype NomadicSubtype,
-	const ETankSubtype TankSubtype,
-	const ESquadSubtype SquadSubtype,
-	const EBuildingExpansionType BxpSubtype, AActor* SelectedActor)
+        const TArray<EAbilityID>& TAbilities,
+        const EAllUnitType PrimaryUnitType,
+        const ENomadicSubtype NomadicSubtype,
+        const ETankSubtype TankSubtype,
+        const ESquadSubtype SquadSubtype,
+        const EBuildingExpansionType BxpSubtype, AActor* SelectedActor)
 {
-	RegisterPrimarySelected(SelectedActor);
-	if (not UpdateAbilitiesUI(TAbilities))
-	{
-		return false;
-	}
-	if (GetIsValidSelectedUnitInfo())
-	{
-		float MaxHp, CurrentHp;
-		float HealthPercentage = SetupHealthComponent(SelectedActor, MaxHp, CurrentHp);
-		M_SelectedUnitInfo->SetupUnitInfoForNewUnit(PrimaryUnitType, HealthPercentage, MaxHp, CurrentHp, NomadicSubtype,
+        RegisterPrimarySelected(SelectedActor);
+        if (not UpdateAbilitiesUI(TAbilities))
+        {
+                return false;
+        }
+        SetupBehaviourUIForSelectedActor(SelectedActor);
+        if (GetIsValidSelectedUnitInfo())
+        {
+                float MaxHp, CurrentHp;
+                float HealthPercentage = SetupHealthComponent(SelectedActor, MaxHp, CurrentHp);
+                M_SelectedUnitInfo->SetupUnitInfoForNewUnit(PrimaryUnitType, HealthPercentage, MaxHp, CurrentHp, NomadicSubtype,
 		                                            TankSubtype, SquadSubtype, BxpSubtype);
 		M_SelectedUnitInfo->SetupUnitDescriptionForNewUnit(SelectedActor,
 		                                                   PrimaryUnitType,
@@ -555,13 +560,17 @@ void UActionUIManager::SetupExperienceComponent(const AActor* PrimarySelectedAct
 
 void UActionUIManager::SetAmmoPickerVisiblity(const bool bVisible) const
 {
-	if (IsValid(M_AmmoPicker))
-	{
-		M_AmmoPicker->SetAmmoPickerVisibility(bVisible);
-		return;
-	}
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this, "M_AmmoPicker", "SetAmmoPickerVisiblity");
+        if (IsValid(M_AmmoPicker))
+        {
+                M_AmmoPicker->SetAmmoPickerVisibility(bVisible);
+                if (GetIsValidBehaviourContainer())
+                {
+                        BehaviourContainer->OnAmmoPickerVisiblityChange(bVisible);
+                }
+                return;
+        }
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+                this, "M_AmmoPicker", "SetAmmoPickerVisiblity");
 }
 
 
@@ -630,18 +639,43 @@ bool UActionUIManager::GetIsCurrentPrimarySelectedValid() const
 }
 
 void UActionUIManager::InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* PlayerController,
-	const FInit_BehaviourUI& BehaviourUIWidgets)
+        const FInit_BehaviourUI& BehaviourUIWidgets)
 {
-	if (not IsValid(MainGameUI))
-	{
-		RTSFunctionLibrary::ReportNullErrorInitialisation(this,
-		                                                  "MainGameUI", "UActionUIManager::InitBehaviourUI");
-		return;
-	}
+        if (not IsValid(MainGameUI))
+        {
+                RTSFunctionLibrary::ReportNullErrorInitialisation(this,
+                                                                  "MainGameUI", "UActionUIManager::InitBehaviourUI");
+                return;
+        }
 
-	BehaviourContainer = BehaviourUIWidgets.BehaviourContainer;
-	(void)GetIsValidBehaviourContainer();
-	BehaviourDescription = BehaviourUIWidgets.BehaviourDescription;
-	(void)GetIsValidBehaviourDescription();
-	BehaviourContainer->
+        M_MainGameUI = MainGameUI;
+        M_PlayerController = PlayerController;
+
+        BehaviourContainer = BehaviourUIWidgets.BehaviourContainer;
+        BehaviourDescription = BehaviourUIWidgets.BehaviourDescription;
+
+        if (not GetIsValidBehaviourContainer() || not GetIsValidBehaviourDescription())
+        {
+                return;
+        }
+
+        BehaviourContainer->InitBehaviourContainer(BehaviourDescription, this);
+        BehaviourContainer->OnAmmoPickerVisiblityChange(false);
+        SetBehaviourDescriptionVisibility(false);
+}
+
+void UActionUIManager::SetupBehaviourUIForSelectedActor(AActor* SelectedActor) const
+{
+        if (not GetIsValidBehaviourContainer())
+        {
+                return;
+        }
+
+        UBehaviourComp* BehaviourComponent = nullptr;
+        if (IsValid(SelectedActor))
+        {
+                BehaviourComponent = SelectedActor->FindComponentByClass<UBehaviourComp>();
+        }
+
+        BehaviourContainer->SetupBehaviourContainerForSelectedUnit(BehaviourComponent);
 }
