@@ -101,19 +101,19 @@ private:
 	 * @brief Queue a behaviour class for addition after ticking finishes.
 	 * @param BehaviourClass Behaviour class to add.
 	 */
-	void QueueAddBehaviour(TSubclassOf<UBehaviour> BehaviourClass);
+	void QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass);
 	/**
 	 * @brief Queue a behaviour class for removal after ticking finishes.
 	 * @param BehaviourClass Behaviour class to remove.
 	 */
-	void QueueRemoveBehaviour(TSubclassOf<UBehaviour> BehaviourClass);
+	void QueueRemoveBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass);
 	/**
 	 * @brief Queue a behaviour swap after ticking finishes.
 	 * @param BehaviourClassToReplace Existing behaviour class to remove.
 	 * @param BehaviourClassToAdd New behaviour class to add.
 	 */
-	void QueueSwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToReplace,
-	                        TSubclassOf<UBehaviour> BehaviourClassToAdd);
+	void QueueSwapBehaviour(const TSubclassOf<UBehaviour>& BehaviourClassToReplace,
+	                        const TSubclassOf<UBehaviour>& BehaviourClassToAdd);
 	/**
 	 * @brief Handle interactions with existing behaviours based on stack rules.
 	 * @param NewBehaviour Newly created behaviour being added.

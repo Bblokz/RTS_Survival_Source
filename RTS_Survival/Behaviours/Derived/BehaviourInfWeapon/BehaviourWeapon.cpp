@@ -11,7 +11,7 @@
 
 namespace BehaviourWeaponConstants
 {
-        constexpr float NextFrameDelaySeconds = 0.0f;
+        constexpr float NextFrameDelaySeconds = 1.f;
         constexpr int32 DefaultWeaponStackCount = 10;
 }
 
@@ -194,8 +194,12 @@ void UBehaviourWeapon::SchedulePostBeginPlayLogic()
                 return;
         }
 
-        World->GetTimerManager().SetTimer(M_PostBeginPlayTimerHandle, this,
-                &UBehaviourWeapon::PostBeginPlayLogicInitialized, BehaviourWeaponConstants::NextFrameDelaySeconds, false);
+        FTimerDelegate TimerDel;
+        TimerDel.BindUObject(this, &UBehaviourWeapon::PostBeginPlayLogicInitialized);
+        World->GetTimerManager().SetTimerForNextTick(TimerDel);
+        //         &UBehaviourWeapon::PostBeginPlayLogicInitialized)
+        // World->GetTimerManager().SetTimer(M_PostBeginPlayTimerHandle, this,
+        //         &UBehaviourWeapon::PostBeginPlayLogicInitialized, BehaviourWeaponConstants::NextFrameDelaySeconds, false);
 }
 
 bool UBehaviourWeapon::TryGetAircraftWeapons(TArray<UWeaponState*>& OutWeapons) const

@@ -232,18 +232,18 @@ void UBehaviourComp::UpdateComponentTickEnabled()
 	SetComponentTickEnabled(bShouldTick);
 }
 
-void UBehaviourComp::QueueAddBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
+void UBehaviourComp::QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass)
 {
 	M_PendingAdds.Add(BehaviourClass);
 }
 
-void UBehaviourComp::QueueRemoveBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
+void UBehaviourComp::QueueRemoveBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass)
 {
 	M_PendingRemovals.Add(BehaviourClass);
 }
 
-void UBehaviourComp::QueueSwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToReplace,
-                                        TSubclassOf<UBehaviour> BehaviourClassToAdd)
+void UBehaviourComp::QueueSwapBehaviour(const TSubclassOf<UBehaviour>& BehaviourClassToReplace,
+                                        const TSubclassOf<UBehaviour>& BehaviourClassToAdd)
 {
 	M_PendingSwapRemove.Add(BehaviourClassToReplace);
 	M_PendingSwapAdd.Add(BehaviourClassToAdd);
