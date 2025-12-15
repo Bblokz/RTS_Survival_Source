@@ -15,6 +15,62 @@ class ASquadController;
 class ATankMaster;
 class UBombComponent;
 
+USTRUCT(BlueprintType)
+struct FBehaviourWeaponMultipliers
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float DamageMlt = 0.0f;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float RangeMlt = 0.0f;
+
+    // Base cooldown time between individual shots, measured in seconds.
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float BaseCooldownMlt = 0.0f;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float ReloadSpeedMlt = 0.0f;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float AccuracyMlt = 0.0f;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float MagSizeMlt = 0.0f;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float ArmorPenetrationMlt = 0.0f;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float TnTGramsMlt = 0.0f;
+
+    // Range of the Area of Effect (AOE) explosion in centimeters, applicable for AOE-enabled projectiles.
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float ShrapnelRangeMlt = 0.0f;
+
+    // Damage dealt by each projectile in an AOE attack, relevant for AOE-enabled projectiles.
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float ShrapnelDamageMlt = 0.0f;
+
+    // Number of shrapnel particles generated in an AOE attack, applicable for AOE-enabled projectiles.
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float ShrapnelParticlesMlt = 0.0f;
+
+    // Factor used for armor penetration calculations before damage application in AOE attacks.
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float ShrapnelPenMlt = 0.0f;
+
+    // The angle cone of the flame weapon in degrees.
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float FlameAngleMlt = 0.0f;
+
+    // Used by flame and laser weapons for damage per burst (one full iteration).
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float DamageTicksMlt = 0.0f;
+};
+
+
 /**
  * @brief Weapon behaviour base that applies changes to mounted weapons once owners are ready.
  * @note Uses async-aware initialisation so weapons that load after BeginPlay still receive behaviour changes.
@@ -46,6 +102,8 @@ protected:
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Attributes")
         FBehaviourWeaponAttributes BehaviourWeaponAttributes;
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Attributes")
+        FBehaviourWeaponMultipliers BehaviourWeaponMultipliers;
 
 private:
         void PostBeginPlayLogicInitialized();
