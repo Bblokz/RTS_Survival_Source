@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
 
 /**
@@ -70,12 +72,32 @@ namespace FAbilityHelpers
 		return AbilityIds;
 	}
 
+
 	inline FUnitAbilityEntry GetRocketAbilityEntry( const EAttachedRocketAbilityType RocketType )
 	{
 		FUnitAbilityEntry RocketAbilityEntry;
 		RocketAbilityEntry.AbilityId = EAbilityID::IdFireRockets;
 		RocketAbilityEntry.CustomType = static_cast<int32>(RocketType);
 		return RocketAbilityEntry;
+	}
+
+	inline FUnitAbilityEntry GetRocketAbilityForRocketType(const ERocketAbility RocketAbility )
+	{
+		FUnitAbilityEntry DefaultRocketAbility;
+		DefaultRocketAbility.AbilityId = EAbilityID::IdFireRockets;
+		switch (RocketAbility) {
+		case ERocketAbility::None:
+			RTSFunctionLibrary::ReportError(
+				TEXT("FAbilityHelpers::GetRocketAbilityForRocketType: Rocket ability is None!"));
+			return DefaultRocketAbility;
+		case ERocketAbility::HetzerRockets:
+			return DefaultRocketAbility;
+		case ERocketAbility::JagdPantherRockets:
+			return GetRocketAbilityEntry(EAttachedRocketAbilityType::SmallRockets);
+		};
+		RTSFunctionLibrary::ReportError(
+			TEXT("FAbilityHelpers::GetRocketAbilityForRocketType: Rocket ability type not handled!"));
+		return DefaultRocketAbility;
 	}
 
 	inline TArray<FUnitAbilityEntry> SwapAtIdForNewEntry(const TArray<FUnitAbilityEntry>& OldAbilityArray,

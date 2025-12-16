@@ -178,7 +178,7 @@ private:
 	UPROPERTY()
 	FTimerHandle M_ReloadTimerHandle;
 	void StartReload();
-	void OnReloadFinished();
+	void OnReloadFinished() const;
 	void SetAllRocketsVisible() const;
 
 	UPROPERTY()

@@ -741,14 +741,15 @@ void UAttachedRockets::StartReload()
 	}
 }
 
-void UAttachedRockets::OnReloadFinished()
+void UAttachedRockets::OnReloadFinished() const
 {
 	if (not EnsureOwnerIsValid())
 	{
 		return;
 	}
 	SetAllRocketsVisible();
-	M_Owner->SwapAbility(EAbilityID::IdRocketsReloading, EAbilityID::IdFireRockets);
+	const FUnitAbilityEntry RocketAbilityEntry = FAbilityHelpers::GetRocketAbilityForRocketType(RocketAbilityType);
+	M_Owner->SwapAbility(EAbilityID::IdRocketsReloading, RocketAbilityEntry);
 }
 
 void UAttachedRockets::SetAllRocketsVisible() const
