@@ -362,36 +362,36 @@ bool ACPPGameState::UpgradeNomadicDataForPlayer(const int32 PlayerOwningNomadic,
 
 TArray<FUnitAbilityEntry> ACPPGameState::GetNomadicAbilities(const ENomadicSubtype NomadicSubtype) const
 {
-        if (M_TPlayerNomadicDataHashMap.Contains(NomadicSubtype))
-        {
-                return M_TPlayerNomadicDataHashMap[NomadicSubtype].Abilities;
-        }
-        return {};
+	if (M_TPlayerNomadicDataHashMap.Contains(NomadicSubtype))
+	{
+		return M_TPlayerNomadicDataHashMap[NomadicSubtype].Abilities;
+	}
+	return {};
 }
 
 TArray<FUnitAbilityEntry> ACPPGameState::GetSquadAbilities(const ESquadSubtype SquadSubtype) const
 {
-        if (M_TPlayerSquadDataHashMap.Contains(SquadSubtype))
-        {
-                return M_TPlayerSquadDataHashMap[SquadSubtype].Abilities;
-        }
-        return {};
+	if (M_TPlayerSquadDataHashMap.Contains(SquadSubtype))
+	{
+		return M_TPlayerSquadDataHashMap[SquadSubtype].Abilities;
+	}
+	return {};
 }
 
 TArray<FUnitAbilityEntry> ACPPGameState::GetTankAbilities(const ETankSubtype TankSubtype) const
 {
-        if (M_TPlayerTankDataHashMap.Contains(TankSubtype))
-        {
-                return M_TPlayerTankDataHashMap[TankSubtype].Abilities;
-        }
-        return {};
+	if (M_TPlayerTankDataHashMap.Contains(TankSubtype))
+	{
+		return M_TPlayerTankDataHashMap[TankSubtype].Abilities;
+	}
+	return {};
 }
 
 TArray<FUnitAbilityEntry> ACPPGameState::GetBxpAbilities(const EBuildingExpansionType BxpType) const
 {
-        if (M_TPlayerBxpDataHashMap.Contains(BxpType))
-        {
-                return M_TPlayerBxpDataHashMap[BxpType].Abilities;
+	if (M_TPlayerBxpDataHashMap.Contains(BxpType))
+	{
+		return M_TPlayerBxpDataHashMap[BxpType].Abilities;
 	}
 	return {};
 }
@@ -622,7 +622,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ProjectileMovementSpeed = 0;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::LB14, WeaponData);
 
-	
+
 	WeaponData.WeaponName = EWeaponName::SPEKTR_V;
 	WeaponData.DamageType = ERTSDamageType::Laser;
 	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
@@ -1039,7 +1039,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	using DeveloperSettings::GameBalance::Weapons::ShrapnelPenPerMM;
 	using DeveloperSettings::GameBalance::Weapons::ShrapnelDamagePerTNTGram;
 
-	using namespace  DeveloperSettings::GameBalance::Weapons::SmallArmsAccuracy;
+	using namespace DeveloperSettings::GameBalance::Weapons::SmallArmsAccuracy;
 	// Projectile Settings.
 	using DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed;
 	// weapon cooldown multipliers
@@ -1195,7 +1195,8 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
 	WeaponData.WeaponCalibre = 30;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DeveloperSettings::GameBalance::Weapons::RailGunDamageMlt ;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *
+		DeveloperSettings::GameBalance::Weapons::RailGunDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = BasicSmallArmsRange;
 	WeaponData.ArmorPen = 170.f;
@@ -1212,7 +1213,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailGun, WeaponData);
-	
+
 	// Handheld railgun with radixite rounds
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::RailGunY;
@@ -1221,7 +1222,8 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
 	WeaponData.WeaponCalibre = 40;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DeveloperSettings::GameBalance::Weapons::RailGunDamageMlt ;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *
+		DeveloperSettings::GameBalance::Weapons::RailGunDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = BasicSmallArmsRange;
 	WeaponData.ArmorPen = 190.f;
@@ -1237,7 +1239,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RailGunY, WeaponData);
-	
+
 	WeaponData.WeaponName = EWeaponName::PTRS_41_14_5MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_AP;
@@ -1253,7 +1255,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ReloadSpeed = 4.f;
 	WeaponData.BaseCooldown = 1.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = RifleAccuracy +10;
+	WeaponData.Accuracy = RifleAccuracy + 10;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -1303,7 +1305,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.MagCapacity = 5;
 	WeaponData.ReloadSpeed = 6.f;
 	SetSmallArmsCooldown(WeaponData, 1.5f);
-	WeaponData.Accuracy = RifleAccuracy ;
+	WeaponData.Accuracy = RifleAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -1358,7 +1360,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1.2f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mosin_Snip, WeaponData);
-	
+
 	// SKS 
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::SKS;
@@ -1535,7 +1537,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
 	WeaponData.WeaponCalibre = 8;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre +3.f;
+	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre + 3.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = BasicSmallArmsRange;
 	WeaponData.ArmorPen = 10.f;
@@ -1934,7 +1936,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	// Pz jager type uses only APCR shells.
 	WeaponData.ShellType = EWeaponShellType::Shell_APCR;
-	WeaponData.ShellTypes = { EWeaponShellType::Shell_APCR};
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APCR};
 	WeaponData.WeaponCalibre = 47;
 	WeaponData.TNTExplosiveGrams = 15;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
@@ -2291,7 +2293,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	// Pz jager type uses only APCR shells.
 	WeaponData.ShellType = EWeaponShellType::Shell_APCR;
-	WeaponData.ShellTypes = { EWeaponShellType::Shell_APCR};
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APCR};
 	WeaponData.WeaponCalibre = 75;
 	WeaponData.TNTExplosiveGrams = 73;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
@@ -2547,7 +2549,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Bazooka_50MM, WeaponData);
-	
+
 	// https://wiki.warthunder.com/T-34-85
 	// Cramped turret; stock reload.
 	WeaponData.WeaponName = EWeaponName::ZIS_S_53_85MM;
@@ -3107,18 +3109,18 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	using DeveloperSettings::GameBalance::UnitHealth::LightTankHealthBase;
 	using DeveloperSettings::GameBalance::UnitHealth::ArmoredCarHealthBase;
 
-	// Abilities (kept identical to your arrays)
-        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	// Abilities 
+	const TArray<FUnitAbilityEntry> BasicTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
-        const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
 	FTankData TankData;
 
@@ -3240,26 +3242,26 @@ void ACPPGameState::InitAllGameLightTankData()
 	using namespace DeveloperSettings::GameBalance::Experience;
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
 
-        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	const TArray<FUnitAbilityEntry> BasicTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
 	FTankData TankData;
 
@@ -3495,21 +3497,21 @@ void ACPPGameState::InitAllGameMediumTankData()
 	using DeveloperSettings::GameBalance::UnitHealth::OneLightTankShotHp;
 	using DeveloperSettings::GameBalance::UnitHealth::OneMediumTankShotHp;
 
-        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	const TArray<FUnitAbilityEntry> BasicTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
 	FTankData TankData;
 
@@ -3802,21 +3804,21 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	using DeveloperSettings::GameBalance::UnitHealth::OneMediumTankShotHp;
 	using DeveloperSettings::GameBalance::UnitHealth::OneHeavyTankShotHp;
 
-        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	const TArray<FUnitAbilityEntry> BasicTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
 	FTankData TankData;
 
@@ -3834,7 +3836,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_Radixite, T3MediumTankDestroyerRadixiteCost},
 		{ERTSResourceType::Resource_VehicleParts, T3MediumTankDestroyerVehiclePartsCost}
 	});
-	TankData.Abilities = TankAbilitiesWithRockets;
+	TankData.Abilities = FAbilityHelpers::SwapAtIdForNewEntry(TankAbilitiesWithRockets, EAbilityID::IdFireRockets,
+		FAbilityHelpers::GetRocketAbilityEntry(EAttachedRocketAbilityType::SmallRockets));
 	TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
 	TankData.ExperienceWorth = BaseHeavyTankExp;
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4174,12 +4177,12 @@ void ACPPGameState::InitAllGameAircraftData()
 	using DeveloperSettings::GameBalance::UnitCosts::AttackAircraftVehiclePartsCost;
 
 
-        // Start with ability no owner; when the owner is set the return to base ability will automatically be swapped with it.
-        TArray<FUnitAbilityEntry> BasicAircraftAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdAircraftOwnerNotExpanded,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	// Start with ability no owner; when the owner is set the return to base ability will automatically be swapped with it.
+	TArray<FUnitAbilityEntry> BasicAircraftAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdAircraftOwnerNotExpanded,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
 	FAircraftData AircraftData;
 
@@ -4702,16 +4705,16 @@ void ACPPGameState::InitAllGameBxpData()
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
 
 
-        TArray<FUnitAbilityEntry> ArmedBxpAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
-        TArray<FUnitAbilityEntry> NotArmedBxpAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	TArray<FUnitAbilityEntry> ArmedBxpAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+	TArray<FUnitAbilityEntry> NotArmedBxpAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
 	FBxpData BxpData;
 
@@ -5130,17 +5133,17 @@ void ACPPGameState::InitAllGameBxpData()
 
 void ACPPGameState::InitAllGameNomadicData()
 {
-        TArray<FUnitAbilityEntry> BasicNomadicAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdNoAbility, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	TArray<FUnitAbilityEntry> BasicNomadicAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdNoAbility, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
-        TArray<FUnitAbilityEntry> NomadicWithWeaponsAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	TArray<FUnitAbilityEntry> NomadicWithWeaponsAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
 	using namespace DeveloperSettings::GameBalance::BuildingRadii;
@@ -5615,17 +5618,17 @@ void ACPPGameState::InitAllGameSquadData()
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
-        TArray<FUnitAbilityEntry> BasicSquadAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
-                EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-                EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	TArray<FUnitAbilityEntry> BasicSquadAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
+		EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 
-        TArray<FUnitAbilityEntry> BasicScavengerAbilities = ConvertAbilityIdsToEntries({
-                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
-                EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdScavenge, EAbilityID::IdRepair,
-                EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-        });
+	TArray<FUnitAbilityEntry> BasicScavengerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
+		EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdScavenge, EAbilityID::IdRepair,
+		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
 	FSquadData SquadData;
 	// --------------------------------------------------
 	//                     Ger Infantry
@@ -5674,8 +5677,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SteelFistAssaultSquad, SquadData);
 
-	
-	SquadData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf( BasicInfantryHealth * 1.67, 10);
+
+	SquadData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(BasicInfantryHealth * 1.67, 10);
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
@@ -5692,9 +5695,10 @@ void ACPPGameState::InitAllGameSquadData()
 	// ----------------------------
 	// -------- Ger Armory Infantry
 	// -----------------------------
-	
-	SquadData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::ArmoredHazmatInfantryHealth+ 40;
-	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetArmoredIHazmatInfantryResistances(SquadData.MaxHealth);
+
+	SquadData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::ArmoredHazmatInfantryHealth + 40;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetArmoredIHazmatInfantryResistances(
+		SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
@@ -5706,7 +5710,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = HazmatInfantryExp;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Vultures, SquadData);
-	
+
 	SquadData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::ArmoredHazmatInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = FastInfantrySpeed;
@@ -5758,7 +5762,6 @@ void ACPPGameState::InitAllGameSquadData()
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SturmPionieren, SquadData);
 
 
-
 	// --------------------------------------------
 	// ---------------- Elite Infantry ---------------
 	// --------------------------------------------
@@ -5786,9 +5789,9 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = FastInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-				{
-		{ERTSResourceType::Resource_Radixite, SturmkommandoRadixiteCost},
-		{ERTSResourceType::Resource_Metal, SturmkommandoMetalCost}
+		{
+			{ERTSResourceType::Resource_Radixite, SturmkommandoRadixiteCost},
+			{ERTSResourceType::Resource_Metal, SturmkommandoMetalCost}
 		}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
@@ -5814,7 +5817,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = EliteInfantryExp;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LightBringers, SquadData);
 
-	
+
 	SquadData.MaxHealth = EliteInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
 		SquadData.MaxHealth);
@@ -5838,7 +5841,7 @@ void ACPPGameState::InitAllGameSquadData()
 	// --------------------------------------------------
 	//                     Basic Rus Infantry
 	// --------------------------------------------------
-	
+
 	SquadData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::HazmatInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHazmatInfantryResistances(SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
@@ -5852,7 +5855,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_HazmatEngineers, SquadData);
-	
+
 	SquadData.MaxHealth = BasicInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
@@ -5897,7 +5900,7 @@ void ACPPGameState::InitAllGameSquadData()
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceWorth = ArmoredInfantryExp + 8;
-	SquadData.ExperienceLevels = GetTier2InfantryExpLevels(); 
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_RedHammer, SquadData);
 
@@ -5918,7 +5921,7 @@ void ACPPGameState::InitAllGameSquadData()
 	// --------------------------------------------
 	// --------- Russian Elite Infantry
 	// --------------------------------------------
-	
+
 	SquadData.MaxHealth = EliteInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
 		SquadData.MaxHealth);
@@ -5935,7 +5938,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = EliteInfantryExp;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Kvarc77, SquadData);
 
-	
+
 	SquadData.MaxHealth = EliteInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
 		SquadData.MaxHealth);
@@ -5966,7 +5969,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_GhostsOfStalingrad, SquadData);
-	
+
 	SquadData.MaxHealth = CommandoInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
 		SquadData.MaxHealth);
@@ -5982,7 +5985,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_CortexOfficer, SquadData);
-	
+
 	M_TEnemySquadDataHashMap = M_TPlayerSquadDataHashMap;
 }
 

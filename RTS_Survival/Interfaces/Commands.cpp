@@ -44,7 +44,7 @@ void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 	TArray<FUnitAbilityEntry> ValidAbilities = Abilities;
 	if (Abilities.Num() > DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI)
 	{
-		RTSFunctionLibrary::ReportError("The number of abilities exceeds the maximum allowed for the Action UI.",
+		RTSFunctionLibrary::ReportError("The number of abilities exceeds the maximum allowed for the Action UI."
 				"UCommandData::SetAbilities");
 		ValidAbilities.SetNum(DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI);
 	}
@@ -53,12 +53,12 @@ void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 
 TArray<EAbilityID> UCommandData::GetAbilityIds(const bool bExcludeNoAbility) const
 {
-        return ExtractAbilityIdsFromEntries(M_Abilities, bExcludeNoAbility);
+        return FAbilityHelpers::ExtractAbilityIdsFromEntries(M_Abilities, bExcludeNoAbility);
 }
 
 bool UCommandData::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
 {
-        return SwapAbility(OldAbility, CreateAbilityEntryFromId(NewAbility));
+        return SwapAbility(OldAbility, FAbilityHelpers::CreateAbilityEntryFromId(NewAbility));
 }
 
 bool UCommandData::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility)
@@ -75,7 +75,7 @@ bool UCommandData::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEn
 
 bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 {
-        return AddAbility(CreateAbilityEntryFromId(NewAbility), AtIndex);
+        return AddAbility(FAbilityHelpers::CreateAbilityEntryFromId(NewAbility), AtIndex);
 }
 
 bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex)
@@ -536,7 +536,7 @@ void ICommands::InitAbilityArray(const TArray<FUnitAbilityEntry>& Abilities)
 
 void ICommands::InitAbilityArray(const TArray<EAbilityID>& Abilities)
 {
-	InitAbilityArray(ConvertAbilityIdsToEntries(Abilities));
+	InitAbilityArray(FAbilityHelpers::ConvertAbilityIdsToEntries(Abilities));
 }
 
 TArray<FUnitAbilityEntry> ICommands::GetUnitAbilityEntries()
@@ -573,7 +573,7 @@ void ICommands::SetUnitAbilitiesRunTime(const TArray<FUnitAbilityEntry>& Abiliti
 
 void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
 {
-        SetUnitAbilitiesRunTime(ConvertAbilityIdsToEntries(Abilities));
+        SetUnitAbilitiesRunTime(FAbilityHelpers::ConvertAbilityIdsToEntries(Abilities));
 }
 
 bool ICommands::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)

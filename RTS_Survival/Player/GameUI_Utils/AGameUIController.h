@@ -20,7 +20,6 @@ class RTS_SURVIVAL_API ANomadicVehicle;
 
 enum class EAllUnitType : uint8;
 enum class EActionUINomadicButton : uint8;
-struct FAbilityStruct;
 
 /** @brief Struct to store selection data for a unit subtype. */
 USTRUCT()

@@ -60,7 +60,7 @@ AGameUIController::AGameUIController()
                 EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
                 EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
         };
-        M_AbilityArrayWithEmptyAbilities = ConvertAbilityIdsToEntries(EmptyAbilityIds);
+        M_AbilityArrayWithEmptyAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries(EmptyAbilityIds);
         M_currentGameUIState.PrimaryUnitAbilities = M_AbilityArrayWithEmptyAbilities;
 }
 
