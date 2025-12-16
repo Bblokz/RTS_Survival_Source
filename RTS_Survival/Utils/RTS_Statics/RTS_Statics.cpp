@@ -606,7 +606,7 @@ int32 FRTS_Statics::GetIndexOfAbilityForBaseTank(const int32 PlayerOwningTank, c
 	}
 	for (int32 i = 0; i < TankData.Abilities.Num(); ++i)
 	{
-		if (TankData.Abilities[i] == AbilityType)
+		if (TankData.Abilities[i].AbilityId == AbilityType)
 		{
 			return i;
 		}

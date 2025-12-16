@@ -10,51 +10,89 @@
 USTRUCT(BlueprintType)
 struct FUnitAbilityEntry
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
-        UPROPERTY(EditAnywhere, BlueprintReadWrite)
-        EAbilityID AbilityId = EAbilityID::IdNoAbility;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EAbilityID AbilityId = EAbilityID::IdNoAbility;
 
-        UPROPERTY(EditAnywhere, BlueprintReadWrite)
-        int32 CustomType = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 CustomType = 0;
 
-        UPROPERTY(EditAnywhere, BlueprintReadWrite)
-        float CooldownDuration = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float CooldownDuration = 0.0f;
 
-        UPROPERTY(EditAnywhere, BlueprintReadWrite)
-        float CooldownRemaining = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float CooldownRemaining = 0.0f;
 };
 
-inline FUnitAbilityEntry CreateAbilityEntryFromId(const EAbilityID AbilityId)
+UENUM()
+enum class EAttachedRocketAbilityType
 {
-        FUnitAbilityEntry AbilityEntry;
-        AbilityEntry.AbilityId = AbilityId;
-        return AbilityEntry;
-}
 
-inline TArray<FUnitAbilityEntry> ConvertAbilityIdsToEntries(const TArray<EAbilityID>& AbilityIds)
-{
-        TArray<FUnitAbilityEntry> AbilityEntries;
-        AbilityEntries.Reserve(AbilityIds.Num());
-        for (const EAbilityID AbilityId : AbilityIds)
-        {
-                AbilityEntries.Add(CreateAbilityEntryFromId(AbilityId));
-        }
-        return AbilityEntries;
-}
+	// The large hetzer rockets.
+	Default,
+	SmallRockets,
+};
 
-inline TArray<EAbilityID> ExtractAbilityIdsFromEntries(const TArray<FUnitAbilityEntry>& AbilityEntries,
-        const bool bExcludeNoAbility = false)
+namespace FAbilityHelpers
 {
-        TArray<EAbilityID> AbilityIds;
-        AbilityIds.Reserve(AbilityEntries.Num());
-        for (const FUnitAbilityEntry& AbilityEntry : AbilityEntries)
-        {
-                if (bExcludeNoAbility && AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
-                {
-                        continue;
-                }
-                AbilityIds.Add(AbilityEntry.AbilityId);
-        }
-        return AbilityIds;
+	inline FUnitAbilityEntry CreateAbilityEntryFromId(const EAbilityID AbilityId)
+	{
+		FUnitAbilityEntry AbilityEntry;
+		AbilityEntry.AbilityId = AbilityId;
+		return AbilityEntry;
+	}
+
+	inline TArray<FUnitAbilityEntry> ConvertAbilityIdsToEntries(const TArray<EAbilityID>& AbilityIds)
+	{
+		TArray<FUnitAbilityEntry> AbilityEntries;
+		AbilityEntries.Reserve(AbilityIds.Num());
+		for (const EAbilityID AbilityId : AbilityIds)
+		{
+			AbilityEntries.Add(CreateAbilityEntryFromId(AbilityId));
+		}
+		return AbilityEntries;
+	}
+
+	inline TArray<EAbilityID> ExtractAbilityIdsFromEntries(const TArray<FUnitAbilityEntry>& AbilityEntries,
+	                                                       const bool bExcludeNoAbility = false)
+	{
+		TArray<EAbilityID> AbilityIds;
+		AbilityIds.Reserve(AbilityEntries.Num());
+		for (const FUnitAbilityEntry& AbilityEntry : AbilityEntries)
+		{
+			if (bExcludeNoAbility && AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
+			{
+				continue;
+			}
+			AbilityIds.Add(AbilityEntry.AbilityId);
+		}
+		return AbilityIds;
+	}
+
+	inline FUnitAbilityEntry GetRocketAbilityEntry( const EAttachedRocketAbilityType RocketType )
+	{
+		FUnitAbilityEntry RocketAbilityEntry;
+		RocketAbilityEntry.AbilityId = EAbilityID::IdFireRockets;
+		RocketAbilityEntry.CustomType = static_cast<int32>(RocketType);
+		return RocketAbilityEntry;
+	}
+
+	inline TArray<FUnitAbilityEntry> SwapAtIdForNewEntry(const TArray<FUnitAbilityEntry>& OldAbilityArray,
+		const EAbilityID AbilityIdToSwap, const FUnitAbilityEntry& NewAbilityEntry)
+	{
+		TArray<FUnitAbilityEntry> NewAbilityArray = OldAbilityArray;
+		for (int32 Index = 0; Index < NewAbilityArray.Num(); Index++)
+		{
+			if (NewAbilityArray[Index].AbilityId == AbilityIdToSwap)
+			{
+				NewAbilityArray[Index] = NewAbilityEntry;
+				break;
+			}
+		}
+		return NewAbilityArray;
+	}
+	
+
+	
 }
