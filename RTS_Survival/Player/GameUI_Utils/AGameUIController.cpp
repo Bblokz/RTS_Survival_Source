@@ -61,6 +61,7 @@ AGameUIController::AGameUIController()
                 EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
         };
         M_AbilityArrayWithEmptyAbilities = ConvertAbilityIdsToEntries(EmptyAbilityIds);
+        M_currentGameUIState.PrimaryUnitAbilities = M_AbilityArrayWithEmptyAbilities;
 }
 
 void AGameUIController::ForEachPrimarySameType(const TFunctionRef<void(AActor&)>& Func)
@@ -379,8 +380,9 @@ void AGameUIController::CalculatePropagateGameUIState(
 	TArray<ASelectableActorObjectsMaster*>* TPlayerSelectedActors,
 	AActor* OverWritePrimarySelectedUnit)
 {
-	FActionUIParameters ActionUIParameters;
-	EAbilityID CurrentAbility = EAbilityID::IdIdle;
+        FActionUIParameters ActionUIParameters;
+        EAbilityID CurrentAbility = EAbilityID::IdIdle;
+        TArray<FUnitAbilityEntry> UnitAbilities = M_AbilityArrayWithEmptyAbilities;
 
 	// Raw subtype that drives per-type enum assignment inside GetGameUIParametersForType.
 	int32 UnitSubtype = 0;
@@ -390,25 +392,28 @@ void AGameUIController::CalculatePropagateGameUIState(
 
 	AActor* PrimaryUnit = nullptr;
 
-	// Try to apply the explicit overwrite primary; fall back to legacy resolution if not applied.
-	if (!TryApplyOverwritePrimarySelectedUnit(OverWritePrimarySelectedUnit, PrimarySelectedUnitType, UnitSubtype,
-	                                          PrimaryUnit))
-	{
-		// Legacy path: pick the first unit of the active type and derive UnitSubtype there.
-		PrimaryUnit = GetPrimarySelectedUnit(*TPlayerSelectedPawnMasters,
-		                                     *TPlayerSelectedSquadControllers,
-		                                     *TPlayerSelectedActors,
+        // Try to apply the explicit overwrite primary; fall back to legacy resolution if not applied.
+        if (not TryApplyOverwritePrimarySelectedUnit(OverWritePrimarySelectedUnit, PrimarySelectedUnitType, UnitSubtype,
+                                                     PrimaryUnit))
+        {
+                // Legacy path: pick the first unit of the active type and derive UnitSubtype there.
+                PrimaryUnit = GetPrimarySelectedUnit(*TPlayerSelectedPawnMasters,
+                                                     *TPlayerSelectedSquadControllers,
+                                                     *TPlayerSelectedActors,
 		                                     UnitSubtype);
 	}
 
 	// Query current ability from the primary unit if it supports ICommands.
-	if (PrimaryUnit && PrimaryUnit->GetClass()->ImplementsInterface(UCommands::StaticClass()))
-	{
-		if (ICommands* CommandsInterface = Cast<ICommands>(PrimaryUnit))
-		{
-			CurrentAbility = CommandsInterface->GetActiveCommandID();
-		}
-	}
+        if (PrimaryUnit && PrimaryUnit->GetClass()->ImplementsInterface(UCommands::StaticClass()))
+        {
+                if (ICommands* CommandsInterface = Cast<ICommands>(PrimaryUnit))
+                {
+                        CurrentAbility = CommandsInterface->GetActiveCommandID();
+                }
+                UnitAbilities = GetPrimaryUnitAbilities(PrimaryUnit);
+        }
+
+        M_currentGameUIState.PrimaryUnitAbilities = UnitAbilities;
 
 	if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 	{
@@ -1088,7 +1093,11 @@ AActor* AGameUIController::GetPrimarySelectedUnit(
 
 TArray<FUnitAbilityEntry> AGameUIController::GetPrimarySelectedAbilityArray()
 {
-        return GetPrimaryUnitAbilities(M_currentGameUIState.PrimarySelectedUnit);
+        if (M_currentGameUIState.PrimaryUnitAbilities.IsEmpty())
+        {
+                return GetPrimaryUnitAbilities(M_currentGameUIState.PrimarySelectedUnit);
+        }
+        return M_currentGameUIState.PrimaryUnitAbilities;
 }
 
 EAbilityID AGameUIController::GetActiveAbility(const int ButtonIndex)
