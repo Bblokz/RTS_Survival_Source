@@ -8,6 +8,7 @@
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "TimerManager.h"
 #include "UObject/Interface.h"
 #include "Commands.generated.h"
 
@@ -160,12 +161,14 @@ private:
 	 * Adds the given command data to the queue. 
 	 * If this is the first command, we immediately execute it.
 	 */
-	ECommandQueueError AddAbilityToTCommands(
-		EAbilityID Ability,
-		const FVector& Location = FVector::ZeroVector,
-		AActor* TargetActor = nullptr,
-		const FRotator& Rotation = FRotator::ZeroRotator
-	);
+        ECommandQueueError AddAbilityToTCommands(
+                EAbilityID Ability,
+                const FVector& Location = FVector::ZeroVector,
+                AActor* TargetActor = nullptr,
+                const FRotator& Rotation = FRotator::ZeroRotator
+        );
+
+        void BeginAbilityCooldown(const EAbilityID AbilityId);
 
 	/**
 	 * Execute either the next command (if bExecuteCurrentCommand=false) 
@@ -183,10 +186,10 @@ private:
 	 */
 	ECommandQueueError IsQueueActiveAndNoPatrol() const;
 
-	/**
-	 * Whether the queue is enabled (accepting new commands).
-	 */
-	bool bM_IsCommandQueueEnabled;
+        /**
+         * Whether the queue is enabled (accepting new commands).
+         */
+        bool bM_IsCommandQueueEnabled;
 
 
 	/** If true, the unit is spawning and hasn't received any commands yet. */
@@ -214,10 +217,19 @@ private:
 	    -1 means "no active command." */
 	int32 CurrentIndex;
 
-	/**
-	 * The "Owner" that implements ICommands and holds this UCommandData.
-	 */
-	ICommands* M_Owner;
+        /**
+         * The "Owner" that implements ICommands and holds this UCommandData.
+         */
+        ICommands* M_Owner;
+
+        FTimerHandle M_AbilityCooldownTimerHandle;
+
+        FUnitAbilityEntry* GetAbilityEntry(const EAbilityID AbilityId);
+        const FUnitAbilityEntry* GetAbilityEntry(const EAbilityID AbilityId) const;
+        bool HasAbilityOnCooldown() const;
+        void StartAbilityCooldownTimer();
+        void StopAbilityCooldownTimer();
+        void AbilityCoolDownTick();
 
 
 	struct FFinalRotation
@@ -723,5 +735,5 @@ private:
 	// Called on DoneExecutingCommand.
 	void TerminateCommand(EAbilityID AbilityToKill);
 
-	bool GetIsAbilityAllowedForUnit(const EAbilityID AbilityToCheck);
+        ECommandQueueError GetIsAbilityAllowedForUnit(const EAbilityID AbilityToCheck);
 };
