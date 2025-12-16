@@ -76,11 +76,20 @@ namespace
 
 void UW_BottomCenterUI::RebuildSelectionUI(const TArray<FSelectedUnitsWidgetState>& AllWidgetStates, const int32 ActivePageIndex)
 {
-	if (not IsValid(SelectionPanel))
-	{
-		return;
-	}
-	SelectionPanel->RebuildSelectionUI(AllWidgetStates, ActivePageIndex);
+        if (not EnsureIsValidSelectionPanel())
+        {
+                return;
+        }
+
+        const bool bHasSelection = AllWidgetStates.Num() > 0;
+        const ESlateVisibility DesiredVisibility = bHasSelection ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+        SelectionPanel->SetVisibility(DesiredVisibility);
+        if (not bHasSelection)
+        {
+                return;
+        }
+
+        SelectionPanel->RebuildSelectionUI(AllWidgetStates, ActivePageIndex);
 }
 
 
