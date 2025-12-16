@@ -25,6 +25,10 @@ void UBehaviour::GetUIData(FBehaviourUIData& OutUIData) const
 {
 	OutUIData.BehaviourIcon = BehaviourIcon;
 	OutUIData.DescriptionText = M_DisplayText;
+	OutUIData.TitleText = M_TitleText;
+	OutUIData.BuffDebuffType = M_BuffType;
+	OutUIData.LifeTimeType = BehaviourLifeTime;
+	OutUIData.TotalLifeTime = M_LifeTimeDuration;
 }
 
 FBehaviourUIData UBehaviour::GetUIData() const

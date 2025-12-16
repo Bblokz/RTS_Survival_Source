@@ -306,8 +306,8 @@ bool UBehaviourSquadMovement::GetIsValidSquadController() const
 {
         if (not M_SquadController.IsValid())
         {
-                RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_SquadController"),
-                        TEXT("GetIsValidSquadController"), this);
+                RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_SquadController") 
+                        TEXT("GetIsValidSquadController"), __func__);
                 return false;
         }
 

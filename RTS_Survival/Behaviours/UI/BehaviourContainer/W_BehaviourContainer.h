@@ -32,6 +32,11 @@ public:
 
         void OnBehaviourHovered(const bool bIsHovering, const FBehaviourUIData& BehaviourUIData);
 
+        
+protected:
+        UFUNCTION(BlueprintCallable , NotBlueprintable)
+        void SetBehaviourWidgets(TArray<UW_Behaviour*> Widgets);
+
 private:
         UPROPERTY()
         TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
@@ -50,9 +55,8 @@ private:
         UPROPERTY()
         TArray<TObjectPtr<UW_Behaviour>> M_BehaviourWidgets;
 
-        void CollectBehaviourWidgets();
 
         void HideUnusedBehaviourWidgets(const int32 StartIndex);
 
-        void SetupBehavioursOnWidgets(const TArray<TObjectPtr<UBehaviour>>& Behaviours);
+        void SetupBehavioursOnWidgets(const TArray<UBehaviour*>& Behaviours);
 };

@@ -52,7 +52,7 @@ public:
 	void DebugDrawBehaviours(const float DurationSeconds) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	TArray<TObjectPtr<UBehaviour>> GetBehaviours() const { return M_Behaviours; }
+	TArray<UBehaviour*> GetBehaviours() const { return M_Behaviours; }
 
 protected:
 	virtual void BeginPlay() override;

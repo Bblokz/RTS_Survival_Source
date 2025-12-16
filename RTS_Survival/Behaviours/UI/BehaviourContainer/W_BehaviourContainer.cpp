@@ -19,8 +19,6 @@ void UW_BehaviourContainer::InitBehaviourContainer(UW_BehaviourDescription* InBe
 
         M_ActionUIManager = InActionUIManger;
         (void)GetIsValidActionUIManager();
-
-        CollectBehaviourWidgets();
 }
 
 void UW_BehaviourContainer::OnAmmoPickerVisiblityChange(const bool bIsVisible)
@@ -54,7 +52,6 @@ void UW_BehaviourContainer::SetupBehaviourContainerForSelectedUnit(UBehaviourCom
                 return;
         }
 
-        CollectBehaviourWidgets();
         if (not NeedsVisibility())
         {
                 SetVisibility(ESlateVisibility::Collapsed);
@@ -84,9 +81,22 @@ void UW_BehaviourContainer::OnBehaviourHovered(const bool bIsHovering, const FBe
         M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
 }
 
+void UW_BehaviourContainer::SetBehaviourWidgets(TArray<UW_Behaviour*> Widgets)
+{
+        M_BehaviourWidgets = Widgets;
+        for(auto EachWidget: Widgets)
+        {
+                if (not IsValid(EachWidget))
+                {
+                        continue;
+                }
+                EachWidget->InitBehaviourWidget(this);
+        }
+}
+
 bool UW_BehaviourContainer::GetIsValidActionUIManager() const
 {
-        if (not IsValid(M_ActionUIManager))
+        if (not M_ActionUIManager.IsValid())
         {
 		RTSFunctionLibrary::ReportError(
 			TEXT("UW_BehaviourContainer::GetIsValidActionUIManager: M_ActionUIManager is not valid!"));
@@ -97,7 +107,7 @@ bool UW_BehaviourContainer::GetIsValidActionUIManager() const
 
 bool UW_BehaviourContainer::GetIsValidBehaviourDescription() const
 {
-	if (not IsValid(M_BehaviourDescription))
+	if (not M_BehaviourDescription.IsValid())
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("UW_BehaviourContainer::GetIsValidBehaviourDescription: M_BehaviourDescription is not valid!"));
@@ -119,31 +129,7 @@ bool UW_BehaviourContainer::NeedsVisibility() const
         return true;
 }
 
-void UW_BehaviourContainer::CollectBehaviourWidgets()
-{
-        if (M_BehaviourWidgets.Num() > 0)
-        {
-                return;
-        }
 
-        if (not WidgetTree)
-        {
-                RTSFunctionLibrary::ReportError(
-                        TEXT("UW_BehaviourContainer::CollectBehaviourWidgets: WidgetTree is null!"));
-                return;
-        }
-
-        TArray<UWidget*> FoundWidgets;
-        WidgetTree->GetAllWidgetsOfClass(FoundWidgets, UW_Behaviour::StaticClass(), true);
-        for (UWidget* Widget : FoundWidgets)
-        {
-                if (UW_Behaviour* BehaviourWidget = Cast<UW_Behaviour>(Widget))
-                {
-                        BehaviourWidget->InitBehaviourWidget(this);
-                        M_BehaviourWidgets.Add(BehaviourWidget);
-                }
-        }
-}
 
 void UW_BehaviourContainer::HideUnusedBehaviourWidgets(const int32 StartIndex)
 {
@@ -156,7 +142,7 @@ void UW_BehaviourContainer::HideUnusedBehaviourWidgets(const int32 StartIndex)
         }
 }
 
-void UW_BehaviourContainer::SetupBehavioursOnWidgets(const TArray<TObjectPtr<UBehaviour>>& Behaviours)
+void UW_BehaviourContainer::SetupBehavioursOnWidgets(const TArray<UBehaviour*>& Behaviours)
 {
         int32 BehaviourWidgetIndex = 0;
 
