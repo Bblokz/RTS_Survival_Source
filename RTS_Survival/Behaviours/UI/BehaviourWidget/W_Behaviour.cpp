@@ -4,6 +4,7 @@
 #include "W_Behaviour.h"
 #include "Components/Button.h"
 #include "Components/Image.h"
+#include "RTS_Survival/Behaviours/ProjectSettings/BehaviourButtonSettings.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourContainer/W_BehaviourContainer.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -64,6 +65,12 @@ bool UW_Behaviour::GetIsValidBehaviourContainer() const
         return false;
 }
 
+const UBehaviourButtonSettings* UW_Behaviour::GetBehaviourButtonSettings()
+{
+        static const UBehaviourButtonSettings* CachedSettings = UBehaviourButtonSettings::Get();
+        return CachedSettings;
+}
+
 void UW_Behaviour::ApplyBehaviourIcon()
 {
         if (not IsValid(BehaviourImage))
@@ -73,7 +80,23 @@ void UW_Behaviour::ApplyBehaviourIcon()
                 return;
         }
 
-        const FBehaviourWidgetStyle* BehaviourStyle = BehaviourIconStyles.Find(M_BehaviourUIData.BehaviourIcon);
+        const UBehaviourButtonSettings* BehaviourButtonSettings = GetBehaviourButtonSettings();
+        if (BehaviourButtonSettings == nullptr)
+        {
+                RTSFunctionLibrary::ReportError(TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to access behaviour button settings."));
+                return;
+        }
+
+        static TMap<EBehaviourIcon, FBehaviourWidgetStyle> CachedBehaviourIconStyles;
+        static bool bHasCachedBehaviourIconStyles = false;
+
+        if (not bHasCachedBehaviourIconStyles)
+        {
+                BehaviourButtonSettings->ResolveBehaviourIconStyles(CachedBehaviourIconStyles);
+                bHasCachedBehaviourIconStyles = true;
+        }
+
+        const FBehaviourWidgetStyle* BehaviourStyle = CachedBehaviourIconStyles.Find(M_BehaviourUIData.BehaviourIcon);
         if (not BehaviourStyle || not IsValid(BehaviourStyle->IconTexture))
         {
                 const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
