@@ -43,6 +43,9 @@ enum class EAbilityID : uint8
 	IdFireRockets,
 	IdCancelRocketFire,
 	IdRocketsReloading,
+	IdThrowGrenade,
+	IdCancelThrowGrenade,
+	IdGrenadesResupplying,
 	IdRepair,
 	IdReturnToBase,
 	IdAircraftOwnerNotExpanded,
@@ -86,6 +89,9 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdFireRockets: return TEXT("Fire Rockets");
 	case EAbilityID::IdCancelRocketFire: return TEXT("Cancel Rocket Fire");
 	case EAbilityID::IdRocketsReloading: return TEXT("Rockets Reloading");
+	case EAbilityID::IdThrowGrenade: return TEXT("Throw Grenade");
+	case EAbilityID::IdCancelThrowGrenade: return TEXT("Cancel Grenade Ability");
+	case EAbilityID::IdGrenadesResupplying: return TEXT("Grenades Resupplying");
 	case EAbilityID::IdRepair: return TEXT("Repair");
 	case EAbilityID::IdReturnToBase: return TEXT("Back To Base");
 	case EAbilityID::IdEnterCargo: return TEXT("Enter Cargo");

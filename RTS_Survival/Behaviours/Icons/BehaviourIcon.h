@@ -9,5 +9,9 @@
 UENUM()
 enum class EBehaviourIcon : uint8
 {
-None,
+	None,
+	RifleAccuracy,
+	LifeRegen,
+	ArmorPiercingBoost,
+	InCoverResistanceBoost,
 };

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameUI_InitData.h"
 #include "ActionUI/ActionUIContainer/FActionUIContainer.h"
 #include "Blueprint/UserWidget.h"
 #include "BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
@@ -346,7 +347,7 @@ protected:
 		UW_TrainingDescription* NewTrainingDescription,
 		UW_ControlGroups* NewControlGroups,
 		UW_ArchiveNotificationHolder* NewArchiveNotificiationHolder, UW_BottomCenterUI* NewBottomCenterUI, UW_Portrait*
-		NewPortrait);
+		NewPortrait, FInit_BehaviourUI BehaviourUIWidgets);
 
 	// The primary selected actor in the game.
 	UPROPERTY(BlueprintReadOnly, Category = "Primary Selection")
@@ -370,7 +371,7 @@ private:
 	void InitMainGameUI_InitActionAndWeaponUI(
 		const FActionUIContainer& ActionUIContainerWidgets,
 		const FInit_WeaponUI& WeaponUIWidgets,
-		const FInit_ActionUI& ActionUIWidgets, ACPPController* PlayerController);
+		const FInit_ActionUI& ActionUIWidgets, const FInit_BehaviourUI& BehaviourUIWidgets, ACPPController* PlayerController);
 
 	void InitMainGameUI_InitBuildingUI(
 		UW_BottomCenterUI* NewBottomCenterUI,

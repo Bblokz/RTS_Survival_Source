@@ -415,16 +415,26 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			M_Owner->ExecuteFireRockets();
 		}
 		break;
-	case EAbilityID::IdCancelRocketFire:
-		{
-			M_Owner->ExecuteCancelFireRockets();
-		}
-		break;
-	case EAbilityID::IdReturnToBase:
-		{
-			M_Owner->ExecuteReturnToBase();
-		}
-		break;
+        case EAbilityID::IdCancelRocketFire:
+                {
+                        M_Owner->ExecuteCancelFireRockets();
+                }
+                break;
+        case EAbilityID::IdThrowGrenade:
+                {
+                        M_Owner->ExecuteThrowGrenadeCommand(Cmd.TargetLocation);
+                }
+                break;
+        case EAbilityID::IdCancelThrowGrenade:
+                {
+                        M_Owner->ExecuteCancelThrowGrenadeCommand();
+                }
+                break;
+        case EAbilityID::IdReturnToBase:
+                {
+                        M_Owner->ExecuteReturnToBase();
+                }
+                break;
 	case EAbilityID::IdEnterCargo:
 		{
 			M_Owner->ExecuteEnterCargoCommand(Cmd.TargetActor.Get());
@@ -994,9 +1004,9 @@ ECommandQueueError ICommands::BreakCover(const bool bSetUnitToIdle)
 
 ECommandQueueError ICommands::SwitchWeapons(const bool bSetUnitToIdle)
 {
-	UCommandData* UnitCommandData = GetIsValidCommandData();
+        UCommandData* UnitCommandData = GetIsValidCommandData();
 
-	if (not IsValid(UnitCommandData))
+        if (not IsValid(UnitCommandData))
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
@@ -1008,10 +1018,52 @@ ECommandQueueError ICommands::SwitchWeapons(const bool bSetUnitToIdle)
 	{
 		SetUnitToIdle();
 	}
-	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
-		EAbilityID::IdSwitchWeapon, FVector::ZeroVector, nullptr,
-		FRotator::ZeroRotator);
-	return Error;
+        const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+                EAbilityID::IdSwitchWeapon, FVector::ZeroVector, nullptr,
+                FRotator::ZeroRotator);
+        return Error;
+}
+
+ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle)
+{
+        UCommandData* UnitCommandData = GetIsValidCommandData();
+        if (not IsValid(UnitCommandData))
+        {
+                return ECommandQueueError::CommandDataInvalid;
+        }
+        if (not GetIsAbilityAllowedForUnit(EAbilityID::IdThrowGrenade))
+        {
+                return ECommandQueueError::AbilityNotAllowed;
+        }
+        if (bSetUnitToIdle)
+        {
+                SetUnitToIdle();
+        }
+        const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+                EAbilityID::IdThrowGrenade, Location, nullptr,
+                FRotator::ZeroRotator);
+        return Error;
+}
+
+ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle)
+{
+        UCommandData* UnitCommandData = GetIsValidCommandData();
+        if (not IsValid(UnitCommandData))
+        {
+                return ECommandQueueError::CommandDataInvalid;
+        }
+        if (not GetIsAbilityAllowedForUnit(EAbilityID::IdCancelThrowGrenade))
+        {
+                return ECommandQueueError::AbilityNotAllowed;
+        }
+        if (bSetUnitToIdle)
+        {
+                SetUnitToIdle();
+        }
+        const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+                EAbilityID::IdCancelThrowGrenade, FVector::ZeroVector, nullptr,
+                FRotator::ZeroRotator);
+        return Error;
 }
 
 ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
@@ -1391,7 +1443,23 @@ void ICommands::ExecuteCancelFireRockets()
 
 void ICommands::TerminateCancelFireRockets()
 {
-	// nothing to do, instant ability.
+        // nothing to do, instant ability.
+}
+
+void ICommands::ExecuteThrowGrenadeCommand(const FVector TargetLocation)
+{
+}
+
+void ICommands::TerminateThrowGrenadeCommand()
+{
+}
+
+void ICommands::ExecuteCancelThrowGrenadeCommand()
+{
+}
+
+void ICommands::TerminateCancelThrowGrenadeCommand()
+{
 }
 
 void ICommands::ExecuteRepairCommand(AActor* TargetActor)
@@ -1663,15 +1731,21 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdBreakCover:
 		TerminateBreakCover();
 		break;
-	case EAbilityID::IdFireRockets:
-		TerminateFireRockets();
-		break;
-	case EAbilityID::IdCancelRocketFire:
-		TerminateCancelFireRockets();
-		break;
-	case EAbilityID::IdRepair:
-		TerminateRepairCommand();
-		break;
+        case EAbilityID::IdFireRockets:
+                TerminateFireRockets();
+                break;
+        case EAbilityID::IdCancelRocketFire:
+                TerminateCancelFireRockets();
+                break;
+        case EAbilityID::IdThrowGrenade:
+                TerminateThrowGrenadeCommand();
+                break;
+        case EAbilityID::IdCancelThrowGrenade:
+                TerminateCancelThrowGrenadeCommand();
+                break;
+        case EAbilityID::IdRepair:
+                TerminateRepairCommand();
+                break;
 	case EAbilityID::IdReturnToBase:
 		TerminateReturnToBase();
 		break;

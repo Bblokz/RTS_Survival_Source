@@ -24,7 +24,23 @@ void UBehaviour::OnTick(const float DeltaTime)
 void UBehaviour::GetUIData(FBehaviourUIData& OutUIData) const
 {
 	OutUIData.BehaviourIcon = BehaviourIcon;
-	OutUIData.DisplayText = M_DisplayText;
+	OutUIData.DescriptionText = M_DisplayText;
+	OutUIData.TitleText = M_TitleText;
+	OutUIData.BuffDebuffType = M_BuffType;
+	OutUIData.LifeTimeType = BehaviourLifeTime;
+	OutUIData.TotalLifeTime = M_LifeTimeDuration;
+}
+
+FBehaviourUIData UBehaviour::GetUIData() const
+{
+	FBehaviourUIData UIData;
+	UIData.BehaviourIcon = BehaviourIcon;
+	UIData.DescriptionText = M_DisplayText;
+	UIData.TitleText= M_TitleText;
+	UIData.BuffDebuffType = M_BuffType;
+	UIData.LifeTimeType = BehaviourLifeTime;
+	UIData.TotalLifeTime = M_LifeTimeDuration;
+	return UIData;
 }
 
 EBehaviourLifeTime UBehaviour::GetLifeTimeType() const

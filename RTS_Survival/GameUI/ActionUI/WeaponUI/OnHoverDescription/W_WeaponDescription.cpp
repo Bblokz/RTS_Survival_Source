@@ -12,6 +12,14 @@
 #include "RTS_Survival/Weapons/WeaponData/MultiProjectileWeapon/UWeaponStateMultiProjectile.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiTraceWeapon/WeaponStateMultiTrace.h"
 
+namespace WeaponDescriptionLayout
+{
+	ERTSRichText NormalText = ERTSRichText::Text_Armor;
+	ERTSRichText BuffedText = ERTSRichText::Text_Exp;
+	ERTSRichText DeBuffText = ERTSRichText::Text_Bad14;
+	
+}
+
 EWeaponDescriptionType UW_WeaponDescription::OnHoverWeaponItem(UWeaponState* WeaponState)
 {
 	if (not IsValid(WeaponState))
@@ -83,7 +91,7 @@ bool UW_WeaponDescription::GetIsValidLeftDescriptionBox() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, TEXT("LeftDescriptionBox"),
-	                                                      TEXT("GetIsValidLeftDescriptionBox"), this);
+	                                                             TEXT("GetIsValidLeftDescriptionBox"), this);
 	return false;
 }
 
@@ -94,7 +102,7 @@ bool UW_WeaponDescription::GetIsValidRightDescriptionBox() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, TEXT("RightDescriptionBox"),
-	                                                      TEXT("GetIsValidRightDescriptionBox"), this);
+	                                                             TEXT("GetIsValidRightDescriptionBox"), this);
 	return false;
 }
 
@@ -105,7 +113,7 @@ bool UW_WeaponDescription::GetIsValidDamageTypeBox() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, TEXT("DamageTypeBox"),
-	                                                      TEXT("GetIsValidDamageTypeBox"), this);
+	                                                             TEXT("GetIsValidDamageTypeBox"), this);
 	return false;
 }
 
@@ -116,7 +124,7 @@ bool UW_WeaponDescription::GetIsValidSizeBoxAmmoIcon() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, TEXT("SizeBoxAmmoIcon"),
-	                                                      TEXT("GetIsValidSizeBoxAmmoIcon"), this);
+	                                                             TEXT("GetIsValidSizeBoxAmmoIcon"), this);
 	return false;
 }
 
@@ -124,10 +132,10 @@ bool UW_WeaponDescription::GetIsValidSizeBoxAmmoText() const
 {
 	if (IsValid(SizeBoxAmmoText))
 	{
-		return true;	
+		return true;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, TEXT("SizeBoxAmmoText"),
-	                                                      TEXT("GetIsValidSizeBoxAmmoText"), this);
+	                                                             TEXT("GetIsValidSizeBoxAmmoText"), this);
 	return false;
 }
 
@@ -154,7 +162,16 @@ FString UW_WeaponDescription::GetNumberWithUnitRich(const float Value, const int
 
 FString UW_WeaponDescription::GetArmorPenText(const float ArmorPen) const
 {
-	return GetNumberRich(ArmorPen, 0, ERTSRichText::Text_Armor);
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.ArmorPenetration> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.ArmorPenetration < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
+	return GetNumberRich(ArmorPen, 0, TextTypeBuffAdjusted);
 }
 
 // ---------- Reusable line builders ----------
@@ -162,86 +179,158 @@ FString UW_WeaponDescription::GetArmorPenText(const float ArmorPen) const
 FString UW_WeaponDescription::Line_CalibreMM() const
 {
 	return TEXT("Calibre: ")
-	     + GetNumberWithUnitRich(WeaponDescription.WeaponCalibre, 0, ERTSRichText::Text_Armor, TEXT("MM"),
-	                              ERTSRichText::Text_Armor)
-	     + TEXT("\n");
+		+ GetNumberWithUnitRich(WeaponDescription.WeaponCalibre, 0, ERTSRichText::Text_Armor, TEXT("MM"),
+		                        ERTSRichText::Text_Armor)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_AverageDamage() const
 {
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.Damage > 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.Damage < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	return TEXT("Average Damage: ")
-	     + GetNumberRich(WeaponDescription.BaseDamage, 0, ERTSRichText::Text_Armor)
-	     + TEXT("\n");
+		+ GetNumberRich(WeaponDescription.BaseDamage, 0, TextTypeBuffAdjusted)
+		+ TEXT("\n");
+	
 }
 
 FString UW_WeaponDescription::Line_ArmorPenAt90() const
 {
+	
 	return TEXT("Armor Pen: ")
-	     + GetArmorPenText(WeaponDescription.ArmorPen)
-	     + GetRTSRich(TEXT(" @90 Deg"), ERTSRichText::Text_DescriptionHelper)
-	     + TEXT("\n");
+		+ GetArmorPenText(WeaponDescription.ArmorPen)
+		+ GetRTSRich(TEXT(" @90 Deg"), ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_ArmorPenAtMaxRange() const
 {
 	return TEXT("At max Range: ")
-	     + GetArmorPenText(WeaponDescription.ArmorPenAtMaxRange)
-	     + TEXT("\n");
+		+ GetArmorPenText(WeaponDescription.ArmorPenAtMaxRange)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_ReloadSeconds(const TCHAR* const Label) const
 {
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	// Negative is faster reload; positive effect.
+	if(WeaponDescription.BehaviourAttributes.ReloadSpeed < 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.ReloadSpeed > 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	return FString(Label)
-	     + GetNumberWithUnitRich(WeaponDescription.ReloadSpeed, 1, ERTSRichText::Text_Armor, TEXT(" Sec"),
-	                              ERTSRichText::Text_DescriptionHelper)
-	     + TEXT("\n");
+		+ GetNumberWithUnitRich(WeaponDescription.ReloadSpeed, 1, TextTypeBuffAdjusted, TEXT(" Sec"),
+		                        ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_TNTGrams(const TCHAR* const Label) const
 {
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.TnTGrams> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.TnTGrams < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	return FString(Label)
-	     + GetNumberWithUnitRich(WeaponDescription.TNTExplosiveGrams, 0, ERTSRichText::Text_Armor, TEXT(" Gr"),
-	                              ERTSRichText::Text_DescriptionHelper)
-	     + TEXT("\n");
+		+ GetNumberWithUnitRich(WeaponDescription.TNTExplosiveGrams, 0, TextTypeBuffAdjusted, TEXT(" Gr"),
+		                        ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_Accuracy() const
 {
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.Accuracy> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.Accuracy< 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	return TEXT("Accuracy: ")
-	     + GetNumberRich(static_cast<float>(WeaponDescription.Accuracy), 0, ERTSRichText::Text_Armor);
+		+ GetNumberRich(static_cast<float>(WeaponDescription.Accuracy), 0, TextTypeBuffAdjusted);
 }
 
 FString UW_WeaponDescription::Line_RangeMeters() const
 {
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.Range> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.Range < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	return TEXT("Range: ")
-	     + GetNumberWithUnitRich(WeaponDescription.Range / 100.f, 0, ERTSRichText::Text_Armor, TEXT(" meter"),
-	                              ERTSRichText::Text_DescriptionHelper)
-	     + TEXT("\n");
+		+ GetNumberWithUnitRich(WeaponDescription.Range / 100.f, 0, TextTypeBuffAdjusted, TEXT(" meter"),
+		                        ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_MagCapacity() const
 {
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.MagSize> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.MagSize < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	if (WeaponDescription.MagCapacity > 1)
 	{
 		return TEXT("Mag Capacity: ")
-		     + GetRTSRich(FString::FromInt(WeaponDescription.CurrentMagCapacity), ERTSRichText::Text_Armor)
-		     + TEXT("/")
-		     + GetRTSRich(FString::FromInt(WeaponDescription.MagCapacity), ERTSRichText::Text_Armor)
-		     + TEXT("\n");
+			+ GetRTSRich(FString::FromInt(WeaponDescription.CurrentMagCapacity), TextTypeBuffAdjusted)
+			+ TEXT("/")
+			+ GetRTSRich(FString::FromInt(WeaponDescription.MagCapacity), TextTypeBuffAdjusted)
+			+ TEXT("\n");
 	}
 	return TEXT("Mag Capacity: ")
-	     + GetRTSRich(FString::FromInt(WeaponDescription.MagCapacity), ERTSRichText::Text_Armor)
-	     + TEXT("\n");
+		+ GetRTSRich(FString::FromInt(WeaponDescription.MagCapacity), TextTypeBuffAdjusted)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_AverageCooldownIfMulti() const
 {
 	if (WeaponDescription.MagCapacity > 1)
 	{
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	// Negative is faster reload; positive effect.
+	if(WeaponDescription.BehaviourAttributes.BaseCooldown< 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.BaseCooldown > 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
+
 		return TEXT("Average Cooldown: ")
-		     + GetNumberWithUnitRich(WeaponDescription.BaseCooldown, 2, ERTSRichText::Text_Armor, TEXT(" Sec"),
-		                              ERTSRichText::Text_DescriptionHelper)
-		     + TEXT("\n");
+			+ GetNumberWithUnitRich(WeaponDescription.BaseCooldown, 2, ERTSRichText::Text_Armor, TEXT(" Sec"),
+			                        ERTSRichText::Text_DescriptionHelper)
+			+ TEXT("\n");
 	}
 	return FString();
 }
@@ -253,14 +342,32 @@ FString UW_WeaponDescription::Lines_AOEIfAny() const
 		return FString();
 	}
 
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.ShrapnelDamage> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.ShrapnelDamage < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	FString Out;
 	Out += TEXT("AOE Damage: ")
-	    + GetNumberRich(WeaponDescription.ShrapnelDamage, 0, ERTSRichText::Text_Armor)
-	    + TEXT("\n");
+		+ GetNumberRich(WeaponDescription.ShrapnelDamage, 0, TextTypeBuffAdjusted)
+		+ TEXT("\n");
+	TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.ShrapnelRange> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.ShrapnelRange < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 
 	Out += TEXT("AOE Range: ")
-	    + GetNumberWithUnitRich(WeaponDescription.ShrapnelRange, 0, ERTSRichText::Text_Armor, TEXT(" cm"),
-	                             ERTSRichText::Text_DescriptionHelper);
+		+ GetNumberWithUnitRich(WeaponDescription.ShrapnelRange, 0, TextTypeBuffAdjusted, TEXT(" cm"),
+		                        ERTSRichText::Text_DescriptionHelper);
 	return Out;
 }
 
@@ -269,42 +376,63 @@ FString UW_WeaponDescription::Line_WeaponsCountIfMulti() const
 	if (WeaponDescription.Count > 1)
 	{
 		return TEXT("Weapons: ")
-		     + GetRTSRich(FString::FromInt(WeaponDescription.Count), ERTSRichText::Text_Armor)
-		     + TEXT("\n");
+			+ GetRTSRich(FString::FromInt(WeaponDescription.Count), ERTSRichText::Text_Armor)
+			+ TEXT("\n");
 	}
 	return FString();
 }
 
 FString UW_WeaponDescription::Line_Ticks() const
 {
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.DamageTicks> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.DamageTicks< 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
 	return TEXT("Ticks: ")
-	     + GetRTSRich(FString::FromInt(WeaponDescription.DamageTicks), ERTSRichText::Text_Armor)
-	     + TEXT("\n");
+		+ GetRTSRich(FString::FromInt(WeaponDescription.DamageTicks), TextTypeBuffAdjusted)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_ConeAngleDeg() const
 {
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.FlameAngle> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.FlameAngle < 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
+
 	return TEXT("Cone Angle: ")
-	     + GetNumberWithUnitRich(WeaponDescription.FlameAngle, 2, ERTSRichText::Text_Armor, TEXT(" Deg"),
-	                              ERTSRichText::Text_DescriptionHelper)
-	     + TEXT("\n");
+		+ GetNumberWithUnitRich(WeaponDescription.FlameAngle, 2, TextTypeBuffAdjusted, TEXT(" Deg"),
+		                        ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_BombCapacity() const
 {
 	return TEXT("Bomb Capacity: ")
-	     + GetRTSRich(FString::FromInt(WeaponDescription.CurrentBombs), ERTSRichText::Text_Armor)
-	     + TEXT("/")
-	     + GetRTSRich(FString::FromInt(WeaponDescription.MaxBombs), ERTSRichText::Text_Armor)
-	     + TEXT("\n");
+		+ GetRTSRich(FString::FromInt(WeaponDescription.CurrentBombs), ERTSRichText::Text_Armor)
+		+ TEXT("/")
+		+ GetRTSRich(FString::FromInt(WeaponDescription.MaxBombs), ERTSRichText::Text_Armor)
+		+ TEXT("\n");
 }
 
 FString UW_WeaponDescription::Line_BombInterval() const
 {
 	return TEXT("Bomb Interval: ")
-	     + GetNumberWithUnitRich(WeaponDescription.BombInterval, 2, ERTSRichText::Text_Armor, TEXT(" Sec"),
-	                              ERTSRichText::Text_DescriptionHelper)
-	     + TEXT("\n");
+		+ GetNumberWithUnitRich(WeaponDescription.BombInterval, 2, ERTSRichText::Text_Armor, TEXT(" Sec"),
+		                        ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 }
 
 // ---------- Top-level update flows ----------
@@ -389,15 +517,15 @@ FString UW_WeaponDescription::LeftFlameText() const
 
 	// Full cone damage (sum of rays) per tick
 	LeftText += TEXT("Full Cone Damage: ")
-	         + GetNumberRich(WeaponDescription.BaseDamage * WeaponDescription.FlameRays, 0, ERTSRichText::Text_Armor)
-	         + GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
-	         + TEXT("\n");
+		+ GetNumberRich(WeaponDescription.BaseDamage * WeaponDescription.FlameRays, 0, ERTSRichText::Text_Armor)
+		+ GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 
 	// Partial (single ray) per tick
 	LeftText += TEXT("Partial Damage: ")
-	         + GetNumberRich(WeaponDescription.BaseDamage, 0, ERTSRichText::Text_Armor)
-	         + GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
-	         + TEXT("\n");
+		+ GetNumberRich(WeaponDescription.BaseDamage, 0, ERTSRichText::Text_Armor)
+		+ GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 
 	LeftText += Line_ReloadSeconds(TEXT("Reload Speed: "));
 
@@ -410,15 +538,38 @@ FString UW_WeaponDescription::LeftLaserText() const
 
 	LeftText += Line_CalibreMM();
 
+	
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.Damage > 0 || WeaponDescription.BehaviourAttributes.DamageTicks> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.Damage < 0 || WeaponDescription.BehaviourAttributes.DamageTicks  <0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
+
+
 	LeftText += TEXT("Full Laser Damage: ")
-	         + GetNumberRich(WeaponDescription.BaseDamage * WeaponDescription.DamageTicks, 0, ERTSRichText::Text_Armor)
-	         + GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
-	         + TEXT("\n");
+		+ GetNumberRich(WeaponDescription.BaseDamage * WeaponDescription.DamageTicks, 0, TextTypeBuffAdjusted)
+		+ GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
+
+	TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if(WeaponDescription.BehaviourAttributes.Damage> 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if(WeaponDescription.BehaviourAttributes.Damage< 0 )
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
+	
 
 	LeftText += TEXT("Damage: ")
-	         + GetNumberRich(WeaponDescription.BaseDamage, 0, ERTSRichText::Text_Armor)
-	         + GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
-	         + TEXT("\n");
+		+ GetNumberRich(WeaponDescription.BaseDamage, 0, TextTypeBuffAdjusted)
+		+ GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
+		+ TEXT("\n");
 
 	LeftText += Line_ReloadSeconds(TEXT("Reload Speed: "));
 	LeftText += Line_Accuracy();
@@ -472,8 +623,8 @@ FString UW_WeaponDescription::RightFlameText() const
 	{
 		// Bursts as in amount per mag (flame weapons are single fire weapons that deplete their mag every full fire iteration)
 		RightText += TEXT("Bursts: ")
-		          + GetRTSRich(FString::FromInt(WeaponDescription.MagCapacity), ERTSRichText::Text_Armor)
-		          + TEXT("\n");
+			+ GetRTSRich(FString::FromInt(WeaponDescription.MagCapacity), ERTSRichText::Text_Armor)
+			+ TEXT("\n");
 	}
 
 	RightText += Line_AverageCooldownIfMulti();
@@ -545,6 +696,7 @@ void UW_WeaponDescription::SetDescriptionWithData(const FWeaponData& WeaponData,
 	WeaponDescription.BaseCooldown = WeaponData.BaseCooldown;
 	WeaponDescription.BaseDamage = WeaponData.BaseDamage;
 	WeaponDescription.MagCapacity = WeaponData.MagCapacity;
+	WeaponDescription.BehaviourAttributes = WeaponData.BehaviourAttributes;
 
 	// Is null for bomb components.
 	if (WeaponState)

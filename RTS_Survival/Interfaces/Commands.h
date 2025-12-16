@@ -484,11 +484,17 @@ public:
 	virtual ECommandQueueError SwitchWeapons(const bool bSetUnitToIdle);
 
 
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-	virtual ECommandQueueError FireRockets(const bool bSetUnitToIdle);
+        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+        virtual ECommandQueueError FireRockets(const bool bSetUnitToIdle);
 
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-	virtual ECommandQueueError CancelFireRockets(const bool bSetUnitToIdle);
+        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+        virtual ECommandQueueError CancelFireRockets(const bool bSetUnitToIdle);
+
+        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+        virtual ECommandQueueError ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle);
+
+        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+        virtual ECommandQueueError CancelThrowingGrenade(const bool bSetUnitToIdle);
 	/**
 	 * @brief Determines whether the provided command is in the command queue.
 	 * @param CommandToCheck The command to check for.
@@ -648,14 +654,23 @@ protected:
 	virtual void ExecuteBreakCover();
 	virtual void TerminateBreakCover();
 
-	virtual void ExecuteFireRockets();
-	virtual void TerminateFireRockets();
+        virtual void ExecuteFireRockets();
+        virtual void TerminateFireRockets();
 
-	virtual void ExecuteCancelFireRockets();
-	virtual void TerminateCancelFireRockets();
+        virtual void ExecuteCancelFireRockets();
+        virtual void TerminateCancelFireRockets();
 
-	virtual void ExecuteRepairCommand(AActor* TargetActor);
-	virtual void TerminateRepairCommand();
+        /**
+         * @brief Executes the grenade throw ability for this squad.
+         * @param TargetLocation World target to throw the grenade towards.
+         */
+        virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation);
+        virtual void TerminateThrowGrenadeCommand();
+        virtual void ExecuteCancelThrowGrenadeCommand();
+        virtual void TerminateCancelThrowGrenadeCommand();
+
+        virtual void ExecuteRepairCommand(AActor* TargetActor);
+        virtual void TerminateRepairCommand();
 
 	virtual void ExecuteReturnToBase();
 	virtual void TerminateReturnToBase();

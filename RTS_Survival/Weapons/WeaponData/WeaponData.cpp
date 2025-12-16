@@ -138,6 +138,7 @@ void FWeaponData::CopyWeaponDataValues(const FWeaponData* const WeaponData)
 	ShrapnelParticles = WeaponData->ShrapnelParticles;
 	ShrapnelPen = WeaponData->ShrapnelPen;
 	ProjectileMovementSpeed = WeaponData->ProjectileMovementSpeed; // ← add
+	BehaviourAttributes = WeaponData->BehaviourAttributes;
 }
 
 bool FLaunchEffectSettings::HasLaunchSettings() const
@@ -754,7 +755,7 @@ void UWeaponState::RegisterActorToIgnore(AActor* RTSValidActor, const bool bRegi
 	}
 	else
 	{
-		if(!ActorsToIgnore.Contains(RTSValidActor))
+		if (!ActorsToIgnore.Contains(RTSValidActor))
 		{
 			const FString ActorName = RTSValidActor ? RTSValidActor->GetName() : "InvalidActor";
 			RTSFunctionLibrary::ReportError("Attempted to un-ignore actor for weapon but actor is not being ignored:"
@@ -768,7 +769,6 @@ void UWeaponState::RegisterActorToIgnore(AActor* RTSValidActor, const bool bRegi
 
 void UWeaponState::Fire(const FVector& AimPointOpt /*= nullptr*/)
 {
-	
 	TRACE_CPUPROFILER_EVENT_SCOPE(FireWeapon);
 	if (IsValid(WeaponOwner.GetObject()) && FireModeFunc)
 	{
@@ -844,6 +844,46 @@ const FWeaponData& UWeaponState::GetRawWeaponData() const
 FWeaponData* UWeaponState::GetWeaponDataToUpgrade()
 {
 	return &WeaponData;
+}
+
+void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade)
+{
+	FWeaponData* WeaponDataToUpgrade = GetWeaponDataToUpgrade();
+	if (WeaponDataToUpgrade == nullptr)
+	{
+		return;
+	}
+
+	FBehaviourWeaponAttributes& CurrentBehaviourAttributes = WeaponDataToUpgrade->BehaviourAttributes;
+
+	WeaponDataToUpgrade->BaseDamage -= CurrentBehaviourAttributes.Damage;
+	WeaponDataToUpgrade->Range -= CurrentBehaviourAttributes.Range;
+	WeaponDataToUpgrade->ReloadSpeed -= CurrentBehaviourAttributes.ReloadSpeed;
+	WeaponDataToUpgrade->Accuracy -= CurrentBehaviourAttributes.Accuracy;
+	WeaponDataToUpgrade->MagCapacity -= CurrentBehaviourAttributes.MagSize;
+
+	if (bAddUpgrade)
+	{
+		CurrentBehaviourAttributes.Damage += BehaviourWeaponAttributes.Damage;
+		CurrentBehaviourAttributes.Range += BehaviourWeaponAttributes.Range;
+		CurrentBehaviourAttributes.ReloadSpeed += BehaviourWeaponAttributes.ReloadSpeed;
+		CurrentBehaviourAttributes.Accuracy += BehaviourWeaponAttributes.Accuracy;
+		CurrentBehaviourAttributes.MagSize += BehaviourWeaponAttributes.MagSize;
+	}
+	else
+	{
+		CurrentBehaviourAttributes.Damage -= BehaviourWeaponAttributes.Damage;
+		CurrentBehaviourAttributes.Range -= BehaviourWeaponAttributes.Range;
+		CurrentBehaviourAttributes.ReloadSpeed -= BehaviourWeaponAttributes.ReloadSpeed;
+		CurrentBehaviourAttributes.Accuracy -= BehaviourWeaponAttributes.Accuracy;
+		CurrentBehaviourAttributes.MagSize -= BehaviourWeaponAttributes.MagSize;
+	}
+
+	WeaponDataToUpgrade->BaseDamage += CurrentBehaviourAttributes.Damage;
+	WeaponDataToUpgrade->Range += CurrentBehaviourAttributes.Range;
+	WeaponDataToUpgrade->ReloadSpeed += CurrentBehaviourAttributes.ReloadSpeed;
+	WeaponDataToUpgrade->Accuracy += CurrentBehaviourAttributes.Accuracy;
+	WeaponDataToUpgrade->MagCapacity += CurrentBehaviourAttributes.MagSize;
 }
 
 FWeaponData UWeaponState::GetWeaponDataAdjustedForShellType() const
@@ -1425,7 +1465,8 @@ void UWeaponState::CreateLaunchAndSmokeVfx(
 		return;
 	}
 
-	switch (M_WeaponVfx.LaunchEffectSettings.UseLaunchSettings) {
+	switch (M_WeaponVfx.LaunchEffectSettings.UseLaunchSettings)
+	{
 	case EWeaponLaunchSettingsType::None:
 		break;
 	case EWeaponLaunchSettingsType::ColorByShellType:
@@ -1511,7 +1552,8 @@ void UWeaponState::InitializeLaunchNiagaraStaticParams(UNiagaraComponent* const 
 		return;
 	}
 
-	switch (M_WeaponVfx.LaunchEffectSettings.UseLaunchSettings) {
+	switch (M_WeaponVfx.LaunchEffectSettings.UseLaunchSettings)
+	{
 	case EWeaponLaunchSettingsType::None:
 		return;
 	case EWeaponLaunchSettingsType::ColorByShellType:
@@ -1521,8 +1563,6 @@ void UWeaponState::InitializeLaunchNiagaraStaticParams(UNiagaraComponent* const 
 		SetDirectLifeTimeSizeScaleInitParams(NiagaraComp);
 		return;
 	}
-
-
 }
 
 void UWeaponState::SetColorByShellTypeInitParams(UNiagaraComponent* NiagaraComp) const
@@ -1556,7 +1596,6 @@ void UWeaponState::SetColorByShellTypeInitParams(UNiagaraComponent* NiagaraComp)
 			GroundZOffsetName,
 			M_WeaponVfx.LaunchEffectSettings.GroundZOffset);
 	}
-	
 }
 
 void UWeaponState::SetDirectLifeTimeSizeScaleInitParams(UNiagaraComponent* NiagaraComp) const
@@ -2018,7 +2057,8 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 	                                        ShellAdjustedData.ProjectileMovementSpeed,
 	                                        LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation,
-	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType, ActorsToIgnore);
+	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
+	                                        ActorsToIgnore);
 }
 
 void UWeaponStateArchProjectile::InitArchProjectileWeapon(

@@ -131,6 +131,10 @@ struct FWeaponDescription
 	// Used by flame and laser weapons for damage per burst (one full iteration).
 	UPROPERTY(BlueprintReadOnly)
 	int32 DamageTicks = 0;
+
+	// The attributes added by active behaviours on this weapon.
+	UPROPERTY(BlueprintReadOnly)
+	FBehaviourWeaponAttributes BehaviourAttributes;
 };
 
 UCLASS()

@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Components/CanvasPanel.h"
+#include "RTS_Survival/GameUI/GameUI_InitData.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIContainer/FActionUIContainer.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/OnHoverDescription/W_WeaponDescription.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "UObject/Object.h"
@@ -46,7 +48,7 @@ public:
 		UW_SelectedUnitInfo* SelectedUnitInfo,
 		const TObjectPtr<UW_AmmoPicker>& AmmoPicker, UW_WeaponDescription* WeaponDescription, FActionUIContainer
 		ActionUIContainerWidgets, UW_SelectedUnitDescription* SelectedUnitDescriptionWidget, UUserWidget*
-		ActionUIDescriptionWidget);
+		ActionUIDescriptionWidget, FInit_BehaviourUI BehaviourUIWidgets);
 
 	void SetActionUIVisibility(const bool bShowActionUI) const;
 	void HideAllHoverInfoWidgets() const;
@@ -136,6 +138,15 @@ private:
 	bool GetIsValidPlayerController() const;
 
 	UPROPERTY()
+	UW_BehaviourContainer* BehaviourContainer = nullptr;
+
+	bool GetIsValidBehaviourContainer() const;
+
+	UPROPERTY()
+	UW_BehaviourDescription* BehaviourDescription = nullptr;
+	bool GetIsValidBehaviourDescription() const;
+	void SetBehaviourDescriptionVisibility(const bool bVisible) const;
+	UPROPERTY()
 	TArray<UW_ItemActionUI*> M_TActionUI_Items;
 
 	UPROPERTY()
@@ -185,12 +196,13 @@ private:
      * registers it with the UI manager so that it can update the UI.
      * @param PrimarySelectedActor The currently selected actor.
      */
-	void SetupExperienceComponent(const AActor* PrimarySelectedActor);
+        void SetupExperienceComponent(const AActor* PrimarySelectedActor);
 
-	void SetAmmoPickerVisiblity(const bool bVisible) const;
+        void SetAmmoPickerVisiblity(const bool bVisible) const;
 
-	TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft, UBombComponent*& OutBombCompPtr)const;
-	TArray<UWeaponState*> GetWeaponsOfSquad(ASquadController* SquadController) const;
+        void SetupBehaviourUIForSelectedActor(AActor* SelectedActor) const;
+
+        TArray<UWeaponState*> GetWeaponsOfSquad(ASquadController* SquadController) const;
 
         bool UpdateAbilitiesUI(const TArray<FUnitAbilityEntry>& InAbilitiesOfPrimary);
 
@@ -201,4 +213,6 @@ private:
 	void RegisterPrimarySelected(AActor* NewPrimarySelected);
 
 	bool GetIsCurrentPrimarySelectedValid()const;
+
+	void InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* PlayerController, const FInit_BehaviourUI& BehaviourUIWidgets);
 };

@@ -4,12 +4,12 @@
 
 #include "Behaviour.h"
 #include "DrawDebugHelpers.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace BehaviourCompConstants
 {
-constexpr float ComponentTickIntervalSeconds = 2.f;
-constexpr float DebugDrawHeight = 500.f;
+	constexpr float ComponentTickIntervalSeconds = 2.f;
+	constexpr float DebugDrawHeight = 500.f;
 }
 
 UBehaviourComp::UBehaviourComp()
@@ -22,7 +22,7 @@ UBehaviourComp::UBehaviourComp()
 void UBehaviourComp::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	UpdateComponentTickEnabled();
 }
 
@@ -35,7 +35,7 @@ void UBehaviourComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	
+
 	bM_IsTickingBehaviours = true;
 	TArray<TObjectPtr<UBehaviour>> RemovalQueue;
 	for (UBehaviour* Behaviour : M_Behaviours)
@@ -44,18 +44,18 @@ void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		{
 			continue;
 		}
-		
+
 		HandleTimedExpiry(DeltaTime, *Behaviour, RemovalQueue);
 		HandleBehaviourTick(DeltaTime, *Behaviour);
 	}
-	
+
 	bM_IsTickingBehaviours = false;
-	
+
 	for (UBehaviour* BehaviourToRemove : RemovalQueue)
 	{
 		RemoveBehaviourInstance(BehaviourToRemove);
 	}
-	
+
 	ProcessPendingOperations();
 	UpdateComponentTickEnabled();
 }
@@ -67,18 +67,18 @@ void UBehaviourComp::AddBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
 		QueueAddBehaviour(BehaviourClass);
 		return;
 	}
-	
+
 	UBehaviour* NewBehaviour = CreateBehaviourInstance(BehaviourClass);
 	if (NewBehaviour == nullptr)
 	{
 		return;
 	}
-	
+
 	if (TryHandleExistingBehaviour(NewBehaviour))
 	{
 		return;
 	}
-	
+
 	AddInitialisedBehaviour(NewBehaviour);
 }
 
@@ -89,45 +89,46 @@ void UBehaviourComp::RemoveBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
 		QueueRemoveBehaviour(BehaviourClass);
 		return;
 	}
-	
+
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
 		if (Behaviour == nullptr)
 		{
 			continue;
 		}
-		
+
 		if (Behaviour->GetClass() != BehaviourClass)
 		{
 			continue;
 		}
-		
+
 		RemoveBehaviourInstance(Behaviour);
 		UpdateComponentTickEnabled();
 		return;
 	}
 }
 
-void UBehaviourComp::SwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToReplace, TSubclassOf<UBehaviour> BehaviourClassToAdd)
+void UBehaviourComp::SwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToReplace,
+                                   TSubclassOf<UBehaviour> BehaviourClassToAdd)
 {
 	if (bM_IsTickingBehaviours)
 	{
 		QueueSwapBehaviour(BehaviourClassToReplace, BehaviourClassToAdd);
 		return;
 	}
-	
+
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
 		if (Behaviour == nullptr)
 		{
 			continue;
 		}
-		
+
 		if (Behaviour->GetClass() != BehaviourClassToReplace)
 		{
 			continue;
 		}
-		
+
 		RemoveBehaviourInstance(Behaviour);
 		AddBehaviour(BehaviourClassToAdd);
 		return;
@@ -145,7 +146,7 @@ void UBehaviourComp::ProcessPendingAdds()
 {
 	TArray<TSubclassOf<UBehaviour>> PendingAddsCopy = M_PendingAdds;
 	M_PendingAdds.Empty();
-	
+
 	for (const TSubclassOf<UBehaviour>& BehaviourClass : PendingAddsCopy)
 	{
 		AddBehaviour(BehaviourClass);
@@ -156,7 +157,7 @@ void UBehaviourComp::ProcessPendingRemovals()
 {
 	TArray<TSubclassOf<UBehaviour>> PendingRemovalsCopy = M_PendingRemovals;
 	M_PendingRemovals.Empty();
-	
+
 	for (const TSubclassOf<UBehaviour>& BehaviourClass : PendingRemovalsCopy)
 	{
 		RemoveBehaviour(BehaviourClass);
@@ -169,7 +170,7 @@ void UBehaviourComp::ProcessPendingSwaps()
 	TArray<TSubclassOf<UBehaviour>> PendingSwapAddCopy = M_PendingSwapAdd;
 	M_PendingSwapRemove.Empty();
 	M_PendingSwapAdd.Empty();
-	
+
 	const int32 PendingCount = PendingSwapRemoveCopy.Num();
 	for (int32 PendingIndex = 0; PendingIndex < PendingCount; PendingIndex++)
 	{
@@ -177,13 +178,14 @@ void UBehaviourComp::ProcessPendingSwaps()
 	}
 }
 
-void UBehaviourComp::HandleTimedExpiry(const float DeltaTime, UBehaviour& Behaviour, TArray<TObjectPtr<UBehaviour>>& RemovalQueue) const
+void UBehaviourComp::HandleTimedExpiry(const float DeltaTime, UBehaviour& Behaviour,
+                                       TArray<TObjectPtr<UBehaviour>>& RemovalQueue) const
 {
 	if (not Behaviour.IsTimedBehaviour())
 	{
 		return;
 	}
-	
+
 	Behaviour.AdvanceLifetime(DeltaTime);
 	if (Behaviour.HasExpired())
 	{
@@ -191,13 +193,13 @@ void UBehaviourComp::HandleTimedExpiry(const float DeltaTime, UBehaviour& Behavi
 	}
 }
 
-void UBehaviourComp::HandleBehaviourTick(const float DeltaTime, const UBehaviour& Behaviour) const
+void UBehaviourComp::HandleBehaviourTick(const float DeltaTime, UBehaviour& Behaviour) const
 {
 	if (not Behaviour.UsesTick())
 	{
 		return;
 	}
-	
+
 	Behaviour.OnTick(DeltaTime);
 }
 
@@ -209,13 +211,13 @@ bool UBehaviourComp::ShouldComponentTick() const
 		{
 			continue;
 		}
-		
+
 		if (Behaviour->UsesTick() || Behaviour->IsTimedBehaviour())
 		{
 			return true;
 		}
 	}
-	
+
 	return false;
 }
 
@@ -226,21 +228,22 @@ void UBehaviourComp::UpdateComponentTickEnabled()
 	{
 		return;
 	}
-	
+
 	SetComponentTickEnabled(bShouldTick);
 }
 
-void UBehaviourComp::QueueAddBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
+void UBehaviourComp::QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass)
 {
 	M_PendingAdds.Add(BehaviourClass);
 }
 
-void UBehaviourComp::QueueRemoveBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
+void UBehaviourComp::QueueRemoveBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass)
 {
 	M_PendingRemovals.Add(BehaviourClass);
 }
 
-void UBehaviourComp::QueueSwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToReplace, TSubclassOf<UBehaviour> BehaviourClassToAdd)
+void UBehaviourComp::QueueSwapBehaviour(const TSubclassOf<UBehaviour>& BehaviourClassToReplace,
+                                        const TSubclassOf<UBehaviour>& BehaviourClassToAdd)
 {
 	M_PendingSwapRemove.Add(BehaviourClassToReplace);
 	M_PendingSwapAdd.Add(BehaviourClassToAdd);
@@ -253,19 +256,19 @@ bool UBehaviourComp::TryHandleExistingBehaviour(UBehaviour* NewBehaviour)
 	{
 		return false;
 	}
-	
+
 	bool bHandledExistingBehaviour = false;
 	bool bAddedToStack = false;
 	switch (NewBehaviour->GetStackRule())
 	{
-		case EBehaviourStackRule::Exclusive:
+	case EBehaviourStackRule::Exclusive:
 		bHandledExistingBehaviour = true;
 		break;
-		case EBehaviourStackRule::Refresh:
+	case EBehaviourStackRule::Refresh:
 		MatchingBehaviours[0]->RefreshLifetime();
 		bHandledExistingBehaviour = true;
 		break;
-		case EBehaviourStackRule::Stack:
+	case EBehaviourStackRule::Stack:
 		bHandledExistingBehaviour = true;
 		if (CanStackBehaviour(MatchingBehaviours, NewBehaviour))
 		{
@@ -274,15 +277,15 @@ bool UBehaviourComp::TryHandleExistingBehaviour(UBehaviour* NewBehaviour)
 			bAddedToStack = true;
 		}
 		break;
-		default:
+	default:
 		break;
 	}
-	
+
 	if (bHandledExistingBehaviour && not bAddedToStack)
 	{
 		NewBehaviour->ConditionalBeginDestroy();
 	}
-	
+
 	return bHandledExistingBehaviour;
 }
 
@@ -294,7 +297,8 @@ void UBehaviourComp::AddInitialisedBehaviour(UBehaviour* NewBehaviour)
 	UpdateComponentTickEnabled();
 }
 
-bool UBehaviourComp::CanStackBehaviour(const TArray<TObjectPtr<UBehaviour>>& MatchingBehaviours, const UBehaviour* NewBehaviour) const
+bool UBehaviourComp::CanStackBehaviour(const TArray<TObjectPtr<UBehaviour>>& MatchingBehaviours,
+                                       const UBehaviour* NewBehaviour) const
 {
 	const int32 MaxStacks = NewBehaviour->GetMaxStackCount();
 	return MatchingBehaviours.Num() < MaxStacks;
@@ -309,13 +313,13 @@ TArray<TObjectPtr<UBehaviour>> UBehaviourComp::FindMatchingBehaviours(const UBeh
 		{
 			continue;
 		}
-		
+
 		if (Behaviour->IsSameBehaviour(*NewBehaviour))
 		{
 			MatchingBehaviours.Add(Behaviour);
 		}
 	}
-	
+
 	return MatchingBehaviours;
 }
 
@@ -325,26 +329,26 @@ void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 	{
 		return;
 	}
-	
+
 	BehaviourInstance->OnRemoved();
 	BehaviourInstance->ConditionalBeginDestroy();
 	M_Behaviours.Remove(BehaviourInstance);
 }
 
-UBehaviour* UBehaviourComp::CreateBehaviourInstance(TSubclassOf<UBehaviour> BehaviourClass) const
+UBehaviour* UBehaviourComp::CreateBehaviourInstance(const TSubclassOf<UBehaviour>& BehaviourClass)
 {
 	if (BehaviourClass == nullptr)
 	{
 		return nullptr;
 	}
-	
+
 	UBehaviour* NewBehaviour = NewObject<UBehaviour>(this, BehaviourClass);
 	if (NewBehaviour == nullptr)
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "BehaviourClass", __FUNCTION__, this);
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "BehaviourClass", __FUNCTION__, nullptr);
 		return nullptr;
 	}
-	
+
 	return NewBehaviour;
 }
 
@@ -425,6 +429,7 @@ void UBehaviourComp::DebugDrawBehaviours(const float DurationSeconds) const
 		DebugString += FString::Printf(TEXT("\n%s | %s | %s"), *BehaviourName, *UsesTickLabel, *StackLabel);
 	}
 
-	const FVector DebugLocation = OwnerActor->GetActorLocation() + FVector(0.f, 0.f, BehaviourCompConstants::DebugDrawHeight);
+	const FVector DebugLocation = OwnerActor->GetActorLocation() + FVector(
+		0.f, 0.f, BehaviourCompConstants::DebugDrawHeight);
 	DrawDebugString(World, DebugLocation, DebugString, nullptr, FColor::Green, DurationSeconds, true);
 }

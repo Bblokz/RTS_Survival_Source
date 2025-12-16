@@ -165,6 +165,10 @@ protected:
 	URTSNavCollision* RTSNavCollision;
 
 
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
+	UBehaviourComp* BehaviourComponent;
+
+	bool GetIsValidBehaviourComponent()const;
 	/**
 	 * @brief the AIController of this tank
 	 * contains behaviour tree logic, like tank movement
