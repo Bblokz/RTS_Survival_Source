@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 
 #include "RTS_Survival/Behaviours/Icons/BehaviourIcon.h"
+#include "RTS_Survival/Behaviours/LifeTime/BehaviourLifeTime.h"
+#include "RTS_Survival/Behaviours/BuffDebuffType/BuffDebuffType.h"
 
 #include "BehaviourUIData.generated.h"
 

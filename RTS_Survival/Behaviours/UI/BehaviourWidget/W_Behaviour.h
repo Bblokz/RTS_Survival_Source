@@ -20,7 +20,7 @@ struct FBehaviourWidgetStyle
         GENERATED_BODY()
 
         UPROPERTY(EditAnywhere, BlueprintReadWrite)
-        UTexture* IconTexture = nullptr;
+        UTexture2D* IconTexture = nullptr;
 };
 
 /**

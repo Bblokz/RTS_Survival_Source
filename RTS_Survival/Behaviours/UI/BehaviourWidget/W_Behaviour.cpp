@@ -78,7 +78,7 @@ void UW_Behaviour::ApplyBehaviourIcon()
         {
                 const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
                 RTSFunctionLibrary::ReportError(
-                        TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to find icon texture for behaviour icon."),
+                        TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to find icon texture for behaviour icon.")
                         "\n Icon: " + IconAsString);
                 return;
         }

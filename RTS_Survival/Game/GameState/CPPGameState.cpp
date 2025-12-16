@@ -1931,8 +1931,9 @@ void ACPPGameState::InitAllGameLightWeapons()
 	// https://wiki.warthunder.com/Panzerjager_I
 	WeaponData.WeaponName = EWeaponName::Pak_t_L_43_47MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+	// Pz jager type uses only APCR shells.
+	WeaponData.ShellType = EWeaponShellType::Shell_APCR;
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_APCR};
 	WeaponData.WeaponCalibre = 47;
 	WeaponData.TNTExplosiveGrams = 15;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
@@ -2284,10 +2285,12 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.Range = MediumAssaultCannonRange;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::StuK40_L48_75MM, WeaponData);
 
+	// Marder cannon.
 	WeaponData.WeaponName = EWeaponName::Pak40_3_L46_75MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+	// Pz jager type uses only APCR shells.
+	WeaponData.ShellType = EWeaponShellType::Shell_APCR;
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_APCR};
 	WeaponData.WeaponCalibre = 75;
 	WeaponData.TNTExplosiveGrams = 73;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
