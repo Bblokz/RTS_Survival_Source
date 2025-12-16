@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 
 #include "GameUIState.generated.h"
@@ -18,10 +19,12 @@ public:
 	PrimarySelectedUnit(nullptr)
 	{}
 
-	UPROPERTY()
-	EAllUnitType PrimarySelectedUnitType; 
-	UPROPERTY()
-	AActor* PrimarySelectedUnit;
-	UPROPERTY()
-	FActionUIParameters ActionUIParameters;
+        UPROPERTY()
+        EAllUnitType PrimarySelectedUnitType;
+        UPROPERTY()
+        AActor* PrimarySelectedUnit;
+        UPROPERTY()
+        FActionUIParameters ActionUIParameters;
+        UPROPERTY()
+        TArray<FUnitAbilityEntry> PrimaryUnitAbilities;
 };

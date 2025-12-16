@@ -10,6 +10,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/RTSExperienceLevels.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/UnitData/VehicleData.h"
 #include "RTS_Survival/UnitData/NomadicVehicleData.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -149,10 +150,10 @@ public:
 
 	inline const FRTSGameSettings& GetGameSettings() const { return M_RTSGameSettings->GetGameSettings(); }
 
-	TArray<EAbilityID> GetNomadicAbilities(const ENomadicSubtype NomadicSubtype) const;
-	TArray<EAbilityID> GetSquadAbilities(const ESquadSubtype SquadSubtype) const;
-	TArray<EAbilityID> GetTankAbilities(const ETankSubtype TankSubtype) const;
-	TArray<EAbilityID> GetBxpAbilities(const EBuildingExpansionType BxpType) const;
+        TArray<FUnitAbilityEntry> GetNomadicAbilities(const ENomadicSubtype NomadicSubtype) const;
+        TArray<FUnitAbilityEntry> GetSquadAbilities(const ESquadSubtype SquadSubtype) const;
+        TArray<FUnitAbilityEntry> GetTankAbilities(const ETankSubtype TankSubtype) const;
+        TArray<FUnitAbilityEntry> GetBxpAbilities(const EBuildingExpansionType BxpType) const;
 
 	/**
 	 * For the given GameTimeUnit, returns the current game time (time survived on map)

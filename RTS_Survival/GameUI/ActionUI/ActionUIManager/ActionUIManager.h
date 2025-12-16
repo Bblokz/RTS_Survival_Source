@@ -5,6 +5,7 @@
 #include "RTS_Survival/GameUI/GameUI_InitData.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIContainer/FActionUIContainer.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/OnHoverDescription/W_WeaponDescription.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
@@ -86,11 +87,11 @@ public:
 	 * @param SelectedActor The primary selected actor.
 	 * @return Whether there was any valid ability that needed to be initialised.
 	 */
-	bool SetUpActionUIForSelectedActor(const TArray<EAbilityID>& TAbilities,
-	                                   const EAllUnitType PrimaryUnitType,
-	                                   const ENomadicSubtype NomadicSubtype,
-	                                   const ETankSubtype TankSubtype,
-	                                   const ESquadSubtype SquadSubtype, const EBuildingExpansionType BxpSubtype, AActor* SelectedActor);
+        bool SetUpActionUIForSelectedActor(const TArray<FUnitAbilityEntry>& TAbilities,
+                                           const EAllUnitType PrimaryUnitType,
+                                           const ENomadicSubtype NomadicSubtype,
+                                           const ETankSubtype TankSubtype,
+                                           const ESquadSubtype SquadSubtype, const EBuildingExpansionType BxpSubtype, AActor* SelectedActor);
 
 	void UpdateHealthBar(const float NewPercentage, const float MaxHp, const float CurrentHp) const;
 
@@ -179,7 +180,7 @@ private:
 	 * @param TAbilities The abilities for the unit.
 	 * @return Whether the selcted unit has any action button ability that is not none.
 	 */
-	inline bool ContainsAnyValidAbility(const TArray<EAbilityID>& TAbilities) const;
+        inline bool ContainsAnyValidAbility(const TArray<FUnitAbilityEntry>& TAbilities) const;
 
 	/**
 	 * 
@@ -203,7 +204,7 @@ private:
 
         TArray<UWeaponState*> GetWeaponsOfSquad(ASquadController* SquadController) const;
 
-	bool UpdateAbilitiesUI(const TArray<EAbilityID>& InAbilitiesOfPrimary);
+        bool UpdateAbilitiesUI(const TArray<FUnitAbilityEntry>& InAbilitiesOfPrimary);
 
 	
 	// Set to the primary selected unit's interface to notify it is primary selected which allows

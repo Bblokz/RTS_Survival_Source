@@ -5,6 +5,7 @@
 #include "UnitCost.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 
 #include "BuildingExpansionData.generated.h"
 
@@ -29,9 +30,9 @@ struct FBxpData
 	UPROPERTY(BlueprintReadOnly)
 	int32 EnergySupply = 0;
 
-	// Readwrite for array references in blueprint.
-	UPROPERTY(BlueprintReadWrite)
-	TArray<EAbilityID> Abilities;
+        // Readwrite for array references in blueprint.
+        UPROPERTY(BlueprintReadWrite)
+        TArray<FUnitAbilityEntry> Abilities;
 
 	UPROPERTY(BlueprintReadOnly)
 	 FResistanceAndDamageReductionData ResistancesAndDamageMlt;

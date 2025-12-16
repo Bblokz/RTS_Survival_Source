@@ -15,7 +15,8 @@ class UImage;
 class UButton;
 class USizeBox;
 /**
- * 
+ * @brief Widget representing a single action button in the action UI bar.
+ * @note UpdateItemActionUI: call to refresh the displayed ability data for this slot.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_ItemActionUI : public UUserWidget
@@ -28,7 +29,7 @@ public:
 	 * Will adjust slate in derived blueprint.
 	 * @param NewAbility The ability to use for this action UI item.
 	 */
-	void UpdateItemActionUI(const EAbilityID NewAbility);
+        void UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType);
 
 	void InitActionUIElement(
 		ACPPController* PlayerController,
@@ -40,7 +41,7 @@ protected:
 	 * @param NewAbility The ability to use.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, Category ="UpdateActionUI")
-	void OnUpdateActionUI(const EAbilityID NewAbility);
+        void OnUpdateActionUI(const EAbilityID NewAbility, const int32 CustomType);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnActionUIClicked();
@@ -74,7 +75,8 @@ protected:
 
 
 private:
-	EAbilityID M_Ability;
+        EAbilityID M_Ability;
+        int32 M_CustomType = 0;
 
 	UPROPERTY()
 	TObjectPtr<ACPPController> M_PlayerController;
