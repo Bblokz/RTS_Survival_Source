@@ -11,17 +11,7 @@ struct FBehaviourUIData;
 class UButton;
 class UImage;
 class UW_BehaviourContainer;
-class UMainGameUI;
-class UTexture;
-
-USTRUCT(BlueprintType)
-struct FBehaviourWidgetStyle
-{
-        GENERATED_BODY()
-
-        UPROPERTY(EditAnywhere, BlueprintReadWrite)
-        UTexture2D* IconTexture = nullptr;
-};
+class UBehaviourButtonSettings;
 
 /**
  * @brief Widget representing a single behaviour entry in the behaviour container.
@@ -42,9 +32,6 @@ protected:
         UPROPERTY(meta = (BindWidget))
         UButton* BehaviourButton;
 
-        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-        TMap<EBehaviourIcon, FBehaviourWidgetStyle> BehaviourIconStyles;
-
 private:
         UPROPERTY()
         TWeakObjectPtr<UW_BehaviourContainer> M_BehaviourContainer;
@@ -52,6 +39,8 @@ private:
         FBehaviourUIData M_BehaviourUIData;
 
         bool GetIsValidBehaviourContainer() const;
+
+        static const UBehaviourButtonSettings* GetBehaviourButtonSettings();
 
         void ApplyBehaviourIcon();
 
