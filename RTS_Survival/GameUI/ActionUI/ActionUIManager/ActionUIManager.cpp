@@ -251,18 +251,18 @@ void UActionUIManager::OnShellTypeSelected(const EWeaponShellType SelectedShellT
 
 void UActionUIManager::RequestUpdateAbilityUIForPrimary(ICommands* RequestingUnit)
 {
-	if (not M_PrimarySelectedUnit.IsValid() || not RequestingUnit)
-	{
-		return;
-	}
-	if (M_PrimarySelectedUnit.Get() != RequestingUnit)
-	{
-		RTSFunctionLibrary::ReportError(
-			"Requesting unit is not the primary selected unit."
-			"\n at function UActionUIManager::RequestUpdateAbilityUIForPrimary");
-		return;
-	}
-	UpdateAbilitiesUI(RequestingUnit->GetUnitAbilities());
+        if (not M_PrimarySelectedUnit.IsValid() || not RequestingUnit)
+        {
+                return;
+        }
+        if (M_PrimarySelectedUnit.Get() != RequestingUnit)
+        {
+                RTSFunctionLibrary::ReportError(
+                        "Requesting unit is not the primary selected unit."
+                        "\n at function UActionUIManager::RequestUpdateAbilityUIForPrimary");
+                return;
+        }
+        UpdateAbilitiesUI(RequestingUnit->GetUnitAbilityEntries());
 }
 
 void UActionUIManager::SetWeaponUIVisibility(const bool bVisible)
@@ -319,19 +319,18 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 }
 
 bool UActionUIManager::SetUpActionUIForSelectedActor(
-	const TArray<EAbilityID>& TAbilities,
-	const EAllUnitType PrimaryUnitType,
-	const ENomadicSubtype NomadicSubtype,
-	const ETankSubtype TankSubtype,
-	const ESquadSubtype SquadSubtype,
-	const EBuildingExpansionType BxpSubtype, AActor* SelectedActor)
+        const TArray<FUnitAbilityEntry>& TAbilities,
+        const EAllUnitType PrimaryUnitType,
+        const ENomadicSubtype NomadicSubtype,
+        const ETankSubtype TankSubtype,
+        const ESquadSubtype SquadSubtype,
+        const EBuildingExpansionType BxpSubtype, AActor* SelectedActor)
 {
 	RegisterPrimarySelected(SelectedActor);
-	if (not UpdateAbilitiesUI(TAbilities))
-	{
-		return false;
-	}
-	SetupBehaviourUIForSelectedActor(SelectedActor);
+  if (not UpdateAbilitiesUI(TAbilities))
+  {
+          return false;
+  }
 	if (GetIsValidSelectedUnitInfo())
 	{
 		float MaxHp, CurrentHp;
@@ -346,7 +345,7 @@ bool UActionUIManager::SetUpActionUIForSelectedActor(
 		SetupExperienceComponent(SelectedActor);
 	}
 	// Whether there was any non ability EAbility ID to fill in into the UI.
-	return ContainsAnyValidAbility(TAbilities);
+        return ContainsAnyValidAbility(TAbilities);
 }
 
 void UActionUIManager::UpdateHealthBar(const float NewPercentage, const float MaxHp, const float CurrentHp) const
@@ -501,16 +500,16 @@ bool UActionUIManager::PropagateWeaponDataToUI(TArray<UWeaponState*> WeaponState
 	return ItemsPopulated > 0;
 }
 
-bool UActionUIManager::ContainsAnyValidAbility(const TArray<EAbilityID>& TAbilities) const
+bool UActionUIManager::ContainsAnyValidAbility(const TArray<FUnitAbilityEntry>& TAbilities) const
 {
-	for (const auto EachAbility : TAbilities)
-	{
-		if (EachAbility != EAbilityID::IdNoAbility)
-		{
-			return true;
-		}
-	}
-	return false;
+        for (const FUnitAbilityEntry& AbilityEntry : TAbilities)
+        {
+                if (AbilityEntry.AbilityId != EAbilityID::IdNoAbility)
+                {
+                        return true;
+                }
+        }
+        return false;
 }
 
 float UActionUIManager::SetupHealthComponent(const AActor* PrimarySelectedActor, float& OutMaxHp, float& OutCurrentHp)
@@ -584,18 +583,18 @@ TArray<UWeaponState*> UActionUIManager::GetWeaponsOfSquad(ASquadController* Squa
 	return Weapons;
 }
 
-bool UActionUIManager::UpdateAbilitiesUI(const TArray<EAbilityID>& InAbilitiesOfPrimary)
+bool UActionUIManager::UpdateAbilitiesUI(const TArray<FUnitAbilityEntry>& InAbilitiesOfPrimary)
 {
-	int32 ElmInit = 0;
-	for (const auto EachAbility : InAbilitiesOfPrimary)
-	{
-		if (GetIndexInAbilityItemRange(ElmInit) && IsValid(M_TActionUI_Items[ElmInit]))
-		{
-			// Update item with ability.
-			M_TActionUI_Items[ElmInit]->UpdateItemActionUI(EachAbility);
-			ElmInit++;
-		}
-		else
+        int32 ElmInit = 0;
+        for (const FUnitAbilityEntry& AbilityEntry : InAbilitiesOfPrimary)
+        {
+                if (GetIndexInAbilityItemRange(ElmInit) && IsValid(M_TActionUI_Items[ElmInit]))
+                {
+                        // Update item with ability.
+                        M_TActionUI_Items[ElmInit]->UpdateItemActionUI(AbilityEntry.AbilityId, AbilityEntry.CustomType);
+                        ElmInit++;
+                }
+                else
 		{
 			RTSFunctionLibrary::ReportError(
 				"Index out of bounds: more abilities than action UI items?"

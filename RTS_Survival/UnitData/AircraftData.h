@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "UnitCost.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "AircraftData.generated.h"
 
 struct FExperienceLevel;
@@ -23,8 +24,8 @@ struct FAircraftData
 	UPROPERTY(BlueprintReadOnly)
 	FUnitCost Cost;
 
-	UPROPERTY(BlueprintReadOnly)
-	TArray<EAbilityID> Abilities;
+        UPROPERTY(BlueprintReadOnly)
+        TArray<FUnitAbilityEntry> Abilities;
 	
 	UPROPERTY()
 	float ExperienceWorth = 0.0f;

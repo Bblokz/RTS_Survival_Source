@@ -4,6 +4,7 @@
 #include "UnitCost.h"
 #include "RTS_Survival/GameUI/BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/RTSExperienceLevels.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -79,8 +80,8 @@ struct FNomadicData
 	UPROPERTY(BlueprintReadOnly)
 	FUnitCost Cost;
 
-	UPROPERTY(BlueprintReadOnly)
-	TArray<EAbilityID> Abilities;
+        UPROPERTY(BlueprintReadOnly)
+        TArray<FUnitAbilityEntry> Abilities;
 
 	UPROPERTY(BlueprintReadOnly)
 	TMap<ERTSResourceType, int32> ResourceDropOffCapacity;

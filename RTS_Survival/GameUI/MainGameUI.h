@@ -8,6 +8,7 @@
 #include "Blueprint/UserWidget.h"
 #include "BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
 #include "Components/CanvasPanel.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Game/GameState/HideGameUI/RTSUIElement.h"
@@ -138,6 +139,10 @@ struct FActionUIParameters
 };
 
 
+/**
+ * @brief Handles top-level game UI including action, training, and minimap widgets.
+ * @note UpdateActionUIForNewUnit: call from selection logic to refresh widgets for the current primary unit.
+ */
 UCLASS()
 class RTS_SURVIVAL_API UMainGameUI : public UUserWidget, public IRTSUIElement
 {
@@ -273,12 +278,12 @@ public:
 	 * @return Whether any valid ability was initialised in the action UI elements, if not we need
 	 * to hide the action UI.
 	 */
-	bool SetupUnitActionUIForUnit(
-		const TArray<EAbilityID>& TAbilities,
-		EAllUnitType PrimaryUnitType,
-		AActor* PrimarySelected,
-		const ENomadicSubtype NomadicSubtype,
-		const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype, const EBuildingExpansionType BxpSubtype) const;
+        bool SetupUnitActionUIForUnit(
+                const TArray<FUnitAbilityEntry>& TAbilities,
+                EAllUnitType PrimaryUnitType,
+                AActor* PrimarySelected,
+                const ENomadicSubtype NomadicSubtype,
+                const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype, const EBuildingExpansionType BxpSubtype) const;
 
 
 	/**

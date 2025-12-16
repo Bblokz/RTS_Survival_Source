@@ -717,7 +717,7 @@ private:
 		const ESquadSubtype SquadSubtype, const FResistanceAndDamageReductionData& ResistanceData);
 
 	// Called after squad is loaded. Assuming that the subtype is set.
-	void InitSquadData_SetAbilities(const TArray<EAbilityID>& Abilities);
+        void InitSquadData_SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
 
 	void OnRepairUnitNotValidForRepairs();
 	void OnRepairTargetFullyRepaired(AActor* RepairTarget);

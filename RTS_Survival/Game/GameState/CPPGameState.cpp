@@ -24,6 +24,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInType/DigInType.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/DecalManagerSubsystem/DecalManagerSubsystem.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/ExplosionManagerSubsystem/ExplosionManagerSubsystem.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
@@ -359,38 +360,38 @@ bool ACPPGameState::UpgradeNomadicDataForPlayer(const int32 PlayerOwningNomadic,
 	return false;
 }
 
-TArray<EAbilityID> ACPPGameState::GetNomadicAbilities(const ENomadicSubtype NomadicSubtype) const
+TArray<FUnitAbilityEntry> ACPPGameState::GetNomadicAbilities(const ENomadicSubtype NomadicSubtype) const
 {
-	if (M_TPlayerNomadicDataHashMap.Contains(NomadicSubtype))
-	{
-		return M_TPlayerNomadicDataHashMap[NomadicSubtype].Abilities;
-	}
-	return {};
+        if (M_TPlayerNomadicDataHashMap.Contains(NomadicSubtype))
+        {
+                return M_TPlayerNomadicDataHashMap[NomadicSubtype].Abilities;
+        }
+        return {};
 }
 
-TArray<EAbilityID> ACPPGameState::GetSquadAbilities(const ESquadSubtype SquadSubtype) const
+TArray<FUnitAbilityEntry> ACPPGameState::GetSquadAbilities(const ESquadSubtype SquadSubtype) const
 {
-	if (M_TPlayerSquadDataHashMap.Contains(SquadSubtype))
-	{
-		return M_TPlayerSquadDataHashMap[SquadSubtype].Abilities;
-	}
-	return {};
+        if (M_TPlayerSquadDataHashMap.Contains(SquadSubtype))
+        {
+                return M_TPlayerSquadDataHashMap[SquadSubtype].Abilities;
+        }
+        return {};
 }
 
-TArray<EAbilityID> ACPPGameState::GetTankAbilities(const ETankSubtype TankSubtype) const
+TArray<FUnitAbilityEntry> ACPPGameState::GetTankAbilities(const ETankSubtype TankSubtype) const
 {
-	if (M_TPlayerTankDataHashMap.Contains(TankSubtype))
-	{
-		return M_TPlayerTankDataHashMap[TankSubtype].Abilities;
-	}
-	return {};
+        if (M_TPlayerTankDataHashMap.Contains(TankSubtype))
+        {
+                return M_TPlayerTankDataHashMap[TankSubtype].Abilities;
+        }
+        return {};
 }
 
-TArray<EAbilityID> ACPPGameState::GetBxpAbilities(const EBuildingExpansionType BxpType) const
+TArray<FUnitAbilityEntry> ACPPGameState::GetBxpAbilities(const EBuildingExpansionType BxpType) const
 {
-	if (M_TPlayerBxpDataHashMap.Contains(BxpType))
-	{
-		return M_TPlayerBxpDataHashMap[BxpType].Abilities;
+        if (M_TPlayerBxpDataHashMap.Contains(BxpType))
+        {
+                return M_TPlayerBxpDataHashMap[BxpType].Abilities;
 	}
 	return {};
 }
@@ -3107,17 +3108,17 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	using DeveloperSettings::GameBalance::UnitHealth::ArmoredCarHealthBase;
 
 	// Abilities (kept identical to your arrays)
-	const TArray<EAbilityID> BasicTankAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
-	const TArray<EAbilityID> BasicHarvesterTankAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
 	FTankData TankData;
 
@@ -3239,26 +3240,26 @@ void ACPPGameState::InitAllGameLightTankData()
 	using namespace DeveloperSettings::GameBalance::Experience;
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
 
-	const TArray<EAbilityID> BasicTankAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	const TArray<EAbilityID> TankAbilitiesWithRockets = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	const TArray<EAbilityID> BasicHarvesterTankAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	const TArray<EAbilityID> BasicTankDestroyerAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
 	FTankData TankData;
 
@@ -3494,21 +3495,21 @@ void ACPPGameState::InitAllGameMediumTankData()
 	using DeveloperSettings::GameBalance::UnitHealth::OneLightTankShotHp;
 	using DeveloperSettings::GameBalance::UnitHealth::OneMediumTankShotHp;
 
-	const TArray<EAbilityID> BasicTankAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	const TArray<EAbilityID> TankAbilitiesWithRockets = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	const TArray<EAbilityID> BasicTankDestroyerAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
 	FTankData TankData;
 
@@ -3801,21 +3802,21 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	using DeveloperSettings::GameBalance::UnitHealth::OneMediumTankShotHp;
 	using DeveloperSettings::GameBalance::UnitHealth::OneHeavyTankShotHp;
 
-	const TArray<EAbilityID> BasicTankAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	const TArray<EAbilityID> TankAbilitiesWithRockets = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	const TArray<EAbilityID> BasicTankDestroyerAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        const TArray<FUnitAbilityEntry> BasicTankAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        const TArray<FUnitAbilityEntry> TankAbilitiesWithRockets = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        const TArray<FUnitAbilityEntry> BasicTankDestroyerAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+                EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
 	FTankData TankData;
 
@@ -4173,12 +4174,12 @@ void ACPPGameState::InitAllGameAircraftData()
 	using DeveloperSettings::GameBalance::UnitCosts::AttackAircraftVehiclePartsCost;
 
 
-	// Start with ability no owner; when the owner is set the return to base ability will automatically be swapped with it.
-	TArray<EAbilityID> BasicAircraftAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdAircraftOwnerNotExpanded,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        // Start with ability no owner; when the owner is set the return to base ability will automatically be swapped with it.
+        TArray<FUnitAbilityEntry> BasicAircraftAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdAircraftOwnerNotExpanded,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
 	FAircraftData AircraftData;
 
@@ -4701,16 +4702,16 @@ void ACPPGameState::InitAllGameBxpData()
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
 
 
-	TArray<EAbilityID> ArmedBxpAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
-	TArray<EAbilityID> NotArmedBxpAbilities = {
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        TArray<FUnitAbilityEntry> ArmedBxpAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
+        TArray<FUnitAbilityEntry> NotArmedBxpAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
 	FBxpData BxpData;
 
@@ -5129,17 +5130,17 @@ void ACPPGameState::InitAllGameBxpData()
 
 void ACPPGameState::InitAllGameNomadicData()
 {
-	TArray<EAbilityID> BasicNomadicAbilities = {
-		EAbilityID::IdNoAbility, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        TArray<FUnitAbilityEntry> BasicNomadicAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdNoAbility, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
-	TArray<EAbilityID> NomadicWithWeaponsAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        TArray<FUnitAbilityEntry> NomadicWithWeaponsAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
 	using namespace DeveloperSettings::GameBalance::BuildingRadii;
@@ -5614,17 +5615,17 @@ void ACPPGameState::InitAllGameSquadData()
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
-	TArray<EAbilityID> BasicSquadAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
-		EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        TArray<FUnitAbilityEntry> BasicSquadAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
+                EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+                EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 
-	TArray<EAbilityID> BasicScavengerAbilities = {
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
-		EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdScavenge, EAbilityID::IdRepair,
-		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
-	};
+        TArray<FUnitAbilityEntry> BasicScavengerAbilities = ConvertAbilityIdsToEntries({
+                EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
+                EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdScavenge, EAbilityID::IdRepair,
+                EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+        });
 	FSquadData SquadData;
 	// --------------------------------------------------
 	//                     Ger Infantry

@@ -7,6 +7,7 @@
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
 #include "Materials/MaterialInstance.h"
 #include "NiagaraSystem.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Buildings/BuildingAttachments/BuildingAttachments.h"
 #include "RTS_Survival/Collapse/DestroySpawnActorsParameters.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
@@ -123,8 +124,8 @@ protected:
 	);
 
 	/**
-	 * Setup all properties for the building expansion.
-	 * @param Abilities
+         * Setup all properties for the building expansion.
+         * @param Abilities Ability entries to apply to the expansion instance.
 	 * @param NewConstructionMesh The mesh used during construction for animating.
 	 * @param NewBuildingMesh The complete (high poly) mesh of the building.
 	 * @param NewProgressBar The progress bar widget used to show the building progress.
@@ -137,12 +138,12 @@ protected:
 	 * @param NewBuildingAttachments The attachments to spawn on the building expansion.
 	 * @param bLetBuildingMeshAffectNavMesh
 	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ReferenceCasts", meta = (BlueprintProtected = "true"))
-	void InitBuildingExpansion(
-		TArray<EAbilityID> Abilities,
-		UStaticMesh* NewConstructionMesh,
-		UStaticMesh* NewBuildingMesh,
-		UTimeProgressBarWidget* NewProgressBar,
+        UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ReferenceCasts", meta = (BlueprintProtected = "true"))
+        void InitBuildingExpansion(
+                TArray<FUnitAbilityEntry> Abilities,
+                UStaticMesh* NewConstructionMesh,
+                UStaticMesh* NewBuildingMesh,
+                UTimeProgressBarWidget* NewProgressBar,
 		const float NewBuildingTime,
 		TArray<UNiagaraSystem*> SmokeSystems,
 		const int NewAmountSmokes,

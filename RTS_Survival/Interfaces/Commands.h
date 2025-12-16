@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UObject/Interface.h"
@@ -97,39 +98,27 @@ class RTS_SURVIVAL_API UCommandData : public UObject
 	friend class ICommands;
 
 public:
-	UCommandData(const FObjectInitializer& ObjectInitializer);
+        UCommandData(const FObjectInitializer& ObjectInitializer);
 
-	virtual void BeginDestroy() override;
+        virtual void BeginDestroy() override;
 
-	TArray<EAbilityID> GetAbilities() const { return M_Abilities; };
+        const TArray<FUnitAbilityEntry>& GetAbilities() const { return M_Abilities; }
 
-	void SetAbilities(const TArray<EAbilityID>& Abilities)
-	{
-		TArray<EAbilityID> ValidAbilities = Abilities;
-		if (Abilities.Num() > DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI)
-		{
-			RTSFunctionLibrary::ReportError("The number of abilities exceeds the maximum allowed for the Action UI."
-				"UCommandData::SetAbilities");
-			ValidAbilities.SetNum(DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI);
-		}
-		M_Abilities = ValidAbilities;
-	}
+        TArray<EAbilityID> GetAbilityIds(const bool bExcludeNoAbility = false) const;
 
-	/**
-	 * @brief: Swaps the new ability in the ability array for the old ability if found.
-	 * @param OldAbility The ability to swap out.
-	 * @param NewAbility The ability to swap in. 
-	 * @return Whether the swap was successful.
-	 */
-	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+        void SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
 
-	/**
-	 * 
-	 * @param NewAbility Ability to add. 
-	 * @param AtIndex Optional: provide a specific index to add the ability to.
-	 * @return Whether we could add the ability to an empty slot in the array. 
-	 */
-	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex);
+        bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+        bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
+
+        /**
+         *
+         * @param NewAbility Ability to add.
+         * @param AtIndex Optional: provide a specific index to add the ability to.
+         * @return Whether we could add the ability to an empty slot in the array.
+         */
+        bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex);
+        bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
 
@@ -211,12 +200,14 @@ private:
 	UPROPERTY()
 	FQueueCommand M_TCommands[MAX_COMMANDS];
 
-	// The Abilities this unit has; initialised with data from game state.
-	UPROPERTY()
-	TArray<EAbilityID> M_Abilities;
+        // The Abilities this unit has; initialised with data from game state.
+        UPROPERTY()
+        TArray<FUnitAbilityEntry> M_Abilities;
 
-	/** The number of valid commands in M_TCommands. */
-	int32 NumCommands;
+        int32 GetAbilityIndexById(EAbilityID AbilityId) const;
+
+        /** The number of valid commands in M_TCommands. */
+        int32 NumCommands;
 
 	/** The index of the currently active command in M_TCommands. 
 	    -1 means "no active command." */
@@ -301,14 +292,20 @@ public:
 	 * ensure the right data is used.
 	 * @param Abilities The abilities to use for this unit.
 	 */
-	void InitAbilityArray(const TArray<EAbilityID>& Abilities);
+        void InitAbilityArray(const TArray<FUnitAbilityEntry>& Abilities);
 
-	TArray<EAbilityID> GetUnitAbilities();
+        void InitAbilityArray(const TArray<EAbilityID>& Abilities);
+
+        TArray<FUnitAbilityEntry> GetUnitAbilityEntries();
+
+        TArray<EAbilityID> GetUnitAbilities();
 	/**
 	 * @brief Allows adding or removing abilities at runtime for the unit.
 	 * @param Abilities The new ability array for the unit.
 	 */
-	void SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities);
+        void SetUnitAbilitiesRunTime(const TArray<FUnitAbilityEntry>& Abilities);
+
+        void SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities);
 
 	/**
 	 * 
@@ -316,7 +313,8 @@ public:
 	 * @param AtIndex Optional: provide a specific index to add the ability to.
 	 * @return Whether we could add the ability to an empty slot in the array. 
 	 */
-	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE);
+        bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE);
+        bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex = INDEX_NONE);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
 
@@ -326,7 +324,8 @@ public:
 	 * @param NewAbility The ability to swap in. 
 	 * @return Whether the swap was successful.
 	 */
-	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+        bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+        bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
 
 
 	bool HasAbility(const EAbilityID AbilityToCheck);

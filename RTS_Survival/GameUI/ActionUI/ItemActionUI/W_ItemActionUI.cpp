@@ -8,10 +8,11 @@
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 
-void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility)
+void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType)
 {
-	M_Ability = NewAbility;
-	OnUpdateActionUI(NewAbility);
+        M_Ability = NewAbility;
+        M_CustomType = CustomType;
+        OnUpdateActionUI(NewAbility, CustomType);
 }
 
 void UW_ItemActionUI::InitActionUIElement(
@@ -25,10 +26,10 @@ void UW_ItemActionUI::InitActionUIElement(
 
 void UW_ItemActionUI::OnActionUIClicked()
 {
-	if(GetIsValidPlayerController())
-	{
-		M_PlayerController->ActivateActionButton(M_Ability);
-	}
+        if(GetIsValidPlayerController())
+        {
+                M_PlayerController->ActivateActionButton(M_Ability);
+        }
 }
 
 void UW_ItemActionUI::OnActionUIHover(const bool bIsHover) const
