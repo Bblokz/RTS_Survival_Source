@@ -1491,7 +1491,7 @@ void ASquadUnit::DetermineDeathVoiceLine()
 	{
 		return;
 	}
-	if (GetIsSelected() || GetIsValidSquadController())
+	if (GetIsSelected() && GetIsValidSquadController())
 	{
 		M_SquadController->PlaySquadUnitLostVoiceLine();
 	}

@@ -1100,12 +1100,12 @@ TArray<FUnitAbilityEntry> AGameUIController::GetPrimarySelectedAbilityArray()
         return M_currentGameUIState.PrimaryUnitAbilities;
 }
 
-EAbilityID AGameUIController::GetActiveAbility(const int ButtonIndex)
+FUnitAbilityEntry AGameUIController::GetActiveAbilityEntry(const int ButtonIndex)
 {
         const TArray<FUnitAbilityEntry> Abilities = GetPrimarySelectedAbilityArray();
         if (Abilities.IsValidIndex(ButtonIndex))
         {
-                return Abilities[ButtonIndex].AbilityId;
+                return Abilities[ButtonIndex];
         }
 	const FString PrimaryUnitName = M_currentGameUIState.PrimarySelectedUnit
 		                                ? M_currentGameUIState.PrimarySelectedUnit->GetName()
@@ -1113,7 +1113,7 @@ EAbilityID AGameUIController::GetActiveAbility(const int ButtonIndex)
 	RTSFunctionLibrary::ReportError("Attempted to get ActiveAbility with invlid index."
 		"\n see AActionUIController::GetActiveAbility"
 		"\n Primary Unit: " + PrimaryUnitName);
-	return EAbilityID::IdNoAbility;
+	return FUnitAbilityEntry();
 }
 
 bool AGameUIController::GetIsUnitTypeSelected(const EAllUnitType UnitTypeToCheck,

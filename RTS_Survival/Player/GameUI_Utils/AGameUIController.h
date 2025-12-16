@@ -143,7 +143,7 @@ public:
 	 * @param ButtonIndex The index of the actionUI button that was clicked.
 	 * @return The Ability ID of the primary selected unitType at the index in that unitType their ability array.
 	 */
-	EAbilityID GetActiveAbility(const int ButtonIndex);
+FUnitAbilityEntry GetActiveAbilityEntry(const int ButtonIndex);
 
 	UFUNCTION(BlueprintCallable, Category="CurrentSelection", NotBlueprintable)
 	bool GetIsUnitTypeSelected(EAllUnitType UnitTypeToCheck, const uint8 UnitSubtypeToCheck) const;

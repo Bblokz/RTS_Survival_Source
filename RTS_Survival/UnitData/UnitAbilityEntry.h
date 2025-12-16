@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/ApplyBehaviourAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/BehaviourAbilityTypes/BehaviourAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
@@ -30,11 +32,11 @@ struct FUnitAbilityEntry
 UENUM()
 enum class EAttachedRocketAbilityType
 {
-
 	// The large hetzer rockets.
 	Default,
 	SmallRockets,
 };
+
 
 namespace FAbilityHelpers
 {
@@ -44,6 +46,7 @@ namespace FAbilityHelpers
 		AbilityEntry.AbilityId = AbilityId;
 		return AbilityEntry;
 	}
+
 
 	inline TArray<FUnitAbilityEntry> ConvertAbilityIdsToEntries(const TArray<EAbilityID>& AbilityIds)
 	{
@@ -72,8 +75,48 @@ namespace FAbilityHelpers
 		return AbilityIds;
 	}
 
+	inline bool GetHasBehaviourAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
+	                                   const EBehaviourAbilityType BehaviourAbility,
+	                                   FUnitAbilityEntry& OutAbilityOfBehaviour)
+	{
+		const int32 CustomDataForBehaviour = static_cast<int32>(BehaviourAbility);
+		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
+		{
+			if (AbilityEntry.AbilityId == EAbilityID::IdApplyBehaviour &&
+				AbilityEntry.CustomType == CustomDataForBehaviour)
+			{
+				OutAbilityOfBehaviour = AbilityEntry;
+				return true;
+			}
+		}
+		return false;
+	}
 
-	inline FUnitAbilityEntry GetRocketAbilityEntry( const EAttachedRocketAbilityType RocketType )
+	inline UApplyBehaviourAbilityComponent* GetBehaviourAbilityCompOfType(
+		const EBehaviourAbilityType Type, AActor* Actor)
+	{
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+		TArray<UApplyBehaviourAbilityComponent*> BehComps;
+		Actor->GetComponents<UApplyBehaviourAbilityComponent>(BehComps);
+		for (UApplyBehaviourAbilityComponent* BehComp : BehComps)
+		{
+			if (not IsValid(BehComp))
+			{
+				continue;
+			}
+			if (BehComp->GetBehaviourAbilityType() == Type)
+			{
+				return BehComp;
+			}
+		}
+		return nullptr;
+	}
+
+
+	inline FUnitAbilityEntry GetRocketAbilityEntry(const EAttachedRocketAbilityType RocketType)
 	{
 		FUnitAbilityEntry RocketAbilityEntry;
 		RocketAbilityEntry.AbilityId = EAbilityID::IdFireRockets;
@@ -81,11 +124,12 @@ namespace FAbilityHelpers
 		return RocketAbilityEntry;
 	}
 
-	inline FUnitAbilityEntry GetRocketAbilityForRocketType(const ERocketAbility RocketAbility )
+	inline FUnitAbilityEntry GetRocketAbilityForRocketType(const ERocketAbility RocketAbility)
 	{
 		FUnitAbilityEntry DefaultRocketAbility;
 		DefaultRocketAbility.AbilityId = EAbilityID::IdFireRockets;
-		switch (RocketAbility) {
+		switch (RocketAbility)
+		{
 		case ERocketAbility::None:
 			RTSFunctionLibrary::ReportError(
 				TEXT("FAbilityHelpers::GetRocketAbilityForRocketType: Rocket ability is None!"));
@@ -101,7 +145,8 @@ namespace FAbilityHelpers
 	}
 
 	inline TArray<FUnitAbilityEntry> SwapAtIdForNewEntry(const TArray<FUnitAbilityEntry>& OldAbilityArray,
-		const EAbilityID AbilityIdToSwap, const FUnitAbilityEntry& NewAbilityEntry)
+	                                                     const EAbilityID AbilityIdToSwap,
+	                                                     const FUnitAbilityEntry& NewAbilityEntry)
 	{
 		TArray<FUnitAbilityEntry> NewAbilityArray = OldAbilityArray;
 		for (int32 Index = 0; Index < NewAbilityArray.Num(); Index++)
@@ -114,7 +159,4 @@ namespace FAbilityHelpers
 		}
 		return NewAbilityArray;
 	}
-	
-
-	
 }
