@@ -28,7 +28,8 @@ enum class ECommandQueueError : uint8
 	QueueInactive,
 	QueueHasPatrol,
 	AbilityNotAllowed,
-	CommandDataInvalid
+	CommandDataInvalid,
+	AbilityOnCooldown,
 };
 
 /**

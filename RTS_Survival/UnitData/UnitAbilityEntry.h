@@ -21,10 +21,10 @@ struct FUnitAbilityEntry
 	int32 CustomType = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CooldownDuration = 0.0f;
+	int32 CooldownDuration = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CooldownRemaining = 0.0f;
+	int32 CooldownRemaining = 0;
 };
 
 UENUM()
