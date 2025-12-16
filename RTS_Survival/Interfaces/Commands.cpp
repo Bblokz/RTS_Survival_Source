@@ -34,9 +34,9 @@ UCommandData::UCommandData(const FObjectInitializer& ObjectInitializer)
 
 void UCommandData::BeginDestroy()
 {
-        StopAbilityCooldownTimer();
-        ClearCommands();
-        UObject::BeginDestroy();
+	StopAbilityCooldownTimer();
+	ClearCommands();
+	UObject::BeginDestroy();
 }
 
 
@@ -46,7 +46,7 @@ void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 	if (Abilities.Num() > DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI)
 	{
 		RTSFunctionLibrary::ReportError("The number of abilities exceeds the maximum allowed for the Action UI."
-				"UCommandData::SetAbilities");
+			"UCommandData::SetAbilities");
 		ValidAbilities.SetNum(DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI);
 	}
 	M_Abilities = ValidAbilities;
@@ -54,71 +54,72 @@ void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 
 TArray<EAbilityID> UCommandData::GetAbilityIds(const bool bExcludeNoAbility) const
 {
-        return FAbilityHelpers::ExtractAbilityIdsFromEntries(M_Abilities, bExcludeNoAbility);
+	return FAbilityHelpers::ExtractAbilityIdsFromEntries(M_Abilities, bExcludeNoAbility);
 }
 
 bool UCommandData::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
 {
-        return SwapAbility(OldAbility, FAbilityHelpers::CreateAbilityEntryFromId(NewAbility));
+	return SwapAbility(OldAbility, FAbilityHelpers::CreateAbilityEntryFromId(NewAbility));
 }
 
 bool UCommandData::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility)
 {
-        const int32 Index = GetAbilityIndexById(OldAbility);
-        if (Index != INDEX_NONE)
-        {
-                M_Abilities[Index] = NewAbility;
-                return true;
-        }
+	const int32 Index = GetAbilityIndexById(OldAbility);
+	if (Index != INDEX_NONE)
+	{
+		M_Abilities[Index] = NewAbility;
+		return true;
+	}
 
-        return false;
+	return false;
 }
 
 bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 {
-        return AddAbility(FAbilityHelpers::CreateAbilityEntryFromId(NewAbility), AtIndex);
+	return AddAbility(FAbilityHelpers::CreateAbilityEntryFromId(NewAbility), AtIndex);
 }
 
 bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex)
 {
-        if (NewAbility.AbilityId == EAbilityID::IdNoAbility)
-        {
-                return false;
-        }
-        if (GetAbilityIndexById(NewAbility.AbilityId) != INDEX_NONE)
-        {
-                RTSFunctionLibrary::ReportError(
-                        TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(NewAbility.AbilityId) +
-                        TEXT(" in UCommandData::AddAbility"));
-                return false;
-        }
+	if (NewAbility.AbilityId == EAbilityID::IdNoAbility)
+	{
+		return false;
+	}
+	if (GetAbilityIndexById(NewAbility.AbilityId) != INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(
+				NewAbility.AbilityId) +
+			TEXT(" in UCommandData::AddAbility"));
+		return false;
+	}
 
-        if (AtIndex == INDEX_NONE)
+	if (AtIndex == INDEX_NONE)
 	{
 		for (int32 i = 0; i < M_Abilities.Num(); i++)
 		{
-                        if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
-                        {
-                                M_Abilities[i] = NewAbility;
-                                return true;
-                        }
-                }
-                return false;
-        }
-        if (AtIndex >= 0 && AtIndex < M_Abilities.Num())
-        {
-                if (M_Abilities[AtIndex].AbilityId != EAbilityID::IdNoAbility)
-                {
-                        RTSFunctionLibrary::ReportError(
-                                TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
-                                TEXT(" in UCommandData::AddAbility"));
-                        return false;
-                }
-                M_Abilities[AtIndex] = NewAbility;
-                return true;
-        }
-        RTSFunctionLibrary::ReportError(
-                TEXT("Attempted to add ability at invalid index: ") + FString::FromInt(AtIndex) +
+			if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
+			{
+				M_Abilities[i] = NewAbility;
+				return true;
+			}
+		}
+		return false;
+	}
+	if (AtIndex >= 0 && AtIndex < M_Abilities.Num())
+	{
+		if (M_Abilities[AtIndex].AbilityId != EAbilityID::IdNoAbility)
+		{
+			RTSFunctionLibrary::ReportError(
+				TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
+				TEXT(" in UCommandData::AddAbility"));
+			return false;
+		}
+		M_Abilities[AtIndex] = NewAbility;
+		return true;
+	}
+	RTSFunctionLibrary::ReportError(
+		TEXT("Attempted to add ability at invalid index: ") + FString::FromInt(AtIndex) +
 		TEXT(" in UCommandData::AddAbility"));
 	return false;
 }
@@ -145,127 +146,135 @@ bool UCommandData::RemoveAbility(const EAbilityID AbilityToRemove)
 
 int32 UCommandData::GetAbilityIndexById(const EAbilityID AbilityId) const
 {
-        return M_Abilities.IndexOfByPredicate([AbilityId](const FUnitAbilityEntry& AbilityEntry)
-        {
-                return AbilityEntry.AbilityId == AbilityId;
-        });
+	return M_Abilities.IndexOfByPredicate([AbilityId](const FUnitAbilityEntry& AbilityEntry)
+	{
+		return AbilityEntry.AbilityId == AbilityId;
+	});
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntry(const EAbilityID AbilityId)
 {
-        return M_Abilities.FindByPredicate([AbilityId](const FUnitAbilityEntry& AbilityEntry)
-        {
-                return AbilityEntry.AbilityId == AbilityId;
-        });
+	return M_Abilities.FindByPredicate([AbilityId](const FUnitAbilityEntry& AbilityEntry)
+	{
+		return AbilityEntry.AbilityId == AbilityId;
+	});
+}
+
+FUnitAbilityEntry* UCommandData::GetAbilityEntryOfCustomType(const EAbilityID AbilityID, int32 CustomType)
+{
+	return M_Abilities.FindByPredicate([AbilityID, CustomType](const FUnitAbilityEntry& AbilityEntry)
+	{
+		return AbilityEntry.AbilityId == AbilityID && AbilityEntry.CustomType == CustomType;
+	});
 }
 
 const FUnitAbilityEntry* UCommandData::GetAbilityEntry(const EAbilityID AbilityId) const
 {
-        return M_Abilities.FindByPredicate([AbilityId](const FUnitAbilityEntry& AbilityEntry)
-        {
-                return AbilityEntry.AbilityId == AbilityId;
-        });
+	return M_Abilities.FindByPredicate([AbilityId](const FUnitAbilityEntry& AbilityEntry)
+	{
+		return AbilityEntry.AbilityId == AbilityId;
+	});
 }
 
 bool UCommandData::HasAbilityOnCooldown() const
 {
-        for (const FUnitAbilityEntry& AbilityEntry : M_Abilities)
-        {
-                if (AbilityEntry.CooldownRemaining > 0)
-                {
-                        return true;
-                }
-        }
+	for (const FUnitAbilityEntry& AbilityEntry : M_Abilities)
+	{
+		if (AbilityEntry.CooldownRemaining > 0)
+		{
+			return true;
+		}
+	}
 
-        return false;
+	return false;
 }
 
 void UCommandData::StartAbilityCooldownTimer()
 {
-        if (not HasAbilityOnCooldown())
-        {
-                return;
-        }
+	if (not HasAbilityOnCooldown())
+	{
+		return;
+	}
 
-        UWorld* World = GetWorld();
-        if (not World)
-        {
-                return;
-        }
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
 
-        FTimerManager& TimerManager = World->GetTimerManager();
-        if (TimerManager.IsTimerActive(M_AbilityCooldownTimerHandle))
-        {
-                return;
-        }
+	FTimerManager& TimerManager = World->GetTimerManager();
+	if (TimerManager.IsTimerActive(M_AbilityCooldownTimerHandle))
+	{
+		return;
+	}
 
-        constexpr float AbilityCooldownTickRate = 1.0f;
-        FTimerDelegate TimerDelegate;
-        TimerDelegate.BindUObject(this, &UCommandData::AbilityCoolDownTick);
-        TimerManager.SetTimer(M_AbilityCooldownTimerHandle, TimerDelegate, AbilityCooldownTickRate, true);
+	constexpr float AbilityCooldownTickRate = 1.0f;
+	FTimerDelegate TimerDelegate;
+	TimerDelegate.BindUObject(this, &UCommandData::AbilityCoolDownTick);
+	TimerManager.SetTimer(M_AbilityCooldownTimerHandle, TimerDelegate, AbilityCooldownTickRate, true);
 }
 
 void UCommandData::StopAbilityCooldownTimer()
 {
-        UWorld* World = GetWorld();
-        if (not World)
-        {
-                return;
-        }
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
 
-        World->GetTimerManager().ClearTimer(M_AbilityCooldownTimerHandle);
+	World->GetTimerManager().ClearTimer(M_AbilityCooldownTimerHandle);
 }
 
 void UCommandData::AbilityCoolDownTick()
 {
-        bool bHasAnyCooldown = false;
+	bool bHasAnyCooldown = false;
 
-        for (FUnitAbilityEntry& AbilityEntry : M_Abilities)
-        {
-                if (AbilityEntry.CooldownRemaining <= 0)
-                {
-                        continue;
-                }
+	for (FUnitAbilityEntry& AbilityEntry : M_Abilities)
+	{
+		if (AbilityEntry.CooldownRemaining <= 0)
+		{
+			continue;
+		}
 
-                AbilityEntry.CooldownRemaining = FMath::Max(AbilityEntry.CooldownRemaining - 1, 0);
+		AbilityEntry.CooldownRemaining = FMath::Max(AbilityEntry.CooldownRemaining - 1, 0);
 
-                if (AbilityEntry.CooldownRemaining > 0)
-                {
-                        bHasAnyCooldown = true;
-                }
-        }
+		if (AbilityEntry.CooldownRemaining > 0)
+		{
+			bHasAnyCooldown = true;
+		}
+	}
 
-        if (not bHasAnyCooldown)
-        {
-                StopAbilityCooldownTimer();
-        }
+	if (not bHasAnyCooldown)
+	{
+		StopAbilityCooldownTimer();
+	}
 }
 
-void UCommandData::BeginAbilityCooldown(const EAbilityID AbilityId)
+void UCommandData::IfCooldownBeginAbilityCooldown(const EAbilityID AbilityId)
 {
-        FUnitAbilityEntry* AbilityEntry = GetAbilityEntry(AbilityId);
-        if (not AbilityEntry)
-        {
-                return;
-        }
+	FUnitAbilityEntry* AbilityEntry = GetAbilityEntry(AbilityId);
+	if (not AbilityEntry)
+	{
+		return;
+	}
 
-        if (AbilityEntry->CooldownDuration <= 0)
-        {
-                return;
-        }
+	if (AbilityEntry->CooldownDuration <= 0)
+	{
+		return;
+	}
 
-        AbilityEntry->CooldownRemaining = AbilityEntry->CooldownDuration;
-        StartAbilityCooldownTimer();
+	AbilityEntry->CooldownRemaining = AbilityEntry->CooldownDuration;
+	StartAbilityCooldownTimer();
 }
 
 void UCommandData::InitCommandData(ICommands* Owner)
 {
-        if (not Owner)
-        {
-                RTSFunctionLibrary::ReportError(TEXT("Attempted to setup command data with a nullptr owner.")
-                        TEXT("at function UCommandData::InitCommandData"));
-                return;
-        }
+	if (not Owner)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Attempted to setup command data with a nullptr owner.")
+			TEXT("at function UCommandData::InitCommandData"));
+		return;
+	}
 
 	M_Owner = Owner;
 	bM_IsCommandQueueEnabled = true;
@@ -295,12 +304,70 @@ bool UCommandData::GetIsQueueFull() const
 }
 
 
+bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility)
+{
+	const TArray<EAbilityID> UnitAbilities = GetAbilityIds();
+	if (not UnitAbilities.Contains(QueuedAbility))
+	{
+		if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+		{
+			RTSFunctionLibrary::PrintString(
+				"Queued command is no longer allowed: " + Global_GetAbilityIDAsString(QueuedAbility.CommandType),
+				FColor::Red);
+		}
+		return false;
+	}
+
+	if (QueuedAbility.CommandType == EAbilityID::IdApplyBehaviour)
+	{
+		// Because mutiple different behaviour abilities might be at cooldown at the same time we cannot just check
+		// for EAbilityID and need to also check the subtype given by the behaviour ability type for a match.
+		FUnitAbilityEntry* Entry = GetAbilityEntryOfCustomType(EAbilityID::IdApplyBehaviour,
+		                                                       static_cast<int32>(QueuedAbility.BehaviourAbilityType));
+		if (not Entry)
+		{
+			RTSFunctionLibrary::ReportError(
+
+				"Queued behaviour ability command is no longer allowed: " + Global_GetAbilityIDAsString(
+					QueuedAbility.CommandType)
+				+ " with behaviour type: " + FString::FromInt(static_cast<int32>(QueuedAbility.BehaviourAbilityType)));
+			return false;
+		}
+		if (Entry->CooldownRemaining > 0)
+		{
+			if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+			{
+				RTSFunctionLibrary::PrintString(
+					"Queued behaviour ability command is on cooldown: " + Global_GetAbilityIDAsString(
+						QueuedAbility.CommandType)
+					+ " with behaviour type: " + UEnum::GetValueAsString(QueuedAbility.BehaviourAbilityType),
+					FColor::Red);
+			}
+			return false;
+		}
+		return true;
+	}
+
+	const FUnitAbilityEntry* AbilityEntry = GetAbilityEntry(QueuedAbility.CommandType);
+	if (AbilityEntry && AbilityEntry->CooldownRemaining > 0)
+	{
+		if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+		{
+			RTSFunctionLibrary::PrintString(
+				"Queued command is on cooldown: " + Global_GetAbilityIDAsString(QueuedAbility.CommandType),
+				FColor::Red);
+		}
+		return false;
+	}
+	return true;
+}
+
 void UCommandData::PrintCommands() const
 {
-        if (not M_Owner)
-        {
-                return;
-        }
+	if (not M_Owner)
+	{
+		return;
+	}
 
 	FString DebugString = "Command queue (size=" + FString::FromInt(NumCommands) + "):";
 
@@ -337,7 +404,8 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	const EAbilityID Ability,
 	const FVector& Location,
 	AActor* TargetActor,
-	const FRotator& Rotation)
+	const FRotator& Rotation,
+	const EBehaviourAbilityType BehaviourAbility)
 {
 	// Check if we have an active queue and if we are not patrolling.
 	// In case we shift click while the queue 
@@ -358,6 +426,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NewCmd.TargetLocation = Location;
 	NewCmd.TargetActor = TargetActor;
 	NewCmd.TargetRotator = Rotation;
+	NewCmd.BehaviourAbilityType = BehaviourAbility;
 
 	// Insert at the end
 	M_TCommands[NumCommands] = NewCmd;
@@ -418,19 +487,29 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		return;
 	}
 
+
 	FQueueCommand& Cmd = M_TCommands[CurrentIndex];
+
 	// If the command is invalid or something, we skip. 
-        if (Cmd.CommandType == EAbilityID::IdNoAbility)
-        {
-                RTSFunctionLibrary::PrintString("The command is IdNoAbility, skipping...");
-                return;
-        }
+	if (Cmd.CommandType == EAbilityID::IdNoAbility)
+	{
+		RTSFunctionLibrary::PrintString("The command is IdNoAbility, skipping...");
+		ExecuteCommand(false);
+		return;
+	}
 
-        BeginAbilityCooldown(Cmd.CommandType);
+	if (not GetIsQueuedCommandStillAllowed(Cmd))
+	{
+		// This ability is now either on cooldown or entirely removed from the unit; skip it.
+		ExecuteCommand(false);
+		return;
+	}
 
-        // Now we call ICommands methods based on the type:
-        switch (Cmd.CommandType)
-        {
+	IfCooldownBeginAbilityCooldown(Cmd.CommandType);
+
+	// Now we call ICommands methods based on the type:
+	switch (Cmd.CommandType)
+	{
 	case EAbilityID::IdMove:
 		{
 			M_Owner->ExecuteMoveCommand(Cmd.TargetLocation);
@@ -525,26 +604,26 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			M_Owner->ExecuteFireRockets();
 		}
 		break;
-        case EAbilityID::IdCancelRocketFire:
-                {
-                        M_Owner->ExecuteCancelFireRockets();
-                }
-                break;
-        case EAbilityID::IdThrowGrenade:
-                {
-                        M_Owner->ExecuteThrowGrenadeCommand(Cmd.TargetLocation);
-                }
-                break;
-        case EAbilityID::IdCancelThrowGrenade:
-                {
-                        M_Owner->ExecuteCancelThrowGrenadeCommand();
-                }
-                break;
-        case EAbilityID::IdReturnToBase:
-                {
-                        M_Owner->ExecuteReturnToBase();
-                }
-                break;
+	case EAbilityID::IdCancelRocketFire:
+		{
+			M_Owner->ExecuteCancelFireRockets();
+		}
+		break;
+	case EAbilityID::IdThrowGrenade:
+		{
+			M_Owner->ExecuteThrowGrenadeCommand(Cmd.TargetLocation);
+		}
+		break;
+	case EAbilityID::IdCancelThrowGrenade:
+		{
+			M_Owner->ExecuteCancelThrowGrenadeCommand();
+		}
+		break;
+	case EAbilityID::IdReturnToBase:
+		{
+			M_Owner->ExecuteReturnToBase();
+		}
+		break;
 	case EAbilityID::IdEnterCargo:
 		{
 			M_Owner->ExecuteEnterCargoCommand(Cmd.TargetActor.Get());
@@ -559,6 +638,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		{
 			M_Owner->ExecuteCaptureCommand(Cmd.TargetActor.Get());
 		}
+	case EAbilityID::IdApplyBehaviour:
+		{
+			ExecuteBehaviourAbility(Cmd.BehaviourAbilityType);
+		}
+		break;
 	default:
 		RTSFunctionLibrary::PrintString(
 			"Command not implemented in ExecuteCommand: " + Global_GetAbilityIDAsString(Cmd.CommandType)
@@ -619,6 +703,19 @@ void UCommandData::SetRotationFlagForFinalMovementCommand(const EAbilityID NewFi
 	}
 	M_FinalRotation.bIsSet = false;
 }
+
+void UCommandData::ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility) const
+{
+	const UApplyBehaviourAbilityComponent* Comp = FAbilityHelpers::GetBehaviourAbilityCompOfType(
+		BehaviourAbility, M_Owner->GetOwnerActor());
+	if (not IsValid(Comp))
+	{
+		M_Owner->DoneExecutingCommand(EAbilityID::IdApplyBehaviour);
+		return;
+	}
+	Comp->ExecuteBehaviourAbility();
+}
+
 
 void ICommands::SetPrimarySelected(UActionUIManager* ActionUIManager)
 {
@@ -683,37 +780,37 @@ void ICommands::SetUnitAbilitiesRunTime(const TArray<FUnitAbilityEntry>& Abiliti
 
 void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
 {
-        SetUnitAbilitiesRunTime(FAbilityHelpers::ConvertAbilityIdsToEntries(Abilities));
+	SetUnitAbilitiesRunTime(FAbilityHelpers::ConvertAbilityIdsToEntries(Abilities));
 }
 
 bool ICommands::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not UnitCommandData)
-        {
-                return false;
-        }
-        const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
-        if (UnitCommandData->GetIsPrimarySelected())
-        {
-                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-        }
-        return bAdded;
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+	const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
+	if (UnitCommandData->GetIsPrimarySelected())
+	{
+		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+	}
+	return bAdded;
 }
 
 bool ICommands::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not UnitCommandData)
-        {
-                return false;
-        }
-        const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
-        if (UnitCommandData->GetIsPrimarySelected())
-        {
-                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-        }
-        return bAdded;
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+	const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
+	if (UnitCommandData->GetIsPrimarySelected())
+	{
+		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+	}
+	return bAdded;
 }
 
 bool ICommands::RemoveAbility(const EAbilityID AbilityToRemove)
@@ -733,41 +830,41 @@ bool ICommands::RemoveAbility(const EAbilityID AbilityToRemove)
 
 bool ICommands::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not UnitCommandData)
-        {
-                return false;
-        }
-        const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
-        if (UnitCommandData->GetIsPrimarySelected())
-        {
-                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-        }
-        return bIsAbilitySwapped;
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
+	if (UnitCommandData->GetIsPrimarySelected())
+	{
+		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+	}
+	return bIsAbilitySwapped;
 }
 
 bool ICommands::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not UnitCommandData)
-        {
-                return false;
-        }
-        const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
-        if (UnitCommandData->GetIsPrimarySelected())
-        {
-                UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-        }
-        return bIsAbilitySwapped;
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
+	if (UnitCommandData->GetIsPrimarySelected())
+	{
+		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
+	}
+	return bIsAbilitySwapped;
 }
 
 bool ICommands::HasAbility(const EAbilityID AbilityToCheck)
 {
-        if (UCommandData* UnitCommandData = GetIsValidCommandData())
-        {
-                return UnitCommandData->GetAbilityIds().Contains(AbilityToCheck);
-        }
-        return false;
+	if (UCommandData* UnitCommandData = GetIsValidCommandData())
+	{
+		return UnitCommandData->GetAbilityIds().Contains(AbilityToCheck);
+	}
+	return false;
 }
 
 
@@ -796,11 +893,11 @@ ECommandQueueError ICommands::MoveToLocation(
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdMove);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdMove);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -853,11 +950,11 @@ ECommandQueueError ICommands::AttackActor(
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdAttack);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdAttack);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -878,28 +975,53 @@ ECommandQueueError ICommands::CaptureActor(AActor* CaptureTarget, const bool bSe
 	{
 		SetUnitToIdle();
 	}
-	if(not FCaptureMechanicHelpers::GetValidCaptureInterface(CaptureTarget) || not GetCanCaptureUnits())
+	if (not FCaptureMechanicHelpers::GetValidCaptureInterface(CaptureTarget) || not GetCanCaptureUnits())
 	{
-	return ECommandQueueError::AbilityNotAllowed;
+		return ECommandQueueError::AbilityNotAllowed;
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdCapture, FVector::ZeroVector, CaptureTarget, FRotator::ZeroRotator);
 	return Error;
 }
 
+ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	FUnitAbilityEntry BehaviourAbilityEntry;
+	if (not FAbilityHelpers::GetHasBehaviourAbility(UnitCommandData->GetAbilities(), BehaviourAbility,
+	                                                BehaviourAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+	if (BehaviourAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdApplyBehaviour,
+		FVector::ZeroVector,
+		/*TargetActor=*/nullptr,
+		/*Rotation=*/FRotator::ZeroRotator,
+		BehaviourAbility);
+}
+
 ECommandQueueError ICommands::AttackGround(const FVector& Location, const bool bSetUnitToIdle)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not IsValid(UnitCommandData))
-        {
-                return ECommandQueueError::CommandDataInvalid;
-        }
-        // Check for regular attack ability; attack ground is not on the command card.
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdAttack);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	// Check for regular attack ability; attack ground is not on the command card.
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdAttack);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -919,11 +1041,11 @@ ECommandQueueError ICommands::PatrolToLocation(const FVector& Location, const bo
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdPatrol);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdPatrol);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -943,11 +1065,11 @@ ECommandQueueError ICommands::ReverseUnitToLocation(
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdReverseMove);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdReverseMove);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -969,11 +1091,11 @@ ECommandQueueError ICommands::RotateTowards(
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdRotateTowards);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdRotateTowards);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1014,11 +1136,11 @@ ECommandQueueError ICommands::HarvestResource(
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdHarvestResource);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdHarvestResource);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1037,11 +1159,11 @@ ECommandQueueError ICommands::ReturnCargo(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdHarvestResource);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdHarvestResource);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1061,11 +1183,11 @@ ECommandQueueError ICommands::PickupItem(AItemsMaster* TargetItem, const bool bS
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdPickupItem);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdPickupItem);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1084,11 +1206,11 @@ ECommandQueueError ICommands::DigIn(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdDigIn);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdDigIn);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1107,11 +1229,11 @@ ECommandQueueError ICommands::BreakCover(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdBreakCover);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdBreakCover);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1125,69 +1247,69 @@ ECommandQueueError ICommands::BreakCover(const bool bSetUnitToIdle)
 
 ECommandQueueError ICommands::SwitchWeapons(const bool bSetUnitToIdle)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
+	UCommandData* UnitCommandData = GetIsValidCommandData();
 
-        if (not IsValid(UnitCommandData))
+	if (not IsValid(UnitCommandData))
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdSwitchWeapon);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdSwitchWeapon);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
 	}
-        const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
-                EAbilityID::IdSwitchWeapon, FVector::ZeroVector, nullptr,
-                FRotator::ZeroRotator);
-        return Error;
+	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdSwitchWeapon, FVector::ZeroVector, nullptr,
+		FRotator::ZeroRotator);
+	return Error;
 }
 
 ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not IsValid(UnitCommandData))
-        {
-                return ECommandQueueError::CommandDataInvalid;
-        }
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdThrowGrenade);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
-        if (bSetUnitToIdle)
-        {
-                SetUnitToIdle();
-        }
-        const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
-                EAbilityID::IdThrowGrenade, Location, nullptr,
-                FRotator::ZeroRotator);
-        return Error;
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdThrowGrenade);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdThrowGrenade, Location, nullptr,
+		FRotator::ZeroRotator);
+	return Error;
 }
 
 ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not IsValid(UnitCommandData))
-        {
-                return ECommandQueueError::CommandDataInvalid;
-        }
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdCancelThrowGrenade);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
-        if (bSetUnitToIdle)
-        {
-                SetUnitToIdle();
-        }
-        const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
-                EAbilityID::IdCancelThrowGrenade, FVector::ZeroVector, nullptr,
-                FRotator::ZeroRotator);
-        return Error;
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdCancelThrowGrenade);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdCancelThrowGrenade, FVector::ZeroVector, nullptr,
+		FRotator::ZeroRotator);
+	return Error;
 }
 
 ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
@@ -1198,11 +1320,11 @@ ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdFireRockets);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdFireRockets);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1220,11 +1342,11 @@ ECommandQueueError ICommands::CancelFireRockets(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdCancelRocketFire);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdCancelRocketFire);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1301,11 +1423,11 @@ ECommandQueueError ICommands::ScavengeObject(AActor* TargetObject, const bool bS
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdScavenge);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdScavenge);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1324,11 +1446,11 @@ ECommandQueueError ICommands::RepairActor(AActor* TargetObject, const bool bSetU
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdRepair);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdRepair);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1347,11 +1469,11 @@ ECommandQueueError ICommands::ReturnToBase(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdReturnToBase);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdReturnToBase);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
@@ -1572,8 +1694,9 @@ void ICommands::ExecuteCancelFireRockets()
 
 void ICommands::TerminateCancelFireRockets()
 {
-        // nothing to do, instant ability.
+	// nothing to do, instant ability.
 }
+
 
 void ICommands::ExecuteThrowGrenadeCommand(const FVector TargetLocation)
 {
@@ -1726,16 +1849,16 @@ void ICommands::DoneExecutingCommand(const EAbilityID AbilityFinished)
 
 ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUnitToIdle)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not IsValid(UnitCommandData))
-        {
-                return ECommandQueueError::CommandDataInvalid;
-        }
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
 
-        // Typically not on the command card; skip the card gate like CreateBuilding/ConvertToVehicle.
-        // If you *do* want to lock it behind abilities, uncomment the check below.
-        // const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdEnterCargo);
-        // if (AbilityError != ECommandQueueError::NoError) { return AbilityError; }
+	// Typically not on the command card; skip the card gate like CreateBuilding/ConvertToVehicle.
+	// If you *do* want to lock it behind abilities, uncomment the check below.
+	// const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdEnterCargo);
+	// if (AbilityError != ECommandQueueError::NoError) { return AbilityError; }
 
 	if (bSetUnitToIdle)
 	{
@@ -1751,17 +1874,17 @@ ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUn
 
 ECommandQueueError ICommands::ExitCargo(const bool bSetUnitToIdle)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not IsValid(UnitCommandData))
-        {
-                return ECommandQueueError::CommandDataInvalid;
-        }
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
 
-        const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdExitCargo);
-        if (AbilityError != ECommandQueueError::NoError)
-        {
-                return AbilityError;
-        }
+	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdExitCargo);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
 
 	if (bSetUnitToIdle)
 	{
@@ -1862,21 +1985,21 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdBreakCover:
 		TerminateBreakCover();
 		break;
-        case EAbilityID::IdFireRockets:
-                TerminateFireRockets();
-                break;
-        case EAbilityID::IdCancelRocketFire:
-                TerminateCancelFireRockets();
-                break;
-        case EAbilityID::IdThrowGrenade:
-                TerminateThrowGrenadeCommand();
-                break;
-        case EAbilityID::IdCancelThrowGrenade:
-                TerminateCancelThrowGrenadeCommand();
-                break;
-        case EAbilityID::IdRepair:
-                TerminateRepairCommand();
-                break;
+	case EAbilityID::IdFireRockets:
+		TerminateFireRockets();
+		break;
+	case EAbilityID::IdCancelRocketFire:
+		TerminateCancelFireRockets();
+		break;
+	case EAbilityID::IdThrowGrenade:
+		TerminateThrowGrenadeCommand();
+		break;
+	case EAbilityID::IdCancelThrowGrenade:
+		TerminateCancelThrowGrenadeCommand();
+		break;
+	case EAbilityID::IdRepair:
+		TerminateRepairCommand();
+		break;
 	case EAbilityID::IdReturnToBase:
 		TerminateReturnToBase();
 		break;
@@ -1889,6 +2012,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdCapture:
 		TerminateCaptureCommand();
 		break;
+	case EAbilityID::IdApplyBehaviour:
+		// No terminate; behaviour auto expires.
+		break;
 	default:
 		RTSFunctionLibrary::PrintString(
 			"Command has no termination logic implemented."
@@ -1900,23 +2026,23 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 
 ECommandQueueError ICommands::GetIsAbilityAllowedForUnit(const EAbilityID AbilityToCheck)
 {
-        UCommandData* UnitCommandData = GetIsValidCommandData();
-        if (not IsValid(UnitCommandData))
-        {
-                return ECommandQueueError::CommandDataInvalid;
-        }
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
 
-        const TArray<EAbilityID> UnitAbilities = GetUnitAbilities();
-        if (not UnitAbilities.Contains(AbilityToCheck))
-        {
-                return ECommandQueueError::AbilityNotAllowed;
-        }
+	const TArray<EAbilityID> UnitAbilities = UnitCommandData->GetAbilityIds();
+	if (not UnitAbilities.Contains(AbilityToCheck))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
 
-        const FUnitAbilityEntry* AbilityEntry = UnitCommandData->GetAbilityEntry(AbilityToCheck);
-        if (AbilityEntry && AbilityEntry->CooldownRemaining > 0)
-        {
-                return ECommandQueueError::AbilityOnCooldown;
-        }
+	const FUnitAbilityEntry* AbilityEntry = UnitCommandData->GetAbilityEntry(AbilityToCheck);
+	if (AbilityEntry && AbilityEntry->CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
 
-        return ECommandQueueError::NoError;
+	return ECommandQueueError::NoError;
 }

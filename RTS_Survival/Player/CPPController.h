@@ -537,7 +537,7 @@ public:
 	float DeltaSeconds;
 
 
-	void ActivateActionButton(const EAbilityID ActionButtonAbility);
+	void ActivateActionButton(const int32 ActionButtonAbilityIndex);
 
 
 	/** @brief all SquadControllers of which the player currently has direct control. */
@@ -1110,6 +1110,8 @@ private:
 
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();
+
+	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
 
 	void DirectActionButtonReturnCargo();
 

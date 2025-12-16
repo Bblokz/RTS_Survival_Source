@@ -55,6 +55,7 @@ enum class EAbilityID : uint8
 	IdDisableResourceConversion,
 	IdCapture,
 	IdReinforceSquad,
+	IdApplyBehaviour,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)

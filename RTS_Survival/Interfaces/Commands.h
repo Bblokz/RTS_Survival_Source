@@ -54,12 +54,15 @@ public:
 	UPROPERTY()
 	FRotator TargetRotator;
 
+	UPROPERTY()
+	EBehaviourAbilityType BehaviourAbilityType;
 
 	FQueueCommand()
 		: CommandType(EAbilityID::IdNoAbility)
 		  , TargetLocation(FVector::ZeroVector)
 		  , TargetActor(nullptr)
 		  , TargetRotator(FRotator::ZeroRotator)
+		  , BehaviourAbilityType(EBehaviourAbilityType::DefaultSprint)
 	{
 	}
 };
@@ -100,27 +103,27 @@ class RTS_SURVIVAL_API UCommandData : public UObject
 	friend class ICommands;
 
 public:
-        UCommandData(const FObjectInitializer& ObjectInitializer);
+	UCommandData(const FObjectInitializer& ObjectInitializer);
 
-        virtual void BeginDestroy() override;
+	virtual void BeginDestroy() override;
 
-        const TArray<FUnitAbilityEntry>& GetAbilities() const { return M_Abilities; }
+	const TArray<FUnitAbilityEntry>& GetAbilities() const { return M_Abilities; }
 
-        TArray<EAbilityID> GetAbilityIds(const bool bExcludeNoAbility = false) const;
+	TArray<EAbilityID> GetAbilityIds(const bool bExcludeNoAbility = false) const;
 
-        void SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
+	void SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
 
-        bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
-        bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
+	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+	bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
 
-        /**
-         *
-         * @param NewAbility Ability to add.
-         * @param AtIndex Optional: provide a specific index to add the ability to.
-         * @return Whether we could add the ability to an empty slot in the array.
-         */
-        bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex);
-        bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex);
+	/**
+	 *
+	 * @param NewAbility Ability to add.
+	 * @param AtIndex Optional: provide a specific index to add the ability to.
+	 * @return Whether we could add the ability to an empty slot in the array.
+	 */
+	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex);
+	bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
 
@@ -146,6 +149,8 @@ private:
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
 
 	inline bool GetIsPrimarySelected() const { return M_ActionUIManager.IsValid(); };
+
+	bool GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility);
 	/**
 	 * Debug function that prints the queue to the screen or logs.
 	 */
@@ -161,14 +166,15 @@ private:
 	 * Adds the given command data to the queue. 
 	 * If this is the first command, we immediately execute it.
 	 */
-        ECommandQueueError AddAbilityToTCommands(
-                EAbilityID Ability,
-                const FVector& Location = FVector::ZeroVector,
-                AActor* TargetActor = nullptr,
-                const FRotator& Rotation = FRotator::ZeroRotator
-        );
+	ECommandQueueError AddAbilityToTCommands(
+		EAbilityID Ability,
+		const FVector& Location = FVector::ZeroVector,
+		AActor* TargetActor = nullptr,
+		const FRotator& Rotation = FRotator::ZeroRotator,
+		const EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint
+	);
 
-        void BeginAbilityCooldown(const EAbilityID AbilityId);
+	void IfCooldownBeginAbilityCooldown(const EAbilityID AbilityId);
 
 	/**
 	 * Execute either the next command (if bExecuteCurrentCommand=false) 
@@ -186,10 +192,10 @@ private:
 	 */
 	ECommandQueueError IsQueueActiveAndNoPatrol() const;
 
-        /**
-         * Whether the queue is enabled (accepting new commands).
-         */
-        bool bM_IsCommandQueueEnabled;
+	/**
+	 * Whether the queue is enabled (accepting new commands).
+	 */
+	bool bM_IsCommandQueueEnabled;
 
 
 	/** If true, the unit is spawning and hasn't received any commands yet. */
@@ -204,32 +210,34 @@ private:
 	UPROPERTY()
 	FQueueCommand M_TCommands[MAX_COMMANDS];
 
-        // The Abilities this unit has; initialised with data from game state.
-        UPROPERTY()
-        TArray<FUnitAbilityEntry> M_Abilities;
+	// The Abilities this unit has; initialised with data from game state.
+	UPROPERTY()
+	TArray<FUnitAbilityEntry> M_Abilities;
 
-        int32 GetAbilityIndexById(EAbilityID AbilityId) const;
+	int32 GetAbilityIndexById(EAbilityID AbilityId) const;
 
-        /** The number of valid commands in M_TCommands. */
-        int32 NumCommands;
+	/** The number of valid commands in M_TCommands. */
+	int32 NumCommands;
 
 	/** The index of the currently active command in M_TCommands. 
 	    -1 means "no active command." */
 	int32 CurrentIndex;
 
-        /**
-         * The "Owner" that implements ICommands and holds this UCommandData.
-         */
-        ICommands* M_Owner;
+	/**
+	 * The "Owner" that implements ICommands and holds this UCommandData.
+	 */
+	ICommands* M_Owner;
 
-        FTimerHandle M_AbilityCooldownTimerHandle;
+	FTimerHandle M_AbilityCooldownTimerHandle;
 
-        FUnitAbilityEntry* GetAbilityEntry(const EAbilityID AbilityId);
-        const FUnitAbilityEntry* GetAbilityEntry(const EAbilityID AbilityId) const;
-        bool HasAbilityOnCooldown() const;
-        void StartAbilityCooldownTimer();
-        void StopAbilityCooldownTimer();
-        void AbilityCoolDownTick();
+	FUnitAbilityEntry* GetAbilityEntry(const EAbilityID AbilityId);
+	// Also requires the custom type of the ability entry to match.
+	FUnitAbilityEntry* GetAbilityEntryOfCustomType(const EAbilityID, int32 CustomType);
+	const FUnitAbilityEntry* GetAbilityEntry(const EAbilityID AbilityId) const;
+	bool HasAbilityOnCooldown() const;
+	void StartAbilityCooldownTimer();
+	void StopAbilityCooldownTimer();
+	void AbilityCoolDownTick();
 
 
 	struct FFinalRotation
@@ -255,6 +263,11 @@ private:
 	/** @brief If this command is a movement command we save the final rotation and set the final rotation flag to set
 	 * only call this for commands added to the END of the queue! */
 	void SetRotationFlagForFinalMovementCommand(const EAbilityID NewFinalCommand, const FRotator& Rotation);
+
+	
+
+	void ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility) const;
+	
 };
 
 
@@ -305,20 +318,20 @@ public:
 	 * ensure the right data is used.
 	 * @param Abilities The abilities to use for this unit.
 	 */
-        void InitAbilityArray(const TArray<FUnitAbilityEntry>& Abilities);
+	void InitAbilityArray(const TArray<FUnitAbilityEntry>& Abilities);
 
-        void InitAbilityArray(const TArray<EAbilityID>& Abilities);
+	void InitAbilityArray(const TArray<EAbilityID>& Abilities);
 
-        TArray<FUnitAbilityEntry> GetUnitAbilityEntries();
+	TArray<FUnitAbilityEntry> GetUnitAbilityEntries();
 
-        TArray<EAbilityID> GetUnitAbilities();
+	TArray<EAbilityID> GetUnitAbilities();
 	/**
 	 * @brief Allows adding or removing abilities at runtime for the unit.
 	 * @param Abilities The new ability array for the unit.
 	 */
-        void SetUnitAbilitiesRunTime(const TArray<FUnitAbilityEntry>& Abilities);
+	void SetUnitAbilitiesRunTime(const TArray<FUnitAbilityEntry>& Abilities);
 
-        void SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities);
+	void SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities);
 
 	/**
 	 * 
@@ -326,8 +339,8 @@ public:
 	 * @param AtIndex Optional: provide a specific index to add the ability to.
 	 * @return Whether we could add the ability to an empty slot in the array. 
 	 */
-        bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE);
-        bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex = INDEX_NONE);
+	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE);
+	bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex = INDEX_NONE);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
 
@@ -337,8 +350,8 @@ public:
 	 * @param NewAbility The ability to swap in. 
 	 * @return Whether the swap was successful.
 	 */
-        bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
-        bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
+	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
+	bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
 
 
 	bool HasAbility(const EAbilityID AbilityToCheck);
@@ -379,7 +392,7 @@ public:
 		const bool bForceFinalRotationRegardlessOfReverse = false);
 
 	void SetForceFinalRotationRegardlessOfReverse(bool ForceUseFinalRotation);
-	
+
 	// On Arrow override this is set to true: KEEP final rotation Regardless of reversing.
 	// Legacy behavior (when set to false): ignore final rotation on reverse.
 	bool GetForceFinalRotationRegardlessOfReverse();
@@ -402,7 +415,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError CaptureActor(AActor* CaptureTarget, const bool bSetUnitToIdle);
-	
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError
+	ActivateBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bSetUnitToIdle);
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError AttackGround(
@@ -497,17 +514,17 @@ public:
 	virtual ECommandQueueError SwitchWeapons(const bool bSetUnitToIdle);
 
 
-        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-        virtual ECommandQueueError FireRockets(const bool bSetUnitToIdle);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError FireRockets(const bool bSetUnitToIdle);
 
-        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-        virtual ECommandQueueError CancelFireRockets(const bool bSetUnitToIdle);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError CancelFireRockets(const bool bSetUnitToIdle);
 
-        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-        virtual ECommandQueueError ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle);
 
-        UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-        virtual ECommandQueueError CancelThrowingGrenade(const bool bSetUnitToIdle);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError CancelThrowingGrenade(const bool bSetUnitToIdle);
 	/**
 	 * @brief Determines whether the provided command is in the command queue.
 	 * @param CommandToCheck The command to check for.
@@ -667,23 +684,24 @@ protected:
 	virtual void ExecuteBreakCover();
 	virtual void TerminateBreakCover();
 
-        virtual void ExecuteFireRockets();
-        virtual void TerminateFireRockets();
+	virtual void ExecuteFireRockets();
+	virtual void TerminateFireRockets();
 
-        virtual void ExecuteCancelFireRockets();
-        virtual void TerminateCancelFireRockets();
+	virtual void ExecuteCancelFireRockets();
+	virtual void TerminateCancelFireRockets();
 
-        /**
-         * @brief Executes the grenade throw ability for this squad.
-         * @param TargetLocation World target to throw the grenade towards.
-         */
-        virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation);
-        virtual void TerminateThrowGrenadeCommand();
-        virtual void ExecuteCancelThrowGrenadeCommand();
-        virtual void TerminateCancelThrowGrenadeCommand();
 
-        virtual void ExecuteRepairCommand(AActor* TargetActor);
-        virtual void TerminateRepairCommand();
+	/**
+	 * @brief Executes the grenade throw ability for this squad.
+	 * @param TargetLocation World target to throw the grenade towards.
+	 */
+	virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation);
+	virtual void TerminateThrowGrenadeCommand();
+	virtual void ExecuteCancelThrowGrenadeCommand();
+	virtual void TerminateCancelThrowGrenadeCommand();
+
+	virtual void ExecuteRepairCommand(AActor* TargetActor);
+	virtual void TerminateRepairCommand();
 
 	virtual void ExecuteReturnToBase();
 	virtual void TerminateReturnToBase();
@@ -735,5 +753,5 @@ private:
 	// Called on DoneExecutingCommand.
 	void TerminateCommand(EAbilityID AbilityToKill);
 
-        ECommandQueueError GetIsAbilityAllowedForUnit(const EAbilityID AbilityToCheck);
+	ECommandQueueError GetIsAbilityAllowedForUnit(const EAbilityID AbilityToCheck);
 };

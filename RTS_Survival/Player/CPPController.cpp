@@ -140,7 +140,7 @@ ACPPController::ACPPController()
 
 void ACPPController::InitPortrait(UW_Portrait* PortraitWidget) const
 {
-	if(not GetIsValidPlayerPortraitManager())
+	if (not GetIsValidPlayerPortraitManager())
 	{
 		return;
 	}
@@ -386,9 +386,9 @@ void ACPPController::PlayVoiceLine(const AActor* Unit, const ERTSVoiceLine Voice
 }
 
 void ACPPController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType VoiceLineType, const bool bQueueIfNotPlayed,
-                                            const bool bInterruptRegularVoiceLines) const 
+                                            const bool bInterruptRegularVoiceLines) const
 {
-	if(not GetIsValidPlayerAudioController())
+	if (not GetIsValidPlayerAudioController())
 	{
 		return;
 	}
@@ -403,7 +403,8 @@ UAudioComponent* ACPPController::PlaySpatialVoiceLine(const AActor* PrimarySelec
 	{
 		return nullptr;
 	}
-	return M_PlayerAudioController->PlaySpatialVoiceLine(PrimarySelectedUnit, VoiceLineType, Location, bIgnorePlayerCooldown);
+	return M_PlayerAudioController->PlaySpatialVoiceLine(PrimarySelectedUnit, VoiceLineType, Location,
+	                                                     bIgnorePlayerCooldown);
 }
 
 void ACPPController::MissionOnHqSpawned(const FUnitCost BonusPerResource)
@@ -1121,11 +1122,11 @@ void ACPPController::MoveCameraToControlGroup(const int32 GroupIndex)
 
 void ACPPController::OnActionButtonShortCut(const int32 Index)
 {
-	if (GetIsValidGameUIController())
+	if (not GetIsValidGameUIController())
 	{
-		EAbilityID Ability = M_GameUIController->GetActiveAbility(Index);
-		ActivateActionButton(Ability);
+		return;
 	}
+	ActivateActionButton(Index);
 }
 
 void ACPPController::SetModifierCameraMovementSpeed(const float NewSpeed)
@@ -2629,37 +2630,37 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 		OutCommand = ECommandType::MoveRallyPoint;
 		OutAbilityActivated = EAbilityID::IdGeneral_Confirm;
 		OrderUnitsToMoveRallyPoint(ClickedLocation);
-		
+
 	case ECommandType::CaptureActor:
-	{
-		// TargetUnion comes from the decoder; it should contain the capture target actor.
-		AActor* const CaptureTargetActor = Target.TargetActor;
-
-		// Only squads will actually execute the capture logic.
-		AmountCommandsExe += OrderUnitsCaptureActor(CaptureTargetActor);
-
-		if (AmountCommandsExe > 0)
 		{
-			// We successfully ordered at least one squad to capture.
-			OutAbilityActivated = EAbilityID::IdCapture;
-		}
-		else
-		{
-			// No squads were able to capture (e.g., none selected).
-			// Fallback: treat this as a normal move command to the click location.
-			bool bSuccessful = false;
-			const FVector NewClickedLocation = RTSFunctionLibrary::GetLocationProjected(
-				this,
-				NewClickedLocation,
-				true,
-				bSuccessful,
-				5);
+			// TargetUnion comes from the decoder; it should contain the capture target actor.
+			AActor* const CaptureTargetActor = Target.TargetActor;
 
-			AmountCommandsExe = MoveUnitsToLocation(NewClickedLocation);
-			OutAbilityActivated = EAbilityID::IdMove;
+			// Only squads will actually execute the capture logic.
+			AmountCommandsExe += OrderUnitsCaptureActor(CaptureTargetActor);
+
+			if (AmountCommandsExe > 0)
+			{
+				// We successfully ordered at least one squad to capture.
+				OutAbilityActivated = EAbilityID::IdCapture;
+			}
+			else
+			{
+				// No squads were able to capture (e.g., none selected).
+				// Fallback: treat this as a normal move command to the click location.
+				bool bSuccessful = false;
+				const FVector NewClickedLocation = RTSFunctionLibrary::GetLocationProjected(
+					this,
+					NewClickedLocation,
+					true,
+					bSuccessful,
+					5);
+
+				AmountCommandsExe = MoveUnitsToLocation(NewClickedLocation);
+				OutAbilityActivated = EAbilityID::IdMove;
+			}
+			break;
 		}
-		break;
-	}
 	default:
 		OutCommand = ECommandType::Movement;
 		OutAbilityActivated = EAbilityID::IdMove;
@@ -3121,14 +3122,16 @@ uint32 ACPPController::RotateUnitsToLocation(const FVector& RotateLocation)
 
 /*--------------------------------- ACTION BUTTON ---------------------------------*/
 
-void ACPPController::ActivateActionButton(const EAbilityID ActionButtonAbility)
+void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 {
-	if (ActionButtonAbility == EAbilityID::IdNoAbility)
+	const FUnitAbilityEntry ActiveAbilityEntry = M_GameUIController->GetActiveAbilityEntry(ActionButtonAbilityIndex);
+
+	if (ActiveAbilityEntry.AbilityId == EAbilityID::IdNoAbility)
 	{
 		return;
 	}
 	EnsureSelectionsAreRTSValid();
-	M_ActiveAbility = ActionButtonAbility;
+	M_ActiveAbility = ActiveAbilityEntry.AbilityId;
 	// switch to determine if ability needs to be executed immediately
 	switch (M_ActiveAbility)
 	{
@@ -3208,6 +3211,9 @@ void ACPPController::ActivateActionButton(const EAbilityID ActionButtonAbility)
 			RTSFunctionLibrary::PrintString("return to base");
 		}
 		this->DirectActionButtonReturnToBase();
+		break;
+	case EAbilityID::IdApplyBehaviour:
+		this->DirectActionButtonBehaviourAbility(static_cast<EBehaviourAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
 	case EAbilityID::IdExitCargo:
 		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
@@ -3693,6 +3699,30 @@ void ACPPController::DirectActionButtonBreakCover()
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdBreakCover),
 		                                false);
+	}
+}
+
+void ACPPController::DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type)
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExe = 0;
+	for (auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->ActivateBehaviourAbility(Type, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	for (auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExe += EachPawn->ActivateBehaviourAbility(Type, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	for (auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExe += EachActor->ActivateBehaviourAbility(Type, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	if(CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
+		                                false);
+		
 	}
 }
 
@@ -4188,10 +4218,10 @@ bool ACPPController::GetIsValidPlayerAudioController() const
 
 bool ACPPController::GetIsValidPlayerPortraitManager() const
 {
-	if(not IsValid(M_PlayerPortraitManager))
+	if (not IsValid(M_PlayerPortraitManager))
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerPortraitManager",
-	                                                      "GetIsValidPlayerPortraitManager", this);
+		                                                      "GetIsValidPlayerPortraitManager", this);
 		return false;
 	}
 	return true;
