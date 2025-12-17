@@ -4,6 +4,7 @@
 
 #include "Behaviour.h"
 #include "DrawDebugHelpers.h"
+#include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace BehaviourCompConstants
@@ -76,10 +77,12 @@ void UBehaviourComp::AddBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
 
 	if (TryHandleExistingBehaviour(NewBehaviour))
 	{
+		NotifyActionUIManagerOfBehaviourUpdate();
 		return;
 	}
 
 	AddInitialisedBehaviour(NewBehaviour);
+	NotifyActionUIManagerOfBehaviourUpdate();
 }
 
 void UBehaviourComp::RemoveBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
@@ -333,6 +336,7 @@ void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 	BehaviourInstance->OnRemoved();
 	BehaviourInstance->ConditionalBeginDestroy();
 	M_Behaviours.Remove(BehaviourInstance);
+	NotifyActionUIManagerOfBehaviourUpdate();
 }
 
 UBehaviour* UBehaviourComp::CreateBehaviourInstance(const TSubclassOf<UBehaviour>& BehaviourClass)
@@ -432,4 +436,40 @@ void UBehaviourComp::DebugDrawBehaviours(const float DurationSeconds) const
 	const FVector DebugLocation = OwnerActor->GetActorLocation() + FVector(
 		0.f, 0.f, BehaviourCompConstants::DebugDrawHeight);
 	DrawDebugString(World, DebugLocation, DebugString, nullptr, FColor::Green, DurationSeconds, true);
+}
+
+void UBehaviourComp::RegisterActionUIManager(UActionUIManager* ActionUIManager)
+{
+	M_ActionUIManager = ActionUIManager;
+	bM_HasActionUIManagerRegistration = ActionUIManager != nullptr;
+}
+
+void UBehaviourComp::NotifyActionUIManagerOfBehaviourUpdate()
+{
+	if (not bM_HasActionUIManagerRegistration)
+	{
+		return;
+	}
+
+	if (not GetIsValidActionUIManager())
+	{
+		return;
+	}
+
+	M_ActionUIManager->RefreshBehaviourUIForComponent(this);
+}
+
+bool UBehaviourComp::GetIsValidActionUIManager() const
+{
+	if (M_ActionUIManager.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_ActionUIManager",
+		"UBehaviourComp::GetIsValidActionUIManager",
+		GetOwner());
+	return false;
 }
