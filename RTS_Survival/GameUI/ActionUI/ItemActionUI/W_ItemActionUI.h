@@ -28,8 +28,10 @@ public:
 	 * @brief Sets this action UI item to use the new provided ability.
 	 * Will adjust slate in derived blueprint.
 	 * @param NewAbility The ability to use for this action UI item.
+	 * @param CoolDownRemaining
+	 * @param CooldownTotalDuration
 	 */
-        void UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType);
+        void UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CoolDownRemaining, const int32 CooldownTotalDuration);
 
 	void InitActionUIElement(
 		ACPPController* PlayerController,
@@ -39,9 +41,11 @@ protected:
 	/**
 	 * @brief Update the slate of this action UI button in blueprints.
 	 * @param NewAbility The ability to use.
+	 * @param CooldownRemaining
+	 * @param CooldownDuration
 	 */
 	UFUNCTION(BlueprintImplementableEvent, Category ="UpdateActionUI")
-        void OnUpdateActionUI(const EAbilityID NewAbility, const int32 CustomType);
+        void OnUpdateActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CooldownRemaining, const int32 CooldownDuration);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnActionUIClicked();

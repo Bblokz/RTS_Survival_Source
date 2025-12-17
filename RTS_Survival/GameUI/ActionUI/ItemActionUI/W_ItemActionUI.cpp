@@ -8,11 +8,11 @@
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 
-void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType)
+void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CoolDownRemaining, const int32 CooldownTotalDuration)
 {
 	M_Ability = NewAbility;
 	M_CustomType = CustomType;
-	OnUpdateActionUI(NewAbility, CustomType);
+	OnUpdateActionUI(NewAbility, CustomType, CoolDownRemaining, CooldownTotalDuration);
 }
 
 void UW_ItemActionUI::InitActionUIElement(

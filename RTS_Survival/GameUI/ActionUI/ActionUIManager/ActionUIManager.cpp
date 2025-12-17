@@ -592,7 +592,7 @@ bool UActionUIManager::UpdateAbilitiesUI(const TArray<FUnitAbilityEntry>& InAbil
 		if (GetIndexInAbilityItemRange(ElmInit) && IsValid(M_TActionUI_Items[ElmInit]))
 		{
 			// Update item with ability.
-			M_TActionUI_Items[ElmInit]->UpdateItemActionUI(AbilityEntry.AbilityId, AbilityEntry.CustomType);
+			M_TActionUI_Items[ElmInit]->UpdateItemActionUI(AbilityEntry.AbilityId, AbilityEntry.CustomType, AbilityEntry.CooldownRemaining, AbilityEntry.CooldownDuration);
 			ElmInit++;
 		}
 		else
