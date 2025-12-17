@@ -33,6 +33,7 @@ struct FWeaponData;
 class UCanvasPanel;
 class UMainGameUI;
 class UW_WeaponItem;
+class UBehaviourComp;
 
 UCLASS()
 class RTS_SURVIVAL_API UActionUIManager : public UObject
@@ -61,6 +62,7 @@ public:
 	void OnShellTypeSelected(const EWeaponShellType SelectedShellType) const;
 
 	void RequestUpdateAbilityUIForPrimary(ICommands* RequestingUnit);
+	void RefreshBehaviourUIForComponent(UBehaviourComp* BehaviourComponent);
 
 	/** @brief Changes the visiblity of all the weapon UI elements depending on the provided
 	 * visibilty setting.
@@ -200,7 +202,7 @@ private:
 
         void SetAmmoPickerVisiblity(const bool bVisible) const;
 
-        void SetupBehaviourUIForSelectedActor(AActor* SelectedActor) const;
+        void SetupBehaviourUIForSelectedActor(AActor* SelectedActor);
 
         TArray<UWeaponState*> GetWeaponsOfSquad(ASquadController* SquadController) const;
 
@@ -215,4 +217,7 @@ private:
 	bool GetIsCurrentPrimarySelectedValid()const;
 
 	void InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* PlayerController, const FInit_BehaviourUI& BehaviourUIWidgets);
+
+	UPROPERTY()
+	TWeakObjectPtr<UBehaviourComp> M_SelectedBehaviourComponent;
 };

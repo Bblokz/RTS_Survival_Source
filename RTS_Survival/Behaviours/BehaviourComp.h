@@ -8,6 +8,7 @@
 #include "BehaviourComp.generated.h"
 
 class UBehaviour;
+class UActionUIManager;
 
 /**
  * @brief Component that owns and manages lifecycle of behaviours.
@@ -53,6 +54,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	TArray<UBehaviour*> GetBehaviours() const { return M_Behaviours; }
+
+	void RegisterActionUIManager(UActionUIManager* ActionUIManager);
 
 protected:
 	virtual void BeginPlay() override;
@@ -158,6 +161,9 @@ private:
 	 */
 	void ClearAllBehaviours();
 
+	void NotifyActionUIManagerOfBehaviourUpdate();
+	bool GetIsValidActionUIManager() const;
+
 	UPROPERTY()
 	TArray<TObjectPtr<UBehaviour>> M_Behaviours;
 
@@ -174,4 +180,9 @@ private:
 	TArray<TSubclassOf<UBehaviour>> M_PendingSwapAdd;
 
 	bool bM_IsTickingBehaviours = false;
+
+	UPROPERTY()
+	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
+
+	bool bM_HasActionUIManagerRegistration = false;
 };
