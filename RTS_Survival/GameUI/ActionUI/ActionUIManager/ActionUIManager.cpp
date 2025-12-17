@@ -663,8 +663,25 @@ void UActionUIManager::InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* 
 	SetBehaviourDescriptionVisibility(false);
 }
 
-void UActionUIManager::SetupBehaviourUIForSelectedActor(AActor* SelectedActor) const
+void UActionUIManager::RefreshBehaviourUIForComponent(UBehaviourComp* BehaviourComponent)
 {
+	if (BehaviourComponent == nullptr)
+	{
+		return;
+	}
+
+	SetupBehaviourUIForSelectedActor(BehaviourComponent->GetOwner());
+}
+
+void UActionUIManager::SetupBehaviourUIForSelectedActor(AActor* SelectedActor)
+{
+	UBehaviourComp* PreviousBehaviourComponent = M_SelectedBehaviourComponent.Get();
+	if (PreviousBehaviourComponent != nullptr)
+	{
+		PreviousBehaviourComponent->RegisterActionUIManager(nullptr);
+		M_SelectedBehaviourComponent.Reset();
+	}
+
 	if (not GetIsValidBehaviourContainer())
 	{
 		return;
@@ -676,5 +693,13 @@ void UActionUIManager::SetupBehaviourUIForSelectedActor(AActor* SelectedActor) c
 		BehaviourComponent = SelectedActor->FindComponentByClass<UBehaviourComp>();
 	}
 
+	if (BehaviourComponent == nullptr)
+	{
+		BehaviourContainer->SetupBehaviourContainerForSelectedUnit(nullptr);
+		return;
+	}
+
+	M_SelectedBehaviourComponent = BehaviourComponent;
+	BehaviourComponent->RegisterActionUIManager(this);
 	BehaviourContainer->SetupBehaviourContainerForSelectedUnit(BehaviourComponent);
 }
