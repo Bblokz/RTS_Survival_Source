@@ -11,5 +11,7 @@ enum class EBehaviourAbilityType : uint8
 	// Which is the implementation for the sprint ability.
 	DefaultSprint,
 	WeakSpotAim,
+	VultureRapidFire,
+	EnhancedShells,
 	
 };
