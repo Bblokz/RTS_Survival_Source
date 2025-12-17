@@ -32,6 +32,7 @@ void FRTS_CollisionSetup::SetupPlayerVehicleMovementMeshCollision(UMeshComponent
 	{
 		MovementMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		MovementMesh->SetGenerateOverlapEvents(true);
+		MovementMesh->SetCanEverAffectNavigation(false);
 		MovementMesh->SetReceivesDecals(false);
 		MovementMesh->SetSimulatePhysics(true);
 		// for possible collisions with other tanks of the player.
@@ -70,6 +71,7 @@ void FRTS_CollisionSetup::SetupNomadicMvtPlayer(UMeshComponent* MovementMesh)
 		MovementMesh->ComponentTags.Add(FName("NomadicVehicleMovementMesh"));
 		MovementMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		MovementMesh->SetReceivesDecals(false);
+		MovementMesh->SetCanEverAffectNavigation(false);
 		MovementMesh->SetGenerateOverlapEvents(true);
 		MovementMesh->SetSimulatePhysics(true);
 		// for possible collisions with other tanks of the player.
@@ -112,6 +114,7 @@ void FRTS_CollisionSetup::SetupNomadicMvtEnemy(UMeshComponent* MovementMesh)
 		MovementMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		MovementMesh->SetGenerateOverlapEvents(true);
 		MovementMesh->SetReceivesDecals(false);
+		MovementMesh->SetCanEverAffectNavigation(false);
 		// for possible collisions with other tanks of the player.
 		MovementMesh->SetCollisionObjectType(COLLISION_OBJ_ENEMY);
 		MovementMesh->SetCollisionResponseToAllChannels(ECR_Block);
@@ -172,6 +175,7 @@ void FRTS_CollisionSetup::SetupEnemyVehicleMovementMeshCollision(UMeshComponent*
 		MovementMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		MovementMesh->SetGenerateOverlapEvents(true);
 		MovementMesh->SetReceivesDecals(false);
+		MovementMesh->SetCanEverAffectNavigation(false);
 		// for possible collisions with other tanks of the player.
 		MovementMesh->SetCollisionObjectType(COLLISION_OBJ_ENEMY);
 		MovementMesh->SetCollisionResponseToAllChannels(ECR_Block);

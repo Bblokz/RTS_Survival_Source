@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "ApplyBehaviourAbilityComponent.generated.h"
 
+class ASquadController;
 class UBehaviour;
 class ICommands;
 class UBehaviourComp;
@@ -66,6 +67,10 @@ private:
 
 	FString GetDebugName() const;
 	void BeginPlay_CheckSettings() const;
+
 	void BeginPlay_AddAbility();
+	void AddAbilityToSquad(ASquadController* Squad);
+	void AddAbilityToCommands();
+	
 
 };

@@ -861,6 +861,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	WeaponDataToUpgrade->ReloadSpeed -= CurrentBehaviourAttributes.ReloadSpeed;
 	WeaponDataToUpgrade->Accuracy -= CurrentBehaviourAttributes.Accuracy;
 	WeaponDataToUpgrade->MagCapacity -= CurrentBehaviourAttributes.MagSize;
+	WeaponDataToUpgrade->BaseCooldown -= CurrentBehaviourAttributes.BaseCooldown;
 
 	if (bAddUpgrade)
 	{
@@ -869,6 +870,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 		CurrentBehaviourAttributes.ReloadSpeed += BehaviourWeaponAttributes.ReloadSpeed;
 		CurrentBehaviourAttributes.Accuracy += BehaviourWeaponAttributes.Accuracy;
 		CurrentBehaviourAttributes.MagSize += BehaviourWeaponAttributes.MagSize;
+		CurrentBehaviourAttributes.BaseCooldown += BehaviourWeaponAttributes.BaseCooldown;
 	}
 	else
 	{
@@ -877,6 +879,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 		CurrentBehaviourAttributes.ReloadSpeed -= BehaviourWeaponAttributes.ReloadSpeed;
 		CurrentBehaviourAttributes.Accuracy -= BehaviourWeaponAttributes.Accuracy;
 		CurrentBehaviourAttributes.MagSize -= BehaviourWeaponAttributes.MagSize;
+		CurrentBehaviourAttributes.BaseCooldown -= BehaviourWeaponAttributes.BaseCooldown;
 	}
 
 	WeaponDataToUpgrade->BaseDamage += CurrentBehaviourAttributes.Damage;
@@ -884,6 +887,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	WeaponDataToUpgrade->ReloadSpeed += CurrentBehaviourAttributes.ReloadSpeed;
 	WeaponDataToUpgrade->Accuracy += CurrentBehaviourAttributes.Accuracy;
 	WeaponDataToUpgrade->MagCapacity += CurrentBehaviourAttributes.MagSize;
+	WeaponDataToUpgrade->BaseCooldown += CurrentBehaviourAttributes.BaseCooldown;
 }
 
 FWeaponData UWeaponState::GetWeaponDataAdjustedForShellType() const
