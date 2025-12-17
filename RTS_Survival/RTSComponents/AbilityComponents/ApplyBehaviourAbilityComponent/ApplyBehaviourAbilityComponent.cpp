@@ -5,6 +5,7 @@
 
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
@@ -105,7 +106,7 @@ void UApplyBehaviourAbilityComponent::BeginPlay_CheckSettings() const
 	}
 }
 
-void UApplyBehaviourAbilityComponent::BeginPlay_AddAbility()
+void UApplyBehaviourAbilityComponent::AddAbilityToCommands()
 {
 	if (not GetIsValidOwnerCommandsInterface())
 	{
@@ -116,4 +117,33 @@ void UApplyBehaviourAbilityComponent::BeginPlay_AddAbility()
 	NewAbility.CooldownDuration = BehaviourAbilitySettings.Cooldown;
 	NewAbility.CustomType = static_cast<int32>(BehaviourAbilitySettings.BehaviourAbility);
 	M_OwnerCommandsInterface->AddAbility(NewAbility, BehaviourAbilitySettings.PreferredAbilityIndex);
+}
+
+void UApplyBehaviourAbilityComponent::BeginPlay_AddAbility()
+{
+	if (not GetOwner())
+	{
+		return;
+	}
+	ASquadController* SquadController = Cast<ASquadController>(GetOwner());
+	if (SquadController)
+	{
+		AddAbilityToSquad(SquadController);
+		return;
+	}
+	AddAbilityToCommands();
+}
+
+void UApplyBehaviourAbilityComponent::AddAbilityToSquad(ASquadController* Squad)
+{
+	TWeakObjectPtr<UApplyBehaviourAbilityComponent> WeakThis(this);
+	auto ApplyLambda = [WeakThis]() -> void
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->AddAbilityToCommands();
+	};
+	Squad->SquadDataCallbacks.CallbackOnSquadDataLoaded(ApplyLambda, WeakThis);
 }

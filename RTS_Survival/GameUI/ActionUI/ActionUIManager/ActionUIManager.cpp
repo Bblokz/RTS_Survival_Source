@@ -290,6 +290,7 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 	}
 	TArray<UWeaponState*> Weapons;
 	M_LastSelectedActor = SelectedActor;
+	SetupBehaviourUIForSelectedActor(SelectedActor);
 	if (const AAircraftMaster* Aircraft = Cast<AAircraftMaster>(SelectedActor); IsValid(Aircraft))
 	{
 		UBombComponent* BombComp = nullptr;

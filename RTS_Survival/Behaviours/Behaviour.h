@@ -84,6 +84,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour")
 	float M_LifeTimeDuration = 0.f;
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Design")
+	void BP_OnAdded();
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Design")
+	void BP_OnRemoved();
+
 private:
 	UPROPERTY()
 	TWeakObjectPtr<UBehaviourComp> M_OwningComponent;

@@ -87,14 +87,22 @@ bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 A
 	}
 	if (GetAbilityIndexById(NewAbility.AbilityId) != INDEX_NONE)
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(
-				NewAbility.AbilityId) +
-			TEXT(" in UCommandData::AddAbility"));
-		return false;
+		if (FUnitAbilityEntry* Entry = GetAbilityEntry(NewAbility.AbilityId); Entry && Entry->CustomType == NewAbility.
+			CustomType)
+		{
+			const FString CustomTypeAsBehaviourAbilityString =
+				UEnum::GetValueAsString(static_cast<EBehaviourAbilityType>(NewAbility.CustomType));
+			RTSFunctionLibrary::ReportError(
+				TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(
+					NewAbility.AbilityId) +
+				TEXT(" in UCommandData::AddAbility") +
+				"Custom type: " + FString::FromInt(NewAbility.CustomType)
+				+ "\n As behaviour custom type: " + CustomTypeAsBehaviourAbilityString);
+			return false;
+		}
 	}
 
-	if (AtIndex == INDEX_NONE)
+	if (AtIndex == INDEX_NONE || AtIndex < 0)
 	{
 		for (int32 i = 0; i < M_Abilities.Num(); i++)
 		{
@@ -984,7 +992,8 @@ ECommandQueueError ICommands::CaptureActor(AActor* CaptureTarget, const bool bSe
 	return Error;
 }
 
-ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bSetUnitToIdle)
+ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityType BehaviourAbility,
+                                                       const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))

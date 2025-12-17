@@ -652,7 +652,7 @@ bool AGameUIController::GetIsValidMainGameUI()
 		M_MainGameUI = M_PlayerController->GetMainMenuUI();
 		return true;
 	}
-	RTSFunctionLibrary::ReportError("Player controller or MainGameUI is null for AACtionUIController"
+	RTSFunctionLibrary::ReportError("Player controller or MainGameUI is null for AGameUIController"
 		"\n @function: GetISValidMainGameUI");
 	return false;
 }
@@ -1111,7 +1111,7 @@ FUnitAbilityEntry AGameUIController::GetActiveAbilityEntry(const int ButtonIndex
 		                                ? M_currentGameUIState.PrimarySelectedUnit->GetName()
 		                                : "No Primary Unit";
 	RTSFunctionLibrary::ReportError("Attempted to get ActiveAbility with invlid index."
-		"\n see AActionUIController::GetActiveAbility"
+		"\n see AGameUIController::GetActiveAbility"
 		"\n Primary Unit: " + PrimaryUnitName);
 	return FUnitAbilityEntry();
 }
