@@ -3,7 +3,6 @@
 #include "BehaviourTurretRotation.h"
 
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 namespace TurretRotationBehaviourConstants
@@ -146,8 +145,7 @@ bool UTurretRotationBehaviour::GetIsValidTankMaster() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 		this,
 		TEXT("M_TankMaster"),
-		TEXT("GetIsValidTankMaster"),
-		this
+		TEXT("GetIsValidTankMaster")
 	);
 
 	return false;

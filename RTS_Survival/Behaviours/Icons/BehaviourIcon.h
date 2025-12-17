@@ -12,6 +12,10 @@ enum class EBehaviourIcon : uint8
 	None,
 	RifleAccuracy,
 	LifeRegen,
-	ArmorPiercingBoost,
+	AimForWeakSpots,
 	InCoverResistanceBoost,
+	JagerSprint,
+	VultureRapidFire,
+	ExplosiveShells,
+	VultureSniperDamage,
 };

@@ -307,7 +307,7 @@ bool UCommandData::GetIsQueueFull() const
 bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility)
 {
 	const TArray<EAbilityID> UnitAbilities = GetAbilityIds();
-	if (not UnitAbilities.Contains(QueuedAbility))
+	if (not UnitAbilities.Contains(QueuedAbility.CommandType))
 	{
 		if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 		{

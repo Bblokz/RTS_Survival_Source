@@ -10,9 +10,9 @@
 
 void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType)
 {
-        M_Ability = NewAbility;
-        M_CustomType = CustomType;
-        OnUpdateActionUI(NewAbility, CustomType);
+	M_Ability = NewAbility;
+	M_CustomType = CustomType;
+	OnUpdateActionUI(NewAbility, CustomType);
 }
 
 void UW_ItemActionUI::InitActionUIElement(
@@ -26,18 +26,18 @@ void UW_ItemActionUI::InitActionUIElement(
 
 void UW_ItemActionUI::OnActionUIClicked()
 {
-        if(GetIsValidPlayerController())
-        {
-                M_PlayerController->ActivateActionButton(M_Ability);
-        }
+	if (GetIsValidPlayerController())
+	{
+		M_PlayerController->ActivateActionButton(M_Index);
+	}
 }
 
 void UW_ItemActionUI::OnActionUIHover(const bool bIsHover) const
 {
-	if(GetIsValidActionUIManager())
+	if (GetIsValidActionUIManager())
 	{
 		M_ActionUIManager->OnHoverActionUIItem(bIsHover);
-	}	
+	}
 }
 
 bool UW_ItemActionUI::GetIsValidPlayerController()
@@ -64,7 +64,7 @@ bool UW_ItemActionUI::GetIsValidPlayerController()
 
 bool UW_ItemActionUI::GetIsValidActionUIManager() const
 {
-	if(not IsValid(M_ActionUIManager))
+	if (not IsValid(M_ActionUIManager))
 	{
 		RTSFunctionLibrary::ReportError("Action UI Manager reference invalid in UW_ItemActionUI");
 		return false;
@@ -85,7 +85,7 @@ void UW_ItemActionUI::UpdateButtonWithGlobalSlateStyle()
 	else
 	{
 		RTSFunctionLibrary::ReportError("ButtonStyle null."
-	"\n at widget: " + GetName() +
-	"\n Forgot to set style reference in UW_ItemActionUI::UpdateButtonWithGlobalSlateStyle?");
+			"\n at widget: " + GetName() +
+			"\n Forgot to set style reference in UW_ItemActionUI::UpdateButtonWithGlobalSlateStyle?");
 	}
 }

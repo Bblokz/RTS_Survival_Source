@@ -46,7 +46,9 @@ void UApplyBehaviourAbilityComponent::PostInitProperties()
 		M_OwnerCommandsInterface.SetInterface(CommandsInterface);
 		M_OwnerCommandsInterface.SetObject(GetOwner());
 	}
-	M_OwnerBehaviourComponent = GetOwner()->GetComponentByClass(UBehaviourComp::StaticClass());
+	M_OwnerBehaviourComponent = Cast<UBehaviourComp>(
+		GetOwner()->GetComponentByClass(UBehaviourComp::StaticClass())
+	);
 }
 
 
