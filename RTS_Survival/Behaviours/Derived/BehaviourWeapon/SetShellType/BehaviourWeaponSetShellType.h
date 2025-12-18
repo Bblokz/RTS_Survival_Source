@@ -21,6 +21,9 @@ class RTS_SURVIVAL_API UBehaviourWeaponSetShellType : public UBehaviourWeapon
 public:
 	UBehaviourWeaponSetShellType();
 
+	virtual void OnAdded(AActor* BehaviourOwner) override;
+	virtual void OnRemoved(AActor* BehaviourOwner) override;
+
 protected:
 	virtual void ApplyBehaviourToWeapon(UWeaponState* WeaponState) override;
 	virtual void RemoveBehaviourFromWeapon(UWeaponState* WeaponState) override;

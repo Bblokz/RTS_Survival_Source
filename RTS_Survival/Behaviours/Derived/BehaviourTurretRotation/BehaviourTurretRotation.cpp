@@ -16,18 +16,22 @@ UTurretRotationBehaviour::UTurretRotationBehaviour()
 	M_MaxStackCount = TurretRotationBehaviourConstants::DefaultTurretRotationStackCount;
 }
 
-void UTurretRotationBehaviour::OnAdded()
+void UTurretRotationBehaviour::OnAdded(AActor* BehaviourOwner)
 {
 	bM_IsBehaviourActive = true;
 	ApplyBehaviourToTurrets();
+	// Make sure to call the bp event.
+	Super::OnAdded(BehaviourOwner);
 }
 
-void UTurretRotationBehaviour::OnRemoved()
+void UTurretRotationBehaviour::OnRemoved(AActor* BehaviourOwner)
 {
 	RemoveBehaviourFromTurrets();
 	ClearTrackedTurrets();
 	bM_HasAppliedRotationAtLeastOnce = false;
 	bM_IsBehaviourActive = false;
+	// Make sure to call the bp event.
+	Super::OnRemoved(BehaviourOwner);
 }
 
 void UTurretRotationBehaviour::OnStack(UBehaviour* StackedBehaviour)

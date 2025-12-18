@@ -84,8 +84,8 @@ public:
         UBehaviourWeapon();
 
 protected:
-        virtual void OnAdded() override;
-        virtual void OnRemoved() override;
+        virtual void OnAdded(AActor* BehaviourOwner) override;
+        virtual void OnRemoved(AActor* BehaviourOwner) override;
         virtual void OnStack(UBehaviour* StackedBehaviour) override;
 
         /** @brief Determine whether this behaviour should be applied to the provided weapon. */

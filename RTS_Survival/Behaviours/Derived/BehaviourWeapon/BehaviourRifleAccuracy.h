@@ -19,6 +19,7 @@ class RTS_SURVIVAL_API UBehaviourRifleAccuracy : public UBehaviourWeapon
 public:
         UBehaviourRifleAccuracy();
 
+
 protected:
         virtual bool CheckRequirement(UWeaponState* WeaponState) const override;
 };

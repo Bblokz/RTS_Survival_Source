@@ -25,8 +25,8 @@ class RTS_SURVIVAL_API UBehaviour : public UObject
 public:
 	UBehaviour();
 
-	virtual void OnAdded();
-	virtual void OnRemoved();
+	virtual void OnAdded(AActor* BehaviourOwner);
+	virtual void OnRemoved(AActor* BehaviourOwner);
 	virtual void OnTick(const float DeltaTime);
 	virtual void OnStack(UBehaviour* StackedBehaviour);
 
@@ -85,10 +85,10 @@ protected:
 	float M_LifeTimeDuration = 0.f;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Design")
-	void BP_OnAdded();
+	void BP_OnAdded(AActor* BehaviourOwner);
 	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Design")
-	void BP_OnRemoved();
+	void BP_OnRemoved(AActor* BehaviourOwner);
 
 private:
 	UPROPERTY()

@@ -9,12 +9,14 @@ UBehaviour::UBehaviour()
 	RefreshLifetime();
 }
 
-void UBehaviour::OnAdded()
+void UBehaviour::OnAdded(AActor* BehaviourOwner)
 {
+	BP_OnAdded(BehaviourOwner);
 }
 
-void UBehaviour::OnRemoved()
+void UBehaviour::OnRemoved(AActor* BehaviourOwner)
 {
+	BP_OnRemoved(BehaviourOwner);
 }
 
 void UBehaviour::OnTick(const float DeltaTime)

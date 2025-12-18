@@ -22,8 +22,8 @@ public:
 	UTurretRotationBehaviour();
 
 protected:
-	virtual void OnAdded() override;
-	virtual void OnRemoved() override;
+	virtual void OnAdded(AActor* BehaviourOwner) override;
+	virtual void OnRemoved(AActor* BehaviourOwner) override;
 	virtual void OnStack(UBehaviour* StackedBehaviour) override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour|TurretRotation", meta = (AllowPrivateAccess = "true"))

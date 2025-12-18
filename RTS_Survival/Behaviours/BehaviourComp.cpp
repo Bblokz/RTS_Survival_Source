@@ -296,7 +296,7 @@ void UBehaviourComp::AddInitialisedBehaviour(UBehaviour* NewBehaviour)
 {
 	NewBehaviour->InitializeBehaviour(this);
 	M_Behaviours.Add(NewBehaviour);
-	NewBehaviour->OnAdded();
+	NewBehaviour->OnAdded(GetOwner());
 	UpdateComponentTickEnabled();
 }
 
@@ -333,7 +333,7 @@ void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 		return;
 	}
 
-	BehaviourInstance->OnRemoved();
+	BehaviourInstance->OnRemoved(GetOwner());
 	BehaviourInstance->ConditionalBeginDestroy();
 	M_Behaviours.Remove(BehaviourInstance);
 	NotifyActionUIManagerOfBehaviourUpdate();
@@ -365,7 +365,7 @@ void UBehaviourComp::ClearAllBehaviours()
 			continue;
 		}
 
-		Behaviour->OnRemoved();
+		Behaviour->OnRemoved(GetOwner());
 		Behaviour->ConditionalBeginDestroy();
 	}
 

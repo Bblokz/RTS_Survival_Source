@@ -46,12 +46,19 @@ void UBehaviourWeaponShellTypeConditional::RemoveBehaviourFromWeapon(UWeaponStat
         ActiveWeapons.Remove(WeaponPtr);
 }
 
-void UBehaviourWeaponShellTypeConditional::OnRemoved()
+void UBehaviourWeaponShellTypeConditional::OnRemoved(AActor* BehaviourOwner)
 {
         UnregisterAllShellTypeDelegates();
         ActiveWeapons.Empty();
 
-        Super::OnRemoved();
+        // make sure to call bp event.
+        Super::OnRemoved(BehaviourOwner);
+}
+
+void UBehaviourWeaponShellTypeConditional::OnAdded(AActor* BehaviourOwner)
+{
+        // make sure to call bp event.
+        Super::OnAdded(BehaviourOwner);
 }
 
 bool UBehaviourWeaponShellTypeConditional::DoesShellTypeAllowBehaviour(const EWeaponShellType ShellType) const

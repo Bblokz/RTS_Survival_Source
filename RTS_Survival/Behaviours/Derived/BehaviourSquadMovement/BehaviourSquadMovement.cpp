@@ -18,18 +18,22 @@ UBehaviourSquadMovement::UBehaviourSquadMovement()
         M_MaxStackCount = BehaviourSquadMovementConstants::DefaultMovementStackCount;
 }
 
-void UBehaviourSquadMovement::OnAdded()
+void UBehaviourSquadMovement::OnAdded(AActor* BehaviourOwner)
 {
         bM_IsBehaviourActive = true;
         SetupInitializationForOwner();
+        // Make sure to call the bp event.
+        Super::OnAdded(BehaviourOwner);
 }
 
-void UBehaviourSquadMovement::OnRemoved()
+void UBehaviourSquadMovement::OnRemoved(AActor* BehaviourOwner)
 {
         RemoveBehaviourFromSquadUnits();
         ClearTrackedUnits();
         bM_HasAppliedMovementAtLeastOnce = false;
         bM_IsBehaviourActive = false;
+        // Make sure to call the bp event.
+        Super::OnRemoved(BehaviourOwner);
 }
 
 void UBehaviourSquadMovement::OnStack(UBehaviour* StackedBehaviour)

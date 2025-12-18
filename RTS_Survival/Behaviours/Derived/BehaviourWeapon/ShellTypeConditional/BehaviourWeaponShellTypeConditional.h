@@ -44,7 +44,8 @@ public:
 protected:
         virtual void ApplyBehaviourToWeapon(UWeaponState* WeaponState) override;
         virtual void RemoveBehaviourFromWeapon(UWeaponState* WeaponState) override;
-        virtual void OnRemoved() override;
+        virtual void OnRemoved(AActor* BehaviourOwner) override;
+        virtual void OnAdded(AActor* BehaviourOwner) override;
 
         /** Shell types for which this behaviour will apply its modifiers */
         UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Behaviour|ShellType")

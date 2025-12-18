@@ -9,6 +9,18 @@ UBehaviourWeaponSetShellType::UBehaviourWeaponSetShellType()
 	BehaviourStackRule = EBehaviourStackRule::Exclusive;
 }
 
+void UBehaviourWeaponSetShellType::OnAdded(AActor* BehaviourOwner)
+{
+	// Make sure to call the bp event.
+	Super::OnAdded(BehaviourOwner);
+}
+
+void UBehaviourWeaponSetShellType::OnRemoved(AActor* BehaviourOwner)
+{
+	// Make sure to call the bp event.
+	Super::OnRemoved(BehaviourOwner);
+}
+
 void UBehaviourWeaponSetShellType::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
 {
 	if (WeaponState == nullptr)
