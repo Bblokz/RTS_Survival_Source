@@ -774,7 +774,7 @@ void UCommandData::ExecuteModeAbility(const EModeAbilityType ModeAbility) const
 		return;
 	}
 
-	const UModeAbilityComponent* Comp = FAbilityHelpers::GetModeAbilityCompOfType(
+	UModeAbilityComponent* Comp = FAbilityHelpers::GetModeAbilityCompOfType(
 		ModeAbility, M_Owner->GetOwnerActor());
 	if (not IsValid(Comp))
 	{
@@ -792,7 +792,7 @@ void UCommandData::ExecuteDisableModeAbility(const EModeAbilityType ModeAbility)
 		return;
 	}
 
-	const UModeAbilityComponent* Comp = FAbilityHelpers::GetModeAbilityCompOfType(
+	UModeAbilityComponent* Comp = FAbilityHelpers::GetModeAbilityCompOfType(
 		ModeAbility, M_Owner->GetOwnerActor());
 	if (not IsValid(Comp))
 	{
@@ -1111,6 +1111,7 @@ ECommandQueueError ICommands::ActivateModeAbility(const EModeAbilityType ModeAbi
 		return ECommandQueueError::AbilityNotAllowed;
 	}
 
+	// Not allowed because the unit can only deactivate the mode now.
 	if (ModeAbilityEntry.AbilityId != EAbilityID::IdActivateMode)
 	{
 		return ECommandQueueError::AbilityNotAllowed;

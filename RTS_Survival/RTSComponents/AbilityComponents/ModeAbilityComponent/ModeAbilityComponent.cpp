@@ -121,7 +121,7 @@ bool UModeAbilityComponent::GetIsValidOwnerCommandsInterface() const
 		this,
 		"M_OwnerCommandsInterface",
 		"GetIsValidOwnerCommandsInterface",
-		this
+	GetOwner()	
 	);
 	return false;
 }
@@ -289,11 +289,6 @@ FString UModeAbilityComponent::GetDebugName() const
 void UModeAbilityComponent::NotifyDoneExecuting(const EAbilityID AbilityId) const
 {
 	if (not GetIsValidOwnerCommandsInterface())
-	{
-		return;
-	}
-
-	if (M_OwnerCommandsInterface->GetActiveCommandID() != AbilityId)
 	{
 		return;
 	}
