@@ -2,6 +2,7 @@
 
 #include "Components/WidgetComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/AnimatedTextSettings/AnimatedTextSettings.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextPoolActor/AnimatedTextPoolActor.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -159,7 +160,7 @@ void UAnimatedTextWidgetPoolManager::Tick(const float DeltaTime)
 			const bool bStillActive = AnimateInstance(Instance, Now);
 			if (not bStillActive)
 			{
-				ResetInstance(Instance);
+				ResetInstance(Pool, Instance);
 
 				// Move index from Active -> Free
 				Pool.ActiveList.RemoveAtSwap(a, 1, EAllowShrinking::No);
@@ -257,7 +258,9 @@ void UAnimatedTextWidgetPoolManager::Init_SpawnPool(FAnimatedTextPool& Pool, con
 		NewInst.Component = Comp;
 		NewInst.Widget = WidgetTyped;
 		NewInst.bActive = false;
+		NewInst.bAttachedToActor = false;
 		NewInst.StartWorldLocation = FVector::ZeroVector;
+		NewInst.AttachOffset = FVector::ZeroVector;
 		NewInst.ActivatedAtSeconds = -1.0f;
 
 		Pool.Instances[i] = NewInst;
@@ -295,6 +298,11 @@ bool UAnimatedTextWidgetPoolManager::AnimateInstance(FAnimatedTextInstance& Inst
 		return false;
 	}
 
+	if (Instance.bAttachedToActor && not Instance.AttachedActor.IsValid())
+	{
+		return false;
+	}
+
 	const float Elapsed = NowSeconds - Instance.StartT;
 
 	// Opacity: visible until VisibleEndT, then linear fade until FadeEndT
@@ -320,12 +328,20 @@ bool UAnimatedTextWidgetPoolManager::AnimateInstance(FAnimatedTextInstance& Inst
 	return (NowSeconds < Instance.FadeEndT);
 }
 
-void UAnimatedTextWidgetPoolManager::ResetInstance(FAnimatedTextInstance& Instance) const
+void UAnimatedTextWidgetPoolManager::ResetInstance(FAnimatedTextPool& Pool, FAnimatedTextInstance& Instance) const
 {
 	if (IsValid(Instance.Component))
 	{
 		Instance.Component->SetVisibility(false, true);
 		Instance.Component->SetHiddenInGame(true);
+
+		USceneComponent* OwnerRoot = IsValid(Pool.OwnerActor) ? Pool.OwnerActor->GetRootComponent() : nullptr;
+		if (IsValid(OwnerRoot))
+		{
+			Instance.Component->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+			Instance.Component->AttachToComponent(OwnerRoot, FAttachmentTransformRules::KeepRelativeTransform);
+			Instance.Component->SetRelativeLocation(FVector::ZeroVector);
+		}
 	}
 
 	if (IsValid(Instance.Widget))
@@ -333,6 +349,11 @@ void UAnimatedTextWidgetPoolManager::ResetInstance(FAnimatedTextInstance& Instan
 		Instance.Widget->SetDormant(true);
 	}
 
+	Instance.AttachedActor.Reset();
+	Instance.AttachOffset = FVector::ZeroVector;
+	Instance.bAttachedToActor = false;
+	Instance.LastAppliedZ = 0.0f;
+	Instance.StartWorldLocation = FVector::ZeroVector;
 	Instance.bActive = false;
 	Instance.ActivatedAtSeconds = -1.0f;
 }
@@ -369,7 +390,9 @@ bool UAnimatedTextWidgetPoolManager::ShowAnimatedTextInPool(FAnimatedTextPool& P
                                                             const bool bInAutoWrap,
                                                             const float InWrapAt,
                                                             const TEnumAsByte<ETextJustify::Type> InJustification,
-                                                            const FRTSVerticalAnimTextSettings& InSettings)
+                                                            const FRTSVerticalAnimTextSettings& InSettings,
+                                                            AActor* InAttachActor,
+                                                            const FVector& InAttachOffset)
 {
 	if (Pool.Instances.Num() <= 0)
 	{
@@ -404,7 +427,7 @@ bool UAnimatedTextWidgetPoolManager::ShowAnimatedTextInPool(FAnimatedTextPool& P
 			                *Pool.DebugName.ToString()));
 
 		// Visual reset but keep it logically in ActiveList
-		ResetInstance(Pool.Instances[Index]);
+		ResetInstance(Pool, Pool.Instances[Index]);
 	}
 
 	FAnimatedTextInstance& Inst = Pool.Instances[Index];
@@ -416,12 +439,56 @@ bool UAnimatedTextWidgetPoolManager::ShowAnimatedTextInPool(FAnimatedTextPool& P
 		return false;
 	}
 
+	Inst.AttachedActor.Reset();
+	Inst.AttachOffset = FVector::ZeroVector;
+	Inst.bAttachedToActor = false;
+
 	// Prepare world-space anchor and settings.
-	Inst.StartWorldLocation = InWorldStartLocation;
+	FVector StartWorldLocation = InWorldStartLocation;
+	const bool bAttachToActor = IsValid(InAttachActor);
+	if (bAttachToActor)
+	{
+		USceneComponent* AttachRoot = InAttachActor->GetRootComponent();
+		if (not IsValid(AttachRoot))
+		{
+			RTSFunctionLibrary::ReportError(
+				FString::Printf(TEXT("Animated text pool '%s' cannot attach: actor has no valid root component."),
+				                *Pool.DebugName.ToString()));
+			return false;
+		}
+
+		Inst.Component->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+		Inst.Component->AttachToComponent(AttachRoot, FAttachmentTransformRules::KeepRelativeTransform);
+		StartWorldLocation = InAttachActor->GetActorLocation() + InAttachOffset;
+
+		Inst.AttachedActor = InAttachActor;
+		Inst.AttachOffset = InAttachOffset;
+		Inst.bAttachedToActor = true;
+	}
+	else if (IsValid(Pool.OwnerActor))
+	{
+		USceneComponent* OwnerRoot = Pool.OwnerActor->GetRootComponent();
+		if (IsValid(OwnerRoot))
+		{
+			Inst.Component->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+			Inst.Component->AttachToComponent(
+				OwnerRoot,
+				FAttachmentTransformRules::KeepWorldTransform);
+		}
+	}
+
+	Inst.StartWorldLocation = StartWorldLocation;
 	Inst.Settings = InSettings;
 
 	// Position the component at the requested world location
-	Inst.Component->SetWorldLocation(InWorldStartLocation);
+	if (bAttachToActor)
+	{
+		Inst.Component->SetRelativeLocation(InAttachOffset);
+	}
+	else
+	{
+		Inst.Component->SetWorldLocation(StartWorldLocation);
+	}
 
 	// Make it visible before activation.
 	Inst.Component->SetHiddenInGame(false);
@@ -466,6 +533,30 @@ bool UAnimatedTextWidgetPoolManager::ShowAnimatedText(const FString& InText,
 {
 	return ShowAnimatedTextInPool(M_RegularPool, InText, InWorldStartLocation, bInAutoWrap, InWrapAt,
 	                              InJustification, InSettings);
+}
+
+bool UAnimatedTextWidgetPoolManager::ShowAnimatedTextAttachedToActor(const FString& InText,
+                                                                     AActor* InAttachActor,
+                                                                     const FVector& InAttachOffset,
+                                                                     const bool bInAutoWrap,
+                                                                     const float InWrapAt,
+                                                                     const TEnumAsByte<ETextJustify::Type> InJustification,
+                                                                     const FRTSVerticalAnimTextSettings& InSettings)
+{
+	if (not IsValid(InAttachActor))
+	{
+		return false;
+	}
+
+	if (not IsValid(InAttachActor->GetRootComponent()))
+	{
+		return false;
+	}
+
+	const FVector StartLocation = InAttachActor->GetActorLocation() + InAttachOffset;
+
+	return ShowAnimatedTextInPool(M_RegularPool, InText, StartLocation, bInAutoWrap, InWrapAt,
+	                              InJustification, InSettings, InAttachActor, InAttachOffset);
 }
 
 bool UAnimatedTextWidgetPoolManager::ShowSingleAnimatedResourceText(
