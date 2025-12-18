@@ -184,7 +184,7 @@ void UGrenadeComponent::Init(ASquadController* SquadController)
 		return;
 	}
 
-	SetAbilityToThrowGrenade();
+	Init_SetAbilityWhenSquadDataLoaded();
 }
 
 void UGrenadeComponent::ExecuteThrowGrenade(const FVector& TargetLocation)
@@ -226,7 +226,13 @@ void UGrenadeComponent::CancelThrowGrenade()
 
 bool UGrenadeComponent::GetIsValidSquadController() const
 {
-	return M_SquadController.IsValid();
+	if (M_SquadController.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController", __func__, GetOwner());
+	return false;
 }
 
 bool UGrenadeComponent::GetIsValidRTSComponent() const
@@ -252,6 +258,22 @@ void UGrenadeComponent::BeginPlay_CacheOwningPlayer()
 	}
 
 	M_OwningPlayer = M_RTSComponent->GetOwningPlayer();
+}
+
+void UGrenadeComponent::Init_SetAbilityWhenSquadDataLoaded()
+{
+	TWeakObjectPtr<UGrenadeComponent> WeakThis(this);
+	auto ApplyLambda = [WeakThis]() -> void
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->SetAbilityToThrowGrenade();
+	};
+
+	M_SquadController->SquadDataCallbacks.CallbackOnSquadDataLoaded(ApplyLambda, WeakThis);
 }
 
 void UGrenadeComponent::BeginPlay_CreateGrenadePool()
@@ -434,31 +456,37 @@ void UGrenadeComponent::DestroyGrenadePool()
 
 void UGrenadeComponent::SetAbilityToResupplying()
 {
-	if (GetIsValidSquadController())
+	if (not GetIsValidSquadController())
 	{
-		M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, EAbilityID::IdGrenadesResupplying);
+		return;
 	}
+
+	M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, EAbilityID::IdGrenadesResupplying);
 }
 
 void UGrenadeComponent::SetAbilityToThrowGrenade()
 {
-	if (GetIsValidSquadController())
+	if (not GetIsValidSquadController())
 	{
-		if (not M_SquadController->HasAbility(EAbilityID::IdThrowGrenade))
-		{
-			M_SquadController->AddAbility(EAbilityID::IdThrowGrenade);
-		}
-		M_SquadController->SwapAbility(EAbilityID::IdGrenadesResupplying, EAbilityID::IdThrowGrenade);
-		M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, EAbilityID::IdThrowGrenade);
+		return;
 	}
+
+	if (not M_SquadController->HasAbility(EAbilityID::IdThrowGrenade))
+	{
+		M_SquadController->AddAbility(EAbilityID::IdThrowGrenade);
+	}
+	M_SquadController->SwapAbility(EAbilityID::IdGrenadesResupplying, EAbilityID::IdThrowGrenade);
+	M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, EAbilityID::IdThrowGrenade);
 }
 
 void UGrenadeComponent::SetAbilityToCancel()
 {
-	if (GetIsValidSquadController())
+	if (not GetIsValidSquadController())
 	{
-		M_SquadController->SwapAbility(EAbilityID::IdThrowGrenade, EAbilityID::IdCancelThrowGrenade);
+		return;
 	}
+
+	M_SquadController->SwapAbility(EAbilityID::IdThrowGrenade, EAbilityID::IdCancelThrowGrenade);
 }
 
 void UGrenadeComponent::ReportIllegalStateTransition(const FString& FromState, const FString& ToState) const
