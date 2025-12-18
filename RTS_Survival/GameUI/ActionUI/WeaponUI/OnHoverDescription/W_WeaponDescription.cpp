@@ -329,7 +329,7 @@ FString UW_WeaponDescription::Line_AverageCooldownIfMulti() const
 
 		return TEXT("Average Cooldown: ")
 			+ GetNumberWithUnitRich(WeaponDescription.BaseCooldown, 2, ERTSRichText::Text_Armor, TEXT(" Sec"),
-			                        ERTSRichText::Text_DescriptionHelper)
+			                        TextTypeBuffAdjusted)
 			+ TEXT("\n");
 	}
 	return FString();
