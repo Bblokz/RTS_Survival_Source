@@ -6,6 +6,7 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "AnimatedTextWidgetPoolManager.generated.h"
 
+class AActor;
 class UAnimatedTextSettings;
 class UW_RTSVerticalAnimatedText;
 class AAnimatedTextPoolActor;
@@ -36,6 +37,12 @@ struct RTS_SURVIVAL_API FAnimatedTextInstance
 	float LastAppliedZ = 0.0f;
 
 	uint8 bActive : 1;
+	uint8 bAttachedToActor : 1;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> AttachedActor;
+
+	FVector AttachOffset = FVector::ZeroVector;
 
 	// keep your settings last
 	UPROPERTY()
@@ -111,6 +118,26 @@ public:
 	                      const FRTSVerticalAnimTextSettings& InSettings);
 
 	/**
+	 * @brief Show an animated text in the Regular pool attached to an actor so it follows movement.
+	 * @param InText Rich text (string) to display.
+	 * @param InAttachActor Actor to attach the widget component to.
+	 * @param InAttachOffset Local offset from the actor root component.
+	 * @param bInAutoWrap Auto-wrap toggle.
+	 * @param InWrapAt Wrap width in pixels when auto-wrap is true.
+	 * @param InJustification Text justification.
+	 * @param InSettings Animation timings and vertical delta.
+	 * @return true if a widget was (re)used successfully, false on error (missing class, world, etc.).
+	 */
+	UFUNCTION(BlueprintCallable, Category="Animated Text")
+	bool ShowAnimatedTextAttachedToActor(const FString& InText,
+	                                     AActor* InAttachActor,
+	                                     const FVector& InAttachOffset,
+	                                     const bool bInAutoWrap,
+	                                     const float InWrapAt,
+	                                     const TEnumAsByte<ETextJustify::Type> InJustification,
+	                                     const FRTSVerticalAnimTextSettings& InSettings);
+
+	/**
 	 * @brief Show a single resource animated text in the Resource pool.
 	 * @param ResourceSettings Resource type and delta amount (positive=blueprint, negative=red).
 	 * @param InWorldStartLocation Anchor location in world.
@@ -180,7 +207,7 @@ private:
 	void Init_SpawnPool(FAnimatedTextPool& Pool, const int32 PoolSize, UClass* WidgetBPClass);
 	int32 FindOldestActiveIndex(const FAnimatedTextPool& Pool) const;
 	bool AnimateInstance(FAnimatedTextInstance& Instance, const float NowSeconds) const;
-	void ResetInstance(FAnimatedTextInstance& Instance) const;
+	void ResetInstance(FAnimatedTextPool& Pool, FAnimatedTextInstance& Instance) const;
 
 	/**
 	 * @brief Core allocator/activator for a given pool.
@@ -199,7 +226,9 @@ private:
 	                            const bool bInAutoWrap,
 	                            const float InWrapAt,
 	                            const TEnumAsByte<ETextJustify::Type> InJustification,
-	                            const FRTSVerticalAnimTextSettings& InSettings);
+	                            const FRTSVerticalAnimTextSettings& InSettings,
+	                            AActor* InAttachActor = nullptr,
+	                            const FVector& InAttachOffset = FVector::ZeroVector);
 
 	/** Resource string helpers. */
 	FString GetSingleResourceText(const ERTSResourceType ResType, const int32 AddOrSubtractAmount) const;

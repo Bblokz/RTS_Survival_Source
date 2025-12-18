@@ -18,6 +18,7 @@ class UPlayerPortraitManager;
 struct FTrainingOption;
 enum class ERTSProgressBarType : uint8;
 struct FRTSVerticalAnimTextSettings;
+class AActor;
 class ABuildingExpansion;
 class ATankMaster;
 enum class ERTSArchiveItem : uint8;
@@ -251,6 +252,17 @@ public:
 		const UObject* WorldContextObject,
 		const FString& InText,
 		const FVector& InWorldStartLocation,
+		const bool bInAutoWrap,
+		const float InWrapAt,
+		const TEnumAsByte<ETextJustify::Type> InJustification,
+		const FRTSVerticalAnimTextSettings& InSettings
+	);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|VerticalAnimatedTextManager")
+	static void RTSSpawnVerticalAnimatedTextAttachedToActor(
+		const UObject* WorldContextObject,
+		const FString& InText,
+		AActor* InAttachActor,
+		const FVector& InAttachOffset,
 		const bool bInAutoWrap,
 		const float InWrapAt,
 		const TEnumAsByte<ETextJustify::Type> InJustification,

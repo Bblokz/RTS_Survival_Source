@@ -20,6 +20,7 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
+#include "GameFramework/Actor.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
@@ -453,6 +454,37 @@ void URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(const 
 		{
 			PoolManager->ShowAnimatedText(InText, InWorldStartLocation, bInAutoWrap, InWrapAt,
 			                              InJustification, InSettings);
+		}
+	}
+}
+
+void URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAttachedToActor(const UObject* WorldContextObject,
+                                                                               const FString& InText,
+                                                                               AActor* InAttachActor,
+                                                                               const FVector& InAttachOffset,
+                                                                               const bool bInAutoWrap,
+                                                                               const float InWrapAt,
+                                                                               const TEnumAsByte<ETextJustify::Type>
+                                                                               InJustification,
+                                                                               const FRTSVerticalAnimTextSettings&
+                                                                               InSettings)
+{
+	if (not IsValid(WorldContextObject) || not IsValid(InAttachActor))
+	{
+		return;
+	}
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not World)
+	{
+		return;
+	}
+	if (const UAnimatedTextWorldSubsystem* Subsystem = World->GetSubsystem<UAnimatedTextWorldSubsystem>())
+	{
+		if (UAnimatedTextWidgetPoolManager* PoolManager = Subsystem->GetAnimatedTextWidgetPoolManager())
+		{
+			PoolManager->ShowAnimatedTextAttachedToActor(
+				InText, InAttachActor, InAttachOffset, bInAutoWrap, InWrapAt,
+				InJustification, InSettings);
 		}
 	}
 }
