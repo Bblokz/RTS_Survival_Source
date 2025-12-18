@@ -766,5 +766,5 @@ private:
 	// Called on DoneExecutingCommand.
 	void TerminateCommand(EAbilityID AbilityToKill);
 
-	ECommandQueueError GetIsAbilityAllowedForUnit(const EAbilityID AbilityToCheck);
+	ECommandQueueError GetIsAbilityOnCommandCardAndNotOnCooldown(const EAbilityID AbilityToCheck);
 };

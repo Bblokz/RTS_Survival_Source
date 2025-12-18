@@ -980,7 +980,7 @@ ECommandQueueError ICommands::MoveToLocation(
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdMove);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdMove);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1037,7 +1037,7 @@ ECommandQueueError ICommands::AttackActor(
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdAttack);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdAttack);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1182,7 +1182,7 @@ ECommandQueueError ICommands::AttackGround(const FVector& Location, const bool b
 		return ECommandQueueError::CommandDataInvalid;
 	}
 	// Check for regular attack ability; attack ground is not on the command card.
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdAttack);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdAttack);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1206,7 +1206,7 @@ ECommandQueueError ICommands::PatrolToLocation(const FVector& Location, const bo
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdPatrol);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdPatrol);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1230,7 +1230,7 @@ ECommandQueueError ICommands::ReverseUnitToLocation(
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdReverseMove);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdReverseMove);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1256,7 +1256,7 @@ ECommandQueueError ICommands::RotateTowards(
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdRotateTowards);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdRotateTowards);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1301,7 +1301,7 @@ ECommandQueueError ICommands::HarvestResource(
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdHarvestResource);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdHarvestResource);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1324,7 +1324,7 @@ ECommandQueueError ICommands::ReturnCargo(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdHarvestResource);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdHarvestResource);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1348,7 +1348,7 @@ ECommandQueueError ICommands::PickupItem(AItemsMaster* TargetItem, const bool bS
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdPickupItem);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdPickupItem);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1371,7 +1371,7 @@ ECommandQueueError ICommands::DigIn(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdDigIn);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdDigIn);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1394,7 +1394,7 @@ ECommandQueueError ICommands::BreakCover(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdBreakCover);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdBreakCover);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1418,7 +1418,7 @@ ECommandQueueError ICommands::SwitchWeapons(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdSwitchWeapon);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdSwitchWeapon);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1440,7 +1440,7 @@ ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool b
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdThrowGrenade);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdThrowGrenade);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1462,7 +1462,7 @@ ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdCancelThrowGrenade);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdCancelThrowGrenade);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1485,7 +1485,7 @@ ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdFireRockets);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdFireRockets);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1507,7 +1507,7 @@ ECommandQueueError ICommands::CancelFireRockets(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdCancelRocketFire);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdCancelRocketFire);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1588,7 +1588,7 @@ ECommandQueueError ICommands::ScavengeObject(AActor* TargetObject, const bool bS
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdScavenge);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdScavenge);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1611,7 +1611,7 @@ ECommandQueueError ICommands::RepairActor(AActor* TargetObject, const bool bSetU
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdRepair);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdRepair);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -1634,7 +1634,7 @@ ECommandQueueError ICommands::ReturnToBase(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdReturnToBase);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdReturnToBase);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -2045,7 +2045,7 @@ ECommandQueueError ICommands::ExitCargo(const bool bSetUnitToIdle)
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
-	const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdExitCargo);
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdExitCargo);
 	if (AbilityError != ECommandQueueError::NoError)
 	{
 		return AbilityError;
@@ -2193,7 +2193,7 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	}
 }
 
-ECommandQueueError ICommands::GetIsAbilityAllowedForUnit(const EAbilityID AbilityToCheck)
+ECommandQueueError ICommands::GetIsAbilityOnCommandCardAndNotOnCooldown(const EAbilityID AbilityToCheck)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))

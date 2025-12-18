@@ -192,7 +192,7 @@ void ATrackedTankMaster::SetupChassisMeshCollision()
 void ATrackedTankMaster::ExecuteHarvestResourceCommand(ACPPResourceMaster* TargetResource)
 {
 	// For harvesters; make sure we turn off overlap evasion.
-	if(EnsureRTSOverlapEvasionComponent())
+	if (EnsureRTSOverlapEvasionComponent())
 	{
 		RTSOverlapEvasionComponent->SetOverlapEvasionEnabled(false);
 	}
@@ -201,7 +201,7 @@ void ATrackedTankMaster::ExecuteHarvestResourceCommand(ACPPResourceMaster* Targe
 
 void ATrackedTankMaster::TerminateHarvestResourceCommand()
 {
-	if(EnsureRTSOverlapEvasionComponent())
+	if (EnsureRTSOverlapEvasionComponent())
 	{
 		RTSOverlapEvasionComponent->SetOverlapEvasionEnabled(true);
 	}
@@ -318,7 +318,6 @@ void ATrackedTankMaster::TerminateMoveCommand()
 		                                                  "ATrackedTankMaster::TerminateMoveCommand()");
 	}
 	CheckFootPrintForOverlaps();
-	
 }
 
 void ATrackedTankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
@@ -357,6 +356,7 @@ void ATrackedTankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
 
 	Super::ExecuteReverseCommand(ReverseToLocation);
 }
+
 void ATrackedTankMaster::TerminateReverseCommand()
 {
 	// Reset reverse enforcement and stop movement/BT
@@ -494,15 +494,19 @@ void ATrackedTankMaster::OnStartDigIn()
 			"\n For tank: " + GetName());
 		return;
 	}
-	if (not RemoveAbility(EAbilityID::IdMove) || not RemoveAbility(EAbilityID::IdRotateTowards))
+	const bool bMoveAbilityRemoved = RemoveAbility(EAbilityID::IdMove);
+	const bool bReverseMoveAbilityRemoved = RemoveAbility(EAbilityID::IdReverseMove);
+	const bool bRotateTowardsAbilityRemoved = RemoveAbility(EAbilityID::IdRotateTowards);
+	if (not(bMoveAbilityRemoved && bReverseMoveAbilityRemoved && bRotateTowardsAbilityRemoved))
 	{
-		RTSFunctionLibrary::ReportError("Failed to remove move or rotate towards ability"
+		RTSFunctionLibrary::ReportError("Failed to remove move, reverse move or rotate towards ability"
 			"\n At function: ATrackedTankMaster::OnStartDigIn"
 			"\n For tank: " + GetName());
 		return;
 	}
 	SetTurretsDisabled();
 }
+
 
 void ATrackedTankMaster::OnDigInCompleted()
 {
@@ -531,17 +535,20 @@ void ATrackedTankMaster::OnBreakCoverCompleted()
 	{
 		return;
 	}
-	bool bIsValidData = false;
 	// We want to put back the move ability at the index it used to be.
 	const int32 MoveIndex = FRTS_Statics::GetIndexOfAbilityForBaseTank(RTSComponent->GetOwningPlayer(),
 	                                                                   RTSComponent->GetSubtypeAsTankSubtype(),
 	                                                                   EAbilityID::IdMove, this);
 	AddAbility(EAbilityID::IdMove, MoveIndex);
+	const int32 ReverseMoveIndex = FRTS_Statics::GetIndexOfAbilityForBaseTank(
+		RTSComponent->GetOwningPlayer(), RTSComponent->GetSubtypeAsTankSubtype(), EAbilityID::IdReverseMove, this);
+	AddAbility(EAbilityID::IdReverseMove, ReverseMoveIndex);
 	const int32 RotateTowardsIndex = FRTS_Statics::GetIndexOfAbilityForBaseTank(
 		RTSComponent->GetOwningPlayer(), RTSComponent->GetSubtypeAsTankSubtype(), EAbilityID::IdRotateTowards, this);
 	AddAbility(EAbilityID::IdRotateTowards, RotateTowardsIndex);
 	SwapAbility(EAbilityID::IdBreakCover, EAbilityID::IdDigIn);
 }
+
 
 void ATrackedTankMaster::WallGotDestroyedForceBreakCover()
 {
@@ -663,7 +670,7 @@ void ATrackedTankMaster::OnRTSUnitSpawned_SetDisabled()
 
 void ATrackedTankMaster::CheckFootPrintForOverlaps() const
 {
-	if(EnsureRTSOverlapEvasionComponent())
+	if (EnsureRTSOverlapEvasionComponent())
 	{
 		RTSOverlapEvasionComponent->CheckFootprintForOverlaps();
 	}
