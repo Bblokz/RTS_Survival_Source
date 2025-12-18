@@ -149,8 +149,8 @@ protected:
         virtual void BeginDestroy() override;
 
 private:
-        UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup", meta=(AllowPrivateAccess="true"))
-        FGrenadeComponentSettings M_Settings;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup", meta=(AllowPrivateAccess="true"))
+	FGrenadeComponentSettings M_Settings;
 
         UPROPERTY()
         TWeakObjectPtr<ASquadController> M_SquadController;
@@ -162,12 +162,13 @@ private:
         TArray<TObjectPtr<AGrenadeActor>> M_GrenadePool;
 
         EGrenadeAbilityState M_AbilityState;
-        int32 M_GrenadesRemaining;
-        FTimerHandle M_CooldownTimerHandle;
+	int32 M_GrenadesRemaining;
+	FTimerHandle M_CooldownTimerHandle;
 
-        void BeginPlay_CacheOwningPlayer();
-        void BeginPlay_CreateGrenadePool();
-        void ExecuteThrowGrenade_MoveOrThrow(const FVector& TargetLocation);
+	void Init_SetAbilityWhenSquadDataLoaded();
+	void BeginPlay_CacheOwningPlayer();
+	void BeginPlay_CreateGrenadePool();
+	void ExecuteThrowGrenade_MoveOrThrow(const FVector& TargetLocation);
         void StartThrowSequence(const FVector& TargetLocation);
         void OnThrowFinished();
         void StartCooldown();
@@ -184,4 +185,3 @@ private:
 
         int32 M_OwningPlayer;
 };
-
