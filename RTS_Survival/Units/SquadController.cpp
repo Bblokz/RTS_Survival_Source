@@ -596,7 +596,7 @@ void ASquadController::BeginPlay()
 			M_UpdatePositionTimerHandle,
 			this,
 			&ASquadController::UpdateControllerPositionToAverage,
-			3.f,
+			0.25f,
 			true
 		);
 	}

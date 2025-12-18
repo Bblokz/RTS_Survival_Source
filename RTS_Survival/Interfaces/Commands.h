@@ -157,6 +157,12 @@ private:
 	inline bool GetIsPrimarySelected() const { return M_ActionUIManager.IsValid(); };
 
 	bool GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility);
+	bool GetIsQueuedCommandAbilityIdStillOnUnit(EAbilityID AbilityId) const;
+	bool GetDoesQueuedCommandRequireSubtypeEntry(EAbilityID AbilityId) const;
+	const FUnitAbilityEntry* GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand);
+	FString GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const;
+	bool GetIsQueuedCommandAbilityEntryOnCooldown(EAbilityID AbilityId, const FUnitAbilityEntry* AbilityEntry,
+	                                              const FString& SubtypeSuffix) const;
 	/**
 	 * Debug function that prints the queue to the screen or logs.
 	 */
@@ -276,6 +282,12 @@ private:
 	void ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility) const;
 	void ExecuteModeAbility(const EModeAbilityType ModeAbility) const;
 	void ExecuteDisableModeAbility(const EModeAbilityType ModeAbility) const;
+
+		/**
+    	 * @brief Some queue commands are not represented as Action UI abilities.
+    	 * These commands must not be rejected just because they are missing from M_Abilities.
+    	 */
+    	bool IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) const;
 
 };
 

@@ -2630,6 +2630,7 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 		OutCommand = ECommandType::MoveRallyPoint;
 		OutAbilityActivated = EAbilityID::IdGeneral_Confirm;
 		OrderUnitsToMoveRallyPoint(ClickedLocation);
+		break;
 
 	case ECommandType::CaptureActor:
 		{

@@ -157,9 +157,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TArray<EHealthLevel> HealthLevelsToNotifyOn;
 
+	virtual void OnWidgetInitialized();
+	
+
 private:
 	void Widget_CreateHealthBar();
-	virtual void OnWidgetInitialized();
 
 	bool CanTolerateFireDamage(const float Damage);
 

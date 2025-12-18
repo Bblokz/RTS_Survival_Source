@@ -256,6 +256,11 @@ void UCommandData::AbilityCoolDownTick()
 	{
 		StopAbilityCooldownTimer();
 	}
+	// Notify UI manager to update ability UI for primary selected unit.
+	if (GetIsPrimarySelected())
+	{
+		M_ActionUIManager->RequestUpdateAbilityUIForPrimary(M_Owner);
+	}
 }
 
 void UCommandData::IfCooldownBeginAbilityCooldown(const EAbilityID AbilityId)
@@ -312,93 +317,143 @@ bool UCommandData::GetIsQueueFull() const
 }
 
 
-bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility)
+bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCommand)
 {
-	const TArray<EAbilityID> UnitAbilities = GetAbilityIds();
-	if (not UnitAbilities.Contains(QueuedAbility.CommandType))
-	{
-		if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
-		{
-			RTSFunctionLibrary::PrintString(
-				"Queued command is no longer allowed: " + Global_GetAbilityIDAsString(QueuedAbility.CommandType),
-				FColor::Red);
-		}
-		return false;
-	}
+	const EAbilityID CommandType = QueuedCommand.CommandType;
 
-	if (QueuedAbility.CommandType == EAbilityID::IdApplyBehaviour)
+	if (not IsAbilityRequiredOnCommandCard(CommandType))
 	{
-		// Because mutiple different behaviour abilities might be at cooldown at the same time we cannot just check
-		// for EAbilityID and need to also check the subtype given by the behaviour ability type for a match.
-		FUnitAbilityEntry* Entry = GetAbilityEntryOfCustomType(EAbilityID::IdApplyBehaviour,
-		                                                   static_cast<int32>(QueuedAbility.BehaviourAbilityType));
-		if (not Entry)
-		{
-			RTSFunctionLibrary::ReportError(
-
-				"Queued behaviour ability command is no longer allowed: " + Global_GetAbilityIDAsString(
-					QueuedAbility.CommandType)
-				+ " with behaviour type: " + FString::FromInt(static_cast<int32>(QueuedAbility.BehaviourAbilityType)));
-			return false;
-		}
-		if (Entry->CooldownRemaining > 0)
-		{
-			if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
-			{
-				RTSFunctionLibrary::PrintString(
-					"Queued behaviour ability command is on cooldown: " + Global_GetAbilityIDAsString(
-						QueuedAbility.CommandType)
-					+ " with behaviour type: " + UEnum::GetValueAsString(QueuedAbility.BehaviourAbilityType),
-					FColor::Red);
-			}
-			return false;
-		}
+		// cannot use cooldown as it has no ability entry.
 		return true;
 	}
-
-	if (QueuedAbility.CommandType == EAbilityID::IdActivateMode || QueuedAbility.CommandType == EAbilityID::IdDisableMode)
+	if (GetDoesQueuedCommandRequireSubtypeEntry(CommandType))
 	{
-		FUnitAbilityEntry* Entry = GetAbilityEntryOfCustomType(QueuedAbility.CommandType,
-		                                                   static_cast<int32>(QueuedAbility.ModeAbilityType));
-		if (not Entry)
+		// Make sure for behaviours or the mode abilty that the specific subtype is still in the ability array
+		// Multiple different abilities of these are possible and so we need to check for the specific one.
+		const FUnitAbilityEntry* const SubtypeAbilityEntry = GetAbilityEntryForQueuedCommandSubtype(QueuedCommand);
+		if (SubtypeAbilityEntry == nullptr)
 		{
 			RTSFunctionLibrary::ReportError(
+				"Queued subtype ability command is no longer allowed: "
+				+ Global_GetAbilityIDAsString(CommandType)
+				+ GetQueuedCommandSubtypeSuffix(QueuedCommand));
 
-				"Queued mode ability command is no longer allowed: " + Global_GetAbilityIDAsString(
-					QueuedAbility.CommandType)
-				+ " with mode type: " + FString::FromInt(static_cast<int32>(QueuedAbility.ModeAbilityType)));
 			return false;
 		}
 
-		if (Entry->CooldownRemaining > 0)
+		if (GetIsQueuedCommandAbilityEntryOnCooldown(CommandType, SubtypeAbilityEntry,
+		                                             GetQueuedCommandSubtypeSuffix(QueuedCommand)))
 		{
-			if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
-			{
-				RTSFunctionLibrary::PrintString(
-					"Queued mode ability command is on cooldown: " + Global_GetAbilityIDAsString(
-						QueuedAbility.CommandType)
-					+ " with mode type: " + UEnum::GetValueAsString(QueuedAbility.ModeAbilityType),
-					FColor::Red);
-			}
 			return false;
 		}
 
 		return true;
 	}
 
-	const FUnitAbilityEntry* AbilityEntry = GetAbilityEntry(QueuedAbility.CommandType);
-	if (AbilityEntry && AbilityEntry->CooldownRemaining > 0)
+	// Check whether the queued ability is still in the ability array.
+	if (not GetIsQueuedCommandAbilityIdStillOnUnit(CommandType))
 	{
-		if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
-		{
-			RTSFunctionLibrary::PrintString(
-				"Queued command is on cooldown: " + Global_GetAbilityIDAsString(QueuedAbility.CommandType),
-				FColor::Red);
-		}
 		return false;
 	}
+
+	const FUnitAbilityEntry* const AbilityEntry = GetAbilityEntry(CommandType);
+	if (GetIsQueuedCommandAbilityEntryOnCooldown(CommandType, AbilityEntry, FString{}))
+	{
+		return false;
+	}
+
 	return true;
 }
+
+bool UCommandData::GetIsQueuedCommandAbilityIdStillOnUnit(const EAbilityID AbilityId) const
+{
+	const TArray<EAbilityID>& UnitAbilities = GetAbilityIds();
+	if (UnitAbilities.Contains(AbilityId))
+	{
+		return true;
+	}
+
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	{
+		RTSFunctionLibrary::PrintString(
+			"Queued command is no longer allowed: " + Global_GetAbilityIDAsString(AbilityId),
+			FColor::Red);
+	}
+
+	return false;
+}
+
+bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID AbilityId) const
+{
+	return (AbilityId == EAbilityID::IdApplyBehaviour)
+		|| (AbilityId == EAbilityID::IdActivateMode)
+		|| (AbilityId == EAbilityID::IdDisableMode);
+}
+
+const FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
+{
+	if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
+	{
+		return GetAbilityEntryOfCustomType(
+			EAbilityID::IdApplyBehaviour,
+			static_cast<int32>(QueuedCommand.BehaviourAbilityType));
+	}
+
+	if ((QueuedCommand.CommandType == EAbilityID::IdActivateMode) || (QueuedCommand.CommandType ==
+		EAbilityID::IdDisableMode))
+	{
+		return GetAbilityEntryOfCustomType(
+			QueuedCommand.CommandType,
+			static_cast<int32>(QueuedCommand.ModeAbilityType));
+	}
+
+	return nullptr;
+}
+
+FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const
+{
+	if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
+	{
+		return " with behaviour type: " + UEnum::GetValueAsString(QueuedCommand.BehaviourAbilityType);
+	}
+
+	if ((QueuedCommand.CommandType == EAbilityID::IdActivateMode) || (QueuedCommand.CommandType ==
+		EAbilityID::IdDisableMode))
+	{
+		return " with mode type: " + UEnum::GetValueAsString(QueuedCommand.ModeAbilityType);
+	}
+
+	return FString{};
+}
+
+bool UCommandData::GetIsQueuedCommandAbilityEntryOnCooldown(
+	const EAbilityID AbilityId,
+	const FUnitAbilityEntry* const AbilityEntry,
+	const FString& SubtypeSuffix) const
+{
+	if (AbilityEntry == nullptr)
+	{
+		return false;
+	}
+
+	if (AbilityEntry->CooldownRemaining <= 0)
+	{
+		return false;
+	}
+
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	{
+		const FString DebugText =
+			"Queued command is on cooldown: "
+			+ Global_GetAbilityIDAsString(AbilityId)
+			+ SubtypeSuffix;
+
+		RTSFunctionLibrary::PrintString(DebugText, FColor::Red);
+	}
+
+	return true;
+}
+
 
 void UCommandData::PrintCommands() const
 {
@@ -765,6 +820,7 @@ void UCommandData::ExecuteBehaviourAbility(const EBehaviourAbilityType Behaviour
 		return;
 	}
 	Comp->ExecuteBehaviourAbility();
+	M_Owner->DoneExecutingCommand(EAbilityID::IdApplyBehaviour);
 }
 
 void UCommandData::ExecuteModeAbility(const EModeAbilityType ModeAbility) const
@@ -801,6 +857,24 @@ void UCommandData::ExecuteDisableModeAbility(const EModeAbilityType ModeAbility)
 	}
 
 	Comp->DeactivateMode();
+}
+
+bool UCommandData::IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) const
+{
+	switch (CommandType)
+	{
+	// Explicitly not on the command card (or gated via other rules).
+	case EAbilityID::IdCreateBuilding:
+	case EAbilityID::IdConvertToVehicle:
+	case EAbilityID::IdAttackGround:
+	case EAbilityID::IdReturnCargo:
+	case EAbilityID::IdEnterCargo:
+	case EAbilityID::IdCapture:
+		return false;
+
+	default:
+		return true;
+	}
 }
 
 

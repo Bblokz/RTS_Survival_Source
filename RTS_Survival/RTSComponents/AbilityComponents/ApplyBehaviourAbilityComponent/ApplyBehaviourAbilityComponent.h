@@ -35,7 +35,10 @@ struct FApplyBehaviourAbilitySettings
 	TSubclassOf<UBehaviour> BehaviourApplied;
 };
 
-
+// THe done executing is done in the icommands as this ability is instantly complete.
+// Adds an abilty to the command card of the unit with a specfic sub type of this ability set with EBehaviourAbilityType.
+// execute is adding the behaviour to the unit's behaviour component.
+// Terminate is no-op.
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UApplyBehaviourAbilityComponent : public UActorComponent
 {

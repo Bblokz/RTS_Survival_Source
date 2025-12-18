@@ -5620,13 +5620,13 @@ void ACPPGameState::InitAllGameSquadData()
 	using namespace DeveloperSettings::GameBalance::Experience;
 	TArray<FUnitAbilityEntry> BasicSquadAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
-		EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdSwitchWeapon, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
 	});
 
 	TArray<FUnitAbilityEntry> BasicScavengerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol,
-		EAbilityID::IdSwitchWeapon, EAbilityID::IdRotateTowards, EAbilityID::IdScavenge, EAbilityID::IdRepair,
+		EAbilityID::IdSwitchWeapon, EAbilityID::IdScavenge, EAbilityID::IdRepair, EAbilityID::IdNoAbility,
 		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
 	});
 	FSquadData SquadData;
@@ -5696,6 +5696,7 @@ void ACPPGameState::InitAllGameSquadData()
 	// -------- Ger Armory Infantry
 	// -----------------------------
 
+	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::ArmoredHazmatInfantryHealth + 40;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetArmoredIHazmatInfantryResistances(
 		SquadData.MaxHealth);
