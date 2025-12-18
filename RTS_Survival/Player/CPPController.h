@@ -39,6 +39,7 @@
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/UnitData/UnitCost.h"
 #include "SelectionHelpers/SelectionChangeAction.h"
 
@@ -1112,6 +1113,9 @@ private:
 	void DirectActionButtonBreakCover();
 
 	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
+
+	void DirectActionButtonActivateModeAbility(const EModeAbilityType ModeType);
+	void DirectActionButtonDisableModeAbility(const EModeAbilityType ModeType);
 
 	void DirectActionButtonReturnCargo();
 

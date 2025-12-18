@@ -7,6 +7,7 @@
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
 #include "UObject/Interface.h"
@@ -17,6 +18,7 @@ class ACPPResourceMaster;
 class AItemsMaster;
 class UHarvester;
 class UResourceComponent;
+enum class EModeAbilityType : uint8;
 // Forward declaration.
 class RTS_SURVIVAL_API ICommands;
 
@@ -57,12 +59,16 @@ public:
 	UPROPERTY()
 	EBehaviourAbilityType BehaviourAbilityType;
 
+	UPROPERTY()
+	EModeAbilityType ModeAbilityType;
+
 	FQueueCommand()
 		: CommandType(EAbilityID::IdNoAbility)
 		  , TargetLocation(FVector::ZeroVector)
 		  , TargetActor(nullptr)
 		  , TargetRotator(FRotator::ZeroRotator)
 		  , BehaviourAbilityType(EBehaviourAbilityType::DefaultSprint)
+		  , ModeAbilityType(EModeAbilityType::DefaultSniperOverwatch)
 	{
 	}
 };
@@ -171,7 +177,8 @@ private:
 		const FVector& Location = FVector::ZeroVector,
 		AActor* TargetActor = nullptr,
 		const FRotator& Rotation = FRotator::ZeroRotator,
-		const EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint
+		const EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint,
+		const EModeAbilityType ModeAbility = EModeAbilityType::DefaultSniperOverwatch
 	);
 
 	void IfCooldownBeginAbilityCooldown(const EAbilityID AbilityId);
@@ -267,7 +274,9 @@ private:
 	
 
 	void ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility) const;
-	
+	void ExecuteModeAbility(const EModeAbilityType ModeAbility) const;
+	void ExecuteDisableModeAbility(const EModeAbilityType ModeAbility) const;
+
 };
 
 
@@ -419,6 +428,10 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError
 	ActivateBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bSetUnitToIdle);
+
+	virtual ECommandQueueError ActivateModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle);
+
+	virtual ECommandQueueError DisableModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle);
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")

@@ -4,6 +4,7 @@
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/ApplyBehaviourAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/BehaviourAbilityTypes/BehaviourAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
@@ -92,6 +93,24 @@ namespace FAbilityHelpers
 		return false;
 	}
 
+	inline bool GetHasModeAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
+	                             const EModeAbilityType ModeAbility,
+	                             FUnitAbilityEntry& OutAbilityOfMode)
+	{
+		const int32 CustomDataForMode = static_cast<int32>(ModeAbility);
+		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
+		{
+			const bool bIsModeAbility = AbilityEntry.AbilityId == EAbilityID::IdActivateMode
+				|| AbilityEntry.AbilityId == EAbilityID::IdDisableMode;
+			if (bIsModeAbility && AbilityEntry.CustomType == CustomDataForMode)
+			{
+				OutAbilityOfMode = AbilityEntry;
+				return true;
+			}
+		}
+		return false;
+	}
+
 	inline UApplyBehaviourAbilityComponent* GetBehaviourAbilityCompOfType(
 		const EBehaviourAbilityType Type, AActor* Actor)
 	{
@@ -112,6 +131,31 @@ namespace FAbilityHelpers
 				return BehComp;
 			}
 		}
+		return nullptr;
+	}
+
+	inline UModeAbilityComponent* GetModeAbilityCompOfType(const EModeAbilityType Type, AActor* Actor)
+	{
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+
+		TArray<UModeAbilityComponent*> ModeComps;
+		Actor->GetComponents<UModeAbilityComponent>(ModeComps);
+		for (UModeAbilityComponent* ModeComp : ModeComps)
+		{
+			if (not IsValid(ModeComp))
+			{
+				continue;
+			}
+
+			if (ModeComp->GetModeAbilityType() == Type)
+			{
+				return ModeComp;
+			}
+		}
+
 		return nullptr;
 	}
 
