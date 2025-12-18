@@ -87,6 +87,10 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 		break;
 	case EAbilityID::IdCapture:
 		break;
+	case EAbilityID::IdActivateMode:
+		return ERTSVoiceLine::Confirm;
+	case EAbilityID::IdDisableMode:
+		return ERTSVoiceLine::Confirm;
 	}
 	RTSFunctionLibrary::ReportError("Could not translate ability: " + Global_GetAbilityIDAsString(Ability) +
 		"To voice line. Please check the enum and the translation function : GetVoiceLineFromAbility.");
@@ -272,4 +276,3 @@ EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetDeathVoiceLineForTank(const ET
             return EAnnouncerVoiceLineType::None;
     }
 }
-

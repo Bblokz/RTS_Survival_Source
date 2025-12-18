@@ -331,7 +331,7 @@ bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbi
 		// Because mutiple different behaviour abilities might be at cooldown at the same time we cannot just check
 		// for EAbilityID and need to also check the subtype given by the behaviour ability type for a match.
 		FUnitAbilityEntry* Entry = GetAbilityEntryOfCustomType(EAbilityID::IdApplyBehaviour,
-		                                                       static_cast<int32>(QueuedAbility.BehaviourAbilityType));
+		                                                   static_cast<int32>(QueuedAbility.BehaviourAbilityType));
 		if (not Entry)
 		{
 			RTSFunctionLibrary::ReportError(
@@ -353,6 +353,36 @@ bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbi
 			}
 			return false;
 		}
+		return true;
+	}
+
+	if (QueuedAbility.CommandType == EAbilityID::IdActivateMode || QueuedAbility.CommandType == EAbilityID::IdDisableMode)
+	{
+		FUnitAbilityEntry* Entry = GetAbilityEntryOfCustomType(QueuedAbility.CommandType,
+		                                                   static_cast<int32>(QueuedAbility.ModeAbilityType));
+		if (not Entry)
+		{
+			RTSFunctionLibrary::ReportError(
+
+				"Queued mode ability command is no longer allowed: " + Global_GetAbilityIDAsString(
+					QueuedAbility.CommandType)
+				+ " with mode type: " + FString::FromInt(static_cast<int32>(QueuedAbility.ModeAbilityType)));
+			return false;
+		}
+
+		if (Entry->CooldownRemaining > 0)
+		{
+			if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+			{
+				RTSFunctionLibrary::PrintString(
+					"Queued mode ability command is on cooldown: " + Global_GetAbilityIDAsString(
+						QueuedAbility.CommandType)
+					+ " with mode type: " + UEnum::GetValueAsString(QueuedAbility.ModeAbilityType),
+					FColor::Red);
+			}
+			return false;
+		}
+
 		return true;
 	}
 
@@ -413,7 +443,8 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	const FVector& Location,
 	AActor* TargetActor,
 	const FRotator& Rotation,
-	const EBehaviourAbilityType BehaviourAbility)
+	const EBehaviourAbilityType BehaviourAbility,
+	const EModeAbilityType ModeAbility)
 {
 	// Check if we have an active queue and if we are not patrolling.
 	// In case we shift click while the queue 
@@ -435,6 +466,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NewCmd.TargetActor = TargetActor;
 	NewCmd.TargetRotator = Rotation;
 	NewCmd.BehaviourAbilityType = BehaviourAbility;
+	NewCmd.ModeAbilityType = ModeAbility;
 
 	// Insert at the end
 	M_TCommands[NumCommands] = NewCmd;
@@ -646,9 +678,20 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		{
 			M_Owner->ExecuteCaptureCommand(Cmd.TargetActor.Get());
 		}
+		break;
 	case EAbilityID::IdApplyBehaviour:
 		{
 			ExecuteBehaviourAbility(Cmd.BehaviourAbilityType);
+		}
+		break;
+	case EAbilityID::IdActivateMode:
+		{
+			ExecuteModeAbility(Cmd.ModeAbilityType);
+		}
+		break;
+	case EAbilityID::IdDisableMode:
+		{
+			ExecuteDisableModeAbility(Cmd.ModeAbilityType);
 		}
 		break;
 	default:
@@ -722,6 +765,42 @@ void UCommandData::ExecuteBehaviourAbility(const EBehaviourAbilityType Behaviour
 		return;
 	}
 	Comp->ExecuteBehaviourAbility();
+}
+
+void UCommandData::ExecuteModeAbility(const EModeAbilityType ModeAbility) const
+{
+	if (not M_Owner)
+	{
+		return;
+	}
+
+	const UModeAbilityComponent* Comp = FAbilityHelpers::GetModeAbilityCompOfType(
+		ModeAbility, M_Owner->GetOwnerActor());
+	if (not IsValid(Comp))
+	{
+		M_Owner->DoneExecutingCommand(EAbilityID::IdActivateMode);
+		return;
+	}
+
+	Comp->ActivateMode();
+}
+
+void UCommandData::ExecuteDisableModeAbility(const EModeAbilityType ModeAbility) const
+{
+	if (not M_Owner)
+	{
+		return;
+	}
+
+	const UModeAbilityComponent* Comp = FAbilityHelpers::GetModeAbilityCompOfType(
+		ModeAbility, M_Owner->GetOwnerActor());
+	if (not IsValid(Comp))
+	{
+		M_Owner->DoneExecutingCommand(EAbilityID::IdDisableMode);
+		return;
+	}
+
+	Comp->DeactivateMode();
 }
 
 
@@ -1016,6 +1095,82 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 		/*TargetActor=*/nullptr,
 		/*Rotation=*/FRotator::ZeroRotator,
 		BehaviourAbility);
+}
+
+ECommandQueueError ICommands::ActivateModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	FUnitAbilityEntry ModeAbilityEntry;
+	if (not FAbilityHelpers::GetHasModeAbility(UnitCommandData->GetAbilities(), ModeAbilityType, ModeAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (ModeAbilityEntry.AbilityId != EAbilityID::IdActivateMode)
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (ModeAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdActivateMode,
+		FVector::ZeroVector,
+		/*TargetActor=*/nullptr,
+		/*Rotation=*/FRotator::ZeroRotator,
+		EBehaviourAbilityType::DefaultSprint,
+		ModeAbilityType);
+}
+
+ECommandQueueError ICommands::DisableModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	FUnitAbilityEntry ModeAbilityEntry;
+	if (not FAbilityHelpers::GetHasModeAbility(UnitCommandData->GetAbilities(), ModeAbilityType, ModeAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (ModeAbilityEntry.AbilityId != EAbilityID::IdDisableMode)
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (ModeAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdDisableMode,
+		FVector::ZeroVector,
+		/*TargetActor=*/nullptr,
+		/*Rotation=*/FRotator::ZeroRotator,
+		EBehaviourAbilityType::DefaultSprint,
+		ModeAbilityType);
 }
 
 ECommandQueueError ICommands::AttackGround(const FVector& Location, const bool bSetUnitToIdle)
@@ -2023,6 +2178,10 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdApplyBehaviour:
 		// No terminate; behaviour auto expires.
+		break;
+	case EAbilityID::IdActivateMode:
+		break;
+	case EAbilityID::IdDisableMode:
 		break;
 	default:
 		RTSFunctionLibrary::PrintString(
