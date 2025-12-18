@@ -193,6 +193,8 @@ FString URTSBlueprintFunctionLibrary::BP_GetAbilityIDString(const EAbilityID Abi
 	case EAbilityID::IdSwitchSingleBurst: return "IdSwitchSingleBurst";
 	case EAbilityID::IdSwitchWeapon: return "IdSwitchWeapon";
 	case EAbilityID::IdConvertToVehicle: return "IdConvertToVehicle";
+	case EAbilityID::IdActivateMode: return "IdActivateMode";
+	case EAbilityID::IdDisableMode: return "IdDisableMode";
 	default:
 		{
 			break;

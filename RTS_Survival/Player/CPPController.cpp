@@ -3215,6 +3215,12 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdApplyBehaviour:
 		this->DirectActionButtonBehaviourAbility(static_cast<EBehaviourAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
+	case EAbilityID::IdActivateMode:
+		this->DirectActionButtonActivateModeAbility(static_cast<EModeAbilityType>(ActiveAbilityEntry.CustomType));
+		break;
+	case EAbilityID::IdDisableMode:
+		this->DirectActionButtonDisableModeAbility(static_cast<EModeAbilityType>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdExitCargo:
 		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
@@ -3718,11 +3724,61 @@ void ACPPController::DirectActionButtonBehaviourAbility(const EBehaviourAbilityT
 	{
 		CommandsExe += EachActor->ActivateBehaviourAbility(Type, !bIsHoldingShift) == ECommandQueueError::NoError;
 	}
-	if(CommandsExe > 0)
+	if (CommandsExe > 0)
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
 		                                false);
 		
+	}
+}
+
+void ACPPController::DirectActionButtonActivateModeAbility(const EModeAbilityType ModeType)
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExe = 0;
+	for (auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->ActivateModeAbility(ModeType, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	for (auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExe += EachPawn->ActivateModeAbility(ModeType, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	for (auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExe += EachActor->ActivateModeAbility(ModeType, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
+			false);
+	}
+}
+
+void ACPPController::DirectActionButtonDisableModeAbility(const EModeAbilityType ModeType)
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExe = 0;
+	for (auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->DisableModeAbility(ModeType, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	for (auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExe += EachPawn->DisableModeAbility(ModeType, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	for (auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExe += EachActor->DisableModeAbility(ModeType, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
+			false);
 	}
 }
 

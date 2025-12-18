@@ -56,6 +56,8 @@ enum class EAbilityID : uint8
 	IdCapture,
 	IdReinforceSquad,
 	IdApplyBehaviour,
+	IdActivateMode,
+	IdDisableMode,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
@@ -102,6 +104,8 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdDisableResourceConversion: return TEXT("Disable Resource Conversion");
 	case EAbilityID::IdEnableResourceConversion: return TEXT("Enable Resource Conversion");
 	case EAbilityID::IdReinforceSquad: return TEXT("Reinforce Squad");
+	case EAbilityID::IdActivateMode: return TEXT("Activate Mode");
+	case EAbilityID::IdDisableMode: return TEXT("Disable Mode");
 	default: return TEXT("Unknown Ability");
 	}
 }
