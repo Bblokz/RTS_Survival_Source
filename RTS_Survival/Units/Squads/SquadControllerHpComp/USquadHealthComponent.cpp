@@ -54,20 +54,24 @@ void USquadHealthComponent::SetMaxHealth(const float NewMaxHealth)
 
 void USquadHealthComponent::OnWidgetInitialized()
 {
-	if(not bM_OnWidgetInitLoadBrushAsset)
-	{
-		return;
-	}
-	UW_HealthBar* HealthBarWidget = GetHealthBarWidget();
-	if(not IsValid(HealthBarWidget))
-	{
-		RTSFunctionLibrary::ReportError("Squad waited for health bar widget to initialize, but it is invalid."
-								  "cannot set squad weapon icon.");
-		return;
-	}
-	HealthBarWidget->UpdateSquadWeaponIcon(M_SquadWeaponIconAssetToSet);
-	bM_OnWidgetInitLoadBrushAsset = false;
-	M_SquadWeaponIconAssetToSet = nullptr;
+        Super::OnWidgetInitialized();
+
+        if (not bM_OnWidgetInitLoadBrushAsset)
+        {
+                return;
+        }
+
+        UW_HealthBar* HealthBarWidget = GetHealthBarWidget();
+        if (not IsValid(HealthBarWidget))
+        {
+                RTSFunctionLibrary::ReportError("Squad waited for health bar widget to initialize, but it is invalid."
+                                                                  "cannot set squad weapon icon.");
+                return;
+        }
+
+        HealthBarWidget->UpdateSquadWeaponIcon(M_SquadWeaponIconAssetToSet);
+        bM_OnWidgetInitLoadBrushAsset = false;
+        M_SquadWeaponIconAssetToSet = nullptr;
 }
 
 void USquadHealthComponent::ApplyDeltaToTotals(const float DeltaMax,
