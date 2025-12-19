@@ -153,8 +153,9 @@ public:
 	                                  const bool bIsEntering);
 	
 
-	void OnOwnerDies(const ERTSDeathType DeathType);
-	void AdjustSeatsForSquad(ASquadController* Squad, int32 SeatsDelta);
+        void OnOwnerDies(const ERTSDeathType DeathType);
+        void ApplyDamageToGarrisonedSquads(const int32 DamagePercent);
+        void AdjustSeatsForSquad(ASquadController* Squad, int32 SeatsDelta);
 
 	void SetIsEnabled(const bool bEnable);
 
@@ -313,14 +314,16 @@ private:
 
 
 	// ----------------------------------------
-	// --------- Unit dies Helpers ---------
-	// ----------------------------------------
-	TArray<TObjectPtr<ASquadController>> OnOwnerDies_GetInsideSquadsSnapshot() const;
-	void OnOwnerDies_KillAllInsideSquads(const TArray<TObjectPtr<ASquadController>>& InsideSquads);
-	void OnOwnerDies_HandleSquad(ASquadController* Squad);
-	void OnOwnerDies_KillUnit(ASquadUnit* Unit);
-	void OnOwnerDies_ResetState();
-	void OnOwnerDies_DetachIfAttachedToOwner(ASquadUnit* Unit);
+        // --------- Unit dies Helpers ---------
+        // ----------------------------------------
+        TArray<TObjectPtr<ASquadController>> OnOwnerDies_GetInsideSquadsSnapshot() const;
+        void OnOwnerDies_KillAllInsideSquads(const TArray<TObjectPtr<ASquadController>>& InsideSquads);
+        void OnOwnerDies_HandleSquad(ASquadController* Squad);
+        void OnOwnerDies_KillUnit(ASquadUnit* Unit);
+        void OnOwnerDies_ResetState();
+        void OnOwnerDies_DetachIfAttachedToOwner(ASquadUnit* Unit);
+        void ApplyDamageToSquadUnits(ASquadController* SquadController, const int32 DamagePercent) const;
+        float CalculateDamageAmountForUnit(UHealthComponent* HealthComponent, const int32 DamagePercent) const;
 
 	// Interval in seconds for automatic seat reshuffle; <= 0 disables reshuffle entirely.
 	UPROPERTY(EditDefaultsOnly, Category="Cargo|Optimisation")

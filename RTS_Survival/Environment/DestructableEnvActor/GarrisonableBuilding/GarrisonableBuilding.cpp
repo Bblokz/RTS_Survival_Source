@@ -10,10 +10,13 @@
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 
+const int32 AGarrisonableBuilding::DamagePercentage = 50;
+
+
 AGarrisonableBuilding::AGarrisonableBuilding(const FObjectInitializer& ObjectInitializer)
-	: ADestructableEnvActor(ObjectInitializer)
+        : ADestructableEnvActor(ObjectInitializer)
 {
-	PrimaryActorTick.bCanEverTick = false;
+        PrimaryActorTick.bCanEverTick = false;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 }
 
@@ -44,83 +47,80 @@ void AGarrisonableBuilding::OnCargoEmpty()
 
 void AGarrisonableBuilding::BeginPlay()
 {
-	Super::BeginPlay();
-	// Cache the visibility settings before garrisoning.
-	if (EnsureHealthComponentIsValid())
-	{
-		M_CachedVisibilityPreGarrison = HealthComponent->GetVisibilitySettings();
-	}
-	// Get all static mesh components.
-	TArray<UStaticMeshComponent*> StaticMeshComponents;
-	GetComponents<UStaticMeshComponent>(StaticMeshComponents);
-	for (UStaticMeshComponent* MeshComp : StaticMeshComponents)
-	{
-		if (IsValid(MeshComp))
-		{
-			FRTS_CollisionSetup::SetupDestructibleEnvActorMeshCollision(MeshComp, false);
-		}
-	}
+        Super::BeginPlay();
+        // Cache the visibility settings before garrisoning.
+        if (EnsureHealthComponentIsValid())
+        {
+                M_CachedVisibilityPreGarrison = HealthComponent->GetVisibilitySettings();
+        }
+        // Get all static mesh components.
+        TArray<UStaticMeshComponent*> StaticMeshComponents;
+        GetComponents<UStaticMeshComponent>(StaticMeshComponents);
+        for (UStaticMeshComponent* MeshComp : StaticMeshComponents)
+        {
+                if (not IsValid(MeshComp))
+                {
+                        continue;
+                }
+                FRTS_CollisionSetup::SetupDestructibleEnvActorMeshCollision(MeshComp, false);
+        }
 }
 
 void AGarrisonableBuilding::PostInitializeComponents()
 {
-	Super::PostInitializeComponents();
-	// Initialize the health component
-	HealthComponent = FindComponentByClass<UHealthComponent>();
-	if (!IsValid(HealthComponent))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "HealthComponent",
-		                                             "AGarrisonableBuilding::PostInitializeComponents");
-	}
+        Super::PostInitializeComponents();
+        // Initialize the health component
+        HealthComponent = FindComponentByClass<UHealthComponent>();
+        EnsureHealthComponentIsValid();
 
-	// Initialize the RTS component
-	RTSComponent = FindComponentByClass<URTSComponent>();
-	if (!IsValid(RTSComponent))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "RTSComponent",
-		                                             "AGarrisonableBuilding::PostInitializeComponents");
-	}
-	CargoComponent = FindComponentByClass<UCargo>();
-	if (!IsValid(CargoComponent))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "CargoComponent",
-		                                             "AGarrisonableBuilding::PostInitializeComponents");
-	}
+        // Initialize the RTS component
+        RTSComponent = FindComponentByClass<URTSComponent>();
+        EnsureRTSComponentIsValid();
+        CargoComponent = FindComponentByClass<UCargo>();
+        EnsureCargoComponentIsValid();
 }
 
 float AGarrisonableBuilding::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
                                         AController* EventInstigator, AActor* DamageCauser)
 {
-	if (not IsUnitAlive())
-	{
-		// Do not trigger kill on a dead unit.
-		return 1.f;
-	}
-	if (HealthComponent)
-	{
-		const ERTSDamageType RtsDamageType = FRTSWeaponHelpers::GetRTSDamageType(DamageEvent);
-		if (HealthComponent->TakeDamage(DamageAmount, RtsDamageType))
-		{
-			const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RtsDamageType);
-			OnUnitDies(DeathType);
-			return 0.0;
-		}
-		return 1.0;
-	}
-	RTSFunctionLibrary::ReportNullErrorComponent(this,
-	                                             "HealthComponent",
-	                                             "AGarrisonableBuilding::TakeDamage");
-	return float();
+        if (not IsUnitAlive())
+        {
+                // Do not trigger kill on a dead unit.
+                return 1.f;
+        }
+        if (not EnsureHealthComponentIsValid())
+        {
+                return float();
+        }
+        const ERTSDamageType RtsDamageType = FRTSWeaponHelpers::GetRTSDamageType(DamageEvent);
+        if (HealthComponent->TakeDamage(DamageAmount, RtsDamageType))
+        {
+                const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RtsDamageType);
+                OnUnitDies(DeathType);
+                return 0.0;
+        }
+        return 1.0;
 }
 
 void AGarrisonableBuilding::OnUnitDies(const ERTSDeathType DeathType)
 {
-	if (not IsUnitAlive())
-	{
-		return;
-	}
-	// Sets death flag, calls bp on unit dies.
-	Super::OnUnitDies(DeathType);
+        if (not IsUnitAlive())
+        {
+                return;
+        }
+
+        OnUnitDies_HandleGarrisonState();
+        // Sets death flag, calls bp on unit dies.
+        Super::OnUnitDies(DeathType);
+}
+
+void AGarrisonableBuilding::OnUnitDies_HandleGarrisonState()
+{
+        if (not EnsureCargoComponentIsValid())
+        {
+                return;
+        }
+        CargoComponent->ApplyDamageToGarrisonedSquads(DamagePercentage);
 }
 
 bool AGarrisonableBuilding::EnsureHealthComponentIsValid() const
