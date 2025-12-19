@@ -12,6 +12,8 @@ enum class ECollapseVFXAdjustNiagaraParams : uint8
 {
 	Not,
 	SetScaleColorLifetime,
+	// Size uses size mlt and count the particle one.
+	SandbagSizeAndCount,
 	
 };
 
@@ -76,6 +78,7 @@ struct FCollapseFX
 	void CreateFX(const AActor* WorldContext) const;
 	void AdjustFX(UNiagaraComponent* NiagaraComp) const;
 	void AdjustFxForSetScaleColorLifetime(UNiagaraComponent* NiagaraComp) const;
+	void AdjustFxForSandbagSizeAndCount(UNiagaraComponent* NiagaraComp) const;
 };
 
 

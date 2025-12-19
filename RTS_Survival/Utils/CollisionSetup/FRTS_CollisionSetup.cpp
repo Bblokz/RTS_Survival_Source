@@ -420,28 +420,28 @@ void FRTS_CollisionSetup::SetupInfantryCapsuleCollision(UCapsuleComponent* Capsu
 }
 
 void FRTS_CollisionSetup::SetupTriggerOverlapCollision(UPrimitiveComponent* TriggerComponent,
-        ETriggerOverlapLogic TriggerLogic)
+                                                       ETriggerOverlapLogic TriggerLogic)
 {
-        if (IsValid(TriggerComponent))
-        {
-                TriggerComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-                TriggerComponent->SetCollisionObjectType(ECC_WorldDynamic);
-                TriggerComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-                TriggerComponent->SetGenerateOverlapEvents(true);
-                TriggerComponent->SetCanEverAffectNavigation(false);
+	if (IsValid(TriggerComponent))
+	{
+		TriggerComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		TriggerComponent->SetCollisionObjectType(ECC_WorldDynamic);
+		TriggerComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+		TriggerComponent->SetGenerateOverlapEvents(true);
+		TriggerComponent->SetCanEverAffectNavigation(false);
 
-                if (TriggerLogic == ETriggerOverlapLogic::OverlapPlayer || TriggerLogic == ETriggerOverlapLogic::OverlapBoth)
-                {
-                        TriggerComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
-                }
-                if (TriggerLogic == ETriggerOverlapLogic::OverlapEnemy || TriggerLogic == ETriggerOverlapLogic::OverlapBoth)
-                {
-                        TriggerComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
-                }
-                return;
-        }
-        RTSFunctionLibrary::ReportError("Invalid trigger component provided for overlap setup."
-                "\nFRTS_CollisionSetup::SetupTriggerOverlapCollision");
+		if (TriggerLogic == ETriggerOverlapLogic::OverlapPlayer || TriggerLogic == ETriggerOverlapLogic::OverlapBoth)
+		{
+			TriggerComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
+		}
+		if (TriggerLogic == ETriggerOverlapLogic::OverlapEnemy || TriggerLogic == ETriggerOverlapLogic::OverlapBoth)
+		{
+			TriggerComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
+		}
+		return;
+	}
+	RTSFunctionLibrary::ReportError("Invalid trigger component provided for overlap setup."
+		"\nFRTS_CollisionSetup::SetupTriggerOverlapCollision");
 }
 
 void FRTS_CollisionSetup::SetupScavengeableObjectCollision(UStaticMeshComponent* ScavengeableObjectMesh)
@@ -634,6 +634,20 @@ void FRTS_CollisionSetup::SetupPickupCollision(UBoxComponent* PickupBox, UMeshCo
 		PickupBox->SetGenerateOverlapEvents(true);
 		PickupBox->SetCanEverAffectNavigation(false);
 	}
+}
+
+void FRTS_CollisionSetup::UpdateGarrisonCollisionForNewOwner(const int32 NewOwningPlayer, const bool bIsAllied,
+                                                             UMeshComponent* MeshToChangeCollisionOn)
+{
+	if (not IsValid(MeshToChangeCollisionOn))
+	{
+		return;
+	}
+	// If allied with player one then make sure to ignore traces that hit enemy as otherwise player units can hit this object.
+	const ECollisionChannel NewCollisionChannel = NewOwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
+	// Set response.
+	const ECollisionResponse ResponseToThisPlayer = bIsAllied ? ECR_Ignore : ECR_Block;
+	MeshToChangeCollisionOn->SetCollisionResponseToChannel(NewCollisionChannel, ResponseToThisPlayer);
 }
 
 void FRTS_CollisionSetup::SetupStaticBuildingPreviewCollision(UStaticMeshComponent* BuildingPreviewMesh,

@@ -6,6 +6,7 @@
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
@@ -34,6 +35,16 @@ void AGarrisonableBuilding::OnSquadRegistered(ASquadController* SquadController)
 	FHealthBarVisibilitySettings NewSettings = M_CachedVisibilityPreGarrison;
 	NewSettings.bAlwaysDisplay = true;
 	HealthComponent->ChangeVisibilitySettings(NewSettings);
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+	URTSComponent* SquadRTSComp = SquadController->FindComponentByClass<URTSComponent>();
+	if (not IsValid(SquadRTSComp))
+	{
+		return;
+	}
+	HandleAlliedDamage(SquadRTSComp->GetOwningPlayer());
 }
 
 void AGarrisonableBuilding::OnCargoEmpty()
@@ -43,6 +54,7 @@ void AGarrisonableBuilding::OnCargoEmpty()
 		return;
 	}
 	HealthComponent->ChangeVisibilitySettings(M_CachedVisibilityPreGarrison);
+	GarissonEmptyHandleAlliedDamage();
 }
 
 void AGarrisonableBuilding::BeginPlay()
@@ -125,6 +137,46 @@ void AGarrisonableBuilding::OnUnitDies_HandleGarrisonState()
 		return;
 	}
 	CargoComponent->ApplyDamageToGarrisonedSquads(DamagePercentage);
+}
+
+void AGarrisonableBuilding::HandleAlliedDamage(const int32 PlayerAlliedTo)
+{
+	if (not IgnoreGarrisonAlliedDamage)
+	{
+		return;
+	}
+	TArray<UStaticMeshComponent*> MyMeshComponents;
+	GetComponents<UStaticMeshComponent>(MyMeshComponents);
+	for (const auto EachComp : MyMeshComponents)
+	{
+		if (not IsValid(EachComp))
+		{
+			continue;
+		}
+		// Now allied; allow tracers from this player.
+		FRTS_CollisionSetup::UpdateGarrisonCollisionForNewOwner(PlayerAlliedTo, true, EachComp);
+		LastAlliedToPlayer = PlayerAlliedTo;
+	}
+}
+
+void AGarrisonableBuilding::GarissonEmptyHandleAlliedDamage() const
+{
+	if (not IgnoreGarrisonAlliedDamage)
+	{
+		// no collision to change.
+		return;
+	}
+	TArray<UStaticMeshComponent*> MyMeshComponents;
+	GetComponents<UStaticMeshComponent>(MyMeshComponents);
+	for (const auto EachComp : MyMeshComponents)
+	{
+		if (not IsValid(EachComp))
+		{
+			continue;
+		}
+		// No longer allied; block tracers from this player.
+		FRTS_CollisionSetup::UpdateGarrisonCollisionForNewOwner(LastAlliedToPlayer, false, EachComp);
+	}
 }
 
 bool AGarrisonableBuilding::EnsureHealthComponentIsValid() const

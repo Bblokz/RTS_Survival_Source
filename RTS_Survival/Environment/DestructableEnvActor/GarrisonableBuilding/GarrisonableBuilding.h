@@ -43,6 +43,10 @@ protected:
 
 	virtual void PostInitializeComponents() override;
 
+	// If set to true the garrison will ignore allied damage from allied units to the garrison.
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
+	bool IgnoreGarrisonAlliedDamage = false;
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
 
@@ -80,10 +84,16 @@ protected:
 
 	bool EnsureCargoComponentIsValid() const;
 
+
 private:
 
         void OnUnitDies_HandleGarrisonState();
 
         // What the health bar visibility settings were before squads entered.
         FHealthBarVisibilitySettings M_CachedVisibilityPreGarrison;
+	
+	void HandleAlliedDamage(const int32 PlayerAlliedTo);
+	void GarissonEmptyHandleAlliedDamage() const;
+	int32 LastAlliedToPlayer = -1;
+	
 };

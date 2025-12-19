@@ -13,6 +13,9 @@ namespace COllapseVFXNiagaraParams
 	const FName UseGroundSmokeName = "UseGroundSmoke";
 	const FName GroundZOffsetName = "GroundZOffset";
 	const FName ParticlesMltName = "NormalizedWeaponCalibre";
+	const FName SandBagSizeMltName = "SandbagSizeMlt";
+	const FName SandBagSpawnCountName = "Spawn Count";
+	
 	FName ColorName = "MuzzleColor";
 }
 
@@ -59,6 +62,9 @@ void FCollapseFX::AdjustFX(UNiagaraComponent* NiagaraComp) const
 	case ECollapseVFXAdjustNiagaraParams::SetScaleColorLifetime:
 		AdjustFxForSetScaleColorLifetime(NiagaraComp);
 		break;
+	case ECollapseVFXAdjustNiagaraParams::SandbagSizeAndCount:
+		AdjustFxForSandbagSizeAndCount(NiagaraComp);
+		break;
 	}
 	
 }
@@ -73,4 +79,13 @@ void FCollapseFX::AdjustFxForSetScaleColorLifetime(UNiagaraComponent* NiagaraCom
 	NiagaraComp->SetFloatParameter(ParticlesMltName, CollapseNiagaraParameters.ParticlesMlt);
 	NiagaraComp->SetVectorParameter(GroundZOffsetName, CollapseNiagaraParameters.GroundSmokeOffset);
 	NiagaraComp->SetColorParameter(ColorName, CollapseNiagaraParameters.SmokeColor);
+}
+
+void FCollapseFX::AdjustFxForSandbagSizeAndCount(UNiagaraComponent* NiagaraComp) const
+{
+	using namespace COllapseVFXNiagaraParams;
+	NiagaraComp->SetFloatParameter(SandBagSizeMltName, CollapseNiagaraParameters.SizeMlt);
+	// Used as counter here!
+	NiagaraComp->SetFloatParameter(SandBagSpawnCountName, CollapseNiagaraParameters.ParticlesMlt);
+	
 }
