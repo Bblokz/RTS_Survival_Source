@@ -82,6 +82,9 @@ public:
 
 	static void SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh);
 
+	// Will dynamically be allied or not with this player by blocking or ignoring the trace channel used to hit the enemies of that player.
+	static void UpdateGarrisonCollisionForNewOwner(const int32 NewOwningPlayer, const bool bIsAllied, UMeshComponent* MeshToChangeCollisionOn);
+
 	// ----------------- Collision setup Building System and buildings -----------------
 	static void SetupStaticBuildingPreviewCollision(UStaticMeshComponent* BuildingPreviewMesh, const bool bUseCollision);
 
