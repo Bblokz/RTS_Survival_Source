@@ -166,7 +166,7 @@ enum class
 
 	// Russian Railgun weapons
 	RailGunY UMETA(DisplayName = "Double sided railgun 30MM"),
-	
+
 
 	// Russian Medium calibre
 	ZIS_S_53_85MM UMETA(DisplayName = "ZIS 85mm (T34/85)"),
@@ -193,9 +193,9 @@ enum class
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 {
-        switch (WeaponName)
-        {
-        case EWeaponName::T26_Mg: return "7.62 DT";
+	switch (WeaponName)
+	{
+	case EWeaponName::T26_Mg: return "7.62 DT";
 	case EWeaponName::MP46: return "MP46";
 	case EWeaponName::F_35_76MM: return "F-35";
 	case EWeaponName::BK_5_50MM: return "BK 5";
@@ -203,7 +203,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::M_10T_152MM: return "M 10T";
 	case EWeaponName::Flak37_88MM: return "Flak 37";
 	case EWeaponName::Flak38_20MM: return "Flak 38";
-		case EWeaponName::SPEKTR_V: return "Spektr-V";
+	case EWeaponName::SPEKTR_V: return "Spektr-V";
 	case EWeaponName::KwK30_20MM: return "KwK 30";
 	case EWeaponName::L_11_76MM: return "L/11";
 	case EWeaponName::shVAK_20MM: return "shVAK";
@@ -301,7 +301,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::BombRocket_3000Gr: return "3000Gr Bomb Rocket";
 	case EWeaponName::BombRocket_5000Gr: return "5000Gr Bomb Rocket";
 	case EWeaponName::KwK44_128MM_E100: return "KwK 44";
-		case EWeaponName::KwK44_L_36_5_75MM_E100: return "KwK44 L/36";
+	case EWeaponName::KwK44_L_36_5_75MM_E100: return "KwK44 L/36";
 	case EWeaponName::ZIS_6_107MM: return "ZIS-6";
 	case EWeaponName::Bazooka_50MM:
 		return "Bazooka";
@@ -316,170 +316,170 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::PPS_43_7_62MM:
 		return "PPS-43";
 
-        case EWeaponName::DEFAULT_WEAPON: return "Default Weapon";
-        default:
-                return "NoWpTranslation";
-        }
+	case EWeaponName::DEFAULT_WEAPON: return "Default Weapon";
+	default:
+		return "NoWpTranslation";
+	}
 }
 
 static bool Global_IsRifle(const EWeaponName WeaponName)
 {
-        switch (WeaponName)
-        {
-        case EWeaponName::GerRailGun:
-        case EWeaponName::RailGunY:
-        case EWeaponName::SVT_40_7_62MM:
-        case EWeaponName::Fedrov_Avtomat:
-        case EWeaponName::FG_42_7_92MM:
-        case EWeaponName::STG44_7_92MM:
-        case EWeaponName::Kar_98k:
-        case EWeaponName::Mosin:
-        case EWeaponName::Mauser:
-        case EWeaponName::SKS:
-        case EWeaponName::PTRS_50MM:
-        case EWeaponName::PTRS_41_14_5MM:
-        case EWeaponName::PanzerRifle_50mm:
-        case EWeaponName::PTRS_X_Tishina:
-                return true;
-        default:
-                return false;
-        }
+	switch (WeaponName)
+	{
+	case EWeaponName::GerRailGun:
+	case EWeaponName::RailGunY:
+	case EWeaponName::SVT_40_7_62MM:
+	case EWeaponName::Fedrov_Avtomat:
+	case EWeaponName::FG_42_7_92MM:
+	case EWeaponName::STG44_7_92MM:
+	case EWeaponName::Kar_98k:
+	case EWeaponName::Mosin:
+	case EWeaponName::Mauser:
+	case EWeaponName::SKS:
+	case EWeaponName::PTRS_50MM:
+	case EWeaponName::PTRS_41_14_5MM:
+	case EWeaponName::PanzerRifle_50mm:
+	case EWeaponName::PTRS_X_Tishina:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 {
-    switch (WeaponType)
-    {
-    	
-        // ---------------------------------------------------------------------
-        // Handheld laser weapons (Highest  tier)
-        // ---------------------------------------------------------------------
-    case EWeaponName::GerRailGun:
-    	return 1100;
-    case EWeaponName::RailGunY:
-    	return 1095;
-        // ---------------------------------------------------------------------
-        // Handheld laser weapons (top tier, category ~1000)
-        // ---------------------------------------------------------------------
-        case EWeaponName::LightStorm:          // Light Laser MG handheld
-            return 1000;
-        case EWeaponName::LB14:               // Handheld laser
-            return 998;
-        case EWeaponName::SPEKTR_V:           // Infantry Laser Weapon
-            return 996;
-    	
+	switch (WeaponType)
+	{
+	// ---------------------------------------------------------------------
+	// Handheld laser weapons (Highest  tier)
+	// ---------------------------------------------------------------------
+	case EWeaponName::GerRailGun:
+		return 1100;
+	case EWeaponName::RailGunY:
+		return 1095;
+	// ---------------------------------------------------------------------
+	// Handheld laser weapons (top tier, category ~1000)
+	// ---------------------------------------------------------------------
+	case EWeaponName::LightStorm: // Light Laser MG handheld
+		return 1000;
+	case EWeaponName::LB14: // Handheld laser
+		return 998;
+	case EWeaponName::SPEKTR_V: // Infantry Laser Weapon
+		return 996;
 
-        // ---------------------------------------------------------------------
-        // Automated / special AT above flame (category ~900)
-        // ---------------------------------------------------------------------
-        case EWeaponName::PTRS_X_Tishina:     // Automated PTRS
-            return 900;
-    case EWeaponName::M920_AtSniper: // sniper AT.
-    	return 898;
-        case EWeaponName::PanzerRifle_50mm:   // Rifle grenade launcher
-            return 895;
-    	
 
-        // ---------------------------------------------------------------------
-        // Flame weapons (infantry, category ~800)
-        // ---------------------------------------------------------------------
-        case EWeaponName::Flamm15:            // Medium flamethrower
-            return 800;
-        case EWeaponName::Ashmaker11:         // Light-medium flamethrower
-            return 798;
-        case EWeaponName::Flamm09:            // Light flamethrower
-            return 796;
-        case EWeaponName::Ashmaker05:         // Very light flamethrower
-            return 794;
+	// ---------------------------------------------------------------------
+	// Automated / special AT above flame (category ~900)
+	// ---------------------------------------------------------------------
+	case EWeaponName::PTRS_X_Tishina: // Automated PTRS
+		return 900;
+	case EWeaponName::M920_AtSniper: // sniper AT.
+		return 898;
+	case EWeaponName::PanzerRifle_50mm: // Rifle grenade launcher
+		return 895;
 
-        // ---------------------------------------------------------------------
-        // Sniper rifles (category ~700)
-        // ---------------------------------------------------------------------
-        case EWeaponName::Kar_Sniper:
-            return 700;
-        case EWeaponName::Mosin_Snip:
-            return 698;
 
-        // ---------------------------------------------------------------------
-        // Infantry AT weapons (category ~600)
-        // ---------------------------------------------------------------------
-        case EWeaponName::PTRS_50MM:
-            return 598;
-        case EWeaponName::PanzerSchreck:
-            return 596;
-    case EWeaponName::Bazooka_50MM:
-    	return 595;
-        case EWeaponName::PanzerFaust:
-            return 594;
-        case EWeaponName::PTRS_41_14_5MM:
-            return 590;
-    	
+	// ---------------------------------------------------------------------
+	// Flame weapons (infantry, category ~800)
+	// ---------------------------------------------------------------------
+	case EWeaponName::Flamm15: // Medium flamethrower
+		return 800;
+	case EWeaponName::Ashmaker11: // Light-medium flamethrower
+		return 798;
+	case EWeaponName::Flamm09: // Light flamethrower
+		return 796;
+	case EWeaponName::Ashmaker05: // Very light flamethrower
+		return 794;
 
-        // ---------------------------------------------------------------------
-        // HMG / LMG – RipperGun top HMG, MP46 lowest HMG (category ~500)
-        // ---------------------------------------------------------------------
-        case EWeaponName::RipperGun_7_62MM:
-            return 500;
-    	// Special case of very powerful rifle.
-        case EWeaponName::SKS:
-            return 499;
-        case EWeaponName::MG_34:
-            return 498;
-        case EWeaponName::DP_28_7_62MM:
-            return 496;
-        case EWeaponName::MP46:               // Very powerful SMG, treated as low HMG tier
-            return 494;
+	// ---------------------------------------------------------------------
+	// Sniper rifles (category ~700)
+	// ---------------------------------------------------------------------
+	case EWeaponName::Kar_Sniper:
+		return 700;
+	case EWeaponName::Mosin_Snip:
+		return 698;
 
-        // ---------------------------------------------------------------------
-        // Automatic / assault rifles (SVT > Fedrov > FG42 > STG) (category ~400)
-        // ---------------------------------------------------------------------
-        case EWeaponName::SVT_40_7_62MM:
-            return 400;
-        case EWeaponName::Fedrov_Avtomat:
-            return 398;
-        case EWeaponName::FG_42_7_92MM:
-            return 396;
-        case EWeaponName::STG44_7_92MM:
-            return 394;
+	// ---------------------------------------------------------------------
+	// Infantry AT weapons (category ~600)
+	// ---------------------------------------------------------------------
+	case EWeaponName::PTRS_50MM:
+		return 598;
+	case EWeaponName::PanzerSchreck:
+		return 596;
+	case EWeaponName::Bazooka_50MM:
+		return 595;
+	case EWeaponName::PanzerFaust:
+		return 594;
+	case EWeaponName::PTRS_41_14_5MM:
+		return 590;
 
-        // ---------------------------------------------------------------------
-        // SMGs (category ~300)
-        // ---------------------------------------------------------------------
-    case EWeaponName::PPS_43_7_62MM:
-    	return 310;
-        case EWeaponName::PPSh_41_7_62MM:
-            return 300;
-        case EWeaponName::MP40_9MM:
-            return 298;
-        case EWeaponName::MP40:
-            return 296;
 
-        // ---------------------------------------------------------------------
-        // Rifles (category ~200)
-        // ---------------------------------------------------------------------
-        case EWeaponName::Kar_98k:
-            return 200;
-        case EWeaponName::Mosin:
-            return 198;
-        case EWeaponName::Mauser:
-            return 196;
+	// ---------------------------------------------------------------------
+	// HMG / LMG – RipperGun top HMG, MP46 lowest HMG (category ~500)
+	// ---------------------------------------------------------------------
+	case EWeaponName::RipperGun_7_62MM:
+		return 500;
+	// Special case of very powerful rifle.
+	case EWeaponName::SKS:
+		return 499;
+	case EWeaponName::MG_34:
+		return 498;
+	case EWeaponName::DP_28_7_62MM:
+		return 496;
+	case EWeaponName::MP46: // Very powerful SMG, treated as low HMG tier
+		return 494;
 
-        // ---------------------------------------------------------------------
-		
-        // ---------------------------------------------------------------------
-        case EWeaponName::M1895_Nagant:
-            return 100;
-        case EWeaponName::DEFAULT_WEAPON:
-            return 98;
+	// ---------------------------------------------------------------------
+	// Automatic / assault rifles (SVT > Fedrov > FG42 > STG) (category ~400)
+	// ---------------------------------------------------------------------
+	case EWeaponName::SVT_40_7_62MM:
+		return 400;
+	case EWeaponName::Fedrov_Avtomat:
+		return 398;
+	case EWeaponName::FG_42_7_92MM:
+		return 396;
+	case EWeaponName::STG44_7_92MM:
+		return 394;
 
-        // ---------------------------------------------------------------------
-        // Everything else: not handheld / not infantry.
-        // This function is only meaningful in that context → return 1.
-        // ---------------------------------------------------------------------
-        default:
-            return 1;
-    }
+	// ---------------------------------------------------------------------
+	// SMGs (category ~300)
+	// ---------------------------------------------------------------------
+	case EWeaponName::PPS_43_7_62MM:
+		return 310;
+	case EWeaponName::PPSh_41_7_62MM:
+		return 300;
+	case EWeaponName::MP40_9MM:
+		return 298;
+	case EWeaponName::MP40:
+		return 296;
+
+	// ---------------------------------------------------------------------
+	// Rifles (category ~200)
+	// ---------------------------------------------------------------------
+	case EWeaponName::Kar_98k:
+		return 200;
+	case EWeaponName::Mosin:
+		return 198;
+	case EWeaponName::Mauser:
+		return 196;
+
+	// ---------------------------------------------------------------------
+
+	// ---------------------------------------------------------------------
+	case EWeaponName::M1895_Nagant:
+		return 100;
+	case EWeaponName::DEFAULT_WEAPON:
+		return 98;
+
+	// ---------------------------------------------------------------------
+	// Everything else: not handheld / not infantry.
+	// This function is only meaningful in that context → return 1.
+	// ---------------------------------------------------------------------
+	default:
+		return 1;
+	}
 }
+
 static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 {
 	switch (WeaponName)
@@ -618,12 +618,11 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 	default:
 		{
 			const auto WeaponEnum = StaticEnum<EWeaponName>();
-			if(WeaponEnum)
+			if (WeaponEnum)
 			{
-			const FName Name = WeaponEnum->GetNameByValue(static_cast<int64>(WeaponName));
-			const FName CleanName = FName(*Name.ToString().RightChop(FString("EWeaponName::").Len()));
-			return CleanName.ToString();
-				
+				const FName Name = WeaponEnum->GetNameByValue(static_cast<int64>(WeaponName));
+				const FName CleanName = FName(*Name.ToString().RightChop(FString("EWeaponName::").Len()));
+				return CleanName.ToString();
 			}
 			return "INVALID WEAPON ENUM";
 		}

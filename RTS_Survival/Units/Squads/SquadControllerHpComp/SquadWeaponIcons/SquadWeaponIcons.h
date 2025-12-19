@@ -20,6 +20,7 @@ enum class ESquadWeaponIcon : uint8
 	DP28,
 	MG42,
 	MG34,
+	PTRS,
 	AutomatedPTRS,
 	SpekterLaser,
 	Bm14Laser,
@@ -30,5 +31,8 @@ enum class ESquadWeaponIcon : uint8
 	PanzerShrek,
 	Mp46SpecialSMG,
 	RifleMG,
+	Railgun,
+	M920Sniper,
+	PanzerRifle50mm,
 	
 };
