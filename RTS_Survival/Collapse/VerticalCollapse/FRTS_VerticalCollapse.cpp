@@ -306,13 +306,17 @@ void FRTS_VerticalCollapse::SpawnCollapseVFX(
 	const FVector VfxLocation = BaseLocationFX + FX.FxLocationOffset;
 	const FTransform NiagTransform(FX.VfxRotation, VfxLocation, FX.VfxScale);
 
-	UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+	auto Niagara = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 		World,
 		FX.CollapseVfx,
 		NiagTransform.GetLocation(),
 		NiagTransform.GetRotation().Rotator(),
 		NiagTransform.GetScale3D(),
 		true, true, ENCPoolMethod::None, true);
+	if (Niagara)
+	{
+		FX.AdjustFX(Niagara);
+	}
 }
 
 void FRTS_VerticalCollapse::SpawnCollapseSFX(

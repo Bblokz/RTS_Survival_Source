@@ -186,12 +186,13 @@ void FRTS_Collapse::HandleCollapseNextTick(TSharedPtr<FCollapseTaskContext> Cont
 	}
 
 	const TSoftObjectPtr<UGeometryCollection>& GeoCollectionSoft = Context->GeoCollection;
-	const FSoftObjectPath                      AssetPath          = GeoCollectionSoft.ToSoftObjectPath();
+	const FSoftObjectPath AssetPath = GeoCollectionSoft.ToSoftObjectPath();
 
 	// No asset assigned ⇒ nothing to load.
 	if (!AssetPath.IsValid())
 	{
-		RTSFunctionLibrary::ReportError(TEXT("HandleCollapseNextTick: GeoCollection soft reference has no asset path."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("HandleCollapseNextTick: GeoCollection soft reference has no asset path."));
 		return;
 	}
 
@@ -427,11 +428,12 @@ void FRTS_Collapse::SpawnCollapseVFX(const FCollapseFX& CollapseFX, UWorld* Worl
 	{
 		const FVector VfxLocation = BaseLocationFX + CollapseFX.FxLocationOffset;
 		const FTransform NiagTransform(CollapseFX.VfxRotation, VfxLocation, CollapseFX.VfxScale);
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		auto Niagara = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			World, CollapseFX.CollapseVfx, NiagTransform.GetLocation(),
 			NiagTransform.GetRotation().Rotator(), NiagTransform.GetScale3D(), true, true,
 			ENCPoolMethod::None, true
 		);
+		CollapseFX.AdjustFX(Niagara);
 	}
 }
 

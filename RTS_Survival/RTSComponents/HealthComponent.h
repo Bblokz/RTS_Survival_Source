@@ -49,9 +49,11 @@ public:
 	/** Callback tracker for when the widget component is created and ready. */
 	FHealthBarWidgetCallbacks M_HealthBarWidgetCallbacks;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MakeHealthBarInvisible() const;
 
 	virtual void OnHideAllGameUI(const bool bHide) override;
+	void HideHealthBar();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Debugging")
 	void DebugHealthComponentAtLocation(const FVector Location) const;

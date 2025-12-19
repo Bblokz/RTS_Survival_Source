@@ -36,23 +36,31 @@ void UHealthComponent::MakeHealthBarInvisible() const
 
 void UHealthComponent::OnHideAllGameUI(const bool bHide)
 {
-    // Always record the global state, even if the widget isn't created yet.
-    bWasHiddenByAllGameUI = bHide;
+	// Always record the global state, even if the widget isn't created yet.
+	bWasHiddenByAllGameUI = bHide;
 
-    if (!M_HealthBarWidget.IsValid())
-    {
-        return;
-    }
+	if (!M_HealthBarWidget.IsValid())
+	{
+		return;
+	}
 
-    if (bHide)
-    {
-        M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
-        return;
-    }
+	if (bHide)
+	{
+		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
 
-    // Unhide: recompute from policy and clear the flag.
-    bWasHiddenByAllGameUI = false;
-    ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
+	// Unhide: recompute from policy and clear the flag.
+	bWasHiddenByAllGameUI = false;
+	ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
+}
+
+void UHealthComponent::HideHealthBar()
+{
+	if (Widget_GetIsValidWidgetComponent())
+	{
+		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
 }
 
 void UHealthComponent::DebugHealthComponentAtLocation(const FVector Location) const
@@ -186,6 +194,7 @@ void UHealthComponent::SetMaxHealth(const float NewMaxHealth)
 
 	UpdateHealthBar();
 }
+
 bool UHealthComponent::Heal(const float HealAmount)
 {
 	bool bIsFullHealth = false;
@@ -236,7 +245,7 @@ FHealthBarVisibilitySettings UHealthComponent::GetVisibilitySettings() const
 
 UW_HealthBar* UHealthComponent::GetHealthBarWidget() const
 {
-	if(M_HealthBarWidget.IsValid())
+	if (M_HealthBarWidget.IsValid())
 	{
 		return M_HealthBarWidget.Get();
 	}
@@ -356,26 +365,25 @@ void UHealthComponent::Widget_CreateHealthBar()
 
 void UHealthComponent::OnWidgetInitialized()
 {
-    if (not Widget_GetIsValidHealthBarWidget() || not Widget_GetIsValidWidgetComponent())
-    {
-        return;
-    }
+	if (not Widget_GetIsValidHealthBarWidget() || not Widget_GetIsValidWidgetComponent())
+	{
+		return;
+	}
 
-    int8 OwningPlayer = 0;
-    if (M_RTSComponent.IsValid())
-    {
-        OwningPlayer = M_RTSComponent->GetOwningPlayer();
-        RegisterCallBackForUnitName(M_RTSComponent.Get());
-    }
-    M_HealthBarWidget->SetSettingsFromHealthComponent(this, CustomizationSettings, OwningPlayer);
+	int8 OwningPlayer = 0;
+	if (M_RTSComponent.IsValid())
+	{
+		OwningPlayer = M_RTSComponent->GetOwningPlayer();
+		RegisterCallBackForUnitName(M_RTSComponent.Get());
+	}
+	M_HealthBarWidget->SetSettingsFromHealthComponent(this, CustomizationSettings, OwningPlayer);
 
-    M_OwnerHpWidgetComp->SetCollisionEnabled(ECollisionEnabled::Type::NoCollision);
-    M_OwnerHpWidgetComp->SetCanEverAffectNavigation(false);
+	M_OwnerHpWidgetComp->SetCollisionEnabled(ECollisionEnabled::Type::NoCollision);
+	M_OwnerHpWidgetComp->SetCanEverAffectNavigation(false);
 
-    // Respect global hide at init time, otherwise fall back to policy.
-    ApplyHealthBarVisibilityPolicy(1.f);
+	// Respect global hide at init time, otherwise fall back to policy.
+	ApplyHealthBarVisibilityPolicy(1.f);
 }
-
 
 
 bool UHealthComponent::CanTolerateFireDamage(const float Damage)
@@ -479,7 +487,7 @@ void UHealthComponent::UpdateHealthBar()
 
 void UHealthComponent::UpdateVisibilityOnHealthChange(const float NewPercentage) const
 {
-   ApplyHealthBarVisibilityPolicy(NewPercentage);
+	ApplyHealthBarVisibilityPolicy(NewPercentage);
 }
 
 bool UHealthComponent::ShouldDisplayHealthForPercentage(const float NewPercentage) const
@@ -593,25 +601,24 @@ void UHealthComponent::Debug(const FString& Message, const FColor& Color) const
 
 void UHealthComponent::ApplyHealthBarVisibilityPolicy(const float CurrentPct) const
 {
-    if (!M_HealthBarWidget.IsValid())
-    {
-        return;
-    }
+	if (!M_HealthBarWidget.IsValid())
+	{
+		return;
+	}
 
-    if (bWasHiddenByAllGameUI)
-    {
-        M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
-        return;
-    }
+	if (bWasHiddenByAllGameUI)
+	{
+		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
 
-    const ESlateVisibility Target =
-        ShouldDisplayHealthForPercentage(CurrentPct)
-            ? ESlateVisibility::Visible
-            : ESlateVisibility::Hidden;
+	const ESlateVisibility Target =
+		ShouldDisplayHealthForPercentage(CurrentPct)
+			? ESlateVisibility::Visible
+			: ESlateVisibility::Hidden;
 
-    M_HealthBarWidget->SetVisibility(Target);
+	M_HealthBarWidget->SetVisibility(Target);
 }
-
 
 
 void UHealthComponent::StartFireRecoveryIfNeeded()
@@ -749,28 +756,28 @@ void UHealthComponent::RegisterCallBackForUnitName(URTSComponent* RTSComponent)
 
 void UHealthComponent::OnUnitHovered() const
 {
-    if (!VisibilitySettings.bDisplayOnHover)
-    {
-        return;
-    }
-    if (!M_HealthBarWidget.IsValid() || bWasHiddenByAllGameUI)
-    {
-        return;
-    }
-    M_HealthBarWidget->SetVisibility(ESlateVisibility::Visible);
+	if (!VisibilitySettings.bDisplayOnHover)
+	{
+		return;
+	}
+	if (!M_HealthBarWidget.IsValid() || bWasHiddenByAllGameUI)
+	{
+		return;
+	}
+	M_HealthBarWidget->SetVisibility(ESlateVisibility::Visible);
 }
 
 void UHealthComponent::OnUnitUnhovered() const
 {
-    if (!VisibilitySettings.bDisplayOnHover)
-    {
-        return;
-    }
-    if (!M_HealthBarWidget.IsValid())
-    {
-        return;
-    }
-    ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
+	if (!VisibilitySettings.bDisplayOnHover)
+	{
+		return;
+	}
+	if (!M_HealthBarWidget.IsValid())
+	{
+		return;
+	}
+	ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
 }
 
 
