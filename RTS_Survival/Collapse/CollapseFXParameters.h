@@ -7,7 +7,39 @@
 #include "NiagaraSystem.h"
 
 #include "CollapseFXParameters.generated.h"
+UENUM()
+enum class ECollapseVFXAdjustNiagaraParams : uint8
+{
+	Not,
+	SetScaleColorLifetime,
+	
+};
 
+USTRUCT(Blueprintable)
+struct FCollapseParameters
+{
+	GENERATED_BODY()
+	// If set to not nothing will happen on the collapse vfx.
+	UPROPERTY(BlueprintReadWrite)
+	ECollapseVFXAdjustNiagaraParams VFXAdjustParams = ECollapseVFXAdjustNiagaraParams::Not;
+
+	UPROPERTY(BlueprintReadWrite)
+	float SizeMlt = 1.f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float LifeTimeMlt = 1.f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float ParticlesMlt = 1.f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FVector GroundSmokeOffset = FVector::ZeroVector;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLinearColor SmokeColor = FLinearColor::White;
+	
+	
+};
 // Defines SFX and VFX for a Collapse.
 USTRUCT(Blueprintable)
 struct FCollapseFX
@@ -38,7 +70,12 @@ struct FCollapseFX
 	UPROPERTY(BlueprintReadWrite)
 	USoundConcurrency* SfxConcurrency = nullptr;
 
+	UPROPERTY(BlueprintReadWrite)
+	FCollapseParameters CollapseNiagaraParameters;
+
 	void CreateFX(const AActor* WorldContext) const;
+	void AdjustFX(UNiagaraComponent* NiagaraComp) const;
+	void AdjustFxForSetScaleColorLifetime(UNiagaraComponent* NiagaraComp) const;
 };
 
 

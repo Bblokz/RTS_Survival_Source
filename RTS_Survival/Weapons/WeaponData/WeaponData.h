@@ -58,6 +58,9 @@ struct FBehaviourWeaponAttributes
 	float ArmorPenetration = 0.0f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ArmorPenetrationMaxRange = 0.0f;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float TnTGrams = 0.0f;
 	
 	// Range of the Area of Effect (AOE) explosion in centimeters, applicable for AOE-enabled projectiles.

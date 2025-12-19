@@ -6,6 +6,7 @@
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 
@@ -48,6 +49,16 @@ void AGarrisonableBuilding::BeginPlay()
 	if (EnsureHealthComponentIsValid())
 	{
 		M_CachedVisibilityPreGarrison = HealthComponent->GetVisibilitySettings();
+	}
+	// Get all static mesh components.
+	TArray<UStaticMeshComponent*> StaticMeshComponents;
+	GetComponents<UStaticMeshComponent>(StaticMeshComponents);
+	for (UStaticMeshComponent* MeshComp : StaticMeshComponents)
+	{
+		if (IsValid(MeshComp))
+		{
+			FRTS_CollisionSetup::SetupDestructibleEnvActorMeshCollision(MeshComp, false);
+		}
 	}
 }
 

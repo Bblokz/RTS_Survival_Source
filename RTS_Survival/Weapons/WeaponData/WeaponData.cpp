@@ -177,7 +177,7 @@ void FShellVfxOverwrites::HandleWeaponShellChange(const EWeaponShellType OldType
 		{
 			RTSFunctionLibrary::ReportError("A shell type was not set to AP but also the AP effects were never stored"
 				"this is unexpected as we assume that weapons always start with AP and then switch to something else"
-				"and that weapons that start with HE are not able to switch at all");
+				"and that weapons that start with something else are not able to switch at all");
 			return;
 		}
 		// Something before was not AP; restore the effects as if we are now changing from AP to something else to not
@@ -858,6 +858,8 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 
 	WeaponDataToUpgrade->BaseDamage -= CurrentBehaviourAttributes.Damage;
 	WeaponDataToUpgrade->Range -= CurrentBehaviourAttributes.Range;
+	WeaponDataToUpgrade->ArmorPen -= CurrentBehaviourAttributes.ArmorPenetration;
+	WeaponDataToUpgrade->ArmorPenMaxRange -= CurrentBehaviourAttributes.ArmorPenetrationMaxRange;
 	WeaponDataToUpgrade->ReloadSpeed -= CurrentBehaviourAttributes.ReloadSpeed;
 	WeaponDataToUpgrade->Accuracy -= CurrentBehaviourAttributes.Accuracy;
 	WeaponDataToUpgrade->MagCapacity -= CurrentBehaviourAttributes.MagSize;
@@ -867,6 +869,8 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	{
 		CurrentBehaviourAttributes.Damage += BehaviourWeaponAttributes.Damage;
 		CurrentBehaviourAttributes.Range += BehaviourWeaponAttributes.Range;
+		CurrentBehaviourAttributes.ArmorPenetration += BehaviourWeaponAttributes.ArmorPenetration;
+		CurrentBehaviourAttributes.ArmorPenetrationMaxRange += BehaviourWeaponAttributes.ArmorPenetrationMaxRange;
 		CurrentBehaviourAttributes.ReloadSpeed += BehaviourWeaponAttributes.ReloadSpeed;
 		CurrentBehaviourAttributes.Accuracy += BehaviourWeaponAttributes.Accuracy;
 		CurrentBehaviourAttributes.MagSize += BehaviourWeaponAttributes.MagSize;
@@ -876,6 +880,8 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	{
 		CurrentBehaviourAttributes.Damage -= BehaviourWeaponAttributes.Damage;
 		CurrentBehaviourAttributes.Range -= BehaviourWeaponAttributes.Range;
+		CurrentBehaviourAttributes.ArmorPenetration -= BehaviourWeaponAttributes.ArmorPenetration;
+		CurrentBehaviourAttributes.ArmorPenetrationMaxRange -= BehaviourWeaponAttributes.ArmorPenetrationMaxRange;
 		CurrentBehaviourAttributes.ReloadSpeed -= BehaviourWeaponAttributes.ReloadSpeed;
 		CurrentBehaviourAttributes.Accuracy -= BehaviourWeaponAttributes.Accuracy;
 		CurrentBehaviourAttributes.MagSize -= BehaviourWeaponAttributes.MagSize;
@@ -884,6 +890,8 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 
 	WeaponDataToUpgrade->BaseDamage += CurrentBehaviourAttributes.Damage;
 	WeaponDataToUpgrade->Range += CurrentBehaviourAttributes.Range;
+	WeaponDataToUpgrade->ArmorPen += CurrentBehaviourAttributes.ArmorPenetration;
+	WeaponDataToUpgrade->ArmorPenMaxRange += CurrentBehaviourAttributes.ArmorPenetrationMaxRange;
 	WeaponDataToUpgrade->ReloadSpeed += CurrentBehaviourAttributes.ReloadSpeed;
 	WeaponDataToUpgrade->Accuracy += CurrentBehaviourAttributes.Accuracy;
 	WeaponDataToUpgrade->MagCapacity += CurrentBehaviourAttributes.MagSize;

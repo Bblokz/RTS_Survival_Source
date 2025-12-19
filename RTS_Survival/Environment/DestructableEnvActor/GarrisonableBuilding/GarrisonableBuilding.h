@@ -13,6 +13,7 @@ class UCargo;
 class URTSComponent;
 class UHealthComponent;
 
+// Collision is setup in the bp of this class automatically.
 UCLASS()
 class RTS_SURVIVAL_API AGarrisonableBuilding : public ADestructableEnvActor, public IHealthBarOwner,
 public ICargoOwner

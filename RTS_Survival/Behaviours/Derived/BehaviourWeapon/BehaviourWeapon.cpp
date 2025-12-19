@@ -148,6 +148,8 @@ FBehaviourWeaponAttributes UBehaviourWeapon::CalculateBehaviourAttributesWithMul
 	ApplyIntMultiplier(WeaponData->MagCapacity, BehaviourWeaponMultipliers.MagSizeMlt, CalculatedAttributes.MagSize);
 	ApplyFloatMultiplier(WeaponData->ArmorPen, BehaviourWeaponMultipliers.ArmorPenetrationMlt,
 	                     CalculatedAttributes.ArmorPenetration);
+	ApplyFloatMultiplier(WeaponData->ArmorPenMaxRange, BehaviourWeaponMultipliers.ArmorPenetrationMlt,
+	                     CalculatedAttributes.ArmorPenetrationMaxRange);
 	ApplyFloatMultiplier(WeaponData->TNTExplosiveGrams, BehaviourWeaponMultipliers.TnTGramsMlt,
 	                     CalculatedAttributes.TnTGrams);
 	ApplyFloatMultiplier(WeaponData->ShrapnelRange, BehaviourWeaponMultipliers.ShrapnelRangeMlt,

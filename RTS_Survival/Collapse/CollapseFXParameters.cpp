@@ -1,7 +1,20 @@
 ﻿#include "CollapseFXParameters.h"
 
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+
+
+namespace COllapseVFXNiagaraParams
+{
+	const FName ScaleParamName = FName("SizeMlt");
+	const FName LifeTimeName = "LifetimeMlt";
+	const FName UseMuzzleSmokeName = "UseMuzzleSmoke";
+	const FName UseGroundSmokeName = "UseGroundSmoke";
+	const FName GroundZOffsetName = "GroundZOffset";
+	const FName ParticlesMltName = "NormalizedWeaponCalibre";
+	FName ColorName = "MuzzleColor";
+}
 
 
 void FCollapseFX::CreateFX(const AActor* WorldContext) const
@@ -14,7 +27,8 @@ void FCollapseFX::CreateFX(const AActor* WorldContext) const
 	if(CollapseVfx)
 	{
 		const FVector SpawnLocation = WorldContext->GetActorLocation() + FxLocationOffset;
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, CollapseVfx, SpawnLocation, VfxRotation, VfxScale);		
+		UNiagaraComponent* Niagara =  UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, CollapseVfx, SpawnLocation, VfxRotation, VfxScale);
+		AdjustFX(Niagara);
 	}
 	if(CollapseSfx)
 	{
@@ -31,4 +45,32 @@ void FCollapseFX::CreateFX(const AActor* WorldContext) const
 			SfxConcurrency
 		);
 	}
+}
+
+void FCollapseFX::AdjustFX(UNiagaraComponent* NiagaraComp) const
+{
+	if(not NiagaraComp ||CollapseNiagaraParameters.VFXAdjustParams == ECollapseVFXAdjustNiagaraParams::Not)
+	{
+		return;
+	}
+	switch (CollapseNiagaraParameters.VFXAdjustParams) {
+	case ECollapseVFXAdjustNiagaraParams::Not:
+		break;
+	case ECollapseVFXAdjustNiagaraParams::SetScaleColorLifetime:
+		AdjustFxForSetScaleColorLifetime(NiagaraComp);
+		break;
+	}
+	
+}
+
+void FCollapseFX::AdjustFxForSetScaleColorLifetime(UNiagaraComponent* NiagaraComp) const
+{
+	using  namespace COllapseVFXNiagaraParams;
+	NiagaraComp->SetBoolParameter(UseGroundSmokeName, true);
+	NiagaraComp->SetBoolParameter(UseMuzzleSmokeName, false);
+	NiagaraComp->SetFloatParameter(ScaleParamName, CollapseNiagaraParameters.SizeMlt);
+	NiagaraComp->SetFloatParameter(LifeTimeName, CollapseNiagaraParameters.LifeTimeMlt);
+	NiagaraComp->SetFloatParameter(ParticlesMltName, CollapseNiagaraParameters.ParticlesMlt);
+	NiagaraComp->SetVectorParameter(GroundZOffsetName, CollapseNiagaraParameters.GroundSmokeOffset);
+	NiagaraComp->SetColorParameter(ColorName, CollapseNiagaraParameters.SmokeColor);
 }
