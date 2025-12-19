@@ -263,21 +263,31 @@ void UCommandData::AbilityCoolDownTick()
 	}
 }
 
-void UCommandData::IfCooldownBeginAbilityCooldown(const EAbilityID AbilityId)
+void UCommandData::IfCooldownBeginAbilityCooldown(const FQueueCommand& Command)
 {
-	FUnitAbilityEntry* AbilityEntry = GetAbilityEntry(AbilityId);
-	if (not AbilityEntry)
-	{
-		return;
-	}
+        FUnitAbilityEntry* AbilityEntry = nullptr;
+
+        if (GetDoesQueuedCommandRequireSubtypeEntry(Command.CommandType))
+        {
+                AbilityEntry = GetAbilityEntryForQueuedCommandSubtype(Command);
+        }
+        else
+        {
+                AbilityEntry = GetAbilityEntry(Command.CommandType);
+        }
+
+        if (not AbilityEntry)
+        {
+                return;
+        }
 
 	if (AbilityEntry->CooldownDuration <= 0)
 	{
 		return;
-	}
+        }
 
-	AbilityEntry->CooldownRemaining = AbilityEntry->CooldownDuration;
-	StartAbilityCooldownTimer();
+        AbilityEntry->CooldownRemaining = AbilityEntry->CooldownDuration;
+        StartAbilityCooldownTimer();
 }
 
 void UCommandData::InitCommandData(ICommands* Owner)
@@ -390,14 +400,14 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 		|| (AbilityId == EAbilityID::IdDisableMode);
 }
 
-const FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
+FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
 {
-	if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
-	{
-		return GetAbilityEntryOfCustomType(
-			EAbilityID::IdApplyBehaviour,
-			static_cast<int32>(QueuedCommand.BehaviourAbilityType));
-	}
+        if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
+        {
+                return GetAbilityEntryOfCustomType(
+                        EAbilityID::IdApplyBehaviour,
+                        static_cast<int32>(QueuedCommand.BehaviourAbilityType));
+        }
 
 	if ((QueuedCommand.CommandType == EAbilityID::IdActivateMode) || (QueuedCommand.CommandType ==
 		EAbilityID::IdDisableMode))
@@ -407,7 +417,7 @@ const FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(co
 			static_cast<int32>(QueuedCommand.ModeAbilityType));
 	}
 
-	return nullptr;
+        return nullptr;
 }
 
 FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const
@@ -549,18 +559,18 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 
 void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 {
-	if (!M_Owner)
-	{
-		RTSFunctionLibrary::ReportError("UCommandData::ExecuteCommand - M_Owner is null");
-		return;
-	}
+        if (not M_Owner)
+        {
+                RTSFunctionLibrary::ReportError("UCommandData::ExecuteCommand - M_Owner is null");
+                return;
+        }
 
-	if (!bExecuteCurrentCommand)
-	{
-		// Move to next
-		CurrentIndex++;
-		if (CurrentIndex >= NumCommands)
-		{
+        if (not bExecuteCurrentCommand)
+        {
+                // Move to next
+                CurrentIndex++;
+                if (CurrentIndex >= NumCommands)
+                {
 			ClearCommands();
 			if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 			{
@@ -600,7 +610,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		return;
 	}
 
-	IfCooldownBeginAbilityCooldown(Cmd.CommandType);
+        IfCooldownBeginAbilityCooldown(Cmd);
 
 	// Now we call ICommands methods based on the type:
 	switch (Cmd.CommandType)
