@@ -622,113 +622,152 @@ void UCargo::BeginPlay_InitSeatShuffleTimer()
 
 void UCargo::TickSeatReassignment()
 {
-	if (not bM_IsEnabled)
-	{
-		return;
-	}
-	if (M_VacancyState.M_InsideSquads.Num() == 0)
-	{
-		return;
-	}
+        if (not CanShuffleSeats())
+        {
+                return;
+        }
 
-	const int32 TotalSockets = M_SocketOccupancy.M_AllCargoSockets.Num();
-	if (TotalSockets <= 1 || M_SocketOccupancy.M_SocketToUnit.Num() == 0)
-	{
-		return;
-	}
+        const int32 TotalSockets = M_SocketOccupancy.M_AllCargoSockets.Num();
+        const int32 FirstEmptyIndex = FindFirstEmptySeatIndexAndClean(TotalSockets);
+        if (FirstEmptyIndex == INDEX_NONE)
+        {
+                return;
+        }
 
-	// Step 1: find the first empty seat in the authoring order, also cleaning up any stale entries.
-	int32 FirstEmptyIndex = INDEX_NONE;
+        ASquadUnit* UnitToMove = nullptr;
+        int32 SourceIndex = INDEX_NONE;
+        if (not TryFindNextUnitToMove(FirstEmptyIndex, UnitToMove, SourceIndex))
+        {
+                return;
+        }
 
-	for (int32 SocketIndex = 0; SocketIndex < TotalSockets; ++SocketIndex)
-	{
-		const FName& SocketName = M_SocketOccupancy.M_AllCargoSockets[SocketIndex];
+        const FName& SourceSocketName = M_SocketOccupancy.M_AllCargoSockets[SourceIndex];
+        const FName& TargetSocketName = M_SocketOccupancy.M_AllCargoSockets[FirstEmptyIndex];
 
-		TObjectPtr<ASquadUnit>* const OccupantPtr = M_SocketOccupancy.M_SocketToUnit.Find(SocketName);
-		ASquadUnit* OccupantUnit = nullptr;
-		if (OccupantPtr)
-		{
-			OccupantUnit = OccupantPtr->Get();
-		}
+        if (SourceSocketName == TargetSocketName)
+        {
+                return;
+        }
 
-		if (not OccupantPtr || not IsValid(OccupantUnit))
-		{
-			if (OccupantPtr && not IsValid(OccupantUnit))
-			{
-				M_SocketOccupancy.M_SocketToUnit.Remove(SocketName);
-			}
-			FirstEmptyIndex = SocketIndex;
-			break;
-		}
-	}
+        UpdateSeatOccupancyAfterMove(SourceSocketName, TargetSocketName, UnitToMove);
+        TryRequestSeatMoveOnSquad(UnitToMove, TargetSocketName);
+}
 
-	if (FirstEmptyIndex == INDEX_NONE)
-	{
-		// No empty seats to improve into.
-		return;
-	}
+bool UCargo::CanShuffleSeats() const
+{
+        if (not bM_IsEnabled)
+        {
+                return false;
+        }
+        if (M_VacancyState.M_InsideSquads.Num() == 0)
+        {
+                return false;
+        }
 
-	// Step 2: find the first valid occupied seat to slide forward.
-	int32 SourceIndex = INDEX_NONE;
-	ASquadUnit* UnitToMove = nullptr;
+        if (M_SocketOccupancy.M_AllCargoSockets.Num() <= 1 || M_SocketOccupancy.M_SocketToUnit.Num() == 0)
+        {
+                return false;
+        }
 
-	for (int32 SocketIndex = 0; SocketIndex < TotalSockets; ++SocketIndex)
-	{
-		const FName& SocketName = M_SocketOccupancy.M_AllCargoSockets[SocketIndex];
+        return true;
+}
 
-		TObjectPtr<ASquadUnit>* const OccupantPtr = M_SocketOccupancy.M_SocketToUnit.Find(SocketName);
-		if (not OccupantPtr)
-		{
-			continue;
-		}
+int32 UCargo::FindFirstEmptySeatIndexAndClean(const int32 TotalSockets)
+{
+        for (int32 SocketIndex = 0; SocketIndex < TotalSockets; ++SocketIndex)
+        {
+                const FName& SocketName = M_SocketOccupancy.M_AllCargoSockets[SocketIndex];
 
-		ASquadUnit* OccupantUnit = OccupantPtr->Get();
-		if (not IsValid(OccupantUnit))
-		{
-			// Clean stale mapping and keep searching.
-			M_SocketOccupancy.M_SocketToUnit.Remove(SocketName);
-			continue;
-		}
+                TObjectPtr<ASquadUnit>* const OccupantPtr = M_SocketOccupancy.M_SocketToUnit.Find(SocketName);
+                ASquadUnit* OccupantUnit = nullptr;
+                if (OccupantPtr)
+                {
+                        OccupantUnit = OccupantPtr->Get();
+                }
 
-		SourceIndex = SocketIndex;
-		UnitToMove = OccupantUnit;
-		break;
-	}
+                if (not OccupantPtr || not IsValid(OccupantUnit))
+                {
+                        if (OccupantPtr && not IsValid(OccupantUnit))
+                        {
+                                M_SocketOccupancy.M_SocketToUnit.Remove(SocketName);
+                        }
+                        return SocketIndex;
+                }
+        }
 
-	if (SourceIndex == INDEX_NONE || not IsValid(UnitToMove))
-	{
-		// Nobody to move into the gap.
-		return;
-	}
+        return INDEX_NONE;
+}
 
-	const FName& SourceSocketName = M_SocketOccupancy.M_AllCargoSockets[SourceIndex];
-	const FName& TargetSocketName = M_SocketOccupancy.M_AllCargoSockets[FirstEmptyIndex];
+bool UCargo::TryFindNextUnitToMove(const int32 EmptySeatIndex, ASquadUnit*& OutUnitToMove, int32& OutSourceIndex)
+{
+        OutUnitToMove = nullptr;
+        OutSourceIndex = INDEX_NONE;
 
-	if (SourceSocketName == TargetSocketName)
-	{
-		return;
-	}
+        const int32 TotalSockets = M_SocketOccupancy.M_AllCargoSockets.Num();
+        if (TotalSockets == 0)
+        {
+                return false;
+        }
 
-	// Step 3: update occupancy bookkeeping first.
-	M_SocketOccupancy.M_SocketToUnit.Remove(SourceSocketName);
-	M_SocketOccupancy.M_SocketToUnit.Add(TargetSocketName, UnitToMove);
+        const int32 StartIndex = FMath::Max(M_SocketOccupancy.M_NextRoundRobinIndex, EmptySeatIndex + 1) % TotalSockets;
 
-	// Step 4: ask the owning squad's cargo component to actually move/attach the unit.
-	TObjectPtr<ASquadController> SquadController = UnitToMove->GetSquadControllerChecked();
-	if (not IsValid(SquadController))
-	{
-		return;
-	}
+        for (int32 Offset = 0; Offset < TotalSockets; ++Offset)
+        {
+                const int32 SocketIndex = (StartIndex + Offset) % TotalSockets;
+                if (SocketIndex == EmptySeatIndex)
+                {
+                        continue;
+                }
 
-	UCargoSquad* CargoSquad = SquadController->FindComponentByClass<UCargoSquad>();
-	if (not IsValid(CargoSquad))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(
-			SquadController.Get(), "CargoSquad", "UCargo::TickSeatReassignment");
-		return;
-	}
+                const FName& SocketName = M_SocketOccupancy.M_AllCargoSockets[SocketIndex];
+                TObjectPtr<ASquadUnit>* const OccupantPtr = M_SocketOccupancy.M_SocketToUnit.Find(SocketName);
+                if (not OccupantPtr)
+                {
+                        continue;
+                }
 
-	CargoSquad->HandleSeatReassignmentFromCargo(this, UnitToMove, TargetSocketName);
+                ASquadUnit* const OccupantUnit = OccupantPtr->Get();
+                if (not IsValid(OccupantUnit))
+                {
+                        M_SocketOccupancy.M_SocketToUnit.Remove(SocketName);
+                        continue;
+                }
+
+                OutUnitToMove = OccupantUnit;
+                OutSourceIndex = SocketIndex;
+                M_SocketOccupancy.M_NextRoundRobinIndex = (SocketIndex + 1) % TotalSockets;
+                return true;
+        }
+
+        M_SocketOccupancy.M_NextRoundRobinIndex = StartIndex;
+        return false;
+}
+
+void UCargo::UpdateSeatOccupancyAfterMove(const FName& SourceSocketName, const FName& TargetSocketName,
+                                          ASquadUnit* UnitToMove)
+{
+        M_SocketOccupancy.M_SocketToUnit.Remove(SourceSocketName);
+        M_SocketOccupancy.M_SocketToUnit.Add(TargetSocketName, UnitToMove);
+}
+
+bool UCargo::TryRequestSeatMoveOnSquad(ASquadUnit* UnitToMove, const FName& TargetSocketName)
+{
+        TObjectPtr<ASquadController> SquadController = UnitToMove->GetSquadControllerChecked();
+        if (not IsValid(SquadController))
+        {
+                return false;
+        }
+
+        UCargoSquad* CargoSquad = SquadController->FindComponentByClass<UCargoSquad>();
+        if (not IsValid(CargoSquad))
+        {
+                RTSFunctionLibrary::ReportNullErrorComponent(
+                        SquadController.Get(), "CargoSquad", "UCargo::TickSeatReassignment");
+                return false;
+        }
+
+        CargoSquad->HandleSeatReassignmentFromCargo(this, UnitToMove, TargetSocketName);
+        return true;
 }
 
 

@@ -293,11 +293,18 @@ private:
 
 	void BeginPlay_SetOwnerInterface();
 
-	// Sets up the single per-cargo timer that may reshuffle seat assignments over time.
-	void BeginPlay_InitSeatShuffleTimer();
+        // Sets up the single per-cargo timer that may reshuffle seat assignments over time.
+        void BeginPlay_InitSeatShuffleTimer();
 
-	// Periodic tick, called by the timer, that moves at most one unit to a better free seat.
-	void TickSeatReassignment();
+        // Periodic tick, called by the timer, that moves at most one unit to a better free seat.
+        void TickSeatReassignment();
+
+        bool CanShuffleSeats() const;
+        int32 FindFirstEmptySeatIndexAndClean(const int32 TotalSockets);
+        bool TryFindNextUnitToMove(const int32 EmptySeatIndex, ASquadUnit*& OutUnitToMove, int32& OutSourceIndex);
+        void UpdateSeatOccupancyAfterMove(const FName& SourceSocketName, const FName& TargetSocketName,
+                                          ASquadUnit* UnitToMove);
+        bool TryRequestSeatMoveOnSquad(ASquadUnit* UnitToMove, const FName& TargetSocketName);
 
 	UPROPERTY()
 	TScriptInterface<ICargoOwner> M_CargoOwner;
