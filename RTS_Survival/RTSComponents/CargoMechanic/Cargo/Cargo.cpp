@@ -74,15 +74,38 @@ void UCargo::OnSquadCompletelyDiedInside(ASquadController* SquadController)
 
 void UCargo::OnOwnerDies(const ERTSDeathType DeathType)
 {
-	// Only the server should authoritatively kill actors.
-	if (not GetOwner() || not GetOwner()->HasAuthority())
-	{
-		return;
-	}
+        // Only the server should authoritatively kill actors.
+        if (not GetOwner() || not GetOwner()->HasAuthority())
+        {
+                return;
+        }
 
-	const TArray<TObjectPtr<ASquadController>> InsideSquads = OnOwnerDies_GetInsideSquadsSnapshot();
-	OnOwnerDies_KillAllInsideSquads(InsideSquads);
-	OnOwnerDies_ResetState();
+        const TArray<TObjectPtr<ASquadController>> InsideSquads = OnOwnerDies_GetInsideSquadsSnapshot();
+        OnOwnerDies_KillAllInsideSquads(InsideSquads);
+        OnOwnerDies_ResetState();
+}
+
+void UCargo::ApplyDamageToGarrisonedSquads(const int32 DamagePercent)
+{
+        AActor* OwnerActor = GetOwner();
+        if (not OwnerActor || not OwnerActor->HasAuthority())
+        {
+                return;
+        }
+
+        const int32 ClampedDamagePercent = FMath::Clamp(DamagePercent, 0, 100);
+        const TArray<TObjectPtr<ASquadController>> InsideSquadsSnapshot = M_VacancyState.M_InsideSquads.Array();
+        for (const TObjectPtr<ASquadController>& SquadPtr : InsideSquadsSnapshot)
+        {
+                ASquadController* const SquadController = SquadPtr.Get();
+                if (not IsValid(SquadController))
+                {
+                        continue;
+                }
+                ApplyDamageToSquadUnits(SquadController, ClampedDamagePercent);
+        }
+
+        SetIsEnabled(false);
 }
 
 void UCargo::AdjustSeatsForSquad(ASquadController* Squad, const int32 SeatsDelta)
@@ -907,16 +930,70 @@ void UCargo::OnOwnerDies_KillUnit(ASquadUnit* Unit)
 
 void UCargo::OnOwnerDies_DetachIfAttachedToOwner(ASquadUnit* Unit)
 {
-	if (Unit->GetAttachParentActor() == GetOwner())
-	{
-		Unit->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	}
+        if (Unit->GetAttachParentActor() == GetOwner())
+        {
+                Unit->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+        }
+}
+
+void UCargo::ApplyDamageToSquadUnits(ASquadController* SquadController, const int32 DamagePercent) const
+{
+        if (DamagePercent <= 0 || not IsValid(SquadController))
+        {
+                return;
+        }
+
+        const TArray<ASquadUnit*> SquadUnits = SquadController->GetSquadUnitsChecked();
+        for (ASquadUnit* SquadUnit : SquadUnits)
+        {
+                if (not IsValid(SquadUnit))
+                {
+                        continue;
+                }
+                UHealthComponent* const UnitHealthComponent = SquadUnit->FindComponentByClass<UHealthComponent>();
+                if (not IsValid(UnitHealthComponent))
+                {
+                        RTSFunctionLibrary::ReportNullErrorComponent(SquadUnit,
+                                                                     "HealthComponent",
+                                                                     "UCargo::ApplyDamageToSquadUnits");
+                        continue;
+                }
+
+                const float DamageAmount = CalculateDamageAmountForUnit(UnitHealthComponent, DamagePercent);
+                if (DamageAmount <= 0.f)
+                {
+                        continue;
+                }
+
+                FDamageEvent DamageEvent;
+                SquadUnit->TakeDamage(DamageAmount,
+                                      DamageEvent,
+                                      /* EventInstigator */ nullptr,
+                                      /* DamageCauser   */ GetOwner());
+        }
+}
+
+float UCargo::CalculateDamageAmountForUnit(UHealthComponent* HealthComponent, const int32 DamagePercent) const
+{
+        if (DamagePercent <= 0 || not IsValid(HealthComponent))
+        {
+                return 0.f;
+        }
+
+        const float MaxHealth = HealthComponent->GetMaxHealth();
+        if (MaxHealth <= 0.f)
+        {
+                return 0.f;
+        }
+
+        constexpr float PercentageScale = 0.01f;
+        return MaxHealth * static_cast<float>(DamagePercent) * PercentageScale;
 }
 
 void UCargo::MoveOutGarrisonedInfantryOnDisabled()
 {
-	if (not GetOwner())
-	{
+        if (not GetOwner())
+        {
 		return;
 	}
 

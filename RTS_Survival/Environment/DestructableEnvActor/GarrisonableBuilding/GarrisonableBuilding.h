@@ -14,15 +14,22 @@ class URTSComponent;
 class UHealthComponent;
 
 // Collision is setup in the bp of this class automatically.
+/**
+ * @brief Environmental building that allows squads to garrison and provides cargo management for them.
+ * Handles visibility changes when squads enter or leave and forwards destruction effects to garrisoned squads.
+ */
 UCLASS()
 class RTS_SURVIVAL_API AGarrisonableBuilding : public ADestructableEnvActor, public IHealthBarOwner,
 public ICargoOwner
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
-	AGarrisonableBuilding(const FObjectInitializer& ObjectInitializer);
+        // Sets default values for this actor's properties
+        AGarrisonableBuilding(const FObjectInitializer& ObjectInitializer);
+
+        /** Percentage of max health dealt as damage to garrisoned units when this building dies. */
+        static const int32 DamagePercentage;
 
 	virtual void OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing) override;
 
@@ -53,7 +60,7 @@ protected:
     		AController* EventInstigator,
     		AActor* DamageCauser) override final;
 
-	virtual void OnUnitDies(const ERTSDeathType DeathType) override;
+        virtual void OnUnitDies(const ERTSDeathType DeathType) override;
 
 	
 	// Contains Health and primitive armor values.
@@ -75,6 +82,8 @@ protected:
 
 private:
 
-	// What the health bar visibility settings were before squads entered.
-	FHealthBarVisibilitySettings M_CachedVisibilityPreGarrison;
+        void OnUnitDies_HandleGarrisonState();
+
+        // What the health bar visibility settings were before squads entered.
+        FHealthBarVisibilitySettings M_CachedVisibilityPreGarrison;
 };
