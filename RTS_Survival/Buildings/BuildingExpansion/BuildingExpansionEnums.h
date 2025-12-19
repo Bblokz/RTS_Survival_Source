@@ -59,6 +59,8 @@ enum class EBuildingExpansionType : uint8
 	BTX_RusGuardTower UMETA(DisplayName = "Rus Guard Tower"),
 	BTX_RusLongCamoBunker UMETA(DisplayName = "Rus Long Camo Bunker"),
 	BTX_RusDomeBunker UMETA(DisplayName = "Rus Dome Bunker"),
+	BTX_RusWall,
+	BTX_RusGate,
 
 	// Rus Buildings.
 	BTX_RusBarracks UMETA(DisplayName = "Rus Barracks"),

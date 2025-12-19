@@ -735,6 +735,8 @@ namespace DeveloperSettings
 			// Building expansions health settings.
 			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(500 * OverallHealthMlt);
 			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(850 * OverallHealthMlt);
+			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(2000* OverallHealthMlt);
+			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500* OverallHealthMlt);
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
 			inline constexpr float T3BxpBunkerHealth = RoundToNearestMultipleOfFive(1600 * OverallHealthMlt);
 			inline constexpr float BxpHeavyBunker = RoundToNearestMultipleOfFive(2400 * OverallHealthMlt);

@@ -131,7 +131,22 @@ void UApplyBehaviourAbilityComponent::BeginPlay_AddAbility()
 		AddAbilityToSquad(SquadController);
 		return;
 	}
-	AddAbilityToCommands();
+	if (UWorld* World = GetWorld())
+	{
+		TWeakObjectPtr<UApplyBehaviourAbilityComponent> WeakThis(this);
+		auto SetupAbility = [WeakThis]()-> void
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->AddAbilityToCommands();
+		};
+		// Prevent race condition with tank master beginplay initialisation.
+		FTimerDelegate Del;
+		Del.BindLambda(SetupAbility);
+		World->GetTimerManager().SetTimerForNextTick(Del);
+	}
 }
 
 void UApplyBehaviourAbilityComponent::AddAbilityToSquad(ASquadController* Squad)

@@ -1161,6 +1161,10 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 	{
 		return ECommandQueueError::AbilityOnCooldown;
 	}
+	if(bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
 	return UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdApplyBehaviour,
 		FVector::ZeroVector,

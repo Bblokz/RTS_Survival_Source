@@ -4957,13 +4957,35 @@ void ACPPGameState::InitAllGameBxpData()
 			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 2), 10)
 		},
 	});
+	BxpData.Abilities = ArmedBxpAbilities;
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2BxpHealth * 1.33, 10);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBoforsPosition, BxpData);
+	
+	// -----------------------------------------------------------------------
+	// --------------------------- RUS WALL AND GATE -------------------------
+	// -----------------------------------------------------------------------
+	BxpData.ConstructionTime = BxpT2BuildTime;
+	BxpData.VisionRadius = T2BxpVisionRadius;
+	BxpData.Cost = FUnitCost({
+		{
+			ERTSResourceType::Resource_Radixite,
+			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 1), 10)
+		},
+		{
+			ERTSResourceType::Resource_Metal,
+			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 2), 10)
+		},
+	});
+	BxpData.Abilities = NotArmedBxpAbilities;
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpWallHealth, 10);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusWall, BxpData);
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpGateHealth, 10);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusGate, BxpData);
 
 	// -----------------------------------------------------------------------
 	// --------------------------- RUS AMMO STORAGE -------------------------
 	// -----------------------------------------------------------------------
-	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2BxpHealth * 1.33, 10);
-	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBoforsPosition, BxpData);
+
 
 	BxpData.ConstructionTime = T1BxpBuildTime;
 	BxpData.VisionRadius = T1BxpVisionRadius;

@@ -324,7 +324,7 @@ private:
 
 	// Interval in seconds for automatic seat reshuffle; <= 0 disables reshuffle entirely.
 	UPROPERTY(EditDefaultsOnly, Category="Cargo|Optimisation")
-	float M_SeatShuffleIntervalSeconds = 0.3f;
+	float M_SeatShuffleIntervalSeconds = 3.f;
 
 	FVector M_Offset = FVector::ZeroVector;
 
