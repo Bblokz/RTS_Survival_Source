@@ -159,7 +159,7 @@ private:
 	bool GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility);
 	bool GetIsQueuedCommandAbilityIdStillOnUnit(EAbilityID AbilityId) const;
 	bool GetDoesQueuedCommandRequireSubtypeEntry(EAbilityID AbilityId) const;
-	const FUnitAbilityEntry* GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand);
+        FUnitAbilityEntry* GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand);
 	FString GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const;
 	bool GetIsQueuedCommandAbilityEntryOnCooldown(EAbilityID AbilityId, const FUnitAbilityEntry* AbilityEntry,
 	                                              const FString& SubtypeSuffix) const;
@@ -187,7 +187,7 @@ private:
 		const EModeAbilityType ModeAbility = EModeAbilityType::DefaultSniperOverwatch
 	);
 
-	void IfCooldownBeginAbilityCooldown(const EAbilityID AbilityId);
+        void IfCooldownBeginAbilityCooldown(const FQueueCommand& Command);
 
 	/**
 	 * Execute either the next command (if bExecuteCurrentCommand=false) 
