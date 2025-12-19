@@ -215,6 +215,7 @@ void UCommandData::StartAbilityCooldownTimer()
 	{
 		return;
 	}
+	UpdateActionUI();
 
 	constexpr float AbilityCooldownTickRate = 1.0f;
 	FTimerDelegate TimerDelegate;
@@ -257,37 +258,34 @@ void UCommandData::AbilityCoolDownTick()
 		StopAbilityCooldownTimer();
 	}
 	// Notify UI manager to update ability UI for primary selected unit.
-	if (GetIsPrimarySelected())
-	{
-		M_ActionUIManager->RequestUpdateAbilityUIForPrimary(M_Owner);
-	}
+	UpdateActionUI();
 }
 
-void UCommandData::IfCooldownBeginAbilityCooldown(const FQueueCommand& Command)
+void UCommandData::StartCooldownForCommand(const FQueueCommand& Command)
 {
-        FUnitAbilityEntry* AbilityEntry = nullptr;
+	FUnitAbilityEntry* AbilityEntry = nullptr;
 
-        if (GetDoesQueuedCommandRequireSubtypeEntry(Command.CommandType))
-        {
-                AbilityEntry = GetAbilityEntryForQueuedCommandSubtype(Command);
-        }
-        else
-        {
-                AbilityEntry = GetAbilityEntry(Command.CommandType);
-        }
+	if (GetDoesQueuedCommandRequireSubtypeEntry(Command.CommandType))
+	{
+		AbilityEntry = GetAbilityEntryForQueuedCommandSubtype(Command);
+	}
+	else
+	{
+		AbilityEntry = GetAbilityEntry(Command.CommandType);
+	}
 
-        if (not AbilityEntry)
-        {
-                return;
-        }
+	if (not AbilityEntry)
+	{
+		return;
+	}
 
 	if (AbilityEntry->CooldownDuration <= 0)
 	{
 		return;
-        }
+	}
 
-        AbilityEntry->CooldownRemaining = AbilityEntry->CooldownDuration;
-        StartAbilityCooldownTimer();
+	AbilityEntry->CooldownRemaining = AbilityEntry->CooldownDuration;
+	StartAbilityCooldownTimer();
 }
 
 void UCommandData::InitCommandData(ICommands* Owner)
@@ -324,6 +322,14 @@ EAbilityID UCommandData::GetCurrentlyActiveCommandType() const
 bool UCommandData::GetIsQueueFull() const
 {
 	return NumCommands >= MAX_COMMANDS;
+}
+
+void UCommandData::UpdateActionUI()
+{
+	if (GetIsPrimarySelected())
+	{
+		M_ActionUIManager->RequestUpdateAbilityUIForPrimary(M_Owner);
+	}
 }
 
 
@@ -402,12 +408,12 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
 {
-        if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
-        {
-                return GetAbilityEntryOfCustomType(
-                        EAbilityID::IdApplyBehaviour,
-                        static_cast<int32>(QueuedCommand.BehaviourAbilityType));
-        }
+	if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
+	{
+		return GetAbilityEntryOfCustomType(
+			EAbilityID::IdApplyBehaviour,
+			static_cast<int32>(QueuedCommand.BehaviourAbilityType));
+	}
 
 	if ((QueuedCommand.CommandType == EAbilityID::IdActivateMode) || (QueuedCommand.CommandType ==
 		EAbilityID::IdDisableMode))
@@ -417,7 +423,7 @@ FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQ
 			static_cast<int32>(QueuedCommand.ModeAbilityType));
 	}
 
-        return nullptr;
+	return nullptr;
 }
 
 FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const
@@ -559,18 +565,18 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 
 void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 {
-        if (not M_Owner)
-        {
-                RTSFunctionLibrary::ReportError("UCommandData::ExecuteCommand - M_Owner is null");
-                return;
-        }
+	if (not M_Owner)
+	{
+		RTSFunctionLibrary::ReportError("UCommandData::ExecuteCommand - M_Owner is null");
+		return;
+	}
 
-        if (not bExecuteCurrentCommand)
-        {
-                // Move to next
-                CurrentIndex++;
-                if (CurrentIndex >= NumCommands)
-                {
+	if (not bExecuteCurrentCommand)
+	{
+		// Move to next
+		CurrentIndex++;
+		if (CurrentIndex >= NumCommands)
+		{
 			ClearCommands();
 			if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 			{
@@ -610,7 +616,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		return;
 	}
 
-        IfCooldownBeginAbilityCooldown(Cmd);
+	StartCooldownForCommand(Cmd);
 
 	// Now we call ICommands methods based on the type:
 	switch (Cmd.CommandType)
@@ -943,10 +949,7 @@ void ICommands::SetUnitAbilitiesRunTime(const TArray<FUnitAbilityEntry>& Abiliti
 		return;
 	}
 	UnitCommandData->SetAbilities(Abilities);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
+	UnitCommandData->UpdateActionUI();
 }
 
 void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
@@ -962,10 +965,7 @@ bool ICommands::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
 		return false;
 	}
 	const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
+	UnitCommandData->UpdateActionUI();
 	return bAdded;
 }
 
@@ -977,10 +977,7 @@ bool ICommands::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIn
 		return false;
 	}
 	const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
+	UnitCommandData->UpdateActionUI();
 	return bAdded;
 }
 
@@ -992,10 +989,7 @@ bool ICommands::RemoveAbility(const EAbilityID AbilityToRemove)
 		return false;
 	}
 	const bool bAbilityRemoved = UnitCommandData->RemoveAbility(AbilityToRemove);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
+	UnitCommandData->UpdateActionUI();
 	return bAbilityRemoved;
 }
 
@@ -1007,10 +1001,7 @@ bool ICommands::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbi
 		return false;
 	}
 	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
+	UnitCommandData->UpdateActionUI();
 	return bIsAbilitySwapped;
 }
 
@@ -1022,10 +1013,7 @@ bool ICommands::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry
 		return false;
 	}
 	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
-	if (UnitCommandData->GetIsPrimarySelected())
-	{
-		UnitCommandData->M_ActionUIManager->RequestUpdateAbilityUIForPrimary(this);
-	}
+	UnitCommandData->UpdateActionUI();
 	return bIsAbilitySwapped;
 }
 

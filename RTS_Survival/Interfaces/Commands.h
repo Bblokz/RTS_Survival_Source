@@ -149,6 +149,8 @@ public:
 
 	bool GetIsQueueFull() const;
 
+	void UpdateActionUI();
+
 private:
 	// The manager that updates the ability UI for this unit.
 	// If set the unit is primary selected.
@@ -187,7 +189,7 @@ private:
 		const EModeAbilityType ModeAbility = EModeAbilityType::DefaultSniperOverwatch
 	);
 
-        void IfCooldownBeginAbilityCooldown(const FQueueCommand& Command);
+        void StartCooldownForCommand(const FQueueCommand& Command);
 
 	/**
 	 * Execute either the next command (if bExecuteCurrentCommand=false) 

@@ -236,6 +236,9 @@ ASquadController::ASquadController(): PlayerController(nullptr), RTSComponent(nu
 	SquadReinforcement = CreateDefaultSubobject<USquadReinforcementComponent>(TEXT("SquadReinforcement"));
 
 	M_SquadWeaponSwitch.Init(this);
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
+	
 }
 
 
@@ -589,17 +592,6 @@ void ASquadController::BeginPlay()
 	}
 	// Start loading the squad units asynchronously
 	LoadSquadUnitsAsync();
-	if (GetWorld())
-	{
-		// Start the timer to update the controller's position every 0.33 seconds
-		GetWorld()->GetTimerManager().SetTimer(
-			M_UpdatePositionTimerHandle,
-			this,
-			&ASquadController::UpdateControllerPositionToAverage,
-			0.25f,
-			true
-		);
-	}
 }
 
 void ASquadController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -613,7 +605,6 @@ void ASquadController::BeginDestroy()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_SpawningTimer);
-		World->GetTimerManager().ClearTimer(M_UpdatePositionTimerHandle);
 	}
 	// Destroy the squad units
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)
@@ -624,6 +615,12 @@ void ASquadController::BeginDestroy()
 		}
 	}
 	Super::BeginDestroy();
+}
+
+void ASquadController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	UpdateControllerPositionToAverage();
 }
 
 bool ASquadController::GetCanCaptureUnits()
@@ -757,6 +754,7 @@ void ASquadController::SetSquadVisionRange(const float NewVision)
 void ASquadController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
+	SetActorTickEnabled(true);
 
 	SquadHealthComponent = FindComponentByClass<USquadHealthComponent>();
 	if (!IsValid(SquadHealthComponent))
@@ -2251,7 +2249,7 @@ void ASquadController::InitSquadData_SetValues(const float MaxWalkSpeed, const f
 
 void ASquadController::InitSquadData_SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 {
-        InitAbilityArray(Abilities);
+	InitAbilityArray(Abilities);
 }
 
 void ASquadController::OnRepairUnitNotValidForRepairs()

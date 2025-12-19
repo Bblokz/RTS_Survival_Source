@@ -139,7 +139,7 @@ struct FRepairState
 USTRUCT()
 struct FCaptureState
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
 	FCaptureState();
 
@@ -153,27 +153,26 @@ struct FCaptureState
 	AActor* M_TargetCaptureActor = nullptr;
 
 	// True once a capture has started (units have been committed).
-        UPROPERTY()
-        bool bIsCaptureInProgress = false;
+	UPROPERTY()
+	bool bIsCaptureInProgress = false;
 };
 
 USTRUCT(BlueprintType)
 struct FPickupSoundSettings
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
-        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
-        TObjectPtr<USoundBase> PickupSound = nullptr;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
+	TObjectPtr<USoundBase> PickupSound = nullptr;
 
-        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
-        TObjectPtr<USoundAttenuation> PickupSoundAttenuation = nullptr;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
+	TObjectPtr<USoundAttenuation> PickupSoundAttenuation = nullptr;
 
-        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
-        TObjectPtr<USoundConcurrency> PickupSoundConcurrency = nullptr;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Pickup Sound")
+	TObjectPtr<USoundConcurrency> PickupSoundConcurrency = nullptr;
 };
 
 
-	
 USTRUCT()
 struct FSquadLoadingStatus
 {
@@ -189,22 +188,22 @@ struct FSquadLoadingStatus
 UCLASS()
 class RTS_SURVIVAL_API ASquadController : public AActor, public ICommands,
                                           public IRTSUnit, public IExperienceInterface,
-public IHealthBarOwner
+                                          public IHealthBarOwner
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-        friend struct FSquadWeaponSwitch;
-        friend class RTS_SURVIVAL_API AWeaponPickup;
-        friend class RTS_SURVIVAL_API AScavengeableObject;
-        friend class RTS_SURVIVAL_API URepairComponent;
-        friend class RTS_SURVIVAL_API UCargoSquad;
+	friend struct FSquadWeaponSwitch;
+	friend class RTS_SURVIVAL_API AWeaponPickup;
+	friend class RTS_SURVIVAL_API AScavengeableObject;
+	friend class RTS_SURVIVAL_API URepairComponent;
+	friend class RTS_SURVIVAL_API UCargoSquad;
 	friend class RTS_SURVIVAL_API UGrenadeComponent;
 	friend class RTS_SURVIVAL_API USquadReinforcementComponent;
-        ASquadController();
+	ASquadController();
 
-	
-	 TArray<UWeaponState*> GetWeaponsOfSquad() ;
+
+	TArray<UWeaponState*> GetWeaponsOfSquad();
 	/**
 	 * @brief Request squad move using the controller's coordinated pathing for a specific ability.
 	 * @param MoveToLocation Destination to move.
@@ -218,7 +217,7 @@ public:
 
 	bool GetIsSquadFullyLoaded() const;
 	void PlaySquadUnitLostVoiceLine();
-	
+
 	// Updates the decal and selection logic for the squad units their selection components.
 	void SetSquadSelected(const bool bIsSelected);
 	void OnSquadUnitInCombat();
@@ -230,7 +229,7 @@ public:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	USquadHealthComponent* SquadHealthComponent;
-	
+
 
 	bool GetIsValidSquadHealthComponent() const;
 
@@ -249,33 +248,33 @@ public:
 	void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected);
 
 	// Checks if all squad units did complete the command; if so, calls DoneExecutingCommand with the CompletedAbilityID.
-        void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID);
+	void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID);
 
-        /**
-         * @brief Initialise spawn grid for reinforcing units around the provided location.
-         * @param OriginLocation Center location used for spawn grid.
-         */
-        void BeginReinforcementSpawnGrid(const FVector& OriginLocation);
+	/**
+	 * @brief Initialise spawn grid for reinforcing units around the provided location.
+	 * @param OriginLocation Center location used for spawn grid.
+	 */
+	void BeginReinforcementSpawnGrid(const FVector& OriginLocation);
 
-        /**
-         * @brief Fetch next formation point for a reinforced squad unit.
-         * @return Projected location on the navmesh.
-         */
-        FVector GetNextReinforcementSpawnLocation();
+	/**
+	 * @brief Fetch next formation point for a reinforced squad unit.
+	 * @return Projected location on the navmesh.
+	 */
+	FVector GetNextReinforcementSpawnLocation();
 
-        /**
-         * @brief Register a newly spawned reinforcement unit with this squad.
-         * @param ReinforcedUnit Newly spawned squad unit.
-         */
-        void RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit);
+	/**
+	 * @brief Register a newly spawned reinforcement unit with this squad.
+	 * @param ReinforcedUnit Newly spawned squad unit.
+	 */
+	void RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit);
 
-        /**
-         * @brief Accessor for the reinforcement component managing this squad.
-         * @return Reinforcement component or nullptr when missing.
-         */
-        TObjectPtr<USquadReinforcementComponent> GetSquadReinforcementComponent() const;
+	/**
+	 * @brief Accessor for the reinforcement component managing this squad.
+	 * @return Reinforcement component or nullptr when missing.
+	 */
+	TObjectPtr<USquadReinforcementComponent> GetSquadReinforcementComponent() const;
 
-        bool GetIsValidGrenadeComponent() const;
+	bool GetIsValidGrenadeComponent() const;
 
 	inline URTSComponent* GetRTSComponent() const { return RTSComponent; }
 
@@ -300,13 +299,13 @@ public:
 	// Called once one of the units arrives at the capture actor.
 	void OnSquadUnitArrivedAtCaptureActor();
 
-        inline int GetSquadUnitsCount() const { return M_TSquadUnits.Num(); }
+	inline int GetSquadUnitsCount() const { return M_TSquadUnits.Num(); }
 
-        /**
-         * @brief Handles switching weapons between squad units when one dies.
-         * @param UnitThatDied The unit that initiated the death event.
-         */
-        void HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied);
+	/**
+	 * @brief Handles switching weapons between squad units when one dies.
+	 * @param UnitThatDied The unit that initiated the death event.
+	 */
+	void HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied);
 
 	virtual void
 	OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo) override;
@@ -326,21 +325,23 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
 
+	virtual void Tick(float DeltaSeconds) override;
+
 	virtual bool GetCanCaptureUnits() override final;
 
 	// Will continuously try exe the action until the squad is fully loaded and actually exe it. 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetSquadStartGameAction(AActor* TargetActor, const FVector TargetLocation, const EAbilityID StartGameAbility);
 
-        /** Array of soft class references to squad units */
-        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad")
-        TArray<TSoftClassPtr<ASquadUnit>> SquadUnitClasses;
+	/** Array of soft class references to squad units */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad")
+	TArray<TSoftClassPtr<ASquadUnit>> SquadUnitClasses;
 
-        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
-        FPickupSoundSettings PickupSoundSettings;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Audio")
+	FPickupSoundSettings PickupSoundSettings;
 
-        UPROPERTY(BlueprintReadWrite, Category = "ReferenceCasts")
-        TObjectPtr<ACPPController> PlayerController;
+	UPROPERTY(BlueprintReadWrite, Category = "ReferenceCasts")
+	TObjectPtr<ACPPController> PlayerController;
 
 	// Contains OwningPlayer and UnitType.
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference")
@@ -349,12 +350,12 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	UBehaviourComp* BehaviourComponent;
 
-	bool GetIsValidBehaviourComponent()const;
-	
+	bool GetIsValidBehaviourComponent() const;
+
 	bool GetIsValidRTSComponent() const;
 	bool EnsureValidExperienceComponent();
 
-		void InitSquadData_SetupSquadHealthAggregation();
+	void InitSquadData_SetupSquadHealthAggregation();
 
 
 	// ----------------- START EXPERIENCE INTERFACE -----------------
@@ -451,16 +452,16 @@ protected:
 	/** @brief Run when the unit finished their move command.*/
 	virtual void TerminateRotateTowardsCommand() override;
 
-        virtual void ExecuteScavengeObject(AActor* TargetObject) override;
-        virtual void TerminateScavengeObject() override;
+	virtual void ExecuteScavengeObject(AActor* TargetObject) override;
+	virtual void TerminateScavengeObject() override;
 
-        virtual void ExecuteRepairCommand(AActor* TargetActor) override;
-        virtual void TerminateRepairCommand() override;
+	virtual void ExecuteRepairCommand(AActor* TargetActor) override;
+	virtual void TerminateRepairCommand() override;
 
-        virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation) override;
-        virtual void TerminateThrowGrenadeCommand() override;
-        virtual void ExecuteCancelThrowGrenadeCommand() override;
-        virtual void TerminateCancelThrowGrenadeCommand() override;
+	virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation) override;
+	virtual void TerminateThrowGrenadeCommand() override;
+	virtual void ExecuteCancelThrowGrenadeCommand() override;
+	virtual void TerminateCancelThrowGrenadeCommand() override;
 
 	virtual void ExecuteEnterCargoCommand(AActor* CarrierActor) override;
 	virtual void TerminateEnterCargoCommand() override;
@@ -486,22 +487,22 @@ protected:
 	void StartScavengeObject(AScavengeableObject* ScavengeableObject);
 
 private:
-        /** Cargo manager component for this squad. */
-        UPROPERTY()
-        TObjectPtr<UCargoSquad> CargoSquad;
+	/** Cargo manager component for this squad. */
+	UPROPERTY()
+	TObjectPtr<UCargoSquad> CargoSquad;
 
-        /** Handles reinforcement activation and spawning missing squad units. */
-        UPROPERTY()
-        TObjectPtr<USquadReinforcementComponent> SquadReinforcement;
+	/** Handles reinforcement activation and spawning missing squad units. */
+	UPROPERTY()
+	TObjectPtr<USquadReinforcementComponent> SquadReinforcement;
 
-        UPROPERTY()
-        TObjectPtr<UGrenadeComponent> M_GrenadeComponent;
+	UPROPERTY()
+	TObjectPtr<UGrenadeComponent> M_GrenadeComponent;
 
-        UPROPERTY()
-        FSquadStartGameAction M_SquadStartGameAction;
+	UPROPERTY()
+	FSquadStartGameAction M_SquadStartGameAction;
 
-        UPROPERTY()
-        FSquadWeaponSwitch M_SquadWeaponSwitch;
+	UPROPERTY()
+	FSquadWeaponSwitch M_SquadWeaponSwitch;
 
 	void InitSquadData_InitExperienceComponent();
 
@@ -524,16 +525,16 @@ private:
 
 	// Contains the data for the commands that this unit can execute using the ICommands interface.
 	// Needs to be accessible by derived classes to get data like current command.
-        UPROPERTY()
-        UCommandData* M_UnitCommandData;
+	UPROPERTY()
+	UCommandData* M_UnitCommandData;
 
-        bool GetIsValidSquadUnit(const ASquadUnit* Unit) const;
-        bool GetIsValidSquadReinforcementComponent() const;
-        void UpdateReinforcementAvailability();
+	bool GetIsValidSquadUnit(const ASquadUnit* Unit) const;
+	bool GetIsValidSquadReinforcementComponent() const;
+	void UpdateReinforcementAvailability();
 	bool GetIsValidPlayerController();
 
-        void BeginPlay_SetupPlayerController();
-        void PostInitializeComponents_SetupGrenadeComponent();
+	void BeginPlay_SetupPlayerController();
+	void PostInitializeComponents_SetupGrenadeComponent();
 
 	int M_UnitsCompletedCommand = 0;
 
@@ -607,37 +608,37 @@ private:
 	 */
 	float GetDistanceToActor(TObjectPtr<AActor> TargetActor);
 
-        // Directly call the start pick up function for the target item instead of waiting for unit movement.
-        // Will also call done executing command for this pickup command.
-        void OnItemCloseEnoughInstantPickup();
+	// Directly call the start pick up function for the target item instead of waiting for unit movement.
+	// Will also call done executing command for this pickup command.
+	void OnItemCloseEnoughInstantPickup();
 
-        void CheckCloseEnoughToItemPickupAnyway();
+	void CheckCloseEnoughToItemPickupAnyway();
 
-        bool GetIsValidWeaponPickup(AWeaponPickup* TargetWeaponItem) const;
+	bool GetIsValidWeaponPickup(AWeaponPickup* TargetWeaponItem) const;
 
-        /**
-         * @brief Finds the eligible squad unit with the lowest weapon value for a pickup.
-         * @return Unit to receive the pickup; nullptr when none are eligible.
-         */
-        TObjectPtr<ASquadUnit> FindSquadUnitWithLowestWeaponValueForPickup();
+	/**
+	 * @brief Finds the eligible squad unit with the lowest weapon value for a pickup.
+	 * @return Unit to receive the pickup; nullptr when none are eligible.
+	 */
+	TObjectPtr<ASquadUnit> FindSquadUnitWithLowestWeaponValueForPickup();
 
-        /**
-         * @brief Checks if the provided squad unit can pick up a weapon.
-         * @param SquadUnit Squad unit evaluated for eligibility.
-         * @return True when the unit can receive a weapon pickup.
-         */
-        bool CanSquadUnitPickupWeapon(ASquadUnit* SquadUnit) const;
+	/**
+	 * @brief Checks if the provided squad unit can pick up a weapon.
+	 * @param SquadUnit Squad unit evaluated for eligibility.
+	 * @return True when the unit can receive a weapon pickup.
+	 */
+	bool CanSquadUnitPickupWeapon(ASquadUnit* SquadUnit) const;
 
-        /**
-         * @brief Fetches the current weapon value of a squad unit using Global_GetWeaponValue.
-         * @param SquadUnit Squad unit to evaluate.
-         * @return Weapon value for comparison; Max int when the value cannot be determined.
-         */
-        int32 GetWeaponValueForSquadUnit(const ASquadUnit* SquadUnit) const;
+	/**
+	 * @brief Fetches the current weapon value of a squad unit using Global_GetWeaponValue.
+	 * @param SquadUnit Squad unit to evaluate.
+	 * @return Weapon value for comparison; Max int when the value cannot be determined.
+	 */
+	int32 GetWeaponValueForSquadUnit(const ASquadUnit* SquadUnit) const;
 
-        bool IsPickupWeaponCommandActive(const AWeaponPickup* TargetWeaponItem) const;
+	bool IsPickupWeaponCommandActive(const AWeaponPickup* TargetWeaponItem) const;
 
-        void PlayPickupSound(const ASquadUnit* SquadUnit) const;
+	void PlayPickupSound(const ASquadUnit* SquadUnit) const;
 
 	/**
 	 * @brief Move the squad to the provided location, attempts to path find once using the squad otherwise units use
@@ -685,8 +686,6 @@ private:
 
 	FTimerHandle M_SpawningTimer;
 
-	/** Timer handle for updating the controller's position to the average position of squad units. */
-	FTimerHandle M_UpdatePositionTimerHandle;
 
 	/**
 	 * @brief Updates the controller's position to the average position of all squad units.
@@ -717,7 +716,7 @@ private:
 		const ESquadSubtype SquadSubtype, const FResistanceAndDamageReductionData& ResistanceData);
 
 	// Called after squad is loaded. Assuming that the subtype is set.
-        void InitSquadData_SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
+	void InitSquadData_SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
 
 	void OnRepairUnitNotValidForRepairs();
 	void OnRepairTargetFullyRepaired(AActor* RepairTarget);

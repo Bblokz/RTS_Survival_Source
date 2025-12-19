@@ -14,7 +14,6 @@ struct FSquadWeaponIconSettingsData
 {
 	GENERATED_BODY()
 	TMap<ESquadWeaponIcon, USlateBrushAsset*> TypeToBrush;
-	
 };
 
 /**
@@ -47,6 +46,10 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 {
 	switch (WeaponName)
 	{
+	// Rail guns
+	case EWeaponName::GerRailGun:
+	case EWeaponName::RailGunY:
+		return ESquadWeaponIcon::Railgun;
 	// Flame weapons
 	case EWeaponName::Ashmaker05:
 		return ESquadWeaponIcon::AshmakerSmall;
@@ -55,13 +58,19 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 	case EWeaponName::Flamm09:
 		return ESquadWeaponIcon::AshmakerLarge;
 
+	case EWeaponName::M920_AtSniper:
+		return ESquadWeaponIcon::M920Sniper;
+
 	// German small arms
+	case EWeaponName::MP46:
+		return ESquadWeaponIcon::Mp46SpecialSMG;
 	case EWeaponName::MP40:
 	case EWeaponName::MP40_9MM:
 		return ESquadWeaponIcon::Mp42;
 	case EWeaponName::STG44_7_92MM:
 		return ESquadWeaponIcon::SturmGewehr;
 	case EWeaponName::Kar_Sniper:
+	case EWeaponName::Mosin_Snip:
 		return ESquadWeaponIcon::SniperRifleGer;
 	case EWeaponName::FG_42_7_92MM:
 		return ESquadWeaponIcon::FG42;
@@ -85,6 +94,12 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 		return ESquadWeaponIcon::PanzerFaust;
 	case EWeaponName::PanzerSchreck:
 		return ESquadWeaponIcon::PanzerShrek;
+	case EWeaponName::PTRS_41_14_5MM:
+	case EWeaponName::PTRS_50MM:
+		return ESquadWeaponIcon::PTRS;
+	case EWeaponName::PanzerRifle_50mm:
+		return ESquadWeaponIcon::PanzerRifle50mm;
+
 
 	// Laser weapons
 	case EWeaponName::SPEKTR_V:
