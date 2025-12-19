@@ -238,8 +238,10 @@ FVector UCargo::GetClosestEntranceWorldLocation(const FVector& FromWorldLocation
 
 bool UCargo::RequestCanEnterCargo(ASquadController* SquadController, TMap<ASquadUnit*, FName>& OutAssignments)
 {
-	if (!SquadController || !GetIsValidCargoMesh() || !M_VacancyState.HasVacancy())
-		return false;
+        if (not bM_IsEnabled || not SquadController || not GetIsValidCargoMesh() || not M_VacancyState.HasVacancy())
+        {
+                return false;
+        }
 
 	const TArray<ASquadUnit*> Units = SquadController->GetSquadUnitsChecked();
 	OutAssignments.Reset();
@@ -248,15 +250,18 @@ bool UCargo::RequestCanEnterCargo(ASquadController* SquadController, TMap<ASquad
 	if (Empty.Num() < Units.Num())
 		return false; // not enough seats for the whole squad
 
-	// seat everyone 1:1
-	for (int32 i = 0; i < Units.Num(); ++i)
-	{
-		ASquadUnit* Unit = Units[i];
-		if (!IsValid(Unit)) continue;
-		const FName Sock = Empty[i];
-		OutAssignments.Add(Unit, Sock);
-		M_SocketOccupancy.M_SocketToUnit.Add(Sock, Unit);
-	}
+        // seat everyone 1:1
+        for (int32 i = 0; i < Units.Num(); ++i)
+        {
+                ASquadUnit* Unit = Units[i];
+                if (not IsValid(Unit))
+                {
+                        continue;
+                }
+                const FName Sock = Empty[i];
+                OutAssignments.Add(Unit, Sock);
+                M_SocketOccupancy.M_SocketToUnit.Add(Sock, Unit);
+        }
 
 	RegisterSquadAtVacancy(SquadController, true);
 	return true;
