@@ -8,9 +8,20 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UObject/ConstructorHelpers.h"
 
+bool URTSRadiusPoolSubsystem::ShouldCreateSubsystem(UObject* Outer) const
+{
+        const UWorld* OuterWorld = Cast<UWorld>(Outer);
+        if (not IsValid(OuterWorld))
+        {
+                return false;
+        }
+
+        return OuterWorld->IsGameWorld();
+}
+
 void URTSRadiusPoolSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
-	Super::Initialize(Collection);
+        Super::Initialize(Collection);
 
 	if (not GetIsValidWorld())
 	{
