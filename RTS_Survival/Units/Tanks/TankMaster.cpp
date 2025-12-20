@@ -25,6 +25,199 @@
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "VehicleAI/Components/VehiclePathFollowingComponent.h"
+#include "Kismet/KismetMathLibrary.h"
+
+FTankStartGameAction::FTankStartGameAction()
+        : StartGameAction(EAbilityID::IdNoAbility)
+          , bM_BeginPlayCalled(false)
+{
+}
+
+void FTankStartGameAction::InitStartGameAction(const EAbilityID InAbilityID, AActor* InTargetActor,
+                                               const FVector& InTargetLocation, ATankMaster* InTankMaster)
+{
+        if (not IsValid(InTankMaster))
+        {
+                return;
+        }
+
+        StartGameAction = InAbilityID;
+        TargetActor = InTargetActor;
+        TargetLocation = InTargetLocation;
+        M_TankMaster = InTankMaster;
+
+        if (bM_BeginPlayCalled)
+        {
+                StartTimerForNextFrame();
+        }
+}
+
+void FTankStartGameAction::OnBeginPlay()
+{
+        bM_BeginPlayCalled = true;
+        StartTimerForNextFrame();
+}
+
+void FTankStartGameAction::OnTankDestroyed(UWorld* World)
+{
+        if (not World)
+        {
+                return;
+        }
+        World->GetTimerManager().ClearTimer(ActionTimer);
+}
+
+void FTankStartGameAction::TimerIteration()
+{
+        if (not GetIsValidTankMaster())
+        {
+                return;
+        }
+
+        if (StartGameAction == EAbilityID::IdNoAbility)
+        {
+                ClearActionTimer();
+                return;
+        }
+
+        ExecuteStartAbility();
+        ClearActionTimer();
+}
+
+void FTankStartGameAction::StartTimerForNextFrame()
+{
+        if (StartGameAction == EAbilityID::IdNoAbility)
+        {
+                return;
+        }
+
+        if (not GetIsValidTankMaster())
+        {
+                return;
+        }
+
+        if (UWorld* World = M_TankMaster->GetWorld())
+        {
+                World->GetTimerManager().ClearTimer(ActionTimer);
+                FTimerDelegate TimerDel;
+                TimerDel.BindRaw(this, &FTankStartGameAction::TimerIteration);
+                constexpr float StartGameActionTimerDelaySeconds = 0.0f;
+                World->GetTimerManager().SetTimer(ActionTimer, TimerDel, StartGameActionTimerDelaySeconds, false);
+        }
+}
+
+void FTankStartGameAction::ClearActionTimer() const
+{
+        if (not M_TankMaster.IsValid())
+        {
+                return;
+        }
+
+        if (UWorld* World = M_TankMaster->GetWorld())
+        {
+                World->GetTimerManager().ClearTimer(ActionTimer);
+        }
+}
+
+bool FTankStartGameAction::GetIsValidTankMaster() const
+{
+        if (M_TankMaster.IsValid())
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportError("TankMaster is not valid!",
+                "\n At function: FTankStartGameAction::GetIsValidTankMaster");
+        return false;
+}
+
+bool FTankStartGameAction::ExecuteStartAbility() const
+{
+        switch (StartGameAction)
+        {
+        case EAbilityID::IdNoAbility:
+                break;
+        case EAbilityID::IdNoAbility_MoveCloserToTarget:
+                break;
+        case EAbilityID::IdNoAbility_MoveToEvasionLocation:
+                break;
+        case EAbilityID::IdIdle:
+                break;
+        case EAbilityID::IdGeneral_Confirm:
+                break;
+        case EAbilityID::IdAttack:
+                return M_TankMaster->AttackActor(TargetActor, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdAttackGround:
+                return M_TankMaster->AttackGround(TargetLocation, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdMove:
+                return M_TankMaster->MoveToLocation(TargetLocation, true, FRotator::ZeroRotator, false) ==
+                        ECommandQueueError::NoError;
+        case EAbilityID::IdPatrol:
+                return M_TankMaster->PatrolToLocation(TargetLocation, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdStop:
+                break;
+        case EAbilityID::IdSwitchWeapon:
+                return M_TankMaster->SwitchWeapons(true) == ECommandQueueError::NoError;
+        case EAbilityID::IdSwitchMelee:
+                break;
+        case EAbilityID::IdProne:
+                break;
+        case EAbilityID::IdCrouch:
+                break;
+        case EAbilityID::IdStand:
+                break;
+        case EAbilityID::IdSwitchSingleBurst:
+                break;
+        case EAbilityID::IdReverseMove:
+                return M_TankMaster->MoveToLocation(TargetLocation, true, FRotator::ZeroRotator, false) ==
+                        ECommandQueueError::NoError;
+        case EAbilityID::IdRotateTowards:
+                return M_TankMaster->RotateTowards(
+                        UKismetMathLibrary::FindLookAtRotation(M_TankMaster->GetActorLocation(), TargetLocation),
+                        true) == ECommandQueueError::NoError;
+        case EAbilityID::IdCreateBuilding:
+                break;
+        case EAbilityID::IdConvertToVehicle:
+                break;
+        case EAbilityID::IdHarvestResource:
+                break;
+        case EAbilityID::IdReturnCargo:
+                break;
+        case EAbilityID::IdPickupItem:
+                break;
+        case EAbilityID::IdScavenge:
+                return M_TankMaster->ScavengeObject(TargetActor, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdDigIn:
+                break;
+        case EAbilityID::IdBreakCover:
+                break;
+        case EAbilityID::IdFireRockets:
+                break;
+        case EAbilityID::IdCancelRocketFire:
+                break;
+        case EAbilityID::IdRocketsReloading:
+                break;
+        case EAbilityID::IdRepair:
+                return M_TankMaster->RepairActor(TargetActor, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdReturnToBase:
+                break;
+        case EAbilityID::IdAircraftOwnerNotExpanded:
+                break;
+        case EAbilityID::IdEnterCargo:
+                return M_TankMaster->EnterCargo(TargetActor, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdExitCargo:
+                break;
+        case EAbilityID::IdEnableResourceConversion:
+                break;
+        case EAbilityID::IdDisableResourceConversion:
+                break;
+        case EAbilityID::IdCapture:
+                return M_TankMaster->CaptureActor(TargetActor, true) == ECommandQueueError::NoError;
+        case EAbilityID::IdReinforceSquad:
+                break;
+        }
+        return true;
+}
 
 ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 	: ASelectablePawnMaster(ObjectInitializer), RTSNavCollision(nullptr), bM_NeedToTurnTowardsTarget(false),
@@ -42,7 +235,13 @@ ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 
 USkeletalMeshComponent* ATankMaster::GetTankMesh() const
 {
-	return nullptr;
+        return nullptr;
+}
+
+void ATankMaster::SetTankStartGameAction(AActor* TargetActor, const FVector TargetLocation,
+                                         const EAbilityID StartGameAbility)
+{
+        M_TankStartGameAction.InitStartGameAction(StartGameAbility, TargetActor, TargetLocation, this);
 }
 
 void ATankMaster::UpgradeTurnRate(const float NewTurnRate)
@@ -123,20 +322,23 @@ void ATankMaster::BeginPlay()
 		                                  &ATankMaster::SetMaxSpeedOnVehicleMovementComponent,
 		                                  1.0f, false);
 	}
-	// Wait for bp begin play to set the subtype.
-	BeginPlay_SetupData();
+        // Wait for bp begin play to set the subtype.
+        BeginPlay_SetupData();
 
-	BeginPlay_SetupCollisionVsBuildings();
+        BeginPlay_SetupCollisionVsBuildings();
+
+        M_TankStartGameAction.OnBeginPlay();
 }
 
 void ATankMaster::BeginDestroy()
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(TimerHandle_CheckIfUpsideDown);
-		World->GetTimerManager().ClearTimer(TimerHandle_SetupMaxSpeed);
-	}
-	Super::BeginDestroy();
+        if (UWorld* World = GetWorld())
+        {
+                World->GetTimerManager().ClearTimer(TimerHandle_CheckIfUpsideDown);
+                World->GetTimerManager().ClearTimer(TimerHandle_SetupMaxSpeed);
+                M_TankStartGameAction.OnTankDestroyed(World);
+        }
+        Super::BeginDestroy();
 }
 
 void ATankMaster::UnitDies(const ERTSDeathType DeathType)

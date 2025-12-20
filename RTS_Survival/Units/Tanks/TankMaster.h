@@ -24,6 +24,45 @@ class URTSNavCollision;
 class RTS_SURVIVAL_API AAITankMaster;
 class RTS_SURVIVAL_API ACPPTurretsMaster;
 
+USTRUCT()
+struct FTankStartGameAction
+{
+        GENERATED_BODY()
+
+        FTankStartGameAction();
+
+        void InitStartGameAction(const EAbilityID InAbilityID,
+                                 AActor* InTargetActor,
+                                 const FVector& InTargetLocation,
+                                 ATankMaster* InTankMaster);
+
+        void OnBeginPlay();
+        void OnTankDestroyed(UWorld* World);
+
+private:
+        void TimerIteration();
+        void StartTimerForNextFrame();
+        void ClearActionTimer() const;
+        bool GetIsValidTankMaster() const;
+        bool ExecuteStartAbility() const;
+
+        EAbilityID StartGameAction;
+
+        UPROPERTY()
+        FTimerHandle ActionTimer;
+
+        UPROPERTY()
+        AActor* TargetActor = nullptr;
+
+        UPROPERTY()
+        FVector TargetLocation = FVector::ZeroVector;
+
+        UPROPERTY()
+        TWeakObjectPtr<ATankMaster> M_TankMaster = nullptr;
+
+        bool bM_BeginPlayCalled;
+};
+
 /**
  * @brief Tank with logic to add turrets and engage targets.
  * @note ***********************************************************************************************
@@ -93,15 +132,24 @@ public:
 
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
 protected:
-	virtual void Tick(float DeltaSeconds) override;
+        virtual void Tick(float DeltaSeconds) override;
 
-	virtual void BeginPlay() override;
+        virtual void BeginPlay() override;
 
-	virtual void BeginDestroy() override;
-	virtual void UnitDies(const ERTSDeathType DeathType) override;
-	void CheckIfUpsideDown();
+        virtual void BeginDestroy() override;
+        virtual void UnitDies(const ERTSDeathType DeathType) override;
+        void CheckIfUpsideDown();
 
-	virtual void PostInitializeComponents() override;
+        virtual void PostInitializeComponents() override;
+
+        /**
+         * @brief Set up the action this tank should perform at the start of the game.
+         * @param TargetActor Optional target actor for actor-driven abilities.
+         * @param TargetLocation Location to use for location-driven abilities.
+         * @param StartGameAbility Ability to execute on the next frame after begin play.
+         */
+        UFUNCTION(BlueprintCallable, NotBlueprintable)
+        void SetTankStartGameAction(AActor* TargetActor, const FVector TargetLocation, const EAbilityID StartGameAbility);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="AimOffset")
 	TArray<FVector> AimOffsetPoints = {
@@ -392,15 +440,18 @@ private:
 	// For adjusting the rotation.
 	FTimerHandle TimerHandle_CheckIfUpsideDown;
 
-	// Contains all the armor components that are setup in blueprints.
-	UPROPERTY()
-	TArray<UArmor*> M_TankArmor;
+        // Contains all the armor components that are setup in blueprints.
+        UPROPERTY()
+        TArray<UArmor*> M_TankArmor;
 
-	/** @return Whether the current active ability of the tank allows for the turret to take control */
-	bool GetCanTurretTakeControl() const;
+        UPROPERTY()
+        FTankStartGameAction M_TankStartGameAction;
 
-	// Plays a little after beginplay to set max vehicle speed on the vehicle movement component.
-	FTimerHandle TimerHandle_SetupMaxSpeed;
+        /** @return Whether the current active ability of the tank allows for the turret to take control */
+        bool GetCanTurretTakeControl() const;
+
+        // Plays a little after beginplay to set max vehicle speed on the vehicle movement component.
+        FTimerHandle TimerHandle_SetupMaxSpeed;
 
 	void SetMaxSpeedOnVehicleMovementComponent();
 
