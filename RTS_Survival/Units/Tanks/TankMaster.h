@@ -42,7 +42,7 @@ struct FTankStartGameAction
 private:
         void TimerIteration();
         void StartTimerForNextFrame();
-        void ClearActionTimer() const;
+        void ClearActionTimer();
         bool GetIsValidTankMaster() const;
         bool ExecuteStartAbility() const;
 
