@@ -101,8 +101,7 @@ void FTankStartGameAction::StartTimerForNextFrame()
 		World->GetTimerManager().ClearTimer(ActionTimer);
 		FTimerDelegate TimerDel;
 		TimerDel.BindRaw(this, &FTankStartGameAction::TimerIteration);
-		constexpr float StartGameActionTimerDelaySeconds = 0.0f;
-		World->GetTimerManager().SetTimer(ActionTimer, TimerDel, StartGameActionTimerDelaySeconds, false);
+		World->GetTimerManager().SetTimerForNextTick(TimerDel);
 	}
 }
 
@@ -126,7 +125,7 @@ bool FTankStartGameAction::GetIsValidTankMaster() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportError("TankMaster is not valid!",
+	RTSFunctionLibrary::ReportError("TankMaster is not valid!"
 	                                "\n At function: FTankStartGameAction::GetIsValidTankMaster");
 	return false;
 }

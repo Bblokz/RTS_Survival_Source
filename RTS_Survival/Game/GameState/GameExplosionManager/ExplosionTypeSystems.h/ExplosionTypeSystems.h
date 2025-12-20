@@ -17,6 +17,8 @@ enum class ERTS_ExplosionType : uint8
 	Small UMETA(DisplayName="Small"),
 	TankTurret UMETA(DisplayName="Tank Turret"),
 	Huge UMETA(DisplayName="Huge"),
+	Huge_Debris UMETA(DisplayName="Huge Debris"),
+	Medium_Debris UMETA(DisplayName="Medium Debris"),
 };
 
 static FString Global_GetExplosionTypeString(const ERTS_ExplosionType Type)
