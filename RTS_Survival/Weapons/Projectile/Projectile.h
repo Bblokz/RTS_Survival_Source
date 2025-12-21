@@ -13,6 +13,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "Sound/SoundCue.h"
+#include "Sound/SoundBase.h"
 
 #include "Projectile.generated.h"
 
@@ -25,6 +26,7 @@ struct FProjectilePoolSettings
 };
 
 class UArmorCalculation;
+class UAudioComponent;
 class UProjectileMovementComponent;
 class UWeaponStateProjectile;
 
@@ -46,11 +48,11 @@ public:
 		TWeakObjectPtr<ASmallArmsProjectileManager> Manager,
 		const int32 Index);
 
-	void SetupProjectileForNewLaunch(
-		UWeaponStateProjectile* NewProjectileOwner,
-		const ERTSDamageType DamageType,
-		const float Range,
-		const float Damage,
+        void SetupProjectileForNewLaunch(
+                UWeaponStateProjectile* NewProjectileOwner,
+                const ERTSDamageType DamageType,
+                const float Range,
+                const float Damage,
 		const float ArmorPen,
 		const float ArmorPenMaxRange,
 		const uint32 ShrapnelParticles,
@@ -66,8 +68,38 @@ public:
 		const float ProjectileSpeed,
 		const FVector& LaunchLocation,
 		const FRotator& LaunchRotation, USoundAttenuation* ImpactAttenuation,
-		USoundConcurrency* ImpactConcurrency, const FProjectileVfxSettings& ProjectileVfxSettings, const EWeaponShellType
-		ShellType, const TArray<AActor*>& ActorsToIgnore);
+                USoundConcurrency* ImpactConcurrency, const FProjectileVfxSettings& ProjectileVfxSettings, const EWeaponShellType
+                ShellType, const TArray<AActor*>& ActorsToIgnore);
+
+        /**
+         * @brief Launches the pooled projectile along an arced path using the provided arch settings.
+         * @param LaunchLocation Start of the trajectory.
+         * @param TargetLocation Desired impact location after accuracy deviation.
+         * @param ProjectileSpeed Base projectile speed fallback for straight flight.
+         * @param Range Range used for fallback timing when arc cannot be solved.
+         * @param ArchSettings Designer-facing settings controlling apex and curvature.
+         * @param DescentAttenuation Attenuation to reuse for descent audio.
+         * @param DescentConcurrency Concurrency to reuse for descent audio.
+         */
+        void SetupArcedLaunch(const FVector& LaunchLocation,
+                              const FVector& TargetLocation,
+                              const float ProjectileSpeed,
+                              const float Range,
+                              const FArchProjectileSettings& ArchSettings,
+                              USoundAttenuation* DescentAttenuation,
+                              USoundConcurrency* DescentConcurrency);
+
+        /**
+         * @brief Fallback straight launch used when arc computation fails.
+         * @param LaunchLocation Starting location for the fallback shot.
+         * @param LaunchToTarget Vector from launch to target for rotation.
+         * @param SafeProjectileSpeed Speed used for the straight launch.
+         * @param Range Range used for timing the fallback explosion.
+         */
+        void LaunchStraightFallback(const FVector& LaunchLocation,
+                                    const FVector& LaunchToTarget,
+                                    const float SafeProjectileSpeed,
+                                    const float Range);
 
 	// Called by abilities using attach rockets to change the mesh on the rocket VFX.
 	void SetupAttachedRocketMesh(UStaticMesh* RocketMesh);
@@ -205,21 +237,66 @@ private:
 	UPROPERTY()
 	USoundConcurrency* M_ImpactConcurrency = nullptr;
 
-	/**
-	 * @brief Performs an async line trace on the channel set accoording to the owning player.
-	 * The line trace interval can be found in developer settings.
-	 * We make use of the delta time passed (calculated in tick) 
-	 */
-	void PerformAsyncLineTrace();
+        /**
+         * @brief Performs an async line trace on the channel set accoording to the owning player.
+         * The line trace interval can be found in developer settings.
+         * We make use of the delta time passed (calculated in tick)
+         */
+        void PerformAsyncLineTrace();
+
+        void StartFlightTimers(const float ExpectedFlightTime);
 
 	/**
 	* @brief The callback function for the async trace.
 	* Calculates armor pen values and handles the hit actor.
 	*/
-	void OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum);
+        void OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum);
 
-	/**
-	 * @brief Calculates the angle between the projectile's velocity vector and the surface normal at the point of impact.
+        void PlayDescentSound(USoundBase* DescentSound,
+                              USoundAttenuation* DescentAttenuation,
+                              USoundConcurrency* DescentConcurrency);
+
+        /**
+         * @brief Stops any active descent audio and cleans up its component.
+         */
+        void StopDescentSound();
+
+        /**
+         * @brief Computes the apex height based on designer settings while preserving target accuracy.
+         * @param LaunchLocation Starting location.
+         * @param TargetLocation Adjusted target location.
+         * @param HorizontalDistance XY distance between launch and target.
+         * @param ArchSettings Designer tuning values.
+         * @return Apex height in world units.
+         */
+        float CalculateDesiredApexHeight(const FVector& LaunchLocation,
+                                         const FVector& TargetLocation,
+                                         const float HorizontalDistance,
+                                         const FArchProjectileSettings& ArchSettings) const;
+
+        /**
+         * @brief Applies curvature multiplier while clamping to safe values.
+         * @param BaseVerticalVelocity Velocity derived from apex height.
+         * @param CurvatureVerticalVelocityMultiplier Designer curvature control.
+         * @return Adjusted vertical launch velocity.
+         */
+        float ApplyCurvatureToVerticalVelocity(const float BaseVerticalVelocity,
+                                               const float CurvatureVerticalVelocityMultiplier) const;
+
+        /**
+         * @brief Starts the timer for the descent audio so it finishes at impact.
+         * @param TimeToTarget Calculated flight time for the arc.
+         * @param ArchSettings Designer settings containing the descent sound.
+         * @param DescentAttenuation Attenuation to reuse for the descent sound.
+         * @param DescentConcurrency Concurrency to reuse for the descent sound.
+         */
+        void ScheduleDescentSound(const float TimeToTarget,
+                                  const FArchProjectileSettings& ArchSettings,
+                                  USoundAttenuation* DescentAttenuation,
+                                  USoundConcurrency* DescentConcurrency);
+
+        /**
+         * @brief Calculates the angle between the projectile's velocity vector and the surface normal at the point of impact.
 	 *
 	 * This angle is essential for determining the interaction between the projectile and the impacted surface.
 	 * It influences factors such as armor penetration effectiveness and whether the projectile should bounce
@@ -309,11 +386,17 @@ private:
 
 	int32 M_MaxBounces = DeveloperSettings::GameBalance::Weapons::Projectiles::MaxBouncesPerProjectile;
 
-	UPROPERTY()
-	FTimerHandle M_ExplosionTimerHandle;
+        UPROPERTY()
+        FTimerHandle M_ExplosionTimerHandle;
 
-	UPROPERTY()
-	FTimerHandle M_LineTraceTimerHandle;
+        UPROPERTY()
+        FTimerHandle M_LineTraceTimerHandle;
+
+        UPROPERTY()
+        FTimerHandle M_DescentSoundTimerHandle;
+
+        UPROPERTY()
+        TWeakObjectPtr<UAudioComponent> M_DescentAudioComponent;
 
 	ECollisionChannel M_TraceChannel;
 

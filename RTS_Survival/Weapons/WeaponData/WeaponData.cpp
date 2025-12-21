@@ -1962,16 +1962,16 @@ void UWeaponStateProjectile::OnProjectileKilledActor(AActor* KilledActor) const
 
 void UWeaponStateProjectile::OnProjectileHit(const bool bBounced) const
 {
-	if (not WeaponOwner)
-	{
-		return;
-	}
-	WeaponOwner->OnProjectileHit(bBounced);
+        if (not WeaponOwner)
+        {
+                return;
+        }
+        WeaponOwner->OnProjectileHit(bBounced);
 }
 
 void UWeaponStateProjectile::SetupProjectileManager(ASmallArmsProjectileManager* ProjectileManager)
 {
-	M_ProjectileManager = ProjectileManager;
+        M_ProjectileManager = ProjectileManager;
 }
 
 void UWeaponStateProjectile::CopyStateFrom(const UWeaponStateProjectile* Other)
@@ -1980,30 +1980,45 @@ void UWeaponStateProjectile::CopyStateFrom(const UWeaponStateProjectile* Other)
 
 void UWeaponStateProjectile::FireWeaponSystem()
 {
-	if (WeaponOwner)
-	{
-		FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
-	}
+        if (WeaponOwner)
+        {
+                FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
+        }
 }
 
 bool UWeaponStateProjectile::GetIsValidProjectileManager() const
 {
-	if (M_ProjectileManager.IsValid())
-	{
-		return true;
-	}
-	RTSFunctionLibrary::ReportError(
-		"PROJECTILE Weapon is provided with an invalid projectile manager. " + GetName());
-	return false;
+        if (M_ProjectileManager.IsValid())
+        {
+                return true;
+        }
+        RTSFunctionLibrary::ReportError(
+                "PROJECTILE Weapon is provided with an invalid projectile manager. " + GetName());
+        return false;
+}
+
+ASmallArmsProjectileManager* UWeaponStateProjectile::GetProjectileManager() const
+{
+        if (not GetIsValidProjectileManager())
+        {
+                return nullptr;
+        }
+        return M_ProjectileManager.Get();
+}
+
+EProjectileNiagaraSystem UWeaponStateProjectile::GetProjectileNiagaraSystem() const
+{
+        return M_ProjectileNiagaraSystem;
 }
 
 void UWeaponStateProjectile::FireProjectile(const FVector& TargetDirection)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_FireProjectile);
-	if (not GetIsValidProjectileManager())
-	{
-		return;
-	}
+        TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_FireProjectile);
+        ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+        if (not ProjectileManager)
+        {
+                return;
+        }
 
 	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
 	const FVector LaunchLocation = LaunchAndForward.Key;
@@ -2014,13 +2029,13 @@ void UWeaponStateProjectile::FireProjectile(const FVector& TargetDirection)
 	// Apply accuracy deviation to the launch rotation.
 	LaunchRotation = FRTSWeaponHelpers::ApplyAccuracyDeviationForProjectile(LaunchRotation, WeaponData.Accuracy);
 
-	AProjectile* SpawnedProjectile = M_ProjectileManager->GetDormantTankProjectile();
+        AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
 
-	if (!IsValid(SpawnedProjectile))
-	{
-		ReportErrorForWeapon("PROJECTILE weapon failed to get dormant projectile from pool manager.");
-		return;
-	}
+        if (not IsValid(SpawnedProjectile))
+        {
+                ReportErrorForWeapon("PROJECTILE weapon failed to get dormant projectile from pool manager.");
+                return;
+        }
 
 	// Apply shell type-specific data if necessary.
 	const bool bIsAPShell = WeaponData.ShellType == EWeaponShellType::Shell_AP || WeaponData.ShellType ==
@@ -2074,131 +2089,139 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 }
 
 void UWeaponStateArchProjectile::InitArchProjectileWeapon(
-	const int32 NewOwningPlayer,
-	const int32 NewWeaponIndex,
-	const EWeaponName NewWeaponName,
-	const EWeaponFireMode NewWeaponBurstMode,
-	TScriptInterface<IWeaponOwner> NewWeaponOwner,
-	UMeshComponent* NewMeshComponent,
-	const FName NewFireSocketName,
-	UWorld* NewWorld,
-	TSubclassOf<AArchProjectile> NewProjectileClass,
-	FWeaponVFX NewWeaponVFX,
-	FWeaponShellCase NewWeaponShellCase,
-	const float NewBurstCooldown,
-	const int32 NewSingleBurstAmountMaxBurstAmount,
-	const int32 NewMinBurstAmount,
-	const bool bNewCreateShellCasingOnEveryRandomBurst,
-	const float NewArchStretch)
+        const int32 NewOwningPlayer,
+        const int32 NewWeaponIndex,
+        const EWeaponName NewWeaponName,
+        const EWeaponFireMode NewWeaponBurstMode,
+        TScriptInterface<IWeaponOwner> NewWeaponOwner,
+        UMeshComponent* NewMeshComponent,
+        const FName NewFireSocketName,
+        UWorld* NewWorld,
+        const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+        FWeaponVFX NewWeaponVFX,
+        FWeaponShellCase NewWeaponShellCase,
+        const float NewBurstCooldown,
+        const int32 NewSingleBurstAmountMaxBurstAmount,
+        const int32 NewMinBurstAmount,
+        const bool bNewCreateShellCasingOnEveryRandomBurst,
+        const FArchProjectileSettings& NewArchSettings)
 {
-	M_ProjectileClass = NewProjectileClass;
-	M_ArchStretch = NewArchStretch;
-	WeaponHitType = EWeaponSystemType::Projectile;
-	InitWeaponState(
-		NewOwningPlayer,
-		NewWeaponIndex,
-		NewWeaponName,
-		NewWeaponBurstMode,
-		NewWeaponOwner,
-		NewMeshComponent,
-		NewFireSocketName,
-		NewWorld,
-		NewWeaponVFX,
-		NewWeaponShellCase,
-		NewBurstCooldown,
-		NewSingleBurstAmountMaxBurstAmount,
-		NewMinBurstAmount,
-		bNewCreateShellCasingOnEveryRandomBurst);
-}
-
-void UWeaponStateArchProjectile::OnProjectileKilledActor(AActor* KilledActor) const
-{
-	if (WeaponOwner)
-	{
-		OnActorKilled(KilledActor);
-	}
+        M_ArchSettings = NewArchSettings;
+        InitProjectileWeapon(
+                NewOwningPlayer,
+                NewWeaponIndex,
+                NewWeaponName,
+                NewWeaponBurstMode,
+                NewWeaponOwner,
+                NewMeshComponent,
+                NewFireSocketName,
+                NewWorld,
+                ProjectileNiagaraSystem,
+                NewWeaponVFX,
+                NewWeaponShellCase,
+                NewBurstCooldown,
+                NewSingleBurstAmountMaxBurstAmount,
+                NewMinBurstAmount,
+                bNewCreateShellCasingOnEveryRandomBurst);
 }
 
 void UWeaponStateArchProjectile::FireWeaponSystem()
 {
-	if (WeaponOwner)
-	{
-		// Fire the projectile towards the target direction
-		FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
-	}
+        if (WeaponOwner)
+        {
+                // Fire the projectile towards the target direction
+                FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
+        }
 }
 
 void UWeaponStateArchProjectile::FireProjectile(const FVector& TargetLocationRaw)
 {
-	if (!IsValid(World))
-	{
-		return;
-	}
+        ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+        if (not ProjectileManager)
+        {
+                return;
+        }
 
-	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
-	const FVector LaunchLocation = LaunchAndForward.Key;
+        const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
+        const FVector LaunchLocation = LaunchAndForward.Key;
 
-	// Apply accuracy deviation to the *location* (unchanged logic).
-	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
-		TargetLocationRaw, WeaponData.Accuracy);
+        // Apply accuracy deviation to the *location* (unchanged logic).
+        FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+                TargetLocationRaw, WeaponData.Accuracy);
 
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
+        if (LaunchDirection.IsNearlyZero())
+        {
+                LaunchDirection = LaunchAndForward.Value.GetSafeNormal();
+        }
+        const FRotator LaunchRotation = LaunchDirection.Rotation();
 
-	// Spawn the projectile
-	AArchProjectile* SpawnedProjectile = World->SpawnActor<AArchProjectile>(
-		M_ProjectileClass,
-		LaunchLocation,
-		FRotator::ZeroRotator,
-		SpawnParameters);
+        AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
 
-	if (!IsValid(SpawnedProjectile))
-	{
-		return;
-	}
+        if (not IsValid(SpawnedProjectile))
+        {
+                ReportErrorForWeapon("ARCH PROJECTILE weapon failed to get dormant projectile from pool manager.");
+                return;
+        }
 
-	// Apply shell type-specific data if necessary.
-	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
-		EWeaponShellType::Shell_APHE);
-	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
-	if (!bIsAPShell && !bIsFireShell)
-	{
-		FWeaponData ShellAdjustedData = GLOBAL_GetWeaponDataForShellType(WeaponData);
-		FireProjectileWithShellAdjustedStats(ShellAdjustedData, SpawnedProjectile, FRotator::ZeroRotator,
-		                                     TargetLocation);
-	}
-	else
-	{
-		// no data alteration needed.
-		FireProjectileWithShellAdjustedStats(WeaponData, SpawnedProjectile, FRotator::ZeroRotator, TargetLocation);
-	}
+        // Apply shell type-specific data if necessary.
+        const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
+                EWeaponShellType::Shell_APHE);
+        const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
+        if (not bIsAPShell && not bIsFireShell)
+        {
+                FWeaponData ShellAdjustedData = GLOBAL_GetWeaponDataForShellType(WeaponData);
+                FireProjectileWithShellAdjustedStats(
+                        ShellAdjustedData,
+                        SpawnedProjectile,
+                        LaunchLocation,
+                        LaunchRotation,
+                        TargetLocation);
+        }
+        else
+        {
+                // no data alteration needed.
+                FireProjectileWithShellAdjustedStats(WeaponData, SpawnedProjectile, LaunchLocation, LaunchRotation,
+                                                     TargetLocation);
+        }
 }
 
 void UWeaponStateArchProjectile::FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
-                                                                      AArchProjectile* Projectile,
+                                                                      AProjectile* Projectile,
+                                                                      const FVector& LaunchLocation,
                                                                       const FRotator& LaunchRotation,
                                                                       const FVector& TargetLocation)
 {
-	constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
-	constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
-	float PenAdjustedWithGameFlux = FMath::RandRange(ShellAdjustedData.ArmorPen * PenFluxFactorLow,
-	                                                 ShellAdjustedData.ArmorPen * PenFluxFactorHigh);
-	float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorLow,
-	                                                         ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorHigh);
+        constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+        constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+        const float PenAdjustedWithGameFlux = FMath::RandRange(ShellAdjustedData.ArmorPen * PenFluxFactorLow,
+                                                               ShellAdjustedData.ArmorPen * PenFluxFactorHigh);
+        const float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(
+                ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorLow,
+                ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorHigh);
 
-	Projectile->InitProjectile(this, ShellAdjustedData.Range, ShellAdjustedData.BaseDamage, PenAdjustedWithGameFlux,
-	                           PenMaxRangeAdjustedWithGameFlux,
-	                           ShellAdjustedData.ShrapnelParticles,
-	                           ShellAdjustedData.ShrapnelRange, ShellAdjustedData.ShrapnelDamage,
-	                           ShellAdjustedData.ShrapnelPen,
-	                           OwningPlayer, M_WeaponVfx.SurfaceImpactEffects,
-	                           M_WeaponVfx.BounceEffect,
-	                           M_WeaponVfx.BounceSound,
-	                           M_WeaponVfx.ImpactScale,
-	                           M_WeaponVfx.BounceScale,
-	                           ShellAdjustedData.ProjectileMovementSpeed,
-	                           LaunchRotation,
-	                           TargetLocation,
-	                           M_ArchStretch,
-	                           M_WeaponVfx.ImpactConcurrency, M_WeaponVfx.ImpactAttenuation);
+        FProjectileVfxSettings ProjectileVfxSettings;
+        ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
+        ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
+        ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
+
+        Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
+                                                ShellAdjustedData.BaseDamage, PenAdjustedWithGameFlux,
+                                                PenMaxRangeAdjustedWithGameFlux,
+                                                ShellAdjustedData.ShrapnelParticles, ShellAdjustedData.ShrapnelRange,
+                                                ShellAdjustedData.ShrapnelDamage,
+                                                ShellAdjustedData.ShrapnelPen, OwningPlayer,
+                                                M_WeaponVfx.SurfaceImpactEffects, M_WeaponVfx.BounceEffect,
+                                                M_WeaponVfx.BounceSound,
+                                                M_WeaponVfx.ImpactScale,
+                                                M_WeaponVfx.BounceScale,
+                                                ShellAdjustedData.ProjectileMovementSpeed,
+                                                LaunchLocation, LaunchRotation,
+                                                M_WeaponVfx.ImpactAttenuation,
+                                                M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
+                                                ActorsToIgnore);
+
+        Projectile->SetupArcedLaunch(LaunchLocation, TargetLocation, ShellAdjustedData.ProjectileMovementSpeed,
+                                     ShellAdjustedData.Range, M_ArchSettings, M_WeaponVfx.LaunchAttenuation,
+                                     M_WeaponVfx.LaunchConcurrency);
 }
