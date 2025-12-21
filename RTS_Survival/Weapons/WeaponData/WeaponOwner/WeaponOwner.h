@@ -94,8 +94,11 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)=0;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) =0;
+        UFUNCTION(BlueprintCallable)
+        virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) =0;
+
+        UFUNCTION(BlueprintCallable)
+        virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) = 0;
 
 	/** @brief Setup a weapon that fires async traces from multiple sockets in parallel. */
 	UFUNCTION(BlueprintCallable)

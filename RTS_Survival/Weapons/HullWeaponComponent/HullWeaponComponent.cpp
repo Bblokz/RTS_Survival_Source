@@ -396,7 +396,12 @@ void UHullWeaponComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProje
 
 void UHullWeaponComponent::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
 {
-	RTSFunctionLibrary::ReportError("ArchProjectile weapons are not supported for HullWeaponComponent: " + GetName());
+        RTSFunctionLibrary::ReportError("ArchProjectile weapons are not supported for HullWeaponComponent: " + GetName());
+}
+
+void UHullWeaponComponent::SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
+{
+        SetupArchProjectileWeapon(ArchProjParameters);
 }
 
 bool UHullWeaponComponent::EnsureWorldIsValid()
