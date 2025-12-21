@@ -1962,16 +1962,16 @@ void UWeaponStateProjectile::OnProjectileKilledActor(AActor* KilledActor) const
 
 void UWeaponStateProjectile::OnProjectileHit(const bool bBounced) const
 {
-	if (not WeaponOwner)
-	{
-		return;
-	}
-	WeaponOwner->OnProjectileHit(bBounced);
+        if (not WeaponOwner)
+        {
+                return;
+        }
+        WeaponOwner->OnProjectileHit(bBounced);
 }
 
 void UWeaponStateProjectile::SetupProjectileManager(ASmallArmsProjectileManager* ProjectileManager)
 {
-	M_ProjectileManager = ProjectileManager;
+        M_ProjectileManager = ProjectileManager;
 }
 
 void UWeaponStateProjectile::CopyStateFrom(const UWeaponStateProjectile* Other)
@@ -1980,30 +1980,45 @@ void UWeaponStateProjectile::CopyStateFrom(const UWeaponStateProjectile* Other)
 
 void UWeaponStateProjectile::FireWeaponSystem()
 {
-	if (WeaponOwner)
-	{
-		FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
-	}
+        if (WeaponOwner)
+        {
+                FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
+        }
 }
 
 bool UWeaponStateProjectile::GetIsValidProjectileManager() const
 {
-	if (M_ProjectileManager.IsValid())
-	{
-		return true;
-	}
-	RTSFunctionLibrary::ReportError(
-		"PROJECTILE Weapon is provided with an invalid projectile manager. " + GetName());
-	return false;
+        if (M_ProjectileManager.IsValid())
+        {
+                return true;
+        }
+        RTSFunctionLibrary::ReportError(
+                "PROJECTILE Weapon is provided with an invalid projectile manager. " + GetName());
+        return false;
+}
+
+ASmallArmsProjectileManager* UWeaponStateProjectile::GetProjectileManager() const
+{
+        if (not GetIsValidProjectileManager())
+        {
+                return nullptr;
+        }
+        return M_ProjectileManager.Get();
+}
+
+EProjectileNiagaraSystem UWeaponStateProjectile::GetProjectileNiagaraSystem() const
+{
+        return M_ProjectileNiagaraSystem;
 }
 
 void UWeaponStateProjectile::FireProjectile(const FVector& TargetDirection)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_FireProjectile);
-	if (not GetIsValidProjectileManager())
-	{
-		return;
-	}
+        TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_FireProjectile);
+        ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+        if (not ProjectileManager)
+        {
+                return;
+        }
 
 	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
 	const FVector LaunchLocation = LaunchAndForward.Key;
@@ -2014,13 +2029,13 @@ void UWeaponStateProjectile::FireProjectile(const FVector& TargetDirection)
 	// Apply accuracy deviation to the launch rotation.
 	LaunchRotation = FRTSWeaponHelpers::ApplyAccuracyDeviationForProjectile(LaunchRotation, WeaponData.Accuracy);
 
-	AProjectile* SpawnedProjectile = M_ProjectileManager->GetDormantTankProjectile();
+        AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
 
-	if (!IsValid(SpawnedProjectile))
-	{
-		ReportErrorForWeapon("PROJECTILE weapon failed to get dormant projectile from pool manager.");
-		return;
-	}
+        if (not IsValid(SpawnedProjectile))
+        {
+                ReportErrorForWeapon("PROJECTILE weapon failed to get dormant projectile from pool manager.");
+                return;
+        }
 
 	// Apply shell type-specific data if necessary.
 	const bool bIsAPShell = WeaponData.ShellType == EWeaponShellType::Shell_AP || WeaponData.ShellType ==
@@ -2091,19 +2106,18 @@ void UWeaponStateArchProjectile::InitArchProjectileWeapon(
         const bool bNewCreateShellCasingOnEveryRandomBurst,
         const FArchProjectileSettings& NewArchSettings)
 {
-        M_ProjectileNiagaraSystem = ProjectileNiagaraSystem;
         M_ArchSettings = NewArchSettings;
-        WeaponHitType = EWeaponSystemType::Projectile;
-        InitWeaponState(
+        InitProjectileWeapon(
                 NewOwningPlayer,
                 NewWeaponIndex,
                 NewWeaponName,
-		NewWeaponBurstMode,
-		NewWeaponOwner,
-		NewMeshComponent,
-		NewFireSocketName,
-		NewWorld,
-		NewWeaponVFX,
+                NewWeaponBurstMode,
+                NewWeaponOwner,
+                NewMeshComponent,
+                NewFireSocketName,
+                NewWorld,
+                ProjectileNiagaraSystem,
+                NewWeaponVFX,
                 NewWeaponShellCase,
                 NewBurstCooldown,
                 NewSingleBurstAmountMaxBurstAmount,
@@ -2111,30 +2125,7 @@ void UWeaponStateArchProjectile::InitArchProjectileWeapon(
                 bNewCreateShellCasingOnEveryRandomBurst);
 }
 
-void UWeaponStateArchProjectile::OnProjectileKilledActor(AActor* KilledActor) const
-{
-        if (WeaponOwner)
-        {
-                OnActorKilled(KilledActor);
-        }
-}
-
 void UWeaponStateArchProjectile::SetupProjectileManager(ASmallArmsProjectileManager* ProjectileManager)
-{
-        M_ProjectileManager = ProjectileManager;
-}
-
-bool UWeaponStateArchProjectile::GetIsValidProjectileManager() const
-{
-        if (M_ProjectileManager.IsValid())
-        {
-                return true;
-        }
-        RTSFunctionLibrary::ReportError("ARCH PROJECTILE Weapon is provided with an invalid projectile manager. " + GetName());
-        return false;
-}
-
-void UWeaponStateArchProjectile::FireWeaponSystem()
 {
         if (WeaponOwner)
         {
@@ -2143,9 +2134,10 @@ void UWeaponStateArchProjectile::FireWeaponSystem()
         }
 }
 
-void UWeaponStateArchProjectile::FireProjectile(const FVector& TargetLocationRaw)
+bool UWeaponStateArchProjectile::GetIsValidProjectileManager() const
 {
-        if (not GetIsValidProjectileManager())
+        ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+        if (not ProjectileManager)
         {
                 return;
         }
@@ -2164,7 +2156,7 @@ void UWeaponStateArchProjectile::FireProjectile(const FVector& TargetLocationRaw
         }
         const FRotator LaunchRotation = LaunchDirection.Rotation();
 
-        AProjectile* SpawnedProjectile = M_ProjectileManager->GetDormantTankProjectile();
+        AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
 
         if (not IsValid(SpawnedProjectile))
         {
@@ -2211,7 +2203,7 @@ void UWeaponStateArchProjectile::FireProjectileWithShellAdjustedStats(const FWea
         FProjectileVfxSettings ProjectileVfxSettings;
         ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
         ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
-        ProjectileVfxSettings.ProjectileNiagaraSystem = M_ProjectileNiagaraSystem;
+        ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
 
         Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
                                                 ShellAdjustedData.BaseDamage, PenAdjustedWithGameFlux,
