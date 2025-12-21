@@ -246,6 +246,14 @@ public:
 		const FVector& SpawnLocation,
 		const bool bPlaySound,
 		const float Delay);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|ExplosionManager")
+	static void RTSSpawnExplosionAtRandomSocket(
+		const UObject* WorldContextObject,
+		const ERTS_ExplosionType ExplosionType,
+		UMeshComponent* MeshComp,
+		const bool bPlaySound,
+		const float Delay);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|VerticalAnimatedTextManager")
 	static void RTSSpawnVerticalAnimatedTextAtLocation(

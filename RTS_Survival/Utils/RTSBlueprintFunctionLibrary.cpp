@@ -432,6 +432,25 @@ void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtLocation(const UObject* Wo
 	}
 }
 
+void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocket(const UObject* WorldContextObject,
+                                                                   const ERTS_ExplosionType ExplosionType, UMeshComponent* MeshComp, const bool bPlaySound, const float Delay)
+{
+	if(not IsValid(MeshComp) || not IsValid(WorldContextObject))
+	{
+		return;
+	}
+	// Get random socket location on mesh.
+	const TArray<FName> SocketNames = MeshComp->GetAllSocketNames();
+	if(SocketNames.Num() == 0)
+	{
+		return;
+	}
+	const int32 RandomIndex = FMath::RandRange(0, SocketNames.Num() - 1);
+	const FName RandomSocketName = SocketNames[RandomIndex];
+	const FVector SocketLocation = MeshComp->GetSocketLocation(RandomSocketName);
+	RTSSpawnExplosionAtLocation(WorldContextObject, ExplosionType, SocketLocation, bPlaySound, Delay);
+}
+
 void URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(const UObject* WorldContextObject,
                                                                           const FString& InText,
                                                                           const FVector& InWorldStartLocation,

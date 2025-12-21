@@ -2125,7 +2125,7 @@ void UWeaponStateArchProjectile::InitArchProjectileWeapon(
                 bNewCreateShellCasingOnEveryRandomBurst);
 }
 
-void UWeaponStateArchProjectile::FireWeaponSystem()
+void UWeaponStateArchProjectile::SetupProjectileManager(ASmallArmsProjectileManager* ProjectileManager)
 {
         if (WeaponOwner)
         {
@@ -2134,7 +2134,7 @@ void UWeaponStateArchProjectile::FireWeaponSystem()
         }
 }
 
-void UWeaponStateArchProjectile::FireProjectile(const FVector& TargetLocationRaw)
+bool UWeaponStateArchProjectile::GetIsValidProjectileManager() const
 {
         ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
         if (not ProjectileManager)

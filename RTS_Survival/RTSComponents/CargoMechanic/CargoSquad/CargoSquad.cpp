@@ -342,23 +342,25 @@ bool UCargoSquad::AbilityRequiresOutside(const EAbilityID Ability)
 
 void UCargoSquad::AttachUnitAndDisableMovement(ASquadUnit* Unit, UCargo* Cargo, const FName& SocketName) const
 {
-	if (!IsValid(Unit) || !IsValid(Cargo) || !Cargo->GetIsValidCargoMesh())
-	{
-		return;
-	}
+        if (not IsValid(Unit) || not IsValid(Cargo) || not Cargo->GetIsValidCargoMesh())
+        {
+                return;
+        }
 
-	Unit->Force_TerminateMovement();
+        Unit->Force_TerminateMovement();
 	if (UCharacterMovementComponent* Move = Unit->GetCharacterMovement())
 	{
 		Move->StopMovementImmediately();
 		Move->DisableMovement();
 	}
 
-	// Compute desired world transform = (socket world) + (cargo seat offset in world space)
-	const FTransform SocketWorld = Cargo->GetSocketWorldTransform(SocketName);
+        // Compute desired world transform = (socket world) + (cargo seat offset in world space)
+        const FVector UnitOriginalScale = Unit->GetActorScale3D();
+        const FTransform SocketWorld = Cargo->GetSocketWorldTransform(SocketName);
 
-	FTransform DesiredWorld = SocketWorld;
-	DesiredWorld.SetLocation(SocketWorld.GetLocation() + Cargo->GetSeatOffset());
+        FTransform DesiredWorld = SocketWorld;
+        DesiredWorld.SetLocation(SocketWorld.GetLocation() + Cargo->GetSeatOffset());
+        DesiredWorld.SetScale3D(UnitOriginalScale);
 
 	if (UPrimitiveComponent* Mesh = Cargo->GetCargoMesh())
 	{
