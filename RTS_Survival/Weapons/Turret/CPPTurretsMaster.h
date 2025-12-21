@@ -279,11 +279,14 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+        UFUNCTION(BlueprintCallable)
+        virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
 
-	UPROPERTY(blueprintReadOnly, VisibleDefaultsOnly)
-	TScriptInterface<ITurretOwner> TurretOwner;
+        UFUNCTION(BlueprintCallable)
+        virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+
+        UPROPERTY(blueprintReadOnly, VisibleDefaultsOnly)
+        TScriptInterface<ITurretOwner> TurretOwner;
 
 	virtual FRotator GetTargetRotation(const FVector& TargetLocation, const FVector& TurretLocation) const;
 

@@ -645,28 +645,37 @@ void ACPPTurretsMaster::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile
 		return;
 	}
 	UWeaponStateArchProjectile* ArchProjectile = NewObject<UWeaponStateArchProjectile>(this);
-	if (ArchProjectile)
-	{
-		ArchProjectile->InitArchProjectileWeapon(
-			ArchProjParameters.OwningPlayer,
-			WeaponIndex,
+        if (ArchProjectile)
+        {
+                ArchProjectile->InitArchProjectileWeapon(
+                        ArchProjParameters.OwningPlayer,
+                        WeaponIndex,
 			ArchProjParameters.WeaponName,
 			ArchProjParameters.WeaponBurstMode,
-			ArchProjParameters.WeaponOwner,
-			ArchProjParameters.MeshComponent,
-			ArchProjParameters.FireSocketName,
-			World,
-			ArchProjParameters.ProjectileClass,
-			ArchProjParameters.WeaponVFX,
-			ArchProjParameters.WeaponShellCase,
-			ArchProjParameters.BurstCooldown,
-			ArchProjParameters.SingleBurstAmountMaxBurstAmount,
-			ArchProjParameters.MinBurstAmount,
-			ArchProjParameters.CreateShellCasingOnEveryRandomBurst,
-			ArchProjParameters.ArchStretch);
-	}
-	M_TWeapons.Add(ArchProjectile);
-	UpdateTurretRangeBasedOnWeapons();
+                        ArchProjParameters.WeaponOwner,
+                        ArchProjParameters.MeshComponent,
+                        ArchProjParameters.FireSocketName,
+                        World,
+                        ArchProjParameters.ProjectileSystem,
+                        ArchProjParameters.WeaponVFX,
+                        ArchProjParameters.WeaponShellCase,
+                        ArchProjParameters.BurstCooldown,
+                        ArchProjParameters.SingleBurstAmountMaxBurstAmount,
+                        ArchProjParameters.MinBurstAmount,
+                        ArchProjParameters.CreateShellCasingOnEveryRandomBurst,
+                        ArchProjParameters.ArchSettings);
+        }
+        if (M_ProjectileManager.IsValid())
+        {
+                FRTSWeaponHelpers::SetupProjectileManagerForWeapon(ArchProjectile, M_ProjectileManager.Get());
+        }
+        M_TWeapons.Add(ArchProjectile);
+        UpdateTurretRangeBasedOnWeapons();
+}
+
+void ACPPTurretsMaster::SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
+{
+        SetupArchProjectileWeapon(ArchProjParameters);
 }
 
 void ACPPTurretsMaster::GetClosestTarget()
