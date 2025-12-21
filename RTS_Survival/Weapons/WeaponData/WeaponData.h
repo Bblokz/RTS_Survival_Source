@@ -626,22 +626,21 @@ protected:
 	UPROPERTY()
 	FWeaponData WeaponData;
 
-	void InitWeaponState(
-		int32 NewOwningPlayer,
-		const int32 NewWeaponIndex,
-		const EWeaponName NewWeaponName,
-		const EWeaponFireMode NewWeaponFireMode,
+        void InitWeaponState(
+                int32 NewOwningPlayer,
+                const int32 NewWeaponIndex,
+                const EWeaponName NewWeaponName,
+                const EWeaponFireMode NewWeaponFireMode,
                 TScriptInterface<IWeaponOwner> NewWeaponOwner,
                 UMeshComponent* NewMeshComponent,
                 const FName NewFireSocketName,
                 UWorld* NewWorld,
-                const EProjectileNiagaraSystem ProjectileNiagaraSystem,
                 FWeaponVFX NewWeaponVFX,
                 FWeaponShellCase NewWeaponShellCase,
                 const float NewBurstCooldown = 0.0f,
                 const int32 NewSingleBurstAmountMaxBurstAmount = 0,
-		const int32 NewMinBurstAmount = 0,
-		const bool bNewCreateShellCasingOnEveryRandomBurst = false, const bool bIsLaserOrFlame = false);
+                const int32 NewMinBurstAmount = 0,
+                const bool bNewCreateShellCasingOnEveryRandomBurst = false, const bool bIsLaserOrFlame = false);
 
 	UPROPERTY()
 	TSubclassOf<UDamageType> DamageTypeClass;
