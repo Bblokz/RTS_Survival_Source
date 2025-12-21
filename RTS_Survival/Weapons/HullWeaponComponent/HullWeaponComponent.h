@@ -111,10 +111,13 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+        UFUNCTION(BlueprintCallable)
+        virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
 
-	// ---- End Override IWeaponOwner ----
+        UFUNCTION(BlueprintCallable)
+        virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+
+        // ---- End Override IWeaponOwner ----
 
 	UPROPERTY(blueprintReadOnly, VisibleDefaultsOnly)
 	TScriptInterface<ITurretOwner> TurretOwner;

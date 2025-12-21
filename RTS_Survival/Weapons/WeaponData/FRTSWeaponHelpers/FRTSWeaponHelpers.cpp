@@ -124,12 +124,18 @@ void FRTSWeaponHelpers::SetupProjectileManagerForWeapon(UWeaponState* Weapon,
 		MultiTraceWeapon->SetupProjectileManager(ProjectileManager);
 		return;
 	}
-	UWeaponStateMultiProjectile* MultiProjectileWeapon = Cast<UWeaponStateMultiProjectile>(Weapon);
-	if (IsValid(MultiProjectileWeapon))
-	{
-		MultiProjectileWeapon->SetupProjectileManager(ProjectileManager);
-		return;
-	}
+        UWeaponStateMultiProjectile* MultiProjectileWeapon = Cast<UWeaponStateMultiProjectile>(Weapon);
+        if (IsValid(MultiProjectileWeapon))
+        {
+                MultiProjectileWeapon->SetupProjectileManager(ProjectileManager);
+                return;
+        }
+        UWeaponStateArchProjectile* ArchProjectileWeapon = Cast<UWeaponStateArchProjectile>(Weapon);
+        if (IsValid(ArchProjectileWeapon))
+        {
+                ArchProjectileWeapon->SetupProjectileManager(ProjectileManager);
+                return;
+        }
 }
 
 ERTSDeathType FRTSWeaponHelpers::TranslateDamageIntoDeathType(const ERTSDamageType DamageType)

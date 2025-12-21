@@ -18,6 +18,7 @@
 enum class EProjectileNiagaraSystem : uint8;
 class UArmorCalculation;
 class ASmallArmsProjectileManager;
+class USoundBase;
 class AArchProjectile;
 class AShellCase;
 class RTS_SURVIVAL_API AProjectile;
@@ -625,21 +626,21 @@ protected:
 	UPROPERTY()
 	FWeaponData WeaponData;
 
-	void InitWeaponState(
-		int32 NewOwningPlayer,
-		const int32 NewWeaponIndex,
-		const EWeaponName NewWeaponName,
-		const EWeaponFireMode NewWeaponFireMode,
-		TScriptInterface<IWeaponOwner> NewWeaponOwner,
-		UMeshComponent* NewMeshComponent,
-		const FName NewFireSocketName,
-		UWorld* NewWorld,
-		FWeaponVFX NewWeaponVFX,
-		FWeaponShellCase NewWeaponShellCase,
-		const float NewBurstCooldown = 0.0f,
-		const int32 NewSingleBurstAmountMaxBurstAmount = 0,
-		const int32 NewMinBurstAmount = 0,
-		const bool bNewCreateShellCasingOnEveryRandomBurst = false, const bool bIsLaserOrFlame = false);
+        void InitWeaponState(
+                int32 NewOwningPlayer,
+                const int32 NewWeaponIndex,
+                const EWeaponName NewWeaponName,
+                const EWeaponFireMode NewWeaponFireMode,
+                TScriptInterface<IWeaponOwner> NewWeaponOwner,
+                UMeshComponent* NewMeshComponent,
+                const FName NewFireSocketName,
+                UWorld* NewWorld,
+                FWeaponVFX NewWeaponVFX,
+                FWeaponShellCase NewWeaponShellCase,
+                const float NewBurstCooldown = 0.0f,
+                const int32 NewSingleBurstAmountMaxBurstAmount = 0,
+                const int32 NewMinBurstAmount = 0,
+                const bool bNewCreateShellCasingOnEveryRandomBurst = false, const bool bIsLaserOrFlame = false);
 
 	UPROPERTY()
 	TSubclassOf<UDamageType> DamageTypeClass;
@@ -1054,10 +1055,31 @@ private:
 USTRUCT(Blueprintable, BlueprintType)
 struct FInitWeaponStateProjectile : public FInitWeaponStateDirectHit
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	EProjectileNiagaraSystem ProjectileSystem = EProjectileNiagaraSystem::TankShell;
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        EProjectileNiagaraSystem ProjectileSystem = EProjectileNiagaraSystem::TankShell;
+};
+
+USTRUCT(BlueprintType)
+struct FArchProjectileSettings
+{
+        GENERATED_BODY()
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        float ApexHeightMultiplier = 1.0f;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        float ApexHeightOffset = 0.0f;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        float MinApexOffset = 0.0f;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        float CurvatureVerticalVelocityMultiplier = 1.0f;
+
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        USoundBase* DescentSound = nullptr;
 };
 
 
@@ -1124,15 +1146,12 @@ private:
 };
 
 USTRUCT(Blueprintable, BlueprintType)
-struct FInitWeaponStateArchProjectile : public FInitWeaponStateDirectHit
+struct FInitWeaponStateArchProjectile : public FInitWeaponStateProjectile
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	TSubclassOf<AArchProjectile> ProjectileClass;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	float ArchStretch = 1.0f;
+        UPROPERTY(BlueprintReadWrite, EditAnywhere)
+        FArchProjectileSettings ArchSettings;
 };
 
 
@@ -1142,7 +1161,7 @@ struct FInitWeaponStateArchProjectile : public FInitWeaponStateDirectHit
 UCLASS()
 class RTS_SURVIVAL_API UWeaponStateArchProjectile : public UWeaponState
 {
-	GENERATED_BODY()
+        GENERATED_BODY()
 
 public:
 	void InitArchProjectileWeapon(
@@ -1153,46 +1172,55 @@ public:
 		TScriptInterface<IWeaponOwner> NewWeaponOwner,
 		UMeshComponent* NewMeshComponent,
 		const FName NewFireSocketName,
-		UWorld* NewWorld,
-		TSubclassOf<AArchProjectile> NewProjectileClass,
-		FWeaponVFX NewWeaponVFX,
-		FWeaponShellCase NewWeaponShellCase,
-		const float NewBurstCooldown = 0.0f,
-		const int32 NewSingleBurstAmountMaxBurstAmount = 0,
-		const int32 NewMinBurstAmount = 0,
-		const bool bNewCreateShellCasingOnEveryRandomBurst = false,
-		const float NewArchStretch = 1.0f);
+                UWorld* NewWorld,
+                FWeaponVFX NewWeaponVFX,
+                FWeaponShellCase NewWeaponShellCase,
+                const float NewBurstCooldown = 0.0f,
+                const int32 NewSingleBurstAmountMaxBurstAmount = 0,
+                const int32 NewMinBurstAmount = 0,
+                const bool bNewCreateShellCasingOnEveryRandomBurst = false,
+                const FArchProjectileSettings& NewArchSettings = FArchProjectileSettings());
 
-	/**
-	 * @brief Notifies weapon owner of the killed actor.
-	 * @param KilledActor The actor that was killed by the projectile.
-	 */
-	void OnProjectileKilledActor(AActor* KilledActor) const;
+        /**
+         * @brief Notifies weapon owner of the killed actor.
+         * @param KilledActor The actor that was killed by the projectile.
+         */
+        void OnProjectileKilledActor(AActor* KilledActor) const;
+
+        void SetupProjectileManager(ASmallArmsProjectileManager* ProjectileManager);
 
 protected:
-	virtual void FireWeaponSystem() override;
+        virtual void FireWeaponSystem() override;
 
 private:
-	// Determines the type of projectile to spawn.
-	UPROPERTY()
-	TSubclassOf<AArchProjectile> M_ProjectileClass;
+        UPROPERTY()
+        TWeakObjectPtr<ASmallArmsProjectileManager> M_ProjectileManager;
 
-	float M_ArchStretch;
+        UPROPERTY()
+        EProjectileNiagaraSystem M_ProjectileNiagaraSystem = EProjectileNiagaraSystem::None;
 
-	// Now takes a target *location* instead of a direction.
-	void FireProjectile(const FVector& TargetLocation);
+        UPROPERTY()
+        FArchProjectileSettings M_ArchSettings;
+
+        // Now takes a target *location* instead of a direction.
+        void FireProjectile(const FVector& TargetLocation);
+
+        bool GetIsValidProjectileManager() const;
 
 
-	/**
-	 * @brief Fires a projectile with the provided stats.
-	 * @param ShellAdjustedData The data of the weapon adjusted for the shell type.
-	 * @param Projectile The spawned projectile assumed to be valid.
-	 * @param LaunchRotation The Rotation the projectile should take.
-	 * @param TargetLocation The adjusted target location.
-	 */
-	FORCEINLINE void FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
-	                                                      AArchProjectile* Projectile, const FRotator& LaunchRotation,
-	                                                      const FVector& TargetLocation);
+        /**
+         * @brief Fires a projectile with the provided stats.
+         * @param ShellAdjustedData The data of the weapon adjusted for the shell type.
+         * @param Projectile The spawned projectile assumed to be valid.
+         * @param LaunchLocation Location the projectile starts from.
+         * @param LaunchRotation The Rotation the projectile should take.
+         * @param TargetLocation The adjusted target location.
+         */
+        FORCEINLINE void FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+                                                              AProjectile* Projectile,
+                                                              const FVector& LaunchLocation,
+                                                              const FRotator& LaunchRotation,
+                                                              const FVector& TargetLocation);
 };
 
 

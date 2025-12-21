@@ -755,25 +755,36 @@ void AInfantryWeaponMaster::SetupArchProjectileWeapon(FInitWeaponStateArchProjec
 		RTSFunctionLibrary::ReportError("World is null for SquadUnitWeapon: " + GetName());
 		return;
 	}
-	UWeaponStateArchProjectile* Projectile = NewObject<UWeaponStateArchProjectile>(this);
-	Projectile->InitArchProjectileWeapon(
-		ArchProjParameters.OwningPlayer,
-		WeaponIndex,
-		ArchProjParameters.WeaponName,
-		ArchProjParameters.WeaponBurstMode,
-		ArchProjParameters.WeaponOwner,
-		ArchProjParameters.MeshComponent,
-		ArchProjParameters.FireSocketName,
-		World,
-		ArchProjParameters.ProjectileClass,
-		ArchProjParameters.WeaponVFX,
-		ArchProjParameters.WeaponShellCase,
-		ArchProjParameters.BurstCooldown,
-		ArchProjParameters.SingleBurstAmountMaxBurstAmount,
-		ArchProjParameters.MinBurstAmount,
-		ArchProjParameters.CreateShellCasingOnEveryRandomBurst);
-	WeaponState = Projectile;
-	SetupRange();
+        UWeaponStateArchProjectile* Projectile = NewObject<UWeaponStateArchProjectile>(this);
+        Projectile->InitArchProjectileWeapon(
+                ArchProjParameters.OwningPlayer,
+                WeaponIndex,
+                ArchProjParameters.WeaponName,
+                ArchProjParameters.WeaponBurstMode,
+                ArchProjParameters.WeaponOwner,
+                ArchProjParameters.MeshComponent,
+                ArchProjParameters.FireSocketName,
+                World,
+                ArchProjParameters.ProjectileSystem,
+                ArchProjParameters.WeaponVFX,
+                ArchProjParameters.WeaponShellCase,
+                ArchProjParameters.BurstCooldown,
+                ArchProjParameters.SingleBurstAmountMaxBurstAmount,
+                ArchProjParameters.MinBurstAmount,
+                ArchProjParameters.CreateShellCasingOnEveryRandomBurst,
+                ArchProjParameters.ArchSettings);
+        WeaponState = Projectile;
+        SetupRange();
+
+        if (M_ProjectileManager.IsValid())
+        {
+                FRTSWeaponHelpers::SetupProjectileManagerForWeapon(WeaponState, M_ProjectileManager.Get());
+        }
+}
+
+void AInfantryWeaponMaster::SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
+{
+        SetupArchProjectileWeapon(ArchProjParameters);
 }
 
 void AInfantryWeaponMaster::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTraceWeaponParameters)

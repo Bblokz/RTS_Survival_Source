@@ -266,8 +266,13 @@ void UAircraftWeapon::SetupProjectileWeapon(FInitWeaponStateProjectile Projectil
 
 void UAircraftWeapon::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
 {
-	RTSFunctionLibrary::ReportError(
-		"ArchProjectile weapons are not supported for aircraft weapon component: " + GetName());
+        RTSFunctionLibrary::ReportError(
+                "ArchProjectile weapons are not supported for aircraft weapon component: " + GetName());
+}
+
+void UAircraftWeapon::SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
+{
+        SetupArchProjectileWeapon(ArchProjParameters);
 }
 
 void UAircraftWeapon::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTraceWeaponParameters)
