@@ -255,6 +255,16 @@ public:
 		const bool bPlaySound,
 		const float Delay);
 
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|ExplosionManager")
+	static void RTSSpawnExplosionAtRandomSocketContaining(
+		const UObject* WorldContextObject,
+		const ERTS_ExplosionType ExplosionType,
+		UMeshComponent* MeshComp,
+		const FString StringToContain,
+		const bool bPlaySound,
+		const float Delay);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|VerticalAnimatedTextManager")
 	static void RTSSpawnVerticalAnimatedTextAtLocation(
 		const UObject* WorldContextObject,
