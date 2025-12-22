@@ -101,6 +101,8 @@ private:
 	UPROPERTY()
 	UWidgetAnimation* M_DamageAnimation = nullptr;
 
+	
+	UPROPERTY()
 	FTargetTypeIconState M_TargetTypeIconState;
 
 	FHealthBarCustomization M_CustomizationSettings;

@@ -108,7 +108,8 @@ private:
 
 	FString RTSRichtText(const FString& Text, const ERTSRichText TextType) const;
 
-	
+
+	UPROPERTY()
 	FTargetTypeIconState M_TargetTypeIconState;
 
 	
