@@ -305,6 +305,15 @@ bool UTrainerComponent::GetSpawnTransform(FTransform& OutTransform) const
 	}
 
 	OutTransform = M_TrainerSettings.TrainingMesh->GetSocketTransform(M_TrainerSettings.SpawnSocketName);
+	bool bWasSuccessful = false;
+	OutTransform.SetLocation(RTSFunctionLibrary::GetLocationProjected(this, OutTransform.GetLocation(), true,
+	                                                                  bWasSuccessful,
+	                                                                  1));
+	if (not bWasSuccessful)
+	{
+		RTSFunctionLibrary::ReportError("Failed to project spawn location to navmesh."
+			"\n in function UTrainerComponent::GetSpawnTransform");
+	}
 	return true;
 }
 
@@ -978,6 +987,7 @@ void UTrainerComponent::OnOptionSpawned(
 				                         SpawnTransform.GetRotation().Rotator(),
 				                         false,
 				                         true);
+				OnSpawnedActorCheckForSquadController(SpawnedActor, SpawnTransform.GetLocation());
 			}
 			else
 			{
@@ -1138,6 +1148,26 @@ bool UTrainerComponent::GetIsValidSelectionComponent() const
 	RTSFunctionLibrary::ReportError("SelectionComponent invalid in TrainerComponent.");
 	return false;
 }
+
+void UTrainerComponent::OnSpawnedActorCheckForSquadController(AActor* SpawnedActor, const FVector& SpawnLocation) const
+{
+	if (not IsValid(SpawnedActor))
+	{
+		return;
+	}
+	ASquadController* SquadController = Cast<ASquadController>(SpawnedActor);
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+	SquadController->SetSquadSpawnLocation(SpawnLocation);
+	if (not SquadController->SetActorLocation(SpawnLocation, false, nullptr, ETeleportType::ResetPhysics))
+	{
+		RTSFunctionLibrary::PrintString("Failed to set location on spawned SquadController actor."
+		                                "\n Location: " + SpawnLocation.ToString(), FColor::Red, 15);
+	}
+}
+
 
 FVector UTrainerComponent::GetDesiredRallyPointLocation() const
 {

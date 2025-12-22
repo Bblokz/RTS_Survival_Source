@@ -191,9 +191,9 @@ bool UEnemyWaveController::CreateAttackWaveTimer(FAttackWave* AttackWave, const 
 		// and started formation movement.
 		if (not WeakThis->SpawnUnitsForAttackWave(Wave))
 		{
-			RTSFunctionLibrary::DisplayNotification(FText::FromString(
+			RTSFunctionLibrary::PrintString(
 				"Wave iteration could not spawn any units possibly due "
-				"to no wave supply left. skipping this iteration."));
+				"to no wave supply left. skipping this iteration.");
 			// Set timer again for next iteration.
 			(void)WeakThis->CreateAttackWaveTimer(Wave, false);
 		}
@@ -298,8 +298,8 @@ bool UEnemyWaveController::SpawnUnitsForAttackWave(FAttackWave* AttackWave)
 
         if (M_EnemyController->GetEnemyWaveSupply() <= 0)
         {
-            RTSFunctionLibrary::DisplayNotification(
-                FText::FromString("Enemy has no wave supply left; skipping this element."));
+            RTSFunctionLibrary::PrintString(
+                "Enemy has no wave supply left; skipping this element.");
             continue;
         }
 

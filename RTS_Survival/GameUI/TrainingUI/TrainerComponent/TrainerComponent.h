@@ -225,6 +225,8 @@ private:
 	bool GetIsValidRallyPointActor() const;
 	bool GetIsValidSelectionComponent() const;
 
+	void OnSpawnedActorCheckForSquadController(AActor* SpawnedActor, const FVector& SpawnLocation) const;
+
 	/** @brief Compute the desired rally point location (actor if valid; otherwise fallback default). */
 	FVector GetDesiredRallyPointLocation() const;
 	/**

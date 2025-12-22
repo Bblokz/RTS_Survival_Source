@@ -10,6 +10,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
+#include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/RTSComponents/TimeProgressBarWidget.h"
@@ -188,6 +189,26 @@ TArray<UWeaponState*> ABuildingExpansion::GetAllWeapons() const
 	return ValidWeapons;
 }
 
+void ABuildingExpansion::VerticalDestruction(const FRTSVerticalCollapseSettings& CollapseSettings,
+	const FCollapseFX& CollapseFX)
+{
+	
+	TWeakObjectPtr<ABuildingExpansion> WeakThis(this);
+	auto OnFinished = [WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->OnVerticalDestructionComplete();
+	};
+	FRTS_VerticalCollapse::StartVerticalCollapse(
+		this,
+		CollapseSettings,
+		CollapseFX,
+		OnFinished);
+}
+
 void ABuildingExpansion::BeginDestroy()
 {
 	DestroyBuildingAttachments();
@@ -356,6 +377,11 @@ void ABuildingExpansion::ExecuteAttackCommand(AActor* TargetActor)
 void ABuildingExpansion::TerminateAttackCommand()
 {
 	SetTurretsToAutoEngage();
+}
+
+void ABuildingExpansion::OnVerticalDestructionComplete()
+{
+	BP_OnVerticalDestructionComplete();
 }
 
 void ABuildingExpansion::DisableAllWeapons()

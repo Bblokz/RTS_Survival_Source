@@ -10,6 +10,7 @@
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Buildings/BuildingAttachments/BuildingAttachments.h"
 #include "RTS_Survival/Collapse/DestroySpawnActorsParameters.h"
+#include "RTS_Survival/Collapse/VerticalCollapse/RTSVerticalCollapseSettings.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 
 #include "BuildingExpansion.generated.h"
@@ -89,6 +90,17 @@ public:
 	TArray<UWeaponState*> GetAllWeapons() const;
 	
 protected:
+
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void VerticalDestruction(
+		const FRTSVerticalCollapseSettings& CollapseSettings,
+		const FCollapseFX& CollapseFX);
+
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnVerticalDestructionComplete();
+	
 	virtual void BeginDestroy() override;
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -200,6 +212,10 @@ protected:
 	virtual void TerminateAttackCommand() override final;
 
 private:
+	
+	UFUNCTION()
+	void OnVerticalDestructionComplete();
+
 
 	// Turrets mounted on this building expansion.
 	UPROPERTY()
