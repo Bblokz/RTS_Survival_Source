@@ -7,7 +7,7 @@
 
 bool FTargetTypeIconState::GetImplementsTargetTypeIcon() const
 {
-	if (IsValid(TargetTypeIconImage))
+	if (TargetTypeIconImage.IsValid())
 	{
 		return true;
 	}
@@ -16,7 +16,7 @@ bool FTargetTypeIconState::GetImplementsTargetTypeIcon() const
 
 void FTargetTypeIconState::SetNewTargetTypeIcon(const int8 OwningPlayer, const ETargetTypeIcon NewTargetTypeIcon)
 {
-	if(not IsValid(TargetTypeIconImage))
+	if (not TargetTypeIconImage.IsValid())
 	{
 		return;
 	}
@@ -30,10 +30,8 @@ void FTargetTypeIconState::SetNewTargetTypeIcon(const int8 OwningPlayer, const E
 	}
 
 	TargetTypeIconImage->SetBrushFromAsset(OwningPlayer == 1
-		                                       ? TypeToBrush[NewTargetTypeIcon].PlayerBrush
-		                                       : TypeToBrush[NewTargetTypeIcon].EnemyBrush);
-	
-	
+		                                         ? TypeToBrush[NewTargetTypeIcon].PlayerBrush
+		                                         : TypeToBrush[NewTargetTypeIcon].EnemyBrush);
 }
 
 bool FTargetTypeIconState::IsTypeContainedAndValid(const ETargetTypeIcon Type)

@@ -27,40 +27,43 @@ class RTS_SURVIVAL_API ACPPTurretsMaster;
 USTRUCT()
 struct FTankStartGameAction
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
-        FTankStartGameAction();
+	FTankStartGameAction();
 
-        void InitStartGameAction(const EAbilityID InAbilityID,
-                                 AActor* InTargetActor,
-                                 const FVector& InTargetLocation,
-                                 ATankMaster* InTankMaster, const FRotator& InEndRotation);
+	void InitStartGameAction(const EAbilityID InAbilityID,
+	                         AActor* InTargetActor,
+	                         const FVector& InTargetLocation,
+	                         ATankMaster* InTankMaster, const FRotator& InEndRotation);
 
-        void OnBeginPlay();
-        void OnTankDestroyed(UWorld* World);
+	void OnBeginPlay();
+	void OnTankDestroyed(UWorld* World);
 
 private:
-        void TimerIteration();
-        void StartTimerForNextFrame();
-        void ClearActionTimer();
-        bool GetIsValidTankMaster() const;
-        bool ExecuteStartAbility() const;
+	void TimerIteration();
+	void StartTimerForNextFrame();
+	void ClearActionTimer();
+	bool GetIsValidTankMaster() const;
+	bool ExecuteStartAbility() const;
 
-        EAbilityID StartGameAction;
+	EAbilityID StartGameAction;
 
-        UPROPERTY()
-        FTimerHandle ActionTimer;
+	UPROPERTY()
+	FTimerHandle ActionTimer;
 
-        UPROPERTY()
-        AActor* TargetActor = nullptr;
+	UPROPERTY()
+	AActor* TargetActor = nullptr;
 
-        UPROPERTY()
-        FVector TargetLocation = FVector::ZeroVector;
+	UPROPERTY()
+	FVector TargetLocation = FVector::ZeroVector;
 
-        UPROPERTY()
-        TWeakObjectPtr<ATankMaster> M_TankMaster = nullptr;
+	UPROPERTY()
+	FRotator EndRotation = FRotator::ZeroRotator;
 
-        bool bM_BeginPlayCalled;
+	UPROPERTY()
+	TWeakObjectPtr<ATankMaster> M_TankMaster = nullptr;
+
+	bool bM_BeginPlayCalled;
 };
 
 /**
@@ -131,26 +134,28 @@ public:
 	// -----End overwrite cargo interface-----
 
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
+
 protected:
-        virtual void Tick(float DeltaSeconds) override;
+	virtual void Tick(float DeltaSeconds) override;
 
-        virtual void BeginPlay() override;
+	virtual void BeginPlay() override;
 
-        virtual void BeginDestroy() override;
-        virtual void UnitDies(const ERTSDeathType DeathType) override;
-        void CheckIfUpsideDown();
+	virtual void BeginDestroy() override;
+	virtual void UnitDies(const ERTSDeathType DeathType) override;
+	void CheckIfUpsideDown();
 
-        virtual void PostInitializeComponents() override;
+	virtual void PostInitializeComponents() override;
 
-        /**
-         * @brief Set up the action this tank should perform at the start of the game.
-         * @param TargetActor Optional target actor for actor-driven abilities.
-         * @param TargetLocation Location to use for location-driven abilities.
-         * @param EndRotation
-         * @param StartGameAbility Ability to execute on the next frame after begin play.
-         */
-        UFUNCTION(BlueprintCallable, NotBlueprintable)
-        void SetTankStartGameAction(AActor* TargetActor, const FVector TargetLocation, const FRotator EndRotation, const EAbilityID StartGameAbility);
+	/**
+	 * @brief Set up the action this tank should perform at the start of the game.
+	 * @param TargetActor Optional target actor for actor-driven abilities.
+	 * @param TargetLocation Location to use for location-driven abilities.
+	 * @param EndRotation
+	 * @param StartGameAbility Ability to execute on the next frame after begin play.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetTankStartGameAction(AActor* TargetActor, const FVector TargetLocation, const FRotator EndRotation,
+	                            const EAbilityID StartGameAbility);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="AimOffset")
 	TArray<FVector> AimOffsetPoints = {
@@ -217,7 +222,7 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	UBehaviourComp* BehaviourComponent;
 
-	bool GetIsValidBehaviourComponent()const;
+	bool GetIsValidBehaviourComponent() const;
 	/**
 	 * @brief the AIController of this tank
 	 * contains behaviour tree logic, like tank movement
@@ -262,7 +267,7 @@ protected:
 
 	/** @copydoc ICommands::TerminateMoveCommand */
 	virtual void TerminateMoveCommand() override;
-	
+
 	virtual void ExecuteReverseCommand(const FVector ReverseToLocation) override;
 	virtual void TerminateReverseCommand() override;
 
@@ -387,6 +392,7 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	USpatialVoiceLinePlayer* GetSpatialVoiceLinePlayer() const { return M_SpatialVoiceLinePlayer; }
+
 	bool GetIsValidSpatialVoiceLinePlayer() const;
 
 	virtual EAnnouncerVoiceLineType OverrideAnnouncerDeathVoiceLine(const EAnnouncerVoiceLineType OriginalLine) const;
@@ -441,18 +447,18 @@ private:
 	// For adjusting the rotation.
 	FTimerHandle TimerHandle_CheckIfUpsideDown;
 
-        // Contains all the armor components that are setup in blueprints.
-        UPROPERTY()
-        TArray<UArmor*> M_TankArmor;
+	// Contains all the armor components that are setup in blueprints.
+	UPROPERTY()
+	TArray<UArmor*> M_TankArmor;
 
-        UPROPERTY()
-        FTankStartGameAction M_TankStartGameAction;
+	UPROPERTY()
+	FTankStartGameAction M_TankStartGameAction;
 
-        /** @return Whether the current active ability of the tank allows for the turret to take control */
-        bool GetCanTurretTakeControl() const;
+	/** @return Whether the current active ability of the tank allows for the turret to take control */
+	bool GetCanTurretTakeControl() const;
 
-        // Plays a little after beginplay to set max vehicle speed on the vehicle movement component.
-        FTimerHandle TimerHandle_SetupMaxSpeed;
+	// Plays a little after beginplay to set max vehicle speed on the vehicle movement component.
+	FTimerHandle TimerHandle_SetupMaxSpeed;
 
 	void SetMaxSpeedOnVehicleMovementComponent();
 
@@ -461,5 +467,5 @@ private:
 
 	void OnUnitDies_DisableWeapons();
 	void OnUnitDies_CheckForCargo(const ERTSDeathType DeathType) const;
-	void OnUnitDies_AnnouncerDeathVoiceLine()const;
+	void OnUnitDies_AnnouncerDeathVoiceLine() const;
 };

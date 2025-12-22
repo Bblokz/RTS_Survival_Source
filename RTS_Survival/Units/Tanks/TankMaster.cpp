@@ -44,6 +44,7 @@ void FTankStartGameAction::InitStartGameAction(const EAbilityID InAbilityID, AAc
 	StartGameAction = InAbilityID;
 	TargetActor = InTargetActor;
 	TargetLocation = InTargetLocation;
+	EndRotation = InEndRotation;
 	M_TankMaster = InTankMaster;
 
 	if (bM_BeginPlayCalled)
@@ -149,7 +150,7 @@ bool FTankStartGameAction::ExecuteStartAbility() const
 	case EAbilityID::IdAttackGround:
 		return M_TankMaster->AttackGround(TargetLocation, true) == ECommandQueueError::NoError;
 	case EAbilityID::IdMove:
-		return M_TankMaster->MoveToLocation(TargetLocation, true, FRotator::ZeroRotator, false) ==
+		return M_TankMaster->MoveToLocation(TargetLocation, true, EndRotation, false) ==
 			ECommandQueueError::NoError;
 	case EAbilityID::IdPatrol:
 		return M_TankMaster->PatrolToLocation(TargetLocation, true) == ECommandQueueError::NoError;
@@ -168,7 +169,7 @@ bool FTankStartGameAction::ExecuteStartAbility() const
 	case EAbilityID::IdSwitchSingleBurst:
 		break;
 	case EAbilityID::IdReverseMove:
-		return M_TankMaster->MoveToLocation(TargetLocation, true, FRotator::ZeroRotator, false) ==
+		return M_TankMaster->ReverseUnitToLocation(TargetLocation, true ) ==
 			ECommandQueueError::NoError;
 	case EAbilityID::IdRotateTowards:
 		return M_TankMaster->RotateTowards(

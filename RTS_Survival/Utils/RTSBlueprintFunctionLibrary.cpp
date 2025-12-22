@@ -451,6 +451,39 @@ void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocket(const UObject
 	RTSSpawnExplosionAtLocation(WorldContextObject, ExplosionType, SocketLocation, bPlaySound, Delay);
 }
 
+void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocketContaining(const UObject* WorldContextObject,
+	const ERTS_ExplosionType ExplosionType, UMeshComponent* MeshComp, const FString StringToContain,
+	const bool bPlaySound, const float Delay)
+{
+	
+	if(not IsValid(MeshComp) || not IsValid(WorldContextObject))
+	{
+		return;
+	}
+	// Get random socket location on mesh.
+	const TArray<FName> SocketNames = MeshComp->GetAllSocketNames();
+	if(SocketNames.Num() == 0)
+	{
+		return;
+	}
+	TArray<FName> FilteredSocketNames;
+	for (const FName& SocketName : SocketNames)
+	{
+		if (SocketName.ToString().Contains(StringToContain))
+		{
+			FilteredSocketNames.Add(SocketName);
+		}
+	}
+	if (FilteredSocketNames.Num() == 0)
+	{
+		return;
+	}
+	const int32 RandomIndex = FMath::RandRange(0, FilteredSocketNames.Num() - 1);
+	const FName RandomSocketName = FilteredSocketNames[RandomIndex];
+	const FVector SocketLocation = MeshComp->GetSocketLocation(RandomSocketName);
+	RTSSpawnExplosionAtLocation(WorldContextObject, ExplosionType, SocketLocation, bPlaySound, Delay);
+}
+
 void URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(const UObject* WorldContextObject,
                                                                           const FString& InText,
                                                                           const FVector& InWorldStartLocation,

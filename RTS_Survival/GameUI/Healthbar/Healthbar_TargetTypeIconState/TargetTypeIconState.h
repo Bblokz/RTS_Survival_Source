@@ -12,13 +12,12 @@ USTRUCT(BlueprintType)
 struct FTargetTypeIconBrushes
 {
 	GENERATED_BODY()
-	// The player brush used for the target type icon.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	USlateBrushAsset* PlayerBrush = nullptr;
 
-	// The enemy brush used for the target type icon.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	USlateBrushAsset* EnemyBrush= nullptr;
+	TObjectPtr<USlateBrushAsset> PlayerBrush = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<USlateBrushAsset> EnemyBrush = nullptr;
 };
 
 USTRUCT(Blueprintable)
@@ -30,8 +29,8 @@ struct FTargetTypeIconState
 
 	void SetNewTargetTypeIcon(const int8 OwningPlayer, const ETargetTypeIcon NewTargetTypeIcon);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UImage* TargetTypeIconImage = nullptr;
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UImage> TargetTypeIconImage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<ETargetTypeIcon, FTargetTypeIconBrushes> TypeToBrush;
