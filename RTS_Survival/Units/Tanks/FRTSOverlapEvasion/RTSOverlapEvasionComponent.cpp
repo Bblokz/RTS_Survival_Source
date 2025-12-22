@@ -431,23 +431,40 @@ void URTSOverlapEvasionComponent::CheckFootprintForOverlaps_BuildUniqueList(
 void URTSOverlapEvasionComponent::TryEvasion_AlliedActorNotIdle(AActor* AlliedActor,
                                                                 ICommands* AlliedActorCommandInterface) const
 {
-	if (not GetIsValidOwnerTrackPathFollowingComponent())
-	{
-		return;
-	}
-	if (not GetIsUnitMoving(AlliedActorCommandInterface))
-	{
-		return;
-	}
-	// Will automatically be de-registered by the same logic as idle blocking actors.
-	M_OwnerTrackPathFollowingComponent->RegisterMovingOverlapBlockingActor(AlliedActor);
+        if (not GetIsValidOwnerTrackPathFollowingComponent())
+        {
+                return;
+        }
+        if (not ShouldRegisterMovingOverlap(AlliedActor))
+        {
+                return;
+        }
+        if (not GetIsUnitMoving(AlliedActorCommandInterface))
+        {
+                return;
+        }
+        // Will automatically be de-registered by the same logic as idle blocking actors.
+        M_OwnerTrackPathFollowingComponent->RegisterMovingOverlapBlockingActor(AlliedActor);
 }
 
 bool URTSOverlapEvasionComponent::GetIsUnitMoving(ICommands* AlliedUnitCommandInterface) const
 {
-	const auto CurrentCommand = AlliedUnitCommandInterface->GetActiveCommandID();
-	const bool bIsMovement = CurrentCommand == EAbilityID::IdMove || CurrentCommand == EAbilityID::IdReverseMove;
-	return bIsMovement;
+        const auto CurrentCommand = AlliedUnitCommandInterface->GetActiveCommandID();
+        const bool bIsMovement = CurrentCommand == EAbilityID::IdMove || CurrentCommand == EAbilityID::IdReverseMove;
+        return bIsMovement;
+}
+
+bool URTSOverlapEvasionComponent::ShouldRegisterMovingOverlap(const AActor* AlliedActor) const
+{
+        if (not M_Owner.IsValid() || not IsValid(AlliedActor))
+        {
+                return false;
+        }
+
+        // Deterministic tie-breaker: only the actor with the higher unique ID registers the overlap.
+        const int32 OwnerUniqueId = M_Owner->GetUniqueID();
+        const int32 AlliedUniqueId = AlliedActor->GetUniqueID();
+        return OwnerUniqueId > AlliedUniqueId;
 }
 
 void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSComponent* OtherRTS) const
