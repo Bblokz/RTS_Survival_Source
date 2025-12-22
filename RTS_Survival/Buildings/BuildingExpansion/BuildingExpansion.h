@@ -11,11 +11,13 @@
 #include "RTS_Survival/Buildings/BuildingAttachments/BuildingAttachments.h"
 #include "RTS_Survival/Collapse/DestroySpawnActorsParameters.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/RTSVerticalCollapseSettings.h"
+#include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 
 #include "BuildingExpansion.generated.h"
 
 
+class UCargo;
 class UWeaponState;
 struct FCollapseFX;
 struct FCollapseForce;
@@ -35,13 +37,15 @@ class RTS_SURVIVAL_API UTimeProgressBarWidget;
  * @note The previewmesh is loaded sync with game thread.
  */
 UCLASS()
-class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster, public ITurretOwner
+class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster, public ITurretOwner, public IAimOffsetProvider
 {
 	GENERATED_BODY()
 
 public:
 
 	ABuildingExpansion(FObjectInitializer const& ObjectInitializer);
+
+	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
 
 	/**
 	 * @brief Initializes the building expansion with necessary status. 
@@ -91,6 +95,11 @@ public:
 	
 protected:
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="AimOffset")
+	TArray<FVector> AimOffsetPoints = {
+		FVector(0, 0, 100), FVector(-50, 0, 100),
+		FVector(0, 25, 100), FVector(0, -25, 100)
+	};
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void VerticalDestruction(
@@ -104,6 +113,7 @@ protected:
 	virtual void BeginDestroy() override;
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -188,6 +198,9 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Turrets")
 	void SetTurretsToAutoEngage();
 
+	UPROPERTY(BlueprintReadOnly, Category="ReferenceCasts")
+	UCargo* CargoComponent;	
+
 	/** @brief Adds the provided turret to the array keeping track of all turrets on this bxp. */
 	UFUNCTION(BlueprintCallable)
 	 void SetupTurret(ACPPTurretsMaster* NewTurret);
@@ -215,7 +228,13 @@ private:
 	
 	UFUNCTION()
 	void OnVerticalDestructionComplete();
+	
 
+	void PostInit_GetCargoComponent();
+	// Important: no rts error report as not all bxps are expected to have cargo!
+	bool GetHasValidCargoComponent()const;
+
+	void DisableCargoComponent()const;
 
 	// Turrets mounted on this building expansion.
 	UPROPERTY()

@@ -3,6 +3,7 @@
 
 #include "W_SelectedUnitDescription.h"
 
+#include "Components/Image.h"
 #include "Components/VerticalBox.h"
 #include "RTS_Survival/Game/GameState/UnitDataHelpers/UnitDataHelpers.h"
 #include "RTS_Survival/GameUI/Healthbar/Healthbar_TargetTypeIconState/ProjectSettings/TargetTypeIconSettings.h"
@@ -61,7 +62,7 @@ void UW_SelectedUnitDescription::NativeOnInitialized()
 	if (TargetTypeIcon)
 	{
 		// Set the reference so we can change the icon using the struct.
-		M_TargetTypeIconState.TargetTypeIconImage = TargetTypeIcon;
+		M_TargetTypeIconState.TargetTypeIconImage= TargetTypeIcon;
 	}
 }
 

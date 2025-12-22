@@ -14,6 +14,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/RTSComponents/TimeProgressBarWidget.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -45,6 +46,11 @@ ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializ
 		// set as root component
 		RootComponent = BuildingMeshComponent;
 	}
+}
+
+void ABuildingExpansion::GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const
+{
+	OutLocalOffsets = AimOffsetPoints;
 }
 
 void ABuildingExpansion::OnBuildingExpansionCreatedByOwner(const TScriptInterface<IBuildingExpansionOwner>& NewOwner,
@@ -190,9 +196,8 @@ TArray<UWeaponState*> ABuildingExpansion::GetAllWeapons() const
 }
 
 void ABuildingExpansion::VerticalDestruction(const FRTSVerticalCollapseSettings& CollapseSettings,
-	const FCollapseFX& CollapseFX)
+                                             const FCollapseFX& CollapseFX)
 {
-	
 	TWeakObjectPtr<ABuildingExpansion> WeakThis(this);
 	auto OnFinished = [WeakThis]()
 	{
@@ -228,6 +233,12 @@ void ABuildingExpansion::BeginPlay()
 	Super::BeginPlay();
 }
 
+void ABuildingExpansion::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	PostInit_GetCargoComponent();
+}
+
 void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
@@ -253,6 +264,7 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	{
 		return;
 	}
+	DisableCargoComponent();
 
 	SetUnitDying();
 	// Before bp event as the bp event may destroy the actor immediately.
@@ -314,7 +326,8 @@ void ABuildingExpansion::OnTurretOutOfRange(const FVector TargetLocation, ACPPTu
 }
 
 void ABuildingExpansion::OnMountedWeaponTargetDestroyed(ACPPTurretsMaster* CallingTurret,
-                                                        UHullWeaponComponent* CallingHullWeapon, AActor* DestroyedActor, const bool bWasDestroyedByOwnWeapons)
+                                                        UHullWeaponComponent* CallingHullWeapon, AActor* DestroyedActor,
+                                                        const bool bWasDestroyedByOwnWeapons)
 {
 	if (not GetIsValidCommandData())
 	{
@@ -384,6 +397,28 @@ void ABuildingExpansion::OnVerticalDestructionComplete()
 	BP_OnVerticalDestructionComplete();
 }
 
+void ABuildingExpansion::PostInit_GetCargoComponent()
+{
+	CargoComponent = FindComponentByClass<UCargo>();
+}
+
+bool ABuildingExpansion::GetHasValidCargoComponent() const
+{
+	if (not IsValid(CargoComponent))
+	{
+		return false;
+	}
+	return true;
+}
+
+void ABuildingExpansion::DisableCargoComponent() const
+{
+	if(GetHasValidCargoComponent())
+	{
+		CargoComponent->SetIsEnabled(false);
+	}
+}
+
 void ABuildingExpansion::DisableAllWeapons()
 {
 	for (auto eachTurret : M_TTurrets)
@@ -412,10 +447,10 @@ void ABuildingExpansion::CollapseMesh(UGeometryCollectionComponent* GeoCollapseC
 }
 
 void ABuildingExpansion::InitBuildingExpansion(
-        TArray<FUnitAbilityEntry> Abilities,
-        UStaticMesh* NewConstructionMesh,
-        UStaticMesh* NewBuildingMesh,
-        UTimeProgressBarWidget* NewProgressBar,
+	TArray<FUnitAbilityEntry> Abilities,
+	UStaticMesh* NewConstructionMesh,
+	UStaticMesh* NewBuildingMesh,
+	UTimeProgressBarWidget* NewProgressBar,
 	const float NewBuildingTime,
 	TArray<UNiagaraSystem*> SmokeSystems,
 	const int NewAmountSmokes,

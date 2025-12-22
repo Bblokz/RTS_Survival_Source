@@ -652,8 +652,6 @@ void UEnemyFormationController::OnFormationUnitDiedPostReachFinal(AActor* Destro
 	{
 		return;
 	}
-	RTSFunctionLibrary::DisplayNotification(
-		FText::FromString("Formation unit died after reaching; providing back supply"));
 	Debug("Formation unit got invalid after reaching final destination, provide back supply.");
 	// Provide back the wave supply after the unit finished its formation movement and died later.
 	RefundUnitWaveSupply(1);

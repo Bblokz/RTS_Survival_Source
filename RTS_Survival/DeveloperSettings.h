@@ -1358,7 +1358,7 @@ namespace DeveloperSettings
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
-		constexpr bool GEnemyController_Compile_DebugSymbols = false;
+		constexpr bool GEnemyController_Compile_DebugSymbols = true;
 		constexpr bool ExplosionsManager_Compile_DebugSymbols = false;
 		constexpr bool GPlayerStartLocations_Compile_DebugSymbols = false;
 		constexpr bool GCamera_Player_Compile_DebugSymbols = false;
@@ -1377,7 +1377,7 @@ namespace DeveloperSettings
 		constexpr bool GCommands_Compile_DebugSymbols = false;
 		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
 		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
-		constexpr bool GPathFindingCosts_Compile_DebugSymbols = true;
+		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
 		// Wheel Animation
