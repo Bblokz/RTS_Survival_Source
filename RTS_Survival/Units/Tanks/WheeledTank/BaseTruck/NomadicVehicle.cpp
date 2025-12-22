@@ -575,6 +575,7 @@ void ANomadicVehicle::OnTruckMontageFinished()
 // Step 4
 void ANomadicVehicle::OnFinishedConvertingToBuilding()
 {
+	AnnounceConversion();
 	FResourceConversionHelper::OnNomadicExpanded(this, true);
 	OnConvertToBuilding_PlacePackedBxps();
 	// This evaluating to false is not an error as not all nomadic vehicles have a build radius component.
@@ -996,7 +997,6 @@ void ANomadicVehicle::OnFinishedConvertingToVehicle()
 	SetRadiusComponentActive(false);
 	SetEnergyComponentActive(false);
 	FResourceConversionHelper::OnNomadicExpanded(this, false);
-	AnnounceConversion();
 
 	if (GetIsValidAircraftOwnerComp())
 	{

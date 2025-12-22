@@ -34,7 +34,7 @@ struct FTankStartGameAction
         void InitStartGameAction(const EAbilityID InAbilityID,
                                  AActor* InTargetActor,
                                  const FVector& InTargetLocation,
-                                 ATankMaster* InTankMaster);
+                                 ATankMaster* InTankMaster, const FRotator& InEndRotation);
 
         void OnBeginPlay();
         void OnTankDestroyed(UWorld* World);
@@ -146,10 +146,11 @@ protected:
          * @brief Set up the action this tank should perform at the start of the game.
          * @param TargetActor Optional target actor for actor-driven abilities.
          * @param TargetLocation Location to use for location-driven abilities.
+         * @param EndRotation
          * @param StartGameAbility Ability to execute on the next frame after begin play.
          */
         UFUNCTION(BlueprintCallable, NotBlueprintable)
-        void SetTankStartGameAction(AActor* TargetActor, const FVector TargetLocation, const EAbilityID StartGameAbility);
+        void SetTankStartGameAction(AActor* TargetActor, const FVector TargetLocation, const FRotator EndRotation, const EAbilityID StartGameAbility);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="AimOffset")
 	TArray<FVector> AimOffsetPoints = {

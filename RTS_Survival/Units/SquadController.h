@@ -73,7 +73,17 @@ private:
 	bool GetIsSquadFullyLoaded() const;
 	bool ExecuteStartAbility() const;
 };
+// Work around to set the spawn location for the squad from the trainer.
+USTRUCT()
+struct FSquadSpawnLocation
+{
+	GENERATED_BODY()
 
+	bool bIsSetByTrainer = false;
+
+	FVector SpawnLocation = FVector::ZeroVector;
+	
+};
 
 DECLARE_MULTICAST_DELEGATE(FOnWeaponPickup);
 
@@ -204,6 +214,8 @@ public:
 
 
 	TArray<UWeaponState*> GetWeaponsOfSquad();
+
+	void SetSquadSpawnLocation(const FVector& SpawnLocation);
 	/**
 	 * @brief Request squad move using the controller's coordinated pathing for a specific ability.
 	 * @param MoveToLocation Destination to move.
@@ -490,6 +502,9 @@ private:
 	/** Cargo manager component for this squad. */
 	UPROPERTY()
 	TObjectPtr<UCargoSquad> CargoSquad;
+	
+	UPROPERTY()
+	FSquadSpawnLocation M_SquadSpawnLocation;
 
 	/** Handles reinforcement activation and spawning missing squad units. */
 	UPROPERTY()
@@ -660,6 +675,8 @@ private:
 	*/
 	void StartGeneratingSpawnLocations(const FVector& GridOriginLocation);
 
+	FVector GetSpawnLocationForSquad()const;
+
 	/**
 	 * @brief Generates the next spawn location in the grid.
 	 * @return The next grid point location.
@@ -724,4 +741,5 @@ private:
 	// ----------------- Weapon Icon -----------------
 	void UpdateSquadWeaponIcon();
 	void SetWeaponIcon(const EWeaponName HighestValuedWeapon);
+
 };

@@ -34,7 +34,7 @@ FTankStartGameAction::FTankStartGameAction()
 }
 
 void FTankStartGameAction::InitStartGameAction(const EAbilityID InAbilityID, AActor* InTargetActor,
-                                               const FVector& InTargetLocation, ATankMaster* InTankMaster)
+                                               const FVector& InTargetLocation, ATankMaster* InTankMaster, const FRotator& InEndRotation)
 {
 	if (not IsValid(InTankMaster))
 	{
@@ -238,9 +238,9 @@ USkeletalMeshComponent* ATankMaster::GetTankMesh() const
 }
 
 void ATankMaster::SetTankStartGameAction(AActor* TargetActor, const FVector TargetLocation,
-                                         const EAbilityID StartGameAbility)
+                                         const FRotator EndRotation, const EAbilityID StartGameAbility)
 {
-	M_TankStartGameAction.InitStartGameAction(StartGameAbility, TargetActor, TargetLocation, this);
+	M_TankStartGameAction.InitStartGameAction(StartGameAbility, TargetActor, TargetLocation, this, EndRotation);
 }
 
 void ATankMaster::UpgradeTurnRate(const float NewTurnRate)
