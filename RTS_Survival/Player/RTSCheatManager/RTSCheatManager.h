@@ -76,6 +76,8 @@ public:
 	void RTSDebugEnemy() const;
 
 	UFUNCTION(Exec)
+	void RTSDebugFormation() const;
+	UFUNCTION(Exec)
 	void RTSDestroyBxps() const;
 
 	UFUNCTION(Exec)

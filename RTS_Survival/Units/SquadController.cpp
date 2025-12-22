@@ -255,6 +255,12 @@ TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 	return Weapons;
 }
 
+void ASquadController::SetSquadSpawnLocation(const FVector& SpawnLocation)
+{
+	M_SquadSpawnLocation.bIsSetByTrainer = true;	
+	M_SquadSpawnLocation.SpawnLocation = SpawnLocation; 
+}
+
 
 void ASquadController::RequestSquadMoveForAbility(const FVector& MoveToLocation, const EAbilityID AbilityID)
 {
@@ -536,7 +542,7 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 		return;
 	}
 	// center grid generation around squad controller location.
-	StartGeneratingSpawnLocations(GetActorLocation());
+	StartGeneratingSpawnLocations(GetSpawnLocationForSquad());
 	for (auto eachSqUnit : M_TSquadUnits)
 	{
 		if (GetIsValidSquadUnit(eachSqUnit))
@@ -2097,6 +2103,15 @@ void ASquadController::StartGeneratingSpawnLocations(const FVector& GridOriginLo
 	}
 }
 
+FVector ASquadController::GetSpawnLocationForSquad() const
+{
+	if(M_SquadSpawnLocation.bIsSetByTrainer)
+	{
+		return M_SquadSpawnLocation.SpawnLocation;
+	}
+	return GetActorLocation();
+}
+
 
 FVector ASquadController::FindIdealSpawnLocation_GetNextGridPoint()
 {
@@ -2140,6 +2155,10 @@ FVector ASquadController::ProjectLocationOnNavMesh(const FVector& Location, cons
 
 void ASquadController::UpdateControllerPositionToAverage()
 {
+	if(not GetIsSquadFullyLoaded())
+	{
+		return;
+	}
 	// Calculate the average position of all valid squad units
 	FVector AveragePosition = FVector::ZeroVector;
 	int32 ValidUnitCount = 0;

@@ -163,6 +163,11 @@ void UFormationController::SetPlayerRotationOverride(const FRotator& InRotation)
 	M_PlayerRotationOverride = InRotation;
 }
 
+void UFormationController::ConsoleDebugFormations() const
+{
+	DebugFormation();
+}
+
 void UFormationController::BeginPlay()
 {
 	Super::BeginPlay();

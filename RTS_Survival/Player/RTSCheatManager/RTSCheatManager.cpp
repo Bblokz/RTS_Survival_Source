@@ -265,6 +265,11 @@ void URTSCheatManager::RTSDebugEnemy() const
 	EnemyController->DebugAllActiveFormations();
 }
 
+void URTSCheatManager::RTSDebugFormation() const
+{
+	
+}
+
 void URTSCheatManager::RTSDestroyBxps() const
 {
 	UWorld* World = GetWorld();

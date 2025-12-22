@@ -100,6 +100,8 @@ FVector UseFormationPosition(const URTSComponent* RTSComponent,
 	/** Overrides automatic formation rotation with a player-specified value. */
 	void SetPlayerRotationOverride(const FRotator& InRotation);
 
+	void ConsoleDebugFormations()const;
+
 protected:
 	virtual void BeginPlay() override;
 
