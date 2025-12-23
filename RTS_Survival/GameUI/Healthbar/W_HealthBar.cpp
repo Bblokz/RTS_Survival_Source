@@ -85,9 +85,9 @@ void UW_HealthBar::UpdateMaxFireThreshold(const float MaxFireThreshold) const
 	M_DMI_FireThresholdBar->SetScalarParameterValue(M_HealthBarColorParameters.AmountSliceName, AmountSlices);
 }
 
-void UW_HealthBar::UpdateSquadWeaponIcon(USlateBrushAsset* NewWeaponIconAsset)
+void UW_HealthBar::UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings)
 {
-	BP_UpdateSquadWeaponIcon(NewWeaponIconAsset);
+        BP_UpdateSquadWeaponIcon(NewWeaponIconSettings);
 }
 
 void UW_HealthBar::SetupUnitName(const FString& UnitName)

@@ -56,7 +56,7 @@ void USquadHealthComponent::OnWidgetInitialized()
 {
         Super::OnWidgetInitialized();
 
-        if (not bM_OnWidgetInitLoadBrushAsset)
+        if (not bM_OnWidgetInitLoadWeaponIcon)
         {
                 return;
         }
@@ -64,14 +64,14 @@ void USquadHealthComponent::OnWidgetInitialized()
         UW_HealthBar* HealthBarWidget = GetHealthBarWidget();
         if (not IsValid(HealthBarWidget))
         {
-                RTSFunctionLibrary::ReportError("Squad waited for health bar widget to initialize, but it is invalid."
-                                                                  "cannot set squad weapon icon.");
+                RTSFunctionLibrary::ReportError("Squad waited for health bar widget to initialize, but it is invalid. "
+                                                                  "Cannot set squad weapon icon.");
                 return;
         }
 
-        HealthBarWidget->UpdateSquadWeaponIcon(M_SquadWeaponIconAssetToSet);
-        bM_OnWidgetInitLoadBrushAsset = false;
-        M_SquadWeaponIconAssetToSet = nullptr;
+        HealthBarWidget->UpdateSquadWeaponIcon(M_SquadWeaponIconSettingsToSet);
+        bM_OnWidgetInitLoadWeaponIcon = false;
+        M_SquadWeaponIconSettingsToSet = FSquadWeaponIconDisplaySettings();
 }
 
 void USquadHealthComponent::ApplyDeltaToTotals(const float DeltaMax,
@@ -145,18 +145,19 @@ void USquadHealthComponent::SquadHeal(const float HealAmount)
 	Heal(HealAmount);
 }
 
-void USquadHealthComponent::UpdateSquadWeaponIcon(USlateBrushAsset* NewWeaponIconAsset)
+void USquadHealthComponent::UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings)
 {
-	UW_HealthBar* HealthBarWidget = GetHealthBarWidget();
-	if(IsValid(HealthBarWidget))
-	{
-		HealthBarWidget->UpdateSquadWeaponIcon(NewWeaponIconAsset);	
-	}
-	else
-	{
-		bM_OnWidgetInitLoadBrushAsset = true;
-		M_SquadWeaponIconAssetToSet = NewWeaponIconAsset;
-	}
+        UW_HealthBar* HealthBarWidget = GetHealthBarWidget();
+        if (not IsValid(HealthBarWidget))
+        {
+                bM_OnWidgetInitLoadWeaponIcon = true;
+                M_SquadWeaponIconSettingsToSet = NewWeaponIconSettings;
+                return;
+        }
+
+        HealthBarWidget->UpdateSquadWeaponIcon(NewWeaponIconSettings);
+        bM_OnWidgetInitLoadWeaponIcon = false;
+        M_SquadWeaponIconSettingsToSet = FSquadWeaponIconDisplaySettings();
 }
 
 void USquadHealthComponent::OnUnitStateChanged(USquadUnitHealthComponent* UnitHealth,

@@ -3,18 +3,32 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Engine/DeveloperSettings.h"
 #include "RTS_Survival/Units/Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIcons.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/SecondaryWeaponComp/SecondaryWeapon.h"
 #include "SquadWeaponIconSettings.generated.h"
 class USlateBrushAsset;
 
+USTRUCT(BlueprintType)
+struct FSquadWeaponIconDisplaySettings
+{
+        GENERATED_BODY()
+
+        UPROPERTY(EditAnywhere, Config, BlueprintReadOnly)
+        TObjectPtr<USlateBrushAsset> WeaponIconBrush = nullptr;
+
+        UPROPERTY(EditAnywhere, Config, BlueprintReadOnly)
+        FAnchorData CanvasSlotLayoutData;
+};
+
 USTRUCT(BlueprintType, Blueprintable)
 struct FSquadWeaponIconSettingsData
 {
-	GENERATED_BODY()
-	UPROPERTY()
-	TMap<ESquadWeaponIcon, USlateBrushAsset*> TypeToBrush;
+        GENERATED_BODY()
+
+        UPROPERTY(EditAnywhere, Config)
+        TMap<ESquadWeaponIcon, FSquadWeaponIconDisplaySettings> TypeToDisplaySettings;
 };
 
 /**
@@ -28,9 +42,9 @@ class RTS_SURVIVAL_API USquadWeaponIconSettings : public UDeveloperSettings
 public:
 	USquadWeaponIconSettings();
 
-	/** Configure target-type icon brushes globally for the project. */
-	UPROPERTY(EditAnywhere, Config, Category="Icons", meta=(ForceInlineRow))
-	FSquadWeaponIconSettingsData SquadWeaponIconData;
+        /** Configure target-type icon brushes and layout overrides globally for the project. */
+        UPROPERTY(EditAnywhere, Config, Category="Icons", meta=(ForceInlineRow))
+        FSquadWeaponIconSettingsData SquadWeaponIconData;
 
 	/**
 	* Convenience accessor.
@@ -40,7 +54,8 @@ public:
 		return GetDefault<USquadWeaponIconSettings>();
 	}
 
-	USlateBrushAsset* GetBrushForWeaponIconType(const ESquadWeaponIcon WeaponIconType) const;
+        bool TryGetWeaponIconSettings(const ESquadWeaponIcon WeaponIconType,
+                                      FSquadWeaponIconDisplaySettings& OutIconSettings) const;
 };
 
 static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponName)

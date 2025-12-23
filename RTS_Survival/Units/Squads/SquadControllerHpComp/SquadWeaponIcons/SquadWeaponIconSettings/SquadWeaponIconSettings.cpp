@@ -12,18 +12,21 @@ USquadWeaponIconSettings::USquadWeaponIconSettings()
 	SectionName  = TEXT("Squad Weapon Icons");
 }
 
-USlateBrushAsset* USquadWeaponIconSettings::GetBrushForWeaponIconType(const ESquadWeaponIcon WeaponIconType) const
+bool USquadWeaponIconSettings::TryGetWeaponIconSettings(const ESquadWeaponIcon WeaponIconType,
+                                      FSquadWeaponIconDisplaySettings& OutIconSettings) const
 {
-	if(WeaponIconType == ESquadWeaponIcon::None)
-	{
-		// Silently ignore as squad does not use a weapon icon.
-		return nullptr;
-	}
-	if(not SquadWeaponIconData.TypeToBrush.Contains(WeaponIconType))
-	{
-		const FString WeaponIconNameFromUEnum = UEnum::GetValueAsString(WeaponIconType);
-		RTSFunctionLibrary::ReportError("The Squad Weapon Icon: " + WeaponIconNameFromUEnum + " does not have a brush assigned in SquadWeaponIconSettings. Please assign one in Project Settings under 'Squad Weapon Icons'.");
-		return nullptr;
-	}
-	return SquadWeaponIconData.TypeToBrush[WeaponIconType];
+        if (WeaponIconType == ESquadWeaponIcon::None)
+        {
+                // Silently ignore as squad does not use a weapon icon.
+                OutIconSettings = FSquadWeaponIconDisplaySettings();
+                return true;
+        }
+        if (not SquadWeaponIconData.TypeToDisplaySettings.Contains(WeaponIconType))
+        {
+                const FString WeaponIconNameFromUEnum = UEnum::GetValueAsString(WeaponIconType);
+                RTSFunctionLibrary::ReportError("The Squad Weapon Icon: " + WeaponIconNameFromUEnum + " does not have display settings assigned in SquadWeaponIconSettings. Please assign them in Project Settings under 'Squad Weapon Icons'.");
+                return false;
+        }
+        OutIconSettings = SquadWeaponIconData.TypeToDisplaySettings[WeaponIconType];
+        return true;
 }
