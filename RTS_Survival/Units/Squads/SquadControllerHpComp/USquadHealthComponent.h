@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/Units/Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIconSettings/SquadWeaponIconSettings.h"
 #include "USquadHealthComponent.generated.h"
 
 class USlateBrushAsset;
@@ -30,7 +31,7 @@ public:
 	void SquadTakeDamage(float Damage);
 	void SquadHeal(float HealAmount);
 
-	void UpdateSquadWeaponIcon(USlateBrushAsset* NewWeaponIconAsset);
+        void UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings);
 
 	/**
 	 * @brief Update a member's snapshot and adjust aggregates by the delta.
@@ -84,9 +85,9 @@ private:
 	UPROPERTY()
 	float M_FullSquadMaxHealth = 0.f;
 
-	bool bM_OnWidgetInitLoadBrushAsset = false;
-	UPROPERTY()
-	USlateBrushAsset* M_SquadWeaponIconAssetToSet = nullptr;
+        bool bM_OnWidgetInitLoadWeaponIcon = false;
+        UPROPERTY()
+        FSquadWeaponIconDisplaySettings M_SquadWeaponIconSettingsToSet;
 
 	UPROPERTY()
 	bool bM_HasFullMaxInitialized = false;

@@ -7,6 +7,7 @@
 #include "HealthBarSettings/HealthBarVisibilitySettings.h"
 #include "Healthbar_TargetTypeIconState/TargetTypeIconState.h"
 #include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarSettings.h"
+#include "RTS_Survival/Units/Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIconSettings/SquadWeaponIconSettings.h"
 #include "Slate/SlateBrushAsset.h"
 
 #include "W_HealthBar.generated.h"
@@ -50,7 +51,7 @@ public:
 	void UpdateMaxFireThreshold (const float MaxFireThreshold) const;
 
 	// For squad units, gets the icon from settings and loads it in blueprints.
-	void UpdateSquadWeaponIcon(USlateBrushAsset* NewWeaponIconAsset);
+        void UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings);
 	
 	void SetupUnitName(const FString& UnitName);
 	void SetSettingsFromHealthComponent(UHealthComponent* OwningHealthComp,
@@ -82,9 +83,9 @@ protected:
 		return M_UnitName;
 	}
 
-	// If asset is null hide the weapon icon.
-	UFUNCTION(BlueprintImplementableEvent, Category="SquadWeapon")
-	void BP_UpdateSquadWeaponIcon(USlateBrushAsset* NewWeaponIconAsset);
+        // If asset is null hide the weapon icon.
+        UFUNCTION(BlueprintImplementableEvent, Category="SquadWeapon")
+        void BP_UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings);
 
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	TObjectPtr<UImage> M_HealthBarImage = nullptr;

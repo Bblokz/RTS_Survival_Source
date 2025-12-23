@@ -2302,67 +2302,67 @@ void ASquadController::OnRepairTargetFullyRepaired(AActor* RepairTarget)
 
 void ASquadController::UpdateSquadWeaponIcon()
 {
-	EnsureSquadUnitsValid();
-	EWeaponName WeaponWithHighestValue = EWeaponName::DEFAULT_WEAPON;
-	int32 HighestWeaponValue = -1;
-	for (auto EachSqUnit : M_TSquadUnits)
-	{
-		if (not EachSqUnit->GetWeaponState())
-		{
-			continue;
-		}
-		const EWeaponName WeaponNameOfUnit = EachSqUnit->GetWeaponState()->GetRawWeaponData().WeaponName;
-		if (Global_GetWeaponValue(WeaponNameOfUnit) > HighestWeaponValue)
-		{
-			HighestWeaponValue = Global_GetWeaponValue(WeaponNameOfUnit);
-			WeaponWithHighestValue = WeaponNameOfUnit;
-		}
-	}
-	SetWeaponIcon(WeaponWithHighestValue);
+        EnsureSquadUnitsValid();
+        EWeaponName WeaponWithHighestValue = EWeaponName::DEFAULT_WEAPON;
+        int32 HighestWeaponValue = -1;
+        for (auto EachSqUnit : M_TSquadUnits)
+        {
+                if (not EachSqUnit->GetWeaponState())
+                {
+                        continue;
+                }
+                const EWeaponName WeaponNameOfUnit = EachSqUnit->GetWeaponState()->GetRawWeaponData().WeaponName;
+                const int32 WeaponValue = Global_GetWeaponValue(WeaponNameOfUnit);
+                if (WeaponValue > HighestWeaponValue)
+                {
+                        HighestWeaponValue = WeaponValue;
+                        WeaponWithHighestValue = WeaponNameOfUnit;
+                }
+        }
+        SetWeaponIcon(WeaponWithHighestValue);
 }
 
 void ASquadController::SetWeaponIcon(const EWeaponName HighestValuedWeapon)
 {
-	ESquadWeaponIcon SquadWeaponIcon = Global_GetWeaponIconForWeapon(HighestValuedWeapon);
-	// Default = no icon; nullptr hides the icon.
-	USlateBrushAsset* Asset = nullptr;
-	if (not GetIsValidSquadHealthComponent())
-	{
-		return;
-	}
-	const bool bNotNone = SquadWeaponIcon != ESquadWeaponIcon::None;
-	if (const USquadWeaponIconSettings* Settings = USquadWeaponIconSettings::Get(); Settings && bNotNone)
-	{
-		const USlateBrushAsset* SlateBrushAsset = Settings->GetBrushForWeaponIconType(SquadWeaponIcon);
-		if (not SlateBrushAsset)
-		{
-			const FString SquadWeaponIconStringFromUEnum = UEnum::GetValueAsString(SquadWeaponIcon);
-			RTSFunctionLibrary::ReportError(
-				"Squad controller wanted to set weapon icon with non null squad weapon icon of type:"
-				+ SquadWeaponIconStringFromUEnum
-				+ "\n but no asset was found in the USquadWeaponIconSettings! Does the mapping entry exist?");
-			return;
-		}
-	}
-	SquadHealthComponent->UpdateSquadWeaponIcon(Asset);
+        ESquadWeaponIcon SquadWeaponIcon = Global_GetWeaponIconForWeapon(HighestValuedWeapon);
+        if (not GetIsValidSquadHealthComponent())
+        {
+                return;
+        }
+        FSquadWeaponIconDisplaySettings WeaponIconSettings;
+        const bool bNotNone = SquadWeaponIcon != ESquadWeaponIcon::None;
+        if (const USquadWeaponIconSettings* Settings = USquadWeaponIconSettings::Get(); Settings && bNotNone)
+        {
+                const bool bHasSettings = Settings->TryGetWeaponIconSettings(SquadWeaponIcon, WeaponIconSettings);
+                if (not bHasSettings)
+                {
+                        const FString SquadWeaponIconStringFromUEnum = UEnum::GetValueAsString(SquadWeaponIcon);
+                        RTSFunctionLibrary::ReportError(
+                                "Squad controller wanted to set weapon icon with non null squad weapon icon of type:"
+                                + SquadWeaponIconStringFromUEnum
+                                + "\n but no icon settings were found in the USquadWeaponIconSettings! Does the mapping entry exist?");
+                        return;
+                }
+        }
+        SquadHealthComponent->UpdateSquadWeaponIcon(WeaponIconSettings);
 }
 
 bool ASquadController::GetIsValidSquadUnit(const ASquadUnit* Unit) const
 {
-	if (!IsValid(Unit))
-	{
-		RTSFunctionLibrary::ReportError("Squad Unit is null when trying to accesss from array in SquadController!");
-		return false;
-	}
-	return true;
+        if (not IsValid(Unit))
+        {
+                RTSFunctionLibrary::ReportError("Squad Unit is null when trying to accesss from array in SquadController!");
+                return false;
+        }
+        return true;
 }
 
 bool ASquadController::GetIsValidSquadReinforcementComponent() const
 {
-	if (IsValid(SquadReinforcement))
-	{
-		return true;
-	}
+        if (IsValid(SquadReinforcement))
+        {
+                return true;
+        }
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this,
 	                                                      "SquadReinforcement",
 	                                                      "ASquadController::GetIsValidSquadReinforcementComponent",
