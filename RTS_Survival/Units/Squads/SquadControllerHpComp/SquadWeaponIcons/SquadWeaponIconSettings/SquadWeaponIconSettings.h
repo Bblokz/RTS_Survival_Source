@@ -13,22 +13,25 @@ class USlateBrushAsset;
 USTRUCT(BlueprintType)
 struct FSquadWeaponIconDisplaySettings
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
-        UPROPERTY(EditAnywhere, Config, BlueprintReadOnly)
-        TObjectPtr<USlateBrushAsset> WeaponIconBrush = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<USlateBrushAsset> WeaponIconBrush = nullptr;
 
-        UPROPERTY(EditAnywhere, Config, BlueprintReadOnly)
-        FAnchorData CanvasSlotLayoutData;
+	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly)
+	FAnchorData CanvasSlotLayoutData;
+	
+	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly)
+	FVector2D ImageWidgetSize = FVector2D(480.f, 211.0f);
 };
 
 USTRUCT(BlueprintType, Blueprintable)
 struct FSquadWeaponIconSettingsData
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
-        UPROPERTY(EditAnywhere, Config)
-        TMap<ESquadWeaponIcon, FSquadWeaponIconDisplaySettings> TypeToDisplaySettings;
+	UPROPERTY(EditAnywhere, Config)
+	TMap<ESquadWeaponIcon, FSquadWeaponIconDisplaySettings> TypeToDisplaySettings;
 };
 
 /**
@@ -42,9 +45,9 @@ class RTS_SURVIVAL_API USquadWeaponIconSettings : public UDeveloperSettings
 public:
 	USquadWeaponIconSettings();
 
-        /** Configure target-type icon brushes and layout overrides globally for the project. */
-        UPROPERTY(EditAnywhere, Config, Category="Icons", meta=(ForceInlineRow))
-        FSquadWeaponIconSettingsData SquadWeaponIconData;
+	/** Configure target-type icon brushes and layout overrides globally for the project. */
+	UPROPERTY(EditAnywhere, Config, Category="Icons", meta=(ForceInlineRow))
+	FSquadWeaponIconSettingsData SquadWeaponIconData;
 
 	/**
 	* Convenience accessor.
@@ -54,8 +57,8 @@ public:
 		return GetDefault<USquadWeaponIconSettings>();
 	}
 
-        bool TryGetWeaponIconSettings(const ESquadWeaponIcon WeaponIconType,
-                                      FSquadWeaponIconDisplaySettings& OutIconSettings) const;
+	bool TryGetWeaponIconSettings(const ESquadWeaponIcon WeaponIconType,
+	                              FSquadWeaponIconDisplaySettings& OutIconSettings) const;
 };
 
 static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponName)
