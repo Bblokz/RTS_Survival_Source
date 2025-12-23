@@ -13,6 +13,7 @@ USTRUCT(BlueprintType, Blueprintable)
 struct FSquadWeaponIconSettingsData
 {
 	GENERATED_BODY()
+	UPROPERTY()
 	TMap<ESquadWeaponIcon, USlateBrushAsset*> TypeToBrush;
 };
 
@@ -64,9 +65,6 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 	// German small arms
 	case EWeaponName::MP46:
 		return ESquadWeaponIcon::Mp46SpecialSMG;
-	case EWeaponName::MP40:
-	case EWeaponName::MP40_9MM:
-		return ESquadWeaponIcon::Mp42;
 	case EWeaponName::STG44_7_92MM:
 		return ESquadWeaponIcon::SturmGewehr;
 	case EWeaponName::Kar_Sniper:

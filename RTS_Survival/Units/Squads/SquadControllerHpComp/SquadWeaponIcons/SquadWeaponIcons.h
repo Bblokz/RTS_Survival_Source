@@ -21,6 +21,7 @@ enum class ESquadWeaponIcon : uint8
 	MG42,
 	MG34,
 	PTRS,
+	PTRS50MM,
 	AutomatedPTRS,
 	SpekterLaser,
 	Bm14Laser,
