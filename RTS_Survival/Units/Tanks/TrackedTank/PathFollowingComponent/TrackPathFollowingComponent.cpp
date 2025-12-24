@@ -37,6 +37,14 @@ namespace TrackFollowingEvasion
 	constexpr float CriticalAngleOfAttackDeg = 10.f;
 }
 
+namespace TrackFollowingOverlapCleanup
+{
+	constexpr int32 CleanupTickInterval = 256;
+}
+
+int32 UTrackPathFollowingComponent::M_TicksCountCheckOverlappers = TrackFollowingOverlapCleanup::CleanupTickInterval;
+float UTrackPathFollowingComponent::M_TimeTillDiscardOverlap = 3.f;
+
 
 /**
  * If Resolve Collisions is set in the project settings on the crowd controller then
@@ -72,6 +80,7 @@ UTrackPathFollowingComponent::UTrackPathFollowingComponent()
 	// // on the navigation mesh and does not directly consider other agents as obstacles during the optimization of the path topology. bEnableOptimizeTopology = false;
 	// bEnablePathOffset = false;
 	//
+	PrimaryComponentTick.bCanEverTick = true;
 	// /* Leave on false will do the following if true:
 	// * Defines the radius within which to start slowing down:
 	// * const dtReal slowDownRadius = ag->params.radius * 2;
@@ -99,13 +108,156 @@ void UTrackPathFollowingComponent::PostEditChangeProperty(FPropertyChangedEvent&
 	SetDesiredSpeed(StartingDesiredSpeed, StartSpeedUnit);
 }
 
+#endif
+
+float UTrackPathFollowingComponent::GetCurrentWorldTimeSeconds() const
+{
+	const UWorld* World = GetWorld();
+	if (World)
+	{
+		return World->GetTimeSeconds();
+	}
+
+	return 0.f;
+}
+
+bool UTrackPathFollowingComponent::ContainsOverlapActor(
+	const TArray<FOverlapActorData>& TargetArray,
+	const AActor* InActor) const
+{
+	if (not IsValid(InActor))
+	{
+		return false;
+	}
+
+	for (const FOverlapActorData& OverlapData : TargetArray)
+	{
+		if (OverlapData.Actor.Get() == InActor)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void UTrackPathFollowingComponent::AddOverlapActorData(
+	TArray<FOverlapActorData>& TargetArray,
+	AActor* InActor)
+{
+	if (not IsValid(InActor))
+	{
+		return;
+	}
+
+	const float CurrentTimeSeconds = GetCurrentWorldTimeSeconds();
+	for (FOverlapActorData& OverlapData : TargetArray)
+	{
+		if (OverlapData.Actor.Get() == InActor)
+		{
+			OverlapData.TimeRegisteredSeconds = CurrentTimeSeconds;
+			return;
+		}
+	}
+
+	FOverlapActorData NewOverlapData;
+	NewOverlapData.Actor = InActor;
+	NewOverlapData.TimeRegisteredSeconds = CurrentTimeSeconds;
+	TargetArray.Add(MoveTemp(NewOverlapData));
+}
+
+void UTrackPathFollowingComponent::RemoveOverlapActorFromArray(
+	TArray<FOverlapActorData>& TargetArray,
+	AActor* InActor)
+{
+	if (not IsValid(InActor))
+	{
+		return;
+	}
+
+	for (int32 Index = TargetArray.Num() - 1; Index >= 0; --Index)
+	{
+		if (TargetArray[Index].Actor.Get() == InActor)
+		{
+			TargetArray.RemoveAt(Index);
+		}
+	}
+}
+
+void UTrackPathFollowingComponent::RemoveInvalidOverlaps(TArray<FOverlapActorData>& TargetArray) const
+{
+	for (int32 Index = TargetArray.Num() - 1; Index >= 0; --Index)
+	{
+		if (not TargetArray[Index].Actor.IsValid())
+		{
+			TargetArray.RemoveAt(Index);
+		}
+	}
+}
+
+void UTrackPathFollowingComponent::DebugRemovedOverlapActor(
+	const FString& Reason,
+	const FOverlapActorData& OverlapData) const
+{
+	if (not DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	{
+		return;
+	}
+
+	const FString ActorName = OverlapData.Actor.IsValid() ? OverlapData.Actor->GetName() : TEXT("Invalid");
+	const FString DebugMessage = FString::Printf(TEXT("%s: %s"), *Reason, *ActorName);
+	RTSFunctionLibrary::PrintString(DebugMessage, FColor::Yellow);
+}
+
+void UTrackPathFollowingComponent::RemoveExpiredOverlaps(
+	const float CurrentTimeSeconds,
+	TArray<FOverlapActorData>& TargetArray)
+{
+	for (int32 Index = TargetArray.Num() - 1; Index >= 0; --Index)
+	{
+		const FOverlapActorData& OverlapData = TargetArray[Index];
+
+		if (not OverlapData.Actor.IsValid())
+		{
+			TargetArray.RemoveAt(Index);
+			continue;
+		}
+
+		const float Elapsed = CurrentTimeSeconds - OverlapData.TimeRegisteredSeconds;
+		if (Elapsed < M_TimeTillDiscardOverlap)
+		{
+			continue;
+		}
+
+		DebugRemovedOverlapActor(TEXT("Removing stale overlap"), OverlapData);
+		TargetArray.RemoveAt(Index);
+	}
+}
+
+void UTrackPathFollowingComponent::ResetOverlapBlockingActors()
+{
+	M_IdleAlliedBlockingActors.Reset();
+	M_MovingBlockingOverlapActors.Reset();
+}
+
+void UTrackPathFollowingComponent::ResetOverlapBlockingActorsForCommand()
+{
+	ResetOverlapBlockingActors();
+	M_TicksCountCheckOverlappers = TrackFollowingOverlapCleanup::CleanupTickInterval;
+	if (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	{
+		RTSFunctionLibrary::PrintString(TEXT("Cleared overlap blockers for new move command."), FColor::Emerald);
+	}
+}
+
 void UTrackPathFollowingComponent::RegisterIdleBlockingActor(AActor* InActor)
 {
 	if (not IsValid(InActor))
 	{
 		return;
 	}
-	M_IdleAlliedBlockingActors.AddUnique(InActor);
+	AddOverlapActorData(M_IdleAlliedBlockingActors, InActor);
+	RemoveOverlapActorFromArray(M_MovingBlockingOverlapActors, InActor);
 }
 
 void UTrackPathFollowingComponent::RegisterMovingOverlapBlockingActor(AActor* InActor)
@@ -114,11 +266,11 @@ void UTrackPathFollowingComponent::RegisterMovingOverlapBlockingActor(AActor* In
 	{
 		return;
 	}
-	if (M_IdleAlliedBlockingActors.Contains(InActor))
+	if (ContainsOverlapActor(M_IdleAlliedBlockingActors, InActor))
 	{
 		return;
 	}
-	M_MovingBlockingOverlapActors.AddUnique(InActor);
+	AddOverlapActorData(M_MovingBlockingOverlapActors, InActor);
 }
 
 void UTrackPathFollowingComponent::DeregisterOverlapBlockingActor(AActor* InActor)
@@ -128,16 +280,23 @@ void UTrackPathFollowingComponent::DeregisterOverlapBlockingActor(AActor* InActo
 	{
 		return;
 	}
-	M_IdleAlliedBlockingActors.Remove(InActor);
-	M_MovingBlockingOverlapActors.Remove(InActor);
+	RemoveOverlapActorFromArray(M_IdleAlliedBlockingActors, InActor);
+	RemoveOverlapActorFromArray(M_MovingBlockingOverlapActors, InActor);
 }
 
 
 bool UTrackPathFollowingComponent::HasBlockingOverlaps() const
 {
-	for (const TWeakObjectPtr<AActor>& WeakActor : M_IdleAlliedBlockingActors)
+	for (const FOverlapActorData& OverlapData : M_IdleAlliedBlockingActors)
 	{
-		if (WeakActor.IsValid())
+		if (OverlapData.Actor.IsValid())
+		{
+			return true;
+		}
+	}
+	for (const FOverlapActorData& OverlapData : M_MovingBlockingOverlapActors)
+	{
+		if (OverlapData.Actor.IsValid())
 		{
 			return true;
 		}
@@ -145,12 +304,14 @@ bool UTrackPathFollowingComponent::HasBlockingOverlaps() const
 	return false;
 }
 
-#endif
-
 
 void UTrackPathFollowingComponent::SetReverse(bool Reverse)
 {
 	bWantsReverse = Reverse;
+	if (Reverse)
+	{
+		ResetOverlapBlockingActorsForCommand();
+	}
 }
 
 bool UTrackPathFollowingComponent::IsReversing()
@@ -253,11 +414,33 @@ void UTrackPathFollowingComponent::BeginDestroy()
 	Super::BeginDestroy();
 }
 
+void UTrackPathFollowingComponent::TickComponent(
+	const float DeltaTime,
+	const ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	M_TicksCountCheckOverlappers -= 1;
+	if (M_TicksCountCheckOverlappers > 0)
+	{
+		return;
+	}
+
+	M_TicksCountCheckOverlappers = TrackFollowingOverlapCleanup::CleanupTickInterval;
+
+	const float CurrentTimeSeconds = GetCurrentWorldTimeSeconds();
+	RemoveExpiredOverlaps(CurrentTimeSeconds, M_IdleAlliedBlockingActors);
+	RemoveExpiredOverlaps(CurrentTimeSeconds, M_MovingBlockingOverlapActors);
+}
+
 
 
 void UTrackPathFollowingComponent::OnPathUpdated()
 {
 	Super::OnPathUpdated();
+
+	ResetOverlapBlockingActorsForCommand();
 
 	// Reset stuck status
 	ResetStuck();
@@ -271,16 +454,9 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 
 bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 {
-	// Prune invalid entries first.
-	for (int32 Idx = M_IdleAlliedBlockingActors.Num() - 1; Idx >= 0; --Idx)
-	{
-		if (not M_IdleAlliedBlockingActors[Idx].IsValid())
-		{
-			M_IdleAlliedBlockingActors.RemoveAt(Idx);
-		}
-	}
+	RemoveInvalidOverlaps(M_IdleAlliedBlockingActors);
 
-	if (M_IdleAlliedBlockingActors.Num() == 0)
+	if (M_IdleAlliedBlockingActors.Num() == 0 || not IsValid(ControlledPawn))
 	{
 		return false;
 	}
@@ -298,16 +474,9 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 
 bool UTrackPathFollowingComponent::CheckOverlapMovingAllies(float DeltaTime)
 {
-	// Prune invalid entries first.
-	for (int32 Idx = M_MovingBlockingOverlapActors.Num() - 1; Idx >= 0; --Idx)
-	{
-		if (not M_MovingBlockingOverlapActors[Idx].IsValid())
-		{
-			M_MovingBlockingOverlapActors.RemoveAt(Idx);
-		}
-	}
+	RemoveInvalidOverlaps(M_MovingBlockingOverlapActors);
 
-	if (M_MovingBlockingOverlapActors.Num() == 0)
+	if (M_MovingBlockingOverlapActors.Num() == 0 || not IsValid(ControlledPawn))
 	{
 		return false;
 	}
@@ -352,9 +521,9 @@ bool UTrackPathFollowingComponent::CheckOverlapMovingAllies(float DeltaTime)
 	}
 
 	EEvasionAction FinalAction = EEvasionAction::MoveNormally;
-	for (const TWeakObjectPtr<AActor>& WeakOther : M_MovingBlockingOverlapActors)
+	for (const FOverlapActorData& OverlapData : M_MovingBlockingOverlapActors)
 	{
-		AActor* Other = WeakOther.Get();
+		AActor* Other = OverlapData.Actor.Get();
 		if (not IsValid(Other))
 		{
 			continue;
@@ -904,11 +1073,11 @@ float UTrackPathFollowingComponent::CalculateTrackStoppingDistance(const float V
 void UTrackPathFollowingComponent::DebugIdleOverlappingActors()
 {
 	FString DebugMessage = "overlapping: ";
-	for (auto eachOverlap : M_IdleAlliedBlockingActors)
+	for (const FOverlapActorData& OverlapData : M_IdleAlliedBlockingActors)
 	{
-		if (eachOverlap.IsValid())
+		if (OverlapData.Actor.IsValid())
 		{
-			DebugMessage += eachOverlap->GetName() + "\n";
+			DebugMessage += OverlapData.Actor->GetName() + "\n";
 		}
 	}
 	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, 300),
@@ -918,11 +1087,11 @@ void UTrackPathFollowingComponent::DebugIdleOverlappingActors()
 void UTrackPathFollowingComponent::DebugMovingOverlappingActors(const float DeltaTime)
 {
 	FString DebugMessage = "overlapping moving: ";
-	for (auto eachOverlap : M_MovingBlockingOverlapActors)
+	for (const FOverlapActorData& OverlapData : M_MovingBlockingOverlapActors)
 	{
-		if (eachOverlap.IsValid())
+		if (OverlapData.Actor.IsValid())
 		{
-			DebugMessage += eachOverlap->GetName() + "\n";
+			DebugMessage += OverlapData.Actor->GetName() + "\n";
 		}
 	}
 	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, 600),

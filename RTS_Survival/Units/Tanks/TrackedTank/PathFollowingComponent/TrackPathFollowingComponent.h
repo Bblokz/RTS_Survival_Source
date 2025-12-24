@@ -11,6 +11,20 @@
 class UTrackPhysicsMovement;
 class ATrackedTankMaster;
 
+/**
+ * @brief Captures overlap tracking data for allied actors while path following.
+ */
+USTRUCT()
+struct FOverlapActorData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> Actor;
+
+	UPROPERTY()
+	float TimeRegisteredSeconds = 0.f;
+};
 
 /* Enumeration defining the speed units used for speed control */
 UENUM()
@@ -41,6 +55,9 @@ enum class EEvasionAction
  * @note common navigation issues:
  * @note 0) jittering of speed; Increase throttle threshold.
  * @note 1) Vehicle goes into reverse too easily; increase should reverse angle and decrease reverse max distance.
+ */
+/**
+ * @brief Vehicle path following component for tracked tanks with overlap-aware evasion logic.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UTrackPathFollowingComponent : public UVehiclePathFollowingComponent
@@ -131,6 +148,11 @@ protected:
 	virtual void BeginPlay() override;
 
 	virtual void BeginDestroy() override;
+
+	virtual void TickComponent(
+		float DeltaTime,
+		ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
 
 	virtual void OnPathUpdated();
 
@@ -512,10 +534,13 @@ private:
 
 	// Actors we are temporarily waiting for because of footprint evasion on idle allies.
 	UPROPERTY()
-	TArray<TWeakObjectPtr<AActor>> M_IdleAlliedBlockingActors;
+	TArray<FOverlapActorData> M_IdleAlliedBlockingActors;
 	// Allied actors that are moving and we need to resolve collision with.
 	UPROPERTY()
-	TArray<TWeakObjectPtr<AActor>> M_MovingBlockingOverlapActors;
+	TArray<FOverlapActorData> M_MovingBlockingOverlapActors;
+
+	static int32 M_TicksCountCheckOverlappers;
+	static float M_TimeTillDiscardOverlap;
 
 	void DebugIdleOverlappingActors();
 	void DebugMovingOverlappingActors(const float DeltaTime);
@@ -602,6 +627,26 @@ private:
 	bool UpdateStuckSamples();
 	float CalculateAverageAngleWithSamples(float& OutDistance);
 	float CalculateLargestAngleWithSamples(float& OutDistance);
+
+	void ResetOverlapBlockingActors();
+	void RemoveExpiredOverlaps(
+		const float CurrentTimeSeconds,
+		TArray<FOverlapActorData>& TargetArray);
+	void RemoveInvalidOverlaps(TArray<FOverlapActorData>& TargetArray) const;
+	void AddOverlapActorData(
+		TArray<FOverlapActorData>& TargetArray,
+		AActor* InActor);
+	bool ContainsOverlapActor(
+		const TArray<FOverlapActorData>& TargetArray,
+		const AActor* InActor) const;
+	void RemoveOverlapActorFromArray(
+		TArray<FOverlapActorData>& TargetArray,
+		AActor* InActor);
+	float GetCurrentWorldTimeSeconds() const;
+	void DebugRemovedOverlapActor(
+		const FString& Reason,
+		const FOverlapActorData& OverlapData) const;
+	void ResetOverlapBlockingActorsForCommand();
 
 	// The physics calculation component that moves the owning pawn by applying velocity.
 	UPROPERTY()

@@ -70,12 +70,12 @@ private:
 	                      UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
 	                      bool bFromSweep, const FHitResult& SweepResult);
 
-	void TryEvasion(AActor* OtherActor, URTSComponent* OtherRTS) const;
-	void TryEvasionSquadUnit(AActor* OtherActor) const;
+	void TryEvasion(AActor* OtherActor, URTSComponent* OtherRTS, const FVector& ContactLocation) const;
+	void TryEvasionSquadUnit(AActor* OtherActor, const FVector& ContactLocation) const;
 
 	void SetupOwningPlayer(ATrackedTankMaster* Owner);
 
-	bool ComputeEvasionLocation(const FVector& SelfLoc, const FVector& OtherLoc,
+	bool ComputeEvasionLocation(const FVector& SelfLoc, const FVector& ContactLocation,
 	                            float Radius, FVector& OutProjected, AActor* OtherActor) const;
 
 	bool TryProjectDirection(const FVector& Start, const FVector& Dir, float Distance,
