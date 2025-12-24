@@ -107,7 +107,8 @@ void URTSOverlapEvasionComponent::OnChassisOverlap(UPrimitiveComponent* Overlapp
 		return;
 	}
 
-	TryEvasion(OtherActor, OtherRtsComp);
+	const FVector ContactLocation = IsValid(OtherComp) ? OtherComp->GetComponentLocation() : OtherActor->GetActorLocation();
+	TryEvasion(OtherActor, OtherRtsComp, ContactLocation);
 }
 
 void URTSOverlapEvasionComponent::CheckFootprintForOverlaps()
@@ -322,7 +323,7 @@ void URTSOverlapEvasionComponent::ProcessFootprintOverlaps(
 		}
 
 		// Try to push idle allied actor out of our footprint.
-		TryEvasion(Other, OtherRTSComp);
+		TryEvasion(Other, OtherRTSComp, Pair.Value);
 	}
 }
 
@@ -467,7 +468,8 @@ bool URTSOverlapEvasionComponent::GetResolveDeadlockWithOther(const AActor* Othe
         return OwnerUniqueId > AlliedUniqueId;
 }
 
-void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSComponent* OtherRTS) const
+void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSComponent* OtherRTS,
+                                             const FVector& ContactLocation) const
 {
 	if (not M_Owner.IsValid() || not IsValid(OtherActor))
 	{
@@ -478,7 +480,7 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 	if (not Commands)
 	{
 		// Squad unit is not part of ICommands, but its squad controller is.
-		TryEvasionSquadUnit(OtherActor);
+		TryEvasionSquadUnit(OtherActor, ContactLocation);
 		return;
 	}
 
@@ -495,10 +497,10 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 
 	const float InnerRadius = OtherRTS->GetFormationUnitInnerRadius();
 	const FVector SelfLoc = M_Owner->GetActorLocation();
-	const FVector OtherLoc = OtherActor->GetActorLocation();
+	const FVector CollisionLoc = ContactLocation;
 
 	FVector ProjectedLoc;
-	if (ComputeEvasionLocation(SelfLoc, OtherLoc, InnerRadius, ProjectedLoc, OtherActor))
+	if (ComputeEvasionLocation(SelfLoc, CollisionLoc, InnerRadius, ProjectedLoc, OtherActor))
 	{
 		const FRotator DesiredFinalRotation = OtherActor->GetActorRotation();
 
@@ -512,7 +514,7 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 	}
 }
 
-void URTSOverlapEvasionComponent::TryEvasionSquadUnit(AActor* OtherActor) const
+void URTSOverlapEvasionComponent::TryEvasionSquadUnit(AActor* OtherActor, const FVector& ContactLocation) const
 {
 	ASquadUnit* SquadUnit = Cast<ASquadUnit>(OtherActor);
 	if (not IsValid(SquadUnit) || not SquadUnit->GetIsSquadUnitIdleAndNotEvading())
@@ -532,10 +534,10 @@ void URTSOverlapEvasionComponent::TryEvasionSquadUnit(AActor* OtherActor) const
 
 	const float InnerRadius = OtherRTS->GetFormationUnitInnerRadius();
 	const FVector SelfLoc = M_Owner->GetActorLocation();
-	const FVector OtherLoc = OtherActor->GetActorLocation();
+	const FVector CollisionLoc = ContactLocation;
 
 	FVector ProjectedLoc;
-	if (ComputeEvasionLocation(SelfLoc, OtherLoc, InnerRadius, ProjectedLoc, OtherActor))
+	if (ComputeEvasionLocation(SelfLoc, CollisionLoc, InnerRadius, ProjectedLoc, OtherActor))
 	{
 		if (GetIsValidOwnerTrackPathFollowingComponent())
 		{
@@ -558,17 +560,17 @@ void URTSOverlapEvasionComponent::SetupOwningPlayer(ATrackedTankMaster* Owner)
 	}
 }
 
-bool URTSOverlapEvasionComponent::ComputeEvasionLocation(const FVector& SelfLoc, const FVector& OtherLoc,
+bool URTSOverlapEvasionComponent::ComputeEvasionLocation(const FVector& SelfLoc, const FVector& ContactLocation,
                                                          const float Radius, FVector& OutProjected,
                                                          AActor* const OtherActor) const
 {
 	// Direction opposite of the collision location (i.e., away from the owner).
-	const FVector OppositeCollisionDir = (OtherLoc - SelfLoc).GetSafeNormal();
+	const FVector OppositeCollisionDir = (ContactLocation - SelfLoc).GetSafeNormal();
 	const float MoveDist = Radius * GOverlapEvasionDistanceScale;
 
 	// Try 1: away from us (opposite of collision location).
 	const FVector FallbackDir = OppositeCollisionDir.IsNearlyZero() ? FVector::ForwardVector : OppositeCollisionDir;
-	if (TryProjectDirection(OtherLoc, FallbackDir, MoveDist, OutProjected, OtherActor))
+	if (TryProjectDirection(ContactLocation, FallbackDir, MoveDist, OutProjected, OtherActor))
 	{
 		return true;
 	}
@@ -580,7 +582,7 @@ bool URTSOverlapEvasionComponent::ComputeEvasionLocation(const FVector& SelfLoc,
 		FacingDir = OtherActor->GetActorForwardVector().GetSafeNormal();
 	}
 	if (!FacingDir.IsNearlyZero() &&
-		TryProjectDirection(OtherLoc, FacingDir, MoveDist, OutProjected, OtherActor))
+		TryProjectDirection(ContactLocation, FacingDir, MoveDist, OutProjected, OtherActor))
 	{
 		return true;
 	}
