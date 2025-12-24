@@ -5,6 +5,7 @@
 #include "FormationPositionEffects/PlayerFormationPositionEffects.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "FormationMovement.generated.h"
 
 class AFormationEffectActor;
@@ -13,7 +14,6 @@ class RTS_SURVIVAL_API ASelectablePawnMaster;
 class RTS_SURVIVAL_API ASquadController;
 class RTS_SURVIVAL_API ASelectableActorObjectsMaster;
 class RTS_SURVIVAL_API URTSComponent;
-enum class EAllUnitType : uint8;
 
 /**
  * @brief Holds unit type, subtype, and formation radius for calculations.

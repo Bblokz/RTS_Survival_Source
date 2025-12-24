@@ -23,3 +23,29 @@ enum class EPlayerError : uint8
 	Error_NoFreeTruckAvailable,
 	Error_CannotBuildHere,
 };
+
+inline EAnnouncerVoiceLineType ConvertPlayerErrorToAnnouncerVoiceLineType(const EPlayerError PlayerError)
+{
+    EAnnouncerVoiceLineType VoiceLineType = EAnnouncerVoiceLineType::None;
+    switch (PlayerError) {
+    case EPlayerError::Error_None:
+        return VoiceLineType;
+    case EPlayerError::Error_NotEnoughRadixite:
+        return EAnnouncerVoiceLineType::NotEnoughRadixite;
+    case EPlayerError::Error_NotEnoughMetal:
+        return EAnnouncerVoiceLineType::NotEnoughMetal;
+    case EPlayerError::Error_NotEnoughVehicleParts:
+        return EAnnouncerVoiceLineType::NotEnoughVehicleParts;
+    case EPlayerError::Error_NotEnoughtFuel:
+    case EPlayerError::Error_LocationNotReachable:
+        return EAnnouncerVoiceLineType::ErrorLocationNotReachable;
+    case EPlayerError::Error_CannotStackBuildingAbilities:
+        return EAnnouncerVoiceLineType::ErrorCannotStackBuildingAbilities;
+    case EPlayerError::Error_NoFreeTruckAvailable:
+        return EAnnouncerVoiceLineType::ErrorNoFreeTruckAvailable;
+    case EPlayerError::Error_CannotBuildHere:
+        return EAnnouncerVoiceLineType::ErrorCannotBuildHere;
+    default:
+        return VoiceLineType;
+    }
+}

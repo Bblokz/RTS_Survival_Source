@@ -488,7 +488,7 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 		return;
 	}
 
-	if (not IsValid(OtherRTS) || not GetResolveDeadlockWithOther(OtherActor))
+	if (not IsValid(OtherRTS) )
 	{
 		return;
 	}
