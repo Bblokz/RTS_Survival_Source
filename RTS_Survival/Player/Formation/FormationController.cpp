@@ -52,6 +52,7 @@ void UFormationController::InitiateMovement(
 {
 	M_OriginalLocation = MoveLocation;
 	M_TPositionsPerUnitType.Empty();
+	M_AssignedFormationSlots.Empty();
 
 	if (not SelectedSquads || not SelectedPawns || not SelectedActorMasters)
 	{
@@ -134,6 +135,22 @@ FVector UFormationController::UseFormationPosition(
 
 	const EAllUnitType UnitType = RTSComponent->GetUnitType();
 	const int32 SubType = static_cast<int32>(RTSComponent->GetUnitSubType());
+
+	const TWeakObjectPtr<AActor> OwningActorWeak = OwningActorForCommands;
+	if (OwningActorWeak.IsValid())
+	{
+		if (FFormationAssignment Assignment; M_AssignedFormationSlots.RemoveAndCopyValue(OwningActorWeak, Assignment))
+		{
+			if (Assignment.UnitType == UnitType && Assignment.UnitSubType == SubType)
+			{
+				OutMovementRotation = Assignment.Rotation;
+				return Assignment.Position;
+			}
+
+			// If types diverge, fall back to the type-based pool to keep priority ordering intact.
+			M_AssignedFormationSlots.Add(OwningActorWeak, Assignment);
+		}
+	}
 
 	if (auto* InnerMap = M_TPositionsPerUnitType.Find(UnitType))
 	{
@@ -360,13 +377,14 @@ void UFormationController::GatherAndSortUnits(
 	 * - Appends the constructed FUnitData to OutUnits.
 	 * - Stores the original location of the unit.
 	 */
-	auto Capture = [&](const URTSComponent* Comp, const FVector& ActorLoc)
+	auto Capture = [&](const URTSComponent* Comp, AActor* Actor, const FVector& ActorLoc)
 	{
 		FUnitData D;
 		D.UnitType = Comp->GetUnitType();
 		D.UnitSubType = static_cast<int32>(Comp->GetUnitSubType());
 		D.FormationRadius = Comp->GetFormationUnitInnerRadius();
 		D.OriginalLocation = ActorLoc;
+		D.SourceActor = Actor;
 		OutUnits.Add(D);
 	};
 
@@ -374,29 +392,48 @@ void UFormationController::GatherAndSortUnits(
 	{
 		if (EachSquadSelected && EachSquadSelected->GetRTSComponent())
 		{
-			Capture(EachSquadSelected->GetRTSComponent(), EachSquadSelected->GetSquadLocation());
+			Capture(EachSquadSelected->GetRTSComponent(), EachSquadSelected, EachSquadSelected->GetSquadLocation());
 			TotalLoc += EachSquadSelected->GetSquadLocation();
 			++Count;
 		}
 	}
 
-	for (const ASelectablePawnMaster* PawnMaster : Pawns)
+	for (ASelectablePawnMaster* PawnMaster : Pawns)
 	{
 		if (PawnMaster && PawnMaster->GetRTSComponent())
 		{
-			Capture(PawnMaster->GetRTSComponent(), PawnMaster->GetActorLocation());
+			Capture(PawnMaster->GetRTSComponent(), PawnMaster, PawnMaster->GetActorLocation());
 			TotalLoc += PawnMaster->GetActorLocation();
 			++Count;
 		}
 	}
 
-	for (const ASelectableActorObjectsMaster* EachSelectedActor : Actors)
+	for (ASelectableActorObjectsMaster* EachSelectedActor : Actors)
 	{
 		if (EachSelectedActor && EachSelectedActor->GetRTSComponent())
 		{
-			Capture(EachSelectedActor->GetRTSComponent(), EachSelectedActor->GetActorLocation());
+			Capture(EachSelectedActor->GetRTSComponent(), EachSelectedActor, EachSelectedActor->GetActorLocation());
 			TotalLoc += EachSelectedActor->GetActorLocation();
 			++Count;
+		}
+	}
+
+	const FVector AverageLocation = (Count > 0)
+		                                ? TotalLoc / static_cast<float>(Count)
+		                                : FVector::ZeroVector;
+
+	FVector SortForward = FVector::ForwardVector;
+	FVector SortRight = FVector::RightVector;
+	{
+		FVector Dir = M_OriginalLocation - AverageLocation;
+		Dir.Z = 0.f;
+		if (Dir.Normalize())
+		{
+			const FRotator SortRotation = bM_PlayerRotationOverride
+				                              ? M_PlayerRotationOverride
+				                              : Dir.Rotation();
+			SortForward = SortRotation.Vector();
+			SortRight = SortRotation.RotateVector(FVector::RightVector);
 		}
 	}
 
@@ -404,14 +441,40 @@ void UFormationController::GatherAndSortUnits(
 	 * Sort the collected units:
 	 *    - First by umbrella unit-type priority (front-to-back).
 	 *    - Then, for equal priorities, by higher subtype value first.
+	 *    - Finally, for identical priority/subtype, by their original distance to the target (closer units to the front)
+	 *      and then by lateral offset (units already near the correct side remain there).
 	 */
-	OutUnits.Sort([](const FUnitData& A, const FUnitData& B)
+	OutUnits.Sort([&](const FUnitData& A, const FUnitData& B)
 	{
 		const int32 Pa = M_TUnitTypePriority.Contains(A.UnitType) ? M_TUnitTypePriority[A.UnitType] : INT32_MAX;
 		const int32 Pb = M_TUnitTypePriority.Contains(B.UnitType) ? M_TUnitTypePriority[B.UnitType] : INT32_MAX;
-		return (Pa != Pb)
-			       ? (Pa < Pb)
-			       : (A.UnitSubType > B.UnitSubType);
+		if (Pa != Pb)
+		{
+			return Pa < Pb;
+		}
+
+		if (A.UnitSubType != B.UnitSubType)
+		{
+			return A.UnitSubType > B.UnitSubType;
+		}
+
+		const float AForward = FVector::DotProduct(M_OriginalLocation - A.OriginalLocation, SortForward);
+		const float BForward = FVector::DotProduct(M_OriginalLocation - B.OriginalLocation, SortForward);
+		if (not FMath::IsNearlyEqual(AForward, BForward))
+		{
+			return AForward < BForward;
+		}
+
+		const float ALateral = FVector::DotProduct(A.OriginalLocation - M_OriginalLocation, SortRight);
+		const float BLateral = FVector::DotProduct(B.OriginalLocation - M_OriginalLocation, SortRight);
+		const float AAbsLateral = FMath::Abs(ALateral);
+		const float BAbsLateral = FMath::Abs(BLateral);
+		if (not FMath::IsNearlyEqual(AAbsLateral, BAbsLateral))
+		{
+			return AAbsLateral < BAbsLateral;
+		}
+
+		return ALateral < BLateral;
 	});
 
 	/*
@@ -419,9 +482,7 @@ void UFormationController::GatherAndSortUnits(
 	 *    - Divide the accumulated TotalLoc by Count, if any units were found.
 	 *    - Otherwise, default to the zero vector.
 	 */
-	OutAverageSelectedUnitsLocation = (Count > 0)
-		                                  ? TotalLoc / static_cast<float>(Count)
-		                                  : FVector::ZeroVector;
+	OutAverageSelectedUnitsLocation = AverageLocation;
 }
 
 
@@ -575,21 +636,30 @@ void UFormationController::StoreRectangleFormationPositions(
 	const TArray<TArray<FVector>>& LocalPos,
 	const TArray<FVector>& GlobalOffsets)
 {
+	int32 TotalUnits = 0;
+	for (const TArray<FUnitData>& Row : AllRows)
+	{
+		TotalUnits += Row.Num();
+	}
+
+	TArray<FUnitData> OrderedUnits;
+	TArray<FVector> OrderedPositions;
+	TArray<FRotator> OrderedRotations;
+	OrderedUnits.Reserve(TotalUnits);
+	OrderedPositions.Reserve(TotalUnits);
+	OrderedRotations.Reserve(TotalUnits);
+
 	for (int32 r = 0; r < AllRows.Num(); ++r)
 	{
 		for (int32 c = 0; c < AllRows[r].Num(); ++c)
 		{
-			const auto& [UnitType, UnitSubType, FormationRadius, OriginalLocation] = AllRows[r][c];
-			FVector WorldPos = GlobalOffsets[r] + LocalPos[r][c];
-			AddPositionForUnitToFormation(
-				UnitType,
-				UnitSubType,
-				WorldPos,
-				FormationRadius,
-				M_FormationRotation
-			);
+			OrderedUnits.Add(AllRows[r][c]);
+			OrderedPositions.Add(GlobalOffsets[r] + LocalPos[r][c]);
+			OrderedRotations.Add(M_FormationRotation);
 		}
 	}
+
+	BuildUnitAssignments(OrderedUnits, OrderedPositions, OrderedRotations);
 }
 
 void UFormationController::SortRowUnitsByOriginalPosition(
@@ -614,6 +684,130 @@ void UFormationController::SortRowUnitsByOriginalPosition(
 			       ? (AProj < BProj)
 			       : (AProj > BProj);
 	});
+}
+
+void UFormationController::BuildUnitAssignments(
+	const TArray<FUnitData>& Units,
+	const TArray<FVector>& Positions,
+	const TArray<FRotator>& Rotations)
+{
+	if (Units.Num() != Positions.Num() || Positions.Num() != Rotations.Num())
+	{
+		RTSFunctionLibrary::ReportError("Formation assignment inputs are mismatched.");
+		return;
+	}
+
+	const FVector ForwardVector = M_FormationRotation.Vector();
+	const FVector RightVector = M_FormationRotation.RotateVector(FVector::RightVector);
+
+	struct FUnitPriority
+	{
+		int32 UnitIndex = INDEX_NONE;
+		float ForwardDistance = 0.f;
+		float AbsLateralOffset = 0.f;
+		float LateralOffset = 0.f;
+	};
+
+	struct FSlotPriority
+	{
+		FVector Position;
+		FRotator Rotation;
+		float FrontPriority = 0.f;
+		float AbsLateralOffset = 0.f;
+		float LateralOffset = 0.f;
+	};
+
+	TMap<EAllUnitType, TMap<int32, TArray<FUnitPriority>>> UnitsByType;
+	TMap<EAllUnitType, TMap<int32, TArray<FSlotPriority>>> SlotsByType;
+
+	for (int32 Index = 0; Index < Units.Num(); ++Index)
+	{
+		const FUnitData& Unit = Units[Index];
+
+		FUnitPriority& UnitPriority = UnitsByType.FindOrAdd(Unit.UnitType).FindOrAdd(Unit.UnitSubType).AddDefaulted_GetRef();
+		UnitPriority.UnitIndex = Index;
+		UnitPriority.ForwardDistance = FVector::DotProduct(M_OriginalLocation - Unit.OriginalLocation, ForwardVector);
+		UnitPriority.LateralOffset = FVector::DotProduct(Unit.OriginalLocation - M_OriginalLocation, RightVector);
+		UnitPriority.AbsLateralOffset = FMath::Abs(UnitPriority.LateralOffset);
+
+		FSlotPriority& SlotPriority = SlotsByType.FindOrAdd(Unit.UnitType).FindOrAdd(Unit.UnitSubType).AddDefaulted_GetRef();
+		SlotPriority.Position = Positions[Index];
+		SlotPriority.Rotation = Rotations[Index];
+		const FVector OffsetFromOrigin = Positions[Index] - M_OriginalLocation;
+		SlotPriority.FrontPriority = FVector::DotProduct(OffsetFromOrigin, ForwardVector);
+		SlotPriority.LateralOffset = FVector::DotProduct(OffsetFromOrigin, RightVector);
+		SlotPriority.AbsLateralOffset = FMath::Abs(SlotPriority.LateralOffset);
+	}
+
+	auto UnitSortPredicate = [](const FUnitPriority& A, const FUnitPriority& B)
+	{
+		if (not FMath::IsNearlyEqual(A.ForwardDistance, B.ForwardDistance))
+		{
+			return A.ForwardDistance < B.ForwardDistance;
+		}
+		if (not FMath::IsNearlyEqual(A.AbsLateralOffset, B.AbsLateralOffset))
+		{
+			return A.AbsLateralOffset < B.AbsLateralOffset;
+		}
+		return A.LateralOffset < B.LateralOffset;
+	};
+
+	auto SlotSortPredicate = [](const FSlotPriority& A, const FSlotPriority& B)
+	{
+		if (not FMath::IsNearlyEqual(A.FrontPriority, B.FrontPriority))
+		{
+			return A.FrontPriority > B.FrontPriority;
+		}
+		if (not FMath::IsNearlyEqual(A.AbsLateralOffset, B.AbsLateralOffset))
+		{
+			return A.AbsLateralOffset < B.AbsLateralOffset;
+		}
+		return A.LateralOffset < B.LateralOffset;
+	};
+
+	for (auto& TypePair : UnitsByType)
+	{
+		for (auto& SubPair : TypePair.Value)
+		{
+			TMap<int32, TArray<FSlotPriority>>* SlotsForType = SlotsByType.Find(TypePair.Key);
+			if (not SlotsForType)
+			{
+				continue;
+			}
+
+			TArray<FSlotPriority>* SlotsForSubtype = SlotsForType->Find(SubPair.Key);
+			if (not SlotsForSubtype)
+			{
+				continue;
+			}
+
+			SubPair.Value.Sort(UnitSortPredicate);
+			SlotsForSubtype->Sort(SlotSortPredicate);
+
+			const int32 PairCount = FMath::Min(SubPair.Value.Num(), SlotsForSubtype->Num());
+			for (int32 PairIndex = 0; PairIndex < PairCount; ++PairIndex)
+			{
+				const FUnitPriority& UnitPriority = SubPair.Value[PairIndex];
+				const FSlotPriority& SlotPriority = (*SlotsForSubtype)[PairIndex];
+				const FUnitData& UnitData = Units[UnitPriority.UnitIndex];
+
+				if (UnitData.SourceActor.IsValid())
+				{
+					M_AssignedFormationSlots.Add(
+						UnitData.SourceActor,
+						{SlotPriority.Position, SlotPriority.Rotation, UnitData.UnitType, UnitData.UnitSubType});
+				}
+
+				AddPositionForUnitToFormation(
+					UnitData.UnitType,
+					UnitData.UnitSubType,
+					SlotPriority.Position,
+					UnitData.FormationRadius,
+					SlotPriority.Rotation
+				);
+			}
+		}
+	}
 }
 
 
@@ -658,11 +852,11 @@ void UFormationController::AddPositionForUnitToFormation(
 	const float Radius,
 	const FRotator& Rotation)
 {
-	if (!M_TPositionsPerUnitType.Contains(UnitType))
+	if (not M_TPositionsPerUnitType.Contains(UnitType))
 		M_TPositionsPerUnitType.Add(UnitType, {});
 	auto& SubMap = M_TPositionsPerUnitType[UnitType];
 
-	if (!SubMap.Contains(UnitSubType))
+	if (not SubMap.Contains(UnitSubType))
 	{
 		FSubtypeFormationData Data;
 		Data.Radius = Radius;
@@ -770,18 +964,9 @@ void UFormationController::CreateSpearFormation(
 		Right
 	);
 
-	// Store them in the formation map
-	for (int32 i = 0; i < Units.Num(); ++i)
-	{
-		const auto& [UnitType, UnitSubType, FormationRadius, OriginalLocation] = Units[i];
-		AddPositionForUnitToFormation(
-			UnitType,
-			UnitSubType,
-			Positions[i],
-			FormationRadius,
-			M_FormationRotation
-		);
-	}
+	TArray<FRotator> Rotations;
+	Rotations.Init(M_FormationRotation, Positions.Num());
+	BuildUnitAssignments(Units, Positions, Rotations);
 }
 
 
@@ -919,18 +1104,7 @@ void UFormationController::CreateSemiCircleFormation(
 		Positions, Rotations
 	);
 
-	// 4) store into formation map
-	for (int32 i = 0; i < Units.Num(); ++i)
-	{
-		const FUnitData& UD = Units[i];
-		AddPositionForUnitToFormation(
-			UD.UnitType,
-			UD.UnitSubType,
-			Positions[i],
-			UD.FormationRadius,
-			Rotations[i]
-		);
-	}
+	BuildUnitAssignments(Units, Positions, Rotations);
 }
 
 
@@ -1190,7 +1364,7 @@ void UFormationController::DebugFormation() const
 				const float Radius = SubPair.Value.Radius;
 				for (const FVector& Pos : SubPair.Value.Positions)
 				{
-					if (!bHaveFirst)
+					if (not bHaveFirst)
 					{
 						FirstPos = Pos;
 						bHaveFirst = true;
