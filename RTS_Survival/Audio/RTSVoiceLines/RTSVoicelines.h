@@ -82,6 +82,13 @@ enum class EAnnouncerVoiceLineType : uint8
 	NotEnoughRadixite,
 	NotEnoughMetal,
 	NotEnoughVehicleParts,
+	ErrorLocationNotReachable,
+	ErrorCannotStackBuildingAbilities,
+	ErrorNoFreeTruckAvailable,
+	ErrorCannotBuildHere,
+	StartDefensiveBxpConstruction,
+	StartEconomicBxpConstruction,
+	StartTechnologyBxpConstruction,
 };
 
 USTRUCT(BlueprintType)

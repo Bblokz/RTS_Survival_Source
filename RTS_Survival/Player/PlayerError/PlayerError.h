@@ -19,4 +19,7 @@ enum class EPlayerError : uint8
 	Error_NotEnoughVehicleBlueprints,
 	Error_NotEnoughConstructionBlueprints,
 	Error_LocationNotReachable,
+	Error_CannotStackBuildingAbilities,
+	Error_NoFreeTruckAvailable,
+	Error_CannotBuildHere,
 };

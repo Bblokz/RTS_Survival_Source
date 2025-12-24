@@ -486,6 +486,13 @@ void UEnemyFormationController::StartFormationMovement(FFormationData& Formation
         // we’ve already torn this formation down
         return;
     }
+	if(AliveFormation->FormationWaypoints.IsEmpty())
+	{
+		// remove this formation as no valid waypoitns found.
+		
+		M_ActiveFormations.Remove(Formation.FormationID);
+		return;
+	}
 
     // now use *Live* safely, without risk of reinserting
     const FVector& WayPoint       = AliveFormation->FormationWaypoints[0];

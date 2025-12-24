@@ -371,6 +371,15 @@ void ACPPController::DisplayErrorMessage(const EPlayerError Error)
 		break;
 	case EPlayerError::Error_NotEnoughConstructionBlueprints:
 		break;
+	case EPlayerError::Error_CannotStackBuildingAbilities:
+		 DisplayErrorMessageCpp(FText::FromString("Cannot stack building abilities!"));
+		break;
+	case EPlayerError::Error_NoFreeTruckAvailable:
+			DisplayErrorMessageCpp(FText::FromString("No free truck available for construction!"));
+		break;
+	case EPlayerError::Error_CannotBuildHere:
+			DisplayErrorMessageCpp(FText::FromString("Cannot Build here!"));
+		break;
 	}
 }
 
@@ -3888,7 +3897,7 @@ bool ACPPController::TryPlaceBuilding(FVector& ClickedLocation)
 	if (CPPConstructionPreviewRef->GetIsBuildingPreviewBlocked())
 	{
 		// Need a click somewhere else.
-		DisplayErrorMessageCpp(FText::FromString("Cannot build here!"));
+		DisplayErrorMessage(EPlayerError::Error_CannotBuildHere);
 		return false;
 	}
 	switch (M_IsBuildingPreviewModeActive)
@@ -4013,12 +4022,12 @@ bool ACPPController::NomadicConvertToBuilding(
 		}
 		if (!bFoundTruckForConstruction)
 		{
-			DisplayErrorMessageCpp(FText::FromString("No free truck available for construction!"));
+			DisplayErrorMessage(EPlayerError::Error_NoFreeTruckAvailable);
 		}
 	}
 	else if (!bFoundTruckForConstruction)
 	{
-		DisplayErrorMessageCpp(FText::FromString("Cannot stack building abilities!"));
+		DisplayErrorMessage(EPlayerError::Error_CannotStackBuildingAbilities);
 	}
 	// Either there was a valid location and an available truck was found which now has the building ability queued.
 	// Or no truck was available. In Both cases we cancel the preview and deactivate building preview mode

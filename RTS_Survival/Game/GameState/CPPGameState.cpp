@@ -1187,6 +1187,33 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::PTRS_41_14_5MM, WeaponData);
 	WeaponData.WeaponName = EWeaponName::PTRS_41_14_5MM;
 
+	
+	// M920 special AT rifle.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::M920_AtSniper;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_AP;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
+	WeaponData.WeaponCalibre = 14.5f;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre + 15.f;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.ArmorPen = 120.f;
+	WeaponData.ArmorPenMaxRange = 110.f;
+	WeaponData.MagCapacity = 10;
+	WeaponData.ReloadSpeed = 6.f;
+	SetSmallArmsCooldown(WeaponData, 1.67f);
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	// Low accuracy to make it worse vs infantry.
+	WeaponData.Accuracy = SniperAccuracy- 20.f;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::M920_AtSniper, WeaponData);
+
 	// Handheld railgun with radixite rounds
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::GerRailGun;
