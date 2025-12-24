@@ -706,6 +706,7 @@ void UFormationController::BuildUnitAssignments(
 		float ForwardDistance = 0.f;
 		float AbsLateralOffset = 0.f;
 		float LateralOffset = 0.f;
+		int32 ActorId = 0;
 	};
 
 	struct FSlotPriority
@@ -715,6 +716,7 @@ void UFormationController::BuildUnitAssignments(
 		float FrontPriority = 0.f;
 		float AbsLateralOffset = 0.f;
 		float LateralOffset = 0.f;
+		int32 StableIndex = 0;
 	};
 
 	TMap<EAllUnitType, TMap<int32, TArray<FUnitPriority>>> UnitsByType;
@@ -729,6 +731,7 @@ void UFormationController::BuildUnitAssignments(
 		UnitPriority.ForwardDistance = FVector::DotProduct(M_OriginalLocation - Unit.OriginalLocation, ForwardVector);
 		UnitPriority.LateralOffset = FVector::DotProduct(Unit.OriginalLocation - M_OriginalLocation, RightVector);
 		UnitPriority.AbsLateralOffset = FMath::Abs(UnitPriority.LateralOffset);
+		UnitPriority.ActorId = Unit.SourceActor.IsValid() ? Unit.SourceActor->GetUniqueID() : Index;
 
 		FSlotPriority& SlotPriority = SlotsByType.FindOrAdd(Unit.UnitType).FindOrAdd(Unit.UnitSubType).AddDefaulted_GetRef();
 		SlotPriority.Position = Positions[Index];
@@ -737,6 +740,7 @@ void UFormationController::BuildUnitAssignments(
 		SlotPriority.FrontPriority = FVector::DotProduct(OffsetFromOrigin, ForwardVector);
 		SlotPriority.LateralOffset = FVector::DotProduct(OffsetFromOrigin, RightVector);
 		SlotPriority.AbsLateralOffset = FMath::Abs(SlotPriority.LateralOffset);
+		SlotPriority.StableIndex = Index;
 	}
 
 	auto UnitSortPredicate = [](const FUnitPriority& A, const FUnitPriority& B)
@@ -749,7 +753,15 @@ void UFormationController::BuildUnitAssignments(
 		{
 			return A.AbsLateralOffset < B.AbsLateralOffset;
 		}
-		return A.LateralOffset < B.LateralOffset;
+		if (not FMath::IsNearlyEqual(A.LateralOffset, B.LateralOffset))
+		{
+			return A.LateralOffset < B.LateralOffset;
+		}
+		if (A.ActorId != B.ActorId)
+		{
+			return A.ActorId < B.ActorId;
+		}
+		return A.UnitIndex < B.UnitIndex;
 	};
 
 	auto SlotSortPredicate = [](const FSlotPriority& A, const FSlotPriority& B)
@@ -762,7 +774,11 @@ void UFormationController::BuildUnitAssignments(
 		{
 			return A.AbsLateralOffset < B.AbsLateralOffset;
 		}
-		return A.LateralOffset < B.LateralOffset;
+		if (not FMath::IsNearlyEqual(A.LateralOffset, B.LateralOffset))
+		{
+			return A.LateralOffset < B.LateralOffset;
+		}
+		return A.StableIndex < B.StableIndex;
 	};
 
 	for (auto& TypePair : UnitsByType)
@@ -781,21 +797,35 @@ void UFormationController::BuildUnitAssignments(
 				continue;
 			}
 
-			SubPair.Value.Sort(UnitSortPredicate);
-			SlotsForSubtype->Sort(SlotSortPredicate);
+			const bool bMultipleSlotsForSubtype = SlotsForSubtype->Num() > 1;
+
+			if (bMultipleSlotsForSubtype)
+			{
+				SubPair.Value.Sort(UnitSortPredicate);
+				SlotsForSubtype->Sort(SlotSortPredicate);
+			}
 
 			const int32 PairCount = FMath::Min(SubPair.Value.Num(), SlotsForSubtype->Num());
 			for (int32 PairIndex = 0; PairIndex < PairCount; ++PairIndex)
 			{
-				const FUnitPriority& UnitPriority = SubPair.Value[PairIndex];
-				const FSlotPriority& SlotPriority = (*SlotsForSubtype)[PairIndex];
+				const FUnitPriority& UnitPriority = bMultipleSlotsForSubtype
+					                                    ? SubPair.Value[PairIndex]
+					                                    : SubPair.Value[PairIndex];
+				const FSlotPriority& SlotPriority = bMultipleSlotsForSubtype
+					                                    ? (*SlotsForSubtype)[PairIndex]
+					                                    : (*SlotsForSubtype)[PairIndex];
 				const FUnitData& UnitData = Units[UnitPriority.UnitIndex];
 
-				if (UnitData.SourceActor.IsValid())
+				if (bMultipleSlotsForSubtype && UnitData.SourceActor.IsValid())
 				{
 					M_AssignedFormationSlots.Add(
 						UnitData.SourceActor,
-						{SlotPriority.Position, SlotPriority.Rotation, UnitData.UnitType, UnitData.UnitSubType});
+						{
+							SlotPriority.Position,
+							SlotPriority.Rotation,
+							UnitData.UnitType,
+							UnitData.UnitSubType
+						});
 				}
 
 				AddPositionForUnitToFormation(
