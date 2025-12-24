@@ -96,9 +96,9 @@ private:
 
 	void SetupHullArmor(UArmorCalculation* ArmorCalculation);
 	void SetupTurretArmor(UArmorCalculation* ArmorCalculation);
-	void SetupResistanceDescriptions(const FResistanceAndDamageReductionData& ResistanceData);
+	void SetupResistanceDescriptions(const FResistanceAndDamageReductionData& ResistanceData, const AActor* SelectedActor);
 
-	void SetupArmorIcon(const ETargetTypeIcon NewTargetTypeIcon);
+	void SetupArmorIcon(const ETargetTypeIcon NewTargetTypeIcon, const AActor* SelectedActor);
 	void SetupLaserResistance(const FDamageMltPerSide& LaserMltPerPart) const;
 	void SetupRadiationResistance(const FDamageMltPerSide& RadiationMltPerPart) const;
 	void SetupFireResistance(const FFireResistanceData& FireResistanceData) const;

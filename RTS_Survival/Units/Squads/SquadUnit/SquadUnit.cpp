@@ -1911,7 +1911,7 @@ void ASquadUnit::ReportPathFollowingResultError(const EPathFollowingResult::Type
 	case EPathFollowingResult::Success:
 		return;
 	case EPathFollowingResult::Blocked:
-		RTSFunctionLibrary::ReportError("Path following result is blocked."
+		RTSFunctionLibrary::PrintString("Path following result is blocked."
 			"\n squad unit: " + GetName());
 		return;
 	case EPathFollowingResult::OffPath:

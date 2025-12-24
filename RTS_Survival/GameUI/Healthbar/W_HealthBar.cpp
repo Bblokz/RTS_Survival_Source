@@ -87,7 +87,7 @@ void UW_HealthBar::UpdateMaxFireThreshold(const float MaxFireThreshold) const
 
 void UW_HealthBar::UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings)
 {
-        BP_UpdateSquadWeaponIcon(NewWeaponIconSettings);
+	BP_UpdateSquadWeaponIcon(NewWeaponIconSettings);
 }
 
 void UW_HealthBar::SetupUnitName(const FString& UnitName)
@@ -117,14 +117,20 @@ void UW_HealthBar::ChangeTargetTypeIcon(const ETargetTypeIcon Icon, const int32 
 	{
 		return;
 	}
-	M_TargetTypeIconState.SetNewTargetTypeIcon(OwningPlayer, Icon);
+	const AActor* ActorContext = nullptr;
+	if (M_OwningHealthComponent.IsValid())
+	{
+		ActorContext = M_OwningHealthComponent->GetOwner();
+	}
+	M_TargetTypeIconState.SetNewTargetTypeIcon(OwningPlayer, Icon, ActorContext);
 }
 
 void UW_HealthBar::InitRTSHealthBar(UWidgetAnimation* DamageAnimation, UMaterialInstanceDynamic* DMIHealthBar,
                                     UMaterialInstanceDynamic* DMIDamagePoint, FDamagePointDynamicMaterialParameter
                                     PointDamageParameters, FHealthBarDynamicMaterialParameter HealthBarParameters,
                                     FHealthBarDMIColorParameter
-                                    HealthBarColorParameters, UMaterialInstanceDynamic* DMIFireThresholdBar, UImage* TargetTypeIconImage)
+                                    HealthBarColorParameters, UMaterialInstanceDynamic* DMIFireThresholdBar,
+                                    UImage* TargetTypeIconImage)
 {
 	M_DamageAnimation = DamageAnimation;
 	M_DMI_HealthBar = DMIHealthBar;

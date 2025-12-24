@@ -1355,7 +1355,8 @@ namespace DeveloperSettings
 	namespace Debugging
 	{
 		constexpr bool GNomadicSkeletalAttachments_Compile_DebugSymbols = false;
-		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
+		// Overlap logic; tanks evasion.
+		constexpr bool GTankOverlaps_Compile_DebugSymbols = true;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
 		constexpr bool GEnemyController_Compile_DebugSymbols = true;

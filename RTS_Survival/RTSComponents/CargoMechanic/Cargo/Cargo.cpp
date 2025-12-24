@@ -429,6 +429,11 @@ void UCargo::RegisterCallBackToInitHealthComponentOnOwner()
 
 void UCargo::OnHealthBarWidgetInit_NoValidWidget() const
 {
+	if(not bUseCargoWidget)
+	{
+		// no error as this is expected when not using cargo widget.
+		return;
+	}
 	const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "NoOwner";
 	const FString Name = GetName();
 	RTSFunctionLibrary::ReportError("The cargo component attempted to get a valid garrison widget from the initialized"

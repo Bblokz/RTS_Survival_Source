@@ -435,7 +435,7 @@ void URTSOverlapEvasionComponent::TryEvasion_AlliedActorNotIdle(AActor* AlliedAc
         {
                 return;
         }
-        if (not ShouldRegisterMovingOverlap(AlliedActor))
+        if (not GetResolveDeadlockWithOther(AlliedActor))
         {
                 return;
         }
@@ -454,16 +454,16 @@ bool URTSOverlapEvasionComponent::GetIsUnitMoving(ICommands* AlliedUnitCommandIn
         return bIsMovement;
 }
 
-bool URTSOverlapEvasionComponent::ShouldRegisterMovingOverlap(const AActor* AlliedActor) const
+bool URTSOverlapEvasionComponent::GetResolveDeadlockWithOther(const AActor* OtherAlliedActor) const
 {
-        if (not M_Owner.IsValid() || not IsValid(AlliedActor))
+        if (not M_Owner.IsValid() || not IsValid(OtherAlliedActor))
         {
                 return false;
         }
 
         // Deterministic tie-breaker: only the actor with the higher unique ID registers the overlap.
         const int32 OwnerUniqueId = M_Owner->GetUniqueID();
-        const int32 AlliedUniqueId = AlliedActor->GetUniqueID();
+        const int32 AlliedUniqueId = OtherAlliedActor->GetUniqueID();
         return OwnerUniqueId > AlliedUniqueId;
 }
 
@@ -488,7 +488,7 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 		return;
 	}
 
-	if (not IsValid(OtherRTS))
+	if (not IsValid(OtherRTS) || not GetResolveDeadlockWithOther(OtherActor))
 	{
 		return;
 	}

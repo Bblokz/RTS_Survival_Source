@@ -27,7 +27,7 @@ struct FTargetTypeIconState
 
 	bool GetImplementsTargetTypeIcon() const;
 
-	void SetNewTargetTypeIcon(const int8 OwningPlayer, const ETargetTypeIcon NewTargetTypeIcon);
+	void SetNewTargetTypeIcon(const int8 OwningPlayer, const ETargetTypeIcon NewTargetTypeIcon, const AActor* ActorContext);
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<UImage> TargetTypeIconImage;
@@ -36,5 +36,5 @@ struct FTargetTypeIconState
 	TMap<ETargetTypeIcon, FTargetTypeIconBrushes> TypeToBrush;
 
 private:
-	bool IsTypeContainedAndValid(const ETargetTypeIcon Type);
+	bool IsTypeContainedAndValid(const ETargetTypeIcon Type, const AActor* ActorContext);
 };

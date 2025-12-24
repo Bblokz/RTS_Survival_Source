@@ -39,7 +39,7 @@ void UW_SelectedUnitDescription::SetupUnitDescription(const AActor* SelectedActo
 		TurretArmorBox->SetVisibility(ESlateVisibility::Visible);
 		SetupHullArmor(ArmorCalculation);
 		SetupTurretArmor(ArmorCalculation);
-		SetupResistanceDescriptions(ResistanceData);
+		SetupResistanceDescriptions(ResistanceData, SelectedActor);
 	}
 	OnSetupUnitDescription(PrimaryUnitType, NomadicSubtype, TankSubtype, SquadSubtype, ResistanceData, BxpSubtype);
 }
@@ -280,15 +280,15 @@ void UW_SelectedUnitDescription::SetupTurretArmor(UArmorCalculation* ArmorCalcul
 	TurretArmorDescription->SetText(FText::FromString(Out));
 }
 
-void UW_SelectedUnitDescription::SetupResistanceDescriptions(const FResistanceAndDamageReductionData& ResistanceData)
+void UW_SelectedUnitDescription::SetupResistanceDescriptions(const FResistanceAndDamageReductionData& ResistanceData, const AActor* SelectedActor)
 {
-	SetupArmorIcon(ResistanceData.TargetTypeIcon);
+	SetupArmorIcon(ResistanceData.TargetTypeIcon, SelectedActor);
 	SetupLaserResistance(ResistanceData.LaserAndRadiationDamageMlt.LaserMltPerPart);
 	SetupRadiationResistance(ResistanceData.LaserAndRadiationDamageMlt.RadiationMltPerPart);
 	SetupFireResistance(ResistanceData.FireResistanceData);
 }
 
-void UW_SelectedUnitDescription::SetupArmorIcon(const ETargetTypeIcon NewTargetTypeIcon)
+void UW_SelectedUnitDescription::SetupArmorIcon(const ETargetTypeIcon NewTargetTypeIcon, const AActor* SelectedActor)
 {
 	if (not M_TargetTypeIconState.GetImplementsTargetTypeIcon())
 	{
@@ -296,7 +296,7 @@ void UW_SelectedUnitDescription::SetupArmorIcon(const ETargetTypeIcon NewTargetT
 			"\n See FTargetTypeIconState M_TargetTypeIconState in :" + GetName());
 		return;
 	}
-	M_TargetTypeIconState.SetNewTargetTypeIcon(1, NewTargetTypeIcon);
+	M_TargetTypeIconState.SetNewTargetTypeIcon(1, NewTargetTypeIcon, SelectedActor);
 	const FString ArmorName = GetTargetTypeDisplayName(NewTargetTypeIcon);
 	if (not ArmorName.IsEmpty() && IsValid(ArmorTypeText))
 	{

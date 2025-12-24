@@ -9,8 +9,6 @@ UENUM(Blueprintable)
 enum class ESquadWeaponIcon : uint8
 {
 	None,
-	Mp42,
-	SVT,
 	Fedrov,
 	FG42,
 	SniperRifleGer,

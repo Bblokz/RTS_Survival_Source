@@ -233,6 +233,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	bool bUseCargoWidget = true;
+
 private:
 	
 	/** Clears seat occupancy for all units that belong to the given squad. */

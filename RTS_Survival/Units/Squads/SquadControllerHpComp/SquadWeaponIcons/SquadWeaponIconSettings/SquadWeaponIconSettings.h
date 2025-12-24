@@ -92,8 +92,6 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 		return ESquadWeaponIcon::FG42;
 
 	// Russian small arms
-	case EWeaponName::SVT_40_7_62MM:
-		return ESquadWeaponIcon::SVT;
 	case EWeaponName::PPSh_41_7_62MM:
 		return ESquadWeaponIcon::PPSH;
 	case EWeaponName::DP_28_7_62MM:
@@ -104,6 +102,8 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 	// Machine guns
 	case EWeaponName::MG_34:
 		return ESquadWeaponIcon::MG34;
+	case EWeaponName::RipperGun_7_62MM:
+		return ESquadWeaponIcon::RifleMG;
 
 	// Anti-tank weapons
 	case EWeaponName::PanzerFaust:
@@ -111,8 +111,9 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 	case EWeaponName::PanzerSchreck:
 		return ESquadWeaponIcon::PanzerShrek;
 	case EWeaponName::PTRS_41_14_5MM:
-	case EWeaponName::PTRS_50MM:
 		return ESquadWeaponIcon::PTRS;
+	case EWeaponName::PTRS_50MM:
+		return ESquadWeaponIcon::PTRS50MM;	
 	case EWeaponName::PanzerRifle_50mm:
 		return ESquadWeaponIcon::PanzerRifle50mm;
 
