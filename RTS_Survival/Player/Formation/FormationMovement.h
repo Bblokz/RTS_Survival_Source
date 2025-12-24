@@ -4,9 +4,11 @@
 #include "FormationTypes.h"
 #include "FormationPositionEffects/PlayerFormationPositionEffects.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 #include "FormationMovement.generated.h"
 
 class AFormationEffectActor;
+class AActor;
 class RTS_SURVIVAL_API ASelectablePawnMaster;
 class RTS_SURVIVAL_API ASquadController;
 class RTS_SURVIVAL_API ASelectableActorObjectsMaster;
@@ -24,6 +26,20 @@ struct FUnitData
 
 	/** @note World‐space location at start of formation, used to minimize crossing. */
 	FVector OriginalLocation;
+
+	/** @note Weak reference to the actor that contributed this unit data. */
+	TWeakObjectPtr<AActor> SourceActor;
+};
+
+/**
+ * @brief Position and rotation pair stored per actor for deterministic assignments.
+ */
+struct FFormationAssignment
+{
+	FVector Position;
+	FRotator Rotation;
+	EAllUnitType UnitType = EAllUnitType::UNType_None;
+	int32 UnitSubType = 0;
 };
 
 
@@ -82,8 +98,8 @@ public:
 	void PrimaryClickPickFormation(const FVector2D& ClickedPosition);
 
 /**
- * @brief Retrieves the next formation slot for a unit, or returns the actor's current location
- *        if that actor does not implement ICommands or lacks the movement ability.
+ * @brief Retrieves the next formation slot for a unit (using original-location-aware per-actor assignments),
+ *        or returns the actor's current location if that actor does not implement ICommands or lacks the movement ability.
  * @param RTSComponent   RTS component of the querying unit (used to resolve type/subtype).
  * @param OutMovementRotation  Returned movement rotation for this slot (unchanged when falling back).
  * @param OwningActorForCommands The actor we attempt to query for ICommands & movement ability. If
@@ -515,6 +531,28 @@ private:
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     // ++++++++++++++++++++++++ END Semi-Circle Formation Helpers ++++++++++++++++++++++++++++++++
     ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// ++++++++++++++++++++++++ Assignment Helpers ++++++++++++++++++++++++++++++++
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	/**
+	 * @brief Assigns calculated formation slots to the originating actors deterministically using their initial
+	 *        locations, while also storing positions per type/subtype for debugging and effects.
+	 *
+	 * @param Units      Source units used to build the formation, containing original locations and actors.
+	 * @param Positions  Computed world-space positions for each corresponding entry in Units.
+	 * @param Rotations  Computed rotations for each corresponding entry in Units.
+	 */
+	void BuildUnitAssignments(
+		const TArray<FUnitData>& Units,
+		const TArray<FVector>& Positions,
+		const TArray<FRotator>& Rotations
+	);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// ++++++++++++++++++++++++ END Assignment Helpers ++++++++++++++++++++++++++++++++
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 	/**
 	 * @brief Draws debug strings and lines for every formation position, labeling units with their display names
 	 *        and radii, and connecting each group’s points to its first point with distance labels.
@@ -523,4 +561,7 @@ private:
 	 * @note Also draws a directional arrow from the original move location showing formation forward.
 	 */
 	void DebugFormation() const;
+
+	/** Deterministic per-actor assignment cache keyed by the actor issuing the move. */
+	TMap<TWeakObjectPtr<AActor>, FFormationAssignment> M_AssignedFormationSlots;
 };
