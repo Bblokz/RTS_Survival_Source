@@ -2084,7 +2084,8 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 	                                        LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation,
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
-	                                        ActorsToIgnore);
+	                                        ActorsToIgnore,
+	                                        ShellAdjustedData.WeaponCalibre);
 }
 
 void UWeaponStateArchProjectile::InitArchProjectileWeapon(
@@ -2219,7 +2220,8 @@ void UWeaponStateArchProjectile::FireProjectileWithShellAdjustedStats(const FWea
 	                                        LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation,
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
-	                                        ActorsToIgnore);
+	                                        ActorsToIgnore,
+	                                        ShellAdjustedData.WeaponCalibre);
 
 	Projectile->SetupArcedLaunch(LaunchLocation, TargetLocation, ShellAdjustedData.ProjectileMovementSpeed,
 	                             ShellAdjustedData.Range, M_ArchSettings, M_WeaponVfx.LaunchAttenuation,
