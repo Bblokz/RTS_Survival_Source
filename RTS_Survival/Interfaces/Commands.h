@@ -413,6 +413,9 @@ public:
 		const FVector& Location,
 		const bool bSetUnitToIdle, const FRotator& FinishedMovementRotation,
 		const bool bForceFinalRotationRegardlessOfReverse = false);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError Reinforce(const bool bSetUnitToIdle);
 
 	void SetForceFinalRotationRegardlessOfReverse(bool ForceUseFinalRotation);
 
@@ -628,6 +631,9 @@ protected:
 
 	/** @brief Stops all logic used for move commands..*/
 	virtual void TerminateMoveCommand();
+
+	virtual void ExecuteReinforceCommand();
+	virtual void TerminateReinforceCommand();
 
 	virtual void ExecuteStopCommand();
 	/**

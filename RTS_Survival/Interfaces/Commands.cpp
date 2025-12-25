@@ -694,6 +694,10 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			M_Owner->ExecuteRepairCommand(TargetActor);
 			break;
 		}
+	case EAbilityID::IdReinforceSquad:
+		{
+			M_Owner->ExecuteReinforceCommand();
+		}
 	// Also switch weapon case if we want:
 	case EAbilityID::IdSwitchWeapon:
 		{
@@ -1072,6 +1076,27 @@ ECommandQueueError ICommands::MoveToLocation(
 	return Error;
 }
 
+ECommandQueueError ICommands::Reinforce(const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdReinforceSquad);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdReinforceSquad, FVector::ZeroVector, nullptr, FRotator::ZeroRotator);
+}
+
 void ICommands::SetForceFinalRotationRegardlessOfReverse(const bool ForceUseFinalRotation)
 {
 	if (UCommandData* CommandData = GetIsValidCommandData())
@@ -1161,7 +1186,7 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 	{
 		return ECommandQueueError::AbilityOnCooldown;
 	}
-	if(bSetUnitToIdle)
+	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
 	}
@@ -1756,6 +1781,14 @@ void ICommands::TerminateMoveCommand()
 	}
 }
 
+void ICommands::ExecuteReinforceCommand()
+{
+}
+
+void ICommands::TerminateReinforceCommand()
+{
+}
+
 void ICommands::ExecuteStopCommand()
 {
 }
@@ -2259,6 +2292,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdActivateMode:
 		break;
 	case EAbilityID::IdDisableMode:
+		break;
+	case EAbilityID::IdReinforceSquad:
+		TerminateReinforceCommand();
 		break;
 	default:
 		RTSFunctionLibrary::PrintString(
