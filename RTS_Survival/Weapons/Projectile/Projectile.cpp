@@ -123,7 +123,8 @@ void AProjectile::SetupProjectileForNewLaunch(
 	const float ProjectileSpeed, const FVector& LaunchLocation,
 	const FRotator& LaunchRotation, USoundAttenuation* ImpactAttenuation, USoundConcurrency* ImpactConcurrency,
 	const FProjectileVfxSettings&
-	ProjectileVfxSettings, const EWeaponShellType ShellType, const TArray<AActor*>& ActorsToIgnore)
+	ProjectileVfxSettings, const EWeaponShellType ShellType, const TArray<AActor*>& ActorsToIgnore, const int32
+	WeaponCalibre)
 {
 	M_ShellType = ShellType;
 	M_ProjectileOwner = NewProjectileOwner;
@@ -147,6 +148,7 @@ void AProjectile::SetupProjectileForNewLaunch(
 	M_ImpactConcurrency = ImpactConcurrency;
 	M_ActorsToIgnore.Empty();
 	M_ActorsToIgnore = ActorsToIgnore;
+	M_WeaponCalibre = WeaponCalibre;
 
 	OnRestartProjectile(LaunchLocation, LaunchRotation, ProjectileSpeed);
 	SetupNiagaraWithPrjVfxSettings(ProjectileVfxSettings);
@@ -1015,6 +1017,18 @@ void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSyst
 	else
 	{
 		M_NiagaraComponent->SetWorldScale3D(M_BasicScale);
+	}
+}
+
+void AProjectile::OnBounce_DisplayText(const FVector& Location)
+{
+	if(M_WeaponCalibre <= 35)
+	{
+		return;
+	}
+	if(M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT)
+	{
+		verticalanima
 	}
 }
 

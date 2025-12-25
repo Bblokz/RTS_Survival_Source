@@ -8,6 +8,7 @@
 #include "Engine/DamageEvents.h"
 #include "ProjectileVfxSettings/ProjectileVfxSettings.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/MasterObjects/ActorObjectsMaster.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -49,27 +50,27 @@ public:
 		const int32 Index);
 
         void SetupProjectileForNewLaunch(
-                UWeaponStateProjectile* NewProjectileOwner,
-                const ERTSDamageType DamageType,
-                const float Range,
-                const float Damage,
-		const float ArmorPen,
-		const float ArmorPenMaxRange,
-		const uint32 ShrapnelParticles,
-		const float ShrapnelRange,
-		const float ShrapnelDamage,
-		const float ShrapnelArmorPen,
-		const int32 OwningPlayer,
-		const TMap<ERTSSurfaceType, FRTSSurfaceImpactData>& ImpactSurfaceData,
-		UNiagaraSystem* BounceEffect,
-		USoundCue* BounceSound,
-		const FVector& ImpactScale,
-		const FVector& BounceScale,
-		const float ProjectileSpeed,
-		const FVector& LaunchLocation,
-		const FRotator& LaunchRotation, USoundAttenuation* ImpactAttenuation,
-                USoundConcurrency* ImpactConcurrency, const FProjectileVfxSettings& ProjectileVfxSettings, const EWeaponShellType
-                ShellType, const TArray<AActor*>& ActorsToIgnore);
+	        UWeaponStateProjectile* NewProjectileOwner,
+	        const ERTSDamageType DamageType,
+	        const float Range,
+	        const float Damage,
+	        const float ArmorPen,
+	        const float ArmorPenMaxRange,
+	        const uint32 ShrapnelParticles,
+	        const float ShrapnelRange,
+	        const float ShrapnelDamage,
+	        const float ShrapnelArmorPen,
+	        const int32 OwningPlayer,
+	        const TMap<ERTSSurfaceType, FRTSSurfaceImpactData>& ImpactSurfaceData,
+	        UNiagaraSystem* BounceEffect,
+	        USoundCue* BounceSound,
+	        const FVector& ImpactScale,
+	        const FVector& BounceScale,
+	        const float ProjectileSpeed,
+	        const FVector& LaunchLocation,
+	        const FRotator& LaunchRotation, USoundAttenuation* ImpactAttenuation,
+	        USoundConcurrency* ImpactConcurrency, const FProjectileVfxSettings& ProjectileVfxSettings, const EWeaponShellType
+	        ShellType, const TArray<AActor*>& ActorsToIgnore, const int32 WeaponCalibre);
 
         /**
          * @brief Launches the pooled projectile along an arced path using the provided arch settings.
@@ -154,6 +155,12 @@ protected:
 private:
 	UPROPERTY()
 	UWeaponStateProjectile* M_ProjectileOwner;
+
+	UPROPERTY()
+	TWeakObjectPtr<UAnimatedTextWidgetPoolManager> M_AnimatedTextWidgetPoolManager;
+
+	UPROPERTY()
+	int32 M_WeaponCalibre = 0;
 
 	// Begin Projectile Pool Settings
 
@@ -414,4 +421,6 @@ private:
 	FVector M_BasicScale = FVector(1.0f, 1.0f, 1.0f);
 
 	void ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type) const;
+
+	void OnBounce_DisplayText(const FVector& Location);
 };

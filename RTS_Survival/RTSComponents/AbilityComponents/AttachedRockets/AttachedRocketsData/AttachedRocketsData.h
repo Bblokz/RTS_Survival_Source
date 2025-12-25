@@ -34,6 +34,7 @@ struct FAttachedRocketsData
     float ProjectileAccelerationFactor = 1.f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Accuracy = 80;
-
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 WeaponCalibre = 30;
 
 };

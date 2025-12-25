@@ -3088,6 +3088,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageFluxMlt = DamageFluxPercentage / 100;
 	RocketData.CoolDownFluxMlt = CooldownFluxPercentage / 100;
 	RocketData.ArmorPenFluxMlt = ArmorPenFluxPercentage / 100;
+	RocketData.WeaponCalibre  =88;
 	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::HetzerRockets, RocketData);
 
 
@@ -3103,6 +3104,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageFluxMlt = DamageFluxPercentage / 100;
 	RocketData.CoolDownFluxMlt = CooldownFluxPercentage / 100;
 	RocketData.ArmorPenFluxMlt = ArmorPenFluxPercentage / 100;
+	RocketData.WeaponCalibre = 50;
 	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::JagdPantherRockets, RocketData);
 
 	M_EnemyAttachedRocketDataHashMap = M_TPlayerAttachedRocketDataHashMap;

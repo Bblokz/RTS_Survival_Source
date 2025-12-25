@@ -632,7 +632,8 @@ bool UAttachedRockets::FireRocket_LaunchPoolProjectile(const FVector& LaunchLoca
 		LaunchLocation,
 		LaunchRotation,
 		ImpactAttenuation,
-		ImpactConcurrency, M_ProjectileVfxSettings, EWeaponShellType::Shell_HEAT, {});
+		ImpactConcurrency, M_ProjectileVfxSettings, EWeaponShellType::Shell_HEAT, {},
+		M_RocketData);
 	if (RocketMesh.IsValid())
 	{
 		Projectile->SetupAttachedRocketMesh(RocketMesh.Get());
