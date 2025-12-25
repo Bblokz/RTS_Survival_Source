@@ -82,9 +82,12 @@ public:
 
 	/** @note Can be null if faulty index is supplied. */
 	ABuildingExpansion* GetBuildingExpansionAtIndex(const int Index) const;
+	FBuildingExpansionItem* GetBuildingExpansionItemAtIndex(const int Index) const;
 
 	/** @return An array of all unlocked building expansion types that this building can expand with.*/
 	TArray<FBxpOptionData> GetUnlockedBuildingExpansionTypes() const;
+
+		EBxpOptionSection GetBxpOptionTypeFromBxpType(const EBuildingExpansionType BxpType) const;
 
 	/** @return Whether the building is in a state in which expanding is possible. */
 	virtual bool IsBuildingAbleToExpand() const;

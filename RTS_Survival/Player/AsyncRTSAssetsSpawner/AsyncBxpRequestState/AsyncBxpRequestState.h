@@ -7,6 +7,7 @@
 
 #include "AsyncBxpRequestState.generated.h"
 
+enum class EBuildingExpansionType : uint8;
 class IBuildingExpansionOwner;
 class ABuildingExpansion;
 

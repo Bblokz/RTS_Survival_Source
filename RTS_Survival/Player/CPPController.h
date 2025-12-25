@@ -769,6 +769,9 @@ private:
 	UPROPERTY()
 	FViewportScreenshotTask M_ViewportScreenshotTask;
 
+	void HandleBxpPlacementVoiceLine(const TScriptInterface<IBuildingExpansionOwner>& BxpOwner,
+	                                 const EBuildingExpansionType BxpType) const;
+
 	// Whether the player is currently in the archive.
 	UPROPERTY()
 	bool bM_IsInArchive;

@@ -1,9 +1,14 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/GameUI/BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
+#include "RTS_Survival/GameUI/BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
+#include "RTS_Survival/GameUI/BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
 
 #include "RTSVoicelines.generated.h"
 
+
+enum class EBxpOptionSection : uint8;
 
 UENUM(BlueprintType)
 enum class ERTSVoiceLine : uint8

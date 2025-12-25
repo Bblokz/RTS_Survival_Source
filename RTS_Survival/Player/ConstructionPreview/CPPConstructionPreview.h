@@ -49,6 +49,8 @@ public:
 	/** @return If the building preview is overlapping with something. */
 	bool GetIsBuildingPreviewBlocked() const;
 
+	FBxpConstructionData GetBxpConstructionData() const { return BxpConstructionData; }
+
 	AStaticPreviewMesh* CreateStaticMeshActor(const FRotator& Rotation, ANomadicVehicle* NomadicConstructing) const;
 
 	/**

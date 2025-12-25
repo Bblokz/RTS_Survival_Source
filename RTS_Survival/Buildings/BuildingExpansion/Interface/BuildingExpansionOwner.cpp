@@ -86,6 +86,15 @@ ABuildingExpansion* IBuildingExpansionOwner::GetBuildingExpansionAtIndex(const i
 	return nullptr;
 }
 
+FBuildingExpansionItem* IBuildingExpansionOwner::GetBuildingExpansionItemAtIndex(const int Index) const
+{
+	if (Index >= 0 && Index < GetBuildingExpansionData().M_TBuildingExpansionItems.Num())
+	{
+		return &GetBuildingExpansionData().M_TBuildingExpansionItems[Index];
+	}
+	return nullptr;
+}
+
 TArray<FBxpOptionData> IBuildingExpansionOwner::GetUnlockedBuildingExpansionTypes() const
 {
 	TArray<FBxpOptionData> UnlockedBxpData;
@@ -105,6 +114,21 @@ TArray<FBxpOptionData> IBuildingExpansionOwner::GetUnlockedBuildingExpansionType
 		UnlockedBxpData.Add(EachOption);
 	}
 	return UnlockedBxpData;
+}
+
+EBxpOptionSection IBuildingExpansionOwner::GetBxpOptionTypeFromBxpType(const EBuildingExpansionType BxpType) const
+{
+	auto Types = GetUnlockedBuildingExpansionTypes();
+	for(auto EachOption : Types)
+	{
+		if(EachOption.ExpansionType == BxpType)
+		{
+			return EachOption.Section;
+		}
+	}
+	RTSFunctionLibrary::ReportError("Could not find bxp option type from bxp type!"
+		"\n See IBuildingExpansionOwner::GetBxpOptionTypeFromBxpType");
+	return EBxpOptionSection::BOS_Tech;
 }
 
 bool IBuildingExpansionOwner::IsBuildingAbleToExpand() const
@@ -612,9 +636,9 @@ void IBuildingExpansionOwner::BatchBxp_OnBuildingCanNoLongerExpand(
 			"\n However, the building can no longer expand; destroying them now and"
 			"resetting the building expansion entries to packed state!"));
 	}
-	for(auto EachBxp : SpawnedBxps)
+	for (auto EachBxp : SpawnedBxps)
 	{
-		if(IsValid(EachBxp))
+		if (IsValid(EachBxp))
 		{
 			EachBxp->Destroy();
 		}
