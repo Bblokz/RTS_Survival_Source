@@ -1821,11 +1821,13 @@ bool UWeaponStateTrace::DidTracePenArmorCalcComponent(UArmorCalculation* ArmorCa
                                                       const FHitResult& HitResult) const
 {
 	float RawArmorValue = 0.0f;
+	
+	EArmorPlate PlateHit = EArmorPlate::Plate_Front;
 	float AdjustedArmorPen = WeaponData.ArmorPen;
 	const FVector ImpactDirection = HitResult.TraceEnd - HitResult.TraceStart;
 	const float EffectiveArmor = ArmorCalculation->GetEffectiveArmorOnHit(
 		HitResult.Component, HitResult.Location, ImpactDirection, HitResult.ImpactNormal, RawArmorValue,
-		AdjustedArmorPen);
+		AdjustedArmorPen, PlateHit);
 	return EffectiveArmor < AdjustedArmorPen;
 }
 

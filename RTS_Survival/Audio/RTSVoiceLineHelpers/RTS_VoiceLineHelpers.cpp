@@ -339,4 +339,5 @@ EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetAnnouncerForPlayerError(const 
 	case EPlayerError::Error_CannotBuildHere:
 		return EAnnouncerVoiceLineType::ErrorCannotBuildHere;
 	}
+	return EAnnouncerVoiceLineType::None;
 }

@@ -5,6 +5,7 @@
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -26,6 +27,20 @@ FRTS_Statics::FRTS_Statics()
 
 FRTS_Statics::~FRTS_Statics()
 {
+}
+
+UAnimatedTextWidgetPoolManager* FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(
+	const UObject* WorldContextObject)
+{
+	if (UWorld* World = WorldContextObject->GetWorld())
+	{
+		UAnimatedTextWorldSubsystem* WorldSubsystem = World->GetSubsystem<UAnimatedTextWorldSubsystem>();
+		if (WorldSubsystem && WorldSubsystem->GetAnimatedTextWidgetPoolManager())
+		{
+			return WorldSubsystem->GetAnimatedTextWidgetPoolManager();
+		}
+	}
+	return nullptr;
 }
 
 ACPPController* FRTS_Statics::GetRTSController(const UObject* WorldContextObject)

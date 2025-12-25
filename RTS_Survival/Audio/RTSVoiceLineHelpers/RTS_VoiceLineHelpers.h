@@ -5,6 +5,7 @@ enum class EPlayerError : uint8;
 enum class ETankSubtype : uint8;
 enum class EAbilityID : uint8;
 enum class ERTSVoiceLine : uint8;
+enum class EBxpOptionSection : uint8;
 
 class FRTS_VoiceLineHelpers
 {

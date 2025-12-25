@@ -8,6 +8,7 @@
 #include "UObject/Interface.h"
 #include "BuildingExpansionOwner.generated.h"
 
+class ACPPController;
 struct RTS_SURVIVAL_API FBuildingExpansionItem;
 enum class EBuildingExpansionStatus : uint8;
 enum class EBuildingExpansionType : uint8;

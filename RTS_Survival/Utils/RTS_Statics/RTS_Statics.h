@@ -10,6 +10,7 @@
 #include "RTS_Survival/UnitData/VehicleData.h"
 
 
+class UAnimatedTextWidgetPoolManager;
 class UPlayerPortraitManager;
 class AEnemyController;
 class UPlayerAudioController;
@@ -39,6 +40,9 @@ class RTS_SURVIVAL_API FRTS_Statics
 	~FRTS_Statics();
 
 public:
+
+	// ------------------ World subsystem helpers ------------
+	static UAnimatedTextWidgetPoolManager* GetVerticalAnimatedTextWidgetPoolManager(const UObject* WorldContextObject);
 
 	// -------------------- Begin Player Related Objects --------------------
 	/** @return A IsValid CPPController or null. */

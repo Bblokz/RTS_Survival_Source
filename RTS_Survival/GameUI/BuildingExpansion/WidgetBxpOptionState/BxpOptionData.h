@@ -1,10 +1,10 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
-
+#include "RTS_Survival/Buildings/BuildingExpansion/BXPConstructionRules/BXPConstructionRules.h"
 #include "BxpOptionData.generated.h"
 
+enum class EBuildingExpansionType : uint8;
 /** Which group/column an option should appear in. */
 UENUM(BlueprintType)
 enum class EBxpOptionSection : uint8

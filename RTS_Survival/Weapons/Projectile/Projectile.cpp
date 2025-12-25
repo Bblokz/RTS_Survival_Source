@@ -18,17 +18,20 @@
 #include "Trace/Trace.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "NiagaraSystem.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 // --- local helpers (file-scope) ------------------------------------------------
 namespace
 {
-        constexpr float MinCurvatureVelocityMultiplier = 0.25f;
-        constexpr float MaxCurvatureVelocityMultiplier = 4.0f;
+	constexpr float MinCurvatureVelocityMultiplier = 0.25f;
+	constexpr float MaxCurvatureVelocityMultiplier = 4.0f;
 
-        // Builds a rotation whose +Z points outward along the impact normal.
-        inline FRotator MakeImpactOutwardRotationZ(const FHitResult& Hit)
-        {
+	// Builds a rotation whose +Z points outward along the impact normal.
+	inline FRotator MakeImpactOutwardRotationZ(const FHitResult& Hit)
+	{
 		const FVector N = Hit.ImpactNormal.GetSafeNormal();
 		return FRotationMatrix::MakeFromZ(N).Rotator();
 	}
@@ -157,160 +160,161 @@ void AProjectile::SetupProjectileForNewLaunch(
 	// Only notify on first bounce; reset as we have a new projectile fire.
 	bM_AlreadyNotified = false;
 
-        // Used to calculate armor pen at different ranges.
-        M_ProjectileSpawn = GetActorLocation();
-        SetupTraceChannel(OwningPlayer);
+	// Used to calculate armor pen at different ranges.
+	M_ProjectileSpawn = GetActorLocation();
+	SetupTraceChannel(OwningPlayer);
 
-        StartFlightTimers(M_Range / ProjectileSpeed);
+	StartFlightTimers(M_Range / ProjectileSpeed);
 }
 
 void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 {
-        if (ExpectedFlightTime <= 0.0f)
-        {
-                return;
-        }
-        if (UWorld* World = GetWorld())
-        {
-                World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
-                World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
-                World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
+	if (ExpectedFlightTime <= 0.0f)
+	{
+		return;
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
+		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 
-                World->GetTimerManager().SetTimer(M_ExplosionTimerHandle, this, &AProjectile::HandleTimedExplosion,
-                                                   ExpectedFlightTime, false);
-                const float LineTraceInterval = DeveloperSettings::Optimization::ProjectileTraceInterval;
-                World->GetTimerManager().SetTimer(M_LineTraceTimerHandle, this, &AProjectile::PerformAsyncLineTrace,
-                                                   LineTraceInterval, true);
-                M_LastTraceTime = World->GetTimeSeconds() - LineTraceInterval;
-                PerformAsyncLineTrace();
-        }
+		World->GetTimerManager().SetTimer(M_ExplosionTimerHandle, this, &AProjectile::HandleTimedExplosion,
+		                                  ExpectedFlightTime, false);
+		const float LineTraceInterval = DeveloperSettings::Optimization::ProjectileTraceInterval;
+		World->GetTimerManager().SetTimer(M_LineTraceTimerHandle, this, &AProjectile::PerformAsyncLineTrace,
+		                                  LineTraceInterval, true);
+		M_LastTraceTime = World->GetTimeSeconds() - LineTraceInterval;
+		PerformAsyncLineTrace();
+	}
 }
 
 void AProjectile::SetupAttachedRocketMesh(UStaticMesh* RocketMesh)
 {
-        if (GetIsValidNiagara())
-        {
-                M_NiagaraComponent->SetVariableStaticMesh(*NiagaraRocketMeshName, RocketMesh);
-        }
+	if (GetIsValidNiagara())
+	{
+		M_NiagaraComponent->SetVariableStaticMesh(*NiagaraRocketMeshName, RocketMesh);
+	}
 }
 
 void AProjectile::PlayDescentSound(USoundBase* DescentSound,
-                                  USoundAttenuation* DescentAttenuation,
-                                  USoundConcurrency* DescentConcurrency)
+                                   USoundAttenuation* DescentAttenuation,
+                                   USoundConcurrency* DescentConcurrency)
 {
-        if (not DescentSound)
-        {
-                return;
-        }
+	if (not DescentSound)
+	{
+		return;
+	}
 
-        if (UAudioComponent* DescentAudio = M_DescentAudioComponent.Get())
-        {
-                DescentAudio->Stop();
-                DescentAudio->DestroyComponent();
-                M_DescentAudioComponent.Reset();
-        }
+	if (UAudioComponent* DescentAudio = M_DescentAudioComponent.Get())
+	{
+		DescentAudio->Stop();
+		DescentAudio->DestroyComponent();
+		M_DescentAudioComponent.Reset();
+	}
 
-        if (USceneComponent* Root = GetRootComponent())
-        {
-                UAudioComponent* SpawnedAudio = UGameplayStatics::SpawnSoundAttached(
-                        DescentSound,
-                        Root,
-                        NAME_None,
-                        FVector::ZeroVector,
-                        EAttachLocation::KeepRelativeOffset,
-                        false,
-                        1.0f,
-                        1.0f,
-                        0.0f,
-                        DescentAttenuation,
-                        DescentConcurrency);
-                M_DescentAudioComponent = SpawnedAudio;
-                return;
-        }
+	if (USceneComponent* Root = GetRootComponent())
+	{
+		UAudioComponent* SpawnedAudio = UGameplayStatics::SpawnSoundAttached(
+			DescentSound,
+			Root,
+			NAME_None,
+			FVector::ZeroVector,
+			EAttachLocation::KeepRelativeOffset,
+			false,
+			1.0f,
+			1.0f,
+			0.0f,
+			DescentAttenuation,
+			DescentConcurrency);
+		M_DescentAudioComponent = SpawnedAudio;
+		return;
+	}
 
-        PlaySoundAt(GetWorld(), DescentSound, GetActorLocation(), GetActorRotation(), DescentAttenuation,
-                    DescentConcurrency);
+	PlaySoundAt(GetWorld(), DescentSound, GetActorLocation(), GetActorRotation(), DescentAttenuation,
+	            DescentConcurrency);
 }
 
 void AProjectile::SetupArcedLaunch(
-        const FVector& LaunchLocation,
-        const FVector& TargetLocation,
-        const float ProjectileSpeed,
-        const float Range,
-        const FArchProjectileSettings& ArchSettings,
-        USoundAttenuation* DescentAttenuation,
-        USoundConcurrency* DescentConcurrency)
+	const FVector& LaunchLocation,
+	const FVector& TargetLocation,
+	const float ProjectileSpeed,
+	const float Range,
+	const FArchProjectileSettings& ArchSettings,
+	USoundAttenuation* DescentAttenuation,
+	USoundConcurrency* DescentConcurrency)
 {
-        if (not GetIsValidProjectileMovement())
-        {
-                return;
-        }
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
 
-        StopDescentSound();
+	StopDescentSound();
 
-        const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
-        const FVector LaunchToTarget = TargetLocation - LaunchLocation;
-        const FVector FlatDelta(LaunchToTarget.X, LaunchToTarget.Y, 0.0f);
-        const float HorizontalDistance = FlatDelta.Size();
-        const float GravityZ = GetWorld() ? GetWorld()->GetGravityZ() : 0.0f;
+	const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
+	const FVector LaunchToTarget = TargetLocation - LaunchLocation;
+	const FVector FlatDelta(LaunchToTarget.X, LaunchToTarget.Y, 0.0f);
+	const float HorizontalDistance = FlatDelta.Size();
+	const float GravityZ = GetWorld() ? GetWorld()->GetGravityZ() : 0.0f;
 
-        if (HorizontalDistance <= KINDA_SMALL_NUMBER || FMath::IsNearlyZero(GravityZ))
-        {
-                LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-                return;
-        }
+	if (HorizontalDistance <= KINDA_SMALL_NUMBER || FMath::IsNearlyZero(GravityZ))
+	{
+		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return;
+	}
 
-        const float Gravity = FMath::Abs(GravityZ);
-        const float DesiredApexHeight = CalculateDesiredApexHeight(
-                LaunchLocation,
-                TargetLocation,
-                HorizontalDistance,
-                ArchSettings);
-        if (DesiredApexHeight <= LaunchLocation.Z)
-        {
-                LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-                return;
-        }
+	const float Gravity = FMath::Abs(GravityZ);
+	const float DesiredApexHeight = CalculateDesiredApexHeight(
+		LaunchLocation,
+		TargetLocation,
+		HorizontalDistance,
+		ArchSettings);
+	if (DesiredApexHeight <= LaunchLocation.Z)
+	{
+		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return;
+	}
 
-        const float BaseVerticalVelocity = FMath::Sqrt(2.0f * Gravity * (DesiredApexHeight - LaunchLocation.Z));
-        const float InitialVerticalVelocity = ApplyCurvatureToVerticalVelocity(
-                BaseVerticalVelocity,
-                ArchSettings.CurvatureVerticalVelocityMultiplier);
-        const float DeltaZ = TargetLocation.Z - LaunchLocation.Z;
-        const float HalfGravity = 0.5f * Gravity;
-        const float Discriminant = (InitialVerticalVelocity * InitialVerticalVelocity) - (4.0f * HalfGravity * DeltaZ);
-        if (Discriminant < 0.0f)
-        {
-                LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-                return;
-        }
+	const float BaseVerticalVelocity = FMath::Sqrt(2.0f * Gravity * (DesiredApexHeight - LaunchLocation.Z));
+	const float InitialVerticalVelocity = ApplyCurvatureToVerticalVelocity(
+		BaseVerticalVelocity,
+		ArchSettings.CurvatureVerticalVelocityMultiplier);
+	const float DeltaZ = TargetLocation.Z - LaunchLocation.Z;
+	const float HalfGravity = 0.5f * Gravity;
+	const float Discriminant = (InitialVerticalVelocity * InitialVerticalVelocity) - (4.0f * HalfGravity * DeltaZ);
+	if (Discriminant < 0.0f)
+	{
+		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return;
+	}
 
-        const float TimeToTarget = (InitialVerticalVelocity + FMath::Sqrt(Discriminant)) / Gravity;
-        if (TimeToTarget <= KINDA_SMALL_NUMBER)
-        {
-                LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-                return;
-        }
+	const float TimeToTarget = (InitialVerticalVelocity + FMath::Sqrt(Discriminant)) / Gravity;
+	if (TimeToTarget <= KINDA_SMALL_NUMBER)
+	{
+		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return;
+	}
 
-        const FVector HorizontalDirection = FlatDelta.GetSafeNormal();
-        const float HorizontalSpeed = HorizontalDistance / TimeToTarget;
-        if (HorizontalSpeed <= KINDA_SMALL_NUMBER)
-        {
-                LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-                return;
-        }
+	const FVector HorizontalDirection = FlatDelta.GetSafeNormal();
+	const float HorizontalSpeed = HorizontalDistance / TimeToTarget;
+	if (HorizontalSpeed <= KINDA_SMALL_NUMBER)
+	{
+		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return;
+	}
 
-        const FVector LaunchVelocity = (HorizontalDirection * HorizontalSpeed) + FVector(0.0f, 0.0f, InitialVerticalVelocity);
+	const FVector LaunchVelocity = (HorizontalDirection * HorizontalSpeed) + FVector(
+		0.0f, 0.0f, InitialVerticalVelocity);
 
-        SetActorLocation(LaunchLocation);
-        SetActorRotation(LaunchVelocity.Rotation());
-        M_ProjectileMovement->Activate();
-        M_ProjectileMovement->ProjectileGravityScale = 1.0f;
-        M_ProjectileMovement->Velocity = LaunchVelocity;
+	SetActorLocation(LaunchLocation);
+	SetActorRotation(LaunchVelocity.Rotation());
+	M_ProjectileMovement->Activate();
+	M_ProjectileMovement->ProjectileGravityScale = 1.0f;
+	M_ProjectileMovement->Velocity = LaunchVelocity;
 
-        StartFlightTimers(TimeToTarget);
+	StartFlightTimers(TimeToTarget);
 
-        ScheduleDescentSound(TimeToTarget, ArchSettings, DescentAttenuation, DescentConcurrency);
+	ScheduleDescentSound(TimeToTarget, ArchSettings, DescentAttenuation, DescentConcurrency);
 }
 
 void AProjectile::LaunchStraightFallback(const FVector& LaunchLocation,
@@ -318,18 +322,18 @@ void AProjectile::LaunchStraightFallback(const FVector& LaunchLocation,
                                          const float SafeProjectileSpeed,
                                          const float Range)
 {
-        OnRestartProjectile(LaunchLocation, LaunchToTarget.Rotation(), SafeProjectileSpeed);
-        StartFlightTimers(Range / SafeProjectileSpeed);
+	OnRestartProjectile(LaunchLocation, LaunchToTarget.Rotation(), SafeProjectileSpeed);
+	StartFlightTimers(Range / SafeProjectileSpeed);
 }
 
 void AProjectile::StopDescentSound()
 {
-        if (UAudioComponent* DescentAudio = M_DescentAudioComponent.Get())
-        {
-                DescentAudio->Stop();
-                DescentAudio->DestroyComponent();
-                M_DescentAudioComponent.Reset();
-        }
+	if (UAudioComponent* DescentAudio = M_DescentAudioComponent.Get())
+	{
+		DescentAudio->Stop();
+		DescentAudio->DestroyComponent();
+		M_DescentAudioComponent.Reset();
+	}
 }
 
 float AProjectile::CalculateDesiredApexHeight(const FVector& LaunchLocation,
@@ -337,21 +341,21 @@ float AProjectile::CalculateDesiredApexHeight(const FVector& LaunchLocation,
                                               const float HorizontalDistance,
                                               const FArchProjectileSettings& ArchSettings) const
 {
-        const float HighestPoint = FMath::Max(LaunchLocation.Z, TargetLocation.Z);
-        const float BaseApexHeight = HighestPoint + (HorizontalDistance * ArchSettings.ApexHeightMultiplier) +
-                ArchSettings.ApexHeightOffset;
-        const float MinimumHeight = HighestPoint + ArchSettings.MinApexOffset;
-        return FMath::Max(BaseApexHeight, MinimumHeight);
+	const float HighestPoint = FMath::Max(LaunchLocation.Z, TargetLocation.Z);
+	const float BaseApexHeight = HighestPoint + (HorizontalDistance * ArchSettings.ApexHeightMultiplier) +
+		ArchSettings.ApexHeightOffset;
+	const float MinimumHeight = HighestPoint + ArchSettings.MinApexOffset;
+	return FMath::Max(BaseApexHeight, MinimumHeight);
 }
 
 float AProjectile::ApplyCurvatureToVerticalVelocity(const float BaseVerticalVelocity,
                                                     const float CurvatureVerticalVelocityMultiplier) const
 {
-        const float ClampedMultiplier = FMath::Clamp(
-                CurvatureVerticalVelocityMultiplier,
-                MinCurvatureVelocityMultiplier,
-                MaxCurvatureVelocityMultiplier);
-        return BaseVerticalVelocity * ClampedMultiplier;
+	const float ClampedMultiplier = FMath::Clamp(
+		CurvatureVerticalVelocityMultiplier,
+		MinCurvatureVelocityMultiplier,
+		MaxCurvatureVelocityMultiplier);
+	return BaseVerticalVelocity * ClampedMultiplier;
 }
 
 void AProjectile::ScheduleDescentSound(const float TimeToTarget,
@@ -359,46 +363,46 @@ void AProjectile::ScheduleDescentSound(const float TimeToTarget,
                                        USoundAttenuation* DescentAttenuation,
                                        USoundConcurrency* DescentConcurrency)
 {
-        if (TimeToTarget <= 0.0f || not ArchSettings.DescentSound)
-        {
-                return;
-        }
+	if (TimeToTarget <= 0.0f || not ArchSettings.DescentSound)
+	{
+		return;
+	}
 
-        const float DescentSoundDuration = ArchSettings.DescentSound->GetDuration();
-        if (DescentSoundDuration <= 0.0f)
-        {
-                return;
-        }
+	const float DescentSoundDuration = ArchSettings.DescentSound->GetDuration();
+	if (DescentSoundDuration <= 0.0f)
+	{
+		return;
+	}
 
-        const float LeadTime = FMath::Max(TimeToTarget - DescentSoundDuration, 0.0f);
-        if (LeadTime <= KINDA_SMALL_NUMBER)
-        {
-                PlayDescentSound(ArchSettings.DescentSound, DescentAttenuation, DescentConcurrency);
-                return;
-        }
+	const float LeadTime = FMath::Max(TimeToTarget - DescentSoundDuration, 0.0f);
+	if (LeadTime <= KINDA_SMALL_NUMBER)
+	{
+		PlayDescentSound(ArchSettings.DescentSound, DescentAttenuation, DescentConcurrency);
+		return;
+	}
 
-        if (UWorld* World = GetWorld())
-        {
-                FTimerDelegate DescentDelegate;
-                TWeakObjectPtr<AProjectile> WeakThis(this);
-                DescentDelegate.BindLambda([WeakThis, ArchSettings, DescentAttenuation, DescentConcurrency]()
-                {
-                        if (not WeakThis.IsValid())
-                        {
-                                return;
-                        }
-                        WeakThis->PlayDescentSound(ArchSettings.DescentSound, DescentAttenuation, DescentConcurrency);
-                });
-                World->GetTimerManager().SetTimer(M_DescentSoundTimerHandle, DescentDelegate, LeadTime, false);
-        }
+	if (UWorld* World = GetWorld())
+	{
+		FTimerDelegate DescentDelegate;
+		TWeakObjectPtr<AProjectile> WeakThis(this);
+		DescentDelegate.BindLambda([WeakThis, ArchSettings, DescentAttenuation, DescentConcurrency]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->PlayDescentSound(ArchSettings.DescentSound, DescentAttenuation, DescentConcurrency);
+		});
+		World->GetTimerManager().SetTimer(M_DescentSoundTimerHandle, DescentDelegate, LeadTime, false);
+	}
 }
 
 void AProjectile::ApplyAccelerationFactor(const float Factor, const bool bUseGravityTArch, const float LowestZValue)
 {
-        if (not GetIsValidProjectileMovement())
-        {
-                return;
-        }
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
 
 	// 1) Scale overall velocity by Factor to accelerate movement over time.
 	if (FMath::IsNearlyZero(Factor))
@@ -503,26 +507,26 @@ void AProjectile::BeginPlay()
 
 void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-        Super::EndPlay(EndPlayReason);
-        if (const UWorld* World = GetWorld())
-        {
-                World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
-                World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
-                World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
-        }
-        StopDescentSound();
+	Super::EndPlay(EndPlayReason);
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
+		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
+	}
+	StopDescentSound();
 }
 
 void AProjectile::BeginDestroy()
 {
-        Super::BeginDestroy();
-        if (const UWorld* World = GetWorld())
-        {
-                World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
-                World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
-                World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
-        }
-        StopDescentSound();
+	Super::BeginDestroy();
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
+		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
+	}
+	StopDescentSound();
 }
 
 void AProjectile::OnHitActor(
@@ -555,32 +559,49 @@ void AProjectile::DamageActorWithShrapnel(AActor* HitActor)
 	HitActor->TakeDamage(M_ShrapnelDamage, M_DamageEvent, nullptr, this);
 }
 
+bool AProjectile::GetIsValidWidgetPoolManager() const
+{
+	if (not M_AnimatedTextWidgetPoolManager.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("Projectile attempted to get widget pool manager but it is invalid!"
+			"\n projectile: " + GetName());
+		return false;
+	}
+	return true;
+}
+
+void AProjectile::PostInit_SetupWidgetPoolManager()
+{
+	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+}
+
+
 void AProjectile::OnProjectileDormant()
 {
-        if (not GetIsValidProjectileMovement() || not GetIsValidProjectileManager())
-        {
-                return;
-        }
-        SetActorHiddenInGame(true);
-        M_ProjectileMovement->Velocity = FVector::ZeroVector;
-        M_ProjectileMovement->Deactivate();
-        StopDescentSound();
-        if (const UWorld* World = GetWorld())
-        {
-                World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
-                World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
-                World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
-        }
-        M_ProjectilePoolSettings.ProjectileManager->OnTankProjectileDormant(M_ProjectilePoolSettings.ProjectileIndex);
+	if (not GetIsValidProjectileMovement() || not GetIsValidProjectileManager())
+	{
+		return;
+	}
+	SetActorHiddenInGame(true);
+	M_ProjectileMovement->Velocity = FVector::ZeroVector;
+	M_ProjectileMovement->Deactivate();
+	StopDescentSound();
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
+		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
+	}
+	M_ProjectilePoolSettings.ProjectileManager->OnTankProjectileDormant(M_ProjectilePoolSettings.ProjectileIndex);
 }
 
 void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator& LaunchRotation,
                                       const float ProjectileSpeed)
 {
-        StopDescentSound();
-        SetActorHiddenInGame(false);
-        // Move projectile to new location.
-        SetActorLocation(NewLocation);
+	StopDescentSound();
+	SetActorHiddenInGame(false);
+	// Move projectile to new location.
+	SetActorLocation(NewLocation);
 	SetActorRotation(LaunchRotation);
 	if (GetIsValidProjectileMovement())
 	{
@@ -694,6 +715,7 @@ void AProjectile::HandleProjectileBounce(const FHitResult& HitResult)
 	{
 		return;
 	}
+	OnBounce_DisplayText(HitResult.Location);
 	ProjectileHitPropagateNotification(true);
 
 	// Reflect the velocity based on the hit normal
@@ -802,9 +824,10 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 	float RawArmorValue = 0.0f;
 	float AdjustedArmorPen = GetArmorPenAtRange();
 	const FVector Velocity = M_ProjectileMovement->Velocity;
+	EArmorPlate PlateHit = EArmorPlate::Plate_Front;
 	const float EffectiveArmor = ArmorCalculation->GetEffectiveArmorOnHit(
 		HitResult.Component, HitResult.Location, Velocity,
-		HitResult.ImpactNormal, RawArmorValue, AdjustedArmorPen);
+		HitResult.ImpactNormal, RawArmorValue, AdjustedArmorPen, PlateHit);
 	// RTSFunctionLibrary::PrintString("Effective Armor: " + FString::SanitizeFloat(EffectiveArmor), FColor::Red);
 	// RTSFunctionLibrary::PrintString("Raw Armor: " + FString::SanitizeFloat(RawArmorValue), FColor::Blue);
 	// RTSFunctionLibrary::PrintString("Adjusted Pen: " + FString::SanitizeFloat(AdjustedArmorPen), FColor::Green);
@@ -816,6 +839,7 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		HandleProjectileBounce(HitResult);
 		return;
 	}
+	OnArmorPen_DisplayText(HitResult.Location, PlateHit);
 	ProjectileHitPropagateNotification(false);
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
@@ -1020,16 +1044,72 @@ void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSyst
 	}
 }
 
-void AProjectile::OnBounce_DisplayText(const FVector& Location)
+void AProjectile::OnBounce_DisplayText(const FVector& Location) const
 {
-	if(M_WeaponCalibre <= 35)
+	if (M_WeaponCalibre <= 35 || not GetIsValidWidgetPoolManager())
 	{
 		return;
 	}
-	if(M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT)
+	if (M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT)
 	{
-		verticalanima
+		FRTSVerticalAnimTextSettings TextSettings;
+		TextSettings.DeltaZ = 75.f;
+		TextSettings.VisibleDuration = 1.f;
+		TextSettings.FadeOutDuration = 1.f;
+
+		M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+			FRTSRichTextConverter::MakeRTSRich("Shell Shattered!", ERTSRichText::Text_Armor),
+			Location, false,
+			350, ETextJustify::Type::Left,
+			TextSettings
+		);
 	}
+}
+
+void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated)
+{
+	if (M_WeaponCalibre <= 35 || not GetIsValidWidgetPoolManager())
+	{
+		return;
+	}
+	FString PlateName;
+	switch (PlatePenetrated)
+	{
+	case EArmorPlate::Plate_SideLeft:
+	case EArmorPlate::Plate_SideRight:
+	case EArmorPlate::Plate_SideLowerLeft:
+	case EArmorPlate::Plate_SideLowerRight:
+		PlateName = "Side armor";
+		break;
+	case EArmorPlate::Turret_Rear:
+	case EArmorPlate::Turret_SidesAndRear:
+		PlateName = "Rear-turret armor";
+		break;
+	case EArmorPlate::Turret_SideLeft:
+	case EArmorPlate::Turret_SideRight:
+		PlateName = "Side-turret armor";
+		break;
+	case EArmorPlate::Plate_Rear:
+	case EArmorPlate::Plate_RearLowerGlacis:
+	case EArmorPlate::Plate_RearUpperGlacis:
+		PlateName = "Rear armor";
+		break;
+	default:
+		// No text for other plates.
+		return;
+	}
+
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = 75.f;
+	TextSettings.VisibleDuration = 1.f;
+	TextSettings.FadeOutDuration = 1.f;
+
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		FRTSRichTextConverter::MakeRTSRich(PlateName + " hit!", ERTSRichText::Text_Exp),
+		Location, false,
+		350, ETextJustify::Type::Left,
+		TextSettings
+	);
 }
 
 void AProjectile::PostInitializeComponents()
@@ -1049,6 +1129,7 @@ void AProjectile::PostInitializeComponents()
 	{
 		M_BasicScale = M_NiagaraComponent->GetComponentScale();
 	}
+	PostInit_SetupWidgetPoolManager();
 }
 
 float AProjectile::GetArmorPenAtRange()

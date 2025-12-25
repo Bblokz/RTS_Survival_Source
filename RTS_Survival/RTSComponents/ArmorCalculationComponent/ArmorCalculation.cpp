@@ -171,7 +171,7 @@ float UArmorCalculation::GetEffectiveArmorOnHit(TWeakObjectPtr<UPrimitiveCompone
                                                 const FVector& ProjectileDirection,
                                                 const FVector& ImpactNormal,
                                                 float& OutRawArmorValue,
-                                                float& OutAdjustedArmorPenForAngle)
+                                                float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlateHit)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UArmorCalculation::GetEffectiveArmorOnHit);
 	const FArmorSettings* SelectedArmorSettings = nullptr;
@@ -187,7 +187,7 @@ float UArmorCalculation::GetEffectiveArmorOnHit(TWeakObjectPtr<UPrimitiveCompone
 
 	return EvaluateArmorPlatesForHit(SelectedArmorSettings, MeshTransform, HitLocation,
 	                                 ProjectileDirection, ImpactNormal,
-	                                 OutRawArmorValue, OutAdjustedArmorPenForAngle);
+	                                 OutRawArmorValue, OutAdjustedArmorPenForAngle, OutPlateHit);
 }
 
 float UArmorCalculation::GetEffectiveDamageOnHit(
@@ -285,7 +285,7 @@ float UArmorCalculation::EvaluateArmorPlatesForHit(const FArmorSettings* Selecte
                                                    const FVector& ProjectileDirection,
                                                    const FVector& ImpactNormal,
                                                    float& OutRawArmorValue,
-                                                   float& OutAdjustedArmorPenForAngle) const
+                                                   float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlateHit) const
 {
 	const int32 NumPlates = DeveloperSettings::GameBalance::Weapons::MaxArmorPlatesPerMesh;
 	for (int32 i = 0; i < NumPlates; i++)
@@ -305,6 +305,7 @@ float UArmorCalculation::EvaluateArmorPlatesForHit(const FArmorSettings* Selecte
 		if (ArmorPlate.ArmorBox.IsInside(LocalHitLocation))
 		{
 			OutRawArmorValue = ArmorPlate.ArmorValue;
+			OutPlateHit = ArmorPlate.ArmorType;
 			// Armor plate found.
 			// todo instant return after debugging.
 			float EffectiveArmor = GetEffectiveArmor(HitLocation, ProjectileDirection, ImpactNormal,
@@ -323,7 +324,7 @@ float UArmorCalculation::EvaluateArmorPlatesForHit(const FArmorSettings* Selecte
 	}
 	// No armor plate found; return closest plate instead.
 	return NoArmorHitGetClosest(SelectedArmorSettings, MeshTransform, HitLocation, ProjectileDirection, ImpactNormal,
-	                            OutRawArmorValue, OutAdjustedArmorPenForAngle);
+	                            OutRawArmorValue, OutAdjustedArmorPenForAngle, OutPlateHit);
 }
 
 float UArmorCalculation::GetEffectiveArmor(const FVector& HitLocation, const FVector& ProjectileDirection,
@@ -338,7 +339,7 @@ float UArmorCalculation::NoArmorHitGetClosest(const FArmorSettings* SelectedArmo
                                               const FTransform& MeshTransform,
                                               const FVector& HitLocation, const FVector& ProjectileDirection,
                                               const FVector& ImpactNormal,
-                                              float& OutRawArmorValue, float& OutAdjustedArmorPenForAngle) const
+                                              float& OutRawArmorValue, float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlatehit) const
 {
 	if (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 	{
@@ -383,6 +384,8 @@ float UArmorCalculation::NoArmorHitGetClosest(const FArmorSettings* SelectedArmo
 		OutRawArmorValue = BestPlate->ArmorValue;
 		// Use helper to compute effective armor based on impact angle.
 		OutAdjustedArmorPenForAngle = 0.0f;
+		OutPlatehit = BestPlate->ArmorType;
+		
 		return GetEffectiveArmor(HitLocation, ProjectileDirection, ImpactNormal, BestPlate->ArmorValue,
 		                         OutAdjustedArmorPenForAngle);
 	}

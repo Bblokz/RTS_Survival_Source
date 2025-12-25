@@ -17,19 +17,19 @@ class UTrainingMenuManager;
 USTRUCT()
 struct FReinforcementRequestState
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
-        UPROPERTY()
-        bool bM_IsInProgress = false;
+	UPROPERTY()
+	bool bM_IsInProgress = false;
 
-        UPROPERTY()
-        FTimerHandle M_TimerHandle;
+	UPROPERTY()
+	FTimerHandle M_TimerHandle;
 
-        UPROPERTY()
-        FVector M_CachedLocation = FVector::ZeroVector;
+	UPROPERTY()
+	FVector M_CachedLocation = FVector::ZeroVector;
 
-        UPROPERTY()
-        TArray<TSubclassOf<ASquadUnit>> M_PendingClasses;
+	UPROPERTY()
+	TArray<TSubclassOf<ASquadUnit>> M_PendingClasses;
 };
 
 /**
@@ -38,95 +38,95 @@ struct FReinforcementRequestState
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API USquadReinforcementComponent : public UActorComponent
 {
-        GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-        USquadReinforcementComponent();
+	USquadReinforcementComponent();
 
-        /**
-         * @brief Toggle the reinforcement ability on the owning squad controller.
-         * @param bActivate True to add ability, false to remove.
-         */
-        void ActivateReinforcements(const bool bActivate);
+	/**
+	 * @brief Toggle the reinforcement ability on the owning squad controller.
+	 * @param bActivate True to add ability, false to remove.
+	 */
+	void ActivateReinforcements(const bool bActivate);
 
-        /**
-         * @brief Update reinforcement availability when squad composition changes.
-         */
-        void NotifySquadMembershipChanged();
+	/**
+	 * @brief Update reinforcement availability when squad composition changes.
+	 */
+	void NotifySquadMembershipChanged();
 
-        /**
-         * @brief Reinforce missing units at the provided reinforcement point.
-         * @param ReinforcementPoint Point that provides the spawn location.
-         */
-        void Reinforce(UReinforcementPoint* ReinforcementPoint);
+	/**
+	 * @brief Reinforce missing units at the provided reinforcement point.
+	 * @param ReinforcementPoint Point that provides the spawn location.
+	 */
+	void Reinforce(UReinforcementPoint* ReinforcementPoint);
 
 protected:
-        virtual void BeginPlay() override;
+	virtual void BeginPlay() override;
 
 private:
-        static constexpr int32 ReinforcementAbilityIndex = 11;
+	static constexpr int32 ReinforcementAbilityIndex = 11;
 
-        void BeginPlay_InitSquadDataSnapshot();
-        bool GetIsValidSquadController();
-        bool GetIsValidRTSComponent();
-        bool EnsureAbilityArraySized();
-        void AddReinforcementAbility();
-        void RemoveReinforcementAbility();
-        void RefreshReinforcementAbility();
-        void UpdateMissingSquadMemberState();
-        bool DoesSquadNeedReinforcement() const;
+	void BeginPlay_InitSquadDataSnapshot();
+	bool GetIsValidSquadController();
+	bool GetIsValidRTSComponent();
+	bool EnsureAbilityArraySized();
+	void AddReinforcementAbility();
+	void RemoveReinforcementAbility();
+	void RefreshReinforcementAbility();
+	void UpdateMissingSquadMemberState();
+	bool DoesSquadNeedReinforcement() const;
 
-        /**
-         * @brief Validate if reinforcement can proceed and gather missing units/location.
-         * @param ReinforcementPoint Source point for reinforcements.
-         * @param OutMissingUnitClasses Missing unit classes for respawn.
-         * @param OutReinforcementLocation Location to spawn reinforcements.
-         * @return True when the request can proceed and the location is valid.
-         */
-        bool CanProcessReinforcement(UReinforcementPoint* ReinforcementPoint,
-                                     TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses,
-                                     FVector& OutReinforcementLocation);
-        bool GetIsReinforcementAllowed(UReinforcementPoint* ReinforcementPoint);
+	/**
+	 * @brief Validate if reinforcement can proceed and gather missing units/location.
+	 * @param ReinforcementPoint Source point for reinforcements.
+	 * @param OutMissingUnitClasses Missing unit classes for respawn.
+	 * @param OutReinforcementLocation Location to spawn reinforcements.
+	 * @return True when the request can proceed and the location is valid.
+	 */
+	bool CanProcessReinforcement(UReinforcementPoint* ReinforcementPoint,
+	                             TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses,
+	                             FVector& OutReinforcementLocation);
+	bool GetIsReinforcementAllowed(UReinforcementPoint* ReinforcementPoint);
 
-        /**
-         * @brief Resolve reinforcement cost based on missing units ratio.
-         * @param MissingUnits Number of units that need replacement.
-         * @param OutCost Computed resource cost rounded up to multiples of five.
-         * @return True when cost data could be resolved.
-         */
-        bool TryResolveReinforcementCost(const int32 MissingUnits, TMap<ERTSResourceType, int32>& OutCost);
+	/**
+	 * @brief Resolve reinforcement cost based on missing units ratio.
+	 * @param MissingUnits Number of units that need replacement.
+	 * @param OutCost Computed resource cost rounded up to multiples of five.
+	 * @return True when cost data could be resolved.
+	 */
+	bool TryResolveReinforcementCost(const int32 MissingUnits, TMap<ERTSResourceType, int32>& OutCost);
 
-        /**
-         * @brief Attempt to pay the computed reinforcement cost.
-         * @param ReinforcementCost Resource map to charge.
-         * @return True when payment succeeds.
-         */
-        bool TryPayReinforcementCost(const TMap<ERTSResourceType, int32>& ReinforcementCost) const;
+	/**
+	 * @brief Attempt to pay the computed reinforcement cost.
+	 * @param ReinforcementCost Resource map to charge.
+	 * @return True when payment succeeds.
+	 */
+	bool TryPayReinforcementCost(const TMap<ERTSResourceType, int32>& ReinforcementCost) const;
 
-        bool TryGetResourceManager(UPlayerResourceManager*& OutManager) const;
-        bool TryGetTrainingMenuManager(UTrainingMenuManager*& OutMenuManager) const;
-        float CalculateReinforcementTime(const int32 MissingUnits) const;
-        bool GetMissingUnitClasses(TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses) const;
-        void ScheduleReinforcement(const float ReinforcementTime, const FVector& SpawnLocation,
-                                   const TArray<TSubclassOf<ASquadUnit>>& MissingUnitClasses);
-        void SpawnMissingUnits();
-        void MoveSpawnedUnitsToController(const TArray<ASquadUnit*>& SpawnedUnits) const;
+	bool TryGetResourceManager(UPlayerResourceManager*& OutManager) const;
+	bool TryGetTrainingMenuManager(UTrainingMenuManager*& OutMenuManager) const;
+	float CalculateReinforcementTime(const int32 MissingUnits) const;
+	bool GetMissingUnitClasses(TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses) const;
+	void ScheduleReinforcement(const float ReinforcementTime, const FVector& SpawnLocation,
+	                           const TArray<TSubclassOf<ASquadUnit>>& MissingUnitClasses);
+	void SpawnMissingUnits();
+	void MoveSpawnedUnitsToController(const TArray<ASquadUnit*>& SpawnedUnits) const;
 
-        bool bM_IsActivated;
+	bool bM_IsActivated;
 
-        UPROPERTY()
-        TWeakObjectPtr<ASquadController> M_SquadController;
+	UPROPERTY()
+	TWeakObjectPtr<ASquadController> M_SquadController;
 
-        UPROPERTY()
-        int32 M_MaxSquadUnits;
+	UPROPERTY()
+	int32 M_MaxSquadUnits;
 
-        UPROPERTY()
-        TArray<TSubclassOf<ASquadUnit>> M_InitialSquadUnitClasses;
+	UPROPERTY()
+	TArray<TSubclassOf<ASquadUnit>> M_InitialSquadUnitClasses;
 
-        UPROPERTY()
-        FReinforcementRequestState M_ReinforcementRequestState;
+	UPROPERTY()
+	FReinforcementRequestState M_ReinforcementRequestState;
 
-        bool bM_HasMissingSquadMembers;
+	bool bM_HasMissingSquadMembers;
 
-        bool bM_ReinforcementAbilityAdded;
+	bool bM_ReinforcementAbilityAdded;
 };

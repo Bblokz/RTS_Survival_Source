@@ -90,6 +90,7 @@ public:
 	 * @param ImpactNormal                World-space impact normal.
 	 * @param OutRawArmorValue            [out] The raw armor value for the impacted armor plate.
 	 * @param OutAdjustedArmorPenForAngle [out] The adjusted armor penetration value for the impact angle.
+	 * @param OutPlateHit
 	 * @return The effective armor value adjusted for the impact angle.
 	 */
 	float GetEffectiveArmorOnHit(
@@ -98,7 +99,7 @@ public:
 		const FVector& ProjectileDirection,
 		const FVector& ImpactNormal,
 		float& OutRawArmorValue,
-		float& OutAdjustedArmorPenForAngle);
+		float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlateHit);
 
 	float GetEffectiveDamageOnHit(
 		ERTSDamageType DamageType,
@@ -157,7 +158,7 @@ private:
 	                                const FVector& ProjectileDirection,
 	                                const FVector& ImpactNormal,
 	                                float& OutRawArmorValue,
-	                                float& OutAdjustedArmorPenForAngle) const;
+	                                float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlateHit) const;
 
 	float GetEffectiveArmor(const FVector& HitLocation,
 	                        const FVector& ProjectileDirection,
@@ -167,7 +168,7 @@ private:
 	float NoArmorHitGetClosest(const FArmorSettings* SelectedArmorSettings, const FTransform& MeshTransform,
 	                           const FVector& HitLocation, const FVector& ProjectileDirection,
 	                           const FVector& ImpactNormal, float& OutRawArmorValue,
-	                           float& OutAdjustedArmorPenForAngle) const;
+	                           float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlatehit) const;
 
 
 	/**

@@ -63,7 +63,6 @@ void ABuildingExpansion::OnBuildingExpansionCreatedByOwner(const TScriptInterfac
 		return;
 	}
 	M_Owner = NewOwner;
-	SelectionComponent->SetCanBeSelected(false);
 	// Updates the Main game UI too.
 	SetStatusAndPropagateToOwner(NewStatus);
 }
@@ -413,7 +412,7 @@ bool ABuildingExpansion::GetHasValidCargoComponent() const
 
 void ABuildingExpansion::DisableCargoComponent() const
 {
-	if(GetHasValidCargoComponent())
+	if (GetHasValidCargoComponent())
 	{
 		CargoComponent->SetIsEnabled(false);
 	}
