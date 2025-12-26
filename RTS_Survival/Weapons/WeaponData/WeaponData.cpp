@@ -2132,7 +2132,7 @@ void UWeaponStateArchProjectile::FireWeaponSystem()
 	if (WeaponOwner)
 	{
 		// Fire the projectile towards the target direction
-		FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
+		FireProjectile(WeaponOwner->GetTargetLocation(WeaponIndex));
 	}
 }
 

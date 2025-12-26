@@ -70,7 +70,7 @@ public:
 	void TickAimSelection();
 
 	/** @return Cached world-space target location for aiming. */
-	const FVector& GetActiveTargetLocation() const { return M_ActiveTargetLocation; }
+	FVector& GetActiveTargetLocation()  { return M_ActiveTargetLocation; }
 
 	/** @return Raw actor pointer if Mode==Actor and still valid; otherwise nullptr. */
 	AActor* GetTargetActor() const { return M_TargetActor.Get(); }

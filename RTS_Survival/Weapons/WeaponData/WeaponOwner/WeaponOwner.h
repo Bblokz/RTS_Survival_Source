@@ -56,6 +56,8 @@ protected:
 	 */
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) = 0;
 
+	virtual FVector& GetTargetLocation(const int32 WeaponIndex) = 0;
+
 	// Can be set to return false if you want to manually order when weapons will be reloaded.
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const = 0;
 

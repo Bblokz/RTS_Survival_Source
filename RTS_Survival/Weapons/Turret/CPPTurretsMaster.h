@@ -173,7 +173,7 @@ protected:
 	void BP_PostInit();
 
 	// For embedded turret for struct interface.
-	const FVector& GetActiveTargetLocation() const { return M_TargetingData.GetActiveTargetLocation(); }
+	FVector& GetActiveTargetLocation() { return M_TargetingData.GetActiveTargetLocation(); }
 	// For embedded turret for struct interface.
 	bool HasValidTarget() const { return M_TargetingData.GetIsTargetValid(); }
 
@@ -227,6 +227,7 @@ protected:
 	 * TargetPitch variable and therefore this implementation is final.
 	 */
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) override final;
+	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override final;
 
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 

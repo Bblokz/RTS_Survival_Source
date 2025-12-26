@@ -346,6 +346,11 @@ FVector& ACPPTurretsMaster::GetFireDirection(const int32 /*WeaponIndex*/)
 	return SteeringState.M_TargetDirection;
 }
 
+FVector& ACPPTurretsMaster::GetTargetLocation(const int32 WeaponIndex)
+{
+	return M_TargetingData.GetActiveTargetLocation();
+}
+
 bool ACPPTurretsMaster::AllowWeaponToReload(const int32 /*WeaponIndex*/) const
 {
 	return true;
