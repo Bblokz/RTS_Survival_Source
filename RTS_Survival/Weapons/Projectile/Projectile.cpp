@@ -16,6 +16,7 @@
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "Sound/SoundCue.h"
 #include "Trace/Trace.h"
+#include "DrawDebugHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
@@ -28,6 +29,15 @@ namespace
 {
 	constexpr float MinCurvatureVelocityMultiplier = 0.25f;
 	constexpr float MaxCurvatureVelocityMultiplier = 4.0f;
+
+	struct FArcedLaunchSolution
+	{
+		FVector LaunchLocation = FVector::ZeroVector;
+		FVector TargetLocation = FVector::ZeroVector;
+		FVector ApexLocation = FVector::ZeroVector;
+		FVector LaunchVelocity = FVector::ZeroVector;
+		float TimeToTarget = 0.0f;
+	};
 
 	// Builds a rotation whose +Z points outward along the impact normal.
 	inline FRotator MakeImpactOutwardRotationZ(const FHitResult& Hit)
@@ -77,6 +87,37 @@ namespace
 		RTSFunctionLibrary::ReportError(
 			"The impact vfx for projectile: " + (Self ? Self->GetName() : TEXT("<null>")) +
 			" does not contain a surface: " + SurfaceString + " in the impact vfx map.");
+	}
+
+	inline FVector CalculateApexLocation(const FVector& LaunchLocation,
+	                                     const FVector& HorizontalDirection,
+	                                     const float HorizontalSpeed,
+	                                     const float InitialVerticalVelocity,
+	                                     const float Gravity)
+	{
+		const float TimeToApex = InitialVerticalVelocity / Gravity;
+		const FVector HorizontalDisplacement = HorizontalDirection * HorizontalSpeed * TimeToApex;
+		const float VerticalDisplacement = (InitialVerticalVelocity * TimeToApex) - (0.5f * Gravity * TimeToApex *
+			TimeToApex);
+		return LaunchLocation + HorizontalDisplacement + FVector(0.0f, 0.0f, VerticalDisplacement);
+	}
+
+	inline void DebugDrawArcedLaunch(const AProjectile* Projectile, const FArcedLaunchSolution& Solution)
+	{
+		if constexpr (DeveloperSettings::Debugging::GArchProjectile_Compile_DebugSymbols)
+		{
+			if (const UWorld* World = Projectile ? Projectile->GetWorld() : nullptr)
+			{
+				DrawDebugString(World, Solution.TargetLocation, TEXT("Arc Target"), nullptr, FColor::Green, 2.0f, false,
+				                1.5f);
+				DrawDebugString(World, Solution.ApexLocation, TEXT("Arc Apex"), nullptr, FColor::Yellow, 2.0f, false,
+				                1.5f);
+				DrawDebugLine(World, Solution.LaunchLocation, Solution.ApexLocation, FColor::Yellow, false, 2.0f, 0,
+				              1.5f);
+				DrawDebugLine(World, Solution.ApexLocation, Solution.TargetLocation, FColor::Green, false, 2.0f, 0,
+				              1.5f);
+			}
+		}
 	}
 } // namespace
 
@@ -175,6 +216,7 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 	}
 	if (UWorld* World = GetWorld())
 	{
+		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
@@ -235,6 +277,67 @@ void AProjectile::PlayDescentSound(USoundBase* DescentSound,
 	            DescentConcurrency);
 }
 
+bool AProjectile::CalculateArcedLaunchParameters(const FVector& LaunchLocation,
+                                                 const FVector& TargetLocation,
+                                                 const FArchProjectileSettings& ArchSettings,
+                                                 FVector& OutLaunchVelocity,
+                                                 FVector& OutApexLocation,
+                                                 float& OutTimeToTarget,
+                                                 FVector& OutHorizontalDirection,
+                                                 float& OutGravity)
+{
+	const FVector LaunchToTarget = TargetLocation - LaunchLocation;
+	const FVector FlatDelta(LaunchToTarget.X, LaunchToTarget.Y, 0.0f);
+	const float HorizontalDistance = FlatDelta.Size();
+	const float GravityZ = GetWorld() ? GetWorld()->GetGravityZ() : 0.0f;
+	if (HorizontalDistance <= KINDA_SMALL_NUMBER || FMath::IsNearlyZero(GravityZ))
+	{
+		return false;
+	}
+	const float Gravity = FMath::Abs(GravityZ);
+	const float DesiredApexHeight = CalculateDesiredApexHeight(
+		LaunchLocation,
+		TargetLocation,
+		HorizontalDistance,
+		ArchSettings);
+	if (DesiredApexHeight <= LaunchLocation.Z)
+	{
+		return false;
+	}
+	const float BaseVerticalVelocity = FMath::Sqrt(2.0f * Gravity * (DesiredApexHeight - LaunchLocation.Z));
+	const float InitialVerticalVelocity = ApplyCurvatureToVerticalVelocity(
+		BaseVerticalVelocity,
+		ArchSettings.CurvatureVerticalVelocityMultiplier);
+	const float DeltaZ = TargetLocation.Z - LaunchLocation.Z;
+	const float Discriminant = (InitialVerticalVelocity * InitialVerticalVelocity) - (2.0f * Gravity * DeltaZ);
+	if (Discriminant < 0.0f)
+	{
+		return false;
+	}
+	const float TimeToTarget = (InitialVerticalVelocity + FMath::Sqrt(Discriminant)) / Gravity;
+	if (TimeToTarget <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+	OutHorizontalDirection = FlatDelta.GetSafeNormal();
+	const float HorizontalSpeed = HorizontalDistance / TimeToTarget;
+	if (HorizontalSpeed <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+	OutLaunchVelocity = (OutHorizontalDirection * HorizontalSpeed) + FVector(
+		0.0f, 0.0f, InitialVerticalVelocity);
+	OutGravity = Gravity;
+	OutTimeToTarget = TimeToTarget;
+	OutApexLocation = CalculateApexLocation(
+		LaunchLocation,
+		OutHorizontalDirection,
+		HorizontalSpeed,
+		InitialVerticalVelocity,
+		Gravity);
+	return true;
+}
+
 void AProjectile::SetupArcedLaunch(
 	const FVector& LaunchLocation,
 	const FVector& TargetLocation,
@@ -252,59 +355,24 @@ void AProjectile::SetupArcedLaunch(
 	StopDescentSound();
 
 	const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
-	const FVector LaunchToTarget = TargetLocation - LaunchLocation;
-	const FVector FlatDelta(LaunchToTarget.X, LaunchToTarget.Y, 0.0f);
-	const float HorizontalDistance = FlatDelta.Size();
-	const float GravityZ = GetWorld() ? GetWorld()->GetGravityZ() : 0.0f;
-
-	if (HorizontalDistance <= KINDA_SMALL_NUMBER || FMath::IsNearlyZero(GravityZ))
-	{
-		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-		return;
-	}
-
-	const float Gravity = FMath::Abs(GravityZ);
-	const float DesiredApexHeight = CalculateDesiredApexHeight(
+	FVector LaunchVelocity = FVector::ZeroVector;
+	FVector ApexLocation = FVector::ZeroVector;
+	FVector HorizontalDirection = FVector::ZeroVector;
+	float TimeToTarget = 0.0f;
+	float Gravity = 0.0f;
+	if (not CalculateArcedLaunchParameters(
 		LaunchLocation,
 		TargetLocation,
-		HorizontalDistance,
-		ArchSettings);
-	if (DesiredApexHeight <= LaunchLocation.Z)
+		ArchSettings,
+		LaunchVelocity,
+		ApexLocation,
+		TimeToTarget,
+		HorizontalDirection,
+		Gravity))
 	{
-		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		LaunchStraightFallback(LaunchLocation, TargetLocation, SafeProjectileSpeed, Range, ArchSettings);
 		return;
 	}
-
-	const float BaseVerticalVelocity = FMath::Sqrt(2.0f * Gravity * (DesiredApexHeight - LaunchLocation.Z));
-	const float InitialVerticalVelocity = ApplyCurvatureToVerticalVelocity(
-		BaseVerticalVelocity,
-		ArchSettings.CurvatureVerticalVelocityMultiplier);
-	const float DeltaZ = TargetLocation.Z - LaunchLocation.Z;
-	const float HalfGravity = 0.5f * Gravity;
-	const float Discriminant = (InitialVerticalVelocity * InitialVerticalVelocity) - (4.0f * HalfGravity * DeltaZ);
-	if (Discriminant < 0.0f)
-	{
-		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-		return;
-	}
-
-	const float TimeToTarget = (InitialVerticalVelocity + FMath::Sqrt(Discriminant)) / Gravity;
-	if (TimeToTarget <= KINDA_SMALL_NUMBER)
-	{
-		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-		return;
-	}
-
-	const FVector HorizontalDirection = FlatDelta.GetSafeNormal();
-	const float HorizontalSpeed = HorizontalDistance / TimeToTarget;
-	if (HorizontalSpeed <= KINDA_SMALL_NUMBER)
-	{
-		LaunchStraightFallback(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
-		return;
-	}
-
-	const FVector LaunchVelocity = (HorizontalDirection * HorizontalSpeed) + FVector(
-		0.0f, 0.0f, InitialVerticalVelocity);
 
 	SetActorLocation(LaunchLocation);
 	SetActorRotation(LaunchVelocity.Rotation());
@@ -315,15 +383,206 @@ void AProjectile::SetupArcedLaunch(
 	StartFlightTimers(TimeToTarget);
 
 	ScheduleDescentSound(TimeToTarget, ArchSettings, DescentAttenuation, DescentConcurrency);
+
+	if constexpr (DeveloperSettings::Debugging::GArchProjectile_Compile_DebugSymbols)
+	{
+		DebugDrawArcedLaunch(
+			this,
+			FArcedLaunchSolution{
+				LaunchLocation,
+				TargetLocation,
+				ApexLocation,
+				LaunchVelocity,
+				TimeToTarget
+			});
+	}
 }
 
 void AProjectile::LaunchStraightFallback(const FVector& LaunchLocation,
-                                         const FVector& LaunchToTarget,
+                                         const FVector& TargetLocation,
                                          const float SafeProjectileSpeed,
-                                         const float Range)
+                                         const float Range,
+                                         const FArchProjectileSettings& ArchSettings)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	StopDescentSound();
+
+	const FVector LaunchToTarget = TargetLocation - LaunchLocation;
+	const FVector FlatDelta(LaunchToTarget.X, LaunchToTarget.Y, 0.0f);
+	const float GravityZ = GetWorld() ? GetWorld()->GetGravityZ() : 0.0f;
+	const float Gravity = FMath::Abs(GravityZ);
+
+	if (FlatDelta.IsNearlyZero() || FMath::IsNearlyZero(Gravity))
+	{
+		LaunchStraightFallbackDirect(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return;
+	}
+
+	LaunchStraightFallbackStartAscent(
+		LaunchLocation,
+		TargetLocation,
+		LaunchToTarget,
+		FlatDelta,
+		SafeProjectileSpeed,
+		Range,
+		Gravity,
+		ArchSettings);
+}
+
+void AProjectile::LaunchStraightFallbackStartAscent(const FVector& LaunchLocation,
+                                                    const FVector& TargetLocation,
+                                                    const FVector& LaunchToTarget,
+                                                    const FVector& FlatDelta,
+                                                    const float SafeProjectileSpeed,
+                                                    const float Range,
+                                                    const float Gravity,
+                                                    const FArchProjectileSettings& ArchSettings)
+{
+	FVector LaunchVelocity = FVector::ZeroVector;
+	FVector ApexLocation = FVector::ZeroVector;
+	float TimeToApex = 0.0f;
+	float TotalFlightTime = 0.0f;
+	if (not CalculateFallbackArcParameters(
+		LaunchLocation,
+		TargetLocation,
+		LaunchToTarget,
+		FlatDelta,
+		SafeProjectileSpeed,
+		Range,
+		Gravity,
+		ArchSettings,
+		LaunchVelocity,
+		ApexLocation,
+		TimeToApex,
+		TotalFlightTime))
+	{
+		return;
+	}
+
+	SetActorLocation(LaunchLocation);
+	SetActorRotation(LaunchVelocity.Rotation());
+	M_ProjectileMovement->Activate();
+	M_ProjectileMovement->ProjectileGravityScale = 1.0f;
+	M_ProjectileMovement->Velocity = LaunchVelocity;
+
+	StartFlightTimers(TotalFlightTime);
+
+	if constexpr (DeveloperSettings::Debugging::GArchProjectile_Compile_DebugSymbols)
+	{
+		DebugDrawArcedLaunch(
+			this,
+			FArcedLaunchSolution{
+				LaunchLocation,
+				TargetLocation,
+				ApexLocation,
+				LaunchVelocity,
+				TotalFlightTime
+			});
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
+		TWeakObjectPtr<AProjectile> WeakThis(this);
+		World->GetTimerManager().SetTimer(
+			M_ArcFallbackTimerHandle,
+			[WeakThis, TargetLocation, SafeProjectileSpeed]()
+			{
+				if (not WeakThis.IsValid())
+				{
+					return;
+				}
+				WeakThis->TransitionArcFallbackToStraight(TargetLocation, SafeProjectileSpeed);
+			},
+			TimeToApex,
+			false);
+	}
+}
+
+bool AProjectile::CalculateFallbackArcParameters(const FVector& LaunchLocation,
+                                                 const FVector& TargetLocation,
+                                                 const FVector& LaunchToTarget,
+                                                 const FVector& FlatDelta,
+                                                 const float SafeProjectileSpeed,
+                                                 const float Range,
+                                                 const float Gravity,
+                                                 const FArchProjectileSettings& ArchSettings,
+                                                 FVector& OutLaunchVelocity,
+                                                 FVector& OutApexLocation,
+                                                 float& OutTimeToApex,
+                                                 float& OutTotalFlightTime)
+{
+	const float HorizontalDistance = FlatDelta.Size();
+	const float DesiredApexHeight = CalculateDesiredApexHeight(
+		LaunchLocation,
+		TargetLocation,
+		HorizontalDistance,
+		ArchSettings);
+	if (DesiredApexHeight <= LaunchLocation.Z)
+	{
+		LaunchStraightFallbackDirect(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return false;
+	}
+
+	const float VerticalVelocity = FMath::Sqrt(2.0f * Gravity * (DesiredApexHeight - LaunchLocation.Z));
+	if (VerticalVelocity <= KINDA_SMALL_NUMBER)
+	{
+		LaunchStraightFallbackDirect(LaunchLocation, LaunchToTarget, SafeProjectileSpeed, Range);
+		return false;
+	}
+
+	OutTimeToApex = VerticalVelocity / Gravity;
+	const FVector HorizontalDirection = FlatDelta.GetSafeNormal();
+	const float DesiredHorizontalSpeed = (HorizontalDistance * 0.5f) / FMath::Max(OutTimeToApex, KINDA_SMALL_NUMBER);
+	const float HorizontalSpeed = FMath::Clamp(DesiredHorizontalSpeed, KINDA_SMALL_NUMBER, SafeProjectileSpeed);
+	OutLaunchVelocity = (HorizontalDirection * HorizontalSpeed) + FVector(0.0f, 0.0f, VerticalVelocity);
+	OutApexLocation = CalculateApexLocation(
+		LaunchLocation,
+		HorizontalDirection,
+		HorizontalSpeed,
+		VerticalVelocity,
+		Gravity);
+	const float StraightDistance = FVector::Dist(OutApexLocation, TargetLocation);
+	const float StraightTime = StraightDistance / SafeProjectileSpeed;
+	OutTotalFlightTime = OutTimeToApex + StraightTime;
+	return true;
+}
+
+void AProjectile::LaunchStraightFallbackDirect(const FVector& LaunchLocation,
+                                               const FVector& LaunchToTarget,
+                                               const float SafeProjectileSpeed,
+                                               const float Range)
 {
 	OnRestartProjectile(LaunchLocation, LaunchToTarget.Rotation(), SafeProjectileSpeed);
 	StartFlightTimers(Range / SafeProjectileSpeed);
+}
+
+void AProjectile::TransitionArcFallbackToStraight(const FVector TargetLocation, const float SafeProjectileSpeed)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
+	}
+
+	const FVector CurrentLocation = GetActorLocation();
+	const FVector Direction = (TargetLocation - CurrentLocation).GetSafeNormal();
+	if (Direction.IsNearlyZero())
+	{
+		return;
+	}
+
+	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
+	M_ProjectileMovement->Velocity = Direction * SafeProjectileSpeed;
+	SetActorRotation(Direction.Rotation());
 }
 
 void AProjectile::StopDescentSound()
@@ -513,6 +772,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
+		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 	}
 	StopDescentSound();
 }
@@ -525,6 +785,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
+		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 	}
 	StopDescentSound();
 }
@@ -591,6 +852,7 @@ void AProjectile::OnProjectileDormant()
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
+		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 	}
 	M_ProjectilePoolSettings.ProjectileManager->OnTankProjectileDormant(M_ProjectilePoolSettings.ProjectileIndex);
 }
