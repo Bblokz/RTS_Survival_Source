@@ -30,6 +30,7 @@ class ASquadUnit;
 class UGrenadeComponent;
 class ACPPController;
 class AWeaponPickup;
+class UReinforcementPoint;
 class UHealthComponent;
 class URTSComponent;
 class AScavengeableObject;
@@ -411,6 +412,9 @@ protected:
 
 	/** @brief Stops all logic used for move commands.*/
 	virtual void TerminateMoveCommand() override;
+
+	virtual void ExecuteReinforceCommand(AActor* ReinforcementTarget) override;
+	virtual void TerminateReinforceCommand() override;
 
 	virtual void ExecuteCaptureCommand(AActor* CaptureTarget) override;
 	virtual void TerminateCaptureCommand() override;

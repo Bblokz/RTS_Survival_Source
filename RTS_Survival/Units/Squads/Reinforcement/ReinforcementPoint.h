@@ -27,10 +27,20 @@ public:
 	 * @param InSocketName Socket name on the mesh to use for reinforcements.
 	 * @param OwningPlayer Index of the player that owns the reinforcement point.
 	 * @param ActivationRadius Radius used for reinforcement activation.
+	 * @param bStartEnabled Toggle to start with trigger overlaps enabled.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitReinforcementPoint(UMeshComponent* InMeshComponent, const FName& InSocketName,
-	                            int32 OwningPlayer, float ActivationRadius);
+	                            int32 OwningPlayer, float ActivationRadius, bool bStartEnabled = true);
+
+	/**
+	 * @brief Toggle the reinforcement trigger overlaps without destroying the sphere.
+	 * @param bEnable True to enable overlaps, false to disable.
+	 */
+	void SetReinforcementEnabled(bool bEnable);
+
+	/** @return True when the reinforcement trigger is currently enabled. */
+	bool GetIsReinforcementEnabled() const;
 
 	/**
 	 * @brief Resolve the world-space location of the configured reinforcement socket.
@@ -40,8 +50,12 @@ public:
 	FVector GetReinforcementLocation(bool& bOutHasValidLocation) const;
 
 private:
+	bool GetIsDebugEnabled() const;
 	bool GetIsValidReinforcementMesh() const;
-	void CreateReinforcementTriggerSphere(const float ActivationRadius);
+	bool GetIsValidReinforcementTriggerSphere(bool bReportIfMissing = true) const;
+	bool CreateReinforcementTriggerSphere(const float ActivationRadius);
+	void SetTriggerOverlapEnabled(bool bEnable) const;
+	void DrawDebugStatusString(const FString& DebugText, const FVector& DrawLocation) const;
 	void HandleSquadUnitEnteredRadius(class ASquadUnit* OverlappingUnit) const;
 	void HandleSquadUnitExitedRadius(class ASquadUnit* OverlappingUnit) const;
 
@@ -68,4 +82,7 @@ private:
 
 	UPROPERTY()
 	float M_ReinforcementActivationRadius;
+
+	UPROPERTY()
+	bool bM_ReinforcementEnabled = false;
 };

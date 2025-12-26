@@ -4,6 +4,8 @@
 
 #include "Components/MeshComponent.h"
 #include "Components/SphereComponent.h"
+#include "DrawDebugHelpers.h"
+#include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -17,13 +19,37 @@ UReinforcementPoint::UReinforcementPoint(): M_OwningPlayer(-1), M_ReinforcementA
 }
 
 void UReinforcementPoint::InitReinforcementPoint(UMeshComponent* InMeshComponent, const FName& InSocketName,
-                                                 const int32 OwningPlayer, const float ActivationRadius)
+                                                 const int32 OwningPlayer, const float ActivationRadius,
+                                                 const bool bStartEnabled)
 {
 	M_ReinforcementMeshComponent = InMeshComponent;
 	M_ReinforcementSocketName = InSocketName;
 	M_OwningPlayer = OwningPlayer;
 	M_ReinforcementActivationRadius = ActivationRadius;
-	CreateReinforcementTriggerSphere(ActivationRadius);
+	SetReinforcementEnabled(bStartEnabled);
+}
+
+void UReinforcementPoint::SetReinforcementEnabled(const bool bEnable)
+{
+	bM_ReinforcementEnabled = bEnable;
+
+	if (bM_ReinforcementEnabled)
+	{
+		if (not CreateReinforcementTriggerSphere(M_ReinforcementActivationRadius))
+		{
+			bM_ReinforcementEnabled = false;
+			return;
+		}
+		SetTriggerOverlapEnabled(true);
+		return;
+	}
+
+	SetTriggerOverlapEnabled(false);
+}
+
+bool UReinforcementPoint::GetIsReinforcementEnabled() const
+{
+	return bM_ReinforcementEnabled;
 }
 
 FVector UReinforcementPoint::GetReinforcementLocation(bool& bOutHasValidLocation) const
@@ -56,18 +82,34 @@ bool UReinforcementPoint::GetIsValidReinforcementMesh() const
 	return false;
 }
 
-void UReinforcementPoint::CreateReinforcementTriggerSphere(const float ActivationRadius)
+bool UReinforcementPoint::GetIsValidReinforcementTriggerSphere(const bool bReportIfMissing) const
 {
 	if (IsValid(M_ReinforcementTriggerSphere))
 	{
-		return;
+		return true;
+	}
+
+	if (bReportIfMissing && bM_ReinforcementEnabled)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ReinforcementTriggerSphere",
+		                                                      "GetIsValidReinforcementTriggerSphere", this);
+	}
+
+	return false;
+}
+
+bool UReinforcementPoint::CreateReinforcementTriggerSphere(const float ActivationRadius)
+{
+	if (GetIsValidReinforcementTriggerSphere(false))
+	{
+		return true;
 	}
 	AActor* OwnerActor = GetOwner();
 	if (not IsValid(OwnerActor))
 	{
 		RTSFunctionLibrary::ReportError("Reinforcement point has no valid owner for trigger creation."
 			"\nUReinforcementPoint::CreateReinforcementTriggerSphere");
-		return;
+		return false;
 	}
 
 	M_ReinforcementTriggerSphere = NewObject<USphereComponent>(OwnerActor, TEXT("ReinforcementTriggerSphere"));
@@ -75,7 +117,7 @@ void UReinforcementPoint::CreateReinforcementTriggerSphere(const float Activatio
 	{
 		RTSFunctionLibrary::ReportError("Failed to create reinforcement trigger sphere component."
 			"\nUReinforcementPoint::CreateReinforcementTriggerSphere");
-		return;
+		return false;
 	}
 
 	const float ClampedRadius = FMath::Max(ActivationRadius, 0.0f);
@@ -100,10 +142,16 @@ void UReinforcementPoint::CreateReinforcementTriggerSphere(const float Activatio
 	                                                                 &UReinforcementPoint::OnReinforcementOverlapBegin);
 	M_ReinforcementTriggerSphere->OnComponentEndOverlap.AddDynamic(this,
 	                                                               &UReinforcementPoint::OnReinforcementOverlapEnd);
+
+	return true;
 }
 
 void UReinforcementPoint::HandleSquadUnitEnteredRadius(ASquadUnit* OverlappingUnit) const
 {
+	if (not bM_ReinforcementEnabled)
+	{
+		return;
+	}
 	if (not IsValid(OverlappingUnit))
 	{
 		return;
@@ -124,11 +172,23 @@ void UReinforcementPoint::HandleSquadUnitEnteredRadius(ASquadUnit* OverlappingUn
 	{
 		return;
 	}
+
+	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	{
+		const FVector DrawLocation = OverlappingUnit->GetActorLocation() + FVector::UpVector * 150.0f;
+		const FString DebugString = FString("Reinforcement overlap begin - Unit: ") + OverlappingUnit->GetName();
+		DrawDebugStatusString(DebugString, DrawLocation);
+	}
+
 	ReinforcementComponent->ActivateReinforcements(true);
 }
 
 void UReinforcementPoint::HandleSquadUnitExitedRadius(ASquadUnit* OverlappingUnit) const
 {
+	if (not bM_ReinforcementEnabled)
+	{
+		return;
+	}
 	if (not IsValid(OverlappingUnit))
 	{
 		return;
@@ -165,4 +225,40 @@ void UReinforcementPoint::OnReinforcementOverlapEnd(UPrimitiveComponent* Overlap
 {
 	ASquadUnit* OverlappingUnit = Cast<ASquadUnit>(OtherActor);
 	HandleSquadUnitExitedRadius(OverlappingUnit);
+}
+
+bool UReinforcementPoint::GetIsDebugEnabled() const
+{
+	return DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols;
+}
+
+void UReinforcementPoint::SetTriggerOverlapEnabled(const bool bEnable) const
+{
+	if (not GetIsValidReinforcementTriggerSphere())
+	{
+		return;
+	}
+
+	M_ReinforcementTriggerSphere->SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	M_ReinforcementTriggerSphere->SetGenerateOverlapEvents(bEnable);
+
+	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	{
+		const FVector DebugLocation = M_ReinforcementTriggerSphere->GetComponentLocation() + FVector::UpVector * 150.0f;
+		const FString DebugText = bEnable ? TEXT("Reinforcement Trigger Enabled") : TEXT("Reinforcement Trigger Disabled");
+		DrawDebugStatusString(DebugText, DebugLocation);
+	}
+}
+
+void UReinforcementPoint::DrawDebugStatusString(const FString& DebugText, const FVector& DrawLocation) const
+{
+	if (not GetIsDebugEnabled())
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		DrawDebugString(World, DrawLocation, DebugText, nullptr, FColor::Green, 2.5f, true);
+	}
 }

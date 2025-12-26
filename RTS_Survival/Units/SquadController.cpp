@@ -29,6 +29,7 @@
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundBase.h"
 #include "Sound/SoundConcurrency.h"
+#include "Squads/Reinforcement/ReinforcementPoint.h"
 #include "Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "Squads/SquadControllerHpComp/USquadHealthComponent.h"
 #include "Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIcons.h"
@@ -1038,6 +1039,35 @@ void ASquadController::TerminateMoveCommand()
 			SquadUnit->TerminateMovementCommand();
 		}
 	}
+}
+
+void ASquadController::ExecuteReinforceCommand(AActor* ReinforcementTarget)
+{
+	if (not GetIsValidSquadReinforcementComponent())
+	{
+		DoneExecutingCommand(EAbilityID::IdReinforceSquad);
+		return;
+	}
+
+	UReinforcementPoint* ReinforcementPoint = nullptr;
+	if (IsValid(ReinforcementTarget))
+	{
+		ReinforcementPoint = ReinforcementTarget->FindComponentByClass<UReinforcementPoint>();
+	}
+
+	if (not IsValid(ReinforcementPoint))
+	{
+		DoneExecutingCommand(EAbilityID::IdReinforceSquad);
+		return;
+	}
+
+	SquadReinforcement->Reinforce(ReinforcementPoint);
+	DoneExecutingCommand(EAbilityID::IdReinforceSquad);
+}
+
+void ASquadController::TerminateReinforceCommand()
+{
+	DoneExecutingCommand(EAbilityID::IdReinforceSquad);
 }
 
 void ASquadController::ExecuteCaptureCommand(AActor* CaptureTarget)

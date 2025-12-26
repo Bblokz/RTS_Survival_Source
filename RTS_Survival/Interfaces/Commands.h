@@ -415,7 +415,7 @@ public:
 		const bool bForceFinalRotationRegardlessOfReverse = false);
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-	virtual ECommandQueueError Reinforce(const bool bSetUnitToIdle);
+	virtual ECommandQueueError Reinforce(AActor* ReinforcementTargetActor, const bool bSetUnitToIdle);
 
 	void SetForceFinalRotationRegardlessOfReverse(bool ForceUseFinalRotation);
 
@@ -632,7 +632,7 @@ protected:
 	/** @brief Stops all logic used for move commands..*/
 	virtual void TerminateMoveCommand();
 
-	virtual void ExecuteReinforceCommand();
+	virtual void ExecuteReinforceCommand(AActor* ReinforcementTarget);
 	virtual void TerminateReinforceCommand();
 
 	virtual void ExecuteStopCommand();
