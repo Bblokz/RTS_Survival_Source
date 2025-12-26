@@ -26,6 +26,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
+#include "RTS_Survival/Units/Squads/Reinforcement/ReinforcementPoint.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -362,6 +363,10 @@ void ANomadicVehicle::PostInitializeComponents()
 	{
 		M_TrainerComponent = TrainerComp;
 	}
+	if(UReinforcementPoint* ReinforcementPointComp = FindComponentByClass<UReinforcementPoint>())
+	{
+		M_ReinforcementPoint = ReinforcementPointComp;
+	}
 }
 
 void ANomadicVehicle::SetupMountCollision(UMeshComponent* MountMesh)
@@ -578,49 +583,62 @@ void ANomadicVehicle::OnFinishedConvertingToBuilding()
 	AnnounceConversion();
 	FResourceConversionHelper::OnNomadicExpanded(this, true);
 	OnConvertToBuilding_PlacePackedBxps();
-	// This evaluating to false is not an error as not all nomadic vehicles have a build radius component.
-	SetRadiusComponentActive(true);
-	SetEnergyComponentActive(true);
-	// Allow Resources to be dropped off now.
-	SetResourceDropOffActive(true);
+	OnFinishedConvertToBuilding_HandleInstanceSpecificComponents();
+
+	CreateBuildingAttachments();
+	// Set max health to building health.
+	AdjustMaxHealthForConversion(false);
+	// Restore any resource visualisation of resources stored in the DropOff Component.
+	RestoreResourceStorageVisualisation();
+	// Initialize airbase if present.
+	OnFinishedConvertToBuilding_UnpackAirbase();
 	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController))
 	{
 		M_NomadStatus = ENomadStatus::Building;
 		// Stop before the training component uses the same progress bar.
 		M_ConversionProgressBar->StopProgressBar();
-		// Open command queue by calling cancel.
-		SetCommandQueueEnabled(true);
-		CreateBuildingAttachments();
 		PlayerController->TruckConverted(this, true);
-		// If we have a trainer comp, set the training to be enabled.
-		// This component will now use the progress bar.
-		SetTrainingEnabled(true);
-		SetCargoEnabled(true);
-		// Set max health to building health.
-		AdjustMaxHealthForConversion(false);
-		// Restore any resource visualisation of resources stored in the DropOff Component.
-		RestoreResourceStorageVisualisation();
-		// Initialize airbase if present.
-		if (GetIsValidAircraftOwnerComp() && IsValid(BuildingMeshComponent) && GetIsValidRTSComponent())
-		{
-			bool bValidData = false;
-			const FNomadicData NomadicData = FRTS_Statics::BP_GetNomadicDataOfPlayer(
-				RTSComponent->GetOwningPlayer(), RTSComponent->GetSubtypeAsNomadicSubtype(), this, bValidData);
-			if (not bValidData)
-			{
-				RTSFunctionLibrary::ReportWarning(
-					"FAILED to get valid nomadic data in ANomadicVehicle::OnFinishedConvertingToBuilding");
-			}
-			M_AircraftOwnerComp->UnpackAirbase(BuildingMeshComponent, NomadicData.RepairPowerMlt);
-		}
-		// Propagate to blueprints.
-		BP_OnFinishedConvertingToBuilding();
 	}
 	else
 	{
 		RTSFunctionLibrary::ReportError("M_ConversionProgressBar or PlayerController is null!"
 			"\n In function: ANomadicVehicle::OnBuildingFinished"
 			"For nomadic vehicle: " + GetName());
+	}
+	// IMPORTANT: set after status change to building!!
+	// Open command queue by calling cancel.
+	SetCommandQueueEnabled(true);
+	// Propagate to blueprints.
+	BP_OnFinishedConvertingToBuilding();
+}
+
+void ANomadicVehicle::OnFinishedConvertToBuilding_HandleInstanceSpecificComponents()
+{
+	// This evaluating to false is not an error as not all nomadic vehicles have a build radius component.
+	SetRadiusComponentActive(true);
+	SetReinforcementPointActive(true);
+	SetEnergyComponentActive(true);
+	// Allow Resources to be dropped off now.
+	SetResourceDropOffActive(true);
+	// If we have a trainer comp, set the training to be enabled.
+	// This component will now use the progress bar.
+	SetTrainingEnabled(true);
+	SetCargoEnabled(true);
+}
+
+void ANomadicVehicle::OnFinishedConvertToBuilding_UnpackAirbase()
+{
+	if (GetIsValidAircraftOwnerComp() && IsValid(BuildingMeshComponent) && GetIsValidRTSComponent())
+	{
+		bool bValidData = false;
+		const FNomadicData NomadicData = FRTS_Statics::BP_GetNomadicDataOfPlayer(
+			RTSComponent->GetOwningPlayer(), RTSComponent->GetSubtypeAsNomadicSubtype(), this, bValidData);
+		if (not bValidData)
+		{
+			RTSFunctionLibrary::ReportWarning(
+				"FAILED to get valid nomadic data in ANomadicVehicle::OnFinishedConvertingToBuilding");
+		}
+		M_AircraftOwnerComp->UnpackAirbase(BuildingMeshComponent, NomadicData.RepairPowerMlt);
 	}
 }
 
@@ -686,139 +704,120 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 
 void ANomadicVehicle::ExecuteConvertToVehicleCommand()
 {
-	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController))
-	{
-		M_NomadStatus = ENomadStatus::CreatingTruck;
-		FResourceConversionHelper::OnNomadicExpanded(this, false);
-
-		OnNomadConvertToVehicle.Broadcast();
-
-		// Starts animations for packing up expansions.
-		StartPackUpAllExpansions(M_ConvertToVehicleTime);
-
-		// Prevents any further commands from being added to the queue until called with true.
-		// See finished converting to vehicle.
-		SetCommandQueueEnabled(false);
-
-		// Disable Training if this nomadic vehicle has a training component.
-		// This component will now no longer use the progress bar; make sure this happens before the bar is set
-		// for the conversion by the vehicle.
-		SetTrainingEnabled(false);
-		if (UseTrainingPreview())
-		{
-			M_TrainingPreviewHelper.HandleTrainingDisabledOrNomadTruck();
-		}
-		SetCargoEnabled(false);
-
-		// Save the building materials to reapply to the mesh after deconstruction is complete.
-		CacheOriginalMaterials();
-
-		CreateSmokeForVehicleConversion();
-		DestroyAllBuildingAttachments();
-		// If we have an airbase owner and aircraft are inside, force them to takeoff first.
-		if (GetIsValidAircraftOwnerComp())
-		{
-			M_AircraftOwnerComp->OnPackUpAirbaseStart(M_ConstructionAnimationMaterial);
-		}
-
-		// Disable DropOff of resources.
-		SetResourceDropOffActive(false);
-
-		// check if smoke systems are initiated
-		uint8 ZeroCounter = 0;
-		for (auto SmokeLocation : M_CreateSmokeTransforms)
-		{
-			if (SmokeLocation.Equals(FTransform::Identity))
-			{
-				ZeroCounter++;
-			}
-			if (ZeroCounter > 1)
-			{
-				// Init smoke locations for material animation.
-				InitSmokeLocations();
-				break;
-			}
-		}
-		// don't apply construction materials but only calculate the amount of materials to exclude.
-		const uint32 AmountMaterialsToExclude = ApplyConstructionMaterial(true);
-		RTSFunctionLibrary::PrintString(
-			"\n\nMaterials to exclude::" + FString::FromInt(AmountMaterialsToExclude) + "\n\n");
-
-		// We now reapply construction materials from the top of the array.
-		M_MaterialIndex = M_CachedOriginalMaterials.Num() - 1;
-
-		// After training component stopped using it.
-		M_ConversionProgressBar->StartProgressBar(M_ConvertToVehicleTime);
-
-		// Start timer to reapply construction materials, m_NomadStatus is used to determine if we are creating the truck or the building.
-		const float Interval = M_ConvertToVehicleTime / (M_CachedOriginalMaterials.Num() - AmountMaterialsToExclude);
-		SetAnimationTimer(Interval);
-		if (PlayerController->GetMainMenuUI())
-		{
-			PlayerController->GetMainMenuUI()->RequestShowCancelVehicleConversion(this);
-		}
-		// Propagate to blueprints.
-		BP_OnStartedConvertingToVehicle();
-	}
-	else
+	if (not IsValid(M_ConversionProgressBar) || not IsValid(PlayerController))
 	{
 		RTSFunctionLibrary::ReportError("M_ConversionProgressBar or PlayerController is null!"
 			"\n In function: ANomadicVehicle::ExecuteConvertToVehicleCommand"
 			"For nomadic vehicle: " + GetName());
+		return;
 	}
+	M_NomadStatus = ENomadStatus::CreatingTruck;
+	FResourceConversionHelper::OnNomadicExpanded(this, false);
+	OnStartConvertToVehicle_HandleInstanceSpecificComponents();
+
+	OnNomadConvertToVehicle.Broadcast();
+
+	// Starts animations for packing up expansions.
+	StartPackUpAllExpansions(M_ConvertToVehicleTime);
+
+	// Prevents any further commands from being added to the queue until called with true.
+	// See finished converting to vehicle.
+	SetCommandQueueEnabled(false);
+
+
+	if (UseTrainingPreview())
+	{
+		M_TrainingPreviewHelper.HandleTrainingDisabledOrNomadTruck();
+	}
+
+	// Save the building materials to reapply to the mesh after deconstruction is complete.
+	CacheOriginalMaterials();
+
+	CreateSmokeForVehicleConversion();
+	DestroyAllBuildingAttachments();
+
+	// check if smoke systems are initiated
+	uint8 ZeroCounter = 0;
+	for (auto SmokeLocation : M_CreateSmokeTransforms)
+	{
+		if (SmokeLocation.Equals(FTransform::Identity))
+		{
+			ZeroCounter++;
+		}
+		if (ZeroCounter > 1)
+		{
+			// Init smoke locations for material animation.
+			InitSmokeLocations();
+			break;
+		}
+	}
+	// don't apply construction materials but only calculate the amount of materials to exclude.
+	const uint32 AmountMaterialsToExclude = ApplyConstructionMaterial(true);
+	RTSFunctionLibrary::PrintString(
+		"\n\nMaterials to exclude::" + FString::FromInt(AmountMaterialsToExclude) + "\n\n");
+
+	// We now reapply construction materials from the top of the array.
+	M_MaterialIndex = M_CachedOriginalMaterials.Num() - 1;
+
+	// After training component stopped using it.
+	M_ConversionProgressBar->StartProgressBar(M_ConvertToVehicleTime);
+
+	// Start timer to reapply construction materials, m_NomadStatus is used to determine if we are creating the truck or the building.
+	const float Interval = M_ConvertToVehicleTime / (M_CachedOriginalMaterials.Num() - AmountMaterialsToExclude);
+	SetAnimationTimer(Interval);
+	if (PlayerController->GetMainMenuUI())
+	{
+		PlayerController->GetMainMenuUI()->RequestShowCancelVehicleConversion(this);
+	}
+	// Propagate to blueprints.
+	BP_OnStartedConvertingToVehicle();
 }
 
 void ANomadicVehicle::TerminateConvertToVehicleCommand()
 {
-	if (IsValid(PlayerController) && IsValid(M_ConversionProgressBar))
-	{
-		if (M_NomadStatus != ENomadStatus::CreatingTruck)
-		{
-			return;
-		}
-
-		if (GetIsValidAircraftOwnerComp())
-		{
-			M_AircraftOwnerComp->OnPackUpAirbaseCancelled();
-		}
-
-		M_NomadStatus = ENomadStatus::Building;
-		M_ConversionProgressBar->StopProgressBar();
-		const UWorld* World = GetWorld();
-		if (World)
-		{
-			World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
-		}
-		// set building materials to original materials before construction materials were applied.
-		SetAllBuildingMaterialsToCache();
-		// Reset index and cache.
-		ResetCachedMaterials();
-
-		if (PlayerController->GetMainMenuUI())
-		{
-			// Only show the convert to vehicle button if this unit is the primary selected unit.
-			PlayerController->GetMainMenuUI()->RequestShowConvertToVehicle(this);
-		}
-		// Propagate to possible bxps to cancel the packing.
-		CancelPackUpExpansions();
-		FResourceConversionHelper::OnNomadicExpanded(this, true);
-		// Create the building attachments again.
-		CreateBuildingAttachments();
-
-		SetCommandQueueEnabled(true);
-		// Note that the progressbar is already stopped for the nomadic truck so now the training component can use it.
-		SetTrainingEnabled(true);
-		// Enable DropOff of resources.
-		SetResourceDropOffActive(true);
-		// Propagate to Blueprints.
-		BP_OnCancelledConvertingToVehicle();
-	}
-	else
+	if (not IsValid(PlayerController) || not IsValid(M_ConversionProgressBar))
 	{
 		RTSFunctionLibrary::ReportError("M_ConversionProgressBar or PlayerController is null!"
 			"\n In function: ANomadicVehicle::TerminateConvertToVehicleCommand"
 			"For nomadic vehicle: " + GetName());
 	}
+	if (M_NomadStatus != ENomadStatus::CreatingTruck)
+	{
+		return;
+	}
+	OnCancelledConvertToVehicle_HandleInstanceSpecificComponents();
+
+	if (GetIsValidAircraftOwnerComp())
+	{
+		M_AircraftOwnerComp->OnPackUpAirbaseCancelled();
+	}
+
+	M_NomadStatus = ENomadStatus::Building;
+	M_ConversionProgressBar->StopProgressBar();
+	const UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+	}
+	// set building materials to original materials before construction materials were applied.
+	SetAllBuildingMaterialsToCache();
+	// Reset index and cache.
+	ResetCachedMaterials();
+
+	if (PlayerController->GetMainMenuUI())
+	{
+		// Only show the convert to vehicle button if this unit is the primary selected unit.
+		PlayerController->GetMainMenuUI()->RequestShowConvertToVehicle(this);
+	}
+	// Propagate to possible bxps to cancel the packing.
+	CancelPackUpExpansions();
+	FResourceConversionHelper::OnNomadicExpanded(this, true);
+	// Create the building attachments again.
+	CreateBuildingAttachments();
+
+	SetCommandQueueEnabled(true);
+	// Propagate to Blueprints.
+	BP_OnCancelledConvertingToVehicle();
 }
 
 void ANomadicVehicle::CreateSmokeForVehicleConversion() const
@@ -990,84 +989,101 @@ void ANomadicVehicle::AdjustSelectionDecalToConversion(const bool bSetToBuilding
 	}
 }
 
+void ANomadicVehicle::OnStartConvertToVehicle_HandleInstanceSpecificComponents()
+{
+	// Disable Training if this nomadic vehicle has a training component.
+	// This component will now no longer use the progress bar; make sure this happens before the bar is set
+	// for the conversion by the vehicle.
+	SetTrainingEnabled(false);
+	SetCargoEnabled(false);
+	SetReinforcementPointActive(false);
+	// If we have an airbase owner and aircraft are inside, force them to takeoff first.
+	if (GetIsValidAircraftOwnerComp())
+	{
+		M_AircraftOwnerComp->OnPackUpAirbaseStart(M_ConstructionAnimationMaterial);
+	}
+
+	// Disable DropOff of resources.
+	SetResourceDropOffActive(false);
+}
+
+void ANomadicVehicle::OnCancelledConvertToVehicle_HandleInstanceSpecificComponents()
+{
+	SetTrainingEnabled(true);
+	SetCargoEnabled(true);
+	SetReinforcementPointActive(true);
+	SetResourceDropOffActive(true);
+}
+
 // Converted to vehicle
 void ANomadicVehicle::OnFinishedConvertingToVehicle()
 {
-	// Evaluating to false is not an error as not all nomadic vehicles have build radii.
-	SetRadiusComponentActive(false);
-	SetEnergyComponentActive(false);
 	FResourceConversionHelper::OnNomadicExpanded(this, false);
 
-	if (GetIsValidAircraftOwnerComp())
-	{
-		M_AircraftOwnerComp->OnPackUpAirbaseComplete();
-	}
-	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController) && IsValid(BuildingMeshComponent))
-	{
-		M_NomadStatus = ENomadStatus::Truck;
-		// Pack up all building expansions.
-		FinishPackUpAllExpansions();
-
-		M_ConversionProgressBar->StopProgressBar();
-		if (UWorld* World = GetWorld())
-		{
-			World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
-		}
-		// Show the vehicle mesh
-		SetDisableChaosVehicleMesh(false);
-
-		// hide the building mesh.
-		BuildingMeshComponent->SetVisibility(false);
-		BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-		// set building materials to original materials before construction materials were applied.
-		SetAllBuildingMaterialsToCache();
-		// Reset index and cache.
-		ResetCachedMaterials();
-
-		// free up the command queue, important to call this after the status is set to truck as otherwise the
-		// terminate conversion command will trigger because enableing the queue will clear it first -> Sets unit to idle.
-		SetCommandQueueEnabled(true);
-
-		if (PlayerController && PlayerController->GetMainMenuUI())
-		{
-			// Update Game UI.
-			PlayerController->TruckConverted(this, false);
-		}
-
-		// Move Truck UI back in place.
-		MoveTruckUIWithLocalOffsets(false);
-
-		// Before we hide building mesh completely, pack up (destroy) the airbase roof if it exists.
-		if (GetIsValidAircraftOwnerComp())
-		{
-			if (M_AircraftOwnerComp->GetCanPackUp())
-			{
-				M_AircraftOwnerComp->OnPackUpAirbaseComplete();
-			}
-			else
-			{
-				RTSFunctionLibrary::ReportError(
-					"Converting to vehicle but airbase cannot pack (aircraft still inside).");
-			}
-		}
-
-		// Set decal to truck mode.
-		AdjustSelectionDecalToConversion(false);
-
-		// Set max health to vehicle health.
-		AdjustMaxHealthForConversion(true);
-
-		// Destroy any resource visualisation.
-		DestroyAllResourceStorageMeshComponents();
-
-		BP_OnFinishedConvertingToVehicle();
-	}
-	else
+	if (not IsValid(M_ConversionProgressBar) || not IsValid(PlayerController) || not IsValid(BuildingMeshComponent))
 	{
 		RTSFunctionLibrary::ReportError("M_ConversionProgressBar, PlayerController or BuildingMeshComponent is null!"
 			"\n In function: ANomadicVehicle::OnFinishedConvertingToVehicle"
 			"For nomadic vehicle: " + GetName());
+		return;
+	}
+
+	M_NomadStatus = ENomadStatus::Truck;
+	// Pack up all building expansions.
+	FinishPackUpAllExpansions();
+	OnFinishedConvertingToVehicle_HandleInstanceSpecificComponents();
+
+	M_ConversionProgressBar->StopProgressBar();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+	}
+	// Show the vehicle mesh
+	SetDisableChaosVehicleMesh(false);
+
+	// hide the building mesh.
+	BuildingMeshComponent->SetVisibility(false);
+	BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// set building materials to original materials before construction materials were applied.
+	SetAllBuildingMaterialsToCache();
+	// Reset index and cache.
+	ResetCachedMaterials();
+
+	// free up the command queue, important to call this after the status is set to truck as otherwise the
+	// terminate conversion command will trigger because enableing the queue will clear it first -> Sets unit to idle.
+	SetCommandQueueEnabled(true);
+
+	if (PlayerController && PlayerController->GetMainMenuUI())
+	{
+		// Update Game UI.
+		PlayerController->TruckConverted(this, false);
+	}
+
+	// Move Truck UI back in place.
+	MoveTruckUIWithLocalOffsets(false);
+
+	// Set decal to truck mode.
+	AdjustSelectionDecalToConversion(false);
+
+	// Set max health to vehicle health.
+	AdjustMaxHealthForConversion(true);
+
+	// Destroy any resource visualisation.
+	DestroyAllResourceStorageMeshComponents();
+
+	BP_OnFinishedConvertingToVehicle();
+}
+
+void ANomadicVehicle::OnFinishedConvertingToVehicle_HandleInstanceSpecificComponents()
+{
+	// Evaluating to false is not an error as not all nomadic vehicles have build radii.
+	SetRadiusComponentActive(false);
+	SetEnergyComponentActive(false);
+
+	if (GetIsValidAircraftOwnerComp())
+	{
+		M_AircraftOwnerComp->OnPackUpAirbaseComplete();
 	}
 }
 
@@ -1169,6 +1185,14 @@ void ANomadicVehicle::SetRadiusComponentActive(const bool bIsActive) const
 	}
 }
 
+void ANomadicVehicle::SetReinforcementPointActive(const bool bIsActive) const
+{
+	if (IsValid(M_ReinforcementPoint))
+	{
+		M_ReinforcementPoint->SetReinforcementEnabled(bIsActive);
+	}
+}
+
 void ANomadicVehicle::StartAsConvertedBuilding()
 {
 	OnFinishedStandaloneRotation();
@@ -1195,11 +1219,11 @@ bool ANomadicVehicle::UseTrainingPreview() const
 
 void ANomadicVehicle::AnnounceConversion() const
 {
-	if(not GetIsValidRTSComponent() || not GetIsValidPlayerControler())
+	if (not GetIsValidRTSComponent() || not GetIsValidPlayerControler())
 	{
 		return;
 	}
-	if(RTSComponent->GetOwningPlayer() != 1)
+	if (RTSComponent->GetOwningPlayer() != 1)
 	{
 		return;
 	}

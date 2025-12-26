@@ -143,6 +143,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Vehicle AI|Stuck Detection")
 	bool IsStuck(const float DeltaTime);
 
+	void ClearOverlapsForNewMovementCommand();
+	
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -503,6 +506,7 @@ protected:
 	// The point to reverse to when the deadzone is entered; only for wheeled vehicles.
 	UPROPERTY(EditDefaultsOnly, Category = "Deadzones")
 	float DeadZoneReverseDistance = 600;
+
 
 private:
 	/**

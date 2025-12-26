@@ -87,6 +87,8 @@ private:
 	FVector m_MoveToLocation;
 
 	void OnPossess_SetupNavAgent(APawn* InPawn) const;
+
+	void OnFindPath_ClearOverlapsForNewMovement() const;
 	
 	UPROPERTY()
 	UTrackPathFollowingComponent* m_VehiclePathComp;

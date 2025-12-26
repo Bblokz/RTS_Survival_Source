@@ -84,6 +84,7 @@ void AAITankMaster::BeginPlay()
 void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query,
                                            FNavPathSharedPtr& OutPath) const
 {
+	OnFindPath_ClearOverlapsForNewMovement();
 	/** 
 	 * Factor used when deriving Query.CostLimit from the straight-line heuristic
 	 * between start and goal. Higher values allow longer / more detoured paths
@@ -189,6 +190,16 @@ void AAITankMaster::OnPossess_SetupNavAgent(APawn* InPawn) const
 		return;
 	}
 	FRTSNavigationHelpers::SetupNavDataForTypeOnPawn(GetWorld(), InPawn);
+}
+
+void AAITankMaster::OnFindPath_ClearOverlapsForNewMovement() const
+{
+	if(not IsValid(m_VehiclePathComp))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "M_vehiclePathComp", "AAITankMaster::OnFindPath_ClearOverlapsForNewMovement");
+		return;
+	}
+	m_VehiclePathComp->ClearOverlapsForNewMovementCommand();
 }
 
 void AAITankMaster::DebugFoundPathCost(const FNavPathSharedPtr& OutPath) const

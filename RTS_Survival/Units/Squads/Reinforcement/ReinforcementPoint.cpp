@@ -6,6 +6,7 @@
 #include "Components/SphereComponent.h"
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -92,7 +93,7 @@ bool UReinforcementPoint::GetIsValidReinforcementTriggerSphere(const bool bRepor
 	if (bReportIfMissing && bM_ReinforcementEnabled)
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ReinforcementTriggerSphere",
-		                                                      "GetIsValidReinforcementTriggerSphere", this);
+		                                                      "GetIsValidReinforcementTriggerSphere", GetOwner());
 	}
 
 	return false;
@@ -225,6 +226,13 @@ void UReinforcementPoint::OnReinforcementOverlapEnd(UPrimitiveComponent* Overlap
 {
 	ASquadUnit* OverlappingUnit = Cast<ASquadUnit>(OtherActor);
 	HandleSquadUnitExitedRadius(OverlappingUnit);
+}
+
+void UReinforcementPoint::OverlapOnReinforcementEnabled(float Radius, int32 OwningPlayer, bool bEnable) const
+{
+		// create a sphere overlap at owner location with given radius and player filter
+	ECollisionChannel CollisionChannel = OwningPlayer == 1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
+	
 }
 
 bool UReinforcementPoint::GetIsDebugEnabled() const

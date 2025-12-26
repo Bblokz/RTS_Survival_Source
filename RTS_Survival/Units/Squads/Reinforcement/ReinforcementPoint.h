@@ -68,6 +68,9 @@ private:
 	void OnReinforcementOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
 	                               UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
+	// Either remove or add overlap depending on enable state.
+	void OverlapOnReinforcementEnabled(float Radius, int32 OwningPlayer, bool bEnable) const;
+
 	UPROPERTY()
 	TWeakObjectPtr<UMeshComponent> M_ReinforcementMeshComponent;
 

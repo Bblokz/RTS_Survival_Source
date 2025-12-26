@@ -400,6 +400,11 @@ bool UTrackPathFollowingComponent::IsStuck(const float DeltaTime)
 	return false;
 }
 
+void UTrackPathFollowingComponent::ClearOverlapsForNewMovementCommand()
+{
+	ResetOverlapBlockingActorsForCommand();
+}
+
 
 // Called when the game starts
 void UTrackPathFollowingComponent::BeginPlay()
@@ -439,8 +444,6 @@ void UTrackPathFollowingComponent::TickComponent(
 void UTrackPathFollowingComponent::OnPathUpdated()
 {
 	Super::OnPathUpdated();
-
-	ResetOverlapBlockingActorsForCommand();
 
 	// Reset stuck status
 	ResetStuck();

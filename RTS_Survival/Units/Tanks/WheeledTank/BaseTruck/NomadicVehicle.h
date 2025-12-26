@@ -496,13 +496,23 @@ private:
 	UPROPERTY()
 	float M_ConvertToVehicleTime;
 
+	// Disables those components that are immediately disabled when the truck starts converting again.
+	void OnStartConvertToVehicle_HandleInstanceSpecificComponents();
+
+	// On cancelling converting to vehicle; handle instance component logic. for training cargo, reinforcements and drop off.
+	void OnCancelledConvertToVehicle_HandleInstanceSpecificComponents();
+
 	/**
 	 * @brief Disables the building component and enables the vehicle mesh.
 	 */
 	void OnFinishedConvertingToVehicle();
 
+	void OnFinishedConvertingToVehicle_HandleInstanceSpecificComponents();
+
 	UPROPERTY()
 	FTimerHandle ConvertToVehicleTimerHandle;
+
+	
 
 	/**
 	 * @brief Finishes the conversion to building process.
@@ -513,6 +523,12 @@ private:
 	 * @note This function is the fourth and final step in the building construction sequence.
 	 */
 	void OnFinishedConvertingToBuilding();
+
+	// Renables the components that are only supposed to work when the vehicle is in building mode.
+	void OnFinishedConvertToBuilding_HandleInstanceSpecificComponents();
+
+	// Unpacks the airbase if this vehicle has aircraft logic.
+	void OnFinishedConvertToBuilding_UnpackAirbase();
 
 	// Cache for original materials of the building mesh
 	// Always empty by calling ResetCachedMaterials as the index also needs to be reset!
@@ -699,6 +715,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnergyComp> M_EnergyComp;
 
+	// May not be set if hte vehicle does not use squad reinforcement.
+	UPROPERTY()
+	TObjectPtr<UReinforcementPoint> M_ReinforcementPoint;
+
 	// The drop off component that can be added to grandchild derived blueprints, is automatically set on
 	// PostInitializeComponents.
 	UPROPERTY()
@@ -754,6 +774,8 @@ private:
 	void SetEnergyComponentActive(const bool bIsActive) const;
 	// Activate or Deactive the radius component if this vehicle has one.
 	void SetRadiusComponentActive(const bool bIsActive) const;
+	// Activate or Deactivate the reinforcement point if this vehicle has one.
+	void SetReinforcementPointActive(const bool bIsActive) const;
 
 	void StartAsConvertedBuilding();
 
