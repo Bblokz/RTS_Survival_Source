@@ -20,6 +20,8 @@ class USpatialVoiceLinePlayer;
 class ACPPResourceMaster;
 class UArmor;
 class URTSNavCollision;
+class UBehaviour;
+class UBehaviourComp;
 // Forward Declaration; reduce compile time; guard against cyclic dependencies.
 class RTS_SURVIVAL_API AAITankMaster;
 class RTS_SURVIVAL_API ACPPTurretsMaster;
@@ -221,6 +223,9 @@ protected:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	UBehaviourComp* BehaviourComponent;
+
+	UPROPERTY(EditDefaultsOnly, Category="Behaviour")
+	TArray<TSubclassOf<UBehaviour>> OnMovementBehaviour;
 
 	bool GetIsValidBehaviourComponent() const;
 	/**
@@ -468,4 +473,7 @@ private:
 	void OnUnitDies_DisableWeapons();
 	void OnUnitDies_CheckForCargo(const ERTSDeathType DeathType) const;
 	void OnUnitDies_AnnouncerDeathVoiceLine() const;
+
+	void ApplyMovementBehaviours();
+	void RemoveMovementBehaviours();
 };
