@@ -92,16 +92,18 @@ public:
 	                      USoundConcurrency* DescentConcurrency);
 
 	/**
-	 * @brief Fallback straight launch used when arc computation fails.
+	 * @brief Two-phase fallback: ascend to apex, then straighten toward the target.
 	 * @param LaunchLocation Starting location for the fallback shot.
-	 * @param LaunchToTarget Vector from launch to target for rotation.
-	 * @param SafeProjectileSpeed Speed used for the straight launch.
-	 * @param Range Range used for timing the fallback explosion.
+	 * @param TargetLocation Target location including accuracy deviation.
+	 * @param SafeProjectileSpeed Speed used for both the ascent and straight segment.
+	 * @param Range Range used for timing when no arc math is possible.
+	 * @param ArchSettings Designer-facing arch settings for apex calculation.
 	 */
 	void LaunchStraightFallback(const FVector& LaunchLocation,
-	                            const FVector& LaunchToTarget,
+	                            const FVector& TargetLocation,
 	                            const float SafeProjectileSpeed,
-	                            const float Range);
+	                            const float Range,
+	                            const FArchProjectileSettings& ArchSettings);
 
 	// Called by abilities using attach rockets to change the mesh on the rocket VFX.
 	void SetupAttachedRocketMesh(UStaticMesh* RocketMesh);
@@ -306,6 +308,87 @@ private:
 	                          USoundConcurrency* DescentConcurrency);
 
 	/**
+	 * @brief Solves arc parameters for the primary arced launch.
+	 * @param LaunchLocation Starting point of the projectile.
+	 * @param TargetLocation Final target after accuracy deviation.
+	 * @param ArchSettings Designer settings for apex planning.
+	 * @param OutLaunchVelocity Calculated initial velocity.
+	 * @param OutApexLocation Apex world location based on the solution.
+	 * @param OutTimeToTarget Time to impact using the arc.
+	 * @param OutHorizontalDirection Horizontal direction toward the target.
+	 * @param OutGravity Magnitude of gravity used in the calculation.
+	 * @return True when a valid arc exists, false when fallback is needed.
+	 */
+	bool CalculateArcedLaunchParameters(const FVector& LaunchLocation,
+	                                    const FVector& TargetLocation,
+	                                    const FArchProjectileSettings& ArchSettings,
+	                                    FVector& OutLaunchVelocity,
+	                                    FVector& OutApexLocation,
+	                                    float& OutTimeToTarget,
+	                                    FVector& OutHorizontalDirection,
+	                                    float& OutGravity);
+
+	void TransitionArcFallbackToStraight(const FVector TargetLocation, const float SafeProjectileSpeed);
+	/**
+	 * @brief Straight-line fallback when no arcing parameters can be computed.
+	 * @param LaunchLocation Spawn location for the projectile.
+	 * @param LaunchToTarget Vector pointing from launch to target.
+	 * @param SafeProjectileSpeed Projectile speed used for timing.
+	 * @param Range Range used for the timed explosion.
+	 */
+	void LaunchStraightFallbackDirect(const FVector& LaunchLocation,
+	                                  const FVector& LaunchToTarget,
+	                                  const float SafeProjectileSpeed,
+	                                  const float Range);
+	/**
+	 * @brief Executes the two-phase fallback: initial ascent then straight line.
+	 * @param LaunchLocation Starting point of the projectile.
+	 * @param TargetLocation Final target after accuracy deviation.
+	 * @param LaunchToTarget Vector from launch to target for rotations.
+	 * @param FlatDelta Horizontal delta between launch and target.
+	 * @param SafeProjectileSpeed Speed budget for both phases.
+	 * @param Range Weapon range for timers.
+	 * @param Gravity Magnitude of world gravity for calculations.
+	 * @param ArchSettings Designer settings for apex planning.
+	 */
+	void LaunchStraightFallbackStartAscent(const FVector& LaunchLocation,
+	                                       const FVector& TargetLocation,
+	                                       const FVector& LaunchToTarget,
+	                                       const FVector& FlatDelta,
+	                                       const float SafeProjectileSpeed,
+	                                       const float Range,
+	                                       const float Gravity,
+	                                       const FArchProjectileSettings& ArchSettings);
+	/**
+	 * @brief Calculates ascent, apex, and straight-line handover for fallback arcs.
+	 * @param LaunchLocation Starting point of the projectile.
+	 * @param TargetLocation Final target after accuracy deviation.
+	 * @param LaunchToTarget Vector from launch to target for rotations.
+	 * @param FlatDelta Horizontal delta between launch and target.
+	 * @param SafeProjectileSpeed Speed budget for both phases.
+	 * @param Range Weapon range for timers.
+	 * @param Gravity Magnitude of world gravity for calculations.
+	 * @param ArchSettings Designer settings for apex planning.
+	 * @param OutLaunchVelocity Calculated initial velocity for the ascent phase.
+	 * @param OutApexLocation World location of the apex.
+	 * @param OutTimeToApex Time to reach the apex.
+	 * @param OutTotalFlightTime Total time until impact using straight descent.
+	 * @return True when valid parameters were built; false triggers straight fallback.
+	 */
+	bool CalculateFallbackArcParameters(const FVector& LaunchLocation,
+	                                    const FVector& TargetLocation,
+	                                    const FVector& LaunchToTarget,
+	                                    const FVector& FlatDelta,
+	                                    const float SafeProjectileSpeed,
+	                                    const float Range,
+	                                    const float Gravity,
+	                                    const FArchProjectileSettings& ArchSettings,
+	                                    FVector& OutLaunchVelocity,
+	                                    FVector& OutApexLocation,
+	                                    float& OutTimeToApex,
+	                                    float& OutTotalFlightTime);
+
+	/**
 	 * @brief Calculates the angle between the projectile's velocity vector and the surface normal at the point of impact.
  *
  * This angle is essential for determining the interaction between the projectile and the impacted surface.
@@ -407,6 +490,9 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_DescentSoundTimerHandle;
+
+	UPROPERTY()
+	FTimerHandle M_ArcFallbackTimerHandle;
 
 	UPROPERTY()
 	TWeakObjectPtr<UAudioComponent> M_DescentAudioComponent;

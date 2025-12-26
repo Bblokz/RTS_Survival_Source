@@ -1376,6 +1376,7 @@ namespace DeveloperSettings
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
 		// ICommands.
 		constexpr bool GCommands_Compile_DebugSymbols = false;
+		constexpr bool GArchProjectile_Compile_DebugSymbols = false;
 		// Reinforcement provider and ability debug draws.
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
 		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
