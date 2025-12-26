@@ -56,7 +56,7 @@ private:
 	bool CreateReinforcementTriggerSphere(const float ActivationRadius);
 	void SetTriggerOverlapEnabled(bool bEnable) const;
 	void DrawDebugStatusString(const FString& DebugText, const FVector& DrawLocation) const;
-	void HandleSquadUnitEnteredRadius(class ASquadUnit* OverlappingUnit) const;
+	void HandleSquadUnitEnteredRadius(class ASquadUnit* OverlappingUnit);
 	void HandleSquadUnitExitedRadius(class ASquadUnit* OverlappingUnit) const;
 
 	UFUNCTION()
@@ -69,7 +69,7 @@ private:
 	                               UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	// Either remove or add overlap depending on enable state.
-	void OverlapOnReinforcementEnabled(float Radius, int32 OwningPlayer, bool bEnable) const;
+	void OverlapOnReinforcementEnabled(float Radius, int32 OwningPlayer, bool bEnable);
 
 	UPROPERTY()
 	TWeakObjectPtr<UMeshComponent> M_ReinforcementMeshComponent;

@@ -372,13 +372,13 @@ void ACPPController::DisplayErrorMessage(const EPlayerError Error)
 	case EPlayerError::Error_NotEnoughConstructionBlueprints:
 		break;
 	case EPlayerError::Error_CannotStackBuildingAbilities:
-		 DisplayErrorMessageCpp(FText::FromString("Cannot stack building abilities!"));
+		DisplayErrorMessageCpp(FText::FromString("Cannot stack building abilities!"));
 		break;
 	case EPlayerError::Error_NoFreeTruckAvailable:
-			DisplayErrorMessageCpp(FText::FromString("No free truck available for construction!"));
+		DisplayErrorMessageCpp(FText::FromString("No free truck available for construction!"));
 		break;
 	case EPlayerError::Error_CannotBuildHere:
-			DisplayErrorMessageCpp(FText::FromString("Cannot Build here!"));
+		DisplayErrorMessageCpp(FText::FromString("Cannot Build here!"));
 		break;
 	}
 }
@@ -1269,15 +1269,13 @@ void ACPPController::RotateRight()
 void ACPPController::HandleBxpPlacementVoiceLine(const TScriptInterface<IBuildingExpansionOwner>& BxpOwner,
                                                  const EBuildingExpansionType BxpType) const
 {
-	if(not IsValid(BxpOwner.GetObject()))
+	if (not IsValid(BxpOwner.GetObject()))
 	{
 		return;
 	}
 	const EBxpOptionSection BxpOptionSection = BxpOwner->GetBxpOptionTypeFromBxpType(BxpType);
 	EAnnouncerVoiceLineType VoiceLineType = FRTS_VoiceLineHelpers::GetAnnouncerForBxp(BxpOptionSection);
 	PlayAnnouncerVoiceLine(VoiceLineType, true, false);
-	
-	
 }
 
 void ACPPController::RegularPrimaryClick()
@@ -3257,6 +3255,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdEnableResourceConversion:
 		this->DirectActionButtonConversion(M_ActiveAbility);
 		break;
+	case EAbilityID::IdReinforceSquad:
+		this->DirectActionButtonReinforce();
+		break;
 	default:
 		// execute a button on the next click
 		bM_IsActionButtonActive = true;
@@ -3629,6 +3630,18 @@ void ACPPController::DirectActionButtonDigIn()
 	}
 }
 
+void ACPPController::DirectActionButtonReinforce()
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExe = 0;
+	for (const auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->Reinforce(!bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdReinforceSquad),
+	                                false);
+}
+
 void ACPPController::DirectionActionButtonFireRockets()
 {
 	EnsureSelectionsAreRTSValid();
@@ -3752,7 +3765,6 @@ void ACPPController::DirectActionButtonBehaviourAbility(const EBehaviourAbilityT
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
 		                                false);
-		
 	}
 }
 
@@ -3963,7 +3975,8 @@ bool ACPPController::PlaceBxpIfAsyncLoaded(FVector& InClickedLocation)
 		InClickedLocation,
 		BxpRotation,
 		BxpAttachToSocketName);
-	HandleBxpPlacementVoiceLine(M_AsyncBxpRequestState.M_BuildingExpansionOwner, M_AsyncBxpRequestState.M_Expansion->GetBuildingExpansionType());
+	HandleBxpPlacementVoiceLine(M_AsyncBxpRequestState.M_BuildingExpansionOwner,
+	                            M_AsyncBxpRequestState.M_Expansion->GetBuildingExpansionType());
 	// Set Bxp to null and reset the state to no async request.
 	M_AsyncBxpRequestState.Reset();
 	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
@@ -4250,7 +4263,6 @@ void ACPPController::DebugPlayerSelection(const FString& Message, const FColor& 
 
 void ACPPController::StopPreviewAndBuildingMode(const bool bIsPlacedSuccessfully)
 {
-
 	CPPConstructionPreviewRef->StopBuildingPreview(bIsPlacedSuccessfully);
 	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::BuildingPreviewModeOFF;
 	ShowPlayerBuildRadius(false);

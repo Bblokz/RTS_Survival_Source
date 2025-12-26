@@ -1105,6 +1105,8 @@ private:
 	// Commands units that can dig in to do so.
 	void DirectActionButtonDigIn();
 
+	void DirectActionButtonReinforce();
+
 	// Some units have an UAttachedRockets component that can be used to fire rockets.
 	void DirectionActionButtonFireRockets();
 	void DirectActionButtonCancelRocketFire();

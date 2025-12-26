@@ -6,9 +6,11 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/BehaviourAbilityTypes/BehaviourAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
+#include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
 
+class USquadReinforcementComponent;
 /**
  * @brief Ability entry containing metadata such as cooldown and custom type.
  */
@@ -48,6 +50,20 @@ namespace FAbilityHelpers
 		return AbilityEntry;
 	}
 
+	inline USquadReinforcementComponent* GetReinforcementAbilityComp(AActor* Actor)
+	{
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+		TArray<USquadReinforcementComponent*> ReinCompArray;
+		Actor->GetComponents<USquadReinforcementComponent>(ReinCompArray);
+		if (ReinCompArray.Num() > 0)
+		{
+			return ReinCompArray[0];
+		}
+		return nullptr;
+	}
 
 	inline TArray<FUnitAbilityEntry> ConvertAbilityIdsToEntries(const TArray<EAbilityID>& AbilityIds)
 	{

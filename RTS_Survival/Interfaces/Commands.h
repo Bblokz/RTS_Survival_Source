@@ -415,7 +415,7 @@ public:
 		const bool bForceFinalRotationRegardlessOfReverse = false);
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-	virtual ECommandQueueError Reinforce(AActor* ReinforcementTargetActor, const bool bSetUnitToIdle);
+	virtual ECommandQueueError Reinforce(const bool bSetUnitToIdle);
 
 	void SetForceFinalRotationRegardlessOfReverse(bool ForceUseFinalRotation);
 

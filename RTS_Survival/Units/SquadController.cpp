@@ -1067,7 +1067,6 @@ void ASquadController::ExecuteReinforceCommand(AActor* ReinforcementTarget)
 
 void ASquadController::TerminateReinforceCommand()
 {
-	DoneExecutingCommand(EAbilityID::IdReinforceSquad);
 }
 
 void ASquadController::ExecuteCaptureCommand(AActor* CaptureTarget)

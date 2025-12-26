@@ -33,15 +33,25 @@ USquadReinforcementComponent::USquadReinforcementComponent(): bM_IsActivated(fal
 	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
+UReinforcementPoint* USquadReinforcementComponent::GetActiveReinforcementPoint() const
+{
+	if(M_ReinforcementPoint.IsValid())
+	{
+		return M_ReinforcementPoint.Get();
+	}
+	return nullptr;
+}
+
 void USquadReinforcementComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_InitSquadDataSnapshot();
 }
 
-void USquadReinforcementComponent::ActivateReinforcements(const bool bActivate)
+void USquadReinforcementComponent::ActivateReinforcements(const bool bActivate, UReinforcementPoint* InstigatingPoint)
 {
 	bM_IsActivated = bActivate;
+	M_ReinforcementPoint = InstigatingPoint;
 	if (not bM_IsActivated)
 	{
 		RemoveReinforcementAbility();

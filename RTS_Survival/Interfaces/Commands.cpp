@@ -10,8 +10,10 @@
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
+#include "RTS_Survival/Units/Squads/Reinforcement/ReinforcementPoint.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
+#include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
@@ -698,6 +700,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		{
 			M_Owner->ExecuteReinforceCommand(Cmd.TargetActor.Get());
 		}
+		break;
 	// Also switch weapon case if we want:
 	case EAbilityID::IdSwitchWeapon:
 		{
@@ -1076,14 +1079,21 @@ ECommandQueueError ICommands::MoveToLocation(
 	return Error;
 }
 
-ECommandQueueError ICommands::Reinforce(AActor* ReinforcementTargetActor, const bool bSetUnitToIdle)
+ECommandQueueError ICommands::Reinforce(const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	if (not IsValid(ReinforcementTargetActor))
+	USquadReinforcementComponent* ReinforcementComp  =FAbilityHelpers::GetReinforcementAbilityComp(GetOwnerActor());
+	
+	if (not IsValid(ReinforcementComp))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+	UReinforcementPoint* ActivePoint = ReinforcementComp->GetActiveReinforcementPoint();
+	if(not IsValid(ActivePoint))
 	{
 		return ECommandQueueError::AbilityNotAllowed;
 	}
@@ -1098,7 +1108,7 @@ ECommandQueueError ICommands::Reinforce(AActor* ReinforcementTargetActor, const 
 		SetUnitToIdle();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
-		EAbilityID::IdReinforceSquad, FVector::ZeroVector, ReinforcementTargetActor, FRotator::ZeroRotator);
+		EAbilityID::IdReinforceSquad, FVector::ZeroVector, ActivePoint->GetOwner(), FRotator::ZeroRotator);
 	return Error;
 }
 

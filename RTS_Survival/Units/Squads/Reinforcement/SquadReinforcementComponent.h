@@ -46,11 +46,13 @@ class RTS_SURVIVAL_API USquadReinforcementComponent : public UActorComponent
 public:
 	USquadReinforcementComponent();
 
+	UReinforcementPoint* GetActiveReinforcementPoint() const;
 	/**
 	 * @brief Toggle the reinforcement ability on the owning squad controller.
 	 * @param bActivate True to add ability, false to remove.
+	 * @param InstigatingPoint
 	 */
-	void ActivateReinforcements(const bool bActivate);
+	void ActivateReinforcements(const bool bActivate, UReinforcementPoint* InstigatingPoint);
 
 	/**
 	 * @brief Update reinforcement availability when squad composition changes.
@@ -123,6 +125,10 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<ASquadController> M_SquadController;
+
+	// Set when close enough for reinforcement.
+	UPROPERTY()
+	TWeakObjectPtr<UReinforcementPoint> M_ReinforcementPoint;
 
 	UPROPERTY()
 	int32 M_MaxSquadUnits;

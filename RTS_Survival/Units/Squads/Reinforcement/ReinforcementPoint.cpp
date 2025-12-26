@@ -33,6 +33,8 @@ void UReinforcementPoint::InitReinforcementPoint(UMeshComponent* InMeshComponent
 void UReinforcementPoint::SetReinforcementEnabled(const bool bEnable)
 {
 	bM_ReinforcementEnabled = bEnable;
+	// Quick sweep of area of units that are already inside the radius when enabling.
+	OverlapOnReinforcementEnabled(M_ReinforcementActivationRadius, M_OwningPlayer, bEnable);
 
 	if (bM_ReinforcementEnabled)
 	{
@@ -147,7 +149,7 @@ bool UReinforcementPoint::CreateReinforcementTriggerSphere(const float Activatio
 	return true;
 }
 
-void UReinforcementPoint::HandleSquadUnitEnteredRadius(ASquadUnit* OverlappingUnit) const
+void UReinforcementPoint::HandleSquadUnitEnteredRadius(ASquadUnit* OverlappingUnit)
 {
 	if (not bM_ReinforcementEnabled)
 	{
@@ -181,7 +183,7 @@ void UReinforcementPoint::HandleSquadUnitEnteredRadius(ASquadUnit* OverlappingUn
 		DrawDebugStatusString(DebugString, DrawLocation);
 	}
 
-	ReinforcementComponent->ActivateReinforcements(true);
+	ReinforcementComponent->ActivateReinforcements(true, this);
 }
 
 void UReinforcementPoint::HandleSquadUnitExitedRadius(ASquadUnit* OverlappingUnit) const
@@ -210,7 +212,7 @@ void UReinforcementPoint::HandleSquadUnitExitedRadius(ASquadUnit* OverlappingUni
 	{
 		return;
 	}
-	ReinforcementComponent->ActivateReinforcements(false);
+	ReinforcementComponent->ActivateReinforcements(false, nullptr);
 }
 
 void UReinforcementPoint::OnReinforcementOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
@@ -228,12 +230,58 @@ void UReinforcementPoint::OnReinforcementOverlapEnd(UPrimitiveComponent* Overlap
 	HandleSquadUnitExitedRadius(OverlappingUnit);
 }
 
-void UReinforcementPoint::OverlapOnReinforcementEnabled(float Radius, int32 OwningPlayer, bool bEnable) const
+void UReinforcementPoint::OverlapOnReinforcementEnabled(const float Radius, const int32 OwningPlayer,
+                                                        const bool bEnable)
 {
-		// create a sphere overlap at owner location with given radius and player filter
-	ECollisionChannel CollisionChannel = OwningPlayer == 1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
-	
+	AActor* const OwnerActor = GetOwner();
+	if (!IsValid(OwnerActor))
+	{
+		RTSFunctionLibrary::ReportError("Reinforcement point has no valid owner for sphere overlap.");
+		return;
+	}
+
+	if (Radius <= 0.0f)
+	{
+		return;
+	}
+
+	UWorld* const World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	const ECollisionChannel CollisionChannel = (OwningPlayer == 1) ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
+
+	TArray<AActor*> OverlappingActors;
+	UKismetSystemLibrary::SphereOverlapActors(
+		World,
+		OwnerActor->GetActorLocation(),
+		Radius,
+		{UEngineTypes::ConvertToObjectType(CollisionChannel)},
+		ASquadUnit::StaticClass(), // class filter reduces work
+		{OwnerActor}, // ignore owner
+		OverlappingActors
+	);
+
+	for (AActor* const OverlappedActor : OverlappingActors)
+	{
+		ASquadUnit* const OverlappingUnit = Cast<ASquadUnit>(OverlappedActor);
+		if (!IsValid(OverlappingUnit))
+		{
+			continue;
+		}
+
+		if (bEnable)
+		{
+			HandleSquadUnitEnteredRadius(OverlappingUnit);
+			continue;
+		}
+
+		HandleSquadUnitExitedRadius(OverlappingUnit);
+	}
 }
+
 
 bool UReinforcementPoint::GetIsDebugEnabled() const
 {
@@ -247,13 +295,16 @@ void UReinforcementPoint::SetTriggerOverlapEnabled(const bool bEnable) const
 		return;
 	}
 
-	M_ReinforcementTriggerSphere->SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	M_ReinforcementTriggerSphere->SetCollisionEnabled(
+		bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 	M_ReinforcementTriggerSphere->SetGenerateOverlapEvents(bEnable);
 
 	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
 	{
 		const FVector DebugLocation = M_ReinforcementTriggerSphere->GetComponentLocation() + FVector::UpVector * 150.0f;
-		const FString DebugText = bEnable ? TEXT("Reinforcement Trigger Enabled") : TEXT("Reinforcement Trigger Disabled");
+		const FString DebugText = bEnable
+			                          ? TEXT("Reinforcement Trigger Enabled")
+			                          : TEXT("Reinforcement Trigger Disabled");
 		DrawDebugStatusString(DebugText, DebugLocation);
 	}
 }
