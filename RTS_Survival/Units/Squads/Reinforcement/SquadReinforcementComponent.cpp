@@ -598,7 +598,8 @@ void USquadReinforcementComponent::SpawnMissingUnits()
 			DrawReinforcementDebugString(TEXT("Reinforced unit spawned"), DebugLocation);
 		}
 	}
-
+	// Sets the unit data on the squad units and fixes health-bar calculations.
+	M_SquadController->OnSquadFullyReinforced();
 	MoveSpawnedUnitsToController(SpawnedUnits);
 	M_ReinforcementRequestState.M_PendingClasses.Reset();
 	M_ReinforcementRequestState.M_ReinforcementProvider.Reset();

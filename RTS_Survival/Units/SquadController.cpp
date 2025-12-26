@@ -239,7 +239,6 @@ ASquadController::ASquadController(): PlayerController(nullptr), RTSComponent(nu
 	M_SquadWeaponSwitch.Init(this);
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
-	
 }
 
 
@@ -258,8 +257,8 @@ TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 
 void ASquadController::SetSquadSpawnLocation(const FVector& SpawnLocation)
 {
-	M_SquadSpawnLocation.bIsSetByTrainer = true;	
-	M_SquadSpawnLocation.SpawnLocation = SpawnLocation; 
+	M_SquadSpawnLocation.bIsSetByTrainer = true;
+	M_SquadSpawnLocation.SpawnLocation = SpawnLocation;
 }
 
 
@@ -2077,6 +2076,28 @@ void ASquadController::RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit)
 	UpdateReinforcementAvailability();
 }
 
+void ASquadController::OnSquadFullyReinforced()
+{
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	if (not GameState)
+	{
+		return;
+	}
+	FSquadData SquadData = GameState->GetSquadDataOfPlayer(
+		RTSComponent->GetOwningPlayer(),
+		RTSComponent->GetSubtypeAsSquadSubtype());
+	InitSquadData_SetValues(SquadData.MaxWalkSpeedCms,
+	                        SquadData.MaxAcceleration, SquadData.MaxHealth, SquadData.VisionRadius,
+	                        RTSComponent->GetSubtypeAsSquadSubtype(), SquadData.ResistancesAndDamageMlt);
+	// After units are fully valid and any BP HP tweaks have run
+	InitSquadData_SetupSquadHealthAggregation();
+
+	if(GetIsValidPlayerController())
+	{
+		PlayerController->PlayVoiceLine(this, ERTSVoiceLine::SquadFullyReinforced, false, true);
+	}
+}
+
 TObjectPtr<USquadReinforcementComponent> ASquadController::GetSquadReinforcementComponent() const
 {
 	if (not GetIsValidSquadReinforcementComponent())
@@ -2134,7 +2155,7 @@ void ASquadController::StartGeneratingSpawnLocations(const FVector& GridOriginLo
 
 FVector ASquadController::GetSpawnLocationForSquad() const
 {
-	if(M_SquadSpawnLocation.bIsSetByTrainer)
+	if (M_SquadSpawnLocation.bIsSetByTrainer)
 	{
 		return M_SquadSpawnLocation.SpawnLocation;
 	}
@@ -2184,7 +2205,7 @@ FVector ASquadController::ProjectLocationOnNavMesh(const FVector& Location, cons
 
 void ASquadController::UpdateControllerPositionToAverage()
 {
-	if(not GetIsSquadFullyLoaded())
+	if (not GetIsSquadFullyLoaded())
 	{
 		return;
 	}
@@ -2331,67 +2352,67 @@ void ASquadController::OnRepairTargetFullyRepaired(AActor* RepairTarget)
 
 void ASquadController::UpdateSquadWeaponIcon()
 {
-        EnsureSquadUnitsValid();
-        EWeaponName WeaponWithHighestValue = EWeaponName::DEFAULT_WEAPON;
-        int32 HighestWeaponValue = -1;
-        for (auto EachSqUnit : M_TSquadUnits)
-        {
-                if (not EachSqUnit->GetWeaponState())
-                {
-                        continue;
-                }
-                const EWeaponName WeaponNameOfUnit = EachSqUnit->GetWeaponState()->GetRawWeaponData().WeaponName;
-                const int32 WeaponValue = Global_GetWeaponValue(WeaponNameOfUnit);
-                if (WeaponValue > HighestWeaponValue)
-                {
-                        HighestWeaponValue = WeaponValue;
-                        WeaponWithHighestValue = WeaponNameOfUnit;
-                }
-        }
-        SetWeaponIcon(WeaponWithHighestValue);
+	EnsureSquadUnitsValid();
+	EWeaponName WeaponWithHighestValue = EWeaponName::DEFAULT_WEAPON;
+	int32 HighestWeaponValue = -1;
+	for (auto EachSqUnit : M_TSquadUnits)
+	{
+		if (not EachSqUnit->GetWeaponState())
+		{
+			continue;
+		}
+		const EWeaponName WeaponNameOfUnit = EachSqUnit->GetWeaponState()->GetRawWeaponData().WeaponName;
+		const int32 WeaponValue = Global_GetWeaponValue(WeaponNameOfUnit);
+		if (WeaponValue > HighestWeaponValue)
+		{
+			HighestWeaponValue = WeaponValue;
+			WeaponWithHighestValue = WeaponNameOfUnit;
+		}
+	}
+	SetWeaponIcon(WeaponWithHighestValue);
 }
 
 void ASquadController::SetWeaponIcon(const EWeaponName HighestValuedWeapon)
 {
-        ESquadWeaponIcon SquadWeaponIcon = Global_GetWeaponIconForWeapon(HighestValuedWeapon);
-        if (not GetIsValidSquadHealthComponent())
-        {
-                return;
-        }
-        FSquadWeaponIconDisplaySettings WeaponIconSettings;
-        const bool bNotNone = SquadWeaponIcon != ESquadWeaponIcon::None;
-        if (const USquadWeaponIconSettings* Settings = USquadWeaponIconSettings::Get(); Settings && bNotNone)
-        {
-                const bool bHasSettings = Settings->TryGetWeaponIconSettings(SquadWeaponIcon, WeaponIconSettings);
-                if (not bHasSettings)
-                {
-                        const FString SquadWeaponIconStringFromUEnum = UEnum::GetValueAsString(SquadWeaponIcon);
-                        RTSFunctionLibrary::ReportError(
-                                "Squad controller wanted to set weapon icon with non null squad weapon icon of type:"
-                                + SquadWeaponIconStringFromUEnum
-                                + "\n but no icon settings were found in the USquadWeaponIconSettings! Does the mapping entry exist?");
-                        return;
-                }
-        }
-        SquadHealthComponent->UpdateSquadWeaponIcon(WeaponIconSettings);
+	ESquadWeaponIcon SquadWeaponIcon = Global_GetWeaponIconForWeapon(HighestValuedWeapon);
+	if (not GetIsValidSquadHealthComponent())
+	{
+		return;
+	}
+	FSquadWeaponIconDisplaySettings WeaponIconSettings;
+	const bool bNotNone = SquadWeaponIcon != ESquadWeaponIcon::None;
+	if (const USquadWeaponIconSettings* Settings = USquadWeaponIconSettings::Get(); Settings && bNotNone)
+	{
+		const bool bHasSettings = Settings->TryGetWeaponIconSettings(SquadWeaponIcon, WeaponIconSettings);
+		if (not bHasSettings)
+		{
+			const FString SquadWeaponIconStringFromUEnum = UEnum::GetValueAsString(SquadWeaponIcon);
+			RTSFunctionLibrary::ReportError(
+				"Squad controller wanted to set weapon icon with non null squad weapon icon of type:"
+				+ SquadWeaponIconStringFromUEnum
+				+ "\n but no icon settings were found in the USquadWeaponIconSettings! Does the mapping entry exist?");
+			return;
+		}
+	}
+	SquadHealthComponent->UpdateSquadWeaponIcon(WeaponIconSettings);
 }
 
 bool ASquadController::GetIsValidSquadUnit(const ASquadUnit* Unit) const
 {
-        if (not IsValid(Unit))
-        {
-                RTSFunctionLibrary::ReportError("Squad Unit is null when trying to accesss from array in SquadController!");
-                return false;
-        }
-        return true;
+	if (not IsValid(Unit))
+	{
+		RTSFunctionLibrary::ReportError("Squad Unit is null when trying to accesss from array in SquadController!");
+		return false;
+	}
+	return true;
 }
 
 bool ASquadController::GetIsValidSquadReinforcementComponent() const
 {
-        if (IsValid(SquadReinforcement))
-        {
-                return true;
-        }
+	if (IsValid(SquadReinforcement))
+	{
+		return true;
+	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this,
 	                                                      "SquadReinforcement",
 	                                                      "ASquadController::GetIsValidSquadReinforcementComponent",

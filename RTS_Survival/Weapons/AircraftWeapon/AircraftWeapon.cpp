@@ -114,6 +114,11 @@ FVector& UAircraftWeapon::GetFireDirection(const int32 WeaponIndex)
 	return M_FireDir;
 }
 
+FVector& UAircraftWeapon::GetTargetLocation(const int32 WeaponIndex)
+{
+	return M_TargetingData.GetActiveTargetLocation();	
+}
+
 bool UAircraftWeapon::AllowWeaponToReload(const int32 /*WeaponIndex*/) const
 {
 	if (M_LandedState == EAircraftLandingState::Landed)

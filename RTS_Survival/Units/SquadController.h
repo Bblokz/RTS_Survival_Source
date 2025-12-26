@@ -281,6 +281,8 @@ public:
 	 */
 	void RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit);
 
+	void OnSquadFullyReinforced();
+
 	/**
 	 * @brief Accessor for the reinforcement component managing this squad.
 	 * @return Reinforcement component or nullptr when missing.

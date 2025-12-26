@@ -59,6 +59,7 @@ enum class ERTSVoiceLine : uint8
 	UnitPromoted,
 	FireExtraWeapons,
 	SquadUnitLost,
+	SquadFullyReinforced,
 	EnterPosition,
 	ExitPosition,
 };
