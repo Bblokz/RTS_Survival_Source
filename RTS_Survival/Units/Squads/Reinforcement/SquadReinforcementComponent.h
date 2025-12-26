@@ -29,6 +29,9 @@ struct FReinforcementRequestState
 	FVector M_CachedLocation = FVector::ZeroVector;
 
 	UPROPERTY()
+	TWeakObjectPtr<UReinforcementPoint> M_ReinforcementProvider;
+
+	UPROPERTY()
 	TArray<TSubclassOf<ASquadUnit>> M_PendingClasses;
 };
 
@@ -108,9 +111,13 @@ private:
 	float CalculateReinforcementTime(const int32 MissingUnits) const;
 	bool GetMissingUnitClasses(TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses) const;
 	void ScheduleReinforcement(const float ReinforcementTime, const FVector& SpawnLocation,
-	                           const TArray<TSubclassOf<ASquadUnit>>& MissingUnitClasses);
+	                           const TArray<TSubclassOf<ASquadUnit>>& MissingUnitClasses,
+	                           UReinforcementPoint* ReinforcementPoint);
 	void SpawnMissingUnits();
 	void MoveSpawnedUnitsToController(const TArray<ASquadUnit*>& SpawnedUnits) const;
+	bool GetIsReinforcementPointEnabled(const UReinforcementPoint* ReinforcementPoint) const;
+	void DrawReinforcementDebugString(const FString& DebugText, const FVector& WorldLocation) const;
+	void DrawReinforcementDebugSphere(const FVector& WorldLocation, const float Radius, const FColor& Color) const;
 
 	bool bM_IsActivated;
 

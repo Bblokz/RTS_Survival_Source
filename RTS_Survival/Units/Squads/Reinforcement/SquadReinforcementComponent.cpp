@@ -3,6 +3,7 @@
 #include "SquadReinforcementComponent.h"
 
 #include "ReinforcementPoint.h"
+#include "DrawDebugHelpers.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
@@ -79,7 +80,15 @@ void USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementP
 	}
 
 	const float ReinforcementTime = CalculateReinforcementTime(MissingUnitCount);
-	ScheduleReinforcement(ReinforcementTime, ReinforcementLocation, MissingUnitClasses);
+	ScheduleReinforcement(ReinforcementTime, ReinforcementLocation, MissingUnitClasses, ReinforcementPoint);
+
+	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	{
+		const FString DebugText = FString::Printf(TEXT("Reinforcement scheduled - Units: %d Time: %.2fs"),
+		                                          MissingUnitCount, ReinforcementTime);
+		DrawReinforcementDebugString(DebugText, ReinforcementLocation + FVector::UpVector * 120.0f);
+		DrawReinforcementDebugSphere(ReinforcementLocation, 85.0f, FColor::Cyan);
+	}
 }
 
 void USquadReinforcementComponent::BeginPlay_InitSquadDataSnapshot()
@@ -289,6 +298,10 @@ bool USquadReinforcementComponent::GetIsReinforcementAllowed(UReinforcementPoint
 			"\nUSquadReinforcementComponent::GetIsReinforcementAllowed");
 		return false;
 	}
+	if (not GetIsReinforcementPointEnabled(ReinforcementPoint))
+	{
+		return false;
+	}
 	if (M_MaxSquadUnits <= 0)
 	{
 		RTSFunctionLibrary::ReportError("Max squad units not initialised for reinforcement."
@@ -462,11 +475,13 @@ bool USquadReinforcementComponent::GetMissingUnitClasses(TArray<TSubclassOf<ASqu
 }
 
 void USquadReinforcementComponent::ScheduleReinforcement(const float ReinforcementTime, const FVector& SpawnLocation,
-                                                         const TArray<TSubclassOf<ASquadUnit>>& MissingUnitClasses)
+                                                         const TArray<TSubclassOf<ASquadUnit>>& MissingUnitClasses,
+                                                         UReinforcementPoint* ReinforcementPoint)
 {
 	M_ReinforcementRequestState.bM_IsInProgress = true;
 	M_ReinforcementRequestState.M_CachedLocation = SpawnLocation;
 	M_ReinforcementRequestState.M_PendingClasses = MissingUnitClasses;
+	M_ReinforcementRequestState.M_ReinforcementProvider = ReinforcementPoint;
 
 	if (UWorld* World = GetWorld())
 	{
@@ -495,6 +510,7 @@ void USquadReinforcementComponent::ScheduleReinforcement(const float Reinforceme
 
 	M_ReinforcementRequestState.bM_IsInProgress = false;
 	M_ReinforcementRequestState.M_PendingClasses.Reset();
+	M_ReinforcementRequestState.M_ReinforcementProvider.Reset();
 }
 
 void USquadReinforcementComponent::SpawnMissingUnits()
@@ -502,6 +518,8 @@ void USquadReinforcementComponent::SpawnMissingUnits()
 	M_ReinforcementRequestState.bM_IsInProgress = false;
 	if (not GetIsValidSquadController())
 	{
+		M_ReinforcementRequestState.M_PendingClasses.Reset();
+		M_ReinforcementRequestState.M_ReinforcementProvider.Reset();
 		return;
 	}
 
@@ -510,12 +528,33 @@ void USquadReinforcementComponent::SpawnMissingUnits()
 	{
 		RTSFunctionLibrary::ReportError(TEXT("World is invalid while spawning reinforcements.")
 			TEXT("\nUSquadReinforcementComponent::SpawnMissingUnits"));
+		M_ReinforcementRequestState.M_PendingClasses.Reset();
+		M_ReinforcementRequestState.M_ReinforcementProvider.Reset();
 		return;
 	}
 
 	World->GetTimerManager().ClearTimer(M_ReinforcementRequestState.M_TimerHandle);
 
+	if (not GetIsReinforcementPointEnabled(M_ReinforcementRequestState.M_ReinforcementProvider.Get()))
+	{
+		if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+		{
+			const FVector DebugLocation = M_ReinforcementRequestState.M_CachedLocation + FVector::UpVector * 120.0f;
+			DrawReinforcementDebugString(TEXT("Reinforcement cancelled - provider disabled"), DebugLocation);
+		}
+		M_ReinforcementRequestState.M_PendingClasses.Reset();
+		M_ReinforcementRequestState.M_ReinforcementProvider.Reset();
+		return;
+	}
+
 	M_SquadController->BeginReinforcementSpawnGrid(M_SquadController->GetActorLocation());
+
+	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	{
+		DrawReinforcementDebugSphere(M_ReinforcementRequestState.M_CachedLocation, 110.0f, FColor::Green);
+		DrawReinforcementDebugString(TEXT("Spawning reinforcements"), M_ReinforcementRequestState.M_CachedLocation +
+			FVector::UpVector * 100.0f);
+	}
 
 	TArray<ASquadUnit*> SpawnedUnits;
 	for (const TSubclassOf<ASquadUnit> UnitClass : M_ReinforcementRequestState.M_PendingClasses)
@@ -542,10 +581,17 @@ void USquadReinforcementComponent::SpawnMissingUnits()
 		SpawnedUnit->OnSquadSpawned(false, 0.0f, M_ReinforcementRequestState.M_CachedLocation);
 		SpawnedUnits.Add(SpawnedUnit);
 		M_SquadController->RegisterReinforcedUnit(SpawnedUnit);
+
+		if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+		{
+			const FVector DebugLocation = SpawnedUnit->GetActorLocation() + FVector::UpVector * 100.0f;
+			DrawReinforcementDebugString(TEXT("Reinforced unit spawned"), DebugLocation);
+		}
 	}
 
 	MoveSpawnedUnitsToController(SpawnedUnits);
 	M_ReinforcementRequestState.M_PendingClasses.Reset();
+	M_ReinforcementRequestState.M_ReinforcementProvider.Reset();
 }
 
 void USquadReinforcementComponent::MoveSpawnedUnitsToController(const TArray<ASquadUnit*>& SpawnedUnits) const
@@ -563,5 +609,39 @@ void USquadReinforcementComponent::MoveSpawnedUnitsToController(const TArray<ASq
 		}
 		const FVector TargetLocation = M_SquadController->GetNextReinforcementSpawnLocation();
 		SpawnedUnit->ExecuteMoveToSelfPathFinding(TargetLocation, EAbilityID::IdMove);
+	}
+}
+
+bool USquadReinforcementComponent::GetIsReinforcementPointEnabled(const UReinforcementPoint* ReinforcementPoint) const
+{
+	if (not IsValid(ReinforcementPoint))
+	{
+		return false;
+	}
+
+	return ReinforcementPoint->GetIsReinforcementEnabled();
+}
+
+void USquadReinforcementComponent::DrawReinforcementDebugString(const FString& DebugText,
+                                                                const FVector& WorldLocation) const
+{
+	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			DrawDebugString(World, WorldLocation, DebugText, nullptr, FColor::Green, 2.0f, true);
+		}
+	}
+}
+
+void USquadReinforcementComponent::DrawReinforcementDebugSphere(const FVector& WorldLocation, const float Radius,
+                                                                const FColor& Color) const
+{
+	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			DrawDebugSphere(World, WorldLocation, Radius, 12, Color, false, 2.0f, 0, 2.0f);
+		}
 	}
 }

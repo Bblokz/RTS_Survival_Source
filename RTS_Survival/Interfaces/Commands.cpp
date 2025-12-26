@@ -696,7 +696,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		}
 	case EAbilityID::IdReinforceSquad:
 		{
-			M_Owner->ExecuteReinforceCommand();
+			M_Owner->ExecuteReinforceCommand(Cmd.TargetActor.Get());
 		}
 	// Also switch weapon case if we want:
 	case EAbilityID::IdSwitchWeapon:
@@ -1076,12 +1076,16 @@ ECommandQueueError ICommands::MoveToLocation(
 	return Error;
 }
 
-ECommandQueueError ICommands::Reinforce(const bool bSetUnitToIdle)
+ECommandQueueError ICommands::Reinforce(AActor* ReinforcementTargetActor, const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))
 	{
 		return ECommandQueueError::CommandDataInvalid;
+	}
+	if (not IsValid(ReinforcementTargetActor))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
 	}
 
 	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdReinforceSquad);
@@ -1094,7 +1098,8 @@ ECommandQueueError ICommands::Reinforce(const bool bSetUnitToIdle)
 		SetUnitToIdle();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
-		EAbilityID::IdReinforceSquad, FVector::ZeroVector, nullptr, FRotator::ZeroRotator);
+		EAbilityID::IdReinforceSquad, FVector::ZeroVector, ReinforcementTargetActor, FRotator::ZeroRotator);
+	return Error;
 }
 
 void ICommands::SetForceFinalRotationRegardlessOfReverse(const bool ForceUseFinalRotation)
@@ -1781,7 +1786,7 @@ void ICommands::TerminateMoveCommand()
 	}
 }
 
-void ICommands::ExecuteReinforceCommand()
+void ICommands::ExecuteReinforceCommand(AActor* ReinforcementTarget)
 {
 }
 
