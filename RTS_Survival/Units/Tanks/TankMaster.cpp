@@ -476,6 +476,38 @@ bool ATankMaster::GetIsValidBehaviourComponent() const
 	return true;
 }
 
+void ATankMaster::ApplyMovementBehaviours()
+{
+	if (not GetIsValidBehaviourComponent())
+	{
+		return;
+	}
+
+	for (const TSubclassOf<UBehaviour>& MovementBehaviourClass : OnMovementBehaviour)
+	{
+		if (MovementBehaviourClass)
+		{
+			BehaviourComponent->AddBehaviour(MovementBehaviourClass);
+		}
+	}
+}
+
+void ATankMaster::RemoveMovementBehaviours()
+{
+	if (not GetIsValidBehaviourComponent())
+	{
+		return;
+	}
+
+	for (const TSubclassOf<UBehaviour>& MovementBehaviourClass : OnMovementBehaviour)
+	{
+		if (MovementBehaviourClass)
+		{
+			BehaviourComponent->RemoveBehaviour(MovementBehaviourClass);
+		}
+	}
+}
+
 void ATankMaster::OnUnitIdleAndNoNewCommands()
 {
 	// Important; calls the delegate in base ICommands.
@@ -519,6 +551,7 @@ void ATankMaster::ExecuteAttackCommand(AActor* Target)
 
 void ATankMaster::ExecuteMoveCommand(const FVector MoveToLocation)
 {
+	ApplyMovementBehaviours();
 	SetTurretsToAutoEngage(true);
 	// Movement logic specific to child classes.
 }
@@ -652,16 +685,19 @@ void ATankMaster::TerminateAttackCommand()
 void ATankMaster::TerminateMoveCommand()
 {
 	Super::TerminateMoveCommand();
+	RemoveMovementBehaviours();
 }
 
 void ATankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
 {
+	ApplyMovementBehaviours();
 	SetTurretsToAutoEngage(true);
 }
 
 void ATankMaster::TerminateReverseCommand()
 {
 	Super::TerminateReverseCommand();
+	RemoveMovementBehaviours();
 }
 
 void ATankMaster::ExecuteAttackGroundCommand(const FVector GroundLocation)
