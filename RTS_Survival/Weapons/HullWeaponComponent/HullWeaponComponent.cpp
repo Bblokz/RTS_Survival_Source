@@ -127,6 +127,11 @@ FVector& UHullWeaponComponent::GetFireDirection(const int32 WeaponIndex)
 	return M_TargetDirectionVectorWorldSpace;
 }
 
+FVector& UHullWeaponComponent::GetTargetLocation(const int32 WeaponIndex)
+{
+	return M_TargetingData.GetActiveTargetLocation();
+}
+
 bool UHullWeaponComponent::AllowWeaponToReload(const int32 WeaponIndex) const
 {
 	return true;
@@ -659,7 +664,7 @@ bool UHullWeaponComponent::GetIsTargetInRange(const FVector& TargetLocation, con
 	return true;
 }
 
-bool UHullWeaponComponent::GetIsTargetWithinYaw() const
+bool UHullWeaponComponent::GetIsTargetWithinYaw()
 {
 	if (not GetIsValidHullWeaponMesh())
 	{

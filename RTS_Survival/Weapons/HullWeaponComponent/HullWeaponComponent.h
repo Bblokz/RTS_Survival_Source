@@ -83,6 +83,7 @@ protected:
 	// ---- Begin Override IWeaponOwner ----
 	virtual void OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon) override;
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) override final;
+	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override;
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override final;
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode) override final;
@@ -178,7 +179,7 @@ private:
 	// Reset the target and stop weapon fire.
 	void OnTargetInvalidOrOutOfReach();
 	bool GetIsTargetInRange(const FVector& TargetLocation, const FVector& WeaponLocation) const;
-	bool GetIsTargetWithinYaw() const;
+	bool GetIsTargetWithinYaw();
 
 	void GetClosestTarget();
 

@@ -53,6 +53,7 @@ protected:
 	// Start I Weapon owner interface.
 	virtual void OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon) override;
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) override;
+	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override;
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override;
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode) override;

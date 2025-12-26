@@ -543,6 +543,11 @@ FVector& AInfantryWeaponMaster::GetFireDirection(const int32 /*WeaponIndex*/)
 	return M_FireDirection;
 }
 
+FVector& AInfantryWeaponMaster::GetTargetLocation(const int32 WeaponIndex)
+{
+	return M_TargetingData.GetActiveTargetLocation();
+}
+
 bool AInfantryWeaponMaster::AllowWeaponToReload(const int32 /*WeaponIndex*/) const
 {
 	return true;
@@ -1034,7 +1039,7 @@ bool AInfantryWeaponMaster::SetAO_Walking(const float AngleToTarget) const
 	return false;
 }
 
-FVector AInfantryWeaponMaster::CalculateTargetDirection(const FVector& WeaponLocation) const
+FVector AInfantryWeaponMaster::CalculateTargetDirection(const FVector& WeaponLocation)
 {
 	// Use the struct's active aim location (already includes any aim offset logic).
 	const FVector AimpointWS = M_TargetingData.GetActiveTargetLocation();

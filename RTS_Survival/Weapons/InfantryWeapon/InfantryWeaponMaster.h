@@ -111,6 +111,7 @@ protected:
 	// ---- IWeaponOwner ----
 	virtual void OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon) override;
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) override;
+	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override;
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override;
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode) override;
@@ -171,7 +172,7 @@ private:
 	bool SetAO_Walking(const float AngleToTarget) const;
 
 	/** Compute look direction towards the struct’s active target location. */
-	FVector CalculateTargetDirection(const FVector& WeaponLocation) const;
+	FVector CalculateTargetDirection(const FVector& WeaponLocation);
 
 	void InitiateAutoEngageTimers();
 	void InitiateSpecificEngageTimers();
