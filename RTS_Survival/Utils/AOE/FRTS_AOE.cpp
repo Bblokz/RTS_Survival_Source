@@ -5,7 +5,6 @@
 #include "Async/Async.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
-#include "Physics/AsyncTrace.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -74,7 +73,7 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 		SafeRadius,
 		BuildObjectQueryParams(OverlapLogic),
 		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType](
-			TArray<FHitResult>&& HitResults)
+		TArray<FHitResult>&& HitResults)
 		{
 			if (not WeakDamageCauser.IsValid())
 			{
@@ -201,14 +200,14 @@ void FRTS_AOE::StartAsyncSphereSweep(
 
 	TraceDelegate.BindLambda(
 		[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete)](
-			const FTraceHandle& /*TraceHandle*/,
-			FTraceDatum& TraceDatum) mutable
+		const FTraceHandle& /*TraceHandle*/,
+		FTraceDatum& TraceDatum) mutable
 		{
 			TArray<FHitResult> HitResults = TraceDatum.OutHits;
 			AsyncTask(
 				ENamedThreads::GameThread,
 				[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete), HitResults = MoveTemp(HitResults)]()
-				mutable
+			mutable
 				{
 					if (not WeakInstigator.IsValid())
 					{
@@ -227,7 +226,7 @@ void FRTS_AOE::StartAsyncSphereSweep(
 		ObjectQueryParams,
 		SphereShape,
 		QueryParams,
-		FCollisionResponseParams::DefaultResponseParam,
-		&TraceDelegate
+		&TraceDelegate,
+		/*UserData*/ 0u
 	);
 }

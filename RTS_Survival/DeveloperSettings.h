@@ -1372,6 +1372,7 @@ namespace DeveloperSettings
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;
+		constexpr bool GAOELibrary_Compile_DebugSymbols = true;
 		// Damage taken on actors
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
 		// ICommands.
