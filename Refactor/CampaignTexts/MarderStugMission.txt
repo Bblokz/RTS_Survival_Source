@@ -1,0 +1,16 @@
+﻿
+setting: east germany.
+hills; factory with many unmanned nearly vehicles parked around;
+layers of trenches around the factory to defend it from all sides.
+one side has a bridge. one side is a hilly scorched landscape.
+
+the player needs to divide infantry between manning the trenches and capturing defenses and using scavengers to repair-capture the vehicles.
+there is a small area for a base where also radixite and metal can be harvested.
+
+the player must make sure the factory survives the soviet assault.
+
+all marders or stugs (depending on what the player picked) are available for capture from the start of the mission.
+in the beginning mostly light infantry and mechanized units will attack the player.
+later large formations of t-34s and kvs will appear.
+
+in the beginning some 

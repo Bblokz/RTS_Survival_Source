@@ -308,10 +308,6 @@ bool UTrackPathFollowingComponent::HasBlockingOverlaps() const
 void UTrackPathFollowingComponent::SetReverse(bool Reverse)
 {
 	bWantsReverse = Reverse;
-	if (Reverse)
-	{
-		ResetOverlapBlockingActorsForCommand();
-	}
 }
 
 bool UTrackPathFollowingComponent::IsReversing()
