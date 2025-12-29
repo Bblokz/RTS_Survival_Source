@@ -8,7 +8,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 
-void UW_GarrisonHealthBar::SetupGarrison(const int32 Slots, const int32 Seats,
+void UW_GarrisonHealthBar::SetupGarrison(const int32 Slots, const int32 Seats, const int32 MaxSquads,
                                          const EGarrisonSeatsTextType TypeText)
 {
 	// New logic: allow Slots == 0 (special case meaning "no boxes, seats only").
@@ -19,8 +19,11 @@ void UW_GarrisonHealthBar::SetupGarrison(const int32 Slots, const int32 Seats,
 	}
 
 	M_Slots = Slots;
-	M_MaxSeats = Seats;
+	M_MaxSeats = FMath::Max(0, Seats);
+	M_MaxSquads = FMath::Max(0, MaxSquads);
 	M_CurrentSeatsTaken = 0;
+	M_CurrentSquads = 0;
+	M_OccupiedSlots.Empty();
 
 	M_SeatsTextType = TypeText;
 	UpdateSeatsText();
@@ -41,7 +44,7 @@ void UW_GarrisonHealthBar::SetupGarrison(const int32 Slots, const int32 Seats,
 			                            : (Slots >= 3
 				                               ? ESlateVisibility::Visible
 				                               : ESlateVisibility::Collapsed));
-	bIsInitialized = true;
+	bM_IsInitialized = true;
 }
 
 void UW_GarrisonHealthBar::UpdateGarrisonSlot(const int32 SlotIndex, const bool bIsOccupied,
@@ -54,10 +57,20 @@ void UW_GarrisonHealthBar::UpdateGarrisonSlot(const int32 SlotIndex, const bool 
 	if (bIsOccupied)
 	{
 		M_CurrentSeatsTaken += SeatsTakenOrBecameVacant;
+		if (not M_OccupiedSlots.Contains(SlotIndex))
+		{
+			M_OccupiedSlots.Add(SlotIndex);
+			M_CurrentSquads = FMath::Clamp(M_CurrentSquads + 1, 0, M_MaxSquads);
+		}
 	}
 	else
 	{
 		M_CurrentSeatsTaken = FMath::Clamp(M_CurrentSeatsTaken - SeatsTakenOrBecameVacant, 0, M_MaxSeats);
+		if (M_OccupiedSlots.Contains(SlotIndex))
+		{
+			M_OccupiedSlots.Remove(SlotIndex);
+			M_CurrentSquads = FMath::Clamp(M_CurrentSquads - 1, 0, M_MaxSquads);
+		}
 	}
 	UpdateSeatsText();
 	// Zero slots is the special case where we let seats drive the UI only.
@@ -70,7 +83,7 @@ void UW_GarrisonHealthBar::UpdateGarrisonSlot(const int32 SlotIndex, const bool 
 
 void UW_GarrisonHealthBar::OnGarrisonEnabled(const bool bEnabled)
 {
-	if(not bIsInitialized)
+	if (not bM_IsInitialized)
 	{
 		RTSFunctionLibrary::ReportError("GarrisonHealthBar not initialized before OnGarrisonEnabled called");
 		return;
@@ -108,7 +121,14 @@ void UW_GarrisonHealthBar::ForceHideCargoUI()
 
 bool UW_GarrisonHealthBar::EnsureIsValidGarrisonSlot(const int32 SlotIndex) const
 {
-	if (SlotIndex < 0 || SlotIndex > 2)
+	if (SlotIndex < 0)
+	{
+		RTSFunctionLibrary::ReportError("no valid garrison slot"
+			"\n provided: " + FString::FromInt(SlotIndex) + "\n must be between 0 and 2");
+		return false;
+	}
+
+	if (M_Slots != 0 && SlotIndex > 2)
 	{
 		RTSFunctionLibrary::ReportError("no valid garrison slot"
 			"\n provided: " + FString::FromInt(SlotIndex) + "\n must be between 0 and 2");
@@ -119,10 +139,37 @@ bool UW_GarrisonHealthBar::EnsureIsValidGarrisonSlot(const int32 SlotIndex) cons
 
 void UW_GarrisonHealthBar::UpdateSeatsText() const
 {
-	const FString Seats = M_SeatsTextType == EGarrisonSeatsTextType::Seats ? "Seats: " : "Units: ";
+	FString Label;
+	int32 Current = 0;
+	int32 Max = 0;
+
+	switch (M_SeatsTextType)
+	{
+	case EGarrisonSeatsTextType::Seats:
+		Label = "Seats: ";
+		Current = M_CurrentSeatsTaken;
+		Max = M_MaxSeats;
+		break;
+	case EGarrisonSeatsTextType::Units:
+		Label = "Units: ";
+		Current = M_CurrentSeatsTaken;
+		Max = M_MaxSeats;
+		break;
+	case EGarrisonSeatsTextType::DisplayFullSquads:
+		Label = "Squads: ";
+		Current = M_CurrentSquads;
+		Max = M_MaxSquads;
+		break;
+	default:
+		Label = "Seats: ";
+		Current = M_CurrentSeatsTaken;
+		Max = M_MaxSeats;
+		break;
+	}
+
 	if (SeatText)
 	{
-		const FString SeatTexts = Seats + FString::FromInt(M_CurrentSeatsTaken) + "/" + FString::FromInt(M_MaxSeats);
+		const FString SeatTexts = Label + FString::FromInt(Current) + "/" + FString::FromInt(Max);
 		const FText MyRichText = FText::FromString(
 			FRTSRichTextConverter::MakeRTSRich(SeatTexts, ERTSRichText::Text_Seats));
 		SeatText->SetText(MyRichText);

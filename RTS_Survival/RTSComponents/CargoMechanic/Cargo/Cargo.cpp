@@ -472,9 +472,12 @@ void UCargo::InitGarrisonWidget()
 		M_VacancyState.M_MaxSquadsSupported = 16;
 	}
 
+	const int32 MaxSquadsForDisplay = M_VacancyState.M_MaxSquadsSupported;
+
 	M_GarrisonHpBarWidget->SetupGarrison(
 		SlotsForWidget,
 		TotalSeats,
+		MaxSquadsForDisplay,
 		M_SeatTextType);
 	// update in case the flag was changed while the widget UI was still async loading.
 	M_GarrisonHpBarWidget->OnGarrisonEnabled(bM_IsEnabled);
