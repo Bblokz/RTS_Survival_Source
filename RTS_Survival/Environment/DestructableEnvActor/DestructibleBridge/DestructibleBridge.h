@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
+#include "Engine/EngineTypes.h"
 #include "DestructibleBridge.generated.h"
 
+/** @brief A destructible bridge that removes actors standing on it when it collapses. */
 UCLASS()
 class RTS_SURVIVAL_API ADestructibleBridge : public ADestructableEnvActor
 {
@@ -20,6 +22,11 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void KillActorsOnBridge(UMeshComponent* BridgeMesh);
+
+private:
+	void HandleAsyncBridgeSweepComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum);
+
+	void TriggerKillOnActor(AActor* ActorToKill) const;
 
 
 };
