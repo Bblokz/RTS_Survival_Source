@@ -213,6 +213,38 @@ void ABuildingExpansion::VerticalDestruction(const FRTSVerticalCollapseSettings&
 		OnFinished);
 }
 
+void ABuildingExpansion::SetupComponentCollisions(TArray<UMeshComponent*> MeshComponents,
+                                                  TArray<UGeometryCollectionComponent*> GeometryComponents,
+                                                  const bool bStaticMeshesAffectNavMesh) const
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	if (IsValid(BuildingMeshComponent))
+	{
+		if (MeshComponents.Contains(BuildingMeshComponent))
+		{
+			RTSFunctionLibrary::ReportWarning("BuildingMeshComponent is already in the MeshComponents array!"
+				"\n At function: ABuildingExpansion::SetupComponentCollisions"
+				"\n For building expansion: " + GetName());
+		}
+		MeshComponents.Remove(BuildingMeshComponent);
+	}
+	const int32 OwningPlayer = RTSComponent->GetOwningPlayer();
+	FRTS_CollisionSetup::SetupBuildingExpansionCollision(BuildingMeshComponent, OwningPlayer,
+	                                                     bStaticMeshesAffectNavMesh);
+	for (const auto EachGeometryComp : GeometryComponents)
+	{
+		if (not IsValid(EachGeometryComp))
+		{
+			continue;
+		}
+		EachGeometryComp->SetCollisionEnabled(ECollisionEnabled::Type::NoCollision);
+		EachGeometryComp->SetSimulatePhysics(false);
+	}
+}
+
 void ABuildingExpansion::BeginDestroy()
 {
 	DestroyBuildingAttachments();

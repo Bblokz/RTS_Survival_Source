@@ -168,8 +168,11 @@ void AScavengeableObject::OnScavengingComplete()
 		return;
 	}
 
-	// Player obtains scavenging resources.
-	RandomRewardPlayer();
+	if (bGivePlayerResourceRewards)
+	{
+		// Player obtains scavenging resources.
+		RandomRewardPlayer();
+	}
 
 	AsyncLoadAndCreateRewardWidget();
 

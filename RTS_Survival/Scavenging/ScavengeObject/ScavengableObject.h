@@ -126,6 +126,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
 	USoundBase* RewardSoundOverride;
 
+	// Can be set to false so no resource reward widget will be created.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
+	bool bGivePlayerResourceRewards = true;
 
 	// the total time it takes to scavenge the object.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scavenge")

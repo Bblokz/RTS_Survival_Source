@@ -106,6 +106,13 @@ protected:
 		const FRTSVerticalCollapseSettings& CollapseSettings,
 		const FCollapseFX& CollapseFX);
 
+
+	// for auxillary components that may be part of the building expansion.
+	// NOTE: the main building mesh has collision set automatically with init function do not provide that mesh here!.
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetupComponentCollisions(TArray<UMeshComponent*> MeshComponents,
+	                              TArray<UGeometryCollectionComponent*> GeometryComponents, bool bStaticMeshesAffectNavMesh = false) const;
+
 	
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnVerticalDestructionComplete();
