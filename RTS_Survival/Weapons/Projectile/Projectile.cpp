@@ -846,6 +846,7 @@ void AProjectile::OnProjectileDormant()
 	SetActorHiddenInGame(true);
 	M_ProjectileMovement->Velocity = FVector::ZeroVector;
 	M_ProjectileMovement->Deactivate();
+	M_ProjectileMovement->ProjectileGravityScale = M_DefaultGravityScale;
 	StopDescentSound();
 	if (const UWorld* World = GetWorld())
 	{
@@ -868,6 +869,7 @@ void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator
 	if (GetIsValidProjectileMovement())
 	{
 		M_ProjectileMovement->Activate();
+		M_ProjectileMovement->ProjectileGravityScale = M_DefaultGravityScale;
 		const FVector Direction = LaunchRotation.Vector();
 		M_ProjectileMovement->Velocity = Direction * ProjectileSpeed;
 		DebugProjectile("Projectile speed: " + FString::SanitizeFloat(ProjectileSpeed));
@@ -1378,12 +1380,16 @@ void AProjectile::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	M_ProjectileMovement = FindComponentByClass<UProjectileMovementComponent>();
-	if (!IsValid(M_ProjectileMovement))
+	if (not IsValid(M_ProjectileMovement))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "ProjectileMovement", "PostInitComponents");
 	}
+	else
+	{
+		M_DefaultGravityScale = M_ProjectileMovement->ProjectileGravityScale;
+	}
 	M_NiagaraComponent = FindComponentByClass<UNiagaraComponent>();
-	if (!IsValid(M_NiagaraComponent))
+	if (not IsValid(M_NiagaraComponent))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "NiagaraComponent", "PostInitComponents");
 	}
