@@ -196,6 +196,124 @@ bool FSquadStartGameAction::ExecuteStartAbility() const
 	return true;
 }
 
+void FDamageSquadGameStart::ApplyStartDamageToSquad(const TArray<ASquadUnit*>& SquadUnits) const
+{
+	if (SquadUnits.IsEmpty())
+	{
+		return;
+	}
+
+	if (AmountSquadUnitsInstantKill > 0)
+	{
+		KillSquadUnits(SquadUnits, AmountSquadUnitsInstantKill);
+	}
+
+	if (AmountSquadUnitsPercentageDamage > 0)
+	{
+		DamageUnitsToPercentage(SquadUnits, AmountSquadUnitsPercentageDamage);
+	}
+}
+
+USquadUnitHealthComponent* FDamageSquadGameStart::GetValidSquadUnitHealthComponent(const ASquadUnit* SquadUnit) const
+{
+	if (not IsValid(SquadUnit))
+	{
+		return nullptr;
+	}
+
+	UHealthComponent* HealthComponent = SquadUnit->GetHealthComponent();
+	USquadUnitHealthComponent* SquadUnitHealthComponent = Cast<USquadUnitHealthComponent>(HealthComponent);
+	if (not IsValid(SquadUnitHealthComponent))
+	{
+		const FString UnitName = SquadUnit->GetName();
+		RTSFunctionLibrary::ReportError("SquadUnit " + UnitName +
+			" does not have a valid USquadUnitHealthComponent."
+			"\n At function: FDamageSquadGameStart::GetValidSquadUnitHealthComponent");
+		return nullptr;
+	}
+
+	return SquadUnitHealthComponent;
+}
+
+void FDamageSquadGameStart::KillSquadUnits(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToKill) const
+{
+	int32 RemainingUnitsToKill = UnitsToKill;
+	for (ASquadUnit* SquadUnit : SquadUnits)
+	{
+		if (RemainingUnitsToKill <= 0)
+		{
+			return;
+		}
+
+		USquadUnitHealthComponent* SquadUnitHealthComponent = GetValidSquadUnitHealthComponent(SquadUnit);
+		if (not IsValid(SquadUnitHealthComponent))
+		{
+			continue;
+		}
+
+		const float CurrentHealth = SquadUnitHealthComponent->GetCurrentHealth();
+		if (CurrentHealth <= 0.0f)
+		{
+			continue;
+		}
+
+		ASquadController* SquadController = SquadUnit->GetSquadControllerChecked();
+		if (not IsValid(SquadController) || not SquadController->GetIsValidSquadHealthComponent())
+		{
+			continue;
+		}
+
+		SquadUnitHealthComponent->SetCurrentHealth(0.0f);
+		SquadController->SquadHealthComponent->OnUnitStateChanged(SquadUnitHealthComponent,
+		                                                          SquadUnitHealthComponent->GetMaxHealth(),
+		                                                          0.0f,
+		                                                          true);
+		RemainingUnitsToKill--;
+	}
+}
+
+void FDamageSquadGameStart::DamageUnitsToPercentage(const TArray<ASquadUnit*>& SquadUnits,
+                                                    const int32 UnitsToDamage) const
+{
+	const float ClampedPercentageLifeLeft = FMath::Clamp(PercentageLifeLeft, 0.0f, 1.0f);
+
+	int32 RemainingUnitsToDamage = UnitsToDamage;
+	for (ASquadUnit* SquadUnit : SquadUnits)
+	{
+		if (RemainingUnitsToDamage <= 0)
+		{
+			return;
+		}
+
+		USquadUnitHealthComponent* SquadUnitHealthComponent = GetValidSquadUnitHealthComponent(SquadUnit);
+		if (not IsValid(SquadUnitHealthComponent))
+		{
+			continue;
+		}
+
+		const float MaxHealth = SquadUnitHealthComponent->GetMaxHealth();
+		const float TargetHealth = MaxHealth * ClampedPercentageLifeLeft;
+		const float CurrentHealth = SquadUnitHealthComponent->GetCurrentHealth();
+		if (CurrentHealth <= TargetHealth)
+		{
+			continue;
+		}
+
+		ASquadController* SquadController = SquadUnit->GetSquadControllerChecked();
+		if (not IsValid(SquadController) || not SquadController->GetIsValidSquadHealthComponent())
+		{
+			continue;
+		}
+
+		SquadUnitHealthComponent->SetCurrentHealth(TargetHealth);
+		SquadController->SquadHealthComponent->OnUnitStateChanged(SquadUnitHealthComponent,
+		                                                          MaxHealth,
+		                                                          TargetHealth,
+		                                                          true);
+		RemainingUnitsToDamage--;
+	}
+}
+
 FTargetPickupItemState::FTargetPickupItemState()
 	: M_TargetPickupItem(nullptr)
 	  , bIsBusyPickingUp(false)
@@ -2275,6 +2393,7 @@ void ASquadController::InitSquadData()
 	InitSquadData_InitExperienceComponent();
 	// After units are fully valid and any BP HP tweaks have run
 	InitSquadData_SetupSquadHealthAggregation();
+	DamageSquadGameStart.ApplyStartDamageToSquad(M_TSquadUnits);
 	// Notify callbacks set and future ones that the blueprint data is loaded on the squad controller.
 	SquadDataCallbacks.SetDataLoaded(true);
 	SquadDataCallbacks.OnSquadDataReady.Broadcast();

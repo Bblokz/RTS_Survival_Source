@@ -35,6 +35,7 @@ class UHealthComponent;
 class URTSComponent;
 class AScavengeableObject;
 struct FSquadWeaponSwitch;
+class USquadUnitHealthComponent;
 class USquadReinforcementComponent;
 class USoundBase;
 class USoundAttenuation;
@@ -73,6 +74,28 @@ private:
 	bool GetIsValidSquadController() const;
 	bool GetIsSquadFullyLoaded() const;
 	bool ExecuteStartAbility() const;
+};
+
+USTRUCT(BlueprintType)
+struct FDamageSquadGameStart
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad|GameStart")
+	int32 AmountSquadUnitsInstantKill = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad|GameStart")
+	int32 AmountSquadUnitsPercentageDamage = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad|GameStart")
+	float PercentageLifeLeft = 0.0f;
+
+	void ApplyStartDamageToSquad(const TArray<ASquadUnit*>& SquadUnits) const;
+
+private:
+	USquadUnitHealthComponent* GetValidSquadUnitHealthComponent(const ASquadUnit* SquadUnit) const;
+	void KillSquadUnits(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToKill) const;
+	void DamageUnitsToPercentage(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToDamage) const;
 };
 // Work around to set the spawn location for the squad from the trainer.
 USTRUCT()
@@ -226,6 +249,9 @@ public:
 
 	// To register callbacks once the data from blueprint is loaded into the squad.
 	FSquadDataCallbacks SquadDataCallbacks;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad|GameStart")
+	FDamageSquadGameStart DamageSquadGameStart;
 
 
 	bool GetIsSquadFullyLoaded() const;

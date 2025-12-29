@@ -13,4 +13,12 @@ all marders or stugs (depending on what the player picked) are available for cap
 in the beginning mostly light infantry and mechanized units will attack the player.
 later large formations of t-34s and kvs will appear.
 
-in the beginning some 
+in the beginning some resistance infantry (kar +MG34) will be in trenches and the player has access to scavengers to repair vehicles
+defenses help support the other infantry.
+
+how the defense looks like now:
+north: 2 bridges.
+east: small ramp towards factory (factory is on the hill)  that connects with the landslide from the bridges that continues south.
+south large ramp with many trenches to defend the largest waves.
+west: build area; base start with harvesters and resources.
+middle/top hill: factory with marders or stugs to capture.
