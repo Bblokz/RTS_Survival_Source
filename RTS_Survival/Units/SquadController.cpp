@@ -1210,7 +1210,16 @@ void ASquadController::ExecuteCaptureCommand(AActor* CaptureTarget)
 	M_CaptureState.M_TargetCaptureActor = CaptureTarget;
 
 	// Move the squad towards the closest capture location exposed by the actor.
-	const FVector MoveToLocation = CaptureInterface->GetCaptureLocationClosestTo(GetActorLocation());
+	FVector MoveToLocation = CaptureInterface->GetCaptureLocationClosestTo(GetActorLocation());
+	// Project to navmesh.
+	bool bWasSuccessfull = false;
+	MoveToLocation = RTSFunctionLibrary::GetLocationProjected(this, MoveToLocation, true, bWasSuccessfull, 1.f);
+	if (not bWasSuccessfull)
+	{
+		const FString CaptureActorName = CaptureTarget ? CaptureTarget->GetName() : "nullptr";
+		RTSFunctionLibrary::ReportWarning("Failed to project location for capture command!"
+			"\n Capture actor: " + CaptureActorName + "\n");
+	}
 	GeneralMoveToForAbility(MoveToLocation, EAbilityID::IdCapture);
 }
 
@@ -2210,7 +2219,7 @@ void ASquadController::OnSquadFullyReinforced()
 	// After units are fully valid and any BP HP tweaks have run
 	InitSquadData_SetupSquadHealthAggregation();
 
-	if(GetIsValidPlayerController())
+	if (GetIsValidPlayerController())
 	{
 		PlayerController->PlayVoiceLine(this, ERTSVoiceLine::SquadFullyReinforced, false, true);
 	}

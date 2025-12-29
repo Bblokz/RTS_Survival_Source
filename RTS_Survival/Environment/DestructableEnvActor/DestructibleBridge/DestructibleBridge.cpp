@@ -39,7 +39,8 @@ void ADestructibleBridge::KillActorsOnBridge(UMeshComponent* BridgeMesh)
 	const FCollisionShape CollisionShape = FCollisionShape::MakeBox(MeshBounds.BoxExtent);
 	constexpr ECollisionChannel TraceChannel = ECC_WorldDynamic;
 
-	FCollisionQueryParams QueryParams(SCENEQUERY_STAT(KillActorsOnBridge), false, this);
+	FCollisionQueryParams QueryParams;
+	QueryParams.bTraceComplex = false;
 	QueryParams.AddIgnoredActor(this);
 
 	FTraceDelegate TraceDelegate;
