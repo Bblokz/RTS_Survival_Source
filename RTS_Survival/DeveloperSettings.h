@@ -739,7 +739,7 @@ namespace DeveloperSettings
 			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500* OverallHealthMlt);
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
 			inline constexpr float T3BxpBunkerHealth = RoundToNearestMultipleOfFive(1600 * OverallHealthMlt);
-			inline constexpr float BxpHeavyBunker = RoundToNearestMultipleOfFive(2400 * OverallHealthMlt);
+			inline constexpr float BxpHeavyBunkerHealth = RoundToNearestMultipleOfFive(2400 * OverallHealthMlt);
 
 			// Infantry health Settings
 			inline constexpr float BasicInfantryHealth = RoundToNearestMultipleOfFive(200.f * OverallHealthMlt);

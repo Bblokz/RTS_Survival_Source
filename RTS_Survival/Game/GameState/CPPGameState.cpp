@@ -4803,6 +4803,17 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.75, 10);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Pak38, BxpData);
 
+	// FLAK BUNKER
+	BxpData.ConstructionTime = BxpT2BuildTime;
+	BxpData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(BxpT2BunkerRadixiteCost * 4, 5)},
+		{ERTSResourceType::Resource_Metal, RTSFunctionLibrary::RoundToNearestMultipleOf(HeavyBunkerMetalCost* 2, 5)}
+	});
+	BxpData.Abilities = ArmedBxpAbilities;
+	BxpData.VisionRadius = T2BxpVisionRadius;
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth * 2.5, 10);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BXT_GerFLakBunker, BxpData);
+
 	BxpData.ConstructionTime = BxpT2BuildTime;
 	BxpData.VisionRadius = T2BxpVisionRadius;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.75, 10);
@@ -5086,7 +5097,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunker + 250, 10);
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth + 250, 10);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker05, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5102,7 +5113,7 @@ void ACPPGameState::InitAllGameBxpData()
 			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerMetalCost - 100), 10)
 		},
 	});
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunker, 10);
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth, 10);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker05_WithTurrets, BxpData);
 
 
@@ -5119,7 +5130,7 @@ void ACPPGameState::InitAllGameBxpData()
 			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerMetalCost), 10)
 		},
 	});
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunker, 10);
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth, 10);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker02_ZIS, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5135,7 +5146,7 @@ void ACPPGameState::InitAllGameBxpData()
 			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerMetalCost * 1.33), 20)
 		},
 	});
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunker + 200, 10);
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth + 200, 10);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker02_204MM, BxpData);
 
 	// -----------------------------------------------------------------------

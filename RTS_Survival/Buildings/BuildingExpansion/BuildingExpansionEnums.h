@@ -37,13 +37,14 @@ enum class EBuildingExpansionType : uint8
 	//
 	// DEFENSIVE
 	//
+	BXT_GerFLakBunker UMETA(DisplayName = "Ger Flak Bunker Expansion"),
 	BXT_88mmFlak UMETA(DisplayName = "88mm Flak Expansion"),
 	BTX_20mmFlak UMETA(DisplayName = "20mm Flak Expansion"),
 	BXT_QuadFlak UMETA(DisplayName = "Quad Flak Expansion"),
 	BTX_37mmFlak UMETA(DisplayName = "37mm Flak Expansion"),
 	BTX_Pak38 UMETA(DisplayName = "Pak 38 Expansion"),
 	BTX_LeFH_150mm UMETA(DisplayName = "LeFH 150mm Expansion"),
-	
+
 	// Capture Bunkers
 	BTX_Ger37MMCaptureBunker UMETA(DisplayName = "Ger 37MM Capture Bunker"),
 	BTX_GerTurretCaptureBunker UMETA(DisplayName = "Ger Turret Capture Bunker"),
@@ -73,7 +74,7 @@ enum class EBuildingExpansionType : uint8
 	BTX_RusFuelStorage1 UMETA(DisplayName = "Rus Fuel Storage 1"),
 	BTX_RusFuelStorage2 UMETA(DisplayName = "Rus Fuel Storage 2"),
 	BTX_Rus_SuppliesStorage UMETA(DisplayName = "Rus Supplies Storage"),
-	
+
 
 	//
 	// ENERGY
@@ -110,8 +111,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusFuelStorage1");
 	case EBuildingExpansionType::BTX_RusFuelStorage2:
 		return FString("BTX_RusFuelStorage2");
-		case EBuildingExpansionType::BTX_Rus_SuppliesStorage:
-			return FString("BTX_Rus_SuppliesStorage");
+	case EBuildingExpansionType::BTX_Rus_SuppliesStorage:
+		return FString("BTX_Rus_SuppliesStorage");
 	case EBuildingExpansionType::BTX_RusPlatformFactory:
 		return FString("BTX_RusPlatformFactory");
 	case EBuildingExpansionType::BTX_RusFactory:
@@ -152,12 +153,11 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerHQTower");
 	case EBuildingExpansionType::BTX_RefConverter:
 		return FString("BTX_RefConverter");
-		
+
 	default:
-		 FString EnumString = UEnum::GetValueAsString(BxpType);
+		FString EnumString = UEnum::GetValueAsString(BxpType);
 		EnumString.RemoveFromStart("EBuildingExpansionType::");
 		return EnumString;
-	
 	}
 }
 
@@ -166,49 +166,50 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 {
 	switch (BxpType)
 	{
-	case EBuildingExpansionType::BTX_GerHQRadar:                return TEXT("HQ Radar");
-	case EBuildingExpansionType::BTX_GerHQPlatform:             return TEXT("HQ Platform");
-	case EBuildingExpansionType::BTX_GerHQHarvester:            return TEXT("HQ Harvester Hub");
-	case EBuildingExpansionType::BTX_GerHQRepairBay:            return TEXT("HQ Repair Bay");
-	case EBuildingExpansionType::BTX_GerHQTower:                return TEXT("HQ GuardTower");
+	case EBuildingExpansionType::BTX_GerHQRadar: return TEXT("HQ Radar");
+	case EBuildingExpansionType::BTX_GerHQPlatform: return TEXT("HQ Platform");
+	case EBuildingExpansionType::BTX_GerHQHarvester: return TEXT("HQ Harvester Hub");
+	case EBuildingExpansionType::BTX_GerHQRepairBay: return TEXT("HQ Repair Bay");
+	case EBuildingExpansionType::BTX_GerHQTower: return TEXT("HQ GuardTower");
 
-	case EBuildingExpansionType::BTX_GerBarracksRadixReactor:   return TEXT("Barracks Radix Reactor");
-	case EBuildingExpansionType::BTX_GerBarrackFuelCell:        return TEXT("Barracks Fuel Cell");
+	case EBuildingExpansionType::BTX_GerBarracksRadixReactor: return TEXT("Barracks Radix Reactor");
+	case EBuildingExpansionType::BTX_GerBarrackFuelCell: return TEXT("Barracks Fuel Cell");
 
-	case EBuildingExpansionType::BTX_GerLFactoryRadixiteReactor:return TEXT("Light Factory Radixite Reactor");
-	case EBuildingExpansionType::BTX_GerLFactoryFuelStorage:    return TEXT("Light Factory Fuel Storage");
+	case EBuildingExpansionType::BTX_GerLFactoryRadixiteReactor: return TEXT("Light Factory Radixite Reactor");
+	case EBuildingExpansionType::BTX_GerLFactoryFuelStorage: return TEXT("Light Factory Fuel Storage");
 
-	case EBuildingExpansionType::BTX_20mmFlak:                  return TEXT("20mm FLAK");
-	case EBuildingExpansionType::BXT_88mmFlak:                  return TEXT("88mm FLAK");
-	case EBuildingExpansionType::BXT_QuadFlak:                  return TEXT("Quad FLAK");
-	case EBuildingExpansionType::BTX_37mmFlak:                  return TEXT("37mm FLAK");
-	case EBuildingExpansionType::BTX_Pak38:                     return TEXT("Pak 38");
-	case EBuildingExpansionType::BTX_LeFH_150mm:                return TEXT("LeFH 150mm");
+	case EBuildingExpansionType::BTX_20mmFlak: return TEXT("20mm FLAK");
+	case EBuildingExpansionType::BXT_GerFLakBunker: return TEXT("FLAK Bunker");
+	case EBuildingExpansionType::BXT_88mmFlak: return TEXT("88mm FLAK");
+	case EBuildingExpansionType::BXT_QuadFlak: return TEXT("Quad FLAK");
+	case EBuildingExpansionType::BTX_37mmFlak: return TEXT("37mm FLAK");
+	case EBuildingExpansionType::BTX_Pak38: return TEXT("Pak 38");
+	case EBuildingExpansionType::BTX_LeFH_150mm: return TEXT("LeFH 150mm");
 
-	case EBuildingExpansionType::BTX_Bunker05_WithTurrets:      return TEXT("Bunker 05 With Turrets");
-	case EBuildingExpansionType::BTX_Bunker05:                  return TEXT("Bunker 05");
-	case EBuildingExpansionType::BTX_Bunker02_ZIS:              return TEXT("Bunker 02 ZIS");
-	case EBuildingExpansionType::BTX_Bunker02_204MM:            return TEXT("Bunker 02 204MM");
-	case EBuildingExpansionType::BTX_RusBunkerMG:               return TEXT("Bunker MG");
-	case EBuildingExpansionType::BTX_RusBoforsPosition:         return TEXT("Bofors Position");
-	case EBuildingExpansionType::BTX_RusGuardTower:             return TEXT("Guard Tower");
-	case EBuildingExpansionType::BTX_RusLongCamoBunker:         return TEXT("Long Camo Bunker");
-	case EBuildingExpansionType::BTX_RusDomeBunker:             return TEXT("Dome Bunker");
+	case EBuildingExpansionType::BTX_Bunker05_WithTurrets: return TEXT("Bunker 05 With Turrets");
+	case EBuildingExpansionType::BTX_Bunker05: return TEXT("Bunker 05");
+	case EBuildingExpansionType::BTX_Bunker02_ZIS: return TEXT("Bunker 02 ZIS");
+	case EBuildingExpansionType::BTX_Bunker02_204MM: return TEXT("Bunker 02 204MM");
+	case EBuildingExpansionType::BTX_RusBunkerMG: return TEXT("Bunker MG");
+	case EBuildingExpansionType::BTX_RusBoforsPosition: return TEXT("Bofors Position");
+	case EBuildingExpansionType::BTX_RusGuardTower: return TEXT("Guard Tower");
+	case EBuildingExpansionType::BTX_RusLongCamoBunker: return TEXT("Long Camo Bunker");
+	case EBuildingExpansionType::BTX_RusDomeBunker: return TEXT("Dome Bunker");
 
-	case EBuildingExpansionType::BTX_RusBarracks:               return TEXT("Barracks");
-	case EBuildingExpansionType::BTX_RusFactory:                return TEXT("Factory");
-	case EBuildingExpansionType::BTX_RusAmmoStorage:            return TEXT("Ammo Storage");
-	case EBuildingExpansionType::BTX_RusResearchCenter:         return TEXT("Research Center");
-	case EBuildingExpansionType::BTX_RusPlatformFactory:        return TEXT("Platform Factory");
-	case EBuildingExpansionType::BTX_RusCoolingTowers:          return TEXT("Cooling Towers");
-	case EBuildingExpansionType::BTX_RusFuelStorage1:           return TEXT("Fuel Storage 1");
-	case EBuildingExpansionType::BTX_RusFuelStorage2:           return TEXT("Fuel Storage 2");
-	case EBuildingExpansionType::BTX_Rus_SuppliesStorage:       return TEXT("Supplies Storage");
+	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
+	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");
+	case EBuildingExpansionType::BTX_RusAmmoStorage: return TEXT("Ammo Storage");
+	case EBuildingExpansionType::BTX_RusResearchCenter: return TEXT("Research Center");
+	case EBuildingExpansionType::BTX_RusPlatformFactory: return TEXT("Platform Factory");
+	case EBuildingExpansionType::BTX_RusCoolingTowers: return TEXT("Cooling Towers");
+	case EBuildingExpansionType::BTX_RusFuelStorage1: return TEXT("Fuel Storage 1");
+	case EBuildingExpansionType::BTX_RusFuelStorage2: return TEXT("Fuel Storage 2");
+	case EBuildingExpansionType::BTX_Rus_SuppliesStorage: return TEXT("Supplies Storage");
 
-	case EBuildingExpansionType::BXT_SolarSmall:                return TEXT("Small Solar Panel");
-	case EBuildingExpansionType::BXT_SolarLarge:                return TEXT("Large Solar Panel");
+	case EBuildingExpansionType::BXT_SolarSmall: return TEXT("Small Solar Panel");
+	case EBuildingExpansionType::BXT_SolarLarge: return TEXT("Large Solar Panel");
 
-	case EBuildingExpansionType::BTX_RefConverter:              return TEXT("Refinery Converter");
+	case EBuildingExpansionType::BTX_RefConverter: return TEXT("Refinery Converter");
 
 	default:
 		break;
