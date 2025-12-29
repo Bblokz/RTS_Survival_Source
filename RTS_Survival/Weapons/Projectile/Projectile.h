@@ -467,6 +467,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UProjectileMovementComponent> M_ProjectileMovement;
 
+	// Cached gravity scale so pooled projectiles can reset between different weapon types.
+	UPROPERTY()
+	float M_DefaultGravityScale = 0.0f;
+
 	UPROPERTY()
 	UNiagaraComponent* M_NiagaraComponent;
 
