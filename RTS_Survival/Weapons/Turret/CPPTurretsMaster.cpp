@@ -1158,19 +1158,29 @@ void ACPPTurretsMaster::RotateTurret_LocalIdle(const float DeltaTime)
 
 void ACPPTurretsMaster::RotateTurret_WorldSteering(const float DeltaTime)
 {
-	if (not SceneSkeletalMesh)
+	if (not GetIsValidSceneSkeletalMesh())
 	{
 		return;
 	}
 
+	const USceneComponent* const ParentComponent = SceneSkeletalMesh->GetAttachParent();
+	const FRotator ParentRotation = ParentComponent
+		? ParentComponent->GetComponentRotation()
+		: SceneSkeletalMesh->GetComponentRotation();
+
+	const FRotator TargetRotationWithTilt = FRotator(
+		ParentRotation.Pitch,
+		SteeringState.M_TargetRotator.Yaw,
+		ParentRotation.Roll);
+
 	const FRotator Current = SceneSkeletalMesh->GetComponentRotation();
-	const FRotator Delta = (SteeringState.M_TargetRotator - Current).GetNormalized();
-	const float AngleDifference = FMath::Abs((SteeringState.M_TargetRotator - Current).Yaw);
+	const FRotator Delta = (TargetRotationWithTilt - Current).GetNormalized();
+	const float AngleDifference = FMath::Abs((TargetRotationWithTilt - Current).Yaw);
 
 	if (Delta.IsNearlyZero())
 	{
 		bM_IsRotatedToEngage = true;
-		SceneSkeletalMesh->SetWorldRotation(SteeringState.M_TargetRotator);
+		SceneSkeletalMesh->SetWorldRotation(TargetRotationWithTilt);
 		StopTurretRotation();
 		return;
 	}
