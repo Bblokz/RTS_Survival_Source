@@ -71,6 +71,50 @@ void UEnemyWaveController::StartNewAttackWave(
 	}
 }
 
+void UEnemyWaveController::StartSingleAttackWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	const int32 MaxFormationWidth,
+	const float TimeTillWave,
+	AActor* WaveCreator)
+{
+	if (not GetIsValidSingleAttackWave(WaveType, WaveElements, Waypoints, WaveCreator))
+	{
+		return;
+	}
+	if (not GetIsValidAsyncSpawner() || not EnsureEnemyControllerIsValid())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid async spawner or enemy controller for enemy wave controller. Cannot start single attack wave.");
+		return;
+	}
+	const int32 UniqueWaveID = GetUniqueWaveID();
+	const float ClampedTimeTillWave = FMath::Max(TimeTillWave, 0.f);
+	const bool bIsSingleWave = true;
+	if (not CreateNewAttackWaveStruct(
+		UniqueWaveID,
+		WaveType,
+		WaveElements, ClampedTimeTillWave, 0.f, Waypoints, FinalWaypointDirection,
+		MaxFormationWidth, WaveCreator, {}, 0.f, bIsSingleWave))
+	{
+		RTSFunctionLibrary::ReportError("failed to create struct for single attack wave!");
+		return;
+	}
+	FAttackWave* AttackWave = GetAttackWaveByID(UniqueWaveID);
+	if (not AttackWave)
+	{
+		return;
+	}
+	const bool bInstantStart = ClampedTimeTillWave <= 0.f;
+	if (not CreateAttackWaveTimer(AttackWave, bInstantStart))
+	{
+		RTSFunctionLibrary::ReportError("Failed to start attack wave timer for single wave, will remove the struct!");
+		RemoveAttackWaveByIDAndInvalidateTimer(AttackWave);
+	}
+}
+
 void UEnemyWaveController::InitWaveController(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
@@ -132,7 +176,8 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
                                                      const int32 MaxFormationWidth,
                                                      AActor* WaveCreator,
                                                      const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings,
-                                                     const float PerAffectingBuildingTimerFraction)
+                                                     const float PerAffectingBuildingTimerFraction,
+                                                     const bool bIsSingleWave)
 {
 	// Sanity check for unique ID
 	if (not EnsureIDIsUnique(UniqueID))
@@ -155,6 +200,7 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
 	NewAttackWave.FinalWaypointDirection = FinalWaypointDirection;
 	NewAttackWave.MaxFormationWidth = MaxFormationWidth;
 	NewAttackWave.UniqueWaveID = UniqueID;
+	NewAttackWave.bIsSingleWave = bIsSingleWave;
 	M_AttackWaves.Add(NewAttackWave);
 	return true;
 }
@@ -438,6 +484,12 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 		Wave->FinalWaypointDirection,
 		Wave->MaxFormationWidth);
 
+	if (Wave->bIsSingleWave)
+	{
+		RemoveAttackWaveByIDAndInvalidateTimer(Wave);
+		return;
+	}
+
 	const bool bInstantStartWave = false;
 	CreateAttackWaveTimer(Wave, bInstantStartWave);
 }
@@ -513,6 +565,38 @@ bool UEnemyWaveController::GetIsValidWave(const EEnemyWaveType WaveType,
 		return false;
 	}
 	if (not GetIsValidWaveType(WaveType, WaveCreator, WaveTimerAffectingBuildings, PerAffectingBuildingTimerFraction))
+	{
+		return false;
+	}
+	return true;
+}
+
+bool UEnemyWaveController::GetIsValidSingleAttackWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const TArray<FVector>& Waypoints,
+	AActor* WaveCreator) const
+{
+	if (WaveType == EEnemyWaveType::Wave_OwningBuildingAndPowerGenerators)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid enemy wave: Single attack waves do not support Wave_OwningBuildingAndPowerGenerators.");
+		return false;
+	}
+	if (WaveType == EEnemyWaveType::Wave_None)
+	{
+		RTSFunctionLibrary::ReportError("Invalid enemy wave: Wave type is set to None.");
+		return false;
+	}
+	if (not GetAreWaveElementsValid(WaveElements))
+	{
+		return false;
+	}
+	if (not GetAreWavePointsValid(Waypoints))
+	{
+		return false;
+	}
+	if (not GetIsValidWaveType(WaveType, WaveCreator))
 	{
 		return false;
 	}

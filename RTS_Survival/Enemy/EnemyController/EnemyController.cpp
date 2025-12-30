@@ -60,6 +60,30 @@ void AEnemyController::CreateAttackWave(const EEnemyWaveType WaveType, const TAr
 		PerAffectingBuildingTimerFraction);
 }
 
+void AEnemyController::CreateSingleAttackWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	const int32 MaxFormationWidth,
+	const float TimeTillWave,
+	AActor* WaveCreator)
+{
+	if (not GetIsValidWaveController())
+	{
+		return;
+	}
+	const float ClampedTimeTillWave = FMath::Max(TimeTillWave, 0.f);
+	M_WaveController->StartSingleAttackWave(
+		WaveType,
+		WaveElements,
+		Waypoints,
+		FinalWaypointDirection,
+		MaxFormationWidth,
+		ClampedTimeTillWave,
+		WaveCreator);
+}
+
 void AEnemyController::DebugAllActiveFormations() const
 {
 	if(not GetIsValidFormationController())
@@ -86,13 +110,13 @@ void AEnemyController::PostInitializeComponents()
 
 	// Register this controller with the world subsystem
 	UWorld* World = GetWorld();
-	if (!IsValid(World))
+	if (not IsValid(World))
 	{
 		return;
 	}
 
 	UEnemyControllerSubsystem* Subsystem = World->GetSubsystem<UEnemyControllerSubsystem>();
-	if (!IsValid(Subsystem))
+	if (not IsValid(Subsystem))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Could not find EnemyControllerSubsystem to register controller."));
 		return;
@@ -120,6 +144,4 @@ bool AEnemyController::GetIsValidWaveController() const
 	}
 	return true;
 }
-
-
 
