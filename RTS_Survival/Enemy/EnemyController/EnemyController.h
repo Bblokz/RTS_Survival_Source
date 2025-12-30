@@ -16,6 +16,9 @@ class UEnemyFormationController;
 class ATankMaster;
 class ASquadController;
 
+/**
+ * @brief Coordinates enemy formations and wave orchestration for AI-controlled assaults.
+ */
 UCLASS()
 class RTS_SURVIVAL_API AEnemyController : public AActorObjectsMaster
 {
@@ -66,6 +69,26 @@ public:
 		AActor* WaveCreator,
 		TArray<AActor*> WaveTimerAffectingBuildings,
 		const float PerAffectingBuildingTimerFraction = 0.f);
+
+	/**
+	 * @brief Creates a one-off enemy attack wave with an optional delay before spawning.
+	 * @param WaveType Determines wave logic and whether an owning actor is required.
+	 * @param WaveElements Defines a unit type and spawn point.
+	 * @param Waypoints The waypoints that the formation will move to.
+	 * @param FinalWaypointDirection The final direction the formation will face when it reaches the last waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to eachother.
+	 * @param TimeTillWave Delay before starting the wave; zero or less starts immediately.
+	 * @param WaveCreator The actor that spawns this wave needs to be RTS IsValid can be left empty depending on wave type.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateSingleAttackWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const float TimeTillWave,
+		AActor* WaveCreator);
 
 
 	void DebugAllActiveFormations() const;

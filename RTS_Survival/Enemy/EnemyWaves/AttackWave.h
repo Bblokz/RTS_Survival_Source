@@ -44,6 +44,7 @@ struct FAttackWave
 	}
 
 	EEnemyWaveType WaveType = EEnemyWaveType::Wave_None;
+	bool bIsSingleWave = false;
 
 	// Defines a unit type and spawn point.
 	TArray<FAttackWaveElement> WaveElements = {};

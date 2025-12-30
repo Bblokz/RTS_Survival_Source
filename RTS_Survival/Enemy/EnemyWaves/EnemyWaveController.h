@@ -13,6 +13,9 @@ class ATankMaster;
 class AEnemyController;
 class ARTSAsyncSpawner;
 
+/**
+ * @brief Coordinates the spawning and iteration of enemy attack waves for the enemy controller.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UEnemyWaveController : public UActorComponent
 {
@@ -34,6 +37,26 @@ public:
 		AActor* WaveCreator = nullptr,
 		const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings = {}, const float
 		PerAffectingBuildingTimerFraction = 0.f
+	);
+
+	/**
+	 * @brief Starts a one-off enemy attack wave with an optional delay.
+	 * @param WaveType Determines wave logic and whether the wave requires an owning actor.
+	 * @param WaveElements Defines the unit types and spawn points for this one-off wave.
+	 * @param Waypoints Formation movement path for the spawned units.
+	 * @param FinalWaypointDirection The facing direction after reaching the final waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to each other.
+	 * @param TimeTillWave Delay before starting the wave; zero or less starts immediately.
+	 * @param WaveCreator The actor responsible for spawning this wave when required by the wave type.
+	 */
+	void StartSingleAttackWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const float TimeTillWave,
+		AActor* WaveCreator = nullptr
 	);
 
 	void InitWaveController(
@@ -61,7 +84,8 @@ private:
 		const FRotator& FinalWaypointDirection,
 		const int32 MaxFormationWidth,
 		AActor* WaveCreator,
-		const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings, const float PerAffectingBuildingTimerFraction);
+		const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings, const float PerAffectingBuildingTimerFraction,
+		const bool bIsSingleWave = false);
 
 	bool CreateAttackWaveTimer(FAttackWave* AttackWave, bool bInstantStart);
 	// Uses the interval as well as the variance fractions to randomly get the wave iteration time.
@@ -131,6 +155,11 @@ private:
 	                    const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings = {}, const float PerAffectingBuildingTimerFraction =
 		                    0
 	) const;
+	bool GetIsValidSingleAttackWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& Waypoints,
+		AActor* WaveCreator) const;
 	bool GetAreWaveElementsValid(TArray<FAttackWaveElement> WaveElements) const;
 	bool GetAreWavePointsValid(const TArray<FVector>& Waypoints) const;
 	bool GetIsValidTrainingOption(const FTrainingOption& TrainingOption) const;
