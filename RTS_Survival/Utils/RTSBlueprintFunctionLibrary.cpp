@@ -28,7 +28,19 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
+
+void URTSBlueprintFunctionLibrary::ApplyRTSDamage(AActor* ActorToDamage, const ERTSDamageType DamageType, const float DamageAmount) 
+{
+	if(not IsValid(ActorToDamage))
+	{
+		return;
+	}
+	TSubclassOf<UDamageType> DamageTypeClass = FRTSWeaponHelpers::GetDamageTypeClass(DamageType);
+	FDamageEvent DamageEvent(DamageTypeClass);
+	ActorToDamage->TakeDamage(DamageAmount, DamageEvent, nullptr, nullptr);
+}
 
 FString URTSBlueprintFunctionLibrary::BP_GetRTSCardAsString(const ERTSCard Card)
 {

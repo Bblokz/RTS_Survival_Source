@@ -10,6 +10,7 @@
 #include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 // Define the static member
 TMap<int32, EHealthLevel> UHealthComponent::M_PercentageToHealthLevel;

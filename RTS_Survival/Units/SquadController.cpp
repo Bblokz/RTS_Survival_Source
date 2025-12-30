@@ -210,7 +210,7 @@ void FDamageSquadGameStart::ApplyStartDamageToSquad(const TArray<ASquadUnit*>& S
 
 	if (AmountSquadUnitsPercentageDamage > 0)
 	{
-		DamageUnitsToPercentage(SquadUnits, AmountSquadUnitsPercentageDamage);
+		DamageUnitsToPercentage(SquadUnits, AmountSquadUnitsPercentageDamage, AmountSquadUnitsInstantKill);
 	}
 }
 
@@ -238,21 +238,14 @@ USquadUnitHealthComponent* FDamageSquadGameStart::GetValidSquadUnitHealthCompone
 void FDamageSquadGameStart::KillSquadUnits(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToKill) const
 {
 	int32 RemainingUnitsToKill = UnitsToKill;
+	TArray<ASquadUnit*> UnitsToDamage;
 	for (ASquadUnit* SquadUnit : SquadUnits)
 	{
 		if (RemainingUnitsToKill <= 0)
 		{
-			return;
+			break;
 		}
-
-		USquadUnitHealthComponent* SquadUnitHealthComponent = GetValidSquadUnitHealthComponent(SquadUnit);
-		if (not IsValid(SquadUnitHealthComponent))
-		{
-			continue;
-		}
-
-		const float CurrentHealth = SquadUnitHealthComponent->GetCurrentHealth();
-		if (CurrentHealth <= 0.0f)
+		if (not IsValid(SquadUnit))
 		{
 			continue;
 		}
@@ -263,23 +256,32 @@ void FDamageSquadGameStart::KillSquadUnits(const TArray<ASquadUnit*>& SquadUnits
 			continue;
 		}
 
-		SquadUnitHealthComponent->SetCurrentHealth(0.0f);
-		SquadController->SquadHealthComponent->OnUnitStateChanged(SquadUnitHealthComponent,
-		                                                          SquadUnitHealthComponent->GetMaxHealth(),
-		                                                          0.0f,
-		                                                          true);
+		UnitsToDamage.Add(SquadUnit);
 		RemainingUnitsToKill--;
+	}
+	for (auto EachToDamageUnit : UnitsToDamage)
+	{
+		if (not IsValid(EachToDamageUnit))
+		{
+			continue;
+		}
+		EachToDamageUnit->TakeFatalDamage();
 	}
 }
 
 void FDamageSquadGameStart::DamageUnitsToPercentage(const TArray<ASquadUnit*>& SquadUnits,
-                                                    const int32 UnitsToDamage) const
+                                                    const int32 UnitsToDamage, int32 InstantKilledUnits) const
 {
 	const float ClampedPercentageLifeLeft = FMath::Clamp(PercentageLifeLeft, 0.0f, 1.0f);
 
 	int32 RemainingUnitsToDamage = UnitsToDamage;
 	for (ASquadUnit* SquadUnit : SquadUnits)
 	{
+		if(InstantKilledUnits > 0)
+		{
+			InstantKilledUnits--;
+			continue;
+		}
 		if (RemainingUnitsToDamage <= 0)
 		{
 			return;

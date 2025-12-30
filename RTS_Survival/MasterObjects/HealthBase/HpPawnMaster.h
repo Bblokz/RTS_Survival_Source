@@ -30,7 +30,8 @@ public:
 	// Sets default values for this pawn's properties
 	AHpPawnMaster(const FObjectInitializer& ObjectInitializer);
 
-	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void TakeFatalDamage();
 	// Destroys the actor with death animation.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void TriggerDestroyActor(const ERTSDeathType DeathType);

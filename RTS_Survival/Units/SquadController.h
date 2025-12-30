@@ -95,7 +95,7 @@ struct FDamageSquadGameStart
 private:
 	USquadUnitHealthComponent* GetValidSquadUnitHealthComponent(const ASquadUnit* SquadUnit) const;
 	void KillSquadUnits(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToKill) const;
-	void DamageUnitsToPercentage(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToDamage) const;
+	void DamageUnitsToPercentage(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToDamage, int32 InstantKilledUnits) const;
 };
 // Work around to set the spawn location for the squad from the trainer.
 USTRUCT()
