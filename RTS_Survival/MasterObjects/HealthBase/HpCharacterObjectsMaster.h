@@ -43,6 +43,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 	inline UHealthComponent* GetHealthComponent() const {return HealthComponent;};
 
+	// Kill the unit.
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void TakeFatalDamage();
+
 	// Contains OwningPlayer and UnitType.
 	UFUNCTION(BlueprintCallable)
 	inline URTSComponent* GetRTSComponent() const {return RTSComponent;};

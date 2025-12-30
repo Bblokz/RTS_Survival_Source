@@ -30,7 +30,8 @@ public:
 
 	// Delegate called when the unit dies.
 	FOnUnitDies OnUnitDies;
-
+UFUNCTION(BlueprintCallable , NotBlueprintable)
+	void TakeFatalDamage();
 
 	// Destroys the actor with death animation.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)

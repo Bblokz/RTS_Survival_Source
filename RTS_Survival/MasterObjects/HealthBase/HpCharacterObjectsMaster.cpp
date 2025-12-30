@@ -26,6 +26,17 @@ void ACharacterObjectsMaster::TriggerDestroyActor(const ERTSDeathType DeathType)
 	UnitDies(DeathType);
 }
 
+void ACharacterObjectsMaster::TakeFatalDamage()
+{
+	if(not GetIsValidHealthComponent())
+	{
+		return;
+	}
+	FDamageEvent DamageEvent;
+	DamageEvent.DamageTypeClass = FRTSWeaponHelpers::GetDamageTypeClass(ERTSDamageType::Kinetic);
+	TakeDamage(HealthComponent->GetCurrentHealth()*100, DamageEvent, nullptr, nullptr);
+}
+
 
 void ACharacterObjectsMaster::PostInitializeComponents()
 {

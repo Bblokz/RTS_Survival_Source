@@ -19,6 +19,17 @@ AHpPawnMaster::AHpPawnMaster(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bCanEverTick = true;
 }
 
+void AHpPawnMaster::TakeFatalDamage()
+{
+	if (not GetIsValidHealthComponent())
+	{
+		return;
+	}
+	FDamageEvent DamageEvent;
+	DamageEvent.DamageTypeClass = FRTSWeaponHelpers::GetDamageTypeClass(ERTSDamageType::Kinetic);
+	TakeDamage(HealthComponent->GetCurrentHealth() * 100, DamageEvent, nullptr, nullptr);
+}
+
 void AHpPawnMaster::TriggerDestroyActor(const ERTSDeathType DeathType)
 {
 	UnitDies(DeathType);
@@ -61,7 +72,7 @@ float AHpPawnMaster::TakeDamage(
 	AController* EventInstigator,
 	AActor* DamageCauser)
 {
-	if(not IsUnitAlive())
+	if (not IsUnitAlive())
 	{
 		// Do not trigger kill on a dead unit.
 		return 1.f;

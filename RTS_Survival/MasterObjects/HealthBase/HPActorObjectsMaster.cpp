@@ -16,6 +16,17 @@ AHPActorObjectsMaster::AHPActorObjectsMaster(const FObjectInitializer& ObjectIni
 {
 }
 
+void AHPActorObjectsMaster::TakeFatalDamage()
+{
+	if(not GetIsValidHealthComponent())
+	{
+		return;
+	}
+	FDamageEvent DamageEvent;
+	DamageEvent.DamageTypeClass = FRTSWeaponHelpers::GetDamageTypeClass(ERTSDamageType::Kinetic);
+	TakeDamage(HealthComponent->GetCurrentHealth()*100, DamageEvent, nullptr, nullptr);
+}
+
 void AHPActorObjectsMaster::TriggerDestroyActor(const ERTSDeathType DeathType)
 {
 	UnitDies(DeathType);
