@@ -14,6 +14,7 @@
 #include "RTSBlueprintFunctionLibrary.generated.h"
 
 
+enum class ERTSDamageType : uint8;
 class UPlayerPortraitManager;
 struct FTrainingOption;
 enum class ERTSProgressBarType : uint8;
@@ -98,6 +99,9 @@ class RTS_SURVIVAL_API URTSBlueprintFunctionLibrary : public UBlueprintFunctionL
 	GENERATED_BODY()
 
 public:
+	// --- Damage actors
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Subtypes")
+	static void ApplyRTSDamage(AActor* ActorToDamage, ERTSDamageType DamageType, float DamageAmount) ;
 	// ------------------------------------------------------------
 	// --------- RTS Card System ------------ ------
 	// ------------------------------------------------------------
