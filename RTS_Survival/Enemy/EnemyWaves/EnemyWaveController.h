@@ -36,7 +36,7 @@ public:
 		const bool bInstantStart = false,
 		AActor* WaveCreator = nullptr,
 		const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings = {}, const float
-		PerAffectingBuildingTimerFraction = 0.f
+		PerAffectingBuildingTimerFraction = 0.f, const float FormationOffsetMultiplier = 0
 	);
 
 	/**
@@ -48,6 +48,7 @@ public:
 	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to each other.
 	 * @param TimeTillWave Delay before starting the wave; zero or less starts immediately.
 	 * @param WaveCreator The actor responsible for spawning this wave when required by the wave type.
+	 * @param FormationOffsetMultiplier
 	 */
 	void StartSingleAttackWave(
 		const EEnemyWaveType WaveType,
@@ -56,7 +57,7 @@ public:
 		const FRotator& FinalWaypointDirection,
 		const int32 MaxFormationWidth,
 		const float TimeTillWave,
-		AActor* WaveCreator = nullptr
+		AActor* WaveCreator = nullptr, const float FormationOffsetMultiplier = 0
 	);
 
 	void InitWaveController(
@@ -85,7 +86,7 @@ private:
 		const int32 MaxFormationWidth,
 		AActor* WaveCreator,
 		const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings, const float PerAffectingBuildingTimerFraction,
-		const bool bIsSingleWave = false);
+		const bool bIsSingleWave = false, const float FormationOffsetMultiplier = 0);
 
 	bool CreateAttackWaveTimer(FAttackWave* AttackWave, bool bInstantStart);
 	// Uses the interval as well as the variance fractions to randomly get the wave iteration time.

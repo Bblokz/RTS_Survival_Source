@@ -30,7 +30,7 @@ void UEnemyWaveController::StartNewAttackWave(
 	const bool bInstantStart,
 	AActor* WaveCreator,
 	const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings,
-	const float PerAffectingBuildingTimerFraction)
+	const float PerAffectingBuildingTimerFraction, const float FormationOffsetMultiplier)
 {
 	if (not GetIsValidWave(WaveType,
 	                       WaveElements,
@@ -50,11 +50,14 @@ void UEnemyWaveController::StartNewAttackWave(
 		return;
 	}
 	const int32 UniqueWaveID = GetUniqueWaveID();
+	constexpr bool bIsSingleTimerSpawnWave = false;
 	if (not CreateNewAttackWaveStruct(
 		UniqueWaveID,
 		WaveType,
 		WaveElements, WaveInterval, IntervalVarianceFraction, Waypoints, FinalWaypointDirection,
-		MaxFormationWidth, WaveCreator, WaveTimerAffectingBuildings, PerAffectingBuildingTimerFraction))
+		MaxFormationWidth, WaveCreator, WaveTimerAffectingBuildings, PerAffectingBuildingTimerFraction,
+		bIsSingleTimerSpawnWave,
+		FormationOffsetMultiplier))
 	{
 		RTSFunctionLibrary::ReportError("failed to create struct for attack wave!");
 		return;
@@ -78,7 +81,8 @@ void UEnemyWaveController::StartSingleAttackWave(
 	const FRotator& FinalWaypointDirection,
 	const int32 MaxFormationWidth,
 	const float TimeTillWave,
-	AActor* WaveCreator)
+	AActor* WaveCreator,
+	const float FormationOffsetMultiplier)
 {
 	if (not GetIsValidSingleAttackWave(WaveType, WaveElements, Waypoints, WaveCreator))
 	{
@@ -97,7 +101,8 @@ void UEnemyWaveController::StartSingleAttackWave(
 		UniqueWaveID,
 		WaveType,
 		WaveElements, ClampedTimeTillWave, 0.f, Waypoints, FinalWaypointDirection,
-		MaxFormationWidth, WaveCreator, {}, 0.f, bIsSingleWave))
+		MaxFormationWidth, WaveCreator, {}, 0.f, bIsSingleWave,
+		FormationOffsetMultiplier))
 	{
 		RTSFunctionLibrary::ReportError("failed to create struct for single attack wave!");
 		return;
@@ -177,7 +182,8 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
                                                      AActor* WaveCreator,
                                                      const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings,
                                                      const float PerAffectingBuildingTimerFraction,
-                                                     const bool bIsSingleWave)
+                                                     const bool bIsSingleWave,
+                                                     const float FormationOffsetMultiplier)
 {
 	// Sanity check for unique ID
 	if (not EnsureIDIsUnique(UniqueID))
@@ -201,6 +207,7 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
 	NewAttackWave.MaxFormationWidth = MaxFormationWidth;
 	NewAttackWave.UniqueWaveID = UniqueID;
 	NewAttackWave.bIsSingleWave = bIsSingleWave;
+	NewAttackWave.FormationOffsetMlt = FormationOffsetMultiplier;
 	M_AttackWaves.Add(NewAttackWave);
 	return true;
 }
@@ -325,71 +332,76 @@ void UEnemyWaveController::OnAttackWaveCreatorDied(FAttackWave* AttackWave)
 
 bool UEnemyWaveController::SpawnUnitsForAttackWave(FAttackWave* AttackWave)
 {
-    if (!AttackWave || !GetIsValidAsyncSpawner() || !EnsureEnemyControllerIsValid())
-        return false;
+	if (!AttackWave || !GetIsValidAsyncSpawner() || !EnsureEnemyControllerIsValid())
+		return false;
 
-    // Reset the counter and clear previous actors.
-    AttackWave->ResetForSpawningNewWave();
+	// Reset the counter and clear previous actors.
+	AttackWave->ResetForSpawningNewWave();
 
-    struct FPendingSpawn { FTrainingOption Option; FVector Location; };
-    TArray<FPendingSpawn> PendingSpawns;
-    PendingSpawns.Reserve(AttackWave->WaveElements.Num());
+	struct FPendingSpawn
+	{
+		FTrainingOption Option;
+		FVector Location;
+	};
+	TArray<FPendingSpawn> PendingSpawns;
+	PendingSpawns.Reserve(AttackWave->WaveElements.Num());
 
-    // Pick the units we will try to spawn, and reserve their supply.
-    for (auto& Element : AttackWave->WaveElements)
-    {
-        FTrainingOption PickedOption;
-        if (!GetRandomAttackWaveElementOption(Element, PickedOption))
-            continue;
+	// Pick the units we will try to spawn, and reserve their supply.
+	for (auto& Element : AttackWave->WaveElements)
+	{
+		FTrainingOption PickedOption;
+		if (!GetRandomAttackWaveElementOption(Element, PickedOption))
+			continue;
 
-        if (M_EnemyController->GetEnemyWaveSupply() <= 0)
-        {
-            RTSFunctionLibrary::PrintString(
-                "Enemy has no wave supply left; skipping this element.");
-            continue;
-        }
+		if (M_EnemyController->GetEnemyWaveSupply() <= 0)
+		{
+			RTSFunctionLibrary::PrintString(
+				"Enemy has no wave supply left; skipping this element.");
+			continue;
+		}
 
-        // We consume one supply for this unit so that we don't spawn more than we can afford in this loop.
-        M_EnemyController->AddToWaveSupply(-1);
-        PendingSpawns.Add({ PickedOption, Element.SpawnLocation });
-    }
+		// We consume one supply for this unit so that we don't spawn more than we can afford in this loop.
+		M_EnemyController->AddToWaveSupply(-1);
+		PendingSpawns.Add({PickedOption, Element.SpawnLocation});
+	}
 
-    // Tell the wave how many callbacks we expect
-    const int32 NumToSpawn = PendingSpawns.Num();
-    AttackWave->AwaitingSpawnsTillStartMoving = NumToSpawn;
-    if (NumToSpawn == 0)
-    {
-        return false;  
-    }
+	// Tell the wave how many callbacks we expect
+	const int32 NumToSpawn = PendingSpawns.Num();
+	AttackWave->AwaitingSpawnsTillStartMoving = NumToSpawn;
+	if (NumToSpawn == 0)
+	{
+		return false;
+	}
 
-    TWeakObjectPtr<UEnemyWaveController> WeakThis(this);
-    for (auto& SpawnInfo : PendingSpawns)
-    {
-        auto OnSpawned = [WeakThis](const FTrainingOption& Opt, AActor* Actor, int32 WaveID)
-        {
-            if (WeakThis.IsValid())
-            {
-            	// Callback to determine when the wave is fully spawned.
-                WeakThis->OnUnitSpawnedForWave(Opt, Actor, WaveID);
-            }
-        };
+	TWeakObjectPtr<UEnemyWaveController> WeakThis(this);
+	for (auto& SpawnInfo : PendingSpawns)
+	{
+		auto OnSpawned = [WeakThis](const FTrainingOption& Opt, AActor* Actor, int32 WaveID)
+		{
+			if (WeakThis.IsValid())
+			{
+				// Callback to determine when the wave is fully spawned.
+				WeakThis->OnUnitSpawnedForWave(Opt, Actor, WaveID);
+			}
+		};
 
-        //If this ever fails, give the supply back immediately,
-        // and decrement our awaiting counter to not hang forever.
-        if (!M_AsyncSpawner->AsyncSpawnOptionAtLocation(
-                SpawnInfo.Option,
-                SpawnInfo.Location,
-                this,
-                AttackWave->UniqueWaveID,
-                OnSpawned))
-        {
-        	M_EnemyController->AddToWaveSupply(1);
-            AttackWave->AwaitingSpawnsTillStartMoving--;
-        }
-    }
+		//If this ever fails, give the supply back immediately,
+		// and decrement our awaiting counter to not hang forever.
+		if (!M_AsyncSpawner->AsyncSpawnOptionAtLocation(
+			SpawnInfo.Option,
+			SpawnInfo.Location,
+			this,
+			AttackWave->UniqueWaveID,
+			OnSpawned))
+		{
+			M_EnemyController->AddToWaveSupply(1);
+			AttackWave->AwaitingSpawnsTillStartMoving--;
+		}
+	}
 
-    return true;
+	return true;
 }
+
 bool UEnemyWaveController::GetRandomAttackWaveElementOption(const FAttackWaveElement& Element,
                                                             FTrainingOption& OutPickedOption) const
 {
@@ -436,31 +448,31 @@ void UEnemyWaveController::OnUnitSpawnedForWave(const FTrainingOption& TrainingO
 }
 
 void UEnemyWaveController::OnWaveUnitFailedToSpawn(
-    const FTrainingOption& TrainingOption,
-    const int32 WaveID)
+	const FTrainingOption& TrainingOption,
+	const int32 WaveID)
 {
-    // If the wave is gone, we need to refund here too.
-    FAttackWave* AttackWave = GetAttackWaveByID(WaveID);
-    if (!AttackWave)
-    {
-        if (EnsureEnemyControllerIsValid())
-        {
-            M_EnemyController->AddToWaveSupply(1);
-        }
-        return;
-    }
+	// If the wave is gone, we need to refund here too.
+	FAttackWave* AttackWave = GetAttackWaveByID(WaveID);
+	if (!AttackWave)
+	{
+		if (EnsureEnemyControllerIsValid())
+		{
+			M_EnemyController->AddToWaveSupply(1);
+		}
+		return;
+	}
 	// Make sure we do not hang waiting for this unit that never spawned!
 	AttackWave->AwaitingSpawnsTillStartMoving--;
-    const FString OptName = TrainingOption.GetDisplayName();
-    RTSFunctionLibrary::ReportError(
-        "Wave unit failed to spawn: " + OptName +
-        " (wave " + FString::FromInt(WaveID) + "). Refunding supply.");
+	const FString OptName = TrainingOption.GetDisplayName();
+	RTSFunctionLibrary::ReportError(
+		"Wave unit failed to spawn: " + OptName +
+		" (wave " + FString::FromInt(WaveID) + "). Refunding supply.");
 
-    // Refund supply for this one unit
-    if (EnsureEnemyControllerIsValid())
-    {
-        M_EnemyController->AddToWaveSupply(1);
-    }
+	// Refund supply for this one unit
+	if (EnsureEnemyControllerIsValid())
+	{
+		M_EnemyController->AddToWaveSupply(1);
+	}
 }
 
 
