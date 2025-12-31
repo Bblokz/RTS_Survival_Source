@@ -76,6 +76,9 @@ struct FAttackWave
 	// How many units still need to be spawned on this iteration to complete the wave and start moving.
 	int32 AwaitingSpawnsTillStartMoving = 0;
 
+	// How much the offset is multiplied by when calculating the unit's formation position.
+	float FormationOffsetMlt = 1.f;
+
 	UPROPERTY()
 	TArray<AActor*> SpawnedWaveUnits;
 };

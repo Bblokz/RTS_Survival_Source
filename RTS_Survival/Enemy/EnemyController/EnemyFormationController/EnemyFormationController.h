@@ -41,7 +41,8 @@ public:
 		TArray<ATankMaster*> TankMasters,
 		const TArray<FVector>& Waypoints,
 		const FRotator& FinalWaypointDirection,
-		int32 MaxFormationWidth = 2);
+		int32 MaxFormationWidth = 2,
+		const float FormationOffsetMlt = 1.f);
 
 	void DebugAllActiveFormations() const;
 
@@ -147,7 +148,7 @@ private:
 	void InitFormationOffsets(
 		FFormationData& OutFormationData,
 		const TMap<TWeakInterfacePtr<ICommands>, float>& RadiusMap,
-		int32 MaxFormationWidth) const;
+		int32 MaxFormationWidth, const float FormationOffSetMlt) const;
 
 	/** Kick off movement on row 0 toward the first waypoint. */
 	void StartFormationMovement(FFormationData& Formation);
@@ -202,7 +203,7 @@ private:
 	FVector ComputeOffsetForUnit(
 		float RowBackOffset,
 		int32 ColumnIndex,
-		const TArray<float>& RowRadii) const;
+		const TArray<float>& RowRadii, const float FormationOffsetMlt) const;
 
 
 	// ------------------------------------------------------------------

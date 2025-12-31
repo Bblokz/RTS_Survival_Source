@@ -36,7 +36,8 @@ public:
 		const TArray<ATankMaster*>& TankMasters,
 		const TArray<FVector>& Waypoints,
 		const FRotator& FinalWaypointDirection,
-		const int32 MaxFormationWidth = 2);
+		const int32 MaxFormationWidth = 2,
+		const float FormationOffsetMlt = 1.f);
 
 	/**
 	 * 
@@ -53,6 +54,7 @@ public:
 	 * @param WaveTimerAffectingBuildings The generator buildings checked for validity that influence the wave spawn timing.
 	 * @param PerAffectingBuildingTimerFraction in (0.0 - 1.0) interval that determines
 	 * the fraction of the wave interval that is added for each building generator that is destroyed.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
 	 * @note Possibly Leave WaveCreator and WaveTimerAffectingBuildings empty if the wave type does not depend on them.
 	 * @note The wave handles wave supply logic; if a wave cannot spawn due to supply issues it will wait till the next wave iteration.
 	 */
@@ -68,7 +70,8 @@ public:
 		const bool bInstantStart,
 		AActor* WaveCreator,
 		TArray<AActor*> WaveTimerAffectingBuildings,
-		const float PerAffectingBuildingTimerFraction = 0.f);
+		const float PerAffectingBuildingTimerFraction = 0.f,
+		const float FormationOffsetMultiplier = 1.f);
 
 	/**
 	 * @brief Creates a one-off enemy attack wave with an optional delay before spawning.
@@ -79,6 +82,7 @@ public:
 	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to eachother.
 	 * @param TimeTillWave Delay before starting the wave; zero or less starts immediately.
 	 * @param WaveCreator The actor that spawns this wave needs to be RTS IsValid can be left empty depending on wave type.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void CreateSingleAttackWave(
@@ -88,7 +92,7 @@ public:
 		const FRotator& FinalWaypointDirection,
 		const int32 MaxFormationWidth,
 		const float TimeTillWave,
-		AActor* WaveCreator);
+		AActor* WaveCreator, const float FormationOffsetMultiplier = 1.f);
 
 
 	void DebugAllActiveFormations() const;

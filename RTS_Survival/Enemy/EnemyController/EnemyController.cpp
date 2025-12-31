@@ -31,7 +31,8 @@ void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& 
                                                const TArray<ATankMaster*>& TankMasters,
                                                const TArray<FVector>& Waypoints,
                                                const FRotator& FinalWaypointDirection,
-                                               const int32 MaxFormationWidth)
+                                               const int32 MaxFormationWidth,
+                                               const float FormationOffsetMlt)
 {
 	if(not GetIsValidFormationController())
 	{
@@ -41,9 +42,10 @@ void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& 
 }
 
 void AEnemyController::CreateAttackWave(const EEnemyWaveType WaveType, const TArray<FAttackWaveElement>& WaveElements,
-	const float WaveInterval, const float IntervalVarianceFraction, const TArray<FVector>& Waypoints,
-	const FRotator& FinalWaypointDirection, const int32 MaxFormationWidth, const bool bInstantStart,
-	AActor* WaveCreator, TArray<AActor*> WaveTimerAffectingBuildings, const float PerAffectingBuildingTimerFraction)
+                                        const float WaveInterval, const float IntervalVarianceFraction, const TArray<FVector>& Waypoints,
+                                        const FRotator& FinalWaypointDirection, const int32 MaxFormationWidth, const bool bInstantStart,
+                                        AActor* WaveCreator, TArray<AActor*> WaveTimerAffectingBuildings, const float PerAffectingBuildingTimerFraction, const
+                                        float FormationOffsetMultiplier)
 {
 	TArray<TWeakObjectPtr<AActor>> WeakBuildings;
 	for(AActor* Building : WaveTimerAffectingBuildings)
@@ -67,7 +69,7 @@ void AEnemyController::CreateSingleAttackWave(
 	const FRotator& FinalWaypointDirection,
 	const int32 MaxFormationWidth,
 	const float TimeTillWave,
-	AActor* WaveCreator)
+	AActor* WaveCreator, const float FormationOffsetMultiplier)
 {
 	if (not GetIsValidWaveController())
 	{
@@ -81,7 +83,8 @@ void AEnemyController::CreateSingleAttackWave(
 		FinalWaypointDirection,
 		MaxFormationWidth,
 		ClampedTimeTillWave,
-		WaveCreator);
+		WaveCreator,
+		FormationOffsetMultiplier);
 }
 
 void AEnemyController::DebugAllActiveFormations() const

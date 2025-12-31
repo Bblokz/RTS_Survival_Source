@@ -25,7 +25,8 @@ void UEnemyFormationController::InitFormationController(AEnemyController* EnemyC
 void UEnemyFormationController::MoveFormationToLocation(TArray<ASquadController*> SquadControllers,
                                                         TArray<ATankMaster*> TankMasters,
                                                         const TArray<FVector>& Waypoints,
-                                                        const FRotator& FinalWaypointDirection, int32 MaxFormationWidth)
+                                                        const FRotator& FinalWaypointDirection, int32 MaxFormationWidth,
+                                                        const float FormationOffsetMlt)
 {
 	if (not EnsureFormationRequestIsValid(SquadControllers, TankMasters, MaxFormationWidth))
 	{
@@ -60,7 +61,7 @@ void UEnemyFormationController::MoveFormationToLocation(TArray<ASquadController*
 	}
 
 	// 3) Compute offsets & kick off movement
-	InitFormationOffsets(NewFormation, MapGuidToFormationRadius, MaxFormationWidth);
+	InitFormationOffsets(NewFormation, MapGuidToFormationRadius, MaxFormationWidth, FormationOffsetMlt);
 	// 4) Save the formation data and start the movement.
 	SaveNewFormation(NewFormation);
 	StartFormationMovement(NewFormation);
@@ -444,7 +445,7 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 void UEnemyFormationController::InitFormationOffsets(
 	FFormationData& OutFormationData,
 	const TMap<TWeakInterfacePtr<ICommands>, float>& RadiusMap,
-	const int32 MaxFormationWidth) const
+	const int32 MaxFormationWidth, const float FormationOffSetMlt) const
 {
 	TArray<TWeakInterfacePtr<ICommands>> Units = GatherFormationUnits(RadiusMap);
 	const int32 TotalUnits = Units.Num();
@@ -469,7 +470,7 @@ void UEnemyFormationController::InitFormationOffsets(
 		{
 			FFormationUnitData UnitData;
 			UnitData.Unit = Units[NextUnitIndex];
-			UnitData.Offset = ComputeOffsetForUnit(AccumulatedRowOffset, Column, RowRadii);
+			UnitData.Offset = ComputeOffsetForUnit(AccumulatedRowOffset, Column, RowRadii, FormationOffSetMlt);
 			OutFormationData.FormationUnits.Add(UnitData);
 		}
 
@@ -480,32 +481,32 @@ void UEnemyFormationController::InitFormationOffsets(
 
 void UEnemyFormationController::StartFormationMovement(FFormationData& Formation)
 {
-    FFormationData* AliveFormation = M_ActiveFormations.Find(Formation.FormationID);
-    if ( !AliveFormation)
-    {
-        // we’ve already torn this formation down
-        return;
-    }
-	if(AliveFormation->FormationWaypoints.IsEmpty())
+	FFormationData* AliveFormation = M_ActiveFormations.Find(Formation.FormationID);
+	if (!AliveFormation)
+	{
+		// we’ve already torn this formation down
+		return;
+	}
+	if (AliveFormation->FormationWaypoints.IsEmpty())
 	{
 		// remove this formation as no valid waypoitns found.
-		
+
 		M_ActiveFormations.Remove(Formation.FormationID);
 		return;
 	}
 
-    // now use *Live* safely, without risk of reinserting
-    const FVector& WayPoint       = AliveFormation->FormationWaypoints[0];
-    const FRotator& Direction    = AliveFormation->FormationWaypointDirections[0];
-    DebugDrawFormation(*AliveFormation);
+	// now use *Live* safely, without risk of reinserting
+	const FVector& WayPoint = AliveFormation->FormationWaypoints[0];
+	const FRotator& Direction = AliveFormation->FormationWaypointDirections[0];
+	DebugDrawFormation(*AliveFormation);
 
-    for ( FFormationUnitData& UnitData : AliveFormation->FormationUnits )
-    {
-        if ( UnitData.IsValidFormationUnit() )
-        {
-            MoveUnitToWayPoint(UnitData, WayPoint, Direction, AliveFormation->FormationID);
-        }
-    }
+	for (FFormationUnitData& UnitData : AliveFormation->FormationUnits)
+	{
+		if (UnitData.IsValidFormationUnit())
+		{
+			MoveUnitToWayPoint(UnitData, WayPoint, Direction, AliveFormation->FormationID);
+		}
+	}
 }
 
 void UEnemyFormationController::DebugDrawFormation(const FFormationData& Formation) const
@@ -610,40 +611,40 @@ void UEnemyFormationController::TeleportFormationUnitInWayPointDirection(
 
 void UEnemyFormationController::CleanupInvalidFormations()
 {
-    TArray<int32> ToRemove;
+	TArray<int32> ToRemove;
 
-    for (auto& Pair : M_ActiveFormations)
-    {
-        FFormationData& Formation = Pair.Value;
-        int32 RemovedCount = 0;
+	for (auto& Pair : M_ActiveFormations)
+	{
+		FFormationData& Formation = Pair.Value;
+		int32 RemovedCount = 0;
 
-        // Collect & remove all dead units in one go
-        for (int32 i = Formation.FormationUnits.Num() - 1; i >= 0; --i)
-        {
-            if (!Formation.FormationUnits[i].IsValidFormationUnit())
-            {
-                Formation.FormationUnits.RemoveAtSwap(i);
-                ++RemovedCount;
-            }
-        }
+		// Collect & remove all dead units in one go
+		for (int32 i = Formation.FormationUnits.Num() - 1; i >= 0; --i)
+		{
+			if (!Formation.FormationUnits[i].IsValidFormationUnit())
+			{
+				Formation.FormationUnits.RemoveAtSwap(i);
+				++RemovedCount;
+			}
+		}
 
-        // Single refund equal to the number of removed units
-        if (RemovedCount > 0)
-        {
-        	Debug("Removing invalid units: gaining supplies: " + FString::FromInt(RemovedCount) );
-            RefundUnitWaveSupply(RemovedCount);
-        }
+		// Single refund equal to the number of removed units
+		if (RemovedCount > 0)
+		{
+			Debug("Removing invalid units: gaining supplies: " + FString::FromInt(RemovedCount));
+			RefundUnitWaveSupply(RemovedCount);
+		}
 
-        if (Formation.FormationUnits.IsEmpty())
-        {
-            ToRemove.Add(Formation.FormationID);
-        }
-    }
+		if (Formation.FormationUnits.IsEmpty())
+		{
+			ToRemove.Add(Formation.FormationID);
+		}
+	}
 
-    for (int32 ID : ToRemove)
-    {
-        M_ActiveFormations.Remove(ID);
-    }
+	for (int32 ID : ToRemove)
+	{
+		M_ActiveFormations.Remove(ID);
+	}
 }
 
 
@@ -666,7 +667,7 @@ void UEnemyFormationController::OnFormationUnitDiedPostReachFinal(AActor* Destro
 
 void UEnemyFormationController::RefundUnitWaveSupply(const int32 AmountToRefund)
 {
-	if(not EnsureEnemyControllerIsValid())
+	if (not EnsureEnemyControllerIsValid())
 	{
 		return;
 	}
@@ -715,7 +716,7 @@ float UEnemyFormationController::ComputeMaxRadiusInRow(const TArray<float>& RowR
 FVector UEnemyFormationController::ComputeOffsetForUnit(
 	const float RowBackOffset,
 	const int32 ColumnIndex,
-	const TArray<float>& RowRadii) const
+	const TArray<float>& RowRadii, const float FormationOffsetMlt) const
 {
 	// X = negative forward to Place rows behind eachother.
 	float XOffset = -RowBackOffset;
@@ -732,8 +733,9 @@ FVector UEnemyFormationController::ComputeOffsetForUnit(
 		// to the right of the lead unit
 		YOffset = FMath::Max(RowRadii[0], RowRadii[ColumnIndex]);
 	}
+	const float Mlt = FMath::Max(1.f, FormationOffsetMlt);
 
-	return FVector(XOffset, YOffset, 0.f);
+	return FVector(XOffset, YOffset, 0.f) * Mlt;
 }
 
 void UEnemyFormationController::Debug(const FString& Message)
