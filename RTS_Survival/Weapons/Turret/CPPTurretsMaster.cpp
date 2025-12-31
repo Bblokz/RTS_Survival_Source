@@ -27,11 +27,11 @@
 
 ACPPTurretsMaster::ACPPTurretsMaster()
 	: SceneSkeletalMesh(nullptr)
-	, RotationSpeed(30)
-	, TargetPitch(0)
-	, M_WorldSpawnedIn(nullptr)
-	, M_MaxTurretPitch(0)
-	, M_MinTurretPitch(0)
+	  , RotationSpeed(30)
+	  , TargetPitch(0)
+	  , M_WorldSpawnedIn(nullptr)
+	  , M_MaxTurretPitch(0)
+	  , M_MinTurretPitch(0)
 {
 	SetActorTickInterval(DeveloperSettings::Optimization::TurretTickInterval);
 	M_WeaponAIState = EWeaponAIState::None;
@@ -135,7 +135,7 @@ void ACPPTurretsMaster::InitiateAutoEngageTimers()
 	M_WorldSpawnedIn->GetTimerManager().ClearTimer(M_WeaponSearchHandle);
 	M_WeaponSearchDel.BindUObject(this, &ACPPTurretsMaster::AutoEngage);
 	M_WorldSpawnedIn->GetTimerManager().SetTimer(M_WeaponSearchHandle,
-		M_WeaponSearchDel, M_WeaponSearchTimeInterval, true);
+	                                             M_WeaponSearchDel, M_WeaponSearchTimeInterval, true);
 }
 
 void ACPPTurretsMaster::InitiateSpecificTargetTimers()
@@ -147,7 +147,7 @@ void ACPPTurretsMaster::InitiateSpecificTargetTimers()
 	M_WorldSpawnedIn->GetTimerManager().ClearTimer(M_WeaponSearchHandle);
 	M_WeaponSearchDel.BindUObject(this, &ACPPTurretsMaster::SpecificEngage);
 	M_WorldSpawnedIn->GetTimerManager().SetTimer(M_WeaponSearchHandle,
-		M_WeaponSearchDel, M_WeaponSearchTimeInterval, true);
+	                                             M_WeaponSearchDel, M_WeaponSearchTimeInterval, true);
 }
 
 TArray<UWeaponState*> ACPPTurretsMaster::GetWeapons()
@@ -212,7 +212,8 @@ void ACPPTurretsMaster::BeginPlay()
 
 	SetActorTickEnabled(true);
 
-	if (AActor* ParentActor = GetParentActor(); ParentActor && ParentActor->GetClass()->ImplementsInterface(UTurretOwner::StaticClass()))
+	if (AActor* ParentActor = GetParentActor(); ParentActor && ParentActor->GetClass()->ImplementsInterface(
+		UTurretOwner::StaticClass()))
 	{
 		InitTurretOwner(ParentActor);
 		InitSelectionDelegatesOfOwner(ParentActor);
@@ -268,7 +269,7 @@ int32 ACPPTurretsMaster::GetOwningPlayerForWeaponInit()
 FRotator ACPPTurretsMaster::GetTargetRotation(const FVector& TargetLocation, const FVector& TurretLocation) const
 {
 	return UKismetMathLibrary::MakeRotator(0, 0,
-		UKismetMathLibrary::FindLookAtRotation(TurretLocation, TargetLocation).Yaw);
+	                                       UKismetMathLibrary::FindLookAtRotation(TurretLocation, TargetLocation).Yaw);
 }
 
 FTransform ACPPTurretsMaster::GetTurretTransform() const
@@ -300,14 +301,13 @@ void ACPPTurretsMaster::InitChildTurret(const float NewRotationSpeed,
 
 void ACPPTurretsMaster::RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister)
 {
-	
-	if(not RTSFunctionLibrary::RTSIsValid(ActorToIgnore))
+	if (not RTSFunctionLibrary::RTSIsValid(ActorToIgnore))
 	{
 		return;
 	}
-	for(auto EachWeapon : M_TWeapons)
+	for (auto EachWeapon : M_TWeapons)
 	{
-		if(IsValid(EachWeapon))
+		if (IsValid(EachWeapon))
 		{
 			EachWeapon->RegisterActorToIgnore(ActorToIgnore, bRegister);
 		}
@@ -366,7 +366,8 @@ void ACPPTurretsMaster::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AActor*
 	if (TurretOwner)
 	{
 		// Owner will dictate turret behaviour after this.
-		TurretOwner.GetInterface()->OnMountedWeaponTargetDestroyed(this, nullptr, M_TargetingData.GetTargetActor(), true);
+		TurretOwner.GetInterface()->OnMountedWeaponTargetDestroyed(this, nullptr, M_TargetingData.GetTargetActor(),
+		                                                           true);
 	}
 	else
 	{
@@ -650,37 +651,37 @@ void ACPPTurretsMaster::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile
 		return;
 	}
 	UWeaponStateArchProjectile* ArchProjectile = NewObject<UWeaponStateArchProjectile>(this);
-        if (ArchProjectile)
-        {
-                ArchProjectile->InitArchProjectileWeapon(
-                        ArchProjParameters.OwningPlayer,
-                        WeaponIndex,
+	if (ArchProjectile)
+	{
+		ArchProjectile->InitArchProjectileWeapon(
+			ArchProjParameters.OwningPlayer,
+			WeaponIndex,
 			ArchProjParameters.WeaponName,
 			ArchProjParameters.WeaponBurstMode,
-                        ArchProjParameters.WeaponOwner,
-                        ArchProjParameters.MeshComponent,
-                        ArchProjParameters.FireSocketName,
-                        World,
-                        ArchProjParameters.ProjectileSystem,
-                        ArchProjParameters.WeaponVFX,
-                        ArchProjParameters.WeaponShellCase,
-                        ArchProjParameters.BurstCooldown,
-                        ArchProjParameters.SingleBurstAmountMaxBurstAmount,
-                        ArchProjParameters.MinBurstAmount,
-                        ArchProjParameters.CreateShellCasingOnEveryRandomBurst,
-                        ArchProjParameters.ArchSettings);
-        }
-        if (M_ProjectileManager.IsValid())
-        {
-                FRTSWeaponHelpers::SetupProjectileManagerForWeapon(ArchProjectile, M_ProjectileManager.Get());
-        }
-        M_TWeapons.Add(ArchProjectile);
-        UpdateTurretRangeBasedOnWeapons();
+			ArchProjParameters.WeaponOwner,
+			ArchProjParameters.MeshComponent,
+			ArchProjParameters.FireSocketName,
+			World,
+			ArchProjParameters.ProjectileSystem,
+			ArchProjParameters.WeaponVFX,
+			ArchProjParameters.WeaponShellCase,
+			ArchProjParameters.BurstCooldown,
+			ArchProjParameters.SingleBurstAmountMaxBurstAmount,
+			ArchProjParameters.MinBurstAmount,
+			ArchProjParameters.CreateShellCasingOnEveryRandomBurst,
+			ArchProjParameters.ArchSettings);
+	}
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(ArchProjectile, M_ProjectileManager.Get());
+	}
+	M_TWeapons.Add(ArchProjectile);
+	UpdateTurretRangeBasedOnWeapons();
 }
 
 void ACPPTurretsMaster::SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
 {
-        SetupArchProjectileWeapon(ArchProjParameters);
+	SetupArchProjectileWeapon(ArchProjParameters);
 }
 
 void ACPPTurretsMaster::GetClosestTarget()
@@ -828,26 +829,26 @@ void ACPPTurretsMaster::OnTurretIdle()
 
 	switch (IdleAnimationState.M_IdleTurretRotationType)
 	{
-		case Idle_KeepLast:
-			break;
+	case Idle_KeepLast:
+		break;
 
-		case Idle_Base:
-			// key: set once, in local space
+	case Idle_Base:
+		// key: set once, in local space
+		SetIdleBaseLocalTarget();
+		return;
+
+	case Idle_Animate:
+		if (IdleSelectState.bIsSelected)
+		{
+			// Selected while we normally animate → rotate to base (locally).
 			SetIdleBaseLocalTarget();
-			return;
-
-		case Idle_Animate:
-			if (IdleSelectState.bIsSelected)
-			{
-				// Selected while we normally animate → rotate to base (locally).
-				SetIdleBaseLocalTarget();
-			}
-			else
-			{
-				// Not selected; animate idle turret.
-				StartIdleAnimationTimer();
-			}
-			break;
+		}
+		else
+		{
+			// Not selected; animate idle turret.
+			StartIdleAnimationTimer();
+		}
+		break;
 	}
 }
 
@@ -1017,23 +1018,23 @@ FRotator ACPPTurretsMaster::GetBaseRotation() const
 {
 	switch (IdleAnimationState.M_IdleTurretRotationType)
 	{
-		case EIdleRotation::Idle_Base:
-			if (TurretOwner.GetObject())
-			{
-				// Keep behavior as before; not used for Idle_Base driving anymore.
-				return TurretOwner.GetInterface()->GetOwnerRotation();
-			}
-			return FRotator(0, 0, 0);
+	case EIdleRotation::Idle_Base:
+		if (TurretOwner.GetObject())
+		{
+			// Keep behavior as before; not used for Idle_Base driving anymore.
+			return TurretOwner.GetInterface()->GetOwnerRotation();
+		}
+		return FRotator(0, 0, 0);
 
-		case EIdleRotation::Idle_KeepLast:
-			return SteeringState.M_TargetRotator;
+	case EIdleRotation::Idle_KeepLast:
+		return SteeringState.M_TargetRotator;
 
-		case Idle_Animate:
-			if (TurretOwner.GetObject())
-			{
-				return TurretOwner.GetInterface()->GetOwnerRotation();
-			}
-			return FRotator(0, 0, 0);
+	case Idle_Animate:
+		if (TurretOwner.GetObject())
+		{
+			return TurretOwner.GetInterface()->GetOwnerRotation();
+		}
+		return FRotator(0, 0, 0);
 	}
 	return FRotator(0, 0, 0);
 }
@@ -1061,7 +1062,8 @@ void ACPPTurretsMaster::SetTarget(AActor* NewTarget)
 
 	// Compute initial desired yaw from current turret transform to active location.
 	const FTransform CurrentTransform = GetTurretTransform();
-	SteeringState.M_TargetRotator = GetTargetRotation(M_TargetingData.GetActiveTargetLocation(), CurrentTransform.GetLocation());
+	SteeringState.M_TargetRotator = GetTargetRotation(M_TargetingData.GetActiveTargetLocation(),
+	                                                  CurrentTransform.GetLocation());
 	bM_IsRotatedToEngage = false;
 	bM_IsFullyRotatedToTarget = false;
 
@@ -1124,7 +1126,7 @@ void ACPPTurretsMaster::RotateTurret(const float DeltaTime)
 	}
 
 	// World-space steering (targets / Idle_Animate).
-	RotateTurret_WorldSteering(DeltaTime);
+	RotateTurret_LocalYaw_Root(DeltaTime);
 }
 
 void ACPPTurretsMaster::RotateTurret_LocalIdle(const float DeltaTime)
@@ -1156,43 +1158,80 @@ void ACPPTurretsMaster::RotateTurret_LocalIdle(const float DeltaTime)
 	SceneSkeletalMesh->SetRelativeRotation(NewLocal);
 }
 
-void ACPPTurretsMaster::RotateTurret_WorldSteering(const float DeltaTime)
+void ACPPTurretsMaster::RotateTurret_LocalYaw_Root(const float DeltaTime)
 {
-	if (not GetIsValidSceneSkeletalMesh())
+	USceneComponent* const TurretRootComponent = GetRootComponent();
+	if (not IsValid(TurretRootComponent))
 	{
 		return;
 	}
 
-	const USceneComponent* const ParentComponent = SceneSkeletalMesh->GetAttachParent();
-	const FRotator ParentRotation = ParentComponent
-		? ParentComponent->GetComponentRotation()
-		: SceneSkeletalMesh->GetComponentRotation();
+	const USceneComponent* const ParentAttachComponent = TurretRootComponent->GetAttachParent();
 
-	const FRotator TargetRotationWithTilt = FRotator(
-		ParentRotation.Pitch,
-		SteeringState.M_TargetRotator.Yaw,
-		ParentRotation.Roll);
+	// If we have no parent (not actually attached), fall back to world-space yaw on the root.
+	// But we still only change yaw.
+	if (not IsValid(ParentAttachComponent))
+	{
+		const FRotator CurrentWorldRotation = TurretRootComponent->GetComponentRotation();
+		const float CurrentYaw = CurrentWorldRotation.Yaw;
 
-	const FRotator Current = SceneSkeletalMesh->GetComponentRotation();
-	const FRotator Delta = (TargetRotationWithTilt - Current).GetNormalized();
-	const float AngleDifference = FMath::Abs((TargetRotationWithTilt - Current).Yaw);
+		const float TargetWorldYaw = SteeringState.M_TargetRotator.Yaw;
+		const float DeltaYawDegrees = FMath::FindDeltaAngleDegrees(CurrentYaw, TargetWorldYaw);
+		const float AbsDeltaYawDegrees = FMath::Abs(DeltaYawDegrees);
 
-	if (Delta.IsNearlyZero())
+		if (AbsDeltaYawDegrees <= AllowedDegreesOffTarget)
+		{
+			bM_IsRotatedToEngage = true;
+
+			FRotator SnappedWorldRotation = CurrentWorldRotation;
+			SnappedWorldRotation.Yaw = TargetWorldYaw;
+
+			TurretRootComponent->SetWorldRotation(SnappedWorldRotation.GetNormalized());
+			StopTurretRotation();
+			return;
+		}
+
+		const float MaxStepThisFrame = RotationSpeed * DeltaTime; // deg/sec
+		const float NewYaw = FMath::FixedTurn(CurrentYaw, TargetWorldYaw, MaxStepThisFrame);
+
+		FRotator NewWorldRotation = CurrentWorldRotation;
+		NewWorldRotation.Yaw = NewYaw;
+
+		TurretRootComponent->SetWorldRotation(NewWorldRotation.GetNormalized());
+		return;
+	}
+
+	// Convert world target rotation into the *parent attach component's local space*.
+	const FQuat ParentWorldQuat = ParentAttachComponent->GetComponentQuat();
+	const FQuat TargetWorldQuat = SteeringState.M_TargetRotator.Quaternion();
+	const FQuat TargetLocalQuat = ParentWorldQuat.Inverse() * TargetWorldQuat;
+	const float TargetLocalYaw = TargetLocalQuat.Rotator().Yaw;
+
+	const FRotator CurrentRelativeRotation = TurretRootComponent->GetRelativeRotation();
+	const float CurrentLocalYaw = CurrentRelativeRotation.Yaw;
+
+	const float DeltaYawDegrees = FMath::FindDeltaAngleDegrees(CurrentLocalYaw, TargetLocalYaw);
+	const float AbsDeltaYawDegrees = FMath::Abs(DeltaYawDegrees);
+
+	if (AbsDeltaYawDegrees <= AllowedDegreesOffTarget)
 	{
 		bM_IsRotatedToEngage = true;
-		SceneSkeletalMesh->SetWorldRotation(TargetRotationWithTilt);
+
+		FRotator SnappedRelativeRotation = CurrentRelativeRotation;
+		SnappedRelativeRotation.Yaw = TargetLocalYaw;
+
+		TurretRootComponent->SetRelativeRotation(SnappedRelativeRotation.GetNormalized());
 		StopTurretRotation();
 		return;
 	}
 
-	if (AngleDifference <= AllowedDegreesOffTarget)
-	{
-		bM_IsRotatedToEngage = true;
-	}
+	const float MaxStepThisFrame = RotationSpeed * DeltaTime; // deg/sec
+	const float NewYaw = FMath::FixedTurn(CurrentLocalYaw, TargetLocalYaw, MaxStepThisFrame);
 
-	const float PercentageMove = FMath::Abs(RotationSpeed / Delta.Yaw) * DeltaTime;
-	const FRotator DeltaMove = Delta * FMath::Clamp<float>(PercentageMove, 0.f, 1.f);
-	SceneSkeletalMesh->SetWorldRotation((Current + DeltaMove).GetNormalized());
+	FRotator NewRelativeRotation = CurrentRelativeRotation;
+	NewRelativeRotation.Yaw = NewYaw;
+
+	TurretRootComponent->SetRelativeRotation(NewRelativeRotation.GetNormalized());
 }
 
 void ACPPTurretsMaster::StopTurretRotation()

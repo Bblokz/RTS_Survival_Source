@@ -419,7 +419,7 @@ private:
 	 * @brief Original world-space steering for targets/Idle_Animate, unchanged in behavior.
 	 * @param DeltaTime Frame delta
 	 */
-	void RotateTurret_WorldSteering(const float DeltaTime);
+	void RotateTurret_LocalYaw_Root(const float DeltaTime);
 
 	// Stops the turret rotation timer.
 	void StopTurretRotation();
