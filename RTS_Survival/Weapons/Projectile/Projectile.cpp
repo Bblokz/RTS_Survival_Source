@@ -973,7 +973,7 @@ float AProjectile::CalculateImpactAngle(const FVector& Velocity, const FVector& 
 	return FMath::RadiansToDegrees(ImpactAngleRadians);
 }
 
-void AProjectile::HandleProjectileBounce(const FHitResult& HitResult)
+void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit )
 {
 	if (not GetIsValidProjectileMovement())
 	{
@@ -1100,7 +1100,7 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		RawArmorValue);
 	if (bShouldBounce)
 	{
-		HandleProjectileBounce(HitResult);
+		HandleProjectileBounce(HitResult, PlateHit);
 		return;
 	}
 	OnArmorPen_DisplayText(HitResult.Location, PlateHit);
@@ -1328,6 +1328,16 @@ void AProjectile::OnBounce_DisplayText(const FVector& Location) const
 			TextSettings
 		);
 	}
+}
+
+bool CanHeHeatDamageOnBounce(const EArmorPlate PlateHit)
+{
+			 inlne constexpr TMap<EArmorPlateDamageType, int32> HeHeatOnBounce_DamageChance = 
+const EArmorPlateDamageType  DamageType = FRTSWeaponHelpers::GetDamageTypeFromPlate(const EArmorPlate PlateHit)
+UDEvelopersettings::GameBalance::Weapons
+
+
+	
 }
 
 void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated)

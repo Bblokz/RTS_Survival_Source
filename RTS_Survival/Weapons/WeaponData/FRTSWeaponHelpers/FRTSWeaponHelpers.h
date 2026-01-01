@@ -23,6 +23,8 @@ namespace FRTSWeaponHelpers
 
 	AActor* GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor);
 
+	bool GetCanArmorPlateDamageEngine(const EArmorPlate PlateHit);
+
 	void SetupProjectileManagerForWeapon(UWeaponState* Weapon, ASmallArmsProjectileManager* ProjectileManager);
 
 	// Returns only a non null if RTS ISValid; checks for parent actor as well.

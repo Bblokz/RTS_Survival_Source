@@ -412,7 +412,7 @@ private:
 	 * @param HitResult The result of the collision trace containing details about the impact, including location and normal.
 	 * @return Returns true if the projectile successfully bounces and continues its lifecycle; otherwise, returns false.
 	 */
-	void HandleProjectileBounce(const FHitResult& HitResult);
+	void HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit);
 
 	/**
 	 * @brief Processes the event when the projectile successfully hits an actor and ensures cleanup of associated timers.

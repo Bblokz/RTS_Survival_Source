@@ -30,6 +30,54 @@ enum class EArmorPlate : uint8
 	
 };
 
+enum class EArmorPlateDamageType : uint8
+{
+	DamageFront = 0,
+	DamageSides = 1,
+	DamageRear = 2,
+}
+
+static EArmorPlateDamageType GetDamageTypeFromPlate(const EArmorPlate PlateHit)
+{
+	switch (PlateHit)
+	{
+	case EArmorPlate::Plate_Front:
+	case EArmorPlate::Plate_FrontUpperGlacis:
+	case EArmorPlate::Plate_FrontLowerGlacis:
+	return EArmorPlateDamageType::DamageFront;
+	
+	case EArmorPlate::Plate_SideLeft:
+	case EArmorPlate::Plate_SideRight:
+	case EArmorPlate::Plate_SideLowerLeft:
+	case EArmorPlate::Plate_SideLowerRight:
+	return EArmorPlateDamageType::DamageSides;
+
+	
+	case EArmorPlate::Plate_Rear:
+	case EArmorPlate::Plate_RearLowerGlacis:
+	case EArmorPlate::Plate_RearUpperGlacis:
+	return EArmorPlateDamageType::DamageRear;
+	
+	case EArmorPlate::Turret_Front:
+	case EArmorPlate::Turret_Cupola:
+	case EArmorPlate::Turret_Mantle:
+	return EArmorPlateDamageType::DamageFront;
+	
+	case EArmorPlate::Turret_SideLeft:
+	case EArmorPlate::Turret_SideRight:
+	return EArmorPlateDamageType::DamageSides;
+	
+	case EArmorPlate::Turret_Rear:
+	return EArmorPlateDamageType::DamageRear;
+	
+	case EArmorPlate::Turret_SidesAndRear:
+	return EArmorPlateDamageType::DamageSides;
+	default:
+		break;
+	}
+	return EArmorPlateDamageType::DamageFront;
+}
+
 static float Global_GetResistanceMultiplierFromPlate(
 	const FDamageMltPerSide& ResistancePerSide, const EArmorPlate Side)
 {

@@ -90,6 +90,19 @@ AActor* FRTSWeaponHelpers::GetHitActorAdjustedForChildActorComponents(AActor* Or
 	return OriginalHitActor;
 }
 
+bool FRTSWeaponHelpers::GetCanArmorPlateDamageEngine(const EArmorPlate PlateHit)
+{
+	switch (PlateHit)
+	{
+	case EArmorPlate::Plate_Rear:
+	case EArmorPlate::Plate_RearLowerGlacis:
+	case EArmorPlate::Plate_RearUpperGlacis:
+		return true;
+	}
+	
+    return false;
+}
+
 void FRTSWeaponHelpers::SetupProjectileManagerForWeapon(UWeaponState* Weapon,
                                                         ASmallArmsProjectileManager* ProjectileManager)
 {
