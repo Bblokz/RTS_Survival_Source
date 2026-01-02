@@ -37,6 +37,22 @@ enum class EArmorPlateDamageType : uint8
 	DamageRear = 2,
 };
 
+static FString Global_GetArmorPlateDamageTypeText(const EArmorPlateDamageType DamageType)
+{
+	switch (DamageType)
+	{
+	case EArmorPlateDamageType::DamageFront:
+		return FString("Front");
+	case EArmorPlateDamageType::DamageSides:
+		return FString("Sides");
+	case EArmorPlateDamageType::DamageRear:
+		return FString("Rear");
+	default:
+		break;
+	}
+	return FString("Unknown");
+}
+
 static EArmorPlateDamageType Global_GetDamageTypeFromPlate(const EArmorPlate PlateHit)
 {
 	switch (PlateHit)
@@ -60,7 +76,7 @@ static EArmorPlateDamageType Global_GetDamageTypeFromPlate(const EArmorPlate Pla
 	
 	case EArmorPlate::Turret_Front:
 	case EArmorPlate::Turret_Cupola:
-	case EArmorPlate::Turret_Mantle:
+	case EArmorPlate::Turret_Mantlet:
 	return EArmorPlateDamageType::DamageFront;
 	
 	case EArmorPlate::Turret_SideLeft:

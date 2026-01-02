@@ -100,8 +100,6 @@ bool FRTSWeaponHelpers::GetCanArmorPlateDamageEngine(const EArmorPlate PlateHit)
 	default:
 		return false;
 	}
-
-	return false;
 }
 
 void FRTSWeaponHelpers::SetupProjectileManagerForWeapon(UWeaponState* Weapon,

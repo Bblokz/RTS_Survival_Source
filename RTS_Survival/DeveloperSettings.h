@@ -583,12 +583,21 @@ namespace DeveloperSettings
 
 			namespace ArmorAndModules
 			{
-				inline constexpr TMap<EArmorPlateDamageType, int32> PlateTypeToHeHeatDamageChance =
+				inline  TMap<EArmorPlateDamageType, int32> PlateTypeToHeHeatDamageChance =
 				{
 					{EArmorPlateDamageType::DamageFront, 25},
 					{EArmorPlateDamageType::DamageSides, 33},
 					{EArmorPlateDamageType::DamageRear, 50}
 				};
+				
+				inline TMap<EArmorPlateDamageType, float> PlateTypeToHeHeatDamageMlt =
+				{
+					{EArmorPlateDamageType::DamageFront, 1.f},
+					{EArmorPlateDamageType::DamageSides, 1.15},
+					{EArmorPlateDamageType::DamageRear, 1.33}
+				};
+				// Multiplied with the real full damage to get the damage when the shell bounces.
+				inline constexpr float HeHeatBounceDamageMlt = 0.2;
 			}
 
 			inline constexpr float DamagePerMM = 1.2;

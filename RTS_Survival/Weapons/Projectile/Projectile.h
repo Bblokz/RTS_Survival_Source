@@ -131,9 +131,11 @@ protected:
 	 */
 	float GetArmorPenAtRange();
 
+	/** @param DamageMlt Multiplier for damage mainly used for when projectiles did not fully penetrate; usually set to 1.0f */
 	void OnHitActor(
 		AActor* HitActor,
-		const FVector& HitLocation, const FRotator& HitRotation, const ERTSSurfaceType HitSurface);
+		const FVector& HitLocation, const FRotator& HitRotation, const ERTSSurfaceType HitSurface,
+		const float DamageMlt);
 
 	virtual void DamageActorWithShrapnel(AActor* HitActor);
 
@@ -410,9 +412,12 @@ private:
 	 * Additionally, it spawns visual and audio effects to indicate the bounce event.
 	 *
 	 * @param HitResult The result of the collision trace containing details about the impact, including location and normal.
+	 * @param HitActor
+	 * @param HitRotation
 	 * @return Returns true if the projectile successfully bounces and continues its lifecycle; otherwise, returns false.
 	 */
-	void HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit);
+	void HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit, AActor* HitActor,
+	                            const FRotator& HitRotation);
 
 	/**
 	 * @brief Processes the event when the projectile successfully hits an actor and ensures cleanup of associated timers.
@@ -425,9 +430,10 @@ private:
 	 * @param HitActor
 	 * @param HitLocation
 	 * @param HitRotation
+	 * @param DamageMlt
 	 */
 	void HandleHitActorAndClearTimer(AActor* HitActor, const FVector& HitLocation, const ERTSSurfaceType HitSurface,
-	                                 const FRotator& HitRotation);
+	                                 const FRotator& HitRotation, const float DamageMlt);
 
 	/**
 	 * @brief Initiates and displays an explosion effect at the specified location upon projectile impact.
@@ -518,6 +524,18 @@ private:
 
 	void ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type) const;
 
-	void OnBounce_DisplayText(const FVector& Location, EArmorPlate ArmorPlateHit) const;
+	/**
+	 * @brief Checks the armor and rolls dice on whether a He or Heat projectile should explode on bounce.
+	 * Will display text to inform the player on what happened.
+	 * @param Location Hit location.
+	 * @param ArmorPlateHit The armor plate hit used to calculate the armor damage type.
+	 * @param HitActor The actor hit.
+	 * @param HitRotator The impact rotation for the he heat bounce or damage explosion.
+	 * @return True if the explosion and dormancy are handled by this function, false otherwise.
+	 */
+	bool OnBounce_HandleHeHeatModuleDamage(const FVector& Location, EArmorPlate ArmorPlateHit, AActor* HitActor,
+	                                       const FRotator& HitRotator);
+	bool CanHeHeatDamageOnBounce(EArmorPlate PlateHit, EArmorPlateDamageType& OutArmorPlateDamageType) const;
+	void CreateHeHeatBounceDamageText(const FVector& Location, const EArmorPlateDamageType DamageType) const;
 	void OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated);
 };

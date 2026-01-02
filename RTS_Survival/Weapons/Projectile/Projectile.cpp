@@ -793,13 +793,13 @@ void AProjectile::BeginDestroy()
 void AProjectile::OnHitActor(
 	AActor* HitActor,
 	const FVector& HitLocation,
-	const FRotator& HitRotation, const ERTSSurfaceType HitSurface)
+	const FRotator& HitRotation, const ERTSSurfaceType HitSurface, const float DamageMlt)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_OnHitActor);
 	if (RTSFunctionLibrary::RTSIsValid(HitActor))
 	{
 		M_DamageEvent.HitInfo.Location = HitLocation;
-		if (HitActor->TakeDamage(M_FullDamage, M_DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
+		if (HitActor->TakeDamage(M_FullDamage * DamageMlt, M_DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
 		{
 			M_ProjectileOwner->OnProjectileKilledActor(HitActor);
 		}
@@ -960,7 +960,7 @@ void AProjectile::OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDa
 		HitResult.GetActor(),
 		HitResult.Location,
 		SurfaceType,
-		MakeImpactOutwardRotationZ(HitResult));
+		MakeImpactOutwardRotationZ(HitResult), 1.f);
 }
 
 
@@ -973,19 +973,25 @@ float AProjectile::CalculateImpactAngle(const FVector& Velocity, const FVector& 
 	return FMath::RadiansToDegrees(ImpactAngleRadians);
 }
 
-void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit)
+void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit, AActor* HitActor,
+                                         const FRotator& HitRotation)
 {
 	if (not GetIsValidProjectileMovement())
 	{
 		return;
 	}
-	OnBounce_DisplayText(HitResult.Location, TODO);
+	if (OnBounce_HandleHeHeatModuleDamage(HitResult.Location, PlateHit, HitActor, HitRotation))
+	{
+		// The HE or HEAT module damage already spawned explosion, damaged actor and set to dormant.
+		return;
+	}
 	ProjectileHitPropagateNotification(true);
 
 	// Reflect the velocity based on the hit normal
-	FVector ReflectedVelocity = FVector::VectorPlaneProject(M_ProjectileMovement->Velocity, HitResult.ImpactNormal).
+	const FVector ReflectedVelocity = FVector::VectorPlaneProject(M_ProjectileMovement->Velocity,
+	                                                              HitResult.ImpactNormal).
 		GetSafeNormal();
-	float VelocityScale = M_ProjectileMovement->Velocity.Size();
+	const float VelocityScale = M_ProjectileMovement->Velocity.Size();
 
 	// Update projectile's position and rotation
 	SetActorLocation(HitResult.ImpactPoint);
@@ -995,15 +1001,8 @@ void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArm
 	// Spawn bounce effects
 	SpawnBounce(HitResult.ImpactPoint, ReflectedVelocity.Rotation());
 
-	if (M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT)
-	{
-		// If the projectile is HE or Heat it never bounced but explodes with the HE bounce effect.
-		OnProjectileDormant();
-		return;
-	}
-
 	// Reduce armor penetration
-	float Divider = DeveloperSettings::GameBalance::Weapons::Projectiles::AmorPenBounceDivider;
+	const float Divider = DeveloperSettings::GameBalance::Weapons::Projectiles::AmorPenBounceDivider;
 	M_ArmorPen /= Divider;
 	M_ArmorPenAtMaxRange /= Divider;
 
@@ -1013,13 +1012,13 @@ void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArm
 	{
 		GetWorld()->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 	}
-	return;
 }
 
 void AProjectile::HandleHitActorAndClearTimer(AActor* HitActor, const FVector& HitLocation,
-                                              const ERTSSurfaceType HitSurface, const FRotator& HitRotation)
+                                              const ERTSSurfaceType HitSurface, const FRotator& HitRotation,
+                                              const float DamageMlt)
 {
-	OnHitActor(HitActor, HitLocation, HitRotation, HitSurface);
+	OnHitActor(HitActor, HitLocation, HitRotation, HitSurface, DamageMlt);
 	GetWorld()->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 }
 
@@ -1100,18 +1099,19 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		RawArmorValue);
 	if (bShouldBounce)
 	{
-		HandleProjectileBounce(HitResult, PlateHit);
+		HandleProjectileBounce(HitResult, PlateHit, HitActor, MakeImpactOutwardRotationZ(HitResult));
 		return;
 	}
 	OnArmorPen_DisplayText(HitResult.Location, PlateHit);
 	ProjectileHitPropagateNotification(false);
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
+	constexpr float DamageMlt = 1.f;
 	HandleHitActorAndClearTimer(
 		HitActor,
 		HitResult.Location,
 		SurfaceTypeHit,
-		MakeImpactOutwardRotationZ(HitResult));
+		MakeImpactOutwardRotationZ(HitResult), DamageMlt);
 }
 
 void AProjectile::ArmorCalc_FireProjectile(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
@@ -1120,11 +1120,12 @@ void AProjectile::ArmorCalc_FireProjectile(UArmorCalculation* ArmorCalculation, 
 	ProjectileHitPropagateNotification(false);
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
+	constexpr float DamageMlt = 1.f;
 	HandleHitActorAndClearTimer(
 		HitActor,
 		HitResult.Location,
 		SurfaceTypeHit,
-		MakeImpactOutwardRotationZ(HitResult));
+		MakeImpactOutwardRotationZ(HitResult), DamageMlt);
 }
 
 void AProjectile::ProjectileHitPropagateNotification(const bool bBounced)
@@ -1308,40 +1309,70 @@ void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSyst
 	}
 }
 
-void AProjectile::OnBounce_DisplayText(const FVector& Location, EArmorPlate ArmorPlateHit) const
+bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, const EArmorPlate ArmorPlateHit,
+                                                    AActor* HitActor, const FRotator& HitRotator)
 {
 	if (M_WeaponCalibre <= 35 || not GetIsValidWidgetPoolManager())
 	{
-		return;
+		return false;
 	}
 	if (M_ShellType != EWeaponShellType::Shell_HE && M_ShellType != EWeaponShellType::Shell_HEAT)
 	{
 		// Not HE or HEAT shell.
-		return;
+		return false;
 	}
 	EArmorPlateDamageType ArmorPlateDamage = EArmorPlateDamageType::DamageFront;
-	if(CanHeHeatDamageOnBounce())
-		FRTSVerticalAnimTextSettings TextSettings;
-		TextSettings.DeltaZ = 75.f;
-		TextSettings.VisibleDuration = 1.f;
-		TextSettings.FadeOutDuration = 1.f;
-
-		M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
-			FRTSRichTextConverter::MakeRTSRich("Shell Shattered!", ERTSRichText::Text_Armor),
-			Location, false,
-			350, ETextJustify::Type::Left,
-			TextSettings
-		);
+	// Throw die to see if we can damage this type of plate (front, sides or rear).
+	if (CanHeHeatDamageOnBounce(ArmorPlateHit, ArmorPlateDamage))
+	{
+		const float* DamageMltPtr = DeveloperSettings::GameBalance::Weapons::ArmorAndModules::PlateTypeToHeHeatDamageMlt
+			.Find(ArmorPlateDamage);
+		const float DamageMlt = DamageMltPtr ? *DamageMltPtr : 1.f;
+		//  damage, explosion and dormant.
+		HandleHitActorAndClearTimer(HitActor, Location, ERTSSurfaceType::Metal, HitRotator, DamageMlt);
+		CreateHeHeatBounceDamageText(Location, ArmorPlateDamage);
+		return true;
 	}
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = 75.f;
+	TextSettings.VisibleDuration = 1.f;
+	TextSettings.FadeOutDuration = 1.f;
+
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		FRTSRichTextConverter::MakeRTSRich("Shell Shattered!", ERTSRichText::Text_Armor),
+		Location, false,
+		350, ETextJustify::Type::Left,
+		TextSettings
+	);
+	SpawnBounce(Location, HitRotator);
+	OnProjectileDormant();
+	return true;
 }
 
-bool CanHeHeatDamageOnBounce(const EArmorPlate PlateHit, const EArmorPlateDamageType& OutArmorPlateDamageType)
+bool AProjectile::CanHeHeatDamageOnBounce(const EArmorPlate PlateHit,
+                                          EArmorPlateDamageType& OutArmorPlateDamageType) const
 {
-	constexpr TMap<EArmorPlateDamageType, int32> HeHeatOnBounce_DamageChance =
+	 TMap<EArmorPlateDamageType, int32> HeHeatOnBounce_DamageChance =
 		DeveloperSettings::GameBalance::Weapons::ArmorAndModules::PlateTypeToHeHeatDamageChance;
-	const EArmorPlateDamageType DamageType = Global_GetDamageTypeFromPlate(PlateHit);
+	OutArmorPlateDamageType = Global_GetDamageTypeFromPlate(PlateHit);
 	const int32 Chance = FMath::RandRange(0, 100);
-	return Chance < HeHeatOnBounce_DamageChance.FindChecked(DamageType);
+	return Chance < HeHeatOnBounce_DamageChance.FindChecked(OutArmorPlateDamageType);
+}
+
+void AProjectile::CreateHeHeatBounceDamageText(const FVector& Location, const EArmorPlateDamageType DamageType) const
+{
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = 105.f;
+	TextSettings.VisibleDuration = 1.5f;
+	TextSettings.FadeOutDuration = 1.5f;
+	FString Text = "Non-Penetrating explosion";
+	Text += "\n " + Global_GetArmorPlateDamageTypeText(DamageType) + " armor damaged!";
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		FRTSRichTextConverter::MakeRTSRich(Text, ERTSRichText::Text_Bad14),
+		Location, true,
+		300, ETextJustify::Type::Left,
+		TextSettings
+	);
 }
 
 void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated)
