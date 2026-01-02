@@ -592,9 +592,9 @@ namespace DeveloperSettings
 				
 				inline TMap<EArmorPlateDamageType, float> PlateTypeToHeHeatDamageMlt =
 				{
-					{EArmorPlateDamageType::DamageFront, 1.f},
-					{EArmorPlateDamageType::DamageSides, 1.15},
-					{EArmorPlateDamageType::DamageRear, 1.33}
+					{EArmorPlateDamageType::DamageFront, 0.15f},
+					{EArmorPlateDamageType::DamageSides, 0.2},
+					{EArmorPlateDamageType::DamageRear, 0.25}
 				};
 				// Multiplied with the real full damage to get the damage when the shell bounces.
 				inline constexpr float HeHeatBounceDamageMlt = 0.2;

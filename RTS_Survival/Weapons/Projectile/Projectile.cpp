@@ -1327,7 +1327,7 @@ bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, con
 	{
 		const float* DamageMltPtr = DeveloperSettings::GameBalance::Weapons::ArmorAndModules::PlateTypeToHeHeatDamageMlt
 			.Find(ArmorPlateDamage);
-		const float DamageMlt = DamageMltPtr ? *DamageMltPtr : 1.f;
+		const float DamageMlt = DamageMltPtr ? *DamageMltPtr : 0.1f;
 		//  damage, explosion and dormant.
 		HandleHitActorAndClearTimer(HitActor, Location, ERTSSurfaceType::Metal, HitRotator, DamageMlt);
 		CreateHeHeatBounceDamageText(Location, ArmorPlateDamage);
@@ -1363,12 +1363,13 @@ void AProjectile::CreateHeHeatBounceDamageText(const FVector& Location, const EA
 {
 	FRTSVerticalAnimTextSettings TextSettings;
 	TextSettings.DeltaZ = 105.f;
-	TextSettings.VisibleDuration = 1.5f;
-	TextSettings.FadeOutDuration = 1.5f;
-	FString Text = "Non-Penetrating explosion";
-	Text += "\n " + Global_GetArmorPlateDamageTypeText(DamageType) + " armor damaged!";
+	TextSettings.VisibleDuration = 1.25f;
+	TextSettings.FadeOutDuration = 1.f;
+	FString Text = FRTSRichTextConverter::MakeRTSRich("Non-Penetrating explosion", ERTSRichText::Text_Bad14);
+	Text += "\n";
+	Text += FRTSRichTextConverter::MakeRTSRich(Global_GetArmorPlateDamageTypeText(DamageType) + " armor damaged!" , ERTSRichText::Text_Bad14);
 	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
-		FRTSRichTextConverter::MakeRTSRich(Text, ERTSRichText::Text_Bad14),
+		Text,
 		Location, true,
 		300, ETextJustify::Type::Left,
 		TextSettings
