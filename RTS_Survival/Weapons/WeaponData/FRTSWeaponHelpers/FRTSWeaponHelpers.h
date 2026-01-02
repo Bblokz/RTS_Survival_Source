@@ -4,6 +4,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 
+enum class EArmorPlate : uint8;
 class UBombComponent;
 class AAircraftMaster;
 class ATankMaster;

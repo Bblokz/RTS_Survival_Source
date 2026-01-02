@@ -518,6 +518,6 @@ private:
 
 	void ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type) const;
 
-	void OnBounce_DisplayText(const FVector& Location) const;
+	void OnBounce_DisplayText(const FVector& Location, EArmorPlate ArmorPlateHit) const;
 	void OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated);
 };

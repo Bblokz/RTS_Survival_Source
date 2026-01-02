@@ -50,11 +50,10 @@ TArray<UWeaponState*> FRTSWeaponHelpers::GetWeaponsMountedOnTank(const ATankMast
 		}
 	}
 	return Weapons;
-	
 }
 
 TArray<UWeaponState*> FRTSWeaponHelpers::GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
-	UBombComponent*& OutBombCompPtr)
+                                                                     UBombComponent*& OutBombCompPtr)
 {
 	if (not IsValid(Aircraft))
 	{
@@ -74,7 +73,6 @@ TArray<UWeaponState*> FRTSWeaponHelpers::GetWeaponsMountedOnAircraft(const AAirc
 		OutBombCompPtr = Aircraft->GetBombComponent();
 	}
 	return Weapons;
-	
 }
 
 AActor* FRTSWeaponHelpers::GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor)
@@ -97,10 +95,13 @@ bool FRTSWeaponHelpers::GetCanArmorPlateDamageEngine(const EArmorPlate PlateHit)
 	case EArmorPlate::Plate_Rear:
 	case EArmorPlate::Plate_RearLowerGlacis:
 	case EArmorPlate::Plate_RearUpperGlacis:
+	case EArmorPlate::Turret_Rear:
 		return true;
+	default:
+		return false;
 	}
-	
-    return false;
+
+	return false;
 }
 
 void FRTSWeaponHelpers::SetupProjectileManagerForWeapon(UWeaponState* Weapon,
@@ -137,18 +138,18 @@ void FRTSWeaponHelpers::SetupProjectileManagerForWeapon(UWeaponState* Weapon,
 		MultiTraceWeapon->SetupProjectileManager(ProjectileManager);
 		return;
 	}
-        UWeaponStateMultiProjectile* MultiProjectileWeapon = Cast<UWeaponStateMultiProjectile>(Weapon);
-        if (IsValid(MultiProjectileWeapon))
-        {
-                MultiProjectileWeapon->SetupProjectileManager(ProjectileManager);
-                return;
-        }
-        UWeaponStateArchProjectile* ArchProjectileWeapon = Cast<UWeaponStateArchProjectile>(Weapon);
-        if (IsValid(ArchProjectileWeapon))
-        {
-                ArchProjectileWeapon->SetupProjectileManager(ProjectileManager);
-                return;
-        }
+	UWeaponStateMultiProjectile* MultiProjectileWeapon = Cast<UWeaponStateMultiProjectile>(Weapon);
+	if (IsValid(MultiProjectileWeapon))
+	{
+		MultiProjectileWeapon->SetupProjectileManager(ProjectileManager);
+		return;
+	}
+	UWeaponStateArchProjectile* ArchProjectileWeapon = Cast<UWeaponStateArchProjectile>(Weapon);
+	if (IsValid(ArchProjectileWeapon))
+	{
+		ArchProjectileWeapon->SetupProjectileManager(ProjectileManager);
+		return;
+	}
 }
 
 ERTSDeathType FRTSWeaponHelpers::TranslateDamageIntoDeathType(const ERTSDamageType DamageType)

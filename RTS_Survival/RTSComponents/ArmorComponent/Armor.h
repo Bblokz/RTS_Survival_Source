@@ -35,9 +35,9 @@ enum class EArmorPlateDamageType : uint8
 	DamageFront = 0,
 	DamageSides = 1,
 	DamageRear = 2,
-}
+};
 
-static EArmorPlateDamageType GetDamageTypeFromPlate(const EArmorPlate PlateHit)
+static EArmorPlateDamageType Global_GetDamageTypeFromPlate(const EArmorPlate PlateHit)
 {
 	switch (PlateHit)
 	{

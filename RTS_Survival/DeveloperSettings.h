@@ -3,7 +3,10 @@
 #include "Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarIcons/HealthBarIcons.h"
 #include "RTSComponents/ArmorCalculationComponent/Resistances/Resistances.h"
+#include "RTSComponents/ArmorComponent/Armor.h"
 #include "RTSComponents/DamageReduction/DamageReduction.h"
+
+enum class EArmorPlateDamageType : uint8;
 
 namespace DeveloperSettings
 {
@@ -90,8 +93,8 @@ namespace DeveloperSettings
 		{
 			inline constexpr int32 BaseInfantryExp = 10;
 			inline constexpr int32 ArmoredInfantryExp = 15;
-			inline constexpr int32 HazmatInfantryExp= 15;
-			inline constexpr int32 ArmoredHazmatInfantryExp= 15;
+			inline constexpr int32 HazmatInfantryExp = 15;
+			inline constexpr int32 ArmoredHazmatInfantryExp = 15;
 			inline constexpr int32 T2InfantryExp = 25;
 			inline constexpr int32 EliteInfantryExp = 35;
 			inline constexpr int32 BaseLightTankExp = 150;
@@ -305,86 +308,85 @@ namespace DeveloperSettings
 			// ----------------------------------
 			namespace InfantryCosts
 			{
-			inline constexpr float InfantryCostMlt = 1.f;
+				inline constexpr float InfantryCostMlt = 1.f;
 				// Ger -- Basic infantry
-			inline constexpr int32 ScavengersRadixiteCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(250 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 JagerRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 BasicSniperRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(250 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 ArmoredInfantryRadixiteCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(325 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 ArmoredInfantryMetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(50 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 ScavengersRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(250 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 JagerRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 BasicSniperRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(250 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 ArmoredInfantryRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(325 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 ArmoredInfantryMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(50 * GameCostMlt * InfantryCostMlt));
 				// Rus -- Basic Infantry
-			inline constexpr int32 HazmatEngineersRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 MosinSquadRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 PTRS_SquadRadixiteCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 HazmatEngineersRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 MosinSquadRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 PTRS_SquadRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
 				// Ger -- Armory unlocked infantry
-			inline constexpr int32 VulturesFg42RadixiteCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(525 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 VulturesFg42MetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(100* GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 SniperTeamRadixiteCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(650 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 SniperTeamMetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(150* GameCostMlt* InfantryCostMlt));
+				inline constexpr int32 VulturesFg42RadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(525 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 VulturesFg42MetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(100 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 SniperTeamRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(650 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 SniperTeamMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(150 * GameCostMlt * InfantryCostMlt));
 				// Ger -- T2 Infantry Costs
-			inline constexpr int32 T2FeuerStormRadixiteCosts = RoundToNearestMultipleOfFive(
-				static_cast<int32>(500 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 T2FeuerStormMetalCosts = RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 T2SturmPioneerRadixiteCosts= RoundToNearestMultipleOfFive(
-				static_cast<int32>(400* GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 T2SturmPioneerMetalCosts = RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt* InfantryCostMlt));
+				inline constexpr int32 T2FeuerStormRadixiteCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(500 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2FeuerStormMetalCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2SturmPioneerRadixiteCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(400 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2SturmPioneerMetalCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
 				// Rus --- T2 Infantry costs
-			inline constexpr int32 T2RedHammerRadixiteCosts= RoundToNearestMultipleOfFive(
-				static_cast<int32>(375 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 T2RedHammerMetalCosts = RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 T2ToxicGuardRadixiteCosts= RoundToNearestMultipleOfFive(
-				static_cast<int32>(450 * GameCostMlt* InfantryCostMlt));
+				inline constexpr int32 T2RedHammerRadixiteCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(375 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2RedHammerMetalCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2ToxicGuardRadixiteCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(450 * GameCostMlt * InfantryCostMlt));
 				// Ger -- Elite infantry costs
-			inline constexpr int32 PanzerGrenadierRadixiteCosts = RoundToNearestMultipleOfFive(
-				static_cast<int32>(675 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 PanzerGrenadierMetalCosts = RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 SturmkommandoRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(800 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 SturmkommandoMetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 LightBringersRadixiteCosts= RoundToNearestMultipleOfFive(
-				static_cast<int32>(800 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 LightBringersMetalCosts = RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 EliteInfantryRadixiteCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(700 * GameCostMlt* InfantryCostMlt));
-			inline constexpr int32 EliteInfantryMetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(300 * GameCostMlt* InfantryCostMlt));
-				
-			inline constexpr int32 GhostOfStalingradRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(1000* GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 PanzerGrenadierRadixiteCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(675 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 PanzerGrenadierMetalCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 SturmkommandoRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(800 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 SturmkommandoMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 LightBringersRadixiteCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(800 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 LightBringersMetalCosts = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 EliteInfantryRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(700 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 EliteInfantryMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
 
-			inline constexpr int32 EliteRusCyborgAtRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 EliteRusCyborgAtMetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(330 * GameCostMlt* InfantryCostMlt));
-					
-			inline constexpr int32 EliteRusCyborgFedrovRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(700 * GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 EliteRusCyborgFedrovMetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(200 * GameCostMlt* InfantryCostMlt));
-				
-			inline constexpr int32 CortextOfficerRadixiteCost= RoundToNearestMultipleOfFive(
-				static_cast<int32>(1000* GameCostMlt * InfantryCostMlt));
-			inline constexpr int32 CortextOfficerMetalCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(300 * GameCostMlt* InfantryCostMlt));
-				
+				inline constexpr int32 GhostOfStalingradRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
+
+				inline constexpr int32 EliteRusCyborgAtRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 EliteRusCyborgAtMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(330 * GameCostMlt * InfantryCostMlt));
+
+				inline constexpr int32 EliteRusCyborgFedrovRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(700 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 EliteRusCyborgFedrovMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+
+				inline constexpr int32 CortextOfficerRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 CortextOfficerMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
 			}
 
 			namespace EnergySupplies
@@ -397,7 +399,7 @@ namespace DeveloperSettings
 				inline constexpr int32 T1VehicleFactorySupply = -30;
 				inline constexpr int32 T2VehicleFactorySupply = -50;
 				inline constexpr int32 T2CommunicationCenterSupply = -40;
-				inline constexpr int32 T2TrainingCenterSupply= -20;
+				inline constexpr int32 T2TrainingCenterSupply = -20;
 				inline constexpr int32 T2AirPadSupply = -40;
 			}
 
@@ -579,6 +581,16 @@ namespace DeveloperSettings
 				inline constexpr int32 SmgAccuracy = 40.f;
 			}
 
+			namespace ArmorAndModules
+			{
+				inline constexpr TMap<EArmorPlateDamageType, int32> PlateTypeToHeHeatDamageChance =
+				{
+					{EArmorPlateDamageType::DamageFront, 25},
+					{EArmorPlateDamageType::DamageSides, 33},
+					{EArmorPlateDamageType::DamageRear, 50}
+				};
+			}
+
 			inline constexpr float DamagePerMM = 1.2;
 			inline constexpr float DamagePerMM_FireProjectileBonus = 0.5f;
 			inline constexpr float DamageBonusSmallArmsMlt = 1.25;
@@ -735,8 +747,8 @@ namespace DeveloperSettings
 			// Building expansions health settings.
 			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(500 * OverallHealthMlt);
 			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(850 * OverallHealthMlt);
-			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(2000* OverallHealthMlt);
-			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500* OverallHealthMlt);
+			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
+			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500 * OverallHealthMlt);
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
 			inline constexpr float T3BxpBunkerHealth = RoundToNearestMultipleOfFive(1600 * OverallHealthMlt);
 			inline constexpr float BxpHeavyBunkerHealth = RoundToNearestMultipleOfFive(2400 * OverallHealthMlt);
@@ -838,6 +850,7 @@ namespace DeveloperSettings
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(4, 0.9f);
 			}
+
 			namespace ArmoredCar
 			{
 				// Takes 6% laser damage on front and 10% on sides and 15% on rear.
@@ -968,25 +981,25 @@ namespace DeveloperSettings
 			inline constexpr float BaseIntervalBetweenSpatialVoiceLines = 12.f;
 			inline constexpr float FluxPercentageIntervalBetweenSpatialVoiceLines = 30.f;
 			inline constexpr float MaxStaggerBetweenSpatialVoiceLines = 1.f;
-			        // Default cooldown used when no per-type override is configured.
-        inline constexpr float CoolDownBetweenSpatialAudioOfSameType = 2.f;
+			// Default cooldown used when no per-type override is configured.
+			inline constexpr float CoolDownBetweenSpatialAudioOfSameType = 2.f;
 			inline constexpr float CheckResourceStorageFullInterval = 5.6f;
 			inline constexpr float MinDelayBetweenVoiceLines = 2.f;
 
-        /**
-         * @brief Optional per-type overrides for the spatial cooldown between
-         *        voice lines of the same type.
-         *
-         * If a given ERTSVoiceLine is not present in this map, the engine will
-         * fall back to CoolDownBetweenSpatialAudioOfSameType.
-         */
-        inline const TMap<ERTSVoiceLine, float> SpatialVoiceLineCooldowns = {
-            {ERTSVoiceLine::Fire,          1.0f},
-            {ERTSVoiceLine::ShotBounced,   1.5f},
-            {ERTSVoiceLine::ShotConnected, 1.5f},
-            {ERTSVoiceLine::IdleTalk,      8.0f},
-            {ERTSVoiceLine::InCombatTalk,6.f},
-        };
+			/**
+			 * @brief Optional per-type overrides for the spatial cooldown between
+			 *        voice lines of the same type.
+			 *
+			 * If a given ERTSVoiceLine is not present in this map, the engine will
+			 * fall back to CoolDownBetweenSpatialAudioOfSameType.
+			 */
+			inline const TMap<ERTSVoiceLine, float> SpatialVoiceLineCooldowns = {
+				{ERTSVoiceLine::Fire, 1.0f},
+				{ERTSVoiceLine::ShotBounced, 1.5f},
+				{ERTSVoiceLine::ShotConnected, 1.5f},
+				{ERTSVoiceLine::IdleTalk, 8.0f},
+				{ERTSVoiceLine::InCombatTalk, 6.f},
+			};
 			/**
 			 * @brief Chance (0–1) that a given spatial voice line will actually fire.
 			 * Used by USpatialVoiceLinePlayer::ShouldPlaySpatialVoiceLine().
@@ -1006,7 +1019,7 @@ namespace DeveloperSettings
 				inline constexpr float FluxPercentageIntervalBetweenSpatialVoiceLines = 30.f;
 				inline constexpr float TimeBetweenIdleVoiceLines = 60.f;
 				inline constexpr int32 IdleVoiceLineFluxPercentage = 10.f;
-				
+
 				/**
 				 * @brief Chance (0–1) that a given spatial voice line will actually fire.
 				 * Used by USpatialVoiceLinePlayer::ShouldPlaySpatialVoiceLine().

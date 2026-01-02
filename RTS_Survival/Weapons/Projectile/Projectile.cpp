@@ -973,13 +973,13 @@ float AProjectile::CalculateImpactAngle(const FVector& Velocity, const FVector& 
 	return FMath::RadiansToDegrees(ImpactAngleRadians);
 }
 
-void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit )
+void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit)
 {
 	if (not GetIsValidProjectileMovement())
 	{
 		return;
 	}
-	OnBounce_DisplayText(HitResult.Location);
+	OnBounce_DisplayText(HitResult.Location, TODO);
 	ProjectileHitPropagateNotification(true);
 
 	// Reflect the velocity based on the hit normal
@@ -1308,14 +1308,19 @@ void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSyst
 	}
 }
 
-void AProjectile::OnBounce_DisplayText(const FVector& Location) const
+void AProjectile::OnBounce_DisplayText(const FVector& Location, EArmorPlate ArmorPlateHit) const
 {
 	if (M_WeaponCalibre <= 35 || not GetIsValidWidgetPoolManager())
 	{
 		return;
 	}
-	if (M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT)
+	if (M_ShellType != EWeaponShellType::Shell_HE && M_ShellType != EWeaponShellType::Shell_HEAT)
 	{
+		// Not HE or HEAT shell.
+		return;
+	}
+	EArmorPlateDamageType ArmorPlateDamage = EArmorPlateDamageType::DamageFront;
+	if(CanHeHeatDamageOnBounce())
 		FRTSVerticalAnimTextSettings TextSettings;
 		TextSettings.DeltaZ = 75.f;
 		TextSettings.VisibleDuration = 1.f;
@@ -1330,14 +1335,13 @@ void AProjectile::OnBounce_DisplayText(const FVector& Location) const
 	}
 }
 
-bool CanHeHeatDamageOnBounce(const EArmorPlate PlateHit)
+bool CanHeHeatDamageOnBounce(const EArmorPlate PlateHit, const EArmorPlateDamageType& OutArmorPlateDamageType)
 {
-			 inlne constexpr TMap<EArmorPlateDamageType, int32> HeHeatOnBounce_DamageChance = 
-const EArmorPlateDamageType  DamageType = FRTSWeaponHelpers::GetDamageTypeFromPlate(const EArmorPlate PlateHit)
-UDEvelopersettings::GameBalance::Weapons
-
-
-	
+	constexpr TMap<EArmorPlateDamageType, int32> HeHeatOnBounce_DamageChance =
+		DeveloperSettings::GameBalance::Weapons::ArmorAndModules::PlateTypeToHeHeatDamageChance;
+	const EArmorPlateDamageType DamageType = Global_GetDamageTypeFromPlate(PlateHit);
+	const int32 Chance = FMath::RandRange(0, 100);
+	return Chance < HeHeatOnBounce_DamageChance.FindChecked(DamageType);
 }
 
 void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated)
