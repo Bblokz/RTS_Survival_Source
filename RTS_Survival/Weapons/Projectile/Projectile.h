@@ -43,6 +43,8 @@ public:
 	// Sets default values for this actor's properties
 	AProjectile(const FObjectInitializer& ObjectInitializer);
 
+	void OverwriteGravityScale(const float NewGravityScale) const;
+
 	void OnCreatedInPoolSetDormant();
 
 	void InitProjectilePoolSettings(
@@ -538,4 +540,5 @@ private:
 	bool CanHeHeatDamageOnBounce(EArmorPlate PlateHit, EArmorPlateDamageType& OutArmorPlateDamageType) const;
 	void CreateHeHeatBounceDamageText(const FVector& Location, const EArmorPlateDamageType DamageType) const;
 	void OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated);
+	void OnArmorPen_HeDisplayText(const FVector& Location);
 };

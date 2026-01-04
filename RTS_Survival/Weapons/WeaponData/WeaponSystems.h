@@ -131,6 +131,7 @@ enum class
 	KwK44_128MM_E100 UMETA(DisplayName = "KwK44 128MM (E100)"),
 	sIG_33_150MM UMETA(DisplayName = "sIG 33 150MM (Sturmpanzer)"),
 	Stu_H_43_L_12_150MM UMETA(DisplayName = "StuH 43 L/12 150MM (Brumbar)"),
+	RW61_Mortar_380MM UMETA(DisplayName = "RW61 Mortar 380MM (SturmTiger)"),
 
 
 	// Russian Small Arms
@@ -243,6 +244,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::D_25T_122MM_IS3: return "D-25T";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
+		case EWeaponName::RW61_Mortar_380MM: return "RW61 Mortar";
 	case EWeaponName::StuK40_L48_75MM: return "StuK 40";
 	case EWeaponName::Pak40_3_L46_75MM: return "Pak40/3";
 	case EWeaponName::Pak43_88MM: return "Pak43";
