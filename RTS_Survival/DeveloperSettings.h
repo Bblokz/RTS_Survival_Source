@@ -635,7 +635,8 @@ namespace DeveloperSettings
 			// Multiplied with the base degree accuracy calculation for projectiles, 1 makes it 10 degrees of variation
 			// for a weapon with zero accuracy.
 			inline constexpr float ProjectileAccuracyMlt = 0.8;
-
+			inline constexpr float ProjectileGravityScale = 0.05f;
+			inline constexpr float RocketProjectileGravityScale = 2.f;
 			inline constexpr float RocketProjectileAccuracyMlt = 0.8f;
 
 			// Influences the projectile accuracy for mortars and artillery this the amount of centimeters in deviation

@@ -191,4 +191,5 @@ private:
 	TObjectPtr<UStaticMeshComponent> M_ManuallySetupMesh = nullptr;
 
 	bool bM_WasSetupManually = false;
+
 };

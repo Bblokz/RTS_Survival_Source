@@ -129,6 +129,15 @@ AProjectile::AProjectile(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bStartWithTickEnabled = false;
 }
 
+void AProjectile::OverwriteGravityScale(const float NewGravityScale) const
+{
+	if (not M_ProjectileMovement)
+	{
+		return;
+	}
+	M_ProjectileMovement->ProjectileGravityScale = NewGravityScale;
+}
+
 void AProjectile::OnCreatedInPoolSetDormant()
 {
 	// Is this enough for the projectile to stay alive and hidden in game till it needs to be used?
@@ -1352,11 +1361,11 @@ bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, con
 bool AProjectile::CanHeHeatDamageOnBounce(const EArmorPlate PlateHit,
                                           EArmorPlateDamageType& OutArmorPlateDamageType) const
 {
-	 TMap<EArmorPlateDamageType, int32> HeHeatOnBounce_DamageChance =
+	TMap<EArmorPlateDamageType, int32> HeHeatOnBounce_DamageChance =
 		DeveloperSettings::GameBalance::Weapons::ArmorAndModules::PlateTypeToHeHeatDamageChance;
 	OutArmorPlateDamageType = Global_GetDamageTypeFromPlate(PlateHit);
 	const int32 Chance = FMath::RandRange(0, 100);
-	return Chance < HeHeatOnBounce_DamageChance.FindChecked(OutArmorPlateDamageType);
+	return Chance < (HeHeatOnBounce_DamageChance.FindChecked(OutArmorPlateDamageType) + M_WeaponCalibre / 5);
 }
 
 void AProjectile::CreateHeHeatBounceDamageText(const FVector& Location, const EArmorPlateDamageType DamageType) const
@@ -1365,9 +1374,10 @@ void AProjectile::CreateHeHeatBounceDamageText(const FVector& Location, const EA
 	TextSettings.DeltaZ = 105.f;
 	TextSettings.VisibleDuration = 1.25f;
 	TextSettings.FadeOutDuration = 1.f;
-	FString Text = FRTSRichTextConverter::MakeRTSRich("Non-Penetrating explosion", ERTSRichText::Text_Bad14);
+	FString Text = FRTSRichTextConverter::MakeRTSRich("Non-Penetrating explosion", ERTSRichText::Text_Exp);
 	Text += "\n";
-	Text += FRTSRichTextConverter::MakeRTSRich(Global_GetArmorPlateDamageTypeText(DamageType) + " armor damaged!" , ERTSRichText::Text_Bad14);
+	Text += FRTSRichTextConverter::MakeRTSRich(Global_GetArmorPlateDamageTypeText(DamageType) + " armor damaged!",
+	                                           ERTSRichText::Text_Exp);
 	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
 		Text,
 		Location, true,
@@ -1382,6 +1392,12 @@ void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPl
 	{
 		return;
 	}
+	if (M_ShellType == EWeaponShellType::Shell_HE)
+	{
+		OnArmorPen_HeDisplayText(Location);
+		return;
+	}
+
 	FString PlateName;
 	switch (PlatePenetrated)
 	{
@@ -1405,6 +1421,7 @@ void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPl
 		PlateName = "Rear armor";
 		break;
 	default:
+
 		// No text for other plates.
 		return;
 	}
@@ -1422,6 +1439,21 @@ void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPl
 	);
 }
 
+void AProjectile::OnArmorPen_HeDisplayText(const FVector& Location)
+{
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = 75.f;
+	TextSettings.VisibleDuration = 1.f;
+	TextSettings.FadeOutDuration = 1.f;
+
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		FRTSRichTextConverter::MakeRTSRich("HE destroyed armor!!", ERTSRichText::Text_Bad14),
+		Location, false,
+		350, ETextJustify::Type::Left,
+		TextSettings
+	);
+}
+
 void AProjectile::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -1430,10 +1462,7 @@ void AProjectile::PostInitializeComponents()
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "ProjectileMovement", "PostInitComponents");
 	}
-	else
-	{
-		M_DefaultGravityScale = M_ProjectileMovement->ProjectileGravityScale;
-	}
+	M_DefaultGravityScale = DeveloperSettings::GameBalance::Weapons::ProjectileGravityScale;
 	M_NiagaraComponent = FindComponentByClass<UNiagaraComponent>();
 	if (not IsValid(M_NiagaraComponent))
 	{

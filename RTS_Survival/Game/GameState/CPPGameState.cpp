@@ -2850,13 +2850,40 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ReloadSpeed = 17.2f;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 85;
+	WeaponData.Accuracy = 94;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Stu_H_43_L_12_150MM, WeaponData);
+
+	
+	// https://old-wiki.warthunder.com/Brummbar
+	WeaponData.WeaponName = EWeaponName::RW61_Mortar_380MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_HE;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
+	WeaponData.WeaponCalibre = 380;
+	WeaponData.TNTExplosiveGrams = 3400;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = LightCannonRange;
+	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
+	WeaponData.ArmorPen = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.ArmorPenMaxRange = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 30.f;
+	WeaponData.BaseCooldown = 1;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 80;
+	WeaponData.ShrapnelRange = 1200;
+	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM * 2;
+	WeaponData.ShrapnelPen = 82;
+	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RW61_Mortar_380MM, WeaponData);
 
 	// https://wiki.warthunder.com/Maus
 	WeaponData.WeaponName = EWeaponName::KwK44_128MM;
@@ -3975,6 +4002,25 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Tiger, TankData);
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_TigerH1, TankData);
+
+
+	// Sturm Tiger
+	TankData.MaxHealth = T3HeavyTankBase + 400;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 25;
+	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleMaxSpeedKmh = 26;
+	TankData.VehicleReverseSpeedKmh = 15;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankRadixiteCost * 1.5, 25)},
+		{ERTSResourceType::Resource_VehicleParts, RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankVehiclePartsCost* 1.33, 25)}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.1f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SturmTiger, TankData);
 
 	// King Tiger
 	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;

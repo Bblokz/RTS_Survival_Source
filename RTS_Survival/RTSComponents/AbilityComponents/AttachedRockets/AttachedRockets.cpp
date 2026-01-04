@@ -634,6 +634,7 @@ bool UAttachedRockets::FireRocket_LaunchPoolProjectile(const FVector& LaunchLoca
 		ImpactAttenuation,
 		ImpactConcurrency, M_ProjectileVfxSettings, EWeaponShellType::Shell_HEAT, {},
 		M_RocketData.WeaponCalibre);
+	Projectile->OverwriteGravityScale(DeveloperSettings::GameBalance::Weapons::RocketProjectileGravityScale * FMath::RandRange(0.2, 1.5));
 	if (RocketMesh.IsValid())
 	{
 		Projectile->SetupAttachedRocketMesh(RocketMesh.Get());
