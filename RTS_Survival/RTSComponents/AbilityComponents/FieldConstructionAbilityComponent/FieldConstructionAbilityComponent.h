@@ -16,6 +16,7 @@ class AStaticPreviewMesh;
 class AFieldConstruction;
 class UNiagaraComponent;
 class UStaticMeshComponent;
+class URTSTimedProgressBarManager;
 
 
 USTRUCT(Blueprintable)
@@ -115,6 +116,7 @@ struct FFieldConstructionActiveState
 		M_TargetLocation = FVector::ZeroVector;
 		M_TargetRotation = FRotator::ZeroRotator;
 		M_ConstructionDuration = 0.f;
+		M_ProgressBarActivationID = 0;
 		M_CurrentPhase = EFieldConstructionAbilityPhase::None;
 		M_ConstructionType = EFieldConstructionType::DefaultGerHedgeHog;
 	}
@@ -128,6 +130,7 @@ struct FFieldConstructionActiveState
 	FVector M_TargetLocation = FVector::ZeroVector;
 	FRotator M_TargetRotation = FRotator::ZeroRotator;
 	float M_ConstructionDuration = 0.f;
+	uint64 M_ProgressBarActivationID = 0;
 	EFieldConstructionAbilityPhase M_CurrentPhase = EFieldConstructionAbilityPhase::None;
 	EFieldConstructionType M_ConstructionType = EFieldConstructionType::DefaultGerHedgeHog;
 };
@@ -180,6 +183,7 @@ private:
 	void BeginPlay_SetOwningSquadController();
 	void BeginPlay_ValidateSettings() const;
 	void BeginPlay_AddAbility();
+	void BeginPlay_CacheTimedProgressBarManager();
 	void AddAbilityToCommands();
 	void AddAbilityToSquad(ASquadController* Squad);
 	bool GetIsValidCommandsInterface() const;
@@ -202,6 +206,10 @@ private:
 
 	UPROPERTY()
 	TArray<FFieldConstructionUnitEquipmentState> M_FieldConstructionEquipment;
+
+	UPROPERTY()
+	TWeakObjectPtr<URTSTimedProgressBarManager> M_TimedProgressBarManager;
+	bool GetIsValidTimedProgressBarManager() const;
 
 	void StartMovementToConstruction();
 	void OnUnitCloseEnoughForConstruction();
@@ -228,4 +236,6 @@ private:
 	void StopConstructionRangeCheckTimer();
 	void StopConstructionDurationTimer();
 	void ReportError_InvalidConstructionState(const FString& ErrorContext) const;
+	void StartConstructionProgressBar(AFieldConstruction* SpawnedConstruction);
+	void StopConstructionProgressBar();
 };

@@ -5,6 +5,7 @@
 
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -12,6 +13,8 @@
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
+#include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/Manager/RTSTimedProgressBarManager.h"
+#include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionActor/FieldConstruction.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -40,6 +43,7 @@ void UFieldConstructionAbilityComponent::BeginPlay()
 	BeginPlay_SetOwningSquadController();
 	BeginPlay_SetFieldTypeOnConstructionData();
 	BeginPlay_ValidateSettings();
+	BeginPlay_CacheTimedProgressBarManager();
 	BeginPlay_AddAbility();
 }
 
@@ -83,6 +87,27 @@ void UFieldConstructionAbilityComponent::BeginPlay_ValidateSettings() const
 	{
 		RTSFunctionLibrary::ReportError("Field construction ability is missing PreviewMesh.");
 	}
+}
+
+void UFieldConstructionAbilityComponent::BeginPlay_CacheTimedProgressBarManager()
+{
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError(
+			"World missing while caching timed progress bar manager for field construction component.");
+		return;
+	}
+
+	URTSTimedProgressBarWorldSubsystem* ProgressBarSubsystem = World->GetSubsystem<URTSTimedProgressBarWorldSubsystem>();
+	if (not IsValid(ProgressBarSubsystem))
+	{
+		RTSFunctionLibrary::ReportError("Failed to access timed progress bar world subsystem.");
+		return;
+	}
+
+	M_TimedProgressBarManager = ProgressBarSubsystem->GetTimedProgressBarManager();
+	(void)GetIsValidTimedProgressBarManager();
 }
 
 void UFieldConstructionAbilityComponent::BeginPlay_AddAbility()
@@ -166,6 +191,21 @@ bool UFieldConstructionAbilityComponent::GetIsValidSquadController() const
 	return false;
 }
 
+bool UFieldConstructionAbilityComponent::GetIsValidTimedProgressBarManager() const
+{
+	if (M_TimedProgressBarManager.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_TimedProgressBarManager",
+		"UFieldConstructionAbilityComponent::GetIsValidTimedProgressBarManager",
+		this);
+	return false;
+}
+
 void UFieldConstructionAbilityComponent::ExecuteFieldConstruction(const FVector& ConstructionLocation,
                                                                   const FRotator& ConstructionRotation,
                                                                   AStaticPreviewMesh* StaticPreviewActor)
@@ -216,6 +256,7 @@ void UFieldConstructionAbilityComponent::TerminateFieldConstructionCommand(AActo
 		DisableSquadWeapons(false);
 		RemoveEquipmentFromSquad();
 		StopConstructionAnimation();
+		StopConstructionProgressBar();
 		ResetConstructionState();
 		return;
 	}
@@ -321,6 +362,7 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 	AddEquipmentToSquad();
 	PlayConstructionAnimation();
 
+	StartConstructionProgressBar(SpawnedConstruction);
 	StartConstructionTimer();
 }
 
@@ -413,6 +455,77 @@ void UFieldConstructionAbilityComponent::StartConstructionTimer()
 	}
 }
 
+void UFieldConstructionAbilityComponent::StartConstructionProgressBar(AFieldConstruction* SpawnedConstruction)
+{
+	if (M_ActiveConstructionState.M_ProgressBarActivationID != 0)
+	{
+		StopConstructionProgressBar();
+	}
+
+	if (not GetIsValidTimedProgressBarManager())
+	{
+		return;
+	}
+
+	if (not IsValid(SpawnedConstruction))
+	{
+		return;
+	}
+
+	USceneComponent* AnchorComponent = SpawnedConstruction->GetRootComponent();
+	if (not IsValid(AnchorComponent))
+	{
+		return;
+	}
+
+	URTSTimedProgressBarManager* ProgressBarManager = M_TimedProgressBarManager.Get();
+	if (not IsValid(ProgressBarManager))
+	{
+		return;
+	}
+
+	const FVector AttachOffset = FVector::ZeroVector;
+	constexpr float RatioStart = 0.f;
+	constexpr bool bUsePercentageText = true;
+	constexpr bool bUseDescriptionText = false;
+	constexpr float ProgressBarScale = 1.f;
+
+	M_ActiveConstructionState.M_ProgressBarActivationID = ProgressBarManager->ActivateTimedProgressBarAnchored(
+		AnchorComponent,
+		AttachOffset,
+		RatioStart,
+		M_ActiveConstructionState.M_ConstructionDuration,
+		bUsePercentageText,
+		ERTSProgressBarType::Default,
+		bUseDescriptionText,
+		TEXT(""),
+		ProgressBarScale);
+}
+
+void UFieldConstructionAbilityComponent::StopConstructionProgressBar()
+{
+	if (M_ActiveConstructionState.M_ProgressBarActivationID == 0)
+	{
+		return;
+	}
+
+	if (not GetIsValidTimedProgressBarManager())
+	{
+		M_ActiveConstructionState.M_ProgressBarActivationID = 0;
+		return;
+	}
+
+	URTSTimedProgressBarManager* ProgressBarManager = M_TimedProgressBarManager.Get();
+	if (not IsValid(ProgressBarManager))
+	{
+		M_ActiveConstructionState.M_ProgressBarActivationID = 0;
+		return;
+	}
+
+	ProgressBarManager->ForceProgressBarDormant(M_ActiveConstructionState.M_ProgressBarActivationID);
+	M_ActiveConstructionState.M_ProgressBarActivationID = 0;
+}
+
 float UFieldConstructionAbilityComponent::CalculateConstructionDurationSeconds() const
 {
 	const float BaseTime = FieldConstructionAbilitySettings.ConstructionTime;
@@ -466,6 +579,7 @@ int32 UFieldConstructionAbilityComponent::GetMaxSquadUnitCount() const
 void UFieldConstructionAbilityComponent::FinishConstruction()
 {
 	StopConstructionDurationTimer();
+	StopConstructionProgressBar();
 	SpawnCompletionEffect();
 	DisableSquadWeapons(false);
 	RemoveEquipmentFromSquad();
@@ -693,6 +807,7 @@ void UFieldConstructionAbilityComponent::OnConstructionActorDestroyed(AActor* De
 	DisableSquadWeapons(false);
 	RemoveEquipmentFromSquad();
 	StopConstructionAnimation();
+	StopConstructionProgressBar();
 	M_ActiveConstructionState.M_CurrentPhase = EFieldConstructionAbilityPhase::Completed;
 
 	if (GetIsValidSquadController())
@@ -705,6 +820,7 @@ void UFieldConstructionAbilityComponent::OnConstructionActorDestroyed(AActor* De
 
 void UFieldConstructionAbilityComponent::ResetConstructionState()
 {
+	StopConstructionProgressBar();
 	StopConstructionRangeCheckTimer();
 	StopConstructionDurationTimer();
 	M_FieldConstructionEquipment.Reset();
