@@ -23,6 +23,7 @@
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -38,6 +39,7 @@
 #include "Squads/SquadUnit/SquadUnit.h"
 #include "Squads/SquadUnit/AISquadUnit/AISquadUnit.h"
 #include "Squads/SquadUnitHpComp/SquadUnitHealthComponent.h"
+#include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
 
 FSquadStartGameAction::FSquadStartGameAction()
 {
@@ -943,6 +945,19 @@ void ASquadController::PostInitializeComponent_SetupFieldConstructionAbilities()
 	M_FieldConstructionAbilities.Append(FoundAbilityComponents);
 }
 
+UFieldConstructionAbilityComponent* ASquadController::GetFieldConstructionAbility(
+	const EFieldConstructionType ConstructionType) const
+{
+	for (UFieldConstructionAbilityComponent* AbilityComponent : M_FieldConstructionAbilities)
+	{
+		if (IsValid(AbilityComponent) && AbilityComponent->GetConstructionType() == ConstructionType)
+		{
+			return AbilityComponent;
+		}
+	}
+	return nullptr;
+}
+
 
 void ASquadController::SetUnitToIdleSpecificLogic()
 {
@@ -1302,11 +1317,44 @@ void ASquadController::ExecuteFieldConstructionCommand(const EFieldConstructionT
                                                        const FVector& ConstructionLocation,
                                                        const FRotator& ConstructionRotation, AActor* StaticPreviewActor)
 {
-	
+	UFieldConstructionAbilityComponent* FieldConstructionComponent = GetFieldConstructionAbility(FieldConstruction);
+	if (not IsValid(FieldConstructionComponent))
+	{
+		const FString ConstructionTypeName = UEnum::GetValueAsString(FieldConstruction);
+		RTSFunctionLibrary::ReportError("Missing field construction ability component for type: " + ConstructionTypeName);
+		DoneExecutingCommand(EAbilityID::IdFieldConstruction);
+		return;
+	}
+
+	AStaticPreviewMesh* PreviewMeshActor = Cast<AStaticPreviewMesh>(StaticPreviewActor);
+	if (StaticPreviewActor && not IsValid(PreviewMeshActor))
+	{
+		RTSFunctionLibrary::ReportError("Static preview actor invalid for field construction execution.");
+	}
+
+	FieldConstructionComponent->ExecuteFieldConstruction(ConstructionLocation, ConstructionRotation, PreviewMeshActor);
 }
 
 void ASquadController::TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor)
 {
+	UFieldConstructionAbilityComponent* FieldConstructionComponent = GetFieldConstructionAbility(FieldConstructionType);
+	if (not IsValid(FieldConstructionComponent))
+	{
+		const FString ConstructionTypeName = UEnum::GetValueAsString(FieldConstructionType);
+		RTSFunctionLibrary::ReportError("Missing field construction ability component during termination for type: " + ConstructionTypeName);
+		if (IsValid(StaticPreviewActor))
+		{
+			StaticPreviewActor->Destroy();
+		}
+		return;
+	}
+
+	FieldConstructionComponent->TerminateFieldConstructionCommand(StaticPreviewActor);
+}
+
+void ASquadController::StartFieldConstructionMove(const FVector& ConstructionLocation)
+{
+	GeneralMoveToForAbility(ConstructionLocation, EAbilityID::IdFieldConstruction);
 }
 
 

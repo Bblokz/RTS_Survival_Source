@@ -120,6 +120,7 @@ private:
 	bool GetIsReinforcementPointEnabled(const UReinforcementPoint* ReinforcementPoint) const;
 	void DrawReinforcementDebugString(const FString& DebugText, const FVector& WorldLocation) const;
 	void DrawReinforcementDebugSphere(const FVector& WorldLocation, const float Radius, const FColor& Color) const;
+	int32 GetMaxSquadUnits() const { return M_MaxSquadUnits; }
 
 	bool bM_IsActivated;
 
