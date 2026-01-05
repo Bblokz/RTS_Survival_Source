@@ -34,7 +34,8 @@ FTankStartGameAction::FTankStartGameAction()
 }
 
 void FTankStartGameAction::InitStartGameAction(const EAbilityID InAbilityID, AActor* InTargetActor,
-                                               const FVector& InTargetLocation, ATankMaster* InTankMaster, const FRotator& InEndRotation)
+                                               const FVector& InTargetLocation, ATankMaster* InTankMaster,
+                                               const FRotator& InEndRotation)
 {
 	if (not IsValid(InTankMaster))
 	{
@@ -127,7 +128,7 @@ bool FTankStartGameAction::GetIsValidTankMaster() const
 	}
 
 	RTSFunctionLibrary::ReportError("TankMaster is not valid!"
-	                                "\n At function: FTankStartGameAction::GetIsValidTankMaster");
+		"\n At function: FTankStartGameAction::GetIsValidTankMaster");
 	return false;
 }
 
@@ -169,7 +170,7 @@ bool FTankStartGameAction::ExecuteStartAbility() const
 	case EAbilityID::IdSwitchSingleBurst:
 		break;
 	case EAbilityID::IdReverseMove:
-		return M_TankMaster->ReverseUnitToLocation(TargetLocation, true ) ==
+		return M_TankMaster->ReverseUnitToLocation(TargetLocation, true) ==
 			ECommandQueueError::NoError;
 	case EAbilityID::IdRotateTowards:
 		return M_TankMaster->RotateTowards(
@@ -402,6 +403,17 @@ void ATankMaster::PostInitializeComponents()
 	UBehaviourComp* BehaviourComp = FindComponentByClass<UBehaviourComp>();
 	BehaviourComponent = BehaviourComp;
 	(void)GetIsValidBehaviourComponent();
+
+	TArray<USceneComponent*> SceneComponents;
+	GetRootComponent()->GetChildrenComponents(true, SceneComponents);
+	for (const auto EachSceneComp : SceneComponents)
+	{
+		if (not IsValid(EachSceneComp))
+		{
+			continue;
+		}
+		EachSceneComp->SetCanEverAffectNavigation(false);
+	}
 }
 
 void ATankMaster::SetTurretsToAutoEngage(const bool bUseLastTarget)

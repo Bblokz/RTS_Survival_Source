@@ -570,6 +570,33 @@ void FRTS_CollisionSetup::SetupDestructibleEnvActorGeometryComponentCollision(
 	GeometryComponent->SetSimulatePhysics(false);
 }
 
+void FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(UMeshComponent* FieldConstructionMesh,
+	const int32 OwningPlayer, const bool bAlliedProjectilesHitObject)
+{
+	if(not IsValid(FieldConstructionMesh))
+	{
+		return ;
+	}
+	FieldConstructionMesh->SetCollisionObjectType(ECC_Destructible);
+	FieldConstructionMesh->SetReceivesDecals(false);
+	FieldConstructionMesh->SetCollisionEnabled(ECollisionEnabled::Type::QueryOnly);
+	FieldConstructionMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+	FieldConstructionMesh->SetCanEverAffectNavigation(false);
+	// Overlap with buildings to block placement.
+	FieldConstructionMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
+	// Block visibility for identifying this destructible when clicked by the player.
+	FieldConstructionMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	// Block weapons of opposite player.
+	FieldConstructionMesh->SetCollisionResponseToChannel(OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
+	                                        ECR_Block);
+	if(bAlliedProjectilesHitObject)
+	{
+		// Also block allied projectiles.
+		FieldConstructionMesh->SetCollisionResponseToChannel(OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER,
+			ECR_Block);
+	}
+}
+
 void FRTS_CollisionSetup::SetupObstacleCollision(UMeshComponent* ObstacleMesh, const bool bBlockWeapons)
 {
 	if (not IsValid(ObstacleMesh))
