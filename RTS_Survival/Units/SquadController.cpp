@@ -6,6 +6,7 @@
 #include "BrainComponent.h"
 #include "NavigationSystem.h"
 #include "NavigationData.h"
+#include "ToolBuilderUtil.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
@@ -277,7 +278,7 @@ void FDamageSquadGameStart::DamageUnitsToPercentage(const TArray<ASquadUnit*>& S
 	int32 RemainingUnitsToDamage = UnitsToDamage;
 	for (ASquadUnit* SquadUnit : SquadUnits)
 	{
-		if(InstantKilledUnits > 0)
+		if (InstantKilledUnits > 0)
 		{
 			InstantKilledUnits--;
 			continue;
@@ -918,6 +919,7 @@ void ASquadController::PostInitializeComponents()
 	}
 
 	PostInitializeComponents_SetupGrenadeComponent();
+	PostInitializeComponent_SetupFieldConstructionAbilities();
 }
 
 void ASquadController::PostInitializeComponents_SetupGrenadeComponent()
@@ -930,6 +932,17 @@ void ASquadController::PostInitializeComponents_SetupGrenadeComponent()
 
 	M_GrenadeComponent->Init(this);
 }
+
+void ASquadController::PostInitializeComponent_SetupFieldConstructionAbilities()
+{
+	M_FieldConstructionAbilities.Reset();
+
+	TInlineComponentArray<UFieldConstructionAbilityComponent*> FoundAbilityComponents;
+	GetComponents(FoundAbilityComponents);
+
+	M_FieldConstructionAbilities.Append(FoundAbilityComponents);
+}
+
 
 void ASquadController::SetUnitToIdleSpecificLogic()
 {
@@ -1283,6 +1296,17 @@ void ASquadController::RemoveCaptureUnitsFromSquad(const int32 AmountCaptureUnit
 
 		--UnitsToRemove;
 	}
+}
+
+void ASquadController::ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction,
+                                                       const FVector& ConstructionLocation,
+                                                       const FRotator& ConstructionRotation, AActor* StaticPreviewActor)
+{
+	
+}
+
+void ASquadController::TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor)
+{
 }
 
 

@@ -32,6 +32,7 @@
 #include "Formation/FormationPositionEffects/PlayerFormationPositionEffects.h"
 #include "FViewportScreenshotTask/FViewportScreenshotTask.h"
 #include "GameInitCallbacks/MainMenuUICallbacks.h"
+#include "PlayerFieldConstructionData/PlayerFieldConstructionCandidate.h"
 #include "PlayerRotationArrowSettings/PlayerRotationArrowSettings.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
@@ -194,8 +195,8 @@ static FString GetStringCommandType(const ECommandType CommandType)
 		return TEXT("RotateTowards");
 	case ECommandType::Repair:
 		return TEXT("Repair");
-			case ECommandType::CaptureActor:
-        		return TEXT("CaptureActor");
+	case ECommandType::CaptureActor:
+		return TEXT("CaptureActor");
 	default:
 		return TEXT("Unknown");
 	}
@@ -280,7 +281,8 @@ public:
 	void PlayVoiceLine(const AActor* Unit, const ERTSVoiceLine VoiceLine, const bool bForcePlay = false,
 	                   const bool bQueueIfNotPlayed = false) const;
 
-	void PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false, bool bInterruptRegularVoiceLines = false) const;
+	void PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false,
+	                            bool bInterruptRegularVoiceLines = false) const;
 
 
 	/**
@@ -766,6 +768,16 @@ private:
 	UPROPERTY()
 	bool bM_IsInTechTree;
 
+	/**
+	 * @brief Picks the best constructor among current selections, skipping excluded GUIDs.
+	 *        Preference is given to the actor with the lowest queued construction ability count.
+	 * @param OutFieldConstructionComp Ability component found on the chosen actor (matching ConstructionType).
+	 * @param ConstructionType Which constructiontype must be supported by the chosen actor.
+	 * @return The chosen actor or nullptr if none qualifies.
+	 */
+	AActor* GetNewFieldConstructionCandidate(UFieldConstructionAbilityComponent*& OutFieldConstructionComp,
+	                                         const EFieldConstructionType ConstructionType);
+
 	UPROPERTY()
 	FViewportScreenshotTask M_ViewportScreenshotTask;
 
@@ -1000,7 +1012,7 @@ private:
 	uint32 MoveUnitsToLocation(const FVector& MoveLocation);
 	uint32 OrderUnitsToAttackActor(AActor* TargetActor);
 	/** @brief Orders all selected squads (only squads) to capture the given capture actor. */
-    uint32 OrderUnitsCaptureActor(AActor* CaptureTargetActor);
+	uint32 OrderUnitsCaptureActor(AActor* CaptureTargetActor);
 	uint32 OrderUnitsToMoveRallyPoint(const FVector& RallyPointLocation);
 	uint32 OrderUnitsAttackGround(const FVector& GroundLocation);
 	void DirectActionButtonConversion(const EAbilityID ConversionAbility);
@@ -1107,6 +1119,8 @@ private:
 
 	void DirectActionButtonReinforce();
 
+	void DirectActionButtonFieldConstruction(const EFieldConstructionType ConstructionType);
+
 	// Some units have an UAttachedRockets component that can be used to fire rockets.
 	void DirectionActionButtonFireRockets();
 	void DirectActionButtonCancelRocketFire();
@@ -1141,6 +1155,10 @@ private:
 	// The vehicle selected for building upon first clicking the building action button.
 	UPROPERTY()
 	ANomadicVehicle* M_NomadicVehicleSelectedForBuilding;
+
+	// Keeps track of the unit that activated the construction preview for field construction.
+	UPROPERTY()
+	FFieldConstructionCandidate M_FieldConstructionCandidate;
 
 	// The controller responsible for building the actionUI.
 	UPROPERTY()
@@ -1190,6 +1208,11 @@ private:
 	 */
 	bool PlaceBxpIfAsyncLoaded(FVector& InClickedLocation);
 
+	void OnPlaceFieldConstructionAtLocation(const FVector& ValidConstructionLocation);
+
+	bool TryPlaceFieldConstructionWithCachedCandidate(
+		const FVector& ClickedLocation);
+
 	/**
 	 * @brief Finds the first available nomadic truck in selected units to convert to building at the given location.
 	 * @param BuildingLocation The location to build the building at.
@@ -1227,6 +1250,8 @@ private:
 	 * @post The building mode is off.
 	 */
 	void StopNomadicPreviewPlacement();
+
+	void StopFieldConstructionPlacement();
 
 	/** @brief Also destroys the preview but without calling a cancel on the bxp placement.
 	 * @note used in case we found a valid location to place our preview. */
@@ -1303,6 +1328,13 @@ private:
 	                                 const EPlayerBuildingPreviewMode PreviewMode,
 	                                 const bool bUseBuildRadius,
 	                                 const FNomadicPreviewAttachments& NomadicPreviewAttachments);
+
+	void StartFieldConstructionPreview(
+		UStaticMesh* PreviewMesh,
+		const FFieldConstructionData& FieldConstructionData,
+		AActor* FieldConstructionCandidate,
+		UFieldConstructionAbilityComponent
+		* FieldConstructionComponent);
 
 
 	TArray<URadiusComp*> Get_NOMADIC_BuildRadiiAndMakeThemVisible() const;

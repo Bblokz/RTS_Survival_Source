@@ -334,6 +334,15 @@ void UCommandData::UpdateActionUI()
 	}
 }
 
+const FQueueCommand* UCommandData::GetCurrentQueuedCommand() const
+{
+	if (CurrentIndex >= 0 && CurrentIndex < NumCommands)
+	{
+		return &M_TCommands[CurrentIndex];
+	}
+	return nullptr;	
+}
+
 
 bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCommand)
 {
@@ -405,7 +414,8 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 {
 	return (AbilityId == EAbilityID::IdApplyBehaviour)
 		|| (AbilityId == EAbilityID::IdActivateMode)
-		|| (AbilityId == EAbilityID::IdDisableMode);
+		|| (AbilityId == EAbilityID::IdDisableMode)
+		|| (AbilityId == EAbilityID::IdFieldConstruction);
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
@@ -415,6 +425,13 @@ FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQ
 		return GetAbilityEntryOfCustomType(
 			EAbilityID::IdApplyBehaviour,
 			static_cast<int32>(QueuedCommand.BehaviourAbilityType));
+	}
+
+	if (QueuedCommand.CommandType == EAbilityID::IdFieldConstruction)
+	{
+		return GetAbilityEntryOfCustomType(
+			EAbilityID::IdFieldConstruction,
+			static_cast<int32>(QueuedCommand.FieldConstructionType));
 	}
 
 	if ((QueuedCommand.CommandType == EAbilityID::IdActivateMode) || (QueuedCommand.CommandType ==
@@ -439,6 +456,11 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 		EAbilityID::IdDisableMode))
 	{
 		return " with mode type: " + UEnum::GetValueAsString(QueuedCommand.ModeAbilityType);
+	}
+
+	if (QueuedCommand.CommandType == EAbilityID::IdFieldConstruction)
+	{
+		return " with field construction type: " + UEnum::GetValueAsString(QueuedCommand.FieldConstructionType);
 	}
 
 	return FString{};
@@ -470,6 +492,21 @@ bool UCommandData::GetIsQueuedCommandAbilityEntryOnCooldown(
 	}
 
 	return true;
+}
+
+void UCommandData::OnCommandInQueueCancelled(const FQueueCommand& CancelledCommand)
+{
+	if (CancelledCommand.CommandType == EAbilityID::IdFieldConstruction)
+	{
+		// If we had a field construction command cancelled, we need to remove any static preview meshes related to it.
+		AActor* StaticPreviewActor = CancelledCommand.TargetActor.IsValid()
+			                             ? CancelledCommand.TargetActor.Get()
+			                             : nullptr;
+		if (StaticPreviewActor)
+		{
+			StaticPreviewActor->Destroy();
+		}
+	}
 }
 
 
@@ -517,7 +554,8 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	AActor* TargetActor,
 	const FRotator& Rotation,
 	const EBehaviourAbilityType BehaviourAbility,
-	const EModeAbilityType ModeAbility)
+	const EModeAbilityType ModeAbility,
+	const EFieldConstructionType FieldConstructionType)
 {
 	// Check if we have an active queue and if we are not patrolling.
 	// In case we shift click while the queue 
@@ -540,6 +578,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NewCmd.TargetRotator = Rotation;
 	NewCmd.BehaviourAbilityType = BehaviourAbility;
 	NewCmd.ModeAbilityType = ModeAbility;
+	NewCmd.FieldConstructionType = FieldConstructionType;
 
 	// Insert at the end
 	M_TCommands[NumCommands] = NewCmd;
@@ -613,6 +652,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 
 	if (not GetIsQueuedCommandStillAllowed(Cmd))
 	{
+		OnCommandInQueueCancelled(Cmd);
 		// This ability is now either on cooldown or entirely removed from the unit; skip it.
 		ExecuteCommand(false);
 		return;
@@ -772,6 +812,13 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			ExecuteDisableModeAbility(Cmd.ModeAbilityType);
 		}
 		break;
+	case EAbilityID::IdFieldConstruction:
+		{
+			AActor* StaticPreviewActor = Cmd.TargetActor.IsValid() ? Cmd.TargetActor.Get() : nullptr;
+			M_Owner->ExecuteFieldConstructionCommand(Cmd.FieldConstructionType, Cmd.TargetLocation,
+			                                         Cmd.TargetRotator, StaticPreviewActor);
+		}
+		break;
 	default:
 		RTSFunctionLibrary::PrintString(
 			"Command not implemented in ExecuteCommand: " + Global_GetAbilityIDAsString(Cmd.CommandType)
@@ -908,6 +955,24 @@ bool UCommandData::IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) 
 	}
 }
 
+void UCommandData::TerminateFieldConstructionCommand()
+{
+	const FQueueCommand* const CurrentCmd = GetCurrentQueuedCommand();
+	if (CurrentCmd == nullptr)
+	{
+		return;
+	}
+
+	if (CurrentCmd->CommandType != EAbilityID::IdFieldConstruction)
+	{
+		return;
+	}
+
+	AActor* const StaticPreviewActor = CurrentCmd->TargetActor.Get();
+	const EFieldConstructionType ConstructionType = CurrentCmd->FieldConstructionType;
+
+	M_Owner->TerminateFieldConstructionCommand(ConstructionType, StaticPreviewActor);
+}
 
 void ICommands::SetPrimarySelected(UActionUIManager* ActionUIManager)
 {
@@ -915,6 +980,24 @@ void ICommands::SetPrimarySelected(UActionUIManager* ActionUIManager)
 	{
 		UnitCommandData->M_ActionUIManager = ActionUIManager;
 	}
+}
+
+int32 ICommands::GetConstructionAbilityCount()
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return 0;
+	}
+	int32 Count = 0;
+	for (const FUnitAbilityEntry& AbilityEntry : UnitCommandData->GetAbilities())
+	{
+		if (AbilityEntry.AbilityId == EAbilityID::IdFieldConstruction)
+		{
+			Count++;
+		}
+	}
+	return Count;
 }
 
 void ICommands::SetIsSpawning(const bool bIsSpawning)
@@ -1222,6 +1305,41 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 	}
 	UnitCommandData->ExecuteBehaviourAbility(BehaviourAbility, true);
 	return ECommandQueueError::NoError;
+}
+
+ECommandQueueError ICommands::FieldConstruction(const EFieldConstructionType FieldConstruction,
+                                                const bool bSetUnitToIdle, const FVector& ConstructionLocation,
+                                                const FRotator& ConstructionRotation, AActor*
+                                                StaticPreview)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	FUnitAbilityEntry OutFieldConstructionAbilityEntry;
+	if (not FAbilityHelpers::GetHasFieldConstructionAbility(UnitCommandData->GetAbilities(), FieldConstruction,
+	                                                        OutFieldConstructionAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+	// Field construction abilities may have a cooldown.
+	if (OutFieldConstructionAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdFieldConstruction,
+		ConstructionLocation,
+		/*TargetActor=*/StaticPreview,
+		ConstructionRotation,
+		/*BehaviourAbility=*/EBehaviourAbilityType::DefaultSprint,
+		/*ModeAbility=*/EModeAbilityType::DefaultSniperOverwatch,
+		FieldConstruction);
 }
 
 ECommandQueueError ICommands::ActivateModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle)
@@ -2081,6 +2199,16 @@ void ICommands::TerminateCaptureCommand()
 {
 }
 
+void ICommands::ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction,
+                                                const FVector& ConstructionLocation,
+                                                const FRotator& ConstructionRotation, AActor* StaticPreviewActor)
+{
+}
+
+void ICommands::TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor)
+{
+}
+
 void ICommands::NoQueue_ExecuteSetResourceConversionEnabled(const bool bEnabled)
 {
 }
@@ -2321,6 +2449,18 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdReinforceSquad:
 		TerminateReinforceCommand();
+		break;
+	case EAbilityID::IdFieldConstruction:
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if(not CommandData)
+			{
+				return;
+			}
+			// Will call back the terminate logic on the Owner but with the preview actor and the subtype
+			// so we know which ability was cancelled.
+			CommandData->TerminateFieldConstructionCommand();
+		}
 		break;
 	default:
 		RTSFunctionLibrary::PrintString(

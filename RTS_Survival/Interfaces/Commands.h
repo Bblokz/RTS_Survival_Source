@@ -62,6 +62,9 @@ public:
 	UPROPERTY()
 	EModeAbilityType ModeAbilityType;
 
+	UPROPERTY()
+	EFieldConstructionType FieldConstructionType;
+
 	FQueueCommand()
 		: CommandType(EAbilityID::IdNoAbility)
 		  , TargetLocation(FVector::ZeroVector)
@@ -69,6 +72,7 @@ public:
 		  , TargetRotator(FRotator::ZeroRotator)
 		  , BehaviourAbilityType(EBehaviourAbilityType::DefaultSprint)
 		  , ModeAbilityType(EModeAbilityType::DefaultSniperOverwatch)
+	      , FieldConstructionType(EFieldConstructionType::DefaultGerHedgeHog)
 	{
 	}
 };
@@ -156,15 +160,19 @@ private:
 	// If set the unit is primary selected.
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
 
+		const FQueueCommand* GetCurrentQueuedCommand() const;
+
 	inline bool GetIsPrimarySelected() const { return M_ActionUIManager.IsValid(); };
 
 	bool GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility);
 	bool GetIsQueuedCommandAbilityIdStillOnUnit(EAbilityID AbilityId) const;
 	bool GetDoesQueuedCommandRequireSubtypeEntry(EAbilityID AbilityId) const;
-        FUnitAbilityEntry* GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand);
+	FUnitAbilityEntry* GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand);
 	FString GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const;
 	bool GetIsQueuedCommandAbilityEntryOnCooldown(EAbilityID AbilityId, const FUnitAbilityEntry* AbilityEntry,
 	                                              const FString& SubtypeSuffix) const;
+
+	void OnCommandInQueueCancelled(const FQueueCommand& CancelledCommand);
 	/**
 	 * Debug function that prints the queue to the screen or logs.
 	 */
@@ -186,10 +194,11 @@ private:
 		AActor* TargetActor = nullptr,
 		const FRotator& Rotation = FRotator::ZeroRotator,
 		const EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint,
-		const EModeAbilityType ModeAbility = EModeAbilityType::DefaultSniperOverwatch
+		const EModeAbilityType ModeAbility = EModeAbilityType::DefaultSniperOverwatch,
+		const EFieldConstructionType FieldConstructionType = EFieldConstructionType::DefaultGerHedgeHog
 	);
 
-        void StartCooldownForCommand(const FQueueCommand& Command);
+	void StartCooldownForCommand(const FQueueCommand& Command);
 
 	/**
 	 * Execute either the next command (if bExecuteCurrentCommand=false) 
@@ -279,18 +288,18 @@ private:
 	 * only call this for commands added to the END of the queue! */
 	void SetRotationFlagForFinalMovementCommand(const EAbilityID NewFinalCommand, const FRotator& Rotation);
 
-	
 
 	void ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bByPassQueue) const;
 	void ExecuteModeAbility(const EModeAbilityType ModeAbility) const;
 	void ExecuteDisableModeAbility(const EModeAbilityType ModeAbility) const;
 
-		/**
-    	 * @brief Some queue commands are not represented as Action UI abilities.
-    	 * These commands must not be rejected just because they are missing from M_Abilities.
-    	 */
-    	bool IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) const;
+	/**
+     * @brief Some queue commands are not represented as Action UI abilities.
+     * These commands must not be rejected just because they are missing from M_Abilities.
+     */
+	bool IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) const;
 
+	void TerminateFieldConstructionCommand();
 };
 
 
@@ -325,6 +334,8 @@ public:
 	FOnUnitIdleAndNoNewCommands OnUnitIdleAndNoNewCommandsDelegate;
 
 	void SetPrimarySelected(UActionUIManager* ActionUIManager);
+
+	int32 GetConstructionAbilityCount();
 
 
 	/** @brief Sets a simple flag to indicate that this unit has not recieved any player commands yet.
@@ -413,7 +424,7 @@ public:
 		const FVector& Location,
 		const bool bSetUnitToIdle, const FRotator& FinishedMovementRotation,
 		const bool bForceFinalRotationRegardlessOfReverse = false);
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError Reinforce(const bool bSetUnitToIdle);
 
@@ -441,10 +452,27 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError CaptureActor(AActor* CaptureTarget, const bool bSetUnitToIdle);
-
+	/**
+	 * @brief Activates a behavior ability for the unit.
+	 * 
+	 * This function allows the unit to execute a specific behavior ability, either immediately or by adding it to the 
+	 * command queue. Behavior abilities are predefined actions or states that the unit can perform, such as sprinting 
+	 * 
+	 * @param BehaviourAbility The type of behavior ability to activate. This is specified using the EBehaviourAbilityType enum.
+	 * @param bSetUnitToIdle If true, the unit will instantly activate the behaviour; ignoring the queue.
+	 *                       If false, the ability will be added to the end of the command queue and executed in sequence.
+	 *                       
+	 *@note The bSetUnitToIdle here allows for immediate execution of the behaviour without interrupting the current command queue.  
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError ActivateBehaviourAbility(const EBehaviourAbilityType BehaviourAbility,
+	                                                    const bool bSetUnitToIdle);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError
-	ActivateBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bSetUnitToIdle);
+	FieldConstruction(const EFieldConstructionType FieldConstruction, const bool bSetUnitToIdle,
+	                  const FVector& ConstructionLocation, const FRotator& ConstructionRotation, AActor* StaticPreview);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 
 	virtual ECommandQueueError ActivateModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle);
 
@@ -747,6 +775,10 @@ protected:
 
 	virtual void ExecuteCaptureCommand(AActor* CaptureTarget);
 	virtual void TerminateCaptureCommand();
+
+	virtual void ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction,
+	                                             const FVector& ConstructionLocation, const FRotator& ConstructionRotation, AActor* StaticPreviewActor);
+	virtual void TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor);
 
 	virtual void NoQueue_ExecuteSetResourceConversionEnabled(const bool bEnabled);
 	/**

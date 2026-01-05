@@ -1410,7 +1410,7 @@ namespace DeveloperSettings
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
 		// Wheel Animation
 		constexpr bool GVehicle_Wheel_Animation_Compile_DebugSymbols = false;
-		constexpr bool GConstruction_Preview_Compile_DebugSymbols = false;
+		constexpr bool GConstruction_Preview_Compile_DebugSymbols = true;
 		constexpr bool GPlayerClickAndAction_Compile_DebugSymbols = false;
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting

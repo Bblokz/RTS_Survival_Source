@@ -51,6 +51,38 @@ void FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruct
 	}
 }
 
+void FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruction(const UObject* WorldContextObject,
+	const AActor* PreviewActor, const FRotator& FinishedMoveRotation)
+{
+	if (not IsValid(WorldContextObject) || not IsValid(PreviewActor))
+	{
+		return;
+	}
+
+	const FBox BoundsWS = GetWorldBoundsOfPreview(PreviewActor);
+	if (BoundsWS.IsValid == 0)
+	{
+		return;
+	}
+
+	TArray<AActor*> OverlappingActors;
+	GatherOverlappingMoveUnitActors(WorldContextObject, PreviewActor, BoundsWS, OverlappingActors);
+	TArray<ASquadController*> MovedSquadControllers = {};
+
+	for (AActor* EachActor : OverlappingActors)
+	{
+		if (not IsValid(EachActor))
+		{
+			continue;
+		}
+		if (not IsOwnedByPlayer1MoveUnit(EachActor))
+		{
+			continue;
+		}
+		IssueMoveOrderIfPossible(EachActor, WorldContextObject, BoundsWS, FinishedMoveRotation, MovedSquadControllers);
+	}
+}
+
 FBox FMoveUnitsFromConstruction::GetWorldBoundsOfPreview(const AActor* PreviewActor)
 {
 	if (not IsValid(PreviewActor))
@@ -172,10 +204,12 @@ void FMoveUnitsFromConstruction::IssueMoveOrderIfPossible(
 			return;
 		}
 	}
-	const bool bIsMoving = Commands->GetActiveCommandID() == EAbilityID::IdMove || Commands->GetActiveCommandID() == EAbilityID::IdReverseMove;
+	const bool bIsMoving = Commands->GetActiveCommandID() == EAbilityID::IdMove || Commands->GetActiveCommandID() ==
+		EAbilityID::IdReverseMove;
 	const bool bIsPatrolling = Commands->GetActiveCommandID() == EAbilityID::IdPatrol;
-	const bool bIsConstructing = Commands->GetActiveCommandID() == EAbilityID::IdCreateBuilding;
-	if(bIsConstructing || bIsMoving || bIsPatrolling)
+	const bool bIsConstructing = Commands->GetActiveCommandID() == EAbilityID::IdCreateBuilding || Commands->
+		GetActiveCommandID() == EAbilityID::IdFieldConstruction;
+	if (bIsConstructing || bIsMoving || bIsPatrolling)
 	{
 		// Already moving or constructing, skip.
 		return;

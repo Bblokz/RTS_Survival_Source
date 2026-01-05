@@ -16,6 +16,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Player/ConstructionPreview/ConstructionRadiusHelper/ConstructionRadiusHelper.h"
 #include "RTS_Survival/Player/Camera/CameraPawn.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 FName ACPPConstructionPreview::PreviewMeshComponentName(TEXT("PreviewMesh"));
 
@@ -67,6 +68,18 @@ ACPPConstructionPreview::ACPPConstructionPreview(const FObjectInitializer& Objec
 	}
 	// Initialize rotation degrees
 	RotationDegrees = 10.f;
+}
+
+EFieldConstructionType ACPPConstructionPreview::GetActiveFieldConstructionType() const
+{
+	if (M_ActivePreviewStatus != EConstructionPreviewMode::Construct_FieldConstruction)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Requested active field construction type but the active preview mode is not field construction"
+			"\n See GetActiveFieldConstructionType");
+		return EFieldConstructionType::DefaultGerHedgeHog;
+	}
+	return FieldConstructionData.FieldConstructionType;
 }
 
 FVector ACPPConstructionPreview::GetBxpPreviewLocation(const FVector& ClickedLocation) const
@@ -364,6 +377,9 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 	case EConstructionPreviewMode::Construct_NomadicPreview:
 		bM_IsValidBuildingLocation = TickRadiiBuildingPlacement(bIsSlopeValid);
 		break;
+	case EConstructionPreviewMode::Construct_FieldConstruction:
+		bM_IsValidBuildingLocation = TickRadiiBuildingPlacement(bIsSlopeValid);
+		break;
 	}
 	// Update materials depending on whether we can place the preview.
 	UpdatePreviewMaterial(bM_IsValidBuildingLocation);
@@ -444,6 +460,30 @@ bool ACPPConstructionPreview::EnsureBxpPreviewRequestIsValid(
 			return false;
 		}
 		break;
+	}
+	return true;
+}
+
+bool ACPPConstructionPreview::EnsureFieldConstructionRequestIsValid(const UStaticMesh* NewPreviewMesh,
+                                                                    const FFieldConstructionData& ConstructionData)
+const
+{
+	const FString ConstructionTypeName = UEnum::GetValueAsString(ConstructionData.FieldConstructionType);
+	if (not IsValid(NewPreviewMesh))
+	{
+		RTSFunctionLibrary::ReportError("Cannot start field construction preview of type : " + ConstructionTypeName +
+			"\n as the provided preview mesh is null!"
+			"\n at function ACPPConstructionPreview::EnsureFieldConstructionRequestIsValid"
+			"\n Actor: " + GetName());
+		return false;
+	}
+	if (ConstructionData.DeltaDegreeOnPreviewRotation <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError("Cannot start field construction preview of type : " + ConstructionTypeName +
+			"\n as the provided DeltaDegreeOnPreviewRotation is not greater than zero!"
+			"\n at function ACPPConstructionPreview::EnsureFieldConstructionRequestIsValid"
+			"\n Actor: " + GetName());
+		return false;
 	}
 	return true;
 }
@@ -604,7 +644,8 @@ bool ACPPConstructionPreview::GetIsBuildingPreviewBlocked() const
 	return !bM_IsValidBuildingLocation;
 }
 
-AStaticPreviewMesh* ACPPConstructionPreview::CreateStaticMeshActor(const FRotator& Rotation, ANomadicVehicle* NomadicConstructing) const
+AStaticPreviewMesh* ACPPConstructionPreview::CreateStaticMeshActor(const FRotator& Rotation,
+                                                                   ANomadicVehicle* NomadicConstructing) const
 {
 	// Validate world first (early return).
 	UWorld* World = GetWorld();
@@ -639,14 +680,26 @@ AStaticPreviewMesh* ACPPConstructionPreview::CreateStaticMeshActor(const FRotato
 
 	StaticPreviewMesh->SetPreviewMesh(PreviewMesh->GetStaticMesh(), M_ConstructionPreviewMaterial);
 
-	// Move overlapping player-1 units out of the construction bounds.
-	FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruction(
-		this,             // world context for projection
-		StaticPreviewMesh,
-		Rotation, NomadicConstructing);        // use building rotation as "final facing" for units
+	if (IsValid(NomadicConstructing))
+	{
+		// Move overlapping player-1 units out of the construction bounds.
+		FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruction(
+			this,
+			StaticPreviewMesh,
+			Rotation, NomadicConstructing);
+	}
+	else
+	{
+		// Move overlapping player-1 units out of the construction bounds.
+		FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruction(
+			this,
+			StaticPreviewMesh,
+			Rotation);
+	}
 
 	return StaticPreviewMesh;
 }
+
 
 void ACPPConstructionPreview::StartNomadicPreview(
 	UStaticMesh* NewPreviewMesh, const TArray<URadiusComp*>& BuildRadii, const bool bNeedWithinBuildRadius, const
@@ -726,6 +779,28 @@ void ACPPConstructionPreview::StartBxpPreview(UStaticMesh* NewPreviewMesh,
 	}
 }
 
+void ACPPConstructionPreview::StartFieldConstructionPreview(UStaticMesh* PreviewMesh,
+                                                            const FFieldConstructionData ConstructionData,
+                                                            const TArray<URadiusComp*>& BuildRadii)
+{
+	if (not EnsureFieldConstructionRequestIsValid(
+		PreviewMesh,
+		ConstructionData))
+	{
+		return;
+	}
+
+	M_PreviewSounds.PlayConstructionSound(this, EConstructionPreviewSoundType::StartPreview);
+	FieldConstructionData = ConstructionData;
+	bM_IsValidBuildingLocation = false;
+	bM_NeedWithinBuildRadius = ConstructionData.bNeedsToBeWithinBuildRadii;
+	M_BuildRadii = BuildRadii;
+	SetGridOverlayEnabled(true);
+	// Also sets the mode of construction.
+	InitPreviewAndStatWidgetForConstruction(PreviewMesh, EConstructionPreviewMode::Construct_FieldConstruction,
+	                                        true);
+}
+
 
 void ACPPConstructionPreview::InitPreviewAndStatWidgetForConstruction(
 	UStaticMesh* NewPreviewMesh,
@@ -789,6 +864,9 @@ bool ACPPConstructionPreview::GetIsRotationAllowed() const
 	case EConstructionPreviewMode::Construct_BxpSocket:
 		break;
 	case EConstructionPreviewMode::Construct_BxpOrigin:
+		break;
+	case EConstructionPreviewMode::Construct_FieldConstruction:
+		bIsAllowed = true;
 		break;
 	}
 	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
@@ -993,6 +1071,7 @@ void ACPPConstructionPreview::UpdatePreviewStatsWidget(const bool bIsInclineVali
 	const bool ShowDistance = M_BuildRadii.Num() > 0;
 	const bool bNoValidBuildRadii = bM_NeedWithinBuildRadius && M_BuildRadii.Num() == 0;
 
+	// Will not display any info on overlaps or distances, only confirm placement.
 	const bool ConfirmPlacementOnly = M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpOrigin ||
 		M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpSocket;
 
@@ -1175,7 +1254,7 @@ void ACPPConstructionPreview::RotatePreviewClockwise() const
 	{
 		return;
 	}
-	const float DeltaYaw = M_ActivePreviewStatus == EConstructionPreviewMode::Construct_NomadicPreview ? 90.f : RotationDegrees;
+	const float DeltaYaw = GetRotationDegrees();
 	M_PreviewSounds.PlayConstructionSound(this, EConstructionPreviewSoundType::RotateClockWise);
 	FRotator CurrentRotation = PreviewMesh->GetComponentRotation();
 	CurrentRotation.Yaw += DeltaYaw;
@@ -1188,7 +1267,7 @@ void ACPPConstructionPreview::RotatePreviewCounterclockwise() const
 	{
 		return;
 	}
-	const float DeltaYaw = M_ActivePreviewStatus == EConstructionPreviewMode::Construct_NomadicPreview ? 90.f : RotationDegrees;
+	const float DeltaYaw = GetRotationDegrees();
 	M_PreviewSounds.PlayConstructionSound(this, EConstructionPreviewSoundType::RotateCounterClockWise);
 	FRotator CurrentRotation = PreviewMesh->GetComponentRotation();
 	CurrentRotation.Yaw -= DeltaYaw;
@@ -1288,4 +1367,24 @@ void ACPPConstructionPreview::UpdateOverlayGridOverlaps()
 	// Apply and test overlaps.
 	M_GridOverlay->SetConstructionPreviewSquares(FootprintIndices);
 	M_GridOverlay->UpdateOverlaps_ForAllTiles();
+}
+
+float ACPPConstructionPreview::GetRotationDegrees() const
+{
+	float DeltaYaw = 0;
+	switch (M_ActivePreviewStatus)
+	{
+	case EConstructionPreviewMode::Construct_None:
+	case EConstructionPreviewMode::Construct_NomadicPreview:
+		DeltaYaw = 90.f;
+		break;
+	case EConstructionPreviewMode::Construct_BxpFree:
+	case EConstructionPreviewMode::Construct_BxpSocket:
+	case EConstructionPreviewMode::Construct_BxpOrigin:
+		DeltaYaw = RotationDegrees;
+		break;
+	case EConstructionPreviewMode::Construct_FieldConstruction:
+		DeltaYaw = FieldConstructionData.DeltaDegreeOnPreviewRotation;
+	}
+	return DeltaYaw;
 }

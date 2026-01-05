@@ -6,6 +6,8 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/BehaviourAbilityTypes/BehaviourAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionTypes/FieldConstructionTypes.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
@@ -109,9 +111,56 @@ namespace FAbilityHelpers
 		return false;
 	}
 
+	inline bool GetHasFieldConstructionAbility(
+		const TArray<FUnitAbilityEntry>& UnitAbilities,
+		const EFieldConstructionType FieldConstructionType,
+		FUnitAbilityEntry& OutAbilityOfFieldConstruction)
+	{
+		const int32 CustomDataForFieldConstruction = static_cast<int32>(FieldConstructionType);
+		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
+		{
+			if (AbilityEntry.AbilityId == EAbilityID::IdFieldConstruction &&
+				AbilityEntry.CustomType == CustomDataForFieldConstruction)
+			{
+				OutAbilityOfFieldConstruction = AbilityEntry;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	inline UFieldConstructionAbilityComponent* GetHasFieldConstructionAbility(
+		AActor* const Actor,
+		const EFieldConstructionType FieldConstructionType)
+	{
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+
+		TArray<UFieldConstructionAbilityComponent*> ConstructionComponents;
+		Actor->GetComponents<UFieldConstructionAbilityComponent>(ConstructionComponents);
+
+		for (UFieldConstructionAbilityComponent* const EachComp : ConstructionComponents)
+		{
+			if (not IsValid(EachComp))
+			{
+				continue;
+			}
+
+			if (EachComp->GetConstructionType() == FieldConstructionType)
+			{
+				return EachComp;
+			}
+		}
+
+		return nullptr;
+	}
+
+
 	inline bool GetHasModeAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
-	                             const EModeAbilityType ModeAbility,
-	                             FUnitAbilityEntry& OutAbilityOfMode)
+	                              const EModeAbilityType ModeAbility,
+	                              FUnitAbilityEntry& OutAbilityOfMode)
 	{
 		const int32 CustomDataForMode = static_cast<int32>(ModeAbility);
 		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
@@ -147,6 +196,32 @@ namespace FAbilityHelpers
 				return BehComp;
 			}
 		}
+		return nullptr;
+	}
+
+	inline UFieldConstructionAbilityComponent* GetFieldConstructionAbilityCompOfType(
+		const EFieldConstructionType Type, const AActor* Actor)
+	{
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+
+		TArray<UFieldConstructionAbilityComponent*> FieldComps;
+		Actor->GetComponents<UFieldConstructionAbilityComponent>(FieldComps);
+		for (UFieldConstructionAbilityComponent* FieldComp : FieldComps)
+		{
+			if (not IsValid(FieldComp))
+			{
+				continue;
+			}
+
+			if (FieldComp->GetConstructionType() == Type)
+			{
+				return FieldComp;
+			}
+		}
+
 		return nullptr;
 	}
 

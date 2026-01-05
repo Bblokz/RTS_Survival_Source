@@ -12,6 +12,7 @@
 #include "ConstructionPreviewSounds/ConstructionPreviewSounds.h"
 #include "NomadicPreviewAttachments/FNomadicPreviewAttachments.h"
 #include "NomadicPreviewAttachments/FNomadicPreviewAttachmentState.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionData/FieldConstructionData.h"
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
 #include "SocketConstructionWidget/WSocketConstructionWidget.h"
 
@@ -42,6 +43,8 @@ public:
 	// Sets default values for this actor's properties
 	ACPPConstructionPreview(const FObjectInitializer& ObjectInitializer);
 
+	EFieldConstructionType GetActiveFieldConstructionType()const;
+
 	FVector GetBxpPreviewLocation(const FVector& ClickedLocation) const;
 
 	FName GetBxpSocketName() const;
@@ -51,7 +54,8 @@ public:
 
 	FBxpConstructionData GetBxpConstructionData() const { return BxpConstructionData; }
 
-	AStaticPreviewMesh* CreateStaticMeshActor(const FRotator& Rotation, ANomadicVehicle* NomadicConstructing) const;
+	AStaticPreviewMesh* CreateStaticMeshActor(const FRotator& Rotation, ANomadicVehicle* NomadicConstructing = nullptr) const;
+
 
 	/**
 	 * @brief Starts the static mesh preview of the building of the provided mesh.
@@ -81,7 +85,7 @@ public:
 		                     HostLocation = {}, const FBxpConstructionData& ConstructionData = FBxpConstructionData());
 
 	void StartFieldConstructionPreview(UStaticMesh* PreviewMesh,
-		const bool bNeedWithinBuildRadius = false)
+	                                   const FFieldConstructionData ConstructionData, const TArray<URadiusComp*>& BuildRadii);
 
 
 	inline UStaticMesh* GetPreviewMesh() const { return PreviewMesh->GetStaticMesh(); }
@@ -171,6 +175,10 @@ private:
 		const UStaticMesh* NewPreviewMesh,
 		const bool bNeedWithinBuildRadius, const FVector& HostLocation,
 		const FBxpConstructionData& ConstructionData) const;
+
+	bool EnsureFieldConstructionRequestIsValid(
+		const UStaticMesh* NewPreviewMesh,
+		const FFieldConstructionData& ConstructionData) const;
 
 	// Keeps track of the build radius that the nomadic building will provide once placed.
 	FNomadicPreviewAttachmentState M_NomadicPreviewAttachmentState;
@@ -335,6 +343,9 @@ private:
 	UPROPERTY()
 	FBxpConstructionData BxpConstructionData;
 
+	UPROPERTY()
+	FFieldConstructionData FieldConstructionData;
+
 	// The socket the bxp that uses socket snapping is currently snapped to.
 	UPROPERTY()
 	UStaticMeshSocket* M_SocketToSnapTo;
@@ -369,4 +380,6 @@ private:
 
 	bool EnsureIsValidGridOverlay() const;
 	void UpdateOverlayGridOverlaps();
+
+	float GetRotationDegrees() const;
 };

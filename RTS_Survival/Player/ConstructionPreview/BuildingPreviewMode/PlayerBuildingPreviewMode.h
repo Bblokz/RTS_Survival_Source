@@ -21,18 +21,23 @@ enum class EPlayerBuildingPreviewMode : uint8
 	// This contains both free expansion placemetns as well as socket and origin placements
 	BxpPreviewMode,
 	// Preview mode is active for determening the building conversion location.
-	NomadicPreviewMode
+	NomadicPreviewMode,
+	// Preview mode is active for field construction placement.
+	FieldConstructionPreviewMode
 };
 
 static FString Global_GetPlayerBuildingPreviewModeEnumAsString(const EPlayerBuildingPreviewMode Mode)
 {
-	switch (Mode) {
+	switch (Mode)
+	{
 	case EPlayerBuildingPreviewMode::BuildingPreviewModeOFF:
 		return "BuildingPreviewModeOFF";
 	case EPlayerBuildingPreviewMode::BxpPreviewMode:
 		return "BxpPreviewMode";
 	case EPlayerBuildingPreviewMode::NomadicPreviewMode:
 		return "NomadicPreviewMode";
+	case EPlayerBuildingPreviewMode::FieldConstructionPreviewMode:
+		return "FieldConstructionPreviewMode";
 	}
 	return "Unknown";
 }
@@ -49,12 +54,14 @@ enum class EConstructionPreviewMode : uint8
 	Construct_BxpSocket,
 	// Used for BXps that are placed at the building origin.
 	Construct_BxpOrigin,
-	
+	// Used for field constructions.
+	Construct_FieldConstruction
 };
 
 static FString Global_GetConstructionPreviewModeEnumAsString(const EConstructionPreviewMode Mode)
 {
-	switch (Mode) {
+	switch (Mode)
+	{
 	case EConstructionPreviewMode::Construct_None:
 		return "Construct_None";
 	case EConstructionPreviewMode::Construct_NomadicPreview:
@@ -65,16 +72,21 @@ static FString Global_GetConstructionPreviewModeEnumAsString(const EConstruction
 		return "Construct_BxpSocket";
 	case EConstructionPreviewMode::Construct_BxpOrigin:
 		return "Construct_BxpOrigin";
+	case EConstructionPreviewMode::Construct_FieldConstruction:
+		return "Construct_FieldConstruction";
+	default: ;
 	}
 	return "Unknown";
 }
 
-static EConstructionPreviewMode Global_GetConstructionTypeFromBxpPreviewMode(const EBxpConstructionType ConstructionType)
+static EConstructionPreviewMode Global_GetConstructionTypeFromBxpPreviewMode(
+	const EBxpConstructionType ConstructionType)
 {
-	switch (ConstructionType) {
+	switch (ConstructionType)
+	{
 	case EBxpConstructionType::None:
 		RTSFunctionLibrary::ReportError("Cannot translate BxpConstructionType None to a valid EConstructionPreviewMode."
-									 " See Global_ConvertCosntructionTypeToBxpPreviewMode in PlayerBuildingPreviewMode.h");
+			" See Global_ConvertCosntructionTypeToBxpPreviewMode in PlayerBuildingPreviewMode.h");
 		return EConstructionPreviewMode::Construct_None;
 	case EBxpConstructionType::Free:
 		return EConstructionPreviewMode::Construct_BxpFree;

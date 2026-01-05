@@ -682,26 +682,27 @@ void ACPPController::CancelBuilding(AActor* RequestingActor)
 // Called from W_BottomCenterUI upon clicking the convert to building button.
 void ACPPController::ConstructBuilding(AActor* RequestingActor)
 {
-	if (RequestingActor && RequestingActor->IsA(ANomadicVehicle::StaticClass()))
+	if (not RequestingActor || not RequestingActor->IsA(ANomadicVehicle::StaticClass()))
 	{
-		if (ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(RequestingActor))
+		return;
+	}
+	if (ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(RequestingActor))
+	{
+		NomadicVehicle->SetUnitToIdle();
+		if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 		{
-			NomadicVehicle->SetUnitToIdle();
-			if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
-			{
-				RTSFunctionLibrary::PrintString("ConstructBuilding: " + NomadicVehicle->GetName());
-			}
-			M_NomadicVehicleSelectedForBuilding = NomadicVehicle;
-			// If it is NOT the HQ converting to building THEN we need a build radius.
-			const bool bUseBuildRadius = NomadicVehicle != M_PlayerHQ;
-			StartNomadicBuildingPreview(NomadicVehicle->GetPreviewMesh(),
-			                            EPlayerBuildingPreviewMode::NomadicPreviewMode,
-			                            bUseBuildRadius,
-			                            GetNomadicPreviewAttachments(NomadicVehicle));
-			M_ActiveAbility = EAbilityID::IdCreateBuilding;
-			// Note that we do not call the MainGameUI to show the cancel button as this is already
-			// completed by MainGameUI itself since this function is called from the MainGameUI.
+			RTSFunctionLibrary::PrintString("ConstructBuilding: " + NomadicVehicle->GetName());
 		}
+		M_NomadicVehicleSelectedForBuilding = NomadicVehicle;
+		// If it is NOT the HQ converting to building THEN we need a build radius.
+		const bool bUseBuildRadius = NomadicVehicle != M_PlayerHQ;
+		StartNomadicBuildingPreview(NomadicVehicle->GetPreviewMesh(),
+		                            EPlayerBuildingPreviewMode::NomadicPreviewMode,
+		                            bUseBuildRadius,
+		                            GetNomadicPreviewAttachments(NomadicVehicle));
+		M_ActiveAbility = EAbilityID::IdCreateBuilding;
+		// Note that we do not call the MainGameUI to show the cancel button as this is already
+		// completed by MainGameUI itself since this function is called from the MainGameUI.
 	}
 }
 
@@ -1265,6 +1266,74 @@ void ACPPController::RotateRight()
 		CPPConstructionPreviewRef->RotatePreviewClockwise();
 	}
 }
+
+AActor* ACPPController::GetNewFieldConstructionCandidate(
+	UFieldConstructionAbilityComponent*& OutFieldConstructionComp,
+	const EFieldConstructionType ConstructionType)
+{
+	OutFieldConstructionComp = nullptr;
+
+	EnsureSelectionsAreRTSValid();
+
+	AActor* BestCandidateActor = nullptr;
+	UFieldConstructionAbilityComponent* BestCandidateAbilityComp = nullptr;
+	int32 BestQueuedConstructionCount = TNumericLimits<int32>::Max();
+
+	const auto TryUpdateBestCandidate = [this, ConstructionType, &BestCandidateActor, &BestCandidateAbilityComp, &
+			BestQueuedConstructionCount](AActor* const CandidateActor)
+	{
+		if (not IsValid(CandidateActor))
+		{
+			return;
+		}
+
+		if (M_FieldConstructionCandidate.GetIsExcludedCandidateActor(CandidateActor))
+		{
+			return;
+		}
+
+		UFieldConstructionAbilityComponent* const FoundAbilityComp =
+			FAbilityHelpers::GetHasFieldConstructionAbility(CandidateActor, ConstructionType);
+
+		if (not IsValid(FoundAbilityComp))
+		{
+			return;
+		}
+
+		ICommands* const CommandInterface = Cast<ICommands>(CandidateActor);
+		if (CommandInterface == nullptr)
+		{
+			return;
+		}
+
+		const int32 QueuedConstructionCount = CommandInterface->GetConstructionAbilityCount();
+		if (QueuedConstructionCount < BestQueuedConstructionCount)
+		{
+			BestQueuedConstructionCount = QueuedConstructionCount;
+			BestCandidateActor = CandidateActor;
+			BestCandidateAbilityComp = FoundAbilityComp;
+		}
+	};
+
+	for (AActor* const EachSquad : TSelectedSquadControllers)
+	{
+		TryUpdateBestCandidate(EachSquad);
+	}
+
+	for (AActor* const EachPawn : TSelectedPawnMasters)
+	{
+		TryUpdateBestCandidate(EachPawn);
+	}
+
+	for (AActor* const EachActor : TSelectedActorsMasters)
+	{
+		TryUpdateBestCandidate(EachActor);
+	}
+
+	OutFieldConstructionComp = BestCandidateAbilityComp;
+	return BestCandidateActor;
+}
+
 
 void ACPPController::HandleBxpPlacementVoiceLine(const TScriptInterface<IBuildingExpansionOwner>& BxpOwner,
                                                  const EBuildingExpansionType BxpType) const
@@ -3243,6 +3312,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdDisableMode:
 		this->DirectActionButtonDisableModeAbility(static_cast<EModeAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
+	case EAbilityID::IdFieldConstruction:
+		this->DirectActionButtonFieldConstruction(static_cast<EFieldConstructionType>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdExitCargo:
 		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
@@ -3642,6 +3714,26 @@ void ACPPController::DirectActionButtonReinforce()
 	                                false);
 }
 
+void ACPPController::DirectActionButtonFieldConstruction(const EFieldConstructionType ConstructionType)
+{
+	UFieldConstructionAbilityComponent* FieldConstructionComp = nullptr;
+	AActor* NewConstructorCandidate = GetNewFieldConstructionCandidate(FieldConstructionComp, ConstructionType);
+	if (not NewConstructorCandidate || not FieldConstructionComp)
+	{
+		return;
+	}
+	M_FieldConstructionCandidate.FieldConstructionActor = NewConstructorCandidate;
+	M_FieldConstructionCandidate.FieldConstructionAbilityComponent = FieldConstructionComp;
+	UStaticMesh* PreviewMesh = FieldConstructionComp->GetPreviewMesh();
+	FFieldConstructionData ConstructionData = FieldConstructionComp->GetFieldConstructionData();
+	StartFieldConstructionPreview(
+		PreviewMesh,
+		ConstructionData,
+		NewConstructorCandidate,
+		FieldConstructionComp
+	);
+}
+
 void ACPPController::DirectionActionButtonFireRockets()
 {
 	EnsureSelectionsAreRTSValid();
@@ -3929,10 +4021,15 @@ bool ACPPController::TryPlaceBuilding(FVector& ClickedLocation)
 	switch (M_IsBuildingPreviewModeActive)
 	{
 	case EPlayerBuildingPreviewMode::NomadicPreviewMode:
-		NomadicConvertToBuilding(ClickedLocation);
+		(void)NomadicConvertToBuilding(ClickedLocation);
 		break;
 	case EPlayerBuildingPreviewMode::BxpPreviewMode:
 		return PlaceBxpIfAsyncLoaded(ClickedLocation);
+	case EPlayerBuildingPreviewMode::FieldConstructionPreviewMode:
+		OnPlaceFieldConstructionAtLocation(ClickedLocation);
+	// Make sure to reset exclusion candidates for a new construction order.
+		M_FieldConstructionCandidate.Reset();
+		return true;
 	default:
 		break;
 	}
@@ -3989,6 +4086,79 @@ bool ACPPController::PlaceBxpIfAsyncLoaded(FVector& InClickedLocation)
 			"\n The pay state when trying to place the bpx is:" + PayState));
 	}
 	return true;
+}
+
+void ACPPController::OnPlaceFieldConstructionAtLocation(const FVector& ValidConstructionLocation)
+{
+	if (not GetIsValidConstructionPreview())
+	{
+		return;
+	}
+	if (TryPlaceFieldConstructionWithCachedCandidate(ValidConstructionLocation))
+	{
+		return;
+	}
+
+	const EFieldConstructionType ConstructionType = CPPConstructionPreviewRef->GetActiveFieldConstructionType();
+	constexpr int32 MaxSelectionAttempts = 16;
+	for (int32 AttemptIndex = 0; AttemptIndex < MaxSelectionAttempts; ++AttemptIndex)
+	{
+		AActor* const CurrentCandidateActor = M_FieldConstructionCandidate.FieldConstructionActor.Get();
+		if (IsValid(CurrentCandidateActor))
+		{
+			// Make sure to not select this one again.
+			// The actor may be valid but the construction ability could be on cooldown.
+			M_FieldConstructionCandidate.AddExcludedCandidateActor(CurrentCandidateActor);
+		}
+
+		UFieldConstructionAbilityComponent* NewFieldConstructionComp = nullptr;
+		AActor* const NewConstructorCandidate =
+			GetNewFieldConstructionCandidate(NewFieldConstructionComp, ConstructionType);
+
+		if (not IsValid(NewConstructorCandidate) || not IsValid(NewFieldConstructionComp))
+		{
+			// No more left.
+			return;
+		}
+
+		M_FieldConstructionCandidate.FieldConstructionActor = NewConstructorCandidate;
+		M_FieldConstructionCandidate.FieldConstructionAbilityComponent = NewFieldConstructionComp;
+
+		if (TryPlaceFieldConstructionWithCachedCandidate(ValidConstructionLocation))
+		{
+			return;
+		}
+	}
+}
+
+
+bool ACPPController::TryPlaceFieldConstructionWithCachedCandidate(const FVector& ClickedLocation)
+{
+	if (not M_FieldConstructionCandidate.IsAlive() || not GetIsValidConstructionPreview())
+	{
+		return false;
+	}
+	ICommands* CommandsFromActor = M_FieldConstructionCandidate.GetCommandInterface();
+	if (not CommandsFromActor)
+	{
+		return false;
+	}
+	// The field construction was placed; make sure the component knows about the preview.
+	AStaticPreviewMesh* StaticMeshActor = CPPConstructionPreviewRef->CreateStaticMeshActor(
+		CPPConstructionPreviewRef->GetPreviewRotation());
+
+	ECommandQueueError Error = CommandsFromActor->FieldConstruction(
+		M_FieldConstructionCandidate.FieldConstructionAbilityComponent->GetConstructionType(),
+		!bIsHoldingShift,
+		ClickedLocation,
+		CPPConstructionPreviewRef->GetPreviewRotation(), StaticMeshActor
+	);
+	if (Error != ECommandQueueError::NoError && StaticMeshActor)
+	{
+		// Something went wrong; destroy the preview.
+		StaticMeshActor->Destroy();
+	}
+	return Error == ECommandQueueError::NoError;
 }
 
 // Second click
@@ -4078,6 +4248,9 @@ void ACPPController::StopBuildingPreviewMode()
 	case EPlayerBuildingPreviewMode::NomadicPreviewMode:
 		StopNomadicPreviewPlacement();
 		break;
+	case EPlayerBuildingPreviewMode::FieldConstructionPreviewMode:
+		StopFieldConstructionPlacement();
+		break;
 	case EPlayerBuildingPreviewMode::BuildingPreviewModeOFF:
 		break;
 	default:
@@ -4092,6 +4265,12 @@ void ACPPController::StopNomadicPreviewPlacement()
 		M_MainGameUI->RequestShowConstructBuilding(M_NomadicVehicleSelectedForBuilding);
 	}
 	M_NomadicVehicleSelectedForBuilding = nullptr;
+	StopPreviewAndBuildingMode(false);
+}
+
+void ACPPController::StopFieldConstructionPlacement()
+{
+	M_FieldConstructionCandidate.Reset();
 	StopPreviewAndBuildingMode(false);
 }
 
@@ -4483,6 +4662,31 @@ void ACPPController::StartNomadicBuildingPreview(
 	{
 		CPPConstructionPreviewRef->StartNomadicPreview(BuildingMesh, {}, false);
 	}
+}
+
+void ACPPController::StartFieldConstructionPreview(UStaticMesh* PreviewMesh,
+                                                   const FFieldConstructionData& FieldConstructionData,
+                                                   AActor* FieldConstructionCandidate,
+                                                   UFieldConstructionAbilityComponent
+                                                   * FieldConstructionComponent)
+{
+	if (not GetIsValidConstructionPreview())
+	{
+		return;
+	}
+	TArray<URadiusComp*> Radii = {};
+	M_FieldConstructionCandidate.FieldConstructionActor = FieldConstructionCandidate;
+	M_FieldConstructionCandidate.FieldConstructionAbilityComponent = FieldConstructionComponent;
+	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::FieldConstructionPreviewMode;
+	if (FieldConstructionData.bNeedsToBeWithinBuildRadii)
+	{
+		// Use the player build radii for this field construction.
+		ShowPlayerBuildRadius(true);
+		Radii = GetIsValidPlayerBuildRadiusManager()
+			        ? Get_NOMADIC_BuildRadiiAndMakeThemVisible()
+			        : TArray<URadiusComp*>();
+	}
+	CPPConstructionPreviewRef->StartFieldConstructionPreview(PreviewMesh, FieldConstructionData, Radii);
 }
 
 

@@ -19,6 +19,7 @@
 #include "SquadController.generated.h"
 
 class UBehaviourComp;
+class RTS_SURVIVAL_API UFieldConstructionAbilityComponent; 
 class UWeaponState;
 enum class EWeaponName : uint8;
 class USquadHealthComponent;
@@ -449,6 +450,9 @@ protected:
 
 	void RemoveCaptureUnitsFromSquad(const int32 AmountCaptureUnits);
 
+	virtual void ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction, const FVector& ConstructionLocation, const FRotator& ConstructionRotation, AActor* StaticPreviewActor) override;
+	virtual void TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor) override;
+
 	/**
 	 * @brief Attack the specified target.
 	 * @param TargetActor The actor to attack.
@@ -534,6 +538,9 @@ private:
 	/** Cargo manager component for this squad. */
 	UPROPERTY()
 	TObjectPtr<UCargoSquad> CargoSquad;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UFieldConstructionAbilityComponent>> M_FieldConstructionAbilities;
 	
 	UPROPERTY()
 	FSquadSpawnLocation M_SquadSpawnLocation;
@@ -582,6 +589,7 @@ private:
 
 	void BeginPlay_SetupPlayerController();
 	void PostInitializeComponents_SetupGrenadeComponent();
+	void PostInitializeComponent_SetupFieldConstructionAbilities();
 
 	int M_UnitsCompletedCommand = 0;
 

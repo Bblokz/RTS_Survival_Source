@@ -30,6 +30,11 @@ public:
 		const UObject* WorldContextObject,
 		const AActor* PreviewActor,
 		const FRotator& FinishedMoveRotation, ANomadicVehicle* NomadicToIgnore);
+	
+	static void MoveOverlappingUnitsForPlayer1AwayFromConstruction(
+		const UObject* WorldContextObject,
+		const AActor* PreviewActor,
+		const FRotator& FinishedMoveRotation);
 
 private:
 	/** @return World-space AABB of the preview. */
