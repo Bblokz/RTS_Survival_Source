@@ -197,6 +197,9 @@ public:
 	bool GetIsUnitIdle() const;
 	bool GetIsUnitInCombat( )const;
 
+	inline AInfantryWeaponMaster* GetInfantryWeapon() const { return M_InfantryWeapon; }
+	inline  USquadUnitAnimInstance * GetAnimBP_SquadUnit() const { return AnimBp_SquadUnit; }
+
 	// Ovewrites if an enum was set to do so.
 	void OnSquadInitsData_OverwriteArmorAndResistance(const float MyMaxHealth) const;
 

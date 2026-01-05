@@ -7,6 +7,7 @@
 #include "Components/ActorComponent.h"
 #include "TimerManager.h"
 #include "FieldConstructionData/FieldConstructionData.h"
+#include "FieldConstructionTypes/FieldConstructionTypes.h"
 #include "FieldConstructionAbilityComponent.generated.h"
 
 class ASquadController;
@@ -15,7 +16,6 @@ class AStaticPreviewMesh;
 class AFieldConstruction;
 class UNiagaraComponent;
 class UStaticMeshComponent;
-enum class EFieldConstructionType : uint8;
 
 
 USTRUCT(Blueprintable)

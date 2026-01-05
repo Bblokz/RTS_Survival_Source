@@ -70,7 +70,8 @@ void UFieldConstructionAbilityComponent::BeginPlay_ValidateSettings() const
 
 	if (FieldConstructionAbilitySettings.ConstructionTime <= 0.f)
 	{
-		RTSFunctionLibrary::ReportError("Field construction ability has non-positive base construction time configured.");
+		RTSFunctionLibrary::ReportError(
+			"Field construction ability has non-positive base construction time configured.");
 	}
 
 	if (not FieldConstructionAbilitySettings.FieldConstructionClass)
@@ -161,8 +162,7 @@ bool UFieldConstructionAbilityComponent::GetIsValidSquadController() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 		this,
 		"M_OwningSquadController",
-		"UFieldConstructionAbilityComponent::GetIsValidSquadController",
-		this);
+		"UFieldConstructionAbilityComponent::GetIsValidSquadController");
 	return false;
 }
 
@@ -195,7 +195,9 @@ void UFieldConstructionAbilityComponent::TerminateFieldConstructionCommand(AActo
 	if (M_ActiveConstructionState.M_CurrentPhase == EFieldConstructionAbilityPhase::MovingToLocation)
 	{
 		DestroyPreviewActor(StaticPreviewActor);
-		DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.Get());
+		DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.IsValid()
+			                    ? M_ActiveConstructionState.M_PreviewActor.Get()
+			                    : nullptr);
 		if (GetIsValidSquadController())
 		{
 			M_OwningSquadController->TerminateMoveCommand();
@@ -271,7 +273,7 @@ bool UFieldConstructionAbilityComponent::GetAnySquadUnitWithinConstructionRange(
 		}
 
 		const float DistanceToConstruction = FVector::Dist(M_ActiveConstructionState.M_TargetLocation,
-			SquadUnit->GetActorLocation());
+		                                                   SquadUnit->GetActorLocation());
 		if (DistanceToConstruction <= SquadUnitFieldConstructionDistance)
 		{
 			return true;
@@ -297,7 +299,9 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 		DisableSquadWeapons(false);
 		RemoveEquipmentFromSquad();
 		StopConstructionAnimation();
-		DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.Get());
+		DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.IsValid()
+			                    ? M_ActiveConstructionState.M_PreviewActor.Get()
+			                    : nullptr);
 		if (GetIsValidSquadController())
 		{
 			M_OwningSquadController->DoneExecutingCommand(EAbilityID::IdFieldConstruction);
@@ -306,9 +310,12 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 		return;
 	}
 
-	UStaticMeshComponent* PreviewMeshComponent = GetPreviewMeshComponent(M_ActiveConstructionState.M_PreviewActor.Get());
+	UStaticMeshComponent* PreviewMeshComponent =
+		GetPreviewMeshComponent(M_ActiveConstructionState.M_PreviewActor.Get());
 	SetupSpawnedConstruction(SpawnedConstruction, PreviewMeshComponent);
-	DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.Get());
+	DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.IsValid()
+		                    ? M_ActiveConstructionState.M_PreviewActor.Get()
+		                    : nullptr);
 
 	DisableSquadWeapons(true);
 	AddEquipmentToSquad();
@@ -355,7 +362,8 @@ AFieldConstruction* UFieldConstructionAbilityComponent::SpawnFieldConstructionAc
 		return nullptr;
 	}
 
-	SpawnedConstruction->OnDestroyed.AddUniqueDynamic(this, &UFieldConstructionAbilityComponent::OnConstructionActorDestroyed);
+	SpawnedConstruction->OnDestroyed.AddUniqueDynamic(
+		this, &UFieldConstructionAbilityComponent::OnConstructionActorDestroyed);
 	M_ActiveConstructionState.M_SpawnedConstruction = SpawnedConstruction;
 	return SpawnedConstruction;
 }
@@ -377,26 +385,12 @@ UStaticMeshComponent* UFieldConstructionAbilityComponent::GetPreviewMeshComponen
 }
 
 void UFieldConstructionAbilityComponent::SetupSpawnedConstruction(AFieldConstruction* SpawnedConstruction,
-                                                                   UStaticMeshComponent* PreviewMeshComponent)
+                                                                  UStaticMeshComponent* PreviewMeshComponent)
 {
 	if (not IsValid(SpawnedConstruction))
 	{
 		return;
 	}
-
-	URTSComponent* RTSComponent = GetIsValidSquadController()
-		                            ? M_OwningSquadController->GetRTSComponent()
-		                            : nullptr;
-	if (not IsValid(RTSComponent))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-			this,
-			"RTSComponent",
-			"UFieldConstructionAbilityComponent::SetupSpawnedConstruction",
-			M_OwningSquadController);
-	}
-	const int32 OwningPlayer = IsValid(RTSComponent) ? RTSComponent->GetOwningPlayer() : -1;
-	SpawnedConstruction->SetupCollision(OwningPlayer, false);
 	SpawnedConstruction->InitialiseFromPreview(PreviewMeshComponent, M_ActiveConstructionState.M_ConstructionDuration);
 }
 
@@ -455,7 +449,8 @@ int32 UFieldConstructionAbilityComponent::GetMaxSquadUnitCount() const
 	{
 		return 0;
 	}
-	TObjectPtr<USquadReinforcementComponent> ReinforcementComponent = M_OwningSquadController->GetSquadReinforcementComponent();
+	TObjectPtr<USquadReinforcementComponent> ReinforcementComponent = M_OwningSquadController->
+		GetSquadReinforcementComponent();
 	if (not IsValid(ReinforcementComponent))
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
@@ -610,7 +605,7 @@ void UFieldConstructionAbilityComponent::DisableSquadWeapons(const bool bDisable
 			continue;
 		}
 
-		AInfantryWeaponMaster* InfantryWeapon = SquadUnit->M_InfantryWeapon;
+		AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
 		if (not IsValid(InfantryWeapon))
 		{
 			continue;
@@ -649,7 +644,7 @@ void UFieldConstructionAbilityComponent::PlayConstructionAnimation() const
 		LookAtRotation.Roll = 0.0f;
 		SquadUnit->SetActorRotation(LookAtRotation);
 
-		USquadUnitAnimInstance* AnimInstance = SquadUnit->AnimBp_SquadUnit;
+		USquadUnitAnimInstance* AnimInstance = SquadUnit->GetAnimBP_SquadUnit();
 		if (AnimInstance)
 		{
 			AnimInstance->PlayWeldingMontage();
@@ -671,7 +666,7 @@ void UFieldConstructionAbilityComponent::StopConstructionAnimation() const
 			continue;
 		}
 
-		USquadUnitAnimInstance* AnimInstance = SquadUnit->AnimBp_SquadUnit;
+		USquadUnitAnimInstance* AnimInstance = SquadUnit->GetAnimBP_SquadUnit();
 		if (AnimInstance)
 		{
 			AnimInstance->StopAllMontages();

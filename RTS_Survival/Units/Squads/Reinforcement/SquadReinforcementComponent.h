@@ -43,6 +43,8 @@ class RTS_SURVIVAL_API USquadReinforcementComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
+	friend class RTS_SURVIVAL_API UFieldConstructionAbilityComponent;
+
 public:
 	USquadReinforcementComponent();
 
