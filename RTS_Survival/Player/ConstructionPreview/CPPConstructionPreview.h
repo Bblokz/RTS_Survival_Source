@@ -80,6 +80,9 @@ public:
 	void StartBxpPreview(UStaticMesh* NewPreviewMesh, const bool bNeedWithinBuildRadius = false, const FVector&
 		                     HostLocation = {}, const FBxpConstructionData& ConstructionData = FBxpConstructionData());
 
+	void StartFieldConstructionPreview(UStaticMesh* PreviewMesh,
+		const bool bNeedWithinBuildRadius = false)
+
 
 	inline UStaticMesh* GetPreviewMesh() const { return PreviewMesh->GetStaticMesh(); }
 

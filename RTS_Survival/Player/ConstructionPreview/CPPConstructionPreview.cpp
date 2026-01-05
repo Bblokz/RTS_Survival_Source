@@ -308,6 +308,7 @@ void ACPPConstructionPreview::InitConstructionPreview(
 	{
 		M_ConstructionPreviewMaterial = ConstructionMaterial;
 		M_PreviewStatsWidget = PreviewStatsWidget;
+		M_PreviewStatsWidget->SetVisibility(ESlateVisibility::Hidden);
 		PreviewStatsWidget->InitW_PreviewStats();
 		M_PreviewStatsWidgetComponent = PreviewStatsWidgetComponent;
 	}

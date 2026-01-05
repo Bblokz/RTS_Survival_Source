@@ -759,7 +759,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		break;
 	case EAbilityID::IdApplyBehaviour:
 		{
-			ExecuteBehaviourAbility(Cmd.BehaviourAbilityType);
+			ExecuteBehaviourAbility(Cmd.BehaviourAbilityType, false);
 		}
 		break;
 	case EAbilityID::IdActivateMode:
@@ -833,16 +833,24 @@ void UCommandData::SetRotationFlagForFinalMovementCommand(const EAbilityID NewFi
 	M_FinalRotation.bIsSet = false;
 }
 
-void UCommandData::ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility) const
+void UCommandData::ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bByPassQueue) const
 {
 	const UApplyBehaviourAbilityComponent* Comp = FAbilityHelpers::GetBehaviourAbilityCompOfType(
 		BehaviourAbility, M_Owner->GetOwnerActor());
 	if (not IsValid(Comp))
 	{
+		if (bByPassQueue)
+		{
+			return;
+		}
 		M_Owner->DoneExecutingCommand(EAbilityID::IdApplyBehaviour);
 		return;
 	}
 	Comp->ExecuteBehaviourAbility();
+	if (bByPassQueue)
+	{
+		return;
+	}
 	M_Owner->DoneExecutingCommand(EAbilityID::IdApplyBehaviour);
 }
 
@@ -1086,14 +1094,14 @@ ECommandQueueError ICommands::Reinforce(const bool bSetUnitToIdle)
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	USquadReinforcementComponent* ReinforcementComp  =FAbilityHelpers::GetReinforcementAbilityComp(GetOwnerActor());
-	
+	USquadReinforcementComponent* ReinforcementComp = FAbilityHelpers::GetReinforcementAbilityComp(GetOwnerActor());
+
 	if (not IsValid(ReinforcementComp))
 	{
 		return ECommandQueueError::AbilityNotAllowed;
 	}
 	UReinforcementPoint* ActivePoint = ReinforcementComp->GetActiveReinforcementPoint();
-	if(not IsValid(ActivePoint))
+	if (not IsValid(ActivePoint))
 	{
 		return ECommandQueueError::AbilityNotAllowed;
 	}
@@ -1201,16 +1209,19 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 	{
 		return ECommandQueueError::AbilityOnCooldown;
 	}
-	if (bSetUnitToIdle)
+	// If the flag was not set then the unit has added the ability with shift meaning we want it to happen at the end of the queue.
+	// else: the ability should fire immediately without stopping the current queue ability.
+	if (not bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		return UnitCommandData->AddAbilityToTCommands(
+			EAbilityID::IdApplyBehaviour,
+			FVector::ZeroVector,
+			/*TargetActor=*/nullptr,
+			/*Rotation=*/FRotator::ZeroRotator,
+			BehaviourAbility);
 	}
-	return UnitCommandData->AddAbilityToTCommands(
-		EAbilityID::IdApplyBehaviour,
-		FVector::ZeroVector,
-		/*TargetActor=*/nullptr,
-		/*Rotation=*/FRotator::ZeroRotator,
-		BehaviourAbility);
+	UnitCommandData->ExecuteBehaviourAbility(BehaviourAbility, true);
+	return ECommandQueueError::NoError;
 }
 
 ECommandQueueError ICommands::ActivateModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle)

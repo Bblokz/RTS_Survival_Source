@@ -281,7 +281,7 @@ private:
 
 	
 
-	void ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility) const;
+	void ExecuteBehaviourAbility(const EBehaviourAbilityType BehaviourAbility, const bool bByPassQueue) const;
 	void ExecuteModeAbility(const EModeAbilityType ModeAbility) const;
 	void ExecuteDisableModeAbility(const EModeAbilityType ModeAbility) const;
 
