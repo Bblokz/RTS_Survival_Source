@@ -84,7 +84,7 @@ public:
 	void StartBxpPreview(UStaticMesh* NewPreviewMesh, const bool bNeedWithinBuildRadius = false, const FVector&
 		                     HostLocation = {}, const FBxpConstructionData& ConstructionData = FBxpConstructionData());
 
-	void StartFieldConstructionPreview(UStaticMesh* PreviewMesh,
+	void StartFieldConstructionPreview(UStaticMesh* FieldPreviewMesh,
 	                                   const FFieldConstructionData ConstructionData, const TArray<URadiusComp*>& BuildRadii);
 
 

@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 
+#include "PlayerFieldConstructionCandidate.generated.h"
+
 USTRUCT()
 struct FFieldConstructionCandidate
 {

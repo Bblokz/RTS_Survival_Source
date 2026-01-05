@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-
+#include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
 
 UENUM(Blueprintable)
 enum class EPlayerError : uint8

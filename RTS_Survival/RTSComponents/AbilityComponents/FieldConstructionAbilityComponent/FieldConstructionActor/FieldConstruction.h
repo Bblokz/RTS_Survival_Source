@@ -28,7 +28,7 @@ protected:
 
 	bool GetIsValidFieldConstructionMesh();
 
-	UFUNCTION(BlueprintCallable, notNotBlueprintable)
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles);
 
 public:

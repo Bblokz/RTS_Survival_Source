@@ -779,12 +779,12 @@ void ACPPConstructionPreview::StartBxpPreview(UStaticMesh* NewPreviewMesh,
 	}
 }
 
-void ACPPConstructionPreview::StartFieldConstructionPreview(UStaticMesh* PreviewMesh,
+void ACPPConstructionPreview::StartFieldConstructionPreview(UStaticMesh* FieldPreviewMesh,
                                                             const FFieldConstructionData ConstructionData,
                                                             const TArray<URadiusComp*>& BuildRadii)
 {
 	if (not EnsureFieldConstructionRequestIsValid(
-		PreviewMesh,
+		FieldPreviewMesh,
 		ConstructionData))
 	{
 		return;
@@ -797,7 +797,7 @@ void ACPPConstructionPreview::StartFieldConstructionPreview(UStaticMesh* Preview
 	M_BuildRadii = BuildRadii;
 	SetGridOverlayEnabled(true);
 	// Also sets the mode of construction.
-	InitPreviewAndStatWidgetForConstruction(PreviewMesh, EConstructionPreviewMode::Construct_FieldConstruction,
+	InitPreviewAndStatWidgetForConstruction(FieldPreviewMesh, EConstructionPreviewMode::Construct_FieldConstruction,
 	                                        true);
 }
 
