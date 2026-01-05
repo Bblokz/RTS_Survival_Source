@@ -452,6 +452,7 @@ protected:
 
 	virtual void ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction, const FVector& ConstructionLocation, const FRotator& ConstructionRotation, AActor* StaticPreviewActor) override;
 	virtual void TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor) override;
+	void StartFieldConstructionMove(const FVector& ConstructionLocation);
 
 	/**
 	 * @brief Attack the specified target.
@@ -590,6 +591,7 @@ private:
 	void BeginPlay_SetupPlayerController();
 	void PostInitializeComponents_SetupGrenadeComponent();
 	void PostInitializeComponent_SetupFieldConstructionAbilities();
+	UFieldConstructionAbilityComponent* GetFieldConstructionAbility(const EFieldConstructionType ConstructionType) const;
 
 	int M_UnitsCompletedCommand = 0;
 

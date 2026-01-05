@@ -834,6 +834,17 @@ void UCommandData::ClearCommands()
 		bM_IsCommandQueueEnabled = true;
 		for (int32 i = 0; i < NumCommands; i++)
 		{
+			const bool bIsFieldConstructionCommand = M_TCommands[i].CommandType == EAbilityID::IdFieldConstruction;
+			if (bIsFieldConstructionCommand)
+			{
+				AActor* const TargetActor = M_TCommands[i].TargetActor.IsValid()
+					                            ? M_TCommands[i].TargetActor.Get()
+					                            : nullptr;
+				if (TargetActor)
+				{
+					TargetActor->Destroy();
+				}
+			}
 			M_TCommands[i] = FQueueCommand();
 		}
 	}
@@ -843,7 +854,7 @@ void UCommandData::ClearCommands()
 
 ECommandQueueError UCommandData::IsQueueActiveAndNoPatrol() const
 {
-	if (!bM_IsCommandQueueEnabled)
+	if (not bM_IsCommandQueueEnabled)
 	{
 		return ECommandQueueError::QueueInactive;
 	}

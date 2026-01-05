@@ -1419,6 +1419,8 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 	case EAbilityID::IdNoAbility_MoveCloserToTarget:
 		OnMoveCompleted_MoveCloserToTarget();
 		break;
+	case EAbilityID::IdFieldConstruction:
+		break;
 	default:
 		// In case of other commands, notify the squad controller.
 		OnCommandComplete();
