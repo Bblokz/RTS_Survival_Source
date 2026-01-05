@@ -355,6 +355,7 @@ AFieldConstruction* UFieldConstructionAbilityComponent::SpawnFieldConstructionAc
 		return nullptr;
 	}
 
+	SpawnedConstruction->OnDestroyed.AddUniqueDynamic(this, &UFieldConstructionAbilityComponent::OnConstructionActorDestroyed);
 	M_ActiveConstructionState.M_SpawnedConstruction = SpawnedConstruction;
 	return SpawnedConstruction;
 }
@@ -684,6 +685,27 @@ void UFieldConstructionAbilityComponent::DestroyPreviewActor(AActor* StaticPrevi
 	{
 		StaticPreviewActor->Destroy();
 	}
+}
+
+void UFieldConstructionAbilityComponent::OnConstructionActorDestroyed(AActor* DestroyedActor)
+{
+	if (M_ActiveConstructionState.M_CurrentPhase != EFieldConstructionAbilityPhase::Constructing)
+	{
+		return;
+	}
+
+	StopConstructionDurationTimer();
+	DisableSquadWeapons(false);
+	RemoveEquipmentFromSquad();
+	StopConstructionAnimation();
+	M_ActiveConstructionState.M_CurrentPhase = EFieldConstructionAbilityPhase::Completed;
+
+	if (GetIsValidSquadController())
+	{
+		M_OwningSquadController->DoneExecutingCommand(EAbilityID::IdFieldConstruction);
+	}
+
+	ResetConstructionState();
 }
 
 void UFieldConstructionAbilityComponent::ResetConstructionState()

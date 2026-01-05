@@ -222,6 +222,8 @@ private:
 	void PlayConstructionAnimation() const;
 	void StopConstructionAnimation() const;
 	void DestroyPreviewActor(AActor* StaticPreviewActor) const;
+	UFUNCTION()
+	void OnConstructionActorDestroyed(AActor* DestroyedActor);
 	void ResetConstructionState();
 	void StopConstructionRangeCheckTimer();
 	void StopConstructionDurationTimer();
