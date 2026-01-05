@@ -1129,6 +1129,7 @@ namespace DeveloperSettings
 			// At this distance the squad can instantly pickup the weapon, to prevent errors where the overlap event will not
 			// occur properly.
 			inline constexpr float SquadUnitWeaponPickupDistance = 250.f;
+			inline constexpr float SquadUnitFieldConstructionDistance = 250.f;
 
 			inline FVector RTSToNavProjectionExtent = FVector(300.f, 300.f, 100.f);
 

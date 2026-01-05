@@ -19,6 +19,12 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	virtual void PostInitializeComponents() override;
+	UPROPERTY(BlueprintReadWrite)
+	TObjectPtr<UStaticMeshComponent> FieldConstructionMesh;
+
+	bool GetIsValidFieldConstructionMesh();
+
 	UFUNCTION(BlueprintCallable, notNotBlueprintable)
 	void SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles);
 };

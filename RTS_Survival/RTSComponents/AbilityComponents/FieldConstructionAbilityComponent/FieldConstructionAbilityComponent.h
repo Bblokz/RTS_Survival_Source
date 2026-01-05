@@ -46,6 +46,10 @@ struct FFieldConstructionAbilitySettings
 	// Defines rules about how the field construction is built.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFieldConstructionData FieldConstructionData;
+
+	// One-shot effect that will play at the location of the construction when it completes.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
+	TObjectPtr<UNiagaraSystem> OnCompletionEffect;
 	
 };
 
@@ -55,11 +59,11 @@ struct FFieldConstructionEquipmentData
 	GENERATED_BODY()
 	
 	// The equipment that the scavenger uses.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
 	TObjectPtr<UStaticMesh> FieldConstructEquipment;
 
 	// The socket to which the ScavengeEquipment can be attached.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
 	FName FieldConstructSocketName;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")

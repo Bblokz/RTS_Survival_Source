@@ -17,12 +17,27 @@ AFieldConstruction::AFieldConstruction(const FObjectInitializer& ObjectInitializ
 void AFieldConstruction::BeginPlay()
 {
 	Super::BeginPlay();
-	
+}
+
+void AFieldConstruction::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	FieldConstructionMesh = FindComponentByClass<UStaticMeshComponent>();
+}
+
+bool AFieldConstruction::GetIsValidFieldConstructionMesh()
+{
+	if (not IsValid(FieldConstructionMesh))
+	{
+		return false;
+	}
+	return true;
 }
 
 void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles)
 {
-	TArray<UMeshComponent*>	MeshComponents;
+	TArray<UMeshComponent*> MeshComponents;
 	GetComponents<UMeshComponent>(MeshComponents);
 	for (UMeshComponent* MeshComp : MeshComponents)
 	{
@@ -33,5 +48,3 @@ void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBl
 		FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(MeshComp, OwningPlayer, bBlockPlayerProjectiles);
 	}
 }
-
-
