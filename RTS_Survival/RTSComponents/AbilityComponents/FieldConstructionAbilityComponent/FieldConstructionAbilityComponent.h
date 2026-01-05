@@ -94,6 +94,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings")
 	FFieldConstructionAbilitySettings FieldConstructionAbilitySettings;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings|Effects")
+	FFieldConstructionEquipmentData FieldConstructionEquipmentSettings;
+
 private:
 	void BeginPlay_SetFieldTypeOnConstructionData();
 	void BeginPlay_SetOwningSquadController();
