@@ -99,7 +99,8 @@ void UFieldConstructionAbilityComponent::BeginPlay_CacheTimedProgressBarManager(
 		return;
 	}
 
-	URTSTimedProgressBarWorldSubsystem* ProgressBarSubsystem = World->GetSubsystem<URTSTimedProgressBarWorldSubsystem>();
+	URTSTimedProgressBarWorldSubsystem* ProgressBarSubsystem = World->GetSubsystem<
+		URTSTimedProgressBarWorldSubsystem>();
 	if (not IsValid(ProgressBarSubsystem))
 	{
 		RTSFunctionLibrary::ReportError("Failed to access timed progress bar world subsystem.");
@@ -257,10 +258,12 @@ void UFieldConstructionAbilityComponent::TerminateFieldConstructionCommand(AActo
 		StopConstructionAnimation();
 		StopConstructionProgressBar();
 		ResetConstructionState();
+		DestroyConstructionAtTerminateWhileConstructing();
 		return;
 	}
 
 	DestroyPreviewActor(StaticPreviewActor);
+	M_FieldConstructionInProgress = nullptr;
 	ResetConstructionState();
 }
 
@@ -349,7 +352,7 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 		ResetConstructionState();
 		return;
 	}
-
+	M_FieldConstructionInProgress = SpawnedConstruction;
 	UStaticMeshComponent* PreviewMeshComponent =
 		GetPreviewMeshComponent(M_ActiveConstructionState.M_PreviewActor.Get());
 	SetupSpawnedConstruction(SpawnedConstruction, PreviewMeshComponent);
@@ -487,7 +490,7 @@ void UFieldConstructionAbilityComponent::StartConstructionProgressBar(AFieldCons
 	constexpr float RatioStart = 0.f;
 	constexpr bool bUsePercentageText = true;
 	constexpr bool bUseDescriptionText = false;
-	constexpr float ProgressBarScale = 1.f;
+	const float ProgressBarScale = FMath::Max(0.05, FieldConstructionAbilitySettings.ConstructionBarSizeMlt);
 
 	M_ActiveConstructionState.M_ProgressBarActivationID = ProgressBarManager->ActivateTimedProgressBarAnchored(
 		AnchorComponent,
@@ -813,7 +816,6 @@ void UFieldConstructionAbilityComponent::OnConstructionActorDestroyed(AActor* De
 	{
 		M_OwningSquadController->DoneExecutingCommand(EAbilityID::IdFieldConstruction);
 	}
-
 	ResetConstructionState();
 }
 
@@ -824,6 +826,15 @@ void UFieldConstructionAbilityComponent::ResetConstructionState()
 	StopConstructionDurationTimer();
 	M_FieldConstructionEquipment.Reset();
 	M_ActiveConstructionState.Reset();
+}
+
+void UFieldConstructionAbilityComponent::DestroyConstructionAtTerminateWhileConstructing()
+{
+	if (IsValid(M_FieldConstructionInProgress))
+	{
+		M_FieldConstructionInProgress->TriggerDestroyActor(ERTSDeathType::Scavenging);
+	}
+	M_FieldConstructionInProgress = nullptr;
 }
 
 void UFieldConstructionAbilityComponent::StopConstructionRangeCheckTimer()

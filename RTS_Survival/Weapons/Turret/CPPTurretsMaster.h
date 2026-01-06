@@ -54,13 +54,15 @@ struct FTurretIdleAnimationState
 {
 	GENERATED_BODY()
 
+	FTurretIdleAnimationState();
+
 	/** "Forward" yaw when idle, captured from local (relative) rotation once. */
 	UPROPERTY()
-	float M_BaseLocalYaw = 0.f;
+	float M_BaseLocalYaw;
 
 	/** Local yaw target used while in Idle_Base. */
 	UPROPERTY()
-	float M_TargetLocalYaw = 0.f;
+	float M_TargetLocalYaw ;
 
 	/** When true, RotateTurret() drives relative yaw (tank space) instead of world yaw. */
 	UPROPERTY()
@@ -68,7 +70,7 @@ struct FTurretIdleAnimationState
 
 	/** Which idle policy to apply (KeepLast / Base / Animate). */
 	UPROPERTY()
-	TEnumAsByte<EIdleRotation> M_IdleTurretRotationType = EIdleRotation::Idle_Animate;
+	TEnumAsByte<EIdleRotation> M_IdleTurretRotationType;
 
 	/** Timer handle for idle animation rotation updates. */
 	FTimerHandle IdleAnimationTimerHandle;

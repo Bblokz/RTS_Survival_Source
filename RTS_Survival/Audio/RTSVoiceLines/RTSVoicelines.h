@@ -30,6 +30,7 @@ enum class ERTSVoiceLine : uint8
 	AttackStressed,
 	Harvest,
 	Building,
+	BuildingStressed,
 	Rotation,
 	RotationStressed,
 	Confirm,

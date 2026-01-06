@@ -51,6 +51,9 @@ struct FFieldConstructionAbilitySettings
 	// Defines rules about how the field construction is built.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFieldConstructionData FieldConstructionData;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ConstructionBarSizeMlt = 1.f;
 
 	// One-shot effect that will play at the location of the construction when it completes.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
@@ -233,9 +236,13 @@ private:
 	UFUNCTION()
 	void OnConstructionActorDestroyed(AActor* DestroyedActor);
 	void ResetConstructionState();
+	void DestroyConstructionAtTerminateWhileConstructing();
 	void StopConstructionRangeCheckTimer();
 	void StopConstructionDurationTimer();
 	void ReportError_InvalidConstructionState(const FString& ErrorContext) const;
 	void StartConstructionProgressBar(AFieldConstruction* SpawnedConstruction);
 	void StopConstructionProgressBar();
+
+	UPROPERTY()
+	AFieldConstruction* M_FieldConstructionInProgress = nullptr;
 };

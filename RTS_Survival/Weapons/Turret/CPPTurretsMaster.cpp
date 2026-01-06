@@ -85,6 +85,11 @@ void ACPPTurretsMaster::SetEngageGroundLocation(const FVector& GroundLocation)
 	InitiateSpecificTargetTimers();
 }
 
+FTurretIdleAnimationState::FTurretIdleAnimationState(): M_BaseLocalYaw(0), M_TargetLocalYaw(0),
+                                                        M_IdleTurretRotationType(EIdleRotation::Idle_Animate)
+{
+}
+
 void ACPPTurretsMaster::Tick(float DeltaTime)
 {
 	// 0.33 ms with 123 turrets.

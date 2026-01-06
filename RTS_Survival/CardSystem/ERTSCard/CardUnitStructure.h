@@ -1,8 +1,12 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "CardUnitStructure.generated.h"
+
+enum class EAircraftSubtype : uint8;
+enum class ETankSubtype : uint8;
+enum class ENomadicSubtype : uint8;
+enum class ESquadSubtype : uint8;
 
 USTRUCT(BlueprintType)
 struct FCardUnitTypeSelector
@@ -12,16 +16,16 @@ struct FCardUnitTypeSelector
     FCardUnitTypeSelector();
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    ESquadSubtype SquadSubtype = ESquadSubtype::Squad_None;
+    ESquadSubtype SquadSubtype;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    ENomadicSubtype NomadicSubtype = ENomadicSubtype::Nomadic_None;
+    ENomadicSubtype NomadicSubtype;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    ETankSubtype TankSubtype  = ETankSubtype::Tank_None;
+    ETankSubtype TankSubtype;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    EAircraftSubtype AircraftSubtype = EAircraftSubtype::Aircarft_None;
+    EAircraftSubtype AircraftSubtype;
 
     // Equality operator for TMap key usage
     bool operator==(const FCardUnitTypeSelector& Other) const

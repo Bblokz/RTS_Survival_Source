@@ -44,7 +44,7 @@ bool AFieldConstruction::GetIsValidFieldConstructionMesh()
 	return false;
 }
 
-void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles)
+void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles, const bool bOverlapTanks)
 {
 	TArray<UMeshComponent*> MeshComponents;
 	GetComponents<UMeshComponent>(MeshComponents);
@@ -54,7 +54,7 @@ void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBl
 		{
 			continue;
 		}
-		FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(MeshComp, OwningPlayer, bBlockPlayerProjectiles);
+		FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(MeshComp, OwningPlayer, bBlockPlayerProjectiles, bOverlapTanks);
 	}
 }
 

@@ -29,7 +29,7 @@ protected:
 	bool GetIsValidFieldConstructionMesh();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	void SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles);
+	void SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles, const bool bOverlapTanks);
 
 public:
 	/**

@@ -18,9 +18,11 @@ struct FApplyBehaviourAbilitySettings
 {
 	GENERATED_BODY()
 
+	FApplyBehaviourAbilitySettings();
+
 	// Determines what type of ability this actually is (base is EAbilityID::IdApplyBehaviour).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint;
+	EBehaviourAbilityType BehaviourAbility;
 
 	// Attempts to add the abilty to this index of the Unit's Ability Array.
 	// Reverts to first empty index if negative or already occupied.

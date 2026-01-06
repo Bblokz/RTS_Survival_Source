@@ -76,7 +76,8 @@ public:
 	static void SetupWallActorMeshCollision(UMeshComponent* WallMesh, const bool bAffectNavigation, const uint8 OwningPlayer);
 	static void SetupDestructibleEnvActorGeometryComponentCollision(UGeometryCollectionComponent* GeometryComponent);
 
-	static void SetupFieldConstructionMeshCollision(UMeshComponent* FieldConstructionMesh , const int32 OwningPlayer, const bool bAlliedProjectilesHitObject = false);
+	static void SetupFieldConstructionMeshCollision(UMeshComponent* FieldConstructionMesh, const int32 OwningPlayer, const bool bAlliedProjectilesHitObject = false, const
+	                                                bool bOverlapTanks = false);
 
 	static void SetupObstacleCollision(UMeshComponent* ObstacleMesh, const bool bBlockWeapons);
 

@@ -4096,6 +4096,10 @@ void ACPPController::OnPlaceFieldConstructionAtLocation(const FVector& ValidCons
 	}
 	if (TryPlaceFieldConstructionWithCachedCandidate(ValidConstructionLocation))
 	{
+		PlayVoiceLine(M_FieldConstructionCandidate.FieldConstructionActor.IsValid()
+			              ? M_FieldConstructionCandidate.FieldConstructionActor.Get()
+			              : nullptr,
+		              FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdFieldConstruction));
 		return;
 	}
 
@@ -4126,6 +4130,10 @@ void ACPPController::OnPlaceFieldConstructionAtLocation(const FVector& ValidCons
 
 		if (TryPlaceFieldConstructionWithCachedCandidate(ValidConstructionLocation))
 		{
+			PlayVoiceLine(M_FieldConstructionCandidate.FieldConstructionActor.IsValid()
+				              ? M_FieldConstructionCandidate.FieldConstructionActor.Get()
+				              : nullptr,
+			              FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdFieldConstruction));
 			return;
 		}
 	}

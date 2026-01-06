@@ -102,6 +102,8 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 		break;
 	case EAbilityID::IdApplyBehaviour:
 		break;
+	case EAbilityID::IdFieldConstruction:
+		return ERTSVoiceLine::Building;
 	}
 	RTSFunctionLibrary::ReportError("Could not translate ability: " + Global_GetAbilityIDAsString(Ability) +
 		"To voice line. Please check the enum and the translation function : GetVoiceLineFromAbility.");
@@ -128,9 +130,10 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetStressedVoiceLineVersion(const ERTSVoice
 		return ERTSVoiceLine::RotationStressed;
 	case ERTSVoiceLine::Repair:
 		return ERTSVoiceLine::RepairStressed;
+	case ERTSVoiceLine::Building:
+		return ERTSVoiceLine::BuildingStressed;
 
 	// Turn into confirm stressed.
-	case ERTSVoiceLine::Building:
 	case ERTSVoiceLine::Scavenge:
 	case ERTSVoiceLine::EnterPosition:
 	case ERTSVoiceLine::ExitPosition:

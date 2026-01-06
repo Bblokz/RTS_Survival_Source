@@ -9,6 +9,16 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
+FApplyBehaviourAbilitySettings::FApplyBehaviourAbilitySettings()
+	: BehaviourAbility(EBehaviourAbilityType::DefaultSprint),
+	  PreferredAbilityIndex(INDEX_NONE),
+	  Cooldown(5),
+	  BehaviourApplied(nullptr)
+
+{
+	
+}
+
 UApplyBehaviourAbilityComponent::UApplyBehaviourAbilityComponent(): BehaviourAbilitySettings()
 {
 	PrimaryComponentTick.bCanEverTick = false;

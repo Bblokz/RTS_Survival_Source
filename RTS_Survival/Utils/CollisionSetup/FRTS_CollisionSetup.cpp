@@ -571,7 +571,7 @@ void FRTS_CollisionSetup::SetupDestructibleEnvActorGeometryComponentCollision(
 }
 
 void FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(UMeshComponent* FieldConstructionMesh,
-	const int32 OwningPlayer, const bool bAlliedProjectilesHitObject)
+                                                              const int32 OwningPlayer, const bool bAlliedProjectilesHitObject, const bool bOverlapTanks)
 {
 	if(not IsValid(FieldConstructionMesh))
 	{
@@ -594,6 +594,12 @@ void FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(UMeshComponent* Fi
 		// Also block allied projectiles.
 		FieldConstructionMesh->SetCollisionResponseToChannel(OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER,
 			ECR_Block);
+	}
+	if (bOverlapTanks)
+	{
+		FieldConstructionMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
+		FieldConstructionMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
+		FieldConstructionMesh->SetGenerateOverlapEvents(true);
 	}
 }
 
