@@ -3,6 +3,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Components/SphereComponent.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -442,6 +443,26 @@ void FRTS_CollisionSetup::SetupTriggerOverlapCollision(UPrimitiveComponent* Trig
 	}
 	RTSFunctionLibrary::ReportError("Invalid trigger component provided for overlap setup."
 		"\nFRTS_CollisionSetup::SetupTriggerOverlapCollision");
+}
+
+void FRTS_CollisionSetup::SetupFieldMineTriggerCollision(USphereComponent* TriggerSphere, const int32 OwningPlayer)
+{
+	if (not IsValid(TriggerSphere))
+	{
+		RTSFunctionLibrary::ReportError("Invalid trigger sphere provided for field mine collision setup.");
+		return;
+	}
+
+	TriggerSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	TriggerSphere->SetCollisionObjectType(ECC_WorldDynamic);
+	TriggerSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+	TriggerSphere->SetGenerateOverlapEvents(true);
+	TriggerSphere->SetCanEverAffectNavigation(false);
+
+	const bool bOwnedByPlayerOne = OwningPlayer == 1;
+	TriggerSphere->SetCollisionResponseToChannel(
+		bOwnedByPlayerOne ? COLLISION_OBJ_ENEMY : COLLISION_OBJ_PLAYER,
+		ECR_Overlap);
 }
 
 void FRTS_CollisionSetup::SetupScavengeableObjectCollision(UStaticMeshComponent* ScavengeableObjectMesh)

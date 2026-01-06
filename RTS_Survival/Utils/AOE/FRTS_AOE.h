@@ -44,6 +44,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param DamageFalloffExponent Exponent controlling how aggressively damage decays towards the edge.
 	 * @param DamageType Damage type to assign to the generated damage event.
 	 * @param OverlapLogic Determines whether to target player units, enemies or both.
+	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
 	 */
 	static void DealDamageInRadiusAsync(
 		AActor* DamageCauser,
@@ -52,7 +53,8 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		float BaseDamage,
 		float DamageFalloffExponent,
 		ERTSDamageType DamageType,
-		ETriggerOverlapLogic OverlapLogic
+		ETriggerOverlapLogic OverlapLogic,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
 	);
 
 	/**
@@ -62,13 +64,15 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param Radius Radius of the behaviour application sphere.
 	 * @param BehaviourClass Behaviour class to add to each found actor.
 	 * @param OverlapLogic Determines whether to target player units, enemies or both.
+	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from behaviour application.
 	 */
 	static void ApplyBehaviourInRadiusAsync(
 		AActor* InstigatorActor,
 		const FVector& Epicenter,
 		float Radius,
 		TSubclassOf<UBehaviour> BehaviourClass,
-		ETriggerOverlapLogic OverlapLogic
+		ETriggerOverlapLogic OverlapLogic,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
 	);
 
 private:
@@ -78,6 +82,7 @@ private:
 		const FVector& Epicenter,
 		float Radius,
 		const FCollisionObjectQueryParams& ObjectQueryParams,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
 		TFunction<void(TArray<FHitResult>&&)> OnSweepComplete
 	);
 };
