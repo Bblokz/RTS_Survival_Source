@@ -68,7 +68,7 @@ struct FTurretIdleAnimationState
 
 	/** Which idle policy to apply (KeepLast / Base / Animate). */
 	UPROPERTY()
-	TEnumAsByte<EIdleRotation> M_IdleTurretRotationType;
+	TEnumAsByte<EIdleRotation> M_IdleTurretRotationType = EIdleRotation::Idle_Animate;
 
 	/** Timer handle for idle animation rotation updates. */
 	FTimerHandle IdleAnimationTimerHandle;

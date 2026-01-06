@@ -75,7 +75,7 @@ struct FBombBayData
 	
 	// To identify the stats of this bomb weapon.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	EWeaponName WeaponName;
+	EWeaponName WeaponName = EWeaponName::DEFAULT_WEAPON;
 	
 	// Mesh used on bomb instances.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Bomb Settings")

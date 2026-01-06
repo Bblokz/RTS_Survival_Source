@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BehaviourAbilityTypes/BehaviourAbilityTypes.h"
 #include "Components/ActorComponent.h"
 #include "ApplyBehaviourAbilityComponent.generated.h"
 
@@ -19,7 +20,7 @@ struct FApplyBehaviourAbilitySettings
 
 	// Determines what type of ability this actually is (base is EAbilityID::IdApplyBehaviour).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EBehaviourAbilityType BehaviourAbility;
+	EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint;
 
 	// Attempts to add the abilty to this index of the Unit's Ability Array.
 	// Reverts to first empty index if negative or already occupied.

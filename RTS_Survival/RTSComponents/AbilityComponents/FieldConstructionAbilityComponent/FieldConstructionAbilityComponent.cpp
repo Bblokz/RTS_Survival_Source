@@ -201,8 +201,7 @@ bool UFieldConstructionAbilityComponent::GetIsValidTimedProgressBarManager() con
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 		this,
 		"M_TimedProgressBarManager",
-		"UFieldConstructionAbilityComponent::GetIsValidTimedProgressBarManager",
-		this);
+		"UFieldConstructionAbilityComponent::GetIsValidTimedProgressBarManager");
 	return false;
 }
 

@@ -25,7 +25,7 @@ struct FFieldConstructionAbilitySettings
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EFieldConstructionType FieldConstructionType;
+	EFieldConstructionType FieldConstructionType = EFieldConstructionType::DefaultGerHedgeHog;
 	
 	// Attempts to add the abilty to this index of the Unit's Ability Array.
 	// Reverts to first empty index if negative or already occupied.
