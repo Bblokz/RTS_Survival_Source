@@ -51,6 +51,11 @@ void UArmorCalculation::ClearArmorSetup()
 	}
 }
 
+float UArmorCalculation::GetRearArmor() const
+{
+	return M_RearArmor;
+}
+
 void UArmorCalculation::BeginPlay()
 {
 	Super::BeginPlay();
@@ -85,6 +90,11 @@ void UArmorCalculation::InitArmorCalculation(
 	{
 		ArmorSetting.ArmorBox.Max *= ArmorSetting.ArmorBoxTransform.GetScale3D();
 		ArmorSetting.ArmorBox.Min *= ArmorSetting.ArmorBoxTransform.GetScale3D();
+		// Special rear armor cache.
+		if (M_RearArmor <= 0 && GetIsRearHullArmor(ArmorSetting.ArmorType))
+		{
+			M_RearArmor = ArmorSetting.ArmorValue;
+		}
 	}
 
 	// Limit the number of plates copied to the fixed maximum.
@@ -248,7 +258,7 @@ float UArmorCalculation::GetDamageOnArmorPlateResistanceAdjusted(
 	}
 	// No plate found; use front resistance.
 	RTSFunctionLibrary::ReportWarning("No plate hit for special damage type; using front mlt"
-								   "\n eventhough selected armor settings of mesh context was obtained");
+		"\n eventhough selected armor settings of mesh context was obtained");
 	return BaseDamage * ResistanceMultipliers.FrontMlt;
 }
 
@@ -339,7 +349,8 @@ float UArmorCalculation::NoArmorHitGetClosest(const FArmorSettings* SelectedArmo
                                               const FTransform& MeshTransform,
                                               const FVector& HitLocation, const FVector& ProjectileDirection,
                                               const FVector& ImpactNormal,
-                                              float& OutRawArmorValue, float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlatehit) const
+                                              float& OutRawArmorValue, float& OutAdjustedArmorPenForAngle,
+                                              EArmorPlate& OutPlatehit) const
 {
 	if (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 	{
@@ -385,11 +396,17 @@ float UArmorCalculation::NoArmorHitGetClosest(const FArmorSettings* SelectedArmo
 		// Use helper to compute effective armor based on impact angle.
 		OutAdjustedArmorPenForAngle = 0.0f;
 		OutPlatehit = BestPlate->ArmorType;
-		
+
 		return GetEffectiveArmor(HitLocation, ProjectileDirection, ImpactNormal, BestPlate->ArmorValue,
 		                         OutAdjustedArmorPenForAngle);
 	}
 	return 0.0f;
+}
+
+bool UArmorCalculation::GetIsRearHullArmor(const EArmorPlate Plate) const
+{
+	return Plate == EArmorPlate::Plate_Rear || Plate == EArmorPlate::Plate_RearLowerGlacis || Plate ==
+		EArmorPlate::Plate_RearUpperGlacis;
 }
 
 

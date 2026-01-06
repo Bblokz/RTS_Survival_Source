@@ -1432,8 +1432,8 @@ void ASquadUnit::OnMoveCompleted_Patrol()
 	const float TimeNow = FPlatformTime::Seconds();
 	if (not FMath::IsNearlyZero(M_LastPatrolMoveTimeOut) && FMath::Abs(M_LastPatrolMoveTimeOut - TimeNow) < 1)
 	{
-		RTSFunctionLibrary::DisplayNotification(
-			FText::FromString("Last patrol move timeout is very close to now, aborting patrol."));
+		RTSFunctionLibrary::PrintString(
+			"Last patrol move timeout is very close to now, aborting patrol.");
 		// Notify the squad controller that the patrol command is completed.
 		StopMovementAndClearPath();
 		OnCommandComplete();

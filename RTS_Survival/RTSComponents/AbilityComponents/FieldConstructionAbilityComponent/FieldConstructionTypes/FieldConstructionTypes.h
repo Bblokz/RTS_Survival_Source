@@ -9,9 +9,17 @@ enum class EFieldConstructionType : uint8
 	DefaultGerHedgeHog,
 	GerBarbedWire,
 	GerSandbagWall,
-	Ger
+	GerAntiInfantryMine,
+	GerAntiInfantryStickMine,
+	GerLightATMine,
+	GerMediumATMine,
+	GerHeavyATMine,
 	RussianHedgeHog,
 	RussianBarrier,
 	RussianWire,
+	RussianAntiInfantryStickMine,
+	RussianLightATMine,
+	RussianMediumATMine,
+	RussianHeavyATMine
 	
 };

@@ -73,6 +73,9 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ArmorSettings")
 	void ClearArmorSetup();
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable )
+	float GetRearArmor() const;
+
 	/**
 	 * Initializes armor calculation for the provided MeshWithArmor by storing the supplied ArmorSettings.
 	 * If all armor slots are used, it reports an error via RTSFunctionLibrary::ReportError.
@@ -134,6 +137,10 @@ private:
 	UPROPERTY()
 	FLaserRadiationDamageMlt M_LaserRadiationDamageMlt;
 
+	// Special cache for rear armor used by mines.
+	UPROPERTY()
+	float M_RearArmor = 0.f;
+
 	
 	FDamageMltPerSide GetResistanceForDamageType(const ERTSDamageType DamageType) const;
 	 float GetDamageFromHitPlate(const FArmorSettings& ArmorPlate,
@@ -170,6 +177,8 @@ private:
 	                           const FVector& ImpactNormal, float& OutRawArmorValue,
 	                           float& OutAdjustedArmorPenForAngle, EArmorPlate& OutPlatehit) const;
 
+	bool GetIsRearHullArmor(const EArmorPlate Plate) const;
+
 
 	/**
      * Sorts the input array of armor settings based on the static armor hierarchy.
@@ -179,4 +188,6 @@ private:
      */
 	void SortArmorArray(TArray<FArmorSettings>& OutSortedArmorSettings) const;
 	void Debug_PostSort(TArray<FArmorSettings>& ArmorSettingsSorted) const;
+
+	
 };

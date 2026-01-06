@@ -10,13 +10,13 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
-#include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "TimerManager.h"
+#include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 
 AFieldMine::AFieldMine(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -227,7 +227,7 @@ float AFieldMine::CalculateMineDamage() const
 		static_cast<int32>(DamageFluxPercentage));
 }
 
-void AFieldMine::ApplyDirectDamage(AActor& TargetActor) const
+void AFieldMine::ApplyDirectDamage(AActor& TargetActor)
 {
 	if (M_CachedDamage <= 0.f)
 	{
@@ -242,7 +242,7 @@ void AFieldMine::ApplyDirectDamage(AActor& TargetActor) const
 		this);
 }
 
-void AFieldMine::ApplyAoeDamage(const FVector& Epicenter) const
+void AFieldMine::ApplyAoeDamage(const FVector& Epicenter)
 {
 	if (MineSettings.AOERange <= 0.f)
 	{
@@ -257,7 +257,7 @@ void AFieldMine::ApplyAoeDamage(const FVector& Epicenter) const
 	const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore = BuildActorsToIgnore();
 
 	FRTS_AOE::DealDamageInRadiusAsync(
-		const_cast<AFieldMine*>(this),
+		this,
 		Epicenter,
 		MineSettings.AOERange,
 		MineSettings.AOEDamage,
@@ -285,7 +285,7 @@ void AFieldMine::ShowMineDamageText(const FVector& TextLocation) const
 	const FString DamageText = FString::Printf(TEXT("<Text_Bad14>%d Mine Damage</>"), RoundedDamage);
 	constexpr bool bAutoWrap = false;
 	constexpr float WrapWidth = 0.f;
-	constexpr TEnumAsByte<ETextJustify::Type> Justification = ETextJustify::Type::Center;
+	const TEnumAsByte<ETextJustify::Type> Justification = ETextJustify::Type::Center;
 	const FRTSVerticalAnimTextSettings TextSettings;
 
 	AnimatedTextPoolManager->ShowAnimatedText(

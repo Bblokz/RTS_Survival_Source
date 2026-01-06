@@ -119,8 +119,8 @@ private:
 	float PlayTriggerSound() const;
 	float CalculateMineDamage() const;
 
-	void ApplyDirectDamage(AActor& TargetActor) const;
-	void ApplyAoeDamage(const FVector& Epicenter) const;
+	void ApplyDirectDamage(AActor& TargetActor);
+	void ApplyAoeDamage(const FVector& Epicenter);
 	void ShowMineDamageText(const FVector& TextLocation) const;
 	void SpawnCollapseFx() const;
 

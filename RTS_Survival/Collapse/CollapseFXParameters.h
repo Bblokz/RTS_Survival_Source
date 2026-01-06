@@ -49,30 +49,30 @@ struct FCollapseFX
 	GENERATED_BODY()
 
 	// Niagara system to spawn with offset from geo component, can be left null.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	UNiagaraSystem* CollapseVfx = nullptr;
 
 	// Offset from the Geo component's location.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	FVector FxLocationOffset = FVector::ZeroVector;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	FVector VfxScale = FVector::OneVector;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	FRotator VfxRotation = FRotator::ZeroRotator;
 
 	// Sound to play when the collapse happens, can be left null.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	USoundCue* CollapseSfx = nullptr;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	USoundAttenuation* SfxAttenuation = nullptr;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	USoundConcurrency* SfxConcurrency = nullptr;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	FCollapseParameters CollapseNiagaraParameters;
 
 	void CreateFX(const AActor* WorldContext) const;
