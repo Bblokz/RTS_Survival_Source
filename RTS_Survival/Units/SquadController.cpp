@@ -565,6 +565,7 @@ void ASquadController::UnitInSquadDied(ASquadUnit* UnitDied, const bool bUnitSel
 	{
 		M_TargetScavengeState.M_TargetScavengeObject->PauseScavenging(this);
 	}
+	SetUnitToIdle();
 
 	Destroy();
 }
