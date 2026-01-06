@@ -7,5 +7,11 @@ UENUM(BlueprintType)
 enum class EFieldConstructionType : uint8
 {
 	DefaultGerHedgeHog,
-	GerBarbedWire
+	GerBarbedWire,
+	GerSandbagWall,
+	Ger
+	RussianHedgeHog,
+	RussianBarrier,
+	RussianWire,
+	
 };

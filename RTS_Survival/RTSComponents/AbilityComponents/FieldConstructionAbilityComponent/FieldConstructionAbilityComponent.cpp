@@ -352,6 +352,7 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 		ResetConstructionState();
 		return;
 	}
+		TeleportSquadUnitsAroundConstructionSite();
 	M_FieldConstructionInProgress = SpawnedConstruction;
 	UStaticMeshComponent* PreviewMeshComponent =
 		GetPreviewMeshComponent(M_ActiveConstructionState.M_PreviewActor.Get());
@@ -857,4 +858,177 @@ void UFieldConstructionAbilityComponent::ReportError_InvalidConstructionState(co
 {
 	const FString ContextMessage = "Field construction component in invalid state at: " + ErrorContext;
 	RTSFunctionLibrary::ReportError(ContextMessage);
+}
+
+void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSite()
+{
+	if (not GetIsValidSquadController())
+	{
+		ReportError_InvalidConstructionState("TeleportSquadUnitsAroundConstructionSite");
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World missing while teleporting squad units for field construction.");
+		return;
+	}
+
+	const TArray<ASquadUnit*> SquadUnits = M_OwningSquadController->GetSquadUnitsChecked();
+	if (SquadUnits.Num() <= 0)
+	{
+		return;
+	}
+
+	using DeveloperSettings::GamePlay::Navigation::SquadUnitFieldConstructionDistance;
+
+	const FVector ConstructionCenter = M_ActiveConstructionState.M_TargetLocation;
+
+	// Determine the construction XY footprint radius (half-extent) from the placed preview,
+	// falling back to the configured preview mesh.
+	float ConstructionFootprintRadiusXY = 0.f;
+	if (M_ActiveConstructionState.M_PreviewActor.IsValid())
+	{
+		if (UStaticMeshComponent* PreviewMeshComponent = GetPreviewMeshComponent(
+			M_ActiveConstructionState.M_PreviewActor.Get()))
+		{
+			const FVector PreviewBoxExtent = PreviewMeshComponent->Bounds.BoxExtent;
+			ConstructionFootprintRadiusXY = FMath::Max(PreviewBoxExtent.X, PreviewBoxExtent.Y);
+		}
+	}
+	else if (IsValid(FieldConstructionAbilitySettings.PreviewMesh))
+	{
+		const FVector PreviewBoxExtent = FieldConstructionAbilitySettings.PreviewMesh->GetBounds().BoxExtent;
+		ConstructionFootprintRadiusXY = FMath::Max(PreviewBoxExtent.X, PreviewBoxExtent.Y);
+	}
+
+	float MaxUnitCollisionRadius = 0.f;
+	TArray<TPair<ASquadUnit*, float>> UnitsWithAngles;
+	UnitsWithAngles.Reserve(SquadUnits.Num());
+
+	for (ASquadUnit* SquadUnit : SquadUnits)
+	{
+		if (not IsValid(SquadUnit))
+		{
+			continue;
+		}
+
+		MaxUnitCollisionRadius = FMath::Max(MaxUnitCollisionRadius, SquadUnit->GetSimpleCollisionRadius());
+
+		const FVector ToUnit = SquadUnit->GetActorLocation() - ConstructionCenter;
+		const float AngleRadians = FMath::Atan2(ToUnit.Y, ToUnit.X);
+		UnitsWithAngles.Add({SquadUnit, AngleRadians});
+	}
+
+	if (UnitsWithAngles.Num() <= 0)
+	{
+		return;
+	}
+
+	UnitsWithAngles.Sort([](const TPair<ASquadUnit*, float>& Left, const TPair<ASquadUnit*, float>& Right)
+	{
+		return Left.Value < Right.Value;
+	});
+
+	const float ConstructionSafetyMargin = 25.f;
+	const float MinimumRadiusFromCenter = ConstructionFootprintRadiusXY + MaxUnitCollisionRadius +
+		ConstructionSafetyMargin;
+
+	// Keep units within the configured range when possible, but never inside the footprint ring.
+	const float MaxRadiusFromCenter = FMath::Max(SquadUnitFieldConstructionDistance, MinimumRadiusFromCenter);
+
+	const FVector NavigationProjectionExtent(MaxUnitCollisionRadius * 2.f, MaxUnitCollisionRadius * 2.f, 250.f);
+
+	const float AngleStepRadians = (2.f * PI) / static_cast<float>(UnitsWithAngles.Num());
+	const float StartAngleRadians = UnitsWithAngles[0].Value;
+
+	for (int32 UnitIndex = 0; UnitIndex < UnitsWithAngles.Num(); ++UnitIndex)
+	{
+		ASquadUnit* SquadUnit = UnitsWithAngles[UnitIndex].Key;
+		if (not IsValid(SquadUnit))
+		{
+			continue;
+		}
+
+		const float SlotAngleRadians = StartAngleRadians + (AngleStepRadians * static_cast<float>(UnitIndex));
+
+		// Take into account current distance: keep close units close (but outside footprint),
+		// pull far units into range.
+		const float CurrentDistanceToConstruction = FVector::Dist2D(SquadUnit->GetActorLocation(), ConstructionCenter);
+		const float DesiredRadiusFromCenter = FMath::Clamp(CurrentDistanceToConstruction, MinimumRadiusFromCenter,
+		                                                   MaxRadiusFromCenter);
+
+		if (not TryTeleportSquadUnitToConstructionRing(
+			SquadUnit,
+			ConstructionCenter,
+			SlotAngleRadians,
+			DesiredRadiusFromCenter,
+			NavigationProjectionExtent))
+		{
+			RTSFunctionLibrary::ReportError("Failed to safely teleport a squad unit for field construction.");
+		}
+	}
+}
+
+bool UFieldConstructionAbilityComponent::TryTeleportSquadUnitToConstructionRing(ASquadUnit* SquadUnit,
+	const FVector& ConstructionCenter,
+	float TargetAngleRadians,
+	float DesiredRadiusFromCenter,
+	const FVector& NavigationProjectionExtent) const
+{
+	if (not IsValid(SquadUnit))
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return false;
+	}
+
+	const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(World);
+
+	const float UnitCollisionRadius = FMath::Max(10.f, SquadUnit->GetSimpleCollisionRadius());
+	const float AngleJitterStepRadians = FMath::DegreesToRadians(20.f);
+	const float RadiusStep = UnitCollisionRadius * 2.f;
+	const int32 MaxAttempts = 10;
+
+	for (int32 AttemptIndex = 0; AttemptIndex < MaxAttempts; ++AttemptIndex)
+	{
+		const float SignedJitter = (AttemptIndex % 2 == 0) ? 1.f : -1.f;
+		const float JitterMagnitude = static_cast<float>(AttemptIndex / 2);
+
+		const float AttemptAngleRadians = TargetAngleRadians + (SignedJitter * JitterMagnitude *
+			AngleJitterStepRadians);
+		const float AttemptRadius = DesiredRadiusFromCenter + (JitterMagnitude * RadiusStep);
+
+		const FVector Direction2D(FMath::Cos(AttemptAngleRadians), FMath::Sin(AttemptAngleRadians), 0.f);
+
+		FVector CandidateLocation = ConstructionCenter + (Direction2D * AttemptRadius);
+		CandidateLocation.Z = SquadUnit->GetActorLocation().Z;
+
+		if (NavigationSystem)
+		{
+			FNavLocation NavLocation;
+			if (NavigationSystem->ProjectPointToNavigation(CandidateLocation, NavLocation, NavigationProjectionExtent))
+			{
+				CandidateLocation = NavLocation.Location;
+			}
+		}
+
+		FRotator CandidateRotation = UKismetMathLibrary::FindLookAtRotation(CandidateLocation, ConstructionCenter);
+		CandidateRotation.Pitch = 0.f;
+		CandidateRotation.Roll = 0.f;
+
+		constexpr bool bIsATest = false;
+		constexpr bool bNoCheck = false;
+		if (SquadUnit->TeleportTo(CandidateLocation, CandidateRotation, bIsATest, bNoCheck))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }

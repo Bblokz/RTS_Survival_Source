@@ -26,7 +26,7 @@ struct FFieldConstructionAbilitySettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EFieldConstructionType FieldConstructionType = EFieldConstructionType::DefaultGerHedgeHog;
-	
+
 	// Attempts to add the abilty to this index of the Unit's Ability Array.
 	// Reverts to first empty index if negative or already occupied.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -46,26 +46,25 @@ struct FFieldConstructionAbilitySettings
 
 	// Mesh used for previewing the placement of the field construction.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UStaticMesh>	PreviewMesh;
+	TObjectPtr<UStaticMesh> PreviewMesh;
 
 	// Defines rules about how the field construction is built.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFieldConstructionData FieldConstructionData;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float ConstructionBarSizeMlt = 1.f;
 
 	// One-shot effect that will play at the location of the construction when it completes.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
 	TObjectPtr<UNiagaraSystem> OnCompletionEffect;
-	
 };
 
 USTRUCT(Blueprintable)
 struct FFieldConstructionEquipmentData
 {
 	GENERATED_BODY()
-	
+
 	// The equipment that the scavenger uses.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
 	TObjectPtr<UStaticMesh> FieldConstructEquipment;
@@ -80,7 +79,6 @@ struct FFieldConstructionEquipmentData
 	// The name of the socket on the equipment mesh to attach the effect to.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
 	FName FieldConstructEffectSocketName;
-	
 };
 
 UENUM()
@@ -153,9 +151,16 @@ public:
 	void AddStaticPreviewWaitingForConstruction(AStaticPreviewMesh* StaticPreview);
 
 	UStaticMesh* GetPreviewMesh() const { return FieldConstructionAbilitySettings.PreviewMesh; }
-	FFieldConstructionData GetFieldConstructionData() const { return FieldConstructionAbilitySettings.FieldConstructionData; }
 
-	EFieldConstructionType GetConstructionType() const { return FieldConstructionAbilitySettings.FieldConstructionType; }
+	FFieldConstructionData GetFieldConstructionData() const
+	{
+		return FieldConstructionAbilitySettings.FieldConstructionData;
+	}
+
+	EFieldConstructionType GetConstructionType() const
+	{
+		return FieldConstructionAbilitySettings.FieldConstructionType;
+	}
 
 	/**
 	 * @brief Starts the field construction command for this component's construction type.
@@ -240,6 +245,19 @@ private:
 	void StopConstructionRangeCheckTimer();
 	void StopConstructionDurationTimer();
 	void ReportError_InvalidConstructionState(const FString& ErrorContext) const;
+	void TeleportSquadUnitsAroundConstructionSite();
+	/**
+     * @brief Attempts to teleport a squad unit to a safe ring position around the construction site.
+     * @param SquadUnit Unit to teleport.
+     * @param ConstructionCenter Center of the construction site.
+     * @param TargetAngleRadians Angle around the center (radians) for the slot.
+     * @param DesiredRadiusFromCenter Desired distance from the center.
+     * @param NavigationProjectionExtent Extent used when projecting points onto the navmesh.
+     * @return True if the unit was successfully teleported.
+     */
+	bool TryTeleportSquadUnitToConstructionRing(ASquadUnit* SquadUnit, const FVector& ConstructionCenter,
+	                                            float TargetAngleRadians, float DesiredRadiusFromCenter,
+	                                            const FVector& NavigationProjectionExtent) const;
 	void StartConstructionProgressBar(AFieldConstruction* SpawnedConstruction);
 	void StopConstructionProgressBar();
 

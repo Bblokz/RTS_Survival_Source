@@ -12,6 +12,7 @@
 #include "RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.h"
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionActor/FieldConstruction.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
@@ -558,6 +559,15 @@ bool UPlayerCommandTypeDecoder::IsOfFaction(AActor* ClickedActor, const uint8 Ow
 			bIsAllied = SquadUnit->GetSquadControllerChecked()->GetRTSComponent()->GetOwningPlayer() == kPlayerOneId;
 			return bIsAllied;
 		}
+	}
+	if(AFieldConstruction* FieldConstruction  = Cast<AFieldConstruction>(ClickedActor))
+	{
+		URTSComponent* RTSComp = FieldConstruction->FindComponentByClass<URTSComponent>();
+		if (not RTSComp)
+		{
+			return false;
+		}
+		bIsAllied = RTSComp->GetOwningPlayer() == kPlayerOneId;
 	}
 	return bIsAllied;
 }
