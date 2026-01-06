@@ -1318,6 +1318,11 @@ void ASquadController::ExecuteFieldConstructionCommand(const EFieldConstructionT
                                                        const FVector& ConstructionLocation,
                                                        const FRotator& ConstructionRotation, AActor* StaticPreviewActor)
 {
+	if (IsValid(CargoSquad))
+	{
+		CargoSquad->CheckCargoState(EAbilityID::IdFieldConstruction);
+	}
+	
 	UFieldConstructionAbilityComponent* FieldConstructionComponent = GetFieldConstructionAbility(FieldConstruction);
 	if (not IsValid(FieldConstructionComponent))
 	{
@@ -1696,6 +1701,11 @@ void ASquadController::TerminateRotateTowardsCommand()
 
 void ASquadController::ExecuteScavengeObject(AActor* TargetObject)
 {
+	
+	if (IsValid(CargoSquad))
+	{
+		CargoSquad->CheckCargoState(EAbilityID::IdScavenge);
+	}
 	Debug_Scavenging("Execute scavenging");
 	AScavengeableObject* ScavengeableObject = Cast<AScavengeableObject>(TargetObject);
 	if (not ExeScav_EnsureValidObj(ScavengeableObject))
