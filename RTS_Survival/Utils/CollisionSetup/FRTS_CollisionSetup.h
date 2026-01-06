@@ -5,6 +5,7 @@
 #include "TriggerOverlapLogic.h"
 
 class UCapsuleComponent;
+class USphereComponent;
 
 // We use the camera trace channel to ge info from units the player is looking at.
 class RTS_SURVIVAL_API FRTS_CollisionSetup
@@ -64,6 +65,8 @@ public:
          * @param TriggerLogic Target overlap channels for players or enemies.
          */
         static void SetupTriggerOverlapCollision(UPrimitiveComponent* TriggerComponent, ETriggerOverlapLogic TriggerLogic);
+
+	static void SetupFieldMineTriggerCollision(USphereComponent* TriggerSphere, int32 OwningPlayer);
 
 	// ----------------- Collision setup static objects -----------------
 	// if bnNoCollision is true, the object will have no except for player mouse interactions.

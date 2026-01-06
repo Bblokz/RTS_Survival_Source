@@ -3,6 +3,7 @@
 #include "FRTS_AOE.h"
 
 #include "Async/Async.h"
+#include "Containers/Set.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
@@ -30,6 +31,7 @@ void FRTS_AOE::ApplyToActorsAsync(
 		Epicenter,
 		Radius,
 		BuildObjectQueryParams(OverlapLogic),
+		TArray<TWeakObjectPtr<AActor>>(),
 		[OnActorFound = MoveTemp(OnActorFound)](TArray<FHitResult>&& HitResults)
 		{
 			for (const FHitResult& Hit : HitResults)
@@ -52,7 +54,8 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 	const float BaseDamage,
 	const float DamageFalloffExponent,
 	const ERTSDamageType DamageType,
-	const ETriggerOverlapLogic OverlapLogic)
+	const ETriggerOverlapLogic OverlapLogic,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
 {
 	if (not IsValid(DamageCauser))
 	{
@@ -72,6 +75,7 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 		Epicenter,
 		SafeRadius,
 		BuildObjectQueryParams(OverlapLogic),
+		ActorsToIgnore,
 		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType](
 		TArray<FHitResult>&& HitResults)
 		{
@@ -113,7 +117,8 @@ void FRTS_AOE::ApplyBehaviourInRadiusAsync(
 	const FVector& Epicenter,
 	const float Radius,
 	const TSubclassOf<UBehaviour> BehaviourClass,
-	const ETriggerOverlapLogic OverlapLogic)
+	const ETriggerOverlapLogic OverlapLogic,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
 {
 	if (not BehaviourClass)
 	{
@@ -125,6 +130,7 @@ void FRTS_AOE::ApplyBehaviourInRadiusAsync(
 		Epicenter,
 		Radius,
 		BuildObjectQueryParams(OverlapLogic),
+		ActorsToIgnore,
 		[BehaviourClass](TArray<FHitResult>&& HitResults)
 		{
 			for (const FHitResult& Hit : HitResults)
@@ -167,6 +173,7 @@ void FRTS_AOE::StartAsyncSphereSweep(
 	const FVector& Epicenter,
 	const float Radius,
 	const FCollisionObjectQueryParams& ObjectQueryParams,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
 	TFunction<void(TArray<FHitResult>&&)> OnSweepComplete)
 {
 	if (not OnSweepComplete)
@@ -192,6 +199,19 @@ void FRTS_AOE::StartAsyncSphereSweep(
 
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTS_AOE_SphereSweep), false, InstigatorActor);
 	QueryParams.AddIgnoredActor(InstigatorActor);
+	TSet<const AActor*> IgnoredActors;
+	IgnoredActors.Add(InstigatorActor);
+	for (const TWeakObjectPtr<AActor>& ActorToIgnore : ActorsToIgnore)
+	{
+		if (not ActorToIgnore.IsValid())
+		{
+			continue;
+		}
+
+		AActor* Actor = ActorToIgnore.Get();
+		QueryParams.AddIgnoredActor(Actor);
+		IgnoredActors.Add(Actor);
+	}
 
 	const FCollisionShape SphereShape = FCollisionShape::MakeSphere(Radius);
 
@@ -199,11 +219,21 @@ void FRTS_AOE::StartAsyncSphereSweep(
 	const TWeakObjectPtr<AActor> WeakInstigator = InstigatorActor;
 
 	TraceDelegate.BindLambda(
-		[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete)](
+		[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete), IgnoredActors](
 		const FTraceHandle& /*TraceHandle*/,
 		FTraceDatum& TraceDatum) mutable
 		{
 			TArray<FHitResult> HitResults = TraceDatum.OutHits;
+			HitResults.RemoveAll([&IgnoredActors](const FHitResult& Hit)
+			{
+				AActor* HitActor = Hit.GetActor();
+				if (not IsValid(HitActor))
+				{
+					return true;
+				}
+
+				return IgnoredActors.Contains(HitActor);
+			});
 			AsyncTask(
 				ENamedThreads::GameThread,
 				[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete), HitResults = MoveTemp(HitResults)]()
