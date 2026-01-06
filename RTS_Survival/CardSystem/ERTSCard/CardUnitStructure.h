@@ -12,16 +12,16 @@ struct FCardUnitTypeSelector
     FCardUnitTypeSelector();
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    ESquadSubtype SquadSubtype;
+    ESquadSubtype SquadSubtype = ESquadSubtype::Squad_None;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    ENomadicSubtype NomadicSubtype;
+    ENomadicSubtype NomadicSubtype = ENomadicSubtype::Nomadic_None;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    ETankSubtype TankSubtype;
+    ETankSubtype TankSubtype  = ETankSubtype::Tank_None;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-    EAircraftSubtype AircraftSubtype;
+    EAircraftSubtype AircraftSubtype = EAircraftSubtype::Aircarft_None;
 
     // Equality operator for TMap key usage
     bool operator==(const FCardUnitTypeSelector& Other) const

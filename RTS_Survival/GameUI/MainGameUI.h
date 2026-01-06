@@ -8,6 +8,7 @@
 #include "Blueprint/UserWidget.h"
 #include "BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
 #include "Components/CanvasPanel.h"
+#include "Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
@@ -81,7 +82,8 @@ struct FActionUIParameters
 		  NomadicSubtype(ENomadicSubtype::Nomadic_None),
 		  TankSubtype(ETankSubtype::Tank_None),
 		  SquadSubtype(ESquadSubtype::Squad_None),
-		  BxpSubtype(EBuildingExpansionType::BXT_Invalid)
+		  BxpSubtype(EBuildingExpansionType::BXT_Invalid),
+		  AircraftSubType(EAircraftSubtype::Aircarft_None)
 
 	{
 	}
@@ -278,12 +280,13 @@ public:
 	 * @return Whether any valid ability was initialised in the action UI elements, if not we need
 	 * to hide the action UI.
 	 */
-        bool SetupUnitActionUIForUnit(
-                const TArray<FUnitAbilityEntry>& TAbilities,
-                EAllUnitType PrimaryUnitType,
-                AActor* PrimarySelected,
-                const ENomadicSubtype NomadicSubtype,
-                const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype, const EBuildingExpansionType BxpSubtype) const;
+	bool SetupUnitActionUIForUnit(
+		const TArray<FUnitAbilityEntry>& TAbilities,
+		EAllUnitType PrimaryUnitType,
+		AActor* PrimarySelected,
+		const ENomadicSubtype NomadicSubtype,
+		const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
+		const EBuildingExpansionType BxpSubtype) const;
 
 
 	/**
@@ -371,7 +374,8 @@ private:
 	void InitMainGameUI_InitActionAndWeaponUI(
 		const FActionUIContainer& ActionUIContainerWidgets,
 		const FInit_WeaponUI& WeaponUIWidgets,
-		const FInit_ActionUI& ActionUIWidgets, const FInit_BehaviourUI& BehaviourUIWidgets, ACPPController* PlayerController);
+		const FInit_ActionUI& ActionUIWidgets, const FInit_BehaviourUI& BehaviourUIWidgets,
+		ACPPController* PlayerController);
 
 	void InitMainGameUI_InitBuildingUI(
 		UW_BottomCenterUI* NewBottomCenterUI,

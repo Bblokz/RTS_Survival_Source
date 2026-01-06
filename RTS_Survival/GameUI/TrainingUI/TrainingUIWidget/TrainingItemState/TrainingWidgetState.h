@@ -43,7 +43,7 @@ struct FTrainingWidgetState
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
 	int Count = 0;
 	UPROPERTY(BlueprintReadOnly)
-	ERequirementCount RequirementCount;
+	ERequirementCount RequirementCount = ERequirementCount::SingleRequirement;
 	UPROPERTY(BlueprintReadOnly)
 	FTrainingOption RequiredUnit;
 	UPROPERTY(BlueprintReadOnly)

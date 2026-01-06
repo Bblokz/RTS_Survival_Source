@@ -18,7 +18,7 @@ struct FBehaviourDescriptionStyle
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UTexture2D* PanelTexture;
+	UTexture2D* PanelTexture = nullptr;
 	
 };
 /**

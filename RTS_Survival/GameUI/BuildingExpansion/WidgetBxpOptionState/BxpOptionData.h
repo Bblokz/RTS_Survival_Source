@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BXPConstructionRules/BXPConstructionRules.h"
 #include "BxpOptionData.generated.h"
 
@@ -24,7 +25,7 @@ struct FBxpOptionData
 	FBxpConstructionRules BxpConstructionRules;
 
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
-	EBuildingExpansionType ExpansionType;
+	EBuildingExpansionType ExpansionType  = EBuildingExpansionType::BTX_20mmFlak;
 
 	/** In which Option section this expansion should be shown. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
