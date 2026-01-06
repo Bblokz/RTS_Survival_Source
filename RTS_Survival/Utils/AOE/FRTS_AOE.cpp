@@ -142,10 +142,6 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType](
 		TArray<FHitResult>&& HitResults)
 		{
-			if (not WeakDamageCauser.IsValid())
-			{
-				return;
-			}
 
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
 			for (const FHitResult& Hit : HitResults)
@@ -219,10 +215,6 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 			DamageType
 		](TArray<FHitResult>&& HitResults)
 		{
-			if (not WeakDamageCauser.IsValid())
-			{
-				return;
-			}
 
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
 			for (const FHitResult& Hit : HitResults)
