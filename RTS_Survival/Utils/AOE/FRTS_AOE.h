@@ -10,6 +10,7 @@
 
 class UBehaviour;
 class UBehaviourComp;
+class UArmorCalculation;
 
 /**
  * @brief Utility struct providing async area-of-effect helpers for damage and behaviours.
@@ -54,6 +55,58 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		float DamageFalloffExponent,
 		ERTSDamageType DamageType,
 		ETriggerOverlapLogic OverlapLogic,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
+	);
+
+	/**
+	 * @brief Deal damage with rear-armor-aware falloff to all actors in range.
+	 * @param DamageCauser Actor credited as damage causer.
+	 * @param Epicenter Center of the area search.
+	 * @param Radius Radius of the damage sphere.
+	 * @param BaseDamage Damage applied at the epicenter before falloff.
+	 * @param DamageFalloffExponent Exponent controlling how aggressively damage decays towards the edge.
+	 * @param FullArmorPen Armor value threshold that still receives full damage.
+	 * @param ArmorPenFallOff Controls how quickly damage decays as armor approaches MaxArmorPen.
+	 * @param MaxArmorPen Armor value at which damage is fully negated.
+	 * @param DamageType Damage type to assign to the generated damage event.
+	 * @param OverlapLogic Determines whether to target player units, enemies or both.
+	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
+	 */
+	static void DealDamageVsRearArmorInRadiusAsync(
+		AActor* DamageCauser,
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		float FullArmorPen,
+		float ArmorPenFallOff,
+		float MaxArmorPen,
+		ERTSDamageType DamageType,
+		ETriggerOverlapLogic OverlapLogic,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
+	);
+
+	/**
+	 * @brief Deal damage with falloff while allowing custom handling for actors with armor calculation.
+	 * @param DamageCauser Actor credited as damage causer.
+	 * @param Epicenter Center of the area search.
+	 * @param Radius Radius of the damage sphere.
+	 * @param BaseDamage Damage applied at the epicenter before falloff.
+	 * @param DamageFalloffExponent Exponent controlling how aggressively damage decays towards the edge.
+	 * @param DamageType Damage type to assign to the generated damage event.
+	 * @param OverlapLogic Determines whether to target player units, enemies or both.
+	 * @param OnArmorComponentHit Custom handler invoked when an actor with armor is hit.
+	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
+	 */
+	static void DealDamageAndCustomArmorHandlingInRadiusAsync(
+		AActor* DamageCauser,
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		ERTSDamageType DamageType,
+		ETriggerOverlapLogic OverlapLogic,
+		TFunction<void(UArmorCalculation*, AActor*)> OnArmorComponentHit,
 		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
 	);
 

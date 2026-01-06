@@ -256,12 +256,15 @@ void AFieldMine::ApplyAoeDamage(const FVector& Epicenter)
 
 	const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore = BuildActorsToIgnore();
 
-	FRTS_AOE::DealDamageInRadiusAsync(
+	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		this,
 		Epicenter,
 		MineSettings.AOERange,
 		MineSettings.AOEDamage,
 		MineSettings.AOEFallOffScaler,
+		MineSettings.FullArmorPen,
+		MineSettings.ArmorPenFallOff,
+		MineSettings.MaxArmorPen,
 		ERTSDamageType::Kinetic,
 		GetOverlapLogicForMineOwner(),
 		ActorsToIgnore);

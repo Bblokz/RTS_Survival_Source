@@ -7,8 +7,71 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+
+namespace
+{
+	float CalculateDamageWithFalloff(
+		const FVector& Epicenter,
+		const float BaseDamage,
+		const float SafeRadius,
+		const float SafeFalloffExponent,
+		const FHitResult& Hit)
+	{
+		const float DistanceFromEpicenter = FVector::Dist(Epicenter, Hit.Location);
+		const float NormalisedDistance = FMath::Clamp(DistanceFromEpicenter / SafeRadius, 0.f, 1.f);
+		const float DamageScale = FMath::Pow(1.f - NormalisedDistance, SafeFalloffExponent);
+		return BaseDamage * DamageScale;
+	}
+
+	void ApplyDamageToActor(
+		AActor& HitActor,
+		const float DamageToApply,
+		FDamageEvent& DamageEvent,
+		const TWeakObjectPtr<AActor>& WeakDamageCauser)
+	{
+		if (DamageToApply <= 0.f)
+		{
+			return;
+		}
+
+		HitActor.TakeDamage(
+			DamageToApply,
+			DamageEvent,
+			WeakDamageCauser->GetInstigatorController(),
+			WeakDamageCauser.Get()
+		);
+	}
+
+	float CalculateRearArmorDamageMultiplier(
+		const float RearArmor,
+		const float SafeFullArmorPen,
+		const float SafeMaxArmorPen,
+		const float ArmorPenFallOff)
+	{
+		if (RearArmor <= SafeFullArmorPen)
+		{
+			return 1.f;
+		}
+
+		if (RearArmor >= SafeMaxArmorPen)
+		{
+			return 0.f;
+		}
+
+		const float ArmorRange = SafeMaxArmorPen - SafeFullArmorPen;
+		if (ArmorRange <= 0.f)
+		{
+			return 0.f;
+		}
+
+		const float ArmorProgress = (RearArmor - SafeFullArmorPen) / ArmorRange;
+		const float DamageScaler = FMath::Pow(1.f - ArmorProgress, FMath::Max(ArmorPenFallOff, 0.f));
+		return FMath::Clamp(DamageScaler, 0.f, 1.f);
+	}
+}
 
 FRTS_AOE::FRTS_AOE() = default;
 
@@ -93,21 +156,196 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 					continue;
 				}
 
-				const float DistanceFromEpicenter = FVector::Dist(Epicenter, Hit.Location);
-				const float NormalisedDistance = FMath::Clamp(DistanceFromEpicenter / SafeRadius, 0.f, 1.f);
-				const float DamageScale = FMath::Pow(1.f - NormalisedDistance, SafeFalloffExponent);
-				const float DamageToApply = BaseDamage * DamageScale;
+				const float DamageToApply = CalculateDamageWithFalloff(
+					Epicenter,
+					BaseDamage,
+					SafeRadius,
+					SafeFalloffExponent,
+					Hit);
 				if (DamageToApply <= 0.f)
 				{
 					continue;
 				}
 
-				HitActor->TakeDamage(
-					DamageToApply,
-					DamageEvent,
-					WeakDamageCauser->GetInstigatorController(),
-					WeakDamageCauser.Get()
-				);
+				ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
+			}
+		});
+}
+
+void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+	AActor* DamageCauser,
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const float FullArmorPen,
+	const float ArmorPenFallOff,
+	const float MaxArmorPen,
+	const ERTSDamageType DamageType,
+	const ETriggerOverlapLogic OverlapLogic,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
+{
+	if (not IsValid(DamageCauser))
+	{
+		return;
+	}
+
+	const float SafeRadius = FMath::Max(Radius, 0.f);
+	if (SafeRadius <= 0.f)
+	{
+		return;
+	}
+
+	const float SafeFalloffExponent = FMath::Max(DamageFalloffExponent, 0.f);
+	const float SafeFullArmorPen = FMath::Max(FullArmorPen, 0.f);
+	const float SafeMaxArmorPen = FMath::Max(MaxArmorPen, SafeFullArmorPen);
+	const float SafeArmorPenFalloff = FMath::Max(ArmorPenFallOff, 0.f);
+	const TWeakObjectPtr<AActor> WeakDamageCauser = DamageCauser;
+	StartAsyncSphereSweep(
+		DamageCauser,
+		Epicenter,
+		SafeRadius,
+		BuildObjectQueryParams(OverlapLogic),
+		ActorsToIgnore,
+		[
+			WeakDamageCauser,
+			Epicenter,
+			BaseDamage,
+			SafeRadius,
+			SafeFalloffExponent,
+			SafeFullArmorPen,
+			SafeArmorPenFalloff,
+			SafeMaxArmorPen,
+			DamageType
+		](TArray<FHitResult>&& HitResults)
+		{
+			if (not WeakDamageCauser.IsValid())
+			{
+				return;
+			}
+
+			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
+			for (const FHitResult& Hit : HitResults)
+			{
+				AActor* HitActor = Hit.GetActor();
+				if (not IsValid(HitActor))
+				{
+					continue;
+				}
+
+				const float DamageToApply = CalculateDamageWithFalloff(
+					Epicenter,
+					BaseDamage,
+					SafeRadius,
+					SafeFalloffExponent,
+					Hit);
+				if (DamageToApply <= 0.f)
+				{
+					continue;
+				}
+
+				UArmorCalculation* ArmorCalculation = HitActor->FindComponentByClass<UArmorCalculation>();
+				if (not IsValid(ArmorCalculation))
+				{
+					ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
+					continue;
+				}
+
+				const float RearArmor = ArmorCalculation->GetRearArmor();
+				const float ArmorDamageMultiplier = CalculateRearArmorDamageMultiplier(
+					RearArmor,
+					SafeFullArmorPen,
+					SafeMaxArmorPen,
+					SafeArmorPenFalloff);
+				if (ArmorDamageMultiplier <= 0.f)
+				{
+					continue;
+				}
+
+				const float AdjustedDamage = DamageToApply * ArmorDamageMultiplier;
+				if (AdjustedDamage <= 0.f)
+				{
+					continue;
+				}
+
+				ApplyDamageToActor(*HitActor, AdjustedDamage, DamageEvent, WeakDamageCauser);
+			}
+		});
+}
+
+void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
+	AActor* DamageCauser,
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const ERTSDamageType DamageType,
+	const ETriggerOverlapLogic OverlapLogic,
+	TFunction<void(UArmorCalculation*, AActor*)> OnArmorComponentHit,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
+{
+	if (not IsValid(DamageCauser))
+	{
+		return;
+	}
+
+	const float SafeRadius = FMath::Max(Radius, 0.f);
+	if (SafeRadius <= 0.f)
+	{
+		return;
+	}
+
+	const float SafeFalloffExponent = FMath::Max(DamageFalloffExponent, 0.f);
+	const TWeakObjectPtr<AActor> WeakDamageCauser = DamageCauser;
+	StartAsyncSphereSweep(
+		DamageCauser,
+		Epicenter,
+		SafeRadius,
+		BuildObjectQueryParams(OverlapLogic),
+		ActorsToIgnore,
+		[
+			WeakDamageCauser,
+			Epicenter,
+			BaseDamage,
+			SafeRadius,
+			SafeFalloffExponent,
+			DamageType,
+			OnArmorComponentHit = MoveTemp(OnArmorComponentHit)
+		](TArray<FHitResult>&& HitResults) mutable
+		{
+			if (not WeakDamageCauser.IsValid())
+			{
+				return;
+			}
+
+			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
+			for (const FHitResult& Hit : HitResults)
+			{
+				AActor* HitActor = Hit.GetActor();
+				if (not IsValid(HitActor))
+				{
+					continue;
+				}
+
+				const float DamageToApply = CalculateDamageWithFalloff(
+					Epicenter,
+					BaseDamage,
+					SafeRadius,
+					SafeFalloffExponent,
+					Hit);
+				if (DamageToApply <= 0.f)
+				{
+					continue;
+				}
+
+				UArmorCalculation* ArmorCalculation = HitActor->FindComponentByClass<UArmorCalculation>();
+				if (IsValid(ArmorCalculation) && OnArmorComponentHit)
+				{
+					OnArmorComponentHit(ArmorCalculation, HitActor);
+					continue;
+				}
+
+				ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
 			}
 		});
 }
