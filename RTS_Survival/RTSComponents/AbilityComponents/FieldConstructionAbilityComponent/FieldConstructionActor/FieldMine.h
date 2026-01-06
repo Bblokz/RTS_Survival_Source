@@ -39,6 +39,18 @@ struct FMineSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
 	float AOEFallOffScaler = 0.f;
 
+	// Rear armor threshold that still receives full AOE damage.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
+	float FullArmorPen = 0.f;
+
+	// Higher values reduce damage more quickly as rear armor approaches MaxArmorPen.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
+	float ArmorPenFallOff = 0.f;
+
+	// Rear armor level that fully negates AOE damage.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
+	float MaxArmorPen = 0.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
 	TArray<ERTSNavAgents> TriggeringNavAgents;
 
