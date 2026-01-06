@@ -153,8 +153,9 @@ void AFieldMine::HandleMineDetonation()
 {
 	if (M_TargetActor.IsValid())
 	{
+		const FVector Location = M_TargetActor->GetActorLocation();
 		ApplyDirectDamage(*M_TargetActor.Get());
-		ShowMineDamageText(M_TargetActor->GetActorLocation());
+		ShowMineDamageText(Location);
 	}
 
 	ApplyAoeDamage(GetActorLocation());
@@ -277,7 +278,8 @@ void AFieldMine::ShowMineDamageText(const FVector& TextLocation) const
 		return;
 	}
 
-	UAnimatedTextWidgetPoolManager* AnimatedTextPoolManager = M_AnimatedTextSubsystem->GetAnimatedTextWidgetPoolManager();
+	UAnimatedTextWidgetPoolManager* AnimatedTextPoolManager = M_AnimatedTextSubsystem->
+		GetAnimatedTextWidgetPoolManager();
 	if (not IsValid(AnimatedTextPoolManager))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("AFieldMine missing AnimatedTextWidgetPoolManager."));
