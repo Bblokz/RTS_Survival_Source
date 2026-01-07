@@ -194,7 +194,7 @@ void ASmallArmsProjectileManager::UpdateNiagaraWithData()
 
 void ASmallArmsProjectileManager::Debug_ProjectilePooling(const FString& Message) const
 {
-	if (DeveloperSettings::Debugging::GProjectilePooling_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GProjectilePooling_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, FColor::Purple);
 	}
@@ -202,7 +202,7 @@ void ASmallArmsProjectileManager::Debug_ProjectilePooling(const FString& Message
 
 void ASmallArmsProjectileManager::Debug_AmountProjectilesActive() const
 {
-	if (DeveloperSettings::Debugging::GProjectilePooling_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GProjectilePooling_Compile_DebugSymbols)
 	{
 		int32 ActiveProjectiles = 0;
 		for (int32 i = 0; i < FSoA_SmallArmsProjectilesPool::PoolSize; ++i)

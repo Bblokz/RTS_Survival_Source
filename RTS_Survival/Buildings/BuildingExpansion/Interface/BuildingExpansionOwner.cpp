@@ -626,7 +626,7 @@ void IBuildingExpansionOwner::BatchBxp_OnBuildingCanNoLongerExpand(
 	TArray<ABuildingExpansion*> SpawnedBxps,
 	TArray<int32> IndicesToReset) const
 {
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		const FString OwnerName = GetOwnerName();
 		const FString HowMany = FString::FromInt(SpawnedBxps.Num());

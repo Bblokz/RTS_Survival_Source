@@ -55,7 +55,7 @@ bool APlayerStartLocation::GetIsValidFOWComponent() const
 
 void APlayerStartLocation::Debug_RegisterWithPlayerStartLocationManager() const
 {
-	if(DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Registering with player start location manger for StartLocation:"
 								  "\n " + GetName() + " \n at location: " + GetActorLocation().ToString());

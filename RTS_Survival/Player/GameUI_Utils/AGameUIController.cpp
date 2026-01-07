@@ -235,7 +235,7 @@ void AGameUIController::RebuildGameUIHierarchy(
 	}
 
 	// Debugging output
-	if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("UI HIERARCHY:", FColor::Red);
 		RTSFunctionLibrary::PrintString("Active index: " + FString::FromInt(M_ActiveGameUIArrayIndex));
@@ -415,7 +415,7 @@ void AGameUIController::CalculatePropagateGameUIState(
 
 	M_currentGameUIState.PrimaryUnitAbilities = UnitAbilities;
 
-	if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Current Ability: " + Global_GetAbilityIDAsString(CurrentAbility) + " for " +
 			Global_GetUnitTypeString(PrimarySelectedUnitType) + " is primary selected.");
@@ -758,7 +758,7 @@ void AGameUIController::PushSelectionPanelState(
 	TArray<ASelectableActorObjectsMaster*>* TPlayerSelectedActors,
 	AActor* OverWritePrimarySelectedUnit)
 {
-	if (DeveloperSettings::Debugging::GPlayerSelection_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerSelection_Compile_DebugSymbols)
 	{
 		Debug_PrintSelectedUnits(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors);
 	}

@@ -763,7 +763,7 @@ void UHarvester::HarvestAIAction_MoveToTargetResource()
 
 void UHarvester::OnUnableToMoveToResource(const ECannotMoveToResource Reason)
 {
-	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		const FString ReasonString = Global_GetCannotMoveToResourceAsString(Reason);
 		HarvestDebug("Harvester cannot move to resource: " + ReasonString, FColor::Orange);

@@ -495,7 +495,7 @@ bool UHealthComponent::ShouldDisplayHealthForPercentage(const float NewPercentag
 {
 	if (VisibilitySettings.bAlwaysDisplay)
 	{
-		if (DeveloperSettings::Debugging::GHealthComponent_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GHealthComponent_Compile_DebugSymbols)
 		{
 			Debug("Display HP bar as always display is set.", FColor::Green);
 		}
@@ -503,7 +503,7 @@ bool UHealthComponent::ShouldDisplayHealthForPercentage(const float NewPercentag
 	}
 	if (VisibilitySettings.bDisplayOnDamaged && NewPercentage < 1.0f)
 	{
-		if (DeveloperSettings::Debugging::GHealthComponent_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GHealthComponent_Compile_DebugSymbols)
 		{
 			Debug("Display HP bar as display on damaged!.", FColor::Green);
 		}

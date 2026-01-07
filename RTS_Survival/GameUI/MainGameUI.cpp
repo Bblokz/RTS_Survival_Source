@@ -893,7 +893,7 @@ void UMainGameUI::PlacePackedUpBuildingExpansion(
 	const bool bIsAttached = bIsOriginexpansion || bIsSocketExpansion;
 	if (bIsAttached && BuildingExpansionOwner->GetIsAsyncBatchLoadingAttachedPackedExpansions())
 	{
-		if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::DisplayNotification(FText::FromString("Skipping user manually attempting to place"
 				"packed bxp that is attached as this bxp is currently being"

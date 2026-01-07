@@ -130,52 +130,55 @@ void AAircraftMaster::Tick(float DeltaTime)
 		return;
 	}
 	Tick_ProjectDecalToLandscape(DeltaTime);
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols && M_AircraftMovementSettings.bDebugState)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
-		const FString LandedStateStr = FRTSAircraftHelpers::GetAircraftLandingStateString(M_LandedState);
-		const FString MovementStateStr = FRTSAircraftHelpers::GetAircraftMovementStateString(M_MovementState);
-		const FString DebugStr = FString::Printf(TEXT("Landed: %s | Move: %s"), *LandedStateStr, *MovementStateStr);
-		FRTSAircraftHelpers::AircraftDebugAtLocation(
-			this,
-			DebugStr,
-			GetActorLocation() + FVector(0.f, 0.f, 400.f),
-			FColor::White,
-			DeltaTime);
-		if (M_PendingPostLiftOffAction.GetAction() != EPostLiftOffAction::Idle)
+		if (M_AircraftMovementSettings.bDebugState)
 		{
-			const FString PostLiftOffStr = "PLO action:" +
-				FRTSAircraftHelpers::GetAircraftPostLifOffString(M_PendingPostLiftOffAction.GetAction());
+			const FString LandedStateStr = FRTSAircraftHelpers::GetAircraftLandingStateString(M_LandedState);
+			const FString MovementStateStr = FRTSAircraftHelpers::GetAircraftMovementStateString(M_MovementState);
+			const FString DebugStr = FString::Printf(TEXT("Landed: %s | Move: %s"), *LandedStateStr, *MovementStateStr);
+			FRTSAircraftHelpers::AircraftDebugAtLocation(
+				this,
+				DebugStr,
+				GetActorLocation() + FVector(0.f, 0.f, 400.f),
+				FColor::White,
+				DeltaTime);
+			if (M_PendingPostLiftOffAction.GetAction() != EPostLiftOffAction::Idle)
+			{
+				const FString PostLiftOffStr = "PLO action:" +
+					FRTSAircraftHelpers::GetAircraftPostLifOffString(M_PendingPostLiftOffAction.GetAction());
 
-			FRTSAircraftHelpers::AircraftDebugAtLocation(
-				this,
-				PostLiftOffStr,
-				GetActorLocation() + FVector(0.f, 0.f, 460.f),
-				FColor::White,
-				DeltaTime);
-		}
-		if (M_AircraftOwner.IsValid())
-		{
-			const int32 MyIndex = M_AircraftOwner->GetAssignedSocketIndex(this);
-			const FString MyIndexString = MyIndex == INDEX_NONE ? "NONE" : FString::FromInt(MyIndex);
-			const FString OwnerStr = "Owner: " + M_AircraftOwner->GetOwner()->GetName() + " (Socket: " + MyIndexString +
-				")";
-			FRTSAircraftHelpers::AircraftDebugAtLocation(
-				this,
-				OwnerStr,
-				GetActorLocation() + FVector(0.f, 0.f, 520.f),
-				FColor::White,
-				DeltaTime);
-		}
-		if (M_AnimInstAircraft)
-		{
-			const float PropSpeed = M_AnimInstAircraft->GetAnimPropSpeed();
-			const FString PropStr = FString::Printf(TEXT("Prop Speed: %.1f"), PropSpeed);
-			FRTSAircraftHelpers::AircraftDebugAtLocation(
-				this,
-				PropStr,
-				GetActorLocation() + FVector(0.f, 0.f, 580.f),
-				FColor::White,
-				DeltaTime);
+				FRTSAircraftHelpers::AircraftDebugAtLocation(
+					this,
+					PostLiftOffStr,
+					GetActorLocation() + FVector(0.f, 0.f, 460.f),
+					FColor::White,
+					DeltaTime);
+			}
+			if (GetIsValidAircraftOwner())
+			{
+				const int32 MyIndex = M_AircraftOwner->GetAssignedSocketIndex(this);
+				const FString MyIndexString = MyIndex == INDEX_NONE ? "NONE" : FString::FromInt(MyIndex);
+				const FString OwnerStr = "Owner: " + M_AircraftOwner->GetOwner()->GetName() + " (Socket: " + MyIndexString +
+					")";
+				FRTSAircraftHelpers::AircraftDebugAtLocation(
+					this,
+					OwnerStr,
+					GetActorLocation() + FVector(0.f, 0.f, 520.f),
+					FColor::White,
+					DeltaTime);
+			}
+			if (M_AnimInstAircraft)
+			{
+				const float PropSpeed = M_AnimInstAircraft->GetAnimPropSpeed();
+				const FString PropStr = FString::Printf(TEXT("Prop Speed: %.1f"), PropSpeed);
+				FRTSAircraftHelpers::AircraftDebugAtLocation(
+					this,
+					PropStr,
+					GetActorLocation() + FVector(0.f, 0.f, 580.f),
+					FColor::White,
+					DeltaTime);
+			}
 		}
 	}
 	M_AnimInstAircraft->UpdateAnim(GetActorRotation(), GetVelocity().Size());
@@ -459,7 +462,7 @@ void AAircraftMaster::StartVto()
 	const float PrepTime = M_AircraftMovementSettings.VtoPrepareTime;
 	SetVtoTimer(PrepTime);
 
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		const FVector TargetLocation = FVector(GetActorLocation().X, GetActorLocation().Y, GroundZ + Apex);
 		DrawDebugSphere(GetWorld(), TargetLocation, 50.f, 12, FColor::Cyan, false, 20.f, 0, 1.f);
@@ -1343,7 +1346,7 @@ float AAircraftMaster::GetRatioSegmentCompleted(const FVector& StartSegment, con
 		                    ? FMath::Clamp(Travelled / SegmentLen, 0.f, 1.f)
 		                    : 1.f;
 
-	// if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	// if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	// {
 	// 	const FString DebugString = "Ratio = " + FString::SanitizeFloat(Ratio) + "\n segmentlength: " +
 	// 		FString::SanitizeFloat(SegmentLen) +
@@ -2031,7 +2034,7 @@ void AAircraftMaster::CancelReturnToBase_VtoBackToAirborne()
 	const float PrepTime = 0.f;
 	SetVtoTimer(PrepTime);
 
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		const FVector TargetLocation = FVector(GetActorLocation().X, GetActorLocation().Y,
 		                                       M_AircraftLandedData.TargetAirborneHeight);

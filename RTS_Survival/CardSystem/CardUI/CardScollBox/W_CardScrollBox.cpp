@@ -496,7 +496,7 @@ void UW_CardScrollBox::CreateNewCardWidget(const ERTSCard CardType)
 		CardWidget->SetVisibility(ESlateVisibility::Visible);
 		M_CardsInScrollBox.Add(CardWidget);
 	}
-	if (DeveloperSettings::Debugging::GCardSystem_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCardSystem_Compile_DebugSymbols)
 	{
 		Debug(CardWidget, CardType);
 	}

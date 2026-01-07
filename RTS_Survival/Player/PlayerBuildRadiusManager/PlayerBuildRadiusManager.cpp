@@ -164,7 +164,7 @@ void UPlayerBuildRadiusManager::SetupRadiusComponentMaterial(
 
 	// Collect overlapping circles for material parameters
 	CollectOverlappingCircles(ValidRadiusComp, RadiiToShow, MaxOtherCircles, OtherCenters, OtherRadii);
-	if (DeveloperSettings::Debugging::GBuildRadius_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuildRadius_Compile_DebugSymbols)
 	{
 		DebugOtherCircles(ValidRadiusComp, OtherCenters, OtherRadii);
 	}
@@ -195,7 +195,7 @@ void UPlayerBuildRadiusManager::SetupRadiusComponentMaterial(
 			                                     FLinearColor(CircleCenter2D.X, CircleCenter2D.Y, 0.0f));
 			DynMaterial->SetScalarParameterValue(FName(*RadiusParamName), OtherRadii[k]);
 		}
-		if (DeveloperSettings::Debugging::GBuildRadius_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GBuildRadius_Compile_DebugSymbols)
 		{
 			DebugDynamicMaterial(ValidRadiusComp, DynMaterial, OtherCenters, OtherRadii);
 		}

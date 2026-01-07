@@ -585,7 +585,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NumCommands++;
 
 
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Added command: " + FString::FromInt((int32)Ability), FColor::Blue);
 		PrintCommands();
@@ -619,7 +619,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		if (CurrentIndex >= NumCommands)
 		{
 			ClearCommands();
-			if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("No valid next command index; all done!", FColor::Blue);
 			}
@@ -628,7 +628,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		}
 	}
 
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		PrintCommands();
 	}
@@ -1930,7 +1930,7 @@ void ICommands::ExecuteMoveCommand(const FVector MoveToLocation)
 
 void ICommands::TerminateMoveCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Terminated move command! (in ICommands)");
 	}
@@ -1955,7 +1955,7 @@ void ICommands::ExecuteAttackCommand(AActor* TargetActor)
 
 void ICommands::TerminateAttackCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished attack command! (in ICommands)");
 	}
@@ -1967,7 +1967,7 @@ void ICommands::ExecuteAttackGroundCommand(const FVector GroundLocation)
 
 void ICommands::TerminateAttackGroundCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished attack ground command! (in ICommands)");
 	}
@@ -1990,7 +1990,7 @@ void ICommands::ExecuteReverseCommand(const FVector ReverseToLocation)
 
 void ICommands::TerminateRotateTowardsCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished Rotate to command! (in ICommands)");
 	}
@@ -1998,7 +1998,7 @@ void ICommands::TerminateRotateTowardsCommand()
 
 void ICommands::ExecuteCreateBuildingCommand(const FVector BuildingLocation, const FRotator BuildingRotation)
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("start create building commands! (in ICommands)");
 	}
@@ -2006,7 +2006,7 @@ void ICommands::ExecuteCreateBuildingCommand(const FVector BuildingLocation, con
 
 void ICommands::TerminateCreateBuildingCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished create building commands! (in ICommands)");
 	}
@@ -2018,7 +2018,7 @@ void ICommands::ExecuteConvertToVehicleCommand()
 
 void ICommands::TerminateConvertToVehicleCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Terminate convert to vehicle command! (in ICommands)");
 	}
@@ -2038,7 +2038,7 @@ void ICommands::TerminateReturnCargoCommand()
 
 void ICommands::TerminateHarvestResourceCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished harvest resource command! (in ICommands)");
 	}
@@ -2050,7 +2050,7 @@ void ICommands::ExecutePickupItemCommand(AItemsMaster* TargetItem)
 
 void ICommands::TerminatePickupItemCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished pickup item command! (in ICommands)");
 	}
@@ -2062,7 +2062,7 @@ void ICommands::ExecuteSwitchWeaponsCommand()
 
 void ICommands::TerminateSwitchWeaponsCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished Switch weapon command! (In ICommands)");
 	}
@@ -2074,7 +2074,7 @@ void ICommands::ExecuteScavengeObject(AActor* TargetObject)
 
 void ICommands::TerminateScavengeObject()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished Scavenge object command! (In ICommands)");
 	}
@@ -2086,7 +2086,7 @@ void ICommands::ExecuteDigIn()
 
 void ICommands::TerminateDigIn()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished DigIn command! (in ICommands)");
 	}
@@ -2098,7 +2098,7 @@ void ICommands::ExecuteBreakCover()
 
 void ICommands::TerminateBreakCover()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished BreakCover Command! (in ICommands)");
 	}
@@ -2111,7 +2111,7 @@ void ICommands::ExecuteFireRockets()
 
 void ICommands::TerminateFireRockets()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished FireRockets Command! (in ICommands)");
 	}
@@ -2149,7 +2149,7 @@ void ICommands::ExecuteRepairCommand(AActor* TargetActor)
 
 void ICommands::TerminateRepairCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished Repair Command! (in ICommands)");
 	}
@@ -2169,7 +2169,7 @@ void ICommands::ExecuteEnterCargoCommand(AActor* CarrierActor)
 	// - validate CarrierActor
 	// - start pathing/boarding logic
 	// - when boarded, call DoneExecutingCommand(EAbilityID::IdEnterCargo)
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("ExecuteEnterCargoCommand (base)", FColor::Blue);
 	}
@@ -2177,7 +2177,7 @@ void ICommands::ExecuteEnterCargoCommand(AActor* CarrierActor)
 
 void ICommands::TerminateEnterCargoCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("TerminateEnterCargoCommand (base)", FColor::Blue);
 	}
@@ -2188,7 +2188,7 @@ void ICommands::ExecuteExitCargoCommand()
 	// Non-pure; override in concrete controllers. Typically:
 	// - start disembark logic (pick egress, unattach, enable movement)
 	// - when done, call DoneExecutingCommand(EAbilityID::IdExitCargo)
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("ExecuteExitCargoCommand (base)", FColor::Blue);
 	}
@@ -2196,7 +2196,7 @@ void ICommands::ExecuteExitCargoCommand()
 
 void ICommands::TerminateExitCargoCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("TerminateExitCargoCommand (base)", FColor::Blue);
 	}
@@ -2232,7 +2232,7 @@ void ICommands::ExecuteRotateTowardsCommand(const FRotator RotateToRotator, cons
 
 void ICommands::TerminateReverseCommand()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finished turn reverse command! (in ICommands)");
 	}
@@ -2254,7 +2254,7 @@ void ICommands::SetUnitToIdle()
 
 void ICommands::OnUnitIdleAndNoNewCommands()
 {
-	if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Unit Idle and no commands left! (in ICommands)");
 	}
@@ -2277,7 +2277,7 @@ void ICommands::DoneExecutingCommand(const EAbilityID AbilityFinished)
 {
 	if (UCommandData* CommandData = GetIsValidCommandData())
 	{
-		if (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Unit done executing command!", FColor::Red);
 		}

@@ -7,7 +7,7 @@
 
 void FRTSAircraftHelpers::AircraftDebug(const FString& Message, const FColor Color)
 {
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, Color, 10);
 	}
@@ -16,7 +16,7 @@ void FRTSAircraftHelpers::AircraftDebug(const FString& Message, const FColor Col
 void FRTSAircraftHelpers::AircraftDebugAtLocation(const UObject* WorldContext, const FString& Message,
                                                   const FVector& Location, const FColor Color, const float Time)
 {
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		if (not IsValid(WorldContext))
 		{
@@ -38,7 +38,7 @@ void FRTSAircraftHelpers::AircraftDebugAtLocation(const UObject* WorldContext, c
 
 void FRTSAircraftHelpers::BombDebug(const FString& Message, const FColor Color)
 {
-	if (DeveloperSettings::Debugging::GBombBay_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBombBay_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, Color, 10);
 	}
@@ -47,7 +47,7 @@ void FRTSAircraftHelpers::BombDebug(const FString& Message, const FColor Color)
 void FRTSAircraftHelpers::AircraftSphereDebug(const UObject* WorldContext, const FVector& Location, const FColor Color,
                                               const float Radius, const float Time)
 {
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		if (not WorldContext)
 		{

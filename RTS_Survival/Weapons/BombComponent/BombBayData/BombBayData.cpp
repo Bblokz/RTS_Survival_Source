@@ -133,7 +133,7 @@ bool FBombBayData::EnsureBombBayIsProperlyInitialized(UObject* Owner)
 
 void FBombBayData::DebugBombBayState() const
 {
-	if (DeveloperSettings::Debugging::GBombBay_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBombBay_Compile_DebugSymbols)
 	{
 		FString DebugString = "\n Bomb Bay State:";
 		for (const FBombBayEntry& BombEntry : TBombEntries)

@@ -1279,7 +1279,7 @@ float AProjectile::GetWidthOfShell(const float WeaponCalibre, const EWeaponShell
 
 void AProjectile::DebugBounce(const FVector& Location) const
 {
-	if (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
 	{
 		DrawDebugString(
 			GetWorld(), Location, TEXT("Bounce!"), 0, FColor::Purple, 5.f, false, 1.f);
@@ -1288,7 +1288,7 @@ void AProjectile::DebugBounce(const FVector& Location) const
 
 void AProjectile::DebugProjectile(const FString& Message) const
 {
-	if (DeveloperSettings::Debugging::GProjectilePooling_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GProjectilePooling_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message + "\n Projectile: " + GetName(), FColor::Magenta);
 	}
@@ -1454,7 +1454,7 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 	ActorsToIgnore.Add(HitActor);
 	const float MaxArmorDamaged = M_ShrapnelArmorPen * 1.5;
 	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(M_ShrapnelParticles, 3, 0.5);
-	if(DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(HitLocation, this,"AOE FallOff = " + FString::SanitizeFloat(DamageFallOff));
 	}

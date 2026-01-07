@@ -123,7 +123,7 @@ void UGameUnitManager::UpdateActorData()
 		return IsValid(In) ? In->GetName() : TEXT("<invalid>");
 	};
 
-	if (DeveloperSettings::Debugging::GUnitManager_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GUnitManager_Compile_DebugSymbols)
 	{
 		for (const auto& EachEnemy : EnemyActorData)
 		{
@@ -796,7 +796,7 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		AddActorData(EnemyOfCheckedUnit, EachBxp, CurrentActorIDMapping, OutActorData);
 	}
 
-	if (DeveloperSettings::Debugging::GAsyncTargetFinding_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAsyncTargetFinding_Compile_DebugSymbols)
 	{
 		const FString Owner = bGetPlayerUnits ? TEXT("Player") : TEXT("Enemy");
 		RTSFunctionLibrary::PrintString(

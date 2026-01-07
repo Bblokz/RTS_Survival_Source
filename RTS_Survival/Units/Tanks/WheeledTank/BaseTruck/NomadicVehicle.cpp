@@ -58,7 +58,7 @@ ANomadicVehicle::ANomadicVehicle(const FObjectInitializer& ObjectInitializer)
 
 static void DebugSocketsPreCheck(TArray<UStaticMeshSocket*> FoundSockets, TArray<FName> OccupiedSocketNames)
 {
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		FString Message = "Before filtering occupied sockets we have:";
 		for (auto eachFound : FoundSockets)
@@ -80,7 +80,7 @@ static void DebugSocketsPreCheck(TArray<UStaticMeshSocket*> FoundSockets, TArray
 
 static void DebugFreeSockets(TArray<UStaticMeshSocket*> FreeSockets)
 {
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		FString Message = "Free sockets found: ";
 		for (auto eachFree : FreeSockets)

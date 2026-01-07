@@ -199,7 +199,7 @@ void UTrackPathFollowingComponent::DebugRemovedOverlapActor(
 	const FString& Reason,
 	const FOverlapActorData& OverlapData) const
 {
-	if (not DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	if constexpr (not DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
 		return;
 	}
@@ -244,7 +244,7 @@ void UTrackPathFollowingComponent::ResetOverlapBlockingActorsForCommand()
 {
 	ResetOverlapBlockingActors();
 	M_TicksCountCheckOverlappers = TrackFollowingOverlapCleanup::CleanupTickInterval;
-	if (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(TEXT("Cleared overlap blockers for new move command."), FColor::Emerald);
 	}
@@ -383,7 +383,7 @@ bool UTrackPathFollowingComponent::IsStuck(const float DeltaTime)
 		{
 			// Vehicle hasn't moved significantly over the sampled locations
 			bIsStuck = true;
-			if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("Vehicle stuck with samples!"
 				                                "\n at time: " + FString::SanitizeFloat(GetWorld()->GetTimeSeconds()),
@@ -445,7 +445,7 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 	ResetStuck();
 
 	// Debug message
-	if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Path Updated: bIsStuck and timers reset!");
 	}
@@ -459,7 +459,7 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 	{
 		return false;
 	}
-	if (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
 		DebugIdleOverlappingActors();
 	}
@@ -479,7 +479,7 @@ bool UTrackPathFollowingComponent::CheckOverlapMovingAllies(float DeltaTime)
 	{
 		return false;
 	}
-	if (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
 		DebugMovingOverlappingActors(DeltaTime);
 	}
@@ -694,37 +694,37 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	              0,
 	              Steering);
 
-	if (bDebug && DeveloperSettings::Debugging::GRTSNavAgents_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GRTSNavAgents_Compile_DebugSymbols)
 	{
-		// flush all debug messages
-
-		if (not ControlledPawn) { return; }
-		FNavAgentProperties Properties = ControlledPawn->GetNavAgentPropertiesRef();
-		auto NavData = Properties.PreferredNavData;
-
-		FString InWorldDebug = "";
-		InWorldDebug += "Cur Vs Des speed: " + FString::SanitizeFloat(M_CurrentSpeed) + " / " +
-			FString::SanitizeFloat(DesiredSpeed) + "\n";
-		InWorldDebug += "Agent Radius: " + FString::SanitizeFloat(Properties.AgentRadius) + "\n";
-		const FString NavDataStr = NavData.IsNull() ? "Any" : NavData.ToString();
-		InWorldDebug += "NavData: " + NavDataStr + "\n";
-		// Add steering:
-		InWorldDebug += "Steering Input: " + FString::SanitizeFloat(M_LastSteeringInput) + "\n";
-
-		// NEW: resolve agent name using our registry (match by radius/height/class)
-		FString AgentNameStr = TEXT("UNKNOWN");
-		if (URTSNavAgentRegistry* Reg = URTSNavAgentRegistry::Get(this))
+		const bool bShouldDebugNavAgents = bDebug && ControlledPawn != nullptr;
+		if (bShouldDebugNavAgents)
 		{
-			const FName AgentName = Reg->GetAgentNameForProps(GetWorld(), Properties, 0.5f);
-			if (!AgentName.IsNone())
-			{
-				AgentNameStr = AgentName.ToString();
-			}
-		}
-		InWorldDebug += "RTSAgent: " + AgentNameStr + "\n";
+			// flush all debug messages
 
-		const FVector DebugLoc = ControlledPawn->GetActorLocation() + FVector(0, 0, 500);
-		DrawDebugString(GetWorld(), DebugLoc, InWorldDebug, nullptr, FColor::Blue, DeltaTime, false, 1.3f);
+			FNavAgentProperties Properties = ControlledPawn->GetNavAgentPropertiesRef();
+			auto NavData = Properties.PreferredNavData;
+
+			FString InWorldDebug = "";
+			InWorldDebug += "Cur Vs Des speed: " + FString::SanitizeFloat(M_CurrentSpeed) + " / " +
+				FString::SanitizeFloat(DesiredSpeed) + "\n";
+			InWorldDebug += "Agent Radius: " + FString::SanitizeFloat(Properties.AgentRadius) + "\n";
+			const FString NavDataStr = NavData.IsNull() ? "Any" : NavData.ToString();
+			InWorldDebug += "NavData: " + NavDataStr + "\n";
+			// Add steering:
+			InWorldDebug += "Steering Input: " + FString::SanitizeFloat(M_LastSteeringInput) + "\n";
+
+			// NEW: resolve agent name using our registry (match by radius/height/class)
+			const URTSNavAgentRegistry* NavAgentRegistry = URTSNavAgentRegistry::Get(this);
+			const FName AgentName = NavAgentRegistry
+				? NavAgentRegistry->GetAgentNameForProps(GetWorld(), Properties, 0.5f)
+				: NAME_None;
+			const FString AgentNameStr = AgentName.IsNone() ? TEXT("UNKNOWN") : AgentName.ToString();
+			InWorldDebug += "RTSAgent: " + AgentNameStr + "\n";
+
+			const FVector DebugLoc = ControlledPawn->GetActorLocation() + FVector(0, 0, 500);
+			DrawDebugString(GetWorld(), DebugLoc, InWorldDebug, nullptr, FColor::Blue, DeltaTime, false, 1.3f);
+		}
+	}
 
 
 		// RTSFunctionLibrary::PrintString("Destination distance: " + FString::SanitizeFloat(DestinationDistance),
@@ -781,7 +781,7 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 	FVector Destination = GetCurrentTargetLocation();
 
 	// sphere at the destination
-	if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 	{
 		DrawDebugSphere(GetWorld(), Destination, 50.f, 12, FColor::Green, false, 0.1f);
 		// Draw debug sphere at unstuck destination
@@ -799,7 +799,7 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 			M_TimeAtLowSpeed += DeltaTime;
 			if (M_TimeAtLowSpeed >= 2 * StuckTimeLowSpeedScale)
 			{
-				if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 				{
 					RTSFunctionLibrary::PrintString("Vehicle stuck while navigating to unstuck location!"
 					                                "\n" + FString::SanitizeFloat(GetWorld()->GetTimeSeconds()),
@@ -814,7 +814,7 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 		{
 			// if the distance is less than the acceptance radius, we can stop our stuck logic
 			ResetStuck();
-			if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("Vehicle no longer stuck as within acceptance radius!", FColor::Green);
 			}
@@ -853,7 +853,7 @@ void UTrackPathFollowingComponent::UpdatePathSegment()
 
 		const float DistanceLeft = (*Path->GetPathPointLocation(Path->GetPathPoints().Num() - 1) - ControlledPawn->
 			GetActorLocation()).Size();
-		if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 		{
 			if (bDebugAcceptanceRadius)
 			{
@@ -874,7 +874,7 @@ void UTrackPathFollowingComponent::UpdatePathSegment()
 			}
 			OnPathFinished(FPathFollowingResult(FPathFollowingResultFlags::Success));
 			//OnPathFinished(EPathFollowingResult::Success);
-			if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 			{
 				if (bDebug)
 				{
@@ -953,7 +953,7 @@ void UTrackPathFollowingComponent::SetMoveSegment(int32 SegmentStartIndex)
 			                          // pick appropriate value base on whether we're going to nav link or not
 			                          : VehiclePathPointAcceptanceRadius;
 		AcceptanceRadius = CurrentAcceptanceRadius;
-		if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 		{
 			if (bDebugAcceptanceRadius)
 			{
@@ -1151,7 +1151,7 @@ float UTrackPathFollowingComponent::GetPathLengthRemaining()
 
 FVector UTrackPathFollowingComponent::GetUnstuckLocation(const FVector& MoveFocus)
 {
-	if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Finding unstuck location");
 	}
@@ -1217,7 +1217,7 @@ FVector UTrackPathFollowingComponent::TeleportOrCalculateUnstuckDestination(cons
 {
 	if (not bM_TeleportedLastStuck)
 	{
-		if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Attempting to teleport vehicle to get unstuck!");
 		}
@@ -1230,7 +1230,7 @@ FVector UTrackPathFollowingComponent::TeleportOrCalculateUnstuckDestination(cons
 			ControlledPawn->SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::TeleportPhysics);
 
 			// Draw a debug sphere at the teleport location
-			if (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 			{
 				DrawDebugSphere(GetWorld(), TeleportLocation, 50.f, 12, FColor::Red, false, 5.f);
 			}

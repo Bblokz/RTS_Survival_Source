@@ -55,7 +55,7 @@ void UTrackedAnimationInstance::SetMovementParameters(
 			"\n On vehicle mesh: " + MeshName
 			+ "\n In function: UTrackedAnimationInstance::SetMovementParameters");
 	}
-	if (DeveloperSettings::Debugging::GVehicle_Track_Animation_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GVehicle_Track_Animation_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Playerate: " + FString::SanitizeFloat(PlayRate), FColor::Red);
 	}
@@ -256,7 +256,7 @@ ETrackAnimation UTrackedAnimationInstance::GetTrackAnimationFromFlag(
 		OutRightTrackSpeed = M_PlayRateFastForward;
 		break;
 	}
-	if (DeveloperSettings::Debugging::GVehicle_Track_Animation_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GVehicle_Track_Animation_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Debug, FColor::Purple);
 	}

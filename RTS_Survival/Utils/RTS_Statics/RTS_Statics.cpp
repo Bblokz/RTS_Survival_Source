@@ -360,7 +360,7 @@ ARTSLandscapeDivider* FRTS_Statics::GetRTSLandscapeDivider(const TObjectPtr<UObj
 			return LandscapeDivider;
 		}
 	}
-	if (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::ReportError("Could not get landscape divider for actor: " + WorldContextObject->GetName() +
 			"\n See FRTS_Statics::GetRTSLandscapeDivider");

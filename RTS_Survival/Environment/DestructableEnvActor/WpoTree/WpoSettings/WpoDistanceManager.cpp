@@ -28,7 +28,7 @@ void UWpoDistanceManager::SetupWpoDistance(UStaticMeshComponent* MeshComponent) 
 void UWpoDistanceManager::BeginPlay()
 {
 	Super::BeginPlay();
-	if (DeveloperSettings::Debugging::GWpoTreeAndFoliage_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GWpoTreeAndFoliage_Compile_DebugSymbols)
 	{
 		AWpoTree* TreeOwner = Cast<AWpoTree>(GetOwner());
 		if (not TreeOwner)
@@ -42,7 +42,7 @@ void UWpoDistanceManager::BeginPlay()
 void UWpoDistanceManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
-	if (DeveloperSettings::Debugging::GWpoTreeAndFoliage_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GWpoTreeAndFoliage_Compile_DebugSymbols)
 	{
 		WpoTreeDebugger.StopDebugging();
 	}

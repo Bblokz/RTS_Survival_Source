@@ -313,7 +313,7 @@ private:
 
 	inline void HarvestDebug(FString Message, FColor Color) const
 	{
-		if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 		{
 			Message = FString::FromInt(AmountDebugs) + " " + Message;
 			DrawDebugString(GetWorld(), GetHarvesterLocation() + FVector(0, 0, 400) + DebugOffsets[DebugOffsetIndex],

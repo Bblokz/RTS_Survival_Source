@@ -198,7 +198,7 @@ void UTechTree::GoBackToMainGameUI()
 void UTechTree::BeginDestroy()
 {
 	Super::BeginDestroy();
-	if(DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Tech tree destroyed!");
 	}

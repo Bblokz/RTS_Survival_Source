@@ -141,7 +141,7 @@ void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FP
 			MinimumPathCostLimit);
 	}
 
-	if (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
 	{
 		UWorld* const world = GetWorld();
 		const APawn* const controlledPawn = GetPawn();
@@ -176,7 +176,7 @@ void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FP
 	// Now run the real path search with the capped cost
 	Super::FindPathForMoveRequest(MoveRequest, Query, OutPath);
 
-	if (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
 	{
 		DebugFoundPathCost(OutPath);
 		DebugPathPointsAndFilter(OutPath, MoveRequest);
@@ -260,7 +260,7 @@ void AAITankMaster::DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath,
 	}
 
 	// NavMeshPath->RTSOffsetFromCorners(OffsetDistance);
-	// if (DeveloperSettings::Debugging::GRTSNavAgents_Compile_DebugSymbols)
+	// if constexpr (DeveloperSettings::Debugging::GRTSNavAgents_Compile_DebugSymbols)
 	// {
 	// 	for (const FNavPathPoint& PathPoint : NavMeshPath->GetPathPoints())
 	// 	{

@@ -242,7 +242,7 @@ float USpatialVoiceLinePlayer::GetBaseIntervalBetweenSpatialVoiceLines(float& Ou
 
 void USpatialVoiceLinePlayer::Debug_SpatialNotAllowed(const ERTSVoiceLine& VoiceLine, const FVector& Location) const
 {
-	if (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 	{
 		FString EnumName = "Enum Ptr NULL";
 		if (const UEnum* EnumPtr = StaticEnum<ERTSVoiceLine>())
@@ -265,7 +265,7 @@ void USpatialVoiceLinePlayer::Debug_SpatialNotAllowed(const ERTSVoiceLine& Voice
 
 void USpatialVoiceLinePlayer::Debug_SpatialAllowed(const ERTSVoiceLine& VoiceLine, const FVector& Location) const
 {
-	if (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 	{
 		FString EnumName = "Enum Ptr NULL";
 		if (const UEnum* EnumPtr = StaticEnum<ERTSVoiceLine>())
@@ -289,7 +289,7 @@ void USpatialVoiceLinePlayer::Debug_SpatialAllowed(const ERTSVoiceLine& VoiceLin
 void USpatialVoiceLinePlayer::Debug_ForceSpatialAudio(const ERTSVoiceLine& VoiceLine, const FVector& Location) const
 {
 	
-	if (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 	{
 		FString EnumName = "Enum Ptr NULL";
 		if (const UEnum* EnumPtr = StaticEnum<ERTSVoiceLine>())

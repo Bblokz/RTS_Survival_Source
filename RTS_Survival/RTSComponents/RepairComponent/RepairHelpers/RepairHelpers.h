@@ -27,7 +27,7 @@ namespace FRTSRepairHelpers
 
 	static void Debug_Repair(const FString& DebugMessage)
 	{
-		if (DeveloperSettings::Debugging::GRepair_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GRepair_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString(DebugMessage);
 		}

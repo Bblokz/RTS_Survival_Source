@@ -215,7 +215,7 @@ void UPlayerControlGroupManager::SelectOnlyControlGroup(const int32 GroupIndex, 
 		Squad->SetSquadSelected(true);
 
 		// Debugging
-		if (GControlGroups_Compile_DebugSymbols)
+		if constexpr (GControlGroups_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = Squad->GetActorLocation() + FVector(0, 0, 300);
 			DrawDebugString(GetWorld(), DrawTextLocation,
@@ -236,7 +236,7 @@ void UPlayerControlGroupManager::SelectOnlyControlGroup(const int32 GroupIndex, 
 		Pawn->SetUnitSelected(true);
 
 		// Debugging
-		if (GControlGroups_Compile_DebugSymbols)
+		if constexpr (GControlGroups_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = Pawn->GetActorLocation() + FVector(0, 0, 300);
 			DrawDebugString(GetWorld(), DrawTextLocation,
@@ -257,7 +257,7 @@ void UPlayerControlGroupManager::SelectOnlyControlGroup(const int32 GroupIndex, 
 		Actor->SetUnitSelected(true);
 
 		// Debugging
-		if (GControlGroups_Compile_DebugSymbols)
+		if constexpr (GControlGroups_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = Actor->GetActorLocation() + FVector(0, 0, 300);
 			DrawDebugString(GetWorld(), DrawTextLocation,
@@ -479,7 +479,7 @@ ESelectionChangeAction UPlayerControlGroupManager::AddSquadsFromControlGroupToSe
 		bAddedAnyUnits = true;
 
 		// Debugging
-		if (GControlGroups_Compile_DebugSymbols)
+		if constexpr (GControlGroups_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = Squad->GetActorLocation() + FVector(0, 0, 300);
 			DrawDebugString(GetWorld(), DrawTextLocation,
@@ -521,7 +521,7 @@ ESelectionChangeAction UPlayerControlGroupManager::AddPawnsFromControlGroupToSel
 		bAddedAnyUnits = true;
 
 		// Debugging
-		if (GControlGroups_Compile_DebugSymbols)
+		if constexpr (GControlGroups_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = Pawn->GetActorLocation() + FVector(0, 0, 300);
 			DrawDebugString(GetWorld(), DrawTextLocation,
@@ -564,7 +564,7 @@ ESelectionChangeAction UPlayerControlGroupManager::AddActorsFromControlGroupToSe
 		}
 
 		// Debugging
-		if (GControlGroups_Compile_DebugSymbols)
+		if constexpr (GControlGroups_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = Actor->GetActorLocation() + FVector(0, 0, 300);
 			DrawDebugString(GetWorld(), DrawTextLocation,

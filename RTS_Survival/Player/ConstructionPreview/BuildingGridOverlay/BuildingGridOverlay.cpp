@@ -104,9 +104,12 @@ void ABuildingGridOverlay::UpdateOverlaps_ForAllTiles()
 	FlushCustomDataRenderState();
 
 	// Draw debug labels if we have a footprint:
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols && M_ConstructPreviewIndices.Num() > 0)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
-		Debug_DrawConstructionPreviewSquares(0.25f);
+		if (M_ConstructPreviewIndices.Num() > 0)
+		{
+			Debug_DrawConstructionPreviewSquares(0.25f);
+		}
 	}
 }
 
@@ -137,9 +140,12 @@ void ABuildingGridOverlay::UpdateOverlaps_ForTiles(const TArray<int32>& Instance
 
 	FlushCustomDataRenderState();
 
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols && M_ConstructPreviewIndices.Num() > 0)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
-		Debug_DrawConstructionPreviewSquares(0.25f);
+		if (M_ConstructPreviewIndices.Num() > 0)
+		{
+			Debug_DrawConstructionPreviewSquares(0.25f);
+		}
 	}
 }
 

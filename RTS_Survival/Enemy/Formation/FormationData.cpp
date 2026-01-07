@@ -66,7 +66,7 @@ void FFormationData::EnsureAllFormationUnitsAreValid(UEnemyFormationController* 
 		{
 			EnemyFormationController->RefundUnitWaveSupply(1);
 		}
-		if (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Invalid unit in formation while checking if formation reached! Removing..."
 				"\n At FFormationData::EnsureAllFormationUnitsAreValid()"

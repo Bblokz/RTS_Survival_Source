@@ -206,7 +206,7 @@ void UW_AmmoHealthBar::ReportError(const FString& ErrorMessage) const
 
 void UW_AmmoHealthBar::Debug(const FString& DebugMessage, const FColor Color) const
 {
-	if (DeveloperSettings::Debugging::GAmmoTracking_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAmmoTracking_Compile_DebugSymbols)
 	{
 		const FString OwnerName = IsValid(GetOuter()) ? GetOuter()->GetName() : TEXT("Unknown Owner");
 		const FString WeaponName = IsValid(M_TrackedWeapon) ? M_TrackedWeapon->GetName() : TEXT("No Weapon Set");

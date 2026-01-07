@@ -68,7 +68,7 @@ void FImpulseOnCrushed::QueueImpulseFromOverlap(UPrimitiveComponent* const Overl
 			return;
 		}
 		const FVector AtLocation = ComputeImpactPoint(Target, bWasSweep, SweepCopy);
-		if (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
 		{
 			// Debug arrow 100 units red from start in direction:
 			DrawDebugDirectionalArrow(Target->GetWorld(), AtLocation, AtLocation + Direction * 100.f, 10.f, FColor::Red,

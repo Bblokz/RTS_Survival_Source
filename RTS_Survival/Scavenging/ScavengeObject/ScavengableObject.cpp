@@ -323,7 +323,7 @@ void AScavengeableObject::CreateRewardWidgetComponent()
 			const FString RewardText = GetRewardText();
 			RewardComponent->SetRewardText(FText::FromString(RewardText));
 
-			if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString(RewardText, FColor::White);
 			}
@@ -396,7 +396,7 @@ void AScavengeableObject::RandomRewardPlayer()
 		// fill in map.
 		M_PlayerResourceAmountRewards.Add(ResourceType, Reward);
 
-		if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("\n Player random reward: ", FColor::White);
 			RTSFunctionLibrary::PrintString("Reward: " + FString::FromInt(Reward), FColor::Red);
@@ -496,7 +496,7 @@ TArray<FVector> AScavengeableObject::GetScavengePositions(const int32 NumUnits)
 	// If no valid sockets are found or sockets are empty, create default positions
 	if (!bSocketsFound || ScavengeLocations.Num() == 0)
 	{
-		if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString(
 				"Could not find sockets on scavengable object. Generating default positions."

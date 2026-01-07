@@ -90,7 +90,7 @@ int32 UResourceComponent::HarvestResource(const int32 MaxAmountHarvesterCapacity
 			{
 				M_ResourceOwner->OnResourceStorageEmpty();
 			}
-			if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 			{
 				DebugPercentage(PercentageResourcesFilled);
 			}
@@ -320,7 +320,7 @@ TArray<FHarvestLocation> UResourceComponent::GenerateHarvestLocations(const floa
 				"\n Owner of resource: " + OwnerName);
 		}
 	}
-	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		DebugGeneratedLocations(Locations);
 	}

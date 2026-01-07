@@ -321,7 +321,7 @@ float UArmorCalculation::EvaluateArmorPlatesForHit(const FArmorSettings* Selecte
 			float EffectiveArmor = GetEffectiveArmor(HitLocation, ProjectileDirection, ImpactNormal,
 			                                         ArmorPlate.ArmorValue,
 			                                         OutAdjustedArmorPenForAngle);
-			if (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 			{
 				if (OutAdjustedArmorPenForAngle >= EffectiveArmor)
 				{
@@ -352,7 +352,7 @@ float UArmorCalculation::NoArmorHitGetClosest(const FArmorSettings* SelectedArmo
                                               float& OutRawArmorValue, float& OutAdjustedArmorPenForAngle,
                                               EArmorPlate& OutPlatehit) const
 {
-	if (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 	{
 		DrawDebugString(GetWorld(), HitLocation, TEXT("No Armor Hit"), nullptr, FColor::Red, 5.0f, false, 2);
 		DrawDebugSphere(GetWorld(), HitLocation, 5.0f, 12, FColor::Red, false, 2.0f);

@@ -232,7 +232,7 @@ UAudioComponent* UPlayerAudioController::PlaySpatialVoiceLine(
 	ERTSVoiceLineUnitType UnitType;
 	if (!GetValidVoiceLineTypeForUnit(PrimarySelectedUnit, UnitType))
 	{
-		if(DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 		{
 			const FString UnitTypeString = UEnum::GetValueAsString(UnitType);
 			const FString VoiceLineTypeString = UEnum::GetValueAsString(VoiceLineType);
@@ -675,7 +675,7 @@ bool UPlayerAudioController::IsSameAnnouncerVoiceLineAsPrevious(const EAnnouncer
 
 void UPlayerAudioController::DebugAudioController(const FString& Message) const
 {
-	if (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, FColor::Blue);
 	}
@@ -1099,7 +1099,7 @@ void UPlayerAudioController::MarkSpatialIndexDormant(const int32 Index)
 	}
 
 	// [New Logic] Debug visualization when returning to pool
-	if (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 	{
 		if (IsValid(Instance.Component) && GetWorld())
 		{
