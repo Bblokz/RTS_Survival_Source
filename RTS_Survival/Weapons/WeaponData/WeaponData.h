@@ -1256,3 +1256,27 @@ struct FInitWeaponStateLaser
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FLaserWeaponSettings LaserWeaponSettings;
 };
+
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateMultiHitLaser
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 OwningPlayer = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	EWeaponName WeaponName = EWeaponName::T26_Mg;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TScriptInterface<IWeaponOwner> WeaponOwner;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UMeshComponent* MeshComponent = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FName FireSocketName = NAME_None;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FMultiHitLaserWeaponSettings LaserWeaponSettings;
+};

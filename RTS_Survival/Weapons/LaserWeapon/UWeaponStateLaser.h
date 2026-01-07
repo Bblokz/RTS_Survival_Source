@@ -6,6 +6,9 @@
 
 class UNiagaraComponent;
 
+/**
+ * @brief Used by weapon owners to fire a laser beam with timed trace pulses.
+ */
 UCLASS()
 class RTS_SURVIVAL_API UWeaponStateLaser : public UWeaponState
 {
@@ -32,16 +35,16 @@ protected:
 
 	virtual void OnStopFire() override;
 
-private:
 	FLaserWeaponSettings M_LaserWeaponSettings;
 
-	// ------------ Beam Niagara ------------
 	bool EnsureLaserEffectIsValid() const;
 	void SetupLaserBeam();
 	void InitLaserBeamParameters() const;
+	bool EnsureLaserBeamSystemIsValid() const;
+
+	// ------------ Beam Niagara ------------
 	UPROPERTY()
 	UNiagaraComponent* M_LaserBeamSystem = nullptr;
-	bool EnsureLaserBeamSystemIsValid() const;
 
 	void SetBeamHidden(const bool bHidden) const;
 
@@ -53,7 +56,7 @@ private:
 	float GetIterationTime() const;
 	void StartBeamIterationSchedule();
 	void DoBeamIteration(); // timer callback
-	void FireTraceIteration(const int32 PulseSerial);
+	virtual void FireTraceIteration(const int32 PulseSerial);
 
 	// Track the active pulse to ignore late async results from prior pulses.
 	int32 M_CurrentPulseSerial = 0;
@@ -64,7 +67,7 @@ private:
 
 	// Async trace plumbing
 	void PlayImpactSound(const FVector& ImpactLocation) const;
-	void OnLaserAsyncTraceComplete(
+	virtual void OnLaserAsyncTraceComplete(
 		FTraceDatum& TraceDatum,
 		float ProjectileLaunchTime,
 		const FVector& LaunchLocation,

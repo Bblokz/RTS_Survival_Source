@@ -71,10 +71,12 @@ protected:
         virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
         UFUNCTION(BlueprintCallable)
         virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
-        UFUNCTION(BlueprintCallable)
-        virtual void SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTraceWeaponParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTraceWeaponParameters) override;
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeaponParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters) override;
 	virtual void SetupFlameThrowerWeapon(const FInitWeaponStateFlameThrower& FlameWeaponParameters) override;
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState) override;

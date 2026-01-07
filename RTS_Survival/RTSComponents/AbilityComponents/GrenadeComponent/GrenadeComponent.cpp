@@ -9,6 +9,7 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "TimerManager.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
@@ -18,6 +19,7 @@ namespace GrenadeComponentConstants
 	constexpr float ThrowTime = 2.f;
 	constexpr float ThrowInterpInterval = 0.02f;
 	constexpr float ArcHeight = 200.f;
+	const FName GrenadeSocketName = TEXT("grenade");
 }
 
 AGrenadeActor::AGrenadeActor()
@@ -42,10 +44,7 @@ void AGrenadeActor::ThrowAndExplode(const FGrenadeComponentSettings& DamageParam
 	M_StartLocation = StartLocation;
 	M_EndLocation = EndLocation;
 
-	if (OverrideMesh)
-	{
-		M_StaticMeshComponent->SetStaticMesh(OverrideMesh);
-	}
+	SetGrenadeMesh(OverrideMesh);
 
 	SetActorLocation(StartLocation);
 	SetActorHiddenInGame(false);
@@ -69,6 +68,19 @@ void AGrenadeActor::ResetGrenade()
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 	}
 	SetActorHiddenInGame(true);
+}
+
+void AGrenadeActor::SetGrenadeMesh(UStaticMesh* OverrideMesh)
+{
+	if (not GetIsValidStaticMeshComponent())
+	{
+		return;
+	}
+
+	if (OverrideMesh)
+	{
+		M_StaticMeshComponent->SetStaticMesh(OverrideMesh);
+	}
 }
 
 bool AGrenadeActor::GetIsValidStaticMeshComponent() const
@@ -299,7 +311,7 @@ void UGrenadeComponent::OnSquadUnitDied(ASquadUnit* DeadUnit)
 		return;
 	}
 
-	ClearThrowTimer(*ThrowerState);
+	ResetThrowerState(*ThrowerState);
 	ThrowerState->M_GrenadesRemaining = 0;
 	ThrowerState->M_SquadUnit = nullptr;
 
@@ -530,10 +542,14 @@ void UGrenadeComponent::StartThrowForThrower(FGrenadeThrowerState& ThrowerState)
 		return;
 	}
 
-	const FVector StartLocation = SquadUnit->GetActorLocation();
-	Grenade->ThrowAndExplode(M_Settings, StartLocation, M_ThrowSequenceState.TargetLocation,
-	                         M_OwningPlayer, M_Settings.GrenadeMesh);
-	ThrowerState.M_GrenadesRemaining = FMath::Max(0, ThrowerState.M_GrenadesRemaining - 1);
+	AttachGrenadeToThrower(ThrowerState, Grenade);
+	if (not ThrowerState.M_AttachedGrenade.IsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Failed to attach grenade to squad unit before throwing."));
+		ThrowerState.M_GrenadesRemaining = 0;
+		return;
+	}
+
 	StartThrowTimer(ThrowerState);
 }
 
@@ -569,6 +585,36 @@ void UGrenadeComponent::OnThrowMontageFinished(TWeakObjectPtr<ASquadUnit> SquadU
 
 	ClearThrowTimer(*ThrowerState);
 
+	if (not ThrowerState->M_AttachedGrenade.IsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Grenade missing when throw montage finished."));
+		ThrowerState->M_GrenadesRemaining = 0;
+		if (not HasPendingThrows())
+		{
+			OnThrowFinished();
+		}
+		return;
+	}
+
+	if (not ThrowerState->M_SquadUnit.IsValid())
+	{
+		ResetThrowerState(*ThrowerState);
+		if (not HasPendingThrows())
+		{
+			OnThrowFinished();
+		}
+		return;
+	}
+
+	const FVector StartLocation = GetThrowStartLocation(*ThrowerState);
+	AGrenadeActor* Grenade = ThrowerState->M_AttachedGrenade.Get();
+	DetachGrenadeFromThrower(*ThrowerState);
+	Grenade->ThrowAndExplode(M_Settings, StartLocation, M_ThrowSequenceState.TargetLocation,
+	                         M_OwningPlayer, M_Settings.GrenadeMesh);
+	ThrowerState->M_AttachedGrenade = nullptr;
+	ThrowerState->M_AttachedGrenadeScale = FVector::OneVector;
+	ThrowerState->M_GrenadesRemaining = FMath::Max(0, ThrowerState->M_GrenadesRemaining - 1);
+
 	if (ThrowerState->M_GrenadesRemaining > 0)
 	{
 		StartThrowForThrower(*ThrowerState);
@@ -587,6 +633,93 @@ void UGrenadeComponent::ClearThrowTimer(FGrenadeThrowerState& ThrowerState)
 	{
 		World->GetTimerManager().ClearTimer(ThrowerState.M_ThrowTimerHandle);
 	}
+}
+
+void UGrenadeComponent::ResetThrowerState(FGrenadeThrowerState& ThrowerState)
+{
+	ClearThrowTimer(ThrowerState);
+
+	if (ThrowerState.M_AttachedGrenade.IsValid())
+	{
+		DetachGrenadeFromThrower(ThrowerState);
+		ThrowerState.M_AttachedGrenade->ResetGrenade();
+	}
+
+	ThrowerState.M_AttachedGrenade = nullptr;
+	ThrowerState.M_AttachedGrenadeScale = FVector::OneVector;
+}
+
+void UGrenadeComponent::AttachGrenadeToThrower(FGrenadeThrowerState& ThrowerState, AGrenadeActor* Grenade)
+{
+	if (not IsValid(Grenade))
+	{
+		return;
+	}
+
+	if (not ThrowerState.M_SquadUnit.IsValid())
+	{
+		return;
+	}
+
+	ASquadUnit* SquadUnit = ThrowerState.M_SquadUnit.Get();
+	USkeletalMeshComponent* MeshComponent = SquadUnit->GetMesh();
+	if (not IsValid(MeshComponent))
+	{
+		return;
+	}
+
+	if (not MeshComponent->DoesSocketExist(GrenadeComponentConstants::GrenadeSocketName))
+	{
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("Grenade socket missing on squad unit %s."), *SquadUnit->GetName()));
+		return;
+	}
+
+	ThrowerState.M_AttachedGrenade = Grenade;
+	ThrowerState.M_AttachedGrenadeScale = Grenade->GetActorScale3D();
+	Grenade->SetGrenadeMesh(M_Settings.GrenadeMesh);
+	Grenade->AttachToComponent(
+		MeshComponent,
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		GrenadeComponentConstants::GrenadeSocketName);
+	Grenade->SetActorScale3D(ThrowerState.M_AttachedGrenadeScale);
+	Grenade->SetActorHiddenInGame(false);
+}
+
+void UGrenadeComponent::DetachGrenadeFromThrower(FGrenadeThrowerState& ThrowerState)
+{
+	if (not ThrowerState.M_AttachedGrenade.IsValid())
+	{
+		return;
+	}
+
+	AGrenadeActor* Grenade = ThrowerState.M_AttachedGrenade.Get();
+	Grenade->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	Grenade->SetActorScale3D(ThrowerState.M_AttachedGrenadeScale);
+}
+
+FVector UGrenadeComponent::GetThrowStartLocation(const FGrenadeThrowerState& ThrowerState) const
+{
+	if (not ThrowerState.M_SquadUnit.IsValid())
+	{
+		return FVector::ZeroVector;
+	}
+
+	const ASquadUnit* SquadUnit = ThrowerState.M_SquadUnit.Get();
+	USkeletalMeshComponent* MeshComponent = SquadUnit->GetMesh();
+	if (not IsValid(MeshComponent))
+	{
+		return SquadUnit->GetActorLocation();
+	}
+
+	if (not MeshComponent->DoesSocketExist(GrenadeComponentConstants::GrenadeSocketName))
+	{
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("Grenade socket missing on squad unit %s."), *SquadUnit->GetName()));
+		return SquadUnit->GetActorLocation();
+	}
+
+	return MeshComponent->GetSocketLocation(GrenadeComponentConstants::GrenadeSocketName);
 }
 
 UGrenadeComponent::FGrenadeThrowerState* UGrenadeComponent::FindThrowerState(
@@ -618,7 +751,7 @@ void UGrenadeComponent::ResetThrowSequenceState()
 {
 	for (FGrenadeThrowerState& ThrowerState : M_ThrowerStates)
 	{
-		ClearThrowTimer(ThrowerState);
+		ResetThrowerState(ThrowerState);
 	}
 
 	M_ThrowerStates.Reset();

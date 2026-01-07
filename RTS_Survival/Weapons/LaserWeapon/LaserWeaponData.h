@@ -3,6 +3,11 @@
 #include "CoreMinimal.h"
 #include "NiagaraSystem.h"
 
+class USoundAttenuation;
+class USoundBase;
+class USoundConcurrency;
+class USoundCue;
+
 #include "LaserWeaponData.generated.h"
 
 USTRUCT(Blueprintable, BlueprintType)
@@ -56,6 +61,27 @@ struct FLaserWeaponSettings
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	USoundConcurrency* LaunchConcurrency = nullptr;
+};
+
+USTRUCT(Blueprintable, BlueprintType)
+struct FMultiHitLaserWeaponSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FLaserWeaponSettings LaserWeaponSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Laser", meta=(ClampMin="1", UIMin="1"))
+	int32 MaxHits = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	USoundBase* LaserStartUpSound = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	USoundAttenuation* LaserStartUpAttenuation = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	USoundConcurrency* LaserStartUpConcurrency = nullptr;
 };
 
 USTRUCT(Blueprintable, BlueprintType)

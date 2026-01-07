@@ -274,6 +274,9 @@ protected:
 	virtual void SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeaponParameters) override;
 
 	UFUNCTION(BlueprintCallable)
+	virtual void SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetupFlameThrowerWeapon(const FInitWeaponStateFlameThrower& FlameWeaponParameters) override;
 
 	UFUNCTION(BlueprintCallable)
