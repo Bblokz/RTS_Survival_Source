@@ -13,6 +13,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 
 namespace GrenadeComponentConstants
@@ -531,6 +532,10 @@ void UGrenadeComponent::StartThrowForThrower(FGrenadeThrowerState& ThrowerState)
 
 	ASquadUnit* SquadUnit = ThrowerState.M_SquadUnit.Get();
 	DisableThrowerWeapon(ThrowerState);
+	const FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(
+		SquadUnit->GetActorLocation(),
+		M_ThrowSequenceState.TargetLocation);
+	SquadUnit->SetActorRotation(LookAtRotation);
 	USquadUnitAnimInstance* AnimInstance = SquadUnit->GetAnimBP_SquadUnit();
 	if (IsValid(AnimInstance))
 	{
