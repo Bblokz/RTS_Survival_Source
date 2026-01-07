@@ -20,6 +20,7 @@
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
+#include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -756,13 +757,8 @@ void AProjectile::HandleTimedExplosion()
 {
 	// Explode mid air.
 	FRotator Rotation = FRotator::ZeroRotator;
-	SpawnExplosion(GetActorLocation(), Rotation, ERTSSurfaceType::Air);
-	if (M_ShrapnelParticles > 0)
-	{
-		// UAOE::CreateTraceAOEHitEnemy(this,
-		//                              [this](AActor* Param) { DamageActorWithShrapnel(Param); },
-		//                              GetActorLocation(), M_ShrapnelRange, M_ShrapnelParticles, {this});
-	}
+	SpawnExplosionHandleAOE(GetActorLocation(), Rotation, ERTSSurfaceType::Air, nullptr);
+
 	OnProjectileDormant();
 }
 
@@ -812,14 +808,7 @@ void AProjectile::OnHitActor(
 		{
 			M_ProjectileOwner->OnProjectileKilledActor(HitActor);
 		}
-		const TArray<AActor*> ActorsToIgnore = {HitActor, this};
-		SpawnExplosion(HitLocation, HitRotation, HitSurface);
-		if (M_ShrapnelParticles > 0)
-		{
-			// UAOE::CreateTraceAOEHitEnemy(this,
-			//                              [this](AActor* Param) { DamageActorWithShrapnel(Param); },
-			//                              HitLocation, M_ShrapnelRange, M_ShrapnelParticles, ActorsToIgnore);
-		}
+		SpawnExplosionHandleAOE(HitLocation, HitRotation, HitSurface, HitActor);
 		OnProjectileDormant();
 	}
 }
@@ -1032,8 +1021,8 @@ void AProjectile::HandleHitActorAndClearTimer(AActor* HitActor, const FVector& H
 }
 
 
-void AProjectile::SpawnExplosion(const FVector& Location, const FRotator& HitRotation,
-                                 const ERTSSurfaceType HitSurface) const
+void AProjectile::SpawnExplosionHandleAOE(const FVector& Location, const FRotator& HitRotation,
+                                          const ERTSSurfaceType HitSurface, AActor* HitActor)
 {
 	// Resolve impact data once.
 	const FRTSSurfaceImpactData* const Data = FindImpactData(M_ImpactVfx, HitSurface);
@@ -1042,6 +1031,7 @@ void AProjectile::SpawnExplosion(const FVector& Location, const FRotator& HitRot
 		ReportMissingSurface(this, HitSurface);
 		return;
 	}
+	HandleAoe(Location, HitActor);
 
 	// Normal pooled path:
 	if (M_ProjectileOwner)
@@ -1452,6 +1442,38 @@ void AProjectile::OnArmorPen_HeDisplayText(const FVector& Location)
 		350, ETextJustify::Type::Left,
 		TextSettings
 	);
+}
+
+void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
+{
+	if (M_WeaponCalibre < 45 || M_ShellType == EWeaponShellType::Shell_APCR || M_ShellType == EWeaponShellType::Shell_AP)
+	{
+		return;
+	}
+	TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
+	ActorsToIgnore.Add(HitActor);
+	const float MaxArmorDamaged = M_ShrapnelArmorPen * 1.5;
+	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(M_ShrapnelParticles, 3, 0.5);
+	if(DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+	{
+		RTSFunctionLibrary::PrintString(HitLocation, this,"AOE FallOff = " + FString::SanitizeFloat(DamageFallOff));
+	}
+	ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == 1
+		? ETriggerOverlapLogic::OverlapEnemy
+		: ETriggerOverlapLogic::OverlapPlayer;
+	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+		this,
+		HitLocation,
+		M_ShrapnelRange,
+		M_ShrapnelDamage,
+		DamageFallOff,
+		M_ShrapnelArmorPen,
+		1,
+		MaxArmorDamaged,
+		ERTSDamageType::Kinetic,
+		OverlapLogic,
+		ActorsToIgnore
+		);
 }
 
 void AProjectile::PostInitializeComponents()

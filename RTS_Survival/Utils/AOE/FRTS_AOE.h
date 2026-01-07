@@ -65,7 +65,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param Radius Radius of the damage sphere.
 	 * @param BaseDamage Damage applied at the epicenter before falloff.
 	 * @param DamageFalloffExponent Exponent controlling how aggressively damage decays towards the edge.
-	 * @param FullArmorPen Armor value threshold that still receives full damage.
+	 * @param FullDmgArmorPen Armor value threshold that still receives full damage.
 	 * @param ArmorPenFallOff Controls how quickly damage decays as armor approaches MaxArmorPen.
 	 * @param MaxArmorPen Armor value at which damage is fully negated.
 	 * @param DamageType Damage type to assign to the generated damage event.
@@ -78,7 +78,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		float Radius,
 		float BaseDamage,
 		float DamageFalloffExponent,
-		float FullArmorPen,
+		float FullDmgArmorPen,
 		float ArmorPenFallOff,
 		float MaxArmorPen,
 		ERTSDamageType DamageType,

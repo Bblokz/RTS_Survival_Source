@@ -447,8 +447,9 @@ private:
 	 * @param Location The world-space coordinates where the explosion effect should be spawned, typically the point of impact.
 	 * @param HitRotation
 	 * @param HitSurface
+	 * @param HitActor
 	 */
-	void SpawnExplosion(const FVector& Location, const FRotator& HitRotation, const ERTSSurfaceType HitSurface) const;
+	void SpawnExplosionHandleAOE(const FVector& Location, const FRotator& HitRotation, const ERTSSurfaceType HitSurface, AActor* HitActor);
 
 	/**
 	 * @brief Creates and displays a bounce effect at the given location with the specified directional orientation.
@@ -541,4 +542,6 @@ private:
 	void CreateHeHeatBounceDamageText(const FVector& Location, const EArmorPlateDamageType DamageType) const;
 	void OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated);
 	void OnArmorPen_HeDisplayText(const FVector& Location);
+
+	void HandleAoe(const FVector& HitLocation,AActor* HitActor);
 };

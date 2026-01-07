@@ -1380,7 +1380,7 @@ namespace DeveloperSettings
 	{
 		constexpr bool GNomadicSkeletalAttachments_Compile_DebugSymbols = false;
 		// Overlap logic; tanks evasion.
-		constexpr bool GTankOverlaps_Compile_DebugSymbols = true;
+		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
 		constexpr bool GEnemyController_Compile_DebugSymbols = true;
@@ -1411,7 +1411,7 @@ namespace DeveloperSettings
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
 		// Wheel Animation
 		constexpr bool GVehicle_Wheel_Animation_Compile_DebugSymbols = false;
-		constexpr bool GConstruction_Preview_Compile_DebugSymbols = true;
+		constexpr bool GConstruction_Preview_Compile_DebugSymbols = false;
 		constexpr bool GPlayerClickAndAction_Compile_DebugSymbols = false;
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting

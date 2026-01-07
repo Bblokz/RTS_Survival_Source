@@ -17,6 +17,7 @@
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 AFieldMine::AFieldMine(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -30,6 +31,19 @@ void AFieldMine::BeginPlay()
 	BeginPlay_DisableMineMeshCollision();
 	BeginPlay_CacheAnimatedTextSubsystem();
 	BeginPlay_SetupTriggerSphere();
+
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	if (M_RTSComponent->GetOwningPlayer() == 1)
+	{
+		M_DamageCauserController = FRTS_Statics::GetRTSController(this);
+	}
+	else
+	{
+		M_DamageCauserController = FRTS_Statics::GetEnemyController(this);
+	}
 }
 
 void AFieldMine::PostInitializeComponents()
@@ -127,7 +141,7 @@ void AFieldMine::TriggerMineForActor(AActor& TriggeringActor)
 		M_TriggerSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
-	const float TriggerDelaySeconds = PlayTriggerSound();
+	const float TriggerDelaySeconds = PlayTriggerSound() - MineSettings.SubtractedTime;
 	if (TriggerDelaySeconds <= 0.f)
 	{
 		HandleMineDetonation();
@@ -258,7 +272,7 @@ void AFieldMine::ApplyAoeDamage(const FVector& Epicenter)
 	const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore = BuildActorsToIgnore();
 
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
-		this,
+		M_DamageCauserController.IsValid() ? M_DamageCauserController.Get() : this,
 		Epicenter,
 		MineSettings.AOERange,
 		MineSettings.AOEDamage,

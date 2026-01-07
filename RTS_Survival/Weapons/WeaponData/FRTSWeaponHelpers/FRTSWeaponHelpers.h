@@ -20,7 +20,7 @@ namespace FRTSWeaponHelpers
 	TArray<UWeaponState*> GetWeaponsMountedOnTank(const ATankMaster* Tank);
 
 	TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
-	                                                         UBombComponent*& OutBombCompPtr);
+	                                                  UBombComponent*& OutBombCompPtr);
 
 	AActor* GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor);
 
@@ -47,6 +47,17 @@ namespace FRTSWeaponHelpers
 	ERTSDeathType TranslateDamageIntoDeathType(const ERTSDamageType DamageType);
 
 	bool GetAdjustedRangeIfFlameThrowerPresent(const TArray<UWeaponState*>& Weapons, float& OutAdjustedRange);
+
+
+	/**
+	 * @brief Converts shrapnel particle count into a damage falloff exponent for FRTS_AOE.
+	 *        More particles => smaller exponent => flatter damage curve.
+	 */
+	float GetAoEFalloffExponentFromShrapnelParticles(
+		const int32 ShrapnelParticles,
+		const float MaxExponent = 3.0f,
+		const float MinExponent = 0.35f,
+		const float ParticleScale = 30.0f);
 
 	FVector GetTraceEndWithAccuracy(
 		const FVector& LaunchLocation,

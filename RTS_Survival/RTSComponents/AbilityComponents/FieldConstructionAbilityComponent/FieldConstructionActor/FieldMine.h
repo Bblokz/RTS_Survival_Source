@@ -51,6 +51,9 @@ struct FMineSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
 	float MaxArmorPen = 0.f;
 
+	// Subtraction from the mine's detonation timer when triggered.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
+	float SubtractedTime = 0.f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
 	TArray<ERTSNavAgents> TriggeringNavAgents;
 
@@ -141,4 +144,8 @@ private:
 	bool GetIsValidRTSComponent() const;
 	bool GetIsValidTriggerSphere() const;
 	bool GetIsValidAnimatedTextSubsystem() const;
+
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_DamageCauserController;
 };

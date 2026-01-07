@@ -192,6 +192,20 @@ bool FRTSWeaponHelpers::GetAdjustedRangeIfFlameThrowerPresent(const TArray<UWeap
 	return false;
 }
 
+float FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(const int32 ShrapnelParticles,
+                                                                    const float MaxExponent, const float MinExponent,
+                                                                    const float ParticleScale)
+{
+	const int32 SafeParticles = FMath::Max(ShrapnelParticles, 1);
+	const float SafeScale = FMath::Max(ParticleScale, 1.0f);
+
+	// N=1 => ~MaxExponent, large N => approaches MinExponent.
+	const float DecayT = FMath::Exp(-(static_cast<float>(SafeParticles - 1) / SafeScale));
+	const float Exponent = MinExponent + (MaxExponent - MinExponent) * DecayT;
+
+	return FMath::Clamp(Exponent, MinExponent, MaxExponent);
+}
+
 static FORCEINLINE FVector RandomPerpOffset(const FVector& DirNorm, float Radius)
 {
 	FVector U, V;

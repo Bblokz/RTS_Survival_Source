@@ -142,7 +142,6 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType](
 		TArray<FHitResult>&& HitResults)
 		{
-
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
 			for (const FHitResult& Hit : HitResults)
 			{
@@ -174,7 +173,7 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	const float Radius,
 	const float BaseDamage,
 	const float DamageFalloffExponent,
-	const float FullArmorPen,
+	const float FullDmgArmorPen,
 	const float ArmorPenFallOff,
 	const float MaxArmorPen,
 	const ERTSDamageType DamageType,
@@ -193,7 +192,7 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	}
 
 	const float SafeFalloffExponent = FMath::Max(DamageFalloffExponent, 0.f);
-	const float SafeFullArmorPen = FMath::Max(FullArmorPen, 0.f);
+	const float SafeFullArmorPen = FMath::Max(FullDmgArmorPen, 0.f);
 	const float SafeMaxArmorPen = FMath::Max(MaxArmorPen, SafeFullArmorPen);
 	const float SafeArmorPenFalloff = FMath::Max(ArmorPenFallOff, 0.f);
 	const TWeakObjectPtr<AActor> WeakDamageCauser = DamageCauser;
@@ -215,7 +214,6 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 			DamageType
 		](TArray<FHitResult>&& HitResults)
 		{
-
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
 			for (const FHitResult& Hit : HitResults)
 			{
@@ -239,6 +237,12 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 				UArmorCalculation* ArmorCalculation = HitActor->FindComponentByClass<UArmorCalculation>();
 				if (not IsValid(ArmorCalculation))
 				{
+					if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+					{
+						DrawDebugString(HitActor->GetWorld(), HitActor->GetActorLocation() + FVector(0, 0, 100),
+						                FString::Printf(TEXT("No Armor dmg: %.1f"), DamageToApply), nullptr,
+							FColor::White, 5.f);
+					}
 					ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
 					continue;
 				}
@@ -252,6 +256,13 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 				if (ArmorDamageMultiplier <= 0.f)
 				{
 					continue;
+				}
+				if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+				{
+					DrawDebugString(HitActor->GetWorld(), HitActor->GetActorLocation() + FVector(0, 0, 100),
+					                FString::Printf(
+						                TEXT("Rear Armor: %.1f, Multiplier: %.2f"), RearArmor, ArmorDamageMultiplier),
+					                nullptr, FColor::White, 5.f);
 				}
 
 				const float AdjustedDamage = DamageToApply * ArmorDamageMultiplier;
@@ -394,6 +405,7 @@ FCollisionObjectQueryParams FRTS_AOE::BuildObjectQueryParams(const ETriggerOverl
 	{
 		ObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_PLAYER);
 	}
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_Destructible);
 
 	return ObjectQueryParams;
 }
@@ -421,6 +433,11 @@ void FRTS_AOE::StartAsyncSphereSweep(
 	{
 		return;
 	}
+	if (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+	{
+		DrawDebugSphere(World, Epicenter, Radius, 32, FColor::Red, false, 5.f);
+	}
+
 
 	if (Radius <= 0.f)
 	{

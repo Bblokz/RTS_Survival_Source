@@ -13,11 +13,12 @@ class RTS_SURVIVAL_API FRTS_CollisionSetup
 public:
 	FRTS_CollisionSetup();
 	~FRTS_CollisionSetup();
-	
-	static void ForceBuildingPlacementResponseOnActor(AActor* Actor, ECollisionResponse Response, bool bRecurseAttachedActors);
+
+	static void ForceBuildingPlacementResponseOnActor(AActor* Actor, ECollisionResponse Response,
+	                                                  bool bRecurseAttachedActors);
 
 	// ----------------- Collision Setup Vehicles -----------------
-	
+
 	/**
 	 * @brief Init the collision settings for a movement mesh component on vehicles for the player.
 	 * @param MovementMesh The mesh component to set collision for.
@@ -29,10 +30,10 @@ public:
 
 	static void SetupNomadicMvtEnemy(UMeshComponent* MovementMesh);
 
-		/** Configure an InstancedStaticMesh grid overlay for building placement preview. */
-    	static void SetupBuildingPlacementGridOverlay(UInstancedStaticMeshComponent* GridISM);
+	/** Configure an InstancedStaticMesh grid overlay for building placement preview. */
+	static void SetupBuildingPlacementGridOverlay(UInstancedStaticMeshComponent* GridISM);
 
-	
+
 	/**
 	 * @brief Init the collision settings for a movement mesh component on vehicles for the enemy.
 	 * @param MovementMesh The mesh component to set collision for.
@@ -41,7 +42,7 @@ public:
 
 	// ----------------- Collision Setup Tanks -----------------
 	static void SetupPlayerArmorMeshCollision(UBoxComponent* ArmorMesh);
-	
+
 	static void SetupEnemyArmorMeshCollision(UBoxComponent* ArmorMesh);
 
 	static void SetupArmorCalculationMeshCollision(UMeshComponent* ArmorMesh,
@@ -49,22 +50,22 @@ public:
 	                                               const bool bAffectNavMesh);
 
 	static void SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshComponent, bool bIsPlayer1);
-	
+
 	static void SetupCollisionForNomadicMount(UMeshComponent* MeshComponent, const bool bOwnedByPlayer1);
 
 	static void SetupCollisionForHullMountedWeapon(UMeshComponent* MeshComponent);
 
 	// ----------------- Collision Setup Infantry -----------------
-        static void SetupInfantryWeaponCollision(UStaticMeshComponent* WeaponMesh);
+	static void SetupInfantryWeaponCollision(UStaticMeshComponent* WeaponMesh);
 
-        static void SetupInfantryCapsuleCollision(UCapsuleComponent* CapsuleComponent, const int OwningPlayer);
+	static void SetupInfantryCapsuleCollision(UCapsuleComponent* CapsuleComponent, const int OwningPlayer);
 
-        /**
-         * @brief Configure overlap-only collision for trigger components.
-         * @param TriggerComponent Component to configure collision on.
-         * @param TriggerLogic Target overlap channels for players or enemies.
-         */
-        static void SetupTriggerOverlapCollision(UPrimitiveComponent* TriggerComponent, ETriggerOverlapLogic TriggerLogic);
+	/**
+	 * @brief Configure overlap-only collision for trigger components.
+	 * @param TriggerComponent Component to configure collision on.
+	 * @param TriggerLogic Target overlap channels for players or enemies.
+	 */
+	static void SetupTriggerOverlapCollision(UPrimitiveComponent* TriggerComponent, ETriggerOverlapLogic TriggerLogic);
 
 	static void SetupFieldMineTriggerCollision(USphereComponent* TriggerSphere, int32 OwningPlayer);
 
@@ -75,24 +76,30 @@ public:
 	static void SetupResourceMeshCollision(UMeshComponent* ResourceMesh);
 	static void SetupResourceGeometryComponentCollision(UGeometryCollectionComponent* GeometryComponent);
 
-	static void SetupDestructibleEnvActorMeshCollision(UMeshComponent* DestructibleEnvActorMesh, const bool bOverlapTanks);
-	static void SetupWallActorMeshCollision(UMeshComponent* WallMesh, const bool bAffectNavigation, const uint8 OwningPlayer);
+	static void SetupDestructibleEnvActorMeshCollision(UMeshComponent* DestructibleEnvActorMesh,
+	                                                   const bool bOverlapTanks);
+	static void SetupWallActorMeshCollision(UMeshComponent* WallMesh, const bool bAffectNavigation,
+	                                        const uint8 OwningPlayer);
 	static void SetupDestructibleEnvActorGeometryComponentCollision(UGeometryCollectionComponent* GeometryComponent);
 
-	static void SetupFieldConstructionMeshCollision(UMeshComponent* FieldConstructionMesh, const int32 OwningPlayer, const bool bAlliedProjectilesHitObject = false, const
+	static void SetupFieldConstructionMeshCollision(UMeshComponent* FieldConstructionMesh, const int32 OwningPlayer,
+	                                                const bool bAlliedProjectilesHitObject = false, const
 	                                                bool bOverlapTanks = false);
 
 	static void SetupObstacleCollision(UMeshComponent* ObstacleMesh, const bool bBlockWeapons);
 
-	static void SetupGroundEnvActorCollision(UMeshComponent* GroundEnvActorMesh, const bool bAllowBuilding, const bool bAffectNavigation);
+	static void SetupGroundEnvActorCollision(UMeshComponent* GroundEnvActorMesh, const bool bAllowBuilding,
+	                                         const bool bAffectNavigation);
 
 	static void SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh);
 
 	// Will dynamically be allied or not with this player by blocking or ignoring the trace channel used to hit the enemies of that player.
-	static void UpdateGarrisonCollisionForNewOwner(const int32 NewOwningPlayer, const bool bIsAllied, UMeshComponent* MeshToChangeCollisionOn);
+	static void UpdateGarrisonCollisionForNewOwner(const int32 NewOwningPlayer, const bool bIsAllied,
+	                                               UMeshComponent* MeshToChangeCollisionOn);
 
 	// ----------------- Collision setup Building System and buildings -----------------
-	static void SetupStaticBuildingPreviewCollision(UStaticMeshComponent* BuildingPreviewMesh, const bool bUseCollision);
+	static void SetupStaticBuildingPreviewCollision(UStaticMeshComponent* BuildingPreviewMesh,
+	                                                const bool bUseCollision);
 
 	static void SetupBuildingCollision(UStaticMeshComponent* BuildingMesh, int32 OwningPlayer);
 
@@ -100,12 +107,12 @@ public:
 
 
 	static void ForceBuildingPlacementResponse_Internal(
-        AActor* Actor,
-        ECollisionResponse Response,
-        TSet<const AActor*>& Visited,
-        const bool bRecurseAttachedActors);
+		AActor* Actor,
+		ECollisionResponse Response,
+		TSet<const AActor*>& Visited,
+		const bool bRecurseAttachedActors);
 
 private:
 	static void SetupCollisionWithBuildingPreview_ForOwningPlayer(UPrimitiveComponent* Component,
-		const int32 OwningPlayer);
+	                                                              const int32 OwningPlayer);
 };
