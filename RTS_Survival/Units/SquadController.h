@@ -569,7 +569,8 @@ private:
 	void OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedClass);
 
 	void OnAllSquadUnitsLoaded();
-
+	
+void UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const;
 	/**
 	 * @brief Part of init squad data, sets the fow vision for all squad units.
 	 * @param NewVision The vision range to set.

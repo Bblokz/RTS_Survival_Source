@@ -518,6 +518,7 @@ void ASquadController::HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied)
 void ASquadController::UnitInSquadDied(ASquadUnit* UnitDied, const bool bUnitSelected)
 {
 	M_TSquadUnits.Remove(UnitDied);
+	UnitInSquadDied_HandleGrenadeComp(UnitDied);
 
 	// Adjust the completed command count if necessary.
 	if (M_UnitsCompletedCommand > M_TSquadUnits.Num())
@@ -1322,12 +1323,13 @@ void ASquadController::ExecuteFieldConstructionCommand(const EFieldConstructionT
 	{
 		CargoSquad->CheckCargoState(EAbilityID::IdFieldConstruction);
 	}
-	
+
 	UFieldConstructionAbilityComponent* FieldConstructionComponent = GetFieldConstructionAbility(FieldConstruction);
 	if (not IsValid(FieldConstructionComponent))
 	{
 		const FString ConstructionTypeName = UEnum::GetValueAsString(FieldConstruction);
-		RTSFunctionLibrary::ReportError("Missing field construction ability component for type: " + ConstructionTypeName);
+		RTSFunctionLibrary::ReportError(
+			"Missing field construction ability component for type: " + ConstructionTypeName);
 		DoneExecutingCommand(EAbilityID::IdFieldConstruction);
 		return;
 	}
@@ -1341,13 +1343,15 @@ void ASquadController::ExecuteFieldConstructionCommand(const EFieldConstructionT
 	FieldConstructionComponent->ExecuteFieldConstruction(ConstructionLocation, ConstructionRotation, PreviewMeshActor);
 }
 
-void ASquadController::TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor)
+void ASquadController::TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType,
+                                                         AActor* StaticPreviewActor)
 {
 	UFieldConstructionAbilityComponent* FieldConstructionComponent = GetFieldConstructionAbility(FieldConstructionType);
 	if (not IsValid(FieldConstructionComponent))
 	{
 		const FString ConstructionTypeName = UEnum::GetValueAsString(FieldConstructionType);
-		RTSFunctionLibrary::ReportError("Missing field construction ability component during termination for type: " + ConstructionTypeName);
+		RTSFunctionLibrary::ReportError(
+			"Missing field construction ability component during termination for type: " + ConstructionTypeName);
 		if (IsValid(StaticPreviewActor))
 		{
 			StaticPreviewActor->Destroy();
@@ -1701,7 +1705,6 @@ void ASquadController::TerminateRotateTowardsCommand()
 
 void ASquadController::ExecuteScavengeObject(AActor* TargetObject)
 {
-	
 	if (IsValid(CargoSquad))
 	{
 		CargoSquad->CheckCargoState(EAbilityID::IdScavenge);
@@ -2765,5 +2768,13 @@ void ASquadController::OnAllSquadUnitsLoaded()
 	if (not M_SquadLoadingStatus.bM_HasInitializedData)
 	{
 		InitSquadData();
+	}
+}
+
+void ASquadController::UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const
+{
+	if (IsValid(M_GrenadeComponent))
+	{
+		M_GrenadeComponent->OnSquadUnitDied(UnitDied);
 	}
 }

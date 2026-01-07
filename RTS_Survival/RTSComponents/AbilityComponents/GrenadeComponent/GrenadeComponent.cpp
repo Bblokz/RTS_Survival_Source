@@ -70,6 +70,7 @@ void AGrenadeActor::ResetGrenade()
 	SetActorHiddenInGame(true);
 }
 
+
 void AGrenadeActor::CacheEffectData(const FGrenadeComponentSettings& DamageParams)
 {
 	M_ExplosionEffect = DamageParams.ExplosionEffect;
@@ -115,19 +116,7 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 	const FVector ExplosionLocation = M_EndLocation;
 	PlayExplosionFX(ExplosionLocation);
 	const float InnerRadius = DamageParams.AoeRange * GrenadeComponentConstants::InnerRadiusScale;
-	UGameplayStatics::ApplyRadialDamageWithFalloff(
-		this,
-		DamageParams.Damage,
-		DamageParams.DamageAtOuterRadius,
-		ExplosionLocation,
-		InnerRadius,
-		DamageParams.AoeRange,
-		GrenadeComponentConstants::DamageFalloffExponent,
-		nullptr,
-		TArray<AActor*>(),
-		this,
-		nullptr,
-		ECC_Visibility);
+	// todo call RTS AOE Library with damage vs armor.
 
 	ResetGrenade();
 }
@@ -233,6 +222,11 @@ bool UGrenadeComponent::GetIsValidSquadController() const
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController", __func__, GetOwner());
 	return false;
+}
+
+void UGrenadeComponent::OnSquadUnitDied(ASquadUnit* DeadUnit)
+{
+	// todo.
 }
 
 bool UGrenadeComponent::GetIsValidRTSComponent() const
