@@ -8,6 +8,7 @@
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateLaser.h"
+#include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiTraceWeapon/WeaponStateMultiTrace.h"
@@ -333,6 +334,33 @@ void UAircraftWeapon::SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeaponP
 	const int32 WeaponIndex = M_TWeapons.Num();
 	UWeaponStateLaser* LaserWeapon = NewObject<UWeaponStateLaser>(this);
 	LaserWeapon->InitLaserWeapon(
+		LaserWeaponParameters.OwningPlayer,
+		WeaponIndex,
+		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.WeaponOwner,
+		LaserWeaponParameters.MeshComponent,
+		LaserWeaponParameters.FireSocketName,
+		GetWorld(),
+		LaserWeaponParameters.LaserWeaponSettings);
+
+	LaserWeapon->SetIsAircraftWeapon(true);
+	M_TWeapons.Add(LaserWeapon);
+	UpdateRangeBasedOnWeapons();
+	M_WeaponIndexToSocket.Add(WeaponIndex, LaserWeaponParameters.FireSocketName);
+}
+
+void UAircraftWeapon::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters)
+{
+	SetOwningPlayer(LaserWeaponParameters.OwningPlayer);
+
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateMultiHitLaser* LaserWeapon = NewObject<UWeaponStateMultiHitLaser>(this);
+	LaserWeapon->InitMultiHitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
 		LaserWeaponParameters.WeaponName,

@@ -22,6 +22,7 @@
 #include "RTS_Survival/Weapons/WeaponData/MultiTraceWeapon/WeaponStateMultiTrace.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateLaser.h"
+#include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
 #include "Trace/Trace.h"
 #include "TurretOwner/TurretOwner.h"
 
@@ -531,6 +532,31 @@ void ACPPTurretsMaster::SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeapo
 	const int32 WeaponIndex = M_TWeapons.Num();
 	UWeaponStateLaser* LaserWeapon = NewObject<UWeaponStateLaser>(this);
 	LaserWeapon->InitLaserWeapon(
+		LaserWeaponParameters.OwningPlayer,
+		WeaponIndex,
+		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.WeaponOwner,
+		LaserWeaponParameters.MeshComponent,
+		LaserWeaponParameters.FireSocketName,
+		GetWorld(),
+		LaserWeaponParameters.LaserWeaponSettings);
+
+	M_TWeapons.Add(LaserWeapon);
+	UpdateTurretRangeBasedOnWeapons();
+}
+
+void ACPPTurretsMaster::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters)
+{
+	SetOwningPlayer(LaserWeaponParameters.OwningPlayer);
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for turret: " + GetName());
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateMultiHitLaser* LaserWeapon = NewObject<UWeaponStateMultiHitLaser>(this);
+	LaserWeapon->InitMultiHitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
 		LaserWeaponParameters.WeaponName,
