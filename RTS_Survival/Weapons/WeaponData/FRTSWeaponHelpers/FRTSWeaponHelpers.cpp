@@ -295,7 +295,7 @@ float FRTSWeaponHelpers::GetDamageWithFlux(const float BaseDamage, const int32 D
 void FRTSWeaponHelpers::Debug_ResistancesAtLocation(const FVector& Location, const UObject* WorldContextObject,
                                                     const FString& Text, const FColor Color)
 {
-	if (DeveloperSettings::Debugging::GArmorCalculation_Resistances_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Resistances_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Location, WorldContextObject, Text, Color);
 	}
@@ -303,7 +303,7 @@ void FRTSWeaponHelpers::Debug_ResistancesAtLocation(const FVector& Location, con
 
 void FRTSWeaponHelpers::Debug_Resistances(const FString& Text, const FColor Color)
 {
-	if (DeveloperSettings::Debugging::GArmorCalculation_Resistances_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Resistances_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Text, Color);
 	}

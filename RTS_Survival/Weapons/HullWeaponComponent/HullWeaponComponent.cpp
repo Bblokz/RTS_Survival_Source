@@ -597,7 +597,7 @@ void UHullWeaponComponent::AutoEngage()
 		return;
 	}
 
-	if (DeveloperSettings::Debugging::GHull_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHull_Weapons_Compile_DebugSymbols)
 	{
 		DrawDebugLine(GetWorld(), MeshLocation,
 		              MeshLocation + M_TargetDirectionVectorWorldSpace * 100, FColor::Purple, false, 0.33, 1, 5);
@@ -944,7 +944,7 @@ bool UHullWeaponComponent::ComputeDesiredAim(const FVector& TargetWorld, FQuat& 
 
 void UHullWeaponComponent::Debug_HullWeapons(const FString& DebugMessage, const FColor& Color) const
 {
-	if (DeveloperSettings::Debugging::GHull_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHull_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(DebugMessage, Color);
 	}

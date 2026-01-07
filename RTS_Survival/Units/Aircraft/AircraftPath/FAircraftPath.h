@@ -64,7 +64,7 @@ struct FDistAbsAngleSign
 
 	void Debug(const float DebugTime) const
 	{
-		if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 		{
 			const FString DebugString = FString::Printf(
 				TEXT("Distance: %.2f, AbsAngle: %.2f, Sign: %d"),

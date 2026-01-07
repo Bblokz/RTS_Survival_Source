@@ -26,7 +26,7 @@ void ANomadicAttachmentSkeletal::EndPlay(const EEndPlayReason::Type EndPlayReaso
 void ANomadicAttachmentSkeletal::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (DeveloperSettings::Debugging::GNomadicSkeletalAttachments_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GNomadicSkeletalAttachments_Compile_DebugSymbols)
 	{
 		Debug(DeltaSeconds);
 	}

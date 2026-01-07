@@ -433,7 +433,7 @@ void FRTS_AOE::StartAsyncSphereSweep(
 	{
 		return;
 	}
-	if (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
 	{
 		DrawDebugSphere(World, Epicenter, Radius, 32, FColor::Red, false, 5.f);
 	}

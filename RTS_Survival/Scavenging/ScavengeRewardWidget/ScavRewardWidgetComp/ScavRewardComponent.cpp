@@ -69,7 +69,7 @@ void UScavRewardComponent::BeginPlay()
 	}
 	else
 	{
-		if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("This is the widget class: " + WidgetClass->GetName(), FColor::Purple);
 		}

@@ -16,7 +16,7 @@ USoundBase* FVoiceLineData::GetVoiceLine()
 		// VoiceLines have not been shuffled yet or we are at the end and need to reshuffle.
 		ReshuffleVoiceLines(M_LastPlayedVoiceLine);
 		M_VoiceLineIndex = 0;
-		if (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString(
 				"\n Reshuffled voicelines amount: " + FString::SanitizeFloat(VoiceLines.Num()));
@@ -26,7 +26,7 @@ USoundBase* FVoiceLineData::GetVoiceLine()
 	else
 	{
 		M_VoiceLineIndex++;
-		if (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("VoiceLines incremented to: " + FString::FromInt(M_VoiceLineIndex));
 		}

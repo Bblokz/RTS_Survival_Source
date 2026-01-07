@@ -316,7 +316,7 @@ void AInfantryWeaponMaster::OnTargetsFound(const TArray<AActor*>& Targets)
 		{
 			M_TargetingData.SetTargetActor(NewTarget);
 
-			if (DeveloperSettings::Debugging::GAsyncTargetFinding_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GAsyncTargetFinding_Compile_DebugSymbols)
 			{
 				FString TargetType = "None ";
 
@@ -346,7 +346,7 @@ void AInfantryWeaponMaster::OnTargetsFound(const TArray<AActor*>& Targets)
 
 void AInfantryWeaponMaster::Debug_Weapons(const FString& DebugMessage) const
 {
-	if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(DebugMessage);
 	}
@@ -1048,7 +1048,7 @@ FVector AInfantryWeaponMaster::CalculateTargetDirection(const FVector& WeaponLoc
 	const FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(WeaponLocation, AimpointWS);
 	const FVector LookAtDirection = LookAtRotation.Vector();
 
-	if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 	{
 		// Calculate the end point for the debug line
 		const FVector EndPoint = WeaponLocation + LookAtDirection * 1000;

@@ -117,7 +117,7 @@ void UWheeledAnimationInstance::SetMovementParameters(const float NewSpeed, cons
 		CurrentWheelAnimation = EWheelAnimation::WA_Stationary;
 		break;
 	}
-	if (DeveloperSettings::Debugging::GVehicle_Wheel_Animation_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GVehicle_Wheel_Animation_Compile_DebugSymbols)
 	{
 		// Get owner location.
 		const FVector DebugLocation = GetOwningComponent()->GetComponentLocation() + FVector(0, 0, 400);

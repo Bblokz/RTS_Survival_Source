@@ -19,7 +19,7 @@ EBTNodeResult::Type UTaskObtainResources::ExecuteTask(UBehaviorTreeComponent& Ow
 		// {
 		// 	// Cargo is full after adding the resources!
 		// 	OwnerComp.GetBlackboardComponent()->SetValueAsBool(ReturnCargoKeySelector.SelectedKeyName, true);
-		// 	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+		// 	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 		// 	{
 		// 		RTSFunctionLibrary::PrintString("Cargo is full after harvest; return cargo!", FColor::Green);
 		// 	}
@@ -28,7 +28,7 @@ EBTNodeResult::Type UTaskObtainResources::ExecuteTask(UBehaviorTreeComponent& Ow
 		// {
 		// 	// Cargo not full.
 		// 	OwnerComp.GetBlackboardComponent()->SetValueAsBool(ReturnCargoKeySelector.SelectedKeyName, false);
-		// 	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+		// 	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 		// 	{
 		// 		RTSFunctionLibrary::PrintString("Cargo not full after harvest; continue harvesting!", FColor::Green);
 		// 	}

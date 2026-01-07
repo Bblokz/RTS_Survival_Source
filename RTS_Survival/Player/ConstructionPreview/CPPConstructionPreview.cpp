@@ -116,7 +116,7 @@ FName ACPPConstructionPreview::GetBxpSocketName() const
 			"\n Actor: " + GetName());
 		return NAME_None;
 	}
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::DisplayNotification(FText::FromString(
 			"Requested Bxp Socket for placement to save in the construction data"
@@ -352,7 +352,7 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 	if (not bM_IsValidCursorLocation)
 	{
 		// Location outside of view.
-		if (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("location outside of view", FColor::Red);
 		}
@@ -503,7 +503,7 @@ bool ACPPConstructionPreview::TickRadiiBuildingPlacement(bool& bOutHasValidIncli
 	if (!bOutHasValidIncline || IsOverlayFootprintOverlapping() || !GetisWithinBuildRadii(CursorWorldPosition))
 	{
 		// Invalid location due to slope or overlap.
-		if (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Cannot place building here", FColor::Red);
 		}
@@ -755,7 +755,7 @@ void ACPPConstructionPreview::StartBxpPreview(UStaticMesh* NewPreviewMesh,
 	// Falls Through.
 	case EBxpConstructionType::Socket:
 	case EBxpConstructionType::AtBuildingOrigin:
-		if (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString(
 				"Starting BXP preview with construction type: " + Global_GetBxpConstructionTypeEnumAsString(
@@ -869,7 +869,7 @@ bool ACPPConstructionPreview::GetIsRotationAllowed() const
 		bIsAllowed = true;
 		break;
 	}
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
 			"GetIsRotationAllowed for construction preview mode: " +
@@ -1153,7 +1153,7 @@ bool ACPPConstructionPreview::IsSlopeValid(const FVector& Location)
 		if (GetWorld()->LineTraceSingleByChannel(Hit, StartPoint, EndPoint, ECC_Visibility))
 		{
 			SlopeAngle = FMath::RadiansToDegrees(acosf(FVector::DotProduct(Hit.Normal, FVector::UpVector)));
-			if (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString(
 					"Hit angle at (" + StartPoint.ToString() + "): " + FString::SanitizeFloat(SlopeAngle),
@@ -1169,7 +1169,7 @@ bool ACPPConstructionPreview::IsSlopeValid(const FVector& Location)
 		else
 		{
 			// If any trace doesn't hit, consider it invalid
-			if (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("No hit at trace point: " + StartPoint.ToString(), FColor::Red);
 			}

@@ -63,7 +63,7 @@ void ACPPResourceMaster::OnResourceStorageChanged(const int32 PercentageResource
 	M_AmountOfAttachedMeshes = AttachedMeshes.Num() + ManuallyAttachedMeshes.Num();
 	// For derived blueprints that handle this differently.
 	Bp_OnResourceStorageChanged(PercentageResourcesFilled);
-	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		const FString DebugString = "Amount meshes removed: " + FString::FromInt(DebugAmountToRemove) +
 			"\n Perentage : " + FString::FromInt(PercentageResourcesFilled);
@@ -192,7 +192,7 @@ int32 ACPPResourceMaster::GenerateResourceAttachments(FResourceAttachmentsSetup 
 		RTSFunctionLibrary::ReportError("MainResourceMesh is not valid or has no static mesh assigned!"
 			"\n On resource: " + GetName() + " of type: " + Global_GetResourceTypeAsString(ResourceTypeDebug));
 	}
-	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		const FString Message = "Generated " + FString::FromInt(AmountMeshesCreated) + " meshes"
 			"\n  on resource " + GetName() +

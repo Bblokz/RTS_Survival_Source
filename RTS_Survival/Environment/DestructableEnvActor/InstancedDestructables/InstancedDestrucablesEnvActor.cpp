@@ -240,7 +240,7 @@ void AInstancedDestrucablesEnvActor::OnFoundClosestInstance(const int32 Instance
 	
 	if(M_Health[InstanceIndex] <= 0)
 	{
-		if(DeveloperSettings::Debugging::GDestructableActors_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GDestructableActors_Compile_DebugSymbols)
 		{
 				RTSFunctionLibrary::PrintString("Instance already destroyed: " + GetName() + " at index: " + FString::FromInt(InstanceIndex));
 			return;
@@ -251,7 +251,7 @@ void AInstancedDestrucablesEnvActor::OnFoundClosestInstance(const int32 Instance
 	{
 		OnInstanceDestroyed(InstanceIndex);
 	}
-	if(DeveloperSettings::Debugging::GDestructableActors_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GDestructableActors_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Damage taken for actor: " + GetName() +
 			"\n at Instance Index: " + FString::FromInt(InstanceIndex));

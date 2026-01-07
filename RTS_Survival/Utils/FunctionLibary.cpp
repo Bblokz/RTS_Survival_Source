@@ -337,7 +337,7 @@ static bool GBEnableTraceDebug = false;
 
 void RTSFunctionLibrary::DebugWeapons(const FString& Message, FColor Color, const bool bIsTrace)
 {
-	if (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
 	{
 		if (bIsTrace)
 		{

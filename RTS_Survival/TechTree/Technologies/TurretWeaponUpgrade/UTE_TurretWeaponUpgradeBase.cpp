@@ -8,7 +8,7 @@
 
 void UTE_TurretWeaponUpgradeBase::ApplyTechnologyEffect(const UObject* WorldContextObject)
 {
-	if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("applying technology effect:" + GetName() + " to turrets.");
 	}
@@ -28,7 +28,7 @@ void UTE_TurretWeaponUpgradeBase::OnApplyEffectToActor(AActor* ValidActor)
 				if (WeaponData)
 				{
 					ApplyEffectToWeapon(WeaponData);
-					if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+					if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 					{
 						RTSFunctionLibrary::PrintString("Upgraded weapon: " + Weapon->GetName() + " with APCR shell");
 					}
@@ -68,7 +68,7 @@ void UTE_TurretWeaponUpgradeBase::UpgradeGameStateForAffectedWeapons(UObject* Wo
 			if (Data)
 			{
 				ApplyEffectToWeapon(Data);
-				if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 				{
 					RTSFunctionLibrary::PrintString(
 						"Upgraded weapon: " + Global_GetWeaponEnumAsString(EachWeapon) + "IN GAMESTATE");

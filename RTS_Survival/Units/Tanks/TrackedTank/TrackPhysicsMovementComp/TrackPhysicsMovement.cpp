@@ -148,7 +148,7 @@ void UTrackPhysicsMovement::UpdateTankMovement(
 		LastNoneZeroThrottle = Throttle;
 	}
 	TankAnimationBP->SetMovementParameters(CurrentSpeed, DesiredYawRate, Throttle >= 0);
-	// if (DeveloperSettings::Debugging::GVehicle_Track_Movement_Compile_DebugSymbols)
+	// if constexpr (DeveloperSettings::Debugging::GVehicle_Track_Movement_Compile_DebugSymbols)
 	// {
 	// 	FString Debug = "Game Thread: "
 	// 		"\n CurrentSpeed: " + FString::SanitizeFloat(CurrentSpeed) +
@@ -207,7 +207,7 @@ void UTrackPhysicsMovement::OnPathFollowingFinished()
 // 			TankAnimationBP->SetMovementParameters(CorrectedVelocity.Length(), DesiredYawRate, Throttle >= 0);
 // 			M_InclineAngle = Incline;
 // 	
-// 			// if(DeveloperSettings::Debugging::GVehicle_Track_Movement_Compile_DebugSymbols)
+// 			// if constexpr (DeveloperSettings::Debugging::GVehicle_Track_Movement_Compile_DebugSymbols)
 // 			// {
 // 			// 	RTSFunctionLibrary::PrintString("Incline: " + FString::SanitizeFloat(Incline));
 // 			// 	RTSFunctionLibrary::PrintString("Throttle: " + FString::SanitizeFloat(Throttle) + " Steering: " + FString::SanitizeFloat(Steering));

@@ -1353,7 +1353,7 @@ TPair<FVector, FVector> UWeaponState::GetLaunchAndForwardVector() const
 		ForwardVector = SocketRotation.GetForwardVector();
 
 		// draw debug of socket forward vector 200 units.
-		if (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
 		{
 			if (IsValid(World))
 			{
@@ -1846,7 +1846,7 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
 	AActor* HitActor;
 	if (DidTracePen(TraceHit, HitActor))
 	{
-		if (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 		{
 			if (IsValid(World))
 			{
@@ -1885,7 +1885,7 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 		const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(TraceHit.PhysMaterial);
 		// Create a rotation that aligns the Z-axis with the ImpactNormal
 		const FRotator ImpactRotation = FRotationMatrix::MakeFromZ(TraceHit.ImpactNormal).Rotator();
-		if (DeveloperSettings::Debugging::GPhysicalMaterialSurfaces_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GPhysicalMaterialSurfaces_Compile_DebugSymbols)
 		{
 			FRTS_PhysicsHelper::DrawTextSurfaceType(SurfaceTypeHit, TraceHit.ImpactPoint, World,
 			                                        2.f);

@@ -299,7 +299,7 @@ float UEnemyWaveController::GetWaveTimeMltDependingOnGenerators(FAttackWave* Att
 			AmountBuildingsNotValid++;
 		}
 	}
-	if (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
 		if (AmountBuildingsNotValid > 0)
 		{
@@ -723,7 +723,7 @@ bool UEnemyWaveController::GetIsValidWaveType(const EEnemyWaveType WaveType, AAc
 
 void UEnemyWaveController::Debug(const FString& Message, const FColor& Color) const
 {
-	if (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, Color);
 	}

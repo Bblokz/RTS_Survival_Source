@@ -460,7 +460,7 @@ ALandscapedeformManager* ACPPController::GetLandscapeDeformManager()
 		M_LdfManager = Manager;
 		return M_LdfManager;
 	}
-	if (DeveloperSettings::Debugging::GLandscapeDeformManager_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GLandscapeDeformManager_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::ReportError(
 			"Could not find LandscapeDeformManager in GetLandscapeDeformManager in CPPController.cpp");
@@ -659,7 +659,7 @@ void ACPPController::CancelBuilding(AActor* RequestingActor)
 		if (ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(RequestingActor))
 		{
 			NomadicVehicle->SetUnitToIdle();
-			if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("CancelBuilding: " + NomadicVehicle->GetName());
 			}
@@ -689,7 +689,7 @@ void ACPPController::ConstructBuilding(AActor* RequestingActor)
 	if (ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(RequestingActor))
 	{
 		NomadicVehicle->SetUnitToIdle();
-		if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("ConstructBuilding: " + NomadicVehicle->GetName());
 		}
@@ -869,7 +869,7 @@ void ACPPController::RebuildPackedExpansion(const FBxpOptionData& BuildingExpans
 	M_RTSAsyncSpawner->AsyncSpawnBuildingExpansion(BuildingExpansionTypeData, BuildingExpansionOwner,
 	                                               ExpansionSlotIndex,
 	                                               BxpLoadingType);
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::DisplayNotification(
 			FText::FromString("start async loading of PackedBxp instant placement!"));
@@ -906,7 +906,7 @@ void ACPPController::OnBxpSpawnedAsync(
 		// Loading is complete but request still there as we need to wait till the building is placed.
 		M_AsyncBxpRequestState.M_Status = EAsyncBxpStatus::Async_BxpIsSpawned;
 		M_AsyncBxpRequestState.M_Expansion = SpawnedBxp;
-		if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 		{
 			const FString BxpLoadingTypeString = Global_GetAsyncBxpLoadingTypeEnumAsString(BxpLoadingType);
 		}
@@ -1369,7 +1369,7 @@ void ACPPController::RegularPrimaryClick()
 
 	if (GetIsPreviewBuildingActive())
 	{
-		if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("In building mode trying to place building!", FColor::Blue);
 		}
@@ -1377,7 +1377,7 @@ void ACPPController::RegularPrimaryClick()
 		if (TryPlaceBuilding(ClickedLocation))
 		{
 			StopPreviewAndBuildingMode(true);
-			if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("Finished Buildingmode!", FColor::Red);
 			}
@@ -1398,7 +1398,7 @@ void ACPPController::RegularPrimaryClick()
 		// Possibly add allied unit to selection.
 		UpdateUIForSelectionAction(ClickUnit_GetSelectionAction(ClickedActor), ClickedActor);
 	}
-	if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 	{
 		if (IsValid(ClickedActor))
 		{
@@ -2632,7 +2632,7 @@ void ACPPController::ExecuteCommandsForEachUnitSelected(
 	constexpr bool bForcePlayVoiceLine = false;
 	CreateVfxAndVoiceLineForIssuedCommand(
 		bResetAllPlacementEffects, CommandsExe, ClickedLocation, CommandType, AbilityActivated, bForcePlayVoiceLine);
-	if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 	{
 		DebugActorAndCommand(ClickedActor, CommandType);
 	}
@@ -3227,77 +3227,77 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	switch (M_ActiveAbility)
 	{
 	case EAbilityID::IdStop:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Stop imm");
 		}
 		this->DirectActionButtonStop();
 		break;
 	case EAbilityID::IdProne:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Prone imm");
 		}
 		this->DirectActionButtonProne();
 		break;
 	case EAbilityID::IdSwitchWeapon:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Switch weapon imm");
 		}
 		this->DirectActionButtonSwitchWeapon();
 		break;
 	case EAbilityID::IdSwitchMelee:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Switch Melee weapon imm");
 		}
 		this->DirectActionButtonSwitchMelee();
 		break;
 	case EAbilityID::IdCreateBuilding:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Create building imm");
 		}
 		this->DirectActionButtonCreateBuilding();
 		break;
 	case EAbilityID::IdDigIn:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Dig in imm");
 		}
 		this->DirectActionButtonDigIn();
 		break;
 	case EAbilityID::IdBreakCover:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Break cover imm");
 		}
 		this->DirectActionButtonBreakCover();
 		break;
 	case EAbilityID::IdReturnCargo:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Return cargo imm");
 		}
 		this->DirectActionButtonReturnCargo();
 		break;
 	case EAbilityID::IdFireRockets:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Fire Rockets");
 		}
 		this->DirectionActionButtonFireRockets();
 		break;
 	case EAbilityID::IdCancelRocketFire:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("cancel fire Rockets");
 		}
 		this->DirectActionButtonCancelRocketFire();
 		break;
 	case EAbilityID::IdReturnToBase:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("return to base");
 		}
@@ -3316,7 +3316,7 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		this->DirectActionButtonFieldConstruction(static_cast<EFieldConstructionType>(ActiveAbilityEntry.CustomType));
 		break;
 	case EAbilityID::IdExitCargo:
-		if (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Exit cargo imm");
 		}
@@ -3459,7 +3459,7 @@ void ACPPController::ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLo
 		bResetAllPlacementEffects, CommandsExe, ClickedLocation, ECommandType::Attack, AbilityActivated,
 		bForcePlayVoiceLine);
 
-	if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 	{
 		DebugActorAndCommand(ClickedActor, Command);
 	}
@@ -3506,7 +3506,7 @@ void ACPPController::ActionButtonMove(FVector& MoveLocation)
 		bResetAllPlacementEffects, CommandsExe, MoveLocation, CommandType, AbilityActivated, bForcePlayVoiceLine);
 
 
-	if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("actionbutton Move!", FColor::Blue);
 	}
@@ -3523,7 +3523,7 @@ void ACPPController::ActionButtonRotateTowards(const FVector& RotateLocation)
 		bResetAllPlacementEffects, CommandsExe, RotateLocation, ECommandType::RotateTowards,
 		EAbilityID::IdRotateTowards, bForcePlayVoiceLine);
 
-	if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("actionbutton RotateTowards towards!", FColor::Blue);
 	}
@@ -3618,7 +3618,7 @@ void ACPPController::ActionButtonReverse(const FVector ReverseLocation)
 	CreateVfxAndVoiceLineForIssuedCommand(
 		bResetAllPlacementEffects, CommandsExe, ReverseLocation, ECommandType::Movement,
 		EAbilityID::IdReverseMove, bForcePlayVoiceLine);
-	if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("actionbutton Reverse move!", FColor::Blue);
 	}
@@ -3656,7 +3656,7 @@ void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation)
 		EAbilityID::IdMove, bForcePlayVoiceLine);
 
 	if (CommandsExe > 0)
-		if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("actionbutton Patrol!", FColor::Blue);
 		}
@@ -4000,7 +4000,7 @@ void ACPPController::DirectActionButtonCreateBuilding()
 				                            GetNomadicPreviewAttachments(NomadicVehicle));
 				M_MainGameUI->RequestShowCancelBuilding(NomadicVehicle);
 				M_NomadicVehicleSelectedForBuilding = NomadicVehicle;
-				if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 				{
 					RTSFunctionLibrary::PrintString("Found truck; building mode active", FColor::Magenta);
 				}
@@ -4076,7 +4076,7 @@ bool ACPPController::PlaceBxpIfAsyncLoaded(FVector& InClickedLocation)
 	                            M_AsyncBxpRequestState.M_Expansion->GetBuildingExpansionType());
 	// Set Bxp to null and reset the state to no async request.
 	M_AsyncBxpRequestState.Reset();
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		const FString PackedExpansionString = bIsNotPackedExpansion ? "WasNewBxp" : "WasUnpackedBxp";
 		const FString PayState = bIsNotPackedExpansion
@@ -4332,7 +4332,7 @@ void ACPPController::StopBxpPreviewPlacementResetAsyncRequest(const TScriptInter
 	{
 		StopPreviewAndBuildingMode(false);
 	}
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		if (not UsedPreviewMode && M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::BuildingPreviewModeOFF)
 		{
@@ -4442,7 +4442,7 @@ bool ACPPController::PauseGame_GetIsGameLocked() const
 
 void ACPPController::DebugPlayerSelection(const FString& Message, const FColor& Color) const
 {
-	if (DeveloperSettings::Debugging::GPlayerSelection_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerSelection_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, Color);
 	}
@@ -4453,7 +4453,7 @@ void ACPPController::StopPreviewAndBuildingMode(const bool bIsPlacedSuccessfully
 	CPPConstructionPreviewRef->StopBuildingPreview(bIsPlacedSuccessfully);
 	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::BuildingPreviewModeOFF;
 	ShowPlayerBuildRadius(false);
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Stopped Building Preview Mode", FColor::Magenta);
 	}
@@ -4818,7 +4818,7 @@ bool ACPPController::CheckResourcesForConstruction()
 
 void ACPPController::DebugActorAndCommand(const AActor* ClickedActor, const ECommandType Command)
 {
-	if (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerClickAndAction_Compile_DebugSymbols)
 	{
 		FString TargetActorName = "nullptr";
 		if (IsValid(ClickedActor))
@@ -4938,7 +4938,7 @@ void ACPPController::UpdateHoveringActorInfo(float DeltaTime, const FVector2D Cu
 	// Raycast under cursor to find hovered actor
 	AActor* UnderCursorActor = bHit ? MouseHitResult.GetActor() : nullptr;
 
-	if (DeveloperSettings::Debugging::GMouseHover_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GMouseHover_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
 			FString::Printf(TEXT("UnderCursorActor: %s | MouseMoved: %s"),
@@ -5107,7 +5107,7 @@ bool ACPPController::GetIsGameWithChoosingStartingLocation()
 	{
 		bStartByPickingLocation = true;
 	}
-	if (DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
 	{
 		const FString StartByChoosing = bStartByPickingLocation ? "Picking start location" : "Start With NO picking";
 		RTSFunctionLibrary::PrintString("Game mode detected: " + StartByChoosing);

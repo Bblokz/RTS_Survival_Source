@@ -330,7 +330,7 @@ void UW_HoveringActor::SetHoveredActor(AActor* HoveredActor)
 
 	if (not RTSFunctionLibrary::RTSIsValid(HoveredActor))
 	{
-		if (DeveloperSettings::Debugging::GMouseHover_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GMouseHover_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("The provided hover actor is not valid or has no HP");
 		}
@@ -344,7 +344,7 @@ void UW_HoveringActor::SetHoveredActor(AActor* HoveredActor)
 
 	if (not bIsValidText)
 	{
-		if (DeveloperSettings::Debugging::GMouseHover_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GMouseHover_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("The provided hover actor has no valid text");
 		}

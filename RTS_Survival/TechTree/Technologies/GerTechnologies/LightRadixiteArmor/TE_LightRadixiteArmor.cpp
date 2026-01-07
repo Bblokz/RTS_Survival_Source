@@ -35,7 +35,7 @@ void UTE_LightRadixiteArmor::OnApplyEffectToActor(AActor* ValidActor)
 	}
 	else
 	{
-		if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Applying light Radixite armor to " + Tank->GetName());
 		}

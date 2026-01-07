@@ -296,8 +296,13 @@ void UWeaponStateMultiTrace::GetLaunchAndForwardVectorForSocket_FetchVectors(
 	OutForwardVector = SocketRotation.GetForwardVector();
 
 #if 0
-	if (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols && IsValid(World))
+	if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
 	{
+		if (not IsValid(World))
+		{
+			return;
+		}
+
 		DrawDebugLine(World, OutLaunchLocation, OutLaunchLocation + OutForwardVector * 200.f, FColor::Red, false, 0.1f, 0, 5.f);
 	}
 #endif

@@ -99,7 +99,7 @@ void URTSOverlapEvasionComponent::OnChassisOverlap(UPrimitiveComponent* Overlapp
 	// Only react to allied actors (same owning player).
 	if (!HaveSameOwningPlayer(OtherActor, OtherRtsComp))
 	{
-		if (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString(
 				M_Owner->GetName() + TEXT(" vs ") + OtherActor->GetName() + TEXT(": No Action"));

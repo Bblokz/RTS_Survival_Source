@@ -126,7 +126,7 @@ void ACrushableEnvActor::Tick(float DeltaTime)
 
 	// Compute the distance between the player and this actor.
 	const float Distance = FVector::Dist(PlayerLocation, GetActorLocation());
-	if(DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
 	{
 	// at  700 units above the actor prinst string the distance:
 	DrawDebugString(GetWorld(), GetActorLocation() + FVector(0, 0, 700),
@@ -155,7 +155,7 @@ void ACrushableEnvActor::Tick(float DeltaTime)
 			{
 				// Switch to geometry: hide the instanced mesh and enable all geometry components.
 				InstSM->SetHiddenInGame(true);
-				if(DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
 				{
 				DrawDebugString(GetWorld(), CompLocation + FVector(0, 0, 400), TEXT("Switch to Geometry"), nullptr,
 				                FColor::Green, 0.f, true);
@@ -171,7 +171,7 @@ void ACrushableEnvActor::Tick(float DeltaTime)
 						GeoComp->SetLinearDamping(1);
 						GeoComp->SetAngularDamping(1);
 						GeoComp->SetSimulatePhysics(true);
-						if(DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
+						if constexpr (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
 						{
 							const float AngularDamping = GeoComp->GetAngularDamping();
 							const float LinearDamping = GeoComp->GetLinearDamping();
@@ -187,7 +187,7 @@ void ACrushableEnvActor::Tick(float DeltaTime)
 				// Switch to instance: show the instanced mesh and disable all geometry components.
 				InstSM->SetHiddenInGame(false);
 				
-				if(DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
 				{
 					DrawDebugString(GetWorld(), CompLocation + FVector(0, 0, 400), TEXT("Switch to Instance"), nullptr,
 									FColor::Red, 0.f, true);

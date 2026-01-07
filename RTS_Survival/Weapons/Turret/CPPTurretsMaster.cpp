@@ -962,7 +962,7 @@ void ACPPTurretsMaster::AutoEngage()
 	RotateTurretToActor(nullptr /*unused now*/);
 	if (bM_IsRotatedToEngage)
 	{
-		if (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Ready to engage", FColor::Green);
 		}
@@ -992,7 +992,7 @@ void ACPPTurretsMaster::SpecificEngage()
 		TurretOwner.GetInterface()->OnTurretInRange(this);
 		if (bM_IsRotatedToEngage)
 		{
-			if (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("Ready to engage", FColor::Green);
 			}
@@ -1072,7 +1072,7 @@ void ACPPTurretsMaster::SetTarget(AActor* NewTarget)
 	bM_IsRotatedToEngage = false;
 	bM_IsFullyRotatedToTarget = false;
 
-	if (DeveloperSettings::Debugging::GAsyncTargetFinding_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAsyncTargetFinding_Compile_DebugSymbols)
 	{
 		FString TargetType = "None";
 

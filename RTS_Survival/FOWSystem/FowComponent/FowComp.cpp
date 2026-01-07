@@ -66,7 +66,7 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 			{
 				FowOwner->Tags.Remove(TagUnitInEnemyVision);
 			}
-			if (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
 			{
 				FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
 				DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("PlayerVis:: %f"), Visibility),
@@ -79,7 +79,7 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 		if (Visibility >= VisibleEnoughToRevealEnemy)
 		{
 			FowOwner->SetActorHiddenInGame(false);
-			if (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
 			{
 				FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
 				DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("Visibility > .15! %f"), Visibility),
@@ -88,7 +88,7 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 			return;
 		}
 		FowOwner->SetActorHiddenInGame(true);
-		if (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
 			DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("Visibility: %f"), Visibility), nullptr,

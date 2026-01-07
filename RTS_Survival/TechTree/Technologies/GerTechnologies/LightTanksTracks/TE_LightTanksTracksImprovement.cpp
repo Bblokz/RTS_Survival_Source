@@ -15,7 +15,7 @@
 
 void UTE_LightTanksTracksImprovement::ApplyTechnologyEffect(const UObject* WorldContextObject)
 {
-	if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("apply light tanks tracks improvement effect");
 	}
@@ -38,7 +38,7 @@ void UTE_LightTanksTracksImprovement::OnApplyEffectToActor(AActor* ValidActor)
 		{
 			const float CurrentSpeed = PathFollowingComponent->BP_GetDesiredSpeed();
 			PathFollowingComponent->SetDesiredSpeed(CurrentSpeed * MaxSpeedMlt, ESpeedUnits::KilometersPerHour);
-			if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString(
 					"Upgraded " + Tank->GetName() + " speed to " + FString::SanitizeFloat(CurrentSpeed * MaxSpeedMlt) +

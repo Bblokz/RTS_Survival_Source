@@ -703,7 +703,7 @@ void ASquadController::OnSquadUnitOutOfRange(const FVector& TargetLocation)
 
 	FVector ProjectedLocation = ProjectLocationOnNavMesh(TargetLocation, 500, true);
 	GeneralMoveToForAbility(ProjectedLocation, EAbilityID::IdNoAbility_MoveCloserToTarget);
-	if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("SQUAD out of range; move closer", FColor::Red);
 	}
@@ -1567,7 +1567,7 @@ float ASquadController::GetDistanceToActor(const TObjectPtr<AActor> TargetActor)
 			ClosestDistance = Distance;
 		}
 	}
-	if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols ||
+	if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols ||
 		DeveloperSettings::Debugging::GSquadUnit_SwitchPickUp_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
@@ -2134,7 +2134,7 @@ void ASquadController::ExeScav_StartOrMoveToScavObj(AScavengeableObject* Scaveng
 	const float DistanceToObject = GetDistanceToActor(ScavengeableObject);
 	if (DistanceToObject <= DeveloperSettings::GamePlay::Navigation::SquadUnitScavengeDistance)
 	{
-		if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Squad is close enough to scavenge object, instant scavenge!",
 			                                FColor::Red);
@@ -2444,7 +2444,7 @@ void ASquadController::UpdateControllerPositionToAverage()
 
 void ASquadController::Debug_Scavenging(const FString& DebugMessage) const
 {
-	if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(DebugMessage);
 	}
@@ -2453,7 +2453,7 @@ void ASquadController::Debug_Scavenging(const FString& DebugMessage) const
 
 void ASquadController::Debug_ItemPickup(const FString& DebugMessage) const
 {
-	if (DeveloperSettings::Debugging::GSquadUnit_SwitchPickUp_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GSquadUnit_SwitchPickUp_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(DebugMessage);
 	}

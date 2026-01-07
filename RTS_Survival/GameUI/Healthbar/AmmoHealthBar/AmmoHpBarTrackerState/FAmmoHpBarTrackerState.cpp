@@ -200,7 +200,7 @@ void FAmmoHpBarTrackerState::SetActorWithAmmoWidget(AActor* HPAmmoWidgetActor)
 
 void FAmmoHpBarTrackerState::Debug(const FString& DebugMessage, const FColor Color) const
 {
-	if (DeveloperSettings::Debugging::GAmmoTracking_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAmmoTracking_Compile_DebugSymbols)
 	{
 		const FString WeaponIndexName = FString::FromInt(AmmoTrackerInitSettings.WeaponIndexToTrack);
 		const FString AmmoIconMaterialName = AmmoTrackerInitSettings.AmmoIconMaterial

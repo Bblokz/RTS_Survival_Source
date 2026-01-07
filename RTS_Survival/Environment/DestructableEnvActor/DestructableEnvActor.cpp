@@ -159,7 +159,7 @@ float ADestructableEnvActor::TakeDamage(float DamageAmount, FDamageEvent const& 
 		DamageAmount -= FMath::Max(0, DamageReduction);
 	}
 	Health -= DamageAmount;
-	if (DeveloperSettings::Debugging::GDamage_System_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GDamage_System_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
 			"Damage tanken by " + GetName() + " is " + FString::SanitizeFloat(DamageAmount));

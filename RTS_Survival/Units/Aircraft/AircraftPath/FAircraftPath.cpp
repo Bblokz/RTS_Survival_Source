@@ -174,30 +174,33 @@ FVector FAircraftPath::GetUTurnPointsInRangeToActor(const FDistAbsAngleSign& Dis
 	FVector OffsetLocation = StartLocation + DistanceAngle.LeftRightUnitVectorToEnemy * OffsetDistanceEndUTurn;
 	FVector ExtremeOffsetLocation = StartLocation + DistanceAngle.GetDirection() * (OffsetDistanceEndUTurn +
 		ExtremeAngleAddOffset);
-	if (bDebugUTurn && DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
-		// draw a red line for 20 seconds from the start location to the offset location with thickness 5.
-		DrawDebugDirectionalArrow(
-			Owner ? Owner->GetWorld() : nullptr,
-			StartLocation,
-			OffsetLocation,
-			5,
-			FColor::Red,
-			false, 20.f, 0, 5.f
-		);
-		FRTSAircraftHelpers::AircraftSphereDebug(
-			Owner, OffsetLocation, FColor::Red, 75, 10);
-		// draw a purple line for the extreme offset location also 20 seconds and thickness 2
-		DrawDebugDirectionalArrow(
-			Owner ? Owner->GetWorld() : nullptr,
-			StartLocation,
-			ExtremeOffsetLocation,
-			5,
-			FColor::Purple,
-			false, 20.f, 0, 2.f
-		);
-		FRTSAircraftHelpers::AircraftSphereDebug(
-			Owner, ExtremeOffsetLocation, FColor::Purple, 100, 10);
+		if (bDebugUTurn)
+		{
+			// draw a red line for 20 seconds from the start location to the offset location with thickness 5.
+			DrawDebugDirectionalArrow(
+				Owner ? Owner->GetWorld() : nullptr,
+				StartLocation,
+				OffsetLocation,
+				5,
+				FColor::Red,
+				false, 20.f, 0, 5.f
+			);
+			FRTSAircraftHelpers::AircraftSphereDebug(
+				Owner, OffsetLocation, FColor::Red, 75, 10);
+			// draw a purple line for the extreme offset location also 20 seconds and thickness 2
+			DrawDebugDirectionalArrow(
+				Owner ? Owner->GetWorld() : nullptr,
+				StartLocation,
+				ExtremeOffsetLocation,
+				5,
+				FColor::Purple,
+				false, 20.f, 0, 2.f
+			);
+			FRTSAircraftHelpers::AircraftSphereDebug(
+				Owner, ExtremeOffsetLocation, FColor::Purple, 100, 10);
+		}
 	}
 	UTurnEndPoint = GetOffsetLocationInAttackRange(EnemyAirPosition, OffsetLocation, AttackMoveSettings);
 	return UTurnStart;
@@ -208,7 +211,7 @@ bool FAircraftPath::GetIsExtremeAngleToEnemy(const FDistAbsAngleSign& DistanceAn
 	using DeveloperSettings::GamePlay::Navigation::Aircraft::DeltaAngleExtreme;
 	constexpr float ExtremeAngle = DeltaAngleExtreme;
 	const bool bIsExtremeTo180Deg = (FMath::Abs(DistanceAngle.AbsAngle - 180) <= ExtremeAngle);
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		if (bIsExtremeTo180Deg)
 		{
@@ -632,7 +635,7 @@ bool FAircraftPath::GetIsWithinDeadZone(const FRotator& StartRotation, const FVe
 	);
 	const bool bIsInAngleDeadZone = OutAngle >= DeadZoneSettings.AngleAtDeadZone;
 	const bool bIsDistanceDeadZone = Distance <= DeadZoneSettings.DistanceAtDeadZone;
-	if (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		if (bIsInAngleDeadZone && bIsDistanceDeadZone)
 		{
