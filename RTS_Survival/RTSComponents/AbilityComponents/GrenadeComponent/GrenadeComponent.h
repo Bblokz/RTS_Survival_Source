@@ -89,6 +89,10 @@ struct FGrenadeComponentSettings
 	// Niagara effect spawned at the explosion location.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	UNiagaraSystem* ExplosionEffect = nullptr;
+
+	// Scale applied to the grenade explosion Niagara effect.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
+	FVector ExplosionEffectScale = FVector::OneVector;
 };
 
 /**
@@ -128,6 +132,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<USoundBase> M_ExplosionSound;
 
+	FVector M_ExplosionEffectScale;
 	float M_ThrowDuration;
 
 	FVector M_StartLocation;
