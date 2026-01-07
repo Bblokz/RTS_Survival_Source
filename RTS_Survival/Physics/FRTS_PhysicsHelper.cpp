@@ -8,7 +8,7 @@ ERTSSurfaceType FRTS_PhysicsHelper::GetRTSSurfaceType(TWeakObjectPtr<UPhysicalMa
 {
 	if (not PhysicalMaterial.IsValid())
 	{
-		if (DeveloperSettings::Debugging::GPhysicalMaterialSurfaces_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GPhysicalMaterialSurfaces_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("No physical material found, defaulting to Sand", FColor::Red);
 		}

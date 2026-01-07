@@ -1063,7 +1063,7 @@ void ABuildingExpansion::BeginPlay_NextFrameInitAbilities()
 
 void ABuildingExpansion::DebugDisplayMessage(const FString& Message) const
 {
-	if (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::DisplayNotification(FText::FromString(Message));
 	}

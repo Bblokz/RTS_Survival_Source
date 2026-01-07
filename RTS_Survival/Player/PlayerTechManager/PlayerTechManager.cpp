@@ -11,7 +11,7 @@
 void UPlayerTechManager::OnTechResearched(ETechnology Tech)
 {
 	M_ResearchedTechs.Add(Tech);
-	if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		const FString TechName = UEnum::GetValueAsString(Tech);
 		RTSFunctionLibrary::PrintString("Technology researched: " + TechName);
@@ -68,7 +68,7 @@ void UPlayerTechManager::InitTechsInManager(ACPPController* Controller)
 	if (IsValid(Controller))
 	{
 		M_TechnologyEffectsMap = Controller->GetTechnologyEffectsMap();
-		if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 		{
 			for (auto EachTech : M_TechnologyEffectsMap)
 			{

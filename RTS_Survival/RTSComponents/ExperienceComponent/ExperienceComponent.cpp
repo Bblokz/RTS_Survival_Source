@@ -274,7 +274,7 @@ void URTSExperienceComp::OnInvalidUnitForVeterancy(const FString& TypeAsString) 
 
 void URTSExperienceComp::Debug_Experience(const FString& Message) const
 {
-	if (DeveloperSettings::Debugging::GExperienceSystem_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GExperienceSystem_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, FColor::Purple);
 	}

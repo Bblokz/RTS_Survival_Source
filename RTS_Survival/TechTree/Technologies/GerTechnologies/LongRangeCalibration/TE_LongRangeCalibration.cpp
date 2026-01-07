@@ -59,7 +59,7 @@ void UTE_LongRangeCalibration::UpgradeGameStateForAffectedWeapons(ACPPTurretsMas
 			{
 				Data->Range *= M_RangeMlt;
 				GameState->UpgradeWeaponDataForPlayer(OwningPlayer, EachWeapon, *Data);
-				if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 				{
 					RTSFunctionLibrary::PrintString(
 						"Upgraded weapon: " + Global_GetWeaponEnumAsString(EachWeapon) + " Range upgrade");

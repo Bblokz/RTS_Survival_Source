@@ -112,7 +112,7 @@ void UW_BombHealthBar::ReportErrorBomb(const FString& ErrorMessage) const
 
 void UW_BombHealthBar::DebugBomb(const FString& DebugMessage, const FColor Color) const
 {
-	if (DeveloperSettings::Debugging::GAmmoTracking_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAmmoTracking_Compile_DebugSymbols)
 	{
 		const FString OwnerName = IsValid(GetOuter()) ? GetOuter()->GetName() : TEXT("Unknown Owner");
 		const FString SourceName = M_TrackedBombComponent.IsValid() ? M_TrackedBombComponent->GetName() : TEXT("No BombComp");

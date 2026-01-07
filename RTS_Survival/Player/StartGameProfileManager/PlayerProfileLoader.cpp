@@ -267,7 +267,7 @@ void UPlayerProfileLoader::OnOptionSpawned(const FTrainingOption& Option)
 		return;
 	}
 	M_IsProfileUnitSpawned[Option] = true;
-	if (DeveloperSettings::Debugging::GCardSystem_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCardSystem_Compile_DebugSymbols)
 	{
 		DebugOnProfileUnitSpawned(Option);
 	}

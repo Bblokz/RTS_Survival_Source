@@ -358,7 +358,7 @@ void AFowManager::UpdateEnemyVision()
 	// Reinitialize the system to process the new data
 	NiagaraEnemyVision->ReinitializeSystem();
 
-	if (DeveloperSettings::Debugging::GFowSystem_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GFowSystem_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
 			"Amount of enemy vision fow components (Update Buffers): " + FString::FromInt(EnemyData.Num()),
@@ -423,7 +423,7 @@ void AFowManager::OnReceivedEnemyVisionUpdate(const TArray<FBasicParticleData>& 
 		// Clear the valid components requesting fog visibility.
 		M_CurrentPlayerCompsForEnemyVisionReadBack.Empty();
 
-		if (DeveloperSettings::Debugging::GFowSystem_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GFowSystem_Compile_DebugSymbols)
 		{
 			if (Data.Num() > 0)
 			{

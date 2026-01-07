@@ -79,7 +79,7 @@ void UAircraftMovement::TickMovement_Homing(const FAircraftPathPoint& TargetPoin
     const FVector ForwardDir = TargetRot.Vector().GetSafeNormal();
     AddInputVector(ForwardDir);
 	UpdateOwnerRotation(TargetRot, DeltaTime);
-	if(DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
 		
         DrawDebugLine(

@@ -592,7 +592,7 @@ void USquadUnitAnimInstance::SetMovementStateWithSpeed(const float& MovementSpee
 
 void USquadUnitAnimInstance::OnStartAimingWhileIdle()
 {
-	if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("OnStartAimingWhileIdle", FColor::Purple);
 	}
@@ -610,7 +610,7 @@ void USquadUnitAnimInstance::OnStartAimingWhileIdle()
 
 void USquadUnitAnimInstance::OnStartWalking()
 {
-	if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("OnStartWalking", FColor::Purple);
 	}
@@ -618,14 +618,14 @@ void USquadUnitAnimInstance::OnStartWalking()
 	switch (AimPositionMontages.AimPosition)
 	{
 	case ESquadAimPosition::Standing:
-		if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Standing; NO CHANGE", FColor::Purple);
 		}
 		break;
 	case ESquadAimPosition::Prone:
 	case ESquadAimPosition::Crouch:
-		if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Crouching; Back to Standing", FColor::Purple);
 		}

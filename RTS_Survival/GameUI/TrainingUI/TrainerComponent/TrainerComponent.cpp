@@ -414,7 +414,7 @@ void UTrainerComponent::UpdateUIQueueForInsufficientResourceState(
 
 void UTrainerComponent::DebugTrainingComp(const FString& Message, const FColor& Color) const
 {
-	if (DeveloperSettings::Debugging::GTrainingComponent_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTrainingComponent_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, Color);
 	}
@@ -1214,7 +1214,7 @@ void UTrainerComponent::SetPauseQueue(const bool bPause)
 
 void UTrainerComponent::DebugPrintQueueLayout()
 {
-	if (DeveloperSettings::Debugging::GTrainingComponent_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTrainingComponent_Compile_DebugSymbols)
 	{
 		// Build a multi-line debug string
 		FString Debug;

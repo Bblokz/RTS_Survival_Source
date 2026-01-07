@@ -90,7 +90,7 @@ void UFormationController::InitiateMovement(
 	// formation: draw arrow. Or if this was a regular formation: draw position marker.
 	DrawFormationPositionEffects();
 
-	if (DeveloperSettings::Debugging::GFormations_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GFormations_Compile_DebugSymbols)
 	{
 		DebugFormation();
 	}

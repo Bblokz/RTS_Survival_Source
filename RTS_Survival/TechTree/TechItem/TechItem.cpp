@@ -104,7 +104,7 @@ void UTechItem::OnClickedTech()
 {
 	if (!GetIsValidPlayerTechManager() || bM_HasBeenResearched || M_ResearchTimerHandle.IsValid())
 	{
-		if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString(
 				"Already researched or research in progress or invalid player tech manager");
@@ -133,7 +133,7 @@ void UTechItem::OnClickedTech()
 		if (!M_PlayerTechManager->HasTechResearched(RequiredTech))
 		{
 			// Required tech not researched
-			if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+			if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString(
 					"Required tech not researched: " + UEnum::GetValueAsString(RequiredTech), FColor::Red);
@@ -148,7 +148,7 @@ void UTechItem::OnClickedTech()
 		{
 			StartResearch(TechCost.M_TechTime);
 		}
-		else if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+		else if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Not enough resources to research " + UEnum::GetValueAsString(Technology),
 			                                FColor::Red);

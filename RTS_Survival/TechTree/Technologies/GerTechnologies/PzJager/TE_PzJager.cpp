@@ -8,7 +8,7 @@
 
 void UTE_PzJager::ApplyTechnologyEffect(const UObject* WorldContextObject)
 {
-	if(DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("apply pz jager effect");
 	}
@@ -17,7 +17,7 @@ void UTE_PzJager::ApplyTechnologyEffect(const UObject* WorldContextObject)
 
 void UTE_PzJager::OnApplyEffectToActor(AActor* ValidActor)
 {
-	if(DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Applying pz jager effect to " + ValidActor->GetName());
 	}

@@ -58,7 +58,7 @@ void UTechnologyEffect::FindActors(const UObject* WorldContextObject)
 
 void UTechnologyEffect::OnActorsFound(const TArray<AActor*>& FoundActors)
 {
-	if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		const FString TechName = GetName();
 		for (const auto Each : FoundActors)

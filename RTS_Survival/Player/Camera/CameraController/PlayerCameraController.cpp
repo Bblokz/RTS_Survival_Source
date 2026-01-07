@@ -35,7 +35,7 @@ void UPlayerCameraController::ZoomIn()
 	NewLength -= DeveloperSettings::UIUX::ZoomSpeed;
 	M_SpringArmComponent->TargetArmLength = FMath::Clamp(NewLength, DeveloperSettings::UIUX::MinZoomLimit,
 	                                                     DeveloperSettings::UIUX::MaxZoomLimit);
-	if (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
 			"Camera Zoom In: " + FString::SanitizeFloat(M_SpringArmComponent->TargetArmLength));
@@ -52,7 +52,7 @@ void UPlayerCameraController::ZoomOut()
 	NewLength += DeveloperSettings::UIUX::ZoomSpeed;
 	M_SpringArmComponent->TargetArmLength = FMath::Clamp(NewLength, DeveloperSettings::UIUX::MinZoomLimit,
 	                                                     DeveloperSettings::UIUX::MaxZoomLimit);
-	if (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
 			"Camera Zoom Out: " + FString::SanitizeFloat(M_SpringArmComponent->TargetArmLength));
@@ -202,7 +202,7 @@ void UPlayerCameraController::EdgeScroll(const float DeltaTime)
 		                     : 1.0f;
 	if (not bIsInHardZone)
 	{
-		if (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("NO hardzone", FColor::Red);
 		}
@@ -210,7 +210,7 @@ void UPlayerCameraController::EdgeScroll(const float DeltaTime)
 		M_EdgeScrollAccelY = 1.0f;
 		return;
 	}
-	if (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
 	{
 		const FString DirXHardzone = bDirXHardZone ? "Hard" : "";
 		const FString DirYHardzone = bDirYHardZone ? "Hard" : "";

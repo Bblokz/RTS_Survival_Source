@@ -70,7 +70,7 @@ void UTrainingMenuManager::UpdateUIClockAtInsufficientResources(const bool bAtIn
 		return;
 	}
 	const bool bPauseClock = bAtInsufficient;
-	if (DeveloperSettings::Debugging::GTrainingComponent_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTrainingComponent_Compile_DebugSymbols)
 	{
 		const FString StrTime = "TimeRemaining: " + FString::Printf(TEXT("%d"), TimeRemaining);
 		const FString StrPause = "Clock Pause status: " + FString::Printf(

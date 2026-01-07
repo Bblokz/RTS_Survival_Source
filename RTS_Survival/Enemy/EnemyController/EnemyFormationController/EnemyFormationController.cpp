@@ -740,7 +740,7 @@ FVector UEnemyFormationController::ComputeOffsetForUnit(
 
 void UEnemyFormationController::Debug(const FString& Message)
 {
-	if (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, FColor::Purple);
 	}
@@ -748,7 +748,7 @@ void UEnemyFormationController::Debug(const FString& Message)
 
 void UEnemyFormationController::DebugFormationReached(FFormationData* ReachedFormation) const
 {
-	if (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
 		const FVector Location = ReachedFormation->GetFormationUnitLocation() + FVector(0.f, 0.f, 400.f);
 		DebugStringAtLocation("Formation reached a location", Location, FColor::Green, 10);
@@ -758,7 +758,7 @@ void UEnemyFormationController::DebugFormationReached(FFormationData* ReachedFor
 void UEnemyFormationController::DebugStringAtLocation(const FString& Message, const FVector& Location,
                                                       const FColor& Color, float Duration) const
 {
-	if (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
 		DrawDebugString(GetWorld(), Location, Message, nullptr, Color, Duration, false);
 	}

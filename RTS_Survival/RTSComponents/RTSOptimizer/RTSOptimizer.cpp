@@ -94,7 +94,7 @@ void URTSOptimizer::OptimizeTick()
 	case ERTSOptimizationDistance::None:
 		break;
 	case ERTSOptimizationDistance::InFOV:
-		if (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
 		{
 			DrawDebugString(GetWorld(), GetOwner()->GetActorLocation() + FVector(0, 0, 300),
 			                "In FOV!", nullptr, FColor::Red, M_OptimizeInterval);
@@ -103,7 +103,7 @@ void URTSOptimizer::OptimizeTick()
 		break;
 	case ERTSOptimizationDistance::OutFOVClose:
 
-		if (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
 		{
 			DrawDebugString(GetWorld(), GetOwner()->GetActorLocation() + FVector(0, 0, 300),
 			                "Out of FOV close!", nullptr, FColor::Orange, M_OptimizeInterval);
@@ -111,7 +111,7 @@ void URTSOptimizer::OptimizeTick()
 		OutFovCloseUpdateComponents();
 		break;
 	case ERTSOptimizationDistance::OutFOVFar:
-		if (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
 		{
 			DrawDebugString(GetWorld(), GetOwner()->GetActorLocation() + FVector(0, 0, 300),
 			                "Out of FOV far!", nullptr, FColor::Yellow, M_OptimizeInterval);
@@ -358,7 +358,7 @@ void URTSOptimizer::BeginPlay_SetupComponentReferences()
 			TickingComponentDetermineOptimizedTicks(EachComponent);
 		}
 	}
-	if (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GOptimComponent_Compile_DebugSymbols)
 	{
 		const FString OwnerName = GetOwner()->GetName();
 		FString Message = "\n\n" + OwnerName + "Found the following ticking components:";

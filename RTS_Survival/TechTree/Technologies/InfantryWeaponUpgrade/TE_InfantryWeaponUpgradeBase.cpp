@@ -11,7 +11,7 @@
 
 void UTE_InfantryWeaponUpgradeBase::ApplyTechnologyEffect(const UObject* WorldContextObject)
 {
-	if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Applying technology effect: " + GetName() + " to infantry weapons.");
 	}
@@ -32,7 +32,7 @@ void UTE_InfantryWeaponUpgradeBase::OnApplyEffectToActor(AActor* ValidActor)
 			if (WeaponData)
 			{
 				ApplyEffectToWeapon(WeaponData);
-				if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 				{
 					RTSFunctionLibrary::PrintString("Upgraded weapon: " + Weapon->GetName() + " on squad unit.");
 				}
@@ -83,7 +83,7 @@ void UTE_InfantryWeaponUpgradeBase::UpgradeGameStateForAffectedWeapons(UObject* 
 			if (Data)
 			{
 				ApplyEffectToWeapon(Data);
-				if (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+				if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 				{
 					RTSFunctionLibrary::PrintString(
 						"Upgraded weapon: " + Global_GetWeaponEnumAsString(EachWeapon) + " in game state.");

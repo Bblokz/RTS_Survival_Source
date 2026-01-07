@@ -1214,7 +1214,7 @@ void ASquadUnit::StartPickupWeapon(AWeaponPickup* TargetWeaponItem)
 	}
 	if (!GetIsWeaponSwitchAllowedToStart())
 	{
-		if (DeveloperSettings::Debugging::GSquadUnit_SwitchPickUp_Weapons_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GSquadUnit_SwitchPickUp_Weapons_Compile_DebugSymbols)
 		{
 			RTSFunctionLibrary::PrintString("Unit cannot pick up weapon because it is still switching weapons."
 			                                "\n squad unit: " + GetName(), FColor::Black);
@@ -1747,7 +1747,7 @@ void ASquadUnit::StopMovementAndClearPath()
 
 void ASquadUnit::Debug_Weapons(const FString& DebugMessage, const FColor Color)
 {
-	if (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Sq Unit: " + DebugMessage, Color);
 	}
@@ -1848,7 +1848,7 @@ void ASquadUnit::OnScavengeStart(UStaticMesh* ScavengeEquipment, const FName Sca
 			"\n squad unit: " + GetName());
 		return;
 	}
-	if (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Start scavenging on unit: " + GetName(), FColor::Blue);
 	}

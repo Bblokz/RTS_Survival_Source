@@ -15,7 +15,7 @@ void FPlayerRotationArrowSettings::InitRotationArrowAction(const FVector2D& Init
 	bM_RotationArrowInitialized = true;
 	RotationArrowActor->SetActorHiddenInGame(true);
 	M_OriginalMouseScreenLocation = InitialMouseScreenLocation;
-	if (DeveloperSettings::Debugging::GPlayerRotationArrow_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerRotationArrow_Compile_DebugSymbols)
 	{
 		const FString StartLocationAsString = RotationArrowActor->GetActorLocation().ToString();
 		DebugArrow("Rotation arrow initialized at: " + StartLocationAsString, FColor::Green);
@@ -104,7 +104,7 @@ void FPlayerRotationArrowSettings::RotateArrowToProjection(const FVector& MouseP
 
 void FPlayerRotationArrowSettings::DebugArrow(const FString& Message, const FColor Color) const
 {
-	if (DeveloperSettings::Debugging::GPlayerRotationArrow_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerRotationArrow_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, Color);
 	}

@@ -76,7 +76,7 @@ void FVerticalCollapseOnCrushed::QueueCollapseFromOverlap(UPrimitiveComponent* c
 
 	// Small debug viz of the axis.
 #if !UE_BUILD_SHIPPING
-	if (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
 	{
 		const FVector Loc = M_TargetPrimitive->GetComponentLocation();
 		DrawDebugDirectionalArrow(World, Loc, Loc + AxisWS * 100.f, 12.f, FColor::Green, false, 1.5f, 0, 2.f);
@@ -143,7 +143,7 @@ void FVerticalCollapseOnCrushed::QueueCollapseRandom(UWorld* const World)
 	M_Anim.M_TargetAngleDeg = 90.f;
 
 #if !UE_BUILD_SHIPPING
-	if (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCrushableActors_Compile_DebugSymbols)
 	{
 		const FVector Loc = M_TargetPrimitive->GetComponentLocation();
 		DrawDebugDirectionalArrow(World, Loc, Loc + AxisWS * 100.f, 12.f, FColor::Cyan, false, 1.5f, 0, 2.f);

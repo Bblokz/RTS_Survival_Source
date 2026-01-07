@@ -25,7 +25,7 @@ UResourceDropOff::UResourceDropOff(): M_OwnerMeshComponent(nullptr)
 
 int32 UResourceDropOff::DropOffResources(const ERTSResourceType ResourceType, const int32 Amount)
 {
-	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		DebugDroppingOff(ResourceType, Amount);
 	}
@@ -133,7 +133,7 @@ int32 UResourceDropOff::GetDropOffCapacity(const ERTSResourceType ResourceType) 
 		Amount = M_ResourceDropOffCapacity[ResourceType].MaxCapacity - M_ResourceDropOffCapacity[ResourceType].
 			CurrentAmount;
 	}
-	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		if (IsValid(GetOwner()))
 		{
@@ -152,7 +152,7 @@ int32 UResourceDropOff::GetDropOffAmountStored(ERTSResourceType ResourceType) co
 	{
 		return M_ResourceDropOffCapacity[ResourceType].CurrentAmount;
 	}
-	if (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::ReportError("Drop off amount requested but does not support resource type!"
 			"\n ResourceDropOff: " + GetName() +

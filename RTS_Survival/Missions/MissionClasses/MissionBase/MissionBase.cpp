@@ -457,7 +457,7 @@ void UMissionBase::OnMissionStart()
 
 void UMissionBase::DebugMission(const FString& Message) const
 {
-	if (DeveloperSettings::Debugging::GMissions_CompileDebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GMissions_CompileDebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message, FColor::Blue);
 	}

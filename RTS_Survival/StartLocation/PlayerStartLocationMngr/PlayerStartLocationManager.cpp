@@ -259,7 +259,7 @@ void UPlayerStartLocationManager::LocationChosen_CleanUpStartLocations()
 
 void UPlayerStartLocationManager::Debug_PickedLocation(const FVector& Location) const
 {
-	if( DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
 	{
 			RTSFunctionLibrary::PrintString("Picked location: " + Location.ToString());
 	}
@@ -268,7 +268,7 @@ void UPlayerStartLocationManager::Debug_PickedLocation(const FVector& Location) 
 void UPlayerStartLocationManager::Debug_MenuReady(
 	const TObjectPtr<UW_ChoosePlayerStartLocation>& StartLocationsWidget) const
 {
-	if(DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Init StartLocation UI: " + StartLocationsWidget->GetName() +
 			"\n started at index: " + FString::FromInt(M_CurrentStartLocationIndex) +
@@ -278,7 +278,7 @@ void UPlayerStartLocationManager::Debug_MenuReady(
 
 void UPlayerStartLocationManager::Debug_Message(const FString& Message) const
 {
-	if(DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GPlayerStartLocations_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(Message);
 	}
