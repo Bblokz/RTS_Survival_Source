@@ -3303,6 +3303,8 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		}
 		this->DirectActionButtonReturnToBase();
 		break;
+	case EAbilityID::IdThrowGrenade:
+		
 	case EAbilityID::IdApplyBehaviour:
 		this->DirectActionButtonBehaviourAbility(static_cast<EBehaviourAbilityType>(ActiveAbilityEntry.CustomType));
 		break;

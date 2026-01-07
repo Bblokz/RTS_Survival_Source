@@ -143,8 +143,8 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 	if (DamageParams.AoeRange > 0.f && DamageParams.Damage > 0.f)
 	{
 		const ETriggerOverlapLogic OverlapLogic = OwningPlayer == 1
-			? ETriggerOverlapLogic::OverlapEnemy
-			: ETriggerOverlapLogic::OverlapPlayer;
+			                                          ? ETriggerOverlapLogic::OverlapEnemy
+			                                          : ETriggerOverlapLogic::OverlapPlayer;
 
 		const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
 
@@ -877,12 +877,21 @@ void UGrenadeComponent::SetAbilityToThrowGrenade()
 	{
 		return;
 	}
+	if(M_SquadController->HasAbility(EAbilityID::IdGrenadesResupplying))
+	{
+	M_SquadController->SwapAbility(EAbilityID::IdGrenadesResupplying, EAbilityID::IdThrowGrenade);
+		return;
+		
+	}
 
 	if (not M_SquadController->HasAbility(EAbilityID::IdThrowGrenade))
 	{
-		M_SquadController->AddAbility(EAbilityID::IdThrowGrenade);
+		FUnitAbilityEntry NewAbility;
+		NewAbility.AbilityId = EAbilityID::IdThrowGrenade;
+		NewAbility.CooldownDuration = M_Settings.Cooldown;
+		NewAbility.CustomType = static_cast<int32>(M_Settings.GrenadeAbility);
+		M_SquadController->AddAbility(NewAbility, M_Settings.PreferredIndex);
 	}
-	M_SquadController->SwapAbility(EAbilityID::IdGrenadesResupplying, EAbilityID::IdThrowGrenade);
 	M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, EAbilityID::IdThrowGrenade);
 }
 

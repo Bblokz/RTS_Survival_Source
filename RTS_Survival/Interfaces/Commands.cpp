@@ -555,7 +555,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	const FRotator& Rotation,
 	const EBehaviourAbilityType BehaviourAbility,
 	const EModeAbilityType ModeAbility,
-	const EFieldConstructionType FieldConstructionType)
+	const EFieldConstructionType FieldConstructionType, const EGrenadeAbilityType GrenadeAbilityType)
 {
 	// Check if we have an active queue and if we are not patrolling.
 	// In case we shift click while the queue 
@@ -579,6 +579,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NewCmd.BehaviourAbilityType = BehaviourAbility;
 	NewCmd.ModeAbilityType = ModeAbility;
 	NewCmd.FieldConstructionType = FieldConstructionType;
+	NewCmd.GrenadeAbilityType = GrenadeAbilityType;
 
 	// Insert at the end
 	M_TCommands[NumCommands] = NewCmd;
@@ -1689,7 +1690,7 @@ ECommandQueueError ICommands::SwitchWeapons(const bool bSetUnitToIdle)
 	return Error;
 }
 
-ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle)
+ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle, const EGrenadeAbilityType GrenadeAbilityType)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))

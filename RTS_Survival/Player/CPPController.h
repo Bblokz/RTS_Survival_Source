@@ -1131,6 +1131,7 @@ private:
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();
 
+	void DirectActionButtonThrowGrenade()
 	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
 
 	void DirectActionButtonActivateModeAbility(const EModeAbilityType ModeType);

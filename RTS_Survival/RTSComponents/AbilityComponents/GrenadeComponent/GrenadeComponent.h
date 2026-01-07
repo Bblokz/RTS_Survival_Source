@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "GrenadeComponent.generated.h"
 
@@ -93,6 +94,12 @@ struct FGrenadeComponentSettings
 	// Scale applied to the grenade explosion Niagara effect.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	FVector ExplosionEffectScale = FVector::OneVector;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
+	EGrenadeAbilityType GrenadeAbility;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
+	int32 PreferredIndex = -1;
 };
 
 /**
@@ -201,7 +208,8 @@ private:
 		FVector ThrowLocation = FVector::ZeroVector;
 		bool bM_IsWaitingForArrival = false;
 		bool bM_HasStarted = false;
-	};
+	}
+	FUnitAbilityEntry 
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup", meta=(AllowPrivateAccess="true"))
 	FGrenadeComponentSettings M_Settings;

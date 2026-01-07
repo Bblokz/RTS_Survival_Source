@@ -10,6 +10,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "UObject/Interface.h"
 #include "Commands.generated.h"
 
@@ -65,6 +66,9 @@ public:
 	UPROPERTY()
 	EFieldConstructionType FieldConstructionType;
 
+	UPROPERTY()
+	EGrenadeAbilityType GrenadeAbilityType;
+
 	FQueueCommand()
 		: CommandType(EAbilityID::IdNoAbility)
 		  , TargetLocation(FVector::ZeroVector)
@@ -72,7 +76,8 @@ public:
 		  , TargetRotator(FRotator::ZeroRotator)
 		  , BehaviourAbilityType(EBehaviourAbilityType::DefaultSprint)
 		  , ModeAbilityType(EModeAbilityType::DefaultSniperOverwatch)
-	      , FieldConstructionType(EFieldConstructionType::DefaultGerHedgeHog)
+		  , FieldConstructionType(EFieldConstructionType::DefaultGerHedgeHog)
+		  , GrenadeAbilityType(EGrenadeAbilityType::DefaultGerBundleGrenade)
 	{
 	}
 };
@@ -160,7 +165,7 @@ private:
 	// If set the unit is primary selected.
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
 
-		const FQueueCommand* GetCurrentQueuedCommand() const;
+	const FQueueCommand* GetCurrentQueuedCommand() const;
 
 	inline bool GetIsPrimarySelected() const { return M_ActionUIManager.IsValid(); };
 
@@ -195,7 +200,8 @@ private:
 		const FRotator& Rotation = FRotator::ZeroRotator,
 		const EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint,
 		const EModeAbilityType ModeAbility = EModeAbilityType::DefaultSniperOverwatch,
-		const EFieldConstructionType FieldConstructionType = EFieldConstructionType::DefaultGerHedgeHog
+		const EFieldConstructionType FieldConstructionType = EFieldConstructionType::DefaultGerHedgeHog, const
+		EGrenadeAbilityType GrenadeAbilityType = EGrenadeAbilityType::DefaultGerBundleGrenade
 	);
 
 	void StartCooldownForCommand(const FQueueCommand& Command);
@@ -579,7 +585,7 @@ public:
 	virtual ECommandQueueError CancelFireRockets(const bool bSetUnitToIdle);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-	virtual ECommandQueueError ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle);
+	virtual ECommandQueueError ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle, const EGrenadeAbilityType GrenadeAbilityType);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError CancelThrowingGrenade(const bool bSetUnitToIdle);
@@ -777,8 +783,10 @@ protected:
 	virtual void TerminateCaptureCommand();
 
 	virtual void ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction,
-	                                             const FVector& ConstructionLocation, const FRotator& ConstructionRotation, AActor* StaticPreviewActor);
-	virtual void TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor);
+	                                             const FVector& ConstructionLocation,
+	                                             const FRotator& ConstructionRotation, AActor* StaticPreviewActor);
+	virtual void TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType,
+	                                               AActor* StaticPreviewActor);
 
 	virtual void NoQueue_ExecuteSetResourceConversionEnabled(const bool bEnabled);
 	/**
