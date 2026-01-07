@@ -397,6 +397,8 @@ UAnimMontage* FAimPositionMontages::GetMiscFullBodyMontage(const ESquadAimPositi
 	{
 	case ESquadAimPositionMontage::Misc_Welding:
 		return Welding;
+	case ESquadAimPositionMontage::Misc_Grenade:
+		return GrenadePullAndThrow;
 	default:
 		break;
 	}
@@ -462,6 +464,12 @@ void USquadUnitAnimInstance::PlaySwitchWeaponMontage(const ESquadWeaponAimOffset
 {
 	UAnimMontage* SelectedMontage = WeaponMontages.GetSwitchWeaponMontage(NewWeaponAimOffset);
 	StartMontage(SelectedMontage, true);
+}
+
+void USquadUnitAnimInstance::PlayGrenadeThrowMontage(const float MontageTime)
+{
+	UAnimMontage* SelectedMontage = AimPositionMontages.GetMiscFullBodyMontage(ESquadAimPositionMontage::Misc_Grenade);
+	StartMontage(SelectedMontage, false, MontageTime);
 }
 
 void USquadUnitAnimInstance::PlayWeldingMontage()

@@ -1952,21 +1952,39 @@ void ASquadUnit::BeginPlay_SetupChildActorWeaponComp()
 
 void ASquadUnit::BeginPlay_SetupUpdateAnimSpeed()
 {
-	FTimerDelegate TimerDelUpdateAnim;
-	TimerDelUpdateAnim.BindLambda([this]()
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
 	{
-		if (!IsValid(AnimBp_SquadUnit))
+		return;
+	}
+
+	TWeakObjectPtr<ASquadUnit> SquadUnitWeak(this);
+
+	FTimerDelegate TimerDelUpdateAnim;
+	TimerDelUpdateAnim.BindLambda([SquadUnitWeak]()
+	{
+		if (not SquadUnitWeak.IsValid())
 		{
 			return;
 		}
-		AnimBp_SquadUnit->UpdateAnimState(GetVelocity());
+
+		ASquadUnit* SquadUnit = SquadUnitWeak.Get();
+
+		if (not IsValid(SquadUnit->AnimBp_SquadUnit))
+		{
+			return;
+		}
+
+		SquadUnit->AnimBp_SquadUnit->UpdateAnimState(SquadUnit->GetVelocity());
 	});
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(M_TimerHandleUpdateAnim, TimerDelUpdateAnim,
-		                                  DeveloperSettings::Optimization::UpdateSquadAnimInterval, true);
-	}
+
+	World->GetTimerManager().SetTimer(
+		M_TimerHandleUpdateAnim,
+		TimerDelUpdateAnim,
+		DeveloperSettings::Optimization::UpdateSquadAnimInterval,
+		true);
 }
+
 
 bool ASquadUnit::EnsureRepairComponentIsValid() const
 {

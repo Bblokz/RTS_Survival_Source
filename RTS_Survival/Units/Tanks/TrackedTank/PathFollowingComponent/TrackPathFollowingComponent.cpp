@@ -199,14 +199,12 @@ void UTrackPathFollowingComponent::DebugRemovedOverlapActor(
 	const FString& Reason,
 	const FOverlapActorData& OverlapData) const
 {
-	if constexpr (not DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
-		return;
+		const FString ActorName = OverlapData.Actor.IsValid() ? OverlapData.Actor->GetName() : TEXT("Invalid");
+		const FString DebugMessage = FString::Printf(TEXT("%s: %s"), *Reason, *ActorName);
+		RTSFunctionLibrary::PrintString(DebugMessage, FColor::Yellow);
 	}
-
-	const FString ActorName = OverlapData.Actor.IsValid() ? OverlapData.Actor->GetName() : TEXT("Invalid");
-	const FString DebugMessage = FString::Printf(TEXT("%s: %s"), *Reason, *ActorName);
-	RTSFunctionLibrary::PrintString(DebugMessage, FColor::Yellow);
 }
 
 void UTrackPathFollowingComponent::RemoveExpiredOverlaps(
@@ -434,7 +432,6 @@ void UTrackPathFollowingComponent::TickComponent(
 	RemoveExpiredOverlaps(CurrentTimeSeconds, M_IdleAlliedBlockingActors);
 	RemoveExpiredOverlaps(CurrentTimeSeconds, M_MovingBlockingOverlapActors);
 }
-
 
 
 void UTrackPathFollowingComponent::OnPathUpdated()
@@ -716,8 +713,8 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			// NEW: resolve agent name using our registry (match by radius/height/class)
 			const URTSNavAgentRegistry* NavAgentRegistry = URTSNavAgentRegistry::Get(this);
 			const FName AgentName = NavAgentRegistry
-				? NavAgentRegistry->GetAgentNameForProps(GetWorld(), Properties, 0.5f)
-				: NAME_None;
+				                        ? NavAgentRegistry->GetAgentNameForProps(GetWorld(), Properties, 0.5f)
+				                        : NAME_None;
 			const FString AgentNameStr = AgentName.IsNone() ? TEXT("UNKNOWN") : AgentName.ToString();
 			InWorldDebug += "RTSAgent: " + AgentNameStr + "\n";
 
@@ -727,43 +724,42 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	}
 
 
-		// RTSFunctionLibrary::PrintString("Destination distance: " + FString::SanitizeFloat(DestinationDistance),
-		//                                 FColor::Red);
-		// RTSFunctionLibrary::PrintString(" frontal desired speed: " + FString::SanitizeFloat(DesiredSpeed),
-		//                                 FColor::Red);
-		// RTSFunctionLibrary::PrintString(
-		// 	" frontaladjusted Desired speed: " + FString::SanitizeFloat(AdjustedDesiredSpeed), FColor::Purple);
-		// RTSFunctionLibrary::PrintString("current speed: " + FString::SanitizeFloat(M_CurrentSpeed), FColor::Green);
-		// RTSFunctionLibrary::PrintString("Desired Reverse Speed: " + FString::SanitizeFloat(DesiredReverseSpeed),
-		//                                 FColor::Yellow);
-		// TArray<FString> DebugMessages;
-		// DebugMessages.Add(FString::Printf(TEXT("Stuck Detection")));
-		// DebugMessages.Add(FString::Printf(TEXT("Is Stuck : %s"), bIsStuck ? TEXT("true") : TEXT("false")));
-		//
-		// DebugMessages.Add(FString::Printf(TEXT("")));
-		//
-		// DebugMessages.Add(
-		// 	FString::Printf(TEXT("Last Path Point : %s"), bIsLastPathPoint ? TEXT("true") : TEXT("false")));
-		//
-		// float AgentRadius, AgentHalfHeight;
-		// AActor* MovingAgent = ControlledPawn;
-		// MovingAgent->GetSimpleCollisionCylinder(AgentRadius, AgentHalfHeight);
-		// AgentRadius *= MinAgentRadiusPct;
-		// DebugMessages.Add(FString::Printf(TEXT("Acceptance Radius: %0.3f"), AcceptanceRadius));
-		// DebugMessages.Add(FString::Printf(TEXT("Agent Radius: %0.3f"), AgentRadius));
-		// DebugMessages.Add(FString::Printf(TEXT("Agent Radius multi: %0.3f"), MinAgentRadiusPct));
-		// for (int i = 0; i < DebugMessages.Num(); i++)
-		// {
-		// 	if (i % 2 == 0)
-		// 	{
-		// 		RTSFunctionLibrary::PrintString(DebugMessages[i], FColor::Blue);
-		// 	}
-		// 	else
-		// 	{
-		// 		RTSFunctionLibrary::PrintString(DebugMessages[i], FColor::Purple);
-		// 	}
-		// }
-	}
+	// RTSFunctionLibrary::PrintString("Destination distance: " + FString::SanitizeFloat(DestinationDistance),
+	//                                 FColor::Red);
+	// RTSFunctionLibrary::PrintString(" frontal desired speed: " + FString::SanitizeFloat(DesiredSpeed),
+	//                                 FColor::Red);
+	// RTSFunctionLibrary::PrintString(
+	// 	" frontaladjusted Desired speed: " + FString::SanitizeFloat(AdjustedDesiredSpeed), FColor::Purple);
+	// RTSFunctionLibrary::PrintString("current speed: " + FString::SanitizeFloat(M_CurrentSpeed), FColor::Green);
+	// RTSFunctionLibrary::PrintString("Desired Reverse Speed: " + FString::SanitizeFloat(DesiredReverseSpeed),
+	//                                 FColor::Yellow);
+	// TArray<FString> DebugMessages;
+	// DebugMessages.Add(FString::Printf(TEXT("Stuck Detection")));
+	// DebugMessages.Add(FString::Printf(TEXT("Is Stuck : %s"), bIsStuck ? TEXT("true") : TEXT("false")));
+	//
+	// DebugMessages.Add(FString::Printf(TEXT("")));
+	//
+	// DebugMessages.Add(
+	// 	FString::Printf(TEXT("Last Path Point : %s"), bIsLastPathPoint ? TEXT("true") : TEXT("false")));
+	//
+	// float AgentRadius, AgentHalfHeight;
+	// AActor* MovingAgent = ControlledPawn;
+	// MovingAgent->GetSimpleCollisionCylinder(AgentRadius, AgentHalfHeight);
+	// AgentRadius *= MinAgentRadiusPct;
+	// DebugMessages.Add(FString::Printf(TEXT("Acceptance Radius: %0.3f"), AcceptanceRadius));
+	// DebugMessages.Add(FString::Printf(TEXT("Agent Radius: %0.3f"), AgentRadius));
+	// DebugMessages.Add(FString::Printf(TEXT("Agent Radius multi: %0.3f"), MinAgentRadiusPct));
+	// for (int i = 0; i < DebugMessages.Num(); i++)
+	// {
+	// 	if (i % 2 == 0)
+	// 	{
+	// 		RTSFunctionLibrary::PrintString(DebugMessages[i], FColor::Blue);
+	// 	}
+	// 	else
+	// 	{
+	// 		RTSFunctionLibrary::PrintString(DebugMessages[i], FColor::Purple);
+	// 	}
+	// }
 }
 
 void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)

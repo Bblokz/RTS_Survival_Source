@@ -242,6 +242,9 @@ struct FAimPositionMontages
 
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category = "Misc Full Body Montages")
 	UAnimMontage* Welding;
+	
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category = "Misc Full Body Montages")
+	UAnimMontage* GrenadePullAndThrow;
 };
 
 /**
@@ -308,6 +311,9 @@ public:
 	 * @param NewWeaponAimOffset The aim offset the new weapon uses.
 	 */
 	void PlaySwitchWeaponMontage(const ESquadWeaponAimOffset NewWeaponAimOffset);
+
+	/** @param MontageTime: The time the grenade throw montage should play for. */
+	void PlayGrenadeThrowMontage(const float MontageTime);
 
 	void PlayWeldingMontage();
 

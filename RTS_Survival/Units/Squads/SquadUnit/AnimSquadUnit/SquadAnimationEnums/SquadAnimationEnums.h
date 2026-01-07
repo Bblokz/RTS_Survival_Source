@@ -62,4 +62,5 @@ enum class ESquadAimPositionMontage : uint8
 	HipToProne,
 	ProneToHip,
 	Misc_Welding,
+	Misc_Grenade,
 };
