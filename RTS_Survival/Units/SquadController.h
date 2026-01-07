@@ -67,7 +67,7 @@ struct FSquadStartGameAction
 	UPROPERTY()
 	FVector TargetLocation = FVector::ZeroVector;
 
-private:
+protected:
 	UPROPERTY()
 	TWeakObjectPtr<ASquadController> M_MySquad = nullptr;
 
@@ -93,7 +93,7 @@ struct FDamageSquadGameStart
 
 	void ApplyStartDamageToSquad(const TArray<ASquadUnit*>& SquadUnits) const;
 
-private:
+protected:
 	USquadUnitHealthComponent* GetValidSquadUnitHealthComponent(const ASquadUnit* SquadUnit) const;
 	void KillSquadUnits(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToKill) const;
 	void DamageUnitsToPercentage(const TArray<ASquadUnit*>& SquadUnits, const int32 UnitsToDamage, int32 InstantKilledUnits) const;
@@ -247,7 +247,7 @@ public:
 	 * @param MoveToLocation Destination to move.
 	 * @param AbilityID Ability context for completion callbacks.
 	 */
-	void RequestSquadMoveForAbility(const FVector& MoveToLocation, EAbilityID AbilityID);
+	virtual void RequestSquadMoveForAbility(const FVector& MoveToLocation, EAbilityID AbilityID);
 
 	// To register callbacks once the data from blueprint is loaded into the squad.
 	FSquadDataCallbacks SquadDataCallbacks;
@@ -286,10 +286,10 @@ public:
 	 * @brief removes the provided Um from the Squad. If the unit was selected it is removed from
 	 * the selection. If this causes the squad to be empty, the squad will be deselected.
 	 */
-	void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected);
+	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected);
 
 	// Checks if all squad units did complete the command; if so, calls DoneExecutingCommand with the CompletedAbilityID.
-	void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID);
+	virtual void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID);
 
 	/**
 	 * @brief Initialise spawn grid for reinforcing units around the provided location.
@@ -540,7 +540,7 @@ protected:
 	// Triggered by the scavengable objects that has overlap with one of the units in the squad.
 	void StartScavengeObject(AScavengeableObject* ScavengeableObject);
 
-private:
+protected:
 	/** Cargo manager component for this squad. */
 	UPROPERTY()
 	TObjectPtr<UCargoSquad> CargoSquad;
@@ -569,14 +569,14 @@ private:
 	void InitSquadData_InitExperienceComponent();
 
 	/** Async load the squad unit classes */
-	void LoadSquadUnitsAsync();
+	virtual void LoadSquadUnitsAsync();
 
 	/** Callback for when a squad unit class is loaded */
-	void OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedClass);
+	virtual void OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedClass);
 
-	void OnAllSquadUnitsLoaded();
+	virtual void OnAllSquadUnitsLoaded();
 	
-void UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const;
+	void UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const;
 	/**
 	 * @brief Part of init squad data, sets the fow vision for all squad units.
 	 * @param NewVision The vision range to set.
@@ -604,7 +604,7 @@ void UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const;
 	int M_UnitsCompletedCommand = 0;
 
 	/** Generates paths for each squad unit based on the move location. */
-	ESquadPathFindingError GeneratePathsForSquadUnits(const FVector& MoveToLocation);
+	virtual ESquadPathFindingError GeneratePathsForSquadUnits(const FVector& MoveToLocation);
 
 
 	/**
@@ -713,7 +713,7 @@ void UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const;
 	 * @param AbilityID For what ability this move to command is.
 	 * @post The active ability ID is set on each squad unit and a call back is bound on when the move is completed.
 	 */
-	void GeneralMoveToForAbility(const FVector& MoveToLocation, EAbilityID AbilityID);
+	virtual void GeneralMoveToForAbility(const FVector& MoveToLocation, EAbilityID AbilityID);
 
 	FVector FindNavigablePointNear(const FVector& Location, float Radius) const;
 
