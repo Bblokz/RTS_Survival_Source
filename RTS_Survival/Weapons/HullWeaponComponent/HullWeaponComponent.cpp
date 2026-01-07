@@ -387,6 +387,41 @@ void UHullWeaponComponent::SetupProjectileWeapon(FInitWeaponStateProjectile Proj
 	}
 }
 
+void UHullWeaponComponent::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
+{
+	SetOwningPlayer(RocketProjectileParameters.OwningPlayer);
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateRocketProjectile* RocketProjectile = NewObject<UWeaponStateRocketProjectile>(this);
+	RocketProjectile->InitRocketProjectileWeapon(
+		RocketProjectileParameters.OwningPlayer,
+		WeaponIndex,
+		RocketProjectileParameters.WeaponName,
+		RocketProjectileParameters.WeaponBurstMode,
+		RocketProjectileParameters.WeaponOwner,
+		RocketProjectileParameters.MeshComponent,
+		RocketProjectileParameters.FireSocketName,
+		M_WorldSpawnedIn,
+		RocketProjectileParameters.ProjectileSystem,
+		RocketProjectileParameters.WeaponVFX,
+		RocketProjectileParameters.WeaponShellCase,
+		RocketProjectileParameters.RocketSettings,
+		RocketProjectileParameters.BurstCooldown,
+		RocketProjectileParameters.SingleBurstAmountMaxBurstAmount,
+		RocketProjectileParameters.MinBurstAmount,
+		RocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(RocketProjectile);
+	UpdateHullWeaponRangeBasedOnWeapons();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(RocketProjectile, M_ProjectileManager.Get());
+	}
+}
+
 void UHullWeaponComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)
 {
 	SetOwningPlayer(MultiProjectileState.OwningPlayer);

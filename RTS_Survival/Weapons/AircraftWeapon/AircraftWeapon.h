@@ -65,9 +65,11 @@ protected:
 	virtual void SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters) override;
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponParameters) override;
-        UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable)
         virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) override;
-        UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
+	UFUNCTION(BlueprintCallable)
         virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
         UFUNCTION(BlueprintCallable)
         virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;

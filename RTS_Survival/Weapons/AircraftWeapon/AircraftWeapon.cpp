@@ -270,6 +270,43 @@ void UAircraftWeapon::SetupProjectileWeapon(FInitWeaponStateProjectile Projectil
 	}
 }
 
+void UAircraftWeapon::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
+{
+	SetOwningPlayer(RocketProjectileParameters.OwningPlayer);
+
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateRocketProjectile* RocketProjectile = NewObject<UWeaponStateRocketProjectile>(this);
+	RocketProjectile->InitRocketProjectileWeapon(
+		RocketProjectileParameters.OwningPlayer,
+		WeaponIndex,
+		RocketProjectileParameters.WeaponName,
+		RocketProjectileParameters.WeaponBurstMode,
+		RocketProjectileParameters.WeaponOwner,
+		RocketProjectileParameters.MeshComponent,
+		RocketProjectileParameters.FireSocketName,
+		M_WorldSpawnedIn,
+		RocketProjectileParameters.ProjectileSystem,
+		RocketProjectileParameters.WeaponVFX,
+		RocketProjectileParameters.WeaponShellCase,
+		RocketProjectileParameters.RocketSettings,
+		RocketProjectileParameters.BurstCooldown,
+		RocketProjectileParameters.SingleBurstAmountMaxBurstAmount,
+		RocketProjectileParameters.MinBurstAmount,
+		RocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(RocketProjectile);
+	RocketProjectile->SetIsAircraftWeapon(true);
+	UpdateRangeBasedOnWeapons();
+	M_WeaponIndexToSocket.Add(WeaponIndex, RocketProjectileParameters.FireSocketName);
+	if (GetIsProjectileManagerLoaded())
+	{
+		RocketProjectile->SetupProjectileManager(M_ProjectileManager.Get());
+	}
+}
+
 void UAircraftWeapon::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
 {
         RTSFunctionLibrary::ReportError(
