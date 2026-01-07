@@ -1555,6 +1555,17 @@ void ASquadController::OnSquadUnitArrivedAtCaptureActor()
 	DoneExecutingCommand(EAbilityID::IdCapture);
 }
 
+void ASquadController::OnSquadUnitArrivedAtThrowGrenadeLocation(ASquadUnit* SquadUnit)
+{
+	if (not GetIsValidGrenadeComponent())
+	{
+		DoneExecutingCommand(EAbilityID::IdThrowGrenade);
+		return;
+	}
+
+	M_GrenadeComponent->OnSquadUnitArrivedAtThrowLocation(SquadUnit);
+}
+
 float ASquadController::GetDistanceToActor(const TObjectPtr<AActor> TargetActor)
 {
 	// find squad unit with closest distance to the item.
@@ -2324,7 +2335,13 @@ TObjectPtr<USquadReinforcementComponent> ASquadController::GetSquadReinforcement
 
 bool ASquadController::GetIsValidGrenadeComponent() const
 {
-	return IsValid(M_GrenadeComponent);
+	if (IsValid(M_GrenadeComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_GrenadeComponent", __func__, this);
+	return false;
 }
 
 
@@ -2773,7 +2790,7 @@ void ASquadController::OnAllSquadUnitsLoaded()
 
 void ASquadController::UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const
 {
-	if (IsValid(M_GrenadeComponent))
+	if (GetIsValidGrenadeComponent())
 	{
 		M_GrenadeComponent->OnSquadUnitDied(UnitDied);
 	}

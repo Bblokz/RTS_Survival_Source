@@ -6,6 +6,8 @@
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
+#include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "TimerManager.h"
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -15,8 +17,6 @@ namespace GrenadeComponentConstants
 	constexpr float ThrowTime = 2.f;
 	constexpr float ThrowInterpInterval = 0.02f;
 	constexpr float ArcHeight = 200.f;
-	constexpr float InnerRadiusScale = 0.5f;
-	constexpr float DamageFalloffExponent = 1.f;
 }
 
 AGrenadeActor::AGrenadeActor()
@@ -70,6 +70,16 @@ void AGrenadeActor::ResetGrenade()
 	SetActorHiddenInGame(true);
 }
 
+bool AGrenadeActor::GetIsValidStaticMeshComponent() const
+{
+	if (IsValid(M_StaticMeshComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_StaticMeshComponent", __func__, this);
+	return false;
+}
 
 void AGrenadeActor::CacheEffectData(const FGrenadeComponentSettings& DamageParams)
 {
@@ -92,7 +102,7 @@ void AGrenadeActor::StartThrowTimer()
 
 void AGrenadeActor::OnTickThrow()
 {
-	if (not IsValid(M_StaticMeshComponent))
+	if (not GetIsValidStaticMeshComponent())
 	{
 		return;
 	}
@@ -115,8 +125,27 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 
 	const FVector ExplosionLocation = M_EndLocation;
 	PlayExplosionFX(ExplosionLocation);
-	const float InnerRadius = DamageParams.AoeRange * GrenadeComponentConstants::InnerRadiusScale;
-	// todo call RTS AOE Library with damage vs armor.
+	if (DamageParams.AoeRange > 0.f && DamageParams.Damage > 0.f)
+	{
+		const ETriggerOverlapLogic OverlapLogic = OwningPlayer == 1
+			? ETriggerOverlapLogic::OverlapEnemy
+			: ETriggerOverlapLogic::OverlapPlayer;
+
+		const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
+
+		FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+			this,
+			ExplosionLocation,
+			DamageParams.AoeRange,
+			DamageParams.Damage,
+			DamageParams.AoeDamageExponentReduction,
+			DamageParams.FullArmorPen,
+			DamageParams.ArmorPenFallOff,
+			DamageParams.MaxArmorPen,
+			ERTSDamageType::Kinetic,
+			OverlapLogic,
+			ActorsToIgnore);
+	}
 
 	ResetGrenade();
 }
@@ -182,6 +211,7 @@ void UGrenadeComponent::ExecuteThrowGrenade(const FVector& TargetLocation)
 	{
 		return;
 	}
+	ResetThrowSequenceState();
 	ExecuteThrowGrenade_MoveOrThrow(TargetLocation);
 }
 
@@ -198,6 +228,7 @@ void UGrenadeComponent::TerminateThrowGrenade()
 		{
 			M_SquadController->StopMovement();
 		}
+		ResetThrowSequenceState();
 	}
 	M_AbilityState = EGrenadeAbilityState::NotActive;
 	SetAbilityToThrowGrenade();
@@ -224,10 +255,57 @@ bool UGrenadeComponent::GetIsValidSquadController() const
 	return false;
 }
 
+void UGrenadeComponent::OnSquadUnitArrivedAtThrowLocation(ASquadUnit* SquadUnit)
+{
+	if (M_AbilityState != EGrenadeAbilityState::MovingToThrowPosition)
+	{
+		return;
+	}
+
+	if (M_ThrowSequenceState.bM_HasStarted)
+	{
+		return;
+	}
+
+	if (not M_ThrowSequenceState.bM_IsWaitingForArrival)
+	{
+		return;
+	}
+
+	if (not IsValid(SquadUnit))
+	{
+		return;
+	}
+
+	StartThrowSequence();
+}
+
 void UGrenadeComponent::OnSquadUnitDied(ASquadUnit* DeadUnit)
 {
-	// todo if the grenade is being thrown by a dead unit, make sure it becomes dormant and this grenade is essentially cancelled.
-	// This requires tracking which units are throwing grenades currently.
+	if (M_AbilityState != EGrenadeAbilityState::Throwing)
+	{
+		return;
+	}
+
+	if (not IsValid(DeadUnit))
+	{
+		return;
+	}
+
+	FGrenadeThrowerState* ThrowerState = FindThrowerState(DeadUnit);
+	if (not ThrowerState)
+	{
+		return;
+	}
+
+	ClearThrowTimer(*ThrowerState);
+	ThrowerState->M_GrenadesRemaining = 0;
+	ThrowerState->M_SquadUnit = nullptr;
+
+	if (not HasPendingThrows())
+	{
+		OnThrowFinished();
+	}
 }
 
 bool UGrenadeComponent::GetIsValidRTSComponent() const
@@ -302,25 +380,55 @@ void UGrenadeComponent::ExecuteThrowGrenade_MoveOrThrow(const FVector& TargetLoc
 		return;
 	}
 
+	CacheThrowSequenceLocations(TargetLocation);
 	const float DistanceToTarget = FVector::Dist(M_SquadController->GetActorLocation(), TargetLocation);
 	if (DistanceToTarget > M_Settings.ThrowRange)
 	{
 		M_AbilityState = EGrenadeAbilityState::MovingToThrowPosition;
+		M_ThrowSequenceState.bM_IsWaitingForArrival = true;
 		SetAbilityToCancel();
-		M_SquadController->RequestSquadMoveForAbility(TargetLocation, EAbilityID::IdThrowGrenade);
+		M_SquadController->RequestSquadMoveForAbility(M_ThrowSequenceState.ThrowLocation, EAbilityID::IdThrowGrenade);
 		return;
 	}
 
-	StartThrowSequence(TargetLocation);
+	StartThrowSequence();
 }
 
-void UGrenadeComponent::StartThrowSequence(const FVector& TargetLocation)
+FVector UGrenadeComponent::CalculateThrowMoveLocation(const FVector& TargetLocation) const
 {
-	if (M_AbilityState == EGrenadeAbilityState::MovingToThrowPosition)
+	if (not GetIsValidSquadController())
 	{
-		ReportIllegalStateTransition(TEXT("MovingToThrowPosition"), TEXT("Throwing"));
+		return TargetLocation;
 	}
 
+	const FVector SquadLocation = M_SquadController->GetActorLocation();
+	const FVector DirectionFromTarget = (SquadLocation - TargetLocation).GetSafeNormal();
+	if (DirectionFromTarget.IsNearlyZero())
+	{
+		return SquadLocation;
+	}
+
+	return TargetLocation + (DirectionFromTarget * M_Settings.ThrowRange);
+}
+
+void UGrenadeComponent::CacheThrowSequenceLocations(const FVector& TargetLocation)
+{
+	M_ThrowSequenceState.TargetLocation = TargetLocation;
+	M_ThrowSequenceState.ThrowLocation = CalculateThrowMoveLocation(TargetLocation);
+	M_ThrowSequenceState.bM_IsWaitingForArrival = false;
+	M_ThrowSequenceState.bM_HasStarted = false;
+}
+
+void UGrenadeComponent::StartThrowSequence()
+{
+	if (M_AbilityState == EGrenadeAbilityState::Throwing)
+	{
+		ReportIllegalStateTransition(TEXT("Throwing"), TEXT("Throwing"));
+		return;
+	}
+
+	M_ThrowSequenceState.bM_HasStarted = true;
+	M_ThrowSequenceState.bM_IsWaitingForArrival = false;
 	M_AbilityState = EGrenadeAbilityState::Throwing;
 	SetAbilityToResupplying();
 	StartCooldown();
@@ -332,26 +440,188 @@ void UGrenadeComponent::StartThrowSequence(const FVector& TargetLocation)
 			TEXT("Owning player not cached before grenade throw. at function: StartThrowSequence"));
 	}
 
-	for (int32 i = 0; i < M_Settings.SquadUnitsThrowing; ++i)
+	BuildThrowerStates();
+	if (M_ThrowerStates.Num() <= 0)
 	{
-		AGrenadeActor* Grenade = AcquireGrenade();
-		if (not IsValid(Grenade))
-		{
-			Grenade = SpawnFallbackGrenade();
-		}
+		OnThrowFinished();
+		return;
+	}
 
-		if (not IsValid(Grenade))
+	for (FGrenadeThrowerState& ThrowerState : M_ThrowerStates)
+	{
+		StartThrowForThrower(ThrowerState);
+	}
+}
+
+void UGrenadeComponent::BuildThrowerStates()
+{
+	M_ThrowerStates.Reset();
+
+	if (not GetIsValidSquadController())
+	{
+		return;
+	}
+
+	if (M_Settings.SquadUnitsThrowing <= 0 || M_Settings.GrenadesPerSquad <= 0)
+	{
+		return;
+	}
+
+	const TArray<ASquadUnit*> SquadUnits = M_SquadController->GetSquadUnitsChecked();
+	int32 UnitsAdded = 0;
+
+	for (ASquadUnit* SquadUnit : SquadUnits)
+	{
+		if (not IsValid(SquadUnit))
 		{
-			RTSFunctionLibrary::ReportError(
-				TEXT("No grenade available to throw after attempting fallback spawn."));
 			continue;
 		}
 
-		const FVector StartLocation = GetOwner()->GetActorLocation();
-		Grenade->ThrowAndExplode(M_Settings, StartLocation, TargetLocation, M_OwningPlayer, M_Settings.GrenadeMesh);
+		FGrenadeThrowerState ThrowerState;
+		ThrowerState.M_SquadUnit = SquadUnit;
+		ThrowerState.M_GrenadesRemaining = M_Settings.GrenadesPerSquad;
+		M_ThrowerStates.Add(ThrowerState);
+
+		UnitsAdded++;
+		if (UnitsAdded >= M_Settings.SquadUnitsThrowing)
+		{
+			break;
+		}
+	}
+}
+
+void UGrenadeComponent::StartThrowForThrower(FGrenadeThrowerState& ThrowerState)
+{
+	if (ThrowerState.M_GrenadesRemaining <= 0)
+	{
+		return;
 	}
 
-	OnThrowFinished();
+	if (not ThrowerState.M_SquadUnit.IsValid())
+	{
+		ThrowerState.M_GrenadesRemaining = 0;
+		return;
+	}
+
+	ASquadUnit* SquadUnit = ThrowerState.M_SquadUnit.Get();
+	USquadUnitAnimInstance* AnimInstance = SquadUnit->GetAnimBP_SquadUnit();
+	if (IsValid(AnimInstance))
+	{
+		AnimInstance->PlayGrenadeThrowMontage(M_Settings.GrenadeThrowMontageDuration);
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("Invalid anim instance for grenade throw on unit %s."), *SquadUnit->GetName()));
+	}
+
+	AGrenadeActor* Grenade = AcquireGrenade();
+	if (not IsValid(Grenade))
+	{
+		Grenade = SpawnFallbackGrenade();
+	}
+
+	if (not IsValid(Grenade))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("No grenade available to throw after attempting fallback spawn."));
+		ThrowerState.M_GrenadesRemaining = 0;
+		return;
+	}
+
+	const FVector StartLocation = SquadUnit->GetActorLocation();
+	Grenade->ThrowAndExplode(M_Settings, StartLocation, M_ThrowSequenceState.TargetLocation,
+	                         M_OwningPlayer, M_Settings.GrenadeMesh);
+	ThrowerState.M_GrenadesRemaining = FMath::Max(0, ThrowerState.M_GrenadesRemaining - 1);
+	StartThrowTimer(ThrowerState);
+}
+
+void UGrenadeComponent::StartThrowTimer(FGrenadeThrowerState& ThrowerState)
+{
+	if (not ThrowerState.M_SquadUnit.IsValid())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	ClearThrowTimer(ThrowerState);
+	const TWeakObjectPtr<ASquadUnit> WeakSquadUnit = ThrowerState.M_SquadUnit;
+	World->GetTimerManager().SetTimer(
+		ThrowerState.M_ThrowTimerHandle,
+		FTimerDelegate::CreateUObject(this, &UGrenadeComponent::OnThrowMontageFinished, WeakSquadUnit),
+		M_Settings.GrenadeThrowMontageDuration,
+		false);
+}
+
+void UGrenadeComponent::OnThrowMontageFinished(TWeakObjectPtr<ASquadUnit> SquadUnit)
+{
+	FGrenadeThrowerState* ThrowerState = FindThrowerState(SquadUnit);
+	if (not ThrowerState)
+	{
+		return;
+	}
+
+	ClearThrowTimer(*ThrowerState);
+
+	if (ThrowerState->M_GrenadesRemaining > 0)
+	{
+		StartThrowForThrower(*ThrowerState);
+		return;
+	}
+
+	if (not HasPendingThrows())
+	{
+		OnThrowFinished();
+	}
+}
+
+void UGrenadeComponent::ClearThrowTimer(FGrenadeThrowerState& ThrowerState)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ThrowerState.M_ThrowTimerHandle);
+	}
+}
+
+UGrenadeComponent::FGrenadeThrowerState* UGrenadeComponent::FindThrowerState(
+	const TWeakObjectPtr<ASquadUnit>& SquadUnit)
+{
+	for (FGrenadeThrowerState& ThrowerState : M_ThrowerStates)
+	{
+		if (ThrowerState.M_SquadUnit == SquadUnit)
+		{
+			return &ThrowerState;
+		}
+	}
+	return nullptr;
+}
+
+bool UGrenadeComponent::HasPendingThrows() const
+{
+	for (const FGrenadeThrowerState& ThrowerState : M_ThrowerStates)
+	{
+		if (ThrowerState.M_SquadUnit.IsValid() && ThrowerState.M_GrenadesRemaining > 0)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void UGrenadeComponent::ResetThrowSequenceState()
+{
+	for (FGrenadeThrowerState& ThrowerState : M_ThrowerStates)
+	{
+		ClearThrowTimer(ThrowerState);
+	}
+
+	M_ThrowerStates.Reset();
+	M_ThrowSequenceState = FGrenadeThrowSequenceState();
 }
 
 void UGrenadeComponent::OnThrowFinished()
@@ -361,6 +631,7 @@ void UGrenadeComponent::OnThrowFinished()
 		ReportIllegalStateTransition(UEnum::GetValueAsString(M_AbilityState), TEXT("ResupplyingGrenades"));
 	}
 
+	ResetThrowSequenceState();
 	M_AbilityState = EGrenadeAbilityState::ResupplyingGrenades;
 	if (GetIsValidSquadController())
 	{
