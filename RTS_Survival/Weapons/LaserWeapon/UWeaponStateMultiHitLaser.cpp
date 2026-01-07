@@ -1,8 +1,8 @@
 ﻿#include "UWeaponStateMultiHitLaser.h"
 
 #include "Kismet/GameplayStatics.h"
-#include "RTS_Survival/RTSFunctionLibrary.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponOwner/WeaponOwner.h"
 #include "Sound/SoundBase.h"
 
 void UWeaponStateMultiHitLaser::InitMultiHitLaserWeapon(
@@ -59,7 +59,7 @@ void UWeaponStateMultiHitLaser::CreateLaunchVfx(
 
 	if (bM_IsStartupSoundActive)
 	{
-		RTSFunctionLibrary::ReportError("Multi-hit laser startup sound was triggered while already active.");
+		RTSFunctionLibrary::PrintString("Multi-hit laser startup sound was triggered while already active.");
 		return;
 	}
 
