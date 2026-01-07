@@ -112,6 +112,7 @@ public:
 	void ThrowAndExplode(const FGrenadeComponentSettings& DamageParams, const FVector& StartLocation,
 	                     const FVector& EndLocation, const int32 OwningPlayer, UStaticMesh* OverrideMesh);
 
+	void SetGrenadeMesh(UStaticMesh* OverrideMesh);
 	void ResetGrenade();
 
 protected:
@@ -183,6 +184,8 @@ private:
 	struct FGrenadeThrowerState
 	{
 		TWeakObjectPtr<ASquadUnit> M_SquadUnit = nullptr;
+		TWeakObjectPtr<AGrenadeActor> M_AttachedGrenade = nullptr;
+		FVector M_AttachedGrenadeScale = FVector::OneVector;
 		int32 M_GrenadesRemaining = 0;
 		FTimerHandle M_ThrowTimerHandle;
 	};
@@ -229,6 +232,10 @@ private:
 	void StartThrowTimer(FGrenadeThrowerState& ThrowerState);
 	void OnThrowMontageFinished(TWeakObjectPtr<ASquadUnit> SquadUnit);
 	void ClearThrowTimer(FGrenadeThrowerState& ThrowerState);
+	void ResetThrowerState(FGrenadeThrowerState& ThrowerState);
+	void AttachGrenadeToThrower(FGrenadeThrowerState& ThrowerState, AGrenadeActor* Grenade);
+	void DetachGrenadeFromThrower(FGrenadeThrowerState& ThrowerState);
+	FVector GetThrowStartLocation(const FGrenadeThrowerState& ThrowerState) const;
 	FGrenadeThrowerState* FindThrowerState(const TWeakObjectPtr<ASquadUnit>& SquadUnit);
 	bool HasPendingThrows() const;
 	void ResetThrowSequenceState();
