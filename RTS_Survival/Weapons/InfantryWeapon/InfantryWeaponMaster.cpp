@@ -713,6 +713,44 @@ void AInfantryWeaponMaster::SetupProjectileWeapon(FInitWeaponStateProjectile Pro
 	}
 }
 
+void AInfantryWeaponMaster::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
+{
+	SetOwningPlayer(RocketProjectileParameters.OwningPlayer);
+
+	constexpr int32 WeaponIndex = 0;
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for SquadUnitWeapon: " + GetName());
+		return;
+	}
+	UWeaponStateRocketProjectile* RocketProjectile = NewObject<UWeaponStateRocketProjectile>(this);
+	RocketProjectile->InitRocketProjectileWeapon(
+		RocketProjectileParameters.OwningPlayer,
+		WeaponIndex,
+		RocketProjectileParameters.WeaponName,
+		RocketProjectileParameters.WeaponBurstMode,
+		RocketProjectileParameters.WeaponOwner,
+		RocketProjectileParameters.MeshComponent,
+		RocketProjectileParameters.FireSocketName,
+		World,
+		RocketProjectileParameters.ProjectileSystem,
+		RocketProjectileParameters.WeaponVFX,
+		RocketProjectileParameters.WeaponShellCase,
+		RocketProjectileParameters.RocketSettings,
+		RocketProjectileParameters.BurstCooldown,
+		RocketProjectileParameters.SingleBurstAmountMaxBurstAmount,
+		RocketProjectileParameters.MinBurstAmount,
+		RocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
+	WeaponState = RocketProjectile;
+	SetupRange();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(WeaponState, M_ProjectileManager.Get());
+	}
+}
+
 void AInfantryWeaponMaster::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)
 {
 	SetOwningPlayer(MultiProjectileState.OwningPlayer);

@@ -30,6 +30,7 @@ class UArmorCalculation;
 class UAudioComponent;
 class UProjectileMovementComponent;
 class UWeaponStateProjectile;
+struct FRocketWeaponSettings;
 
 /**
  * Collision of the projectile works by performing async traces
@@ -106,6 +107,18 @@ public:
 	                            const float SafeProjectileSpeed,
 	                            const float Range,
 	                            const FArchProjectileSettings& ArchSettings);
+
+	/**
+	 * @brief Launches a rocket with an initial swing segment followed by straight flight.
+	 * @param LaunchLocation Start location of the rocket.
+	 * @param TargetLocation Adjusted target location after accuracy deviation.
+	 * @param ProjectileSpeed Base projectile speed before multipliers.
+	 * @param RocketSettings Swing and straight movement tuning settings.
+	 */
+	void SetupRocketSwingLaunch(const FVector& LaunchLocation,
+	                            const FVector& TargetLocation,
+	                            const float ProjectileSpeed,
+	                            const FRocketWeaponSettings& RocketSettings);
 
 	// Called by abilities using attach rockets to change the mesh on the rocket VFX.
 	void SetupAttachedRocketMesh(UStaticMesh* RocketMesh);
@@ -333,6 +346,9 @@ private:
 	                                    float& OutGravity);
 
 	void TransitionArcFallbackToStraight(const FVector TargetLocation, const float SafeProjectileSpeed);
+
+	void TransitionRocketSwingToStraight(const FVector& TargetLocation, const float StraightSpeed);
+	void ScheduleRocketSwingTransition(const FVector& TargetLocation, const float StraightSpeed, const float CurveTime);
 	/**
 	 * @brief Straight-line fallback when no arcing parameters can be computed.
 	 * @param LaunchLocation Spawn location for the projectile.
@@ -506,6 +522,9 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_ArcFallbackTimerHandle;
+
+	UPROPERTY()
+	FTimerHandle M_RocketSwingTimerHandle;
 
 	UPROPERTY()
 	TWeakObjectPtr<UAudioComponent> M_DescentAudioComponent;

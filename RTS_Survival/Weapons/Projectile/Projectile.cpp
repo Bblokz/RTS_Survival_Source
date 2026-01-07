@@ -18,6 +18,7 @@
 #include "Trace/Trace.h"
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Weapons/RocketWeapon/RocketWeaponData.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
@@ -30,6 +31,13 @@ namespace
 {
 	constexpr float MinCurvatureVelocityMultiplier = 0.25f;
 	constexpr float MaxCurvatureVelocityMultiplier = 4.0f;
+	constexpr float RocketSwingStrengthMin = 1.0f;
+	constexpr float RocketSwingStrengthMax = 100.0f;
+	constexpr float RocketSwingCurveDistanceMinPercent = 0.2f;
+	constexpr float RocketSwingCurveDistanceMaxPercent = 0.65f;
+	constexpr float RocketSwingMinStraightPercent = 0.15f;
+	constexpr float RocketSwingMinSpeedMultiplier = 0.1f;
+	constexpr float RocketSwingMinCurveDistance = 50.0f;
 
 	struct FArcedLaunchSolution
 	{
@@ -38,6 +46,17 @@ namespace
 		FVector ApexLocation = FVector::ZeroVector;
 		FVector LaunchVelocity = FVector::ZeroVector;
 		float TimeToTarget = 0.0f;
+	};
+
+	struct FRocketSwingLaunchSolution
+	{
+		FVector CurveDirection = FVector::ZeroVector;
+		FVector CurveEndLocation = FVector::ZeroVector;
+		float CurveSpeed = 0.0f;
+		float StraightSpeed = 0.0f;
+		float CurveTime = 0.0f;
+		float StraightTime = 0.0f;
+		bool bUseStraightOnly = false;
 	};
 
 	// Builds a rotation whose +Z points outward along the impact normal.
@@ -119,6 +138,67 @@ namespace
 				              1.5f);
 			}
 		}
+	}
+
+	inline bool BuildRocketSwingLaunchSolution(const FVector& LaunchLocation,
+	                                           const FVector& TargetLocation,
+	                                           const float ProjectileSpeed,
+	                                           const FRocketWeaponSettings& RocketSettings,
+	                                           FRocketSwingLaunchSolution& OutSolution)
+	{
+		const FVector LaunchToTarget = TargetLocation - LaunchLocation;
+		const float DistanceToTarget = LaunchToTarget.Size();
+		if (DistanceToTarget <= KINDA_SMALL_NUMBER)
+		{
+			return false;
+		}
+
+		const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
+		OutSolution.CurveSpeed = SafeProjectileSpeed * FMath::Max(RocketSettings.InCurveSpeedMlt,
+		                                                          RocketSwingMinSpeedMultiplier);
+		OutSolution.StraightSpeed = SafeProjectileSpeed * FMath::Max(RocketSettings.StraightSpeedMlt,
+		                                                             RocketSwingMinSpeedMultiplier);
+
+		const float StrengthClamped = FMath::Clamp(RocketSettings.RandomSwingStrength, RocketSwingStrengthMin,
+		                                           RocketSwingStrengthMax);
+		const float StrengthAlpha = (StrengthClamped - RocketSwingStrengthMin) /
+			(RocketSwingStrengthMax - RocketSwingStrengthMin);
+		const float CurveDistancePercent = FMath::Lerp(RocketSwingCurveDistanceMinPercent,
+		                                               RocketSwingCurveDistanceMaxPercent,
+		                                               StrengthAlpha);
+		const float MaxCurveDistance = DistanceToTarget * (1.0f - RocketSwingMinStraightPercent);
+		const FVector BaseDirection = LaunchToTarget.GetSafeNormal();
+
+		if (MaxCurveDistance <= RocketSwingMinCurveDistance)
+		{
+			OutSolution.bUseStraightOnly = true;
+			OutSolution.CurveDirection = BaseDirection;
+			OutSolution.CurveEndLocation = LaunchLocation;
+			OutSolution.StraightTime = DistanceToTarget / OutSolution.StraightSpeed;
+			return true;
+		}
+
+		const float CurveDistance = FMath::Clamp(DistanceToTarget * CurveDistancePercent,
+		                                         RocketSwingMinCurveDistance,
+		                                         MaxCurveDistance);
+
+		const float SwingYawMin = FMath::Min(RocketSettings.RandomSwingYawDeviationMin,
+		                                     RocketSettings.RandomSwingYawDeviationMax);
+		const float SwingYawMax = FMath::Max(RocketSettings.RandomSwingYawDeviationMin,
+		                                     RocketSettings.RandomSwingYawDeviationMax);
+		const float SwingYawDeviation = FMath::RandRange(SwingYawMin, SwingYawMax);
+		const float SwingYawSigned = FMath::RandBool() ? SwingYawDeviation : -SwingYawDeviation;
+		OutSolution.CurveDirection = FRotator(0.0f, SwingYawSigned, 0.0f).RotateVector(BaseDirection);
+		if (OutSolution.CurveDirection.IsNearlyZero())
+		{
+			OutSolution.CurveDirection = BaseDirection;
+		}
+
+		OutSolution.CurveEndLocation = LaunchLocation + (OutSolution.CurveDirection * CurveDistance);
+		const float StraightDistance = FVector::Distance(OutSolution.CurveEndLocation, TargetLocation);
+		OutSolution.CurveTime = CurveDistance / OutSolution.CurveSpeed;
+		OutSolution.StraightTime = StraightDistance / OutSolution.StraightSpeed;
+		return true;
 	}
 } // namespace
 
@@ -227,6 +307,7 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
@@ -443,6 +524,49 @@ void AProjectile::LaunchStraightFallback(const FVector& LaunchLocation,
 		ArchSettings);
 }
 
+void AProjectile::SetupRocketSwingLaunch(const FVector& LaunchLocation,
+                                         const FVector& TargetLocation,
+                                         const float ProjectileSpeed,
+                                         const FRocketWeaponSettings& RocketSettings)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	StopDescentSound();
+
+	FRocketSwingLaunchSolution LaunchSolution;
+	if (not BuildRocketSwingLaunchSolution(LaunchLocation, TargetLocation, ProjectileSpeed, RocketSettings,
+	                                       LaunchSolution))
+	{
+		return;
+	}
+
+	SetActorLocation(LaunchLocation);
+	M_ProjectileMovement->Activate();
+	M_ProjectileMovement->ProjectileGravityScale = M_DefaultGravityScale;
+
+	if (LaunchSolution.bUseStraightOnly)
+	{
+		if (LaunchSolution.CurveDirection.IsNearlyZero())
+		{
+			return;
+		}
+		SetActorRotation(LaunchSolution.CurveDirection.Rotation());
+		M_ProjectileMovement->Velocity = LaunchSolution.CurveDirection * LaunchSolution.StraightSpeed;
+		StartFlightTimers(LaunchSolution.StraightTime);
+		return;
+	}
+
+	SetActorRotation(LaunchSolution.CurveDirection.Rotation());
+	M_ProjectileMovement->Velocity = LaunchSolution.CurveDirection * LaunchSolution.CurveSpeed;
+
+	StartFlightTimers(LaunchSolution.CurveTime + LaunchSolution.StraightTime);
+
+	ScheduleRocketSwingTransition(TargetLocation, LaunchSolution.StraightSpeed, LaunchSolution.CurveTime);
+}
+
 void AProjectile::LaunchStraightFallbackStartAscent(const FVector& LaunchLocation,
                                                     const FVector& TargetLocation,
                                                     const FVector& LaunchToTarget,
@@ -593,6 +717,59 @@ void AProjectile::TransitionArcFallbackToStraight(const FVector TargetLocation, 
 	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
 	M_ProjectileMovement->Velocity = Direction * SafeProjectileSpeed;
 	SetActorRotation(Direction.Rotation());
+}
+
+void AProjectile::TransitionRocketSwingToStraight(const FVector& TargetLocation, const float StraightSpeed)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+	}
+
+	const FVector CurrentLocation = GetActorLocation();
+	const FVector Direction = (TargetLocation - CurrentLocation).GetSafeNormal();
+	if (Direction.IsNearlyZero())
+	{
+		return;
+	}
+
+	M_ProjectileMovement->ProjectileGravityScale = M_DefaultGravityScale;
+	M_ProjectileMovement->Velocity = Direction * StraightSpeed;
+	SetActorRotation(Direction.Rotation());
+}
+
+void AProjectile::ScheduleRocketSwingTransition(const FVector& TargetLocation,
+                                                const float StraightSpeed,
+                                                const float CurveTime)
+{
+	if (CurveTime <= 0.0f)
+	{
+		TransitionRocketSwingToStraight(TargetLocation, StraightSpeed);
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		TWeakObjectPtr<AProjectile> WeakThis(this);
+		World->GetTimerManager().SetTimer(
+			M_RocketSwingTimerHandle,
+			[WeakThis, TargetLocation, StraightSpeed]()
+			{
+				if (not WeakThis.IsValid())
+				{
+					return;
+				}
+				WeakThis->TransitionRocketSwingToStraight(TargetLocation, StraightSpeed);
+			},
+			CurveTime,
+			false);
+	}
 }
 
 void AProjectile::StopDescentSound()
@@ -778,6 +955,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 	}
 	StopDescentSound();
 }
@@ -791,6 +969,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 	}
 	StopDescentSound();
 }
@@ -852,6 +1031,7 @@ void AProjectile::OnProjectileDormant()
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 	}
 	M_ProjectilePoolSettings.ProjectileManager->OnTankProjectileDormant(M_ProjectilePoolSettings.ProjectileIndex);
 }

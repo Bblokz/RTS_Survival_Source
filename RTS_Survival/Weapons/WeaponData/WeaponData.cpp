@@ -2229,3 +2229,146 @@ void UWeaponStateArchProjectile::FireProjectileWithShellAdjustedStats(const FWea
 	                             ShellAdjustedData.Range, M_ArchSettings, M_WeaponVfx.LaunchAttenuation,
 	                             M_WeaponVfx.LaunchConcurrency);
 }
+
+void UWeaponStateRocketProjectile::InitRocketProjectileWeapon(
+	const int32 NewOwningPlayer,
+	const int32 NewWeaponIndex,
+	const EWeaponName NewWeaponName,
+	const EWeaponFireMode NewWeaponBurstMode,
+	TScriptInterface<IWeaponOwner> NewWeaponOwner,
+	UMeshComponent* NewMeshComponent,
+	const FName NewFireSocketName,
+	UWorld* NewWorld,
+	const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+	FWeaponVFX NewWeaponVFX,
+	FWeaponShellCase NewWeaponShellCase,
+	const FRocketWeaponSettings& NewRocketSettings,
+	const float NewBurstCooldown,
+	const int32 NewSingleBurstAmountMaxBurstAmount,
+	const int32 NewMinBurstAmount,
+	const bool bNewCreateShellCasingOnEveryRandomBurst)
+{
+	M_RocketSettings = NewRocketSettings;
+	InitProjectileWeapon(
+		NewOwningPlayer,
+		NewWeaponIndex,
+		NewWeaponName,
+		NewWeaponBurstMode,
+		NewWeaponOwner,
+		NewMeshComponent,
+		NewFireSocketName,
+		NewWorld,
+		ProjectileNiagaraSystem,
+		NewWeaponVFX,
+		NewWeaponShellCase,
+		NewBurstCooldown,
+		NewSingleBurstAmountMaxBurstAmount,
+		NewMinBurstAmount,
+		bNewCreateShellCasingOnEveryRandomBurst);
+}
+
+void UWeaponStateRocketProjectile::FireWeaponSystem()
+{
+	if (WeaponOwner)
+	{
+		FireProjectile(WeaponOwner->GetTargetLocation(WeaponIndex));
+	}
+}
+
+void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationRaw)
+{
+	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+	if (not ProjectileManager)
+	{
+		return;
+	}
+
+	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
+	const FVector LaunchLocation = LaunchAndForward.Key;
+
+	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+		TargetLocationRaw, WeaponData.Accuracy);
+
+	FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
+	if (LaunchDirection.IsNearlyZero())
+	{
+		LaunchDirection = LaunchAndForward.Value.GetSafeNormal();
+	}
+	const FRotator LaunchRotation = LaunchDirection.Rotation();
+
+	AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
+
+	if (not IsValid(SpawnedProjectile))
+	{
+		ReportErrorForWeapon("ROCKET PROJECTILE weapon failed to get dormant projectile from pool manager.");
+		return;
+	}
+
+	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
+		EWeaponShellType::Shell_APHE);
+	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
+	if (not bIsAPShell && not bIsFireShell)
+	{
+		FWeaponData ShellAdjustedData = GLOBAL_GetWeaponDataForShellType(WeaponData);
+		FireProjectileWithShellAdjustedStats(
+			ShellAdjustedData,
+			SpawnedProjectile,
+			LaunchLocation,
+			LaunchRotation,
+			TargetLocation);
+	}
+	else
+	{
+		FireProjectileWithShellAdjustedStats(
+			WeaponData,
+			SpawnedProjectile,
+			LaunchLocation,
+			LaunchRotation,
+			TargetLocation);
+	}
+}
+
+void UWeaponStateRocketProjectile::FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+                                                                        AProjectile* Projectile,
+                                                                        const FVector& LaunchLocation,
+                                                                        const FRotator& LaunchRotation,
+                                                                        const FVector& TargetLocation)
+{
+	constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	const float PenAdjustedWithGameFlux = FMath::RandRange(ShellAdjustedData.ArmorPen * PenFluxFactorLow,
+	                                                       ShellAdjustedData.ArmorPen * PenFluxFactorHigh);
+	const float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorLow,
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorHigh);
+
+	FProjectileVfxSettings ProjectileVfxSettings;
+	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
+	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
+	ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
+
+	Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
+	                                        ShellAdjustedData.BaseDamage, PenAdjustedWithGameFlux,
+	                                        PenMaxRangeAdjustedWithGameFlux,
+	                                        ShellAdjustedData.ShrapnelParticles, ShellAdjustedData.ShrapnelRange,
+	                                        ShellAdjustedData.ShrapnelDamage,
+	                                        ShellAdjustedData.ShrapnelPen, OwningPlayer,
+	                                        M_WeaponVfx.SurfaceImpactEffects, M_WeaponVfx.BounceEffect,
+	                                        M_WeaponVfx.BounceSound,
+	                                        M_WeaponVfx.ImpactScale,
+	                                        M_WeaponVfx.BounceScale,
+	                                        ShellAdjustedData.ProjectileMovementSpeed,
+	                                        LaunchLocation, LaunchRotation,
+	                                        M_WeaponVfx.ImpactAttenuation,
+	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
+	                                        ActorsToIgnore,
+	                                        ShellAdjustedData.WeaponCalibre);
+
+	Projectile->SetupRocketSwingLaunch(LaunchLocation, TargetLocation, ShellAdjustedData.ProjectileMovementSpeed,
+	                                   M_RocketSettings);
+
+	if (M_RocketSettings.RocketMesh)
+	{
+		Projectile->SetupAttachedRocketMesh(M_RocketSettings.RocketMesh);
+	}
+}

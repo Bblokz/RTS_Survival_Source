@@ -9,6 +9,7 @@
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
 #include "RTS_Survival/Weapons/LaserWeapon/LaserWeaponData.h"
 #include "RTS_Survival/Weapons/Projectile/ProjectileVfxSettings/ProjectileVfxSettings.h"
+#include "RTS_Survival/Weapons/RocketWeapon/RocketWeaponData.h"
 #include "Sound/SoundCue.h"
 #include "WeaponShellType/WeaponShellType.h"
 
@@ -1219,6 +1220,85 @@ private:
 
 	/**
 	 * @brief Fires a projectile with the provided stats.
+	 * @param ShellAdjustedData The data of the weapon adjusted for the shell type.
+	 * @param Projectile The spawned projectile assumed to be valid.
+	 * @param LaunchLocation Location the projectile starts from.
+	 * @param LaunchRotation The Rotation the projectile should take.
+	 * @param TargetLocation The adjusted target location.
+	 */
+	FORCEINLINE void FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+	                                                      AProjectile* Projectile,
+	                                                      const FVector& LaunchLocation,
+	                                                      const FRotator& LaunchRotation,
+	                                                      const FVector& TargetLocation);
+};
+
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateRocketProjectile : public FInitWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FRocketWeaponSettings RocketSettings;
+};
+
+/**
+ * @brief Weapon state that fires a rocket with a curved opening swing before straight flight.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UWeaponStateRocketProjectile : public UWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Initializes a rocket projectile weapon with swing/straight movement settings.
+	 * @param NewOwningPlayer Player index owning the weapon.
+	 * @param NewWeaponIndex Weapon array index on the owner.
+	 * @param NewWeaponName Identifier for this weapon.
+	 * @param NewWeaponBurstMode Burst mode configuration.
+	 * @param NewWeaponOwner Interface to the weapon owner.
+	 * @param NewMeshComponent Mesh used to anchor the fire socket.
+	 * @param NewFireSocketName Socket the projectile spawns from.
+	 * @param NewWorld World context for spawning.
+	 * @param ProjectileNiagaraSystem Niagara system used for the projectile VFX.
+	 * @param NewWeaponVFX VFX configuration for the weapon.
+	 * @param NewWeaponShellCase Shell casing configuration.
+	 * @param NewRocketSettings Swing/straight tuning for the rocket launch.
+	 * @param NewBurstCooldown Cooldown between bursts.
+	 * @param NewSingleBurstAmountMaxBurstAmount Burst count settings.
+	 * @param NewMinBurstAmount Minimum burst shots.
+	 * @param bNewCreateShellCasingOnEveryRandomBurst Should spawn shell casing each random burst.
+	 */
+	void InitRocketProjectileWeapon(
+		const int32 NewOwningPlayer,
+		const int32 NewWeaponIndex,
+		const EWeaponName NewWeaponName,
+		const EWeaponFireMode NewWeaponBurstMode,
+		TScriptInterface<IWeaponOwner> NewWeaponOwner,
+		UMeshComponent* NewMeshComponent,
+		const FName NewFireSocketName,
+		UWorld* NewWorld,
+		const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+		FWeaponVFX NewWeaponVFX,
+		FWeaponShellCase NewWeaponShellCase,
+		const FRocketWeaponSettings& NewRocketSettings,
+		const float NewBurstCooldown = 0.0f,
+		const int32 NewSingleBurstAmountMaxBurstAmount = 0,
+		const int32 NewMinBurstAmount = 0,
+		const bool bNewCreateShellCasingOnEveryRandomBurst = false);
+
+protected:
+	virtual void FireWeaponSystem() override;
+
+private:
+	UPROPERTY()
+	FRocketWeaponSettings M_RocketSettings;
+
+	void FireProjectile(const FVector& TargetLocation);
+
+	/**
+	 * @brief Fires a rocket with the provided stats and swing configuration.
 	 * @param ShellAdjustedData The data of the weapon adjusted for the shell type.
 	 * @param Projectile The spawned projectile assumed to be valid.
 	 * @param LaunchLocation Location the projectile starts from.
