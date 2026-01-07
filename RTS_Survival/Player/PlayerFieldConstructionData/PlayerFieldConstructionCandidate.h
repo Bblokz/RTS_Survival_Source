@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
+#include "RTS_Survival/Interfaces/Commands.h"
+
 
 #include "PlayerFieldConstructionCandidate.generated.h"
 

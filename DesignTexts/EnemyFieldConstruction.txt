@@ -1,0 +1,83 @@
+﻿Like how the enemy controller has
+a component specifically for formations where with one function call routed through the controller you can setup a formation to move i want
+you to implement the new EnemyFieldConstructionComponent that allows the enemy controller to construct field constructions using the provided squads.
+this will have one public    function to call: one where a set of field construction locations is provided and the component will pick a strategy to fill them depending on
+the field construction abilities of the squads.
+
+like with the attack waves which have their own struct we create a struct for this EnemyFieldConstructionOrder which contains the squads first and foremost.
+make sure to search the squad controlelrs for UFieldConstructionAbilityComponents and gather their comps in a weap ptr as well as their EFieldConstructionType for each squad controller (make a struct containing
+the squad controller, the component and the EFieldConstructionType together to place in the order struct) so we have an over view of who can do what. note it is possible that a squad controller has several 
+of these construction abilities so make sure to save arrays of the weak ptr components and the enums. 
+here are the enum values:
+UENUM(BlueprintType)
+enum class EFieldConstructionType : uint8
+{
+	DefaultGerHedgeHog,
+	GerBarbedWire,
+	GerSandbagWall,
+	GerAntiInfantryMine,
+	GerAntiInfantryStickMine,
+	GerLightATMine,
+	GerMediumATMine,
+	GerHeavyATMine,
+	RussianHedgeHog,
+	RussianBarrier,
+	RussianWire,
+	RussianAntiInfantryStickMine,
+	RussianLightATMine,
+	RussianMediumATMine,
+	RussianHeavyATMine
+	
+};
+
+for the strategy: make sure the original function call also has a EFieldConstructionStrategy enum value so the caller can pick a strategy if they want to. 
+this can have the following values:
+None; the component will pick a random strategy from the available ones
+VsTanks
+VsInfantry
+VsMixed
+
+the enemy controller is the russian player so we look for russian field constructions.
+if vsTanks then prefer to build 
+	RussianLightATMine,
+	RussianMediumATMine,
+	RussianHeavyATMine
+	RussianHedgeHog,
+	RussianBarrier,
+	
+make a hierarchy of them with the mines being the highest priority and the barrier being the lowest priority; save this hierarchy in the struct (make sure we have a sperate private on the component
+that handles strategy picking) make sure to then filter our hierarchy directly; only leave the construction types that at least one of the squads can build!
+
+save the locations on the struct too.
+
+so now we have what squad can do what and what we prefer to build and we have an array of locations to build at.
+
+we will now in the same determine strategy private call a new private to create the FFieldConstructionLocationsStrategy for our order struct.
+this struct will contain pairs of locations and EFieldFieldConstructionType that we will try to build at.
+look at the amount of locations we have; if it is less than 10 divide the locations in half using the following strategy:
+using squared distances; using dijkstras to find half the locations that are closest to each other and call this half one and assign the other half to two.
+for the first half assign the highest priority construction types from our strategy hierarchy until we run out of locations or construction types.
+for the second half assign the other contruction types form our hierarchy randomly (Where there are only construction types buildable by the squads as this is already filtered)
+if it is less than 20 do a similair thing where we divide it up in 3 groups; the first gets the highest priority construction types; the second gets the middle ones and the third gets the lowest ones randomly.
+if it is more than 20 then divide it in 4 groups; the first gets the highest priority construction types; the second gets the middle high ones; the third gets the middle low ones and the fourth gets the lowest ones randomly.
+
+
+
+like with the formation component do no tick individual timers but have a single timer on the component that will be started as soon as we have one order struct.
+so if it already runs do not run again. make sure to have a float on the component for the build interval time. also make sure there is a funciton routed through the enemy controller
+that can adjust this interval of the field construction order componenent. if it already runs then adjust the timer interval accordingly; make sure the timer will run with the new interval next time.
+
+at the timer check first remove invalid squad controllers from the struct at hand; if no remain remove the struct. if no struct remains stop the timer.
+then check if our FFieldConstructionLocationsStrategy has any locations left; if not remove the struct and if no struct remains stop the timer.
+then check all pairs left; if they have a field construction no longer available from the squads then remove them from the struct. if no pairs remain remove the struct and if no struct remains stop the timer.
+then pick the first pair; get the location and the construction type.
+finally loop over the squads to see which are idle. if a squad is idle see which  field cosntruction type they can build and assign it to them; 
+call 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError
+	FieldConstruction(const EFieldConstructionType FieldConstruction, const bool bSetUnitToIdle,
+	                  const FVector& ConstructionLocation, const FRotator& ConstructionRotation, AActor* StaticPreview); with a nullptr preview.
+	                  
+	 after that is succesfful remove the pair from the struct. if not succsefful try another pair and if it still does not work after 8 times remove the squad controller from the order struct.
+	 
+	 

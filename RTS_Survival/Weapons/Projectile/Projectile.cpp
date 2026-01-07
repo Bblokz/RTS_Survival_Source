@@ -18,7 +18,6 @@
 #include "Trace/Trace.h"
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
-#include "RTS_Survival/Weapons/RocketWeapon/RocketWeaponData.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
