@@ -259,15 +259,15 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 				{
 					continue;
 				}
+				const float AdjustedDamage = DamageToApply * ArmorDamageMultiplier;
 				if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
 				{
 					DrawDebugString(HitActor->GetWorld(), HitActor->GetActorLocation() + FVector(0, 0, 100),
 					                FString::Printf(
-						                TEXT("Rear Armor: %.1f, Multiplier: %.2f"), RearArmor, ArmorDamageMultiplier),
+						                TEXT("Rear Armor: %.1f, Multiplier: %.2f \n damage: %.2f"), RearArmor, ArmorDamageMultiplier, DamageToApply),
 					                nullptr, FColor::White, 5.f);
 				}
-
-				const float AdjustedDamage = DamageToApply * ArmorDamageMultiplier;
+				
 				if (AdjustedDamage <= 0.f)
 				{
 					continue;
@@ -421,7 +421,7 @@ void FRTS_AOE::StartAsyncSphereSweep(
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
 	TFunction<void(TArray<FHitResult>&&)> OnSweepComplete)
 {
-	if (not OnSweepComplete)
+	if (not OnSweepComplete || Radius < 85)
 	{
 		return;
 	}
