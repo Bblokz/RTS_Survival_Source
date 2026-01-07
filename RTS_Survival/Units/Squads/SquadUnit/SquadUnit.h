@@ -265,6 +265,13 @@ public:
 	void OnWeaponFire();
 	void OnProjectileHit(const bool bBounced);
 
+	/** 
+	 * @return True if the infantry weapon is valid; otherwise, false.
+	 */
+	bool GetIsValidWeapon() const;
+
+	
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -498,11 +505,6 @@ private:
 	 * @return Whether the child actor component is valid, if not attempts to retrieve it.
 	 */
 	bool GetIsValidChildWeaponActor();
-
-	/** 
-	 * @return True if the infantry weapon is valid; otherwise, false.
-	 */
-	bool GetIsValidWeapon() const;
 
 	/** 
 	 * @brief Notifies the squad controller of the completion of the current command.
