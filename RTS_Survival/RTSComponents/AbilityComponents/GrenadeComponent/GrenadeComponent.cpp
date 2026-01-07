@@ -7,6 +7,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "TimerManager.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -529,9 +530,11 @@ void UGrenadeComponent::StartThrowForThrower(FGrenadeThrowerState& ThrowerState)
 	}
 
 	ASquadUnit* SquadUnit = ThrowerState.M_SquadUnit.Get();
+	DisableThrowerWeapon(ThrowerState);
 	USquadUnitAnimInstance* AnimInstance = SquadUnit->GetAnimBP_SquadUnit();
 	if (IsValid(AnimInstance))
 	{
+		AnimInstance->StopAllMontages();
 		AnimInstance->PlayGrenadeThrowMontage(M_Settings.GrenadeThrowMontageDuration);
 	}
 	else
@@ -551,6 +554,7 @@ void UGrenadeComponent::StartThrowForThrower(FGrenadeThrowerState& ThrowerState)
 		RTSFunctionLibrary::ReportError(
 			TEXT("No grenade available to throw after attempting fallback spawn."));
 		ThrowerState.M_GrenadesRemaining = 0;
+		EnableThrowerWeapon(ThrowerState);
 		return;
 	}
 
@@ -559,10 +563,45 @@ void UGrenadeComponent::StartThrowForThrower(FGrenadeThrowerState& ThrowerState)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to attach grenade to squad unit before throwing."));
 		ThrowerState.M_GrenadesRemaining = 0;
+		EnableThrowerWeapon(ThrowerState);
 		return;
 	}
 
 	StartThrowTimer(ThrowerState);
+}
+
+void UGrenadeComponent::DisableThrowerWeapon(const FGrenadeThrowerState& ThrowerState) const
+{
+	if (not ThrowerState.M_SquadUnit.IsValid())
+	{
+		return;
+	}
+
+	ASquadUnit* SquadUnit = ThrowerState.M_SquadUnit.Get();
+	if (not SquadUnit->GetIsValidWeapon())
+	{
+		return;
+	}
+
+	AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
+	InfantryWeapon->DisableWeaponSearch(true, true);
+}
+
+void UGrenadeComponent::EnableThrowerWeapon(const FGrenadeThrowerState& ThrowerState) const
+{
+	if (not ThrowerState.M_SquadUnit.IsValid())
+	{
+		return;
+	}
+
+	ASquadUnit* SquadUnit = ThrowerState.M_SquadUnit.Get();
+	if (not SquadUnit->GetIsValidWeapon())
+	{
+		return;
+	}
+
+	AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
+	InfantryWeapon->SetAutoEngageTargets(true);
 }
 
 void UGrenadeComponent::StartThrowTimer(FGrenadeThrowerState& ThrowerState)
@@ -596,6 +635,7 @@ void UGrenadeComponent::OnThrowMontageFinished(TWeakObjectPtr<ASquadUnit> SquadU
 	}
 
 	ClearThrowTimer(*ThrowerState);
+	EnableThrowerWeapon(*ThrowerState);
 
 	if (not ThrowerState->M_AttachedGrenade.IsValid())
 	{
