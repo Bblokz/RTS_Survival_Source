@@ -614,11 +614,11 @@ namespace DeveloperSettings
 			// Multiply calibre of the shell with this to obtain the shrapnel amount.
 			inline constexpr float ShrapnelAmountPerMM = 0.5;
 			// Divide mm of the gun to obtain shrapnel range.
-			inline constexpr float ShrapnelRangePerMM = 0.5;
+			inline constexpr float ShrapnelRangePerMM = 1.33;
 			// Dived gun pen by this factor to obtain shrapnel pen.
 			inline constexpr float ShrapnelPenPerMM = 0.5;
 			// Shrapnel damage per gram of TNT equivalent.
-			inline constexpr float ShrapnelDamagePerTNTGram = 1;
+			inline constexpr float ShrapnelDamagePerTNTGram = 0.5;
 			// How much a projectile's penetration can differ from the base value in percentages
 			inline constexpr float ArmorPenFluxPercentage = 10.f;
 

@@ -18,9 +18,9 @@ namespace
 		const float BaseDamage,
 		const float SafeRadius,
 		const float SafeFalloffExponent,
-		const FHitResult& Hit)
+		const FVector& HitLocation)
 	{
-		const float DistanceFromEpicenter = FVector::Dist(Epicenter, Hit.Location);
+		const float DistanceFromEpicenter = FVector::Dist(Epicenter, HitLocation);
 		const float NormalisedDistance = FMath::Clamp(DistanceFromEpicenter / SafeRadius, 0.f, 1.f);
 		const float DamageScale = FMath::Pow(1.f - NormalisedDistance, SafeFalloffExponent);
 		return BaseDamage * DamageScale;
@@ -150,13 +150,14 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 				{
 					continue;
 				}
+				const FVector HitLocation = HitActor->GetActorLocation();
 
 				const float DamageToApply = CalculateDamageWithFalloff(
 					Epicenter,
 					BaseDamage,
 					SafeRadius,
 					SafeFalloffExponent,
-					Hit);
+					HitLocation);
 				if (DamageToApply <= 0.f)
 				{
 					continue;
@@ -222,13 +223,14 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 				{
 					continue;
 				}
+				const FVector EnemyLocation = HitActor->GetActorLocation();
 
 				const float DamageToApply = CalculateDamageWithFalloff(
 					Epicenter,
 					BaseDamage,
 					SafeRadius,
 					SafeFalloffExponent,
-					Hit);
+					EnemyLocation);
 				if (DamageToApply <= 0.f)
 				{
 					continue;
@@ -329,13 +331,14 @@ void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
 				{
 					continue;
 				}
+				const FVector HitLocation = HitActor->GetActorLocation();
 
 				const float DamageToApply = CalculateDamageWithFalloff(
 					Epicenter,
 					BaseDamage,
 					SafeRadius,
 					SafeFalloffExponent,
-					Hit);
+					HitLocation);
 				if (DamageToApply <= 0.f)
 				{
 					continue;

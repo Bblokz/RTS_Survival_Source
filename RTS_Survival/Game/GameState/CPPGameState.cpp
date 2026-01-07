@@ -2878,8 +2878,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 80;
-	WeaponData.ShrapnelRange = 1200;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelRange = 700;
+	WeaponData.ShrapnelDamage = 800;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM * 2;
 	WeaponData.ShrapnelPen = 82;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
