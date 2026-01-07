@@ -1,38 +1,151 @@
-﻿Team weapons in my game will be a separate actor derived from
-AEmbeddedTurretsMaster so they can get a controller for if they need to have movement too.
+﻿Team weapons in my game will be a created from a set of new classes that you need to create.
 With this design document i will layout the requirements needed for the team weapons in my game. Team weapons for mortars,
 mgs and at guns; we will start with the at gun first.
 currently the game only has 'regular' squads which have a squad controller that issues order to squad units.
 the main difference with team weapons will be that they have an extra team weapon pawn which can require setting
-up deployment by a few of the squad members before it can fire.
+up deployment by a few of the squad members before it can fire. while the other squad units function as guards and can use their
+regular weapons
 
-look through the squad controller code and derive a new TeamWeaponController from it.
- the team weapon pawn needs to have a few configs, put these in a struct so it is easy to expand upon later:
+general:
+ATeamWeaponController -- the main brain of the squad responsible for assigning units to the weapon and executing the orders from icommands.
+ATeamWeapon -- the actual team weapon actor derived from AHpPawnMaster, IRTSNavAIInterface,  IAimOffsetProvider and IWeaponOwner. Look through the turret master and see how to setup auto engage and specific engage as well as
+logic for attacking a ground target.
+UTeamWeaponMover - a component that handles the movement of the team weapon when it is packed up. for now only define the 
+
+
+look through the squad controller code and derive a new ATeamWeaponController from it.
+ the team weapon  (diferent class!) will be derived from embedded turret master. it needs to have a few configs, put these in a struct so it is easy to expand upon later:
  - a yaw setting that defines the min and max yaw for the arc the weapon can reach; if it is zero the
- weapon can turn the full 360 degrees this will be set on the embedded turrets master ; make sure that the embedded turret respects the limits. 
+ weapon can turn the full 360 degrees (if max is zero) make sure to add that to the documentation of the struct.
  - it needs to include from weapon owner like the infantry weapon does and support all the setups for
  different weapon types.
+ look at the embedded turret master to see how to setup the weapon properly with the limitations
+ - a setting for FResistanceAndDamageReductionData which we will supply to its health component.
  - it needs a setting for DeploymentTime this is a float and determines how long it takes for the weapon to 
  be ready to fire after being placed.
  - the squad needs to wait the same time when they want to move and the weapon needs to be undeployed.
  - a setting that defines how many of the squad units will be direct operators of the team weapon; the other squad units will just
  be defending the squad but not deploying or operating the team weapon.
+ - float turn speed for how fast the weapon can turn yaw. (and the squad units that operate that will turn with it)
+ 
+ make sure to add documentation to the class which will be visible to the designer when deriving a blueprint from it and put there all the steps
+ that need to be taken in blueprint to setup this customised embedded turret properly.
+ Core purpose (what it owns)
+ 
+ UTeamWeaponMover should be the single authority that physically moves the team weapon actor (translation + yaw while moving), and it should expose a small, predictable API to the controller:
+ 
+ “Move this gun here (or along this path)”
+ 
+ “Stop / abort / report stuck”
+ 
+ “I’m moving / I arrived / I failed”
+ 
+ “What do you need from the crew to start moving?”
+ 
+ The controller stays responsible for intent + state; the mover is responsible for execution.
+ 
+ 1) A mover-level state machine (separate from team-weapon state)
+ 
+ Give the mover its own small state enum (not the same as ETeamWeaponState), so it’s easy to debug:
+ 
+ Idle
+ 
+ AwaitingCrew (crew hasn’t latched on / isn’t in position yet)
+ 
+ Pathing (computing path or waiting for nav)
+ 
+ Moving
+ 
+ Option A (recommended): weapon path is “the truth”
+ 
+ UTeamWeaponMover generates one central nav path for the weapon.
+ 
+ The controller tells infantry to follow the weapon with offsets (or uses their own local pathing).
+ 
+ Pros: fewer mismatched arrivals, easy to reason about, weapon never gets left behind.
+ 
+ Cons: infantry path offsets need to tolerate obstacles.
+ 
+ this means that the weapon mover is essential to the squad as it will determine the entire move path.
+ 
+     	
 
-Define the general logic for squads using team weapons in the TeamWeaponController but define another controller from that
-for at weapons, called CarriedAtSquadController
-so it is the same for the team weapon pawn; define a general one and derive from  that the
-CarriedAtWeapon class.
+Define the general logic for squads using team weapons in the TeamWeaponController which will handle the spawning of the squad units asynchronously as the base already does and once that
+is done it will spawn the team weapon actor class at the location of itself and assign the squad units to use it.
 
-make sure the weapon is fully functional and that the place and pick up logic works well.
-make sure that the weapon will only trigger the underlaying uweapon state to fire if the current target is within the arc
-that the weapon can reach.
+setup logic for letting the  ATeamWeaponController know when the ATeamWeapon cannot reach target either when it is out of range -> so need to move closer to the target or
+when it is out of arc -> so need to turn the weapon;
+ATeamWeaponController needs to implement turning properly so we can also use it for the rotate towards command which the  ATeamWeaponController will override.
+
+important for the weapon movement: 
+No strafing: forward movement aligned to weapon yaw (or allow a little “slide” if terrain demands).
+
+Turn rate clamp: turning is slower while moving (big gun on wheels).
+
+Turn radius / cornering: if the next segment is sharp, the mover can:
+
+slow down + steer gradually, or
+
+stop → TurningInPlace → continue
+
+Also: add a “reverse move” mode to back up the gun  without fully turning.
+
+Also make sure to make squad controller functions virtual where needed so the team weapon controller can override them to use the weapon-first path finding approach.
+
+
 make sure only player actions of moving the squad can turn the weapon; if a current target is not within reach then
 search for a new one (see the infantry weapon later for how to implement a weapon owner) in this case the TeamWeaponController
-will be the weapon owner; that logic is directed from the squad.
+will be the weapon owner; that logic is directed from the squad. Unless the weapon is set to specific engage, then always adjust; turn or move
+to try and reach the target. (idem for ground attack) only at auto engage do we want to search for a new target if the current one is out of reach.
+
+2.1 ETeamWeaponState (the state machine)
+
+This state drives all gating: movement, firing, crew actions, and command queuing.
+
+Recommended states (minimal but complete):
+
+Uninitialized – controller exists, units maybe still loading.
+
+Spawning – async squad unit loading in progress (mirrors your current loading pipeline).
+
+Ready_Packed – weapon exists, crew assigned, weapon is packed (movable), cannot fire.
+
+Packing – transitioning from deployed → packed (timer).
+
+Moving – squad is executing a movement-family command while weapon is packed.
+
+Unpacking – transitioning from packed → deploy flow start (timer or instant).
+
+Deploying – operators moving to slots + deployment timer running; cannot fire.
+
+Ready_Deployed – deployed and allowed to fire (subject to arc, target validity).
+
+Abandoned – not enough operators alive; weapon cannot be used.
+
+Destroyed – weapon actor destroyed (handle cleanup + UI).
+
+Design rule: Only Ready_Deployed can fire.
+
+crew slots: to find where to place the squad units that handle the team weapon look for sockets on the mesh component that
+contain crew in their name; for example crew_01, crew_02 etc.
+
 
 make sure that the n squad units operating the team weapon cannot use their regular weapon (hide their main weapon)
-while they are operating the weapon.
+while they are operating the weapon ( look at how for example the repair component hides them).
 as you can see the squad controller has a function that is called when a squad unit dies; override this in the team weapon squad
 to drive the logic of updating who controls the team weapon; when a contorller dies he needs to be replaced and 
 when enough infantry died so we can no longer 
 operate this weapon; then the weapon will be left vacant.
+
+
+some more general notes:
+- make sure to add structs to group variables that go together to keep implementation and extension clean.
+- make sure patrol commands instantly signal done executing command because team weapons will not support them.
+- on “Who completes commands?” in regular squad controllers we wait for all sqwuad units but in here make sure the team weapon specifies when it is done;
+when the team weapon is moved to the new location then the full squad is done with the command!
+-What happens if the player shift-queues: Move → Attack → Move while currently deployed? then we first undeloy, move to the attack location, attack, then move again.
+What happens when the mover reports stuck/fail mid-command? then the controller should abort the command (premature done) and report error.
+make sure we implement the nav agent interface stuff and the
+IAimOffsetProvider stuff. as well.
+
+- think ahead for weapon capture; setup logic that allow the team weapon to become part of a different squad (just for the new classes)
