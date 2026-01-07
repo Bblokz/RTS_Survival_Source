@@ -75,6 +75,7 @@ ACPPController::ACPPController()
 	  , M_PrimaryClickContext()
 	  , bM_IsActionButtonActive(false)
 	  , M_ActiveAbility(EAbilityID::IdNoAbility)
+	  , M_ActiveGrenadeAbilityType(EGrenadeAbilityType::DefaultGerBundleGrenade)
 	  , M_NomadicVehicleSelectedForBuilding(nullptr)
 	  , M_GameUIController(nullptr)
 	  , M_FormationController(nullptr)
@@ -3304,7 +3305,11 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		this->DirectActionButtonReturnToBase();
 		break;
 	case EAbilityID::IdThrowGrenade:
-		
+		this->DirectActionButtonThrowGrenade(static_cast<EGrenadeAbilityType>(ActiveAbilityEntry.CustomType));
+		break;
+	case EAbilityID::IdCancelThrowGrenade:
+		this->DirectActionButtonCancelThrowGrenade(static_cast<EGrenadeAbilityType>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdApplyBehaviour:
 		this->DirectActionButtonBehaviourAbility(static_cast<EBehaviourAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
@@ -3408,6 +3413,9 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		break;
 	case EAbilityID::IdPatrol:
 		this->ActionButtonPatrol(ClickedLocation);
+		break;
+	case EAbilityID::IdThrowGrenade:
+		this->ActionButtonThrowGrenade(ClickedLocation, M_ActiveGrenadeAbilityType);
 		break;
 	case EAbilityID::IdRotateTowards:
 		this->ActionButtonRotateTowards(ClickedLocation);
@@ -3664,6 +3672,37 @@ void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation)
 		}
 }
 
+void ACPPController::ActionButtonThrowGrenade(const FVector& ClickedLocation,
+                                              const EGrenadeAbilityType GrenadeAbilityType)
+{
+	EnsureSelectionsAreRTSValid();
+
+	int32 CommandsExe = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (const auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->ThrowGrenade(ClickedLocation, bResetCommandQueueFirst, GrenadeAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExe += EachPawn->ThrowGrenade(ClickedLocation, bResetCommandQueueFirst, GrenadeAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExe += EachActor->ThrowGrenade(ClickedLocation, bResetCommandQueueFirst, GrenadeAbilityType)
+			== ECommandQueueError::NoError;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdThrowGrenade),
+		                                false);
+	}
+}
+
 /*--------------------------------- Action Button DIRECT ABILITIES---------------------------------*/
 
 void ACPPController::DirectActionButtonStop()
@@ -3836,6 +3875,44 @@ void ACPPController::DirectActionButtonBreakCover()
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdBreakCover),
 		                                false);
+	}
+}
+
+void ACPPController::DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType)
+{
+	M_ActiveGrenadeAbilityType = GrenadeAbilityType;
+	bM_IsActionButtonActive = true;
+	UpdateCursor();
+}
+
+void ACPPController::DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType)
+{
+	EnsureSelectionsAreRTSValid();
+
+	int32 CommandsExe = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (const auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->CancelThrowingGrenade(bResetCommandQueueFirst, GrenadeAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExe += EachPawn->CancelThrowingGrenade(bResetCommandQueueFirst, GrenadeAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExe += EachActor->CancelThrowingGrenade(bResetCommandQueueFirst, GrenadeAbilityType)
+			== ECommandQueueError::NoError;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdCancelThrowGrenade),
+			false);
 	}
 }
 

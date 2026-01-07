@@ -8,6 +8,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionTypes/FieldConstructionTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
@@ -248,6 +249,48 @@ namespace FAbilityHelpers
 		}
 
 		return nullptr;
+	}
+
+	inline UGrenadeComponent* GetGrenadeAbilityCompOfType(const EGrenadeAbilityType Type, const AActor* Actor)
+	{
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+
+		TArray<UGrenadeComponent*> GrenadeComponents;
+		Actor->GetComponents<UGrenadeComponent>(GrenadeComponents);
+		for (UGrenadeComponent* GrenadeComponent : GrenadeComponents)
+		{
+			if (not IsValid(GrenadeComponent))
+			{
+				continue;
+			}
+
+			if (GrenadeComponent->GetGrenadeAbilityType() == Type)
+			{
+				return GrenadeComponent;
+			}
+		}
+
+		return nullptr;
+	}
+
+	inline bool GetHasGrenadeAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
+	                                 const EAbilityID GrenadeAbilityId,
+	                                 const EGrenadeAbilityType GrenadeAbility,
+	                                 FUnitAbilityEntry& OutAbilityOfGrenade)
+	{
+		const int32 CustomDataForGrenade = static_cast<int32>(GrenadeAbility);
+		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
+		{
+			if (AbilityEntry.AbilityId == GrenadeAbilityId && AbilityEntry.CustomType == CustomDataForGrenade)
+			{
+				OutAbilityOfGrenade = AbilityEntry;
+				return true;
+			}
+		}
+		return false;
 	}
 
 

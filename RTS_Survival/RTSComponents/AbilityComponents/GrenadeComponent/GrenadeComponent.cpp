@@ -264,6 +264,11 @@ void UGrenadeComponent::CancelThrowGrenade()
 	TerminateThrowGrenade();
 }
 
+EGrenadeAbilityType UGrenadeComponent::GetGrenadeAbilityType() const
+{
+	return M_Settings.GrenadeAbility;
+}
+
 bool UGrenadeComponent::GetIsValidSquadController() const
 {
 	if (M_SquadController.IsValid())
@@ -861,6 +866,18 @@ void UGrenadeComponent::DestroyGrenadePool()
 	M_GrenadePool.Empty();
 }
 
+FUnitAbilityEntry UGrenadeComponent::CreateGrenadeAbilityEntry(const EAbilityID AbilityId) const
+{
+	FUnitAbilityEntry AbilityEntry;
+	AbilityEntry.AbilityId = AbilityId;
+	AbilityEntry.CustomType = static_cast<int32>(M_Settings.GrenadeAbility);
+	if (AbilityId == EAbilityID::IdThrowGrenade)
+	{
+		AbilityEntry.CooldownDuration = M_Settings.Cooldown;
+	}
+	return AbilityEntry;
+}
+
 void UGrenadeComponent::SetAbilityToResupplying()
 {
 	if (not GetIsValidSquadController())
@@ -868,7 +885,8 @@ void UGrenadeComponent::SetAbilityToResupplying()
 		return;
 	}
 
-	M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, EAbilityID::IdGrenadesResupplying);
+	const FUnitAbilityEntry GrenadeAbilityEntry = CreateGrenadeAbilityEntry(EAbilityID::IdGrenadesResupplying);
+	M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, GrenadeAbilityEntry);
 }
 
 void UGrenadeComponent::SetAbilityToThrowGrenade()
@@ -877,22 +895,20 @@ void UGrenadeComponent::SetAbilityToThrowGrenade()
 	{
 		return;
 	}
-	if(M_SquadController->HasAbility(EAbilityID::IdGrenadesResupplying))
+
+	const FUnitAbilityEntry GrenadeAbilityEntry = CreateGrenadeAbilityEntry(EAbilityID::IdThrowGrenade);
+
+	if (M_SquadController->HasAbility(EAbilityID::IdGrenadesResupplying))
 	{
-	M_SquadController->SwapAbility(EAbilityID::IdGrenadesResupplying, EAbilityID::IdThrowGrenade);
+		M_SquadController->SwapAbility(EAbilityID::IdGrenadesResupplying, GrenadeAbilityEntry);
 		return;
-		
 	}
 
 	if (not M_SquadController->HasAbility(EAbilityID::IdThrowGrenade))
 	{
-		FUnitAbilityEntry NewAbility;
-		NewAbility.AbilityId = EAbilityID::IdThrowGrenade;
-		NewAbility.CooldownDuration = M_Settings.Cooldown;
-		NewAbility.CustomType = static_cast<int32>(M_Settings.GrenadeAbility);
-		M_SquadController->AddAbility(NewAbility, M_Settings.PreferredIndex);
+		M_SquadController->AddAbility(GrenadeAbilityEntry, M_Settings.PreferredIndex);
 	}
-	M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, EAbilityID::IdThrowGrenade);
+	M_SquadController->SwapAbility(EAbilityID::IdCancelThrowGrenade, GrenadeAbilityEntry);
 }
 
 void UGrenadeComponent::SetAbilityToCancel()
@@ -902,7 +918,8 @@ void UGrenadeComponent::SetAbilityToCancel()
 		return;
 	}
 
-	M_SquadController->SwapAbility(EAbilityID::IdThrowGrenade, EAbilityID::IdCancelThrowGrenade);
+	const FUnitAbilityEntry GrenadeAbilityEntry = CreateGrenadeAbilityEntry(EAbilityID::IdCancelThrowGrenade);
+	M_SquadController->SwapAbility(EAbilityID::IdThrowGrenade, GrenadeAbilityEntry);
 }
 
 void UGrenadeComponent::ReportIllegalStateTransition(const FString& FromState, const FString& ToState) const

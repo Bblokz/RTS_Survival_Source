@@ -415,7 +415,9 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 	return (AbilityId == EAbilityID::IdApplyBehaviour)
 		|| (AbilityId == EAbilityID::IdActivateMode)
 		|| (AbilityId == EAbilityID::IdDisableMode)
-		|| (AbilityId == EAbilityID::IdFieldConstruction);
+		|| (AbilityId == EAbilityID::IdFieldConstruction)
+		|| (AbilityId == EAbilityID::IdThrowGrenade)
+		|| (AbilityId == EAbilityID::IdCancelThrowGrenade);
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
@@ -442,6 +444,14 @@ FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQ
 			static_cast<int32>(QueuedCommand.ModeAbilityType));
 	}
 
+	if ((QueuedCommand.CommandType == EAbilityID::IdThrowGrenade)
+		|| (QueuedCommand.CommandType == EAbilityID::IdCancelThrowGrenade))
+	{
+		return GetAbilityEntryOfCustomType(
+			QueuedCommand.CommandType,
+			static_cast<int32>(QueuedCommand.GrenadeAbilityType));
+	}
+
 	return nullptr;
 }
 
@@ -461,6 +471,12 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 	if (QueuedCommand.CommandType == EAbilityID::IdFieldConstruction)
 	{
 		return " with field construction type: " + UEnum::GetValueAsString(QueuedCommand.FieldConstructionType);
+	}
+
+	if ((QueuedCommand.CommandType == EAbilityID::IdThrowGrenade)
+		|| (QueuedCommand.CommandType == EAbilityID::IdCancelThrowGrenade))
+	{
+		return " with grenade type: " + UEnum::GetValueAsString(QueuedCommand.GrenadeAbilityType);
 	}
 
 	return FString{};
@@ -770,12 +786,12 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		break;
 	case EAbilityID::IdThrowGrenade:
 		{
-			M_Owner->ExecuteThrowGrenadeCommand(Cmd.TargetLocation);
+			M_Owner->ExecuteThrowGrenadeCommand(Cmd.TargetLocation, Cmd.GrenadeAbilityType);
 		}
 		break;
 	case EAbilityID::IdCancelThrowGrenade:
 		{
-			M_Owner->ExecuteCancelThrowGrenadeCommand();
+			M_Owner->ExecuteCancelThrowGrenadeCommand(Cmd.GrenadeAbilityType);
 		}
 		break;
 	case EAbilityID::IdReturnToBase:
@@ -1690,17 +1706,23 @@ ECommandQueueError ICommands::SwitchWeapons(const bool bSetUnitToIdle)
 	return Error;
 }
 
-ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle, const EGrenadeAbilityType GrenadeAbilityType)
+ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle,
+                                           const EGrenadeAbilityType GrenadeAbilityType)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdThrowGrenade);
-	if (AbilityError != ECommandQueueError::NoError)
+	FUnitAbilityEntry GrenadeAbilityEntry;
+	if (not FAbilityHelpers::GetHasGrenadeAbility(UnitCommandData->GetAbilities(), EAbilityID::IdThrowGrenade,
+	                                              GrenadeAbilityType, GrenadeAbilityEntry))
 	{
-		return AbilityError;
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+	if (GrenadeAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
 	}
 	if (bSetUnitToIdle)
 	{
@@ -1708,21 +1730,29 @@ ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool b
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdThrowGrenade, Location, nullptr,
-		FRotator::ZeroRotator);
+		FRotator::ZeroRotator, EBehaviourAbilityType::DefaultSprint,
+		EModeAbilityType::DefaultSniperOverwatch, EFieldConstructionType::DefaultGerHedgeHog,
+		GrenadeAbilityType);
 	return Error;
 }
 
-ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle)
+ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle,
+                                                    const EGrenadeAbilityType GrenadeAbilityType)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
-	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdCancelThrowGrenade);
-	if (AbilityError != ECommandQueueError::NoError)
+	FUnitAbilityEntry GrenadeAbilityEntry;
+	if (not FAbilityHelpers::GetHasGrenadeAbility(UnitCommandData->GetAbilities(), EAbilityID::IdCancelThrowGrenade,
+	                                              GrenadeAbilityType, GrenadeAbilityEntry))
 	{
-		return AbilityError;
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+	if (GrenadeAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
 	}
 	if (bSetUnitToIdle)
 	{
@@ -1730,7 +1760,9 @@ ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle)
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdCancelThrowGrenade, FVector::ZeroVector, nullptr,
-		FRotator::ZeroRotator);
+		FRotator::ZeroRotator, EBehaviourAbilityType::DefaultSprint,
+		EModeAbilityType::DefaultSniperOverwatch, EFieldConstructionType::DefaultGerHedgeHog,
+		GrenadeAbilityType);
 	return Error;
 }
 
@@ -2128,19 +2160,20 @@ void ICommands::TerminateCancelFireRockets()
 }
 
 
-void ICommands::ExecuteThrowGrenadeCommand(const FVector TargetLocation)
+void ICommands::ExecuteThrowGrenadeCommand(const FVector TargetLocation,
+                                           const EGrenadeAbilityType GrenadeAbilityType)
 {
 }
 
-void ICommands::TerminateThrowGrenadeCommand()
+void ICommands::TerminateThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType)
 {
 }
 
-void ICommands::ExecuteCancelThrowGrenadeCommand()
+void ICommands::ExecuteCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType)
 {
 }
 
-void ICommands::TerminateCancelThrowGrenadeCommand()
+void ICommands::TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType)
 {
 }
 
@@ -2432,10 +2465,38 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		TerminateCancelFireRockets();
 		break;
 	case EAbilityID::IdThrowGrenade:
-		TerminateThrowGrenadeCommand();
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if (not CommandData)
+			{
+				return;
+			}
+
+			const FQueueCommand* CurrentCommand = CommandData->GetCurrentQueuedCommand();
+			if (CurrentCommand == nullptr)
+			{
+				return;
+			}
+
+			TerminateThrowGrenadeCommand(CurrentCommand->GrenadeAbilityType);
+		}
 		break;
 	case EAbilityID::IdCancelThrowGrenade:
-		TerminateCancelThrowGrenadeCommand();
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if (not CommandData)
+			{
+				return;
+			}
+
+			const FQueueCommand* CurrentCommand = CommandData->GetCurrentQueuedCommand();
+			if (CurrentCommand == nullptr)
+			{
+				return;
+			}
+
+			TerminateCancelThrowGrenadeCommand(CurrentCommand->GrenadeAbilityType);
+		}
 		break;
 	case EAbilityID::IdRepair:
 		TerminateRepairCommand();
