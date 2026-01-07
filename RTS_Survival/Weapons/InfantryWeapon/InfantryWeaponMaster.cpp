@@ -17,6 +17,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateLaser.h"
+#include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
 #include "RTS_Survival/Weapons/WeaponAIState/WeaponAIState.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -846,6 +847,33 @@ void AInfantryWeaponMaster::SetupLaserWeapon(const FInitWeaponStateLaser& LaserW
 	constexpr int32 WeaponIndex = 0;
 	UWeaponStateLaser* LaserWeapon = NewObject<UWeaponStateLaser>(this);
 	LaserWeapon->InitLaserWeapon(
+		LaserWeaponParameters.OwningPlayer,
+		WeaponIndex,
+		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.WeaponOwner,
+		LaserWeaponParameters.MeshComponent,
+		LaserWeaponParameters.FireSocketName,
+		GetWorld(),
+		LaserWeaponParameters.LaserWeaponSettings);
+
+	WeaponState = LaserWeapon;
+	SetupRange();
+}
+
+void AInfantryWeaponMaster::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters)
+{
+	SetOwningPlayer(LaserWeaponParameters.OwningPlayer);
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for inf weapon: " + GetName());
+		return;
+	}
+
+	constexpr int32 WeaponIndex = 0;
+	UWeaponStateMultiHitLaser* LaserWeapon = NewObject<UWeaponStateMultiHitLaser>(this);
+	LaserWeapon->InitMultiHitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
 		LaserWeaponParameters.WeaponName,

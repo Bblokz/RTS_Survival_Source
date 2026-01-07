@@ -11,6 +11,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateLaser.h"
+#include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
 #include "RTS_Survival/Weapons/WeaponAIState/WeaponAIState.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -296,6 +297,29 @@ void UHullWeaponComponent::SetupLaserWeapon(const FInitWeaponStateLaser& LaserWe
 		GetWorld(),
 		LaserWeaponParameters.LaserWeaponSettings);
 
+
+	M_TWeapons.Add(LaserWeapon);
+	UpdateHullWeaponRangeBasedOnWeapons();
+}
+
+void UHullWeaponComponent::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters)
+{
+	SetOwningPlayer(LaserWeaponParameters.OwningPlayer);
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateMultiHitLaser* LaserWeapon = NewObject<UWeaponStateMultiHitLaser>(this);
+	LaserWeapon->InitMultiHitLaserWeapon(
+		LaserWeaponParameters.OwningPlayer,
+		WeaponIndex,
+		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.WeaponOwner,
+		LaserWeaponParameters.MeshComponent,
+		LaserWeaponParameters.FireSocketName,
+		GetWorld(),
+		LaserWeaponParameters.LaserWeaponSettings);
 
 	M_TWeapons.Add(LaserWeapon);
 	UpdateHullWeaponRangeBasedOnWeapons();

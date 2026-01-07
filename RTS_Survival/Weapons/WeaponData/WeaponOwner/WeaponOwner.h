@@ -9,6 +9,7 @@
 #include "WeaponOwner.generated.h"
 
 struct FInitWeaponStateLaser;
+struct FInitWeaponStateMultiHitLaser;
 struct FInitWeaponStateMultiTrace;
 struct FInitWeaponStateArchProjectile;
 struct FWeaponData;
@@ -41,6 +42,7 @@ class RTS_SURVIVAL_API IWeaponOwner
 	friend class RTS_SURVIVAL_API UWeaponStateMultiProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateArchProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateLaser;
+	friend class RTS_SURVIVAL_API UWeaponStateMultiHitLaser;
 	/** @return The array of weapons that this owner has. */
 	virtual TArray<UWeaponState*> GetWeapons() =0;
 	// To register or deregister actors to ignore with this weapon.
@@ -110,9 +112,11 @@ protected:
 	virtual void SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeaponParameters) = 0;
 
 	UFUNCTION(BlueprintCallable)
+	virtual void SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters) = 0;
+
+	UFUNCTION(BlueprintCallable)
     virtual void SetupFlameThrowerWeapon(const FInitWeaponStateFlameThrower& FlameWeaponParameters) = 0;
 	
 
 };
-
 
