@@ -11,6 +11,7 @@
 #include "TimerManager.h"
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 
 namespace GrenadeComponentConstants
 {
