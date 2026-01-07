@@ -34,12 +34,15 @@ struct FGrenadeComponentSettings
 {
 	GENERATED_BODY()
 
+	// Max distance at which squad units can throw grenades at the target.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float ThrowRange = 400.f;
 
+	// Radius of the grenade explosion damage.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float AoeRange = 300.f;
 
+	// Base damage applied at the center of the explosion.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float Damage = 40.f;
 
@@ -55,15 +58,19 @@ struct FGrenadeComponentSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
 	float MaxArmorPen = 0.f;
 
+	// Damage falloff exponent applied across the AOE radius.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float AoeDamageExponentReduction = 1.f;
 
+	// Cooldown between grenade throws for the squad.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float Cooldown = 10.f;
 
+	// Number of squad units selected to throw grenades.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	int32 SquadUnitsThrowing = 1;
 
+	// Amount of grenades each selected squad unit throws.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	int32 GrenadesPerSquad = 1;
 
@@ -71,12 +78,15 @@ struct FGrenadeComponentSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float GrenadeThrowMontageDuration = 1.67;
 
+	// Mesh override used by the grenade actor when thrown.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	UStaticMesh* GrenadeMesh = nullptr;
 
+	// Sound effect played when the grenade explodes.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	USoundBase* ExplosionSound = nullptr;
 
+	// Niagara effect spawned at the explosion location.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	UNiagaraSystem* ExplosionEffect = nullptr;
 };
@@ -104,9 +114,6 @@ public:
 
 	void ResetGrenade();
 
-	
-
-
 protected:
 	virtual void BeginPlay() override;
 
@@ -128,6 +135,7 @@ private:
 	FTimerHandle M_ThrowTimerHandle;
 	FTimerHandle M_ExplosionTimerHandle;
 
+	bool GetIsValidStaticMeshComponent() const;
 	void CacheEffectData(const FGrenadeComponentSettings& DamageParams);
 	void StartThrowTimer();
 	void OnTickThrow();
@@ -164,13 +172,29 @@ public:
 
 	bool GetIsValidSquadController() const;
 
-void OnSquadUnitDied(ASquadUnit* DeadUnit);
+	void OnSquadUnitArrivedAtThrowLocation(ASquadUnit* SquadUnit);
+	void OnSquadUnitDied(ASquadUnit* DeadUnit);
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void BeginDestroy() override;
 
 private:
+	struct FGrenadeThrowerState
+	{
+		TWeakObjectPtr<ASquadUnit> M_SquadUnit = nullptr;
+		int32 M_GrenadesRemaining = 0;
+		FTimerHandle M_ThrowTimerHandle;
+	};
+
+	struct FGrenadeThrowSequenceState
+	{
+		FVector TargetLocation = FVector::ZeroVector;
+		FVector ThrowLocation = FVector::ZeroVector;
+		bool bM_IsWaitingForArrival = false;
+		bool bM_HasStarted = false;
+	};
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup", meta=(AllowPrivateAccess="true"))
 	FGrenadeComponentSettings M_Settings;
 
@@ -187,11 +211,27 @@ private:
 	int32 M_GrenadesRemaining;
 	FTimerHandle M_CooldownTimerHandle;
 
+	// Tracks the active throw sequence and requested throw locations.
+	FGrenadeThrowSequenceState M_ThrowSequenceState;
+
+	// Tracks which squad units are currently throwing grenades and how many remain.
+	TArray<FGrenadeThrowerState> M_ThrowerStates;
+
 	void Init_SetAbilityWhenSquadDataLoaded();
 	void BeginPlay_CacheOwningPlayer();
 	void BeginPlay_CreateGrenadePool();
 	void ExecuteThrowGrenade_MoveOrThrow(const FVector& TargetLocation);
-	void StartThrowSequence(const FVector& TargetLocation);
+	FVector CalculateThrowMoveLocation(const FVector& TargetLocation) const;
+	void CacheThrowSequenceLocations(const FVector& TargetLocation);
+	void StartThrowSequence();
+	void BuildThrowerStates();
+	void StartThrowForThrower(FGrenadeThrowerState& ThrowerState);
+	void StartThrowTimer(FGrenadeThrowerState& ThrowerState);
+	void OnThrowMontageFinished(TWeakObjectPtr<ASquadUnit> SquadUnit);
+	void ClearThrowTimer(FGrenadeThrowerState& ThrowerState);
+	FGrenadeThrowerState* FindThrowerState(const TWeakObjectPtr<ASquadUnit>& SquadUnit);
+	bool HasPendingThrows() const;
+	void ResetThrowSequenceState();
 	void OnThrowFinished();
 	void StartCooldown();
 	void ResetCooldown();

@@ -342,6 +342,9 @@ public:
 	// Called once one of the units arrives at the capture actor.
 	void OnSquadUnitArrivedAtCaptureActor();
 
+	// Called once one of the units reaches the grenade throw location.
+	void OnSquadUnitArrivedAtThrowGrenadeLocation(ASquadUnit* SquadUnit);
+
 	inline int GetSquadUnitsCount() const { return M_TSquadUnits.Num(); }
 
 	/**
