@@ -5,6 +5,7 @@
 
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
 
@@ -15,6 +16,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bCanEverTick = false;
 	M_FormationController = CreateDefaultSubobject<UEnemyFormationController>(TEXT("FormationController"));
 	M_WaveController = CreateDefaultSubobject<UEnemyWaveController>(TEXT("WaveController"));
+	M_FieldConstructionComponent = CreateDefaultSubobject<UEnemyFieldConstructionComponent>(TEXT("FieldConstructionComponent"));
 	if(M_FormationController)
 	{
 		M_FormationController->InitFormationController(this);
@@ -22,7 +24,11 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	if(M_WaveController)
 	{
 		M_WaveController->InitWaveController(this);
-	
+
+	}
+	if (M_FieldConstructionComponent)
+	{
+		M_FieldConstructionComponent->InitFieldConstructionComponent(this);
 	}
 	
 }
@@ -87,6 +93,32 @@ void AEnemyController::CreateSingleAttackWave(
 		FormationOffsetMultiplier);
 }
 
+void AEnemyController::CreateFieldConstructionOrder(
+	const TArray<ASquadController*>& SquadControllers,
+	const TArray<FVector>& ConstructionLocations,
+	const EFieldConstructionStrategy Strategy)
+{
+	if (not GetIsValidFieldConstructionComponent())
+	{
+		return;
+	}
+
+	M_FieldConstructionComponent->CreateFieldConstructionOrder(
+		SquadControllers,
+		ConstructionLocations,
+		Strategy);
+}
+
+void AEnemyController::SetFieldConstructionOrderInterval(const float NewIntervalSeconds)
+{
+	if (not GetIsValidFieldConstructionComponent())
+	{
+		return;
+	}
+
+	M_FieldConstructionComponent->SetFieldConstructionOrderInterval(NewIntervalSeconds);
+}
+
 void AEnemyController::DebugAllActiveFormations() const
 {
 	if(not GetIsValidFormationController())
@@ -148,3 +180,12 @@ bool AEnemyController::GetIsValidWaveController() const
 	return true;
 }
 
+bool AEnemyController::GetIsValidFieldConstructionComponent() const
+{
+	if (not IsValid(M_FieldConstructionComponent))
+	{
+		RTSFunctionLibrary::ReportError("Invalid field construction component for enemy controller!");
+		return false;
+	}
+	return true;
+}

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Enemy/EnemyResources/EnemyResources.h"
 #include "RTS_Survival/MasterObjects/ActorObjectsMaster.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "EnemyController.generated.h"
 
 
@@ -94,6 +95,21 @@ public:
 		const float TimeTillWave,
 		AActor* WaveCreator, const float FormationOffsetMultiplier = 1.f);
 
+	/**
+	 * @brief Assigns squads to construct field constructions at provided locations.
+	 * @param SquadControllers Squads used to determine available field constructions.
+	 * @param ConstructionLocations Locations to build at.
+	 * @param Strategy Desired strategy or None to pick one automatically.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateFieldConstructionOrder(
+		const TArray<ASquadController*>& SquadControllers,
+		const TArray<FVector>& ConstructionLocations,
+		const EFieldConstructionStrategy Strategy = EFieldConstructionStrategy::None);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetFieldConstructionOrderInterval(const float NewIntervalSeconds);
+
 
 	void DebugAllActiveFormations() const;
 
@@ -132,11 +148,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnemyWaveController> M_WaveController;
 
+	UPROPERTY()
+	TObjectPtr<UEnemyFieldConstructionComponent> M_FieldConstructionComponent;
+
 	TArray<TWeakObjectPtr<ATankMaster>> M_Tanks;
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 
 	bool GetIsValidFormationController() const;
 	bool GetIsValidWaveController() const;
+	bool GetIsValidFieldConstructionComponent() const;
 
 	// Contains the supplies and other resource settings for waves and construction.
 	FEnemyResources M_Resources;
