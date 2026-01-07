@@ -226,7 +226,8 @@ bool UGrenadeComponent::GetIsValidSquadController() const
 
 void UGrenadeComponent::OnSquadUnitDied(ASquadUnit* DeadUnit)
 {
-	// todo.
+	// todo if the grenade is being thrown by a dead unit, make sure it becomes dormant and this grenade is essentially cancelled.
+	// This requires tracking which units are throwing grenades currently.
 }
 
 bool UGrenadeComponent::GetIsValidRTSComponent() const
