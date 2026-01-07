@@ -138,7 +138,8 @@ void ANomadicVehicle::UnitDies(const ERTSDeathType DeathType)
 		// no double calls.
 		return;
 	}
-	if (IsValid(M_AircraftOwnerComp))
+	DestroyAllBuildingAttachments();
+	if (GetIsValidAircraftOwnerComp())
 	{
 		M_AircraftOwnerComp->OnAirbaseDies();
 	}
@@ -328,6 +329,7 @@ void ANomadicVehicle::BeginDestroy()
 		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
 		World->GetTimerManager().ClearTimer(ConvertToVehicleTimerHandle);
 	}
+	DestroyAllBuildingAttachments();
 	Super::BeginDestroy();
 }
 
