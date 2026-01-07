@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "GrenadeComponent.generated.h"
 
 class ASquadUnit;
@@ -183,6 +184,8 @@ public:
 	void TerminateThrowGrenade();
 	void CancelThrowGrenade();
 
+	EGrenadeAbilityType GetGrenadeAbilityType() const;
+
 	bool GetIsValidSquadController() const;
 
 	void OnSquadUnitArrivedAtThrowLocation(ASquadUnit* SquadUnit);
@@ -208,8 +211,9 @@ private:
 		FVector ThrowLocation = FVector::ZeroVector;
 		bool bM_IsWaitingForArrival = false;
 		bool bM_HasStarted = false;
-	}
-	FUnitAbilityEntry 
+	};
+
+	FUnitAbilityEntry CreateGrenadeAbilityEntry(const EAbilityID AbilityId) const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup", meta=(AllowPrivateAccess="true"))
 	FGrenadeComponentSettings M_Settings;

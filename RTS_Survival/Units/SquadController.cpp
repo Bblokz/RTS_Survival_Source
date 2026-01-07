@@ -1557,13 +1557,15 @@ void ASquadController::OnSquadUnitArrivedAtCaptureActor()
 
 void ASquadController::OnSquadUnitArrivedAtThrowGrenadeLocation(ASquadUnit* SquadUnit)
 {
-	if (not GetIsValidGrenadeComponent())
+	UGrenadeComponent* GrenadeComponent = FAbilityHelpers::GetGrenadeAbilityCompOfType(
+		M_ActiveGrenadeAbilityType, this);
+	if (not IsValid(GrenadeComponent))
 	{
 		DoneExecutingCommand(EAbilityID::IdThrowGrenade);
 		return;
 	}
 
-	M_GrenadeComponent->OnSquadUnitArrivedAtThrowLocation(SquadUnit);
+	GrenadeComponent->OnSquadUnitArrivedAtThrowLocation(SquadUnit);
 }
 
 float ASquadController::GetDistanceToActor(const TObjectPtr<AActor> TargetActor)
@@ -1833,35 +1835,48 @@ void ASquadController::TerminateRepairCommand()
 	}
 }
 
-void ASquadController::ExecuteThrowGrenadeCommand(const FVector TargetLocation)
+void ASquadController::ExecuteThrowGrenadeCommand(const FVector TargetLocation,
+                                                  const EGrenadeAbilityType GrenadeAbilityType)
 {
-	if (not GetIsValidGrenadeComponent())
+	UGrenadeComponent* GrenadeComponent = FAbilityHelpers::GetGrenadeAbilityCompOfType(
+		GrenadeAbilityType, this);
+	if (not IsValid(GrenadeComponent))
 	{
 		DoneExecutingCommand(EAbilityID::IdThrowGrenade);
 		return;
 	}
 
-	M_GrenadeComponent->ExecuteThrowGrenade(TargetLocation);
+	M_ActiveGrenadeAbilityType = GrenadeAbilityType;
+	GrenadeComponent->ExecuteThrowGrenade(TargetLocation);
 }
 
-void ASquadController::TerminateThrowGrenadeCommand()
+void ASquadController::TerminateThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType)
 {
-	if (GetIsValidGrenadeComponent())
+	UGrenadeComponent* GrenadeComponent = FAbilityHelpers::GetGrenadeAbilityCompOfType(
+		GrenadeAbilityType, this);
+	if (not IsValid(GrenadeComponent))
 	{
-		M_GrenadeComponent->TerminateThrowGrenade();
+		return;
 	}
+
+	GrenadeComponent->TerminateThrowGrenade();
 }
 
-void ASquadController::ExecuteCancelThrowGrenadeCommand()
+void ASquadController::ExecuteCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType)
 {
-	if (GetIsValidGrenadeComponent())
+	UGrenadeComponent* GrenadeComponent = FAbilityHelpers::GetGrenadeAbilityCompOfType(
+		GrenadeAbilityType, this);
+	if (not IsValid(GrenadeComponent))
 	{
-		M_GrenadeComponent->CancelThrowGrenade();
+		DoneExecutingCommand(EAbilityID::IdCancelThrowGrenade);
+		return;
 	}
+
+	GrenadeComponent->CancelThrowGrenade();
 	DoneExecutingCommand(EAbilityID::IdCancelThrowGrenade);
 }
 
-void ASquadController::TerminateCancelThrowGrenadeCommand()
+void ASquadController::TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType)
 {
 }
 
@@ -2790,8 +2805,12 @@ void ASquadController::OnAllSquadUnitsLoaded()
 
 void ASquadController::UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const
 {
-	if (GetIsValidGrenadeComponent())
+	UGrenadeComponent* GrenadeComponent = FAbilityHelpers::GetGrenadeAbilityCompOfType(
+		M_ActiveGrenadeAbilityType, this);
+	if (not IsValid(GrenadeComponent))
 	{
-		M_GrenadeComponent->OnSquadUnitDied(UnitDied);
+		return;
 	}
+
+	GrenadeComponent->OnSquadUnitDied(UnitDied);
 }

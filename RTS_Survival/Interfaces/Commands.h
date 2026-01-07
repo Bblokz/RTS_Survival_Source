@@ -588,7 +588,8 @@ public:
 	virtual ECommandQueueError ThrowGrenade(const FVector& Location, const bool bSetUnitToIdle, const EGrenadeAbilityType GrenadeAbilityType);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-	virtual ECommandQueueError CancelThrowingGrenade(const bool bSetUnitToIdle);
+	virtual ECommandQueueError CancelThrowingGrenade(const bool bSetUnitToIdle,
+	                                                 const EGrenadeAbilityType GrenadeAbilityType);
 	/**
 	 * @brief Determines whether the provided command is in the command queue.
 	 * @param CommandToCheck The command to check for.
@@ -762,10 +763,10 @@ protected:
 	 * @brief Executes the grenade throw ability for this squad.
 	 * @param TargetLocation World target to throw the grenade towards.
 	 */
-	virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation);
-	virtual void TerminateThrowGrenadeCommand();
-	virtual void ExecuteCancelThrowGrenadeCommand();
-	virtual void TerminateCancelThrowGrenadeCommand();
+	virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation, const EGrenadeAbilityType GrenadeAbilityType);
+	virtual void TerminateThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType);
+	virtual void ExecuteCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType);
+	virtual void TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType);
 
 	virtual void ExecuteRepairCommand(AActor* TargetActor);
 	virtual void TerminateRepairCommand();

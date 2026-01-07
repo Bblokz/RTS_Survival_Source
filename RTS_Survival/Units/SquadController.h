@@ -511,10 +511,11 @@ protected:
 	virtual void ExecuteRepairCommand(AActor* TargetActor) override;
 	virtual void TerminateRepairCommand() override;
 
-	virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation) override;
-	virtual void TerminateThrowGrenadeCommand() override;
-	virtual void ExecuteCancelThrowGrenadeCommand() override;
-	virtual void TerminateCancelThrowGrenadeCommand() override;
+	virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation,
+	                                        const EGrenadeAbilityType GrenadeAbilityType) override;
+	virtual void TerminateThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType) override;
+	virtual void ExecuteCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType) override;
+	virtual void TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType) override;
 
 	virtual void ExecuteEnterCargoCommand(AActor* CarrierActor) override;
 	virtual void TerminateEnterCargoCommand() override;
@@ -556,6 +557,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UGrenadeComponent> M_GrenadeComponent;
+
+	EGrenadeAbilityType M_ActiveGrenadeAbilityType = EGrenadeAbilityType::DefaultGerBundleGrenade;
 
 	UPROPERTY()
 	FSquadStartGameAction M_SquadStartGameAction;

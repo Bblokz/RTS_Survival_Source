@@ -40,6 +40,7 @@
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/UnitData/UnitCost.h"
 #include "SelectionHelpers/SelectionChangeAction.h"
@@ -1038,6 +1039,8 @@ private:
 	 */
 	EAbilityID M_ActiveAbility;
 
+	EGrenadeAbilityType M_ActiveGrenadeAbilityType;
+
 	// Called in the main RC function, after all shift-related functions
 	// Removes the unit from the selection array
 	// Resets the ActionHierarchyUI if removed type is nolonger selected
@@ -1110,6 +1113,8 @@ private:
 	 */
 	void ActionButtonPatrol(const FVector& ClickedLocation);
 
+	void ActionButtonThrowGrenade(const FVector& ClickedLocation, const EGrenadeAbilityType GrenadeAbilityType);
+
 	// Stops Movement, BT Logic, targets and TCommand
 	// todo integrate with ICommands.
 	void DirectActionButtonStop();
@@ -1131,7 +1136,8 @@ private:
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();
 
-	void DirectActionButtonThrowGrenade()
+	void DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
+	void DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
 
 	void DirectActionButtonActivateModeAbility(const EModeAbilityType ModeType);
