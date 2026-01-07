@@ -28,6 +28,7 @@ AGrenadeActor::AGrenadeActor()
 	M_StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("GrenadeMesh"));
 	M_StaticMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetRootComponent(M_StaticMeshComponent);
+	M_ExplosionEffectScale = FVector::OneVector;
 	M_ThrowDuration = GrenadeComponentConstants::ThrowTime;
 }
 
@@ -98,6 +99,7 @@ void AGrenadeActor::CacheEffectData(const FGrenadeComponentSettings& DamageParam
 {
 	M_ExplosionEffect = DamageParams.ExplosionEffect;
 	M_ExplosionSound = DamageParams.ExplosionSound;
+	M_ExplosionEffectScale = DamageParams.ExplosionEffectScale;
 }
 
 void AGrenadeActor::StartThrowTimer()
@@ -171,7 +173,12 @@ void AGrenadeActor::PlayExplosionFX(const FVector& ExplosionLocation) const
 	}
 	if (M_ExplosionEffect)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, M_ExplosionEffect, ExplosionLocation);
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			M_ExplosionEffect,
+			ExplosionLocation,
+			FRotator::ZeroRotator,
+			M_ExplosionEffectScale);
 	}
 }
 
