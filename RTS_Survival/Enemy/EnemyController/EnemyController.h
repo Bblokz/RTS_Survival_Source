@@ -111,6 +111,20 @@ public:
 		const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy,
 		const EFieldConstructionStrategy Strategy = EFieldConstructionStrategy::None);
 
+	/**
+	 * @brief Spawns squads for wave elements and issues a construction order once all spawns complete.
+	 * @param WaveElements Units to spawn and their spawn locations.
+	 * @param ConstructionLocations Locations to build at.
+	 * @param AdditionalLocationsStrategy Strategy to fetch more locations when the order runs out.
+	 * @param Strategy Desired strategy or None to pick automatically.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateFieldConstructionOrderFromWaveElements(
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& ConstructionLocations,
+		const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy,
+		const EFieldConstructionStrategy Strategy = EFieldConstructionStrategy::None);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetFieldConstructionOrderInterval(const float NewIntervalSeconds);
 
