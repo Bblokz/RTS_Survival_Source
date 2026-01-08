@@ -101,6 +101,8 @@ void AGrenadeActor::CacheEffectData(const FGrenadeComponentSettings& DamageParam
 {
 	M_ExplosionEffect = DamageParams.ExplosionEffect;
 	M_ExplosionSound = DamageParams.ExplosionSound;
+	M_ExplosionSoundAttenuation = DamageParams.ExplosionSoundAttenuation;
+	M_ExplosionSoundConcurrency = DamageParams.ExplosionSoundConcurrency;
 	M_ExplosionEffectScale = DamageParams.ExplosionEffectScale;
 }
 
@@ -171,7 +173,16 @@ void AGrenadeActor::PlayExplosionFX(const FVector& ExplosionLocation) const
 {
 	if (M_ExplosionSound)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, M_ExplosionSound, ExplosionLocation);
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			M_ExplosionSound,
+			ExplosionLocation,
+			FRotator::ZeroRotator,
+			1.f,
+			1.f,
+			0.f,
+			M_ExplosionSoundAttenuation,
+			M_ExplosionSoundConcurrency);
 	}
 	if (M_ExplosionEffect)
 	{

@@ -85,8 +85,16 @@ struct FGrenadeComponentSettings
 	UStaticMesh* GrenadeMesh = nullptr;
 
 	// Sound effect played when the grenade explodes.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades|SoundHandling")
 	USoundBase* ExplosionSound = nullptr;
+
+	// Attenuation settings used for the grenade explosion sound.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades|SoundHandling")
+	TObjectPtr<USoundAttenuation> ExplosionSoundAttenuation = nullptr;
+
+	// Concurrency settings used for the grenade explosion sound.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades|SoundHandling")
+	TObjectPtr<USoundConcurrency> ExplosionSoundConcurrency = nullptr;
 
 	// Niagara effect spawned at the explosion location.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
@@ -139,6 +147,12 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<USoundBase> M_ExplosionSound;
+
+	UPROPERTY()
+	TObjectPtr<USoundAttenuation> M_ExplosionSoundAttenuation;
+
+	UPROPERTY()
+	TObjectPtr<USoundConcurrency> M_ExplosionSoundConcurrency;
 
 	FVector M_ExplosionEffectScale;
 	float M_ThrowDuration;
