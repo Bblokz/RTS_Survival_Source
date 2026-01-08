@@ -2355,7 +2355,6 @@ bool ASquadController::GetIsValidGrenadeComponent() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_GrenadeComponent", __func__, this);
 	return false;
 }
 

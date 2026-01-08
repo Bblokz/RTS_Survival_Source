@@ -11,6 +11,8 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+// Used for weak pointer capture from GetEnemyController.
+#include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"

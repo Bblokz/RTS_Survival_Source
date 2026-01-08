@@ -537,6 +537,7 @@ void ACPPController::SpawnReinforcementAttackWave(
 	{
 		return;
 	}
+	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ReinforcementsHaveArrived, true, true);
 
 	int32 SpawnId = 0;
 	TWeakObjectPtr<ACPPController> WeakThis(this);

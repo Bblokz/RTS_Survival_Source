@@ -188,6 +188,8 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
 	// Sanity check for unique ID
 	if (not EnsureIDIsUnique(UniqueID))
 	{
+		RTSFunctionLibrary::ReportError("Cannot create new attack wave struct; ID is not unique: " +
+			FString::FromInt(UniqueID));
 		return false;
 	}
 	const FTimerHandle NewWaveTimerHandle;
