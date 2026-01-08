@@ -7,8 +7,105 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
+#include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
+#include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
+
+namespace EnemyControllerFieldConstruction
+{
+	struct FFieldConstructionSpawnRequest
+	{
+		FTrainingOption TrainingOption;
+		FVector SpawnLocation = FVector::ZeroVector;
+	};
+
+	struct FFieldConstructionSpawnContext
+	{
+		TWeakObjectPtr<AEnemyController> EnemyController = nullptr;
+		TArray<ASquadController*> SpawnedSquadControllers;
+		TArray<FVector> ConstructionLocations;
+		FFindAddtionalLocationsStrategy AdditionalLocationsStrategy;
+		EFieldConstructionStrategy Strategy = EFieldConstructionStrategy::None;
+		int32 PendingSpawnCount = 0;
+		bool bHasCompleted = false;
+
+		void RegisterSpawnedActor(AActor* SpawnedActor)
+		{
+			if (not IsValid(SpawnedActor))
+			{
+				RTSFunctionLibrary::ReportError(
+					"Field construction wave spawn failed: Spawned actor was invalid.");
+				return;
+			}
+
+			ASquadController* SquadController = Cast<ASquadController>(SpawnedActor);
+			if (not IsValid(SquadController))
+			{
+				RTSFunctionLibrary::ReportError(
+					"Field construction wave spawn failed: Expected SquadController actor.");
+				SpawnedActor->Destroy();
+				return;
+			}
+
+			SpawnedSquadControllers.Add(SquadController);
+		}
+
+		void RegisterSpawnFailure()
+		{
+			RTSFunctionLibrary::ReportError("Field construction wave spawn request failed.");
+		}
+
+		void NotifySpawnComplete()
+		{
+			PendingSpawnCount--;
+			if (PendingSpawnCount > 0 || bHasCompleted)
+			{
+				return;
+			}
+
+			bHasCompleted = true;
+			if (EnemyController.IsValid())
+			{
+				EnemyController->CreateFieldConstructionOrder(
+					SpawnedSquadControllers,
+					ConstructionLocations,
+					AdditionalLocationsStrategy,
+					Strategy);
+			}
+
+			Cleanup();
+		}
+
+		void Cleanup()
+		{
+			SpawnedSquadControllers.Empty();
+			ConstructionLocations.Empty();
+			PendingSpawnCount = 0;
+		}
+	};
+
+	bool TryGetRandomTrainingOption(const FAttackWaveElement& WaveElement, FTrainingOption& OutTrainingOption)
+	{
+		if (WaveElement.UnitOptions.IsEmpty())
+		{
+			RTSFunctionLibrary::ReportError("Field construction wave element has no unit options.");
+			return false;
+		}
+
+		const int32 RandomIndex = FMath::RandRange(0, WaveElement.UnitOptions.Num() - 1);
+		if (not WaveElement.UnitOptions.IsValidIndex(RandomIndex))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Field construction wave element random index was invalid.");
+			return false;
+		}
+
+		OutTrainingOption = WaveElement.UnitOptions[RandomIndex];
+		return true;
+	}
+}
 
 
 AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
@@ -115,6 +212,93 @@ void AEnemyController::CreateFieldConstructionOrder(
 		ConstructionLocations,
 		AdditionalLocationsStrategy,
 		Strategy);
+}
+
+void AEnemyController::CreateFieldConstructionOrderFromWaveElements(
+	const TArray<FAttackWaveElement>& WaveElements,
+	const TArray<FVector>& ConstructionLocations,
+	const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy,
+	const EFieldConstructionStrategy Strategy)
+{
+	using namespace EnemyControllerFieldConstruction;
+
+	if (not GetIsValidFieldConstructionComponent())
+	{
+		return;
+	}
+
+	if (WaveElements.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("Field construction wave elements list is empty.");
+		return;
+	}
+
+	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
+	if (not IsValid(AsyncSpawner))
+	{
+		RTSFunctionLibrary::ReportError("Field construction requires a valid async spawner.");
+		return;
+	}
+
+	TArray<FFieldConstructionSpawnRequest> SpawnRequests;
+	SpawnRequests.Reserve(WaveElements.Num());
+	for (const FAttackWaveElement& WaveElement : WaveElements)
+	{
+		FTrainingOption PickedOption;
+		if (not TryGetRandomTrainingOption(WaveElement, PickedOption))
+		{
+			continue;
+		}
+
+		SpawnRequests.Add({PickedOption, WaveElement.SpawnLocation});
+	}
+
+	if (SpawnRequests.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("Field construction wave spawn requests are empty.");
+		return;
+	}
+
+	TSharedPtr<FFieldConstructionSpawnContext> SpawnContext = MakeShared<FFieldConstructionSpawnContext>();
+	SpawnContext->EnemyController = this;
+	SpawnContext->ConstructionLocations = ConstructionLocations;
+	SpawnContext->AdditionalLocationsStrategy = AdditionalLocationsStrategy;
+	SpawnContext->Strategy = Strategy;
+	SpawnContext->PendingSpawnCount = SpawnRequests.Num();
+
+	TWeakPtr<FFieldConstructionSpawnContext> WeakSpawnContext = SpawnContext;
+	TWeakObjectPtr<AEnemyController> WeakEnemyController(this);
+	int32 SpawnRequestId = 0;
+	for (const FFieldConstructionSpawnRequest& SpawnRequest : SpawnRequests)
+	{
+		const int32 CurrentSpawnRequestId = SpawnRequestId++;
+		auto OnSpawned = [WeakSpawnContext](const FTrainingOption& TrainingOption, AActor* SpawnedActor,
+		                                    const int32 SpawnRequestId)
+		{
+			static_cast<void>(TrainingOption);
+			static_cast<void>(SpawnRequestId);
+
+			const TSharedPtr<FFieldConstructionSpawnContext> PinnedSpawnContext = WeakSpawnContext.Pin();
+			if (not PinnedSpawnContext.IsValid())
+			{
+				return;
+			}
+
+			PinnedSpawnContext->RegisterSpawnedActor(SpawnedActor);
+			PinnedSpawnContext->NotifySpawnComplete();
+		};
+
+		if (not AsyncSpawner->AsyncSpawnOptionAtLocation(
+			SpawnRequest.TrainingOption,
+			SpawnRequest.SpawnLocation,
+			WeakEnemyController,
+			CurrentSpawnRequestId,
+			OnSpawned))
+		{
+			SpawnContext->RegisterSpawnFailure();
+			SpawnContext->NotifySpawnComplete();
+		}
+	}
 }
 
 void AEnemyController::SetFieldConstructionOrderInterval(const float NewIntervalSeconds)
