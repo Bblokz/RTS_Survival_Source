@@ -79,7 +79,7 @@ public:
 		const float SampleDensityScalar,
 		const float ProjectionScale,
 		const int32 MaxPointsToReturn,
-		TFunction<void(const TArray<FVector>&)> OnPointsFound) const;
+		TFunction<void(const TArray<FVector>&)> OnPointsFound);
 
 	/**
 	 * @brief Samples navigable points along the closest road spline to guide enemy movement paths.
@@ -92,7 +92,7 @@ public:
 		const FVector& StartSearchPoint,
 		const float SampleDensityScalar,
 		const float ProjectionScale,
-		TFunction<void(const TArray<FVector>&)> OnPointsFound) const;
+		TFunction<void(const TArray<FVector>&)> OnPointsFound);
 
 protected:
 	virtual void BeginPlay() override;
@@ -141,7 +141,7 @@ private:
 		const TArray<FVector>& SamplePoints,
 		const FVector& ProjectionExtent,
 		TFunction<void(const TArray<FVector>&)> OnPointsFound,
-		const FString& DebugContext) const;
+		const FString& DebugContext);
 
 	void DebugProjectionAttempt(const FVector& Location, const FVector& Extent, const FString& Context) const;
 	void DebugProjectionResult(const FVector& Location, const bool bSuccess, const FString& Context) const;

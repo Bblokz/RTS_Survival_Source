@@ -1,0 +1,25 @@
+﻿ I want you to add a new struct and  enum to enemy field cosntruction component called the CreateFieldConstructionOrder
+ the struct needs to be in its own file (so we can reuse it elsewhere too) together with the enum and will be used in CreateFieldConstructionOrder let me first describe the enum
+ EAdditionalLocationsStrategy with the following values:
+ None, // stop like before; this order is completed.
+ ContinueOnClosestRoad // compute the average location of the squad controllers that are still in the order and find the closest 
+ ContinueOnAreaBetweenCurrentAndEnemyLocation // compute the average location of the squad controllers that are still in the order and find a location between that and the enemy location
+ this enemy location will be provided with the new struct as well. 
+ 
+ the new struct to add to the public function for the order:
+ FFindAddtionalLocationsStrategy
+ -- EAdditionalLocationsStrategy to see what the strategy will be.
+ -- FVector EnemyLocation; // only used when the strategy needs it.
+ -- int32 AmountOfLocationsToFind; // how many locations to find with the area strategy
+ -- float PointDensityScaler // how dense the points should be sampled when looking for locations. used in both area and road strategy.
+ 
+ make sure to keep this in the FEnemyFieldConstructionOrder.
+ then update the field construction component with a new private that is called when no points remain; this will return whether to search for more points.
+ if not stop like before. if we do search; realise that both of these strategies need to be async because they need to call the enemy navigation ai component functions.
+ so keep the struct order alive and call the appropriate function on the enemy navigation ai component. with callbacks that have a weak capture of the field construction component. also make sure we 
+ use an ID system for the orders so each order struct has a unique one (use an int32 and if we run out reset the id to zero and start incremting from there again)
+ now for the callback we first check if the struct of our id still exists (squads may have died in mean time and so the struct may have been deleted)
+ if so determine the strategies for the points like we did before and add them to the order struct.
+ note: make sure to also mark on the struct if it is awaiting an async point search and if so do not search again until the callback is done. so in that case when we get to the same point in the code
+ where there are no points left but we are waiting for async points just skip searching and keep the struct alive.
+ 

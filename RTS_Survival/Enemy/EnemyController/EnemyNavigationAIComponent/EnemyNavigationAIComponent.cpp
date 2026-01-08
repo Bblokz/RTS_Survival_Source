@@ -9,6 +9,7 @@
 #include "AI/Navigation/NavigationTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/SplineComponent.h"
+#include "NavAreas/NavArea_Default.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
@@ -49,8 +50,8 @@ namespace FEnemyNavigationAIHelpers
 		}
 
 		const float ExtentMultiplier = ProjectionFailedStrategy == EOnProjectionFailedStrategy::LookAtDoubleExtent
-			? DoubleExtentMultiplier
-			: 1.f;
+			                               ? DoubleExtentMultiplier
+			                               : 1.f;
 		const FVector OffsetExtent = ProjectionExtent * ExtentMultiplier;
 		Offsets.Reserve(4);
 		Offsets.Add(FVector(OffsetExtent.X, 0.f, 0.f));
@@ -76,10 +77,10 @@ namespace FEnemyNavigationAIHelpers
 		SamplePoints.Reserve(MaxPointsToReturn);
 
 		for (float XOffset = -AbsExtent.X; XOffset <= AbsExtent.X && SamplePoints.Num() < MaxPointsToReturn;
-			XOffset += SampleSpacing)
+		     XOffset += SampleSpacing)
 		{
 			for (float YOffset = -AbsExtent.Y; YOffset <= AbsExtent.Y && SamplePoints.Num() < MaxPointsToReturn;
-				YOffset += SampleSpacing)
+			     YOffset += SampleSpacing)
 			{
 				SamplePoints.Add(CenterPoint + FVector(XOffset, YOffset, 0.f));
 			}
@@ -106,45 +107,6 @@ namespace FEnemyNavigationAIHelpers
 		}
 
 		return SamplePoints;
-	}
-
-	TArray<FVector> ProjectDefaultCostPoints(
-		ARecastNavMesh* RecastNavMesh,
-		const TArray<FVector>& SamplePoints,
-		const FVector& ProjectionExtent)
-	{
-		TArray<FVector> ProjectedPoints;
-		if (RecastNavMesh == nullptr)
-		{
-			return ProjectedPoints;
-		}
-
-		TArray<FNavigationProjectionWork> ProjectionWork;
-		ProjectionWork.Reserve(SamplePoints.Num());
-		for (const FVector& SamplePoint : SamplePoints)
-		{
-			ProjectionWork.Emplace(SamplePoint, ProjectionExtent);
-		}
-
-		RecastNavMesh->BatchProjectPoints(ProjectionWork, ProjectionExtent);
-
-		ProjectedPoints.Reserve(ProjectionWork.Num());
-		for (const FNavigationProjectionWork& WorkItem : ProjectionWork)
-		{
-			if (not WorkItem.bResult)
-			{
-				continue;
-			}
-
-			if (not GetIsDefaultNavAreaAtLocation(RecastNavMesh, WorkItem.Result))
-			{
-				continue;
-			}
-
-			ProjectedPoints.Add(WorkItem.Result.Location);
-		}
-
-		return ProjectedPoints;
 	}
 
 	bool GetIsDefaultNavAreaAtLocation(
@@ -174,6 +136,53 @@ namespace FEnemyNavigationAIHelpers
 		}
 
 		return AreaClass->IsChildOf(UNavArea_Default::StaticClass());
+	}
+
+
+	TArray<FVector> ProjectDefaultCostPoints(
+		ARecastNavMesh* RecastNavMesh,
+		const TArray<FVector>& SamplePoints,
+		const FVector& ProjectionExtent)
+	{
+		TArray<FVector> ProjectedPoints;
+
+		if (not IsValid(RecastNavMesh) || SamplePoints.IsEmpty())
+		{
+			return ProjectedPoints;
+		}
+
+		TArray<FNavigationProjectionWork> ProjectionWork;
+		ProjectionWork.Reserve(SamplePoints.Num());
+
+		for (const FVector& SamplePoint : SamplePoints)
+		{
+			// 2nd ctor param is FBox (custom limits), NOT FVector extent.
+			// Rely on the shared ProjectionExtent passed to BatchProjectPoints.
+			ProjectionWork.Emplace(SamplePoint);
+		}
+
+		RecastNavMesh->BatchProjectPoints(ProjectionWork, ProjectionExtent);
+
+		ProjectedPoints.Reserve(ProjectionWork.Num());
+
+		for (const FNavigationProjectionWork& WorkItem : ProjectionWork)
+		{
+			if (not WorkItem.bIsValid || not WorkItem.bResult)
+			{
+				continue;
+			}
+
+			const FNavLocation& ProjectedNavLocation = WorkItem.OutLocation;
+
+			if (not GetIsDefaultNavAreaAtLocation(RecastNavMesh, ProjectedNavLocation))
+			{
+				continue;
+			}
+
+			ProjectedPoints.Add(ProjectedNavLocation.Location);
+		}
+
+		return ProjectedPoints;
 	}
 }
 
@@ -238,7 +247,8 @@ bool UEnemyNavigationAIComponent::GetNavPointDefaultCosts(
 	}
 
 	FNavLocation NavLocation;
-	if (TryProjectDefaultCostPointWithStrategy(OriginalLocation, ProjectionScale, ProjectionFailedStrategy, NavLocation))
+	if (TryProjectDefaultCostPointWithStrategy(OriginalLocation, ProjectionScale, ProjectionFailedStrategy,
+	                                           NavLocation))
 	{
 		OutProjectedLocation = NavLocation.Location;
 		return true;
@@ -254,7 +264,7 @@ void UEnemyNavigationAIComponent::FindDefaultNavCostPointsInAreaBetweenTwoPoints
 	const float SampleDensityScalar,
 	const float ProjectionScale,
 	const int32 MaxPointsToReturn,
-	TFunction<void(const TArray<FVector>&)> OnPointsFound) const
+	TFunction<void(const TArray<FVector>&)> OnPointsFound)
 {
 	if (not OnPointsFound)
 	{
@@ -311,7 +321,7 @@ void UEnemyNavigationAIComponent::FindDefaultNavCostPointsAlongClosestRoadSpline
 	const FVector& StartSearchPoint,
 	const float SampleDensityScalar,
 	const float ProjectionScale,
-	TFunction<void(const TArray<FVector>&)> OnPointsFound) const
+	TFunction<void(const TArray<FVector>&)> OnPointsFound)
 {
 	if (not OnPointsFound)
 	{
@@ -364,8 +374,7 @@ bool UEnemyNavigationAIComponent::EnsureEnemyControllerIsValid() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 		this,
 		TEXT("M_EnemyController"),
-		TEXT("EnsureEnemyControllerIsValid"),
-		this);
+		TEXT("EnsureEnemyControllerIsValid"));
 	return false;
 }
 
@@ -379,8 +388,7 @@ bool UEnemyNavigationAIComponent::GetIsValidRecastNavMesh() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 		this,
 		TEXT("M_RecastNavMesh"),
-		TEXT("GetIsValidRecastNavMesh"),
-		this);
+		TEXT("GetIsValidRecastNavMesh"));
 	return false;
 }
 
@@ -595,39 +603,39 @@ void UEnemyNavigationAIComponent::QueueDefaultCostBatchProjectionAsync(
 	const TArray<FVector>& SamplePoints,
 	const FVector& ProjectionExtent,
 	TFunction<void(const TArray<FVector>&)> OnPointsFound,
-	const FString& DebugContext) const
+	const FString& DebugContext)
 {
-	TWeakObjectPtr<UEnemyNavigationAIComponent> WeakThis = this;
+	TWeakObjectPtr<UEnemyNavigationAIComponent> WeakThis(this);
 	TWeakObjectPtr<ARecastNavMesh> WeakRecastNavMesh = M_RecastNavMesh;
 	TFunction<void(const TArray<FVector>&)> PointsFoundCallback = MoveTemp(OnPointsFound);
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask,
-		[WeakThis, WeakRecastNavMesh, ProjectionExtent, SamplePoints, PointsFoundCallback, DebugContext]() mutable
-		{
-			if (not WeakRecastNavMesh.IsValid())
-			{
-				AsyncTask(ENamedThreads::GameThread, [PointsFoundCallback]()
-				{
-					PointsFoundCallback({});
-				});
-				return;
-			}
+	          [WeakThis, WeakRecastNavMesh, ProjectionExtent, SamplePoints, PointsFoundCallback, DebugContext]() mutable
+	          {
+		          if (not WeakRecastNavMesh.IsValid())
+		          {
+			          AsyncTask(ENamedThreads::GameThread, [PointsFoundCallback]()
+			          {
+				          PointsFoundCallback({});
+			          });
+			          return;
+		          }
 
-			const TArray<FVector> ProjectedPoints = FEnemyNavigationAIHelpers::ProjectDefaultCostPoints(
-				WeakRecastNavMesh.Get(),
-				SamplePoints,
-				ProjectionExtent);
+		          const TArray<FVector> ProjectedPoints = FEnemyNavigationAIHelpers::ProjectDefaultCostPoints(
+			          WeakRecastNavMesh.Get(),
+			          SamplePoints,
+			          ProjectionExtent);
 
-			AsyncTask(ENamedThreads::GameThread,
-				[WeakThis, PointsFoundCallback, ProjectedPoints, DebugContext]() mutable
-				{
-					PointsFoundCallback(ProjectedPoints);
-					if (WeakThis.IsValid())
-					{
-						WeakThis->DebugBatchResult(ProjectedPoints, DebugContext);
-					}
-				});
-		});
+		          AsyncTask(ENamedThreads::GameThread,
+		                    [WeakThis, PointsFoundCallback, ProjectedPoints, DebugContext]() mutable
+		                    {
+			                    PointsFoundCallback(ProjectedPoints);
+			                    if (WeakThis.IsValid())
+			                    {
+				                    WeakThis->DebugBatchResult(ProjectedPoints, DebugContext);
+			                    }
+		                    });
+	          });
 }
 
 void UEnemyNavigationAIComponent::DebugProjectionAttempt(
@@ -637,7 +645,8 @@ void UEnemyNavigationAIComponent::DebugProjectionAttempt(
 {
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_NavDetector_DebugSymbols)
 	{
-		const FVector TextLocation = Location + FVector(0.f, 0.f, Extent.Z + FEnemyNavigationAIHelpers::DebugTextOffsetZ);
+		const FVector TextLocation = Location + FVector(
+			0.f, 0.f, Extent.Z + FEnemyNavigationAIHelpers::DebugTextOffsetZ);
 		DrawDebugSphere(
 			GetWorld(),
 			Location,
