@@ -6,6 +6,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
 
@@ -17,6 +18,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_FormationController = CreateDefaultSubobject<UEnemyFormationController>(TEXT("FormationController"));
 	M_WaveController = CreateDefaultSubobject<UEnemyWaveController>(TEXT("WaveController"));
 	M_FieldConstructionComponent = CreateDefaultSubobject<UEnemyFieldConstructionComponent>(TEXT("FieldConstructionComponent"));
+	M_EnemyNavigationAIComponent = CreateDefaultSubobject<UEnemyNavigationAIComponent>(TEXT("EnemyNavigationAIComponent"));
 	if(M_FormationController)
 	{
 		M_FormationController->InitFormationController(this);
@@ -29,6 +31,10 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	if (M_FieldConstructionComponent)
 	{
 		M_FieldConstructionComponent->InitFieldConstructionComponent(this);
+	}
+	if (M_EnemyNavigationAIComponent)
+	{
+		M_EnemyNavigationAIComponent->InitNavigationAIComponent(this);
 	}
 	
 }
@@ -133,6 +139,16 @@ void AEnemyController::AddToWaveSupply(const int32 AddSupply)
 	M_Resources.WaveSupply += AddSupply;
 }
 
+UEnemyNavigationAIComponent* AEnemyController::GetEnemyNavigationAIComponent() const
+{
+	if (not GetIsValidEnemyNavigationAIComponent())
+	{
+		return nullptr;
+	}
+
+	return M_EnemyNavigationAIComponent;
+}
+
 void AEnemyController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -185,6 +201,16 @@ bool AEnemyController::GetIsValidFieldConstructionComponent() const
 	if (not IsValid(M_FieldConstructionComponent))
 	{
 		RTSFunctionLibrary::ReportError("Invalid field construction component for enemy controller!");
+		return false;
+	}
+	return true;
+}
+
+bool AEnemyController::GetIsValidEnemyNavigationAIComponent() const
+{
+	if (not IsValid(M_EnemyNavigationAIComponent))
+	{
+		RTSFunctionLibrary::ReportError("Invalid enemy navigation AI component for enemy controller!");
 		return false;
 	}
 	return true;
