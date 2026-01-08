@@ -5,10 +5,12 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionTypes/FieldConstructionTypes.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/FindAdditionalLocationsStrategy.h"
 #include "EnemyFieldConstructionComponent.generated.h"
 
 class AEnemyController;
 class ASquadController;
+class UEnemyNavigationAIComponent;
 class UFieldConstructionAbilityComponent;
 
 UENUM(BlueprintType)
@@ -68,6 +70,9 @@ struct FEnemyFieldConstructionOrder
 	TArray<FVector> ConstructionLocations;
 
 	UPROPERTY()
+	FFindAddtionalLocationsStrategy AdditionalLocationsStrategy;
+
+	UPROPERTY()
 	EFieldConstructionStrategy Strategy = EFieldConstructionStrategy::None;
 
 	// Filtered hierarchy based on selected strategy and available construction abilities.
@@ -76,6 +81,13 @@ struct FEnemyFieldConstructionOrder
 
 	UPROPERTY()
 	FFieldConstructionLocationsStrategy LocationStrategy;
+
+	UPROPERTY()
+	int32 OrderId = 0;
+
+	// When true the order is waiting on async location sampling to finish.
+	UPROPERTY()
+	bool bIsAwaitingAdditionalLocationsSearch = false;
 };
 
 /**
@@ -95,12 +107,14 @@ public:
 	 * @brief Creates a field construction order and assigns construction types based on the chosen strategy.
 	 * @param SquadControllers Squads considered for construction abilities.
 	 * @param ConstructionLocations Locations to fill with field constructions.
+	 * @param AdditionalLocationsStrategy Strategy to fetch more locations when the order runs out.
 	 * @param Strategy Desired strategy or None to pick automatically.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void CreateFieldConstructionOrder(
 		const TArray<ASquadController*>& SquadControllers,
 		const TArray<FVector>& ConstructionLocations,
+		const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy,
 		const EFieldConstructionStrategy Strategy = EFieldConstructionStrategy::None);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -120,6 +134,7 @@ private:
 	FTimerHandle M_FieldConstructionTimerHandle;
 
 	float M_FieldConstructionOrderInterval = 20.f;
+	int32 M_NextFieldConstructionOrderId = 0;
 
 	void StartFieldConstructionTimerIfNeeded();
 	void StopFieldConstructionTimerIfIdle();
@@ -127,6 +142,15 @@ private:
 	void ProcessFieldConstructionOrders();
 	void RemoveInvalidSquadEntries(FEnemyFieldConstructionOrder& Order) const;
 	void RemoveUnavailableLocationPairs(FEnemyFieldConstructionOrder& Order) const;
+	bool TryHandleEmptyLocationPairs(FEnemyFieldConstructionOrder& Order);
+	bool TryQueueAdditionalLocationsOnClosestRoad(
+		FEnemyFieldConstructionOrder& Order,
+		const FVector& AverageSquadLocation,
+		UEnemyNavigationAIComponent* EnemyNavigationAIComponent);
+	bool TryQueueAdditionalLocationsInAreaBetweenSquadAndEnemy(
+		FEnemyFieldConstructionOrder& Order,
+		const FVector& AverageSquadLocation,
+		UEnemyNavigationAIComponent* EnemyNavigationAIComponent);
 
 	void BuildOrderSquadAbilityData(FEnemyFieldConstructionOrder& Order,
 	                                const TArray<ASquadController*>& SquadControllers) const;
@@ -149,6 +173,11 @@ private:
 		const TArray<FVector>& Locations,
 		const TArray<EFieldConstructionType>& ConstructionTypes,
 		const bool bRandomizeTypes) const;
+
+	FEnemyFieldConstructionOrder* GetFieldConstructionOrderById(const int32 OrderId);
+	bool TryGetAverageSquadLocation(const FEnemyFieldConstructionOrder& Order, FVector& OutAverageLocation) const;
+	int32 GetNextFieldConstructionOrderId();
+	void HandleAdditionalLocationsFound(const int32 OrderId, const TArray<FVector>& Locations);
 
 	TArray<EFieldConstructionType> GetAvailableFieldConstructionTypes(const FEnemyFieldConstructionOrder& Order) const;
 

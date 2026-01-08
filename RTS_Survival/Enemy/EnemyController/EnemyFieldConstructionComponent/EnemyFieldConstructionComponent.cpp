@@ -3,6 +3,7 @@
 #include "EnemyFieldConstructionComponent.h"
 
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -14,6 +15,10 @@ namespace EnemyFieldConstructionConstants
 	constexpr int32 MaxConstructionAssignmentAttempts = 8;
 	constexpr float DefaultFieldConstructionIntervalSeconds = 6.f;
 	constexpr float MinFieldConstructionIntervalSeconds = 0.1f;
+	constexpr float AdditionalLocationsProjectionScale = 1.f;
+	constexpr float AdditionalLocationsAreaExtentScale = 0.5f;
+	constexpr float AdditionalLocationsAreaMinExtent = 500.f;
+	constexpr float AdditionalLocationsAreaExtentZ = 100.f;
 }
 
 UEnemyFieldConstructionComponent::UEnemyFieldConstructionComponent()
@@ -30,6 +35,7 @@ void UEnemyFieldConstructionComponent::InitFieldConstructionComponent(AEnemyCont
 void UEnemyFieldConstructionComponent::CreateFieldConstructionOrder(
 	const TArray<ASquadController*>& SquadControllers,
 	const TArray<FVector>& ConstructionLocations,
+	const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy,
 	const EFieldConstructionStrategy Strategy)
 {
 	if (SquadControllers.Num() == 0 || ConstructionLocations.Num() == 0)
@@ -37,7 +43,9 @@ void UEnemyFieldConstructionComponent::CreateFieldConstructionOrder(
 		return;
 	}
 	FEnemyFieldConstructionOrder NewOrder;
+	NewOrder.OrderId = GetNextFieldConstructionOrderId();
 	NewOrder.ConstructionLocations = ConstructionLocations;
+	NewOrder.AdditionalLocationsStrategy = AdditionalLocationsStrategy;
 	BuildOrderSquadAbilityData(NewOrder, SquadControllers);
 	if (NewOrder.SquadConstructionData.Num() == 0)
 	{
@@ -169,24 +177,33 @@ void UEnemyFieldConstructionComponent::ProcessFieldConstructionOrders()
 
 	if (Order.LocationStrategy.LocationPairs.Num() == 0)
 	{
-		M_FieldConstructionOrders.RemoveAt(0);
-		StopFieldConstructionTimerIfIdle();
+		if (not TryHandleEmptyLocationPairs(Order))
+		{
+			M_FieldConstructionOrders.RemoveAt(0);
+			StopFieldConstructionTimerIfIdle();
+		}
 		return;
 	}
 
 	RemoveUnavailableLocationPairs(Order);
 	if (Order.LocationStrategy.LocationPairs.Num() == 0)
 	{
-		M_FieldConstructionOrders.RemoveAt(0);
-		StopFieldConstructionTimerIfIdle();
+		if (not TryHandleEmptyLocationPairs(Order))
+		{
+			M_FieldConstructionOrders.RemoveAt(0);
+			StopFieldConstructionTimerIfIdle();
+		}
 		return;
 	}
 
 	TryAssignConstructionToIdleSquads(Order);
 	if (Order.LocationStrategy.LocationPairs.Num() == 0)
 	{
-		M_FieldConstructionOrders.RemoveAt(0);
-		StopFieldConstructionTimerIfIdle();
+		if (not TryHandleEmptyLocationPairs(Order))
+		{
+			M_FieldConstructionOrders.RemoveAt(0);
+			StopFieldConstructionTimerIfIdle();
+		}
 	}
 }
 
@@ -236,6 +253,150 @@ void UEnemyFieldConstructionComponent::RemoveUnavailableLocationPairs(FEnemyFiel
 	{
 		return not AvailableTypeSet.Contains(Pair.ConstructionType);
 	});
+}
+
+bool UEnemyFieldConstructionComponent::TryHandleEmptyLocationPairs(FEnemyFieldConstructionOrder& Order)
+{
+	if (Order.LocationStrategy.LocationPairs.Num() > 0)
+	{
+		return true;
+	}
+
+	if (Order.bIsAwaitingAdditionalLocationsSearch)
+	{
+		return true;
+	}
+
+	if (Order.AdditionalLocationsStrategy.Strategy == EAdditionalLocationsStrategy::None)
+	{
+		return false;
+	}
+
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return false;
+	}
+
+	AEnemyController* EnemyController = M_EnemyController.Get();
+	if (not IsValid(EnemyController))
+	{
+		return false;
+	}
+
+	UEnemyNavigationAIComponent* EnemyNavigationAIComponent = EnemyController->GetEnemyNavigationAIComponent();
+	if (not IsValid(EnemyNavigationAIComponent))
+	{
+		return false;
+	}
+
+	FVector AverageSquadLocation = FVector::ZeroVector;
+	if (not TryGetAverageSquadLocation(Order, AverageSquadLocation))
+	{
+		return false;
+	}
+
+	const EAdditionalLocationsStrategy Strategy = Order.AdditionalLocationsStrategy.Strategy;
+	if (Strategy == EAdditionalLocationsStrategy::ContinueOnClosestRoad)
+	{
+		return TryQueueAdditionalLocationsOnClosestRoad(Order, AverageSquadLocation, EnemyNavigationAIComponent);
+	}
+
+	if (Strategy == EAdditionalLocationsStrategy::ContinueOnAreaBetweenCurrentAndEnemyLocation)
+	{
+		return TryQueueAdditionalLocationsInAreaBetweenSquadAndEnemy(
+			Order,
+			AverageSquadLocation,
+			EnemyNavigationAIComponent);
+	}
+
+	return false;
+}
+
+bool UEnemyFieldConstructionComponent::TryQueueAdditionalLocationsOnClosestRoad(
+	FEnemyFieldConstructionOrder& Order,
+	const FVector& AverageSquadLocation,
+	UEnemyNavigationAIComponent* EnemyNavigationAIComponent)
+{
+	if (not IsValid(EnemyNavigationAIComponent))
+	{
+		return false;
+	}
+
+	const int32 OrderId = Order.OrderId;
+	Order.bIsAwaitingAdditionalLocationsSearch = true;
+
+	const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy = Order.AdditionalLocationsStrategy;
+	TWeakObjectPtr<UEnemyFieldConstructionComponent> WeakThis(this);
+
+	EnemyNavigationAIComponent->FindDefaultNavCostPointsAlongClosestRoadSplineAsync(
+		AverageSquadLocation,
+		AdditionalLocationsStrategy.PointDensityScaler,
+		EnemyFieldConstructionConstants::AdditionalLocationsProjectionScale,
+		[WeakThis, OrderId](const TArray<FVector>& Points)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->HandleAdditionalLocationsFound(OrderId, Points);
+		});
+
+	return true;
+}
+
+bool UEnemyFieldConstructionComponent::TryQueueAdditionalLocationsInAreaBetweenSquadAndEnemy(
+	FEnemyFieldConstructionOrder& Order,
+	const FVector& AverageSquadLocation,
+	UEnemyNavigationAIComponent* EnemyNavigationAIComponent)
+{
+	if (not IsValid(EnemyNavigationAIComponent))
+	{
+		return false;
+	}
+
+	const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy = Order.AdditionalLocationsStrategy;
+	if (AdditionalLocationsStrategy.AmountOfLocationsToFind <= 0)
+	{
+		return false;
+	}
+
+	const int32 OrderId = Order.OrderId;
+	Order.bIsAwaitingAdditionalLocationsSearch = true;
+
+	const FVector EnemyLocation = AdditionalLocationsStrategy.EnemyLocation;
+	const FVector DistanceDelta = EnemyLocation - AverageSquadLocation;
+	const FVector AbsDelta = DistanceDelta.GetAbs();
+	const float BoxExtentX = FMath::Max(
+		AbsDelta.X * EnemyFieldConstructionConstants::AdditionalLocationsAreaExtentScale,
+		EnemyFieldConstructionConstants::AdditionalLocationsAreaMinExtent);
+	const float BoxExtentY = FMath::Max(
+		AbsDelta.Y * EnemyFieldConstructionConstants::AdditionalLocationsAreaExtentScale,
+		EnemyFieldConstructionConstants::AdditionalLocationsAreaMinExtent);
+	const FVector BoxExtent(
+		BoxExtentX,
+		BoxExtentY,
+		EnemyFieldConstructionConstants::AdditionalLocationsAreaExtentZ);
+
+	TWeakObjectPtr<UEnemyFieldConstructionComponent> WeakThis(this);
+	EnemyNavigationAIComponent->FindDefaultNavCostPointsInAreaBetweenTwoPointsAsync(
+		AverageSquadLocation,
+		EnemyLocation,
+		BoxExtent,
+		AdditionalLocationsStrategy.PointDensityScaler,
+		EnemyFieldConstructionConstants::AdditionalLocationsProjectionScale,
+		AdditionalLocationsStrategy.AmountOfLocationsToFind,
+		[WeakThis, OrderId](const TArray<FVector>& Points)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->HandleAdditionalLocationsFound(OrderId, Points);
+		});
+
+	return true;
 }
 
 void UEnemyFieldConstructionComponent::BuildOrderSquadAbilityData(
@@ -587,6 +748,86 @@ void UEnemyFieldConstructionComponent::AppendLocationPairs(
 		Pair.ConstructionType = SelectedType;
 		OutPairs.Add(Pair);
 	}
+}
+
+FEnemyFieldConstructionOrder* UEnemyFieldConstructionComponent::GetFieldConstructionOrderById(const int32 OrderId)
+{
+	for (FEnemyFieldConstructionOrder& Order : M_FieldConstructionOrders)
+	{
+		if (Order.OrderId == OrderId)
+		{
+			return &Order;
+		}
+	}
+
+	return nullptr;
+}
+
+bool UEnemyFieldConstructionComponent::TryGetAverageSquadLocation(
+	const FEnemyFieldConstructionOrder& Order,
+	FVector& OutAverageLocation) const
+{
+	if (Order.SquadConstructionData.Num() == 0)
+	{
+		return false;
+	}
+
+	FVector LocationSum = FVector::ZeroVector;
+	int32 ValidSquadCount = 0;
+	for (const FEnemyFieldConstructionSquadEntry& SquadEntry : Order.SquadConstructionData)
+	{
+		const ASquadController* SquadController = SquadEntry.SquadController.Get();
+		if (not IsValid(SquadController))
+		{
+			continue;
+		}
+
+		LocationSum += SquadController->GetActorLocation();
+		++ValidSquadCount;
+	}
+
+	if (ValidSquadCount == 0)
+	{
+		return false;
+	}
+
+	OutAverageLocation = LocationSum / static_cast<float>(ValidSquadCount);
+	return true;
+}
+
+int32 UEnemyFieldConstructionComponent::GetNextFieldConstructionOrderId()
+{
+	const int32 NextOrderId = M_NextFieldConstructionOrderId;
+	if (M_NextFieldConstructionOrderId == TNumericLimits<int32>::Max())
+	{
+		M_NextFieldConstructionOrderId = 0;
+	}
+	else
+	{
+		++M_NextFieldConstructionOrderId;
+	}
+
+	return NextOrderId;
+}
+
+void UEnemyFieldConstructionComponent::HandleAdditionalLocationsFound(
+	const int32 OrderId,
+	const TArray<FVector>& Locations)
+{
+	FEnemyFieldConstructionOrder* Order = GetFieldConstructionOrderById(OrderId);
+	if (Order == nullptr)
+	{
+		return;
+	}
+
+	Order->bIsAwaitingAdditionalLocationsSearch = false;
+	if (Locations.Num() == 0)
+	{
+		return;
+	}
+
+	Order->ConstructionLocations = Locations;
+	BuildLocationStrategyForOrder(*Order);
 }
 
 TArray<EFieldConstructionType> UEnemyFieldConstructionComponent::GetAvailableFieldConstructionTypes(

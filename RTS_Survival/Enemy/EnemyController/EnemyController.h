@@ -101,12 +101,14 @@ public:
 	 * @brief Assigns squads to construct field constructions at provided locations.
 	 * @param SquadControllers Squads used to determine available field constructions.
 	 * @param ConstructionLocations Locations to build at.
+	 * @param AdditionalLocationsStrategy Strategy to fetch more locations when the order runs out.
 	 * @param Strategy Desired strategy or None to pick one automatically.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void CreateFieldConstructionOrder(
 		const TArray<ASquadController*>& SquadControllers,
 		const TArray<FVector>& ConstructionLocations,
+		const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy,
 		const EFieldConstructionStrategy Strategy = EFieldConstructionStrategy::None);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
