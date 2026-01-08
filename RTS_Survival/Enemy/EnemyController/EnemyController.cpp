@@ -102,6 +102,7 @@ void AEnemyController::CreateSingleAttackWave(
 void AEnemyController::CreateFieldConstructionOrder(
 	const TArray<ASquadController*>& SquadControllers,
 	const TArray<FVector>& ConstructionLocations,
+	const FFindAddtionalLocationsStrategy& AdditionalLocationsStrategy,
 	const EFieldConstructionStrategy Strategy)
 {
 	if (not GetIsValidFieldConstructionComponent())
@@ -112,6 +113,7 @@ void AEnemyController::CreateFieldConstructionOrder(
 	M_FieldConstructionComponent->CreateFieldConstructionOrder(
 		SquadControllers,
 		ConstructionLocations,
+		AdditionalLocationsStrategy,
 		Strategy);
 }
 
