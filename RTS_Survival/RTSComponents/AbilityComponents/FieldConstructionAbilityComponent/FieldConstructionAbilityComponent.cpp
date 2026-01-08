@@ -966,7 +966,7 @@ void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSit
 			DesiredRadiusFromCenter,
 			NavigationProjectionExtent))
 		{
-			RTSFunctionLibrary::ReportError("Failed to safely teleport a squad unit for field construction.");
+			RTSFunctionLibrary::PrintString("Failed to safely teleport a squad unit for field construction.");
 		}
 	}
 }

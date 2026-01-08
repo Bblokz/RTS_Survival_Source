@@ -123,6 +123,14 @@ bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 A
 			RTSFunctionLibrary::ReportError(
 				TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
 				TEXT(" in UCommandData::AddAbility"));
+			for (int32 i = 0; i < M_Abilities.Num(); i++)
+			{
+				if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
+				{
+					M_Abilities[i] = NewAbility;
+					return true;
+				}
+			}
 			return false;
 		}
 		M_Abilities[AtIndex] = NewAbility;
@@ -340,7 +348,7 @@ const FQueueCommand* UCommandData::GetCurrentQueuedCommand() const
 	{
 		return &M_TCommands[CurrentIndex];
 	}
-	return nullptr;	
+	return nullptr;
 }
 
 
@@ -2250,7 +2258,8 @@ void ICommands::ExecuteFieldConstructionCommand(const EFieldConstructionType Fie
 {
 }
 
-void ICommands::TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType, AActor* StaticPreviewActor)
+void ICommands::TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType,
+                                                  AActor* StaticPreviewActor)
 {
 }
 
@@ -2526,7 +2535,7 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdFieldConstruction:
 		{
 			UCommandData* CommandData = GetIsValidCommandData();
-			if(not CommandData)
+			if (not CommandData)
 			{
 				return;
 			}

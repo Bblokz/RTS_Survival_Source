@@ -1383,7 +1383,7 @@ namespace DeveloperSettings
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
-		constexpr bool GEnemyController_Compile_DebugSymbols = true;
+		constexpr bool GEnemyController_Compile_DebugSymbols = false;
 		constexpr bool GEnemyController_NavDetector_DebugSymbols = true;
 		constexpr bool ExplosionsManager_Compile_DebugSymbols = false;
 		constexpr bool GPlayerStartLocations_Compile_DebugSymbols = false;
@@ -1397,7 +1397,7 @@ namespace DeveloperSettings
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;
-		constexpr bool GAOELibrary_Compile_DebugSymbols = true;
+		constexpr bool GAOELibrary_Compile_DebugSymbols = false;
 		// Damage taken on actors
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
 		// ICommands.
