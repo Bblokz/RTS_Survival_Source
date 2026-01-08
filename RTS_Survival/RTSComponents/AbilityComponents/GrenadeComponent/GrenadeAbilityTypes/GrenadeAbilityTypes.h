@@ -9,4 +9,8 @@ enum class EGrenadeAbilityType : uint8
 {
 	DefaultGerBundleGrenade,
 	GerAtGrenade,
+	GerStickGrenade,
+	SmallGrenade,
+	BundleSturmKommando,
+	StickGrenadeVultures,
 };

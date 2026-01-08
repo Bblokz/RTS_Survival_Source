@@ -154,4 +154,6 @@ public:
 	static FVector GetLocationProjected(const UObject* WorldContextObject, const FVector& OriginalLocation,
 	                                    const bool bExtentInZ, bool& bOutWasSuccessful,
 	                                    const float ProjectionScale = 1.f);
+
+	
 };

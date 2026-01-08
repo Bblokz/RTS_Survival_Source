@@ -119,7 +119,7 @@ private:
 
 	FTimerHandle M_FieldConstructionTimerHandle;
 
-	float M_FieldConstructionOrderInterval = 0.f;
+	float M_FieldConstructionOrderInterval = 20.f;
 
 	void StartFieldConstructionTimerIfNeeded();
 	void StopFieldConstructionTimerIfIdle();

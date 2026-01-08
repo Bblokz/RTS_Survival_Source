@@ -9,9 +9,13 @@
 #include "Logging/LogMacros.h"
 #include "Misc/OutputDeviceRedirector.h"
 #include "Misc/OutputDevice.h"
+#include "NavAreas/NavArea_Default.h"
+#include "NavMesh/NavMeshPath.h"
+#include "NavMesh/RecastNavMesh.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 
+class ARecastNavMesh;
 DEFINE_LOG_CATEGORY(LogRTS);
 
 
@@ -364,6 +368,37 @@ USoundAttenuation* RTSFunctionLibrary::CreateSoundAttenuation(float Range)
 	return SoundAttenuation;
 }
 
+
+
+static bool GetIsDefaultNavAreaAtLocation(
+    const ARecastNavMesh* const RecastNavMesh,
+    const FNavLocation& NavLocation)
+{
+    if (RecastNavMesh == nullptr)
+    {
+        return false;
+    }
+
+    if (!NavLocation.HasNodeRef())
+    {
+        return false;
+    }
+
+    FNavMeshNodeFlags PolyFlags;
+    if (!RecastNavMesh->GetPolyFlags(NavLocation.NodeRef, PolyFlags))
+    {
+        return false;
+    }
+
+    const UClass* const AreaClass = RecastNavMesh->GetAreaClass(PolyFlags.Area);
+    if (AreaClass == nullptr)
+    {
+        return false;
+    }
+
+    return AreaClass->IsChildOf(UNavArea_Default::StaticClass());
+}
+
 FVector RTSFunctionLibrary::GetLocationProjected(const UObject* WorldContextObject, const FVector& OriginalLocation,
                                                  const bool bExtentInZ, bool& bOutWasSuccessful,
                                                  const float ProjectionScale)
@@ -383,14 +418,24 @@ FVector RTSFunctionLibrary::GetLocationProjected(const UObject* WorldContextObje
 		return OriginalLocation;
 	}
 	FNavLocation ProjectedLocation;
+	
 
 	if (NavSys->ProjectPointToNavigation(OriginalLocation, ProjectedLocation, Extent))
 	{
 		// Successfully projected onto navmesh
 		bOutWasSuccessful = true;
 
-		DrawDebugSphere(WorldContextObject->GetWorld(), ProjectedLocation.Location,
-		                25.0f, 12, FColor::Blue, false, 10.0f, 0, 2);
+		ARecastNavMesh* RecastNavMesh = Cast<ARecastNavMesh>(NavSys->GetDefaultNavDataInstance(FNavigationSystem::DontCreate));
+		if(GetIsDefaultNavAreaAtLocation(RecastNavMesh, ProjectedLocation))
+		{
+			DrawDebugSphere(WorldContextObject->GetWorld(), ProjectedLocation.Location, 25.f, 12, FColor::Green, false, 5.f);
+		}
+		else
+		{
+			DrawDebugSphere(WorldContextObject->GetWorld(), ProjectedLocation.Location, 25.f, 12, FColor::Red, false, 5.f);
+		}
+		
+
 		return ProjectedLocation.Location;
 	}
 	return OriginalLocation;
