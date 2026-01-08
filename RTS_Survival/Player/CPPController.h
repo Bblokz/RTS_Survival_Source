@@ -37,6 +37,7 @@
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
+#include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Player/Abilities.h"
@@ -218,6 +219,10 @@ struct FPlayerProfileLoadingStatus
 	bool bInitializeHqResourceBonusesFromProfileCardsOnLoad = false;
 };
 
+/**
+ * @brief Main player controller used to route input, UI, and player gameplay setup.
+ * @note InitPlayerController: call in blueprint to initialize runtime references.
+ */
 UCLASS()
 class RTS_SURVIVAL_API ACPPController : public APlayerController
 {
@@ -303,6 +308,18 @@ public:
 	// Called for custom missions to init the player profile.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MissionOnHqSpawned(const FUnitCost BonusPerResource);
+
+	/**
+	 * @brief Spawns a batch of reinforcement units and directs them to a projected formation point.
+	 * @param WaveElements Options and spawn locations for each unit in the batch.
+	 * @param ProjectionExtentScale Scale used to project the formation location to navigable space.
+	 * @param CenterFormationLocation Center location for the formation movement orders.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Reinforcements")
+	void SpawnReinforcementAttackWave(
+		const TArray<FAttackWaveElement>& WaveElements,
+		const float ProjectionExtentScale,
+		const FVector& CenterFormationLocation);
 
 	/**
 	 * @brief Called by CPPGameState when the UpdateComponent is loaded.

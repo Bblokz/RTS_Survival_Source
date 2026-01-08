@@ -52,6 +52,98 @@
 #include "SelectionHelpers/PlayerSelectionHelpers.h"
 #include "StartGameProfileManager/PlayerProfileLoader.h"
 
+namespace
+{
+	bool TryGetAttackWaveTrainingOption(const FAttackWaveElement& WaveElement, FTrainingOption& OutTrainingOption)
+	{
+		if (WaveElement.UnitOptions.IsEmpty())
+		{
+			RTSFunctionLibrary::ReportError(
+				"Attack wave element has no unit options in SpawnReinforcementAttackWave.");
+			return false;
+		}
+
+		const int32 OptionIndex = FMath::RandRange(0, WaveElement.UnitOptions.Num() - 1);
+		if (not WaveElement.UnitOptions.IsValidIndex(OptionIndex))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Invalid attack wave option index in SpawnReinforcementAttackWave.");
+			return false;
+		}
+
+		OutTrainingOption = WaveElement.UnitOptions[OptionIndex];
+		return true;
+	}
+
+	FVector GetFormationMoveLocation(
+		const FVector& CenterFormationLocation,
+		const float FormationRadius,
+		const int32 UnitId)
+	{
+		const int32 EvenDivisor = 2;
+		const int32 FourDivisor = 4;
+		const int32 ThreeDivisor = 3;
+
+		FVector FormationLocation = CenterFormationLocation;
+		if (UnitId == 0)
+		{
+			return FormationLocation;
+		}
+		if (UnitId % EvenDivisor == 0)
+		{
+			const bool bIsFourMod = UnitId % FourDivisor == 0;
+			FormationLocation.X += bIsFourMod ? FormationRadius : -FormationRadius;
+			return FormationLocation;
+		}
+
+		const bool bIsThreeMod = UnitId % ThreeDivisor == 0;
+		FormationLocation.Y += bIsThreeMod ? FormationRadius : -FormationRadius;
+		return FormationLocation;
+	}
+
+	void HandleReinforcementSpawned(
+		const TWeakObjectPtr<ACPPController>& WeakThis,
+		const FVector& CenterFormationLocation,
+		const float ProjectionExtentScale,
+		AActor* SpawnedActor,
+		const int32 UnitId)
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		if (not IsValid(SpawnedActor))
+		{
+			return;
+		}
+
+		URTSComponent* RTSComponent = SpawnedActor->FindComponentByClass<URTSComponent>();
+		if (not IsValid(RTSComponent))
+		{
+			return;
+		}
+
+		const float FormationRadius = RTSComponent->GetFormationUnitInnerRadius();
+		const FVector FormationLocation = GetFormationMoveLocation(
+			CenterFormationLocation,
+			FormationRadius,
+			UnitId);
+
+		bool bOutWasSuccessful = false;
+		const FVector ProjectedLocation = RTSFunctionLibrary::GetLocationProjected(
+			WeakThis.Get(),
+			FormationLocation,
+			true,
+			bOutWasSuccessful,
+			ProjectionExtentScale);
+
+		if (ICommands* Commands = Cast<ICommands>(SpawnedActor))
+		{
+			Commands->MoveToLocation(ProjectedLocation, true, FRotator::ZeroRotator);
+		}
+	}
+}
+
 
 class RTS_SURVIVAL_API AStaticPreviewMesh;
 /**
@@ -430,6 +522,60 @@ void ACPPController::MissionOnHqSpawned(const FUnitCost BonusPerResource)
 	}
 	M_PlayerResourceManager->AddCustomResourceBonuses(ExtraResourceBonuses);
 	OnPlayerProfileLoadComplete();
+}
+
+void ACPPController::SpawnReinforcementAttackWave(
+	const TArray<FAttackWaveElement>& WaveElements,
+	const float ProjectionExtentScale,
+	const FVector& CenterFormationLocation)
+{
+	if (not GetIsValidAsyncSpawner())
+	{
+		return;
+	}
+	if (WaveElements.IsEmpty())
+	{
+		return;
+	}
+
+	int32 SpawnId = 0;
+	TWeakObjectPtr<ACPPController> WeakThis(this);
+
+	for (const FAttackWaveElement& WaveElement : WaveElements)
+	{
+		FTrainingOption TrainingOption;
+		if (not TryGetAttackWaveTrainingOption(WaveElement, TrainingOption))
+		{
+			continue;
+		}
+
+		const int32 SpawnIdForUnit = SpawnId;
+		SpawnId++;
+
+		auto OnSpawned = [WeakThis, CenterFormationLocation, ProjectionExtentScale](
+			const FTrainingOption& Option,
+			AActor* SpawnedActor,
+			const int32 ID)
+		{
+			HandleReinforcementSpawned(
+				WeakThis,
+				CenterFormationLocation,
+				ProjectionExtentScale,
+				SpawnedActor,
+				ID);
+		};
+
+		if (not M_RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
+			TrainingOption,
+			WaveElement.SpawnLocation,
+			this,
+			SpawnIdForUnit,
+			OnSpawned))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Failed to request async reinforcement spawn in SpawnReinforcementAttackWave.");
+		}
+	}
 }
 
 void ACPPController::OnRTSGameSettingsLoaded(URTSGameSettingsHandler* RTSGameSettings)
@@ -3753,6 +3899,10 @@ void ACPPController::DirectActionButtonReinforce()
 	}
 	PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdReinforceSquad),
 	                                false);
+	if (CommandsExe > 0)
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ReinforcementsHaveArrived, true, false);
+	}
 }
 
 void ACPPController::DirectActionButtonFieldConstruction(const EFieldConstructionType ConstructionType)
