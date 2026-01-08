@@ -424,18 +424,6 @@ FVector RTSFunctionLibrary::GetLocationProjected(const UObject* WorldContextObje
 	{
 		// Successfully projected onto navmesh
 		bOutWasSuccessful = true;
-
-		ARecastNavMesh* RecastNavMesh = Cast<ARecastNavMesh>(NavSys->GetDefaultNavDataInstance(FNavigationSystem::DontCreate));
-		if(GetIsDefaultNavAreaAtLocation(RecastNavMesh, ProjectedLocation))
-		{
-			DrawDebugSphere(WorldContextObject->GetWorld(), ProjectedLocation.Location, 25.f, 12, FColor::Green, false, 5.f);
-		}
-		else
-		{
-			DrawDebugSphere(WorldContextObject->GetWorld(), ProjectedLocation.Location, 25.f, 12, FColor::Red, false, 5.f);
-		}
-		
-
 		return ProjectedLocation.Location;
 	}
 	return OriginalLocation;

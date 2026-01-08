@@ -1,0 +1,126 @@
+﻿ you will create a new component for the enemy controller called enemy navigation AI.
+ this comp will have several functions to help with determiening what areas are navigatable for enemy units and what areas are not.
+ 
+ General rule; make use of the GEnemyController_NavDetector_DebugSymbols bool from the developer settings to create if constexpr debug symbols
+ for visualizing what the nav detector is doing. I expect you to make nice private functions to call if this if cosnt expr is one wthich take context from the functions they are in
+ to give a lot of info for debugging without cluttering the main functions.
+ 
+ the first public func will be get navigable point. it will be very similair to the function:
+ 
+FVector RTSFunctionLibrary::GetLocationProjected(const UObject* WorldContextObject, const FVector& OriginalLocation,
+                                                 const bool bExtentInZ, bool& bOutWasSuccessful,
+                                                 const float ProjectionScale)
+{
+	bOutWasSuccessful = false;
+	if (not IsValid(WorldContextObject))
+	{
+		return OriginalLocation;
+	}
+	const FVector RTSExtent = DeveloperSettings::GamePlay::Navigation::RTSToNavProjectionExtent * ProjectionScale;
+	const FVector Extent = bExtentInZ ? RTSExtent : RTSExtent * FVector(1.f, 1.f, 0.f);
+
+
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(WorldContextObject->GetWorld());
+	if (not NavSys)
+	{
+		return OriginalLocation;
+	}
+	FNavLocation ProjectedLocation;
+	
+
+	if (NavSys->ProjectPointToNavigation(OriginalLocation, ProjectedLocation, Extent))
+	{
+		// Successfully projected onto navmesh
+		bOutWasSuccessful = true;
+		return ProjectedLocation.Location;
+	}
+	return OriginalLocation;
+}
+but without the bool for z: MAKE SURE THIS ONE ALWAYS PROJECTS IN Z TOO.
+do keep a scaler param for the extent though so we can make smaller or larger prjections if needed.
+also provide this function with an enum:
+EOnProjectionFailedStrategy
+{
+None,
+LookAtXY,
+LookAtDoubleExtent
+ }
+ where if the projection fails and the strategy is not None then we do one of the following:
+ at LookAtXY: we try to find the nav location by iteratively projecting original + X offset RTSToNavProjectionExtent * ProjectionScale (so at the end of our original projection in positive world x)
+ if that fails we try -X if that fails we try Y and then -Y and if all fail we return false eventually.
+ 
+ at LookAtDoubleExtent: we do the same as before but instead of offsetting by RTSToNavProjectionExtent * ProjectionScale we offset by double that amount.
+ 
+ 
+ 
+it will need to implement a function like this to check if a point is in default nav area (e.g. no additional costs)
+Make sure the component caches the Recast nav mesh at begin play for performance.
+static bool GetIsDefaultNavAreaAtLocation(
+    const ARecastNavMesh* const RecastNavMesh,
+    const FNavLocation& NavLocation)
+{
+    if (RecastNavMesh == nullptr)
+    {
+        return false;
+    }
+
+    if (!NavLocation.HasNodeRef())
+    {
+        return false;
+    }
+
+    FNavMeshNodeFlags PolyFlags;
+    if (!RecastNavMesh->GetPolyFlags(NavLocation.NodeRef, PolyFlags))
+    {
+        return false;
+    }
+
+    const UClass* const AreaClass = RecastNavMesh->GetAreaClass(PolyFlags.Area);
+    if (AreaClass == nullptr)
+    {
+        return false;
+    }
+
+    return AreaClass->IsChildOf(UNavArea_Default::StaticClass());
+
+here then is the second public function to implement: GetNavPointDefaultCosts. this function will do the same as the previous one
+but use the  GetIsDefaultNavAreaAtLocation and only if that returns true as well as the projection then we return true. Also give it the option for an enum 
+strategy. If the projection succeeeds but the GetIsDefaultNavAreaAtLocation fails then utilize the strategy like before until both are true or we run out of options.
+
+for the next public function called find default nav cost points in area between two points we need:
+a box extend parameter to define how large the area will be.
+2 vectors deininhg the points to search between.
+a scaler for how dense the points should be sampled.
+a scalar for the projection extent.
+an integer for the amount of points to return. (make sure that internally we max this to 128)
+
+this function will return an array of points we want to use ARecastNavMesh::BatchProjectPoints(TArray<FNavigationProjectionWork>&, ...) as this will computationally be expensive.
+here is what i want you to do; find hte middle point beteen the provided points and project it with the extend to obtain our region center point (using our other projection function for default cost).
+if the projection fails return an empty array.
+then then start an async task in which we:
+1. sample the amount of points we need in our defined box area around the center point; make sure to use the density scalar to ensure we do not have too many close to eachother points.
+2 from the async task call the batch process on recast to project all those points with the provided extent.
+3. return to the game thread only the points that were successfully projected.
+
+because this function is async make sure to also take in a function pointer that can do something with the array of points once they are found. and make sure to use weak pointer lambdas to not cause dangling pointers.
+
+
+
+for the next public function first do the following:
+at begin play make sure to cache all actors on the map of ARoadSplineActor.
+this funtion will take a start search point.
+a scalar for density to sample along the road splines.
+a scalar for projection extent.
+a function pointer to call with the found points.
+this function will first in sync find the closest road spline actor to the point. if none exist return empty array.
+then start an async task in which you:
+1. provide the bounds of the road spline that was found as closest.
+2. sample the points on the bound similairly to how it was done in the previous function but now along the spline.
+3. make sure to batch call the projection on recast with the provided extent.
+4. return to the game thread only the successfully projected points via the function pointer.
+
+
+to keep the implementation of this component clean consider adding a name space FEnemyNavigationAIHelpers in the .cpp to put functions that are reused throughout the component but are not part of the public API.
+
+add the component to the enemy controller and make sure the enemy controler has a public function that is bp callable not bp able and bp pure that returns the component. make sure only the non-async functions on the component are bp callable the others
+are only c++ callable (on the component)
