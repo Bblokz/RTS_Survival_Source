@@ -1,0 +1,67 @@
+﻿YOu will have to write new functions for updating the async target processor with detailed actor data from the
+UGameUnitManager so that we can  use it to make async requests for detailed strategies by the enemy AI.
+You also have to add a new component for the enemy AI controller called UEnemyStrategicAIComponent that will
+handle the requests to the target procesor for different strategy structs. add this component in a new directory
+inside Enemy/StrategicAI called Component.
+I just added 
+// How often the UGameUnitManager writes detailed actor data to the AsyncGetTargetThread.
+inline constexpr float GameThreadUpdateAsyncWithAllDetailedActorDataInterval = 8.67f;
+
+and
+#pragma once
+
+#include "CoreMinimal.h"
+
+
+#include "AsyncUnitDetailedState.generated.h"
+
+enum class EAbilityID : uint8;
+enum class EAllUnitType : uint8;
+
+USTRUCT()
+struct FAsyncDetailedUnitState
+{
+	GENERATED_BODY()
+
+	FAsyncDetailedUnitState();
+
+	int32 OwningPlayer;
+
+	TWeakObjectPtr<AActor> UnitActorPtr;
+	
+	EAllUnitType UnitType ;
+	
+	int32 UnitSubtypeRaw ;
+
+	EAbilityID CurrentActiveAbility;
+
+	bool bIsInCombat;
+
+	float HealthRatio;
+
+	FVector UnitLocation;
+	
+	FRotator UnitRotation;
+	
+};
+ i want you to implement the UpdateDetailedActorData where i want to update the 
+M_AsyncTargetProcessor with one new giant array that has the  FAsyncDetailedUnitState of all player tanks, squad controllers and other actors and bxp units.
+note that i want the squad controllers and not the individual squad units as we do for the async actor data for target processing!
+
+for each of the units if they are RRTSFunctionLibrary::RTSIsValid (not RTSIsVisibleTarget! this data will see through the FOW!)
+make sure to use their rts components and health components to get all the data as well as the icommands interface to get info on the
+current active ability.
+
+implement a new queue in the GetAsyncTarget.h that will process this new array of (both player and enemy) so they are stored on the async thread.
+add a new while in the Run() to extract the data from the queue for use.
+
+as you can see these data structs will have their associated actors in weak pointers on them; do never read these on the other thread; they are just to provide as call back on the
+game thread for the EnemyController.
+
+i have already added Enemy/Strate
+
+how i want to use the same target processor thread but differently from target processing:
+Because this is for strategic AI decisions it will not have to write back immediately when it has the results.
+I want to make use of EnemyAISettings::EnemyStrategicAIThinkingSpeed for how often the ai controller's component will
+request accumulated strategy request structs from the async target processor.
+
