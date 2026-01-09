@@ -44,6 +44,9 @@ namespace DeveloperSettings
 		// to the AsyncGetTargetThread.
 		inline constexpr float GameThreadUpdateAsyncWithActorTargetsInterval = 1.f;
 
+		// How often the UGameUnitManager writes detailed actor data to the AsyncGetTargetThread.
+		inline constexpr float GameThreadUpdateAsyncWithAllDetailedActorDataInterval = 8.67f;
+
 		// How Long the AsyncGetTargetThread waits before handling new incoming target requests from the game thread.
 		// Increasing this will cause a longer delay on the thread and hence a longer wait for target request to be processed.
 		inline constexpr float AsyncGetTargetThreadUpdateInterval = 0.1f;
@@ -1143,9 +1146,6 @@ namespace DeveloperSettings
 
 			// Extent used in X-Y to project potential formation locations for enemy formations.
 			inline constexpr float EnemyFormationPositionProjectionExtent = 200.f;
-			// How long between checks for enemy formations; controls logic that will periodically try to unstuck enemy units
-			// that are idle while in an active formation.
-			inline constexpr float EnemyFormationCheckInterval = 11.25;
 		}
 
 		namespace Environment
@@ -1384,6 +1384,7 @@ namespace DeveloperSettings
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
 		constexpr bool GEnemyController_Compile_DebugSymbols = false;
+		constexpr bool GEnemyController_StrategicAI_Compile_DebugSymbols = true;
 		constexpr bool GEnemyController_NavDetector_DebugSymbols = true;
 		constexpr bool ExplosionsManager_Compile_DebugSymbols = false;
 		constexpr bool GPlayerStartLocations_Compile_DebugSymbols = false;

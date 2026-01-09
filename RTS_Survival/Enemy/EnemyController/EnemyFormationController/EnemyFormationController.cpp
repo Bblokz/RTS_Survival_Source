@@ -5,6 +5,7 @@
 
 #include "NavigationSystem.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -168,7 +169,7 @@ void UEnemyFormationController::SaveNewFormation(const FFormationData& NewFormat
 	{
 		return;
 	}
-	using DeveloperSettings::GamePlay::Navigation::EnemyFormationCheckInterval;
+	using EnemyAISettings::EnemyFormationCheckInterval;
 	// store into the map _before_ any callbacks fire
 	M_ActiveFormations.Add(NewFormation.FormationID, NewFormation);
 	if (not M_FormationCheckTimerHandle.IsValid())

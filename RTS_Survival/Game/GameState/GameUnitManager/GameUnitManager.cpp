@@ -144,6 +144,11 @@ void UGameUnitManager::UpdateActorData()
 	}
 }
 
+void UGameUnitManager::UpdateDetailedActorData()
+{
+	
+}
+
 void UGameUnitManager::RequestClosestTargets(
 	const FVector& SearchLocation,
 	float SearchRadius,

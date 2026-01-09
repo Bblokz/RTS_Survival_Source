@@ -184,6 +184,8 @@ private:
 	 */
 	void UpdateActorData();
 
+	void UpdateDetailedActorData();
+
 	/** @brief contains all SquadUnits currently alive, for the player. */
 	UPROPERTY()
 	TArray<ASquadUnit*> M_SquadUnitAlivePlayer;
@@ -241,6 +243,7 @@ private:
 	template <typename T>
 	void CleanupActorArray(TArray<T*>& ActorArray);
 
+	
 
 	/** Interval for actor data updates */
 	float M_ActorDataUpdateInterval;

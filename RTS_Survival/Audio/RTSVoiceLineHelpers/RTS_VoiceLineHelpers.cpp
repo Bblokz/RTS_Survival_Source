@@ -203,92 +203,32 @@ void FRTS_VoiceLineHelpers::PlayUnitDeathVoiceLineOnRadio(AActor* UnitThatDied, 
 
 EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetDeathVoiceLineForTank(const ETankSubtype Type)
 {
-	switch (Type)
+	// Handle the harvester as an exception
+	if (Type == ETankSubtype::Tank_PzI_Harvester)
 	{
-	// Harvester
-	case ETankSubtype::Tank_PzI_Harvester:
 		return EAnnouncerVoiceLineType::LostHarvester;
+	}
 
-	// Armored Cars
-	case ETankSubtype::Tank_Sdkfz251:
-	case ETankSubtype::Tank_Sdkfz250:
-	case ETankSubtype::Tank_Sdkfz250_37mm:
-	case ETankSubtype::Tank_Sdkfz251_PZIV:
-	case ETankSubtype::Tank_Sdkfz251_22:
-	case ETankSubtype::Tank_Puma:
-	case ETankSubtype::Tank_Sdkfz_231:
-	case ETankSubtype::Tank_Sdkfz_232_3:
+	// Use helper functions for other categories
+	if (Global_GetIsArmoredCar(Type))
+	{
 		return EAnnouncerVoiceLineType::LostArmoredCar;
-
-	// Light Tanks
-	case ETankSubtype::Tank_PzJager:
-	case ETankSubtype::Tank_PzI_Scout:
-	case ETankSubtype::Tank_PzI_15cm:
-	case ETankSubtype::Tank_Pz38t:
-	case ETankSubtype::Tank_PzII_F:
-	case ETankSubtype::Tank_Sdkfz_140:
-	case ETankSubtype::Tank_BT7:
-	case ETankSubtype::Tank_T26:
-	case ETankSubtype::Tank_BT7_4:
-	case ETankSubtype::Tank_T70:
+	}
+	if (Global_GetIsLightTank(Type))
+	{
 		return EAnnouncerVoiceLineType::LostLightVehicle;
-
-	// Medium Tanks
-	case ETankSubtype::Tank_PanzerIv:
-	case ETankSubtype::Tank_PzIII_J:
-	case ETankSubtype::Tank_PzIII_AA:
-	case ETankSubtype::Tank_PzIII_FLamm:
-	case ETankSubtype::Tank_PzIII_J_Commander:
-	case ETankSubtype::Tank_PzIII_M:
-	case ETankSubtype::Tank_PzIV_F1:
-	case ETankSubtype::Tank_PzIV_F1_Commander:
-	case ETankSubtype::Tank_PzIV_G:
-	case ETankSubtype::Tank_PzIV_H:
-	case ETankSubtype::Tank_Stug:
-	case ETankSubtype::Tank_Marder:
-	case ETankSubtype::Tank_PzIV_70:
-	case ETankSubtype::Tank_Brumbar:
-	case ETankSubtype::Tank_Hetzer:
-	case ETankSubtype::Tank_Jaguar:
-	case ETankSubtype::Tank_T34_85:
-	case ETankSubtype::Tank_T34_100:
-	case ETankSubtype::Tank_T34_76:
-	case ETankSubtype::Tank_T34E:
+	}
+	if (Global_GetIsMediumTank(Type))
+	{
 		return EAnnouncerVoiceLineType::LostMediumVehicle;
-
-	// Heavy Tanks
-	case ETankSubtype::Tank_PantherD:
-	case ETankSubtype::Tank_PantherG:
-	case ETankSubtype::Tank_PanzerV_III:
-	case ETankSubtype::Tank_PanzerV_IV:
-	case ETankSubtype::Tank_PantherII:
-	case ETankSubtype::Tank_KeugelT38:
-	case ETankSubtype::Tank_JagdPanther:
-	case ETankSubtype::Tank_SturmTiger:
-	case ETankSubtype::Tank_Tiger:
-	case ETankSubtype::Tank_TigerH1:
-	case ETankSubtype::Tank_KingTiger:
-	case ETankSubtype::Tank_Tiger105:
-	case ETankSubtype::Tank_E25:
-	case ETankSubtype::Tank_JagdTiger:
-	case ETankSubtype::Tank_Maus:
-	case ETankSubtype::Tank_E100:
-	case ETankSubtype::Tank_T35:
-	case ETankSubtype::Tank_KV_1:
-	case ETankSubtype::Tank_KV_2:
-	case ETankSubtype::Tank_KV_1E:
-	case ETankSubtype::Tank_T28:
-	case ETankSubtype::Tank_IS_1:
-	case ETankSubtype::Tank_KV_IS:
-	case ETankSubtype::Tank_IS_2:
-	case ETankSubtype::Tank_IS_3:
-	case ETankSubtype::Tank_KV_5:
+	}
+	if (Global_GetIsHeavyTank(Type))
+	{
 		return EAnnouncerVoiceLineType::LostHeavyVehicle;
+	}
 
 	// Default case
-	default:
-		return EAnnouncerVoiceLineType::None;
-	}
+	return EAnnouncerVoiceLineType::None;
 }
 
 EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetAnnouncerForBxp(const EBxpOptionSection Section)
