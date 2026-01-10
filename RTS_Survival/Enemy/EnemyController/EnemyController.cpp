@@ -116,6 +116,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_WaveController = CreateDefaultSubobject<UEnemyWaveController>(TEXT("WaveController"));
 	M_FieldConstructionComponent = CreateDefaultSubobject<UEnemyFieldConstructionComponent>(TEXT("FieldConstructionComponent"));
 	M_EnemyNavigationAIComponent = CreateDefaultSubobject<UEnemyNavigationAIComponent>(TEXT("EnemyNavigationAIComponent"));
+	M_EnemyStrategicAIComponent = CreateDefaultSubobject<UEnemyStrategicAIComponent>(TEXT("EnemyStrategicAIComponent"));
 	if(M_FormationController)
 	{
 		M_FormationController->InitFormationController(this);
@@ -132,6 +133,10 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	if (M_EnemyNavigationAIComponent)
 	{
 		M_EnemyNavigationAIComponent->InitNavigationAIComponent(this);
+	}
+	if (M_EnemyStrategicAIComponent)
+	{
+		M_EnemyStrategicAIComponent->InitStrategicAIComponent(this);
 	}
 	
 }
@@ -335,6 +340,16 @@ UEnemyNavigationAIComponent* AEnemyController::GetEnemyNavigationAIComponent() c
 	return M_EnemyNavigationAIComponent;
 }
 
+UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() const
+{
+	if (not GetIsValidEnemyStrategicAIComponent())
+	{
+		return nullptr;
+	}
+
+	return M_EnemyStrategicAIComponent;
+}
+
 void AEnemyController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -397,6 +412,16 @@ bool AEnemyController::GetIsValidEnemyNavigationAIComponent() const
 	if (not IsValid(M_EnemyNavigationAIComponent))
 	{
 		RTSFunctionLibrary::ReportError("Invalid enemy navigation AI component for enemy controller!");
+		return false;
+	}
+	return true;
+}
+
+bool AEnemyController::GetIsValidEnemyStrategicAIComponent() const
+{
+	if (not IsValid(M_EnemyStrategicAIComponent))
+	{
+		RTSFunctionLibrary::ReportError("Invalid enemy strategic AI component for enemy controller!");
 		return false;
 	}
 	return true;

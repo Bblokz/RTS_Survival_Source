@@ -7,6 +7,7 @@
 #include "RTS_Survival/MasterObjects/ActorObjectsMaster.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
+#include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "EnemyController.generated.h"
 
 
@@ -16,6 +17,7 @@ class UEnemyWaveController;
 struct FEnemyResources;
 class UEnemyFormationController;
 class UEnemyNavigationAIComponent;
+class UEnemyStrategicAIComponent;
 class ATankMaster;
 class ASquadController;
 
@@ -152,6 +154,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyNavigationAIComponent* GetEnemyNavigationAIComponent() const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
+	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
+
 	// ------------------------------------------------------------
 	// END Enemy Resources Management
 	// ------------------------------------------------------------
@@ -175,6 +180,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnemyNavigationAIComponent> M_EnemyNavigationAIComponent;
 
+	UPROPERTY()
+	TObjectPtr<UEnemyStrategicAIComponent> M_EnemyStrategicAIComponent;
+
 	TArray<TWeakObjectPtr<ATankMaster>> M_Tanks;
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 
@@ -182,6 +190,7 @@ private:
 	bool GetIsValidWaveController() const;
 	bool GetIsValidFieldConstructionComponent() const;
 	bool GetIsValidEnemyNavigationAIComponent() const;
+	bool GetIsValidEnemyStrategicAIComponent() const;
 
 	// Contains the supplies and other resource settings for waves and construction.
 	FEnemyResources M_Resources;
