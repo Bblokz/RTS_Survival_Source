@@ -1,6 +1,7 @@
 ﻿#include "GetAsyncTarget.h"
 #include "Async/Async.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicAIHelpers.h"
 
 FGetAsyncTarget::FGetAsyncTarget()
 	: bM_StopThread(false)
@@ -25,7 +26,7 @@ bool FGetAsyncTarget::Init()
 
 uint32 FGetAsyncTarget::Run()
 {
-	while (!bM_StopThread)
+	while (not bM_StopThread)
 	{
 		// Process any pending actor data updates
 		TMap<uint32, TPair<ETargetPreference, FVector>> NewActorData;
@@ -38,9 +39,16 @@ uint32 FGetAsyncTarget::Run()
 			M_EnemyActorData = MoveTemp(NewActorData);
 		}
 
+		TArray<FAsyncDetailedUnitState> NewDetailedUnitStates;
+		while (M_PendingDetailedUnitStateUpdates.Dequeue(NewDetailedUnitStates))
+		{
+			M_DetailedUnitStates = MoveTemp(NewDetailedUnitStates);
+		}
+
 
 		// Process target requests
 		ProcessRequests();
+		ProcessStrategicAIRequests();
 
 		// Sleep to prevent tight loop
 		FPlatformProcess::Sleep(DeveloperSettings::Async::AsyncGetTargetThreadUpdateInterval);
@@ -61,6 +69,21 @@ void FGetAsyncTarget::ScheduleUpdateActorData(const TMap<uint32, TPair<ETargetPr
 	// Enqueue the new actor data for processing on the thread
 	M_PendingPlayerActorDataUpdates.Enqueue(NewPlayerActorData);
 	M_PendingEnemyActorDataUpdates.Enqueue(NewEnemyActorData);
+}
+
+void FGetAsyncTarget::ScheduleUpdateDetailedActorData(const TArray<FAsyncDetailedUnitState>& NewDetailedUnitStates)
+{
+	M_PendingDetailedUnitStateUpdates.Enqueue(NewDetailedUnitStates);
+}
+
+void FGetAsyncTarget::AddStrategicAIRequest(
+	const FStrategicAIRequestBatch& RequestBatch,
+	TFunction<void(const FStrategicAIResultBatch&)> Callback)
+{
+	FStrategicAIRequest NewRequest;
+	NewRequest.RequestBatch = RequestBatch;
+	NewRequest.Callback = MoveTemp(Callback);
+	M_StrategicAIRequestQueue.Enqueue(MoveTemp(NewRequest));
 }
 
 void FGetAsyncTarget::AddTargetRequest(
@@ -186,3 +209,42 @@ void FGetAsyncTarget::ProcessRequests()
     }
 }
 
+void FGetAsyncTarget::ProcessStrategicAIRequests()
+{
+	FStrategicAIRequest Request;
+	while (M_StrategicAIRequestQueue.Dequeue(Request))
+	{
+		FStrategicAIResultBatch Results;
+
+		Results.FindClosestFlankableEnemyHeavyResults.Reserve(
+			Request.RequestBatch.FindClosestFlankableEnemyHeavyRequests.Num());
+		for (const FFindClosestFlankableEnemyHeavy& FindRequest : Request.RequestBatch.FindClosestFlankableEnemyHeavyRequests)
+		{
+			Results.FindClosestFlankableEnemyHeavyResults.Add(
+				FStrategicAIHelpers::BuildClosestFlankableEnemyHeavyResult(FindRequest, M_DetailedUnitStates));
+		}
+
+		Results.PlayerUnitCountsResults.Reserve(
+			Request.RequestBatch.GetPlayerUnitCountsAndBaseRequests.Num());
+		for (const FGetPlayerUnitCountsAndBase& CountRequest : Request.RequestBatch.GetPlayerUnitCountsAndBaseRequests)
+		{
+			Results.PlayerUnitCountsResults.Add(
+				FStrategicAIHelpers::BuildPlayerUnitCountsResult(CountRequest, M_DetailedUnitStates));
+		}
+
+		Results.AlliedTanksToRetreatResults.Reserve(
+			Request.RequestBatch.FindAlliedTanksToRetreatRequests.Num());
+		for (const FFindAlliedTanksToRetreat& RetreatRequest : Request.RequestBatch.FindAlliedTanksToRetreatRequests)
+		{
+			Results.AlliedTanksToRetreatResults.Add(
+				FStrategicAIHelpers::BuildAlliedTanksToRetreatResult(RetreatRequest, M_DetailedUnitStates));
+		}
+
+		TFunction<void(const FStrategicAIResultBatch&)> Callback = MoveTemp(Request.Callback);
+		AsyncTask(ENamedThreads::GameThread,
+			[Callback = MoveTemp(Callback), Results = MoveTemp(Results)]() mutable
+			{
+				Callback(Results);
+			});
+	}
+}

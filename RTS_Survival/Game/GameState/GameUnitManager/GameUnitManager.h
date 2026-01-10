@@ -19,6 +19,8 @@ enum class ETargetPreference : uint8;
 class FGetAsyncTarget;
 class ASquadUnit;
 class ATankMaster;
+struct FStrategicAIRequestBatch;
+struct FStrategicAIResultBatch;
 /**
  * Contains all the units for all the players in the game.
  */
@@ -54,6 +56,15 @@ public:
 		int32 NumTargets,
 		int32 OwningPlayer, ETargetPreference PrefferedTarget,
 		TFunction<void(const TArray<AActor*>&)> Callback);
+
+	/**
+	 * @brief Requests strategic AI results based on detailed unit state cached on the async thread.
+	 * @param RequestBatch Aggregated strategy requests to evaluate asynchronously.
+	 * @param Callback Callback invoked on the game thread with the computed results.
+	 */
+	void RequestStrategicAIRequests(
+		const FStrategicAIRequestBatch& RequestBatch,
+		TFunction<void(const FStrategicAIResultBatch&)> Callback);
 
 	/**
  * @brief Returns all currently alive UnitMasters of the provided player.
@@ -235,6 +246,9 @@ private:
 	/** Timer handle for periodic actor data updates */
 	FTimerHandle M_ActorDataUpdateTimerHandle;
 
+	/** Timer handle for periodic detailed actor data updates */
+	FTimerHandle M_DetailedActorDataUpdateTimerHandle;
+
 	// Timer handle for cleaning up invalid actor references.
 	FTimerHandle M_CleanUpInvalidRefsTimerHandle;
 
@@ -247,6 +261,9 @@ private:
 
 	/** Interval for actor data updates */
 	float M_ActorDataUpdateInterval;
+
+	/** Interval for detailed actor data updates */
+	float M_DetailedActorDataUpdateInterval;
 
 	/**
 	 * @brief Called when target IDs are received from the async thread.

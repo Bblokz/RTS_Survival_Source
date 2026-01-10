@@ -5,17 +5,143 @@
 
 #include "GetTargetUnitThread/GetAsyncTarget.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/AsyncUnitDetailedState/AsyncUnitDetailedState.h"
+#include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/MasterObjects/HealthBase/HPActorObjectsMaster.h"
+#include "RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace GameUnitManagerDetailedState
+{
+	void AppendDetailedUnitState(AActor* Actor, TArray<FAsyncDetailedUnitState>& OutStates);
+
+	template <typename TActorType>
+	void AppendDetailedUnitStatesForActors(
+		const TArray<TActorType*>& Actors,
+		TArray<FAsyncDetailedUnitState>& OutStates)
+	{
+		for (TActorType* Actor : Actors)
+		{
+			AppendDetailedUnitState(Actor, OutStates);
+		}
+	}
+
+	TSet<ASquadController*> GatherSquadControllers(
+		const TArray<ASquadUnit*>& PlayerUnits,
+		const TArray<ASquadUnit*>& EnemyUnits)
+	{
+		TSet<ASquadController*> SquadControllers;
+		auto AppendSquadControllers = [&SquadControllers](const TArray<ASquadUnit*>& SquadUnits)
+		{
+			for (ASquadUnit* SquadUnit : SquadUnits)
+			{
+				if (not RTSFunctionLibrary::RTSIsValid(SquadUnit))
+				{
+					continue;
+				}
+				ASquadController* SquadController = SquadUnit->GetSquadControllerChecked();
+				if (not RTSFunctionLibrary::RTSIsValid(SquadController))
+				{
+					continue;
+				}
+				SquadControllers.Add(SquadController);
+			}
+		};
+
+		AppendSquadControllers(PlayerUnits);
+		AppendSquadControllers(EnemyUnits);
+
+		return SquadControllers;
+	}
+
+	bool TryGetActorComponents(AActor* Actor, URTSComponent*& OutRTSComponent, UHealthComponent*& OutHealthComponent)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(Actor))
+		{
+			return false;
+		}
+
+		if (const AHpPawnMaster* HpPawnMaster = Cast<AHpPawnMaster>(Actor))
+		{
+			OutRTSComponent = HpPawnMaster->GetRTSComponent();
+			OutHealthComponent = HpPawnMaster->GetHealthComponent();
+		}
+		else if (const AHPActorObjectsMaster* HpActorMaster = Cast<AHPActorObjectsMaster>(Actor))
+		{
+			OutRTSComponent = HpActorMaster->GetRTSComponent();
+			OutHealthComponent = HpActorMaster->GetHealthComponent();
+		}
+		else
+		{
+			OutRTSComponent = Cast<URTSComponent>(Actor->GetComponentByClass(URTSComponent::StaticClass()));
+			OutHealthComponent = Cast<UHealthComponent>(Actor->GetComponentByClass(UHealthComponent::StaticClass()));
+		}
+
+		if (not IsValid(OutRTSComponent) || not IsValid(OutHealthComponent))
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	bool TryBuildDetailedUnitState(AActor* Actor, FAsyncDetailedUnitState& OutState)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(Actor))
+		{
+			return false;
+		}
+
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not TryGetActorComponents(Actor, RTSComponent, HealthComponent))
+		{
+			return false;
+		}
+
+		OutState.OwningPlayer = RTSComponent->GetOwningPlayer();
+		OutState.UnitActorPtr = Actor;
+		OutState.UnitType = RTSComponent->GetUnitType();
+		OutState.UnitSubtypeRaw = static_cast<int32>(RTSComponent->GetUnitSubType());
+		OutState.CurrentActiveAbility = EAbilityID::IdNoAbility;
+		OutState.bIsInCombat = RTSComponent->GetIsUnitInCombat();
+		OutState.HealthRatio = HealthComponent->GetHealthPercentage();
+		OutState.UnitLocation = Actor->GetActorLocation();
+		OutState.UnitRotation = Actor->GetActorRotation();
+
+		if (ICommands* CommandsInterface = Cast<ICommands>(Actor))
+		{
+			OutState.CurrentActiveAbility = CommandsInterface->GetActiveCommandID();
+		}
+
+		return true;
+	}
+
+	void AppendDetailedUnitState(AActor* Actor, TArray<FAsyncDetailedUnitState>& OutStates)
+	{
+		FAsyncDetailedUnitState DetailedState;
+		if (not TryBuildDetailedUnitState(Actor, DetailedState))
+		{
+			return;
+		}
+
+		OutStates.Add(MoveTemp(DetailedState));
+	}
+}
+
 UGameUnitManager::UGameUnitManager()
 	: M_AsyncTargetProcessor(nullptr)
 	  , M_ActorDataUpdateInterval(DeveloperSettings::Async::GameThreadUpdateAsyncWithActorTargetsInterval)
+	  , M_DetailedActorDataUpdateInterval(DeveloperSettings::Async::GameThreadUpdateAsyncWithAllDetailedActorDataInterval)
 {
 }
 
@@ -67,7 +193,7 @@ void UGameUnitManager::SetAllUnitOptimizationEnabled(const bool bEnable)
 void UGameUnitManager::Initialize()
 {
 	// Create the async target processor and start the thread
-	if (!M_AsyncTargetProcessor)
+	if (not M_AsyncTargetProcessor)
 	{
 		M_AsyncTargetProcessor = new FGetAsyncTarget();
 
@@ -79,6 +205,12 @@ void UGameUnitManager::Initialize()
 				this,
 				&UGameUnitManager::UpdateActorData,
 				M_ActorDataUpdateInterval,
+				true);
+			World->GetTimerManager().SetTimer(
+				M_DetailedActorDataUpdateTimerHandle,
+				this,
+				&UGameUnitManager::UpdateDetailedActorData,
+				M_DetailedActorDataUpdateInterval,
 				true);
 			World->GetTimerManager().SetTimer(
 				M_CleanUpInvalidRefsTimerHandle,
@@ -101,6 +233,7 @@ void UGameUnitManager::ShutdownAsyncTargetThread()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_ActorDataUpdateTimerHandle);
+		World->GetTimerManager().ClearTimer(M_DetailedActorDataUpdateTimerHandle);
 		World->GetTimerManager().ClearTimer(M_CleanUpInvalidRefsTimerHandle);
 	}
 }
@@ -146,7 +279,44 @@ void UGameUnitManager::UpdateActorData()
 
 void UGameUnitManager::UpdateDetailedActorData()
 {
-	
+	TRACE_CPUPROFILER_EVENT_SCOPE(UpdateDetailedActorData);
+
+	if (not M_AsyncTargetProcessor)
+	{
+		return;
+	}
+
+	TArray<FAsyncDetailedUnitState> DetailedUnitStates;
+	const int32 EstimatedSize = M_TankMastersAlivePlayer.Num()
+		+ M_TankMastersAliveEnemy.Num()
+		+ M_AircraftMastersAlivePlayer.Num()
+		+ M_AircraftMastersAliveEnemy.Num()
+		+ M_BxpAlivePlayer.Num()
+		+ M_BxpAliveEnemy.Num()
+		+ M_ActorsAlivePlayer.Num()
+		+ M_ActorsAliveEnemy.Num()
+		+ M_SquadUnitAlivePlayer.Num()
+		+ M_SquadUnitsAliveEnemy.Num();
+	DetailedUnitStates.Reserve(EstimatedSize);
+
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_TankMastersAlivePlayer, DetailedUnitStates);
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_TankMastersAliveEnemy, DetailedUnitStates);
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_AircraftMastersAlivePlayer, DetailedUnitStates);
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_AircraftMastersAliveEnemy, DetailedUnitStates);
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_BxpAlivePlayer, DetailedUnitStates);
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_BxpAliveEnemy, DetailedUnitStates);
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_ActorsAlivePlayer, DetailedUnitStates);
+	GameUnitManagerDetailedState::AppendDetailedUnitStatesForActors(M_ActorsAliveEnemy, DetailedUnitStates);
+
+	const TSet<ASquadController*> SquadControllers = GameUnitManagerDetailedState::GatherSquadControllers(
+		M_SquadUnitAlivePlayer,
+		M_SquadUnitsAliveEnemy);
+	for (ASquadController* SquadController : SquadControllers)
+	{
+		GameUnitManagerDetailedState::AppendDetailedUnitState(SquadController, DetailedUnitStates);
+	}
+
+	M_AsyncTargetProcessor->ScheduleUpdateDetailedActorData(DetailedUnitStates);
 }
 
 void UGameUnitManager::RequestClosestTargets(
@@ -184,6 +354,19 @@ void UGameUnitManager::RequestClosestTargets(
 		// If the async processor is not available, invoke the callback with an empty array
 		Callback(TArray<AActor*>());
 	}
+}
+
+void UGameUnitManager::RequestStrategicAIRequests(
+	const FStrategicAIRequestBatch& RequestBatch,
+	TFunction<void(const FStrategicAIResultBatch&)> Callback)
+{
+	if (M_AsyncTargetProcessor)
+	{
+		M_AsyncTargetProcessor->AddStrategicAIRequest(RequestBatch, MoveTemp(Callback));
+		return;
+	}
+
+	Callback(FStrategicAIResultBatch());
 }
 
 
