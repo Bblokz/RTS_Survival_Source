@@ -2,16 +2,20 @@
 
 #include "ReinforcementPoint.h"
 
+#include "Async/Async.h"
+#include "CollisionShape.h"
 #include "Components/MeshComponent.h"
-#include "Components/SphereComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/World.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
+#include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+
+float UReinforcementPoint::SearchForSquadsInterval = 2.5f;
 
 UReinforcementPoint::UReinforcementPoint(): M_OwningPlayer(-1), M_ReinforcementActivationRadius(0.0f)
 {
@@ -33,21 +37,14 @@ void UReinforcementPoint::InitReinforcementPoint(UMeshComponent* InMeshComponent
 void UReinforcementPoint::SetReinforcementEnabled(const bool bEnable)
 {
 	bM_ReinforcementEnabled = bEnable;
-	// Quick sweep of area of units that are already inside the radius when enabling.
-	OverlapOnReinforcementEnabled(M_ReinforcementActivationRadius, M_OwningPlayer, bEnable);
-
 	if (bM_ReinforcementEnabled)
 	{
-		if (not CreateReinforcementTriggerSphere(M_ReinforcementActivationRadius))
-		{
-			bM_ReinforcementEnabled = false;
-			return;
-		}
-		SetTriggerOverlapEnabled(true);
+		StartSquadSearchTimer();
 		return;
 	}
 
-	SetTriggerOverlapEnabled(false);
+	StopSquadSearchTimer();
+	ClearTrackedSquadControllers();
 }
 
 bool UReinforcementPoint::GetIsReinforcementEnabled() const
@@ -76,210 +73,26 @@ FVector UReinforcementPoint::GetReinforcementLocation(bool& bOutHasValidLocation
 	return MeshComponent->GetSocketLocation(M_ReinforcementSocketName);
 }
 
-bool UReinforcementPoint::GetIsValidReinforcementMesh() const
+void UReinforcementPoint::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	StopSquadSearchTimer();
+	ClearTrackedSquadControllers();
+	Super::EndPlay(EndPlayReason);
+}
+
+bool UReinforcementPoint::GetIsValidReinforcementMesh(const bool bReportIfMissing) const
 {
 	if (M_ReinforcementMeshComponent.IsValid())
 	{
 		return true;
 	}
-	return false;
-}
-
-bool UReinforcementPoint::GetIsValidReinforcementTriggerSphere(const bool bReportIfMissing) const
-{
-	if (IsValid(M_ReinforcementTriggerSphere))
-	{
-		return true;
-	}
-
 	if (bReportIfMissing && bM_ReinforcementEnabled)
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ReinforcementTriggerSphere",
-		                                                      "GetIsValidReinforcementTriggerSphere", GetOwner());
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ReinforcementMeshComponent",
+		                                                      "GetIsValidReinforcementMesh", GetOwner());
 	}
 
 	return false;
-}
-
-bool UReinforcementPoint::CreateReinforcementTriggerSphere(const float ActivationRadius)
-{
-	if (GetIsValidReinforcementTriggerSphere(false))
-	{
-		return true;
-	}
-	AActor* OwnerActor = GetOwner();
-	if (not IsValid(OwnerActor))
-	{
-		RTSFunctionLibrary::ReportError("Reinforcement point has no valid owner for trigger creation."
-			"\nUReinforcementPoint::CreateReinforcementTriggerSphere");
-		return false;
-	}
-
-	M_ReinforcementTriggerSphere = NewObject<USphereComponent>(OwnerActor, TEXT("ReinforcementTriggerSphere"));
-	if (not IsValid(M_ReinforcementTriggerSphere))
-	{
-		RTSFunctionLibrary::ReportError("Failed to create reinforcement trigger sphere component."
-			"\nUReinforcementPoint::CreateReinforcementTriggerSphere");
-		return false;
-	}
-
-	const float ClampedRadius = FMath::Max(ActivationRadius, 0.0f);
-	M_ReinforcementTriggerSphere->SetSphereRadius(ClampedRadius);
-
-	if (M_ReinforcementMeshComponent.IsValid())
-	{
-		M_ReinforcementTriggerSphere->SetupAttachment(M_ReinforcementMeshComponent.Get());
-	}
-	else
-	{
-		M_ReinforcementTriggerSphere->SetupAttachment(OwnerActor->GetRootComponent());
-	}
-	M_ReinforcementTriggerSphere->RegisterComponent();
-
-	const ETriggerOverlapLogic TriggerLogic = M_OwningPlayer == 1
-		                                          ? ETriggerOverlapLogic::OverlapPlayer
-		                                          : ETriggerOverlapLogic::OverlapEnemy;
-	FRTS_CollisionSetup::SetupTriggerOverlapCollision(M_ReinforcementTriggerSphere, TriggerLogic);
-
-	M_ReinforcementTriggerSphere->OnComponentBeginOverlap.AddDynamic(this,
-	                                                                 &UReinforcementPoint::OnReinforcementOverlapBegin);
-	M_ReinforcementTriggerSphere->OnComponentEndOverlap.AddDynamic(this,
-	                                                               &UReinforcementPoint::OnReinforcementOverlapEnd);
-
-	return true;
-}
-
-void UReinforcementPoint::HandleSquadUnitEnteredRadius(ASquadUnit* OverlappingUnit)
-{
-	if (not bM_ReinforcementEnabled)
-	{
-		return;
-	}
-	if (not IsValid(OverlappingUnit))
-	{
-		return;
-	}
-	if (OverlappingUnit->GetOwningPlayer() != M_OwningPlayer)
-	{
-		return;
-	}
-
-	TObjectPtr<ASquadController> SquadController = OverlappingUnit->GetSquadControllerChecked();
-	if (not IsValid(SquadController))
-	{
-		return;
-	}
-
-	TObjectPtr<USquadReinforcementComponent> ReinforcementComponent = SquadController->GetSquadReinforcementComponent();
-	if (not IsValid(ReinforcementComponent))
-	{
-		return;
-	}
-
-	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
-	{
-		const FVector DrawLocation = OverlappingUnit->GetActorLocation() + FVector::UpVector * 150.0f;
-		const FString DebugString = FString("Reinforcement overlap begin - Unit: ") + OverlappingUnit->GetName();
-		DrawDebugStatusString(DebugString, DrawLocation);
-	}
-
-	ReinforcementComponent->ActivateReinforcements(true, this);
-}
-
-void UReinforcementPoint::HandleSquadUnitExitedRadius(ASquadUnit* OverlappingUnit) const
-{
-	if (not bM_ReinforcementEnabled)
-	{
-		return;
-	}
-	if (not IsValid(OverlappingUnit))
-	{
-		return;
-	}
-	if (OverlappingUnit->GetOwningPlayer() != M_OwningPlayer)
-	{
-		return;
-	}
-
-	TObjectPtr<ASquadController> SquadController = OverlappingUnit->GetSquadControllerChecked();
-	if (not IsValid(SquadController))
-	{
-		return;
-	}
-
-	TObjectPtr<USquadReinforcementComponent> ReinforcementComponent = SquadController->GetSquadReinforcementComponent();
-	if (not IsValid(ReinforcementComponent))
-	{
-		return;
-	}
-	ReinforcementComponent->ActivateReinforcements(false, nullptr);
-}
-
-void UReinforcementPoint::OnReinforcementOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                                      UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-                                                      bool bFromSweep, const FHitResult& SweepResult)
-{
-	ASquadUnit* OverlappingUnit = Cast<ASquadUnit>(OtherActor);
-	HandleSquadUnitEnteredRadius(OverlappingUnit);
-}
-
-void UReinforcementPoint::OnReinforcementOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                                    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	ASquadUnit* OverlappingUnit = Cast<ASquadUnit>(OtherActor);
-	HandleSquadUnitExitedRadius(OverlappingUnit);
-}
-
-void UReinforcementPoint::OverlapOnReinforcementEnabled(const float Radius, const int32 OwningPlayer,
-                                                        const bool bEnable)
-{
-	AActor* const OwnerActor = GetOwner();
-	if (!IsValid(OwnerActor))
-	{
-		RTSFunctionLibrary::ReportError("Reinforcement point has no valid owner for sphere overlap.");
-		return;
-	}
-
-	if (Radius <= 0.0f)
-	{
-		return;
-	}
-
-	UWorld* const World = GetWorld();
-	if (!IsValid(World))
-	{
-		return;
-	}
-
-	const ECollisionChannel CollisionChannel = (OwningPlayer == 1) ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
-
-	TArray<AActor*> OverlappingActors;
-	UKismetSystemLibrary::SphereOverlapActors(
-		World,
-		OwnerActor->GetActorLocation(),
-		Radius,
-		{UEngineTypes::ConvertToObjectType(CollisionChannel)},
-		ASquadUnit::StaticClass(), // class filter reduces work
-		{OwnerActor}, // ignore owner
-		OverlappingActors
-	);
-
-	for (AActor* const OverlappedActor : OverlappingActors)
-	{
-		ASquadUnit* const OverlappingUnit = Cast<ASquadUnit>(OverlappedActor);
-		if (!IsValid(OverlappingUnit))
-		{
-			continue;
-		}
-
-		if (bEnable)
-		{
-			HandleSquadUnitEnteredRadius(OverlappingUnit);
-			continue;
-		}
-
-		HandleSquadUnitExitedRadius(OverlappingUnit);
-	}
 }
 
 
@@ -288,25 +101,34 @@ bool UReinforcementPoint::GetIsDebugEnabled() const
 	return DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols;
 }
 
-void UReinforcementPoint::SetTriggerOverlapEnabled(const bool bEnable) const
+void UReinforcementPoint::StartSquadSearchTimer()
 {
-	if (not GetIsValidReinforcementTriggerSphere())
+	if (M_ReinforcementActivationRadius <= 0.0f)
 	{
 		return;
 	}
 
-	M_ReinforcementTriggerSphere->SetCollisionEnabled(
-		bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
-	M_ReinforcementTriggerSphere->SetGenerateOverlapEvents(bEnable);
-
-	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
 	{
-		const FVector DebugLocation = M_ReinforcementTriggerSphere->GetComponentLocation() + FVector::UpVector * 150.0f;
-		const FString DebugText = bEnable
-			                          ? TEXT("Reinforcement Trigger Enabled")
-			                          : TEXT("Reinforcement Trigger Disabled");
-		DrawDebugStatusString(DebugText, DebugLocation);
+		return;
 	}
+
+	RequestSquadOverlapCheck();
+	World->GetTimerManager().SetTimer(M_SearchForSquadsTimerHandle, this,
+	                                  &UReinforcementPoint::RequestSquadOverlapCheck,
+	                                  SearchForSquadsInterval, true);
+}
+
+void UReinforcementPoint::StopSquadSearchTimer()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_SearchForSquadsTimerHandle);
 }
 
 void UReinforcementPoint::DrawDebugStatusString(const FString& DebugText, const FVector& DrawLocation) const
@@ -320,4 +142,245 @@ void UReinforcementPoint::DrawDebugStatusString(const FString& DebugText, const 
 	{
 		DrawDebugString(World, DrawLocation, DebugText, nullptr, FColor::Green, 2.5f, true);
 	}
+}
+
+void UReinforcementPoint::RequestSquadOverlapCheck()
+{
+	if (not bM_ReinforcementEnabled)
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		RTSFunctionLibrary::ReportError("Reinforcement point has no valid owner for overlap query.");
+		return;
+	}
+
+	if (M_ReinforcementActivationRadius <= 0.0f)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	TSet<const AActor*> IgnoredActors;
+	const FCollisionQueryParams QueryParams = BuildOverlapQueryParams(OwnerActor, IgnoredActors);
+
+	const FVector OriginLocation = GetSearchOriginLocation();
+	const FCollisionShape SphereShape = FCollisionShape::MakeSphere(M_ReinforcementActivationRadius);
+	const ETriggerOverlapLogic OverlapLogic = (M_OwningPlayer == 1)
+		                                          ? ETriggerOverlapLogic::OverlapPlayer
+		                                          : ETriggerOverlapLogic::OverlapEnemy;
+	const FCollisionObjectQueryParams ObjectQueryParams = BuildObjectQueryParams(OverlapLogic);
+
+	const FTraceDelegate TraceDelegate = BuildOverlapTraceDelegate(MoveTemp(IgnoredActors));
+
+	World->AsyncSweepByObjectType(
+		EAsyncTraceType::Multi,
+		OriginLocation,
+		OriginLocation,
+		FQuat::Identity,
+		ObjectQueryParams,
+		SphereShape,
+		QueryParams,
+		&TraceDelegate,
+		/*UserData*/ 0u
+	);
+}
+
+void UReinforcementPoint::HandleAsyncSquadOverlapResults(TArray<FHitResult> HitResults)
+{
+	if (not bM_ReinforcementEnabled)
+	{
+		return;
+	}
+
+	TSet<TWeakObjectPtr<ASquadController>> OverlappingControllers;
+	for (const FHitResult& HitResult : HitResults)
+	{
+		ASquadUnit* OverlappingUnit = Cast<ASquadUnit>(HitResult.GetActor());
+		if (not IsValid(OverlappingUnit))
+		{
+			continue;
+		}
+		if (OverlappingUnit->GetOwningPlayer() != M_OwningPlayer)
+		{
+			continue;
+		}
+
+		ASquadController* SquadController = OverlappingUnit->GetSquadControllerChecked();
+		if (not IsValid(SquadController))
+		{
+			continue;
+		}
+
+		OverlappingControllers.Add(SquadController);
+		HandleSquadControllerOverlap(SquadController);
+	}
+
+	TArray<TWeakObjectPtr<ASquadController>> ControllersToRemove;
+	for (const TWeakObjectPtr<ASquadController>& TrackedController : M_TrackedSquadControllers)
+	{
+		if (not TrackedController.IsValid())
+		{
+			ControllersToRemove.Add(TrackedController);
+			continue;
+		}
+
+		if (OverlappingControllers.Contains(TrackedController))
+		{
+			continue;
+		}
+
+		HandleSquadControllerExit(TrackedController.Get());
+		ControllersToRemove.Add(TrackedController);
+	}
+
+	for (const TWeakObjectPtr<ASquadController>& ControllerToRemove : ControllersToRemove)
+	{
+		M_TrackedSquadControllers.Remove(ControllerToRemove);
+	}
+}
+
+void UReinforcementPoint::HandleSquadControllerOverlap(ASquadController* SquadController)
+{
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+
+	if (M_TrackedSquadControllers.Contains(SquadController))
+	{
+		return;
+	}
+
+	TObjectPtr<USquadReinforcementComponent> ReinforcementComponent = SquadController->GetSquadReinforcementComponent();
+	if (not IsValid(ReinforcementComponent))
+	{
+		return;
+	}
+
+	if constexpr (DeveloperSettings::Debugging::GReinforcementAbility_Compile_DebugSymbols)
+	{
+		const FVector DrawLocation = SquadController->GetActorLocation() + FVector::UpVector * 150.0f;
+		const FString DebugString = FString("Reinforcement overlap begin - Squad: ") + SquadController->GetName();
+		DrawDebugStatusString(DebugString, DrawLocation);
+	}
+
+	ReinforcementComponent->ActivateReinforcements(true, this);
+	M_TrackedSquadControllers.Add(SquadController);
+}
+
+void UReinforcementPoint::HandleSquadControllerExit(ASquadController* SquadController)
+{
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+
+	TObjectPtr<USquadReinforcementComponent> ReinforcementComponent = SquadController->GetSquadReinforcementComponent();
+	if (not IsValid(ReinforcementComponent))
+	{
+		return;
+	}
+
+	ReinforcementComponent->ActivateReinforcements(false, this);
+}
+
+void UReinforcementPoint::ClearTrackedSquadControllers()
+{
+	for (const TWeakObjectPtr<ASquadController>& TrackedController : M_TrackedSquadControllers)
+	{
+		if (not TrackedController.IsValid())
+		{
+			continue;
+		}
+
+		HandleSquadControllerExit(TrackedController.Get());
+	}
+	M_TrackedSquadControllers.Reset();
+}
+
+FVector UReinforcementPoint::GetSearchOriginLocation() const
+{
+	AActor* OwnerActor = GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		return FVector::ZeroVector;
+	}
+
+	if (GetIsValidReinforcementMesh(false))
+	{
+		return M_ReinforcementMeshComponent->GetComponentLocation();
+	}
+
+	return OwnerActor->GetActorLocation();
+}
+
+FCollisionQueryParams UReinforcementPoint::BuildOverlapQueryParams(AActor* OwnerActor,
+                                                                    TSet<const AActor*>& OutIgnoredActors) const
+{
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTS_ReinforcementPointSweep), false, OwnerActor);
+	QueryParams.AddIgnoredActor(OwnerActor);
+	OutIgnoredActors.Add(OwnerActor);
+	return QueryParams;
+}
+
+FTraceDelegate UReinforcementPoint::BuildOverlapTraceDelegate(TSet<const AActor*> IgnoredActors) const
+{
+	FTraceDelegate TraceDelegate;
+	const TWeakObjectPtr<UReinforcementPoint> WeakReinforcementPoint = this;
+	TraceDelegate.BindLambda(
+		[WeakReinforcementPoint, IgnoredActors = MoveTemp(IgnoredActors)](
+		const FTraceHandle& /*TraceHandle*/,
+		FTraceDatum& TraceDatum) mutable
+		{
+			TArray<FHitResult> HitResults = TraceDatum.OutHits;
+			HitResults.RemoveAll([&IgnoredActors](const FHitResult& Hit)
+			{
+				AActor* HitActor = Hit.GetActor();
+				if (not IsValid(HitActor))
+				{
+					return true;
+				}
+
+				return IgnoredActors.Contains(HitActor);
+			});
+			AsyncTask(
+				ENamedThreads::GameThread,
+				[WeakReinforcementPoint, HitResults = MoveTemp(HitResults)]() mutable
+				{
+					if (not WeakReinforcementPoint.IsValid())
+					{
+						return;
+					}
+
+					WeakReinforcementPoint->HandleAsyncSquadOverlapResults(MoveTemp(HitResults));
+				});
+		});
+
+	return TraceDelegate;
+}
+
+FCollisionObjectQueryParams UReinforcementPoint::BuildObjectQueryParams(
+	const ETriggerOverlapLogic OverlapLogic) const
+{
+	FCollisionObjectQueryParams ObjectQueryParams;
+	if (OverlapLogic == ETriggerOverlapLogic::OverlapEnemy || OverlapLogic == ETriggerOverlapLogic::OverlapBoth)
+	{
+		ObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_ENEMY);
+	}
+
+	if (OverlapLogic == ETriggerOverlapLogic::OverlapPlayer || OverlapLogic == ETriggerOverlapLogic::OverlapBoth)
+	{
+		ObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_PLAYER);
+	}
+
+	return ObjectQueryParams;
 }
