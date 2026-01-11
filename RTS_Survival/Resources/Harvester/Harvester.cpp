@@ -17,6 +17,9 @@
 #include "RTS_Survival/Resources/Harvester/HarvesterInterface/HarvesterInterface.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "TimerManager.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 // Sets default values for this component's properties
 UHarvester::UHarvester()
@@ -501,6 +504,7 @@ int32 UHarvester::GetMaxCapacityForTargetResource(int32& OutCurrentAmount, ERTSR
 void UHarvester::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_SetupAnimatedTextWidgetPoolManager();
 
 	if (const UWorld* World = GetWorld())
 	{
@@ -942,6 +946,7 @@ void UHarvester::AsyncOnReceivedDropOffs(const TArray<TWeakObjectPtr<UResourceDr
 	}
 	for (auto EachDropOff : DropOffs)
 	{
+		OnNoDropOffsFound_DisplayMessage();		
 		if (!EachDropOff.IsValid() || !EachDropOff->GetIsDropOffActive())
 		{
 			continue;
@@ -1334,4 +1339,37 @@ bool UHarvester::ConsumeTeleportAllowanceOrBlacklist(const EHarvesterAIAction Ac
 
 	// Default: disallow
 	return false;
+}
+
+void UHarvester::OnNoDropOffsFound_DisplayMessage()
+{
+	if(not GetWorld())
+	{
+		return;
+	}
+	const float TimeNow = GetWorld()->GetTimeSeconds();
+	if (TimeNow - M_LastNoDropOffMessageTime > DeveloperSettings::GamePlay::Navigation::MinTimeBetweenDropOffNotificationHarvester)
+	{
+		FRTSVerticalAnimTextSettings Settings;
+		Settings.DeltaZ = 75;
+		Settings.VisibleDuration = 1.5f;
+		Settings.FadeOutDuration = 1.0f;
+		M_LastNoDropOffMessageTime = TimeNow;
+		FString Text = FRTSRichTextConverter::MakeRTSRich("No Drop-Offs Available!", ERTSRichText::Text_Bad14);
+		if (M_AnimatedTextWidgetPoolManager.IsValid())
+		{
+			M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+				Text,
+				GetHarvesterLocation(),
+				false,
+				400,
+				ETextJustify::Type::Center,
+				Settings);
+		}
+	}
+}
+
+void UHarvester::BeginPlay_SetupAnimatedTextWidgetPoolManager()
+{
+	M_AnimatedTextWidgetPoolManager =  FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
 }

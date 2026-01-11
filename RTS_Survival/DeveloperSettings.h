@@ -1144,6 +1144,8 @@ namespace DeveloperSettings
 			// Extent used to project potential harvester positions to the navmesh.
 			inline constexpr float HarvesterPositionProjectedExtent = 450.f;
 
+			inline constexpr float MinTimeBetweenDropOffNotificationHarvester = 12.5f;
+
 			// Extent used in X-Y to project potential formation locations for enemy formations.
 			inline constexpr float EnemyFormationPositionProjectionExtent = 200.f;
 		}

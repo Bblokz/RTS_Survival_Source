@@ -13,6 +13,7 @@
 #include "Harvester.generated.h"
 
 
+class UAnimatedTextWidgetPoolManager;
 class UAsyncFindClosestResource;
 class AAIController;
 class IHarvesterInterface;
@@ -377,4 +378,14 @@ private:
 	 *         false -> goal was blacklisted (do not teleport; pick a new goal).
 	 */
 	bool ConsumeTeleportAllowanceOrBlacklist(const EHarvesterAIAction ActionGroup);
+
+	void OnNoDropOffsFound_DisplayMessage();
+
+	// keeps track of when the last message was so we do not spam.
+	float M_LastNoDropOffMessageTime = 0.f;
+
+
+	void BeginPlay_SetupAnimatedTextWidgetPoolManager();
+	UPROPERTY()
+	TWeakObjectPtr<UAnimatedTextWidgetPoolManager> M_AnimatedTextWidgetPoolManager;
 };
