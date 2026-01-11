@@ -1142,7 +1142,7 @@ namespace DeveloperSettings
 			inline constexpr float SquadUnitScavengeDistance = 350.f;
 
 			// Extent used to project potential harvester positions to the navmesh.
-			inline constexpr float HarvesterPositionProjectedExtent = 100.f;
+			inline constexpr float HarvesterPositionProjectedExtent = 450.f;
 
 			// Extent used in X-Y to project potential formation locations for enemy formations.
 			inline constexpr float EnemyFormationPositionProjectionExtent = 200.f;
