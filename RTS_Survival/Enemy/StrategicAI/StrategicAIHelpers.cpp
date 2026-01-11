@@ -195,17 +195,9 @@ namespace StrategicAIHelperUtilities
 			DamagedTanks.Add(&UnitState);
 		}
 
-		DamagedTanks.Sort([](const FAsyncDetailedUnitState* Left, const FAsyncDetailedUnitState* Right)
+		DamagedTanks.Sort([](const FAsyncDetailedUnitState& Left, const FAsyncDetailedUnitState& Right)
 		{
-			if (not Left)
-			{
-				return false;
-			}
-			if (not Right)
-			{
-				return true;
-			}
-			return Left->HealthRatio < Right->HealthRatio;
+			return Left.HealthRatio < Right.HealthRatio;
 		});
 
 		return DamagedTanks;
