@@ -74,8 +74,10 @@ private:
 	static constexpr int32 ReinforcementAbilityIndex = 11;
 
 	void BeginPlay_InitSquadDataSnapshot();
-	bool GetIsValidSquadController();
-	bool GetIsValidRTSComponent();
+	bool GetIsValidSquadController() const;
+	bool GetIsValidRTSComponent() const;
+	bool GetIsValidReinforcementPoint(bool bReportIfMissing = true) const;
+	bool GetCanDeactivateReinforcement(UReinforcementPoint* InstigatingPoint) const;
 	bool EnsureAbilityArraySized();
 	void AddReinforcementAbility();
 	void RemoveReinforcementAbility();

@@ -4,11 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "CollisionQueryParams.h"
+#include "Engine/EngineTypes.h"
 #include "ReinforcementPoint.generated.h"
 
 class UMeshComponent;
-class USphereComponent;
-class UPrimitiveComponent;
+enum class ETriggerOverlapLogic : uint8;
 
 /**
  * @brief Defines a socket-based reinforcement location on a mesh.
@@ -49,27 +50,26 @@ public:
 	 */
 	FVector GetReinforcementLocation(bool& bOutHasValidLocation) const;
 
+	static float SearchForSquadsInterval;
+
+protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
 	bool GetIsDebugEnabled() const;
-	bool GetIsValidReinforcementMesh() const;
-	bool GetIsValidReinforcementTriggerSphere(bool bReportIfMissing = true) const;
-	bool CreateReinforcementTriggerSphere(const float ActivationRadius);
-	void SetTriggerOverlapEnabled(bool bEnable) const;
+	bool GetIsValidReinforcementMesh(bool bReportIfMissing = true) const;
 	void DrawDebugStatusString(const FString& DebugText, const FVector& DrawLocation) const;
-	void HandleSquadUnitEnteredRadius(class ASquadUnit* OverlappingUnit);
-	void HandleSquadUnitExitedRadius(class ASquadUnit* OverlappingUnit) const;
-
-	UFUNCTION()
-	void OnReinforcementOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-	                                 UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
-	                                 const FHitResult& SweepResult);
-
-	UFUNCTION()
-	void OnReinforcementOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-	                               UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
-	// Either remove or add overlap depending on enable state.
-	void OverlapOnReinforcementEnabled(float Radius, int32 OwningPlayer, bool bEnable);
+	void StartSquadSearchTimer();
+	void StopSquadSearchTimer();
+	void RequestSquadOverlapCheck();
+	void HandleAsyncSquadOverlapResults(TArray<FHitResult> HitResults);
+	void HandleSquadControllerOverlap(class ASquadController* SquadController);
+	void HandleSquadControllerExit(class ASquadController* SquadController);
+	void ClearTrackedSquadControllers();
+	FVector GetSearchOriginLocation() const;
+	FCollisionQueryParams BuildOverlapQueryParams(AActor* OwnerActor, TSet<const AActor*>& OutIgnoredActors) const;
+	FTraceDelegate BuildOverlapTraceDelegate(TSet<const AActor*> IgnoredActors) const;
+	FCollisionObjectQueryParams BuildObjectQueryParams(ETriggerOverlapLogic OverlapLogic) const;
 
 	UPROPERTY()
 	TWeakObjectPtr<UMeshComponent> M_ReinforcementMeshComponent;
@@ -78,13 +78,16 @@ private:
 	FName M_ReinforcementSocketName;
 
 	UPROPERTY()
-	TObjectPtr<USphereComponent> M_ReinforcementTriggerSphere;
-
-	UPROPERTY()
 	int32 M_OwningPlayer;
 
 	UPROPERTY()
 	float M_ReinforcementActivationRadius;
+
+	UPROPERTY()
+	FTimerHandle M_SearchForSquadsTimerHandle;
+
+	UPROPERTY()
+	TSet<TWeakObjectPtr<class ASquadController>> M_TrackedSquadControllers;
 
 	UPROPERTY()
 	bool bM_ReinforcementEnabled = false;

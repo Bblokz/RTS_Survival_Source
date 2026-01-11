@@ -35,7 +35,7 @@ USquadReinforcementComponent::USquadReinforcementComponent(): bM_IsActivated(fal
 
 UReinforcementPoint* USquadReinforcementComponent::GetActiveReinforcementPoint() const
 {
-	if(M_ReinforcementPoint.IsValid())
+	if (GetIsValidReinforcementPoint(false))
 	{
 		return M_ReinforcementPoint.Get();
 	}
@@ -50,16 +50,23 @@ void USquadReinforcementComponent::BeginPlay()
 
 void USquadReinforcementComponent::ActivateReinforcements(const bool bActivate, UReinforcementPoint* InstigatingPoint)
 {
-	bM_IsActivated = bActivate;
-	M_ReinforcementPoint = InstigatingPoint;
-	if (not bM_IsActivated)
+	if (bActivate)
 	{
-		RemoveReinforcementAbility();
+		bM_IsActivated = true;
+		M_ReinforcementPoint = InstigatingPoint;
+		UpdateMissingSquadMemberState();
+		RefreshReinforcementAbility();
 		return;
 	}
 
-	UpdateMissingSquadMemberState();
-	RefreshReinforcementAbility();
+	if (not GetCanDeactivateReinforcement(InstigatingPoint))
+	{
+		return;
+	}
+
+	bM_IsActivated = false;
+	M_ReinforcementPoint.Reset();
+	RemoveReinforcementAbility();
 }
 
 void USquadReinforcementComponent::NotifySquadMembershipChanged()
@@ -121,7 +128,7 @@ void USquadReinforcementComponent::BeginPlay_InitSquadDataSnapshot()
 	UpdateMissingSquadMemberState();
 }
 
-bool USquadReinforcementComponent::GetIsValidSquadController()
+bool USquadReinforcementComponent::GetIsValidSquadController() const
 {
 	if (M_SquadController.IsValid())
 	{
@@ -133,7 +140,7 @@ bool USquadReinforcementComponent::GetIsValidSquadController()
 	return false;
 }
 
-bool USquadReinforcementComponent::GetIsValidRTSComponent()
+bool USquadReinforcementComponent::GetIsValidRTSComponent() const
 {
 	if (not GetIsValidSquadController())
 	{
@@ -146,6 +153,43 @@ bool USquadReinforcementComponent::GetIsValidRTSComponent()
 	RTSFunctionLibrary::ReportNullErrorComponent(this, "RTSComponent",
 	                                             "USquadReinforcementComponent::GetIsValidRTSComponent");
 	return false;
+}
+
+bool USquadReinforcementComponent::GetIsValidReinforcementPoint(const bool bReportIfMissing) const
+{
+	if (M_ReinforcementPoint.IsValid())
+	{
+		return true;
+	}
+
+	if (bReportIfMissing)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ReinforcementPoint",
+		                                                      "USquadReinforcementComponent::"
+		                                                      "GetIsValidReinforcementPoint", GetOwner());
+	}
+
+	return false;
+}
+
+bool USquadReinforcementComponent::GetCanDeactivateReinforcement(UReinforcementPoint* InstigatingPoint) const
+{
+	if (not bM_IsActivated)
+	{
+		return false;
+	}
+
+	if (not IsValid(InstigatingPoint))
+	{
+		return false;
+	}
+
+	if (not GetIsValidReinforcementPoint())
+	{
+		return false;
+	}
+
+	return M_ReinforcementPoint.Get() == InstigatingPoint;
 }
 
 bool USquadReinforcementComponent::EnsureAbilityArraySized()
@@ -258,7 +302,7 @@ void USquadReinforcementComponent::UpdateMissingSquadMemberState()
 
 bool USquadReinforcementComponent::DoesSquadNeedReinforcement() const
 {
-	if (not M_SquadController.IsValid())
+	if (not GetIsValidSquadController())
 	{
 		return false;
 	}
@@ -424,7 +468,7 @@ float USquadReinforcementComponent::CalculateReinforcementTime(const int32 Missi
 	{
 		return 1.0f;
 	}
-	if (not M_SquadController.IsValid() || not IsValid(M_SquadController->RTSComponent))
+	if (not GetIsValidSquadController() || not IsValid(M_SquadController->RTSComponent))
 	{
 		return 1.0f;
 	}
@@ -446,7 +490,7 @@ float USquadReinforcementComponent::CalculateReinforcementTime(const int32 Missi
 
 bool USquadReinforcementComponent::GetMissingUnitClasses(TArray<TSubclassOf<ASquadUnit>>& OutMissingUnitClasses) const
 {
-	if (not M_SquadController.IsValid())
+	if (not GetIsValidSquadController())
 	{
 		return false;
 	}
@@ -607,7 +651,7 @@ void USquadReinforcementComponent::SpawnMissingUnits()
 
 void USquadReinforcementComponent::MoveSpawnedUnitsToController(const TArray<ASquadUnit*>& SpawnedUnits) const
 {
-	if (not M_SquadController.IsValid())
+	if (not GetIsValidSquadController())
 	{
 		return;
 	}
