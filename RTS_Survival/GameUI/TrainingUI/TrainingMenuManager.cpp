@@ -356,15 +356,15 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			ETankSubtype::Tank_PzI_Harvester,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None,
-			EAircraftSubtype::Aircarft_None,
-			FRTS_RequirementHelpers::CreateDouble_Unit_Unit(
-				GetTransientPackage(),
-				// Mission Center
-				FTrainingOption(EAllUnitType::UNType_Nomadic,
-				                static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter)),
-				FTrainingOption(EAllUnitType::UNType_Nomadic,
-				                static_cast<uint8>(ENomadicSubtype::Nomadic_GerGammaFacility))
-			));
+			EAircraftSubtype::Aircarft_None
+			// FRTS_RequirementHelpers::CreateDouble_Unit_Unit(
+			// 	GetTransientPackage(),
+			// 	// Mission Center
+			// 	FTrainingOption(EAllUnitType::UNType_Nomadic,
+			// 	                static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter)),
+			// 	FTrainingOption(EAllUnitType::UNType_Nomadic,
+			// 	                static_cast<uint8>(ENomadicSubtype::Nomadic_GerGammaFacility))
+			);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 

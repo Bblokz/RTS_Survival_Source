@@ -118,7 +118,7 @@ private:
 	/**
 	 * @brief Processes the queued target requests.
 	 */
-	void ProcessRequests();
+	void ProcessTargetRequests();
 
 	/**
 	 * @brief Processes queued strategic AI requests.

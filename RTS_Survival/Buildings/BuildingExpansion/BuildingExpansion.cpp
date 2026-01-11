@@ -11,11 +11,13 @@
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/RTSComponents/TimeProgressBarWidget.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
+#include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
@@ -428,6 +430,23 @@ void ABuildingExpansion::OnVerticalDestructionComplete()
 	BP_OnVerticalDestructionComplete();
 }
 
+FBxpData ABuildingExpansion::GetBxpData(const EBuildingExpansionType BxpSubType) const
+{
+	FBxpData BxpData;
+	if (not GetIsValidRTSComponent())
+	{
+		return BxpData;
+	}
+	if (ACPPGameState* RTSGameState = FRTS_Statics::GetGameState(this))
+	{
+		const bool bOwnedByPlayer = RTSComponent->GetOwningPlayer() == 1;
+		BxpData = bOwnedByPlayer
+			          ? RTSGameState->GetPlayerBxpData(BxpSubType)
+			          : RTSGameState->GetEnemyBxpData(BxpSubType);
+	}
+	return BxpData;
+}
+
 void ABuildingExpansion::PostInit_GetCargoComponent()
 {
 	CargoComponent = FindComponentByClass<UCargo>();
@@ -478,11 +497,9 @@ void ABuildingExpansion::CollapseMesh(UGeometryCollectionComponent* GeoCollapseC
 }
 
 void ABuildingExpansion::InitBuildingExpansion(
-	TArray<FUnitAbilityEntry> Abilities,
 	UStaticMesh* NewConstructionMesh,
 	UStaticMesh* NewBuildingMesh,
 	UTimeProgressBarWidget* NewProgressBar,
-	const float NewBuildingTime,
 	TArray<UNiagaraSystem*> SmokeSystems,
 	const int NewAmountSmokes,
 	const float NewSmokeRadius,
@@ -491,9 +508,19 @@ void ABuildingExpansion::InitBuildingExpansion(
 	TArray<FBuildingAttachment> NewBuildingAttachments, const bool bIsStandAlone,
 	const bool bLetBuildingMeshAffectNavMesh)
 {
-	SetUnitAbilitiesRunTime(Abilities);
+	const FBxpData MyData = GetBxpData(NewBuildingExpansionType);
+	if(GetIsValidFowComponent())
+	{
+		FowComponent->SetVisionRadius(MyData.VisionRadius);
+	}
+	SetUnitAbilitiesRunTime(MyData.Abilities);
 	OnInitBuildingExpansion_SetupCollision(bLetBuildingMeshAffectNavMesh);
+	if(GetIsValidHealthComponent())
+	{
+		HealthComponent->InitHealthAndResistance(MyData.ResistancesAndDamageMlt, MyData.Health);
+	}
 	if (IsValid(NewConstructionMesh))
+		
 	{
 		M_ConstructionMesh = NewConstructionMesh;
 	}
@@ -523,9 +550,9 @@ void ABuildingExpansion::InitBuildingExpansion(
 		                                             "NewProgressBar",
 		                                             "ABuildingExpansion::InitBuildingExpansion");
 	}
-	if (NewBuildingTime > 0.f)
+	if (MyData.ConstructionTime > 0.f)
 	{
-		M_BuildingTime = NewBuildingTime;
+		M_BuildingTime = MyData.ConstructionTime;
 	}
 	else
 	{

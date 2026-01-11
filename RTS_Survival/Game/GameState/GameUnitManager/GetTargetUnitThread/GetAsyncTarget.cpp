@@ -47,7 +47,7 @@ uint32 FGetAsyncTarget::Run()
 
 
 		// Process target requests
-		ProcessRequests();
+		ProcessTargetRequests();
 		ProcessStrategicAIRequests();
 
 		// Sleep to prevent tight loop
@@ -109,7 +109,7 @@ void FGetAsyncTarget::AddTargetRequest(
 	M_RequestQueue.Enqueue(MoveTemp(NewRequest));
 }
 
-void FGetAsyncTarget::ProcessRequests()
+void FGetAsyncTarget::ProcessTargetRequests()
 {
     FTargetRequest Request;
     while (M_RequestQueue.Dequeue(Request))

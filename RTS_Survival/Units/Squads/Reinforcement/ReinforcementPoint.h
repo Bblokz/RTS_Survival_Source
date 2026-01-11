@@ -68,7 +68,7 @@ private:
 	void ClearTrackedSquadControllers();
 	FVector GetSearchOriginLocation() const;
 	FCollisionQueryParams BuildOverlapQueryParams(AActor* OwnerActor, TSet<const AActor*>& OutIgnoredActors) const;
-	FTraceDelegate BuildOverlapTraceDelegate(TSet<const AActor*> IgnoredActors) const;
+	FTraceDelegate BuildOverlapTraceDelegate(TSet<const AActor*> IgnoredActors);
 	FCollisionObjectQueryParams BuildObjectQueryParams(ETriggerOverlapLogic OverlapLogic) const;
 
 	UPROPERTY()

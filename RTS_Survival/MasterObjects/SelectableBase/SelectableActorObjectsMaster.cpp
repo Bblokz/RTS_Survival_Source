@@ -134,6 +134,17 @@ void ASelectableActorObjectsMaster::PostInitializeComponents()
 	PostInitComp_InitFowBehaviour(RTSComponent);
 }
 
+bool ASelectableActorObjectsMaster::GetIsValidFowComponent() const
+{
+	if(not IsValid(FowComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "FowComponent",
+		                                             "ASelectableActorObjectsMaster::GetIsValidFowComponent");
+		return false;
+	}
+	return true;
+}
+
 void ASelectableActorObjectsMaster::SetUnitToIdleSpecificLogic()
 {
 }

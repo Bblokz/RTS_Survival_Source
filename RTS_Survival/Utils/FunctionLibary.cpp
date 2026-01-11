@@ -125,7 +125,6 @@ void RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 }
 
 
-
 void RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(const UObject* Object, const FString& VariableName,
                                                                   const FString& FunctionName,
                                                                   const UObject* DerivedBpContext)
@@ -369,34 +368,33 @@ USoundAttenuation* RTSFunctionLibrary::CreateSoundAttenuation(float Range)
 }
 
 
-
 static bool GetIsDefaultNavAreaAtLocation(
-    const ARecastNavMesh* const RecastNavMesh,
-    const FNavLocation& NavLocation)
+	const ARecastNavMesh* const RecastNavMesh,
+	const FNavLocation& NavLocation)
 {
-    if (RecastNavMesh == nullptr)
-    {
-        return false;
-    }
+	if (RecastNavMesh == nullptr)
+	{
+		return false;
+	}
 
-    if (!NavLocation.HasNodeRef())
-    {
-        return false;
-    }
+	if (!NavLocation.HasNodeRef())
+	{
+		return false;
+	}
 
-    FNavMeshNodeFlags PolyFlags;
-    if (!RecastNavMesh->GetPolyFlags(NavLocation.NodeRef, PolyFlags))
-    {
-        return false;
-    }
+	FNavMeshNodeFlags PolyFlags;
+	if (!RecastNavMesh->GetPolyFlags(NavLocation.NodeRef, PolyFlags))
+	{
+		return false;
+	}
 
-    const UClass* const AreaClass = RecastNavMesh->GetAreaClass(PolyFlags.Area);
-    if (AreaClass == nullptr)
-    {
-        return false;
-    }
+	const UClass* const AreaClass = RecastNavMesh->GetAreaClass(PolyFlags.Area);
+	if (AreaClass == nullptr)
+	{
+		return false;
+	}
 
-    return AreaClass->IsChildOf(UNavArea_Default::StaticClass());
+	return AreaClass->IsChildOf(UNavArea_Default::StaticClass());
 }
 
 FVector RTSFunctionLibrary::GetLocationProjected(const UObject* WorldContextObject, const FVector& OriginalLocation,
@@ -418,7 +416,7 @@ FVector RTSFunctionLibrary::GetLocationProjected(const UObject* WorldContextObje
 		return OriginalLocation;
 	}
 	FNavLocation ProjectedLocation;
-	
+
 
 	if (NavSys->ProjectPointToNavigation(OriginalLocation, ProjectedLocation, Extent))
 	{

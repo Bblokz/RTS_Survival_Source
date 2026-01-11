@@ -186,9 +186,6 @@ bool UDigInComponent::GetIsValidDigInWallActor() const
 {
 	if (not M_DigInWallActor.IsValid())
 	{
-		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "NULL";
-		RTSFunctionLibrary::ReportError("DigInComponent expected valid wall actor but got Null"
-			"\n DigInComponent of owner: " + OwnerName);
 		return false;
 	}
 	return true;

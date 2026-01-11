@@ -70,6 +70,8 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFowComp* FowComponent;
 
+	bool GetIsValidFowComponent() const;
+
 	/*--------------------------------- Abilities ---------------------------------*/
 	/** @copydoc ICommands::ResetUnitSpecificLogic */
 	virtual void SetUnitToIdleSpecificLogic() override;

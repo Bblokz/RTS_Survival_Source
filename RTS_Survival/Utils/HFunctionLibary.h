@@ -48,8 +48,7 @@ public:
 		const FString& VariableName,
 		const FString& FunctionName,
 		const AActor* DerivedBpContext = nullptr);
-
-
+	
 
 	/**
 	 * @brief To report an error when a variable was not initialized before being used.

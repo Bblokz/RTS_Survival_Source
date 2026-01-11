@@ -598,13 +598,7 @@ bool ATrackedTankMaster::GetIsValidDigInComponent() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		"M_DigInComponent",
-		"GetIsValidDigInComponent",
-		this
-	);
-
+	// IMPORTANT: no error report here as some tanks do not use this component!!
 	return false;
 }
 

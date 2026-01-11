@@ -17,6 +17,7 @@
 #include "BuildingExpansion.generated.h"
 
 
+struct FBxpData;
 class UCargo;
 class UWeaponState;
 struct FCollapseFX;
@@ -154,11 +155,9 @@ protected:
 
 	/**
          * Setup all properties for the building expansion.
-         * @param Abilities Ability entries to apply to the expansion instance.
 	 * @param NewConstructionMesh The mesh used during construction for animating.
 	 * @param NewBuildingMesh The complete (high poly) mesh of the building.
 	 * @param NewProgressBar The progress bar widget used to show the building progress.
-	 * @param NewBuildingTime How long it takes to build the building.
 	 * @param SmokeSystems The smoke systems used for the building expansion.
 	 * @param NewAmountSmokes The amount of smoke systems used for the building expansion per material application.
 	 * @param NewSmokeRadius The radius of the smoke systems used for the building expansion.
@@ -169,11 +168,9 @@ protected:
 	 */
         UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ReferenceCasts", meta = (BlueprintProtected = "true"))
         void InitBuildingExpansion(
-                TArray<FUnitAbilityEntry> Abilities,
-                UStaticMesh* NewConstructionMesh,
-                UStaticMesh* NewBuildingMesh,
-                UTimeProgressBarWidget* NewProgressBar,
-		const float NewBuildingTime,
+		UStaticMesh* NewConstructionMesh,
+		UStaticMesh* NewBuildingMesh,
+		UTimeProgressBarWidget* NewProgressBar,
 		TArray<UNiagaraSystem*> SmokeSystems,
 		const int NewAmountSmokes,
 		const float NewSmokeRadius,
@@ -235,6 +232,8 @@ private:
 	
 	UFUNCTION()
 	void OnVerticalDestructionComplete();
+
+	FBxpData GetBxpData(const EBuildingExpansionType BxpSubType) const;
 	
 
 	void PostInit_GetCargoComponent();

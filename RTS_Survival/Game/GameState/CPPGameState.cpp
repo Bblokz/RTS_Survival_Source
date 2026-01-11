@@ -2977,8 +2977,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ArmorPen = 201;
 	WeaponData.ArmorPenMaxRange = 182;
 	WeaponData.MagCapacity = 1;
-	// WeaponData.ReloadSpeed = 26;
-	WeaponData.ReloadSpeed = 4.0f;
+	WeaponData.ReloadSpeed = 26;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 90;
@@ -4801,6 +4800,7 @@ void ACPPGameState::InitAllGameBxpData()
 
 	BxpData.ConstructionTime = T1BxpBuildTime;
 	BxpData.Health = T1BxpHealth;
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.VisionRadius = T1BxpVisionRadius;
 	BxpData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, BxpT1DefensiveRadixiteCost},
@@ -4811,6 +4811,7 @@ void ACPPGameState::InitAllGameBxpData()
 
 	BxpData.ConstructionTime = T1BxpBuildTime * 2;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.5, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, BxpT1DefensiveRadixiteCost * 3},
 		{ERTSResourceType::Resource_Metal, BxpT1DefensiveMetalCost * 4}
@@ -4827,6 +4828,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Abilities = NotArmedBxpAbilities;
 	BxpData.VisionRadius = T1BxpVisionRadius;
 	BxpData.Health = T1BxpHealth;
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BXT_SolarSmall, BxpData);
 
 	BxpData.ConstructionTime = T1BxpBuildTime * 2;
@@ -4836,6 +4838,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = NotArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.25, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.VisionRadius = T1BxpVisionRadius;
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BXT_SolarLarge, BxpData);
 
@@ -4847,6 +4850,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.VisionRadius = T2BxpVisionRadius;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.75, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Pak38, BxpData);
 
 	// FLAK BUNKER
@@ -4858,11 +4862,13 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.VisionRadius = T2BxpVisionRadius;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth * 2.5, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BXT_GerFLakBunker, BxpData);
 
 	BxpData.ConstructionTime = BxpT2BuildTime;
 	BxpData.VisionRadius = T2BxpVisionRadius;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.75, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, BxpT2DefensiveRadixiteCost + 200},
 		{ERTSResourceType::Resource_Metal, BxpT2DefensiveMetalCost + 75}
@@ -4872,26 +4878,6 @@ void ACPPGameState::InitAllGameBxpData()
 
 
 	// todo later fix the prices of these russian buildings when we have their counter parts for the player.
-	// Russian BXP
-	// -----------------------------------------------------------------------
-	// ----------------------------- RUS BARRACKS ---------------------------
-	// -----------------------------------------------------------------------
-	BxpData.ConstructionTime = T1BxpBuildTime;
-	BxpData.VisionRadius = T1BxpVisionRadius;
-	BxpData.Cost = FUnitCost({
-		{
-			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(NomadicBarracksRadixiteCost * 1.5), 10)
-		},
-		{
-			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(NomadicBarracksMetalCost * 1.5), 10)
-		},
-	});
-	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 2, 10);
-	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBarracks, BxpData);
-
 	// -----------------------------------------------------------------------
 	// ----------------------------- RUS FACTORY ----------------------------
 	// -----------------------------------------------------------------------
@@ -4910,6 +4896,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 5, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFactory, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -4930,6 +4917,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 7, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusPlatformFactory, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -4949,6 +4937,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusResearchCenter, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -4968,6 +4957,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusCoolingTowers, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -4987,6 +4977,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicBuildingHealth * 1, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBarracks, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5006,6 +4997,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.5, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBunkerMG, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5025,6 +5017,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 2.2, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusGuardTower, BxpData);
 
 
@@ -5045,6 +5038,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2BxpHealth * 1.33, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBoforsPosition, BxpData);
 	
 	// -----------------------------------------------------------------------
@@ -5064,8 +5058,10 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = NotArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpWallHealth, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusWall, BxpData);
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpGateHealth, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusGate, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5087,6 +5083,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusAmmoStorage, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5106,6 +5103,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 0.8, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFuelStorage1, BxpData);
 
 
@@ -5126,6 +5124,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 2.5, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFuelStorage2, BxpData);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus_SuppliesStorage, BxpData);
 
@@ -5144,6 +5143,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth + 250, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker05, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5160,6 +5160,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker05_WithTurrets, BxpData);
 
 
@@ -5177,6 +5178,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker02_ZIS, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5193,6 +5195,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth + 200, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker02_204MM, BxpData);
 
 	// -----------------------------------------------------------------------
@@ -5212,6 +5215,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2BxpBunkerHealth, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusLongCamoBunker, BxpData);
 
 
@@ -5232,6 +5236,7 @@ void ACPPGameState::InitAllGameBxpData()
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2BxpBunkerHealth * 1.33, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusDomeBunker, BxpData);
 
 

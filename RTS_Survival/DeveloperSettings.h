@@ -796,7 +796,7 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.1f),
 					FDamageMltPerSide::Uniform(1.f)
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.2f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.1f;
 				inline constexpr float FireRecoveryPerSec = 5.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::BasicInfantryArmor;
 				// This damage reduction struct applies to all types of damage
@@ -812,7 +812,7 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.15f),
 					FDamageMltPerSide::Uniform(0.7f)
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.2f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.1f;
 				inline constexpr float FireRecoveryPerSec = 5.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::HeavyInfantryArmor;
 				// This damage reduction struct applies to all types of damage
@@ -827,7 +827,7 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.15f),
 					FDamageMltPerSide::Uniform(0.5f)
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.66f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.25f;
 				inline constexpr float FireRecoveryPerSec = 15.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::CommandoInfantryArmor;
 				// This damage reduction struct applies to all types of damage
@@ -842,7 +842,7 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.1f),
 					FDamageMltPerSide::Uniform(0.f)
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.2f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.1f;
 				inline constexpr float FireRecoveryPerSec = 5.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::HazmatInfantryArmor;
 				// This damage reduction struct applies to all types of damage
@@ -857,7 +857,7 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.1f),
 					FDamageMltPerSide::Uniform(0.f)
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.2f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.1f;
 				inline constexpr float FireRecoveryPerSec = 5.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::HazmatInfantryArmor;
 				// This damage reduction struct applies to all types of damage
@@ -872,8 +872,8 @@ namespace DeveloperSettings
 					FDamageMltPerSide{0.06f, 0.1f, 0.15f},
 					FDamageMltPerSide{0.45f, 0.55f, 0.6f}
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.2f;
-				inline constexpr float FireRecoveryPerSec = 25.f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.1f;
+				inline constexpr float FireRecoveryPerSec = 15.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::ArmoredCarArmor;
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(0, 1.f);
@@ -887,8 +887,8 @@ namespace DeveloperSettings
 					FDamageMltPerSide{0.2f, 0.25, 0.3f},
 					FDamageMltPerSide{0.3f, 0.40f, 0.45f}
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.25f;
-				inline constexpr float FireRecoveryPerSec = 35.f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.15f;
+				inline constexpr float FireRecoveryPerSec = 20.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::LightArmor;
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(0, 1.f);
@@ -902,8 +902,8 @@ namespace DeveloperSettings
 					FDamageMltPerSide{0.6f, 0.65f, 0.7f},
 					FDamageMltPerSide{0.2f, 0.3f, 0.35f}
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.33;
-				inline constexpr float FireRecoveryPerSec = 35.f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.25;
+				inline constexpr float FireRecoveryPerSec = 25.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::MediumArmor;
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(0, 1.f);
@@ -917,8 +917,8 @@ namespace DeveloperSettings
 					FDamageMltPerSide{0.9f, 0.95f, 1.f},
 					FDamageMltPerSide{0.05f, 0.08f, 0.12f}
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.33;
-				inline constexpr float FireRecoveryPerSec = 50.f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.30;
+				inline constexpr float FireRecoveryPerSec = 35.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::HeavilyArmored;
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(0, 1.f);
@@ -932,8 +932,8 @@ namespace DeveloperSettings
 					FDamageMltPerSide{1.1f, 1.15f, 1.2f},
 					FDamageMltPerSide{0.01f, 0.03f, 0.05f}
 				};
-				inline constexpr float FireThresholdMaxHPMlt = 0.45;
-				inline constexpr float FireRecoveryPerSec = 75.f;
+				inline constexpr float FireThresholdMaxHPMlt = 0.33;
+				inline constexpr float FireRecoveryPerSec = 55.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::SuperHeavyArmor;
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(0, 1.f);
@@ -949,8 +949,8 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.15)
 				};
 				inline constexpr float FireThresholdMaxHPMlt = 0.05;
-				inline constexpr float FireRecoveryPerSec = 25.f;
-				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::Reinforced;
+				inline constexpr float FireRecoveryPerSec = 5.f;
+				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::BasicBuildingArmor;
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(20, 1.f);
 			};
@@ -965,10 +965,10 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.1)
 				};
 				inline constexpr float FireThresholdMaxHPMlt = 0.05;
-				inline constexpr float FireRecoveryPerSec = 25.f;
-				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::BasicBuildingArmor;
+				inline constexpr float FireRecoveryPerSec = 10.f;
+				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::Reinforced;
 				// This damage reduction struct applies to all types of damage
-				inline constexpr FDamageReductionSettings DamageReduction(20, 0.7f);
+				inline constexpr FDamageReductionSettings DamageReduction(25, 0.7f);
 			};
 		}
 
@@ -1380,7 +1380,7 @@ namespace DeveloperSettings
 	{
 		constexpr bool GNomadicSkeletalAttachments_Compile_DebugSymbols = false;
 		// Overlap logic; tanks evasion.
-		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
+		constexpr bool GTankOverlaps_Compile_DebugSymbols = true;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
 		constexpr bool GEnemyController_Compile_DebugSymbols = false;
@@ -1417,7 +1417,7 @@ namespace DeveloperSettings
 		constexpr bool GPlayerClickAndAction_Compile_DebugSymbols = false;
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting
-		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
+		constexpr bool GHarvestResources_Compile_DebugSymbols = true;
 		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Resistances_Compile_DebugSymbols = false;

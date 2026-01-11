@@ -60,7 +60,7 @@ bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		"M_EnemyController",
 		"EnsureEnemyControllerIsValid",

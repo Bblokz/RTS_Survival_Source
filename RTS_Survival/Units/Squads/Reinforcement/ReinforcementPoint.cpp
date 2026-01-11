@@ -332,10 +332,10 @@ FCollisionQueryParams UReinforcementPoint::BuildOverlapQueryParams(AActor* Owner
 	return QueryParams;
 }
 
-FTraceDelegate UReinforcementPoint::BuildOverlapTraceDelegate(TSet<const AActor*> IgnoredActors) const
+FTraceDelegate UReinforcementPoint::BuildOverlapTraceDelegate(TSet<const AActor*> IgnoredActors)
 {
 	FTraceDelegate TraceDelegate;
-	const TWeakObjectPtr<UReinforcementPoint> WeakReinforcementPoint = this;
+	TWeakObjectPtr<UReinforcementPoint> WeakReinforcementPoint(this);
 	TraceDelegate.BindLambda(
 		[WeakReinforcementPoint, IgnoredActors = MoveTemp(IgnoredActors)](
 		const FTraceHandle& /*TraceHandle*/,

@@ -693,10 +693,10 @@ void ACPPController::SelectUnitsFromMarquee(
 				MarqueeSquadUnits, MarqueeSelectableActors, MarqueeSelectablePawns);
 		}
 	}
-	const bool bRemovedHarvesters = FilterMarqueeSelection_RemoveHarvesterTanksIfMixed();
-	if (bRemovedHarvesters && SelectionAction != ESelectionChangeAction::UnitAdded_RebuildUIHierarchy
-		&& SelectionAction != ESelectionChangeAction::UnitRemoved_RebuildUIHierarchy
-		&& SelectionAction != ESelectionChangeAction::FullResetSelection)
+	const bool bIsFullResetSelection = SelectionAction == ESelectionChangeAction::FullResetSelection;
+	const bool bIsRebuildUIHierarchy = SelectionAction == ESelectionChangeAction::UnitAdded_RebuildUIHierarchy;
+	const bool bRemovedHarvesters = FilterMarqueeSelection_RemoveHarvesterTanksIfMixed(MarqueeSelectablePawns);
+	if (bRemovedHarvesters && not bIsFullResetSelection && not bIsRebuildUIHierarchy)
 	{
 		SelectionAction = ESelectionChangeAction::UnitRemoved_RebuildUIHierarchy;
 	}
@@ -1818,7 +1818,7 @@ ESelectionChangeAction ACPPController::Internal_RemoveMarqueeFromSelection(const
 	return ESelectionChangeAction::UnitRemoved_HierarchyInvariant;
 }
 
-bool ACPPController::GetIsHarvesterTankPawn(const ASelectablePawnMaster* SelectedPawn) const
+bool ACPPController::GetIsHarvesterTankPawn(ASelectablePawnMaster* SelectedPawn) const
 {
 	if (not RTSFunctionLibrary::RTSIsValid(SelectedPawn))
 	{
@@ -1833,9 +1833,23 @@ bool ACPPController::GetIsHarvesterTankPawn(const ASelectablePawnMaster* Selecte
 		&& RTSComponent->GetSubtypeAsTankSubtype() == ETankSubtype::Tank_PzI_Harvester;
 }
 
+bool ACPPController::GetIsMarqueePawnsOnlyHarvester(const TArray<ASelectablePawnMaster*>& MarqueeSelectedPawns) const
+{
+	bool bIsOnlyHarvesters = true;	
+	for(const auto EachPawn : MarqueeSelectedPawns)
+	{
+		if (not GetIsHarvesterTankPawn(EachPawn))
+		{
+			bIsOnlyHarvesters = false;
+			break;
+		}	
+	}
+	return bIsOnlyHarvesters;
+}
+
 bool ACPPController::GetHasSelectedHarvesterTank() const
 {
-	for (const ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
+	for (ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
 	{
 		if (GetIsHarvesterTankPawn(SelectedPawn))
 		{
@@ -1847,7 +1861,7 @@ bool ACPPController::GetHasSelectedHarvesterTank() const
 
 bool ACPPController::GetHasNonHarvesterSelection() const
 {
-	for (const ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
+	for (ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
 	{
 		if (not RTSFunctionLibrary::RTSIsValid(SelectedPawn))
 		{
@@ -1858,7 +1872,7 @@ bool ACPPController::GetHasNonHarvesterSelection() const
 			return true;
 		}
 	}
-	for (const ASquadController* EachSquad : TSelectedSquadControllers)
+	for (ASquadController* EachSquad : TSelectedSquadControllers)
 	{
 		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
 		{
@@ -1866,7 +1880,7 @@ bool ACPPController::GetHasNonHarvesterSelection() const
 		}
 		return true;
 	}
-	for (const ASelectableActorObjectsMaster* EachActor : TSelectedActorsMasters)
+	for (ASelectableActorObjectsMaster* EachActor : TSelectedActorsMasters)
 	{
 		if (not RTSFunctionLibrary::RTSIsValid(EachActor))
 		{
@@ -1894,8 +1908,15 @@ bool ACPPController::RemoveSelectedHarvesterTanks()
 	return bRemovedHarvester;
 }
 
-bool ACPPController::FilterMarqueeSelection_RemoveHarvesterTanksIfMixed()
+bool ACPPController::FilterMarqueeSelection_RemoveHarvesterTanksIfMixed(const TArray<ASelectablePawnMaster*>& NewMarqueeSelectedPawns)
 {
+	const bool bOnlyHarvestersInMarquee=  GetIsMarqueePawnsOnlyHarvester(NewMarqueeSelectedPawns);
+	if(bIsHoldingShift && bOnlyHarvestersInMarquee)
+	{
+		// No harvesters to remove from selection as the player attempted to add ONLY harvesters.
+		// So we allow adding harvesters in this specific case.
+		return false;
+	}
 	if (not GetHasSelectedHarvesterTank())
 	{
 		return false;

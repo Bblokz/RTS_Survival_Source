@@ -787,7 +787,6 @@ void ATankMaster::OnTurretOutOfRange(
 		if (GetCanTurretTakeControl())
 		{
 			AITankController->MoveToLocationWithGoalAcceptance(TargetLocation);
-			RTSFunctionLibrary::PrintString("Unit out of range!", FColor::Cyan);
 			if (GetIsValidRTSNavCollision())
 			{
 				RTSNavCollision->EnableAffectNavmesh(false);
