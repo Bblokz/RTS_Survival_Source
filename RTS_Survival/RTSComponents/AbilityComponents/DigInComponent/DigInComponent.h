@@ -39,6 +39,7 @@ public:
 
 	void ExecuteDigInCommand();
 	void TerminateDigInCommand();
+	void OnOwningUnitDeath();
 
 protected:
 	// Called when the game starts

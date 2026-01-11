@@ -131,10 +131,11 @@ void ATrackedTankMaster::PostInitializeComponents()
 	}
 	M_DigInComponent = FindComponentByClass<UDigInComponent>();
 	M_AttachedRockets = FindComponentByClass<UAttachedRockets>();
-	if (IsValid(M_DigInComponent))
+	if (not GetIsValidDigInComponent())
 	{
-		M_DigInComponent->SetupOwner(this);
+		return;
 	}
+	M_DigInComponent->SetupOwner(this);
 }
 
 void ATrackedTankMaster::BeginPlay()
@@ -151,6 +152,15 @@ void ATrackedTankMaster::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_EngineSoundHandle);
 	}
 	Super::BeginDestroy();
+}
+
+void ATrackedTankMaster::UnitDies(const ERTSDeathType DeathType)
+{
+	if (GetIsValidDigInComponent())
+	{
+		M_DigInComponent->OnOwningUnitDeath();
+	}
+	Super::UnitDies(DeathType);
 }
 
 void ATrackedTankMaster::Tick(float DeltaSeconds)
@@ -422,13 +432,11 @@ void ATrackedTankMaster::TerminateRotateTowardsCommand()
 void ATrackedTankMaster::ExecuteDigIn()
 {
 	Super::ExecuteDigIn();
-	if (IsValid(M_DigInComponent))
+	if (not GetIsValidDigInComponent())
 	{
-		M_DigInComponent->ExecuteDigInCommand();
 		return;
 	}
-	RTSFunctionLibrary::ReportError("Tank got dig in command to exe but has no DigIn component!"
-		"\n Tank: " + GetName());
+	M_DigInComponent->ExecuteDigInCommand();
 }
 
 void ATrackedTankMaster::TerminateDigIn()
@@ -441,14 +449,12 @@ void ATrackedTankMaster::TerminateDigIn()
 void ATrackedTankMaster::ExecuteBreakCover()
 {
 	Super::ExecuteBreakCover();
-	if (IsValid(M_DigInComponent))
+	if (not GetIsValidDigInComponent())
 	{
-		// Will call OnBreakCoverCompleted when the unit is movable again.
-		M_DigInComponent->TerminateDigInCommand();
 		return;
 	}
-	RTSFunctionLibrary::ReportError("Tank got undig command to exe but has no DigIn component!"
-		"\n Tank: " + GetName());
+	// Will call OnBreakCoverCompleted when the unit is movable again.
+	M_DigInComponent->TerminateDigInCommand();
 }
 
 void ATrackedTankMaster::TerminateBreakCover()
@@ -583,6 +589,23 @@ bool ATrackedTankMaster::EnsureValidExperienceComponent()
 		"\n For tank: " + GetName());
 	ExperienceComponent = NewObject<URTSExperienceComp>(this, "ExperienceComponent");
 	return IsValid(ExperienceComponent);
+}
+
+bool ATrackedTankMaster::GetIsValidDigInComponent() const
+{
+	if (IsValid(M_DigInComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_DigInComponent",
+		"GetIsValidDigInComponent",
+		this
+	);
+
+	return false;
 }
 
 void ATrackedTankMaster::BeginPlay_SetupExperienceComponent()

@@ -72,6 +72,7 @@ protected:
 
 	virtual void BeginPlay() override;
 	virtual void BeginDestroy() override;
+	virtual void UnitDies(const ERTSDeathType DeathType) override;
 
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -223,5 +224,7 @@ private:
 	void OnRTSUnitSpawned_SetDisabled();
 
 	void CheckFootPrintForOverlaps() const;
+
+	bool GetIsValidDigInComponent() const;
 
 };
