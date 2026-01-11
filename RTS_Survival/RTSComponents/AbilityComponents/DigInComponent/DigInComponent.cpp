@@ -84,12 +84,28 @@ void UDigInComponent::TerminateDigInCommand()
 	{
 		return;
 	}
-	if (M_DigInWallActor.IsValid())
+	if (GetIsValidDigInWallActor())
 	{
 		M_DigInWallActor->DestroyWall();
 	}
 	M_DigInWallActor.Reset();
 	M_OwningDigInUnit->OnBreakCoverCompleted();
+}
+
+void UDigInComponent::OnOwningUnitDeath()
+{
+	if (M_DigInStatus == EDigInStatus::Movable || M_DigInStatus == EDigInStatus::None)
+	{
+		return;
+	}
+
+	M_DigInStatus = EDigInStatus::Movable;
+	if (not GetIsValidDigInWallActor())
+	{
+		return;
+	}
+	M_DigInWallActor->DestroyWall();
+	M_DigInWallActor.Reset();
 }
 
 
@@ -157,11 +173,12 @@ bool UDigInComponent::SpawnDigInWallActor(const FVector& SpawnLocation)
 		SpawnRotation,
 		SpawnParams
 	);
-	if(M_DigInWallActor.IsValid() && EnsureScalingVectorIsValid(DigInWallScaling))
+	const bool bIsValidDigInWallActor = GetIsValidDigInWallActor();
+	if (bIsValidDigInWallActor && EnsureScalingVectorIsValid(DigInWallScaling))
 	{
 		M_DigInWallActor->SetActorScale3D(DigInWallScaling);
 	}
-	return GetIsValidDigInWallActor();
+	return bIsValidDigInWallActor;
 }
 
 
