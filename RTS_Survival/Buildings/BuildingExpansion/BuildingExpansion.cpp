@@ -418,7 +418,39 @@ void ABuildingExpansion::ExecuteAttackCommand(AActor* TargetActor)
 	}
 }
 
+void ABuildingExpansion::ExecuteAttackGroundCommand(const FVector GroundLocation)
+{
+	if (GroundLocation.IsNearlyZero())
+	{
+		DoneExecutingCommand(EAbilityID::IdAttackGround);
+		return;
+	}
+
+	M_TargetActor = nullptr;
+
+	for (const auto EachTurret : M_TTurrets)
+	{
+		if (EachTurret.IsValid())
+		{
+			EachTurret->SetEngageGroundLocation(GroundLocation);
+		}
+	}
+
+	for (const auto EachHullWeapon : HullWeapons)
+	{
+		if (GetIsValidHullWeapon(EachHullWeapon))
+		{
+			EachHullWeapon->SetEngageGroundLocation(GroundLocation);
+		}
+	}
+}
+
 void ABuildingExpansion::TerminateAttackCommand()
+{
+	SetTurretsToAutoEngage();
+}
+
+void ABuildingExpansion::TerminateAttackGroundCommand()
 {
 	SetTurretsToAutoEngage();
 }
