@@ -11,7 +11,6 @@ UW_TrainingItem::UW_TrainingItem(const FObjectInitializer& ObjectInitializer)
 	, ButtonStyleAsset(nullptr)
 	, M_TrainingItemSizeBox(nullptr)
 	, M_TrainingItemButton(nullptr)
-	, M_TrainingItemImage(nullptr)
 	, M_TrainingUIManager(nullptr)
 	, M_Index(0)
 	, M_AnimationStartTime(0.f)
@@ -66,10 +65,11 @@ void UW_TrainingItem::StartClock(
 		// 2) Compute and store the opacity at the moment we begin
 		M_InitialOpacity = 1.0f - float(TimeRemaining) / float(TotalTrainingTime);
 
-		// 3) Paint the very first frame via our common curve helper
-		if (M_TrainingItemImage)
+		// // 3) Paint the very first frame via our common curve helper
+		if(M_TrainingItemButton)
 		{
-			M_TrainingItemImage->SetOpacity( ComputeClockOpacity(M_AnimationStartTime) );
+			M_TrainingItemButton->SetRenderOpacity(ComputeClockOpacity(M_AnimationStartTime));
+			
 		}
 
 		// 4) Reset any existing timer
@@ -101,10 +101,10 @@ void UW_TrainingItem::StopClock()
 	{
 		World->GetTimerManager().ClearTimer(M_ClockTimerHandle);
 
-		if (M_TrainingItemImage)
+		if (M_TrainingItemButton)
 		{
 			// Ensure final state is fully visible
-			M_TrainingItemImage->SetOpacity(1.0f);
+			M_TrainingItemButton->SetRenderOpacity(ComputeClockOpacity(1.f));
 		}
 	}
 }
@@ -130,7 +130,7 @@ void UW_TrainingItem::SetClockPaused(const bool bPause)
 
 void UW_TrainingItem::ResumeClock()
 {
-	if (!bM_IsClockPaused || !GetWorld() || !M_TrainingItemImage)
+	if (!bM_IsClockPaused || !GetWorld() || !M_TrainingItemButton)
 	{
 		return;
 	}
@@ -144,7 +144,7 @@ void UW_TrainingItem::ResumeClock()
 	M_AnimationEndTime    += PauseDelta;
 
 	// 2) Paint the very first post-pause frame
-	M_TrainingItemImage->SetOpacity( ComputeClockOpacity(Now) );
+			M_TrainingItemButton->SetRenderOpacity(ComputeClockOpacity(Now));
 
 	// 3) Restart ticking
 	World->GetTimerManager().SetTimer(
@@ -168,9 +168,9 @@ void UW_TrainingItem::UpdateClockOpacity()
 		{
 			StopClock();
 		}
-		else if (M_TrainingItemImage)
+		else if (M_TrainingItemButton)
 		{
-			M_TrainingItemImage->SetOpacity( ComputeClockOpacity(Now) );
+			M_TrainingItemButton->SetRenderOpacity(ComputeClockOpacity(Now));
 		}
 	}
 }

@@ -98,9 +98,6 @@ protected:
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	UButton* M_TrainingItemButton;
 
-	// The image of this widget that is a child of the button.
-	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
-	UImage* M_TrainingItemImage;
 
 private:
 	UPROPERTY()
