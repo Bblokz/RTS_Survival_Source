@@ -227,6 +227,8 @@ protected:
 	// ICommand functions
 	virtual void ExecuteAttackCommand(AActor* TargetActor) override final;
 	virtual void TerminateAttackCommand() override final;
+	virtual void ExecuteAttackGroundCommand(const FVector GroundLocation) override final;
+	virtual void TerminateAttackGroundCommand() override final;
 
 private:
 	
