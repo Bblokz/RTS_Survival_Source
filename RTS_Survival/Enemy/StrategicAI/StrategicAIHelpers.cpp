@@ -301,6 +301,11 @@ namespace StrategicAIHelperUtilities
 		TArray<const FAsyncDetailedUnitState*> IdleHazmats,
 		const FFindAlliedTanksToRetreat& Request)
 	{
+		IdleHazmats.RemoveAll([](const FAsyncDetailedUnitState* UnitState)
+		{
+			return not UnitState;
+		});
+
 		for (FDamagedTankGroupBuilder& GroupBuilder : Groups)
 		{
 			if (GroupBuilder.Locations.IsEmpty())
@@ -309,17 +314,9 @@ namespace StrategicAIHelperUtilities
 			}
 
 			const FVector GroupCenter = GetAverageLocation(GroupBuilder.Locations);
-			IdleHazmats.Sort([&GroupCenter](const FAsyncDetailedUnitState* Left, const FAsyncDetailedUnitState* Right)
+			IdleHazmats.Sort([&GroupCenter](const FAsyncDetailedUnitState& Left, const FAsyncDetailedUnitState& Right)
 			{
-				if (not Left)
-				{
-					return false;
-				}
-				if (not Right)
-				{
-					return true;
-				}
-				return FVector::Dist(Left->UnitLocation, GroupCenter) < FVector::Dist(Right->UnitLocation, GroupCenter);
+				return FVector::Dist(Left.UnitLocation, GroupCenter) < FVector::Dist(Right.UnitLocation, GroupCenter);
 			});
 
 			const int32 MaxHazmatsToConsider = FMath::Max(0, Request.MaxIdleHazmatsToConsider);
