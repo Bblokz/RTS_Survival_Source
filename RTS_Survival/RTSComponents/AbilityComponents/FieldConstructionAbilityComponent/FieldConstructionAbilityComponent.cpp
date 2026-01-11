@@ -192,6 +192,34 @@ bool UFieldConstructionAbilityComponent::GetIsValidSquadController() const
 	return false;
 }
 
+bool UFieldConstructionAbilityComponent::GetIsValidPreviewActor() const
+{
+	if (M_ActiveConstructionState.M_PreviewActor.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_ActiveConstructionState.M_PreviewActor",
+		"UFieldConstructionAbilityComponent::GetIsValidPreviewActor");
+	return false;
+}
+
+bool UFieldConstructionAbilityComponent::GetIsValidSpawnedConstruction() const
+{
+	if (M_ActiveConstructionState.M_SpawnedConstruction.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_ActiveConstructionState.M_SpawnedConstruction",
+		"UFieldConstructionAbilityComponent::GetIsValidSpawnedConstruction");
+	return false;
+}
+
 bool UFieldConstructionAbilityComponent::GetIsValidTimedProgressBarManager() const
 {
 	if (M_TimedProgressBarManager.IsValid())
@@ -235,9 +263,10 @@ void UFieldConstructionAbilityComponent::TerminateFieldConstructionCommand(AActo
 	if (M_ActiveConstructionState.M_CurrentPhase == EFieldConstructionAbilityPhase::MovingToLocation)
 	{
 		DestroyPreviewActor(StaticPreviewActor);
-		DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.IsValid()
-			                    ? M_ActiveConstructionState.M_PreviewActor.Get()
-			                    : nullptr);
+		AStaticPreviewMesh* PreviewActor = GetIsValidPreviewActor()
+			                                   ? M_ActiveConstructionState.M_PreviewActor.Get()
+			                                   : nullptr;
+		DestroyPreviewActor(PreviewActor);
 		if (GetIsValidSquadController())
 		{
 			M_OwningSquadController->TerminateMoveCommand();
@@ -248,7 +277,7 @@ void UFieldConstructionAbilityComponent::TerminateFieldConstructionCommand(AActo
 
 	if (M_ActiveConstructionState.M_CurrentPhase == EFieldConstructionAbilityPhase::Constructing)
 	{
-		if (M_ActiveConstructionState.M_SpawnedConstruction.IsValid())
+		if (GetIsValidSpawnedConstruction())
 		{
 			M_ActiveConstructionState.M_SpawnedConstruction->StopConstructionMaterialTimer();
 		}
@@ -342,9 +371,10 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 		DisableSquadWeapons(false);
 		RemoveEquipmentFromSquad();
 		StopConstructionAnimation();
-		DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.IsValid()
-			                    ? M_ActiveConstructionState.M_PreviewActor.Get()
-			                    : nullptr);
+		AStaticPreviewMesh* PreviewActor = GetIsValidPreviewActor()
+			                                   ? M_ActiveConstructionState.M_PreviewActor.Get()
+			                                   : nullptr;
+		DestroyPreviewActor(PreviewActor);
 		if (GetIsValidSquadController())
 		{
 			M_OwningSquadController->DoneExecutingCommand(EAbilityID::IdFieldConstruction);
@@ -352,14 +382,14 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 		ResetConstructionState();
 		return;
 	}
-		TeleportSquadUnitsAroundConstructionSite();
+	TeleportSquadUnitsAroundConstructionSite();
 	M_FieldConstructionInProgress = SpawnedConstruction;
-	UStaticMeshComponent* PreviewMeshComponent =
-		GetPreviewMeshComponent(M_ActiveConstructionState.M_PreviewActor.Get());
+	AStaticPreviewMesh* PreviewActor = GetIsValidPreviewActor()
+		                                   ? M_ActiveConstructionState.M_PreviewActor.Get()
+		                                   : nullptr;
+	UStaticMeshComponent* PreviewMeshComponent = GetPreviewMeshComponent(PreviewActor);
 	SetupSpawnedConstruction(SpawnedConstruction, PreviewMeshComponent);
-	DestroyPreviewActor(M_ActiveConstructionState.M_PreviewActor.IsValid()
-		                    ? M_ActiveConstructionState.M_PreviewActor.Get()
-		                    : nullptr);
+	DestroyPreviewActor(PreviewActor);
 
 	DisableSquadWeapons(true);
 	AddEquipmentToSquad();
@@ -606,7 +636,7 @@ void UFieldConstructionAbilityComponent::SpawnCompletionEffect() const
 		return;
 	}
 
-	if (not M_ActiveConstructionState.M_SpawnedConstruction.IsValid())
+	if (not GetIsValidSpawnedConstruction())
 	{
 		return;
 	}
@@ -888,7 +918,7 @@ void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSit
 	// Determine the construction XY footprint radius (half-extent) from the placed preview,
 	// falling back to the configured preview mesh.
 	float ConstructionFootprintRadiusXY = 0.f;
-	if (M_ActiveConstructionState.M_PreviewActor.IsValid())
+	if (GetIsValidPreviewActor())
 	{
 		if (UStaticMeshComponent* PreviewMeshComponent = GetPreviewMeshComponent(
 			M_ActiveConstructionState.M_PreviewActor.Get()))
@@ -906,12 +936,20 @@ void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSit
 	float MaxUnitCollisionRadius = 0.f;
 	TArray<TPair<ASquadUnit*, float>> UnitsWithAngles;
 	UnitsWithAngles.Reserve(SquadUnits.Num());
+	bool bHasMinimumTeleportZ = false;
+	float MinimumTeleportZ = 0.f;
 
 	for (ASquadUnit* SquadUnit : SquadUnits)
 	{
 		if (not IsValid(SquadUnit))
 		{
 			continue;
+		}
+
+		if (not bHasMinimumTeleportZ)
+		{
+			MinimumTeleportZ = SquadUnit->GetActorLocation().Z;
+			bHasMinimumTeleportZ = true;
 		}
 
 		MaxUnitCollisionRadius = FMath::Max(MaxUnitCollisionRadius, SquadUnit->GetSimpleCollisionRadius());
@@ -921,7 +959,7 @@ void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSit
 		UnitsWithAngles.Add({SquadUnit, AngleRadians});
 	}
 
-	if (UnitsWithAngles.Num() <= 0)
+	if (UnitsWithAngles.Num() <= 0 || not bHasMinimumTeleportZ)
 	{
 		return;
 	}
@@ -937,8 +975,6 @@ void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSit
 
 	// Keep units within the configured range when possible, but never inside the footprint ring.
 	const float MaxRadiusFromCenter = FMath::Max(SquadUnitFieldConstructionDistance, MinimumRadiusFromCenter);
-
-	const FVector NavigationProjectionExtent(MaxUnitCollisionRadius * 2.f, MaxUnitCollisionRadius * 2.f, 250.f);
 
 	const float AngleStepRadians = (2.f * PI) / static_cast<float>(UnitsWithAngles.Num());
 	const float StartAngleRadians = UnitsWithAngles[0].Value;
@@ -964,7 +1000,7 @@ void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSit
 			ConstructionCenter,
 			SlotAngleRadians,
 			DesiredRadiusFromCenter,
-			NavigationProjectionExtent))
+			MinimumTeleportZ))
 		{
 			RTSFunctionLibrary::PrintString("Failed to safely teleport a squad unit for field construction.");
 		}
@@ -975,25 +1011,19 @@ bool UFieldConstructionAbilityComponent::TryTeleportSquadUnitToConstructionRing(
 	const FVector& ConstructionCenter,
 	float TargetAngleRadians,
 	float DesiredRadiusFromCenter,
-	const FVector& NavigationProjectionExtent) const
+	float MinimumTeleportZ) const
 {
 	if (not IsValid(SquadUnit))
 	{
 		return false;
 	}
 
-	UWorld* World = GetWorld();
-	if (not World)
-	{
-		return false;
-	}
-
-	const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(World);
-
 	const float UnitCollisionRadius = FMath::Max(10.f, SquadUnit->GetSimpleCollisionRadius());
 	const float AngleJitterStepRadians = FMath::DegreesToRadians(20.f);
 	const float RadiusStep = UnitCollisionRadius * 2.f;
 	const int32 MaxAttempts = 10;
+	constexpr float ProjectionScale = 1.f;
+	constexpr float TeleportHeightOffset = 30.f;
 
 	for (int32 AttemptIndex = 0; AttemptIndex < MaxAttempts; ++AttemptIndex)
 	{
@@ -1007,16 +1037,16 @@ bool UFieldConstructionAbilityComponent::TryTeleportSquadUnitToConstructionRing(
 		const FVector Direction2D(FMath::Cos(AttemptAngleRadians), FMath::Sin(AttemptAngleRadians), 0.f);
 
 		FVector CandidateLocation = ConstructionCenter + (Direction2D * AttemptRadius);
-		CandidateLocation.Z = SquadUnit->GetActorLocation().Z;
-
-		if (NavigationSystem)
-		{
-			FNavLocation NavLocation;
-			if (NavigationSystem->ProjectPointToNavigation(CandidateLocation, NavLocation, NavigationProjectionExtent))
-			{
-				CandidateLocation = NavLocation.Location;
-			}
-		}
+		CandidateLocation.Z = MinimumTeleportZ;
+		bool bWasProjected = false;
+		CandidateLocation = RTSFunctionLibrary::GetLocationProjected(
+			this,
+			CandidateLocation,
+			true,
+			bWasProjected,
+			ProjectionScale);
+		static_cast<void>(bWasProjected);
+		CandidateLocation.Z = FMath::Max(CandidateLocation.Z, MinimumTeleportZ) + TeleportHeightOffset;
 
 		FRotator CandidateRotation = UKismetMathLibrary::FindLookAtRotation(CandidateLocation, ConstructionCenter);
 		CandidateRotation.Pitch = 0.f;

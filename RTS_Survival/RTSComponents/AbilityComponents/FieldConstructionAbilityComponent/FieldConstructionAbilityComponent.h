@@ -202,6 +202,8 @@ private:
 	UPROPERTY()
 	ASquadController* M_OwningSquadController = nullptr;
 	bool GetIsValidSquadController() const;
+	bool GetIsValidPreviewActor() const;
+	bool GetIsValidSpawnedConstruction() const;
 
 	UPROPERTY()
 	FTimerHandle M_FieldConstructionRangeCheckHandle;
@@ -252,12 +254,12 @@ private:
      * @param ConstructionCenter Center of the construction site.
      * @param TargetAngleRadians Angle around the center (radians) for the slot.
      * @param DesiredRadiusFromCenter Desired distance from the center.
-     * @param NavigationProjectionExtent Extent used when projecting points onto the navmesh.
+     * @param MinimumTeleportZ Lowest acceptable Z for teleport placement.
      * @return True if the unit was successfully teleported.
      */
 	bool TryTeleportSquadUnitToConstructionRing(ASquadUnit* SquadUnit, const FVector& ConstructionCenter,
 	                                            float TargetAngleRadians, float DesiredRadiusFromCenter,
-	                                            const FVector& NavigationProjectionExtent) const;
+	                                            float MinimumTeleportZ) const;
 	void StartConstructionProgressBar(AFieldConstruction* SpawnedConstruction);
 	void StopConstructionProgressBar();
 
