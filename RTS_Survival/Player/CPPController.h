@@ -864,6 +864,12 @@ private:
 		const TArray<ASelectableActorObjectsMaster*>& MarqueeSelectableActors,
 		const TArray<ASelectablePawnMaster*>& MarqueeSelectablePawn);
 
+	bool GetIsHarvesterTankPawn(const ASelectablePawnMaster* SelectedPawn) const;
+	bool GetHasSelectedHarvesterTank() const;
+	bool GetHasNonHarvesterSelection() const;
+	bool RemoveSelectedHarvesterTanks();
+	bool FilterMarqueeSelection_RemoveHarvesterTanksIfMixed();
+
 	void UpdateUIForSelectionAction(const ESelectionChangeAction Action,
 	                                AActor* AddSelectedActorToPlayVoiceLine);
 	void PlayActorSelectionVoiceLine(const AActor* SelectedActor) const;

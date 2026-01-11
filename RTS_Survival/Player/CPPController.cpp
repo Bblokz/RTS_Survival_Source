@@ -693,6 +693,13 @@ void ACPPController::SelectUnitsFromMarquee(
 				MarqueeSquadUnits, MarqueeSelectableActors, MarqueeSelectablePawns);
 		}
 	}
+	const bool bRemovedHarvesters = FilterMarqueeSelection_RemoveHarvesterTanksIfMixed();
+	if (bRemovedHarvesters && SelectionAction != ESelectionChangeAction::UnitAdded_RebuildUIHierarchy
+		&& SelectionAction != ESelectionChangeAction::UnitRemoved_RebuildUIHierarchy
+		&& SelectionAction != ESelectionChangeAction::FullResetSelection)
+	{
+		SelectionAction = ESelectionChangeAction::UnitRemoved_RebuildUIHierarchy;
+	}
 	UpdateUIForSelectionAction(SelectionAction, nullptr);
 }
 
@@ -1809,6 +1816,95 @@ ESelectionChangeAction ACPPController::Internal_RemoveMarqueeFromSelection(const
 		return ESelectionChangeAction::UnitRemoved_RebuildUIHierarchy;
 	}
 	return ESelectionChangeAction::UnitRemoved_HierarchyInvariant;
+}
+
+bool ACPPController::GetIsHarvesterTankPawn(const ASelectablePawnMaster* SelectedPawn) const
+{
+	if (not RTSFunctionLibrary::RTSIsValid(SelectedPawn))
+	{
+		return false;
+	}
+	const URTSComponent* RTSComponent = SelectedPawn->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		return false;
+	}
+	return RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank
+		&& RTSComponent->GetSubtypeAsTankSubtype() == ETankSubtype::Tank_PzI_Harvester;
+}
+
+bool ACPPController::GetHasSelectedHarvesterTank() const
+{
+	for (const ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
+	{
+		if (GetIsHarvesterTankPawn(SelectedPawn))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ACPPController::GetHasNonHarvesterSelection() const
+{
+	for (const ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(SelectedPawn))
+		{
+			continue;
+		}
+		if (not GetIsHarvesterTankPawn(SelectedPawn))
+		{
+			return true;
+		}
+	}
+	for (const ASquadController* EachSquad : TSelectedSquadControllers)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
+		{
+			continue;
+		}
+		return true;
+	}
+	for (const ASelectableActorObjectsMaster* EachActor : TSelectedActorsMasters)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachActor))
+		{
+			continue;
+		}
+		return true;
+	}
+	return false;
+}
+
+bool ACPPController::RemoveSelectedHarvesterTanks()
+{
+	bool bRemovedHarvester = false;
+	for (int32 PawnIndex = TSelectedPawnMasters.Num() - 1; PawnIndex >= 0; --PawnIndex)
+	{
+		ASelectablePawnMaster* SelectedPawn = TSelectedPawnMasters[PawnIndex];
+		if (not GetIsHarvesterTankPawn(SelectedPawn))
+		{
+			continue;
+		}
+		SelectedPawn->SetUnitSelected(false);
+		TSelectedPawnMasters.RemoveAt(PawnIndex);
+		bRemovedHarvester = true;
+	}
+	return bRemovedHarvester;
+}
+
+bool ACPPController::FilterMarqueeSelection_RemoveHarvesterTanksIfMixed()
+{
+	if (not GetHasSelectedHarvesterTank())
+	{
+		return false;
+	}
+	if (not GetHasNonHarvesterSelection())
+	{
+		return false;
+	}
+	return RemoveSelectedHarvesterTanks();
 }
 
 void ACPPController::UpdateUIForSelectionAction(const ESelectionChangeAction Action,
