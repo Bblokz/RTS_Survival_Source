@@ -47,9 +47,10 @@ void ATeamWeaponController::ExecuteRotateTowardsCommand(const FRotator RotateToR
 	Super::ExecuteRotateTowardsCommand(RotateToRotator, IsQueueCommand);
 }
 
-void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected)
+void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
+                                            const ERTSDeathType DeathType)
 {
-	Super::UnitInSquadDied(UnitDied, bUnitSelected);
+	Super::UnitInSquadDied(UnitDied, bUnitSelected, DeathType);
 	AssignCrewToTeamWeapon();
 }
 

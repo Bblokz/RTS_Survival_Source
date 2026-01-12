@@ -515,7 +515,8 @@ void ASquadController::HandleWeaponSwitchOnUnitDeath(ASquadUnit* UnitThatDied)
 }
 
 
-void ASquadController::UnitInSquadDied(ASquadUnit* UnitDied, const bool bUnitSelected)
+void ASquadController::UnitInSquadDied(ASquadUnit* UnitDied, const bool bUnitSelected,
+                                       const ERTSDeathType DeathType)
 {
 	M_TSquadUnits.Remove(UnitDied);
 	UnitInSquadDied_HandleGrenadeComp(UnitDied);
@@ -551,12 +552,12 @@ void ASquadController::UnitInSquadDied(ASquadUnit* UnitDied, const bool bUnitSel
 		{
 			PlayerController->RemoveSquadFromSelectionAndUpdateUI(this);
 		}
-		if (IsValid(RTSComponent))
+		const bool bShouldPlayAnnouncer = DeathType != ERTSDeathType::Scavenging
+			&& GetIsValidRTSComponent()
+			&& RTSComponent->GetOwningPlayer() == 1;
+		if (bShouldPlayAnnouncer)
 		{
-			if (RTSComponent->GetOwningPlayer() == 1)
-			{
-				PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::LostSquad, true, false);
-			}
+			PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::LostSquad, true, false);
 		}
 	}
 
@@ -1299,7 +1300,7 @@ void ASquadController::RemoveCaptureUnitsFromSquad(const int32 AmountCaptureUnit
 
 		// Use the existing helper so selection, squad array bookkeeping and squad HP aggregation
 		// all update exactly the same as on a normal death.
-		UnitInSquadDied(SquadUnit, bWasSelected);
+		UnitInSquadDied(SquadUnit, bWasSelected, ERTSDeathType::Scavenging);
 
 		// Prevent this unit from telling the controller again from its own UnitDies / EndPlay path.
 		SquadUnit->M_SquadController = nullptr;
@@ -1517,6 +1518,27 @@ void ASquadController::OnScavengingComplete()
 	DoneExecutingCommand(EAbilityID::IdScavenge);
 }
 
+void ASquadController::ConsumeSquadOnScavengingComplete()
+{
+	EnsureSquadUnitsValid();
+	if (M_TSquadUnits.Num() <= 0)
+	{
+		return;
+	}
+
+	M_TargetScavengeState.Reset();
+	const TArray<ASquadUnit*> CurrentSquadUnits = M_TSquadUnits;
+
+	for (ASquadUnit* SquadUnit : CurrentSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->UnitDies(ERTSDeathType::Scavenging);
+	}
+}
 void ASquadController::OnSquadUnitArrivedAtCaptureActor()
 {
 	ICaptureInterface* CaptureInterface =
