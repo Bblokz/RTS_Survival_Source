@@ -26,17 +26,16 @@ void UW_TrainingItem::InitW_TrainingItem(
 	UTrainingMenuManager* TrainingUIManager,
 	int32 IndexInScrollBar)
 {
-	if (IsValid(TrainingUIManager))
-	{
-		M_TrainingUIManager = TrainingUIManager;
-		M_Index = IndexInScrollBar;
-	}
-	else
+	if (not IsValid(TrainingUIManager))
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("TrainingUIManager is not valid in InitW_TrainingItem\n")
 			TEXT(" at function UW_TrainingItem::InitW_TrainingItem"));
+		return;
 	}
+
+	M_TrainingUIManager = TrainingUIManager;
+	M_Index = IndexInScrollBar;
 }
 
 void UW_TrainingItem::UpdateTrainingItem(const FTrainingWidgetState& TrainingItemState)
@@ -64,7 +63,9 @@ void UW_TrainingItem::StartClock(
 		M_AnimationEndTime   = M_AnimationStartTime + TimeRemaining;
 
 		// 2) Compute and store the opacity at the moment we begin
-		M_InitialOpacity = 1.0f - float(TimeRemaining) / float(TotalTrainingTime);
+		const float NormalizedProgress = 1.0f - float(TimeRemaining) / float(TotalTrainingTime);
+		M_InitialOpacity = M_LowestPossibleTrainingOpacity
+			+ NormalizedProgress * (1.0f - M_LowestPossibleTrainingOpacity);
 
 		// 3) Paint the very first frame via our common curve helper
 		if (M_TrainingItemImage)
@@ -130,7 +131,7 @@ void UW_TrainingItem::SetClockPaused(const bool bPause)
 
 void UW_TrainingItem::ResumeClock()
 {
-	if (!bM_IsClockPaused || !GetWorld() || !M_TrainingItemImage)
+	if (not bM_IsClockPaused || not GetWorld() || not M_TrainingItemImage)
 	{
 		return;
 	}
@@ -195,39 +196,28 @@ float UW_TrainingItem::ComputeClockOpacity(const float WorldTime) const
 	const float Curved = FMath::Pow(t, OpacityGamma);
 
 	// 3) blend between initial (when we started) and fully visible
-	return M_InitialOpacity + Curved * (1.0f - M_InitialOpacity);
+	const float StartingOpacity = FMath::Max(M_InitialOpacity, M_LowestPossibleTrainingOpacity);
+	return StartingOpacity + Curved * (1.0f - StartingOpacity);
 }
 
 void UW_TrainingItem::OnClickedTrainingItem(const bool bIsLeftClick)
 {
-	if (IsValid(M_TrainingUIManager))
+	if (not GetIsValidTrainingUIManager())
 	{
-		M_TrainingUIManager->OnTrainingItemClicked(M_TrainingItemState, M_Index, bIsLeftClick);
+		return;
 	}
-	else
-	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("TrainingUIManager is null at UW_TrainingItem::OnClickedTrainingItem.\n")
-			TEXT(" ItemIndex: ") + FString::FromInt(M_Index) +
-			TEXT(" ItemName: ") + GetName()
-		);
-	}
+
+	M_TrainingUIManager->OnTrainingItemClicked(M_TrainingItemState, M_Index, bIsLeftClick);
 }
 
 void UW_TrainingItem::OnHoverTrainingItem(const bool bIsHovering)
 {
-	if (IsValid(M_TrainingUIManager))
+	if (not GetIsValidTrainingUIManager())
 	{
-		M_TrainingUIManager->OnTrainingItemHovered(M_TrainingItemState, bIsHovering);
+		return;
 	}
-	else
-	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("TrainingUIManager is null at UW_TrainingItem::OnHoverTrainingItem.\n")
-			TEXT(" ItemIndex: ") + FString::FromInt(M_Index) +
-			TEXT(" ItemName: ") + GetName()
-		);
-	}
+
+	M_TrainingUIManager->OnTrainingItemHovered(M_TrainingItemState, bIsHovering);
 }
 
 void UW_TrainingItem::UpdateButtonWithGlobalSlateStyle()
@@ -248,4 +238,21 @@ void UW_TrainingItem::UpdateButtonWithGlobalSlateStyle()
 			TEXT("\n Forgot to set style reference in UW_TrainingItem::UpdateButtonWithGlobalSlateStyle?")
 		);
 	}
+}
+
+bool UW_TrainingItem::GetIsValidTrainingUIManager() const
+{
+	if (IsValid(M_TrainingUIManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_TrainingUIManager",
+		"GetIsValidTrainingUIManager",
+		this
+	);
+
+	return false;
 }
