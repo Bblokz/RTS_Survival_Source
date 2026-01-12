@@ -67,10 +67,10 @@ void AScavengeableObject::PauseScavenging(const TObjectPtr<ASquadController>& Re
 	}
 
 	// Only the active scavenging squad may pause.
-	if (!EnsureRequestingSquadIsActiveScavenger(RequestingSquadController))
+	if (not EnsureRequestingSquadIsActiveScavenger(RequestingSquadController))
 	{
 		if (bM_IsScavengeEnabled) { return; } // already available; nothing to do
-		const FString Scavenger = IsValid(M_ScavengingSquad) ? M_ScavengingSquad->GetName() : "Invalid";
+		const FString Scavenger = GetIsValidScavengingSquad() ? M_ScavengingSquad->GetName() : "Invalid";
 		const FString Requester = IsValid(RequestingSquadController) ? RequestingSquadController->GetName() : "Invalid";
 		RTSFunctionLibrary::ReportError("PauseScavenging requested by non-active squad.\n Scavenging: " + Scavenger +
 			"\n Requesting: " + Requester + "\n Object: " + GetName());
@@ -149,7 +149,7 @@ bool AScavengeableObject::StartScavTimer_EnsureAliveScavObj(const TObjectPtr<ASq
 bool AScavengeableObject::EnsureRequestingSquadIsActiveScavenger(
 	const TObjectPtr<ASquadController>& RequestingSquadController) const
 {
-	if (IsValid(M_ScavengingSquad) && M_ScavengingSquad == RequestingSquadController)
+	if (GetIsValidScavengingSquad() && M_ScavengingSquad == RequestingSquadController)
 	{
 		return true;
 	}
@@ -158,7 +158,7 @@ bool AScavengeableObject::EnsureRequestingSquadIsActiveScavenger(
 
 void AScavengeableObject::OnScavengingComplete()
 {
-	MakeScavengingSquadStopScavenging_AndDisableScavObj();
+	HandleScavengeCompletionForSquad();
 	DisableProgressBarAndTimers();
 
 	if (not IsUnitAlive())
@@ -648,7 +648,7 @@ void AScavengeableObject::OnUnitDies(const ERTSDeathType DeathType)
 
 void AScavengeableObject::OnUnitDies_StopScavSquadIfValid()
 {
-	if (not IsValid(M_ScavengingSquad))
+	if (not GetIsValidScavengingSquad())
 	{
 		return;
 	}
@@ -664,7 +664,7 @@ void AScavengeableObject::OnUnitDies_StopTimersAndDisableScavObj()
 
 void AScavengeableObject::MakeScavengingSquadStopScavenging_AndDisableScavObj()
 {
-	if (IsValid(M_ScavengingSquad))
+	if (GetIsValidScavengingSquad())
 	{
 		// Sets scav object to active again.
 		M_ScavengingSquad->OnScavengingComplete();
@@ -675,6 +675,36 @@ void AScavengeableObject::MakeScavengingSquadStopScavenging_AndDisableScavObj()
 		"Scavengable object has attempted to make squad stop scavenging but it is not valid!"
 		"Squad died while scavenging?"
 		"\n for object: " + GetName());
+}
+
+void AScavengeableObject::HandleScavengeCompletionForSquad()
+{
+	if (not bConsumeSquadWhenFinished)
+	{
+		MakeScavengingSquadStopScavenging_AndDisableScavObj();
+		return;
+	}
+
+	if (not GetIsValidScavengingSquad())
+	{
+		bM_IsScavengeEnabled = false;
+		return;
+	}
+
+	M_ScavengingSquad->ConsumeSquadOnScavengingComplete();
+	bM_IsScavengeEnabled = false;
+}
+
+bool AScavengeableObject::GetIsValidScavengingSquad() const
+{
+	if (not IsValid(M_ScavengingSquad))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ScavengingSquad",
+		                                                      "GetIsValidScavengingSquad", this);
+		return false;
+	}
+
+	return true;
 }
 
 void AScavengeableObject::GenerateAdditionalPositions(TArray<FVector>& Positions, int32 NumRequired) const

@@ -41,6 +41,7 @@ class USquadReinforcementComponent;
 class USoundBase;
 class USoundAttenuation;
 class USoundConcurrency;
+enum class ERTSDeathType : uint8;
 
 // Will only start to exe the action once the squad is fully loaded.
 USTRUCT()
@@ -285,8 +286,9 @@ public:
 	/**
 	 * @brief removes the provided Um from the Squad. If the unit was selected it is removed from
 	 * the selection. If this causes the squad to be empty, the squad will be deselected.
+	 * @param DeathType Used for last-unit cleanup behavior.
 	 */
-	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected);
+	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType);
 
 	// Checks if all squad units did complete the command; if so, calls DoneExecutingCommand with the CompletedAbilityID.
 	virtual void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID);
@@ -338,6 +340,7 @@ public:
 
 	// Called by scavengable objects when the scavenging timer is complete.
 	void OnScavengingComplete();
+	void ConsumeSquadOnScavengingComplete();
 
 	// Called once one of the units arrives at the capture actor.
 	void OnSquadUnitArrivedAtCaptureActor();
