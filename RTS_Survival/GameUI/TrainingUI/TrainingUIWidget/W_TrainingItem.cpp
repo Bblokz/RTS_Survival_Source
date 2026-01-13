@@ -105,7 +105,7 @@ void UW_TrainingItem::StopClock()
 		if (M_TrainingItemButton)
 		{
 			// Ensure final state is fully visible
-			M_TrainingItemButton->SetRenderOpacity(ComputeClockOpacity(1.f));
+			M_TrainingItemButton->SetRenderOpacity(1.0f);
 		}
 	}
 }
@@ -114,14 +114,14 @@ void UW_TrainingItem::SetClockPaused(const bool bPause)
 {
 	if (UWorld* World = GetWorld())
 	{
-		if (bPause && !bM_IsClockPaused)
+		if (bPause && not bM_IsClockPaused)
 		{
 			// Pause: kill the timer, remember when
 			World->GetTimerManager().ClearTimer(M_ClockTimerHandle);
 			bM_IsClockPaused = true;
 			M_PauseTime      = World->GetTimeSeconds();
 		}
-		else if (!bPause && bM_IsClockPaused)
+		else if (not bPause && bM_IsClockPaused)
 		{
 			// Unpause
 			ResumeClock();
@@ -145,7 +145,10 @@ void UW_TrainingItem::ResumeClock()
 	M_AnimationEndTime    += PauseDelta;
 
 	// 2) Paint the very first post-pause frame
-			M_TrainingItemButton->SetRenderOpacity(ComputeClockOpacity(Now));
+	if (M_TrainingItemButton)
+	{
+		M_TrainingItemButton->SetRenderOpacity(ComputeClockOpacity(Now));
+	}
 
 	// 3) Restart ticking
 	World->GetTimerManager().SetTimer(
