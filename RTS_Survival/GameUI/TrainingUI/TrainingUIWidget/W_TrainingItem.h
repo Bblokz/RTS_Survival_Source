@@ -32,6 +32,7 @@ public:
 	 * @brief Propagates the training item state to the blueprint widget.
 	 */
 	void UpdateTrainingItem(const FTrainingWidgetState& TrainingItemState);
+	void SetTrainingButtonRenderOpacity(const float RenderOpacity);
 
 	/**
 	 * @brief Called when the trainer finished an item and the count needs to be adjusted.

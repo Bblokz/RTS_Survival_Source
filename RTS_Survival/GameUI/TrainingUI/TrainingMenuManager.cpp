@@ -135,15 +135,28 @@ void UTrainingMenuManager::SetTrainingTimeForEachOption(const float NewTime)
 
 void UTrainingMenuManager::HideTrainingRequirement() const
 {
-	if (IsValid(M_TrainingRequirementWidget))
+	if (not EnsureIsValidTrainingRequirementWidget())
 	{
-		M_TrainingRequirementWidget->SetVisibility(ESlateVisibility::Hidden);
+		return;
 	}
+	M_TrainingRequirementWidget->SetVisibility(ESlateVisibility::Hidden);
 }
 
 bool UTrainingMenuManager::GetIsValidPrimarySelectedTrainer() const
 {
-	return IsValid(M_PrimarySelectedTrainer);
+	if (IsValid(M_PrimarySelectedTrainer))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_PrimarySelectedTrainer",
+		"GetIsValidPrimarySelectedTrainer",
+		this
+	);
+
+	return false;
 }
 
 void UTrainingMenuManager::PauseQueueOrRemove(const FTrainingWidgetState& TrainingItem) const
@@ -204,9 +217,6 @@ void UTrainingMenuManager::OnTrainingItemClicked(
 {
 	if (not GetIsValidPrimarySelectedTrainer())
 	{
-		RTSFunctionLibrary::ReportError("Primary selected trainer is not valid."
-			"\n see UTrainingMenuManager::OnTrainingItemClicked."
-			"clicked item: " + TrainingItem.ItemID.GetTrainingName());
 		return;
 	}
 	//  Ensure fresh requirement/UI state
@@ -228,10 +238,8 @@ void UTrainingMenuManager::OnTrainingItemClicked(
 
 void UTrainingMenuManager::OnTrainingItemHovered(const FTrainingWidgetState& TrainingWidgetState, const bool bIsHovered)
 {
-	if (not IsValid(M_MainGameUI))
+	if (not GetIsValidMainGameUI())
 	{
-		RTSFunctionLibrary::ReportError("Could not access valid MainMenu "
-			"\n At function OnTrainingItemHovered in UTrainingManager");
 		return;
 	}
 	if (GetIsValidPrimarySelectedTrainer())
@@ -1885,21 +1893,16 @@ void UTrainingMenuManager::AddTrainingItemToQueue(const FTrainingQueueItem& Trai
 
 void UTrainingMenuManager::RemoveLastOptionFromQueue(const FTrainingOption& TrainingOption) const
 {
-	if (IsValid(M_PrimarySelectedTrainer))
+	if (not GetIsValidPrimarySelectedTrainer())
 	{
-		M_PrimarySelectedTrainer->RemoveLastInstanceOfTypeFromQueue(TrainingOption);
+		return;
 	}
-	else
-	{
-		RTSFunctionLibrary::ReportError("No primary selected trainer."
-			"\n see UTrainingMenuManager::RemoveLastOptionFromQueue."
-			"\n Option to remove: " + TrainingOption.GetTrainingName());
-	}
+	M_PrimarySelectedTrainer->RemoveLastInstanceOfTypeFromQueue(TrainingOption);
 }
 
 void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 {
-	if (not IsValid(M_PrimarySelectedTrainer))
+	if (not GetIsValidPrimarySelectedTrainer())
 	{
 		return;
 	}
@@ -1943,6 +1946,7 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 			WidgetState.bIsFirstRequirementMet);
 
 		M_TTrainingMenuWidgets[WidgetIndex]->UpdateTrainingItem(WidgetState);
+		UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[WidgetIndex], WidgetState);
 		WidgetIndex++;
 		if (WidgetIndex >= DeveloperSettings::GamePlay::Training::MaxTrainingOptions)
 		{
@@ -1957,6 +1961,7 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 	for (int32 i = WidgetIndex; i < DeveloperSettings::GamePlay::Training::MaxTrainingOptions; i++)
 	{
 		M_TTrainingMenuWidgets[i]->UpdateTrainingItem(M_EmptyTrainingOptionState);
+		UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[i], M_EmptyTrainingOptionState);
 	}
 	// Check if there is an active item.
 	if (ActiveItemIndex != INDEX_NONE && ActiveItemIndex <
@@ -1971,6 +1976,22 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 	{
 		ResetActiveItem();
 	}
+}
+
+void UTrainingMenuManager::UpdateRequirementOpacityForWidget(
+	UW_TrainingItem* TrainingItemWidget,
+	const FTrainingWidgetState& WidgetState) const
+{
+	if (not IsValid(TrainingItemWidget))
+	{
+		RTSFunctionLibrary::ReportError("Training widget is not valid."
+			"\n see UTrainingMenuManager::UpdateRequirementOpacityForWidget.");
+		return;
+	}
+
+	const bool bIsRequirementMet = WidgetState.TrainingStatus == ETrainingItemStatus::TS_Unlocked;
+	const float RenderOpacity = bIsRequirementMet ? 1.0f : M_RequirementNotMetOpacity;
+	TrainingItemWidget->SetTrainingButtonRenderOpacity(RenderOpacity);
 }
 
 ETrainingItemStatus UTrainingMenuManager::CheckRequirement(
@@ -2046,14 +2067,12 @@ bool UTrainingMenuManager::GetWidgetIndexInBounds(const int32 Index) const
 
 bool UTrainingMenuManager::GetRequestIsPrimary(const UTrainerComponent* const RequestingTrainer) const
 {
-	if (IsValid(M_MainGameUI) && IsValid(M_PrimarySelectedTrainer) && IsValid(RequestingTrainer))
+	if (not GetIsValidMainGameUI() || not GetIsValidPrimarySelectedTrainer() || not IsValid(RequestingTrainer))
 	{
-		if (M_PrimarySelectedTrainer == RequestingTrainer)
-		{
-			return true;
-		}
+		return false;
 	}
-	return false;
+
+	return M_PrimarySelectedTrainer == RequestingTrainer;
 }
 
 bool UTrainingMenuManager::GetIsValidMainGameUI() const
@@ -2082,9 +2101,6 @@ void UTrainingMenuManager::SetTrainingPause(const bool bPause) const
 	RTSFunctionLibrary::PrintString("Set training pause: " + Pause, FColor::Red, 20);
 	if (not GetIsValidPrimarySelectedTrainer())
 	{
-		RTSFunctionLibrary::ReportError("Cannot set pause on training, no primary selected trainer."
-			"\n see UTrainingMenuManager::SetTrainingPause."
-			"\n bPause: " + FString(bPause ? "true" : "false"));
 		return;
 	}
 	if (M_ActiveTrainingItem)
@@ -2096,7 +2112,7 @@ void UTrainingMenuManager::SetTrainingPause(const bool bPause) const
 
 void UTrainingMenuManager::RefreshRequirements()
 {
-	if (not IsValid(M_PrimarySelectedTrainer))
+	if (not GetIsValidPrimarySelectedTrainer())
 	{
 		// no trainer selected; nothing to do.
 		return;
@@ -2181,7 +2197,7 @@ void UTrainingMenuManager::UpdateRequirementWidget(const FTrainingWidgetState& T
 
 void UTrainingMenuManager::ReportInvalidActiveItemForQueueClock(const int32 IndexActiveTrainingItem) const
 {
-	const FString PrimaryName = IsValid(M_PrimarySelectedTrainer) ? M_PrimarySelectedTrainer->GetName() : "Nullptr";
+	const FString PrimaryName = GetIsValidPrimarySelectedTrainer() ? M_PrimarySelectedTrainer->GetName() : "Nullptr";
 	RTSFunctionLibrary::ReportError(
 		"Active training item is nullptr. This should not happen as we asked for starting the clock"
 		"on a valid Training item Index."

@@ -44,6 +44,14 @@ void UW_TrainingItem::UpdateTrainingItem(const FTrainingWidgetState& TrainingIte
 	OnUpdateTrainingItem(TrainingItemState);
 }
 
+void UW_TrainingItem::SetTrainingButtonRenderOpacity(const float RenderOpacity)
+{
+	if (M_TrainingItemButton)
+	{
+		M_TrainingItemButton->SetRenderOpacity(RenderOpacity);
+	}
+}
+
 
 void UW_TrainingItem::StartClock(
 	const int32 TimeRemaining,

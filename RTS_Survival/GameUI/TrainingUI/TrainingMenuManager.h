@@ -107,6 +107,8 @@ private:
 	UPROPERTY()
 	TArray<UW_TrainingItem*> M_TTrainingMenuWidgets;
 
+	float M_RequirementNotMetOpacity = 0.33f;
+
 	// The widget item that currently has a clock running.
 	UPROPERTY()
 	UW_TrainingItem* M_ActiveTrainingItem;
@@ -158,6 +160,9 @@ private:
 	 * @pre M_PrimarySelectedTrainer is not nullptr.
 	 */
 	void UpdateWidgetsWithPrimaryQueue();
+	void UpdateRequirementOpacityForWidget(
+		UW_TrainingItem* TrainingItemWidget,
+		const FTrainingWidgetState& WidgetState) const;
 
 	/**
 	 * @brief Decodes the requirement of a a training option and turns it into a state for the widget.
