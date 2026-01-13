@@ -68,7 +68,7 @@ protected:
 	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
 	virtual void ExecutePatrolCommand(const FVector PatrolToLocation) override;
 	virtual void ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand) override;
-	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected) override;
+	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;
 	virtual void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID) override;
 
 private:

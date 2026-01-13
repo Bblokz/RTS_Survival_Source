@@ -130,6 +130,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
 	bool bGivePlayerResourceRewards = true;
 
+	// If true, the scavenging squad is consumed when scavenging completes.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scavenge")
+	bool bConsumeSquadWhenFinished = false;
+
 	// the total time it takes to scavenge the object.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scavenge")
 	float ScavengeTime = 10;
@@ -155,6 +159,8 @@ private:
 	void OnUnitDies_StopScavSquadIfValid();
 	void OnUnitDies_StopTimersAndDisableScavObj();
 	void MakeScavengingSquadStopScavenging_AndDisableScavObj();
+	void HandleScavengeCompletionForSquad();
+	bool GetIsValidScavengingSquad() const;
 
 	// The socket names of the mesh comp to find the scavenge positions.
 	UPROPERTY()

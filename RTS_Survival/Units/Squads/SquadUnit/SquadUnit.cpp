@@ -658,11 +658,11 @@ void ASquadUnit::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
 	}
-	if (IsValid(SelectionComponent) && IsValid(M_SquadController))
+	if (IsValid(SelectionComponent) && GetIsValidSquadController())
 	{
 		// No error report as is valid.
 		const bool bIsSelected = SelectionComponent->GetIsSelected();
-		M_SquadController->UnitInSquadDied(this, bIsSelected);
+		M_SquadController->UnitInSquadDied(this, bIsSelected, ERTSDeathType::Kinetic);
 	}
 }
 
@@ -1608,7 +1608,7 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 	UnitDies_HandleSelectionAndCommand(bIsSelected);
 
 	// Inform the squad controller that this unit has died.
-	UnitDies_RemoveFromSquadController(bIsSelected);
+	UnitDies_RemoveFromSquadController(bIsSelected, DeathType);
 
 	// Notify the animation instance (unbind selection delegates etc.).
 	UnitDies_NotifyAnimInstance();
@@ -1645,13 +1645,15 @@ void ASquadUnit::UnitDies_HandleSelectionAndCommand(bool& OutIsSelected)
 	}
 }
 
-void ASquadUnit::UnitDies_RemoveFromSquadController(bool bIsSelected)
+void ASquadUnit::UnitDies_RemoveFromSquadController(bool bIsSelected, const ERTSDeathType DeathType)
 {
-        if (IsValid(M_SquadController))
-        {
-                M_SquadController->HandleWeaponSwitchOnUnitDeath(this);
-                M_SquadController->UnitInSquadDied(this, bIsSelected);
-        }
+	if (not GetIsValidSquadController())
+	{
+		return;
+	}
+
+	M_SquadController->HandleWeaponSwitchOnUnitDeath(this);
+	M_SquadController->UnitInSquadDied(this, bIsSelected, DeathType);
 }
 
 void ASquadUnit::UnitDies_NotifyAnimInstance()

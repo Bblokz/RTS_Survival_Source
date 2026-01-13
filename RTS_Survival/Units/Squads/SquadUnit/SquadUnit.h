@@ -626,7 +626,7 @@ private:
 	void UnitDies_HandleSelectionAndCommand(bool& OutIsSelected);
 
 	/** @brief Removes the unit from the squad controller. */
-	void UnitDies_RemoveFromSquadController(bool bIsSelected);
+	void UnitDies_RemoveFromSquadController(bool bIsSelected, ERTSDeathType DeathType);
 
 	/** @brief Notifies the animation instance that the unit is dying. */
 	void UnitDies_NotifyAnimInstance();
