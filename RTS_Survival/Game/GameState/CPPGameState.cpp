@@ -5302,14 +5302,21 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_Harvester)),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Scavengers)),
 		FTrainingOption(),
+		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerGammaFacility)),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerRefinery)),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerMetalVault)),
+		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerBarracks)),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerMechanizedDepot)),
+		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerLightSteelForge)),
+		// todo armory.
+		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Nomadic,
 		                static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter)),
+		FTrainingOption(EAllUnitType::UNType_Nomadic,
+		                static_cast<uint8>(ENomadicSubtype::Nomadic_GerAirbase)),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerMedTankFactory)),
 	};
 	// BuildingAnimationTime with vehicle expansion time is total deployment time.

@@ -70,13 +70,13 @@ namespace DeveloperSettings
 	{
 		namespace Resources
 		{
-			inline constexpr int32 HQBaseRadixiteStorage = 500;
-			inline constexpr int32 HQBaseMetalStorage = 250;
-			inline constexpr int32 HQBaseVehiclePartsStorage = 125;
+			inline constexpr int32 HQBaseRadixiteStorage = 800;
+			inline constexpr int32 HQBaseMetalStorage = 350;
+			inline constexpr int32 HQBaseVehiclePartsStorage = 250;
 
-			inline constexpr int32 RefineryRadixiteStorage = 1000;
-			inline constexpr int32 MetalVaultMetalStorage = 500;
-			inline constexpr int32 MetalVaultVehiclePartsStorage = 250;
+			inline constexpr int32 RefineryRadixiteStorage = 1500;
+			inline constexpr int32 MetalVaultMetalStorage = 800;
+			inline constexpr int32 MetalVaultVehiclePartsStorage = 400;
 
 			inline constexpr float ScavengeTimePer70Parts = 14.f;
 			inline constexpr int32 PercentageVehiclePartsFromDestroyedVehicleMin = 40;

@@ -16,7 +16,7 @@ class RTS_SURVIVAL_API UTrainingMenuManager;
 
 
 /**
- * 
+ * @brief Displays a training queue item and handles its clock-driven opacity updates.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_TrainingItem : public UUserWidget
@@ -116,17 +116,19 @@ private:
 
 	float M_InitialOpacity;
 	bool bM_IsClockPaused;
+	const float M_LowestPossibleTrainingOpacity = 0.25f;
 
 	void UpdateClockOpacity();
 
-	    /** 
-         * Returns the clock opacity at a given world time, 
-         * using a power curve so the last 40% of time is most visible. 
-         */
-        float ComputeClockOpacity(float WorldTime) const;
+	/** 
+	 * Returns the clock opacity at a given world time, 
+	 * using a power curve so the last 40% of time is most visible. 
+	 */
+	float ComputeClockOpacity(float WorldTime) const;
 
 	bool bM_IsCLockPaused = false;
 	float M_PauseTime = 0.0f;
 
 	void ResumeClock();
+	bool GetIsValidTrainingUIManager() const;
 };

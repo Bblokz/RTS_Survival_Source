@@ -364,7 +364,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			// 	                static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter)),
 			// 	FTrainingOption(EAllUnitType::UNType_Nomadic,
 			// 	                static_cast<uint8>(ENomadicSubtype::Nomadic_GerGammaFacility))
-			);
+		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
@@ -1010,7 +1010,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
-	
+
 	// Ger E100 
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -1308,7 +1308,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
-	
+
 	// Rus KV-5
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -1453,7 +1453,10 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
-	// ------------------------------------------------------------------------------------------------------- // -------------------------------------- T1 BUILDINGS // ------------------------------------------------------------------------------------------------------- 
+	// -------------------------------------------------------------------------------------------------------
+	// // -------------------------------------- T1 BUILDINGS
+	// -------------------------------------------------------------------------------------------------------
+	
 	// Train Light Steel Forge Truck
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -1488,16 +1491,11 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 			EAllUnitType::UNType_Nomadic,
 			static_cast<uint8>(ENomadicSubtype::Nomadic_GerMechanizedDepot)
 		);
-		const FTrainingOption Option1 = FTrainingOption(
+		const FTrainingOption RequiredGammaFacility = FTrainingOption(
 			EAllUnitType::UNType_Nomadic,
 			static_cast<uint8>(ENomadicSubtype::Nomadic_GerGammaFacility)
 		);
-		// Tiger tank.
-		const FTrainingOption Option2 = FTrainingOption(
-			EAllUnitType::UNType_Tank,
-			static_cast<uint8>(ETankSubtype::Tank_Tiger)
-		);
-		
+
 		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
 			ItemID,
 			NomadicT1MechanizedDepotTrainingTime,
@@ -1506,8 +1504,8 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 			ENomadicSubtype::Nomadic_GerMechanizedDepot,
 			ESquadSubtype::Squad_None,
 			EAircraftSubtype::Aircarft_None,
-			FRTS_RequirementHelpers::CreateOr_Unit_Unit(GetTransientPackage(),
-				Option1, Option2)
+			FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(),
+			                                            RequiredGammaFacility)
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
@@ -2018,7 +2016,6 @@ ETrainingItemStatus UTrainingMenuManager::CheckRequirement(
 		OutRequirementCount = AsDouble->GetRequirementCount();
 		bOutIsFirstRequirementMet = AsDouble->IsFirstRequirementMet();
 		bOutIsSecondRequirementMet = AsDouble->IsSecondRequirementMet();
-		                                      
 	}
 	else if (const UOrDoubleRequirement* AsOr = Cast<UOrDoubleRequirement>(RequirementForTraining.Get()))
 	{
