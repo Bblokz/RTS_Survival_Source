@@ -44,11 +44,11 @@ void UW_TrainingItem::UpdateTrainingItem(const FTrainingWidgetState& TrainingIte
 	OnUpdateTrainingItem(TrainingItemState);
 }
 
-void UW_TrainingItem::SetTrainingButtonRenderOpacity(const float RenderOpacity)
+void UW_TrainingItem::SetTrainingButtonRenderOpacity(const float NewRenderOpacity)
 {
 	if (M_TrainingItemButton)
 	{
-		M_TrainingItemButton->SetRenderOpacity(RenderOpacity);
+		M_TrainingItemButton->SetRenderOpacity(NewRenderOpacity);
 	}
 }
 
