@@ -1464,7 +1464,7 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 	// -------------------------------------------------------------------------------------------------------
 	// // -------------------------------------- T1 BUILDINGS
 	// -------------------------------------------------------------------------------------------------------
-	
+
 	// Train Light Steel Forge Truck
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -1513,7 +1513,7 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 			ESquadSubtype::Squad_None,
 			EAircraftSubtype::Aircarft_None,
 			FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(),
-			                                            RequiredGammaFacility)
+			                                               RequiredGammaFacility)
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
@@ -1679,6 +1679,94 @@ void UTrainingMenuManager::InitAllGameSquadTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+
+	// Ger female sniper
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Squad,
+			static_cast<uint8>(ESquadSubtype::Squad_Ger_Gebirgsjagerin)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			ArmoredInfantryTrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_Ger_Gebirgsjagerin
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger Armory unlocked units.
+
+	// Ger Armory Vulture assasin squad
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Squad,
+			static_cast<uint8>(ESquadSubtype::Squad_Ger_Vultures)
+		);
+		const FTrainingOption RequiredUnit_CommCenter(
+			EAllUnitType::UNType_Nomadic,
+			static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter));
+
+		// Create single unit requirement.
+		URTSRequirement* VulturesRequirement =
+			FRTS_RequirementHelpers::CreateUnitRequirement(
+				GetTransientPackage(),
+				RequiredUnit_CommCenter);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T2EngineersTrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_Ger_Vultures,
+			EAircraftSubtype::Aircarft_None,
+			VulturesRequirement
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+
+	// Ger Armory unlocked units.
+
+	// Ger Armory Vulture sniper squad
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Squad,
+			static_cast<uint8>(ESquadSubtype::Squad_Ger_SniperTeam)
+		);
+		const FTrainingOption RequiredUnit_CommCenter(
+			EAllUnitType::UNType_Nomadic,
+			static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter));
+
+		// Required: BXP Fuel Cell + Ger Communication Center
+		const FTrainingOption RequiredExpansion_FuelCell(
+			EAllUnitType::UNType_BuildingExpansion,
+			static_cast<uint8>(EBuildingExpansionType::BTX_GerBarrackFuelCell));
+
+
+		URTSRequirement* const VulturesRequirement =
+			FRTS_RequirementHelpers::CreateDouble_Unit_Expansion(
+				GetTransientPackage(),
+				RequiredUnit_CommCenter,
+				RequiredExpansion_FuelCell);
+
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T2EngineersTrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_Ger_SniperTeam,
+			EAircraftSubtype::Aircarft_None,
+			VulturesRequirement
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
 	// Ger T2 FeuerStrom Squad
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -1720,13 +1808,25 @@ void UTrainingMenuManager::InitAllGameSquadTrainingOptions()
 			static_cast<uint8>(ESquadSubtype::Squad_Ger_SturmPionieren)
 		);
 
+		const FTrainingOption RequiredUnit_CommCenter(
+			EAllUnitType::UNType_Nomadic,
+			static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter));
+
+		// Create single unit requirement.
+		URTSRequirement* SturmPioneerRequirement =
+			FRTS_RequirementHelpers::CreateUnitRequirement(
+				GetTransientPackage(),
+				RequiredUnit_CommCenter);
+
 		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
 			ItemID,
 			T2EngineersTrainingTime,
 			EAllUnitType::UNType_Squad,
 			ETankSubtype::Tank_None,
 			ENomadicSubtype::Nomadic_None,
-			ESquadSubtype::Squad_Ger_SturmPionieren
+			ESquadSubtype::Squad_Ger_SturmPionieren,
+			EAircraftSubtype::Aircarft_None,
+			SturmPioneerRequirement
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
@@ -1747,7 +1847,7 @@ void UTrainingMenuManager::InitAllGameSquadTrainingOptions()
 			FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), FTrainingOption(
 				                                               EAllUnitType::UNType_Nomadic,
 				                                               static_cast<uint8>(
-					                                               ENomadicSubtype::Nomadic_GerMechanizedDepot)))
+					                                               ENomadicSubtype::Nomadic_GerCommunicationCenter)))
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
@@ -1768,7 +1868,7 @@ void UTrainingMenuManager::InitAllGameSquadTrainingOptions()
 			FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), FTrainingOption(
 				                                               EAllUnitType::UNType_Nomadic,
 				                                               static_cast<uint8>(
-					                                               ENomadicSubtype::Nomadic_GerMechanizedDepot)))
+					                                               ENomadicSubtype::Nomadic_GerMedTankFactory)))
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
