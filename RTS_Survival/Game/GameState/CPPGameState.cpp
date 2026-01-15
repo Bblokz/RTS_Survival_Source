@@ -5480,8 +5480,11 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(),
 		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_LightBringers)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_FeuerSturm)),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SturmKommandos)),
-
 	};
 	NomadicData.BuildingAnimationTime = BarracksBuildingAnimationTime;
 	NomadicData.VehicleExpansionTime = T1TruckVehicleConversionTime;

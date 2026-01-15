@@ -1477,7 +1477,11 @@ bool AAircraftMaster::IsIdleHover() const
 
 void AAircraftMaster::OnLandscapeTraceHit(const FHitResult& TraceHit) const
 {
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	{
 	DrawDebugSphere(GetWorld(), TraceHit.Location, 100.f, 12, FColor::Green, false, 5.f);
+		
+	}
 	if (not M_SelectionDecal)
 	{
 		return;

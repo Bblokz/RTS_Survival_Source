@@ -52,8 +52,11 @@ void FAircraftPath::CreateMoveToPath(
 
 	OnPathCompleteCalculateRotations(EndAirPoint, StartRotation);
 
-	// todo remove
-	DebugPath(5);
+
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	{
+		DebugPath(5);
+	}
 }
 
 void FAircraftPath::AddMoveToPathFromStart(
@@ -334,11 +337,14 @@ void FAircraftPath::CreateAttackPath(const FVector& StartAirPoint, const FRotato
 		                       DistanceAngleToTarget);
 		break;
 	}
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	{
 	FRTSAircraftHelpers::AircraftDebug("Result : " +
 	                                   Global_GetDirectAttackDiveResultString(DiveResult), FColor::Green);
 	DistanceAngleToTarget.Debug(5);
-	// todo remove
 	DebugPath(5);
+		
+	}
 }
 
 void FAircraftPath::AddAttackPathTooFar(
@@ -889,7 +895,7 @@ void FAircraftPath::RemovePointsAfterAttackPossible(
 			Curr,
 			FacingRot,
 			EnemyAtPoint,
-			StrictSettings, 
+			StrictSettings,
 			Dummy);
 
 		return Res == EDirectAttackDiveResult::DivePossible;
