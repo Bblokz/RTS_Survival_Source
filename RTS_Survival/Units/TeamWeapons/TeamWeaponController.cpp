@@ -40,6 +40,7 @@ void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 
 void ATeamWeaponController::ExecutePatrolCommand(const FVector PatrolToLocation)
 {
+	// We do not support patrol with team weapons.
 	DoneExecutingCommand(EAbilityID::IdPatrol);
 }
 

@@ -639,7 +639,7 @@ protected:
 	 * @param OutNavPath 
 	 * @return The path for the squad will return null if invalid path.
 	 */
-	::ESquadPathFindingError GeneratePaths_ExeQuery(UNavigationSystemV1* NavSystem, const FPathFindingQuery& PFQuery,
+	ESquadPathFindingError GeneratePaths_ExeQuery(UNavigationSystemV1* NavSystem, const FPathFindingQuery& PFQuery,
 	                                                FNavPathSharedPtr& OutNavPath) const;
 
 	/**

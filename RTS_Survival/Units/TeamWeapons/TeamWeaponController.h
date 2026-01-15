@@ -18,11 +18,9 @@ enum class ETeamWeaponState : uint8
 	Ready_Packed,
 	Packing,
 	Moving,
-	Unpacking,
 	Deploying,
 	Ready_Deployed,
 	Abandoned,
-	Destroyed
 };
 
 USTRUCT()
