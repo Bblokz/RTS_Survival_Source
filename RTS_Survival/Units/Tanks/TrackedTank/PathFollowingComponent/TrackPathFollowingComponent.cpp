@@ -779,9 +779,9 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 	// sphere at the destination
 	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 	{
-		DrawDebugSphere(GetWorld(), Destination, 50.f, 12, FColor::Green, false, 0.1f);
+		DrawDebugSphere(GetWorld(), Destination, 50.f, 12, FColor::Green, false, DeltaTime);
 		// Draw debug sphere at unstuck destination
-		DrawDebugSphere(GetWorld(), UnStuckDestination, 50.f, 12, FColor::Red, false, 0.1f);
+		DrawDebugSphere(GetWorld(), UnStuckDestination, 50.f, 12, FColor::Red, false, DeltaTime);
 	}
 
 	// If we're stuck try to unstuck
@@ -797,9 +797,9 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 			{
 				if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 				{
-					RTSFunctionLibrary::PrintString("Vehicle stuck while navigating to unstuck location!"
+					RTSFunctionLibrary::DrawDebugAtLocation(this,GetAgentLocation() + FVector(0,0,300),"Vehicle stuck while navigating to unstuck location!"
 					                                "\n" + FString::SanitizeFloat(GetWorld()->GetTimeSeconds()),
-					                                FColor::Red);
+					                                FColor::Red, 3);
 				}
 				// Get new unstuck location.
 				UnStuckDestination = TeleportOrCalculateUnstuckDestination(Destination);
@@ -853,10 +853,21 @@ void UTrackPathFollowingComponent::UpdatePathSegment()
 		{
 			if (bDebugAcceptanceRadius)
 			{
-				RTSFunctionLibrary::PrintString("Distance left: " + FString::SanitizeFloat(DistanceLeft),
-				                                FColor::Green);
-				RTSFunctionLibrary::PrintString("Acceptance Radius: " + FString::SanitizeFloat(AcceptanceRadius),
-				                                FColor::Green);
+				const FVector DebugLocation = GetAgentLocation() + FVector(0, 0, 200);
+				RTSFunctionLibrary::DrawDebugAtLocation(this,
+				                                        DebugLocation,
+				                                        "Distance left: " + FString::SanitizeFloat(DistanceLeft),
+				                                        FColor::White,
+				                                        0.167
+				                                        
+				);
+				RTSFunctionLibrary::DrawDebugAtLocation(this,
+				                                        DebugLocation,
+				                                        "Acceptance Radius: " +
+				                                        FString::SanitizeFloat(AcceptanceRadius),
+				                                        FColor::Green,
+				                                        0.167
+				);
 			}
 		}
 
@@ -1076,7 +1087,7 @@ void UTrackPathFollowingComponent::DebugIdleOverlappingActors()
 		}
 	}
 	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, 300),
-	                                        DebugMessage, FColor::White, 5.f);
+	                                        DebugMessage, FColor::Red, 5.f);
 }
 
 void UTrackPathFollowingComponent::DebugMovingOverlappingActors(const float DeltaTime)

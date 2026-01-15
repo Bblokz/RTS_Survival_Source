@@ -4,6 +4,7 @@
 
 #include "TeamWeapon.h"
 #include "TeamWeaponMover.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -85,7 +86,7 @@ void ATeamWeaponController::SpawnTeamWeapon()
 	}
 
 	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	M_TeamWeapon = World->SpawnActor<ATeamWeapon>(TeamWeaponClass, GetActorLocation(), GetActorRotation(),
 	                                             SpawnParameters);
 	if (not GetIsValidTeamWeapon())
