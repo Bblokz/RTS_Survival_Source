@@ -97,6 +97,17 @@ void UAOEBehaviourComponent::OnBehavioursRemoved(const TArray<UBehaviourComp*>& 
 	static_cast<void>(NoLongerAffected);
 }
 
+bool UAOEBehaviourComponent::IsValidTarget(AActor* ValidActor) const
+{
+	static_cast<void>(ValidActor);
+	return true;
+}
+
+float UAOEBehaviourComponent::GetAOERadius() const
+{
+	return M_Settings.Radius;
+}
+
 void UAOEBehaviourComponent::BeginPlay_SetupAnimatedTextWidgetPoolManager()
 {
 	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
@@ -241,6 +252,11 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 	{
 		AActor* HitActor = Hit.GetActor();
 		if (not IsValid(HitActor))
+		{
+			continue;
+		}
+
+		if (not IsValidTarget(HitActor))
 		{
 			continue;
 		}

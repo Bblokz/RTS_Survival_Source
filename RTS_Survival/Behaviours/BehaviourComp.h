@@ -70,6 +70,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	TArray<UBehaviour*> GetBehavioursByClass(const TSubclassOf<UBehaviour>& BehaviourClass) const;
 
+	/**
+	 * @brief Forward a UI hover event to the matching behaviour instance.
+	 * @param bIsHovering Whether the behaviour icon is hovered.
+	 * @param BehaviourUIData UI data for the hovered behaviour widget.
+	 */
+	void OnBehaviourHovered(const bool bIsHovering, const FBehaviourUIData& BehaviourUIData);
+
 	void RegisterActionUIManager(UActionUIManager* ActionUIManager);
 
 protected:

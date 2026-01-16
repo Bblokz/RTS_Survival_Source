@@ -486,6 +486,27 @@ TArray<UBehaviour*> UBehaviourComp::GetBehavioursByClass(const TSubclassOf<UBeha
 	return MatchingBehaviours;
 }
 
+void UBehaviourComp::OnBehaviourHovered(const bool bIsHovering, const FBehaviourUIData& BehaviourUIData)
+{
+	for (UBehaviour* Behaviour : M_Behaviours)
+	{
+		if (Behaviour == nullptr)
+		{
+			continue;
+		}
+
+		FBehaviourUIData CachedUIData;
+		Behaviour->GetUIData(CachedUIData);
+		if (CachedUIData.BehaviourIcon != BehaviourUIData.BehaviourIcon)
+		{
+			continue;
+		}
+
+		Behaviour->OnBehaviorHover(bIsHovering);
+		return;
+	}
+}
+
 
 void UBehaviourComp::RegisterActionUIManager(UActionUIManager* ActionUIManager)
 {

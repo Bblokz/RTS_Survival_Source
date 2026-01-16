@@ -48,6 +48,7 @@ private:
 
         UPROPERTY()
         TWeakObjectPtr<UBehaviourComp> M_PrimaryBehaviourComponent;
+        bool GetIsValidPrimaryBehaviourComponent() const;
 
         // Only visible if behaviour component is valid and there are any active behaviours.
         bool NeedsVisibility() const;
