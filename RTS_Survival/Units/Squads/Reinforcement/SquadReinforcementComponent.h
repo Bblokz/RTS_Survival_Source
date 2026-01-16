@@ -36,7 +36,10 @@ struct FReinforcementRequestState
 };
 
 /**
- * @brief Handles reinforcement ability activation and spawning missing squad units.
+ * @brief Drives the squad reinforcement flow by tracking active providers and scheduling spawns.
+ * @details Bound to a squad controller and toggled by reinforcement points, this component
+ *          adds/removes the Reinforce ability, checks missing members and cost, then schedules
+ *          a timed spawn that registers units back into the squad when the timer fires.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API USquadReinforcementComponent : public UActorComponent
