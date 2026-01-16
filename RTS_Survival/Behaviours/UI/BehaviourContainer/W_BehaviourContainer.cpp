@@ -66,19 +66,23 @@ void UW_BehaviourContainer::SetupBehaviourContainerForSelectedUnit(UBehaviourCom
 
 void UW_BehaviourContainer::OnBehaviourHovered(const bool bIsHovering, const FBehaviourUIData& BehaviourUIData)
 {
-        if (not GetIsValidBehaviourDescription())
+        if (GetIsValidBehaviourDescription())
         {
-                return;
+                if (bIsHovering)
+                {
+                        M_BehaviourDescription->SetupDescription(BehaviourUIData);
+                        M_BehaviourDescription->SetVisibility(ESlateVisibility::Visible);
+                }
+                else
+                {
+                        M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
+                }
         }
 
-        if (bIsHovering)
+        if (GetIsValidPrimaryBehaviourComponent())
         {
-                M_BehaviourDescription->SetupDescription(BehaviourUIData);
-                M_BehaviourDescription->SetVisibility(ESlateVisibility::Visible);
-                return;
+                M_PrimaryBehaviourComponent->OnBehaviourHovered(bIsHovering, BehaviourUIData);
         }
-
-        M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
 }
 
 void UW_BehaviourContainer::SetBehaviourWidgets(TArray<UW_Behaviour*> Widgets)
@@ -116,9 +120,21 @@ bool UW_BehaviourContainer::GetIsValidBehaviourDescription() const
 	return true;
 }
 
+bool UW_BehaviourContainer::GetIsValidPrimaryBehaviourComponent() const
+{
+        if (M_PrimaryBehaviourComponent.IsValid())
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportError(
+                TEXT("UW_BehaviourContainer::GetIsValidPrimaryBehaviourComponent: M_PrimaryBehaviourComponent is not valid!"));
+        return false;
+}
+
 bool UW_BehaviourContainer::NeedsVisibility() const
 {
-        if (not M_PrimaryBehaviourComponent.IsValid())
+        if (not GetIsValidPrimaryBehaviourComponent())
         {
                 return false;
         }

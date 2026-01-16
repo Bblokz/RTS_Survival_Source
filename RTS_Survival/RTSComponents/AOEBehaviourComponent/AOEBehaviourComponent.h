@@ -122,6 +122,10 @@ protected:
 	 */
 	virtual void OnBehavioursRemoved(const TArray<UBehaviourComp*>& NoLongerAffected);
 
+	virtual bool IsValidTarget(AActor* ValidActor) const;
+
+	float GetAOERadius() const;
+
 private:
 	// ---- Settings ----
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour", meta=(AllowPrivateAccess="true"))
