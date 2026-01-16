@@ -34,8 +34,10 @@ struct RTS_SURVIVAL_API FRadiusAOEBehaviourSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Radius")
 	TSubclassOf<UOnHoverShowRadiusBehaviour> HoverShowRadiusBehaviourClass;
 
+	// Used on the title of the host behaviour; the description is set dynamically depending on the behaviours applied
+	//to allies in range.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Radius")
-	FString HostBehaviourText;
+	FString HostBehaviourTitleText;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Radius")
 	EBehaviourIcon HostBehaviourIcon = EBehaviourIcon::None;

@@ -27,7 +27,7 @@ void URadiusRepairAura::SetHostBehaviourUIData(UBehaviour& Behaviour) const
 {
 	FBehaviourUIData UIData = Behaviour.GetUIData();
 	UIData.BehaviourIcon = RadiusSettings.HostBehaviourIcon;
-	UIData.TitleText = RadiusSettings.HostBehaviourText;
+	UIData.TitleText = RadiusSettings.HostBehaviourTitleText;
 	const float RepairPerSecond = GetRepairPerSecondFromBehaviours();
 	SetDescriptionWithRepairAmount(UIData, RepairPerSecond);
 	Behaviour.SetCustomUIData(UIData);

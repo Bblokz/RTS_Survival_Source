@@ -18,7 +18,7 @@ void URadiusImprovedRangeAura::SetHostBehaviourUIData(UBehaviour& Behaviour) con
 {
 	FBehaviourUIData UIData = Behaviour.GetUIData();
 	UIData.BehaviourIcon = RadiusSettings.HostBehaviourIcon;
-	UIData.TitleText = RadiusSettings.HostBehaviourText;
+	UIData.TitleText = RadiusSettings.HostBehaviourTitleText;
 
 	const float TotalRangePercentageGain = GetTotalRangePercentageGain();
 	const FString RangePercentageText = FString::SanitizeFloat(TotalRangePercentageGain) + "%";
