@@ -12,7 +12,10 @@ class UMeshComponent;
 enum class ETriggerOverlapLogic : uint8;
 
 /**
- * @brief Defines a socket-based reinforcement location on a mesh.
+ * @brief Supplies a socket-based reinforcement location and activates nearby squads.
+ * @details This component owns the mesh/socket used as the spawn anchor, polls for squads
+ *          within the activation radius, and notifies their reinforcement components to
+ *          enable the Reinforce ability while the squad remains in range.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UReinforcementPoint : public UActorComponent
