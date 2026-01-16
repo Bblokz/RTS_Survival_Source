@@ -6,6 +6,8 @@
 #include "Components/ActorComponent.h"
 #include "TeamWeaponMover.generated.h"
 
+class ASquadUnit;
+
 UENUM(BlueprintType)
 enum class ETeamWeaponMoverState : uint8
 {
@@ -19,6 +21,18 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FOnTeamWeaponMoverStateChanged, ETeamWeaponM
 DECLARE_MULTICAST_DELEGATE(FOnTeamWeaponMoverArrived);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnTeamWeaponMoverFailed, const FString& /*FailureReason*/);
 
+USTRUCT()
+struct FTeamWeaponCrewMemberOffset
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<ASquadUnit> M_CrewMember;
+
+	UPROPERTY()
+	FVector M_OffsetFromCenter = FVector::ZeroVector;
+};
+
 /**
  * @brief Executes physical movement for packed team weapons and reports movement status to the controller.
  */
@@ -30,7 +44,9 @@ class RTS_SURVIVAL_API UTeamWeaponMover : public UActorComponent
 public:
 	UTeamWeaponMover();
 
+	void SetCrewMembersToFollow(const TArray<FTeamWeaponCrewMemberOffset>& CrewMembers);
 	void MoveWeaponToLocation(const FVector& Destination);
+	void BeginFollowingCrew();
 	void AbortMove(const FString& Reason);
 	void NotifyCrewReady(const bool bIsReady);
 
@@ -45,19 +61,31 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
+	                           FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
 	void SetMoverState(const ETeamWeaponMoverState NewState);
 	bool GetIsOwnerValid() const;
+	bool GetIsCrewDataValid() const;
+	bool TryGetCrewCenterLocation(FVector& OutCenter) const;
+	bool HaveCrewReachedDestination() const;
+	void UpdateOwnerLocationFromCrew();
 
 	UPROPERTY(EditDefaultsOnly, Category="TeamWeapon|Mover")
 	int32 M_CrewMembersRequiredToMove = 2;
+
+	UPROPERTY()
+	TArray<FTeamWeaponCrewMemberOffset> M_CrewMembers;
 
 	UPROPERTY()
 	FVector M_MoveDestination = FVector::ZeroVector;
 
 	UPROPERTY()
 	bool bM_IsCrewReady = false;
+
+	UPROPERTY()
+	bool bM_HasMoveRequest = false;
 
 	UPROPERTY()
 	ETeamWeaponMoverState M_MoverState = ETeamWeaponMoverState::Idle;

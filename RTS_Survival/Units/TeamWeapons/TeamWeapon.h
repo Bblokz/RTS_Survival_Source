@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/Embedded/EmbeddedTurretsMaster.h"
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
@@ -48,6 +49,15 @@ struct FTeamWeaponConfig
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
 	float M_TurnSpeedYaw = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Text")
+	FString M_DeployingAnimatedText;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Text")
+	FString M_PackingAnimatedText;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Text")
+	FRTSVerticalAnimTextSettings M_AnimatedTextSettings;
 };
 
 /**
@@ -65,6 +75,15 @@ class RTS_SURVIVAL_API ATeamWeapon : public AEmbeddedTurretsMaster, public IRTSN
 public:
 	ATeamWeapon();
 
+	/**
+	 * @brief Applies balance data so designers can tune the weapon without touching code.
+	 * Keeps the runtime state aligned with the latest blueprint configuration.
+	 *
+	 * @details Copies the config into the actor and propagates the values to dependent components
+	 *          (health, resistance, deploy time) so the runtime stays deterministic.
+	 *
+	 * @param NewConfig Configuration payload applied to this instance.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "TeamWeapon")
 	void ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewConfig);
 
@@ -78,6 +97,16 @@ public:
 
 	void SetTurretOwnerActor(AActor* NewOwner);
 
+	/**
+	 * @brief Guards fire logic by enforcing the configured yaw arc for this emplacement.
+	 * Prevents firing when the target would require exceeding the intended mechanical limits.
+	 *
+	 * @details Converts the target vector into local space and compares the yaw to the min/max
+	 *          arc values so the gunner logic can keep predictable constraints.
+	 *
+	 * @param TargetLocation World location to evaluate against the yaw arc.
+	 * @return True when the target location is inside the permitted yaw arc.
+	 */
 	bool GetIsTargetWithinYawArc(const FVector& TargetLocation) const;
 
 	virtual void SetDefaultQueryFilter(const TSubclassOf<UNavigationQueryFilter> NewDefaultFilter) override;
