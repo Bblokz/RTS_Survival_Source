@@ -1,0 +1,44 @@
+﻿You need to implement a big refactor to the radius pool system of my game.
+before the URadiusPoolSettings onlylisted options for a BorderOnlyRadiusMesh and settings related to that, the change was then in
+what material was applied to the radius actor (pooled) based on the request enum. right now i have added some materials that work on a full plane
+and cannot use the same radius mesh (the original one is only a border and has the middle cut out) which is why i introduced  	/** The mesh used to visualize full circle material radii that use their own opacity logic in their material. */
+                                                                                                                              	UPROPERTY(Config, EditAnywhere, Category="Rendering")
+                                                                                                                              	TSoftObjectPtr<UStaticMesh> FullCircleRadiusMesh;
+i have only added settings and added new enum values to ERTSRadiusType but you need to change the full system so it can dynamically use these different two meshes.
+an other important caviat for this new radius mesh is that we assume the material to apply on it has a param called                                                                                  
+	// Used when applying a radius material to a FullCircleRadiusMesh as the material needs to know about the radius its cm.
+	UPROPERTY(Config, EditAnywhere, Category="Rendering")
+	FName RadiusMeshRadiusParameterName = "RadiusCm";
+this is because of the way that material works we need to adjust the radius on the material depending on the requested radius size.
+
+Okay, first of all you need to implement a functio nthat can identify which of hte meshes to use; use the  ERTSRadiusType
+and if the enum is a FullCircle_ one then you know we need to use the new mesh and apply that param on the material of it.
+NOTE: both of the possible meshes only have one material.
+
+the main deal with this refactor is: no API changes for the designer; the designer must be able to call 
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+	int32 CreateRTSRadius(FVector Location, float Radius, ERTSRadiusType Type, float LifeTime = 0.0f);
+	
+now on the backend of things we previously init the radius actor once with a mesh in InitRadiusActor
+you have to make sure this can potentially be called later as well and that in the beginning with pool initialisation one half
+has the BorderOnlyRadiusMesh and the other half the FullCircleRadiusMesh.
+it needs to be dynamically callable cause it coudl be the case that the full pool needs to make use of the full circle mesh later on. or the border only.
+also keep track on the actor itself what type it is so that we can reuse dormant actors more cleverly; matching type? then we only need to change the radius
+which in case of the full circle means two things: setting the radius by scaling the radius component as it does through UpdateRadius and make sure it used the  right settings; InitRadiusComp
+needs to either supply the settings of the border only or hte full circle system. the second thing is to set the radius cm parameter on the material after that material was set.
+not matching type but matching mesh radius type? (e.g. border vs full circle) then we only need to change the material!
+
+
+also make sure to rename the 	float M_UnitsPerScale = 1.0f;
+                             	float M_ZScale = 1.0f;
+                             	float M_RenderHeight = 0.0f; which currently are only used for the border radius.
+                             	and make sure to add
+    equivalent settings for the full circle system in the URadiusPoolSettings.
+    
+  
+
+implement all of this while making sure the public api stays the same; the designer should not have to change anything on their side and be able to use the new enum values
+with the new circle mesh seamlessly.
+
+
+

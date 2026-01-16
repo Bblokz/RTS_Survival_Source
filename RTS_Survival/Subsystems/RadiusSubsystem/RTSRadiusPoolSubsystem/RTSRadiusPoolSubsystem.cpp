@@ -89,11 +89,11 @@ void URTSRadiusPoolSubsystem::Initialize_LoadSettings()
 		return;
 	}
 
-	M_RadiusMesh = Settings->RadiusMesh.LoadSynchronous();
+	M_RadiusMesh = Settings->BorderOnlyRadiusMesh.LoadSynchronous();
 	M_DefaultStartingRadius = Settings->StartingRadius;
-	M_UnitsPerScale = Settings->UnitsPerScale;
+	M_UnitsPerScale = Settings->BorderOnlyUnitsPerScale;
 	M_ZScale = Settings->ZScale;
-	M_RenderHeight = Settings->RenderHeight;
+	M_RenderHeight = Settings->BorderOnlyRenderHeight;
 	M_DefaultPoolSize = FMath::Max(1, Settings->DefaultPoolSize);
 
 	Initialize_LoadMaterials(Settings);

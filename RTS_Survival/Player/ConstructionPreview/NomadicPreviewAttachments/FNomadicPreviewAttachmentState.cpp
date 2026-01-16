@@ -53,7 +53,7 @@ void FNomadicPreviewAttachmentState::AttachBuildRadiusToPreview(
 
 	// Create a buildng radius type radius at the actor's current world location (no lifetime for preview).
 	const FVector SpawnLocation = PreviewActor->GetActorLocation();
-	constexpr ERTSRadiusType RadiusType = ERTSRadiusType::PostConstructionBuildingRange;
+	constexpr ERTSRadiusType RadiusType = ERTSRadiusType::PostConstructionBuildingRangeBorderOnly;
 
 	const int32 NewId = Subsystem->CreateRTSRadius(SpawnLocation, Radius, RadiusType, /*LifeTime*/ 0.0f);
 	if (NewId < 0)
