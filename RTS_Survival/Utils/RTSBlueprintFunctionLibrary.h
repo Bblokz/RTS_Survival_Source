@@ -14,6 +14,7 @@
 #include "RTSBlueprintFunctionLibrary.generated.h"
 
 
+enum class ERTSRadiusType : uint8;
 enum class ERTSDamageType : uint8;
 class UPlayerPortraitManager;
 struct FTrainingOption;
@@ -101,7 +102,7 @@ class RTS_SURVIVAL_API URTSBlueprintFunctionLibrary : public UBlueprintFunctionL
 public:
 	// --- Damage actors
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Subtypes")
-	static void ApplyRTSDamage(AActor* ActorToDamage, ERTSDamageType DamageType, float DamageAmount) ;
+	static void ApplyRTSDamage(AActor* ActorToDamage, ERTSDamageType DamageType, float DamageAmount);
 	// ------------------------------------------------------------
 	// --------- RTS Card System ------------ ------
 	// ------------------------------------------------------------
@@ -114,10 +115,10 @@ public:
 	// ------------------------------------------------------------
 	//  -------------- Sub types string translations --------------
 	// ------------------------------------------------------------
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Subtypes")
 	static FString BP_GetTrainingOptionDisplayName(const FTrainingOption TrainingOption);
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Subtypes")
 	static FString BP_GetNomadicSubtypeString(const ENomadicSubtype NomadicSubtype);
 
@@ -126,7 +127,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "BuildingExpansionType")
 	static FString BP_GetBxpTypeString(const EBuildingExpansionType BuildingExpansionType);
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "BuildingExpansionType")
 	static FString BP_GetBxpDisplayNameString(const EBuildingExpansionType BuildingExpansionType);
 
@@ -170,7 +171,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "TechTree")
 	static FString BP_GetTechString(const ETechnology Tech);
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "TechTree")
 	static FString BP_GetTechDisplayNameString(const ETechnology Tech);
 
@@ -233,7 +234,8 @@ public:
 	static float GetDestroyedTankHealth(UObject* WorldContextObject, ETankSubtype TankSubtype);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="UnitData")
-	static float GetDestroyedTankVehiclePartsRewardAndScavTime(UObject* WorldContextObject, ETankSubtype TankSubtype, float& TimeToScavenge);
+	static float GetDestroyedTankVehiclePartsRewardAndScavTime(UObject* WorldContextObject, ETankSubtype TankSubtype,
+	                                                           float& TimeToScavenge);
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="RTSDecal")
@@ -250,7 +252,7 @@ public:
 		const FVector& SpawnLocation,
 		const bool bPlaySound,
 		const float Delay);
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|ExplosionManager")
 	static void RTSSpawnExplosionAtRandomSocket(
 		const UObject* WorldContextObject,
@@ -259,7 +261,7 @@ public:
 		const bool bPlaySound,
 		const float Delay);
 
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|ExplosionManager")
 	static void RTSSpawnExplosionAtRandomSocketContaining(
 		const UObject* WorldContextObject,
@@ -290,6 +292,8 @@ public:
 		const TEnumAsByte<ETextJustify::Type> InJustification,
 		const FRTSVerticalAnimTextSettings& InSettings
 	);
+
+
 	/** @return The the ID that identifies this progress bar instance */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|TimedProgressBarManager")
 	static int RTSActivatedTimedProgressBar(
@@ -317,6 +321,38 @@ public:
 		const bool bUseDescriptionText,
 		const FString& InText,
 		const float ScaleMlt);
+
+	/**
+	 * @brief Show a radius ring.
+	 * @param WorldContextObject Context object to get the world.
+	 * @param Location World-space center for the ring.
+	 * @param Radius   Radius in units.
+	 * @param Type     Which logical type (drives the material).
+	 * @param LifeTime If > 0, auto-hide after this many seconds.
+	 * @return Unique runtime id for later HideRTSRadiusById; negative on error.
+	 */
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+	static int32 CreateRTSRadius(const UObject* WorldContextObject, const FVector& Location, float Radius,
+	                             ERTSRadiusType Type, float LifeTime = 0.0f);
+
+    /**
+     * @brief Attach an active pooled radius actor to another actor with a relative offset.
+     * @param ID           The id returned by CreateRTSRadius.
+     * @param TargetActor  Actor to attach to.
+     * @param RelativeOffset Offset applied as relative location while attached.
+     *
+     * @note The pooled actor is detached automatically when hidden or reclaimed.
+     */
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+    static void AttachRTSRadiusToActor(const UObject* WorldContextObject, int32 ID, AActor* TargetActor, FVector RelativeOffset);
+	
+	/**
+	 * @brief Hide and return the pooled actor with a given id to the pool.
+	 * @param WorldContextObject Context object to get the world.
+	 * @param ID The id returned by CreateRTSRadius.
+	 */
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+	static void HideRTSRadiusById(const UObject* WorldContextObject, int32 ID);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="UnitData")
 	static bool RTSIsValid(AActor* ActorToCheck);

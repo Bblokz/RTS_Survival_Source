@@ -71,6 +71,8 @@ private:
 	UPROPERTY()
 	UWeaponState* M_LoadedWeaponState;
 
+	float GetWeaponRange() const;
+
 	// The bomb component that this widget is displaying, if any.
 	UPROPERTY()
 	UBombComponent* M_LoadedBombComponent;

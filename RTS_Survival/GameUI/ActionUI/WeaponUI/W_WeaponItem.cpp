@@ -105,7 +105,17 @@ void UW_WeaponItem::OnHoverWeaponItem(const bool bIsHover)
 	{
 		M_W_WeaponDescription->OnUnHover();
 	}
-	M_ActionUIManager->OnHoverWeaponItem(bIsHover);
+	M_ActionUIManager->OnHoverWeaponItem(bIsHover, GetWeaponRange());
+}
+
+float UW_WeaponItem::GetWeaponRange() const
+{
+	if( not IsValid(M_LoadedWeaponState))
+	{
+		return -1;
+	}
+	return M_LoadedWeaponState->GetRange();
+	
 }
 
 bool UW_WeaponItem::EnsureIsValidWeaponDescription()

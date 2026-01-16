@@ -20,8 +20,10 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
+#include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
@@ -160,17 +162,19 @@ void UActionUIManager::OnHoverSelectedUnitInfo(const bool bIsHover) const
 		return;
 	}
 
-	M_MainGameUI->OnHoverSelectedUnitInfo(bIsHover);
+	
 }
 
-void UActionUIManager::OnHoverWeaponItem(const bool bIsHover) const
+void UActionUIManager::OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange)
 {
+	OnWeaponHoverHandleRangeRadius(bIsHover, WeaponHoveredRange);
 	if (not GetIsValidMainGameUI())
 	{
 		return;
 	}
 	M_MainGameUI->OnHoverWeaponItem(bIsHover);
 }
+
 
 void UActionUIManager::SetWeaponDescriptionVisibility(const bool bVisible) const
 {
@@ -592,7 +596,9 @@ bool UActionUIManager::UpdateAbilitiesUI(const TArray<FUnitAbilityEntry>& InAbil
 		if (GetIndexInAbilityItemRange(ElmInit) && IsValid(M_TActionUI_Items[ElmInit]))
 		{
 			// Update item with ability.
-			M_TActionUI_Items[ElmInit]->UpdateItemActionUI(AbilityEntry.AbilityId, AbilityEntry.CustomType, AbilityEntry.CooldownRemaining, AbilityEntry.CooldownDuration);
+			M_TActionUI_Items[ElmInit]->UpdateItemActionUI(AbilityEntry.AbilityId, AbilityEntry.CustomType,
+			                                               AbilityEntry.CooldownRemaining,
+			                                               AbilityEntry.CooldownDuration);
 			ElmInit++;
 		}
 		else
@@ -661,6 +667,52 @@ void UActionUIManager::InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* 
 	BehaviourContainer->OnAmmoPickerVisiblityChange(false);
 	BehaviourContainer->SetVisibility(ESlateVisibility::Collapsed);
 	SetBehaviourDescriptionVisibility(false);
+}
+
+void UActionUIManager::OnWeaponHoverHandleRangeRadius(const bool bIsHover, const float WeaponHoveredRange)
+{
+	if (WeaponHoveredRange <= 100)
+	{
+		RTSFunctionLibrary::PrintString("Weapon range too short to display hover range!");
+		return;
+	}
+
+	if (not GetIsCurrentPrimarySelectedValid())
+	{
+		return;
+	}
+	const bool bHasValidOwningActorInInterface = IsValid(M_PrimarySelectedUnit->GetOwnerActor());
+	if (not bHasValidOwningActorInInterface)
+	{
+		RTSFunctionLibrary::ReportError(
+			"ActionUiManager::OnWeaponHoverHandleRangeRadius: Primary selected unit has no valid owning actor!"
+			"\n Eventhough the interface pointer is valid! forgot to implement the get actor function on ICommands for this unit?");
+		return;
+	}
+
+	if (bIsHover)
+	{
+		WeaponRangeRadiusActorIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(M_PrimarySelectedUnit->GetOwnerActor(),
+			M_PrimarySelectedUnit->GetOwnerActor()->GetActorLocation(),
+			WeaponHoveredRange, ERTSRadiusType::FUllCircle_Weaponrange);
+		if(WeaponRangeRadiusActorIndex<0)
+		{
+			RTSFunctionLibrary::ReportError(
+				"ActionUiManager::OnWeaponHoverHandleRangeRadius: Failed to create radius actor!");
+			return;
+		}
+		const FVector RadiusOffset = FVector(0.f, 0.f, 25.f);
+		URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(M_PrimarySelectedUnit->GetOwnerActor(),
+			WeaponRangeRadiusActorIndex, M_PrimarySelectedUnit->GetOwnerActor(),RadiusOffset);
+
+		return;
+	}
+	 if(WeaponRangeRadiusActorIndex>=0)
+	{
+		URTSBlueprintFunctionLibrary::HideRTSRadiusById(M_PrimarySelectedUnit->GetOwnerActor(),
+			WeaponRangeRadiusActorIndex);
+	}
+	
 }
 
 void UActionUIManager::RefreshBehaviourUIForComponent(UBehaviourComp* BehaviourComponent)

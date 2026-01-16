@@ -24,6 +24,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -604,6 +605,68 @@ int URTSBlueprintFunctionLibrary::ActivateTimedProgressBarAnchored(const UObject
 			bUseDescriptionText, InText, ScaleMlt);
 	}
 	return -1;
+}
+
+
+int32 URTSBlueprintFunctionLibrary::CreateRTSRadius(const UObject* WorldContextObject, const FVector& Location, float Radius, ERTSRadiusType Type, float LifeTime)
+{
+    if (!IsValid(WorldContextObject))
+    {
+        return -1;
+    }
+
+    UWorld* World = WorldContextObject->GetWorld();
+    if (!World)
+    {
+        return -1;
+    }
+
+    if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+    {
+        return Subsystem->CreateRTSRadius(Location, Radius, Type, LifeTime);
+    }
+
+    return -1;
+}
+
+void URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(const UObject* WorldContextObject, int32 ID, AActor* TargetActor, FVector RelativeOffset)
+{
+
+    if (!IsValid(WorldContextObject) || !IsValid(TargetActor))
+    {
+        return; 
+    }
+
+    UWorld* World = WorldContextObject->GetWorld();
+    if (!World)
+    {
+        return; 
+    }
+
+    if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+    {
+        Subsystem->AttachRTSRadiusToActor(ID, TargetActor, RelativeOffset);
+    }
+}
+
+
+void URTSBlueprintFunctionLibrary::HideRTSRadiusById(const UObject* WorldContextObject, int32 ID)
+{
+    if (!IsValid(WorldContextObject))
+    {
+        return;
+    }
+
+    UWorld* World = WorldContextObject->GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+    {
+        Subsystem->HideRTSRadiusById(ID);
+    }
 }
 
 bool URTSBlueprintFunctionLibrary::RTSIsValid(AActor* ActorToCheck)

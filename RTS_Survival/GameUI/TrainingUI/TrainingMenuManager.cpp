@@ -149,13 +149,8 @@ bool UTrainingMenuManager::GetIsValidPrimarySelectedTrainer() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		"M_PrimarySelectedTrainer",
-		"GetIsValidPrimarySelectedTrainer",
-		this
-	);
 
+	// No error report as we may not have selected anyone before.
 	return false;
 }
 

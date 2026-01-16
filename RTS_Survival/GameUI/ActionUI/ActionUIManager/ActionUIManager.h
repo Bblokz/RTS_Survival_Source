@@ -57,7 +57,7 @@ public:
 
 	void OnHoverActionUIItem(const bool bIsHover) const;
 	void OnHoverSelectedUnitInfo(const bool bIsHover)const;
-	void OnHoverWeaponItem(const bool bIsHover) const;
+	void OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange);
 
 	void OnShellTypeSelected(const EWeaponShellType SelectedShellType) const;
 
@@ -220,4 +220,7 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UBehaviourComp> M_SelectedBehaviourComponent;
+
+	void OnWeaponHoverHandleRangeRadius(const bool bIsHover, const float WeaponHoveredRange);
+	int32 WeaponRangeRadiusActorIndex = -1;
 };
