@@ -647,7 +647,8 @@ protected:
 	 * @param MoveToLocation The location to move to.
 	 * @param SquadPath By reference the path to assign to the squad units.
 	 */
-	ESquadPathFindingError GeneratePaths_Assign(const FVector& MoveToLocation, const FNavPathSharedPtr& SquadPath);
+	virtual ESquadPathFindingError GeneratePaths_Assign(const FVector& MoveToLocation,
+	                                                    const FNavPathSharedPtr& SquadPath);
 
 	FVector GetFinalPathPointOffset(const FVector& UnitOffset) const;
 

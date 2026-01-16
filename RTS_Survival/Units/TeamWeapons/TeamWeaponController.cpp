@@ -4,9 +4,11 @@
 
 #include "TeamWeapon.h"
 #include "TeamWeaponMover.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 
 ATeamWeaponController::ATeamWeaponController()
@@ -17,6 +19,7 @@ ATeamWeaponController::ATeamWeaponController()
 void ATeamWeaponController::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_InitAnimatedTextWidgetPoolManager();
 	SetTeamWeaponState(ETeamWeaponState::Spawning);
 }
 
@@ -34,8 +37,20 @@ void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 		return;
 	}
 
-	SetTeamWeaponState(ETeamWeaponState::Moving);
-	M_TeamWeaponMover->MoveWeaponToLocation(MoveToLocation);
+	SetPostDeployPackActionForMove(MoveToLocation);
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed || M_TeamWeaponState == ETeamWeaponState::Deploying)
+	{
+		StartPacking();
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Packing)
+	{
+		return;
+	}
+
+	TryIssuePostDeployPackAction();
 }
 
 void ATeamWeaponController::ExecutePatrolCommand(const FVector PatrolToLocation)
@@ -64,6 +79,51 @@ void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbili
 		return;
 	}
 	Super::OnSquadUnitCommandComplete(CompletedAbilityID);
+}
+
+ESquadPathFindingError ATeamWeaponController::GeneratePaths_Assign(const FVector& MoveToLocation,
+                                                                   const FNavPathSharedPtr& SquadPath)
+{
+	static_cast<void>(MoveToLocation);
+
+	const int32 OffsetCount = M_SqPath_Offsets.Num();
+
+	int32 NonCrewCounter = 0;
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		FNavPathSharedPtr UnitPath = MakeShared<FNavigationPath>(*SquadPath);
+		const bool bIsCrewOperator = GetIsCrewOperator(SquadUnit);
+
+		if (bIsCrewOperator)
+		{
+			FVector CrewOffset = FVector::ZeroVector;
+			if (TryGetCrewMemberOffset(SquadUnit, CrewOffset))
+			{
+				ApplyCrewOffsetToPath(UnitPath, CrewOffset);
+			}
+		}
+		else if (NonCrewCounter > 0)
+		{
+			const FVector UnitOffset = (OffsetCount > 0)
+				                           ? M_SqPath_Offsets[NonCrewCounter % OffsetCount]
+				                           : FVector::ZeroVector;
+			ApplyNonCrewOffsetToPath(UnitPath, UnitOffset);
+		}
+
+		if (not bIsCrewOperator)
+		{
+			NonCrewCounter++;
+		}
+
+		M_SquadUnitPaths.Add(SquadUnit, UnitPath);
+	}
+
+	return ESquadPathFindingError::NoError;
 }
 
 void ATeamWeaponController::SpawnTeamWeapon()
@@ -135,10 +195,12 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 			OperatorIndex++;
 
 			AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
-			if (IsValid(InfantryWeapon))
+			if (not IsValid(InfantryWeapon))
 			{
-				InfantryWeapon->DisableWeaponSearch(false, true);
+				continue;
 			}
+
+			InfantryWeapon->DisableWeaponSearch(false, true);
 			continue;
 		}
 
@@ -149,17 +211,356 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 	{
 		M_TeamWeaponMover->NotifyCrewReady(M_CrewAssignment.GetHasEnoughOperators());
 	}
+
+	TryIssuePostDeployPackAction();
+}
+
+void ATeamWeaponController::StartPacking()
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Packing)
+	{
+		return;
+	}
+
+	SetTeamWeaponState(ETeamWeaponState::Packing);
+	ShowPackingAnimatedText();
+
+	const float DeploymentTime = M_TeamWeapon->GetDeploymentTime();
+	if (DeploymentTime <= 0.0f)
+	{
+		HandlePackingTimerFinished();
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_DeployTimer);
+	World->GetTimerManager().SetTimer(
+		M_DeployTimer,
+		this,
+		&ATeamWeaponController::HandlePackingTimerFinished,
+		DeploymentTime,
+		false);
+}
+
+void ATeamWeaponController::StartDeploying()
+{
+	StartDeployingTeamWeapon();
+}
+
+void ATeamWeaponController::BeginPlay_InitAnimatedTextWidgetPoolManager()
+{
+	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+}
+
+void ATeamWeaponController::StartMoveWithCrew(const FVector MoveToLocation)
+{
+	if (not GetIsValidTeamWeapon() || not GetIsValidTeamWeaponMover())
+	{
+		return;
+	}
+
+	if (not M_CrewAssignment.GetHasEnoughOperators())
+	{
+		return;
+	}
+
+	UpdateCrewMoveOffsets();
+	if (M_CrewMoveOffsets.Num() == 0)
+	{
+		M_TeamWeaponMover->AbortMove(TEXT("No crew members for movement"));
+		return;
+	}
+
+	SetTeamWeaponState(ETeamWeaponState::Moving);
+	M_TeamWeaponMover->SetCrewMembersToFollow(M_CrewMoveOffsets);
+	M_TeamWeaponMover->MoveWeaponToLocation(MoveToLocation);
+	GeneralMoveToForAbility(MoveToLocation, EAbilityID::IdMove);
+	M_TeamWeaponMover->BeginFollowingCrew();
+	M_PostDeployPackAction.Reset();
+}
+
+void ATeamWeaponController::StartDeployingTeamWeapon()
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	if (M_TeamWeaponState != ETeamWeaponState::Ready_Packed)
+	{
+		return;
+	}
+
+	SetTeamWeaponState(ETeamWeaponState::Deploying);
+	ShowDeployingAnimatedText();
+
+	const float DeploymentTime = M_TeamWeapon->GetDeploymentTime();
+	if (DeploymentTime <= 0.0f)
+	{
+		HandleDeployingTimerFinished();
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_DeployTimer);
+	World->GetTimerManager().SetTimer(
+		M_DeployTimer,
+		this,
+		&ATeamWeaponController::HandleDeployingTimerFinished,
+		DeploymentTime,
+		false);
+}
+
+void ATeamWeaponController::HandlePackingTimerFinished()
+{
+	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	TryIssuePostDeployPackAction();
+}
+
+void ATeamWeaponController::HandleDeployingTimerFinished()
+{
+	SetTeamWeaponState(ETeamWeaponState::Ready_Deployed);
+	TryIssuePostDeployPackAction();
+}
+
+void ATeamWeaponController::SetPostDeployPackActionForMove(const FVector MoveToLocation)
+{
+	M_PostDeployPackAction.InitForCommand(
+		EAbilityID::IdMove,
+		true,
+		MoveToLocation,
+		false,
+		FRotator::ZeroRotator,
+		nullptr);
+}
+
+void ATeamWeaponController::TryIssuePostDeployPackAction()
+{
+	if (not M_PostDeployPackAction.GetHasAction())
+	{
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Packing || M_TeamWeaponState == ETeamWeaponState::Deploying)
+	{
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
+	{
+		StartPacking();
+		return;
+	}
+
+	if (not GetIsValidTeamWeapon() || not GetIsValidTeamWeaponMover())
+	{
+		return;
+	}
+
+	IssuePostDeployPackAction();
+}
+
+void ATeamWeaponController::IssuePostDeployPackAction()
+{
+	switch (M_PostDeployPackAction.GetAbilityId())
+	{
+	case EAbilityID::IdMove:
+		if (not M_PostDeployPackAction.GetHasLocation())
+		{
+			M_PostDeployPackAction.Reset();
+			break;
+		}
+
+		if (not M_CrewAssignment.GetHasEnoughOperators())
+		{
+			M_TeamWeaponMover->MoveWeaponToLocation(M_PostDeployPackAction.GetTargetLocation());
+			M_PostDeployPackAction.Reset();
+			break;
+		}
+
+		StartMoveWithCrew(M_PostDeployPackAction.GetTargetLocation());
+		break;
+
+	default:
+		M_PostDeployPackAction.Reset();
+		break;
+	}
+}
+
+void ATeamWeaponController::UpdateCrewMoveOffsets()
+{
+	M_CrewMoveOffsets.Reset();
+
+	int32 ValidCrewCount = 0;
+	FVector CrewCenter = FVector::ZeroVector;
+
+	for (const TWeakObjectPtr<ASquadUnit>& CrewMember : M_CrewAssignment.M_Operators)
+	{
+		ASquadUnit* SquadUnit = CrewMember.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		CrewCenter += SquadUnit->GetActorLocation();
+		ValidCrewCount++;
+	}
+
+	if (ValidCrewCount == 0)
+	{
+		return;
+	}
+
+	CrewCenter /= static_cast<float>(ValidCrewCount);
+
+	for (const TWeakObjectPtr<ASquadUnit>& CrewMember : M_CrewAssignment.M_Operators)
+	{
+		ASquadUnit* SquadUnit = CrewMember.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		FTeamWeaponCrewMemberOffset CrewOffset;
+		CrewOffset.M_CrewMember = SquadUnit;
+		CrewOffset.M_OffsetFromCenter = SquadUnit->GetActorLocation() - CrewCenter;
+		M_CrewMoveOffsets.Add(CrewOffset);
+	}
+}
+
+bool ATeamWeaponController::TryGetCrewMemberOffset(const ASquadUnit* SquadUnit, FVector& OutOffset) const
+{
+	for (const FTeamWeaponCrewMemberOffset& CrewOffset : M_CrewMoveOffsets)
+	{
+		if (CrewOffset.M_CrewMember.Get() == SquadUnit)
+		{
+			OutOffset = CrewOffset.M_OffsetFromCenter;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool ATeamWeaponController::GetIsCrewOperator(const ASquadUnit* SquadUnit) const
+{
+	for (const TWeakObjectPtr<ASquadUnit>& CrewMember : M_CrewAssignment.M_Operators)
+	{
+		if (CrewMember.Get() == SquadUnit)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void ATeamWeaponController::ApplyCrewOffsetToPath(FNavPathSharedPtr& UnitPath, const FVector& CrewOffset) const
+{
+	const float CrewPathProjectionHeight = 200.0f;
+
+	for (int32 i = 0; i < UnitPath->GetPathPoints().Num(); ++i)
+	{
+		FNavPathPoint& PathPoint = UnitPath->GetPathPoints()[i];
+		PathPoint.Location += CrewOffset;
+		PathPoint.Location = ProjectLocationOnNavMesh(PathPoint.Location, CrewPathProjectionHeight, false);
+	}
+}
+
+void ATeamWeaponController::ApplyNonCrewOffsetToPath(FNavPathSharedPtr& UnitPath, const FVector& UnitOffset) const
+{
+	const float NonCrewMinOffsetScale = 0.8f;
+	const float NonCrewMaxOffsetScale = 1.2f;
+	const float CrewPathProjectionHeight = 200.0f;
+
+	for (int32 i = 0; i < UnitPath->GetPathPoints().Num(); ++i)
+	{
+		const bool bLast = (i == UnitPath->GetPathPoints().Num() - 1);
+		const FVector PointOffset = bLast
+			                            ? GetFinalPathPointOffset(UnitOffset)
+			                            : (UnitOffset * FMath::FRandRange(NonCrewMinOffsetScale, NonCrewMaxOffsetScale));
+		FNavPathPoint& PathPoint = UnitPath->GetPathPoints()[i];
+		PathPoint.Location += PointOffset;
+		PathPoint.Location = ProjectLocationOnNavMesh(PathPoint.Location, CrewPathProjectionHeight, false);
+	}
+}
+
+void ATeamWeaponController::ShowDeployingAnimatedText() const
+{
+	if (not GetIsValidTeamWeapon() || not GetIsValidAnimatedTextWidgetPoolManager())
+	{
+		return;
+	}
+
+	const FTeamWeaponConfig& TeamWeaponConfig = M_TeamWeapon->GetTeamWeaponConfig();
+	if (TeamWeaponConfig.M_DeployingAnimatedText.IsEmpty())
+	{
+		return;
+	}
+
+	constexpr bool bAutoWrap = false;
+	const float WrapWidth = 300.0f;
+	const TEnumAsByte<ETextJustify::Type> Justification = ETextJustify::Center;
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		TeamWeaponConfig.M_DeployingAnimatedText,
+		M_TeamWeapon->GetActorLocation(),
+		bAutoWrap,
+		WrapWidth,
+		Justification,
+		TeamWeaponConfig.M_AnimatedTextSettings);
+}
+
+void ATeamWeaponController::ShowPackingAnimatedText() const
+{
+	if (not GetIsValidTeamWeapon() || not GetIsValidAnimatedTextWidgetPoolManager())
+	{
+		return;
+	}
+
+	const FTeamWeaponConfig& TeamWeaponConfig = M_TeamWeapon->GetTeamWeaponConfig();
+	if (TeamWeaponConfig.M_PackingAnimatedText.IsEmpty())
+	{
+		return;
+	}
+
+	constexpr bool bAutoWrap = false;
+	const float WrapWidth = 300.0f;
+	const TEnumAsByte<ETextJustify::Type> Justification = ETextJustify::Center;
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		TeamWeaponConfig.M_PackingAnimatedText,
+		M_TeamWeapon->GetActorLocation(),
+		bAutoWrap,
+		WrapWidth,
+		Justification,
+		TeamWeaponConfig.M_AnimatedTextSettings);
 }
 
 void ATeamWeaponController::HandleMoverArrived()
 {
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	M_PostDeployPackAction.Reset();
 	DoneExecutingCommand(EAbilityID::IdMove);
 }
 
 void ATeamWeaponController::HandleMoverFailed(const FString& FailureReason)
 {
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	M_PostDeployPackAction.Reset();
 	RTSFunctionLibrary::ReportError("Team weapon mover failed: " + FailureReason);
 	DoneExecutingCommand(EAbilityID::IdMove);
 }
@@ -197,6 +598,19 @@ bool ATeamWeaponController::GetIsValidTeamWeaponMover() const
 	return false;
 }
 
+bool ATeamWeaponController::GetIsValidAnimatedTextWidgetPoolManager() const
+{
+	if (M_AnimatedTextWidgetPoolManager.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_AnimatedTextWidgetPoolManager",
+	                                                      "ATeamWeaponController::GetIsValidAnimatedTextWidgetPoolManager",
+	                                                      this);
+	return false;
+}
+
 int ATeamWeaponController::GetOwningPlayer()
 {
 	if (GetIsValidRTSComponent())
@@ -226,6 +640,11 @@ void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	{
+		StartDeploying();
 	}
 }
 
