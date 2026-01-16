@@ -5,6 +5,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 URadiusComp::URadiusComp(): M_ZScale(0), M_RenderHeight(0), bM_IsEnabled(true)
@@ -20,7 +21,7 @@ void URadiusComp::BeginPlay()
 {
 	Super::BeginPlay();
 	// Ensure the owner has a valid root component
-	if (!GetOwner()->GetRootComponent())
+	if (not GetOwner()->GetRootComponent())
 	{
 		RTSFunctionLibrary::ReportError("Owner has no RootComponent in URadiusComp::BeginPlay");
 	}
@@ -28,11 +29,12 @@ void URadiusComp::BeginPlay()
 
 void URadiusComp::SetNewMaterial(UMaterialInterface* NewMaterial) 
 {
-	if(!IsValid(NewMaterial))
+	if (not IsValid(NewMaterial))
 	{
 		RTSFunctionLibrary::ReportNullErrorComponent(this, "NewMaterial", "RadiusComp::SetNewMaterial");
+		return;
 	}
-	if(IsValid(RadiusMeshComponent))
+	if (IsValid(RadiusMeshComponent))
 	{
 		RadiusMeshComponent->SetMaterial(0, NewMaterial);
 	}
@@ -45,19 +47,25 @@ void URadiusComp::SetNewMaterial(UMaterialInterface* NewMaterial)
 void URadiusComp::InitRadiusComp(UStaticMesh* RadiusMesh, const float Radius, const float UnitsPerScale,
                                  const float ZScale, const float RenderHeight)
 {
-	if (IsValid(RadiusMesh) && Radius > 0.0f && UnitsPerScale > 0.0f)
-	{
-		M_RadiusMesh = RadiusMesh;
-		M_Radius = Radius;
-		M_UnitsPerScale = UnitsPerScale;
-		M_ZScale = ZScale > 0 ? ZScale : 1.0f;
-		M_RenderHeight = RenderHeight > 0 ? RenderHeight : 0.0f;
-	}
-	else
+	if (not IsValid(RadiusMesh) || Radius <= 0.0f || UnitsPerScale <= 0.0f)
 	{
 		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : TEXT("NoOwner");
 		RTSFunctionLibrary::ReportError(
 			"Invalid parameters provided to URadiusComp::InitRadiusComp\nOwner: " + OwnerName);
+		return;
+	}
+
+	M_RadiusMesh = RadiusMesh;
+	M_Radius = Radius;
+	M_UnitsPerScale = UnitsPerScale;
+	M_ZScale = ZScale > 0 ? ZScale : 1.0f;
+	M_RenderHeight = RenderHeight > 0 ? RenderHeight : 0.0f;
+
+	if (IsValid(RadiusMeshComponent))
+	{
+		RadiusMeshComponent->SetStaticMesh(M_RadiusMesh);
+		RadiusMeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, M_RenderHeight));
+		ShowRadius();
 	}
 }
 
@@ -77,6 +85,80 @@ void URadiusComp::UpdateRadius(float Radius)
 	}
 }
 
+void URadiusComp::SetMaterialScalarParameter(const FName ParameterName, const float RadiusCm)
+{
+	if (ParameterName.IsNone())
+	{
+		RTSFunctionLibrary::ReportError("Invalid material parameter name in URadiusComp::SetMaterialScalarParameter");
+		return;
+	}
+
+	if (not IsValid(RadiusMeshComponent))
+	{
+		RTSFunctionLibrary::ReportError("Radius mesh component is invalid in URadiusComp::SetMaterialScalarParameter");
+		return;
+	}
+
+	UMaterialInstanceDynamic* DynamicMaterial = RadiusMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+	if (not IsValid(DynamicMaterial))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create dynamic material in URadiusComp::SetMaterialScalarParameter");
+		return;
+	}
+
+	DynamicMaterial->SetScalarParameterValue(ParameterName, RadiusCm);
+}
+
+void URadiusComp::CreateRadiusMeshComponent()
+{
+	if (IsValid(RadiusMeshComponent))
+	{
+		return;
+	}
+
+	RadiusMeshComponent = NewObject<UStaticMeshComponent>(this);
+	if (not RadiusMeshComponent)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to create Radius Mesh Component in URadiusComp::ShowRadius");
+		return;
+	}
+
+	if (M_Material)
+	{
+		RadiusMeshComponent->SetMaterial(0, M_Material);
+		M_Material = nullptr;
+	}
+
+	// Set up the mesh component
+	RadiusMeshComponent->SetSimulatePhysics(false);
+	RadiusMeshComponent->SetStaticMesh(M_RadiusMesh);
+	RadiusMeshComponent->AttachToComponent(
+		GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+	UpdateMeshComponentTransform();
+
+	// Set collision settings
+	RadiusMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RadiusMeshComponent->SetCollisionProfileName(TEXT("NoCollision"));
+	RadiusMeshComponent->SetCanEverAffectNavigation(false);
+
+	RadiusMeshComponent->SetCastShadow(false);
+
+	RadiusMeshComponent->RegisterComponent();
+}
+
+void URadiusComp::UpdateMeshComponentTransform()
+{
+	if (not IsValid(RadiusMeshComponent))
+	{
+		return;
+	}
+
+	const float ScaleValue = 2.0f * M_Radius / M_UnitsPerScale;
+	const FVector NewScale(ScaleValue, ScaleValue, M_ZScale);
+	RadiusMeshComponent->SetRelativeScale3D(NewScale);
+	RadiusMeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, M_RenderHeight));
+}
 
 
 void URadiusComp::SetEnabled(const bool bIsEnabled)
@@ -89,55 +171,19 @@ void URadiusComp::ShowRadius()
 	if (M_RadiusMesh && M_Radius > 0.0f && M_UnitsPerScale > 0.0f)
 	{
 		// Check if the mesh component already exists
-		if (!IsValid(RadiusMeshComponent))
+		if (not IsValid(RadiusMeshComponent))
 		{
-			// Create a new UStaticMeshComponent
-			RadiusMeshComponent = NewObject<UStaticMeshComponent>(this);
-			if (RadiusMeshComponent)
-			{
-				if(M_Material)
-				{
-					RadiusMeshComponent->SetMaterial(0, M_Material);
-					M_Material = nullptr;
-				}
-				// Set up the mesh component
-				RadiusMeshComponent->SetSimulatePhysics(false);
-				RadiusMeshComponent->SetStaticMesh(M_RadiusMesh);
-				RadiusMeshComponent->AttachToComponent(
-					GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
-				RadiusMeshComponent->SetRelativeLocation(
-					RadiusMeshComponent->GetRelativeLocation() + FVector(0, 0, M_RenderHeight));
-
-				float ScaleValue = 2 * M_Radius / M_UnitsPerScale;
-				FVector NewScale(ScaleValue, ScaleValue, M_ZScale);
-				RadiusMeshComponent->SetRelativeScale3D(NewScale);
-
-				// Set collision settings
-				RadiusMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-				RadiusMeshComponent->SetCollisionProfileName(TEXT("NoCollision"));
-				RadiusMeshComponent->SetCanEverAffectNavigation(false);
-
-				RadiusMeshComponent->SetCastShadow(false);
-
-				RadiusMeshComponent->RegisterComponent();
-			}
-			else
-			{
-				RTSFunctionLibrary::ReportError(
-					"Failed to create Radius Mesh Component in URadiusComp::ShowRadius");
-			}
+			CreateRadiusMeshComponent();
 		}
-		else
+		if (not IsValid(RadiusMeshComponent))
 		{
-			RadiusMeshComponent->SetHiddenInGame(false);
-			// If component exists, make sure it's visible and update scale in case parameters changed
-			RadiusMeshComponent->SetVisibility(true);
-
-			// Recalculate the scale in case M_Radius or M_UnitsPerScale have changed
-			float ScaleValue = 2 * M_Radius / M_UnitsPerScale;
-			FVector NewScale(ScaleValue, ScaleValue, M_ZScale);
-			RadiusMeshComponent->SetRelativeScale3D(NewScale);
+			return;
 		}
+
+		RadiusMeshComponent->SetHiddenInGame(false);
+		// If component exists, make sure it's visible and update scale in case parameters changed
+		RadiusMeshComponent->SetVisibility(true);
+		UpdateMeshComponentTransform();
 		RTSFunctionLibrary::PrintString("My render height: " + FString::SanitizeFloat(RadiusMeshComponent->GetRelativeLocation().Z)
 			+ "\n Set value: " + FString::SanitizeFloat(M_RenderHeight));
 	}

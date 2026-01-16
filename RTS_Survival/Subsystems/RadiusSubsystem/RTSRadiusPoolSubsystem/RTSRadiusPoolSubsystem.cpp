@@ -55,7 +55,9 @@ void URTSRadiusPoolSubsystem::Deinitialize()
 	M_Pool.Empty();
 	M_IdToActor.Empty();
 	M_TypeToMaterial.Empty();
-	M_RadiusMesh = nullptr;
+	M_BorderOnlyMeshSettings.M_RadiusMesh = nullptr;
+	M_FullCircleMeshSettings.M_RadiusMesh = nullptr;
+	M_RadiusMeshRadiusParameterName = NAME_None;
 
 	Super::Deinitialize();
 }
@@ -70,14 +72,45 @@ bool URTSRadiusPoolSubsystem::GetIsValidWorld() const
 	return false;
 }
 
-bool URTSRadiusPoolSubsystem::GetIsValidMesh() const
+bool URTSRadiusPoolSubsystem::GetIsValidBorderOnlyMesh() const
 {
-	if (IsValid(M_RadiusMesh))
+	if (IsValid(M_BorderOnlyMeshSettings.M_RadiusMesh))
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportError(TEXT("RTS Radius Pool: Radius mesh is not set/loaded in settings."));
+	RTSFunctionLibrary::ReportError(TEXT("RTS Radius Pool: Border only radius mesh is not set/loaded in settings."));
 	return false;
+}
+
+bool URTSRadiusPoolSubsystem::GetIsValidFullCircleMesh() const
+{
+	if (IsValid(M_FullCircleMeshSettings.M_RadiusMesh))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportError(TEXT("RTS Radius Pool: Full circle radius mesh is not set/loaded in settings."));
+	return false;
+}
+
+bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Type) const
+{
+	switch (Type)
+	{
+	case ERTSRadiusType::FUllCircle_Weaponrange:
+	case ERTSRadiusType::FullCircle_RepairRange:
+	case ERTSRadiusType::FullCircle_CommandAura:
+	case ERTSRadiusType::FullCircle_ReinforcementAura:
+	case ERTSRadiusType::FullCircle_ImprovedRangeArea:
+	case ERTSRadiusType::FullCircle_RadiationAura:
+		return true;
+	default:
+		return false;
+	}
+}
+
+const FRTSRadiusMeshSettings* URTSRadiusPoolSubsystem::GetMeshSettingsForType(const ERTSRadiusType Type) const
+{
+	return GetIsFullCircleRadiusType(Type) ? &M_FullCircleMeshSettings : &M_BorderOnlyMeshSettings;
 }
 
 void URTSRadiusPoolSubsystem::Initialize_LoadSettings()
@@ -89,11 +122,16 @@ void URTSRadiusPoolSubsystem::Initialize_LoadSettings()
 		return;
 	}
 
-	M_RadiusMesh = Settings->BorderOnlyRadiusMesh.LoadSynchronous();
+	M_BorderOnlyMeshSettings.M_RadiusMesh = Settings->BorderOnlyRadiusMesh.LoadSynchronous();
+	M_FullCircleMeshSettings.M_RadiusMesh = Settings->FullCircleRadiusMesh.LoadSynchronous();
 	M_DefaultStartingRadius = Settings->StartingRadius;
-	M_UnitsPerScale = Settings->BorderOnlyUnitsPerScale;
-	M_ZScale = Settings->ZScale;
-	M_RenderHeight = Settings->BorderOnlyRenderHeight;
+	M_BorderOnlyMeshSettings.M_UnitsPerScale = Settings->BorderOnlyUnitsPerScale;
+	M_BorderOnlyMeshSettings.M_ZScale = Settings->ZScale;
+	M_BorderOnlyMeshSettings.M_RenderHeight = Settings->BorderOnlyRenderHeight;
+	M_FullCircleMeshSettings.M_UnitsPerScale = Settings->FullCircleUnitsPerScale;
+	M_FullCircleMeshSettings.M_ZScale = Settings->FullCircleZScale;
+	M_FullCircleMeshSettings.M_RenderHeight = Settings->FullCircleRenderHeight;
+	M_RadiusMeshRadiusParameterName = Settings->RadiusMeshRadiusParameterName;
 	M_DefaultPoolSize = FMath::Max(1, Settings->DefaultPoolSize);
 
 	Initialize_LoadMaterials(Settings);
@@ -119,7 +157,7 @@ void URTSRadiusPoolSubsystem::Initialize_LoadMaterials(const URadiusPoolSettings
 
 void URTSRadiusPoolSubsystem::Initialize_SpawnPool()
 {
-	if (not GetIsValidWorld() || not GetIsValidMesh())
+	if (not GetIsValidWorld() || not GetIsValidBorderOnlyMesh() || not GetIsValidFullCircleMesh())
 	{
 		return;
 	}
@@ -129,6 +167,8 @@ void URTSRadiusPoolSubsystem::Initialize_SpawnPool()
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
+	const int32 BorderOnlyCount = M_DefaultPoolSize / 2;
+
 	for (int32 i = 0; i < M_DefaultPoolSize; ++i)
 	{
 		APooledRadiusActor* Actor = GetWorld()->SpawnActor<APooledRadiusActor>(APooledRadiusActor::StaticClass(), FTransform::Identity, Params);
@@ -137,8 +177,11 @@ void URTSRadiusPoolSubsystem::Initialize_SpawnPool()
 			RTSFunctionLibrary::ReportError(TEXT("RTS Radius Pool: Failed to spawn APooledRadiusActor."));
 			continue;
 		}
+		const bool bUseFullCircleMesh = i >= BorderOnlyCount;
+		const FRTSRadiusMeshSettings& MeshSettings = bUseFullCircleMesh ? M_FullCircleMeshSettings : M_BorderOnlyMeshSettings;
 		Actor->SetPoolId(INDEX_NONE);
-		Actor->InitRadiusActor(M_RadiusMesh, M_DefaultStartingRadius, M_UnitsPerScale, M_ZScale, M_RenderHeight);
+		Actor->InitRadiusActor(MeshSettings.M_RadiusMesh, M_DefaultStartingRadius, MeshSettings.M_UnitsPerScale,
+		                       MeshSettings.M_ZScale, MeshSettings.M_RenderHeight, bUseFullCircleMesh);
 		M_Pool.Add(Actor);
 	}
 }
@@ -206,8 +249,25 @@ APooledRadiusActor* URTSRadiusPoolSubsystem::AcquireFreeOrLRU()
 
 int32 URTSRadiusPoolSubsystem::CreateRTSRadius(const FVector Location, const float Radius, const ERTSRadiusType Type, const float LifeTime)
 {
-	if (not GetIsValidWorld() || not GetIsValidMesh())
+	if (not GetIsValidWorld())
 	{
+		return -1;
+	}
+
+	const bool bRequestFullCircleMesh = GetIsFullCircleRadiusType(Type);
+	if (bRequestFullCircleMesh && not GetIsValidFullCircleMesh())
+	{
+		return -1;
+	}
+	if (not bRequestFullCircleMesh && not GetIsValidBorderOnlyMesh())
+	{
+		return -1;
+	}
+
+	const FRTSRadiusMeshSettings* MeshSettings = GetMeshSettingsForType(Type);
+	if (not MeshSettings)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("RTS Radius Pool: Missing mesh settings for radius type."));
 		return -1;
 	}
 
@@ -223,10 +283,24 @@ int32 URTSRadiusPoolSubsystem::CreateRTSRadius(const FVector Location, const flo
 	Entry->SetPoolId(NewId);
 	M_IdToActor.Add(NewId, Entry);
 
-	TObjectPtr<UMaterialInterface>* MatPtr = M_TypeToMaterial.Find(Type);
+	const TObjectPtr<UMaterialInterface>* MatPtr = M_TypeToMaterial.Find(Type);
 	UMaterialInterface* Mat = MatPtr ? *MatPtr : nullptr;
 
-	Entry->ActivateRadiusAt(Location, Radius, Mat);
+	const bool bMeshTypeMatches = Entry->GetUsesFullCircleMesh() == bRequestFullCircleMesh;
+	const bool bRadiusTypeMatches = Entry->GetRadiusType() == Type;
+	if (not bMeshTypeMatches)
+	{
+		Entry->InitRadiusActor(MeshSettings->M_RadiusMesh, M_DefaultStartingRadius, MeshSettings->M_UnitsPerScale,
+		                       MeshSettings->M_ZScale, MeshSettings->M_RenderHeight, bRequestFullCircleMesh);
+	}
+
+	UMaterialInterface* MaterialToApply = nullptr;
+	if (not bRadiusTypeMatches || not bMeshTypeMatches)
+	{
+		MaterialToApply = Mat;
+	}
+
+	Entry->ActivateRadiusAt(Location, Radius, MaterialToApply, Type, bRequestFullCircleMesh, M_RadiusMeshRadiusParameterName);
 
 	// Lifetime handling
 	if (LifeTime > 0.0f)

@@ -62,7 +62,7 @@ bool APooledRadiusActor::GetIsValidRootScene() const
 }
 
 void APooledRadiusActor::InitRadiusActor(UStaticMesh* RadiusMesh, const float StartingRadius, const float UnitsPerScale,
-                                         const float ZScale, const float RenderHeight)
+                                         const float ZScale, const float RenderHeight, const bool bUseFullCircleMesh)
 {
 	if (not GetIsValidRadiusComp() || not GetIsValidRootScene())
 	{
@@ -74,10 +74,12 @@ void APooledRadiusActor::InitRadiusActor(UStaticMesh* RadiusMesh, const float St
 
 	SetActorHiddenInGame(true);
 	bM_InUse = false;
+	bM_UsesFullCircleMesh = bUseFullCircleMesh;
 }
 
 void APooledRadiusActor::ActivateRadiusAt(const FVector& WorldLocation, const float Radius,
-                                          UMaterialInterface* Material)
+                                          UMaterialInterface* Material, const ERTSRadiusType RadiusType,
+                                          const bool bUseFullCircleMesh, const FName RadiusParameterName)
 {
 	if (not GetIsValidRadiusComp())
 	{
@@ -97,8 +99,15 @@ void APooledRadiusActor::ActivateRadiusAt(const FVector& WorldLocation, const fl
 	M_RadiusComp->UpdateRadius(Radius);
 	M_RadiusComp->ShowRadius();
 
+	if (bUseFullCircleMesh && not RadiusParameterName.IsNone())
+	{
+		M_RadiusComp->SetMaterialScalarParameter(RadiusParameterName, Radius);
+	}
+
 	SetActorHiddenInGame(false);
 	bM_InUse = true;
+	M_RadiusType = RadiusType;
+	bM_UsesFullCircleMesh = bUseFullCircleMesh;
 
 	if (const UWorld* World = GetWorld())
 	{

@@ -49,9 +49,13 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Rendering", meta=(ClampMin="1.0"))
 	float FullCircleUnitsPerScale = 4300.0f;
 
-	/** Fixed Z scale for the radius mesh; used for both types of meshes. */
+	/** Fixed Z scale for the border only radius mesh. */
 	UPROPERTY(Config, EditAnywhere, Category="Rendering", meta=(ClampMin="0.001"))
 	float ZScale = 1.0f;
+
+	/** Fixed Z scale for the full circle radius mesh. */
+	UPROPERTY(Config, EditAnywhere, Category="Rendering", meta=(ClampMin="0.001"))
+	float FullCircleZScale = 1.0f;
 
 	/** Offset above ground at which the mesh renders. used for the border only radius  */
 	UPROPERTY(Config, EditAnywhere, Category="Rendering")

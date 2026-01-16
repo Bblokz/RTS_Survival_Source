@@ -53,15 +53,25 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Material")
 	void SetNewMaterial(UMaterialInterface* NewMaterial);
 
+	/**
+	 * @brief Apply a scalar parameter for full circle materials that need the radius in cm.
+	 * @param ParameterName Material parameter to set; must exist on the material.
+	 * @param RadiusCm Radius in centimeters used by the material.
+	 */
+	void SetMaterialScalarParameter(FName ParameterName, float RadiusCm);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
 	/** The mesh component that displays the radius mesh. */
 	UPROPERTY()
-	UStaticMeshComponent* RadiusMeshComponent;
+	TObjectPtr<UStaticMeshComponent> RadiusMeshComponent;
 
 private:
+	void CreateRadiusMeshComponent();
+	void UpdateMeshComponentTransform();
+
 	/** The static mesh used to display the radius. */
 	UPROPERTY()
 	UStaticMesh* M_RadiusMesh;
