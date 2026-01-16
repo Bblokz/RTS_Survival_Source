@@ -68,6 +68,9 @@ public:
 	// Sets default values for this component's properties
 	UTrackPathFollowingComponent();
 
+	TArray<FOverlapActorData>& GetOverlapBlockingActorsArray();
+	
+
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -77,12 +80,10 @@ public:
 	 */
 	void RegisterIdleBlockingActor(AActor* InActor);
 
-	void RegisterMovingOverlapBlockingActor(AActor* InActor);
 	/**
 	 * @brief Returns true if any valid blocking overlaps are currently registered.
 	 * @return true when at least one valid actor is still considered blocking.
 	 */
-
 	void DeregisterOverlapBlockingActor(AActor* InActor);
 	bool HasBlockingOverlaps() const;
 
@@ -144,7 +145,6 @@ public:
 	bool IsStuck(const float DeltaTime);
 
 	void ClearOverlapsForNewMovementCommand();
-	
 
 protected:
 	// Called when the game starts
@@ -206,7 +206,6 @@ protected:
 	void UpdateDriving(FVector Destination, float DeltaTime);
 
 	bool CheckOverlapIdleAllies(float DeltaTime);
-	bool CheckOverlapMovingAllies(float DeltaTime);
 
 
 	/* The speed of this vehicle in cm/s, speed is always converted into cm/s in the plugin as this is the default velocity units
@@ -399,8 +398,8 @@ protected:
      *        Higher values → vehicle waits longer before considering itself stuck due to low speed
      *        adjust if the vehicle has very extreme deadzones -> a lot of stationary turning. 
      */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Stuck Detection")
-    float StuckTimeLowSpeedScale = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Stuck Detection")
+	float StuckTimeLowSpeedScale = 1.0f;
 
 	/* Is this vehicle currently stuck and unable to move? */
 	bool bIsStuck = false;
@@ -507,7 +506,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Deadzones")
 	float DeadZoneReverseDistance = 600;
 
-
 private:
 	/**
 	 * @brief If the angle to the current path point is smaller than this the tank will not slow down.
@@ -539,15 +537,11 @@ private:
 	// Actors we are temporarily waiting for because of footprint evasion on idle allies.
 	UPROPERTY()
 	TArray<FOverlapActorData> M_IdleAlliedBlockingActors;
-	// Allied actors that are moving and we need to resolve collision with.
-	UPROPERTY()
-	TArray<FOverlapActorData> M_MovingBlockingOverlapActors;
 
 	static int32 M_TicksCountCheckOverlappers;
 	static float M_TimeTillDiscardOverlap;
 
 	void DebugWaitingForIdleOverlappingActors(const float DeltaTime);
-	void DebugMovingOverlappingActors(const float DeltaTime);
 
 	// Last steering command applied to the vehicle; reused while paused for overlaps.
 	float M_LastSteeringInput = 0.f;
@@ -713,16 +707,12 @@ private:
 
 	bool bIsLastPathPoint = false;
 
-	/**
-     * @brief Decide how to react to one moving allied actor that’s inside/near our forward cone.
-     * @param MovementDirection Our own world-space, normalized 2D movement direction.
-     * @param OverlapActor The other allied actor we’re evaluating.
-     * @param DeltaTime
-     * @return EvadeRight when they are entering our cone and headed toward us at a critical AoA;
-     *         Wait when they pierce our cone but with a less critical AoA; otherwise MoveNormally.
-     */
-	EEvasionAction DetermineOverlapWithinMovementDirection(
-		const FVector& MovementDirection, AActor* OverlapActor, const float DeltaTime);
-
-	bool ExecuteEvasiveAction(const EEvasionAction Action, const float DeltaTime);
+		// Tracks whether we currently have UE's blocked-move detection disabled due to an intentional wait.
+    	bool bM_IsEngineBlockDetectionSuppressed = false;
+    
+    	// Toggles UE's internal blocked-move detection (idempotent; safe to call every frame).
+    	void SetEngineBlockDetectionSuppressed(const bool bShouldBeSuppressed);
+    
+    	// Convenience for the idle-blocker wait case (keeps UpdateDriving clean).
+    	void UpdateEngineBlockDetectionForIdleBlockerWait(const bool bIsWaitingForIdleBlockers);
 };

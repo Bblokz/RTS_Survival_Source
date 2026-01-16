@@ -22,23 +22,7 @@
 
 namespace TrackFollowingEvasion
 {
-	// Angle used on both sides of the movement direction to get the cone in which to check for other moving
-	// overlapping allied actors.
-	constexpr float MovementDirectionConeHalfAngle = 40.f;
-	constexpr bool bDebugTrackEvasion = false;
-	constexpr float DebugConeLength = 400.f;
-
-	//  Minimal speed to consider a valid direction (cm/s). Below this we fall back to forward.
-	constexpr float MinSpeedForDirection = 10.f;
-
-	// Distance under which we ignore AoA checks to avoid jitter (cm).
-	constexpr float MinSeparationToConsider = 30.f;
-
-	//  If the other actor's "angle-of-attack" against our movement exceeds this, we treat as critical.
-	constexpr float CriticalAngleOfAttackDeg = 10.f;
-
 	constexpr float ZOffsetDebug = 400;
-	constexpr float ZOffsetDebugAction = 550;
 }
 
 namespace TrackFollowingOverlapCleanup
@@ -170,6 +154,11 @@ void UTrackPathFollowingComponent::AddOverlapActorData(
 	TargetArray.Add(MoveTemp(NewOverlapData));
 }
 
+TArray<FOverlapActorData>& UTrackPathFollowingComponent::GetOverlapBlockingActorsArray()
+{
+	return M_IdleAlliedBlockingActors;
+}
+
 void UTrackPathFollowingComponent::RemoveOverlapActorFromArray(
 	TArray<FOverlapActorData>& TargetArray,
 	AActor* InActor)
@@ -239,7 +228,6 @@ void UTrackPathFollowingComponent::RemoveExpiredOverlaps(
 void UTrackPathFollowingComponent::ResetOverlapBlockingActors()
 {
 	M_IdleAlliedBlockingActors.Reset();
-	M_MovingBlockingOverlapActors.Reset();
 }
 
 void UTrackPathFollowingComponent::ResetOverlapBlockingActorsForCommand()
@@ -259,21 +247,9 @@ void UTrackPathFollowingComponent::RegisterIdleBlockingActor(AActor* InActor)
 		return;
 	}
 	AddOverlapActorData(M_IdleAlliedBlockingActors, InActor);
-	RemoveOverlapActorFromArray(M_MovingBlockingOverlapActors, InActor);
 }
 
-void UTrackPathFollowingComponent::RegisterMovingOverlapBlockingActor(AActor* InActor)
-{
-	if (not IsValid(InActor))
-	{
-		return;
-	}
-	if (ContainsOverlapActor(M_IdleAlliedBlockingActors, InActor))
-	{
-		return;
-	}
-	AddOverlapActorData(M_MovingBlockingOverlapActors, InActor);
-}
+
 
 void UTrackPathFollowingComponent::DeregisterOverlapBlockingActor(AActor* InActor)
 {
@@ -283,20 +259,12 @@ void UTrackPathFollowingComponent::DeregisterOverlapBlockingActor(AActor* InActo
 		return;
 	}
 	RemoveOverlapActorFromArray(M_IdleAlliedBlockingActors, InActor);
-	RemoveOverlapActorFromArray(M_MovingBlockingOverlapActors, InActor);
 }
 
 
 bool UTrackPathFollowingComponent::HasBlockingOverlaps() const
 {
 	for (const FOverlapActorData& OverlapData : M_IdleAlliedBlockingActors)
-	{
-		if (OverlapData.Actor.IsValid())
-		{
-			return true;
-		}
-	}
-	for (const FOverlapActorData& OverlapData : M_MovingBlockingOverlapActors)
 	{
 		if (OverlapData.Actor.IsValid())
 		{
@@ -434,7 +402,6 @@ void UTrackPathFollowingComponent::TickComponent(
 
 	const float CurrentTimeSeconds = GetCurrentWorldTimeSeconds();
 	RemoveExpiredOverlaps(CurrentTimeSeconds, M_IdleAlliedBlockingActors);
-	RemoveExpiredOverlaps(CurrentTimeSeconds, M_MovingBlockingOverlapActors);
 }
 
 
@@ -456,10 +423,16 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 {
 	RemoveInvalidOverlaps(M_IdleAlliedBlockingActors);
 
-	if (M_IdleAlliedBlockingActors.Num() == 0 || not IsValid(ControlledPawn))
+	const bool bHasIdleBlockers = (M_IdleAlliedBlockingActors.Num() > 0);
+	const bool bCanWait = bHasIdleBlockers && IsValid(ControlledPawn);
+
+	UpdateEngineBlockDetectionForIdleBlockerWait(bCanWait);
+
+	if (not bCanWait)
 	{
 		return false;
 	}
+
 	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
 		DebugWaitingForIdleOverlappingActors(DeltaTime);
@@ -467,97 +440,11 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 
 	// Keep steering as before, set throttle to zero while we’re overlapping.
 	const float CurrentSpeed = ControlledPawn->GetVelocity().Size2D();
-	UpdateVehicle(/*Throttle*/0.f, /*CurrentSpeed*/CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/
-	                          M_LastSteeringInput);
+	UpdateVehicle(/*Throttle*/0.f, /*CurrentSpeed*/CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/ M_LastSteeringInput);
 	return true;
 }
 
-bool UTrackPathFollowingComponent::CheckOverlapMovingAllies(float DeltaTime)
-{
-	RemoveInvalidOverlaps(M_MovingBlockingOverlapActors);
 
-	if (M_MovingBlockingOverlapActors.Num() == 0 || not IsValid(ControlledPawn))
-	{
-		return false;
-	}
-	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
-	{
-		DebugMovingOverlappingActors(DeltaTime);
-	}
-
-
-	// --- Compute our movement direction (world space, 2D) -----------------------------
-	const FVector SelfLoc = IsValid(ControlledPawn) ? ControlledPawn->GetActorLocation() : FVector::ZeroVector;
-	const FVector Vel = IsValid(ControlledPawn) ? ControlledPawn->GetVelocity() : FVector::ZeroVector;
-
-	FVector MovementDirection = Vel.GetSafeNormal2D();
-	if (MovementDirection.IsNearlyZero())
-	{
-		// If velocity is too small, use facing (forward) so the cone is still meaningful.
-		const FRotator SelfRot = IsValid(ControlledPawn) ? ControlledPawn->GetActorRotation() : FRotator::ZeroRotator;
-		MovementDirection = SelfRot.Vector().GetSafeNormal2D();
-	}
-	// Guard against pathological cases.
-	if (MovementDirection.IsNearlyZero())
-	{
-		return false;
-	}
-
-	if (TrackFollowingEvasion::bDebugTrackEvasion)
-	{
-		const FVector Tip = SelfLoc + MovementDirection * TrackFollowingEvasion::DebugConeLength;
-		DrawDebugDirectionalArrow(GetWorld(), SelfLoc, Tip, /*ArrowSize*/20.f, FColor::Cyan, /*bPersistentLines*/false,
-		                          /*LifeTime*/0.f, /*Depth*/0, /*Thickness*/2.f);
-
-		// Cone sides: rotate around +Z by ±half-angle.
-		const float HalfAngleRad = FMath::DegreesToRadians(TrackFollowingEvasion::MovementDirectionConeHalfAngle);
-		const FVector LeftDir = FQuat(FVector::UpVector, +HalfAngleRad).RotateVector(MovementDirection);
-		const FVector RightDir = FQuat(FVector::UpVector, -HalfAngleRad).RotateVector(MovementDirection);
-
-		DrawDebugLine(GetWorld(), SelfLoc, SelfLoc + LeftDir * TrackFollowingEvasion::DebugConeLength, FColor::Cyan,
-		              false, 0.f, 0, 1.5f);
-		DrawDebugLine(GetWorld(), SelfLoc, SelfLoc + RightDir * TrackFollowingEvasion::DebugConeLength, FColor::Cyan,
-		              false, 0.f, 0, 1.5f);
-	}
-
-	EEvasionAction FinalAction = EEvasionAction::MoveNormally;
-	for (const FOverlapActorData& OverlapData : M_MovingBlockingOverlapActors)
-	{
-		AActor* Other = OverlapData.Actor.Get();
-		if (not IsValid(Other))
-		{
-			continue;
-		}
-		const EEvasionAction Action = DetermineOverlapWithinMovementDirection(MovementDirection, Other, DeltaTime);
-		if (Action == EEvasionAction::Wait)
-		{
-			FinalAction = EEvasionAction::Wait;
-			break;
-		}
-		if (Action == EEvasionAction::EvadeRight)
-		{
-			FinalAction = EEvasionAction::EvadeRight;
-		}
-	}
-
-	if (TrackFollowingEvasion::bDebugTrackEvasion)
-	{
-		// Debug draw our action 400 units above the vehicle.
-		FColor ActionColor = FColor::Green;
-		if (FinalAction == EEvasionAction::Wait)
-		{
-			ActionColor = FColor::Red;
-		}
-		else if (FinalAction == EEvasionAction::EvadeRight)
-		{
-			ActionColor = FColor::Yellow;
-		}
-		FString ActionText = UEnum::GetValueAsString(FinalAction);
-		RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, 400.f),
-		                                        ActionText, ActionColor, DeltaTime);
-	}
-	return ExecuteEvasiveAction(FinalAction, DeltaTime);
-}
 
 void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float DeltaTime)
 {
@@ -569,18 +456,16 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	}
 	VehicleCurrentDestination = Destination;
 
-	// Make sure we have an associated move compnent and the interface is implemented
 	if (not bImplementsInterface || not IsValid(ControlledPawn))
 	{
+		// Make sure we never "stick" in suppressed mode if something becomes invalid.
+		UpdateEngineBlockDetectionForIdleBlockerWait(false);
 		return;
 	}
 
+
 	// Pause throttle while overlapping idle allies being pushed aside; keep last steering.
 	if (CheckOverlapIdleAllies(DeltaTime))
-	{
-		return;
-	}
-	if (CheckOverlapMovingAllies(DeltaTime))
 	{
 		return;
 	}
@@ -983,8 +868,9 @@ void UTrackPathFollowingComponent::SetMoveSegment(int32 SegmentStartIndex)
 
 void UTrackPathFollowingComponent::OnPathFinished(const FPathFollowingResult& Result)
 {
-	// When the path ends, set all the steering and throttle to nothing, and apply the brakes
-	UpdateVehicle(0.f, 0.f, 1.f, 0, 0);
+	SetEngineBlockDetectionSuppressed(false);
+	// // When the path ends, set all the steering and throttle to nothing, and apply the brakes
+	// UpdateVehicle(0.f, 0.f, 1.f, 0, 0);
 	if (IsValid(ControlledPawn))
 	{
 		IVehicleAIInterface* VehicleAI = Cast<IVehicleAIInterface>(ControlledPawn);
@@ -1097,22 +983,7 @@ void UTrackPathFollowingComponent::DebugWaitingForIdleOverlappingActors(const fl
 	                                        DebugMessage, FColor::Red, DeltaTime);
 }
 
-void UTrackPathFollowingComponent::DebugMovingOverlappingActors(const float DeltaTime)
-{
-	FString DebugMessage = "AdjustTo : ";
-	for (const FOverlapActorData& OverlapData : M_MovingBlockingOverlapActors)
-	{
-		if (OverlapData.Actor.IsValid())
-		{
-			bool bValidName = false;
-			URTSComponent* OtherRTSComp = OverlapData.Actor->FindComponentByClass<URTSComponent>();
-			const FString NameOfOther = OtherRTSComp ? OtherRTSComp->GetDisplayName(bValidName) : OverlapData.Actor->GetName();
-			DebugMessage += NameOfOther + "--";
-		}
-	}
-	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, TrackFollowingEvasion::ZOffsetDebug),
-	                                        DebugMessage, FColor::Orange, DeltaTime);
-}
+
 
 void UTrackPathFollowingComponent::DrawNavLinks(const FColor Color)
 {
@@ -1638,118 +1509,31 @@ float UTrackPathFollowingComponent::GetVectorAngle(FVector A, FVector B)
 	return UKismetMathLibrary::DegAcos(FVector::DotProduct(A, B) / (A.Size() * B.Size()));
 }
 
-EEvasionAction UTrackPathFollowingComponent::DetermineOverlapWithinMovementDirection(
-	const FVector& MovementDirection, AActor* OverlapActor, const float DeltaTime)
+void UTrackPathFollowingComponent::SetEngineBlockDetectionSuppressed(const bool bShouldBeSuppressed)
 {
-	if (not IsValid(OverlapActor) || MovementDirection.IsNearlyZero())
+	if (bM_IsEngineBlockDetectionSuppressed == bShouldBeSuppressed)
 	{
-		return EEvasionAction::MoveNormally;
+		return;
 	}
 
-	const FVector SelfLoc = ControlledPawn->GetActorLocation();
-	const FVector OtherLoc = OverlapActor->GetActorLocation();
+	bM_IsEngineBlockDetectionSuppressed = bShouldBeSuppressed;
 
-	// Relative vector to the other actor (2D ground-plane).
-	const FVector ToOther2D = (OtherLoc - SelfLoc);
-	const float Dist2D = ToOther2D.Size2D();
-	if (Dist2D < TrackFollowingEvasion::MinSeparationToConsider)
+	if (bM_IsEngineBlockDetectionSuppressed)
 	{
-		// Too close to make a stable prediction; keep moving normally to avoid oscillation.
-		return EEvasionAction::MoveNormally;
+		// We are intentionally stationary: don't let UE classify this as "Blocked".
+		SetBlockDetectionState(false);
+		ResetBlockDetectionData();
+		return;
 	}
 
-	const FVector DirToOther = ToOther2D.GetSafeNormal2D();
-	const float cosInCone = FVector::DotProduct(MovementDirection, DirToOther);
-
-	// Check if the other actor lies inside our forward cone.
-	const float minCosCone = FMath::Cos(FMath::DegreesToRadians(TrackFollowingEvasion::MovementDirectionConeHalfAngle));
-	if (cosInCone <= minCosCone)
-	{
-		// Outside our cone -> not a forward conflict case.
-		return EEvasionAction::MoveNormally;
-	}
-
-	// Angle-of-attack: compare the other's velocity direction against our movement vector.
-	// Intuition:
-	// - If the other is headed "into us", its direction aligns with -MovementDirection and also roughly with -DirToOther.
-	// - Using -MovementDirection is robust when we’re fast and the other is fast too (classic head-on geometry).
-	const FVector OtherVel = OverlapActor->GetVelocity();
-	FVector OtherDir = OtherVel.GetSafeNormal2D();
-
-	// If they have no meaningful velocity, they’re not a “moving evader” case.
-	if (OtherDir.IsNearlyZero())
-	{
-		return EEvasionAction::MoveNormally;
-	}
-
-	// Compute AoA in degrees against our movement (reversed, i.e., toward us).
-	const float cosAoA = FMath::Clamp(FVector::DotProduct(OtherDir, -MovementDirection), -1.f, 1.f);
-	const float AoADeg = FMath::RadiansToDegrees(FMath::Acos(cosAoA));
-	const bool bCriticalAoA = (AoADeg <= TrackFollowingEvasion::CriticalAngleOfAttackDeg);
-
-	// Additional gating: the other should be traveling *toward us*, not parallel-away.
-	// Check that it's generally aimed toward us using vector from other to us.
-	const FVector ToUs2D = (SelfLoc - OtherLoc).GetSafeNormal2D();
-	const float cosTowardUs = FVector::DotProduct(OtherDir, ToUs2D);
-	const bool bEnteringCone = cosTowardUs > 0.f;
-
-	// Debug readouts over the other actor.
-	if (TrackFollowingEvasion::bDebugTrackEvasion)
-	{
-		const FVector TextLoc = OtherLoc + FVector(0.f, 0.f, 300.f);
-		DrawDebugString(GetWorld(), TextLoc, FString::Printf(TEXT("AoA: %.1f deg"), AoADeg), nullptr, FColor::White,
-		                DeltaTime, true);
-	}
-
-	// Pick color & action based on classification and draw their motion arrow.
-	EEvasionAction Result = EEvasionAction::MoveNormally;
-	FColor ArrowCol = FColor::Green;
-
-	if (bEnteringCone && bCriticalAoA)
-	{
-		Result = EEvasionAction::EvadeRight;
-		ArrowCol = FColor::Black;
-	}
-	else if (bEnteringCone /*inside our cone by cosInCone check*/ && not bCriticalAoA)
-	{
-		Result = EEvasionAction::Wait;
-		ArrowCol = FColor::Orange;
-	}
-	else
-	{
-		Result = EEvasionAction::MoveNormally;
-		ArrowCol = FColor::Green;
-	}
-
-	if (TrackFollowingEvasion::bDebugTrackEvasion)
-	{
-		const FVector OtherTip = OtherLoc + OtherDir * TrackFollowingEvasion::DebugConeLength;
-		DrawDebugDirectionalArrow(GetWorld(), OtherLoc, OtherTip, /*ArrowSize*/18.f, ArrowCol, false, DeltaTime, 0,
-		                          2.f);
-	}
-
-	return Result;
+	// We're moving again: re-enable with a clean slate so stale samples don't instantly fire.
+	ResetBlockDetectionData();
+	SetBlockDetectionState(true);
+	ForceBlockDetectionUpdate();
 }
 
-bool UTrackPathFollowingComponent::ExecuteEvasiveAction(const EEvasionAction Action, const float DeltaTime)
+void UTrackPathFollowingComponent::UpdateEngineBlockDetectionForIdleBlockerWait(const bool bIsWaitingForIdleBlockers)
 {
-	const float CurrentSpeed = ControlledPawn->GetVelocity().Size2D();
-	// If we go backwards then the right is reversed
-	const float RightSteeringDir = bReversing ? -1.f : 1.f;
-	switch (Action)
-	{
-	case EEvasionAction::MoveNormally:
-		// Not blocked by allies
-		return false;
-	case EEvasionAction::Wait:
-		UpdateVehicle(/*Throttle*/0.f, CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/
-		                          M_LastSteeringInput);
-		return true;
-	case EEvasionAction::EvadeRight:
-		// Move slower to the right.
-		UpdateVehicle(M_LastThrottleInput * 0.66, CurrentSpeed, DeltaTime, /*Brake*/0.f,
-		              RightSteeringDir);
-		return true;
-	}
-	return false;
+	SetEngineBlockDetectionSuppressed(bIsWaitingForIdleBlockers);
 }
+

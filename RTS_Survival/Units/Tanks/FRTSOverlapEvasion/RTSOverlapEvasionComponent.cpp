@@ -444,49 +444,20 @@ void URTSOverlapEvasionComponent::CheckFootprintForOverlaps_BuildUniqueList(
 	}
 }
 
-// todo make sure we do not consider ourselves and units that are already registered!.
-void URTSOverlapEvasionComponent::TryEvasion_AlliedActorNotIdle(AActor* AlliedActor,
-                                                                ICommands* AlliedActorCommandInterface) const
-{
-	return;
-	// if (not GetIsValidOwnerTrackPathFollowingComponent())
-	// {
-	// 	return;
-	// }
-	// if (not GetResolveDeadlockWithOther(AlliedActor))
-	// {
-	// 	return;
-	// }
-	// if (not GetIsUnitMoving(AlliedActorCommandInterface))
-	// {
-	//
-	// 	return;
-	// }
-	//
-	// // Will automatically be de-registered by the same logic as idle blocking actors.
-	// M_OwnerTrackPathFollowingComponent->RegisterMovingOverlapBlockingActor(AlliedActor);
-}
 
-bool URTSOverlapEvasionComponent::GetIsUnitMoving(ICommands* AlliedUnitCommandInterface) const
-{
-	const auto CurrentCommand = AlliedUnitCommandInterface->GetActiveCommandID();
-	const bool bIsMovement = CurrentCommand == EAbilityID::IdMove || CurrentCommand == EAbilityID::IdReverseMove;
-	return bIsMovement;
-}
-
-bool URTSOverlapEvasionComponent::GetResolveDeadlockWithOther(const AActor* OtherAlliedActor) const
-{
-	if (not M_Owner.IsValid() || not IsValid(OtherAlliedActor))
-	{
-		return false;
-	}
-
-	// Deterministic tie-breaker: only the actor with the higher unique ID registers the overlap.
-	const int32 OwnerUniqueId = M_Owner->GetUniqueID();
-	const int32 AlliedUniqueId = OtherAlliedActor->GetUniqueID();
-	return OwnerUniqueId > AlliedUniqueId;
-}
-
+// bool URTSOverlapEvasionComponent::GetResolveDeadlockWithOther(const AActor* OtherAlliedActor) const
+// {
+// 	if (not M_Owner.IsValid() || not IsValid(OtherAlliedActor))
+// 	{
+// 		return false;
+// 	}
+//
+// 	// Deterministic tie-breaker: only the actor with the higher unique ID registers the overlap.
+// 	const int32 OwnerUniqueId = M_Owner->GetUniqueID();
+// 	const int32 AlliedUniqueId = OtherAlliedActor->GetUniqueID();
+// 	return OwnerUniqueId > AlliedUniqueId;
+// }
+//
 void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSComponent* OtherRTS,
                                              const FVector& ContactLocation) const
 {
@@ -505,13 +476,32 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 
 	if (not OtherCommands->GetIsUnitIdle())
 	{
-		TryEvasion_AlliedActorNotIdle(OtherActor, OtherCommands);
 		return;
 	}
 
 	if (not IsValid(OtherRTS))
 	{
 		return;
+	}
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	{
+		if(M_OwnerTrackPathFollowingComponent.IsValid())
+		{
+			auto ArrayOfBlockers = M_OwnerTrackPathFollowingComponent->GetOverlapBlockingActorsArray();
+			for(auto EachBlocker: ArrayOfBlockers)
+			{
+				if(not EachBlocker.Actor.IsValid())
+				{
+					continue;
+				}
+				if(EachBlocker.Actor.Get() == OtherActor)
+				{
+					RTSFunctionLibrary::PrintString("Found idle ally we already wait for : " + OtherActor->GetName() +
+						"\n ordering new movement command to it", FColor::Red, 2.f);
+				}
+			}
+		}
+			
 	}
 
 	const float InnerRadius = OtherRTS->GetFormationUnitInnerRadius();

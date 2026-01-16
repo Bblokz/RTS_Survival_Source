@@ -134,9 +134,6 @@ private:
                 TArray<TPair<TWeakObjectPtr<AActor>, FVector>>& OutUniqueOverlaps) const;
 
 
-        void TryEvasion_AlliedActorNotIdle(AActor* AlliedActor, ICommands* AlliedActorCommandInterface) const;
-        bool GetIsUnitMoving(ICommands* AlliedUnitCommandInterface) const;
-        // Use a deterministic tie-breaker so only one of the overlapping movers registers the other.
-        bool GetResolveDeadlockWithOther(const AActor* OtherAlliedActor) const;
+
 	
 };
