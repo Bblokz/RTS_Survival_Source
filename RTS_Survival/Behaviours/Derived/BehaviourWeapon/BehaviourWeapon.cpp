@@ -21,6 +21,11 @@ UBehaviourWeapon::UBehaviourWeapon()
 	M_MaxStackCount = BehaviourWeaponConstants::DefaultWeaponStackCount;
 }
 
+const FBehaviourWeaponMultipliers& UBehaviourWeapon::GetBehaviourWeaponMultipliers() const
+{
+	return BehaviourWeaponMultipliers;
+}
+
 void UBehaviourWeapon::OnAdded(AActor* BehaviourOwner)
 {
 	if (bM_HasInitializedPostBeginPlayLogic)

@@ -82,6 +82,7 @@ class RTS_SURVIVAL_API UBehaviourWeapon : public UBehaviour
 
 public:
         UBehaviourWeapon();
+        const FBehaviourWeaponMultipliers& GetBehaviourWeaponMultipliers() const;
 
 protected:
         virtual void OnAdded(AActor* BehaviourOwner) override;
