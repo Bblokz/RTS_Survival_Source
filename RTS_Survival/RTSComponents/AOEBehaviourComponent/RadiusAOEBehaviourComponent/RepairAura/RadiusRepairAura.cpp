@@ -11,6 +11,8 @@
 URadiusRepairAura::URadiusRepairAura()
 	: URadiusAOEBehaviourComponent()
 {
+	RadiusSettings.HostBehaviourIcon = EBehaviourIcon::RepairRadius;
+	RadiusSettings.RadiusType = ERTSRadiusType::FullCircle_RepairRange;
 }
 
 bool URadiusRepairAura::IsValidTarget(AActor* ValidActor) const

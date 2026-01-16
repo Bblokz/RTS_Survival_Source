@@ -49,6 +49,13 @@ struct RTS_SURVIVAL_API FRadiusAOEBehaviourSettings
 
 /**
  * @brief Extends AOE behaviour components with pooled radius visualisation support.
+ * it is also differentiated by the host behaviour which is a passive set on the beh comp of the host/owner of this component.
+ * when that behavioru is hovered it sends a signal to the beh component which will call the same hover on the behaviour, since this behaviour
+ * is of the UOnHoverShowRadiusBehaviour type it can call OnHostBehaviourHovered on this component which either shows or hides the radius.
+ * the base UAOE behaviour component is used to appply behaviours to allies in range some components derived from this one alter the rules
+ * for whether a unit can have the behaviour applied by overriding IsValidTarget.
+ *
+ * @note the EAOeBehaviourShowRadiusType enum can be set to show the radius on hover, selection or both.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), BlueprintType)
 class RTS_SURVIVAL_API URadiusAOEBehaviourComponent : public UAOEBehaviourComponent

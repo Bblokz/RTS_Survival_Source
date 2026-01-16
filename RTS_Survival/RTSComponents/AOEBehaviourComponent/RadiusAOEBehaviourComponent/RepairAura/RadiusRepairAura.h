@@ -20,11 +20,12 @@ public:
 
 protected:
 	virtual bool IsValidTarget(AActor* ValidActor) const override;
-
+	
 	virtual void SetHostBehaviourUIData(UBehaviour& Behaviour) const override;
 
 	float GetRepairPerSecondFromBehaviours() const;
 
+	virtual void SetDescriptionWithRepairAmount(FBehaviourUIData& OutUIData, const float RepairPerSecond) const ;
+	
 private:
-	void SetDescriptionWithRepairAmount(FBehaviourUIData& OutUIData, const float RepairPerSecond) const;
 };

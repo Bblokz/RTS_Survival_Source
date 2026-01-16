@@ -102,6 +102,7 @@ bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Typ
 	case ERTSRadiusType::FullCircle_ReinforcementAura:
 	case ERTSRadiusType::FullCircle_ImprovedRangeArea:
 	case ERTSRadiusType::FullCircle_RadiationAura:
+	case ERTSRadiusType::Fullcircle_HealAura:
 		return true;
 	default:
 		return false;

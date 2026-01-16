@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/Squads/SquadControllerHpComp/USquadHealthComponent.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 
 namespace FRTSRepairHelpers
@@ -54,6 +55,33 @@ namespace FRTSRepairHelpers
 		const bool IsNearlyFullHealth = HealthComponent->GetHealthPercentage() >= 0.99f;
 		return not IsNearlyFullHealth;
 	};
+
+	static bool GetIsUnitValidForHealing(AActor* UnitToHeal)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(UnitToHeal))
+		{
+			return false;
+		}
+		ASquadController* UnitAsSquadController = Cast<ASquadController>(UnitToHeal);
+		if(UnitAsSquadController)
+		{
+			if(USquadHealthComponent* SquadHealth = UnitAsSquadController->FindComponentByClass<USquadHealthComponent>())
+			{
+				return SquadHealth->GetHealthPercentage() < 1.f;	
+			}
+			return false;
+		}
+		if(ASquadUnit* UnitAsSquadUnit = Cast<ASquadUnit>(UnitToHeal))
+		{
+			if(USquadHealthComponent* SquadHealth = UnitAsSquadUnit->FindComponentByClass<USquadHealthComponent>())
+			{
+				return SquadHealth->GetHealthPercentage() < 1.f;	
+			}
+			return false;
+		}
+		return false;
+	}
+
 
 	static TArray<FVector> GetRepairSquadOffsets(
 		const int32 AmountSquadUnits,

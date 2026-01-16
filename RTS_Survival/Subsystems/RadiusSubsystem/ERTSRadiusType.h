@@ -5,6 +5,9 @@
 /**
  * @brief Types of RTS helper radii we can render.
  * Keep this lightweight; materials are mapped per type in URadiusPoolSettings.
+ * 
+* also adjust the new cases in  bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Type) const
+* to help determine which types are full circles.
  */
 UENUM(BlueprintType)
 enum class ERTSRadiusType : uint8
@@ -18,5 +21,6 @@ enum class ERTSRadiusType : uint8
 	FullCircle_CommandAura			  UMETA(DisplayName="FullCircle_CommandAura"),
 	FullCircle_ReinforcementAura		  UMETA(DisplayName="FullCircle_ReinforcementAura"),
 	FullCircle_ImprovedRangeArea	  UMETA(DisplayName="FullCircle_ImprovedRangeArea"),
-	FullCircle_RadiationAura	      UMETA(DisplayName="FullCircle_RadiationAura")
+	FullCircle_RadiationAura	      UMETA(DisplayName="FullCircle_RadiationAura"),
+	Fullcircle_HealAura	          UMETA(DisplayName="FullCircle_HealAura")
 };
