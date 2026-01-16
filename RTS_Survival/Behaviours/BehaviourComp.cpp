@@ -438,6 +438,55 @@ void UBehaviourComp::DebugDrawBehaviours(const float DurationSeconds) const
 	DrawDebugString(World, DebugLocation, DebugString, nullptr, FColor::Green, DurationSeconds, true);
 }
 
+UBehaviour* UBehaviourComp::GetBehaviourByClass(const TSubclassOf<UBehaviour>& BehaviourClass) const
+{
+	if (BehaviourClass == nullptr)
+	{
+		return nullptr;
+	}
+
+	for (UBehaviour* Behaviour : M_Behaviours)
+	{
+		if (Behaviour == nullptr)
+		{
+			continue;
+		}
+
+		if (Behaviour->GetClass() == BehaviourClass)
+		{
+			return Behaviour;
+		}
+	}
+
+	return nullptr;
+}
+
+TArray<UBehaviour*> UBehaviourComp::GetBehavioursByClass(const TSubclassOf<UBehaviour>& BehaviourClass) const
+{
+	TArray<UBehaviour*> MatchingBehaviours;
+
+	if (BehaviourClass == nullptr)
+	{
+		return MatchingBehaviours;
+	}
+
+	for (UBehaviour* Behaviour : M_Behaviours)
+	{
+		if (Behaviour == nullptr)
+		{
+			continue;
+		}
+
+		if (Behaviour->GetClass() == BehaviourClass)
+		{
+			MatchingBehaviours.Add(Behaviour);
+		}
+	}
+
+	return MatchingBehaviours;
+}
+
+
 void UBehaviourComp::RegisterActionUIManager(UActionUIManager* ActionUIManager)
 {
 	M_ActionUIManager = ActionUIManager;

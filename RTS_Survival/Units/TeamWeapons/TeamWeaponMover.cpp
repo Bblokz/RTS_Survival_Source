@@ -3,6 +3,7 @@
 #include "TeamWeaponMover.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UTeamWeaponMover::UTeamWeaponMover()
@@ -149,7 +150,7 @@ bool UTeamWeaponMover::GetIsCrewDataValid() const
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_CrewMembers"),
-	                                                      TEXT("UTeamWeaponMover::GetIsCrewDataValid"), this);
+	                                                      TEXT("UTeamWeaponMover::GetIsCrewDataValid"));
 	return false;
 }
 

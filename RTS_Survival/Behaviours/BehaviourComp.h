@@ -48,12 +48,27 @@ public:
 	 * @brief Debug draw current behaviours above the owning actor.
 	 * @param DurationSeconds How long the debug string should persist.
 	 */
-
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void DebugDrawBehaviours(const float DurationSeconds) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	TArray<UBehaviour*> GetBehaviours() const { return M_Behaviours; }
+
+	/**
+     * @brief Find the first behaviour instance with an exact matching class.
+     * @param BehaviourClass Behaviour class to search for.
+     * @return First matching behaviour, or nullptr when none exists / invalid input.
+     */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	UBehaviour* GetBehaviourByClass(const TSubclassOf<UBehaviour>& BehaviourClass) const;
+
+	/**
+	 * @brief Find all behaviour instances with an exact matching class.
+	 * @param BehaviourClass Behaviour class to search for.
+	 * @return Array of matching behaviours (can be empty).
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	TArray<UBehaviour*> GetBehavioursByClass(const TSubclassOf<UBehaviour>& BehaviourClass) const;
 
 	void RegisterActionUIManager(UActionUIManager* ActionUIManager);
 

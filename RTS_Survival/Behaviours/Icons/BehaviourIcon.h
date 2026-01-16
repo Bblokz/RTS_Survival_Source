@@ -18,4 +18,5 @@ enum class EBehaviourIcon : uint8
 	VultureRapidFire,
 	ExplosiveShells,
 	VultureSniperDamage,
+	RepairRadius,
 };

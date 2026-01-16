@@ -1,0 +1,101 @@
+﻿make sure to look through the URTSRadiusPoolSubsystem and the UAOEBehaviourComponent and make sure you understand them before proceeding.
+
+you will design the URadiusAOEBehaviourComponent class placed at RadiusAOEBehaviourComponent dir in  AOEBehaviourComponent. as well as add some improvements to other parts of the behavioru system.
+you also need to add a new virtual function to UAOEBehaviourComponent protected that takes an AActor* called ValidActor and returns a bool called IsValidTarget which by default
+will return true.
+
+call this in the for loop after we checked that the hit get actor is valid in the sweep complete function.
+
+the UI changes you need to make:
+UW_BehaviourContainer has various  UW_Behaviour. when its button hovers no also provide that info to the primary behaviour component (add a public function that gets the UI data of the button when hovered) 
+also add a public function on the UBehaviour itself called OnBehaviorHover, make it virtual and by default do nothing.
+now the primary behaviour component needs to implement in this public function on behaviour hovered which behaviour it was. You can assume that per behaviour component the Behaviour icon is enough to identify which
+behaviour was associated with this hover; so use that from the behaviour UI data that was passed ot the component; and call the hover function on the behaviour itself.
+Make sure the OnBehaviorHover-Chain takes in a bool that defines whether it is hovered or unhovered; so we can use the one the container already gets in void UW_BehaviourContainer::OnBehaviourHovered(const bool bIsHovering, const FBehaviourUIData& BehaviourUIData)
+
+
+before we go over the new URadiusAOEBehaviourComponent make sure to first add a new behaviour object derived from UBehaviour
+called UOnHoverShowRadiusBehaviour placed in its own dir in Behaviours/Derived. this behaviour will overwrite the hover function.
+make sure that as soon as this behaviour is added it will cache the URadiusAOEBehaviourComponent in a weak ptr by searching for it on the owner actor.
+when it is hovered we check if the weak is valid and if so call OnHostBehaviourHovered on the radius aoe behaviour component.
+
+
+define a new enum in its own file in  the same dir as RadiusAOEBehaviourComponent
+called EAOeBehaviourShowRadiusType with the following values:
+None
+OnHover
+OnSelectionOnly
+OnHoverAndOnSelection
+
+add a new public funtion on the UBehaviour called SetCustomUIData that takes in a FBehaviourUIData and sets all the params associated with it to the behaviour like the same that
+are used to get the data for display in the ui in:
+
+FBehaviourUIData UBehaviour::GetUIData() const
+{
+	FBehaviourUIData UIData;
+	UIData.BehaviourIcon = BehaviourIcon;
+	UIData.DescriptionText = M_DisplayText;
+	UIData.TitleText= M_TitleText;
+	UIData.BuffDebuffType = M_BuffType;
+	UIData.LifeTimeType = BehaviourLifeTime;
+	UIData.TotalLifeTime = M_LifeTimeDuration;
+	return UIData;
+}
+
+okay these define the rules of when we want the radius of this component to be shown now i tell you how to implement that radius in the first place:
+the aoe RadiusAOEBehaviourComponent will have its own settings struct
+ERTSRadiusType (note this is unit8 based)
+EAOeBehaviourShowRadiusType ShowRadiusType
+// Note that the hover functionallity is only used if set to do so by the enum; the host behaviour is added to the behavioru component of the owner/host regardless of the enum setting though.
+TSubclassOf<UOnHoverShowRadiusBehaviour> HoverShowRadiusBehaviourClass
+// Defines the title for the host behaviour; the description is set automatically based on other settings in the more specific components derived form RadiusAOEBehaviourComponent
+FString HostBehaviourText 
+EBehaviourIcon HostBehaviourIcon
+bool bMoveRadius = false;
+FVector RadiusRelativeAttachmentOffset = FVector::ZeroVector;
+
+We already have a system to show a radius at a location of a type of  EAOeBehaviourShowRadiusType with a certain float radius (for radius we use the Radius from the parent component ofcourse), 
+it is called the URTSRadiusPoolSubsystem. cache this system at begin play.
+add a function that is private called show radius that will call CreateRTSRadius at our owner/host location. with radius as per our parent comp and the radius type as per our settings. this will return an int32 check if it is posiive
+if not RTSFunctionlibary::ReportError(FString) because a negative number means failure to create the radius.
+we cache our radius identfier.
+Note if the bool in our settings bMoveRadius is true we need to also need to attach the radius actor to our owner actor via AttachRTSRadiusToActor.
+for this also provide the offset from our settings. (only if we had a valid ID and our owner IsValid too ofcourse).
+
+add a private function called hide radius that will call HideRTSRadiusById with our cached radius identifier if it is positive.
+
+
+also in begin play cache a weap ptr to the behavioru component on the owner actor / host actor.
+after that call a new private function that will setup the host behaviour with our subclass.
+add a protected func that is virtual that will set the FBehaviourUIData on the behaviour. by default only supply the title as per our setting and the icon as per our setting. We get access to the added behaviour with a timer that delegates that to next tick (Set timer for next tick)
+because the beh comp may wait with adding till that frame.
+make sure to set this one shot timer with a weak ptr to this , if not valid we do nothing. otherwise we call GetBehaviourByClass which will get the first matching beh of our subclass type.
+if found we call our protected virtual func to set the UI data on it.
+
+how to handle our EAOeBehaviourShowRadiusType
+for the show on behavioru hover part: simply implement a private funct that returns if we do, depending on the enum setting if so then call show radius on the hover function OnHostBehaviourHovered that we will implement as public.
+in case the hover function was called with false then we call the hide funtion if our enum allows it.
+
+for the show on selection part: if our enum allows for selection show radius then first :
+make sure that the selection component: 
+USelectionComponent is cached at begin play as well. if the owner has none do not error report; not all units have one.
+now bind to 
+DECLARE_MULTICAST_DELEGATE(FOnUnitSelected);
+DECLARE_MULTICAST_DELEGATE(FOnUnitDeselected);
+
+with lambdas that capture a weak ptr of our component;  in the body if that weak ptr is invalid do nothing. otherwise call show radius or hide radius depending on which delegate was called.
+
+    
+finally after all this is implemented correctly derive from the URadiusAOEBehaviourComponent a new class called RadiusRepairAura which will implement the 
+check function for valid target. we already know the actor is allied to us as per the collilsion settings but need to check if we can repair the actor for
+this  call 	static bool GetIsUnitValidForRepairs(AActor* UnitToRepair) in the FRTSRepairHelpers namespace.
+
+    
+
+
+
+
+
+
+
+
