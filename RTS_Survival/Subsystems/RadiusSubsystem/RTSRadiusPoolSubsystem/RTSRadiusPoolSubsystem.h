@@ -11,6 +11,19 @@ class URadiusPoolSettings;
 class UStaticMesh;
 class AActor;
 
+USTRUCT()
+struct FRTSRadiusMeshSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> M_RadiusMesh = nullptr;
+
+	float M_UnitsPerScale = 1.0f;
+	float M_ZScale = 1.0f;
+	float M_RenderHeight = 0.0f;
+};
+
 /**
  * @brief World subsystem that owns a pool of APooledRadiusActor instances.
  * Loads settings on init, spawns the pool, and serves Create/Hide/Attach API for gameplay code.
@@ -58,12 +71,13 @@ public:
 private:
 	// -------- Settings cache (loaded once at Initialize) --------
 	UPROPERTY()
-	TObjectPtr<UStaticMesh> M_RadiusMesh = nullptr;
+	FRTSRadiusMeshSettings M_BorderOnlyMeshSettings;
 
 	float M_DefaultStartingRadius = 0.0f;
-	float M_UnitsPerScale = 1.0f;
-	float M_ZScale = 1.0f;
-	float M_RenderHeight = 0.0f;
+	UPROPERTY()
+	FRTSRadiusMeshSettings M_FullCircleMeshSettings;
+
+	FName M_RadiusMeshRadiusParameterName = NAME_None;
 	int32 M_DefaultPoolSize = 0;
 
 	// Materials resolved from settings.
@@ -99,7 +113,12 @@ private:
 
 	// --- Validators ---
 	bool GetIsValidWorld() const;
-	bool GetIsValidMesh() const;
+	bool GetIsValidBorderOnlyMesh() const;
+	bool GetIsValidFullCircleMesh() const;
+
+	// --- Mesh selection ---
+	bool GetIsFullCircleRadiusType(ERTSRadiusType Type) const;
+	const FRTSRadiusMeshSettings* GetMeshSettingsForType(ERTSRadiusType Type) const;
 
 	// --- Lifetime callback ---
 	UFUNCTION()
