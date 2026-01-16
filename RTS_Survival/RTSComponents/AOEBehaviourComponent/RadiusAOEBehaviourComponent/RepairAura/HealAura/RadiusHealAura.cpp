@@ -13,6 +13,8 @@ URadiusHealAura::URadiusHealAura()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
+	// We expect the healing to use timed behaviours that will fade.
+	AOEBehaviourSettings.ApplyStrategy = EInAOEBehaviourApplyStrategy::ApplyEveryTick;
 	RadiusSettings.HostBehaviourIcon = EBehaviourIcon::HealRadius;
 	RadiusSettings.RadiusType = ERTSRadiusType::Fullcircle_HealAura;
 

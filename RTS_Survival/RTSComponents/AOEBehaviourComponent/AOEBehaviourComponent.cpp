@@ -14,10 +14,10 @@
 UAOEBehaviourComponent::UAOEBehaviourComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-	M_Settings.IntervalSeconds = AOEBehaviourComponentConstants::DefaultIntervalSeconds;
-	M_Settings.Radius = AOEBehaviourComponentConstants::DefaultRadius;
-	M_Settings.TextSettings.TextOffset = FVector(0.f, 0.f, AOEBehaviourComponentConstants::DefaultTextOffsetZ);
-	M_Settings.TextSettings.InWrapAt = AOEBehaviourComponentConstants::DefaultWrapAt;
+	AOEBehaviourSettings.IntervalSeconds = AOEBehaviourComponentConstants::DefaultIntervalSeconds;
+	AOEBehaviourSettings.Radius = AOEBehaviourComponentConstants::DefaultRadius;
+	AOEBehaviourSettings.TextSettings.TextOffset = FVector(0.f, 0.f, AOEBehaviourComponentConstants::DefaultTextOffsetZ);
+	AOEBehaviourSettings.TextSettings.InWrapAt = AOEBehaviourComponentConstants::DefaultWrapAt;
 }
 
 void UAOEBehaviourComponent::SetAOEEnabled(const bool bEnabled)
@@ -82,17 +82,24 @@ void UAOEBehaviourComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void UAOEBehaviourComponent::OnApplyTick(const TArray<UBehaviourComp*>& BehaviourComponentsInRange)
+void UAOEBehaviourComponent::OnTickComponentsInRange(const TArray<UBehaviourComp*>& BehaviourComponentsInRange)
 {
-	static_cast<void>(BehaviourComponentsInRange);
+	for (auto* BehaviourComponent : BehaviourComponentsInRange)
+	{
+		if (not IsValid(BehaviourComponent))
+		{
+			continue;
+		}
+		ApplyBehavioursToTarget(*BehaviourComponent);
+	}
 }
 
-void UAOEBehaviourComponent::OnBehavioursApplied(const TArray<UBehaviourComp*>& NewlyAffected)
+void UAOEBehaviourComponent::OnNewlyEnteredRadius(const TArray<UBehaviourComp*>& NewlyAffected)
 {
 	static_cast<void>(NewlyAffected);
 }
 
-void UAOEBehaviourComponent::OnBehavioursRemoved(const TArray<UBehaviourComp*>& NoLongerAffected)
+void UAOEBehaviourComponent::OnLeftRadius(const TArray<UBehaviourComp*>& NoLongerAffected)
 {
 	static_cast<void>(NoLongerAffected);
 }
@@ -105,26 +112,26 @@ bool UAOEBehaviourComponent::IsValidTarget(AActor* ValidActor) const
 
 float UAOEBehaviourComponent::GetAOERadius() const
 {
-	return M_Settings.Radius;
+	return AOEBehaviourSettings.Radius;
 }
 
 const FAOEBehaviourSettings& UAOEBehaviourComponent::GetAoeBehaviourSettings() const
 {
-	return M_Settings;
+	return AOEBehaviourSettings;
 }
 
 void UAOEBehaviourComponent::BeginPlay_SetupAnimatedTextWidgetPoolManager()
 {
 	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
 
-	if (not M_Settings.TextSettings.bUseText)
+	if (not AOEBehaviourSettings.TextSettings.bUseText)
 	{
 		return;
 	}
 
 	if (not GetIsValidAnimatedTextWidgetPoolManager())
 	{
-		M_Settings.TextSettings.bUseText = false;
+		AOEBehaviourSettings.TextSettings.bUseText = false;
 	}
 }
 
@@ -150,7 +157,7 @@ void UAOEBehaviourComponent::BeginPlay_StartAoeTimer()
 		M_AOEIntervalTimerHandle,
 		this,
 		&UAOEBehaviourComponent::HandleApplyTick,
-		M_Settings.IntervalSeconds,
+		AOEBehaviourSettings.IntervalSeconds,
 		true);
 }
 
@@ -168,7 +175,7 @@ void UAOEBehaviourComponent::HandleApplyTick()
 	}
 
 	const FVector Epicenter = Owner->GetActorLocation();
-	StartAsyncSphereSweep(Owner, Epicenter, M_Settings.Radius);
+	StartAsyncSphereSweep(Owner, Epicenter, AOEBehaviourSettings.Radius);
 }
 
 void UAOEBehaviourComponent::StartAsyncSphereSweep(
@@ -280,14 +287,16 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 	TArray<UBehaviourComp*> RemovedTargets;
 	UpdateTrackedComponents(CurrentTargets, AddedTargets, RemovedTargets);
 
-	for (UBehaviourComp* BehaviourComponent : AddedTargets)
+	if (AOEBehaviourSettings.ApplyStrategy == EInAOEBehaviourApplyStrategy::ApplyEveryTick)
 	{
-		if (not IsValid(BehaviourComponent))
+		for (UBehaviourComp* BehaviourComponent : BehaviourComponentsInRange)
 		{
-			continue;
+			if (not IsValid(BehaviourComponent))
+			{
+				continue;
+			}
+			ApplyBehavioursToTarget(*BehaviourComponent);
 		}
-
-		ApplyBehavioursToTarget(*BehaviourComponent);
 	}
 
 	for (UBehaviourComp* BehaviourComponent : RemovedTargets)
@@ -300,17 +309,16 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 		RemoveBehavioursFromTarget(*BehaviourComponent);
 	}
 
-	OnBehavioursApplied(AddedTargets);
-	OnBehavioursRemoved(RemovedTargets);
-	OnApplyTick(BehaviourComponentsInRange);
-
+	OnNewlyEnteredRadius(AddedTargets);
+	OnLeftRadius(RemovedTargets);
+	OnTickComponentsInRange(BehaviourComponentsInRange);
 	ApplyTextForTargets(BehaviourComponentsInRange);
 	M_TrackedBehaviourComponents = MoveTemp(CurrentTargets);
 }
 
 void UAOEBehaviourComponent::ApplyBehavioursToTarget(UBehaviourComp& BehaviourComponent) const
 {
-	for (const TSubclassOf<UBehaviour>& BehaviourClass : M_Settings.BehaviourTypes)
+	for (const TSubclassOf<UBehaviour>& BehaviourClass : AOEBehaviourSettings.BehaviourTypes)
 	{
 		if (not BehaviourClass)
 		{
@@ -323,7 +331,7 @@ void UAOEBehaviourComponent::ApplyBehavioursToTarget(UBehaviourComp& BehaviourCo
 
 void UAOEBehaviourComponent::RemoveBehavioursFromTarget(UBehaviourComp& BehaviourComponent) const
 {
-	for (const TSubclassOf<UBehaviour>& BehaviourClass : M_Settings.BehaviourTypes)
+	for (const TSubclassOf<UBehaviour>& BehaviourClass : AOEBehaviourSettings.BehaviourTypes)
 	{
 		if (not BehaviourClass)
 		{
@@ -368,7 +376,7 @@ void UAOEBehaviourComponent::UpdateTrackedComponents(
 
 void UAOEBehaviourComponent::ApplyTextForTargets(const TArray<UBehaviourComp*>& BehaviourComponentsInRange) const
 {
-	if (not M_Settings.TextSettings.bUseText)
+	if (not AOEBehaviourSettings.TextSettings.bUseText)
 	{
 		return;
 	}
@@ -392,13 +400,13 @@ void UAOEBehaviourComponent::ApplyTextForTargets(const TArray<UBehaviourComp*>& 
 		}
 
 		M_AnimatedTextWidgetPoolManager->ShowAnimatedTextAttachedToActor(
-			M_Settings.TextSettings.TextOnSubjects,
+			AOEBehaviourSettings.TextSettings.TextOnSubjects,
 			TargetActor,
-			M_Settings.TextSettings.TextOffset,
-			M_Settings.TextSettings.bAutoWrap,
-			M_Settings.TextSettings.InWrapAt,
-			M_Settings.TextSettings.InJustification,
-			M_Settings.TextSettings.InSettings);
+			AOEBehaviourSettings.TextSettings.TextOffset,
+			AOEBehaviourSettings.TextSettings.bAutoWrap,
+			AOEBehaviourSettings.TextSettings.InWrapAt,
+			AOEBehaviourSettings.TextSettings.InJustification,
+			AOEBehaviourSettings.TextSettings.InSettings);
 	}
 }
 
@@ -434,25 +442,25 @@ bool UAOEBehaviourComponent::GetIsValidAnimatedTextWidgetPoolManager() const
 
 bool UAOEBehaviourComponent::GetIsValidSettings() const
 {
-	if (M_Settings.IntervalSeconds <= 0.f)
+	if (AOEBehaviourSettings.IntervalSeconds <= 0.f)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("AOEBehaviourComponent: IntervalSeconds must be > 0."));
 		return false;
 	}
 
-	if (M_Settings.Radius <= 0.f)
+	if (AOEBehaviourSettings.Radius <= 0.f)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("AOEBehaviourComponent: Radius must be > 0."));
 		return false;
 	}
 
-	if (M_Settings.Radius < AOEBehaviourComponentConstants::MinimumSweepRadius)
+	if (AOEBehaviourSettings.Radius < AOEBehaviourComponentConstants::MinimumSweepRadius)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("AOEBehaviourComponent: Radius is below minimum async sweep size."));
 		return false;
 	}
 
-	if (M_Settings.BehaviourTypes.IsEmpty())
+	if (AOEBehaviourSettings.BehaviourTypes.IsEmpty())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("AOEBehaviourComponent: BehaviourTypes must have at least one entry."));
 		return false;

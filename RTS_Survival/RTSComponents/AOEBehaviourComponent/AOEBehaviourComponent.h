@@ -22,6 +22,12 @@ namespace AOEBehaviourComponentConstants
 	constexpr float MinimumSweepRadius = 85.f;
 }
 
+UENUM(BlueprintType) 
+enum  class EInAOEBehaviourApplyStrategy : uint8
+{
+	ApplyEveryTick,
+	ApplyOnlyOnEnter
+};
 /**
  * @brief Text layout settings for the AOE behaviour component.
  */
@@ -79,6 +85,11 @@ struct RTS_SURVIVAL_API FAOEBehaviourSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
 	TArray<TSubclassOf<UBehaviour>> BehaviourTypes;
 
+	// Defines when the behaviours are applied to the beh components within our range and that pass IsValidTarget.
+	// Either every tick apply new behaviours or only when they enter the radius.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
+	EInAOEBehaviourApplyStrategy ApplyStrategy = EInAOEBehaviourApplyStrategy::ApplyEveryTick;
+
 	/** Animated text settings for affected units. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
 	FAOEBehaviourTextSettings TextSettings;
@@ -107,31 +118,33 @@ protected:
 	/**
 	 * @brief Extension point for derived components to react to each apply tick.
 	 * @param BehaviourComponentsInRange Components currently within the AOE radius.
+	 * @note IF application strategy is ApplyEveryTick then make sure to call super when overriding!
+	 * @note this function will apply the behaviours to the targets when the strategy is ApplyEveryTick.
 	 */
-	virtual void OnApplyTick(const TArray<UBehaviourComp*>& BehaviourComponentsInRange);
+	virtual void OnTickComponentsInRange(const TArray<UBehaviourComp*>& BehaviourComponentsInRange);
 
 	/**
 	 * @brief Extension point for derived components to respond to newly affected units.
 	 * @param NewlyAffected Components that just entered the radius.
 	 */
-	virtual void OnBehavioursApplied(const TArray<UBehaviourComp*>& NewlyAffected);
+	virtual void OnNewlyEnteredRadius(const TArray<UBehaviourComp*>& NewlyAffected);
 
 	/**
 	 * @brief Extension point for derived components to respond to units leaving the radius.
 	 * @param NoLongerAffected Components that just left the radius.
 	 */
-	virtual void OnBehavioursRemoved(const TArray<UBehaviourComp*>& NoLongerAffected);
+	virtual void OnLeftRadius(const TArray<UBehaviourComp*>& NoLongerAffected);
 
 	virtual bool IsValidTarget(AActor* ValidActor) const;
 
 	float GetAOERadius() const;
 
 	const FAOEBehaviourSettings& GetAoeBehaviourSettings() const;
+	// ---- Settings ----
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
+	FAOEBehaviourSettings AOEBehaviourSettings;
 
 private:
-	// ---- Settings ----
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour", meta=(AllowPrivateAccess="true"))
-	FAOEBehaviourSettings M_Settings;
 
 	// ---- Cached references ----
 	UPROPERTY()

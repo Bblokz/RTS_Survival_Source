@@ -13,6 +13,9 @@ URadiusRepairAura::URadiusRepairAura()
 {
 	RadiusSettings.HostBehaviourIcon = EBehaviourIcon::RepairRadius;
 	RadiusSettings.RadiusType = ERTSRadiusType::FullCircle_RepairRange;
+	// We expect the healing to use timed behaviours that will fade.
+	AOEBehaviourSettings.ApplyStrategy = EInAOEBehaviourApplyStrategy::ApplyEveryTick;
+	
 }
 
 bool URadiusRepairAura::IsValidTarget(AActor* ValidActor) const
