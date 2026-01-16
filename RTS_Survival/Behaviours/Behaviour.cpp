@@ -53,7 +53,7 @@ FBehaviourUIData UBehaviour::GetUIData() const
 	FBehaviourUIData UIData;
 	UIData.BehaviourIcon = BehaviourIcon;
 	UIData.DescriptionText = M_DisplayText;
-	UIData.TitleText= M_TitleText;
+	UIData.TitleText = M_TitleText;
 	UIData.BuffDebuffType = M_BuffType;
 	UIData.LifeTimeType = BehaviourLifeTime;
 	UIData.TotalLifeTime = M_LifeTimeDuration;
@@ -102,7 +102,7 @@ void UBehaviour::AdvanceLifetime(const float DeltaTime)
 	{
 		return;
 	}
-	
+
 	M_RemainingLifeTime -= DeltaTime;
 }
 
@@ -117,7 +117,7 @@ bool UBehaviour::IsSameBehaviour(const UBehaviour& OtherBehaviour) const
 	{
 		return false;
 	}
-	
+
 	return IsSameAs(&OtherBehaviour);
 }
 
@@ -127,21 +127,21 @@ void UBehaviour::OnStack(UBehaviour* StackedBehaviour)
 
 bool UBehaviour::IsSameAs(const UBehaviour* OtherBehaviour) const
 {
-        return OtherBehaviour != nullptr;
+	return OtherBehaviour != nullptr;
 }
 
 UBehaviourComp* UBehaviour::GetOwningBehaviourComp() const
 {
-        return M_OwningComponent.Get();
+	return M_OwningComponent.Get();
 }
 
 AActor* UBehaviour::GetOwningActor() const
 {
-        const UBehaviourComp* BehaviourComponent = GetOwningBehaviourComp();
-        if (BehaviourComponent == nullptr)
-        {
-                return nullptr;
-        }
+	const UBehaviourComp* BehaviourComponent = GetOwningBehaviourComp();
+	if (BehaviourComponent == nullptr)
+	{
+		return nullptr;
+	}
 
-        return BehaviourComponent->GetOwner();
+	return BehaviourComponent->GetOwner();
 }

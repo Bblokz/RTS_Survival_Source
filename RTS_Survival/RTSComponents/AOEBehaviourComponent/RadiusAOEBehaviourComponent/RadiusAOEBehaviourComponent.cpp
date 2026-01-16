@@ -13,7 +13,7 @@
 
 URadiusAOEBehaviourComponent::URadiusAOEBehaviourComponent()
 {
-	M_RadiusSettings.HoverShowRadiusBehaviourClass = UOnHoverShowRadiusBehaviour::StaticClass();
+	RadiusSettings.HoverShowRadiusBehaviourClass = UOnHoverShowRadiusBehaviour::StaticClass();
 }
 
 void URadiusAOEBehaviourComponent::BeginPlay()
@@ -53,8 +53,8 @@ void URadiusAOEBehaviourComponent::OnHostBehaviourHovered(const bool bIsHovering
 void URadiusAOEBehaviourComponent::SetHostBehaviourUIData(UBehaviour& Behaviour) const
 {
 	FBehaviourUIData UIData = Behaviour.GetUIData();
-	UIData.TitleText = M_RadiusSettings.HostBehaviourText;
-	UIData.BehaviourIcon = M_RadiusSettings.HostBehaviourIcon;
+	UIData.TitleText = RadiusSettings.HostBehaviourText;
+	UIData.BehaviourIcon = RadiusSettings.HostBehaviourIcon;
 	Behaviour.SetCustomUIData(UIData);
 }
 
@@ -100,14 +100,14 @@ void URadiusAOEBehaviourComponent::BeginPlay_SetupHostBehaviour()
 		return;
 	}
 
-	if (not M_RadiusSettings.HoverShowRadiusBehaviourClass)
+	if (not RadiusSettings.HoverShowRadiusBehaviourClass)
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("URadiusAOEBehaviourComponent: HoverShowRadiusBehaviourClass is null."));
 		return;
 	}
 
-	M_BehaviourComponent->AddBehaviour(M_RadiusSettings.HoverShowRadiusBehaviourClass);
+	M_BehaviourComponent->AddBehaviour(RadiusSettings.HoverShowRadiusBehaviourClass);
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -130,7 +130,7 @@ void URadiusAOEBehaviourComponent::BeginPlay_SetupHostBehaviour()
 			}
 
 			UBehaviour* Behaviour = WeakThis->M_BehaviourComponent->GetBehaviourByClass(
-				WeakThis->M_RadiusSettings.HoverShowRadiusBehaviourClass);
+				WeakThis->RadiusSettings.HoverShowRadiusBehaviourClass);
 			if (not IsValid(Behaviour))
 			{
 				return;
@@ -204,7 +204,7 @@ void URadiusAOEBehaviourComponent::ShowRadius()
 	M_RadiusId = M_RadiusPoolSubsystem->CreateRTSRadius(
 		Owner->GetActorLocation(),
 		Radius,
-		M_RadiusSettings.RadiusType);
+		RadiusSettings.RadiusType);
 
 	if (M_RadiusId <= 0)
 	{
@@ -213,12 +213,12 @@ void URadiusAOEBehaviourComponent::ShowRadius()
 		return;
 	}
 
-	if (M_RadiusSettings.bMoveRadius)
+	if (RadiusSettings.bMoveRadius)
 	{
 		M_RadiusPoolSubsystem->AttachRTSRadiusToActor(
 			M_RadiusId,
 			Owner,
-			M_RadiusSettings.RadiusRelativeAttachmentOffset);
+			RadiusSettings.RadiusRelativeAttachmentOffset);
 	}
 }
 
@@ -240,7 +240,7 @@ void URadiusAOEBehaviourComponent::HideRadius()
 
 bool URadiusAOEBehaviourComponent::GetShouldShowRadiusOnHover() const
 {
-	switch (M_RadiusSettings.ShowRadiusType)
+	switch (RadiusSettings.ShowRadiusType)
 	{
 	case EAOeBehaviourShowRadiusType::OnHover:
 	case EAOeBehaviourShowRadiusType::OnHoverAndOnSelection:
@@ -252,7 +252,7 @@ bool URadiusAOEBehaviourComponent::GetShouldShowRadiusOnHover() const
 
 bool URadiusAOEBehaviourComponent::GetShouldShowRadiusOnSelection() const
 {
-	switch (M_RadiusSettings.ShowRadiusType)
+	switch (RadiusSettings.ShowRadiusType)
 	{
 	case EAOeBehaviourShowRadiusType::OnSelectionOnly:
 	case EAOeBehaviourShowRadiusType::OnHoverAndOnSelection:

@@ -108,6 +108,11 @@ float UAOEBehaviourComponent::GetAOERadius() const
 	return M_Settings.Radius;
 }
 
+const FAOEBehaviourSettings& UAOEBehaviourComponent::GetAoeBehaviourSettings() const
+{
+	return M_Settings;
+}
+
 void UAOEBehaviourComponent::BeginPlay_SetupAnimatedTextWidgetPoolManager()
 {
 	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);

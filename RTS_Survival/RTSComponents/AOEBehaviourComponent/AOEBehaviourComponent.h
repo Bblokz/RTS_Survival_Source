@@ -126,6 +126,8 @@ protected:
 
 	float GetAOERadius() const;
 
+	const FAOEBehaviourSettings& GetAoeBehaviourSettings() const;
+
 private:
 	// ---- Settings ----
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour", meta=(AllowPrivateAccess="true"))

@@ -65,12 +65,14 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	virtual void SetHostBehaviourUIData(UBehaviour& Behaviour) const;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Radius", meta=(AllowPrivateAccess="true"))
+	FRadiusAOEBehaviourSettings RadiusSettings;
 
+	
 private:
 	static constexpr int32 InvalidRadiusId = -1;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Radius", meta=(AllowPrivateAccess="true"))
-	FRadiusAOEBehaviourSettings M_RadiusSettings;
 
 	UPROPERTY()
 	TWeakObjectPtr<URTSRadiusPoolSubsystem> M_RadiusPoolSubsystem;

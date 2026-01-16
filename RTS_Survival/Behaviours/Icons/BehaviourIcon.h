@@ -19,4 +19,13 @@ enum class EBehaviourIcon : uint8
 	ExplosiveShells,
 	VultureSniperDamage,
 	RepairRadius,
+	Repairing,
+	HealRadius,
+	Healing,
+	RadiationRadius,
+	RadiationDamage,
+	RangeBoostRadius,
+	RangeBoost,
+	MoraleBoostRadius,
+	MoraleBoost
 };
