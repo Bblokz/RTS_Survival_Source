@@ -18,7 +18,7 @@ void URadiusCommandAura::SetHostBehaviourUIData(UBehaviour& Behaviour) const
 {
 	FBehaviourUIData UIData = Behaviour.GetUIData();
 	UIData.BehaviourIcon = RadiusSettings.HostBehaviourIcon;
-	UIData.TitleText = RadiusSettings.HostBehaviourText;
+	UIData.TitleText = RadiusSettings.HostBehaviourTitleText;
 
 	const float AccuracyPercentageGain = GetTotalAccuracyPercentageGain();
 	const float ReloadTimePercentageReduction = GetTotalReloadTimePercentageReduction();

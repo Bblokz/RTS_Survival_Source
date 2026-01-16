@@ -127,8 +127,7 @@ bool UW_BehaviourContainer::GetIsValidPrimaryBehaviourComponent() const
                 return true;
         }
 
-        RTSFunctionLibrary::ReportError(
-                TEXT("UW_BehaviourContainer::GetIsValidPrimaryBehaviourComponent: M_PrimaryBehaviourComponent is not valid!"));
+        // No error as we could simply have a unit selected without behaviours.
         return false;
 }
 

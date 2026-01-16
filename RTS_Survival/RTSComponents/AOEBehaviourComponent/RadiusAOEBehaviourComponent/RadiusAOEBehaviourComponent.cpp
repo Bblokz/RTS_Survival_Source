@@ -53,7 +53,7 @@ void URadiusAOEBehaviourComponent::OnHostBehaviourHovered(const bool bIsHovering
 void URadiusAOEBehaviourComponent::SetHostBehaviourUIData(UBehaviour& Behaviour) const
 {
 	FBehaviourUIData UIData = Behaviour.GetUIData();
-	UIData.TitleText = RadiusSettings.HostBehaviourText;
+	UIData.TitleText = RadiusSettings.HostBehaviourTitleText;
 	UIData.BehaviourIcon = RadiusSettings.HostBehaviourIcon;
 	Behaviour.SetCustomUIData(UIData);
 }

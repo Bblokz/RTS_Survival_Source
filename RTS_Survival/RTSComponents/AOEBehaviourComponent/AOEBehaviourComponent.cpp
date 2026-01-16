@@ -16,7 +16,8 @@ UAOEBehaviourComponent::UAOEBehaviourComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 	AOEBehaviourSettings.IntervalSeconds = AOEBehaviourComponentConstants::DefaultIntervalSeconds;
 	AOEBehaviourSettings.Radius = AOEBehaviourComponentConstants::DefaultRadius;
-	AOEBehaviourSettings.TextSettings.TextOffset = FVector(0.f, 0.f, AOEBehaviourComponentConstants::DefaultTextOffsetZ);
+	AOEBehaviourSettings.TextSettings.TextOffset =
+		FVector(0.f, 0.f, AOEBehaviourComponentConstants::DefaultTextOffsetZ);
 	AOEBehaviourSettings.TextSettings.InWrapAt = AOEBehaviourComponentConstants::DefaultWrapAt;
 }
 
@@ -84,6 +85,10 @@ void UAOEBehaviourComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UAOEBehaviourComponent::OnTickComponentsInRange(const TArray<UBehaviourComp*>& BehaviourComponentsInRange)
 {
+	if (AOEBehaviourSettings.ApplyStrategy != EInAOEBehaviourApplyStrategy::ApplyEveryTick)
+	{
+		return;
+	}
 	for (auto* BehaviourComponent : BehaviourComponentsInRange)
 	{
 		if (not IsValid(BehaviourComponent))
@@ -251,15 +256,47 @@ FCollisionObjectQueryParams UAOEBehaviourComponent::BuildObjectQueryParams(
 		ObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_PLAYER);
 	}
 
-	ObjectQueryParams.AddObjectTypesToQuery(ECC_Destructible);
+	if (AOEBehaviourSettings.bAddDestructiblesToOverlap)
+	{
+		ObjectQueryParams.AddObjectTypesToQuery(ECC_Destructible);
+	}
 
 	return ObjectQueryParams;
+}
+
+
+void UAOEBehaviourComponent::FilterUniqueActorsInPlace(TArray<FHitResult>& InOutHitResults)
+{
+	TSet<TWeakObjectPtr<const AActor>> SeenActors;
+	TArray<FHitResult> UniqueResults;
+	UniqueResults.Reserve(InOutHitResults.Num());
+
+	for (const FHitResult& HitResult : InOutHitResults)
+	{
+		const AActor* const HitActor = HitResult.GetActor();
+		if (not IsValid(HitActor))
+		{
+			continue;
+		}
+
+		const TWeakObjectPtr<const AActor> WeakHitActor(HitActor);
+		if (SeenActors.Contains(WeakHitActor))
+		{
+			continue;
+		}
+
+		SeenActors.Add(WeakHitActor);
+		UniqueResults.Add(HitResult);
+	}
+
+	InOutHitResults = MoveTemp(UniqueResults);
 }
 
 void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults)
 {
 	TSet<TWeakObjectPtr<UBehaviourComp>> CurrentTargets;
 	TArray<UBehaviourComp*> BehaviourComponentsInRange;
+	FilterUniqueActorsInPlace(HitResults);
 	for (const FHitResult& Hit : HitResults)
 	{
 		AActor* HitActor = Hit.GetActor();
@@ -287,9 +324,9 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 	TArray<UBehaviourComp*> RemovedTargets;
 	UpdateTrackedComponents(CurrentTargets, AddedTargets, RemovedTargets);
 
-	if (AOEBehaviourSettings.ApplyStrategy == EInAOEBehaviourApplyStrategy::ApplyEveryTick)
+	if (AOEBehaviourSettings.ApplyStrategy == EInAOEBehaviourApplyStrategy::ApplyOnlyOnEnter)
 	{
-		for (UBehaviourComp* BehaviourComponent : BehaviourComponentsInRange)
+		for (UBehaviourComp* BehaviourComponent : AddedTargets)
 		{
 			if (not IsValid(BehaviourComponent))
 			{
@@ -475,8 +512,19 @@ ETriggerOverlapLogic UAOEBehaviourComponent::GetOverlapLogicForOwner() const
 	{
 		return ETriggerOverlapLogic::OverlapEnemy;
 	}
-
+	if (AOEBehaviourSettings.bSearchForBothAlliesAndEnemies)
+	{
+		return ETriggerOverlapLogic::OverlapBoth;
+	}
+	if (AOEBehaviourSettings.bSearchForEnemies)
+	{
+		// search for enemies.
+		return M_RTSComponent->GetOwningPlayer() == 1
+			       ? ETriggerOverlapLogic::OverlapEnemy
+			       : ETriggerOverlapLogic::OverlapPlayer;
+	}
+	//  search for allies.
 	return M_RTSComponent->GetOwningPlayer() == 1
-		       ? ETriggerOverlapLogic::OverlapEnemy
-		       : ETriggerOverlapLogic::OverlapPlayer;
+		       ? ETriggerOverlapLogic::OverlapPlayer
+		       : ETriggerOverlapLogic::OverlapEnemy;
 }

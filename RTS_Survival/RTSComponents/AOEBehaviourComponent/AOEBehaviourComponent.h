@@ -22,12 +22,13 @@ namespace AOEBehaviourComponentConstants
 	constexpr float MinimumSweepRadius = 85.f;
 }
 
-UENUM(BlueprintType) 
-enum  class EInAOEBehaviourApplyStrategy : uint8
+UENUM(BlueprintType)
+enum class EInAOEBehaviourApplyStrategy : uint8
 {
 	ApplyEveryTick,
 	ApplyOnlyOnEnter
 };
+
 /**
  * @brief Text layout settings for the AOE behaviour component.
  */
@@ -93,6 +94,20 @@ struct RTS_SURVIVAL_API FAOEBehaviourSettings
 	/** Animated text settings for affected units. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
 	FAOEBehaviourTextSettings TextSettings;
+
+	/** Whether the component searches for distructables. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
+	bool bAddDestructiblesToOverlap = false;
+
+	/** Whether the component is seen as a debuff behaviour provider; meaning it deals damager or is otherwise bad for the
+	 * unit receiving it. When this is the case the component will search for units NOT Allied with it (if false as by default
+	 * it will look for allied units)
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
+	bool bSearchForEnemies = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
+	bool bSearchForBothAlliesAndEnemies = false;
 };
 
 /**
@@ -114,6 +129,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	void FilterUniqueActorsInPlace(TArray<FHitResult>& InOutHitResults);
 
 	/**
 	 * @brief Extension point for derived components to react to each apply tick.
@@ -145,7 +162,6 @@ protected:
 	FAOEBehaviourSettings AOEBehaviourSettings;
 
 private:
-
 	// ---- Cached references ----
 	UPROPERTY()
 	TObjectPtr<URTSComponent> M_RTSComponent = nullptr;
@@ -174,7 +190,7 @@ private:
 	 * @param Radius Radius of the sphere sweep.
 	 */
 	void StartAsyncSphereSweep(AActor* InstigatorActor, const FVector& Epicenter, const float Radius);
-	static FCollisionObjectQueryParams BuildObjectQueryParams(const ETriggerOverlapLogic OverlapLogic);
+	FCollisionObjectQueryParams BuildObjectQueryParams(const ETriggerOverlapLogic OverlapLogic);
 	void HandleSweepComplete(TArray<FHitResult>&& HitResults);
 
 	// ---- Behaviour tracking ----
