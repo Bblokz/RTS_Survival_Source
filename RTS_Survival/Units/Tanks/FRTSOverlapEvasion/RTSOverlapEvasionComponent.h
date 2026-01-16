@@ -53,6 +53,11 @@ private:
 	TWeakObjectPtr<ATrackedTankMaster> M_Owner;
 
 	UPROPERTY()
+	TScriptInterface<ICommands> M_OwnerCommandsInterface;
+
+	void SetOwnerInterface(ATrackedTankMaster* InOwner);
+
+	UPROPERTY()
 	TArray<TWeakObjectPtr<UPrimitiveComponent>> M_TrackedOverlapMeshes;
 
 	UPROPERTY()

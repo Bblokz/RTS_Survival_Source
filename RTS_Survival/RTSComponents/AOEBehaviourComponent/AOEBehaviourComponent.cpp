@@ -9,7 +9,6 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 
 UAOEBehaviourComponent::UAOEBehaviourComponent()

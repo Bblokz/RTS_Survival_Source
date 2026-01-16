@@ -13,6 +13,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Navigation/RTSNavAgentRegistery/RTSNavAgentRegistery.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/AI/AITrackTank.h"
 #include "RTS_Survival/Units/Tanks/VehicleAI/Utils/VehicleAIFunctionLibrary.h"
@@ -35,6 +36,9 @@ namespace TrackFollowingEvasion
 
 	//  If the other actor's "angle-of-attack" against our movement exceeds this, we treat as critical.
 	constexpr float CriticalAngleOfAttackDeg = 10.f;
+
+	constexpr float ZOffsetDebug = 400;
+	constexpr float ZOffsetDebugAction = 550;
 }
 
 namespace TrackFollowingOverlapCleanup
@@ -458,7 +462,7 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 	}
 	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
-		DebugIdleOverlappingActors();
+		DebugWaitingForIdleOverlappingActors(DeltaTime);
 	}
 
 	// Keep steering as before, set throttle to zero while we’re overlapping.
@@ -1076,32 +1080,38 @@ float UTrackPathFollowingComponent::CalculateTrackStoppingDistance(const float V
 }
 
 
-void UTrackPathFollowingComponent::DebugIdleOverlappingActors()
+void UTrackPathFollowingComponent::DebugWaitingForIdleOverlappingActors(const float DeltaTime)
 {
-	FString DebugMessage = "overlapping: ";
+	FString DebugMessage = "Wait : ";
 	for (const FOverlapActorData& OverlapData : M_IdleAlliedBlockingActors)
 	{
 		if (OverlapData.Actor.IsValid())
 		{
-			DebugMessage += OverlapData.Actor->GetName() + "\n";
+			bool bValidName = false;
+			URTSComponent* OtherRTSComp = OverlapData.Actor->FindComponentByClass<URTSComponent>();
+			const FString NameOfOther = OtherRTSComp ? OtherRTSComp->GetDisplayName(bValidName) : OverlapData.Actor->GetName();
+			DebugMessage += NameOfOther + "--";
 		}
 	}
-	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, 300),
-	                                        DebugMessage, FColor::Red, 5.f);
+	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, TrackFollowingEvasion::ZOffsetDebug),
+	                                        DebugMessage, FColor::Red, DeltaTime);
 }
 
 void UTrackPathFollowingComponent::DebugMovingOverlappingActors(const float DeltaTime)
 {
-	FString DebugMessage = "overlapping moving: ";
+	FString DebugMessage = "AdjustTo : ";
 	for (const FOverlapActorData& OverlapData : M_MovingBlockingOverlapActors)
 	{
 		if (OverlapData.Actor.IsValid())
 		{
-			DebugMessage += OverlapData.Actor->GetName() + "\n";
+			bool bValidName = false;
+			URTSComponent* OtherRTSComp = OverlapData.Actor->FindComponentByClass<URTSComponent>();
+			const FString NameOfOther = OtherRTSComp ? OtherRTSComp->GetDisplayName(bValidName) : OverlapData.Actor->GetName();
+			DebugMessage += NameOfOther + "--";
 		}
 	}
-	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, 600),
-	                                        DebugMessage, FColor::Yellow, DeltaTime);
+	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, TrackFollowingEvasion::ZOffsetDebug),
+	                                        DebugMessage, FColor::Orange, DeltaTime);
 }
 
 void UTrackPathFollowingComponent::DrawNavLinks(const FColor Color)

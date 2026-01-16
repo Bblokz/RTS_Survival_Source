@@ -546,7 +546,7 @@ private:
 	static int32 M_TicksCountCheckOverlappers;
 	static float M_TimeTillDiscardOverlap;
 
-	void DebugIdleOverlappingActors();
+	void DebugWaitingForIdleOverlappingActors(const float DeltaTime);
 	void DebugMovingOverlappingActors(const float DeltaTime);
 
 	// Last steering command applied to the vehicle; reused while paused for overlaps.
