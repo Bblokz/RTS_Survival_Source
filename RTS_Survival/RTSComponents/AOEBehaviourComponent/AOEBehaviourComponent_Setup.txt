@@ -1,0 +1,50 @@
+AOE Behaviour Component Setup (Blueprint)
+=======================================
+
+Purpose
+-------
+Use the AOEBehaviourComponent to periodically apply Behaviour Components to nearby units.
+It performs async sphere sweeps and applies or removes behaviours as actors enter or leave
+range, optionally spawning animated combat text.
+
+Blueprint Setup Checklist
+-------------------------
+1) Add the component
+   - In your Blueprint Actor, add the "AOE Behaviour Component".
+
+2) Provide an RTS component on the same actor
+   - Ensure the owning actor has an RTSComponent attached (the AOE component validates this
+     on BeginPlay and uses it to resolve player ownership / team logic).
+
+3) Configure the Settings struct (AOE Behaviour category)
+   - Interval Seconds
+     * How often the async sweep runs. Must be > 0.
+     * Lower values update more frequently but cost more CPU.
+   - Radius
+     * Sweep radius in Unreal units (centimeters). Must be > 0 and above the minimum async
+       sweep radius.
+   - Behaviour Types
+     * List of behaviour classes to apply to valid targets in range. Must contain at least
+       one entry.
+   - Text Settings (Animated Text)
+     * Text Class: The widget class used to display floating text.
+     * Text Material: Optional material override for the widget.
+     * Text Offset: World offset applied when spawning the text (Z default is 100).
+     * In Wrap At: Text wrap width for the widget.
+     * Text Color: The color used for the animated text.
+
+4) Optional: Control runtime enable/disable
+   - Call SetAOEEnabled(true/false) from Blueprint to start or stop periodic checks.
+   - When disabled, the timer is cleared and existing applied behaviours are removed.
+
+5) Optional: Custom overlap logic
+   - Overlap logic is resolved from the owning actor (e.g., friend/enemy rules). Make sure
+     the owning actor is set up with the correct team/affiliation data to filter targets.
+
+Notes
+-----
+- IntervalSeconds and Radius are validated on BeginPlay. If invalid, the component logs
+  an error and does not start ticking.
+- The component uses async sphere sweeps, so it is safe to run on frequent intervals.
+- For animated text, ensure your project has a valid widget class and any pooled text
+  manager needed by your UI setup.
