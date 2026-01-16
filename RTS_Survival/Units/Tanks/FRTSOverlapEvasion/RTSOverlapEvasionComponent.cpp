@@ -483,26 +483,6 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 	{
 		return;
 	}
-	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
-	{
-		if(M_OwnerTrackPathFollowingComponent.IsValid())
-		{
-			auto ArrayOfBlockers = M_OwnerTrackPathFollowingComponent->GetOverlapBlockingActorsArray();
-			for(auto EachBlocker: ArrayOfBlockers)
-			{
-				if(not EachBlocker.Actor.IsValid())
-				{
-					continue;
-				}
-				if(EachBlocker.Actor.Get() == OtherActor)
-				{
-					RTSFunctionLibrary::PrintString("Found idle ally we already wait for : " + OtherActor->GetName() +
-						"\n ordering new movement command to it", FColor::Red, 2.f);
-				}
-			}
-		}
-			
-	}
 
 	const float InnerRadius = OtherRTS->GetFormationUnitInnerRadius();
 	const FVector SelfLoc = M_Owner->GetActorLocation();
