@@ -24,13 +24,13 @@ void URadiusCommandAura::SetHostBehaviourUIData(UBehaviour& Behaviour) const
 	const float ReloadTimePercentageReduction = GetTotalReloadTimePercentageReduction();
 
 	const FString AccuracyDescription = FRTSRichTextConverter::MakeRTSRich(
-		"Accuracy by " + FString::SanitizeFloat(AccuracyPercentageGain) + "%",
+		"Accuracy by " + FString::FromInt(static_cast<int32>(AccuracyPercentageGain)) + "%",
 		ERTSRichText::Text_Exp);
 	const FString ReloadDescription = FRTSRichTextConverter::MakeRTSRich(
-		"Reload time by " + FString::SanitizeFloat(ReloadTimePercentageReduction) + "%",
+		"Reload time by " + FString::SanitizeFloat(static_cast<int32>(ReloadTimePercentageReduction)) + "%",
 		ERTSRichText::Text_Exp);
 	const FString RadiusDescription = FRTSRichTextConverter::MakeRTSRich(
-		FString::SanitizeFloat(GetAoeBehaviourSettings().Radius / 100.f) + " m radius",
+		FString::FromInt(static_cast<int32>(GetAoeBehaviourSettings().Radius / 100.f)) + " m radius",
 		ERTSRichText::Text_Exp);
 
 	UIData.DescriptionText = "Improves " + AccuracyDescription + " and " + ReloadDescription + " in " +

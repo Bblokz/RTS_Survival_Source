@@ -18,7 +18,7 @@ public:
 
 	USingleHealBehaviour();
 virtual void OnAdded(AActor* BehaviourOwner) override;
-	float GetHealing();
+	float GetHealing() const;
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Heal")
 	float HealAmount = 10.f;

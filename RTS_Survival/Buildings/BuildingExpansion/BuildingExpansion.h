@@ -101,6 +101,12 @@ protected:
 		FVector(0, 0, 100), FVector(-50, 0, 100),
 		FVector(0, 25, 100), FVector(0, -25, 100)
 	};
+
+	
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
+	UBehaviourComp* BehaviourComponent;
+	
+	bool GetIsValidBehaviourComponent() const;
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void VerticalDestruction(

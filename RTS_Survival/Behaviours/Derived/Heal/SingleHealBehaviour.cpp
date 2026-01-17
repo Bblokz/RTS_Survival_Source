@@ -23,10 +23,10 @@ void USingleHealBehaviour::OnAdded(AActor* BehaviourOwner)
 	{
 		return;
 	}
-	HealthComp->Heal(10.f);
+	HealthComp->Heal(HealAmount);
 }
 
-float USingleHealBehaviour::GetHealing()
+float USingleHealBehaviour::GetHealing() const
 {
 	return HealAmount;
 }

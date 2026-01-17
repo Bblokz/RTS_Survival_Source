@@ -2068,7 +2068,7 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 
 	FProjectileVfxSettings ProjectileVfxSettings;
 	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
-	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
+	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre * ;
 	ProjectileVfxSettings.ProjectileNiagaraSystem = M_ProjectileNiagaraSystem;
 
 	Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,

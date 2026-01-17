@@ -40,7 +40,7 @@ float URadiusRepairAura::GetRepairPerSecondFromBehaviours() const
 	for (const auto EachBehaviour : GetAoeBehaviourSettings().BehaviourTypes)
 	{
 		if (not EachBehaviour->IsChildOf(UTickingHealBehaviour::StaticClass())
-			|| not EachBehaviour->IsChildOf(USingleHealBehaviour::StaticClass()))
+			&& not EachBehaviour->IsChildOf(USingleHealBehaviour::StaticClass()))
 		{
 			continue;
 		}

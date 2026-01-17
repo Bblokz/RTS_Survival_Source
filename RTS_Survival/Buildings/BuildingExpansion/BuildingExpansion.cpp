@@ -8,6 +8,7 @@
 #include "BXPConstructionRules/BXPConstructionRules.h"
 #include "Interface/BuildingExpansionOwner.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
@@ -196,6 +197,18 @@ TArray<UWeaponState*> ABuildingExpansion::GetAllWeapons() const
 	return ValidWeapons;
 }
 
+bool ABuildingExpansion::GetIsValidBehaviourComponent() const
+{
+	if (not IsValid(BehaviourComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this,
+		                                             "BehaviourComponent",
+		                                             "ABuildingExpansion::GetIsValidBehaviourComponent");
+		return false;
+	}
+	return true;
+}
+
 void ABuildingExpansion::VerticalDestruction(const FRTSVerticalCollapseSettings& CollapseSettings,
                                              const FCollapseFX& CollapseFX)
 {
@@ -270,6 +283,10 @@ void ABuildingExpansion::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	PostInit_GetCargoComponent();
+
+	UBehaviourComp* BehaviourComp = FindComponentByClass<UBehaviourComp>();
+	BehaviourComponent = BehaviourComp;
+	(void)GetIsValidBehaviourComponent();
 }
 
 void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -541,18 +558,18 @@ void ABuildingExpansion::InitBuildingExpansion(
 	const bool bLetBuildingMeshAffectNavMesh)
 {
 	const FBxpData MyData = GetBxpData(NewBuildingExpansionType);
-	if(GetIsValidFowComponent())
+	if (GetIsValidFowComponent())
 	{
 		FowComponent->SetVisionRadius(MyData.VisionRadius);
 	}
 	SetUnitAbilitiesRunTime(MyData.Abilities);
 	OnInitBuildingExpansion_SetupCollision(bLetBuildingMeshAffectNavMesh);
-	if(GetIsValidHealthComponent())
+	if (GetIsValidHealthComponent())
 	{
 		HealthComponent->InitHealthAndResistance(MyData.ResistancesAndDamageMlt, MyData.Health);
 	}
 	if (IsValid(NewConstructionMesh))
-		
+
 	{
 		M_ConstructionMesh = NewConstructionMesh;
 	}

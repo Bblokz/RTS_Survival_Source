@@ -4,7 +4,9 @@
 
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "RTS_Survival/Player/PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
+#include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 APooledRadiusActor::APooledRadiusActor()

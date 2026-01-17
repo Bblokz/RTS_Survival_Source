@@ -313,7 +313,18 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 		UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
 		if (not IsValid(BehaviourComponent))
 		{
-			continue;
+			if(AOEBehaviourSettings.bAffectSquadControllers)
+			{
+				BehaviourComponent = GetBehaviourCompOfSquadController(HitActor);
+				if(not BehaviourComponent)
+				{
+					continue;
+				}
+			}
+			else
+			{
+				continue;
+			}
 		}
 
 		CurrentTargets.Add(BehaviourComponent);
@@ -527,4 +538,19 @@ ETriggerOverlapLogic UAOEBehaviourComponent::GetOverlapLogicForOwner() const
 	return M_RTSComponent->GetOwningPlayer() == 1
 		       ? ETriggerOverlapLogic::OverlapPlayer
 		       : ETriggerOverlapLogic::OverlapEnemy;
+}
+
+UBehaviourComp* UAOEBehaviourComponent::GetBehaviourCompOfSquadController(AActor* ValidHitActor) const
+{
+	const ASquadUnit* SquadUnit = Cast<ASquadUnit>(ValidHitActor);
+	if( not IsValid(SquadUnit))
+	{
+		return nullptr;
+	}
+	const ASquadController* SquadController = SquadUnit->GetSquadControllerChecked();
+	if(not SquadController)
+	{
+		return nullptr;
+	}
+	return SquadController->GetBehaviourComponentOfSquad();
 }

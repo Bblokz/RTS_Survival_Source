@@ -99,6 +99,10 @@ struct RTS_SURVIVAL_API FAOEBehaviourSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
 	bool bAddDestructiblesToOverlap = false;
 
+	// Whether to try and find squad controllers to apply behaviours to as well.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
+	bool bAffectSquadControllers = false;
+
 	/** Whether the component is seen as a debuff behaviour provider; meaning it deals damager or is otherwise bad for the
 	 * unit receiving it. When this is the case the component will search for units NOT Allied with it (if false as by default
 	 * it will look for allied units)
@@ -214,4 +218,6 @@ private:
 	bool GetIsValidSettings() const;
 
 	ETriggerOverlapLogic GetOverlapLogicForOwner() const;
+
+	UBehaviourComp* GetBehaviourCompOfSquadController(AActor* ValidHitActor) const;
 };

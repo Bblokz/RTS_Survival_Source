@@ -378,6 +378,11 @@ TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 	return Weapons;
 }
 
+UBehaviourComp* ASquadController::GetBehaviourComponentOfSquad() const
+{
+	return BehaviourComponent;
+}
+
 void ASquadController::SetSquadSpawnLocation(const FVector& SpawnLocation)
 {
 	M_SquadSpawnLocation.bIsSetByTrainer = true;

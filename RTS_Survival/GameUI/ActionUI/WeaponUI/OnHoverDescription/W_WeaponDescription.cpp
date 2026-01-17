@@ -266,7 +266,7 @@ FString UW_WeaponDescription::Line_Accuracy() const
 		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
 	}
 	return TEXT("Accuracy: ")
-		+ GetNumberRich(static_cast<float>(WeaponDescription.Accuracy), 0, TextTypeBuffAdjusted);
+		+ GetNumberRich(static_cast<float>(FMath::Min(WeaponDescription.Accuracy, 100)), 0, TextTypeBuffAdjusted);
 }
 
 FString UW_WeaponDescription::Line_RangeMeters() const

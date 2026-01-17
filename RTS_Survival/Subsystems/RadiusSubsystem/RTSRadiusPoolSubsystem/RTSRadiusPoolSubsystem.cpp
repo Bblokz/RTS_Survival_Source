@@ -92,7 +92,7 @@ bool URTSRadiusPoolSubsystem::GetIsValidFullCircleMesh() const
 	return false;
 }
 
-bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Type) const
+bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Type) 
 {
 	switch (Type)
 	{

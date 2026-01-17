@@ -3627,6 +3627,7 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		break;
 	case EAbilityID::IdThrowGrenade:
 		this->DirectActionButtonThrowGrenade(static_cast<EGrenadeAbilityType>(ActiveAbilityEntry.CustomType));
+		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
 		break;
 	case EAbilityID::IdCancelThrowGrenade:
 		this->DirectActionButtonCancelThrowGrenade(static_cast<EGrenadeAbilityType>(ActiveAbilityEntry.CustomType));

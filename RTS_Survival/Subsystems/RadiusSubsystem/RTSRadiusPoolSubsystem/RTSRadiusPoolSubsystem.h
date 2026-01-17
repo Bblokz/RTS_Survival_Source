@@ -34,10 +34,13 @@ class RTS_SURVIVAL_API URTSRadiusPoolSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
-        // UWorldSubsystem
-        virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
-        virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-        virtual void Deinitialize() override;
+	// UWorldSubsystem
+	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
+	static bool GetIsFullCircleRadiusType(ERTSRadiusType Type);
+
 
 	/**
 	 * @brief Show a radius ring.
@@ -117,7 +120,6 @@ private:
 	bool GetIsValidFullCircleMesh() const;
 
 	// --- Mesh selection ---
-	bool GetIsFullCircleRadiusType(ERTSRadiusType Type) const;
 	const FRTSRadiusMeshSettings* GetMeshSettingsForType(ERTSRadiusType Type) const;
 
 	// --- Lifetime callback ---

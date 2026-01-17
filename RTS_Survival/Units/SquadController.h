@@ -242,6 +242,8 @@ public:
 
 	TArray<UWeaponState*> GetWeaponsOfSquad();
 
+	UBehaviourComp* GetBehaviourComponentOfSquad() const;
+
 	void SetSquadSpawnLocation(const FVector& SpawnLocation);
 	/**
 	 * @brief Request squad move using the controller's coordinated pathing for a specific ability.
