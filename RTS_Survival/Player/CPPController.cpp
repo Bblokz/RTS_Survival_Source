@@ -11,6 +11,7 @@
 #include "HUD/CPPHUD.h"
 #include "Kismet/GameplayStatics.h"
 #include "PauseGame/PauseGameOptions.h"
+#include "PlayerAimAbilitiy/PlayerAimAbility.h"
 #include "PlayerAudioController/PlayerAudioController.h"
 #include "PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "PlayerControlGroupManager/PlayerControlGroupManager.h"
@@ -1420,6 +1421,17 @@ void ACPPController::RotateRight()
 	{
 		CPPConstructionPreviewRef->RotatePreviewClockwise();
 	}
+}
+
+void ACPPController::BeginPlay_SetupPlayerAimAbility()
+{
+	if(not IsValid(M_PlayerAimAbilityClass))
+	{
+		RTSFunctionLibrary::ReportError("No valid PlayerAimAbilityClass set on CPPController!");
+		return;
+	}
+	FTransform DefaultTransform = FTransform::Identity;
+	
 }
 
 AActor* ACPPController::GetNewFieldConstructionCandidate(

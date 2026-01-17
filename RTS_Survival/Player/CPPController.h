@@ -48,6 +48,7 @@
 
 #include "CPPController.generated.h"
 
+class APlayerAimAbility;
 class UPlayerPortraitManager;
 class UW_Portrait;
 struct FNomadicPreviewAttachments;
@@ -646,6 +647,9 @@ protected:
 	UPROPERTY()
 	ALandscapedeformManager* M_LdfManager;
 
+	UPROPERTY()
+	TSubclassOf<APlayerAimAbility> M_PlayerAimAbilityClass;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ControlGroups")
 	void UseControlGroup(const int32 GroupIndex);
 
@@ -785,6 +789,13 @@ private:
 	// Whether the player is currently in the tech tree.
 	UPROPERTY()
 	bool bM_IsInTechTree;
+
+	// An actor with a simple mesh and various materials for EPlayerAimAbilityTypes.
+	// use IsPlayerAimActive to determine if the ability is active.
+	UPROPERTY()
+	TObjectPtr<APlayerAimAbility> M_PlayerAimAbility;
+
+	void BeginPlay_SetupPlayerAimAbility();
 
 	/**
 	 * @brief Picks the best constructor among current selections, skipping excluded GUIDs.
