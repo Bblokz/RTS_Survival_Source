@@ -183,6 +183,8 @@ class RTS_SURVIVAL_API UGrenadeComponent : public UActorComponent
 public:
 	UGrenadeComponent();
 
+	float GetGrenadeAoeRange() const;
+
 	/**
 	 * @brief Initializes the component with its owning squad controller.
 	 * @param SquadController Controller owning this component.

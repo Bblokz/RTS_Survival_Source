@@ -3,10 +3,13 @@
 
 #include "PlayerAimAbility.h"
 
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
-APlayerAimAbility::APlayerAimAbility()
+APlayerAimAbility::APlayerAimAbility(const FObjectInitializer& ObjectInitializer)
+	: AActorObjectsMaster(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = false;
 	PrimaryActorTick.bStartWithTickEnabled = false;
@@ -26,20 +29,33 @@ APlayerAimAbility::APlayerAimAbility()
 	SetCanBeDamaged(false);
 }
 
-void APlayerAimAbility::ShowAimRadius(const float Radius, const EPlayerAimAbilityTypes AimType)
+void APlayerAimAbility::DetermineShowAimRadiusForAbility(const EAbilityID MainAbility,
+                                                         const int32 AbilitySubType, AActor* PrimarySelectedActor)
 {
-	if (not GetIsValidAimMeshComponent())
+	if (not GetIsValidAimMeshComponent() || not RTSFunctionLibrary::RTSIsValid(PrimarySelectedActor))
 	{
-		return;
+		return FailedToShowAimRadius();
+	}
+	float Radius = 0.f;
+	const EPlayerAimAbilityTypes AimType = GetAimTypeForAbility(MainAbility, AbilitySubType, PrimarySelectedActor,
+	                                                            Radius);
+	if (AimType == EPlayerAimAbilityTypes::None)
+	{
+		return FailedToShowAimRadius();
+	}
+	if (Radius <= 1)
+	{
+		return OnNoRadiusForValidAimAbility(Radius, AimType, MainAbility, AbilitySubType);
 	}
 	bM_IsPlayerAimActive = true;
 	SetActorHiddenInGame(false);
 	const float ScaleValue = Radius / UnitsPerScale;
 	SetActorScale3D(FVector(ScaleValue, ScaleValue, 1));
 	UMaterialInterface* AimMaterial = nullptr;
+	// Does error report.
 	if (not GetIsValidMaterialForAimType(AimType, AimMaterial))
 	{
-		return;
+		return FailedToShowAimRadius();
 	}
 	AimMeshComponent->SetMaterial(0, AimMaterial);
 }
@@ -91,4 +107,59 @@ bool APlayerAimAbility::GetIsValidMaterialForAimType(const EPlayerAimAbilityType
 	}
 	OutMaterial = MaterialPerAbilityAim[AimType];
 	return true;
+}
+
+EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeForAbility(const EAbilityID MainAbility,
+                                                               const int32 AbilitySubType,
+                                                               const AActor* RTSValid_PrimarySelectedActor,
+                                                               float& OutAbilityRadius) const
+{
+	switch (MainAbility)
+	{
+	case EAbilityID::IdThrowGrenade:
+		return GetAimTypeFromGrenadeAbility(static_cast<EGrenadeAbilityType>(AbilitySubType),
+		                                    RTSValid_PrimarySelectedActor,
+		                                    OutAbilityRadius);
+	default:
+		return EPlayerAimAbilityTypes::None;
+	}
+}
+
+EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeFromGrenadeAbility(
+	const EGrenadeAbilityType GrenadeAbilityType, const AActor* RTSValid_PrimarySelectedActor,
+	float& OutAbilityRadius) const
+{
+	const UGrenadeComponent* GrenadeComponent = FAbilityHelpers::GetGrenadeAbilityCompOfType(
+		GrenadeAbilityType, RTSValid_PrimarySelectedActor);
+	if (IsValid(GrenadeComponent))
+	{
+		// Note: if this fails because of invalid comp then later we do get a detailed error message due to the radius being invalid.
+		OutAbilityRadius = GrenadeComponent->GetGrenadeAoeRange();
+	}
+	switch (GrenadeAbilityType)
+	{
+	case EGrenadeAbilityType::GerAtGrenade:
+	case EGrenadeAbilityType::BundleSturmKommando:
+		return EPlayerAimAbilityTypes::AntiVehicleGrenade;
+	default:
+		return EPlayerAimAbilityTypes::AntiInfantryGrenade;
+	}
+}
+
+void APlayerAimAbility::FailedToShowAimRadius()
+{
+	HideRadius();
+}
+
+void APlayerAimAbility::OnNoRadiusForValidAimAbility(const float Radius, const EPlayerAimAbilityTypes AimType,
+                                                     const EAbilityID MainAbility, const int32 AbilitySubType) const
+{
+	const FString AbilityName = UEnum::GetValueAsString(MainAbility) + " of subtype " +
+		FString::FromInt(AbilitySubType);
+	const FString AimTypeName = UEnum::GetValueAsString(AimType);
+	RTSFunctionLibrary::ReportError("APlayerAimAbility::OnNoRadiusForValidAimAbility"
+		"No radius defined for valid aim ability! (<=1)"
+		"\n Ability: " + AbilityName +
+		"\n AimType: " + AimTypeName +
+		"\n Radius: " + FString::SanitizeFloat(Radius));
 }

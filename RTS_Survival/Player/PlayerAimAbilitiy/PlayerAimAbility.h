@@ -4,8 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "PlayerAimAbilityTypes/PlayerAimAbilityTypes.h"
+#include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/MasterObjects/ActorObjectsMaster.h"
 #include "PlayerAimAbility.generated.h"
+
+enum class EGrenadeAbilityType : uint8;
+enum class EAbilityID : uint8;
 
 UCLASS()
 class RTS_SURVIVAL_API APlayerAimAbility : public AActorObjectsMaster
@@ -14,11 +18,13 @@ class RTS_SURVIVAL_API APlayerAimAbility : public AActorObjectsMaster
 
 public:
 	// Sets default values for this actor's properties
-	APlayerAimAbility();
+	APlayerAimAbility(const FObjectInitializer& ObjectInitializer);
 
-	void ShowAimRadius(const float Radius, const EPlayerAimAbilityTypes AimType);
+	void DetermineShowAimRadiusForAbility(
+		const EAbilityID MainAbility,
+		const int32 AbilitySubType, AActor* PrimarySelectedActor);
 	void HideRadius();
-	bool IsPlayerAimActive() const { return bM_IsPlayerAimActive; }
+	[[nodiscard]] bool IsPlayerAimActive() const { return bM_IsPlayerAimActive; }
 
 protected:
 	// Called when the game starts or when spawned
@@ -39,4 +45,13 @@ private:
 	bool GetIsValidMaterialForAimType(const EPlayerAimAbilityTypes AimType, UMaterialInterface*& OutMaterial);
 	UPROPERTY()
 	bool bM_IsPlayerAimActive = false;
+
+
+	EPlayerAimAbilityTypes GetAimTypeForAbility(const EAbilityID MainAbility, const int32 AbilitySubType, const AActor* RTSValid_PrimarySelectedActor, float& OutAbilityRadius) const;
+
+	EPlayerAimAbilityTypes GetAimTypeFromGrenadeAbility(const EGrenadeAbilityType GrenadeAbilityType, const AActor* RTSValid_PrimarySelectedActor, float& OutAbilityRadius) const;
+
+	void FailedToShowAimRadius();
+	void OnNoRadiusForValidAimAbility(const float Radius, const EPlayerAimAbilityTypes AimType,
+		const EAbilityID MainAbility, const int32 AbilitySubType) const;
 };

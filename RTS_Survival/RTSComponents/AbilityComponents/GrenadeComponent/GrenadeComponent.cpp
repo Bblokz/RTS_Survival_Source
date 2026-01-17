@@ -213,6 +213,11 @@ UGrenadeComponent::UGrenadeComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+float UGrenadeComponent::GetGrenadeAoeRange() const
+{
+	return M_Settings.AoeRange;
+}
+
 void UGrenadeComponent::BeginPlay()
 {
 	Super::BeginPlay();

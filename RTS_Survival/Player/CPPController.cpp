@@ -410,14 +410,15 @@ void ACPPController::Tick(float DeltaTime)
 	GetMousePosition(MouseScreenPosition.X, MouseScreenPosition.Y);
 
 	// Get the current projected mouse location on the landscape.
-	FHitResult HitResult;
-	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+	FHitResult HitResultCursorProjection;
+	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResultCursorProjection);
 
 	// --------------------------------------------------------
 	// ----- Tick player component updates
 	// --------------------------------------------------------
-	PlayerRotationArrow.TickArrowRotation(MouseScreenPosition, HitResult.Location);
-	UpdateHoveringActorInfo(DeltaTime, MouseScreenPosition, HitResult, bHit);
+	PlayerRotationArrow.TickArrowRotation(MouseScreenPosition, HitResultCursorProjection.Location);
+	UpdateHoveringActorInfo(DeltaTime, MouseScreenPosition, HitResultCursorProjection, bHit);
+	UpdateAimAbilityAtCursorProjection(DeltaTime, HitResultCursorProjection);
 
 
 	M_LastFrameMousePosition = MouseScreenPosition;
@@ -1213,6 +1214,7 @@ void ACPPController::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_SetupRotationArrow();
+	BeginPlay_SetupPlayerAimAbility();
 }
 
 void ACPPController::PostInitializeComponents()
@@ -1423,15 +1425,57 @@ void ACPPController::RotateRight()
 	}
 }
 
+bool ACPPController::GetIsValidPlayerAimAbilityActor() const
+{
+	if (not IsValid(M_PlayerAimAbility))
+	{
+		RTSFunctionLibrary::ReportError("PlayerAimAbility is not valid on CPPController!");
+		return false;
+	}
+	return true;
+}
+
+void ACPPController::UpdateAimAbilityAtCursorProjection(const float DeltaTime, const FHitResult& CursorProjection) const
+{
+	if (not IsValid(M_PlayerAimAbility))
+	{
+		// Note: no error report as first few ticks it might still need spawning.
+		return;
+	}
+	if (not M_PlayerAimAbility->IsPlayerAimActive())
+	{
+		// No ability with aim cursor.
+		return;
+	}
+	M_PlayerAimAbility->SetActorLocation(CursorProjection.Location);
+}
+
+void ACPPController::DetermineShowAimAbilityAtCursorProjection(const EAbilityID AbilityJustActivated,
+                                                               const int32 AbilitySubtype)
+{
+	if (not GetIsValidPlayerAimAbilityActor() || not GetIsValidGameUIController())
+	{
+		return;
+	}
+	M_PlayerAimAbility->DetermineShowAimRadiusForAbility(AbilityJustActivated, AbilitySubtype,
+	                                                     M_GameUIController->GetPrimarySelectedUnit());
+}
+
 void ACPPController::BeginPlay_SetupPlayerAimAbility()
 {
-	if(not IsValid(M_PlayerAimAbilityClass))
+	if (not IsValid(M_PlayerAimAbilityClass) || not GetWorld())
 	{
-		RTSFunctionLibrary::ReportError("No valid PlayerAimAbilityClass set on CPPController!");
+		RTSFunctionLibrary::ReportError("No valid PlayerAimAbilityClass set on CPPController! or world is invalid!");
 		return;
 	}
 	FTransform DefaultTransform = FTransform::Identity;
-	
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.Owner = this;
+	M_PlayerAimAbility = GetWorld()->SpawnActor<APlayerAimAbility>(
+		M_PlayerAimAbilityClass, DefaultTransform, SpawnParams);
+	// Error check.
+	(void)GetIsValidPlayerAimAbilityActor();
 }
 
 AActor* ACPPController::GetNewFieldConstructionCandidate(
@@ -1847,14 +1891,14 @@ bool ACPPController::GetIsHarvesterTankPawn(ASelectablePawnMaster* SelectedPawn)
 
 bool ACPPController::GetIsMarqueePawnsOnlyHarvester(const TArray<ASelectablePawnMaster*>& MarqueeSelectedPawns) const
 {
-	bool bIsOnlyHarvesters = true;	
-	for(const auto EachPawn : MarqueeSelectedPawns)
+	bool bIsOnlyHarvesters = true;
+	for (const auto EachPawn : MarqueeSelectedPawns)
 	{
 		if (not GetIsHarvesterTankPawn(EachPawn))
 		{
 			bIsOnlyHarvesters = false;
 			break;
-		}	
+		}
 	}
 	return bIsOnlyHarvesters;
 }
@@ -1920,10 +1964,11 @@ bool ACPPController::RemoveSelectedHarvesterTanks()
 	return bRemovedHarvester;
 }
 
-bool ACPPController::FilterMarqueeSelection_RemoveHarvesterTanksIfMixed(const TArray<ASelectablePawnMaster*>& NewMarqueeSelectedPawns)
+bool ACPPController::FilterMarqueeSelection_RemoveHarvesterTanksIfMixed(
+	const TArray<ASelectablePawnMaster*>& NewMarqueeSelectedPawns)
 {
-	const bool bOnlyHarvestersInMarquee=  GetIsMarqueePawnsOnlyHarvester(NewMarqueeSelectedPawns);
-	if(bIsHoldingShift && bOnlyHarvestersInMarquee)
+	const bool bOnlyHarvestersInMarquee = GetIsMarqueePawnsOnlyHarvester(NewMarqueeSelectedPawns);
+	if (bIsHoldingShift && bOnlyHarvestersInMarquee)
 	{
 		// No harvesters to remove from selection as the player attempted to add ONLY harvesters.
 		// So we allow adding harvesters in this specific case.
@@ -3616,6 +3661,7 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	default:
 		// execute a button on the next click
 		bM_IsActionButtonActive = true;
+		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
 		UpdateCursor();
 	}
 }
@@ -5228,6 +5274,10 @@ void ACPPController::DeactivateActionButton()
 	bM_IsActionButtonActive = false;
 	M_ActiveAbility = EAbilityID::IdNoAbility;
 	UpdateCursor();
+	if (GetIsValidPlayerAimAbilityActor())
+	{
+		M_PlayerAimAbility->HideRadius();
+	}
 }
 
 void ACPPController::InitFowManager()

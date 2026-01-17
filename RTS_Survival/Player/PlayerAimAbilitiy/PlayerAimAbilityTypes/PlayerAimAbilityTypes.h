@@ -8,4 +8,7 @@ enum class EPlayerAimAbilityTypes : uint8
 	None,
 	AntiInfantryGrenade,
 	AntiVehicleGrenade,
+	SmallCrosshair,
+	MediumCrosshair,
+	LargeCrosshair
 };

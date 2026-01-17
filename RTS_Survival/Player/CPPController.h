@@ -647,8 +647,9 @@ protected:
 	UPROPERTY()
 	ALandscapedeformManager* M_LdfManager;
 
-	UPROPERTY()
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AimAbility")
 	TSubclassOf<APlayerAimAbility> M_PlayerAimAbilityClass;
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ControlGroups")
 	void UseControlGroup(const int32 GroupIndex);
@@ -794,6 +795,10 @@ private:
 	// use IsPlayerAimActive to determine if the ability is active.
 	UPROPERTY()
 	TObjectPtr<APlayerAimAbility> M_PlayerAimAbility;
+	[[nodiscard]] bool GetIsValidPlayerAimAbilityActor() const;
+	void UpdateAimAbilityAtCursorProjection(const float DeltaTime, const FHitResult& CursorProjection) const;
+
+	void DetermineShowAimAbilityAtCursorProjection(const EAbilityID AbilityJustActivated, const int32 AbilitySubtype);
 
 	void BeginPlay_SetupPlayerAimAbility();
 
