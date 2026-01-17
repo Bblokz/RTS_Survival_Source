@@ -430,61 +430,32 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
 {
-	if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
-	{
-		return GetAbilityEntryOfCustomType(
-			EAbilityID::IdApplyBehaviour,
-			static_cast<int32>(QueuedCommand.BehaviourAbilityType));
-	}
-
-	if (QueuedCommand.CommandType == EAbilityID::IdFieldConstruction)
-	{
-		return GetAbilityEntryOfCustomType(
-			EAbilityID::IdFieldConstruction,
-			static_cast<int32>(QueuedCommand.FieldConstructionType));
-	}
-
-	if ((QueuedCommand.CommandType == EAbilityID::IdActivateMode) || (QueuedCommand.CommandType ==
-		EAbilityID::IdDisableMode))
-	{
-		return GetAbilityEntryOfCustomType(
-			QueuedCommand.CommandType,
-			static_cast<int32>(QueuedCommand.ModeAbilityType));
-	}
-
-	if ((QueuedCommand.CommandType == EAbilityID::IdThrowGrenade)
-		|| (QueuedCommand.CommandType == EAbilityID::IdCancelThrowGrenade))
-	{
-		return GetAbilityEntryOfCustomType(
-			QueuedCommand.CommandType,
-			static_cast<int32>(QueuedCommand.GrenadeAbilityType));
-	}
-
-	return nullptr;
+	return GetAbilityEntryOfCustomType(QueuedCommand.CommandType, QueuedCommand.CustomType);
 }
 
 FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const
 {
 	if (QueuedCommand.CommandType == EAbilityID::IdApplyBehaviour)
 	{
-		return " with behaviour type: " + UEnum::GetValueAsString(QueuedCommand.BehaviourAbilityType);
+		return " with behaviour type: " + UEnum::GetValueAsString(QueuedCommand.GetBehaviourAbilitySubtype());
 	}
 
 	if ((QueuedCommand.CommandType == EAbilityID::IdActivateMode) || (QueuedCommand.CommandType ==
 		EAbilityID::IdDisableMode))
 	{
-		return " with mode type: " + UEnum::GetValueAsString(QueuedCommand.ModeAbilityType);
+		return " with mode type: " + UEnum::GetValueAsString(QueuedCommand.GetModeAbilitySubtype());
 	}
 
 	if (QueuedCommand.CommandType == EAbilityID::IdFieldConstruction)
 	{
-		return " with field construction type: " + UEnum::GetValueAsString(QueuedCommand.FieldConstructionType);
+		return " with field construction type: " + UEnum::GetValueAsString(
+			QueuedCommand.GetFieldConstructionSubtype());
 	}
 
 	if ((QueuedCommand.CommandType == EAbilityID::IdThrowGrenade)
 		|| (QueuedCommand.CommandType == EAbilityID::IdCancelThrowGrenade))
 	{
-		return " with grenade type: " + UEnum::GetValueAsString(QueuedCommand.GrenadeAbilityType);
+		return " with grenade type: " + UEnum::GetValueAsString(QueuedCommand.GetGrenadeAbilitySubtype());
 	}
 
 	return FString{};
@@ -577,9 +548,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	const FVector& Location,
 	AActor* TargetActor,
 	const FRotator& Rotation,
-	const EBehaviourAbilityType BehaviourAbility,
-	const EModeAbilityType ModeAbility,
-	const EFieldConstructionType FieldConstructionType, const EGrenadeAbilityType GrenadeAbilityType)
+	const int32 CustomType)
 {
 	// Check if we have an active queue and if we are not patrolling.
 	// In case we shift click while the queue 
@@ -600,10 +569,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NewCmd.TargetLocation = Location;
 	NewCmd.TargetActor = TargetActor;
 	NewCmd.TargetRotator = Rotation;
-	NewCmd.BehaviourAbilityType = BehaviourAbility;
-	NewCmd.ModeAbilityType = ModeAbility;
-	NewCmd.FieldConstructionType = FieldConstructionType;
-	NewCmd.GrenadeAbilityType = GrenadeAbilityType;
+	NewCmd.CustomType = CustomType;
 
 	// Insert at the end
 	M_TCommands[NumCommands] = NewCmd;
@@ -794,12 +760,12 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		break;
 	case EAbilityID::IdThrowGrenade:
 		{
-			M_Owner->ExecuteThrowGrenadeCommand(Cmd.TargetLocation, Cmd.GrenadeAbilityType);
+			M_Owner->ExecuteThrowGrenadeCommand(Cmd.TargetLocation, Cmd.GetGrenadeAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdCancelThrowGrenade:
 		{
-			M_Owner->ExecuteCancelThrowGrenadeCommand(Cmd.GrenadeAbilityType);
+			M_Owner->ExecuteCancelThrowGrenadeCommand(Cmd.GetGrenadeAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdReturnToBase:
@@ -824,23 +790,23 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		break;
 	case EAbilityID::IdApplyBehaviour:
 		{
-			ExecuteBehaviourAbility(Cmd.BehaviourAbilityType, false);
+			ExecuteBehaviourAbility(Cmd.GetBehaviourAbilitySubtype(), false);
 		}
 		break;
 	case EAbilityID::IdActivateMode:
 		{
-			ExecuteModeAbility(Cmd.ModeAbilityType);
+			ExecuteModeAbility(Cmd.GetModeAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdDisableMode:
 		{
-			ExecuteDisableModeAbility(Cmd.ModeAbilityType);
+			ExecuteDisableModeAbility(Cmd.GetModeAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdFieldConstruction:
 		{
 			AActor* StaticPreviewActor = Cmd.TargetActor.IsValid() ? Cmd.TargetActor.Get() : nullptr;
-			M_Owner->ExecuteFieldConstructionCommand(Cmd.FieldConstructionType, Cmd.TargetLocation,
+			M_Owner->ExecuteFieldConstructionCommand(Cmd.GetFieldConstructionSubtype(), Cmd.TargetLocation,
 			                                         Cmd.TargetRotator, StaticPreviewActor);
 		}
 		break;
@@ -1005,7 +971,7 @@ void UCommandData::TerminateFieldConstructionCommand()
 	}
 
 	AActor* const StaticPreviewActor = CurrentCmd->TargetActor.Get();
-	const EFieldConstructionType ConstructionType = CurrentCmd->FieldConstructionType;
+	const EFieldConstructionType ConstructionType = CurrentCmd->GetFieldConstructionSubtype();
 
 	M_Owner->TerminateFieldConstructionCommand(ConstructionType, StaticPreviewActor);
 }
@@ -1337,7 +1303,7 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 			FVector::ZeroVector,
 			/*TargetActor=*/nullptr,
 			/*Rotation=*/FRotator::ZeroRotator,
-			BehaviourAbility);
+			static_cast<int32>(BehaviourAbility));
 	}
 	UnitCommandData->ExecuteBehaviourAbility(BehaviourAbility, true);
 	return ECommandQueueError::NoError;
@@ -1373,9 +1339,7 @@ ECommandQueueError ICommands::FieldConstruction(const EFieldConstructionType Fie
 		ConstructionLocation,
 		/*TargetActor=*/StaticPreview,
 		ConstructionRotation,
-		/*BehaviourAbility=*/EBehaviourAbilityType::DefaultSprint,
-		/*ModeAbility=*/EModeAbilityType::DefaultSniperOverwatch,
-		FieldConstruction);
+		static_cast<int32>(FieldConstruction));
 }
 
 ECommandQueueError ICommands::ActivateModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle)
@@ -1413,8 +1377,7 @@ ECommandQueueError ICommands::ActivateModeAbility(const EModeAbilityType ModeAbi
 		FVector::ZeroVector,
 		/*TargetActor=*/nullptr,
 		/*Rotation=*/FRotator::ZeroRotator,
-		EBehaviourAbilityType::DefaultSprint,
-		ModeAbilityType);
+		static_cast<int32>(ModeAbilityType));
 }
 
 ECommandQueueError ICommands::DisableModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle)
@@ -1451,8 +1414,7 @@ ECommandQueueError ICommands::DisableModeAbility(const EModeAbilityType ModeAbil
 		FVector::ZeroVector,
 		/*TargetActor=*/nullptr,
 		/*Rotation=*/FRotator::ZeroRotator,
-		EBehaviourAbilityType::DefaultSprint,
-		ModeAbilityType);
+		static_cast<int32>(ModeAbilityType));
 }
 
 ECommandQueueError ICommands::AttackGround(const FVector& Location, const bool bSetUnitToIdle)
@@ -1738,9 +1700,7 @@ ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool b
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdThrowGrenade, Location, nullptr,
-		FRotator::ZeroRotator, EBehaviourAbilityType::DefaultSprint,
-		EModeAbilityType::DefaultSniperOverwatch, EFieldConstructionType::DefaultGerHedgeHog,
-		GrenadeAbilityType);
+		FRotator::ZeroRotator, static_cast<int32>(GrenadeAbilityType));
 	return Error;
 }
 
@@ -1768,9 +1728,7 @@ ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle,
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdCancelThrowGrenade, FVector::ZeroVector, nullptr,
-		FRotator::ZeroRotator, EBehaviourAbilityType::DefaultSprint,
-		EModeAbilityType::DefaultSniperOverwatch, EFieldConstructionType::DefaultGerHedgeHog,
-		GrenadeAbilityType);
+		FRotator::ZeroRotator, static_cast<int32>(GrenadeAbilityType));
 	return Error;
 }
 
@@ -2487,7 +2445,7 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 				return;
 			}
 
-			TerminateThrowGrenadeCommand(CurrentCommand->GrenadeAbilityType);
+			TerminateThrowGrenadeCommand(CurrentCommand->GetGrenadeAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdCancelThrowGrenade:
@@ -2504,7 +2462,7 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 				return;
 			}
 
-			TerminateCancelThrowGrenadeCommand(CurrentCommand->GrenadeAbilityType);
+			TerminateCancelThrowGrenadeCommand(CurrentCommand->GetGrenadeAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdRepair:

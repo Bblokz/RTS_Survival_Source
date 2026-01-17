@@ -58,26 +58,36 @@ public:
 	FRotator TargetRotator;
 
 	UPROPERTY()
-	EBehaviourAbilityType BehaviourAbilityType;
+	int32 CustomType;
 
-	UPROPERTY()
-	EModeAbilityType ModeAbilityType;
+	static constexpr int32 DefaultCustomType = 0;
 
-	UPROPERTY()
-	EFieldConstructionType FieldConstructionType;
+	EBehaviourAbilityType GetBehaviourAbilitySubtype() const
+	{
+		return static_cast<EBehaviourAbilityType>(CustomType);
+	}
 
-	UPROPERTY()
-	EGrenadeAbilityType GrenadeAbilityType;
+	EModeAbilityType GetModeAbilitySubtype() const
+	{
+		return static_cast<EModeAbilityType>(CustomType);
+	}
+
+	EFieldConstructionType GetFieldConstructionSubtype() const
+	{
+		return static_cast<EFieldConstructionType>(CustomType);
+	}
+
+	EGrenadeAbilityType GetGrenadeAbilitySubtype() const
+	{
+		return static_cast<EGrenadeAbilityType>(CustomType);
+	}
 
 	FQueueCommand()
 		: CommandType(EAbilityID::IdNoAbility)
 		  , TargetLocation(FVector::ZeroVector)
 		  , TargetActor(nullptr)
 		  , TargetRotator(FRotator::ZeroRotator)
-		  , BehaviourAbilityType(EBehaviourAbilityType::DefaultSprint)
-		  , ModeAbilityType(EModeAbilityType::DefaultSniperOverwatch)
-		  , FieldConstructionType(EFieldConstructionType::DefaultGerHedgeHog)
-		  , GrenadeAbilityType(EGrenadeAbilityType::DefaultGerBundleGrenade)
+		  , CustomType(DefaultCustomType)
 	{
 	}
 };
@@ -198,10 +208,7 @@ private:
 		const FVector& Location = FVector::ZeroVector,
 		AActor* TargetActor = nullptr,
 		const FRotator& Rotation = FRotator::ZeroRotator,
-		const EBehaviourAbilityType BehaviourAbility = EBehaviourAbilityType::DefaultSprint,
-		const EModeAbilityType ModeAbility = EModeAbilityType::DefaultSniperOverwatch,
-		const EFieldConstructionType FieldConstructionType = EFieldConstructionType::DefaultGerHedgeHog, const
-		EGrenadeAbilityType GrenadeAbilityType = EGrenadeAbilityType::DefaultGerBundleGrenade
+		const int32 CustomType = FQueueCommand::DefaultCustomType
 	);
 
 	void StartCooldownForCommand(const FQueueCommand& Command);
