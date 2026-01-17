@@ -101,7 +101,7 @@ namespace FAbilityHelpers
 	                                   FUnitAbilityEntry& OutAbilityOfBehaviour)
 	{
 		const int32 CustomDataForBehaviour = static_cast<int32>(BehaviourAbility);
-		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
+		for (FUnitAbilityEntry AbilityEntry : UnitAbilities)
 		{
 			if (AbilityEntry.AbilityId == EAbilityID::IdApplyBehaviour &&
 				AbilityEntry.CustomType == CustomDataForBehaviour)

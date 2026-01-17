@@ -170,6 +170,8 @@ public:
 
 	void UpdateActionUI();
 
+	bool StartCooldownOnAbility(const EAbilityID AbilityID, const int32 CustomType);
+
 private:
 	// The manager that updates the ability UI for this unit.
 	// If set the unit is primary selected.
@@ -184,7 +186,7 @@ private:
 	bool GetDoesQueuedCommandRequireSubtypeEntry(EAbilityID AbilityId) const;
 	FUnitAbilityEntry* GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand);
 	FString GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedCommand) const;
-	bool GetIsQueuedCommandAbilityEntryOnCooldown(EAbilityID AbilityId, const FUnitAbilityEntry* AbilityEntry,
+	bool GetIsAbilityEntryOnCooldown(EAbilityID AbilityId, const FUnitAbilityEntry* AbilityEntry,
 	                                              const FString& SubtypeSuffix) const;
 
 	void OnCommandInQueueCancelled(const FQueueCommand& CancelledCommand);

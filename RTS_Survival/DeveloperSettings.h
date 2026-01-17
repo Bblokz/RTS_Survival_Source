@@ -1382,12 +1382,12 @@ namespace DeveloperSettings
 	{
 		constexpr bool GNomadicSkeletalAttachments_Compile_DebugSymbols = false;
 		// Overlap logic; tanks evasion.
-		constexpr bool GTankOverlaps_Compile_DebugSymbols = true;
+		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
 		constexpr bool GEnemyController_Compile_DebugSymbols = false;
 		constexpr bool GEnemyController_StrategicAI_Compile_DebugSymbols = true;
-		constexpr bool GEnemyController_NavDetector_DebugSymbols = true;
+		constexpr bool GEnemyController_NavDetector_DebugSymbols = false;
 		constexpr bool ExplosionsManager_Compile_DebugSymbols = false;
 		constexpr bool GPlayerStartLocations_Compile_DebugSymbols = false;
 		constexpr bool GCamera_Player_Compile_DebugSymbols = false;
@@ -1408,7 +1408,7 @@ namespace DeveloperSettings
 		constexpr bool GArchProjectile_Compile_DebugSymbols = false;
 		// Reinforcement provider and ability debug draws.
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
-		constexpr bool GPathFollowing_Compile_DebugSymbols = true;
+		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
 		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
 		constexpr bool GPathFindingCosts_Compile_DebugSymbols = true;
 		// Track animation
@@ -1419,7 +1419,7 @@ namespace DeveloperSettings
 		constexpr bool GPlayerClickAndAction_Compile_DebugSymbols = false;
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting
-		constexpr bool GHarvestResources_Compile_DebugSymbols = true;
+		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
 		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Resistances_Compile_DebugSymbols = false;

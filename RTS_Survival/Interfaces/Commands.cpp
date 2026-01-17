@@ -342,6 +342,25 @@ void UCommandData::UpdateActionUI()
 	}
 }
 
+bool UCommandData::StartCooldownOnAbility(const EAbilityID AbilityID, const int32 CustomType)
+{
+	for (auto& AbilityEntry : M_Abilities)
+	{
+		if (AbilityEntry.AbilityId == AbilityID && (CustomType == INDEX_NONE || AbilityEntry.CustomType == CustomType))
+		{
+			if (AbilityEntry.CooldownDuration <= 0)
+			{
+				return false;
+			}
+
+			AbilityEntry.CooldownRemaining = AbilityEntry.CooldownDuration;
+			StartAbilityCooldownTimer();
+			return true;
+		}
+	}
+	return false;
+}
+
 const FQueueCommand* UCommandData::GetCurrentQueuedCommand() const
 {
 	if (CurrentIndex >= 0 && CurrentIndex < NumCommands)
@@ -358,7 +377,7 @@ bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCom
 
 	if (not IsAbilityRequiredOnCommandCard(CommandType))
 	{
-		// cannot use cooldown as it has no ability entry.
+		// cannot use cooldown as it has no ability entry and is therefore always allowed.
 		return true;
 	}
 	if (GetDoesQueuedCommandRequireSubtypeEntry(CommandType))
@@ -376,8 +395,8 @@ bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCom
 			return false;
 		}
 
-		if (GetIsQueuedCommandAbilityEntryOnCooldown(CommandType, SubtypeAbilityEntry,
-		                                             GetQueuedCommandSubtypeSuffix(QueuedCommand)))
+		if (GetIsAbilityEntryOnCooldown(CommandType, SubtypeAbilityEntry,
+		                                GetQueuedCommandSubtypeSuffix(QueuedCommand)))
 		{
 			return false;
 		}
@@ -392,7 +411,7 @@ bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCom
 	}
 
 	const FUnitAbilityEntry* const AbilityEntry = GetAbilityEntry(CommandType);
-	if (GetIsQueuedCommandAbilityEntryOnCooldown(CommandType, AbilityEntry, FString{}))
+	if (GetIsAbilityEntryOnCooldown(CommandType, AbilityEntry, FString{}))
 	{
 		return false;
 	}
@@ -461,7 +480,7 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 	return FString{};
 }
 
-bool UCommandData::GetIsQueuedCommandAbilityEntryOnCooldown(
+bool UCommandData::GetIsAbilityEntryOnCooldown(
 	const EAbilityID AbilityId,
 	const FUnitAbilityEntry* const AbilityEntry,
 	const FString& SubtypeSuffix) const
@@ -1288,7 +1307,6 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 	if (not FAbilityHelpers::GetHasBehaviourAbility(UnitCommandData->GetAbilities(), BehaviourAbility,
 	                                                BehaviourAbilityEntry))
 	{
-		return ECommandQueueError::AbilityNotAllowed;
 	}
 	if (BehaviourAbilityEntry.CooldownRemaining > 0)
 	{
@@ -1304,6 +1322,19 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 			/*TargetActor=*/nullptr,
 			/*Rotation=*/FRotator::ZeroRotator,
 			static_cast<int32>(BehaviourAbility));
+	}
+
+	// no queuing but do start the cooldown if needed to prevent spam.
+	if (BehaviourAbilityEntry.CooldownDuration > 0)
+	{
+		if (not UnitCommandData->StartCooldownOnAbility(EAbilityID::IdApplyBehaviour,
+		                                                static_cast<int32>(BehaviourAbility)))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Failed to start cooldown on behaviour ability when activating without queueing"
+				"\n eventhough the behaviour has a non zero cooldown: " + UEnum::GetValueAsString(BehaviourAbility) +
+				" with: " + FString::FromInt(BehaviourAbilityEntry.CooldownDuration));
+		}
 	}
 	UnitCommandData->ExecuteBehaviourAbility(BehaviourAbility, true);
 	return ECommandQueueError::NoError;
