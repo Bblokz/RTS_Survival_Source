@@ -47,6 +47,7 @@ public:
 	int32 GetMaxStackCount() const;
 	bool UsesTick() const;
 	bool IsTimedBehaviour() const;
+	const FRepeatedBehaviourTextSettings& GetAnimatedTextSettings() const;
 
 	void InitializeBehaviour(UBehaviourComp* InOwningComponent);
 	void RefreshLifetime();

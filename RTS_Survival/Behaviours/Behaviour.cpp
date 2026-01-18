@@ -85,6 +85,11 @@ bool UBehaviour::IsTimedBehaviour() const
 	return BehaviourLifeTime == EBehaviourLifeTime::Timed;
 }
 
+const FRepeatedBehaviourTextSettings& UBehaviour::GetAnimatedTextSettings() const
+{
+	return AnimatedTextSettings;
+}
+
 void UBehaviour::InitializeBehaviour(UBehaviourComp* InOwningComponent)
 {
 	M_OwningComponent = InOwningComponent;

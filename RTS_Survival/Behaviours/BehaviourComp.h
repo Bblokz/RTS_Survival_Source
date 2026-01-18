@@ -9,6 +9,16 @@
 
 class UBehaviour;
 class UActionUIManager;
+class UAnimatedTextWidgetPoolManager;
+
+struct FBehaviourCompAnimatedTextState
+{
+	FBehaviourTextSettings TextSettings;
+	EBehaviourRepeatedVerticalTextStrategy RepeatStrategy = EBehaviourRepeatedVerticalTextStrategy::PerAmountRepeats;
+	float RepeatIntervalSeconds = 0.f;
+	float TimeSinceLastTextSeconds = 0.f;
+	int32 RemainingRepeats = 0;
+};
 
 /**
  * @brief Component that owns and manages lifecycle of behaviours.
@@ -185,6 +195,23 @@ private:
 
 	void NotifyActionUIManagerOfBehaviourUpdate();
 	bool GetIsValidActionUIManager() const;
+	bool GetIsValidAnimatedTextWidgetPoolManager() const;
+	void BeginPlay_InitAnimatedTextWidgetPoolManager();
+	void HandleBehaviourAddedText(UBehaviour& Behaviour);
+	void HandleBehaviourRemovedText(const UBehaviour& Behaviour);
+	void HandleAnimatedTextTick(const float DeltaTime);
+	/**
+	 * @brief Cache repeat timing so tick processing can re-use settings without re-querying behaviours.
+	 * @param Behaviour Behaviour that owns the animated text settings.
+	 * @param AnimatedTextSettings Source settings to cache.
+	 * @param RemainingRepeats Remaining repeats after the initial display (ignored for infinite repeats).
+	 */
+	void RegisterAnimatedTextState(UBehaviour& Behaviour, const FRepeatedBehaviourTextSettings& AnimatedTextSettings,
+	                               const int32 RemainingRepeats);
+	bool ShouldRegisterAnimatedTextState(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const;
+	bool ShowAnimatedTextForOwner(const FBehaviourTextSettings& TextSettings) const;
+	bool ShouldRepeatAnimatedText(const FBehaviourCompAnimatedTextState& TextState) const;
+	int32 GetInitialRemainingRepeats(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UBehaviour>> M_Behaviours;
@@ -207,4 +234,10 @@ private:
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
 
 	bool bM_HasActionUIManagerRegistration = false;
+
+	UPROPERTY()
+	TWeakObjectPtr<UAnimatedTextWidgetPoolManager> M_AnimatedTextWidgetPoolManager;
+
+	// Tracks animated text repeat timing for each active behaviour.
+	TMap<TWeakObjectPtr<UBehaviour>, FBehaviourCompAnimatedTextState> M_BehaviourAnimatedTextStates;
 };
