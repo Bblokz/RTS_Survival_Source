@@ -42,6 +42,10 @@ struct FBehaviourWeaponAttributes
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float Range = 0.0f;
 
+	// Gun diameter in mm.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	int32 WeaponCalibre = 0;
+
 	// Base cooldown time between individual shots, measured in seconds.
 	UPROPERTY(BlueprintReadOnly)
 	float BaseCooldown = 0.0f;
