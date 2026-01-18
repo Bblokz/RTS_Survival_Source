@@ -11,7 +11,7 @@
 
 namespace BehaviourCompConstants
 {
-	constexpr float ComponentTickIntervalSeconds = 0.5f;
+	constexpr float ComponentTickIntervalSeconds = 2.f;
 	constexpr float DebugDrawHeight = 500.f;
 }
 
