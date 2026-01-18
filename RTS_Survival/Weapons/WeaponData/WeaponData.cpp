@@ -2252,7 +2252,10 @@ void UWeaponStateRocketProjectile::InitRocketProjectileWeapon(
 	const int32 NewMinBurstAmount,
 	const bool bNewCreateShellCasingOnEveryRandomBurst)
 {
+	constexpr int32 InitialRocketSocketIndex = 0;
+
 	M_RocketSettings = NewRocketSettings;
+	M_NextRocketSocketIndex = InitialRocketSocketIndex;
 	InitProjectileWeapon(
 		NewOwningPlayer,
 		NewWeaponIndex,
@@ -2279,6 +2282,59 @@ void UWeaponStateRocketProjectile::FireWeaponSystem()
 	}
 }
 
+TPair<FVector, FVector> UWeaponStateRocketProjectile::GetLaunchAndForwardVectorForRocketSocket()
+{
+	if (not IsValid(MeshComponent))
+	{
+		return TPair<FVector, FVector>(FVector::ZeroVector, FVector::ZeroVector);
+	}
+
+	constexpr int32 FirstSocketIndex = 0;
+	constexpr int32 SocketIndexIncrement = 1;
+	const int32 SocketCount = M_RocketSettings.FireSocketNames.Num();
+	const bool bHasSocketOverrides = SocketCount > FirstSocketIndex;
+	const int32 MaxSocketIndex = SocketCount - SocketIndexIncrement;
+	const int32 SelectedSocketIndex = bHasSocketOverrides
+		? FMath::Clamp(M_NextRocketSocketIndex, FirstSocketIndex, MaxSocketIndex)
+		: FirstSocketIndex;
+	const FName SelectedSocketName = bHasSocketOverrides
+		? M_RocketSettings.FireSocketNames[SelectedSocketIndex]
+		: FireSocketName;
+
+	if (bHasSocketOverrides)
+	{
+		M_NextRocketSocketIndex = (SelectedSocketIndex + SocketIndexIncrement) % SocketCount;
+	}
+
+	const FName SocketNameToUse = SelectedSocketName.IsNone() ? FireSocketName : SelectedSocketName;
+	const FVector LaunchLocation = MeshComponent->GetSocketLocation(SocketNameToUse);
+	const FQuat SocketRotation = MeshComponent->GetSocketQuaternion(SocketNameToUse);
+	const FVector ForwardVector = SocketRotation.GetForwardVector();
+
+	// draw debug of socket forward vector 200 units.
+	if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
+	{
+		if (IsValid(World))
+		{
+			constexpr float DebugLineLength = 200.0f;
+			constexpr float DebugLineLifetime = 0.1f;
+			constexpr int32 DebugLineDepthPriority = 0;
+			constexpr float DebugLineThickness = 5.0f;
+
+			DrawDebugLine(World,
+			              LaunchLocation,
+			              LaunchLocation + ForwardVector * DebugLineLength,
+			              FColor::Red,
+			              false,
+			              DebugLineLifetime,
+			              DebugLineDepthPriority,
+			              DebugLineThickness);
+		}
+	}
+
+	return TPair<FVector, FVector>(LaunchLocation, ForwardVector);
+}
+
 void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationRaw)
 {
 	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
@@ -2287,7 +2343,7 @@ void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationR
 		return;
 	}
 
-	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
+	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVectorForRocketSocket();
 	const FVector LaunchLocation = LaunchAndForward.Key;
 
 	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
