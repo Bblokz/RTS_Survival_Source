@@ -857,6 +857,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 
 	WeaponDataToUpgrade->BaseDamage -= CurrentBehaviourAttributes.Damage;
 	WeaponDataToUpgrade->Range -= CurrentBehaviourAttributes.Range;
+	WeaponDataToUpgrade->WeaponCalibre -= static_cast<float>(CurrentBehaviourAttributes.WeaponCalibre);
 	WeaponDataToUpgrade->ArmorPen -= CurrentBehaviourAttributes.ArmorPenetration;
 	WeaponDataToUpgrade->ArmorPenMaxRange -= CurrentBehaviourAttributes.ArmorPenetrationMaxRange;
 	WeaponDataToUpgrade->ReloadSpeed -= CurrentBehaviourAttributes.ReloadSpeed;
@@ -868,6 +869,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	{
 		CurrentBehaviourAttributes.Damage += BehaviourWeaponAttributes.Damage;
 		CurrentBehaviourAttributes.Range += BehaviourWeaponAttributes.Range;
+		CurrentBehaviourAttributes.WeaponCalibre += BehaviourWeaponAttributes.WeaponCalibre;
 		CurrentBehaviourAttributes.ArmorPenetration += BehaviourWeaponAttributes.ArmorPenetration;
 		CurrentBehaviourAttributes.ArmorPenetrationMaxRange += BehaviourWeaponAttributes.ArmorPenetrationMaxRange;
 		CurrentBehaviourAttributes.ReloadSpeed += BehaviourWeaponAttributes.ReloadSpeed;
@@ -879,6 +881,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	{
 		CurrentBehaviourAttributes.Damage -= BehaviourWeaponAttributes.Damage;
 		CurrentBehaviourAttributes.Range -= BehaviourWeaponAttributes.Range;
+		CurrentBehaviourAttributes.WeaponCalibre -= BehaviourWeaponAttributes.WeaponCalibre;
 		CurrentBehaviourAttributes.ArmorPenetration -= BehaviourWeaponAttributes.ArmorPenetration;
 		CurrentBehaviourAttributes.ArmorPenetrationMaxRange -= BehaviourWeaponAttributes.ArmorPenetrationMaxRange;
 		CurrentBehaviourAttributes.ReloadSpeed -= BehaviourWeaponAttributes.ReloadSpeed;
@@ -889,6 +892,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 
 	WeaponDataToUpgrade->BaseDamage += CurrentBehaviourAttributes.Damage;
 	WeaponDataToUpgrade->Range += CurrentBehaviourAttributes.Range;
+	WeaponDataToUpgrade->WeaponCalibre += static_cast<float>(CurrentBehaviourAttributes.WeaponCalibre);
 	WeaponDataToUpgrade->ArmorPen += CurrentBehaviourAttributes.ArmorPenetration;
 	WeaponDataToUpgrade->ArmorPenMaxRange += CurrentBehaviourAttributes.ArmorPenetrationMaxRange;
 	WeaponDataToUpgrade->ReloadSpeed += CurrentBehaviourAttributes.ReloadSpeed;

@@ -26,6 +26,9 @@ struct FBehaviourWeaponMultipliers
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     float RangeMlt = 0.0f;
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
+    float WeaponCalibreMlt = 0.0f;
+
     // Base cooldown time between individual shots, measured in seconds.
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     float BaseCooldownMlt = 0.0f;
