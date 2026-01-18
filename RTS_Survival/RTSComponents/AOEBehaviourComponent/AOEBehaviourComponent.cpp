@@ -294,12 +294,17 @@ void UAOEBehaviourComponent::FilterUniqueActorsInPlace(TArray<FHitResult>& InOut
 
 void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults)
 {
-	TSet<TWeakObjectPtr<UBehaviourComp>> CurrentTargets;
-	TArray<UBehaviourComp*> BehaviourComponentsInRange;
 	FilterUniqueActorsInPlace(HitResults);
+
+	TSet<TWeakObjectPtr<UBehaviourComp>> CurrentTargets;
+	CurrentTargets.Reserve(HitResults.Num());
+
+	TArray<UBehaviourComp*> BehaviourComponentsInRange;
+	BehaviourComponentsInRange.Reserve(HitResults.Num());
+
 	for (const FHitResult& Hit : HitResults)
 	{
-		AActor* HitActor = Hit.GetActor();
+		AActor* const HitActor = Hit.GetActor();
 		if (not IsValid(HitActor))
 		{
 			continue;
@@ -310,21 +315,10 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 			continue;
 		}
 
-		UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
+		UBehaviourComp* const BehaviourComponent = TryGetBehaviourCompForHitActor(HitActor);
 		if (not IsValid(BehaviourComponent))
 		{
-			if(AOEBehaviourSettings.bAffectSquadControllers)
-			{
-				BehaviourComponent = GetBehaviourCompOfSquadController(HitActor);
-				if(not BehaviourComponent)
-				{
-					continue;
-				}
-			}
-			else
-			{
-				continue;
-			}
+			continue;
 		}
 
 		CurrentTargets.Add(BehaviourComponent);
@@ -337,30 +331,16 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 
 	if (AOEBehaviourSettings.ApplyStrategy == EInAOEBehaviourApplyStrategy::ApplyOnlyOnEnter)
 	{
-		for (UBehaviourComp* BehaviourComponent : AddedTargets)
-		{
-			if (not IsValid(BehaviourComponent))
-			{
-				continue;
-			}
-			ApplyBehavioursToTarget(*BehaviourComponent);
-		}
+		ApplyBehavioursToAddedTargets(AddedTargets);
 	}
 
-	for (UBehaviourComp* BehaviourComponent : RemovedTargets)
-	{
-		if (not IsValid(BehaviourComponent))
-		{
-			continue;
-		}
-
-		RemoveBehavioursFromTarget(*BehaviourComponent);
-	}
+	RemoveBehavioursFromRemovedTargets(RemovedTargets);
 
 	OnNewlyEnteredRadius(AddedTargets);
 	OnLeftRadius(RemovedTargets);
 	OnTickComponentsInRange(BehaviourComponentsInRange);
 	ApplyTextForTargets(BehaviourComponentsInRange);
+
 	M_TrackedBehaviourComponents = MoveTemp(CurrentTargets);
 }
 
@@ -553,4 +533,51 @@ UBehaviourComp* UAOEBehaviourComponent::GetBehaviourCompOfSquadController(AActor
 		return nullptr;
 	}
 	return SquadController->GetBehaviourComponentOfSquad();
+}
+
+UBehaviourComp* UAOEBehaviourComponent::TryGetBehaviourCompForHitActor(AActor* HitActor) const
+{
+	if (not IsValid(HitActor))
+	{
+		return nullptr;
+	}
+
+	UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
+	if (IsValid(BehaviourComponent))
+	{
+		return BehaviourComponent;
+	}
+
+	if (not AOEBehaviourSettings.bAffectSquadControllers)
+	{
+		return nullptr;
+	}
+
+	return GetBehaviourCompOfSquadController(HitActor);
+}
+
+void UAOEBehaviourComponent::ApplyBehavioursToAddedTargets(const TArray<UBehaviourComp*>& AddedTargets) const
+{
+	for (UBehaviourComp* BehaviourComponent : AddedTargets)
+	{
+		if (not IsValid(BehaviourComponent))
+		{
+			continue;
+		}
+
+		ApplyBehavioursToTarget(*BehaviourComponent);
+	}
+}
+
+void UAOEBehaviourComponent::RemoveBehavioursFromRemovedTargets(const TArray<UBehaviourComp*>& RemovedTargets) const
+{
+	for (UBehaviourComp* BehaviourComponent : RemovedTargets)
+	{
+		if (not IsValid(BehaviourComponent))
+		{
+			continue;
+		}
+
+		RemoveBehavioursFromTarget(*BehaviourComponent);
+	}
 }

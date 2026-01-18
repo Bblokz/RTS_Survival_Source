@@ -4,8 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
+#include "RTS_Survival/Behaviours/BehaviourVerticalTextSettings/BehaviourVerticalTextSettings.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
+#include "RTS_Survival/RTSComponents/AOEBehaviourComponent/Constants/AoeBehaviourConstants.h"
 #include "AOEBehaviourComponent.generated.h"
 
 class UBehaviour;
@@ -13,14 +14,6 @@ class UBehaviourComp;
 class UAnimatedTextWidgetPoolManager;
 class URTSComponent;
 
-namespace AOEBehaviourComponentConstants
-{
-	constexpr float DefaultIntervalSeconds = 2.25f;
-	constexpr float DefaultRadius = 450.f;
-	constexpr float DefaultTextOffsetZ = 120.f;
-	constexpr float DefaultWrapAt = 320.f;
-	constexpr float MinimumSweepRadius = 85.f;
-}
 
 UENUM(BlueprintType)
 enum class EInAOEBehaviourApplyStrategy : uint8
@@ -29,42 +22,6 @@ enum class EInAOEBehaviourApplyStrategy : uint8
 	ApplyOnlyOnEnter
 };
 
-/**
- * @brief Text layout settings for the AOE behaviour component.
- */
-USTRUCT(BlueprintType)
-struct RTS_SURVIVAL_API FAOEBehaviourTextSettings
-{
-	GENERATED_BODY()
-
-	/** When enabled, pooled text is shown above affected units each tick. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Animated Text")
-	bool bUseText = false;
-
-	/** Text shown above affected units. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Animated Text")
-	FString TextOnSubjects = TEXT("Aura");
-
-	/** Local offset from the target actor root component. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Animated Text")
-	FVector TextOffset = FVector(0.f, 0.f, AOEBehaviourComponentConstants::DefaultTextOffsetZ);
-
-	/** When true the text will auto-wrap at InWrapAt (set by the component). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Animated Text")
-	bool bAutoWrap = true;
-
-	/** Width in px when auto-wrap is enabled. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Animated Text")
-	float InWrapAt = AOEBehaviourComponentConstants::DefaultWrapAt;
-
-	/** Text justification for the rich text. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Animated Text")
-	TEnumAsByte<ETextJustify::Type> InJustification = ETextJustify::Center;
-
-	/** Animation timings and vertical motion. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour|Animated Text")
-	FRTSVerticalAnimTextSettings InSettings;
-};
 
 /**
  * @brief Settings for the AOE behaviour component.
@@ -93,7 +50,7 @@ struct RTS_SURVIVAL_API FAOEBehaviourSettings
 
 	/** Animated text settings for affected units. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
-	FAOEBehaviourTextSettings TextSettings;
+	FBehaviourTextSettings TextSettings;
 
 	/** Whether the component searches for distructables. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
@@ -220,4 +177,16 @@ private:
 	ETriggerOverlapLogic GetOverlapLogicForOwner() const;
 
 	UBehaviourComp* GetBehaviourCompOfSquadController(AActor* ValidHitActor) const;
+
+	
+	/**
+	 * @brief Resolve the behaviour component for a hit actor.
+	 * Falls back to the squad controller behaviour component when enabled in settings.
+	 * @param HitActor Actor that was hit by the sweep.
+	 * @return A valid behaviour component if found; otherwise nullptr.
+	 */
+	UBehaviourComp* TryGetBehaviourCompForHitActor(AActor* HitActor) const;
+
+void ApplyBehavioursToAddedTargets(const TArray<UBehaviourComp*>& AddedTargets) const;
+	void RemoveBehavioursFromRemovedTargets(const TArray<UBehaviourComp*>& RemovedTargets) const;
 };

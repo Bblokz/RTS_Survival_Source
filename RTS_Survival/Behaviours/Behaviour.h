@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BehaviourVerticalTextSettings/BehaviourVerticalTextSettings.h"
 #include "BuffDebuffType/BuffDebuffType.h"
 #include "Lifetime/BehaviourLifeTime.h"
 #include "StackRule/BehaviourStackRule.h"
@@ -58,6 +59,9 @@ protected:
 
 	UBehaviourComp* GetOwningBehaviourComp() const;
 	AActor* GetOwningActor() const;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|AnimatedText")
+	FRepeatedBehaviourTextSettings AnimatedTextSettings;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour")
 	EBehaviourLifeTime BehaviourLifeTime = EBehaviourLifeTime::None;
