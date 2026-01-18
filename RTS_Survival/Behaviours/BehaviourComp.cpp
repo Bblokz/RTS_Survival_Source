@@ -4,12 +4,14 @@
 
 #include "Behaviour.h"
 #include "DrawDebugHelpers.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace BehaviourCompConstants
 {
-	constexpr float ComponentTickIntervalSeconds = 2.f;
+	constexpr float ComponentTickIntervalSeconds = 0.5f;
 	constexpr float DebugDrawHeight = 500.f;
 }
 
@@ -24,6 +26,7 @@ void UBehaviourComp::BeginPlay()
 {
 	Super::BeginPlay();
 
+	BeginPlay_InitAnimatedTextWidgetPoolManager();
 	UpdateComponentTickEnabled();
 }
 
@@ -57,6 +60,7 @@ void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		RemoveBehaviourInstance(BehaviourToRemove);
 	}
 
+	HandleAnimatedTextTick(DeltaTime);
 	ProcessPendingOperations();
 	UpdateComponentTickEnabled();
 }
@@ -208,6 +212,11 @@ void UBehaviourComp::HandleBehaviourTick(const float DeltaTime, UBehaviour& Beha
 
 bool UBehaviourComp::ShouldComponentTick() const
 {
+	if (M_BehaviourAnimatedTextStates.Num() > 0)
+	{
+		return true;
+	}
+
 	for (const UBehaviour* Behaviour : M_Behaviours)
 	{
 		if (Behaviour == nullptr)
@@ -297,6 +306,7 @@ void UBehaviourComp::AddInitialisedBehaviour(UBehaviour* NewBehaviour)
 	NewBehaviour->InitializeBehaviour(this);
 	M_Behaviours.Add(NewBehaviour);
 	NewBehaviour->OnAdded(GetOwner());
+	HandleBehaviourAddedText(*NewBehaviour);
 	UpdateComponentTickEnabled();
 }
 
@@ -334,6 +344,7 @@ void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 	}
 
 	BehaviourInstance->OnRemoved(GetOwner());
+	HandleBehaviourRemovedText(*BehaviourInstance);
 	BehaviourInstance->ConditionalBeginDestroy();
 	M_Behaviours.Remove(BehaviourInstance);
 	NotifyActionUIManagerOfBehaviourUpdate();
@@ -370,6 +381,7 @@ void UBehaviourComp::ClearAllBehaviours()
 	}
 
 	M_Behaviours.Empty();
+	M_BehaviourAnimatedTextStates.Empty();
 }
 
 void UBehaviourComp::DebugDrawBehaviours(const float DurationSeconds) const
@@ -542,4 +554,181 @@ bool UBehaviourComp::GetIsValidActionUIManager() const
 		"UBehaviourComp::GetIsValidActionUIManager",
 		GetOwner());
 	return false;
+}
+
+bool UBehaviourComp::GetIsValidAnimatedTextWidgetPoolManager() const
+{
+	if (M_AnimatedTextWidgetPoolManager.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_AnimatedTextWidgetPoolManager",
+		"UBehaviourComp::GetIsValidAnimatedTextWidgetPoolManager",
+		GetOwner());
+	return false;
+}
+
+void UBehaviourComp::BeginPlay_InitAnimatedTextWidgetPoolManager()
+{
+	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+}
+
+void UBehaviourComp::HandleBehaviourAddedText(UBehaviour& Behaviour)
+{
+	const FRepeatedBehaviourTextSettings& AnimatedTextSettings = Behaviour.GetAnimatedTextSettings();
+	if (not AnimatedTextSettings.TextSettings.bUseText)
+	{
+		return;
+	}
+
+	if (not GetIsValidAnimatedTextWidgetPoolManager())
+	{
+		return;
+	}
+
+	if (not ShowAnimatedTextForOwner(AnimatedTextSettings.TextSettings))
+	{
+		return;
+	}
+
+	if (not ShouldRegisterAnimatedTextState(AnimatedTextSettings))
+	{
+		return;
+	}
+
+	const int32 RemainingRepeats = GetInitialRemainingRepeats(AnimatedTextSettings);
+	RegisterAnimatedTextState(Behaviour, AnimatedTextSettings, RemainingRepeats);
+}
+
+void UBehaviourComp::HandleBehaviourRemovedText(const UBehaviour& Behaviour)
+{
+	M_BehaviourAnimatedTextStates.Remove(&Behaviour);
+}
+
+void UBehaviourComp::HandleAnimatedTextTick(const float DeltaTime)
+{
+	if (M_BehaviourAnimatedTextStates.IsEmpty())
+	{
+		return;
+	}
+
+	if (not GetIsValidAnimatedTextWidgetPoolManager())
+	{
+		return;
+	}
+
+	for (auto It = M_BehaviourAnimatedTextStates.CreateIterator(); It; ++It)
+	{
+		const TWeakObjectPtr<UBehaviour> WeakBehaviour = It.Key();
+		if (not WeakBehaviour.IsValid())
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+
+		FBehaviourCompAnimatedTextState& TextState = It.Value();
+		TextState.TimeSinceLastTextSeconds += DeltaTime;
+		if (TextState.TimeSinceLastTextSeconds < TextState.RepeatIntervalSeconds)
+		{
+			continue;
+		}
+
+		TextState.TimeSinceLastTextSeconds = 0.f;
+		if (not ShouldRepeatAnimatedText(TextState))
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+
+		if (not ShowAnimatedTextForOwner(TextState.TextSettings))
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+
+		if (TextState.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::PerAmountRepeats)
+		{
+			TextState.RemainingRepeats -= 1;
+			if (TextState.RemainingRepeats <= 0)
+			{
+				It.RemoveCurrent();
+			}
+		}
+	}
+}
+
+void UBehaviourComp::RegisterAnimatedTextState(
+	UBehaviour& Behaviour,
+	const FRepeatedBehaviourTextSettings& AnimatedTextSettings,
+	const int32 RemainingRepeats)
+{
+	FBehaviourCompAnimatedTextState TextState;
+	TextState.TextSettings = AnimatedTextSettings.TextSettings;
+	TextState.RepeatStrategy = AnimatedTextSettings.RepeatStrategy;
+	TextState.RepeatIntervalSeconds = AnimatedTextSettings.RepeatInterval;
+	TextState.TimeSinceLastTextSeconds = 0.f;
+	TextState.RemainingRepeats = RemainingRepeats;
+	M_BehaviourAnimatedTextStates.Add(&Behaviour, MoveTemp(TextState));
+}
+
+bool UBehaviourComp::ShouldRegisterAnimatedTextState(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const
+{
+	if (AnimatedTextSettings.RepeatInterval <= 0.f)
+	{
+		return false;
+	}
+
+	if (AnimatedTextSettings.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::InfiniteRepeats)
+	{
+		return true;
+	}
+
+	return AnimatedTextSettings.AmountRepeats > 1;
+}
+
+bool UBehaviourComp::ShowAnimatedTextForOwner(const FBehaviourTextSettings& TextSettings) const
+{
+	if (not GetIsValidAnimatedTextWidgetPoolManager())
+	{
+		return false;
+	}
+
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return false;
+	}
+
+	return M_AnimatedTextWidgetPoolManager->ShowAnimatedTextAttachedToActor(
+		TextSettings.TextOnSubjects,
+		Owner,
+		TextSettings.TextOffset,
+		TextSettings.bAutoWrap,
+		TextSettings.InWrapAt,
+		TextSettings.InJustification,
+		TextSettings.InSettings);
+}
+
+bool UBehaviourComp::ShouldRepeatAnimatedText(const FBehaviourCompAnimatedTextState& TextState) const
+{
+	if (TextState.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::InfiniteRepeats)
+	{
+		return true;
+	}
+
+	return TextState.RemainingRepeats > 0;
+}
+
+int32 UBehaviourComp::GetInitialRemainingRepeats(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const
+{
+	if (AnimatedTextSettings.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::InfiniteRepeats)
+	{
+		return 0;
+	}
+
+	const int32 RemainingRepeats = AnimatedTextSettings.AmountRepeats - 1;
+	return RemainingRepeats > 0 ? RemainingRepeats : 0;
 }
