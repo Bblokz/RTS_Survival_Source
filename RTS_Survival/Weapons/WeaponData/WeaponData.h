@@ -1243,6 +1243,9 @@ struct FRocketWeaponSettings
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UStaticMesh* RocketMesh = nullptr;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<FName> FireSocketNames;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float RandomSwingYawDeviationMin = 0.0f;
 
@@ -1321,7 +1324,11 @@ private:
 	UPROPERTY()
 	FRocketWeaponSettings M_RocketSettings;
 
+	int32 M_NextRocketSocketIndex = 0;
+
 	void FireProjectile(const FVector& TargetLocation);
+
+	TPair<FVector, FVector> GetLaunchAndForwardVectorForRocketSocket();
 
 	/**
 	 * @brief Fires a rocket with the provided stats and swing configuration.
