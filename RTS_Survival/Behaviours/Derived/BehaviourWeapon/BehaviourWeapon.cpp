@@ -143,8 +143,23 @@ FBehaviourWeaponAttributes UBehaviourWeapon::CalculateBehaviourAttributesWithMul
 		AttributeToUpgrade += FMath::CeilToInt(PercentageDelta);
 	};
 
+	const auto ApplyRoundedCalibreMultiplier = [](const int32 BaseValue, const float Multiplier,
+	                                              int32& AttributeToUpgrade)
+	{
+		if (FMath::IsNearlyZero(Multiplier))
+		{
+			return;
+		}
+
+		const int32 RoundedValue = FMath::RoundToInt(static_cast<float>(BaseValue) * Multiplier);
+		AttributeToUpgrade += RoundedValue - BaseValue;
+	};
+
 	ApplyFloatMultiplier(WeaponData->BaseDamage, BehaviourWeaponMultipliers.DamageMlt, CalculatedAttributes.Damage);
 	ApplyFloatMultiplier(WeaponData->Range, BehaviourWeaponMultipliers.RangeMlt, CalculatedAttributes.Range);
+	ApplyRoundedCalibreMultiplier(FMath::RoundToInt(WeaponData->WeaponCalibre),
+	                              BehaviourWeaponMultipliers.WeaponCalibreMlt,
+	                              CalculatedAttributes.WeaponCalibre);
 	ApplyFloatMultiplier(WeaponData->BaseCooldown, BehaviourWeaponMultipliers.BaseCooldownMlt,
 	                     CalculatedAttributes.BaseCooldown);
 	ApplyFloatMultiplier(WeaponData->ReloadSpeed, BehaviourWeaponMultipliers.ReloadSpeedMlt,
@@ -187,6 +202,7 @@ void UBehaviourWeapon::CacheAppliedAttributes(UWeaponState* WeaponState,
 	{
 		CachedAttributes->Damage += AppliedAttributes.Damage;
 		CachedAttributes->Range += AppliedAttributes.Range;
+		CachedAttributes->WeaponCalibre += AppliedAttributes.WeaponCalibre;
 		CachedAttributes->BaseCooldown += AppliedAttributes.BaseCooldown;
 		CachedAttributes->ReloadSpeed += AppliedAttributes.ReloadSpeed;
 		CachedAttributes->Accuracy += AppliedAttributes.Accuracy;
