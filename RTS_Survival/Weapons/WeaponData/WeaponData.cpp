@@ -840,6 +840,16 @@ const FWeaponData& UWeaponState::GetRawWeaponData() const
 	return WeaponData;
 }
 
+FWeaponVFX* UWeaponState::GetWeaponVfx()
+{
+	return &M_WeaponVfx;
+}
+
+const FWeaponVFX* UWeaponState::GetWeaponVfx() const
+{
+	return &M_WeaponVfx;
+}
+
 FWeaponData* UWeaponState::GetWeaponDataToUpgrade()
 {
 	return &WeaponData;
