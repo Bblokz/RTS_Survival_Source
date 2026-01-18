@@ -583,6 +583,9 @@ public:
 	 * shell type, only returns pure primitive weapon data values. */
 	const FWeaponData& GetRawWeaponData() const;
 
+	FWeaponVFX* GetWeaponVfx();
+	const FWeaponVFX* GetWeaponVfx() const;
+
 	inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
 
 	FWeaponData* GetWeaponDataToUpgrade();
