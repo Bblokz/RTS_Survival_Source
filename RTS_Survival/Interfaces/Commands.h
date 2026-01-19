@@ -7,6 +7,7 @@
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
@@ -80,6 +81,11 @@ public:
 	EGrenadeAbilityType GetGrenadeAbilitySubtype() const
 	{
 		return static_cast<EGrenadeAbilityType>(CustomType);
+	}
+
+	EAimAbilityType GetAimAbilitySubtype() const
+	{
+		return static_cast<EAimAbilityType>(CustomType);
 	}
 
 	FQueueCommand()
@@ -404,6 +410,7 @@ public:
 
 
 	bool HasAbility(const EAbilityID AbilityToCheck);
+	bool StartCooldownOnAbility(const EAbilityID AbilityID, const int32 CustomType);
 
 	// -----------------------------------------------------------------------
 	// ================== End Ability Utilities =========================
@@ -599,6 +606,26 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError CancelThrowingGrenade(const bool bSetUnitToIdle,
 	                                                 const EGrenadeAbilityType GrenadeAbilityType);
+
+	/**
+	 * @brief Queues the aim ability with the provided target location and subtype.
+	 * @param Location World location to aim at.
+	 * @param bSetUnitToIdle Whether the unit should clear all previous commands making this ability the first.
+	 * @param AimAbilityType Subtype to execute.
+	 * @return Whether the command could be added; command queue has not been stopped.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError AimAbility(const FVector& Location, const bool bSetUnitToIdle,
+	                                      const EAimAbilityType AimAbilityType);
+
+	/**
+	 * @brief Queues the cancel aim ability used while moving to range.
+	 * @param bSetUnitToIdle Whether the unit should clear all previous commands making this ability the first.
+	 * @param AimAbilityType Subtype to cancel.
+	 * @return Whether the command could be added; command queue has not been stopped.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError CancelAimAbility(const bool bSetUnitToIdle, const EAimAbilityType AimAbilityType);
 	/**
 	 * @brief Determines whether the provided command is in the command queue.
 	 * @param CommandToCheck The command to check for.
@@ -776,6 +803,11 @@ protected:
 	virtual void TerminateThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType);
 	virtual void ExecuteCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType);
 	virtual void TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType);
+
+	virtual void ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType);
+	virtual void TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType);
+	virtual void ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType);
+	virtual void TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType);
 
 	virtual void ExecuteRepairCommand(AActor* TargetActor);
 	virtual void TerminateRepairCommand();

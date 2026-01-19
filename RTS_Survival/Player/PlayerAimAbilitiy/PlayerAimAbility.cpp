@@ -3,6 +3,8 @@
 
 #include "PlayerAimAbility.h"
 
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -120,6 +122,17 @@ EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeForAbility(const EAbilityID 
 		return GetAimTypeFromGrenadeAbility(static_cast<EGrenadeAbilityType>(AbilitySubType),
 		                                    RTSValid_PrimarySelectedActor,
 		                                    OutAbilityRadius);
+	case EAbilityID::IdAimAbility:
+		{
+			const UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(
+				static_cast<EAimAbilityType>(AbilitySubType), RTSValid_PrimarySelectedActor);
+			if (not IsValid(AimAbilityComponent))
+			{
+				return EPlayerAimAbilityTypes::None;
+			}
+			OutAbilityRadius = AimAbilityComponent->GetAimAbilityRange();
+			return AimAbilityComponent->GetAimAssistType();
+		}
 	default:
 		return EPlayerAimAbilityTypes::None;
 	}

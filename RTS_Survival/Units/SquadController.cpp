@@ -23,6 +23,7 @@
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
@@ -1904,6 +1905,45 @@ void ASquadController::ExecuteCancelThrowGrenadeCommand(const EGrenadeAbilityTyp
 }
 
 void ASquadController::TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType)
+{
+}
+
+void ASquadController::ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType)
+{
+	UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, this);
+	if (not IsValid(AimAbilityComponent))
+	{
+		DoneExecutingCommand(EAbilityID::IdAimAbility);
+		return;
+	}
+
+	AimAbilityComponent->ExecuteAimAbility(TargetLocation);
+}
+
+void ASquadController::TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
+	UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, this);
+	if (not IsValid(AimAbilityComponent))
+	{
+		return;
+	}
+
+	AimAbilityComponent->TerminateAimAbility();
+}
+
+void ASquadController::ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
+	UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, this);
+	if (IsValid(AimAbilityComponent))
+	{
+		AimAbilityComponent->ExecuteCancelAimAbility();
+	}
+
+	StopMovement();
+	DoneExecutingCommand(EAbilityID::IdCancelAimAbility);
+}
+
+void ASquadController::TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
 {
 }
 

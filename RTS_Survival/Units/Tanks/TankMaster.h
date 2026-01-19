@@ -280,6 +280,11 @@ protected:
 	virtual void ExecuteAttackGroundCommand(const FVector GroundLocation) override;
 	virtual void TerminateAttackGroundCommand() override;
 
+	virtual void ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType) override;
+	virtual void TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+	virtual void ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+	virtual void TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+
 	virtual void SetUnitToIdleSpecificLogic() override;
 
 	/** @copydoc ICommands::StopBehaviourTree()

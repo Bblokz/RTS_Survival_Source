@@ -522,6 +522,11 @@ protected:
 	virtual void ExecuteCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType) override;
 	virtual void TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType GrenadeAbilityType) override;
 
+	virtual void ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType) override;
+	virtual void TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+	virtual void ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+	virtual void TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+
 	virtual void ExecuteEnterCargoCommand(AActor* CarrierActor) override;
 	virtual void TerminateEnterCargoCommand() override;
 

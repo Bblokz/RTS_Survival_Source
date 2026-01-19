@@ -444,7 +444,9 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 		|| (AbilityId == EAbilityID::IdDisableMode)
 		|| (AbilityId == EAbilityID::IdFieldConstruction)
 		|| (AbilityId == EAbilityID::IdThrowGrenade)
-		|| (AbilityId == EAbilityID::IdCancelThrowGrenade);
+		|| (AbilityId == EAbilityID::IdCancelThrowGrenade)
+		|| (AbilityId == EAbilityID::IdAimAbility)
+		|| (AbilityId == EAbilityID::IdCancelAimAbility);
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
@@ -475,6 +477,12 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 		|| (QueuedCommand.CommandType == EAbilityID::IdCancelThrowGrenade))
 	{
 		return " with grenade type: " + UEnum::GetValueAsString(QueuedCommand.GetGrenadeAbilitySubtype());
+	}
+
+	if ((QueuedCommand.CommandType == EAbilityID::IdAimAbility)
+		|| (QueuedCommand.CommandType == EAbilityID::IdCancelAimAbility))
+	{
+		return " with aim ability type: " + UEnum::GetValueAsString(QueuedCommand.GetAimAbilitySubtype());
 	}
 
 	return FString{};
@@ -785,6 +793,16 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	case EAbilityID::IdCancelThrowGrenade:
 		{
 			M_Owner->ExecuteCancelThrowGrenadeCommand(Cmd.GetGrenadeAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdAimAbility:
+		{
+			M_Owner->ExecuteAimAbilityCommand(Cmd.TargetLocation, Cmd.GetAimAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdCancelAimAbility:
+		{
+			M_Owner->ExecuteCancelAimAbilityCommand(Cmd.GetAimAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdReturnToBase:
@@ -1143,6 +1161,18 @@ bool ICommands::HasAbility(const EAbilityID AbilityToCheck)
 		return UnitCommandData->GetAbilityIds().Contains(AbilityToCheck);
 	}
 	return false;
+}
+
+bool ICommands::StartCooldownOnAbility(const EAbilityID AbilityID, const int32 CustomType)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+	const bool bDidStartCooldown = UnitCommandData->StartCooldownOnAbility(AbilityID, CustomType);
+	UnitCommandData->UpdateActionUI();
+	return bDidStartCooldown;
 }
 
 
@@ -1763,6 +1793,60 @@ ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle,
 	return Error;
 }
 
+ECommandQueueError ICommands::AimAbility(const FVector& Location, const bool bSetUnitToIdle,
+                                         const EAimAbilityType AimAbilityType)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	FUnitAbilityEntry AimAbilityEntry;
+	if (not FAbilityHelpers::GetHasAimAbility(UnitCommandData->GetAbilities(), EAbilityID::IdAimAbility,
+	                                          AimAbilityType, AimAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+	if (AimAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdAimAbility, Location, nullptr, FRotator::ZeroRotator, static_cast<int32>(AimAbilityType));
+	return Error;
+}
+
+ECommandQueueError ICommands::CancelAimAbility(const bool bSetUnitToIdle, const EAimAbilityType AimAbilityType)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	FUnitAbilityEntry AimAbilityEntry;
+	if (not FAbilityHelpers::GetHasAimAbility(UnitCommandData->GetAbilities(), EAbilityID::IdCancelAimAbility,
+	                                          AimAbilityType, AimAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+	if (AimAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdCancelAimAbility, FVector::ZeroVector, nullptr, FRotator::ZeroRotator,
+		static_cast<int32>(AimAbilityType));
+	return Error;
+}
+
 ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -2174,6 +2258,22 @@ void ICommands::TerminateCancelThrowGrenadeCommand(const EGrenadeAbilityType Gre
 {
 }
 
+void ICommands::ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType)
+{
+}
+
+void ICommands::TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
+}
+
+void ICommands::ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
+}
+
+void ICommands::TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
+}
+
 void ICommands::ExecuteRepairCommand(AActor* TargetActor)
 {
 }
@@ -2494,6 +2594,40 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 			}
 
 			TerminateCancelThrowGrenadeCommand(CurrentCommand->GetGrenadeAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdAimAbility:
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if (not CommandData)
+			{
+				return;
+			}
+
+			const FQueueCommand* CurrentCommand = CommandData->GetCurrentQueuedCommand();
+			if (CurrentCommand == nullptr)
+			{
+				return;
+			}
+
+			TerminateAimAbilityCommand(CurrentCommand->GetAimAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdCancelAimAbility:
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if (not CommandData)
+			{
+				return;
+			}
+
+			const FQueueCommand* CurrentCommand = CommandData->GetCurrentQueuedCommand();
+			if (CurrentCommand == nullptr)
+			{
+				return;
+			}
+
+			TerminateCancelAimAbilityCommand(CurrentCommand->GetAimAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdRepair:

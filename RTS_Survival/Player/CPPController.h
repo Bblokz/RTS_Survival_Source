@@ -41,6 +41,7 @@
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/UnitData/UnitCost.h"
@@ -1080,6 +1081,7 @@ private:
 	EAbilityID M_ActiveAbility;
 
 	EGrenadeAbilityType M_ActiveGrenadeAbilityType;
+	EAimAbilityType M_ActiveAimAbilityType = EAimAbilityType::DefaultBrummbarFire;
 
 	// Called in the main RC function, after all shift-related functions
 	// Removes the unit from the selection array
@@ -1154,6 +1156,7 @@ private:
 	void ActionButtonPatrol(const FVector& ClickedLocation);
 
 	void ActionButtonThrowGrenade(const FVector& ClickedLocation, const EGrenadeAbilityType GrenadeAbilityType);
+	void ActionButtonAimAbility(const FVector& ClickedLocation, const EAimAbilityType AimAbilityType);
 
 	// Stops Movement, BT Logic, targets and TCommand
 	// todo integrate with ICommands.
@@ -1178,6 +1181,8 @@ private:
 
 	void DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
+	void DirectActionButtonAimAbility(const EAimAbilityType AimAbilityType);
+	void DirectActionButtonCancelAimAbility(const EAimAbilityType AimAbilityType);
 	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
 
 	void DirectActionButtonActivateModeAbility(const EModeAbilityType ModeType);
