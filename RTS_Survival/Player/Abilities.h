@@ -59,6 +59,8 @@ enum class EAbilityID : uint8
 	IdActivateMode,
 	IdDisableMode,
 	IdFieldConstruction,
+	IdAimAbility,
+	IdCancelAimAbility,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)

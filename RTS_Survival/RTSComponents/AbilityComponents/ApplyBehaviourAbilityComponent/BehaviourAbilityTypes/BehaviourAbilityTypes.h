@@ -23,5 +23,7 @@ enum class EBehaviourAbilityType : uint8
 	LongAmmoBelt,
 	// Used on pz 38t.
 	AdrenalineShot,
+	FlakShrapnelRounds,
+	FlameNapalmAbility,
 	
 };

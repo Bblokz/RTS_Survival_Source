@@ -6,6 +6,16 @@
 
 UBehWeaponOverwriteVFX::UBehWeaponOverwriteVFX() = default;
 
+void UBehWeaponOverwriteVFX::ApplybehaviourToWeaponStandalone(UWeaponState* WeaponState)
+{
+	ApplyBehaviourToWeapon(WeaponState);
+}
+
+void UBehWeaponOverwriteVFX::RemovebehaviourFromWeaponStandalone(UWeaponState* WeaponState)
+{
+	ApplyBehaviourToWeapon(WeaponState);
+}
+
 void UBehWeaponOverwriteVFX::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
 {
 	if (WeaponState == nullptr)

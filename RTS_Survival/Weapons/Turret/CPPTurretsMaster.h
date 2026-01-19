@@ -152,7 +152,8 @@ public:
 	void SetEngageGroundLocation(const FVector& GroundLocation);
 	
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
-	
+
+	inline bool GetIsRotatedToEngage() const { return bM_IsRotatedToEngage; }
 
 	virtual TArray<UWeaponState*> GetWeapons() override final;
 	int32 GetOwningPlayer();

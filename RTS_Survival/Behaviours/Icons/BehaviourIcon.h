@@ -32,5 +32,7 @@ enum class EBehaviourIcon : uint8
 	RapidFire20mmAutoCannon,
 	LongAmmoBelt,
 	OverwatchFireSupport,
-	AdrenalineShot
+	AdrenalineShot,
+	FlakShrapnelRounds,
+	FlameNapalmAbility,
 };

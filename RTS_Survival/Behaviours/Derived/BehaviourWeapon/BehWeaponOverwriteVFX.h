@@ -161,6 +161,11 @@ class RTS_SURVIVAL_API UBehWeaponOverwriteVFX : public UBehaviourWeapon
 public:
 	UBehWeaponOverwriteVFX();
 
+	// Used when applying the effects of this behaviour outside of the behaviour component logic.
+	void ApplybehaviourToWeaponStandalone(UWeaponState* WeaponState);
+	// Used when removing the effects of this behaviour outside of the behaviour component logic.
+	void RemovebehaviourFromWeaponStandalone(UWeaponState* WeaponState);
+
 protected:
 	virtual void ApplyBehaviourToWeapon(UWeaponState* WeaponState) override;
 	virtual void RemoveBehaviourFromWeapon(UWeaponState* WeaponState) override;

@@ -1,0 +1,125 @@
+﻿This is a complex new feature that requires integrating various parts of the current game systems.
+make sure to analyse the relevant code and understand it and its style before starting to implement this feature.
+this includes but is not limited to:
+the ACPPCOntroller
+the APlayerAimAbility which is an actor that handles the aiming assist visuals
+the ICommands interface.
+ATankMaster,
+ASquadController,
+UWeaponState,
+UBehWeaponOverwriteVFX,
+
+after you have implemented it go over my important notes and verify that you have covered those requirements in particular.
+
+
+You have to add a new component to the AbiltyComponents called AimAbilityComponent. with two derived components one for the squad controllers
+and one for tank masters.
+
+this type of ability will be recognized by the 	IdAimAbility,
+                                               	IdCancelAimAbility, 
+which i already added for the EAbilityID and will have various subtypes to differentiate between different aiming abilities
+like we also have for the behaviour abilty system. with UENUM(BlueprintType)
+                                                        enum class EBehaviourAbilityType : uint8
+Make sure this comp is added in its own folder and has a folder in there we you will define the EAimAbilityType enum.
+with stating values:
+DefaultBrummbarFire,
+PanzerIVArtilleryExplosiveShot,
+
+to keep track of what state of this ability we are in define the enum
+EAimAbilityState with:
+None,
+MovingToRange,
+InAbility,
+
+it will need a setting struct with:
+the enum type
+a preffered index; where if none we apply it on the first available index.
+a int32 cooldown
+a float BehaviourDuration // not used on the behaviour itself but specifically by our component as you will see later.
+a TSubclass of  UBehWeaponOverwriteVFX; which is a behaviour that will not be added to the owners behaviour component but rather;
+created and cached as part of this component and used to affect the weapons this ability will use.
+EPlayerAimAbilityTypes // which will define the aim assistant material on the APlayerAimAbility when the EAbiltyID::IdAimAbility is activated.
+int32 RangePercentage // 1 - 99 how much buffer range the unit takes when moving closer; so if this is 10 and the range of the turret (or infantry weapon) is 
+1000 the unit will move to within 900 units of the target location before starting the ability! 
+
+here is the high level overview:
+
+at beginplay first create the UBehWeaponOverwriteVFX behaviour and cache it (owner is our component)
+
+the player activates the EAbilityID::IdAimAbility via the ACPPCOntroller; in the DetermineShowAimAbilityAtCursorProjection get
+the component of derived from AimAbilityComponent that is associated with this subtype and EAbilityID on the primary selected unit using:
+using a new function in FAbilityHelpers called GetHasAimAbilityComponent which will just take the actor and the subtype as EAimAbilityType
+and return the component if found or nullptr if not. (Very similair to 
+	inline UFieldConstructionAbilityComponent* GetHasFieldConstructionAbility(
+		AActor* const Actor,
+		const EFieldConstructionType FieldConstructionType) )
+	
+then on the second click the abilty's target location is confirmed and propagated
+together with the ability id to the icommands interface.
+if shift is held it is queued otherwise it starts immediately.
+
+the icommands interface will call the execute function of this abiltiy once it is its turn to execute as per the queue.
+implement this for both squad controllers and tank masters:
+if the unit is in range as per the range of the turret or infantry weapon it will start the ability immediatly.
+NOTE: tanks can have mutliple turrets, you can assume that we want this abilty to always work with the turret with the most range and do 
+not care about hullweapons at all! just turret masters!
+else it will first move closer; depending on the turret/inf weapon range and the RangePercentage setting of this ability as well as 
+the clicked target location ofcourse. When needing to move closer also swap the abiltiy with the IdCancelAimAbility (more on this one later)
+and make sure to set the state enum to MovingToRange.
+
+IMPORTANT NOTE 1: i do not want the abilty to look for the correct turret (with the most range) every time it is set to execute this abiltiy; cache this the frame
+after beginplay; do not assume in what order turrets and their weapons intialize; instead set a one-shot timer for next frame at beginplay to search for our turret.
+
+IMPORTANT NOTE 2: derive two versions off of AimAbilityComponent one for tanks that will look for that most range turret and one for squad controllers where
+it will apply to all the infantry weapons of the full squad; without caching as infantry units die or are added to the squad this can change often; instead it will just get them
+when the ability is set to execute.
+Make sure that all shared logic is in the base class.
+
+IMPORTANT NOTE 3: when swapping the ability make sure to also set the correct subtype as per our ability settings struct!
+
+Once in range:
+IF we switched to the IdCancelAimAbility we need to switch back to the IdAimAbility now that we are in range as now the ability is no longer allowed to be cancelled.
+First disable the weapons it will use for this ability; in the case of the squad controllers that is all squad's weapons. in case of the tank it is
+all the weapons on the turret.
+Then: apply the behaviour on said weapons. And set the inabiltiy in our enum that tracks state(  used for terminate command, in case the player decides to go move or attack something etc while this is happening)
+then: order the weapons to fire at the target location using the target ground. (the location being the one we got from our command)
+then: for squads we assume they will fire almost immediately as the units are in range and their weapons allows for very fast facing of the target location
+so we fire of a timer with BehaviourDuration + 0.2 time where this 0.2 is part of a namespace called AimAbilityConstants defined in the cpp file of our component.
+for tanks however we do not know when the turret will face the target location and start firing; we will first set a timer (exclusive to the tank derived component for this ability)
+that will check every 0.2 seconds ( also a namespace constant) if the turret is allowed to fire by calling  
+	inline bool GetIsRotatedToEngage() const { return bM_IsRotatedToEngage; } on that turret master.
+as soon as that is true (after the fire at ground command was given) we start another timer for just BehaviourDuration for the turret.
+
+after the behaviour duration is over we use the behaviour to remove the behaviour effects from all weapons using 	void RemovebehaviourFromWeaponStandalone(UWeaponState* WeaponState);
+and re-enable the weapons again.
+we will also set them to automatic engage again (the InfantryWeapons of the squad or the turret of the tank)
+set the cooldown of our ability to have the full time remaining on the commands interface for this ability (as it is automatically started when
+the command is first executed from the queue but we really want it to count when the behaviour duration ends)
+we reset our state enum to none.
+finally we call done executing command of our ability.
+
+the terminate command of this ability: if the state is not set to inability then we know no behaviorus are currently applied nor can the timers be active so we only check if we need to 
+reset movement. else
+we remove the behaviour from all weapons like in the execute function's ending part. and we re-enable the weapons again like the execute function's ending part.
+so maybe put that ending part in a separate private to make it reusable. Make sure the timers are also cleared when terminating from that state.
+
+
+for the EAbilityID::IdCancelAimAbility:
+this can only be called once squad or tank is moving as only then the ability is swapped; so in the execute function (of this abilityID) we simply stop 
+them from moving. and call the done executing command of this ability right away.
+
+the terminate command of this ability does nothing as there is nothing to clean up.
+
+
+make sure to add the new private functions to the cppcontroller to also activate this 
+IdAimAbility and that they are called at the right places concerning their action button.
+for IdCancelAimAbility it is only a direct action button as it does not need a secondary click location;
+for the IdAimAbility we need both a DirectActionButton
+and ActionButton function as it needs both the initial activation and the target location confirmation.
+
+finally after all of this is done check that you have indeed made sure that the shared logic is in the base component and the 
+tank aim ability and the squad aim ability do not share logic for their turret and infantry weapons respectively.
+and again; the squad one will not cache those infantry weapons as they can change often; and the tank
+one will cache the turret master with the most range; the next frame after beginplay.
+
+
