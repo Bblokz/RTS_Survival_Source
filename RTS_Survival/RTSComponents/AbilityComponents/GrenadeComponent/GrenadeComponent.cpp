@@ -274,12 +274,15 @@ void UGrenadeComponent::TerminateThrowGrenade()
 
 void UGrenadeComponent::CancelThrowGrenade()
 {
-	if (M_AbilityState == EGrenadeAbilityState::Throwing)
+	if (M_AbilityState != EGrenadeAbilityState::Throwing)
 	{
+		TerminateThrowGrenade();
 		return;
 	}
 
-	TerminateThrowGrenade();
+	CancelThrowSequence();
+	M_AbilityState = EGrenadeAbilityState::NotActive;
+	SetAbilityToThrowGrenade();
 }
 
 EGrenadeAbilityType UGrenadeComponent::GetGrenadeAbilityType() const
@@ -623,6 +626,32 @@ void UGrenadeComponent::EnableThrowerWeapon(const FGrenadeThrowerState& ThrowerS
 
 	AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
 	InfantryWeapon->SetAutoEngageTargets(true);
+}
+
+void UGrenadeComponent::CancelThrowSequence()
+{
+	for (FGrenadeThrowerState& ThrowerState : M_ThrowerStates)
+	{
+		CancelThrowerState(ThrowerState);
+	}
+
+	M_ThrowerStates.Reset();
+	M_ThrowSequenceState = FGrenadeThrowSequenceState();
+}
+
+void UGrenadeComponent::CancelThrowerState(FGrenadeThrowerState& ThrowerState)
+{
+	ClearThrowTimer(ThrowerState);
+	EnableThrowerWeapon(ThrowerState);
+
+	if (ThrowerState.M_AttachedGrenade.IsValid())
+	{
+		DetachGrenadeFromThrower(ThrowerState);
+		ThrowerState.M_AttachedGrenade->ResetGrenade();
+	}
+
+	ThrowerState.M_AttachedGrenade = nullptr;
+	ThrowerState.M_AttachedGrenadeScale = FVector::OneVector;
 }
 
 void UGrenadeComponent::StartThrowTimer(FGrenadeThrowerState& ThrowerState)
