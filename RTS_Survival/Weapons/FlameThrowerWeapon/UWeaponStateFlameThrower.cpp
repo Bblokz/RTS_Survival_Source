@@ -57,6 +57,16 @@ void UWeaponStateFlameThrower::InitFlameThrowerWeapon(
 	InitFlameParamsStatic(); // Color/Range/ConeAngle (Duration is set at fire start)
 }
 
+FFlameThrowerSettings* UWeaponStateFlameThrower::GetFlameSettingsForChange()
+{
+	return &M_FlameSettings;
+}
+
+void UWeaponStateFlameThrower::ApplyFlameColorFromSettings()
+{
+	UpdateFlameParam_Color(M_FlameSettings.Color);
+}
+
 bool UWeaponStateFlameThrower::EnsureFlameEffectIsValid() const
 {
 	if (!IsValid(M_FlameSettings.FlameEffect))

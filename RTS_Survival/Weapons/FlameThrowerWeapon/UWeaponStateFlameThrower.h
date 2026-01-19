@@ -57,6 +57,8 @@ public:
 		FFlameThrowerSettings FlameSettings);
 
 	FFlameThrowerSettings GetFlameSettings() const { return M_FlameSettings; }
+	FFlameThrowerSettings* GetFlameSettingsForChange();
+	void ApplyFlameColorFromSettings();
 
 protected:
 	// Drives the timed trace schedule; CreateLaunchVfx handles visuals/audio start/stop.
