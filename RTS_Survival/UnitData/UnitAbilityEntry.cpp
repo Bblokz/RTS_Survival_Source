@@ -1,4 +1,5 @@
 ﻿#include "UnitAbilityEntry.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 
 UGrenadeComponent* FAbilityHelpers::GetGrenadeAbilityCompOfType(const EGrenadeAbilityType Type,
@@ -21,6 +22,31 @@ UGrenadeComponent* FAbilityHelpers::GetGrenadeAbilityCompOfType(const EGrenadeAb
 		if (GrenadeComponent->GetGrenadeAbilityType() == Type)
 		{
 			return GrenadeComponent;
+		}
+	}
+
+	return nullptr;
+}
+
+UAimAbilityComponent* FAbilityHelpers::GetHasAimAbilityComponent(const EAimAbilityType Type, const AActor* Actor)
+{
+	if (not IsValid(Actor))
+	{
+		return nullptr;
+	}
+
+	TArray<UAimAbilityComponent*> AimComponents;
+	Actor->GetComponents<UAimAbilityComponent>(AimComponents);
+	for (UAimAbilityComponent* AimComponent : AimComponents)
+	{
+		if (not IsValid(AimComponent))
+		{
+			continue;
+		}
+
+		if (AimComponent->GetAimAbilityType() == Type)
+		{
+			return AimComponent;
 		}
 	}
 

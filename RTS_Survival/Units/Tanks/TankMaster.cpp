@@ -23,6 +23,7 @@
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "VehicleAI/Components/VehiclePathFollowingComponent.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -745,6 +746,48 @@ void ATankMaster::TerminateAttackGroundCommand()
 	bM_AttackGroundActive = false;
 	M_AttackGroundLocation = FVector::ZeroVector;
 	SetTurretsToAutoEngage(false);
+}
+
+void ATankMaster::ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType)
+{
+	UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, this);
+	if (not IsValid(AimAbilityComponent))
+	{
+		DoneExecutingCommand(EAbilityID::IdAimAbility);
+		return;
+	}
+
+	AimAbilityComponent->ExecuteAimAbility(TargetLocation);
+}
+
+void ATankMaster::TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
+	UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, this);
+	if (not IsValid(AimAbilityComponent))
+	{
+		return;
+	}
+
+	AimAbilityComponent->TerminateAimAbility();
+}
+
+void ATankMaster::ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
+	UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, this);
+	if (IsValid(AimAbilityComponent))
+	{
+		AimAbilityComponent->ExecuteCancelAimAbility();
+	}
+
+	if (GetIsValidAIController())
+	{
+		AITankController->StopMovement();
+	}
+	DoneExecutingCommand(EAbilityID::IdCancelAimAbility);
+}
+
+void ATankMaster::TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
+{
 }
 
 void ATankMaster::StopBehaviourTree()

@@ -35,6 +35,7 @@
 #include "RTS_Survival/Procedural/LandscapeDivider/RTSLandscapeDivider.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
@@ -1456,6 +1457,17 @@ void ACPPController::DetermineShowAimAbilityAtCursorProjection(const EAbilityID 
 	if (not GetIsValidPlayerAimAbilityActor() || not GetIsValidGameUIController())
 	{
 		return;
+	}
+	if (AbilityJustActivated == EAbilityID::IdAimAbility)
+	{
+		AActor* PrimarySelectedUnit = M_GameUIController->GetPrimarySelectedUnit();
+		const UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(
+			static_cast<EAimAbilityType>(AbilitySubtype), PrimarySelectedUnit);
+		if (not IsValid(AimAbilityComponent))
+		{
+			M_PlayerAimAbility->HideRadius();
+			return;
+		}
 	}
 	M_PlayerAimAbility->DetermineShowAimRadiusForAbility(AbilityJustActivated, AbilitySubtype,
 	                                                     M_GameUIController->GetPrimarySelectedUnit());
@@ -3632,6 +3644,13 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdCancelThrowGrenade:
 		this->DirectActionButtonCancelThrowGrenade(static_cast<EGrenadeAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
+	case EAbilityID::IdAimAbility:
+		this->DirectActionButtonAimAbility(static_cast<EAimAbilityType>(ActiveAbilityEntry.CustomType));
+		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
+		break;
+	case EAbilityID::IdCancelAimAbility:
+		this->DirectActionButtonCancelAimAbility(static_cast<EAimAbilityType>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdApplyBehaviour:
 		this->DirectActionButtonBehaviourAbility(static_cast<EBehaviourAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
@@ -3739,6 +3758,9 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		break;
 	case EAbilityID::IdThrowGrenade:
 		this->ActionButtonThrowGrenade(ClickedLocation, M_ActiveGrenadeAbilityType);
+		break;
+	case EAbilityID::IdAimAbility:
+		this->ActionButtonAimAbility(ClickedLocation, M_ActiveAimAbilityType);
 		break;
 	case EAbilityID::IdRotateTowards:
 		this->ActionButtonRotateTowards(ClickedLocation);
@@ -4026,6 +4048,36 @@ void ACPPController::ActionButtonThrowGrenade(const FVector& ClickedLocation,
 	}
 }
 
+void ACPPController::ActionButtonAimAbility(const FVector& ClickedLocation, const EAimAbilityType AimAbilityType)
+{
+	EnsureSelectionsAreRTSValid();
+
+	int32 CommandsExe = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (const auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->AimAbility(ClickedLocation, bResetCommandQueueFirst, AimAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExe += EachPawn->AimAbility(ClickedLocation, bResetCommandQueueFirst, AimAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExe += EachActor->AimAbility(ClickedLocation, bResetCommandQueueFirst, AimAbilityType)
+			== ECommandQueueError::NoError;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdAimAbility),
+		                                false);
+	}
+}
+
 /*--------------------------------- Action Button DIRECT ABILITIES---------------------------------*/
 
 void ACPPController::DirectActionButtonStop()
@@ -4239,6 +4291,44 @@ void ACPPController::DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityT
 	{
 		PlayVoiceLineForPrimarySelected(
 			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdCancelThrowGrenade),
+			false);
+	}
+}
+
+void ACPPController::DirectActionButtonAimAbility(const EAimAbilityType AimAbilityType)
+{
+	M_ActiveAimAbilityType = AimAbilityType;
+	bM_IsActionButtonActive = true;
+	UpdateCursor();
+}
+
+void ACPPController::DirectActionButtonCancelAimAbility(const EAimAbilityType AimAbilityType)
+{
+	EnsureSelectionsAreRTSValid();
+
+	int32 CommandsExe = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (const auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExe += EachSquad->CancelAimAbility(bResetCommandQueueFirst, AimAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExe += EachPawn->CancelAimAbility(bResetCommandQueueFirst, AimAbilityType)
+			== ECommandQueueError::NoError;
+	}
+	for (const auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExe += EachActor->CancelAimAbility(bResetCommandQueueFirst, AimAbilityType)
+			== ECommandQueueError::NoError;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdCancelAimAbility),
 			false);
 	}
 }

@@ -1422,6 +1422,8 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 			M_SquadController->OnSquadUnitArrivedAtThrowGrenadeLocation(this);
 		}
 		break;
+	case EAbilityID::IdAimAbility:
+		break;
 	case EAbilityID::IdNoAbility_MoveCloserToTarget:
 		OnMoveCompleted_MoveCloserToTarget();
 		break;
