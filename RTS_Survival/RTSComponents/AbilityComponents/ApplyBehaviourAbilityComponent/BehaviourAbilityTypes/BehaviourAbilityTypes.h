@@ -15,8 +15,11 @@ enum class EBehaviourAbilityType : uint8
 	EnhancedShells,
 	BrummbarHugeShells,
 	VultureSnipeDamage,
+	// Pz II , jaguar, sdkfz 140.
 	RapidFireAutoCannon,
+	// Stug
 	OverwatchFireSupport,
+	// PZ 3 AA.
 	LongAmmoBelt,
 	// Used on pz 38t.
 	AdrenalineShot,
