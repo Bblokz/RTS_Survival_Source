@@ -264,6 +264,8 @@ private:
 	void StartThrowForThrower(FGrenadeThrowerState& ThrowerState);
 	void DisableThrowerWeapon(const FGrenadeThrowerState& ThrowerState) const;
 	void EnableThrowerWeapon(const FGrenadeThrowerState& ThrowerState) const;
+	void CancelThrowSequence();
+	void CancelThrowerState(FGrenadeThrowerState& ThrowerState);
 	void StartThrowTimer(FGrenadeThrowerState& ThrowerState);
 	void OnThrowMontageFinished(TWeakObjectPtr<ASquadUnit> SquadUnit);
 	void ClearThrowTimer(FGrenadeThrowerState& ThrowerState);
