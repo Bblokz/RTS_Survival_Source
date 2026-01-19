@@ -92,6 +92,9 @@ protected:
         virtual void OnRemoved(AActor* BehaviourOwner) override;
         virtual void OnStack(UBehaviour* StackedBehaviour) override;
 
+	bool GetIsWeaponCalibreLargeEnough(const UWeaponState* ValidWeapon) const;
+        
+
         /** @brief Determine whether this behaviour should be applied to the provided weapon. */
         virtual bool CheckRequirement(UWeaponState* WeaponState) const;
 
@@ -103,6 +106,11 @@ protected:
 
         /** @brief Hook executed when a new stack is added; override for stack-specific logic. */
         virtual void OnWeaponBehaviourStack(UWeaponState* WeaponState);
+
+        // If set <=0 then the behaviour is applied to all weapons regardless of calibre.
+        // Otherwise; only weapons with a calibre equal to or larger than this value will receive the behaviour.
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Rules")
+        float MinimalWeaponCalibreToApplyTo = 0.f;
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Attributes")
         FBehaviourWeaponAttributes BehaviourWeaponAttributes;

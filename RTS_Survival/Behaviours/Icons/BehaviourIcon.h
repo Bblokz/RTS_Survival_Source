@@ -27,5 +27,10 @@ enum class EBehaviourIcon : uint8
 	RangeBoostRadius,
 	RangeBoost,
 	MoraleBoostRadius,
-	MoraleBoost
+	MoraleBoost,
+	BrummbarHugeShells,
+	RapidFire20mmAutoCannon,
+	LongAmmoBelt,
+	OverwatchFireSupport,
+	AdrenalineShot
 };

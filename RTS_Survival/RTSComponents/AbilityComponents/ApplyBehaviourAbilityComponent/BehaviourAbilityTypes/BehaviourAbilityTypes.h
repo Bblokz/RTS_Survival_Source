@@ -13,5 +13,12 @@ enum class EBehaviourAbilityType : uint8
 	WeakSpotAim,
 	VultureRapidFire,
 	EnhancedShells,
+	BrummbarHugeShells,
+	VultureSnipeDamage,
+	RapidFireAutoCannon,
+	OverwatchFireSupport,
+	LongAmmoBelt,
+	// Used on pz 38t.
+	AdrenalineShot,
 	
 };

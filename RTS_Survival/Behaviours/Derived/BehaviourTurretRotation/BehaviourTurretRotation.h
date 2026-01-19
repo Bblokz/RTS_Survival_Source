@@ -7,6 +7,7 @@
 
 #include "BehaviourTurretRotation.generated.h"
 
+class UWeaponState;
 class ATankMaster;
 class ACPPTurretsMaster;
 
@@ -31,6 +32,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour|TurretRotation", meta = (AllowPrivateAccess = "true"))
 	float RotationSpeedAdd = 0.0f;
+
 
 private:
 	void ApplyBehaviourToTurrets();

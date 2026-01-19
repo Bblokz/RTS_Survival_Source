@@ -72,9 +72,18 @@ void UBehaviourWeapon::OnStack(UBehaviour* StackedBehaviour)
 	}
 }
 
+bool UBehaviourWeapon::GetIsWeaponCalibreLargeEnough(const UWeaponState* ValidWeapon) const
+{
+	if (ValidWeapon->GetRawWeaponData().WeaponCalibre < MinimalWeaponCalibreToApplyTo)
+	{
+		return false;
+	}
+	return true;
+}
+
 bool UBehaviourWeapon::CheckRequirement(UWeaponState* WeaponState) const
 {
-	return WeaponState != nullptr;
+	return GetIsWeaponCalibreLargeEnough(WeaponState);
 }
 
 void UBehaviourWeapon::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
