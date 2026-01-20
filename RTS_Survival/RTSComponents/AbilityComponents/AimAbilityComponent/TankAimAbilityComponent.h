@@ -36,7 +36,7 @@ protected:
 private:
 	void BeginPlay_CacheTurretNextTick();
 	void CacheTurretWithMostRange();
-	float GetTurretMaxRange(const ACPPTurretsMaster* Turret, TArray<UWeaponState*>& OutWeaponStates) const;
+	float GetTurretMaxRange(ACPPTurretsMaster* Turret, TArray<UWeaponState*>& OutWeaponStates) const;
 	void CheckTurretRotationAndStartBehaviour();
 	void ClearTurretRotationTimer();
 

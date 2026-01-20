@@ -1,6 +1,7 @@
 ﻿This is a complex new feature that requires integrating various parts of the current game systems.
 make sure to analyse the relevant code and understand it and its style before starting to implement this feature.
 this includes but is not limited to:
+
 the ACPPCOntroller
 the APlayerAimAbility which is an actor that handles the aiming assist visuals
 the ICommands interface.
@@ -123,3 +124,4 @@ and again; the squad one will not cache those infantry weapons as they can chang
 one will cache the turret master with the most range; the next frame after beginplay.
 
 
+implement all of the new code needed.

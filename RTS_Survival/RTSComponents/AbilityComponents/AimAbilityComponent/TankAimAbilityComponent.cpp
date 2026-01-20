@@ -192,7 +192,7 @@ void UTankAimAbilityComponent::CacheTurretWithMostRange()
 	M_TurretWithMostRange = BestTurret;
 }
 
-float UTankAimAbilityComponent::GetTurretMaxRange(const ACPPTurretsMaster* Turret,
+float UTankAimAbilityComponent::GetTurretMaxRange(ACPPTurretsMaster* Turret,
                                                   TArray<UWeaponState*>& OutWeaponStates) const
 {
 	OutWeaponStates.Reset();
@@ -202,7 +202,7 @@ float UTankAimAbilityComponent::GetTurretMaxRange(const ACPPTurretsMaster* Turre
 	}
 
 	float MaxRange = 0.0f;
-	const TArray<UWeaponState*> WeaponStates = Turret->GetWeapons();
+	 TArray<UWeaponState*> WeaponStates = Turret->GetWeapons();
 	for (UWeaponState* WeaponState : WeaponStates)
 	{
 		if (not IsValid(WeaponState))
@@ -243,7 +243,7 @@ bool UTankAimAbilityComponent::GetIsValidTankMaster() const
 {
 	if (not M_TankMaster.IsValid())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TankMaster",
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_TankMaster",
 		                                                      "UTankAimAbilityComponent::GetIsValidTankMaster", this);
 		return false;
 	}
@@ -255,7 +255,7 @@ bool UTankAimAbilityComponent::GetIsValidTurretWithMostRange() const
 {
 	if (not M_TurretWithMostRange.IsValid())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TurretWithMostRange",
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_TurretWithMostRange",
 		                                                      "UTankAimAbilityComponent::GetIsValidTurretWithMostRange",
 		                                                      this);
 		return false;

@@ -161,8 +161,6 @@ void UActionUIManager::OnHoverSelectedUnitInfo(const bool bIsHover) const
 	{
 		return;
 	}
-
-	
 }
 
 void UActionUIManager::OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange)
@@ -255,11 +253,11 @@ void UActionUIManager::OnShellTypeSelected(const EWeaponShellType SelectedShellT
 
 void UActionUIManager::RequestUpdateAbilityUIForPrimary(ICommands* RequestingUnit)
 {
-	if (not M_PrimarySelectedUnit.IsValid() || not RequestingUnit)
+	if (not M_PrimarySelectedICommands.IsValid() || not RequestingUnit)
 	{
 		return;
 	}
-	if (M_PrimarySelectedUnit.Get() != RequestingUnit)
+	if (M_PrimarySelectedICommands.Get() != RequestingUnit)
 	{
 		RTSFunctionLibrary::ReportError(
 			"Requesting unit is not the primary selected unit."
@@ -284,6 +282,10 @@ void UActionUIManager::SetWeaponUIVisibility(const bool bVisible)
 
 bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 {
+	if (WeaponRangeRadiusActorIndex >= 0)
+	{
+		HideWeaponRangeRadius();
+	}
 	if (not IsValid(SelectedActor))
 	{
 		SetWeaponUIVisibility(false);
@@ -616,7 +618,7 @@ void UActionUIManager::RegisterPrimarySelected(AActor* NewPrimarySelected)
 {
 	ICommands* NewCommands = Cast<ICommands>(NewPrimarySelected);
 
-	ICommands* OldCommands = M_PrimarySelectedUnit.IsValid() ? M_PrimarySelectedUnit.Get() : nullptr;
+	ICommands* OldCommands = M_PrimarySelectedICommands.IsValid() ? M_PrimarySelectedICommands.Get() : nullptr;
 
 	if (OldCommands == NewCommands)
 	{
@@ -626,12 +628,12 @@ void UActionUIManager::RegisterPrimarySelected(AActor* NewPrimarySelected)
 	if (OldCommands)
 	{
 		OldCommands->SetPrimarySelected(nullptr);
-		M_PrimarySelectedUnit.Reset();
+		M_PrimarySelectedICommands.Reset();
 	}
 
 	if (NewCommands)
 	{
-		M_PrimarySelectedUnit = NewCommands;
+		M_PrimarySelectedICommands = NewCommands;
 		NewCommands->SetPrimarySelected(this);
 	}
 }
@@ -639,7 +641,7 @@ void UActionUIManager::RegisterPrimarySelected(AActor* NewPrimarySelected)
 
 bool UActionUIManager::GetIsCurrentPrimarySelectedValid() const
 {
-	return M_PrimarySelectedUnit.IsValid();
+	return M_PrimarySelectedICommands.IsValid();
 }
 
 void UActionUIManager::InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* PlayerController,
@@ -681,7 +683,7 @@ void UActionUIManager::OnWeaponHoverHandleRangeRadius(const bool bIsHover, const
 	{
 		return;
 	}
-	const bool bHasValidOwningActorInInterface = IsValid(M_PrimarySelectedUnit->GetOwnerActor());
+	const bool bHasValidOwningActorInInterface = IsValid(M_PrimarySelectedICommands->GetOwnerActor());
 	if (not bHasValidOwningActorInInterface)
 	{
 		RTSFunctionLibrary::ReportError(
@@ -692,27 +694,45 @@ void UActionUIManager::OnWeaponHoverHandleRangeRadius(const bool bIsHover, const
 
 	if (bIsHover)
 	{
-		WeaponRangeRadiusActorIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(M_PrimarySelectedUnit->GetOwnerActor(),
-			M_PrimarySelectedUnit->GetOwnerActor()->GetActorLocation(),
-			WeaponHoveredRange, ERTSRadiusType::FUllCircle_Weaponrange);
-		if(WeaponRangeRadiusActorIndex<0)
-		{
-			RTSFunctionLibrary::ReportError(
-				"ActionUiManager::OnWeaponHoverHandleRangeRadius: Failed to create radius actor!");
-			return;
-		}
-		const FVector RadiusOffset = FVector(0.f, 0.f, 25.f);
-		URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(M_PrimarySelectedUnit->GetOwnerActor(),
-			WeaponRangeRadiusActorIndex, M_PrimarySelectedUnit->GetOwnerActor(),RadiusOffset);
+		CreateWeaponRangeRadius(M_PrimarySelectedICommands->GetOwnerActor(), WeaponHoveredRange);
 
 		return;
 	}
-	 if(WeaponRangeRadiusActorIndex>=0)
+	if (WeaponRangeRadiusActorIndex >= 0)
 	{
-		URTSBlueprintFunctionLibrary::HideRTSRadiusById(M_PrimarySelectedUnit->GetOwnerActor(),
-			WeaponRangeRadiusActorIndex);
+		HideWeaponRangeRadius();
 	}
-	
+}
+
+
+void UActionUIManager::CreateWeaponRangeRadius(AActor* OwnerActor, const float WeaponHoveredRange)
+{
+	if (not IsValid(OwnerActor))
+	{
+		return;
+	}
+	WeaponRangeRadiusActorIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(
+		OwnerActor,
+		OwnerActor->GetActorLocation(),
+		WeaponHoveredRange, ERTSRadiusType::FUllCircle_Weaponrange);
+	if (WeaponRangeRadiusActorIndex < 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"ActionUiManager::CreateWeaponRangeRadius: Failed to create radius actor!");
+		return;
+	}
+	const FVector RadiusOffset = FVector(0.f, 0.f, 25.f);
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(OwnerActor,
+	                                                     WeaponRangeRadiusActorIndex,
+	                                                     OwnerActor, RadiusOffset);
+}
+
+
+void UActionUIManager::HideWeaponRangeRadius()
+{
+	URTSBlueprintFunctionLibrary::HideRTSRadiusById(M_PrimarySelectedICommands->GetOwnerActor(),
+	                                                WeaponRangeRadiusActorIndex);
+	WeaponRangeRadiusActorIndex = -1;
 }
 
 void UActionUIManager::RefreshBehaviourUIForComponent(UBehaviourComp* BehaviourComponent)

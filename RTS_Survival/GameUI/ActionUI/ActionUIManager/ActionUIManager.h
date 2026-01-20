@@ -211,7 +211,7 @@ private:
 	
 	// Set to the primary selected unit's interface to notify it is primary selected which allows
 	// ICommands to update the UI when abilities are changed.
-	TWeakInterfacePtr<ICommands> M_PrimarySelectedUnit;
+	TWeakInterfacePtr<ICommands> M_PrimarySelectedICommands;
 	void RegisterPrimarySelected(AActor* NewPrimarySelected);
 
 	bool GetIsCurrentPrimarySelectedValid()const;
@@ -223,4 +223,6 @@ private:
 
 	void OnWeaponHoverHandleRangeRadius(const bool bIsHover, const float WeaponHoveredRange);
 	int32 WeaponRangeRadiusActorIndex = -1;
+	void CreateWeaponRangeRadius(AActor* OwnerActor, const float WeaponHoveredRange);
+	void HideWeaponRangeRadius();
 };

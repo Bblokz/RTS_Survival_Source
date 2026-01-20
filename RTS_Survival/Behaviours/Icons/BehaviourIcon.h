@@ -35,4 +35,5 @@ enum class EBehaviourIcon : uint8
 	AdrenalineShot,
 	FlakShrapnelRounds,
 	FlameNapalmAbility,
+	PanzerIVArtilleryBarrage,
 };

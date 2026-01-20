@@ -41,6 +41,7 @@
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
@@ -1182,6 +1183,10 @@ private:
 	void DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonAimAbility(const EAimAbilityType AimAbilityType);
+	void CreateAimAbilityRadius(AActor* Primary, const UAimAbilityComponent* AimComp) ;
+	void HideAimAbilityRadiusIfNeeded();
+	// Keeps track of the aim ability radius ID.
+	int32 AimAbilityRadiusIndex = -1;
 	void DirectActionButtonCancelAimAbility(const EAimAbilityType AimAbilityType);
 	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
 

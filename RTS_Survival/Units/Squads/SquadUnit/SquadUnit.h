@@ -190,6 +190,8 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	friend class USquadReinforcementComponent;
 	// for weapon swapping.
 	friend struct FSquadWeaponSwitch;
+	// for changing the way the weapon of this unit behaves when an aim ability is active.
+	friend class USquadAimAbilityComponent;
 
 public:
 	ASquadUnit(const FObjectInitializer& ObjectInitializer);

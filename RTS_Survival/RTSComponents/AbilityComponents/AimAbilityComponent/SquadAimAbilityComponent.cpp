@@ -148,7 +148,7 @@ bool USquadAimAbilityComponent::GetIsValidSquadController() const
 {
 	if (not M_SquadController.IsValid())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController",
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_SquadController",
 		                                                      "USquadAimAbilityComponent::GetIsValidSquadController",
 		                                                      this);
 		return false;

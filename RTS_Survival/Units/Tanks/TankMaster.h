@@ -94,6 +94,8 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 	// To not bloat public interface with functions that are not relevant to more than one other class.
 	friend class ACPPTurretsMaster;
 	friend class AAITankMaster;
+	// For movement orders on the AI controller directly.
+	friend class UTankAimAbilityComponent;
 
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);

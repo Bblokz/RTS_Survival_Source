@@ -73,6 +73,11 @@ struct FAimAbilitySettings
 	// 1-99 buffer range percentage when moving closer before firing.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RangePercentage = 10;
+
+	// the radius of the ability effect.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Radius = 300;
+	
 };
 
 /**
@@ -93,6 +98,7 @@ public:
 	EAimAbilityType GetAimAbilityType() const;
 	EPlayerAimAbilityTypes GetAimAssistType() const;
 	float GetAimAbilityRange() const;
+	float GetAimAbilityRadius() const;
 
 protected:
 	virtual void PostInitProperties() override;
@@ -107,13 +113,13 @@ protected:
 	 * @param OutMaxRange Maximum weapon range detected for targeting.
 	 * @return True when the weapon list is valid for use.
 	 */
-	virtual bool CollectWeaponStates(TArray<UWeaponState*>& OutWeaponStates, float& OutMaxRange) const = 0;
+	virtual bool CollectWeaponStates(TArray<UWeaponState*>& OutWeaponStates, float& OutMaxRange) const ;
 
-	virtual void SetWeaponsDisabled() = 0;
-	virtual void SetWeaponsAutoEngage(const bool bUseLastTarget) = 0;
-	virtual void FireWeaponsAtLocation(const FVector& TargetLocation) = 0;
-	virtual void RequestMoveToLocation(const FVector& MoveToLocation) = 0;
-	virtual void StopMovementForAbility() = 0;
+	virtual void SetWeaponsDisabled() ;
+	virtual void SetWeaponsAutoEngage(const bool bUseLastTarget) ;
+	virtual void FireWeaponsAtLocation(const FVector& TargetLocation) ;
+	virtual void RequestMoveToLocation(const FVector& MoveToLocation) ;
+	virtual void StopMovementForAbility() ;
 	virtual void BeginAbilityDurationTimer();
 	virtual void ClearDerivedTimers();
 

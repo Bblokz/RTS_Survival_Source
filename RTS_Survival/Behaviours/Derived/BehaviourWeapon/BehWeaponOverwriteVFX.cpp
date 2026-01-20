@@ -13,7 +13,7 @@ void UBehWeaponOverwriteVFX::ApplybehaviourToWeaponStandalone(UWeaponState* Weap
 
 void UBehWeaponOverwriteVFX::RemovebehaviourFromWeaponStandalone(UWeaponState* WeaponState)
 {
-	ApplyBehaviourToWeapon(WeaponState);
+	RemoveBehaviourFromWeapon(WeaponState);
 }
 
 void UBehWeaponOverwriteVFX::ApplyBehaviourToWeapon(UWeaponState* WeaponState)

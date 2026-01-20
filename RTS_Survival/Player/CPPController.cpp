@@ -41,12 +41,14 @@
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
 #include "RTS_Survival/StartLocation/PlayerStartLocationMngr/PlayerStartLocationManager.h"
+#include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/BuildRadiusComp/BuildRadiusComp.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -4297,9 +4299,51 @@ void ACPPController::DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityT
 
 void ACPPController::DirectActionButtonAimAbility(const EAimAbilityType AimAbilityType)
 {
+	if (not GetIsValidGameUIController())
+	{
+		return;
+	}
 	M_ActiveAimAbilityType = AimAbilityType;
 	bM_IsActionButtonActive = true;
 	UpdateCursor();
+	AActor* PrimarySelected = M_GameUIController->GetPrimarySelectedUnit();
+	UAimAbilityComponent* AimAbilityComp = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, PrimarySelected);
+	CreateAimAbilityRadius(PrimarySelected, AimAbilityComp);
+}
+
+void ACPPController::CreateAimAbilityRadius(AActor* Primary, const UAimAbilityComponent* AimComp)
+{
+	HideAimAbilityRadiusIfNeeded();
+	if (not IsValid(Primary) || not IsValid(AimComp))
+	{
+		return;
+	}
+	AimAbilityRadiusIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(
+		this,
+		Primary->GetActorLocation(),
+		// Note that we use range not radius as the radius is for the impact aim assist and this is to display the
+		// full fire range of the ability.
+		AimComp->GetAimAbilityRange(), ERTSRadiusType::FUllCircle_Weaponrange);
+	if (AimAbilityRadiusIndex < 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"ACPPController::CreateAimAbilityRadius: Failed to create radius actor!");
+		return;
+	}
+	const FVector RadiusOffset = FVector(0.f, 0.f, 50.f);
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(this,
+	                                                     AimAbilityRadiusIndex,
+	                                                     Primary, RadiusOffset);
+}
+
+void ACPPController::HideAimAbilityRadiusIfNeeded()
+{
+	if (AimAbilityRadiusIndex >= 0)
+	{
+		// Hide previous.
+		URTSBlueprintFunctionLibrary::HideRTSRadiusById(this, AimAbilityRadiusIndex);
+		AimAbilityRadiusIndex = -1;
+	}
 }
 
 void ACPPController::DirectActionButtonCancelAimAbility(const EAimAbilityType AimAbilityType)
@@ -5365,6 +5409,7 @@ void ACPPController::DeactivateActionButton()
 	bM_IsActionButtonActive = false;
 	M_ActiveAbility = EAbilityID::IdNoAbility;
 	UpdateCursor();
+	HideAimAbilityRadiusIfNeeded();
 	if (GetIsValidPlayerAimAbilityActor())
 	{
 		M_PlayerAimAbility->HideRadius();

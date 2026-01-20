@@ -60,6 +60,31 @@ void UAimAbilityComponent::BeginPlay()
 	BeginPlay_AddAbility();
 }
 
+bool UAimAbilityComponent::CollectWeaponStates(TArray<UWeaponState*>& OutWeaponStates, float& OutMaxRange) const
+{
+	return false;
+}
+
+void UAimAbilityComponent::SetWeaponsDisabled()
+{
+}
+
+void UAimAbilityComponent::SetWeaponsAutoEngage(const bool bUseLastTarget)
+{
+}
+
+void UAimAbilityComponent::FireWeaponsAtLocation(const FVector& TargetLocation)
+{
+}
+
+void UAimAbilityComponent::RequestMoveToLocation(const FVector& MoveToLocation)
+{
+}
+
+void UAimAbilityComponent::StopMovementForAbility()
+{
+}
+
 void UAimAbilityComponent::ExecuteAimAbility(const FVector& TargetLocation)
 {
 	if (not GetIsValidOwnerCommandsInterface())
@@ -140,6 +165,11 @@ float UAimAbilityComponent::GetAimAbilityRange() const
 	return MaxRange;
 }
 
+float UAimAbilityComponent::GetAimAbilityRadius() const
+{
+	return M_AimAbilitySettings.Radius;
+}
+
 void UAimAbilityComponent::BeginAbilityDurationTimer()
 {
 	StartBehaviourTimer(M_AimAbilitySettings.BehaviourDuration + AimAbilityConstants::SquadBehaviourBufferSeconds);
@@ -153,7 +183,7 @@ bool UAimAbilityComponent::GetIsValidOwnerCommandsInterface() const
 {
 	if (not IsValid(M_OwnerCommandsInterface.GetObject()))
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_OwnerCommandsInterface",
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_OwnerCommandsInterface",
 		                                                      "UAimAbilityComponent::GetIsValidOwnerCommandsInterface",
 		                                                      this);
 		return false;
@@ -166,7 +196,7 @@ bool UAimAbilityComponent::GetIsValidBehaviourInstance() const
 {
 	if (not IsValid(M_WeaponOverwriteBehaviour))
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_WeaponOverwriteBehaviour",
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_WeaponOverwriteBehaviour",
 		                                                      "UAimAbilityComponent::GetIsValidBehaviourInstance",
 		                                                      this);
 		return false;

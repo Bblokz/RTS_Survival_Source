@@ -130,7 +130,7 @@ EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeForAbility(const EAbilityID 
 			{
 				return EPlayerAimAbilityTypes::None;
 			}
-			OutAbilityRadius = AimAbilityComponent->GetAimAbilityRange();
+			OutAbilityRadius = AimAbilityComponent->getaim();
 			return AimAbilityComponent->GetAimAssistType();
 		}
 	default:

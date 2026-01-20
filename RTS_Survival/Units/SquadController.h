@@ -237,6 +237,7 @@ public:
 	friend class RTS_SURVIVAL_API UGrenadeComponent;
 	friend class RTS_SURVIVAL_API USquadReinforcementComponent;
 	friend class RTS_SURVIVAL_API UFieldConstructionAbilityComponent;
+	friend class RTS_SURVIVAL_API USquadAimAbilityComponent;
 	ASquadController();
 
 
