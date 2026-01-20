@@ -385,6 +385,12 @@ UBehaviourComp* ASquadController::GetBehaviourComponentOfSquad() const
 	return BehaviourComponent;
 }
 
+int32 ASquadController::GetSquadUnitAmount()
+{
+	EnsureSquadUnitsValid();
+	return M_TSquadUnits.Num();
+}
+
 void ASquadController::SetSquadSpawnLocation(const FVector& SpawnLocation)
 {
 	M_SquadSpawnLocation.bIsSetByTrainer = true;
@@ -1242,6 +1248,7 @@ void ASquadController::ExecuteCaptureCommand(AActor* CaptureTarget)
 	const int32 UnitsNeededToCapture = CaptureInterface->GetCaptureUnitAmountNeeded();
 	if (NumSquadUnitsAlive < UnitsNeededToCapture)
 	{
+		PlayAnnouncerLineNotEnoughSquadMembersToCapture();
 		DoneExecutingCommand(EAbilityID::IdCapture);
 		return;
 	}
@@ -1589,6 +1596,7 @@ void ASquadController::ConsumeSquadOnScavengingComplete()
 		SquadUnit->UnitDies(ERTSDeathType::Scavenging);
 	}
 }
+
 void ASquadController::OnSquadUnitArrivedAtCaptureActor()
 {
 	ICaptureInterface* CaptureInterface =
@@ -2753,6 +2761,15 @@ void ASquadController::SetWeaponIcon(const EWeaponName HighestValuedWeapon)
 		}
 	}
 	SquadHealthComponent->UpdateSquadWeaponIcon(WeaponIconSettings);
+}
+
+void ASquadController::PlayAnnouncerLineNotEnoughSquadMembersToCapture()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+	PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NotEnoughSquadUnitsToCapture, true, false);
 }
 
 bool ASquadController::GetIsValidSquadUnit(const ASquadUnit* Unit) const

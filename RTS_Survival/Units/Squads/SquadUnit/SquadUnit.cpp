@@ -658,7 +658,7 @@ void ASquadUnit::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
 	}
-	if (IsValid(SelectionComponent) && GetIsValidSquadController())
+	if (IsValid(SelectionComponent) && IsValid(M_SquadController))
 	{
 		// No error report as is valid.
 		const bool bIsSelected = SelectionComponent->GetIsSelected();
@@ -1624,9 +1624,18 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 	// Notify the animation instance (unbind selection delegates etc.).
 	UnitDies_NotifyAnimInstance();
 
-	// Start ragdoll simulation and ensure the weapon is destroyed at this moment.
-	M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit, M_InfantryWeapon);
+	if (DeathType != ERTSDeathType::Scavenging)
+	{
+		// Start ragdoll simulation and ensure the weapon is destroyed at this moment.
+		M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit, M_InfantryWeapon);
+	}
+	else
+	{
+		// Scavenging death; no voice line and no physics ragdoll.
+		SetActorHiddenInGame(true);
+	}
 	M_InfantryWeapon = nullptr;
+
 
 	// Remove the unit from its AI controller.
 	UnitDies_RemoveFromAIController();

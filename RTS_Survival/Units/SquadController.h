@@ -245,6 +245,8 @@ public:
 
 	UBehaviourComp* GetBehaviourComponentOfSquad() const;
 
+	int32 GetSquadUnitAmount();
+
 	void SetSquadSpawnLocation(const FVector& SpawnLocation);
 	/**
 	 * @brief Request squad move using the controller's coordinated pathing for a specific ability.
@@ -813,5 +815,7 @@ protected:
 	// ----------------- Weapon Icon -----------------
 	void UpdateSquadWeaponIcon();
 	void SetWeaponIcon(const EWeaponName HighestValuedWeapon);
+
+	void PlayAnnouncerLineNotEnoughSquadMembersToCapture();
 
 };
