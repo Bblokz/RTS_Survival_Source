@@ -1249,16 +1249,9 @@ void ASquadController::ExecuteCaptureCommand(AActor* CaptureTarget)
 	M_CaptureState.M_TargetCaptureActor = CaptureTarget;
 
 	// Move the squad towards the closest capture location exposed by the actor.
-	FVector MoveToLocation = CaptureInterface->GetCaptureLocationClosestTo(GetActorLocation());
-	// Project to navmesh.
-	bool bWasSuccessfull = false;
-	MoveToLocation = RTSFunctionLibrary::GetLocationProjected(this, MoveToLocation, true, bWasSuccessfull, 1.f);
-	if (not bWasSuccessfull)
-	{
-		const FString CaptureActorName = CaptureTarget ? CaptureTarget->GetName() : "nullptr";
-		RTSFunctionLibrary::ReportWarning("Failed to project location for capture command!"
-			"\n Capture actor: " + CaptureActorName + "\n");
-	}
+	const FVector DesiredLocation = CaptureInterface->GetCaptureLocationClosestTo(GetActorLocation());
+	const FVector FallbackLocation = CaptureTarget ? CaptureTarget->GetActorLocation() : DesiredLocation;
+	const FVector MoveToLocation = GetProjectedCaptureMoveLocation(DesiredLocation, FallbackLocation, CaptureTarget);
 	GeneralMoveToForAbility(MoveToLocation, EAbilityID::IdCapture);
 }
 
@@ -1320,6 +1313,56 @@ void ASquadController::RemoveCaptureUnitsFromSquad(const int32 AmountCaptureUnit
 
 		--UnitsToRemove;
 	}
+}
+
+FVector ASquadController::GetProjectedCaptureMoveLocation(const FVector& DesiredLocation,
+                                                          const FVector& FallbackLocation,
+                                                          const AActor* CaptureTarget) const
+{
+	const bool bFallbackPreferred = DesiredLocation.IsNearlyZero() && not FallbackLocation.IsNearlyZero();
+	const FVector PreferredLocation = bFallbackPreferred ? FallbackLocation : DesiredLocation;
+	bool bWasSuccessful = false;
+	constexpr float CaptureProjectionScale = 5.f;
+	const FVector ProjectedPreferredLocation = RTSFunctionLibrary::GetLocationProjected(
+		this,
+		PreferredLocation,
+		true,
+		bWasSuccessful,
+		CaptureProjectionScale);
+
+	if (bWasSuccessful)
+	{
+		if (bFallbackPreferred)
+		{
+			const FString CaptureActorName = CaptureTarget ? CaptureTarget->GetName() : "nullptr";
+			RTSFunctionLibrary::ReportWarning(
+				"Capture sockets missing; falling back to actor location."
+				"\n Capture actor: " + CaptureActorName + "\n");
+		}
+		return ProjectedPreferredLocation;
+	}
+
+	bool bFallbackProjected = false;
+	const FVector ProjectedFallbackLocation = RTSFunctionLibrary::GetLocationProjected(
+		this,
+		FallbackLocation,
+		true,
+		bFallbackProjected,
+		CaptureProjectionScale);
+	if (bFallbackProjected)
+	{
+		const FString CaptureActorName = CaptureTarget ? CaptureTarget->GetName() : "nullptr";
+		RTSFunctionLibrary::ReportWarning(
+			"Capture move location projection failed; using actor location instead."
+			"\n Capture actor: " + CaptureActorName + "\n");
+		return ProjectedFallbackLocation;
+	}
+
+	const FString CaptureActorName = CaptureTarget ? CaptureTarget->GetName() : "nullptr";
+	RTSFunctionLibrary::ReportWarning(
+		"Failed to project location for capture command; using raw fallback location."
+		"\n Capture actor: " + CaptureActorName + "\n");
+	return FallbackLocation;
 }
 
 void ASquadController::ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction,
