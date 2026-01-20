@@ -152,7 +152,13 @@ void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& 
 	{
 		return;
 	}
-	M_FormationController->MoveFormationToLocation(SquadControllers, TankMasters, Waypoints, FinalWaypointDirection, MaxFormationWidth);
+	M_FormationController->MoveFormationToLocation(
+		SquadControllers,
+		TankMasters,
+		Waypoints,
+		FinalWaypointDirection,
+		MaxFormationWidth,
+		FormationOffsetMlt);
 }
 
 void AEnemyController::CreateAttackWave(const EEnemyWaveType WaveType, const TArray<FAttackWaveElement>& WaveElements,
@@ -173,7 +179,7 @@ void AEnemyController::CreateAttackWave(const EEnemyWaveType WaveType, const TAr
 	M_WaveController->StartNewAttackWave(
 		WaveType, WaveElements, WaveInterval, IntervalVarianceFraction, Waypoints,
 		FinalWaypointDirection, MaxFormationWidth, bInstantStart, WaveCreator, WeakBuildings,
-		PerAffectingBuildingTimerFraction);
+		PerAffectingBuildingTimerFraction, FormationOffsetMultiplier);
 }
 
 void AEnemyController::CreateSingleAttackWave(
@@ -199,6 +205,92 @@ void AEnemyController::CreateSingleAttackWave(
 		ClampedTimeTillWave,
 		WaveCreator,
 		FormationOffsetMultiplier);
+}
+
+void AEnemyController::CreateAttackMoveWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const float WaveInterval,
+	const float IntervalVarianceFraction,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	const int32 MaxFormationWidth,
+	const bool bInstantStart,
+	AActor* WaveCreator,
+	TArray<AActor*> WaveTimerAffectingBuildings,
+	const float PerAffectingBuildingTimerFraction,
+	const float FormationOffsetMultiplier,
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale)
+{
+	TArray<TWeakObjectPtr<AActor>> WeakBuildings;
+	for (AActor* Building : WaveTimerAffectingBuildings)
+	{
+		WeakBuildings.Add(Building);
+	}
+	if (not GetIsValidWaveController())
+	{
+		return;
+	}
+
+	M_WaveController->StartNewAttackMoveWave(
+		WaveType,
+		WaveElements,
+		WaveInterval,
+		IntervalVarianceFraction,
+		Waypoints,
+		FinalWaypointDirection,
+		MaxFormationWidth,
+		bInstantStart,
+		WaveCreator,
+		WeakBuildings,
+		PerAffectingBuildingTimerFraction,
+		FormationOffsetMultiplier,
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale);
+}
+
+void AEnemyController::CreateSingleAttackMoveWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	const int32 MaxFormationWidth,
+	const float TimeTillWave,
+	AActor* WaveCreator,
+	const float FormationOffsetMultiplier,
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale)
+{
+	if (not GetIsValidWaveController())
+	{
+		return;
+	}
+
+	const float ClampedTimeTillWave = FMath::Max(TimeTillWave, 0.f);
+	M_WaveController->StartSingleAttackMoveWave(
+		WaveType,
+		WaveElements,
+		Waypoints,
+		FinalWaypointDirection,
+		MaxFormationWidth,
+		ClampedTimeTillWave,
+		WaveCreator,
+		FormationOffsetMultiplier,
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale);
 }
 
 void AEnemyController::CreateFieldConstructionOrder(
@@ -323,6 +415,30 @@ void AEnemyController::DebugAllActiveFormations() const
 	return;	
 	}
 	M_FormationController->DebugAllActiveFormations();
+}
+
+void AEnemyController::MoveAttackMoveFormationToLocation(
+	const TArray<ASquadController*>& SquadControllers,
+	const TArray<ATankMaster*>& TankMasters,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	const int32 MaxFormationWidth,
+	const float FormationOffsetMlt,
+	const FAttackMoveWaveSettings& AttackMoveSettings)
+{
+	if (not GetIsValidFormationController())
+	{
+		return;
+	}
+
+	M_FormationController->MoveAttackMoveFormationToLocation(
+		SquadControllers,
+		TankMasters,
+		Waypoints,
+		FinalWaypointDirection,
+		MaxFormationWidth,
+		FormationOffsetMlt,
+		AttackMoveSettings);
 }
 
 void AEnemyController::AddToWaveSupply(const int32 AddSupply)

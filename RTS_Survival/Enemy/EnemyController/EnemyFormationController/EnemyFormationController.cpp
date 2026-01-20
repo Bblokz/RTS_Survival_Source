@@ -3,6 +3,7 @@
 
 #include "EnemyFormationController.h"
 
+#include "DrawDebugHelpers.h"
 #include "NavigationSystem.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
@@ -64,6 +65,51 @@ void UEnemyFormationController::MoveFormationToLocation(TArray<ASquadController*
 	// 3) Compute offsets & kick off movement
 	InitFormationOffsets(NewFormation, MapGuidToFormationRadius, MaxFormationWidth, FormationOffsetMlt);
 	// 4) Save the formation data and start the movement.
+	SaveNewFormation(NewFormation);
+	StartFormationMovement(NewFormation);
+}
+
+void UEnemyFormationController::MoveAttackMoveFormationToLocation(
+	TArray<ASquadController*> SquadControllers,
+	TArray<ATankMaster*> TankMasters,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	int32 MaxFormationWidth,
+	const float FormationOffsetMlt,
+	const FAttackMoveWaveSettings& AttackMoveSettings)
+{
+	if (not EnsureFormationRequestIsValid(SquadControllers, TankMasters, MaxFormationWidth))
+	{
+		return;
+	}
+
+	FFormationData NewFormation;
+	const int32 FormationID = GenerateUniqueFormationID();
+	NewFormation.FormationID = FormationID;
+	NewFormation.AttackMoveSettings = AttackMoveSettings;
+	NewFormation.bIsAttackMoveFormation = true;
+
+	InitWaypointsAndDirections(NewFormation, FinalWaypointDirection, Waypoints);
+
+	TMap<TWeakInterfacePtr<ICommands>, float> MapGuidToFormationRadius;
+	for (auto EachSquad : SquadControllers)
+	{
+		if (not IsValid(EachSquad))
+		{
+			continue;
+		}
+		MapGuidToFormationRadius.Add(EachSquad, ExtractFormationRadiusForUnit(EachSquad));
+	}
+	for (auto EachTank : TankMasters)
+	{
+		if (not IsValid(EachTank))
+		{
+			continue;
+		}
+		MapGuidToFormationRadius.Add(EachTank, ExtractFormationRadiusForUnit(EachTank));
+	}
+
+	InitFormationOffsets(NewFormation, MapGuidToFormationRadius, MaxFormationWidth, FormationOffsetMlt);
 	SaveNewFormation(NewFormation);
 	StartFormationMovement(NewFormation);
 }
@@ -130,15 +176,383 @@ void UEnemyFormationController::CheckFormations()
 		const FVector& WayLoc = Formation.FormationWaypoints[Formation.CurrentWaypointIndex];
 		const FRotator& WayDir = Formation.FormationWaypointDirections[Formation.CurrentWaypointIndex];
 
-		for (auto& UnitData : Formation.FormationUnits)
+		if (Formation.bIsAttackMoveFormation)
 		{
-			if (GetIsFormationUnitIdle(UnitData))
-			{
-				OnFormationUnitIdleReorderMove(
-					UnitData, WayLoc, WayDir, Formation.FormationID);
-			}
+			HandleAttackMoveFormation(Formation, WayLoc, WayDir);
+			continue;
+		}
+
+		HandleFormationIdleUnits(Formation, WayLoc, WayDir);
+	}
+}
+
+void UEnemyFormationController::HandleFormationIdleUnits(
+	FFormationData& Formation,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection)
+{
+	for (auto& UnitData : Formation.FormationUnits)
+	{
+		if (GetIsFormationUnitIdle(UnitData))
+		{
+			OnFormationUnitIdleReorderMove(
+				UnitData, WaypointLocation, WaypointDirection, Formation.FormationID);
 		}
 	}
+}
+
+void UEnemyFormationController::HandleAttackMoveFormation(
+	FFormationData& Formation,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection)
+{
+	HandleFormationIdleUnits(Formation, WaypointLocation, WaypointDirection);
+
+	if (not GetDoAllFormationUnitsReachedWaypoint(Formation))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	const float CurrentTimeSeconds = World->GetTimeSeconds();
+	bool bHasCombatUnits = false;
+	TArray<const FFormationUnitData*> CombatUnits;
+	const bool bCanAdvance = GetCanAttackMoveFormationAdvance(
+		Formation,
+		CurrentTimeSeconds,
+		bHasCombatUnits,
+		CombatUnits);
+
+	if (bHasCombatUnits && not bCanAdvance)
+	{
+		IssueAttackMoveHelpOrders(Formation, CombatUnits);
+	}
+
+	if (bCanAdvance)
+	{
+		OnCompleteFormationReached(&Formation);
+	}
+}
+
+bool UEnemyFormationController::GetDoAllFormationUnitsReachedWaypoint(const FFormationData& Formation) const
+{
+	for (const FFormationUnitData& UnitData : Formation.FormationUnits)
+	{
+		if (not UnitData.bHasReachedNextDestination)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool UEnemyFormationController::GetIsFormationUnitInCombat(const FFormationUnitData& FormationUnit) const
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return false;
+	}
+
+	const AActor* UnitActor = FormationUnit.Unit->GetOwnerActor();
+	if (not IsValid(UnitActor))
+	{
+		return false;
+	}
+
+	const URTSComponent* RTSComponent = UnitActor->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent))
+	{
+		return false;
+	}
+
+	return RTSComponent->GetIsUnitInCombat();
+}
+
+float UEnemyFormationController::GetFormationUnitInnerRadius(const FFormationUnitData& FormationUnit) const
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return 0.f;
+	}
+
+	const AActor* UnitActor = FormationUnit.Unit->GetOwnerActor();
+	if (not IsValid(UnitActor))
+	{
+		return 0.f;
+	}
+
+	const URTSComponent* RTSComponent = UnitActor->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent))
+	{
+		return 0.f;
+	}
+
+	return RTSComponent->GetFormationUnitInnerRadius();
+}
+
+const FFormationUnitData* UEnemyFormationController::FindClosestCombatUnit(
+	const FFormationUnitData& UnitToAssist,
+	const TArray<const FFormationUnitData*>& CombatUnits) const
+{
+	if (not UnitToAssist.IsValidFormationUnit())
+	{
+		return nullptr;
+	}
+
+	const FVector UnitLocation = UnitToAssist.Unit->GetOwnerLocation();
+	const FFormationUnitData* ClosestUnit = nullptr;
+	float ClosestDistanceSquared = TNumericLimits<float>::Max();
+
+	for (const FFormationUnitData* CombatUnit : CombatUnits)
+	{
+		if (not CombatUnit || not CombatUnit->IsValidFormationUnit())
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared(UnitLocation, CombatUnit->Unit->GetOwnerLocation());
+		if (DistanceSquared < ClosestDistanceSquared)
+		{
+			ClosestDistanceSquared = DistanceSquared;
+			ClosestUnit = CombatUnit;
+		}
+	}
+
+	return ClosestUnit;
+}
+
+void UEnemyFormationController::IssueAttackMoveHelpOrders(
+	const FFormationData& Formation,
+	const TArray<const FFormationUnitData*>& CombatUnits) const
+{
+	if (CombatUnits.IsEmpty())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World);
+	if (not NavSys)
+	{
+		return;
+	}
+
+	const float DebugTextDurationSeconds = 2.f;
+
+	for (const FFormationUnitData& UnitData : Formation.FormationUnits)
+	{
+		IssueAttackMoveHelpOrderForUnit(Formation, UnitData, CombatUnits, NavSys, DebugTextDurationSeconds);
+	}
+}
+
+void UEnemyFormationController::IssueAttackMoveHelpOrderForUnit(
+	const FFormationData& Formation,
+	const FFormationUnitData& UnitData,
+	const TArray<const FFormationUnitData*>& CombatUnits,
+	UNavigationSystemV1* NavSys,
+	const float DebugTextDuration) const
+{
+	if (not UnitData.IsValidFormationUnit())
+	{
+		return;
+	}
+	if (GetIsFormationUnitInCombat(UnitData))
+	{
+		return;
+	}
+
+	const FFormationUnitData* ClosestCombatUnit = FindClosestCombatUnit(UnitData, CombatUnits);
+	if (not ClosestCombatUnit)
+	{
+		return;
+	}
+
+	const float UnitInnerRadius = GetFormationUnitInnerRadius(UnitData);
+	if (UnitInnerRadius <= 0.f)
+	{
+		return;
+	}
+
+	const FVector CombatUnitLocation = ClosestCombatUnit->Unit->GetOwnerLocation();
+	FVector ProjectedLocation = CombatUnitLocation;
+	if (not TryGetAttackMoveHelpLocation(
+		Formation.AttackMoveSettings,
+		CombatUnitLocation,
+		UnitInnerRadius,
+		NavSys,
+		ProjectedLocation))
+	{
+		return;
+	}
+
+	const FVector UnitLocation = UnitData.Unit->GetOwnerLocation();
+	const FRotator MoveRotation = UKismetMathLibrary::FindLookAtRotation(UnitLocation, ProjectedLocation);
+	const ECommandQueueError Error = UnitData.Unit->MoveToLocation(ProjectedLocation, true, MoveRotation);
+	if (Error != ECommandQueueError::NoError)
+	{
+		OnUnitMovementError(UnitData.Unit, Error);
+		return;
+	}
+
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		UWorld* World = GetWorld();
+		if (not World)
+		{
+			return;
+		}
+
+		const FString UnitName = UnitData.Unit->GetOwnerName();
+		const float DebugTextHeight = 120.f;
+		const FVector DebugTextLocation = ProjectedLocation + FVector(0.f, 0.f, DebugTextHeight);
+		DrawDebugString(World, DebugTextLocation, "Helping combat unit: " + UnitName, nullptr, FColor::Yellow,
+		                DebugTextDuration, false);
+	}
+}
+
+bool UEnemyFormationController::TryGetAttackMoveHelpLocation(
+	const FAttackMoveWaveSettings& AttackMoveSettings,
+	const FVector& CombatUnitLocation,
+	const float UnitInnerRadius,
+	UNavigationSystemV1* NavSys,
+	FVector& OutProjectedLocation) const
+{
+	const int32 MaxTries = AttackMoveSettings.MaxTriesFindNavPointForHelpOffset;
+	if (MaxTries <= 0 || not NavSys)
+	{
+		return false;
+	}
+
+	const float FullCircleDegrees = 360.f;
+	const float DebugSphereRadius = 45.f;
+	const float DebugSphereDurationSeconds = 2.f;
+	const int32 DebugSphereSegments = 12;
+
+	for (int32 TryIndex = 0; TryIndex < MaxTries; ++TryIndex)
+	{
+		const float RandomMlt = FMath::FRandRange(
+			AttackMoveSettings.HelpOffsetRadiusMltMin,
+			AttackMoveSettings.HelpOffsetRadiusMltMax);
+		const float Distance = UnitInnerRadius * RandomMlt;
+		const float RandomAngleDegrees = FMath::FRandRange(0.f, FullCircleDegrees);
+		const float RandomAngleRadians = FMath::DegreesToRadians(RandomAngleDegrees);
+		const FVector OffsetDirection(FMath::Cos(RandomAngleRadians), FMath::Sin(RandomAngleRadians), 0.f);
+		const FVector CandidateLocation = CombatUnitLocation + OffsetDirection * Distance;
+
+		bool bProjectionSuccess = false;
+		const FVector Projected = RTSFunctionLibrary::GetLocationProjected_WithNavSystem(
+			NavSys,
+			CandidateLocation,
+			true,
+			bProjectionSuccess,
+			AttackMoveSettings.ProjectionScale);
+
+		DebugAttackMoveHelpProjection(
+			CandidateLocation,
+			Projected,
+			bProjectionSuccess,
+			DebugSphereRadius,
+			DebugSphereSegments,
+			DebugSphereDurationSeconds);
+
+		if (bProjectionSuccess)
+		{
+			OutProjectedLocation = Projected;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void UEnemyFormationController::DebugAttackMoveHelpProjection(
+	const FVector& CandidateLocation,
+	const FVector& ProjectedLocation,
+	const bool bProjectionSuccess,
+	const float DebugSphereRadius,
+	const int32 DebugSphereSegments,
+	const float DebugSphereDurationSeconds) const
+{
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		UWorld* World = GetWorld();
+		if (not World)
+		{
+			return;
+		}
+
+		const FColor DebugColor = bProjectionSuccess ? FColor::Green : FColor::Red;
+		const FVector SphereLocation = bProjectionSuccess ? ProjectedLocation : CandidateLocation;
+		DrawDebugSphere(
+			World,
+			SphereLocation,
+			DebugSphereRadius,
+			DebugSphereSegments,
+			DebugColor,
+			false,
+			DebugSphereDurationSeconds);
+	}
+}
+
+bool UEnemyFormationController::GetCanAttackMoveFormationAdvance(
+	FFormationData& Formation,
+	const float CurrentTimeSeconds,
+	bool& bOutHasCombatUnits,
+	TArray<const FFormationUnitData*>& OutCombatUnits)
+{
+	bOutHasCombatUnits = false;
+	OutCombatUnits.Reset();
+
+	const float MaxCombatTime = Formation.AttackMoveSettings.MaxAttackTimeBeforeAdvancingToNextWayPoint;
+	bool bCanAdvance = true;
+
+	for (FFormationUnitData& UnitData : Formation.FormationUnits)
+	{
+		if (not UnitData.IsValidFormationUnit())
+		{
+			continue;
+		}
+
+		if (not GetIsFormationUnitInCombat(UnitData))
+		{
+			UnitData.M_CombatStartTimeSeconds = -1.f;
+			continue;
+		}
+
+		bOutHasCombatUnits = true;
+		OutCombatUnits.Add(&UnitData);
+
+		if (MaxCombatTime <= 0.f)
+		{
+			bCanAdvance = false;
+			continue;
+		}
+
+		if (UnitData.M_CombatStartTimeSeconds < 0.f)
+		{
+			UnitData.M_CombatStartTimeSeconds = CurrentTimeSeconds;
+			bCanAdvance = false;
+			continue;
+		}
+
+		const float TimeInCombat = CurrentTimeSeconds - UnitData.M_CombatStartTimeSeconds;
+		if (TimeInCombat < MaxCombatTime)
+		{
+			bCanAdvance = false;
+		}
+	}
+
+	return bCanAdvance;
 }
 
 void UEnemyFormationController::InitWaypointsAndDirections(FFormationData& OutFormationData,
@@ -291,6 +705,7 @@ void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& Formation
 	const FDelegateHandle Handle = FormationUnit.Unit->OnUnitIdleAndNoNewCommandsDelegate.AddLambda(CallBackOnReached);
 	FormationUnit.MovementCompleteHandle = Handle;
 	FormationUnit.bHasReachedNextDestination = false;
+	FormationUnit.M_CombatStartTimeSeconds = -1.f;
 }
 
 void UEnemyFormationController::OnUnitMovementError(const TWeakInterfacePtr<ICommands> Unit,
@@ -340,7 +755,12 @@ void UEnemyFormationController::OnUnitReachedFWaypoint(TWeakInterfacePtr<IComman
 	// Unbind the delegate for this unit.
 	(void)Unit->OnUnitIdleAndNoNewCommandsDelegate.Remove(UnitInFormation->MovementCompleteHandle);
 	// Note: this also marks this formation unit as "bHasReachedNextDestination".
-	if (Formation->CheckIfFormationReachedCurrentWayPoint(Unit, this))
+	const bool bAllUnitsReached = Formation->CheckIfFormationReachedCurrentWayPoint(Unit, this);
+	if (Formation->bIsAttackMoveFormation)
+	{
+		return;
+	}
+	if (bAllUnitsReached)
 	{
 		// Everyone reached the waypoint, move to the next one.
 		OnCompleteFormationReached(Formation);

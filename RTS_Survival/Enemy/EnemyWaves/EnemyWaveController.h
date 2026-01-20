@@ -12,6 +12,7 @@ class ASquadController;
 class ATankMaster;
 class AEnemyController;
 class ARTSAsyncSpawner;
+class UNavigationSystemV1;
 
 /**
  * @brief Coordinates the spawning and iteration of enemy attack waves for the enemy controller.
@@ -40,6 +41,45 @@ public:
 	);
 
 	/**
+	 * @brief Use when a repeating wave should pause for allied combat support before advancing.
+	 * @param WaveType Determines wave logic and whether the wave requires an owning actor.
+	 * @param WaveElements Defines the unit types and spawn points for this wave.
+	 * @param WaveInterval Time between wave iterations.
+	 * @param IntervalVarianceFraction Variance fraction applied to the wave interval.
+	 * @param Waypoints Formation movement path for the spawned units.
+	 * @param FinalWaypointDirection The facing direction after reaching the final waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to each other.
+	 * @param bInstantStart Whether to start immediately or after the first timer.
+	 * @param WaveCreator The actor responsible for spawning this wave when required by the wave type.
+	 * @param WaveTimerAffectingBuildings Generator buildings checked for validity that influence the wave spawn timing.
+	 * @param PerAffectingBuildingTimerFraction Fraction of the wave interval added per destroyed generator building.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
+	 * @param HelpOffsetRadiusMltMax Multiplier for max help distance around allied combat units.
+	 * @param HelpOffsetRadiusMltMin Multiplier for min help distance around allied combat units.
+	 * @param MaxAttackTimeBeforeAdvancingToNextWayPoint Max time to wait at a waypoint before advancing while in combat.
+	 * @param MaxTriesFindNavPointForHelpOffset Attempts per tick to find a valid help location.
+	 * @param ProjectionScale Scale for RTSToNavProjectionExtent used in help projections.
+	 */
+	void StartNewAttackMoveWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		float WaveInterval,
+		float IntervalVarianceFraction,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const bool bInstantStart,
+		AActor* WaveCreator,
+		const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings,
+		const float PerAffectingBuildingTimerFraction,
+		const float FormationOffsetMultiplier,
+		const float HelpOffsetRadiusMltMax,
+		const float HelpOffsetRadiusMltMin,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		const int32 MaxTriesFindNavPointForHelpOffset,
+		const float ProjectionScale);
+
+	/**
 	 * @brief Starts a one-off enemy attack wave with an optional delay.
 	 * @param WaveType Determines wave logic and whether the wave requires an owning actor.
 	 * @param WaveElements Defines the unit types and spawn points for this one-off wave.
@@ -60,6 +100,37 @@ public:
 		AActor* WaveCreator = nullptr, const float FormationOffsetMultiplier = 0
 	);
 
+	/**
+	 * @brief Use when a one-off wave should pause for allied combat support before advancing.
+	 * @param WaveType Determines wave logic and whether the wave requires an owning actor.
+	 * @param WaveElements Defines the unit types and spawn points for this one-off wave.
+	 * @param Waypoints Formation movement path for the spawned units.
+	 * @param FinalWaypointDirection The facing direction after reaching the final waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to each other.
+	 * @param TimeTillWave Delay before starting the wave; zero or less starts immediately.
+	 * @param WaveCreator The actor responsible for spawning this wave when required by the wave type.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
+	 * @param HelpOffsetRadiusMltMax Multiplier for max help distance around allied combat units.
+	 * @param HelpOffsetRadiusMltMin Multiplier for min help distance around allied combat units.
+	 * @param MaxAttackTimeBeforeAdvancingToNextWayPoint Max time to wait at a waypoint before advancing while in combat.
+	 * @param MaxTriesFindNavPointForHelpOffset Attempts per tick to find a valid help location.
+	 * @param ProjectionScale Scale for RTSToNavProjectionExtent used in help projections.
+	 */
+	void StartSingleAttackMoveWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const float TimeTillWave,
+		AActor* WaveCreator,
+		const float FormationOffsetMultiplier,
+		const float HelpOffsetRadiusMltMax,
+		const float HelpOffsetRadiusMltMin,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		const int32 MaxTriesFindNavPointForHelpOffset,
+		const float ProjectionScale);
+
 	void InitWaveController(
 		AEnemyController* EnemyController);
 
@@ -70,6 +141,9 @@ protected:
 private:
 
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
+	// Cached navigation system for attack move wave projections.
+	UPROPERTY()
+	TWeakObjectPtr<UNavigationSystemV1> M_NavigationSystem = nullptr;
 	bool EnsureEnemyControllerIsValid();
 	TArray<FAttackWave> M_AttackWaves;
 	void RemoveAttackWaveByIDAndInvalidateTimer(FAttackWave* AttackWave);
@@ -86,7 +160,10 @@ private:
 		const int32 MaxFormationWidth,
 		AActor* WaveCreator,
 		const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings, const float PerAffectingBuildingTimerFraction,
-		const bool bIsSingleWave = false, const float FormationOffsetMultiplier = 0);
+		const bool bIsSingleWave = false,
+		const float FormationOffsetMultiplier = 0,
+		const bool bIsAttackMoveWave = false,
+		const FAttackMoveWaveSettings& AttackMoveSettings = {});
 
 	bool CreateAttackWaveTimer(FAttackWave* AttackWave, bool bInstantStart);
 	// Uses the interval as well as the variance fractions to randomly get the wave iteration time.
@@ -161,6 +238,11 @@ private:
 		const TArray<FAttackWaveElement>& WaveElements,
 		const TArray<FVector>& Waypoints,
 		AActor* WaveCreator) const;
+	bool GetIsValidAttackMoveWaveSettings(
+		const float HelpOffsetRadiusMltMax,
+		const float HelpOffsetRadiusMltMin,
+		const int32 MaxTriesFindNavPointForHelpOffset,
+		const float ProjectionScale) const;
 	bool GetAreWaveElementsValid(TArray<FAttackWaveElement> WaveElements) const;
 	bool GetAreWavePointsValid(const TArray<FVector>& Waypoints) const;
 	bool GetIsValidTrainingOption(const FTrainingOption& TrainingOption) const;

@@ -12,6 +12,7 @@
 class AEnemyController;
 class ATankMaster;
 class ASquadController;
+class UNavigationSystemV1;
 
 // Hash TWeakInterfacePtr<ICommands> by its underlying UObject*
 // Used for matching the radius of the unit with the icommand interface.
@@ -44,6 +45,25 @@ public:
 		int32 MaxFormationWidth = 2,
 		const float FormationOffsetMlt = 1.f);
 
+	/**
+	 * @brief Starts a formation using attack move logic so combat-ready units can assist each other en route.
+	 * @param SquadControllers Squads that will be moved in formation.
+	 * @param TankMasters Tanks that will be moved in formation.
+	 * @param Waypoints Waypoints for the formation to move through.
+	 * @param FinalWaypointDirection Desired facing direction at the final waypoint.
+	 * @param MaxFormationWidth Maximum number of units per row in the formation.
+	 * @param FormationOffsetMlt Multiplier applied to the formation spacing offsets.
+	 * @param AttackMoveSettings Settings that control combat waiting and help offsets.
+	 */
+	void MoveAttackMoveFormationToLocation(
+		TArray<ASquadController*> SquadControllers,
+		TArray<ATankMaster*> TankMasters,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		int32 MaxFormationWidth,
+		const float FormationOffsetMlt,
+		const FAttackMoveWaveSettings& AttackMoveSettings);
+
 	void DebugAllActiveFormations() const;
 
 protected:
@@ -63,6 +83,50 @@ private:
 	 * IF a unit is found to be idle; teleport it and order it to move to the same point again.
 	 */
 	void CheckFormations();
+
+	void HandleFormationIdleUnits(
+		FFormationData& Formation,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection);
+
+	void HandleAttackMoveFormation(
+		FFormationData& Formation,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection);
+
+	bool GetDoAllFormationUnitsReachedWaypoint(const FFormationData& Formation) const;
+	bool GetIsFormationUnitInCombat(const FFormationUnitData& FormationUnit) const;
+	float GetFormationUnitInnerRadius(const FFormationUnitData& FormationUnit) const;
+	const FFormationUnitData* FindClosestCombatUnit(
+		const FFormationUnitData& UnitToAssist,
+		const TArray<const FFormationUnitData*>& CombatUnits) const;
+	void IssueAttackMoveHelpOrders(
+		const FFormationData& Formation,
+		const TArray<const FFormationUnitData*>& CombatUnits) const;
+	void IssueAttackMoveHelpOrderForUnit(
+		const FFormationData& Formation,
+		const FFormationUnitData& UnitData,
+		const TArray<const FFormationUnitData*>& CombatUnits,
+		UNavigationSystemV1* NavSys,
+		const float DebugTextDuration) const;
+	bool TryGetAttackMoveHelpLocation(
+		const FAttackMoveWaveSettings& AttackMoveSettings,
+		const FVector& CombatUnitLocation,
+		const float UnitInnerRadius,
+		UNavigationSystemV1* NavSys,
+		FVector& OutProjectedLocation) const;
+	void DebugAttackMoveHelpProjection(
+		const FVector& CandidateLocation,
+		const FVector& ProjectedLocation,
+		const bool bProjectionSuccess,
+		const float DebugSphereRadius,
+		const int32 DebugSphereSegments,
+		const float DebugSphereDurationSeconds) const;
+	bool GetCanAttackMoveFormationAdvance(
+		FFormationData& Formation,
+		const float CurrentTimeSeconds,
+		bool& bOutHasCombatUnits,
+		TArray<const FFormationUnitData*>& OutCombatUnits);
 
 	// To continuously check if the formations are still going.
 	FTimerHandle M_FormationCheckTimerHandle;

@@ -4,6 +4,7 @@
 #include "EnemyWaveController.h"
 
 #include "Algo/Unique.h"
+#include "NavigationSystem.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -74,6 +75,95 @@ void UEnemyWaveController::StartNewAttackWave(
 	}
 }
 
+void UEnemyWaveController::StartNewAttackMoveWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const float WaveInterval,
+	const float IntervalVarianceFraction,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	const int32 MaxFormationWidth,
+	const bool bInstantStart,
+	AActor* WaveCreator,
+	const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings,
+	const float PerAffectingBuildingTimerFraction,
+	const float FormationOffsetMultiplier,
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale)
+{
+	if (not GetIsValidWave(
+		WaveType,
+		WaveElements,
+		WaveInterval,
+		IntervalVarianceFraction,
+		Waypoints,
+		WaveCreator,
+		WaveTimerAffectingBuildings,
+		PerAffectingBuildingTimerFraction))
+	{
+		return;
+	}
+	if (not GetIsValidAttackMoveWaveSettings(
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale))
+	{
+		return;
+	}
+	if (not GetIsValidAsyncSpawner() || not EnsureEnemyControllerIsValid())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid async spawner or enemy controller for enemy wave controller. Cannot start new attack move wave.");
+		return;
+	}
+
+	FAttackMoveWaveSettings AttackMoveSettings;
+	AttackMoveSettings.HelpOffsetRadiusMltMax = HelpOffsetRadiusMltMax;
+	AttackMoveSettings.HelpOffsetRadiusMltMin = HelpOffsetRadiusMltMin;
+	AttackMoveSettings.MaxAttackTimeBeforeAdvancingToNextWayPoint = MaxAttackTimeBeforeAdvancingToNextWayPoint;
+	AttackMoveSettings.MaxTriesFindNavPointForHelpOffset = MaxTriesFindNavPointForHelpOffset;
+	AttackMoveSettings.ProjectionScale = ProjectionScale;
+
+	const int32 UniqueWaveID = GetUniqueWaveID();
+	constexpr bool bIsSingleTimerSpawnWave = false;
+	constexpr bool bIsAttackMoveWave = true;
+	if (not CreateNewAttackWaveStruct(
+		UniqueWaveID,
+		WaveType,
+		WaveElements,
+		WaveInterval,
+		IntervalVarianceFraction,
+		Waypoints,
+		FinalWaypointDirection,
+		MaxFormationWidth,
+		WaveCreator,
+		WaveTimerAffectingBuildings,
+		PerAffectingBuildingTimerFraction,
+		bIsSingleTimerSpawnWave,
+		FormationOffsetMultiplier,
+		bIsAttackMoveWave,
+		AttackMoveSettings))
+	{
+		RTSFunctionLibrary::ReportError("failed to create struct for attack move wave!");
+		return;
+	}
+
+	FAttackWave* AttackWave = GetAttackWaveByID(UniqueWaveID);
+	if (not AttackWave)
+	{
+		return;
+	}
+	if (not CreateAttackWaveTimer(AttackWave, bInstantStart))
+	{
+		RTSFunctionLibrary::ReportError("Failed to start attack move wave timer for wave, will remove the struct!");
+		RemoveAttackWaveByIDAndInvalidateTimer(AttackWave);
+	}
+}
+
 void UEnemyWaveController::StartSingleAttackWave(
 	const EEnemyWaveType WaveType,
 	const TArray<FAttackWaveElement>& WaveElements,
@@ -120,6 +210,86 @@ void UEnemyWaveController::StartSingleAttackWave(
 	}
 }
 
+void UEnemyWaveController::StartSingleAttackMoveWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const TArray<FVector>& Waypoints,
+	const FRotator& FinalWaypointDirection,
+	const int32 MaxFormationWidth,
+	const float TimeTillWave,
+	AActor* WaveCreator,
+	const float FormationOffsetMultiplier,
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale)
+{
+	if (not GetIsValidSingleAttackWave(WaveType, WaveElements, Waypoints, WaveCreator))
+	{
+		return;
+	}
+	if (not GetIsValidAttackMoveWaveSettings(
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale))
+	{
+		return;
+	}
+	if (not GetIsValidAsyncSpawner() || not EnsureEnemyControllerIsValid())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid async spawner or enemy controller for enemy wave controller. Cannot start single attack move wave.");
+		return;
+	}
+
+	FAttackMoveWaveSettings AttackMoveSettings;
+	AttackMoveSettings.HelpOffsetRadiusMltMax = HelpOffsetRadiusMltMax;
+	AttackMoveSettings.HelpOffsetRadiusMltMin = HelpOffsetRadiusMltMin;
+	AttackMoveSettings.MaxAttackTimeBeforeAdvancingToNextWayPoint = MaxAttackTimeBeforeAdvancingToNextWayPoint;
+	AttackMoveSettings.MaxTriesFindNavPointForHelpOffset = MaxTriesFindNavPointForHelpOffset;
+	AttackMoveSettings.ProjectionScale = ProjectionScale;
+
+	const int32 UniqueWaveID = GetUniqueWaveID();
+	const float ClampedTimeTillWave = FMath::Max(TimeTillWave, 0.f);
+	const bool bIsSingleWave = true;
+	constexpr bool bIsAttackMoveWave = true;
+	if (not CreateNewAttackWaveStruct(
+		UniqueWaveID,
+		WaveType,
+		WaveElements,
+		ClampedTimeTillWave,
+		0.f,
+		Waypoints,
+		FinalWaypointDirection,
+		MaxFormationWidth,
+		WaveCreator,
+		{},
+		0.f,
+		bIsSingleWave,
+		FormationOffsetMultiplier,
+		bIsAttackMoveWave,
+		AttackMoveSettings))
+	{
+		RTSFunctionLibrary::ReportError("failed to create struct for single attack move wave!");
+		return;
+	}
+
+	FAttackWave* AttackWave = GetAttackWaveByID(UniqueWaveID);
+	if (not AttackWave)
+	{
+		return;
+	}
+	const bool bInstantStart = ClampedTimeTillWave <= 0.f;
+	if (not CreateAttackWaveTimer(AttackWave, bInstantStart))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to start attack move wave timer for single wave, will remove the struct!");
+		RemoveAttackWaveByIDAndInvalidateTimer(AttackWave);
+	}
+}
+
 void UEnemyWaveController::InitWaveController(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
@@ -129,6 +299,8 @@ void UEnemyWaveController::InitWaveController(AEnemyController* EnemyController)
 void UEnemyWaveController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	M_NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
 }
 
 bool UEnemyWaveController::EnsureEnemyControllerIsValid()
@@ -183,7 +355,9 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
                                                      const TArray<TWeakObjectPtr<AActor>>& WaveTimerAffectingBuildings,
                                                      const float PerAffectingBuildingTimerFraction,
                                                      const bool bIsSingleWave,
-                                                     const float FormationOffsetMultiplier)
+                                                     const float FormationOffsetMultiplier,
+                                                     const bool bIsAttackMoveWave,
+                                                     const FAttackMoveWaveSettings& AttackMoveSettings)
 {
 	// Sanity check for unique ID
 	if (not EnsureIDIsUnique(UniqueID))
@@ -210,6 +384,8 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
 	NewAttackWave.UniqueWaveID = UniqueID;
 	NewAttackWave.bIsSingleWave = bIsSingleWave;
 	NewAttackWave.FormationOffsetMlt = FormationOffsetMultiplier;
+	NewAttackWave.AttackMoveSettings = AttackMoveSettings;
+	NewAttackWave.bIsAttackMoveWave = bIsAttackMoveWave;
 	M_AttackWaves.Add(NewAttackWave);
 	return true;
 }
@@ -491,12 +667,27 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 	// Start the formation movement using the enemy formation controller; note that at this point
 	// all the wave resources are paid for and that if a wave unit dies during the formation or after
 	// the enemy formation controller will callback on the enemy controller to adjust the wave supply accordingly.
-	M_EnemyController->MoveFormationToLocation(
-		WaveSquads,
-		WaveTanks,
-		Wave->Waypoints,
-		Wave->FinalWaypointDirection,
-		Wave->MaxFormationWidth);
+	if (Wave->bIsAttackMoveWave)
+	{
+		M_EnemyController->MoveAttackMoveFormationToLocation(
+			WaveSquads,
+			WaveTanks,
+			Wave->Waypoints,
+			Wave->FinalWaypointDirection,
+			Wave->MaxFormationWidth,
+			Wave->FormationOffsetMlt,
+			Wave->AttackMoveSettings);
+	}
+	else
+	{
+		M_EnemyController->MoveFormationToLocation(
+			WaveSquads,
+			WaveTanks,
+			Wave->Waypoints,
+			Wave->FinalWaypointDirection,
+			Wave->MaxFormationWidth,
+			Wave->FormationOffsetMlt);
+	}
 
 	if (Wave->bIsSingleWave)
 	{
@@ -612,6 +803,39 @@ bool UEnemyWaveController::GetIsValidSingleAttackWave(
 	}
 	if (not GetIsValidWaveType(WaveType, WaveCreator))
 	{
+		return false;
+	}
+	return true;
+}
+
+bool UEnemyWaveController::GetIsValidAttackMoveWaveSettings(
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale) const
+{
+	if (HelpOffsetRadiusMltMin <= 0.f || HelpOffsetRadiusMltMax <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid attack move wave settings: help offset multipliers must be greater than zero.");
+		return false;
+	}
+	if (HelpOffsetRadiusMltMax < HelpOffsetRadiusMltMin)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid attack move wave settings: max help offset multiplier is smaller than min.");
+		return false;
+	}
+	if (MaxTriesFindNavPointForHelpOffset <= 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid attack move wave settings: MaxTriesFindNavPointForHelpOffset must be greater than zero.");
+		return false;
+	}
+	if (ProjectionScale <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid attack move wave settings: ProjectionScale must be greater than zero.");
 		return false;
 	}
 	return true;
