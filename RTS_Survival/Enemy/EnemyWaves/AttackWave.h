@@ -32,6 +32,27 @@ enum class EEnemyWaveType :uint8
 	Wave_OwningBuildingAndPowerGenerators
 };
 
+USTRUCT(Blueprintable)
+struct FAttackMoveWaveSettings
+{
+	GENERATED_BODY()
+
+	// Multiplier applied to the unit inner radius for the max help offset.
+	float HelpOffsetRadiusMltMax = 1.f;
+
+	// Multiplier applied to the unit inner radius for the min help offset.
+	float HelpOffsetRadiusMltMin = 1.f;
+
+	// Max time a unit can keep attacking after reaching a waypoint before advancing.
+	float MaxAttackTimeBeforeAdvancingToNextWayPoint = 0.f;
+
+	// How many times to try to project a help offset location per tick.
+	int32 MaxTriesFindNavPointForHelpOffset = 5;
+
+	// Scale applied to RTSToNavProjectionExtent for help offset projections.
+	float ProjectionScale = 1.f;
+};
+
 USTRUCT()
 struct FAttackWave
 {
@@ -78,6 +99,12 @@ struct FAttackWave
 
 	// How much the offset is multiplied by when calculating the unit's formation position.
 	float FormationOffsetMlt = 1.f;
+
+	// Attack move settings used for attack move waves.
+	FAttackMoveWaveSettings AttackMoveSettings = {};
+
+	// When true the wave is handled as an attack move wave.
+	bool bIsAttackMoveWave = false;
 
 	UPROPERTY()
 	TArray<AActor*> SpawnedWaveUnits;

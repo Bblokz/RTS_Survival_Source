@@ -12,6 +12,7 @@
 
 
 struct FAttackWaveElement;
+struct FAttackMoveWaveSettings;
 enum class EEnemyWaveType : uint8;
 class UEnemyWaveController;
 struct FEnemyResources;
@@ -100,6 +101,78 @@ public:
 		AActor* WaveCreator, const float FormationOffsetMultiplier = 1.f);
 
 	/**
+	 * @brief Use when a wave should support allies in combat before advancing to the next waypoint.
+	 * @param WaveType Determines wave logic: depending on actor? Time depending on generator buildings?
+	 * @param WaveElements Defines a unit type and spawn point.
+	 * @param WaveInterval The interval between the wave elements spawning.
+	 * @param IntervalVarianceFraction Variance factor in [0.0 - 1.0) interval that determines the variance of the wave interval.
+	 * @param Waypoints The waypoints that the formation will move to.
+	 * @param FinalWaypointDirection The final direction the formation will face when it reaches the last waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to each other.
+	 * @param bInstantStart Whether to start instantly or wait for the first timer.
+	 * @param WaveCreator The actor that spawns this wave needs to be RTS IsValid can be left empty depending on wave type.
+	 * @param WaveTimerAffectingBuildings The generator buildings checked for validity that influence the wave spawn timing.
+	 * @param PerAffectingBuildingTimerFraction Fraction of the wave interval added per destroyed generator building.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
+	 * @param HelpOffsetRadiusMltMax Multiplier for max help distance around allied combat units.
+	 * @param HelpOffsetRadiusMltMin Multiplier for min help distance around allied combat units.
+	 * @param MaxAttackTimeBeforeAdvancingToNextWayPoint Max time to wait at a waypoint before advancing while in combat.
+	 * @param MaxTriesFindNavPointForHelpOffset Attempts per tick to find a valid help location.
+	 * @param ProjectionScale Scale for RTSToNavProjectionExtent used in help projections.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateAttackMoveWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const float WaveInterval,
+		const float IntervalVarianceFraction,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const bool bInstantStart,
+		AActor* WaveCreator,
+		TArray<AActor*> WaveTimerAffectingBuildings,
+		const float PerAffectingBuildingTimerFraction,
+		const float FormationOffsetMultiplier,
+		const float HelpOffsetRadiusMltMax,
+		const float HelpOffsetRadiusMltMin,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		const int32 MaxTriesFindNavPointForHelpOffset,
+		const float ProjectionScale);
+
+	/**
+	 * @brief Use when a single wave should wait on combat and assist allies before moving on.
+	 * @param WaveType Determines wave logic and whether an owning actor is required.
+	 * @param WaveElements Defines a unit type and spawn point.
+	 * @param Waypoints The waypoints that the formation will move to.
+	 * @param FinalWaypointDirection The final direction the formation will face when it reaches the last waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to each other.
+	 * @param TimeTillWave Delay before starting the wave; zero or less starts immediately.
+	 * @param WaveCreator The actor that spawns this wave needs to be RTS IsValid can be left empty depending on wave type.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
+	 * @param HelpOffsetRadiusMltMax Multiplier for max help distance around allied combat units.
+	 * @param HelpOffsetRadiusMltMin Multiplier for min help distance around allied combat units.
+	 * @param MaxAttackTimeBeforeAdvancingToNextWayPoint Max time to wait at a waypoint before advancing while in combat.
+	 * @param MaxTriesFindNavPointForHelpOffset Attempts per tick to find a valid help location.
+	 * @param ProjectionScale Scale for RTSToNavProjectionExtent used in help projections.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateSingleAttackMoveWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const float TimeTillWave,
+		AActor* WaveCreator,
+		const float FormationOffsetMultiplier,
+		const float HelpOffsetRadiusMltMax,
+		const float HelpOffsetRadiusMltMin,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		const int32 MaxTriesFindNavPointForHelpOffset,
+		const float ProjectionScale);
+
+	/**
 	 * @brief Assigns squads to construct field constructions at provided locations.
 	 * @param SquadControllers Squads used to determine available field constructions.
 	 * @param ConstructionLocations Locations to build at.
@@ -132,6 +205,25 @@ public:
 
 
 	void DebugAllActiveFormations() const;
+
+	/**
+	 * @brief Use when formations must pause to support allied combat before resuming movement.
+	 * @param SquadControllers Squads to move in formation.
+	 * @param TankMasters Tanks to move in formation.
+	 * @param Waypoints Formation movement path.
+	 * @param FinalWaypointDirection Direction the formation should face at the final waypoint.
+	 * @param MaxFormationWidth Maximum number of units in a row.
+	 * @param FormationOffsetMlt Multiplier applied to formation offsets.
+	 * @param AttackMoveSettings Settings that control help offset logic and combat waiting.
+	 */
+	void MoveAttackMoveFormationToLocation(
+		const TArray<ASquadController*>& SquadControllers,
+		const TArray<ATankMaster*>& TankMasters,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const float FormationOffsetMlt,
+		const FAttackMoveWaveSettings& AttackMoveSettings);
 
 	// ------------------------------------------------------------
 	// Enemy Resources Management
