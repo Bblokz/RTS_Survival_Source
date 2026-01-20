@@ -24,6 +24,7 @@
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
+#include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
@@ -861,6 +862,7 @@ void ACPPController::ConstructBuilding(AActor* RequestingActor)
 		                            bUseBuildRadius,
 		                            GetNomadicPreviewAttachments(NomadicVehicle));
 		M_ActiveAbility = EAbilityID::IdCreateBuilding;
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::SelectTargetForNomadicBuilding, true, false);
 		// Note that we do not call the MainGameUI to show the cancel button as this is already
 		// completed by MainGameUI itself since this function is called from the MainGameUI.
 	}
@@ -1556,7 +1558,10 @@ void ACPPController::BeginPlay_SetupPlayerAimAbility()
 		M_PlayerAimAbilityClass, DefaultTransform, SpawnParams);
 	bM_HasInitializedPlayerAimAbility = true;
 	// Error check.
-	(void)GetIsValidPlayerAimAbilityActor();
+	if(GetIsValidPlayerAimAbilityActor())
+	{
+		M_PlayerAimAbility->InitPlayerAimAbility(this);
+	}
 }
 
 AActor* ACPPController::GetNewFieldConstructionCandidate(
@@ -3361,8 +3366,18 @@ void ACPPController::CreateVfxAndVoiceLineForIssuedCommand(const bool bResetAllP
 	                                                             M_CommandTypeDecoder->DecodeCommandTypeIntoEffect(
 		                                                             CommandTypeIssued),
 	                                                             true);
-	PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(AbilityActivated),
-	                                bForcePlayVoiceLine);
+	EAnnouncerVoiceLineType AnnouncerVoiceLine = EAnnouncerVoiceLineType::None;
+	// Check if this is a special ability case where we play a voice line with the announcer instead of the primary unit
+	// that has activated the ability.
+	if (FRTS_VoiceLineHelpers::NeedToPlayAnnouncerLineForAbility(AbilityActivated, AnnouncerVoiceLine))
+	{
+		PlayAnnouncerVoiceLine(AnnouncerVoiceLine, true, true);
+	}
+	else
+	{
+		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(AbilityActivated),
+		                                bForcePlayVoiceLine);
+	}
 }
 
 
@@ -3460,15 +3475,16 @@ uint32 ACPPController::OrderUnitsCaptureActor(AActor* CaptureTargetActor)
 {
 	uint32 AmountCommandsExe = 0;
 
-	if (!RTSFunctionLibrary::RTSIsValid(CaptureTargetActor))
+	if (!IsValid(CaptureTargetActor))
 	{
 		RTSFunctionLibrary::ReportError(
 			"OrderUnitsCaptureActor called with invalid CaptureTargetActor in ACPPController.");
 		return AmountCommandsExe;
 	}
-
+	ICaptureInterface* CaptureInterface =
+		FCaptureMechanicHelpers::GetValidCaptureInterface(CaptureTargetActor);
 	// Verify that the actor actually supports the capture interface.
-	if (FCaptureMechanicHelpers::GetValidCaptureInterface(CaptureTargetActor) == nullptr)
+	if (not CaptureInterface)
 	{
 		RTSFunctionLibrary::ReportError(
 			"OrderUnitsCaptureActor called on actor that does not implement CaptureInterface.");
@@ -3483,6 +3499,8 @@ uint32 ACPPController::OrderUnitsCaptureActor(AActor* CaptureTargetActor)
 		// No squads selected: nothing to capture. Caller can decide on fallback (e.g. plain move).
 		return AmountCommandsExe;
 	}
+	bool bHasSquadWithNotEnoughMembers = false;
+	int32 MembersNeeded = CaptureInterface->GetCaptureUnitAmountNeeded();
 
 	for (ASquadController* EachSquad : TSelectedSquadControllers)
 	{
@@ -3490,11 +3508,19 @@ uint32 ACPPController::OrderUnitsCaptureActor(AActor* CaptureTargetActor)
 		{
 			continue;
 		}
+		if(EachSquad->GetSquadUnitAmount() < MembersNeeded)
+		{
+			bHasSquadWithNotEnoughMembers = true;
+			continue;
+		}
 
 		// Capture command does not need to exist in any ability array; we explicitly
 		// target squads here and let the squad controller handle the capture logic.
-		EachSquad->CaptureActor(CaptureTargetActor, !bIsHoldingShift);
-		++AmountCommandsExe;
+		 AmountCommandsExe +=EachSquad->CaptureActor(CaptureTargetActor, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	if(AmountCommandsExe == 0 && bHasSquadWithNotEnoughMembers)
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NotEnoughSquadUnitsToCapture);
 	}
 
 	return AmountCommandsExe;
@@ -3603,7 +3629,7 @@ uint32 ACPPController::RotateUnitsToLocation(const FVector& RotateLocation)
 
 void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 {
-	if(bM_IsActionButtonActive)
+	if (bM_IsActionButtonActive)
 	{
 		DeactivateActionButton();
 	}

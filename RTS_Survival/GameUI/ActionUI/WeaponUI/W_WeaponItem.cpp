@@ -76,7 +76,7 @@ void UW_WeaponItem::OnClickedWeaponItem()
 	}
 	if (IsValid(M_AmmoPicker))
 	{
-		M_AmmoPicker->SetupAmmoPickerForWeapon(this, M_LoadedWeaponState->GetRawWeaponData().ShellTypes);
+		M_AmmoPicker->OnClickedWeaponItemToAmmoPick(this, M_LoadedWeaponState->GetRawWeaponData().ShellTypes);
 		return;
 	}
 	RTSFunctionLibrary::ReportError("Attempted to load ammo picker for weapon item, but the ammo picker"

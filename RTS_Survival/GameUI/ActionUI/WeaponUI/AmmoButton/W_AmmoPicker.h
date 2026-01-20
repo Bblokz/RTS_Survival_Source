@@ -25,7 +25,7 @@ public:
 	 * @param WeaponItem The weapon item that was clicked.
 	 * @param ShellTypesToPickFrom The shell types that the weapon item can use.
 	 */
-	void SetupAmmoPickerForWeapon(UW_WeaponItem* WeaponItem, const TArray<EWeaponShellType>& ShellTypesToPickFrom);
+	void OnClickedWeaponItemToAmmoPick(UW_WeaponItem* WeaponItem, const TArray<EWeaponShellType>& ShellTypesToPickFrom);
 
 	void InitActionUIMngr(UActionUIManager* ActionUIManager);
 
@@ -34,6 +34,8 @@ public:
 	 * @param SelectedShellType The selected shell type.
 	 */
 	void OnShellTypeSelected(const EWeaponShellType SelectedShellType);
+
+	void OnAmmoButtonHovered(const EWeaponShellType HoveredShellType, const bool bIsHovering) const;
 
 	void SetAmmoPickerVisibility(const bool bVisible);
 protected:

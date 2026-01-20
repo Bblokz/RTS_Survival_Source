@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameUI_InitData.h"
 #include "ActionUI/ActionUIContainer/FActionUIContainer.h"
+#include "ActionUI/WeaponUI/OnHoverAmmoDescription/W_OnHoverAmmoDescription.h"
 #include "Blueprint/UserWidget.h"
 #include "BuildingExpansion/WidgetBxpOptionState/BxpOptionData.h"
 #include "Components/CanvasPanel.h"
@@ -350,7 +351,7 @@ protected:
 		UW_TrainingDescription* NewTrainingDescription,
 		UW_ControlGroups* NewControlGroups,
 		UW_ArchiveNotificationHolder* NewArchiveNotificiationHolder, UW_BottomCenterUI* NewBottomCenterUI, UW_Portrait*
-		NewPortrait, FInit_BehaviourUI BehaviourUIWidgets);
+		NewPortrait, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
 
 	// The primary selected actor in the game.
 	UPROPERTY(BlueprintReadOnly, Category = "Primary Selection")
@@ -375,7 +376,7 @@ private:
 		const FActionUIContainer& ActionUIContainerWidgets,
 		const FInit_WeaponUI& WeaponUIWidgets,
 		const FInit_ActionUI& ActionUIWidgets, const FInit_BehaviourUI& BehaviourUIWidgets,
-		ACPPController* PlayerController);
+		ACPPController* PlayerController, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
 
 	void InitMainGameUI_InitBuildingUI(
 		UW_BottomCenterUI* NewBottomCenterUI,

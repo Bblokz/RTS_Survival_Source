@@ -386,7 +386,7 @@ void UMainGameUI::InitMainGameUI_InitActionAndWeaponUI(const FActionUIContainer&
                                                        const FInit_WeaponUI& WeaponUIWidgets,
                                                        const FInit_ActionUI& ActionUIWidgets,
                                                        const FInit_BehaviourUI& BehaviourUIWidgets,
-                                                       ACPPController* PlayerController)
+                                                       ACPPController* PlayerController, UW_OnHoverAmmoDescription* AmmoDescriptionWidget)
 {
 	M_ActionUIManager = NewObject<UActionUIManager>();
 	// Error check.
@@ -396,17 +396,18 @@ void UMainGameUI::InitMainGameUI_InitActionAndWeaponUI(const FActionUIContainer&
 	}
 	// Sets the ammo picker on each weapon element as well as the reference to the weapon description widget.
         M_ActionUIManager->InitActionUIManager(
-                WeaponUIWidgets.WeaponUIElements,
-                this,
-                ActionUIWidgets.ActionUIElementsInMenu,
-                PlayerController,
-                ActionUIWidgets.SelectedUnitInfo,
-                WeaponUIWidgets.AmmoPicker,
-                WeaponUIWidgets.WeaponDescription,
-                ActionUIContainerWidgets,
-                ActionUIWidgets.SelectedUnitDescription,
-                ActionUIWidgets.ActionUIDescription,
-                BehaviourUIWidgets);
+	        WeaponUIWidgets.WeaponUIElements,
+	        this,
+	        ActionUIWidgets.ActionUIElementsInMenu,
+	        PlayerController,
+	        ActionUIWidgets.SelectedUnitInfo,
+	        WeaponUIWidgets.AmmoPicker,
+	        WeaponUIWidgets.WeaponDescription,
+	        ActionUIContainerWidgets,
+	        ActionUIWidgets.SelectedUnitDescription,
+	        ActionUIWidgets.ActionUIDescription,
+	        BehaviourUIWidgets,
+	        AmmoDescriptionWidget);
 }
 
 void UMainGameUI::InitMainGameUI_InitBuildingUI(UW_BottomCenterUI* NewBottomCenterUI,
@@ -1277,7 +1278,7 @@ void UMainGameUI::InitMainGameUI(
 	UW_ControlGroups* NewControlGroups,
 	UW_ArchiveNotificationHolder* NewArchiveNotificiationHolder, UW_BottomCenterUI* NewBottomCenterUI,
 	UW_Portrait* NewPortrait,
-	FInit_BehaviourUI BehaviourUIWidgets)
+	FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget)
 
 {
 	// M_TItemBuildingExpansionWidgets = NewBuildingExpansionWidgets;
@@ -1303,7 +1304,7 @@ void UMainGameUI::InitMainGameUI(
 	}
 	InitMainGameUI_InitActionAndWeaponUI(
 		ActionUIContainerWidgets,
-		WeaponUIWidgets, ActionUIWidgets, BehaviourUIWidgets, NewPlayerController);
+		WeaponUIWidgets, ActionUIWidgets, BehaviourUIWidgets, NewPlayerController, AmmoDescriptionWidget);
 
 	if (IsValid(NewTrainingDescription))
 	{
