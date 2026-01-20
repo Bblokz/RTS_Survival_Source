@@ -458,6 +458,16 @@ protected:
 	virtual void ExecuteCaptureCommand(AActor* CaptureTarget) override;
 	virtual void TerminateCaptureCommand() override;
 
+	/**
+	 * @brief Keeps capture movement stable when sockets are missing or projections fail.
+	 * @param DesiredLocation Location returned from the capture interface.
+	 * @param FallbackLocation Actor location used when capture sockets are unavailable.
+	 * @param CaptureTarget Actor used for warning context.
+	 * @return Projected capture location with a safe fallback applied.
+	 */
+	FVector GetProjectedCaptureMoveLocation(const FVector& DesiredLocation, const FVector& FallbackLocation,
+	                                        const AActor* CaptureTarget) const;
+
 	void RemoveCaptureUnitsFromSquad(const int32 AmountCaptureUnits);
 
 	virtual void ExecuteFieldConstructionCommand(const EFieldConstructionType FieldConstruction, const FVector& ConstructionLocation, const FRotator& ConstructionRotation, AActor* StaticPreviewActor) override;
