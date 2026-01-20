@@ -11,6 +11,7 @@
 #include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/W_SelectedUnitInfo.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/AmmoButton/W_AmmoButton.h"
 #include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/UnitDescriptionItem/W_SelectedUnitDescription.h"
+#include "RTS_Survival/GameUI/ActionUI/WeaponUI/OnHoverAmmoDescription/W_OnHoverAmmoDescription.h"
 
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
@@ -39,7 +40,7 @@ void UActionUIManager::InitActionUIManager(
 	ActionUIContainerWidgets,
 	UW_SelectedUnitDescription* SelectedUnitDescriptionWidget,
 	UUserWidget* ActionUIDescriptionWidget,
-	FInit_BehaviourUI BehaviourUIWidgets)
+	FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget)
 {
 	if (TWeaponUIItemsInMenu.Num() == 0)
 	{
@@ -120,6 +121,7 @@ void UActionUIManager::InitActionUIManager(
 		SetActionUIDescriptionWidgetVisibility(false);
 	}
 	M_PlayerController = PlayerController;
+	M_AmmoDescriptionWidget = AmmoDescriptionWidget;
 
 	InitBehaviourUI(MainGameUI, PlayerController, BehaviourUIWidgets);
 }
@@ -135,6 +137,7 @@ void UActionUIManager::HideAllHoverInfoWidgets() const
 	SetSelectedUnitDescriptionVisibility(false);
 	SetActionUIDescriptionWidgetVisibility(false);
 	SetBehaviourDescriptionVisibility(false);
+	SetAmmoDescriptionWidgetVisibility(false, EWeaponShellType::Shell_None);
 }
 
 void UActionUIManager::HideAmmoPicker() const
@@ -171,6 +174,11 @@ void UActionUIManager::OnHoverWeaponItem(const bool bIsHover, const float Weapon
 		return;
 	}
 	M_MainGameUI->OnHoverWeaponItem(bIsHover);
+}
+
+void UActionUIManager::OnClickedWeaponItemToAmmoPick()
+{
+	SetAmmoPickerVisiblity(true);
 }
 
 
@@ -226,6 +234,34 @@ void UActionUIManager::SetActionUIDescriptionWidgetVisibility(const bool bVisibl
 	M_ActionUIDescriptionWidget->SetVisibility(NewVisibility);
 }
 
+bool UActionUIManager::GetIsValidAmmoDescriptionWidget() const
+{
+	if (IsValid(M_AmmoDescriptionWidget))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this, "M_AmmoDescriptionWidget", "GetIsValidAmmoDescriptionWidget");
+	return false;
+}
+
+void UActionUIManager::SetAmmoDescriptionWidgetVisibility(const bool bVisible,
+                                                          const EWeaponShellType ShellTypeToDisplayDetailsFor) const
+{
+	if (not GetIsValidAmmoDescriptionWidget())
+	{
+		return;
+	}
+	if (bVisible)
+	{
+		M_AmmoDescriptionWidget->ShowAmmoDescription(ShellTypeToDisplayDetailsFor);
+	}
+	else
+	{
+		M_AmmoDescriptionWidget->HideAmmoDescription();
+	}
+}
+
 bool UActionUIManager::GetIsValidAmmoPicker() const
 {
 	if (not IsValid(M_AmmoPicker))
@@ -249,6 +285,11 @@ void UActionUIManager::OnShellTypeSelected(const EWeaponShellType SelectedShellT
 		// After picking ammo the ammo picker is no longer visible and we can show the behaviour container again.
 		BehaviourContainer->OnAmmoPickerVisiblityChange(false);
 	}
+}
+
+void UActionUIManager::OnShellTypeHovered(const EWeaponShellType HoveredShellType, const bool bIsHovering) const
+{
+	SetAmmoDescriptionWidgetVisibility(bIsHovering, HoveredShellType);
 }
 
 void UActionUIManager::RequestUpdateAbilityUIForPrimary(ICommands* RequestingUnit)
@@ -292,6 +333,7 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 		// On UI reload make sure to hide the ammo picker.
 		SetAmmoPickerVisiblity(false);
 		SetupBehaviourUIForSelectedActor(nullptr);
+		SetAmmoDescriptionWidgetVisibility(false, EWeaponShellType::Shell_None);
 		return false;
 	}
 	TArray<UWeaponState*> Weapons;

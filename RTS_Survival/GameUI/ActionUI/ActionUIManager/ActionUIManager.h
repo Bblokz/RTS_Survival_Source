@@ -13,6 +13,7 @@
 
 #include "ActionUIManager.generated.h"
 
+class UW_OnHoverAmmoDescription;
 class UW_SelectedUnitDescription;
 enum class EWeaponShellType : uint8;
 enum class EVeterancyIconSet : uint8;
@@ -49,7 +50,7 @@ public:
 		UW_SelectedUnitInfo* SelectedUnitInfo,
 		const TObjectPtr<UW_AmmoPicker>& AmmoPicker, UW_WeaponDescription* WeaponDescription, FActionUIContainer
 		ActionUIContainerWidgets, UW_SelectedUnitDescription* SelectedUnitDescriptionWidget, UUserWidget*
-		ActionUIDescriptionWidget, FInit_BehaviourUI BehaviourUIWidgets);
+		ActionUIDescriptionWidget, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
 
 	void SetActionUIVisibility(const bool bShowActionUI) const;
 	void HideAllHoverInfoWidgets() const;
@@ -58,8 +59,10 @@ public:
 	void OnHoverActionUIItem(const bool bIsHover) const;
 	void OnHoverSelectedUnitInfo(const bool bIsHover)const;
 	void OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange);
+	void OnClickedWeaponItemToAmmoPick();
 
 	void OnShellTypeSelected(const EWeaponShellType SelectedShellType) const;
+	void OnShellTypeHovered(const EWeaponShellType HoveredShellType, const bool bIsHovering) const;
 
 	void RequestUpdateAbilityUIForPrimary(ICommands* RequestingUnit);
 	void RefreshBehaviourUIForComponent(UBehaviourComp* BehaviourComponent);
@@ -128,6 +131,11 @@ private:
 	TObjectPtr<UUserWidget> M_ActionUIDescriptionWidget;
 	bool GetIsValidActionUIDescriptionWidget() const;
 	void SetActionUIDescriptionWidgetVisibility(const bool bVisible) const;
+
+	UPROPERTY()
+	UW_OnHoverAmmoDescription * M_AmmoDescriptionWidget;
+	bool GetIsValidAmmoDescriptionWidget() const;
+	void SetAmmoDescriptionWidgetVisibility(const bool bVisible, const EWeaponShellType ShellTypeToDisplayDetailsFor) const;
 
 	UPROPERTY()
 	UW_AmmoPicker* M_AmmoPicker;

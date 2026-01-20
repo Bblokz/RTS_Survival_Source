@@ -21,3 +21,11 @@ void UW_AmmoButton::OnAmmoButtonClicked()
 		M_AmmoPicker->OnShellTypeSelected(M_ShellType);
 	}
 }
+
+void UW_AmmoButton::OnAmmoButtonHovered(const bool bIsHover)
+{
+	if(IsValid(M_AmmoPicker))
+	{
+		M_AmmoPicker->OnAmmoButtonHovered(M_ShellType, bIsHover);
+	}
+}

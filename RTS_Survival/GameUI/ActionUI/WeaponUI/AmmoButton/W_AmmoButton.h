@@ -23,6 +23,9 @@ public:
 protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnAmmoButtonClicked();
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void OnAmmoButtonHovered(const bool bIsHover);
 
 	// Set up visuals in derived blueprint.
 	UFUNCTION(BlueprintImplementableEvent)

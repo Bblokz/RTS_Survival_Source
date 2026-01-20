@@ -9,13 +9,17 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
-void UW_AmmoPicker::SetupAmmoPickerForWeapon(
+void UW_AmmoPicker::OnClickedWeaponItemToAmmoPick(
 	UW_WeaponItem* WeaponItem,
 	const TArray<EWeaponShellType>& ShellTypesToPickFrom)
 {
 	if (!IsValid(WeaponItem) || ShellTypesToPickFrom.Num() <= 1)
 	{
 		return;
+	}
+	if (GetIsValidActionUIManager())
+	{
+		M_ActionUIManager->OnClickedWeaponItemToAmmoPick();
 	}
 	SetAmmoPickerVisibility(true);
 	M_ActiveWeaponItem = WeaponItem;
@@ -100,6 +104,15 @@ void UW_AmmoPicker::OnShellTypeSelected(const EWeaponShellType SelectedShellType
 	}
 	M_ActiveWeaponItem->OnNewShellTypeSelected(SelectedShellType);
 	M_ActionUIManager->OnShellTypeSelected(SelectedShellType);
+}
+
+void UW_AmmoPicker::OnAmmoButtonHovered(const EWeaponShellType HoveredShellType, const bool bIsHovering) const
+{
+	if (not GetIsValidActionUIManager())
+	{
+		return;
+	}
+	M_ActionUIManager->OnShellTypeHovered(HoveredShellType, bIsHovering);
 }
 
 void UW_AmmoPicker::SetAmmoPickerVisibility(const bool bVisible)
