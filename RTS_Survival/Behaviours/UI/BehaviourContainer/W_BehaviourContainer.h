@@ -26,7 +26,7 @@ class RTS_SURVIVAL_API UW_BehaviourContainer : public UUserWidget
 public:
 	void InitBehaviourContainer(UW_BehaviourDescription* InBehaviourDescription, UActionUIManager* InActionUIManger);
 
-	void OnAmmoPickerVisiblityChange(const bool bIsVisible);
+	void OnAmmoPickerVisiblityChange(const bool bNeedsAmmoPickerVisible);
 
         void SetupBehaviourContainerForSelectedUnit(UBehaviourComp* PrimarySelectedBehaviourComp);
 
@@ -60,4 +60,5 @@ private:
         void HideUnusedBehaviourWidgets(const int32 StartIndex);
 
         void SetupBehavioursOnWidgets(const TArray<UBehaviour*>& Behaviours);
+        void HideAllBehaviourWidgets();
 };

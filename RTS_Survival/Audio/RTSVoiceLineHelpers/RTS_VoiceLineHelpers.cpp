@@ -113,6 +113,19 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 	return ERTSVoiceLine::None;
 }
 
+bool FRTS_VoiceLineHelpers::NeedToPlayAnnouncerLineForAbility(const EAbilityID Ability,
+                                                              EAnnouncerVoiceLineType& OutAnnouncerLine)
+{
+	switch (Ability)
+	{
+	case EAbilityID::IdCapture:
+		OutAnnouncerLine = EAnnouncerVoiceLineType::SquadWillCaptureObjective;
+		return true;
+	default:
+		return false;
+	}
+}
+
 ERTSVoiceLine FRTS_VoiceLineHelpers::GetStressedVoiceLineVersion(const ERTSVoiceLine VoiceLineType)
 {
 	switch (VoiceLineType)

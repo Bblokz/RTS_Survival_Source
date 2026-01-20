@@ -97,6 +97,9 @@ enum class EAnnouncerVoiceLineType : uint8
 	StartEconomicBxpConstruction,
 	StartTechnologyBxpConstruction,
 	SelectTargetForNomadicBuilding,
+	SelectTargetForAimAbility,
+	NotEnoughSquadUnitsToCapture,
+	SquadWillCaptureObjective
 };
 
 USTRUCT(BlueprintType)

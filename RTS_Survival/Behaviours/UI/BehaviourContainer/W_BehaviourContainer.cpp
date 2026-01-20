@@ -14,94 +14,99 @@
 void UW_BehaviourContainer::InitBehaviourContainer(UW_BehaviourDescription* InBehaviourDescription,
                                                    UActionUIManager* InActionUIManger)
 {
-        M_BehaviourDescription = InBehaviourDescription;
-        (void)GetIsValidBehaviourDescription();
+	M_BehaviourDescription = InBehaviourDescription;
+	(void)GetIsValidBehaviourDescription();
 
-        M_ActionUIManager = InActionUIManger;
-        (void)GetIsValidActionUIManager();
+	M_ActionUIManager = InActionUIManger;
+	(void)GetIsValidActionUIManager();
 }
 
-void UW_BehaviourContainer::OnAmmoPickerVisiblityChange(const bool bIsVisible)
+void UW_BehaviourContainer::OnAmmoPickerVisiblityChange(const bool bNeedsAmmoPickerVisible)
 {
-        if (bIsVisible)
-        {
-                SetVisibility(ESlateVisibility::Collapsed);
-                if (GetIsValidBehaviourDescription())
-                {
-                        M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
-                }
-                return;
-        }
-        if (NeedsVisibility())
-        {
+	if (bNeedsAmmoPickerVisible)
+	{
+		SetVisibility(ESlateVisibility::Collapsed);
+		if (GetIsValidBehaviourDescription())
+		{
+			M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
+			HideAllBehaviourWidgets();
+		}
+		return;
+	}
+	if (NeedsVisibility())
+	{
 		// the ammo picker is hidden, and we have behaviours to show.
 		SetVisibility(ESlateVisibility::Visible);
+		if (GetIsValidPrimaryBehaviourComponent())
+		{
+			SetupBehavioursOnWidgets(M_PrimaryBehaviourComponent->GetBehaviours());
+		}
 	}
 }
 
 void UW_BehaviourContainer::SetupBehaviourContainerForSelectedUnit(UBehaviourComp* PrimarySelectedBehaviourComp)
 {
-        M_PrimaryBehaviourComponent = PrimarySelectedBehaviourComp;
-        if (not GetIsValidBehaviourDescription())
-        {
-                return;
-        }
+	M_PrimaryBehaviourComponent = PrimarySelectedBehaviourComp;
+	if (not GetIsValidBehaviourDescription())
+	{
+		return;
+	}
 
-        if (not GetIsValidActionUIManager())
-        {
-                return;
-        }
+	if (not GetIsValidActionUIManager())
+	{
+		return;
+	}
 
-        if (not NeedsVisibility())
-        {
-                SetVisibility(ESlateVisibility::Collapsed);
-                HideUnusedBehaviourWidgets(0);
-                M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
-                return;
-        }
+	if (not NeedsVisibility())
+	{
+		SetVisibility(ESlateVisibility::Collapsed);
+		HideUnusedBehaviourWidgets(0);
+		M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
 
-        SetupBehavioursOnWidgets(M_PrimaryBehaviourComponent->GetBehaviours());
-        SetVisibility(ESlateVisibility::Visible);
+	SetupBehavioursOnWidgets(M_PrimaryBehaviourComponent->GetBehaviours());
+	SetVisibility(ESlateVisibility::Visible);
 }
 
 void UW_BehaviourContainer::OnBehaviourHovered(const bool bIsHovering, const FBehaviourUIData& BehaviourUIData)
 {
-        if (GetIsValidBehaviourDescription())
-        {
-                if (bIsHovering)
-                {
-                        M_BehaviourDescription->SetupDescription(BehaviourUIData);
-                        M_BehaviourDescription->SetVisibility(ESlateVisibility::Visible);
-                }
-                else
-                {
-                        M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
-                }
-        }
+	if (GetIsValidBehaviourDescription())
+	{
+		if (bIsHovering)
+		{
+			M_BehaviourDescription->SetupDescription(BehaviourUIData);
+			M_BehaviourDescription->SetVisibility(ESlateVisibility::Visible);
+		}
+		else
+		{
+			M_BehaviourDescription->SetVisibility(ESlateVisibility::Hidden);
+		}
+	}
 
-        if (GetIsValidPrimaryBehaviourComponent())
-        {
-                M_PrimaryBehaviourComponent->OnBehaviourHovered(bIsHovering, BehaviourUIData);
-        }
+	if (GetIsValidPrimaryBehaviourComponent())
+	{
+		M_PrimaryBehaviourComponent->OnBehaviourHovered(bIsHovering, BehaviourUIData);
+	}
 }
 
 void UW_BehaviourContainer::SetBehaviourWidgets(TArray<UW_Behaviour*> Widgets)
 {
-        M_BehaviourWidgets = Widgets;
-        for(auto EachWidget: Widgets)
-        {
-                if (not IsValid(EachWidget))
-                {
-                        continue;
-                }
-                EachWidget->InitBehaviourWidget(this);
-        }
+	M_BehaviourWidgets = Widgets;
+	for (auto EachWidget : Widgets)
+	{
+		if (not IsValid(EachWidget))
+		{
+			continue;
+		}
+		EachWidget->InitBehaviourWidget(this);
+	}
 }
 
 bool UW_BehaviourContainer::GetIsValidActionUIManager() const
 {
-        if (not M_ActionUIManager.IsValid())
-        {
+	if (not M_ActionUIManager.IsValid())
+	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("UW_BehaviourContainer::GetIsValidActionUIManager: M_ActionUIManager is not valid!"));
 		return false;
@@ -122,64 +127,76 @@ bool UW_BehaviourContainer::GetIsValidBehaviourDescription() const
 
 bool UW_BehaviourContainer::GetIsValidPrimaryBehaviourComponent() const
 {
-        if (M_PrimaryBehaviourComponent.IsValid())
-        {
-                return true;
-        }
+	if (M_PrimaryBehaviourComponent.IsValid())
+	{
+		return true;
+	}
 
-        // No error as we could simply have a unit selected without behaviours.
-        return false;
+	// No error as we could simply have a unit selected without behaviours.
+	return false;
 }
 
 bool UW_BehaviourContainer::NeedsVisibility() const
 {
-        if (not GetIsValidPrimaryBehaviourComponent())
-        {
-                return false;
-        }
-        if (M_PrimaryBehaviourComponent->GetBehaviours().IsEmpty())
-        {
-                return false;
-        }
-        return true;
+	if (not GetIsValidPrimaryBehaviourComponent())
+	{
+		return false;
+	}
+	if (M_PrimaryBehaviourComponent->GetBehaviours().IsEmpty())
+	{
+		return false;
+	}
+	return true;
 }
-
 
 
 void UW_BehaviourContainer::HideUnusedBehaviourWidgets(const int32 StartIndex)
 {
-        for (int32 WidgetIndex = StartIndex; WidgetIndex < M_BehaviourWidgets.Num(); WidgetIndex++)
-        {
-                if (IsValid(M_BehaviourWidgets[WidgetIndex]))
-                {
-                        M_BehaviourWidgets[WidgetIndex]->SetVisibility(ESlateVisibility::Collapsed);
-                }
-        }
+	for (int32 WidgetIndex = StartIndex; WidgetIndex < M_BehaviourWidgets.Num(); WidgetIndex++)
+	{
+		if (IsValid(M_BehaviourWidgets[WidgetIndex]))
+		{
+			M_BehaviourWidgets[WidgetIndex]->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
 }
 
 void UW_BehaviourContainer::SetupBehavioursOnWidgets(const TArray<UBehaviour*>& Behaviours)
 {
-        int32 BehaviourWidgetIndex = 0;
+	int32 BehaviourWidgetIndex = 0;
 
-        for (; BehaviourWidgetIndex < M_BehaviourWidgets.Num() && BehaviourWidgetIndex < Behaviours.Num(); BehaviourWidgetIndex++)
-        {
-                UW_Behaviour* BehaviourWidget = M_BehaviourWidgets[BehaviourWidgetIndex];
-                if (not IsValid(BehaviourWidget))
-                {
-                        continue;
-                }
+	for (; BehaviourWidgetIndex < M_BehaviourWidgets.Num() && BehaviourWidgetIndex < Behaviours.Num();
+	       BehaviourWidgetIndex++)
+	{
+		UW_Behaviour* BehaviourWidget = M_BehaviourWidgets[BehaviourWidgetIndex];
+		if (not IsValid(BehaviourWidget))
+		{
+			continue;
+		}
 
-                if (not IsValid(Behaviours[BehaviourWidgetIndex]))
-                {
-                        BehaviourWidget->SetVisibility(ESlateVisibility::Collapsed);
-                        continue;
-                }
+		if (not IsValid(Behaviours[BehaviourWidgetIndex]))
+		{
+			BehaviourWidget->SetVisibility(ESlateVisibility::Collapsed);
+			continue;
+		}
 
-                FBehaviourUIData BehaviourUIData;
-                Behaviours[BehaviourWidgetIndex]->GetUIData(BehaviourUIData);
-                BehaviourWidget->SetupBehaviourWidget(BehaviourUIData);
-                BehaviourWidget->SetVisibility(ESlateVisibility::Visible);
-        }
+		FBehaviourUIData BehaviourUIData;
+		Behaviours[BehaviourWidgetIndex]->GetUIData(BehaviourUIData);
+		BehaviourWidget->SetupBehaviourWidget(BehaviourUIData);
+		BehaviourWidget->SetVisibility(ESlateVisibility::Visible);
+	}
 
-        HideUnusedBehaviourWidgets(BehaviourWidgetIndex);
+	HideUnusedBehaviourWidgets(BehaviourWidgetIndex);
+}
+
+void UW_BehaviourContainer::HideAllBehaviourWidgets()
+{
+	for (auto EachWidget : M_BehaviourWidgets)
+	{
+		if (not IsValid(EachWidget))
+		{
+			continue;
+		}
+		EachWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
