@@ -60,6 +60,8 @@ void APlayerAimAbility::DetermineShowAimRadiusForAbility(const EAbilityID MainAb
 		return FailedToShowAimRadius();
 	}
 	AimMeshComponent->SetMaterial(0, AimMaterial);
+	// To adjust the radius.
+	SetMaterialParameter(Radius, AimType);
 }
 
 void APlayerAimAbility::HideRadius()
@@ -130,7 +132,8 @@ EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeForAbility(const EAbilityID 
 			{
 				return EPlayerAimAbilityTypes::None;
 			}
-			OutAbilityRadius = AimAbilityComponent->getaim();
+			// Note that we use the radius and not the range here.
+			OutAbilityRadius = AimAbilityComponent->GetAimAbilityRadius();
 			return AimAbilityComponent->GetAimAssistType();
 		}
 	default:
@@ -175,4 +178,36 @@ void APlayerAimAbility::OnNoRadiusForValidAimAbility(const float Radius, const E
 		"\n Ability: " + AbilityName +
 		"\n AimType: " + AimTypeName +
 		"\n Radius: " + FString::SanitizeFloat(Radius));
+}
+
+void APlayerAimAbility::SetMaterialParameter(const float Radius, const EPlayerAimAbilityTypes TypeSet)
+{
+	if (not GetIsValidAimMeshComponent())
+	{
+		return;
+	}
+
+	UMaterialInterface* Material = AimMeshComponent->GetMaterial(0);
+	if (!Material)
+	{
+		RTSFunctionLibrary::ReportError(
+			"APlayerAimAbility::SetMaterialParameter - No material found on AimMeshComponent.");
+		return;
+	}
+
+	UMaterialInstanceDynamic* DynamicMaterial = Cast<UMaterialInstanceDynamic>(Material);
+	if (!DynamicMaterial)
+	{
+		DynamicMaterial = AimMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+		if (!DynamicMaterial)
+		{
+			RTSFunctionLibrary::ReportError(
+				"APlayerAimAbility::SetMaterialParameter - Failed to create dynamic material instance.");
+			return;
+		}
+	}
+
+	// Set the scalar parameter for the radius
+	DynamicMaterial->SetScalarParameterValue(TEXT("Radius"), Radius);
+
 }

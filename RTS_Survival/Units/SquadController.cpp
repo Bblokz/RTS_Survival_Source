@@ -269,6 +269,7 @@ void FDamageSquadGameStart::KillSquadUnits(const TArray<ASquadUnit*>& SquadUnits
 		{
 			continue;
 		}
+		EachToDamageUnit->SetNoDeathVoiceLineOnDeath();
 		EachToDamageUnit->TakeFatalDamage();
 	}
 }

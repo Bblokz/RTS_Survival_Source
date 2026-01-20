@@ -8,12 +8,26 @@ UBehWeaponOverwriteVFX::UBehWeaponOverwriteVFX() = default;
 
 void UBehWeaponOverwriteVFX::ApplybehaviourToWeaponStandalone(UWeaponState* WeaponState)
 {
-	ApplyBehaviourToWeapon(WeaponState);
+	if (not IsValid(WeaponState))
+	{
+		return;
+	}
+	if (CheckRequirement(WeaponState))
+	{
+		ApplyBehaviourToWeapon(WeaponState);
+	}
 }
 
 void UBehWeaponOverwriteVFX::RemovebehaviourFromWeaponStandalone(UWeaponState* WeaponState)
 {
-	RemoveBehaviourFromWeapon(WeaponState);
+	if (not IsValid(WeaponState))
+	{
+		return;
+	}
+	if (CheckRequirement(WeaponState))
+	{
+		RemoveBehaviourFromWeapon(WeaponState);
+	}
 }
 
 void UBehWeaponOverwriteVFX::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
@@ -120,7 +134,7 @@ void UBehWeaponOverwriteVFX::RestoreVfxOverrides(UWeaponState* WeaponState)
 }
 
 void UBehWeaponOverwriteVFX::ApplyOverridesToVfx(FWeaponVFX& WeaponVfx,
-                                                const FBehWeaponVfxOverrideSettings& Overrides) const
+                                                 const FBehWeaponVfxOverrideSettings& Overrides) const
 {
 	if (Overrides.bOverrideLaunchSound)
 	{
@@ -189,7 +203,7 @@ void UBehWeaponOverwriteVFX::ApplyOverridesToVfx(FWeaponVFX& WeaponVfx,
 }
 
 void UBehWeaponOverwriteVFX::RestoreOverridesFromRecord(FWeaponVFX& WeaponVfx,
-                                                       const FBehWeaponVfxOverrideRecord& Record) const
+                                                        const FBehWeaponVfxOverrideRecord& Record) const
 {
 	const FBehWeaponVfxOverrideFlags& Flags = Record.OverrideFlags;
 	const FWeaponVFX& PreviousWeaponVfx = Record.PreviousWeaponVfx;

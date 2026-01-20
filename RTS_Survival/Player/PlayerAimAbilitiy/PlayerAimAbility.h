@@ -54,4 +54,6 @@ private:
 	void FailedToShowAimRadius();
 	void OnNoRadiusForValidAimAbility(const float Radius, const EPlayerAimAbilityTypes AimType,
 		const EAbilityID MainAbility, const int32 AbilitySubType) const;
+
+	void SetMaterialParameter(const float Radius, const EPlayerAimAbilityTypes TypeSet);
 };

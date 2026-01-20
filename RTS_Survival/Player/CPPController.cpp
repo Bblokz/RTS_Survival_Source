@@ -3612,6 +3612,10 @@ uint32 ACPPController::RotateUnitsToLocation(const FVector& RotateLocation)
 
 void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 {
+	if(bM_IsActionButtonActive)
+	{
+		DeactivateActionButton();
+	}
 	const FUnitAbilityEntry ActiveAbilityEntry = M_GameUIController->GetActiveAbilityEntry(ActionButtonAbilityIndex);
 
 	if (ActiveAbilityEntry.AbilityId == EAbilityID::IdNoAbility)

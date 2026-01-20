@@ -324,7 +324,7 @@ void FSquadUnitRagdoll::DestroyWeapon(AInfantryWeaponMaster* InfantryWeapon) con
 
 void FSquadUnitRagdoll::StartRagdoll_CreateEffect(AActor* OwningActor)
 {
-	if(not IsValid(OwningActor))
+	if (not IsValid(OwningActor))
 	{
 		return;
 	}
@@ -391,7 +391,7 @@ void ASquadUnit::OnUnitEnteredLeftCargo(UCargo* CargoComponentEntered, const boo
 
 void ASquadUnit::PlaySpatialVoiceLine(const ERTSVoiceLine VoiceLineType, const bool bIgnorePlayerCooldown) const
 {
-	if(not GetIsValidSpatialVoiceLinePlayer())
+	if (not GetIsValidSpatialVoiceLinePlayer())
 	{
 		return;
 	}
@@ -483,7 +483,7 @@ void ASquadUnit::SetSquadController(ASquadController* SquadController)
 	{
 		M_SquadController->SquadDataCallbacks.CallbackOnSquadDataLoaded(CallOnDataLoaded, this);
 	}
-	if(GetIsValidSpatialVoiceLinePlayer())
+	if (GetIsValidSpatialVoiceLinePlayer())
 	{
 		SpatialVoiceLinePlayer->OnSquadSet_SetupIdleVoiceLineCheck();
 	}
@@ -594,7 +594,7 @@ void ASquadUnit::OnWeaponFire()
 	{
 		RTSComponent->SetUnitInCombat(true);
 	}
-	if(M_SquadController)
+	if (M_SquadController)
 	{
 		M_SquadController->OnSquadUnitInCombat();
 	}
@@ -1113,90 +1113,95 @@ bool ASquadUnit::GetIsValidWeapon() const
 	return false;
 }
 
+void ASquadUnit::SetNoDeathVoiceLineOnDeath()
+{
+	bM_NoDeathVoiceLineOnDeath = true;
+}
+
 void ASquadUnit::SetupWeapon(AInfantryWeaponMaster* NewWeapon)
 {
 	if (IsValid(NewWeapon))
 	{
 		M_InfantryWeapon = NewWeapon;
-	M_ChildWeaponComp = FindComponentByClass<UChildActorComponent>();
+		M_ChildWeaponComp = FindComponentByClass<UChildActorComponent>();
 	}
 }
 
 void ASquadUnit::TerminatePickupWeapon()
 {
-        // Stop any movement towards the weapon item.
-        // Also unbinds the OnMoveCompleted function.
-        StopMovementAndClearPath();
+	// Stop any movement towards the weapon item.
+	// Also unbinds the OnMoveCompleted function.
+	StopMovementAndClearPath();
 
-        M_ActiveCommand = EAbilityID::IdIdle;
+	M_ActiveCommand = EAbilityID::IdIdle;
 }
 
 bool ASquadUnit::SwapWeaponsWithUnit(ASquadUnit* OtherUnit)
 {
-        if (not IsValid(OtherUnit))
-        {
-                return false;
-        }
+	if (not IsValid(OtherUnit))
+	{
+		return false;
+	}
 
-        if (not GetIsValidChildWeaponActor())
-        {
-                return false;
-        }
+	if (not GetIsValidChildWeaponActor())
+	{
+		return false;
+	}
 
-        if (not OtherUnit->GetIsValidChildWeaponActor())
-        {
-                return false;
-        }
+	if (not OtherUnit->GetIsValidChildWeaponActor())
+	{
+		return false;
+	}
 
-        UChildActorComponent* OtherChildWeapon = OtherUnit->M_ChildWeaponComp;
+	UChildActorComponent* OtherChildWeapon = OtherUnit->M_ChildWeaponComp;
 
-        const TSubclassOf<AActor> ThisWeaponClass = M_ChildWeaponComp->GetChildActorClass();
-        const TSubclassOf<AActor> OtherWeaponClass = OtherChildWeapon->GetChildActorClass();
+	const TSubclassOf<AActor> ThisWeaponClass = M_ChildWeaponComp->GetChildActorClass();
+	const TSubclassOf<AActor> OtherWeaponClass = OtherChildWeapon->GetChildActorClass();
 
-        M_ChildWeaponComp->DestroyChildActor();
-        OtherChildWeapon->DestroyChildActor();
+	M_ChildWeaponComp->DestroyChildActor();
+	OtherChildWeapon->DestroyChildActor();
 
-        M_ChildWeaponComp->SetChildActorClass(OtherWeaponClass);
-        M_ChildWeaponComp->CreateChildActor();
+	M_ChildWeaponComp->SetChildActorClass(OtherWeaponClass);
+	M_ChildWeaponComp->CreateChildActor();
 
-        OtherChildWeapon->SetChildActorClass(ThisWeaponClass);
-        OtherChildWeapon->CreateChildActor();
+	OtherChildWeapon->SetChildActorClass(ThisWeaponClass);
+	OtherChildWeapon->CreateChildActor();
 
-        SetupSwappedWeapon(Cast<AInfantryWeaponMaster>(M_ChildWeaponComp->GetChildActor()));
-        OtherUnit->SetupSwappedWeapon(Cast<AInfantryWeaponMaster>(OtherChildWeapon->GetChildActor()));
+	SetupSwappedWeapon(Cast<AInfantryWeaponMaster>(M_ChildWeaponComp->GetChildActor()));
+	OtherUnit->SetupSwappedWeapon(Cast<AInfantryWeaponMaster>(OtherChildWeapon->GetChildActor()));
 
-        return GetIsValidWeapon() && OtherUnit->GetIsValidWeapon();
+	return GetIsValidWeapon() && OtherUnit->GetIsValidWeapon();
 }
 
 void ASquadUnit::SetupSwappedWeapon(AInfantryWeaponMaster* NewWeapon)
 {
-        SetupWeapon(NewWeapon);
+	SetupWeapon(NewWeapon);
 
-        if (not IsValid(NewWeapon))
-        {
-                return;
-        }
+	if (not IsValid(NewWeapon))
+	{
+		return;
+	}
 
-        NewWeapon->SetupOwner(this);
+	NewWeapon->SetupOwner(this);
 
-        if (IsValid(RTSComponent))
-        {
-                NewWeapon->SetOwningPlayer(RTSComponent->GetOwningPlayer());
-        }
+	if (IsValid(RTSComponent))
+	{
+		NewWeapon->SetOwningPlayer(RTSComponent->GetOwningPlayer());
+	}
 
-        NewWeapon->DisableWeaponSearch(true);
+	NewWeapon->DisableWeaponSearch(true);
 
-        if (IsValid(AnimBp_SquadUnit))
-        {
-                AnimBp_SquadUnit->SetWeaponAimOffset(NewWeapon->GetAimOffsetType());
-        }
+	if (IsValid(AnimBp_SquadUnit))
+	{
+		AnimBp_SquadUnit->SetWeaponAimOffset(NewWeapon->GetAimOffsetType());
+	}
 }
 
 void ASquadUnit::SetWeaponToAutoEngageTargets(const bool bUseLastTarget)
 {
-        if (not GetIsValidWeapon())
-        {
-                return;
+	if (not GetIsValidWeapon())
+	{
+		return;
 	}
 	M_InfantryWeapon->SetAutoEngageTargets(bUseLastTarget);
 }
@@ -1602,7 +1607,11 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 	}
 
 	SetUnitDying();
-	DetermineDeathVoiceLine();
+	// Check if the no vl on death flag is set, if not determine and play death voice line.
+	if (DeathType != ERTSDeathType::Scavenging && not bM_NoDeathVoiceLineOnDeath)
+	{
+		DetermineDeathVoiceLine();
+	}
 
 	bool bIsSelected = false;
 

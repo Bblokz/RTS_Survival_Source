@@ -272,6 +272,8 @@ public:
 	 */
 	bool GetIsValidWeapon() const;
 
+	void SetNoDeathVoiceLineOnDeath();
+
 	
 
 protected:
@@ -675,4 +677,7 @@ private:
 
 	UPROPERTY()
 	float M_LastPatrolMoveTimeOut = 0.f;
+
+	// Set when killed at the start of the game to simulate damage on the squad.
+	bool bM_NoDeathVoiceLineOnDeath = false;
 };
