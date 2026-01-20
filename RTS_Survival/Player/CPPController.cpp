@@ -1438,11 +1438,32 @@ bool ACPPController::GetIsValidPlayerAimAbilityActor() const
 	return true;
 }
 
+bool ACPPController::GetIsValidPlayerAimAbilityClass() const
+{
+	if (IsValid(M_PlayerAimAbilityClass))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_PlayerAimAbilityClass",
+		"GetIsValidPlayerAimAbilityClass",
+		this
+	);
+
+	return false;
+}
+
 void ACPPController::UpdateAimAbilityAtCursorProjection(const float DeltaTime, const FHitResult& CursorProjection) const
 {
-	if (not IsValid(M_PlayerAimAbility))
+	if (not bM_HasInitializedPlayerAimAbility)
 	{
 		// Note: no error report as first few ticks it might still need spawning.
+		return;
+	}
+	if (not GetIsValidPlayerAimAbilityActor())
+	{
 		return;
 	}
 	if (not M_PlayerAimAbility->IsPlayerAimActive())
@@ -1451,6 +1472,40 @@ void ACPPController::UpdateAimAbilityAtCursorProjection(const float DeltaTime, c
 		return;
 	}
 	M_PlayerAimAbility->SetActorLocation(CursorProjection.Location);
+	const AActor* PrimarySelectedUnit = nullptr;
+	if (GetIsValidGameUIController())
+	{
+		PrimarySelectedUnit = M_GameUIController->GetPrimarySelectedUnit();
+	}
+	if (not IsValid(PrimarySelectedUnit))
+	{
+		return;
+	}
+	const FVector SurfaceNormal = CursorProjection.ImpactNormal.GetSafeNormal();
+	if (SurfaceNormal.IsNearlyZero())
+	{
+		const FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(
+			PrimarySelectedUnit->GetActorLocation(), CursorProjection.Location);
+		FRotator AimRotation = LookAtRotation;
+		AimRotation.Pitch = 0.f;
+		AimRotation.Roll = 0.f;
+		M_PlayerAimAbility->SetActorRotation(AimRotation);
+		return;
+	}
+	const FVector UnitToCursor = CursorProjection.Location - PrimarySelectedUnit->GetActorLocation();
+	FVector ForwardOnSurface = FVector::VectorPlaneProject(UnitToCursor, SurfaceNormal);
+	if (ForwardOnSurface.IsNearlyZero())
+	{
+		FVector FallbackForward = FVector::CrossProduct(SurfaceNormal, FVector::RightVector);
+		if (FallbackForward.IsNearlyZero())
+		{
+			FallbackForward = FVector::CrossProduct(SurfaceNormal, FVector::ForwardVector);
+		}
+		ForwardOnSurface = FallbackForward;
+	}
+	ForwardOnSurface = ForwardOnSurface.GetSafeNormal();
+	const FRotator AimRotation = UKismetMathLibrary::MakeRotFromXZ(ForwardOnSurface, SurfaceNormal);
+	M_PlayerAimAbility->SetActorRotation(AimRotation);
 }
 
 void ACPPController::DetermineShowAimAbilityAtCursorProjection(const EAbilityID AbilityJustActivated,
@@ -1477,17 +1532,23 @@ void ACPPController::DetermineShowAimAbilityAtCursorProjection(const EAbilityID 
 
 void ACPPController::BeginPlay_SetupPlayerAimAbility()
 {
-	if (not IsValid(M_PlayerAimAbilityClass) || not GetWorld())
+	if (not GetIsValidPlayerAimAbilityClass())
 	{
-		RTSFunctionLibrary::ReportError("No valid PlayerAimAbilityClass set on CPPController! or world is invalid!");
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is invalid in BeginPlay_SetupPlayerAimAbility.");
 		return;
 	}
 	FTransform DefaultTransform = FTransform::Identity;
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	SpawnParams.Owner = this;
-	M_PlayerAimAbility = GetWorld()->SpawnActor<APlayerAimAbility>(
+	M_PlayerAimAbility = World->SpawnActor<APlayerAimAbility>(
 		M_PlayerAimAbilityClass, DefaultTransform, SpawnParams);
+	bM_HasInitializedPlayerAimAbility = true;
 	// Error check.
 	(void)GetIsValidPlayerAimAbilityActor();
 }

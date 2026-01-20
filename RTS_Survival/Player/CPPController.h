@@ -797,6 +797,8 @@ private:
 	// use IsPlayerAimActive to determine if the ability is active.
 	UPROPERTY()
 	TObjectPtr<APlayerAimAbility> M_PlayerAimAbility;
+	bool bM_HasInitializedPlayerAimAbility = false;
+	[[nodiscard]] bool GetIsValidPlayerAimAbilityClass() const;
 	[[nodiscard]] bool GetIsValidPlayerAimAbilityActor() const;
 	void UpdateAimAbilityAtCursorProjection(const float DeltaTime, const FHitResult& CursorProjection) const;
 
