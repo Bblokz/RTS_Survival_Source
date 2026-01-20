@@ -648,7 +648,8 @@ void AScavengeableObject::OnUnitDies(const ERTSDeathType DeathType)
 
 void AScavengeableObject::OnUnitDies_StopScavSquadIfValid()
 {
-	if (not GetIsValidScavengingSquad())
+	// Note no error report! we expect a null here.
+	if (not IsValid(M_ScavengingSquad))
 	{
 		return;
 	}

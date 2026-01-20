@@ -31,6 +31,14 @@ APlayerAimAbility::APlayerAimAbility(const FObjectInitializer& ObjectInitializer
 	SetCanBeDamaged(false);
 }
 
+void APlayerAimAbility::InitPlayerAimAbility(ACPPController* PlayerController)
+{
+	M_PlayerController = PlayerController;
+	// Error check.
+	(void)GetIsValidPlayerController();
+	HideRadius();
+}
+
 void APlayerAimAbility::DetermineShowAimRadiusForAbility(const EAbilityID MainAbility,
                                                          const int32 AbilitySubType, AActor* PrimarySelectedActor)
 {
@@ -62,6 +70,7 @@ void APlayerAimAbility::DetermineShowAimRadiusForAbility(const EAbilityID MainAb
 	AimMeshComponent->SetMaterial(0, AimMaterial);
 	// To adjust the radius.
 	SetMaterialParameter(Radius, AimType);
+	OnAimActivated_PlayAnnouncerVl();
 }
 
 void APlayerAimAbility::HideRadius()
@@ -112,6 +121,27 @@ bool APlayerAimAbility::GetIsValidMaterialForAimType(const EPlayerAimAbilityType
 	OutMaterial = MaterialPerAbilityAim[AimType];
 	return true;
 }
+
+bool APlayerAimAbility::GetIsValidPlayerController() const
+{
+	if (not M_PlayerController.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("APlayerAimAbility::GetIsValidPlayerController"
+			"PlayerController is not valid!");
+		return false;
+	}
+	return true;
+}
+
+void APlayerAimAbility::OnAimActivated_PlayAnnouncerVl()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+	M_PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::SelectTargetForAimAbility, true, false);
+}
+
 
 EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeForAbility(const EAbilityID MainAbility,
                                                                const int32 AbilitySubType,
@@ -209,5 +239,4 @@ void APlayerAimAbility::SetMaterialParameter(const float Radius, const EPlayerAi
 
 	// Set the scalar parameter for the radius
 	DynamicMaterial->SetScalarParameterValue(TEXT("Radius"), Radius);
-
 }

@@ -19,6 +19,7 @@ class RTS_SURVIVAL_API APlayerAimAbility : public AActorObjectsMaster
 public:
 	// Sets default values for this actor's properties
 	APlayerAimAbility(const FObjectInitializer& ObjectInitializer);
+	void InitPlayerAimAbility(ACPPController* PlayerController);
 
 	void DetermineShowAimRadiusForAbility(
 		const EAbilityID MainAbility,
@@ -41,19 +42,31 @@ protected:
 	float UnitsPerScale = 100.0f;
 
 private:
-	bool GetIsValidAimMeshComponent() const;
-	bool GetIsValidMaterialForAimType(const EPlayerAimAbilityTypes AimType, UMaterialInterface*& OutMaterial);
+	[[nodiscard]] bool GetIsValidAimMeshComponent() const;
+	[[nodiscard]] bool GetIsValidMaterialForAimType(const EPlayerAimAbilityTypes AimType,
+	                                                UMaterialInterface*& OutMaterial);
 	UPROPERTY()
 	bool bM_IsPlayerAimActive = false;
 
+	UPROPERTY()
+	TWeakObjectPtr<ACPPController> M_PlayerController;
 
-	EPlayerAimAbilityTypes GetAimTypeForAbility(const EAbilityID MainAbility, const int32 AbilitySubType, const AActor* RTSValid_PrimarySelectedActor, float& OutAbilityRadius) const;
+	[[nodiscard]] bool GetIsValidPlayerController() const;
 
-	EPlayerAimAbilityTypes GetAimTypeFromGrenadeAbility(const EGrenadeAbilityType GrenadeAbilityType, const AActor* RTSValid_PrimarySelectedActor, float& OutAbilityRadius) const;
+	void OnAimActivated_PlayAnnouncerVl();
+
+
+	EPlayerAimAbilityTypes GetAimTypeForAbility(const EAbilityID MainAbility, const int32 AbilitySubType,
+	                                            const AActor* RTSValid_PrimarySelectedActor,
+	                                            float& OutAbilityRadius) const;
+
+	EPlayerAimAbilityTypes GetAimTypeFromGrenadeAbility(const EGrenadeAbilityType GrenadeAbilityType,
+	                                                    const AActor* RTSValid_PrimarySelectedActor,
+	                                                    float& OutAbilityRadius) const;
 
 	void FailedToShowAimRadius();
 	void OnNoRadiusForValidAimAbility(const float Radius, const EPlayerAimAbilityTypes AimType,
-		const EAbilityID MainAbility, const int32 AbilitySubType) const;
+	                                  const EAbilityID MainAbility, const int32 AbilitySubType) const;
 
 	void SetMaterialParameter(const float Radius, const EPlayerAimAbilityTypes TypeSet);
 };

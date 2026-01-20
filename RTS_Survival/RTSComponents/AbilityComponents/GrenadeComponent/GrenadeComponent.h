@@ -105,7 +105,7 @@ struct FGrenadeComponentSettings
 	FVector ExplosionEffectScale = FVector::OneVector;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
-	EGrenadeAbilityType GrenadeAbility;
+	EGrenadeAbilityType GrenadeAbility = static_cast<EGrenadeAbilityType>(0);
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	int32 PreferredIndex = -1;

@@ -279,7 +279,7 @@ void UCargoSquad::ExecuteExitCargo_Explicit()
 void UCargoSquad::HandleSeatReassignmentFromCargo(UCargo* CargoComponent, ASquadUnit* UnitToMove,
                                                   const FName& NewSocketName)
 {
-	if (not IsValid(CargoComponent) || not IsValid(UnitToMove))
+	if (not IsValid(CargoComponent) || not RTSFunctionLibrary::RTSIsValid(UnitToMove))
 	{
 		return;
 	}
