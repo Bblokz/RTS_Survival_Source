@@ -1,0 +1,135 @@
+﻿you are going to add functionality for new types of waves from the enemy routing them through the enemy AI controller
+into the enemy wave controller.
+
+AEnemyController is where all enemy logic is routed. For setting up attack waves there are currently:
+	/**
+	 * 
+	 * @param WaveType Determines wave logic: depending on actor? Time depending on generator buildings?
+	 * @param WaveElements Defines a unit type and spawn point.
+	 * @param WaveInterval The interval between the wave elements spawning.
+	 * @param IntervalVarianceFraction Variance factor in [0.0 - 1.0) interval that determines the variance of the wave interval.
+	 * Set to zero for no variance.
+	 * @param Waypoints The waypoints that the formation will move to.
+	 * @param FinalWaypointDirection The final direction the formation will face when it reaches the last waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to eachother.
+	 * @param bInstantStart Whether to start instantly or wait for the first timer.
+	 * @param WaveCreator The actor that spawns this wave needs to be RTS IsValid can be left empty depending on wave type.
+	 * @param WaveTimerAffectingBuildings The generator buildings checked for validity that influence the wave spawn timing.
+	 * @param PerAffectingBuildingTimerFraction in (0.0 - 1.0) interval that determines
+	 * the fraction of the wave interval that is added for each building generator that is destroyed.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
+	 * @note Possibly Leave WaveCreator and WaveTimerAffectingBuildings empty if the wave type does not depend on them.
+	 * @note The wave handles wave supply logic; if a wave cannot spawn due to supply issues it will wait till the next wave iteration.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateAttackWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const float WaveInterval,
+		const float IntervalVarianceFraction,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const bool bInstantStart,
+		AActor* WaveCreator,
+		TArray<AActor*> WaveTimerAffectingBuildings,
+		const float PerAffectingBuildingTimerFraction = 0.f,
+		const float FormationOffsetMultiplier = 1.f);
+
+	/**
+	 * @brief Creates a one-off enemy attack wave with an optional delay before spawning.
+	 * @param WaveType Determines wave logic and whether an owning actor is required.
+	 * @param WaveElements Defines a unit type and spawn point.
+	 * @param Waypoints The waypoints that the formation will move to.
+	 * @param FinalWaypointDirection The final direction the formation will face when it reaches the last waypoint.
+	 * @param MaxFormationWidth The maximum width of the formation that is spawned in units next to eachother.
+	 * @param TimeTillWave Delay before starting the wave; zero or less starts immediately.
+	 * @param WaveCreator The actor that spawns this wave needs to be RTS IsValid can be left empty depending on wave type.
+	 * @param FormationOffsetMultiplier Multiplier for the formation offset when spawning units in formation.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateSingleAttackWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& Waypoints,
+		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const float TimeTillWave,
+		AActor* WaveCreator, const float FormationOffsetMultiplier = 1.f);
+		
+
+both of which are routed from the enemy controller to the  UEnemyWaveController which handles the actual wave spawning logic and has
+a special tick function that checks in with existing waves to see if they need a new move order are idle or waiting for other units of the same
+formation etc.
+
+the enum: UENUM(Blueprintable)
+          enum class EEnemyWaveType :uint8
+          {
+          	Wave_None,
+          	// The wave will spawn units and does not depend on some building.
+          	Wave_NoOwningBuilding,
+          	// The wave will spawn units and depend on a building that is owned by the enemy.
+          	Wave_OwningBuilding,
+          	// The wave will spawn units and depend on a building that is owned by the enemy and has power generators
+          	// Which when destroyed slow down the wave interval.
+          	Wave_OwningBuildingAndPowerGenerators
+          };
+          
+dictates how fast the wave spawns (potentially changed when power generators are down) and whether a wave is actually allowed
+to spawn nieuw units based on the owning building being valid or not. 
+
+you will add functionality for two new types of waves:
+-CreateAttackMoveWave and -CreateSingleAttackMoveWave
+these will take the exact same params as their existing movement counterparts but also take: 
+- const float HelpOffsetRadiusMltMax // multiplied with the GetFormationUnitInnerRadius of the unit to determine the distance from the allied unit
+in combat to start helping them by moving towards them.
+- const float HelpOffsetRadiusMltMin // multiplied with the GetFormationUnitInnerRadius of the unit to determine the distance from the allied unit
+in combat to start helping them by moving towards them.
+- const float MaxAttackTimeBeforeAdvancingToNextWayPoint // from the first time since the unit has arrived at its CURRENT waypoint how long do we maximally
+wait before advancing this unit to the next waypoint regardless of whether it is still in combat or not?
+// Note: if this is <= 0.f then we never advance the unit while is in combat 
+- int32 MaxTriesFindNavPointForHelpOffset // when trying to find a nav point around the allied unit in combat to move towards for helping them how often do we try?
+-const float ProjectionScale // Multiplied with RTSToNavProjectionExtent; used in RTSFunctionLibrary::GetLocationProjected_WithNavSystem to find points to move to when
+helping allies.
+
+IMPORTANT NOTE: because a lot of the functionality in the wave controller depends on the FAttackWave i want you to add the needed fields for the attack move waves
+ to this struct; then for regular attack waves they will simply not be used and for attack move waves also set a bool on the struct that shows it is an attack move wave.
+
+make sure that at begin play the Enemy wave controller has cached the 
+UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
+as a private member as we expect to use the nav system a lot for our new wave type.
+
+Here is the main difference with this wave type; before units only waited for other units if those units were not yet at their waypoint
+in the same formation. Units that are part of an attack move wave will also wait when they are in combat which is check with their rts component
+that has the function 
+	inline bool GetIsUnitInCombat() const { return bM_IsUnitInCombat; }
+here is how that part works: say the wave has waypoints A, B and C. A unit that arrived at B and at tick is queried wether to advance to C:
+if it is in combat we now record the current time at which that unit is in combat (if this is the first time we check since this unit has arrived at the B
+way point) now because the unit itself is in combat we leave it be for this tick. On the next tick we check the combat flag again; still in combat? then
+leave it be unless the time since we first recorded the combat time is larger than MaxAttackTimeBeforeAdvancingToNextWayPoint. Important note;
+if MaxAttackTimeBeforeAdvancingToNextWayPoint <= 0.f then we never advance the unit while it is in combat regardless of how long it has been!
+
+for other units that are not in combat but formation units different from that unit are still not at this part of the formation (in our example the B point) then wait for those units 
+like we do in regular attack waves. If all units have reached the waypoint but there is at least one in combat then:
+for each unit that is NOT in combat:
+- find the closest allied unit of the same formation that IS in combat.
+- while we have not succesfully projected a location and we have not yet tried MaxTriesFindNavPointForHelpOffset for this unit in the formation at this tick then;
+multiply its GetFormationUnitInnerRadius with a random value between HelpOffsetRadiusMltMin and HelpOffsetRadiusMltMax
+then pick a random degree around the allied unit in combat and try to project a nav location at that distance in that direction using RTSFunctionLibrary::GetLocationProjected_WithNavSystem
+with our cached nav system, our projection scale and set bExtentInZ to true.
+when a succesfull projection is found move this unit to that location to help the allied unit in combat.
+
+Note it is possible that due to moving in the next tick the unit that was not in combat now is and in that case we start counting for that unit from that tick onwards.
+
+
+put debug messages in world space with if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+when ordering units to help as well as debug spheres for the failed projections and green ones for a successful projection.
+
+make sure to properly document all new functions and params; also in the enemy controller from which the designer will start these new types of waves.
+
+
+          
+    
+
+
+

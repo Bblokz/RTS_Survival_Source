@@ -426,3 +426,24 @@ FVector RTSFunctionLibrary::GetLocationProjected(const UObject* WorldContextObje
 	}
 	return OriginalLocation;
 }
+
+FVector RTSFunctionLibrary::GetLocationProjected_WithNavSystem(UNavigationSystemV1* ValidNavSys,
+	const FVector& OriginalLocation, const bool bExtentInZ, bool& bOutWasSuccessful, const float ProjectionScale)
+{
+	if(not ValidNavSys)
+	{
+		return OriginalLocation;
+	}
+	FNavLocation ProjectedLocation;
+	const FVector RTSExtent = DeveloperSettings::GamePlay::Navigation::RTSToNavProjectionExtent * ProjectionScale;
+	const FVector Extent = bExtentInZ ? RTSExtent : RTSExtent * FVector(1.f, 1.f, 0.f);
+	
+	if (ValidNavSys->ProjectPointToNavigation(OriginalLocation, ProjectedLocation, Extent))
+	{
+		// Successfully projected onto navmesh
+		bOutWasSuccessful = true;
+		return ProjectedLocation.Location;
+	}
+	return OriginalLocation;
+	
+}

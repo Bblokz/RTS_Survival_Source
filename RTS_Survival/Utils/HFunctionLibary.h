@@ -7,6 +7,7 @@
  * 
  */
 
+class UNavigationSystemV1;
 class UBoxComponent;
 DECLARE_LOG_CATEGORY_EXTERN(LogRTS, Log, All);
 
@@ -153,6 +154,11 @@ public:
 	static FVector GetLocationProjected(const UObject* WorldContextObject, const FVector& OriginalLocation,
 	                                    const bool bExtentInZ, bool& bOutWasSuccessful,
 	                                    const float ProjectionScale = 1.f);
+	static FVector GetLocationProjected_WithNavSystem(
+		UNavigationSystemV1* ValidNavSys, const FVector& OriginalLocation,
+        	                                    const bool bExtentInZ, bool& bOutWasSuccessful,
+        	                                    const float ProjectionScale = 1.f
+		)
 
 	
 };
