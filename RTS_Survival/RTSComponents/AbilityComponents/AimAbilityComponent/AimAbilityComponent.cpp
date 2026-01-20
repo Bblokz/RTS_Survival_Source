@@ -252,6 +252,7 @@ void UAimAbilityComponent::HandleBehaviourDurationFinished(const bool bNotifyCom
 
 	ClearCachedAbilityWeaponStates();
 	SetWeaponsAutoEngage(false);
+	RestoreRemovedAbilitiesForAimAbility();
 	M_AbilityExecutionState.M_State = EAimAbilityState::None;
 	SwapAbilityToAim();
 	StartCooldownOnAimAbility();
@@ -420,6 +421,7 @@ void UAimAbilityComponent::HandleAbilityInRange(const FVector& TargetLocation,
 	}
 
 	M_AbilityExecutionState.M_State = EAimAbilityState::InAbility;
+	RemoveAbilitiesForAimAbility();
 	CacheAbilityWeaponStates(WeaponStates);
 	SetWeaponsDisabled();
 	for (UWeaponState* WeaponState : WeaponStates)
@@ -505,6 +507,84 @@ void UAimAbilityComponent::ClearAbilityTimers()
 		World->GetTimerManager().ClearTimer(M_AbilityExecutionState.M_BehaviourDurationTimerHandle);
 	}
 	ClearDerivedTimers();
+}
+
+void UAimAbilityComponent::RemoveAbilitiesForAimAbility()
+{
+	if (not GetIsValidOwnerCommandsInterface())
+	{
+		return;
+	}
+
+	M_RemovedAbilityEntries.Reset();
+	if (M_AimAbilitySettings.AbilitiesToRemove.IsEmpty())
+	{
+		return;
+	}
+
+	const TArray<FUnitAbilityEntry> AbilityEntries = M_OwnerCommandsInterface->GetUnitAbilityEntries();
+	TSet<EAbilityID> RemovedAbilityIds;
+
+	for (const EAbilityID AbilityToRemove : M_AimAbilitySettings.AbilitiesToRemove)
+	{
+		if (AbilityToRemove == EAbilityID::IdNoAbility)
+		{
+			continue;
+		}
+
+		if (RemovedAbilityIds.Contains(AbilityToRemove))
+		{
+			continue;
+		}
+
+		const int32 AbilityIndex = AbilityEntries.IndexOfByPredicate([AbilityToRemove](
+			const FUnitAbilityEntry& AbilityEntry)
+		{
+			return AbilityEntry.AbilityId == AbilityToRemove;
+		});
+
+		if (AbilityIndex == INDEX_NONE)
+		{
+			continue;
+		}
+
+		const FUnitAbilityEntry AbilityEntry = AbilityEntries[AbilityIndex];
+		if (AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
+		{
+			continue;
+		}
+
+		if (not M_OwnerCommandsInterface->RemoveAbility(AbilityEntry.AbilityId))
+		{
+			continue;
+		}
+
+		FAimAbilityRemovedAbilityEntry RemovedAbility;
+		RemovedAbility.AbilityEntry = AbilityEntry;
+		RemovedAbility.AbilityIndex = AbilityIndex;
+		M_RemovedAbilityEntries.Add(RemovedAbility);
+		RemovedAbilityIds.Add(AbilityToRemove);
+	}
+}
+
+void UAimAbilityComponent::RestoreRemovedAbilitiesForAimAbility()
+{
+	if (not GetIsValidOwnerCommandsInterface())
+	{
+		return;
+	}
+
+	for (const FAimAbilityRemovedAbilityEntry& RemovedAbility : M_RemovedAbilityEntries)
+	{
+		if (RemovedAbility.AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
+		{
+			continue;
+		}
+
+		M_OwnerCommandsInterface->AddAbility(RemovedAbility.AbilityEntry, RemovedAbility.AbilityIndex);
+	}
+
+	M_RemovedAbilityEntries.Reset();
 }
 
 void UAimAbilityComponent::SwapAbilityToCancel()

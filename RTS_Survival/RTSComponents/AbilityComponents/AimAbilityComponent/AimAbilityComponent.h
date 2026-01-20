@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Player/PlayerAimAbilitiy/PlayerAimAbilityTypes/PlayerAimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "AimAbilityComponent.generated.h"
 
 class ASquadController;
@@ -36,6 +37,18 @@ struct FAimAbilityExecutionState
 
 	FTimerHandle M_MoveToRangeTimerHandle;
 	FTimerHandle M_BehaviourDurationTimerHandle;
+};
+
+USTRUCT()
+struct FAimAbilityRemovedAbilityEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FUnitAbilityEntry AbilityEntry;
+
+	UPROPERTY()
+	int32 AbilityIndex = INDEX_NONE;
 };
 
 USTRUCT(BlueprintType)
@@ -69,6 +82,10 @@ struct FAimAbilitySettings
 	// Aim assist material type shown on the player aim ability.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EPlayerAimAbilityTypes AimAssistType = EPlayerAimAbilityTypes::None;
+
+	// Abilities to remove while the aim ability is active.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<EAbilityID> AbilitiesToRemove;
 
 	// 1-99 buffer range percentage when moving closer before firing.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -145,6 +162,8 @@ private:
 	void StartMoveToRange(const FVector& TargetLocation, const float MaxRange);
 	void OnMoveCheckTimer();
 	void ClearAbilityTimers();
+	void RemoveAbilitiesForAimAbility();
+	void RestoreRemovedAbilitiesForAimAbility();
 
 	void SwapAbilityToCancel();
 	void SwapAbilityToAim();
@@ -156,6 +175,10 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UBehWeaponOverwriteVFX> M_WeaponOverwriteBehaviour;
+
+	// Stores removed ability entries so they can be restored at their original indices.
+	UPROPERTY()
+	TArray<FAimAbilityRemovedAbilityEntry> M_RemovedAbilityEntries;
 
 	FAimAbilityExecutionState M_AbilityExecutionState;
 };
