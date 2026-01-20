@@ -1457,6 +1457,8 @@ bool ACPPController::GetIsValidPlayerAimAbilityClass() const
 
 void ACPPController::UpdateAimAbilityAtCursorProjection(const float DeltaTime, const FHitResult& CursorProjection) const
 {
+	const float AimAbilityRotationClampDegrees = 20.0f;
+
 	if (not bM_HasInitializedPlayerAimAbility)
 	{
 		// Note: no error report as first few ticks it might still need spawning.
@@ -1504,7 +1506,11 @@ void ACPPController::UpdateAimAbilityAtCursorProjection(const float DeltaTime, c
 		ForwardOnSurface = FallbackForward;
 	}
 	ForwardOnSurface = ForwardOnSurface.GetSafeNormal();
-	const FRotator AimRotation = UKismetMathLibrary::MakeRotFromXZ(ForwardOnSurface, SurfaceNormal);
+	FRotator AimRotation = UKismetMathLibrary::MakeRotFromXZ(ForwardOnSurface, SurfaceNormal);
+	AimRotation.Pitch = FMath::Clamp(AimRotation.Pitch, -AimAbilityRotationClampDegrees,
+	                                 AimAbilityRotationClampDegrees);
+	AimRotation.Roll = FMath::Clamp(AimRotation.Roll, -AimAbilityRotationClampDegrees,
+	                                AimAbilityRotationClampDegrees);
 	M_PlayerAimAbility->SetActorRotation(AimRotation);
 }
 
