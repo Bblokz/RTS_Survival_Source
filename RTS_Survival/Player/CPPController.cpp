@@ -3132,21 +3132,6 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 				// We successfully ordered at least one squad to capture.
 				OutAbilityActivated = EAbilityID::IdCapture;
 			}
-			else
-			{
-				// No squads were able to capture (e.g., none selected).
-				// Fallback: treat this as a normal move command to the click location.
-				bool bSuccessful = false;
-				const FVector NewClickedLocation = RTSFunctionLibrary::GetLocationProjected(
-					this,
-					NewClickedLocation,
-					true,
-					bSuccessful,
-					5);
-
-				AmountCommandsExe = MoveUnitsToLocation(NewClickedLocation);
-				OutAbilityActivated = EAbilityID::IdMove;
-			}
 			break;
 		}
 	default:
