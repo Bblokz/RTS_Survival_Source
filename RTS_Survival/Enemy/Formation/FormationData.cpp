@@ -19,13 +19,14 @@ bool FFormationData::CheckIfFormationReachedCurrentWayPoint(const TWeakInterface
 		bool bFoundReachedUnit = false;
 		for (auto& EachUnit : FormationUnits)
 		{
-			if (EachUnit.Unit == UnitThatReached)
-			{
-				bFoundReachedUnit = true;
-				EachUnit.bHasReachedNextDestination = true;
-				EachUnit.StuckCounts = 0;
-				EachUnit.SquaredDistanceToNextPoint = 0.f;
-			}
+				if (EachUnit.Unit == UnitThatReached)
+				{
+					bFoundReachedUnit = true;
+					EachUnit.bHasReachedNextDestination = true;
+					EachUnit.StuckCounts = 0;
+					EachUnit.M_LastKnownLocation = FVector::ZeroVector;
+					EachUnit.bM_HasLastKnownLocation = false;
+				}
 			if (not EachUnit.bHasReachedNextDestination)
 			{
 				bAllUnitsReached = false;

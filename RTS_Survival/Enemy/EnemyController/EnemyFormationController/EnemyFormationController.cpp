@@ -229,29 +229,38 @@ void UEnemyFormationController::UpdateFormationUnitStuckState(
 	const FRotator& WaypointDirection,
 	UNavigationSystemV1* NavSys)
 {
-	const float CurrentSquaredDistance = GetSquaredDistanceToWaypoint(
-		FormationUnit,
-		WaypointLocation,
-		WaypointDirection);
-	const float PreviousSquaredDistance = FormationUnit.SquaredDistanceToNextPoint;
-	FormationUnit.SquaredDistanceToNextPoint = CurrentSquaredDistance;
-
-	if (GetIsFormationUnitInCombat(FormationUnit))
+	if (not FormationUnit.IsValidFormationUnit())
 	{
-		DebugFormationUnitStillMoving(FormationUnit, CurrentSquaredDistance);
 		return;
 	}
 
-	if (GetHasUnitMovedEnough(PreviousSquaredDistance, CurrentSquaredDistance))
+	const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+	if (not FormationUnit.bM_HasLastKnownLocation)
 	{
-		DebugFormationUnitStillMoving(FormationUnit, CurrentSquaredDistance);
+		FormationUnit.M_LastKnownLocation = UnitLocation;
+		FormationUnit.bM_HasLastKnownLocation = true;
+		return;
+	}
+
+	const float DistanceMovedSquared = FVector::DistSquared(UnitLocation, FormationUnit.M_LastKnownLocation);
+	FormationUnit.M_LastKnownLocation = UnitLocation;
+
+	if (GetIsFormationUnitInCombat(FormationUnit))
+	{
+		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
+		return;
+	}
+
+	if (GetHasUnitMovedEnough(DistanceMovedSquared))
+	{
+		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
 		return;
 	}
 
 	FormationUnit.StuckCounts++;
 	if (FormationUnit.StuckCounts < EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport)
 	{
-		DebugFormationUnitStillMoving(FormationUnit, CurrentSquaredDistance);
+		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
 		return;
 	}
 
@@ -260,7 +269,7 @@ void UEnemyFormationController::UpdateFormationUnitStuckState(
 		FormationUnit.StuckCounts = 0;
 	}
 
-	DebugFormationUnitStillMoving(FormationUnit, FormationUnit.SquaredDistanceToNextPoint);
+	DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
 }
 
 FVector UEnemyFormationController::GetFormationUnitRawWaypointLocation(
@@ -271,46 +280,10 @@ FVector UEnemyFormationController::GetFormationUnitRawWaypointLocation(
 	return WaypointLocation + WaypointDirection.RotateVector(FormationUnit.Offset);
 }
 
-FVector UEnemyFormationController::GetFormationUnitProjectedWaypointLocation(
-	const FFormationUnitData& FormationUnit,
-	const FVector& WaypointLocation,
-	const FRotator& WaypointDirection) const
-{
-	using DeveloperSettings::GamePlay::Navigation::EnemyFormationPositionProjectionExtent;
-
-	const FVector RawLocation = GetFormationUnitRawWaypointLocation(FormationUnit, WaypointLocation, WaypointDirection);
-	return ProjectLocationOnNavMesh(RawLocation, EnemyFormationPositionProjectionExtent, false);
-}
-
-float UEnemyFormationController::GetSquaredDistanceToWaypoint(
-	const FFormationUnitData& FormationUnit,
-	const FVector& WaypointLocation,
-	const FRotator& WaypointDirection) const
-{
-	if (not FormationUnit.IsValidFormationUnit())
-	{
-		return 0.f;
-	}
-
-	const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
-	const FVector TargetLocation = GetFormationUnitProjectedWaypointLocation(
-		FormationUnit,
-		WaypointLocation,
-		WaypointDirection);
-	return FVector::DistSquared(UnitLocation, TargetLocation);
-}
-
 bool UEnemyFormationController::GetHasUnitMovedEnough(
-	const float PreviousSquaredDistance,
-	const float CurrentSquaredDistance) const
+	const float DistanceMovedSquared) const
 {
-	if (PreviousSquaredDistance <= 0.f)
-	{
-		return true;
-	}
-
-	return CurrentSquaredDistance <=
-	       PreviousSquaredDistance - EnemyFormationConstants::SquarredDistanceDeltaConsiderStuck;
+	return DistanceMovedSquared >= EnemyFormationConstants::SquarredDistanceDeltaConsiderStuck;
 }
 
 bool UEnemyFormationController::TryTeleportStuckFormationUnit(
@@ -365,10 +338,8 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 		}
 
 		UnitActor->SetActorLocation(ProjectedTeleportLocation, false, nullptr, ETeleportType::ResetPhysics);
-		FormationUnit.SquaredDistanceToNextPoint = GetSquaredDistanceToWaypoint(
-			FormationUnit,
-			WaypointLocation,
-			WaypointDirection);
+		FormationUnit.M_LastKnownLocation = ProjectedTeleportLocation;
+		FormationUnit.bM_HasLastKnownLocation = true;
 		return true;
 	}
 
@@ -393,7 +364,9 @@ FVector UEnemyFormationController::GetTeleportCandidateLocation(
 
 void UEnemyFormationController::DebugFormationUnitStillMoving(
 	const FFormationUnitData& FormationUnit,
-	const float SquaredDistanceToWaypoint) const
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	const float DistanceMovedSquared) const
 {
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
@@ -407,15 +380,29 @@ void UEnemyFormationController::DebugFormationUnitStillMoving(
 			return;
 		}
 
+		using DeveloperSettings::GamePlay::Navigation::EnemyFormationPositionProjectionExtent;
+
+		const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+		const FVector RawWaypointLocation = GetFormationUnitRawWaypointLocation(
+			FormationUnit,
+			WaypointLocation,
+			WaypointDirection);
+		const FVector ProjectedWaypointLocation = ProjectLocationOnNavMesh(
+			RawWaypointLocation,
+			EnemyFormationPositionProjectionExtent,
+			false);
+		const float DistanceToWaypointSquared = FVector::DistSquared(UnitLocation, ProjectedWaypointLocation);
+
 		const float DebugTextHeightOffset = 200.f;
 		const float DebugTextDurationSeconds = 2.f;
-		const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation() + FVector(0.f, 0.f, DebugTextHeightOffset);
+		const FVector DebugTextLocation = UnitLocation + FVector(0.f, 0.f, DebugTextHeightOffset);
 		const FString DebugMessage = FString::Printf(
-			TEXT("still moving\n%d / %d\n dist: %.2f"),
+			TEXT("still moving\n%d / %d\n dist: %.2f\n prev dist: %.2f"),
 			FormationUnit.StuckCounts,
 			EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport,
-			SquaredDistanceToWaypoint);
-		DebugStringAtLocation(DebugMessage, UnitLocation, FColor::Cyan, DebugTextDurationSeconds);
+			DistanceToWaypointSquared,
+			DistanceMovedSquared);
+		DebugStringAtLocation(DebugMessage, DebugTextLocation, FColor::Cyan, DebugTextDurationSeconds);
 	}
 }
 
@@ -916,8 +903,8 @@ void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& Formation
 	FVector LocationToProject = WaypointLocation + WaypointDirection.RotateVector(FormationUnit.Offset);
 
 	LocationToProject = ProjectLocationOnNavMesh(LocationToProject, EnemyFormationPositionProjectionExtent, false);
-	const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
-	FormationUnit.SquaredDistanceToNextPoint = FVector::DistSquared(UnitLocation, LocationToProject);
+	FormationUnit.M_LastKnownLocation = FormationUnit.Unit->GetOwnerLocation();
+	FormationUnit.bM_HasLastKnownLocation = true;
 	// Move the unit to the projected location.
 	const ECommandQueueError Error = FormationUnit.Unit->MoveToLocation(LocationToProject, true, WaypointDirection);
 	if (Error != ECommandQueueError::NoError)
