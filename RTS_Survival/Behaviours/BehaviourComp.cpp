@@ -67,26 +67,12 @@ void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 void UBehaviourComp::AddBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
 {
-	if (bM_IsTickingBehaviours)
-	{
-		QueueAddBehaviour(BehaviourClass);
-		return;
-	}
+	AddBehaviourInternal(BehaviourClass, TOptional<float>());
+}
 
-	UBehaviour* NewBehaviour = CreateBehaviourInstance(BehaviourClass);
-	if (NewBehaviour == nullptr)
-	{
-		return;
-	}
-
-	if (TryHandleExistingBehaviour(NewBehaviour))
-	{
-		NotifyActionUIManagerOfBehaviourUpdate();
-		return;
-	}
-
-	AddInitialisedBehaviour(NewBehaviour);
-	NotifyActionUIManagerOfBehaviourUpdate();
+void UBehaviourComp::AddBehaviourWithDuration(TSubclassOf<UBehaviour> BehaviourClass, const float CustomLifetimeSeconds)
+{
+	AddBehaviourInternal(BehaviourClass, CustomLifetimeSeconds);
 }
 
 void UBehaviourComp::RemoveBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
@@ -151,12 +137,17 @@ void UBehaviourComp::ProcessPendingOperations()
 
 void UBehaviourComp::ProcessPendingAdds()
 {
-	TArray<TSubclassOf<UBehaviour>> PendingAddsCopy = M_PendingAdds;
+	TArray<FPendingBehaviourAdd> PendingAddsCopy = M_PendingAdds;
 	M_PendingAdds.Empty();
 
-	for (const TSubclassOf<UBehaviour>& BehaviourClass : PendingAddsCopy)
+	for (const FPendingBehaviourAdd& PendingAdd : PendingAddsCopy)
 	{
-		AddBehaviour(BehaviourClass);
+		if (PendingAdd.bHasCustomLifetime)
+		{
+			AddBehaviourInternal(PendingAdd.BehaviourClass, PendingAdd.CustomLifetimeSeconds);
+			continue;
+		}
+		AddBehaviourInternal(PendingAdd.BehaviourClass, TOptional<float>());
 	}
 }
 
@@ -244,9 +235,17 @@ void UBehaviourComp::UpdateComponentTickEnabled()
 	SetComponentTickEnabled(bShouldTick);
 }
 
-void UBehaviourComp::QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass)
+void UBehaviourComp::QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass,
+                                       const TOptional<float>& CustomLifetimeSeconds)
 {
-	M_PendingAdds.Add(BehaviourClass);
+	FPendingBehaviourAdd PendingAdd;
+	PendingAdd.BehaviourClass = BehaviourClass;
+	if (CustomLifetimeSeconds.IsSet())
+	{
+		PendingAdd.bHasCustomLifetime = true;
+		PendingAdd.CustomLifetimeSeconds = CustomLifetimeSeconds.GetValue();
+	}
+	M_PendingAdds.Add(PendingAdd);
 }
 
 void UBehaviourComp::QueueRemoveBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass)
@@ -277,6 +276,7 @@ bool UBehaviourComp::TryHandleExistingBehaviour(UBehaviour* NewBehaviour)
 		bHandledExistingBehaviour = true;
 		break;
 	case EBehaviourStackRule::Refresh:
+		MatchingBehaviours[0]->OnRefreshed(NewBehaviour);
 		MatchingBehaviours[0]->RefreshLifetime();
 		bHandledExistingBehaviour = true;
 		break;
@@ -299,6 +299,36 @@ bool UBehaviourComp::TryHandleExistingBehaviour(UBehaviour* NewBehaviour)
 	}
 
 	return bHandledExistingBehaviour;
+}
+
+void UBehaviourComp::AddBehaviourInternal(const TSubclassOf<UBehaviour>& BehaviourClass,
+                                          const TOptional<float>& CustomLifetimeSeconds)
+{
+	if (bM_IsTickingBehaviours)
+	{
+		QueueAddBehaviour(BehaviourClass, CustomLifetimeSeconds);
+		return;
+	}
+
+	UBehaviour* NewBehaviour = CreateBehaviourInstance(BehaviourClass);
+	if (NewBehaviour == nullptr)
+	{
+		return;
+	}
+
+	if (CustomLifetimeSeconds.IsSet())
+	{
+		NewBehaviour->SetLifetimeDuration(CustomLifetimeSeconds.GetValue());
+	}
+
+	if (TryHandleExistingBehaviour(NewBehaviour))
+	{
+		NotifyActionUIManagerOfBehaviourUpdate();
+		return;
+	}
+
+	AddInitialisedBehaviour(NewBehaviour);
+	NotifyActionUIManagerOfBehaviourUpdate();
 }
 
 void UBehaviourComp::AddInitialisedBehaviour(UBehaviour* NewBehaviour)

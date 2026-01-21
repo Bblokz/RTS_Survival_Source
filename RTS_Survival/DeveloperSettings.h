@@ -704,6 +704,12 @@ namespace DeveloperSettings
 				inline constexpr float HEAT_ProjectileSpeedMlt = 0.85f;
 				// How much Heat changes armor pen, also make sure to set the max range pen to min range pen!
 				inline constexpr float HEAT_ArmorPenMlt = 1.2f;
+				// How much Radixite changes base damage.
+				inline constexpr float Radixite_DamageMlt = 1.2f;
+				// How much Radixite reduces armor penetration at max range.
+				inline constexpr float Radixite_ArmorPenMaxRangeMlt = 0.67f;
+				// Accuracy change in points for Radixite shells.
+				inline constexpr int32 Radixite_AccuracyDelta = -10;
 				// How much APHEBC changes the distance between min and max range pen (lerp factor)
 				inline constexpr float APHEBC_ArmorPenLerpFactor = 0.5f;
 			}

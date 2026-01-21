@@ -20,6 +20,13 @@ struct FBehaviourCompAnimatedTextState
 	int32 RemainingRepeats = 0;
 };
 
+struct FPendingBehaviourAdd
+{
+	TSubclassOf<UBehaviour> BehaviourClass = nullptr;
+	bool bHasCustomLifetime = false;
+	float CustomLifetimeSeconds = 0.f;
+};
+
 /**
  * @brief Component that owns and manages lifecycle of behaviours.
  */
@@ -37,6 +44,13 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void AddBehaviour(TSubclassOf<UBehaviour> BehaviourClass);
+
+	/**
+	 * @brief Add a behaviour instance with a custom lifetime to align with external timing.
+	 * @param BehaviourClass Class to instantiate and add.
+	 * @param CustomLifetimeSeconds Override duration in seconds for timed behaviours.
+	 */
+	void AddBehaviourWithDuration(TSubclassOf<UBehaviour> BehaviourClass, const float CustomLifetimeSeconds);
 
 	/**
 	 * @brief Remove a behaviour instance matching the provided class.
@@ -138,8 +152,9 @@ private:
 	/**
 	 * @brief Queue a behaviour class for addition after ticking finishes.
 	 * @param BehaviourClass Behaviour class to add.
+	 * @param CustomLifetimeSeconds Optional custom lifetime duration.
 	 */
-	void QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass);
+	void QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass, const TOptional<float>& CustomLifetimeSeconds);
 	/**
 	 * @brief Queue a behaviour class for removal after ticking finishes.
 	 * @param BehaviourClass Behaviour class to remove.
@@ -158,6 +173,12 @@ private:
 	 * @return true if handled without direct addition; false otherwise.
 	 */
 	bool TryHandleExistingBehaviour(UBehaviour* NewBehaviour);
+	/**
+	 * @brief Add a behaviour instance with optional lifetime overrides.
+	 * @param BehaviourClass Class used to create the behaviour instance.
+	 * @param CustomLifetimeSeconds Optional custom lifetime duration.
+	 */
+	void AddBehaviourInternal(const TSubclassOf<UBehaviour>& BehaviourClass, const TOptional<float>& CustomLifetimeSeconds);
 	/**
 	 * @brief Initialize and register a new behaviour instance.
 	 * @param NewBehaviour Behaviour to initialize.
@@ -217,7 +238,7 @@ private:
 	TArray<TObjectPtr<UBehaviour>> M_Behaviours;
 
 	UPROPERTY()
-	TArray<TSubclassOf<UBehaviour>> M_PendingAdds;
+	TArray<FPendingBehaviourAdd> M_PendingAdds;
 
 	UPROPERTY()
 	TArray<TSubclassOf<UBehaviour>> M_PendingRemovals;

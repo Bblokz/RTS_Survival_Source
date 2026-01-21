@@ -14,6 +14,8 @@
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/RadixiteDamageBehaviour.h"
 #include "Sound/SoundCue.h"
 #include "Trace/Trace.h"
 #include "DrawDebugHelpers.h"
@@ -37,6 +39,14 @@ namespace
 	constexpr float RocketSwingMinStraightPercent = 0.15f;
 	constexpr float RocketSwingMinSpeedMultiplier = 0.1f;
 	constexpr float RocketSwingMinCurveDistance = 50.0f;
+
+	namespace RadixiteDamageConstants
+	{
+		constexpr float MinCalibreMm = 20.f;
+		constexpr float MaxCalibreMm = 160.f;
+		constexpr float MinDurationSeconds = 5.f;
+		constexpr float MaxDurationSeconds = 15.f;
+	}
 
 	struct FArcedLaunchSolution
 	{
@@ -986,6 +996,7 @@ void AProjectile::OnHitActor(
 		{
 			M_ProjectileOwner->OnProjectileKilledActor(HitActor);
 		}
+		ApplyRadixiteDamageBehaviour(HitActor);
 		SpawnExplosionHandleAOE(HitLocation, HitRotation, HitSurface, HitActor);
 		OnProjectileDormant();
 	}
@@ -994,6 +1005,40 @@ void AProjectile::OnHitActor(
 void AProjectile::DamageActorWithShrapnel(AActor* HitActor)
 {
 	HitActor->TakeDamage(M_ShrapnelDamage, M_DamageEvent, nullptr, this);
+}
+
+void AProjectile::ApplyRadixiteDamageBehaviour(AActor* HitActor)
+{
+	if (M_ShellType != EWeaponShellType::Shell_Radixite)
+	{
+		return;
+	}
+	if (not IsValid(HitActor))
+	{
+		return;
+	}
+
+	UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
+	if (not IsValid(BehaviourComponent))
+	{
+		return;
+	}
+
+	const float RadixiteDurationSeconds = GetRadixiteDamageDurationSeconds();
+	BehaviourComponent->AddBehaviourWithDuration(URadixiteDamageBehaviour::StaticClass(), RadixiteDurationSeconds);
+}
+
+float AProjectile::GetRadixiteDamageDurationSeconds() const
+{
+	const float WeaponCalibre = static_cast<float>(M_WeaponCalibre);
+	const float ClampedCalibre = FMath::Clamp(WeaponCalibre,
+		RadixiteDamageConstants::MinCalibreMm,
+		RadixiteDamageConstants::MaxCalibreMm);
+	const float InterpolationFactor = (ClampedCalibre - RadixiteDamageConstants::MinCalibreMm)
+		/ (RadixiteDamageConstants::MaxCalibreMm - RadixiteDamageConstants::MinCalibreMm);
+	return FMath::Lerp(RadixiteDamageConstants::MinDurationSeconds,
+		RadixiteDamageConstants::MaxDurationSeconds,
+		InterpolationFactor);
 }
 
 bool AProjectile::GetIsValidWidgetPoolManager() const
