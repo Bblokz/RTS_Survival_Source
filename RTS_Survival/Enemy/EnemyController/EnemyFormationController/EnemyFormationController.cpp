@@ -15,12 +15,14 @@
 
 namespace EnemyFormationConstants
 {
-	const int32 HowOftenTickStuckUnitTillTeleport = 2;
-	const float SquarredDistanceDeltaConsiderStuck = 300.f;
-	const float TeleportXYRange = 200.f;
+	const int32 HowOftenTickStuckUnitTillTeleport = 1;
+	const float SquarredDistanceDeltaConsiderStuck = 90000.f; // ~300cm
+	const float TeleportXYRange = 225.f;
+	const float TeleportSideRange = 300.f;
 	const float TeleportDegreesRange = 20.f;
-	const float FindTeleportLocationProjectionExtent = 3.f;
-	const int32 TeleportProjectionAttempts = 2;
+	// WARNING; multiplied by 5 if previous teleport attempts failed; do not make this too high.
+	const float FindTeleportLocationProjectionExtent = 0.2f;
+	const int32 TeleportProjectionAttempts = 8;
 }
 
 UEnemyFormationController::UEnemyFormationController()
@@ -258,7 +260,7 @@ void UEnemyFormationController::UpdateFormationUnitStuckState(
 	}
 
 	FormationUnit.StuckCounts++;
-	if (FormationUnit.StuckCounts < EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport)
+	if (FormationUnit.StuckCounts <= EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport)
 	{
 		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
 		return;
@@ -267,9 +269,14 @@ void UEnemyFormationController::UpdateFormationUnitStuckState(
 	if (TryTeleportStuckFormationUnit(FormationUnit, WaypointLocation, WaypointDirection, NavSys))
 	{
 		FormationUnit.StuckCounts = 0;
+		FormationUnit.bPreviousStuckTeleportsFailed = false;
+	}
+	else
+	{
+		FormationUnit.bPreviousStuckTeleportsFailed = true;
 	}
 
-	DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
+	DebugFormationUnitJustTeleported(FormationUnit, WaypointLocation);
 }
 
 FVector UEnemyFormationController::GetFormationUnitRawWaypointLocation(
@@ -307,6 +314,7 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 	{
 		return false;
 	}
+	FormationUnit.Unit->SetUnitToIdle();
 
 	const FVector UnitLocation = UnitActor->GetActorLocation();
 	const FVector RawWaypointLocation = GetFormationUnitRawWaypointLocation(
@@ -314,15 +322,39 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 		WaypointLocation,
 		WaypointDirection);
 
+	float ProjectionExtent = EnemyFormationConstants::FindTeleportLocationProjectionExtent;
+	float TpDistance = EnemyFormationConstants::TeleportXYRange;
+	float TpSideDistance = EnemyFormationConstants::TeleportSideRange;
+	if (FormationUnit.bPreviousStuckTeleportsFailed)
+	{
+		TpDistance *= 1.33f * FormationUnit.StuckCounts;
+		ProjectionExtent *= 3.f;
+		TpSideDistance *= 1.33f * FormationUnit.StuckCounts;
+	}
+	FVector LastFailedTpLocation = FVector::ZeroVector;
 	for (int32 AttemptIndex = 0; AttemptIndex < EnemyFormationConstants::TeleportProjectionAttempts; ++AttemptIndex)
 	{
 		const float TeleportAngleDegrees = FMath::FRandRange(
 			-EnemyFormationConstants::TeleportDegreesRange,
 			EnemyFormationConstants::TeleportDegreesRange);
-		const FVector RawTeleportLocation = GetTeleportCandidateLocation(
-			UnitLocation,
-			RawWaypointLocation,
-			TeleportAngleDegrees);
+		FVector RawTeleportLocation = FVector::ZeroVector;
+		if (AttemptIndex % 2 == 0)
+		{
+			RawTeleportLocation = GetTpLocationTowardsWayPoint(
+				UnitLocation,
+				RawWaypointLocation,
+				TeleportAngleDegrees,
+				TpDistance);
+		}
+		else
+		{
+			const FRotator UnitRotation = UnitActor->GetActorRotation();
+			RawTeleportLocation = GetTpLocationToSide(
+				AttemptIndex % 3 == 0,
+				UnitLocation,
+				TpSideDistance, AttemptIndex, UnitRotation
+			);
+		}
 
 		bool bProjectionSuccess = false;
 		const FVector ProjectedTeleportLocation = RTSFunctionLibrary::GetLocationProjected_WithNavSystem(
@@ -330,26 +362,69 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 			RawTeleportLocation,
 			true,
 			bProjectionSuccess,
-			EnemyFormationConstants::FindTeleportLocationProjectionExtent);
+			ProjectionExtent);
 
 		if (not bProjectionSuccess)
 		{
+			if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+			{
+				DebugTeleportAttempt(FColor::Red, RawTeleportLocation);
+			}
 			continue;
 		}
 
-		UnitActor->SetActorLocation(ProjectedTeleportLocation, false, nullptr, ETeleportType::ResetPhysics);
+		if (not UnitActor->TeleportTo(ProjectedTeleportLocation, UnitActor->GetActorRotation(), false, false))
+		{
+			if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+			{
+				DebugTeleportAttempt(FColor::Black, RawTeleportLocation);
+			}
+			// Only set if projection was valid.
+			LastFailedTpLocation = ProjectedTeleportLocation;
+			continue;
+		}
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+		{
+			DebugTeleportAttempt(FColor::Green, RawTeleportLocation);
+		}
 		FormationUnit.M_LastKnownLocation = ProjectedTeleportLocation;
 		FormationUnit.bM_HasLastKnownLocation = true;
 		return true;
 	}
+	// if (not LastFailedTpLocation.IsNearlyZero())
+	// {
+	// 	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	// 	{
+	// 		const FVector DebugLoc = LastFailedTpLocation + FVector(0.f, 0.f, 300.f);
+	// 		DebugStringAtLocation("Final failed teleport location; teleporting next tick", DebugLoc, FColor::Orange,
+	// 		                      10.f);
+	// 	}
+	// 	FTimerDelegate OneShotTpTimerDel;
+	// 	TWeakObjectPtr<AActor> WeakUnitActor(UnitActor);
+	// 	// fire at next tick due to physics issues on tp.
+	// 	OneShotTpTimerDel.BindLambda([WeakUnitActor, LastFailedTpLocation]()
+	// 	{
+	// 		if (not WeakUnitActor.IsValid())
+	// 		{
+	// 			return;
+	// 		}
+	// 		AActor* PinnedUnitActor = WeakUnitActor.Get();
+	// 		PinnedUnitActor->TeleportTo(LastFailedTpLocation, PinnedUnitActor->GetActorRotation(), false, true);
+	// 	});
+	// 	if (UWorld* World = GetWorld())
+	// 	{
+	// 		World->GetTimerManager().SetTimerForNextTick(OneShotTpTimerDel);
+	// 	}
+	// }
 
 	return false;
 }
 
-FVector UEnemyFormationController::GetTeleportCandidateLocation(
+FVector UEnemyFormationController::GetTpLocationTowardsWayPoint(
 	const FVector& UnitLocation,
 	const FVector& WaypointLocation,
-	const float TeleportAngleDegrees) const
+	const float TeleportAngleDegrees,
+	const float TpDistance) const
 {
 	FVector DirectionToWaypoint = WaypointLocation - UnitLocation;
 	DirectionToWaypoint.Z = 0.f;
@@ -359,7 +434,24 @@ FVector UEnemyFormationController::GetTeleportCandidateLocation(
 	}
 	const FVector NormalizedDirection = DirectionToWaypoint.GetSafeNormal();
 	const FVector RotatedDirection = FRotator(0.f, TeleportAngleDegrees, 0.f).RotateVector(NormalizedDirection);
-	return UnitLocation + RotatedDirection * EnemyFormationConstants::TeleportXYRange;
+	return UnitLocation + RotatedDirection * TpDistance;
+}
+
+FVector UEnemyFormationController::GetTpLocationToSide(const bool bLeftSide, const FVector& UnitLocation,
+                                                       const float SideOffsetDistance, const int32 Index,
+                                                       const FRotator& UnitRotation) const
+{
+	const float IndexMlt = 1.f + (Index / 6);
+	FVector SideOffset = FVector::ZeroVector;
+	if (bLeftSide)
+	{
+		SideOffset = UnitRotation.RotateVector(FVector(0.f, -1.f, 0.f));
+	}
+	else
+	{
+		SideOffset = UnitRotation.RotateVector(FVector(0.f, 1.f, 0.f));
+	}
+	return UnitLocation + SideOffset * SideOffsetDistance * IndexMlt;
 }
 
 void UEnemyFormationController::DebugFormationUnitStillMoving(
@@ -406,6 +498,29 @@ void UEnemyFormationController::DebugFormationUnitStillMoving(
 	}
 }
 
+void UEnemyFormationController::DebugFormationUnitJustTeleported(const FFormationUnitData& FormationUnit,
+                                                                 const FVector& WaypointLocation)
+{
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		if (not FormationUnit.IsValidFormationUnit())
+		{
+			return;
+		}
+
+		const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+		const float SquaredDistToRawWayPoint = FVector::DistSquared(
+			UnitLocation,
+			GetFormationUnitRawWaypointLocation(FormationUnit, WaypointLocation, FRotator::ZeroRotator));
+		const FString DebugString = "Unit just teleported."
+			"\n Distance to raw waypoint squared: " + FString::SanitizeFloat(SquaredDistToRawWayPoint);
+		const float DebugTextHeightOffset = 250.f;
+		const float DebugTextDurationSeconds = 2.f;
+		const FVector DebugTextLocation = UnitLocation + FVector(0.f, 0.f, DebugTextHeightOffset);
+		DebugStringAtLocation(DebugString, DebugTextLocation, FColor::Red, DebugTextDurationSeconds);
+	}
+}
+
 void UEnemyFormationController::HandleFormationIdleUnits(
 	FFormationData& Formation,
 	const FVector& WaypointLocation,
@@ -413,7 +528,8 @@ void UEnemyFormationController::HandleFormationIdleUnits(
 {
 	for (auto& UnitData : Formation.FormationUnits)
 	{
-		if (GetIsFormationUnitIdle(UnitData))
+		// Do not reorder move if still stuck.
+		if (not UnitData.bPreviousStuckTeleportsFailed && GetIsFormationUnitIdle(UnitData))
 		{
 			OnFormationUnitIdleReorderMove(
 				UnitData, WaypointLocation, WaypointDirection, Formation.FormationID);
@@ -1218,7 +1334,7 @@ bool UEnemyFormationController::GetIsFormationUnitIdle(const FFormationUnitData&
 		{
 			if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 			{
-				DebugStringAtLocation("Unit idle but actually waiting for formation: " + UnitName, UnitLocation,
+				DebugStringAtLocation("Unit idle but actually waiting for other units. ", UnitLocation,
 				                      FColor::Orange, 8.f);
 			}
 			return false;
@@ -1414,6 +1530,12 @@ FVector UEnemyFormationController::ComputeOffsetForUnit(
 	return FVector(XOffset, YOffset, 0.f) * Mlt;
 }
 
+bool UEnemyFormationController::TeleportActorWithCheck(AActor* ValidUnit, const FVector& TeleportLocation,
+                                                       const FRotator& TeleportRotation) const
+{
+	return true;
+}
+
 void UEnemyFormationController::Debug(const FString& Message)
 {
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
@@ -1438,4 +1560,10 @@ void UEnemyFormationController::DebugStringAtLocation(const FString& Message, co
 	{
 		DrawDebugString(GetWorld(), Location, Message, nullptr, Color, Duration, false);
 	}
+}
+
+void UEnemyFormationController::DebugTeleportAttempt(const FColor& TpColor, const FVector& Location) const
+{
+	const float Radius = 100.f;
+	DrawDebugSphere(GetWorld(), Location, Radius, 12, TpColor, false, 5.f);
 }

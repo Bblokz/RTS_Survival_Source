@@ -110,16 +110,25 @@ private:
 		const FRotator& WaypointDirection,
 		UNavigationSystemV1* NavSys) const;
 
-	FVector GetTeleportCandidateLocation(
+	FVector GetTpLocationTowardsWayPoint(
 		const FVector& UnitLocation,
 		const FVector& WaypointLocation,
-		const float TeleportAngleDegrees) const;
+		const float TeleportAngleDegrees, const float TpDistance) const;
+
+	FVector GetTpLocationToSide(
+		const bool bLeftSide,
+		const FVector& UnitLocation,
+		const float SideOffsetDistance, const int32 Index, const FRotator& UnitRotation) const;
 
 	void DebugFormationUnitStillMoving(
 		const FFormationUnitData& FormationUnit,
 		const FVector& WaypointLocation,
 		const FRotator& WaypointDirection,
 		const float DistanceMovedSquared) const;
+
+	void DebugFormationUnitJustTeleported(
+		const FFormationUnitData& FormationUnit,
+		const FVector& WaypointLocation);
 
 	void HandleFormationIdleUnits(
 		FFormationData& Formation,
@@ -306,6 +315,10 @@ private:
 		int32 ColumnIndex,
 		const TArray<float>& RowRadii, const float FormationOffsetMlt) const;
 
+	bool TeleportActorWithCheck(AActor* ValidUnit,
+		const FVector& TeleportLocation,
+		const FRotator& TeleportRotation) const;
+
 
 	// ------------------------------------------------------------------
 	// --------------Begin Formation Grid Helpers. --------------------
@@ -317,4 +330,6 @@ private:
 
 	void DebugStringAtLocation(const FString& Message, const FVector& Location, const FColor& Color = FColor::Red,
 	                           float Duration = 5.0f) const;
+
+	void DebugTeleportAttempt(const FColor& TpColor, const FVector& Location) const;
 };

@@ -25,6 +25,7 @@ struct FFormationUnitData
 	// Counts consecutive checks without enough progress towards the current waypoint.
 	int32 StuckCounts = 0;
 
+	bool bPreviousStuckTeleportsFailed = false;
 	// Time when this unit first entered combat after reaching the current waypoint.
 	float M_CombatStartTimeSeconds = -1.f;
 };
