@@ -30,9 +30,11 @@ public:
 	virtual void OnRemoved(AActor* BehaviourOwner);
 	virtual void OnTick(const float DeltaTime);
 	virtual void OnStack(UBehaviour* StackedBehaviour);
+	virtual void OnRefreshed(UBehaviour* RefreshingBehaviour);
 	virtual void OnBehaviorHover(const bool bIsHovering);
 
 	void SetCustomUIData(const FBehaviourUIData& UIData);
+	void SetLifetimeDuration(const float NewLifetimeDuration);
 
 	/**
 	* @brief Retrieve UI data for this behaviour.

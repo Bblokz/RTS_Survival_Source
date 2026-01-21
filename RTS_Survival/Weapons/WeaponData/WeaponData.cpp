@@ -298,6 +298,14 @@ FWeaponData GLOBAL_GetWeaponDataForShellType(const FWeaponData& OldWeaponData)
 			DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ProjectileSpeedMlt;
 		break;
 
+	case EWeaponShellType::Shell_Radixite:
+		// Adjust damage and armor penetration at max range for Radixite shells.
+		NewWeaponData.BaseDamage *= DeveloperSettings::GameBalance::Weapons::Projectiles::Radixite_DamageMlt;
+		NewWeaponData.ArmorPenMaxRange *=
+			DeveloperSettings::GameBalance::Weapons::Projectiles::Radixite_ArmorPenMaxRangeMlt;
+		NewWeaponData.Accuracy += DeveloperSettings::GameBalance::Weapons::Projectiles::Radixite_AccuracyDelta;
+		break;
+
 	case EWeaponShellType::Shell_APCR:
 		// Adjust damage and armor penetration for APCR shells.
 		NewWeaponData.ArmorPen *= DeveloperSettings::GameBalance::Weapons::Projectiles::APCR_ArmorPenMlt;

@@ -23,6 +23,11 @@ void UBehaviour::OnTick(const float DeltaTime)
 {
 }
 
+void UBehaviour::OnRefreshed(UBehaviour* RefreshingBehaviour)
+{
+	static_cast<void>(RefreshingBehaviour);
+}
+
 void UBehaviour::OnBehaviorHover(const bool bIsHovering)
 {
 	static_cast<void>(bIsHovering);
@@ -36,6 +41,12 @@ void UBehaviour::SetCustomUIData(const FBehaviourUIData& UIData)
 	M_BuffType = UIData.BuffDebuffType;
 	BehaviourLifeTime = UIData.LifeTimeType;
 	M_LifeTimeDuration = UIData.TotalLifeTime;
+}
+
+void UBehaviour::SetLifetimeDuration(const float NewLifetimeDuration)
+{
+	M_LifeTimeDuration = FMath::Max(0.f, NewLifetimeDuration);
+	RefreshLifetime();
 }
 
 void UBehaviour::GetUIData(FBehaviourUIData& OutUIData) const

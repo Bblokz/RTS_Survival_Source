@@ -153,6 +153,8 @@ protected:
 		const float DamageMlt);
 
 	virtual void DamageActorWithShrapnel(AActor* HitActor);
+	void ApplyRadixiteDamageBehaviour(AActor* HitActor);
+	float GetRadixiteDamageDurationSeconds() const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "VFX")
 	TMap<EProjectileNiagaraSystem, UNiagaraSystem*> ProjectileNiagaraSystems;
