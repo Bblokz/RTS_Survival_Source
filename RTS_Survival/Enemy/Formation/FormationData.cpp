@@ -23,6 +23,8 @@ bool FFormationData::CheckIfFormationReachedCurrentWayPoint(const TWeakInterface
 			{
 				bFoundReachedUnit = true;
 				EachUnit.bHasReachedNextDestination = true;
+				EachUnit.StuckCounts = 0;
+				EachUnit.SquaredDistanceToNextPoint = 0.f;
 			}
 			if (not EachUnit.bHasReachedNextDestination)
 			{
@@ -57,7 +59,7 @@ void FFormationData::EnsureAllFormationUnitsAreValid(UEnemyFormationController* 
 	TArray<FFormationUnitData> ValidFormationUnits;
 	for (auto EachUnit : FormationUnits)
 	{
-		if (EachUnit.Unit.IsValid())
+		if (EachUnit.IsValidFormationUnit())
 		{
 			ValidFormationUnits.Add(EachUnit);
 			continue;

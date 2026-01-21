@@ -13,6 +13,15 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace EnemyFormationConstants
+{
+	const int32 HowOftenTickStuckUnitTillTeleport = 2;
+	const float SquarredDistanceDeltaConsiderStuck = 300.f;
+	const float TeleportXYRange = 200.f;
+	const float TeleportDegreesRange = 20.f;
+	const float FindTeleportLocationProjectionExtent = 3.f;
+	const int32 TeleportProjectionAttempts = 2;
+}
 
 UEnemyFormationController::UEnemyFormationController()
 {
@@ -162,11 +171,12 @@ void UEnemyFormationController::CheckFormations()
 	}
 
 	// Then  idle→teleport→reorder logic on the survivors:
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
 	for (auto& Pair : M_ActiveFormations)
 	{
 		FFormationData& Formation = Pair.Value;
 
-		if (!Formation.FormationWaypoints.IsValidIndex(Formation.CurrentWaypointIndex))
+		if (not Formation.FormationWaypoints.IsValidIndex(Formation.CurrentWaypointIndex))
 		{
 			RTSFunctionLibrary::ReportError(
 				TEXT("On formation check formation has no valid waypoint index but it is still active!"));
@@ -176,6 +186,8 @@ void UEnemyFormationController::CheckFormations()
 		const FVector& WayLoc = Formation.FormationWaypoints[Formation.CurrentWaypointIndex];
 		const FRotator& WayDir = Formation.FormationWaypointDirections[Formation.CurrentWaypointIndex];
 
+		UpdateFormationUnitMovementProgress(Formation, WayLoc, WayDir, NavSys);
+
 		if (Formation.bIsAttackMoveFormation)
 		{
 			HandleAttackMoveFormation(Formation, WayLoc, WayDir);
@@ -184,6 +196,221 @@ void UEnemyFormationController::CheckFormations()
 
 		HandleFormationIdleUnits(Formation, WayLoc, WayDir);
 	}
+}
+
+void UEnemyFormationController::UpdateFormationUnitMovementProgress(
+	FFormationData& Formation,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	UNavigationSystemV1* NavSys)
+{
+	for (FFormationUnitData& UnitData : Formation.FormationUnits)
+	{
+		if (not UnitData.IsValidFormationUnit())
+		{
+			continue;
+		}
+
+		if (UnitData.bHasReachedNextDestination)
+		{
+			continue;
+		}
+
+		UpdateFormationUnitStuckState(UnitData, WaypointLocation, WaypointDirection, NavSys);
+	}
+}
+
+void UEnemyFormationController::UpdateFormationUnitStuckState(
+	FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	UNavigationSystemV1* NavSys)
+{
+	const float CurrentSquaredDistance = GetSquaredDistanceToWaypoint(
+		FormationUnit,
+		WaypointLocation,
+		WaypointDirection);
+	const float PreviousSquaredDistance = FormationUnit.SquaredDistanceToNextPoint;
+	FormationUnit.SquaredDistanceToNextPoint = CurrentSquaredDistance;
+
+	if (GetIsFormationUnitInCombat(FormationUnit))
+	{
+		DebugFormationUnitStillMoving(FormationUnit, CurrentSquaredDistance);
+		return;
+	}
+
+	if (GetHasUnitMovedEnough(PreviousSquaredDistance, CurrentSquaredDistance))
+	{
+		DebugFormationUnitStillMoving(FormationUnit, CurrentSquaredDistance);
+		return;
+	}
+
+	FormationUnit.StuckCounts++;
+	if (FormationUnit.StuckCounts < EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport)
+	{
+		DebugFormationUnitStillMoving(FormationUnit, CurrentSquaredDistance);
+		return;
+	}
+
+	if (TryTeleportStuckFormationUnit(FormationUnit, WaypointLocation, WaypointDirection, NavSys))
+	{
+		FormationUnit.StuckCounts = 0;
+	}
+
+	DebugFormationUnitStillMoving(FormationUnit, FormationUnit.SquaredDistanceToNextPoint);
+}
+
+FVector UEnemyFormationController::GetFormationUnitRawWaypointLocation(
+	const FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection) const
+{
+	return WaypointLocation + WaypointDirection.RotateVector(FormationUnit.Offset);
+}
+
+FVector UEnemyFormationController::GetFormationUnitProjectedWaypointLocation(
+	const FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection) const
+{
+	using DeveloperSettings::GamePlay::Navigation::EnemyFormationPositionProjectionExtent;
+
+	const FVector RawLocation = GetFormationUnitRawWaypointLocation(FormationUnit, WaypointLocation, WaypointDirection);
+	return ProjectLocationOnNavMesh(RawLocation, EnemyFormationPositionProjectionExtent, false);
+}
+
+float UEnemyFormationController::GetSquaredDistanceToWaypoint(
+	const FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection) const
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return 0.f;
+	}
+
+	const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+	const FVector TargetLocation = GetFormationUnitProjectedWaypointLocation(
+		FormationUnit,
+		WaypointLocation,
+		WaypointDirection);
+	return FVector::DistSquared(UnitLocation, TargetLocation);
+}
+
+bool UEnemyFormationController::GetHasUnitMovedEnough(
+	const float PreviousSquaredDistance,
+	const float CurrentSquaredDistance) const
+{
+	if (PreviousSquaredDistance <= 0.f)
+	{
+		return true;
+	}
+
+	return CurrentSquaredDistance <=
+	       PreviousSquaredDistance - EnemyFormationConstants::SquarredDistanceDeltaConsiderStuck;
+}
+
+bool UEnemyFormationController::TryTeleportStuckFormationUnit(
+	FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	UNavigationSystemV1* NavSys) const
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return false;
+	}
+
+	if (not NavSys)
+	{
+		return false;
+	}
+
+	AActor* UnitActor = FormationUnit.Unit->GetOwnerActor();
+	if (not IsValid(UnitActor))
+	{
+		return false;
+	}
+
+	const FVector UnitLocation = UnitActor->GetActorLocation();
+	const FVector RawWaypointLocation = GetFormationUnitRawWaypointLocation(
+		FormationUnit,
+		WaypointLocation,
+		WaypointDirection);
+
+	for (int32 AttemptIndex = 0; AttemptIndex < EnemyFormationConstants::TeleportProjectionAttempts; ++AttemptIndex)
+	{
+		const float TeleportAngleDegrees = FMath::FRandRange(
+			-EnemyFormationConstants::TeleportDegreesRange,
+			EnemyFormationConstants::TeleportDegreesRange);
+		const FVector RawTeleportLocation = GetTeleportCandidateLocation(
+			UnitLocation,
+			RawWaypointLocation,
+			TeleportAngleDegrees);
+
+		bool bProjectionSuccess = false;
+		const FVector ProjectedTeleportLocation = RTSFunctionLibrary::GetLocationProjected_WithNavSystem(
+			NavSys,
+			RawTeleportLocation,
+			true,
+			bProjectionSuccess,
+			EnemyFormationConstants::FindTeleportLocationProjectionExtent);
+
+		if (not bProjectionSuccess)
+		{
+			continue;
+		}
+
+		UnitActor->SetActorLocation(ProjectedTeleportLocation, false, nullptr, ETeleportType::ResetPhysics);
+		FormationUnit.SquaredDistanceToNextPoint = GetSquaredDistanceToWaypoint(
+			FormationUnit,
+			WaypointLocation,
+			WaypointDirection);
+		return true;
+	}
+
+	return false;
+}
+
+FVector UEnemyFormationController::GetTeleportCandidateLocation(
+	const FVector& UnitLocation,
+	const FVector& WaypointLocation,
+	const float TeleportAngleDegrees) const
+{
+	FVector DirectionToWaypoint = WaypointLocation - UnitLocation;
+	DirectionToWaypoint.Z = 0.f;
+	if (DirectionToWaypoint.IsNearlyZero())
+	{
+		DirectionToWaypoint = FVector::ForwardVector;
+	}
+	const FVector NormalizedDirection = DirectionToWaypoint.GetSafeNormal();
+	const FVector RotatedDirection = FRotator(0.f, TeleportAngleDegrees, 0.f).RotateVector(NormalizedDirection);
+	return UnitLocation + RotatedDirection * EnemyFormationConstants::TeleportXYRange;
+}
+
+void UEnemyFormationController::DebugFormationUnitStillMoving(
+	const FFormationUnitData& FormationUnit,
+	const float SquaredDistanceToWaypoint) const
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return;
+	}
+
+	if (FormationUnit.Unit->GetActiveCommandID() == EAbilityID::IdIdle)
+	{
+		return;
+	}
+
+	const float DebugTextHeightOffset = 200.f;
+	const float DebugTextDurationSeconds = 2.f;
+	const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation() + FVector(0.f, 0.f, DebugTextHeightOffset);
+	const FString DebugMessage = FString::Printf(
+		TEXT("still moving\n%d / %d\n dist: %.2f"),
+		FormationUnit.StuckCounts,
+		EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport,
+		SquaredDistanceToWaypoint);
+	DebugStringAtLocation(DebugMessage, UnitLocation, FColor::Cyan, DebugTextDurationSeconds);
 }
 
 void UEnemyFormationController::HandleFormationIdleUnits(
@@ -674,6 +901,8 @@ void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& Formation
 	FVector LocationToProject = WaypointLocation + WaypointDirection.RotateVector(FormationUnit.Offset);
 
 	LocationToProject = ProjectLocationOnNavMesh(LocationToProject, EnemyFormationPositionProjectionExtent, false);
+	const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+	FormationUnit.SquaredDistanceToNextPoint = FVector::DistSquared(UnitLocation, LocationToProject);
 	// Move the unit to the projected location.
 	const ECommandQueueError Error = FormationUnit.Unit->MoveToLocation(LocationToProject, true, WaypointDirection);
 	if (Error != ECommandQueueError::NoError)

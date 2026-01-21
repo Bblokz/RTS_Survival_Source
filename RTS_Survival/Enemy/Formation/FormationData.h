@@ -19,6 +19,10 @@ struct FFormationUnitData
 	FVector Offset = FVector::ZeroVector;
 	bool bHasReachedNextDestination = false;
 	FDelegateHandle MovementCompleteHandle;
+	// Tracks remaining squared distance for stuck detection while moving to the current waypoint.
+	float SquaredDistanceToNextPoint = 0.f;
+	// Counts consecutive checks without enough progress towards the current waypoint.
+	int32 StuckCounts = 0;
 
 	// Time when this unit first entered combat after reaching the current waypoint.
 	float M_CombatStartTimeSeconds = -1.f;
