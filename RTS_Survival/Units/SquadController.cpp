@@ -380,6 +380,16 @@ TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 	return Weapons;
 }
 
+bool ASquadController::GetIsUnitInCombat() const
+{
+	if(not GetIsValidRTSComponent())
+	{
+		return false;
+	}
+	return RTSComponent->GetIsUnitInCombat();
+
+}
+
 UBehaviourComp* ASquadController::GetBehaviourComponentOfSquad() const
 {
 	return BehaviourComponent;

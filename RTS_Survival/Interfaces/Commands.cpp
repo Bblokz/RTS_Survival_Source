@@ -1039,6 +1039,16 @@ int32 ICommands::GetConstructionAbilityCount()
 	return Count;
 }
 
+void ICommands::SetRTSOverlapEvasionEnabled(const bool bEnabled)
+{
+	
+}
+
+bool ICommands::GetIsUnitInCombat() const
+{
+	return false;
+}
+
 void ICommands::SetIsSpawning(const bool bIsSpawning)
 {
 	if (UCommandData* UnitCommandData = GetIsValidCommandData())

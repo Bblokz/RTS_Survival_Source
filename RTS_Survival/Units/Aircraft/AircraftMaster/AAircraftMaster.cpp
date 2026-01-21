@@ -34,6 +34,7 @@ AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
 }
 
 
+
 void AAircraftMaster::OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo)
 {
 	if (bSetDisabled)
@@ -159,7 +160,8 @@ void AAircraftMaster::Tick(float DeltaTime)
 			{
 				const int32 MyIndex = M_AircraftOwner->GetAssignedSocketIndex(this);
 				const FString MyIndexString = MyIndex == INDEX_NONE ? "NONE" : FString::FromInt(MyIndex);
-				const FString OwnerStr = "Owner: " + M_AircraftOwner->GetOwner()->GetName() + " (Socket: " + MyIndexString +
+				const FString OwnerStr = "Owner: " + M_AircraftOwner->GetOwner()->GetName() + " (Socket: " +
+					MyIndexString +
 					")";
 				FRTSAircraftHelpers::AircraftDebugAtLocation(
 					this,
@@ -1479,8 +1481,7 @@ void AAircraftMaster::OnLandscapeTraceHit(const FHitResult& TraceHit) const
 {
 	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{
-	DrawDebugSphere(GetWorld(), TraceHit.Location, 100.f, 12, FColor::Green, false, 5.f);
-		
+		DrawDebugSphere(GetWorld(), TraceHit.Location, 100.f, 12, FColor::Green, false, 5.f);
 	}
 	if (not M_SelectionDecal)
 	{
@@ -1809,7 +1810,7 @@ void AAircraftMaster::VerticalText_WaitForLanding() const
 {
 	const FVector Location = GetActorLocation() + FVector(0.f, 0.f, VerticalTextAircraftZOffset);
 	const FString Text = FRTSRichTextConverter::MakeRTSRich("Waiting for bay to open",
-	                                                                  ERTSRichText::Text_Armor);
+	                                                        ERTSRichText::Text_Armor);
 	FRTSVerticalAnimTextSettings Settings;
 	Settings.DeltaZ = 75.f;
 	Settings.VisibleDuration = 3.f;
@@ -1830,7 +1831,7 @@ void AAircraftMaster::VerticalText_PrepTakeOff() const
 	const float VisibleDuration = FMath::Max(M_AircraftMovementSettings.VtoPrepareTime - FadeDuration, 1.f);
 	const FString Text = FRTSRichTextConverter::MakeRTSRich("Preparing for takeoff",
 
-	                                                                  ERTSRichText::Text_Armor);
+	                                                        ERTSRichText::Text_Armor);
 	FRTSVerticalAnimTextSettings Settings;
 	Settings.DeltaZ = 75.f;
 	Settings.VisibleDuration = VisibleDuration;

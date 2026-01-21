@@ -42,6 +42,8 @@ public:
 		float CalculatedBreak,
 		float CalculatedSteering) override final;
 
+	virtual void SetRTSOverlapEvasionEnabled(const bool bEnabled) override;
+
 	virtual void OnFinishedPathFollowing() override;
 
 	virtual USkeletalMeshComponent* GetTankMesh() const override final;

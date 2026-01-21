@@ -258,19 +258,8 @@ bool UEnemyFormationController::GetIsFormationUnitInCombat(const FFormationUnitD
 		return false;
 	}
 
-	const AActor* UnitActor = FormationUnit.Unit->GetOwnerActor();
-	if (not IsValid(UnitActor))
-	{
-		return false;
-	}
-
-	const URTSComponent* RTSComponent = UnitActor->FindComponentByClass<URTSComponent>();
-	if (not IsValid(RTSComponent))
-	{
-		return false;
-	}
-
-	return RTSComponent->GetIsUnitInCombat();
+	// Uses RTS comp on the interface implementor.
+	return FormationUnit.Unit->GetIsUnitInCombat();
 }
 
 float UEnemyFormationController::GetFormationUnitInnerRadius(const FFormationUnitData& FormationUnit) const

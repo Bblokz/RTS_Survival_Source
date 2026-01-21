@@ -243,6 +243,8 @@ public:
 
 	TArray<UWeaponState*> GetWeaponsOfSquad();
 
+	virtual bool GetIsUnitInCombat() const override;
+
 	UBehaviourComp* GetBehaviourComponentOfSquad() const;
 
 	int32 GetSquadUnitAmount();

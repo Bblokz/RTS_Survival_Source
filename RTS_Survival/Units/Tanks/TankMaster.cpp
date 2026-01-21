@@ -235,6 +235,8 @@ ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 		TEXT("RTSOptimizer"));
 }
 
+
+
 USkeletalMeshComponent* ATankMaster::GetTankMesh() const
 {
 	return nullptr;

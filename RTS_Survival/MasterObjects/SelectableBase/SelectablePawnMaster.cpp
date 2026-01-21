@@ -15,6 +15,15 @@ ASelectablePawnMaster::ASelectablePawnMaster(const FObjectInitializer& ObjectIni
 {
 }
 
+bool ASelectablePawnMaster::GetIsUnitInCombat() const
+{
+	if(not GetIsValidRTSComponent())
+	{
+		return false;
+	}
+	return RTSComponent->GetIsUnitInCombat();
+}
+
 void ASelectablePawnMaster::SetUnitSelected(const bool bIsSelected) const
 {
 	if (not GetIsValidSelectionComponent())

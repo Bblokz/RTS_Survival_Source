@@ -49,6 +49,7 @@ class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterfac
 	friend class UAircraftOwnerComp;
 
 public:
+
 	/**
 	 * @brief Switch to a new airbase: leave current owner safely, become idle, then route toward the new owner.
 	 *

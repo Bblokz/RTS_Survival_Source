@@ -358,6 +358,9 @@ public:
 
 	int32 GetConstructionAbilityCount();
 
+	virtual void SetRTSOverlapEvasionEnabled(const bool bEnabled);
+	virtual bool GetIsUnitInCombat()const;
+
 
 	/** @brief Sets a simple flag to indicate that this unit has not recieved any player commands yet.
 	 * Will be reset as soon as any order is issued (other than the spawn order)

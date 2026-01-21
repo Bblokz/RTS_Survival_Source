@@ -102,7 +102,7 @@ public:
 
 	// Controller is set with OnPosses on AITankMaster.
 	void SetAIController(AAITankMaster* NewController) { AITankController = NewController; }
-
+	
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="TankMaster")
 	inline AAITankMaster* GetAIController() const { return AITankController; };
 

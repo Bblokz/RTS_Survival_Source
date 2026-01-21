@@ -21,6 +21,15 @@ ASelectableActorObjectsMaster::ASelectableActorObjectsMaster(const FObjectInitia
 {
 }
 
+bool ASelectableActorObjectsMaster::GetIsUnitInCombat() const
+{
+	if(not GetIsValidRTSComponent())
+	{
+		return false;
+	}
+	return RTSComponent->GetIsUnitInCombat();
+}
+
 void ASelectableActorObjectsMaster::SetUnitSelected(const bool bIsSelected) const
 {
 	if (not GetIsValidSelectionComponent())

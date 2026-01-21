@@ -34,6 +34,8 @@ public:
 
 	ASelectablePawnMaster(const FObjectInitializer& ObjectInitializer);
 
+	virtual bool GetIsUnitInCombat() const override;
+
 	// Contains references to selectionBox, decals and associated flags.
 	UFUNCTION(BlueprintCallable)
 	inline USelectionComponent* GetSelectionComponent() const { return SelectionComponent; };

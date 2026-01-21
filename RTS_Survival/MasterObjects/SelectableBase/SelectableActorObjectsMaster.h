@@ -24,6 +24,8 @@ class RTS_SURVIVAL_API ASelectableActorObjectsMaster : public AHPActorObjectsMas
 public:
 	ASelectableActorObjectsMaster(const FObjectInitializer& ObjectInitializer);
 
+	virtual bool GetIsUnitInCombat() const override;
+
 	
 	// Updates selection logic on the component which also updates the selection decal.
 	void SetUnitSelected(const bool bIsSelected) const;
