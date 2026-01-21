@@ -240,6 +240,12 @@ protected:
 	TMap<EBuildingExpansionType, UStaticMesh*> BxpPreviewMeshMap;
 
 private:
+	struct FAsyncSpawnCallbackEntry
+	{
+		TWeakObjectPtr<UObject> CallbackOwner;
+		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback;
+	};
+
 	// Associates the concrete training option with the class to spawn using a hashmap.
 	TMap<FTrainingOption, TSoftClassPtr<AActor>> M_TrainingOptionMap;
 
@@ -313,12 +319,15 @@ private:
 	 * @param AssetPath The path of the loaded asset.
 	 * @param TrainingOption The option that was loaded.
 	 * @param Location The location where the unit should be spawned.
-	 * @param ID
+	 * @param ID The external spawn id to forward to the caller.
+	 * @param SpawnRequestId The internal request id used to find the callback.
 	 */
 	void OnAsyncSpawnOptionAtLocationComplete(
 		const FSoftObjectPath& AssetPath,
 		const FTrainingOption TrainingOption,
-		const FVector& Location, const int32 ID);
+		const FVector& Location,
+		const int32 ID,
+		const int32 SpawnRequestId);
 
 	bool IsTrainerNotInQueue(const TWeakObjectPtr<UTrainerComponent> TrainerComponent);
 
@@ -360,6 +369,19 @@ private:
 		TWeakObjectPtr<UTrainerComponent> TrainerComponent,
 		const FTrainingOption& TrainingOption) const;
 
+	/**
+	 * @brief Ensures a queued spawn callback is invoked once for each request.
+	 * @param SpawnRequestId The internal request id for the spawn.
+	 * @param TrainingOption The training option that was requested.
+	 * @param SpawnedActor The actor that was spawned, or nullptr when spawning failed.
+	 * @param ID The external spawn id to forward.
+	 */
+	void InvokeSpawnCallback(
+		const int32 SpawnRequestId,
+		const FTrainingOption& TrainingOption,
+		AActor* SpawnedActor,
+		const int32 ID);
+
 
 	// StreamableHandle that is currently loading training option assets.
 	TSharedPtr<FStreamableHandle> M_CurrentTrainingOptionLoadingHandle;
@@ -370,9 +392,10 @@ private:
 
 
 	// Callbacks used to the player profile loader to indicate when a unit has been spawned.
-	TMap<FSoftObjectPath, TPair<TWeakObjectPtr<UObject>,
-	                            TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)>>>
-	M_SpawnCallbacks;
+	// Stored by request id to ensure each spawn attempt triggers a callback.
+	TMap<int32, FAsyncSpawnCallbackEntry> M_SpawnCallbacks;
+
+	int32 M_NextSpawnOptionRequestId = 0;
 
 
 

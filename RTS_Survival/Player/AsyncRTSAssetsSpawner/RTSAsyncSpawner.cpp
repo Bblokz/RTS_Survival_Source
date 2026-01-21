@@ -428,44 +428,51 @@ void ARTSAsyncSpawner::OnBuildingExpansionSpawned(
 void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 	const FSoftObjectPath& AssetPath,
 	const FTrainingOption TrainingOption,
-	const FVector& Location, const int32 ID)
+	const FVector& Location,
+	const int32 ID,
+	const int32 SpawnRequestId)
 {
 	// Resolve the loaded asset
 	UObject* LoadedAsset = AssetPath.ResolveObject();
-	if (!LoadedAsset)
+	if (not LoadedAsset)
 	{
 		RTSFunctionLibrary::ReportError(
 			"Failed to resolve loaded asset for TrainingOption: " + TrainingOption.GetTrainingName() +
 			"\nAt function OnAsyncSpawnOptionAtLocationComplete in ARTSAsyncSpawner.cpp");
+		InvokeSpawnCallback(SpawnRequestId, TrainingOption, nullptr, ID);
 		return;
 	}
 
 	// Cast the loaded asset to UClass
 	UClass* AssetClass = Cast<UClass>(LoadedAsset);
-	if (!AssetClass)
+	if (not AssetClass)
 	{
 		RTSFunctionLibrary::ReportError(
 			"Failed to cast loaded asset to UClass for TrainingOption: " + TrainingOption.GetTrainingName()
 			+
 			"\nAt function OnAsyncSpawnOptionAtLocationComplete in ARTSAsyncSpawner.cpp");
+		InvokeSpawnCallback(SpawnRequestId, TrainingOption, nullptr, ID);
 		return;
 	}
 
 	// Spawn the actor at the provided location
 	FActorSpawnParameters SpawnParams;
-	if (not GetWorld())
+	UWorld* World = GetWorld();
+	if (not World)
 	{
+		InvokeSpawnCallback(SpawnRequestId, TrainingOption, nullptr, ID);
 		return;
 	}
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(
+	AActor* SpawnedActor = World->SpawnActor<AActor>(
 		AssetClass, Location, FRotator::ZeroRotator, SpawnParams);
 
-	if (!IsValid(SpawnedActor))
+	if (not IsValid(SpawnedActor))
 	{
 		RTSFunctionLibrary::ReportError(
 			"Failed to spawn actor for TrainingOption: " + TrainingOption.GetTrainingName() +
 			"\nAt function OnAsyncSpawnOptionAtLocationComplete in ARTSAsyncSpawner.cpp");
+		InvokeSpawnCallback(SpawnRequestId, TrainingOption, nullptr, ID);
 		return;
 	}
 	if (APawn* SpawnedPawn = Cast<APawn>(SpawnedActor))
@@ -486,14 +493,27 @@ void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 			"Spawned actor does not implement IRTSUnit for TrainingOption: " + TrainingOption.GetTrainingName() +
 			"\nAt function OnAsyncSpawnOptionAtLocationComplete in ARTSAsyncSpawner.cpp");
 	}
-	if (M_SpawnCallbacks.Contains(AssetPath))
+
+	InvokeSpawnCallback(SpawnRequestId, TrainingOption, SpawnedActor, ID);
+}
+
+void ARTSAsyncSpawner::InvokeSpawnCallback(
+	const int32 SpawnRequestId,
+	const FTrainingOption& TrainingOption,
+	AActor* SpawnedActor,
+	const int32 ID)
+{
+	if (not M_SpawnCallbacks.Contains(SpawnRequestId))
 	{
-		const auto& PairData = M_SpawnCallbacks[AssetPath];
-		if (PairData.Key.IsValid() && PairData.Value)
-		{
-			PairData.Value(TrainingOption, SpawnedActor, ID);
-		}
-		M_SpawnCallbacks.Remove(AssetPath);
+		return;
+	}
+
+	FAsyncSpawnCallbackEntry CallbackEntry = M_SpawnCallbacks[SpawnRequestId];
+	M_SpawnCallbacks.Remove(SpawnRequestId);
+
+	if (CallbackEntry.CallbackOwner.IsValid() && CallbackEntry.OnSpawnedCallback)
+	{
+		CallbackEntry.OnSpawnedCallback(TrainingOption, SpawnedActor, ID);
 	}
 }
 
@@ -564,7 +584,7 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 	}
 
 	// Check if TrainingOption exists in TrainingOptionMap
-	if (!M_TrainingOptionMap.Contains(TrainingOption))
+	if (not M_TrainingOptionMap.Contains(TrainingOption))
 	{
 		RTSFunctionLibrary::ReportError(
 			"Training option type not found in the map!\n"
@@ -576,11 +596,12 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 
 	const TSoftClassPtr<AActor> AssetClass = M_TrainingOptionMap[TrainingOption];
 
-	// Store the call back for this asset.
-	M_SpawnCallbacks.Add(AssetClass.ToSoftObjectPath(),
-	                     TPair<TWeakObjectPtr<UObject>,
-	                           TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)>>(
-		                     CallbackOwner, OnSpawnedCallback));
+	const int32 SpawnRequestId = M_NextSpawnOptionRequestId++;
+
+	FAsyncSpawnCallbackEntry CallbackEntry;
+	CallbackEntry.CallbackOwner = CallbackOwner;
+	CallbackEntry.OnSpawnedCallback = OnSpawnedCallback;
+	M_SpawnCallbacks.Add(SpawnRequestId, CallbackEntry);
 
 	// If the asset is already loaded, handle it immediately
 	if (AssetClass.IsValid())
@@ -588,7 +609,9 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 		OnAsyncSpawnOptionAtLocationComplete(
 			AssetClass.ToSoftObjectPath(),
 			TrainingOption,
-			Location, SpawnID);
+			Location,
+			SpawnID,
+			SpawnRequestId);
 	}
 	else
 	{
@@ -596,20 +619,26 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 		FSoftObjectPath AssetPath = AssetClass.ToSoftObjectPath();
 
 		FStreamableDelegate Delegate = FStreamableDelegate::CreateLambda(
-			[this, AssetPath, TrainingOption, Location, SpawnID]()
+			[this, AssetPath, TrainingOption, Location, SpawnID, SpawnRequestId]()
 			{
-				OnAsyncSpawnOptionAtLocationComplete(AssetPath, TrainingOption, Location, SpawnID);
+				OnAsyncSpawnOptionAtLocationComplete(
+					AssetPath,
+					TrainingOption,
+					Location,
+					SpawnID,
+					SpawnRequestId);
 			});
 
 		TSharedPtr<FStreamableHandle> LoadingHandle = M_StreamableManager.RequestAsyncLoad(
 			AssetPath,
 			Delegate);
 
-		if (!LoadingHandle.IsValid())
+		if (not LoadingHandle.IsValid())
 		{
 			RTSFunctionLibrary::ReportError(
 				"Failed to request async load for TrainingOption: " + TrainingOption.GetTrainingName() +
 				"\nAt function AsyncSpawnOptionAtLocation in ARTSAsyncSpawner.cpp");
+			InvokeSpawnCallback(SpawnRequestId, TrainingOption, nullptr, SpawnID);
 			return false;
 		}
 	}
