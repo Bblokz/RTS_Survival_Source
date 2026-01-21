@@ -158,7 +158,7 @@ public:
 		UNavigationSystemV1* ValidNavSys, const FVector& OriginalLocation,
         	                                    const bool bExtentInZ, bool& bOutWasSuccessful,
         	                                    const float ProjectionScale = 1.f
-		)
+		);
 
 	
 };
