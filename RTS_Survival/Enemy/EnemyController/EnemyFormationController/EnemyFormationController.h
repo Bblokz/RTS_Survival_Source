@@ -84,6 +84,52 @@ private:
 	 */
 	void CheckFormations();
 
+	void UpdateFormationUnitMovementProgress(
+		FFormationData& Formation,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection,
+		UNavigationSystemV1* NavSys);
+
+	void UpdateFormationUnitStuckState(
+		FFormationUnitData& FormationUnit,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection,
+		UNavigationSystemV1* NavSys);
+
+	FVector GetFormationUnitRawWaypointLocation(
+		const FFormationUnitData& FormationUnit,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection) const;
+
+	FVector GetFormationUnitProjectedWaypointLocation(
+		const FFormationUnitData& FormationUnit,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection) const;
+
+	float GetSquaredDistanceToWaypoint(
+		const FFormationUnitData& FormationUnit,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection) const;
+
+	bool GetHasUnitMovedEnough(
+		const float PreviousSquaredDistance,
+		const float CurrentSquaredDistance) const;
+
+	bool TryTeleportStuckFormationUnit(
+		FFormationUnitData& FormationUnit,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection,
+		UNavigationSystemV1* NavSys) const;
+
+	FVector GetTeleportCandidateLocation(
+		const FVector& UnitLocation,
+		const FVector& WaypointLocation,
+		const float TeleportAngleDegrees) const;
+
+	void DebugFormationUnitStillMoving(
+		const FFormationUnitData& FormationUnit,
+		const float SquaredDistanceToWaypoint) const;
+
 	void HandleFormationIdleUnits(
 		FFormationData& Formation,
 		const FVector& WaypointLocation,
