@@ -19,11 +19,14 @@ bool FFormationData::CheckIfFormationReachedCurrentWayPoint(const TWeakInterface
 		bool bFoundReachedUnit = false;
 		for (auto& EachUnit : FormationUnits)
 		{
-			if (EachUnit.Unit == UnitThatReached)
-			{
-				bFoundReachedUnit = true;
-				EachUnit.bHasReachedNextDestination = true;
-			}
+				if (EachUnit.Unit == UnitThatReached)
+				{
+					bFoundReachedUnit = true;
+					EachUnit.bHasReachedNextDestination = true;
+					EachUnit.StuckCounts = 0;
+					EachUnit.M_LastKnownLocation = FVector::ZeroVector;
+					EachUnit.bM_HasLastKnownLocation = false;
+				}
 			if (not EachUnit.bHasReachedNextDestination)
 			{
 				bAllUnitsReached = false;
@@ -57,7 +60,7 @@ void FFormationData::EnsureAllFormationUnitsAreValid(UEnemyFormationController* 
 	TArray<FFormationUnitData> ValidFormationUnits;
 	for (auto EachUnit : FormationUnits)
 	{
-		if (EachUnit.Unit.IsValid())
+		if (EachUnit.IsValidFormationUnit())
 		{
 			ValidFormationUnits.Add(EachUnit);
 			continue;

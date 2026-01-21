@@ -13,6 +13,15 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace EnemyFormationConstants
+{
+	const int32 HowOftenTickStuckUnitTillTeleport = 2;
+	const float SquarredDistanceDeltaConsiderStuck = 300.f;
+	const float TeleportXYRange = 200.f;
+	const float TeleportDegreesRange = 20.f;
+	const float FindTeleportLocationProjectionExtent = 3.f;
+	const int32 TeleportProjectionAttempts = 2;
+}
 
 UEnemyFormationController::UEnemyFormationController()
 {
@@ -116,9 +125,12 @@ void UEnemyFormationController::MoveAttackMoveFormationToLocation(
 
 void UEnemyFormationController::DebugAllActiveFormations() const
 {
-	for (auto FormationTuple : M_ActiveFormations)
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
-		DebugDrawFormation(FormationTuple.Value);
+		for (auto FormationTuple : M_ActiveFormations)
+		{
+			DebugDrawFormation(FormationTuple.Value);
+		}
 	}
 }
 
@@ -162,11 +174,12 @@ void UEnemyFormationController::CheckFormations()
 	}
 
 	// Then  idle→teleport→reorder logic on the survivors:
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
 	for (auto& Pair : M_ActiveFormations)
 	{
 		FFormationData& Formation = Pair.Value;
 
-		if (!Formation.FormationWaypoints.IsValidIndex(Formation.CurrentWaypointIndex))
+		if (not Formation.FormationWaypoints.IsValidIndex(Formation.CurrentWaypointIndex))
 		{
 			RTSFunctionLibrary::ReportError(
 				TEXT("On formation check formation has no valid waypoint index but it is still active!"));
@@ -176,6 +189,8 @@ void UEnemyFormationController::CheckFormations()
 		const FVector& WayLoc = Formation.FormationWaypoints[Formation.CurrentWaypointIndex];
 		const FRotator& WayDir = Formation.FormationWaypointDirections[Formation.CurrentWaypointIndex];
 
+		UpdateFormationUnitMovementProgress(Formation, WayLoc, WayDir, NavSys);
+
 		if (Formation.bIsAttackMoveFormation)
 		{
 			HandleAttackMoveFormation(Formation, WayLoc, WayDir);
@@ -183,6 +198,211 @@ void UEnemyFormationController::CheckFormations()
 		}
 
 		HandleFormationIdleUnits(Formation, WayLoc, WayDir);
+	}
+}
+
+void UEnemyFormationController::UpdateFormationUnitMovementProgress(
+	FFormationData& Formation,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	UNavigationSystemV1* NavSys)
+{
+	for (FFormationUnitData& UnitData : Formation.FormationUnits)
+	{
+		if (not UnitData.IsValidFormationUnit())
+		{
+			continue;
+		}
+
+		if (UnitData.bHasReachedNextDestination)
+		{
+			continue;
+		}
+
+		UpdateFormationUnitStuckState(UnitData, WaypointLocation, WaypointDirection, NavSys);
+	}
+}
+
+void UEnemyFormationController::UpdateFormationUnitStuckState(
+	FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	UNavigationSystemV1* NavSys)
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return;
+	}
+
+	const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+	if (not FormationUnit.bM_HasLastKnownLocation)
+	{
+		FormationUnit.M_LastKnownLocation = UnitLocation;
+		FormationUnit.bM_HasLastKnownLocation = true;
+		return;
+	}
+
+	const float DistanceMovedSquared = FVector::DistSquared(UnitLocation, FormationUnit.M_LastKnownLocation);
+	FormationUnit.M_LastKnownLocation = UnitLocation;
+
+	if (GetIsFormationUnitInCombat(FormationUnit))
+	{
+		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
+		return;
+	}
+
+	if (GetHasUnitMovedEnough(DistanceMovedSquared))
+	{
+		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
+		return;
+	}
+
+	FormationUnit.StuckCounts++;
+	if (FormationUnit.StuckCounts < EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport)
+	{
+		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
+		return;
+	}
+
+	if (TryTeleportStuckFormationUnit(FormationUnit, WaypointLocation, WaypointDirection, NavSys))
+	{
+		FormationUnit.StuckCounts = 0;
+	}
+
+	DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
+}
+
+FVector UEnemyFormationController::GetFormationUnitRawWaypointLocation(
+	const FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection) const
+{
+	return WaypointLocation + WaypointDirection.RotateVector(FormationUnit.Offset);
+}
+
+bool UEnemyFormationController::GetHasUnitMovedEnough(
+	const float DistanceMovedSquared) const
+{
+	return DistanceMovedSquared >= EnemyFormationConstants::SquarredDistanceDeltaConsiderStuck;
+}
+
+bool UEnemyFormationController::TryTeleportStuckFormationUnit(
+	FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	UNavigationSystemV1* NavSys) const
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return false;
+	}
+
+	if (not NavSys)
+	{
+		return false;
+	}
+
+	AActor* UnitActor = FormationUnit.Unit->GetOwnerActor();
+	if (not IsValid(UnitActor))
+	{
+		return false;
+	}
+
+	const FVector UnitLocation = UnitActor->GetActorLocation();
+	const FVector RawWaypointLocation = GetFormationUnitRawWaypointLocation(
+		FormationUnit,
+		WaypointLocation,
+		WaypointDirection);
+
+	for (int32 AttemptIndex = 0; AttemptIndex < EnemyFormationConstants::TeleportProjectionAttempts; ++AttemptIndex)
+	{
+		const float TeleportAngleDegrees = FMath::FRandRange(
+			-EnemyFormationConstants::TeleportDegreesRange,
+			EnemyFormationConstants::TeleportDegreesRange);
+		const FVector RawTeleportLocation = GetTeleportCandidateLocation(
+			UnitLocation,
+			RawWaypointLocation,
+			TeleportAngleDegrees);
+
+		bool bProjectionSuccess = false;
+		const FVector ProjectedTeleportLocation = RTSFunctionLibrary::GetLocationProjected_WithNavSystem(
+			NavSys,
+			RawTeleportLocation,
+			true,
+			bProjectionSuccess,
+			EnemyFormationConstants::FindTeleportLocationProjectionExtent);
+
+		if (not bProjectionSuccess)
+		{
+			continue;
+		}
+
+		UnitActor->SetActorLocation(ProjectedTeleportLocation, false, nullptr, ETeleportType::ResetPhysics);
+		FormationUnit.M_LastKnownLocation = ProjectedTeleportLocation;
+		FormationUnit.bM_HasLastKnownLocation = true;
+		return true;
+	}
+
+	return false;
+}
+
+FVector UEnemyFormationController::GetTeleportCandidateLocation(
+	const FVector& UnitLocation,
+	const FVector& WaypointLocation,
+	const float TeleportAngleDegrees) const
+{
+	FVector DirectionToWaypoint = WaypointLocation - UnitLocation;
+	DirectionToWaypoint.Z = 0.f;
+	if (DirectionToWaypoint.IsNearlyZero())
+	{
+		DirectionToWaypoint = FVector::ForwardVector;
+	}
+	const FVector NormalizedDirection = DirectionToWaypoint.GetSafeNormal();
+	const FVector RotatedDirection = FRotator(0.f, TeleportAngleDegrees, 0.f).RotateVector(NormalizedDirection);
+	return UnitLocation + RotatedDirection * EnemyFormationConstants::TeleportXYRange;
+}
+
+void UEnemyFormationController::DebugFormationUnitStillMoving(
+	const FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	const float DistanceMovedSquared) const
+{
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		if (not FormationUnit.IsValidFormationUnit())
+		{
+			return;
+		}
+
+		if (FormationUnit.Unit->GetActiveCommandID() == EAbilityID::IdIdle)
+		{
+			return;
+		}
+
+		using DeveloperSettings::GamePlay::Navigation::EnemyFormationPositionProjectionExtent;
+
+		const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+		const FVector RawWaypointLocation = GetFormationUnitRawWaypointLocation(
+			FormationUnit,
+			WaypointLocation,
+			WaypointDirection);
+		const FVector ProjectedWaypointLocation = ProjectLocationOnNavMesh(
+			RawWaypointLocation,
+			EnemyFormationPositionProjectionExtent,
+			false);
+		const float DistanceToWaypointSquared = FVector::DistSquared(UnitLocation, ProjectedWaypointLocation);
+
+		const float DebugTextHeightOffset = 200.f;
+		const float DebugTextDurationSeconds = 2.f;
+		const FVector DebugTextLocation = UnitLocation + FVector(0.f, 0.f, DebugTextHeightOffset);
+		const FString DebugMessage = FString::Printf(
+			TEXT("still moving\n%d / %d\n dist: %.2f\n prev dist: %.2f"),
+			FormationUnit.StuckCounts,
+			EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport,
+			DistanceToWaypointSquared,
+			DistanceMovedSquared);
+		DebugStringAtLocation(DebugMessage, DebugTextLocation, FColor::Cyan, DebugTextDurationSeconds);
 	}
 }
 
@@ -446,13 +666,16 @@ bool UEnemyFormationController::TryGetAttackMoveHelpLocation(
 			bProjectionSuccess,
 			AttackMoveSettings.ProjectionScale);
 
-		DebugAttackMoveHelpProjection(
-			CandidateLocation,
-			Projected,
-			bProjectionSuccess,
-			DebugSphereRadius,
-			DebugSphereSegments,
-			DebugSphereDurationSeconds);
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+		{
+			DebugAttackMoveHelpProjection(
+				CandidateLocation,
+				Projected,
+				bProjectionSuccess,
+				DebugSphereRadius,
+				DebugSphereSegments,
+				DebugSphereDurationSeconds);
+		}
 
 		if (bProjectionSuccess)
 		{
@@ -626,7 +849,10 @@ FVector UEnemyFormationController::ProjectLocationOnNavMesh(const FVector& Locat
 		// Successfully projected onto navmesh
 		return ProjectedLocation.Location;
 	}
-	Debug(TEXT("NavMesh projection failed in EnemyController."));
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		Debug(TEXT("NavMesh projection failed in EnemyController."));
+	}
 	return Location;
 }
 
@@ -656,7 +882,10 @@ bool UEnemyFormationController::EnsureFormationRequestIsValid(
 	}
 	if (OutMaxFormationWidth <= 0)
 	{
-		Debug("Formation request made with invalid width; fallback to 2");
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+		{
+			Debug("Formation request made with invalid width; fallback to 2");
+		}
 		OutMaxFormationWidth = 2;
 	}
 	return true;
@@ -674,6 +903,8 @@ void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& Formation
 	FVector LocationToProject = WaypointLocation + WaypointDirection.RotateVector(FormationUnit.Offset);
 
 	LocationToProject = ProjectLocationOnNavMesh(LocationToProject, EnemyFormationPositionProjectionExtent, false);
+	FormationUnit.M_LastKnownLocation = FormationUnit.Unit->GetOwnerLocation();
+	FormationUnit.bM_HasLastKnownLocation = true;
 	// Move the unit to the projected location.
 	const ECommandQueueError Error = FormationUnit.Unit->MoveToLocation(LocationToProject, true, WaypointDirection);
 	if (Error != ECommandQueueError::NoError)
@@ -803,7 +1034,10 @@ bool UEnemyFormationController::GetUnitInFormation(
 void UEnemyFormationController::OnCompleteFormationReached(FFormationData* Formation)
 {
 	Formation->CurrentWaypointIndex++;
-	DebugFormationReached(Formation);
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		DebugFormationReached(Formation);
+	}
 	if (Formation->CurrentWaypointIndex >= Formation->FormationWaypoints.Num())
 	{
 		OnFormationReachedFinalDestination(Formation);
@@ -827,7 +1061,10 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 	{
 		GetWorld()->GetTimerManager().ClearTimer(M_FormationCheckTimerHandle);
 	}
-	Debug("Formation reached FINAL destination!");
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		Debug("Formation reached FINAL destination!");
+	}
 	int32 InvalidUnitsInFormation = 0;
 	TWeakObjectPtr<UEnemyFormationController> WeakThis(this);
 	for (auto EachUnit : Formation->FormationUnits)
@@ -892,7 +1129,7 @@ void UEnemyFormationController::InitFormationOffsets(
 void UEnemyFormationController::StartFormationMovement(FFormationData& Formation)
 {
 	FFormationData* AliveFormation = M_ActiveFormations.Find(Formation.FormationID);
-	if (!AliveFormation)
+	if (not AliveFormation)
 	{
 		// we’ve already torn this formation down
 		return;
@@ -908,7 +1145,10 @@ void UEnemyFormationController::StartFormationMovement(FFormationData& Formation
 	// now use *Live* safely, without risk of reinserting
 	const FVector& WayPoint = AliveFormation->FormationWaypoints[0];
 	const FRotator& Direction = AliveFormation->FormationWaypointDirections[0];
-	DebugDrawFormation(*AliveFormation);
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		DebugDrawFormation(*AliveFormation);
+	}
 
 	for (FFormationUnitData& UnitData : AliveFormation->FormationUnits)
 	{
@@ -921,38 +1161,46 @@ void UEnemyFormationController::StartFormationMovement(FFormationData& Formation
 
 void UEnemyFormationController::DebugDrawFormation(const FFormationData& Formation) const
 {
-	UWorld* World = GetWorld();
-	if (!World) return;
-
-	const int32 WPIndex = Formation.CurrentWaypointIndex;
-	if (!Formation.FormationWaypoints.IsValidIndex(WPIndex) ||
-		!Formation.FormationWaypointDirections.IsValidIndex(WPIndex))
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
-		return;
-	}
+		UWorld* World = GetWorld();
+		if (not World)
+		{
+			return;
+		}
 
-	// 1) Red sphere at the raw waypoint
-	const FVector WaypointLocation = Formation.FormationWaypoints[WPIndex];
+		const int32 WPIndex = Formation.CurrentWaypointIndex;
+		if (not Formation.FormationWaypoints.IsValidIndex(WPIndex) ||
+			not Formation.FormationWaypointDirections.IsValidIndex(WPIndex))
+		{
+			return;
+		}
 
-	const FRotator WaypointDirection = Formation.FormationWaypointDirections[WPIndex];
+		// 1) Red sphere at the raw waypoint
+		const FVector WaypointLocation = Formation.FormationWaypoints[WPIndex];
 
-	for (const FFormationUnitData& UnitData : Formation.FormationUnits)
-	{
-		if (!UnitData.IsValidFormationUnit())
-			continue;
+		const FRotator WaypointDirection = Formation.FormationWaypointDirections[WPIndex];
 
-		// 2) Green sphere at the unprojected offset‐location
-		const FVector OffsetLocation =
-			WaypointLocation + WaypointDirection.RotateVector(UnitData.Offset);
+		for (const FFormationUnitData& UnitData : Formation.FormationUnits)
+		{
+			if (not UnitData.IsValidFormationUnit())
+			{
+				continue;
+			}
 
-		// 3) Purple sphere at the navmesh‐projected point
-		const FVector ProjectedLocation =
-			ProjectLocationOnNavMesh(OffsetLocation, /*Radius=*/0.f, /*bZ=*/false);
+			// 2) Green sphere at the unprojected offset‐location
+			const FVector OffsetLocation =
+				WaypointLocation + WaypointDirection.RotateVector(UnitData.Offset);
 
-		// 4) Draw the unit’s name 100 units above that point
-		const FString UnitName = UnitData.Unit->GetOwnerName();
-		const FVector TextLocation = ProjectedLocation + FVector(0.f, 0.f, 100.f);
-		DrawDebugString(World, TextLocation, UnitName, nullptr, FColor::White, 10.f, false);
+			// 3) Purple sphere at the navmesh‐projected point
+			const FVector ProjectedLocation =
+				ProjectLocationOnNavMesh(OffsetLocation, /*Radius=*/0.f, /*bZ=*/false);
+
+			// 4) Draw the unit’s name 100 units above that point
+			const FString UnitName = UnitData.Unit->GetOwnerName();
+			const FVector TextLocation = ProjectedLocation + FVector(0.f, 0.f, 100.f);
+			DrawDebugString(World, TextLocation, UnitName, nullptr, FColor::White, 10.f, false);
+		}
 	}
 }
 
@@ -968,12 +1216,18 @@ bool UEnemyFormationController::GetIsFormationUnitIdle(const FFormationUnitData&
 		const FVector UnitLocation = Unit.Unit->GetOwnerLocation() + FVector(0.f, 0.f, 200.f);
 		if (Unit.bHasReachedNextDestination)
 		{
-			DebugStringAtLocation("Unit idle but actually waiting for formation: " + UnitName, UnitLocation,
-			                      FColor::Orange, 8.f);
+			if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+			{
+				DebugStringAtLocation("Unit idle but actually waiting for formation: " + UnitName, UnitLocation,
+				                      FColor::Orange, 8.f);
+			}
 			return false;
 		}
-		DebugStringAtLocation("Formation Unit Idle" + UnitName, UnitLocation,
-		                      FColor::Red, 8.f);
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+		{
+			DebugStringAtLocation("Formation Unit Idle" + UnitName, UnitLocation,
+			                      FColor::Red, 8.f);
+		}
 		return true;
 	}
 	return false;
@@ -984,7 +1238,10 @@ void UEnemyFormationController::OnFormationUnitIdleReorderMove(FFormationUnitDat
                                                                const FRotator& WaypointDirection,
                                                                const int32 FormationID)
 {
-	Debug("Formation unit idle -> reorder movement to waypoint.");
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		Debug("Formation unit idle -> reorder movement to waypoint.");
+	}
 	TeleportFormationUnitInWayPointDirection(FormationUnit, WaypointLocation, WaypointDirection);
 
 	if (FormationUnit.MovementCompleteHandle.IsValid())
@@ -1031,7 +1288,7 @@ void UEnemyFormationController::CleanupInvalidFormations()
 		// Collect & remove all dead units in one go
 		for (int32 i = Formation.FormationUnits.Num() - 1; i >= 0; --i)
 		{
-			if (!Formation.FormationUnits[i].IsValidFormationUnit())
+			if (not Formation.FormationUnits[i].IsValidFormationUnit())
 			{
 				Formation.FormationUnits.RemoveAtSwap(i);
 				++RemovedCount;
@@ -1041,7 +1298,10 @@ void UEnemyFormationController::CleanupInvalidFormations()
 		// Single refund equal to the number of removed units
 		if (RemovedCount > 0)
 		{
-			Debug("Removing invalid units: gaining supplies: " + FString::FromInt(RemovedCount));
+			if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+			{
+				Debug("Removing invalid units: gaining supplies: " + FString::FromInt(RemovedCount));
+			}
 			RefundUnitWaveSupply(RemovedCount);
 		}
 
@@ -1060,7 +1320,10 @@ void UEnemyFormationController::CleanupInvalidFormations()
 
 void UEnemyFormationController::OnFormationUnitInvalidAddBackSupply(const int32 AmountFormationUnitsInvalid)
 {
-	Debug("Formation Units got invalid providing back supply: " + FString::FromInt(AmountFormationUnitsInvalid));
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		Debug("Formation Units got invalid providing back supply: " + FString::FromInt(AmountFormationUnitsInvalid));
+	}
 	RefundUnitWaveSupply(AmountFormationUnitsInvalid);
 }
 
@@ -1070,7 +1333,10 @@ void UEnemyFormationController::OnFormationUnitDiedPostReachFinal(AActor* Destro
 	{
 		return;
 	}
-	Debug("Formation unit got invalid after reaching final destination, provide back supply.");
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		Debug("Formation unit got invalid after reaching final destination, provide back supply.");
+	}
 	// Provide back the wave supply after the unit finished its formation movement and died later.
 	RefundUnitWaveSupply(1);
 }
