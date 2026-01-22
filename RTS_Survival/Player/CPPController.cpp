@@ -400,6 +400,7 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 	GameUnitManager->SetAllUnitOptimizationEnabled(bOptimizeAllUnitsInGame);
 	M_MainGameUI->SetMainMenuVisiblity(bMakeGameUIVisible);
 	M_PlayerCameraController->SetCameraMovementDisabled(bLockCamera);
+	SetSuppressRegularVoiceLines(bStartCinematic);
 	return true;
 }
 

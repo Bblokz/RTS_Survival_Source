@@ -20,8 +20,12 @@ struct FBehaviourCompAnimatedTextState
 	int32 RemainingRepeats = 0;
 };
 
+USTRUCT()
 struct FPendingBehaviourAdd
 {
+	GENERATED_BODY()
+	
+	UPROPERTY()
 	TSubclassOf<UBehaviour> BehaviourClass = nullptr;
 	bool bHasCustomLifetime = false;
 	float CustomLifetimeSeconds = 0.f;
@@ -154,7 +158,8 @@ private:
 	 * @param BehaviourClass Behaviour class to add.
 	 * @param CustomLifetimeSeconds Optional custom lifetime duration.
 	 */
-	void QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass, const TOptional<float>& CustomLifetimeSeconds);
+	void QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass,
+	                       const TOptional<float>& CustomLifetimeSeconds);
 	/**
 	 * @brief Queue a behaviour class for removal after ticking finishes.
 	 * @param BehaviourClass Behaviour class to remove.
@@ -178,7 +183,8 @@ private:
 	 * @param BehaviourClass Class used to create the behaviour instance.
 	 * @param CustomLifetimeSeconds Optional custom lifetime duration.
 	 */
-	void AddBehaviourInternal(const TSubclassOf<UBehaviour>& BehaviourClass, const TOptional<float>& CustomLifetimeSeconds);
+	void AddBehaviourInternal(const TSubclassOf<UBehaviour>& BehaviourClass,
+	                          const TOptional<float>& CustomLifetimeSeconds);
 	/**
 	 * @brief Initialize and register a new behaviour instance.
 	 * @param NewBehaviour Behaviour to initialize.

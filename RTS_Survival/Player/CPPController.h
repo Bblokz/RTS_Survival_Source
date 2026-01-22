@@ -266,7 +266,9 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;
 
-	/** @return whether the menu was successfully hidden/Shown and the camera movement disabled/enabled successfully.*/
+	/** @return whether the menu was successfully hidden/Shown and the camera movement disabled/enabled successfully.
+	 * @note Suppresses all voicelines except the play custom announcer voice lines.
+	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	bool OnCinematicTakeOver(const bool bStartCinematic);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -293,6 +295,7 @@ public:
 	void PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false,
 	                            bool bInterruptRegularVoiceLines = false) const;
 
+	// Suppresses all voice lines except the PlayCustomAnnouncer voicelines.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Audio")
 	void SetSuppressRegularVoiceLines(const bool bSuppress);
 
