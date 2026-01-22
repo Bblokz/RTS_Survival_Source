@@ -5,7 +5,6 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/GameUI/StartGameWidget/StartGameWidget.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
 
 namespace PlayerStartGameControlDefaults
 {
@@ -97,7 +96,7 @@ bool UPlayerStartGameControl::GetIsValidPlayerController() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		"M_PlayerController",
 		"GetIsValidPlayerController",
@@ -113,7 +112,7 @@ bool UPlayerStartGameControl::GetIsValidStartGameWidgetClass() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		"M_StartGameWidgetClass",
 		"GetIsValidStartGameWidgetClass",
@@ -129,7 +128,7 @@ bool UPlayerStartGameControl::GetIsValidStartGameWidget() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		"M_StartGameWidget",
 		"GetIsValidStartGameWidget",

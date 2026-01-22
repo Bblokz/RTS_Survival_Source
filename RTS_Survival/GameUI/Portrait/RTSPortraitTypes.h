@@ -12,4 +12,10 @@ enum class ERTSPortraitTypes :uint8
 	SovietHazmat,
 	SovietCortexCommander,
 	SovietCyborgEmissive,
+	GermanScavengers,
+	GermanResistanceInfantry,
+	GermanSniper,
+	GermanVultures,
+	GermanMechanizedPioneers,
+	GermanCommando,
 };

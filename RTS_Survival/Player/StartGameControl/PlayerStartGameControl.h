@@ -39,7 +39,7 @@ private:
 	bool GetIsValidStartGameWidgetClass() const;
 	bool GetIsValidStartGameWidget() const;
 
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
 	TSubclassOf<UStartGameWidget> M_StartGameWidgetClass;
 
 	UPROPERTY()

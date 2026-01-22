@@ -14,6 +14,13 @@ Whenever an `IsValid(Obj)` is used **where all logic lives inside the `if` body*
 
 ---
 
+## 0.1) Think ahead with booleans
+in case it seems very likely that later more conditions will be added where now a boolean will be used
+then make it an enum class uint8 with descriptive names instead of a boolean. 
+important: do not do this lightly; only if it seems very likely that more conditions will be added later,
+so prevent spamming enums everywhere unnecessarily.
+Do not do this for a refactor; only when explicitly asked to do so.
+
 ## 0.5) Mandatory Validator Functions for Member Pointers
 
 ### Context
@@ -342,11 +349,12 @@ struct FPauseStateTimedProgressBar
 
 	// Accumulated paused duration
 	float M_TotalPausedDuration;
-
+~~~~
 	bool bM_WasHiddenByPause = false;
-};
+}~~~~;
 ```
-
+## 21) RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object vs RTSFunctionLibrary::ReportErrorVariableNotInitialised
+make sure to use the _Object version if the this pointer is not AActor derived.
 ### Rules
 
 - If the struct is only used by one class:
