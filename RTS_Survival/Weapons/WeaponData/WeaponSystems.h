@@ -165,6 +165,8 @@ enum class
 	// Russian laser weapons
 	// infantry held
 	SPEKTR_V UMETA(DisplayName = "Spektr V 30MM (Infantry Laser Weapon)"),
+	Luch_85L UMETA(DisplayName = "Luch 85L (SU-85 Laser)"),
+	Zarya_100L UMETA(DisplayName = "Zarya 100L (T-44 Laser)"),
 
 	// Russian Railgun weapons
 	RailGunY UMETA(DisplayName = "Double sided railgun 30MM"),
@@ -172,9 +174,12 @@ enum class
 
 	// Russian Medium calibre
 	ZIS_S_53_85MM UMETA(DisplayName = "ZIS 85mm (T34/85)"),
+	D_5S_85MM_SU85 UMETA(DisplayName = "D-5S 85MM (SU-85)"),
 	ZIS_3_76MM UMETA(DisplayName = "ZIS-3 76MM (ZIS-3)"),
+	ZIS_3_76MM_SU76 UMETA(DisplayName = "ZIS-3 76MM (SU-76)"),
 	DT_5_85MM UMETA(DisplayName = "DT-5 85mm (IS-1)"),
 	L_11_76MM UMETA(DisplayName = "L_11 76mm (KV-1 L-11)"),
+	L_11_76MM_Arc UMETA(DisplayName = "L-11 76MM Arc (KV-1 Arc)"),
 	F_34_76MM UMETA(DisplayName = "F-34 76MM (T-34)"),
 	F_34_T34E UMETA(DisplayName = "F-34 76MM (T-34E)"),
 	L_10_76MM UMETA(DisplayName = "L_10 76MM (T-28)"),
@@ -186,7 +191,9 @@ enum class
 	KT_28_76MM_T24 UMETA(DisplayName = "KT-28 76MM T-24-4"),
 	// Russian Heavy calibre
 	LB_1_100MM UMETA(DisplayName = "LB-1 100mm (T34/100)"),
+	D_10S_100MM_SU100 UMETA(DisplayName = "D-10S 100MM (SU-100)"),
 	D_25T_122MM UMETA(DisplayName = "DT-25T 122MM (IS-2)"),
+	M_30S_122MM_SU122 UMETA(DisplayName = "M-30S 122MM (SU-122)"),
 	ZIS_6_107MM UMETA(DisplayName = "ZIS-6 107MM (KV-5)"),
 	QF_37In_94MM UMETA(DisplayName = "QF 37in 94MM"),
 	D_25T_122MM_IS3 UMETA(Displayname = "DT-25T 122MM (IS-3)"),
@@ -206,8 +213,11 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Flak37_88MM: return "Flak 37";
 	case EWeaponName::Flak38_20MM: return "Flak 38";
 	case EWeaponName::SPEKTR_V: return "Spektr-V";
+	case EWeaponName::Luch_85L: return "Luch 85L";
+	case EWeaponName::Zarya_100L: return "Zarya 100L";
 	case EWeaponName::KwK30_20MM: return "KwK 30";
 	case EWeaponName::L_11_76MM: return "L/11";
+	case EWeaponName::L_11_76MM_Arc: return "L-11 Arc";
 	case EWeaponName::shVAK_20MM: return "shVAK";
 	case EWeaponName::NS_37MM: return "NS-37";
 	case EWeaponName::T26_45MM: return "20-K";
@@ -226,6 +236,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::KwK43_88MM: return "KwK 43";
 	case EWeaponName::KwK43_88MM_PantherII: return "KwK 43";
 	case EWeaponName::LB_1_100MM: return "LB-1";
+	case EWeaponName::D_10S_100MM_SU100: return "D-10S";
 	case EWeaponName::PTRS_X_Tishina: return "PTRS X Tishina";
 	case EWeaponName::KwK38_T_37MM: return "KwK 38(t)";
 	case EWeaponName::KwK40_L48_75MM: return "KwK L/48";
@@ -235,7 +246,9 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Ger_TankMG_7_6MM: return "MG 34";
 	case EWeaponName::Ba12_23MM: return "Ba12 23MM";
 	case EWeaponName::ZIS_S_53_85MM: return "ZiS-S-53";
+	case EWeaponName::D_5S_85MM_SU85: return "D-5S";
 	case EWeaponName::ZIS_3_76MM: return "ZiS-3";
+	case EWeaponName::ZIS_3_76MM_SU76: return "ZiS-3 SU-76";
 	case EWeaponName::DT_5_85MM: return "DT-5";
 	case EWeaponName::ZIS_5_76MM: return "ZiS-5";
 	case EWeaponName::F_34_76MM: return "F-34";
@@ -244,6 +257,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::L_10_76MM: return "L-10";
 	case EWeaponName::D_25T_122MM: return "D-25T";
 	case EWeaponName::D_25T_122MM_IS3: return "D-25T";
+	case EWeaponName::M_30S_122MM_SU122: return "M-30S";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
 		case EWeaponName::RW61_Mortar_380MM: return "RW61 Mortar";
@@ -510,6 +524,10 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "KwK40_L48_75MM";
 	case EWeaponName::Ger_TankMG_7_6MM:
 		return "Ger_TankMG_7_6MM";
+	case EWeaponName::Luch_85L:
+		return "Luch_85L";
+	case EWeaponName::Zarya_100L:
+		return "Zarya_100L";
 	case EWeaponName::DShk_12_7MM:
 		return "DShk_12_7MM";
 	case EWeaponName::KwK42_75MM:
@@ -532,12 +550,18 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "T_70_20k_45MM";
 	case EWeaponName::ZIS_S_53_85MM:
 		return "ZIS_S_53_85MM";
+	case EWeaponName::D_5S_85MM_SU85:
+		return "D_5S_85MM_SU85";
 	case EWeaponName::ZIS_3_76MM:
 		return "ZIS_3_76MM";
+	case EWeaponName::ZIS_3_76MM_SU76:
+		return "ZIS_3_76MM_SU76";
 	case EWeaponName::DT_5_85MM:
 		return "DT_5_85MM";
 	case EWeaponName::L_11_76MM:
 		return "L_11_76MM";
+	case EWeaponName::L_11_76MM_Arc:
+		return "L_11_76MM_Arc";
 	case EWeaponName::F_35_76MM:
 		return "F_35_76MM";
 	case EWeaponName::ZIS_5_76MM:
@@ -554,10 +578,14 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "KT_28_76MM_T24";
 	case EWeaponName::LB_1_100MM:
 		return "LB_1_100MM";
+	case EWeaponName::D_10S_100MM_SU100:
+		return "D_10S_100MM_SU100";
 	case EWeaponName::D_25T_122MM:
 		return "D_25T_122MM";
 	case EWeaponName::D_25T_122MM_IS3:
 		return "D_25T_122MM";
+	case EWeaponName::M_30S_122MM_SU122:
+		return "M_30S_122MM_SU122";
 	case EWeaponName::KwK44_L_36_5_75MM:
 		return "KwK44_L_36_5_75MM";
 	case EWeaponName::KwK44_128MM:
