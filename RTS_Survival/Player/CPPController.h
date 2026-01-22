@@ -293,6 +293,9 @@ public:
 	void PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false,
 	                            bool bInterruptRegularVoiceLines = false) const;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Audio")
+	void SetSuppressRegularVoiceLines(const bool bSuppress);
+
 
 	/**
 	 * @brief Play a 3D (spatial) voice‐line at a world location.

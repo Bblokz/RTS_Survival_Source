@@ -206,6 +206,8 @@ public:
 		USoundBase* CustomVoiceLineSound,
 		const bool bQueueIfNotPlayed);
 
+	void SetSuppressRegularVoiceLines(const bool bSuppress);
+
 
 	/**
 	 * @brief Play a 3D (spatial) voice‐line at a world location.
@@ -350,6 +352,8 @@ private:
 
 	/** What kind of line is currently playing (or last played) */
 	FCurrentVoiceLineState M_CurrentVoiceLineState;
+
+	bool bM_SuppressRegularVoiceLines = false;
 
 	/** Helper to figure out what unit‐type map to use */
 	static bool GetValidVoiceLineTypeForUnit(const AActor* PrimarySelectedUnit,
