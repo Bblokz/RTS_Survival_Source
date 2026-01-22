@@ -8,7 +8,7 @@
 #include "PlayerStartGameControl.generated.h"
 
 class ACPPController;
-class UStartGameWidget;
+class UW_StartGameWidget;
 
 /**
  * @brief Gatekeeper component used by the controller to pause the game until the player starts.
@@ -29,6 +29,10 @@ protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UW_StartGameWidget> M_StartGameWidgetClass;
+	
+
 private:
 	void BeginPlay_InitStartGameFlow();
 
@@ -39,11 +43,9 @@ private:
 	bool GetIsValidStartGameWidgetClass() const;
 	bool GetIsValidStartGameWidget() const;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
-	TSubclassOf<UStartGameWidget> M_StartGameWidgetClass;
 
 	UPROPERTY()
-	TObjectPtr<UStartGameWidget> M_StartGameWidget;
+	TObjectPtr<UW_StartGameWidget> M_StartGameWidget;
 
 	UPROPERTY()
 	TObjectPtr<ACPPController> M_PlayerController;

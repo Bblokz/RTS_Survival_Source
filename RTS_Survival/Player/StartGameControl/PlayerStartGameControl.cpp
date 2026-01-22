@@ -4,7 +4,7 @@
 
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
-#include "RTS_Survival/GameUI/StartGameWidget/StartGameWidget.h"
+#include "RTS_Survival/GameUI/StartGameWidget/W_StartGameWidget.h"
 
 namespace PlayerStartGameControlDefaults
 {
@@ -57,7 +57,7 @@ void UPlayerStartGameControl::BeginPlay_InitStartGameFlow()
 	PauseGameAndDisableCamera();
 	bM_HasPausedGame = true;
 
-	M_StartGameWidget = CreateWidget<UStartGameWidget>(M_PlayerController, M_StartGameWidgetClass);
+	M_StartGameWidget = CreateWidget<UW_StartGameWidget>(M_PlayerController, M_StartGameWidgetClass);
 	if (not GetIsValidStartGameWidget())
 	{
 		return;

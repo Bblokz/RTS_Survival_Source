@@ -358,6 +358,8 @@ public:
 
 	int32 GetConstructionAbilityCount();
 
+	virtual bool GetIsSquadUnit() { return false; }
+
 	virtual void SetRTSOverlapEvasionEnabled(const bool bEnabled);
 	virtual bool GetIsUnitInCombat()const;
 

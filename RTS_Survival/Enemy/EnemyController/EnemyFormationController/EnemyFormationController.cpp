@@ -331,7 +331,6 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 		ProjectionExtent *= 3.f;
 		TpSideDistance *= 1.33f * FormationUnit.StuckCounts;
 	}
-	FVector LastFailedTpLocation = FVector::ZeroVector;
 	for (int32 AttemptIndex = 0; AttemptIndex < EnemyFormationConstants::TeleportProjectionAttempts; ++AttemptIndex)
 	{
 		const float TeleportAngleDegrees = FMath::FRandRange(
@@ -379,8 +378,6 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 			{
 				DebugTeleportAttempt(FColor::Black, RawTeleportLocation);
 			}
-			// Only set if projection was valid.
-			LastFailedTpLocation = ProjectedTeleportLocation;
 			continue;
 		}
 		if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
@@ -391,32 +388,6 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 		FormationUnit.bM_HasLastKnownLocation = true;
 		return true;
 	}
-	// if (not LastFailedTpLocation.IsNearlyZero())
-	// {
-	// 	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
-	// 	{
-	// 		const FVector DebugLoc = LastFailedTpLocation + FVector(0.f, 0.f, 300.f);
-	// 		DebugStringAtLocation("Final failed teleport location; teleporting next tick", DebugLoc, FColor::Orange,
-	// 		                      10.f);
-	// 	}
-	// 	FTimerDelegate OneShotTpTimerDel;
-	// 	TWeakObjectPtr<AActor> WeakUnitActor(UnitActor);
-	// 	// fire at next tick due to physics issues on tp.
-	// 	OneShotTpTimerDel.BindLambda([WeakUnitActor, LastFailedTpLocation]()
-	// 	{
-	// 		if (not WeakUnitActor.IsValid())
-	// 		{
-	// 			return;
-	// 		}
-	// 		AActor* PinnedUnitActor = WeakUnitActor.Get();
-	// 		PinnedUnitActor->TeleportTo(LastFailedTpLocation, PinnedUnitActor->GetActorRotation(), false, true);
-	// 	});
-	// 	if (UWorld* World = GetWorld())
-	// 	{
-	// 		World->GetTimerManager().SetTimerForNextTick(OneShotTpTimerDel);
-	// 	}
-	// }
-
 	return false;
 }
 

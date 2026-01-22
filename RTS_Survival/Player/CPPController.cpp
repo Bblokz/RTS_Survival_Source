@@ -1236,6 +1236,7 @@ void ACPPController::BeginPlay()
 void ACPPController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
+	M_PlayerCameraController = FindComponentByClass<UPlayerCameraController>();
 
 	if (M_FormationController)
 	{
