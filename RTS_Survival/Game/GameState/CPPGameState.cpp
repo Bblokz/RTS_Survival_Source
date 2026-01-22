@@ -1832,6 +1832,31 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::shVAK_20MM, WeaponData);
 
+	
+	// Ba 12 23mm
+	WeaponData.WeaponName = EWeaponName::Ba12_23MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_AP;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
+	WeaponData.WeaponCalibre = 23;
+	WeaponData.TNTExplosiveGrams = 0;
+	WeaponData.BaseDamage = 23 * DamagePerMM + 4;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = BasicSmallArmsRange + 250;
+	WeaponData.ArmorPen = 45;
+	WeaponData.ArmorPenMaxRange = 38;
+	WeaponData.MagCapacity = 10;
+	WeaponData.ReloadSpeed = 4.5;
+	WeaponData.BaseCooldown = 0.22;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 65;
+	WeaponData.ShrapnelRange = 0;
+	WeaponData.ShrapnelDamage = 0;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ba12_23MM, WeaponData);
+
 	// NS-37 (37mm flak/aircraft)
 	WeaponData.WeaponName = EWeaponName::NS_37MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -2139,7 +2164,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.WeaponName = EWeaponName::KwK42_L_50MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE, EWeaponShellType::Shell_Radixite};
 	WeaponData.WeaponCalibre = 50;
 	WeaponData.TNTExplosiveGrams = 36;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
@@ -3288,6 +3313,45 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz251_PZIV, TankData);
+
+	
+	// ------------------------------- RUS Armored Cars -------------------------------
+
+	// BA-12 
+	TankData.MaxHealth = LightTankHealthBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 30;
+	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleMaxSpeedKmh = 35;
+	TankData.VehicleReverseSpeedKmh = 35;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost},
+		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Ba12, TankData);
+	
+	// BA-14 
+	TankData.MaxHealth = LightTankHealthBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 30;
+	TankData.TurretRotationSpeed = 30;
+	TankData.VehicleMaxSpeedKmh = 35;
+	TankData.VehicleReverseSpeedKmh = 35;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost},
+		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Ba14, TankData);
 }
 
 void ACPPGameState::InitAllGameLightTankData()

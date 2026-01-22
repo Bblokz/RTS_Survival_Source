@@ -1036,6 +1036,45 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 	// RUS TANKS
 	// ----------------------
 
+	// RUS ARMORED CARS
+
+	// Rus BA-12
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Ba12)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Ba12,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus BA-14
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Ba14)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Ba14,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+
 	// RUS LIGHT TANKS
 
 	// Rus BT-7

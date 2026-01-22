@@ -154,6 +154,7 @@ enum class
 
 	// Russian Small calibre
 	shVAK_20MM UMETA(DisplayName = "ShVAK 20MM"),
+	Ba12_23MM UMETA(DisplayName = "Ba-12 23MM"),
 	T26_45MM UMETA(DisplayName = "20-K 45MM (T-26)"),
 	PTRS_50MM UMETA(DisplayName = "PTRS 50MM AT RIFLE"),
 	BT_7_20K_45MM UMETA(DisplayName = "20-K 45MM BT-7"),
@@ -232,6 +233,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::KwKL_68_105MM: return "KwK L/68";
 	case EWeaponName::PTRS_50MM: return "PTRS 50MM";
 	case EWeaponName::Ger_TankMG_7_6MM: return "MG 34";
+	case EWeaponName::Ba12_23MM: return "Ba12 23MM";
 	case EWeaponName::ZIS_S_53_85MM: return "ZiS-S-53";
 	case EWeaponName::ZIS_3_76MM: return "ZiS-3";
 	case EWeaponName::DT_5_85MM: return "DT-5";

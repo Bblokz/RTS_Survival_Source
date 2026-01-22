@@ -40,8 +40,6 @@ enum class ENomadicSubtype : uint8
 	Nomadic_GerMedTankFactory UMETA(DisplayName = "Ger Medium Tank Factory"),
 	Nomadic_GerCommunicationCenter UMETA(DisplayName = "Ger Communication Center"),
 	Nomadic_GerAirbase UMETA(DisplayName = "Ger Airbase"),
-	
-	
 };
 
 
@@ -103,6 +101,11 @@ enum class ETankSubtype : uint8
 	Tank_JagdTiger UMETA(DisplayName = "Ger Heavy JagdTiger"),
 	Tank_Maus UMETA(DisplayName = "Ger Heavy Maus"),
 	Tank_E100 UMETA(DisplayName = "Ger Heavy E100"),
+	// Russian armored cars.
+	// 45 mm armored car.
+	Tank_Ba12 UMETA(DisplayName = "Rus ArmCar BA-12"),
+	// has 23 mm autocannon.
+	Tank_Ba14 UMETA(DisplayName = "Rus ArmCar BA-14"),
 	// Russian light tanks.
 	Tank_BT7 UMETA(DisplayName = "Rus Light BT-7"),
 	Tank_T26 UMETA(DisplayName = "Rus Light T-26"),
@@ -129,106 +132,108 @@ enum class ETankSubtype : uint8
 
 static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 {
-    switch (TankSubtype)
-    {
-        case ETankSubtype::Tank_PantherD:
-        case ETankSubtype::Tank_PantherG:
-        case ETankSubtype::Tank_PanzerV_III:
-        case ETankSubtype::Tank_PanzerV_IV:
-        case ETankSubtype::Tank_PantherII:
-        case ETankSubtype::Tank_KeugelT38:
-        case ETankSubtype::Tank_JagdPanther:
-        case ETankSubtype::Tank_SturmTiger:
-        case ETankSubtype::Tank_Tiger:
-        case ETankSubtype::Tank_TigerH1:
-        case ETankSubtype::Tank_KingTiger:
-        case ETankSubtype::Tank_Tiger105:
-        case ETankSubtype::Tank_E25:
-        case ETankSubtype::Tank_JagdTiger:
-        case ETankSubtype::Tank_Maus:
-        case ETankSubtype::Tank_E100:
-        case ETankSubtype::Tank_T35:
-        case ETankSubtype::Tank_KV_1:
-        case ETankSubtype::Tank_KV_2:
-        case ETankSubtype::Tank_KV_1E:
-        case ETankSubtype::Tank_T28:
-        case ETankSubtype::Tank_IS_1:
-        case ETankSubtype::Tank_KV_IS:
-        case ETankSubtype::Tank_IS_2:
-        case ETankSubtype::Tank_IS_3:
-        case ETankSubtype::Tank_KV_5:
-            return true;
-        default:
-            return false;
-    }
+	switch (TankSubtype)
+	{
+	case ETankSubtype::Tank_PantherD:
+	case ETankSubtype::Tank_PantherG:
+	case ETankSubtype::Tank_PanzerV_III:
+	case ETankSubtype::Tank_PanzerV_IV:
+	case ETankSubtype::Tank_PantherII:
+	case ETankSubtype::Tank_KeugelT38:
+	case ETankSubtype::Tank_JagdPanther:
+	case ETankSubtype::Tank_SturmTiger:
+	case ETankSubtype::Tank_Tiger:
+	case ETankSubtype::Tank_TigerH1:
+	case ETankSubtype::Tank_KingTiger:
+	case ETankSubtype::Tank_Tiger105:
+	case ETankSubtype::Tank_E25:
+	case ETankSubtype::Tank_JagdTiger:
+	case ETankSubtype::Tank_Maus:
+	case ETankSubtype::Tank_E100:
+	case ETankSubtype::Tank_T35:
+	case ETankSubtype::Tank_KV_1:
+	case ETankSubtype::Tank_KV_2:
+	case ETankSubtype::Tank_KV_1E:
+	case ETankSubtype::Tank_T28:
+	case ETankSubtype::Tank_IS_1:
+	case ETankSubtype::Tank_KV_IS:
+	case ETankSubtype::Tank_IS_2:
+	case ETankSubtype::Tank_IS_3:
+	case ETankSubtype::Tank_KV_5:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static bool Global_GetIsMediumTank(const ETankSubtype TankSubtype)
 {
-    switch (TankSubtype)
-    {
-        case ETankSubtype::Tank_PanzerIv:
-        case ETankSubtype::Tank_PzIII_J:
-        case ETankSubtype::Tank_PzIII_AA:
-        case ETankSubtype::Tank_PzIII_FLamm:
-        case ETankSubtype::Tank_PzIII_J_Commander:
-        case ETankSubtype::Tank_PzIII_M:
-        case ETankSubtype::Tank_PzIV_F1:
-        case ETankSubtype::Tank_PzIV_F1_Commander:
-        case ETankSubtype::Tank_PzIV_G:
-        case ETankSubtype::Tank_PzIV_H:
-        case ETankSubtype::Tank_Stug:
-        case ETankSubtype::Tank_Marder:
-        case ETankSubtype::Tank_PzIV_70:
-        case ETankSubtype::Tank_Brumbar:
-        case ETankSubtype::Tank_Hetzer:
-        case ETankSubtype::Tank_Jaguar:
-        case ETankSubtype::Tank_T34_85:
-        case ETankSubtype::Tank_T34_100:
-        case ETankSubtype::Tank_T34_76:
-        case ETankSubtype::Tank_T34E:
-            return true;
-        default:
-            return false;
-    }
+	switch (TankSubtype)
+	{
+	case ETankSubtype::Tank_PanzerIv:
+	case ETankSubtype::Tank_PzIII_J:
+	case ETankSubtype::Tank_PzIII_AA:
+	case ETankSubtype::Tank_PzIII_FLamm:
+	case ETankSubtype::Tank_PzIII_J_Commander:
+	case ETankSubtype::Tank_PzIII_M:
+	case ETankSubtype::Tank_PzIV_F1:
+	case ETankSubtype::Tank_PzIV_F1_Commander:
+	case ETankSubtype::Tank_PzIV_G:
+	case ETankSubtype::Tank_PzIV_H:
+	case ETankSubtype::Tank_Stug:
+	case ETankSubtype::Tank_Marder:
+	case ETankSubtype::Tank_PzIV_70:
+	case ETankSubtype::Tank_Brumbar:
+	case ETankSubtype::Tank_Hetzer:
+	case ETankSubtype::Tank_Jaguar:
+	case ETankSubtype::Tank_T34_85:
+	case ETankSubtype::Tank_T34_100:
+	case ETankSubtype::Tank_T34_76:
+	case ETankSubtype::Tank_T34E:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static bool Global_GetIsLightTank(const ETankSubtype TankSubtype)
 {
-    switch (TankSubtype)
-    {
-        case ETankSubtype::Tank_PzJager:
-        case ETankSubtype::Tank_PzI_Scout:
-        case ETankSubtype::Tank_PzI_15cm:
-        case ETankSubtype::Tank_Pz38t:
-        case ETankSubtype::Tank_PzII_F:
-        case ETankSubtype::Tank_Sdkfz_140:
-        case ETankSubtype::Tank_BT7:
-        case ETankSubtype::Tank_T26:
-        case ETankSubtype::Tank_BT7_4:
-        case ETankSubtype::Tank_T70:
-            return true;
-        default:
-            return false;
-    }
+	switch (TankSubtype)
+	{
+	case ETankSubtype::Tank_PzJager:
+	case ETankSubtype::Tank_PzI_Scout:
+	case ETankSubtype::Tank_PzI_15cm:
+	case ETankSubtype::Tank_Pz38t:
+	case ETankSubtype::Tank_PzII_F:
+	case ETankSubtype::Tank_Sdkfz_140:
+	case ETankSubtype::Tank_BT7:
+	case ETankSubtype::Tank_T26:
+	case ETankSubtype::Tank_BT7_4:
+	case ETankSubtype::Tank_T70:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 {
-    switch (TankSubtype)
-    {
-        case ETankSubtype::Tank_Sdkfz251:
-        case ETankSubtype::Tank_Sdkfz250:
-        case ETankSubtype::Tank_Sdkfz250_37mm:
-        case ETankSubtype::Tank_Sdkfz251_PZIV:
-        case ETankSubtype::Tank_Sdkfz251_22:
-        case ETankSubtype::Tank_Puma:
-        case ETankSubtype::Tank_Sdkfz_231:
-        case ETankSubtype::Tank_Sdkfz_232_3:
-            return true;
-        default:
-            return false;
-    }
+	switch (TankSubtype)
+	{
+	case ETankSubtype::Tank_Sdkfz251:
+	case ETankSubtype::Tank_Sdkfz250:
+	case ETankSubtype::Tank_Sdkfz250_37mm:
+	case ETankSubtype::Tank_Sdkfz251_PZIV:
+	case ETankSubtype::Tank_Sdkfz251_22:
+	case ETankSubtype::Tank_Puma:
+	case ETankSubtype::Tank_Sdkfz_231:
+	case ETankSubtype::Tank_Sdkfz_232_3:
+	case ETankSubtype::Tank_Ba12:
+	case ETankSubtype::Tank_Ba14:
+		return true;
+	default:
+		return false;
+	}
 }
 
 UENUM(BlueprintType)
@@ -380,8 +385,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Iron Storm Squad";
 	case ESquadSubtype::Squad_Rus_RedHammer:
 		return "RedHammer Squad";
-		case ESquadSubtype::Squad_Rus_ToxicGuard:
-			return "Toxic Guard Squad";
+	case ESquadSubtype::Squad_Rus_ToxicGuard:
+		return "Toxic Guard Squad";
 	case ESquadSubtype::Squad_Rus_GhostsOfStalingrad:
 		return "Ghost of Stalingrad";
 	case ESquadSubtype::Squad_Rus_Tucha12T:
@@ -448,34 +453,34 @@ static FString Global_GetTankDisplayName(ETankSubtype TankSubtype)
 
 static FString Global_GetAircraftDisplayName(const EAircraftSubtype AircraftType)
 {
-    // Retrieve the UEnum for EAircraftType
-    static UEnum* EnumPtr = StaticEnum<EAircraftSubtype>();
-    if (!EnumPtr)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("EAircraftType enum not found!"));
-        return FString("Unknown");
-    }
+	// Retrieve the UEnum for EAircraftType
+	static UEnum* EnumPtr = StaticEnum<EAircraftSubtype>();
+	if (!EnumPtr)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("EAircraftType enum not found!"));
+		return FString("Unknown");
+	}
 
-    // Special-case the "None" entry if desired
-    if (AircraftType == EAircraftSubtype::Aircarft_None)
-    {
-        return FString("None");
-    }
+	// Special-case the "None" entry if desired
+	if (AircraftType == EAircraftSubtype::Aircarft_None)
+	{
+		return FString("None");
+	}
 
-    // Get the raw enum entry name (e.g. "Aircraft_Bf109")
-    FString EnumName = EnumPtr->GetNameStringByValue(static_cast<int64>(AircraftType));
+	// Get the raw enum entry name (e.g. "Aircraft_Bf109")
+	FString EnumName = EnumPtr->GetNameStringByValue(static_cast<int64>(AircraftType));
 
-    // Remove the full class-qualified prefix if present ("EAircraftType::Aircraft_")
-    FString FullPrefix = FString::Printf(TEXT("%s::Aircraft_"), *EnumPtr->GetName());
-    if (EnumName.StartsWith(FullPrefix))
-    {
-        EnumName.RemoveAt(0, FullPrefix.Len());
-    }
-    else if (EnumName.StartsWith(TEXT("Aircraft_")))
-    {
-        // Fallback: strip just "Aircraft_"
-        EnumName.RemoveAt(0, FString(TEXT("Aircraft_")).Len());
-    }
+	// Remove the full class-qualified prefix if present ("EAircraftType::Aircraft_")
+	FString FullPrefix = FString::Printf(TEXT("%s::Aircraft_"), *EnumPtr->GetName());
+	if (EnumName.StartsWith(FullPrefix))
+	{
+		EnumName.RemoveAt(0, FullPrefix.Len());
+	}
+	else if (EnumName.StartsWith(TEXT("Aircraft_")))
+	{
+		// Fallback: strip just "Aircraft_"
+		EnumName.RemoveAt(0, FString(TEXT("Aircraft_")).Len());
+	}
 
-    return EnumName;
+	return EnumName;
 }
