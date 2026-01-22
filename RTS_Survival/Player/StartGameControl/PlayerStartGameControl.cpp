@@ -64,6 +64,7 @@ void UPlayerStartGameControl::BeginPlay_InitStartGameFlow()
 		return;
 	}
 
+	M_StartGameWidget->InitStartGameWidget(this);
 	M_StartGameWidget->AddToViewport(PlayerStartGameControlDefaults::StartGameWidgetZOrder);
 }
 
