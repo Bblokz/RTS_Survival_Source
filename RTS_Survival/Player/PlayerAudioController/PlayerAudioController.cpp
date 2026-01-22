@@ -77,9 +77,13 @@ void UPlayerAudioController::PlayVoiceLine(const AActor* PrimarySelectedUnit,
 			TEXT("Attempted to play None as voice line in PlayVoiceLine"));
 		return;
 	}
+	if (bM_SuppressRegularVoiceLines)
+	{
+		return;
+	}
 
 	ERTSVoiceLineUnitType UnitType;
-	if (!GetValidVoiceLineTypeForUnit(PrimarySelectedUnit, UnitType))
+	if (not GetValidVoiceLineTypeForUnit(PrimarySelectedUnit, UnitType))
 	{
 		return;
 	}
@@ -87,7 +91,7 @@ void UPlayerAudioController::PlayVoiceLine(const AActor* PrimarySelectedUnit,
 	AdjustVoiceLineForCombatSituation(PrimarySelectedUnit, VoiceLineType, UnitType, bForcePlay);
 
 	USoundBase* VoiceLine = GetVoiceLineFromTypes(UnitType, VoiceLineType);
-	if (!IsValid(VoiceLine))
+	if (not IsValid(VoiceLine))
 	{
 		return;
 	}
@@ -100,12 +104,21 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
                                                     const bool InterruptRegularVoiceLines)
 {
 	const bool bIsCustomLine = Type == EAnnouncerVoiceLineType::Custom;
-	if (not GetIsValidResourceAudioComponent() || bIsCustomLine)
+	if (bIsCustomLine)
 	{
 		RTSFunctionLibrary::ReportError(
-			"Either the audio component is not valid or the player audio controller is asked"
-			"to play a custom line using the wrong function: PlayAnnouncerVoiceLine."
-			"Use PlayCustomAnnouncerVoiceLine instead.");
+			"PlayerAudioController is asked to play a custom line using the wrong function: "
+			"PlayAnnouncerVoiceLine. Use PlayCustomAnnouncerVoiceLine instead.");
+		return;
+	}
+	if (bM_SuppressRegularVoiceLines)
+	{
+		return;
+	}
+	if (not GetIsValidResourceAudioComponent())
+	{
+		RTSFunctionLibrary::ReportError(
+			"PlayerAudioController cannot play announcer voice lines without a valid resource audio component.");
 		return;
 	}
 	
@@ -216,6 +229,42 @@ void UPlayerAudioController::PlayCustomAnnouncerVoiceLine(
     M_CurrentVoiceLineState.SetCurrentVoiceLineAsAnnouncerVoiceLine(EAnnouncerVoiceLineType::Custom);
 }
 
+void UPlayerAudioController::SetSuppressRegularVoiceLines(const bool bSuppress)
+{
+	if (bM_SuppressRegularVoiceLines == bSuppress)
+	{
+		return;
+	}
+
+	bM_SuppressRegularVoiceLines = bSuppress;
+
+	if (not bM_SuppressRegularVoiceLines)
+	{
+		return;
+	}
+
+	M_QueuedVoiceLineEntry.Reset();
+	if (not M_QueuedAnnouncerVoiceLineEntry.IsCustomVoiceLine())
+	{
+		M_QueuedAnnouncerVoiceLineEntry.Reset();
+	}
+
+	if (M_CurrentVoiceLineState.IsCurrentCustomAnnouncerVoiceLine())
+	{
+		return;
+	}
+
+	if (not GetIsValidVoiceLineAudioComp())
+	{
+		return;
+	}
+
+	if (M_VoiceLineAudioComponent->IsPlaying())
+	{
+		M_VoiceLineAudioComponent->Stop();
+	}
+	M_CurrentVoiceLineState.Reset();
+}
 
 UAudioComponent* UPlayerAudioController::PlaySpatialVoiceLine(
 	const AActor* PrimarySelectedUnit,
@@ -228,9 +277,13 @@ UAudioComponent* UPlayerAudioController::PlaySpatialVoiceLine(
 			TEXT("Attempted to play None as spatial voice line"));
 		return nullptr;
 	}
+	if (bM_SuppressRegularVoiceLines)
+	{
+		return nullptr;
+	}
 
 	ERTSVoiceLineUnitType UnitType;
-	if (!GetValidVoiceLineTypeForUnit(PrimarySelectedUnit, UnitType))
+	if (not GetValidVoiceLineTypeForUnit(PrimarySelectedUnit, UnitType))
 	{
 		if constexpr (DeveloperSettings::Debugging::GAudioController_Compile_DebugSymbols)
 		{
@@ -277,7 +330,7 @@ UAudioComponent* UPlayerAudioController::PlaySpatialVoiceLine(
 
 
 	USoundBase* Line = GetVoiceLineFromTypes(UnitType, VoiceLineType);
-	if (!IsValid(Line))
+	if (not IsValid(Line))
 	{
 		return nullptr;
 	}

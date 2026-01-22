@@ -503,6 +503,15 @@ void ACPPController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType VoiceL
 	M_PlayerAudioController->PlayAnnouncerVoiceLine(VoiceLineType, bQueueIfNotPlayed, bInterruptRegularVoiceLines);
 }
 
+void ACPPController::SetSuppressRegularVoiceLines(const bool bSuppress)
+{
+	if (not GetIsValidPlayerAudioController())
+	{
+		return;
+	}
+	M_PlayerAudioController->SetSuppressRegularVoiceLines(bSuppress);
+}
+
 UAudioComponent* ACPPController::PlaySpatialVoiceLine(const AActor* PrimarySelectedUnit,
                                                       const ERTSVoiceLine VoiceLineType,
                                                       const FVector& Location, const bool bIgnorePlayerCooldown) const
