@@ -111,16 +111,23 @@ enum class ETankSubtype : uint8
 	Tank_T26 UMETA(DisplayName = "Rus Light T-26"),
 	Tank_BT7_4 UMETA(DisplayName = "Rus Light BT-7-4"),
 	Tank_T70 UMETA(DisplayName = "Rus Light T-70"),
+	Tank_SU_76 UMETA(DisplayName = "Rus Light SU-76"),
 	// Russian medium tanks.
 	Tank_T34_85 UMETA(DisplayName = "Rus Medium T-34/85"),
 	Tank_T34_100 UMETA(DisplayName = "Rus Medium T-34/100"),
 	Tank_T34_76 UMETA(DisplayName = "Rus Medium T-34/76"),
 	Tank_T34E UMETA(DisplayName = "Rus Medium T-34E"),
+	Tank_SU_85 UMETA(DisplayName = "Rus Medium SU-85"),
+	Tank_SU_85_L UMETA(DisplayName = "Rus Medium SU-85-L"),
+	Tank_SU_100 UMETA(DisplayName = "Rus Medium SU-100"),
+	Tank_SU_122 UMETA(DisplayName = "Rus Medium SU-122"),
+	Tank_T44_100L UMETA(DisplayName = "Rus Medium T-44/100L"),
 	// Russian heavy tanks.
 	Tank_T35 UMETA(DisplayName = "Rus Heavy T-35"),
 	Tank_KV_1 UMETA(DisplayName = "Rus Heavy KV-1"),
 	Tank_KV_2 UMETA(DisplayName = "Rus Heavy KV-2"),
 	Tank_KV_1E UMETA(DisplayName = "Rus Heavy KV-1E"),
+	Tank_KV_1_Arc UMETA(DisplayName = "Rus Heavy KV-1 Arc"),
 	Tank_T28 UMETA(DisplayName = "Rus Heavy T-28"),
 	Tank_IS_1 UMETA(DisplayName = "Rus Heavy IS-1"),
 	Tank_KV_IS UMETA(DisplayName = "Rus Heavy KV-IS"),
@@ -154,6 +161,7 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_KV_1:
 	case ETankSubtype::Tank_KV_2:
 	case ETankSubtype::Tank_KV_1E:
+	case ETankSubtype::Tank_KV_1_Arc:
 	case ETankSubtype::Tank_T28:
 	case ETankSubtype::Tank_IS_1:
 	case ETankSubtype::Tank_KV_IS:
@@ -190,6 +198,11 @@ static bool Global_GetIsMediumTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_T34_100:
 	case ETankSubtype::Tank_T34_76:
 	case ETankSubtype::Tank_T34E:
+	case ETankSubtype::Tank_SU_85:
+	case ETankSubtype::Tank_SU_85_L:
+	case ETankSubtype::Tank_SU_100:
+	case ETankSubtype::Tank_SU_122:
+	case ETankSubtype::Tank_T44_100L:
 		return true;
 	default:
 		return false;
@@ -210,6 +223,7 @@ static bool Global_GetIsLightTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_T26:
 	case ETankSubtype::Tank_BT7_4:
 	case ETankSubtype::Tank_T70:
+	case ETankSubtype::Tank_SU_76:
 		return true;
 	default:
 		return false;
