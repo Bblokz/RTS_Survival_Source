@@ -366,6 +366,11 @@ ASquadController::ASquadController(): PlayerController(nullptr), RTSComponent(nu
 	PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
+bool ASquadController::GetIsSquadUnit()
+{
+	return true;
+}
+
 
 TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 {

@@ -240,6 +240,8 @@ public:
 	friend class RTS_SURVIVAL_API USquadAimAbilityComponent;
 	ASquadController();
 
+	virtual bool GetIsSquadUnit() override final;
+
 
 	TArray<UWeaponState*> GetWeaponsOfSquad();
 
