@@ -1,0 +1,21 @@
+﻿ You will have to design a new actor component called UPlayerStartGameControl which will be found by the acppcontroller
+ at post init and set into its protected field which is a Object pointer called PlayerStartGameControlComponent.
+ it will also init the comp there with a ptr to the acppcontroller
+ 
+ you will also add a new widget class derived from UUserWidget called UStartGameWidget of which a class ptr will be a 
+ editdeaults only on the new component.
+ 
+ 
+ at begin play this component will
+-pause the game through the controller.
+- disable all camera controls 
+-add the UStartGameWidget to the screen. with a high z order.
+
+it will also have a public function called player started game where:
+-it will unpause the game
+-it will enable camera controls
+-it will remove the start game widget from the screen. and destroy it.
+
+on the cpp controller add a proteced ufunction called clicked start game button and in there call the player started game function on the component.
+
+
