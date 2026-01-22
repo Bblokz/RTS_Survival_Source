@@ -21,6 +21,7 @@
 #include "PortraitManager/PortraitManager.h"
 #include "RTSCheatManager/RTSCheatManager.h"
 #include "RTSPrimaryClickContext/RTSPrimaryClickContext.h"
+#include "StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
@@ -1258,6 +1259,12 @@ void ACPPController::PostInitializeComponents()
 		M_PlayerCameraController->Activate();
 	}
 
+	PlayerStartGameControlComponent = FindComponentByClass<UPlayerStartGameControl>();
+	if (GetIsValidPlayerStartGameControlComponent())
+	{
+		PlayerStartGameControlComponent->InitPlayerStartGameControl(this);
+	}
+
 	// create aactionuicontroller on map using spawn actor.
 	M_GameUIController = GetWorld()->SpawnActor<AGameUIController>(AGameUIController::StaticClass());
 	if (IsValid(M_GameUIController))
@@ -1275,6 +1282,16 @@ void ACPPController::PostInitializeComponents()
 void ACPPController::BeginDestroy()
 {
 	Super::BeginDestroy();
+}
+
+void ACPPController::ClickedStartGameButton()
+{
+	if (not GetIsValidPlayerStartGameControlComponent())
+	{
+		return;
+	}
+
+	PlayerStartGameControlComponent->PlayerStartedGame();
 }
 
 void ACPPController::UseControlGroup(const int32 GroupIndex)
@@ -5177,6 +5194,17 @@ bool ACPPController::GetIsValidPlayerBuildRadiusManager() const
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerBuildRadiusManager",
 	                                                      "GetIsValidPlayerBuildRadiusManager", this);
+	return false;
+}
+
+bool ACPPController::GetIsValidPlayerStartGameControlComponent() const
+{
+	if (IsValid(PlayerStartGameControlComponent))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "PlayerStartGameControlComponent",
+	                                                      "GetIsValidPlayerStartGameControlComponent", this);
 	return false;
 }
 

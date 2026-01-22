@@ -78,6 +78,7 @@ class UPlayerCommandTypeDecoder;
 class UPlayerCameraController;
 class URTSGameSettingsHandler;
 class UPlayerResourceManager;
+class UPlayerStartGameControl;
 class ARTSAsyncSpawner;
 class ARTSNavigator;
 class ACameraPawn;
@@ -655,6 +656,9 @@ protected:
 	UPROPERTY()
 	ALandscapedeformManager* M_LdfManager;
 
+	UPROPERTY()
+	TObjectPtr<UPlayerStartGameControl> PlayerStartGameControlComponent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AimAbility")
 	TSubclassOf<APlayerAimAbility> M_PlayerAimAbilityClass;
 
@@ -698,6 +702,9 @@ protected:
 	// Determines how long the left mouse button should be held to trigger a marquee selection.
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Settings")
 	float TimeHoldLeftMarquee;
+
+	UFUNCTION()
+	void ClickedStartGameButton();
 
 	/**
 	 * @brief Setsup the references.
@@ -1372,6 +1379,7 @@ private:
 	bool GetIsValidPlayerCameraController() const;
 
 	bool GetIsValidPlayerBuildRadiusManager() const;
+	bool GetIsValidPlayerStartGameControlComponent() const;
 	bool GetIsValidPlayerProfileLoader();
 	bool GetIsValidGameUIController() const;
 	bool GetIsValidAsyncSpawner() const;
