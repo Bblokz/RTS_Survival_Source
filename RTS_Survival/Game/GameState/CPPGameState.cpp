@@ -3360,7 +3360,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility
 	});
@@ -3369,7 +3369,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility
 	});
@@ -3537,7 +3537,7 @@ void ACPPGameState::InitAllGameLightTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility
 	});
@@ -3545,7 +3545,7 @@ void ACPPGameState::InitAllGameLightTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -3553,7 +3553,7 @@ void ACPPGameState::InitAllGameLightTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -3561,7 +3561,7 @@ void ACPPGameState::InitAllGameLightTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -3835,7 +3835,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -3843,7 +3843,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -3851,7 +3851,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -4285,7 +4285,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -4293,7 +4293,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdFireRockets, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -4301,7 +4301,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility
 	});
@@ -4695,7 +4695,7 @@ void ACPPGameState::InitAllGameAircraftData()
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdAircraftOwnerNotExpanded,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -5709,7 +5709,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	TArray<FUnitAbilityEntry> NomadicWithWeaponsAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
@@ -6206,7 +6206,7 @@ void ACPPGameState::InitAllGameSquadData()
 	TArray<FUnitAbilityEntry> BasicSquadAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol, EAbilityID::IdRetreat,
 		EAbilityID::IdSwitchWeapon, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility
 	});
@@ -6214,7 +6214,7 @@ void ACPPGameState::InitAllGameSquadData()
 	TArray<FUnitAbilityEntry> BasicScavengerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol, EAbilityID::IdRetreat,
 		EAbilityID::IdSwitchWeapon, EAbilityID::IdScavenge, EAbilityID::IdRepair, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});

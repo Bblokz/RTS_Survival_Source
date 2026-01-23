@@ -3756,6 +3756,14 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		}
 		this->DirectActionButtonRetreat();
 		break;
+	case EAbilityID::IdAttackGround:
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		{
+			RTSFunctionLibrary::PrintString("attack ground");
+		}
+		this->DirectActionButtonAttackGround();
+		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
+		break;
 	case EAbilityID::IdThrowGrenade:
 		this->DirectActionButtonThrowGrenade(static_cast<EGrenadeAbilityType>(ActiveAbilityEntry.CustomType));
 		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
@@ -3817,6 +3825,9 @@ void ACPPController::UpdateCursor()
 		case EAbilityID::IdAttack:
 			CursorType = EMouseCursor::Crosshairs;
 			break;
+		case EAbilityID::IdAttackGround:
+			CursorType = EMouseCursor::Crosshairs;
+			break;
 		case EAbilityID::IdMove:
 			CursorType = EMouseCursor::CardinalCross;
 			break;
@@ -3871,6 +3882,9 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		break;
 	case EAbilityID::IdAttack:
 		this->ActionButtonAttack(ClickedActor, ClickedLocation);
+		break;
+	case EAbilityID::IdAttackGround:
+		this->ActionButtonAttackGround(ClickedLocation);
 		break;
 	case EAbilityID::IdPatrol:
 		this->ActionButtonPatrol(ClickedLocation);
@@ -3937,6 +3951,17 @@ void ACPPController::ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLo
 	{
 		DebugActorAndCommand(ClickedActor, Command);
 	}
+}
+
+void ACPPController::ActionButtonAttackGround(const FVector& ClickedLocation)
+{
+	EnsureSelectionsAreRTSValid();
+	const uint32 CommandsExe = OrderUnitsAttackGround(ClickedLocation);
+	const bool bResetAllPlacementEffects = not bIsHoldingShift;
+	constexpr bool bForcePlayVoiceLine = false;
+	CreateVfxAndVoiceLineForIssuedCommand(
+		bResetAllPlacementEffects, CommandsExe, ClickedLocation, ECommandType::AttackGround,
+		EAbilityID::IdAttackGround, bForcePlayVoiceLine);
 }
 
 void ACPPController::CheckAttackCommandForAttackGround(ECommandType& OutCommandType) const
@@ -4415,6 +4440,12 @@ void ACPPController::DirectActionButtonBreakCover()
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdBreakCover),
 		                                false);
 	}
+}
+
+void ACPPController::DirectActionButtonAttackGround()
+{
+	bM_IsActionButtonActive = true;
+	UpdateCursor();
 }
 
 void ACPPController::DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType)
