@@ -42,6 +42,7 @@ struct FFormationData
 	TArray<FRotator> FormationWaypointDirections = {};
 	int32 CurrentWaypointIndex = 0;
 	int32 FormationID = -1;
+	FVector AverageSpawnLocation = FVector::ZeroVector;
 
 	// Settings used when this formation is running an attack move wave.
 	FAttackMoveWaveSettings AttackMoveSettings = {};

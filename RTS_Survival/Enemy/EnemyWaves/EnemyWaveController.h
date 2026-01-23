@@ -199,6 +199,9 @@ private:
 		const int32 WaveID);
 
 	void OnWaveCompletedSpawn(FAttackWave* Wave);
+	FVector GetAverageSpawnLocation(
+		const TArray<ASquadController*>& SquadControllers,
+		const TArray<ATankMaster*>& TankMasters) const;
 
 	// Gets the tanks and squads from the wave, will destroy actors that are not of those types.
 	// Assumes valid Enemy controller is set.

@@ -664,6 +664,7 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 	TArray<ATankMaster*> WaveTanks;
 	TArray<ASquadController*> WaveSquads;
 	ExtractTanksAndSquadsFromWaveActors(WaveTanks, WaveSquads, Wave->SpawnedWaveUnits);
+	const FVector AverageSpawnLocation = GetAverageSpawnLocation(WaveSquads, WaveTanks);
 	// Start the formation movement using the enemy formation controller; note that at this point
 	// all the wave resources are paid for and that if a wave unit dies during the formation or after
 	// the enemy formation controller will callback on the enemy controller to adjust the wave supply accordingly.
@@ -676,7 +677,8 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 			Wave->FinalWaypointDirection,
 			Wave->MaxFormationWidth,
 			Wave->FormationOffsetMlt,
-			Wave->AttackMoveSettings);
+			Wave->AttackMoveSettings,
+			AverageSpawnLocation);
 	}
 	else
 	{
@@ -686,7 +688,8 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 			Wave->Waypoints,
 			Wave->FinalWaypointDirection,
 			Wave->MaxFormationWidth,
-			Wave->FormationOffsetMlt);
+			Wave->FormationOffsetMlt,
+			AverageSpawnLocation);
 	}
 
 	if (Wave->bIsSingleWave)
@@ -697,6 +700,44 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 
 	const bool bInstantStartWave = false;
 	CreateAttackWaveTimer(Wave, bInstantStartWave);
+}
+
+FVector UEnemyWaveController::GetAverageSpawnLocation(
+	const TArray<ASquadController*>& SquadControllers,
+	const TArray<ATankMaster*>& TankMasters) const
+{
+	FVector AccumulatedLocation = FVector::ZeroVector;
+	int32 ValidUnitCount = 0;
+
+	for (const ASquadController* SquadController : SquadControllers)
+	{
+		if (not IsValid(SquadController))
+		{
+			continue;
+		}
+		AccumulatedLocation += SquadController->GetActorLocation();
+		ValidUnitCount++;
+	}
+
+	for (const ATankMaster* TankMaster : TankMasters)
+	{
+		if (not IsValid(TankMaster))
+		{
+			continue;
+		}
+		AccumulatedLocation += TankMaster->GetActorLocation();
+		ValidUnitCount++;
+	}
+
+	if (ValidUnitCount <= 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"No valid units found when calculating average spawn location. "
+			"\nAt UEnemyWaveController::GetAverageSpawnLocation()");
+		return FVector::ZeroVector;
+	}
+
+	return AccumulatedLocation / static_cast<float>(ValidUnitCount);
 }
 
 void UEnemyWaveController::ExtractTanksAndSquadsFromWaveActors(TArray<ATankMaster*>& OutTankMasters,

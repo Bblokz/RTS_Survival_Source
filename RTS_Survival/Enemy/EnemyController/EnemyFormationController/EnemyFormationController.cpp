@@ -40,7 +40,8 @@ void UEnemyFormationController::MoveFormationToLocation(TArray<ASquadController*
                                                         TArray<ATankMaster*> TankMasters,
                                                         const TArray<FVector>& Waypoints,
                                                         const FRotator& FinalWaypointDirection, int32 MaxFormationWidth,
-                                                        const float FormationOffsetMlt)
+                                                        const float FormationOffsetMlt,
+                                                        const FVector& AverageSpawnLocation)
 {
 	if (not EnsureFormationRequestIsValid(SquadControllers, TankMasters, MaxFormationWidth))
 	{
@@ -51,6 +52,7 @@ void UEnemyFormationController::MoveFormationToLocation(TArray<ASquadController*
 	FFormationData NewFormation;
 	const int32 FormationID = GenerateUniqueFormationID();
 	NewFormation.FormationID = FormationID;
+	NewFormation.AverageSpawnLocation = AverageSpawnLocation;
 	// Set up the waypoints and the direction of one waypoint to the next so we know how to use the offset vector for
 	// formation calculations.
 	InitWaypointsAndDirections(NewFormation, FinalWaypointDirection, Waypoints);
@@ -88,7 +90,8 @@ void UEnemyFormationController::MoveAttackMoveFormationToLocation(
 	const FRotator& FinalWaypointDirection,
 	int32 MaxFormationWidth,
 	const float FormationOffsetMlt,
-	const FAttackMoveWaveSettings& AttackMoveSettings)
+	const FAttackMoveWaveSettings& AttackMoveSettings,
+	const FVector& AverageSpawnLocation)
 {
 	if (not EnsureFormationRequestIsValid(SquadControllers, TankMasters, MaxFormationWidth))
 	{
@@ -100,6 +103,7 @@ void UEnemyFormationController::MoveAttackMoveFormationToLocation(
 	NewFormation.FormationID = FormationID;
 	NewFormation.AttackMoveSettings = AttackMoveSettings;
 	NewFormation.bIsAttackMoveFormation = true;
+	NewFormation.AverageSpawnLocation = AverageSpawnLocation;
 
 	InitWaypointsAndDirections(NewFormation, FinalWaypointDirection, Waypoints);
 
@@ -134,6 +138,15 @@ void UEnemyFormationController::DebugAllActiveFormations() const
 		{
 			DebugDrawFormation(FormationTuple.Value);
 		}
+	}
+}
+
+void UEnemyFormationController::GetActiveFormationData(TArray<FFormationData>& OutFormationData) const
+{
+	OutFormationData.Reserve(OutFormationData.Num() + M_ActiveFormations.Num());
+	for (const auto& FormationPair : M_ActiveFormations)
+	{
+		OutFormationData.Add(FormationPair.Value);
 	}
 }
 
