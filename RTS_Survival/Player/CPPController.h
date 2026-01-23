@@ -1190,6 +1190,7 @@ private:
 	void DirectActionButtonCancelRocketFire();
 
 	void DirectActionButtonReturnToBase();
+	void DirectActionButtonRetreat();
 	void DirectActionButtonExitCargo();
 
 	// Commands units that can break cover to do so.
@@ -1374,6 +1375,7 @@ private:
 
 	bool GetIsValidCommandTypeDecoder();
 	bool GetIsValidPlayerResourceManager() const;
+	bool GetIsValidPlayerHQ() const;
 	bool GetIsValidPlayerAudioController() const;
 	bool GetIsValidPlayerPortraitManager() const;
 	bool GetIsValidPlayerCameraController() const;

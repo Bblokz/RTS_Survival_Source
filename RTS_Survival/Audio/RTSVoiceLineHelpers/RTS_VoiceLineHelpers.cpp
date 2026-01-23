@@ -60,6 +60,8 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 	// todo
 	case EAbilityID::IdReturnToBase:
 		return ERTSVoiceLine::LoadAP;
+	case EAbilityID::IdRetreat:
+		return ERTSVoiceLine::Move;
 	case EAbilityID::IdEnterCargo:
 		return ERTSVoiceLine::EnterPosition;
 	case EAbilityID::IdExitCargo:

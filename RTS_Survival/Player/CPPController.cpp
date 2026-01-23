@@ -3749,6 +3749,13 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		}
 		this->DirectActionButtonReturnToBase();
 		break;
+	case EAbilityID::IdRetreat:
+		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
+		{
+			RTSFunctionLibrary::PrintString("retreat");
+		}
+		this->DirectActionButtonRetreat();
+		break;
 	case EAbilityID::IdThrowGrenade:
 		this->DirectActionButtonThrowGrenade(static_cast<EGrenadeAbilityType>(ActiveAbilityEntry.CustomType));
 		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
@@ -4321,6 +4328,43 @@ void ACPPController::DirectActionButtonReturnToBase()
 	if (CommandsExe > 0)
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdReturnToBase),
+		                                false);
+	}
+}
+
+void ACPPController::DirectActionButtonRetreat()
+{
+	EnsureSelectionsAreRTSValid();
+	if (not GetIsValidPlayerHQ())
+	{
+		return;
+	}
+
+	constexpr float RetreatProjectionScale = 2.0f;
+	bool bWasProjected = false;
+	const FVector RetreatLocation = RTSFunctionLibrary::GetLocationProjected(
+		this,
+		M_PlayerHQ->GetActorLocation(),
+		true,
+		bWasProjected,
+		RetreatProjectionScale);
+	static_cast<void>(bWasProjected);
+
+	int32 CommandsExe = 0;
+	const bool bResetQueue = not bIsHoldingShift;
+	for (ASquadController* EachSquad : TSelectedSquadControllers)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
+		{
+			continue;
+		}
+		CommandsExe += EachSquad->RetreatToLocation(RetreatLocation, bResetQueue) ==
+			ECommandQueueError::NoError;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdRetreat),
 		                                false);
 	}
 }
@@ -5136,6 +5180,17 @@ bool ACPPController::GetIsValidPlayerResourceManager() const
 	return false;
 }
 
+bool ACPPController::GetIsValidPlayerHQ() const
+{
+	if (IsValid(M_PlayerHQ))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerHQ",
+	                                                      "GetIsValidPlayerHQ", this);
+	return false;
+}
+
 bool ACPPController::GetIsValidPlayerAudioController() const
 {
 	if (IsValid(M_PlayerAudioController))
@@ -5514,7 +5569,7 @@ bool ACPPController::SetupPlayerHQReference()
 			}
 		}
 	}
-	return IsValid(M_PlayerHQ);
+	return GetIsValidPlayerHQ();
 }
 
 void ACPPController::ShowPlayerBuildRadius(const bool bShowRadius) const

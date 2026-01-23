@@ -456,9 +456,11 @@ protected:
      * @param MoveToLocation The location to move to.
      */
 	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
+	virtual void ExecuteRetreatCommand(const FVector RetreatLocation) override;
 
 	/** @brief Stops all logic used for move commands.*/
 	virtual void TerminateMoveCommand() override;
+	virtual void TerminateRetreatCommand() override;
 
 	virtual void ExecuteReinforceCommand(AActor* ReinforcementTarget) override;
 	virtual void TerminateReinforceCommand() override;
@@ -556,6 +558,10 @@ protected:
 
 	// Util to stop movement on any ICommand unit.
 	virtual void StopMovement() override;
+
+	void HandleRetreatCommandStart();
+	void HandleRetreatCommandCleanup();
+	void SetSquadUnitsCanBeSelected(const bool bCanBeSelected);
 
 	// Triggered by the pickup item that has overlap with one of the units in this squad.
 	void StartPickupWeapon(AWeaponPickup* TargetWeaponItem);
