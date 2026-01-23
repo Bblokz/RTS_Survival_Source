@@ -179,7 +179,7 @@ enum class
 	ZIS_3_76MM_SU76 UMETA(DisplayName = "ZIS-3 76MM (SU-76)"),
 	DT_5_85MM UMETA(DisplayName = "DT-5 85mm (IS-1)"),
 	L_11_76MM UMETA(DisplayName = "L_11 76mm (KV-1 L-11)"),
-	L_11_76MM_Arc UMETA(DisplayName = "L-11 76MM Arc (KV-1 Arc)"),
+	L_14_122MM_Arc UMETA(DisplayName = "L-11 76MM Arc (KV-1 Arc)"),
 	F_34_76MM UMETA(DisplayName = "F-34 76MM (T-34)"),
 	F_34_T34E UMETA(DisplayName = "F-34 76MM (T-34E)"),
 	L_10_76MM UMETA(DisplayName = "L_10 76MM (T-28)"),
@@ -217,7 +217,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Zarya_100L: return "Zarya 100L";
 	case EWeaponName::KwK30_20MM: return "KwK 30";
 	case EWeaponName::L_11_76MM: return "L/11";
-	case EWeaponName::L_11_76MM_Arc: return "L-11 Arc";
+	case EWeaponName::L_14_122MM_Arc: return "L-14 Arc";
 	case EWeaponName::shVAK_20MM: return "shVAK";
 	case EWeaponName::NS_37MM: return "NS-37";
 	case EWeaponName::T26_45MM: return "20-K";
@@ -560,8 +560,6 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "DT_5_85MM";
 	case EWeaponName::L_11_76MM:
 		return "L_11_76MM";
-	case EWeaponName::L_11_76MM_Arc:
-		return "L_11_76MM_Arc";
 	case EWeaponName::F_35_76MM:
 		return "F_35_76MM";
 	case EWeaponName::ZIS_5_76MM:

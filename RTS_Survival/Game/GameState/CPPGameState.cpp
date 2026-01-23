@@ -1236,7 +1236,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::PTRS_41_14_5MM, WeaponData);
 	WeaponData.WeaponName = EWeaponName::PTRS_41_14_5MM;
 
-	
+
 	// M920 special AT rifle.
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::M920_AtSniper;
@@ -1255,7 +1255,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	SetSmallArmsCooldown(WeaponData, 1.67f);
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	// Low accuracy to make it worse vs infantry.
-	WeaponData.Accuracy = SniperAccuracy- 20.f;
+	WeaponData.Accuracy = SniperAccuracy - 20.f;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -1881,7 +1881,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::shVAK_20MM, WeaponData);
 
-	
+
 	// Ba 12 23mm
 	WeaponData.WeaponName = EWeaponName::Ba12_23MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -2213,7 +2213,9 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.WeaponName = EWeaponName::KwK42_L_50MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE, EWeaponShellType::Shell_Radixite};
+	WeaponData.ShellTypes = {
+		EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE, EWeaponShellType::Shell_Radixite
+	};
 	WeaponData.WeaponCalibre = 50;
 	WeaponData.TNTExplosiveGrams = 36;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
@@ -2566,18 +2568,19 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		const float Kv1ArcArmorPen = 76.f;
 
 		FWeaponData Kv1ArcWeaponData = WeaponData;
-		Kv1ArcWeaponData.WeaponName = EWeaponName::L_11_76MM_Arc;
+		Kv1ArcWeaponData.WeaponName = EWeaponName::L_14_122MM_Arc;
 		Kv1ArcWeaponData.DamageType = ERTSDamageType::Kinetic;
 		Kv1ArcWeaponData.ShellType = EWeaponShellType::Shell_HE;
 		Kv1ArcWeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
-		Kv1ArcWeaponData.WeaponCalibre = 76;
-		Kv1ArcWeaponData.TNTExplosiveGrams = 79;
+		Kv1ArcWeaponData.WeaponCalibre = 122;
+		Kv1ArcWeaponData.TNTExplosiveGrams = 140;
 		Kv1ArcWeaponData.BaseDamage = (DamagePerMM * Kv1ArcWeaponData.WeaponCalibre
 			+ Kv1ArcWeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * Kv1ArcDamageMlt;
 		Kv1ArcWeaponData.DamageFlux = DamageFluxPercentage;
 		Kv1ArcWeaponData.Range = MediumCannonRange;
 		// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
-		Kv1ArcWeaponData.ArmorPen = Kv1ArcArmorPen / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+		Kv1ArcWeaponData.ArmorPen = Kv1ArcArmorPen /
+			DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 		Kv1ArcWeaponData.ArmorPenMaxRange = Kv1ArcArmorPen /
 			DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 		Kv1ArcWeaponData.MagCapacity = 1;
@@ -2590,7 +2593,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		Kv1ArcWeaponData.ShrapnelParticles = Kv1ArcWeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 		Kv1ArcWeaponData.ShrapnelPen = Kv1ArcWeaponData.WeaponCalibre * ShrapnelPenPerMM;
 		Kv1ArcWeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
-		M_TPlayerWeaponDataHashMap.Add(EWeaponName::L_11_76MM_Arc, Kv1ArcWeaponData);
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::L_14_122MM_Arc, Kv1ArcWeaponData);
 	}
 
 	// https://wiki.warthunder.com/KV-1E
@@ -3009,7 +3012,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Stu_H_43_L_12_150MM, WeaponData);
 
-	
+
 	// https://old-wiki.warthunder.com/Brummbar
 	WeaponData.WeaponName = EWeaponName::RW61_Mortar_380MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -3161,7 +3164,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		WeaponData.Range = HeavyCannonRange;
 		// He is the starting shell for this gun but the projectile multiplies with this factor so we neutralize it.
 		WeaponData.ArmorPen = Su122HeArmorPen / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-		WeaponData.ArmorPenMaxRange = Su122HeArmorPen / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+		WeaponData.ArmorPenMaxRange = Su122HeArmorPen /
+			DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 		WeaponData.MagCapacity = 1;
 		WeaponData.ReloadSpeed = 26;
 		WeaponData.BaseCooldown = 1;
@@ -3301,7 +3305,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageFluxMlt = DamageFluxPercentage / 100;
 	RocketData.CoolDownFluxMlt = CooldownFluxPercentage / 100;
 	RocketData.ArmorPenFluxMlt = ArmorPenFluxPercentage / 100;
-	RocketData.WeaponCalibre  =88;
+	RocketData.WeaponCalibre = 88;
 	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::HetzerRockets, RocketData);
 
 
@@ -3476,7 +3480,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz251_PZIV, TankData);
 
-	
+
 	// ------------------------------- RUS Armored Cars -------------------------------
 
 	// BA-12 
@@ -3496,7 +3500,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Ba12, TankData);
-	
+
 	// BA-14 
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
@@ -4162,7 +4166,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * Su85LaserExpWorthMlt, 5);
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseMediumTankExp * Su85LaserExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_85_L, TankData);
 
@@ -4179,7 +4184,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * Su100ExpWorthMlt, 5);
+		TankData.ExperienceWorth =
+			RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * Su100ExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_100, TankData);
 
@@ -4196,7 +4202,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * Su122ExpWorthMlt, 5);
+		TankData.ExperienceWorth =
+			RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * Su122ExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_122, TankData);
 	}
@@ -4209,7 +4216,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		const float T44LaserReverseSpeedKmh = 20.f;
 		const float T44LaserCostMlt = 2.0f;
 		const float T44LaserExpWorthMlt = 1.75f;
-		const int32 T44LaserCost = RTSFunctionLibrary::RoundToNearestMultipleOf(T3MediumTankRadixiteCost * T44LaserCostMlt, 10);
+		const int32 T44LaserCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			T3MediumTankRadixiteCost * T44LaserCostMlt, 10);
 		const int32 T44LaserVehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			T3MediumTankVehiclePartsCost * T44LaserCostMlt, 10);
 
@@ -4226,7 +4234,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		});
 		TankData.Abilities = BasicTankAbilities;
 		TankData.ExperienceLevels = GetMediumTankExpLevels();
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * T44LaserExpWorthMlt, 5);
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseMediumTankExp * T44LaserExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T44_100L, TankData);
 	}
@@ -4278,7 +4287,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, T3MediumTankDestroyerVehiclePartsCost}
 	});
 	TankData.Abilities = FAbilityHelpers::SwapAtIdForNewEntry(TankAbilitiesWithRockets, EAbilityID::IdFireRockets,
-		FAbilityHelpers::GetRocketAbilityEntry(EAttachedRocketAbilityType::SmallRockets));
+	                                                          FAbilityHelpers::GetRocketAbilityEntry(
+		                                                          EAttachedRocketAbilityType::SmallRockets));
 	TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
 	TankData.ExperienceWorth = BaseHeavyTankExp;
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4398,8 +4408,14 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankRadixiteCost * 1.5, 25)},
-		{ERTSResourceType::Resource_VehicleParts, RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankVehiclePartsCost* 1.33, 25)}
+		{
+			ERTSResourceType::Resource_Radixite,
+			RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankRadixiteCost * 1.5, 25)
+		},
+		{
+			ERTSResourceType::Resource_VehicleParts,
+			RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankVehiclePartsCost * 1.33, 25)
+		}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5243,8 +5259,11 @@ void ACPPGameState::InitAllGameBxpData()
 	// FLAK BUNKER
 	BxpData.ConstructionTime = BxpT2BuildTime;
 	BxpData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(BxpT2BunkerRadixiteCost * 4, 5)},
-		{ERTSResourceType::Resource_Metal, RTSFunctionLibrary::RoundToNearestMultipleOf(HeavyBunkerMetalCost* 2, 5)}
+		{
+			ERTSResourceType::Resource_Radixite,
+			RTSFunctionLibrary::RoundToNearestMultipleOf(BxpT2BunkerRadixiteCost * 4, 5)
+		},
+		{ERTSResourceType::Resource_Metal, RTSFunctionLibrary::RoundToNearestMultipleOf(HeavyBunkerMetalCost * 2, 5)}
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.VisionRadius = T2BxpVisionRadius;
@@ -5427,7 +5446,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2BxpHealth * 1.33, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBoforsPosition, BxpData);
-	
+
 	// -----------------------------------------------------------------------
 	// --------------------------- RUS WALL AND GATE -------------------------
 	// -----------------------------------------------------------------------

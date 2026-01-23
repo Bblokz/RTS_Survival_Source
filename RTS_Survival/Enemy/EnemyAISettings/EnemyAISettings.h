@@ -13,4 +13,6 @@ namespace EnemyAISettings
 	// Makes use of one large request structure and batch processes multiple units at once which are then written back in
 	// a large structure.
 	inline float EnemyStrategicAIThinkingSpeed = 5.f;
+
+	inline float EnemyRetreatControllerCheckInterval = 8.4f;
 }
