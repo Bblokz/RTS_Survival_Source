@@ -30,7 +30,6 @@ class RTS_SURVIVAL_API AEnemyController : public AActorObjectsMaster
 {
 	GENERATED_BODY()
 
-
 public:
 	// Sets default values for this actor's properties
 	AEnemyController(const FObjectInitializer& ObjectInitializer);
@@ -96,9 +95,10 @@ public:
 		const TArray<FAttackWaveElement>& WaveElements,
 		const TArray<FVector>& Waypoints,
 		const FRotator& FinalWaypointDirection,
-		const int32 MaxFormationWidth,
-		const float TimeTillWave,
-		AActor* WaveCreator, const float FormationOffsetMultiplier = 1.f);
+		const int32 MaxFormationWidth = 2,
+		const float TimeTillWave = 0.f,
+		AActor* WaveCreator = nullptr,
+		 const float FormationOffsetMultiplier = 1.f);
 
 	/**
 	 * @brief Use when a wave should support allies in combat before advancing to the next waypoint.
@@ -132,14 +132,13 @@ public:
 		const bool bInstantStart,
 		AActor* WaveCreator,
 		TArray<AActor*> WaveTimerAffectingBuildings,
-		const float PerAffectingBuildingTimerFraction,
-		const float FormationOffsetMultiplier,
-		const float HelpOffsetRadiusMltMax,
-		const float HelpOffsetRadiusMltMin,
-		const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
-		const int32 MaxTriesFindNavPointForHelpOffset,
-		const float ProjectionScale);
-
+		const float PerAffectingBuildingTimerFraction = 0.1,
+		const float FormationOffsetMultiplier = 1.f,
+		const float HelpOffsetRadiusMltMax = 1.2,
+		const float HelpOffsetRadiusMltMin = 1.0,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint = 0.f,
+		const int32 MaxTriesFindNavPointForHelpOffset = 3,
+		const float ProjectionScale = 1.f);
 	/**
 	 * @brief Use when a single wave should wait on combat and assist allies before moving on.
 	 * @param WaveType Determines wave logic and whether an owning actor is required.
@@ -162,15 +161,15 @@ public:
 		const TArray<FAttackWaveElement>& WaveElements,
 		const TArray<FVector>& Waypoints,
 		const FRotator& FinalWaypointDirection,
-		const int32 MaxFormationWidth,
-		const float TimeTillWave,
-		AActor* WaveCreator,
-		const float FormationOffsetMultiplier,
-		const float HelpOffsetRadiusMltMax,
-		const float HelpOffsetRadiusMltMin,
-		const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
-		const int32 MaxTriesFindNavPointForHelpOffset,
-		const float ProjectionScale);
+		const int32 MaxFormationWidth = 2,
+		const float TimeTillWave = 0.f,
+		AActor* WaveCreator = nullptr,
+		const float FormationOffsetMultiplier = 1.f,
+		const float HelpOffsetRadiusMltMax = 1.2,
+		const float HelpOffsetRadiusMltMin = 1.0,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint = 0.f,
+		const int32 MaxTriesFindNavPointForHelpOffset = 3,
+		const float ProjectionScale = 1.f);
 
 	/**
 	 * @brief Assigns squads to construct field constructions at provided locations.

@@ -371,6 +371,16 @@ bool ASquadController::GetIsSquadUnit()
 	return true;
 }
 
+void ASquadController::UnstuckSquadMoveUp(const float ZOffset)
+{
+	EnsureSquadUnitsValid();
+	for(auto EachSquadUnit: M_TSquadUnits)
+	{
+		FVector TeleportLocation = EachSquadUnit->GetActorLocation() + FVector(0,0,ZOffset);
+		EachSquadUnit->SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::ResetPhysics);
+	}
+}
+
 
 TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 {

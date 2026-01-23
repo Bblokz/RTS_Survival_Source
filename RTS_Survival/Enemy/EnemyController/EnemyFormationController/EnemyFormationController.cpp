@@ -20,6 +20,7 @@ namespace EnemyFormationConstants
 	const float TeleportXYRange = 225.f;
 	const float TeleportSideRange = 300.f;
 	const float TeleportDegreesRange = 20.f;
+	const float TeleportSquadUnitsUnStuckHeight = 100.f;
 	// WARNING; multiplied by 5 if previous teleport attempts failed; do not make this too high.
 	const float FindTeleportLocationProjectionExtent = 0.2f;
 	const int32 TeleportProjectionAttempts = 8;
@@ -265,18 +266,14 @@ void UEnemyFormationController::UpdateFormationUnitStuckState(
 		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
 		return;
 	}
-
-	if (TryTeleportStuckFormationUnit(FormationUnit, WaypointLocation, WaypointDirection, NavSys))
+	if(FormationUnit.Unit->GetIsSquadUnit())
 	{
-		FormationUnit.StuckCounts = 0;
-		FormationUnit.bPreviousStuckTeleportsFailed = false;
+		AttemptUnStuckSquad(FormationUnit);
+		return;
 	}
-	else
-	{
-		FormationUnit.bPreviousStuckTeleportsFailed = true;
-	}
+	// Unstuck vehicles.
+	AttemptUnstuckWithTeleport(FormationUnit, WaypointLocation, WaypointDirection, NavSys);
 
-	DebugFormationUnitJustTeleported(FormationUnit, WaypointLocation);
 }
 
 FVector UEnemyFormationController::GetFormationUnitRawWaypointLocation(
@@ -484,6 +481,29 @@ void UEnemyFormationController::DebugFormationUnitJustTeleported(const FFormatio
 			UnitLocation,
 			GetFormationUnitRawWaypointLocation(FormationUnit, WaypointLocation, FRotator::ZeroRotator));
 		const FString DebugString = "Unit just teleported."
+			"\n Distance to raw waypoint squared: " + FString::SanitizeFloat(SquaredDistToRawWayPoint);
+		const float DebugTextHeightOffset = 250.f;
+		const float DebugTextDurationSeconds = 2.f;
+		const FVector DebugTextLocation = UnitLocation + FVector(0.f, 0.f, DebugTextHeightOffset);
+		DebugStringAtLocation(DebugString, DebugTextLocation, FColor::Red, DebugTextDurationSeconds);
+	}
+}
+
+void UEnemyFormationController::DebugFormationUnitJustTeleported_AndFailed(const FFormationUnitData& FormationUnit,
+                                                                           const FVector& WaypointLocation)
+{
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
+	{
+		if (not FormationUnit.IsValidFormationUnit())
+		{
+			return;
+		}
+
+		const FVector UnitLocation = FormationUnit.Unit->GetOwnerLocation();
+		const float SquaredDistToRawWayPoint = FVector::DistSquared(
+			UnitLocation,
+			GetFormationUnitRawWaypointLocation(FormationUnit, WaypointLocation, FRotator::ZeroRotator));
+		const FString DebugString = "Unit FAILED TO TELEPORT."
 			"\n Distance to raw waypoint squared: " + FString::SanitizeFloat(SquaredDistToRawWayPoint);
 		const float DebugTextHeightOffset = 250.f;
 		const float DebugTextDurationSeconds = 2.f;
@@ -1537,4 +1557,28 @@ void UEnemyFormationController::DebugTeleportAttempt(const FColor& TpColor, cons
 {
 	const float Radius = 100.f;
 	DrawDebugSphere(GetWorld(), Location, Radius, 12, TpColor, false, 5.f);
+}
+
+void UEnemyFormationController::AttemptUnstuckWithTeleport(FFormationUnitData& FormationUnit,
+                                                             const FVector& WaypointLocation,
+                                                             const FRotator& WaypointDirection,
+                                                             UNavigationSystemV1* NavSys)
+{
+	if (TryTeleportStuckFormationUnit(FormationUnit, WaypointLocation, WaypointDirection, NavSys))
+	{
+		FormationUnit.StuckCounts = 0;
+		FormationUnit.bPreviousStuckTeleportsFailed = false;
+		DebugFormationUnitJustTeleported(FormationUnit, WaypointLocation);
+	}
+	else
+	{
+		FormationUnit.bPreviousStuckTeleportsFailed = true;
+		DebugFormationUnitJustTeleported_AndFailed(FormationUnit, WaypointLocation);
+	}
+	
+}
+
+void UEnemyFormationController::AttemptUnStuckSquad(const FFormationUnitData& FormationUnit) const
+{
+	FormationUnit.Unit->UnstuckSquadMoveUp(EnemyFormationConstants::TeleportSquadUnitsUnStuckHeight);
 }

@@ -129,6 +129,9 @@ private:
 	void DebugFormationUnitJustTeleported(
 		const FFormationUnitData& FormationUnit,
 		const FVector& WaypointLocation);
+	void DebugFormationUnitJustTeleported_AndFailed(
+		const FFormationUnitData& FormationUnit,
+		const FVector& WaypointLocation);
 
 	void HandleFormationIdleUnits(
 		FFormationData& Formation,
@@ -332,4 +335,13 @@ private:
 	                           float Duration = 5.0f) const;
 
 	void DebugTeleportAttempt(const FColor& TpColor, const FVector& Location) const;
+
+	void AttemptUnstuckWithTeleport(
+	FFormationUnitData& FormationUnit,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection,
+	UNavigationSystemV1* NavSys);
+
+	void AttemptUnStuckSquad(
+		const FFormationUnitData& FormationUnit) const;
 };

@@ -360,6 +360,8 @@ public:
 
 	virtual bool GetIsSquadUnit() { return false; }
 
+	virtual void UnstuckSquadMoveUp(const float ZOffset);
+
 	virtual void SetRTSOverlapEvasionEnabled(const bool bEnabled);
 	virtual bool GetIsUnitInCombat()const;
 

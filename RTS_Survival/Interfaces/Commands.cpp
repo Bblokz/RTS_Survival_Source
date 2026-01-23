@@ -1039,6 +1039,11 @@ int32 ICommands::GetConstructionAbilityCount()
 	return Count;
 }
 
+void ICommands::UnstuckSquadMoveUp(const float ZOffset)
+{
+	return;
+}
+
 void ICommands::SetRTSOverlapEvasionEnabled(const bool bEnabled)
 {
 	
