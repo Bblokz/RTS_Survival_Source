@@ -7,6 +7,8 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatData.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -117,6 +119,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_FieldConstructionComponent = CreateDefaultSubobject<UEnemyFieldConstructionComponent>(TEXT("FieldConstructionComponent"));
 	M_EnemyNavigationAIComponent = CreateDefaultSubobject<UEnemyNavigationAIComponent>(TEXT("EnemyNavigationAIComponent"));
 	M_EnemyStrategicAIComponent = CreateDefaultSubobject<UEnemyStrategicAIComponent>(TEXT("EnemyStrategicAIComponent"));
+	M_EnemyRetreatController = CreateDefaultSubobject<UEnemyRetreatController>(TEXT("EnemyRetreatController"));
 	if(M_FormationController)
 	{
 		M_FormationController->InitFormationController(this);
@@ -138,6 +141,10 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	{
 		M_EnemyStrategicAIComponent->InitStrategicAIComponent(this);
 	}
+	if (M_EnemyRetreatController)
+	{
+		M_EnemyRetreatController->InitRetreatController(this);
+	}
 	
 }
 
@@ -146,7 +153,8 @@ void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& 
                                                const TArray<FVector>& Waypoints,
                                                const FRotator& FinalWaypointDirection,
                                                const int32 MaxFormationWidth,
-                                               const float FormationOffsetMlt)
+                                               const float FormationOffsetMlt,
+                                               const FVector& AverageSpawnLocation)
 {
 	if(not GetIsValidFormationController())
 	{
@@ -158,7 +166,8 @@ void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& 
 		Waypoints,
 		FinalWaypointDirection,
 		MaxFormationWidth,
-		FormationOffsetMlt);
+		FormationOffsetMlt,
+		AverageSpawnLocation);
 }
 
 void AEnemyController::CreateAttackWave(const EEnemyWaveType WaveType, const TArray<FAttackWaveElement>& WaveElements,
@@ -424,7 +433,8 @@ void AEnemyController::MoveAttackMoveFormationToLocation(
 	const FRotator& FinalWaypointDirection,
 	const int32 MaxFormationWidth,
 	const float FormationOffsetMlt,
-	const FAttackMoveWaveSettings& AttackMoveSettings)
+	const FAttackMoveWaveSettings& AttackMoveSettings,
+	const FVector& AverageSpawnLocation)
 {
 	if (not GetIsValidFormationController())
 	{
@@ -438,7 +448,87 @@ void AEnemyController::MoveAttackMoveFormationToLocation(
 		FinalWaypointDirection,
 		MaxFormationWidth,
 		FormationOffsetMlt,
-		AttackMoveSettings);
+		AttackMoveSettings,
+		AverageSpawnLocation);
+}
+
+void AEnemyController::RetreatAllFormations(
+	const FVector& CounterattackLocation,
+	const EPostRetreatCounterStrategy PostRetreatCounterStrategy,
+	const float TileTillCounterAttackAfterLastRetreatingUnitReached,
+	const float MaxTimeWaitTillCounterAttack)
+{
+	if (not GetIsValidFormationController() || not GetIsValidEnemyRetreatController())
+	{
+		return;
+	}
+
+	TArray<FFormationData> ActiveFormations;
+	M_FormationController->GetActiveFormationData(ActiveFormations);
+	if (ActiveFormations.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"No active formations found to retreat. \nAt AEnemyController::RetreatAllFormations()");
+		return;
+	}
+
+	TArray<FRetreatElement> RetreatingSquadControllers;
+	TArray<FRetreatElement> ReverseRetreatUnits;
+
+	for (const FFormationData& Formation : ActiveFormations)
+	{
+		const FVector RetreatLocation = Formation.AverageSpawnLocation;
+		for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
+		{
+			if (not FormationUnit.Unit.IsValid())
+			{
+				continue;
+			}
+
+			ICommands* Commands = FormationUnit.Unit.Get();
+			if (not Commands)
+			{
+				continue;
+			}
+
+			if (Commands->GetIsSquadUnit())
+			{
+				const ECommandQueueError CommandError = Commands->RetreatToLocation(RetreatLocation, true);
+				if (CommandError == ECommandQueueError::NoError)
+				{
+					FRetreatElement RetreatElement;
+					RetreatElement.Unit = FormationUnit.Unit;
+					RetreatElement.RetreatLocation = RetreatLocation;
+					RetreatingSquadControllers.Add(RetreatElement);
+				}
+				continue;
+			}
+
+			const ECommandQueueError CommandError = Commands->ReverseUnitToLocation(RetreatLocation, true);
+			if (CommandError == ECommandQueueError::NoError)
+			{
+				FRetreatElement RetreatElement;
+				RetreatElement.Unit = FormationUnit.Unit;
+				RetreatElement.RetreatLocation = RetreatLocation;
+				ReverseRetreatUnits.Add(RetreatElement);
+			}
+		}
+	}
+
+	if (RetreatingSquadControllers.IsEmpty() && ReverseRetreatUnits.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"No valid retreat units found to track. \nAt AEnemyController::RetreatAllFormations()");
+		return;
+	}
+
+	M_EnemyRetreatController->StartRetreat(
+		RetreatingSquadControllers,
+		ReverseRetreatUnits,
+		CounterattackLocation,
+		PostRetreatCounterStrategy,
+		TileTillCounterAttackAfterLastRetreatingUnitReached,
+		MaxTimeWaitTillCounterAttack);
 }
 
 void AEnemyController::AddToWaveSupply(const int32 AddSupply)
@@ -538,6 +628,20 @@ bool AEnemyController::GetIsValidEnemyStrategicAIComponent() const
 	if (not IsValid(M_EnemyStrategicAIComponent))
 	{
 		RTSFunctionLibrary::ReportError("Invalid enemy strategic AI component for enemy controller!");
+		return false;
+	}
+	return true;
+}
+
+bool AEnemyController::GetIsValidEnemyRetreatController() const
+{
+	if (not IsValid(M_EnemyRetreatController))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_EnemyRetreatController",
+			"AEnemyController::GetIsValidEnemyRetreatController",
+			this);
 		return false;
 	}
 	return true;

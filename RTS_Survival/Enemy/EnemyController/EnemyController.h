@@ -14,9 +14,11 @@
 struct FAttackWaveElement;
 struct FAttackMoveWaveSettings;
 enum class EEnemyWaveType : uint8;
+enum class EPostRetreatCounterStrategy : uint8;
 class UEnemyWaveController;
 struct FEnemyResources;
 class UEnemyFormationController;
+class UEnemyRetreatController;
 class UEnemyNavigationAIComponent;
 class UEnemyStrategicAIComponent;
 class ATankMaster;
@@ -42,7 +44,8 @@ public:
 		const TArray<FVector>& Waypoints,
 		const FRotator& FinalWaypointDirection,
 		const int32 MaxFormationWidth = 2,
-		const float FormationOffsetMlt = 1.f);
+		const float FormationOffsetMlt = 1.f,
+		const FVector& AverageSpawnLocation = FVector::ZeroVector);
 
 	/**
 	 * 
@@ -247,7 +250,21 @@ public:
 		const FRotator& FinalWaypointDirection,
 		const int32 MaxFormationWidth,
 		const float FormationOffsetMlt,
-		const FAttackMoveWaveSettings& AttackMoveSettings);
+		const FAttackMoveWaveSettings& AttackMoveSettings,
+		const FVector& AverageSpawnLocation = FVector::ZeroVector);
+
+	/**
+	 * @brief Orders all active formations to retreat so the AI can regroup before counterattacking.
+	 * @param CounterattackLocation Location used when regrouping units should re-engage.
+	 * @param PostRetreatCounterStrategy Determines what happens after all units reach retreat.
+	 * @param TileTillCounterAttackAfterLastRetreatingUnitReached Delay after the last unit reaches retreat.
+	 * @param MaxTimeWaitTillCounterAttack Hard timeout before forcing a counterattack.
+	 */
+	void RetreatAllFormations(
+		const FVector& CounterattackLocation,
+		const EPostRetreatCounterStrategy PostRetreatCounterStrategy,
+		const float TileTillCounterAttackAfterLastRetreatingUnitReached = 60.f,
+		const float MaxTimeWaitTillCounterAttack = 120.f);
 
 	// ------------------------------------------------------------
 	// Enemy Resources Management
@@ -299,6 +316,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnemyStrategicAIComponent> M_EnemyStrategicAIComponent;
 
+	UPROPERTY()
+	TObjectPtr<UEnemyRetreatController> M_EnemyRetreatController;
+
 	TArray<TWeakObjectPtr<ATankMaster>> M_Tanks;
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 
@@ -307,6 +327,7 @@ private:
 	bool GetIsValidFieldConstructionComponent() const;
 	bool GetIsValidEnemyNavigationAIComponent() const;
 	bool GetIsValidEnemyStrategicAIComponent() const;
+	bool GetIsValidEnemyRetreatController() const;
 
 	// Contains the supplies and other resource settings for waves and construction.
 	FEnemyResources M_Resources;

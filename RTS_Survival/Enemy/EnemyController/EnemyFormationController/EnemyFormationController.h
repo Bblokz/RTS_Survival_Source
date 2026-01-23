@@ -43,7 +43,8 @@ public:
 		const TArray<FVector>& Waypoints,
 		const FRotator& FinalWaypointDirection,
 		int32 MaxFormationWidth = 2,
-		const float FormationOffsetMlt = 1.f);
+		const float FormationOffsetMlt = 1.f,
+		const FVector& AverageSpawnLocation = FVector::ZeroVector);
 
 	/**
 	 * @brief Starts a formation using attack move logic so combat-ready units can assist each other en route.
@@ -62,9 +63,11 @@ public:
 		const FRotator& FinalWaypointDirection,
 		int32 MaxFormationWidth,
 		const float FormationOffsetMlt,
-		const FAttackMoveWaveSettings& AttackMoveSettings);
+		const FAttackMoveWaveSettings& AttackMoveSettings,
+		const FVector& AverageSpawnLocation = FVector::ZeroVector);
 
 	void DebugAllActiveFormations() const;
+	void GetActiveFormationData(TArray<FFormationData>& OutFormationData) const;
 
 protected:
 	// Called when the game starts
