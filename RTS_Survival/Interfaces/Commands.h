@@ -657,6 +657,15 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError ReturnToBase(const bool bSetUnitToIdle);
 
+	/**
+	 * @brief Queues a retreat command that moves the unit to a safe fallback location.
+	 * @param RetreatLocation Destination used when retreating.
+	 * @param bSetUnitToIdle Whether the unit should clear all previous commands making this ability the first.
+	 * @return Whether the command could be added; command queue has not been stopped.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError RetreatToLocation(const FVector& RetreatLocation, const bool bSetUnitToIdle);
+
 	/** @return the current command of the unit. */
 	EAbilityID GetActiveCommandID();
 
@@ -821,6 +830,9 @@ protected:
 
 	virtual void ExecuteReturnToBase();
 	virtual void TerminateReturnToBase();
+
+	virtual void ExecuteRetreatCommand(const FVector RetreatLocation);
+	virtual void TerminateRetreatCommand();
 
 	virtual void ExecuteEnterCargoCommand(AActor* CarrierActor);
 	virtual void TerminateEnterCargoCommand();

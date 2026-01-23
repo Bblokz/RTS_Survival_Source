@@ -810,6 +810,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			M_Owner->ExecuteReturnToBase();
 		}
 		break;
+	case EAbilityID::IdRetreat:
+		{
+			M_Owner->ExecuteRetreatCommand(Cmd.TargetLocation);
+		}
+		break;
 	case EAbilityID::IdEnterCargo:
 		{
 			M_Owner->ExecuteEnterCargoCommand(Cmd.TargetActor.Get());
@@ -2035,6 +2040,29 @@ ECommandQueueError ICommands::ReturnToBase(const bool bSetUnitToIdle)
 	return Error;
 }
 
+ECommandQueueError ICommands::RetreatToLocation(const FVector& RetreatLocation, const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdRetreat);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdRetreat, RetreatLocation,
+		nullptr,
+		FRotator::ZeroRotator);
+}
+
 
 EAbilityID ICommands::GetActiveCommandID()
 {
@@ -2306,6 +2334,15 @@ void ICommands::ExecuteReturnToBase()
 }
 
 void ICommands::TerminateReturnToBase()
+{
+}
+
+void ICommands::ExecuteRetreatCommand(const FVector RetreatLocation)
+{
+	static_cast<void>(RetreatLocation);
+}
+
+void ICommands::TerminateRetreatCommand()
 {
 }
 
@@ -2650,6 +2687,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdReturnToBase:
 		TerminateReturnToBase();
+		break;
+	case EAbilityID::IdRetreat:
+		TerminateRetreatCommand();
 		break;
 	case EAbilityID::IdEnterCargo:
 		TerminateEnterCargoCommand();

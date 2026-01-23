@@ -109,8 +109,11 @@ private:
         bool TryGetSquadController(ASquadController*& OutSquadController);
         bool GetIsValidSquadController() const;
 
+protected:
         UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour|Movement", meta = (AllowPrivateAccess = "true"))
         FBehaviourSquadMovementMultipliers BehaviourMovementMultipliers;
+
+private:
 
         UPROPERTY()
         TWeakObjectPtr<ASquadController> M_SquadController;

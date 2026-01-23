@@ -9,6 +9,7 @@
 #include "ToolBuilderUtil.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Behaviours/Derived/BehaviourSquadRetreat/SquadRetreatBehaviour.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
@@ -631,6 +632,17 @@ void ASquadController::OnSquadUnitCommandComplete(const EAbilityID CompletedAbil
 		return;
 	}
 
+	if (CompletedAbilityID == EAbilityID::IdRetreat)
+	{
+		if (M_UnitsCompletedCommand >= M_TSquadUnits.Num())
+		{
+			HandleRetreatCommandCleanup();
+			DoneExecutingCommand(EAbilityID::IdRetreat);
+			M_UnitsCompletedCommand = 0;
+		}
+		return;
+	}
+
 	// If all units have completed the command.
 	if (M_UnitsCompletedCommand >= M_TSquadUnits.Num())
 	{
@@ -1032,6 +1044,26 @@ void ASquadController::ExecuteMoveCommand(const FVector MoveToLocation)
 	GeneralMoveToForAbility(MoveToLocation, EAbilityID::IdMove);
 }
 
+void ASquadController::ExecuteRetreatCommand(const FVector RetreatLocation)
+{
+	if (RetreatLocation.IsNearlyZero())
+	{
+		DoneExecutingCommand(EAbilityID::IdRetreat);
+		return;
+	}
+
+	if (not GetIsValidBehaviourComponent())
+	{
+		DoneExecutingCommand(EAbilityID::IdRetreat);
+		return;
+	}
+
+	M_UnitsCompletedCommand = 0;
+	BehaviourComponent->AddBehaviour(USquadRetreatBehaviour::StaticClass());
+	HandleRetreatCommandStart();
+	GeneralMoveToForAbility(RetreatLocation, EAbilityID::IdRetreat);
+}
+
 ESquadPathFindingError ASquadController::GeneratePathsForSquadUnits(const FVector& MoveToLocation)
 {
 	UWorld* World = nullptr;
@@ -1227,6 +1259,12 @@ void ASquadController::TerminateMoveCommand()
 			SquadUnit->TerminateMovementCommand();
 		}
 	}
+}
+
+void ASquadController::TerminateRetreatCommand()
+{
+	TerminateMoveCommand();
+	HandleRetreatCommandCleanup();
 }
 
 void ASquadController::ExecuteReinforceCommand(AActor* ReinforcementTarget)
@@ -2096,6 +2134,43 @@ void ASquadController::StopMovement()
 		{
 			SquadUnit->M_AISquadUnit->StopMovement();
 		}
+	}
+}
+
+void ASquadController::HandleRetreatCommandStart()
+{
+	SetSquadUnitsCanBeSelected(false);
+	if (GetIsValidPlayerController())
+	{
+		PlayerController->RemoveSquadFromSelectionAndUpdateUI(this);
+	}
+}
+
+void ASquadController::HandleRetreatCommandCleanup()
+{
+	if (GetIsValidBehaviourComponent())
+	{
+		BehaviourComponent->RemoveBehaviour(USquadRetreatBehaviour::StaticClass());
+	}
+	SetSquadUnitsCanBeSelected(true);
+}
+
+void ASquadController::SetSquadUnitsCanBeSelected(const bool bCanBeSelected)
+{
+	EnsureSquadUnitsValid();
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		USelectionComponent* SelectionComponent = SquadUnit->GetSelectionComponent();
+		if (not IsValid(SelectionComponent))
+		{
+			continue;
+		}
+		SelectionComponent->SetCanBeSelected(bCanBeSelected);
 	}
 }
 
