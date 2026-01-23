@@ -1127,6 +1127,8 @@ private:
 	 */
 	void ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLocation);
 
+	void ActionButtonAttackGround(const FVector& ClickedLocation);
+
 	void CheckAttackCommandForAttackGround(ECommandType& OutCommandType) const;
 
 	/**
@@ -1196,6 +1198,7 @@ private:
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();
 
+	void DirectActionButtonAttackGround();
 	void DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonAimAbility(const EAimAbilityType AimAbilityType);

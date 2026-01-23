@@ -2057,6 +2057,10 @@ ECommandQueueError ICommands::RetreatToLocation(const FVector& RetreatLocation, 
 	{
 		SetUnitToIdle();
 	}
+	if (UnitCommandData->GetHasCommandInQueue(EAbilityID::IdRetreat))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
 	return UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdRetreat, RetreatLocation,
 		nullptr,
