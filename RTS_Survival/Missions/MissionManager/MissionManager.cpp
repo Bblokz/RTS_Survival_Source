@@ -36,6 +36,23 @@ void AMissionManager::OnAnyMissionFailed(UMissionBase* FailedMission)
 	PlayMissionSound(EMissionSoundType::MissionFailed);
 }
 
+void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty)
+{
+	M_GameDifficulty.DifficultyLevel = GameDifficulty;
+	M_GameDifficulty.DifficultyPercentage = NewDifficultyPercentage;
+	M_GameDifficulty.bIsInitialized = true;
+}
+
+FRTSGameDifficulty AMissionManager::GetCurrentGameDifficulty() const
+{
+	if(not M_GameDifficulty.bIsInitialized)
+	{
+		RTSFunctionLibrary::ReportError("Game difficulty requested but not initialized yet in mission manager.");
+		return FRTSGameDifficulty();
+	}
+	return M_GameDifficulty;
+}
+
 UW_Mission* AMissionManager::OnMissionRequestSetupWidget(UMissionBase* RequestingMission)
 {
 	if (not EnsureMissionIsValid(RequestingMission) || not EnsureMissionWidgetIsValid())

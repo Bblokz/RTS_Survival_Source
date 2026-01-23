@@ -260,6 +260,7 @@ public:
 	 * @param TileTillCounterAttackAfterLastRetreatingUnitReached Delay after the last unit reaches retreat.
 	 * @param MaxTimeWaitTillCounterAttack Hard timeout before forcing a counterattack.
 	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RetreatAllFormations(
 		const FVector& CounterattackLocation,
 		const EPostRetreatCounterStrategy PostRetreatCounterStrategy,

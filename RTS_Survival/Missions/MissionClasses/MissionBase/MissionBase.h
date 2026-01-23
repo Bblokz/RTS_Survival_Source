@@ -7,6 +7,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "UObject/NoExportTypes.h"
 #include "Engine/OverlapResult.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "MissionBase.generated.h"
 
 class ADestructableEnvActor;
@@ -131,6 +132,9 @@ public:
 protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AMissionManager* GetMissionManagerChecked() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	FRTSGameDifficulty GetGameDifficulty()const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AEnemyController* GetEnemyControllerChecked() const;

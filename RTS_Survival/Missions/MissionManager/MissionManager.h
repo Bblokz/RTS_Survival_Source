@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "MissionSounds/MissionSounds.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "MissionManager.generated.h"
 
 
@@ -45,6 +46,9 @@ public:
 	void OnAnyMissionCompleted(UMissionBase* CompletedMission, const bool bPlaySound = true);
 	void OnAnyMissionStarted(UMissionBase* LoadedMission);
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
+	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	FRTSGameDifficulty GetCurrentGameDifficulty() const;
 	UW_Mission* OnMissionRequestSetupWidget(UMissionBase* RequestingMission);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlaySound2DForMission(USoundBase* SoundToPlay) const;
@@ -118,6 +122,9 @@ private:
 	void PlayMissionFailed();
 
 	void ProvideMissionWidgetToMainGameUI() const;
+
+	UPROPERTY()
+	FRTSGameDifficulty M_GameDifficulty;
 
 	
 

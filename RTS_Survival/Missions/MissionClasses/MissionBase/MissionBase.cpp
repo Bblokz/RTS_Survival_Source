@@ -125,6 +125,15 @@ AMissionManager* UMissionBase::GetMissionManagerChecked() const
 	return M_MissionManager.Get();
 }
 
+FRTSGameDifficulty UMissionBase::GetGameDifficulty() const
+{
+	if(not GetIsValidMissionManager())
+	{
+		return FRTSGameDifficulty();
+	}
+	return M_MissionManager->GetCurrentGameDifficulty();
+}
+
 AEnemyController* UMissionBase::GetEnemyControllerChecked() const
 {
 	if(AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(M_MissionManager.Get()))
