@@ -4340,6 +4340,10 @@ void ACPPController::DirectActionButtonRetreat()
 		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NoMobileHQToFallBackto, true, true);
 		return;
 	}
+	if(not GetIsValidGameUIController())
+	{
+		return;
+	}
 
 	constexpr float RetreatProjectionScale = 2.0f;
 	bool bWasProjected = false;
@@ -4353,6 +4357,8 @@ void ACPPController::DirectActionButtonRetreat()
 
 	// Make a copy as units get removed because retreating leads to deselection.
 	TArray<ASquadController*> TempArray = TSelectedSquadControllers;
+
+	const AActor* PrimarySelected = M_GameUIController->GetPrimarySelectedUnit();
 
 	int32 CommandsExe = 0;
 	const bool bResetQueue = not bIsHoldingShift;
@@ -4368,6 +4374,11 @@ void ACPPController::DirectActionButtonRetreat()
 
 	if (CommandsExe > 0)
 	{
+		// Because if successful the primary selected unit is no longer in selection we play the voiceline here.
+		if(GetIsValidPlayerAudioController() && IsValid(PrimarySelected))
+		{
+			M_PlayerAudioController->PlayVoiceLine(PrimarySelected, ERTSVoiceLine::FallBackToHQ, true, false);
+		}
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdRetreat),
 		                                false);
 	}
