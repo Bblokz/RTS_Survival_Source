@@ -379,6 +379,8 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 		break;
 	case EConstructionPreviewMode::Construct_FieldConstruction:
 		bM_IsValidBuildingLocation = TickRadiiBuildingPlacement(bIsSlopeValid);
+		// Slope always valid for field constructions.
+		bIsSlopeValid = true;
 		break;
 	}
 	// Update materials depending on whether we can place the preview.

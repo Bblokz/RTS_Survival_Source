@@ -1,0 +1,30 @@
+﻿ you will have to  create a nw widget under GameUI and then GameDifficultyPicker as its dir.
+ this uuser derived widget will have: (all bind widget)
+ a button for new to rts difficulty
+ a button for normal difficulty
+    a button for hard difficulty
+    a button for brutal difficulty
+    a button for ironman difficulty
+
+it will also have a border called DifficultyInfoBorder by initialization set it hidden.
+make sure the difficulty border is shown whenever we hover on of the buttons and call a blueprint implementable event
+ called BP_OnDifficultyHovered with a parameter of the difficulty type hovered. this difficulty type you get from  ERTSGameDifficulty
+ as found in GameDifficulty.h
+ 
+ in addition you need to implement the dev settings found in RTSGameDifficultySettings.h so that that settings page will have
+ a tmap from the ERTSGameDifficulty to int32 that will get the percentage per difficulty level. also set the CategoryName to Game and set the section name to 
+ RTS Difficulty Settings
+ 
+ make sure the border of the info is hidden when no button is hovered.
+ 
+ okay so when a button in the widget is clicked get those settings and find the integer for percentage. if not found
+ do an RTSFunc lib ReportError.
+ then call an other func on the widget called OnDifficultyChosen with the int32 percentage and the ERTSGameDifficulty chosen.
+ and in there use the FRTS_Statics::GetGameMissionManager and set the difficulty using 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
+ on it. after that remove this widget from the viewport and destroy it.
+ 
+ in addition add a editanywhere property bool to the mission manager that will be called bSetGameDifficultyWithWidget.
+ also add a protected field; edit defaults only and bp readwrite of subclass of our new widget.
+ 
+ at begin play before activate new mission on all the configured mission call a private that checks if this bool is set; 
+ if so then create the widget with a high z order and add to viewport.

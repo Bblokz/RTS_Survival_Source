@@ -10,6 +10,7 @@
 #include "RTS_Survival/UnitData/VehicleData.h"
 
 
+class AMissionManager;
 class UAnimatedTextWidgetPoolManager;
 class UPlayerPortraitManager;
 class AEnemyController;
@@ -72,6 +73,8 @@ public:
 	static UPlayerCameraController* GetPlayerCameraController(const UObject* WorldContextObject);
 
 	static UPlayerAudioController* GetPlayerAudioController(const UObject* WorldContextObject);
+
+	static AMissionManager* GetGameMissionManager(const UObject* WorldContextObject);
 	// -------------------- End Player Related Objects --------------------
 
 	/** @return Whether the player is holding down the shift key. */

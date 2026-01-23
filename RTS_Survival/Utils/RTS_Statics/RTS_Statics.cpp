@@ -7,6 +7,7 @@
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
+#include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/Camera/CameraPawn.h"
@@ -416,6 +417,23 @@ UPlayerAudioController* FRTS_Statics::GetPlayerAudioController(const UObject* Wo
 			return Audio;
 		}
 	}
+	return nullptr;
+}
+
+AMissionManager* FRTS_Statics::GetGameMissionManager(const UObject* WorldContextObject)
+{
+	// find it on the map.
+	if (AMissionManager* MissionManager = Cast<AMissionManager>(
+		UGameplayStatics::GetActorOfClass(WorldContextObject, AMissionManager::StaticClass())))
+	{
+		if (IsValid(MissionManager))
+		{
+			return MissionManager;
+		}
+	}
+	RTSFunctionLibrary::ReportError("Could not get mission manager for actor: " + WorldContextObject->GetName() +
+		"\n See FRTS_Statics::GetGameMissionManager"
+  "\n is there a mission manager on  this map?");
 	return nullptr;
 }
 

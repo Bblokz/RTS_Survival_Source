@@ -873,7 +873,7 @@ void ACPPController::ConstructBuilding(AActor* RequestingActor)
 		                            bUseBuildRadius,
 		                            GetNomadicPreviewAttachments(NomadicVehicle));
 		M_ActiveAbility = EAbilityID::IdCreateBuilding;
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::SelectTargetForNomadicBuilding, true, false);
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::SelectTargetForNomadicBuilding, false, false);
 		// Note that we do not call the MainGameUI to show the cancel button as this is already
 		// completed by MainGameUI itself since this function is called from the MainGameUI.
 	}
