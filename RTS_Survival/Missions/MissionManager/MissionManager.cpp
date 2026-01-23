@@ -5,6 +5,7 @@
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
+#include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -103,6 +104,7 @@ void AMissionManager::BeginPlay()
 	Super::BeginPlay();
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionWidgetManager();
+	BeginPlay_InitGameDifficultyPickerWidget();
 
 	// Start all configured missions.
 	for (UMissionBase* Mission : Missions)
@@ -196,6 +198,38 @@ void AMissionManager::BeginPlay_InitMissionWidgetManager()
 		return;
 	}
 	InitMissionManagerWidget();
+}
+
+void AMissionManager::BeginPlay_InitGameDifficultyPickerWidget()
+{
+	if (not bSetGameDifficultyWithWidget)
+	{
+		return;
+	}
+
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	if (not M_GameDifficultyPickerWidgetClass)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Game difficulty widget class is not set on the mission manager.");
+		return;
+	}
+
+	const int32 DifficultyWidgetZOrder = 100;
+	UW_GameDifficultyPicker* DifficultyPickerWidget = CreateWidget<UW_GameDifficultyPicker>(
+		M_PlayerController.Get(), M_GameDifficultyPickerWidgetClass);
+	if (not IsValid(DifficultyPickerWidget))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to create game difficulty picker widget on mission manager.");
+		return;
+	}
+
+	DifficultyPickerWidget->AddToViewport(DifficultyWidgetZOrder);
 }
 
 bool AMissionManager::EnsureValidPlayerController() const
@@ -320,4 +354,3 @@ void AMissionManager::ProvideMissionWidgetToMainGameUI() const
 	}
 	MainGameUI->SetMissionManagerWidget(M_MissionWidgetManager);
 }
-

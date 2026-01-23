@@ -12,6 +12,7 @@ struct FMissionWidgetState;
 class ACPPController;
 class UW_MissionWidgetManager;
 class UMissionBase;
+class UW_GameDifficultyPicker;
 
 /**
  * @brief Keeps track of the currently active missions with the active array.
@@ -72,6 +73,12 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
+	bool bSetGameDifficultyWithWidget = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Difficulty")
+	TSubclassOf<UW_GameDifficultyPicker> M_GameDifficultyPickerWidgetClass;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);
 
@@ -102,6 +109,7 @@ private:
 
 	void BeginPlay_InitPlayerController();
 	void BeginPlay_InitMissionWidgetManager();
+	void BeginPlay_InitGameDifficultyPickerWidget();
 	bool EnsureValidPlayerController() const;
 
 	UPROPERTY()
