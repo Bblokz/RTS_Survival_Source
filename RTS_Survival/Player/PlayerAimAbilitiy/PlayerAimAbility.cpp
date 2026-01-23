@@ -166,6 +166,12 @@ EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeForAbility(const EAbilityID 
 			OutAbilityRadius = AimAbilityComponent->GetAimAbilityRadius();
 			return AimAbilityComponent->GetAimAssistType();
 		}
+	case EAbilityID::IdAttackGround:
+		{
+			constexpr float AttackGroundAimRadius = 200.0f;
+			OutAbilityRadius = AttackGroundAimRadius;
+			return EPlayerAimAbilityTypes::SmallCrosshair;
+		}
 	default:
 		return EPlayerAimAbilityTypes::None;
 	}
