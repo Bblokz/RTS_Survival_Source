@@ -36,4 +36,5 @@ enum class EBehaviourIcon : uint8
 	FlakShrapnelRounds,
 	FlameNapalmAbility,
 	PanzerIVArtilleryBarrage,
+	FallbackToHQ,
 };

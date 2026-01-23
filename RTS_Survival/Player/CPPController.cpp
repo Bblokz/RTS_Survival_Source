@@ -4337,6 +4337,7 @@ void ACPPController::DirectActionButtonRetreat()
 	EnsureSelectionsAreRTSValid();
 	if (not GetIsValidPlayerHQ())
 	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NoMobileHQToFallBackto, true, true);
 		return;
 	}
 
@@ -4350,9 +4351,12 @@ void ACPPController::DirectActionButtonRetreat()
 		RetreatProjectionScale);
 	static_cast<void>(bWasProjected);
 
+	// Make a copy as units get removed because retreating leads to deselection.
+	TArray<ASquadController*> TempArray = TSelectedSquadControllers;
+
 	int32 CommandsExe = 0;
 	const bool bResetQueue = not bIsHoldingShift;
-	for (ASquadController* EachSquad : TSelectedSquadControllers)
+	for (ASquadController* EachSquad : TempArray)
 	{
 		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
 		{

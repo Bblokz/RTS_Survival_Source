@@ -1242,7 +1242,7 @@ namespace DeveloperSettings
 		namespace ActionUI
 		{
 			// Defines the maximum lenght for an ability array of a unit.
-			inline constexpr int32 MaxAbilitiesForActionUI = 12;
+			inline constexpr int32 MaxAbilitiesForActionUI = 15;
 		}
 
 		namespace Resources

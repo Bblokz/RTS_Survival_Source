@@ -63,6 +63,7 @@ enum class ERTSVoiceLine : uint8
 	SquadFullyReinforced,
 	EnterPosition,
 	ExitPosition,
+	FallBackToHQ,
 };
 
 UENUM(Blueprintable)
@@ -99,7 +100,8 @@ enum class EAnnouncerVoiceLineType : uint8
 	SelectTargetForNomadicBuilding,
 	SelectTargetForAimAbility,
 	NotEnoughSquadUnitsToCapture,
-	SquadWillCaptureObjective
+	SquadWillCaptureObjective,
+	NoMobileHQToFallBackto,
 };
 
 USTRUCT(BlueprintType)
