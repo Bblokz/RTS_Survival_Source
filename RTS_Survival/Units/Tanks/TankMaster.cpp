@@ -236,7 +236,6 @@ ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 }
 
 
-
 USkeletalMeshComponent* ATankMaster::GetTankMesh() const
 {
 	return nullptr;
@@ -596,41 +595,46 @@ UHarvester* ATankMaster::GetIsHarvester()
 
 void ATankMaster::ExecuteHarvestResourceCommand(ACPPResourceMaster* TargetResource)
 {
+	if (not IsValid(M_HarvesterComponent) || not GetIsValidAIController())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Harvester component OR AI CONTROLLER is not valid while trying to harvest resource!"
+			"\n At function: ATankMaster::ExecuteHarvestResourceCommand"
+			"\n For tank: " + GetName());
+		DoneExecutingCommand(EAbilityID::IdHarvestResource);
+		return;
+	}
 	UResourceComponent* ResourceComponentOfTarget = nullptr;
 	if (IsValid(TargetResource))
 	{
 		ResourceComponentOfTarget = TargetResource->GetResourceComponent();
 	}
 
-	if (IsValid(M_HarvesterComponent))
+	// reset previous targets
+	if (GetIsValidRTSNavCollision())
 	{
-		// reset previous targets
-		if (GetIsValidRTSNavCollision())
-		{
-			RTSNavCollision->EnableAffectNavmesh(false);
-		}
-		M_HarvesterComponent->ExecuteHarvestResourceCommand(ResourceComponentOfTarget);
+		RTSNavCollision->EnableAffectNavmesh(false);
 	}
-	else
-	{
-		RTSFunctionLibrary::ReportError("Harvester component is not valid while trying to harvest resource!"
-			"\n At function: ATankMaster::ExecuteHarvestResourceCommand"
-			"\n For tank: " + GetName());
-	}
+	// note that overlap evasion is disabled in the derived tracked tank class.
+	AITankController->SetMoveBlockDetection(false);
+	M_HarvesterComponent->ExecuteHarvestResourceCommand(ResourceComponentOfTarget);
 }
 
 void ATankMaster::TerminateHarvestResourceCommand()
 {
-	if (IsValid(M_HarvesterComponent))
+	if (not IsValid(M_HarvesterComponent) || not GetIsValidAIController())
 	{
-		M_HarvesterComponent->TerminateHarvestCommand();
-	}
-	else
-	{
-		RTSFunctionLibrary::ReportError("Harvester component is not valid while trying to terminate harvest resource!"
+		RTSFunctionLibrary::ReportError(
+			"Harvester component is not valid OR INVALID AICONTROLLER while trying to terminate harvest resource!"
 			"\n At function: ATankMaster::TerminateHarvestResourceCommand"
 			"\n For tank: " + GetName());
+
+		return;
 	}
+	M_HarvesterComponent->TerminateHarvestCommand();
+
+	// note that overlap evasion is re-enabled in the derived tracked tank class.
+	AITankController->SetMoveBlockDetection(true);
 	StopBehaviourTree();
 	if (IsValid(GetAIController()))
 	{

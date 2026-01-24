@@ -56,9 +56,9 @@ void ATrackedTankMaster::UpdateVehicle_Implementation(
 
 void ATrackedTankMaster::SetRTSOverlapEvasionEnabled(const bool bEnabled)
 {
-	if(not EnsureRTSOverlapEvasionComponent())
+	if (not EnsureRTSOverlapEvasionComponent())
 	{
-	return;	
+		return;
 	}
 	RTSOverlapEvasionComponent->SetOverlapEvasionEnabled(bEnabled);
 }
