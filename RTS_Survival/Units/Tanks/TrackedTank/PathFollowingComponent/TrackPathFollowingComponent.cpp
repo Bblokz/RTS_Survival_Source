@@ -34,6 +34,27 @@ int32 UTrackPathFollowingComponent::M_TicksCountCheckOverlappers = TrackFollowin
 float UTrackPathFollowingComponent::M_TimeTillDiscardOverlap = 3.f;
 
 
+namespace TrackFollowingBlockDetection
+{
+	// Vehicles accelerate slowly and can be flagged as blocked too early with default thresholds.
+	// These values control when UE decides a move is "blocked" and aborts the path request.
+	// DistanceThresholdCentimeters:
+	// - Minimum distance the agent must advance during a single block-detection interval.
+	// - Increase this if vehicles should more aggressively give up when they barely move.
+	// - Decrease this if slow heavy vehicles are incorrectly marked as blocked while still moving.
+	// IntervalSeconds:
+	// - How often UE samples position deltas for blocked detection.
+	// - Increase this to give heavy vehicles more time to build momentum before being evaluated.
+	// - Decrease this to make blocked detection react faster when responsiveness is more important.
+	// SampleCount:
+	// - Number of recent samples UE considers before declaring the move blocked.
+	// - Increase this to require a longer "no progress" window (less false positives, slower abort).
+	// - Decrease this to allow quicker aborts when the vehicle is truly stuck.
+	constexpr float DistanceThresholdCentimeters = 150.f;
+	constexpr float IntervalSeconds = 2.0f;
+	constexpr int32 SampleCount = 16;
+}
+
 /**
  * If Resolve Collisions is set in the project settings on the crowd controller then
  * ApplyCrowdAgentPosition will be called to resolve issues, however this causes glitches with physics based vehicles.
@@ -82,6 +103,9 @@ UTrackPathFollowingComponent::UTrackPathFollowingComponent()
 	// PathOptimizationRange = 1000.0f; // approx: radius * 30.0f
 	// AvoidanceQuality = ECrowdAvoidanceQuality::Low;
 	// AvoidanceRangeMultiplier = 1.0f;
+	BlockDetectionDistance = TrackFollowingBlockDetection::DistanceThresholdCentimeters;
+	BlockDetectionInterval = TrackFollowingBlockDetection::IntervalSeconds;
+	BlockDetectionSampleCount = TrackFollowingBlockDetection::SampleCount;
 }
 
 
@@ -248,7 +272,6 @@ void UTrackPathFollowingComponent::RegisterIdleBlockingActor(AActor* InActor)
 	}
 	AddOverlapActorData(M_IdleAlliedBlockingActors, InActor);
 }
-
 
 
 void UTrackPathFollowingComponent::DeregisterOverlapBlockingActor(AActor* InActor)
@@ -440,10 +463,10 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 
 	// Keep steering as before, set throttle to zero while we’re overlapping.
 	const float CurrentSpeed = ControlledPawn->GetVelocity().Size2D();
-	UpdateVehicle(/*Throttle*/0.f, /*CurrentSpeed*/CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/ M_LastSteeringInput);
+	UpdateVehicle(/*Throttle*/0.f, /*CurrentSpeed*/CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/
+	                          M_LastSteeringInput);
 	return true;
 }
-
 
 
 void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float DeltaTime)
@@ -465,6 +488,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 
 
 	// Pause throttle while overlapping idle allies being pushed aside; keep last steering.
+	// Disables engine block detection while waiting.
 	if (CheckOverlapIdleAllies(DeltaTime))
 	{
 		return;
@@ -686,9 +710,10 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 			{
 				if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 				{
-					RTSFunctionLibrary::DrawDebugAtLocation(this,GetAgentLocation() + FVector(0,0,300),"Vehicle stuck while navigating to unstuck location!"
-					                                "\n" + FString::SanitizeFloat(GetWorld()->GetTimeSeconds()),
-					                                FColor::Red, 3);
+					RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, 300),
+					                                        "Vehicle stuck while navigating to unstuck location!"
+					                                        "\n" + FString::SanitizeFloat(GetWorld()->GetTimeSeconds()),
+					                                        FColor::Red, 3);
 				}
 				// Get new unstuck location.
 				UnStuckDestination = TeleportOrCalculateUnstuckDestination(Destination);
@@ -748,7 +773,7 @@ void UTrackPathFollowingComponent::UpdatePathSegment()
 				                                        "Distance left: " + FString::SanitizeFloat(DistanceLeft),
 				                                        FColor::White,
 				                                        0.167
-				                                        
+
 				);
 				RTSFunctionLibrary::DrawDebugAtLocation(this,
 				                                        DebugLocation,
@@ -975,14 +1000,16 @@ void UTrackPathFollowingComponent::DebugWaitingForIdleOverlappingActors(const fl
 		{
 			bool bValidName = false;
 			URTSComponent* OtherRTSComp = OverlapData.Actor->FindComponentByClass<URTSComponent>();
-			const FString NameOfOther = OtherRTSComp ? OtherRTSComp->GetDisplayName(bValidName) : OverlapData.Actor->GetName();
+			const FString NameOfOther = OtherRTSComp
+				                            ? OtherRTSComp->GetDisplayName(bValidName)
+				                            : OverlapData.Actor->GetName();
 			DebugMessage += NameOfOther + "--";
 		}
 	}
-	RTSFunctionLibrary::DrawDebugAtLocation(this, GetAgentLocation() + FVector(0, 0, TrackFollowingEvasion::ZOffsetDebug),
-	                                        DebugMessage, FColor::Red, DeltaTime);
+	RTSFunctionLibrary::DrawDebugAtLocation(
+		this, GetAgentLocation() + FVector(0, 0, TrackFollowingEvasion::ZOffsetDebug),
+		DebugMessage, FColor::Red, DeltaTime);
 }
-
 
 
 void UTrackPathFollowingComponent::DrawNavLinks(const FColor Color)
@@ -1536,4 +1563,3 @@ void UTrackPathFollowingComponent::UpdateEngineBlockDetectionForIdleBlockerWait(
 {
 	SetEngineBlockDetectionSuppressed(bIsWaitingForIdleBlockers);
 }
-

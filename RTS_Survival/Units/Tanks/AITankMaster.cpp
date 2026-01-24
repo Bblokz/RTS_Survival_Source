@@ -257,6 +257,23 @@ void AAITankMaster::DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath,
 		// at 100 units above location print the filter name:
 		DrawDebugString(World, PathPoint.Location + FVector(0, 0, 100.f), QueryFilter, nullptr,
 		                FColor::White, 5.0f, false, 1.4f);
+		// draw a line from this point to the next point (if not last point)
+		const int32 PathPointIndex = NavMeshPath->GetPathPoints().IndexOfByKey(PathPoint);
+		if(PathPointIndex == 0)
+		{
+			// Draw line from actor location to first path point
+			const FVector ActorLocation = GetPawn() ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
+			DrawDebugLine(World, ActorLocation, PathPoint.Location, FColor::Green, false,
+			              5.0f, 0, 5.0f);
+			continue;
+		}
+		if (PathPointIndex < NavMeshPath->GetPathPoints().Num() - 2)
+		{
+			const FVector NextPointLocation =
+				NavMeshPath->GetPathPoints()[PathPointIndex + 1].Location;
+			DrawDebugLine(World, PathPoint.Location, NextPointLocation, FColor::Yellow, false,
+			              5.0f, 0, 5.0f);
+		}
 	}
 
 	// NavMeshPath->RTSOffsetFromCorners(OffsetDistance);
