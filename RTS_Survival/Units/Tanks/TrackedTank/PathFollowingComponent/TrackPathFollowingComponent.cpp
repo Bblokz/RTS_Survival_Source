@@ -51,7 +51,9 @@ namespace TrackFollowingBlockDetection
 	// - Increase this to require a longer "no progress" window (less false positives, slower abort).
 	// - Decrease this to allow quicker aborts when the vehicle is truly stuck.
 	constexpr float DistanceThresholdCentimeters = 150.f;
-	constexpr float IntervalSeconds = 2.0f;
+	constexpr float DistanceThresholdCentimeters_Min = 50.f;
+	constexpr float DistanceThresholdCentimeters_Max = 200.f;
+	constexpr float IntervalSeconds = 1.0f;
 	constexpr int32 SampleCount = 16;
 }
 
