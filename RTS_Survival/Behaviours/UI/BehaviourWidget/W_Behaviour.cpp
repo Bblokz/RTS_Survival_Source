@@ -16,10 +16,8 @@ void UW_Behaviour::InitBehaviourWidget(UW_BehaviourContainer* InBehaviourContain
                 return;
         }
 
-        if (not IsValid(BehaviourButton))
+        if (not GetIsValidBehaviourButton())
         {
-                RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-                        this, "BehaviourButton", "UW_Behaviour::InitBehaviourWidget");
                 return;
         }
 
@@ -60,8 +58,44 @@ bool UW_Behaviour::GetIsValidBehaviourContainer() const
                 return true;
         }
 
-        RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-                this, "M_BehaviourContainer", "UW_Behaviour::GetIsValidBehaviourContainer");
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+                this,
+                "M_BehaviourContainer",
+                "UW_Behaviour::GetIsValidBehaviourContainer",
+                this
+        );
+        return false;
+}
+
+bool UW_Behaviour::GetIsValidBehaviourButton() const
+{
+        if (IsValid(BehaviourButton))
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+                this,
+                "BehaviourButton",
+                "UW_Behaviour::GetIsValidBehaviourButton",
+                this
+        );
+        return false;
+}
+
+bool UW_Behaviour::GetIsValidBehaviourImage() const
+{
+        if (IsValid(BehaviourImage))
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+                this,
+                "BehaviourImage",
+                "UW_Behaviour::GetIsValidBehaviourImage",
+                this
+        );
         return false;
 }
 
@@ -73,30 +107,21 @@ const UBehaviourButtonSettings* UW_Behaviour::GetBehaviourButtonSettings()
 
 void UW_Behaviour::ApplyBehaviourIcon()
 {
-        if (not IsValid(BehaviourImage))
+        if (not GetIsValidBehaviourImage())
         {
-                RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-                        this, "BehaviourImage", "UW_Behaviour::ApplyBehaviourIcon");
                 return;
         }
 
         const UBehaviourButtonSettings* BehaviourButtonSettings = GetBehaviourButtonSettings();
-        if (BehaviourButtonSettings == nullptr)
+        if (not IsValid(BehaviourButtonSettings))
         {
                 RTSFunctionLibrary::ReportError(TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to access behaviour button settings."));
                 return;
         }
 
-        static TMap<EBehaviourIcon, FBehaviourWidgetStyle> CachedBehaviourIconStyles;
-        static bool bHasCachedBehaviourIconStyles = false;
-
-        if (not bHasCachedBehaviourIconStyles)
-        {
-                BehaviourButtonSettings->ResolveBehaviourIconStyles(CachedBehaviourIconStyles);
-                bHasCachedBehaviourIconStyles = true;
-        }
-
-        const FBehaviourWidgetStyle* BehaviourStyle = CachedBehaviourIconStyles.Find(M_BehaviourUIData.BehaviourIcon);
+        const TMap<EBehaviourIcon, FBehaviourWidgetStyle>& ResolvedBehaviourIconStyles =
+                BehaviourButtonSettings->GetResolvedBehaviourIconStyles();
+        const FBehaviourWidgetStyle* BehaviourStyle = ResolvedBehaviourIconStyles.Find(M_BehaviourUIData.BehaviourIcon);
         if (not BehaviourStyle || not IsValid(BehaviourStyle->IconTexture))
         {
                 const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
