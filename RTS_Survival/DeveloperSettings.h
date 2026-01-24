@@ -493,7 +493,7 @@ namespace DeveloperSettings
 
 		namespace Ranges
 		{
-			inline constexpr float GameRangeMlt = 1.f;
+			inline constexpr float GameRangeMlt = 0.5f;
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(7000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(7500.f * GameRangeMlt);
 			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
@@ -504,6 +504,7 @@ namespace DeveloperSettings
 			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(9300.f * GameRangeMlt);
 			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(9600.f * GameRangeMlt);
 			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(10000.f * GameRangeMlt);
+			inline constexpr float ArtilleryRange = RoundToNearestMultipleOfFive(12000.f * GameRangeMlt);
 
 			// Medium artillery range ~105 mm howitzers
 			inline constexpr float MediumArtilleryRange = 12000.f * GameRangeMlt;
@@ -1279,7 +1280,8 @@ namespace DeveloperSettings
 
 		inline constexpr float MinZoomLimit = 300.f;
 		// corresponds with 8500 range in the game (weapon on left side engaging weapon just visible on right side)
-		inline constexpr float MaxZoomLimit = 4200.f;
+		// inline constexpr float MaxZoomLimit = 4200.f;
+		inline constexpr float MaxZoomLimit = 5200.f;
 		inline constexpr float ZoomForPlayerStartOverview = 10000.f;
 		inline constexpr float DefaultTerrainHeight = 110.f;
 		inline constexpr float ZoomSpeed = 150.f;

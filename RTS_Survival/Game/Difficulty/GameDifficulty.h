@@ -5,8 +5,8 @@
 #include "GameDifficulty.generated.h"
 
 
-UENUM()
-enum class ERTSGameDifficulty
+UENUM(BlueprintType)
+enum class ERTSGameDifficulty : uint8
 {
 	NewToRTS,
 	Normal,
