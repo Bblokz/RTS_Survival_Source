@@ -10,6 +10,7 @@
 #include "TankMaster.h"
 
 
+#include "Navigation/PathFollowingComponent.h"
 #include "NavMesh/NavMeshPath.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Navigation/RTSNavAgentRegistery/RTSNavAgentRegistery.h"
@@ -18,10 +19,16 @@
 #include "RTS_Survival/Utils/RTSPathFindingHelpers/FRTSPathFindingHelpers.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 
+namespace TankPathFollowingDebug
+{
+	constexpr float ResultTextZOffset = 300.0f;
+	constexpr float ResultTextDurationSeconds = 8.0f;
+}
 
 AAITankMaster::AAITankMaster(const FObjectInitializer& ObjectInitializer)
 	: AVehicleAIController(ObjectInitializer),
-	  ControlledTank(NULL)
+	  ControlledTank(nullptr),
+	  m_VehiclePathComp(nullptr)
 {
 	PrimaryActorTick.bCanEverTick = false;
 	PrimaryActorTick.bStartWithTickEnabled = false;
@@ -45,6 +52,11 @@ void AAITankMaster::StopMovement()
 
 void AAITankMaster::MoveToLocationWithGoalAcceptance(const FVector Location)
 {
+	if (not GetIsValidVehiclePathComp())
+	{
+		return;
+	}
+
 	MoveToLocation(Location, m_VehiclePathComp->GetGoalAcceptanceRadius());
 }
 
@@ -57,15 +69,9 @@ void AAITankMaster::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 	ControlledTank = Cast<ATankMaster>(InPawn);
-	if (IsValid(ControlledTank))
+	if (GetIsValidControlledTank())
 	{
 		ControlledTank->SetAIController(this);
-	}
-	else
-	{
-		RTSFunctionLibrary::ReportNullErrorInitialisation(this,
-		                                                  "ControlledTank",
-		                                                  "AAITankMaster::OnPossess");
 	}
 	OnPossess_SetupNavAgent(InPawn);
 }
@@ -74,12 +80,18 @@ void AAITankMaster::BeginPlay()
 {
 	Super::BeginPlay();
 	m_VehiclePathComp = Cast<UTrackPathFollowingComponent>(GetPathFollowingComponent());
-	if (!IsValid(m_VehiclePathComp))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "M_vehiclePathComp", "AAITankMaster::BeginPlay");
-	}
+	GetIsValidVehiclePathComp();
 }
 
+void AAITankMaster::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
+{
+	Super::OnMoveCompleted(RequestID, Result);
+
+	if constexpr (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
+	{
+		DebugPathFollowingResult(Result);
+	}
+}
 
 void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query,
                                            FNavPathSharedPtr& OutPath) const
@@ -143,34 +155,7 @@ void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FP
 
 	if constexpr (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
 	{
-		UWorld* const world = GetWorld();
-		const APawn* const controlledPawn = GetPawn();
-
-		if (world != nullptr && IsValid(controlledPawn))
-		{
-			const FVector debugLocation =
-				controlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, 500.0f);
-			if (bIsHighCostStart)
-			{
-				const FVector debuglocation2 = debugLocation + FVector(0, 0, 400);
-				const FString HighCostsText = "HIGH COST START";
-				DrawDebugString(world, debuglocation2, HighCostsText, /*TestBaseActor=*/nullptr,
-				                FColor::Red, 5.0f, /*bDrawShadow=*/false);
-			}
-
-			const FString debugText = FString::Printf(
-				TEXT("Max Path Cost Limit: %.1f"), Query.CostLimit);
-
-			constexpr float lifeTimeSeconds = 5.0f;
-			DrawDebugString(
-				world,
-				debugLocation,
-				debugText,
-				/*TestBaseActor=*/nullptr,
-				FColor::Cyan,
-				lifeTimeSeconds,
-				/*bDrawShadow=*/false);
-		}
+		DebugPathCostLimit(Query, bIsHighCostStart);
 	}
 
 	// Now run the real path search with the capped cost
@@ -194,43 +179,107 @@ void AAITankMaster::OnPossess_SetupNavAgent(APawn* InPawn) const
 
 void AAITankMaster::OnFindPath_ClearOverlapsForNewMovement() const
 {
-	if(not IsValid(m_VehiclePathComp))
+	if (not GetIsValidVehiclePathComp())
 	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "M_vehiclePathComp", "AAITankMaster::OnFindPath_ClearOverlapsForNewMovement");
 		return;
 	}
 	m_VehiclePathComp->ClearOverlapsForNewMovementCommand();
 }
 
+void AAITankMaster::DebugPathCostLimit(const FPathFindingQuery& Query, bool bIsHighCostStart) const
+{
+	constexpr float CostLimitZOffset = 500.0f;
+	constexpr float HighCostExtraZOffset = 400.0f;
+	constexpr float DebugLifetimeSeconds = 5.0f;
+
+	UWorld* const world = GetWorld();
+	if (world == nullptr)
+	{
+		return;
+	}
+
+	const APawn* const controlledPawn = GetPawn();
+	if (not IsValid(controlledPawn))
+	{
+		return;
+	}
+
+	const FVector debugLocation =
+		controlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, CostLimitZOffset);
+
+	if (bIsHighCostStart)
+	{
+		const FVector highCostDebugLocation =
+			debugLocation + FVector(0.0f, 0.0f, HighCostExtraZOffset);
+		const FString highCostText = TEXT("HIGH COST START");
+		DrawDebugString(
+			world,
+			highCostDebugLocation,
+			highCostText,
+			/*TestBaseActor=*/nullptr,
+			FColor::Red,
+			DebugLifetimeSeconds,
+			/*bDrawShadow=*/false
+		);
+	}
+
+	const FString debugText = FString::Printf(
+		TEXT("Max Path Cost Limit: %.1f"), Query.CostLimit);
+
+	DrawDebugString(
+		world,
+		debugLocation,
+		debugText,
+		/*TestBaseActor=*/nullptr,
+		FColor::Cyan,
+		DebugLifetimeSeconds,
+		/*bDrawShadow=*/false);
+}
+
 void AAITankMaster::DebugFoundPathCost(const FNavPathSharedPtr& OutPath) const
 {
+	constexpr float PathCostZOffset = 700.0f;
+	constexpr float DebugLifetimeSeconds = 5.0f;
+
 	UWorld* const world = GetWorld();
-	const APawn* const controlledPawn = GetPawn();
-
-	if (world != nullptr && IsValid(controlledPawn) && OutPath.IsValid())
+	if (world == nullptr)
 	{
-		const FNavMeshPath* const navMeshPath = OutPath->CastPath<FNavMeshPath>();
-		if (navMeshPath != nullptr)
-		{
-			const float pathCost = navMeshPath->GetCost();
-
-			const FVector debugLocation =
-				controlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, 700.0f);
-
-			const FString debugText = FString::Printf(
-				TEXT("Actual Path Cost: %.1f"), pathCost);
-
-			constexpr float lifeTimeSeconds = 5.0f;
-			DrawDebugString(
-				world,
-				debugLocation,
-				debugText,
-				/*TestBaseActor=*/nullptr,
-				FColor::Green, // different color
-				lifeTimeSeconds,
-				/*bDrawShadow=*/false);
-		}
+		return;
 	}
+
+	const APawn* const controlledPawn = GetPawn();
+	if (not IsValid(controlledPawn))
+	{
+		return;
+	}
+
+	if (not OutPath.IsValid())
+	{
+		return;
+	}
+
+	const FNavMeshPath* const navMeshPath = OutPath->CastPath<FNavMeshPath>();
+	if (navMeshPath == nullptr)
+	{
+		return;
+	}
+
+	const float pathCost = navMeshPath->GetCost();
+
+	const FVector debugLocation =
+		controlledPawn->GetActorLocation() + FVector(0.0f, 0.0f, PathCostZOffset);
+
+	const FString debugText = FString::Printf(
+		TEXT("Actual Path Cost: %.1f"), pathCost);
+
+	DrawDebugString(
+		world,
+		debugLocation,
+		debugText,
+		/*TestBaseActor=*/nullptr,
+		FColor::Green,
+		DebugLifetimeSeconds,
+		/*bDrawShadow=*/false);
 }
 
 void AAITankMaster::DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath,
@@ -284,4 +333,98 @@ void AAITankMaster::DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath,
 	// 		DrawDebugSphere(World, PathPoint.Location, 30.0f, 12, FColor::Purple, false, 5.0f);
 	// 	}
 	// }
+}
+
+bool AAITankMaster::GetIsValidControlledTank() const
+{
+	if (IsValid(ControlledTank))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"ControlledTank",
+		"AAITankMaster::GetIsValidControlledTank",
+		this
+	);
+
+	return false;
+}
+
+bool AAITankMaster::GetIsValidVehiclePathComp() const
+{
+	if (IsValid(m_VehiclePathComp))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"m_VehiclePathComp",
+		"AAITankMaster::GetIsValidVehiclePathComp",
+		this
+	);
+
+	return false;
+}
+
+void AAITankMaster::DebugPathFollowingResult(const FPathFollowingResult& Result) const
+{
+	if (not GetIsValidControlledTank())
+	{
+		return;
+	}
+
+	const ATankMaster* const validTankMaster = ControlledTank;
+	if (validTankMaster == nullptr)
+	{
+		return;
+	}
+
+	const EPathFollowingResult::Type resultType = Result.Code;
+
+	switch (resultType)
+	{
+	case EPathFollowingResult::Success:
+		DebugPathFollowingResult_Draw(TEXT("Pathfinding Success"), FColor::Green, validTankMaster);
+		return;
+	case EPathFollowingResult::Blocked:
+		DebugPathFollowingResult_Draw(TEXT("Pathfinding Blocked"), FColor::Red, validTankMaster);
+		return;
+	case EPathFollowingResult::Aborted:
+		DebugPathFollowingResult_Draw(TEXT("Pathfinding Aborted"), FColor::Red, validTankMaster);
+		return;
+	default:
+		DebugPathFollowingResult_Draw(TEXT("Pathfinding Result: Other"), FColor::Yellow, validTankMaster);
+		return;
+	}
+}
+
+void AAITankMaster::DebugPathFollowingResult_Draw(const FString& DebugText, const FColor& DebugColor,
+                                                  const ATankMaster* ValidTankMaster) const
+{
+	UWorld* const world = GetWorld();
+	if (world == nullptr)
+	{
+		return;
+	}
+
+	if (ValidTankMaster == nullptr)
+	{
+		return;
+	}
+
+	const FVector debugLocation = ValidTankMaster->GetActorLocation() +
+		FVector(0.0f, 0.0f, TankPathFollowingDebug::ResultTextZOffset);
+
+	DrawDebugString(
+		world,
+		debugLocation,
+		DebugText,
+		/*TestBaseActor=*/nullptr,
+		DebugColor,
+		TankPathFollowingDebug::ResultTextDurationSeconds,
+		/*bDrawShadow=*/false
+	);
 }

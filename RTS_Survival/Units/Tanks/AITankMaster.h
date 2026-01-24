@@ -8,6 +8,8 @@
 #include "AITankMaster.generated.h"
 
 class UTrackPathFollowingComponent;
+struct FAIRequestID;
+struct FPathFollowingResult;
 // Forward Declaration
 class RTS_SURVIVAL_API ATankMaster;
 /**
@@ -23,6 +25,9 @@ struct FTankSteering
 };
 
 
+/**
+ * @brief AI controller for tank masters that centralises tank-only navigation handling and diagnostics.
+ */
 UCLASS()
 class RTS_SURVIVAL_API AAITankMaster : public AVehicleAIController, public IRTSNavAIInterface
 {
@@ -32,7 +37,7 @@ public:
 	AAITankMaster(const FObjectInitializer& ObjectInitializer);
 	
 	UFUNCTION(BlueprintPure)
-	inline ATankMaster* GetControlledTank() const {return ControlledTank;};
+	inline ATankMaster* GetControlledTank() const { return ControlledTank; };
 
 	// Stops all AI brain logic.
 	void StopBehaviourTreeAI();
@@ -64,6 +69,8 @@ protected:
 
 	virtual void BeginPlay() override;
 
+	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+
 	
 	TArray<FVector> TLocationsToDestination;
 
@@ -86,15 +93,25 @@ private:
 	// Set by controlled unit, used for movement behaviour trees.
 	FVector m_MoveToLocation;
 
+	bool GetIsValidControlledTank() const;
+	bool GetIsValidVehiclePathComp() const;
+
 	void OnPossess_SetupNavAgent(APawn* InPawn) const;
 
 	void OnFindPath_ClearOverlapsForNewMovement() const;
 	
 	UPROPERTY()
-	UTrackPathFollowingComponent* m_VehiclePathComp;
+	TObjectPtr<UTrackPathFollowingComponent> m_VehiclePathComp;
 
+	/**
+	 * @brief Centralises tank-only cost-limit debug drawing so it cannot affect move execution.
+	 * @param Query Active pathfinding query used for cost diagnostics.
+	 * @param bIsHighCostStart Whether the start location is inside a high-cost area.
+	 */
+	void DebugPathCostLimit(const FPathFindingQuery& Query, bool bIsHighCostStart) const;
 	void DebugFoundPathCost(const FNavPathSharedPtr& OutPath) const;
 	void DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath, const FAIMoveRequest& MoveRequest) const;
+	void DebugPathFollowingResult(const FPathFollowingResult& Result) const;
+	void DebugPathFollowingResult_Draw(const FString& DebugText, const FColor& DebugColor, const ATankMaster* ValidTankMaster) const;
 
 };
-
