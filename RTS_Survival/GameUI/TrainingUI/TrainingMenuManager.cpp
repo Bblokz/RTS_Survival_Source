@@ -158,13 +158,28 @@ void UTrainingMenuManager::PauseQueueOrRemove(const FTrainingWidgetState& Traini
 {
 	if (M_PrimarySelectedTrainer->GetIsPaused())
 	{
-		RTSFunctionLibrary::PrintString("right click on widget is paused: delete!");
 		RemoveLastOptionFromQueue(TrainingItem.ItemID);
+		PlayAnnouncerTrainingSound(EAnnouncerVoiceLineType::Cancelled);
 	}
 	else if (M_ActiveTrainingItem)
 	{
 		SetTrainingPause(true);
+		PlayAnnouncerTrainingSound(EAnnouncerVoiceLineType::OnHold);
 	}
+}
+
+void UTrainingMenuManager::PlayAnnouncerTrainingSound(const EAnnouncerVoiceLineType VoiceLineType) const
+{
+	if(not GetIsValidMainGameUI())
+	{
+		return;
+	}
+	ACPPController* PlayerController = M_MainGameUI->GetPlayerController();
+	if(not IsValid(PlayerController))
+	{
+		return;
+	}
+	PlayerController->PlayAnnouncerVoiceLine(VoiceLineType);
 }
 
 void UTrainingMenuManager::InitTrainingManager(
@@ -2143,6 +2158,8 @@ void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& T
 		// Also calls OnTrainingItemAddedToQueue on the trainer that owns the primary trainer component.
 		// also updates the UI through a refresh request.
 		AddTrainingItemToQueue(NewTrainingItem);
+		PlayAnnouncerTrainingSound(EAnnouncerVoiceLineType::Training);
+		
 	}
 }
 

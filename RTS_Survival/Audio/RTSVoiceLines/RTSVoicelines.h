@@ -102,6 +102,9 @@ enum class EAnnouncerVoiceLineType : uint8
 	NotEnoughSquadUnitsToCapture,
 	SquadWillCaptureObjective,
 	NoMobileHQToFallBackto,
+	Training,
+	OnHold,
+	Cancelled
 };
 
 USTRUCT(BlueprintType)

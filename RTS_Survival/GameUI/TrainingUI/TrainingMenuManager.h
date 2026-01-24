@@ -103,6 +103,8 @@ private:
 
 	void PauseQueueOrRemove(const FTrainingWidgetState& TrainingItem) const;
 
+	void PlayAnnouncerTrainingSound(EAnnouncerVoiceLineType VoiceLineType) const;
+
 	// An array of all the training widgets in the menu.
 	UPROPERTY()
 	TArray<UW_TrainingItem*> M_TTrainingMenuWidgets;

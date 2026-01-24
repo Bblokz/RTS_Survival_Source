@@ -196,6 +196,11 @@ TObjectPtr<UW_MiniMap> UMainGameUI::GetIsValidMiniMap() const
 	return M_MiniMap;
 }
 
+ACPPController* UMainGameUI::GetPlayerController() const
+{
+	return M_PlayerController;
+}
+
 void UMainGameUI::RequestShowCancelBuilding(const AActor* RequestingActor) const
 {
 	if (not GetIsValidBottomCenterUI() || not GetIsProvidedActorPrimarySelected(RequestingActor))

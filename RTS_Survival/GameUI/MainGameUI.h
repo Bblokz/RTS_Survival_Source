@@ -192,6 +192,8 @@ public:
 
 	TObjectPtr<UW_MiniMap> GetIsValidMiniMap() const;
 
+	ACPPController* GetPlayerController()const;
+
 	// Allows saving callbacks to when the soft archive pointer is loaded. Will exe immediately if already loaded.
 	FOnArchiveLoadedCallbacks OnArchiveLoadedCallbacks;
 
