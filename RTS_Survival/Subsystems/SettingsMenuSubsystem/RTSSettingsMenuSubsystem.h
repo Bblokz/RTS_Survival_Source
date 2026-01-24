@@ -1,0 +1,296 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "RTS_Survival/Game/Settings/RTSGameUserSettings.h"
+
+#include "RTSSettingsMenuSubsystem.generated.h"
+
+class APlayerController;
+class USoundClass;
+class USoundMix;
+
+UENUM(BlueprintType)
+enum class ERTSWindowMode : uint8
+{
+	Fullscreen UMETA(DisplayName="Fullscreen"),
+	WindowedFullscreen UMETA(DisplayName="Windowed Fullscreen"),
+	Windowed UMETA(DisplayName="Windowed")
+};
+
+UENUM(BlueprintType)
+enum class ERTSScalabilityQuality : uint8
+{
+	Low UMETA(DisplayName="Low"),
+	Medium UMETA(DisplayName="Medium"),
+	High UMETA(DisplayName="High"),
+	Epic UMETA(DisplayName="Epic")
+};
+
+UENUM(BlueprintType)
+enum class ERTSScalabilityGroup : uint8
+{
+	ViewDistance UMETA(DisplayName="View Distance"),
+	Shadows UMETA(DisplayName="Shadows"),
+	Textures UMETA(DisplayName="Textures"),
+	Effects UMETA(DisplayName="Effects"),
+	PostProcessing UMETA(DisplayName="Post Processing")
+};
+
+UENUM(BlueprintType)
+enum class ERTSAudioChannel : uint8
+{
+	Master UMETA(DisplayName="Master"),
+	Music UMETA(DisplayName="Music"),
+	Sfx UMETA(DisplayName="SFX")
+};
+
+USTRUCT(BlueprintType)
+struct FRTSScalabilityGroupSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSScalabilityQuality M_ViewDistance = ERTSScalabilityQuality::High;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSScalabilityQuality M_Shadows = ERTSScalabilityQuality::High;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSScalabilityQuality M_Textures = ERTSScalabilityQuality::High;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSScalabilityQuality M_Effects = ERTSScalabilityQuality::High;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSScalabilityQuality M_PostProcessing = ERTSScalabilityQuality::High;
+};
+
+USTRUCT(BlueprintType)
+struct FRTSDisplaySettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSWindowMode M_WindowMode = ERTSWindowMode::WindowedFullscreen;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	FIntPoint M_Resolution = FIntPoint(1920, 1080);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	bool bM_VSyncEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSScalabilityQuality M_OverallQuality = ERTSScalabilityQuality::High;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	float M_FrameRateLimit = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct FRTSGraphicsSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	FRTSDisplaySettings M_DisplaySettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	FRTSScalabilityGroupSettings M_ScalabilityGroups;
+};
+
+USTRUCT(BlueprintType)
+struct FRTSAudioSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
+	float M_MasterVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
+	float M_MusicVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
+	float M_SfxVolume = RTSGameUserSettingsRanges::DefaultVolume;
+};
+
+USTRUCT(BlueprintType)
+struct FRTSControlSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
+	float M_MouseSensitivity = RTSGameUserSettingsRanges::DefaultMouseSensitivity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
+	bool bM_InvertYAxis = false;
+};
+
+USTRUCT(BlueprintType)
+struct FRTSSettingsSnapshot
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings")
+	FRTSGraphicsSettings M_GraphicsSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings")
+	FRTSAudioSettings M_AudioSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings")
+	FRTSControlSettings M_ControlSettings;
+};
+
+/**
+ * @brief Central settings manager that widgets call to stage, apply, save, and revert runtime settings changes.
+ *
+ * The subsystem owns the pending settings state, applies it through UGameUserSettings, and keeps UI logic decoupled.
+ * @note ConfigureAudioMixAndClasses: call in GameInstance Blueprint to provide a sound mix and classes for channel volumes.
+ */
+UCLASS()
+class RTS_SURVIVAL_API URTSSettingsMenuSubsystem : public UGameInstanceSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void LoadSettings();
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	bool GetCurrentSettingsValues(FRTSSettingsSnapshot& OutSettingsValues) const;
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	bool GetPendingSettingsValues(FRTSSettingsSnapshot& OutSettingsValues) const;
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	TArray<FIntPoint> GetSupportedResolutions() const;
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	TArray<FString> GetSupportedResolutionLabels() const;
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingResolution(const FIntPoint& NewResolution);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingWindowMode(ERTSWindowMode NewWindowMode);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingVSyncEnabled(bool bNewVSyncEnabled);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingGraphicsQuality(ERTSScalabilityQuality NewGraphicsQuality);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingScalabilityGroupQuality(ERTSScalabilityGroup ScalabilityGroup, ERTSScalabilityQuality NewQuality);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingFrameRateLimit(float NewFrameRateLimit);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingAudioVolume(ERTSAudioChannel AudioChannel, float NewVolume);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingMouseSensitivity(float NewMouseSensitivity);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingInvertYAxis(bool bNewInvertYAxis);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void ApplySettings();
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SaveSettings();
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void RevertSettings();
+
+	/**
+	 * @brief Registers the audio mix and classes used to apply per-channel volume changes at runtime.
+	 * @param NewSettingsSoundMix Sound mix that receives class overrides for the settings menu.
+	 * @param NewMasterSoundClass Master sound class used for the master volume channel.
+	 * @param NewMusicSoundClass Music sound class used for the music volume channel.
+	 * @param NewSfxSoundClass SFX sound class used for the effects volume channel.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Settings|Audio")
+	void ConfigureAudioMixAndClasses(
+		TSoftObjectPtr<USoundMix> NewSettingsSoundMix,
+		TSoftObjectPtr<USoundClass> NewMasterSoundClass,
+		TSoftObjectPtr<USoundClass> NewMusicSoundClass,
+		TSoftObjectPtr<USoundClass> NewSfxSoundClass
+	);
+
+private:
+	bool GetIsValidGameUserSettings() const;
+	URTSGameUserSettings* GetGameUserSettingsChecked() const;
+
+	void EnsureGameUserSettingsInstance();
+	void CacheSupportedResolutions();
+	void CacheSettingsSnapshots();
+	void ResetPendingSettingsToCurrent();
+
+	void ApplyPendingSettingsToGameUserSettings();
+	void ApplyResolutionSettings();
+	void ApplyNonResolutionSettings();
+	void ApplyAudioSettings();
+	void ApplyControlSettings();
+
+	void ApplyAudioChannelVolume(ERTSAudioChannel AudioChannel, float VolumeToApply);
+	void ApplyControlSettingsToPlayerController(APlayerController* PlayerControllerToApply) const;
+
+	FRTSSettingsSnapshot BuildSnapshotFromSettings(const URTSGameUserSettings& GameUserSettings) const;
+
+	/**
+	 * @brief Applies a snapshot onto UGameUserSettings so staged values can be committed in one place.
+	 * @param SnapshotToApply Settings snapshot staged by the menu subsystem.
+	 * @param GameUserSettingsToApply Settings object that receives the staged values.
+	 */
+	void ApplySnapshotToSettings(const FRTSSettingsSnapshot& SnapshotToApply, URTSGameUserSettings& GameUserSettingsToApply);
+
+	void AddSupportedResolutionUnique(const FIntPoint& ResolutionToAdd);
+
+	ERTSScalabilityQuality GetScalabilityQualityFromLevel(int32 ScalabilityLevel) const;
+	int32 GetLevelFromScalabilityQuality(ERTSScalabilityQuality ScalabilityQuality) const;
+	EWindowMode::Type GetNativeWindowMode(ERTSWindowMode WindowMode) const;
+	ERTSWindowMode GetMenuWindowMode(EWindowMode::Type WindowMode) const;
+
+	// Stores the baseline input scales so mouse sensitivity can be applied as a multiplier without drifting each apply.
+	UPROPERTY(Transient)
+	float M_BaseYawScale = 1.0f;
+
+	UPROPERTY(Transient)
+	float M_BasePitchScale = 1.0f;
+
+	UPROPERTY(Transient)
+	bool bM_BaseInputScaleInitialised = false;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<URTSGameUserSettings> M_GameUserSettings;
+
+	UPROPERTY(Transient)
+	FRTSSettingsSnapshot M_CurrentSettings;
+
+	UPROPERTY(Transient)
+	FRTSSettingsSnapshot M_PendingSettings;
+
+	UPROPERTY(Transient)
+	TArray<FIntPoint> M_SupportedResolutions;
+
+	UPROPERTY(Transient)
+	TArray<FString> M_SupportedResolutionLabels;
+
+	UPROPERTY(EditAnywhere, Category="Settings|Audio")
+	TSoftObjectPtr<USoundMix> M_SettingsSoundMix;
+
+	UPROPERTY(EditAnywhere, Category="Settings|Audio")
+	TSoftObjectPtr<USoundClass> M_MasterSoundClass;
+
+	UPROPERTY(EditAnywhere, Category="Settings|Audio")
+	TSoftObjectPtr<USoundClass> M_MusicSoundClass;
+
+	UPROPERTY(EditAnywhere, Category="Settings|Audio")
+	TSoftObjectPtr<USoundClass> M_SfxSoundClass;
+};

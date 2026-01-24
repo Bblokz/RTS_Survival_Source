@@ -27,7 +27,8 @@ public class RTS_Survival : ModuleRules
 			"PhysicsCore",
 			"PCG",
 			"DeveloperSettings",
-			"GameplayTags"
+			"GameplayTags",
+			"UMG"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
@@ -35,7 +36,9 @@ public class RTS_Survival : ModuleRules
 			"Niagara",
 			"AsyncTickPhysics",
 			"Slate",
-			"SlateCore", "ProtoAnimatedText"
+			"SlateCore",
+			"ProtoAnimatedText",
+			"RHI"
 		});
 
 		// Uncomment if you are using online features
