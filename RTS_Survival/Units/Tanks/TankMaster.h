@@ -435,6 +435,10 @@ private:
 	UPROPERTY()
 	AActor* M_TargetActor;
 
+	// Tracks the most recent turret-driven move request so we can throttle reissues while already moving.
+	bool bM_HasTurretOutOfRangeMoveRequest = false;
+	float M_LastTurretOutOfRangeMoveRequestTimeSeconds = 0.0f;
+
 	UPROPERTY()
 	USpatialVoiceLinePlayer* M_SpatialVoiceLinePlayer;
 

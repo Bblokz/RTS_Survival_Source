@@ -4,6 +4,8 @@
 #include "TankMaster.h"
 
 #include "AITankMaster.h"
+#include "RTS_Survival/DeveloperSettings.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
@@ -831,33 +833,59 @@ void ATankMaster::OnTurretOutOfRange(
 	const FVector TargetLocation,
 	ACPPTurretsMaster* CallingTurret)
 {
-	if (GetIsValidAIController())
+	UWorld* World = GetWorld();
+	const bool bHasValidAIController = GetIsValidAIController();
+	const bool bCanTurretTakeControl = GetCanTurretTakeControl();
+	const bool bHasValidWorld = World != nullptr;
+	if (not bHasValidAIController || not bCanTurretTakeControl || not bHasValidWorld)
 	{
-		if (GetCanTurretTakeControl())
-		{
-			AITankController->MoveToLocationWithGoalAcceptance(TargetLocation);
-			if (GetIsValidRTSNavCollision())
-			{
-				RTSNavCollision->EnableAffectNavmesh(false);
-			}
-		}
+		return;
+	}
+
+	const float CurrentTimeSeconds = World->GetTimeSeconds();
+	const bool bIsAlreadyMoving = AITankController->GetMoveStatus() == EPathFollowingStatus::Moving;
+	const float TimeSinceLastRequestSeconds = bM_HasTurretOutOfRangeMoveRequest
+		? CurrentTimeSeconds - M_LastTurretOutOfRangeMoveRequestTimeSeconds
+		: DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
+	const bool bElapsedEnoughTime = TimeSinceLastRequestSeconds >=
+		DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
+
+	if (bIsAlreadyMoving && not bElapsedEnoughTime)
+	{
+		return;
+	}
+
+	AITankController->MoveToLocationWithGoalAcceptance(TargetLocation);
+	M_LastTurretOutOfRangeMoveRequestTimeSeconds = CurrentTimeSeconds;
+	bM_HasTurretOutOfRangeMoveRequest = true;
+
+	if (GetIsValidRTSNavCollision())
+	{
+		RTSNavCollision->EnableAffectNavmesh(false);
 	}
 }
 
 void ATankMaster::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
-	if (GetIsValidAIController())
+	bM_HasTurretOutOfRangeMoveRequest = false;
+
+	if (not GetIsValidAIController())
 	{
-		const bool bIsIdle = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdIdle;
-		if (UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack || bIsIdle)
-		{
-			if (GetIsValidRTSNavCollision())
-			{
-				RTSNavCollision->EnableAffectNavmesh(true);
-			}
-			AITankController->StopMovement();
-		}
+		return;
 	}
+
+	const bool bIsIdle = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdIdle;
+	const bool bCanStopForTurret = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack || bIsIdle;
+	if (not bCanStopForTurret)
+	{
+		return;
+	}
+
+	if (GetIsValidRTSNavCollision())
+	{
+		RTSNavCollision->EnableAffectNavmesh(true);
+	}
+	AITankController->StopMovement();
 }
 
 void ATankMaster::OnMountedWeaponTargetDestroyed(ACPPTurretsMaster* CallingTurret,

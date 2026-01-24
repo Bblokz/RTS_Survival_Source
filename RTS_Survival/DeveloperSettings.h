@@ -1179,6 +1179,9 @@ namespace DeveloperSettings
 			// Base time between idle turret animations.
 			inline constexpr float RotateAnimationInterval = 15.f;
 			inline constexpr float RotateAnimationFlux = 3.f;
+
+			// Minimum elapsed time between turret-driven move-to-target reissues while already moving.
+			inline constexpr float MoveToTargetReissueElapsedSeconds = 1.0f;
 		}
 
 		namespace Projectile
