@@ -364,6 +364,30 @@ void ACPPController::PauseAndLockGame(const bool bLock)
 	}
 }
 
+void ACPPController::OpenEscapeMenu()
+{
+	EnsureEscapeMenuHelperInitialized();
+	M_PlayerEscapeMenuHelper.OpenEscapeMenu(PlayerEscapeMenuSettings);
+}
+
+void ACPPController::CloseEscapeMenu()
+{
+	EnsureEscapeMenuHelperInitialized();
+	M_PlayerEscapeMenuHelper.CloseEscapeMenu(PlayerEscapeMenuSettings);
+}
+
+void ACPPController::OpenEscapeMenuSettings()
+{
+	EnsureEscapeMenuHelperInitialized();
+	M_PlayerEscapeMenuHelper.OpenEscapeMenuSettings(PlayerEscapeMenuSettings);
+}
+
+void ACPPController::CloseEscapeMenuSettings()
+{
+	EnsureEscapeMenuHelperInitialized();
+	M_PlayerEscapeMenuHelper.CloseEscapeMenuSettings(PlayerEscapeMenuSettings);
+}
+
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
 {
 	return M_PlayerPortraitManager;
@@ -1231,6 +1255,12 @@ void ACPPController::BeginPlay()
 	Super::BeginPlay();
 	BeginPlay_SetupRotationArrow();
 	BeginPlay_SetupPlayerAimAbility();
+	BeginPlay_InitEscapeMenuHelper();
+}
+
+void ACPPController::BeginPlay_InitEscapeMenuHelper()
+{
+	M_PlayerEscapeMenuHelper.InitEscapeMenuHelper(this);
 }
 
 void ACPPController::PostInitializeComponents()
@@ -5624,6 +5654,62 @@ void ACPPController::ShowPlayerBuildRadius(const bool bShowRadius) const
 	{
 		M_PlayerBuildRadiusManager->ShowBuildRadius(bShowRadius);
 	}
+}
+
+void ACPPController::EnsureEscapeMenuHelperInitialized()
+{
+	M_PlayerEscapeMenuHelper.InitEscapeMenuHelper(this);
+}
+
+bool ACPPController::TryHandleEscapeMenuBuildingModeActive()
+{
+	if (not GetIsPreviewBuildingActive())
+	{
+		return false;
+	}
+
+	StopPreviewAndBuildingMode(false);
+	return true;
+}
+
+bool ACPPController::TryHandleEscapeMenuActionButtonActive()
+{
+	if (not bM_IsActionButtonActive)
+	{
+		return false;
+	}
+
+	DeactivateActionButton();
+	return true;
+}
+
+bool ACPPController::TryHandleEscapeMenuRotationArrowActive()
+{
+	if (not PlayerRotationArrow.GetIsRotationArrowActive())
+	{
+		return false;
+	}
+
+	PlayerRotationArrow.CancelRotationArrow();
+	return true;
+}
+
+void ACPPController::OnHitExscape()
+{
+	if (TryHandleEscapeMenuBuildingModeActive())
+	{
+		return;
+	}
+	if (TryHandleEscapeMenuActionButtonActive())
+	{
+		return;
+	}
+	if (TryHandleEscapeMenuRotationArrowActive())
+	{
+		return;
+	}
+
+	OpenEscapeMenu();
 }
 
 void ACPPController::DeactivateActionButton()
