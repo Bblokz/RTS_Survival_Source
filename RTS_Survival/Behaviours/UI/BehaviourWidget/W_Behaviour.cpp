@@ -10,102 +10,126 @@
 
 void UW_Behaviour::InitBehaviourWidget(UW_BehaviourContainer* InBehaviourContainer)
 {
-	M_BehaviourContainer = InBehaviourContainer;
-	if (not GetIsValidBehaviourContainer())
-	{
-		return;
-	}
+        M_BehaviourContainer = InBehaviourContainer;
+        if (not GetIsValidBehaviourContainer())
+        {
+                return;
+        }
 
-	if (not IsValid(BehaviourButton))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-			this, "BehaviourButton", "UW_Behaviour::InitBehaviourWidget");
-		return;
-	}
+        if (not GetIsValidBehaviourButton())
+        {
+                return;
+        }
 
-	BehaviourButton->OnHovered.AddDynamic(this, &UW_Behaviour::OnHoveredButton);
-	BehaviourButton->OnUnhovered.AddDynamic(this, &UW_Behaviour::OnUnHoverButton);
+        BehaviourButton->OnHovered.AddDynamic(this, &UW_Behaviour::OnHoveredButton);
+        BehaviourButton->OnUnhovered.AddDynamic(this, &UW_Behaviour::OnUnHoverButton);
 }
 
 void UW_Behaviour::SetupBehaviourWidget(const FBehaviourUIData& InBehaviourUIData)
 {
-	M_BehaviourUIData = InBehaviourUIData;
-	ApplyBehaviourIcon();
+        M_BehaviourUIData = InBehaviourUIData;
+        ApplyBehaviourIcon();
 }
 
 void UW_Behaviour::OnHoveredButton()
 {
-	if (not GetIsValidBehaviourContainer())
-	{
-		return;
-	}
+        if (not GetIsValidBehaviourContainer())
+        {
+                return;
+        }
 
-	M_BehaviourContainer->OnBehaviourHovered(true, M_BehaviourUIData);
+        M_BehaviourContainer->OnBehaviourHovered(true, M_BehaviourUIData);
 }
 
 void UW_Behaviour::OnUnHoverButton()
 {
-	if (not GetIsValidBehaviourContainer())
-	{
-		return;
-	}
+        if (not GetIsValidBehaviourContainer())
+        {
+                return;
+        }
 
-	M_BehaviourContainer->OnBehaviourHovered(false, M_BehaviourUIData);
+        M_BehaviourContainer->OnBehaviourHovered(false, M_BehaviourUIData);
 }
 
 bool UW_Behaviour::GetIsValidBehaviourContainer() const
 {
-	if (M_BehaviourContainer.IsValid())
-	{
-		return true;
-	}
+        if (M_BehaviourContainer.IsValid())
+        {
+                return true;
+        }
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this, "M_BehaviourContainer", "UW_Behaviour::GetIsValidBehaviourContainer");
-	return false;
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+                this,
+                "M_BehaviourContainer",
+                "UW_Behaviour::GetIsValidBehaviourContainer",
+                this
+        );
+        return false;
+}
+
+bool UW_Behaviour::GetIsValidBehaviourButton() const
+{
+        if (IsValid(BehaviourButton))
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+                this,
+                "BehaviourButton",
+                "UW_Behaviour::GetIsValidBehaviourButton",
+                this
+        );
+        return false;
+}
+
+bool UW_Behaviour::GetIsValidBehaviourImage() const
+{
+        if (IsValid(BehaviourImage))
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+                this,
+                "BehaviourImage",
+                "UW_Behaviour::GetIsValidBehaviourImage",
+                this
+        );
+        return false;
 }
 
 const UBehaviourButtonSettings* UW_Behaviour::GetBehaviourButtonSettings()
 {
-	static const UBehaviourButtonSettings* CachedSettings = UBehaviourButtonSettings::Get();
-	return CachedSettings;
+        static const UBehaviourButtonSettings* CachedSettings = UBehaviourButtonSettings::Get();
+        return CachedSettings;
 }
 
 void UW_Behaviour::ApplyBehaviourIcon()
 {
-	if (not IsValid(BehaviourImage))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-			this, "BehaviourImage", "UW_Behaviour::ApplyBehaviourIcon");
-		return;
-	}
+        if (not GetIsValidBehaviourImage())
+        {
+                return;
+        }
 
-	const UBehaviourButtonSettings* BehaviourButtonSettings = GetBehaviourButtonSettings();
-	if (BehaviourButtonSettings == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to access behaviour button settings."));
-		return;
-	}
+        const UBehaviourButtonSettings* BehaviourButtonSettings = GetBehaviourButtonSettings();
+        if (not IsValid(BehaviourButtonSettings))
+        {
+                RTSFunctionLibrary::ReportError(TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to access behaviour button settings."));
+                return;
+        }
 
-	static TMap<EBehaviourIcon, FBehaviourWidgetStyle> CachedBehaviourIconStyles;
-	static bool bHasCachedBehaviourIconStyles = false;
+        const TMap<EBehaviourIcon, FBehaviourWidgetStyle>& ResolvedBehaviourIconStyles =
+                BehaviourButtonSettings->GetResolvedBehaviourIconStyles();
+        const FBehaviourWidgetStyle* BehaviourStyle = ResolvedBehaviourIconStyles.Find(M_BehaviourUIData.BehaviourIcon);
+        if (not BehaviourStyle || not IsValid(BehaviourStyle->IconTexture))
+        {
+                const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
+                RTSFunctionLibrary::ReportError(
+                        TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to find icon texture for behaviour icon.")
+                        "\n Icon: " + IconAsString);
+                return;
+        }
 
-	if (not bHasCachedBehaviourIconStyles)
-	{
-		BehaviourButtonSettings->ResolveBehaviourIconStyles(CachedBehaviourIconStyles);
-		bHasCachedBehaviourIconStyles = true;
-	}
-
-	const FBehaviourWidgetStyle* BehaviourStyle = CachedBehaviourIconStyles.Find(M_BehaviourUIData.BehaviourIcon);
-	if (not BehaviourStyle || not IsValid(BehaviourStyle->IconTexture))
-	{
-		const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
-		RTSFunctionLibrary::ReportError(
-			TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to find icon texture for behaviour icon.")
-			"\n Icon: " + IconAsString);
-		return;
-	}
-
-	BehaviourImage->SetBrushFromTexture(BehaviourStyle->IconTexture);
+        BehaviourImage->SetBrushFromTexture(BehaviourStyle->IconTexture);
 }

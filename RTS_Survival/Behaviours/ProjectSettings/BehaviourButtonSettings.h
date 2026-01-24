@@ -6,6 +6,7 @@
 #include "BehaviourButtonSettings.generated.h"
 
 class UTexture2D;
+struct FPropertyChangedEvent;
 
 enum class EBehaviourIcon : uint8;
 
@@ -16,7 +17,7 @@ struct FBehaviourWidgetStyle
 
         /** Behaviour icon texture. */
         UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Behaviour Button")
-        UTexture2D* IconTexture = nullptr;
+        TObjectPtr<UTexture2D> IconTexture = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -51,9 +52,26 @@ public:
                 return GetDefault<UBehaviourButtonSettings>();
         }
 
+        /** Access resolved icon styles while keeping strong references for GC safety. */
+        const TMap<EBehaviourIcon, FBehaviourWidgetStyle>& GetResolvedBehaviourIconStyles() const;
+
         /**
          * Resolve soft references to hard pointers for runtime use.
          * Loads assets synchronously the first time they are requested.
          */
         void ResolveBehaviourIconStyles(TMap<EBehaviourIcon, FBehaviourWidgetStyle>& OutIconStyles) const;
+
+#if WITH_EDITOR
+        virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+private:
+        // Resolved runtime styles cached on the settings object to prevent GC from invalidating pointers.
+        UPROPERTY(Transient)
+        mutable TMap<EBehaviourIcon, FBehaviourWidgetStyle> M_ResolvedBehaviourIconStyles;
+
+        UPROPERTY(Transient)
+        mutable bool bM_HasResolvedBehaviourIconStyles = false;
+
+        void InvalidateResolvedBehaviourIconStyles() const;
 };

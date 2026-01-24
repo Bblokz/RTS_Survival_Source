@@ -27,10 +27,10 @@ public:
 
 protected:
         UPROPERTY(meta = (BindWidget))
-        UImage* BehaviourImage;
+        TObjectPtr<UImage> BehaviourImage;
 
         UPROPERTY(meta = (BindWidget))
-        UButton* BehaviourButton;
+        TObjectPtr<UButton> BehaviourButton;
 
 private:
         UPROPERTY()
@@ -39,6 +39,8 @@ private:
         FBehaviourUIData M_BehaviourUIData;
 
         bool GetIsValidBehaviourContainer() const;
+        bool GetIsValidBehaviourButton() const;
+        bool GetIsValidBehaviourImage() const;
 
         static const UBehaviourButtonSettings* GetBehaviourButtonSettings();
 
