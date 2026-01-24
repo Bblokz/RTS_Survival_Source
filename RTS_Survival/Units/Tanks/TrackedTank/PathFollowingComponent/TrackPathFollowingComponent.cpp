@@ -50,9 +50,11 @@ namespace TrackFollowingBlockDetection
 	// - Number of recent samples UE considers before declaring the move blocked.
 	// - Increase this to require a longer "no progress" window (less false positives, slower abort).
 	// - Decrease this to allow quicker aborts when the vehicle is truly stuck.
-	constexpr float DistanceThresholdCentimeters = 150.f;
+	constexpr float DefaultDistanceThresholdCentimeters = 150.f;
 	constexpr float DistanceThresholdCentimeters_Min = 50.f;
+	constexpr float RTSRadius_MinThreshold = 500.f;
 	constexpr float DistanceThresholdCentimeters_Max = 200.f;
+	constexpr float RTSRadius_MaxThreshold = 1000.f;
 	constexpr float IntervalSeconds = 1.0f;
 	constexpr int32 SampleCount = 16;
 }
@@ -105,7 +107,7 @@ UTrackPathFollowingComponent::UTrackPathFollowingComponent()
 	// PathOptimizationRange = 1000.0f; // approx: radius * 30.0f
 	// AvoidanceQuality = ECrowdAvoidanceQuality::Low;
 	// AvoidanceRangeMultiplier = 1.0f;
-	BlockDetectionDistance = TrackFollowingBlockDetection::DistanceThresholdCentimeters;
+	BlockDetectionDistance = TrackFollowingBlockDetection::DefaultDistanceThresholdCentimeters;
 	BlockDetectionInterval = TrackFollowingBlockDetection::IntervalSeconds;
 	BlockDetectionSampleCount = TrackFollowingBlockDetection::SampleCount;
 }
@@ -184,6 +186,31 @@ TArray<FOverlapActorData>& UTrackPathFollowingComponent::GetOverlapBlockingActor
 {
 	return M_IdleAlliedBlockingActors;
 }
+
+void UTrackPathFollowingComponent::UpdateBlockDetectionDistanceFromRTSRadius(const float RTSRadius)
+{
+	using namespace TrackFollowingBlockDetection;
+	// If thresholds are misconfigured (avoid divide-by-zero / inverted ranges), fall back safely.
+	if (RTSRadius_MaxThreshold <= RTSRadius_MinThreshold)
+	{
+		BlockDetectionDistance = DistanceThresholdCentimeters_Min;
+		return;
+	}
+
+	// Map RTSRadius from [MinThreshold .. MaxThreshold] -> [MinDistance .. MaxDistance], clamped.
+	const float RadiusAlpha01 =
+		FMath::Clamp((RTSRadius - RTSRadius_MinThreshold) / (RTSRadius_MaxThreshold - RTSRadius_MinThreshold), 0.0f,
+		             1.0f);
+
+	BlockDetectionDistance =
+		FMath::Lerp(DistanceThresholdCentimeters_Min, DistanceThresholdCentimeters_Max, RadiusAlpha01);
+}
+
+float UTrackPathFollowingComponent::GetStuckDetectionDist() const
+{
+	return BlockDetectionDistance;
+}
+
 
 void UTrackPathFollowingComponent::RemoveOverlapActorFromArray(
 	TArray<FOverlapActorData>& TargetArray,

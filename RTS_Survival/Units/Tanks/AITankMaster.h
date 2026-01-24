@@ -97,6 +97,7 @@ private:
 	bool GetIsValidVehiclePathComp() const;
 
 	void OnPossess_SetupNavAgent(APawn* InPawn) const;
+	void OnPosses_ConfigureBlockingDectionDistanceWithRTSRadius(ATankMaster* MyControlledTank);
 
 	void OnFindPath_ClearOverlapsForNewMovement() const;
 	

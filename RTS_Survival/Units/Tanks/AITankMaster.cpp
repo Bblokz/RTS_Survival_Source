@@ -15,13 +15,15 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Navigation/RTSNavAgentRegistery/RTSNavAgentRegistery.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSPathFindingHelpers/FRTSPathFindingHelpers.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 
 namespace TankPathFollowingDebug
 {
-	constexpr float ResultTextZOffset = 300.0f;
+	constexpr float ResultTextZOffset = 400.0f;
+	constexpr float ResultMyStuckDectionRadiusOffset = 300.0f;
 	constexpr float ResultTextDurationSeconds = 8.0f;
 }
 
@@ -72,6 +74,7 @@ void AAITankMaster::OnPossess(APawn* InPawn)
 	if (GetIsValidControlledTank())
 	{
 		ControlledTank->SetAIController(this);
+		OnPosses_ConfigureBlockingDectionDistanceWithRTSRadius(ControlledTank);
 	}
 	OnPossess_SetupNavAgent(InPawn);
 }
@@ -80,7 +83,7 @@ void AAITankMaster::BeginPlay()
 {
 	Super::BeginPlay();
 	m_VehiclePathComp = Cast<UTrackPathFollowingComponent>(GetPathFollowingComponent());
-	GetIsValidVehiclePathComp();
+	(void)GetIsValidVehiclePathComp();
 }
 
 void AAITankMaster::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
@@ -175,6 +178,25 @@ void AAITankMaster::OnPossess_SetupNavAgent(APawn* InPawn) const
 		return;
 	}
 	FRTSNavigationHelpers::SetupNavDataForTypeOnPawn(GetWorld(), InPawn);
+}
+
+void AAITankMaster::OnPosses_ConfigureBlockingDectionDistanceWithRTSRadius(ATankMaster* MyControlledTank)
+{
+	UTrackPathFollowingComponent* const vehiclePathComp =
+		Cast<UTrackPathFollowingComponent>(GetPathFollowingComponent());
+	if (not IsValid(MyControlledTank) || not IsValid(vehiclePathComp))
+	{
+		RTSFunctionLibrary::ReportError("AAITankMaster::OnPosses_ConfigureBlockingDectionDistanceWithRTSRadius - "
+			"ControlledTank or vehiclePathComp is invalid");
+		return;
+	}
+	URTSComponent* RTSComp = MyControlledTank->FindComponentByClass<URTSComponent>();
+	if (not RTSComp)
+	{
+		return;
+	}
+	const float RTSRadius = RTSComp->GetFormationUnitInnerRadius();
+	vehiclePathComp->UpdateBlockDetectionDistanceFromRTSRadius(RTSRadius);
 }
 
 void AAITankMaster::OnFindPath_ClearOverlapsForNewMovement() const
@@ -303,20 +325,20 @@ void AAITankMaster::DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath,
 		const FString QueryFilter = MoveRequest.GetNavigationFilter()
 			                            ? MoveRequest.GetNavigationFilter()->GetName()
 			                            : TEXT("NONE");
-		// at 100 units above location print the filter name:
-		DrawDebugString(World, PathPoint.Location + FVector(0, 0, 100.f), QueryFilter, nullptr,
-		                FColor::White, 5.0f, false, 1.4f);
+		// // at 100 units above location print the filter name:
+		// DrawDebugString(World, PathPoint.Location + FVector(0, 0, 100.f), QueryFilter, nullptr,
+		//                 FColor::White, 5.0f, false, 1.4f);
 		// draw a line from this point to the next point (if not last point)
 		const int32 PathPointIndex = NavMeshPath->GetPathPoints().IndexOfByKey(PathPoint);
-		if(PathPointIndex == 0)
+		if (PathPointIndex == 0)
 		{
 			// Draw line from actor location to first path point
 			const FVector ActorLocation = GetPawn() ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
-			DrawDebugLine(World, ActorLocation, PathPoint.Location, FColor::Green, false,
+			DrawDebugLine(World, ActorLocation, PathPoint.Location, FColor::Yellow, false,
 			              5.0f, 0, 5.0f);
 			continue;
 		}
-		if (PathPointIndex < NavMeshPath->GetPathPoints().Num() - 2)
+		if (PathPointIndex < NavMeshPath->GetPathPoints().Num() - 1)
 		{
 			const FVector NextPointLocation =
 				NavMeshPath->GetPathPoints()[PathPointIndex + 1].Location;
@@ -427,4 +449,19 @@ void AAITankMaster::DebugPathFollowingResult_Draw(const FString& DebugText, cons
 		TankPathFollowingDebug::ResultTextDurationSeconds,
 		/*bDrawShadow=*/false
 	);
+	if(IsValid(m_VehiclePathComp))
+	{
+		// debug draw the my stuck detection radius
+		const float MyStuckDetectionRadius = m_VehiclePathComp->GetStuckDetectionDist();
+		const FString RadiusText = "My Stuck Detection Radius: " + FString::SanitizeFloat(MyStuckDetectionRadius);
+		DrawDebugString(
+			world,
+			debugLocation + FVector(0.0f, 0.0f, TankPathFollowingDebug::ResultMyStuckDectionRadiusOffset),
+			RadiusText,
+			/*TestBaseActor=*/nullptr,
+			FColor::White,
+			TankPathFollowingDebug::ResultTextDurationSeconds,
+			/*bDrawShadow=*/false
+		);
+	}
 }

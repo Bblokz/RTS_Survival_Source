@@ -69,7 +69,16 @@ public:
 	UTrackPathFollowingComponent();
 
 	TArray<FOverlapActorData>& GetOverlapBlockingActorsArray();
-	
+
+
+	/**
+	 * @brief Scales blocked-movement detection sensitivity based on RTS unit radius.
+	 * @param RTSRadius The unit's RTS radius in centimeters used to scale the detection threshold.
+	 */
+	void UpdateBlockDetectionDistanceFromRTSRadius(const float RTSRadius);
+
+	float GetStuckDetectionDist() const;
+
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -707,12 +716,12 @@ private:
 
 	bool bIsLastPathPoint = false;
 
-		// Tracks whether we currently have UE's blocked-move detection disabled due to an intentional wait.
-    	bool bM_IsEngineBlockDetectionSuppressed = false;
-    
-    	// Toggles UE's internal blocked-move detection (idempotent; safe to call every frame).
-    	void SetEngineBlockDetectionSuppressed(const bool bShouldBeSuppressed);
-    
-    	// Convenience for the idle-blocker wait case (keeps UpdateDriving clean).
-    	void UpdateEngineBlockDetectionForIdleBlockerWait(const bool bIsWaitingForIdleBlockers);
+	// Tracks whether we currently have UE's blocked-move detection disabled due to an intentional wait.
+	bool bM_IsEngineBlockDetectionSuppressed = false;
+
+	// Toggles UE's internal blocked-move detection (idempotent; safe to call every frame).
+	void SetEngineBlockDetectionSuppressed(const bool bShouldBeSuppressed);
+
+	// Convenience for the idle-blocker wait case (keeps UpdateDriving clean).
+	void UpdateEngineBlockDetectionForIdleBlockerWait(const bool bIsWaitingForIdleBlockers);
 };
