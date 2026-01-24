@@ -1180,10 +1180,8 @@ namespace DeveloperSettings
 			inline constexpr float RotateAnimationInterval = 15.f;
 			inline constexpr float RotateAnimationFlux = 3.f;
 
-			// Minimum time between turret-driven move-to-target reissues when already moving.
-			inline constexpr float MoveToTargetReissueIntervalSeconds = 1.0f;
-			// Distance the target must shift before we ignore the reissue interval and repath immediately.
-			inline constexpr float MoveToTargetReissueLocationTolerance = 250.f;
+			// Minimum elapsed time between turret-driven move-to-target reissues while already moving.
+			inline constexpr float MoveToTargetReissueElapsedSeconds = 1.0f;
 		}
 
 		namespace Projectile

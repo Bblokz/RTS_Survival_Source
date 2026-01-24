@@ -833,47 +833,30 @@ void ATankMaster::OnTurretOutOfRange(
 	const FVector TargetLocation,
 	ACPPTurretsMaster* CallingTurret)
 {
-	if (not GetIsValidAIController())
-	{
-		return;
-	}
-	if (not GetCanTurretTakeControl())
-	{
-		return;
-	}
-
 	UWorld* World = GetWorld();
-	if (not World)
+	const bool bHasValidAIController = GetIsValidAIController();
+	const bool bCanTurretTakeControl = GetCanTurretTakeControl();
+	const bool bHasValidWorld = World != nullptr;
+	if (not bHasValidAIController || not bCanTurretTakeControl || not bHasValidWorld)
 	{
 		return;
 	}
 
 	const float CurrentTimeSeconds = World->GetTimeSeconds();
 	const bool bIsAlreadyMoving = AITankController->GetMoveStatus() == EPathFollowingStatus::Moving;
-	const bool bHasPreviousRequest = bM_HasTurretOutOfRangeMoveRequest;
-
-	const float TimeSinceLastRequestSeconds = bHasPreviousRequest
+	const float TimeSinceLastRequestSeconds = bM_HasTurretOutOfRangeMoveRequest
 		? CurrentTimeSeconds - M_LastTurretOutOfRangeMoveRequestTimeSeconds
-		: DeveloperSettings::GamePlay::Turret::MoveToTargetReissueIntervalSeconds;
+		: DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
+	const bool bElapsedEnoughTime = TimeSinceLastRequestSeconds >=
+		DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
 
-	const float LocationToleranceSquared = FMath::Square(
-		DeveloperSettings::GamePlay::Turret::MoveToTargetReissueLocationTolerance);
-	const float DistanceFromLastRequestSquared = bHasPreviousRequest
-		? FVector::DistSquared(TargetLocation, M_LastTurretOutOfRangeMoveTargetLocation)
-		: LocationToleranceSquared;
-
-	const bool bIntervalElapsed = TimeSinceLastRequestSeconds >=
-		DeveloperSettings::GamePlay::Turret::MoveToTargetReissueIntervalSeconds;
-	const bool bTargetLocationChangedEnough = DistanceFromLastRequestSquared >= LocationToleranceSquared;
-
-	if (bIsAlreadyMoving && not bIntervalElapsed && not bTargetLocationChangedEnough)
+	if (bIsAlreadyMoving && not bElapsedEnoughTime)
 	{
 		return;
 	}
 
 	AITankController->MoveToLocationWithGoalAcceptance(TargetLocation);
 	M_LastTurretOutOfRangeMoveRequestTimeSeconds = CurrentTimeSeconds;
-	M_LastTurretOutOfRangeMoveTargetLocation = TargetLocation;
 	bM_HasTurretOutOfRangeMoveRequest = true;
 
 	if (GetIsValidRTSNavCollision())
