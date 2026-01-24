@@ -186,6 +186,13 @@ public:
 	void OnOpenArchive();
 	void OnCloseArchive();
 
+	void OnEscapeMenuResumeGame();
+	void OnEscapeMenuOpenSettings();
+	void OnEscapeMenuCloseSettings();
+	void OnEscapeMenuOpenArchive();
+	void OnEscapeMenuRestartLevel();
+	void OnEscapeMenuExitToMainMenu();
+
 	void OnHoverWeaponItem(const bool bIsHovering);
 	void OnHoverActionUIItem(const bool bIsHovering);
 	void OnHoverSelectedUnitInfo(const bool bIsHovering);

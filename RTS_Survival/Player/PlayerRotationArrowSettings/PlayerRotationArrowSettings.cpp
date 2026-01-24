@@ -40,7 +40,7 @@ void FPlayerRotationArrowSettings::TickArrowRotation(const FVector2D& MouseScree
 
 void FPlayerRotationArrowSettings::StopRotationArrow()
 {
-	if (!EnsureFormationControllerIsValid())
+	if (not EnsureFormationControllerIsValid())
 	{
 		return;
 	}
@@ -52,6 +52,17 @@ void FPlayerRotationArrowSettings::StopRotationArrow()
 	}
 	// Clean up for the next drag
 	ResetForNextRotation();
+}
+
+
+void FPlayerRotationArrowSettings::CancelRotationArrow()
+{
+	ResetForNextRotation();
+}
+
+bool FPlayerRotationArrowSettings::GetIsRotationArrowActive() const
+{
+	return bM_RotationArrowInitialized;
 }
 
 

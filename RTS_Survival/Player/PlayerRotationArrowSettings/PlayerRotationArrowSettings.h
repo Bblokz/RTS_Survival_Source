@@ -23,6 +23,8 @@ struct FPlayerRotationArrowSettings
 		const FVector& MouseProjectedLocation);
 
 	void StopRotationArrow();
+	void CancelRotationArrow();
+	bool GetIsRotationArrowActive() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AActor> RotationArrowClass;

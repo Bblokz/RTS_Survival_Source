@@ -34,6 +34,8 @@
 #include "GameInitCallbacks/MainMenuUICallbacks.h"
 #include "PlayerFieldConstructionData/PlayerFieldConstructionCandidate.h"
 #include "PlayerRotationArrowSettings/PlayerRotationArrowSettings.h"
+#include "PlayerEscapeMenuManager/PlayerEscapeMenuHelper.h"
+#include "RTS_Survival/GameUI/EscapeMenu/PlayerEscapeMenuSettings.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
@@ -263,6 +265,15 @@ public:
 	// Pauses and prevents unpause until this function is called with false.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PauseAndLockGame(const bool bLock);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "EscapeMenu")
+	void OpenEscapeMenu();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "EscapeMenu")
+	void CloseEscapeMenu();
+
+	void OpenEscapeMenuSettings();
+	void CloseEscapeMenuSettings();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;
@@ -652,6 +663,9 @@ protected:
 	virtual void PostInitializeComponents() override;
 	virtual void BeginDestroy() override;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "EscapeMenu")
+	void OnHitExscape();
+
 	// Keeps  track of an array of landscape deform components to write radii to a render target.
 	UPROPERTY()
 	ALandscapedeformManager* M_LdfManager;
@@ -744,6 +758,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FPlayerFormationPositionEffects PlayerFormationEffects;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "EscapeMenu")
+	FPlayerEscapeMenuSettings PlayerEscapeMenuSettings;
+
 	// Start Location of secondary click.
 	FVector M_SecondaryStartMouseProjectedLocation;
 
@@ -754,6 +771,7 @@ protected:
 		AActor*& OutClickedActor, FVector& OutHitLocation) const;
 
 	void BeginPlay_SetupRotationArrow();
+	void BeginPlay_InitEscapeMenuHelper();
 
 
 	/**
@@ -1339,6 +1357,9 @@ private:
 	UPROPERTY()
 	UMainGameUI* M_MainGameUI;
 
+	UPROPERTY(Transient)
+	FPlayerEscapeMenuHelper M_PlayerEscapeMenuHelper;
+
 	UPROPERTY()
 	ARTSNavigator* M_RTSNavigator;
 
@@ -1450,6 +1471,11 @@ private:
 
 	// Resets the current active ability and cursor.
 	void DeactivateActionButton();
+
+	void EnsureEscapeMenuHelperInitialized();
+	bool TryHandleEscapeMenuBuildingModeActive();
+	bool TryHandleEscapeMenuActionButtonActive();
+	bool TryHandleEscapeMenuRotationArrowActive();
 
 	void InitFowManager();
 

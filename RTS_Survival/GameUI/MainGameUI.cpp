@@ -30,6 +30,8 @@
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "EngineSettings/GameMapsSettings.h"
+#include "Kismet/GameplayStatics.h"
 #include "MiniMap/MiniMapStartDirection/MiniMapStartDirection.h"
 #include "Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/Player/PlayerControlGroupManager/PlayerControlGroupManager.h"
@@ -1215,10 +1217,12 @@ void UMainGameUI::AddTechTreeToViewport(UTechTree* TechTreeWidget)
 
 void UMainGameUI::OnCloseTechTree()
 {
-	if (IsValid(M_PlayerController))
+	if (not GetIsValidPlayerController())
 	{
-		M_PlayerController->SetIsPlayerInTechTree(false);
+		return;
 	}
+
+	M_PlayerController->SetIsPlayerInTechTree(false);
 	SetMainMenuVisiblity(true);
 }
 
@@ -1250,6 +1254,91 @@ void UMainGameUI::OnCloseArchive()
 	M_Archive->SetVisibility(ESlateVisibility::Collapsed);
 	// Show menu.
 	SetMainMenuVisiblity(true);
+}
+
+void UMainGameUI::OnEscapeMenuResumeGame()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->CloseEscapeMenu();
+}
+
+void UMainGameUI::OnEscapeMenuOpenSettings()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->OpenEscapeMenuSettings();
+}
+
+void UMainGameUI::OnEscapeMenuCloseSettings()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->CloseEscapeMenuSettings();
+}
+
+void UMainGameUI::OnEscapeMenuOpenArchive()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	OnEscapeMenuResumeGame();
+	OnOpenArchive();
+}
+
+void UMainGameUI::OnEscapeMenuRestartLevel()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	OnEscapeMenuResumeGame();
+	const FString CurrentLevelName = UGameplayStatics::GetCurrentLevelName(this, true);
+	if (CurrentLevelName.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("Failed to restart level because the current level name was empty.");
+		return;
+	}
+
+	UGameplayStatics::OpenLevel(this, FName(*CurrentLevelName));
+}
+
+void UMainGameUI::OnEscapeMenuExitToMainMenu()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	OnEscapeMenuResumeGame();
+	const UGameMapsSettings* GameMapsSettings = GetDefault<UGameMapsSettings>();
+	if (not GameMapsSettings)
+	{
+		RTSFunctionLibrary::ReportError("Failed to exit to main menu because GameMapsSettings was null.");
+		return;
+	}
+
+	const FString DefaultMapPath = GameMapsSettings->GetGameDefaultMap();
+	if (DefaultMapPath.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("Failed to exit to main menu because the default map path was empty.");
+		return;
+	}
+
+	const FName DefaultMapName(*DefaultMapPath);
+	UGameplayStatics::OpenLevel(this, DefaultMapName);
 }
 
 void UMainGameUI::OnHoverWeaponItem(const bool bIsHovering)
