@@ -18,6 +18,8 @@ enum class ERTSGameDifficulty
 USTRUCT(Blueprintable)
 struct FRTSGameDifficulty
 {
+	GENERATED_BODY()
+	
 	UPROPERTY(BlueprintReadWrite)
 	int32 DifficultyPercentage  =0;
 

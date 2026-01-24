@@ -191,11 +191,14 @@ void UEnemyFormationController::CheckFormations()
 
 	// Then  idle→teleport→reorder logic on the survivors:
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
-	for (auto& Pair : M_ActiveFormations)
+	// May delete formations in this loop; so copy to array first.
+	TArray<TPair<int32, FFormationData>> FormationsToLoop = M_ActiveFormations.Array();
+	for (auto& Pair : FormationsToLoop)
 	{
 		FFormationData& Formation = Pair.Value;
 
-		if (not Formation.FormationWaypoints.IsValidIndex(Formation.CurrentWaypointIndex))
+		if (not Formation.FormationWaypoints.IsValidIndex(Formation.CurrentWaypointIndex) ||
+			not Formation.FormationWaypointDirections.IsValidIndex(Formation.CurrentWaypointIndex))
 		{
 			RTSFunctionLibrary::ReportError(
 				TEXT("On formation check formation has no valid waypoint index but it is still active!"));
