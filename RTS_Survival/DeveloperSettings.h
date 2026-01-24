@@ -499,15 +499,19 @@ namespace DeveloperSettings
 			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
 
 			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
-			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(8500.f * GameRangeMlt);
+			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9600.f * GameRangeMlt);
 			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(8800.f * GameRangeMlt);
-			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(9300.f * GameRangeMlt);
-			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(9600.f * GameRangeMlt);
-			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(10000.f * GameRangeMlt);
-			inline constexpr float ArtilleryRange = RoundToNearestMultipleOfFive(12000.f * GameRangeMlt);
+			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
+			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(10000.f * GameRangeMlt);
+			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(13000.f * GameRangeMlt);
+			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(13000.f * GameRangeMlt);
 
 			// Medium artillery range ~105 mm howitzers
-			inline constexpr float MediumArtilleryRange = 12000.f * GameRangeMlt;
+			inline constexpr float MediumArtilleryRange = 15000.f * GameRangeMlt;
+			inline constexpr float HeavyArtilleryRange = 17500.f * GameRangeMlt;
+			
+			// Static artillery range  /  howitzers
+			inline constexpr float StaticArtilleryRange = 18000.f * GameRangeMlt;
 
 			// Laser weapons
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);
@@ -1181,7 +1185,7 @@ namespace DeveloperSettings
 			inline constexpr float RotateAnimationFlux = 3.f;
 
 			// Minimum elapsed time between turret-driven move-to-target reissues while already moving.
-			inline constexpr float MoveToTargetReissueElapsedSeconds = 1.0f;
+			inline constexpr float MoveToTargetReissueElapsedSeconds = 2.0f;
 		}
 
 		namespace Projectile

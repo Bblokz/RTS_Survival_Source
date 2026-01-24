@@ -74,7 +74,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	static constexpr int32 ReinforcementAbilityIndex = 11;
+	static constexpr int32 ReinforcementAbilityIndex = 14;
 
 	void BeginPlay_InitSquadDataSnapshot();
 	bool GetIsValidSquadController() const;

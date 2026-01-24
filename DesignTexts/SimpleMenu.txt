@@ -1,0 +1,56 @@
+﻿I need you to implement a new widget called W_EscapeMenu
+in its own dir called EscapeMenu in the GameUI folder.
+in there in a separate folder also create the W_EscapeMenuSettings .h and .cpp files also derived from UUserWidget
+
+also add a struct there called FPlayerEscapeMenuSettings in its own file
+it will have a derived class ptr to  the escape menu widget and 
+it will also have a derived class ptr to the settings menu widget which will be provided
+to the excape menu when it is created.
+a sound base pointer called open menu sound.
+a sound base pointer called close menu sound.
+a sound base pointer called OpenSettingsMenuSound.
+a sound base pointer called CloseSettingsMenuSound.
+
+add this struct as a uproperty edit defaults, bp read write on the cppcontroller. and add a public
+bp callable function called OpenEscapeMenu that will:
+1. if the escape menu was not yet created before create it from the class.
+2. add it to the viewport with good z order so it goes over the main menu.
+3. play the open menu sound if it is set in the struct.
+4. pause the game.
+make sure there are plenty of private helpers for this in a new struct you will define under the player directory, in its 
+own directroy called PlayerEscapeMenuManager and the struct called FPlayerEscapeMenuHelper
+also make sure to add a bp callable function called CloseEscapeMenu that will:
+1. remove the escape menu from the viewport.
+2. not destroy the widget but make sure it is completely dormant and does not interfere with anything.
+3. play the close menu sound if it is set in the struct.
+4. unpause the game.
+
+in the widget
+make sure the cppcontroller is provided right after it is created by the controller.
+use bind widget for buttons:
+- Resume Game
+- Settings
+- Archive
+- Restart Level
+- Exit to Main Menu
+
+now for also bind all the click events to the appropriate functions in the GameUIManager class.
+For the resume game: this will simply call the CloseEscapeMenu function on the cppcontroller.
+
+for the settings button: create the settings widget from the clas ptr if it is not yet created.
+then add it to the viewport with good z order so it goes over the escape menu.
+play the OpenSettingsMenuSound if it is set in the struct.
+make sure that the settings widget has a close button that will remove it from the viewport,
+play the CloseSettingsMenuSound if it is set in the struct, and then make itself dormant again.
+and bring the player back to the escape menu.
+
+for the archive button: this will first call the resume game and then call: 
+void UMainGameUI::OnOpenArchive() on the main menu.
+
+finally:
+add a protected bp callable function to the cppcontroller that will be called OnHitExscape (how this is called
+ will be decided on the blueprint) now when this is called and:
+ we have building mode active; make sure the building mode is cancelled.
+ if we have an action button active (waiting for second click) cancel that.
+ if we have rotation arrow active cancel that.
+ finally if none of those are the case then call the OpenEscapeMenu function.
