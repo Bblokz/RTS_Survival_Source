@@ -188,6 +188,9 @@ private:
 	// example when placing the Nomadic HQ building.
 	bool TickRadiiBuildingPlacement(bool& bOutHasValidIncline);
 
+	// The tick used for field construction placement where the slope angle is disregarded entirely.
+	bool TickFieldConstructionPlacement(bool& bOutHasValidIncline);
+
 	// Snaps to the closest socket location, disregards slopes/inlcline.
 	bool TickSocketBxpBuildingPlacement(bool& bOutHasValidIncline);
 
@@ -247,6 +250,7 @@ private:
 	bool EnsureIsValidPreviewMesh() const;
 	bool EnsureIsValidPreviewStatsWidget() const;
 	bool EnsureIsValidPreviewStatsWidgetComponent() const;
+	bool GetIsValidPlayerController() const;
 
 	/**
 	 * @brief Updates the preview widget with the data of the preview.

@@ -346,6 +346,10 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 	{
 		return;
 	}
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
 	SetCursorPosition(
 		PlayerController->GetCursorWorldPosition(DeveloperSettings::UIUX::SightDistanceMouse,
 		                                         bM_IsValidCursorLocation));
@@ -378,9 +382,7 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 		bM_IsValidBuildingLocation = TickRadiiBuildingPlacement(bIsSlopeValid);
 		break;
 	case EConstructionPreviewMode::Construct_FieldConstruction:
-		bM_IsValidBuildingLocation = TickRadiiBuildingPlacement(bIsSlopeValid);
-		// Slope always valid for field constructions.
-		bIsSlopeValid = true;
+		bM_IsValidBuildingLocation = TickFieldConstructionPlacement(bIsSlopeValid);
 		break;
 	}
 	// Update materials depending on whether we can place the preview.
@@ -502,7 +504,7 @@ bool ACPPConstructionPreview::TickRadiiBuildingPlacement(bool& bOutHasValidIncli
 	// Makes sure the landscape blocks visibility traces!
 	bOutHasValidIncline = IsSlopeValid(CursorWorldPosition);
 
-	if (!bOutHasValidIncline || IsOverlayFootprintOverlapping() || !GetisWithinBuildRadii(CursorWorldPosition))
+	if (not bOutHasValidIncline || IsOverlayFootprintOverlapping() || not GetisWithinBuildRadii(CursorWorldPosition))
 	{
 		// Invalid location due to slope or overlap.
 		if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
@@ -514,6 +516,30 @@ bool ACPPConstructionPreview::TickRadiiBuildingPlacement(bool& bOutHasValidIncli
 		return false;
 	}
 	// Valid location.
+	UpdatePreviewMaterial(true);
+	return true;
+}
+
+bool ACPPConstructionPreview::TickFieldConstructionPlacement(bool& bOutHasValidIncline)
+{
+	// Move preview along grid.
+	SetActorLocation(GetGridSnapAdjusted(CursorWorldPosition));
+	UpdateOverlayGridOverlaps();
+
+	// Field constructions disregard slope validation entirely.
+	bOutHasValidIncline = true;
+	M_SlopeAngle = 0.0f;
+
+	if (IsOverlayFootprintOverlapping() || not GetisWithinBuildRadii(CursorWorldPosition))
+	{
+		if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
+		{
+			RTSFunctionLibrary::PrintString("Cannot place field construction here", FColor::Red);
+		}
+		UpdatePreviewMaterial(false);
+		return false;
+	}
+
 	UpdatePreviewMaterial(true);
 	return true;
 }
@@ -643,7 +669,7 @@ bool ACPPConstructionPreview::GetisWithinBuildRadii(const FVector& PreviewLocati
 
 bool ACPPConstructionPreview::GetIsBuildingPreviewBlocked() const
 {
-	return !bM_IsValidBuildingLocation;
+	return not bM_IsValidBuildingLocation;
 }
 
 AStaticPreviewMesh* ACPPConstructionPreview::CreateStaticMeshActor(const FRotator& Rotation,
@@ -1092,14 +1118,19 @@ void ACPPConstructionPreview::UpdatePreviewStatsWidget(const bool bIsInclineVali
 
 void ACPPConstructionPreview::RotatePreviewStatsToCamera() const
 {
-	if (IsValid(PlayerController) && IsValid(PlayerController->CameraRef))
+	if (not GetIsValidPlayerController())
 	{
-		const FRotator NewRotation = UKismetMathLibrary::FindLookAtRotation(
-			M_PreviewStatsWidgetComponent->GetComponentLocation(),
-			PlayerController->CameraRef->GetCameraComponent()->GetComponentLocation());
-		// Apply the calculated rotation to the widget component
-		M_PreviewStatsWidgetComponent->SetWorldRotation(NewRotation);
+		return;
 	}
+	if (not IsValid(PlayerController->CameraRef))
+	{
+		return;
+	}
+	const FRotator NewRotation = UKismetMathLibrary::FindLookAtRotation(
+		M_PreviewStatsWidgetComponent->GetComponentLocation(),
+		PlayerController->CameraRef->GetCameraComponent()->GetComponentLocation());
+	// Apply the calculated rotation to the widget component
+	M_PreviewStatsWidgetComponent->SetWorldRotation(NewRotation);
 }
 
 
@@ -1278,11 +1309,28 @@ void ACPPConstructionPreview::RotatePreviewCounterclockwise() const
 
 FRotator ACPPConstructionPreview::GetPreviewRotation() const
 {
-	if (IsValid(PreviewMesh))
+	if (not EnsureIsValidPreviewMesh())
 	{
-		return PreviewMesh->GetComponentToWorld().Rotator();
+		return FRotator();
 	}
-	return FRotator();
+	return PreviewMesh->GetComponentToWorld().Rotator();
+}
+
+bool ACPPConstructionPreview::GetIsValidPlayerController() const
+{
+	if (IsValid(PlayerController))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"PlayerController",
+		"GetIsValidPlayerController",
+		this
+	);
+
+	return false;
 }
 
 bool ACPPConstructionPreview::EnsureIsValidPreviewMesh() const
@@ -1323,7 +1371,7 @@ bool ACPPConstructionPreview::EnsureIsValidPreviewStatsWidgetComponent() const
 
 void ACPPConstructionPreview::UpdateOverlayGridOverlaps()
 {
-	if (!EnsureIsValidGridOverlay() || !EnsureIsValidPreviewMesh())
+	if (not EnsureIsValidGridOverlay() || not EnsureIsValidPreviewMesh())
 	{
 		return;
 	}
