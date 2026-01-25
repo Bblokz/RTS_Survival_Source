@@ -3,6 +3,7 @@
 
 #include "Components/AudioComponent.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Audio/Pooling/RTSPooledAudio.h"
 #include "RTS_Survival/Audio/Settings/RTSSpatialAudioSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -113,6 +114,11 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 	}
 	if (bM_SuppressRegularVoiceLines)
 	{
+		return;
+	}
+	if(GetHasToPlayAnnouncerLineAs2DSound(Type))
+	{
+		PlayAnnouncerLineAs2DSound(Type);
 		return;
 	}
 	if (not GetIsValidResourceAudioComponent())
@@ -1257,4 +1263,28 @@ UAudioComponent* UPlayerAudioController::AcquirePooledSpatialAudioComponent(cons
 	}
 
 	return Instance.Component;
+}
+
+bool UPlayerAudioController::GetHasToPlayAnnouncerLineAs2DSound(const EAnnouncerVoiceLineType Type) const
+{
+	switch (Type)
+	{
+	case EAnnouncerVoiceLineType::GamePaused:
+	case EAnnouncerVoiceLineType::GameResumed:
+		return true;
+	default:
+		return false;
+	}
+}
+
+void UPlayerAudioController::PlayAnnouncerLineAs2DSound(EAnnouncerVoiceLineType Type)
+{
+	USoundBase* VoiceLine = GetAnnouncerVoiceLineFromType(Type);
+	if (not IsValid(VoiceLine))
+	{
+		return;
+	}
+	UGameplayStatics::PlaySound2D(
+		this,
+		VoiceLine);
 }

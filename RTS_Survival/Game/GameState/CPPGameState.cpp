@@ -3217,7 +3217,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 		WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			DeveloperSettings::GameBalance::Ranges::ArtilleryRange * 1.33, 100);
+			DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.33, 100);
 	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 	WeaponData.ArmorPen = 66 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 66 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;

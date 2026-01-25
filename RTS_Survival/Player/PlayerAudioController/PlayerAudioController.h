@@ -501,4 +501,7 @@ private:
 	 * @return A pooled audio component or nullptr when no free component is available.
 	 */
 	UAudioComponent* AcquirePooledSpatialAudioComponent(const bool bIsForceRequest);
+
+	bool GetHasToPlayAnnouncerLineAs2DSound(EAnnouncerVoiceLineType Type) const;
+	void PlayAnnouncerLineAs2DSound(EAnnouncerVoiceLineType Type);
 };

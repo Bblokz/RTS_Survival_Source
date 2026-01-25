@@ -664,7 +664,7 @@ protected:
 	virtual void BeginDestroy() override;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "EscapeMenu")
-	void OnHitExscape();
+	void OnHitEscape();
 
 	// Keeps  track of an array of landscape deform components to write radii to a render target.
 	UPROPERTY()

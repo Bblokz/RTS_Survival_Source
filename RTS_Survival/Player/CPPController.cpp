@@ -5696,7 +5696,7 @@ bool ACPPController::TryHandleEscapeMenuRotationArrowActive()
 	return true;
 }
 
-void ACPPController::OnHitExscape()
+void ACPPController::OnHitEscape()
 {
 	if (TryHandleEscapeMenuBuildingModeActive())
 	{

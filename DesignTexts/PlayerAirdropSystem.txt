@@ -13,6 +13,10 @@ an int32 of the number of actors to spawn.
  float min spawn offset
  float max spanw offset
 float time to wait on ground before takeoff
+a sound base ptr, attenuation and concurency for the sound to play when a single drop off supply is placed.
+float MinTimeForDropOffItem
+float MaxTimeForDropOffItem
+float TimeBetweenDropOffs.
    
 for the vto speed and such it relys on the settings in the base aircraft class.
 
@@ -22,7 +26,18 @@ for the spawnchance probabily mass.
 
 how you have to implement this: first call SetAircraftActive (there is also a SetAircraftDormant) then set the aircraft position to the start location and with
 the start rotation. then start vertical landing to the land location. ( you can assume they only differ in Z axis; so we do not have to adjust in x or y)
-one the vertical landing is complete pick a class to spawn exactly the amount of actors to spawn times. 
+one the vertical landing is complete pick a class to spawn exactly the amount of actors to spawn times. for each pick do a random float
+between 0 and 1 and see which class it falls into based on the spawn chance probability mass tarray. after it is async loaded start a one shot timer between
+min and max time for drop off item to spawn it. then wait TImeBetweenDropOffs and set another one shot timer for the next item to spawn until all are spawned.
+after spawning all actors wait the time to wait on ground before takeoff and then start vertical takeoff. (make sure in the doxygen of the struct it is clear
+what each setting, in particular each time setting means in relation to the spawning of the items so the designer knows how to configure it)
+
+after the aircraft is fully back up at the place it started make it dormant.
+
+for the dormant state in particular make sure the 	TObjectPtr<USkeletalMeshComponent> M_AircraftMesh; is set to not execute any animations
+and make sure the aircraft is completely hidden. make sure the tick on the aircraft and its controller are cmpletely disabled as well.
+
+
 
 
     

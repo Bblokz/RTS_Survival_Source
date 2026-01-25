@@ -446,8 +446,9 @@ void URTSSettingsMenuSubsystem::ApplyControlSettings()
 
 		if (not bM_BaseInputScaleInitialised)
 		{
-			M_BaseYawScale = PlayerController->GetInputYawScale();
-			M_BasePitchScale = PlayerController->GetInputPitchScale();
+			// todo.
+			// M_BaseYawScale = PlayerController->GetInputYawScale();
+			// M_BasePitchScale = PlayerController->GetInputPitchScale();
 			bM_BaseInputScaleInitialised = true;
 		}
 
@@ -523,8 +524,9 @@ void URTSSettingsMenuSubsystem::ApplyControlSettingsToPlayerController(APlayerCo
 		? RTSSettingsMenuSubsystemPrivate::InvertedPitchFactor
 		: RTSSettingsMenuSubsystemPrivate::NormalPitchFactor;
 
-	PlayerControllerToApply->SetInputYawScale(M_BaseYawScale * SensitivityMultiplier);
-	PlayerControllerToApply->SetInputPitchScale(M_BasePitchScale * SensitivityMultiplier * PitchFactor);
+	// todo
+	// PlayerControllerToApply->SetInputYawScale(M_BaseYawScale * SensitivityMultiplier);
+	// PlayerControllerToApply->SetInputPitchScale(M_BasePitchScale * SensitivityMultiplier * PitchFactor);
 }
 
 FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const URTSGameUserSettings& GameUserSettings) const
