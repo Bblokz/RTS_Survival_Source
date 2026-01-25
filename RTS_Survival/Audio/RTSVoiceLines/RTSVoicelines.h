@@ -104,7 +104,9 @@ enum class EAnnouncerVoiceLineType : uint8
 	NoMobileHQToFallBackto,
 	Training,
 	OnHold,
-	Cancelled
+	Cancelled,
+	GamePaused,
+	GameResumed,
 };
 
 USTRUCT(BlueprintType)
