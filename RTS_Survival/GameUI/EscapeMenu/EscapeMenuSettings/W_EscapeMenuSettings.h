@@ -170,7 +170,7 @@ private:
 	 * @param HeaderText Placeholder header text that designers can replace.
 	 * @return The created section container or nullptr when creation fails.
 	 */
-	UVerticalBox* CreateSectionContainer(UVerticalBox* ParentContainer, const FName SectionName, URichTextBlock*& OutSectionHeader, const FName HeaderName, const FText& HeaderText);
+	UVerticalBox* CreateSectionContainer(UVerticalBox* ParentContainer, const FName SectionName, TObjectPtr<URichTextBlock>& OutSectionHeader, const FName HeaderName, const FText& HeaderText);
 
 	/**
 	 * @brief Creates a neutral label/control row so each setting can be bound without depending on final styling.
@@ -182,7 +182,7 @@ private:
 	 * @param ControlWidget The input widget that represents the setting value.
 	 * @return The created row container or nullptr when creation fails.
 	 */
-	UHorizontalBox* CreateSettingRow(UVerticalBox* ParentContainer, const FName RowName, URichTextBlock*& OutLabel, const FName LabelName, const FText& LabelText, UWidget* ControlWidget);
+	UHorizontalBox* CreateSettingRow(UVerticalBox* ParentContainer, const FName RowName, TObjectPtr<URichTextBlock>& OutLabel, const FName LabelName, const FText& LabelText, UWidget* ControlWidget);
 	URichTextBlock* CreateRichTextBlock(const FName WidgetName, const FText& TextToAssign);
 	UComboBoxString* CreateComboBox(const FName WidgetName);
 	USlider* CreateSlider(const FName WidgetName);
@@ -196,7 +196,7 @@ private:
 	 * @param ButtonText Placeholder button text that designers can replace.
 	 * @return The created button or nullptr when creation fails.
 	 */
-	UButton* CreateButton(const FName WidgetName, URichTextBlock*& OutButtonText, const FName ButtonTextName, const FText& ButtonText);
+	UButton* CreateButton(const FName WidgetName, TObjectPtr<URichTextBlock>& OutButtonText, const FName ButtonTextName, const FText& ButtonText);
 
 	void CacheWidgetReferencesFromTree();
 	void CacheRootWidgetReferences();
