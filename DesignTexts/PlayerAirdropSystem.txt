@@ -1,0 +1,28 @@
+﻿you will implement a new type of aircraft based on AAircraft master called SupplyDropAircraft
+
+on a high level: this aircraft will be moved to a certain location and then use Vertical landing to land add a certain point below it,
+async spawn the actor classes set on it to spawn, using the RTS Functionlibrary static FVector GetLocationProjected to find those locations
+near the landing point of the aircraft. then it will wait a certain time, then take off vertically and enter dormancy.
+
+this aircraft will at begin play be set to not be selectable.
+ 
+ for the airdropping it will have a bp friendly struct with the followign settings:
+ tarray of actor soft class ptrs to spawn with each array element having a soft class ptr and a float from 0 to 1 for the chance to spawn that actor.
+ if set to one it will have a high chance to spawn, if set to 0 it will never spawn.
+an int32 of the number of actors to spawn.
+ float min spawn offset
+ float max spanw offset
+float time to wait on ground before takeoff
+   
+for the vto speed and such it relys on the settings in the base aircraft class.
+
+it will have a public function called StartAirdropMission that will be bp callable and will take
+a start vector , a start FRotator , a land location vector, an int32 of the amount of actors to spawn, and a tarray of actor soft class ptrs to spawn with their float
+for the spawnchance probabily mass.
+
+how you have to implement this: first call SetAircraftActive (there is also a SetAircraftDormant) then set the aircraft position to the start location and with
+the start rotation. then start vertical landing to the land location. ( you can assume they only differ in Z axis; so we do not have to adjust in x or y)
+one the vertical landing is complete pick a class to spawn exactly the amount of actors to spawn times. 
+
+
+    

@@ -283,6 +283,7 @@ void ACPPController::PauseGame(const ERTSPauseGameOptions PauseOption)
 		}
 		World->bIsCameraMoveableWhenPaused = true;
 		M_PauseGameState.bM_IsGamePaused = true;
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::GamePaused, false, true);
 		UGameplayStatics::SetGamePaused(World, true);
 		return;
 	}
@@ -295,6 +296,7 @@ void ACPPController::PauseGame(const ERTSPauseGameOptions PauseOption)
 		}
 		World->bIsCameraMoveableWhenPaused = false;
 		M_PauseGameState.bM_IsGamePaused = false;
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::GameResumed, false, true);
 		UGameplayStatics::SetGamePaused(World, false);
 		return;
 	}
