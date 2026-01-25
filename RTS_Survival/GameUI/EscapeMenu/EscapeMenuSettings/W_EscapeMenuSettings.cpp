@@ -618,12 +618,14 @@ UHorizontalBox* UW_EscapeMenuSettings::CreateSettingRow(
 		return nullptr;
 	}
 
-	UHorizontalBox* const RowContainer = WidgetTree->ConstructWidget<UHorizontalBox>(RowName);
+	UHorizontalBox* const RowContainer = WidgetTree->ConstructWidget<UHorizontalBox>();
 	if (RowContainer == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a settings row container."));
 		return nullptr;
 	}
+	const FString NewName = RowName.ToString();
+	RowContainer->SetCategoryName(NewName);
 
 	ParentContainer->AddChildToVerticalBox(RowContainer);
 
@@ -1344,7 +1346,6 @@ void UW_EscapeMenuSettings::HandleBackOrCancelClicked()
 
 void UW_EscapeMenuSettings::HandleWindowModeSelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;
@@ -1367,7 +1368,6 @@ void UW_EscapeMenuSettings::HandleWindowModeSelectionChanged(FString SelectedIte
 
 void UW_EscapeMenuSettings::HandleResolutionSelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;
@@ -1405,7 +1405,6 @@ void UW_EscapeMenuSettings::HandleVSyncChanged(const bool bIsChecked)
 
 void UW_EscapeMenuSettings::HandleOverallQualitySelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;
@@ -1437,7 +1436,6 @@ void UW_EscapeMenuSettings::HandleOverallQualitySelectionChanged(FString Selecte
 
 void UW_EscapeMenuSettings::HandleViewDistanceQualitySelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;
@@ -1460,7 +1458,6 @@ void UW_EscapeMenuSettings::HandleViewDistanceQualitySelectionChanged(FString Se
 
 void UW_EscapeMenuSettings::HandleShadowsQualitySelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;
@@ -1483,7 +1480,6 @@ void UW_EscapeMenuSettings::HandleShadowsQualitySelectionChanged(FString Selecte
 
 void UW_EscapeMenuSettings::HandleTexturesQualitySelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;
@@ -1506,7 +1502,6 @@ void UW_EscapeMenuSettings::HandleTexturesQualitySelectionChanged(FString Select
 
 void UW_EscapeMenuSettings::HandleEffectsQualitySelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;
@@ -1529,7 +1524,6 @@ void UW_EscapeMenuSettings::HandleEffectsQualitySelectionChanged(FString Selecte
 
 void UW_EscapeMenuSettings::HandlePostProcessingQualitySelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
 {
-	UE_UNUSED(SelectionType);
 	if (bM_IsInitialisingControls)
 	{
 		return;

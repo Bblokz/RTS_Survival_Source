@@ -5,6 +5,7 @@
 #include "RTS_Survival/GameUI/EscapeMenu/EscapeMenuSettings/W_EscapeMenuSettings.h"
 #include "RTS_Survival/GameUI/EscapeMenu/W_EscapeMenu.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace EscapeMenuZOrder
