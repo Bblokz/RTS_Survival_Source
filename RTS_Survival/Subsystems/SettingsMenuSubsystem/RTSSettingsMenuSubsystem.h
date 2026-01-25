@@ -2,8 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "RTS_Survival/Game/Settings/RTSGameUserSettings.h"
 
 #include "RTSSettingsMenuSubsystem.generated.h"
 

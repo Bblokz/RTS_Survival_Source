@@ -20,6 +20,7 @@
 #include "TrainingUI/TrainingMenuManager.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 // To set render targets on the mini map.
+#include "GameMapsSettings.h"
 #include "GameUI_InitData.h"
 #include "Archive/W_Archive/W_Archive.h"
 #include "Components/Border.h"
@@ -30,7 +31,6 @@
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "Engine/TextureRenderTarget2D.h"
-#include "EngineSettings/GameMapsSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "MiniMap/MiniMapStartDirection/MiniMapStartDirection.h"
 #include "Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"

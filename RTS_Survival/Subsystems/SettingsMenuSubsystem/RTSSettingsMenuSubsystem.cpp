@@ -23,7 +23,7 @@ namespace RTSSettingsMenuSubsystemPrivate
 		return FString::Printf(TEXT("%dx%d"), Resolution.X, Resolution.Y);
 	}
 
-	void ApplyScalabilityGroupsToQualityLevels(const FRTSScalabilityGroupSettings& ScalabilityGroups, FQualityLevels& QualityLevels)
+	void ApplyScalabilityGroupsToQualityLevels(const FRTSScalabilityGroupSettings& ScalabilityGroups, Scalability::FQualityLevels& QualityLevels)
 	{
 		QualityLevels.ViewDistanceQuality = static_cast<int32>(ScalabilityGroups.M_ViewDistance);
 		QualityLevels.ShadowQuality = static_cast<int32>(ScalabilityGroups.M_Shadows);
@@ -530,7 +530,7 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_OverallQuality = GetScalabilityQualityFromLevel(GameUserSettings.GetOverallScalabilityLevel());
 	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_FrameRateLimit = GameUserSettings.GetFrameRateLimit();
 
-	const FQualityLevels QualityLevels = GameUserSettings.GetQualityLevels();
+	const Scalability::FQualityLevels QualityLevels = GameUserSettings.GetQualityLevels();
 	Snapshot.M_GraphicsSettings.M_ScalabilityGroups.M_ViewDistance = GetScalabilityQualityFromLevel(QualityLevels.ViewDistanceQuality);
 	Snapshot.M_GraphicsSettings.M_ScalabilityGroups.M_Shadows = GetScalabilityQualityFromLevel(QualityLevels.ShadowQuality);
 	Snapshot.M_GraphicsSettings.M_ScalabilityGroups.M_Textures = GetScalabilityQualityFromLevel(QualityLevels.TextureQuality);
@@ -557,7 +557,7 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetOverallScalabilityLevel(GetLevelFromScalabilityQuality(SnapshotToApply.M_GraphicsSettings.M_DisplaySettings.M_OverallQuality));
 	GameUserSettingsToApply.SetFrameRateLimit(SnapshotToApply.M_GraphicsSettings.M_DisplaySettings.M_FrameRateLimit);
 
-	FQualityLevels QualityLevels = GameUserSettingsToApply.GetQualityLevels();
+	Scalability::FQualityLevels QualityLevels = GameUserSettingsToApply.GetQualityLevels();
 	RTSSettingsMenuSubsystemPrivate::ApplyScalabilityGroupsToQualityLevels(SnapshotToApply.M_GraphicsSettings.M_ScalabilityGroups, QualityLevels);
 	GameUserSettingsToApply.SetQualityLevels(QualityLevels);
 
