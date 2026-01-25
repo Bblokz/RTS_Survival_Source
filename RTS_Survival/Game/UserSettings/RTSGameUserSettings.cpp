@@ -79,6 +79,16 @@ void URTSGameUserSettings::SetInvertYAxis(const bool bNewInvertYAxis)
 	bM_InvertYAxis = bNewInvertYAxis;
 }
 
+Scalability::FQualityLevels URTSGameUserSettings::GetQualityLevels() const
+{
+	return Scalability::GetQualityLevels();
+}
+
+void URTSGameUserSettings::SetQualityLevels(const Scalability::FQualityLevels& NewQualityLevels)
+{
+	Scalability::SetQualityLevels(NewQualityLevels);
+}
+
 void URTSGameUserSettings::ApplyCustomSettingClamps()
 {
 	const float ClampedMasterVolume = FMath::Clamp(M_MasterVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
@@ -109,10 +119,10 @@ void URTSGameUserSettings::ApplyCustomSettingClamps()
 		M_MouseSensitivity = ClampedMouseSensitivity;
 	}
 
-	const float FrameRateLimit = GetFrameRateLimit();
-	if (FrameRateLimit < MinFrameRateLimit)
+	const float CurrentFrameRateLimit = GetFrameRateLimit();
+	if (CurrentFrameRateLimit < RTSGameUserSettingsPrivate::MinFrameRateLimit)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Frame rate limit was negative and has been reset to unlimited."));
-		SetFrameRateLimit(MinFrameRateLimit);
+		SetFrameRateLimit(RTSGameUserSettingsPrivate::MinFrameRateLimit);
 	}
 }

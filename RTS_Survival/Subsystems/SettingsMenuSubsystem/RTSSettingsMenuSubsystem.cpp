@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "RHI.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "Scalability.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
 
@@ -294,7 +295,13 @@ void URTSSettingsMenuSubsystem::EnsureGameUserSettingsInstance()
 		return;
 	}
 
-	UGameUserSettings::SetGameUserSettings(CreatedSettings);
+	if (GEngine == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("GEngine was null while replacing the game user settings instance."));
+		return;
+	}
+
+	GEngine->GameUserSettings = CreatedSettings;
 	CreatedSettings->LoadSettings(true);
 	M_GameUserSettings = CreatedSettings;
 }
@@ -403,7 +410,7 @@ void URTSSettingsMenuSubsystem::ApplyAudioSettings()
 		return;
 	}
 
-	AudioDevice->SetTransientMasterVolume(GameUserSettings->GetMasterVolume());
+	AudioDevice->SetTransientPrimaryVolume(GameUserSettings->GetMasterVolume());
 	if (M_SettingsSoundMix.IsNull())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Settings sound mix is required to apply per-channel volumes."));
@@ -439,8 +446,8 @@ void URTSSettingsMenuSubsystem::ApplyControlSettings()
 
 		if (not bM_BaseInputScaleInitialised)
 		{
-			M_BaseYawScale = PlayerController->InputYawScale;
-			M_BasePitchScale = PlayerController->InputPitchScale;
+			M_BaseYawScale = PlayerController->GetInputYawScale();
+			M_BasePitchScale = PlayerController->GetInputPitchScale();
 			bM_BaseInputScaleInitialised = true;
 		}
 
@@ -516,8 +523,8 @@ void URTSSettingsMenuSubsystem::ApplyControlSettingsToPlayerController(APlayerCo
 		? RTSSettingsMenuSubsystemPrivate::InvertedPitchFactor
 		: RTSSettingsMenuSubsystemPrivate::NormalPitchFactor;
 
-	PlayerControllerToApply->InputYawScale = M_BaseYawScale * SensitivityMultiplier;
-	PlayerControllerToApply->InputPitchScale = M_BasePitchScale * SensitivityMultiplier * PitchFactor;
+	PlayerControllerToApply->SetInputYawScale(M_BaseYawScale * SensitivityMultiplier);
+	PlayerControllerToApply->SetInputPitchScale(M_BasePitchScale * SensitivityMultiplier * PitchFactor);
 }
 
 FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const URTSGameUserSettings& GameUserSettings) const
