@@ -409,7 +409,7 @@ private:
 	 * @note Designers may change layout, styling, padding, and add wrapper widgets around this overlay.
 	 * @note The bound widget must exist, keep this name, and remain an Overlay for C++ validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UOverlay> M_RootOverlay = nullptr;
 
 	/**
@@ -417,7 +417,7 @@ private:
 	 * @note Designers may restyle the blur and adjust layout wrappers to fit the menu presentation.
 	 * @note The bound widget must exist, keep this name, and remain a BackgroundBlur for runtime logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UBackgroundBlur> M_BackgroundBlurFullscreen = nullptr;
 
 	/**
@@ -425,7 +425,7 @@ private:
 	 * @note Designers may adjust sizing, padding, and wrappers to fit the screen or platform.
 	 * @note The bound widget must exist, keep this name, and remain a SizeBox for validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USizeBox> M_SizeBoxMenuRoot = nullptr;
 
 	/**
@@ -433,7 +433,7 @@ private:
 	 * @note Designers may reorder children and styling within the vertical box as long as it remains present.
 	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxMenuRoot = nullptr;
 
 	/**
@@ -441,7 +441,7 @@ private:
 	 * @note Designers may style section spacing, padding, and wrappers around this container.
 	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxSections = nullptr;
 
 	/**
@@ -449,7 +449,7 @@ private:
 	 * @note Designers may style spacing or add wrappers, but the horizontal box must remain the bound widget.
 	 * @note The bound widget must exist, keep this name, and remain a HorizontalBox for C++ validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UHorizontalBox> M_HorizontalBoxFooterButtons = nullptr;
 
 	/**
@@ -457,7 +457,7 @@ private:
 	 * @note Designers may style or wrap the section, but the bound vertical box must remain present.
 	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxGraphicsSection = nullptr;
 
 	/**
@@ -465,7 +465,7 @@ private:
 	 * @note Designers may adjust spacing or layout within the section as long as this vertical box remains bound.
 	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxAudioSection = nullptr;
 
 	/**
@@ -473,7 +473,7 @@ private:
 	 * @note Designers may style the section and add wrappers, but this vertical box must remain bound.
 	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxControlsSection = nullptr;
 
 	/**
@@ -481,7 +481,7 @@ private:
 	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextGraphicsHeader = nullptr;
 
 	/**
@@ -489,7 +489,7 @@ private:
 	 * @note Designers may style the label or add wrappers, but C++ sets the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextWindowModeLabel = nullptr;
 
 	/**
@@ -497,7 +497,7 @@ private:
 	 * @note Designers may style the label or adjust layout, but C++ sets the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextResolutionLabel = nullptr;
 
 	/**
@@ -505,7 +505,7 @@ private:
 	 * @note Designers may style the label, but C++ sets the label text at runtime for localization.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextVSyncLabel = nullptr;
 
 	/**
@@ -513,7 +513,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextOverallQualityLabel = nullptr;
 
 	/**
@@ -521,7 +521,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextViewDistanceLabel = nullptr;
 
 	/**
@@ -529,7 +529,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextShadowsLabel = nullptr;
 
 	/**
@@ -537,7 +537,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextTexturesLabel = nullptr;
 
 	/**
@@ -545,7 +545,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextEffectsLabel = nullptr;
 
 	/**
@@ -553,7 +553,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextPostProcessingLabel = nullptr;
 
 	/**
@@ -561,7 +561,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextFrameRateLimitLabel = nullptr;
 
 	/**
@@ -569,7 +569,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboWindowMode = nullptr;
 
 	/**
@@ -577,7 +577,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboResolution = nullptr;
 
 	/**
@@ -585,7 +585,7 @@ private:
 	 * @note Designers may style and wrap the checkbox, but C++ binds callbacks and sets the checked state.
 	 * @note The bound widget must exist, keep this name, and remain a CheckBox for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckVSync = nullptr;
 
 	/**
@@ -593,7 +593,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboOverallQuality = nullptr;
 
 	/**
@@ -601,7 +601,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboViewDistanceQuality = nullptr;
 
 	/**
@@ -609,7 +609,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboShadowsQuality = nullptr;
 
 	/**
@@ -617,7 +617,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboTexturesQuality = nullptr;
 
 	/**
@@ -625,7 +625,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboEffectsQuality = nullptr;
 
 	/**
@@ -633,7 +633,7 @@ private:
 	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboPostProcessingQuality = nullptr;
 
 	/**
@@ -641,7 +641,7 @@ private:
 	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderFrameRateLimit = nullptr;
 
 	/**
@@ -649,7 +649,7 @@ private:
 	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextAudioHeader = nullptr;
 
 	/**
@@ -657,7 +657,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextMasterVolumeLabel = nullptr;
 
 	/**
@@ -665,7 +665,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextMusicVolumeLabel = nullptr;
 
 	/**
@@ -673,7 +673,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextSfxVolumeLabel = nullptr;
 
 	/**
@@ -681,7 +681,7 @@ private:
 	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderMasterVolume = nullptr;
 
 	/**
@@ -689,7 +689,7 @@ private:
 	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderMusicVolume = nullptr;
 
 	/**
@@ -697,7 +697,7 @@ private:
 	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderSfxVolume = nullptr;
 
 	/**
@@ -705,7 +705,7 @@ private:
 	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextControlsHeader = nullptr;
 
 	/**
@@ -713,7 +713,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextMouseSensitivityLabel = nullptr;
 
 	/**
@@ -721,7 +721,7 @@ private:
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextInvertYAxisLabel = nullptr;
 
 	/**
@@ -729,7 +729,7 @@ private:
 	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderMouseSensitivity = nullptr;
 
 	/**
@@ -737,7 +737,7 @@ private:
 	 * @note Designers may style and wrap the checkbox, but C++ binds callbacks and sets the checked state.
 	 * @note The bound widget must exist, keep this name, and remain a CheckBox for logic.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckInvertYAxis = nullptr;
 
 	/**
@@ -745,7 +745,7 @@ private:
 	 * @note Designers may style and wrap the button, but it must contain a child RichTextBlock named M_TextApplyButton.
 	 * @note The bound button and its label must exist, keep names, and remain the same widget types.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UButton> M_ButtonApply = nullptr;
 
 	/**
@@ -753,7 +753,7 @@ private:
 	 * @note Designers may style and wrap the button, but it must contain a child RichTextBlock named M_TextBackOrCancelButton.
 	 * @note The bound button and its label must exist, keep names, and remain the same widget types.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UButton> M_ButtonBackOrCancel = nullptr;
 
 	/**
@@ -761,7 +761,7 @@ private:
 	 * @note Designers may style the label, but C++ sets the button label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextApplyButton = nullptr;
 
 	/**
@@ -769,7 +769,7 @@ private:
 	 * @note Designers may style the label, but C++ sets the button label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
 	 */
-	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextBackOrCancelButton = nullptr;
 
 	UPROPERTY(Transient)

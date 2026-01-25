@@ -1,0 +1,8 @@
+﻿ We need a huge refactor for the escape menu settings.
+ right now on the cpp side we try to setup part of the UI but i want all of that to be moved to bind widget
+ and let the designer add the actual buttons/sliders/checkboxes in the widget blueprint.
+ what i do want it things like: we need a drop down so we expect a drop down in the widget blueprint through bind widget but then binding
+ the options and handling the selection of the drop down should be done on the cpp side after the widget is loaded.
+ 
+ i also want detailed doxygen above the declarations of the bind widgets to make it clear what the designer shoudl add it with child rich
+ text boxes to it for example. 
