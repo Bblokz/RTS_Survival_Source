@@ -38,6 +38,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "TrainingUI/TrainingDescription/W_TrainingDescription.h"
 #include "RTS_Survival/GameUI/Archive/W_ArchiveNotificationHolder/W_ArchiveNotificationHolder.h"
+#include "RTS_Survival/Utils/RTSInputModeDefaults.h"
 
 
 void UMainGameUI::OpenTechTree()
@@ -1241,6 +1242,15 @@ void UMainGameUI::OnOpenArchive()
 	SetMainMenuVisiblity(false);
 	M_Archive->SetVisibility(ESlateVisibility::Visible);
 	M_Archive->OnOpenArchive();
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetWidgetToFocus(M_Archive->TakeWidget());
+	M_PlayerController->SetInputMode(InputMode);
+	M_PlayerController->bShowMouseCursor = true;
+	M_PlayerController->bEnableClickEvents = true;
+	M_PlayerController->bEnableMouseOverEvents = true;
 }
 
 void UMainGameUI::OnCloseArchive()
@@ -1254,6 +1264,7 @@ void UMainGameUI::OnCloseArchive()
 	M_Archive->SetVisibility(ESlateVisibility::Collapsed);
 	// Show menu.
 	SetMainMenuVisiblity(true);
+	RTSInputModeDefaults::ApplyRegularGameInputMode(M_PlayerController);
 }
 
 void UMainGameUI::OnEscapeMenuResumeGame()

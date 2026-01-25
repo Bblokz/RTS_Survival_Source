@@ -7,6 +7,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSInputModeDefaults.h"
 
 namespace EscapeMenuZOrder
 {
@@ -324,11 +325,7 @@ void FPlayerEscapeMenuHelper::UnpauseGameForEscapeMenu() const
 
 	M_PlayerController->PauseGame(ERTSPauseGameOptions::ForceUnpause);
 
-	FInputModeGameOnly InputMode;
-	M_PlayerController->SetInputMode(InputMode);
-	M_PlayerController->bShowMouseCursor = false;
-	M_PlayerController->bEnableClickEvents = false;
-	M_PlayerController->bEnableMouseOverEvents = false;
+	RTSInputModeDefaults::ApplyRegularGameInputMode(M_PlayerController.Get());
 }
 
 void FPlayerEscapeMenuHelper::PlaySoundIfSet(USoundBase* SoundToPlay) const
