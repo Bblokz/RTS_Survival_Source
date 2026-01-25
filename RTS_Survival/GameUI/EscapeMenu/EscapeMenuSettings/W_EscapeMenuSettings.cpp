@@ -1,98 +1,15 @@
 #include "RTS_Survival/GameUI/EscapeMenu/EscapeMenuSettings/W_EscapeMenuSettings.h"
 
-#include "Blueprint/WidgetTree.h"
-#include "Components/BackgroundBlur.h"
 #include "Components/Button.h"
 #include "Components/CheckBox.h"
 #include "Components/ComboBoxString.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
-#include "Components/Overlay.h"
-#include "Components/OverlaySlot.h"
 #include "Components/RichTextBlock.h"
-#include "Components/SizeBox.h"
 #include "Components/Slider.h"
-#include "Components/VerticalBox.h"
-#include "Components/VerticalBoxSlot.h"
 #include "Engine/GameInstance.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-
-namespace EscapeMenuSettingsWidgetNames
-{
-	const FName RootOverlay = TEXT("Overlay_Root");
-	const FName BackgroundBlur = TEXT("BackgroundBlur_Fullscreen");
-	const FName SizeBoxMenuRoot = TEXT("SizeBox_MenuRoot");
-	const FName VerticalBoxMenuRoot = TEXT("VerticalBox_MenuRoot");
-	const FName VerticalBoxSections = TEXT("VerticalBox_Sections");
-	const FName HorizontalBoxFooterButtons = TEXT("HorizontalBox_FooterButtons");
-
-	const FName VerticalBoxGraphicsSection = TEXT("VerticalBox_GraphicsSection");
-	const FName VerticalBoxAudioSection = TEXT("VerticalBox_AudioSection");
-	const FName VerticalBoxControlsSection = TEXT("VerticalBox_ControlsSection");
-
-	const FName TextGraphicsHeader = TEXT("RichText_GraphicsHeader");
-	const FName TextWindowModeLabel = TEXT("RichText_WindowModeLabel");
-	const FName TextResolutionLabel = TEXT("RichText_ResolutionLabel");
-	const FName TextVSyncLabel = TEXT("RichText_VSyncLabel");
-	const FName TextOverallQualityLabel = TEXT("RichText_OverallQualityLabel");
-	const FName TextViewDistanceLabel = TEXT("RichText_ViewDistanceLabel");
-	const FName TextShadowsLabel = TEXT("RichText_ShadowsLabel");
-	const FName TextTexturesLabel = TEXT("RichText_TexturesLabel");
-	const FName TextEffectsLabel = TEXT("RichText_EffectsLabel");
-	const FName TextPostProcessingLabel = TEXT("RichText_PostProcessingLabel");
-	const FName TextFrameRateLimitLabel = TEXT("RichText_FrameRateLimitLabel");
-
-	const FName ComboWindowMode = TEXT("Combo_WindowMode");
-	const FName ComboResolution = TEXT("Combo_Resolution");
-	const FName CheckVSync = TEXT("Check_VSync");
-	const FName ComboOverallQuality = TEXT("Combo_OverallQuality");
-	const FName ComboViewDistanceQuality = TEXT("Combo_ViewDistanceQuality");
-	const FName ComboShadowsQuality = TEXT("Combo_ShadowsQuality");
-	const FName ComboTexturesQuality = TEXT("Combo_TexturesQuality");
-	const FName ComboEffectsQuality = TEXT("Combo_EffectsQuality");
-	const FName ComboPostProcessingQuality = TEXT("Combo_PostProcessingQuality");
-	const FName SliderFrameRateLimit = TEXT("Slider_FrameRateLimit");
-
-	const FName TextAudioHeader = TEXT("RichText_AudioHeader");
-	const FName TextMasterVolumeLabel = TEXT("RichText_MasterVolumeLabel");
-	const FName TextMusicVolumeLabel = TEXT("RichText_MusicVolumeLabel");
-	const FName TextSfxVolumeLabel = TEXT("RichText_SfxVolumeLabel");
-	const FName SliderMasterVolume = TEXT("Slider_MasterVolume");
-	const FName SliderMusicVolume = TEXT("Slider_MusicVolume");
-	const FName SliderSfxVolume = TEXT("Slider_SfxVolume");
-
-	const FName TextControlsHeader = TEXT("RichText_ControlsHeader");
-	const FName TextMouseSensitivityLabel = TEXT("RichText_MouseSensitivityLabel");
-	const FName TextInvertYAxisLabel = TEXT("RichText_InvertYAxisLabel");
-	const FName SliderMouseSensitivity = TEXT("Slider_MouseSensitivity");
-	const FName CheckInvertYAxis = TEXT("Check_InvertYAxis");
-
-	const FName ButtonApply = TEXT("Button_Apply");
-	const FName ButtonBackOrCancel = TEXT("Button_BackOrCancel");
-	const FName TextApplyButton = TEXT("RichText_ApplyButton");
-	const FName TextBackOrCancelButton = TEXT("RichText_BackOrCancelButton");
-
-	const FName RowWindowMode = TEXT("Row_WindowMode");
-	const FName RowResolution = TEXT("Row_Resolution");
-	const FName RowVSync = TEXT("Row_VSync");
-	const FName RowOverallQuality = TEXT("Row_OverallQuality");
-	const FName RowViewDistance = TEXT("Row_ViewDistance");
-	const FName RowShadows = TEXT("Row_Shadows");
-	const FName RowTextures = TEXT("Row_Textures");
-	const FName RowEffects = TEXT("Row_Effects");
-	const FName RowPostProcessing = TEXT("Row_PostProcessing");
-	const FName RowFrameRateLimit = TEXT("Row_FrameRateLimit");
-
-	const FName RowMasterVolume = TEXT("Row_MasterVolume");
-	const FName RowMusicVolume = TEXT("Row_MusicVolume");
-	const FName RowSfxVolume = TEXT("Row_SfxVolume");
-
-	const FName RowMouseSensitivity = TEXT("Row_MouseSensitivity");
-	const FName RowInvertYAxis = TEXT("Row_InvertYAxis");
-}
 
 namespace EscapeMenuSettingsOptionDefaults
 {
@@ -113,30 +30,6 @@ namespace EscapeMenuSettingsOptionDefaults
 		TEXT("SETTINGS_QUALITY_HIGH_OPTION"),
 		TEXT("SETTINGS_QUALITY_EPIC_OPTION")
 	};
-
-	template <typename TWidgetType>
-	void AssignWidgetIfFound(UWidgetTree* WidgetTree, TObjectPtr<TWidgetType>& WidgetReference, const FName WidgetName)
-	{
-		if (WidgetTree == nullptr)
-		{
-			return;
-		}
-
-		if (TWidgetType* const FoundWidget = WidgetTree->FindWidget<TWidgetType>(WidgetName))
-		{
-			WidgetReference = FoundWidget;
-		}
-	}
-
-	void AssignWidgetName(UWidget* WidgetToName, UWidgetTree* WidgetTree, const FName WidgetName)
-	{
-		if (WidgetToName == nullptr || WidgetTree == nullptr)
-		{
-			return;
-		}
-
-		WidgetToName->Rename(*WidgetName.ToString(), WidgetTree);
-	}
 }
 
 void UW_EscapeMenuSettings::SetPlayerController(ACPPController* NewPlayerController)
@@ -151,50 +44,29 @@ void UW_EscapeMenuSettings::SetPlayerController(ACPPController* NewPlayerControl
 	M_MainGameUI = NewPlayerController->GetMainMenuUI();
 }
 
-void UW_EscapeMenuSettings::NativeOnInitialized()
-{
-	Super::NativeOnInitialized();
-	InitWidgetTree();
-	CacheWidgetReferencesFromTree();
-
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::NativeOnInitialized");
-	if (not EnsureWidgetReferencesValid(FunctionName))
-	{
-		return;
-	}
-
-	bM_IsInitialisingControls = true;
-	EnsureWindowModeOptionTexts();
-	EnsureQualityOptionTexts();
-	PopulateWindowModeOptions();
-	PopulateQualityOptions();
-	SetSliderRange(M_SliderFrameRateLimit, M_SliderRanges.M_FrameRateLimitMin, M_SliderRanges.M_FrameRateLimitMax);
-	SetSliderRange(M_SliderMouseSensitivity, M_SliderRanges.M_MouseSensitivityMin, M_SliderRanges.M_MouseSensitivityMax);
-	bM_IsInitialisingControls = false;
-
-	UpdateAllRichTextBlocks();
-}
-
 void UW_EscapeMenuSettings::NativePreConstruct()
 {
 	Super::NativePreConstruct();
-	InitWidgetTree();
-	CacheWidgetReferencesFromTree();
 
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::NativePreConstruct");
-	if (not EnsureWidgetReferencesValid(FunctionName))
+	if (not GetAreGraphicsTextWidgetsValid())
 	{
 		return;
 	}
 
-	bM_IsInitialisingControls = true;
-	EnsureWindowModeOptionTexts();
-	EnsureQualityOptionTexts();
-	PopulateWindowModeOptions();
-	PopulateQualityOptions();
-	SetSliderRange(M_SliderFrameRateLimit, M_SliderRanges.M_FrameRateLimitMin, M_SliderRanges.M_FrameRateLimitMax);
-	SetSliderRange(M_SliderMouseSensitivity, M_SliderRanges.M_MouseSensitivityMin, M_SliderRanges.M_MouseSensitivityMax);
-	bM_IsInitialisingControls = false;
+	if (not GetAreAudioTextWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreControlsTextWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreFooterTextWidgetsValid())
+	{
+		return;
+	}
 
 	UpdateAllRichTextBlocks();
 }
@@ -202,11 +74,8 @@ void UW_EscapeMenuSettings::NativePreConstruct()
 void UW_EscapeMenuSettings::NativeConstruct()
 {
 	Super::NativeConstruct();
-	InitWidgetTree();
-	CacheWidgetReferencesFromTree();
 
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::NativeConstruct");
-	if (not EnsureWidgetReferencesValid(FunctionName))
+	if (not GetAreAllWidgetsValid())
 	{
 		return;
 	}
@@ -243,12 +112,6 @@ void UW_EscapeMenuSettings::RefreshControlsFromSubsystem()
 		return;
 	}
 
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::RefreshControlsFromSubsystem");
-	if (not EnsureWidgetReferencesValid(FunctionName))
-	{
-		return;
-	}
-
 	bM_IsInitialisingControls = true;
 	M_SettingsSubsystem->LoadSettings();
 	PopulateComboBoxOptions();
@@ -264,665 +127,23 @@ void UW_EscapeMenuSettings::RefreshControlsFromSubsystem()
 	bM_IsInitialisingControls = false;
 }
 
-void UW_EscapeMenuSettings::InitWidgetTree()
-{
-	if (WidgetTree == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("WidgetTree was null while building EscapeMenuSettings."));
-		return;
-	}
-
-	if (WidgetTree->RootWidget != nullptr)
-	{
-		return;
-	}
-
-	InitRootLayout();
-}
-
-void UW_EscapeMenuSettings::InitRootLayout()
-{
-	M_RootOverlay = WidgetTree->ConstructWidget<UOverlay>();
-	if (M_RootOverlay == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the root overlay for EscapeMenuSettings."));
-		return;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_RootOverlay, WidgetTree, EscapeMenuSettingsWidgetNames::RootOverlay);
-
-	WidgetTree->RootWidget = M_RootOverlay;
-
-	M_BackgroundBlurFullscreen = WidgetTree->ConstructWidget<UBackgroundBlur>();
-	if (M_BackgroundBlurFullscreen == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the fullscreen background blur for EscapeMenuSettings."));
-		return;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_BackgroundBlurFullscreen, WidgetTree, EscapeMenuSettingsWidgetNames::BackgroundBlur);
-
-	if (UOverlaySlot* const BlurSlot = M_RootOverlay->AddChildToOverlay(M_BackgroundBlurFullscreen))
-	{
-		BlurSlot->SetHorizontalAlignment(HAlign_Fill);
-		BlurSlot->SetVerticalAlignment(VAlign_Fill);
-	}
-
-	M_SizeBoxMenuRoot = WidgetTree->ConstructWidget<USizeBox>();
-	if (M_SizeBoxMenuRoot == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the menu root size box for EscapeMenuSettings."));
-		return;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_SizeBoxMenuRoot, WidgetTree, EscapeMenuSettingsWidgetNames::SizeBoxMenuRoot);
-
-	if (UOverlaySlot* const MenuRootSlot = M_RootOverlay->AddChildToOverlay(M_SizeBoxMenuRoot))
-	{
-		MenuRootSlot->SetHorizontalAlignment(HAlign_Fill);
-		MenuRootSlot->SetVerticalAlignment(VAlign_Fill);
-	}
-
-	M_VerticalBoxMenuRoot = WidgetTree->ConstructWidget<UVerticalBox>();
-	if (M_VerticalBoxMenuRoot == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the menu root vertical box for EscapeMenuSettings."));
-		return;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_VerticalBoxMenuRoot, WidgetTree, EscapeMenuSettingsWidgetNames::VerticalBoxMenuRoot);
-
-	M_SizeBoxMenuRoot->SetContent(M_VerticalBoxMenuRoot);
-
-	M_VerticalBoxSections = WidgetTree->ConstructWidget<UVerticalBox>();
-	if (M_VerticalBoxSections == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the sections vertical box for EscapeMenuSettings."));
-		return;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_VerticalBoxSections, WidgetTree, EscapeMenuSettingsWidgetNames::VerticalBoxSections);
-
-	M_VerticalBoxMenuRoot->AddChildToVerticalBox(M_VerticalBoxSections);
-
-	InitGraphicsSection(M_VerticalBoxSections);
-	InitAudioSection(M_VerticalBoxSections);
-	InitControlsSection(M_VerticalBoxSections);
-	InitFooterButtons();
-}
-
-void UW_EscapeMenuSettings::InitGraphicsSection(UVerticalBox* SectionsContainer)
-{
-	M_VerticalBoxGraphicsSection = CreateSectionContainer(
-		SectionsContainer,
-		EscapeMenuSettingsWidgetNames::VerticalBoxGraphicsSection,
-		M_TextGraphicsHeader,
-		EscapeMenuSettingsWidgetNames::TextGraphicsHeader,
-		M_GraphicsText.M_HeaderText
-	);
-	if (M_VerticalBoxGraphicsSection == nullptr)
-	{
-		return;
-	}
-
-	InitGraphicsDisplaySettings(M_VerticalBoxGraphicsSection);
-	InitGraphicsScalabilitySettings(M_VerticalBoxGraphicsSection);
-	InitGraphicsFrameRateSetting(M_VerticalBoxGraphicsSection);
-}
-
-void UW_EscapeMenuSettings::InitGraphicsDisplaySettings(UVerticalBox* GraphicsSection)
-{
-	M_ComboWindowMode = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboWindowMode);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowWindowMode,
-		M_TextWindowModeLabel,
-		EscapeMenuSettingsWidgetNames::TextWindowModeLabel,
-		M_GraphicsText.M_WindowModeLabelText,
-		M_ComboWindowMode
-	);
-
-	M_ComboResolution = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboResolution);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowResolution,
-		M_TextResolutionLabel,
-		EscapeMenuSettingsWidgetNames::TextResolutionLabel,
-		M_GraphicsText.M_ResolutionLabelText,
-		M_ComboResolution
-	);
-
-	M_CheckVSync = CreateCheckBox(EscapeMenuSettingsWidgetNames::CheckVSync);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowVSync,
-		M_TextVSyncLabel,
-		EscapeMenuSettingsWidgetNames::TextVSyncLabel,
-		M_GraphicsText.M_VSyncLabelText,
-		M_CheckVSync
-	);
-
-	M_ComboOverallQuality = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboOverallQuality);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowOverallQuality,
-		M_TextOverallQualityLabel,
-		EscapeMenuSettingsWidgetNames::TextOverallQualityLabel,
-		M_GraphicsText.M_OverallQualityLabelText,
-		M_ComboOverallQuality
-	);
-}
-
-void UW_EscapeMenuSettings::InitGraphicsScalabilitySettings(UVerticalBox* GraphicsSection)
-{
-	M_ComboViewDistanceQuality = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboViewDistanceQuality);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowViewDistance,
-		M_TextViewDistanceLabel,
-		EscapeMenuSettingsWidgetNames::TextViewDistanceLabel,
-		M_GraphicsText.M_ViewDistanceLabelText,
-		M_ComboViewDistanceQuality
-	);
-
-	M_ComboShadowsQuality = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboShadowsQuality);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowShadows,
-		M_TextShadowsLabel,
-		EscapeMenuSettingsWidgetNames::TextShadowsLabel,
-		M_GraphicsText.M_ShadowsLabelText,
-		M_ComboShadowsQuality
-	);
-
-	M_ComboTexturesQuality = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboTexturesQuality);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowTextures,
-		M_TextTexturesLabel,
-		EscapeMenuSettingsWidgetNames::TextTexturesLabel,
-		M_GraphicsText.M_TexturesLabelText,
-		M_ComboTexturesQuality
-	);
-
-	M_ComboEffectsQuality = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboEffectsQuality);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowEffects,
-		M_TextEffectsLabel,
-		EscapeMenuSettingsWidgetNames::TextEffectsLabel,
-		M_GraphicsText.M_EffectsLabelText,
-		M_ComboEffectsQuality
-	);
-
-	M_ComboPostProcessingQuality = CreateComboBox(EscapeMenuSettingsWidgetNames::ComboPostProcessingQuality);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowPostProcessing,
-		M_TextPostProcessingLabel,
-		EscapeMenuSettingsWidgetNames::TextPostProcessingLabel,
-		M_GraphicsText.M_PostProcessingLabelText,
-		M_ComboPostProcessingQuality
-	);
-}
-
-void UW_EscapeMenuSettings::InitGraphicsFrameRateSetting(UVerticalBox* GraphicsSection)
-{
-	M_SliderFrameRateLimit = CreateSlider(EscapeMenuSettingsWidgetNames::SliderFrameRateLimit);
-	CreateSettingRow(
-		GraphicsSection,
-		EscapeMenuSettingsWidgetNames::RowFrameRateLimit,
-		M_TextFrameRateLimitLabel,
-		EscapeMenuSettingsWidgetNames::TextFrameRateLimitLabel,
-		M_GraphicsText.M_FrameRateLimitLabelText,
-		M_SliderFrameRateLimit
-	);
-}
-
-void UW_EscapeMenuSettings::InitAudioSection(UVerticalBox* SectionsContainer)
-{
-	M_VerticalBoxAudioSection = CreateSectionContainer(
-		SectionsContainer,
-		EscapeMenuSettingsWidgetNames::VerticalBoxAudioSection,
-		M_TextAudioHeader,
-		EscapeMenuSettingsWidgetNames::TextAudioHeader,
-		M_AudioText.M_HeaderText
-	);
-	if (M_VerticalBoxAudioSection == nullptr)
-	{
-		return;
-	}
-
-	M_SliderMasterVolume = CreateSlider(EscapeMenuSettingsWidgetNames::SliderMasterVolume);
-	CreateSettingRow(
-		M_VerticalBoxAudioSection,
-		EscapeMenuSettingsWidgetNames::RowMasterVolume,
-		M_TextMasterVolumeLabel,
-		EscapeMenuSettingsWidgetNames::TextMasterVolumeLabel,
-		M_AudioText.M_MasterVolumeLabelText,
-		M_SliderMasterVolume
-	);
-
-	M_SliderMusicVolume = CreateSlider(EscapeMenuSettingsWidgetNames::SliderMusicVolume);
-	CreateSettingRow(
-		M_VerticalBoxAudioSection,
-		EscapeMenuSettingsWidgetNames::RowMusicVolume,
-		M_TextMusicVolumeLabel,
-		EscapeMenuSettingsWidgetNames::TextMusicVolumeLabel,
-		M_AudioText.M_MusicVolumeLabelText,
-		M_SliderMusicVolume
-	);
-
-	M_SliderSfxVolume = CreateSlider(EscapeMenuSettingsWidgetNames::SliderSfxVolume);
-	CreateSettingRow(
-		M_VerticalBoxAudioSection,
-		EscapeMenuSettingsWidgetNames::RowSfxVolume,
-		M_TextSfxVolumeLabel,
-		EscapeMenuSettingsWidgetNames::TextSfxVolumeLabel,
-		M_AudioText.M_SfxVolumeLabelText,
-		M_SliderSfxVolume
-	);
-}
-
-void UW_EscapeMenuSettings::InitControlsSection(UVerticalBox* SectionsContainer)
-{
-	M_VerticalBoxControlsSection = CreateSectionContainer(
-		SectionsContainer,
-		EscapeMenuSettingsWidgetNames::VerticalBoxControlsSection,
-		M_TextControlsHeader,
-		EscapeMenuSettingsWidgetNames::TextControlsHeader,
-		M_ControlsText.M_HeaderText
-	);
-	if (M_VerticalBoxControlsSection == nullptr)
-	{
-		return;
-	}
-
-	M_SliderMouseSensitivity = CreateSlider(EscapeMenuSettingsWidgetNames::SliderMouseSensitivity);
-	CreateSettingRow(
-		M_VerticalBoxControlsSection,
-		EscapeMenuSettingsWidgetNames::RowMouseSensitivity,
-		M_TextMouseSensitivityLabel,
-		EscapeMenuSettingsWidgetNames::TextMouseSensitivityLabel,
-		M_ControlsText.M_MouseSensitivityLabelText,
-		M_SliderMouseSensitivity
-	);
-
-	M_CheckInvertYAxis = CreateCheckBox(EscapeMenuSettingsWidgetNames::CheckInvertYAxis);
-	CreateSettingRow(
-		M_VerticalBoxControlsSection,
-		EscapeMenuSettingsWidgetNames::RowInvertYAxis,
-		M_TextInvertYAxisLabel,
-		EscapeMenuSettingsWidgetNames::TextInvertYAxisLabel,
-		M_ControlsText.M_InvertYAxisLabelText,
-		M_CheckInvertYAxis
-	);
-}
-
-void UW_EscapeMenuSettings::InitFooterButtons()
-{
-	M_HorizontalBoxFooterButtons = WidgetTree->ConstructWidget<UHorizontalBox>();
-	if (M_HorizontalBoxFooterButtons == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the footer button row for EscapeMenuSettings."));
-		return;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_HorizontalBoxFooterButtons, WidgetTree, EscapeMenuSettingsWidgetNames::HorizontalBoxFooterButtons);
-
-	M_VerticalBoxMenuRoot->AddChildToVerticalBox(M_HorizontalBoxFooterButtons);
-
-	M_ButtonApply = CreateButton(
-		EscapeMenuSettingsWidgetNames::ButtonApply,
-		M_TextApplyButton,
-		EscapeMenuSettingsWidgetNames::TextApplyButton,
-		M_ButtonText.M_ApplyButtonText
-	);
-	if (M_ButtonApply != nullptr)
-	{
-		M_HorizontalBoxFooterButtons->AddChildToHorizontalBox(M_ButtonApply);
-	}
-
-	M_ButtonBackOrCancel = CreateButton(
-		EscapeMenuSettingsWidgetNames::ButtonBackOrCancel,
-		M_TextBackOrCancelButton,
-		EscapeMenuSettingsWidgetNames::TextBackOrCancelButton,
-		M_ButtonText.M_BackOrCancelButtonText
-	);
-	if (M_ButtonBackOrCancel != nullptr)
-	{
-		M_HorizontalBoxFooterButtons->AddChildToHorizontalBox(M_ButtonBackOrCancel);
-	}
-}
-
-UVerticalBox* UW_EscapeMenuSettings::CreateSectionContainer(
-	UVerticalBox* ParentContainer,
-	const FName SectionName,
-	TObjectPtr<URichTextBlock>& OutSectionHeader,
-	const FName HeaderName,
-	const FText& HeaderText)
-{
-	if (ParentContainer == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Parent container was null while creating a settings section."));
-		return nullptr;
-	}
-
-	UVerticalBox* const SectionContainer = WidgetTree->ConstructWidget<UVerticalBox>();
-	if (SectionContainer == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a settings section container."));
-		return nullptr;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(SectionContainer, WidgetTree, SectionName);
-
-	ParentContainer->AddChildToVerticalBox(SectionContainer);
-
-	OutSectionHeader = CreateRichTextBlock(HeaderName, HeaderText);
-	if (OutSectionHeader == nullptr)
-	{
-		return SectionContainer;
-	}
-
-	SectionContainer->AddChildToVerticalBox(OutSectionHeader);
-	return SectionContainer;
-}
-
-UHorizontalBox* UW_EscapeMenuSettings::CreateSettingRow(
-	UVerticalBox* ParentContainer,
-	const FName RowName,
-	TObjectPtr<URichTextBlock>& OutLabel,
-	const FName LabelName,
-	const FText& LabelText,
-	UWidget* ControlWidget)
-{
-	if (ParentContainer == nullptr || ControlWidget == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to create a settings row due to an invalid parent or control widget."));
-		return nullptr;
-	}
-
-	UHorizontalBox* const RowContainer = WidgetTree->ConstructWidget<UHorizontalBox>();
-	if (RowContainer == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a settings row container."));
-		return nullptr;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(RowContainer, WidgetTree, RowName);
-
-	ParentContainer->AddChildToVerticalBox(RowContainer);
-
-	OutLabel = CreateRichTextBlock(LabelName, LabelText);
-	if (OutLabel != nullptr)
-	{
-		RowContainer->AddChildToHorizontalBox(OutLabel);
-	}
-
-	RowContainer->AddChildToHorizontalBox(ControlWidget);
-	return RowContainer;
-}
-
-URichTextBlock* UW_EscapeMenuSettings::CreateRichTextBlock(const FName WidgetName, const FText& TextToAssign)
-{
-	if (WidgetTree == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("WidgetTree was null while constructing a rich text block."));
-		return nullptr;
-	}
-
-	URichTextBlock* const RichTextBlock = WidgetTree->ConstructWidget<URichTextBlock>();
-	if (RichTextBlock == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a rich text block for EscapeMenuSettings."));
-		return nullptr;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(RichTextBlock, WidgetTree, WidgetName);
-
-	RichTextBlock->SetText(TextToAssign);
-	return RichTextBlock;
-}
-
-UComboBoxString* UW_EscapeMenuSettings::CreateComboBox(const FName WidgetName)
-{
-	if (WidgetTree == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("WidgetTree was null while constructing a combo box."));
-		return nullptr;
-	}
-
-	UComboBoxString* const ComboBox = WidgetTree->ConstructWidget<UComboBoxString>();
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(ComboBox, WidgetTree, WidgetName);
-	return ComboBox;
-}
-
-USlider* UW_EscapeMenuSettings::CreateSlider(const FName WidgetName)
-{
-	if (WidgetTree == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("WidgetTree was null while constructing a slider."));
-		return nullptr;
-	}
-
-	USlider* const Slider = WidgetTree->ConstructWidget<USlider>();
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(Slider, WidgetTree, WidgetName);
-	return Slider;
-}
-
-UCheckBox* UW_EscapeMenuSettings::CreateCheckBox(const FName WidgetName)
-{
-	if (WidgetTree == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("WidgetTree was null while constructing a checkbox."));
-		return nullptr;
-	}
-
-	UCheckBox* const CheckBox = WidgetTree->ConstructWidget<UCheckBox>();
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(CheckBox, WidgetTree, WidgetName);
-	return CheckBox;
-}
-
-UButton* UW_EscapeMenuSettings::CreateButton(
-	const FName WidgetName,
-	TObjectPtr<URichTextBlock>& OutButtonText,
-	const FName ButtonTextName,
-	const FText& ButtonText)
-{
-	if (WidgetTree == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("WidgetTree was null while constructing a button."));
-		return nullptr;
-	}
-
-	UButton* const Button = WidgetTree->ConstructWidget<UButton>();
-	if (Button == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a button for EscapeMenuSettings."));
-		return nullptr;
-	}
-	EscapeMenuSettingsOptionDefaults::AssignWidgetName(Button, WidgetTree, WidgetName);
-
-	OutButtonText = CreateRichTextBlock(ButtonTextName, ButtonText);
-	if (OutButtonText != nullptr)
-	{
-		Button->SetContent(OutButtonText);
-	}
-
-	return Button;
-}
-
-void UW_EscapeMenuSettings::CacheWidgetReferencesFromTree()
-{
-	CacheRootWidgetReferences();
-	CacheGraphicsWidgetReferences();
-	CacheAudioWidgetReferences();
-	CacheControlsWidgetReferences();
-	CacheFooterWidgetReferences();
-}
-
-void UW_EscapeMenuSettings::CacheRootWidgetReferences()
-{
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_RootOverlay, EscapeMenuSettingsWidgetNames::RootOverlay);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_BackgroundBlurFullscreen, EscapeMenuSettingsWidgetNames::BackgroundBlur);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_SizeBoxMenuRoot, EscapeMenuSettingsWidgetNames::SizeBoxMenuRoot);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_VerticalBoxMenuRoot, EscapeMenuSettingsWidgetNames::VerticalBoxMenuRoot);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_VerticalBoxSections, EscapeMenuSettingsWidgetNames::VerticalBoxSections);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_HorizontalBoxFooterButtons, EscapeMenuSettingsWidgetNames::HorizontalBoxFooterButtons);
-}
-
-void UW_EscapeMenuSettings::CacheGraphicsWidgetReferences()
-{
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_VerticalBoxGraphicsSection, EscapeMenuSettingsWidgetNames::VerticalBoxGraphicsSection);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextGraphicsHeader, EscapeMenuSettingsWidgetNames::TextGraphicsHeader);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextWindowModeLabel, EscapeMenuSettingsWidgetNames::TextWindowModeLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextResolutionLabel, EscapeMenuSettingsWidgetNames::TextResolutionLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextVSyncLabel, EscapeMenuSettingsWidgetNames::TextVSyncLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextOverallQualityLabel, EscapeMenuSettingsWidgetNames::TextOverallQualityLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextViewDistanceLabel, EscapeMenuSettingsWidgetNames::TextViewDistanceLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextShadowsLabel, EscapeMenuSettingsWidgetNames::TextShadowsLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextTexturesLabel, EscapeMenuSettingsWidgetNames::TextTexturesLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextEffectsLabel, EscapeMenuSettingsWidgetNames::TextEffectsLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextPostProcessingLabel, EscapeMenuSettingsWidgetNames::TextPostProcessingLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextFrameRateLimitLabel, EscapeMenuSettingsWidgetNames::TextFrameRateLimitLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboWindowMode, EscapeMenuSettingsWidgetNames::ComboWindowMode);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboResolution, EscapeMenuSettingsWidgetNames::ComboResolution);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_CheckVSync, EscapeMenuSettingsWidgetNames::CheckVSync);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboOverallQuality, EscapeMenuSettingsWidgetNames::ComboOverallQuality);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboViewDistanceQuality, EscapeMenuSettingsWidgetNames::ComboViewDistanceQuality);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboShadowsQuality, EscapeMenuSettingsWidgetNames::ComboShadowsQuality);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboTexturesQuality, EscapeMenuSettingsWidgetNames::ComboTexturesQuality);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboEffectsQuality, EscapeMenuSettingsWidgetNames::ComboEffectsQuality);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ComboPostProcessingQuality, EscapeMenuSettingsWidgetNames::ComboPostProcessingQuality);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_SliderFrameRateLimit, EscapeMenuSettingsWidgetNames::SliderFrameRateLimit);
-}
-
-void UW_EscapeMenuSettings::CacheAudioWidgetReferences()
-{
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_VerticalBoxAudioSection, EscapeMenuSettingsWidgetNames::VerticalBoxAudioSection);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextAudioHeader, EscapeMenuSettingsWidgetNames::TextAudioHeader);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextMasterVolumeLabel, EscapeMenuSettingsWidgetNames::TextMasterVolumeLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextMusicVolumeLabel, EscapeMenuSettingsWidgetNames::TextMusicVolumeLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextSfxVolumeLabel, EscapeMenuSettingsWidgetNames::TextSfxVolumeLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_SliderMasterVolume, EscapeMenuSettingsWidgetNames::SliderMasterVolume);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_SliderMusicVolume, EscapeMenuSettingsWidgetNames::SliderMusicVolume);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_SliderSfxVolume, EscapeMenuSettingsWidgetNames::SliderSfxVolume);
-}
-
-void UW_EscapeMenuSettings::CacheControlsWidgetReferences()
-{
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_VerticalBoxControlsSection, EscapeMenuSettingsWidgetNames::VerticalBoxControlsSection);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextControlsHeader, EscapeMenuSettingsWidgetNames::TextControlsHeader);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextMouseSensitivityLabel, EscapeMenuSettingsWidgetNames::TextMouseSensitivityLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextInvertYAxisLabel, EscapeMenuSettingsWidgetNames::TextInvertYAxisLabel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_SliderMouseSensitivity, EscapeMenuSettingsWidgetNames::SliderMouseSensitivity);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_CheckInvertYAxis, EscapeMenuSettingsWidgetNames::CheckInvertYAxis);
-}
-
-void UW_EscapeMenuSettings::CacheFooterWidgetReferences()
-{
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ButtonApply, EscapeMenuSettingsWidgetNames::ButtonApply);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_ButtonBackOrCancel, EscapeMenuSettingsWidgetNames::ButtonBackOrCancel);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextApplyButton, EscapeMenuSettingsWidgetNames::TextApplyButton);
-	EscapeMenuSettingsOptionDefaults::AssignWidgetIfFound(WidgetTree, M_TextBackOrCancelButton, EscapeMenuSettingsWidgetNames::TextBackOrCancelButton);
-}
-
-bool UW_EscapeMenuSettings::EnsureWidgetReferencesValid(const FString& FunctionName) const
-{
-	if (not EnsureRootWidgetReferencesValid(FunctionName))
-	{
-		return false;
-	}
-
-	if (not EnsureGraphicsWidgetReferencesValid(FunctionName))
-	{
-		return false;
-	}
-
-	if (not EnsureAudioWidgetReferencesValid(FunctionName))
-	{
-		return false;
-	}
-
-	if (not EnsureControlsWidgetReferencesValid(FunctionName))
-	{
-		return false;
-	}
-
-	return EnsureFooterWidgetReferencesValid(FunctionName);
-}
-
-bool UW_EscapeMenuSettings::EnsureRootWidgetReferencesValid(const FString& FunctionName) const
-{
-	bool bWidgetsValid = true;
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_RootOverlay, TEXT("M_RootOverlay"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_BackgroundBlurFullscreen, TEXT("M_BackgroundBlurFullscreen"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_SizeBoxMenuRoot, TEXT("M_SizeBoxMenuRoot"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_VerticalBoxMenuRoot, TEXT("M_VerticalBoxMenuRoot"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_VerticalBoxSections, TEXT("M_VerticalBoxSections"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_HorizontalBoxFooterButtons, TEXT("M_HorizontalBoxFooterButtons"), FunctionName);
-	return bWidgetsValid;
-}
-
-bool UW_EscapeMenuSettings::EnsureGraphicsWidgetReferencesValid(const FString& FunctionName) const
-{
-	bool bWidgetsValid = true;
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_VerticalBoxGraphicsSection, TEXT("M_VerticalBoxGraphicsSection"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextGraphicsHeader, TEXT("M_TextGraphicsHeader"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextWindowModeLabel, TEXT("M_TextWindowModeLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextResolutionLabel, TEXT("M_TextResolutionLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextVSyncLabel, TEXT("M_TextVSyncLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextOverallQualityLabel, TEXT("M_TextOverallQualityLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextViewDistanceLabel, TEXT("M_TextViewDistanceLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextShadowsLabel, TEXT("M_TextShadowsLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextTexturesLabel, TEXT("M_TextTexturesLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextEffectsLabel, TEXT("M_TextEffectsLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextPostProcessingLabel, TEXT("M_TextPostProcessingLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextFrameRateLimitLabel, TEXT("M_TextFrameRateLimitLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboWindowMode, TEXT("M_ComboWindowMode"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboResolution, TEXT("M_ComboResolution"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_CheckVSync, TEXT("M_CheckVSync"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboOverallQuality, TEXT("M_ComboOverallQuality"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboViewDistanceQuality, TEXT("M_ComboViewDistanceQuality"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboShadowsQuality, TEXT("M_ComboShadowsQuality"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboTexturesQuality, TEXT("M_ComboTexturesQuality"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboEffectsQuality, TEXT("M_ComboEffectsQuality"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ComboPostProcessingQuality, TEXT("M_ComboPostProcessingQuality"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_SliderFrameRateLimit, TEXT("M_SliderFrameRateLimit"), FunctionName);
-	return bWidgetsValid;
-}
-
-bool UW_EscapeMenuSettings::EnsureAudioWidgetReferencesValid(const FString& FunctionName) const
-{
-	bool bWidgetsValid = true;
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_VerticalBoxAudioSection, TEXT("M_VerticalBoxAudioSection"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextAudioHeader, TEXT("M_TextAudioHeader"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextMasterVolumeLabel, TEXT("M_TextMasterVolumeLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextMusicVolumeLabel, TEXT("M_TextMusicVolumeLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextSfxVolumeLabel, TEXT("M_TextSfxVolumeLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_SliderMasterVolume, TEXT("M_SliderMasterVolume"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_SliderMusicVolume, TEXT("M_SliderMusicVolume"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_SliderSfxVolume, TEXT("M_SliderSfxVolume"), FunctionName);
-	return bWidgetsValid;
-}
-
-bool UW_EscapeMenuSettings::EnsureControlsWidgetReferencesValid(const FString& FunctionName) const
-{
-	bool bWidgetsValid = true;
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_VerticalBoxControlsSection, TEXT("M_VerticalBoxControlsSection"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextControlsHeader, TEXT("M_TextControlsHeader"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextMouseSensitivityLabel, TEXT("M_TextMouseSensitivityLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextInvertYAxisLabel, TEXT("M_TextInvertYAxisLabel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_SliderMouseSensitivity, TEXT("M_SliderMouseSensitivity"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_CheckInvertYAxis, TEXT("M_CheckInvertYAxis"), FunctionName);
-	return bWidgetsValid;
-}
-
-bool UW_EscapeMenuSettings::EnsureFooterWidgetReferencesValid(const FString& FunctionName) const
-{
-	bool bWidgetsValid = true;
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_HorizontalBoxFooterButtons, TEXT("M_HorizontalBoxFooterButtons"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ButtonApply, TEXT("M_ButtonApply"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_ButtonBackOrCancel, TEXT("M_ButtonBackOrCancel"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextApplyButton, TEXT("M_TextApplyButton"), FunctionName);
-	bWidgetsValid &= EnsureWidgetPointerIsValid(M_TextBackOrCancelButton, TEXT("M_TextBackOrCancelButton"), FunctionName);
-	return bWidgetsValid;
-}
-
 void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 {
+	if (not GetAreGraphicsWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreAudioWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreControlsWidgetsValid())
+	{
+		return;
+	}
+
 	EnsureWindowModeOptionTexts();
 	EnsureQualityOptionTexts();
 	PopulateWindowModeOptions();
@@ -938,8 +159,7 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 
 void UW_EscapeMenuSettings::PopulateWindowModeOptions()
 {
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::PopulateWindowModeOptions");
-	if (not EnsureWidgetPointerIsValid(M_ComboWindowMode, TEXT("M_ComboWindowMode"), FunctionName))
+	if (not GetIsValidComboWindowMode())
 	{
 		return;
 	}
@@ -953,20 +173,18 @@ void UW_EscapeMenuSettings::PopulateWindowModeOptions()
 
 void UW_EscapeMenuSettings::PopulateResolutionOptions()
 {
-	URTSSettingsMenuSubsystem* const SettingsSubsystem = M_SettingsSubsystem.Get();
-	if (SettingsSubsystem == nullptr)
+	if (not GetIsValidSettingsSubsystem())
 	{
 		return;
 	}
 
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::PopulateResolutionOptions");
-	if (not EnsureWidgetPointerIsValid(M_ComboResolution, TEXT("M_ComboResolution"), FunctionName))
+	if (not GetIsValidComboResolution())
 	{
 		return;
 	}
 
-	M_SupportedResolutions = SettingsSubsystem->GetSupportedResolutions();
-	M_SupportedResolutionLabels = SettingsSubsystem->GetSupportedResolutionLabels();
+	M_SupportedResolutions = M_SettingsSubsystem->GetSupportedResolutions();
+	M_SupportedResolutionLabels = M_SettingsSubsystem->GetSupportedResolutionLabels();
 	if (M_SupportedResolutions.Num() == 0)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("No supported resolutions were available for the settings menu."));
@@ -1001,8 +219,7 @@ void UW_EscapeMenuSettings::PopulateQualityOptions()
 
 void UW_EscapeMenuSettings::PopulateQualityOptionsForComboBox(UComboBoxString* ComboBoxToPopulate) const
 {
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::PopulateQualityOptionsForComboBox");
-	if (not EnsureWidgetPointerIsValid(ComboBoxToPopulate, TEXT("ComboBoxToPopulate"), FunctionName))
+	if (ComboBoxToPopulate == nullptr)
 	{
 		return;
 	}
@@ -1042,8 +259,22 @@ void UW_EscapeMenuSettings::EnsureQualityOptionTexts()
 
 void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 {
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::UpdateAllRichTextBlocks");
-	if (not EnsureWidgetReferencesValid(FunctionName))
+	if (not GetAreGraphicsTextWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreAudioTextWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreControlsTextWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreFooterTextWidgetsValid())
 	{
 		return;
 	}
@@ -1089,6 +320,11 @@ void UW_EscapeMenuSettings::InitialiseGraphicsControls(const FRTSGraphicsSetting
 
 void UW_EscapeMenuSettings::InitialiseGraphicsDisplayControls(const FRTSDisplaySettings& DisplaySettings)
 {
+	if (not GetAreGraphicsDisplayWidgetsValid())
+	{
+		return;
+	}
+
 	const int32 WindowModeIndex = GetClampedOptionIndex(static_cast<int32>(DisplaySettings.M_WindowMode), M_WindowModeOptionTexts.Num());
 	if (WindowModeIndex != INDEX_NONE)
 	{
@@ -1121,6 +357,11 @@ void UW_EscapeMenuSettings::InitialiseGraphicsDisplayControls(const FRTSDisplayS
 
 void UW_EscapeMenuSettings::InitialiseGraphicsScalabilityControls(const FRTSScalabilityGroupSettings& ScalabilityGroups)
 {
+	if (not GetAreGraphicsScalabilityWidgetsValid())
+	{
+		return;
+	}
+
 	SetQualityComboSelection(M_ComboViewDistanceQuality, ScalabilityGroups.M_ViewDistance);
 	SetQualityComboSelection(M_ComboShadowsQuality, ScalabilityGroups.M_Shadows);
 	SetQualityComboSelection(M_ComboTexturesQuality, ScalabilityGroups.M_Textures);
@@ -1130,6 +371,11 @@ void UW_EscapeMenuSettings::InitialiseGraphicsScalabilityControls(const FRTSScal
 
 void UW_EscapeMenuSettings::InitialiseGraphicsFrameRateControl(const FRTSDisplaySettings& DisplaySettings)
 {
+	if (not GetAreGraphicsFrameRateWidgetsValid())
+	{
+		return;
+	}
+
 	const float ClampedFrameRate = FMath::Clamp(
 		DisplaySettings.M_FrameRateLimit,
 		M_SliderRanges.M_FrameRateLimitMin,
@@ -1140,6 +386,11 @@ void UW_EscapeMenuSettings::InitialiseGraphicsFrameRateControl(const FRTSDisplay
 
 void UW_EscapeMenuSettings::InitialiseAudioControls(const FRTSAudioSettings& AudioSettings)
 {
+	if (not GetAreAudioSliderWidgetsValid())
+	{
+		return;
+	}
+
 	M_SliderMasterVolume->SetValue(AudioSettings.M_MasterVolume);
 	M_SliderMusicVolume->SetValue(AudioSettings.M_MusicVolume);
 	M_SliderSfxVolume->SetValue(AudioSettings.M_SfxVolume);
@@ -1147,6 +398,11 @@ void UW_EscapeMenuSettings::InitialiseAudioControls(const FRTSAudioSettings& Aud
 
 void UW_EscapeMenuSettings::InitialiseControlSettingsControls(const FRTSControlSettings& ControlSettings)
 {
+	if (not GetAreControlSettingsWidgetsValid())
+	{
+		return;
+	}
+
 	const float ClampedSensitivity = FMath::Clamp(
 		ControlSettings.M_MouseSensitivity,
 		M_SliderRanges.M_MouseSensitivityMin,
@@ -1219,8 +475,7 @@ void UW_EscapeMenuSettings::BindButtonCallbacks()
 
 void UW_EscapeMenuSettings::BindApplyButton()
 {
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::BindApplyButton");
-	if (not EnsureWidgetPointerIsValid(M_ButtonApply, TEXT("M_ButtonApply"), FunctionName))
+	if (not GetIsValidButtonApply())
 	{
 		return;
 	}
@@ -1231,8 +486,7 @@ void UW_EscapeMenuSettings::BindApplyButton()
 
 void UW_EscapeMenuSettings::BindBackOrCancelButton()
 {
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::BindBackOrCancelButton");
-	if (not EnsureWidgetPointerIsValid(M_ButtonBackOrCancel, TEXT("M_ButtonBackOrCancel"), FunctionName))
+	if (not GetIsValidButtonBackOrCancel())
 	{
 		return;
 	}
@@ -1243,12 +497,28 @@ void UW_EscapeMenuSettings::BindBackOrCancelButton()
 
 void UW_EscapeMenuSettings::BindSettingCallbacks()
 {
-	const FString FunctionName = TEXT("UW_EscapeMenuSettings::BindSettingCallbacks");
-	if (not EnsureWidgetReferencesValid(FunctionName))
+	if (not GetAreGraphicsWidgetsValid())
 	{
 		return;
 	}
 
+	if (not GetAreAudioWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreControlsWidgetsValid())
+	{
+		return;
+	}
+
+	BindGraphicsSettingCallbacks();
+	BindAudioSettingCallbacks();
+	BindControlSettingCallbacks();
+}
+
+void UW_EscapeMenuSettings::BindGraphicsSettingCallbacks()
+{
 	M_ComboWindowMode->OnSelectionChanged.RemoveAll(this);
 	M_ComboWindowMode->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleWindowModeSelectionChanged);
 
@@ -1278,7 +548,10 @@ void UW_EscapeMenuSettings::BindSettingCallbacks()
 
 	M_SliderFrameRateLimit->OnValueChanged.RemoveAll(this);
 	M_SliderFrameRateLimit->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleFrameRateLimitChanged);
+}
 
+void UW_EscapeMenuSettings::BindAudioSettingCallbacks()
+{
 	M_SliderMasterVolume->OnValueChanged.RemoveAll(this);
 	M_SliderMasterVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleMasterVolumeChanged);
 
@@ -1287,12 +560,31 @@ void UW_EscapeMenuSettings::BindSettingCallbacks()
 
 	M_SliderSfxVolume->OnValueChanged.RemoveAll(this);
 	M_SliderSfxVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleSfxVolumeChanged);
+}
 
+void UW_EscapeMenuSettings::BindControlSettingCallbacks()
+{
 	M_SliderMouseSensitivity->OnValueChanged.RemoveAll(this);
 	M_SliderMouseSensitivity->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleMouseSensitivityChanged);
 
 	M_CheckInvertYAxis->OnCheckStateChanged.RemoveAll(this);
 	M_CheckInvertYAxis->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleInvertYAxisChanged);
+}
+
+bool UW_EscapeMenuSettings::GetIsValidPlayerController() const
+{
+	if (not M_PlayerController.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_PlayerController"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidPlayerController"),
+			this
+		);
+		return false;
+	}
+
+	return true;
 }
 
 bool UW_EscapeMenuSettings::GetIsValidMainGameUI() const
@@ -1327,18 +619,1090 @@ bool UW_EscapeMenuSettings::GetIsValidSettingsSubsystem() const
 	return true;
 }
 
-bool UW_EscapeMenuSettings::EnsureWidgetPointerIsValid(
-	const UWidget* WidgetToCheck,
-	const FString& WidgetName,
-	const FString& FunctionName) const
+bool UW_EscapeMenuSettings::GetIsValidRootOverlay() const
 {
-	if (WidgetToCheck != nullptr)
+	if (not IsValid(M_RootOverlay))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_RootOverlay"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidRootOverlay"),
+			this
+		);
+		return false;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, WidgetName, FunctionName, this);
-	return false;
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidBackgroundBlurFullscreen() const
+{
+	if (not IsValid(M_BackgroundBlurFullscreen))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_BackgroundBlurFullscreen"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidBackgroundBlurFullscreen"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSizeBoxMenuRoot() const
+{
+	if (not IsValid(M_SizeBoxMenuRoot))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SizeBoxMenuRoot"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSizeBoxMenuRoot"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidVerticalBoxMenuRoot() const
+{
+	if (not IsValid(M_VerticalBoxMenuRoot))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_VerticalBoxMenuRoot"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxMenuRoot"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidVerticalBoxSections() const
+{
+	if (not IsValid(M_VerticalBoxSections))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_VerticalBoxSections"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxSections"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidHorizontalBoxFooterButtons() const
+{
+	if (not IsValid(M_HorizontalBoxFooterButtons))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_HorizontalBoxFooterButtons"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidHorizontalBoxFooterButtons"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidVerticalBoxGraphicsSection() const
+{
+	if (not IsValid(M_VerticalBoxGraphicsSection))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_VerticalBoxGraphicsSection"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxGraphicsSection"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidVerticalBoxAudioSection() const
+{
+	if (not IsValid(M_VerticalBoxAudioSection))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_VerticalBoxAudioSection"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxAudioSection"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidVerticalBoxControlsSection() const
+{
+	if (not IsValid(M_VerticalBoxControlsSection))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_VerticalBoxControlsSection"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxControlsSection"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextGraphicsHeader() const
+{
+	if (not IsValid(M_TextGraphicsHeader))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextGraphicsHeader"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextGraphicsHeader"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextWindowModeLabel() const
+{
+	if (not IsValid(M_TextWindowModeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextWindowModeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextWindowModeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextResolutionLabel() const
+{
+	if (not IsValid(M_TextResolutionLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextResolutionLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextResolutionLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextVSyncLabel() const
+{
+	if (not IsValid(M_TextVSyncLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextVSyncLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextVSyncLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextOverallQualityLabel() const
+{
+	if (not IsValid(M_TextOverallQualityLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextOverallQualityLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextOverallQualityLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextViewDistanceLabel() const
+{
+	if (not IsValid(M_TextViewDistanceLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextViewDistanceLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextViewDistanceLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextShadowsLabel() const
+{
+	if (not IsValid(M_TextShadowsLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextShadowsLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextShadowsLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextTexturesLabel() const
+{
+	if (not IsValid(M_TextTexturesLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextTexturesLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextTexturesLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEffectsLabel() const
+{
+	if (not IsValid(M_TextEffectsLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEffectsLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEffectsLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextPostProcessingLabel() const
+{
+	if (not IsValid(M_TextPostProcessingLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextPostProcessingLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextPostProcessingLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextFrameRateLimitLabel() const
+{
+	if (not IsValid(M_TextFrameRateLimitLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextFrameRateLimitLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextFrameRateLimitLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboWindowMode() const
+{
+	if (not IsValid(M_ComboWindowMode))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboWindowMode"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboWindowMode"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboResolution() const
+{
+	if (not IsValid(M_ComboResolution))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboResolution"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboResolution"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidCheckVSync() const
+{
+	if (not IsValid(M_CheckVSync))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_CheckVSync"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidCheckVSync"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboOverallQuality() const
+{
+	if (not IsValid(M_ComboOverallQuality))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboOverallQuality"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboOverallQuality"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboViewDistanceQuality() const
+{
+	if (not IsValid(M_ComboViewDistanceQuality))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboViewDistanceQuality"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboViewDistanceQuality"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboShadowsQuality() const
+{
+	if (not IsValid(M_ComboShadowsQuality))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboShadowsQuality"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboShadowsQuality"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboTexturesQuality() const
+{
+	if (not IsValid(M_ComboTexturesQuality))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboTexturesQuality"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboTexturesQuality"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboEffectsQuality() const
+{
+	if (not IsValid(M_ComboEffectsQuality))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboEffectsQuality"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboEffectsQuality"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboPostProcessingQuality() const
+{
+	if (not IsValid(M_ComboPostProcessingQuality))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboPostProcessingQuality"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboPostProcessingQuality"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderFrameRateLimit() const
+{
+	if (not IsValid(M_SliderFrameRateLimit))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderFrameRateLimit"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderFrameRateLimit"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextAudioHeader() const
+{
+	if (not IsValid(M_TextAudioHeader))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextAudioHeader"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextAudioHeader"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextMasterVolumeLabel() const
+{
+	if (not IsValid(M_TextMasterVolumeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextMasterVolumeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextMasterVolumeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextMusicVolumeLabel() const
+{
+	if (not IsValid(M_TextMusicVolumeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextMusicVolumeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextMusicVolumeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextSfxVolumeLabel() const
+{
+	if (not IsValid(M_TextSfxVolumeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextSfxVolumeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextSfxVolumeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderMasterVolume() const
+{
+	if (not IsValid(M_SliderMasterVolume))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderMasterVolume"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderMasterVolume"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderMusicVolume() const
+{
+	if (not IsValid(M_SliderMusicVolume))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderMusicVolume"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderMusicVolume"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderSfxVolume() const
+{
+	if (not IsValid(M_SliderSfxVolume))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderSfxVolume"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderSfxVolume"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextControlsHeader() const
+{
+	if (not IsValid(M_TextControlsHeader))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextControlsHeader"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextControlsHeader"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextMouseSensitivityLabel() const
+{
+	if (not IsValid(M_TextMouseSensitivityLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextMouseSensitivityLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextMouseSensitivityLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextInvertYAxisLabel() const
+{
+	if (not IsValid(M_TextInvertYAxisLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextInvertYAxisLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextInvertYAxisLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderMouseSensitivity() const
+{
+	if (not IsValid(M_SliderMouseSensitivity))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderMouseSensitivity"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderMouseSensitivity"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidCheckInvertYAxis() const
+{
+	if (not IsValid(M_CheckInvertYAxis))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_CheckInvertYAxis"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidCheckInvertYAxis"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidButtonApply() const
+{
+	if (not IsValid(M_ButtonApply))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ButtonApply"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonApply"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidButtonBackOrCancel() const
+{
+	if (not IsValid(M_ButtonBackOrCancel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ButtonBackOrCancel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonBackOrCancel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextApplyButton() const
+{
+	if (not IsValid(M_TextApplyButton))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextApplyButton"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextApplyButton"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextBackOrCancelButton() const
+{
+	if (not IsValid(M_TextBackOrCancelButton))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextBackOrCancelButton"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextBackOrCancelButton"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetAreRootWidgetsValid() const
+{
+	if (not GetIsValidRootOverlay())
+	{
+		return false;
+	}
+
+	if (not GetIsValidBackgroundBlurFullscreen())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSizeBoxMenuRoot())
+	{
+		return false;
+	}
+
+	if (not GetIsValidVerticalBoxMenuRoot())
+	{
+		return false;
+	}
+
+	if (not GetIsValidVerticalBoxSections())
+	{
+		return false;
+	}
+
+	return GetIsValidHorizontalBoxFooterButtons();
+}
+
+bool UW_EscapeMenuSettings::GetAreGraphicsWidgetsValid() const
+{
+	if (not GetIsValidVerticalBoxGraphicsSection())
+	{
+		return false;
+	}
+
+	if (not GetAreGraphicsTextWidgetsValid())
+	{
+		return false;
+	}
+
+	return GetAreGraphicsControlWidgetsValid();
+}
+
+bool UW_EscapeMenuSettings::GetAreAudioWidgetsValid() const
+{
+	if (not GetIsValidVerticalBoxAudioSection())
+	{
+		return false;
+	}
+
+	if (not GetAreAudioTextWidgetsValid())
+	{
+		return false;
+	}
+
+	return GetAreAudioSliderWidgetsValid();
+}
+
+bool UW_EscapeMenuSettings::GetAreControlsWidgetsValid() const
+{
+	if (not GetIsValidVerticalBoxControlsSection())
+	{
+		return false;
+	}
+
+	if (not GetAreControlsTextWidgetsValid())
+	{
+		return false;
+	}
+
+	return GetAreControlSettingsWidgetsValid();
+}
+
+bool UW_EscapeMenuSettings::GetAreFooterWidgetsValid() const
+{
+	if (not GetIsValidHorizontalBoxFooterButtons())
+	{
+		return false;
+	}
+
+	if (not GetIsValidButtonApply())
+	{
+		return false;
+	}
+
+	if (not GetIsValidButtonBackOrCancel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextApplyButton())
+	{
+		return false;
+	}
+
+	return GetIsValidTextBackOrCancelButton();
+}
+
+bool UW_EscapeMenuSettings::GetAreAllWidgetsValid() const
+{
+	if (not GetAreRootWidgetsValid())
+	{
+		return false;
+	}
+
+	if (not GetAreGraphicsWidgetsValid())
+	{
+		return false;
+	}
+
+	if (not GetAreAudioWidgetsValid())
+	{
+		return false;
+	}
+
+	if (not GetAreControlsWidgetsValid())
+	{
+		return false;
+	}
+
+	return GetAreFooterWidgetsValid();
+}
+
+bool UW_EscapeMenuSettings::GetAreGraphicsTextWidgetsValid() const
+{
+	if (not GetIsValidTextGraphicsHeader())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextWindowModeLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextResolutionLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextVSyncLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextOverallQualityLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextViewDistanceLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextShadowsLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextTexturesLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextEffectsLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextPostProcessingLabel())
+	{
+		return false;
+	}
+
+	return GetIsValidTextFrameRateLimitLabel();
+}
+
+bool UW_EscapeMenuSettings::GetAreGraphicsControlWidgetsValid() const
+{
+	if (not GetIsValidComboWindowMode())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboResolution())
+	{
+		return false;
+	}
+
+	if (not GetIsValidCheckVSync())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboOverallQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboViewDistanceQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboShadowsQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboTexturesQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboEffectsQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboPostProcessingQuality())
+	{
+		return false;
+	}
+
+	return GetIsValidSliderFrameRateLimit();
+}
+
+bool UW_EscapeMenuSettings::GetAreAudioTextWidgetsValid() const
+{
+	if (not GetIsValidTextAudioHeader())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextMasterVolumeLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextMusicVolumeLabel())
+	{
+		return false;
+	}
+
+	return GetIsValidTextSfxVolumeLabel();
+}
+
+bool UW_EscapeMenuSettings::GetAreControlsTextWidgetsValid() const
+{
+	if (not GetIsValidTextControlsHeader())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextMouseSensitivityLabel())
+	{
+		return false;
+	}
+
+	return GetIsValidTextInvertYAxisLabel();
+}
+
+bool UW_EscapeMenuSettings::GetAreFooterTextWidgetsValid() const
+{
+	if (not GetIsValidTextApplyButton())
+	{
+		return false;
+	}
+
+	return GetIsValidTextBackOrCancelButton();
+}
+
+bool UW_EscapeMenuSettings::GetAreGraphicsDisplayWidgetsValid() const
+{
+	if (not GetIsValidComboWindowMode())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboResolution())
+	{
+		return false;
+	}
+
+	if (not GetIsValidCheckVSync())
+	{
+		return false;
+	}
+
+	return GetIsValidComboOverallQuality();
+}
+
+bool UW_EscapeMenuSettings::GetAreGraphicsScalabilityWidgetsValid() const
+{
+	if (not GetIsValidComboViewDistanceQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboShadowsQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboTexturesQuality())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboEffectsQuality())
+	{
+		return false;
+	}
+
+	return GetIsValidComboPostProcessingQuality();
+}
+
+bool UW_EscapeMenuSettings::GetAreGraphicsFrameRateWidgetsValid() const
+{
+	return GetIsValidSliderFrameRateLimit();
+}
+
+bool UW_EscapeMenuSettings::GetAreAudioSliderWidgetsValid() const
+{
+	if (not GetIsValidSliderMasterVolume())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSliderMusicVolume())
+	{
+		return false;
+	}
+
+	return GetIsValidSliderSfxVolume();
+}
+
+bool UW_EscapeMenuSettings::GetAreControlSettingsWidgetsValid() const
+{
+	if (not GetIsValidSliderMouseSensitivity())
+	{
+		return false;
+	}
+
+	return GetIsValidCheckInvertYAxis();
 }
 
 void UW_EscapeMenuSettings::HandleApplyClicked()
@@ -1381,6 +1745,11 @@ void UW_EscapeMenuSettings::HandleWindowModeSelectionChanged(FString SelectedIte
 		return;
 	}
 
+	if (not GetIsValidComboWindowMode())
+	{
+		return;
+	}
+
 	const int32 SelectedIndex = M_ComboWindowMode->FindOptionIndex(SelectedItem);
 	if (SelectedIndex == INDEX_NONE)
 	{
@@ -1399,6 +1768,11 @@ void UW_EscapeMenuSettings::HandleResolutionSelectionChanged(FString SelectedIte
 	}
 
 	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboResolution())
 	{
 		return;
 	}
@@ -1425,6 +1799,11 @@ void UW_EscapeMenuSettings::HandleVSyncChanged(const bool bIsChecked)
 		return;
 	}
 
+	if (not GetIsValidCheckVSync())
+	{
+		return;
+	}
+
 	M_SettingsSubsystem->SetPendingVSyncEnabled(bIsChecked);
 }
 
@@ -1436,6 +1815,16 @@ void UW_EscapeMenuSettings::HandleOverallQualitySelectionChanged(FString Selecte
 	}
 
 	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboOverallQuality())
+	{
+		return;
+	}
+
+	if (not GetAreGraphicsScalabilityWidgetsValid())
 	{
 		return;
 	}
@@ -1471,6 +1860,11 @@ void UW_EscapeMenuSettings::HandleViewDistanceQualitySelectionChanged(FString Se
 		return;
 	}
 
+	if (not GetIsValidComboViewDistanceQuality())
+	{
+		return;
+	}
+
 	const int32 SelectedIndex = M_ComboViewDistanceQuality->FindOptionIndex(SelectedItem);
 	if (SelectedIndex == INDEX_NONE)
 	{
@@ -1489,6 +1883,11 @@ void UW_EscapeMenuSettings::HandleShadowsQualitySelectionChanged(FString Selecte
 	}
 
 	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboShadowsQuality())
 	{
 		return;
 	}
@@ -1515,6 +1914,11 @@ void UW_EscapeMenuSettings::HandleTexturesQualitySelectionChanged(FString Select
 		return;
 	}
 
+	if (not GetIsValidComboTexturesQuality())
+	{
+		return;
+	}
+
 	const int32 SelectedIndex = M_ComboTexturesQuality->FindOptionIndex(SelectedItem);
 	if (SelectedIndex == INDEX_NONE)
 	{
@@ -1533,6 +1937,11 @@ void UW_EscapeMenuSettings::HandleEffectsQualitySelectionChanged(FString Selecte
 	}
 
 	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboEffectsQuality())
 	{
 		return;
 	}
@@ -1559,6 +1968,11 @@ void UW_EscapeMenuSettings::HandlePostProcessingQualitySelectionChanged(FString 
 		return;
 	}
 
+	if (not GetIsValidComboPostProcessingQuality())
+	{
+		return;
+	}
+
 	const int32 SelectedIndex = M_ComboPostProcessingQuality->FindOptionIndex(SelectedItem);
 	if (SelectedIndex == INDEX_NONE)
 	{
@@ -1581,6 +1995,11 @@ void UW_EscapeMenuSettings::HandleFrameRateLimitChanged(const float NewValue)
 		return;
 	}
 
+	if (not GetIsValidSliderFrameRateLimit())
+	{
+		return;
+	}
+
 	M_SettingsSubsystem->SetPendingFrameRateLimit(NewValue);
 }
 
@@ -1592,6 +2011,11 @@ void UW_EscapeMenuSettings::HandleMasterVolumeChanged(const float NewValue)
 	}
 
 	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderMasterVolume())
 	{
 		return;
 	}
@@ -1611,6 +2035,11 @@ void UW_EscapeMenuSettings::HandleMusicVolumeChanged(const float NewValue)
 		return;
 	}
 
+	if (not GetIsValidSliderMusicVolume())
+	{
+		return;
+	}
+
 	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioChannel::Music, NewValue);
 }
 
@@ -1622,6 +2051,11 @@ void UW_EscapeMenuSettings::HandleSfxVolumeChanged(const float NewValue)
 	}
 
 	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderSfxVolume())
 	{
 		return;
 	}
@@ -1641,6 +2075,11 @@ void UW_EscapeMenuSettings::HandleMouseSensitivityChanged(const float NewValue)
 		return;
 	}
 
+	if (not GetIsValidSliderMouseSensitivity())
+	{
+		return;
+	}
+
 	M_SettingsSubsystem->SetPendingMouseSensitivity(NewValue);
 }
 
@@ -1652,6 +2091,11 @@ void UW_EscapeMenuSettings::HandleInvertYAxisChanged(const bool bIsChecked)
 	}
 
 	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidCheckInvertYAxis())
 	{
 		return;
 	}
