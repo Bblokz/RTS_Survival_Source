@@ -9,13 +9,21 @@ class ACPPController;
 class UButton;
 class UMainGameUI;
 
-/** @brief Escape menu root widget; it delegates all button actions to the main game UI manager. */
+/**
+ * @brief Escape menu root widget that forwards button intent to the main game UI manager.
+ *
+ * Designers style this widget in Blueprint while C++ keeps the callbacks wired to gameplay flow.
+ */
 UCLASS()
 class RTS_SURVIVAL_API UW_EscapeMenu : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
+	/**
+	 * @brief Provides the owning controller so button callbacks can reach gameplay systems.
+	 * @param NewPlayerController Player controller that owns the escape menu instance.
+	 */
 	void SetPlayerController(ACPPController* NewPlayerController);
 
 protected:

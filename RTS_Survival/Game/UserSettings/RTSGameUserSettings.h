@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameUserSettings.h"
+#include "Scalability.h"
 
 #include "RTSGameUserSettings.generated.h"
 
@@ -17,9 +18,9 @@ namespace RTSGameUserSettingsRanges
 }
 
 /**
- * @brief Stores runtime-changeable settings in GameUserSettings.ini so the settings menu can load and persist user preferences.
+ * @brief Stores and persists runtime settings so the escape menu can restore user choices every session.
  *
- * This class extends UGameUserSettings with audio and controls data that can be applied without restarting the game.
+ * Designers read and tweak the values through the settings UI while this class keeps them synced to GameUserSettings.ini.
  */
 UCLASS(config=GameUserSettings)
 class RTS_SURVIVAL_API URTSGameUserSettings : public UGameUserSettings
@@ -27,21 +28,63 @@ class RTS_SURVIVAL_API URTSGameUserSettings : public UGameUserSettings
 	GENERATED_BODY()
 
 public:
+	/**
+	 * @brief Pulls settings from config and normalizes them before the UI reads them.
+	 * @param bForceReload Forces a fresh read from config instead of cached values.
+	 */
 	virtual void LoadSettings(bool bForceReload = false) override;
+
+	/**
+	 * @brief Applies runtime values so subsystems can safely consume them during play.
+	 * @param bCheckForCommandLineOverrides Honors command line overrides when applying values.
+	 */
 	virtual void ApplySettings(bool bCheckForCommandLineOverrides) override;
+
+	/**
+	 * @brief Saves the current values so menu changes persist between sessions.
+	 */
 	virtual void SaveSettings() override;
 
+	/** @brief Returns the volume used for the master audio channel in the settings menu. */
 	float GetMasterVolume() const;
+
+	/** @brief Returns the volume used for the music audio channel in the settings menu. */
 	float GetMusicVolume() const;
+
+	/** @brief Returns the volume used for the SFX audio channel in the settings menu. */
 	float GetSfxVolume() const;
+
+	/** @brief Returns the mouse sensitivity multiplier applied by the settings menu. */
 	float GetMouseSensitivity() const;
+
+	/** @brief Returns whether the settings menu should invert the vertical look direction. */
 	bool GetInvertYAxis() const;
 
+	/** @brief Writes the master volume value before clamping and saving. */
 	void SetMasterVolume(const float NewMasterVolume);
+
+	/** @brief Writes the music volume value before clamping and saving. */
 	void SetMusicVolume(const float NewMusicVolume);
+
+	/** @brief Writes the SFX volume value before clamping and saving. */
 	void SetSfxVolume(const float NewSfxVolume);
+
+	/** @brief Writes the mouse sensitivity multiplier before clamping and saving. */
 	void SetMouseSensitivity(const float NewMouseSensitivity);
+
+	/** @brief Writes the invert setting so input code can flip vertical control direction. */
 	void SetInvertYAxis(const bool bNewInvertYAxis);
+
+	/**
+	 * @brief Returns the current scalability group values so the settings menu can mirror the live engine state.
+	 */
+	Scalability::FQualityLevels GetQualityLevels() const;
+
+	/**
+	 * @brief Pushes new scalability values so the engine applies group-level quality changes.
+	 * @param NewQualityLevels Group quality levels built from the menu selection.
+	 */
+	void SetQualityLevels(const Scalability::FQualityLevels& NewQualityLevels);
 
 private:
 	void ApplyCustomSettingClamps();

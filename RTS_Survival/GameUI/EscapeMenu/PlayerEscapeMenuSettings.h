@@ -8,7 +8,11 @@
 class UW_EscapeMenu;
 class UW_EscapeMenuSettings;
 
-/** @brief Defines the assets and classes needed to create and drive the escape menu flow. */
+/**
+ * @brief Bundles the widget classes and sounds used when the player opens or closes the escape menu flow.
+ *
+ * Designers assign these assets in data-driven settings so the UI manager can build the menu consistently.
+ */
 USTRUCT(BlueprintType)
 struct FPlayerEscapeMenuSettings
 {

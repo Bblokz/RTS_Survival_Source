@@ -21,6 +21,11 @@ class USlider;
 class UVerticalBox;
 class UWidget;
 
+/**
+ * @brief Holds designer-facing text keys for the graphics settings section.
+ *
+ * Populate these with localization keys so the menu can replace labels without editing layout code.
+ */
 USTRUCT(BlueprintType)
 struct FEscapeMenuSettingsGraphicsText
 {
@@ -60,6 +65,11 @@ struct FEscapeMenuSettingsGraphicsText
 	FText M_FrameRateLimitLabelText = FText::FromString(TEXT("SETTINGS_FRAME_RATE_LIMIT_LABEL"));
 };
 
+/**
+ * @brief Holds designer-facing text keys for the audio settings section.
+ *
+ * Update these values in Blueprint to localize or rename audio labels without touching C++ logic.
+ */
 USTRUCT(BlueprintType)
 struct FEscapeMenuSettingsAudioText
 {
@@ -78,6 +88,11 @@ struct FEscapeMenuSettingsAudioText
 	FText M_SfxVolumeLabelText = FText::FromString(TEXT("SETTINGS_SFX_VOLUME_LABEL"));
 };
 
+/**
+ * @brief Holds designer-facing text keys for the controls settings section.
+ *
+ * Keeping these in a struct makes it easy to swap label wording for different control schemes.
+ */
 USTRUCT(BlueprintType)
 struct FEscapeMenuSettingsControlsText
 {
@@ -93,6 +108,9 @@ struct FEscapeMenuSettingsControlsText
 	FText M_InvertYAxisLabelText = FText::FromString(TEXT("SETTINGS_INVERT_Y_AXIS_LABEL"));
 };
 
+/**
+ * @brief Holds the apply/back button text so designers can relabel the footer actions.
+ */
 USTRUCT(BlueprintType)
 struct FEscapeMenuSettingsButtonText
 {
@@ -111,6 +129,9 @@ namespace EscapeMenuSettingsDefaults
 	constexpr float FrameRateLimitMax = 240.0f;
 }
 
+/**
+ * @brief Defines the slider ranges so designers can tune min/max limits without code edits.
+ */
 USTRUCT(BlueprintType)
 struct FEscapeMenuSettingsSliderRanges
 {
@@ -140,6 +161,10 @@ class RTS_SURVIVAL_API UW_EscapeMenuSettings : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	/**
+	 * @brief Provides the owning controller so the menu can drive gameplay state changes.
+	 * @param NewPlayerController Player controller that owns the settings menu.
+	 */
 	void SetPlayerController(ACPPController* NewPlayerController);
 
 protected:
@@ -230,10 +255,41 @@ private:
 	void InitialiseAudioControls(const FRTSAudioSettings& AudioSettings);
 	void InitialiseControlSettingsControls(const FRTSControlSettings& ControlSettings);
 
+	/**
+	 * @brief Applies slider min/max bounds so designer ranges stay enforced at runtime.
+	 * @param SliderToConfigure Slider widget that receives the bounds.
+	 * @param MinValue Minimum value to expose to the player.
+	 * @param MaxValue Maximum value to expose to the player.
+	 */
 	void SetSliderRange(USlider* SliderToConfigure, float MinValue, float MaxValue) const;
+
+	/**
+	 * @brief Selects a combo option that matches the provided quality enum.
+	 * @param ComboBoxToSelect Combo box that hosts the quality options.
+	 * @param QualityToSelect Quality enum to map into the combo selection.
+	 */
 	void SetQualityComboSelection(UComboBoxString* ComboBoxToSelect, ERTSScalabilityQuality QualityToSelect) const;
+
+	/**
+	 * @brief Clamps the requested index so UI queries never access an out-of-range option.
+	 * @param DesiredIndex Index the caller wants to use.
+	 * @param OptionCount Total available options in the list.
+	 * @return A safe index that is guaranteed to be within the option array.
+	 */
 	int32 GetClampedOptionIndex(int32 DesiredIndex, int32 OptionCount) const;
+
+	/**
+	 * @brief Formats a resolution label for combo box display.
+	 * @param Resolution Resolution pair used to build the label.
+	 * @return Text label for the resolution, e.g. 1920x1080.
+	 */
 	FString BuildResolutionLabel(const FIntPoint& Resolution) const;
+
+	/**
+	 * @brief Finds a resolution in the cached list so the UI can sync the current selection.
+	 * @param Resolution Resolution value to search for.
+	 * @return Index into the supported resolutions array, or INDEX_NONE when missing.
+	 */
 	int32 FindResolutionIndex(const FIntPoint& Resolution) const;
 
 	void BindButtonCallbacks();
@@ -243,6 +299,14 @@ private:
 
 	bool GetIsValidMainGameUI() const;
 	bool GetIsValidSettingsSubsystem() const;
+
+	/**
+	 * @brief Validates a widget pointer to protect against missing Blueprint bindings.
+	 * @param WidgetToCheck Widget pointer to validate.
+	 * @param WidgetName Name to include in error output for designers.
+	 * @param FunctionName Function name to include in error output.
+	 * @return True when the widget pointer is valid.
+	 */
 	bool EnsureWidgetPointerIsValid(const UWidget* WidgetToCheck, const FString& WidgetName, const FString& FunctionName) const;
 
 	UFUNCTION()
