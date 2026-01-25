@@ -126,6 +126,16 @@ namespace EscapeMenuSettingsOptionDefaults
 			WidgetReference = FoundWidget;
 		}
 	}
+
+	void AssignWidgetName(UWidget* WidgetToName, UWidgetTree* WidgetTree, const FName WidgetName)
+	{
+		if (WidgetToName == nullptr || WidgetTree == nullptr)
+		{
+			return;
+		}
+
+		WidgetToName->Rename(*WidgetName.ToString(), WidgetTree);
+	}
 }
 
 void UW_EscapeMenuSettings::SetPlayerController(ACPPController* NewPlayerController)
@@ -271,21 +281,23 @@ void UW_EscapeMenuSettings::InitWidgetTree()
 
 void UW_EscapeMenuSettings::InitRootLayout()
 {
-	M_RootOverlay = WidgetTree->ConstructWidget<UOverlay>(EscapeMenuSettingsWidgetNames::RootOverlay);
+	M_RootOverlay = WidgetTree->ConstructWidget<UOverlay>();
 	if (M_RootOverlay == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the root overlay for EscapeMenuSettings."));
 		return;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_RootOverlay, WidgetTree, EscapeMenuSettingsWidgetNames::RootOverlay);
 
 	WidgetTree->RootWidget = M_RootOverlay;
 
-	M_BackgroundBlurFullscreen = WidgetTree->ConstructWidget<UBackgroundBlur>(EscapeMenuSettingsWidgetNames::BackgroundBlur);
+	M_BackgroundBlurFullscreen = WidgetTree->ConstructWidget<UBackgroundBlur>();
 	if (M_BackgroundBlurFullscreen == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the fullscreen background blur for EscapeMenuSettings."));
 		return;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_BackgroundBlurFullscreen, WidgetTree, EscapeMenuSettingsWidgetNames::BackgroundBlur);
 
 	if (UOverlaySlot* const BlurSlot = M_RootOverlay->AddChildToOverlay(M_BackgroundBlurFullscreen))
 	{
@@ -293,12 +305,13 @@ void UW_EscapeMenuSettings::InitRootLayout()
 		BlurSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 
-	M_SizeBoxMenuRoot = WidgetTree->ConstructWidget<USizeBox>(EscapeMenuSettingsWidgetNames::SizeBoxMenuRoot);
+	M_SizeBoxMenuRoot = WidgetTree->ConstructWidget<USizeBox>();
 	if (M_SizeBoxMenuRoot == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the menu root size box for EscapeMenuSettings."));
 		return;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_SizeBoxMenuRoot, WidgetTree, EscapeMenuSettingsWidgetNames::SizeBoxMenuRoot);
 
 	if (UOverlaySlot* const MenuRootSlot = M_RootOverlay->AddChildToOverlay(M_SizeBoxMenuRoot))
 	{
@@ -306,21 +319,23 @@ void UW_EscapeMenuSettings::InitRootLayout()
 		MenuRootSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 
-	M_VerticalBoxMenuRoot = WidgetTree->ConstructWidget<UVerticalBox>(EscapeMenuSettingsWidgetNames::VerticalBoxMenuRoot);
+	M_VerticalBoxMenuRoot = WidgetTree->ConstructWidget<UVerticalBox>();
 	if (M_VerticalBoxMenuRoot == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the menu root vertical box for EscapeMenuSettings."));
 		return;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_VerticalBoxMenuRoot, WidgetTree, EscapeMenuSettingsWidgetNames::VerticalBoxMenuRoot);
 
 	M_SizeBoxMenuRoot->SetContent(M_VerticalBoxMenuRoot);
 
-	M_VerticalBoxSections = WidgetTree->ConstructWidget<UVerticalBox>(EscapeMenuSettingsWidgetNames::VerticalBoxSections);
+	M_VerticalBoxSections = WidgetTree->ConstructWidget<UVerticalBox>();
 	if (M_VerticalBoxSections == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the sections vertical box for EscapeMenuSettings."));
 		return;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_VerticalBoxSections, WidgetTree, EscapeMenuSettingsWidgetNames::VerticalBoxSections);
 
 	M_VerticalBoxMenuRoot->AddChildToVerticalBox(M_VerticalBoxSections);
 
@@ -540,12 +555,13 @@ void UW_EscapeMenuSettings::InitControlsSection(UVerticalBox* SectionsContainer)
 
 void UW_EscapeMenuSettings::InitFooterButtons()
 {
-	M_HorizontalBoxFooterButtons = WidgetTree->ConstructWidget<UHorizontalBox>(EscapeMenuSettingsWidgetNames::HorizontalBoxFooterButtons);
+	M_HorizontalBoxFooterButtons = WidgetTree->ConstructWidget<UHorizontalBox>();
 	if (M_HorizontalBoxFooterButtons == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct the footer button row for EscapeMenuSettings."));
 		return;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(M_HorizontalBoxFooterButtons, WidgetTree, EscapeMenuSettingsWidgetNames::HorizontalBoxFooterButtons);
 
 	M_VerticalBoxMenuRoot->AddChildToVerticalBox(M_HorizontalBoxFooterButtons);
 
@@ -575,7 +591,7 @@ void UW_EscapeMenuSettings::InitFooterButtons()
 UVerticalBox* UW_EscapeMenuSettings::CreateSectionContainer(
 	UVerticalBox* ParentContainer,
 	const FName SectionName,
-	URichTextBlock*& OutSectionHeader,
+	TObjectPtr<URichTextBlock>& OutSectionHeader,
 	const FName HeaderName,
 	const FText& HeaderText)
 {
@@ -585,12 +601,13 @@ UVerticalBox* UW_EscapeMenuSettings::CreateSectionContainer(
 		return nullptr;
 	}
 
-	UVerticalBox* const SectionContainer = WidgetTree->ConstructWidget<UVerticalBox>(SectionName);
+	UVerticalBox* const SectionContainer = WidgetTree->ConstructWidget<UVerticalBox>();
 	if (SectionContainer == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a settings section container."));
 		return nullptr;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(SectionContainer, WidgetTree, SectionName);
 
 	ParentContainer->AddChildToVerticalBox(SectionContainer);
 
@@ -607,7 +624,7 @@ UVerticalBox* UW_EscapeMenuSettings::CreateSectionContainer(
 UHorizontalBox* UW_EscapeMenuSettings::CreateSettingRow(
 	UVerticalBox* ParentContainer,
 	const FName RowName,
-	URichTextBlock*& OutLabel,
+	TObjectPtr<URichTextBlock>& OutLabel,
 	const FName LabelName,
 	const FText& LabelText,
 	UWidget* ControlWidget)
@@ -618,12 +635,13 @@ UHorizontalBox* UW_EscapeMenuSettings::CreateSettingRow(
 		return nullptr;
 	}
 
-	UHorizontalBox* const RowContainer = WidgetTree->ConstructWidget<UHorizontalBox>(RowName);
+	UHorizontalBox* const RowContainer = WidgetTree->ConstructWidget<UHorizontalBox>();
 	if (RowContainer == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a settings row container."));
 		return nullptr;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(RowContainer, WidgetTree, RowName);
 
 	ParentContainer->AddChildToVerticalBox(RowContainer);
 
@@ -645,12 +663,13 @@ URichTextBlock* UW_EscapeMenuSettings::CreateRichTextBlock(const FName WidgetNam
 		return nullptr;
 	}
 
-	URichTextBlock* const RichTextBlock = WidgetTree->ConstructWidget<URichTextBlock>(WidgetName);
+	URichTextBlock* const RichTextBlock = WidgetTree->ConstructWidget<URichTextBlock>();
 	if (RichTextBlock == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a rich text block for EscapeMenuSettings."));
 		return nullptr;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(RichTextBlock, WidgetTree, WidgetName);
 
 	RichTextBlock->SetText(TextToAssign);
 	return RichTextBlock;
@@ -664,7 +683,9 @@ UComboBoxString* UW_EscapeMenuSettings::CreateComboBox(const FName WidgetName)
 		return nullptr;
 	}
 
-	return WidgetTree->ConstructWidget<UComboBoxString>(WidgetName);
+	UComboBoxString* const ComboBox = WidgetTree->ConstructWidget<UComboBoxString>();
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(ComboBox, WidgetTree, WidgetName);
+	return ComboBox;
 }
 
 USlider* UW_EscapeMenuSettings::CreateSlider(const FName WidgetName)
@@ -675,7 +696,9 @@ USlider* UW_EscapeMenuSettings::CreateSlider(const FName WidgetName)
 		return nullptr;
 	}
 
-	return WidgetTree->ConstructWidget<USlider>(WidgetName);
+	USlider* const Slider = WidgetTree->ConstructWidget<USlider>();
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(Slider, WidgetTree, WidgetName);
+	return Slider;
 }
 
 UCheckBox* UW_EscapeMenuSettings::CreateCheckBox(const FName WidgetName)
@@ -686,12 +709,14 @@ UCheckBox* UW_EscapeMenuSettings::CreateCheckBox(const FName WidgetName)
 		return nullptr;
 	}
 
-	return WidgetTree->ConstructWidget<UCheckBox>(WidgetName);
+	UCheckBox* const CheckBox = WidgetTree->ConstructWidget<UCheckBox>();
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(CheckBox, WidgetTree, WidgetName);
+	return CheckBox;
 }
 
 UButton* UW_EscapeMenuSettings::CreateButton(
 	const FName WidgetName,
-	URichTextBlock*& OutButtonText,
+	TObjectPtr<URichTextBlock>& OutButtonText,
 	const FName ButtonTextName,
 	const FText& ButtonText)
 {
@@ -701,12 +726,13 @@ UButton* UW_EscapeMenuSettings::CreateButton(
 		return nullptr;
 	}
 
-	UButton* const Button = WidgetTree->ConstructWidget<UButton>(WidgetName);
+	UButton* const Button = WidgetTree->ConstructWidget<UButton>();
 	if (Button == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to construct a button for EscapeMenuSettings."));
 		return nullptr;
 	}
+	EscapeMenuSettingsOptionDefaults::AssignWidgetName(Button, WidgetTree, WidgetName);
 
 	OutButtonText = CreateRichTextBlock(ButtonTextName, ButtonText);
 	if (OutButtonText != nullptr)
