@@ -19,7 +19,6 @@ class URichTextBlock;
 class USizeBox;
 class USlider;
 class UVerticalBox;
-class UWidget;
 
 /**
  * @brief Holds designer-facing text keys for the graphics settings section.
@@ -151,9 +150,9 @@ struct FEscapeMenuSettingsSliderRanges
 };
 
 /**
- * @brief Fullscreen escape settings menu that stages changes through URTSSettingsMenuSubsystem before applying or reverting.
+ * @brief Fullscreen escape settings menu that binds Blueprint-authored widgets to settings runtime logic.
  *
- * The widget builds a neutral layout in C++ so designers can focus on styling in Blueprint without changing the settings logic.
+ * Designers own the widget tree in Blueprint while C++ populates options, binds callbacks, and stages settings changes.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_EscapeMenuSettings : public UUserWidget
@@ -168,74 +167,12 @@ public:
 	void SetPlayerController(ACPPController* NewPlayerController);
 
 protected:
-	virtual void NativeOnInitialized() override;
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 
 private:
 	void CacheSettingsSubsystem();
 	void RefreshControlsFromSubsystem();
-
-	void InitWidgetTree();
-	void InitRootLayout();
-	void InitGraphicsSection(UVerticalBox* SectionsContainer);
-	void InitGraphicsDisplaySettings(UVerticalBox* GraphicsSection);
-	void InitGraphicsScalabilitySettings(UVerticalBox* GraphicsSection);
-	void InitGraphicsFrameRateSetting(UVerticalBox* GraphicsSection);
-	void InitAudioSection(UVerticalBox* SectionsContainer);
-	void InitControlsSection(UVerticalBox* SectionsContainer);
-	void InitFooterButtons();
-
-	/**
-	 * @brief Builds a section wrapper with a header to keep the menu grouped without relying on styling data.
-	 * @param ParentContainer The vertical box that owns the section.
-	 * @param SectionName Name assigned to the section widget for Blueprint lookup.
-	 * @param OutSectionHeader Rich text header created for the section.
-	 * @param HeaderName Name assigned to the header widget for Blueprint lookup.
-	 * @param HeaderText Placeholder header text that designers can replace.
-	 * @return The created section container or nullptr when creation fails.
-	 */
-	UVerticalBox* CreateSectionContainer(UVerticalBox* ParentContainer, const FName SectionName, TObjectPtr<URichTextBlock>& OutSectionHeader, const FName HeaderName, const FText& HeaderText);
-
-	/**
-	 * @brief Creates a neutral label/control row so each setting can be bound without depending on final styling.
-	 * @param ParentContainer The section that receives the row.
-	 * @param RowName Name assigned to the row widget for Blueprint lookup.
-	 * @param OutLabel Rich text label created for the row.
-	 * @param LabelName Name assigned to the label widget for Blueprint lookup.
-	 * @param LabelText Placeholder label text that designers can replace.
-	 * @param ControlWidget The input widget that represents the setting value.
-	 * @return The created row container or nullptr when creation fails.
-	 */
-	UHorizontalBox* CreateSettingRow(UVerticalBox* ParentContainer, const FName RowName, TObjectPtr<URichTextBlock>& OutLabel, const FName LabelName, const FText& LabelText, UWidget* ControlWidget);
-	URichTextBlock* CreateRichTextBlock(const FName WidgetName, const FText& TextToAssign);
-	UComboBoxString* CreateComboBox(const FName WidgetName);
-	USlider* CreateSlider(const FName WidgetName);
-	UCheckBox* CreateCheckBox(const FName WidgetName);
-
-	/**
-	 * @brief Creates a button with rich text content so the apply/cancel labels stay fully designer-editable.
-	 * @param WidgetName Name assigned to the button widget for Blueprint lookup.
-	 * @param OutButtonText Rich text block created for the button content.
-	 * @param ButtonTextName Name assigned to the button text widget for Blueprint lookup.
-	 * @param ButtonText Placeholder button text that designers can replace.
-	 * @return The created button or nullptr when creation fails.
-	 */
-	UButton* CreateButton(const FName WidgetName, TObjectPtr<URichTextBlock>& OutButtonText, const FName ButtonTextName, const FText& ButtonText);
-
-	void CacheWidgetReferencesFromTree();
-	void CacheRootWidgetReferences();
-	void CacheGraphicsWidgetReferences();
-	void CacheAudioWidgetReferences();
-	void CacheControlsWidgetReferences();
-	void CacheFooterWidgetReferences();
-
-	bool EnsureWidgetReferencesValid(const FString& FunctionName) const;
-	bool EnsureRootWidgetReferencesValid(const FString& FunctionName) const;
-	bool EnsureGraphicsWidgetReferencesValid(const FString& FunctionName) const;
-	bool EnsureAudioWidgetReferencesValid(const FString& FunctionName) const;
-	bool EnsureControlsWidgetReferencesValid(const FString& FunctionName) const;
-	bool EnsureFooterWidgetReferencesValid(const FString& FunctionName) const;
 
 	void PopulateComboBoxOptions();
 	void PopulateWindowModeOptions();
@@ -296,18 +233,84 @@ private:
 	void BindApplyButton();
 	void BindBackOrCancelButton();
 	void BindSettingCallbacks();
+	void BindGraphicsSettingCallbacks();
+	void BindAudioSettingCallbacks();
+	void BindControlSettingCallbacks();
 
+	bool GetIsValidPlayerController() const;
 	bool GetIsValidMainGameUI() const;
 	bool GetIsValidSettingsSubsystem() const;
 
-	/**
-	 * @brief Validates a widget pointer to protect against missing Blueprint bindings.
-	 * @param WidgetToCheck Widget pointer to validate.
-	 * @param WidgetName Name to include in error output for designers.
-	 * @param FunctionName Function name to include in error output.
-	 * @return True when the widget pointer is valid.
-	 */
-	bool EnsureWidgetPointerIsValid(const UWidget* WidgetToCheck, const FString& WidgetName, const FString& FunctionName) const;
+	bool GetIsValidRootOverlay() const;
+	bool GetIsValidBackgroundBlurFullscreen() const;
+	bool GetIsValidSizeBoxMenuRoot() const;
+	bool GetIsValidVerticalBoxMenuRoot() const;
+	bool GetIsValidVerticalBoxSections() const;
+	bool GetIsValidHorizontalBoxFooterButtons() const;
+
+	bool GetIsValidVerticalBoxGraphicsSection() const;
+	bool GetIsValidVerticalBoxAudioSection() const;
+	bool GetIsValidVerticalBoxControlsSection() const;
+
+	bool GetIsValidTextGraphicsHeader() const;
+	bool GetIsValidTextWindowModeLabel() const;
+	bool GetIsValidTextResolutionLabel() const;
+	bool GetIsValidTextVSyncLabel() const;
+	bool GetIsValidTextOverallQualityLabel() const;
+	bool GetIsValidTextViewDistanceLabel() const;
+	bool GetIsValidTextShadowsLabel() const;
+	bool GetIsValidTextTexturesLabel() const;
+	bool GetIsValidTextEffectsLabel() const;
+	bool GetIsValidTextPostProcessingLabel() const;
+	bool GetIsValidTextFrameRateLimitLabel() const;
+
+	bool GetIsValidComboWindowMode() const;
+	bool GetIsValidComboResolution() const;
+	bool GetIsValidCheckVSync() const;
+	bool GetIsValidComboOverallQuality() const;
+	bool GetIsValidComboViewDistanceQuality() const;
+	bool GetIsValidComboShadowsQuality() const;
+	bool GetIsValidComboTexturesQuality() const;
+	bool GetIsValidComboEffectsQuality() const;
+	bool GetIsValidComboPostProcessingQuality() const;
+	bool GetIsValidSliderFrameRateLimit() const;
+
+	bool GetIsValidTextAudioHeader() const;
+	bool GetIsValidTextMasterVolumeLabel() const;
+	bool GetIsValidTextMusicVolumeLabel() const;
+	bool GetIsValidTextSfxVolumeLabel() const;
+	bool GetIsValidSliderMasterVolume() const;
+	bool GetIsValidSliderMusicVolume() const;
+	bool GetIsValidSliderSfxVolume() const;
+
+	bool GetIsValidTextControlsHeader() const;
+	bool GetIsValidTextMouseSensitivityLabel() const;
+	bool GetIsValidTextInvertYAxisLabel() const;
+	bool GetIsValidSliderMouseSensitivity() const;
+	bool GetIsValidCheckInvertYAxis() const;
+
+	bool GetIsValidButtonApply() const;
+	bool GetIsValidButtonBackOrCancel() const;
+	bool GetIsValidTextApplyButton() const;
+	bool GetIsValidTextBackOrCancelButton() const;
+
+	bool GetAreRootWidgetsValid() const;
+	bool GetAreGraphicsWidgetsValid() const;
+	bool GetAreAudioWidgetsValid() const;
+	bool GetAreControlsWidgetsValid() const;
+	bool GetAreFooterWidgetsValid() const;
+	bool GetAreAllWidgetsValid() const;
+
+	bool GetAreGraphicsTextWidgetsValid() const;
+	bool GetAreGraphicsControlWidgetsValid() const;
+	bool GetAreAudioTextWidgetsValid() const;
+	bool GetAreControlsTextWidgetsValid() const;
+	bool GetAreFooterTextWidgetsValid() const;
+	bool GetAreGraphicsDisplayWidgetsValid() const;
+	bool GetAreGraphicsScalabilityWidgetsValid() const;
+	bool GetAreGraphicsFrameRateWidgetsValid() const;
+	bool GetAreAudioSliderWidgetsValid() const;
+	bool GetAreControlSettingsWidgetsValid() const;
 
 	UFUNCTION()
 	void HandleApplyClicked();
@@ -401,142 +404,372 @@ private:
 		FText::FromString(TEXT("SETTINGS_QUALITY_EPIC_OPTION"))
 	};
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference an Overlay named M_RootOverlay in the Widget Blueprint.
+	 * @note Designers may change layout, styling, padding, and add wrapper widgets around this overlay.
+	 * @note The bound widget must exist, keep this name, and remain an Overlay for C++ validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UOverlay> M_RootOverlay = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a BackgroundBlur named M_BackgroundBlurFullscreen in the Widget Blueprint.
+	 * @note Designers may restyle the blur and adjust layout wrappers to fit the menu presentation.
+	 * @note The bound widget must exist, keep this name, and remain a BackgroundBlur for runtime logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UBackgroundBlur> M_BackgroundBlurFullscreen = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a SizeBox named M_SizeBoxMenuRoot in the Widget Blueprint.
+	 * @note Designers may adjust sizing, padding, and wrappers to fit the screen or platform.
+	 * @note The bound widget must exist, keep this name, and remain a SizeBox for validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USizeBox> M_SizeBoxMenuRoot = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a VerticalBox named M_VerticalBoxMenuRoot in the Widget Blueprint.
+	 * @note Designers may reorder children and styling within the vertical box as long as it remains present.
+	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxMenuRoot = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a VerticalBox named M_VerticalBoxSections in the Widget Blueprint.
+	 * @note Designers may style section spacing, padding, and wrappers around this container.
+	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxSections = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a HorizontalBox named M_HorizontalBoxFooterButtons in the Widget Blueprint.
+	 * @note Designers may style spacing or add wrappers, but the horizontal box must remain the bound widget.
+	 * @note The bound widget must exist, keep this name, and remain a HorizontalBox for C++ validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UHorizontalBox> M_HorizontalBoxFooterButtons = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a VerticalBox named M_VerticalBoxGraphicsSection in the Widget Blueprint.
+	 * @note Designers may style or wrap the section, but the bound vertical box must remain present.
+	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxGraphicsSection = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a VerticalBox named M_VerticalBoxAudioSection in the Widget Blueprint.
+	 * @note Designers may adjust spacing or layout within the section as long as this vertical box remains bound.
+	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxAudioSection = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a VerticalBox named M_VerticalBoxControlsSection in the Widget Blueprint.
+	 * @note Designers may style the section and add wrappers, but this vertical box must remain bound.
+	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxControlsSection = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextGraphicsHeader in the Widget Blueprint.
+	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextGraphicsHeader = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextWindowModeLabel in the Widget Blueprint.
+	 * @note Designers may style the label or add wrappers, but C++ sets the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextWindowModeLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextResolutionLabel in the Widget Blueprint.
+	 * @note Designers may style the label or adjust layout, but C++ sets the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextResolutionLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextVSyncLabel in the Widget Blueprint.
+	 * @note Designers may style the label, but C++ sets the label text at runtime for localization.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextVSyncLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextOverallQualityLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextOverallQualityLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextViewDistanceLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextViewDistanceLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextShadowsLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextShadowsLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextTexturesLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextTexturesLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextEffectsLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextEffectsLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextPostProcessingLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextPostProcessingLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextFrameRateLimitLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextFrameRateLimitLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboWindowMode in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboWindowMode = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboResolution in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboResolution = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a CheckBox named M_CheckVSync in the Widget Blueprint.
+	 * @note Designers may style and wrap the checkbox, but C++ binds callbacks and sets the checked state.
+	 * @note The bound widget must exist, keep this name, and remain a CheckBox for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckVSync = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboOverallQuality in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboOverallQuality = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboViewDistanceQuality in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboViewDistanceQuality = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboShadowsQuality in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboShadowsQuality = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboTexturesQuality in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboTexturesQuality = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboEffectsQuality in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboEffectsQuality = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboPostProcessingQuality in the Widget Blueprint.
+	 * @note Designers may style and wrap the combo box, but C++ populates options and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a ComboBoxString for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboPostProcessingQuality = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderFrameRateLimit in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderFrameRateLimit = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextAudioHeader in the Widget Blueprint.
+	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextAudioHeader = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextMasterVolumeLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextMasterVolumeLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextMusicVolumeLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextMusicVolumeLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextSfxVolumeLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextSfxVolumeLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderMasterVolume in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderMasterVolume = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderMusicVolume in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderMusicVolume = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderSfxVolume in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderSfxVolume = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextControlsHeader in the Widget Blueprint.
+	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextControlsHeader = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextMouseSensitivityLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextMouseSensitivityLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextInvertYAxisLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextInvertYAxisLabel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderMouseSensitivity in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderMouseSensitivity = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a CheckBox named M_CheckInvertYAxis in the Widget Blueprint.
+	 * @note Designers may style and wrap the checkbox, but C++ binds callbacks and sets the checked state.
+	 * @note The bound widget must exist, keep this name, and remain a CheckBox for logic.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckInvertYAxis = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a Button named M_ButtonApply in the Widget Blueprint.
+	 * @note Designers may style and wrap the button, but it must contain a child RichTextBlock named M_TextApplyButton.
+	 * @note The bound button and its label must exist, keep names, and remain the same widget types.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UButton> M_ButtonApply = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a Button named M_ButtonBackOrCancel in the Widget Blueprint.
+	 * @note Designers may style and wrap the button, but it must contain a child RichTextBlock named M_TextBackOrCancelButton.
+	 * @note The bound button and its label must exist, keep names, and remain the same widget types.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UButton> M_ButtonBackOrCancel = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextApplyButton in the Widget Blueprint.
+	 * @note Designers may style the label, but C++ sets the button label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextApplyButton = nullptr;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category="Settings|Widgets", meta=(AllowPrivateAccess="true"))
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextBackOrCancelButton in the Widget Blueprint.
+	 * @note Designers may style the label, but C++ sets the button label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextBackOrCancelButton = nullptr;
 
 	UPROPERTY(Transient)
