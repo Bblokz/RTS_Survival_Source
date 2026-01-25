@@ -295,8 +295,9 @@ void FPlayerEscapeMenuHelper::ApplyInputModeForWidget(UUserWidget* WidgetToFocus
 		return;
 	}
 
-	FInputModeUIOnly InputMode;
+	FInputModeGameAndUI InputMode;
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
 	InputMode.SetWidgetToFocus(WidgetToFocus->TakeWidget());
 	M_PlayerController->SetInputMode(InputMode);
 	M_PlayerController->bShowMouseCursor = true;
