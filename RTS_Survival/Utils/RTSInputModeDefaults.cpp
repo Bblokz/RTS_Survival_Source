@@ -1,6 +1,6 @@
 #include "RTS_Survival/Utils/RTSInputModeDefaults.h"
 
-#include "Kismet/WidgetBlueprintLibrary.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 

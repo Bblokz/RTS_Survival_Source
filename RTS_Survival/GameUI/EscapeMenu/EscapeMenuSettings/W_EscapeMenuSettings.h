@@ -124,7 +124,7 @@ struct FEscapeMenuSettingsButtonText
 
 namespace EscapeMenuSettingsDefaults
 {
-	constexpr float FrameRateLimitMin = 0.0f;
+	constexpr float FrameRateLimitMin = 35.f;
 	constexpr float FrameRateLimitMax = 240.0f;
 }
 

@@ -734,7 +734,7 @@ namespace DeveloperSettings
 
 
 			// T1 light calibre 37mm-50mm deals 80~105 damage. base armored vehicle gets killed in 3-4 shots.
-			inline constexpr float ArmoredCarHealthBase = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
+			inline constexpr float ArmoredCarHealthBase = RoundToNearestMultipleOfFive(450.f * OverallHealthMlt);
 			// T1 Light calibre 37mm~50mm deals 80~105 damage. Base light tank gets killed in 5 shots. 
 			inline constexpr float LightTankHealthBase = RoundToNearestMultipleOfFive(450.f * OverallHealthMlt);
 			// T1.5 Between a light and medium tank, takes 6 light shots or 3 mediums shots on avg.
