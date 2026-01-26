@@ -1294,7 +1294,7 @@ namespace DeveloperSettings
 		inline constexpr float ZoomSpeed = 150.f;
 		inline constexpr float CameraPanSpeed = 5.f;
 		// 25 degrees to make skybox not visible.
-		inline constexpr float CameraPitchLimit = 25.f;
+		inline constexpr float CameraPitchLimit = 18.f;
 		inline constexpr float DefaultCameraMovementSpeed = 15.f;
 		inline static float ModifierCameraMovementSpeed = 1.f;
 		// How long the player needs to hover an actor to get the hover popup.
@@ -1400,7 +1400,7 @@ namespace DeveloperSettings
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
-		constexpr bool GEnemyController_Compile_DebugSymbols = false;
+		constexpr bool GEnemyController_Compile_DebugSymbols = true;
 		constexpr bool GEnemyController_StrategicAI_Compile_DebugSymbols = false;
 		constexpr bool GEnemyController_NavDetector_DebugSymbols = false;
 		constexpr bool ExplosionsManager_Compile_DebugSymbols = false;
@@ -1425,7 +1425,7 @@ namespace DeveloperSettings
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
 		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
 		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
-		constexpr bool GPathFindingCosts_Compile_DebugSymbols = true;
+		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
 		// Wheel Animation

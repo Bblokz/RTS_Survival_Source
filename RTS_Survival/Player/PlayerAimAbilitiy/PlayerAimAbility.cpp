@@ -139,7 +139,7 @@ void APlayerAimAbility::OnAimActivated_PlayAnnouncerVl()
 	{
 		return;
 	}
-	M_PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::SelectTargetForAimAbility, true, false);
+	M_PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::SelectTargetForAimAbility, false, false);
 }
 
 

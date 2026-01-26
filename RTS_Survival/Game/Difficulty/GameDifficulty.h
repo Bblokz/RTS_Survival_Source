@@ -28,4 +28,21 @@ struct FRTSGameDifficulty
 	
 	UPROPERTY(BlueprintReadWrite)
 	bool bIsInitialized = false;
+
+	bool IsNormalOrHigher() const
+	{
+		return DifficultyLevel >= ERTSGameDifficulty::Normal;
+	}
+	bool IsHardOrHigher() const
+	{
+		return DifficultyLevel >= ERTSGameDifficulty::Hard;
+	}
+	bool IsBrutalOrHigher() const
+	{
+		return DifficultyLevel >= ERTSGameDifficulty::Brutal;
+	}
+	bool IsIronman() const
+	{
+		return DifficultyLevel == ERTSGameDifficulty::Ironman;
+	}
 };
