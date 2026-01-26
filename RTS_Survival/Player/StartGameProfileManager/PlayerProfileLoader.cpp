@@ -44,12 +44,13 @@ void UPlayerProfileLoader::LoadProfile(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 	}
 	FRTS_Profile::DebugPrintProfile(PlayerProfile);
 
-	UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::BarracksTrain),
-	                  ENomadicSubtype::Nomadic_GerBarracks);
-	UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::ForgeTrain),
-	                  ENomadicSubtype::Nomadic_GerLightSteelForge);
-	UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::MechanicalDepotTrain),
-	                  ENomadicSubtype::Nomadic_GerMechanizedDepot);
+	// todo renable when done with world map for profile building.
+	// UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::BarracksTrain),
+	//                   ENomadicSubtype::Nomadic_GerBarracks);
+	// UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::ForgeTrain),
+	//                   ENomadicSubtype::Nomadic_GerLightSteelForge);
+	// UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::MechanicalDepotTrain),
+	//                   ENomadicSubtype::Nomadic_GerMechanizedDepot);
 	ApplyResourceCards(ExtractResources(PlayerProfile->M_SelectedCards));
 	ApplyTechnologies(ExtractTechnologies(PlayerProfile->M_SelectedCards));
 	if(bDoNotLoadPlayerUnits)

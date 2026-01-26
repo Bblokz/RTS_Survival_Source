@@ -758,19 +758,19 @@ namespace DeveloperSettings
 			// Nomadic Trucks Health settings.
 
 			// The most durable nomadic vehicle.
-			inline constexpr float NomadicHQTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
+			inline constexpr float NomadicHQTruckHealth = RoundToNearestMultipleOfFive(5000 * OverallHealthMlt);
 			// More health in base mode; takes 10 heavy tank shots to destroy.
-			inline constexpr float NomadicHQBuildingHealth = RoundToNearestMultipleOfFive(10 * OneHeavyTankShotHp);
-			inline constexpr float T1NomadicTruckHealth = RoundToNearestMultipleOfFive(400 * OverallHealthMlt);
-			inline constexpr float T1NomadicBuildingHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
-			inline constexpr float T2NomadicTruckHealth = RoundToNearestMultipleOfFive(600 * OverallHealthMlt);
-			inline constexpr float T2NomadicBuildingHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
-			inline constexpr float T3NomadicTruckHealth = RoundToNearestMultipleOfFive(800 * OverallHealthMlt);
-			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
+			inline constexpr float NomadicHQBuildingHealth = RoundToNearestMultipleOfFive(10000 * OverallHealthMlt);
+			inline constexpr float T1NomadicTruckHealth = RoundToNearestMultipleOfFive(800 * OverallHealthMlt);
+			inline constexpr float T1NomadicBuildingHealth = RoundToNearestMultipleOfFive(4000 * OverallHealthMlt);
+			inline constexpr float T2NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
+			inline constexpr float T2NomadicBuildingHealth = RoundToNearestMultipleOfFive(6000 * OverallHealthMlt);
+			inline constexpr float T3NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
+			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive( 8000 * OverallHealthMlt);
 
 			// Building expansions health settings.
-			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(500 * OverallHealthMlt);
-			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(850 * OverallHealthMlt);
+			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(700 * OverallHealthMlt);
+			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1000* OverallHealthMlt);
 			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
 			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500 * OverallHealthMlt);
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);

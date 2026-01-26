@@ -1136,11 +1136,11 @@ void ANomadicVehicle::AdjustMaxHealthForConversion(const bool bSetToTruckMaxHeal
 	}
 	if (bSetToTruckMaxHealth)
 	{
-		HealthComponent->SetMaxHealth(TruckMaxHealth);
+		HealthComponent->InitHealthAndResistance(M_TruckHealthData, M_TruckMaxHealth);
 	}
 	else
 	{
-		HealthComponent->SetMaxHealth(BuildingMaxHealth);
+		HealthComponent->InitHealthAndResistance(M_BuildingHealthData, M_BuildingMaxHealth);
 	}
 }
 
@@ -1503,6 +1503,15 @@ void ANomadicVehicle::InitResourceStorageLevels(
 			}
 		}
 	}
+}
+
+void ANomadicVehicle::SetupNomadicHealthData(FResistanceAndDamageReductionData TruckHealthData,
+	FResistanceAndDamageReductionData BuildingHealthData, const float TruckMaxHealth, const float BuildingMaxHealth)
+{
+	M_TruckHealthData = TruckHealthData;
+	M_BuildingHealthData = BuildingHealthData;
+	M_TruckMaxHealth = TruckMaxHealth;
+	M_BuildingMaxHealth = BuildingMaxHealth;
 }
 
 
