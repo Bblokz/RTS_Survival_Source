@@ -8,6 +8,60 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace EnemyFieldConstructionStrategyData
+{
+	TArray<EFieldConstructionType> GetVsTanksHierarchy()
+	{
+		return {
+			EFieldConstructionType::RussianLightATMine,
+			EFieldConstructionType::RussianMediumATMine,
+			EFieldConstructionType::RussianHeavyATMine,
+			EFieldConstructionType::RussianHedgeHog,
+			EFieldConstructionType::RussianBarrier
+		};
+	}
+
+	TArray<EFieldConstructionType> GetVsInfantryHierarchy()
+	{
+		return {
+			EFieldConstructionType::RussianAntiInfantryStickMine,
+			EFieldConstructionType::RussianWire,
+			EFieldConstructionType::RussianHedgeHog,
+			EFieldConstructionType::RussianBarrier
+		};
+	}
+
+	TArray<EFieldConstructionType> GetVsMixedHierarchy()
+	{
+		return {
+			EFieldConstructionType::RussianAntiInfantryStickMine,
+			EFieldConstructionType::RussianLightATMine,
+			EFieldConstructionType::RussianMediumATMine,
+			EFieldConstructionType::RussianHeavyATMine,
+			EFieldConstructionType::RussianWire,
+			EFieldConstructionType::RussianHedgeHog,
+			EFieldConstructionType::RussianBarrier
+		};
+	}
+
+	TArray<EFieldConstructionType> GetMinesOnlyHierarchy()
+	{
+		return {
+			EFieldConstructionType::RussianAntiInfantryStickMine,
+			EFieldConstructionType::RussianLightATMine,
+			EFieldConstructionType::RussianMediumATMine,
+			EFieldConstructionType::RussianHeavyATMine
+		};
+	}
+
+	TArray<EFieldConstructionType> GetHedgehogsOnlyHierarchy()
+	{
+		return {
+			EFieldConstructionType::RussianHedgeHog
+		};
+	}
+}
+
 namespace EnemyFieldConstructionConstants
 {
 	constexpr int32 GroupSplitThresholdSmall = 10;
@@ -459,7 +513,9 @@ void UEnemyFieldConstructionComponent::DetermineFieldConstructionStrategy(
 		constexpr EFieldConstructionStrategy StrategyOptions[] = {
 			EFieldConstructionStrategy::VsTanks,
 			EFieldConstructionStrategy::VsInfantry,
-			EFieldConstructionStrategy::VsMixed
+			EFieldConstructionStrategy::VsMixed,
+			EFieldConstructionStrategy::MinesOnly,
+			EFieldConstructionStrategy::HedgehogsOnly
 		};
 
 		for (const EFieldConstructionStrategy StrategyOption : StrategyOptions)
@@ -933,32 +989,19 @@ TArray<EFieldConstructionType> UEnemyFieldConstructionComponent::GetStrategyHier
 	switch (Strategy)
 	{
 	case EFieldConstructionStrategy::VsTanks:
-		Hierarchy = {
-			EFieldConstructionType::RussianLightATMine,
-			EFieldConstructionType::RussianMediumATMine,
-			EFieldConstructionType::RussianHeavyATMine,
-			EFieldConstructionType::RussianHedgeHog,
-			EFieldConstructionType::RussianBarrier
-		};
+		Hierarchy = EnemyFieldConstructionStrategyData::GetVsTanksHierarchy();
 		break;
 	case EFieldConstructionStrategy::VsInfantry:
-		Hierarchy = {
-			EFieldConstructionType::RussianAntiInfantryStickMine,
-			EFieldConstructionType::RussianWire,
-			EFieldConstructionType::RussianHedgeHog,
-			EFieldConstructionType::RussianBarrier
-		};
+		Hierarchy = EnemyFieldConstructionStrategyData::GetVsInfantryHierarchy();
 		break;
 	case EFieldConstructionStrategy::VsMixed:
-		Hierarchy = {
-			EFieldConstructionType::RussianAntiInfantryStickMine,
-			EFieldConstructionType::RussianLightATMine,
-			EFieldConstructionType::RussianMediumATMine,
-			EFieldConstructionType::RussianHeavyATMine,
-			EFieldConstructionType::RussianWire,
-			EFieldConstructionType::RussianHedgeHog,
-			EFieldConstructionType::RussianBarrier
-		};
+		Hierarchy = EnemyFieldConstructionStrategyData::GetVsMixedHierarchy();
+		break;
+	case EFieldConstructionStrategy::MinesOnly:
+		Hierarchy = EnemyFieldConstructionStrategyData::GetMinesOnlyHierarchy();
+		break;
+	case EFieldConstructionStrategy::HedgehogsOnly:
+		Hierarchy = EnemyFieldConstructionStrategyData::GetHedgehogsOnlyHierarchy();
 		break;
 	default:
 		break;
