@@ -8,6 +8,7 @@ enum class EArmorPlate : uint8;
 class UBombComponent;
 class AAircraftMaster;
 class ATankMaster;
+class ABuildingExpansion;
 enum class ERTSDeathType : uint8;
 class ASmallArmsProjectileManager;
 class UWeaponState;
@@ -21,6 +22,8 @@ namespace FRTSWeaponHelpers
 
 	TArray<UWeaponState*> GetWeaponsMountedOnAircraft(const AAircraftMaster* Aircraft,
 	                                                  UBombComponent*& OutBombCompPtr);
+
+	TArray<UWeaponState*> GetWeaponsMountedOnBxp(const ABuildingExpansion* BuildingExpansion);
 
 	AActor* GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor);
 

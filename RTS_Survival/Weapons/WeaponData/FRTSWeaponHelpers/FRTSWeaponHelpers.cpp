@@ -1,6 +1,8 @@
-﻿#include "FRTSWeaponHelpers.h"
+#include "FRTSWeaponHelpers.h"
 
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -73,6 +75,16 @@ TArray<UWeaponState*> FRTSWeaponHelpers::GetWeaponsMountedOnAircraft(const AAirc
 		OutBombCompPtr = Aircraft->GetBombComponent();
 	}
 	return Weapons;
+}
+
+TArray<UWeaponState*> FRTSWeaponHelpers::GetWeaponsMountedOnBxp(const ABuildingExpansion* BuildingExpansion)
+{
+	if (not IsValid(BuildingExpansion))
+	{
+		return TArray<UWeaponState*>();
+	}
+
+	return BuildingExpansion->GetAllWeapons();
 }
 
 AActor* FRTSWeaponHelpers::GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor)

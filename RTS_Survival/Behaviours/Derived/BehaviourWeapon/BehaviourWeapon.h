@@ -13,6 +13,7 @@ class UWeaponState;
 class AAircraftMaster;
 class ASquadController;
 class ATankMaster;
+class ABuildingExpansion;
 class UBombComponent;
 
 USTRUCT(BlueprintType)
@@ -133,9 +134,11 @@ private:
         bool TryGetAircraftWeapons(TArray<UWeaponState*>& OutWeapons) const;
         bool TryGetTankWeapons(TArray<UWeaponState*>& OutWeapons) const;
         bool TryGetSquadWeapons(TArray<UWeaponState*>& OutWeapons) const;
+        bool TryGetBxpWeapons(TArray<UWeaponState*>& OutWeapons) const;
         bool TryGetAircraftMaster(AAircraftMaster*& OutAircraftMaster) const;
         bool TryGetTankMaster(ATankMaster*& OutTankMaster) const;
         bool TryGetSquadController(ASquadController*& OutSquadController) const;
+        bool TryGetBuildingExpansion(ABuildingExpansion*& OutBuildingExpansion) const;
         void ClearTimers();
 
         UPROPERTY()
