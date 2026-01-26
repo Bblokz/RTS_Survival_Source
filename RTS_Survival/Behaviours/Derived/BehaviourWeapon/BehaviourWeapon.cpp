@@ -2,6 +2,7 @@
 
 #include "BehaviourWeapon.h"
 
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -51,7 +52,8 @@ void UBehaviourWeapon::OnStack(UBehaviour* StackedBehaviour)
 	static_cast<void>(StackedBehaviour);
 
 	TArray<UWeaponState*> Weapons;
-	if (not TryGetAircraftWeapons(Weapons) && not TryGetTankWeapons(Weapons) && not TryGetSquadWeapons(Weapons))
+	if (not TryGetAircraftWeapons(Weapons) && not TryGetTankWeapons(Weapons) && not TryGetSquadWeapons(Weapons)
+		&& not TryGetBxpWeapons(Weapons))
 	{
 		return;
 	}
@@ -274,7 +276,8 @@ void UBehaviourWeapon::PostBeginPlayLogicInitialized()
 
 	bM_HasInitializedPostBeginPlayLogic = true;
 	TArray<UWeaponState*> Weapons;
-	if (TryGetAircraftWeapons(Weapons) || TryGetTankWeapons(Weapons) || TryGetSquadWeapons(Weapons))
+	if (TryGetAircraftWeapons(Weapons) || TryGetTankWeapons(Weapons) || TryGetSquadWeapons(Weapons)
+		|| TryGetBxpWeapons(Weapons))
 	{
 		ApplyBehaviourToMountedWeapons(Weapons);
 	}
@@ -412,6 +415,18 @@ bool UBehaviourWeapon::TryGetSquadWeapons(TArray<UWeaponState*>& OutWeapons) con
 	return SquadController->GetIsSquadFullyLoaded();
 }
 
+bool UBehaviourWeapon::TryGetBxpWeapons(TArray<UWeaponState*>& OutWeapons) const
+{
+	ABuildingExpansion* BuildingExpansion = nullptr;
+	if (not TryGetBuildingExpansion(BuildingExpansion))
+	{
+		return false;
+	}
+
+	OutWeapons = FRTSWeaponHelpers::GetWeaponsMountedOnBxp(BuildingExpansion);
+	return true;
+}
+
 bool UBehaviourWeapon::TryGetAircraftMaster(AAircraftMaster*& OutAircraftMaster) const
 {
 	OutAircraftMaster = Cast<AAircraftMaster>(GetOwningActor());
@@ -428,6 +443,12 @@ bool UBehaviourWeapon::TryGetSquadController(ASquadController*& OutSquadControll
 {
 	OutSquadController = Cast<ASquadController>(GetOwningActor());
 	return OutSquadController != nullptr;
+}
+
+bool UBehaviourWeapon::TryGetBuildingExpansion(ABuildingExpansion*& OutBuildingExpansion) const
+{
+	OutBuildingExpansion = Cast<ABuildingExpansion>(GetOwningActor());
+	return OutBuildingExpansion != nullptr;
 }
 
 void UBehaviourWeapon::ClearTimers()
