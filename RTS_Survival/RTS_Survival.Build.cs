@@ -40,7 +40,7 @@ public class RTS_Survival : ModuleRules
 			"Slate",
 			"SlateCore",
 			"ProtoAnimatedText",
-			"RHI"
+			"RHI", "EnhancedInput"
 		});
 
 		// Uncomment if you are using online features

@@ -256,6 +256,8 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void TakeScreenShot(const bool bIncludeUI, const float InnerPercent);
 
+	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PauseGame(const ERTSPauseGameOptions PauseOption);
 

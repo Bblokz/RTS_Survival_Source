@@ -3,6 +3,7 @@
 #include "CPPController.h"
 
 #include "Abilities.h"
+#include "InputMappingContext.h"
 #include "AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "Camera/CameraPawn.h"
 #include "Camera/CameraController/PlayerCameraController.h"
