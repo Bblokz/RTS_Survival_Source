@@ -191,32 +191,37 @@ void UEnemyFormationController::CheckFormations()
 
 	// Then  idle→teleport→reorder logic on the survivors:
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
-	// May delete formations in this loop; so copy to array first.
-	TArray<TPair<int32, FFormationData>> FormationsToLoop = M_ActiveFormations.Array();
-	for (auto& Pair : FormationsToLoop)
+	// May delete formations in this loop; so snapshot keys first and re-fetch live data each iteration.
+	TArray<int32> FormationIDs;
+	M_ActiveFormations.GetKeys(FormationIDs);
+	for (const int32 FormationID : FormationIDs)
 	{
-		FFormationData& Formation = Pair.Value;
+		FFormationData* Formation = M_ActiveFormations.Find(FormationID);
+		if (not Formation)
+		{
+			continue;
+		}
 
-		if (not Formation.FormationWaypoints.IsValidIndex(Formation.CurrentWaypointIndex) ||
-			not Formation.FormationWaypointDirections.IsValidIndex(Formation.CurrentWaypointIndex))
+		if (not Formation->FormationWaypoints.IsValidIndex(Formation->CurrentWaypointIndex) ||
+			not Formation->FormationWaypointDirections.IsValidIndex(Formation->CurrentWaypointIndex))
 		{
 			RTSFunctionLibrary::ReportError(
 				TEXT("On formation check formation has no valid waypoint index but it is still active!"));
 			continue;
 		}
 
-		const FVector& WayLoc = Formation.FormationWaypoints[Formation.CurrentWaypointIndex];
-		const FRotator& WayDir = Formation.FormationWaypointDirections[Formation.CurrentWaypointIndex];
+		const FVector& WayLoc = Formation->FormationWaypoints[Formation->CurrentWaypointIndex];
+		const FRotator& WayDir = Formation->FormationWaypointDirections[Formation->CurrentWaypointIndex];
 
-		UpdateFormationUnitMovementProgress(Formation, WayLoc, WayDir, NavSys);
+		UpdateFormationUnitMovementProgress(*Formation, WayLoc, WayDir, NavSys);
 
-		if (Formation.bIsAttackMoveFormation)
+		if (Formation->bIsAttackMoveFormation)
 		{
-			HandleAttackMoveFormation(Formation, WayLoc, WayDir);
+			HandleAttackMoveFormation(*Formation, WayLoc, WayDir);
 			continue;
 		}
 
-		HandleFormationIdleUnits(Formation, WayLoc, WayDir);
+		HandleFormationIdleUnits(*Formation, WayLoc, WayDir);
 	}
 }
 
