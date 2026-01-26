@@ -1567,6 +1567,17 @@ float UTrackPathFollowingComponent::GetVectorAngle(FVector A, FVector B)
 
 void UTrackPathFollowingComponent::SetEngineBlockDetectionSuppressed(const bool bShouldBeSuppressed)
 {
+	if (bM_IsEngineBlockDetectionSuppressionLocked && not bShouldBeSuppressed)
+	{
+		if (not bM_IsEngineBlockDetectionSuppressed)
+		{
+			bM_IsEngineBlockDetectionSuppressed = true;
+			SetBlockDetectionState(false);
+			ResetBlockDetectionData();
+		}
+		return;
+	}
+
 	if (bM_IsEngineBlockDetectionSuppressed == bShouldBeSuppressed)
 	{
 		return;
@@ -1586,6 +1597,24 @@ void UTrackPathFollowingComponent::SetEngineBlockDetectionSuppressed(const bool 
 	ResetBlockDetectionData();
 	SetBlockDetectionState(true);
 	ForceBlockDetectionUpdate();
+}
+
+void UTrackPathFollowingComponent::SetEngineBlockDetectionSuppressionLock(const bool bShouldLock)
+{
+	if (bM_IsEngineBlockDetectionSuppressionLocked == bShouldLock)
+	{
+		return;
+	}
+
+	bM_IsEngineBlockDetectionSuppressionLocked = bShouldLock;
+
+	if (bM_IsEngineBlockDetectionSuppressionLocked)
+	{
+		SetEngineBlockDetectionSuppressed(true);
+		return;
+	}
+
+	SetEngineBlockDetectionSuppressed(false);
 }
 
 void UTrackPathFollowingComponent::UpdateEngineBlockDetectionForIdleBlockerWait(const bool bIsWaitingForIdleBlockers)

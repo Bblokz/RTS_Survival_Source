@@ -62,6 +62,18 @@ void AAITankMaster::MoveToLocationWithGoalAcceptance(const FVector Location)
 	MoveToLocation(Location, m_VehiclePathComp->GetGoalAcceptanceRadius());
 }
 
+void AAITankMaster::SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress)
+{
+	SetMoveBlockDetection(not bShouldSuppress);
+
+	if (not GetIsValidVehiclePathComp())
+	{
+		return;
+	}
+
+	m_VehiclePathComp->SetEngineBlockDetectionSuppressionLock(bShouldSuppress);
+}
+
 void AAITankMaster::SetDefaultQueryFilter(const TSubclassOf<UNavigationQueryFilter> NewDefaultFilter)
 {
 	DefaultNavigationFilterClass = NewDefaultFilter;

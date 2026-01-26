@@ -618,7 +618,7 @@ void ATankMaster::ExecuteHarvestResourceCommand(ACPPResourceMaster* TargetResour
 		RTSNavCollision->EnableAffectNavmesh(false);
 	}
 	// note that overlap evasion is disabled in the derived tracked tank class.
-	AITankController->SetMoveBlockDetection(false);
+	AITankController->SetHarvesterMoveBlockDetectionSuppressed(true);
 	M_HarvesterComponent->ExecuteHarvestResourceCommand(ResourceComponentOfTarget);
 }
 
@@ -636,7 +636,7 @@ void ATankMaster::TerminateHarvestResourceCommand()
 	M_HarvesterComponent->TerminateHarvestCommand();
 
 	// note that overlap evasion is re-enabled in the derived tracked tank class.
-	AITankController->SetMoveBlockDetection(true);
+	AITankController->SetHarvesterMoveBlockDetectionSuppressed(false);
 	StopBehaviourTree();
 	if (IsValid(GetAIController()))
 	{
