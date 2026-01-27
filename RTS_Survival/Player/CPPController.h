@@ -874,6 +874,31 @@ private:
 	AActor* GetNewFieldConstructionCandidate(UFieldConstructionAbilityComponent*& OutFieldConstructionComp,
 	                                         const EFieldConstructionType ConstructionType);
 
+	/**
+	 * @brief Finds field construction ability data and queue load for a candidate, used to balance shift orders.
+	 * @param CandidateActor Candidate actor to inspect.
+	 * @param ConstructionType Construction type we are queuing.
+	 * @param OutFieldConstructionComp Ability component on the candidate that matches ConstructionType.
+	 * @param OutQueuedConstructionCount How many queued commands of this construction type the candidate has.
+	 * @return True if the candidate is valid and can accept the construction order.
+	 */
+	bool GetFieldConstructionCandidateData(AActor* CandidateActor, const EFieldConstructionType ConstructionType,
+	                                       UFieldConstructionAbilityComponent*& OutFieldConstructionComp,
+	                                       int32& OutQueuedConstructionCount) const;
+
+	/**
+	 * @brief Updates the current best constructor when the candidate is less busy for this construction type.
+	 * @param CandidateActor Candidate actor to inspect.
+	 * @param ConstructionType Construction type we are queuing.
+	 * @param InOutBestCandidateActor Current best candidate actor to update.
+	 * @param InOutBestCandidateAbilityComp Ability component on the best candidate.
+	 * @param InOutBestQueuedConstructionCount Queue size of the current best candidate for this construction type.
+	 */
+	void TryUpdateBestFieldConstructionCandidate(AActor* CandidateActor, const EFieldConstructionType ConstructionType,
+	                                             AActor*& InOutBestCandidateActor,
+	                                             UFieldConstructionAbilityComponent*& InOutBestCandidateAbilityComp,
+	                                             int32& InOutBestQueuedConstructionCount) const;
+
 	UPROPERTY()
 	FViewportScreenshotTask M_ViewportScreenshotTask;
 
