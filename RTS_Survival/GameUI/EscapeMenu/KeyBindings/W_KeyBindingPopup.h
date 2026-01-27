@@ -43,14 +43,21 @@ protected:
 private:
 	bool GetIsValidKeyBindingEntry() const;
 	bool GetIsValidPopupSwitcher() const;
+	bool GetIsValidTitleText() const;
 	bool GetIsValidConflictText() const;
 	bool GetIsValidUnderstoodButton() const;
+
+	bool SetBindingContext(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey);
+	void SetTitleText(const FString& TitleText);
 
 	UFUNCTION()
 	void HandleUnderstoodClicked();
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidgetSwitcher> M_PopupSwitcher = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<URichTextBlock> M_Title = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UW_EscapeMenuKeyBindingEntry> M_KeyBindingEntry = nullptr;
@@ -60,4 +67,7 @@ private:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_UnderstoodButton = nullptr;
+
+	bool bM_HasBindingContext = false;
+	bool bM_ShouldReturnToEntryOnUnderstood = false;
 };

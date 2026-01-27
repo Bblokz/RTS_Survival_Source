@@ -8,6 +8,14 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace KeyBindingPopupConstants
+{
+	const TCHAR* ChangeBindingTitle = TEXT("<Text_Title>Change Key Binding</>");
+	const TCHAR* ConflictBindingTitle = TEXT("<Text_BadTitle>Conflicting Key Binding</>");
+	const TCHAR* TryDifferentBindingTitle = TEXT("<Text_Title>Try Different Key</>");
+	const TCHAR* ConflictMessageFormat = TEXT("<Text_Bad14>cannot set keybinding, key already taken by %s</>");
+}
+
 void UW_KeyBindingPopup::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -23,24 +31,13 @@ void UW_KeyBindingPopup::NativeConstruct()
 
 void UW_KeyBindingPopup::SetupPopup(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey)
 {
-	if (not IsValid(NewPlayerController))
-	{
-		RTSFunctionLibrary::ReportError("Key binding popup received an invalid player controller reference.");
-		return;
-	}
-
-	if (not IsValid(ActionToBind))
-	{
-		RTSFunctionLibrary::ReportError("Key binding popup received an invalid input action reference.");
-		return;
-	}
-
-	if (not GetIsValidKeyBindingEntry())
+	if (not SetBindingContext(NewPlayerController, ActionToBind, CurrentKey))
 	{
 		return;
 	}
 
-	M_KeyBindingEntry->SetupEntry(NewPlayerController, ActionToBind, CurrentKey);
+	SetTitleText(KeyBindingPopupConstants::ChangeBindingTitle);
+	bM_ShouldReturnToEntryOnUnderstood = false;
 	ShowBindingEntry();
 }
 
@@ -62,11 +59,13 @@ void UW_KeyBindingPopup::ShowCollisionMessage(const FString& CollidingActionName
 	}
 
 	const FString MessageText = FString::Printf(
-		TEXT("<Text_Bad14>cannot set keybinding, key already taken by %s</>"),
+		KeyBindingPopupConstants::ConflictMessageFormat,
 		*CollidingActionName
 	);
 	M_ConflictText->SetText(FText::FromString(MessageText));
+	SetTitleText(KeyBindingPopupConstants::ConflictBindingTitle);
 	M_PopupSwitcher->SetActiveWidgetIndex(1);
+	bM_ShouldReturnToEntryOnUnderstood = bM_HasBindingContext;
 }
 
 void UW_KeyBindingPopup::ClosePopup()
@@ -111,6 +110,22 @@ bool UW_KeyBindingPopup::GetIsValidPopupSwitcher() const
 	return false;
 }
 
+bool UW_KeyBindingPopup::GetIsValidTitleText() const
+{
+	if (IsValid(M_Title))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_Title"),
+		TEXT("UW_KeyBindingPopup::GetIsValidTitleText"),
+		this
+	);
+	return false;
+}
+
 bool UW_KeyBindingPopup::GetIsValidConflictText() const
 {
 	if (IsValid(M_ConflictText))
@@ -125,6 +140,43 @@ bool UW_KeyBindingPopup::GetIsValidConflictText() const
 		this
 	);
 	return false;
+}
+
+bool UW_KeyBindingPopup::SetBindingContext(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey)
+{
+	if (not IsValid(NewPlayerController))
+	{
+		RTSFunctionLibrary::ReportError("Key binding popup received an invalid player controller reference.");
+		bM_HasBindingContext = false;
+		return false;
+	}
+
+	if (not IsValid(ActionToBind))
+	{
+		RTSFunctionLibrary::ReportError("Key binding popup received an invalid input action reference.");
+		bM_HasBindingContext = false;
+		return false;
+	}
+
+	if (not GetIsValidKeyBindingEntry())
+	{
+		bM_HasBindingContext = false;
+		return false;
+	}
+
+	M_KeyBindingEntry->SetupEntry(NewPlayerController, ActionToBind, CurrentKey);
+	bM_HasBindingContext = true;
+	return true;
+}
+
+void UW_KeyBindingPopup::SetTitleText(const FString& TitleText)
+{
+	if (not GetIsValidTitleText())
+	{
+		return;
+	}
+
+	M_Title->SetText(FText::FromString(TitleText));
 }
 
 bool UW_KeyBindingPopup::GetIsValidUnderstoodButton() const
@@ -145,5 +197,13 @@ bool UW_KeyBindingPopup::GetIsValidUnderstoodButton() const
 
 void UW_KeyBindingPopup::HandleUnderstoodClicked()
 {
+	if (bM_ShouldReturnToEntryOnUnderstood && bM_HasBindingContext)
+	{
+		SetTitleText(KeyBindingPopupConstants::TryDifferentBindingTitle);
+		ShowBindingEntry();
+		bM_ShouldReturnToEntryOnUnderstood = false;
+		return;
+	}
+
 	ClosePopup();
 }
