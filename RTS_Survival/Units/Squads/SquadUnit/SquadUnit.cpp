@@ -1341,10 +1341,15 @@ void ASquadUnit::OnSecondaryWeapon_SpawnAndInitializeNewWeapon(
 	AnimBp_SquadUnit->PlaySwitchWeaponMontage(M_InfantryWeapon->GetAimOffsetType());
 
 	// Bind a lambda to call OnSwitchWeaponCompleted after 1 second.
+	TWeakObjectPtr<ASquadUnit> SquadUnitWeak = this;
 	FTimerDelegate TimerDelSwitchWeapon;
-	TimerDelSwitchWeapon.BindLambda([this]()
+	TimerDelSwitchWeapon.BindLambda([SquadUnitWeak]()
 	{
-		OnSwitchWeaponCompleted();
+		if (not SquadUnitWeak.IsValid())
+		{
+			return;
+		}
+		SquadUnitWeak->OnSwitchWeaponCompleted();
 	});
 	if (UWorld* World = GetWorld())
 	{
@@ -1965,7 +1970,16 @@ void ASquadUnit::BeginPlay_SetupChildActorWeaponComp()
 	GetComponents<UChildActorComponent>(ChildActorComponents);
 	for (UChildActorComponent* ChildActorComponent : ChildActorComponents)
 	{
-		if (ChildActorComponent->GetChildActorClass()->IsChildOf(AInfantryWeaponMaster::StaticClass()))
+		if (not IsValid(ChildActorComponent))
+		{
+			continue;
+		}
+		UClass* ChildActorClass = ChildActorComponent->GetChildActorClass();
+		if (not IsValid(ChildActorClass))
+		{
+			continue;
+		}
+		if (ChildActorClass->IsChildOf(AInfantryWeaponMaster::StaticClass()))
 		{
 			SetupWeapon(Cast<AInfantryWeaponMaster>(ChildActorComponent->GetChildActor()));
 			M_ChildWeaponComp = ChildActorComponent;

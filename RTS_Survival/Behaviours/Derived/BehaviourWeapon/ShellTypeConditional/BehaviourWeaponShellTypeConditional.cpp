@@ -6,7 +6,7 @@ UBehaviourWeaponShellTypeConditional::UBehaviourWeaponShellTypeConditional() = d
 
 void UBehaviourWeaponShellTypeConditional::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
 {
-        if (!IsValid(WeaponState))
+        if (not IsValid(WeaponState))
         {
                 return;
         }
@@ -14,7 +14,7 @@ void UBehaviourWeaponShellTypeConditional::ApplyBehaviourToWeapon(UWeaponState* 
         RegisterShellTypeChangedDelegate(WeaponState);
 
         const EWeaponShellType CurrentShellType = WeaponState->GetRawWeaponData().ShellType;
-        if (!DoesShellTypeAllowBehaviour(CurrentShellType))
+        if (not DoesShellTypeAllowBehaviour(CurrentShellType))
         {
                 return;
         }
@@ -31,13 +31,13 @@ void UBehaviourWeaponShellTypeConditional::ApplyBehaviourToWeapon(UWeaponState* 
 
 void UBehaviourWeaponShellTypeConditional::RemoveBehaviourFromWeapon(UWeaponState* WeaponState)
 {
-        if (!IsValid(WeaponState))
+        if (not IsValid(WeaponState))
         {
                 return;
         }
 
         const TWeakObjectPtr<UWeaponState> WeaponPtr = WeaponState;
-        if (!ActiveWeapons.Contains(WeaponPtr))
+        if (not ActiveWeapons.Contains(WeaponPtr))
         {
                 return;
         }
@@ -68,7 +68,7 @@ bool UBehaviourWeaponShellTypeConditional::DoesShellTypeAllowBehaviour(const EWe
 
 void UBehaviourWeaponShellTypeConditional::RegisterShellTypeChangedDelegate(UWeaponState* WeaponState)
 {
-        if (!IsValid(WeaponState))
+        if (not IsValid(WeaponState))
         {
                 return;
         }
@@ -87,10 +87,16 @@ void UBehaviourWeaponShellTypeConditional::RegisterShellTypeChangedDelegate(UWea
         FShellTypeDelegateEntry NewEntry;
         NewEntry.WeaponState = WeaponState;
 
+        const TWeakObjectPtr<UBehaviourWeaponShellTypeConditional> WeakThis(this);
         NewEntry.DelegateHandle = WeaponState->OnWeaponShellTypeChanged.AddLambda(
-                [this, WeaponPtr](const EWeaponShellType NewShellType)
+                [WeakThis, WeaponPtr](const EWeaponShellType NewShellType)
                 {
-                        HandleShellTypeChanged(WeaponPtr, NewShellType);
+                        if (not WeakThis.IsValid())
+                        {
+                                return;
+                        }
+
+                        WeakThis->HandleShellTypeChanged(WeaponPtr, NewShellType);
                 });
 
         ShellTypeDelegates.Add(MoveTemp(NewEntry));
@@ -100,7 +106,7 @@ void UBehaviourWeaponShellTypeConditional::HandleShellTypeChanged(
         const TWeakObjectPtr<UWeaponState> WeaponPtr,
         const EWeaponShellType NewShellType)
 {
-        if (!WeaponPtr.IsValid())
+        if (not WeaponPtr.IsValid())
         {
                 // Cleanup stale entry
                 ActiveWeapons.Remove(WeaponPtr);
@@ -118,12 +124,12 @@ void UBehaviourWeaponShellTypeConditional::HandleShellTypeChanged(
         const bool bIsAllowed        = DoesShellTypeAllowBehaviour(NewShellType);
         const bool bHasModifiers     = ActiveWeapons.Contains(WeaponPtr);
 
-        if (bIsAllowed && !bHasModifiers)
+        if (bIsAllowed && not bHasModifiers)
         {
                 Super::ApplyBehaviourToWeapon(State);
                 ActiveWeapons.Add(WeaponPtr);
         }
-        else if (!bIsAllowed && bHasModifiers)
+        else if (not bIsAllowed && bHasModifiers)
         {
                 Super::RemoveBehaviourFromWeapon(State);
                 ActiveWeapons.Remove(WeaponPtr);
