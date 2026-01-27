@@ -42,7 +42,7 @@ private:
 	void UpdateDisplayedKey(const FKey& NewKey);
 
 	UFUNCTION()
-	void HandleKeySelected(const FInputChord& SelectedKey);
+	void HandleKeySelected(FInputChord SelectedKey);
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ACPPController> M_PlayerController;

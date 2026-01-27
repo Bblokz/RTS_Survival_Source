@@ -1,0 +1,39 @@
+﻿we  right now have a very basic keybindings system setup with  UW_EscapeMenuKeyBindingEntry and UW_EscapeMenuKeyBindings.
+the core idea here of using the inputmapping is good but right now the UI is unsable and we are going to improve it.
+In addition to the 	UPROPERTY(EditDefaultsOnly, Category = "KeyBindings")
+                   	TSubclassOf<UW_EscapeMenuKeyBindingEntry> M_KeyBindingEntryClass;
+add a new widget class in the same dir the other key binding related widgets are created called
+W_KeyBindingPopup which will be a popup widget show when the user clicks on a specific button in our keybindings menu.
+this pop up widget will itself have a UW_EscapeMenuKeyBindingEntry that is populated dynamically depending on the special buttons clicked in our
+keybindigns menu; more on these special buttosn later. Make sure that this popup widget has a widget switcher where you can assume that
+in 0 i put the entry for binding and in 1 i put a richtext block that you populate when the user tries to bind a key that is already taken by
+another action.
+
+we keep the original populated list of keybindings with keybing entries; but make sure their box is a scroll box and make sure there is a search bar
+ called M_SearchKeyBar which is also bindwidget; i will place the bar above the scroll box and place the scroll box on the left side of the menu (let me do that
+ in blueprints you just adjust the backend of things here)
+ Note the keybindingentries in that scrollbox should still function like before; that means that actionbuttons and control groups can also be adjusted through that list.
+ 
+ make sure the searchbar works for sorting the keybinding entries in the scrollbar using their action name text; trying to loosely match
+ what is typed in the bar.
+ 
+also i want a change in how we display the M_ActionNameText; make sure to remove "IA_" if the action name starts with that.
+
+
+
+we need to add 15 buttons to the bind widgets of the UW_EscapeMenuKeyBindingEntry these will each be associated with 
+an action button; call them M_ActionButton1 through M_ActionButton15. Now when the player clicks one of these we bring up the 
+pop up widget which will be called W_KeyBindingPopup; we will create an instance of this widget dynamically and add it to the viewport or remove ti when needed.
+in there populate the keybindingsentry depending on the clicked action button.
+IMPORTANT: because the action buttons bindings are also shown in the list of keybindings make sure that when an action button is changed
+through the popup the list of keybindings is also updated to reflect that change.
+
+we also need 10 buttons for control groups call them M_ControlGroupButton1 through M_ControlGroupButton10
+when these are clicked also use the W_KeyBindingPopup to show the keybinding entry for that control group
+IMPORTANT: because the control group bindings are also shown in the list of keybindings make sure that when a control group button is changed
+through the popup the list of keybindings is also updated to reflect that change.
+
+In addition make sure there is a checker that makes sure that no two action buttons or control groups can have the same keybinding.
+if there is a collision show the pop up with index 1 and populate the rich text block with cannot set keybinding, key already taken by <colliding action>
+make sure to use <Text_Bad14> </> around it.
+make sure there is an UnderstoodButton in the popup to close it when this message is shown.

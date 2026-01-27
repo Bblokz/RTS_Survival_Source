@@ -23,6 +23,7 @@ void UW_EscapeMenuKeyBindingEntry::SetupEntry(
 	ACPPController* NewPlayerController,
 	UInputAction* ActionToBind,
 	const FKey& CurrentKey)
+
 {
 	if (not IsValid(NewPlayerController))
 	{
@@ -126,7 +127,7 @@ void UW_EscapeMenuKeyBindingEntry::UpdateDisplayedKey(const FKey& NewKey)
 	M_KeySelector->SetAllowModifierKeys(false);
 }
 
-void UW_EscapeMenuKeyBindingEntry::HandleKeySelected(const FInputChord& SelectedKey)
+void UW_EscapeMenuKeyBindingEntry::HandleKeySelected(FInputChord SelectedKey)
 {
 	if (not GetIsValidPlayerController() || not GetIsValidAction())
 	{

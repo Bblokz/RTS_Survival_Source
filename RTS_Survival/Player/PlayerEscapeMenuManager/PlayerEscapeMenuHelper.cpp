@@ -290,7 +290,7 @@ bool FPlayerEscapeMenuHelper::EnsureEscapeMenuKeyBindingsWidgetCreated(const FPl
 	);
 	if (EscapeMenuKeyBindingsWidget == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(\"Failed to create escape menu key bindings widget.\");
+		RTSFunctionLibrary::ReportError("Failed to create escape menu key bindings widget.");
 		return false;
 	}
 
@@ -342,8 +342,8 @@ bool FPlayerEscapeMenuHelper::EnsureEscapeMenuKeyBindingsClassIsValid(
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		M_PlayerController.Get(),
-		TEXT(\"EscapeMenuKeyBindingsClass\"),
-		TEXT(\"FPlayerEscapeMenuHelper::EnsureEscapeMenuKeyBindingsClassIsValid\"),
+		TEXT("EscapeMenuKeyBindingsClass"),
+		TEXT("FPlayerEscapeMenuHelper::EnsureEscapeMenuKeyBindingsClassIsValid"),
 		M_PlayerController.Get()
 	);
 	return false;

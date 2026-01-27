@@ -423,7 +423,7 @@ void ACPPController::ChangeKeyBinding(UInputAction* ActionToRebind, const FKey O
 
 	if (not IsValid(ActionToRebind))
 	{
-		RTSFunctionLibrary::ReportError(\"ChangeKeyBinding received an invalid action reference.\");
+		RTSFunctionLibrary::ReportError("ChangeKeyBinding received an invalid action reference.");
 		return;
 	}
 

@@ -81,7 +81,11 @@ void UW_EscapeMenuKeyBindings::BuildKeyBindingEntries()
 			continue;
 		}
 
-		EntryWidget->SetupEntry(M_PlayerController.Get(), Mapping.Action, Mapping.Key);
+		EntryWidget->SetupEntry(
+			M_PlayerController.Get(),
+			const_cast<UInputAction*>(Mapping.Action.Get()),
+			Mapping.Key
+		);
 		M_KeyBindingsList->AddChild(EntryWidget);
 	}
 }

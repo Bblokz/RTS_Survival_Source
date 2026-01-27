@@ -258,7 +258,6 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void TakeScreenShot(const bool bIncludeUI, const float InnerPercent);
 
-	
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PauseGame(const ERTSPauseGameOptions PauseOption);
@@ -290,7 +289,6 @@ public:
 	 * @param OldKey The key currently mapped to the action.
 	 * @param NewKey The newly selected key to apply.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Input")
 	void ChangeKeyBinding(UInputAction* ActionToRebind, const FKey OldKey, const FKey NewKey);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -941,7 +939,8 @@ private:
 	bool GetHasSelectedHarvesterTank() const;
 	bool GetHasNonHarvesterSelection() const;
 	bool RemoveSelectedHarvesterTanks();
-	bool FilterMarqueeSelection_RemoveHarvesterTanksIfMixed(const TArray<ASelectablePawnMaster*>& NewMarqueeSelectedPawns);
+	bool FilterMarqueeSelection_RemoveHarvesterTanksIfMixed(
+		const TArray<ASelectablePawnMaster*>& NewMarqueeSelectedPawns);
 
 	void UpdateUIForSelectionAction(const ESelectionChangeAction Action,
 	                                AActor* AddSelectedActorToPlayVoiceLine);
@@ -1241,7 +1240,7 @@ private:
 	void DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonAimAbility(const EAimAbilityType AimAbilityType);
-	void CreateAimAbilityRadius(AActor* Primary, const UAimAbilityComponent* AimComp) ;
+	void CreateAimAbilityRadius(AActor* Primary, const UAimAbilityComponent* AimComp);
 	void HideAimAbilityRadiusIfNeeded();
 	// Keeps track of the aim ability radius ID.
 	int32 AimAbilityRadiusIndex = -1;
