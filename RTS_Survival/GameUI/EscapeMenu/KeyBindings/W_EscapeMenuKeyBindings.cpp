@@ -13,7 +13,7 @@
 
 namespace EscapeMenuKeyBindingsConstants
 {
-	constexpr int32 PopupZOrder = 600;
+	constexpr int32 PopupZOrder = 2000;
 	const TCHAR* ActionButtonPrefix = TEXT("IA_ActionButton");
 	const TCHAR* ControlGroupPrefix = TEXT("IA_ControlGroup");
 }
@@ -67,32 +67,50 @@ void UW_EscapeMenuKeyBindings::BindSearchBar()
 	M_SearchKeyBar->OnTextChanged.RemoveAll(this);
 	M_SearchKeyBar->OnTextChanged.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleSearchTextChanged);
 }
-
 void UW_EscapeMenuKeyBindings::BindActionButtons()
 {
+	enum class EActionButtonHandler : uint8
+	{
+		ActionButton1,
+		ActionButton2,
+		ActionButton3,
+		ActionButton4,
+		ActionButton5,
+		ActionButton6,
+		ActionButton7,
+		ActionButton8,
+		ActionButton9,
+		ActionButton10,
+		ActionButton11,
+		ActionButton12,
+		ActionButton13,
+		ActionButton14,
+		ActionButton15,
+	};
+
 	struct FActionButtonBinding
 	{
-		UButton* Button;
-		const TCHAR* ButtonName;
-		void (UW_EscapeMenuKeyBindings::*Handler)();
+		UButton* Button = nullptr;
+		const TCHAR* ButtonName = TEXT("Invalid");
+		EActionButtonHandler Handler = EActionButtonHandler::ActionButton1;
 	};
 
 	const TArray<FActionButtonBinding> ButtonBindings = {
-		{M_ActionButton1, TEXT("M_ActionButton1"), &UW_EscapeMenuKeyBindings::HandleActionButton1Clicked},
-		{M_ActionButton2, TEXT("M_ActionButton2"), &UW_EscapeMenuKeyBindings::HandleActionButton2Clicked},
-		{M_ActionButton3, TEXT("M_ActionButton3"), &UW_EscapeMenuKeyBindings::HandleActionButton3Clicked},
-		{M_ActionButton4, TEXT("M_ActionButton4"), &UW_EscapeMenuKeyBindings::HandleActionButton4Clicked},
-		{M_ActionButton5, TEXT("M_ActionButton5"), &UW_EscapeMenuKeyBindings::HandleActionButton5Clicked},
-		{M_ActionButton6, TEXT("M_ActionButton6"), &UW_EscapeMenuKeyBindings::HandleActionButton6Clicked},
-		{M_ActionButton7, TEXT("M_ActionButton7"), &UW_EscapeMenuKeyBindings::HandleActionButton7Clicked},
-		{M_ActionButton8, TEXT("M_ActionButton8"), &UW_EscapeMenuKeyBindings::HandleActionButton8Clicked},
-		{M_ActionButton9, TEXT("M_ActionButton9"), &UW_EscapeMenuKeyBindings::HandleActionButton9Clicked},
-		{M_ActionButton10, TEXT("M_ActionButton10"), &UW_EscapeMenuKeyBindings::HandleActionButton10Clicked},
-		{M_ActionButton11, TEXT("M_ActionButton11"), &UW_EscapeMenuKeyBindings::HandleActionButton11Clicked},
-		{M_ActionButton12, TEXT("M_ActionButton12"), &UW_EscapeMenuKeyBindings::HandleActionButton12Clicked},
-		{M_ActionButton13, TEXT("M_ActionButton13"), &UW_EscapeMenuKeyBindings::HandleActionButton13Clicked},
-		{M_ActionButton14, TEXT("M_ActionButton14"), &UW_EscapeMenuKeyBindings::HandleActionButton14Clicked},
-		{M_ActionButton15, TEXT("M_ActionButton15"), &UW_EscapeMenuKeyBindings::HandleActionButton15Clicked}
+		{M_ActionButton1,  TEXT("M_ActionButton1"),  EActionButtonHandler::ActionButton1},
+		{M_ActionButton2,  TEXT("M_ActionButton2"),  EActionButtonHandler::ActionButton2},
+		{M_ActionButton3,  TEXT("M_ActionButton3"),  EActionButtonHandler::ActionButton3},
+		{M_ActionButton4,  TEXT("M_ActionButton4"),  EActionButtonHandler::ActionButton4},
+		{M_ActionButton5,  TEXT("M_ActionButton5"),  EActionButtonHandler::ActionButton5},
+		{M_ActionButton6,  TEXT("M_ActionButton6"),  EActionButtonHandler::ActionButton6},
+		{M_ActionButton7,  TEXT("M_ActionButton7"),  EActionButtonHandler::ActionButton7},
+		{M_ActionButton8,  TEXT("M_ActionButton8"),  EActionButtonHandler::ActionButton8},
+		{M_ActionButton9,  TEXT("M_ActionButton9"),  EActionButtonHandler::ActionButton9},
+		{M_ActionButton10, TEXT("M_ActionButton10"), EActionButtonHandler::ActionButton10},
+		{M_ActionButton11, TEXT("M_ActionButton11"), EActionButtonHandler::ActionButton11},
+		{M_ActionButton12, TEXT("M_ActionButton12"), EActionButtonHandler::ActionButton12},
+		{M_ActionButton13, TEXT("M_ActionButton13"), EActionButtonHandler::ActionButton13},
+		{M_ActionButton14, TEXT("M_ActionButton14"), EActionButtonHandler::ActionButton14},
+		{M_ActionButton15, TEXT("M_ActionButton15"), EActionButtonHandler::ActionButton15},
 	};
 
 	for (const FActionButtonBinding& Binding : ButtonBindings)
@@ -103,36 +121,101 @@ void UW_EscapeMenuKeyBindings::BindActionButtons()
 				this,
 				Binding.ButtonName,
 				TEXT("UW_EscapeMenuKeyBindings::BindActionButtons"),
-				this
-			);
+				this);
 			continue;
 		}
 
 		Binding.Button->OnClicked.RemoveAll(this);
-		Binding.Button->OnClicked.AddDynamic(this, Binding.Handler);
+
+		switch (Binding.Handler)
+		{
+		case EActionButtonHandler::ActionButton1:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton1Clicked);
+			break;
+		case EActionButtonHandler::ActionButton2:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton2Clicked);
+			break;
+		case EActionButtonHandler::ActionButton3:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton3Clicked);
+			break;
+		case EActionButtonHandler::ActionButton4:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton4Clicked);
+			break;
+		case EActionButtonHandler::ActionButton5:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton5Clicked);
+			break;
+		case EActionButtonHandler::ActionButton6:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton6Clicked);
+			break;
+		case EActionButtonHandler::ActionButton7:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton7Clicked);
+			break;
+		case EActionButtonHandler::ActionButton8:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton8Clicked);
+			break;
+		case EActionButtonHandler::ActionButton9:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton9Clicked);
+			break;
+		case EActionButtonHandler::ActionButton10:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton10Clicked);
+			break;
+		case EActionButtonHandler::ActionButton11:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton11Clicked);
+			break;
+		case EActionButtonHandler::ActionButton12:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton12Clicked);
+			break;
+		case EActionButtonHandler::ActionButton13:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton13Clicked);
+			break;
+		case EActionButtonHandler::ActionButton14:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton14Clicked);
+			break;
+		case EActionButtonHandler::ActionButton15:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleActionButton15Clicked);
+			break;
+		default:
+			RTSFunctionLibrary::ReportError(
+				TEXT("UW_EscapeMenuKeyBindings::BindActionButtons: Unknown action button handler."));
+			break;
+		}
 	}
 }
 
 void UW_EscapeMenuKeyBindings::BindControlGroupButtons()
 {
+	enum class EControlGroupHandler : uint8
+	{
+		ControlGroup1,
+		ControlGroup2,
+		ControlGroup3,
+		ControlGroup4,
+		ControlGroup5,
+		ControlGroup6,
+		ControlGroup7,
+		ControlGroup8,
+		ControlGroup9,
+		ControlGroup10,
+	};
+
 	struct FControlGroupButtonBinding
 	{
-		UButton* Button;
-		const TCHAR* ButtonName;
-		void (UW_EscapeMenuKeyBindings::*Handler)();
+		UButton* Button = nullptr;
+		const TCHAR* ButtonName = TEXT("Invalid");
+		EControlGroupHandler Handler = EControlGroupHandler::ControlGroup1;
 	};
 
 	const TArray<FControlGroupButtonBinding> ButtonBindings = {
-		{M_ControlGroupButton1, TEXT("M_ControlGroupButton1"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton1Clicked},
-		{M_ControlGroupButton2, TEXT("M_ControlGroupButton2"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton2Clicked},
-		{M_ControlGroupButton3, TEXT("M_ControlGroupButton3"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton3Clicked},
-		{M_ControlGroupButton4, TEXT("M_ControlGroupButton4"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton4Clicked},
-		{M_ControlGroupButton5, TEXT("M_ControlGroupButton5"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton5Clicked},
-		{M_ControlGroupButton6, TEXT("M_ControlGroupButton6"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton6Clicked},
-		{M_ControlGroupButton7, TEXT("M_ControlGroupButton7"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton7Clicked},
-		{M_ControlGroupButton8, TEXT("M_ControlGroupButton8"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton8Clicked},
-		{M_ControlGroupButton9, TEXT("M_ControlGroupButton9"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton9Clicked},
-		{M_ControlGroupButton10, TEXT("M_ControlGroupButton10"), &UW_EscapeMenuKeyBindings::HandleControlGroupButton10Clicked}
+		{M_ControlGroupButton1,  TEXT("M_ControlGroupButton1"),  EControlGroupHandler::ControlGroup1},
+		{M_ControlGroupButton2,  TEXT("M_ControlGroupButton2"),  EControlGroupHandler::ControlGroup2},
+		{M_ControlGroupButton3,  TEXT("M_ControlGroupButton3"),  EControlGroupHandler::ControlGroup3},
+		{M_ControlGroupButton4,  TEXT("M_ControlGroupButton4"),  EControlGroupHandler::ControlGroup4},
+		{M_ControlGroupButton5,  TEXT("M_ControlGroupButton5"),  EControlGroupHandler::ControlGroup5},
+		{M_ControlGroupButton6,  TEXT("M_ControlGroupButton6"),  EControlGroupHandler::ControlGroup6},
+		{M_ControlGroupButton7,  TEXT("M_ControlGroupButton7"),  EControlGroupHandler::ControlGroup7},
+		{M_ControlGroupButton8,  TEXT("M_ControlGroupButton8"),  EControlGroupHandler::ControlGroup8},
+		{M_ControlGroupButton9,  TEXT("M_ControlGroupButton9"),  EControlGroupHandler::ControlGroup9},
+		{M_ControlGroupButton10, TEXT("M_ControlGroupButton10"), EControlGroupHandler::ControlGroup10},
 	};
 
 	for (const FControlGroupButtonBinding& Binding : ButtonBindings)
@@ -143,13 +226,49 @@ void UW_EscapeMenuKeyBindings::BindControlGroupButtons()
 				this,
 				Binding.ButtonName,
 				TEXT("UW_EscapeMenuKeyBindings::BindControlGroupButtons"),
-				this
-			);
+				this);
 			continue;
 		}
 
 		Binding.Button->OnClicked.RemoveAll(this);
-		Binding.Button->OnClicked.AddDynamic(this, Binding.Handler);
+
+		switch (Binding.Handler)
+		{
+		case EControlGroupHandler::ControlGroup1:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton1Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup2:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton2Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup3:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton3Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup4:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton4Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup5:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton5Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup6:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton6Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup7:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton7Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup8:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton8Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup9:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton9Clicked);
+			break;
+		case EControlGroupHandler::ControlGroup10:
+			Binding.Button->OnClicked.AddDynamic(this, &UW_EscapeMenuKeyBindings::HandleControlGroupButton10Clicked);
+			break;
+		default:
+			RTSFunctionLibrary::ReportError(
+				TEXT("UW_EscapeMenuKeyBindings::BindControlGroupButtons: Unknown control group handler."));
+			break;
+		}
 	}
 }
 

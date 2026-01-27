@@ -41,6 +41,12 @@ class RTS_SURVIVAL_API UPlayerCameraController : public UActorComponent
 public:
 	UPlayerCameraController();
 
+	UFUNCTION(BlueprintPure, Category = "Camera")
+	bool IsCameraLocked() const { return bM_IsCameraLocked; }
+
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void SetIsCameraLocked(const bool bIsLocked) { bM_IsCameraLocked = bIsLocked; }
+	
 	inline void SetIsPlayerInTechTreeOrArchive(const bool bIsInTechTreeOrArchive) { bM_IsPlayerInTechTreeOrArchive = bIsInTechTreeOrArchive; }
 
 	UFUNCTION(BlueprintCallable, Category = "Camera")
@@ -88,11 +94,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void MoveCameraOverTime(const FMovePlayerCamera& NewMove);
 
+
 	virtual void PostInitProperties() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	bool GetIsLockedOrDisabled() const;
 	// References
 	UPROPERTY()
 	ACameraPawn* M_PlayerCamera;
@@ -130,4 +138,6 @@ private:
 		float& OutMouseX,
 		float& OutMouseY,
 		bool& bOutIsMouseInViewport) const;
+
+	bool bM_IsCameraLocked = false;
 };

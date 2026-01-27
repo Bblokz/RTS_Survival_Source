@@ -20,6 +20,7 @@ UPlayerCameraController::UPlayerCameraController(): M_PlayerCamera(nullptr), M_S
 	EdgeScrollSpeedX = 0.0f;
 	EdgeScrollSpeedY = 0.0f;
 	bM_IsCameraMovementDisabled = false;
+	bM_IsCameraLocked = false;
 	PrimaryComponentTick.bTickEvenWhenPaused = true;
 	PrimaryComponentTick.bStartWithTickEnabled = true;
 	PrimaryComponentTick.bCanEverTick = true;
@@ -27,7 +28,7 @@ UPlayerCameraController::UPlayerCameraController(): M_PlayerCamera(nullptr), M_S
 
 void UPlayerCameraController::ZoomIn()
 {
-	if (bM_IsPlayerInTechTreeOrArchive || !GetIsValidSpringArmComponent())
+	if (bM_IsPlayerInTechTreeOrArchive || !GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -44,7 +45,7 @@ void UPlayerCameraController::ZoomIn()
 
 void UPlayerCameraController::ZoomOut()
 {
-	if (bM_IsPlayerInTechTreeOrArchive || !GetIsValidSpringArmComponent())
+	if (bM_IsPlayerInTechTreeOrArchive || !GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -75,7 +76,7 @@ void UPlayerCameraController::InitPlayerCameraController(ACameraPawn* NewCameraR
 
 void UPlayerCameraController::ResetCameraToBaseZoomLevel() const
 {
-	if (!GetIsValidSpringArmComponent())
+	if (!GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -84,7 +85,7 @@ void UPlayerCameraController::ResetCameraToBaseZoomLevel() const
 
 void UPlayerCameraController::SetCustomCameraZoomLevel(const float NewZoomLevel) const
 {
-	if (!GetIsValidSpringArmComponent())
+	if (!GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -95,7 +96,7 @@ void UPlayerCameraController::EdgeScroll(const float DeltaTime)
 {
 	// Early‐return and reset *only* the untouched axis
 	if (bM_IsPlayerInTechTreeOrArchive
-		|| bM_IsCameraMovementDisabled
+		|| GetIsLockedOrDisabled()
 		|| not GetIsValidCameraPawn())
 	{
 		M_EdgeScrollAccelX = 1.0f;
@@ -306,7 +307,7 @@ void UPlayerCameraController::GetViewportSizeAndMouse(
 
 void UPlayerCameraController::ForwardRightMovement(const bool bOnForward, float AxisX, const bool bOnRight, float AxisY)
 {
-	if (bM_IsPlayerInTechTreeOrArchive || bM_IsCameraMovementDisabled || !GetIsValidCameraPawn())
+	if (bM_IsPlayerInTechTreeOrArchive || GetIsLockedOrDisabled() || !GetIsValidCameraPawn())
 	{
 		return;
 	}
@@ -348,7 +349,7 @@ void UPlayerCameraController::ForwardRightMovement(const bool bOnForward, float 
 
 void UPlayerCameraController::PanReset()
 {
-	if (bM_IsPlayerInTechTreeOrArchive || !GetIsValidCameraPawn())
+	if (GetIsLockedOrDisabled()|| bM_IsPlayerInTechTreeOrArchive || !GetIsValidCameraPawn())
 	{
 		return;
 	}
@@ -433,4 +434,9 @@ void UPlayerCameraController::TickComponent(float DeltaTime, ELevelTick TickType
 		M_PlayerCamera->SetActorLocation(NewLocation, true);
 	}
 	EdgeScroll(DeltaTime);
+}
+
+bool UPlayerCameraController::GetIsLockedOrDisabled() const
+{
+	return bM_IsCameraLocked || bM_IsCameraMovementDisabled;
 }

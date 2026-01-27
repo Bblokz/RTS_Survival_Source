@@ -12,9 +12,9 @@
 
 namespace EscapeMenuZOrder
 {
-	constexpr int32 EscapeMenu = 2000;
-	constexpr int32 EscapeMenuSettings = 2010;
-	constexpr int32 EscapeMenuKeyBindings = 2020;
+	constexpr int32 EscapeMenu = 1900;
+	constexpr int32 EscapeMenuSettings = 1910;
+	constexpr int32 EscapeMenuKeyBindings = 1920;
 }
 
 void FPlayerEscapeMenuHelper::InitEscapeMenuHelper(ACPPController* PlayerController)
@@ -443,7 +443,7 @@ void FPlayerEscapeMenuHelper::PauseGameForEscapeMenu() const
 		return;
 	}
 
-	M_PlayerController->PauseGame(ERTSPauseGameOptions::ForcePause);
+	M_PlayerController->PauseAndLockGame(true);
 }
 
 void FPlayerEscapeMenuHelper::UnpauseGameForEscapeMenu() const
@@ -453,8 +453,7 @@ void FPlayerEscapeMenuHelper::UnpauseGameForEscapeMenu() const
 		return;
 	}
 
-	M_PlayerController->PauseGame(ERTSPauseGameOptions::ForceUnpause);
-
+	M_PlayerController->PauseAndLockGame(false);
 	RTSInputModeDefaults::ApplyRegularGameInputMode(M_PlayerController.Get());
 }
 

@@ -364,7 +364,7 @@ void ACPPController::PauseAndLockGame(const bool bLock)
 	const bool bLockCamera = bLock;
 	if (GetIsValidPlayerCameraController())
 	{
-		M_PlayerCameraController->SetCameraMovementDisabled(bLockCamera);
+		M_PlayerCameraController->SetIsCameraLocked(bLockCamera);
 	}
 }
 
