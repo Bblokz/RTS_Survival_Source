@@ -61,10 +61,8 @@ void UW_CardMenu::OnPopupBack()
 void UW_CardMenu::InitializeCardPicker(const TArray<ERTSCard>& AvailableCards,
                                        const TSubclassOf<UW_RTSCard> InCardClass)
 {
-	if (not IsValid(M_CardScrollBox))
+	if (not GetIsValidCardScrollBox())
 	{
-		RTSFunctionLibrary::ReportError("not able to initialize card picker in CardMenu as the scroll box widget"
-			"is not valid");
 		return;
 	}
 	M_CardScrollBox->InitCardScrollBox(AvailableCards, InCardClass, this, M_ScrollBoxHeightMlt);
@@ -73,9 +71,8 @@ void UW_CardMenu::InitializeCardPicker(const TArray<ERTSCard>& AvailableCards,
 void UW_CardMenu::InitializeUnitCardHolder(const TArray<ERTSCard>& AvailableCards,
                                            const TSubclassOf<UW_RTSCard> InCardClass, const int32 MaxCards)
 {
-	if (not IsValid(M_UnitCardHolder))
+	if (not GetIsValidUnitCardHolder())
 	{
-		RTSFunctionLibrary::ReportError("No valid unit card holder found in UW_CardMenu::InitializeUnitCardHolder");
 		return;
 	}
 	M_UnitCardHolder->SetupCardHolder(AvailableCards, InCardClass, MaxCards,
@@ -85,9 +82,8 @@ void UW_CardMenu::InitializeUnitCardHolder(const TArray<ERTSCard>& AvailableCard
 void UW_CardMenu::InitializeTechCardHolder(const TArray<ERTSCard>& AvailableCards,
                                            const TSubclassOf<UW_RTSCard> InCardClass, const int32 MaxCards)
 {
-	if (not IsValid(M_TechResourceCardHolder))
+	if (not GetIsValidTechCardHolder())
 	{
-		RTSFunctionLibrary::ReportError("No valid tech card holder found in UW_CardMenu::InitializeTechCardHolder");
 		return;
 	}
 	M_TechResourceCardHolder->SetupCardHolder(AvailableCards, InCardClass, MaxCards,
@@ -127,62 +123,92 @@ bool UW_CardMenu::GetIsCardValid(UW_RTSCard* Card)
 
 bool UW_CardMenu::GetIsValidCardScrollBox() const
 {
-	if (IsValid(M_CardScrollBox))
+	if (not IsValid(M_CardScrollBox))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_CardScrollBox",
+			"GetIsValidCardScrollBox",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("No valid card scroll box found in UW_CardMenu::GetIsValidCardScrollBox");
-	return false;
+	return true;
 }
 
 bool UW_CardMenu::GetIsValidUnitCardHolder() const
 {
-	if (IsValid(M_UnitCardHolder))
+	if (not IsValid(M_UnitCardHolder))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_UnitCardHolder",
+			"GetIsValidUnitCardHolder",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError(" Card Menu has invalid Unit Card Holder.");
-	return false;
+	return true;
 }
 
 bool UW_CardMenu::GetIsValidTechCardHolder() const
 {
-	if (IsValid(M_TechResourceCardHolder))
+	if (not IsValid(M_TechResourceCardHolder))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_TechResourceCardHolder",
+			"GetIsValidTechCardHolder",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError(" Card Menu has invalid Tech Card Holder.");
-	return false;
+	return true;
 }
 
 bool UW_CardMenu::GetIsValidNomadicLayout() const
 {
-	if (IsValid(M_NomadicLayout))
+	if (not IsValid(M_NomadicLayout))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_NomadicLayout",
+			"GetIsValidNomadicLayout",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("No valid nomadic layout found in UW_CardMenu::GetIsValidNomadicLayout");
-	return false;
+	return true;
 }
 
 bool UW_CardMenu::GetIsValidLayoutSwitcher() const
 {
-	if (IsValid(M_LayoutSwitcher))
+	if (not IsValid(M_LayoutSwitcher))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_LayoutSwitcher",
+			"GetIsValidLayoutSwitcher",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("No valid widget switcher found in UW_CardMenu::GetIsValidLayoutSwitcher");
-	return false;
+	return true;
 }
 
 bool UW_CardMenu::GetIsValidPopupWidget() const
 {
-	if (IsValid(M_PopupWidget))
+	if (not IsValid(M_PopupWidget))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_PopupWidget",
+			"GetIsValidPopupWidget",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("No valid popup widget found in UW_CardMenu::GetIsValidPopupWidget");
-	return false;
+	return true;
 }
 
 bool UW_CardMenu::RegisterSelectedCardsAndCheckSlots()
@@ -460,7 +486,7 @@ void UW_CardMenu::CreateCardsNotFilledPopup(const uint32& EmptyUnitSlots, const 
 
 void UW_CardMenu::EnablePopupWidget(const ERTSPopup Popup, const FText& Title, const FText& Message)
 {
-	if (!GetIsValidPopupWidget())
+	if (not GetIsValidPopupWidget())
 	{
 		return;
 	}
@@ -588,8 +614,8 @@ void UW_CardMenu::SwitchLayout(const ELayoutProfileWidgets NewLayoutProfile)
 
 void UW_CardMenu::PlayRTSCardSound(const ECardSound Sound)
 {
-	// Check if the sound type is in the map and is valid
-	if (!M_MapSoundToCue.Contains(Sound) || !IsValid(M_MapSoundToCue[Sound]))
+	USoundCue* const* SoundCue = M_MapSoundToCue.Find(Sound);
+	if (SoundCue == nullptr || not IsValid(*SoundCue))
 	{
 		return;
 	}
@@ -630,10 +656,12 @@ UW_CardScrollBox* UW_CardMenu::GetCardScrollBox() const
 void UW_CardMenu::Play2DSound(const ECardSound Sound)
 {
 	// Plays the sound associated with the provided type
-	if (IsValid(M_MapSoundToCue[Sound]))
+	USoundCue* const* SoundCue = M_MapSoundToCue.Find(Sound);
+	if (SoundCue == nullptr || not IsValid(*SoundCue))
 	{
-		UGameplayStatics::PlaySound2D(this, M_MapSoundToCue[Sound]);
+		return;
 	}
+	UGameplayStatics::PlaySound2D(this, *SoundCue);
 }
 
 void UW_CardMenu::ResetHoverSoundCooldown()

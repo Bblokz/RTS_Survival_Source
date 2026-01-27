@@ -9,7 +9,7 @@
 enum class ERTSCard : uint8;
 class UW_RTSCard;
 /**
- * 
+ * @brief Shows a single card preview widget when card hover actions request it.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_CardViewer : public UUserWidget
@@ -21,4 +21,7 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TWeakObjectPtr<UW_RTSCard> RTSCard;
+
+private:
+	bool GetIsValidRTSCard() const;
 };
