@@ -233,20 +233,20 @@ USoundCue* UGameExplosionsManager::PickRandomSoundForType(const ERTS_ExplosionTy
 		return nullptr;
 	}
 	const TArray<USoundCue*>* SoundArrayPtr = M_ExplSoundsMap.Find(ExplosionType);
-	if (SoundArrayPtr)
+	if (not SoundArrayPtr || SoundArrayPtr->Num() == 0)
 	{
-		const TArray<USoundCue*>& SoundArray = *SoundArrayPtr;
-		const int32 SoundIndex = FMath::RandRange(0, SoundArrayPtr->Num() - 1);
-		return SoundArray.Num() > 0 ? SoundArray[SoundIndex] : nullptr;
+		return nullptr;
 	}
-	return nullptr;
+	const TArray<USoundCue*>& SoundArray = *SoundArrayPtr;
+	const int32 SoundIndex = FMath::RandRange(0, SoundArray.Num() - 1);
+	return SoundArray[SoundIndex];
 }
 
 UNiagaraSystem* UGameExplosionsManager::PickRandomExplForType(const ERTS_ExplosionType ExplosionType)
 {
 	// Ensure we have systems for the requested type
 	const TArray<UNiagaraSystem*>* SystemsArrayPtr = M_ExplosionSystemsMap.Find(ExplosionType);
-	if (!SystemsArrayPtr || SystemsArrayPtr->Num() == 0)
+	if (not SystemsArrayPtr || SystemsArrayPtr->Num() == 0)
 	{
 		RTSFunctionLibrary::ReportError(
 			Global_GetExplosionTypeString(ExplosionType) + FString::Printf(
@@ -312,7 +312,7 @@ void UGameExplosionsManager::SpawnMultipleExplosionsInArea(
 			}
 		}
 
-		if (!bPlaced)
+		if (not bPlaced)
 		{
 			// Couldn't find a strictly valid spot, place randomly ignoring the distance
 			float RandRadius = FMath::FRandRange(0.f, Range);
