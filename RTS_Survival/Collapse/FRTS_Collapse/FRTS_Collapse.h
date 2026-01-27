@@ -70,8 +70,14 @@ private:
 	static void OnAssetLoadSucceeded(TSharedPtr<struct FCollapseTaskContext> Context);
 	static void HandleDestroyGeometry(TSharedPtr<struct FCollapseTaskContext> Context);
 
-	static void LoadSwapMeshAsset(TWeakObjectPtr<AActor> WeakOwner, FSwapToDestroyedMesh SwapParams);
-	static void OnSwapMeshAssetLoaded(TWeakObjectPtr<AActor> WeakOwner, FSwapToDestroyedMesh SwapParams);
+	static void LoadSwapMeshAsset(
+		TWeakObjectPtr<AActor> WeakOwner,
+		TWeakObjectPtr<UMeshComponent> WeakComponent,
+		FSwapToDestroyedMesh SwapParams);
+	static void OnSwapMeshAssetLoaded(
+		TWeakObjectPtr<AActor> WeakOwner,
+		TWeakObjectPtr<UMeshComponent> WeakComponent,
+		FSwapToDestroyedMesh SwapParams);
 
 
 	// New private functions for spawn-on-destroy:

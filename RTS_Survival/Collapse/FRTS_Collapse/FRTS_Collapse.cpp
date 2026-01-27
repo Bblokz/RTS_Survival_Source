@@ -50,9 +50,10 @@ void FRTS_Collapse::CollapseSwapMesh(AActor* CollapseOwner, FSwapToDestroyedMesh
 {
 	// Create a weak pointer for safe handling in async callbacks.
 	TWeakObjectPtr<AActor> WeakOwner(CollapseOwner);
+	TWeakObjectPtr<UMeshComponent> WeakComponent(SwapToDestroyedMeshParameters.ComponentToSwapOn);
 
 	// Validate that we have a valid owner and a valid component to swap on.
-	if (!CollapseOwner || !SwapToDestroyedMeshParameters.ComponentToSwapOn)
+	if (not IsValid(CollapseOwner) || not IsValid(SwapToDestroyedMeshParameters.ComponentToSwapOn))
 	{
 		const FString CollapseOwnerName = CollapseOwner ? CollapseOwner->GetName() : "null";
 		const FString ComponentName = SwapToDestroyedMeshParameters.ComponentToSwapOn
@@ -68,45 +69,61 @@ void FRTS_Collapse::CollapseSwapMesh(AActor* CollapseOwner, FSwapToDestroyedMesh
 			"\n MeshName: " + MeshName);
 		return;
 	}
+	if (SwapToDestroyedMeshParameters.MeshToSwapTo.IsNull())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("CollapseSwapMesh: MeshToSwapTo is null."));
+		return;
+	}
 
 	// Begin asynchronous loading of the mesh asset.
-	LoadSwapMeshAsset(WeakOwner, SwapToDestroyedMeshParameters);
+	LoadSwapMeshAsset(WeakOwner, WeakComponent, SwapToDestroyedMeshParameters);
 }
 
 
-void FRTS_Collapse::LoadSwapMeshAsset(TWeakObjectPtr<AActor> WeakOwner, FSwapToDestroyedMesh SwapParams)
+void FRTS_Collapse::LoadSwapMeshAsset(
+	TWeakObjectPtr<AActor> WeakOwner,
+	TWeakObjectPtr<UMeshComponent> WeakComponent,
+	FSwapToDestroyedMesh SwapParams)
 {
-	if (!SwapParams.MeshToSwapTo.IsValid())
+	if (not SwapParams.MeshToSwapTo.IsValid())
 	{
 		FStreamableManager& StreamableManager = UAssetManager::GetStreamableManager();
 		StreamableManager.RequestAsyncLoad(
 			SwapParams.MeshToSwapTo.ToSoftObjectPath(),
-			FStreamableDelegate::CreateStatic(&FRTS_Collapse::OnSwapMeshAssetLoaded, WeakOwner, SwapParams)
+			FStreamableDelegate::CreateStatic(&FRTS_Collapse::OnSwapMeshAssetLoaded, WeakOwner, WeakComponent,
+			                                  SwapParams)
 		);
 	}
 	else
 	{
 		// Already loaded; proceed immediately.
-		OnSwapMeshAssetLoaded(WeakOwner, SwapParams);
+		OnSwapMeshAssetLoaded(WeakOwner, WeakComponent, SwapParams);
 	}
 }
 
-void FRTS_Collapse::OnSwapMeshAssetLoaded(TWeakObjectPtr<AActor> WeakOwner, FSwapToDestroyedMesh SwapParams)
+void FRTS_Collapse::OnSwapMeshAssetLoaded(
+	TWeakObjectPtr<AActor> WeakOwner,
+	TWeakObjectPtr<UMeshComponent> WeakComponent,
+	FSwapToDestroyedMesh SwapParams)
 {
 	AActor* Owner = WeakOwner.Get();
-	if (!Owner)
+	if (not IsValid(Owner))
+	{
+		return;
+	}
+	if (not WeakComponent.IsValid())
 	{
 		return;
 	}
 	UStaticMesh* LoadedMesh = SwapParams.MeshToSwapTo.Get();
-	if (!LoadedMesh)
+	if (not IsValid(LoadedMesh))
 	{
 		return;
 	}
 
-	if (SwapParams.ComponentToSwapOn)
+	if (UMeshComponent* ComponentToSwapOn = WeakComponent.Get())
 	{
-		if (UStaticMeshComponent* StaticMeshComp = Cast<UStaticMeshComponent>(SwapParams.ComponentToSwapOn))
+		if (UStaticMeshComponent* StaticMeshComp = Cast<UStaticMeshComponent>(ComponentToSwapOn))
 		{
 			StaticMeshComp->SetStaticMesh(LoadedMesh);
 		}

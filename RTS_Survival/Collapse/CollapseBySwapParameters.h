@@ -5,12 +5,19 @@
 
 #include "CollapseBySwapParameters.generated.h"
 
+class UMeshComponent;
+class USoundBase;
+class UNiagaraSystem;
+class USoundAttenuation;
+class USoundConcurrency;
+class UStaticMesh;
+
 USTRUCT(BlueprintType)
 struct FSwapToDestroyedMesh
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UMeshComponent* ComponentToSwapOn = nullptr;
+	TObjectPtr<UMeshComponent> ComponentToSwapOn = nullptr;
 
 	// The sound to play when the mesh is swapped.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
