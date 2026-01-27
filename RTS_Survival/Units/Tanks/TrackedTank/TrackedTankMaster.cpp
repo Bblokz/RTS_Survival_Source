@@ -304,22 +304,27 @@ void ATrackedTankMaster::InitTrackedTank(
 
 void ATrackedTankMaster::ExecuteMoveCommand(const FVector MoveToLocation)
 {
-	if (IsValid(AITankController))
+	if (not GetIsValidAIController())
 	{
-		AITankController->SetMoveToLocation(MoveToLocation);
-		ExecuteCommandMoveBP(false);
-		if (GetIsValidRTSNavCollision())
-		{
-			RTSNavCollision->EnableAffectNavmesh(false);
-		}
-		// To auto engage turrets.
-		Super::ExecuteMoveCommand(MoveToLocation);
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			this, "AITankController", "ATrackedTankMaster::ExecuteMoveCommand");
+		return;
 	}
-	else
+
+	if (UTrackPathFollowingComponent* TrackPFC = Cast<UTrackPathFollowingComponent>(
+		AITankController->GetPathFollowingComponent()))
 	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "AITankController",
-		                                             "ATrackedTankMaster::ExecuteMoveCommand");
+		TrackPFC->SetReverse(false);
 	}
+
+	AITankController->SetMoveToLocation(MoveToLocation);
+	ExecuteCommandMoveBP(false);
+	if (GetIsValidRTSNavCollision())
+	{
+		RTSNavCollision->EnableAffectNavmesh(false);
+	}
+	// To auto engage turrets.
+	Super::ExecuteMoveCommand(MoveToLocation);
 }
 
 void ATrackedTankMaster::TerminateMoveCommand()
@@ -341,7 +346,7 @@ void ATrackedTankMaster::TerminateMoveCommand()
 
 void ATrackedTankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
 {
-	if (!IsValid(AITankController))
+	if (not IsValid(AITankController))
 	{
 		RTSFunctionLibrary::ReportNullErrorComponent(
 			this, "AITankController", "ATrackedTankMaster::ExecuteReverseCommand");
