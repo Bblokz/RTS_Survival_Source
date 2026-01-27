@@ -746,7 +746,7 @@ void UEnemyWaveController::ExtractTanksAndSquadsFromWaveActors(TArray<ATankMaste
 {
 	for (const auto EachWaveActor : InWaveActors)
 	{
-		if (not EachWaveActor)
+		if (not IsValid(EachWaveActor))
 		{
 			M_EnemyController->AddToWaveSupply(1);
 			continue;
