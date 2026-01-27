@@ -1810,99 +1810,105 @@ FVector ANomadicVehicle::CalculateMeshPartSize(const TArray<FVector3f>& VertexPo
 
 void ANomadicVehicle::InitSmokeLocations()
 {
-	if (IsValid(BuildingMeshComponent) && BuildingMeshComponent->GetStaticMesh())
+	if (not IsValid(BuildingMeshComponent) || not BuildingMeshComponent->GetStaticMesh())
 	{
-		SetSmokeLocationsToRandomInBox();
-		// Save guard to check if the mesh allows CPU access otherwise it breaks shipped builds.
-		if (BuildingMeshComponent->GetStaticMesh()->bAllowCPUAccess)
+		RTSFunctionLibrary::ReportError("Building Mesh component or static mesh is not set on vehicle: " + GetName());
+		return;
+	}
+
+	SetSmokeLocationsToRandomInBox();
+	// Save guard to check if the mesh allows CPU access otherwise it breaks shipped builds.
+	if (BuildingMeshComponent->GetStaticMesh()->bAllowCPUAccess)
+	{
+		FStaticMeshLODResources& LODResources = BuildingMeshComponent->GetStaticMesh()->GetRenderData()->LODResources[0];
+		FIndexArrayView Indices = LODResources.IndexBuffer.GetArrayView();
+		TArray<TArray<FVector3f>> VertexPositionsByMaterial;
+		VertexPositionsByMaterial.SetNum(BuildingMeshComponent->GetNumMaterials());
+
+		TArray<float> MeshPartSizes;
+		MeshPartSizes.SetNum(BuildingMeshComponent->GetNumMaterials());
+		float MaxPartSize = 0;
+
+		// Collect vertices and calculate mesh part sizes. REQUIRES "Allow CPUAccess" in the static mesh editor.
+		for (int32 SectionIndex = 0; SectionIndex < LODResources.Sections.Num(); ++SectionIndex)
 		{
-			FStaticMeshLODResources& LODResources = BuildingMeshComponent->GetStaticMesh()->GetRenderData()->
-			                                                               LODResources[0];
-			FIndexArrayView Indices = LODResources.IndexBuffer.GetArrayView();
-			TArray<TArray<FVector3f>> VertexPositionsByMaterial;
-			VertexPositionsByMaterial.SetNum(BuildingMeshComponent->GetNumMaterials());
+			const FStaticMeshSection& Section = LODResources.Sections[SectionIndex];
+			TArray<FVector3f> PartVertices;
 
-			TArray<float> MeshPartSizes;
-			MeshPartSizes.SetNum(BuildingMeshComponent->GetNumMaterials());
-			float MaxPartSize = 0;
-
-			// Collect vertices and calculate mesh part sizes. REQUIRES "Allow CPUAccess" in the static mesh editor.
-			for (int32 SectionIndex = 0; SectionIndex < LODResources.Sections.Num(); ++SectionIndex)
+			for (uint32 i = Section.FirstIndex; i < Section.FirstIndex + Section.NumTriangles * 3; i++)
 			{
-				const FStaticMeshSection& Section = LODResources.Sections[SectionIndex];
-				TArray<FVector3f> PartVertices;
-
-				for (uint32 i = Section.FirstIndex; i < Section.FirstIndex + Section.NumTriangles * 3; i++)
-				{
-					PartVertices.Add(LODResources.VertexBuffers.PositionVertexBuffer.VertexPosition(Indices[i]));
-				}
-
-				FVector PartSize = CalculateMeshPartSize(PartVertices);
-				MeshPartSizes[Section.MaterialIndex] = PartSize.Size();
-
-				MaxPartSize = FMath::Max(MaxPartSize, MeshPartSizes[Section.MaterialIndex]);
-				VertexPositionsByMaterial[Section.MaterialIndex] = MoveTemp(PartVertices);
+				PartVertices.Add(LODResources.VertexBuffers.PositionVertexBuffer.VertexPosition(Indices[i]));
 			}
 
-			const FTransform ComponentTransform = BuildingMeshComponent->GetComponentTransform();
-			FVector OriginLocation = ComponentTransform.GetLocation();
-			RTSFunctionLibrary::PrintString("InitSmokeLocations:: Before AsyncTask");
-			// A weak pointer to this object to prevent a dangling pointer in the async task.
-			TWeakObjectPtr<ANomadicVehicle> WeakThis(this);
-			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [WeakThis, VertexPositionsByMaterial,
-				          ComponentTransform, OriginLocation, MeshPartSizes, MaxPartSize]()
-			          {
-				          RTSFunctionLibrary::PrintString("InitSmokeLocations:: At async task");
-				          TArray<FTransform> CalculatedTransforms;
-				          for (int32 i = 0; i < VertexPositionsByMaterial.Num(); ++i)
-				          {
-					          FVector MeanLocation = WeakThis->CalculateMeanMaterialLocation(
-						          i, VertexPositionsByMaterial[i], ComponentTransform);
-					          // Normalize scale factor based on the largest part
-					          const float ScaleFactor = FMath::Max(2 * (MeshPartSizes[i] / MaxPartSize), 0.33);
+			FVector PartSize = CalculateMeshPartSize(PartVertices);
+			MeshPartSizes[Section.MaterialIndex] = PartSize.Size();
 
-					          FRotator Rotation = (MeanLocation - OriginLocation).Rotation();
-					          FTransform Transform(Rotation, MeanLocation,
-					                               FVector(ScaleFactor, ScaleFactor, ScaleFactor));
-					          CalculatedTransforms.Add(Transform);
-				          }
-				          AsyncTask(ENamedThreads::GameThread, [WeakThis, CalculatedTransforms]()
+			MaxPartSize = FMath::Max(MaxPartSize, MeshPartSizes[Section.MaterialIndex]);
+			VertexPositionsByMaterial[Section.MaterialIndex] = MoveTemp(PartVertices);
+		}
+
+		const FTransform ComponentTransform = BuildingMeshComponent->GetComponentTransform();
+		FVector OriginLocation = ComponentTransform.GetLocation();
+		RTSFunctionLibrary::PrintString("InitSmokeLocations:: Before AsyncTask");
+		// A weak pointer to this object to prevent a dangling pointer in the async task.
+		TWeakObjectPtr<ANomadicVehicle> WeakThis(this);
+		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [WeakThis, VertexPositionsByMaterial,
+			          ComponentTransform, OriginLocation, MeshPartSizes, MaxPartSize]()
+		          {
+			          RTSFunctionLibrary::PrintString("InitSmokeLocations:: At async task");
+			          if (not WeakThis.IsValid())
+			          {
+				          return;
+			          }
+
+			          ANomadicVehicle* StrongThis = WeakThis.Get();
+			          TArray<FTransform> CalculatedTransforms;
+			          for (int32 i = 0; i < VertexPositionsByMaterial.Num(); ++i)
+			          {
+				          FVector MeanLocation = StrongThis->CalculateMeanMaterialLocation(
+					          i, VertexPositionsByMaterial[i], ComponentTransform);
+				          // Normalize scale factor based on the largest part
+				          const float ScaleFactor = FMath::Max(2 * (MeshPartSizes[i] / MaxPartSize), 0.33);
+
+				          FRotator Rotation = (MeanLocation - OriginLocation).Rotation();
+				          FTransform Transform(Rotation, MeanLocation,
+				                               FVector(ScaleFactor, ScaleFactor, ScaleFactor));
+				          CalculatedTransforms.Add(Transform);
+			          }
+			          AsyncTask(ENamedThreads::GameThread, [WeakThis, CalculatedTransforms]()
+			          {
+				          // Check if the object still exists we cannot access members, for that we need the strong pointer.
+				          if (WeakThis.IsValid())
 				          {
-					          // Check if the object still exists we cannot access members, for that we need the strong pointer.
-					          if (WeakThis.IsValid())
-					          {
-						          ANomadicVehicle* StrongThis = WeakThis.Get();
-						          StrongThis->M_CreateSmokeTransforms = CalculatedTransforms;
-						          RTSFunctionLibrary::PrintString("InitSmokeLocations:: Rewrite back to game thread");
-					          }
-				          });
+					          ANomadicVehicle* StrongThis = WeakThis.Get();
+					          StrongThis->M_CreateSmokeTransforms = CalculatedTransforms;
+					          RTSFunctionLibrary::PrintString("InitSmokeLocations:: Rewrite back to game thread");
+				          }
 			          });
-		}
-		else
-		{
-			RTSFunctionLibrary::ReportError("Mesh is not CPU Accessible, cannot calculate smoke locations.");
-		}
+		          });
 	}
 	else
 	{
-		RTSFunctionLibrary::ReportError("Building Mesh component or static mesh is not set on vehicle: " + GetName());
+		RTSFunctionLibrary::ReportError("Mesh is not CPU Accessible, cannot calculate smoke locations.");
 	}
 }
 
 void ANomadicVehicle::SetSmokeLocationsToRandomInBox()
 {
-	if (IsValid(BuildingMeshComponent))
+	if (not IsValid(BuildingMeshComponent))
 	{
-		const FBoxSphereBounds MeshBounds = BuildingMeshComponent->CalcBounds(
-			BuildingMeshComponent->GetComponentTransform());
-		const FBox Box = MeshBounds.GetBox();
-		const int32 NumMaterials = BuildingMeshComponent->GetNumMaterials();
+		return;
+	}
 
-		M_CreateSmokeTransforms.Init(FTransform::Identity, NumMaterials);
-		for (FTransform& Transform : M_CreateSmokeTransforms)
-		{
-			Transform.SetLocation(FMath::RandPointInBox(Box));
-		}
+	const FBoxSphereBounds MeshBounds = BuildingMeshComponent->CalcBounds(
+		BuildingMeshComponent->GetComponentTransform());
+	const FBox Box = MeshBounds.GetBox();
+	const int32 NumMaterials = BuildingMeshComponent->GetNumMaterials();
+
+	M_CreateSmokeTransforms.Init(FTransform::Identity, NumMaterials);
+	for (FTransform& Transform : M_CreateSmokeTransforms)
+	{
+		Transform.SetLocation(FMath::RandPointInBox(Box));
 	}
 }
 
