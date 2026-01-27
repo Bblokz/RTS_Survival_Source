@@ -59,11 +59,12 @@ void UPlayerStartLocationManager::OnClickedLocation(const bool bGoToNextLocation
 
 void UPlayerStartLocationManager::OnDecidedToStartAtLocation()
 {
-	if(not GetIsValidStartLocationIndex(M_CurrentStartLocationIndex))
+	APlayerStartLocation* StartLocation = nullptr;
+	if (not GetIsValidStartLocationAtIndex(M_CurrentStartLocationIndex, StartLocation))
 	{
 		return;
 	}
-	OnStartLocationChosen(M_StartLocations[M_CurrentStartLocationIndex].Get()->GetActorLocation());
+	OnStartLocationChosen(StartLocation->GetActorLocation());
 }
 
 
@@ -191,24 +192,40 @@ void UPlayerStartLocationManager::SetInputToFocusWidget(const TObjectPtr<UUserWi
 
 void UPlayerStartLocationManager::NavigateCameraToLocation(const int32 Index)
 {
-	if(not GetIsValidStartLocationIndex(Index) || not EnsureValidPlayerController())
+	APlayerStartLocation* StartLocation = nullptr;
+	if (not GetIsValidStartLocationAtIndex(Index, StartLocation) || not EnsureValidPlayerController())
 	{
 		return;
 	}
 	// Get the location and navigate the camera to it.
-	const FVector StartLocation = M_StartLocations[Index].Get()->GetActorLocation();
-	M_PlayerController->FocusCameraOnStartLocation(StartLocation);
-	Debug_PickedLocation(StartLocation);
+	const FVector StartLocationPosition = StartLocation->GetActorLocation();
+	M_PlayerController->FocusCameraOnStartLocation(StartLocationPosition);
+	Debug_PickedLocation(StartLocationPosition);
 }
 
-bool UPlayerStartLocationManager::GetIsValidStartLocationIndex(const int32 Index) const
+bool UPlayerStartLocationManager::GetIsValidStartLocationAtIndex(
+	const int32 Index,
+	APlayerStartLocation*& OutStartLocation) const
 {
-	if(not M_StartLocations.IsValidIndex(Index))
+	OutStartLocation = nullptr;
+	if (not M_StartLocations.IsValidIndex(Index))
 	{
 		RTSFunctionLibrary::ReportError("Invalid index for start location: " + FString::FromInt(Index) +
-			"\n At function EnsureIsValidStartLocationIndex() in PlayerStartLocationManager.cpp");
+			"\n At function GetIsValidStartLocationAtIndex() in PlayerStartLocationManager.cpp");
 		return false;
 	}
+
+	const TWeakObjectPtr<APlayerStartLocation> StartLocation = M_StartLocations[Index];
+	if (not StartLocation.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_StartLocations[Index]",
+			"GetIsValidStartLocationAtIndex",
+			this);
+		return false;
+	}
+	OutStartLocation = StartLocation.Get();
 	return true;
 }
 

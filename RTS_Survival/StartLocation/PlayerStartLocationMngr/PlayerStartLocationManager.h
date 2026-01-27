@@ -12,6 +12,9 @@ class UW_ChoosePlayerStartLocation;
 class ARTSLandscapeDivider;
 class APlayerStartLocation;
 
+/**
+ * @brief Component that registers start locations and drives the selection flow for the player.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UPlayerStartLocationManager : public UActorComponent
 {
@@ -72,8 +75,15 @@ private:
 	void SetInputToFocusWidget(const TObjectPtr<UUserWidget>& WidgetToFocus) const;
 
 	void NavigateCameraToLocation(const int32 Index);
-	/** @return Whether this index is a valid start location index. */
-	[[nodiscard]] bool GetIsValidStartLocationIndex(const int32 Index) const;
+	/**
+	 * @brief Validates the index and resolves a live start location for navigation or selection.
+	 * @param Index The desired start location index.
+	 * @param OutStartLocation The resolved live start location when valid.
+	 * @return True when the index is valid and the start location is still alive.
+	 */
+	[[nodiscard]] bool GetIsValidStartLocationAtIndex(
+		const int32 Index,
+		APlayerStartLocation*& OutStartLocation) const;
 
 	void OnCouldNotInitStartLocationUI() const;
 
@@ -88,5 +98,4 @@ private:
 	void Debug_MenuReady(const TObjectPtr<UW_ChoosePlayerStartLocation>& StartLocationsWidget) const;
 	void Debug_Message(const FString& Message) const;
 };
-
 

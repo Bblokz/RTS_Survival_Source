@@ -115,5 +115,6 @@ private:
 	// Extracted function to handle move-to-object completion logic.
 	void HandleMoveToObjectComplete();
 
+	UPROPERTY()
 	TObjectPtr<AScavengeableObject> M_TargetScavengeObject;
 };
