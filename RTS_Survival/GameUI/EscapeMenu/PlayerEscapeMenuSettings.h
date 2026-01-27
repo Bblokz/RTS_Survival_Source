@@ -6,6 +6,7 @@
 #include "PlayerEscapeMenuSettings.generated.h"
 
 class UW_EscapeMenu;
+class UW_EscapeMenuKeyBindings;
 class UW_EscapeMenuSettings;
 
 /**
@@ -23,6 +24,9 @@ struct FPlayerEscapeMenuSettings
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "EscapeMenu")
 	TSubclassOf<UW_EscapeMenuSettings> EscapeMenuSettingsClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "EscapeMenu")
+	TSubclassOf<UW_EscapeMenuKeyBindings> EscapeMenuKeyBindingsClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "EscapeMenu|Audio")
 	TObjectPtr<USoundBase> OpenMenuSound = nullptr;

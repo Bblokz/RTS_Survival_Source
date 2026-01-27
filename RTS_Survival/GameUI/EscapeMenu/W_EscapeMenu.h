@@ -33,6 +33,7 @@ private:
 	void BindButtonCallbacks();
 	void BindResumeGameButton();
 	void BindSettingsButton();
+	void BindKeyBindingsButton();
 	void BindArchiveButton();
 	void BindRestartLevelButton();
 	void BindExitToMainMenuButton();
@@ -45,6 +46,9 @@ private:
 
 	UFUNCTION()
 	void HandleSettingsClicked();
+
+	UFUNCTION()
+	void HandleKeyBindingsClicked();
 
 	UFUNCTION()
 	void HandleArchiveClicked();
@@ -68,6 +72,9 @@ private:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ButtonSettings = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ButtonKeyBindings = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ButtonArchive = nullptr;

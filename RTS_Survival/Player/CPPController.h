@@ -98,6 +98,8 @@ class RTS_SURVIVAL_API ACPPResourceMaster;
 class RTS_SURVIVAL_API ASelectablePawnMaster;
 class RTS_SURVIVAL_API ASelectableActorObjectsMaster;
 class RTS_SURVIVAL_API UPlayerProfileLoader;
+class UInputAction;
+class UInputMappingContext;
 
 USTRUCT(BlueprintType)
 struct FPauseGameState
@@ -276,6 +278,20 @@ public:
 
 	void OpenEscapeMenuSettings();
 	void CloseEscapeMenuSettings();
+	void OpenEscapeMenuKeyBindings();
+	void CloseEscapeMenuKeyBindings();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	UInputMappingContext* GetDefaultInputMappingContext() const;
+
+	/**
+	 * @brief Updates a single action binding so UI-driven remaps can take effect immediately.
+	 * @param ActionToRebind Action whose key mapping should change.
+	 * @param OldKey The key currently mapped to the action.
+	 * @param NewKey The newly selected key to apply.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void ChangeKeyBinding(UInputAction* ActionToRebind, const FKey OldKey, const FKey NewKey);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;
@@ -762,6 +778,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "EscapeMenu")
 	FPlayerEscapeMenuSettings PlayerEscapeMenuSettings;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputMappingContext> M_DefaultInputMappingContext = nullptr;
 
 	// Start Location of secondary click.
 	FVector M_SecondaryStartMouseProjectedLocation;
@@ -1478,6 +1497,7 @@ private:
 	bool TryHandleEscapeMenuBuildingModeActive();
 	bool TryHandleEscapeMenuActionButtonActive();
 	bool TryHandleEscapeMenuRotationArrowActive();
+	[[nodiscard]] bool GetIsValidDefaultInputMappingContext() const;
 
 	void InitFowManager();
 
