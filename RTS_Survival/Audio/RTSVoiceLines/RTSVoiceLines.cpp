@@ -42,7 +42,8 @@ USoundBase* FVoiceLineData::GetVoiceLine()
 void FVoiceLineData::ReshuffleVoiceLines(USoundBase* LastPlayedVoiceLine)
 {
 	ValidateVoiceLines();
-	if (LastPlayedVoiceLine != nullptr)
+	const bool bHasValidLastPlayedVoiceLine = IsValid(LastPlayedVoiceLine);
+	if (bHasValidLastPlayedVoiceLine)
 	{
 		// Remove the last played voiceline from the array.
 		VoiceLines.Remove(LastPlayedVoiceLine);
@@ -50,11 +51,12 @@ void FVoiceLineData::ReshuffleVoiceLines(USoundBase* LastPlayedVoiceLine)
 	// Shuffle the array.
 	Algo::RandomShuffle(VoiceLines);
 	// Add the last played voiceline back to the array.
-	if (LastPlayedVoiceLine != nullptr)
+	if (bHasValidLastPlayedVoiceLine)
 	{
 		VoiceLines.Add(LastPlayedVoiceLine);
 	}
 }
+
 
 void FVoiceLineData::ValidateVoiceLines()
 {
@@ -111,7 +113,7 @@ bool FUnitVoiceLinesData::GetVoiceLinesForType(const ERTSVoiceLine VoiceLineType
 bool FAnnouncerVoiceLineData::GetVoiceLinesForType(const EAnnouncerVoiceLineType VoiceLineType,
                                                    FVoiceLineData*& OutVoiceLines)
 {
-	if( FVoiceLineData* Found = VoiceLines.Find(VoiceLineType))
+	if (FVoiceLineData* Found = VoiceLines.Find(VoiceLineType))
 	{
 		OutVoiceLines = Found;
 		return true;

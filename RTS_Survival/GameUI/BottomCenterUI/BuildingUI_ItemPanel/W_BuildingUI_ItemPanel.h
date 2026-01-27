@@ -93,5 +93,6 @@ private:
 	bool GetIsValidConvertToVehicleButton() const;
 	bool GetIsValidCancelVehicleConversionButton() const;
 
+	UPROPERTY()
 	TArray<UW_ItemBuildingExpansion*> M_BxpItems;
 };
