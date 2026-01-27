@@ -50,6 +50,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	bool GetIsValidPlayerController() const;
 	/** @brief The status of all the building expansion items.
 	 * @note contains:
 	 * @note ABuildingExpansion* Expansion, a pointer to the building expansion.

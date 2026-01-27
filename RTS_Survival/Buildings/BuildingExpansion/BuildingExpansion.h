@@ -401,13 +401,6 @@ private:
 	void SetMeshToConstructionMesh();
 
 	/**
-	 * @brief IsValid checks the progress bar widget. 
-	 * @param FunctionName The function at which we perform this check.
-	 * @return true if the progress bar widget is valid.
-	 */
-	bool EnsureProgressBarIsValid(const FString& FunctionName) const;
-
-	/**
 	 * @brief Checks the provided world paramter for validity.
 	 * @param World The world to check. 
 	 * @param FunctionName At what function we call for this check.
@@ -423,12 +416,13 @@ private:
 	 */
 	bool DidKillTargetActorOrTargetNoLongerValid(AActor* TargetActor, AActor* KilledActor);
 
-	/**
-	 * @brief Checks if the building mesh component is valid.
-	 * @param FunctionName The function at which we perform this check.
-	 * @return true if the building mesh component is valid.
-	 */
-	bool EnsureBuildingMeshComponentIsValid(const FString& FunctionName) const;
+	bool GetIsValidBuildingMeshComponent() const;
+	bool GetIsValidProgressBarWidget() const;
+	bool GetIsValidConstructionMesh() const;
+	bool GetIsValidBuildingMesh() const;
+	bool GetIsValidConstructionAnimationMaterial() const;
+
+	void StartFinishMaterialsTimer(const float TotalTime);
 
 	void OnTurretTargetDestroyed(ACPPTurretsMaster* CallingTurret, AActor* DestroyedActor);
 	void OnHullWeaponKilledActor(UHullWeaponComponent* CallingHullWeapon, AActor* DestroyedActor);

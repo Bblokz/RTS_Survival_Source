@@ -5,6 +5,7 @@
 
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
 UBuildingExpansionOwnerComp::UBuildingExpansionOwnerComp(FObjectInitializer const& ObjectInitializer)
@@ -25,18 +26,13 @@ void UBuildingExpansionOwnerComp::UpdateMainGameUIWithStatusChanges(const int In
                                                                     const EBuildingExpansionType NewType,
                                                                     const FBxpConstructionRules& ConstructionRules) const
 {
-	if (M_PlayerController.IsValid())
+	if (not GetIsValidPlayerController())
 	{
-		AActor* ComponentImplementingActor = GetOwner();
-		M_PlayerController->GetMainMenuUI()->RequestUpdateSpecificBuildingExpansionItem(ComponentImplementingActor,
-			NewType, NewStatus, ConstructionRules, IndexBExpansion);
+		return;
 	}
-	else
-	{
-		RTSFunctionLibrary::ReportError("Player controller is null! "
-			"\n at function UpdateMainGameUIWithStatusChanges in BuildingExpansionOwnerComp.cpp"
-			"\n Actor: " + GetOwner()->GetName());
-	}
+	AActor* ComponentImplementingActor = GetOwner();
+	M_PlayerController->GetMainMenuUI()->RequestUpdateSpecificBuildingExpansionItem(ComponentImplementingActor,
+		NewType, NewStatus, ConstructionRules, IndexBExpansion);
 }
 
 void UBuildingExpansionOwnerComp::InitBuildingExpansionComp(ACPPController* NewPlayerController)
@@ -55,9 +51,22 @@ void UBuildingExpansionOwnerComp::InitBuildingExpansionComp(ACPPController* NewP
 		return;
 	}
 	M_PlayerController = Cast<ACPPController>(World->GetFirstPlayerController());
-	if (M_PlayerController.IsValid())
+	if (GetIsValidPlayerController())
 	{
 		return;
 	}
-	RTSFunctionLibrary::ReportError("auto-repair failed!");
+}
+
+bool UBuildingExpansionOwnerComp::GetIsValidPlayerController() const
+{
+	if (M_PlayerController.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_PlayerController",
+		"GetIsValidPlayerController",
+		this);
+	return false;
 }
