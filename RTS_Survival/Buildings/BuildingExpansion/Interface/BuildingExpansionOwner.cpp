@@ -204,6 +204,34 @@ void IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned(
 	{
 		return;
 	}
+	const int32 SpawnedBxpCount = SpawnedBxps.Num();
+	if (SpawnedBxpCount != BxpItemIndices.Num() || SpawnedBxpCount != BxpTypesAndConstructionRules.Num())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Batch bxp spawn data is out of sync in IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned"
+			"\n Spawned bxps: " + FString::FromInt(SpawnedBxps.Num()) +
+			"\n Indices: " + FString::FromInt(BxpItemIndices.Num()) +
+			"\n Types: " + FString::FromInt(BxpTypesAndConstructionRules.Num()));
+		for (const auto EachBxp : SpawnedBxps)
+		{
+			if (not IsValid(EachBxp))
+			{
+				continue;
+			}
+			EachBxp->Destroy();
+		}
+		for (const int32 IndexToReset : BxpItemIndices)
+		{
+			if (BuildingExpansionData.M_TBuildingExpansionItems.IsValidIndex(IndexToReset))
+			{
+				ResetEntryAndUpdateUI(IndexToReset, true);
+				continue;
+			}
+			RTSFunctionLibrary::ReportError("Invalid building expansion index to reset after batch mismatch."
+				"\n See IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned");
+		}
+		return;
+	}
 	if (not IsBuildingAbleToExpand())
 	{
 		// Reset all indices back to packed state!
@@ -212,7 +240,7 @@ void IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned(
 	}
 	// The player controller function that handles bxp entry and ui updates for single loaded instant placement bxps
 	// will here be used on the full batch which is why that function is public.
-	for (int i = 0; i < SpawnedBxps.Num(); ++i)
+	for (int32 i = 0; i < SpawnedBxpCount; ++i)
 	{
 		ABuildingExpansion* Bxp = SpawnedBxps[i];
 		if (not IsValid(Bxp))
@@ -220,7 +248,14 @@ void IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned(
 			RTSFunctionLibrary::ReportError(
 				"Invalid bxp spawned at index: " + FString::FromInt(i) +
 				"\n in IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned");
-			ResetEntryAndUpdateUI(BxpItemIndices[i], true);
+			const int32 ResetIndex = BxpItemIndices[i];
+			if (BuildingExpansionData.M_TBuildingExpansionItems.IsValidIndex(ResetIndex))
+			{
+				ResetEntryAndUpdateUI(ResetIndex, true);
+				continue;
+			}
+			RTSFunctionLibrary::ReportError("Invalid building expansion index after batch spawn failure."
+				"\n See IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned");
 			continue;
 		}
 		const int32 BxpIndex = BxpItemIndices[i];
@@ -244,7 +279,7 @@ void IBuildingExpansionOwner::OnBuildingExpansionCreated(
 	// Get location of actor implementing this interface.
 	const AActor* Owner = Cast<AActor>(this);
 
-	if (!RTSFunctionLibrary::RTSIsValid(BuildingExpansion))
+	if (not RTSFunctionLibrary::RTSIsValid(BuildingExpansion))
 	{
 		RTSFunctionLibrary::ReportError(
 			"Failed to spawn building expansion of owner: " + Owner->GetName() +
@@ -276,15 +311,15 @@ void IBuildingExpansionOwner::OnBuildingExpansionCreated(
 void IBuildingExpansionOwner::DestroyBuildingExpansion(ABuildingExpansion* BuildingExpansion,
                                                        const bool bDestroyPackedBxp)
 {
-	if (IsValid(BuildingExpansion))
+	if (not IsValid(BuildingExpansion))
 	{
-		OnBuildingExpansionDestroyed(BuildingExpansion, bDestroyPackedBxp);
-		BuildingExpansion->Destroy();
+		RTSFunctionLibrary::ReportError("Building expansion is null! or invalid!"
+			"\n At function DestroyBuildingExpansion in BuildingExpansionOwner.cpp"
+			"\n Owner: " + GetOwnerName());
 		return;
 	}
-	RTSFunctionLibrary::ReportError("Building expansion is null! or invalid!"
-		"\n At function DestroyBuildingExpansion in BuildingExpansionOwner.cpp"
-		"\n Owner: " + GetOwnerName());
+	OnBuildingExpansionDestroyed(BuildingExpansion, bDestroyPackedBxp);
+	BuildingExpansion->Destroy();
 }
 
 void IBuildingExpansionOwner::UpdateExpansionData(
@@ -392,7 +427,7 @@ TArray<FName> IBuildingExpansionOwner::GetOccupiedSocketNames(const int32 Expans
 		if (MyConstructionRules.SocketName == NAME_None &&
 			MyConstructionRules.ConstructionType == EBxpConstructionType::Socket)
 		{
-			if (not Index == ExpansionSlotToIgnore)
+			if (Index != ExpansionSlotToIgnore)
 			{
 				Error_BxpSetToSocketNoName(EachBxpItem.Expansion);
 				continue;
@@ -471,24 +506,41 @@ void IBuildingExpansionOwner::InitBuildingExpansionEntry(
 	const EBuildingExpansionStatus BuildingExpansionStatus,
 	ABuildingExpansion* BuildingExpansion) const
 {
-	if (IsValid(BuildingExpansion))
+	UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
+	if (not BuildingExpansionData.M_TBuildingExpansionItems.IsValidIndex(BuildingExpansionIndex))
 	{
-		UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
-		BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].Expansion = BuildingExpansion;
-		BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].ExpansionType =
-			BxpConstructionRulesAndType.
-			ExpansionType;
-		BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].ExpansionStatus =
-			BuildingExpansionStatus;
-		// After spawning the bxp data array has now been updated with the construction rules of this bxp.
-		BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].BxpConstructionRules =
-			BxpConstructionRulesAndType.BxpConstructionRules;
+		RTSFunctionLibrary::ReportError(
+			"Invalid building expansion index when initializing entry!"
+			"\n See IBuildingExpansionOwner::InitBuildingExpansionEntry");
+		return;
 	}
+	if (not IsValid(BuildingExpansion))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Attempted to init a building expansion entry with an invalid building expansion!"
+			"\n See IBuildingExpansionOwner::InitBuildingExpansionEntry");
+		return;
+	}
+	BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].Expansion = BuildingExpansion;
+	BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].ExpansionType =
+		BxpConstructionRulesAndType.ExpansionType;
+	BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].ExpansionStatus =
+		BuildingExpansionStatus;
+	// After spawning the bxp data array has now been updated with the construction rules of this bxp.
+	BuildingExpansionData.M_TBuildingExpansionItems[BuildingExpansionIndex].BxpConstructionRules =
+		BxpConstructionRulesAndType.BxpConstructionRules;
 }
 
 void IBuildingExpansionOwner::ResetEntryAndUpdateUI(const int32 Index, const bool bResetForPackedUpExpansion) const
 {
 	UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
+	if (not BuildingExpansionData.M_TBuildingExpansionItems.IsValidIndex(Index))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid building expansion index when resetting entry!"
+			"\n See IBuildingExpansionOwner::ResetEntryAndUpdateUI");
+		return;
+	}
 	// If we destroy a packed expansion we set the status to packed.
 	const EBuildingExpansionStatus Status = bResetForPackedUpExpansion
 		                                        ? EBuildingExpansionStatus::BXS_PackedUp
@@ -638,10 +690,11 @@ void IBuildingExpansionOwner::BatchBxp_OnBuildingCanNoLongerExpand(
 	}
 	for (auto EachBxp : SpawnedBxps)
 	{
-		if (IsValid(EachBxp))
+		if (not IsValid(EachBxp))
 		{
-			EachBxp->Destroy();
+			continue;
 		}
+		EachBxp->Destroy();
 	}
 	const UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
 	for (const auto Index : IndicesToReset)
