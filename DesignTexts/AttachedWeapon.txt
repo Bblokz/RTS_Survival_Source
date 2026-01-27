@@ -1,14 +1,60 @@
 ﻿you need to implement a new type of component called AttachedWeaponAbilityComponent
 it will be identified with the a new Eability Id called IdAttachedWeapon
 this component will use mechanics a bit similar to the Aimability component where it will use the player 
-aim aimability on the second action button click to aim this weapon but instead of relying on weapons already mounted by a tank
+aim aimability on the second action button click to aim this weapon but instead of relying on weapons already mounted by a tank, building expansion
 or aircraft (this component will not be implemented for squad controllers) it will setup a new weapon using either
-a mesh as provided by the blueprint that has this component added calling the initWithExistingMesh funtion with a mesh 
+a mesh as provided by the blueprint that has this component added calling the initWithExistingMesh function with a mesh 
 of that bluerpint on this component 
 OR it will have the component spawn a new weapon mesh that will serve as the weapon mesh.
 
 The component needs to Implement IWeaponOwner so the weapon that is spawned can treat it as one.
 the weapons are then spawned through the bp callable Setup functions from IWeaponOwner (note: it must be possible to setup multiple
 weapons with the same component!)
+
+to identify the sub-type of this ability define a new enum in its own filed called EAttachWeaponAbilitySubType with entries:
+Pz38AttachedMortarDefault, KingTigerAttachedRocketBarrage
+
+IMPORTANT NOTE:  the iweapon owner functiosn like
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters) = 0;
+Expect a weapon mesh to be provided with their setup. in the case that the designer has set this weapon ability comp to spawn its own mesh we first check if that mesh
+is valid and overwrite the InitState... struct of every SetupFunction to use for the weapon instead of the one provided with the struct which we assume to be null.
+because the setup functions are called in the bluerpint that implements this weapon, on this struct it is possible that the designer forgot to fist call
+the correct init function for this component (Either the one with existing mesh or the one that spawns a new mesh) before calling the setup functions; if that is the case error report and
+wait with spawning the weapon and initializing it untill the  init function has been called.
+
+you need to RTSFunctionLibrary::ReportError if this weapon ability comp was set to use an existing mesh but none is provided in the setup params for the weapon.
+you also need to error report if the component was initialized to use a spawned mesh but the spawned mesh is invalid and so we cannot init the weapon with a valid mesh.
+
+
+
+
+The settings struct (BP friendly like FAimAbilitySettings is) will contain:
+Note that no static mesh class is set here that is only provided with  that special init function.
+- EAttachWeaponAbilitySubType WeaponAbilityType
+- UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 PreferredAbilityIndex = INDEX_NONE;
+
+	// How long the ability is on cooldown after use.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Cooldown = 5;
+
+	// Aim assist material type shown on the player aim ability.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPlayerAimAbilityTypes AimAssistType = EPlayerAimAbilityTypes::None;
+	
+	// the radius of the ability effect.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Radius = 300;
+	
+
+
+make sure that you completely implemented:
+- the new component
+- the direct action button and second click action button functions in the cpp contoller (again relay this ability
+only to the selected pawns and selected actors; not the squad controllers)
+- the execute and terminate of the Ability are fully implemented in tank master, aircraft master and the ABuildingExpansion.
+
+
 
 
