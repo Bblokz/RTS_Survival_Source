@@ -15,6 +15,18 @@ class UInputMappingContext;
 class UW_KeyBindingPopup;
 class UInputAction;
 
+USTRUCT(BlueprintType)
+struct FEscapeMenuKeyBindingEntryData
+
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UW_EscapeMenuKeyBindingEntry> EntryWidget = nullptr;
+	FString ActionDisplayName;
+};
+
+
 /**
  * @brief Escape menu panel that builds a list of key binding entries for runtime remapping.
  *
@@ -43,12 +55,6 @@ protected:
 	TSubclassOf<UW_KeyBindingPopup> M_KeyBindingPopupClass;
 
 private:
-	struct FEscapeMenuKeyBindingEntryData
-	{
-		TObjectPtr<UW_EscapeMenuKeyBindingEntry> EntryWidget = nullptr;
-		FString ActionDisplayName;
-	};
-
 	void BindButtonCallbacks();
 	void BindBackButton();
 	void BindSearchBar();
@@ -218,7 +224,6 @@ private:
 	UPROPERTY(Transient)
 	TMap<FName, TWeakObjectPtr<UInputAction>> M_ActionNameToAction;
 
-	UPROPERTY(Transient)
 	TMap<FName, FKey> M_SpecialActionKeyBindings;
 
 	UPROPERTY(Transient)

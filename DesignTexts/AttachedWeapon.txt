@@ -1,0 +1,14 @@
+﻿you need to implement a new type of component called AttachedWeaponAbilityComponent
+it will be identified with the a new Eability Id called IdAttachedWeapon
+this component will use mechanics a bit similar to the Aimability component where it will use the player 
+aim aimability on the second action button click to aim this weapon but instead of relying on weapons already mounted by a tank
+or aircraft (this component will not be implemented for squad controllers) it will setup a new weapon using either
+a mesh as provided by the blueprint that has this component added calling the initWithExistingMesh funtion with a mesh 
+of that bluerpint on this component 
+OR it will have the component spawn a new weapon mesh that will serve as the weapon mesh.
+
+The component needs to Implement IWeaponOwner so the weapon that is spawned can treat it as one.
+the weapons are then spawned through the bp callable Setup functions from IWeaponOwner (note: it must be possible to setup multiple
+weapons with the same component!)
+
+
