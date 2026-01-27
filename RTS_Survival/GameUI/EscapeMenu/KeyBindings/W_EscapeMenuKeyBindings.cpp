@@ -397,11 +397,6 @@ void UW_EscapeMenuKeyBindings::OpenKeyBindingPopupForActionName(const FName& Act
 	}
 
 	const FKey CurrentKey = GetCurrentKeyForAction(ActionName);
-	if (not CurrentKey.IsValid())
-	{
-		RTSFunctionLibrary::ReportError("Key binding popup failed to find a valid key for the selected action.");
-		return;
-	}
 
 	if (M_KeyBindingPopup == nullptr)
 	{
@@ -526,6 +521,28 @@ TArray<FString> UW_EscapeMenuKeyBindings::GetUnboundActionNames() const
 	}
 
 	return UnboundActions;
+}
+
+bool UW_EscapeMenuKeyBindings::TryGetFirstUnboundActionName(FName& OutActionName) const
+{
+	for (const TPair<FName, TObjectPtr<UW_EscapeMenuKeyBindingEntry>>& EntryPair : M_ActionNameToEntry)
+	{
+		const UW_EscapeMenuKeyBindingEntry* EntryWidget = EntryPair.Value;
+		if (not IsValid(EntryWidget))
+		{
+			continue;
+		}
+
+		if (EntryWidget->GetIsKeyBound())
+		{
+			continue;
+		}
+
+		OutActionName = EntryPair.Key;
+		return true;
+	}
+
+	return false;
 }
 
 FName UW_EscapeMenuKeyBindings::GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const
@@ -990,5 +1007,31 @@ void UW_EscapeMenuKeyBindings::HandlePopupConfirmExitRequested()
 
 void UW_EscapeMenuKeyBindings::HandlePopupCancelExitRequested()
 {
-	CloseKeyBindingPopup();
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	FName UnboundActionName = NAME_None;
+	if (not TryGetFirstUnboundActionName(UnboundActionName))
+	{
+		CloseKeyBindingPopup();
+		return;
+	}
+
+	UInputAction* ActionToBind = GetInputActionByName(UnboundActionName);
+	if (not IsValid(ActionToBind))
+	{
+		CloseKeyBindingPopup();
+		return;
+	}
+
+	EnsureKeyBindingPopupVisible();
+	if (M_KeyBindingPopup == nullptr)
+	{
+		return;
+	}
+
+	const FKey CurrentKey = GetCurrentKeyForAction(UnboundActionName);
+	M_KeyBindingPopup->SetupPopup(M_PlayerController.Get(), ActionToBind, CurrentKey);
 }

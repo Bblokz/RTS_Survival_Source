@@ -74,6 +74,7 @@ private:
 	void BindKeyBindingPopupCallbacks();
 	FString BuildUnboundActionsWarningText(const TArray<FString>& UnboundActionNames) const;
 	TArray<FString> GetUnboundActionNames() const;
+	bool TryGetFirstUnboundActionName(FName& OutActionName) const;
 
 	FName GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const;
 	FString GetActionDisplayName(const FName& ActionName) const;
