@@ -125,18 +125,135 @@ AMissionManager* UMissionBase::GetMissionManagerChecked() const
 	return M_MissionManager.Get();
 }
 
+TArray<FTrainingOption> UMissionBase::GetTrainingOptionsDifficultyAdjusted(TArray<FTrainingOption> EasyOptions,
+                                                                           TArray<FTrainingOption> NormalOptions,
+                                                                           TArray<FTrainingOption> HardOptions,
+                                                                           TArray<FTrainingOption> BrutalOptions,
+                                                                           TArray<FTrainingOption> IronmanOptions) const
+{
+	if(not GetGameDifficulty().bIsInitialized)
+	{
+		RTSFunctionLibrary::ReportError("Mission attempted to get training options but game difficulty is not initialized!"
+			"\n Mission : " + GetName());
+	}
+	if (GetIsGameDifficultyIronMan())
+	{
+		return IronmanOptions;
+	}
+	if (GetIsGameDifficultyBrutalOrHigher())
+	{
+		return BrutalOptions;
+	}
+	if (GetIsGameDifficultyHardOrHigher())
+	{
+		return HardOptions;
+	}
+	if (GetIsGameDifficultyNormalOrHigher())
+	{
+		return NormalOptions;
+	}
+	return EasyOptions;
+}
+
+bool UMissionBase::CreateSingleAttackMoveDifficultyConditional(ERTSGameDifficulty MinimalDifficulty,
+                                                               TArray<FVector> SpawnLocations,
+                                                               TArray<FTrainingOption> TrainingOptions,
+                                                               TArray<FVector> WayPoints,
+                                                               FRotator FinalRotation,
+                                                               const int32 MaxFormationWidth, float TimeTillWave,
+                                                               const float FormationOffsetMultiplier,
+                                                               const float HelpOffsetRadiusMltMax,
+                                                               const float HelpOffsetRadiusMltMin,
+                                                               const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+                                                               const int32 MaxTriesFindNavPointForHelpOffset,
+                                                               const float ProjectionScale)
+{
+	AEnemyController* EnemyController = GetEnemyControllerChecked();
+	if (not EnemyController)
+	{
+		return false;
+	}
+	if (not GetIsDifficultyAtLeast(MinimalDifficulty) )
+	{
+		return false;
+	}
+	if(TrainingOptions.IsEmpty() || SpawnLocations.IsEmpty() || WayPoints.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("Mission attempted to create single attack move wave but one of the required arrays is empty!"
+			"\n Mission : " + GetName());
+		return false;
+	}
+
+	TArray<FAttackWaveElement> WaveElements;
+	for (const FVector& EachSpawnLocation : SpawnLocations)
+	{
+		FAttackWaveElement NewWaveElement;
+		NewWaveElement.SpawnLocation = EachSpawnLocation;
+		NewWaveElement.UnitOptions = TrainingOptions;
+		WaveElements.Add(NewWaveElement);
+	}
+	EnemyController->CreateSingleAttackMoveWave(
+		EEnemyWaveType::Wave_NoOwningBuilding,
+		WaveElements,
+		WayPoints,
+		FinalRotation,
+		MaxFormationWidth ,
+		TimeTillWave ,
+		nullptr,
+		FormationOffsetMultiplier,
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale);
+	return true;
+}
+
+
 FRTSGameDifficulty UMissionBase::GetGameDifficulty() const
 {
-	if(not GetIsValidMissionManager())
+	if (not GetIsValidMissionManager())
 	{
 		return FRTSGameDifficulty();
 	}
 	return M_MissionManager->GetCurrentGameDifficulty();
 }
 
+bool UMissionBase::GetIsGameDifficultyNormalOrHigher() const
+{
+	return GetGameDifficulty().IsNormalOrHigher();
+}
+
+bool UMissionBase::GetIsGameDifficultyHardOrHigher() const
+{
+	return GetGameDifficulty().IsHardOrHigher();
+}
+
+bool UMissionBase::GetIsGameDifficultyBrutalOrHigher() const
+{
+	return GetGameDifficulty().IsBrutalOrHigher();
+}
+
+bool UMissionBase::GetIsGameDifficultyIronMan() const
+{
+	return GetGameDifficulty().IsIronman();
+}
+
+bool UMissionBase::GetIsDifficultyAtLeast(const ERTSGameDifficulty DifficultyLevel) const
+{
+	if (not GetGameDifficulty().bIsInitialized)
+	{
+		RTSFunctionLibrary::ReportError("Mission attempted to get game difficulty but it is not initialized!"
+			"\n Mission : " + GetName());
+		return false;
+	}
+	return GetGameDifficulty().DifficultyLevel >= DifficultyLevel;
+}
+
+
 AEnemyController* UMissionBase::GetEnemyControllerChecked() const
 {
-	if(AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(M_MissionManager.Get()))
+	if (AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(M_MissionManager.Get()))
 	{
 		return EnemyController;
 	}
@@ -168,10 +285,10 @@ void UMissionBase::PlaySound2D(USoundBase* SoundToPlay) const
 void UMissionBase::PlayPortrait(const ERTSPortraitTypes PortraitType, USoundBase* VoiceLine) const
 {
 	const auto PlayerPortraitManager = FRTS_Statics::GetPlayerPortraitManager(this);
-	if(not PlayerPortraitManager)
+	if (not PlayerPortraitManager)
 	{
 		RTSFunctionLibrary::ReportError("Mission attempted to play portrait but player portrait manager is not valid!"
-								  "\n Mission : " + GetName());
+			"\n Mission : " + GetName());
 		return;
 	}
 	PlayerPortraitManager->PlayPortrait(PortraitType, VoiceLine);
@@ -179,12 +296,12 @@ void UMissionBase::PlayPortrait(const ERTSPortraitTypes PortraitType, USoundBase
 
 void UMissionBase::PlayPlayerAnnouncerLine(const EAnnouncerVoiceLineType AnnouncerLineType) const
 {
-	if(not GetIsValidMissionManager())
+	if (not GetIsValidMissionManager())
 	{
 		return;
 	}
 	const auto PlayerAudioController = FRTS_Statics::GetPlayerAudioController(M_MissionManager.Get());
-	if(not PlayerAudioController)
+	if (not PlayerAudioController)
 	{
 		return;
 	}
@@ -308,7 +425,7 @@ AActor* UMissionBase::FindActorInRange(
 
 void UMissionBase::RegisterCallbackOnDestructibleCollapse(ADestructableEnvActor* ActorToTrackWhenCollapse)
 {
-	if(not IsValid(ActorToTrackWhenCollapse))
+	if (not IsValid(ActorToTrackWhenCollapse))
 	{
 		return;
 	}
@@ -368,7 +485,7 @@ void UMissionBase::RegisterCallbackOnTankDies(ATankMaster* Tank)
 
 void UMissionBase::DiginFortifyVehicleOverTime(ATankMaster* Tank, const float TimeTillStartDigIn, const int32 ID)
 {
-	if (not EnsureTankIsValid(Tank) || TimeTillStartDigIn <= 0.0f )
+	if (not EnsureTankIsValid(Tank) || TimeTillStartDigIn <= 0.0f)
 	{
 		return;
 	}
@@ -389,7 +506,6 @@ void UMissionBase::DiginFortifyVehicleOverTime(ATankMaster* Tank, const float Ti
 	}
 	FTimerHandle TimerHandle;
 	World->GetTimerManager().SetTimer(TimerHandle, MissionCallBack, TimeTillStartDigIn, false);
-	
 }
 
 void UMissionBase::RegisterCallBackOnPickUpWeapon(ASquadController* SquadController)
@@ -507,7 +623,8 @@ void UMissionBase::AsyncSpawnActor(
 		return;
 	}
 	M_MapIdToRotation.Add(ID, SpawnPointActor->GetActorRotation());
-	M_RTSAsyncSpawner->AsyncSpawnOptionAtLocation(TrainingOption, SpawnPointActor->GetActorLocation() + FVector(0,0,50), this, ID,
+	M_RTSAsyncSpawner->AsyncSpawnOptionAtLocation(TrainingOption,
+	                                              SpawnPointActor->GetActorLocation() + FVector(0, 0, 50), this, ID,
 	                                              [this](const FTrainingOption& Option, AActor* SpawnedActor,
 	                                                     const int32 ID)-> void
 	                                              {

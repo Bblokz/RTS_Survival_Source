@@ -62,6 +62,9 @@ public:
 
 	void MoveToLocationWithGoalAcceptance(const FVector Location);
 
+	// Ensures harvesters keep UE blocked-move detection disabled throughout harvesting.
+	void SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress);
+
 	virtual void SetDefaultQueryFilter(const TSubclassOf<UNavigationQueryFilter> NewDefaultFilter) override final;
 protected:
 

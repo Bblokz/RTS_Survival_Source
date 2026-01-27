@@ -122,6 +122,9 @@ public:
 
 	inline float GetGoalAcceptanceRadius() const { return VehicleGoalAcceptanceRadius; }
 
+	// Prevents re-enabling blocked-move detection while a harvester override is active.
+	void SetEngineBlockDetectionSuppressionLock(const bool bShouldLock);
+
 
 	/* Returns the agents controlled pawn */
 	APawn* GetValidControlledPawn();
@@ -718,6 +721,9 @@ private:
 
 	// Tracks whether we currently have UE's blocked-move detection disabled due to an intentional wait.
 	bool bM_IsEngineBlockDetectionSuppressed = false;
+
+	// Blocks other systems from re-enabling UE blocked-move detection during a harvester override.
+	bool bM_IsEngineBlockDetectionSuppressionLocked = false;
 
 	// Toggles UE's internal blocked-move detection (idempotent; safe to call every frame).
 	void SetEngineBlockDetectionSuppressed(const bool bShouldBeSuppressed);

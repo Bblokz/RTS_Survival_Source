@@ -758,19 +758,19 @@ namespace DeveloperSettings
 			// Nomadic Trucks Health settings.
 
 			// The most durable nomadic vehicle.
-			inline constexpr float NomadicHQTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
+			inline constexpr float NomadicHQTruckHealth = RoundToNearestMultipleOfFive(5000 * OverallHealthMlt);
 			// More health in base mode; takes 10 heavy tank shots to destroy.
-			inline constexpr float NomadicHQBuildingHealth = RoundToNearestMultipleOfFive(10 * OneHeavyTankShotHp);
-			inline constexpr float T1NomadicTruckHealth = RoundToNearestMultipleOfFive(400 * OverallHealthMlt);
-			inline constexpr float T1NomadicBuildingHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
-			inline constexpr float T2NomadicTruckHealth = RoundToNearestMultipleOfFive(600 * OverallHealthMlt);
-			inline constexpr float T2NomadicBuildingHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
-			inline constexpr float T3NomadicTruckHealth = RoundToNearestMultipleOfFive(800 * OverallHealthMlt);
-			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
+			inline constexpr float NomadicHQBuildingHealth = RoundToNearestMultipleOfFive(10000 * OverallHealthMlt);
+			inline constexpr float T1NomadicTruckHealth = RoundToNearestMultipleOfFive(800 * OverallHealthMlt);
+			inline constexpr float T1NomadicBuildingHealth = RoundToNearestMultipleOfFive(4000 * OverallHealthMlt);
+			inline constexpr float T2NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
+			inline constexpr float T2NomadicBuildingHealth = RoundToNearestMultipleOfFive(6000 * OverallHealthMlt);
+			inline constexpr float T3NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
+			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive( 8000 * OverallHealthMlt);
 
 			// Building expansions health settings.
-			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(500 * OverallHealthMlt);
-			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(850 * OverallHealthMlt);
+			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(700 * OverallHealthMlt);
+			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1000* OverallHealthMlt);
 			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
 			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500 * OverallHealthMlt);
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
@@ -1294,7 +1294,7 @@ namespace DeveloperSettings
 		inline constexpr float ZoomSpeed = 150.f;
 		inline constexpr float CameraPanSpeed = 5.f;
 		// 25 degrees to make skybox not visible.
-		inline constexpr float CameraPitchLimit = 25.f;
+		inline constexpr float CameraPitchLimit = 18.f;
 		inline constexpr float DefaultCameraMovementSpeed = 15.f;
 		inline static float ModifierCameraMovementSpeed = 1.f;
 		// How long the player needs to hover an actor to get the hover popup.
@@ -1425,7 +1425,7 @@ namespace DeveloperSettings
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
 		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
 		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
-		constexpr bool GPathFindingCosts_Compile_DebugSymbols = true;
+		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
 		// Wheel Animation

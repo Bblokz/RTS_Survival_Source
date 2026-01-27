@@ -946,7 +946,6 @@ void UHarvester::AsyncOnReceivedDropOffs(const TArray<TWeakObjectPtr<UResourceDr
 	}
 	for (auto EachDropOff : DropOffs)
 	{
-		OnNoDropOffsFound_DisplayMessage();		
 		if (!EachDropOff.IsValid() || !EachDropOff->GetIsDropOffActive())
 		{
 			continue;
@@ -959,6 +958,8 @@ void UHarvester::AsyncOnReceivedDropOffs(const TArray<TWeakObjectPtr<UResourceDr
 		HarvestAIExecuteAction(EHarvesterAIAction::MoveToDropOff);
 		return;
 	}
+		OnNoDropOffsFound_DisplayMessage();		
+	
 	HarvestDebug("No valid drop-off available; terminate harvest command", FColor::Red);
 	HarvestAIExecuteAction(EHarvesterAIAction::FinishHarvestCommand);
 }

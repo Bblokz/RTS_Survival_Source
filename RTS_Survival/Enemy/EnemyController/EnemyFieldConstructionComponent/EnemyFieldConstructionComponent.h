@@ -19,7 +19,9 @@ enum class EFieldConstructionStrategy : uint8
 	None,
 	VsTanks,
 	VsInfantry,
-	VsMixed
+	VsMixed,
+	MinesOnly,
+	HedgehogsOnly
 };
 
 USTRUCT()

@@ -231,11 +231,7 @@ protected:
 	virtual void OnUnitIdleAndNoNewCommands() override final;
 	virtual void TerminateMoveCommand() override;
 
-	UPROPERTY(BlueprintReadWrite)
-	float TruckMaxHealth;
 
-	UPROPERTY(BlueprintReadWrite)
-	float BuildingMaxHealth;
 
 
 	// Static Mesh for the building representation
@@ -408,7 +404,19 @@ protected:
 		TMap<ERTSResourceType, FResourceStorageLevels> HighToLowLevelsPerResource,
 		TMap<ERTSResourceType, FName> ResourceToSocketMap);
 
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetupNomadicHealthData(FResistanceAndDamageReductionData TruckHealthData,
+	                            FResistanceAndDamageReductionData BuildingHealthData,
+	                            const float TruckMaxHealth,
+	                            const float BuildingMaxHealth);
 private:
+
+	FResistanceAndDamageReductionData M_TruckHealthData;
+	FResistanceAndDamageReductionData M_BuildingHealthData;
+	float M_TruckMaxHealth;
+	float M_BuildingMaxHealth;
+	
 	/** For each resource type supported this map contains the array of levels from high to low for that resource,
 	*  Where each level is an integer determining the percentage of resources filled at which the mesh is placed.
 	* @note The resource visualisation is Restored once the vehicle finished converting into a building.

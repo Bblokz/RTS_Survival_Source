@@ -111,7 +111,7 @@ public:
 	// Is not used for regular missions.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BaseSettings")
 	float TextOnlyMissionDuration = 5.0f;
-	
+
 	// If set to true the mission will display as title first and the user needs to expand the widget to read the desc.
 	// and or to click the next button on TextOnlyMissions.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BaseSettings")
@@ -133,8 +133,49 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AMissionManager* GetMissionManagerChecked() const;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	TArray<FTrainingOption> GetTrainingOptionsDifficultyAdjusted(TArray<FTrainingOption> EasyOptions,
+	                                                             TArray<FTrainingOption> NormalOptions,
+	                                                             TArray<FTrainingOption> HardOptions,
+	                                                             TArray<FTrainingOption> BrutalOptions,
+	                                                             TArray<FTrainingOption> IronmanOptions) const;
+
+	// Only creates if the current game difficulty is at least the minimal difficulty specified.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	FRTSGameDifficulty GetGameDifficulty()const;
+	bool CreateSingleAttackMoveDifficultyConditional(
+		ERTSGameDifficulty MinimalDifficulty,
+		TArray<FVector> SpawnLocations,
+		TArray<FTrainingOption> TrainingOptions,
+		TArray<FVector> WayPoints,
+		FRotator FinalRotation = FRotator::ZeroRotator,
+		const int32 MaxFormationWidth = 2,
+		float TimeTillWave = 0.f,
+		const float FormationOffsetMultiplier = 1.f,
+		const float HelpOffsetRadiusMltMax = 1.5,
+		const float HelpOffsetRadiusMltMin = 1.2,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint = 0.f,
+		const int32 MaxTriesFindNavPointForHelpOffset = 3,
+		const float ProjectionScale = 1.f);
+
+
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	FRTSGameDifficulty GetGameDifficulty() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	bool GetIsGameDifficultyNormalOrHigher() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	bool GetIsGameDifficultyHardOrHigher() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	bool GetIsGameDifficultyBrutalOrHigher() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	bool GetIsGameDifficultyIronMan() const;
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	bool GetIsDifficultyAtLeast(const ERTSGameDifficulty DifficultyLevel) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AEnemyController* GetEnemyControllerChecked() const;
@@ -147,24 +188,24 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Sounds")
 	void PlayPortrait(ERTSPortraitTypes PortraitType, USoundBase* VoiceLine) const;
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Sounds")
 	void PlayPlayerAnnouncerLine(EAnnouncerVoiceLineType AnnouncerLineType) const;
-	
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Cinematics")
 	bool OnCinematicTakeOverFromMission(const bool bCinematicStarted) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void AddArchiveItem(const ERTSArchiveItem ItemType, const FTrainingOption OptionalUnit = FTrainingOption(),
-                       	                       const int32 SortingPriority = 0, const float NotificationTime = 20) const;
+	                    const int32 SortingPriority = 0, const float NotificationTime = 20) const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="FindUnits")
 	AActor* FindActorInRange(
 		const FVector Location,
 		const float Range,
 		const TSubclassOf<AActor> ActorClasses,
 		const bool bFindClosest = false, const bool bFindPlayerUnits = true);
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnDestructibleCollapse(ADestructableEnvActor* ActorToTrackWhenCollapse);
 
@@ -183,7 +224,7 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackNomadicVehicle(ANomadicVehicle* NomadicVehicle, const bool bCallBackOnBuildingConversion);
 
-		UFUNCTION(BlueprintCallable, NotBlueprintable)
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnTankDies(ATankMaster* Tank);
 
 	UFUNCTION(BlueprintImplementableEvent)
@@ -198,19 +239,19 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackTankDigIn(ATankMaster* Tank, const int32 ID);
 
-	 UFUNCTION(BlueprintCallable, NotBlueprintable)
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallBackOnPickUpWeapon(ASquadController* SquadController);
-	
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackSquadPickupWeapon(ASquadController* SquadController);
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Mission")
 	void DestroyActorsInRange(
 		float Range,
 		const TArray<TSubclassOf<AActor>>& ActorClasses,
 		const FVector& Location);
 
-		virtual auto OnMissionStart() -> void;
+	virtual auto OnMissionStart() -> void;
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionStart();
@@ -239,15 +280,17 @@ protected:
 	void AsyncSpawnActor(const FTrainingOption& TrainingOption, const int32 ID, AActor*
 	                     SpawnPointActor);
 
-	
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "SpawnCreateActor")
-	void AsyncSpawnActorAtLocation(const FTrainingOption& TrainingOption, const int32 ID, const FVector SpawnLocation, const FRotator Rotation);
-	
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "SpawnCreateActor")
-	void AsyncSpawnActorAtLocationWithDelay(const FTrainingOption& TrainingOption, const int32 ID, const FVector SpawnLocation, const FRotator Rotation,
-		const float Delay);
-	
+	void AsyncSpawnActorAtLocation(const FTrainingOption& TrainingOption, const int32 ID, const FVector SpawnLocation,
+	                               const FRotator Rotation);
+
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "SpawnCreateActor")
+	void AsyncSpawnActorAtLocationWithDelay(const FTrainingOption& TrainingOption, const int32 ID,
+	                                        const FVector SpawnLocation, const FRotator Rotation,
+	                                        const float Delay);
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnAsyncSpawnComplete(const FTrainingOption TrainingOption, AActor* SpawnedActor, const int32 ID);
 
@@ -306,5 +349,4 @@ private:
 	FTimerHandle M_TextOnlyDurationHandle;
 
 	void TextOnlyMission_SetAutoCompleteTimer();
-
 };
