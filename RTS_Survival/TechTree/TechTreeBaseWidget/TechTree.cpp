@@ -21,7 +21,7 @@ void UTechTree::NativeConstruct()
 	bIsPanning = false;
 
 	// Ensure that TechTreeCanvas is valid
-	if (!TechTreeCanvas)
+	if (not TechTreeCanvas)
 	{
 		UE_LOG(LogTemp, Error, TEXT("TechTreeCanvas is null in UTechTree::NativeConstruct"));
 		return;
@@ -114,7 +114,7 @@ FReply UTechTree::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPoin
 void UTechTree::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	if(!IsValid(TechTreeCanvas))
+	if (not IsValid(TechTreeCanvas))
 	{
 		return;
 	}
@@ -157,25 +157,78 @@ void UTechTree::SetupResources(TArray<UW_PlayerResource*> TResourceWidgets)
 		ERTSResourceType::Blueprint_Construction
 	};
 
-	// get first playercontroller
-	if (!IsValid(M_PlayerController))
+	const int32 NumResourceTypes = ResourcesLeftToRight.Num();
+	const int32 NumResourceWidgets = TResourceWidgets.Num();
+	if (NumResourceWidgets != NumResourceTypes)
 	{
-		M_PlayerController = Cast<ACPPController>(UGameplayStatics::GetPlayerController(this, 0));
-		if (!IsValid(M_PlayerController))
-		{
-			return;
-		}
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("UTechTree::SetupResources expects %d widgets but received %d."),
+			NumResourceTypes,
+			NumResourceWidgets));
 	}
-	if (UPlayerResourceManager* PlayerResourceManager = M_PlayerController->GetPlayerResourceManager(); IsValid(
-		PlayerResourceManager))
+
+	if (not GetIsValidPlayerController())
 	{
-		for (int i = 0; i < TResourceWidgets.Num(); ++i)
-		{
-			TResourceWidgets[i]->InitUwPlayerResource(PlayerResourceManager, ResourcesLeftToRight[i]);
-		}
 		return;
 	}
-	RTSFunctionLibrary::ReportError("Could not access UPlayerResourceManager for UTechTree::SetupResources");
+
+	ACPPController* PlayerController = M_PlayerController.Get();
+	if (not IsValid(PlayerController))
+	{
+		RTSFunctionLibrary::ReportError("Player controller invalid during UTechTree::SetupResources.");
+		return;
+	}
+
+	UPlayerResourceManager* PlayerResourceManager = PlayerController->GetPlayerResourceManager();
+	if (not IsValid(PlayerResourceManager))
+	{
+		RTSFunctionLibrary::ReportError("Could not access UPlayerResourceManager for UTechTree::SetupResources.");
+		return;
+	}
+
+	const int32 NumToInitialize = FMath::Min(NumResourceWidgets, NumResourceTypes);
+	for (int32 ResourceIndex = 0; ResourceIndex < NumToInitialize; ++ResourceIndex)
+	{
+		if (not IsValid(TResourceWidgets[ResourceIndex]))
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("UTechTree::SetupResources widget at index %d is invalid."),
+				ResourceIndex));
+			continue;
+		}
+		TResourceWidgets[ResourceIndex]->InitUwPlayerResource(PlayerResourceManager,
+		                                                     ResourcesLeftToRight[ResourceIndex]);
+	}
+}
+
+bool UTechTree::GetIsValidPlayerController()
+{
+	if (M_PlayerController.IsValid())
+	{
+		return true;
+	}
+
+	M_PlayerController = Cast<ACPPController>(UGameplayStatics::GetPlayerController(this, 0));
+	if (M_PlayerController.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_PlayerController",
+	                                                             "GetIsValidPlayerController",
+	                                                             this);
+	return false;
+}
+
+bool UTechTree::GetIsValidMainGameUI() const
+{
+	if (M_MainGameUI.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_MainGameUI", "GetIsValidMainGameUI", this);
+	return false;
 }
 
 void UTechTree::GoBackToMainGameUI()
@@ -189,9 +242,12 @@ void UTechTree::GoBackToMainGameUI()
 		ViewportClient->bDisableWorldRendering = false;
 	}
 
-	if (IsValid(M_MainGameUI))
+	if (GetIsValidMainGameUI())
 	{
-		M_MainGameUI->OnCloseTechTree();
+		if (UMainGameUI* MainGameUI = M_MainGameUI.Get())
+		{
+			MainGameUI->OnCloseTechTree();
+		}
 	}
 }
 

@@ -25,7 +25,7 @@ void UScavengerComponent::SetScavengeState(const EScavengeState NewState)
 void UScavengerComponent::TeleportAndRotateAtScavSocket(const FVector& InDesiredLocation)
 {
 	UWorld* World = GetWorld();
-	if (!World)
+	if (not World)
 	{
 		RTSFunctionLibrary::ReportNullErrorComponent(this, "World", __FUNCTION__);
 		return;
@@ -36,9 +36,15 @@ void UScavengerComponent::TeleportAndRotateAtScavSocket(const FVector& InDesired
 	TWeakObjectPtr<UScavengerComponent> WeakThis(this);
 	const FTimerDelegate TimerDel = FTimerDelegate::CreateLambda([WeakThis, InDesiredLocation]()
 	{
-		if (!WeakThis.IsValid()) return;
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
 		auto* Self = WeakThis.Get();
-		if (!Self->GetIsValidTargetScavengeObject() || !Self->GetIsValidOwnerSquadUnit()) return;
+		if (not Self->GetIsValidTargetScavengeObject() || not Self->GetIsValidOwnerSquadUnit())
+		{
+			return;
+		}
 
 		ASquadUnit* Unit = Self->M_OwnerSquadUnit;
 		const AScavengeableObject* Obj = Self->M_TargetScavengeObject;
@@ -84,13 +90,13 @@ void UScavengerComponent::SetTargetScavengeObject(TObjectPtr<AScavengeableObject
 
 void UScavengerComponent::UpdateOwnerBlockScavengeObjects(const bool bBlock) const
 {
-	if (!IsValid(M_OwnerSquadUnit))
+	if (not GetIsValidOwnerSquadUnit())
 	{
 		return;
 	}
 
 	UCapsuleComponent* Capsule = M_OwnerSquadUnit->GetCapsuleComponent();
-	if (!IsValid(Capsule))
+	if (not IsValid(Capsule))
 	{
 		return;
 	}
@@ -105,7 +111,7 @@ EScavengeState UScavengerComponent::GetScavengeState() const
 
 void UScavengerComponent::SetSquadOwner(ASquadUnit* OwnerUnit)
 {
-	if (!IsValid(OwnerUnit))
+	if (not IsValid(OwnerUnit))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "M_OwnerSquadUnit", "SetSquadOwner");
 		return;
@@ -116,7 +122,7 @@ void UScavengerComponent::SetSquadOwner(ASquadUnit* OwnerUnit)
 void UScavengerComponent::StartScavenging()
 {
 	M_ScavengeState = EScavengeState::Scavenging;
-	if (!GetIsValidOwnerSquadUnit() || !GetIsValidTargetScavengeObject())
+	if (not GetIsValidOwnerSquadUnit() || not GetIsValidTargetScavengeObject())
 	{
 		return;
 	}
@@ -164,7 +170,7 @@ void UScavengerComponent::MoveToLocationComplete()
 
 void UScavengerComponent::HandleMoveToObjectComplete()
 {
-	if (!GetIsValidOwnerSquadUnit())
+	if (not GetIsValidOwnerSquadUnit())
 	{
 		return;
 	}

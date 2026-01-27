@@ -51,6 +51,9 @@ struct FScavengeAmount
 	int32 Chance = 50;
 };
 
+/**
+ * @brief Placed in the world as a scavenging target and configured through blueprint setup.
+ */
 UCLASS()
 class RTS_SURVIVAL_API AScavengeableObject : public ADestructableEnvActor
 {
@@ -203,7 +206,8 @@ private:
 	// If the widget is already loaded we create instantly.
 	void AsyncLoadAndCreateRewardWidget();
 
-	TObjectPtr<ACPPController> M_PlayerController;
+	UPROPERTY()
+	TWeakObjectPtr<ACPPController> M_PlayerController;
 
 	bool GetIsValidPlayerController();
 
@@ -232,7 +236,7 @@ private:
 
 	// Reference to the mesh of this object.
 	UPROPERTY()
-	UStaticMeshComponent* M_ScavengeMeshComp = nullptr;
+	TObjectPtr<UStaticMeshComponent> M_ScavengeMeshComp = nullptr;
 
 	/**
      * @brief Find the mesh component marked with FRTSGamePlayTags::ScavengeMeshComponent.

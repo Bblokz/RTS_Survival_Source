@@ -78,7 +78,7 @@ void AScavengeableObject::PauseScavenging(const TObjectPtr<ASquadController>& Re
 	}
 
 	// If object is dead or no timer is running, nothing to pause.
-	if (!IsUnitAlive() || !GetWorld()->GetTimerManager().IsTimerActive(M_ScavengeTimerHandle))
+	if (not IsUnitAlive() || not GetWorld()->GetTimerManager().IsTimerActive(M_ScavengeTimerHandle))
 	{
 		return;
 	}
@@ -226,7 +226,7 @@ void AScavengeableObject::ExtractScavengeSocketNames(
 	OutSocketNames.Reset();
 
 	const UStaticMesh* const StaticMesh = InMeshComponent.GetStaticMesh();
-	if (!IsValid(StaticMesh))
+	if (not IsValid(StaticMesh))
 	{
 		return;
 	}
@@ -238,7 +238,7 @@ void AScavengeableObject::ExtractScavengeSocketNames(
 
 	for (const TObjectPtr<UStaticMeshSocket>& Socket : MeshSockets)
 	{
-		if (!IsValid(Socket))
+		if (not IsValid(Socket))
 		{
 			continue;
 		}
@@ -366,7 +366,7 @@ FString AScavengeableObject::GetRewardText()
 
 void AScavengeableObject::RandomRewardPlayer()
 {
-	if (not GetIsValidPlayerController() || not M_PlayerController->GetPlayerResourceManager())
+	if (not GetIsValidPlayerController())
 	{
 		RTSFunctionLibrary::ReportError("Scavengable Object is not able to provide player with reward as either"
 			"the player controller or the player resource manager is null!"
@@ -374,7 +374,20 @@ void AScavengeableObject::RandomRewardPlayer()
 		return;
 	}
 	TArray<FString> RewardTexts;
-	UPlayerResourceManager* PlayerResourceManager = M_PlayerController->GetPlayerResourceManager();
+	ACPPController* PlayerController = M_PlayerController.Get();
+	if (not IsValid(PlayerController))
+	{
+		RTSFunctionLibrary::ReportError("Scavengable Object player controller is invalid after validation."
+			"\n for object: " + GetName());
+		return;
+	}
+	UPlayerResourceManager* PlayerResourceManager = PlayerController->GetPlayerResourceManager();
+	if (not IsValid(PlayerResourceManager))
+	{
+		RTSFunctionLibrary::ReportError("Scavengable Object has no valid PlayerResourceManager."
+			"\n for object: " + GetName());
+		return;
+	}
 	bool bDidGetAnyReward = false;
 	for (auto& EachReward : ScavengeResources)
 	{
@@ -442,6 +455,11 @@ bool AScavengeableObject::GetCanScavenge() const
 
 FVector AScavengeableObject::GetScavLocationClosestToPosition(const FVector& Position) const
 {
+	if (not GetIsValidMeshComp(TEXT("GetScavLocationClosestToPosition")))
+	{
+		return GetActorLocation();
+	}
+
 	float MinDistance = TNumericLimits<float>::Max();
 	FVector ClosestLocation = GetActorLocation();
 	for (const auto EachSocket : M_ScavengeSocketNames)
@@ -469,9 +487,8 @@ TArray<FVector> AScavengeableObject::GetScavengePositions(const int32 NumUnits)
 {
 	TArray<FVector> ScavengeLocations;
 
-	if (!IsValid(M_ScavengeMeshComp))
+	if (not GetIsValidMeshComp(TEXT("GetScavengePositions")))
 	{
-		RTSFunctionLibrary::ReportError("Invalid mesh component in AScavengeableObject::GetScavengePositions");
 		return {GetActorLocation()};
 	}
 
@@ -494,7 +511,7 @@ TArray<FVector> AScavengeableObject::GetScavengePositions(const int32 NumUnits)
 	}
 
 	// If no valid sockets are found or sockets are empty, create default positions
-	if (!bSocketsFound || ScavengeLocations.Num() == 0)
+	if (not bSocketsFound || ScavengeLocations.Num() == 0)
 	{
 		if constexpr (DeveloperSettings::Debugging::GScavenging_Compile_DebugSymbols)
 		{
@@ -522,17 +539,21 @@ TArray<FVector> AScavengeableObject::GetScavengePositions(const int32 NumUnits)
 
 bool AScavengeableObject::GetIsValidPlayerController()
 {
-	if (IsValid(M_PlayerController))
+	if (M_PlayerController.IsValid())
 	{
 		return true;
 	}
-	M_PlayerController = Cast<ACPPController>(GetWorld()->GetFirstPlayerController());
-	if (IsValid(M_PlayerController))
+	if (UWorld* World = GetWorld())
 	{
-		return true;
+		M_PlayerController = Cast<ACPPController>(World->GetFirstPlayerController());
+		if (M_PlayerController.IsValid())
+		{
+			return true;
+		}
 	}
-	RTSFunctionLibrary::ReportError(
-		"Player controller is not valid in AScavengeableObject::GetIsValidPlayerController");
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerController",
+	                                                      "GetIsValidPlayerController",
+	                                                      this);
 	return false;
 }
 
@@ -555,16 +576,14 @@ void AScavengeableObject::PostInitializeComponents()
 			"\n object: " + GetName());
 		M_ScavengeMeshComp = FindScavengeMeshComponent();
 	}
-	if (!IsValid(M_ScavengeMeshComp))
+	if (not GetIsValidMeshComp(TEXT("PostInitializeComponents")))
 	{
-		RTSFunctionLibrary::ReportError("No mesh component found in AScavengeableObject::PostInitializeComponents");
+		return;
 	}
-	else
-	{
-		// Find all sockets on the mesh and save them in ScavengeSocketNames
-		ExtractScavengeSocketNames(*M_ScavengeMeshComp, M_ScavengeSocketNames);
-		FRTS_CollisionSetup::SetupScavengeableObjectCollision(M_ScavengeMeshComp);
-	}
+
+	// Find all sockets on the mesh and save them in ScavengeSocketNames
+	ExtractScavengeSocketNames(*M_ScavengeMeshComp, M_ScavengeSocketNames);
+	FRTS_CollisionSetup::SetupScavengeableObjectCollision(M_ScavengeMeshComp);
 }
 
 void AScavengeableObject::BeginPlay()

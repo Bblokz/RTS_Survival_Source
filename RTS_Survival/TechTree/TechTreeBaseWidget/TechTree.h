@@ -12,14 +12,14 @@ class RTS_SURVIVAL_API UMainGameUI;
 class UButton;
 class UCanvasPanel;
 /**
- * 
+ * @brief Widget that presents the tech tree and handles panning with UI setup from the main game UI.
  */
 UCLASS()
 class RTS_SURVIVAL_API UTechTree : public UUserWidget
 {
 	GENERATED_BODY()
 public:
-	inline void SetMainGameUI( UMainGameUI* NewMainGameUI){M_MainGameUI = NewMainGameUI;};
+	inline void SetMainGameUI(UMainGameUI* NewMainGameUI){M_MainGameUI = NewMainGameUI;};
 	inline void SetPlayerController(ACPPController* NewPlayerController){M_PlayerController = NewPlayerController;};
 	
 
@@ -61,12 +61,14 @@ private:
 	FVector2D TargetTranslation;
 
 	UPROPERTY()
-	UMainGameUI* M_MainGameUI;
+	TWeakObjectPtr<UMainGameUI> M_MainGameUI;
 
 	UPROPERTY()
-	ACPPController* M_PlayerController;
+	TWeakObjectPtr<ACPPController> M_PlayerController;
 
 	void NativeConstruct();
 	// Initialize panning bounds based on tech tree size and viewport size
 	void InitializePanBounds();
+	bool GetIsValidPlayerController();
+	bool GetIsValidMainGameUI() const;
 };
