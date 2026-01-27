@@ -27,6 +27,7 @@ void UW_EscapeMenu::BindButtonCallbacks()
 {
 	BindResumeGameButton();
 	BindSettingsButton();
+	BindKeyBindingsButton();
 	BindArchiveButton();
 	BindRestartLevelButton();
 	BindExitToMainMenuButton();
@@ -54,6 +55,18 @@ void UW_EscapeMenu::BindSettingsButton()
 
 	M_ButtonSettings->OnClicked.RemoveAll(this);
 	M_ButtonSettings->OnClicked.AddDynamic(this, &UW_EscapeMenu::HandleSettingsClicked);
+}
+
+void UW_EscapeMenu::BindKeyBindingsButton()
+{
+	const FString FunctionName = TEXT("UW_EscapeMenu::BindKeyBindingsButton");
+	if (not EnsureButtonIsValid(M_ButtonKeyBindings, TEXT("M_ButtonKeyBindings"), FunctionName))
+	{
+		return;
+	}
+
+	M_ButtonKeyBindings->OnClicked.RemoveAll(this);
+	M_ButtonKeyBindings->OnClicked.AddDynamic(this, &UW_EscapeMenu::HandleKeyBindingsClicked);
 }
 
 void UW_EscapeMenu::BindArchiveButton()
@@ -142,6 +155,16 @@ void UW_EscapeMenu::HandleSettingsClicked()
 	}
 
 	M_MainGameUI->OnEscapeMenuOpenSettings();
+}
+
+void UW_EscapeMenu::HandleKeyBindingsClicked()
+{
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+
+	M_MainGameUI->OnEscapeMenuOpenKeyBindings();
 }
 
 void UW_EscapeMenu::HandleArchiveClicked()

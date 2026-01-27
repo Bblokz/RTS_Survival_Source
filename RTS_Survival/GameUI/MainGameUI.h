@@ -189,6 +189,8 @@ public:
 	void OnEscapeMenuResumeGame();
 	void OnEscapeMenuOpenSettings();
 	void OnEscapeMenuCloseSettings();
+	void OnEscapeMenuOpenKeyBindings();
+	void OnEscapeMenuCloseKeyBindings();
 	void OnEscapeMenuOpenArchive();
 	void OnEscapeMenuRestartLevel();
 	void OnEscapeMenuExitToMainMenu();

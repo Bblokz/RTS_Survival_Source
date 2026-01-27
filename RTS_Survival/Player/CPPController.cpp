@@ -3,6 +3,8 @@
 #include "CPPController.h"
 
 #include "Abilities.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
 #include "AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "Camera/CameraPawn.h"
 #include "Camera/CameraController/PlayerCameraController.h"
@@ -388,6 +390,50 @@ void ACPPController::CloseEscapeMenuSettings()
 {
 	EnsureEscapeMenuHelperInitialized();
 	M_PlayerEscapeMenuHelper.CloseEscapeMenuSettings(PlayerEscapeMenuSettings);
+}
+
+void ACPPController::OpenEscapeMenuKeyBindings()
+{
+	EnsureEscapeMenuHelperInitialized();
+	M_PlayerEscapeMenuHelper.OpenEscapeMenuKeyBindings(PlayerEscapeMenuSettings);
+}
+
+void ACPPController::CloseEscapeMenuKeyBindings()
+{
+	EnsureEscapeMenuHelperInitialized();
+	M_PlayerEscapeMenuHelper.CloseEscapeMenuKeyBindings(PlayerEscapeMenuSettings);
+}
+
+UInputMappingContext* ACPPController::GetDefaultInputMappingContext() const
+{
+	if (not GetIsValidDefaultInputMappingContext())
+	{
+		return nullptr;
+	}
+
+	return M_DefaultInputMappingContext;
+}
+
+void ACPPController::ChangeKeyBinding(UInputAction* ActionToRebind, const FKey OldKey, const FKey NewKey)
+{
+	if (not GetIsValidDefaultInputMappingContext())
+	{
+		return;
+	}
+
+	if (not IsValid(ActionToRebind))
+	{
+		RTSFunctionLibrary::ReportError(\"ChangeKeyBinding received an invalid action reference.\");
+		return;
+	}
+
+	if (not NewKey.IsValid() || OldKey == NewKey)
+	{
+		return;
+	}
+
+	M_DefaultInputMappingContext->UnmapKey(ActionToRebind, OldKey);
+	M_DefaultInputMappingContext->MapKey(ActionToRebind, NewKey);
 }
 
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
@@ -5661,6 +5707,22 @@ void ACPPController::ShowPlayerBuildRadius(const bool bShowRadius) const
 void ACPPController::EnsureEscapeMenuHelperInitialized()
 {
 	M_PlayerEscapeMenuHelper.InitEscapeMenuHelper(this);
+}
+
+bool ACPPController::GetIsValidDefaultInputMappingContext() const
+{
+	if (IsValid(M_DefaultInputMappingContext))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_DefaultInputMappingContext"),
+		TEXT("ACPPController::GetIsValidDefaultInputMappingContext"),
+		this
+	);
+	return false;
 }
 
 bool ACPPController::TryHandleEscapeMenuBuildingModeActive()

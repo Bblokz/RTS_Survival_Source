@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/GameUI/EscapeMenu/EscapeMenuSettings/W_EscapeMenuSettings.h"
+#include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/W_EscapeMenuKeyBindings.h"
 #include "RTS_Survival/GameUI/EscapeMenu/W_EscapeMenu.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
@@ -13,6 +14,7 @@ namespace EscapeMenuZOrder
 {
 	constexpr int32 EscapeMenu = 2000;
 	constexpr int32 EscapeMenuSettings = 2010;
+	constexpr int32 EscapeMenuKeyBindings = 2020;
 }
 
 void FPlayerEscapeMenuHelper::InitEscapeMenuHelper(ACPPController* PlayerController)
@@ -38,6 +40,11 @@ void FPlayerEscapeMenuHelper::OpenEscapeMenu(const FPlayerEscapeMenuSettings& Es
 		MakeWidgetDormant(M_EscapeMenuSettingsWidget);
 	}
 
+	if (M_EscapeMenuKeyBindingsWidget != nullptr)
+	{
+		MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
+	}
+
 	ShowEscapeMenu();
 	PlaySoundIfSet(EscapeMenuSettings.OpenMenuSound);
 	PauseGameForEscapeMenu();
@@ -56,6 +63,11 @@ void FPlayerEscapeMenuHelper::CloseEscapeMenu(const FPlayerEscapeMenuSettings& E
 		MakeWidgetDormant(M_EscapeMenuSettingsWidget);
 	}
 
+	if (M_EscapeMenuKeyBindingsWidget != nullptr)
+	{
+		MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
+	}
+
 	PlaySoundIfSet(EscapeMenuSettings.CloseMenuSound);
 	UnpauseGameForEscapeMenu();
 }
@@ -72,6 +84,11 @@ void FPlayerEscapeMenuHelper::OpenEscapeMenuSettings(const FPlayerEscapeMenuSett
 		MakeWidgetDormant(M_EscapeMenuWidget);
 	}
 
+	if (M_EscapeMenuKeyBindingsWidget != nullptr)
+	{
+		MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
+	}
+
 	ShowEscapeMenuSettings();
 	PlaySoundIfSet(EscapeMenuSettings.OpenSettingsMenuSound);
 	PauseGameForEscapeMenu();
@@ -85,6 +102,46 @@ void FPlayerEscapeMenuHelper::CloseEscapeMenuSettings(const FPlayerEscapeMenuSet
 	}
 
 	MakeWidgetDormant(M_EscapeMenuSettingsWidget);
+	PlaySoundIfSet(EscapeMenuSettings.CloseSettingsMenuSound);
+
+	if (EnsureEscapeMenuWidgetCreated(EscapeMenuSettings))
+	{
+		ShowEscapeMenu();
+	}
+
+	PauseGameForEscapeMenu();
+}
+
+void FPlayerEscapeMenuHelper::OpenEscapeMenuKeyBindings(const FPlayerEscapeMenuSettings& EscapeMenuSettings)
+{
+	if (not EnsureEscapeMenuKeyBindingsWidgetCreated(EscapeMenuSettings))
+	{
+		return;
+	}
+
+	if (M_EscapeMenuWidget != nullptr)
+	{
+		MakeWidgetDormant(M_EscapeMenuWidget);
+	}
+
+	if (M_EscapeMenuSettingsWidget != nullptr)
+	{
+		MakeWidgetDormant(M_EscapeMenuSettingsWidget);
+	}
+
+	ShowEscapeMenuKeyBindings();
+	PlaySoundIfSet(EscapeMenuSettings.OpenSettingsMenuSound);
+	PauseGameForEscapeMenu();
+}
+
+void FPlayerEscapeMenuHelper::CloseEscapeMenuKeyBindings(const FPlayerEscapeMenuSettings& EscapeMenuSettings)
+{
+	if (M_EscapeMenuKeyBindingsWidget == nullptr)
+	{
+		return;
+	}
+
+	MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
 	PlaySoundIfSet(EscapeMenuSettings.CloseSettingsMenuSound);
 
 	if (EnsureEscapeMenuWidgetCreated(EscapeMenuSettings))
@@ -138,6 +195,22 @@ bool FPlayerEscapeMenuHelper::GetIsValidEscapeMenuSettingsWidget() const
 		M_PlayerController.Get(),
 		TEXT("M_EscapeMenuSettingsWidget"),
 		TEXT("FPlayerEscapeMenuHelper::GetIsValidEscapeMenuSettingsWidget"),
+		M_PlayerController.Get()
+	);
+	return false;
+}
+
+bool FPlayerEscapeMenuHelper::GetIsValidEscapeMenuKeyBindingsWidget() const
+{
+	if (IsValid(M_EscapeMenuKeyBindingsWidget))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		M_PlayerController.Get(),
+		TEXT("M_EscapeMenuKeyBindingsWidget"),
+		TEXT("FPlayerEscapeMenuHelper::GetIsValidEscapeMenuKeyBindingsWidget"),
 		M_PlayerController.Get()
 	);
 	return false;
@@ -199,6 +272,34 @@ bool FPlayerEscapeMenuHelper::EnsureEscapeMenuSettingsWidgetCreated(const FPlaye
 	return true;
 }
 
+bool FPlayerEscapeMenuHelper::EnsureEscapeMenuKeyBindingsWidgetCreated(const FPlayerEscapeMenuSettings& EscapeMenuSettings)
+{
+	if (M_EscapeMenuKeyBindingsWidget != nullptr)
+	{
+		return true;
+	}
+
+	if (not GetIsValidPlayerController() || not EnsureEscapeMenuKeyBindingsClassIsValid(EscapeMenuSettings))
+	{
+		return false;
+	}
+
+	UW_EscapeMenuKeyBindings* EscapeMenuKeyBindingsWidget = CreateWidget<UW_EscapeMenuKeyBindings>(
+		M_PlayerController.Get(),
+		EscapeMenuSettings.EscapeMenuKeyBindingsClass
+	);
+	if (EscapeMenuKeyBindingsWidget == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(\"Failed to create escape menu key bindings widget.\");
+		return false;
+	}
+
+	EscapeMenuKeyBindingsWidget->SetPlayerController(M_PlayerController.Get());
+	M_EscapeMenuKeyBindingsWidget = EscapeMenuKeyBindingsWidget;
+	MakeWidgetDormant(EscapeMenuKeyBindingsWidget);
+	return true;
+}
+
 bool FPlayerEscapeMenuHelper::EnsureEscapeMenuClassIsValid(const FPlayerEscapeMenuSettings& EscapeMenuSettings) const
 {
 	if (EscapeMenuSettings.EscapeMenuClass)
@@ -231,6 +332,23 @@ bool FPlayerEscapeMenuHelper::EnsureEscapeMenuSettingsClassIsValid(const FPlayer
 	return false;
 }
 
+bool FPlayerEscapeMenuHelper::EnsureEscapeMenuKeyBindingsClassIsValid(
+	const FPlayerEscapeMenuSettings& EscapeMenuSettings) const
+{
+	if (EscapeMenuSettings.EscapeMenuKeyBindingsClass)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		M_PlayerController.Get(),
+		TEXT(\"EscapeMenuKeyBindingsClass\"),
+		TEXT(\"FPlayerEscapeMenuHelper::EnsureEscapeMenuKeyBindingsClassIsValid\"),
+		M_PlayerController.Get()
+	);
+	return false;
+}
+
 void FPlayerEscapeMenuHelper::ShowEscapeMenu()
 {
 	if (not GetIsValidEscapeMenuWidget())
@@ -253,6 +371,18 @@ void FPlayerEscapeMenuHelper::ShowEscapeMenuSettings()
 	WakeWidget(M_EscapeMenuSettingsWidget);
 	AddWidgetToViewport(M_EscapeMenuSettingsWidget, EscapeMenuZOrder::EscapeMenuSettings);
 	ApplyInputModeForWidget(M_EscapeMenuSettingsWidget);
+}
+
+void FPlayerEscapeMenuHelper::ShowEscapeMenuKeyBindings()
+{
+	if (not GetIsValidEscapeMenuKeyBindingsWidget())
+	{
+		return;
+	}
+
+	WakeWidget(M_EscapeMenuKeyBindingsWidget);
+	AddWidgetToViewport(M_EscapeMenuKeyBindingsWidget, EscapeMenuZOrder::EscapeMenuKeyBindings);
+	ApplyInputModeForWidget(M_EscapeMenuKeyBindingsWidget);
 }
 
 void FPlayerEscapeMenuHelper::MakeWidgetDormant(UUserWidget* WidgetToDormant) const

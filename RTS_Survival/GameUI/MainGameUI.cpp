@@ -1297,6 +1297,26 @@ void UMainGameUI::OnEscapeMenuCloseSettings()
 	M_PlayerController->CloseEscapeMenuSettings();
 }
 
+void UMainGameUI::OnEscapeMenuOpenKeyBindings()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->OpenEscapeMenuKeyBindings();
+}
+
+void UMainGameUI::OnEscapeMenuCloseKeyBindings()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->CloseEscapeMenuKeyBindings();
+}
+
 void UMainGameUI::OnEscapeMenuOpenArchive()
 {
 	if (not GetIsValidPlayerController())
