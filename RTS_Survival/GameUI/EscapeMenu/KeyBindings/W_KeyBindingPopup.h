@@ -12,6 +12,9 @@ class URichTextBlock;
 class UWidgetSwitcher;
 class UW_EscapeMenuKeyBindingEntry;
 
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnKeyBindingPopupUnbindRequested, UInputAction*, const FKey&);
+DECLARE_MULTICAST_DELEGATE(FOnKeyBindingPopupExitRequested);
+
 /**
  * @brief Popup widget used to focus on remapping a single key binding at a time.
  *
@@ -33,9 +36,13 @@ public:
 
 	void ShowBindingEntry();
 	void ShowCollisionMessage(const FString& CollidingActionName);
+	void ShowUnboundActionsWarning(const FString& WarningText);
 	void ClosePopup();
 
 	UW_EscapeMenuKeyBindingEntry* GetKeyBindingEntry() const;
+	FOnKeyBindingPopupUnbindRequested& OnUnbindRequested();
+	FOnKeyBindingPopupExitRequested& OnConfirmExitRequested();
+	FOnKeyBindingPopupExitRequested& OnCancelExitRequested();
 
 protected:
 	virtual void NativeConstruct() override;
@@ -46,12 +53,26 @@ private:
 	bool GetIsValidTitleText() const;
 	bool GetIsValidConflictText() const;
 	bool GetIsValidUnderstoodButton() const;
+	bool GetIsValidUnbindButton() const;
+	bool GetIsValidBindWarningText() const;
+	bool GetIsValidConfirmExitButton() const;
+	bool GetIsValidCancelExitButton() const;
+	bool GetIsValidActionToBind() const;
 
 	bool SetBindingContext(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey);
 	void SetTitleText(const FString& TitleText);
 
 	UFUNCTION()
 	void HandleUnderstoodClicked();
+
+	UFUNCTION()
+	void HandleUnbindClicked();
+
+	UFUNCTION()
+	void HandleConfirmExitClicked();
+
+	UFUNCTION()
+	void HandleCancelExitClicked();
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidgetSwitcher> M_PopupSwitcher = nullptr;
@@ -68,6 +89,30 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_UnderstoodButton = nullptr;
 
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_UnbindButton = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<URichTextBlock> M_BindWarningText = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ConfirmExitButton = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_CancelExitButton = nullptr;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<ACPPController> M_PlayerController;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> M_ActionToBind = nullptr;
+
+	FKey M_CurrentKey;
+
 	bool bM_HasBindingContext = false;
 	bool bM_ShouldReturnToEntryOnUnderstood = false;
+
+	FOnKeyBindingPopupUnbindRequested M_OnUnbindRequested;
+	FOnKeyBindingPopupExitRequested M_OnConfirmExitRequested;
+	FOnKeyBindingPopupExitRequested M_OnCancelExitRequested;
 };

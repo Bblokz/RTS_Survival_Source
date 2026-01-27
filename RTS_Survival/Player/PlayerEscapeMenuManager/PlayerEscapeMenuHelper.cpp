@@ -42,6 +42,7 @@ void FPlayerEscapeMenuHelper::OpenEscapeMenu(const FPlayerEscapeMenuSettings& Es
 
 	if (M_EscapeMenuKeyBindingsWidget != nullptr)
 	{
+		M_EscapeMenuKeyBindingsWidget->HandleKeyBindingsMenuClosed();
 		MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
 	}
 
@@ -65,6 +66,7 @@ void FPlayerEscapeMenuHelper::CloseEscapeMenu(const FPlayerEscapeMenuSettings& E
 
 	if (M_EscapeMenuKeyBindingsWidget != nullptr)
 	{
+		M_EscapeMenuKeyBindingsWidget->HandleKeyBindingsMenuClosed();
 		MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
 	}
 
@@ -86,6 +88,7 @@ void FPlayerEscapeMenuHelper::OpenEscapeMenuSettings(const FPlayerEscapeMenuSett
 
 	if (M_EscapeMenuKeyBindingsWidget != nullptr)
 	{
+		M_EscapeMenuKeyBindingsWidget->HandleKeyBindingsMenuClosed();
 		MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
 	}
 
@@ -141,6 +144,7 @@ void FPlayerEscapeMenuHelper::CloseEscapeMenuKeyBindings(const FPlayerEscapeMenu
 		return;
 	}
 
+	M_EscapeMenuKeyBindingsWidget->HandleKeyBindingsMenuClosed();
 	MakeWidgetDormant(M_EscapeMenuKeyBindingsWidget);
 	PlaySoundIfSet(EscapeMenuSettings.CloseSettingsMenuSound);
 

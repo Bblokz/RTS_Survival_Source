@@ -290,6 +290,12 @@ public:
 	 * @param NewKey The newly selected key to apply.
 	 */
 	void ChangeKeyBinding(UInputAction* ActionToRebind, const FKey OldKey, const FKey NewKey);
+	/**
+	 * @brief Removes a single action binding so the key can be reused elsewhere.
+	 * @param ActionToUnbind Action whose key mapping should be removed.
+	 * @param BoundKey The key currently mapped to the action.
+	 */
+	void UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey BoundKey);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;

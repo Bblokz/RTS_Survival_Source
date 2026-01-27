@@ -62,13 +62,18 @@ FOnKeyBindingUpdated& UW_EscapeMenuKeyBindingEntry::OnKeyBindingUpdated()
 
 void UW_EscapeMenuKeyBindingEntry::UpdateKeyBinding(const FKey& NewKey)
 {
-	if (not NewKey.IsValid())
-	{
-		return;
-	}
-
 	M_CurrentKey = NewKey;
 	UpdateDisplayedKey(NewKey);
+}
+
+bool UW_EscapeMenuKeyBindingEntry::GetIsKeyBound() const
+{
+	return M_CurrentKey.IsValid();
+}
+
+FKey UW_EscapeMenuKeyBindingEntry::GetCurrentKey() const
+{
+	return M_CurrentKey;
 }
 
 FString UW_EscapeMenuKeyBindingEntry::GetActionDisplayName() const
@@ -147,7 +152,7 @@ void UW_EscapeMenuKeyBindingEntry::UpdateDisplayedKey(const FKey& NewKey)
 		return;
 	}
 
-	const FInputChord InputChord(NewKey);
+	const FInputChord InputChord = NewKey.IsValid() ? FInputChord(NewKey) : FInputChord();
 	M_KeySelector->SetSelectedKey(InputChord);
 	M_KeySelector->SetAllowGamepadKeys(true);
 	M_KeySelector->SetAllowModifierKeys(false);

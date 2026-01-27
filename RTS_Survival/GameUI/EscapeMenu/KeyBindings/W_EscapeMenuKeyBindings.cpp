@@ -30,6 +30,11 @@ void UW_EscapeMenuKeyBindings::SetPlayerController(ACPPController* NewPlayerCont
 	M_MainGameUI = NewPlayerController->GetMainMenuUI();
 }
 
+void UW_EscapeMenuKeyBindings::HandleKeyBindingsMenuClosed()
+{
+	CloseKeyBindingPopup();
+}
+
 void UW_EscapeMenuKeyBindings::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -411,6 +416,7 @@ void UW_EscapeMenuKeyBindings::OpenKeyBindingPopupForActionName(const FName& Act
 
 	M_KeyBindingPopup->SetupPopup(M_PlayerController.Get(), ActionToBind, CurrentKey);
 	M_KeyBindingPopup->AddToViewport(EscapeMenuKeyBindingsConstants::PopupZOrder);
+	BindKeyBindingPopupCallbacks();
 
 	if (UW_EscapeMenuKeyBindingEntry* PopupEntry = M_KeyBindingPopup->GetKeyBindingEntry())
 	{
@@ -452,6 +458,74 @@ void UW_EscapeMenuKeyBindings::EnsureKeyBindingPopupVisible()
 	}
 
 	M_KeyBindingPopup->AddToViewport(EscapeMenuKeyBindingsConstants::PopupZOrder);
+	BindKeyBindingPopupCallbacks();
+}
+
+void UW_EscapeMenuKeyBindings::CloseKeyBindingPopup()
+{
+	if (M_KeyBindingPopup == nullptr)
+	{
+		return;
+	}
+
+	if (M_KeyBindingPopup->IsInViewport())
+	{
+		M_KeyBindingPopup->ClosePopup();
+	}
+}
+
+void UW_EscapeMenuKeyBindings::BindKeyBindingPopupCallbacks()
+{
+	if (M_KeyBindingPopup == nullptr)
+	{
+		return;
+	}
+
+	M_KeyBindingPopup->OnUnbindRequested().RemoveAll(this);
+	M_KeyBindingPopup->OnUnbindRequested().AddUObject(this, &UW_EscapeMenuKeyBindings::HandlePopupUnbindRequested);
+	M_KeyBindingPopup->OnConfirmExitRequested().RemoveAll(this);
+	M_KeyBindingPopup->OnConfirmExitRequested().AddUObject(this, &UW_EscapeMenuKeyBindings::HandlePopupConfirmExitRequested);
+	M_KeyBindingPopup->OnCancelExitRequested().RemoveAll(this);
+	M_KeyBindingPopup->OnCancelExitRequested().AddUObject(this, &UW_EscapeMenuKeyBindings::HandlePopupCancelExitRequested);
+}
+
+FString UW_EscapeMenuKeyBindings::BuildUnboundActionsWarningText(
+	const TArray<FString>& UnboundActionNames) const
+{
+	if (UnboundActionNames.Num() == 0)
+	{
+		return FString();
+	}
+
+	const FString JoinedNames = FString::Join(UnboundActionNames, TEXT(", "));
+	return FString::Printf(
+		TEXT("The following actions are unbound: <Text_Bad14>%s</>"),
+		*JoinedNames
+	);
+}
+
+TArray<FString> UW_EscapeMenuKeyBindings::GetUnboundActionNames() const
+{
+	TArray<FString> UnboundActions;
+	UnboundActions.Reserve(M_ActionNameToEntry.Num());
+
+	for (const TPair<FName, TObjectPtr<UW_EscapeMenuKeyBindingEntry>>& EntryPair : M_ActionNameToEntry)
+	{
+		const UW_EscapeMenuKeyBindingEntry* EntryWidget = EntryPair.Value;
+		if (not IsValid(EntryWidget))
+		{
+			continue;
+		}
+
+		if (EntryWidget->GetIsKeyBound())
+		{
+			continue;
+		}
+
+		UnboundActions.Add(EntryWidget->GetActionDisplayName());
+	}
+
+	return UnboundActions;
 }
 
 FName UW_EscapeMenuKeyBindings::GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const
@@ -679,7 +753,21 @@ void UW_EscapeMenuKeyBindings::HandleBackClicked()
 		return;
 	}
 
-	M_MainGameUI->OnEscapeMenuCloseKeyBindings();
+	const TArray<FString> UnboundActionNames = GetUnboundActionNames();
+	if (UnboundActionNames.Num() == 0)
+	{
+		CloseKeyBindingPopup();
+		M_MainGameUI->OnEscapeMenuCloseKeyBindings();
+		return;
+	}
+
+	EnsureKeyBindingPopupVisible();
+	if (M_KeyBindingPopup == nullptr)
+	{
+		return;
+	}
+
+	M_KeyBindingPopup->ShowUnboundActionsWarning(BuildUnboundActionsWarningText(UnboundActionNames));
 }
 
 void UW_EscapeMenuKeyBindings::HandleSearchTextChanged(const FText& NewText)
@@ -845,15 +933,17 @@ void UW_EscapeMenuKeyBindings::HandleKeyBindingUpdated(UInputAction* ActionToBin
 		return;
 	}
 
-	if (not NewKey.IsValid())
-	{
-		return;
-	}
-
 	const FName ActionName = ActionToBind->GetFName();
 	if (GetIsSpecialBindingAction(ActionName))
 	{
-		M_SpecialActionKeyBindings.Add(ActionName, NewKey);
+		if (NewKey.IsValid())
+		{
+			M_SpecialActionKeyBindings.Add(ActionName, NewKey);
+		}
+		else
+		{
+			M_SpecialActionKeyBindings.Remove(ActionName);
+		}
 	}
 
 	UpdateKeyBindingEntryForAction(ActionName, NewKey);
@@ -862,4 +952,43 @@ void UW_EscapeMenuKeyBindings::HandleKeyBindingUpdated(UInputAction* ActionToBin
 	{
 		M_KeyBindingPopup->ClosePopup();
 	}
+}
+
+void UW_EscapeMenuKeyBindings::HandlePopupUnbindRequested(UInputAction* ActionToUnbind, const FKey& CurrentKey)
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	if (not IsValid(ActionToUnbind))
+	{
+		RTSFunctionLibrary::ReportError("Key binding popup requested an unbind with an invalid action reference.");
+		return;
+	}
+
+	if (not CurrentKey.IsValid())
+	{
+		return;
+	}
+
+	M_PlayerController->UnbindKeyBinding(ActionToUnbind, CurrentKey);
+	HandleKeyBindingUpdated(ActionToUnbind, FKey());
+	CloseKeyBindingPopup();
+}
+
+void UW_EscapeMenuKeyBindings::HandlePopupConfirmExitRequested()
+{
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+
+	CloseKeyBindingPopup();
+	M_MainGameUI->OnEscapeMenuCloseKeyBindings();
+}
+
+void UW_EscapeMenuKeyBindings::HandlePopupCancelExitRequested()
+{
+	CloseKeyBindingPopup();
 }

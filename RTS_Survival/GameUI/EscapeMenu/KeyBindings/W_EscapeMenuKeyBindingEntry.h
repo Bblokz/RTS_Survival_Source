@@ -37,6 +37,8 @@ public:
 	FOnKeyBindingUpdated& OnKeyBindingUpdated();
 
 	void UpdateKeyBinding(const FKey& NewKey);
+	bool GetIsKeyBound() const;
+	FKey GetCurrentKey() const;
 	FString GetActionDisplayName() const;
 
 protected:
