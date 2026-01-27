@@ -618,10 +618,15 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 		// Start a new async loading request
 		FSoftObjectPath AssetPath = AssetClass.ToSoftObjectPath();
 
+		const TWeakObjectPtr<ARTSAsyncSpawner> WeakThis(this);
 		FStreamableDelegate Delegate = FStreamableDelegate::CreateLambda(
-			[this, AssetPath, TrainingOption, Location, SpawnID, SpawnRequestId]()
+			[WeakThis, AssetPath, TrainingOption, Location, SpawnID, SpawnRequestId]()
 			{
-				OnAsyncSpawnOptionAtLocationComplete(
+				if (not WeakThis.IsValid())
+				{
+					return;
+				}
+				WeakThis->OnAsyncSpawnOptionAtLocationComplete(
 					AssetPath,
 					TrainingOption,
 					Location,
