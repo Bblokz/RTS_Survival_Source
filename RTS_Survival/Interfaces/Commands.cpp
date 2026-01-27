@@ -335,6 +335,28 @@ bool UCommandData::GetIsQueueFull() const
 	return NumCommands >= MAX_COMMANDS;
 }
 
+int32 UCommandData::GetQueuedFieldConstructionCommandCount(const EFieldConstructionType ConstructionType) const
+{
+	int32 CommandCount = 0;
+	for (int32 CommandIndex = 0; CommandIndex < NumCommands; CommandIndex++)
+	{
+		const FQueueCommand& QueuedCommand = M_TCommands[CommandIndex];
+		if (QueuedCommand.CommandType != EAbilityID::IdFieldConstruction)
+		{
+			continue;
+		}
+
+		if (QueuedCommand.GetFieldConstructionSubtype() != ConstructionType)
+		{
+			continue;
+		}
+
+		CommandCount++;
+	}
+
+	return CommandCount;
+}
+
 void UCommandData::UpdateActionUI()
 {
 	if (GetIsPrimarySelected())

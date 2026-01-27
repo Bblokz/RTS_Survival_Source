@@ -181,6 +181,8 @@ public:
 
 	bool GetIsQueueFull() const;
 
+	int32 GetQueuedFieldConstructionCommandCount(const EFieldConstructionType ConstructionType) const;
+
 	void UpdateActionUI();
 
 	bool StartCooldownOnAbility(const EAbilityID AbilityID, const int32 CustomType);

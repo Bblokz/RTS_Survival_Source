@@ -37,6 +37,7 @@
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
+#include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Procedural/LandscapeDivider/RTSLandscapeDivider.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -1703,6 +1704,74 @@ void ACPPController::BeginPlay_SetupPlayerAimAbility()
 	}
 }
 
+bool ACPPController::GetFieldConstructionCandidateData(
+	AActor* CandidateActor,
+	const EFieldConstructionType ConstructionType,
+	UFieldConstructionAbilityComponent*& OutFieldConstructionComp,
+	int32& OutQueuedConstructionCount) const
+{
+	OutFieldConstructionComp = nullptr;
+	OutQueuedConstructionCount = 0;
+
+	if (not IsValid(CandidateActor))
+	{
+		return false;
+	}
+
+	if (M_FieldConstructionCandidate.GetIsExcludedCandidateActor(CandidateActor))
+	{
+		return false;
+	}
+
+	UFieldConstructionAbilityComponent* const FoundAbilityComp =
+		FAbilityHelpers::GetHasFieldConstructionAbility(CandidateActor, ConstructionType);
+	if (not IsValid(FoundAbilityComp))
+	{
+		return false;
+	}
+
+	ICommands* const CommandInterface = Cast<ICommands>(CandidateActor);
+	if (CommandInterface == nullptr)
+	{
+		return false;
+	}
+
+	const UCommandData* const CommandData = CommandInterface->GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return false;
+	}
+
+	OutQueuedConstructionCount = CommandData->GetQueuedFieldConstructionCommandCount(ConstructionType);
+	OutFieldConstructionComp = FoundAbilityComp;
+	return true;
+}
+
+void ACPPController::TryUpdateBestFieldConstructionCandidate(
+	AActor* CandidateActor,
+	const EFieldConstructionType ConstructionType,
+	AActor*& InOutBestCandidateActor,
+	UFieldConstructionAbilityComponent*& InOutBestCandidateAbilityComp,
+	int32& InOutBestQueuedConstructionCount) const
+{
+	UFieldConstructionAbilityComponent* CandidateAbilityComp = nullptr;
+	int32 CandidateQueuedConstructionCount = 0;
+	if (not GetFieldConstructionCandidateData(
+		CandidateActor, ConstructionType, CandidateAbilityComp, CandidateQueuedConstructionCount))
+	{
+		return;
+	}
+
+	if (CandidateQueuedConstructionCount >= InOutBestQueuedConstructionCount)
+	{
+		return;
+	}
+
+	InOutBestQueuedConstructionCount = CandidateQueuedConstructionCount;
+	InOutBestCandidateActor = CandidateActor;
+	InOutBestCandidateAbilityComp = CandidateAbilityComp;
+}
+
 AActor* ACPPController::GetNewFieldConstructionCandidate(
 	UFieldConstructionAbilityComponent*& OutFieldConstructionComp,
 	const EFieldConstructionType ConstructionType)
@@ -1715,55 +1784,22 @@ AActor* ACPPController::GetNewFieldConstructionCandidate(
 	UFieldConstructionAbilityComponent* BestCandidateAbilityComp = nullptr;
 	int32 BestQueuedConstructionCount = TNumericLimits<int32>::Max();
 
-	const auto TryUpdateBestCandidate = [this, ConstructionType, &BestCandidateActor, &BestCandidateAbilityComp, &
-			BestQueuedConstructionCount](AActor* const CandidateActor)
-	{
-		if (not IsValid(CandidateActor))
-		{
-			return;
-		}
-
-		if (M_FieldConstructionCandidate.GetIsExcludedCandidateActor(CandidateActor))
-		{
-			return;
-		}
-
-		UFieldConstructionAbilityComponent* const FoundAbilityComp =
-			FAbilityHelpers::GetHasFieldConstructionAbility(CandidateActor, ConstructionType);
-
-		if (not IsValid(FoundAbilityComp))
-		{
-			return;
-		}
-
-		ICommands* const CommandInterface = Cast<ICommands>(CandidateActor);
-		if (CommandInterface == nullptr)
-		{
-			return;
-		}
-
-		const int32 QueuedConstructionCount = CommandInterface->GetConstructionAbilityCount();
-		if (QueuedConstructionCount < BestQueuedConstructionCount)
-		{
-			BestQueuedConstructionCount = QueuedConstructionCount;
-			BestCandidateActor = CandidateActor;
-			BestCandidateAbilityComp = FoundAbilityComp;
-		}
-	};
-
 	for (AActor* const EachSquad : TSelectedSquadControllers)
 	{
-		TryUpdateBestCandidate(EachSquad);
+		TryUpdateBestFieldConstructionCandidate(
+			EachSquad, ConstructionType, BestCandidateActor, BestCandidateAbilityComp, BestQueuedConstructionCount);
 	}
 
 	for (AActor* const EachPawn : TSelectedPawnMasters)
 	{
-		TryUpdateBestCandidate(EachPawn);
+		TryUpdateBestFieldConstructionCandidate(
+			EachPawn, ConstructionType, BestCandidateActor, BestCandidateAbilityComp, BestQueuedConstructionCount);
 	}
 
 	for (AActor* const EachActor : TSelectedActorsMasters)
 	{
-		TryUpdateBestCandidate(EachActor);
+		TryUpdateBestFieldConstructionCandidate(
+			EachActor, ConstructionType, BestCandidateActor, BestCandidateAbilityComp, BestQueuedConstructionCount);
 	}
 
 	OutFieldConstructionComp = BestCandidateAbilityComp;
