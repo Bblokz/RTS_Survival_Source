@@ -240,11 +240,17 @@ void ACPPTurretsMaster::BeginPlay()
 
 	if (M_AmmoTrackingState.bIsUsingWeaponAmmoTracker && M_WorldSpawnedIn)
 	{
+		const TWeakObjectPtr<ACPPTurretsMaster> WeakTurret(this);
 		M_WorldSpawnedIn->GetTimerManager().SetTimer(
 			M_AmmoTrackingState.VerifyBindingTimer,
-			FTimerDelegate::CreateLambda([this]()
+			FTimerDelegate::CreateLambda([WeakTurret]()
 			{
-				M_AmmoTrackingState.VerifyTrackingActive();
+				if (not WeakTurret.IsValid())
+				{
+					return;
+				}
+
+				WeakTurret->M_AmmoTrackingState.VerifyTrackingActive();
 			}),
 			M_AmmoTrackingState.VerifyBindingDelay, false);
 	}
