@@ -26,18 +26,7 @@ void UGameResourceManager::RegisterMapResource(
 	const TObjectPtr<UResourceComponent>& Resource,
 	const bool bRegister)
 {
-	if (IsValid(Resource))
-	{
-		if (bRegister && !M_MapResources.Contains(Resource))
-		{
-			M_MapResources.Add(Resource);
-		}
-		else if (!bRegister && M_MapResources.Contains(Resource))
-		{
-			M_MapResources.Remove(Resource);
-		}
-	}
-	else
+	if (not IsValid(Resource))
 	{
 		const FString IsContained = M_MapResources.Contains(Resource)
 			                            ? "resource is in M_MapResources"
@@ -48,6 +37,15 @@ void UGameResourceManager::RegisterMapResource(
 			"\n at function RegisterMapResource in CPPGameState.cpp."
 			"\n Resource status in array: " + IsContained +
 			"Resource will not be " + Register + " the array in game state.");
+		return;
+	}
+	if (bRegister && not M_MapResources.Contains(Resource))
+	{
+		M_MapResources.Add(Resource);
+	}
+	else if (not bRegister && M_MapResources.Contains(Resource))
+	{
+		M_MapResources.Remove(Resource);
 	}
 }
 
@@ -63,22 +61,22 @@ void UGameResourceManager::RegisterResourceDropOff(
 		return;
 	}
 
-		if (bRegister && !M_ResourceDropOffsPlayer.Contains(ResourceDropOff))
+	if (bRegister && not M_ResourceDropOffsPlayer.Contains(ResourceDropOff))
+	{
+		if (not ResourceDropOff.IsValid())
 		{
-			if(not ResourceDropOff.IsValid())
-			{
-				RTSFunctionLibrary::ReportError("cannot register DropOff as it is INVALID"
-									"\n See UGameResourceManager::RegisterResourceDropOff");
-				return;
-			}
-			M_ResourceDropOffsPlayer.Add(ResourceDropOff);
-			RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
+			RTSFunctionLibrary::ReportError("cannot register DropOff as it is INVALID"
+								"\n See UGameResourceManager::RegisterResourceDropOff");
+			return;
 		}
-		else if (!bRegister && M_ResourceDropOffsPlayer.Contains(ResourceDropOff))
-		{
-			M_ResourceDropOffsPlayer.Remove(ResourceDropOff);
-			RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
-		}
+		M_ResourceDropOffsPlayer.Add(ResourceDropOff);
+		RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
+	}
+	else if (not bRegister && M_ResourceDropOffsPlayer.Contains(ResourceDropOff))
+	{
+		M_ResourceDropOffsPlayer.Remove(ResourceDropOff);
+		RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
+	}
 }
 
 TArray<TWeakObjectPtr<UResourceDropOff>> UGameResourceManager::GetCopyOfResourceDropOffs() const
@@ -279,4 +277,5 @@ void UGameResourceManager::CleanUpInvalidResourcesAndDropOffs()
 			M_ValidResources.Add(EachResource);
 		}
 	}
+	M_MapResources = M_ValidResources;
 }
