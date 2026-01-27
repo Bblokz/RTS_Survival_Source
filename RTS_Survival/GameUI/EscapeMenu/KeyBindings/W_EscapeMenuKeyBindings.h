@@ -7,10 +7,13 @@
 
 class ACPPController;
 class UButton;
+class UEditableTextBox;
 class UMainGameUI;
-class UVerticalBox;
+class UScrollBox;
 class UW_EscapeMenuKeyBindingEntry;
 class UInputMappingContext;
+class UW_KeyBindingPopup;
+class UInputAction;
 
 /**
  * @brief Escape menu panel that builds a list of key binding entries for runtime remapping.
@@ -36,10 +39,38 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "KeyBindings")
 	TSubclassOf<UW_EscapeMenuKeyBindingEntry> M_KeyBindingEntryClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "KeyBindings")
+	TSubclassOf<UW_KeyBindingPopup> M_KeyBindingPopupClass;
+
 private:
+	struct FEscapeMenuKeyBindingEntryData
+	{
+		TObjectPtr<UW_EscapeMenuKeyBindingEntry> EntryWidget = nullptr;
+		FString ActionDisplayName;
+	};
+
 	void BindButtonCallbacks();
 	void BindBackButton();
+	void BindSearchBar();
+	void BindActionButtons();
+	void BindControlGroupButtons();
 	void BuildKeyBindingEntries();
+	void ApplySearchFilter(const FString& SearchText);
+
+	void HandleActionButtonClicked(const int32 ActionButtonIndex);
+	void HandleControlGroupButtonClicked(const int32 ControlGroupIndex);
+
+	void OpenKeyBindingPopupForActionName(const FName& ActionName);
+	void UpdateKeyBindingEntryForAction(const FName& ActionName, const FKey& NewKey);
+	void EnsureKeyBindingPopupVisible();
+
+	FName GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const;
+	FString GetActionDisplayName(const FName& ActionName) const;
+	bool GetIsSpecialBindingAction(const FName& ActionName) const;
+	bool ValidateSpecialBinding(UInputAction* ActionToBind, const FKey& ProposedKey);
+
+	UInputAction* GetInputActionByName(const FName& ActionName) const;
+	FKey GetCurrentKeyForAction(const FName& ActionName) const;
 
 	UInputMappingContext* GetDefaultMappingContext() const;
 
@@ -47,10 +78,69 @@ private:
 	bool GetIsValidMainGameUI() const;
 	bool GetIsValidKeyBindingsList() const;
 	bool GetIsValidKeyBindingEntryClass() const;
+	bool GetIsValidKeyBindingPopupClass() const;
 	bool GetIsValidButtonBack() const;
+	bool GetIsValidSearchKeyBar() const;
 
 	UFUNCTION()
 	void HandleBackClicked();
+
+	UFUNCTION()
+	void HandleSearchTextChanged(const FText& NewText);
+
+	UFUNCTION()
+	void HandleActionButton1Clicked();
+	UFUNCTION()
+	void HandleActionButton2Clicked();
+	UFUNCTION()
+	void HandleActionButton3Clicked();
+	UFUNCTION()
+	void HandleActionButton4Clicked();
+	UFUNCTION()
+	void HandleActionButton5Clicked();
+	UFUNCTION()
+	void HandleActionButton6Clicked();
+	UFUNCTION()
+	void HandleActionButton7Clicked();
+	UFUNCTION()
+	void HandleActionButton8Clicked();
+	UFUNCTION()
+	void HandleActionButton9Clicked();
+	UFUNCTION()
+	void HandleActionButton10Clicked();
+	UFUNCTION()
+	void HandleActionButton11Clicked();
+	UFUNCTION()
+	void HandleActionButton12Clicked();
+	UFUNCTION()
+	void HandleActionButton13Clicked();
+	UFUNCTION()
+	void HandleActionButton14Clicked();
+	UFUNCTION()
+	void HandleActionButton15Clicked();
+
+	UFUNCTION()
+	void HandleControlGroupButton1Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton2Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton3Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton4Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton5Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton6Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton7Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton8Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton9Clicked();
+	UFUNCTION()
+	void HandleControlGroupButton10Clicked();
+
+	void HandleKeyBindingUpdated(UInputAction* ActionToBind, const FKey& NewKey);
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ACPPController> M_PlayerController;
@@ -59,8 +149,78 @@ private:
 	TWeakObjectPtr<UMainGameUI> M_MainGameUI;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UVerticalBox> M_KeyBindingsList = nullptr;
+	TObjectPtr<UScrollBox> M_KeyBindingsList = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UEditableTextBox> M_SearchKeyBar = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ButtonBack = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton1 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton2 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton3 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton4 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton5 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton6 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton7 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton8 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton9 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton10 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton11 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton12 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton13 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton14 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ActionButton15 = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton1 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton2 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton3 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton4 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton5 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton6 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton7 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton8 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton9 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ControlGroupButton10 = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UW_KeyBindingPopup> M_KeyBindingPopup = nullptr;
+
+	UPROPERTY(Transient)
+	TMap<FName, TObjectPtr<UW_EscapeMenuKeyBindingEntry>> M_ActionNameToEntry;
+
+	UPROPERTY(Transient)
+	TMap<FName, TWeakObjectPtr<UInputAction>> M_ActionNameToAction;
+
+	UPROPERTY(Transient)
+	TMap<FName, FKey> M_SpecialActionKeyBindings;
+
+	UPROPERTY(Transient)
+	TArray<FEscapeMenuKeyBindingEntryData> M_KeyBindingEntries;
 };

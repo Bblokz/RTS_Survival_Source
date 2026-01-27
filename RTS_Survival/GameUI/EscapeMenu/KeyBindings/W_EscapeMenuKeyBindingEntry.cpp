@@ -40,14 +40,40 @@ void UW_EscapeMenuKeyBindingEntry::SetupEntry(
 	M_PlayerController = NewPlayerController;
 	M_Action = ActionToBind;
 	M_CurrentKey = CurrentKey;
+	M_ActionDisplayName = BuildActionDisplayName(ActionToBind->GetFName());
 
 	if (GetIsValidActionNameText())
 	{
-		const FText ActionLabel = FText::FromName(ActionToBind->GetFName());
-		M_ActionNameText->SetText(ActionLabel);
+		M_ActionNameText->SetText(FText::FromString(M_ActionDisplayName));
 	}
 
 	UpdateDisplayedKey(CurrentKey);
+}
+
+void UW_EscapeMenuKeyBindingEntry::SetKeyBindingValidationDelegate(FKeyBindingValidationDelegate ValidationDelegate)
+{
+	M_KeyBindingValidationDelegate = ValidationDelegate;
+}
+
+FOnKeyBindingUpdated& UW_EscapeMenuKeyBindingEntry::OnKeyBindingUpdated()
+{
+	return M_OnKeyBindingUpdated;
+}
+
+void UW_EscapeMenuKeyBindingEntry::UpdateKeyBinding(const FKey& NewKey)
+{
+	if (not NewKey.IsValid())
+	{
+		return;
+	}
+
+	M_CurrentKey = NewKey;
+	UpdateDisplayedKey(NewKey);
+}
+
+FString UW_EscapeMenuKeyBindingEntry::GetActionDisplayName() const
+{
+	return M_ActionDisplayName;
 }
 
 bool UW_EscapeMenuKeyBindingEntry::GetIsValidPlayerController() const
@@ -127,6 +153,18 @@ void UW_EscapeMenuKeyBindingEntry::UpdateDisplayedKey(const FKey& NewKey)
 	M_KeySelector->SetAllowModifierKeys(false);
 }
 
+FString UW_EscapeMenuKeyBindingEntry::BuildActionDisplayName(const FName& ActionName) const
+{
+	FString ActionLabel = ActionName.ToString();
+	const FString Prefix = TEXT("IA_");
+	if (ActionLabel.StartsWith(Prefix))
+	{
+		ActionLabel.RightChopInline(Prefix.Len());
+	}
+
+	return ActionLabel;
+}
+
 void UW_EscapeMenuKeyBindingEntry::HandleKeySelected(FInputChord SelectedKey)
 {
 	if (not GetIsValidPlayerController() || not GetIsValidAction())
@@ -141,7 +179,18 @@ void UW_EscapeMenuKeyBindingEntry::HandleKeySelected(FInputChord SelectedKey)
 		return;
 	}
 
+	if (M_KeyBindingValidationDelegate.IsBound())
+	{
+		const bool bIsAllowed = M_KeyBindingValidationDelegate.Execute(M_Action, NewKey);
+		if (not bIsAllowed)
+		{
+			UpdateDisplayedKey(M_CurrentKey);
+			return;
+		}
+	}
+
 	M_PlayerController->ChangeKeyBinding(M_Action, M_CurrentKey, NewKey);
 	M_CurrentKey = NewKey;
 	UpdateDisplayedKey(NewKey);
+	M_OnKeyBindingUpdated.Broadcast(M_Action, NewKey);
 }

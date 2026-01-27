@@ -11,6 +11,9 @@ class UInputAction;
 class UInputKeySelector;
 class URichTextBlock;
 
+DECLARE_DELEGATE_RetVal_TwoParams(bool, FKeyBindingValidationDelegate, UInputAction*, const FKey&);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnKeyBindingUpdated, UInputAction*, const FKey&);
+
 /**
  * @brief Row widget that binds a single input action to a selectable key widget.
  *
@@ -30,6 +33,12 @@ public:
 	 */
 	void SetupEntry(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey);
 
+	void SetKeyBindingValidationDelegate(FKeyBindingValidationDelegate ValidationDelegate);
+	FOnKeyBindingUpdated& OnKeyBindingUpdated();
+
+	void UpdateKeyBinding(const FKey& NewKey);
+	FString GetActionDisplayName() const;
+
 protected:
 	virtual void NativeConstruct() override;
 
@@ -40,6 +49,7 @@ private:
 	bool GetIsValidKeySelector() const;
 
 	void UpdateDisplayedKey(const FKey& NewKey);
+	FString BuildActionDisplayName(const FName& ActionName) const;
 
 	UFUNCTION()
 	void HandleKeySelected(FInputChord SelectedKey);
@@ -51,6 +61,10 @@ private:
 	TObjectPtr<UInputAction> M_Action = nullptr;
 
 	FKey M_CurrentKey;
+	FString M_ActionDisplayName;
+
+	FKeyBindingValidationDelegate M_KeyBindingValidationDelegate;
+	FOnKeyBindingUpdated M_OnKeyBindingUpdated;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<URichTextBlock> M_ActionNameText = nullptr;
