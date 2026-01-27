@@ -1,11 +1,17 @@
-﻿you need to implement a new type of component called AttachedWeaponAbilityComponent
+﻿you need to implement a new type of component called AttachedWeaponAbilityComponent.
+This new component requires a lot of integration across various parts of the code base; analyse the following text carefully before implementing:
+
+This ability will work like an attack ground command on the attached weapon(s) of the component.
+
 it will be identified with the a new Eability Id called IdAttachedWeapon
 this component will use mechanics a bit similar to the Aimability component where it will use the player 
-aim aimability on the second action button click to aim this weapon but instead of relying on weapons already mounted by a tank, building expansion
-or aircraft (this component will not be implemented for squad controllers) it will setup a new weapon using either
+aim aimability on the second action button click to aim this weapon but instead of relying on weapons already mounted by a tank or building expansion
+ (this component will not be implemented for squad controllers or aircraft) it will setup a new weapon using either
 a mesh as provided by the blueprint that has this component added calling the initWithExistingMesh function with a mesh 
 of that bluerpint on this component 
 OR it will have the component spawn a new weapon mesh that will serve as the weapon mesh.
+In addition an important distinction is that it does not order the unit to move closer; out of range is not casting of the ability (more on that later)
+
 
 The component needs to Implement IWeaponOwner so the weapon that is spawned can treat it as one.
 the weapons are then spawned through the bp callable Setup functions from IWeaponOwner (note: it must be possible to setup multiple
@@ -14,20 +20,141 @@ weapons with the same component!)
 to identify the sub-type of this ability define a new enum in its own filed called EAttachWeaponAbilitySubType with entries:
 Pz38AttachedMortarDefault, KingTigerAttachedRocketBarrage
 
-IMPORTANT NOTE:  the iweapon owner functiosn like
+IMPORTANT NOTE:  the iweapon owner functions like
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters) = 0;
 Expect a weapon mesh to be provided with their setup. in the case that the designer has set this weapon ability comp to spawn its own mesh we first check if that mesh
 is valid and overwrite the InitState... struct of every SetupFunction to use for the weapon instead of the one provided with the struct which we assume to be null.
-because the setup functions are called in the bluerpint that implements this weapon, on this struct it is possible that the designer forgot to fist call
+because the setup functions are called in the blueprint that implements this weapon, on this struct it is possible that the designer forgot to fist call
 the correct init function for this component (Either the one with existing mesh or the one that spawns a new mesh) before calling the setup functions; if that is the case error report and
-wait with spawning the weapon and initializing it untill the  init function has been called.
+wait with spawning the weapon and initializing it until the init function has been called.
 
 you need to RTSFunctionLibrary::ReportError if this weapon ability comp was set to use an existing mesh but none is provided in the setup params for the weapon.
 you also need to error report if the component was initialized to use a spawned mesh but the spawned mesh is invalid and so we cannot init the weapon with a valid mesh.
 
 
+you also need to implement a new helper in the FAbilityHelpers to get the AttachedWeaponAbilityComponent from an actor based on the EAttachWeaponAbilitySubType (like we also have for the GetHasAimAbilityComponent).
+And implement one similair to 
+	inline bool GetHasAimAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
+	                             const EAbilityID AimAbilityId,
+	                             const EAimAbilityType AimAbilityType,
+	                             FUnitAbilityEntry& OutAbilityOfAim)
+ That will later be used in ICommands to check if the unit has this exact AttachedWeaponAbility.
 
+
+
+note how for the direct action button of the aim ability we use the following logic:
+void ACPPController::DirectActionButtonAimAbility(const EAimAbilityType AimAbilityType)
+{
+	if (not GetIsValidGameUIController())
+	{
+		return;
+	}
+	M_ActiveAimAbilityType = AimAbilityType;
+	bM_IsActionButtonActive = true;
+	UpdateCursor();
+	AActor* PrimarySelected = M_GameUIController->GetPrimarySelectedUnit();
+	UAimAbilityComponent* AimAbilityComp = FAbilityHelpers::GetHasAimAbilityComponent(AimAbilityType, PrimarySelected);
+	CreateAimAbilityRadius(PrimarySelected, AimAbilityComp);
+}
+
+void ACPPController::CreateAimAbilityRadius(AActor* Primary, const UAimAbilityComponent* AimComp)
+{
+	HideAimAbilityRadiusIfNeeded();
+	if (not IsValid(Primary) || not IsValid(AimComp))
+	{
+		return;
+	}
+	AimAbilityRadiusIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(
+		this,
+		Primary->GetActorLocation(),
+		// Note that we use range not radius as the radius is for the impact aim assist and this is to display the
+		// full fire range of the ability.
+		AimComp->GetAimAbilityRange(), ERTSRadiusType::FUllCircle_Weaponrange);
+	if (AimAbilityRadiusIndex < 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"ACPPController::CreateAimAbilityRadius: Failed to create radius actor!");
+		return;
+	}
+	const FVector RadiusOffset = FVector(0.f, 0.f, 50.f);
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(this,
+	                                                     AimAbilityRadiusIndex,
+	                                                     Primary, RadiusOffset);
+}
+
+i want you to implement something similair for the direct action button of the AttachedWeaponAbilityComponent;
+use the range of the component which is set by the weapons that are initialized on it.
+note how this is different from the aim assist we get from DetermineShowAimRadiusForAbility which
+is the actual crosshair (attached to player mouse projection) used within this range radius.
+
+Cooldown behaviour (AttachedWeaponAbility)
+
+The AttachedWeaponAbility cooldown must behave like a regular queued ability: it starts immediately when the command begins executing, not when the firing/FX finishes.
+
+Requirements
+
+The cooldown is started by the command queue execution path, the same way other queued abilities do it.
+
+ON the icommands implementation:
+Add a public ECommandQueueError FireAttachedWeaponAbility(const FVector& TargetLocation,
+const bool bSetUnitToIdle, const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
+
+and add the functionaity for adding it to the queue, calling the protected execute and terminate functions for this ability as well.
+
+For the new AttachedWeaponAbility we must not implement any “move into range, then cast” behaviour. This ability can be used by static buildings / building expansions that cannot move, and even for movable units we explicitly want the cast to fail if the target is out of range.
+
+New command queue error
+
+Extend ECommandQueueError with a new entry:
+
+AbilityNotInCastRange
+
+This error is returned when a unit receives a FireAttachedWeaponAbility(...) request but the target location is outside the cast range of the AttachedWeaponAbilityComponent (range derived from the initialized weapon(s) on the component).
+
+ICommands: range check + early return (no movement)
+
+In the ICommands implementation for:
+
+ECommandQueueError FireAttachedWeaponAbility(
+    const FVector& TargetLocation,
+    const bool bSetUnitToIdle,
+    const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
+
+
+IMportant for cpp controller logic and announcer voice line do the following:
+
+Validate the unit has the correct AttachedWeaponAbilityComponent for AttachedWeaponAbilityType.
+
+Determine the ability range from the component (based on its initialized weapon states).
+
+If the target is not in cast range:
+
+Do not enqueue the command.
+
+Do not issue any move request.
+
+Return ECommandQueueError::AbilityNotInCastRange.
+
+This keeps behaviour consistent across pawns and static building actors, and avoids introducing any hidden “walk into range” logic.
+
+Announcer voice line: only when everyone fails due to range
+
+When the player attempts to cast the AttachedWeaponAbility on a target location:
+
+The controller issues FireAttachedWeaponAbility(...) to each selected valid actor/unit that supports this ability.
+
+Track the returned errors per unit.
+
+If all selected units that attempted the cast returned only ECommandQueueError::AbilityNotInCastRange
+
+then play the announcer voice line AbilityNotInRange (once).
+
+Notes:
+
+If at least one unit successfully enqueues/executes the ability, do not play the voice line.
+
+If failures occur for other reasons (cooldown, missing component, invalid state, etc.), do not treat that as “not in range” for the announcer aggregation—only the new error should drive this specific VO.
 
 The settings struct (BP friendly like FAimAbilitySettings is) will contain:
 Note that no static mesh class is set here that is only provided with  that special init function.
@@ -35,6 +162,9 @@ Note that no static mesh class is set here that is only provided with  that spec
 - UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 PreferredAbilityIndex = INDEX_NONE;
 
+// how long the attached weapon(s) fire for.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TotalWeaponFireTime = 2.0f;
 	// How long the ability is on cooldown after use.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Cooldown = 5;
@@ -47,13 +177,26 @@ Note that no static mesh class is set here that is only provided with  that spec
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Radius = 300;
 	
+the execution of the abilty on the tank or the buiding expansion:
+make sure all attached weapon(s) of the component are set to be fully reloaded instantly.
+relay the attack ground command of the ground location we got fromthe queue to all attached weapon(s) of the component.
+set a timer for TotalWeaponFireTime that when it ends makes all attached weapon(s) of the component stop firing.
+fire done executing command directly after setting the timer (the unit can go do other things)
+
+the terminate command function will be called right after setting the timer so it can just be left empty.
 
 
 make sure that you completely implemented:
 - the new component
 - the direct action button and second click action button functions in the cpp contoller (again relay this ability
 only to the selected pawns and selected actors; not the squad controllers)
-- the execute and terminate of the Ability are fully implemented in tank master, aircraft master and the ABuildingExpansion.
+- the execute and terminate of the Ability are fully implemented in tank master and ABuildingExpansion.
+- make sure the helpers of FAbilityHelpers are there.
+- make sure the aim assistance is properly shown and the range radius is aswell. and make sure they are properly deactivated
+after succesfull casting or deactivating the action button after activating it.
+- make sure the exection will work like an attack ground command for the attached weapon(s) of the component; and set the weapons to completely stop
+firing after the total fire timer ends.
+
 
 
 

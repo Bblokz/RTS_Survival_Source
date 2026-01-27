@@ -107,6 +107,7 @@ enum class EAnnouncerVoiceLineType : uint8
 	Cancelled,
 	GamePaused,
 	GameResumed,
+	AbilityNotInRange
 };
 
 USTRUCT(BlueprintType)

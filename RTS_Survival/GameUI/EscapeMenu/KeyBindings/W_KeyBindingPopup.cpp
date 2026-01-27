@@ -13,7 +13,6 @@ namespace KeyBindingPopupConstants
 	const TCHAR* ChangeBindingTitle = TEXT("<Text_Title>Change Key Binding</>");
 	const TCHAR* ConflictBindingTitle = TEXT("<Text_BadTitle>Conflicting Key Binding</>");
 	const TCHAR* TryDifferentBindingTitle = TEXT("<Text_Title>Try Different Key</>");
-	const TCHAR* ConflictMessageFormat = TEXT("<Text_Bad14>cannot set keybinding, key already taken by %s</>");
 }
 
 void UW_KeyBindingPopup::NativeConstruct()
@@ -29,7 +28,8 @@ void UW_KeyBindingPopup::NativeConstruct()
 	M_UnderstoodButton->OnClicked.AddDynamic(this, &UW_KeyBindingPopup::HandleUnderstoodClicked);
 }
 
-void UW_KeyBindingPopup::SetupPopup(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey)
+void UW_KeyBindingPopup::SetupPopup(ACPPController* NewPlayerController, UInputAction* ActionToBind,
+                                    const FKey& CurrentKey)
 {
 	if (not SetBindingContext(NewPlayerController, ActionToBind, CurrentKey))
 	{
@@ -58,10 +58,11 @@ void UW_KeyBindingPopup::ShowCollisionMessage(const FString& CollidingActionName
 		return;
 	}
 
-	const FString MessageText = FString::Printf(
-		KeyBindingPopupConstants::ConflictMessageFormat,
-		*CollidingActionName
-	);
+	const FString MessageText =
+		TEXT("<Text_Bad14>cannot set keybinding, key already taken by ")
+		+ CollidingActionName
+		+ TEXT("</>");
+
 	M_ConflictText->SetText(FText::FromString(MessageText));
 	SetTitleText(KeyBindingPopupConstants::ConflictBindingTitle);
 	M_PopupSwitcher->SetActiveWidgetIndex(1);
@@ -142,7 +143,8 @@ bool UW_KeyBindingPopup::GetIsValidConflictText() const
 	return false;
 }
 
-bool UW_KeyBindingPopup::SetBindingContext(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey)
+bool UW_KeyBindingPopup::SetBindingContext(ACPPController* NewPlayerController, UInputAction* ActionToBind,
+                                           const FKey& CurrentKey)
 {
 	if (not IsValid(NewPlayerController))
 	{
