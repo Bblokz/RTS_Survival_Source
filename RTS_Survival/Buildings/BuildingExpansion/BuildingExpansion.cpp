@@ -19,6 +19,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
@@ -77,11 +78,8 @@ void ABuildingExpansion::StartExpansionConstructionAtLocation(
 	const FRotator& Rotation,
 	const FName& AttachedToSocketName)
 {
-	if (not IsValid(BuildingMeshComponent))
+	if (not GetIsValidBuildingMeshComponent())
 	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this,
-		                                             "BuildingMeshComponent",
-		                                             "ABuildingExpansion::StartExpansionConstructionAtLocation");
 		return;
 	}
 
@@ -118,7 +116,7 @@ void ABuildingExpansion::StartPackUpBuildingExpansion(const float TotalTime)
 	SetAllTurretsDisabled();
 	SetMeshToConstructionMesh();
 	if (M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_Built &&
-		EnsureProgressBarIsValid("ABuildingExpansion::StartPackUpBuildingExpansion"))
+		GetIsValidProgressBarWidget())
 	{
 		// Get elapesed time from the progress bar to restart the construction if packing is cancelled.
 		M_TimeElapsedWhenConstructionCancelled = M_ProgressBarWidget->GetTimeElapsed();
@@ -132,7 +130,14 @@ void ABuildingExpansion::StartPackUpBuildingExpansion(const float TotalTime)
 	}
 	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_BeingPackedUp);
 
-	const float Interval = TotalTime / M_CachedOriginalMaterials.Num();
+	const int32 CachedMaterialCount = M_CachedOriginalMaterials.Num();
+	if (CachedMaterialCount == 0)
+	{
+		StartFinishMaterialsTimer(TotalTime);
+		BP_OnStartPackUpBxp();
+		return;
+	}
+	const float Interval = TotalTime / CachedMaterialCount;
 	// Procedurally apply construction materials to material slots.
 	StartAnimationTimer(Interval, false);
 	BP_OnStartPackUpBxp();
@@ -158,9 +163,12 @@ void ABuildingExpansion::CancelPackUpBuildingExpansion()
 	}
 	else
 	{
-		for (int32 i = 0; i < M_CachedOriginalMaterials.Num(); ++i)
+		if (GetIsValidBuildingMeshComponent())
 		{
-			BuildingMeshComponent->SetMaterial(i, M_CachedOriginalMaterials[i]);
+			for (int32 i = 0; i < M_CachedOriginalMaterials.Num(); ++i)
+			{
+				BuildingMeshComponent->SetMaterial(i, M_CachedOriginalMaterials[i]);
+			}
 		}
 		ResetCachedMaterials();
 		SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_Built);
@@ -237,16 +245,17 @@ void ABuildingExpansion::SetupComponentCollisions(TArray<UMeshComponent*> MeshCo
 	{
 		return;
 	}
-	if (IsValid(BuildingMeshComponent))
+	if (not GetIsValidBuildingMeshComponent())
 	{
-		if (MeshComponents.Contains(BuildingMeshComponent))
-		{
-			RTSFunctionLibrary::ReportWarning("BuildingMeshComponent is already in the MeshComponents array!"
-				"\n At function: ABuildingExpansion::SetupComponentCollisions"
-				"\n For building expansion: " + GetName());
-		}
-		MeshComponents.Remove(BuildingMeshComponent);
+		return;
 	}
+	if (MeshComponents.Contains(BuildingMeshComponent))
+	{
+		RTSFunctionLibrary::ReportWarning("BuildingMeshComponent is already in the MeshComponents array!"
+			"\n At function: ABuildingExpansion::SetupComponentCollisions"
+			"\n For building expansion: " + GetName());
+	}
+	MeshComponents.Remove(BuildingMeshComponent);
 	const int32 OwningPlayer = RTSComponent->GetOwningPlayer();
 	FRTS_CollisionSetup::SetupBuildingExpansionCollision(BuildingMeshComponent, OwningPlayer,
 	                                                     bStaticMeshesAffectNavMesh);
@@ -370,10 +379,11 @@ void ABuildingExpansion::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 
 void ABuildingExpansion::OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret)
 {
-	if (IsValid(CallingTurret))
+	if (not IsValid(CallingTurret))
 	{
-		CallingTurret->SetAutoEngageTargets(false);
+		return;
 	}
+	CallingTurret->SetAutoEngageTargets(false);
 }
 
 void ABuildingExpansion::OnMountedWeaponTargetDestroyed(ACPPTurretsMaster* CallingTurret,
@@ -660,30 +670,33 @@ void ABuildingExpansion::InitBuildingExpansion(
 
 void ABuildingExpansion::OnFinishedExpansionConstruction()
 {
-	if (M_ProgressBarWidget.IsValid())
+	if (not GetIsValidProgressBarWidget())
 	{
-		SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_Built);
-
-
-		M_ProgressBarWidget->StopProgressBar();
-		// No need to reconstruct when cancelling packing; this bxp is completely built.
-		M_TimeElapsedWhenConstructionCancelled = 0.f;
-		SpawnBuildingAttachments();
-		SetTurretsToAutoEngage();
-		SetMeshToBuildingMesh();
-		BP_OnFinishedExpansionConstruction();
+		return;
 	}
-	else
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this,
-		                                             "M_ProgressBarWidget",
-		                                             "ABuildingExpansion::OnFinishedExpansionConstruction");
-	}
+	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_Built);
+
+	M_ProgressBarWidget->StopProgressBar();
+	// No need to reconstruct when cancelling packing; this bxp is completely built.
+	M_TimeElapsedWhenConstructionCancelled = 0.f;
+	SpawnBuildingAttachments();
+	SetTurretsToAutoEngage();
+	SetMeshToBuildingMesh();
+	BP_OnFinishedExpansionConstruction();
 }
 
 
 void ABuildingExpansion::SpawnBuildingAttachments()
 {
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (not EnsureWorldIsValid(World, "ABuildingExpansion::SpawnBuildingAttachments"))
+	{
+		return;
+	}
 	for (const auto& [ActorToSpawn, SocketName, Scale] : M_BuildingAttachments)
 	{
 		if (not ActorToSpawn)
@@ -692,16 +705,16 @@ void ABuildingExpansion::SpawnBuildingAttachments()
 		}
 		// Attempt to get the transform of the specified socket
 		FTransform SocketTransform;
-		if (!BuildingMeshComponent->DoesSocketExist(SocketName) ||
-			!(SocketTransform = BuildingMeshComponent->GetSocketTransform(SocketName,
-			                                                              ERelativeTransformSpace::RTS_World)).
+		if (not BuildingMeshComponent->DoesSocketExist(SocketName) ||
+			not (SocketTransform = BuildingMeshComponent->GetSocketTransform(SocketName,
+			                                                                 ERelativeTransformSpace::RTS_World)).
 			IsValid())
 		{
 			continue;
 		}
 
 		// Spawn the actor at the socket's location and orientation
-		AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(ActorToSpawn,
+		AActor* SpawnedActor = World->SpawnActor<AActor>(ActorToSpawn,
 		                                                      SocketTransform.GetLocation(),
 		                                                      SocketTransform.GetRotation().Rotator());
 		if (not SpawnedActor)
@@ -760,43 +773,46 @@ void ABuildingExpansion::OnNewConstructionLocationPropagateStatus(const EBuildin
 void ABuildingExpansion::CacheOriginalMaterials()
 {
 	ResetCachedMaterials();
-	if (IsValid(BuildingMeshComponent))
+	if (not GetIsValidBuildingMeshComponent())
 	{
-		for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
-		{
-			M_CachedOriginalMaterials.Add(BuildingMeshComponent->GetMaterial(i));
-		}
 		return;
 	}
-	RTSFunctionLibrary::ReportNullErrorComponent(this,
-	                                             "BuildingMeshComponent",
-	                                             "ABuildingExpansion::CacheOriginalMaterials");
+	for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
+	{
+		M_CachedOriginalMaterials.Add(BuildingMeshComponent->GetMaterial(i));
+	}
 }
 
 void ABuildingExpansion::ApplyConstructionMaterial() const
 {
-	if (IsValid(BuildingMeshComponent) && IsValid(M_ConstructionAnimationMaterial))
+	if (not GetIsValidBuildingMeshComponent())
 	{
-		for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
-		{
-			BuildingMeshComponent->SetMaterial(i, M_ConstructionAnimationMaterial);
-		}
 		return;
 	}
-	RTSFunctionLibrary::ReportNullErrorComponent(this,
-	                                             "BuildingMeshComponent or ConstructionAnimationMaterial",
-	                                             "ABuildingExpansion::ApplyConstructionMaterial");
+	if (not GetIsValidConstructionAnimationMaterial())
+	{
+		return;
+	}
+	for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
+	{
+		BuildingMeshComponent->SetMaterial(i, M_ConstructionAnimationMaterial);
+	}
 }
 
 void ABuildingExpansion::ApplyCachedMaterials()
 {
-	if (not EnsureBuildingMeshComponentIsValid("ABuildingExpansion::ApplyCachedMaterials"))
+	if (not GetIsValidBuildingMeshComponent())
 	{
 		return;
 	}
 	if (M_StatusBuildingExpansion == EBuildingExpansionStatus::BXS_BeingPackedUp)
 	{
 		if (M_MaterialIndex < 0)
+		{
+			FinishReapplyingMaterials();
+			return;
+		}
+		if (not GetIsValidConstructionAnimationMaterial())
 		{
 			FinishReapplyingMaterials();
 			return;
@@ -900,13 +916,19 @@ void ABuildingExpansion::StartConstructionAnimation(
 	// Applies construction materials to all slots.
 	ApplyConstructionMaterial();
 
-	if (EnsureProgressBarIsValid("ABuildingExpansion::StartConstructionAnimation"))
+	if (GetIsValidProgressBarWidget())
 	{
 		// Start the progress bar.
 		M_ProgressBarWidget->StartProgressBar(BuildingTime);
 	}
 	// Start timer to reapply original materials.
-	const float Interval = BuildingTime / M_CachedOriginalMaterials.Num();
+	const int32 CachedMaterialCount = M_CachedOriginalMaterials.Num();
+	if (CachedMaterialCount == 0)
+	{
+		StartFinishMaterialsTimer(BuildingTime);
+		return;
+	}
+	const float Interval = BuildingTime / CachedMaterialCount;
 	StartAnimationTimer(Interval, true);
 }
 
@@ -949,7 +971,11 @@ void ABuildingExpansion::SetAllTurretsDisabled()
 
 void ABuildingExpansion::SetMeshToBuildingMesh()
 {
-	if (not IsValid(M_BuildingMesh))
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	if (not GetIsValidBuildingMesh())
 	{
 		return;
 	}
@@ -972,7 +998,11 @@ void ABuildingExpansion::SetMeshToBuildingMesh()
 void ABuildingExpansion::SetMeshToConstructionMesh()
 {
 	// Set the construction mesh back on the building expansion.
-	if (not IsValid(M_ConstructionMesh))
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	if (not GetIsValidConstructionMesh())
 	{
 		return;
 	}
@@ -990,18 +1020,6 @@ void ABuildingExpansion::SetMeshToConstructionMesh()
 			BuildingMeshComponent->SetMaterial(i, ConstructionMaterial);
 		}
 	}
-}
-
-bool ABuildingExpansion::EnsureProgressBarIsValid(const FString& FunctionName) const
-{
-	if (M_ProgressBarWidget.IsValid())
-	{
-		return true;
-	}
-	RTSFunctionLibrary::ReportNullErrorComponent(this,
-	                                             "M_ProgressBarWidget",
-	                                             FunctionName);
-	return false;
 }
 
 bool ABuildingExpansion::EnsureWorldIsValid(const UWorld* World, const FString& FunctionName) const
@@ -1023,16 +1041,92 @@ bool ABuildingExpansion::DidKillTargetActorOrTargetNoLongerValid(AActor* TargetA
 	return not RTSFunctionLibrary::RTSIsValid(TargetActor);
 }
 
-bool ABuildingExpansion::EnsureBuildingMeshComponentIsValid(const FString& FunctionName) const
+bool ABuildingExpansion::GetIsValidBuildingMeshComponent() const
 {
 	if (IsValid(BuildingMeshComponent))
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportNullErrorComponent(this,
-	                                             "BuildingMeshComponent",
-	                                             FunctionName);
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"BuildingMeshComponent",
+		"GetIsValidBuildingMeshComponent",
+		this);
 	return false;
+}
+
+bool ABuildingExpansion::GetIsValidProgressBarWidget() const
+{
+	if (M_ProgressBarWidget.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_ProgressBarWidget",
+		"GetIsValidProgressBarWidget",
+		this);
+	return false;
+}
+
+bool ABuildingExpansion::GetIsValidConstructionMesh() const
+{
+	if (IsValid(M_ConstructionMesh))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_ConstructionMesh",
+		"GetIsValidConstructionMesh",
+		this);
+	return false;
+}
+
+bool ABuildingExpansion::GetIsValidBuildingMesh() const
+{
+	if (IsValid(M_BuildingMesh))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_BuildingMesh",
+		"GetIsValidBuildingMesh",
+		this);
+	return false;
+}
+
+bool ABuildingExpansion::GetIsValidConstructionAnimationMaterial() const
+{
+	if (IsValid(M_ConstructionAnimationMaterial))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_ConstructionAnimationMaterial",
+		"GetIsValidConstructionAnimationMaterial",
+		this);
+	return false;
+}
+
+void ABuildingExpansion::StartFinishMaterialsTimer(const float TotalTime)
+{
+	const UWorld* World = GetWorld();
+	if (not EnsureWorldIsValid(World, "ABuildingExpansion::StartFinishMaterialsTimer"))
+	{
+		return;
+	}
+	World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+	if (TotalTime <= 0.f)
+	{
+		FinishReapplyingMaterials();
+		return;
+	}
+	World->GetTimerManager().SetTimer(MaterialReapplyTimerHandle, this,
+	                                  &ABuildingExpansion::FinishReapplyingMaterials,
+	                                  TotalTime, false);
 }
 
 void ABuildingExpansion::OnTurretTargetDestroyed(ACPPTurretsMaster* CallingTurret, AActor* DestroyedActor)
@@ -1095,9 +1189,9 @@ void ABuildingExpansion::OnHullWeaponKilledActor(UHullWeaponComponent* CallingHu
 
 void ABuildingExpansion::OnInitBuildingExpansion_SetupCollision(const bool bLetBuildingComponentAffectNavmesh) const
 {
-	if (not IsValid(BuildingMeshComponent))
+	if (not GetIsValidBuildingMeshComponent())
 	{
-		RTSFunctionLibrary::ReportError("Bxp has no valid building mesh component cannot init the collision settings");
+		return;
 	}
 	if (not GetIsValidRTSComponent())
 	{
