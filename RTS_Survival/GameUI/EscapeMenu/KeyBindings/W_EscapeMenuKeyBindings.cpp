@@ -392,9 +392,17 @@ bool UW_EscapeMenuKeyBindings::ValidateSpecialBinding(UInputAction* ActionToBind
 		return true;
 	}
 
+	const FKey CurrentKey = GetCurrentKeyForAction(ActionName);
+	if (not CurrentKey.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("Key binding conflict handling failed to find the current binding.");
+		return false;
+	}
+
 	EnsureKeyBindingPopupVisible();
 	if (M_KeyBindingPopup != nullptr)
 	{
+		M_KeyBindingPopup->SetupPopup(M_PlayerController.Get(), ActionToBind, CurrentKey);
 		M_KeyBindingPopup->ShowCollisionMessage(GetActionDisplayName(CollisionActionName));
 	}
 
@@ -730,4 +738,9 @@ void UW_EscapeMenuKeyBindings::HandleKeyBindingUpdated(UInputAction* ActionToBin
 	}
 
 	UpdateKeyBindingEntryForAction(ActionName, NewKey);
+
+	if (M_KeyBindingPopup != nullptr && M_KeyBindingPopup->IsInViewport())
+	{
+		M_KeyBindingPopup->ClosePopup();
+	}
 }
