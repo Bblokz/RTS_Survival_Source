@@ -139,11 +139,17 @@ void UBombComponent::ConfigureBombAmmoTracking(const FBombTrackerInitSettings& S
 	UWorld* World = GetWorld();
 	if (World)
 	{
+		const TWeakObjectPtr<UBombComponent> WeakBombComponent(this);
 		World->GetTimerManager().SetTimer(
 			M_BombTrackerState.VerifyBindingTimer,
-			FTimerDelegate::CreateLambda([this]()
+			FTimerDelegate::CreateLambda([WeakBombComponent]()
 			{
-				M_BombTrackerState.VerifyTrackingActive();
+				if (not WeakBombComponent.IsValid())
+				{
+					return;
+				}
+
+				WeakBombComponent->M_BombTrackerState.VerifyTrackingActive();
 			}),
 			M_BombTrackerState.VerifyBindingDelay, false);
 	}
