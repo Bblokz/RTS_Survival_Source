@@ -436,6 +436,27 @@ void ACPPController::ChangeKeyBinding(UInputAction* ActionToRebind, const FKey O
 	M_DefaultInputMappingContext->MapKey(ActionToRebind, NewKey);
 }
 
+void ACPPController::UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey BoundKey)
+{
+	if (not GetIsValidDefaultInputMappingContext())
+	{
+		return;
+	}
+
+	if (not IsValid(ActionToUnbind))
+	{
+		RTSFunctionLibrary::ReportError("UnbindKeyBinding received an invalid action reference.");
+		return;
+	}
+
+	if (not BoundKey.IsValid())
+	{
+		return;
+	}
+
+	M_DefaultInputMappingContext->UnmapKey(ActionToUnbind, BoundKey);
+}
+
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
 {
 	return M_PlayerPortraitManager;

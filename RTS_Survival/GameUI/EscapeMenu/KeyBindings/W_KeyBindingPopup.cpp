@@ -13,19 +13,38 @@ namespace KeyBindingPopupConstants
 	const TCHAR* ChangeBindingTitle = TEXT("<Text_Title>Change Key Binding</>");
 	const TCHAR* ConflictBindingTitle = TEXT("<Text_BadTitle>Conflicting Key Binding</>");
 	const TCHAR* TryDifferentBindingTitle = TEXT("<Text_Title>Try Different Key</>");
+	const TCHAR* UnboundActionsTitle = TEXT("<Text_BadTitle>Unbound Actions</>");
+	constexpr int32 BindingEntrySwitcherIndex = 0;
+	constexpr int32 CollisionSwitcherIndex = 1;
+	constexpr int32 UnboundWarningSwitcherIndex = 2;
 }
 
 void UW_KeyBindingPopup::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (not GetIsValidUnderstoodButton())
+	if (not GetIsValidUnderstoodButton() || not GetIsValidUnbindButton())
 	{
 		return;
 	}
 
 	M_UnderstoodButton->OnClicked.RemoveAll(this);
 	M_UnderstoodButton->OnClicked.AddDynamic(this, &UW_KeyBindingPopup::HandleUnderstoodClicked);
+
+	M_UnbindButton->OnClicked.RemoveAll(this);
+	M_UnbindButton->OnClicked.AddDynamic(this, &UW_KeyBindingPopup::HandleUnbindClicked);
+
+	if (GetIsValidConfirmExitButton())
+	{
+		M_ConfirmExitButton->OnClicked.RemoveAll(this);
+		M_ConfirmExitButton->OnClicked.AddDynamic(this, &UW_KeyBindingPopup::HandleConfirmExitClicked);
+	}
+
+	if (GetIsValidCancelExitButton())
+	{
+		M_CancelExitButton->OnClicked.RemoveAll(this);
+		M_CancelExitButton->OnClicked.AddDynamic(this, &UW_KeyBindingPopup::HandleCancelExitClicked);
+	}
 }
 
 void UW_KeyBindingPopup::SetupPopup(ACPPController* NewPlayerController, UInputAction* ActionToBind,
@@ -48,7 +67,7 @@ void UW_KeyBindingPopup::ShowBindingEntry()
 		return;
 	}
 
-	M_PopupSwitcher->SetActiveWidgetIndex(0);
+	M_PopupSwitcher->SetActiveWidgetIndex(KeyBindingPopupConstants::BindingEntrySwitcherIndex);
 }
 
 void UW_KeyBindingPopup::ShowCollisionMessage(const FString& CollidingActionName)
@@ -65,8 +84,20 @@ void UW_KeyBindingPopup::ShowCollisionMessage(const FString& CollidingActionName
 
 	M_ConflictText->SetText(FText::FromString(MessageText));
 	SetTitleText(KeyBindingPopupConstants::ConflictBindingTitle);
-	M_PopupSwitcher->SetActiveWidgetIndex(1);
+	M_PopupSwitcher->SetActiveWidgetIndex(KeyBindingPopupConstants::CollisionSwitcherIndex);
 	bM_ShouldReturnToEntryOnUnderstood = bM_HasBindingContext;
+}
+
+void UW_KeyBindingPopup::ShowUnboundActionsWarning(const FString& WarningText)
+{
+	if (not GetIsValidPopupSwitcher() || not GetIsValidBindWarningText())
+	{
+		return;
+	}
+
+	SetTitleText(KeyBindingPopupConstants::UnboundActionsTitle);
+	M_BindWarningText->SetText(FText::FromString(WarningText));
+	M_PopupSwitcher->SetActiveWidgetIndex(KeyBindingPopupConstants::UnboundWarningSwitcherIndex);
 }
 
 void UW_KeyBindingPopup::ClosePopup()
@@ -77,6 +108,21 @@ void UW_KeyBindingPopup::ClosePopup()
 UW_EscapeMenuKeyBindingEntry* UW_KeyBindingPopup::GetKeyBindingEntry() const
 {
 	return M_KeyBindingEntry;
+}
+
+FOnKeyBindingPopupUnbindRequested& UW_KeyBindingPopup::OnUnbindRequested()
+{
+	return M_OnUnbindRequested;
+}
+
+FOnKeyBindingPopupExitRequested& UW_KeyBindingPopup::OnConfirmExitRequested()
+{
+	return M_OnConfirmExitRequested;
+}
+
+FOnKeyBindingPopupExitRequested& UW_KeyBindingPopup::OnCancelExitRequested()
+{
+	return M_OnCancelExitRequested;
 }
 
 bool UW_KeyBindingPopup::GetIsValidKeyBindingEntry() const
@@ -167,6 +213,9 @@ bool UW_KeyBindingPopup::SetBindingContext(ACPPController* NewPlayerController, 
 	}
 
 	M_KeyBindingEntry->SetupEntry(NewPlayerController, ActionToBind, CurrentKey);
+	M_PlayerController = NewPlayerController;
+	M_ActionToBind = ActionToBind;
+	M_CurrentKey = CurrentKey;
 	bM_HasBindingContext = true;
 	return true;
 }
@@ -197,6 +246,86 @@ bool UW_KeyBindingPopup::GetIsValidUnderstoodButton() const
 	return false;
 }
 
+bool UW_KeyBindingPopup::GetIsValidUnbindButton() const
+{
+	if (IsValid(M_UnbindButton))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_UnbindButton"),
+		TEXT("UW_KeyBindingPopup::GetIsValidUnbindButton"),
+		this
+	);
+	return false;
+}
+
+bool UW_KeyBindingPopup::GetIsValidBindWarningText() const
+{
+	if (IsValid(M_BindWarningText))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_BindWarningText"),
+		TEXT("UW_KeyBindingPopup::GetIsValidBindWarningText"),
+		this
+	);
+	return false;
+}
+
+bool UW_KeyBindingPopup::GetIsValidConfirmExitButton() const
+{
+	if (IsValid(M_ConfirmExitButton))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_ConfirmExitButton"),
+		TEXT("UW_KeyBindingPopup::GetIsValidConfirmExitButton"),
+		this
+	);
+	return false;
+}
+
+bool UW_KeyBindingPopup::GetIsValidCancelExitButton() const
+{
+	if (IsValid(M_CancelExitButton))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_CancelExitButton"),
+		TEXT("UW_KeyBindingPopup::GetIsValidCancelExitButton"),
+		this
+	);
+	return false;
+}
+
+bool UW_KeyBindingPopup::GetIsValidActionToBind() const
+{
+	if (IsValid(M_ActionToBind))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_ActionToBind"),
+		TEXT("UW_KeyBindingPopup::GetIsValidActionToBind"),
+		this
+	);
+	return false;
+}
+
 void UW_KeyBindingPopup::HandleUnderstoodClicked()
 {
 	if (bM_ShouldReturnToEntryOnUnderstood && bM_HasBindingContext)
@@ -208,4 +337,24 @@ void UW_KeyBindingPopup::HandleUnderstoodClicked()
 	}
 
 	ClosePopup();
+}
+
+void UW_KeyBindingPopup::HandleUnbindClicked()
+{
+	if (not bM_HasBindingContext || not GetIsValidActionToBind() || not M_CurrentKey.IsValid())
+	{
+		return;
+	}
+
+	M_OnUnbindRequested.Broadcast(M_ActionToBind, M_CurrentKey);
+}
+
+void UW_KeyBindingPopup::HandleConfirmExitClicked()
+{
+	M_OnConfirmExitRequested.Broadcast();
+}
+
+void UW_KeyBindingPopup::HandleCancelExitClicked()
+{
+	M_OnCancelExitRequested.Broadcast();
 }

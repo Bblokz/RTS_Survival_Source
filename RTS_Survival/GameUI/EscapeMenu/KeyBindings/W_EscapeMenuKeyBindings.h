@@ -43,6 +43,7 @@ public:
 	 * @param NewPlayerController Player controller that owns the key bindings menu.
 	 */
 	void SetPlayerController(ACPPController* NewPlayerController);
+	void HandleKeyBindingsMenuClosed();
 
 protected:
 	virtual void NativeConstruct() override;
@@ -69,6 +70,10 @@ private:
 	void OpenKeyBindingPopupForActionName(const FName& ActionName);
 	void UpdateKeyBindingEntryForAction(const FName& ActionName, const FKey& NewKey);
 	void EnsureKeyBindingPopupVisible();
+	void CloseKeyBindingPopup();
+	void BindKeyBindingPopupCallbacks();
+	FString BuildUnboundActionsWarningText(const TArray<FString>& UnboundActionNames) const;
+	TArray<FString> GetUnboundActionNames() const;
 
 	FName GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const;
 	FString GetActionDisplayName(const FName& ActionName) const;
@@ -147,6 +152,9 @@ private:
 	void HandleControlGroupButton10Clicked();
 
 	void HandleKeyBindingUpdated(UInputAction* ActionToBind, const FKey& NewKey);
+	void HandlePopupUnbindRequested(UInputAction* ActionToUnbind, const FKey& CurrentKey);
+	void HandlePopupConfirmExitRequested();
+	void HandlePopupCancelExitRequested();
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ACPPController> M_PlayerController;
