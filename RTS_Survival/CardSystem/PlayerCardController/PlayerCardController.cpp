@@ -15,12 +15,16 @@ APlayerCardController::APlayerCardController(const FObjectInitializer& ObjectIni
 
 bool APlayerCardController::GetIsValidCardMenu() const
 {
-	if(IsValid(CardMenu))
+	if (not IsValid(CardMenu))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"CardMenu",
+			"GetIsValidCardMenu",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("Card menu is not valid in APlayerCardController::GetIsValidCardMenu.");
-	return false;
+	return true;
 }
-
 

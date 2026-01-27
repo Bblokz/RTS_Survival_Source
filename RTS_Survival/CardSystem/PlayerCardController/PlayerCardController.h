@@ -10,7 +10,7 @@ class UW_RTSCard;
 class UW_CardMenu;
 class URTSCardManager;
 /**
- * 
+ * @brief Serves as the player controller that coordinates card menu UI interactions.
  */
 UCLASS()
 class RTS_SURVIVAL_API APlayerCardController : public APlayerController

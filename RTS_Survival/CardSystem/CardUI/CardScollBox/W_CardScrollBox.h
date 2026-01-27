@@ -17,7 +17,7 @@ class UW_RTSCard;
 enum class ERTSCard : uint8;
 class UScrollBox;
 /**
- * 
+ * @brief Displays and manages the scrollable list of card widgets for selection.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_CardScrollBox : public UUserWidget, public ICardHolder
