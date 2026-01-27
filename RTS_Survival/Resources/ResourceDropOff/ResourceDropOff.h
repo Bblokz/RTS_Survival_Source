@@ -122,4 +122,6 @@ private:
 	void UpdateDropOffVisuals(const ERTSResourceType ResourceTypeChanged);
 
 	void CreateTextOfDropOff(const ERTSResourceType ResourceType, const int32 Amount) const;
+
+	bool GetIsValidPlayerResourceManager() const;
 };

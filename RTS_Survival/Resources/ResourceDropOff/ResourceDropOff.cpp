@@ -33,7 +33,7 @@ int32 UResourceDropOff::DropOffResources(const ERTSResourceType ResourceType, co
 	if (M_ResourceDropOffCapacity.Contains(ResourceType))
 	{
 		const int32 AmountLeft = M_ResourceDropOffCapacity[ResourceType].AddResource(Amount);
-		if (IsValid(M_PlayerResourceManager))
+		if (GetIsValidPlayerResourceManager())
 		{
 			// Update player resource system without affecting the DropOffs as we will store the resources locally.
 			M_PlayerResourceManager->DropOffNoVisualUpdate_AddResource(ResourceType, Amount - AmountLeft);
@@ -73,6 +73,7 @@ void UResourceDropOff::UpgradeDropOffCapacity(const ERTSResourceType ResourceTyp
 			"\n Resource type: " + Global_GetResourceTypeAsString(ResourceType) +
 			"\n ResourceDropOff: " + GetName() +
 			"\n wanted behaviour: " + AlsoUpdateAmount + " " + FString::FromInt(Amount));
+		return;
 	}
 	M_ResourceDropOffCapacity[ResourceType].MaxCapacity += Amount;
 	if (bAlsoAddAmount)
@@ -185,10 +186,7 @@ void UResourceDropOff::BeginPlay()
 		IsValid(NewPlayerController))
 	{
 		M_PlayerResourceManager = NewPlayerController->GetPlayerResourceManager();
-		if (!IsValid(M_PlayerResourceManager))
-		{
-			RTSFunctionLibrary::ReportError("M_PlayerResourceManager is null at UResourceDropOff");
-		}
+		(void)GetIsValidPlayerResourceManager();
 	}
 }
 
@@ -377,4 +375,19 @@ void UResourceDropOff::CreateTextOfDropOff(const ERTSResourceType ResourceType, 
 	                                                                     BaseText, LocationOfDropOff, false, 0.f,
 	                                                                     Justify,
 	                                                                     Settings);
+}
+
+bool UResourceDropOff::GetIsValidPlayerResourceManager() const
+{
+	if (IsValid(M_PlayerResourceManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_PlayerResourceManager",
+		"UResourceDropOff::GetIsValidPlayerResourceManager",
+		this);
+	return false;
 }
