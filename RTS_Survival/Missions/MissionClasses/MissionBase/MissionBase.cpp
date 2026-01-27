@@ -131,9 +131,10 @@ TArray<FTrainingOption> UMissionBase::GetTrainingOptionsDifficultyAdjusted(TArra
                                                                            TArray<FTrainingOption> BrutalOptions,
                                                                            TArray<FTrainingOption> IronmanOptions) const
 {
-	if(not GetGameDifficulty().bIsInitialized)
+	if (not GetGameDifficulty().bIsInitialized)
 	{
-		RTSFunctionLibrary::ReportError("Mission attempted to get training options but game difficulty is not initialized!"
+		RTSFunctionLibrary::ReportError(
+			"Mission attempted to get training options but game difficulty is not initialized!"
 			"\n Mission : " + GetName());
 	}
 	if (GetIsGameDifficultyIronMan())
@@ -173,13 +174,14 @@ bool UMissionBase::CreateSingleAttackMoveDifficultyConditional(ERTSGameDifficult
 	{
 		return false;
 	}
-	if (not GetIsDifficultyAtLeast(MinimalDifficulty) )
+	if (not GetIsDifficultyAtLeast(MinimalDifficulty))
 	{
 		return false;
 	}
-	if(TrainingOptions.IsEmpty() || SpawnLocations.IsEmpty() || WayPoints.IsEmpty())
+	if (TrainingOptions.IsEmpty() || SpawnLocations.IsEmpty() || WayPoints.IsEmpty())
 	{
-		RTSFunctionLibrary::ReportError("Mission attempted to create single attack move wave but one of the required arrays is empty!"
+		RTSFunctionLibrary::ReportError(
+			"Mission attempted to create single attack move wave but one of the required arrays is empty!"
 			"\n Mission : " + GetName());
 		return false;
 	}
@@ -197,8 +199,8 @@ bool UMissionBase::CreateSingleAttackMoveDifficultyConditional(ERTSGameDifficult
 		WaveElements,
 		WayPoints,
 		FinalRotation,
-		MaxFormationWidth ,
-		TimeTillWave ,
+		MaxFormationWidth,
+		TimeTillWave,
 		nullptr,
 		FormationOffsetMultiplier,
 		HelpOffsetRadiusMltMax,
@@ -623,14 +625,20 @@ void UMissionBase::AsyncSpawnActor(
 		return;
 	}
 	M_MapIdToRotation.Add(ID, SpawnPointActor->GetActorRotation());
+	TWeakObjectPtr<UMissionBase> WeakThis(this);
 	M_RTSAsyncSpawner->AsyncSpawnOptionAtLocation(TrainingOption,
 	                                              SpawnPointActor->GetActorLocation() + FVector(0, 0, 50), this, ID,
-	                                              [this](const FTrainingOption& Option, AActor* SpawnedActor,
-	                                                     const int32 ID)-> void
+	                                              [WeakThis](const FTrainingOption& Option, AActor* SpawnedActor,
+	                                                         const int32 ID)-> void
 	                                              {
-		                                              this->OnAsyncSpawnComplete(Option, SpawnedActor, ID);
+		                                              if (not WeakThis.IsValid())
+		                                              {
+			                                              return;
+		                                              }
+		                                              WeakThis->OnAsyncSpawnComplete(Option, SpawnedActor, ID);
 	                                              });
 }
+
 
 void UMissionBase::AsyncSpawnActorAtLocation(const FTrainingOption& TrainingOption, const int32 ID,
                                              const FVector SpawnLocation, const FRotator Rotation)
@@ -640,13 +648,19 @@ void UMissionBase::AsyncSpawnActorAtLocation(const FTrainingOption& TrainingOpti
 		return;
 	}
 	M_MapIdToRotation.Add(ID, Rotation);
+	TWeakObjectPtr<UMissionBase> WeakThis(this);
 	M_RTSAsyncSpawner->AsyncSpawnOptionAtLocation(TrainingOption, SpawnLocation, this, ID,
-	                                              [this](const FTrainingOption& Option, AActor* SpawnedActor,
-	                                                     const int32 ID)-> void
+	                                              [WeakThis](const FTrainingOption& Option, AActor* SpawnedActor,
+	                                                         const int32 ID)-> void
 	                                              {
-		                                              this->OnAsyncSpawnComplete(Option, SpawnedActor, ID);
+		                                              if (not WeakThis.IsValid())
+		                                              {
+			                                              return;
+		                                              }
+		                                              WeakThis->OnAsyncSpawnComplete(Option, SpawnedActor, ID);
 	                                              });
 }
+
 
 void UMissionBase::AsyncSpawnActorAtLocationWithDelay(const FTrainingOption& TrainingOption, const int32 ID,
                                                       const FVector SpawnLocation, const FRotator Rotation,

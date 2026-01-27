@@ -94,7 +94,6 @@ void FPlayerEscapeMenuHelper::OpenEscapeMenuSettings(const FPlayerEscapeMenuSett
 
 	ShowEscapeMenuSettings();
 	PlaySoundIfSet(EscapeMenuSettings.OpenSettingsMenuSound);
-	PauseGameForEscapeMenu();
 }
 
 void FPlayerEscapeMenuHelper::CloseEscapeMenuSettings(const FPlayerEscapeMenuSettings& EscapeMenuSettings)
@@ -112,7 +111,6 @@ void FPlayerEscapeMenuHelper::CloseEscapeMenuSettings(const FPlayerEscapeMenuSet
 		ShowEscapeMenu();
 	}
 
-	PauseGameForEscapeMenu();
 }
 
 void FPlayerEscapeMenuHelper::OpenEscapeMenuKeyBindings(const FPlayerEscapeMenuSettings& EscapeMenuSettings)
@@ -152,8 +150,6 @@ void FPlayerEscapeMenuHelper::CloseEscapeMenuKeyBindings(const FPlayerEscapeMenu
 	{
 		ShowEscapeMenu();
 	}
-
-	PauseGameForEscapeMenu();
 }
 
 bool FPlayerEscapeMenuHelper::GetIsValidPlayerController() const

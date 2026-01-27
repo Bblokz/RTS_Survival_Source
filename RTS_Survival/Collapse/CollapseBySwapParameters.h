@@ -17,7 +17,7 @@ struct FSwapToDestroyedMesh
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UMeshComponent> ComponentToSwapOn = nullptr;
+	UMeshComponent* ComponentToSwapOn = nullptr;
 
 	// The sound to play when the mesh is swapped.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

@@ -33,12 +33,12 @@ void UFowComp::StartFow(const EFowBehaviour FowComponentBehaviour, const bool bS
 {
 	M_FowBehaviour = FowComponentBehaviour;
 
-	if(bStartImmediately)
+	if (bStartImmediately)
 	{
 		OnFowStartParticipation();
 		return;
 	}
-	
+
 	// As there is a delay between when the unit gets loaded and when it is actually selectable for the player we wait
 	// a bit before we start participating in the FOW system.
 	constexpr float TimeTillActivateFow = DeveloperSettings::GamePlay::Training::TimeRemainingStartAsyncLoading + 2.0f;
@@ -50,50 +50,52 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
 	using DeveloperSettings::GamePlay::FoW::VisibleEnoughToRevealEnemy;
 	using DeveloperSettings::GamePlay::FoW::VisibleEnoughToRevealPlayer;
-	if (AActor* FowOwner = GetOwner(); IsValid(GetOwner()))
+	AActor* FowOwner = GetOwner();
+	if (not IsValid(FowOwner))
 	{
-		if (M_FowBehaviour == EFowBehaviour::Fow_Active)
+		return;
+	}
+	if (M_FowBehaviour == EFowBehaviour::Fow_Active)
+	{
+		const FName VisionTag = DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+		if (Visibility >= VisibleEnoughToRevealPlayer)
 		{
-			const FName VisionTag = DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
-			if (Visibility >= VisibleEnoughToRevealPlayer)
+			if (not FowOwner->Tags.Contains(TagUnitInEnemyVision))
 			{
-				if (not FowOwner->Tags.Contains(TagUnitInEnemyVision))
-				{
-					FowOwner->Tags.Add(TagUnitInEnemyVision);
-				}
+				FowOwner->Tags.Add(TagUnitInEnemyVision);
 			}
-			else
-			{
-				FowOwner->Tags.Remove(TagUnitInEnemyVision);
-			}
-			if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
-			{
-				FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
-				DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("PlayerVis:: %f"), Visibility),
-				                nullptr,
-				                FColor::White, 2.0f, false);
-			}
-			return;
 		}
-
-		if (Visibility >= VisibleEnoughToRevealEnemy)
+		else
 		{
-			FowOwner->SetActorHiddenInGame(false);
-			if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
-			{
-				FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
-				DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("Visibility > .15! %f"), Visibility),
-				                nullptr, FColor::Red, 1.0f, false);
-			}
-			return;
+			FowOwner->Tags.Remove(TagUnitInEnemyVision);
 		}
-		FowOwner->SetActorHiddenInGame(true);
 		if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
 		{
 			FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
-			DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("Visibility: %f"), Visibility), nullptr,
+			DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("PlayerVis:: %f"), Visibility),
+			                nullptr,
 			                FColor::White, 2.0f, false);
 		}
+		return;
+	}
+
+	if (Visibility >= VisibleEnoughToRevealEnemy)
+	{
+		FowOwner->SetActorHiddenInGame(false);
+		if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
+		{
+			FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
+			DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("Visibility > .15! %f"), Visibility),
+			                nullptr, FColor::Red, 1.0f, false);
+		}
+		return;
+	}
+	FowOwner->SetActorHiddenInGame(true);
+	if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
+	{
+		FVector DrawTextLocation = FowOwner->GetActorLocation() + FVector(0, 0, 300);
+		DrawDebugString(GetWorld(), DrawTextLocation, FString::Printf(TEXT("Visibility: %f"), Visibility), nullptr,
+		                FColor::White, 2.0f, false);
 	}
 }
 

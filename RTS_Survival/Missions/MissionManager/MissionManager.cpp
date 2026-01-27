@@ -46,7 +46,7 @@ void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, 
 
 FRTSGameDifficulty AMissionManager::GetCurrentGameDifficulty() const
 {
-	if(not M_GameDifficulty.bIsInitialized)
+	if (not M_GameDifficulty.bIsInitialized)
 	{
 		RTSFunctionLibrary::ReportError("Game difficulty requested but not initialized yet in mission manager.");
 		return FRTSGameDifficulty();
@@ -81,12 +81,11 @@ UW_Mission* AMissionManager::OnMissionRequestSetupWidget(UMissionBase* Requestin
 void AMissionManager::PlaySound2DForMission(USoundBase* SoundToPlay) const
 {
 	UWorld* World = GetWorld();
-	if(not World)
+	if (not World)
 	{
 		return;
 	}
 	UGameplayStatics::PlaySound2D(World, SoundToPlay, 1, 1, 0);
-	                              
 }
 
 void AMissionManager::ActivateNewMission(UMissionBase* NewMission)
@@ -139,26 +138,25 @@ void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AMissionManager::Tick(float DeltaSeconds)
 {
-    Super::Tick(DeltaSeconds);
-    for (int32 i = 0; i < M_ActiveMissions.Num(); ++i)
-    {
-        UMissionBase* Mission = M_ActiveMissions[i];
-        if (!EnsureMissionIsValid(Mission))
-        {
-        	RTSFunctionLibrary::ReportError("Invalid mission in mission manager");
-            continue;
-        }
-        if (Mission->GetCanCheckTrigger())
-        {
-            Mission->MissionTrigger->TickTrigger();    
-        }
-        if (Mission->GetCanTickMission())
-        {
-            Mission->TickMission(DeltaSeconds);
-        }
-    }
-	
+	Super::Tick(DeltaSeconds);
+	for (int32 MissionIndex = M_ActiveMissions.Num() - 1; MissionIndex >= 0; --MissionIndex)
+	{
+		UMissionBase* Mission = M_ActiveMissions[MissionIndex];
+		if (not EnsureMissionIsValid(Mission))
+		{
+			continue;
+		}
+		if (Mission->GetCanCheckTrigger())
+		{
+			Mission->MissionTrigger->TickTrigger();
+		}
+		if (Mission->GetCanTickMission())
+		{
+			Mission->TickMission(DeltaSeconds);
+		}
+	}
 }
+
 void AMissionManager::InitMissionManagerWidget()
 {
 	// Create widget class and add to viewport.
@@ -348,7 +346,7 @@ void AMissionManager::PlayMissionFailed()
 void AMissionManager::ProvideMissionWidgetToMainGameUI() const
 {
 	UMainGameUI* MainGameUI = FRTS_Statics::GetMainGameUI(this);
-	if(not MainGameUI)
+	if (not MainGameUI)
 	{
 		return;
 	}
