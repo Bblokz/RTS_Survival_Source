@@ -80,6 +80,8 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 		return ERTSVoiceLine::Repair;
 	case EAbilityID::IdAttackGround:
 		return ERTSVoiceLine::Attack;
+	case EAbilityID::IdAttachedWeapon:
+		return ERTSVoiceLine::Attack;
 	case EAbilityID::IdAircraftOwnerNotExpanded:
 		return ERTSVoiceLine::Confirm;
 	case EAbilityID::IdNoAbility_MoveToEvasionLocation:

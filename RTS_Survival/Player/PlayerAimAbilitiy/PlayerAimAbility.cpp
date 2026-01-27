@@ -4,6 +4,7 @@
 #include "PlayerAimAbility.h"
 
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
@@ -70,7 +71,10 @@ void APlayerAimAbility::DetermineShowAimRadiusForAbility(const EAbilityID MainAb
 	AimMeshComponent->SetMaterial(0, AimMaterial);
 	// To adjust the radius.
 	SetMaterialParameter(Radius, AimType);
-	OnAimActivated_PlayAnnouncerVl();
+	if (MainAbility == EAbilityID::IdAimAbility)
+	{
+		OnAimActivated_PlayAnnouncerVl();
+	}
 }
 
 void APlayerAimAbility::HideRadius()
@@ -165,6 +169,18 @@ EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeForAbility(const EAbilityID 
 			// Note that we use the radius and not the range here.
 			OutAbilityRadius = AimAbilityComponent->GetAimAbilityRadius();
 			return AimAbilityComponent->GetAimAssistType();
+		}
+	case EAbilityID::IdAttachedWeapon:
+		{
+			const UAttachedWeaponAbilityComponent* AbilityComponent =
+				FAbilityHelpers::GetAttachedWeaponAbilityComponent(
+					static_cast<EAttachWeaponAbilitySubType>(AbilitySubType), RTSValid_PrimarySelectedActor);
+			if (not IsValid(AbilityComponent))
+			{
+				return EPlayerAimAbilityTypes::None;
+			}
+			OutAbilityRadius = AbilityComponent->GetAttachedWeaponAbilityRadius();
+			return AbilityComponent->GetAimAssistType();
 		}
 	case EAbilityID::IdAttackGround:
 		{

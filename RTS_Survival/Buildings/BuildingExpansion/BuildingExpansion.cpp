@@ -22,6 +22,7 @@
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializer):
@@ -472,6 +473,26 @@ void ABuildingExpansion::TerminateAttackCommand()
 void ABuildingExpansion::TerminateAttackGroundCommand()
 {
 	SetTurretsToAutoEngage();
+}
+
+void ABuildingExpansion::ExecuteAttachedWeaponAbilityCommand(
+	const FVector TargetLocation, const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
+	UAttachedWeaponAbilityComponent* AbilityComponent = FAbilityHelpers::GetAttachedWeaponAbilityComponent(
+		AttachedWeaponAbilityType, this);
+	if (not IsValid(AbilityComponent))
+	{
+		DoneExecutingCommand(EAbilityID::IdAttachedWeapon);
+		return;
+	}
+
+	AbilityComponent->ExecuteAttachedWeaponAbility(TargetLocation);
+	DoneExecutingCommand(EAbilityID::IdAttachedWeapon);
+}
+
+void ABuildingExpansion::TerminateAttachedWeaponAbilityCommand(
+	const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
 }
 
 void ABuildingExpansion::OnVerticalDestructionComplete()

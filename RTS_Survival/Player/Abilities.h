@@ -60,6 +60,7 @@ enum class EAbilityID : uint8
 	IdActivateMode,
 	IdDisableMode,
 	IdFieldConstruction,
+	IdAttachedWeapon,
 	IdAimAbility,
 	IdCancelAimAbility,
 };
@@ -112,6 +113,7 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdActivateMode: return TEXT("Activate Mode");
 	case EAbilityID::IdDisableMode: return TEXT("Disable Mode");
 		case EAbilityID::IdFieldConstruction: return TEXT("Field Construction");
+	case EAbilityID::IdAttachedWeapon: return TEXT("Attached Weapon Ability");
 	case EAbilityID::IdAimAbility: return TEXT("Aim Ability");
 	case EAbilityID::IdCancelAimAbility: return TEXT("Cancel Aim Ability");
 	default: return TEXT("Unknown Ability");

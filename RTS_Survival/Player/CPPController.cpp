@@ -15,6 +15,7 @@
 #include "PauseGame/PauseGameOptions.h"
 #include "PlayerAimAbilitiy/PlayerAimAbility.h"
 #include "PlayerAudioController/PlayerAudioController.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "PlayerControlGroupManager/PlayerControlGroupManager.h"
 #include "PlayerError/PlayerError.h"
@@ -1650,9 +1651,9 @@ void ACPPController::DetermineShowAimAbilityAtCursorProjection(const EAbilityID 
 	{
 		return;
 	}
+	AActor* PrimarySelectedUnit = M_GameUIController->GetPrimarySelectedUnit();
 	if (AbilityJustActivated == EAbilityID::IdAimAbility)
 	{
-		AActor* PrimarySelectedUnit = M_GameUIController->GetPrimarySelectedUnit();
 		const UAimAbilityComponent* AimAbilityComponent = FAbilityHelpers::GetHasAimAbilityComponent(
 			static_cast<EAimAbilityType>(AbilitySubtype), PrimarySelectedUnit);
 		if (not IsValid(AimAbilityComponent))
@@ -1661,8 +1662,19 @@ void ACPPController::DetermineShowAimAbilityAtCursorProjection(const EAbilityID 
 			return;
 		}
 	}
+
+	if (AbilityJustActivated == EAbilityID::IdAttachedWeapon)
+	{
+		const UAttachedWeaponAbilityComponent* AbilityComponent = FAbilityHelpers::GetAttachedWeaponAbilityComponent(
+			static_cast<EAttachWeaponAbilitySubType>(AbilitySubtype), PrimarySelectedUnit);
+		if (not IsValid(AbilityComponent))
+		{
+			M_PlayerAimAbility->HideRadius();
+			return;
+		}
+	}
 	M_PlayerAimAbility->DetermineShowAimRadiusForAbility(AbilityJustActivated, AbilitySubtype,
-	                                                     M_GameUIController->GetPrimarySelectedUnit());
+	                                                     PrimarySelectedUnit);
 }
 
 void ACPPController::BeginPlay_SetupPlayerAimAbility()
@@ -3874,6 +3886,11 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		this->DirectActionButtonAimAbility(static_cast<EAimAbilityType>(ActiveAbilityEntry.CustomType));
 		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
 		break;
+	case EAbilityID::IdAttachedWeapon:
+		this->DirectActionButtonAttachedWeaponAbility(
+			static_cast<EAttachWeaponAbilitySubType>(ActiveAbilityEntry.CustomType));
+		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
+		break;
 	case EAbilityID::IdCancelAimAbility:
 		this->DirectActionButtonCancelAimAbility(static_cast<EAimAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
@@ -3925,6 +3942,9 @@ void ACPPController::UpdateCursor()
 			CursorType = EMouseCursor::Crosshairs;
 			break;
 		case EAbilityID::IdAttackGround:
+			CursorType = EMouseCursor::Crosshairs;
+			break;
+		case EAbilityID::IdAttachedWeapon:
 			CursorType = EMouseCursor::Crosshairs;
 			break;
 		case EAbilityID::IdMove:
@@ -3993,6 +4013,9 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		break;
 	case EAbilityID::IdAimAbility:
 		this->ActionButtonAimAbility(ClickedLocation, M_ActiveAimAbilityType);
+		break;
+	case EAbilityID::IdAttachedWeapon:
+		this->ActionButtonAttachedWeaponAbility(ClickedLocation, M_ActiveAttachedWeaponAbilityType);
 		break;
 	case EAbilityID::IdRotateTowards:
 		this->ActionButtonRotateTowards(ClickedLocation);
@@ -4321,6 +4344,58 @@ void ACPPController::ActionButtonAimAbility(const FVector& ClickedLocation, cons
 	}
 }
 
+void ACPPController::ActionButtonAttachedWeaponAbility(
+	const FVector& ClickedLocation, const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
+	EnsureSelectionsAreRTSValid();
+
+	int32 CommandsExe = 0;
+	int32 AbilityNotInRangeCount = 0;
+	int32 AttemptedCount = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (const auto EachPawn : TSelectedPawnMasters)
+	{
+		if (not IsValid(FAbilityHelpers::GetAttachedWeaponAbilityComponent(AttachedWeaponAbilityType, EachPawn)))
+		{
+			continue;
+		}
+
+		const ECommandQueueError Result = EachPawn->FireAttachedWeaponAbility(
+			ClickedLocation, bResetCommandQueueFirst, AttachedWeaponAbilityType);
+		AttemptedCount++;
+		CommandsExe += Result == ECommandQueueError::NoError;
+		AbilityNotInRangeCount += Result == ECommandQueueError::AbilityNotInCastRange;
+	}
+
+	for (const auto EachActor : TSelectedActorsMasters)
+	{
+		if (not IsValid(FAbilityHelpers::GetAttachedWeaponAbilityComponent(AttachedWeaponAbilityType, EachActor)))
+		{
+			continue;
+		}
+
+		const ECommandQueueError Result = EachActor->FireAttachedWeaponAbility(
+			ClickedLocation, bResetCommandQueueFirst, AttachedWeaponAbilityType);
+		AttemptedCount++;
+		CommandsExe += Result == ECommandQueueError::NoError;
+		AbilityNotInRangeCount += Result == ECommandQueueError::AbilityNotInCastRange;
+	}
+
+	if (CommandsExe > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdAttachedWeapon),
+			false);
+		return;
+	}
+
+	if (AttemptedCount > 0 && AbilityNotInRangeCount == AttemptedCount)
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::AbilityNotInRange, true, true);
+	}
+}
+
 /*--------------------------------- Action Button DIRECT ABILITIES---------------------------------*/
 
 void ACPPController::DirectActionButtonStop()
@@ -4642,6 +4717,57 @@ void ACPPController::HideAimAbilityRadiusIfNeeded()
 		// Hide previous.
 		URTSBlueprintFunctionLibrary::HideRTSRadiusById(this, AimAbilityRadiusIndex);
 		AimAbilityRadiusIndex = -1;
+	}
+}
+
+void ACPPController::DirectActionButtonAttachedWeaponAbility(
+	const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
+	if (not GetIsValidGameUIController())
+	{
+		return;
+	}
+	M_ActiveAttachedWeaponAbilityType = AttachedWeaponAbilityType;
+	bM_IsActionButtonActive = true;
+	UpdateCursor();
+	AActor* PrimarySelected = M_GameUIController->GetPrimarySelectedUnit();
+	UAttachedWeaponAbilityComponent* AbilityComp = FAbilityHelpers::GetAttachedWeaponAbilityComponent(
+		AttachedWeaponAbilityType, PrimarySelected);
+	CreateAttachedWeaponAbilityRadius(PrimarySelected, AbilityComp);
+}
+
+void ACPPController::CreateAttachedWeaponAbilityRadius(
+	AActor* Primary, const UAttachedWeaponAbilityComponent* AbilityComp)
+{
+	HideAttachedWeaponAbilityRadiusIfNeeded();
+	if (not IsValid(Primary) || not IsValid(AbilityComp))
+	{
+		return;
+	}
+
+	AttachedWeaponAbilityRadiusIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(
+		this,
+		Primary->GetActorLocation(),
+		AbilityComp->GetAttachedWeaponAbilityRange(),
+		ERTSRadiusType::FUllCircle_Weaponrange);
+	if (AttachedWeaponAbilityRadiusIndex < 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"ACPPController::CreateAttachedWeaponAbilityRadius: Failed to create radius actor!");
+		return;
+	}
+	const FVector RadiusOffset = FVector(0.f, 0.f, 50.f);
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(this,
+	                                                     AttachedWeaponAbilityRadiusIndex,
+	                                                     Primary, RadiusOffset);
+}
+
+void ACPPController::HideAttachedWeaponAbilityRadiusIfNeeded()
+{
+	if (AttachedWeaponAbilityRadiusIndex >= 0)
+	{
+		URTSBlueprintFunctionLibrary::HideRTSRadiusById(this, AttachedWeaponAbilityRadiusIndex);
+		AttachedWeaponAbilityRadiusIndex = -1;
 	}
 }
 
@@ -5803,6 +5929,7 @@ void ACPPController::DeactivateActionButton()
 	M_ActiveAbility = EAbilityID::IdNoAbility;
 	UpdateCursor();
 	HideAimAbilityRadiusIfNeeded();
+	HideAttachedWeaponAbilityRadiusIfNeeded();
 	if (GetIsValidPlayerAimAbilityActor())
 	{
 		M_PlayerAimAbility->HideRadius();

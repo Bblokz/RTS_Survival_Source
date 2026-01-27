@@ -12,6 +12,7 @@
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "TankMaster.generated.h"
 
 class URTSOptimizer;
@@ -286,6 +287,9 @@ protected:
 
 	virtual void ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType) override;
 	virtual void TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+	virtual void ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
+	                                                 const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override;
+	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override;
 	virtual void ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
 	virtual void TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
 

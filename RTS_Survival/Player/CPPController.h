@@ -45,6 +45,7 @@
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/UnitData/UnitCost.h"
@@ -53,6 +54,7 @@
 #include "CPPController.generated.h"
 
 class APlayerAimAbility;
+class UAttachedWeaponAbilityComponent;
 class UPlayerPortraitManager;
 class UW_Portrait;
 struct FNomadicPreviewAttachments;
@@ -1142,6 +1144,8 @@ private:
 
 	EGrenadeAbilityType M_ActiveGrenadeAbilityType;
 	EAimAbilityType M_ActiveAimAbilityType = EAimAbilityType::DefaultBrummbarFire;
+	EAttachWeaponAbilitySubType M_ActiveAttachedWeaponAbilityType =
+		EAttachWeaponAbilitySubType::Pz38AttachedMortarDefault;
 
 	// Called in the main RC function, after all shift-related functions
 	// Removes the unit from the selection array
@@ -1219,6 +1223,8 @@ private:
 
 	void ActionButtonThrowGrenade(const FVector& ClickedLocation, const EGrenadeAbilityType GrenadeAbilityType);
 	void ActionButtonAimAbility(const FVector& ClickedLocation, const EAimAbilityType AimAbilityType);
+	void ActionButtonAttachedWeaponAbility(const FVector& ClickedLocation,
+	                                       const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
 
 	// Stops Movement, BT Logic, targets and TCommand
 	// todo integrate with ICommands.
@@ -1250,6 +1256,10 @@ private:
 	void HideAimAbilityRadiusIfNeeded();
 	// Keeps track of the aim ability radius ID.
 	int32 AimAbilityRadiusIndex = -1;
+	void DirectActionButtonAttachedWeaponAbility(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
+	void CreateAttachedWeaponAbilityRadius(AActor* Primary, const UAttachedWeaponAbilityComponent* AbilityComp);
+	void HideAttachedWeaponAbilityRadiusIfNeeded();
+	int32 AttachedWeaponAbilityRadiusIndex = -1;
 	void DirectActionButtonCancelAimAbility(const EAimAbilityType AimAbilityType);
 	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
 

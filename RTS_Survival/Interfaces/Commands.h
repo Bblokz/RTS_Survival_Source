@@ -8,6 +8,7 @@
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
@@ -35,6 +36,7 @@ enum class ECommandQueueError : uint8
 	AbilityNotAllowed,
 	CommandDataInvalid,
 	AbilityOnCooldown,
+	AbilityNotInCastRange,
 };
 
 /**
@@ -86,6 +88,11 @@ public:
 	EAimAbilityType GetAimAbilitySubtype() const
 	{
 		return static_cast<EAimAbilityType>(CustomType);
+	}
+
+	EAttachWeaponAbilitySubType GetAttachedWeaponAbilitySubtype() const
+	{
+		return static_cast<EAttachWeaponAbilitySubType>(CustomType);
 	}
 
 	FQueueCommand()
@@ -633,6 +640,17 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError CancelAimAbility(const bool bSetUnitToIdle, const EAimAbilityType AimAbilityType);
+
+	/**
+	 * @brief Queues an attached weapon ability at the provided location if in range.
+	 * @param TargetLocation World location to target.
+	 * @param bSetUnitToIdle Whether the unit should clear all previous commands making this ability the first.
+	 * @param AttachedWeaponAbilityType Subtype to execute.
+	 * @return Whether the command could be added; command queue has not been stopped.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError FireAttachedWeaponAbility(const FVector& TargetLocation, const bool bSetUnitToIdle,
+	                                                     const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
 	/**
 	 * @brief Determines whether the provided command is in the command queue.
 	 * @param CommandToCheck The command to check for.
@@ -824,6 +842,10 @@ protected:
 	virtual void TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType);
 	virtual void ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType);
 	virtual void TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType);
+
+	virtual void ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
+	                                                 const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
+	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
 
 	virtual void ExecuteRepairCommand(AActor* TargetActor);
 	virtual void TerminateRepairCommand();
