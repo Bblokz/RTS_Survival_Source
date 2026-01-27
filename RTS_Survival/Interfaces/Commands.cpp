@@ -15,6 +15,7 @@
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 
 
 UCommandData::UCommandData(const FObjectInitializer& ObjectInitializer)
@@ -446,7 +447,8 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 		|| (AbilityId == EAbilityID::IdThrowGrenade)
 		|| (AbilityId == EAbilityID::IdCancelThrowGrenade)
 		|| (AbilityId == EAbilityID::IdAimAbility)
-		|| (AbilityId == EAbilityID::IdCancelAimAbility);
+		|| (AbilityId == EAbilityID::IdCancelAimAbility)
+		|| (AbilityId == EAbilityID::IdAttachedWeapon);
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
@@ -483,6 +485,12 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 		|| (QueuedCommand.CommandType == EAbilityID::IdCancelAimAbility))
 	{
 		return " with aim ability type: " + UEnum::GetValueAsString(QueuedCommand.GetAimAbilitySubtype());
+	}
+
+	if (QueuedCommand.CommandType == EAbilityID::IdAttachedWeapon)
+	{
+		return " with attached weapon type: " + UEnum::GetValueAsString(
+			QueuedCommand.GetAttachedWeaponAbilitySubtype());
 	}
 
 	return FString{};
@@ -798,6 +806,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	case EAbilityID::IdAimAbility:
 		{
 			M_Owner->ExecuteAimAbilityCommand(Cmd.TargetLocation, Cmd.GetAimAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdAttachedWeapon:
+		{
+			M_Owner->ExecuteAttachedWeaponAbilityCommand(Cmd.TargetLocation, Cmd.GetAttachedWeaponAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdCancelAimAbility:
@@ -1867,6 +1880,57 @@ ECommandQueueError ICommands::CancelAimAbility(const bool bSetUnitToIdle, const 
 	return Error;
 }
 
+ECommandQueueError ICommands::FireAttachedWeaponAbility(const FVector& TargetLocation, const bool bSetUnitToIdle,
+                                                        const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	FUnitAbilityEntry AbilityEntry;
+	if (not FAbilityHelpers::GetHasAttachedWeaponAbility(UnitCommandData->GetAbilities(), EAbilityID::IdAttachedWeapon,
+	                                                     AttachedWeaponAbilityType, AbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (AbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+
+	AActor* OwnerActor = GetOwnerActor();
+	UAttachedWeaponAbilityComponent* AbilityComponent = FAbilityHelpers::GetAttachedWeaponAbilityComponent(
+		AttachedWeaponAbilityType, OwnerActor);
+	if (not IsValid(AbilityComponent))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	const float AbilityRange = AbilityComponent->GetAttachedWeaponAbilityRange();
+	const FVector OwnerLocation = GetOwnerLocation();
+	const float DistanceSquared = FVector::DistSquared(OwnerLocation, TargetLocation);
+	if (AbilityRange <= 0.0f || DistanceSquared > FMath::Square(AbilityRange))
+	{
+		return ECommandQueueError::AbilityNotInCastRange;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdAttachedWeapon,
+		TargetLocation,
+		nullptr,
+		FRotator::ZeroRotator,
+		static_cast<int32>(AttachedWeaponAbilityType));
+	return Error;
+}
+
 ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -2313,6 +2377,15 @@ void ICommands::TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType)
 {
 }
 
+void ICommands::ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
+                                                    const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
+}
+
+void ICommands::TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
+}
+
 void ICommands::ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
 {
 }
@@ -2667,6 +2740,23 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 			}
 
 			TerminateAimAbilityCommand(CurrentCommand->GetAimAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdAttachedWeapon:
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if (not CommandData)
+			{
+				return;
+			}
+
+			const FQueueCommand* CurrentCommand = CommandData->GetCurrentQueuedCommand();
+			if (CurrentCommand == nullptr)
+			{
+				return;
+			}
+
+			TerminateAttachedWeaponAbilityCommand(CurrentCommand->GetAttachedWeaponAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdCancelAimAbility:

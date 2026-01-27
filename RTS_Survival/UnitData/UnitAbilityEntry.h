@@ -5,6 +5,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/ApplyBehaviourAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/BehaviourAbilityTypes/BehaviourAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
@@ -17,6 +18,7 @@ class UGrenadeComponent;
 enum class EGrenadeAbilityType : uint8;
 class USquadReinforcementComponent;
 class UAimAbilityComponent;
+class UAttachedWeaponAbilityComponent;
 /**
  * @brief Ability entry containing metadata such as cooldown and custom type.
  */
@@ -256,6 +258,8 @@ namespace FAbilityHelpers
 
 	UGrenadeComponent* GetGrenadeAbilityCompOfType(const EGrenadeAbilityType Type, const AActor* Actor);
 	UAimAbilityComponent* GetHasAimAbilityComponent(const EAimAbilityType Type, const AActor* Actor);
+	UAttachedWeaponAbilityComponent* GetAttachedWeaponAbilityComponent(const EAttachWeaponAbilitySubType Type,
+	                                                                   const AActor* Actor);
 
 
 	inline bool GetHasGrenadeAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
@@ -286,6 +290,24 @@ namespace FAbilityHelpers
 			if (AbilityEntry.AbilityId == AimAbilityId && AbilityEntry.CustomType == CustomDataForAim)
 			{
 				OutAbilityOfAim = AbilityEntry;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	inline bool GetHasAttachedWeaponAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
+	                                        const EAbilityID AttachedWeaponAbilityId,
+	                                        const EAttachWeaponAbilitySubType AttachedWeaponAbilityType,
+	                                        FUnitAbilityEntry& OutAbilityOfAttachedWeapon)
+	{
+		const int32 CustomDataForAttachedWeapon = static_cast<int32>(AttachedWeaponAbilityType);
+		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
+		{
+			if (AbilityEntry.AbilityId == AttachedWeaponAbilityId
+				&& AbilityEntry.CustomType == CustomDataForAttachedWeapon)
+			{
+				OutAbilityOfAttachedWeapon = AbilityEntry;
 				return true;
 			}
 		}

@@ -13,6 +13,7 @@
 #include "RTS_Survival/Collapse/VerticalCollapse/RTSVerticalCollapseSettings.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 
 #include "BuildingExpansion.generated.h"
 
@@ -235,6 +236,9 @@ protected:
 	virtual void TerminateAttackCommand() override final;
 	virtual void ExecuteAttackGroundCommand(const FVector GroundLocation) override final;
 	virtual void TerminateAttackGroundCommand() override final;
+	virtual void ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
+	                                                 const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override final;
+	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override final;
 
 private:
 	

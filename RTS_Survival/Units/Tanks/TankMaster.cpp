@@ -26,6 +26,7 @@
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "VehicleAI/Components/VehiclePathFollowingComponent.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -777,6 +778,26 @@ void ATankMaster::TerminateAimAbilityCommand(const EAimAbilityType AimAbilityTyp
 	}
 
 	AimAbilityComponent->TerminateAimAbility();
+}
+
+void ATankMaster::ExecuteAttachedWeaponAbilityCommand(
+	const FVector TargetLocation, const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
+	UAttachedWeaponAbilityComponent* AbilityComponent = FAbilityHelpers::GetAttachedWeaponAbilityComponent(
+		AttachedWeaponAbilityType, this);
+	if (not IsValid(AbilityComponent))
+	{
+		DoneExecutingCommand(EAbilityID::IdAttachedWeapon);
+		return;
+	}
+
+	AbilityComponent->ExecuteAttachedWeaponAbility(TargetLocation);
+	DoneExecutingCommand(EAbilityID::IdAttachedWeapon);
+}
+
+void ATankMaster::TerminateAttachedWeaponAbilityCommand(
+	const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
+{
 }
 
 void ATankMaster::ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
