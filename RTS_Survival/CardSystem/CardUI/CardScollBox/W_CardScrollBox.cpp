@@ -327,32 +327,47 @@ UHorizontalBox* UW_CardScrollBox::GetVacantHorizontalBox(int32& OutIndexInHzBox)
 
 bool UW_CardScrollBox::GetIsValidScrollBox() const
 {
-	if (IsValid(CardScrollBox))
+	if (not IsValid(CardScrollBox))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"CardScrollBox",
+			"GetIsValidScrollBox",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("No Valid scrollbox set in W_CardScrollBox (The card picker)");
-	return false;
+	return true;
 }
 
 bool UW_CardScrollBox::GetIsValidCardMenu() const
 {
-	if (IsValid(M_CardMenu))
+	if (not IsValid(M_CardMenu))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_CardMenu",
+			"GetIsValidCardMenu",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("No valid card menu set in W_CardScrollBox");
-	return false;
+	return true;
 }
 
 bool UW_CardScrollBox::GetIsValidScrollBoxBorder() const
 {
-	if (IsValid(ScrollBoxBorder))
+	if (not IsValid(ScrollBoxBorder))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"ScrollBoxBorder",
+			"GetIsValidScrollBoxBorder",
+			this
+		);
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("No valid scroll box border set in W_CardScrollBox");
-	return false;
+	return true;
 }
 
 void UW_CardScrollBox::Debug(UW_RTSCard* CreatedCard, ERTSCard CardType)
@@ -363,7 +378,7 @@ void UW_CardScrollBox::Debug(UW_RTSCard* CreatedCard, ERTSCard CardType)
 
 void UW_CardScrollBox::UpdateCardWidgetsInScrollBox()
 {
-	if (!GetIsValidScrollBox())
+	if (not GetIsValidScrollBox())
 	{
 		return;
 	}
@@ -501,6 +516,5 @@ void UW_CardScrollBox::CreateNewCardWidget(const ERTSCard CardType)
 		Debug(CardWidget, CardType);
 	}
 }
-
 
 
