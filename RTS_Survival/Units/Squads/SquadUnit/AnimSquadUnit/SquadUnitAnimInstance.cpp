@@ -216,7 +216,7 @@ UAnimMontage* FWeaponMontages::GetPistolFireMontage(const ESquadAimPosition Fire
 		"could not find the aim offset type in FWeaponMontages::GetPistolFireMontage"
 		"for the provided enum type."
 		"\n Falling back to FirePistolSingle!");
-	return PistolSingleFireMontages[0];
+	return GetRandomStandingPistolFireMontage();
 }
 
 UAnimMontage* FWeaponMontages::GetHipFireMontage(const ESquadAimPosition FirePosition, const bool bIsSingleFire) const
@@ -282,18 +282,36 @@ UAnimMontage* FWeaponMontages::GetSwitchWeaponMontage(const ESquadWeaponAimOffse
 
 UAnimMontage* FWeaponMontages::GetRandomStandingPistolFireMontage() const
 {
+	if (PistolSingleFireMontages.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"No standing pistol fire montages are configured in FWeaponMontages.");
+		return nullptr;
+	}
 	const int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, PistolSingleFireMontages.Num() - 1);
 	return PistolSingleFireMontages[RandomIndex];
 }
 
 UAnimMontage* FWeaponMontages::GetRandomCrouchPistolFireMontage() const
 {
+	if (PistolCrouchSingleFireMontages.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"No crouch pistol fire montages are configured in FWeaponMontages.");
+		return nullptr;
+	}
 	const int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, PistolCrouchSingleFireMontages.Num() - 1);
 	return PistolCrouchSingleFireMontages[RandomIndex];
 }
 
 UAnimMontage* FWeaponMontages::GetRandomPronePistolFireMontage() const
 {
+	if (PistolProneSingleFireMontages.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"No prone pistol fire montages are configured in FWeaponMontages.");
+		return nullptr;
+	}
 	const int32 RandomIndex = UKismetMathLibrary::RandomIntegerInRange(0, PistolProneSingleFireMontages.Num() - 1);
 	return PistolProneSingleFireMontages[RandomIndex];
 }
