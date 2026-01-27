@@ -219,16 +219,16 @@ private:
 	void SetupMultiProjectileWeaponInternal(const FInitWeaponStateMultiProjectile& MultiProjectileState);
 	void SetupArchProjectileWeaponInternal(const FInitWeaponStateArchProjectile& ArchProjParameters);
 
-	void CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStatTrace& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiTrace& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateProjectile& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateRocketProjectile& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiProjectile& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateArchProjectile& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateLaser& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiHitLaser& WeaponParameters) const;
-	void CacheWeaponOwnerInParameters(FInitWeaponStateFlameThrower& WeaponParameters) const;
+	void CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStatTrace& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiTrace& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateProjectile& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateRocketProjectile& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiProjectile& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateArchProjectile& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateLaser& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiHitLaser& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateFlameThrower& WeaponParameters);
 
 	UPROPERTY()
 	TScriptInterface<ICommands> M_OwnerCommandsInterface;

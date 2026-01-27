@@ -90,7 +90,7 @@ void UScavengerComponent::SetTargetScavengeObject(TObjectPtr<AScavengeableObject
 
 void UScavengerComponent::UpdateOwnerBlockScavengeObjects(const bool bBlock) const
 {
-	if (not GetIsValidOwnerSquadUnit())
+	if (not IsValid(M_OwnerSquadUnit))
 	{
 		return;
 	}

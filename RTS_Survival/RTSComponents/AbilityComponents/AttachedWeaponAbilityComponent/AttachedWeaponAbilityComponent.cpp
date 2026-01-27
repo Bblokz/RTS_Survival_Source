@@ -1225,58 +1225,58 @@ void UAttachedWeaponAbilityComponent::SetupArchProjectileWeaponInternal(
 		ArchProjParameters.SingleBurstAmountMaxBurstAmount,
 		ArchProjParameters.MinBurstAmount,
 		ArchProjParameters.CreateShellCasingOnEveryRandomBurst,
-		ArchProjParameters.MortarSettings);
+		ArchProjParameters.ArchSettings);
 
 	M_AttachedWeapons.Add(ArchWeapon);
 	UpdateAbilityRangeFromWeapons();
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStatTrace& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStatTrace& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateMultiTrace& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateMultiTrace& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateProjectile& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateProjectile& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateRocketProjectile& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateRocketProjectile& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateMultiProjectile& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateMultiProjectile& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateArchProjectile& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateArchProjectile& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateLaser& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateLaser& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateMultiHitLaser& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateMultiHitLaser& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
 
-void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateFlameThrower& WeaponParameters) const
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateFlameThrower& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }

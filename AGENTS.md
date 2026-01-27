@@ -366,3 +366,103 @@ make sure to use the _Object version if the this pointer is not AActor derived.
     - Clearly indicate it belongs to that class
 
 ---
+## 22) Always check code for the following issues:
+
+Use this as a **pre-commit / pre-review safety checklist** (especially for Unreal containers and UObject lifetimes). These are the patterns that most often produce **use-after-free**, **out-of-bounds**, or **GC-related dangling pointers**.
+
+### TArray safety & iteration hazards
+
+- **Out-of-bounds array access**  
+  Ensure every index is valid at the moment it’s used: `0 <= Index && Index < Array.Num()`. Pay special attention to **stale indices** after removals/compaction and indices cached across frames/ticks.
+
+- **Modifying a `TArray` while iterating with a range-for**  
+  `for (auto& Elem : Array)` assumes stable storage. Any `Add/Insert/Remove/Reserve/Shrink` can reallocate or reshuffle, invalidating references/iterators → **use-after-free**. Prefer:
+  - index-based loops (often reverse iteration for removals), or
+  - staging changes (collect then apply after the loop).
+
+- **Keeping raw pointers/references to `TArray` elements across mutations**  
+  Any mutation that can reallocate or move elements (`Add/Insert/Remove/Reserve/Shrink`) can dangle cached `ElementType*` or `ElementType&`. Don’t persist element addresses; persist **indices/keys** (and re-validate) or store stable objects elsewhere.
+
+- **Range-for by reference over a temporary**  
+  Avoid `for (auto& X : SomeFunctionReturningTArray())` because references bind into a temporary that dies immediately, leaving `X` dangling. Store the returned array in a named variable (or iterate by value if appropriate).
+
+- **Using `TArray::GetData()` then growing/shrinking**  
+  `ElementType* Data = Array.GetData()` is only valid until the array reallocates. Any growth/shrink/move can invalidate it → classic **UAF**. Re-fetch `GetData()` after mutations or avoid caching it across operations.
+
+- **Removing elements with `RemoveAt` / `RemoveAtSwap` but continuing with the old loop index**  
+  Removals change indices and/or swap in new elements. If the loop index continues naively, you can skip elements or access invalid indices. Common fixes:
+  - iterate backwards for `RemoveAt`, or
+  - decrement index after removal, or
+  - for `RemoveAtSwap`, re-check the current index because a new element was swapped in.
+
+- **Using `Remove` / `RemoveAll` with predicates that capture references into the same container**  
+  During removal/compaction, elements move. If your predicate captures `&Array[i]`, `GetData()`, or element references/pointers, those can become invalid mid-operation. Capture only safe, external data (or copy what you need).
+
+- **Iterating a `TArray` and calling functions that mutate the same array indirectly**  
+  Watch for re-entrant mutation via delegates/events/callbacks. If code inside the loop can modify the array (even indirectly), you can invalidate the ongoing iteration and crash. Consider:
+  - copying the items to iterate, or
+  - guarding against re-entrancy, or
+  - moving mutation out of the iteration path.
+
+- **Using `Reserve()` incorrectly then writing past `Num()`**  
+  `Reserve()` only increases capacity. Writing to `Array[i]` for `i >= Array.Num()` without `SetNum()` is out-of-bounds. Use `SetNum()`/`AddDefaulted()`/`Emplace()` to grow `Num()` safely.
+
+- **Assuming `IsValidIndex()` stays true after removals**  
+  A validity check is only meaningful until the next mutation. If anything can remove/compact between “check” and “use”, the index can become invalid. Re-check right before access or restructure to avoid time gaps.
+
+- **Assuming `TArray` is zero-initialized after `SetNumUninitialized`**  
+  Uninitialized memory contains garbage. Reading it (especially as pointers/refs) is undefined behavior and can crash. Use `SetNumZeroed`, `Init`, or explicitly initialize every element before use.
+
+### TMap / TSet mutation, invalidation, and key pitfalls
+
+- **`TMap` pointer/reference invalidation after mutation**  
+  Storing `ValueType*`, `ValueType&`, or iterators from `Find()`/iteration and then adding/removing entries can invalidate them due to rehashing/relocation → dangling access. Treat map-held addresses as unstable across mutation.
+
+- **Using `TMap::operator[]` assuming it “just reads”**  
+  `Map[Key]` inserts a default value if missing. That mutates the map (allocate/rehash), potentially invalidating previously held pointers/references and altering program state unexpectedly. Prefer `Find`, `FindRef`, or `Contains` when you mean “read-only”.
+
+- **Stale `TMap` keys with pointer types (`UObject*` / `AActor*`)**  
+  Raw pointer keys can dangle when objects are destroyed, and later lookups/iteration may touch invalid memory. Prefer weak keys (`TWeakObjectPtr`) or enforce cleanup on destruction.
+
+- **Key mutation after insertion into `TMap`**  
+  If the key is a mutable struct and you change fields that affect `GetTypeHash`/`operator==` after insertion, the entry becomes “lost” (can’t be found, iteration/order assumptions break). Treat keys as immutable once inserted.
+
+- **Incorrect custom `GetTypeHash` / `operator==` for map keys**  
+  Broken hashing/equality causes missing entries, duplicate “same” keys, or pathological rehash behavior that can appear as corruption-like crashes. Ensure `operator==` is consistent and `GetTypeHash` matches equality semantics.
+
+- **Using `TSet` / `TMap` with UObject keys across GC without weak handling**  
+  UObjects can be destroyed while still present in the container; later hashing/equality or iteration may touch invalid object memory. Use weak keys or purge entries on GC/destruction events.
+
+- **Storing `TMap` values as references/pointers to stack data**  
+  Inserting pointers to locals (or reference-like wrappers) leaves the map pointing at freed stack memory once the function returns. Store owning values or heap-backed lifetime-managed objects.
+
+- **Iterating `TMap` / `TSet` and calling functions that mutate them indirectly**  
+  Re-entrant mutation via callbacks/events can invalidate iterators and in-flight references. If mutation is possible, iterate over a snapshot of keys/values or gate mutation during traversal.
+
+### Threading & lifetime / ownership traps
+
+- **Using `TMap` / `TArray` from the wrong thread**  
+  These containers are not generally safe for concurrent mutation. Racing reads/writes—especially with iteration—can corrupt memory and crash nondeterministically. Constrain access to a single thread or use proper synchronization and thread-safe patterns.
+
+- **Capturing `this` (or raw `UObject*`) in a lambda stored/executed later**  
+  If the object is destroyed/GC’d before the lambda runs, dereferencing is a crash. Capture `TWeakObjectPtr` and validate at execution time before use.
+
+- **`TArray<UObject*>` without `UPROPERTY()` (or `TObjectPtr`) inside a `UObject`**  
+  The GC can’t see raw references, so objects may be collected while the array still holds their pointers → dangling access. Use `UPROPERTY()` with `TObjectPtr<>` (or appropriate GC-visible containers).
+
+- **Storing non-owned memory in a `TArrayView` / `MakeArrayView` past its lifetime**  
+  Views do not own data. If the backing buffer/array goes away or reallocates, the view becomes dangling. Keep views strictly within the lifetime of the backing storage.
+
+- **`TMap` / `TArray` holding raw pointers to objects freed elsewhere**  
+  Containers don’t manage pointee lifetime. If something else deletes the pointee, you must null/weakify/update entries and handle destruction events to avoid later dereference crashes.
+
+- **Allocator/lifetime mismatch with `TUniquePtr` / `TSharedPtr` stored in containers**  
+  Reallocation moves smart pointers correctly, but mixing raw deletes, custom deleters, or storing additional raw aliases elsewhere can produce double-free/UAF when the container is modified. Prefer a single ownership model and avoid raw aliasing unless it’s strictly bounded and validated.
+
+### Low-level memory operations & re-entrancy footguns
+
+- **Using `FMemory::Memcpy` / `Memmove` on non-trivially-copyable element types**  
+  For types like `FString`, `TArray`, or smart pointers, bypassing constructors/destructors corrupts internal state and can crash later. Use proper copy/move operations or type-aware utilities.
+
+- **Double-remove / stale handle patterns (cached index/key already removed)**  
+  “Remove again” patterns can hit invalid indices or assume `Find` succeeded and dereference null. Always handle “not found” as a normal case, and invalidate cached indices/handles when removals occur.
