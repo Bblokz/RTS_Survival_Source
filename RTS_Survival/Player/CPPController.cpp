@@ -19,6 +19,8 @@
 #include "PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "PlayerControlGroupManager/PlayerControlGroupManager.h"
 #include "PlayerError/PlayerError.h"
+#include "PlayerOutlineComponent/PlayerOutlineComponent.h"
+#include "PlayerOutlineComponent/RTSOutlineRules/RTSOutlineRules.h"
 #include "PlayerResourceManager/PlayerResourceManager.h"
 #include "PlayerTechManager/PlayerTechManager.h"
 #include "PortraitManager/PortraitManager.h"
@@ -227,6 +229,7 @@ ACPPController::ACPPController()
 	M_PlayerProfileLoader = CreateDefaultSubobject<UPlayerProfileLoader>(TEXT("PlayerProfileLoader"));
 	M_PlayerAudioController = CreateDefaultSubobject<UPlayerAudioController>(TEXT("PlayerAudioController"));
 	M_PlayerPortraitManager = CreateDefaultSubobject<UPlayerPortraitManager>(TEXT("PlayerPortraitManager"));
+	M_PlayerOutlineComponent = CreateDefaultSubobject<UPlayerOutlineComponent>(TEXT("PlayerOutlineComponent"));
 
 
 	CheatClass = URTSCheatManager::StaticClass();
@@ -1325,6 +1328,7 @@ void ACPPController::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_SetupRotationArrow();
+	BeginPlay_SetupOutlineRules();
 	BeginPlay_SetupPlayerAimAbility();
 	BeginPlay_InitEscapeMenuHelper();
 }
@@ -2778,6 +2782,15 @@ void ACPPController::BeginPlay_SetupRotationArrow()
 	}
 }
 
+void ACPPController::BeginPlay_SetupOutlineRules()
+{
+	if(not GetIsValidPlayerOutlineComponent())
+	{
+		return;
+	}
+	M_PlayerOutlineComponent->InitPlayerOutlineComponent(ERTSOutlineRules::None);
+}
+
 
 /*--------------------------------- SHIFT WITH NO ACTIONBUTTON ---------------------------------*/
 
@@ -3957,6 +3970,10 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		bM_IsActionButtonActive = true;
 		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
 		UpdateCursor();
+	}
+	if(bM_IsActionButtonActive)
+	{
+		OutlinerUpdateForActionButton(M_ActiveAbility);
 	}
 }
 
@@ -5544,6 +5561,17 @@ bool ACPPController::GetIsValidPlayerCameraController() const
 	return false;
 }
 
+bool ACPPController::GetIsValidPlayerOutlineComponent() const
+{
+	if(not IsValid(M_PlayerOutlineComponent))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerOutlineComponent",
+		                                                      "GetIsValidPlayerOutlineComponent", this);
+		return false;
+	}
+	return true;
+}
+
 bool ACPPController::GetIsValidPlayerBuildRadiusManager() const
 {
 	if (IsValid(M_PlayerBuildRadiusManager))
@@ -5957,6 +5985,7 @@ void ACPPController::OnHitEscape()
 void ACPPController::DeactivateActionButton()
 {
 	bM_IsActionButtonActive = false;
+	OutlinerResetAfterActionButton(M_ActiveAbility);
 	M_ActiveAbility = EAbilityID::IdNoAbility;
 	UpdateCursor();
 	HideAimAbilityRadiusIfNeeded();
@@ -6110,8 +6139,10 @@ bool ACPPController::GetIsValidHoverWidget()
 	return false;
 }
 
-void ACPPController::OnActorHovered(const AActor* HoveredActor, const bool bIsHovered) const
+void ACPPController::OnActorHovered(AActor* HoveredActor, const bool bIsHovered) const
 {
+	// Allows null actors to be passed -> resets previous outline.
+	UpdatePlayerOutlineWithHoverActor(HoveredActor);
 	if (not IsValid(HoveredActor))
 	{
 		return;
@@ -6120,6 +6151,33 @@ void ACPPController::OnActorHovered(const AActor* HoveredActor, const bool bIsHo
 	{
 		Comp->OnUnitHoverChange(bIsHovered);
 	}
+}
+
+void ACPPController::UpdatePlayerOutlineWithHoverActor(AActor* HoveredActor) const
+{
+	if(not GetIsValidPlayerOutlineComponent())
+	{
+		return;
+	}
+	M_PlayerOutlineComponent->OnNewHoverActor(HoveredActor);
+}
+
+void ACPPController::OutlinerUpdateForActionButton(const EAbilityID ActivatedAbilityForSecondClick) const
+{
+	if(not GetIsValidPlayerOutlineComponent())
+	{
+		return;
+	}
+	M_PlayerOutlineComponent->OnActionButtonActivated(ActivatedAbilityForSecondClick);
+}
+
+void ACPPController::OutlinerResetAfterActionButton(const EAbilityID DeactivatedActionButton) const
+{
+	if(not GetIsValidPlayerOutlineComponent())
+	{
+		return;
+	}
+	M_PlayerOutlineComponent->OnActionButtonDeactivated(DeactivatedActionButton);
 }
 
 void ACPPController::LoadPlayerProfile(const FVector& SpawnCenterOfUnits, const bool bDoNotLoadPlayerProfileUnits)

@@ -80,6 +80,8 @@ public:
 
 	void SetIsScavengeEnabled(bool bEnabled);
 
+	inline bool GetShowOutline() const { return bShowScavengableObjectOutline; }
+
 	/** Provides scavenge positions for units */
 	TArray<FVector> GetScavengePositions(int32 NumUnits);
 
@@ -151,6 +153,9 @@ protected:
 	// How long the fade duraton on the reward widget lasts.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RewardWidget")
 	float FadeTimeRewardWidget = 3;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
+	bool bShowScavengableObjectOutline = true;
 
 	virtual void OnUnitDies(const ERTSDeathType DeathType) override;
 

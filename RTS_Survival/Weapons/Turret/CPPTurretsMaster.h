@@ -117,12 +117,12 @@ struct FTurretAimingSteeringState
 UCLASS()
 class RTS_SURVIVAL_API ACPPTurretsMaster : public ACPPWeaponsMaster, public IWeaponOwner
 {
-	//TODO Check if bp rotation function needs to stop when StopAllWeaponFire is called.
 	GENERATED_BODY()
 
 	// to affect rotation speed.
 	friend class RTS_SURVIVAL_API UTurretRotationBehaviour;
 	friend class AEmbeddedTurretsMaster;
+	friend class RTS_SURVIVAL_API UTankAimAbilityComponent;
 
 	virtual void Tick(float DeltaTime) override;
 

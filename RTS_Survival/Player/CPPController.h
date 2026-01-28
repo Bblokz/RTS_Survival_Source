@@ -53,6 +53,7 @@
 
 #include "CPPController.generated.h"
 
+class UPlayerOutlineComponent;
 class APlayerAimAbility;
 class UAttachedWeaponAbilityComponent;
 class UPlayerPortraitManager;
@@ -602,9 +603,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float DeltaSeconds;
 
-
 	void ActivateActionButton(const int32 ActionButtonAbilityIndex);
-
 
 	/** @brief all SquadControllers of which the player currently has direct control. */
 	UPROPERTY(BlueprintReadOnly)
@@ -798,6 +797,7 @@ protected:
 		AActor*& OutClickedActor, FVector& OutHitLocation) const;
 
 	void BeginPlay_SetupRotationArrow();
+	void BeginPlay_SetupOutlineRules();
 	void BeginPlay_InitEscapeMenuHelper();
 
 
@@ -1424,6 +1424,9 @@ private:
 	UPROPERTY()
 	ARTSNavigator* M_RTSNavigator;
 
+	UPROPERTY()
+	UPlayerOutlineComponent* M_PlayerOutlineComponent;
+
 	// Reference to the async spawner
 	UPROPERTY()
 	ARTSAsyncSpawner* M_RTSAsyncSpawner;
@@ -1464,6 +1467,7 @@ private:
 	bool GetIsValidPlayerAudioController() const;
 	bool GetIsValidPlayerPortraitManager() const;
 	bool GetIsValidPlayerCameraController() const;
+	bool GetIsValidPlayerOutlineComponent() const;
 
 	bool GetIsValidPlayerBuildRadiusManager() const;
 	bool GetIsValidPlayerStartGameControlComponent() const;
@@ -1571,7 +1575,13 @@ private:
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();
 	bool GetIsValidHoverWidget();
-	void OnActorHovered(const AActor* HoveredActor, const bool bIsHovered) const;
+	void OnActorHovered(AActor* HoveredActor, const bool bIsHovered) const;
+	// The new actor may be null; which causes the previous outlined actor to no longer be outlined.
+	void UpdatePlayerOutlineWithHoverActor(AActor* HoveredActor) const;
+	// Determines rules for outlining actors depending on the new ability
+	void OutlinerUpdateForActionButton(EAbilityID ActivatedAbilityForSecondClick) const;
+	// Resets any outline rule changes causes by the previously active ability
+	void OutlinerResetAfterActionButton(const EAbilityID DeactivatedActionButton) const;
 
 	// Player Profile.
 	void LoadPlayerProfile(const FVector& SpawnCenterOfUnits, const bool bDoNotLoadPlayerProfileUnits);
