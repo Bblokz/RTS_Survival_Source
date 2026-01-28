@@ -493,6 +493,11 @@ void UAircraftWeapon::ForceInstantReloadAllWeapons()
 	}
 }
 
+void UAircraftWeapon::ForceSetAllWeaponsFullyReloaded()
+{
+	ForceInstantReloadAllWeapons();
+}
+
 void UAircraftWeapon::AllWeaponsStopFire(const bool bStopReload, const bool bStopCoolDown)
 {
 	for (const auto EachWeapon : M_TWeapons)

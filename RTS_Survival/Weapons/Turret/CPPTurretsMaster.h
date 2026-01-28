@@ -261,6 +261,7 @@ protected:
 	/** @param WeaponIndex The index of the weapon that Finished reloading.
 	 * @note IWeaponOwner Implementation.*/
 	virtual void OnReloadFinished(const int32 WeaponIndex) override;
+	virtual void ForceSetAllWeaponsFullyReloaded() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters) override;

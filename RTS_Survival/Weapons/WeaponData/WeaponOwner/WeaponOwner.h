@@ -49,6 +49,8 @@ class RTS_SURVIVAL_API IWeaponOwner
 	virtual TArray<UWeaponState*> GetWeapons() =0;
 	// To register or deregister actors to ignore with this weapon.
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) = 0;	
+	/** Force every weapon owned by this implementor to be instantly reloaded. */
+	virtual void ForceSetAllWeaponsFullyReloaded() = 0;
 	
 
 protected:

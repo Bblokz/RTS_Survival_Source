@@ -418,6 +418,18 @@ void ACPPTurretsMaster::OnReloadFinished(const int32 /*WeaponIndex*/)
 {
 }
 
+void ACPPTurretsMaster::ForceSetAllWeaponsFullyReloaded()
+{
+	for (const auto EachWeapon : M_TWeapons)
+	{
+		if (not EachWeapon)
+		{
+			continue;
+		}
+		EachWeapon->ForceInstantReload();
+	}
+}
+
 void ACPPTurretsMaster::SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters)
 {
 	SetOwningPlayer(DirectHitWeaponParameters.OwningPlayer);
