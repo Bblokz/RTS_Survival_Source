@@ -1,0 +1,32 @@
+﻿
+you have to implemnt a new developer settings for audio called URTSAudioSettings and improve the way audio settings are handled in the game.
+in the new developer settings struct we need the designer to place the reference to our sound mixer (the derived one is defined in blueprints and
+needs to be set there so we have access in cpp)
+
+also define a new enum in a sperate file in the same dir bluerpint type called ERTSAudioType
+with options:
+SFXAndWeapons,
+Music,
+Voicelines,
+Announcer
+UI
+
+in the settings we need to have a tmap from that enum to a Soundclass so we know what sound class is for what type.
+then in the URTSGameInstance load the settings when the game is starting and UGameplayStatics::PushSoundMixModifier(GetWorld(), UserSettingsSoundMix); where
+the settings object is equal to that one from the audio settings.
+make sure that the sound class effects array of the mixer has each of the classes from the tmap in it and if not add the missing entries (do report
+RTSFunctionLibrar::ReportError as we do expect the desginer to have already set all the entries in that mixer object beforehand.)
+
+now we have the mixer for our audio we need to hook up , and create the missing, sliders in the W_EscapeMenuSettings and we need to make sure that the escape menu settings
+adjusts the correct sound class volume in our mixer when the sliders are moved. WE already have M_SliderMasterVolume which needs to be used
+to adjust the overall mixer volume.
+the M_SliderMusicVolume will be used for the music sound class from the tmap.
+the M_SliderSfxVolume will be used for the SFXAndWeapons sound class from the tmap.
+for the voicelines, announcer and UI you need to create 3 new sliders for the escape menu settings and implement them.
+
+after your rework of the Escape menu settings the sliders should all adjust the correct sound class volume in our mixer.
+make sure to change the URTSSettingsMenuSubsystem as well to make use of this new developersettings-based way of getting access to the right 
+mixer and sound classes. (this also means changing FRTSAudioSettings to track all of the different volumes) Make sure the system loads and saves correctly.
+
+finally add detailed doxygen to the new developer settings for the audio where you explain what needs to be setup beforehand and how the system works in terms of saving and laoding
+the volumes of the different sound classes for the mixer.

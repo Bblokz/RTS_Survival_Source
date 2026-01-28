@@ -100,6 +100,9 @@ private:
 	bool TryBuildResourceHoverText(AActor* HoveredActor, bool& bOutIsValidText, int32& OutPadding,
 	                               FString& OutActorText) const;
 
+	bool TryBuildScavengeHoverText(AActor* HoveredActor, bool& bOutIsValidText, int32& OutPadding,
+	                              FString& OutActorText) const;
+
 	/**
 	 * @brief Attempts to build hover text for drop-off actors that have no RTS component.
 	 * @param HoveredActor Actor currently under the cursor.

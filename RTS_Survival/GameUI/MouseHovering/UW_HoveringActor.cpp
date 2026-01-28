@@ -12,6 +12,7 @@
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 
@@ -54,6 +55,12 @@ FString UW_HoveringActor::GetActorText(AActor* HoveredActor, bool& bOutIsValidTe
 
 	// Pure resource nodes.
 	if (TryBuildResourceHoverText(HoveredActor, bOutIsValidText, OutPadding, ActorText))
+	{
+		return ActorText;
+	}
+
+	// Scavengeable objects.
+	if (TryBuildScavengeHoverText(HoveredActor, bOutIsValidText, OutPadding, ActorText))
 	{
 		return ActorText;
 	}
@@ -186,6 +193,20 @@ bool UW_HoveringActor::TryBuildResourceHoverText(AActor* HoveredActor, bool& bOu
 	OutPadding = 35;
 	OutActorText = GetResourceText(ResourceComponent);
 	return true;
+}
+
+bool UW_HoveringActor::TryBuildScavengeHoverText(AActor* HoveredActor, bool& bOutIsValidText, int32& OutPadding,
+	FString& OutActorText) const
+{
+	if(HoveredActor->IsA(AScavengeableObject::StaticClass()))
+	{
+		bOutIsValidText = true;
+		OutPadding = 35;
+		OutActorText = FRTSRichTextConverter::MakeRTSRich( "Scavengeable Object", ERTSRichText::Text_Armor);
+		return true;	
+	}
+	bOutIsValidText = false;
+	return false;
 }
 
 bool UW_HoveringActor::TryBuildDropOffHoverText_NoRTS(AActor* HoveredActor, bool& bOutIsValidText, int32& OutPadding,
