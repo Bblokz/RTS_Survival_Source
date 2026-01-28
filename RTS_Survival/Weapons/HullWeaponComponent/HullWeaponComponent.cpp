@@ -177,6 +177,18 @@ void UHullWeaponComponent::OnReloadFinished(const int32 WeaponIndex)
 	// no reload animations for hull components.
 }
 
+void UHullWeaponComponent::ForceSetAllWeaponsFullyReloaded()
+{
+	for (const auto EachWeapon : M_TWeapons)
+	{
+		if (not GetIsValidWeapon(EachWeapon))
+		{
+			continue;
+		}
+		EachWeapon->ForceInstantReload();
+	}
+}
+
 void UHullWeaponComponent::SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters)
 {
 	SetOwningPlayer(DirectHitWeaponParameters.OwningPlayer);

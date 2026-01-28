@@ -55,14 +55,12 @@ void AInfantryWeaponMaster::SetAutoEngageTargets(const bool bUseLastTarget)
 	{
 		ResetTarget();
 	}
-	if (WeaponState)
+	if (not GetIsValidWeaponState())
 	{
-		WeaponState->StopFire(false, true);
-		InitiateAutoEngageTimers();
 		return;
 	}
-	RTSFunctionLibrary::ReportError("WeaponState is not valid in AInfantryWeaponMaster::SetAutoEngageTargets"
-		"\n for weapon: " + GetName());
+	WeaponState->StopFire(false, true);
+	InitiateAutoEngageTimers();
 }
 
 void AInfantryWeaponMaster::InitiateAutoEngageTimers()
@@ -129,6 +127,23 @@ bool AInfantryWeaponMaster::GetIsValidGameUnitManager() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportError("GameUnitManager not initialized for InfantryWeapon: " + GetName());
+	return false;
+}
+
+bool AInfantryWeaponMaster::GetIsValidWeaponState() const
+{
+	if (IsValid(WeaponState))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"WeaponState",
+		"GetIsValidWeaponState",
+		this
+	);
+
 	return false;
 }
 
@@ -378,14 +393,12 @@ void AInfantryWeaponMaster::SetEngageSpecificTarget(AActor* Target)
 	{
 		WeaponMesh->SetVisibility(true);
 	}
-	if (WeaponState)
+	if (not GetIsValidWeaponState())
 	{
-		WeaponState->StopFire(false, true);
-		InitiateSpecificEngageTimers();
 		return;
 	}
-	RTSFunctionLibrary::ReportError("WeaponState is not valid in AInfantryWeaponMaster::SetEngageSpecificTarget"
-		"\n for weapon: " + GetName());
+	WeaponState->StopFire(false, true);
+	InitiateSpecificEngageTimers();
 }
 
 void AInfantryWeaponMaster::SetEngageGroundLocation(const FVector& GroundLocation)
@@ -395,10 +408,8 @@ void AInfantryWeaponMaster::SetEngageGroundLocation(const FVector& GroundLocatio
 		WeaponMesh->SetVisibility(true);
 	}
 
-	if (!IsValid(WeaponState))
+	if (not GetIsValidWeaponState())
 	{
-		RTSFunctionLibrary::ReportError(
-			"WeaponState is not valid in AInfantryWeaponMaster::SetEngageGround for weapon: " + GetName());
 		return;
 	}
 
@@ -430,7 +441,7 @@ void AInfantryWeaponMaster::CheckTargetKilled(AActor* KilledActor)
 TArray<UWeaponState*> AInfantryWeaponMaster::GetWeapons()
 {
 	TArray<UWeaponState*> WeaponStates;
-	if (IsValid(WeaponState))
+	if (GetIsValidWeaponState())
 	{
 		WeaponStates.Add(WeaponState);
 	}
@@ -439,7 +450,7 @@ TArray<UWeaponState*> AInfantryWeaponMaster::GetWeapons()
 
 void AInfantryWeaponMaster::DisableWeaponSearch(const bool bStopReload, const bool bMakeWeaponInvisible)
 {
-	if (WeaponState)
+	if (GetIsValidWeaponState())
 	{
 		WeaponState->StopFire(bStopReload, true);
 	}
@@ -455,7 +466,7 @@ void AInfantryWeaponMaster::DisableWeaponSearch(const bool bStopReload, const bo
 
 void AInfantryWeaponMaster::DisableAllWeapons()
 {
-	if (WeaponState)
+	if (GetIsValidWeaponState())
 	{
 		WeaponState->DisableWeapon();
 	}
@@ -525,11 +536,11 @@ int32 AInfantryWeaponMaster::GetOwningPLayerForWeaponInit()
 
 void AInfantryWeaponMaster::RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister)
 {
-	if(not RTSFunctionLibrary::RTSIsValid(ActorToIgnore))
+	if (not RTSFunctionLibrary::RTSIsValid(ActorToIgnore))
 	{
 		return;
 	}
-	if(IsValid(WeaponState))
+	if (GetIsValidWeaponState())
 	{
 		WeaponState->RegisterActorToIgnore(ActorToIgnore, bRegister);	
 	}
@@ -604,6 +615,15 @@ void AInfantryWeaponMaster::OnReloadStart(const int32 /*WeaponIndex*/, const flo
 
 void AInfantryWeaponMaster::OnReloadFinished(const int32 /*WeaponIndex*/)
 {
+}
+
+void AInfantryWeaponMaster::ForceSetAllWeaponsFullyReloaded()
+{
+	if (not GetIsValidWeaponState())
+	{
+		return;
+	}
+	WeaponState->ForceInstantReload();
 }
 
 void AInfantryWeaponMaster::SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters)
@@ -1007,10 +1027,8 @@ void AInfantryWeaponMaster::ResetTarget()
 
 void AInfantryWeaponMaster::SetupRange()
 {
-	if (not IsValid(WeaponState))
+	if (not GetIsValidWeaponState())
 	{
-		RTSFunctionLibrary::ReportError("WeaponState is not valid in AInfantryWeaponMaster::SetupRange"
-			"\n for weapon: " + GetName());
 		return;
 	}
 	M_WeaponRangeData.AdjustRangeForNewWeapon(WeaponState->GetRange());

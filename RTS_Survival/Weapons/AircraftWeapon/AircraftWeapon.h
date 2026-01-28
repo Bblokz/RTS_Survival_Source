@@ -44,6 +44,8 @@ public:
 
 	virtual TArray<UWeaponState*> GetWeapons() override final { return M_TWeapons; }
 
+	virtual void ForceSetAllWeaponsFullyReloaded() override;
+
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
 	
 protected:

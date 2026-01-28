@@ -224,6 +224,11 @@ void UAttachedWeaponAbilityComponent::OnReloadFinished(const int32 WeaponIndex)
 {
 }
 
+void UAttachedWeaponAbilityComponent::ForceSetAllWeaponsFullyReloaded()
+{
+	ForceReloadAllWeapons();
+}
+
 void UAttachedWeaponAbilityComponent::OnProjectileHit(const bool bBounced)
 {
 }
