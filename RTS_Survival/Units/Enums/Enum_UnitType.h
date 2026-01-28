@@ -56,6 +56,7 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz251_PZIV UMETA(DisplayName = "Ger ArmCar SdKfz 251 PzIV"),
 	Tank_Sdkfz251_22 UMETA(DisplayName = "Ger ArmCar SdKfz 251 75mm"),
 	Tank_Puma UMETA(DisplayName = "Ger ArmCar Puma"),
+	Tank_Panzerwerfer UMETA(DisplayName = "Ger ArmCar Panzerwerfer"),
 	Tank_Sdkfz_231 UMETA(DisplayName = "Ger SdKfz 231 8-rad 2cm"),
 	Tank_Sdkfz_232_3 UMETA(DisplayName = "Ger SdKfz 232/3 8-rad 75mm Puma"),
 
@@ -65,6 +66,7 @@ enum class ETankSubtype : uint8
 	Tank_PzI_Scout UMETA(DisplayName = "Ger Light Pz I Scout"),
 	Tank_PzI_15cm UMETA(DisplayName = "Ger Light Pz I 15cm"),
 	Tank_Pz38t UMETA(DisplayName = "Ger Light Pz 38t"),
+	Tank_Pz38t_R UMETA(DisplayName = "Ger Light Pz 38t R"),
 	Tank_PzII_F UMETA(DisplayName = "Ger Light Pz II F"),
 	Tank_Sdkfz_140 UMETA(DisplayName = "Ger Light SdKfz 140"),
 	// German Medium tanks.
@@ -217,6 +219,7 @@ static bool Global_GetIsLightTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_PzI_Scout:
 	case ETankSubtype::Tank_PzI_15cm:
 	case ETankSubtype::Tank_Pz38t:
+	case ETankSubtype::Tank_Pz38t_R:
 	case ETankSubtype::Tank_PzII_F:
 	case ETankSubtype::Tank_Sdkfz_140:
 	case ETankSubtype::Tank_BT7:
@@ -240,6 +243,7 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_Sdkfz251_PZIV:
 	case ETankSubtype::Tank_Sdkfz251_22:
 	case ETankSubtype::Tank_Puma:
+	case ETankSubtype::Tank_Panzerwerfer:
 	case ETankSubtype::Tank_Sdkfz_231:
 	case ETankSubtype::Tank_Sdkfz_232_3:
 	case ETankSubtype::Tank_Ba12:
