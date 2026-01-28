@@ -90,6 +90,7 @@ protected:
 	virtual void OnProjectileHit(const bool bBounced) override;
 	virtual void OnReloadStart(const int32 WeaponIndex, const float ReloadTime) override final;
 	virtual void OnReloadFinished(const int32 WeaponIndex) override final;
+	virtual void ForceSetAllWeaponsFullyReloaded() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWeaponParameters) override;

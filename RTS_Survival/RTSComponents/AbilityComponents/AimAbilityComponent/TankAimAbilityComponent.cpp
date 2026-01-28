@@ -73,6 +73,7 @@ void UTankAimAbilityComponent::FireWeaponsAtLocation(const FVector& TargetLocati
 	{
 		return;
 	}
+	M_TurretWithMostRange->ForceSetAllWeaponsFullyReloaded();
 	M_TurretWithMostRange->SetEngageGroundLocation(TargetLocation);
 }
 

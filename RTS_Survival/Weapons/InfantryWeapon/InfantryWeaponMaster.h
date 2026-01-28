@@ -118,6 +118,7 @@ protected:
 	virtual void OnProjectileHit(const bool bBounced) override;
 	virtual void OnReloadStart(const int32 WeaponIndex, const float ReloadTime) override;
 	virtual void OnReloadFinished(const int32 WeaponIndex) override;
+	virtual void ForceSetAllWeaponsFullyReloaded() override;
 	// ---- end IWeaponOwner ----
 
 	UFUNCTION(BlueprintCallable)
@@ -193,6 +194,7 @@ private:
 
 	/** Validate the GameUnitManager. */
 	bool GetIsValidGameUnitManager() const;
+	bool GetIsValidWeaponState() const;
 
 	UPROPERTY()
 	TObjectPtr<UWeaponState> WeaponState;
