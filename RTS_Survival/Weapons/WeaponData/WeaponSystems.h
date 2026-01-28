@@ -131,7 +131,12 @@ enum class
 	KwK44_128MM_E100 UMETA(DisplayName = "KwK44 128MM (E100)"),
 	sIG_33_150MM UMETA(DisplayName = "sIG 33 150MM (Sturmpanzer)"),
 	Stu_H_43_L_12_150MM UMETA(DisplayName = "StuH 43 L/12 150MM (Brumbar)"),
+	Panzerwerfer UMETA(DisplayName = "Panzerwerfer 150MM"),
 	RW61_Mortar_380MM UMETA(DisplayName = "RW61 Mortar 380MM (SturmTiger)"),
+	Mortar_120MM UMETA(DisplayName = "120MM Mortar"),
+	Mortar_80MM UMETA(DisplayName = "80MM Mortar"),
+	Mortar_40MM UMETA(DisplayName = "40MM Mortar"),
+	Panzerwerfer_Small UMETA(DisplayName = "Panzerwerfer 40MM"),
 
 
 	// Russian Small Arms
@@ -260,7 +265,12 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::M_30S_122MM_SU122: return "M-30S";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
-		case EWeaponName::RW61_Mortar_380MM: return "RW61 Mortar";
+	case EWeaponName::Panzerwerfer: return "Panzerwerfer";
+	case EWeaponName::RW61_Mortar_380MM: return "RW61 Mortar";
+	case EWeaponName::Mortar_120MM: return "120MM Mortar";
+	case EWeaponName::Mortar_80MM: return "80MM Mortar";
+	case EWeaponName::Mortar_40MM: return "40MM Mortar";
+	case EWeaponName::Panzerwerfer_Small: return "Panzerwerfer 40MM";
 	case EWeaponName::StuK40_L48_75MM: return "StuK 40";
 	case EWeaponName::Pak40_3_L46_75MM: return "Pak40/3";
 	case EWeaponName::Pak43_88MM: return "Pak43";
@@ -602,6 +612,18 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Kwk37_20MM";
 	case EWeaponName::sIG_33_150MM:
 		return "sIG_33_150MM";
+	case EWeaponName::Panzerwerfer:
+		return "Panzerwerfer";
+	case EWeaponName::RW61_Mortar_380MM:
+		return "RW61_Mortar_380MM";
+	case EWeaponName::Mortar_120MM:
+		return "Mortar_120MM";
+	case EWeaponName::Mortar_80MM:
+		return "Mortar_80MM";
+	case EWeaponName::Mortar_40MM:
+		return "Mortar_40MM";
+	case EWeaponName::Panzerwerfer_Small:
+		return "Panzerwerfer_Small";
 	case EWeaponName::STG44_7_92MM:
 		return "STG44_7_92MM";
 	case EWeaponName::MP40_9MM:

@@ -627,6 +627,8 @@ namespace DeveloperSettings
 			inline constexpr float ShrapnelPenPerMM = 0.5;
 			// Shrapnel damage per gram of TNT equivalent.
 			inline constexpr float ShrapnelDamagePerTNTGram = 0.5;
+			// Bonus multiplier for mortar AOE ranges compared to standard shrapnel range.
+			inline constexpr float MortarAOEMlt = 1.5f;
 			// How much a projectile's penetration can differ from the base value in percentages
 			inline constexpr float ArmorPenFluxPercentage = 10.f;
 
