@@ -18,6 +18,7 @@ class UWeaponState;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UMeshComponent;
+class ASmallArmsProjectileManager;
 
 UENUM()
 enum class EAttachedWeaponAbilityMeshSetup : uint8
@@ -216,6 +217,11 @@ private:
 	void ProcessPendingArchProjectileWeapons();
 	void ReportMissingInit(const FString& SetupFunctionName) const;
 
+	void BeginPlay_SetupCallbackToProjectileManager();
+	void OnProjectileManagerLoaded(const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager);
+	void SetupProjectileManagerIfReady(UWeaponState* Weapon);
+	bool GetIsValidProjectileManager() const;
+
 	bool TryPrepareWeaponParameters(FInitWeaponStateDirectHit& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStatTrace& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiTrace& WeaponParameters, const FString& FunctionName);
@@ -278,6 +284,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> M_SpawnedWeaponMesh;
+
+	UPROPERTY()
+	TWeakObjectPtr<ASmallArmsProjectileManager> M_ProjectileManager;
+
+	bool bM_HasProjectileManager = false;
 
 	FWeaponTargetingData M_TargetingData;
 	FAttachedWeaponAbilityFireState M_FireState;
