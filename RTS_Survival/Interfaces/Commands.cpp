@@ -1079,6 +1079,16 @@ int32 ICommands::GetConstructionAbilityCount()
 	return Count;
 }
 
+int32 ICommands::GetQueuedFieldConstructionCommandCount(const EFieldConstructionType ConstructionType)
+{
+	const UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return 0;
+	}
+	return UnitCommandData->GetQueuedFieldConstructionCommandCount(ConstructionType);
+}
+
 void ICommands::UnstuckSquadMoveUp(const float ZOffset)
 {
 	return;

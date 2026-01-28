@@ -1736,13 +1736,8 @@ bool ACPPController::GetFieldConstructionCandidateData(
 		return false;
 	}
 
-	const UCommandData* const CommandData = CommandInterface->GetIsValidCommandData();
-	if (not IsValid(CommandData))
-	{
-		return false;
-	}
 
-	OutQueuedConstructionCount = CommandData->GetQueuedFieldConstructionCommandCount(ConstructionType);
+	OutQueuedConstructionCount = CommandInterface->GetQueuedFieldConstructionCommandCount(ConstructionType);
 	OutFieldConstructionComp = FoundAbilityComp;
 	return true;
 }

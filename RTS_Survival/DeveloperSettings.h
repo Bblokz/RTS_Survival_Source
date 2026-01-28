@@ -648,6 +648,7 @@ namespace DeveloperSettings
 			inline constexpr float ProjectileGravityScale = 0.05f;
 			inline constexpr float RocketProjectileGravityScale = 1.f;
 			inline constexpr float RocketProjectileAccuracyMlt = 0.8f;
+			inline constexpr int32 MortarAccuracy = 10;
 
 			// Influences the projectile accuracy for mortars and artillery this the amount of centimeters in deviation
 			// from the targeted position (deviates only in x,y).

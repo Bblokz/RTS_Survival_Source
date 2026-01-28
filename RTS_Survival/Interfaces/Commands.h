@@ -367,6 +367,9 @@ public:
 
 	int32 GetConstructionAbilityCount();
 
+	
+	int32 GetQueuedFieldConstructionCommandCount(const EFieldConstructionType ConstructionType);
+
 	virtual bool GetIsSquadUnit() { return false; }
 
 	virtual void UnstuckSquadMoveUp(const float ZOffset);

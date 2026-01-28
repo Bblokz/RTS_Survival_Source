@@ -8,4 +8,6 @@ enum class EAimAbilityType : uint8
 	DefaultBrummbarFire,
 	PanzerIVArtilleryExplosiveShot,
 	HeArtilleryBarrage,
+	SmallRocketBarrage,
+	MortarBarrage,
 };

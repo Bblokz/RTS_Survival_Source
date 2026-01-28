@@ -1862,7 +1862,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ReloadSpeed = PanzerwerferReloadSpeed;
 	WeaponData.BaseCooldown = PanzerwerferBaseCooldown;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 70;
+	WeaponData.Accuracy = 20;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -1890,7 +1890,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ReloadSpeed = 10.f;
 	WeaponData.BaseCooldown = 1.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 60;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -3142,7 +3142,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ReloadSpeed = 12.f;
 	WeaponData.BaseCooldown = MortarBaseCooldown;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 70;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -3160,7 +3160,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumArtilleryRange, 100);
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
 	WeaponData.ArmorPen = (MortarArmorPenPerMM * WeaponData.WeaponCalibre)
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = (MortarArmorPenPerMM * WeaponData.WeaponCalibre)
@@ -3169,7 +3169,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ReloadSpeed = 10.f;
 	WeaponData.BaseCooldown = MortarBaseCooldown;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 65;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -3197,7 +3197,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 80;
-	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
+	WeaponData.ShrapnelRange = 700;
 	WeaponData.ShrapnelDamage = 800;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM * 2;
 	WeaponData.ShrapnelPen = 82;
@@ -3798,7 +3798,7 @@ void ACPPGameState::InitAllGameLightTankData()
 		TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40;
-		TankData.TurretRotationSpeed = 14;
+		TankData.TurretRotationSpeed = 30;
 		TankData.VehicleMaxSpeedKmh = 20;
 		TankData.VehicleReverseSpeedKmh = 8;
 		TankData.VisionRadius = T1TankVisionRadius;
