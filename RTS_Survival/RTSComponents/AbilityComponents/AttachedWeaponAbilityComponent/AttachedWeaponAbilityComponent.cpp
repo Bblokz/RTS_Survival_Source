@@ -4,9 +4,13 @@
 
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiProjectileWeapon/UWeaponStateMultiProjectile.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiTraceWeapon/WeaponStateMultiTrace.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponSystems.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateLaser.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
@@ -49,6 +53,7 @@ void UAttachedWeaponAbilityComponent::BeginPlay()
 	Super::BeginPlay();
 	(void)GetIsValidOwnerCommandsInterface();
 	BeginPlay_AddAbility();
+	BeginPlay_SetupCallbackToProjectileManager();
 }
 
 void UAttachedWeaponAbilityComponent::ExecuteAttachedWeaponAbility(const FVector& TargetLocation)
@@ -187,6 +192,73 @@ void UAttachedWeaponAbilityComponent::RegisterIgnoreActor(AActor* ActorToIgnore,
 		}
 		Weapon->RegisterActorToIgnore(ActorToIgnore, bRegister);
 	}
+}
+
+void UAttachedWeaponAbilityComponent::BeginPlay_SetupCallbackToProjectileManager()
+{
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	if (not GameState)
+	{
+		return;
+	}
+	TWeakObjectPtr<UAttachedWeaponAbilityComponent> WeakThis(this);
+	auto Callback = [WeakThis](const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager)-> void
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->OnProjectileManagerLoaded(ProjectileManager);
+	};
+	GameState->RegisterCallbackForSmallArmsProjectileMgr(Callback, this);
+}
+
+void UAttachedWeaponAbilityComponent::OnProjectileManagerLoaded(
+	const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager)
+{
+	if (not IsValid(ProjectileManager))
+	{
+		RTSFunctionLibrary::ReportError("OnProjectileManagerLoaded: ProjectileManager is not valid"
+			"\n For AttachedWeaponAbilityComponent: " + GetName());
+		return;
+	}
+	M_ProjectileManager = ProjectileManager;
+	bM_HasProjectileManager = true;
+	for (const TObjectPtr<UWeaponState>& EachWeapon : M_AttachedWeapons)
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(EachWeapon, ProjectileManager);
+	}
+}
+
+void UAttachedWeaponAbilityComponent::SetupProjectileManagerIfReady(UWeaponState* Weapon)
+{
+	if (not IsValid(Weapon) || not bM_HasProjectileManager)
+	{
+		return;
+	}
+
+	if (not GetIsValidProjectileManager())
+	{
+		return;
+	}
+
+	FRTSWeaponHelpers::SetupProjectileManagerForWeapon(Weapon, M_ProjectileManager.Get());
+}
+
+bool UAttachedWeaponAbilityComponent::GetIsValidProjectileManager() const
+{
+	if (M_ProjectileManager.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_ProjectileManager",
+		"UAttachedWeaponAbilityComponent::GetIsValidProjectileManager",
+		this);
+
+	return false;
 }
 
 void UAttachedWeaponAbilityComponent::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon)
@@ -1021,6 +1093,7 @@ void UAttachedWeaponAbilityComponent::SetupTraceWeaponInternal(const FInitWeapon
 
 	M_AttachedWeapons.Add(TraceWeapon);
 	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(TraceWeapon);
 }
 
 void UAttachedWeaponAbilityComponent::SetupMultiTraceWeaponInternal(
@@ -1051,6 +1124,7 @@ void UAttachedWeaponAbilityComponent::SetupMultiTraceWeaponInternal(
 
 	M_AttachedWeapons.Add(MultiTraceWeapon);
 	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(MultiTraceWeapon);
 }
 
 void UAttachedWeaponAbilityComponent::SetupLaserWeaponInternal(const FInitWeaponStateLaser& LaserWeaponParameters)
@@ -1145,6 +1219,7 @@ void UAttachedWeaponAbilityComponent::SetupProjectileWeaponInternal(
 
 	M_AttachedWeapons.Add(ProjectileWeapon);
 	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(ProjectileWeapon);
 }
 
 void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeaponInternal(
@@ -1175,6 +1250,7 @@ void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeaponInternal(
 
 	M_AttachedWeapons.Add(RocketWeapon);
 	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(RocketWeapon);
 }
 
 void UAttachedWeaponAbilityComponent::SetupMultiProjectileWeaponInternal(
@@ -1204,6 +1280,7 @@ void UAttachedWeaponAbilityComponent::SetupMultiProjectileWeaponInternal(
 
 	M_AttachedWeapons.Add(MultiProjectileWeapon);
 	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(MultiProjectileWeapon);
 }
 
 void UAttachedWeaponAbilityComponent::SetupArchProjectileWeaponInternal(
@@ -1234,6 +1311,7 @@ void UAttachedWeaponAbilityComponent::SetupArchProjectileWeaponInternal(
 
 	M_AttachedWeapons.Add(ArchWeapon);
 	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(ArchWeapon);
 }
 
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters)
