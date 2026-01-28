@@ -1322,8 +1322,19 @@ public:
 
 protected:
 	virtual void FireWeaponSystem() override;
+	virtual void CreateLaunchVfx(
+		const FVector& LaunchLocation,
+		const FVector& ForwardVector,
+		const bool bCreateShellCase = true) override;
 
 private:
+	struct FRocketLaunchSocketData
+	{
+		FName SocketName = NAME_None;
+		FVector LaunchLocation = FVector::ZeroVector;
+		FVector ForwardVector = FVector::ZeroVector;
+	};
+
 	UPROPERTY()
 	FRocketWeaponSettings M_RocketSettings;
 
@@ -1331,7 +1342,7 @@ private:
 
 	void FireProjectile(const FVector& TargetLocation);
 
-	TPair<FVector, FVector> GetLaunchAndForwardVectorForRocketSocket();
+	FRocketLaunchSocketData GetRocketLaunchSocketData(const bool bAdvanceSocketIndex);
 
 	/**
 	 * @brief Fires a rocket with the provided stats and swing configuration.
