@@ -1853,7 +1853,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = LightCannonRange;
+	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::LightArtilleryRange;
 	WeaponData.ArmorPen = (PanzerSchreckArmorPenPerMM * WeaponData.WeaponCalibre)
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = (PanzerSchreckArmorPenMaxRangePerMM * WeaponData.WeaponCalibre)
@@ -3808,9 +3808,7 @@ void ACPPGameState::InitAllGameLightTankData()
 			{ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
 				 Panzer38TBaseVehiclePartsCost * Panzer38TRVehiclePartsCostMlt)}
 		});
-		TankData.Abilities = FAbilityHelpers::SwapAtIdForNewEntry(TankAbilitiesWithRockets, EAbilityID::IdFireRockets,
-		                                                          FAbilityHelpers::GetRocketAbilityEntry(
-			                                                          EAttachedRocketAbilityType::SmallRockets));
+		TankData.Abilities = BasicTankAbilities;
 		TankData.ExperienceLevels = GetLightTankExpLevels();
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.2f, 5);
 		TankData.ExperienceMultiplier = 1.0f;
