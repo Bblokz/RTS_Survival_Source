@@ -74,7 +74,31 @@ struct FAttachedWeaponAbilitySettings
 };
 
 /**
- * @brief Ability component that attaches weapon states and fires them at a ground target.
+ * @brief Ability component used by designers to bolt weapon fire logic onto a unit via mesh sockets.
+ *        Treat it as the weapon runtime for an ability and configure it before any Setup calls.
+ *        The component expects a mesh source and then builds weapon state objects around it.
+ *
+ * Designer setup (existing mesh):
+ * - Ensure the owning actor already has a mesh component with the required fire sockets.
+ * - Call InitWithExistingMesh from Blueprint before any Setup*Weapon calls.
+ * - The mesh supplied to Setup*Weapon is ignored and replaced by the existing mesh, so keep
+ *   the socket names and fire offsets authored on that mesh.
+ *
+ * Designer setup (spawned mesh):
+ * - Provide a static mesh asset that contains the required fire sockets.
+ * - Call InitWithSpawnedMesh from Blueprint before any Setup*Weapon calls and supply a
+ *   relative transform that places the mesh correctly on the owner.
+ * - The component spawns and registers a UStaticMeshComponent, so collision and materials
+ *   should be authored on the mesh asset itself.
+ *
+ * Runtime flow (init → fire → stop):
+ * - InitWithExistingMesh or InitWithSpawnedMesh stores the mesh choice and resolves any
+ *   pending Setup*Weapon requests once the mesh is valid.
+ * - Setup*Weapon builds a weapon state and caches the owner, sockets, and targeting data.
+ * - ExecuteAttachedWeaponAbility updates the target location, reloads weapons if needed,
+ *   and starts the internal fire loop.
+ * - StopAttachedWeaponAbilityFire clears fire timers and tells all weapon states to stop.
+ *
  * @note InitWithExistingMesh: call in blueprint to set the weapon mesh before setup functions.
  * @note InitWithSpawnedMesh: call in blueprint to spawn a mesh before setup functions.
  */
