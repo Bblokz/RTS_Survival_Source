@@ -2300,11 +2300,44 @@ void UWeaponStateRocketProjectile::FireWeaponSystem()
 	}
 }
 
-TPair<FVector, FVector> UWeaponStateRocketProjectile::GetLaunchAndForwardVectorForRocketSocket()
+void UWeaponStateRocketProjectile::CreateLaunchVfx(
+	const FVector& /*LaunchLocation*/,
+	const FVector& /*ForwardVector*/,
+	const bool bCreateShellCase)
 {
 	if (not IsValid(MeshComponent))
 	{
-		return TPair<FVector, FVector>(FVector::ZeroVector, FVector::ZeroVector);
+		return;
+	}
+
+	if (not World)
+	{
+		return;
+	}
+
+	const FRocketLaunchSocketData LaunchData = GetRocketLaunchSocketData(false);
+
+	if (M_WeaponVfx.LaunchSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(World, M_WeaponVfx.LaunchSound, LaunchData.LaunchLocation,
+		                                      FRotator::ZeroRotator, 1, 1, 0,
+		                                      M_WeaponVfx.LaunchAttenuation, M_WeaponVfx.LaunchConcurrency);
+	}
+
+	CreateLaunchAndSmokeVfx(LaunchData.SocketName, LaunchData.ForwardVector.Rotation(), LaunchData.LaunchLocation);
+
+	if (bCreateShellCase)
+	{
+		WeaponShellCase.SpawnShellCase();
+	}
+}
+
+UWeaponStateRocketProjectile::FRocketLaunchSocketData
+UWeaponStateRocketProjectile::GetRocketLaunchSocketData(const bool bAdvanceSocketIndex)
+{
+	if (not IsValid(MeshComponent))
+	{
+		return FRocketLaunchSocketData();
 	}
 
 	constexpr int32 FirstSocketIndex = 0;
@@ -2319,15 +2352,18 @@ TPair<FVector, FVector> UWeaponStateRocketProjectile::GetLaunchAndForwardVectorF
 		? M_RocketSettings.FireSocketNames[SelectedSocketIndex]
 		: FireSocketName;
 
-	if (bHasSocketOverrides)
+	if (bHasSocketOverrides && bAdvanceSocketIndex)
 	{
 		M_NextRocketSocketIndex = (SelectedSocketIndex + SocketIndexIncrement) % SocketCount;
 	}
 
 	const FName SocketNameToUse = SelectedSocketName.IsNone() ? FireSocketName : SelectedSocketName;
-	const FVector LaunchLocation = MeshComponent->GetSocketLocation(SocketNameToUse);
 	const FQuat SocketRotation = MeshComponent->GetSocketQuaternion(SocketNameToUse);
-	const FVector ForwardVector = SocketRotation.GetForwardVector();
+
+	FRocketLaunchSocketData LaunchData;
+	LaunchData.SocketName = SocketNameToUse;
+	LaunchData.LaunchLocation = MeshComponent->GetSocketLocation(SocketNameToUse);
+	LaunchData.ForwardVector = SocketRotation.GetForwardVector();
 
 	// draw debug of socket forward vector 200 units.
 	if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
@@ -2340,8 +2376,8 @@ TPair<FVector, FVector> UWeaponStateRocketProjectile::GetLaunchAndForwardVectorF
 			constexpr float DebugLineThickness = 5.0f;
 
 			DrawDebugLine(World,
-			              LaunchLocation,
-			              LaunchLocation + ForwardVector * DebugLineLength,
+			              LaunchData.LaunchLocation,
+			              LaunchData.LaunchLocation + LaunchData.ForwardVector * DebugLineLength,
 			              FColor::Red,
 			              false,
 			              DebugLineLifetime,
@@ -2350,7 +2386,7 @@ TPair<FVector, FVector> UWeaponStateRocketProjectile::GetLaunchAndForwardVectorF
 		}
 	}
 
-	return TPair<FVector, FVector>(LaunchLocation, ForwardVector);
+	return LaunchData;
 }
 
 void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationRaw)
@@ -2361,8 +2397,8 @@ void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationR
 		return;
 	}
 
-	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVectorForRocketSocket();
-	const FVector LaunchLocation = LaunchAndForward.Key;
+	const FRocketLaunchSocketData LaunchData = GetRocketLaunchSocketData(true);
+	const FVector LaunchLocation = LaunchData.LaunchLocation;
 
 	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
 		TargetLocationRaw, WeaponData.Accuracy);
@@ -2370,7 +2406,7 @@ void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationR
 	FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
 	if (LaunchDirection.IsNearlyZero())
 	{
-		LaunchDirection = LaunchAndForward.Value.GetSafeNormal();
+		LaunchDirection = LaunchData.ForwardVector.GetSafeNormal();
 	}
 	const FRotator LaunchRotation = LaunchDirection.Rotation();
 
