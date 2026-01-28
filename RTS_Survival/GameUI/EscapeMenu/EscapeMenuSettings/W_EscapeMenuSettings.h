@@ -85,6 +85,15 @@ struct FEscapeMenuSettingsAudioText
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_SfxVolumeLabelText = FText::FromString(TEXT("SETTINGS_SFX_VOLUME_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_VoicelinesVolumeLabelText = FText::FromString(TEXT("SETTINGS_VOICELINES_VOLUME_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_AnnouncerVolumeLabelText = FText::FromString(TEXT("SETTINGS_ANNOUNCER_VOLUME_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_UiVolumeLabelText = FText::FromString(TEXT("SETTINGS_UI_VOLUME_LABEL"));
 };
 
 /**
@@ -279,9 +288,15 @@ private:
 	bool GetIsValidTextMasterVolumeLabel() const;
 	bool GetIsValidTextMusicVolumeLabel() const;
 	bool GetIsValidTextSfxVolumeLabel() const;
+	bool GetIsValidTextVoicelinesVolumeLabel() const;
+	bool GetIsValidTextAnnouncerVolumeLabel() const;
+	bool GetIsValidTextUiVolumeLabel() const;
 	bool GetIsValidSliderMasterVolume() const;
 	bool GetIsValidSliderMusicVolume() const;
 	bool GetIsValidSliderSfxVolume() const;
+	bool GetIsValidSliderVoicelinesVolume() const;
+	bool GetIsValidSliderAnnouncerVolume() const;
+	bool GetIsValidSliderUiVolume() const;
 
 	bool GetIsValidTextControlsHeader() const;
 	bool GetIsValidTextMouseSensitivityLabel() const;
@@ -356,6 +371,15 @@ private:
 
 	UFUNCTION()
 	void HandleSfxVolumeChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleVoicelinesVolumeChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleAnnouncerVolumeChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleUiVolumeChanged(float NewValue);
 
 	UFUNCTION()
 	void HandleMouseSensitivityChanged(float NewValue);
@@ -677,6 +701,30 @@ private:
 	TObjectPtr<URichTextBlock> M_TextSfxVolumeLabel = nullptr;
 
 	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextVoicelinesVolumeLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextVoicelinesVolumeLabel = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextAnnouncerVolumeLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextAnnouncerVolumeLabel = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextUiVolumeLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextUiVolumeLabel = nullptr;
+
+	/**
 	 * @brief BindWidget variable must reference a Slider named M_SliderMasterVolume in the Widget Blueprint.
 	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
@@ -699,6 +747,30 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderSfxVolume = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderVoicelinesVolume in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderVoicelinesVolume = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderAnnouncerVolume in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderAnnouncerVolume = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderUiVolume in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderUiVolume = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextControlsHeader in the Widget Blueprint.

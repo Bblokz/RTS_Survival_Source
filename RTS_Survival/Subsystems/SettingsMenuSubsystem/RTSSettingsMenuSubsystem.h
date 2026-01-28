@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
+#include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 
@@ -36,14 +37,6 @@ enum class ERTSScalabilityGroup : uint8
 	Textures UMETA(DisplayName="Textures"),
 	Effects UMETA(DisplayName="Effects"),
 	PostProcessing UMETA(DisplayName="Post Processing")
-};
-
-UENUM(BlueprintType)
-enum class ERTSAudioChannel : uint8
-{
-	Master UMETA(DisplayName="Master"),
-	Music UMETA(DisplayName="Music"),
-	Sfx UMETA(DisplayName="SFX")
 };
 
 USTRUCT(BlueprintType)
@@ -112,7 +105,16 @@ struct FRTSAudioSettings
 	float M_MusicVolume = RTSGameUserSettingsRanges::DefaultVolume;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
-	float M_SfxVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	float M_SfxAndWeaponsVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
+	float M_VoicelinesVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
+	float M_AnnouncerVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
+	float M_UiVolume = RTSGameUserSettingsRanges::DefaultVolume;
 };
 
 USTRUCT(BlueprintType)
@@ -146,7 +148,6 @@ struct FRTSSettingsSnapshot
  * @brief Central settings manager that widgets call to stage, apply, save, and revert runtime settings changes.
  *
  * The subsystem owns the pending settings state, applies it through UGameUserSettings, and keeps UI logic decoupled.
- * @note ConfigureAudioMixAndClasses: call in GameInstance Blueprint to provide a sound mix and classes for channel volumes.
  */
 UCLASS()
 class RTS_SURVIVAL_API URTSSettingsMenuSubsystem : public UGameInstanceSubsystem
@@ -191,7 +192,10 @@ public:
 	void SetPendingFrameRateLimit(float NewFrameRateLimit);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
-	void SetPendingAudioVolume(ERTSAudioChannel AudioChannel, float NewVolume);
+	void SetPendingMasterVolume(float NewVolume);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingAudioVolume(ERTSAudioType AudioType, float NewVolume);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingMouseSensitivity(float NewMouseSensitivity);
@@ -208,21 +212,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void RevertSettings();
 
-	/**
-	 * @brief Registers the audio mix and classes used to apply per-channel volume changes at runtime.
-	 * @param NewSettingsSoundMix Sound mix that receives class overrides for the settings menu.
-	 * @param NewMasterSoundClass Master sound class used for the master volume channel.
-	 * @param NewMusicSoundClass Music sound class used for the music volume channel.
-	 * @param NewSfxSoundClass SFX sound class used for the effects volume channel.
-	 */
-	UFUNCTION(BlueprintCallable, Category="Settings|Audio")
-	void ConfigureAudioMixAndClasses(
-		TSoftObjectPtr<USoundMix> NewSettingsSoundMix,
-		TSoftObjectPtr<USoundClass> NewMasterSoundClass,
-		TSoftObjectPtr<USoundClass> NewMusicSoundClass,
-		TSoftObjectPtr<USoundClass> NewSfxSoundClass
-	);
-
 private:
 	bool GetIsValidGameUserSettings() const;
 	URTSGameUserSettings* GetGameUserSettingsChecked() const;
@@ -230,6 +219,7 @@ private:
 	void EnsureGameUserSettingsInstance();
 	void CacheSupportedResolutions();
 	void CacheSettingsSnapshots();
+	void CacheAudioSettingsFromDeveloperSettings();
 	void ResetPendingSettingsToCurrent();
 
 	void ApplyPendingSettingsToGameUserSettings();
@@ -238,7 +228,8 @@ private:
 	void ApplyAudioSettings();
 	void ApplyControlSettings();
 
-	void ApplyAudioChannelVolume(ERTSAudioChannel AudioChannel, float VolumeToApply);
+	void ApplyAudioChannelVolume(ERTSAudioType AudioType, float VolumeToApply);
+	bool TryGetSoundClassForAudioType(ERTSAudioType AudioType, TSoftObjectPtr<USoundClass>& OutSoundClass) const;
 	void ApplyControlSettingsToPlayerController(APlayerController* PlayerControllerToApply) const;
 
 	FRTSSettingsSnapshot BuildSnapshotFromSettings(const URTSGameUserSettings& GameUserSettings) const;
@@ -282,15 +273,9 @@ private:
 	UPROPERTY(Transient)
 	TArray<FString> M_SupportedResolutionLabels;
 
-	UPROPERTY(EditAnywhere, Category="Settings|Audio")
+	UPROPERTY(Transient)
 	TSoftObjectPtr<USoundMix> M_SettingsSoundMix;
 
-	UPROPERTY(EditAnywhere, Category="Settings|Audio")
-	TSoftObjectPtr<USoundClass> M_MasterSoundClass;
-
-	UPROPERTY(EditAnywhere, Category="Settings|Audio")
-	TSoftObjectPtr<USoundClass> M_MusicSoundClass;
-
-	UPROPERTY(EditAnywhere, Category="Settings|Audio")
-	TSoftObjectPtr<USoundClass> M_SfxSoundClass;
+	UPROPERTY(Transient)
+	TMap<ERTSAudioType, TSoftObjectPtr<USoundClass>> M_SoundClassesByType;
 };

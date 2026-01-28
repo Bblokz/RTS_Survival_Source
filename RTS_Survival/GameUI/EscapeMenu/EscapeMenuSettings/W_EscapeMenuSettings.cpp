@@ -300,6 +300,9 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 	M_TextMasterVolumeLabel->SetText(M_AudioText.M_MasterVolumeLabelText);
 	M_TextMusicVolumeLabel->SetText(M_AudioText.M_MusicVolumeLabelText);
 	M_TextSfxVolumeLabel->SetText(M_AudioText.M_SfxVolumeLabelText);
+	M_TextVoicelinesVolumeLabel->SetText(M_AudioText.M_VoicelinesVolumeLabelText);
+	M_TextAnnouncerVolumeLabel->SetText(M_AudioText.M_AnnouncerVolumeLabelText);
+	M_TextUiVolumeLabel->SetText(M_AudioText.M_UiVolumeLabelText);
 
 	M_TextControlsHeader->SetText(M_ControlsText.M_HeaderText);
 	M_TextMouseSensitivityLabel->SetText(M_ControlsText.M_MouseSensitivityLabelText);
@@ -398,7 +401,10 @@ void UW_EscapeMenuSettings::InitialiseAudioControls(const FRTSAudioSettings& Aud
 
 	M_SliderMasterVolume->SetValue(AudioSettings.M_MasterVolume);
 	M_SliderMusicVolume->SetValue(AudioSettings.M_MusicVolume);
-	M_SliderSfxVolume->SetValue(AudioSettings.M_SfxVolume);
+	M_SliderSfxVolume->SetValue(AudioSettings.M_SfxAndWeaponsVolume);
+	M_SliderVoicelinesVolume->SetValue(AudioSettings.M_VoicelinesVolume);
+	M_SliderAnnouncerVolume->SetValue(AudioSettings.M_AnnouncerVolume);
+	M_SliderUiVolume->SetValue(AudioSettings.M_UiVolume);
 }
 
 void UW_EscapeMenuSettings::InitialiseControlSettingsControls(const FRTSControlSettings& ControlSettings)
@@ -565,6 +571,15 @@ void UW_EscapeMenuSettings::BindAudioSettingCallbacks()
 
 	M_SliderSfxVolume->OnValueChanged.RemoveAll(this);
 	M_SliderSfxVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleSfxVolumeChanged);
+
+	M_SliderVoicelinesVolume->OnValueChanged.RemoveAll(this);
+	M_SliderVoicelinesVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleVoicelinesVolumeChanged);
+
+	M_SliderAnnouncerVolume->OnValueChanged.RemoveAll(this);
+	M_SliderAnnouncerVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleAnnouncerVolumeChanged);
+
+	M_SliderUiVolume->OnValueChanged.RemoveAll(this);
+	M_SliderUiVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleUiVolumeChanged);
 }
 
 void UW_EscapeMenuSettings::BindControlSettingCallbacks()
@@ -1168,6 +1183,54 @@ bool UW_EscapeMenuSettings::GetIsValidTextSfxVolumeLabel() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidTextVoicelinesVolumeLabel() const
+{
+	if (not IsValid(M_TextVoicelinesVolumeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextVoicelinesVolumeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextVoicelinesVolumeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextAnnouncerVolumeLabel() const
+{
+	if (not IsValid(M_TextAnnouncerVolumeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextAnnouncerVolumeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextAnnouncerVolumeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextUiVolumeLabel() const
+{
+	if (not IsValid(M_TextUiVolumeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextUiVolumeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextUiVolumeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidSliderMasterVolume() const
 {
 	if (not IsValid(M_SliderMasterVolume))
@@ -1208,6 +1271,54 @@ bool UW_EscapeMenuSettings::GetIsValidSliderSfxVolume() const
 			this,
 			TEXT("M_SliderSfxVolume"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidSliderSfxVolume"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderVoicelinesVolume() const
+{
+	if (not IsValid(M_SliderVoicelinesVolume))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderVoicelinesVolume"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderVoicelinesVolume"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderAnnouncerVolume() const
+{
+	if (not IsValid(M_SliderAnnouncerVolume))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderAnnouncerVolume"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderAnnouncerVolume"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderUiVolume() const
+{
+	if (not IsValid(M_SliderUiVolume))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderUiVolume"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderUiVolume"),
 			this
 		);
 		return false;
@@ -1607,7 +1718,22 @@ bool UW_EscapeMenuSettings::GetAreAudioTextWidgetsValid() const
 		return false;
 	}
 
-	return GetIsValidTextSfxVolumeLabel();
+	if (not GetIsValidTextSfxVolumeLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextVoicelinesVolumeLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextAnnouncerVolumeLabel())
+	{
+		return false;
+	}
+
+	return GetIsValidTextUiVolumeLabel();
 }
 
 bool UW_EscapeMenuSettings::GetAreControlsTextWidgetsValid() const
@@ -1697,7 +1823,22 @@ bool UW_EscapeMenuSettings::GetAreAudioSliderWidgetsValid() const
 		return false;
 	}
 
-	return GetIsValidSliderSfxVolume();
+	if (not GetIsValidSliderSfxVolume())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSliderVoicelinesVolume())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSliderAnnouncerVolume())
+	{
+		return false;
+	}
+
+	return GetIsValidSliderUiVolume();
 }
 
 bool UW_EscapeMenuSettings::GetAreControlSettingsWidgetsValid() const
@@ -2025,7 +2166,7 @@ void UW_EscapeMenuSettings::HandleMasterVolumeChanged(const float NewValue)
 		return;
 	}
 
-	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioChannel::Master, NewValue);
+	M_SettingsSubsystem->SetPendingMasterVolume(NewValue);
 }
 
 void UW_EscapeMenuSettings::HandleMusicVolumeChanged(const float NewValue)
@@ -2045,7 +2186,7 @@ void UW_EscapeMenuSettings::HandleMusicVolumeChanged(const float NewValue)
 		return;
 	}
 
-	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioChannel::Music, NewValue);
+	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioType::Music, NewValue);
 }
 
 void UW_EscapeMenuSettings::HandleSfxVolumeChanged(const float NewValue)
@@ -2065,7 +2206,67 @@ void UW_EscapeMenuSettings::HandleSfxVolumeChanged(const float NewValue)
 		return;
 	}
 
-	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioChannel::Sfx, NewValue);
+	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioType::SFXAndWeapons, NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleVoicelinesVolumeChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderVoicelinesVolume())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioType::Voicelines, NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleAnnouncerVolumeChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderAnnouncerVolume())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioType::Announcer, NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleUiVolumeChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderUiVolume())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioType::UI, NewValue);
 }
 
 void UW_EscapeMenuSettings::HandleMouseSensitivityChanged(const float NewValue)

@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "RHI.h"
+#include "RTS_Survival/Audio/Settings/RTSAudioSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Scalability.h"
 #include "Sound/SoundClass.h"
@@ -50,6 +51,8 @@ void URTSSettingsMenuSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	EnsureGameUserSettingsInstance();
 	CacheSupportedResolutions();
 	CacheSettingsSnapshots();
+	CacheAudioSettingsFromDeveloperSettings();
+	ApplyAudioSettings();
 }
 
 void URTSSettingsMenuSubsystem::Deinitialize()
@@ -62,6 +65,7 @@ void URTSSettingsMenuSubsystem::LoadSettings()
 {
 	CacheSupportedResolutions();
 	CacheSettingsSnapshots();
+	CacheAudioSettingsFromDeveloperSettings();
 }
 
 bool URTSSettingsMenuSubsystem::GetCurrentSettingsValues(FRTSSettingsSnapshot& OutSettingsValues) const
@@ -160,22 +164,34 @@ void URTSSettingsMenuSubsystem::SetPendingFrameRateLimit(const float NewFrameRat
 	M_PendingSettings.M_GraphicsSettings.M_DisplaySettings.M_FrameRateLimit = ClampedFrameRateLimit;
 }
 
-void URTSSettingsMenuSubsystem::SetPendingAudioVolume(const ERTSAudioChannel AudioChannel, const float NewVolume)
+void URTSSettingsMenuSubsystem::SetPendingMasterVolume(const float NewVolume)
 {
 	const float ClampedVolume = FMath::Clamp(NewVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
-	switch (AudioChannel)
+	M_PendingSettings.M_AudioSettings.M_MasterVolume = ClampedVolume;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingAudioVolume(const ERTSAudioType AudioType, const float NewVolume)
+{
+	const float ClampedVolume = FMath::Clamp(NewVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
+	switch (AudioType)
 	{
-	case ERTSAudioChannel::Master:
-		M_PendingSettings.M_AudioSettings.M_MasterVolume = ClampedVolume;
+	case ERTSAudioType::SFXAndWeapons:
+		M_PendingSettings.M_AudioSettings.M_SfxAndWeaponsVolume = ClampedVolume;
 		return;
-	case ERTSAudioChannel::Music:
+	case ERTSAudioType::Music:
 		M_PendingSettings.M_AudioSettings.M_MusicVolume = ClampedVolume;
 		return;
-	case ERTSAudioChannel::Sfx:
-		M_PendingSettings.M_AudioSettings.M_SfxVolume = ClampedVolume;
+	case ERTSAudioType::Voicelines:
+		M_PendingSettings.M_AudioSettings.M_VoicelinesVolume = ClampedVolume;
+		return;
+	case ERTSAudioType::Announcer:
+		M_PendingSettings.M_AudioSettings.M_AnnouncerVolume = ClampedVolume;
+		return;
+	case ERTSAudioType::UI:
+		M_PendingSettings.M_AudioSettings.M_UiVolume = ClampedVolume;
 		return;
 	default:
-		RTSFunctionLibrary::ReportError(TEXT("Unhandled audio channel when setting pending volume."));
+		RTSFunctionLibrary::ReportError(TEXT("Unhandled audio type when setting pending volume."));
 		return;
 	}
 }
@@ -224,25 +240,6 @@ void URTSSettingsMenuSubsystem::SaveSettings()
 void URTSSettingsMenuSubsystem::RevertSettings()
 {
 	ResetPendingSettingsToCurrent();
-}
-
-void URTSSettingsMenuSubsystem::ConfigureAudioMixAndClasses(
-	const TSoftObjectPtr<USoundMix> NewSettingsSoundMix,
-	const TSoftObjectPtr<USoundClass> NewMasterSoundClass,
-	const TSoftObjectPtr<USoundClass> NewMusicSoundClass,
-	const TSoftObjectPtr<USoundClass> NewSfxSoundClass)
-{
-	M_SettingsSoundMix = NewSettingsSoundMix;
-	M_MasterSoundClass = NewMasterSoundClass;
-	M_MusicSoundClass = NewMusicSoundClass;
-	M_SfxSoundClass = NewSfxSoundClass;
-
-	if (not GetIsValidGameUserSettings())
-	{
-		return;
-	}
-
-	ApplyAudioSettings();
 }
 
 bool URTSSettingsMenuSubsystem::GetIsValidGameUserSettings() const
@@ -348,6 +345,29 @@ void URTSSettingsMenuSubsystem::CacheSettingsSnapshots()
 	ResetPendingSettingsToCurrent();
 }
 
+void URTSSettingsMenuSubsystem::CacheAudioSettingsFromDeveloperSettings()
+{
+	const URTSAudioSettings* const AudioSettings = GetDefault<URTSAudioSettings>();
+	if (AudioSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Audio settings were missing while caching audio mix data."));
+		return;
+	}
+
+	M_SettingsSoundMix = AudioSettings->UserSettingsSoundMix;
+	M_SoundClassesByType = AudioSettings->SoundClassesByType;
+
+	if (M_SettingsSoundMix.IsNull())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UserSettingsSoundMix is not configured in RTSAudioSettings."));
+	}
+
+	if (M_SoundClassesByType.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("SoundClassesByType is empty in RTSAudioSettings."));
+	}
+}
+
 void URTSSettingsMenuSubsystem::ResetPendingSettingsToCurrent()
 {
 	M_PendingSettings = M_CurrentSettings;
@@ -417,9 +437,11 @@ void URTSSettingsMenuSubsystem::ApplyAudioSettings()
 		return;
 	}
 
-	ApplyAudioChannelVolume(ERTSAudioChannel::Master, GameUserSettings->GetMasterVolume());
-	ApplyAudioChannelVolume(ERTSAudioChannel::Music, GameUserSettings->GetMusicVolume());
-	ApplyAudioChannelVolume(ERTSAudioChannel::Sfx, GameUserSettings->GetSfxVolume());
+	ApplyAudioChannelVolume(ERTSAudioType::SFXAndWeapons, GameUserSettings->GetSfxAndWeaponsVolume());
+	ApplyAudioChannelVolume(ERTSAudioType::Music, GameUserSettings->GetMusicVolume());
+	ApplyAudioChannelVolume(ERTSAudioType::Voicelines, GameUserSettings->GetVoicelinesVolume());
+	ApplyAudioChannelVolume(ERTSAudioType::Announcer, GameUserSettings->GetAnnouncerVolume());
+	ApplyAudioChannelVolume(ERTSAudioType::UI, GameUserSettings->GetUiVolume());
 }
 
 void URTSSettingsMenuSubsystem::ApplyControlSettings()
@@ -456,7 +478,7 @@ void URTSSettingsMenuSubsystem::ApplyControlSettings()
 	}
 }
 
-void URTSSettingsMenuSubsystem::ApplyAudioChannelVolume(const ERTSAudioChannel AudioChannel, const float VolumeToApply)
+void URTSSettingsMenuSubsystem::ApplyAudioChannelVolume(const ERTSAudioType AudioType, const float VolumeToApply)
 {
 	UWorld* const World = GetWorld();
 	if (World == nullptr)
@@ -479,19 +501,8 @@ void URTSSettingsMenuSubsystem::ApplyAudioChannelVolume(const ERTSAudioChannel A
 	}
 
 	TSoftObjectPtr<USoundClass> TargetSoundClass;
-	switch (AudioChannel)
+	if (not TryGetSoundClassForAudioType(AudioType, TargetSoundClass))
 	{
-	case ERTSAudioChannel::Master:
-		TargetSoundClass = M_MasterSoundClass;
-		break;
-	case ERTSAudioChannel::Music:
-		TargetSoundClass = M_MusicSoundClass;
-		break;
-	case ERTSAudioChannel::Sfx:
-		TargetSoundClass = M_SfxSoundClass;
-		break;
-	default:
-		RTSFunctionLibrary::ReportError(TEXT("Unhandled audio channel while applying volume."));
 		return;
 	}
 
@@ -508,8 +519,35 @@ void URTSSettingsMenuSubsystem::ApplyAudioChannelVolume(const ERTSAudioChannel A
 		return;
 	}
 
-	UGameplayStatics::SetSoundMixClassOverride(World, SettingsSoundMix, LoadedSoundClass, VolumeToApply, 1.0f, 0.0f, true);
+	const float DefaultPitch = 1.0f;
+	const float DefaultFadeInTime = 0.0f;
+	const bool bDefaultApplyToChildren = true;
+
+	UGameplayStatics::SetSoundMixClassOverride(
+		World,
+		SettingsSoundMix,
+		LoadedSoundClass,
+		VolumeToApply,
+		DefaultPitch,
+		DefaultFadeInTime,
+		bDefaultApplyToChildren
+	);
 	UGameplayStatics::PushSoundMixModifier(World, SettingsSoundMix);
+}
+
+bool URTSSettingsMenuSubsystem::TryGetSoundClassForAudioType(
+	const ERTSAudioType AudioType,
+	TSoftObjectPtr<USoundClass>& OutSoundClass) const
+{
+	const TSoftObjectPtr<USoundClass>* const FoundSoundClass = M_SoundClassesByType.Find(AudioType);
+	if (FoundSoundClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Audio type was not configured in RTSAudioSettings."));
+		return false;
+	}
+
+	OutSoundClass = *FoundSoundClass;
+	return true;
 }
 
 void URTSSettingsMenuSubsystem::ApplyControlSettingsToPlayerController(APlayerController* PlayerControllerToApply) const
@@ -548,7 +586,10 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 
 	Snapshot.M_AudioSettings.M_MasterVolume = GameUserSettings.GetMasterVolume();
 	Snapshot.M_AudioSettings.M_MusicVolume = GameUserSettings.GetMusicVolume();
-	Snapshot.M_AudioSettings.M_SfxVolume = GameUserSettings.GetSfxVolume();
+	Snapshot.M_AudioSettings.M_SfxAndWeaponsVolume = GameUserSettings.GetSfxAndWeaponsVolume();
+	Snapshot.M_AudioSettings.M_VoicelinesVolume = GameUserSettings.GetVoicelinesVolume();
+	Snapshot.M_AudioSettings.M_AnnouncerVolume = GameUserSettings.GetAnnouncerVolume();
+	Snapshot.M_AudioSettings.M_UiVolume = GameUserSettings.GetUiVolume();
 
 	Snapshot.M_ControlSettings.M_MouseSensitivity = GameUserSettings.GetMouseSensitivity();
 	Snapshot.M_ControlSettings.bM_InvertYAxis = GameUserSettings.GetInvertYAxis();
@@ -572,7 +613,10 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 
 	GameUserSettingsToApply.SetMasterVolume(SnapshotToApply.M_AudioSettings.M_MasterVolume);
 	GameUserSettingsToApply.SetMusicVolume(SnapshotToApply.M_AudioSettings.M_MusicVolume);
-	GameUserSettingsToApply.SetSfxVolume(SnapshotToApply.M_AudioSettings.M_SfxVolume);
+	GameUserSettingsToApply.SetSfxAndWeaponsVolume(SnapshotToApply.M_AudioSettings.M_SfxAndWeaponsVolume);
+	GameUserSettingsToApply.SetVoicelinesVolume(SnapshotToApply.M_AudioSettings.M_VoicelinesVolume);
+	GameUserSettingsToApply.SetAnnouncerVolume(SnapshotToApply.M_AudioSettings.M_AnnouncerVolume);
+	GameUserSettingsToApply.SetUiVolume(SnapshotToApply.M_AudioSettings.M_UiVolume);
 	GameUserSettingsToApply.SetMouseSensitivity(SnapshotToApply.M_ControlSettings.M_MouseSensitivity);
 	GameUserSettingsToApply.SetInvertYAxis(SnapshotToApply.M_ControlSettings.bM_InvertYAxis);
 }

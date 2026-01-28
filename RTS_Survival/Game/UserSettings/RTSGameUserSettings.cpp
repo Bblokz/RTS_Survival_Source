@@ -35,9 +35,24 @@ float URTSGameUserSettings::GetMusicVolume() const
 	return M_MusicVolume;
 }
 
-float URTSGameUserSettings::GetSfxVolume() const
+float URTSGameUserSettings::GetSfxAndWeaponsVolume() const
 {
-	return M_SfxVolume;
+	return M_SfxAndWeaponsVolume;
+}
+
+float URTSGameUserSettings::GetVoicelinesVolume() const
+{
+	return M_VoicelinesVolume;
+}
+
+float URTSGameUserSettings::GetAnnouncerVolume() const
+{
+	return M_AnnouncerVolume;
+}
+
+float URTSGameUserSettings::GetUiVolume() const
+{
+	return M_UiVolume;
 }
 
 float URTSGameUserSettings::GetMouseSensitivity() const
@@ -62,9 +77,27 @@ void URTSGameUserSettings::SetMusicVolume(const float NewMusicVolume)
 	ApplyCustomSettingClamps();
 }
 
-void URTSGameUserSettings::SetSfxVolume(const float NewSfxVolume)
+void URTSGameUserSettings::SetSfxAndWeaponsVolume(const float NewSfxAndWeaponsVolume)
 {
-	M_SfxVolume = NewSfxVolume;
+	M_SfxAndWeaponsVolume = NewSfxAndWeaponsVolume;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetVoicelinesVolume(const float NewVoicelinesVolume)
+{
+	M_VoicelinesVolume = NewVoicelinesVolume;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetAnnouncerVolume(const float NewAnnouncerVolume)
+{
+	M_AnnouncerVolume = NewAnnouncerVolume;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetUiVolume(const float NewUiVolume)
+{
+	M_UiVolume = NewUiVolume;
 	ApplyCustomSettingClamps();
 }
 
@@ -105,11 +138,32 @@ void URTSGameUserSettings::ApplyCustomSettingClamps()
 		M_MusicVolume = ClampedMusicVolume;
 	}
 
-	const float ClampedSfxVolume = FMath::Clamp(M_SfxVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
-	if (not FMath::IsNearlyEqual(ClampedSfxVolume, M_SfxVolume))
+	const float ClampedSfxVolume = FMath::Clamp(M_SfxAndWeaponsVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
+	if (not FMath::IsNearlyEqual(ClampedSfxVolume, M_SfxAndWeaponsVolume))
 	{
-		RTSFunctionLibrary::ReportError(TEXT("SFX volume was out of range and has been clamped."));
-		M_SfxVolume = ClampedSfxVolume;
+		RTSFunctionLibrary::ReportError(TEXT("SFX and weapons volume was out of range and has been clamped."));
+		M_SfxAndWeaponsVolume = ClampedSfxVolume;
+	}
+
+	const float ClampedVoicelinesVolume = FMath::Clamp(M_VoicelinesVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
+	if (not FMath::IsNearlyEqual(ClampedVoicelinesVolume, M_VoicelinesVolume))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Voicelines volume was out of range and has been clamped."));
+		M_VoicelinesVolume = ClampedVoicelinesVolume;
+	}
+
+	const float ClampedAnnouncerVolume = FMath::Clamp(M_AnnouncerVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
+	if (not FMath::IsNearlyEqual(ClampedAnnouncerVolume, M_AnnouncerVolume))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Announcer volume was out of range and has been clamped."));
+		M_AnnouncerVolume = ClampedAnnouncerVolume;
+	}
+
+	const float ClampedUiVolume = FMath::Clamp(M_UiVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
+	if (not FMath::IsNearlyEqual(ClampedUiVolume, M_UiVolume))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UI volume was out of range and has been clamped."));
+		M_UiVolume = ClampedUiVolume;
 	}
 
 	const float ClampedMouseSensitivity = FMath::Clamp(M_MouseSensitivity, RTSGameUserSettingsRanges::MinMouseSensitivity, RTSGameUserSettingsRanges::MaxMouseSensitivity);

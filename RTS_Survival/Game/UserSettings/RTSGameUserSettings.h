@@ -52,7 +52,16 @@ public:
 	float GetMusicVolume() const;
 
 	/** @brief Returns the volume used for the SFX audio channel in the settings menu. */
-	float GetSfxVolume() const;
+	float GetSfxAndWeaponsVolume() const;
+
+	/** @brief Returns the volume used for the voicelines audio channel in the settings menu. */
+	float GetVoicelinesVolume() const;
+
+	/** @brief Returns the volume used for the announcer audio channel in the settings menu. */
+	float GetAnnouncerVolume() const;
+
+	/** @brief Returns the volume used for the UI audio channel in the settings menu. */
+	float GetUiVolume() const;
 
 	/** @brief Returns the mouse sensitivity multiplier applied by the settings menu. */
 	float GetMouseSensitivity() const;
@@ -67,7 +76,16 @@ public:
 	void SetMusicVolume(const float NewMusicVolume);
 
 	/** @brief Writes the SFX volume value before clamping and saving. */
-	void SetSfxVolume(const float NewSfxVolume);
+	void SetSfxAndWeaponsVolume(const float NewSfxAndWeaponsVolume);
+
+	/** @brief Writes the voicelines volume value before clamping and saving. */
+	void SetVoicelinesVolume(const float NewVoicelinesVolume);
+
+	/** @brief Writes the announcer volume value before clamping and saving. */
+	void SetAnnouncerVolume(const float NewAnnouncerVolume);
+
+	/** @brief Writes the UI volume value before clamping and saving. */
+	void SetUiVolume(const float NewUiVolume);
 
 	/** @brief Writes the mouse sensitivity multiplier before clamping and saving. */
 	void SetMouseSensitivity(const float NewMouseSensitivity);
@@ -96,7 +114,16 @@ private:
 	float M_MusicVolume = RTSGameUserSettingsRanges::DefaultVolume;
 
 	UPROPERTY(config)
-	float M_SfxVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	float M_SfxAndWeaponsVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(config)
+	float M_VoicelinesVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(config)
+	float M_AnnouncerVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(config)
+	float M_UiVolume = RTSGameUserSettingsRanges::DefaultVolume;
 
 	UPROPERTY(config)
 	float M_MouseSensitivity = RTSGameUserSettingsRanges::DefaultMouseSensitivity;
