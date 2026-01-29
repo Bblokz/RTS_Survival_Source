@@ -171,7 +171,7 @@ namespace BxpHelpers
 				{ERTSResourceType::Resource_Metal,
 					RoundToNearestMultipleOfFive( 180* GameCostMlt)},
 			});
-			BxpData.EnergySupply = 5;
+			BxpData.EnergySupply = -5;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQRadar, BxpData);
 			
@@ -186,7 +186,7 @@ namespace BxpHelpers
 				{ERTSResourceType::Resource_Metal,
 					RoundToNearestMultipleOfFive( 100* GameCostMlt)},
 			});
-			BxpData.EnergySupply = 5;
+			BxpData.EnergySupply = -5;
 			BxpData.Abilities = ArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQPlatform, BxpData);
 
@@ -201,7 +201,7 @@ namespace BxpHelpers
 				{ERTSResourceType::Resource_Metal,
 					RoundToNearestMultipleOfFive( 300* GameCostMlt)},
 			});
-			BxpData.EnergySupply = 8;
+			BxpData.EnergySupply = -8;
 			BxpData.Abilities = ArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQTower, BxpData);
 
@@ -216,7 +216,7 @@ namespace BxpHelpers
 				{ERTSResourceType::Resource_Metal,
 					RoundToNearestMultipleOfFive( 150* GameCostMlt)},
 			});
-			BxpData.EnergySupply = 5;
+			BxpData.EnergySupply = -5;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQRepairBay, BxpData);
 		}

@@ -1886,7 +1886,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = (MortarArmorPenPerMM * WeaponData.WeaponCalibre)
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.MagCapacity = 1;
+	WeaponData.MagCapacity = 4;
 	WeaponData.ReloadSpeed = 10.f;
 	WeaponData.BaseCooldown = 1.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
