@@ -550,7 +550,7 @@ void AInfantryWeaponMaster::OnWeaponAdded(const int32 /*WeaponIndex*/, UWeaponSt
 {
 }
 
-void AInfantryWeaponMaster::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+void AInfantryWeaponMaster::OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, const float NewRange)
 {
 	SetupRange();
 }

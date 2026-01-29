@@ -15,6 +15,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "TankMaster.generated.h"
 
+class UTankEnergyComponent;
 class URTSOptimizer;
 class UDigInComponent;
 class USpatialVoiceLinePlayer;
@@ -100,8 +101,6 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
-
-	
 
 	// Controller is set with OnPosses on AITankMaster.
 	void SetAIController(AAITankMaster* NewController) { AITankController = NewController; }
@@ -493,4 +492,6 @@ private:
 
 	void ApplyMovementBehaviours();
 	void RemoveMovementBehaviours();
+
+	
 };

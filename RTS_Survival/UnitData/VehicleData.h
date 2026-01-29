@@ -52,4 +52,7 @@ struct FTankData
 
 	UPROPERTY()
 	TArray<FExperienceLevel> ExperienceLevels;
+	
+	UPROPERTY(BlueprintReadOnly)
+	int32 EnergyRequired = 0;
 };

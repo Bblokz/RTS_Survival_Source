@@ -334,7 +334,7 @@ void ACPPTurretsMaster::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Wea
 	}
 }
 
-void ACPPTurretsMaster::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+void ACPPTurretsMaster::OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, const float NewRange)
 {
 	UpdateTurretRangeBasedOnWeapons();
 }

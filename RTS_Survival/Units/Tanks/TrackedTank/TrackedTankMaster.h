@@ -116,6 +116,7 @@ protected:
 	 * can be used on tanks where the physics assistance makes the mesh go through the ground.
 	 * @param AngularDamping
 	 * @param LinearDamping
+	 * @param Energy
 	 * 
 	 */
 	UFUNCTION(BlueprintCallable, Category = "ReferenceCasts")
@@ -125,7 +126,8 @@ protected:
 		const float NewTurnRate,
 		UChassisAnimInstance* TrackedAnimBP,
 		const float TankCornerOffset,
-		const float TankMeshZOffset = 0.f, const float AngularDamping = 0, const float LinearDamping = 0);
+		const float TankMeshZOffset = 0.f, const float AngularDamping = 0, const float LinearDamping = 0, const int32 Energy
+			= 0);
 
 	// Exists both on the tank and the physics track movement component for quick accesss.
 	UPROPERTY(BlueprintReadOnly, Category="Reference")
@@ -228,5 +230,10 @@ private:
 	void CheckFootPrintForOverlaps() const;
 
 	bool GetIsValidDigInComponent() const;
+
+	UPROPERTY()
+	UTankEnergyComponent* M_TankEnergyComponent = nullptr;
+	void OnInit_FindEnergyComponent(const int32 MyEnergy);
+	
 
 };

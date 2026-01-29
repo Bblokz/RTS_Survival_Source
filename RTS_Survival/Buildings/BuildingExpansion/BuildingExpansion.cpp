@@ -9,6 +9,7 @@
 #include "Interface/BuildingExpansionOwner.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Buildings/EnergyComponent/BuildingExpansionEnergyComponent.h"
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
@@ -549,6 +550,30 @@ FBxpData ABuildingExpansion::GetBxpData(const EBuildingExpansionType BxpSubType)
 	return BxpData;
 }
 
+bool ABuildingExpansion::GetHasValidEnergyComponent() const
+{
+	if (IsValid(M_BuildingExpansionEnergyComponent))
+	{
+		return true;
+	}
+	return false;
+}
+
+void ABuildingExpansion::OnInit_FindEnergyComponent(const int32 MyEnergy)
+{
+	UBuildingExpansionEnergyComponent* EnergyComp = FindComponentByClass<UBuildingExpansionEnergyComponent>();
+	if (not IsValid(EnergyComp))
+	{
+		RTSFunctionLibrary::ReportError("The building expansion: " + GetName() +
+			"\n Could not find a building expansion energy component eventhough its energy amount per bxp data is not zero!"
+			"\n Energy amount: " + FString::FromInt(MyEnergy));
+		return;
+	}
+	M_BuildingExpansionEnergyComponent = EnergyComp;
+	M_BuildingExpansionEnergyComponent->InitEnergyComponent(MyEnergy);
+	M_BuildingExpansionEnergyComponent->SetEnabled(true);
+}
+
 void ABuildingExpansion::PostInit_GetCargoComponent()
 {
 	CargoComponent = FindComponentByClass<UCargo>();
@@ -614,6 +639,10 @@ void ABuildingExpansion::InitBuildingExpansion(
 	if (GetIsValidFowComponent())
 	{
 		FowComponent->SetVisionRadius(MyData.VisionRadius);
+	}
+	if (MyData.EnergySupply != 0)
+	{
+		OnInit_FindEnergyComponent(MyData.EnergySupply);
 	}
 	SetUnitAbilitiesRunTime(MyData.Abilities);
 	OnInitBuildingExpansion_SetupCollision(bLetBuildingMeshAffectNavMesh);
@@ -729,8 +758,8 @@ void ABuildingExpansion::SpawnBuildingAttachments()
 		// Attempt to get the transform of the specified socket
 		FTransform SocketTransform;
 		if (not BuildingMeshComponent->DoesSocketExist(SocketName) ||
-			not (SocketTransform = BuildingMeshComponent->GetSocketTransform(SocketName,
-			                                                                 ERelativeTransformSpace::RTS_World)).
+			not(SocketTransform = BuildingMeshComponent->GetSocketTransform(SocketName,
+			                                                                ERelativeTransformSpace::RTS_World)).
 			IsValid())
 		{
 			continue;
@@ -738,8 +767,8 @@ void ABuildingExpansion::SpawnBuildingAttachments()
 
 		// Spawn the actor at the socket's location and orientation
 		AActor* SpawnedActor = World->SpawnActor<AActor>(ActorToSpawn,
-		                                                      SocketTransform.GetLocation(),
-		                                                      SocketTransform.GetRotation().Rotator());
+		                                                 SocketTransform.GetLocation(),
+		                                                 SocketTransform.GetRotation().Rotator());
 		if (not SpawnedActor)
 		{
 			continue;

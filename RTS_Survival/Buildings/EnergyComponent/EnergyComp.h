@@ -81,6 +81,18 @@ public:
 	int32 GetEnergySupplied() const { return M_Energy; }
 	void UpgradeEnergy(const int32 Amount);
 
+	/**
+	 * @brief Initializes the energy component with the specified energy amount.
+	 *
+	 * Sets the energy supplied by this component and updates the `UPlayerResourceManager` if the component is enabled.
+	 *
+	 * @param Energy The initial energy amount to be supplied by this component; used to set `M_Energy` and update the resource manager.
+	 * @pre The component should be properly initialized.
+	 * @note If the component is enabled, the `UPlayerResourceManager` will be notified of the new energy amount.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Energy")
+	void InitEnergyComponent(const int32 Energy);
+
 protected:
 	/**
 	 * @brief Called when the game starts; performs necessary initialization.
@@ -109,17 +121,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Energy")
 	ELowEnergyStrategy OverwriteLowEnergyStrategy = ELowEnergyStrategy::LES_Invalid;
 
-	/**
-	 * @brief Initializes the energy component with the specified energy amount.
-	 *
-	 * Sets the energy supplied by this component and updates the `UPlayerResourceManager` if the component is enabled.
-	 *
-	 * @param Energy The initial energy amount to be supplied by this component; used to set `M_Energy` and update the resource manager.
-	 * @pre The component should be properly initialized.
-	 * @note If the component is enabled, the `UPlayerResourceManager` will be notified of the new energy amount.
-	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Energy")
-	void InitEnergyComponent(const int32 Energy);
+
 
 	/** Cache owner-specific mesh/material data for low energy visuals. */
 	virtual void CacheOwnerMaterials();

@@ -18,6 +18,7 @@
 #include "BuildingExpansion.generated.h"
 
 
+class UBuildingExpansionEnergyComponent;
 struct FBxpData;
 class UCargo;
 class UWeaponState;
@@ -260,8 +261,13 @@ private:
 	void OnVerticalDestructionComplete();
 
 	FBxpData GetBxpData(const EBuildingExpansionType BxpSubType) const;
-	
 
+	UPROPERTY()
+	UBuildingExpansionEnergyComponent* M_BuildingExpansionEnergyComponent;
+
+	bool GetHasValidEnergyComponent() const;
+
+	void OnInit_FindEnergyComponent(const int32 MyEnergy);
 	void PostInit_GetCargoComponent();
 	// Important: no rts error report as not all bxps are expected to have cargo!
 	bool GetHasValidCargoComponent()const;

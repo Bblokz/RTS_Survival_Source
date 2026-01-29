@@ -57,7 +57,7 @@ void UAircraftWeapon::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapo
 {
 }
 
-void UAircraftWeapon::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+void UAircraftWeapon::OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, const float NewRange)
 {
 	UpdateRangeBasedOnWeapons();
 }

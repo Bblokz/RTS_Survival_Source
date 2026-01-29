@@ -121,9 +121,11 @@ bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 A
 	{
 		if (M_Abilities[AtIndex].AbilityId != EAbilityID::IdNoAbility)
 		{
+			const FString OwnerName = M_Owner ? M_Owner->GetOwnerName() : "Unknown Owner";
 			RTSFunctionLibrary::ReportError(
 				TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
-				TEXT(" in UCommandData::AddAbility"));
+				TEXT(" in UCommandData::AddAbility")
+				+ "\n Owner: " + OwnerName);
 			for (int32 i = 0; i < M_Abilities.Num(); i++)
 			{
 				if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)

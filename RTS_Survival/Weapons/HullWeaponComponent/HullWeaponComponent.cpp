@@ -107,7 +107,7 @@ void UHullWeaponComponent::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* 
 {
 }
 
-void UHullWeaponComponent::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+void UHullWeaponComponent::OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, const float NewRange)
 {
 	UpdateHullWeaponRangeBasedOnWeapons();
 }

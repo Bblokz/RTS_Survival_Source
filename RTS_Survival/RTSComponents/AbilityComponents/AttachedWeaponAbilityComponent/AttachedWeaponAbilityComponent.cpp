@@ -265,7 +265,7 @@ void UAttachedWeaponAbilityComponent::OnWeaponAdded(const int32 WeaponIndex, UWe
 {
 }
 
-void UAttachedWeaponAbilityComponent::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState,
+void UAttachedWeaponAbilityComponent::OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState,
                                                                     const float NewRange)
 {
 	UpdateAbilityRangeFromWeapons();

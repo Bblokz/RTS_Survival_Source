@@ -274,15 +274,6 @@ bool UPlayerResourceManager::GetCanPayForBxp(const EBuildingExpansionType BxpTyp
 	const EPlayerError Error = GetCanPayForCost(BxpData.Cost.ResourceCosts);
 	if (Error == EPlayerError::Error_None)
 	{
-		if (BxpData.EnergySupply < 0)
-		{
-			if (GetHasEnoughEnergy(-1 * BxpData.EnergySupply))
-			{
-				return true;
-			}
-			M_PlayerController->DisplayErrorMessage(EPlayerError::Error_NotEnoughEnergy);
-			return false;
-		}
 		return true;
 	}
 	M_PlayerController->DisplayErrorMessage(Error);

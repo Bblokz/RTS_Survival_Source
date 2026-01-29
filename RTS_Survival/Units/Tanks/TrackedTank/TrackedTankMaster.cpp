@@ -9,6 +9,7 @@
 #include "PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
+#include "RTS_Survival/Buildings/EnergyComponent/TankEnergyComponent.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
@@ -260,8 +261,13 @@ void ATrackedTankMaster::InitTrackedTank(
 	const float NewTurnRate,
 	UChassisAnimInstance* TrackedAnimBP,
 	const float TankCornerOffset,
-	const float TankMeshZOffset, const float AngularDamping, const float LinearDamping)
+	const float TankMeshZOffset, const float AngularDamping, const float LinearDamping,
+	const int32 Energy)
 {
+	if(Energy != 0 )
+	{
+		OnInit_FindEnergyComponent(Energy);
+	}
 	if (IsValid(Mesh))
 	{
 		ChassisMesh = Mesh;
@@ -614,6 +620,21 @@ bool ATrackedTankMaster::GetIsValidDigInComponent() const
 
 	// IMPORTANT: no error report here as some tanks do not use this component!!
 	return false;
+}
+
+void ATrackedTankMaster::OnInit_FindEnergyComponent(const int32 MyEnergy)
+{
+	UTankEnergyComponent* FoundEnergyComp = FindComponentByClass<UTankEnergyComponent>();
+	if(not IsValid(FoundEnergyComp))
+	{
+		RTSFunctionLibrary::ReportError("The tank could not find a UTankEnergyComponent on it eventhough it has non-zero energy!"
+								  "tank: " + GetName()
+								  + "\n Energy: " + FString::FromInt(MyEnergy));
+		return;
+	}
+	M_TankEnergyComponent = FoundEnergyComp;
+	M_TankEnergyComponent->InitEnergyComponent(MyEnergy);
+	M_TankEnergyComponent->SetEnabled(true);
 }
 
 void ATrackedTankMaster::BeginPlay_SetupExperienceComponent()
