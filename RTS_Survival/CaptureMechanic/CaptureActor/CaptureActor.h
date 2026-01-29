@@ -19,9 +19,15 @@ struct FCaptureSettings
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	float CaptureDuration = 5.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float CaptureProgressBarScale = 1.f;
 };
 
 
+/**
+ * @brief Use to place capture points that show capture progress and respond to capture completion.
+ */
 UCLASS()
 class RTS_SURVIVAL_API ACaptureActor : public ADestructableEnvActor, public ICaptureInterface
 {
@@ -45,8 +51,9 @@ protected:
 	virtual void BeginPlay() override;
 
 	/**
-	 * @brief Caches all socket locations on MeshComp whose name contains SocketNameContaining.
-	 * The locations are stored relative to the actor location so they can be reconstructed later.
+	 * @brief Ensures capture locations stay aligned to the actor even after it moves.
+	 * @param MeshComp The mesh to scan for sockets used as capture locations.
+	 * @param SocketNameContaining Filter used to include sockets with a shared name fragment.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="BeginPlay")
 	void SetupCaptureLocations(UMeshComponent* MeshComp, const FName SocketNameContaining);
