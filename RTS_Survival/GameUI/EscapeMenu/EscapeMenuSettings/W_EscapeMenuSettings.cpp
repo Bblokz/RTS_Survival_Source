@@ -309,6 +309,7 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 	M_TextInvertYAxisLabel->SetText(M_ControlsText.M_InvertYAxisLabelText);
 
 	M_TextApplyButton->SetText(M_ButtonText.M_ApplyButtonText);
+	M_TextSetDefaultsButton->SetText(M_ButtonText.M_SetDefaultsButtonText);
 	M_TextBackOrCancelButton->SetText(M_ButtonText.M_BackOrCancelButtonText);
 }
 
@@ -481,6 +482,7 @@ int32 UW_EscapeMenuSettings::FindResolutionIndex(const FIntPoint& Resolution) co
 void UW_EscapeMenuSettings::BindButtonCallbacks()
 {
 	BindApplyButton();
+	BindSetDefaultsButton();
 	BindBackOrCancelButton();
 }
 
@@ -493,6 +495,17 @@ void UW_EscapeMenuSettings::BindApplyButton()
 
 	M_ButtonApply->OnClicked.RemoveAll(this);
 	M_ButtonApply->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleApplyClicked);
+}
+
+void UW_EscapeMenuSettings::BindSetDefaultsButton()
+{
+	if (not GetIsValidButtonSetDefaults())
+	{
+		return;
+	}
+
+	M_ButtonSetDefaults->OnClicked.RemoveAll(this);
+	M_ButtonSetDefaults->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleSetDefaultsClicked);
 }
 
 void UW_EscapeMenuSettings::BindBackOrCancelButton()
@@ -1439,6 +1452,22 @@ bool UW_EscapeMenuSettings::GetIsValidButtonBackOrCancel() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidButtonSetDefaults() const
+{
+	if (not IsValid(M_ButtonSetDefaults))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ButtonSetDefaults"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonSetDefaults"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidTextApplyButton() const
 {
 	if (not IsValid(M_TextApplyButton))
@@ -1447,6 +1476,22 @@ bool UW_EscapeMenuSettings::GetIsValidTextApplyButton() const
 			this,
 			TEXT("M_TextApplyButton"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidTextApplyButton"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextSetDefaultsButton() const
+{
+	if (not IsValid(M_TextSetDefaultsButton))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextSetDefaultsButton"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextSetDefaultsButton"),
 			this
 		);
 		return false;
@@ -1558,12 +1603,22 @@ bool UW_EscapeMenuSettings::GetAreFooterWidgetsValid() const
 		return false;
 	}
 
+	if (not GetIsValidButtonSetDefaults())
+	{
+		return false;
+	}
+
 	if (not GetIsValidButtonBackOrCancel())
 	{
 		return false;
 	}
 
 	if (not GetIsValidTextApplyButton())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextSetDefaultsButton())
 	{
 		return false;
 	}
@@ -1758,6 +1813,11 @@ bool UW_EscapeMenuSettings::GetAreFooterTextWidgetsValid() const
 		return false;
 	}
 
+	if (not GetIsValidTextSetDefaultsButton())
+	{
+		return false;
+	}
+
 	return GetIsValidTextBackOrCancelButton();
 }
 
@@ -1858,6 +1918,26 @@ void UW_EscapeMenuSettings::HandleApplyClicked()
 		return;
 	}
 
+	M_SettingsSubsystem->ApplySettings();
+	M_SettingsSubsystem->SaveSettings();
+	RefreshControlsFromSubsystem();
+
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+
+	M_MainGameUI->OnEscapeMenuCloseSettings();
+}
+
+void UW_EscapeMenuSettings::HandleSetDefaultsClicked()
+{
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingSettingsToDefaults();
 	M_SettingsSubsystem->ApplySettings();
 	M_SettingsSubsystem->SaveSettings();
 	RefreshControlsFromSubsystem();
