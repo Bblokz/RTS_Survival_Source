@@ -10,6 +10,10 @@ void UTankEnergyComponent::CacheOwnerMaterials()
 	ATankMaster* TankMaster = Cast<ATankMaster>(GetOwner());
 	if (TankMaster == nullptr)
 	{
+		const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "Invalid Owner";
+		RTSFunctionLibrary::ReportError("Tank energy component is not attached to a tank master!"
+			"\n Component: " + GetName()
+			+ "\n Owner: " + OwnerName);
 		return;
 	}
 

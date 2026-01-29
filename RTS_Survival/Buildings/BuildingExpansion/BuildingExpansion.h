@@ -53,6 +53,8 @@ public:
 
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
 
+		
+
 	// Called when the construction finished.
 	FOnBxpConstructed OnBxpConstructed;
 	// Called when the Bxp starts packing up.

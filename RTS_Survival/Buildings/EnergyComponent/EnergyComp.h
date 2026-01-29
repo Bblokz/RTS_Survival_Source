@@ -12,6 +12,19 @@ class ULowEnergyBehaviour;
 class UMaterialInterface;
 class UMeshComponent;
 
+USTRUCT()
+struct FEnergyMeshMaterialCache
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<UMeshComponent> MeshComponent;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
+};
+
+
 /**
  * @brief Manages the energy supply of an actor, including registration with the PlayerResourceManager.
  *
@@ -54,8 +67,9 @@ public:
 	/**
 	 * @brief Notifies this component about changes in the base energy state.
 	 * @param bIsLowPower Whether the base is currently in a low power state.
+	 * @param bSuppressErrorsOnJustEnabledEnergyComp
 	 */
-	void OnBaseEnergyChange(const bool bIsLowPower);
+	void OnBaseEnergyChange(const bool bIsLowPower, const bool bSuppressErrorsOnJustEnabledEnergyComp);
 
 	/**
 	 * @brief Retrieves the amount of energy supplied by this component.
@@ -121,18 +135,6 @@ protected:
 	bool GetIsShuttingDown() const;
 
 private:
-	USTRUCT()
-	struct FEnergyMeshMaterialCache
-	{
-		GENERATED_BODY()
-
-		UPROPERTY()
-		TWeakObjectPtr<UMeshComponent> MeshComponent;
-
-		UPROPERTY()
-		TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
-	};
-
 	bool bM_IsEnabled = false;
 	bool bM_IsLowEnergy = false;
 	bool bM_IsShuttingDown = false;
@@ -182,5 +184,5 @@ private:
 	void ReportInvalidMaterialCache(const UMeshComponent* MeshComponent, const int32 CachedMaterialCount,
 	                                const int32 CurrentMaterialCount, const FString& Context) const;
 	void ReportNoCachedMeshes(const FString& Context) const;
-	void ReportDuplicateEnergyState(const bool bAttemptedLowEnergy) const;
+	void ReportDuplicateEnergyState(const bool bAttemptedLowEnergy, const bool bSuppress) const;
 };

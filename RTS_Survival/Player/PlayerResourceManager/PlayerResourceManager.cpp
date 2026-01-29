@@ -618,6 +618,7 @@ void UPlayerResourceManager::RegisterEnergyComponent(UEnergyComp* EnergyComponen
 	{
 		// Adjusts the supply and adds the component to the list.
 		UpdateEnergySupplyWithComponent(EnergyComponent, true);
+		NotifyEnergyComponentOfCurrentBaseEnergyState(EnergyComponent);
 		return;
 	}
 
@@ -678,7 +679,19 @@ void UPlayerResourceManager::RegisterDropOff(const TWeakObjectPtr<UResourceDropO
 		" in player resource manager, but it is already registered/deregistered or it is Invalid!"
 		"\n Owner: " + OwnerName);
 }
-
+void UPlayerResourceManager::NotifyEnergyComponentOfCurrentBaseEnergyState(UEnergyComp* EnergyComponent) const
+{
+	if (not IsValid(EnergyComponent))
+	{
+		return;
+	}
+	constexpr bool bIsFistTimeNotifyingSoSuppressErrors = true;
+	if (M_EnergyStateChangeTracker.bIsBaseLowEnergy)
+	{
+		
+		EnergyComponent->OnBaseEnergyChange(true, bIsFistTimeNotifyingSoSuppressErrors);
+	}
+}
 void UPlayerResourceManager::UpdateEnergySupplyForUpgradedComponent(UEnergyComp* EnergyCompUpgraded,
                                                                     const int32 OldEnergyAmount)
 {
@@ -834,7 +847,7 @@ void UPlayerResourceManager::NotifyEnergyComponentsBaseEnergyChange(const bool b
 			continue;
 		}
 
-		EnergyComponent->OnBaseEnergyChange(bIsLowPower);
+		EnergyComponent->OnBaseEnergyChange(bIsLowPower, false);
 	}
 }
 

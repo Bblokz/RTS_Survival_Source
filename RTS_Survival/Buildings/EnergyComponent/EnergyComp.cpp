@@ -106,7 +106,7 @@ void UEnergyComp::UpdateEnergySupplied(const int32 NewEnergySupplied)
 	}
 }
 
-void UEnergyComp::OnBaseEnergyChange(const bool bIsLowPower)
+void UEnergyComp::OnBaseEnergyChange(const bool bIsLowPower, const bool bSuppressErrorsOnJustEnabledEnergyComp)
 {
 	if (GetIsShuttingDown())
 	{
@@ -115,7 +115,7 @@ void UEnergyComp::OnBaseEnergyChange(const bool bIsLowPower)
 
 	if (bIsLowPower == bM_IsLowEnergy)
 	{
-		ReportDuplicateEnergyState(bIsLowPower);
+		ReportDuplicateEnergyState(bIsLowPower, bSuppressErrorsOnJustEnabledEnergyComp);
 		return;
 	}
 
@@ -175,7 +175,7 @@ void UEnergyComp::BeginPlay_CheckInitialLowEnergyState()
 	const bool bIsLowPower = PlayerResourceManager->GetPlayerEnergySupply() < PlayerResourceManager->GetPlayerEnergyDemand();
 	if (bIsLowPower)
 	{
-		OnBaseEnergyChange(true);
+		OnBaseEnergyChange(true, false);
 	}
 }
 
@@ -478,9 +478,9 @@ void UEnergyComp::ReportNoCachedMeshes(const FString& Context) const
 		"\n Component: " + GetName());
 }
 
-void UEnergyComp::ReportDuplicateEnergyState(const bool bAttemptedLowEnergy) const
+void UEnergyComp::ReportDuplicateEnergyState(const bool bAttemptedLowEnergy, const bool bSuppress) const
 {
-	if (GetIsShuttingDown())
+	if (GetIsShuttingDown() || bSuppress)
 	{
 		return;
 	}
