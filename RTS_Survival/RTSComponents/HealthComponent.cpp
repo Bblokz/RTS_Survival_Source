@@ -470,6 +470,8 @@ void UHealthComponent::OnWidgetInitialized()
 		return;
 	}
 
+	bM_IsHealthBarWidgetInitialized = true;
+
 	int8 OwningPlayer = 0;
 	if (M_RTSComponent.IsValid())
 	{
@@ -483,6 +485,12 @@ void UHealthComponent::OnWidgetInitialized()
 
 	// Respect global hide at init time, otherwise fall back to policy.
 	ApplyHealthBarVisibilityPolicy(1.f);
+
+	if (bM_ShouldApplyVisibilitySettingsOnWidgetInit)
+	{
+		bM_ShouldApplyVisibilitySettingsOnWidgetInit = false;
+		UpdateVisibilityAfterSettingsChange();
+	}
 }
 
 
@@ -915,10 +923,16 @@ void UHealthComponent::ClearSelectionComponentBindings()
 	}
 }
 
-void UHealthComponent::UpdateVisibilityAfterSettingsChange() const
+void UHealthComponent::UpdateVisibilityAfterSettingsChange()
 {
 	if (not HealthBarWidgetClass)
 	{
+		return;
+	}
+
+	if (not bM_IsHealthBarWidgetInitialized)
+	{
+		bM_ShouldApplyVisibilitySettingsOnWidgetInit = true;
 		return;
 	}
 

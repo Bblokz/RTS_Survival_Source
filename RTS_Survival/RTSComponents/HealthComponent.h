@@ -244,7 +244,7 @@ private:
 
 	void UpdateSelectionComponentBindings();
 	void ClearSelectionComponentBindings();
-	void UpdateVisibilityAfterSettingsChange() const;
+	void UpdateVisibilityAfterSettingsChange();
 	void RestoreUnitDefaultHealthBarVisibilitySettings();
 
 	// The RTS Component of the same owner that needs to know whether the unit is in combat due to being damaged.
@@ -279,6 +279,13 @@ private:
 
 	UPROPERTY()
 	bool bWasHiddenByAllGameUI = false;
+
+	// Defers visibility changes until the widget has finished initializing.
+	UPROPERTY()
+	bool bM_ShouldApplyVisibilitySettingsOnWidgetInit = false;
+
+	UPROPERTY()
+	bool bM_IsHealthBarWidgetInitialized = false;
 
 	UPROPERTY()
 	FHealthBarVisibilitySettings M_UnitDefaultHealthBarVisibilitySettings;
