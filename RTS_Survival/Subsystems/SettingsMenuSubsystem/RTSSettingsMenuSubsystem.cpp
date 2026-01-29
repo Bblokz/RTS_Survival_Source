@@ -19,6 +19,12 @@ namespace RTSSettingsMenuSubsystemPrivate
 	constexpr int32 MinResolutionDimension = 1;
 	constexpr float InvertedPitchFactor = -1.0f;
 	constexpr float NormalPitchFactor = 1.0f;
+	constexpr bool bDefaultVSyncEnabled = false;
+	constexpr bool bDefaultInvertYAxis = false;
+
+	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::Fullscreen;
+	const ERTSScalabilityQuality DefaultScalabilityQuality = ERTSScalabilityQuality::Epic;
+	const FIntPoint DefaultResolution = FIntPoint(1920, 1080);
 
 	FString BuildResolutionLabel(const FIntPoint& Resolution)
 	{
@@ -41,6 +47,39 @@ namespace RTSSettingsMenuSubsystemPrivate
 		ScalabilityGroups.M_Textures = OverallQuality;
 		ScalabilityGroups.M_Effects = OverallQuality;
 		ScalabilityGroups.M_PostProcessing = OverallQuality;
+	}
+
+	FIntPoint SelectDefaultResolution(
+		const TArray<FIntPoint>& SupportedResolutions,
+		const FIntPoint& DesktopResolution,
+		const FIntPoint& CurrentResolution)
+	{
+		if (SupportedResolutions.Contains(DesktopResolution))
+		{
+			return DesktopResolution;
+		}
+
+		if (SupportedResolutions.Contains(CurrentResolution))
+		{
+			return CurrentResolution;
+		}
+
+		if (SupportedResolutions.Num() > 0)
+		{
+			return SupportedResolutions[0];
+		}
+
+		if (DesktopResolution.X >= MinResolutionDimension && DesktopResolution.Y >= MinResolutionDimension)
+		{
+			return DesktopResolution;
+		}
+
+		if (CurrentResolution.X >= MinResolutionDimension && CurrentResolution.Y >= MinResolutionDimension)
+		{
+			return CurrentResolution;
+		}
+
+		return DefaultResolution;
 	}
 }
 
@@ -240,6 +279,51 @@ void URTSSettingsMenuSubsystem::SaveSettings()
 void URTSSettingsMenuSubsystem::RevertSettings()
 {
 	ResetPendingSettingsToCurrent();
+}
+
+void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
+{
+	if (not GetIsValidGameUserSettings())
+	{
+		return;
+	}
+
+	URTSGameUserSettings* const GameUserSettings = GetGameUserSettingsChecked();
+	if (GameUserSettings == nullptr)
+	{
+		return;
+	}
+
+	FRTSSettingsSnapshot DefaultSettings;
+	const FIntPoint DesktopResolution = GameUserSettings->GetDesktopResolution();
+	const FIntPoint CurrentResolution = GameUserSettings->GetScreenResolution();
+
+	DefaultSettings.M_GraphicsSettings.M_DisplaySettings.M_WindowMode = RTSSettingsMenuSubsystemPrivate::DefaultWindowMode;
+	DefaultSettings.M_GraphicsSettings.M_DisplaySettings.M_Resolution = RTSSettingsMenuSubsystemPrivate::SelectDefaultResolution(
+		M_SupportedResolutions,
+		DesktopResolution,
+		CurrentResolution
+	);
+	DefaultSettings.M_GraphicsSettings.M_DisplaySettings.bM_VSyncEnabled = RTSSettingsMenuSubsystemPrivate::bDefaultVSyncEnabled;
+	DefaultSettings.M_GraphicsSettings.M_DisplaySettings.M_OverallQuality = RTSSettingsMenuSubsystemPrivate::DefaultScalabilityQuality;
+	DefaultSettings.M_GraphicsSettings.M_DisplaySettings.M_FrameRateLimit = RTSSettingsMenuSubsystemPrivate::UnlimitedFrameRateLimit;
+
+	RTSSettingsMenuSubsystemPrivate::ApplyOverallQualityToScalabilityGroups(
+		DefaultSettings.M_GraphicsSettings.M_ScalabilityGroups,
+		RTSSettingsMenuSubsystemPrivate::DefaultScalabilityQuality
+	);
+
+	DefaultSettings.M_AudioSettings.M_MasterVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	DefaultSettings.M_AudioSettings.M_MusicVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	DefaultSettings.M_AudioSettings.M_SfxAndWeaponsVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	DefaultSettings.M_AudioSettings.M_VoicelinesVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	DefaultSettings.M_AudioSettings.M_AnnouncerVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	DefaultSettings.M_AudioSettings.M_UiVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	DefaultSettings.M_ControlSettings.M_MouseSensitivity = RTSGameUserSettingsRanges::DefaultMouseSensitivity;
+	DefaultSettings.M_ControlSettings.bM_InvertYAxis = RTSSettingsMenuSubsystemPrivate::bDefaultInvertYAxis;
+
+	M_PendingSettings = DefaultSettings;
 }
 
 bool URTSSettingsMenuSubsystem::GetIsValidGameUserSettings() const
