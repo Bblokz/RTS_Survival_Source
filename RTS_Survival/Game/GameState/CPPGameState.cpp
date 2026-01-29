@@ -5452,7 +5452,7 @@ void ACPPGameState::InitAllGameBxpData()
 		EAbilityID::IdAttack, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});

@@ -1634,4 +1634,7 @@ private:
 
 
 	void DebugPlayerSelection(const FString& Message, const FColor& Color = FColor::Blue) const;
+
+	UPROPERTY()
+	FTimerHandle M_HqReferenceHandle;
 };

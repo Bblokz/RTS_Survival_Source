@@ -979,7 +979,7 @@ namespace DeveloperSettings
 					FDamageMltPerSide::Uniform(0.1)
 				};
 				inline constexpr float FireThresholdMaxHPMlt = 0.05;
-				inline constexpr float FireRecoveryPerSec = 10.f;
+				inline constexpr float FireRecoveryPerSec = 8.f;
 				inline constexpr ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::Reinforced;
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(25, 0.7f);

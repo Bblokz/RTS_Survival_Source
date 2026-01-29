@@ -276,11 +276,11 @@ EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetAnnouncerForPlayerError(const 
 	case EPlayerError::Error_NotEnoughMetal:
 		return EAnnouncerVoiceLineType::NotEnoughMetal;
 	case EPlayerError::Error_NotEnoughEnergy:
-		return EAnnouncerVoiceLineType::LowEnergy;
+		return EAnnouncerVoiceLineType::NotEnoughEnergy;
 	case EPlayerError::Error_NotEnoughVehicleParts:
 		return EAnnouncerVoiceLineType::NotEnoughVehicleParts;
 	case EPlayerError::Error_NotEnoughtFuel:
-		return EAnnouncerVoiceLineType::LowEnergy;
+		return EAnnouncerVoiceLineType::NotEnoughEnergy;
 	case EPlayerError::Error_NotENoughAmmo:
 		break;
 	case EPlayerError::Error_NotEnoughWeaponBlueprints:

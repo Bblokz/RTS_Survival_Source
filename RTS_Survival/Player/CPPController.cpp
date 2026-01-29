@@ -1702,7 +1702,7 @@ void ACPPController::BeginPlay_SetupPlayerAimAbility()
 		M_PlayerAimAbilityClass, DefaultTransform, SpawnParams);
 	bM_HasInitializedPlayerAimAbility = true;
 	// Error check.
-	if(GetIsValidPlayerAimAbilityActor())
+	if (GetIsValidPlayerAimAbilityActor())
 	{
 		M_PlayerAimAbility->InitPlayerAimAbility(this);
 	}
@@ -2784,7 +2784,7 @@ void ACPPController::BeginPlay_SetupRotationArrow()
 
 void ACPPController::BeginPlay_SetupOutlineRules()
 {
-	if(not GetIsValidPlayerOutlineComponent())
+	if (not GetIsValidPlayerOutlineComponent())
 	{
 		return;
 	}
@@ -3691,7 +3691,7 @@ uint32 ACPPController::OrderUnitsCaptureActor(AActor* CaptureTargetActor)
 		{
 			continue;
 		}
-		if(EachSquad->GetSquadUnitAmount() < MembersNeeded)
+		if (EachSquad->GetSquadUnitAmount() < MembersNeeded)
 		{
 			bHasSquadWithNotEnoughMembers = true;
 			continue;
@@ -3699,9 +3699,10 @@ uint32 ACPPController::OrderUnitsCaptureActor(AActor* CaptureTargetActor)
 
 		// Capture command does not need to exist in any ability array; we explicitly
 		// target squads here and let the squad controller handle the capture logic.
-		 AmountCommandsExe +=EachSquad->CaptureActor(CaptureTargetActor, !bIsHoldingShift) == ECommandQueueError::NoError;
+		AmountCommandsExe += EachSquad->CaptureActor(CaptureTargetActor, !bIsHoldingShift) ==
+			ECommandQueueError::NoError;
 	}
-	if(AmountCommandsExe == 0 && bHasSquadWithNotEnoughMembers)
+	if (AmountCommandsExe == 0 && bHasSquadWithNotEnoughMembers)
 	{
 		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NotEnoughSquadUnitsToCapture);
 	}
@@ -3971,7 +3972,7 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 		DetermineShowAimAbilityAtCursorProjection(M_ActiveAbility, ActiveAbilityEntry.CustomType);
 		UpdateCursor();
 	}
-	if(bM_IsActionButtonActive)
+	if (bM_IsActionButtonActive)
 	{
 		OutlinerUpdateForActionButton(M_ActiveAbility);
 	}
@@ -4587,7 +4588,7 @@ void ACPPController::DirectActionButtonRetreat()
 		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NoMobileHQToFallBackto, true, true);
 		return;
 	}
-	if(not GetIsValidGameUIController())
+	if (not GetIsValidGameUIController())
 	{
 		return;
 	}
@@ -4622,7 +4623,7 @@ void ACPPController::DirectActionButtonRetreat()
 	if (CommandsExe > 0)
 	{
 		// Because if successful the primary selected unit is no longer in selection we play the voiceline here.
-		if(GetIsValidPlayerAudioController() && IsValid(PrimarySelected))
+		if (GetIsValidPlayerAudioController() && IsValid(PrimarySelected))
 		{
 			M_PlayerAudioController->PlayVoiceLine(PrimarySelected, ERTSVoiceLine::FallBackToHQ, true, false);
 		}
@@ -5563,7 +5564,7 @@ bool ACPPController::GetIsValidPlayerCameraController() const
 
 bool ACPPController::GetIsValidPlayerOutlineComponent() const
 {
-	if(not IsValid(M_PlayerOutlineComponent))
+	if (not IsValid(M_PlayerOutlineComponent))
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerOutlineComponent",
 		                                                      "GetIsValidPlayerOutlineComponent", this);
@@ -6155,7 +6156,7 @@ void ACPPController::OnActorHovered(AActor* HoveredActor, const bool bIsHovered)
 
 void ACPPController::UpdatePlayerOutlineWithHoverActor(AActor* HoveredActor) const
 {
-	if(not GetIsValidPlayerOutlineComponent())
+	if (not GetIsValidPlayerOutlineComponent())
 	{
 		return;
 	}
@@ -6164,7 +6165,7 @@ void ACPPController::UpdatePlayerOutlineWithHoverActor(AActor* HoveredActor) con
 
 void ACPPController::OutlinerUpdateForActionButton(const EAbilityID ActivatedAbilityForSecondClick) const
 {
-	if(not GetIsValidPlayerOutlineComponent())
+	if (not GetIsValidPlayerOutlineComponent())
 	{
 		return;
 	}
@@ -6173,7 +6174,7 @@ void ACPPController::OutlinerUpdateForActionButton(const EAbilityID ActivatedAbi
 
 void ACPPController::OutlinerResetAfterActionButton(const EAbilityID DeactivatedActionButton) const
 {
-	if(not GetIsValidPlayerOutlineComponent())
+	if (not GetIsValidPlayerOutlineComponent())
 	{
 		return;
 	}
@@ -6187,22 +6188,28 @@ void ACPPController::LoadPlayerProfile(const FVector& SpawnCenterOfUnits, const 
 		return;
 	}
 	M_PlayerProfileLoader->LoadProfile(M_RTSAsyncSpawner, SpawnCenterOfUnits, this, bDoNotLoadPlayerProfileUnits);
-	// // Find Nomadic HQ on the map.
-	// if (not SetupPlayerHQReference())
-	// {
-	// 	auto RetryFindHq = [this]()
-	// 	{
-	// 		if (SetupPlayerHQReference())
-	// 		{
-	// 			GetWorld()->GetTimerManager().ClearTimer(M_HqReferenceHandle);
-	// 		}
-	// 	};
-	// 	if (GetWorld())
-	// 	{
-	// 		// retry every second.
-	// 		GetWorld()->GetTimerManager().SetTimer(M_HqReferenceHandle, RetryFindHq, 1.0f, true);
-	// 	}
-	// }
+	// Find Nomadic HQ on the map.
+	const bool bHasLoadedHQ = not bDoNotLoadPlayerProfileUnits;
+	if (not SetupPlayerHQReference() && bHasLoadedHQ)
+	{
+		TWeakObjectPtr<ACPPController> WeakController(this);
+		auto RetryFindHq = [WeakController]()
+		{
+			if (not WeakController.IsValid())
+			{
+				return;
+			}
+			if (WeakController->SetupPlayerHQReference())
+			{
+				WeakController->GetWorld()->GetTimerManager().ClearTimer(WeakController->M_HqReferenceHandle);
+			}
+		};
+		if (GetWorld())
+		{
+			// retry every second.
+			GetWorld()->GetTimerManager().SetTimer(M_HqReferenceHandle, RetryFindHq, 1.0f, true);
+		}
+	}
 }
 
 void ACPPController::OnPlayerProfileLoadComplete()

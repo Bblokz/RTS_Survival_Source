@@ -85,7 +85,7 @@ enum class EAnnouncerVoiceLineType : uint8
 	RadixiteStorageFull,
 	MetalStorageFull,
 	VehiclePartsStorageFull,
-	LowEnergy,
+	NotEnoughEnergy,
 	ReinforcementsHaveArrived,
 	NotEnoughRadixite,
 	NotEnoughMetal,
@@ -107,7 +107,9 @@ enum class EAnnouncerVoiceLineType : uint8
 	Cancelled,
 	GamePaused,
 	GameResumed,
-	AbilityNotInRange
+	AbilityNotInRange,
+	LowBaseEnergy,
+	BaseEnergyRestored,
 };
 
 USTRUCT(BlueprintType)

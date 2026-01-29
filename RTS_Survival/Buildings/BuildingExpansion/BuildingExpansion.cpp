@@ -134,12 +134,14 @@ void ABuildingExpansion::StartPackUpBuildingExpansion(const float TotalTime)
 	if (CachedMaterialCount == 0)
 	{
 		StartFinishMaterialsTimer(TotalTime);
+		OnBxpPackingUp.Broadcast();
 		BP_OnStartPackUpBxp();
 		return;
 	}
 	const float Interval = TotalTime / CachedMaterialCount;
 	// Procedurally apply construction materials to material slots.
 	StartAnimationTimer(Interval, false);
+	OnBxpPackingUp.Broadcast();
 	BP_OnStartPackUpBxp();
 }
 
@@ -159,6 +161,7 @@ void ABuildingExpansion::CancelPackUpBuildingExpansion()
 		SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_BeingBuild);
 		// We restart the construction animation, note that the materials are already cached!!
 		StartConstructionAnimation(M_TimeElapsedWhenConstructionCancelled, false);
+		OnBxpCancelPackingUp.Broadcast();
 		BP_OnCancelledPackUpBxp();
 	}
 	else
@@ -172,6 +175,7 @@ void ABuildingExpansion::CancelPackUpBuildingExpansion()
 		}
 		ResetCachedMaterials();
 		SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_Built);
+		OnBxpCancelPackingUp.Broadcast();
 		BP_OnCancelledPackUpBxp();
 	}
 	SetTurretsToAutoEngage();
@@ -682,6 +686,7 @@ void ABuildingExpansion::OnFinishedExpansionConstruction()
 	SpawnBuildingAttachments();
 	SetTurretsToAutoEngage();
 	SetMeshToBuildingMesh();
+	OnBxpConstructed.Broadcast();
 	BP_OnFinishedExpansionConstruction();
 }
 

@@ -1,7 +1,7 @@
 ﻿#include "RTSGameInstance.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
-#include "RTS_Survival/Audio/Settings/RTSAudioSettings.h"
+#include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
 #include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Sound/SoundClass.h"
@@ -35,7 +35,7 @@ void URTSGameInstance::Shutdown()
 
 void URTSGameInstance::InitializeAudioSettings()
 {
-	const URTSAudioSettings* const AudioSettings = GetDefault<URTSAudioSettings>();
+	const URTSAudioDeveloperSettings* const AudioSettings = GetDefault<URTSAudioDeveloperSettings>();
 	if (AudioSettings == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Audio settings were missing while initializing audio."));

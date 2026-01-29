@@ -5,7 +5,7 @@
 #include "Engine/DeveloperSettings.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 
-#include "RTSAudioSettings.generated.h"
+#include "RTSAudioDeveloperSettings.generated.h"
 
 class USoundClass;
 class USoundMix;
@@ -19,12 +19,12 @@ class USoundMix;
  * reloads them and applies overrides per ERTSAudioType using the sound mix and mapped classes.
  */
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="RTS Audio Settings"))
-class RTS_SURVIVAL_API URTSAudioSettings : public UDeveloperSettings
+class RTS_SURVIVAL_API URTSAudioDeveloperSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 
 public:
-	URTSAudioSettings();
+	URTSAudioDeveloperSettings();
 
 	/** Sound mix that receives class overrides for all menu-driven volume changes. */
 	UPROPERTY(Config, EditAnywhere, Category="Audio")

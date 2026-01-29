@@ -5,7 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "RHI.h"
-#include "RTS_Survival/Audio/Settings/RTSAudioSettings.h"
+#include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Scalability.h"
 #include "Sound/SoundClass.h"
@@ -347,7 +347,7 @@ void URTSSettingsMenuSubsystem::CacheSettingsSnapshots()
 
 void URTSSettingsMenuSubsystem::CacheAudioSettingsFromDeveloperSettings()
 {
-	const URTSAudioSettings* const AudioSettings = GetDefault<URTSAudioSettings>();
+	const URTSAudioDeveloperSettings* const AudioSettings = GetDefault<URTSAudioDeveloperSettings>();
 	if (AudioSettings == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Audio settings were missing while caching audio mix data."));

@@ -30,6 +30,10 @@ enum class EBuildingExpansionType : uint8;
 class RTS_SURVIVAL_API IBuildingExpansionOwner;
 class RTS_SURVIVAL_API UTimeProgressBarWidget;
 
+DECLARE_MULTICAST_DELEGATE(FOnBxpConstructed);
+DECLARE_MULTICAST_DELEGATE(FOnBxpPackingUp);
+DECLARE_MULTICAST_DELEGATE(FOnBxpCancelledPackingUp);
+
 /**
  * A building expansion actor can be added to a building in an expansion slot.
  * These slots are stored in a TArray in the building expansion owner component called UBuildingExpansionOwnerComp.
@@ -48,6 +52,13 @@ public:
 	ABuildingExpansion(FObjectInitializer const& ObjectInitializer);
 
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
+
+	// Called when the construction finished.
+	FOnBxpConstructed OnBxpConstructed;
+	// Called when the Bxp starts packing up.
+	FOnBxpPackingUp OnBxpPackingUp;
+	// Called when the Bxp starts packing up.
+	FOnBxpCancelledPackingUp OnBxpCancelPackingUp;
 
 	/**
 	 * @brief Initializes the building expansion with necessary status. 

@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Game/GameState/UnitDataHelpers/UnitDataHelpers.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
 
 
@@ -146,6 +147,7 @@ namespace BxpHelpers
 			// ----------------------- GER HQ Harvester Socket Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(T1BxpBuildTime*2);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
@@ -161,6 +163,7 @@ namespace BxpHelpers
 			// ----------------------- GER HQ Radar Socket Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(T1BxpBuildTime*2);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
@@ -175,6 +178,7 @@ namespace BxpHelpers
 			// ----------------------- GER HQ Platform Socket Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(T1BxpBuildTime*2);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth*1.25);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
@@ -186,10 +190,10 @@ namespace BxpHelpers
 			BxpData.Abilities = ArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQPlatform, BxpData);
 
-			
 			// ----------------------- GER HQ Tower Origin Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(T1BxpBuildTime*5);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth*3);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
@@ -201,10 +205,10 @@ namespace BxpHelpers
 			BxpData.Abilities = ArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQTower, BxpData);
 
-			
 			// ----------------------- GER HQ Repair Bay Free Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(T1BxpBuildTime*3);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth*3);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
@@ -230,6 +234,7 @@ namespace BxpHelpers
 			// ----------------------- GER LFactory RadixiteReactor Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(T1BxpBuildTime*2);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth*1.5);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 			BxpData.VisionRadius = 100;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
@@ -243,6 +248,7 @@ namespace BxpHelpers
 		
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(T1BxpBuildTime*2);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth*1.5);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 			BxpData.VisionRadius = 100;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
