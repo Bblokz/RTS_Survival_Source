@@ -338,12 +338,42 @@ bool UTrackPathFollowingComponent::IsReversing()
 }
 
 
-APawn* UTrackPathFollowingComponent::GetValidControlledPawn()
+bool UTrackPathFollowingComponent::GetIsValidControlledPawn() const
 {
 	if (IsValid(ControlledPawn))
 	{
-		return ControlledPawn;
+		return true;
 	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"ControlledPawn",
+		"UTrackPathFollowingComponent::GetIsValidControlledPawn",
+		this
+	);
+
+	return false;
+}
+
+bool UTrackPathFollowingComponent::GetIsValidTrackPhysicsMovement() const
+{
+	if (IsValid(M_TrackPhysicsMovement))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_TrackPhysicsMovement",
+		"UTrackPathFollowingComponent::GetIsValidTrackPhysicsMovement",
+		this
+	);
+
+	return false;
+}
+
+APawn* UTrackPathFollowingComponent::GetValidControlledPawn()
+{
 	// Use the NavMovementInterface to access the owner
 	if (NavMovementInterface.IsValid())
 	{
@@ -355,14 +385,15 @@ APawn* UTrackPathFollowingComponent::GetValidControlledPawn()
 			if (APawn* PawnOwner = Cast<APawn>(OwnerAsObject))
 			{
 				ControlledPawn = PawnOwner;
-				return PawnOwner;
 			}
 		}
 	}
-	const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "None";
-	const FString OwnerClass = GetOwner() ? GetOwner()->GetClass()->GetName() : "None";
-	RTSFunctionLibrary::ReportError("The UVehiclePathFollowingComponent is not able to find the controlled pawn!"
-		"\n Component name: " + GetName() + "Owner: " + OwnerName + "Owner Class: " + OwnerClass);
+
+	if (GetIsValidControlledPawn())
+	{
+		return ControlledPawn;
+	}
+
 	return nullptr;
 }
 
@@ -401,7 +432,7 @@ bool UTrackPathFollowingComponent::IsStuck(const float DeltaTime)
 			}
 		}
 
-		if (!bHasMoved)
+		if (not bHasMoved)
 		{
 			// Vehicle hasn't moved significantly over the sampled locations
 			bIsStuck = true;
@@ -463,6 +494,8 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 
 	// Reset stuck status
 	ResetStuck();
+	bM_IsInDeadzone = false;
+	bM_IsInReverseDeadzone = false;
 
 	// Debug message
 	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
@@ -476,7 +509,7 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 	RemoveInvalidOverlaps(M_IdleAlliedBlockingActors);
 
 	const bool bHasIdleBlockers = (M_IdleAlliedBlockingActors.Num() > 0);
-	const bool bCanWait = bHasIdleBlockers && IsValid(ControlledPawn);
+	const bool bCanWait = bHasIdleBlockers && GetIsValidControlledPawn();
 
 	UpdateEngineBlockDetectionForIdleBlockerWait(bCanWait);
 
@@ -502,13 +535,13 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 {
 	// .65 ms for 100 vehicles.
 	// TRACE_CPUPROFILER_EVENT_SCOPE(Tracks_UpdateDriving);
-	if (!M_TrackPhysicsMovement)
+	if (not GetIsValidTrackPhysicsMovement())
 	{
 		return;
 	}
 	VehicleCurrentDestination = Destination;
 
-	if (not bImplementsInterface || not IsValid(ControlledPawn))
+	if (not bImplementsInterface || not GetIsValidControlledPawn())
 	{
 		// Make sure we never "stick" in suppressed mode if something becomes invalid.
 		UpdateEngineBlockDetectionForIdleBlockerWait(false);
@@ -544,13 +577,11 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 
 	float SpeedDifference = 0;
 	float Steering = 0;
-	bool bIsInReverseDeadzone = false;
 	// Needs TargetAngle to be in absolute value.
 	float ThrottleIncreaseValue;
 	bReversing = ShouldTrackVehicleReverse(AbsoluteTargetAngle, DestinationDistance);
 	if (bReversing)
 	{
-		bIsInReverseDeadzone = AbsoluteTargetAngle <= (180 - DeadZoneAngle);
 		const float AbsoluteTurnAngle = AbsoluteTargetAngle > 90 ? 180 - AbsoluteTargetAngle : AbsoluteTargetAngle;
 		// Steer maximally if the angle is greater than the threshold, otherwise steer based on the angle.
 		Steering = AbsoluteTurnAngle > MaxAngleDontSlow ? 1 : AbsoluteTurnAngle / MaxAngleDontSlow;
@@ -602,24 +633,19 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	CalculatedThrottleValue = FMath::Clamp(CalculatedThrottleValue, 0, 1);
 	CalculatedThrottleValue = bReversing ? CalculatedThrottleValue * -1.f : CalculatedThrottleValue;
 
-	// Apply smoothing
-	SmoothedTargetAngle = FMath::Lerp(SmoothedTargetAngle, AbsoluteTargetAngle, SmoothingFactor);
-	SmoothedDestinationDistance = FMath::Lerp(SmoothedDestinationDistance, DestinationDistance, SmoothingFactor);
-
-	// Use smoothed values in deadzone calculations to avoid jittering.
-	if (SmoothedDestinationDistance < DeadZoneDistance &&
-		((!bReversing && SmoothedTargetAngle >= DeadZoneAngle) || bIsInReverseDeadzone))
+	const bool bIsInDeadzone = UpdateDeadzoneHysteresis(AbsoluteTargetAngle, DestinationDistance, bReversing);
+	if (bIsInDeadzone)
 	{
-		CalculatedThrottleValue = 0.00;
+		CalculatedThrottleValue = 0.f;
 
 		// Max steering.
 		Steering = FMath::Sign(SignedTargetAngle);
-		if (bDebugSlowDown && !bIsInReverseDeadzone)
+		if (bDebugSlowDown && not bM_IsInReverseDeadzone)
 		{
 			RTSFunctionLibrary::PrintString("Frontal deadzone, only steering!", FColor::Black);
 			DrawDebugLine(GetWorld(), GetAgentLocation(), Destination, FColor::Black, false, 0.1f, 1, 3.0f);
 		}
-		if (bDebugSlowDown && bIsInReverseDeadzone)
+		if (bDebugSlowDown && bM_IsInReverseDeadzone)
 		{
 			RTSFunctionLibrary::PrintString("Reverse deadzone, only steering!", FColor::Black);
 			DrawDebugLine(GetWorld(), GetAgentLocation(), Destination, FColor::White, false, 0.1f, 1, 3.0f);
@@ -635,7 +661,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 
 	if constexpr (DeveloperSettings::Debugging::GRTSNavAgents_Compile_DebugSymbols)
 	{
-		const bool bShouldDebugNavAgents = bDebug && ControlledPawn != nullptr;
+		const bool bShouldDebugNavAgents = bDebug && GetIsValidControlledPawn();
 		if (bShouldDebugNavAgents)
 		{
 			// flush all debug messages
@@ -704,12 +730,67 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	// }
 }
 
+bool UTrackPathFollowingComponent::UpdateDeadzoneHysteresis(
+	const float TargetAngle,
+	const float TargetDistance,
+	const bool bIsReversing)
+{
+	const float DeadzoneExitAngle = FMath::Max(0.f, DeadZoneAngle - DeadZoneExitAngleOffset);
+	const float DeadzoneExitDistance = DeadZoneDistance * FMath::Max(DeadZoneExitDistanceMultiplier, 1.f);
+
+	if (bM_IsInDeadzone && bM_IsInReverseDeadzone != bIsReversing)
+	{
+		bM_IsInDeadzone = false;
+		bM_IsInReverseDeadzone = false;
+	}
+
+	if (bM_IsInDeadzone)
+	{
+		const float ReverseExitAngle = 180.f - DeadzoneExitAngle;
+		const bool bShouldExitForwardDeadzone = not bM_IsInReverseDeadzone &&
+			(TargetDistance > DeadzoneExitDistance || TargetAngle < DeadzoneExitAngle);
+		const bool bShouldExitReverseDeadzone = bM_IsInReverseDeadzone &&
+			(TargetDistance > DeadzoneExitDistance || TargetAngle > ReverseExitAngle);
+
+		if (bShouldExitForwardDeadzone || bShouldExitReverseDeadzone)
+		{
+			bM_IsInDeadzone = false;
+			bM_IsInReverseDeadzone = false;
+		}
+
+		return bM_IsInDeadzone;
+	}
+
+	const bool bShouldEnterForwardDeadzone = not bIsReversing &&
+		TargetDistance < DeadZoneDistance &&
+		TargetAngle >= DeadZoneAngle;
+	const bool bShouldEnterReverseDeadzone = bIsReversing &&
+		TargetDistance < DeadZoneDistance &&
+		TargetAngle <= (180.f - DeadZoneAngle);
+
+	if (bShouldEnterForwardDeadzone)
+	{
+		bM_IsInDeadzone = true;
+		bM_IsInReverseDeadzone = false;
+		return true;
+	}
+
+	if (bShouldEnterReverseDeadzone)
+	{
+		bM_IsInDeadzone = true;
+		bM_IsInReverseDeadzone = true;
+		return true;
+	}
+
+	return false;
+}
+
 void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 {
 	UVehiclePathFollowingComponent::FollowPathSegment(DeltaTime);
 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_FollowSegment);
 
-	if (not IsValid(ControlledPawn))
+	if (not GetIsValidControlledPawn())
 	{
 		return;
 	}
@@ -925,7 +1006,7 @@ void UTrackPathFollowingComponent::OnPathFinished(const FPathFollowingResult& Re
 	SetEngineBlockDetectionSuppressed(false);
 	// // When the path ends, set all the steering and throttle to nothing, and apply the brakes
 	// UpdateVehicle(0.f, 0.f, 1.f, 0, 0);
-	if (IsValid(ControlledPawn))
+	if (GetIsValidControlledPawn())
 	{
 		IVehicleAIInterface* VehicleAI = Cast<IVehicleAIInterface>(ControlledPawn);
 		if (VehicleAI)
@@ -958,7 +1039,7 @@ void UTrackPathFollowingComponent::Initialize()
 
 	bImplementsInterface = DoesControlledPawnImplementInterface();
 
-	if (!bImplementsInterface)
+	if (not bImplementsInterface)
 	{
 		RTSFunctionLibrary::PrintString("Interface is not implemented on your vehicle, AI will not work!");
 	}
@@ -1123,14 +1204,14 @@ FVector UTrackPathFollowingComponent::GetUnstuckLocation(const FVector& MoveFocu
 	}
 
 	// Perform visibility trace on the first preferred side
-	if (!VisibilityTrace(AgentLocation, FirstCheckLocation))
+	if (not VisibilityTrace(AgentLocation, FirstCheckLocation))
 	{
 		DrawDebugSphere(GetWorld(), FirstCheckLocation, 50.f, 12, FColor::Purple, false, 1.f);
 		return FirstCheckLocation;
 	}
 
 	// If first trace fails, perform visibility trace on the opposite side
-	if (!VisibilityTrace(AgentLocation, SecondCheckLocation))
+	if (not VisibilityTrace(AgentLocation, SecondCheckLocation))
 	{
 		DrawDebugSphere(GetWorld(), SecondCheckLocation, 50.f, 12, FColor::Purple, false, 1.f);
 		return SecondCheckLocation;
@@ -1240,11 +1321,8 @@ float UTrackPathFollowingComponent::TrackGetSlowdownSpeed(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Tracjs_GetSlowDownSpeed);
 
-	if (!IsValid(M_TrackPhysicsMovement))
+	if (not GetIsValidTrackPhysicsMovement())
 	{
-		RTSFunctionLibrary::ReportError("No TrackPhysics movement component"
-			"\n On component:" + GetName()
-			+ "\n ");
 		return DesiredSpeed;
 	}
 	const float Alpha = FMath::GetMappedRangeValueClamped(FVector2D(SlowdownDistance, 0.f), FVector2D(0.f, 1.f),
