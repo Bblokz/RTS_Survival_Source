@@ -340,30 +340,32 @@ bool UTrackPathFollowingComponent::IsReversing()
 
 APawn* UTrackPathFollowingComponent::GetValidControlledPawn()
 {
-	if (IsValid(ControlledPawn))
+	if (not IsValid(ControlledPawn))
 	{
-		return ControlledPawn;
-	}
-	// Use the NavMovementInterface to access the owner
-	if (NavMovementInterface.IsValid())
-	{
-		// Retrieve the object implementing the interface
-		UObject* OwnerAsObject = NavMovementInterface->GetOwnerAsObject();
-		if (OwnerAsObject)
+		// Use the NavMovementInterface to access the owner
+		if (NavMovementInterface.IsValid())
 		{
-			// Cast the object to a Pawn and return if valid
-			if (APawn* PawnOwner = Cast<APawn>(OwnerAsObject))
+			// Retrieve the object implementing the interface
+			UObject* OwnerAsObject = NavMovementInterface->GetOwnerAsObject();
+			if (OwnerAsObject)
 			{
-				ControlledPawn = PawnOwner;
-				return PawnOwner;
+				// Cast the object to a Pawn and return if valid
+				if (APawn* PawnOwner = Cast<APawn>(OwnerAsObject))
+				{
+					ControlledPawn = PawnOwner;
+					return PawnOwner;
+				}
 			}
 		}
+
+		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "None";
+		const FString OwnerClass = GetOwner() ? GetOwner()->GetClass()->GetName() : "None";
+		RTSFunctionLibrary::ReportError("The UVehiclePathFollowingComponent is not able to find the controlled pawn!"
+			"\n Component name: " + GetName() + "Owner: " + OwnerName + "Owner Class: " + OwnerClass);
+		return nullptr;
 	}
-	const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "None";
-	const FString OwnerClass = GetOwner() ? GetOwner()->GetClass()->GetName() : "None";
-	RTSFunctionLibrary::ReportError("The UVehiclePathFollowingComponent is not able to find the controlled pawn!"
-		"\n Component name: " + GetName() + "Owner: " + OwnerName + "Owner Class: " + OwnerClass);
-	return nullptr;
+
+	return ControlledPawn;
 }
 
 
@@ -463,6 +465,8 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 
 	// Reset stuck status
 	ResetStuck();
+	bM_IsInDeadzone = false;
+	bM_IsInReverseDeadzone = false;
 
 	// Debug message
 	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
@@ -544,13 +548,11 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 
 	float SpeedDifference = 0;
 	float Steering = 0;
-	bool bIsInReverseDeadzone = false;
 	// Needs TargetAngle to be in absolute value.
 	float ThrottleIncreaseValue;
 	bReversing = ShouldTrackVehicleReverse(AbsoluteTargetAngle, DestinationDistance);
 	if (bReversing)
 	{
-		bIsInReverseDeadzone = AbsoluteTargetAngle <= (180 - DeadZoneAngle);
 		const float AbsoluteTurnAngle = AbsoluteTargetAngle > 90 ? 180 - AbsoluteTargetAngle : AbsoluteTargetAngle;
 		// Steer maximally if the angle is greater than the threshold, otherwise steer based on the angle.
 		Steering = AbsoluteTurnAngle > MaxAngleDontSlow ? 1 : AbsoluteTurnAngle / MaxAngleDontSlow;
@@ -602,24 +604,19 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	CalculatedThrottleValue = FMath::Clamp(CalculatedThrottleValue, 0, 1);
 	CalculatedThrottleValue = bReversing ? CalculatedThrottleValue * -1.f : CalculatedThrottleValue;
 
-	// Apply smoothing
-	SmoothedTargetAngle = FMath::Lerp(SmoothedTargetAngle, AbsoluteTargetAngle, SmoothingFactor);
-	SmoothedDestinationDistance = FMath::Lerp(SmoothedDestinationDistance, DestinationDistance, SmoothingFactor);
-
-	// Use smoothed values in deadzone calculations to avoid jittering.
-	if (SmoothedDestinationDistance < DeadZoneDistance &&
-		((!bReversing && SmoothedTargetAngle >= DeadZoneAngle) || bIsInReverseDeadzone))
+	const bool bIsInDeadzone = UpdateDeadzoneHysteresis(AbsoluteTargetAngle, DestinationDistance, bReversing);
+	if (bIsInDeadzone)
 	{
-		CalculatedThrottleValue = 0.00;
+		CalculatedThrottleValue = 0.f;
 
 		// Max steering.
 		Steering = FMath::Sign(SignedTargetAngle);
-		if (bDebugSlowDown && !bIsInReverseDeadzone)
+		if (bDebugSlowDown && not bM_IsInReverseDeadzone)
 		{
 			RTSFunctionLibrary::PrintString("Frontal deadzone, only steering!", FColor::Black);
 			DrawDebugLine(GetWorld(), GetAgentLocation(), Destination, FColor::Black, false, 0.1f, 1, 3.0f);
 		}
-		if (bDebugSlowDown && bIsInReverseDeadzone)
+		if (bDebugSlowDown && bM_IsInReverseDeadzone)
 		{
 			RTSFunctionLibrary::PrintString("Reverse deadzone, only steering!", FColor::Black);
 			DrawDebugLine(GetWorld(), GetAgentLocation(), Destination, FColor::White, false, 0.1f, 1, 3.0f);
@@ -702,6 +699,61 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	// 		RTSFunctionLibrary::PrintString(DebugMessages[i], FColor::Purple);
 	// 	}
 	// }
+}
+
+bool UTrackPathFollowingComponent::UpdateDeadzoneHysteresis(
+	const float TargetAngle,
+	const float TargetDistance,
+	const bool bIsReversing)
+{
+	const float DeadzoneExitAngle = FMath::Max(0.f, DeadZoneAngle - DeadZoneExitAngleOffset);
+	const float DeadzoneExitDistance = DeadZoneDistance * FMath::Max(DeadZoneExitDistanceMultiplier, 1.f);
+
+	if (bM_IsInDeadzone && bM_IsInReverseDeadzone != bIsReversing)
+	{
+		bM_IsInDeadzone = false;
+		bM_IsInReverseDeadzone = false;
+	}
+
+	if (bM_IsInDeadzone)
+	{
+		const float ReverseExitAngle = 180.f - DeadzoneExitAngle;
+		const bool bShouldExitForwardDeadzone = not bM_IsInReverseDeadzone &&
+			(TargetDistance > DeadzoneExitDistance || TargetAngle < DeadzoneExitAngle);
+		const bool bShouldExitReverseDeadzone = bM_IsInReverseDeadzone &&
+			(TargetDistance > DeadzoneExitDistance || TargetAngle > ReverseExitAngle);
+
+		if (bShouldExitForwardDeadzone || bShouldExitReverseDeadzone)
+		{
+			bM_IsInDeadzone = false;
+			bM_IsInReverseDeadzone = false;
+		}
+
+		return bM_IsInDeadzone;
+	}
+
+	const bool bShouldEnterForwardDeadzone = not bIsReversing &&
+		TargetDistance < DeadZoneDistance &&
+		TargetAngle >= DeadZoneAngle;
+	const bool bShouldEnterReverseDeadzone = bIsReversing &&
+		TargetDistance < DeadZoneDistance &&
+		TargetAngle <= (180.f - DeadZoneAngle);
+
+	if (bShouldEnterForwardDeadzone)
+	{
+		bM_IsInDeadzone = true;
+		bM_IsInReverseDeadzone = false;
+		return true;
+	}
+
+	if (bShouldEnterReverseDeadzone)
+	{
+		bM_IsInDeadzone = true;
+		bM_IsInReverseDeadzone = true;
+		return true;
+	}
+
+	return false;
 }
 
 void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)

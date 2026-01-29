@@ -514,6 +514,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Deadzones")
 	float DeadZoneAngle;
 
+	/**
+	 * @brief Angle buffer required to exit a deadzone after it has been entered.
+	 * @note Higher values increase hysteresis and reduce throttle jittering near the threshold.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Deadzones", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+	float DeadZoneExitAngleOffset = 10.f;
+
+	/**
+	 * @brief Distance multiplier required to exit a deadzone after it has been entered.
+	 * @note Values above 1.0 provide distance-based hysteresis for throttle recovery.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Deadzones", meta = (ClampMin = "1.0"))
+	float DeadZoneExitDistanceMultiplier = 1.2f;
+
 	// The point to reverse to when the deadzone is entered; only for wheeled vehicles.
 	UPROPERTY(EditDefaultsOnly, Category = "Deadzones")
 	float DeadZoneReverseDistance = 600;
@@ -539,12 +553,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Speed Control")
 	float DesiredReverseSpeedKmph = 10.f;
 
-
-	float SmoothedTargetAngle = 0;
-	float SmoothedDestinationDistance = 0;
-
-	// Smoothing factor (alpha value between 0 and 1)
-	const float SmoothingFactor = 0.1f;
 
 	// Actors we are temporarily waiting for because of footprint evasion on idle allies.
 	UPROPERTY()
@@ -657,6 +665,17 @@ private:
 		const FString& Reason,
 		const FOverlapActorData& OverlapData) const;
 	void ResetOverlapBlockingActorsForCommand();
+	/**
+	 * @brief Applies entry/exit hysteresis to decide if the vehicle should stay in the deadzone.
+	 * @param TargetAngle The absolute angle to the current target.
+	 * @param TargetDistance The distance to the current target.
+	 * @param bIsReversing Whether the vehicle currently wants to reverse.
+	 * @return True if throttle should be blocked by the deadzone this frame.
+	 */
+	bool UpdateDeadzoneHysteresis(
+		const float TargetAngle,
+		const float TargetDistance,
+		const bool bIsReversing);
 
 	// The physics calculation component that moves the owning pawn by applying velocity.
 	UPROPERTY()
@@ -683,6 +702,12 @@ private:
 
 	/* Flag set to true if reversing, used with the threshold */
 	bool bReversing = false;
+
+	// Tracks whether the deadzone hysteresis currently blocks throttle input.
+	bool bM_IsInDeadzone = false;
+
+	// Tracks whether the deadzone hysteresis is for reversing.
+	bool bM_IsInReverseDeadzone = false;
 
 	/* Helper to return the agents current location in the world */
 	FVector GetAgentLocation() const;
