@@ -4,6 +4,8 @@
 
 #include "WeaponRangeData.generated.h"
 
+class UWeaponState;
+
 /**
  * @brief Contains the range, squared range and the search range for a weapon
  * @pre Provide AdjustRangeForNewWeapon(const float Range) to see if the radii need to be
@@ -24,6 +26,10 @@ struct FWeaponRangeData
 			M_WeaponSearchRadius = Range;
 		}		
 	};
+
+	void AdjustRangeForWeapon(const UWeaponState* WeaponState);
+
+	void RecalculateRangeFromWeapons(const TArray<UWeaponState*>& Weapons);
 
 	inline void ForceSetRange(const float Range)
 	{

@@ -198,7 +198,7 @@ bool FRTSWeaponHelpers::GetAdjustedRangeIfFlameThrowerPresent(const TArray<UWeap
 		{
 			continue;
 		}
-		OutAdjustedRange = FlameThrower->GetRange();
+		OutAdjustedRange = FlameThrower->GetWeaponRangeBehaviourAdjusted();
 		return true;
 	}
 	return false;

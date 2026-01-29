@@ -57,6 +57,11 @@ void UAircraftWeapon::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapo
 {
 }
 
+void UAircraftWeapon::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+{
+	UpdateRangeBasedOnWeapons();
+}
+
 void UAircraftWeapon::RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister)
 {
 	if(not RTSFunctionLibrary::RTSIsValid(ActorToIgnore))
@@ -594,11 +599,10 @@ void UAircraftWeapon::UpdateRangeBasedOnWeapons()
 		{
 			RTSFunctionLibrary::ReportError(
 				"Invalid weapon for aircraft weapon: " + GetName() +
-				" at function: AircraftWeapon::UpdateTurretRangeBasedOnWeapons");
-			continue;
+				" at function: UAircraftWeapon::UpdateRangeBasedOnWeapons");
 		}
-		M_WeaponRangeData.AdjustRangeForNewWeapon(EachWeapon->GetRange());
 	}
+	M_WeaponRangeData.RecalculateRangeFromWeapons(M_TWeapons);
 }
 
 bool UAircraftWeapon::EnsureWorldIsValid()

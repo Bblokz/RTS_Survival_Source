@@ -265,6 +265,12 @@ void UAttachedWeaponAbilityComponent::OnWeaponAdded(const int32 WeaponIndex, UWe
 {
 }
 
+void UAttachedWeaponAbilityComponent::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState,
+                                                                    const float NewRange)
+{
+	UpdateAbilityRangeFromWeapons();
+}
+
 FVector& UAttachedWeaponAbilityComponent::GetFireDirection(const int32 WeaponIndex)
 {
 	return M_TargetDirectionVectorWorldSpace;
@@ -627,7 +633,7 @@ void UAttachedWeaponAbilityComponent::UpdateAbilityRangeFromWeapons()
 		{
 			continue;
 		}
-		MaxRange = FMath::Max(MaxRange, Weapon->GetRange());
+		MaxRange = FMath::Max(MaxRange, Weapon->GetWeaponRangeBehaviourAdjusted());
 	}
 	M_AbilityRange = MaxRange;
 }

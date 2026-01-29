@@ -219,6 +219,7 @@ protected:
 	                     EIdleRotation NewIdleTurretRotationType);
 
 	virtual void OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon) override;
+	virtual void OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange) override;
 
 	// Call this in the PostInit to provide what type of tracking we want and on which weapon index.
 	// The in post init the turret set the owner (on which the ammobar is placed) next to this data

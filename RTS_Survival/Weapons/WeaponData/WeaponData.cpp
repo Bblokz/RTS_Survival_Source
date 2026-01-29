@@ -833,6 +833,11 @@ float UWeaponState::GetRange() const
 	return WeaponData.Range;
 }
 
+float UWeaponState::GetWeaponRangeBehaviourAdjusted() const
+{
+	return WeaponData.Range;
+}
+
 void UWeaponState::ForceInstantReload()
 {
 	OnReloadFinished();
@@ -871,6 +876,7 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 		return;
 	}
 
+	const bool bShouldNotifyRangeChange = not FMath::IsNearlyZero(BehaviourWeaponAttributes.Range);
 	FBehaviourWeaponAttributes& CurrentBehaviourAttributes = WeaponDataToUpgrade->BehaviourAttributes;
 
 	WeaponDataToUpgrade->BaseDamage -= CurrentBehaviourAttributes.Damage;
@@ -917,6 +923,11 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	WeaponDataToUpgrade->Accuracy += CurrentBehaviourAttributes.Accuracy;
 	WeaponDataToUpgrade->MagCapacity += CurrentBehaviourAttributes.MagSize;
 	WeaponDataToUpgrade->BaseCooldown += CurrentBehaviourAttributes.BaseCooldown;
+
+	if (bShouldNotifyRangeChange && WeaponOwner.GetInterface())
+	{
+		WeaponOwner->OnWeaponBehaviourChangesRange(this, GetWeaponRangeBehaviourAdjusted());
+	}
 }
 
 FWeaponData UWeaponState::GetWeaponDataAdjustedForShellType() const
