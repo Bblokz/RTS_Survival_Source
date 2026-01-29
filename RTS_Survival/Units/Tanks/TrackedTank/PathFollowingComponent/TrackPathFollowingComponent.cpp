@@ -338,63 +338,34 @@ bool UTrackPathFollowingComponent::IsReversing()
 }
 
 
-bool UTrackPathFollowingComponent::GetIsValidControlledPawn() const
-{
-	if (IsValid(ControlledPawn))
-	{
-		return true;
-	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		"ControlledPawn",
-		"UTrackPathFollowingComponent::GetIsValidControlledPawn",
-		this
-	);
-
-	return false;
-}
-
-bool UTrackPathFollowingComponent::GetIsValidTrackPhysicsMovement() const
-{
-	if (IsValid(M_TrackPhysicsMovement))
-	{
-		return true;
-	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		"M_TrackPhysicsMovement",
-		"UTrackPathFollowingComponent::GetIsValidTrackPhysicsMovement",
-		this
-	);
-
-	return false;
-}
-
 APawn* UTrackPathFollowingComponent::GetValidControlledPawn()
 {
-	// Use the NavMovementInterface to access the owner
-	if (NavMovementInterface.IsValid())
+	if (not IsValid(ControlledPawn))
 	{
-		// Retrieve the object implementing the interface
-		UObject* OwnerAsObject = NavMovementInterface->GetOwnerAsObject();
-		if (OwnerAsObject)
+		// Use the NavMovementInterface to access the owner
+		if (NavMovementInterface.IsValid())
 		{
-			// Cast the object to a Pawn and return if valid
-			if (APawn* PawnOwner = Cast<APawn>(OwnerAsObject))
+			// Retrieve the object implementing the interface
+			UObject* OwnerAsObject = NavMovementInterface->GetOwnerAsObject();
+			if (OwnerAsObject)
 			{
-				ControlledPawn = PawnOwner;
+				// Cast the object to a Pawn and return if valid
+				if (APawn* PawnOwner = Cast<APawn>(OwnerAsObject))
+				{
+					ControlledPawn = PawnOwner;
+					return PawnOwner;
+				}
 			}
 		}
+
+		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "None";
+		const FString OwnerClass = GetOwner() ? GetOwner()->GetClass()->GetName() : "None";
+		RTSFunctionLibrary::ReportError("The UVehiclePathFollowingComponent is not able to find the controlled pawn!"
+			"\n Component name: " + GetName() + "Owner: " + OwnerName + "Owner Class: " + OwnerClass);
+		return nullptr;
 	}
 
-	if (GetIsValidControlledPawn())
-	{
-		return ControlledPawn;
-	}
-
-	return nullptr;
+	return ControlledPawn;
 }
 
 
@@ -432,7 +403,7 @@ bool UTrackPathFollowingComponent::IsStuck(const float DeltaTime)
 			}
 		}
 
-		if (not bHasMoved)
+		if (!bHasMoved)
 		{
 			// Vehicle hasn't moved significantly over the sampled locations
 			bIsStuck = true;
@@ -509,7 +480,7 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 	RemoveInvalidOverlaps(M_IdleAlliedBlockingActors);
 
 	const bool bHasIdleBlockers = (M_IdleAlliedBlockingActors.Num() > 0);
-	const bool bCanWait = bHasIdleBlockers && GetIsValidControlledPawn();
+	const bool bCanWait = bHasIdleBlockers && IsValid(ControlledPawn);
 
 	UpdateEngineBlockDetectionForIdleBlockerWait(bCanWait);
 
@@ -535,13 +506,13 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 {
 	// .65 ms for 100 vehicles.
 	// TRACE_CPUPROFILER_EVENT_SCOPE(Tracks_UpdateDriving);
-	if (not GetIsValidTrackPhysicsMovement())
+	if (!M_TrackPhysicsMovement)
 	{
 		return;
 	}
 	VehicleCurrentDestination = Destination;
 
-	if (not bImplementsInterface || not GetIsValidControlledPawn())
+	if (not bImplementsInterface || not IsValid(ControlledPawn))
 	{
 		// Make sure we never "stick" in suppressed mode if something becomes invalid.
 		UpdateEngineBlockDetectionForIdleBlockerWait(false);
@@ -661,7 +632,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 
 	if constexpr (DeveloperSettings::Debugging::GRTSNavAgents_Compile_DebugSymbols)
 	{
-		const bool bShouldDebugNavAgents = bDebug && GetIsValidControlledPawn();
+		const bool bShouldDebugNavAgents = bDebug && ControlledPawn != nullptr;
 		if (bShouldDebugNavAgents)
 		{
 			// flush all debug messages
@@ -790,7 +761,7 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 	UVehiclePathFollowingComponent::FollowPathSegment(DeltaTime);
 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_FollowSegment);
 
-	if (not GetIsValidControlledPawn())
+	if (not IsValid(ControlledPawn))
 	{
 		return;
 	}
@@ -1006,7 +977,7 @@ void UTrackPathFollowingComponent::OnPathFinished(const FPathFollowingResult& Re
 	SetEngineBlockDetectionSuppressed(false);
 	// // When the path ends, set all the steering and throttle to nothing, and apply the brakes
 	// UpdateVehicle(0.f, 0.f, 1.f, 0, 0);
-	if (GetIsValidControlledPawn())
+	if (IsValid(ControlledPawn))
 	{
 		IVehicleAIInterface* VehicleAI = Cast<IVehicleAIInterface>(ControlledPawn);
 		if (VehicleAI)
@@ -1039,7 +1010,7 @@ void UTrackPathFollowingComponent::Initialize()
 
 	bImplementsInterface = DoesControlledPawnImplementInterface();
 
-	if (not bImplementsInterface)
+	if (!bImplementsInterface)
 	{
 		RTSFunctionLibrary::PrintString("Interface is not implemented on your vehicle, AI will not work!");
 	}
@@ -1204,14 +1175,14 @@ FVector UTrackPathFollowingComponent::GetUnstuckLocation(const FVector& MoveFocu
 	}
 
 	// Perform visibility trace on the first preferred side
-	if (not VisibilityTrace(AgentLocation, FirstCheckLocation))
+	if (!VisibilityTrace(AgentLocation, FirstCheckLocation))
 	{
 		DrawDebugSphere(GetWorld(), FirstCheckLocation, 50.f, 12, FColor::Purple, false, 1.f);
 		return FirstCheckLocation;
 	}
 
 	// If first trace fails, perform visibility trace on the opposite side
-	if (not VisibilityTrace(AgentLocation, SecondCheckLocation))
+	if (!VisibilityTrace(AgentLocation, SecondCheckLocation))
 	{
 		DrawDebugSphere(GetWorld(), SecondCheckLocation, 50.f, 12, FColor::Purple, false, 1.f);
 		return SecondCheckLocation;
@@ -1321,8 +1292,11 @@ float UTrackPathFollowingComponent::TrackGetSlowdownSpeed(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Tracjs_GetSlowDownSpeed);
 
-	if (not GetIsValidTrackPhysicsMovement())
+	if (!IsValid(M_TrackPhysicsMovement))
 	{
+		RTSFunctionLibrary::ReportError("No TrackPhysics movement component"
+			"\n On component:" + GetName()
+			+ "\n ");
 		return DesiredSpeed;
 	}
 	const float Alpha = FMath::GetMappedRangeValueClamped(FVector2D(SlowdownDistance, 0.f), FVector2D(0.f, 1.f),

@@ -676,8 +676,6 @@ private:
 		const float TargetAngle,
 		const float TargetDistance,
 		const bool bIsReversing);
-	bool GetIsValidControlledPawn() const;
-	bool GetIsValidTrackPhysicsMovement() const;
 
 	// The physics calculation component that moves the owning pawn by applying velocity.
 	UPROPERTY()
