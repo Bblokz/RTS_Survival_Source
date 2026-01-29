@@ -210,6 +210,24 @@ TArray<UWeaponState*> ABuildingExpansion::GetAllWeapons() const
 	return ValidWeapons;
 }
 
+TArray<ACPPTurretsMaster*> ABuildingExpansion::GetTurrets() const
+{
+	TArray<ACPPTurretsMaster*> Turrets;
+	Turrets.Reserve(M_TTurrets.Num());
+
+	for (const TWeakObjectPtr<ACPPTurretsMaster>& EachTurret : M_TTurrets)
+	{
+		if (not EachTurret.IsValid())
+		{
+			continue;
+		}
+
+		Turrets.Add(EachTurret.Get());
+	}
+
+	return Turrets;
+}
+
 bool ABuildingExpansion::GetIsValidBehaviourComponent() const
 {
 	if (not IsValid(BehaviourComponent))

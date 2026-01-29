@@ -9,6 +9,7 @@
 #include "RTS_Survival/Game/GameState/BxpDataHelpers/BxpConstructionRulesHelpers.h"
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
 #include "RTS_Survival/Player/PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
@@ -19,6 +20,11 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
+namespace PlayerResourceEnergyConstants
+{
+	constexpr float MinEnergyStateChangeIntervalSeconds = 2.0f;
+	constexpr float EnergyStateChangeCoalesceSeconds = 5.0f;
+}
 
 // Sets default values for this component's properties
 UPlayerResourceManager::UPlayerResourceManager()
@@ -601,41 +607,45 @@ void UPlayerResourceManager::InitializeResourcesSettings(URTSGameSettingsHandler
 
 void UPlayerResourceManager::RegisterEnergyComponent(UEnergyComp* EnergyComponent)
 {
-	if (IsValid(EnergyComponent))
+	if (not IsValid(EnergyComponent))
 	{
-		if (not M_EnergyComponents.Contains(EnergyComponent))
-		{
-			// Adjusts the supply and adds the component to the list.
-			UpdateEnergySupplyWithComponent(EnergyComponent, true);
-			return;
-		}
-		FString EnergyCompName = EnergyComponent->GetName();
-		RTSFunctionLibrary::ReportError(
-			"Attempted to add energy component: " + EnergyCompName +
-			" to player resource manager, but it is already registered.");
+		RTSFunctionLibrary::ReportError("UPlayer Resource Manager was supplied with an invalid energy component"
+			"\n see function RegisterEnergyComponent in PlayerResourceManager.cpp.");
 		return;
 	}
-	RTSFunctionLibrary::ReportError("UPlayer Resource Manager was supplied with an invalid energy component"
-		"\n see function RegisterEnergyComponent in PlayerResourceManager.cpp.");
+
+	if (not M_EnergyComponents.Contains(EnergyComponent))
+	{
+		// Adjusts the supply and adds the component to the list.
+		UpdateEnergySupplyWithComponent(EnergyComponent, true);
+		return;
+	}
+
+	FString EnergyCompName = EnergyComponent->GetName();
+	RTSFunctionLibrary::ReportError(
+		"Attempted to add energy component: " + EnergyCompName +
+		" to player resource manager, but it is already registered.");
 }
 
 void UPlayerResourceManager::DeregisterEnergyComponent(UEnergyComp* EnergyComponent)
 {
-	if (IsValid(EnergyComponent))
+	if (not IsValid(EnergyComponent))
 	{
-		if (M_EnergyComponents.Contains(EnergyComponent))
-		{
-			// Adjusts the supply and removes the component from the list.
-			UpdateEnergySupplyWithComponent(EnergyComponent, false);
-			return;
-		}
-		const FString EnergyCompName = EnergyComponent->GetName();
-		RTSFunctionLibrary::ReportError("Attempted to remove energy component: " + EnergyCompName +
-			" from player resource manager, but it is not registered.");
+		RTSFunctionLibrary::ReportError("UPlayer Resource Manager was supplied with an invalid energy component"
+			"\n see function DeregisterEnergyComponent in PlayerResourceManager.cpp.");
 		return;
 	}
-	RTSFunctionLibrary::ReportError("UPlayer Resource Manager was supplied with an invalid energy component"
-		"\n see function DeregisterEnergyComponent in PlayerResourceManager.cpp.");
+
+	if (M_EnergyComponents.Contains(EnergyComponent))
+	{
+		// Adjusts the supply and removes the component from the list.
+		UpdateEnergySupplyWithComponent(EnergyComponent, false);
+		return;
+	}
+
+	const FString EnergyCompName = EnergyComponent->GetName();
+	RTSFunctionLibrary::ReportError("Attempted to remove energy component: " + EnergyCompName +
+		" from player resource manager, but it is not registered.");
 }
 
 void UPlayerResourceManager::RegisterDropOff(const TWeakObjectPtr<UResourceDropOff> DropOff, const bool bRegister)
@@ -672,18 +682,22 @@ void UPlayerResourceManager::RegisterDropOff(const TWeakObjectPtr<UResourceDropO
 void UPlayerResourceManager::UpdateEnergySupplyForUpgradedComponent(UEnergyComp* EnergyCompUpgraded,
                                                                     const int32 OldEnergyAmount)
 {
-	if (IsValid(EnergyCompUpgraded))
+	if (not IsValid(EnergyCompUpgraded))
 	{
-		if (M_EnergyComponents.Contains(EnergyCompUpgraded))
-		{
-			M_EnergySupply -= OldEnergyAmount;
-			M_EnergySupply += EnergyCompUpgraded->GetEnergySupplied();
-			return;
-		}
-		RTSFunctionLibrary::ReportError(
-			"Attempted to update energy supply for upgraded component: " + EnergyCompUpgraded->GetName() +
-			" in player resource manager, but it is not registered.");
+		return;
 	}
+
+	if (M_EnergyComponents.Contains(EnergyCompUpgraded))
+	{
+		M_EnergySupply -= OldEnergyAmount;
+		M_EnergySupply += EnergyCompUpgraded->GetEnergySupplied();
+		HandleEnergySupplyChanged();
+		return;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"Attempted to update energy supply for upgraded component: " + EnergyCompUpgraded->GetName() +
+		" in player resource manager, but it is not registered.");
 }
 
 
@@ -698,7 +712,7 @@ void UPlayerResourceManager::BeginPlay()
 
 void UPlayerResourceManager::UpdateEnergySupplyWithComponent(UEnergyComp* EnergyComponent, const bool bRegister)
 {
-	if (!IsValid(EnergyComponent))
+	if (not IsValid(EnergyComponent))
 	{
 		return;
 	}
@@ -727,6 +741,115 @@ void UPlayerResourceManager::UpdateEnergySupplyWithComponent(UEnergyComp* Energy
 		}
 		M_EnergyComponents.Remove(EnergyComponent);
 	}
+	HandleEnergySupplyChanged();
+}
+
+void UPlayerResourceManager::HandleEnergySupplyChanged()
+{
+	const bool bIsLowPower = M_EnergySupply < M_EnergyDemand;
+	if (bIsLowPower == M_EnergyStateChangeTracker.bIsBaseLowEnergy
+		&& not M_EnergyStateChangeTracker.bHasPendingEnergyState)
+	{
+		return;
+	}
+
+	QueueBaseEnergyStateChange(bIsLowPower);
+}
+
+void UPlayerResourceManager::QueueBaseEnergyStateChange(const bool bIsLowPower)
+{
+	UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return;
+	}
+
+	M_EnergyStateChangeTracker.bPendingLowEnergyState = bIsLowPower;
+	M_EnergyStateChangeTracker.bHasPendingEnergyState = true;
+	M_EnergyStateChangeTracker.M_LastEnergyStateChangeSeconds = World->GetTimeSeconds();
+
+	if (World->GetTimerManager().IsTimerActive(M_EnergyStateChangeTracker.EnergyStateChangeTimer))
+	{
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		M_EnergyStateChangeTracker.EnergyStateChangeTimer,
+		this,
+		&UPlayerResourceManager::ProcessPendingBaseEnergyStateChange,
+		PlayerResourceEnergyConstants::MinEnergyStateChangeIntervalSeconds,
+		false);
+}
+
+void UPlayerResourceManager::ProcessPendingBaseEnergyStateChange()
+{
+	if (not M_EnergyStateChangeTracker.bHasPendingEnergyState)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return;
+	}
+
+	const float Now = World->GetTimeSeconds();
+	const float TimeSinceLastChange = Now - M_EnergyStateChangeTracker.M_LastEnergyStateChangeSeconds;
+
+	if (TimeSinceLastChange < PlayerResourceEnergyConstants::EnergyStateChangeCoalesceSeconds)
+	{
+		const float DelaySeconds = PlayerResourceEnergyConstants::EnergyStateChangeCoalesceSeconds - TimeSinceLastChange;
+		World->GetTimerManager().SetTimer(
+			M_EnergyStateChangeTracker.EnergyStateChangeTimer,
+			this,
+			&UPlayerResourceManager::ProcessPendingBaseEnergyStateChange,
+			DelaySeconds,
+			false);
+		return;
+	}
+
+	ApplyBaseEnergyStateChange(M_EnergyStateChangeTracker.bPendingLowEnergyState);
+	M_EnergyStateChangeTracker.bHasPendingEnergyState = false;
+}
+
+void UPlayerResourceManager::ApplyBaseEnergyStateChange(const bool bIsLowPower)
+{
+	if (bIsLowPower == M_EnergyStateChangeTracker.bIsBaseLowEnergy)
+	{
+		return;
+	}
+
+	M_EnergyStateChangeTracker.bIsBaseLowEnergy = bIsLowPower;
+	NotifyEnergyComponentsBaseEnergyChange(bIsLowPower);
+	PlayBaseEnergyAnnouncerVoiceLine(bIsLowPower);
+}
+
+void UPlayerResourceManager::NotifyEnergyComponentsBaseEnergyChange(const bool bIsLowPower)
+{
+	for (UEnergyComp* EnergyComponent : M_EnergyComponents)
+	{
+		if (not IsValid(EnergyComponent))
+		{
+			continue;
+		}
+
+		EnergyComponent->OnBaseEnergyChange(bIsLowPower);
+	}
+}
+
+void UPlayerResourceManager::PlayBaseEnergyAnnouncerVoiceLine(const bool bIsLowPower)
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	const EAnnouncerVoiceLineType VoiceLineType = bIsLowPower
+		? EAnnouncerVoiceLineType::LowBaseEnergy
+		: EAnnouncerVoiceLineType::BaseEnergyRestored;
+
+	M_PlayerController->PlayAnnouncerVoiceLine(VoiceLineType, true, true);
 }
 
 bool UPlayerResourceManager::GetIsValidPlayerController()
@@ -741,12 +864,13 @@ bool UPlayerResourceManager::GetIsValidPlayerController()
 
 bool UPlayerResourceManager::GetIsValidHQDropOff() const
 {
-	if (M_HQDropOff.IsValid())
+	if (not M_HQDropOff.IsValid())
 	{
-		return true;
+		RTSFunctionLibrary::ReportError("Player HQ DropOff reference is not valid for UPlayerResourceManager!");
+		return false;
 	}
-	RTSFunctionLibrary::ReportError("Player HQ DropOff reference is not valid for UPlayerResourceManager!");
-	return false;
+
+	return true;
 }
 
 void UPlayerResourceManager::AddDropOffToPlayerResources(const TWeakObjectPtr<UResourceDropOff> DropOff)
@@ -909,15 +1033,16 @@ void UPlayerResourceManager::ReportInvalidDataError(const FTrainingOption& Train
 
 bool UPlayerResourceManager::GetIsValidPlayerAudioController() const
 {
-	if (M_PlayerAudioController.IsValid())
+	if (not M_PlayerAudioController.IsValid())
 	{
-		return true;
+		const FString Name = GetName();
+		const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "NullPtr";
+		RTSFunctionLibrary::ReportError("Invalid M_PlayerAudioController "
+			"\n For PlayerResourceManager: " + Name + "Of Owner: " + OwnerName);
+		return false;
 	}
-	const FString Name = GetName();
-	const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "NullPtr";
-	RTSFunctionLibrary::ReportError("Invalid M_PlayerAudioController "
-		"\n For PlayerResourceManager: " + Name + "Of Owner: " + OwnerName);
-	return false;
+
+	return true;
 }
 
 void UPlayerResourceManager::BeginPlay_InitPlayerAudioController()
