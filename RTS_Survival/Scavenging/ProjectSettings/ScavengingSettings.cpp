@@ -6,6 +6,6 @@
 
 UScavengingSettings::UScavengingSettings()
 {
-	CategoryName =  TEXT("GamePlay");
+	CategoryName = TEXT("Game");
 	SectionName = TEXT("Scavenging");
 }

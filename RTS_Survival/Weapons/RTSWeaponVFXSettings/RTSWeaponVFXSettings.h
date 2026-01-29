@@ -17,6 +17,8 @@ class RTS_SURVIVAL_API URTSWeaponVFXSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	URTSWeaponVFXSettings();
+
 	/** Per-shell VFX color for UI/FX usage. */
 	UPROPERTY(EditAnywhere, Config, Category="Shell VFX")
 	TMap<EWeaponShellType, FLinearColor> ShellTypeColors;

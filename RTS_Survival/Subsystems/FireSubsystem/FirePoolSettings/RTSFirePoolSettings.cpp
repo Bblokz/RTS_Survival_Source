@@ -2,5 +2,6 @@
 
 URTSFirePoolSettings::URTSFirePoolSettings()
 {
-	CategoryName = TEXT("RTS");
+	CategoryName = TEXT("Game");
+	SectionName = TEXT("RTS Fire Pool");
 }

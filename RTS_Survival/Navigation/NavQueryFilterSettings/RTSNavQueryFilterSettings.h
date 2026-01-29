@@ -15,6 +15,8 @@ class RTS_SURVIVAL_API URTSNavQueryFilterSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	URTSNavQueryFilterSettings();
+
 	// If an agent has no explicit entry, this filter is used (may be null = use NavData/AIController defaults).
 	UPROPERTY(EditAnywhere, Config, Category="Filters")
 	TSoftClassPtr<UNavigationQueryFilter> DefaultFilterClass;

@@ -3,6 +3,12 @@
 
 #include "RTSWeaponVFXSettings.h"
 
+URTSWeaponVFXSettings::URTSWeaponVFXSettings()
+{
+	CategoryName = TEXT("Game");
+	SectionName = TEXT("RTS Weapon VFX");
+}
+
 const URTSWeaponVFXSettings* URTSWeaponVFXSettings::Get()
 {
 	return GetDefault<URTSWeaponVFXSettings>();
