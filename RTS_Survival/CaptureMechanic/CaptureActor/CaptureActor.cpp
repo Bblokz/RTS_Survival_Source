@@ -51,7 +51,7 @@ void ACaptureActor::SetupCaptureLocations(UMeshComponent* MeshComp, const FName 
 		if (bHasFilter)
 		{
 			const FString SocketString = SocketName.ToString();
-			if (!SocketString.Contains(FilterString))
+			if (not SocketString.Contains(FilterString))
 			{
 				continue;
 			}
@@ -174,7 +174,7 @@ void ACaptureActor::StartCaptureProgressBarForCaptureActor(ACaptureActor& Captur
 	}
 
 	USceneComponent* AnchorComponent = CaptureActor.GetRootComponent();
-	if (!IsValid(AnchorComponent))
+	if (not IsValid(AnchorComponent))
 	{
 		return;
 	}
@@ -184,7 +184,7 @@ void ACaptureActor::StartCaptureProgressBarForCaptureActor(ACaptureActor& Captur
 	constexpr float RatioStart = 0.f;
 	constexpr bool bUsePercentageText = true;
 	constexpr bool bUseDescriptionText = true;
-	constexpr float ScaleMlt = 1.f;
+	const float ProgressBarScale = CaptureActor.CaptureSettings.CaptureProgressBarScale;
 	const ERTSProgressBarType BarType = ERTSProgressBarType{};
 
 	ProgressSubsystem->ActivateTimedProgressBarAnchored(
@@ -196,5 +196,5 @@ void ACaptureActor::StartCaptureProgressBarForCaptureActor(ACaptureActor& Captur
 		BarType,
 		bUseDescriptionText,
 		DescriptionText,
-		ScaleMlt);
+		ProgressBarScale);
 }
