@@ -29,6 +29,21 @@ struct FRTSResourceStorage
 	int32 Storage = 0;
 };
 
+USTRUCT()
+struct FEnergyStateChangeTracker
+{
+	GENERATED_BODY()
+
+	bool bIsBaseLowEnergy = false;
+	bool bHasPendingEnergyState = false;
+	bool bPendingLowEnergyState = false;
+	float M_LastEnergyStateChangeSeconds = 0.0f;
+
+	UPROPERTY()
+	FTimerHandle EnergyStateChangeTimer;
+};
+
+
 /**
  * This class is responsible for storing and updating the player resources.
  * The MainGameUI uses this to fill out the resource display.
@@ -172,19 +187,6 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UEnergyComp>> M_EnergyComponents;
 
-	USTRUCT()
-	struct FEnergyStateChangeTracker
-	{
-		GENERATED_BODY()
-
-		bool bIsBaseLowEnergy = false;
-		bool bHasPendingEnergyState = false;
-		bool bPendingLowEnergyState = false;
-		float M_LastEnergyStateChangeSeconds = 0.0f;
-
-		UPROPERTY()
-		FTimerHandle EnergyStateChangeTimer;
-	};
 
 	UPROPERTY()
 	FEnergyStateChangeTracker M_EnergyStateChangeTracker;
@@ -215,6 +217,9 @@ private:
 	void UpdateDropOffsWithAddedResource(const ERTSResourceType Resource, const int32 Amount);
 
 	void UpdateDropOffsWithSubtractedResource(const ERTSResourceType Resource, const int32 Amount);
+	void NotifyEnergyComponentOfCurrentBaseEnergyState(UEnergyComp* EnergyComponent) const;
+
+	
 
 	UPROPERTY()
 	ACPPController* M_PlayerController;

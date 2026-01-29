@@ -1,0 +1,28 @@
+﻿In this game project: UW_EscapeMenuSettings manages the user settings.
+and saves them with the help of: class RTS_SURVIVAL_API URTSGameUserSettings : public UGameUserSettings
+i want you to implement a new helper name space with functions for the health bar to adjust the
+
+under game user settings dir define a new dir called GameplaySettings and in there define a new dir called
+HealthbarVisibilityStrategy and in there define HealthBarVisibilityStrategy.h
+where the new bp friendly enum classes will be defined:
+ERTSPlayerHealthBarVisibilityStrategy
+UnitDefaults,
+AwaysVisible,
+VisibleWhenDamagedOnly,
+VisibleOnSelectionAndDamaged,
+VisibleOnSelectionOnly
+// The only one that will also adjust bDisplayOnHover in FHealthBarVisibilitySettings.
+NeverVisible
+
+Also define
+ERTSEnemyHealthBarVisibilityStrategy
+UnitDefaults,
+AwaysVisible,
+VisibleWhenDamagedOnly
+
+also define in there an FText global_GetEnemyVisibilityStrategyText(ERTSEnemyHealthBarVisibilityStrategy Strategy)
+and FText global_GetPlayerVisibilityStrategyText(ERTSPlayerHealthBarVisibilityStrategy Strategy)
+and return for each value the space separated text version of the enum value.
+
+
+
