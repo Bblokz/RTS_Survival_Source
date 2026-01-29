@@ -1291,7 +1291,7 @@ namespace DeveloperSettings
 		inline constexpr float MinZoomLimit = 300.f;
 		// corresponds with 8500 range in the game (weapon on left side engaging weapon just visible on right side)
 		// inline constexpr float MaxZoomLimit = 4200.f;
-		inline constexpr float MaxZoomLimit = 5000.f;
+		inline constexpr float MaxZoomLimit = 4900.f;
 		inline constexpr float ZoomForPlayerStartOverview = 10000.f;
 		inline constexpr float DefaultTerrainHeight = 110.f;
 		inline constexpr float ZoomSpeed = 150.f;
