@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameUnitAddRemoveDelegates/FGameUnitAddRemoveDelegates.h"
+#include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "UObject/Object.h"
@@ -15,6 +16,7 @@ enum class ENomadicSubtype : uint8;
 enum class ETankSubtype : uint8;
 struct FTrainingOption;
 class AHpPawnMaster;
+class UHealthComponent;
 enum class ETargetPreference : uint8;
 class FGetAsyncTarget;
 class ASquadUnit;
@@ -39,6 +41,24 @@ public:
 	/** @brief External entry point to subscribe to unit add/remove events per player and unit type. */
 	UPROPERTY()
 	FGameUnitAddRemoveDelegates GameUnitDelegates;
+
+	/**
+	 * @brief Applies cached user healthbar visibility settings for the provided component.
+	 * @param HealthComponent Component to update based on saved user settings.
+	 * @return True if a visibility override was applied, otherwise false.
+	 */
+	bool TryApplyHealthBarVisibilityFromUserSettings(UHealthComponent* HealthComponent);
+
+	void ApplyPlayerTankHealthBarVisibilityStrategy(ERTSPlayerHealthBarVisibilityStrategy Strategy);
+	void ApplyPlayerSquadHealthBarVisibilityStrategy(ERTSPlayerHealthBarVisibilityStrategy Strategy);
+	void ApplyPlayerNomadicHealthBarVisibilityStrategy(ERTSPlayerHealthBarVisibilityStrategy Strategy);
+	void ApplyPlayerBxpHealthBarVisibilityStrategy(ERTSPlayerHealthBarVisibilityStrategy Strategy);
+	void ApplyPlayerAircraftHealthBarVisibilityStrategy(ERTSPlayerHealthBarVisibilityStrategy Strategy);
+	void ApplyEnemyTankHealthBarVisibilityStrategy(ERTSEnemyHealthBarVisibilityStrategy Strategy);
+	void ApplyEnemySquadHealthBarVisibilityStrategy(ERTSEnemyHealthBarVisibilityStrategy Strategy);
+	void ApplyEnemyNomadicHealthBarVisibilityStrategy(ERTSEnemyHealthBarVisibilityStrategy Strategy);
+	void ApplyEnemyBxpHealthBarVisibilityStrategy(ERTSEnemyHealthBarVisibilityStrategy Strategy);
+	void ApplyEnemyAircraftHealthBarVisibilityStrategy(ERTSEnemyHealthBarVisibilityStrategy Strategy);
 
 
 	/**

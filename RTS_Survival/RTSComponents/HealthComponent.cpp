@@ -6,6 +6,7 @@
 #include "HealthInterface/HealthBarOwner.h"
 #include "HealthInterface/HealthLevels/HealthLevels.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
@@ -236,12 +237,92 @@ void UHealthComponent::InitHealthAndResistance(const FResistanceAndDamageReducti
 void UHealthComponent::ChangeVisibilitySettings(const FHealthBarVisibilitySettings& NewSettings)
 {
 	VisibilitySettings = NewSettings;
+	UpdateSelectionComponentBindings();
+	UpdateVisibilityAfterSettingsChange();
 	UpdateHealthBar();
 }
 
 FHealthBarVisibilitySettings UHealthComponent::GetVisibilitySettings() const
 {
 	return VisibilitySettings;
+}
+
+void UHealthComponent::OnOverwiteHealthbarVisiblityPlayer(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	if (Strategy == ERTSPlayerHealthBarVisibilityStrategy::NotInitialized ||
+		Strategy == ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults)
+	{
+		RestoreUnitDefaultHealthBarVisibilitySettings();
+		return;
+	}
+
+	FHealthBarVisibilitySettings NewSettings = VisibilitySettings;
+	switch (Strategy)
+	{
+	case ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible:
+		NewSettings.bAlwaysDisplay = true;
+		NewSettings.bDisplayOnSelected = false;
+		NewSettings.bDisplayOnDamaged = false;
+		break;
+	case ERTSPlayerHealthBarVisibilityStrategy::VisibleWhenDamagedOnly:
+		NewSettings.bAlwaysDisplay = false;
+		NewSettings.bDisplayOnSelected = false;
+		NewSettings.bDisplayOnDamaged = true;
+		break;
+	case ERTSPlayerHealthBarVisibilityStrategy::VisibleOnSelectionAndDamaged:
+		NewSettings.bAlwaysDisplay = false;
+		NewSettings.bDisplayOnSelected = true;
+		NewSettings.bDisplayOnDamaged = true;
+		break;
+	case ERTSPlayerHealthBarVisibilityStrategy::VisibleOnSelectionOnly:
+		NewSettings.bAlwaysDisplay = false;
+		NewSettings.bDisplayOnSelected = true;
+		NewSettings.bDisplayOnDamaged = false;
+		break;
+	case ERTSPlayerHealthBarVisibilityStrategy::NeverVisible:
+		NewSettings.bAlwaysDisplay = false;
+		NewSettings.bDisplayOnSelected = false;
+		NewSettings.bDisplayOnDamaged = false;
+		NewSettings.bDisplayOnHover = false;
+		break;
+	default:
+		return;
+	}
+
+	VisibilitySettings = NewSettings;
+	UpdateSelectionComponentBindings();
+	UpdateVisibilityAfterSettingsChange();
+}
+
+void UHealthComponent::OnOverwiteHealthbarVisiblityEnemy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	if (Strategy == ERTSEnemyHealthBarVisibilityStrategy::NotInitialized ||
+		Strategy == ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults)
+	{
+		RestoreUnitDefaultHealthBarVisibilitySettings();
+		return;
+	}
+
+	FHealthBarVisibilitySettings NewSettings = VisibilitySettings;
+	switch (Strategy)
+	{
+	case ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible:
+		NewSettings.bAlwaysDisplay = true;
+		NewSettings.bDisplayOnSelected = false;
+		NewSettings.bDisplayOnDamaged = false;
+		break;
+	case ERTSEnemyHealthBarVisibilityStrategy::VisibleWhenDamagedOnly:
+		NewSettings.bAlwaysDisplay = false;
+		NewSettings.bDisplayOnSelected = false;
+		NewSettings.bDisplayOnDamaged = true;
+		break;
+	default:
+		return;
+	}
+
+	VisibilitySettings = NewSettings;
+	UpdateSelectionComponentBindings();
+	UpdateVisibilityAfterSettingsChange();
 }
 
 UW_HealthBar* UHealthComponent::GetHealthBarWidget() const
@@ -302,10 +383,12 @@ void UHealthComponent::BeginPlay()
 
 	BeginPlay_CheckDamageReductionSettings();
 	BeginPlay_SetupAssociatedRTSComponent();
+	M_UnitDefaultHealthBarVisibilitySettings = VisibilitySettings;
+	BeginPlay_ApplyUserSettingsHealthBarVisibility();
 	BeginPlay_BindHoverToSelectionComponent();
 
 	M_OwnerActor = GetOwner();
-	if (!IsValid(M_OwnerActor))
+	if (not IsValid(M_OwnerActor))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(
 			this,
@@ -321,6 +404,21 @@ void UHealthComponent::BeginPlay()
 	{
 		Widget_CreateHealthBar();
 		OnWidgetInitialized();
+	}
+}
+
+void UHealthComponent::BeginPlay_ApplyUserSettingsHealthBarVisibility()
+{
+	UGameUnitManager* const GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RestoreUnitDefaultHealthBarVisibilitySettings();
+		return;
+	}
+
+	if (not GameUnitManager->TryApplyHealthBarVisibilityFromUserSettings(this))
+	{
+		RestoreUnitDefaultHealthBarVisibilitySettings();
 	}
 }
 
@@ -711,12 +809,39 @@ void UHealthComponent::BeginPlay_BindHoverToSelectionComponent()
 		USelectionComponent>(GetOwner()->GetComponentByClass(USelectionComponent::StaticClass())))
 	{
 		M_SelectionComponent = SelectionComponent;
-		if (not VisibilitySettings.bDisplayOnHover)
+		UpdateSelectionComponentBindings();
+	}
+}
+
+void UHealthComponent::UpdateSelectionComponentBindings()
+{
+	AActor* const Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return;
+	}
+
+	if (not HealthBarWidgetClass)
+	{
+		return;
+	}
+
+	USelectionComponent* SelectionComponent = M_SelectionComponent.Get();
+	if (not IsValid(SelectionComponent))
+	{
+		SelectionComponent = Cast<USelectionComponent>(Owner->GetComponentByClass(USelectionComponent::StaticClass()));
+		if (not IsValid(SelectionComponent))
 		{
-			// No binding to be done.
 			return;
 		}
-		TWeakObjectPtr<UHealthComponent> WeakThis(this);
+		M_SelectionComponent = SelectionComponent;
+	}
+
+	ClearSelectionComponentBindings();
+
+	TWeakObjectPtr<UHealthComponent> WeakThis(this);
+	if (VisibilitySettings.bDisplayOnHover)
+	{
 		auto HoverLambda = [WeakThis]()-> void
 		{
 			if (WeakThis.IsValid())
@@ -731,9 +856,100 @@ void UHealthComponent::BeginPlay_BindHoverToSelectionComponent()
 				WeakThis->OnUnitUnhovered();
 			}
 		};
-		M_SelectionComponent->OnUnitHovered.AddLambda(HoverLambda);
-		M_SelectionComponent->OnUnitUnHovered.AddLambda(UnHoverLambda);
+		M_SelectionDelegateHandles.M_OnUnitHoveredHandle = SelectionComponent->OnUnitHovered.AddLambda(HoverLambda);
+		M_SelectionDelegateHandles.M_OnUnitUnhoveredHandle = SelectionComponent->OnUnitUnHovered.AddLambda(UnHoverLambda);
 	}
+
+	if (VisibilitySettings.bDisplayOnSelected)
+	{
+		auto SelectedLambda = [WeakThis]()-> void
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->OnUnitSelected();
+			}
+		};
+		auto DeselectedLambda = [WeakThis]()-> void
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->OnUnitDeselected();
+			}
+		};
+		M_SelectionDelegateHandles.M_OnUnitSelectedHandle = SelectionComponent->OnUnitSelected.AddLambda(SelectedLambda);
+		M_SelectionDelegateHandles.M_OnUnitDeselectedHandle = SelectionComponent->OnUnitDeselected.AddLambda(DeselectedLambda);
+	}
+}
+
+void UHealthComponent::ClearSelectionComponentBindings()
+{
+	USelectionComponent* const SelectionComponent = M_SelectionComponent.Get();
+	if (not IsValid(SelectionComponent))
+	{
+		return;
+	}
+
+	if (M_SelectionDelegateHandles.M_OnUnitHoveredHandle.IsValid())
+	{
+		SelectionComponent->OnUnitHovered.Remove(M_SelectionDelegateHandles.M_OnUnitHoveredHandle);
+		M_SelectionDelegateHandles.M_OnUnitHoveredHandle.Reset();
+	}
+
+	if (M_SelectionDelegateHandles.M_OnUnitUnhoveredHandle.IsValid())
+	{
+		SelectionComponent->OnUnitUnHovered.Remove(M_SelectionDelegateHandles.M_OnUnitUnhoveredHandle);
+		M_SelectionDelegateHandles.M_OnUnitUnhoveredHandle.Reset();
+	}
+
+	if (M_SelectionDelegateHandles.M_OnUnitSelectedHandle.IsValid())
+	{
+		SelectionComponent->OnUnitSelected.Remove(M_SelectionDelegateHandles.M_OnUnitSelectedHandle);
+		M_SelectionDelegateHandles.M_OnUnitSelectedHandle.Reset();
+	}
+
+	if (M_SelectionDelegateHandles.M_OnUnitDeselectedHandle.IsValid())
+	{
+		SelectionComponent->OnUnitDeselected.Remove(M_SelectionDelegateHandles.M_OnUnitDeselectedHandle);
+		M_SelectionDelegateHandles.M_OnUnitDeselectedHandle.Reset();
+	}
+}
+
+void UHealthComponent::UpdateVisibilityAfterSettingsChange() const
+{
+	if (not HealthBarWidgetClass)
+	{
+		return;
+	}
+
+	if (not Widget_GetIsValidHealthBarWidget())
+	{
+		return;
+	}
+
+	if (bWasHiddenByAllGameUI)
+	{
+		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
+
+	if (VisibilitySettings.bDisplayOnSelected)
+	{
+		const USelectionComponent* const SelectionComponent = M_SelectionComponent.Get();
+		if (IsValid(SelectionComponent) && SelectionComponent->GetIsSelected())
+		{
+			M_HealthBarWidget->SetVisibility(ESlateVisibility::Visible);
+			return;
+		}
+	}
+
+	ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
+}
+
+void UHealthComponent::RestoreUnitDefaultHealthBarVisibilitySettings()
+{
+	VisibilitySettings = M_UnitDefaultHealthBarVisibilitySettings;
+	UpdateSelectionComponentBindings();
+	UpdateVisibilityAfterSettingsChange();
 }
 
 void UHealthComponent::RegisterCallBackForUnitName(URTSComponent* RTSComponent)
@@ -757,11 +973,11 @@ void UHealthComponent::RegisterCallBackForUnitName(URTSComponent* RTSComponent)
 
 void UHealthComponent::OnUnitHovered() const
 {
-	if (!VisibilitySettings.bDisplayOnHover)
+	if (not VisibilitySettings.bDisplayOnHover)
 	{
 		return;
 	}
-	if (!M_HealthBarWidget.IsValid() || bWasHiddenByAllGameUI)
+	if (not Widget_GetIsValidHealthBarWidget() || bWasHiddenByAllGameUI)
 	{
 		return;
 	}
@@ -770,14 +986,44 @@ void UHealthComponent::OnUnitHovered() const
 
 void UHealthComponent::OnUnitUnhovered() const
 {
-	if (!VisibilitySettings.bDisplayOnHover)
+	if (not VisibilitySettings.bDisplayOnHover)
 	{
 		return;
 	}
-	if (!M_HealthBarWidget.IsValid())
+	if (not Widget_GetIsValidHealthBarWidget())
 	{
 		return;
 	}
+	ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
+}
+
+void UHealthComponent::OnUnitSelected() const
+{
+	if (not VisibilitySettings.bDisplayOnSelected)
+	{
+		return;
+	}
+
+	if (not Widget_GetIsValidHealthBarWidget() || bWasHiddenByAllGameUI)
+	{
+		return;
+	}
+
+	M_HealthBarWidget->SetVisibility(ESlateVisibility::Visible);
+}
+
+void UHealthComponent::OnUnitDeselected() const
+{
+	if (not VisibilitySettings.bDisplayOnSelected)
+	{
+		return;
+	}
+
+	if (not Widget_GetIsValidHealthBarWidget())
+	{
+		return;
+	}
+
 	ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
 }
 

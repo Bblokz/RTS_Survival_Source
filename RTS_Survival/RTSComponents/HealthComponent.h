@@ -10,6 +10,7 @@
 #include "HealthBarWidgetCallBacks/HealthBarWidgetCallbacks.h"
 #include "HealthInterface/HealthBarIcons/HealthBarIcons.h"
 #include "RTS_Survival/Game/GameState/HideGameUI/RTSUIElement.h"
+#include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
 #include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarVisibilitySettings.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponShellType/WeaponShellType.h"
@@ -29,6 +30,17 @@ class IHealthBarOwner;
 enum class EHealthLevel : uint8;
 class ACameraPawn;
 class UProgressBar;
+
+USTRUCT()
+struct FHealthComponentSelectionDelegateHandles
+{
+	GENERATED_BODY()
+
+	FDelegateHandle M_OnUnitHoveredHandle;
+	FDelegateHandle M_OnUnitUnhoveredHandle;
+	FDelegateHandle M_OnUnitSelectedHandle;
+	FDelegateHandle M_OnUnitDeselectedHandle;
+};
 
 /**
  * @brief Container for Health and primitive armor values.
@@ -118,12 +130,17 @@ public:
 	void ChangeVisibilitySettings(const FHealthBarVisibilitySettings& NewSettings);
 	FHealthBarVisibilitySettings GetVisibilitySettings() const;
 
+	virtual void OnOverwiteHealthbarVisiblityPlayer(ERTSPlayerHealthBarVisibilityStrategy Strategy);
+	virtual void OnOverwiteHealthbarVisiblityEnemy(ERTSEnemyHealthBarVisibilityStrategy Strategy);
+
 	// Not null checked; may still be loading; if so overwrite OnWigetInitialized.
 	UW_HealthBar* GetHealthBarWidget() const;
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
+
+	virtual void BeginPlay_ApplyUserSettingsHealthBarVisibility();
 
 	// Leave this empty if we do not want to use a health widget on this actor.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HealthWidget")
@@ -225,6 +242,10 @@ private:
 	 */
 	void BeginPlay_BindHoverToSelectionComponent();
 
+	void UpdateSelectionComponentBindings();
+	void ClearSelectionComponentBindings();
+	void UpdateVisibilityAfterSettingsChange() const;
+	void RestoreUnitDefaultHealthBarVisibilitySettings();
 
 	// The RTS Component of the same owner that needs to know whether the unit is in combat due to being damaged.
 	TWeakObjectPtr<URTSComponent> M_RTSComponent;
@@ -236,6 +257,8 @@ private:
 
 	void OnUnitHovered() const;
 	void OnUnitUnhovered() const;
+	void OnUnitSelected() const;
+	void OnUnitDeselected() const;
 
 	void OnUnitInCombat() const;
 
@@ -256,6 +279,11 @@ private:
 
 	UPROPERTY()
 	bool bWasHiddenByAllGameUI = false;
+
+	UPROPERTY()
+	FHealthBarVisibilitySettings M_UnitDefaultHealthBarVisibilitySettings;
+
+	FHealthComponentSelectionDelegateHandles M_SelectionDelegateHandles;
 
 	/**
 	 * @brief Helper function that maps an EHealthLevel to its numeric threshold value.

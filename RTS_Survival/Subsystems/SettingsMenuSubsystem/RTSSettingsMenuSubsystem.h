@@ -130,6 +130,48 @@ struct FRTSControlSettings
 };
 
 USTRUCT(BlueprintType)
+struct FRTSGameplaySettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSEnemyHealthBarVisibilityStrategy M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::NotInitialized;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+};
+
+USTRUCT(BlueprintType)
 struct FRTSSettingsSnapshot
 {
 	GENERATED_BODY()
@@ -142,6 +184,9 @@ struct FRTSSettingsSnapshot
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings")
 	FRTSControlSettings M_ControlSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings")
+	FRTSGameplaySettings M_GameplaySettings;
 };
 
 /**
@@ -204,6 +249,42 @@ public:
 	void SetPendingInvertYAxis(bool bNewInvertYAxis);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingOverwriteAllPlayerHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingPlayerTankHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingPlayerSquadHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingPlayerNomadicHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingPlayerBxpHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingPlayerAircraftHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingOverwriteAllEnemyHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingEnemyTankHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingEnemySquadHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingEnemyNomadicHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingEnemyBxpHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingEnemyAircraftHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
 	void ApplySettings();
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
@@ -230,6 +311,7 @@ private:
 	void ApplyNonResolutionSettings();
 	void ApplyAudioSettings();
 	void ApplyControlSettings();
+	void ApplyGameplaySettingsDiff(const FRTSGameplaySettings& PreviousSettings, const FRTSGameplaySettings& CurrentSettings);
 
 	void ApplyAudioChannelVolume(ERTSAudioType AudioType, float VolumeToApply);
 	bool TryGetSoundClassForAudioType(ERTSAudioType AudioType, TSoftObjectPtr<USoundClass>& OutSoundClass) const;

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Scalability.h"
+#include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
 
 #include "RTSGameUserSettings.generated.h"
 
@@ -28,6 +29,12 @@ class RTS_SURVIVAL_API URTSGameUserSettings : public UGameUserSettings
 	GENERATED_BODY()
 
 public:
+	/**
+	 * @brief Returns the live RTS user settings singleton currently used by the engine.
+	 * This does not force a disk reload; it returns the in-memory instance.
+	 */
+	static const URTSGameUserSettings* Get();
+
 	/**
 	 * @brief Pulls settings from config and normalizes them before the UI reads them.
 	 * @param bForceReload Forces a fresh read from config instead of cached values.
@@ -93,6 +100,78 @@ public:
 	/** @brief Writes the invert setting so input code can flip vertical control direction. */
 	void SetInvertYAxis(const bool bNewInvertYAxis);
 
+	/** @brief Returns the saved player health bar visibility override. */
+	ERTSPlayerHealthBarVisibilityStrategy GetOverwriteAllPlayerHpBarStrat() const;
+
+	/** @brief Returns the saved player tank health bar visibility strategy. */
+	ERTSPlayerHealthBarVisibilityStrategy GetPlayerTankHpBarStrat() const;
+
+	/** @brief Returns the saved player squad health bar visibility strategy. */
+	ERTSPlayerHealthBarVisibilityStrategy GetPlayerSquadHpBarStrat() const;
+
+	/** @brief Returns the saved player nomadic health bar visibility strategy. */
+	ERTSPlayerHealthBarVisibilityStrategy GetPlayerNomadicHpBarStrat() const;
+
+	/** @brief Returns the saved player building expansion health bar visibility strategy. */
+	ERTSPlayerHealthBarVisibilityStrategy GetPlayerBxpHpBarStrat() const;
+
+	/** @brief Returns the saved player aircraft health bar visibility strategy. */
+	ERTSPlayerHealthBarVisibilityStrategy GetPlayerAircraftHpBarStrat() const;
+
+	/** @brief Returns the saved enemy health bar visibility override. */
+	ERTSEnemyHealthBarVisibilityStrategy GetOverwriteAllEnemyHpBarStrat() const;
+
+	/** @brief Returns the saved enemy tank health bar visibility strategy. */
+	ERTSEnemyHealthBarVisibilityStrategy GetEnemyTankHpBarStrat() const;
+
+	/** @brief Returns the saved enemy squad health bar visibility strategy. */
+	ERTSEnemyHealthBarVisibilityStrategy GetEnemySquadHpBarStrat() const;
+
+	/** @brief Returns the saved enemy nomadic health bar visibility strategy. */
+	ERTSEnemyHealthBarVisibilityStrategy GetEnemyNomadicHpBarStrat() const;
+
+	/** @brief Returns the saved enemy building expansion health bar visibility strategy. */
+	ERTSEnemyHealthBarVisibilityStrategy GetEnemyBxpHpBarStrat() const;
+
+	/** @brief Returns the saved enemy aircraft health bar visibility strategy. */
+	ERTSEnemyHealthBarVisibilityStrategy GetEnemyAircraftHpBarStrat() const;
+
+	/** @brief Stores the player health bar visibility override. */
+	void SetOverwriteAllPlayerHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the player tank health bar visibility strategy. */
+	void SetPlayerTankHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the player squad health bar visibility strategy. */
+	void SetPlayerSquadHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the player nomadic health bar visibility strategy. */
+	void SetPlayerNomadicHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the player building expansion health bar visibility strategy. */
+	void SetPlayerBxpHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the player aircraft health bar visibility strategy. */
+	void SetPlayerAircraftHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the enemy health bar visibility override. */
+	void SetOverwriteAllEnemyHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the enemy tank health bar visibility strategy. */
+	void SetEnemyTankHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the enemy squad health bar visibility strategy. */
+	void SetEnemySquadHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the enemy nomadic health bar visibility strategy. */
+	void SetEnemyNomadicHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the enemy building expansion health bar visibility strategy. */
+	void SetEnemyBxpHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
+	/** @brief Stores the enemy aircraft health bar visibility strategy. */
+	void SetEnemyAircraftHpBarStrat(ERTSEnemyHealthBarVisibilityStrategy NewStrategy);
+
 	/**
 	 * @brief Returns the current scalability group values so the settings menu can mirror the live engine state.
 	 */
@@ -130,4 +209,40 @@ private:
 
 	UPROPERTY(config)
 	bool bM_InvertYAxis = false;
+
+	UPROPERTY(config)
+	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
+
+	UPROPERTY(config)
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSEnemyHealthBarVisibilityStrategy M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::NotInitialized;
+
+	UPROPERTY(config)
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+
+	UPROPERTY(config)
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
 };

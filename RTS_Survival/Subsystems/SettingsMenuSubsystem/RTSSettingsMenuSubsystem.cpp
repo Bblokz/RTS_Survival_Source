@@ -7,6 +7,7 @@
 #include "RHI.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Scalability.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
@@ -250,6 +251,66 @@ void URTSSettingsMenuSubsystem::SetPendingInvertYAxis(const bool bNewInvertYAxis
 	M_PendingSettings.M_ControlSettings.bM_InvertYAxis = bNewInvertYAxis;
 }
 
+void URTSSettingsMenuSubsystem::SetPendingOverwriteAllPlayerHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingPlayerTankHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_PlayerTankHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingPlayerSquadHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_PlayerSquadHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingPlayerNomadicHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_PlayerNomadicHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingPlayerBxpHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_PlayerBxpHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingPlayerAircraftHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_PlayerAircraftHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingOverwriteAllEnemyHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_OverwriteAllEnemyHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingEnemyTankHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_EnemyTankHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingEnemySquadHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_EnemySquadHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingEnemyNomadicHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_EnemyNomadicHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingEnemyBxpHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_EnemyBxpHpBarStrat = NewStrategy;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingEnemyAircraftHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PendingSettings.M_GameplaySettings.M_EnemyAircraftHpBarStrat = NewStrategy;
+}
+
 void URTSSettingsMenuSubsystem::ApplySettings()
 {
 	if (not GetIsValidGameUserSettings())
@@ -257,11 +318,13 @@ void URTSSettingsMenuSubsystem::ApplySettings()
 		return;
 	}
 
+	const FRTSSettingsSnapshot PreviousCurrentSettings = M_CurrentSettings;
 	ApplyPendingSettingsToGameUserSettings();
 	ApplyNonResolutionSettings();
 	ApplyResolutionSettings();
 
 	M_CurrentSettings = M_PendingSettings;
+	ApplyGameplaySettingsDiff(PreviousCurrentSettings.M_GameplaySettings, M_CurrentSettings.M_GameplaySettings);
 }
 
 void URTSSettingsMenuSubsystem::SaveSettings()
@@ -322,6 +385,19 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 
 	DefaultSettings.M_ControlSettings.M_MouseSensitivity = RTSGameUserSettingsRanges::DefaultMouseSensitivity;
 	DefaultSettings.M_ControlSettings.bM_InvertYAxis = RTSSettingsMenuSubsystemPrivate::bDefaultInvertYAxis;
+
+	DefaultSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
+	DefaultSettings.M_GameplaySettings.M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::NotInitialized;
+	DefaultSettings.M_GameplaySettings.M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
 
 	M_PendingSettings = DefaultSettings;
 }
@@ -562,6 +638,67 @@ void URTSSettingsMenuSubsystem::ApplyControlSettings()
 	}
 }
 
+void URTSSettingsMenuSubsystem::ApplyGameplaySettingsDiff(
+	const FRTSGameplaySettings& PreviousSettings,
+	const FRTSGameplaySettings& CurrentSettings)
+{
+	UGameUnitManager* const GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		return;
+	}
+
+	if (PreviousSettings.M_PlayerTankHpBarStrat != CurrentSettings.M_PlayerTankHpBarStrat)
+	{
+		GameUnitManager->ApplyPlayerTankHealthBarVisibilityStrategy(CurrentSettings.M_PlayerTankHpBarStrat);
+	}
+
+	if (PreviousSettings.M_PlayerSquadHpBarStrat != CurrentSettings.M_PlayerSquadHpBarStrat)
+	{
+		GameUnitManager->ApplyPlayerSquadHealthBarVisibilityStrategy(CurrentSettings.M_PlayerSquadHpBarStrat);
+	}
+
+	if (PreviousSettings.M_PlayerNomadicHpBarStrat != CurrentSettings.M_PlayerNomadicHpBarStrat)
+	{
+		GameUnitManager->ApplyPlayerNomadicHealthBarVisibilityStrategy(CurrentSettings.M_PlayerNomadicHpBarStrat);
+	}
+
+	if (PreviousSettings.M_PlayerBxpHpBarStrat != CurrentSettings.M_PlayerBxpHpBarStrat)
+	{
+		GameUnitManager->ApplyPlayerBxpHealthBarVisibilityStrategy(CurrentSettings.M_PlayerBxpHpBarStrat);
+	}
+
+	if (PreviousSettings.M_PlayerAircraftHpBarStrat != CurrentSettings.M_PlayerAircraftHpBarStrat)
+	{
+		GameUnitManager->ApplyPlayerAircraftHealthBarVisibilityStrategy(CurrentSettings.M_PlayerAircraftHpBarStrat);
+	}
+
+	if (PreviousSettings.M_EnemyTankHpBarStrat != CurrentSettings.M_EnemyTankHpBarStrat)
+	{
+		GameUnitManager->ApplyEnemyTankHealthBarVisibilityStrategy(CurrentSettings.M_EnemyTankHpBarStrat);
+	}
+
+	if (PreviousSettings.M_EnemySquadHpBarStrat != CurrentSettings.M_EnemySquadHpBarStrat)
+	{
+		GameUnitManager->ApplyEnemySquadHealthBarVisibilityStrategy(CurrentSettings.M_EnemySquadHpBarStrat);
+	}
+
+	if (PreviousSettings.M_EnemyNomadicHpBarStrat != CurrentSettings.M_EnemyNomadicHpBarStrat)
+	{
+		GameUnitManager->ApplyEnemyNomadicHealthBarVisibilityStrategy(CurrentSettings.M_EnemyNomadicHpBarStrat);
+	}
+
+	if (PreviousSettings.M_EnemyBxpHpBarStrat != CurrentSettings.M_EnemyBxpHpBarStrat)
+	{
+		GameUnitManager->ApplyEnemyBxpHealthBarVisibilityStrategy(CurrentSettings.M_EnemyBxpHpBarStrat);
+	}
+
+	if (PreviousSettings.M_EnemyAircraftHpBarStrat != CurrentSettings.M_EnemyAircraftHpBarStrat)
+	{
+		GameUnitManager->ApplyEnemyAircraftHealthBarVisibilityStrategy(CurrentSettings.M_EnemyAircraftHpBarStrat);
+	}
+}
+
 void URTSSettingsMenuSubsystem::ApplyAudioChannelVolume(const ERTSAudioType AudioType, const float VolumeToApply)
 {
 	UWorld* const World = GetWorld();
@@ -677,6 +814,18 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 
 	Snapshot.M_ControlSettings.M_MouseSensitivity = GameUserSettings.GetMouseSensitivity();
 	Snapshot.M_ControlSettings.bM_InvertYAxis = GameUserSettings.GetInvertYAxis();
+	Snapshot.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = GameUserSettings.GetOverwriteAllPlayerHpBarStrat();
+	Snapshot.M_GameplaySettings.M_PlayerTankHpBarStrat = GameUserSettings.GetPlayerTankHpBarStrat();
+	Snapshot.M_GameplaySettings.M_PlayerSquadHpBarStrat = GameUserSettings.GetPlayerSquadHpBarStrat();
+	Snapshot.M_GameplaySettings.M_PlayerNomadicHpBarStrat = GameUserSettings.GetPlayerNomadicHpBarStrat();
+	Snapshot.M_GameplaySettings.M_PlayerBxpHpBarStrat = GameUserSettings.GetPlayerBxpHpBarStrat();
+	Snapshot.M_GameplaySettings.M_PlayerAircraftHpBarStrat = GameUserSettings.GetPlayerAircraftHpBarStrat();
+	Snapshot.M_GameplaySettings.M_OverwriteAllEnemyHpBarStrat = GameUserSettings.GetOverwriteAllEnemyHpBarStrat();
+	Snapshot.M_GameplaySettings.M_EnemyTankHpBarStrat = GameUserSettings.GetEnemyTankHpBarStrat();
+	Snapshot.M_GameplaySettings.M_EnemySquadHpBarStrat = GameUserSettings.GetEnemySquadHpBarStrat();
+	Snapshot.M_GameplaySettings.M_EnemyNomadicHpBarStrat = GameUserSettings.GetEnemyNomadicHpBarStrat();
+	Snapshot.M_GameplaySettings.M_EnemyBxpHpBarStrat = GameUserSettings.GetEnemyBxpHpBarStrat();
+	Snapshot.M_GameplaySettings.M_EnemyAircraftHpBarStrat = GameUserSettings.GetEnemyAircraftHpBarStrat();
 
 	return Snapshot;
 }
@@ -703,6 +852,18 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetUiVolume(SnapshotToApply.M_AudioSettings.M_UiVolume);
 	GameUserSettingsToApply.SetMouseSensitivity(SnapshotToApply.M_ControlSettings.M_MouseSensitivity);
 	GameUserSettingsToApply.SetInvertYAxis(SnapshotToApply.M_ControlSettings.bM_InvertYAxis);
+	GameUserSettingsToApply.SetOverwriteAllPlayerHpBarStrat(SnapshotToApply.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
+	GameUserSettingsToApply.SetPlayerTankHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerTankHpBarStrat);
+	GameUserSettingsToApply.SetPlayerSquadHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerSquadHpBarStrat);
+	GameUserSettingsToApply.SetPlayerNomadicHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerNomadicHpBarStrat);
+	GameUserSettingsToApply.SetPlayerBxpHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerBxpHpBarStrat);
+	GameUserSettingsToApply.SetPlayerAircraftHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerAircraftHpBarStrat);
+	GameUserSettingsToApply.SetOverwriteAllEnemyHpBarStrat(SnapshotToApply.M_GameplaySettings.M_OverwriteAllEnemyHpBarStrat);
+	GameUserSettingsToApply.SetEnemyTankHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemyTankHpBarStrat);
+	GameUserSettingsToApply.SetEnemySquadHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemySquadHpBarStrat);
+	GameUserSettingsToApply.SetEnemyNomadicHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemyNomadicHpBarStrat);
+	GameUserSettingsToApply.SetEnemyBxpHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemyBxpHpBarStrat);
+	GameUserSettingsToApply.SetEnemyAircraftHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemyAircraftHpBarStrat);
 }
 
 void URTSSettingsMenuSubsystem::AddSupportedResolutionUnique(const FIntPoint& ResolutionToAdd)

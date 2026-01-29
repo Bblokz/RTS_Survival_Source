@@ -117,6 +117,56 @@ struct FEscapeMenuSettingsControlsText
 };
 
 /**
+ * @brief Holds designer-facing text keys for the gameplay settings section.
+ *
+ * Gameplay labels can be localized without touching logic by overriding these in Blueprint.
+ */
+USTRUCT(BlueprintType)
+struct FEscapeMenuSettingsGameplayText
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_HeaderText = FText::FromString(TEXT("SETTINGS_GAMEPLAY_HEADER"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_OverwriteAllPlayerHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_OVERWRITE_PLAYER_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_PlayerTankHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_PLAYER_TANK_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_PlayerSquadHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_PLAYER_SQUAD_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_PlayerNomadicHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_PLAYER_NOMADIC_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_PlayerBxpHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_PLAYER_BXP_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_PlayerAircraftHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_PLAYER_AIRCRAFT_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_OverwriteAllEnemyHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_OVERWRITE_ENEMY_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnemyTankHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_ENEMY_TANK_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnemySquadHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_ENEMY_SQUAD_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnemyNomadicHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_ENEMY_NOMADIC_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnemyBxpHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_ENEMY_BXP_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnemyAircraftHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_ENEMY_AIRCRAFT_LABEL"));
+};
+
+/**
  * @brief Holds the apply/back button text so designers can relabel the footer actions.
  */
 USTRUCT(BlueprintType)
@@ -191,6 +241,12 @@ private:
 	void PopulateResolutionOptions();
 	void PopulateQualityOptions();
 	void PopulateQualityOptionsForComboBox(UComboBoxString* ComboBoxToPopulate) const;
+	void PopulateGameplayOptions();
+	void PopulateVisibilityOptionsForComboBox(UComboBoxString* ComboBoxToPopulate, const TArray<FText>& OptionTexts) const;
+	void SetPlayerHealthBarStrategySelection(UComboBoxString* ComboBoxToSelect, ERTSPlayerHealthBarVisibilityStrategy Strategy) const;
+	void SetEnemyHealthBarStrategySelection(UComboBoxString* ComboBoxToSelect, ERTSEnemyHealthBarVisibilityStrategy Strategy) const;
+	void ApplyOverwriteAllPlayerHealthBarStrategy(ERTSPlayerHealthBarVisibilityStrategy Strategy);
+	void ApplyOverwriteAllEnemyHealthBarStrategy(ERTSEnemyHealthBarVisibilityStrategy Strategy);
 
 	void EnsureWindowModeOptionTexts();
 	void EnsureQualityOptionTexts();
@@ -203,6 +259,7 @@ private:
 	void InitialiseGraphicsFrameRateControl(const FRTSDisplaySettings& DisplaySettings);
 	void InitialiseAudioControls(const FRTSAudioSettings& AudioSettings);
 	void InitialiseControlSettingsControls(const FRTSControlSettings& ControlSettings);
+	void InitialiseGameplayControls(const FRTSGameplaySettings& GameplaySettings);
 
 	/**
 	 * @brief Applies slider min/max bounds so designer ranges stay enforced at runtime.
@@ -249,6 +306,7 @@ private:
 	void BindGraphicsSettingCallbacks();
 	void BindAudioSettingCallbacks();
 	void BindControlSettingCallbacks();
+	void BindGameplaySettingCallbacks();
 
 	bool GetIsValidPlayerController() const;
 	bool GetIsValidMainGameUI() const;
@@ -264,6 +322,7 @@ private:
 	bool GetIsValidVerticalBoxGraphicsSection() const;
 	bool GetIsValidVerticalBoxAudioSection() const;
 	bool GetIsValidVerticalBoxControlsSection() const;
+	bool GetIsValidVerticalBoxGameplaySection() const;
 
 	bool GetIsValidTextGraphicsHeader() const;
 	bool GetIsValidTextWindowModeLabel() const;
@@ -308,6 +367,33 @@ private:
 	bool GetIsValidSliderMouseSensitivity() const;
 	bool GetIsValidCheckInvertYAxis() const;
 
+	bool GetIsValidTextGameplayHeader() const;
+	bool GetIsValidTextOverwriteAllPlayerHpBarLabel() const;
+	bool GetIsValidTextPlayerTankHpBarLabel() const;
+	bool GetIsValidTextPlayerSquadHpBarLabel() const;
+	bool GetIsValidTextPlayerNomadicHpBarLabel() const;
+	bool GetIsValidTextPlayerBxpHpBarLabel() const;
+	bool GetIsValidTextPlayerAircraftHpBarLabel() const;
+	bool GetIsValidTextOverwriteAllEnemyHpBarLabel() const;
+	bool GetIsValidTextEnemyTankHpBarLabel() const;
+	bool GetIsValidTextEnemySquadHpBarLabel() const;
+	bool GetIsValidTextEnemyNomadicHpBarLabel() const;
+	bool GetIsValidTextEnemyBxpHpBarLabel() const;
+	bool GetIsValidTextEnemyAircraftHpBarLabel() const;
+
+	bool GetIsValidComboOverwriteAllPlayerHpBarStrat() const;
+	bool GetIsValidComboPlayerTankHpBarStrat() const;
+	bool GetIsValidComboPlayerSquadHpBarStrat() const;
+	bool GetIsValidComboPlayerNomadicHpBarStrat() const;
+	bool GetIsValidComboPlayerBxpHpBarStrat() const;
+	bool GetIsValidComboPlayerAircraftHpBarStrat() const;
+	bool GetIsValidComboOverwriteAllEnemyHpBarStrat() const;
+	bool GetIsValidComboEnemyTankHpBarStrat() const;
+	bool GetIsValidComboEnemySquadHpBarStrat() const;
+	bool GetIsValidComboEnemyNomadicHpBarStrat() const;
+	bool GetIsValidComboEnemyBxpHpBarStrat() const;
+	bool GetIsValidComboEnemyAircraftHpBarStrat() const;
+
 	bool GetIsValidButtonApply() const;
 	bool GetIsValidButtonSetDefaults() const;
 	bool GetIsValidButtonBackOrCancel() const;
@@ -326,12 +412,15 @@ private:
 	bool GetAreGraphicsControlWidgetsValid() const;
 	bool GetAreAudioTextWidgetsValid() const;
 	bool GetAreControlsTextWidgetsValid() const;
+	bool GetAreGameplayTextWidgetsValid() const;
 	bool GetAreFooterTextWidgetsValid() const;
 	bool GetAreGraphicsDisplayWidgetsValid() const;
 	bool GetAreGraphicsScalabilityWidgetsValid() const;
 	bool GetAreGraphicsFrameRateWidgetsValid() const;
 	bool GetAreAudioSliderWidgetsValid() const;
 	bool GetAreControlSettingsWidgetsValid() const;
+	bool GetAreGameplayWidgetsValid() const;
+	bool GetAreGameplayComboWidgetsValid() const;
 
 	UFUNCTION()
 	void HandleApplyClicked();
@@ -396,6 +485,42 @@ private:
 	UFUNCTION()
 	void HandleInvertYAxisChanged(bool bIsChecked);
 
+	UFUNCTION()
+	void HandleOverwriteAllPlayerHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandlePlayerTankHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandlePlayerSquadHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandlePlayerNomadicHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandlePlayerBxpHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandlePlayerAircraftHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandleOverwriteAllEnemyHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandleEnemyTankHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandleEnemySquadHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandleEnemyNomadicHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandleEnemyBxpHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	UFUNCTION()
+	void HandleEnemyAircraftHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 
@@ -413,6 +538,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings|Text", meta=(AllowPrivateAccess="true"))
 	FEscapeMenuSettingsControlsText M_ControlsText;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings|Text", meta=(AllowPrivateAccess="true"))
+	FEscapeMenuSettingsGameplayText M_GameplayText;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings|Text", meta=(AllowPrivateAccess="true"))
 	FEscapeMenuSettingsButtonText M_ButtonText;
@@ -508,6 +636,14 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxControlsSection = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a VerticalBox named M_VerticalBoxGameplaySection in the Widget Blueprint.
+	 * @note Designers may style the section and add wrappers, but this vertical box must remain bound.
+	 * @note The bound widget must exist, keep this name, and remain a VerticalBox for validation.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UVerticalBox> M_VerticalBoxGameplaySection = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextGraphicsHeader in the Widget Blueprint.
@@ -806,6 +942,50 @@ private:
 	TObjectPtr<URichTextBlock> M_TextInvertYAxisLabel = nullptr;
 
 	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextGameplayHeader in the Widget Blueprint.
+	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextGameplayHeader = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextOverwriteAllPlayerHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextPlayerTankHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextPlayerSquadHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextPlayerNomadicHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextPlayerBxpHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextPlayerAircraftHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextOverwriteAllEnemyHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextEnemyTankHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextEnemySquadHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextEnemyNomadicHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextEnemyBxpHpBarLabel = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextEnemyAircraftHpBarLabel = nullptr;
+
+	/**
 	 * @brief BindWidget variable must reference a Slider named M_SliderMouseSensitivity in the Widget Blueprint.
 	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
 	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
@@ -820,6 +1000,42 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckInvertYAxis = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboOverwriteAllPlayerHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboPlayerTankHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboPlayerSquadHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboPlayerNomadicHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboPlayerBxpHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboPlayerAircraftHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboOverwriteAllEnemyHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboEnemyTankHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboEnemySquadHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboEnemyNomadicHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboEnemyBxpHpBarStrat = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboEnemyAircraftHpBarStrat = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a Button named M_ButtonApply in the Widget Blueprint.
