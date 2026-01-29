@@ -107,6 +107,11 @@ void UHullWeaponComponent::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* 
 {
 }
 
+void UHullWeaponComponent::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+{
+	UpdateHullWeaponRangeBasedOnWeapons();
+}
+
 void UHullWeaponComponent::RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister)
 {
 	if(not RTSFunctionLibrary::RTSIsValid(ActorToIgnore))
@@ -879,12 +884,11 @@ void UHullWeaponComponent::UpdateHullWeaponRangeBasedOnWeapons()
 		if (not IsValid(EachWeapon))
 		{
 			RTSFunctionLibrary::ReportError(
-				"Invalid weapon for turret: " + GetName() +
-				" at function: ACPPTurretsMaster::UpdateTurretRangeBasedOnWeapons");
-			continue;
+				"Invalid weapon for hull weapon component: " + GetName() +
+				" at function: UHullWeaponComponent::UpdateHullWeaponRangeBasedOnWeapons");
 		}
-		M_WeaponRangeData.AdjustRangeForNewWeapon(EachWeapon->GetRange());
 	}
+	M_WeaponRangeData.RecalculateRangeFromWeapons(M_TWeapons);
 }
 
 void UHullWeaponComponent::BeginPlay_SetupGameUnitManager()

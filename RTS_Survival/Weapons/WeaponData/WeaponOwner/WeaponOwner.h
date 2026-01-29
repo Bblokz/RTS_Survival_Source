@@ -15,6 +15,7 @@ struct FInitWeaponStateArchProjectile;
 struct FInitWeaponStateRocketProjectile;
 struct FWeaponData;
 class ASquadController;
+class UWeaponState;
 struct FInitWeaponStateProjectile;
 struct FInitWeaponStateDirectHit;
 enum class EWeaponFireMode : uint8;
@@ -56,6 +57,12 @@ class RTS_SURVIVAL_API IWeaponOwner
 protected:
 	// Called by the weapon state on the owner once it is initialized.
 	virtual void OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon) = 0;
+	/**
+	 * @brief Notify owners to refresh cached ranges after behaviour driven range changes.
+	 * @param WeaponState The weapon whose range changed.
+	 * @param NewRange The updated range after behaviour adjustments.
+	 */
+	virtual void OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange) = 0;
 	/**
 	 * @param WeaponIndex The index of the weapon that is firing.
 	 * @return The targetpitch the weapon currently has towards the target used for trace fire.

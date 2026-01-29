@@ -576,6 +576,9 @@ public:
 	/** @return The range of this weapon in cm. */
 	float GetRange() const;
 
+	/** @return The range of this weapon in cm including behaviour adjustments. */
+	float GetWeaponRangeBehaviourAdjusted() const;
+
 	void ForceInstantReload();
 	bool IsWeaponFullyLoaded() const;
 

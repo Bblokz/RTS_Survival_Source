@@ -334,6 +334,11 @@ void ACPPTurretsMaster::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Wea
 	}
 }
 
+void ACPPTurretsMaster::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+{
+	UpdateTurretRangeBasedOnWeapons();
+}
+
 void ACPPTurretsMaster::SetupWeaponAmmoTracker(FAmmoTrackerInitSettings AmmoTrackingSettings)
 {
 	if (not AmmoTrackingSettings.EnsureIsValid())
@@ -1407,8 +1412,7 @@ void ACPPTurretsMaster::UpdateTurretRangeBasedOnWeapons()
 			RTSFunctionLibrary::ReportError(
 				"Invalid weapon for turret: " + GetName() +
 				" at function: ACPPTurretsMaster::UpdateTurretRangeBasedOnWeapons");
-			continue;
 		}
-		M_WeaponRangeData.AdjustRangeForNewWeapon(EachWeapon->GetRange());
 	}
+	M_WeaponRangeData.RecalculateRangeFromWeapons(M_TWeapons);
 }

@@ -550,6 +550,11 @@ void AInfantryWeaponMaster::OnWeaponAdded(const int32 /*WeaponIndex*/, UWeaponSt
 {
 }
 
+void AInfantryWeaponMaster::OnWeaponBehaviourChangesRange(const UWeaponState* WeaponState, const float NewRange)
+{
+	SetupRange();
+}
+
 FVector& AInfantryWeaponMaster::GetFireDirection(const int32 /*WeaponIndex*/)
 {
 	return M_FireDirection;
@@ -1031,7 +1036,7 @@ void AInfantryWeaponMaster::SetupRange()
 	{
 		return;
 	}
-	M_WeaponRangeData.AdjustRangeForNewWeapon(WeaponState->GetRange());
+	M_WeaponRangeData.RecalculateRangeFromWeapons(GetWeapons());
 }
 
 bool AInfantryWeaponMaster::GetIsTargetWithinAngleLimitsAndSetAO(const bool bInvalidateTargetOutOfReach)
