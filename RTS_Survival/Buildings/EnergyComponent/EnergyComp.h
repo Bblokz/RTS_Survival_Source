@@ -4,8 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "RTS_Survival/Buildings/EnergyComponent/LowEnergyStrategy.h"
 #include "EnergyComp.generated.h"
 
+class UBehaviourComp;
+class ULowEnergyBehaviour;
+class UMaterialInterface;
+class UMeshComponent;
 
 /**
  * @brief Manages the energy supply of an actor, including registration with the PlayerResourceManager.
@@ -47,6 +52,12 @@ public:
 	void SetEnabled(const bool bEnabled);
 
 	/**
+	 * @brief Notifies this component about changes in the base energy state.
+	 * @param bIsLowPower Whether the base is currently in a low power state.
+	 */
+	void OnBaseEnergyChange(const bool bIsLowPower);
+
+	/**
 	 * @brief Retrieves the amount of energy supplied by this component.
 	 *
 	 * Returns the current energy amount that this component contributes to the player's total energy supply can be negitive when the component consumes energy.
@@ -80,6 +91,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bStartEnabled = false;
 
+	/** Override the auto-detected low energy strategy. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Energy")
+	ELowEnergyStrategy OverwriteLowEnergyStrategy = ELowEnergyStrategy::LES_Invalid;
+
 	/**
 	 * @brief Initializes the energy component with the specified energy amount.
 	 *
@@ -92,10 +107,53 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Energy")
 	void InitEnergyComponent(const int32 Energy);
 
+	/** Cache owner-specific mesh/material data for low energy visuals. */
+	virtual void CacheOwnerMaterials();
+
+	void CacheMeshComponentMaterials(UMeshComponent* MeshComponent);
+	void CacheMeshesFromActor(AActor* ActorToCache);
+	void ApplyLowEnergyMaterials();
+	void RestoreOriginalMaterials();
+	void ApplyMaterialsForCurrentEnergyState();
+	bool GetDoesStrategyUseMaterials() const;
+	bool GetDoesStrategyUseBehaviour() const;
+	virtual bool GetShouldApplyMaterialChanges() const;
+	bool GetIsShuttingDown() const;
+
 private:
+	USTRUCT()
+	struct FEnergyMeshMaterialCache
+	{
+		GENERATED_BODY()
+
+		UPROPERTY()
+		TWeakObjectPtr<UMeshComponent> MeshComponent;
+
+		UPROPERTY()
+		TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
+	};
+
 	bool bM_IsEnabled = false;
+	bool bM_IsLowEnergy = false;
+	bool bM_IsShuttingDown = false;
 
 	int32 M_Energy = 0;
+
+	UPROPERTY()
+	TArray<FEnergyMeshMaterialCache> M_CachedMeshMaterials;
+
+	UPROPERTY()
+	TWeakObjectPtr<UBehaviourComp> M_OwnerBehaviourComponent;
+
+	UPROPERTY()
+	TSubclassOf<ULowEnergyBehaviour> M_LowEnergyBehaviourClass;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> M_LowEnergyMaterial = nullptr;
+
+	bool bM_HasAppliedLowEnergyBehaviour = false;
+
+	ELowEnergyStrategy M_LowEnergyStrategy = ELowEnergyStrategy::LES_Invalid;
 
 	/**
 	 * @brief Updates the energy amount supplied by this component.
@@ -108,4 +166,21 @@ private:
 	 * @post `M_Energy` is updated with the new value.
 	 */
 	void UpdateEnergySupplied(const int32 NewEnergySupplied);
+
+	void BeginPlay_CacheLowEnergySettings();
+	void BeginPlay_InitializeLowEnergyStrategy();
+	void BeginPlay_CheckInitialLowEnergyState();
+	void DetermineLowEnergyStrategy();
+	void CacheOwnerBehaviourComponent();
+	void ApplyLowEnergyBehaviour();
+	void RemoveLowEnergyBehaviour();
+
+	bool GetIsOwnerBehaviourComponentValid() const;
+	bool GetIsValidLowEnergyMaterial() const;
+	bool GetIsValidLowEnergyBehaviourClass() const;
+
+	void ReportInvalidMaterialCache(const UMeshComponent* MeshComponent, const int32 CachedMaterialCount,
+	                                const int32 CurrentMaterialCount, const FString& Context) const;
+	void ReportNoCachedMeshes(const FString& Context) const;
+	void ReportDuplicateEnergyState(const bool bAttemptedLowEnergy) const;
 };

@@ -105,6 +105,7 @@ public:
 
 	inline EBuildingExpansionStatus GetStatus() const { return M_StatusBuildingExpansion; }
 	TArray<UWeaponState*> GetAllWeapons() const;
+	TArray<ACPPTurretsMaster*> GetTurrets() const;
 	
 protected:
 
