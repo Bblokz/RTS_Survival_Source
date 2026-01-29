@@ -6,6 +6,7 @@
 #include "RTSOutlineHelpers/FRTSOutlineHelpers.h"
 #include "RTSOutlineRules/RTSOutlineRules.h"
 #include "RTSOutlineTypes/RTSOutlineTypes.h"
+#include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Game/GameState/GameResourceManager/GetTargetResourceThread/FGetAsyncResource.h"
 #include "RTS_Survival/Player/PlayerAimAbilitiy/PlayerAimAbility.h"
 #include "RTS_Survival/Resources/Resource.h"
@@ -53,6 +54,9 @@ void UPlayerOutlineComponent::OnActionButtonActivated(const EAbilityID AbilityID
 		break;
 	case EAbilityID::IdScavenge:
 		M_OutlineRules = ERTSOutlineRules::ScavengeOnly;
+		break;
+	case EAbilityID::IdCapture:
+		M_OutlineRules = ERTSOutlineRules::CaptureOnly;
 		break;
 	case EAbilityID::IdAttack:
 	case EAbilityID::IdAttackGround:
@@ -102,6 +106,10 @@ ERTSOutLineTypes UPlayerOutlineComponent::GetOutLineForActor(AActor* ValidActor)
 		}
 		return GetOutLineForScavengableObject(ScavengeObj, M_OutlineRules);
 	}
+	if (ValidActor->GetClass()->ImplementsInterface(UCaptureInterface::StaticClass()))
+	{
+		return GetOutLineForCapturableActor(ValidActor, M_OutlineRules);
+	}
 	return ERTSOutLineTypes::None;
 }
 
@@ -135,6 +143,8 @@ ERTSOutLineTypes UPlayerOutlineComponent::GetOutLineForValidResource(const UReso
 		}
 	case ERTSOutlineRules::ScavengeOnly:
 		return ERTSOutLineTypes::None;
+	case ERTSOutlineRules::CaptureOnly:
+		return ERTSOutLineTypes::None;
 	case ERTSOutlineRules::DoNotShowAnyOutlines:
 		return ERTSOutLineTypes::None;
 	}
@@ -156,10 +166,26 @@ ERTSOutLineTypes UPlayerOutlineComponent::GetOutLineForScavengableObject(
 		return ERTSOutLineTypes::None;
 	case ERTSOutlineRules::ScavengeOnly:
 		break;
+	case ERTSOutlineRules::CaptureOnly:
+		return ERTSOutLineTypes::None;
 	case ERTSOutlineRules::DoNotShowAnyOutlines:
 		return ERTSOutLineTypes::None;
 	}
 	return ByScavengeOutline;
+}
+
+ERTSOutLineTypes UPlayerOutlineComponent::GetOutLineForCapturableActor(
+	const AActor* CapturableActor, const ERTSOutlineRules Rules) const
+{
+	if (not IsValid(CapturableActor))
+	{
+		return ERTSOutLineTypes::None;
+	}
+	if (Rules != ERTSOutlineRules::CaptureOnly)
+	{
+		return ERTSOutLineTypes::None;
+	}
+	return ERTSOutLineTypes::VehicleParts;
 }
 
 void UPlayerOutlineComponent::CheckHidePreviousOutlinedActor(const AActor* NewActor)
