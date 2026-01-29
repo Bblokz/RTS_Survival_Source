@@ -506,7 +506,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 {
 	// .65 ms for 100 vehicles.
 	// TRACE_CPUPROFILER_EVENT_SCOPE(Tracks_UpdateDriving);
-	if (!M_TrackPhysicsMovement)
+	if (not M_TrackPhysicsMovement)
 	{
 		return;
 	}
@@ -609,8 +609,23 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	{
 		CalculatedThrottleValue = 0.f;
 
+		const float DeadzoneSteeringDeadbandAngle = FMath::Max(DeadZoneSteeringDeadbandAngle, 0.f);
+		const bool bShouldUseStableReverseSteering = bWantsReverse &&
+			bM_IsInReverseDeadzone &&
+			FMath::Abs(SignedTargetAngle) <= DeadzoneSteeringDeadbandAngle;
+
 		// Max steering.
-		Steering = FMath::Sign(SignedTargetAngle);
+		if (bShouldUseStableReverseSteering)
+		{
+			const float LastSteeringSign = FMath::Sign(M_LastSteeringInput);
+			const float FallbackSteeringSign = LastSteeringSign != 0.f ? LastSteeringSign : 1.f;
+			Steering = FallbackSteeringSign;
+		}
+		else
+		{
+			Steering = FMath::Sign(SignedTargetAngle);
+		}
+
 		if (bDebugSlowDown && not bM_IsInReverseDeadzone)
 		{
 			RTSFunctionLibrary::PrintString("Frontal deadzone, only steering!", FColor::Black);

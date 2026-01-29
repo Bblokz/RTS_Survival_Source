@@ -528,6 +528,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Deadzones", meta = (ClampMin = "1.0"))
 	float DeadZoneExitDistanceMultiplier = 1.2f;
 
+	// Angle tolerance to keep reverse deadzone steering stable when the target is directly in front.
+	UPROPERTY(EditDefaultsOnly, Category = "Deadzones", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+	float DeadZoneSteeringDeadbandAngle = 2.f;
+
 	// The point to reverse to when the deadzone is entered; only for wheeled vehicles.
 	UPROPERTY(EditDefaultsOnly, Category = "Deadzones")
 	float DeadZoneReverseDistance = 600;
