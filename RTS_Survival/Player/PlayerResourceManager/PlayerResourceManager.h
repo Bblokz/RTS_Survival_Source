@@ -155,6 +155,12 @@ private:
 	TMap<ERTSResourceType, FRTSResourceStorage> M_PlayerResources;
 
 	void UpdateEnergySupplyWithComponent(UEnergyComp* EnergyComponent, const bool bRegister);
+	void HandleEnergySupplyChanged();
+	void QueueBaseEnergyStateChange(const bool bIsLowPower);
+	void ProcessPendingBaseEnergyStateChange();
+	void ApplyBaseEnergyStateChange(const bool bIsLowPower);
+	void NotifyEnergyComponentsBaseEnergyChange(const bool bIsLowPower);
+	void PlayBaseEnergyAnnouncerVoiceLine(const bool bIsLowPower);
 
 
 	UPROPERTY()
@@ -165,6 +171,23 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<UEnergyComp>> M_EnergyComponents;
+
+	USTRUCT()
+	struct FEnergyStateChangeTracker
+	{
+		GENERATED_BODY()
+
+		bool bIsBaseLowEnergy = false;
+		bool bHasPendingEnergyState = false;
+		bool bPendingLowEnergyState = false;
+		float M_LastEnergyStateChangeSeconds = 0.0f;
+
+		UPROPERTY()
+		FTimerHandle EnergyStateChangeTimer;
+	};
+
+	UPROPERTY()
+	FEnergyStateChangeTracker M_EnergyStateChangeTracker;
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<UResourceDropOff>> M_DropOffs;
