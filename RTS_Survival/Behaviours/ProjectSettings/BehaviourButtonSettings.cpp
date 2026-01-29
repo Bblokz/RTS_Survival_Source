@@ -6,7 +6,7 @@
 
 UBehaviourButtonSettings::UBehaviourButtonSettings()
 {
-        CategoryName = TEXT("UI");
+        CategoryName = TEXT("Game");
         SectionName = TEXT("Behaviour Buttons");
 }
 

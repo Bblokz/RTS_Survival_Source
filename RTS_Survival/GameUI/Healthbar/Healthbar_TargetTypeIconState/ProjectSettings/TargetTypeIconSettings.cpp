@@ -9,7 +9,7 @@
 UTargetTypeIconSettings::UTargetTypeIconSettings()
 {
 	// Optional: categorize nicely in Project Settings
-	CategoryName = TEXT("UI");
+	CategoryName = TEXT("Game");
 	SectionName  = TEXT("Health Bar Icons");
 }
 

@@ -1,6 +1,12 @@
 ﻿#include "RTSNavQueryFilterSettings.h"
 #include "Engine/AssetManager.h"
 
+URTSNavQueryFilterSettings::URTSNavQueryFilterSettings()
+{
+	CategoryName = TEXT("Game");
+	SectionName = TEXT("RTS Navigation Filters");
+}
+
 const URTSNavQueryFilterSettings* URTSNavQueryFilterSettings::Get()
 {
 	return GetDefault<URTSNavQueryFilterSettings>();

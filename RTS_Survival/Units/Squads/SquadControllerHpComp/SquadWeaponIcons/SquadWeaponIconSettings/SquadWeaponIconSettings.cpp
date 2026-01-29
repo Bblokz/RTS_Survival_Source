@@ -8,7 +8,7 @@
 USquadWeaponIconSettings::USquadWeaponIconSettings()
 {
 	
-	CategoryName = TEXT("UI");
+	CategoryName = TEXT("Game");
 	SectionName  = TEXT("Squad Weapon Icons");
 }
 

@@ -3,12 +3,8 @@
 
 #include "RTSGameDifficultySettings.h"
 
-FName URTSGameDifficultySettings::GetCategoryName() const
+URTSGameDifficultySettings::URTSGameDifficultySettings()
 {
-	return TEXT("Game");
-}
-
-FName URTSGameDifficultySettings::GetSectionName() const
-{
-	return TEXT("RTS Difficulty Settings");
+	CategoryName = TEXT("Game");
+	SectionName = TEXT("RTS Difficulty Settings");
 }
