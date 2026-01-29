@@ -48,9 +48,9 @@ void ULowEnergyBehaviour::ApplyLowEnergyTurretRotation()
 			continue;
 		}
 
-		const float BaseRotationSpeed = Turret->RotationSpeed;
+		const float BaseRotationSpeed = Turret->GetTurretRotationSpeed();
 		M_CachedTurretRotationSpeeds.Add(TurretPtr, BaseRotationSpeed);
-		Turret->RotationSpeed = BaseRotationSpeed * TurretLowEnergyRotationSpeedMlt;
+		Turret->SetTurretRotationSpeed( BaseRotationSpeed * TurretLowEnergyRotationSpeedMlt);
 	}
 }
 
@@ -63,7 +63,7 @@ void ULowEnergyBehaviour::RestoreTurretRotation()
 			continue;
 		}
 
-		CachedTurret.Key->RotationSpeed = CachedTurret.Value;
+		CachedTurret.Key->SetTurretRotationSpeed( CachedTurret.Value);
 	}
 
 	M_CachedTurretRotationSpeeds.Empty();

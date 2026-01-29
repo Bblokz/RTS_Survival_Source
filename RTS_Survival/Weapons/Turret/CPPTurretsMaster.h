@@ -168,6 +168,9 @@ public:
 
 	void OnSetupTurret(AActor* OwnerOfTurret);
 
+	float GetTurretRotationSpeed() const { return RotationSpeed; }
+	void SetTurretRotationSpeed(const float NewRotationSpeed) { RotationSpeed = NewRotationSpeed; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
