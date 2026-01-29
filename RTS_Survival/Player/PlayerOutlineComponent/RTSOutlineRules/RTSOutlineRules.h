@@ -12,5 +12,7 @@ enum class ERTSOutlineRules : uint8
 	RadixiteMetalOnly,
 	// Will only show the outline around scavengable actors (if hovered)
 	ScavengeOnly,
+	// Will only show the outline around capturable actors (if hovered)
+	CaptureOnly,
 	DoNotShowAnyOutlines
 };

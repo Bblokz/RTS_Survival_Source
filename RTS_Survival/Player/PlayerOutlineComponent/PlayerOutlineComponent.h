@@ -41,6 +41,8 @@ private:
 	ERTSOutLineTypes GetOutLineForActor(AActor* ValidActor) const;
 	ERTSOutLineTypes GetOutLineForValidResource(const UResourceComponent* Resource, const ERTSOutlineRules Rules) const;
 	ERTSOutLineTypes GetOutLineForScavengableObject(AScavengeableObject* ScavObject, const ERTSOutlineRules Rules) const;
+	ERTSOutLineTypes GetOutLineForCapturableActor(const AActor* CapturableActor,
+	                                              const ERTSOutlineRules Rules) const;
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_OutlinedActor;
 	void CheckHidePreviousOutlinedActor(const AActor* NewActor);
