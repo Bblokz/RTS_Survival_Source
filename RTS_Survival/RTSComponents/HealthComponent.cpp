@@ -383,6 +383,7 @@ void UHealthComponent::BeginPlay()
 
 	BeginPlay_CheckDamageReductionSettings();
 	BeginPlay_SetupAssociatedRTSComponent();
+	// Important; set default before loading user settings.
 	M_UnitDefaultHealthBarVisibilitySettings = VisibilitySettings;
 	BeginPlay_ApplyUserSettingsHealthBarVisibility();
 	BeginPlay_BindHoverToSelectionComponent();
