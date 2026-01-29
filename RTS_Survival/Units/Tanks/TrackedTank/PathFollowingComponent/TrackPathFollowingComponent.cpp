@@ -30,6 +30,11 @@ namespace TrackFollowingOverlapCleanup
 	constexpr int32 CleanupTickInterval = 256;
 }
 
+namespace TrackFollowingReverseDeadzone
+{
+	constexpr float ReverseDeadzoneDistanceBufferPercent = 0.15f;
+}
+
 int32 UTrackPathFollowingComponent::M_TicksCountCheckOverlappers = TrackFollowingOverlapCleanup::CleanupTickInterval;
 float UTrackPathFollowingComponent::M_TimeTillDiscardOverlap = 3.f;
 
@@ -330,6 +335,10 @@ bool UTrackPathFollowingComponent::HasBlockingOverlaps() const
 void UTrackPathFollowingComponent::SetReverse(bool Reverse)
 {
 	bWantsReverse = Reverse;
+	if (not bWantsReverse)
+	{
+		bM_ReverseToPositionInDeadzone = false;
+	}
 }
 
 bool UTrackPathFollowingComponent::IsReversing()
@@ -467,6 +476,7 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 	ResetStuck();
 	bM_IsInDeadzone = false;
 	bM_IsInReverseDeadzone = false;
+	UpdateReverseDeadzoneStateForNewPath();
 
 	// Debug message
 	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
@@ -506,7 +516,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 {
 	// .65 ms for 100 vehicles.
 	// TRACE_CPUPROFILER_EVENT_SCOPE(Tracks_UpdateDriving);
-	if (!M_TrackPhysicsMovement)
+	if (not M_TrackPhysicsMovement)
 	{
 		return;
 	}
@@ -531,6 +541,31 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	AbsoluteTargetAngle = FMath::Abs(SignedTargetAngle);
 
 	M_CurrentSpeed = ControlledPawn->GetVelocity().Size2D();
+
+	if (bM_ReverseToPositionInDeadzone && bWantsReverse)
+	{
+		const FVector AgentLocation = GetAgentLocation();
+		const FVector ReverseFacingDestination = AgentLocation - (Destination - AgentLocation);
+		const float SignedReverseFacingAngle = CalculateDestinationAngle(ReverseFacingDestination);
+		const float AbsoluteReverseFacingAngle = FMath::Abs(SignedReverseFacingAngle);
+
+		if (AbsoluteReverseFacingAngle <= DeadZoneExitAngleOffset)
+		{
+			bM_ReverseToPositionInDeadzone = false;
+		}
+		else
+		{
+			const float SteeringScale = AbsoluteReverseFacingAngle > MaxAngleDontSlow
+				                            ? 1.f
+				                            : AbsoluteReverseFacingAngle / MaxAngleDontSlow;
+			const float Steering = SteeringScale * FMath::Sign(SignedReverseFacingAngle);
+			M_LastSteeringInput = Steering;
+			M_LastThrottleInput = 0.f;
+			UpdateVehicle(/*Throttle*/0.f, /*CurrentSpeed*/M_CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/
+			              Steering);
+			return;
+		}
+	}
 
 	// Use target location instead of move focus for calculating distance so it works with the crowd simulation
 	// Crowd simulation uses direction vector offset by about 500 units, so the destination would always be constant if using move focus
@@ -754,6 +789,42 @@ bool UTrackPathFollowingComponent::UpdateDeadzoneHysteresis(
 	}
 
 	return false;
+}
+
+void UTrackPathFollowingComponent::UpdateReverseDeadzoneStateForNewPath()
+{
+	bM_ReverseToPositionInDeadzone = false;
+	if (not bWantsReverse)
+	{
+		return;
+	}
+
+	const APawn* const PawnOwner = GetValidControlledPawn();
+	if (not IsValid(PawnOwner))
+	{
+		return;
+	}
+
+	if (not Path.IsValid())
+	{
+		return;
+	}
+
+	const TArray<FNavPathPoint>& PathPoints = Path->GetPathPoints();
+	if (PathPoints.IsEmpty())
+	{
+		return;
+	}
+
+	const float ReverseDeadzoneRange = DeadZoneDistance *
+		(1.0f + TrackFollowingReverseDeadzone::ReverseDeadzoneDistanceBufferPercent);
+	const float DistanceToDestination = FVector::Dist(GetAgentLocation(), PathPoints.Last().Location);
+	if (DistanceToDestination > ReverseDeadzoneRange)
+	{
+		return;
+	}
+
+	bM_ReverseToPositionInDeadzone = true;
 }
 
 void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)

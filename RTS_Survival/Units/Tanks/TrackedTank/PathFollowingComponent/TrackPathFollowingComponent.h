@@ -676,6 +676,7 @@ private:
 		const float TargetAngle,
 		const float TargetDistance,
 		const bool bIsReversing);
+	void UpdateReverseDeadzoneStateForNewPath();
 
 	// The physics calculation component that moves the owning pawn by applying velocity.
 	UPROPERTY()
@@ -708,6 +709,9 @@ private:
 
 	// Tracks whether the deadzone hysteresis is for reversing.
 	bool bM_IsInReverseDeadzone = false;
+
+	// Tracks if a reverse command starts inside the deadzone, requiring rear alignment before reversing.
+	bool bM_ReverseToPositionInDeadzone = false;
 
 	/* Helper to return the agents current location in the world */
 	FVector GetAgentLocation() const;
