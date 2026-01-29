@@ -128,6 +128,9 @@ struct FEscapeMenuSettingsButtonText
 	FText M_ApplyButtonText = FText::FromString(TEXT("SETTINGS_APPLY_BUTTON"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_SetDefaultsButtonText = FText::FromString(TEXT("SETTINGS_DEFAULTS_BUTTON"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_BackOrCancelButtonText = FText::FromString(TEXT("SETTINGS_BACK_OR_CANCEL_BUTTON"));
 };
 
@@ -240,6 +243,7 @@ private:
 
 	void BindButtonCallbacks();
 	void BindApplyButton();
+	void BindSetDefaultsButton();
 	void BindBackOrCancelButton();
 	void BindSettingCallbacks();
 	void BindGraphicsSettingCallbacks();
@@ -305,8 +309,10 @@ private:
 	bool GetIsValidCheckInvertYAxis() const;
 
 	bool GetIsValidButtonApply() const;
+	bool GetIsValidButtonSetDefaults() const;
 	bool GetIsValidButtonBackOrCancel() const;
 	bool GetIsValidTextApplyButton() const;
+	bool GetIsValidTextSetDefaultsButton() const;
 	bool GetIsValidTextBackOrCancelButton() const;
 
 	bool GetAreRootWidgetsValid() const;
@@ -329,6 +335,9 @@ private:
 
 	UFUNCTION()
 	void HandleApplyClicked();
+
+	UFUNCTION()
+	void HandleSetDefaultsClicked();
 
 	UFUNCTION()
 	void HandleBackOrCancelClicked();
@@ -821,6 +830,14 @@ private:
 	TObjectPtr<UButton> M_ButtonApply = nullptr;
 
 	/**
+	 * @brief BindWidget variable must reference a Button named M_ButtonSetDefaults in the Widget Blueprint.
+	 * @note Designers may style and wrap the button, but it must contain a child RichTextBlock named M_TextSetDefaultsButton.
+	 * @note The bound button and its label must exist, keep names, and remain the same widget types.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UButton> M_ButtonSetDefaults = nullptr;
+
+	/**
 	 * @brief BindWidget variable must reference a Button named M_ButtonBackOrCancel in the Widget Blueprint.
 	 * @note Designers may style and wrap the button, but it must contain a child RichTextBlock named M_TextBackOrCancelButton.
 	 * @note The bound button and its label must exist, keep names, and remain the same widget types.
@@ -835,6 +852,14 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextApplyButton = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextSetDefaultsButton in the Widget Blueprint.
+	 * @note Designers may style the label, but C++ sets the button label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextSetDefaultsButton = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextBackOrCancelButton in the Widget Blueprint.

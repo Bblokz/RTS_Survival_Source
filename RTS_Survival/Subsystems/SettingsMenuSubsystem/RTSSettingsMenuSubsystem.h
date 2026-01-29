@@ -212,6 +212,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void RevertSettings();
 
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingSettingsToDefaults();
+
 private:
 	bool GetIsValidGameUserSettings() const;
 	URTSGameUserSettings* GetGameUserSettingsChecked() const;
