@@ -12,6 +12,7 @@
 #include "Components/SizeBox.h"
 #include "Engine/GameInstance.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
+#include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -64,6 +65,11 @@ void UW_EscapeMenuSettings::NativePreConstruct()
 	}
 
 	if (not GetAreControlsTextWidgetsValid())
+	{
+		return;
+	}
+
+	if (not GetAreGameplayTextWidgetsValid())
 	{
 		return;
 	}
@@ -149,11 +155,17 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 		return;
 	}
 
+	if (not GetAreGameplayWidgetsValid())
+	{
+		return;
+	}
+
 	EnsureWindowModeOptionTexts();
 	EnsureQualityOptionTexts();
 	PopulateWindowModeOptions();
 	PopulateResolutionOptions();
 	PopulateQualityOptions();
+	PopulateGameplayOptions();
 
 	SetSliderRange(M_SliderFrameRateLimit, M_SliderRanges.M_FrameRateLimitMin, M_SliderRanges.M_FrameRateLimitMax);
 	SetSliderRange(M_SliderMouseSensitivity, M_SliderRanges.M_MouseSensitivityMin, M_SliderRanges.M_MouseSensitivityMax);
@@ -236,6 +248,139 @@ void UW_EscapeMenuSettings::PopulateQualityOptionsForComboBox(UComboBoxString* C
 	}
 }
 
+void UW_EscapeMenuSettings::PopulateGameplayOptions()
+{
+	const TArray<ERTSPlayerHealthBarVisibilityStrategy> PlayerStrategies =
+	{
+		ERTSPlayerHealthBarVisibilityStrategy::NotInitialized,
+		ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults,
+		ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible,
+		ERTSPlayerHealthBarVisibilityStrategy::VisibleWhenDamagedOnly,
+		ERTSPlayerHealthBarVisibilityStrategy::VisibleOnSelectionAndDamaged,
+		ERTSPlayerHealthBarVisibilityStrategy::VisibleOnSelectionOnly,
+		ERTSPlayerHealthBarVisibilityStrategy::NeverVisible
+	};
+
+	const TArray<ERTSEnemyHealthBarVisibilityStrategy> EnemyStrategies =
+	{
+		ERTSEnemyHealthBarVisibilityStrategy::NotInitialized,
+		ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults,
+		ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible,
+		ERTSEnemyHealthBarVisibilityStrategy::VisibleWhenDamagedOnly
+	};
+
+	TArray<FText> PlayerOptionTexts;
+	PlayerOptionTexts.Reserve(PlayerStrategies.Num());
+	for (const ERTSPlayerHealthBarVisibilityStrategy Strategy : PlayerStrategies)
+	{
+		PlayerOptionTexts.Add(global_GetPlayerVisibilityStrategyText(Strategy));
+	}
+
+	TArray<FText> EnemyOptionTexts;
+	EnemyOptionTexts.Reserve(EnemyStrategies.Num());
+	for (const ERTSEnemyHealthBarVisibilityStrategy Strategy : EnemyStrategies)
+	{
+		EnemyOptionTexts.Add(global_GetEnemyVisibilityStrategyText(Strategy));
+	}
+
+	PopulateVisibilityOptionsForComboBox(M_ComboOverwriteAllPlayerHpBarStrat, PlayerOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboPlayerTankHpBarStrat, PlayerOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboPlayerSquadHpBarStrat, PlayerOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboPlayerNomadicHpBarStrat, PlayerOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboPlayerBxpHpBarStrat, PlayerOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboPlayerAircraftHpBarStrat, PlayerOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboOverwriteAllEnemyHpBarStrat, EnemyOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboEnemyTankHpBarStrat, EnemyOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboEnemySquadHpBarStrat, EnemyOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboEnemyNomadicHpBarStrat, EnemyOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboEnemyBxpHpBarStrat, EnemyOptionTexts);
+	PopulateVisibilityOptionsForComboBox(M_ComboEnemyAircraftHpBarStrat, EnemyOptionTexts);
+}
+
+void UW_EscapeMenuSettings::PopulateVisibilityOptionsForComboBox(
+	UComboBoxString* ComboBoxToPopulate,
+	const TArray<FText>& OptionTexts) const
+{
+	if (ComboBoxToPopulate == nullptr)
+	{
+		return;
+	}
+
+	ComboBoxToPopulate->ClearOptions();
+	for (const FText& OptionText : OptionTexts)
+	{
+		ComboBoxToPopulate->AddOption(OptionText.ToString());
+	}
+}
+
+void UW_EscapeMenuSettings::SetPlayerHealthBarStrategySelection(
+	UComboBoxString* ComboBoxToSelect,
+	const ERTSPlayerHealthBarVisibilityStrategy Strategy) const
+{
+	if (ComboBoxToSelect == nullptr)
+	{
+		return;
+	}
+
+	ComboBoxToSelect->SetSelectedOption(global_GetPlayerVisibilityStrategyText(Strategy).ToString());
+}
+
+void UW_EscapeMenuSettings::SetEnemyHealthBarStrategySelection(
+	UComboBoxString* ComboBoxToSelect,
+	const ERTSEnemyHealthBarVisibilityStrategy Strategy) const
+{
+	if (ComboBoxToSelect == nullptr)
+	{
+		return;
+	}
+
+	ComboBoxToSelect->SetSelectedOption(global_GetEnemyVisibilityStrategyText(Strategy).ToString());
+}
+
+void UW_EscapeMenuSettings::ApplyOverwriteAllPlayerHealthBarStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	bM_IsInitialisingControls = true;
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerTankHpBarStrat, Strategy);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerSquadHpBarStrat, Strategy);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerNomadicHpBarStrat, Strategy);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerBxpHpBarStrat, Strategy);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerAircraftHpBarStrat, Strategy);
+	bM_IsInitialisingControls = false;
+
+	M_SettingsSubsystem->SetPendingPlayerTankHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingPlayerSquadHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingPlayerNomadicHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingPlayerBxpHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingPlayerAircraftHpBarStrat(Strategy);
+}
+
+void UW_EscapeMenuSettings::ApplyOverwriteAllEnemyHealthBarStrategy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	bM_IsInitialisingControls = true;
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyTankHpBarStrat, Strategy);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemySquadHpBarStrat, Strategy);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyNomadicHpBarStrat, Strategy);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyBxpHpBarStrat, Strategy);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyAircraftHpBarStrat, Strategy);
+	bM_IsInitialisingControls = false;
+
+	M_SettingsSubsystem->SetPendingEnemyTankHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingEnemySquadHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingEnemyNomadicHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingEnemyBxpHpBarStrat(Strategy);
+	M_SettingsSubsystem->SetPendingEnemyAircraftHpBarStrat(Strategy);
+}
+
 void UW_EscapeMenuSettings::EnsureWindowModeOptionTexts()
 {
 	if (M_WindowModeOptionTexts.Num() >= EscapeMenuSettingsOptionDefaults::WindowModeOptionCount)
@@ -308,6 +453,20 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 	M_TextMouseSensitivityLabel->SetText(M_ControlsText.M_MouseSensitivityLabelText);
 	M_TextInvertYAxisLabel->SetText(M_ControlsText.M_InvertYAxisLabelText);
 
+	M_TextGameplayHeader->SetText(M_GameplayText.M_HeaderText);
+	M_TextOverwriteAllPlayerHpBarLabel->SetText(M_GameplayText.M_OverwriteAllPlayerHpBarLabelText);
+	M_TextPlayerTankHpBarLabel->SetText(M_GameplayText.M_PlayerTankHpBarLabelText);
+	M_TextPlayerSquadHpBarLabel->SetText(M_GameplayText.M_PlayerSquadHpBarLabelText);
+	M_TextPlayerNomadicHpBarLabel->SetText(M_GameplayText.M_PlayerNomadicHpBarLabelText);
+	M_TextPlayerBxpHpBarLabel->SetText(M_GameplayText.M_PlayerBxpHpBarLabelText);
+	M_TextPlayerAircraftHpBarLabel->SetText(M_GameplayText.M_PlayerAircraftHpBarLabelText);
+	M_TextOverwriteAllEnemyHpBarLabel->SetText(M_GameplayText.M_OverwriteAllEnemyHpBarLabelText);
+	M_TextEnemyTankHpBarLabel->SetText(M_GameplayText.M_EnemyTankHpBarLabelText);
+	M_TextEnemySquadHpBarLabel->SetText(M_GameplayText.M_EnemySquadHpBarLabelText);
+	M_TextEnemyNomadicHpBarLabel->SetText(M_GameplayText.M_EnemyNomadicHpBarLabelText);
+	M_TextEnemyBxpHpBarLabel->SetText(M_GameplayText.M_EnemyBxpHpBarLabelText);
+	M_TextEnemyAircraftHpBarLabel->SetText(M_GameplayText.M_EnemyAircraftHpBarLabelText);
+
 	M_TextApplyButton->SetText(M_ButtonText.M_ApplyButtonText);
 	M_TextSetDefaultsButton->SetText(M_ButtonText.M_SetDefaultsButtonText);
 	M_TextBackOrCancelButton->SetText(M_ButtonText.M_BackOrCancelButtonText);
@@ -318,6 +477,7 @@ void UW_EscapeMenuSettings::InitialiseControlsFromSnapshot(const FRTSSettingsSna
 	InitialiseGraphicsControls(SettingsSnapshot.M_GraphicsSettings);
 	InitialiseAudioControls(SettingsSnapshot.M_AudioSettings);
 	InitialiseControlSettingsControls(SettingsSnapshot.M_ControlSettings);
+	InitialiseGameplayControls(SettingsSnapshot.M_GameplaySettings);
 }
 
 void UW_EscapeMenuSettings::InitialiseGraphicsControls(const FRTSGraphicsSettings& GraphicsSettings)
@@ -422,6 +582,27 @@ void UW_EscapeMenuSettings::InitialiseControlSettingsControls(const FRTSControlS
 	);
 	M_SliderMouseSensitivity->SetValue(ClampedSensitivity);
 	M_CheckInvertYAxis->SetIsChecked(ControlSettings.bM_InvertYAxis);
+}
+
+void UW_EscapeMenuSettings::InitialiseGameplayControls(const FRTSGameplaySettings& GameplaySettings)
+{
+	if (not GetAreGameplayWidgetsValid())
+	{
+		return;
+	}
+
+	SetPlayerHealthBarStrategySelection(M_ComboOverwriteAllPlayerHpBarStrat, GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerTankHpBarStrat, GameplaySettings.M_PlayerTankHpBarStrat);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerSquadHpBarStrat, GameplaySettings.M_PlayerSquadHpBarStrat);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerNomadicHpBarStrat, GameplaySettings.M_PlayerNomadicHpBarStrat);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerBxpHpBarStrat, GameplaySettings.M_PlayerBxpHpBarStrat);
+	SetPlayerHealthBarStrategySelection(M_ComboPlayerAircraftHpBarStrat, GameplaySettings.M_PlayerAircraftHpBarStrat);
+	SetEnemyHealthBarStrategySelection(M_ComboOverwriteAllEnemyHpBarStrat, GameplaySettings.M_OverwriteAllEnemyHpBarStrat);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyTankHpBarStrat, GameplaySettings.M_EnemyTankHpBarStrat);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemySquadHpBarStrat, GameplaySettings.M_EnemySquadHpBarStrat);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyNomadicHpBarStrat, GameplaySettings.M_EnemyNomadicHpBarStrat);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyBxpHpBarStrat, GameplaySettings.M_EnemyBxpHpBarStrat);
+	SetEnemyHealthBarStrategySelection(M_ComboEnemyAircraftHpBarStrat, GameplaySettings.M_EnemyAircraftHpBarStrat);
 }
 
 void UW_EscapeMenuSettings::SetSliderRange(USlider* SliderToConfigure, const float MinValue, const float MaxValue) const
@@ -536,9 +717,15 @@ void UW_EscapeMenuSettings::BindSettingCallbacks()
 		return;
 	}
 
+	if (not GetAreGameplayWidgetsValid())
+	{
+		return;
+	}
+
 	BindGraphicsSettingCallbacks();
 	BindAudioSettingCallbacks();
 	BindControlSettingCallbacks();
+	BindGameplaySettingCallbacks();
 }
 
 void UW_EscapeMenuSettings::BindGraphicsSettingCallbacks()
@@ -602,6 +789,45 @@ void UW_EscapeMenuSettings::BindControlSettingCallbacks()
 
 	M_CheckInvertYAxis->OnCheckStateChanged.RemoveAll(this);
 	M_CheckInvertYAxis->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleInvertYAxisChanged);
+}
+
+void UW_EscapeMenuSettings::BindGameplaySettingCallbacks()
+{
+	M_ComboOverwriteAllPlayerHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboOverwriteAllPlayerHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleOverwriteAllPlayerHpBarStratChanged);
+
+	M_ComboPlayerTankHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboPlayerTankHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandlePlayerTankHpBarStratChanged);
+
+	M_ComboPlayerSquadHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboPlayerSquadHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandlePlayerSquadHpBarStratChanged);
+
+	M_ComboPlayerNomadicHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboPlayerNomadicHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandlePlayerNomadicHpBarStratChanged);
+
+	M_ComboPlayerBxpHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboPlayerBxpHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandlePlayerBxpHpBarStratChanged);
+
+	M_ComboPlayerAircraftHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboPlayerAircraftHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandlePlayerAircraftHpBarStratChanged);
+
+	M_ComboOverwriteAllEnemyHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboOverwriteAllEnemyHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleOverwriteAllEnemyHpBarStratChanged);
+
+	M_ComboEnemyTankHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboEnemyTankHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnemyTankHpBarStratChanged);
+
+	M_ComboEnemySquadHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboEnemySquadHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnemySquadHpBarStratChanged);
+
+	M_ComboEnemyNomadicHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboEnemyNomadicHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnemyNomadicHpBarStratChanged);
+
+	M_ComboEnemyBxpHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboEnemyBxpHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnemyBxpHpBarStratChanged);
+
+	M_ComboEnemyAircraftHpBarStrat->OnSelectionChanged.RemoveAll(this);
+	M_ComboEnemyAircraftHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnemyAircraftHpBarStratChanged);
 }
 
 bool UW_EscapeMenuSettings::GetIsValidPlayerController() const
@@ -788,6 +1014,22 @@ bool UW_EscapeMenuSettings::GetIsValidVerticalBoxControlsSection() const
 			this,
 			TEXT("M_VerticalBoxControlsSection"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxControlsSection"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidVerticalBoxGameplaySection() const
+{
+	if (not IsValid(M_VerticalBoxGameplaySection))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_VerticalBoxGameplaySection"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxGameplaySection"),
 			this
 		);
 		return false;
@@ -1388,6 +1630,214 @@ bool UW_EscapeMenuSettings::GetIsValidTextInvertYAxisLabel() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidTextGameplayHeader() const
+{
+	if (not IsValid(M_TextGameplayHeader))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextGameplayHeader"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextGameplayHeader"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextOverwriteAllPlayerHpBarLabel() const
+{
+	if (not IsValid(M_TextOverwriteAllPlayerHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextOverwriteAllPlayerHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextOverwriteAllPlayerHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextPlayerTankHpBarLabel() const
+{
+	if (not IsValid(M_TextPlayerTankHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextPlayerTankHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextPlayerTankHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextPlayerSquadHpBarLabel() const
+{
+	if (not IsValid(M_TextPlayerSquadHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextPlayerSquadHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextPlayerSquadHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextPlayerNomadicHpBarLabel() const
+{
+	if (not IsValid(M_TextPlayerNomadicHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextPlayerNomadicHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextPlayerNomadicHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextPlayerBxpHpBarLabel() const
+{
+	if (not IsValid(M_TextPlayerBxpHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextPlayerBxpHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextPlayerBxpHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextPlayerAircraftHpBarLabel() const
+{
+	if (not IsValid(M_TextPlayerAircraftHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextPlayerAircraftHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextPlayerAircraftHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextOverwriteAllEnemyHpBarLabel() const
+{
+	if (not IsValid(M_TextOverwriteAllEnemyHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextOverwriteAllEnemyHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextOverwriteAllEnemyHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEnemyTankHpBarLabel() const
+{
+	if (not IsValid(M_TextEnemyTankHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEnemyTankHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEnemyTankHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEnemySquadHpBarLabel() const
+{
+	if (not IsValid(M_TextEnemySquadHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEnemySquadHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEnemySquadHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEnemyNomadicHpBarLabel() const
+{
+	if (not IsValid(M_TextEnemyNomadicHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEnemyNomadicHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEnemyNomadicHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEnemyBxpHpBarLabel() const
+{
+	if (not IsValid(M_TextEnemyBxpHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEnemyBxpHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEnemyBxpHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEnemyAircraftHpBarLabel() const
+{
+	if (not IsValid(M_TextEnemyAircraftHpBarLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEnemyAircraftHpBarLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEnemyAircraftHpBarLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidSliderMouseSensitivity() const
 {
 	if (not IsValid(M_SliderMouseSensitivity))
@@ -1412,6 +1862,198 @@ bool UW_EscapeMenuSettings::GetIsValidCheckInvertYAxis() const
 			this,
 			TEXT("M_CheckInvertYAxis"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidCheckInvertYAxis"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboOverwriteAllPlayerHpBarStrat() const
+{
+	if (not IsValid(M_ComboOverwriteAllPlayerHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboOverwriteAllPlayerHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboOverwriteAllPlayerHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboPlayerTankHpBarStrat() const
+{
+	if (not IsValid(M_ComboPlayerTankHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboPlayerTankHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboPlayerTankHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboPlayerSquadHpBarStrat() const
+{
+	if (not IsValid(M_ComboPlayerSquadHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboPlayerSquadHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboPlayerSquadHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboPlayerNomadicHpBarStrat() const
+{
+	if (not IsValid(M_ComboPlayerNomadicHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboPlayerNomadicHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboPlayerNomadicHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboPlayerBxpHpBarStrat() const
+{
+	if (not IsValid(M_ComboPlayerBxpHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboPlayerBxpHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboPlayerBxpHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboPlayerAircraftHpBarStrat() const
+{
+	if (not IsValid(M_ComboPlayerAircraftHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboPlayerAircraftHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboPlayerAircraftHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboOverwriteAllEnemyHpBarStrat() const
+{
+	if (not IsValid(M_ComboOverwriteAllEnemyHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboOverwriteAllEnemyHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboOverwriteAllEnemyHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboEnemyTankHpBarStrat() const
+{
+	if (not IsValid(M_ComboEnemyTankHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboEnemyTankHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboEnemyTankHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboEnemySquadHpBarStrat() const
+{
+	if (not IsValid(M_ComboEnemySquadHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboEnemySquadHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboEnemySquadHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboEnemyNomadicHpBarStrat() const
+{
+	if (not IsValid(M_ComboEnemyNomadicHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboEnemyNomadicHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboEnemyNomadicHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboEnemyBxpHpBarStrat() const
+{
+	if (not IsValid(M_ComboEnemyBxpHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboEnemyBxpHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboEnemyBxpHpBarStrat"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboEnemyAircraftHpBarStrat() const
+{
+	if (not IsValid(M_ComboEnemyAircraftHpBarStrat))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboEnemyAircraftHpBarStrat"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboEnemyAircraftHpBarStrat"),
 			this
 		);
 		return false;
@@ -1591,6 +2233,21 @@ bool UW_EscapeMenuSettings::GetAreControlsWidgetsValid() const
 	return GetAreControlSettingsWidgetsValid();
 }
 
+bool UW_EscapeMenuSettings::GetAreGameplayWidgetsValid() const
+{
+	if (not GetIsValidVerticalBoxGameplaySection())
+	{
+		return false;
+	}
+
+	if (not GetAreGameplayTextWidgetsValid())
+	{
+		return false;
+	}
+
+	return GetAreGameplayComboWidgetsValid();
+}
+
 bool UW_EscapeMenuSettings::GetAreFooterWidgetsValid() const
 {
 	if (not GetIsValidHorizontalBoxFooterButtons())
@@ -1644,6 +2301,11 @@ bool UW_EscapeMenuSettings::GetAreAllWidgetsValid() const
 	}
 
 	if (not GetAreControlsWidgetsValid())
+	{
+		return false;
+	}
+
+	if (not GetAreGameplayWidgetsValid())
 	{
 		return false;
 	}
@@ -1806,6 +2468,71 @@ bool UW_EscapeMenuSettings::GetAreControlsTextWidgetsValid() const
 	return GetIsValidTextInvertYAxisLabel();
 }
 
+bool UW_EscapeMenuSettings::GetAreGameplayTextWidgetsValid() const
+{
+	if (not GetIsValidTextGameplayHeader())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextOverwriteAllPlayerHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextPlayerTankHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextPlayerSquadHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextPlayerNomadicHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextPlayerBxpHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextPlayerAircraftHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextOverwriteAllEnemyHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextEnemyTankHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextEnemySquadHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextEnemyNomadicHpBarLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextEnemyBxpHpBarLabel())
+	{
+		return false;
+	}
+
+	return GetIsValidTextEnemyAircraftHpBarLabel();
+}
+
 bool UW_EscapeMenuSettings::GetAreFooterTextWidgetsValid() const
 {
 	if (not GetIsValidTextApplyButton())
@@ -1909,6 +2636,66 @@ bool UW_EscapeMenuSettings::GetAreControlSettingsWidgetsValid() const
 	}
 
 	return GetIsValidCheckInvertYAxis();
+}
+
+bool UW_EscapeMenuSettings::GetAreGameplayComboWidgetsValid() const
+{
+	if (not GetIsValidComboOverwriteAllPlayerHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboPlayerTankHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboPlayerSquadHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboPlayerNomadicHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboPlayerBxpHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboPlayerAircraftHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboOverwriteAllEnemyHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboEnemyTankHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboEnemySquadHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboEnemyNomadicHpBarStrat())
+	{
+		return false;
+	}
+
+	if (not GetIsValidComboEnemyBxpHpBarStrat())
+	{
+		return false;
+	}
+
+	return GetIsValidComboEnemyAircraftHpBarStrat();
 }
 
 void UW_EscapeMenuSettings::HandleApplyClicked()
@@ -2387,4 +3174,332 @@ void UW_EscapeMenuSettings::HandleInvertYAxisChanged(const bool bIsChecked)
 	}
 
 	M_SettingsSubsystem->SetPendingInvertYAxis(bIsChecked);
+}
+
+void UW_EscapeMenuSettings::HandleOverwriteAllPlayerHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboOverwriteAllPlayerHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboOverwriteAllPlayerHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player health bar overwrite selection was not found in the combo box options."));
+		return;
+	}
+
+	const ERTSPlayerHealthBarVisibilityStrategy Strategy = static_cast<ERTSPlayerHealthBarVisibilityStrategy>(SelectedIndex);
+	M_SettingsSubsystem->SetPendingOverwriteAllPlayerHpBarStrat(Strategy);
+	ApplyOverwriteAllPlayerHealthBarStrategy(Strategy);
+}
+
+void UW_EscapeMenuSettings::HandlePlayerTankHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboPlayerTankHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboPlayerTankHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player tank health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingPlayerTankHpBarStrat(static_cast<ERTSPlayerHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandlePlayerSquadHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboPlayerSquadHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboPlayerSquadHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player squad health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingPlayerSquadHpBarStrat(static_cast<ERTSPlayerHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandlePlayerNomadicHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboPlayerNomadicHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboPlayerNomadicHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player nomadic health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingPlayerNomadicHpBarStrat(static_cast<ERTSPlayerHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandlePlayerBxpHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboPlayerBxpHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboPlayerBxpHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player bxp health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingPlayerBxpHpBarStrat(static_cast<ERTSPlayerHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandlePlayerAircraftHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboPlayerAircraftHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboPlayerAircraftHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player aircraft health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingPlayerAircraftHpBarStrat(static_cast<ERTSPlayerHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandleOverwriteAllEnemyHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboOverwriteAllEnemyHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboOverwriteAllEnemyHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy health bar overwrite selection was not found in the combo box options."));
+		return;
+	}
+
+	const ERTSEnemyHealthBarVisibilityStrategy Strategy = static_cast<ERTSEnemyHealthBarVisibilityStrategy>(SelectedIndex);
+	M_SettingsSubsystem->SetPendingOverwriteAllEnemyHpBarStrat(Strategy);
+	ApplyOverwriteAllEnemyHealthBarStrategy(Strategy);
+}
+
+void UW_EscapeMenuSettings::HandleEnemyTankHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboEnemyTankHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboEnemyTankHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy tank health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingEnemyTankHpBarStrat(static_cast<ERTSEnemyHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandleEnemySquadHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboEnemySquadHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboEnemySquadHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy squad health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingEnemySquadHpBarStrat(static_cast<ERTSEnemyHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandleEnemyNomadicHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboEnemyNomadicHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboEnemyNomadicHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy nomadic health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingEnemyNomadicHpBarStrat(static_cast<ERTSEnemyHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandleEnemyBxpHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboEnemyBxpHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboEnemyBxpHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy bxp health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingEnemyBxpHpBarStrat(static_cast<ERTSEnemyHealthBarVisibilityStrategy>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandleEnemyAircraftHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboEnemyAircraftHpBarStrat())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboEnemyAircraftHpBarStrat->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy aircraft health bar selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingEnemyAircraftHpBarStrat(static_cast<ERTSEnemyHealthBarVisibilityStrategy>(SelectedIndex));
 }

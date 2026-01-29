@@ -6,6 +6,7 @@
 #include "GetTargetUnitThread/GetAsyncTarget.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/AsyncUnitDetailedState/AsyncUnitDetailedState.h"
 #include "RTS_Survival/Interfaces/Commands.h"
@@ -14,10 +15,12 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace GameUnitManagerDetailedState
@@ -138,6 +141,95 @@ namespace GameUnitManagerDetailedState
 	}
 }
 
+namespace GameUnitManagerHealthBarVisibility
+{
+	bool TryGetPlayerVisibilityStrategy(
+		const AActor* OwnerActor,
+		const URTSGameUserSettings& GameUserSettings,
+		ERTSPlayerHealthBarVisibilityStrategy& OutStrategy)
+	{
+		if (OwnerActor == nullptr)
+		{
+			return false;
+		}
+
+		if (OwnerActor->IsA(ANomadicVehicle::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetPlayerNomadicHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(ATankMaster::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetPlayerTankHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(AAircraftMaster::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetPlayerAircraftHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(ASquadController::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetPlayerSquadHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(ABuildingExpansion::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetPlayerBxpHpBarStrat();
+			return true;
+		}
+
+		return false;
+	}
+
+	bool TryGetEnemyVisibilityStrategy(
+		const AActor* OwnerActor,
+		const URTSGameUserSettings& GameUserSettings,
+		ERTSEnemyHealthBarVisibilityStrategy& OutStrategy)
+	{
+		if (OwnerActor == nullptr)
+		{
+			return false;
+		}
+
+		if (OwnerActor->IsA(ANomadicVehicle::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetEnemyNomadicHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(ATankMaster::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetEnemyTankHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(AAircraftMaster::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetEnemyAircraftHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(ASquadController::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetEnemySquadHpBarStrat();
+			return true;
+		}
+
+		if (OwnerActor->IsA(ABuildingExpansion::StaticClass()))
+		{
+			OutStrategy = GameUserSettings.GetEnemyBxpHpBarStrat();
+			return true;
+		}
+
+		return false;
+	}
+}
+
 UGameUnitManager::UGameUnitManager()
 	: M_AsyncTargetProcessor(nullptr)
 	  , M_ActorDataUpdateInterval(DeveloperSettings::Async::GameThreadUpdateAsyncWithActorTargetsInterval)
@@ -187,6 +279,261 @@ void UGameUnitManager::SetAllUnitOptimizationEnabled(const bool bEnable)
 			UActorComponent* Component = EachSquadUnit->GetComponentByClass(URTSOptimizer::StaticClass());
 			DisableOptimization(Component);
 		}
+	}
+}
+
+bool UGameUnitManager::TryApplyHealthBarVisibilityFromUserSettings(UHealthComponent* HealthComponent)
+{
+	if (not IsValid(HealthComponent))
+	{
+		return false;
+	}
+
+	const URTSGameUserSettings* const GameUserSettings = URTSGameUserSettings::Get();
+	if (GameUserSettings == nullptr)
+	{
+		return false;
+	}
+
+	AActor* const OwnerActor = HealthComponent->GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		return false;
+	}
+
+	URTSComponent* const RTSComponent = Cast<URTSComponent>(OwnerActor->GetComponentByClass(URTSComponent::StaticClass()));
+	if (RTSComponent == nullptr)
+	{
+		return false;
+	}
+
+	const int32 PlayerIndex = 1;
+	const bool bIsPlayerUnit = (RTSComponent->GetOwningPlayer() == PlayerIndex);
+	if (bIsPlayerUnit)
+	{
+		ERTSPlayerHealthBarVisibilityStrategy Strategy = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
+		if (not GameUnitManagerHealthBarVisibility::TryGetPlayerVisibilityStrategy(
+			OwnerActor,
+			*GameUserSettings,
+			Strategy))
+		{
+			return false;
+		}
+
+		if (Strategy == ERTSPlayerHealthBarVisibilityStrategy::NotInitialized ||
+			Strategy == ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults)
+		{
+			return false;
+		}
+
+		HealthComponent->OnOverwiteHealthbarVisiblityPlayer(Strategy);
+		return true;
+	}
+
+	ERTSEnemyHealthBarVisibilityStrategy EnemyStrategy = ERTSEnemyHealthBarVisibilityStrategy::NotInitialized;
+	if (not GameUnitManagerHealthBarVisibility::TryGetEnemyVisibilityStrategy(
+		OwnerActor,
+		*GameUserSettings,
+		EnemyStrategy))
+	{
+		return false;
+	}
+
+	if (EnemyStrategy == ERTSEnemyHealthBarVisibilityStrategy::NotInitialized ||
+		EnemyStrategy == ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults)
+	{
+		return false;
+	}
+
+	HealthComponent->OnOverwiteHealthbarVisiblityEnemy(EnemyStrategy);
+	return true;
+}
+
+void UGameUnitManager::ApplyPlayerTankHealthBarVisibilityStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	for (ATankMaster* Tank : M_TankMastersAlivePlayer)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Tank, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityPlayer(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyPlayerSquadHealthBarVisibilityStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	const int32 PlayerIndex = 1;
+	const TSet<ASquadController*> SquadControllers = GameUnitManagerDetailedState::GatherSquadControllers(
+		M_SquadUnitAlivePlayer,
+		M_SquadUnitsAliveEnemy);
+
+	for (ASquadController* SquadController : SquadControllers)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(SquadController, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+
+		if (RTSComponent->GetOwningPlayer() != PlayerIndex)
+		{
+			continue;
+		}
+
+		HealthComponent->OnOverwiteHealthbarVisiblityPlayer(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyPlayerNomadicHealthBarVisibilityStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	for (AActor* Actor : M_ActorsAlivePlayer)
+	{
+		if (not IsValid(Actor) || not Actor->IsA(ANomadicVehicle::StaticClass()))
+		{
+			continue;
+		}
+
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Actor, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityPlayer(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyPlayerBxpHealthBarVisibilityStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	for (ABuildingExpansion* Bxp : M_BxpAlivePlayer)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Bxp, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityPlayer(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyPlayerAircraftHealthBarVisibilityStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	for (AAircraftMaster* Aircraft : M_AircraftMastersAlivePlayer)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Aircraft, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityPlayer(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyEnemyTankHealthBarVisibilityStrategy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	for (ATankMaster* Tank : M_TankMastersAliveEnemy)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Tank, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityEnemy(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyEnemySquadHealthBarVisibilityStrategy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	const int32 PlayerIndex = 1;
+	const TSet<ASquadController*> SquadControllers = GameUnitManagerDetailedState::GatherSquadControllers(
+		M_SquadUnitAlivePlayer,
+		M_SquadUnitsAliveEnemy);
+
+	for (ASquadController* SquadController : SquadControllers)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(SquadController, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+
+		if (RTSComponent->GetOwningPlayer() == PlayerIndex)
+		{
+			continue;
+		}
+
+		HealthComponent->OnOverwiteHealthbarVisiblityEnemy(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyEnemyNomadicHealthBarVisibilityStrategy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	for (AActor* Actor : M_ActorsAliveEnemy)
+	{
+		if (not IsValid(Actor) || not Actor->IsA(ANomadicVehicle::StaticClass()))
+		{
+			continue;
+		}
+
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Actor, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityEnemy(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyEnemyBxpHealthBarVisibilityStrategy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	for (ABuildingExpansion* Bxp : M_BxpAliveEnemy)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Bxp, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityEnemy(Strategy);
+	}
+}
+
+void UGameUnitManager::ApplyEnemyAircraftHealthBarVisibilityStrategy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	for (AAircraftMaster* Aircraft : M_AircraftMastersAliveEnemy)
+	{
+		URTSComponent* RTSComponent = nullptr;
+		UHealthComponent* HealthComponent = nullptr;
+		if (not GameUnitManagerDetailedState::TryGetActorComponents(Aircraft, RTSComponent, HealthComponent))
+		{
+			continue;
+		}
+		(void)RTSComponent;
+
+		HealthComponent->OnOverwiteHealthbarVisiblityEnemy(Strategy);
 	}
 }
 

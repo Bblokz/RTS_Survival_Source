@@ -3,6 +3,7 @@
 #include "SquadUnitHealthComponent.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/Units/Squads/SquadControllerHpComp/USquadHealthComponent.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 void USquadUnitHealthComponent::SetSquadHealthComponent(USquadHealthComponent* InSquadHealth)
 {
@@ -54,10 +55,27 @@ void USquadUnitHealthComponent::SetMaxHealth(const float NewMaxHealth)
 	NotifySquadOfState(/*bAffectSquadCurrent*/ true);
 }
 
+void USquadUnitHealthComponent::OnOverwiteHealthbarVisiblityPlayer(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+{
+	(void)Strategy;
+	RTSFunctionLibrary::ReportError(TEXT("Squad unit health components do not support changing health bar visibility."));
+}
+
+void USquadUnitHealthComponent::OnOverwiteHealthbarVisiblityEnemy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+{
+	(void)Strategy;
+	RTSFunctionLibrary::ReportError(TEXT("Squad unit health components do not support changing health bar visibility."));
+}
+
 void USquadUnitHealthComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_BindOwnerDeath();
+}
+
+void USquadUnitHealthComponent::BeginPlay_ApplyUserSettingsHealthBarVisibility()
+{
+	return;
 }
 
 bool USquadUnitHealthComponent::GetIsValidSquadHealth_NoReport() const

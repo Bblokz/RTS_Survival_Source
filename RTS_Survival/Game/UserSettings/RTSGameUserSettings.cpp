@@ -7,6 +7,25 @@ namespace RTSGameUserSettingsPrivate
 	constexpr float MinFrameRateLimit = 0.0f;
 }
 
+const URTSGameUserSettings* URTSGameUserSettings::Get()
+{
+	UGameUserSettings* const BaseSettings = UGameUserSettings::GetGameUserSettings();
+	if (BaseSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UGameUserSettings::GetGameUserSettings returned null."));
+		return nullptr;
+	}
+
+	const URTSGameUserSettings* const RTSSettings = Cast<URTSGameUserSettings>(BaseSettings);
+	if (RTSSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("GameUserSettings is not an instance of URTSGameUserSettings."));
+		return nullptr;
+	}
+
+	return RTSSettings;
+}
+
 void URTSGameUserSettings::LoadSettings(const bool bForceReload)
 {
 	Super::LoadSettings(bForceReload);
@@ -110,6 +129,126 @@ void URTSGameUserSettings::SetMouseSensitivity(const float NewMouseSensitivity)
 void URTSGameUserSettings::SetInvertYAxis(const bool bNewInvertYAxis)
 {
 	bM_InvertYAxis = bNewInvertYAxis;
+}
+
+ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetOverwriteAllPlayerHpBarStrat() const
+{
+	return M_OverwriteAllPlayerHpBarStrat;
+}
+
+ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetPlayerTankHpBarStrat() const
+{
+	return M_PlayerTankHpBarStrat;
+}
+
+ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetPlayerSquadHpBarStrat() const
+{
+	return M_PlayerSquadHpBarStrat;
+}
+
+ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetPlayerNomadicHpBarStrat() const
+{
+	return M_PlayerNomadicHpBarStrat;
+}
+
+ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetPlayerBxpHpBarStrat() const
+{
+	return M_PlayerBxpHpBarStrat;
+}
+
+ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetPlayerAircraftHpBarStrat() const
+{
+	return M_PlayerAircraftHpBarStrat;
+}
+
+ERTSEnemyHealthBarVisibilityStrategy URTSGameUserSettings::GetOverwriteAllEnemyHpBarStrat() const
+{
+	return M_OverwriteAllEnemyHpBarStrat;
+}
+
+ERTSEnemyHealthBarVisibilityStrategy URTSGameUserSettings::GetEnemyTankHpBarStrat() const
+{
+	return M_EnemyTankHpBarStrat;
+}
+
+ERTSEnemyHealthBarVisibilityStrategy URTSGameUserSettings::GetEnemySquadHpBarStrat() const
+{
+	return M_EnemySquadHpBarStrat;
+}
+
+ERTSEnemyHealthBarVisibilityStrategy URTSGameUserSettings::GetEnemyNomadicHpBarStrat() const
+{
+	return M_EnemyNomadicHpBarStrat;
+}
+
+ERTSEnemyHealthBarVisibilityStrategy URTSGameUserSettings::GetEnemyBxpHpBarStrat() const
+{
+	return M_EnemyBxpHpBarStrat;
+}
+
+ERTSEnemyHealthBarVisibilityStrategy URTSGameUserSettings::GetEnemyAircraftHpBarStrat() const
+{
+	return M_EnemyAircraftHpBarStrat;
+}
+
+void URTSGameUserSettings::SetOverwriteAllPlayerHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_OverwriteAllPlayerHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetPlayerTankHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PlayerTankHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetPlayerSquadHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PlayerSquadHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetPlayerNomadicHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PlayerNomadicHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetPlayerBxpHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PlayerBxpHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetPlayerAircraftHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
+{
+	M_PlayerAircraftHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetOverwriteAllEnemyHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_OverwriteAllEnemyHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetEnemyTankHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_EnemyTankHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetEnemySquadHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_EnemySquadHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetEnemyNomadicHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_EnemyNomadicHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetEnemyBxpHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_EnemyBxpHpBarStrat = NewStrategy;
+}
+
+void URTSGameUserSettings::SetEnemyAircraftHpBarStrat(const ERTSEnemyHealthBarVisibilityStrategy NewStrategy)
+{
+	M_EnemyAircraftHpBarStrat = NewStrategy;
 }
 
 Scalability::FQualityLevels URTSGameUserSettings::GetQualityLevels() const

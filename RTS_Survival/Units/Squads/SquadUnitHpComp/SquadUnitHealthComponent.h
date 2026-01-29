@@ -43,8 +43,12 @@ public:
 	/** Notifies the squad of Max/Current delta; aggregate applies delta accordingly. */
 	virtual void SetMaxHealth(float NewMaxHealth) override;
 
+	virtual void OnOverwiteHealthbarVisiblityPlayer(ERTSPlayerHealthBarVisibilityStrategy Strategy) override;
+	virtual void OnOverwiteHealthbarVisiblityEnemy(ERTSEnemyHealthBarVisibilityStrategy Strategy) override;
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void BeginPlay_ApplyUserSettingsHealthBarVisibility() override;
 
 private:
 	// Owning squad aggregate; intentionally no error spam if unset at BeginPlay.
