@@ -1,105 +1,30 @@
-﻿Energy system.
+﻿You are going to implement the new hotkey feature which will integrate with the user settings to display the correct
+hotkey for action items ; UW_ItemActionUI of which the associated actions are IA_ActionButtonN where N is the index of that
+action ui item (const int32 IndexActionUIElm)
+the same goes for the control groups;  each control group has a UW_ControlGroupImage that now also holds a hotkey;
+the numbering of the control group actions goes like IA_ControlGroup1, IA_ControlGroup2 , ... till IA_ControlGroup10 so no zero.
+originally the controll group image used their index and used that to display their static hotkey with 	UFUNCTION(BlueprintImplementableEvent)
+                                                                                                       	void SetupControlGroupIndex(const int32 GroupIndex);
+ you need to refactor this to use the new hotkey provider system as well; where index 0 for a control group image
+ means action IA_ControlGroup1 and index 9 means IA_ControlGroup10.
 
-right now some blueprint buildings are setup with an energy component. In particular; some bxp buildings have this.
-Currently there is no panelty for when the player's base is on low power; the player resource manager correctly 
-shows the energy usage levels on the energy bar in the UI but there is no gameplay effect for low energy.
-You will also need to define three more energy components based on the base one we already have;
-1. TankEnergyComponent,
-2. BuildingExpansionEnergyComponent.
-3. NomadicVehicleEnergyComponent.
+ Add a single “Hotkey Provider” (subsystem) that can answer: “Key for slot N?”
 
-where you can expect that i put the tank energy ones on the derived blueprints of tank masters that are not nomadic vehicles
-and the building expansion energy component on the bxp buildings.
-the nomadic vehicle energy component goes on the nomadic vehicle blueprints that are not tank masters.
-
-i want this effect to be guided by the energy component and a behaviour.
-first the energy component needs to have a public function called OnBaseEnergyChange(const bool bIsLowPower) which is only called
-once there is not enough power or when there is again a higher power supply than demand. This is done by the player resource manager. 
-make sure there is atleast 2 seconds between calls to this function to avoid spamming it in case of rapid energy changes; always cache the latest
-energy change; if within 5 sec we go from low->restore->low->restore then only the last restore state matters.
-make sure 	LowBaseEnergy, respectively
-          	BaseEnergyRestored, are called from the cppcontroller 's 
-	void PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false,
-	                            bool bInterruptRegularVoiceLines = false) const;
+Give UW_ItemActionUI zero knowledge of Enhanced Input internals.
+Instead:
+UW_ItemActionUI::InitActionUIElement(...) stores:
+owning controller (or local player reference)
+its IndexActionUIElm
+reference a subsystem
+Immediately (or on the next tick if you prefer), it asks:
+Provider → GetDisplayKeyForActionSlot(IndexActionUIElm)
+That provider does the actual work:
+Convert slot index → UInputAction* (IA_ActionButton[n])
+Query current mapping(s)
+Pick the “primary” key to display (keyboard vs gamepad rules)
+Return a display string/text suitable for your UW_HotKey RichTextBlock
+Result: each action button’s M_ActionItemHotKey just receives “F” / “1” / “Mouse4” / “RB” etc.
 
 
-I also need you to derive a new behaviour based on 
-class RTS_SURVIVAL_API UBehaviourWeapon : public UBehaviour called LowEnergyBehaviour.
-this behaviour will also look for turrets on the owner actor and cache their current rotate speed,
-it will then multiply the rotate speed with its own TurretLowEnergyRotationSpeedMlt which will be set in the derived bp. when the behaviour is removed it
-needs to restore the original turret rotate speed.
-
-you also need to define a new developer settings derived object in its own dir under the EnergyComponent dir. this one will be called
-RTSEnergyGameSettings and contain the material pointer for the material to apply when the building/vehicle is low on energy. (if the component is
-set to use that strategy of changing materials) Note: make sure hte energy component caches this material once at beginplay before doing anything else.
-this settings object will also hold the derived class for the LowEnergyBehaviour to apply, which energy components also need to cache.
-make sure the CategoryName = TEXT("Game"); for the ctor of this settings object. 
-make sure the SectionName is set to TEXT("RTSEnergyGameSettings");
-
-now depending on the owner of this energy component it will react differently.
-as soon as the component is at begin play it will determine its owner type and with that set its ELowEnergyStrategy which needs to be an 
-enum in a separate file. (uint8) 
-enum ELowEnergyStrategy
-{
-    LES_Invalid
-    LES_None       
-    LES_ApplyBehaviourOnly, 
-    LES_ChangeMaterialsOnly,
-    LES_ApplyBehaviourAndChangeMaterials,
-};
-if the owner is ANomadicVehicle then it will set it to LES_ApplyBehaviourOnly
-if the owner is ABXPBuilding then it will set it to LES_ApplyBehaviourAndChangeMaterials
-if the owner is ATankMaster but not ANomadicBuilding then it will also be set to LES_ApplyBehaviourAndChangeMaterials.
-(this is rare but can happen for vehicles that require energy)
-also make sure the energy comp has UPROPERTY Editdefaults bp readwrite for the strategy called OverwriteLowEnergyStrategy;
-if this is set to something other than LES_Invalid then use that value instead of the auto determined one.
-after this; if we are set to either use
-    LES_ChangeMaterialsOnly or
-    LES_ApplyBehaviourAndChangeMaterials,
- then call the protected virtual method cache OwnerMaterials on the energy component ( i will later describe how to implmeent this for the different energy components)
-if we are set to use
-    LES_ApplyBehaviourOnly, 
-    LES_ApplyBehaviourAndChangeMaterials,
-then attempt to cache the behaviour component on the owner actor if it is not there leave the weakpointer null.
-Important note: the GetIsOwnerBehaviourComponentValid should not ReportError as it is possible some actors do not support behaviours.
-now check if the base is already at low energy (it is possible that the energy component is spawned at run time on an actor;
-so we need to check what the current energy situation is)
-if it is then call OnBaseEnergyChange(true) to trigger the low energy effects right away.
-
-When we hit low energy and hte component receives it through OnBaseEnergyChange ; first check if the eneryg comp is already
-set to low energy if it is then report error.
-if not then set the internal bool to low energy true.
-then depending on the strategy do the following:
--ChangeMaterial: we set all cached meshes to use the low energy material from the dev settings. Important note if we find not a single
-cached mesh OR find more material slots than we have back-up-ed materials to restore; give a detailed error report in a private function to not
-clutter the code flow.
--ApplyBehaviour: we add the LowEnergyBehaviour to the owner actor using the derived class from the dev settings if the owner has a behaviour component.
-
-on energy restored; first check if we are already not at low energy; if so report error.
-if not then set the internal bool to low energy false.
-then depending on the strategy do the following:
--ChangeMaterial: we restore all cached meshes to use their original materials. DO error report if the mesh does not support the amount of cached materials we set.
--ApplyBehaviour: we remove the LowEnergyBehaviour from the owner actor if it was added.
-
-How the material caching will work differently depending on the energy component: 
-for building expansions; upon begin play it is possible that the bxp is not a stand alone; if it is not then it means the building expansion is still constructing.
-look for the 
-DECLARE_MULTICAST_DELEGATE(FOnBxpConstructed) on it and bind to that lambda our bxp material cache function so we only cache the materials once the bxp is fully constructed
-as during the construction process the materials and mesh are different. cache all meshes on the bxp actor; but do not do anything for the attachments.
-it is possible the buidlding expansion has turrets check that from the same function (either called immediatly if standalone or after the construction through
-the delegate) and cache all the materials and meshes from the turret. (all in weak object poitners!)
-
-note in case the low energy hits while the construction is ongoing; we wait till the construction is done to apply the material change.
-note 2 if the low energy or restoreation happens during packingup see 
-DECLARE_MULTICAST_DELEGATE(FOnBxpPackingUp) then the bulding is set to its construction materials again; so do nothing and wait untill 
-DECLARE_MULTICAST_DELEGATE(FOnBxpCancelledPackingUp) fires which means the packing up was cancelled and we have our materials and everything restored; then 
-apply the materials for the energy level!
-Note: it is ofcourse possible to have the energy level change from low to restored multiple times during the construction process; so make sure to always
-track the last one!
-Note in case no cancel packing up follows after packing up; the building will be destroyed so no need to restore anything.
-
-for tanks: cache all meshes and materials of them and also on all turrets; no need to wait for construction logic or anything!
-for nomadic vehicles; we only apply the behaviour and do no material caching even if the override strategy is set to do so (in that case do report error as we will
-not support this!)
-
-Make sure there is no error report spam on shutting down of the component (it needs to be aware of when the owner is set to be destroyed)
+make sure that as soon as the player updates the keybindings through the settings the subsystem is notified of this and has delegates
+for both action ui buttons and control group buttons so they can be updated with their new IA_ ... hotkey!

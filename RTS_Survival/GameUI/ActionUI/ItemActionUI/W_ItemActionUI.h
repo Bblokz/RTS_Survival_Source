@@ -7,6 +7,7 @@
 #include "RTS_Survival/Player/Abilities.h"
 #include "W_ItemActionUI.generated.h"
 
+class UW_HotKey;
 class UActionUIManager;
 class UTextBlock;
 class ACPPController;
@@ -31,7 +32,8 @@ public:
 	 * @param CoolDownRemaining
 	 * @param CooldownTotalDuration
 	 */
-        void UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CoolDownRemaining, const int32 CooldownTotalDuration);
+	void UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CoolDownRemaining,
+	                        const int32 CooldownTotalDuration);
 
 	void InitActionUIElement(
 		ACPPController* PlayerController,
@@ -45,11 +47,12 @@ protected:
 	 * @param CooldownDuration
 	 */
 	UFUNCTION(BlueprintImplementableEvent, Category ="UpdateActionUI")
-        void OnUpdateActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CooldownRemaining, const int32 CooldownDuration);
+	void OnUpdateActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CooldownRemaining,
+	                      const int32 CooldownDuration);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnActionUIClicked();
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnActionUIHover(const bool bIsHover) const;
 
@@ -70,17 +73,16 @@ protected:
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	UImage* M_ActionItemImage;
 
-	// The image of this widget that is a child of the button.
+	// The hotkey of this action ui item.
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
-	UTextBlock* M_ActionItemHotKeyText;
+	UW_HotKey* M_ActionItemHotKey;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void UpdateButtonWithGlobalSlateStyle();
 
-
 private:
-        EAbilityID M_Ability;
-        int32 M_CustomType = 0;
+	EAbilityID M_Ability;
+	int32 M_CustomType = 0;
 
 	UPROPERTY()
 	TObjectPtr<ACPPController> M_PlayerController;

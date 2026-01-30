@@ -7,6 +7,7 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "W_ControlGroupImage.generated.h"
 
+class UW_HotKey;
 struct FTrainingOption;
 enum class EAllUnitType : uint8;
 /**
@@ -23,4 +24,9 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnUpdateControlGroup(const FTrainingOption MostFrequentUnitInGroup);
+
+	
+	// The hotkey of this control group ui item.
+	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
+	UW_HotKey* M_ControlGroupHotKey;
 };
