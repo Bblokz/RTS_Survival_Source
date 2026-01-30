@@ -38,4 +38,5 @@ enum class EBehaviourIcon : uint8
 	PanzerIVArtilleryBarrage,
 	FallbackToHQ,
 	RocketBarrage,
+	LowPower,
 };

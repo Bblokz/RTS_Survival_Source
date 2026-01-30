@@ -877,7 +877,7 @@ FMargin UW_EscapeMenuSettings::GetButtonSlotPadding(const UButton* Button) const
 	return FMargin();
 }
 
-void UW_EscapeMenuSettings::SetButtonSlotPadding(UButton* Button, const FMargin& Padding) const
+void UW_EscapeMenuSettings::SetButtonSlotPadding(UButton* Button, const FMargin& NewPadding) const
 {
 	if (not IsValid(Button))
 	{
@@ -886,13 +886,13 @@ void UW_EscapeMenuSettings::SetButtonSlotPadding(UButton* Button, const FMargin&
 
 	if (UHorizontalBoxSlot* const HorizontalSlot = Cast<UHorizontalBoxSlot>(Button->Slot))
 	{
-		HorizontalSlot->SetPadding(Padding);
+		HorizontalSlot->SetPadding(NewPadding);
 		return;
 	}
 
 	if (UVerticalBoxSlot* const VerticalSlot = Cast<UVerticalBoxSlot>(Button->Slot))
 	{
-		VerticalSlot->SetPadding(Padding);
+		VerticalSlot->SetPadding(NewPadding);
 	}
 }
 

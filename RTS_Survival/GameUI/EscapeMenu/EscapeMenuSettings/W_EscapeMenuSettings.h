@@ -327,7 +327,7 @@ private:
 	void UpdateSettingsSectionButtonPadding(int32 SelectedIndex);
 	FMargin BuildSelectedButtonPadding(const FMargin& BasePadding) const;
 	FMargin GetButtonSlotPadding(const UButton* Button) const;
-	void SetButtonSlotPadding(UButton* Button, const FMargin& Padding) const;
+	void SetButtonSlotPadding(UButton* Button, const FMargin& NewPadding) const;
 
 	bool GetIsValidPlayerController() const;
 	bool GetIsValidMainGameUI() const;
