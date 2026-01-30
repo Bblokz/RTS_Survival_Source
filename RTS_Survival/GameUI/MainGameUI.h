@@ -198,6 +198,7 @@ public:
 	void OnHoverWeaponItem(const bool bIsHovering);
 	void OnHoverActionUIItem(const bool bIsHovering);
 	void OnHoverSelectedUnitInfo(const bool bIsHovering);
+	void SetActionButtonHotkeysHidden(const bool bHideActionButtonHotkeys);
 
 	TObjectPtr<UW_MiniMap> GetIsValidMiniMap() const;
 

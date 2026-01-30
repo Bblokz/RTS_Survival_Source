@@ -46,6 +46,8 @@ public:
 		ACPPController* PlayerController,
 		const int32 IndexActionUIElm, UActionUIManager* ActionUIManager);
 
+	void SetActionButtonHotkeyHidden(const bool bHideActionButtonHotkey) const;
+
 protected:
 	/**
 	 * @brief Update the slate of this action UI button in blueprints.

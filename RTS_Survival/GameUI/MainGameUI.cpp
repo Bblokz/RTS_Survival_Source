@@ -1387,6 +1387,16 @@ void UMainGameUI::OnHoverSelectedUnitInfo(const bool bIsHovering)
 	OnHoverInfoWidget_HandleTrainingUI(bIsHovering);
 }
 
+void UMainGameUI::SetActionButtonHotkeysHidden(const bool bHideActionButtonHotkeys)
+{
+	if (not GetIsValidActionUIManager())
+	{
+		return;
+	}
+
+	M_ActionUIManager->SetActionButtonHotkeysHidden(bHideActionButtonHotkeys);
+}
+
 void UMainGameUI::InitMainGameUI(
 	FActionUIContainer ActionUIContainerWidgets,
 	FInit_ActionUI ActionUIWidgets,

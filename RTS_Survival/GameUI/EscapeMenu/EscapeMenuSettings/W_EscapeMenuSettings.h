@@ -130,6 +130,9 @@ struct FEscapeMenuSettingsGameplayText
 	FText M_HeaderText = FText::FromString(TEXT("SETTINGS_GAMEPLAY_HEADER"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_HideActionButtonHotkeysLabelText = FText::FromString(TEXT("SETTINGS_HIDE_ACTION_BUTTON_HOTKEYS_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_OverwriteAllPlayerHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_OVERWRITE_PLAYER_LABEL"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
@@ -368,6 +371,7 @@ private:
 	bool GetIsValidCheckInvertYAxis() const;
 
 	bool GetIsValidTextGameplayHeader() const;
+	bool GetIsValidTextHideActionButtonHotkeysLabel() const;
 	bool GetIsValidTextOverwriteAllPlayerHpBarLabel() const;
 	bool GetIsValidTextPlayerTankHpBarLabel() const;
 	bool GetIsValidTextPlayerSquadHpBarLabel() const;
@@ -393,6 +397,8 @@ private:
 	bool GetIsValidComboEnemyNomadicHpBarStrat() const;
 	bool GetIsValidComboEnemyBxpHpBarStrat() const;
 	bool GetIsValidComboEnemyAircraftHpBarStrat() const;
+
+	bool GetIsValidCheckHideActionButtonHotkeys() const;
 
 	bool GetIsValidButtonApply() const;
 	bool GetIsValidButtonSetDefaults() const;
@@ -484,6 +490,9 @@ private:
 
 	UFUNCTION()
 	void HandleInvertYAxisChanged(bool bIsChecked);
+
+	UFUNCTION()
+	void HandleHideActionButtonHotkeysChanged(bool bIsChecked);
 
 	UFUNCTION()
 	void HandleOverwriteAllPlayerHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
@@ -949,6 +958,14 @@ private:
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextGameplayHeader = nullptr;
 
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextHideActionButtonHotkeysLabel in the Widget Blueprint.
+	 * @note Designers may style the label, but C++ sets the runtime text for localization.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextHideActionButtonHotkeysLabel = nullptr;
+
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextOverwriteAllPlayerHpBarLabel = nullptr;
 
@@ -1000,6 +1017,14 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckInvertYAxis = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a CheckBox named M_CheckHideActionButtonHotkeys in the Widget Blueprint.
+	 * @note Designers may style and wrap the checkbox, but C++ binds callbacks and sets the checked state.
+	 * @note The bound widget must exist, keep this name, and remain a CheckBox for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UCheckBox> M_CheckHideActionButtonHotkeys = nullptr;
 
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboOverwriteAllPlayerHpBarStrat = nullptr;

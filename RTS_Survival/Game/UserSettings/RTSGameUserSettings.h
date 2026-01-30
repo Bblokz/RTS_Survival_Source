@@ -76,6 +76,9 @@ public:
 	/** @brief Returns whether the settings menu should invert the vertical look direction. */
 	bool GetInvertYAxis() const;
 
+	/** @brief Returns whether action button hotkeys should be hidden in the action UI. */
+	bool GetHideActionButtonHotkeys() const;
+
 	/** @brief Writes the master volume value before clamping and saving. */
 	void SetMasterVolume(const float NewMasterVolume);
 
@@ -99,6 +102,9 @@ public:
 
 	/** @brief Writes the invert setting so input code can flip vertical control direction. */
 	void SetInvertYAxis(const bool bNewInvertYAxis);
+
+	/** @brief Writes the setting that hides action button hotkeys in the action UI. */
+	void SetHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys);
 
 	/** @brief Returns the saved player health bar visibility override. */
 	ERTSPlayerHealthBarVisibilityStrategy GetOverwriteAllPlayerHpBarStrat() const;
@@ -209,6 +215,9 @@ private:
 
 	UPROPERTY(config)
 	bool bM_InvertYAxis = false;
+
+	UPROPERTY(config)
+	bool bM_HideActionButtonHotkeys = false;
 
 	UPROPERTY(config)
 	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;

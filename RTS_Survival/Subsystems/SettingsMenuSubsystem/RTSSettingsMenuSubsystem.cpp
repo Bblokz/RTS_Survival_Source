@@ -6,6 +6,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "RHI.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
+#include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Scalability.h"
@@ -22,6 +24,7 @@ namespace RTSSettingsMenuSubsystemPrivate
 	constexpr float NormalPitchFactor = 1.0f;
 	constexpr bool bDefaultVSyncEnabled = false;
 	constexpr bool bDefaultInvertYAxis = false;
+	constexpr bool bDefaultHideActionButtonHotkeys = false;
 
 	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::Fullscreen;
 	const ERTSScalabilityQuality DefaultScalabilityQuality = ERTSScalabilityQuality::Epic;
@@ -251,6 +254,11 @@ void URTSSettingsMenuSubsystem::SetPendingInvertYAxis(const bool bNewInvertYAxis
 	M_PendingSettings.M_ControlSettings.bM_InvertYAxis = bNewInvertYAxis;
 }
 
+void URTSSettingsMenuSubsystem::SetPendingHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys)
+{
+	M_PendingSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = bNewHideActionButtonHotkeys;
+}
+
 void URTSSettingsMenuSubsystem::SetPendingOverwriteAllPlayerHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
 {
 	M_PendingSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = NewStrategy;
@@ -386,6 +394,7 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 	DefaultSettings.M_ControlSettings.M_MouseSensitivity = RTSGameUserSettingsRanges::DefaultMouseSensitivity;
 	DefaultSettings.M_ControlSettings.bM_InvertYAxis = RTSSettingsMenuSubsystemPrivate::bDefaultInvertYAxis;
 
+	DefaultSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = RTSSettingsMenuSubsystemPrivate::bDefaultHideActionButtonHotkeys;
 	DefaultSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
 	DefaultSettings.M_GameplaySettings.M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
 	DefaultSettings.M_GameplaySettings.M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
@@ -642,6 +651,36 @@ void URTSSettingsMenuSubsystem::ApplyGameplaySettingsDiff(
 	const FRTSGameplaySettings& PreviousSettings,
 	const FRTSGameplaySettings& CurrentSettings)
 {
+	if (PreviousSettings.bM_HideActionButtonHotkeys != CurrentSettings.bM_HideActionButtonHotkeys)
+	{
+		UWorld* const World = GetWorld();
+		if (World != nullptr)
+		{
+			for (FConstPlayerControllerIterator ControllerIterator = World->GetPlayerControllerIterator(); ControllerIterator; ++ControllerIterator)
+			{
+				APlayerController* const PlayerController = ControllerIterator->Get();
+				if (PlayerController == nullptr)
+				{
+					continue;
+				}
+
+				ACPPController* const RtsPlayerController = Cast<ACPPController>(PlayerController);
+				if (RtsPlayerController == nullptr)
+				{
+					continue;
+				}
+
+				UMainGameUI* const MainGameUI = RtsPlayerController->GetMainMenuUI();
+				if (not IsValid(MainGameUI))
+				{
+					continue;
+				}
+
+				MainGameUI->SetActionButtonHotkeysHidden(CurrentSettings.bM_HideActionButtonHotkeys);
+			}
+		}
+	}
+
 	UGameUnitManager* const GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	if (not IsValid(GameUnitManager))
 	{
@@ -814,6 +853,7 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 
 	Snapshot.M_ControlSettings.M_MouseSensitivity = GameUserSettings.GetMouseSensitivity();
 	Snapshot.M_ControlSettings.bM_InvertYAxis = GameUserSettings.GetInvertYAxis();
+	Snapshot.M_GameplaySettings.bM_HideActionButtonHotkeys = GameUserSettings.GetHideActionButtonHotkeys();
 	Snapshot.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = GameUserSettings.GetOverwriteAllPlayerHpBarStrat();
 	Snapshot.M_GameplaySettings.M_PlayerTankHpBarStrat = GameUserSettings.GetPlayerTankHpBarStrat();
 	Snapshot.M_GameplaySettings.M_PlayerSquadHpBarStrat = GameUserSettings.GetPlayerSquadHpBarStrat();
@@ -852,6 +892,7 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetUiVolume(SnapshotToApply.M_AudioSettings.M_UiVolume);
 	GameUserSettingsToApply.SetMouseSensitivity(SnapshotToApply.M_ControlSettings.M_MouseSensitivity);
 	GameUserSettingsToApply.SetInvertYAxis(SnapshotToApply.M_ControlSettings.bM_InvertYAxis);
+	GameUserSettingsToApply.SetHideActionButtonHotkeys(SnapshotToApply.M_GameplaySettings.bM_HideActionButtonHotkeys);
 	GameUserSettingsToApply.SetOverwriteAllPlayerHpBarStrat(SnapshotToApply.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
 	GameUserSettingsToApply.SetPlayerTankHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerTankHpBarStrat);
 	GameUserSettingsToApply.SetPlayerSquadHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerSquadHpBarStrat);

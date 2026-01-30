@@ -84,6 +84,11 @@ bool URTSGameUserSettings::GetInvertYAxis() const
 	return bM_InvertYAxis;
 }
 
+bool URTSGameUserSettings::GetHideActionButtonHotkeys() const
+{
+	return bM_HideActionButtonHotkeys;
+}
+
 void URTSGameUserSettings::SetMasterVolume(const float NewMasterVolume)
 {
 	M_MasterVolume = NewMasterVolume;
@@ -129,6 +134,11 @@ void URTSGameUserSettings::SetMouseSensitivity(const float NewMouseSensitivity)
 void URTSGameUserSettings::SetInvertYAxis(const bool bNewInvertYAxis)
 {
 	bM_InvertYAxis = bNewInvertYAxis;
+}
+
+void URTSGameUserSettings::SetHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys)
+{
+	bM_HideActionButtonHotkeys = bNewHideActionButtonHotkeys;
 }
 
 ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetOverwriteAllPlayerHpBarStrat() const
