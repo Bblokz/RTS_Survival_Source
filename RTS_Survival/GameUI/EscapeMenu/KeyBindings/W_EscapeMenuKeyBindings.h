@@ -14,6 +14,8 @@ class UW_EscapeMenuKeyBindingEntry;
 class UInputMappingContext;
 class UW_KeyBindingPopup;
 class UInputAction;
+class URTSHotkeyProviderSubsystem;
+class UW_HotKey;
 
 USTRUCT(BlueprintType)
 struct FEscapeMenuKeyBindingEntryData
@@ -47,6 +49,7 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "KeyBindings")
@@ -63,6 +66,7 @@ private:
 	void BindControlGroupButtons();
 	void BuildKeyBindingEntries();
 	void ApplySearchFilter(const FString& SearchText);
+	void InitializeHotkeyBindings();
 
 	void HandleActionButtonClicked(const int32 ActionButtonIndex);
 	void HandleControlGroupButtonClicked(const int32 ControlGroupIndex);
@@ -75,6 +79,22 @@ private:
 	FString BuildUnboundActionsWarningText(const TArray<FString>& UnboundActionNames) const;
 	TArray<FString> GetUnboundActionNames() const;
 	bool TryGetFirstUnboundActionName(FName& OutActionName) const;
+	void CacheHotkeyProviderSubsystem();
+	void BindHotkeyUpdateDelegates();
+	void UnbindHotkeyUpdateDelegates();
+	void UpdateActionButtonHotkeys();
+	void UpdateControlGroupHotkeys();
+	void HandleActionSlotHotkeyUpdated(const int32 ActionSlotIndex, const FText& HotkeyText);
+	void HandleControlGroupHotkeyUpdated(const int32 ControlGroupIndex, const FText& HotkeyText);
+
+	UW_HotKey* GetActionButtonHotKeyByIndex(const int32 ActionSlotIndex) const;
+	UW_HotKey* GetControlGroupHotKeyByIndex(const int32 ControlGroupIndex) const;
+	const TCHAR* GetActionButtonHotKeyName(const int32 ActionSlotIndex) const;
+	const TCHAR* GetControlGroupHotKeyName(const int32 ControlGroupIndex) const;
+	bool GetUsesZeroBasedActionButtonIndexing() const;
+	bool GetUsesZeroBasedControlGroupIndexing() const;
+	int32 GetActionButtonActionIndex(const int32 ActionButtonIndex) const;
+	int32 GetControlGroupActionIndex(const int32 ControlGroupIndex) const;
 
 	FName GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const;
 	FString GetActionDisplayName(const FName& ActionName) const;
@@ -93,6 +113,9 @@ private:
 	bool GetIsValidKeyBindingPopupClass() const;
 	bool GetIsValidButtonBack() const;
 	bool GetIsValidSearchKeyBar() const;
+	bool GetIsValidHotkeyProviderSubsystem() const;
+	bool GetIsValidActionButtonHotKey(const int32 ActionSlotIndex) const;
+	bool GetIsValidControlGroupHotKey(const int32 ControlGroupIndex) const;
 
 	UFUNCTION()
 	void HandleBackClicked();
@@ -175,54 +198,104 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton1 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey1 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton2 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey2 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton3 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey3 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton4 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey4 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton5 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey5 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton6 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey6 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton7 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey7 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton8 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey8 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton9 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey9 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton10 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey10 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton11 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey11 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton12 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey12 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton13 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey13 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton14 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey14 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ActionButton15 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ActionButtonHotKey15 = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton1 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey1 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton2 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey2 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton3 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey3 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton4 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey4 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton5 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey5 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton6 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey6 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton7 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey7 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton8 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey8 = nullptr;
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton9 = nullptr;
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey9 = nullptr;
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ControlGroupButton10 = nullptr;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_ControlGroupHotKey10 = nullptr;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UW_KeyBindingPopup> M_KeyBindingPopup = nullptr;
@@ -237,4 +310,12 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<FEscapeMenuKeyBindingEntryData> M_KeyBindingEntries;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<URTSHotkeyProviderSubsystem> M_HotkeyProviderSubsystem;
+
+	FDelegateHandle M_ActionSlotHotkeyHandle;
+	FDelegateHandle M_ControlGroupHotkeyHandle;
+
+	bool bM_HasConstructed = false;
 };

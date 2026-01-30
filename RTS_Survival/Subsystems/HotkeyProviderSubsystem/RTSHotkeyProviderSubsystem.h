@@ -39,6 +39,7 @@ private:
 	UInputAction* GetInputActionForActionSlot(const int32 ActionSlotIndex) const;
 	UInputAction* GetInputActionForControlGroupSlot(const int32 ControlGroupIndex) const;
 	bool GetUsesZeroBasedActionButtonIndexing() const;
+	bool GetUsesZeroBasedControlGroupIndexing() const;
 	FText GetDisplayKeyForAction(const UInputAction* Action) const;
 
 	void BroadcastActionSlotHotkey(const int32 ActionSlotIndex);
