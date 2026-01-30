@@ -3,17 +3,22 @@
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "Components/ScrollBox.h"
+#include "Engine/LocalPlayer.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/W_EscapeMenuKeyBindingEntry.h"
 #include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/W_KeyBindingPopup.h"
+#include "RTS_Survival/GameUI/Hotkey/W_HotKey.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace EscapeMenuKeyBindingsConstants
 {
 	constexpr int32 PopupZOrder = 2000;
+	constexpr int32 MaxActionButtons = 15;
+	constexpr int32 MaxControlGroupButtons = 10;
 	const TCHAR* ActionButtonPrefix = TEXT("IA_ActionButton");
 	const TCHAR* ControlGroupPrefix = TEXT("IA_ControlGroup");
 }
@@ -28,6 +33,11 @@ void UW_EscapeMenuKeyBindings::SetPlayerController(ACPPController* NewPlayerCont
 
 	M_PlayerController = NewPlayerController;
 	M_MainGameUI = NewPlayerController->GetMainMenuUI();
+
+	if (bM_HasConstructed)
+	{
+		InitializeHotkeyBindings();
+	}
 }
 
 void UW_EscapeMenuKeyBindings::HandleKeyBindingsMenuClosed()
@@ -41,6 +51,14 @@ void UW_EscapeMenuKeyBindings::NativeConstruct()
 
 	BindButtonCallbacks();
 	BuildKeyBindingEntries();
+	bM_HasConstructed = true;
+	InitializeHotkeyBindings();
+}
+
+void UW_EscapeMenuKeyBindings::NativeDestruct()
+{
+	UnbindHotkeyUpdateDelegates();
+	Super::NativeDestruct();
 }
 
 void UW_EscapeMenuKeyBindings::BindButtonCallbacks()
@@ -362,24 +380,353 @@ void UW_EscapeMenuKeyBindings::ApplySearchFilter(const FString& SearchText)
 	}
 }
 
+void UW_EscapeMenuKeyBindings::InitializeHotkeyBindings()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	CacheHotkeyProviderSubsystem();
+	if (not GetIsValidHotkeyProviderSubsystem())
+	{
+		return;
+	}
+
+	UpdateActionButtonHotkeys();
+	UpdateControlGroupHotkeys();
+	BindHotkeyUpdateDelegates();
+}
+
 void UW_EscapeMenuKeyBindings::HandleActionButtonClicked(const int32 ActionButtonIndex)
 {
+	const int32 ActionNameIndex = GetActionButtonActionIndex(ActionButtonIndex);
 	const FString ActionName = FString::Printf(
 		TEXT("%s%d"),
 		EscapeMenuKeyBindingsConstants::ActionButtonPrefix,
-		ActionButtonIndex
+		ActionNameIndex
 	);
 	OpenKeyBindingPopupForActionName(FName(*ActionName));
 }
 
 void UW_EscapeMenuKeyBindings::HandleControlGroupButtonClicked(const int32 ControlGroupIndex)
 {
+	const int32 ControlGroupActionIndex = GetControlGroupActionIndex(ControlGroupIndex);
 	const FString ActionName = FString::Printf(
 		TEXT("%s%d"),
 		EscapeMenuKeyBindingsConstants::ControlGroupPrefix,
-		ControlGroupIndex
+		ControlGroupActionIndex
 	);
 	OpenKeyBindingPopupForActionName(FName(*ActionName));
+}
+
+void UW_EscapeMenuKeyBindings::CacheHotkeyProviderSubsystem()
+{
+	if (M_HotkeyProviderSubsystem.Get() != nullptr)
+	{
+		return;
+	}
+
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = M_PlayerController->GetLocalPlayer();
+	if (not IsValid(LocalPlayer))
+	{
+		RTSFunctionLibrary::ReportError("Key bindings menu could not resolve a local player for hotkey updates.");
+		return;
+	}
+
+	URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>();
+	if (not IsValid(HotkeyProviderSubsystem))
+	{
+		RTSFunctionLibrary::ReportError("Key bindings menu could not resolve the hotkey provider subsystem.");
+		return;
+	}
+
+	M_HotkeyProviderSubsystem = HotkeyProviderSubsystem;
+}
+
+void UW_EscapeMenuKeyBindings::BindHotkeyUpdateDelegates()
+{
+	if (not GetIsValidHotkeyProviderSubsystem())
+	{
+		return;
+	}
+
+	if (M_ActionSlotHotkeyHandle.IsValid())
+	{
+		M_HotkeyProviderSubsystem->OnActionSlotHotkeyUpdated().Remove(M_ActionSlotHotkeyHandle);
+		M_ActionSlotHotkeyHandle.Reset();
+	}
+
+	if (M_ControlGroupHotkeyHandle.IsValid())
+	{
+		M_HotkeyProviderSubsystem->OnControlGroupHotkeyUpdated().Remove(M_ControlGroupHotkeyHandle);
+		M_ControlGroupHotkeyHandle.Reset();
+	}
+
+	M_ActionSlotHotkeyHandle = M_HotkeyProviderSubsystem->OnActionSlotHotkeyUpdated().AddUObject(
+		this,
+		&UW_EscapeMenuKeyBindings::HandleActionSlotHotkeyUpdated
+	);
+
+	M_ControlGroupHotkeyHandle = M_HotkeyProviderSubsystem->OnControlGroupHotkeyUpdated().AddUObject(
+		this,
+		&UW_EscapeMenuKeyBindings::HandleControlGroupHotkeyUpdated
+	);
+}
+
+void UW_EscapeMenuKeyBindings::UnbindHotkeyUpdateDelegates()
+{
+	if (not GetIsValidHotkeyProviderSubsystem())
+	{
+		return;
+	}
+
+	if (M_ActionSlotHotkeyHandle.IsValid())
+	{
+		M_HotkeyProviderSubsystem->OnActionSlotHotkeyUpdated().Remove(M_ActionSlotHotkeyHandle);
+		M_ActionSlotHotkeyHandle.Reset();
+	}
+
+	if (M_ControlGroupHotkeyHandle.IsValid())
+	{
+		M_HotkeyProviderSubsystem->OnControlGroupHotkeyUpdated().Remove(M_ControlGroupHotkeyHandle);
+		M_ControlGroupHotkeyHandle.Reset();
+	}
+}
+
+void UW_EscapeMenuKeyBindings::UpdateActionButtonHotkeys()
+{
+	if (not GetIsValidHotkeyProviderSubsystem())
+	{
+		return;
+	}
+
+	for (int32 ActionSlotIndex = 0;
+	     ActionSlotIndex < EscapeMenuKeyBindingsConstants::MaxActionButtons;
+	     ++ActionSlotIndex)
+	{
+		if (not GetIsValidActionButtonHotKey(ActionSlotIndex))
+		{
+			continue;
+		}
+
+		UW_HotKey* HotKeyWidget = GetActionButtonHotKeyByIndex(ActionSlotIndex);
+		const FText HotkeyText = M_HotkeyProviderSubsystem->GetDisplayKeyForActionSlot(ActionSlotIndex);
+		HotKeyWidget->SetKeyText(HotkeyText);
+	}
+}
+
+void UW_EscapeMenuKeyBindings::UpdateControlGroupHotkeys()
+{
+	if (not GetIsValidHotkeyProviderSubsystem())
+	{
+		return;
+	}
+
+	for (int32 ControlGroupIndex = 0;
+	     ControlGroupIndex < EscapeMenuKeyBindingsConstants::MaxControlGroupButtons;
+	     ++ControlGroupIndex)
+	{
+		if (not GetIsValidControlGroupHotKey(ControlGroupIndex))
+		{
+			continue;
+		}
+
+		UW_HotKey* HotKeyWidget = GetControlGroupHotKeyByIndex(ControlGroupIndex);
+		const FText HotkeyText = M_HotkeyProviderSubsystem->GetDisplayKeyForControlGroupSlot(ControlGroupIndex);
+		HotKeyWidget->SetKeyText(HotkeyText);
+	}
+}
+
+void UW_EscapeMenuKeyBindings::HandleActionSlotHotkeyUpdated(const int32 ActionSlotIndex, const FText& HotkeyText)
+{
+	if (not GetIsValidActionButtonHotKey(ActionSlotIndex))
+	{
+		return;
+	}
+
+	UW_HotKey* HotKeyWidget = GetActionButtonHotKeyByIndex(ActionSlotIndex);
+	HotKeyWidget->SetKeyText(HotkeyText);
+}
+
+void UW_EscapeMenuKeyBindings::HandleControlGroupHotkeyUpdated(const int32 ControlGroupIndex, const FText& HotkeyText)
+{
+	if (not GetIsValidControlGroupHotKey(ControlGroupIndex))
+	{
+		return;
+	}
+
+	UW_HotKey* HotKeyWidget = GetControlGroupHotKeyByIndex(ControlGroupIndex);
+	HotKeyWidget->SetKeyText(HotkeyText);
+}
+
+UW_HotKey* UW_EscapeMenuKeyBindings::GetActionButtonHotKeyByIndex(const int32 ActionSlotIndex) const
+{
+	switch (ActionSlotIndex)
+	{
+	case 0:
+		return M_ActionButtonHotKey1;
+	case 1:
+		return M_ActionButtonHotKey2;
+	case 2:
+		return M_ActionButtonHotKey3;
+	case 3:
+		return M_ActionButtonHotKey4;
+	case 4:
+		return M_ActionButtonHotKey5;
+	case 5:
+		return M_ActionButtonHotKey6;
+	case 6:
+		return M_ActionButtonHotKey7;
+	case 7:
+		return M_ActionButtonHotKey8;
+	case 8:
+		return M_ActionButtonHotKey9;
+	case 9:
+		return M_ActionButtonHotKey10;
+	case 10:
+		return M_ActionButtonHotKey11;
+	case 11:
+		return M_ActionButtonHotKey12;
+	case 12:
+		return M_ActionButtonHotKey13;
+	case 13:
+		return M_ActionButtonHotKey14;
+	case 14:
+		return M_ActionButtonHotKey15;
+	default:
+		return nullptr;
+	}
+}
+
+UW_HotKey* UW_EscapeMenuKeyBindings::GetControlGroupHotKeyByIndex(const int32 ControlGroupIndex) const
+{
+	switch (ControlGroupIndex)
+	{
+	case 0:
+		return M_ControlGroupHotKey1;
+	case 1:
+		return M_ControlGroupHotKey2;
+	case 2:
+		return M_ControlGroupHotKey3;
+	case 3:
+		return M_ControlGroupHotKey4;
+	case 4:
+		return M_ControlGroupHotKey5;
+	case 5:
+		return M_ControlGroupHotKey6;
+	case 6:
+		return M_ControlGroupHotKey7;
+	case 7:
+		return M_ControlGroupHotKey8;
+	case 8:
+		return M_ControlGroupHotKey9;
+	case 9:
+		return M_ControlGroupHotKey10;
+	default:
+		return nullptr;
+	}
+}
+
+const TCHAR* UW_EscapeMenuKeyBindings::GetActionButtonHotKeyName(const int32 ActionSlotIndex) const
+{
+	switch (ActionSlotIndex)
+	{
+	case 0:
+		return TEXT("M_ActionButtonHotKey1");
+	case 1:
+		return TEXT("M_ActionButtonHotKey2");
+	case 2:
+		return TEXT("M_ActionButtonHotKey3");
+	case 3:
+		return TEXT("M_ActionButtonHotKey4");
+	case 4:
+		return TEXT("M_ActionButtonHotKey5");
+	case 5:
+		return TEXT("M_ActionButtonHotKey6");
+	case 6:
+		return TEXT("M_ActionButtonHotKey7");
+	case 7:
+		return TEXT("M_ActionButtonHotKey8");
+	case 8:
+		return TEXT("M_ActionButtonHotKey9");
+	case 9:
+		return TEXT("M_ActionButtonHotKey10");
+	case 10:
+		return TEXT("M_ActionButtonHotKey11");
+	case 11:
+		return TEXT("M_ActionButtonHotKey12");
+	case 12:
+		return TEXT("M_ActionButtonHotKey13");
+	case 13:
+		return TEXT("M_ActionButtonHotKey14");
+	case 14:
+		return TEXT("M_ActionButtonHotKey15");
+	default:
+		return TEXT("UnknownActionButtonHotKey");
+	}
+}
+
+const TCHAR* UW_EscapeMenuKeyBindings::GetControlGroupHotKeyName(const int32 ControlGroupIndex) const
+{
+	switch (ControlGroupIndex)
+	{
+	case 0:
+		return TEXT("M_ControlGroupHotKey1");
+	case 1:
+		return TEXT("M_ControlGroupHotKey2");
+	case 2:
+		return TEXT("M_ControlGroupHotKey3");
+	case 3:
+		return TEXT("M_ControlGroupHotKey4");
+	case 4:
+		return TEXT("M_ControlGroupHotKey5");
+	case 5:
+		return TEXT("M_ControlGroupHotKey6");
+	case 6:
+		return TEXT("M_ControlGroupHotKey7");
+	case 7:
+		return TEXT("M_ControlGroupHotKey8");
+	case 8:
+		return TEXT("M_ControlGroupHotKey9");
+	case 9:
+		return TEXT("M_ControlGroupHotKey10");
+	default:
+		return TEXT("UnknownControlGroupHotKey");
+	}
+}
+
+bool UW_EscapeMenuKeyBindings::GetUsesZeroBasedActionButtonIndexing() const
+{
+	const FName ZeroBasedName = FName(
+		*FString::Printf(TEXT("%s%d"), EscapeMenuKeyBindingsConstants::ActionButtonPrefix, 0)
+	);
+	return M_ActionNameToAction.Contains(ZeroBasedName);
+}
+
+bool UW_EscapeMenuKeyBindings::GetUsesZeroBasedControlGroupIndexing() const
+{
+	const FName ZeroBasedName = FName(
+		*FString::Printf(TEXT("%s%d"), EscapeMenuKeyBindingsConstants::ControlGroupPrefix, 0)
+	);
+	return M_ActionNameToAction.Contains(ZeroBasedName);
+}
+
+int32 UW_EscapeMenuKeyBindings::GetActionButtonActionIndex(const int32 ActionButtonIndex) const
+{
+	const bool bUsesZeroBasedIndexing = GetUsesZeroBasedActionButtonIndexing();
+	return bUsesZeroBasedIndexing ? ActionButtonIndex - 1 : ActionButtonIndex;
+}
+
+int32 UW_EscapeMenuKeyBindings::GetControlGroupActionIndex(const int32 ControlGroupIndex) const
+{
+	const bool bUsesZeroBasedIndexing = GetUsesZeroBasedControlGroupIndexing();
+	return bUsesZeroBasedIndexing ? ControlGroupIndex - 1 : ControlGroupIndex;
 }
 
 void UW_EscapeMenuKeyBindings::OpenKeyBindingPopupForActionName(const FName& ActionName)
@@ -758,6 +1105,56 @@ bool UW_EscapeMenuKeyBindings::GetIsValidSearchKeyBar() const
 		this,
 		TEXT("M_SearchKeyBar"),
 		TEXT("UW_EscapeMenuKeyBindings::GetIsValidSearchKeyBar"),
+		this
+	);
+	return false;
+}
+
+bool UW_EscapeMenuKeyBindings::GetIsValidHotkeyProviderSubsystem() const
+{
+	if (M_HotkeyProviderSubsystem.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_HotkeyProviderSubsystem"),
+		TEXT("UW_EscapeMenuKeyBindings::GetIsValidHotkeyProviderSubsystem"),
+		this
+	);
+	return false;
+}
+
+bool UW_EscapeMenuKeyBindings::GetIsValidActionButtonHotKey(const int32 ActionSlotIndex) const
+{
+	const UW_HotKey* HotKeyWidget = GetActionButtonHotKeyByIndex(ActionSlotIndex);
+	if (IsValid(HotKeyWidget))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		GetActionButtonHotKeyName(ActionSlotIndex),
+		TEXT("UW_EscapeMenuKeyBindings::GetIsValidActionButtonHotKey"),
+		this
+	);
+	return false;
+}
+
+bool UW_EscapeMenuKeyBindings::GetIsValidControlGroupHotKey(const int32 ControlGroupIndex) const
+{
+	const UW_HotKey* HotKeyWidget = GetControlGroupHotKeyByIndex(ControlGroupIndex);
+	if (IsValid(HotKeyWidget))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		GetControlGroupHotKeyName(ControlGroupIndex),
+		TEXT("UW_EscapeMenuKeyBindings::GetIsValidControlGroupHotKey"),
 		this
 	);
 	return false;

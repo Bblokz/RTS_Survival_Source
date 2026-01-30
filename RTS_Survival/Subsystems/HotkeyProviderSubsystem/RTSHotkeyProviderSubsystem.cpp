@@ -150,7 +150,10 @@ UInputAction* URTSHotkeyProviderSubsystem::GetInputActionForActionSlot(const int
 
 UInputAction* URTSHotkeyProviderSubsystem::GetInputActionForControlGroupSlot(const int32 ControlGroupIndex) const
 {
-	const int32 InputActionIndex = ControlGroupIndex + RTSHotkeyProviderConstants::ControlGroupIndexOffset;
+	const bool bUsesZeroBasedIndexing = GetUsesZeroBasedControlGroupIndexing();
+	const int32 InputActionIndex = bUsesZeroBasedIndexing
+		? ControlGroupIndex
+		: ControlGroupIndex + RTSHotkeyProviderConstants::ControlGroupIndexOffset;
 	const FName ActionName = RTSHotkeyProviderStatics::BuildActionName(
 		RTSHotkeyProviderConstants::ControlGroupPrefix,
 		InputActionIndex);
@@ -161,6 +164,14 @@ bool URTSHotkeyProviderSubsystem::GetUsesZeroBasedActionButtonIndexing() const
 {
 	const FName ZeroBasedName = RTSHotkeyProviderStatics::BuildActionName(
 		RTSHotkeyProviderConstants::ActionButtonPrefix,
+		0);
+	return FindActionByName(ZeroBasedName) != nullptr;
+}
+
+bool URTSHotkeyProviderSubsystem::GetUsesZeroBasedControlGroupIndexing() const
+{
+	const FName ZeroBasedName = RTSHotkeyProviderStatics::BuildActionName(
+		RTSHotkeyProviderConstants::ControlGroupPrefix,
 		0);
 	return FindActionByName(ZeroBasedName) != nullptr;
 }
