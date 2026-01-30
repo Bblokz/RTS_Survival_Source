@@ -19,6 +19,7 @@ class URichTextBlock;
 class USizeBox;
 class USlider;
 class UVerticalBox;
+class UWidgetSwitcher;
 
 /**
  * @brief Holds designer-facing text keys for the graphics settings section.
@@ -191,6 +192,7 @@ namespace EscapeMenuSettingsDefaults
 {
 	constexpr float FrameRateLimitMin = 35.f;
 	constexpr float FrameRateLimitMax = 240.0f;
+	constexpr float ExtraLeftPadding = 10.0f;
 }
 
 /**
@@ -212,6 +214,14 @@ struct FEscapeMenuSettingsSliderRanges
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
 	float M_MouseSensitivityMax = RTSGameUserSettingsRanges::MaxMouseSensitivity;
+};
+
+struct FEscapeMenuSettingsSectionButtonPadding
+{
+	FMargin M_GameplayPadding;
+	FMargin M_GraphicsPadding;
+	FMargin M_AudioPadding;
+	FMargin M_ControlsPadding;
 };
 
 /**
@@ -310,6 +320,14 @@ private:
 	void BindAudioSettingCallbacks();
 	void BindControlSettingCallbacks();
 	void BindGameplaySettingCallbacks();
+	void BindSettingsSectionButtons();
+
+	void CacheSettingsSectionButtonPadding();
+	void ApplySettingsSectionSelection(int32 NewIndex);
+	void UpdateSettingsSectionButtonPadding(int32 SelectedIndex);
+	FMargin BuildSelectedButtonPadding(const FMargin& BasePadding) const;
+	FMargin GetButtonSlotPadding(const UButton* Button) const;
+	void SetButtonSlotPadding(UButton* Button, const FMargin& Padding) const;
 
 	bool GetIsValidPlayerController() const;
 	bool GetIsValidMainGameUI() const;
@@ -321,6 +339,11 @@ private:
 	bool GetIsValidVerticalBoxMenuRoot() const;
 	bool GetIsValidVerticalBoxSections() const;
 	bool GetIsValidHorizontalBoxFooterButtons() const;
+	bool GetIsValidSettingsSwitch() const;
+	bool GetIsValidButtonGameplaySettings() const;
+	bool GetIsValidButtonGraphicsSettings() const;
+	bool GetIsValidButtonAudioSettings() const;
+	bool GetIsValidButtonControlSettings() const;
 
 	bool GetIsValidVerticalBoxGraphicsSection() const;
 	bool GetIsValidVerticalBoxAudioSection() const;
@@ -408,6 +431,7 @@ private:
 	bool GetIsValidTextBackOrCancelButton() const;
 
 	bool GetAreRootWidgetsValid() const;
+	bool GetAreSettingsNavigationWidgetsValid() const;
 	bool GetAreGraphicsWidgetsValid() const;
 	bool GetAreAudioWidgetsValid() const;
 	bool GetAreControlsWidgetsValid() const;
@@ -530,6 +554,18 @@ private:
 	UFUNCTION()
 	void HandleEnemyAircraftHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
 
+	UFUNCTION()
+	void HandleGameplaySettingsClicked();
+
+	UFUNCTION()
+	void HandleGraphicsSettingsClicked();
+
+	UFUNCTION()
+	void HandleAudioSettingsClicked();
+
+	UFUNCTION()
+	void HandleControlSettingsClicked();
+
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 
@@ -556,6 +592,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings|Sliders", meta=(AllowPrivateAccess="true"))
 	FEscapeMenuSettingsSliderRanges M_SliderRanges;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings|Layout", meta=(AllowPrivateAccess="true"))
+	float M_ExtraLeftPadding = EscapeMenuSettingsDefaults::ExtraLeftPadding;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings|Text", meta=(AllowPrivateAccess="true"))
 	TArray<FText> M_WindowModeOptionTexts =
@@ -613,6 +652,46 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UVerticalBox> M_VerticalBoxSections = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a WidgetSwitcher named M_SettingsSwitch in the Widget Blueprint.
+	 * @note Designers may change the widgets inside the switcher, but it must remain present for navigation.
+	 * @note The bound widget must exist, keep this name, and remain a WidgetSwitcher for runtime switching.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UWidgetSwitcher> M_SettingsSwitch = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Button named M_GameplaySettings in the Widget Blueprint.
+	 * @note Designers may style the button, but it must remain bound for navigation.
+	 * @note The bound widget must exist, keep this name, and remain a Button for runtime switching.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UButton> M_GameplaySettings = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Button named M_GraphicsSettings in the Widget Blueprint.
+	 * @note Designers may style the button, but it must remain bound for navigation.
+	 * @note The bound widget must exist, keep this name, and remain a Button for runtime switching.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UButton> M_GraphicsSettings = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Button named M_AudioSettings in the Widget Blueprint.
+	 * @note Designers may style the button, but it must remain bound for navigation.
+	 * @note The bound widget must exist, keep this name, and remain a Button for runtime switching.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UButton> M_AudioSettings = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Button named M_ControlSettings in the Widget Blueprint.
+	 * @note Designers may style the button, but it must remain bound for navigation.
+	 * @note The bound widget must exist, keep this name, and remain a Button for runtime switching.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UButton> M_ControlSettings = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a HorizontalBox named M_HorizontalBoxFooterButtons in the Widget Blueprint.
@@ -1118,4 +1197,10 @@ private:
 
 	UPROPERTY(Transient)
 	bool bM_IsInitialisingControls = false;
+
+	UPROPERTY(Transient)
+	bool bM_HasCachedSettingsSectionPadding = false;
+
+	// Cached padding for each settings section button so selection can add extra left offset.
+	FEscapeMenuSettingsSectionButtonPadding M_SettingsSectionButtonPadding;
 };
