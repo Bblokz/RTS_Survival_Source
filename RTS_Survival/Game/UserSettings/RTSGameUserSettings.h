@@ -67,6 +67,9 @@ public:
 	/** @brief Returns the volume used for the announcer audio channel in the settings menu. */
 	float GetAnnouncerVolume() const;
 
+	/** @brief Returns the volume used for the transmissions and cinematics audio channel in the settings menu. */
+	float GetTransmissionsAndCinematicsVolume() const;
+
 	/** @brief Returns the volume used for the UI audio channel in the settings menu. */
 	float GetUiVolume() const;
 
@@ -93,6 +96,9 @@ public:
 
 	/** @brief Writes the announcer volume value before clamping and saving. */
 	void SetAnnouncerVolume(const float NewAnnouncerVolume);
+
+	/** @brief Writes the transmissions and cinematics volume value before clamping and saving. */
+	void SetTransmissionsAndCinematicsVolume(const float NewTransmissionsAndCinematicsVolume);
 
 	/** @brief Writes the UI volume value before clamping and saving. */
 	void SetUiVolume(const float NewUiVolume);
@@ -206,6 +212,9 @@ private:
 
 	UPROPERTY(config)
 	float M_AnnouncerVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(config)
+	float M_TransmissionsAndCinematicsVolume = RTSGameUserSettingsRanges::DefaultVolume;
 
 	UPROPERTY(config)
 	float M_UiVolume = RTSGameUserSettingsRanges::DefaultVolume;

@@ -94,6 +94,9 @@ struct FEscapeMenuSettingsAudioText
 	FText M_AnnouncerVolumeLabelText = FText::FromString(TEXT("SETTINGS_ANNOUNCER_VOLUME_LABEL"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_TransmissionsAndCinematicsVolumeLabelText = FText::FromString(TEXT("SETTINGS_TRANSMISSIONS_CINEMATICS_VOLUME_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_UiVolumeLabelText = FText::FromString(TEXT("SETTINGS_UI_VOLUME_LABEL"));
 };
 
@@ -379,12 +382,14 @@ private:
 	bool GetIsValidTextSfxVolumeLabel() const;
 	bool GetIsValidTextVoicelinesVolumeLabel() const;
 	bool GetIsValidTextAnnouncerVolumeLabel() const;
+	bool GetIsValidTextTransmissionsAndCinematicsVolumeLabel() const;
 	bool GetIsValidTextUiVolumeLabel() const;
 	bool GetIsValidSliderMasterVolume() const;
 	bool GetIsValidSliderMusicVolume() const;
 	bool GetIsValidSliderSfxVolume() const;
 	bool GetIsValidSliderVoicelinesVolume() const;
 	bool GetIsValidSliderAnnouncerVolume() const;
+	bool GetIsValidSliderTransmissionsAndCinematicsVolume() const;
 	bool GetIsValidSliderUiVolume() const;
 
 	bool GetIsValidTextControlsHeader() const;
@@ -505,6 +510,9 @@ private:
 
 	UFUNCTION()
 	void HandleAnnouncerVolumeChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleTransmissionsAndCinematicsVolumeChanged(float NewValue);
 
 	UFUNCTION()
 	void HandleUiVolumeChanged(float NewValue);
@@ -950,6 +958,14 @@ private:
 	TObjectPtr<URichTextBlock> M_TextAnnouncerVolumeLabel = nullptr;
 
 	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextTransmissionsAndCinematicsVolumeLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextTransmissionsAndCinematicsVolumeLabel = nullptr;
+
+	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextUiVolumeLabel in the Widget Blueprint.
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
@@ -996,6 +1012,14 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderAnnouncerVolume = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderTransmissionsAndCinematicsVolume in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderTransmissionsAndCinematicsVolume = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a Slider named M_SliderUiVolume in the Widget Blueprint.

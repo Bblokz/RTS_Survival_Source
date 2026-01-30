@@ -230,6 +230,9 @@ void URTSSettingsMenuSubsystem::SetPendingAudioVolume(const ERTSAudioType AudioT
 	case ERTSAudioType::Announcer:
 		M_PendingSettings.M_AudioSettings.M_AnnouncerVolume = ClampedVolume;
 		return;
+	case ERTSAudioType::TransmissionsAndCinematics:
+		M_PendingSettings.M_AudioSettings.M_TransmissionsAndCinematicsVolume = ClampedVolume;
+		return;
 	case ERTSAudioType::UI:
 		M_PendingSettings.M_AudioSettings.M_UiVolume = ClampedVolume;
 		return;
@@ -389,6 +392,7 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 	DefaultSettings.M_AudioSettings.M_SfxAndWeaponsVolume = RTSGameUserSettingsRanges::DefaultVolume;
 	DefaultSettings.M_AudioSettings.M_VoicelinesVolume = RTSGameUserSettingsRanges::DefaultVolume;
 	DefaultSettings.M_AudioSettings.M_AnnouncerVolume = RTSGameUserSettingsRanges::DefaultVolume;
+	DefaultSettings.M_AudioSettings.M_TransmissionsAndCinematicsVolume = RTSGameUserSettingsRanges::DefaultVolume;
 	DefaultSettings.M_AudioSettings.M_UiVolume = RTSGameUserSettingsRanges::DefaultVolume;
 
 	DefaultSettings.M_ControlSettings.M_MouseSensitivity = RTSGameUserSettingsRanges::DefaultMouseSensitivity;
@@ -610,6 +614,7 @@ void URTSSettingsMenuSubsystem::ApplyAudioSettings()
 	ApplyAudioChannelVolume(ERTSAudioType::Music, GameUserSettings->GetMusicVolume());
 	ApplyAudioChannelVolume(ERTSAudioType::Voicelines, GameUserSettings->GetVoicelinesVolume());
 	ApplyAudioChannelVolume(ERTSAudioType::Announcer, GameUserSettings->GetAnnouncerVolume());
+	ApplyAudioChannelVolume(ERTSAudioType::TransmissionsAndCinematics, GameUserSettings->GetTransmissionsAndCinematicsVolume());
 	ApplyAudioChannelVolume(ERTSAudioType::UI, GameUserSettings->GetUiVolume());
 }
 
@@ -849,6 +854,7 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_AudioSettings.M_SfxAndWeaponsVolume = GameUserSettings.GetSfxAndWeaponsVolume();
 	Snapshot.M_AudioSettings.M_VoicelinesVolume = GameUserSettings.GetVoicelinesVolume();
 	Snapshot.M_AudioSettings.M_AnnouncerVolume = GameUserSettings.GetAnnouncerVolume();
+	Snapshot.M_AudioSettings.M_TransmissionsAndCinematicsVolume = GameUserSettings.GetTransmissionsAndCinematicsVolume();
 	Snapshot.M_AudioSettings.M_UiVolume = GameUserSettings.GetUiVolume();
 
 	Snapshot.M_ControlSettings.M_MouseSensitivity = GameUserSettings.GetMouseSensitivity();
@@ -889,6 +895,7 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetSfxAndWeaponsVolume(SnapshotToApply.M_AudioSettings.M_SfxAndWeaponsVolume);
 	GameUserSettingsToApply.SetVoicelinesVolume(SnapshotToApply.M_AudioSettings.M_VoicelinesVolume);
 	GameUserSettingsToApply.SetAnnouncerVolume(SnapshotToApply.M_AudioSettings.M_AnnouncerVolume);
+	GameUserSettingsToApply.SetTransmissionsAndCinematicsVolume(SnapshotToApply.M_AudioSettings.M_TransmissionsAndCinematicsVolume);
 	GameUserSettingsToApply.SetUiVolume(SnapshotToApply.M_AudioSettings.M_UiVolume);
 	GameUserSettingsToApply.SetMouseSensitivity(SnapshotToApply.M_ControlSettings.M_MouseSensitivity);
 	GameUserSettingsToApply.SetInvertYAxis(SnapshotToApply.M_ControlSettings.bM_InvertYAxis);

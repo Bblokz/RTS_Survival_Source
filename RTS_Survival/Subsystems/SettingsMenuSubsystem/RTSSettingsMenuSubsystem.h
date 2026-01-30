@@ -114,6 +114,9 @@ struct FRTSAudioSettings
 	float M_AnnouncerVolume = RTSGameUserSettingsRanges::DefaultVolume;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
+	float M_TransmissionsAndCinematicsVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Audio")
 	float M_UiVolume = RTSGameUserSettingsRanges::DefaultVolume;
 };
 
