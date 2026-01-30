@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "W_FactionSelectionMenu.generated.h"
 
@@ -16,18 +17,93 @@ class UW_FactionUnit;
 class UW_Portrait;
 
 USTRUCT(BlueprintType)
-struct FFactionMenuSetting
+struct FFactionMenuTankOption
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	TArray<FTrainingOption> UnitOptions;
+	ETankSubtype TankSubtype = ETankSubtype::Tank_None;
+};
+
+USTRUCT(BlueprintType)
+struct FFactionMenuSquadOption
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	ESquadSubtype SquadSubtype = ESquadSubtype::Squad_None;
+};
+
+USTRUCT(BlueprintType)
+struct FFactionMenuAircraftOption
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	EAircraftSubtype AircraftSubtype = EAircraftSubtype::Aircarft_None;
+};
+
+USTRUCT(BlueprintType)
+struct FFactionMenuBuildingExpansionOption
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	EBuildingExpansionType BuildingExpansionType = EBuildingExpansionType::BXT_Invalid;
+};
+
+USTRUCT(BlueprintType)
+struct FFactionMenuSetting
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Armored Cars")
+	TArray<FFactionMenuTankOption> ArmoredCars;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Light")
+	TArray<FFactionMenuTankOption> LightTanks;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Medium")
+	TArray<FFactionMenuTankOption> MediumTanks;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Heavy")
+	TArray<FFactionMenuTankOption> HeavyTanks;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Infantry")
+	TArray<FFactionMenuSquadOption> Infantry;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Aircraft")
+	TArray<FFactionMenuAircraftOption> Aircraft;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Building Expansion")
+	TArray<FFactionMenuBuildingExpansionOption> BuildingExpansions;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool bIsEnabled = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TObjectPtr<USoundBase> FactionDescription = nullptr;
+};
+
+USTRUCT()
+struct FFactionSelectionUnitWidgets
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<TObjectPtr<UW_FactionUnit>> AllUnits;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UW_FactionUnit>> ArmoredCars;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UW_FactionUnit>> LightTanks;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UW_FactionUnit>> MediumTanks;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UW_FactionUnit>> HeavyTanks;
 };
 
 /**
@@ -73,6 +149,21 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	UW_Portrait* M_Portrait = nullptr;
 
+	UPROPERTY(meta = (BindWidget))
+	UButton* SortArmoredCars = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	UButton* SortLightTanks = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	UButton* SortMediumTanks = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	UButton* SortHeavyTanks = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	UButton* ShowAllUnits = nullptr;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionUnit> M_FactionUnitWidgetClass;
 
@@ -117,6 +208,21 @@ private:
 	UFUNCTION()
 	void HandleLaunchCampaignClicked();
 
+	UFUNCTION()
+	void HandleSortArmoredCarsClicked();
+
+	UFUNCTION()
+	void HandleSortLightTanksClicked();
+
+	UFUNCTION()
+	void HandleSortMediumTanksClicked();
+
+	UFUNCTION()
+	void HandleSortHeavyTanksClicked();
+
+	UFUNCTION()
+	void HandleShowAllUnitsClicked();
+
 	void SetupButtonBindings();
 	void ApplyFactionAvailability();
 	void SelectGermanBreakthrough(const bool bForceAudio);
@@ -129,7 +235,19 @@ private:
 	 * @param bHasPlayedAudio Tracks whether this faction has already played its announcer audio.
 	 */
 	void SelectFaction(const FFactionMenuSetting& FactionSetting, const bool bForceAudio, bool& bHasPlayedAudio);
-	void PopulateFactionUnits(const TArray<FTrainingOption>& UnitOptions);
+	void PopulateFactionUnits(const FFactionMenuSetting& FactionSetting);
+	void AddTankUnitWidgets(
+		const TArray<FFactionMenuTankOption>& TankOptions,
+		TArray<TObjectPtr<UW_FactionUnit>>& OutUnitWidgets);
+	void AddSquadUnitWidgets(const TArray<FFactionMenuSquadOption>& SquadOptions);
+	void AddAircraftUnitWidgets(const TArray<FFactionMenuAircraftOption>& AircraftOptions);
+	void AddBuildingExpansionUnitWidgets(const TArray<FFactionMenuBuildingExpansionOption>& BuildingExpansionOptions);
+	void AddUnitWidgetFromTrainingOption(
+		const FTrainingOption& TrainingOption,
+		TArray<TObjectPtr<UW_FactionUnit>>* OptionalBucket);
+	void ApplyUnitFilter(const TArray<TObjectPtr<UW_FactionUnit>>& VisibleUnits);
+	void ShowAllUnitWidgets();
+	void ResetUnitWidgets();
 	void PlayFactionAudio(const FFactionMenuSetting& FactionSetting);
 	void UpdatePortraitForAnnouncement();
 	void HidePortrait();
@@ -146,4 +264,13 @@ private:
 	bool GetIsValidGermanItalianGameButton() const;
 	bool GetIsValidGermanItalianGameAudioButton() const;
 	bool GetIsValidLaunchCampaignButton() const;
+	bool GetIsValidSortArmoredCarsButton() const;
+	bool GetIsValidSortLightTanksButton() const;
+	bool GetIsValidSortMediumTanksButton() const;
+	bool GetIsValidSortHeavyTanksButton() const;
+	bool GetIsValidShowAllUnitsButton() const;
+
+	// Tracks widget groups used to filter the scroll list without destroying widgets.
+	UPROPERTY()
+	FFactionSelectionUnitWidgets M_UnitWidgets;
 };
