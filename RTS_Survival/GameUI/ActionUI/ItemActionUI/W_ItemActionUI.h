@@ -11,6 +11,7 @@ class UW_HotKey;
 class UActionUIManager;
 class UTextBlock;
 class ACPPController;
+class URTSHotkeyProviderSubsystem;
 enum class EAbilityID : uint8;
 class UImage;
 class UButton;
@@ -35,6 +36,12 @@ public:
 	void UpdateItemActionUI(const EAbilityID NewAbility, const int32 CustomType, const int32 CoolDownRemaining,
 	                        const int32 CooldownTotalDuration);
 
+	/**
+	 * @brief Caches the owning references and pulls the current hotkey text for this slot.
+	 * @param PlayerController Owning player controller for input mapping access.
+	 * @param IndexActionUIElm Index of this action UI slot.
+	 * @param ActionUIManager Manager that owns the action UI elements.
+	 */
 	void InitActionUIElement(
 		ACPPController* PlayerController,
 		const int32 IndexActionUIElm, UActionUIManager* ActionUIManager);
@@ -80,17 +87,33 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void UpdateButtonWithGlobalSlateStyle();
 
+	virtual void NativeDestruct() override;
+
 private:
 	EAbilityID M_Ability;
 	int32 M_CustomType = 0;
 
 	UPROPERTY()
-	TObjectPtr<ACPPController> M_PlayerController;
+	TWeakObjectPtr<ACPPController> M_PlayerController;
 
-	int32 M_Index;
+	int32 M_Index = 0;
 
 	UPROPERTY()
-	TObjectPtr<UActionUIManager> M_ActionUIManager;
+	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
+
+	UPROPERTY()
+	TWeakObjectPtr<URTSHotkeyProviderSubsystem> M_HotkeyProviderSubsystem;
+
+	FDelegateHandle M_ActionSlotHotkeyHandle;
+
+	void CacheHotkeyProviderSubsystem();
+	void BindHotkeyUpdateDelegate();
+	void UnbindHotkeyUpdateDelegate();
+	void UpdateHotkeyFromProvider();
+	void HandleActionSlotHotkeyUpdated(const int32 ActionSlotIndex, const FText& HotkeyText);
+
+	bool GetIsValidActionItemHotKey() const;
+	bool GetIsValidHotkeyProviderSubsystem() const;
 
 	/** @return Whether the player controller reference is valid.
 	 * Will atempt to reset the reference if not valid. */

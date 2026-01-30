@@ -8,15 +8,22 @@
 
 class URichTextBlock;
 /**
- * 
+ * @brief Rich text hotkey display widget that receives key strings from UI logic.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_HotKey : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetKeyText(const FText& NewKeyText);
+
 protected:
 	
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	URichTextBlock* M_KeyText;
+
+private:
+	bool GetIsValidKeyText() const;
 };

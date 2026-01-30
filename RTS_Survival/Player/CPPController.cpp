@@ -50,6 +50,7 @@
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
 #include "RTS_Survival/StartLocation/PlayerStartLocationMngr/PlayerStartLocationManager.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/BuildRadiusComp/BuildRadiusComp.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -439,6 +440,14 @@ void ACPPController::ChangeKeyBinding(UInputAction* ActionToRebind, const FKey O
 
 	M_DefaultInputMappingContext->UnmapKey(ActionToRebind, OldKey);
 	M_DefaultInputMappingContext->MapKey(ActionToRebind, NewKey);
+
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+	{
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		{
+			HotkeyProviderSubsystem->HandleKeyBindingChanged(ActionToRebind);
+		}
+	}
 }
 
 void ACPPController::UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey BoundKey)
@@ -460,6 +469,14 @@ void ACPPController::UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey B
 	}
 
 	M_DefaultInputMappingContext->UnmapKey(ActionToUnbind, BoundKey);
+
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+	{
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		{
+			HotkeyProviderSubsystem->HandleKeyBindingChanged(ActionToUnbind);
+		}
+	}
 }
 
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const

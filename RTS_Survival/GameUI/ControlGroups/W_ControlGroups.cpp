@@ -4,6 +4,7 @@
 #include "W_ControlGroups.h"
 
 #include "ControlGroupImage/W_ControlGroupImage.h"
+#include "Engine/LocalPlayer.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -21,16 +22,33 @@ void UW_ControlGroups::UpdateMostFrequentUnitInGroup(const int32 GroupIndex, con
 
 void UW_ControlGroups::InitControlGroups(const TArray<UW_ControlGroupImage*> ControlGroupWidgets)
 {
-	if (ControlGroupWidgets.Num() != 10)
+	constexpr int32 ExpectedControlGroupCount = 10;
+	if (ControlGroupWidgets.Num() != ExpectedControlGroupCount)
 	{
 		RTSFunctionLibrary::ReportError(
-			"Not enough control groups provided for the UW_ControlGroups widget! Expected 10, got " +
-			FString::FromInt(ControlGroupWidgets.Num()) + " in function: UW_ControlGroups::InitControlGroups");
+			"Not enough control groups provided for the UW_ControlGroups widget! Expected " +
+			FString::FromInt(ExpectedControlGroupCount) + ", got " + FString::FromInt(ControlGroupWidgets.Num()) +
+			" in function: UW_ControlGroups::InitControlGroups");
 		return;
 	}
-	M_ControlGroupWidgets = ControlGroupWidgets;
-	for(int i = 0; i < M_ControlGroupWidgets.Num(); i++)
+
+	ULocalPlayer* OwningLocalPlayer = GetOwningLocalPlayer();
+	if (not IsValid(OwningLocalPlayer))
 	{
-		M_ControlGroupWidgets[i]->SetupControlGroupIndex(i);
+		RTSFunctionLibrary::ReportError("UW_ControlGroups could not resolve an owning local player.");
+		return;
+	}
+
+	M_ControlGroupWidgets = ControlGroupWidgets;
+	for (int32 GroupIndex = 0; GroupIndex < M_ControlGroupWidgets.Num(); ++GroupIndex)
+	{
+		if (not IsValid(M_ControlGroupWidgets[GroupIndex]))
+		{
+			RTSFunctionLibrary::ReportError(
+				"UW_ControlGroups found a null control group widget at index " + FString::FromInt(GroupIndex));
+			continue;
+		}
+
+		M_ControlGroupWidgets[GroupIndex]->InitControlGroupImage(OwningLocalPlayer, GroupIndex);
 	}
 }
