@@ -371,6 +371,7 @@ void FPlayerEscapeMenuHelper::ShowEscapeMenuSettings()
 	WakeWidget(M_EscapeMenuSettingsWidget);
 	AddWidgetToViewport(M_EscapeMenuSettingsWidget, EscapeMenuZOrder::EscapeMenuSettings);
 	ApplyInputModeForWidget(M_EscapeMenuSettingsWidget);
+	M_EscapeMenuSettingsWidget->NotifyMenuOpened();
 }
 
 void FPlayerEscapeMenuHelper::ShowEscapeMenuKeyBindings()
