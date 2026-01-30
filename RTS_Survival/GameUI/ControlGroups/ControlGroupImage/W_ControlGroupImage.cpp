@@ -17,7 +17,6 @@ void UW_ControlGroupImage::InitControlGroupImage(ULocalPlayer* OwningLocalPlayer
 	}
 
 	M_GroupIndex = GroupIndex;
-	SetupControlGroupIndex(GroupIndex);
 
 	CacheHotkeyProviderSubsystem(OwningLocalPlayer);
 	UpdateControlGroupHotkey();

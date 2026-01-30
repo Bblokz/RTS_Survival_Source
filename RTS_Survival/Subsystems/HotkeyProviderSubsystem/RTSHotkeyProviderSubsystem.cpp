@@ -121,7 +121,7 @@ UInputAction* URTSHotkeyProviderSubsystem::FindActionByName(const FName& ActionN
 	const TArray<FEnhancedActionKeyMapping>& Mappings = MappingContext->GetMappings();
 	for (const FEnhancedActionKeyMapping& Mapping : Mappings)
 	{
-		if (not Mapping.Action.IsValid())
+		if (not IsValid(Mapping.Action))
 		{
 			continue;
 		}

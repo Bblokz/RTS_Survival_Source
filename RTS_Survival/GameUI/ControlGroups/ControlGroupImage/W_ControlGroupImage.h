@@ -30,8 +30,6 @@ public:
 	 */
 	void InitControlGroupImage(ULocalPlayer* OwningLocalPlayer, const int32 GroupIndex);
 
-	UFUNCTION(BlueprintImplementableEvent)
-	void SetupControlGroupIndex(const int32 GroupIndex);
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnUpdateControlGroup(const FTrainingOption MostFrequentUnitInGroup);

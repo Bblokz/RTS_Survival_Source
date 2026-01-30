@@ -1,0 +1,10 @@
+﻿
+main game menu
+-- Continue
+-- Start New Campaign
+-- Load Campaign
+-- 
+
+Continue: only if there is a world map save or compaign save.
+Start New Campaign --> FactoionSelection --> Set faction enum in GameInstance
+
