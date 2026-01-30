@@ -10,6 +10,9 @@
 #include "Components/BackgroundBlur.h"
 #include "Components/Overlay.h"
 #include "Components/SizeBox.h"
+#include "Components/WidgetSwitcher.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Engine/GameInstance.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
@@ -21,6 +24,10 @@ namespace EscapeMenuSettingsOptionDefaults
 {
 	constexpr int32 WindowModeOptionCount = 3;
 	constexpr int32 QualityOptionCount = 4;
+	constexpr int32 SettingsSectionGameplayIndex = 0;
+	constexpr int32 SettingsSectionGraphicsIndex = 1;
+	constexpr int32 SettingsSectionAudioIndex = 2;
+	constexpr int32 SettingsSectionControlsIndex = 3;
 
 	const TCHAR* const WindowModeOptionKeys[WindowModeOptionCount] =
 	{
@@ -94,6 +101,8 @@ void UW_EscapeMenuSettings::NativeConstruct()
 	CacheSettingsSubsystem();
 	BindButtonCallbacks();
 	BindSettingCallbacks();
+	CacheSettingsSectionButtonPadding();
+	ApplySettingsSectionSelection(EscapeMenuSettingsOptionDefaults::SettingsSectionGameplayIndex);
 	RefreshControlsFromSubsystem();
 }
 
@@ -667,6 +676,7 @@ void UW_EscapeMenuSettings::BindButtonCallbacks()
 	BindApplyButton();
 	BindSetDefaultsButton();
 	BindBackOrCancelButton();
+	BindSettingsSectionButtons();
 }
 
 void UW_EscapeMenuSettings::BindApplyButton()
@@ -700,6 +710,190 @@ void UW_EscapeMenuSettings::BindBackOrCancelButton()
 
 	M_ButtonBackOrCancel->OnClicked.RemoveAll(this);
 	M_ButtonBackOrCancel->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleBackOrCancelClicked);
+}
+
+void UW_EscapeMenuSettings::BindSettingsSectionButtons()
+{
+	if (not GetIsValidButtonGameplaySettings())
+	{
+		return;
+	}
+
+	if (not GetIsValidButtonGraphicsSettings())
+	{
+		return;
+	}
+
+	if (not GetIsValidButtonAudioSettings())
+	{
+		return;
+	}
+
+	if (not GetIsValidButtonControlSettings())
+	{
+		return;
+	}
+
+	M_GameplaySettings->OnClicked.RemoveAll(this);
+	M_GameplaySettings->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleGameplaySettingsClicked);
+
+	M_GraphicsSettings->OnClicked.RemoveAll(this);
+	M_GraphicsSettings->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleGraphicsSettingsClicked);
+
+	M_AudioSettings->OnClicked.RemoveAll(this);
+	M_AudioSettings->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleAudioSettingsClicked);
+
+	M_ControlSettings->OnClicked.RemoveAll(this);
+	M_ControlSettings->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleControlSettingsClicked);
+}
+
+void UW_EscapeMenuSettings::CacheSettingsSectionButtonPadding()
+{
+	if (bM_HasCachedSettingsSectionPadding)
+	{
+		return;
+	}
+
+	if (not GetIsValidButtonGameplaySettings())
+	{
+		return;
+	}
+
+	if (not GetIsValidButtonGraphicsSettings())
+	{
+		return;
+	}
+
+	if (not GetIsValidButtonAudioSettings())
+	{
+		return;
+	}
+
+	if (not GetIsValidButtonControlSettings())
+	{
+		return;
+	}
+
+	M_SettingsSectionButtonPadding.M_GameplayPadding = GetButtonSlotPadding(M_GameplaySettings);
+	M_SettingsSectionButtonPadding.M_GraphicsPadding = GetButtonSlotPadding(M_GraphicsSettings);
+	M_SettingsSectionButtonPadding.M_AudioPadding = GetButtonSlotPadding(M_AudioSettings);
+	M_SettingsSectionButtonPadding.M_ControlsPadding = GetButtonSlotPadding(M_ControlSettings);
+	bM_HasCachedSettingsSectionPadding = true;
+}
+
+void UW_EscapeMenuSettings::ApplySettingsSectionSelection(const int32 NewIndex)
+{
+	if (not GetIsValidSettingsSwitch())
+	{
+		return;
+	}
+
+	const int32 ClampedIndex = FMath::Clamp(
+		NewIndex,
+		EscapeMenuSettingsOptionDefaults::SettingsSectionGameplayIndex,
+		EscapeMenuSettingsOptionDefaults::SettingsSectionControlsIndex
+	);
+
+	CacheSettingsSectionButtonPadding();
+	M_SettingsSwitch->SetActiveWidgetIndex(ClampedIndex);
+	UpdateSettingsSectionButtonPadding(ClampedIndex);
+}
+
+void UW_EscapeMenuSettings::UpdateSettingsSectionButtonPadding(const int32 SelectedIndex)
+{
+	if (not bM_HasCachedSettingsSectionPadding)
+	{
+		return;
+	}
+
+	SetButtonSlotPadding(M_GameplaySettings, M_SettingsSectionButtonPadding.M_GameplayPadding);
+	SetButtonSlotPadding(M_GraphicsSettings, M_SettingsSectionButtonPadding.M_GraphicsPadding);
+	SetButtonSlotPadding(M_AudioSettings, M_SettingsSectionButtonPadding.M_AudioPadding);
+	SetButtonSlotPadding(M_ControlSettings, M_SettingsSectionButtonPadding.M_ControlsPadding);
+
+	if (SelectedIndex == EscapeMenuSettingsOptionDefaults::SettingsSectionGameplayIndex)
+	{
+		SetButtonSlotPadding(
+			M_GameplaySettings,
+			BuildSelectedButtonPadding(M_SettingsSectionButtonPadding.M_GameplayPadding)
+		);
+		return;
+	}
+
+	if (SelectedIndex == EscapeMenuSettingsOptionDefaults::SettingsSectionGraphicsIndex)
+	{
+		SetButtonSlotPadding(
+			M_GraphicsSettings,
+			BuildSelectedButtonPadding(M_SettingsSectionButtonPadding.M_GraphicsPadding)
+		);
+		return;
+	}
+
+	if (SelectedIndex == EscapeMenuSettingsOptionDefaults::SettingsSectionAudioIndex)
+	{
+		SetButtonSlotPadding(
+			M_AudioSettings,
+			BuildSelectedButtonPadding(M_SettingsSectionButtonPadding.M_AudioPadding)
+		);
+		return;
+	}
+
+	if (SelectedIndex == EscapeMenuSettingsOptionDefaults::SettingsSectionControlsIndex)
+	{
+		SetButtonSlotPadding(
+			M_ControlSettings,
+			BuildSelectedButtonPadding(M_SettingsSectionButtonPadding.M_ControlsPadding)
+		);
+	}
+}
+
+FMargin UW_EscapeMenuSettings::BuildSelectedButtonPadding(const FMargin& BasePadding) const
+{
+	return FMargin(
+		BasePadding.Left + M_ExtraLeftPadding,
+		BasePadding.Top,
+		BasePadding.Right,
+		BasePadding.Bottom
+	);
+}
+
+FMargin UW_EscapeMenuSettings::GetButtonSlotPadding(const UButton* Button) const
+{
+	if (not IsValid(Button))
+	{
+		return FMargin();
+	}
+
+	if (const UHorizontalBoxSlot* const HorizontalSlot = Cast<UHorizontalBoxSlot>(Button->Slot))
+	{
+		return HorizontalSlot->GetPadding();
+	}
+
+	if (const UVerticalBoxSlot* const VerticalSlot = Cast<UVerticalBoxSlot>(Button->Slot))
+	{
+		return VerticalSlot->GetPadding();
+	}
+
+	return FMargin();
+}
+
+void UW_EscapeMenuSettings::SetButtonSlotPadding(UButton* Button, const FMargin& Padding) const
+{
+	if (not IsValid(Button))
+	{
+		return;
+	}
+
+	if (UHorizontalBoxSlot* const HorizontalSlot = Cast<UHorizontalBoxSlot>(Button->Slot))
+	{
+		HorizontalSlot->SetPadding(Padding);
+		return;
+	}
+
+	if (UVerticalBoxSlot* const VerticalSlot = Cast<UVerticalBoxSlot>(Button->Slot))
+	{
+		VerticalSlot->SetPadding(Padding);
+	}
 }
 
 void UW_EscapeMenuSettings::BindSettingCallbacks()
@@ -971,6 +1165,86 @@ bool UW_EscapeMenuSettings::GetIsValidHorizontalBoxFooterButtons() const
 			this,
 			TEXT("M_HorizontalBoxFooterButtons"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidHorizontalBoxFooterButtons"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSettingsSwitch() const
+{
+	if (not IsValid(M_SettingsSwitch))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SettingsSwitch"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSettingsSwitch"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidButtonGameplaySettings() const
+{
+	if (not IsValid(M_GameplaySettings))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_GameplaySettings"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonGameplaySettings"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidButtonGraphicsSettings() const
+{
+	if (not IsValid(M_GraphicsSettings))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_GraphicsSettings"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonGraphicsSettings"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidButtonAudioSettings() const
+{
+	if (not IsValid(M_AudioSettings))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_AudioSettings"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonAudioSettings"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidButtonControlSettings() const
+{
+	if (not IsValid(M_ControlSettings))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ControlSettings"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonControlSettings"),
 			this
 		);
 		return false;
@@ -2225,6 +2499,31 @@ bool UW_EscapeMenuSettings::GetAreRootWidgetsValid() const
 	return GetIsValidHorizontalBoxFooterButtons();
 }
 
+bool UW_EscapeMenuSettings::GetAreSettingsNavigationWidgetsValid() const
+{
+	if (not GetIsValidSettingsSwitch())
+	{
+		return false;
+	}
+
+	if (not GetIsValidButtonGameplaySettings())
+	{
+		return false;
+	}
+
+	if (not GetIsValidButtonGraphicsSettings())
+	{
+		return false;
+	}
+
+	if (not GetIsValidButtonAudioSettings())
+	{
+		return false;
+	}
+
+	return GetIsValidButtonControlSettings();
+}
+
 bool UW_EscapeMenuSettings::GetAreGraphicsWidgetsValid() const
 {
 	if (not GetIsValidVerticalBoxGraphicsSection())
@@ -2328,6 +2627,11 @@ bool UW_EscapeMenuSettings::GetAreFooterWidgetsValid() const
 bool UW_EscapeMenuSettings::GetAreAllWidgetsValid() const
 {
 	if (not GetAreRootWidgetsValid())
+	{
+		return false;
+	}
+
+	if (not GetAreSettingsNavigationWidgetsValid())
 	{
 		return false;
 	}
@@ -2791,6 +3095,26 @@ void UW_EscapeMenuSettings::HandleBackOrCancelClicked()
 	}
 
 	M_MainGameUI->OnEscapeMenuCloseSettings();
+}
+
+void UW_EscapeMenuSettings::HandleGameplaySettingsClicked()
+{
+	ApplySettingsSectionSelection(EscapeMenuSettingsOptionDefaults::SettingsSectionGameplayIndex);
+}
+
+void UW_EscapeMenuSettings::HandleGraphicsSettingsClicked()
+{
+	ApplySettingsSectionSelection(EscapeMenuSettingsOptionDefaults::SettingsSectionGraphicsIndex);
+}
+
+void UW_EscapeMenuSettings::HandleAudioSettingsClicked()
+{
+	ApplySettingsSectionSelection(EscapeMenuSettingsOptionDefaults::SettingsSectionAudioIndex);
+}
+
+void UW_EscapeMenuSettings::HandleControlSettingsClicked()
+{
+	ApplySettingsSectionSelection(EscapeMenuSettingsOptionDefaults::SettingsSectionControlsIndex);
 }
 
 void UW_EscapeMenuSettings::HandleWindowModeSelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
