@@ -243,10 +243,17 @@ public:
 	 * @param NewPlayerController Player controller that owns the settings menu.
 	 */
 	void SetPlayerController(ACPPController* NewPlayerController);
+	void NotifyMenuOpened();
 
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Settings|Events")
+	void BP_OnOpenMenu();
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Settings|Events")
+	void BP_OnSettingsMenuChange(int32 Index);
 
 private:
 	void CacheSettingsSubsystem();

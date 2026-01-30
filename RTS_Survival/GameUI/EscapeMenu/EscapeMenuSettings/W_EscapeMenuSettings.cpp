@@ -57,6 +57,11 @@ void UW_EscapeMenuSettings::SetPlayerController(ACPPController* NewPlayerControl
 	M_MainGameUI = NewPlayerController->GetMainMenuUI();
 }
 
+void UW_EscapeMenuSettings::NotifyMenuOpened()
+{
+	BP_OnOpenMenu();
+}
+
 void UW_EscapeMenuSettings::NativePreConstruct()
 {
 	Super::NativePreConstruct();
@@ -800,6 +805,7 @@ void UW_EscapeMenuSettings::ApplySettingsSectionSelection(const int32 NewIndex)
 	CacheSettingsSectionButtonPadding();
 	M_SettingsSwitch->SetActiveWidgetIndex(ClampedIndex);
 	UpdateSettingsSectionButtonPadding(ClampedIndex);
+	BP_OnSettingsMenuChange(ClampedIndex);
 }
 
 void UW_EscapeMenuSettings::UpdateSettingsSectionButtonPadding(const int32 SelectedIndex)
