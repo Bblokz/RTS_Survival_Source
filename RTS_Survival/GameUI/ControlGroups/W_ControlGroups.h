@@ -9,7 +9,7 @@
 class UW_ControlGroupImage;
 struct FTrainingOption;
 /**
- * 
+ * @brief Maintains a collection of control group widgets and updates their displayed unit and hotkey state.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_ControlGroups : public UUserWidget
@@ -22,6 +22,10 @@ public:
 
 
 protected:
+	/**
+	 * @brief Registers the control group widget list and initializes their hotkey bindings.
+	 * @param ControlGroupWidgets Control group widget list in slot order.
+	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Init")
 	void InitControlGroups(TArray<UW_ControlGroupImage*> ControlGroupWidgets);
 
