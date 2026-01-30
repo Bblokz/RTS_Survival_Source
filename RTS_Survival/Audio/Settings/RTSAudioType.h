@@ -12,5 +12,6 @@ enum class ERTSAudioType : uint8
 	Music UMETA(DisplayName="Music"),
 	Voicelines UMETA(DisplayName="Voicelines"),
 	Announcer UMETA(DisplayName="Announcer"),
+	TransmissionsAndCinematics UMETA(DisplayName="Transmissions & Cinematics"),
 	UI UMETA(DisplayName="UI")
 };

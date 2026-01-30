@@ -181,6 +181,7 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 	SetSliderRange(M_SliderMasterVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderMusicVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderSfxVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
+	SetSliderRange(M_SliderTransmissionsAndCinematicsVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 }
 
 void UW_EscapeMenuSettings::PopulateWindowModeOptions()
@@ -456,6 +457,7 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 	M_TextSfxVolumeLabel->SetText(M_AudioText.M_SfxVolumeLabelText);
 	M_TextVoicelinesVolumeLabel->SetText(M_AudioText.M_VoicelinesVolumeLabelText);
 	M_TextAnnouncerVolumeLabel->SetText(M_AudioText.M_AnnouncerVolumeLabelText);
+	M_TextTransmissionsAndCinematicsVolumeLabel->SetText(M_AudioText.M_TransmissionsAndCinematicsVolumeLabelText);
 	M_TextUiVolumeLabel->SetText(M_AudioText.M_UiVolumeLabelText);
 
 	M_TextControlsHeader->SetText(M_ControlsText.M_HeaderText);
@@ -575,6 +577,7 @@ void UW_EscapeMenuSettings::InitialiseAudioControls(const FRTSAudioSettings& Aud
 	M_SliderSfxVolume->SetValue(AudioSettings.M_SfxAndWeaponsVolume);
 	M_SliderVoicelinesVolume->SetValue(AudioSettings.M_VoicelinesVolume);
 	M_SliderAnnouncerVolume->SetValue(AudioSettings.M_AnnouncerVolume);
+	M_SliderTransmissionsAndCinematicsVolume->SetValue(AudioSettings.M_TransmissionsAndCinematicsVolume);
 	M_SliderUiVolume->SetValue(AudioSettings.M_UiVolume);
 }
 
@@ -973,6 +976,9 @@ void UW_EscapeMenuSettings::BindAudioSettingCallbacks()
 
 	M_SliderAnnouncerVolume->OnValueChanged.RemoveAll(this);
 	M_SliderAnnouncerVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleAnnouncerVolumeChanged);
+
+	M_SliderTransmissionsAndCinematicsVolume->OnValueChanged.RemoveAll(this);
+	M_SliderTransmissionsAndCinematicsVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleTransmissionsAndCinematicsVolumeChanged);
 
 	M_SliderUiVolume->OnValueChanged.RemoveAll(this);
 	M_SliderUiVolume->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleUiVolumeChanged);
@@ -1749,6 +1755,22 @@ bool UW_EscapeMenuSettings::GetIsValidTextAnnouncerVolumeLabel() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidTextTransmissionsAndCinematicsVolumeLabel() const
+{
+	if (not IsValid(M_TextTransmissionsAndCinematicsVolumeLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextTransmissionsAndCinematicsVolumeLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextTransmissionsAndCinematicsVolumeLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidTextUiVolumeLabel() const
 {
 	if (not IsValid(M_TextUiVolumeLabel))
@@ -1837,6 +1859,22 @@ bool UW_EscapeMenuSettings::GetIsValidSliderAnnouncerVolume() const
 			this,
 			TEXT("M_SliderAnnouncerVolume"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidSliderAnnouncerVolume"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderTransmissionsAndCinematicsVolume() const
+{
+	if (not IsValid(M_SliderTransmissionsAndCinematicsVolume))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderTransmissionsAndCinematicsVolume"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderTransmissionsAndCinematicsVolume"),
 			this
 		);
 		return false;
@@ -2796,6 +2834,11 @@ bool UW_EscapeMenuSettings::GetAreAudioTextWidgetsValid() const
 		return false;
 	}
 
+	if (not GetIsValidTextTransmissionsAndCinematicsVolumeLabel())
+	{
+		return false;
+	}
+
 	return GetIsValidTextUiVolumeLabel();
 }
 
@@ -2972,6 +3015,11 @@ bool UW_EscapeMenuSettings::GetAreAudioSliderWidgetsValid() const
 	}
 
 	if (not GetIsValidSliderAnnouncerVolume())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSliderTransmissionsAndCinematicsVolume())
 	{
 		return false;
 	}
@@ -3485,6 +3533,26 @@ void UW_EscapeMenuSettings::HandleAnnouncerVolumeChanged(const float NewValue)
 	}
 
 	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioType::Announcer, NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleTransmissionsAndCinematicsVolumeChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderTransmissionsAndCinematicsVolume())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingAudioVolume(ERTSAudioType::TransmissionsAndCinematics, NewValue);
 }
 
 void UW_EscapeMenuSettings::HandleUiVolumeChanged(const float NewValue)

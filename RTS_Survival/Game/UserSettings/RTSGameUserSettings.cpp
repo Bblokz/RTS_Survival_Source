@@ -69,6 +69,11 @@ float URTSGameUserSettings::GetAnnouncerVolume() const
 	return M_AnnouncerVolume;
 }
 
+float URTSGameUserSettings::GetTransmissionsAndCinematicsVolume() const
+{
+	return M_TransmissionsAndCinematicsVolume;
+}
+
 float URTSGameUserSettings::GetUiVolume() const
 {
 	return M_UiVolume;
@@ -116,6 +121,12 @@ void URTSGameUserSettings::SetVoicelinesVolume(const float NewVoicelinesVolume)
 void URTSGameUserSettings::SetAnnouncerVolume(const float NewAnnouncerVolume)
 {
 	M_AnnouncerVolume = NewAnnouncerVolume;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetTransmissionsAndCinematicsVolume(const float NewTransmissionsAndCinematicsVolume)
+{
+	M_TransmissionsAndCinematicsVolume = NewTransmissionsAndCinematicsVolume;
 	ApplyCustomSettingClamps();
 }
 
@@ -306,6 +317,17 @@ void URTSGameUserSettings::ApplyCustomSettingClamps()
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Announcer volume was out of range and has been clamped."));
 		M_AnnouncerVolume = ClampedAnnouncerVolume;
+	}
+
+	const float ClampedTransmissionsAndCinematicsVolume = FMath::Clamp(
+		M_TransmissionsAndCinematicsVolume,
+		RTSGameUserSettingsRanges::MinVolume,
+		RTSGameUserSettingsRanges::MaxVolume
+	);
+	if (not FMath::IsNearlyEqual(ClampedTransmissionsAndCinematicsVolume, M_TransmissionsAndCinematicsVolume))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Transmissions and cinematics volume was out of range and has been clamped."));
+		M_TransmissionsAndCinematicsVolume = ClampedTransmissionsAndCinematicsVolume;
 	}
 
 	const float ClampedUiVolume = FMath::Clamp(M_UiVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
