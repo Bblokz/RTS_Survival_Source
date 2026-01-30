@@ -454,6 +454,7 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 	M_TextInvertYAxisLabel->SetText(M_ControlsText.M_InvertYAxisLabelText);
 
 	M_TextGameplayHeader->SetText(M_GameplayText.M_HeaderText);
+	M_TextHideActionButtonHotkeysLabel->SetText(M_GameplayText.M_HideActionButtonHotkeysLabelText);
 	M_TextOverwriteAllPlayerHpBarLabel->SetText(M_GameplayText.M_OverwriteAllPlayerHpBarLabelText);
 	M_TextPlayerTankHpBarLabel->SetText(M_GameplayText.M_PlayerTankHpBarLabelText);
 	M_TextPlayerSquadHpBarLabel->SetText(M_GameplayText.M_PlayerSquadHpBarLabelText);
@@ -591,6 +592,7 @@ void UW_EscapeMenuSettings::InitialiseGameplayControls(const FRTSGameplaySetting
 		return;
 	}
 
+	M_CheckHideActionButtonHotkeys->SetIsChecked(GameplaySettings.bM_HideActionButtonHotkeys);
 	SetPlayerHealthBarStrategySelection(M_ComboOverwriteAllPlayerHpBarStrat, GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
 	SetPlayerHealthBarStrategySelection(M_ComboPlayerTankHpBarStrat, GameplaySettings.M_PlayerTankHpBarStrat);
 	SetPlayerHealthBarStrategySelection(M_ComboPlayerSquadHpBarStrat, GameplaySettings.M_PlayerSquadHpBarStrat);
@@ -793,6 +795,9 @@ void UW_EscapeMenuSettings::BindControlSettingCallbacks()
 
 void UW_EscapeMenuSettings::BindGameplaySettingCallbacks()
 {
+	M_CheckHideActionButtonHotkeys->OnCheckStateChanged.RemoveAll(this);
+	M_CheckHideActionButtonHotkeys->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleHideActionButtonHotkeysChanged);
+
 	M_ComboOverwriteAllPlayerHpBarStrat->OnSelectionChanged.RemoveAll(this);
 	M_ComboOverwriteAllPlayerHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleOverwriteAllPlayerHpBarStratChanged);
 
@@ -1646,6 +1651,22 @@ bool UW_EscapeMenuSettings::GetIsValidTextGameplayHeader() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidTextHideActionButtonHotkeysLabel() const
+{
+	if (not IsValid(M_TextHideActionButtonHotkeysLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextHideActionButtonHotkeysLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextHideActionButtonHotkeysLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidTextOverwriteAllPlayerHpBarLabel() const
 {
 	if (not IsValid(M_TextOverwriteAllPlayerHpBarLabel))
@@ -1862,6 +1883,22 @@ bool UW_EscapeMenuSettings::GetIsValidCheckInvertYAxis() const
 			this,
 			TEXT("M_CheckInvertYAxis"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidCheckInvertYAxis"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidCheckHideActionButtonHotkeys() const
+{
+	if (not IsValid(M_CheckHideActionButtonHotkeys))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_CheckHideActionButtonHotkeys"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidCheckHideActionButtonHotkeys"),
 			this
 		);
 		return false;
@@ -2245,6 +2282,11 @@ bool UW_EscapeMenuSettings::GetAreGameplayWidgetsValid() const
 		return false;
 	}
 
+	if (not GetIsValidCheckHideActionButtonHotkeys())
+	{
+		return false;
+	}
+
 	return GetAreGameplayComboWidgetsValid();
 }
 
@@ -2471,6 +2513,11 @@ bool UW_EscapeMenuSettings::GetAreControlsTextWidgetsValid() const
 bool UW_EscapeMenuSettings::GetAreGameplayTextWidgetsValid() const
 {
 	if (not GetIsValidTextGameplayHeader())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextHideActionButtonHotkeysLabel())
 	{
 		return false;
 	}
@@ -3174,6 +3221,26 @@ void UW_EscapeMenuSettings::HandleInvertYAxisChanged(const bool bIsChecked)
 	}
 
 	M_SettingsSubsystem->SetPendingInvertYAxis(bIsChecked);
+}
+
+void UW_EscapeMenuSettings::HandleHideActionButtonHotkeysChanged(const bool bIsChecked)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidCheckHideActionButtonHotkeys())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingHideActionButtonHotkeys(bIsChecked);
 }
 
 void UW_EscapeMenuSettings::HandleOverwriteAllPlayerHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)

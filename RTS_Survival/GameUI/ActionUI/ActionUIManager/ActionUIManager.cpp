@@ -27,6 +27,7 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 
 void UActionUIManager::InitActionUIManager(
 	TArray<UW_WeaponItem*> TWeaponUIItemsInMenu,
@@ -103,6 +104,11 @@ void UActionUIManager::InitActionUIManager(
 	{
 		M_TActionUI_Items[i]->InitActionUIElement(PlayerController, i, this);
 	}
+	const URTSGameUserSettings* const GameUserSettings = URTSGameUserSettings::Get();
+	if (GameUserSettings != nullptr)
+	{
+		SetActionButtonHotkeysHidden(GameUserSettings->GetHideActionButtonHotkeys());
+	}
 	if (!IsValid(SelectedUnitInfo))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this,
@@ -129,6 +135,19 @@ void UActionUIManager::InitActionUIManager(
 void UActionUIManager::SetActionUIVisibility(const bool bShowActionUI) const
 {
 	M_ActionUIContainer.SetActionUIVisibility(bShowActionUI);
+}
+
+void UActionUIManager::SetActionButtonHotkeysHidden(const bool bHideActionButtonHotkeys) const
+{
+	for (UW_ItemActionUI* ActionUIItem : M_TActionUI_Items)
+	{
+		if (not IsValid(ActionUIItem))
+		{
+			continue;
+		}
+
+		ActionUIItem->SetActionButtonHotkeyHidden(bHideActionButtonHotkeys);
+	}
 }
 
 void UActionUIManager::HideAllHoverInfoWidgets() const

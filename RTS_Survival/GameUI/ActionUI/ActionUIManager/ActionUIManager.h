@@ -53,6 +53,7 @@ public:
 		ActionUIDescriptionWidget, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
 
 	void SetActionUIVisibility(const bool bShowActionUI) const;
+	void SetActionButtonHotkeysHidden(const bool bHideActionButtonHotkeys) const;
 	void HideAllHoverInfoWidgets() const;
 	void HideAmmoPicker() const;
 

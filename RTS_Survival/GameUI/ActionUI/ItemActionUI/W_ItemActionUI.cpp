@@ -37,6 +37,17 @@ void UW_ItemActionUI::InitActionUIElement(
 	BindHotkeyUpdateDelegate();
 }
 
+void UW_ItemActionUI::SetActionButtonHotkeyHidden(const bool bHideActionButtonHotkey) const
+{
+	if (not GetIsValidActionItemHotKey())
+	{
+		return;
+	}
+
+	const ESlateVisibility NewVisibility = bHideActionButtonHotkey ? ESlateVisibility::Hidden : ESlateVisibility::Visible;
+	M_ActionItemHotKey->SetVisibility(NewVisibility);
+}
+
 void UW_ItemActionUI::OnActionUIClicked()
 {
 	if (GetIsValidPlayerController())
