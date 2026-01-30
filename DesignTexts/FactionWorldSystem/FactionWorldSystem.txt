@@ -8,3 +8,92 @@ main game menu
 Continue: only if there is a world map save or compaign save.
 Start New Campaign --> FactoionSelection --> Set faction enum in GameInstance
 
+the faction selection screen:
+You are going to implement the various widgets and actors needed for the Faction Selection screen of the game. Both the UI and 
+other classes have to be placed under hte FactionSystem directory.
+For this map where the faction selection will be done we need a simple player controller through which most of the logic will be routed;
+because the game is single player we do not use player state.
+define the FactionPlayerController class that will be used it needs a bp edit defaults sub class of W_FactionSelectionMenu
+which will be the main widget for the faction selection screen. the controller will at begin play create this widget, add it to viewport
+and make sure the game mode is set to show the mouse but only work on this created widget. (no camera controls)
+
+for the W_FactionSelectionMenu widget:
+we need many bind widget variables to be set up, assume nothing about the layout i will set them up in the derived blueprint widget later.
+we need the following buttons:
+M_GerBreakthrough
+M_GerBreakthroughAudio
+M_GerThermoKorps
+M_GerThermoKorpsAudio
+M_GerItalianGame
+M_GerItalianGameAudio
+
+M_LaunchCampaign
+
+we also need a scrollbox called M_ScrollBox to be set up.
+as well as a edit defaults subclass of W_FactionUnit which will be used to populate the scrollbox with various of these widgets;
+more on that later.
+
+it will also need a bind widget setup for UW_Portrait which is an already defined widget used elswhere in the project too.
+called: M_Portrait.
+
+we also need a new AActor derived class called FactionUnitPreview which we will assume exists on the map
+and get at begin play in the controller by searching for it. the location of this actor will be the place where we will spawn the previews of units.
+in a similair way the player controller will look for the ARTSAsyncSpawner on the map and store a reference to it for later use.
+this spawner has the function AsyncSpawnOptionAtLocation which makes use of FTrainingOption to determine a unit to spawn at a location asynchronously.
+
+in the W_FactionSelectionMenu we want to have setting structs for each faction we define these setting structs above the widget class called
+FFactionMenuSetting
+it will contain an array of FTrainingOption called UnitOptions, which determine the units of that faction.
+it will also contain a boolean bIsEnabled to determine if the faction is available to select.
+it will also contain a USoundBase* calle faction description which will be played with the portrait when the faction is selcted for the first time
+or when the player clicks the audio button next to the faction button.
+
+define one of these in the edit defaults for each of the 3 factions.
+
+if a faction is set to not be enabled make sure its faction button is not clickable (set to disabled). same goes for its associated audio button.
+
+when the widget is constructed it will automatically 'simulate' the player selecting the first faction which is the German Breakthrough faction.
+because it is the fist selection it will play the audio as 2D and on the portrait call UpdatePortrait with ERTSPortraitTypes::GermanAnnouncer. 
+it will use this same announcer for every of the factions.
+NOTE: keep track of when the audio is finished; if it is then call HidePortrait on the portrait widget.
+because it is easiest to have control of stopping the audio if needed make sure the player controller has an audio component and that we
+play the sound on that component.
+after playing this audio and setting the portrait the widget will populate the scrollbox with as many W_FactionUnit as there are 
+training options set for this faction in its FactionMenuSetting struct.
+about the W_FactionUnit widget;
+these will have a private that stores their current FTrainingOption  and a bluerpintimplementable event that is called once their training option is changed
+through the public function SetTrainingOption which will call the bp event BP_OnTrainingOptionChanged which as param has the option.
+as bind widgets these will have a button called M_UnitButton
+bind a func to the click of that button and make sure the W_FactionSelectionMenu sets a referene to itself on them which they store as weakpointer to notify
+the W_FactionSelectionMenu when they are clicked.
+we simulate a click on the first one after populating the scrollbox to make sure the first unit of the faction is also previewed.
+
+make sure there is also a editdefaults World Soft Object Reference on the  W_FactionSelectionMenu which will be used to load the world map
+when the player clicks the Launch Campaign button.
+
+when a faction button is clicked on the W_FactionSelectionMenu it will provide its training option and it will
+propagate that to the player controller which will use the async spawner to spawn that option at the location of the FactionUnitPreview actor.
+the spawn rotation will be and edit defaults rotator on the player contorller. make sure to register a callback on the async spawner, which we use to spawn the
+trainingoption so that after spanwing we can save the actor pointer as currently spawned actor.
+After trhat is done also cast the actor to ICommands* and save that as ScriptInterface poitner as well for later use.
+before spawning a new unit make sure to destroy the currently spawned actor if valid.
+
+in this way whenever the player clicks a different faction nunit in the scroll box the preview is updated.
+
+in addition define a struct bp friendly above the controller called FunitPreviewActions
+which will have
+a float MinTimeTillGroundAttack
+a float MaxTimeTillGroundAttack
+and an array of FVector called GroundAttackLocations.
+
+what the player controlelr also needs to do is keep track of a timer handle that is set everytime there is a new preview spawned;
+with random time between these min and max and when the timer fires it will order the icommands unit to attack ground randomly at one of the locations.
+
+IMPORTANT NOTE: stop the sound of the current announcer talking about a faction when a new faciton button is clicked but the sound is still playing.
+make sure the timer of the unit ground attack is rest to a new random interval when the preview is updated.
+
+implement all the classes and logic between them.
+
+
+
+

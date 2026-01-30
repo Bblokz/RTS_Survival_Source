@@ -47,12 +47,12 @@ void AFactionPlayerController::SpawnPreviewForTrainingOption(const FTrainingOpti
 
 	ClearCurrentPreview();
 
-	const FVector SpawnLocation = M_FactionUnitPreview->GetActorLocation();
+	const FVector FactionUnitSpawnLocation = M_FactionUnitPreview->GetActorLocation();
 	const int32 PreviewSpawnRequestId = 1;
 	TWeakObjectPtr<AFactionPlayerController> WeakThis(this);
 	const bool bRequestStarted = M_RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
 		TrainingOption,
-		SpawnLocation,
+		FactionUnitSpawnLocation,
 		this,
 		PreviewSpawnRequestId,
 		[WeakThis](const FTrainingOption& SpawnedOption, AActor* SpawnedActor, const int32 SpawnRequestId)
@@ -200,8 +200,6 @@ void AFactionPlayerController::HandlePreviewSpawned(
 	AActor* SpawnedActor,
 	const int32 SpawnRequestId)
 {
-	UE_UNUSED(TrainingOption);
-	UE_UNUSED(SpawnRequestId);
 
 	if (not IsValid(SpawnedActor))
 	{
