@@ -129,6 +129,21 @@ void AAnchorPoint::DebugDrawConnectionTo(const AAnchorPoint* OtherAnchor, const 
 	DrawDebugLine(World, GetActorLocation(), OtherAnchor->GetActorLocation(), Color, false, Duration, 0, DebugLineThickness);
 }
 
+void AAnchorPoint::OnEnemyItemPromotion(EMapEnemyItem EnemyItemType)
+{
+	BP_OnEnemyItemPromotion(EnemyItemType);
+}
+
+void AAnchorPoint::OnNeutralItemPromotion(EMapNeutralObjectType NeutralObjectType)
+{
+	BP_OnNeutralItemPromotion(NeutralObjectType);
+}
+
+void AAnchorPoint::OnMissionPromotion(EMapMission MissionType)
+{
+	BP_OnMissionPromotion(MissionType);
+}
+
 void AAnchorPoint::EnsureAnchorKeyIsInitialized()
 {
 	if (HasAnyFlags(RF_ClassDefaultObject))

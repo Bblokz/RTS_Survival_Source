@@ -6,11 +6,17 @@
 #include "Algo/Sort.h"
 #include "DeveloperSettings.h"
 #include "EngineUtils.h"
+#include "Utils/HFunctionLibary.h"
 #include "WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
 namespace
 {
+	constexpr int32 MaxStepAttempts = 25;
+	constexpr int32 MaxTotalAttempts = 200;
+	constexpr int32 AttemptSeedMultiplier = 13;
+	constexpr float DebugAnchorDurationSeconds = 10.f;
+
 	struct FConnectionSegment
 	{
 		FVector2D StartPoint;
@@ -258,9 +264,617 @@ AGeneratorWorldCampaign::AGeneratorWorldCampaign()
 	M_ConnectionClass = AConnection::StaticClass();
 }
 
-void AGeneratorWorldCampaign::GenerateConnections()
+void AGeneratorWorldCampaign::CreateConnectionsStep()
+{
+	ExecuteStepWithTransaction(ECampaignGenerationStep::ConnectionsCreated,
+		&AGeneratorWorldCampaign::ExecuteCreateConnections);
+}
+
+void AGeneratorWorldCampaign::PlaceHQStep()
+{
+	ExecuteStepWithTransaction(ECampaignGenerationStep::PlayerHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceHQ);
+}
+
+void AGeneratorWorldCampaign::PlaceEnemyHQStep()
+{
+	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ);
+}
+
+void AGeneratorWorldCampaign::PlaceEnemyObjectsStep()
+{
+	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyObjectsPlaced,
+		&AGeneratorWorldCampaign::ExecutePlaceEnemyObjects);
+}
+
+void AGeneratorWorldCampaign::PlaceNeutralObjectsStep()
+{
+	ExecuteStepWithTransaction(ECampaignGenerationStep::NeutralObjectsPlaced,
+		&AGeneratorWorldCampaign::ExecutePlaceNeutralObjects);
+}
+
+void AGeneratorWorldCampaign::PlaceMissionsStep()
+{
+	ExecuteStepWithTransaction(ECampaignGenerationStep::MissionsPlaced, &AGeneratorWorldCampaign::ExecutePlaceMissions);
+}
+
+void AGeneratorWorldCampaign::ExecuteAllSteps()
+{
+	ExecuteAllStepsWithBacktracking();
+}
+
+void AGeneratorWorldCampaign::EraseAllGeneration()
+{
+	ClearExistingConnections();
+	ClearPlacementState();
+	ClearDerivedData();
+	M_StepTransactions.Reset();
+	M_StepAttemptIndices.Reset();
+	M_TotalAttemptCount = 0;
+	M_GenerationStep = ECampaignGenerationStep::NotStarted;
+
+	TArray<TObjectPtr<AAnchorPoint>> AnchorPoints;
+	GatherAnchorPoints(AnchorPoints);
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		AnchorPoint->ClearConnections();
+	}
+}
+
+bool AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor() const
+{
+	if (M_PlacementState.PlayerHQAnchor.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.PlayerHQAnchor"),
+		TEXT("AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor"), this);
+	return false;
+}
+
+bool AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor() const
+{
+	if (M_PlacementState.EnemyHQAnchor.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.EnemyHQAnchor"),
+		TEXT("AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor"), this);
+	return false;
+}
+
+bool AGeneratorWorldCampaign::ExecuteStepWithTransaction(ECampaignGenerationStep CompletedStep,
+	bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&))
+{
+	if (not CanExecuteStep(CompletedStep))
+	{
+		return false;
+	}
+
+	FCampaignGenerationStepTransaction Transaction;
+	Transaction.CompletedStep = CompletedStep;
+	Transaction.PreviousPlacementState = M_PlacementState;
+	Transaction.PreviousDerivedData = M_DerivedData;
+
+	if (not (this->*StepFunction)(Transaction))
+	{
+		return false;
+	}
+
+	M_StepTransactions.Add(Transaction);
+	M_GenerationStep = CompletedStep;
+	ResetStepAttemptsFrom(CompletedStep);
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecuteCreateConnections(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	if (not ValidateGenerationRules())
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> AnchorPoints;
+	if (not PrepareAnchorsForConnectionGeneration(AnchorPoints))
+	{
+		return false;
+	}
+
+	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::ConnectionsCreated);
+	const int32 SeedOffset = AttemptIndex * AttemptSeedMultiplier;
+	FRandomStream RandomStream(M_CountAndDifficultyTuning.Seed + SeedOffset);
+	TMap<TObjectPtr<AAnchorPoint>, int32> DesiredConnections;
+	GenerateConnectionsForAnchors(AnchorPoints, RandomStream, DesiredConnections);
+	CacheGeneratedState(AnchorPoints);
+	OutTransaction.SpawnedConnections = M_GeneratedConnections;
+	return true;
+}
+
+bool AGeneratorWorldCampaign::PrepareAnchorsForConnectionGeneration(TArray<TObjectPtr<AAnchorPoint>>& OutAnchorPoints)
+{
+	ClearExistingConnections();
+	ClearPlacementState();
+	ClearDerivedData();
+
+	GatherAnchorPoints(OutAnchorPoints);
+	if (OutAnchorPoints.Num() < 2)
+	{
+		return false;
+	}
+
+	Algo::Sort(OutAnchorPoints, [](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
+	{
+		if (not IsValid(Left))
+		{
+			return false;
+		}
+
+		if (not IsValid(Right))
+		{
+			return true;
+		}
+
+		return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
+	});
+
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : OutAnchorPoints)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		AnchorPoint->ClearConnections();
+	}
+
+	return true;
+}
+
+void AGeneratorWorldCampaign::GenerateConnectionsForAnchors(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
+	FRandomStream& RandomStream, TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections)
+{
+	AssignDesiredConnections(AnchorPoints, RandomStream, OutDesiredConnections);
+
+	TArray<TObjectPtr<AAnchorPoint>> ShuffledAnchors = AnchorPoints;
+	Algo::Shuffle(ShuffledAnchors, RandomStream);
+
+	TArray<FConnectionSegment> ExistingSegments;
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : ShuffledAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		if constexpr (DeveloperSettings::Debugging::GCampaignConnectionGeneration_Compile_DebugSymbols)
+		{
+			DebugNotifyAnchorProcessing(AnchorPoint, TEXT("Processing"), FColor::Cyan);
+		}
+
+		GeneratePhasePreferredConnections(AnchorPoint, AnchorPoints, OutDesiredConnections, ExistingSegments);
+		GeneratePhaseExtendedConnections(AnchorPoint, AnchorPoints, ExistingSegments);
+		GeneratePhaseThreeWayConnections(AnchorPoint, ExistingSegments);
+	}
+
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		AnchorPoint->SortNeighborsByKey();
+	}
+}
+
+void AGeneratorWorldCampaign::CacheGeneratedState(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints)
+{
+	M_PlacementState.SeedUsed = M_CountAndDifficultyTuning.Seed;
+	M_PlacementState.CachedAnchors.Reset();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		M_PlacementState.CachedAnchors.Add(AnchorPoint);
+	}
+
+	M_PlacementState.CachedConnections.Reset();
+	for (const TObjectPtr<AConnection>& Connection : M_GeneratedConnections)
+	{
+		if (not IsValid(Connection))
+		{
+			continue;
+		}
+
+		M_PlacementState.CachedConnections.Add(Connection);
+	}
+
+	CacheAnchorConnectionDegrees();
+}
+
+bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	(void)OutTransaction;
+
+	if (M_PlacementState.CachedAnchors.Num() == 0)
+	{
+		return false;
+	}
+
+	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::PlayerHQPlaced);
+	const int32 AnchorIndex = AttemptIndex % M_PlacementState.CachedAnchors.Num();
+	AAnchorPoint* AnchorPoint = M_PlacementState.CachedAnchors[AnchorIndex].Get();
+	if (not IsValid(AnchorPoint))
+	{
+		return false;
+	}
+
+	M_PlacementState.PlayerHQAnchor = AnchorPoint;
+	M_PlacementState.PlayerHQAnchorKey = AnchorPoint->GetAnchorKey();
+
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Player HQ"), FColor::Green);
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	(void)OutTransaction;
+
+	if (M_PlacementState.CachedAnchors.Num() == 0)
+	{
+		return false;
+	}
+
+	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::EnemyHQPlaced);
+	const int32 AnchorIndex = AttemptIndex % M_PlacementState.CachedAnchors.Num();
+	AAnchorPoint* AnchorPoint = M_PlacementState.CachedAnchors[AnchorIndex].Get();
+	if (not IsValid(AnchorPoint))
+	{
+		return false;
+	}
+
+	M_PlacementState.EnemyHQAnchor = AnchorPoint;
+	M_PlacementState.EnemyHQAnchorKey = AnchorPoint->GetAnchorKey();
+
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Enemy HQ"), FColor::Red);
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	(void)OutTransaction;
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	(void)OutTransaction;
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	(void)OutTransaction;
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
+{
+	if (M_GenerationStep != ECampaignGenerationStep::NotStarted)
+	{
+		EraseAllGeneration();
+	}
+
+	TArray<ECampaignGenerationStep> StepOrder;
+	StepOrder.Add(ECampaignGenerationStep::ConnectionsCreated);
+	StepOrder.Add(ECampaignGenerationStep::PlayerHQPlaced);
+	StepOrder.Add(ECampaignGenerationStep::EnemyHQPlaced);
+	StepOrder.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+	StepOrder.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
+	StepOrder.Add(ECampaignGenerationStep::MissionsPlaced);
+
+	int32 StepIndex = 0;
+	while (StepIndex < StepOrder.Num())
+	{
+		const ECampaignGenerationStep StepToExecute = StepOrder[StepIndex];
+		bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&) = nullptr;
+		switch (StepToExecute)
+		{
+		case ECampaignGenerationStep::ConnectionsCreated:
+			StepFunction = &AGeneratorWorldCampaign::ExecuteCreateConnections;
+			break;
+		case ECampaignGenerationStep::PlayerHQPlaced:
+			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceHQ;
+			break;
+		case ECampaignGenerationStep::EnemyHQPlaced:
+			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ;
+			break;
+		case ECampaignGenerationStep::EnemyObjectsPlaced:
+			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyObjects;
+			break;
+		case ECampaignGenerationStep::NeutralObjectsPlaced:
+			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceNeutralObjects;
+			break;
+		case ECampaignGenerationStep::MissionsPlaced:
+			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceMissions;
+			break;
+		default:
+			return false;
+		}
+
+		const bool bDidExecute = ExecuteStepWithTransaction(StepToExecute, StepFunction);
+		if (bDidExecute)
+		{
+			StepIndex++;
+			continue;
+		}
+
+		if (not HandleStepFailure(StepToExecute, StepIndex, StepOrder))
+		{
+			return false;
+		}
+	}
+
+	M_GenerationStep = ECampaignGenerationStep::Finished;
+	return true;
+}
+
+bool AGeneratorWorldCampaign::CanExecuteStep(ECampaignGenerationStep CompletedStep) const
+{
+	return M_GenerationStep == GetPrerequisiteStep(CompletedStep);
+}
+
+ECampaignGenerationStep AGeneratorWorldCampaign::GetPrerequisiteStep(ECampaignGenerationStep CompletedStep) const
+{
+	switch (CompletedStep)
+	{
+	case ECampaignGenerationStep::ConnectionsCreated:
+		return ECampaignGenerationStep::NotStarted;
+	case ECampaignGenerationStep::PlayerHQPlaced:
+		return ECampaignGenerationStep::ConnectionsCreated;
+	case ECampaignGenerationStep::EnemyHQPlaced:
+		return ECampaignGenerationStep::PlayerHQPlaced;
+	case ECampaignGenerationStep::EnemyObjectsPlaced:
+		return ECampaignGenerationStep::EnemyHQPlaced;
+	case ECampaignGenerationStep::NeutralObjectsPlaced:
+		return ECampaignGenerationStep::EnemyObjectsPlaced;
+	case ECampaignGenerationStep::MissionsPlaced:
+		return ECampaignGenerationStep::NeutralObjectsPlaced;
+	case ECampaignGenerationStep::Finished:
+		return ECampaignGenerationStep::MissionsPlaced;
+	case ECampaignGenerationStep::NotStarted:
+	default:
+		return ECampaignGenerationStep::NotStarted;
+	}
+}
+
+ECampaignGenerationStep AGeneratorWorldCampaign::GetNextStep(ECampaignGenerationStep CurrentStep) const
+{
+	switch (CurrentStep)
+	{
+	case ECampaignGenerationStep::NotStarted:
+		return ECampaignGenerationStep::ConnectionsCreated;
+	case ECampaignGenerationStep::ConnectionsCreated:
+		return ECampaignGenerationStep::PlayerHQPlaced;
+	case ECampaignGenerationStep::PlayerHQPlaced:
+		return ECampaignGenerationStep::EnemyHQPlaced;
+	case ECampaignGenerationStep::EnemyHQPlaced:
+		return ECampaignGenerationStep::EnemyObjectsPlaced;
+	case ECampaignGenerationStep::EnemyObjectsPlaced:
+		return ECampaignGenerationStep::NeutralObjectsPlaced;
+	case ECampaignGenerationStep::NeutralObjectsPlaced:
+		return ECampaignGenerationStep::MissionsPlaced;
+	case ECampaignGenerationStep::MissionsPlaced:
+		return ECampaignGenerationStep::Finished;
+	default:
+		return ECampaignGenerationStep::Finished;
+	}
+}
+
+int32 AGeneratorWorldCampaign::GetStepAttemptIndex(ECampaignGenerationStep CompletedStep) const
+{
+	const int32* AttemptIndex = M_StepAttemptIndices.Find(CompletedStep);
+	return AttemptIndex ? *AttemptIndex : 0;
+}
+
+void AGeneratorWorldCampaign::IncrementStepAttempt(ECampaignGenerationStep CompletedStep)
+{
+	const int32 CurrentAttempt = GetStepAttemptIndex(CompletedStep);
+	M_StepAttemptIndices.Add(CompletedStep, CurrentAttempt + 1);
+}
+
+void AGeneratorWorldCampaign::ResetStepAttemptsFrom(ECampaignGenerationStep CompletedStep)
+{
+	ECampaignGenerationStep StepToReset = GetNextStep(CompletedStep);
+	while (StepToReset != ECampaignGenerationStep::Finished)
+	{
+		M_StepAttemptIndices.Remove(StepToReset);
+		StepToReset = GetNextStep(StepToReset);
+	}
+}
+
+EPlacementFailurePolicy AGeneratorWorldCampaign::GetFailurePolicyForStep(ECampaignGenerationStep FailedStep) const
+{
+	const EPlacementFailurePolicy GlobalPolicy = M_PlacementFailurePolicy.GlobalPolicy;
+	switch (FailedStep)
+	{
+	case ECampaignGenerationStep::ConnectionsCreated:
+		return M_PlacementFailurePolicy.CreateConnectionsPolicy != EPlacementFailurePolicy::NotSet
+			? M_PlacementFailurePolicy.CreateConnectionsPolicy
+			: GlobalPolicy;
+	case ECampaignGenerationStep::PlayerHQPlaced:
+		return M_PlacementFailurePolicy.PlaceHQPolicy != EPlacementFailurePolicy::NotSet
+			? M_PlacementFailurePolicy.PlaceHQPolicy
+			: GlobalPolicy;
+	case ECampaignGenerationStep::EnemyHQPlaced:
+		return M_PlacementFailurePolicy.PlaceEnemyHQPolicy != EPlacementFailurePolicy::NotSet
+			? M_PlacementFailurePolicy.PlaceEnemyHQPolicy
+			: GlobalPolicy;
+	case ECampaignGenerationStep::EnemyObjectsPlaced:
+		return M_PlacementFailurePolicy.PlaceEnemyObjectsPolicy != EPlacementFailurePolicy::NotSet
+			? M_PlacementFailurePolicy.PlaceEnemyObjectsPolicy
+			: GlobalPolicy;
+	case ECampaignGenerationStep::NeutralObjectsPlaced:
+		return M_PlacementFailurePolicy.PlaceNeutralObjectsPolicy != EPlacementFailurePolicy::NotSet
+			? M_PlacementFailurePolicy.PlaceNeutralObjectsPolicy
+			: GlobalPolicy;
+	case ECampaignGenerationStep::MissionsPlaced:
+		return M_PlacementFailurePolicy.PlaceMissionsPolicy != EPlacementFailurePolicy::NotSet
+			? M_PlacementFailurePolicy.PlaceMissionsPolicy
+			: GlobalPolicy;
+	default:
+		return GlobalPolicy;
+	}
+}
+
+bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedStep, int32& InOutStepIndex,
+	const TArray<ECampaignGenerationStep>& StepOrder)
+{
+	IncrementStepAttempt(FailedStep);
+	M_TotalAttemptCount++;
+
+	if (GetStepAttemptIndex(FailedStep) > MaxStepAttempts)
+	{
+		return false;
+	}
+
+	if (M_TotalAttemptCount > MaxTotalAttempts)
+	{
+		return false;
+	}
+
+	const EPlacementFailurePolicy FailurePolicy = GetFailurePolicyForStep(FailedStep);
+	if (FailurePolicy == EPlacementFailurePolicy::NotSet)
+	{
+		return false;
+	}
+
+	int32 BacktrackSteps = 1;
+	const int32 AttemptIndex = GetStepAttemptIndex(FailedStep);
+	BacktrackSteps = FMath::Clamp(AttemptIndex, 1, StepOrder.Num());
+	for (int32 StepCount = 0; StepCount < BacktrackSteps; StepCount++)
+	{
+		UndoLastTransaction();
+	}
+
+	InOutStepIndex = StepOrder.IndexOfByKey(GetNextStep(M_GenerationStep));
+	if (InOutStepIndex == INDEX_NONE)
+	{
+		InOutStepIndex = 0;
+	}
+
+	return true;
+}
+
+void AGeneratorWorldCampaign::UndoLastTransaction()
+{
+	if (M_StepTransactions.Num() == 0)
+	{
+		M_GenerationStep = ECampaignGenerationStep::NotStarted;
+		return;
+	}
+
+	const FCampaignGenerationStepTransaction Transaction = M_StepTransactions.Pop();
+	switch (Transaction.CompletedStep)
+	{
+	case ECampaignGenerationStep::ConnectionsCreated:
+		UndoConnections(Transaction);
+		break;
+	default:
+		break;
+	}
+
+	M_PlacementState = Transaction.PreviousPlacementState;
+	M_DerivedData = Transaction.PreviousDerivedData;
+	M_GenerationStep = GetPrerequisiteStep(Transaction.CompletedStep);
+}
+
+void AGeneratorWorldCampaign::UndoConnections(const FCampaignGenerationStepTransaction& Transaction)
+{
+	for (const TObjectPtr<AConnection>& Connection : Transaction.SpawnedConnections)
+	{
+		if (not IsValid(Connection))
+		{
+			continue;
+		}
+
+		Connection->Destroy();
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> AnchorPoints;
+	GatherAnchorPoints(AnchorPoints);
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		AnchorPoint->ClearConnections();
+	}
+
+	M_GeneratedConnections.Reset();
+}
+
+void AGeneratorWorldCampaign::ClearPlacementState()
+{
+	M_PlacementState = FWorldCampaignPlacementState();
+}
+
+void AGeneratorWorldCampaign::ClearDerivedData()
+{
+	M_DerivedData = FWorldCampaignDerivedData();
+}
+
+void AGeneratorWorldCampaign::CacheAnchorConnectionDegrees()
+{
+	M_DerivedData.AnchorConnectionDegreesByAnchorKey.Reset();
+	for (const TWeakObjectPtr<AAnchorPoint>& AnchorPointWeak : M_PlacementState.CachedAnchors)
+	{
+		AAnchorPoint* AnchorPoint = AnchorPointWeak.Get();
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		M_DerivedData.AnchorConnectionDegreesByAnchorKey.Add(AnchorPoint->GetAnchorKey(),
+			AnchorPoint->GetConnectionCount());
+	}
+}
+
+void AGeneratorWorldCampaign::DebugNotifyAnchorPicked(const AAnchorPoint* AnchorPoint, const FString& Label,
+	const FColor& Color) const
+{
+	if (not IsValid(AnchorPoint))
+	{
+		return;
+	}
+
+	AnchorPoint->DebugDrawAnchorState(Label, Color, DebugAnchorDurationSeconds);
+}
 	{
 		return;
 	}
