@@ -725,6 +725,9 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Camera")
 	void SetModifierCameraMovementSpeed(const float NewSpeed);
 
+	void SetCameraMovementSpeedMultiplier(const float NewMultiplier);
+	void SetCameraPanSpeedMultiplier(const float NewMultiplier);
+
 	/** @return The camera pan speed from the developer settings
 	 * @note used in blueprint for pan camera logic.*/
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable, Category = "Camera")
@@ -1448,6 +1451,8 @@ private:
 
 	UPROPERTY()
 	UPlayerCameraController* M_PlayerCameraController;
+
+	float M_CameraPanSpeedMultiplier;
 
 	UPROPERTY()
 	UPlayerCommandTypeDecoder* M_CommandTypeDecoder;

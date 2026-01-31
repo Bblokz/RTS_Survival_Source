@@ -33,6 +33,7 @@
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
@@ -193,6 +194,7 @@ ACPPController::ACPPController()
 	  , M_PlayerTechManager(nullptr)
 	  , M_PlayerProfileLoader(nullptr)
 	  , M_PlayerCameraController(nullptr)
+	  , M_CameraPanSpeedMultiplier(RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier)
 	  , M_CommandTypeDecoder(nullptr)
 	  , M_PlayerBuildRadiusManager(nullptr)
 	  , M_PlayerControlGroupManager(nullptr)
@@ -895,7 +897,7 @@ FVector ACPPController::GetCursorWorldPosition(
 
 void ACPPController::SetIsPlayerInTechTree(const bool bIsInTechTree)
 {
-	if (IsValid(M_PlayerCameraController))
+	if (GetIsValidPlayerCameraController())
 	{
 		M_PlayerCameraController->SetIsPlayerInTechTreeOrArchive(bIsInTechTree);
 	}
@@ -917,7 +919,7 @@ void ACPPController::SetIsPlayerInTechTree(const bool bIsInTechTree)
 
 void ACPPController::SetIsPlayerInArchive(const bool bIsInArchive)
 {
-	if (IsValid(M_PlayerCameraController))
+	if (GetIsValidPlayerCameraController())
 	{
 		M_PlayerCameraController->SetIsPlayerInTechTreeOrArchive(bIsInArchive);
 	}
@@ -1457,9 +1459,28 @@ void ACPPController::SetModifierCameraMovementSpeed(const float NewSpeed)
 	DeveloperSettings::UIUX::ModifierCameraMovementSpeed = NewSpeed;
 }
 
+void ACPPController::SetCameraMovementSpeedMultiplier(const float NewMultiplier)
+{
+	if (not GetIsValidPlayerCameraController())
+	{
+		return;
+	}
+
+	M_PlayerCameraController->SetCameraMovementSpeedMultiplier(NewMultiplier);
+}
+
+void ACPPController::SetCameraPanSpeedMultiplier(const float NewMultiplier)
+{
+	M_CameraPanSpeedMultiplier = FMath::Clamp(
+		NewMultiplier,
+		RTSGameUserSettingsRanges::MinCameraPanSpeedMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraPanSpeedMultiplier
+	);
+}
+
 float ACPPController::GetCameraPanSpeed()
 {
-	return DeveloperSettings::UIUX::CameraPanSpeed;
+	return DeveloperSettings::UIUX::CameraPanSpeed * M_CameraPanSpeedMultiplier;
 }
 
 float ACPPController::GetCameraPitchLimit()
@@ -2727,12 +2748,12 @@ ESelectionChangeAction ACPPController::Internal_AddActorToSelection_UpdateDecals
 
 UPlayerCameraController* ACPPController::GetValidPlayerCameraController()
 {
-	if (IsValid(M_PlayerCameraController))
+	if (M_PlayerCameraController != nullptr)
 	{
 		return M_PlayerCameraController;
 	}
 	M_PlayerCameraController = FindComponentByClass<UPlayerCameraController>();
-	if (not IsValid(M_PlayerCameraController))
+	if (not GetIsValidPlayerCameraController())
 	{
 		RTSFunctionLibrary::ReportError("could not find player camera controller!!");
 	}

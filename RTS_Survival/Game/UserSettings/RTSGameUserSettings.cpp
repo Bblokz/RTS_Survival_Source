@@ -89,6 +89,16 @@ bool URTSGameUserSettings::GetInvertYAxis() const
 	return bM_InvertYAxis;
 }
 
+float URTSGameUserSettings::GetCameraMovementSpeedMultiplier() const
+{
+	return M_CameraMovementSpeedMultiplier;
+}
+
+float URTSGameUserSettings::GetCameraPanSpeedMultiplier() const
+{
+	return M_CameraPanSpeedMultiplier;
+}
+
 bool URTSGameUserSettings::GetHideActionButtonHotkeys() const
 {
 	return bM_HideActionButtonHotkeys;
@@ -145,6 +155,18 @@ void URTSGameUserSettings::SetMouseSensitivity(const float NewMouseSensitivity)
 void URTSGameUserSettings::SetInvertYAxis(const bool bNewInvertYAxis)
 {
 	bM_InvertYAxis = bNewInvertYAxis;
+}
+
+void URTSGameUserSettings::SetCameraMovementSpeedMultiplier(const float NewCameraMovementSpeedMultiplier)
+{
+	M_CameraMovementSpeedMultiplier = NewCameraMovementSpeedMultiplier;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetCameraPanSpeedMultiplier(const float NewCameraPanSpeedMultiplier)
+{
+	M_CameraPanSpeedMultiplier = NewCameraPanSpeedMultiplier;
+	ApplyCustomSettingClamps();
 }
 
 void URTSGameUserSettings::SetHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys)
@@ -342,6 +364,28 @@ void URTSGameUserSettings::ApplyCustomSettingClamps()
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Mouse sensitivity was out of range and has been clamped."));
 		M_MouseSensitivity = ClampedMouseSensitivity;
+	}
+
+	const float ClampedCameraMovementSpeedMultiplier = FMath::Clamp(
+		M_CameraMovementSpeedMultiplier,
+		RTSGameUserSettingsRanges::MinCameraMovementSpeedMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraMovementSpeedMultiplier
+	);
+	if (not FMath::IsNearlyEqual(ClampedCameraMovementSpeedMultiplier, M_CameraMovementSpeedMultiplier))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Camera movement speed multiplier was out of range and has been clamped."));
+		M_CameraMovementSpeedMultiplier = ClampedCameraMovementSpeedMultiplier;
+	}
+
+	const float ClampedCameraPanSpeedMultiplier = FMath::Clamp(
+		M_CameraPanSpeedMultiplier,
+		RTSGameUserSettingsRanges::MinCameraPanSpeedMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraPanSpeedMultiplier
+	);
+	if (not FMath::IsNearlyEqual(ClampedCameraPanSpeedMultiplier, M_CameraPanSpeedMultiplier))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Camera pan speed multiplier was out of range and has been clamped."));
+		M_CameraPanSpeedMultiplier = ClampedCameraPanSpeedMultiplier;
 	}
 
 	const float CurrentFrameRateLimit = GetFrameRateLimit();

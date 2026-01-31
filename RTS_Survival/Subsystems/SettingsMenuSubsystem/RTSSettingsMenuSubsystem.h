@@ -130,6 +130,12 @@ struct FRTSControlSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
 	bool bM_InvertYAxis = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
+	float M_CameraMovementSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraMovementSpeedMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
+	float M_CameraPanSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier;
 };
 
 USTRUCT(BlueprintType)
@@ -253,6 +259,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingInvertYAxis(bool bNewInvertYAxis);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingCameraMovementSpeedMultiplier(float NewCameraMovementSpeedMultiplier);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingCameraPanSpeedMultiplier(float NewCameraPanSpeedMultiplier);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingHideActionButtonHotkeys(bool bNewHideActionButtonHotkeys);

@@ -16,6 +16,14 @@ namespace RTSGameUserSettingsRanges
 	constexpr float MinMouseSensitivity = 0.1f;
 	constexpr float MaxMouseSensitivity = 5.0f;
 	constexpr float DefaultMouseSensitivity = 1.0f;
+
+	constexpr float MinCameraMovementSpeedMultiplier = 0.5f;
+	constexpr float MaxCameraMovementSpeedMultiplier = 2.0f;
+	constexpr float DefaultCameraMovementSpeedMultiplier = 1.0f;
+
+	constexpr float MinCameraPanSpeedMultiplier = 0.5f;
+	constexpr float MaxCameraPanSpeedMultiplier = 2.0f;
+	constexpr float DefaultCameraPanSpeedMultiplier = 1.0f;
 }
 
 /**
@@ -79,6 +87,12 @@ public:
 	/** @brief Returns whether the settings menu should invert the vertical look direction. */
 	bool GetInvertYAxis() const;
 
+	/** @brief Returns the camera movement speed multiplier stored in the settings menu. */
+	float GetCameraMovementSpeedMultiplier() const;
+
+	/** @brief Returns the camera pan speed multiplier stored in the settings menu. */
+	float GetCameraPanSpeedMultiplier() const;
+
 	/** @brief Returns whether action button hotkeys should be hidden in the action UI. */
 	bool GetHideActionButtonHotkeys() const;
 
@@ -108,6 +122,12 @@ public:
 
 	/** @brief Writes the invert setting so input code can flip vertical control direction. */
 	void SetInvertYAxis(const bool bNewInvertYAxis);
+
+	/** @brief Writes the camera movement speed multiplier before clamping and saving. */
+	void SetCameraMovementSpeedMultiplier(const float NewCameraMovementSpeedMultiplier);
+
+	/** @brief Writes the camera pan speed multiplier before clamping and saving. */
+	void SetCameraPanSpeedMultiplier(const float NewCameraPanSpeedMultiplier);
 
 	/** @brief Writes the setting that hides action button hotkeys in the action UI. */
 	void SetHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys);
@@ -224,6 +244,12 @@ private:
 
 	UPROPERTY(config)
 	bool bM_InvertYAxis = false;
+
+	UPROPERTY(config)
+	float M_CameraMovementSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraMovementSpeedMultiplier;
+
+	UPROPERTY(config)
+	float M_CameraPanSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier;
 
 	UPROPERTY(config)
 	bool bM_HideActionButtonHotkeys = false;
