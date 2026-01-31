@@ -58,6 +58,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void SetCameraMovementDisabled(const bool bIsDisabled) { bM_IsCameraMovementDisabled = bIsDisabled; }
 
+	void SetCameraMovementSpeedMultiplier(float NewMultiplier);
+
 	UFUNCTION(BlueprintCallable, Category = "ReferencesCasts")
 	void InitPlayerCameraController(ACameraPawn* NewCameraRef, USpringArmComponent* NewSpringarmRef);
 
@@ -113,6 +115,7 @@ private:
 	float EdgeScrollSpeedY;
 	float M_EdgeScrollAccelX;
 	float M_EdgeScrollAccelY;
+	float M_CameraMovementSpeedMultiplier;
 
 	bool bM_IsCameraMovementDisabled;
 	bool bM_IsPlayerInTechTreeOrArchive;

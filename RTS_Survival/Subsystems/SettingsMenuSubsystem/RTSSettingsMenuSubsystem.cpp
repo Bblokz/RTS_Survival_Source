@@ -257,6 +257,26 @@ void URTSSettingsMenuSubsystem::SetPendingInvertYAxis(const bool bNewInvertYAxis
 	M_PendingSettings.M_ControlSettings.bM_InvertYAxis = bNewInvertYAxis;
 }
 
+void URTSSettingsMenuSubsystem::SetPendingCameraMovementSpeedMultiplier(const float NewCameraMovementSpeedMultiplier)
+{
+	const float ClampedMultiplier = FMath::Clamp(
+		NewCameraMovementSpeedMultiplier,
+		RTSGameUserSettingsRanges::MinCameraMovementSpeedMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraMovementSpeedMultiplier
+	);
+	M_PendingSettings.M_ControlSettings.M_CameraMovementSpeedMultiplier = ClampedMultiplier;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingCameraPanSpeedMultiplier(const float NewCameraPanSpeedMultiplier)
+{
+	const float ClampedMultiplier = FMath::Clamp(
+		NewCameraPanSpeedMultiplier,
+		RTSGameUserSettingsRanges::MinCameraPanSpeedMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraPanSpeedMultiplier
+	);
+	M_PendingSettings.M_ControlSettings.M_CameraPanSpeedMultiplier = ClampedMultiplier;
+}
+
 void URTSSettingsMenuSubsystem::SetPendingHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys)
 {
 	M_PendingSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = bNewHideActionButtonHotkeys;
@@ -397,6 +417,8 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 
 	DefaultSettings.M_ControlSettings.M_MouseSensitivity = RTSGameUserSettingsRanges::DefaultMouseSensitivity;
 	DefaultSettings.M_ControlSettings.bM_InvertYAxis = RTSSettingsMenuSubsystemPrivate::bDefaultInvertYAxis;
+	DefaultSettings.M_ControlSettings.M_CameraMovementSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraMovementSpeedMultiplier;
+	DefaultSettings.M_ControlSettings.M_CameraPanSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier;
 
 	DefaultSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = RTSSettingsMenuSubsystemPrivate::bDefaultHideActionButtonHotkeys;
 	DefaultSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
@@ -830,6 +852,15 @@ void URTSSettingsMenuSubsystem::ApplyControlSettingsToPlayerController(APlayerCo
 	// todo
 	// PlayerControllerToApply->SetInputYawScale(M_BaseYawScale * SensitivityMultiplier);
 	// PlayerControllerToApply->SetInputPitchScale(M_BasePitchScale * SensitivityMultiplier * PitchFactor);
+
+	ACPPController* const RtsPlayerController = Cast<ACPPController>(PlayerControllerToApply);
+	if (RtsPlayerController == nullptr)
+	{
+		return;
+	}
+
+	RtsPlayerController->SetCameraMovementSpeedMultiplier(M_PendingSettings.M_ControlSettings.M_CameraMovementSpeedMultiplier);
+	RtsPlayerController->SetCameraPanSpeedMultiplier(M_PendingSettings.M_ControlSettings.M_CameraPanSpeedMultiplier);
 }
 
 FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const URTSGameUserSettings& GameUserSettings) const
@@ -859,6 +890,8 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 
 	Snapshot.M_ControlSettings.M_MouseSensitivity = GameUserSettings.GetMouseSensitivity();
 	Snapshot.M_ControlSettings.bM_InvertYAxis = GameUserSettings.GetInvertYAxis();
+	Snapshot.M_ControlSettings.M_CameraMovementSpeedMultiplier = GameUserSettings.GetCameraMovementSpeedMultiplier();
+	Snapshot.M_ControlSettings.M_CameraPanSpeedMultiplier = GameUserSettings.GetCameraPanSpeedMultiplier();
 	Snapshot.M_GameplaySettings.bM_HideActionButtonHotkeys = GameUserSettings.GetHideActionButtonHotkeys();
 	Snapshot.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = GameUserSettings.GetOverwriteAllPlayerHpBarStrat();
 	Snapshot.M_GameplaySettings.M_PlayerTankHpBarStrat = GameUserSettings.GetPlayerTankHpBarStrat();
@@ -899,6 +932,8 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetUiVolume(SnapshotToApply.M_AudioSettings.M_UiVolume);
 	GameUserSettingsToApply.SetMouseSensitivity(SnapshotToApply.M_ControlSettings.M_MouseSensitivity);
 	GameUserSettingsToApply.SetInvertYAxis(SnapshotToApply.M_ControlSettings.bM_InvertYAxis);
+	GameUserSettingsToApply.SetCameraMovementSpeedMultiplier(SnapshotToApply.M_ControlSettings.M_CameraMovementSpeedMultiplier);
+	GameUserSettingsToApply.SetCameraPanSpeedMultiplier(SnapshotToApply.M_ControlSettings.M_CameraPanSpeedMultiplier);
 	GameUserSettingsToApply.SetHideActionButtonHotkeys(SnapshotToApply.M_GameplaySettings.bM_HideActionButtonHotkeys);
 	GameUserSettingsToApply.SetOverwriteAllPlayerHpBarStrat(SnapshotToApply.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
 	GameUserSettingsToApply.SetPlayerTankHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerTankHpBarStrat);

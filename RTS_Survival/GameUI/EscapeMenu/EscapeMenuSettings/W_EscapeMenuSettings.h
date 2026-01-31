@@ -117,6 +117,12 @@ struct FEscapeMenuSettingsControlsText
 	FText M_MouseSensitivityLabelText = FText::FromString(TEXT("SETTINGS_MOUSE_SENSITIVITY_LABEL"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_CameraMovementSpeedMultiplierLabelText = FText::FromString(TEXT("SETTINGS_CAMERA_MOVEMENT_SPEED_MULTIPLIER_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_CameraPanSpeedMultiplierLabelText = FText::FromString(TEXT("SETTINGS_CAMERA_PAN_SPEED_MULTIPLIER_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_InvertYAxisLabelText = FText::FromString(TEXT("SETTINGS_INVERT_Y_AXIS_LABEL"));
 };
 
@@ -217,6 +223,18 @@ struct FEscapeMenuSettingsSliderRanges
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
 	float M_MouseSensitivityMax = RTSGameUserSettingsRanges::MaxMouseSensitivity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
+	float M_CameraMovementSpeedMultiplierMin = RTSGameUserSettingsRanges::MinCameraMovementSpeedMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
+	float M_CameraMovementSpeedMultiplierMax = RTSGameUserSettingsRanges::MaxCameraMovementSpeedMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
+	float M_CameraPanSpeedMultiplierMin = RTSGameUserSettingsRanges::MinCameraPanSpeedMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
+	float M_CameraPanSpeedMultiplierMax = RTSGameUserSettingsRanges::MaxCameraPanSpeedMultiplier;
 };
 
 struct FEscapeMenuSettingsSectionButtonPadding
@@ -401,8 +419,12 @@ private:
 
 	bool GetIsValidTextControlsHeader() const;
 	bool GetIsValidTextMouseSensitivityLabel() const;
+	bool GetIsValidTextCameraMovementSpeedMultiplierLabel() const;
+	bool GetIsValidTextCameraPanSpeedMultiplierLabel() const;
 	bool GetIsValidTextInvertYAxisLabel() const;
 	bool GetIsValidSliderMouseSensitivity() const;
+	bool GetIsValidSliderCameraMovementSpeedMultiplier() const;
+	bool GetIsValidSliderCameraPanSpeedMultiplier() const;
 	bool GetIsValidCheckInvertYAxis() const;
 
 	bool GetIsValidTextGameplayHeader() const;
@@ -526,6 +548,12 @@ private:
 
 	UFUNCTION()
 	void HandleMouseSensitivityChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleCameraMovementSpeedMultiplierChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleCameraPanSpeedMultiplierChanged(float NewValue);
 
 	UFUNCTION()
 	void HandleInvertYAxisChanged(bool bIsChecked);
@@ -1053,6 +1081,22 @@ private:
 	TObjectPtr<URichTextBlock> M_TextMouseSensitivityLabel = nullptr;
 
 	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextCameraMovementSpeedMultiplierLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextCameraMovementSpeedMultiplierLabel = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextCameraPanSpeedMultiplierLabel in the Widget Blueprint.
+	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextCameraPanSpeedMultiplierLabel = nullptr;
+
+	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextInvertYAxisLabel in the Widget Blueprint.
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
@@ -1119,6 +1163,22 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderMouseSensitivity = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderCameraMovementSpeedMultiplier in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderCameraMovementSpeedMultiplier = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderCameraPanSpeedMultiplier in the Widget Blueprint.
+	 * @note Designers may style and wrap the slider, but C++ applies ranges and binds callbacks.
+	 * @note The bound widget must exist, keep this name, and remain a Slider for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderCameraPanSpeedMultiplier = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a CheckBox named M_CheckInvertYAxis in the Widget Blueprint.

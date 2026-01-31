@@ -183,6 +183,16 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 
 	SetSliderRange(M_SliderFrameRateLimit, M_SliderRanges.M_FrameRateLimitMin, M_SliderRanges.M_FrameRateLimitMax);
 	SetSliderRange(M_SliderMouseSensitivity, M_SliderRanges.M_MouseSensitivityMin, M_SliderRanges.M_MouseSensitivityMax);
+	SetSliderRange(
+		M_SliderCameraMovementSpeedMultiplier,
+		M_SliderRanges.M_CameraMovementSpeedMultiplierMin,
+		M_SliderRanges.M_CameraMovementSpeedMultiplierMax
+	);
+	SetSliderRange(
+		M_SliderCameraPanSpeedMultiplier,
+		M_SliderRanges.M_CameraPanSpeedMultiplierMin,
+		M_SliderRanges.M_CameraPanSpeedMultiplierMax
+	);
 	SetSliderRange(M_SliderMasterVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderMusicVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderSfxVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
@@ -467,6 +477,8 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 
 	M_TextControlsHeader->SetText(M_ControlsText.M_HeaderText);
 	M_TextMouseSensitivityLabel->SetText(M_ControlsText.M_MouseSensitivityLabelText);
+	M_TextCameraMovementSpeedMultiplierLabel->SetText(M_ControlsText.M_CameraMovementSpeedMultiplierLabelText);
+	M_TextCameraPanSpeedMultiplierLabel->SetText(M_ControlsText.M_CameraPanSpeedMultiplierLabelText);
 	M_TextInvertYAxisLabel->SetText(M_ControlsText.M_InvertYAxisLabelText);
 
 	M_TextGameplayHeader->SetText(M_GameplayText.M_HeaderText);
@@ -599,6 +611,20 @@ void UW_EscapeMenuSettings::InitialiseControlSettingsControls(const FRTSControlS
 		M_SliderRanges.M_MouseSensitivityMax
 	);
 	M_SliderMouseSensitivity->SetValue(ClampedSensitivity);
+
+	const float ClampedCameraMovementSpeedMultiplier = FMath::Clamp(
+		ControlSettings.M_CameraMovementSpeedMultiplier,
+		M_SliderRanges.M_CameraMovementSpeedMultiplierMin,
+		M_SliderRanges.M_CameraMovementSpeedMultiplierMax
+	);
+	M_SliderCameraMovementSpeedMultiplier->SetValue(ClampedCameraMovementSpeedMultiplier);
+
+	const float ClampedCameraPanSpeedMultiplier = FMath::Clamp(
+		ControlSettings.M_CameraPanSpeedMultiplier,
+		M_SliderRanges.M_CameraPanSpeedMultiplierMin,
+		M_SliderRanges.M_CameraPanSpeedMultiplierMax
+	);
+	M_SliderCameraPanSpeedMultiplier->SetValue(ClampedCameraPanSpeedMultiplier);
 	M_CheckInvertYAxis->SetIsChecked(ControlSettings.bM_InvertYAxis);
 }
 
@@ -994,6 +1020,12 @@ void UW_EscapeMenuSettings::BindControlSettingCallbacks()
 {
 	M_SliderMouseSensitivity->OnValueChanged.RemoveAll(this);
 	M_SliderMouseSensitivity->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleMouseSensitivityChanged);
+
+	M_SliderCameraMovementSpeedMultiplier->OnValueChanged.RemoveAll(this);
+	M_SliderCameraMovementSpeedMultiplier->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleCameraMovementSpeedMultiplierChanged);
+
+	M_SliderCameraPanSpeedMultiplier->OnValueChanged.RemoveAll(this);
+	M_SliderCameraPanSpeedMultiplier->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleCameraPanSpeedMultiplierChanged);
 
 	M_CheckInvertYAxis->OnCheckStateChanged.RemoveAll(this);
 	M_CheckInvertYAxis->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleInvertYAxisChanged);
@@ -1937,6 +1969,38 @@ bool UW_EscapeMenuSettings::GetIsValidTextMouseSensitivityLabel() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidTextCameraMovementSpeedMultiplierLabel() const
+{
+	if (not IsValid(M_TextCameraMovementSpeedMultiplierLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextCameraMovementSpeedMultiplierLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextCameraMovementSpeedMultiplierLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextCameraPanSpeedMultiplierLabel() const
+{
+	if (not IsValid(M_TextCameraPanSpeedMultiplierLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextCameraPanSpeedMultiplierLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextCameraPanSpeedMultiplierLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidTextInvertYAxisLabel() const
 {
 	if (not IsValid(M_TextInvertYAxisLabel))
@@ -2185,6 +2249,38 @@ bool UW_EscapeMenuSettings::GetIsValidSliderMouseSensitivity() const
 			this,
 			TEXT("M_SliderMouseSensitivity"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidSliderMouseSensitivity"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderCameraMovementSpeedMultiplier() const
+{
+	if (not IsValid(M_SliderCameraMovementSpeedMultiplier))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderCameraMovementSpeedMultiplier"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderCameraMovementSpeedMultiplier"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderCameraPanSpeedMultiplier() const
+{
+	if (not IsValid(M_SliderCameraPanSpeedMultiplier))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderCameraPanSpeedMultiplier"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderCameraPanSpeedMultiplier"),
 			this
 		);
 		return false;
@@ -2860,6 +2956,16 @@ bool UW_EscapeMenuSettings::GetAreControlsTextWidgetsValid() const
 		return false;
 	}
 
+	if (not GetIsValidTextCameraMovementSpeedMultiplierLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextCameraPanSpeedMultiplierLabel())
+	{
+		return false;
+	}
+
 	return GetIsValidTextInvertYAxisLabel();
 }
 
@@ -3036,6 +3142,16 @@ bool UW_EscapeMenuSettings::GetAreAudioSliderWidgetsValid() const
 bool UW_EscapeMenuSettings::GetAreControlSettingsWidgetsValid() const
 {
 	if (not GetIsValidSliderMouseSensitivity())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSliderCameraMovementSpeedMultiplier())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSliderCameraPanSpeedMultiplier())
 	{
 		return false;
 	}
@@ -3599,6 +3715,60 @@ void UW_EscapeMenuSettings::HandleMouseSensitivityChanged(const float NewValue)
 	}
 
 	M_SettingsSubsystem->SetPendingMouseSensitivity(NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleCameraMovementSpeedMultiplierChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderCameraMovementSpeedMultiplier())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingCameraMovementSpeedMultiplier(NewValue);
+
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->SetCameraMovementSpeedMultiplier(NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleCameraPanSpeedMultiplierChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderCameraPanSpeedMultiplier())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingCameraPanSpeedMultiplier(NewValue);
+
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->SetCameraPanSpeedMultiplier(NewValue);
 }
 
 void UW_EscapeMenuSettings::HandleInvertYAxisChanged(const bool bIsChecked)

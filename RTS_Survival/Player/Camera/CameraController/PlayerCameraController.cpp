@@ -7,12 +7,14 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Player/Camera/CameraPawn.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UPlayerCameraController::UPlayerCameraController(): M_PlayerCamera(nullptr), M_SpringArmComponent(nullptr),
                                                     M_EdgeScrollAccelX(1),
                                                     M_EdgeScrollAccelY(1),
+                                                    M_CameraMovementSpeedMultiplier(RTSGameUserSettingsRanges::DefaultCameraMovementSpeedMultiplier),
                                                     bM_IsPlayerInTechTreeOrArchive(false),
                                                     M_BaseCameraZoomLevel(0),
                                                     CurrentMove(), MoveStartLocation()
@@ -24,6 +26,15 @@ UPlayerCameraController::UPlayerCameraController(): M_PlayerCamera(nullptr), M_S
 	PrimaryComponentTick.bTickEvenWhenPaused = true;
 	PrimaryComponentTick.bStartWithTickEnabled = true;
 	PrimaryComponentTick.bCanEverTick = true;
+}
+
+void UPlayerCameraController::SetCameraMovementSpeedMultiplier(const float NewMultiplier)
+{
+	M_CameraMovementSpeedMultiplier = FMath::Clamp(
+		NewMultiplier,
+		RTSGameUserSettingsRanges::MinCameraMovementSpeedMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraMovementSpeedMultiplier
+	);
 }
 
 void UPlayerCameraController::ZoomIn()
@@ -231,7 +242,7 @@ void UPlayerCameraController::EdgeScroll(const float DeltaTime)
 	}
 
 	// Build local‐space pan delta (X=forward, Y=right)
-	const float BaseSpeed = DeveloperSettings::UIUX::ModifierCameraMovementSpeed * 230.0f;
+	const float BaseSpeed = DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier * 230.0f;
 	const FVector LocalDelta(
 		DirY * BaseSpeed * M_EdgeScrollAccelY * StrY * DeltaTime,
 		DirX * BaseSpeed * M_EdgeScrollAccelX * StrX * DeltaTime,
@@ -307,14 +318,14 @@ void UPlayerCameraController::GetViewportSizeAndMouse(
 
 void UPlayerCameraController::ForwardRightMovement(const bool bOnForward, float AxisX, const bool bOnRight, float AxisY)
 {
-	if (bM_IsPlayerInTechTreeOrArchive || GetIsLockedOrDisabled() || !GetIsValidCameraPawn())
+	if (bM_IsPlayerInTechTreeOrArchive || GetIsLockedOrDisabled() || not GetIsValidCameraPawn())
 	{
 		return;
 	}
 	if (bOnForward)
 	{
 		AxisX = AxisX * DeveloperSettings::UIUX::DefaultCameraMovementSpeed;
-		AxisX = AxisX * DeveloperSettings::UIUX::ModifierCameraMovementSpeed;
+		AxisX = AxisX * DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
 
 		FVector DirectionVector;
 		DirectionVector.X = AxisX;
@@ -331,7 +342,7 @@ void UPlayerCameraController::ForwardRightMovement(const bool bOnForward, float 
 	if (bOnRight)
 	{
 		AxisY = AxisY * DeveloperSettings::UIUX::DefaultCameraMovementSpeed;
-		AxisY = AxisY * DeveloperSettings::UIUX::ModifierCameraMovementSpeed;
+		AxisY = AxisY * DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
 
 		FVector DirectionVector;
 		DirectionVector.X = 0;
