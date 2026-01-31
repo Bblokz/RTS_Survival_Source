@@ -305,7 +305,7 @@ void AGeneratorWorldCampaign::GenerateConnections()
 		AnchorPoint->ClearConnections();
 	}
 
-	FRandomStream RandomStream(Seed);
+	FRandomStream RandomStream(M_CountAndDifficultyTuning.Seed);
 	TMap<TObjectPtr<AAnchorPoint>, int32> DesiredConnections;
 	AssignDesiredConnections(AnchorPoints, RandomStream, DesiredConnections);
 

@@ -4,6 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
+#include "WorldCampaign/CampaignGeneration/GenerationRules/EnemyHQPlacementRules.h"
+#include "WorldCampaign/CampaignGeneration/GenerationRules/EnemyPlacementRules/EnemyPlacementRules.h"
+#include "WorldCampaign/CampaignGeneration/GenerationRules/MissionPlacementRules.h"
+#include "WorldCampaign/CampaignGeneration/GenerationRules/NeutralItemPlacementRules.h"
+#include "WorldCampaign/CampaignGeneration/GenerationRules/PlayerHQPlacementRules.h"
+#include "WorldCampaign/CampaignGeneration/GenerationRules/WorldCampaignCountDifficultyTuning.h"
+#include "WorldCampaign/CampaignGeneration/GenerationRules/WorldCampaignPlacementFailurePolicy.h"
 #include "GeneratorWorldCampaign.generated.h"
 
 class AAnchorPoint;
@@ -35,7 +43,8 @@ class RTS_SURVIVAL_API AGeneratorWorldCampaign : public AActor
 public:
 	AGeneratorWorldCampaign();
 
-	UFUNCTION(CallInEditor, Category = "World Campaign|Connection Generation")
+	UFUNCTION(CallInEditor, Category = "World Campaign|Connection Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::CreateConnections"))
 	void GenerateConnections();
 
 private:
@@ -154,8 +163,8 @@ private:
 	void DebugDrawConnection(const AConnection* Connection, const FColor& Color) const;
 	void DebugDrawThreeWay(const AConnection* Connection, const FColor& Color) const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation", meta = (AllowPrivateAccess = "true"))
-	int32 Seed = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	ECampaignGenerationStep M_GenerationStep = ECampaignGenerationStep::CreateConnections;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation", meta = (AllowPrivateAccess = "true"))
 	FConnectionGenerationRules ConnectionGenerationRules;
@@ -165,4 +174,25 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<AConnection>> M_GeneratedConnections;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Player HQ", meta = (AllowPrivateAccess = "true"))
+	FPlayerHQPlacementRules M_PlayerHQPlacementRules;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy HQ", meta = (AllowPrivateAccess = "true"))
+	FEnemyHQPlacementRules M_EnemyHQPlacementRules;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy Items", meta = (AllowPrivateAccess = "true"))
+	FEnemyPlacementRules M_EnemyPlacementRules;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Neutral Items", meta = (AllowPrivateAccess = "true"))
+	FNeutralItemPlacementRules M_NeutralItemPlacementRules;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Missions", meta = (AllowPrivateAccess = "true"))
+	FMissionPlacement M_MissionPlacementRules;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Counts & Difficulty", meta = (AllowPrivateAccess = "true"))
+	FWorldCampaignCountDifficultyTuning M_CountAndDifficultyTuning;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy", meta = (AllowPrivateAccess = "true"))
+	FWorldCampaignPlacementFailurePolicy M_PlacementFailurePolicy;
 };
