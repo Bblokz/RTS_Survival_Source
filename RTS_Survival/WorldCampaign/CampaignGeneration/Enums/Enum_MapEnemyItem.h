@@ -7,6 +7,7 @@ UENUM(BlueprintType)
 enum class EMapEnemyItem : uint8
 {
 	None,
+	EnemyHQ,
 	Factory,
 	Airfield,
 	Barracks,
