@@ -7,11 +7,12 @@
 UENUM(BlueprintType)
 enum class ECampaignGenerationStep : uint8
 {
-	NotSet,
-	CreateConnections,
-	PlaceHQ,
-	PlaceEnemyHQ,
-	PlaceEnemyObjects,
-	PlaceNeutralObjects,
-	PlaceMissions
+	NotStarted,
+	ConnectionsCreated,
+	PlayerHQPlaced,
+	EnemyHQPlaced,
+	EnemyObjectsPlaced,
+	NeutralObjectsPlaced,
+	MissionsPlaced,
+	Finished
 };

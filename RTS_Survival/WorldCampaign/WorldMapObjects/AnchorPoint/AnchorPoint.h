@@ -4,6 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
+#include "WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
+#include "WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 #include "AnchorPoint.generated.h"
 
 class AConnection;
@@ -36,6 +39,24 @@ public:
 
 	void DebugDrawAnchorState(const FString& Label, const FColor& Color, float Duration) const;
 	void DebugDrawConnectionTo(const AAnchorPoint* OtherAnchor, const FColor& Color, float Duration) const;
+
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Anchor")
+	void OnEnemyItemPromotion(EMapEnemyItem EnemyItemType);
+
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Anchor")
+	void OnNeutralItemPromotion(EMapNeutralObjectType NeutralObjectType);
+
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Anchor")
+	void OnMissionPromotion(EMapMission MissionType);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Anchor")
+	void BP_OnEnemyItemPromotion(EMapEnemyItem EnemyItemType);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Anchor")
+	void BP_OnNeutralItemPromotion(EMapNeutralObjectType NeutralObjectType);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Anchor")
+	void BP_OnMissionPromotion(EMapMission MissionType);
 
 private:
 	void EnsureAnchorKeyIsInitialized();
