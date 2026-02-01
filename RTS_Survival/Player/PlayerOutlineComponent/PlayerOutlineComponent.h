@@ -43,6 +43,7 @@ private:
 	ERTSOutLineTypes GetOutLineForScavengableObject(AScavengeableObject* ScavObject, const ERTSOutlineRules Rules) const;
 	ERTSOutLineTypes GetOutLineForCapturableActor(const AActor* CapturableActor,
 	                                              const ERTSOutlineRules Rules) const;
+	bool GetIsCaptureOutlineAllowed() const;
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_OutlinedActor;
 	void CheckHidePreviousOutlinedActor(const AActor* NewActor);
