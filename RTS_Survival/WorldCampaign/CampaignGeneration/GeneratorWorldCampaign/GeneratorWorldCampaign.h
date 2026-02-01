@@ -161,6 +161,15 @@ public:
 	void EraseAllGeneration();
 
 private:
+	struct FConnectionSegment
+	{
+		FVector2D StartPoint;
+		FVector2D EndPoint;
+		TWeakObjectPtr<AAnchorPoint> StartAnchor;
+		TWeakObjectPtr<AAnchorPoint> EndAnchor;
+		TWeakObjectPtr<AConnection> OwningConnection;
+	};
+
 	bool GetIsValidPlayerHQAnchor() const;
 	bool GetIsValidEnemyHQAnchor() const;
 
@@ -226,6 +235,41 @@ private:
 	void CacheGeneratedState(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints);
 
 	bool ValidateGenerationRules() const;
+	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
+	bool IsAnchorCached(const AAnchorPoint* AnchorPoint) const;
+	/**
+	 * @brief Filters and sorts HQ anchor candidates so retries stay deterministic.
+	 * @param CandidateSource Input anchors to evaluate.
+	 * @param MinDegree Minimum required connection degree.
+	 * @param MaxDegree Maximum allowed connection degree.
+	 * @param AnchorToExclude Anchor that cannot be selected.
+	 * @param OutCandidates Filtered, sorted candidates.
+	 * @return true if at least one candidate remains.
+	 */
+	bool BuildHQAnchorCandidates(const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource, int32 MinDegree, int32 MaxDegree,
+		const AAnchorPoint* AnchorToExclude, TArray<TObjectPtr<AAnchorPoint>>& OutCandidates) const;
+	/**
+	 * @brief Picks a candidate deterministically based on the attempt index.
+	 * @param Candidates Sorted candidate list.
+	 * @param AttemptIndex Attempt index for selection.
+	 * @return The chosen anchor or nullptr if none are available.
+	 */
+	AAnchorPoint* SelectAnchorCandidateByAttempt(const TArray<TObjectPtr<AAnchorPoint>>& Candidates,
+		int32 AttemptIndex) const;
+	bool HasSharedEndpoint(const FConnectionSegment& Segment, const AAnchorPoint* AnchorA, const AAnchorPoint* AnchorB) const;
+	/**
+	 * @brief Avoids creating crossing segments so the connection graph stays readable.
+	 * @param StartPoint Segment start.
+	 * @param EndPoint Segment end.
+	 * @param StartAnchor Start anchor for endpoint sharing checks.
+	 * @param EndAnchor End anchor for endpoint sharing checks.
+	 * @param ExistingSegments Segments that should remain non-intersecting.
+	 * @param ConnectionToIgnore Optional connection ignored during intersection tests.
+	 * @return true if the new segment would intersect existing segments.
+	 */
+	bool IsSegmentIntersectingExisting(const FVector2D& StartPoint, const FVector2D& EndPoint,
+		const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor,
+		const TArray<FConnectionSegment>& ExistingSegments, const AConnection* ConnectionToIgnore) const;
 	void ClearExistingConnections();
 	void GatherAnchorPoints(TArray<TObjectPtr<AAnchorPoint>>& OutAnchorPoints) const;
 
@@ -248,7 +292,7 @@ private:
 	void GeneratePhasePreferredConnections(AAnchorPoint* AnchorPoint,
 		const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
 		const TMap<TObjectPtr<AAnchorPoint>, int32>& DesiredConnections,
-		TArray<struct FConnectionSegment>& ExistingSegments);
+		TArray<FConnectionSegment>& ExistingSegments);
 
 	/**
 	 * @brief Extends the search beyond distance limits to satisfy minimum connections.
@@ -258,15 +302,14 @@ private:
 	 */
 	void GeneratePhaseExtendedConnections(AAnchorPoint* AnchorPoint,
 		const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-		TArray<struct FConnectionSegment>& ExistingSegments);
+		TArray<FConnectionSegment>& ExistingSegments);
 
 	/**
 	 * @brief Attempts to attach the anchor to an existing connection segment as a junction.
 	 * @param AnchorPoint Anchor currently being processed.
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 */
-	void GeneratePhaseThreeWayConnections(AAnchorPoint* AnchorPoint,
-		TArray<struct FConnectionSegment>& ExistingSegments);
+	void GeneratePhaseThreeWayConnections(AAnchorPoint* AnchorPoint, TArray<FConnectionSegment>& ExistingSegments);
 
 	/**
 	 * @brief Spawns and registers a new connection between two anchors if allowed.
@@ -277,7 +320,7 @@ private:
 	 * @return true if the connection was created and registered.
 	 */
 	bool TryCreateConnection(AAnchorPoint* AnchorPoint, AAnchorPoint* CandidateAnchor,
-		TArray<struct FConnectionSegment>& ExistingSegments, const FColor& DebugColor);
+		TArray<FConnectionSegment>& ExistingSegments, const FColor& DebugColor);
 
 	/**
 	 * @brief Validates a potential anchor-to-anchor segment against max counts and intersections.
@@ -290,7 +333,7 @@ private:
 	 * @return true if the connection is allowed.
 	 */
 	bool IsConnectionAllowed(AAnchorPoint* AnchorPoint, AAnchorPoint* CandidateAnchor,
-		const FVector2D& StartPoint, const FVector2D& EndPoint, const TArray<struct FConnectionSegment>& ExistingSegments,
+		const FVector2D& StartPoint, const FVector2D& EndPoint, const TArray<FConnectionSegment>& ExistingSegments,
 		const AConnection* ConnectionToIgnore) const;
 
 	/**
@@ -299,7 +342,7 @@ private:
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 * @return true if a three-way connection was created.
 	 */
-	bool TryAddThreeWayConnection(AAnchorPoint* AnchorPoint, TArray<struct FConnectionSegment>& ExistingSegments);
+	bool TryAddThreeWayConnection(AAnchorPoint* AnchorPoint, TArray<FConnectionSegment>& ExistingSegments);
 
 	/**
 	 * @brief Registers the base connection relationship on both anchors.
@@ -324,7 +367,7 @@ private:
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 */
 	void AddConnectionSegment(AConnection* Connection, AAnchorPoint* AnchorA, AAnchorPoint* AnchorB,
-		TArray<struct FConnectionSegment>& ExistingSegments) const;
+		TArray<FConnectionSegment>& ExistingSegments) const;
 
 	/**
 	 * @brief Adds the third-branch segment entry for intersection checks.
@@ -334,7 +377,7 @@ private:
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 */
 	void AddThirdConnectionSegment(AConnection* Connection, AAnchorPoint* ThirdAnchor, const FVector& JunctionLocation,
-		TArray<struct FConnectionSegment>& ExistingSegments) const;
+		TArray<FConnectionSegment>& ExistingSegments) const;
 
 	void DebugNotifyAnchorProcessing(const AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const;
 	void DebugDrawConnection(const AConnection* Connection, const FColor& Color) const;

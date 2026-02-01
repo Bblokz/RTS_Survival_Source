@@ -16,15 +16,6 @@ namespace
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr float DebugAnchorDurationSeconds = 10.f;
 
-	struct FConnectionSegment
-	{
-		FVector2D StartPoint;
-		FVector2D EndPoint;
-		TWeakObjectPtr<AAnchorPoint> StartAnchor;
-		TWeakObjectPtr<AAnchorPoint> EndAnchor;
-		TWeakObjectPtr<AConnection> OwningConnection;
-	};
-
 	struct FAnchorCandidate
 	{
 		TObjectPtr<AAnchorPoint> AnchorPoint = nullptr;
@@ -40,6 +31,7 @@ namespace
 	};
 
 	constexpr float SegmentIntersectionTolerance = 0.01f;
+	constexpr int32 NoRequiredItems = 0;
 
 	TArray<FAnchorCandidate> BuildAndSortCandidates(AAnchorPoint* AnchorPoint,
 		const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints, const int32 MaxConnections,
@@ -175,6 +167,107 @@ namespace
 		return Result;
 	}
 
+	const FDifficultyEnumItemOverrides& GetDifficultyOverrides(const FWorldCampaignCountDifficultyTuning& Tuning)
+	{
+		switch (Tuning.DifficultyLevel)
+		{
+		case ERTSGameDifficulty::NewToRTS:
+			return Tuning.DifficultyEnumOverrides.NewToRTS;
+		case ERTSGameDifficulty::Hard:
+			return Tuning.DifficultyEnumOverrides.Hard;
+		case ERTSGameDifficulty::Brutal:
+			return Tuning.DifficultyEnumOverrides.Brutal;
+		case ERTSGameDifficulty::Ironman:
+			return Tuning.DifficultyEnumOverrides.Ironman;
+		case ERTSGameDifficulty::Normal:
+		default:
+			return Tuning.DifficultyEnumOverrides.Normal;
+		}
+	}
+
+	int32 GetRequiredEnemyItemCount(const FWorldCampaignCountDifficultyTuning& Tuning)
+	{
+		int32 TotalRequired = 0;
+		for (const TPair<EMapEnemyItem, int32>& Pair : Tuning.BaseEnemyItemsByType)
+		{
+			TotalRequired += Pair.Value;
+		}
+
+		const FDifficultyEnumItemOverrides& Overrides = GetDifficultyOverrides(Tuning);
+		for (const TPair<EMapEnemyItem, int32>& Pair : Overrides.ExtraEnemyItemsByType)
+		{
+			TotalRequired += Pair.Value;
+		}
+
+		return TotalRequired;
+	}
+
+	int32 GetRequiredNeutralItemCount(const FWorldCampaignCountDifficultyTuning& Tuning)
+	{
+		int32 TotalRequired = 0;
+		for (const TPair<EMapNeutralObjectType, int32>& Pair : Tuning.BaseNeutralItemsByType)
+		{
+			TotalRequired += Pair.Value;
+		}
+
+		const FDifficultyEnumItemOverrides& Overrides = GetDifficultyOverrides(Tuning);
+		for (const TPair<EMapNeutralObjectType, int32>& Pair : Overrides.ExtraNeutralItemsByType)
+		{
+			TotalRequired += Pair.Value;
+		}
+
+		return TotalRequired;
+	}
+
+	int32 GetRequiredMissionCount(const FMissionPlacement& MissionRules)
+	{
+		return MissionRules.RulesByMission.Num();
+	}
+
+	void BuildBacktrackEscalationSteps(ECampaignGenerationStep FailedStep,
+		TArray<ECampaignGenerationStep>& OutSteps)
+	{
+		OutSteps.Reset();
+		if (FailedStep == ECampaignGenerationStep::MissionsPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
+
+		if (FailedStep == ECampaignGenerationStep::NeutralObjectsPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
+
+		if (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
+
+		if (FailedStep == ECampaignGenerationStep::EnemyHQPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
+
+		if (FailedStep == ECampaignGenerationStep::PlayerHQPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+		}
+	}
+
 	bool IsPointOnSegment(const FVector2D& SegmentStart, const FVector2D& SegmentEnd, const FVector2D& Point)
 	{
 		const float MinX = FMath::Min(SegmentStart.X, SegmentEnd.X) - SegmentIntersectionTolerance;
@@ -224,37 +317,6 @@ namespace
 
 		return false;
 	}
-
-	bool HasSharedEndpoint(const FConnectionSegment& Segment, const AAnchorPoint* AnchorA, const AAnchorPoint* AnchorB)
-	{
-		return Segment.StartAnchor.Get() == AnchorA || Segment.EndAnchor.Get() == AnchorA
-			|| Segment.StartAnchor.Get() == AnchorB || Segment.EndAnchor.Get() == AnchorB;
-	}
-
-	bool IsSegmentIntersectingExisting(const FVector2D& StartPoint, const FVector2D& EndPoint,
-		const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor,
-		const TArray<FConnectionSegment>& ExistingSegments, const AConnection* ConnectionToIgnore)
-	{
-		for (const FConnectionSegment& Segment : ExistingSegments)
-		{
-			if (Segment.OwningConnection.Get() == ConnectionToIgnore)
-			{
-				continue;
-			}
-
-			if (HasSharedEndpoint(Segment, StartAnchor, EndAnchor))
-			{
-				continue;
-			}
-
-			if (DoSegmentsIntersect(StartPoint, EndPoint, Segment.StartPoint, Segment.EndPoint))
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
 }
 
 AGeneratorWorldCampaign::AGeneratorWorldCampaign()
@@ -265,44 +327,108 @@ AGeneratorWorldCampaign::AGeneratorWorldCampaign()
 
 void AGeneratorWorldCampaign::CreateConnectionsStep()
 {
+	if (not CanExecuteStep(ECampaignGenerationStep::ConnectionsCreated))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("CreateConnectionsStep called out of order."));
+		return;
+	}
+
 	ExecuteStepWithTransaction(ECampaignGenerationStep::ConnectionsCreated,
 		&AGeneratorWorldCampaign::ExecuteCreateConnections);
 }
 
 void AGeneratorWorldCampaign::PlaceHQStep()
 {
+	if (not CanExecuteStep(ECampaignGenerationStep::PlayerHQPlaced))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PlaceHQStep called out of order."));
+		return;
+	}
+
 	ExecuteStepWithTransaction(ECampaignGenerationStep::PlayerHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceHQ);
 }
 
 void AGeneratorWorldCampaign::PlaceEnemyHQStep()
 {
+	if (not CanExecuteStep(ECampaignGenerationStep::EnemyHQPlaced))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PlaceEnemyHQStep called out of order."));
+		return;
+	}
+
 	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ);
 }
 
 void AGeneratorWorldCampaign::PlaceEnemyObjectsStep()
 {
+	if (not CanExecuteStep(ECampaignGenerationStep::EnemyObjectsPlaced))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PlaceEnemyObjectsStep called out of order."));
+		return;
+	}
+
 	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyObjectsPlaced,
 		&AGeneratorWorldCampaign::ExecutePlaceEnemyObjects);
 }
 
 void AGeneratorWorldCampaign::PlaceNeutralObjectsStep()
 {
+	if (not CanExecuteStep(ECampaignGenerationStep::NeutralObjectsPlaced))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PlaceNeutralObjectsStep called out of order."));
+		return;
+	}
+
 	ExecuteStepWithTransaction(ECampaignGenerationStep::NeutralObjectsPlaced,
 		&AGeneratorWorldCampaign::ExecutePlaceNeutralObjects);
 }
 
 void AGeneratorWorldCampaign::PlaceMissionsStep()
 {
+	if (not CanExecuteStep(ECampaignGenerationStep::MissionsPlaced))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PlaceMissionsStep called out of order."));
+		return;
+	}
+
 	ExecuteStepWithTransaction(ECampaignGenerationStep::MissionsPlaced, &AGeneratorWorldCampaign::ExecutePlaceMissions);
 }
 
 void AGeneratorWorldCampaign::ExecuteAllSteps()
 {
+	if (M_GenerationStep != ECampaignGenerationStep::NotStarted)
+	{
+		EraseAllGeneration();
+	}
+
 	ExecuteAllStepsWithBacktracking();
 }
 
 void AGeneratorWorldCampaign::EraseAllGeneration()
 {
+	for (const FCampaignGenerationStepTransaction& Transaction : M_StepTransactions)
+	{
+		for (const TObjectPtr<AActor>& SpawnedActor : Transaction.SpawnedActors)
+		{
+			if (not IsValid(SpawnedActor))
+			{
+				continue;
+			}
+
+			SpawnedActor->Destroy();
+		}
+
+		for (const TObjectPtr<AConnection>& SpawnedConnection : Transaction.SpawnedConnections)
+		{
+			if (not IsValid(SpawnedConnection))
+			{
+				continue;
+			}
+
+			SpawnedConnection->Destroy();
+		}
+	}
+
 	ClearExistingConnections();
 	ClearPlacementState();
 	ClearDerivedData();
@@ -447,7 +573,7 @@ void AGeneratorWorldCampaign::GenerateConnectionsForAnchors(const TArray<TObject
 	AssignDesiredConnections(AnchorPoints, RandomStream, OutDesiredConnections);
 
 	TArray<TObjectPtr<AAnchorPoint>> ShuffledAnchors = AnchorPoints;
-	Algo::Shuffle(ShuffledAnchors, RandomStream);
+	RandomStream.Shuffle(ShuffledAnchors);
 
 	TArray<FConnectionSegment> ExistingSegments;
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : ShuffledAnchors)
@@ -512,14 +638,28 @@ bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction&
 
 	if (M_PlacementState.CachedAnchors.Num() == 0)
 	{
+		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: no cached anchors available."));
+		return false;
+	}
+
+	constexpr int32 MaxAnchorDegreeUnlimited = TNumericLimits<int32>::Max();
+	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = M_PlayerHQPlacementRules.AnchorCandidates.Num() > 0
+		? M_PlayerHQPlacementRules.AnchorCandidates
+		: M_PlacementState.CachedAnchors;
+
+	TArray<TObjectPtr<AAnchorPoint>> Candidates;
+	if (not BuildHQAnchorCandidates(CandidateSource, M_PlayerHQPlacementRules.MinAnchorDegreeForHQ,
+		MaxAnchorDegreeUnlimited, nullptr, Candidates))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: no valid anchor candidates found."));
 		return false;
 	}
 
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::PlayerHQPlaced);
-	const int32 AnchorIndex = AttemptIndex % M_PlacementState.CachedAnchors.Num();
-	AAnchorPoint* AnchorPoint = M_PlacementState.CachedAnchors[AnchorIndex].Get();
+	AAnchorPoint* AnchorPoint = SelectAnchorCandidateByAttempt(Candidates, AttemptIndex);
 	if (not IsValid(AnchorPoint))
 	{
+		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: selected anchor was invalid."));
 		return false;
 	}
 
@@ -538,16 +678,37 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 {
 	(void)OutTransaction;
 
-	if (M_PlacementState.CachedAnchors.Num() == 0)
+	if (not GetIsValidPlayerHQAnchor())
 	{
 		return false;
 	}
 
+	if (M_PlacementState.CachedAnchors.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: no cached anchors available."));
+		return false;
+	}
+
+	constexpr int32 MinAnchorDegreeFloor = 0;
+	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = M_EnemyHQPlacementRules.AnchorCandidates.Num() > 0
+		? M_EnemyHQPlacementRules.AnchorCandidates
+		: M_PlacementState.CachedAnchors;
+
+	TArray<TObjectPtr<AAnchorPoint>> Candidates;
+	const int32 MinAnchorDegree = FMath::Max(MinAnchorDegreeFloor, M_EnemyHQPlacementRules.MinAnchorDegree);
+	const int32 MaxAnchorDegree = FMath::Max(MinAnchorDegree, M_EnemyHQPlacementRules.MaxAnchorDegree);
+	if (not BuildHQAnchorCandidates(CandidateSource, MinAnchorDegree, MaxAnchorDegree,
+		M_PlacementState.PlayerHQAnchor.Get(), Candidates))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: no valid anchor candidates found."));
+		return false;
+	}
+
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::EnemyHQPlaced);
-	const int32 AnchorIndex = AttemptIndex % M_PlacementState.CachedAnchors.Num();
-	AAnchorPoint* AnchorPoint = M_PlacementState.CachedAnchors[AnchorIndex].Get();
+	AAnchorPoint* AnchorPoint = SelectAnchorCandidateByAttempt(Candidates, AttemptIndex);
 	if (not IsValid(AnchorPoint))
 	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: selected anchor was invalid."));
 		return false;
 	}
 
@@ -565,28 +726,47 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	(void)OutTransaction;
-	return true;
+
+	const int32 RequiredEnemyItems = GetRequiredEnemyItemCount(M_CountAndDifficultyTuning);
+	if (RequiredEnemyItems <= NoRequiredItems)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("Enemy object placement is not implemented yet."));
+	return false;
 }
 
 bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	(void)OutTransaction;
-	return true;
+
+	const int32 RequiredNeutralItems = GetRequiredNeutralItemCount(M_CountAndDifficultyTuning);
+	if (RequiredNeutralItems <= NoRequiredItems)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("Neutral object placement is not implemented yet."));
+	return false;
 }
 
 bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	(void)OutTransaction;
-	return true;
+
+	const int32 RequiredMissions = GetRequiredMissionCount(M_MissionPlacementRules);
+	if (RequiredMissions <= NoRequiredItems)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("Mission placement is not implemented yet."));
+	return false;
 }
 
 bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 {
-	if (M_GenerationStep != ECampaignGenerationStep::NotStarted)
-	{
-		EraseAllGeneration();
-	}
-
 	TArray<ECampaignGenerationStep> StepOrder;
 	StepOrder.Add(ECampaignGenerationStep::ConnectionsCreated);
 	StepOrder.Add(ECampaignGenerationStep::PlayerHQPlaced);
@@ -757,24 +937,33 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 
 	if (GetStepAttemptIndex(FailedStep) > MaxStepAttempts)
 	{
+		RTSFunctionLibrary::ReportError(TEXT("Generation failed: maximum step attempts exceeded."));
 		return false;
 	}
 
 	if (M_TotalAttemptCount > MaxTotalAttempts)
 	{
+		RTSFunctionLibrary::ReportError(TEXT("Generation failed: maximum total attempts exceeded."));
 		return false;
 	}
 
 	const EPlacementFailurePolicy FailurePolicy = GetFailurePolicyForStep(FailedStep);
 	if (FailurePolicy == EPlacementFailurePolicy::NotSet)
 	{
+		RTSFunctionLibrary::ReportError(TEXT("Generation failed: no failure policy set for step."));
 		return false;
 	}
 
-	int32 BacktrackSteps = 1;
 	const int32 AttemptIndex = GetStepAttemptIndex(FailedStep);
-	BacktrackSteps = FMath::Clamp(AttemptIndex, 1, StepOrder.Num());
-	for (int32 StepCount = 0; StepCount < BacktrackSteps; StepCount++)
+
+	TArray<ECampaignGenerationStep> EscalationSteps;
+	BuildBacktrackEscalationSteps(FailedStep, EscalationSteps);
+	const int32 MaxBacktrackSteps = EscalationSteps.Num();
+	const int32 TransactionsToUndo = FMath::Clamp(AttemptIndex - 1, 0, MaxBacktrackSteps);
+	const int32 AvailableTransactions = M_StepTransactions.Num();
+	const int32 UndoCount = FMath::Min(TransactionsToUndo, AvailableTransactions);
+
+	for (int32 StepCount = 0; StepCount < UndoCount; StepCount++)
 	{
 		UndoLastTransaction();
 	}
@@ -797,6 +986,16 @@ void AGeneratorWorldCampaign::UndoLastTransaction()
 	}
 
 	const FCampaignGenerationStepTransaction Transaction = M_StepTransactions.Pop();
+	for (const TObjectPtr<AActor>& SpawnedActor : Transaction.SpawnedActors)
+	{
+		if (not IsValid(SpawnedActor))
+		{
+			continue;
+		}
+
+		SpawnedActor->Destroy();
+	}
+
 	switch (Transaction.CompletedStep)
 	{
 	case ECampaignGenerationStep::ConnectionsCreated:
@@ -874,85 +1073,6 @@ void AGeneratorWorldCampaign::DebugNotifyAnchorPicked(const AAnchorPoint* Anchor
 
 	AnchorPoint->DebugDrawAnchorState(Label, Color, DebugAnchorDurationSeconds);
 }
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return;
-	}
-
-	ClearExistingConnections();
-
-	TArray<TObjectPtr<AAnchorPoint>> AnchorPoints;
-	GatherAnchorPoints(AnchorPoints);
-	if (AnchorPoints.Num() < 2)
-	{
-		return;
-	}
-
-	Algo::Sort(AnchorPoints, [](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
-	{
-		if (not IsValid(Left))
-		{
-			return false;
-		}
-
-		if (not IsValid(Right))
-		{
-			return true;
-		}
-
-		return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
-	});
-
-	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
-	{
-		if (not IsValid(AnchorPoint))
-		{
-			continue;
-		}
-
-		AnchorPoint->ClearConnections();
-	}
-
-	FRandomStream RandomStream(M_CountAndDifficultyTuning.Seed);
-	TMap<TObjectPtr<AAnchorPoint>, int32> DesiredConnections;
-	AssignDesiredConnections(AnchorPoints, RandomStream, DesiredConnections);
-
-	TArray<TObjectPtr<AAnchorPoint>> ShuffledAnchors = AnchorPoints;
-	Algo::Shuffle(ShuffledAnchors, RandomStream);
-
-	TArray<FConnectionSegment> ExistingSegments;
-	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : ShuffledAnchors)
-	{
-		if (not IsValid(AnchorPoint))
-		{
-			continue;
-		}
-
-		if constexpr (DeveloperSettings::Debugging::GCampaignConnectionGeneration_Compile_DebugSymbols)
-		{
-			DebugNotifyAnchorProcessing(AnchorPoint, TEXT("Processing"), FColor::Cyan);
-		}
-
-		GeneratePhasePreferredConnections(AnchorPoint, AnchorPoints, DesiredConnections, ExistingSegments);
-		GeneratePhaseExtendedConnections(AnchorPoint, AnchorPoints, ExistingSegments);
-		GeneratePhaseThreeWayConnections(AnchorPoint, ExistingSegments);
-	}
-
-	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
-	{
-		if (not IsValid(AnchorPoint))
-		{
-			continue;
-		}
-
-		AnchorPoint->SortNeighborsByKey();
-	}
-}
 
 bool AGeneratorWorldCampaign::ValidateGenerationRules() const
 {
@@ -972,6 +1092,135 @@ bool AGeneratorWorldCampaign::ValidateGenerationRules() const
 	}
 
 	return ConnectionGenerationRules.MaxConnections >= 0;
+}
+
+int32 AGeneratorWorldCampaign::GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const
+{
+	if (not IsValid(AnchorPoint))
+	{
+		return 0;
+	}
+
+	const int32* CachedDegree = M_DerivedData.AnchorConnectionDegreesByAnchorKey.Find(AnchorPoint->GetAnchorKey());
+	return CachedDegree ? *CachedDegree : AnchorPoint->GetConnectionCount();
+}
+
+bool AGeneratorWorldCampaign::IsAnchorCached(const AAnchorPoint* AnchorPoint) const
+{
+	if (not IsValid(AnchorPoint))
+	{
+		return false;
+	}
+
+	for (const TWeakObjectPtr<AAnchorPoint>& CachedAnchor : M_PlacementState.CachedAnchors)
+	{
+		if (CachedAnchor.Get() == AnchorPoint)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool AGeneratorWorldCampaign::BuildHQAnchorCandidates(const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource,
+	int32 MinDegree, int32 MaxDegree, const AAnchorPoint* AnchorToExclude,
+	TArray<TObjectPtr<AAnchorPoint>>& OutCandidates) const
+{
+	OutCandidates.Reset();
+	OutCandidates.Reserve(CandidateSource.Num());
+
+	for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : CandidateSource)
+	{
+		if (not IsValid(CandidateAnchor))
+		{
+			continue;
+		}
+
+		if (not IsAnchorCached(CandidateAnchor))
+		{
+			continue;
+		}
+
+		if (AnchorToExclude != nullptr && CandidateAnchor == AnchorToExclude)
+		{
+			continue;
+		}
+
+		const int32 ConnectionDegree = GetAnchorConnectionDegree(CandidateAnchor);
+		if (ConnectionDegree < MinDegree || ConnectionDegree > MaxDegree)
+		{
+			continue;
+		}
+
+		OutCandidates.Add(CandidateAnchor);
+	}
+
+	if (OutCandidates.Num() == 0)
+	{
+		return false;
+	}
+
+	Algo::Sort(OutCandidates, [](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
+	{
+		if (not IsValid(Left))
+		{
+			return false;
+		}
+
+		if (not IsValid(Right))
+		{
+			return true;
+		}
+
+		return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
+	});
+
+	return true;
+}
+
+AAnchorPoint* AGeneratorWorldCampaign::SelectAnchorCandidateByAttempt(const TArray<TObjectPtr<AAnchorPoint>>& Candidates,
+	int32 AttemptIndex) const
+{
+	if (Candidates.Num() == 0)
+	{
+		return nullptr;
+	}
+
+	const int32 CandidateIndex = AttemptIndex % Candidates.Num();
+	return Candidates[CandidateIndex].Get();
+}
+
+bool AGeneratorWorldCampaign::HasSharedEndpoint(const FConnectionSegment& Segment, const AAnchorPoint* AnchorA,
+	const AAnchorPoint* AnchorB) const
+{
+	return Segment.StartAnchor.Get() == AnchorA || Segment.EndAnchor.Get() == AnchorA
+		|| Segment.StartAnchor.Get() == AnchorB || Segment.EndAnchor.Get() == AnchorB;
+}
+
+bool AGeneratorWorldCampaign::IsSegmentIntersectingExisting(const FVector2D& StartPoint, const FVector2D& EndPoint,
+	const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor,
+	const TArray<FConnectionSegment>& ExistingSegments, const AConnection* ConnectionToIgnore) const
+{
+	for (const FConnectionSegment& Segment : ExistingSegments)
+	{
+		if (Segment.OwningConnection.Get() == ConnectionToIgnore)
+		{
+			continue;
+		}
+
+		if (HasSharedEndpoint(Segment, StartAnchor, EndAnchor))
+		{
+			continue;
+		}
+
+		if (DoSegmentsIntersect(StartPoint, EndPoint, Segment.StartPoint, Segment.EndPoint))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void AGeneratorWorldCampaign::ClearExistingConnections()
