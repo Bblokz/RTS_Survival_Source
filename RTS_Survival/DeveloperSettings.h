@@ -579,6 +579,22 @@ namespace DeveloperSettings
 				// How often the laser deals damage again and updates end location within one pulse (laser weapons are
 				// always single fire and this settings adjusts how many beam updates exist within one shot).
 				inline constexpr float LaserIterationTimeInOnePulse = 0.25f;
+				// Global multiplier for all laser weapon base damage.
+				inline constexpr float LaserWeaponDamageMlt = 1.0f;
+				// Used by PZ V/III Strahlkanone 39 laser tank cannon.
+				inline constexpr float Strahlkanone39BaseDamage = 20.f;
+				// Used by LB 14 handheld laser weapon.
+				inline constexpr float LB14BaseDamage = 8.f;
+				// Used by Spektr V infantry laser weapon.
+				inline constexpr float SpektrVBaseDamage = 8.f;
+				// Used by LightStorm light laser MG handheld weapon.
+				inline constexpr float LightStormBaseDamage = 8.f;
+				// Used by T-34/76L laser cannon.
+				inline constexpr float Luch50LBaseDamage = 18.f;
+				// Used by SU-85L laser tank destroyer cannon.
+				inline constexpr float Luch85LBaseDamage = 24.f;
+				// Used by T-44/100L laser tank cannon.
+				inline constexpr float Zarya100LBaseDamage = 35.f;
 			}
 
 			namespace SmallArmsAccuracy
