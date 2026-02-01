@@ -1,9 +1,9 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
-#include "WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 
 #include "DrawDebugHelpers.h"
-#include "WorldCampaign/WorldMapObjects/Connection/Connection.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
 AAnchorPoint::AAnchorPoint()
 {

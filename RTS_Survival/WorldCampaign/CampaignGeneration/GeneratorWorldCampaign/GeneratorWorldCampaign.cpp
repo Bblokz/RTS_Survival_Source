@@ -1,14 +1,13 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
-#include "WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 
-#include "Algo/Shuffle.h"
 #include "Algo/Sort.h"
-#include "DeveloperSettings.h"
+#include "RTS_Survival/DeveloperSettings.h"
 #include "EngineUtils.h"
-#include "Utils/HFunctionLibary.h"
-#include "WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
-#include "WorldCampaign/WorldMapObjects/Connection/Connection.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
 namespace
 {

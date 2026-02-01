@@ -1,0 +1,306 @@
+﻿Backtracking strategy introduction (context for implementation)
+
+We want the campaign generator to be debuggable in-editor and capable of automatically solving hard placement cases. To achieve this, implement backtracking using a state machine + transaction log approach.
+
+The generator runs in fixed, ordered steps:
+
+Create connections
+
+Place Player HQ
+
+Place Enemy HQ
+
+Place Enemy Objects
+
+Place Neutral Objects
+
+Place Missions
+
+Each step must be implemented so it can be:
+
+executed individually via editor-callable functions (so designers can inspect intermediate results), and
+
+executed as part of an automatic “run all” solver that can undo and retry decisions when later steps fail.
+
+Key implementation idea
+
+Treat each step as a transaction:
+
+Running a step produces changes (spawned actors, anchor assignments, cached derived data).
+
+Those changes must be recorded in a StepTransaction so they can be undone deterministically.
+
+Undoing a step restores the generator to the exact prior state and rolls back the “current step” enum.
+
+State machine
+
+Maintain a single enum in the generator that represents the current progress (highest completed step / next step to run). This enum is the source of truth for:
+
+which editor buttons are enabled/disabled,
+
+what placement data is considered valid,
+
+where automatic backtracking resumes after undoing steps.
+
+Two execution modes
+
+Manual stepping (designer debugging): runs exactly one step, records its transaction, advances the step enum.
+
+Automatic run (with backtracking): runs steps in order; if a step fails, it follows a failure policy:
+
+optionally relaxes soft constraints (distance/spacing preferences),
+
+otherwise undoes one or more prior step transactions,
+
+retries with a different deterministic choice sequence (using per-step attempt indices) to avoid repeating the same failure loop.
+
+Required editor functions
+
+“EraseAllGeneration”: clears all generated actors/state and resets the step enum.
+
+“ExecuteAllSteps”: clears if needed, then runs all steps in sequence using backtracking.
+
+Keep the individual step functions for inspection; they must be gated by the step enum so invalid steps are greyed out / early-return.
+
+See here more details:
+
+
+The trick is to treat the generator as a state machine + transaction log, where each step is both:
+individually executable (for debugging), and
+replayable/undoable as part of an automatic “run all with backtracking” solver.
+Below is what Codex needs to implement (pure text, no code).
+1) Make the generator a state machine with a single “current step” enum
+Add an enum that represents the highest completed step (or “current step to execute next”). This enum is the source of truth for:
+
+which editor buttons are enabled/greyed out,
+
+what data is considered valid,
+
+where the backtracker resumes.
+
+Example concept:
+
+NotStarted
+
+ConnectionsCreated
+
+PlayerHQPlaced
+
+EnemyHQPlaced
+
+EnemyObjectsPlaced
+
+NeutralObjectsPlaced
+
+MissionsPlaced
+
+Finished (optional)
+
+Rule: A step can only run if all previous steps are completed.
+If a step is undone by backtracking, the enum rolls back to the correct earlier state.
+
+2) Persist progress in the generator actor (so step-by-step works)
+
+The generator actor must store all intermediate results so you can “pause” after any step and inspect the map:
+
+Seed used
+
+Cached list of anchors and connections (after step 1)
+
+PlayerHQ anchor (after step 2)
+
+EnemyHQ anchor (after step 3)
+
+Lists of spawned enemy objects and which anchor they occupy (after step 4)
+
+Lists of spawned neutral objects and anchors (after step 5)
+
+Lists of placed missions and anchors (+ stacked missions) (after step 6)
+
+Any derived caches used for placement:
+
+BFS hop distance arrays from PlayerHQ / EnemyHQ
+
+anchor degree list
+
+chokepoint scores (if you use them)
+
+Per-type “placed count so far” maps (needed for variant cycling)
+
+This persistent state is what makes the editor step buttons meaningful.
+
+3) Add a “transaction log” per step to enable global backtracking
+
+To backtrack across steps, each step must record exactly what it changed, so it can be undone cleanly.
+
+For each step, store a StepTransaction containing:
+
+What actors were spawned in that step (connections, objects, missions, etc.)
+
+What anchors were “reserved” or had their item state modified
+
+Any arrays/maps that were updated (e.g., counts by type, occupancy markers)
+
+Any “choices” made that you may want to revisit:
+
+which HQ anchor was chosen
+
+which enemy object went to which anchor
+
+candidate lists + current index (optional but helpful for efficient retry)
+
+Undoing a step means:
+
+Destroy spawned actors from that step
+
+Clear anchor assignments done in that step
+
+Restore relevant cached maps/arrays to previous values
+
+Roll back the step-state enum
+
+Important: Step 1 (connections) must be undoable too if you want full cross-step backtracking. That means you either:
+
+store spawned connection actors and delete them, and restore anchor connection lists, or
+
+regenerate from scratch deterministically from the seed (but then you still must reset state correctly).
+
+4) Keep step-by-step editor buttons while allowing automatic backtracking
+
+You will implement two execution modes:
+
+Mode A: Manual step execution (designer presses buttons)
+
+Each step editor function:
+
+validates it’s allowed for the current enum
+
+runs exactly that step once
+
+records a StepTransaction
+
+updates enum to the next completed step
+
+Buttons are greyed out if step is not allowed.
+
+This is your “inspectable progress” path.
+
+Mode B: “Run All Steps” automatic solver with backtracking
+
+Add one editor function that runs the whole pipeline, but it still internally calls the same step functions (so behavior is identical).
+
+Flow:
+
+If the generator is not in a clean state, call “EraseAllGeneration” first.
+
+Execute steps in order. If a step fails:
+
+consult the failure policy for that step (your enum: NotSet / BreakDistanceRules_ThenBackTrack / InstantBackTrack)
+
+either try relaxations (if that policy supports it) OR immediately backtrack
+
+Backtracking means:
+
+undo the most recent step transaction (or multiple, depending on policy)
+
+pick a different choice for the step being retried (e.g., different HQ anchor / different candidate ordering)
+
+then continue forward again
+
+While running automatically, you still update the step-state enum as you go. This means the editor UI always reflects the current progress, even if it’s mid-run.
+
+5) Backtracking scope rules (how far back can we go?)
+
+Define per-step configuration: “If this step fails, how far back are we allowed to undo?”
+
+Recommended default escalation:
+
+Missions fail → backtrack missions, then neutrals, then enemy objects, then Enemy HQ, then Player HQ, then connections.
+
+Neutrals fail → backtrack neutrals, then enemy objects, then Enemy HQ, then Player HQ, then connections.
+
+Enemy objects fail → backtrack enemy objects, then Enemy HQ, then Player HQ, then connections.
+
+Enemy HQ fail → backtrack Enemy HQ, then Player HQ, then connections.
+
+Player HQ fail → backtrack Player HQ, then connections.
+
+Connections fail → regenerate connections with a different deterministic “attempt salt” derived from the seed.
+
+These escalation rules should be data-driven or at least centralized, so you can tune later.
+
+6) Make retries deterministic (so backtracking doesn’t loop forever)
+
+When a step is retried, Codex must ensure it does not repeat the exact same choice sequence forever.
+
+Do this by maintaining an “attempt index” per step and incorporating it into:
+
+the shuffled order of candidates
+
+tie-breakers
+
+variant selection offsets (optionally)
+
+Example: For “Place Enemy HQ”, attempt 0 tries the best candidate, attempt 1 tries the next-best, etc.
+For “Place Enemy Objects”, attempt 0 uses the default ordering; attempt 1 uses a different seeded shuffle of candidate anchors.
+
+Also enforce:
+
+max retries per step
+
+max total retries across the entire run
+If exceeded: fail cleanly with a detailed log of which step failed and why.
+
+7) Required editor callable functions
+
+Codex must add editor-callable functions for:
+
+(1) Erase all generation
+
+Destroys all spawned actors created by the generator (connections, objects, missions, etc.)
+
+Clears anchor state (occupancy, assigned item types, mission stacks, etc.)
+
+Clears cached data (hop maps, chokepoint scores, placed-count maps)
+
+Clears transaction logs
+
+Resets the step enum to NotStarted
+
+(2) Execute all steps in sequence (with backtracking)
+
+If current state isn’t NotStarted (or if any generated state exists), call EraseAllGeneration first.
+
+Then run:
+
+Create connections
+
+Place HQ
+
+Place Enemy HQ
+
+Place Enemy Objects
+
+Place Neutral Objects
+
+Place Missions
+
+Use backtracking as described above on failure.
+
+When finished successfully, set step enum to Finished (or MissionsPlaced if that’s your terminal).
+
+Additionally, keep the individual step editor-callable functions:
+
+CreateConnectionsStep()
+
+PlaceHQStep()
+
+PlaceEnemyHQStep()
+
+PlaceEnemyObjectsStep()
+
+PlaceNeutralObjectsStep()
+
+PlaceMissionsStep()
+
+Each should be disabled if the current step enum indicates prerequisites are not complete.

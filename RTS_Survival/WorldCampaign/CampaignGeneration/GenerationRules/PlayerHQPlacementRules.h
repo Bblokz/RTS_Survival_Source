@@ -12,7 +12,7 @@ struct FPlayerHQPlacementRules
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules")
-	TArray<TWeakObjectPtr<AAnchorPoint>> AnchorCandidates;
+	TArray<TObjectPtr<AAnchorPoint>> AnchorCandidates;
 
 	// Anchor degree constraints: avoid dead-ends (typical 2 or 3)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules")

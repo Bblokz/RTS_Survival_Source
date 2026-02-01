@@ -1,11 +1,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "WorldCampaign/CampaignGeneration/Enums/MissionTier/Enum_MissionTier.h"
-#include "WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
-#include "WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
-#include "WorldCampaign/CampaignGeneration/Enums/TopologySearchStrategy/Enum_TopologySearchStrategy.h"
-#include "WorldCampaign/CampaignGeneration/GenerationRules/MapObjectAdjacencyRequirement.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/MissionTier/Enum_MissionTier.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/TopologySearchStrategy/Enum_TopologySearchStrategy.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/MapObjectAdjacencyRequirement.h"
 
 #include "MissionPlacementRules.generated.h"
 

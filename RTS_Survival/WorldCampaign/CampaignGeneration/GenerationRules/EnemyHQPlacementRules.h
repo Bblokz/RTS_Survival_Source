@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "WorldCampaign/CampaignGeneration/Enums/TopologySearchStrategy/Enum_TopologySearchStrategy.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/TopologySearchStrategy/Enum_TopologySearchStrategy.h"
 
 #include "EnemyHQPlacementRules.generated.h"
 
@@ -13,7 +13,7 @@ struct FEnemyHQPlacementRules
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules")
-	TArray<TWeakObjectPtr<AAnchorPoint>> AnchorCandidates;
+	TArray<TObjectPtr<AAnchorPoint>> AnchorCandidates;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules")
 	int32 MinAnchorDegree = 1;

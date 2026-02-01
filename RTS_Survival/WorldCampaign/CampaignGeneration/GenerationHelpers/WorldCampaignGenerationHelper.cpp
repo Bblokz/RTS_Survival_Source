@@ -1,7 +1,7 @@
 #include "WorldCampaignGenerationHelper.h"
 
 #include "Containers/Queue.h"
-#include "WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 
 namespace CampaignGenerationHelper
 {

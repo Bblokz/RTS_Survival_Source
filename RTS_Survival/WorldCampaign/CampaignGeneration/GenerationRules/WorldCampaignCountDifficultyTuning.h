@@ -1,9 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Game/Difficulty/GameDifficulty.h"
-#include "WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
-#include "WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 
 #include "WorldCampaignCountDifficultyTuning.generated.h"
 

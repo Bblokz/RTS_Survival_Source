@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "WorldCampaign/CampaignGeneration/Enums/AdjacencyPolicy/Enum_AdjacencyPolicy.h"
-#include "WorldCampaign/CampaignGeneration/Enums/Enum_MapItemType.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/AdjacencyPolicy/Enum_AdjacencyPolicy.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapItemType.h"
 
 #include "MapObjectAdjacencyRequirement.generated.h"
 
