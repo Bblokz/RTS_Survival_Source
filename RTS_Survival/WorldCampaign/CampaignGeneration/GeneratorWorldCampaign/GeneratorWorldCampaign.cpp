@@ -6,6 +6,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "EngineUtils.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
@@ -573,7 +574,7 @@ void AGeneratorWorldCampaign::GenerateConnectionsForAnchors(const TArray<TObject
 	AssignDesiredConnections(AnchorPoints, RandomStream, OutDesiredConnections);
 
 	TArray<TObjectPtr<AAnchorPoint>> ShuffledAnchors = AnchorPoints;
-	RandomStream.Shuffle(ShuffledAnchors);
+	CampaignGenerationHelper::DeterministicShuffle(ShuffledAnchors, RandomStream);
 
 	TArray<FConnectionSegment> ExistingSegments;
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : ShuffledAnchors)
