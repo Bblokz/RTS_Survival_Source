@@ -45,6 +45,38 @@ namespace EscapeMenuSettingsOptionDefaults
 	};
 }
 
+namespace EscapeMenuSettingsValueHelpers
+{
+	constexpr float SliderNormalizedMin = 0.0f;
+	constexpr float SliderNormalizedMax = 1.0f;
+
+	float GetScaledSliderValue(
+		const USlider* Slider,
+		const float SliderValue,
+		const float MinValue,
+		const float MaxValue)
+	{
+		if (Slider == nullptr)
+		{
+			return SliderValue;
+		}
+
+		const float SliderMin = Slider->GetMinValue();
+		const float SliderMax = Slider->GetMaxValue();
+		if (FMath::IsNearlyEqual(SliderMin, SliderNormalizedMin)
+			&& FMath::IsNearlyEqual(SliderMax, SliderNormalizedMax))
+		{
+			return FMath::GetMappedRangeValueClamped(
+				FVector2D(SliderNormalizedMin, SliderNormalizedMax),
+				FVector2D(MinValue, MaxValue),
+				SliderValue
+			);
+		}
+
+		return SliderValue;
+	}
+}
+
 void UW_EscapeMenuSettings::SetPlayerController(ACPPController* NewPlayerController)
 {
 	if (not IsValid(NewPlayerController))
@@ -3734,14 +3766,20 @@ void UW_EscapeMenuSettings::HandleCameraMovementSpeedMultiplierChanged(const flo
 		return;
 	}
 
-	M_SettingsSubsystem->SetPendingCameraMovementSpeedMultiplier(NewValue);
+	const float ScaledMultiplier = EscapeMenuSettingsValueHelpers::GetScaledSliderValue(
+		M_SliderCameraMovementSpeedMultiplier,
+		NewValue,
+		M_SliderRanges.M_CameraMovementSpeedMultiplierMin,
+		M_SliderRanges.M_CameraMovementSpeedMultiplierMax
+	);
+	M_SettingsSubsystem->SetPendingCameraMovementSpeedMultiplier(ScaledMultiplier);
 
 	if (not GetIsValidPlayerController())
 	{
 		return;
 	}
 
-	M_PlayerController->SetCameraMovementSpeedMultiplier(NewValue);
+	M_PlayerController->SetCameraMovementSpeedMultiplier(ScaledMultiplier);
 }
 
 void UW_EscapeMenuSettings::HandleCameraPanSpeedMultiplierChanged(const float NewValue)
@@ -3761,14 +3799,20 @@ void UW_EscapeMenuSettings::HandleCameraPanSpeedMultiplierChanged(const float Ne
 		return;
 	}
 
-	M_SettingsSubsystem->SetPendingCameraPanSpeedMultiplier(NewValue);
+	const float ScaledMultiplier = EscapeMenuSettingsValueHelpers::GetScaledSliderValue(
+		M_SliderCameraPanSpeedMultiplier,
+		NewValue,
+		M_SliderRanges.M_CameraPanSpeedMultiplierMin,
+		M_SliderRanges.M_CameraPanSpeedMultiplierMax
+	);
+	M_SettingsSubsystem->SetPendingCameraPanSpeedMultiplier(ScaledMultiplier);
 
 	if (not GetIsValidPlayerController())
 	{
 		return;
 	}
 
-	M_PlayerController->SetCameraPanSpeedMultiplier(NewValue);
+	M_PlayerController->SetCameraPanSpeedMultiplier(ScaledMultiplier);
 }
 
 void UW_EscapeMenuSettings::HandleInvertYAxisChanged(const bool bIsChecked)
