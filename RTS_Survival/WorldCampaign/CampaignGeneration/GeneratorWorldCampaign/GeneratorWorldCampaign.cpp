@@ -2606,7 +2606,7 @@ bool AGeneratorWorldCampaign::IsAnchorCached(const AAnchorPoint* AnchorPoint) co
 		return false;
 	}
 
-	for (const TWeakObjectPtr<AAnchorPoint>& CachedAnchor : M_PlacementState.CachedAnchors)
+	for ( TWeakObjectPtr<AAnchorPoint> CachedAnchor : M_PlacementState.CachedAnchors)
 	{
 		if (CachedAnchor.Get() == AnchorPoint)
 		{

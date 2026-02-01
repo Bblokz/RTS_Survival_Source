@@ -354,6 +354,9 @@ public:
 	UFUNCTION(CallInEditor, Category = "World Campaign|Debug")
 	void DebugDrawAllConnections() const;
 
+	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
+	
+
 private:
 	bool GetIsValidPlayerHQAnchor() const;
 	bool GetIsValidEnemyHQAnchor() const;
@@ -421,7 +424,6 @@ private:
 	void CacheGeneratedState(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints);
 
 	bool ValidateGenerationRules() const;
-	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
 	bool IsAnchorCached(const AAnchorPoint* AnchorPoint) const;
 	/**
 	 * @brief Filters and sorts HQ anchor candidates so retries stay deterministic.
