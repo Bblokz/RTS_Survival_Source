@@ -19,10 +19,10 @@ struct FNeutralItemPlacementRules
 	 * Example: Increase this to keep neutral resources out of the player’s immediate start area.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced.\n"
-		                  "Why: Keeps neutral items out of the immediate player HQ neighborhood.\n"
-		                  "Technical: Hard minimum hop distance filter from PlayerHQAnchor.\n"
-		                  "Notes: Must be <= MaxHopsFromHQ; too high can eliminate all candidates."))
+		meta = (ToolTip = R"(Used in: NeutralObjectsPlaced.
+Why: Keeps neutral items out of the immediate player HQ neighborhood.
+Technical: Hard minimum hop distance filter from PlayerHQAnchor.
+Notes: Must be <= MaxHopsFromHQ; too high can eliminate all candidates.)"))
 	int32 MinHopsFromHQ = 0;
 
 	/**
@@ -30,10 +30,10 @@ struct FNeutralItemPlacementRules
 	 * Example: Lower this if you want neutral items concentrated near mid-map for early access.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced.\n"
-		                  "Why: Keeps neutral items within a bounded travel radius from the player HQ.\n"
-		                  "Technical: Hard maximum hop distance filter from PlayerHQAnchor.\n"
-		                  "Notes: Must be >= MinHopsFromHQ; too low can starve placements."))
+		meta = (ToolTip = R"(Used in: NeutralObjectsPlaced.
+Why: Keeps neutral items within a bounded travel radius from the player HQ.
+Technical: Hard maximum hop distance filter from PlayerHQAnchor.
+Notes: Must be >= MinHopsFromHQ; too low can starve placements.)"))
 	int32 MaxHopsFromHQ = 0;
 
 	/**
@@ -41,10 +41,10 @@ struct FNeutralItemPlacementRules
 	 * Example: Increase this to reduce clustering of resource nodes and encourage exploration.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced.\n"
-		                  "Why: Enforces a minimum hop spacing between neutral items to prevent clustering.\n"
-		                  "Technical: Hard filter against cached neutral placements by hop distance.\n"
-		                  "Notes: Must be <= MaxHopsFromOtherNeutralItems; too high may block placement."))
+		meta = (ToolTip = R"(Used in: NeutralObjectsPlaced.
+Why: Enforces a minimum hop spacing between neutral items to prevent clustering.
+Technical: Hard filter against cached neutral placements by hop distance.
+Notes: Must be <= MaxHopsFromOtherNeutralItems; too high may block placement.)"))
 	int32 MinHopsFromOtherNeutralItems = 0;
 
 	/**
@@ -52,10 +52,10 @@ struct FNeutralItemPlacementRules
 	 * Example: Lower this to allow multiple neutral items to appear within the same region.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced.\n"
-		                  "Why: Caps spacing so neutral items can cluster if desired.\n"
-		                  "Technical: Hard maximum hop distance filter relative to other neutral items.\n"
-		                  "Notes: Must be >= MinHopsFromOtherNeutralItems; too low can force tight clustering."))
+		meta = (ToolTip = R"(Used in: NeutralObjectsPlaced.
+Why: Caps spacing so neutral items can cluster if desired.
+Technical: Hard maximum hop distance filter relative to other neutral items.
+Notes: Must be >= MinHopsFromOtherNeutralItems; too low can force tight clustering.)"))
 	int32 MaxHopsFromOtherNeutralItems = 0;
 
 	/**
@@ -63,9 +63,9 @@ struct FNeutralItemPlacementRules
 	 * Example: PreferMin to keep neutral items closer to the player HQ after enemy objects are placed.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced candidate ordering.\n"
-		                  "Why: Lets designers bias where within the Min/Max hop window neutral items land.\n"
-		                  "Technical: Soft preference applied during candidate sorting; does not bypass hard bounds.\n"
-		                  "Notes: Deterministic ordering also uses anchor keys and attempt index."))
+		meta = (ToolTip = R"(Used in: NeutralObjectsPlaced candidate ordering.
+Why: Lets designers bias where within the Min/Max hop window neutral items land.
+Technical: Soft preference applied during candidate sorting; does not bypass hard bounds.
+Notes: Deterministic ordering also uses anchor keys and attempt index.)"))
 	ETopologySearchStrategy Preference = ETopologySearchStrategy::NotSet;
 };

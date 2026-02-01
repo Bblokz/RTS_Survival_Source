@@ -22,10 +22,10 @@ struct FEnemyHQPlacementRules
 	 * encounters away from the player HQ while still allowing later enemy object placement.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: EnemyHQPlaced -> ExecutePlaceEnemyHQ/BuildHQAnchorCandidates.\n"
-		                  "Why: Allows authored control over where the enemy HQ is allowed to appear.\n"
-		                  "Technical: Acts as a hard filter before degree and hop constraints are evaluated.\n"
-		                  "Notes: Empty means all anchors are candidates; non-empty strictly gates selection."))
+		meta = (ToolTip = R"(Used in: EnemyHQPlaced -> ExecutePlaceEnemyHQ/BuildHQAnchorCandidates.
+Why: Allows authored control over where the enemy HQ is allowed to appear.
+Technical: Acts as a hard filter before degree and hop constraints are evaluated.
+Notes: Empty means all anchors are candidates; non-empty strictly gates selection.)"))
 	TArray<TObjectPtr<AAnchorPoint>> AnchorCandidates;
 
 	/**
@@ -34,10 +34,10 @@ struct FEnemyHQPlacementRules
 	 * so that later EnemyObjectsPlaced can branch outward easily.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: EnemyHQPlaced -> BuildHQAnchorCandidates.\n"
-		                  "Why: Ensures the enemy HQ sits on a sufficiently connected node.\n"
-		                  "Technical: Hard minimum on cached connection degree for candidate anchors.\n"
-		                  "Notes: Must be <= MaxAnchorDegree; too high can remove all candidates."))
+		meta = (ToolTip = R"(Used in: EnemyHQPlaced -> BuildHQAnchorCandidates.
+Why: Ensures the enemy HQ sits on a sufficiently connected node.
+Technical: Hard minimum on cached connection degree for candidate anchors.
+Notes: Must be <= MaxAnchorDegree; too high can remove all candidates.)"))
 	int32 MinAnchorDegree = 1;
 
 	/**
@@ -46,10 +46,10 @@ struct FEnemyHQPlacementRules
 	 * so the player has fewer approach paths before NeutralObjectsPlaced.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: EnemyHQPlaced -> BuildHQAnchorCandidates.\n"
-		                  "Why: Prevents the enemy HQ from spawning on overly connected hubs.\n"
-		                  "Technical: Hard maximum on cached connection degree for candidate anchors.\n"
-		                  "Notes: Must be >= MinAnchorDegree; too low can block placement entirely."))
+		meta = (ToolTip = R"(Used in: EnemyHQPlaced -> BuildHQAnchorCandidates.
+Why: Prevents the enemy HQ from spawning on overly connected hubs.
+Technical: Hard maximum on cached connection degree for candidate anchors.
+Notes: Must be >= MinAnchorDegree; too low can block placement entirely.)"))
 	int32 MaxAnchorDegree = 3;
 
 	/**
@@ -58,9 +58,9 @@ struct FEnemyHQPlacementRules
 	 * the enemy object network to expand quickly in subsequent steps.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: EnemyHQPlaced candidate sorting/selection.\n"
-		                  "Why: Allows designers to bias the selection toward low- or high-degree anchors.\n"
-		                  "Technical: Soft preference used when ordering candidates; does not bypass Min/Max limits.\n"
-		                  "Notes: Deterministic ordering uses this bias plus anchor keys and attempt index."))
+		meta = (ToolTip = R"(Used in: EnemyHQPlaced candidate sorting/selection.
+Why: Allows designers to bias the selection toward low- or high-degree anchors.
+Technical: Soft preference used when ordering candidates; does not bypass Min/Max limits.
+Notes: Deterministic ordering uses this bias plus anchor keys and attempt index.)"))
 	ETopologySearchStrategy AnchorDegreePreference = ETopologySearchStrategy::NotSet;
 };

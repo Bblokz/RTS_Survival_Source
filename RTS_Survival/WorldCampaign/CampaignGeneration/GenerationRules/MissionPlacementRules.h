@@ -23,10 +23,10 @@ struct FMissionTierRules
 	 * Example: Enable this to guarantee Tier1 missions stay within a short hop radius.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Enables hop-distance filtering from the player HQ for this tier.\n"
-		                  "Technical: Gates Min/Max hop filters and preference checks.\n"
-		                  "Notes: Drives EditCondition for hop distance fields; disabling ignores hop rules."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Enables hop-distance filtering from the player HQ for this tier.
+Technical: Gates Min/Max hop filters and preference checks.
+Notes: Drives EditCondition for hop distance fields; disabling ignores hop rules.)"))
 	bool bUseHopsDistanceFromHQ = true;
 
 	/**
@@ -35,10 +35,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
 		meta = (EditCondition = "bUseHopsDistanceFromHQ",
-		        ToolTip = "Used in: MissionsPlaced when bUseHopsDistanceFromHQ is true.\n"
-		                  "Why: Keeps missions away from the start by enforcing a minimum hop distance.\n"
-		                  "Technical: Hard filter against PlayerHQHopDistancesByAnchorKey.\n"
-		                  "Notes: Must be <= MaxHopsFromHQ; ignored when hop distance is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseHopsDistanceFromHQ is true.
+Why: Keeps missions away from the start by enforcing a minimum hop distance.
+Technical: Hard filter against PlayerHQHopDistancesByAnchorKey.
+Notes: Must be <= MaxHopsFromHQ; ignored when hop distance is disabled.)"))
 	int32 MinHopsFromHQ = 0;
 
 	/**
@@ -47,10 +47,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
 		meta = (EditCondition = "bUseHopsDistanceFromHQ",
-		        ToolTip = "Used in: MissionsPlaced when bUseHopsDistanceFromHQ is true.\n"
-		                  "Why: Caps how far missions can be from the player HQ in hop distance.\n"
-		                  "Technical: Hard filter against PlayerHQHopDistancesByAnchorKey.\n"
-		                  "Notes: Must be >= MinHopsFromHQ; ignored when hop distance is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseHopsDistanceFromHQ is true.
+Why: Caps how far missions can be from the player HQ in hop distance.
+Technical: Hard filter against PlayerHQHopDistancesByAnchorKey.
+Notes: Must be >= MinHopsFromHQ; ignored when hop distance is disabled.)"))
 	int32 MaxHopsFromHQ = 0;
 
 	/**
@@ -59,10 +59,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
 		meta = (EditCondition = "bUseHopsDistanceFromHQ",
-		        ToolTip = "Used in: MissionsPlaced when bUseHopsDistanceFromHQ is true.\n"
-		                  "Why: Biases mission anchors toward the near or far edge of the hop window.\n"
-		                  "Technical: Soft preference in candidate ordering; does not bypass Min/Max hop limits.\n"
-		                  "Notes: Deterministic ordering also uses anchor keys and attempt index."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseHopsDistanceFromHQ is true.
+Why: Biases mission anchors toward the near or far edge of the hop window.
+Technical: Soft preference in candidate ordering; does not bypass Min/Max hop limits.
+Notes: Deterministic ordering also uses anchor keys and attempt index.)"))
 	ETopologySearchStrategy HopsDistancePreference = ETopologySearchStrategy::NotSet;
 
 	/**
@@ -70,10 +70,10 @@ struct FMissionTierRules
 	 * Example: Enable this when you want missions to spread across the map visually, not just by hops.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Enables world-space (XY) distance filtering from the player HQ.\n"
-		                  "Technical: Gates Min/Max XY checks and preference ordering.\n"
-		                  "Notes: Drives EditCondition for XY distance fields; disabling ignores XY rules."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Enables world-space (XY) distance filtering from the player HQ.
+Technical: Gates Min/Max XY checks and preference ordering.
+Notes: Drives EditCondition for XY distance fields; disabling ignores XY rules.)"))
 	bool bUseXYDistanceFromHQ = false;
 
 	/**
@@ -82,10 +82,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
 		meta = (EditCondition = "bUseXYDistanceFromHQ",
-		        ToolTip = "Used in: MissionsPlaced when bUseXYDistanceFromHQ is true.\n"
-		                  "Why: Enforces a minimum world-space radius from the HQ.\n"
-		                  "Technical: Hard filter against XY distance from PlayerHQAnchor.\n"
-		                  "Notes: Must be <= MaxXYDistanceFromHQ; ignored when XY distance is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseXYDistanceFromHQ is true.
+Why: Enforces a minimum world-space radius from the HQ.
+Technical: Hard filter against XY distance from PlayerHQAnchor.
+Notes: Must be <= MaxXYDistanceFromHQ; ignored when XY distance is disabled.)"))
 	float MinXYDistanceFromHQ = 0.f;
 
 	/**
@@ -94,10 +94,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
 		meta = (EditCondition = "bUseXYDistanceFromHQ",
-		        ToolTip = "Used in: MissionsPlaced when bUseXYDistanceFromHQ is true.\n"
-		                  "Why: Caps world-space distance so missions stay within a desired ring.\n"
-		                  "Technical: Hard filter against XY distance from PlayerHQAnchor.\n"
-		                  "Notes: Must be >= MinXYDistanceFromHQ; ignored when XY distance is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseXYDistanceFromHQ is true.
+Why: Caps world-space distance so missions stay within a desired ring.
+Technical: Hard filter against XY distance from PlayerHQAnchor.
+Notes: Must be >= MinXYDistanceFromHQ; ignored when XY distance is disabled.)"))
 	float MaxXYDistanceFromHQ = 0.f;
 
 	/**
@@ -106,10 +106,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance|HQ",
 		meta = (EditCondition = "bUseXYDistanceFromHQ",
-		        ToolTip = "Used in: MissionsPlaced when bUseXYDistanceFromHQ is true.\n"
-		                  "Why: Biases mission anchors toward near or far XY distances from the HQ.\n"
-		                  "Technical: Soft preference applied in candidate ordering; does not bypass Min/Max XY bounds.\n"
-		                  "Notes: Deterministic ordering also uses anchor keys and attempt index."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseXYDistanceFromHQ is true.
+Why: Biases mission anchors toward near or far XY distances from the HQ.
+Technical: Soft preference applied in candidate ordering; does not bypass Min/Max XY bounds.
+Notes: Deterministic ordering also uses anchor keys and attempt index.)"))
 	ETopologySearchStrategy XYDistancePreference = ETopologySearchStrategy::NotSet;
 
 	/**
@@ -117,10 +117,10 @@ struct FMissionTierRules
 	 * Example: Enable this to prevent two Tier2 missions from appearing adjacent.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Enables hop-based spacing constraints between missions of this tier.\n"
-		                  "Technical: Gates Min/Max mission hop spacing filters.\n"
-		                  "Notes: Drives EditCondition for hop spacing fields; disabling ignores hop spacing."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Enables hop-based spacing constraints between missions of this tier.
+Technical: Gates Min/Max mission hop spacing filters.
+Notes: Drives EditCondition for hop spacing fields; disabling ignores hop spacing.)"))
 	bool bUseMissionSpacingHops = false;
 
 	/**
@@ -129,10 +129,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
 		meta = (EditCondition = "bUseMissionSpacingHops",
-		        ToolTip = "Used in: MissionsPlaced when bUseMissionSpacingHops is true.\n"
-		                  "Why: Enforces a minimum hop separation between missions of this tier.\n"
-		                  "Technical: Hard filter against hop distances between already placed missions.\n"
-		                  "Notes: Must be <= MaxMissionSpacingHops; ignored when hop spacing is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseMissionSpacingHops is true.
+Why: Enforces a minimum hop separation between missions of this tier.
+Technical: Hard filter against hop distances between already placed missions.
+Notes: Must be <= MaxMissionSpacingHops; ignored when hop spacing is disabled.)"))
 	int32 MinMissionSpacingHops = 0;
 
 	/**
@@ -141,10 +141,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
 		meta = (EditCondition = "bUseMissionSpacingHops",
-		        ToolTip = "Used in: MissionsPlaced when bUseMissionSpacingHops is true.\n"
-		                  "Why: Caps how far apart missions of this tier are allowed to be.\n"
-		                  "Technical: Hard maximum hop spacing filter against placed missions.\n"
-		                  "Notes: Must be >= MinMissionSpacingHops; ignored when hop spacing is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseMissionSpacingHops is true.
+Why: Caps how far apart missions of this tier are allowed to be.
+Technical: Hard maximum hop spacing filter against placed missions.
+Notes: Must be >= MinMissionSpacingHops; ignored when hop spacing is disabled.)"))
 	int32 MaxMissionSpacingHops = 0;
 
 	/**
@@ -153,10 +153,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
 		meta = (EditCondition = "bUseMissionSpacingHops",
-		        ToolTip = "Used in: MissionsPlaced when bUseMissionSpacingHops is true.\n"
-		                  "Why: Biases candidate selection toward larger or smaller hop spacing.\n"
-		                  "Technical: Soft preference applied during candidate ordering; does not bypass Min/Max.\n"
-		                  "Notes: Deterministic ordering also uses anchor keys and attempt index."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseMissionSpacingHops is true.
+Why: Biases candidate selection toward larger or smaller hop spacing.
+Technical: Soft preference applied during candidate ordering; does not bypass Min/Max.
+Notes: Deterministic ordering also uses anchor keys and attempt index.)"))
 	ETopologySearchStrategy MissionSpacingHopsPreference = ETopologySearchStrategy::NotSet;
 
 	/**
@@ -164,10 +164,10 @@ struct FMissionTierRules
 	 * Example: Enable this when visual spacing on the world map is more important than graph hops.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Enables world-space spacing rules between missions of this tier.\n"
-		                  "Technical: Gates Min/Max XY spacing filters.\n"
-		                  "Notes: Drives EditCondition for XY spacing fields; disabling ignores XY spacing."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Enables world-space spacing rules between missions of this tier.
+Technical: Gates Min/Max XY spacing filters.
+Notes: Drives EditCondition for XY spacing fields; disabling ignores XY spacing.)"))
 	bool bUseMissionSpacingXY = false;
 
 	/**
@@ -176,10 +176,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
 		meta = (EditCondition = "bUseMissionSpacingXY",
-		        ToolTip = "Used in: MissionsPlaced when bUseMissionSpacingXY is true.\n"
-		                  "Why: Enforces a minimum world-space separation between missions of this tier.\n"
-		                  "Technical: Hard filter against XY distance between missions.\n"
-		                  "Notes: Must be <= MaxMissionSpacingXY; ignored when XY spacing is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseMissionSpacingXY is true.
+Why: Enforces a minimum world-space separation between missions of this tier.
+Technical: Hard filter against XY distance between missions.
+Notes: Must be <= MaxMissionSpacingXY; ignored when XY spacing is disabled.)"))
 	float MinMissionSpacingXY = 0.f;
 
 	/**
@@ -188,10 +188,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
 		meta = (EditCondition = "bUseMissionSpacingXY",
-		        ToolTip = "Used in: MissionsPlaced when bUseMissionSpacingXY is true.\n"
-		                  "Why: Caps how far apart missions of this tier can be in world space.\n"
-		                  "Technical: Hard maximum XY spacing filter against placed missions.\n"
-		                  "Notes: Must be >= MinMissionSpacingXY; ignored when XY spacing is disabled."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseMissionSpacingXY is true.
+Why: Caps how far apart missions of this tier can be in world space.
+Technical: Hard maximum XY spacing filter against placed missions.
+Notes: Must be >= MinMissionSpacingXY; ignored when XY spacing is disabled.)"))
 	float MaxMissionSpacingXY = 0.f;
 
 	/**
@@ -200,10 +200,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing|Missions",
 		meta = (EditCondition = "bUseMissionSpacingXY",
-		        ToolTip = "Used in: MissionsPlaced when bUseMissionSpacingXY is true.\n"
-		                  "Why: Biases candidates toward tighter or looser XY spacing.\n"
-		                  "Technical: Soft preference applied in candidate ordering; does not bypass Min/Max.\n"
-		                  "Notes: Deterministic ordering also uses anchor keys and attempt index."))
+		        ToolTip = R"(Used in: MissionsPlaced when bUseMissionSpacingXY is true.
+Why: Biases candidates toward tighter or looser XY spacing.
+Technical: Soft preference applied in candidate ordering; does not bypass Min/Max.
+Notes: Deterministic ordering also uses anchor keys and attempt index.)"))
 	ETopologySearchStrategy MissionSpacingXYPreference = ETopologySearchStrategy::NotSet;
 
 	/**
@@ -211,10 +211,10 @@ struct FMissionTierRules
 	 * Example: Raise this so missions appear on well-connected nodes to create branching routes.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Topology",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Ensures missions appear on sufficiently connected nodes for routing options.\n"
-		                  "Technical: Hard minimum connection degree filter using cached degrees.\n"
-		                  "Notes: Must be <= MaxConnections; too high can eliminate all mission candidates."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Ensures missions appear on sufficiently connected nodes for routing options.
+Technical: Hard minimum connection degree filter using cached degrees.
+Notes: Must be <= MaxConnections; too high can eliminate all mission candidates.)"))
 	int32 MinConnections = 0;
 
 	/**
@@ -222,10 +222,10 @@ struct FMissionTierRules
 	 * Example: Lower this if you want missions to appear on quieter side nodes.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Topology",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Prevents missions from clustering exclusively on high-traffic hubs.\n"
-		                  "Technical: Hard maximum connection degree filter using cached degrees.\n"
-		                  "Notes: Must be >= MinConnections; too low can block mission placement."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Prevents missions from clustering exclusively on high-traffic hubs.
+Technical: Hard maximum connection degree filter using cached degrees.
+Notes: Must be >= MinConnections; too low can block mission placement.)"))
 	int32 MaxConnections = 0;
 
 	/**
@@ -233,10 +233,10 @@ struct FMissionTierRules
 	 * Example: PreferMax to bias missions toward high-traffic hubs.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Topology",
-		meta = (ToolTip = "Used in: MissionsPlaced candidate ordering.\n"
-		                  "Why: Biases selection toward lower or higher connection degrees.\n"
-		                  "Technical: Soft preference used for sorting; does not bypass Min/Max constraints.\n"
-		                  "Notes: Deterministic ordering also uses anchor keys and attempt index."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced candidate ordering.
+Why: Biases selection toward lower or higher connection degrees.
+Technical: Soft preference used for sorting; does not bypass Min/Max constraints.
+Notes: Deterministic ordering also uses anchor keys and attempt index.)"))
 	ETopologySearchStrategy ConnectionPreference = ETopologySearchStrategy::NotSet;
 
 	/**
@@ -244,10 +244,10 @@ struct FMissionTierRules
 	 * Example: Enable this for scavenging missions that must sit on top of a resource node.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Neutral Item",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Allows missions to be bound to existing neutral items for thematic placement.\n"
-		                  "Technical: Gates RequiredNeutralItemType checks against NeutralItemsByAnchorKey.\n"
-		                  "Notes: Drives EditCondition; disabling ignores neutral item requirements."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Allows missions to be bound to existing neutral items for thematic placement.
+Technical: Gates RequiredNeutralItemType checks against NeutralItemsByAnchorKey.
+Notes: Drives EditCondition; disabling ignores neutral item requirements.)"))
 	bool bNeutralItemRequired = false;
 
 	/**
@@ -256,10 +256,10 @@ struct FMissionTierRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Neutral Item",
 		meta = (EditCondition = "bNeutralItemRequired",
-		        ToolTip = "Used in: MissionsPlaced when bNeutralItemRequired is true.\n"
-		                  "Why: Forces mission placement on anchors that already host a specific neutral item.\n"
-		                  "Technical: Hard filter against NeutralItemsByAnchorKey values.\n"
-		                  "Notes: Ignored when bNeutralItemRequired is false; can heavily restrict candidates."))
+		        ToolTip = R"(Used in: MissionsPlaced when bNeutralItemRequired is true.
+Why: Forces mission placement on anchors that already host a specific neutral item.
+Technical: Hard filter against NeutralItemsByAnchorKey values.
+Notes: Ignored when bNeutralItemRequired is false; can heavily restrict candidates.)"))
 	EMapNeutralObjectType RequiredNeutralItemType = EMapNeutralObjectType::None;
 
 	/**
@@ -267,10 +267,10 @@ struct FMissionTierRules
 	 * Example: Configure this to demand a nearby NeutralItem before allowing mission placement.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Adjacency",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Enforces adjacency requirements beyond simple distance checks.\n"
-		                  "Technical: Applied as a hard filter against nearby object types.\n"
-		                  "Notes: Can gate placement entirely if adjacency requirements are unmet."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Enforces adjacency requirements beyond simple distance checks.
+Technical: Applied as a hard filter against nearby object types.
+Notes: Can gate placement entirely if adjacency requirements are unmet.)"))
 	FMapObjectAdjacencyRequirement AdjacencyRequirement;
 };
 
@@ -288,10 +288,10 @@ struct FPerMissionRules
 	 * Example: Assign Tier3 to a late-game mission so it inherits deeper placement distances.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Maps this mission to a tier so it inherits the tier rules by default.\n"
-		                  "Technical: Used to look up FMissionTierRules from RulesByTier.\n"
-		                  "Notes: If Tier is NotSet and no override is provided, placement may fail."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Maps this mission to a tier so it inherits the tier rules by default.
+Technical: Used to look up FMissionTierRules from RulesByTier.
+Notes: If Tier is NotSet and no override is provided, placement may fail.)"))
 	EMissionTier Tier = EMissionTier::NotSet;
 
 	/**
@@ -299,10 +299,10 @@ struct FPerMissionRules
 	 * Example: Enable this to place a story-critical mission closer than its tier would allow.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Allows a specific mission to deviate from its tier rules.\n"
-		                  "Technical: When true, OverrideRules replace tier rules for this mission.\n"
-		                  "Notes: Drives EditCondition for OverrideRules; disabling hides the override field."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Allows a specific mission to deviate from its tier rules.
+Technical: When true, OverrideRules replace tier rules for this mission.
+Notes: Drives EditCondition for OverrideRules; disabling hides the override field.)"))
 	bool bOverrideTierRules = false;
 
 	/**
@@ -311,10 +311,10 @@ struct FPerMissionRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission",
 		meta = (EditCondition = "bOverrideTierRules",
-		        ToolTip = "Used in: MissionsPlaced when bOverrideTierRules is true.\n"
-		                  "Why: Defines the mission-specific rules that replace tier defaults.\n"
-		                  "Technical: Applied as hard/soft constraints for this mission only.\n"
-		                  "Notes: Ignored when bOverrideTierRules is false."))
+		        ToolTip = R"(Used in: MissionsPlaced when bOverrideTierRules is true.
+Why: Defines the mission-specific rules that replace tier defaults.
+Technical: Applied as hard/soft constraints for this mission only.
+Notes: Ignored when bOverrideTierRules is false.)"))
 	FMissionTierRules OverrideRules;
 };
 
@@ -332,10 +332,10 @@ struct FMissionPlacement
 	 * Example: Tighten Tier1 distances while expanding Tier4 to push late missions to the outskirts.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Missions",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Establishes baseline rules for each mission tier.\n"
-		                  "Technical: Looked up by EMissionTier and applied unless overridden per mission.\n"
-		                  "Notes: Missing tiers can cause placements to fail if referenced by a mission."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Establishes baseline rules for each mission tier.
+Technical: Looked up by EMissionTier and applied unless overridden per mission.
+Notes: Missing tiers can cause placements to fail if referenced by a mission.)"))
 	TMap<EMissionTier, FMissionTierRules> RulesByTier;
 
 	/**
@@ -343,9 +343,9 @@ struct FMissionPlacement
 	 * Example: Override a single mission to require a nearby neutral item even if the tier does not.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Missions",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Allows specific missions to override their tier's baseline rules.\n"
-		                  "Technical: Looked up by EMapMission; overrides apply before placement filtering.\n"
-		                  "Notes: Only missions present in this map receive overrides; others use tier rules."))
+		meta = (ToolTip = R"(Used in: MissionsPlaced.
+Why: Allows specific missions to override their tier's baseline rules.
+Technical: Looked up by EMapMission; overrides apply before placement filtering.
+Notes: Only missions present in this map receive overrides; others use tier rules.)"))
 	TMap<EMapMission, FPerMissionRules> RulesByMission;
 };
