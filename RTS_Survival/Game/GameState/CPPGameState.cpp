@@ -567,6 +567,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
 	using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
 	using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
+	using namespace DeveloperSettings::GameBalance::Weapons::LaserWeapons;
 
 
 	// Range Settings.
@@ -582,7 +583,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
 	WeaponData.WeaponCalibre = 50.f;
 	WeaponData.TNTExplosiveGrams = 0;
-	WeaponData.BaseDamage = 20;
+	WeaponData.BaseDamage = Strahlkanone39BaseDamage * LaserWeaponDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumLaserWeaponRange;
 	WeaponData.ArmorPen = 0;
@@ -605,7 +606,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
 	WeaponData.WeaponCalibre = 30.f;
 	WeaponData.TNTExplosiveGrams = 0;
-	WeaponData.BaseDamage = 8;
+	WeaponData.BaseDamage = LB14BaseDamage * LaserWeaponDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumLaserWeaponRange;
 	WeaponData.ArmorPen = 0;
@@ -629,7 +630,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
 	WeaponData.WeaponCalibre = 30.f;
 	WeaponData.TNTExplosiveGrams = 0;
-	WeaponData.BaseDamage = 8;
+	WeaponData.BaseDamage = SpektrVBaseDamage * LaserWeaponDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumLaserWeaponRange;
 	WeaponData.ArmorPen = 0;
@@ -652,7 +653,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
 	WeaponData.WeaponCalibre = 30.f;
 	WeaponData.TNTExplosiveGrams = 0;
-	WeaponData.BaseDamage = 8;
+	WeaponData.BaseDamage = LightStormBaseDamage * LaserWeaponDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumLaserWeaponRange;
 	WeaponData.ArmorPen = 0;
@@ -669,8 +670,32 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ProjectileMovementSpeed = 0;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::LightStorm, WeaponData);
 
-	const int32 LuchBaseDamage = 24;
-	const int32 ZaryaBaseDamage = 35;
+	const float T34LuchDamage = Luch50LBaseDamage * LaserWeaponDamageMlt;
+	const float LuchDamage = Luch85LBaseDamage * LaserWeaponDamageMlt;
+	const float ZaryaDamage = Zarya100LBaseDamage * LaserWeaponDamageMlt;
+
+	WeaponData.WeaponName = EWeaponName::Luch_50L;
+	WeaponData.DamageType = ERTSDamageType::Laser;
+	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
+	WeaponData.WeaponCalibre = 50.f;
+	WeaponData.TNTExplosiveGrams = 0;
+	WeaponData.BaseDamage = T34LuchDamage;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumLaserWeaponRange;
+	WeaponData.ArmorPen = 0;
+	WeaponData.ArmorPenMaxRange = 0;
+	WeaponData.MagCapacity = 3;
+	WeaponData.ReloadSpeed = 5;
+	WeaponData.BaseCooldown = 0.25;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 100;
+	WeaponData.ShrapnelRange = 0;
+	WeaponData.ShrapnelDamage = 0;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0;
+	WeaponData.ProjectileMovementSpeed = 0;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Luch_50L, WeaponData);
 
 	WeaponData.WeaponName = EWeaponName::Luch_85L;
 	WeaponData.DamageType = ERTSDamageType::Laser;
@@ -678,7 +703,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
 	WeaponData.WeaponCalibre = 85.f;
 	WeaponData.TNTExplosiveGrams = 0;
-	WeaponData.BaseDamage = LuchBaseDamage;
+	WeaponData.BaseDamage = LuchDamage;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumLaserWeaponRange;
 	WeaponData.ArmorPen = 0;
@@ -701,7 +726,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
 	WeaponData.WeaponCalibre = 100.f;
 	WeaponData.TNTExplosiveGrams = 0;
-	WeaponData.BaseDamage = ZaryaBaseDamage;
+	WeaponData.BaseDamage = ZaryaDamage;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumLaserWeaponRange;
 	WeaponData.ArmorPen = 0;
@@ -4305,6 +4330,31 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceWorth = BaseMediumTankExp;
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_76, TankData);
+
+	// T-34/76L
+	{
+		const int32 T34_76_L_RadixiteCostOffset = 25;
+		const int32 T34_76_L_VehiclePartsCostOffset = 120;
+		const float T34_76_L_ExpWorthMlt = 1.1f;
+
+		TankData.MaxHealth = MediumTankHealthBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 49;
+		TankData.TurretRotationSpeed = 25;
+		TankData.VehicleMaxSpeedKmh = 26;
+		TankData.VehicleReverseSpeedKmh = 18;
+		TankData.VisionRadius = T2TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + T34_76_L_RadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + T34_76_L_VehiclePartsCostOffset}
+		});
+		TankData.Abilities = BasicTankAbilities;
+		TankData.ExperienceLevels = GetMediumTankExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseMediumTankExp * T34_76_L_ExpWorthMlt, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_76_L, TankData);
+	}
 
 	// T-34E
 	TankData.MaxHealth = MediumTankHealthBase;

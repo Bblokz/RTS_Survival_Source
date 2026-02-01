@@ -170,6 +170,7 @@ enum class
 	// Russian laser weapons
 	// infantry held
 	SPEKTR_V UMETA(DisplayName = "Spektr V 30MM (Infantry Laser Weapon)"),
+	Luch_50L UMETA(DisplayName = "Luch 50L (T-34/76L Laser)"),
 	Luch_85L UMETA(DisplayName = "Luch 85L (SU-85 Laser)"),
 	Zarya_100L UMETA(DisplayName = "Zarya 100L (T-44 Laser)"),
 
@@ -218,6 +219,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Flak37_88MM: return "Flak 37";
 	case EWeaponName::Flak38_20MM: return "Flak 38";
 	case EWeaponName::SPEKTR_V: return "Spektr-V";
+	case EWeaponName::Luch_50L: return "Luch 50L";
 	case EWeaponName::Luch_85L: return "Luch 85L";
 	case EWeaponName::Zarya_100L: return "Zarya 100L";
 	case EWeaponName::KwK30_20MM: return "KwK 30";
@@ -534,6 +536,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "KwK40_L48_75MM";
 	case EWeaponName::Ger_TankMG_7_6MM:
 		return "Ger_TankMG_7_6MM";
+	case EWeaponName::Luch_50L:
+		return "Luch_50L";
 	case EWeaponName::Luch_85L:
 		return "Luch_85L";
 	case EWeaponName::Zarya_100L:
