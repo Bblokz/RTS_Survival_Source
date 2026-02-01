@@ -35,8 +35,9 @@ namespace
 	constexpr int32 NoRequiredItems = 0;
 
 	TArray<FAnchorCandidate> BuildAndSortCandidates(AAnchorPoint* AnchorPoint,
-		const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints, const int32 MaxConnections,
-		const float MaxPreferredDistance, const bool bIgnoreDistance)
+	                                                const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
+	                                                const int32 MaxConnections,
+	                                                const float MaxPreferredDistance, const bool bIgnoreDistance)
 	{
 		TArray<FAnchorCandidate> Candidates;
 		if (not IsValid(AnchorPoint))
@@ -94,7 +95,7 @@ namespace
 	}
 
 	FClosestConnectionCandidate FindClosestConnectionCandidate(AAnchorPoint* AnchorPoint,
-		const TArray<TObjectPtr<AConnection>>& Connections)
+	                                                           const TArray<TObjectPtr<AConnection>>& Connections)
 	{
 		FClosestConnectionCandidate Result;
 		if (not IsValid(AnchorPoint))
@@ -226,7 +227,7 @@ namespace
 	}
 
 	void BuildBacktrackEscalationSteps(ECampaignGenerationStep FailedStep,
-		TArray<ECampaignGenerationStep>& OutSteps)
+	                                   TArray<ECampaignGenerationStep>& OutSteps)
 	{
 		OutSteps.Reset();
 		if (FailedStep == ECampaignGenerationStep::MissionsPlaced)
@@ -284,7 +285,7 @@ namespace
 	}
 
 	bool DoSegmentsIntersect(const FVector2D& SegmentAStart, const FVector2D& SegmentAEnd,
-		const FVector2D& SegmentBStart, const FVector2D& SegmentBEnd)
+	                         const FVector2D& SegmentBStart, const FVector2D& SegmentBEnd)
 	{
 		const float Orientation1 = CalculateOrientation(SegmentAStart, SegmentAEnd, SegmentBStart);
 		const float Orientation2 = CalculateOrientation(SegmentAStart, SegmentAEnd, SegmentBEnd);
@@ -335,7 +336,7 @@ void AGeneratorWorldCampaign::CreateConnectionsStep()
 	}
 
 	ExecuteStepWithTransaction(ECampaignGenerationStep::ConnectionsCreated,
-		&AGeneratorWorldCampaign::ExecuteCreateConnections);
+	                           &AGeneratorWorldCampaign::ExecuteCreateConnections);
 }
 
 void AGeneratorWorldCampaign::PlaceHQStep()
@@ -369,7 +370,7 @@ void AGeneratorWorldCampaign::PlaceEnemyObjectsStep()
 	}
 
 	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyObjectsPlaced,
-		&AGeneratorWorldCampaign::ExecutePlaceEnemyObjects);
+	                           &AGeneratorWorldCampaign::ExecutePlaceEnemyObjects);
 }
 
 void AGeneratorWorldCampaign::PlaceNeutralObjectsStep()
@@ -381,7 +382,7 @@ void AGeneratorWorldCampaign::PlaceNeutralObjectsStep()
 	}
 
 	ExecuteStepWithTransaction(ECampaignGenerationStep::NeutralObjectsPlaced,
-		&AGeneratorWorldCampaign::ExecutePlaceNeutralObjects);
+	                           &AGeneratorWorldCampaign::ExecutePlaceNeutralObjects);
 }
 
 void AGeneratorWorldCampaign::PlaceMissionsStep()
@@ -453,30 +454,33 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 
 bool AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor() const
 {
-	if (M_PlacementState.PlayerHQAnchor.IsValid())
+	if (IsValid(M_PlacementState.PlayerHQAnchor))
 	{
 		return true;
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.PlayerHQAnchor"),
-		TEXT("AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor"), this);
+	                                                      TEXT("AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor"),
+	                                                      this);
 	return false;
 }
 
 bool AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor() const
 {
-	if (M_PlacementState.EnemyHQAnchor.IsValid())
+	if (IsValid(M_PlacementState.EnemyHQAnchor))
 	{
 		return true;
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.EnemyHQAnchor"),
-		TEXT("AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor"), this);
+	                                                      TEXT("AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor"),
+	                                                      this);
 	return false;
 }
 
 bool AGeneratorWorldCampaign::ExecuteStepWithTransaction(ECampaignGenerationStep CompletedStep,
-	bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&))
+                                                         bool (AGeneratorWorldCampaign::*StepFunction)(
+	                                                         FCampaignGenerationStepTransaction&))
 {
 	if (not CanExecuteStep(CompletedStep))
 	{
@@ -488,7 +492,7 @@ bool AGeneratorWorldCampaign::ExecuteStepWithTransaction(ECampaignGenerationStep
 	Transaction.PreviousPlacementState = M_PlacementState;
 	Transaction.PreviousDerivedData = M_DerivedData;
 
-	if (not (this->*StepFunction)(Transaction))
+	if (not(this->*StepFunction)(Transaction))
 	{
 		return false;
 	}
@@ -569,7 +573,9 @@ bool AGeneratorWorldCampaign::PrepareAnchorsForConnectionGeneration(TArray<TObje
 }
 
 void AGeneratorWorldCampaign::GenerateConnectionsForAnchors(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-	FRandomStream& RandomStream, TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections)
+                                                            FRandomStream& RandomStream,
+                                                            TMap<TObjectPtr<AAnchorPoint>, int32>&
+                                                            OutDesiredConnections)
 {
 	AssignDesiredConnections(AnchorPoints, RandomStream, OutDesiredConnections);
 
@@ -645,12 +651,12 @@ bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction&
 
 	constexpr int32 MaxAnchorDegreeUnlimited = TNumericLimits<int32>::Max();
 	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = M_PlayerHQPlacementRules.AnchorCandidates.Num() > 0
-		? M_PlayerHQPlacementRules.AnchorCandidates
-		: M_PlacementState.CachedAnchors;
+		                                                          ? M_PlayerHQPlacementRules.AnchorCandidates
+		                                                          : M_PlacementState.CachedAnchors;
 
 	TArray<TObjectPtr<AAnchorPoint>> Candidates;
 	if (not BuildHQAnchorCandidates(CandidateSource, M_PlayerHQPlacementRules.MinAnchorDegreeForHQ,
-		MaxAnchorDegreeUnlimited, nullptr, Candidates))
+	                                MaxAnchorDegreeUnlimited, nullptr, Candidates))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: no valid anchor candidates found."));
 		return false;
@@ -692,14 +698,14 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 
 	constexpr int32 MinAnchorDegreeFloor = 0;
 	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = M_EnemyHQPlacementRules.AnchorCandidates.Num() > 0
-		? M_EnemyHQPlacementRules.AnchorCandidates
-		: M_PlacementState.CachedAnchors;
+		                                                          ? M_EnemyHQPlacementRules.AnchorCandidates
+		                                                          : M_PlacementState.CachedAnchors;
 
 	TArray<TObjectPtr<AAnchorPoint>> Candidates;
 	const int32 MinAnchorDegree = FMath::Max(MinAnchorDegreeFloor, M_EnemyHQPlacementRules.MinAnchorDegree);
 	const int32 MaxAnchorDegree = FMath::Max(MinAnchorDegree, M_EnemyHQPlacementRules.MaxAnchorDegree);
 	if (not BuildHQAnchorCandidates(CandidateSource, MinAnchorDegree, MaxAnchorDegree,
-		M_PlacementState.PlayerHQAnchor.Get(), Candidates))
+	                                M_PlacementState.PlayerHQAnchor.Get(), Candidates))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: no valid anchor candidates found."));
 		return false;
@@ -903,35 +909,35 @@ EPlacementFailurePolicy AGeneratorWorldCampaign::GetFailurePolicyForStep(ECampai
 	{
 	case ECampaignGenerationStep::ConnectionsCreated:
 		return M_PlacementFailurePolicy.CreateConnectionsPolicy != EPlacementFailurePolicy::NotSet
-			? M_PlacementFailurePolicy.CreateConnectionsPolicy
-			: GlobalPolicy;
+			       ? M_PlacementFailurePolicy.CreateConnectionsPolicy
+			       : GlobalPolicy;
 	case ECampaignGenerationStep::PlayerHQPlaced:
 		return M_PlacementFailurePolicy.PlaceHQPolicy != EPlacementFailurePolicy::NotSet
-			? M_PlacementFailurePolicy.PlaceHQPolicy
-			: GlobalPolicy;
+			       ? M_PlacementFailurePolicy.PlaceHQPolicy
+			       : GlobalPolicy;
 	case ECampaignGenerationStep::EnemyHQPlaced:
 		return M_PlacementFailurePolicy.PlaceEnemyHQPolicy != EPlacementFailurePolicy::NotSet
-			? M_PlacementFailurePolicy.PlaceEnemyHQPolicy
-			: GlobalPolicy;
+			       ? M_PlacementFailurePolicy.PlaceEnemyHQPolicy
+			       : GlobalPolicy;
 	case ECampaignGenerationStep::EnemyObjectsPlaced:
 		return M_PlacementFailurePolicy.PlaceEnemyObjectsPolicy != EPlacementFailurePolicy::NotSet
-			? M_PlacementFailurePolicy.PlaceEnemyObjectsPolicy
-			: GlobalPolicy;
+			       ? M_PlacementFailurePolicy.PlaceEnemyObjectsPolicy
+			       : GlobalPolicy;
 	case ECampaignGenerationStep::NeutralObjectsPlaced:
 		return M_PlacementFailurePolicy.PlaceNeutralObjectsPolicy != EPlacementFailurePolicy::NotSet
-			? M_PlacementFailurePolicy.PlaceNeutralObjectsPolicy
-			: GlobalPolicy;
+			       ? M_PlacementFailurePolicy.PlaceNeutralObjectsPolicy
+			       : GlobalPolicy;
 	case ECampaignGenerationStep::MissionsPlaced:
 		return M_PlacementFailurePolicy.PlaceMissionsPolicy != EPlacementFailurePolicy::NotSet
-			? M_PlacementFailurePolicy.PlaceMissionsPolicy
-			: GlobalPolicy;
+			       ? M_PlacementFailurePolicy.PlaceMissionsPolicy
+			       : GlobalPolicy;
 	default:
 		return GlobalPolicy;
 	}
 }
 
 bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedStep, int32& InOutStepIndex,
-	const TArray<ECampaignGenerationStep>& StepOrder)
+                                                const TArray<ECampaignGenerationStep>& StepOrder)
 {
 	IncrementStepAttempt(FailedStep);
 	M_TotalAttemptCount++;
@@ -1060,12 +1066,12 @@ void AGeneratorWorldCampaign::CacheAnchorConnectionDegrees()
 		}
 
 		M_DerivedData.AnchorConnectionDegreesByAnchorKey.Add(AnchorPoint->GetAnchorKey(),
-			AnchorPoint->GetConnectionCount());
+		                                                     AnchorPoint->GetConnectionCount());
 	}
 }
 
 void AGeneratorWorldCampaign::DebugNotifyAnchorPicked(const AAnchorPoint* AnchorPoint, const FString& Label,
-	const FColor& Color) const
+                                                      const FColor& Color) const
 {
 	if (not IsValid(AnchorPoint))
 	{
@@ -1125,8 +1131,9 @@ bool AGeneratorWorldCampaign::IsAnchorCached(const AAnchorPoint* AnchorPoint) co
 }
 
 bool AGeneratorWorldCampaign::BuildHQAnchorCandidates(const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource,
-	int32 MinDegree, int32 MaxDegree, const AAnchorPoint* AnchorToExclude,
-	TArray<TObjectPtr<AAnchorPoint>>& OutCandidates) const
+                                                      int32 MinDegree, int32 MaxDegree,
+                                                      const AAnchorPoint* AnchorToExclude,
+                                                      TArray<TObjectPtr<AAnchorPoint>>& OutCandidates) const
 {
 	OutCandidates.Reset();
 	OutCandidates.Reserve(CandidateSource.Num());
@@ -1180,7 +1187,8 @@ bool AGeneratorWorldCampaign::BuildHQAnchorCandidates(const TArray<TObjectPtr<AA
 	return true;
 }
 
-AAnchorPoint* AGeneratorWorldCampaign::SelectAnchorCandidateByAttempt(const TArray<TObjectPtr<AAnchorPoint>>& Candidates,
+AAnchorPoint* AGeneratorWorldCampaign::SelectAnchorCandidateByAttempt(
+	const TArray<TObjectPtr<AAnchorPoint>>& Candidates,
 	int32 AttemptIndex) const
 {
 	if (Candidates.Num() == 0)
@@ -1193,15 +1201,17 @@ AAnchorPoint* AGeneratorWorldCampaign::SelectAnchorCandidateByAttempt(const TArr
 }
 
 bool AGeneratorWorldCampaign::HasSharedEndpoint(const FConnectionSegment& Segment, const AAnchorPoint* AnchorA,
-	const AAnchorPoint* AnchorB) const
+                                                const AAnchorPoint* AnchorB) const
 {
 	return Segment.StartAnchor.Get() == AnchorA || Segment.EndAnchor.Get() == AnchorA
 		|| Segment.StartAnchor.Get() == AnchorB || Segment.EndAnchor.Get() == AnchorB;
 }
 
 bool AGeneratorWorldCampaign::IsSegmentIntersectingExisting(const FVector2D& StartPoint, const FVector2D& EndPoint,
-	const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor,
-	const TArray<FConnectionSegment>& ExistingSegments, const AConnection* ConnectionToIgnore) const
+                                                            const AAnchorPoint* StartAnchor,
+                                                            const AAnchorPoint* EndAnchor,
+                                                            const TArray<FConnectionSegment>& ExistingSegments,
+                                                            const AConnection* ConnectionToIgnore) const
 {
 	for (const FConnectionSegment& Segment : ExistingSegments)
 	{
@@ -1268,7 +1278,9 @@ void AGeneratorWorldCampaign::GatherAnchorPoints(TArray<TObjectPtr<AAnchorPoint>
 }
 
 void AGeneratorWorldCampaign::AssignDesiredConnections(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-	FRandomStream& RandomStream, TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections) const
+                                                       FRandomStream& RandomStream,
+                                                       TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections)
+const
 {
 	OutDesiredConnections.Reset();
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
@@ -1279,15 +1291,16 @@ void AGeneratorWorldCampaign::AssignDesiredConnections(const TArray<TObjectPtr<A
 		}
 
 		const int32 DesiredConnections = RandomStream.RandRange(ConnectionGenerationRules.MinConnections,
-			ConnectionGenerationRules.MaxConnections);
+		                                                        ConnectionGenerationRules.MaxConnections);
 		OutDesiredConnections.Add(AnchorPoint, DesiredConnections);
 	}
 }
 
 void AGeneratorWorldCampaign::GeneratePhasePreferredConnections(AAnchorPoint* AnchorPoint,
-	const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-	const TMap<TObjectPtr<AAnchorPoint>, int32>& DesiredConnections,
-	TArray<FConnectionSegment>& ExistingSegments)
+                                                                const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
+                                                                const TMap<TObjectPtr<AAnchorPoint>, int32>&
+                                                                DesiredConnections,
+                                                                TArray<FConnectionSegment>& ExistingSegments)
 {
 	if (not IsValid(AnchorPoint))
 	{
@@ -1295,14 +1308,17 @@ void AGeneratorWorldCampaign::GeneratePhasePreferredConnections(AAnchorPoint* An
 	}
 
 	const int32* DesiredConnectionsPtr = DesiredConnections.Find(AnchorPoint);
-	const int32 DesiredConnectionCount = DesiredConnectionsPtr ? *DesiredConnectionsPtr : ConnectionGenerationRules.MinConnections;
+	const int32 DesiredConnectionCount = DesiredConnectionsPtr
+		                                     ? *DesiredConnectionsPtr
+		                                     : ConnectionGenerationRules.MinConnections;
 	if (AnchorPoint->GetConnectionCount() >= DesiredConnectionCount)
 	{
 		return;
 	}
 
 	TArray<FAnchorCandidate> Candidates = BuildAndSortCandidates(AnchorPoint, AnchorPoints,
-		ConnectionGenerationRules.MaxConnections, ConnectionGenerationRules.MaxPreferredDistance, false);
+	                                                             ConnectionGenerationRules.MaxConnections,
+	                                                             ConnectionGenerationRules.MaxPreferredDistance, false);
 
 	const FColor RegularConnectionColor = FColor::Green;
 	for (const FAnchorCandidate& Candidate : Candidates)
@@ -1327,8 +1343,8 @@ void AGeneratorWorldCampaign::GeneratePhasePreferredConnections(AAnchorPoint* An
 }
 
 void AGeneratorWorldCampaign::GeneratePhaseExtendedConnections(AAnchorPoint* AnchorPoint,
-	const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-	TArray<FConnectionSegment>& ExistingSegments)
+                                                               const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
+                                                               TArray<FConnectionSegment>& ExistingSegments)
 {
 	if (not IsValid(AnchorPoint))
 	{
@@ -1341,7 +1357,8 @@ void AGeneratorWorldCampaign::GeneratePhaseExtendedConnections(AAnchorPoint* Anc
 	}
 
 	TArray<FAnchorCandidate> Candidates = BuildAndSortCandidates(AnchorPoint, AnchorPoints,
-		ConnectionGenerationRules.MaxConnections, ConnectionGenerationRules.MaxPreferredDistance, true);
+	                                                             ConnectionGenerationRules.MaxConnections,
+	                                                             ConnectionGenerationRules.MaxPreferredDistance, true);
 
 	const FColor ExtendedConnectionColor = FColor::Yellow;
 	for (const FAnchorCandidate& Candidate : Candidates)
@@ -1366,7 +1383,7 @@ void AGeneratorWorldCampaign::GeneratePhaseExtendedConnections(AAnchorPoint* Anc
 }
 
 void AGeneratorWorldCampaign::GeneratePhaseThreeWayConnections(AAnchorPoint* AnchorPoint,
-	TArray<FConnectionSegment>& ExistingSegments)
+                                                               TArray<FConnectionSegment>& ExistingSegments)
 {
 	if (not IsValid(AnchorPoint))
 	{
@@ -1383,7 +1400,8 @@ void AGeneratorWorldCampaign::GeneratePhaseThreeWayConnections(AAnchorPoint* Anc
 }
 
 bool AGeneratorWorldCampaign::TryCreateConnection(AAnchorPoint* AnchorPoint, AAnchorPoint* CandidateAnchor,
-	TArray<FConnectionSegment>& ExistingSegments, const FColor& DebugColor)
+                                                  TArray<FConnectionSegment>& ExistingSegments,
+                                                  const FColor& DebugColor)
 {
 	if (not IsValid(AnchorPoint))
 	{
@@ -1400,7 +1418,8 @@ bool AGeneratorWorldCampaign::TryCreateConnection(AAnchorPoint* AnchorPoint, AAn
 	const FVector2D AnchorLocation2D(AnchorLocation.X, AnchorLocation.Y);
 	const FVector2D CandidateLocation2D(CandidateLocation.X, CandidateLocation.Y);
 
-	if (not IsConnectionAllowed(AnchorPoint, CandidateAnchor, AnchorLocation2D, CandidateLocation2D, ExistingSegments, nullptr))
+	if (not IsConnectionAllowed(AnchorPoint, CandidateAnchor, AnchorLocation2D, CandidateLocation2D, ExistingSegments,
+	                            nullptr))
 	{
 		return false;
 	}
@@ -1416,8 +1435,21 @@ bool AGeneratorWorldCampaign::TryCreateConnection(AAnchorPoint* AnchorPoint, AAn
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = this;
 
-	const TSubclassOf<AConnection> ConnectionClassToSpawn = M_ConnectionClass ? M_ConnectionClass : AConnection::StaticClass();
-	AConnection* NewConnection = World->SpawnActor<AConnection>(ConnectionClassToSpawn, SpawnLocation, FRotator::ZeroRotator, SpawnParameters);
+	UClass* ConnectionClassToSpawn = nullptr;
+	if (M_ConnectionClass)
+	{
+		ConnectionClassToSpawn = *M_ConnectionClass; // UClass* from TSubclassOf
+	}
+	else
+	{
+		ConnectionClassToSpawn = AConnection::StaticClass();
+	}
+	AConnection* NewConnection = World->SpawnActor<AConnection>(
+		ConnectionClassToSpawn,
+		SpawnLocation,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	
 	if (not IsValid(NewConnection))
 	{
 		return false;
@@ -1437,8 +1469,9 @@ bool AGeneratorWorldCampaign::TryCreateConnection(AAnchorPoint* AnchorPoint, AAn
 }
 
 bool AGeneratorWorldCampaign::IsConnectionAllowed(AAnchorPoint* AnchorPoint, AAnchorPoint* CandidateAnchor,
-	const FVector2D& StartPoint, const FVector2D& EndPoint, const TArray<FConnectionSegment>& ExistingSegments,
-	const AConnection* ConnectionToIgnore) const
+                                                  const FVector2D& StartPoint, const FVector2D& EndPoint,
+                                                  const TArray<FConnectionSegment>& ExistingSegments,
+                                                  const AConnection* ConnectionToIgnore) const
 {
 	if (AnchorPoint->GetConnectionCount() >= ConnectionGenerationRules.MaxConnections)
 	{
@@ -1451,11 +1484,11 @@ bool AGeneratorWorldCampaign::IsConnectionAllowed(AAnchorPoint* AnchorPoint, AAn
 	}
 
 	return not IsSegmentIntersectingExisting(StartPoint, EndPoint, AnchorPoint, CandidateAnchor,
-		ExistingSegments, ConnectionToIgnore);
+	                                         ExistingSegments, ConnectionToIgnore);
 }
 
 bool AGeneratorWorldCampaign::TryAddThreeWayConnection(AAnchorPoint* AnchorPoint,
-	TArray<FConnectionSegment>& ExistingSegments)
+                                                       TArray<FConnectionSegment>& ExistingSegments)
 {
 	if (not IsValid(AnchorPoint))
 	{
@@ -1467,7 +1500,8 @@ bool AGeneratorWorldCampaign::TryAddThreeWayConnection(AAnchorPoint* AnchorPoint
 		return false;
 	}
 
-	const FClosestConnectionCandidate ClosestCandidate = FindClosestConnectionCandidate(AnchorPoint, M_GeneratedConnections);
+	const FClosestConnectionCandidate ClosestCandidate = FindClosestConnectionCandidate(
+		AnchorPoint, M_GeneratedConnections);
 	AConnection* ClosestConnection = ClosestCandidate.Connection.Get();
 	if (not IsValid(ClosestConnection))
 	{
@@ -1478,7 +1512,7 @@ bool AGeneratorWorldCampaign::TryAddThreeWayConnection(AAnchorPoint* AnchorPoint
 	const FVector2D AnchorLocation2D(AnchorLocation.X, AnchorLocation.Y);
 	const FVector2D JunctionLocation2D(ClosestCandidate.JunctionLocation.X, ClosestCandidate.JunctionLocation.Y);
 	if (IsSegmentIntersectingExisting(AnchorLocation2D, JunctionLocation2D, AnchorPoint, nullptr,
-		ExistingSegments, ClosestConnection))
+	                                  ExistingSegments, ClosestConnection))
 	{
 		return false;
 	}
@@ -1500,7 +1534,8 @@ bool AGeneratorWorldCampaign::TryAddThreeWayConnection(AAnchorPoint* AnchorPoint
 	return true;
 }
 
-void AGeneratorWorldCampaign::RegisterConnectionOnAnchors(AConnection* Connection, AAnchorPoint* AnchorA, AAnchorPoint* AnchorB) const
+void AGeneratorWorldCampaign::RegisterConnectionOnAnchors(AConnection* Connection, AAnchorPoint* AnchorA,
+                                                          AAnchorPoint* AnchorB) const
 {
 	if (not IsValid(Connection))
 	{
@@ -1553,8 +1588,9 @@ void AGeneratorWorldCampaign::RegisterThirdAnchorOnConnection(AConnection* Conne
 	SecondAnchor->AddConnection(Connection, ThirdAnchor);
 }
 
-void AGeneratorWorldCampaign::AddConnectionSegment(AConnection* Connection, AAnchorPoint* AnchorA, AAnchorPoint* AnchorB,
-	TArray<FConnectionSegment>& ExistingSegments) const
+void AGeneratorWorldCampaign::AddConnectionSegment(AConnection* Connection, AAnchorPoint* AnchorA,
+                                                   AAnchorPoint* AnchorB,
+                                                   TArray<FConnectionSegment>& ExistingSegments) const
 {
 	if (not IsValid(Connection))
 	{
@@ -1579,7 +1615,8 @@ void AGeneratorWorldCampaign::AddConnectionSegment(AConnection* Connection, AAnc
 }
 
 void AGeneratorWorldCampaign::AddThirdConnectionSegment(AConnection* Connection, AAnchorPoint* ThirdAnchor,
-	const FVector& JunctionLocation, TArray<FConnectionSegment>& ExistingSegments) const
+                                                        const FVector& JunctionLocation,
+                                                        TArray<FConnectionSegment>& ExistingSegments) const
 {
 	if (not IsValid(Connection))
 	{
@@ -1601,7 +1638,8 @@ void AGeneratorWorldCampaign::AddThirdConnectionSegment(AConnection* Connection,
 	ExistingSegments.Add(Segment);
 }
 
-void AGeneratorWorldCampaign::DebugNotifyAnchorProcessing(const AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const
+void AGeneratorWorldCampaign::DebugNotifyAnchorProcessing(const AAnchorPoint* AnchorPoint, const FString& Label,
+                                                          const FColor& Color) const
 {
 	if (not IsValid(AnchorPoint))
 	{

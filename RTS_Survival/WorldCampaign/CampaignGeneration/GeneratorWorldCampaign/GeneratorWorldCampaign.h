@@ -44,19 +44,19 @@ struct FWorldCampaignPlacementState
 	int32 SeedUsed = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
-	TArray<TWeakObjectPtr<AAnchorPoint>> CachedAnchors;
+	TArray<TObjectPtr<AAnchorPoint>> CachedAnchors;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
-	TArray<TWeakObjectPtr<AConnection>> CachedConnections;
+	TArray<TObjectPtr<AConnection>> CachedConnections;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
-	TWeakObjectPtr<AAnchorPoint> PlayerHQAnchor;
+	TObjectPtr<AAnchorPoint> PlayerHQAnchor;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	FGuid PlayerHQAnchorKey;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
-	TWeakObjectPtr<AAnchorPoint> EnemyHQAnchor;
+	TObjectPtr<AAnchorPoint> EnemyHQAnchor;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	FGuid EnemyHQAnchorKey;
@@ -119,6 +119,22 @@ struct FCampaignGenerationStepTransaction
 	FWorldCampaignDerivedData PreviousDerivedData;
 };
 
+// Must be in Ustruct for GC tracking.
+USTRUCT()
+struct FConnectionSegment
+{
+	GENERATED_BODY()
+
+	FVector2D StartPoint;
+	FVector2D EndPoint;
+	UPROPERTY()
+	TWeakObjectPtr<AAnchorPoint> StartAnchor;
+	UPROPERTY()
+	TWeakObjectPtr<AAnchorPoint> EndAnchor;
+	UPROPERTY()
+	TWeakObjectPtr<AConnection> OwningConnection;
+};
+
 /**
  * @brief Generator actor that can be placed on a campaign map to spawn and configure world connections.
  */
@@ -161,15 +177,6 @@ public:
 	void EraseAllGeneration();
 
 private:
-	struct FConnectionSegment
-	{
-		FVector2D StartPoint;
-		FVector2D EndPoint;
-		TWeakObjectPtr<AAnchorPoint> StartAnchor;
-		TWeakObjectPtr<AAnchorPoint> EndAnchor;
-		TWeakObjectPtr<AConnection> OwningConnection;
-	};
-
 	bool GetIsValidPlayerHQAnchor() const;
 	bool GetIsValidEnemyHQAnchor() const;
 
@@ -180,7 +187,7 @@ private:
 	 * @return true if the step executed successfully.
 	 */
 	bool ExecuteStepWithTransaction(ECampaignGenerationStep CompletedStep,
-		bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&));
+	                                bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&));
 	bool ExecuteCreateConnections(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceHQ(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceEnemyHQ(FCampaignGenerationStepTransaction& OutTransaction);
@@ -204,7 +211,7 @@ private:
 	 * @return true if backtracking can continue.
 	 */
 	bool HandleStepFailure(ECampaignGenerationStep FailedStep, int32& InOutStepIndex,
-		const TArray<ECampaignGenerationStep>& StepOrder);
+	                       const TArray<ECampaignGenerationStep>& StepOrder);
 	void UndoLastTransaction();
 	void UndoConnections(const FCampaignGenerationStepTransaction& Transaction);
 	void ClearPlacementState();
@@ -225,8 +232,9 @@ private:
 	 * @param RandomStream Stream seeded for deterministic attempts.
 	 * @param OutDesiredConnections Desired connection counts per anchor.
 	 */
-	void GenerateConnectionsForAnchors(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints, FRandomStream& RandomStream,
-		TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections);
+	void GenerateConnectionsForAnchors(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
+	                                   FRandomStream& RandomStream,
+	                                   TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections);
 
 	/**
 	 * @brief Stores derived cached data so designers can inspect intermediate results.
@@ -246,8 +254,10 @@ private:
 	 * @param OutCandidates Filtered, sorted candidates.
 	 * @return true if at least one candidate remains.
 	 */
-	bool BuildHQAnchorCandidates(const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource, int32 MinDegree, int32 MaxDegree,
-		const AAnchorPoint* AnchorToExclude, TArray<TObjectPtr<AAnchorPoint>>& OutCandidates) const;
+	bool BuildHQAnchorCandidates(const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource, int32 MinDegree,
+	                             int32 MaxDegree,
+	                             const AAnchorPoint* AnchorToExclude,
+	                             TArray<TObjectPtr<AAnchorPoint>>& OutCandidates) const;
 	/**
 	 * @brief Picks a candidate deterministically based on the attempt index.
 	 * @param Candidates Sorted candidate list.
@@ -255,8 +265,9 @@ private:
 	 * @return The chosen anchor or nullptr if none are available.
 	 */
 	AAnchorPoint* SelectAnchorCandidateByAttempt(const TArray<TObjectPtr<AAnchorPoint>>& Candidates,
-		int32 AttemptIndex) const;
-	bool HasSharedEndpoint(const FConnectionSegment& Segment, const AAnchorPoint* AnchorA, const AAnchorPoint* AnchorB) const;
+	                                             int32 AttemptIndex) const;
+	bool HasSharedEndpoint(const FConnectionSegment& Segment, const AAnchorPoint* AnchorA,
+	                       const AAnchorPoint* AnchorB) const;
 	/**
 	 * @brief Avoids creating crossing segments so the connection graph stays readable.
 	 * @param StartPoint Segment start.
@@ -268,8 +279,9 @@ private:
 	 * @return true if the new segment would intersect existing segments.
 	 */
 	bool IsSegmentIntersectingExisting(const FVector2D& StartPoint, const FVector2D& EndPoint,
-		const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor,
-		const TArray<FConnectionSegment>& ExistingSegments, const AConnection* ConnectionToIgnore) const;
+	                                   const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor,
+	                                   const TArray<FConnectionSegment>& ExistingSegments,
+	                                   const AConnection* ConnectionToIgnore) const;
 	void ClearExistingConnections();
 	void GatherAnchorPoints(TArray<TObjectPtr<AAnchorPoint>>& OutAnchorPoints) const;
 
@@ -280,7 +292,8 @@ private:
 	 * @param OutDesiredConnections Output mapping of anchors to desired counts.
 	 */
 	void AssignDesiredConnections(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-		FRandomStream& RandomStream, TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections) const;
+	                              FRandomStream& RandomStream,
+	                              TMap<TObjectPtr<AAnchorPoint>, int32>& OutDesiredConnections) const;
 
 	/**
 	 * @brief Attempts to create preferred-distance connections for a single anchor.
@@ -290,9 +303,9 @@ private:
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 */
 	void GeneratePhasePreferredConnections(AAnchorPoint* AnchorPoint,
-		const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-		const TMap<TObjectPtr<AAnchorPoint>, int32>& DesiredConnections,
-		TArray<FConnectionSegment>& ExistingSegments);
+	                                       const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
+	                                       const TMap<TObjectPtr<AAnchorPoint>, int32>& DesiredConnections,
+	                                       TArray<FConnectionSegment>& ExistingSegments);
 
 	/**
 	 * @brief Extends the search beyond distance limits to satisfy minimum connections.
@@ -301,8 +314,8 @@ private:
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 */
 	void GeneratePhaseExtendedConnections(AAnchorPoint* AnchorPoint,
-		const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
-		TArray<FConnectionSegment>& ExistingSegments);
+	                                      const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
+	                                      TArray<FConnectionSegment>& ExistingSegments);
 
 	/**
 	 * @brief Attempts to attach the anchor to an existing connection segment as a junction.
@@ -320,7 +333,7 @@ private:
 	 * @return true if the connection was created and registered.
 	 */
 	bool TryCreateConnection(AAnchorPoint* AnchorPoint, AAnchorPoint* CandidateAnchor,
-		TArray<FConnectionSegment>& ExistingSegments, const FColor& DebugColor);
+	                         TArray<FConnectionSegment>& ExistingSegments, const FColor& DebugColor);
 
 	/**
 	 * @brief Validates a potential anchor-to-anchor segment against max counts and intersections.
@@ -333,8 +346,9 @@ private:
 	 * @return true if the connection is allowed.
 	 */
 	bool IsConnectionAllowed(AAnchorPoint* AnchorPoint, AAnchorPoint* CandidateAnchor,
-		const FVector2D& StartPoint, const FVector2D& EndPoint, const TArray<FConnectionSegment>& ExistingSegments,
-		const AConnection* ConnectionToIgnore) const;
+	                         const FVector2D& StartPoint, const FVector2D& EndPoint,
+	                         const TArray<FConnectionSegment>& ExistingSegments,
+	                         const AConnection* ConnectionToIgnore) const;
 
 	/**
 	 * @brief Finds and adds a valid three-way junction connection to satisfy minimum connections.
@@ -367,7 +381,7 @@ private:
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 */
 	void AddConnectionSegment(AConnection* Connection, AAnchorPoint* AnchorA, AAnchorPoint* AnchorB,
-		TArray<FConnectionSegment>& ExistingSegments) const;
+	                          TArray<FConnectionSegment>& ExistingSegments) const;
 
 	/**
 	 * @brief Adds the third-branch segment entry for intersection checks.
@@ -377,57 +391,73 @@ private:
 	 * @param ExistingSegments Current list of generated connection segments for intersection checks.
 	 */
 	void AddThirdConnectionSegment(AConnection* Connection, AAnchorPoint* ThirdAnchor, const FVector& JunctionLocation,
-		TArray<FConnectionSegment>& ExistingSegments) const;
+	                               TArray<FConnectionSegment>& ExistingSegments) const;
 
 	void DebugNotifyAnchorProcessing(const AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const;
 	void DebugDrawConnection(const AConnection* Connection, const FColor& Color) const;
 	void DebugDrawThreeWay(const AConnection* Connection, const FColor& Color) const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
 	ECampaignGenerationStep M_GenerationStep = ECampaignGenerationStep::NotStarted;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignPlacementState M_PlacementState;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignDerivedData M_DerivedData;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
 	TArray<FCampaignGenerationStepTransaction> M_StepTransactions;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
 	TMap<ECampaignGenerationStep, int32> M_StepAttemptIndices;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
 	int32 M_TotalAttemptCount = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation",
+		meta = (AllowPrivateAccess = "true"))
 	FConnectionGenerationRules ConnectionGenerationRules;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation",
+		meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AConnection> M_ConnectionClass;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation",
+		meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<AConnection>> M_GeneratedConnections;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Player HQ", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Player HQ",
+		meta = (AllowPrivateAccess = "true"))
 	FPlayerHQPlacementRules M_PlayerHQPlacementRules;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy HQ", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy HQ",
+		meta = (AllowPrivateAccess = "true"))
 	FEnemyHQPlacementRules M_EnemyHQPlacementRules;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy Items", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy Items",
+		meta = (AllowPrivateAccess = "true"))
 	FEnemyPlacementRules M_EnemyPlacementRules;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Neutral Items", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Neutral Items",
+		meta = (AllowPrivateAccess = "true"))
 	FNeutralItemPlacementRules M_NeutralItemPlacementRules;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Missions", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Missions",
+		meta = (AllowPrivateAccess = "true"))
 	FMissionPlacement M_MissionPlacementRules;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Counts & Difficulty", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Counts & Difficulty",
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignCountDifficultyTuning M_CountAndDifficultyTuning;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignPlacementFailurePolicy M_PlacementFailurePolicy;
 };

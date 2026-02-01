@@ -683,7 +683,8 @@ public:
 
 	void SetCameraMovementSpeedMultiplier(const float NewMultiplier);
 	void SetCameraPanSpeedMultiplier(const float NewMultiplier);
-	
+
+	inline AGameUIController* GetGameUIController() const { return M_GameUIController; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -766,7 +767,6 @@ protected:
 	                          Technologies, TSubclassOf<UW_HoveringActor> HoverWidgetClass,
 	                          const bool bDoNotLoadPlayerProfileUnits, const EMiniMapStartDirection StartDirection);
 
-	inline AGameUIController* GetGameUIController() const { return M_GameUIController; }
 
 	/** @brief called on start of secondary button click*/
 	UFUNCTION(BlueprintCallable)
