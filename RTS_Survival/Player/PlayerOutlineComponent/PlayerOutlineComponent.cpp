@@ -9,9 +9,11 @@
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Game/GameState/GameResourceManager/GetTargetResourceThread/FGetAsyncResource.h"
 #include "RTS_Survival/Player/PlayerAimAbilitiy/PlayerAimAbility.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
@@ -181,6 +183,10 @@ ERTSOutLineTypes UPlayerOutlineComponent::GetOutLineForCapturableActor(
 	{
 		return ERTSOutLineTypes::None;
 	}
+	if (not GetIsCaptureOutlineAllowed())
+	{
+		return ERTSOutLineTypes::None;
+	}
 	if (Rules != ERTSOutlineRules::CaptureOnly)
 	{
 		return ERTSOutLineTypes::None;
@@ -188,32 +194,65 @@ ERTSOutLineTypes UPlayerOutlineComponent::GetOutLineForCapturableActor(
 	return ERTSOutLineTypes::VehicleParts;
 }
 
+bool UPlayerOutlineComponent::GetIsCaptureOutlineAllowed() const
+{
+	const ACPPController* PlayerController = Cast<ACPPController>(GetOwner());
+	if (not IsValid(PlayerController))
+	{
+		return false;
+	}
+
+	const bool bHasNoSelections = PlayerController->TSelectedSquadControllers.IsEmpty()
+		&& PlayerController->TSelectedActorsMasters.IsEmpty()
+		&& PlayerController->TSelectedPawnMasters.IsEmpty();
+	if (bHasNoSelections)
+	{
+		return true;
+	}
+
+	const AGameUIController* GameUIController = PlayerController->GetGameUIController();
+	if (not IsValid(GameUIController))
+	{
+		return false;
+	}
+
+	const AActor* PrimarySelectedActor = GameUIController->GetPrimarySelectedUnit();
+	if (not IsValid(PrimarySelectedActor))
+	{
+		return false;
+	}
+
+	return PrimarySelectedActor->IsA(ASquadController::StaticClass());
+}
+
 void UPlayerOutlineComponent::CheckHidePreviousOutlinedActor(const AActor* NewActor)
 {
-	if (not M_OutlinedActor.IsValid())
+	const AActor* OutlinedActor = M_OutlinedActor.Get();
+	if (not IsValid(OutlinedActor))
 	{
 		return;
 	}
 	if (not IsValid(NewActor))
 	{
-		ResetActorOutline(M_OutlinedActor.Get());
+		ResetActorOutline(OutlinedActor);
 		M_OutlinedActor = nullptr;
 		return;
 	}
-	if (M_OutlinedActor.Get() != NewActor)
+	if (OutlinedActor != NewActor)
 	{
-		ResetActorOutline(M_OutlinedActor.Get());
+		ResetActorOutline(OutlinedActor);
 		M_OutlinedActor = nullptr;
 	}
 }
 
 bool UPlayerOutlineComponent::IsNewActorEqualToOldOutlinedActor(const AActor* NewActor) const
 {
-	if (not M_OutlinedActor.IsValid())
+	const AActor* OutlinedActor = M_OutlinedActor.Get();
+	if (not IsValid(OutlinedActor))
 	{
 		return false;
 	}
-	return M_OutlinedActor.Get() == NewActor;
+	return OutlinedActor == NewActor;
 }
 
 void UPlayerOutlineComponent::SetOutLineOnActor(const AActor* ActorToOutLine, const ERTSOutLineTypes OutLineType)
