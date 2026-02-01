@@ -22,10 +22,10 @@ struct FEnemyItemToItemSpacingRules
 	 * must travel farther between distinct enemy facilities.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Prevents different enemy item types from stacking too tightly.\n"
-		                  "Technical: Hard minimum hop distance filter between different item types.\n"
-		                  "Notes: Larger values reduce clustering but can cause placement failures."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Prevents different enemy item types from stacking too tightly.
+Technical: Hard minimum hop distance filter between different item types.
+Notes: Larger values reduce clustering but can cause placement failures.)"))
 	int32 MinEnemySeparationHopsOtherType = 0;
 
 	/**
@@ -34,10 +34,10 @@ struct FEnemyItemToItemSpacingRules
 	 * defenses in a single region.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Spreads identical enemy items so repeated defenses are not adjacent.\n"
-		                  "Technical: Hard minimum hop distance filter between same-type items.\n"
-		                  "Notes: High values reduce repetition but can starve placement candidates."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Spreads identical enemy items so repeated defenses are not adjacent.
+Technical: Hard minimum hop distance filter between same-type items.
+Notes: High values reduce repetition but can starve placement candidates.)"))
 	int32 MinEnemySeparationHopsSameType = 0;
 };
 
@@ -56,10 +56,10 @@ struct FEnemyItemToEnemyHQSpacingRules
 	 * player must push deeper before encountering them.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Enforces a buffer around the enemy HQ for certain item types.\n"
-		                  "Technical: Hard minimum hop distance from EnemyHQAnchor.\n"
-		                  "Notes: Must be <= MaxHopsFromEnemyHQ; too high can remove valid anchors."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Enforces a buffer around the enemy HQ for certain item types.
+Technical: Hard minimum hop distance from EnemyHQAnchor.
+Notes: Must be <= MaxHopsFromEnemyHQ; too high can remove valid anchors.)"))
 	int32 MinHopsFromEnemyHQ = 0;
 
 	/**
@@ -67,10 +67,10 @@ struct FEnemyItemToEnemyHQSpacingRules
 	 * Example: Lower this to keep high-value targets within a compact defensive ring.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Keeps certain enemy items within a bounded radius of the enemy HQ.\n"
-		                  "Technical: Hard maximum hop distance from EnemyHQAnchor.\n"
-		                  "Notes: Must be >= MinHopsFromEnemyHQ; too low can block placement."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Keeps certain enemy items within a bounded radius of the enemy HQ.
+Technical: Hard maximum hop distance from EnemyHQAnchor.
+Notes: Must be >= MinHopsFromEnemyHQ; too low can block placement.)"))
 	int32 MaxHopsFromEnemyHQ = 0;
 
 	/**
@@ -78,10 +78,10 @@ struct FEnemyItemToEnemyHQSpacingRules
 	 * Example: PreferNearMaxBound to push an enemy outpost toward the edge of the enemy network.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spacing",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced candidate ordering.\n"
-		                  "Why: Biases placements toward the near/min or far/max side of the hop window.\n"
-		                  "Technical: Soft preference used in ordering; does not bypass hard hop bounds.\n"
-		                  "Notes: Deterministic ordering also uses anchor keys and attempt index."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced candidate ordering.
+Why: Biases placements toward the near/min or far/max side of the hop window.
+Technical: Soft preference used in ordering; does not bypass hard hop bounds.
+Notes: Deterministic ordering also uses anchor keys and attempt index.)"))
 	EEnemyTopologySearchStrategy Preference = EEnemyTopologySearchStrategy::None;
 };
 
@@ -99,10 +99,10 @@ struct FEnemyItemPlacementRules
 	 * Example: Tighten these when you want dense enemy clusters near chokepoints.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Defines item-to-item spacing constraints for this enemy item type.\n"
-		                  "Technical: Hard hop-distance filters applied against existing enemy placements.\n"
-		                  "Notes: Violations cause candidate anchors to be rejected."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Defines item-to-item spacing constraints for this enemy item type.
+Technical: Hard hop-distance filters applied against existing enemy placements.
+Notes: Violations cause candidate anchors to be rejected.)"))
 	FEnemyItemToItemSpacingRules ItemSpacing;
 
 	/**
@@ -110,10 +110,10 @@ struct FEnemyItemPlacementRules
 	 * Example: Widen these to ensure certain enemy items appear as outer-ring objectives.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rules",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Enforces min/max hop distance from the enemy HQ for this item type.\n"
-		                  "Technical: Hard hop-distance filter based on EnemyHQHopDistancesByAnchorKey.\n"
-		                  "Notes: If EnemyHQHopDistances is missing, this filter can fail placements."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Enforces min/max hop distance from the enemy HQ for this item type.
+Technical: Hard hop-distance filter based on EnemyHQHopDistancesByAnchorKey.
+Notes: If EnemyHQHopDistances is missing, this filter can fail placements.)"))
 	FEnemyItemToEnemyHQSpacingRules EnemyHQSpacing;
 };
 
@@ -132,10 +132,10 @@ struct FEnemyItemPlacementVariant
 	 */
 	// When false, ignore this variant entirely.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced variant selection.\n"
-		                  "Why: Allows designers to disable a variant without deleting it.\n"
-		                  "Technical: Hard gate; disabled variants are skipped during selection.\n"
-		                  "Notes: Deterministic selection ignores disabled entries entirely."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced variant selection.
+Why: Allows designers to disable a variant without deleting it.
+Technical: Hard gate; disabled variants are skipped during selection.
+Notes: Deterministic selection ignores disabled entries entirely.)"))
 	bool bEnabled = true;
 
 	/**
@@ -144,10 +144,10 @@ struct FEnemyItemPlacementVariant
 	 */
 	// If true, use these rules instead of base for this placement.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced variant selection.\n"
-		                  "Why: Lets this variant override the base rules for specific placements.\n"
-		                  "Technical: When true, OverrideRules are applied as the hard filters for this placement.\n"
-		                  "Notes: Drives the EditCondition for OverrideRules; disabling hides the override field."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced variant selection.
+Why: Lets this variant override the base rules for specific placements.
+Technical: When true, OverrideRules are applied as the hard filters for this placement.
+Notes: Drives the EditCondition for OverrideRules; disabling hides the override field.)"))
 	bool bOverrideRules = false;
 
 	/**
@@ -156,10 +156,10 @@ struct FEnemyItemPlacementVariant
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant",
 		meta = (EditCondition = "bOverrideRules",
-		        ToolTip = "Used in: EnemyObjectsPlaced when bOverrideRules is true.\n"
-		                  "Why: Defines the variant-specific spacing rules for this placement.\n"
-		                  "Technical: Replaces BaseRules for the selected placement index.\n"
-		                  "Notes: Hard constraints; hidden when bOverrideRules is false."))
+		        ToolTip = R"(Used in: EnemyObjectsPlaced when bOverrideRules is true.
+Why: Defines the variant-specific spacing rules for this placement.
+Technical: Replaces BaseRules for the selected placement index.
+Notes: Hard constraints; hidden when bOverrideRules is false.)"))
 	FEnemyItemPlacementRules OverrideRules;
 };
 
@@ -177,10 +177,10 @@ struct FEnemyItemRuleset
 	 * Example: Establish a conservative spacing baseline, then use variants to loosen it.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ruleset",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Defines the default spacing rules for this enemy item type.\n"
-		                  "Technical: Applied when no variant overrides are selected.\n"
-		                  "Notes: Hard filters; variants can override per-placement."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Defines the default spacing rules for this enemy item type.
+Technical: Applied when no variant overrides are selected.
+Notes: Hard filters; variants can override per-placement.)"))
 	FEnemyItemPlacementRules BaseRules;
 
 	/**
@@ -188,10 +188,10 @@ struct FEnemyItemRuleset
 	 * Example: Use CycleByPlacementIndex to repeat a predictable pattern along a chain of anchors.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ruleset",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced variant selection.\n"
-		                  "Why: Controls deterministic selection of which variant to apply for each placement.\n"
-		                  "Technical: Selection mode affects ordering by placement index and attempt index.\n"
-		                  "Notes: Drives the EditCondition for Variants; None disables the variant list."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced variant selection.
+Why: Controls deterministic selection of which variant to apply for each placement.
+Technical: Selection mode affects ordering by placement index and attempt index.
+Notes: Drives the EditCondition for Variants; None disables the variant list.)"))
 	EEnemyRuleVariantSelectionMode VariantMode = EEnemyRuleVariantSelectionMode::None;
 
 	/**
@@ -201,10 +201,10 @@ struct FEnemyItemRuleset
 	// Example: 3 variants -> placements 0,3,6 use Variants[0], 1,4,7 use [1], 2,5,8 use [2].
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ruleset",
 		meta = (EditCondition = "VariantMode!=EEnemyRuleVariantSelectionMode::None",
-		        ToolTip = "Used in: EnemyObjectsPlaced when VariantMode is not None.\n"
-		                  "Why: Provides optional per-placement rule variants for this enemy item type.\n"
-		                  "Technical: Indexed based on VariantMode and placement index for deterministic selection.\n"
-		                  "Notes: Hidden when VariantMode is None; disabled variants are skipped."))
+		        ToolTip = R"(Used in: EnemyObjectsPlaced when VariantMode is not None.
+Why: Provides optional per-placement rule variants for this enemy item type.
+Technical: Indexed based on VariantMode and placement index for deterministic selection.
+Notes: Hidden when VariantMode is None; disabled variants are skipped.)"))
 	TArray<FEnemyItemPlacementVariant> Variants;
 };
 
@@ -222,9 +222,9 @@ struct FEnemyPlacementRules
 	 * Example: Increase spacing for EnemyHQ-adjacent factories without affecting outposts.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Provides per-enemy-type rules to customize spacing and variants.\n"
-		                  "Technical: The map key selects which ruleset applies to each item type.\n"
-		                  "Notes: Missing keys fall back to default rules (if any); extra keys are ignored."))
+		meta = (ToolTip = R"(Used in: EnemyObjectsPlaced.
+Why: Provides per-enemy-type rules to customize spacing and variants.
+Technical: The map key selects which ruleset applies to each item type.
+Notes: Missing keys fall back to default rules (if any); extra keys are ignored.)"))
 	TMap<EMapEnemyItem, FEnemyItemRuleset> RulesByEnemyItem;
 };
