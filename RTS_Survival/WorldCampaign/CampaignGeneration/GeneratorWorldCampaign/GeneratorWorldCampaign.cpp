@@ -3,6 +3,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 
 #include "Algo/Sort.h"
+#include "DrawDebugHelpers.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "EngineUtils.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -449,6 +450,35 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 		}
 
 		AnchorPoint->ClearConnections();
+	}
+}
+
+void AGeneratorWorldCampaign::DebugDrawAllConnections() const
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const TArray<TObjectPtr<AConnection>>* ConnectionsToDraw = &M_GeneratedConnections;
+	if (ConnectionsToDraw->Num() == 0)
+	{
+		ConnectionsToDraw = &M_PlacementState.CachedConnections;
+	}
+
+	if (ConnectionsToDraw->Num() == 0)
+	{
+		return;
+	}
+
+	const FVector HeightOffset(0.f, 0.f, M_DebugConnectionDrawHeightOffset);
+	const FColor BaseConnectionColor = FColor::Cyan;
+	const FColor ThreeWayConnectionColor = FColor::Yellow;
+
+	for (const TObjectPtr<AConnection>& Connection : *ConnectionsToDraw)
+	{
+		DrawDebugConnectionForActor(World, Connection, HeightOffset, BaseConnectionColor, ThreeWayConnectionColor);
 	}
 }
 
@@ -1670,4 +1700,77 @@ void AGeneratorWorldCampaign::DebugDrawThreeWay(const AConnection* Connection, c
 
 	constexpr float DebugDuration = 10.f;
 	Connection->DebugDrawThirdConnection(Color, DebugDuration);
+}
+
+void AGeneratorWorldCampaign::DrawDebugConnectionLine(UWorld* World, const FVector& Start, const FVector& End,
+                                                      const FColor& Color) const
+{
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	DrawDebugLine(World,
+	              Start,
+	              End,
+	              Color,
+	              false,
+	              M_DebugConnectionDrawDurationSeconds,
+	              0,
+	              M_DebugConnectionLineThickness);
+}
+
+void AGeneratorWorldCampaign::DrawDebugConnectionForActor(UWorld* World, const AConnection* Connection,
+                                                          const FVector& HeightOffset,
+                                                          const FColor& BaseConnectionColor,
+                                                          const FColor& ThreeWayConnectionColor) const
+{
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	if (not IsValid(Connection))
+	{
+		return;
+	}
+
+	const TArray<TObjectPtr<AAnchorPoint>>& ConnectedAnchors = Connection->GetConnectedAnchors();
+	if (ConnectedAnchors.Num() < 2)
+	{
+		return;
+	}
+
+	AAnchorPoint* FirstAnchor = ConnectedAnchors[0];
+	AAnchorPoint* SecondAnchor = ConnectedAnchors[1];
+	if (not IsValid(FirstAnchor) || not IsValid(SecondAnchor))
+	{
+		return;
+	}
+
+	DrawDebugConnectionLine(World,
+	                        FirstAnchor->GetActorLocation() + HeightOffset,
+	                        SecondAnchor->GetActorLocation() + HeightOffset,
+	                        BaseConnectionColor);
+
+	if (not Connection->GetIsThreeWayConnection())
+	{
+		return;
+	}
+
+	if (ConnectedAnchors.Num() < 3)
+	{
+		return;
+	}
+
+	AAnchorPoint* ThirdAnchor = ConnectedAnchors[2];
+	if (not IsValid(ThirdAnchor))
+	{
+		return;
+	}
+
+	DrawDebugConnectionLine(World,
+	                        Connection->GetJunctionLocation() + HeightOffset,
+	                        ThirdAnchor->GetActorLocation() + HeightOffset,
+	                        ThreeWayConnectionColor);
 }
