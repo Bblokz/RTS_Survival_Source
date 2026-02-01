@@ -26,23 +26,23 @@ struct FDifficultyEnumItemOverrides
 	/**
 	 * Extra enemy items to add by type on top of base counts.
 	 * Example: Add +2 factories on Brutal to increase late-game production hubs.
+	 * @note Used in: EnemyObjectsPlaced count setup.
+	 * @note Why: Allows per-difficulty tuning by adding extra enemy items by type.
+	 * @note Technical: Added after base count scaling; treated as a hard increase.
+	 * @note Notes: Deterministic given DifficultyLevel and Seed; affects required counts.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced count setup.\n"
-		                  "Why: Allows per-difficulty tuning by adding extra enemy items by type.\n"
-		                  "Technical: Added after base count scaling; treated as a hard increase.\n"
-		                  "Notes: Deterministic given DifficultyLevel and Seed; affects required counts."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides")
 	TMap<EMapEnemyItem, int32> ExtraEnemyItemsByType;
 
 	/**
 	 * Extra neutral items to add by type on top of base counts.
 	 * Example: Add +1 RadixiteField on Hard to increase resource pressure.
+	 * @note Used in: NeutralObjectsPlaced count setup.
+	 * @note Why: Allows per-difficulty tuning by adding extra neutral items by type.
+	 * @note Technical: Added after base count scaling; treated as a hard increase.
+	 * @note Notes: Deterministic given DifficultyLevel and Seed; affects required counts.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced count setup.\n"
-		                  "Why: Allows per-difficulty tuning by adding extra neutral items by type.\n"
-		                  "Technical: Added after base count scaling; treated as a hard increase.\n"
-		                  "Notes: Deterministic given DifficultyLevel and Seed; affects required counts."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides")
 	TMap<EMapNeutralObjectType, int32> ExtraNeutralItemsByType;
 };
 
@@ -58,56 +58,56 @@ struct FDifficultyEnumOverridesTable
 	/**
 	 * Overrides applied for NewToRTS difficulty.
 	 * Example: Keep this empty to avoid extra spawns for new players.
+	 * @note Used in: Count overrides lookup when DifficultyLevel == NewToRTS.
+	 * @note Why: Keeps beginner runs simpler by controlling extra spawn counts.
+	 * @note Technical: Returned by GetDifficultyOverrides and added to scaled base counts.
+	 * @note Notes: Hard add-on; negative values should be avoided.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides",
-		meta = (ToolTip = "Used in: Count overrides lookup when DifficultyLevel == NewToRTS.\n"
-		                  "Why: Keeps beginner runs simpler by controlling extra spawn counts.\n"
-		                  "Technical: Returned by GetDifficultyOverrides and added to scaled base counts.\n"
-		                  "Notes: Hard add-on; negative values should be avoided."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides")
 	FDifficultyEnumItemOverrides NewToRTS;
 
 	/**
 	 * Overrides applied for Normal difficulty.
 	 * Example: Add a small neutral item bonus to encourage exploration without heavy combat.
+	 * @note Used in: Count overrides lookup when DifficultyLevel == Normal.
+	 * @note Why: Defines baseline extra items for the standard difficulty tier.
+	 * @note Technical: Returned by GetDifficultyOverrides and added to scaled base counts.
+	 * @note Notes: Hard add-on; values directly affect required placement counts.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides",
-		meta = (ToolTip = "Used in: Count overrides lookup when DifficultyLevel == Normal.\n"
-		                  "Why: Defines baseline extra items for the standard difficulty tier.\n"
-		                  "Technical: Returned by GetDifficultyOverrides and added to scaled base counts.\n"
-		                  "Notes: Hard add-on; values directly affect required placement counts."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides")
 	FDifficultyEnumItemOverrides Normal;
 
 	/**
 	 * Overrides applied for Hard difficulty.
 	 * Example: Add extra enemy outposts to tighten the mid-campaign challenge.
+	 * @note Used in: Count overrides lookup when DifficultyLevel == Hard.
+	 * @note Why: Pushes extra content for a harder campaign curve.
+	 * @note Technical: Returned by GetDifficultyOverrides and added to scaled base counts.
+	 * @note Notes: Hard add-on; excessive values can cause placement failures.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides",
-		meta = (ToolTip = "Used in: Count overrides lookup when DifficultyLevel == Hard.\n"
-		                  "Why: Pushes extra content for a harder campaign curve.\n"
-		                  "Technical: Returned by GetDifficultyOverrides and added to scaled base counts.\n"
-		                  "Notes: Hard add-on; excessive values can cause placement failures."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides")
 	FDifficultyEnumItemOverrides Hard;
 
 	/**
 	 * Overrides applied for Brutal difficulty.
 	 * Example: Increase both enemy factories and checkpoints to create layered defenses.
+	 * @note Used in: Count overrides lookup when DifficultyLevel == Brutal.
+	 * @note Why: Defines aggressive extra counts for late-game challenge.
+	 * @note Technical: Returned by GetDifficultyOverrides and added to scaled base counts.
+	 * @note Notes: Hard add-on; verify there are enough anchors to place all items.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides",
-		meta = (ToolTip = "Used in: Count overrides lookup when DifficultyLevel == Brutal.\n"
-		                  "Why: Defines aggressive extra counts for late-game challenge.\n"
-		                  "Technical: Returned by GetDifficultyOverrides and added to scaled base counts.\n"
-		                  "Notes: Hard add-on; verify there are enough anchors to place all items."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides")
 	FDifficultyEnumItemOverrides Brutal;
 
 	/**
 	 * Overrides applied for Ironman difficulty.
 	 * Example: Add a few extra enemy HQ-adjacent structures to punish direct routes.
+	 * @note Used in: Count overrides lookup when DifficultyLevel == Ironman.
+	 * @note Why: Defines extra counts for the most punishing tier.
+	 * @note Technical: Returned by GetDifficultyOverrides and added to scaled base counts.
+	 * @note Notes: Hard add-on; may trigger backtracking if counts exceed capacity.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides",
-		meta = (ToolTip = "Used in: Count overrides lookup when DifficultyLevel == Ironman.\n"
-		                  "Why: Defines extra counts for the most punishing tier.\n"
-		                  "Technical: Returned by GetDifficultyOverrides and added to scaled base counts.\n"
-		                  "Notes: Hard add-on; may trigger backtracking if counts exceed capacity."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Overrides")
 	FDifficultyEnumItemOverrides Ironman;
 };
 
@@ -123,99 +123,99 @@ struct FWorldCampaignCountDifficultyTuning
 	/**
 	 * Seed used for deterministic difficulty scaling.
 	 * Example: Set this to match a known seed when reproducing a specific campaign layout.
+	 * @note Used in: Count/difficulty scaling before EnemyObjectsPlaced and NeutralObjectsPlaced.
+	 * @note Why: Ensures count scaling is deterministic and repeatable across retries.
+	 * @note Technical: Seed feeds the scaling calculations and random streams used for counts.
+	 * @note Notes: Changing it changes required item counts even with the same map seed.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty",
-		meta = (ToolTip = "Used in: Count/difficulty scaling before EnemyObjectsPlaced and NeutralObjectsPlaced.\n"
-		                  "Why: Ensures count scaling is deterministic and repeatable across retries.\n"
-		                  "Technical: Seed feeds the scaling calculations and random streams used for counts.\n"
-		                  "Notes: Changing it changes required item counts even with the same map seed."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	int32 Seed = 0;
 
 	/**
 	 * Raw difficulty percentage used to scale base counts.
 	 * Example: Raise this to 150 to increase overall spawn counts by 50%.
+	 * @note Used in: Count scaling before EnemyObjectsPlaced and NeutralObjectsPlaced.
+	 * @note Why: Primary tuning lever for overall content density.
+	 * @note Technical: Clamped to DifficultyPercentMin/Max, then compressed by LogCompressionStrength.
+	 * @note Notes: Hard multiplier; very high values can exceed anchor capacity.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty",
-		meta = (ToolTip = "Used in: Count scaling before EnemyObjectsPlaced and NeutralObjectsPlaced.\n"
-		                  "Why: Primary tuning lever for overall content density.\n"
-		                  "Technical: Clamped to DifficultyPercentMin/Max, then compressed by LogCompressionStrength.\n"
-		                  "Notes: Hard multiplier; very high values can exceed anchor capacity."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	int32 DifficultyPercentage = 100;
 
 	/**
 	 * Minimum clamp for DifficultyPercentage before compression.
 	 * Example: Raise this if you never want the campaign to scale below a baseline density.
+	 * @note Used in: DifficultyPercentage clamping.
+	 * @note Why: Prevents difficulty scaling from dropping below a baseline.
+	 * @note Technical: Applied as a hard clamp before logarithmic compression.
+	 * @note Notes: Must be <= DifficultyPercentMax; affects all difficulties equally.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty",
-		meta = (ToolTip = "Used in: DifficultyPercentage clamping.\n"
-		                  "Why: Prevents difficulty scaling from dropping below a baseline.\n"
-		                  "Technical: Applied as a hard clamp before logarithmic compression.\n"
-		                  "Notes: Must be <= DifficultyPercentMax; affects all difficulties equally."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	int32 DifficultyPercentMin = WorldCampaignDifficultyDefaults::DifficultyPercentMin;
 
 	/**
 	 * Maximum clamp for DifficultyPercentage before compression.
 	 * Example: Lower this to prevent extreme content spikes on very high difficulty values.
+	 * @note Used in: DifficultyPercentage clamping.
+	 * @note Why: Prevents extreme scaling spikes from overpopulating the map.
+	 * @note Technical: Applied as a hard clamp before logarithmic compression.
+	 * @note Notes: Must be >= DifficultyPercentMin; too low may flatten difficulty differences.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty",
-		meta = (ToolTip = "Used in: DifficultyPercentage clamping.\n"
-		                  "Why: Prevents extreme scaling spikes from overpopulating the map.\n"
-		                  "Technical: Applied as a hard clamp before logarithmic compression.\n"
-		                  "Notes: Must be >= DifficultyPercentMin; too low may flatten difficulty differences."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	int32 DifficultyPercentMax = WorldCampaignDifficultyDefaults::DifficultyPercentMax;
 
 	/**
 	 * Strength of logarithmic compression applied to the difficulty percentage.
 	 * Example: Increase this to soften the impact of very high difficulty values.
+	 * @note Used in: Difficulty scaling.
+	 * @note Why: Softens the impact of high DifficultyPercentage values for smoother tuning.
+	 * @note Technical: Applied after clamping as a logarithmic compression factor.
+	 * @note Notes: Higher values reduce scaling variance; lower values preserve extremes.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty",
-		meta = (ToolTip = "Used in: Difficulty scaling.\n"
-		                  "Why: Softens the impact of high DifficultyPercentage values for smoother tuning.\n"
-		                  "Technical: Applied after clamping as a logarithmic compression factor.\n"
-		                  "Notes: Higher values reduce scaling variance; lower values preserve extremes."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	float LogCompressionStrength = WorldCampaignDifficultyDefaults::LogCompressionStrength;
 
 	/**
 	 * Base enemy item counts before difficulty scaling.
 	 * Example: Increase the base count of FortifiedCheckpoint to harden early routes.
+	 * @note Used in: EnemyObjectsPlaced count setup.
+	 * @note Why: Defines the baseline number of each enemy item before scaling.
+	 * @note Technical: Scaled by DifficultyPercentage and then augmented by overrides.
+	 * @note Notes: Hard counts; too many may exceed available anchors and trigger backtracking.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Counts",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced count setup.\n"
-		                  "Why: Defines the baseline number of each enemy item before scaling.\n"
-		                  "Technical: Scaled by DifficultyPercentage and then augmented by overrides.\n"
-		                  "Notes: Hard counts; too many may exceed available anchors and trigger backtracking."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Counts")
 	TMap<EMapEnemyItem, int32> BaseEnemyItemsByType;
 
 	/**
 	 * Base neutral item counts before difficulty scaling.
 	 * Example: Add more RuinedCity entries to emphasize scavenging in the mid campaign.
+	 * @note Used in: NeutralObjectsPlaced count setup.
+	 * @note Why: Defines the baseline number of each neutral item before scaling.
+	 * @note Technical: Scaled by DifficultyPercentage and then augmented by overrides.
+	 * @note Notes: Hard counts; excessive values can cause placement failure.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Counts",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced count setup.\n"
-		                  "Why: Defines the baseline number of each neutral item before scaling.\n"
-		                  "Technical: Scaled by DifficultyPercentage and then augmented by overrides.\n"
-		                  "Notes: Hard counts; excessive values can cause placement failure."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Counts")
 	TMap<EMapNeutralObjectType, int32> BaseNeutralItemsByType;
 
 	/**
 	 * Selected difficulty tier to pull overrides from.
 	 * Example: Set to Hard to apply the Hard overrides in DifficultyEnumOverrides.
+	 * @note Used in: GetDifficultyOverrides for count setup.
+	 * @note Why: Selects which override set is applied on top of scaled base counts.
+	 * @note Technical: Switches to the matching FDifficultyEnumItemOverrides struct.
+	 * @note Notes: Deterministic; changing this changes required counts immediately.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty",
-		meta = (ToolTip = "Used in: GetDifficultyOverrides for count setup.\n"
-		                  "Why: Selects which override set is applied on top of scaled base counts.\n"
-		                  "Technical: Switches to the matching FDifficultyEnumItemOverrides struct.\n"
-		                  "Notes: Deterministic; changing this changes required counts immediately."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	ERTSGameDifficulty DifficultyLevel = ERTSGameDifficulty::Normal;
 
 	/**
 	 * Overrides table that augments base counts per difficulty tier.
 	 * Example: Add extra neutral items for NewToRTS while increasing enemy items for Brutal.
+	 * @note Used in: Difficulty-level count overrides.
+	 * @note Why: Central place to author per-difficulty additions for enemy/neutral counts.
+	 * @note Technical: Queried by GetDifficultyOverrides based on DifficultyLevel.
+	 * @note Notes: Hard add-on to counts; does not respect placement capacity automatically.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty",
-		meta = (ToolTip = "Used in: Difficulty-level count overrides.\n"
-		                  "Why: Central place to author per-difficulty additions for enemy/neutral counts.\n"
-		                  "Technical: Queried by GetDifficultyOverrides based on DifficultyLevel.\n"
-		                  "Notes: Hard add-on to counts; does not respect placement capacity automatically."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	FDifficultyEnumOverridesTable DifficultyEnumOverrides;
 };

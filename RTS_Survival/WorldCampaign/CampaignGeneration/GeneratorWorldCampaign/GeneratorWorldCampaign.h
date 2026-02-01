@@ -32,25 +32,31 @@ struct FConnectionGenerationRules
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Campaign|Connection Generation",
-		meta = (ToolTip = "Used in: ConnectionsCreated -> ExecuteCreateConnections/GenerateConnectionsForAnchors.\n"
-		                  "Why: Sets a hard minimum connection degree so anchors are not stranded.\n"
-		                  "Technical: Enforced in desired-connection assignment and validated during connection passes.\n"
-		                  "Notes: Hard constraint; may trigger retries/backtracking if impossible with current anchors."))
+	/**
+	 * @note Used in: ConnectionsCreated -> ExecuteCreateConnections/GenerateConnectionsForAnchors.
+	 * @note Why: Sets a hard minimum connection degree so anchors are not stranded.
+	 * @note Technical: Enforced in desired-connection assignment and validated during connection passes.
+	 * @note Notes: Hard constraint; may trigger retries/backtracking if impossible with current anchors.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Campaign|Connection Generation")
 	int32 MinConnections = 1;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Campaign|Connection Generation",
-		meta = (ToolTip = "Used in: ConnectionsCreated -> ExecuteCreateConnections/GenerateConnectionsForAnchors.\n"
-		                  "Why: Caps graph density so the map retains readable routing and pacing.\n"
-		                  "Technical: Hard upper bound for per-anchor connection counts during generation.\n"
-		                  "Notes: MinConnections must be <= MaxConnections; if too low, generation may under-connect."))
+	/**
+	 * @note Used in: ConnectionsCreated -> ExecuteCreateConnections/GenerateConnectionsForAnchors.
+	 * @note Why: Caps graph density so the map retains readable routing and pacing.
+	 * @note Technical: Hard upper bound for per-anchor connection counts during generation.
+	 * @note Notes: MinConnections must be <= MaxConnections; if too low, generation may under-connect.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Campaign|Connection Generation")
 	int32 MaxConnections = 3;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Campaign|Connection Generation",
-		meta = (ToolTip = "Used in: ConnectionsCreated -> GeneratePhasePreferredConnections.\n"
-		                  "Why: Defines the preferred spatial radius for first-pass connections so topology stays local.\n"
-		                  "Technical: Acts as a soft preference (distance filter) before extended phases relax it.\n"
-		                  "Notes: If too small, later phases will extend beyond it to satisfy MinConnections."))
+	/**
+	 * @note Used in: ConnectionsCreated -> GeneratePhasePreferredConnections.
+	 * @note Why: Defines the preferred spatial radius for first-pass connections so topology stays local.
+	 * @note Technical: Acts as a soft preference (distance filter) before extended phases relax it.
+	 * @note Notes: If too small, later phases will extend beyond it to satisfy MinConnections.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Campaign|Connection Generation")
 	float MaxPreferredDistance = 5000.f;
 };
 
@@ -59,74 +65,94 @@ struct FWorldCampaignPlacementState
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: All generation steps.\n"
-		                  "Why: Records the deterministic seed actually used so results can be reproduced.\n"
-		                  "Technical: This seed is fed into FRandomStream and combined with step attempt indices.\n"
-		                  "Notes: Changing it invalidates determinism for retries and debugging."))
+	/**
+	 * @note Used in: All generation steps.
+	 * @note Why: Records the deterministic seed actually used so results can be reproduced.
+	 * @note Technical: This seed is fed into FRandomStream and combined with step attempt indices.
+	 * @note Notes: Changing it invalidates determinism for retries and debugging.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	int32 SeedUsed = 0;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: ConnectionsCreated and all downstream steps.\n"
-		                  "Why: Caches the anchor set that the generator operated on for inspection and undo.\n"
-		                  "Technical: Filled during CacheGeneratedState; drives placement candidate lookups.\n"
-		                  "Notes: Acts as the authoritative anchor list for this generation attempt."))
+	/**
+	 * @note Used in: ConnectionsCreated and all downstream steps.
+	 * @note Why: Caches the anchor set that the generator operated on for inspection and undo.
+	 * @note Technical: Filled during CacheGeneratedState; drives placement candidate lookups.
+	 * @note Notes: Acts as the authoritative anchor list for this generation attempt.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TArray<TObjectPtr<AAnchorPoint>> CachedAnchors;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: ConnectionsCreated and all downstream steps.\n"
-		                  "Why: Caches spawned connections so later steps can derive hops and undo reliably.\n"
-		                  "Technical: Populated during connection generation and referenced for hop distance maps.\n"
-		                  "Notes: Serves as the rollback source when backtracking connections."))
+	/**
+	 * @note Used in: ConnectionsCreated and all downstream steps.
+	 * @note Why: Caches spawned connections so later steps can derive hops and undo reliably.
+	 * @note Technical: Populated during connection generation and referenced for hop distance maps.
+	 * @note Notes: Serves as the rollback source when backtracking connections.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TArray<TObjectPtr<AConnection>> CachedConnections;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: PlayerHQPlaced and all subsequent steps.\n"
-		                  "Why: Stores the selected player HQ anchor so other placement rules can reference it.\n"
-		                  "Technical: Set by ExecutePlaceHQ after filtering candidates and selecting by attempt.\n"
-		                  "Notes: Hard prerequisite for enemy/neutral/mission placement filters."))
+	/**
+	 * @note Used in: PlayerHQPlaced and all subsequent steps.
+	 * @note Why: Stores the selected player HQ anchor so other placement rules can reference it.
+	 * @note Technical: Set by ExecutePlaceHQ after filtering candidates and selecting by attempt.
+	 * @note Notes: Hard prerequisite for enemy/neutral/mission placement filters.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TObjectPtr<AAnchorPoint> PlayerHQAnchor;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: Cached lookup keys and undo transactions.\n"
-		                  "Why: Provides a stable identifier for the player HQ anchor across retries.\n"
-		                  "Technical: Cached from the anchor's GUID; used for hop distance maps and maps keyed by anchor.\n"
-		                  "Notes: Required for determinism even if anchor pointers change during regeneration."))
+	/**
+	 * @note Used in: Cached lookup keys and undo transactions.
+	 * @note Why: Provides a stable identifier for the player HQ anchor across retries.
+	 * @note Technical: Cached from the anchor's GUID; used for hop distance maps and maps keyed by anchor.
+	 * @note Notes: Required for determinism even if anchor pointers change during regeneration.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	FGuid PlayerHQAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: EnemyHQPlaced and all subsequent steps.\n"
-		                  "Why: Stores the selected enemy HQ anchor to drive enemy spacing rules.\n"
-		                  "Technical: Set by ExecutePlaceEnemyHQ after filtering candidates and selection.\n"
-		                  "Notes: Downstream enemy placement uses its hop distances as hard filters."))
+	/**
+	 * @note Used in: EnemyHQPlaced and all subsequent steps.
+	 * @note Why: Stores the selected enemy HQ anchor to drive enemy spacing rules.
+	 * @note Technical: Set by ExecutePlaceEnemyHQ after filtering candidates and selection.
+	 * @note Notes: Downstream enemy placement uses its hop distances as hard filters.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TObjectPtr<AAnchorPoint> EnemyHQAnchor;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: Cached lookup keys and undo transactions.\n"
-		                  "Why: Provides a stable identifier for the enemy HQ anchor across retries.\n"
-		                  "Technical: Cached from the anchor GUID; used for hop distance maps and anchor-keyed maps.\n"
-		                  "Notes: Keeps deterministic keying even if anchors are rebuilt."))
+	/**
+	 * @note Used in: Cached lookup keys and undo transactions.
+	 * @note Why: Provides a stable identifier for the enemy HQ anchor across retries.
+	 * @note Technical: Cached from the anchor GUID; used for hop distance maps and anchor-keyed maps.
+	 * @note Notes: Keeps deterministic keying even if anchors are rebuilt.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	FGuid EnemyHQAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Records which enemy item type was placed at each anchor for later filtering and undo.\n"
-		                  "Technical: Written during enemy placement, keyed by anchor GUID for deterministic lookup.\n"
-		                  "Notes: Acts as a hard occupancy map; a key present means the anchor is consumed."))
+	/**
+	 * @note Used in: EnemyObjectsPlaced.
+	 * @note Why: Records which enemy item type was placed at each anchor for later filtering and undo.
+	 * @note Technical: Written during enemy placement, keyed by anchor GUID for deterministic lookup.
+	 * @note Notes: Acts as a hard occupancy map; a key present means the anchor is consumed.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, EMapEnemyItem> EnemyItemsByAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced.\n"
-		                  "Why: Records which neutral object type was placed at each anchor for spacing checks and undo.\n"
-		                  "Technical: Filled during neutral placement; queried when validating mission placement adjacency.\n"
-		                  "Notes: Hard occupancy map; used as a filter during mission requirements."))
+	/**
+	 * @note Used in: NeutralObjectsPlaced.
+	 * @note Why: Records which neutral object type was placed at each anchor for spacing checks and undo.
+	 * @note Technical: Filled during neutral placement; queried when validating mission placement adjacency.
+	 * @note Notes: Hard occupancy map; used as a filter during mission requirements.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, EMapNeutralObjectType> NeutralItemsByAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Records the mission type placed at each anchor to prevent duplicates and support undo.\n"
-		                  "Technical: Populated during mission placement; keyed by anchor GUID for deterministic access.\n"
-		                  "Notes: Hard occupancy map for mission anchors; used for validation and backtracking."))
+	/**
+	 * @note Used in: MissionsPlaced.
+	 * @note Why: Records the mission type placed at each anchor to prevent duplicates and support undo.
+	 * @note Technical: Populated during mission placement; keyed by anchor GUID for deterministic access.
+	 * @note Notes: Hard occupancy map for mission anchors; used for validation and backtracking.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, EMapMission> MissionsByAnchorKey;
 };
 
@@ -135,53 +161,67 @@ struct FWorldCampaignDerivedData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: PlayerHQPlaced, EnemyObjectsPlaced, NeutralObjectsPlaced, MissionsPlaced.\n"
-		                  "Why: Stores hop distances from the player HQ to every anchor as a reusable cache.\n"
-		                  "Technical: Built after connections are generated; reused for hop-based filtering.\n"
-		                  "Notes: Deterministic given seed and connection graph; treated as authoritative distances."))
+	/**
+	 * @note Used in: PlayerHQPlaced, EnemyObjectsPlaced, NeutralObjectsPlaced, MissionsPlaced.
+	 * @note Why: Stores hop distances from the player HQ to every anchor as a reusable cache.
+	 * @note Technical: Built after connections are generated; reused for hop-based filtering.
+	 * @note Notes: Deterministic given seed and connection graph; treated as authoritative distances.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, int32> PlayerHQHopDistancesByAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Caches hop distances from the enemy HQ for enemy spacing rules.\n"
-		                  "Technical: Built after EnemyHQPlaced; used for Min/Max hop filters.\n"
-		                  "Notes: Hard filter source; if missing or empty, enemy placement can fail."))
+	/**
+	 * @note Used in: EnemyObjectsPlaced.
+	 * @note Why: Caches hop distances from the enemy HQ for enemy spacing rules.
+	 * @note Technical: Built after EnemyHQPlaced; used for Min/Max hop filters.
+	 * @note Notes: Hard filter source; if missing or empty, enemy placement can fail.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, int32> EnemyHQHopDistancesByAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: PlayerHQPlaced, EnemyHQPlaced, MissionsPlaced.\n"
-		                  "Why: Stores connection degree per anchor for degree-based filters.\n"
-		                  "Technical: Cached via CacheAnchorConnectionDegrees and reused by selection logic.\n"
-		                  "Notes: Hard constraint when Min/Max connection degree rules are enabled."))
+	/**
+	 * @note Used in: PlayerHQPlaced, EnemyHQPlaced, MissionsPlaced.
+	 * @note Why: Stores connection degree per anchor for degree-based filters.
+	 * @note Technical: Cached via CacheAnchorConnectionDegrees and reused by selection logic.
+	 * @note Notes: Hard constraint when Min/Max connection degree rules are enabled.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, int32> AnchorConnectionDegreesByAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: ConnectionsCreated debug/analysis.\n"
-		                  "Why: Preserves chokepoint scoring so designers can inspect connectivity bottlenecks.\n"
-		                  "Technical: Derived data keyed by anchor GUID, typically computed after connections exist.\n"
-		                  "Notes: Informational/diagnostic; does not directly gate placement."))
+	/**
+	 * @note Used in: ConnectionsCreated debug/analysis.
+	 * @note Why: Preserves chokepoint scoring so designers can inspect connectivity bottlenecks.
+	 * @note Technical: Derived data keyed by anchor GUID, typically computed after connections exist.
+	 * @note Notes: Informational/diagnostic; does not directly gate placement.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, float> ChokepointScoresByAnchorKey;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Tracks how many enemy items of each type have been placed.\n"
-		                  "Technical: Updated as items are spawned; compared against required counts.\n"
-		                  "Notes: Hard constraint; when counts are met, additional placement is skipped."))
+	/**
+	 * @note Used in: EnemyObjectsPlaced.
+	 * @note Why: Tracks how many enemy items of each type have been placed.
+	 * @note Technical: Updated as items are spawned; compared against required counts.
+	 * @note Notes: Hard constraint; when counts are met, additional placement is skipped.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<EMapEnemyItem, int32> EnemyItemPlacedCounts;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: NeutralObjectsPlaced.\n"
-		                  "Why: Tracks how many neutral items of each type have been placed.\n"
-		                  "Technical: Updated during neutral placement and used to stop once required counts are reached.\n"
-		                  "Notes: Hard constraint; affects retry logic if counts cannot be satisfied."))
+	/**
+	 * @note Used in: NeutralObjectsPlaced.
+	 * @note Why: Tracks how many neutral items of each type have been placed.
+	 * @note Technical: Updated during neutral placement and used to stop once required counts are reached.
+	 * @note Notes: Hard constraint; affects retry logic if counts cannot be satisfied.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<EMapNeutralObjectType, int32> NeutralItemPlacedCounts;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Tracks how many missions of each type have been placed.\n"
-		                  "Technical: Updated during mission placement and checked against required mission counts.\n"
-		                  "Notes: Hard constraint; unmet counts can trigger backtracking."))
+	/**
+	 * @note Used in: MissionsPlaced.
+	 * @note Why: Tracks how many missions of each type have been placed.
+	 * @note Technical: Updated during mission placement and checked against required mission counts.
+	 * @note Notes: Hard constraint; unmet counts can trigger backtracking.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<EMapMission, int32> MissionPlacedCounts;
 };
 
@@ -190,34 +230,49 @@ struct FCampaignGenerationStepTransaction
 {
 	GENERATED_BODY()
 
-	UPROPERTY(meta = (ToolTip = "Used in: Backtracking/Undo for every generation step.\n"
-	                    "Why: Identifies which step completed to decide how to roll back state.\n"
-	                    "Technical: Set in ExecuteStepWithTransaction when a step succeeds.\n"
-	                    "Notes: Determinism relies on the same step order when replayed."))
+	/**
+	 * @note Used in: Backtracking/Undo for every generation step.
+	 * @note Why: Identifies which step completed to decide how to roll back state.
+	 * @note Technical: Set in ExecuteStepWithTransaction when a step succeeds.
+	 * @note Notes: Determinism relies on the same step order when replayed.
+	 */
+	UPROPERTY()
 	ECampaignGenerationStep CompletedStep = ECampaignGenerationStep::NotStarted;
 
-	UPROPERTY(meta = (ToolTip = "Used in: Undo of placement steps.\n"
-	                    "Why: Records spawned actors so a failed step can be fully rolled back.\n"
-	                    "Technical: Populated by each step's Execute* function; destroyed in UndoLastTransaction.\n"
-	                    "Notes: Hard rollback data; includes any spawn that must be removed."))
+	/**
+	 * @note Used in: Undo of placement steps.
+	 * @note Why: Records spawned actors so a failed step can be fully rolled back.
+	 * @note Technical: Populated by each step's Execute* function; destroyed in UndoLastTransaction.
+	 * @note Notes: Hard rollback data; includes any spawn that must be removed.
+	 */
+	UPROPERTY()
 	TArray<TObjectPtr<AActor>> SpawnedActors;
 
-	UPROPERTY(meta = (ToolTip = "Used in: Undo for ConnectionsCreated.\n"
-	                    "Why: Tracks connection actors spawned during a step for deterministic rollback.\n"
-	                    "Technical: Stored in the transaction and consumed by UndoConnections.\n"
-	                    "Notes: Hard rollback data; must include all connections created in the step."))
+	/**
+	 * @note Used in: Undo for ConnectionsCreated.
+	 * @note Why: Tracks connection actors spawned during a step for deterministic rollback.
+	 * @note Technical: Stored in the transaction and consumed by UndoConnections.
+	 * @note Notes: Hard rollback data; must include all connections created in the step.
+	 */
+	UPROPERTY()
 	TArray<TObjectPtr<AConnection>> SpawnedConnections;
 
-	UPROPERTY(meta = (ToolTip = "Used in: Undo for any step.\n"
-	                    "Why: Snapshot of placement state before the step so rollback restores maps and anchors.\n"
-	                    "Technical: Copied in ExecuteStepWithTransaction prior to mutation.\n"
-	                    "Notes: Restores deterministic state for retries."))
+	/**
+	 * @note Used in: Undo for any step.
+	 * @note Why: Snapshot of placement state before the step so rollback restores maps and anchors.
+	 * @note Technical: Copied in ExecuteStepWithTransaction prior to mutation.
+	 * @note Notes: Restores deterministic state for retries.
+	 */
+	UPROPERTY()
 	FWorldCampaignPlacementState PreviousPlacementState;
 
-	UPROPERTY(meta = (ToolTip = "Used in: Undo for any step.\n"
-	                    "Why: Snapshot of derived data before the step for consistent rollback.\n"
-	                    "Technical: Copied in ExecuteStepWithTransaction prior to mutation.\n"
-	                    "Notes: Keeps hop/degree caches aligned with placement state during backtracking."))
+	/**
+	 * @note Used in: Undo for any step.
+	 * @note Why: Snapshot of derived data before the step for consistent rollback.
+	 * @note Technical: Copied in ExecuteStepWithTransaction prior to mutation.
+	 * @note Notes: Keeps hop/degree caches aligned with placement state during backtracking.
+	 */
+	UPROPERTY()
 	FWorldCampaignDerivedData PreviousDerivedData;
 };
 
@@ -229,20 +284,29 @@ struct FConnectionSegment
 
 	FVector2D StartPoint;
 	FVector2D EndPoint;
-	UPROPERTY(meta = (ToolTip = "Used in: Connection intersection checks during ConnectionsCreated.\n"
-	                    "Why: Ties this segment back to the owning anchor for shared-endpoint logic.\n"
-	                    "Technical: Weak pointer to avoid GC issues; validated before use.\n"
-	                    "Notes: Internal debug/validation data only; not a placement rule."))
+	/**
+	 * @note Used in: Connection intersection checks during ConnectionsCreated.
+	 * @note Why: Ties this segment back to the owning anchor for shared-endpoint logic.
+	 * @note Technical: Weak pointer to avoid GC issues; validated before use.
+	 * @note Notes: Internal debug/validation data only; not a placement rule.
+	 */
+	UPROPERTY()
 	TWeakObjectPtr<AAnchorPoint> StartAnchor;
-	UPROPERTY(meta = (ToolTip = "Used in: Connection intersection checks during ConnectionsCreated.\n"
-	                    "Why: Ties this segment back to the second endpoint anchor for intersection filters.\n"
-	                    "Technical: Weak pointer to avoid GC ownership; validated before use.\n"
-	                    "Notes: Internal data; ignored if invalid."))
+	/**
+	 * @note Used in: Connection intersection checks during ConnectionsCreated.
+	 * @note Why: Ties this segment back to the second endpoint anchor for intersection filters.
+	 * @note Technical: Weak pointer to avoid GC ownership; validated before use.
+	 * @note Notes: Internal data; ignored if invalid.
+	 */
+	UPROPERTY()
 	TWeakObjectPtr<AAnchorPoint> EndAnchor;
-	UPROPERTY(meta = (ToolTip = "Used in: Connection intersection checks during ConnectionsCreated.\n"
-	                    "Why: Allows ignoring segments that belong to a specific connection during checks.\n"
-	                    "Technical: Weak pointer so destroyed connections do not keep references alive.\n"
-	                    "Notes: Internal data for generation safety; not exposed as tuning."))
+	/**
+	 * @note Used in: Connection intersection checks during ConnectionsCreated.
+	 * @note Why: Allows ignoring segments that belong to a specific connection during checks.
+	 * @note Technical: Weak pointer so destroyed connections do not keep references alive.
+	 * @note Notes: Internal data for generation safety; not exposed as tuning.
+	 */
+	UPROPERTY()
 	TWeakObjectPtr<AConnection> OwningConnection;
 };
 
@@ -514,155 +578,193 @@ private:
 	void DrawDebugConnectionForActor(UWorld* World, const AConnection* Connection, const FVector& HeightOffset,
 	                                 const FColor& BaseConnectionColor, const FColor& ThreeWayConnectionColor) const;
 
+	/**
+	 * @note Used in: Editor button gating for step execution.
+	 * @note Why: Enforces the ordered generation pipeline (ConnectionsCreated -> ... -> MissionsPlaced).
+	 * @note Technical: Each CallInEditor step checks this enum via EditCondition to enable buttons.
+	 * @note Notes: Changing it manually can desync cached data; intended for controlled progression.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: Editor button gating for step execution.\n"
-		                  "Why: Enforces the ordered generation pipeline (ConnectionsCreated -> ... -> MissionsPlaced).\n"
-		                  "Technical: Each CallInEditor step checks this enum via EditCondition to enable buttons.\n"
-		                  "Notes: Changing it manually can desync cached data; intended for controlled progression."))
+		meta = (AllowPrivateAccess = "true"))
 	ECampaignGenerationStep M_GenerationStep = ECampaignGenerationStep::NotStarted;
 
+	/**
+	 * @note Used in: All placement steps and undo.
+	 * @note Why: Exposes the current placement state for debugging and verification.
+	 * @note Technical: Mutated by Execute* functions; restored from transactions on backtrack.
+	 * @note Notes: Visible-only snapshot; editing is not supported.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: All placement steps and undo.\n"
-		                  "Why: Exposes the current placement state for debugging and verification.\n"
-		                  "Technical: Mutated by Execute* functions; restored from transactions on backtrack.\n"
-		                  "Notes: Visible-only snapshot; editing is not supported."))
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignPlacementState M_PlacementState;
 
+	/**
+	 * @note Used in: Debugging and placement filters.
+	 * @note Why: Shows derived caches like hop distances and connection degrees.
+	 * @note Technical: Updated during cache steps; read by placement logic for filtering.
+	 * @note Notes: Derived data; regenerated when connections change.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: Debugging and placement filters.\n"
-		                  "Why: Shows derived caches like hop distances and connection degrees.\n"
-		                  "Technical: Updated during cache steps; read by placement logic for filtering.\n"
-		                  "Notes: Derived data; regenerated when connections change."))
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignDerivedData M_DerivedData;
 
+	/**
+	 * @note Used in: Backtracking system.
+	 * @note Why: Stores a stack of step transactions for undo and retries.
+	 * @note Technical: Each successful step pushes a transaction; failures pop and restore.
+	 * @note Notes: Determinism depends on consistent transaction order.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: Backtracking system.\n"
-		                  "Why: Stores a stack of step transactions for undo and retries.\n"
-		                  "Technical: Each successful step pushes a transaction; failures pop and restore.\n"
-		                  "Notes: Determinism depends on consistent transaction order."))
+		meta = (AllowPrivateAccess = "true"))
 	TArray<FCampaignGenerationStepTransaction> M_StepTransactions;
 
+	/**
+	 * @note Used in: Backtracking and retry determinism.
+	 * @note Why: Tracks how many times each step has been attempted to vary the random stream.
+	 * @note Technical: Incremented per step failure; used to seed deterministic retries.
+	 * @note Notes: Changing this breaks reproducibility of attempt-based selection.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: Backtracking and retry determinism.\n"
-		                  "Why: Tracks how many times each step has been attempted to vary the random stream.\n"
-		                  "Technical: Incremented per step failure; used to seed deterministic retries.\n"
-		                  "Notes: Changing this breaks reproducibility of attempt-based selection."))
+		meta = (AllowPrivateAccess = "true"))
 	TMap<ECampaignGenerationStep, int32> M_StepAttemptIndices;
 
+	/**
+	 * @note Used in: Backtracking guardrails.
+	 * @note Why: Prevents infinite retry loops across all steps.
+	 * @note Technical: Incremented every attempt; compared against MaxTotalAttempts.
+	 * @note Notes: Hard fail-safe; exceeding it aborts generation.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: Backtracking guardrails.\n"
-		                  "Why: Prevents infinite retry loops across all steps.\n"
-		                  "Technical: Incremented every attempt; compared against MaxTotalAttempts.\n"
-		                  "Notes: Hard fail-safe; exceeding it aborts generation."))
+		meta = (AllowPrivateAccess = "true"))
 	int32 M_TotalAttemptCount = 0;
 
+	/**
+	 * @note Used in: ConnectionsCreated.
+	 * @note Why: Centralizes tuning for connection creation phases.
+	 * @note Technical: Read by ExecuteCreateConnections and helper functions when building the graph.
+	 * @note Notes: Changing these requires regenerating connections to take effect.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: ConnectionsCreated.\n"
-		                  "Why: Centralizes tuning for connection creation phases.\n"
-		                  "Technical: Read by ExecuteCreateConnections and helper functions when building the graph.\n"
-		                  "Notes: Changing these requires regenerating connections to take effect."))
+		meta = (AllowPrivateAccess = "true"))
 	FConnectionGenerationRules ConnectionGenerationRules;
 
+	/**
+	 * @note Used in: ConnectionsCreated.
+	 * @note Why: Defines which connection actor class is spawned so visuals/behavior can be customized.
+	 * @note Technical: Spawned per segment; must be a valid AConnection subclass.
+	 * @note Notes: If null or invalid, connection generation will fail.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: ConnectionsCreated.\n"
-		                  "Why: Defines which connection actor class is spawned so visuals/behavior can be customized.\n"
-		                  "Technical: Spawned per segment; must be a valid AConnection subclass.\n"
-		                  "Notes: If null or invalid, connection generation will fail."))
+		meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AConnection> M_ConnectionClass;
 
+	/**
+	 * @note Used in: Debugging and backtracking.
+	 * @note Why: Tracks the live connection actors generated in the current run.
+	 * @note Technical: Populated by ExecuteCreateConnections; used for later debug draws.
+	 * @note Notes: Cleared when generation is erased or rolled back.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: Debugging and backtracking.\n"
-		                  "Why: Tracks the live connection actors generated in the current run.\n"
-		                  "Technical: Populated by ExecuteCreateConnections; used for later debug draws.\n"
-		                  "Notes: Cleared when generation is erased or rolled back."))
+		meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<AConnection>> M_GeneratedConnections;
 
+	/**
+	 * @note Used in: DebugDrawAllConnections.
+	 * @note Why: Keeps debug lines visible long enough for inspection without pausing the editor.
+	 * @note Technical: Passed into DrawDebugLine as Duration for every segment.
+	 * @note Notes: Does not affect generation; purely debug visualization.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Debug",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: DebugDrawAllConnections.\n"
-		                  "Why: Keeps debug lines visible long enough for inspection without pausing the editor.\n"
-		                  "Technical: Passed into DrawDebugLine as Duration for every segment.\n"
-		                  "Notes: Does not affect generation; purely debug visualization."))
+		meta = (AllowPrivateAccess = "true"))
 	float M_DebugConnectionDrawDurationSeconds = WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds;
 
+	/**
+	 * @note Used in: DebugDrawAllConnections.
+	 * @note Why: Makes debug lines readable over dense map art or UI overlays.
+	 * @note Technical: Passed into DrawDebugLine as line thickness.
+	 * @note Notes: This is visual-only; does not affect collision or selection.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Debug",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: DebugDrawAllConnections.\n"
-		                  "Why: Makes debug lines readable over dense map art or UI overlays.\n"
-		                  "Technical: Passed into DrawDebugLine as line thickness.\n"
-		                  "Notes: This is visual-only; does not affect collision or selection."))
+		meta = (AllowPrivateAccess = "true"))
 	float M_DebugConnectionLineThickness = WorldCampaignDebugDefaults::ConnectionLineThickness;
 
+	/**
+	 * @note Used in: DebugDrawAllConnections.
+	 * @note Why: Offsets debug lines above the map so they are not Z-fighting with geometry.
+	 * @note Technical: Added to the Z of anchor and junction locations before drawing.
+	 * @note Notes: Visual-only; does not affect any placement logic.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Debug",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: DebugDrawAllConnections.\n"
-		                  "Why: Offsets debug lines above the map so they are not Z-fighting with geometry.\n"
-		                  "Technical: Added to the Z of anchor and junction locations before drawing.\n"
-		                  "Notes: Visual-only; does not affect any placement logic."))
+		meta = (AllowPrivateAccess = "true"))
 	float M_DebugConnectionDrawHeightOffset = WorldCampaignDebugDefaults::ConnectionDrawHeightOffset;
 
+	/**
+	 * @note Used in: PlayerHQPlaced.
+	 * @note Why: Defines player HQ eligibility and safety constraints for the start of the campaign.
+	 * @note Technical: Read by ExecutePlaceHQ and BuildHQAnchorCandidates.
+	 * @note Notes: Hard filters; if too strict, HQ placement will fail and trigger backtracking.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Player HQ",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: PlayerHQPlaced.\n"
-		                  "Why: Defines player HQ eligibility and safety constraints for the start of the campaign.\n"
-		                  "Technical: Read by ExecutePlaceHQ and BuildHQAnchorCandidates.\n"
-		                  "Notes: Hard filters; if too strict, HQ placement will fail and trigger backtracking."))
+		meta = (AllowPrivateAccess = "true"))
 	FPlayerHQPlacementRules M_PlayerHQPlacementRules;
 
+	/**
+	 * @note Used in: EnemyHQPlaced.
+	 * @note Why: Defines where the enemy HQ may appear relative to the player HQ and graph topology.
+	 * @note Technical: Read by ExecutePlaceEnemyHQ when building candidate lists and selecting by attempt.
+	 * @note Notes: Hard filters; overly strict rules trigger backtracking.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy HQ",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: EnemyHQPlaced.\n"
-		                  "Why: Defines where the enemy HQ may appear relative to the player HQ and graph topology.\n"
-		                  "Technical: Read by ExecutePlaceEnemyHQ when building candidate lists and selecting by attempt.\n"
-		                  "Notes: Hard filters; overly strict rules trigger backtracking."))
+		meta = (AllowPrivateAccess = "true"))
 	FEnemyHQPlacementRules M_EnemyHQPlacementRules;
 
+	/**
+	 * @note Used in: EnemyObjectsPlaced.
+	 * @note Why: Controls spacing and variant selection for enemy item placement.
+	 * @note Technical: Read by ExecutePlaceEnemyObjects and per-item placement logic.
+	 * @note Notes: Mix of hard filters (spacing) and soft variant selection (ordering).
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy Items",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: EnemyObjectsPlaced.\n"
-		                  "Why: Controls spacing and variant selection for enemy item placement.\n"
-		                  "Technical: Read by ExecutePlaceEnemyObjects and per-item placement logic.\n"
-		                  "Notes: Mix of hard filters (spacing) and soft variant selection (ordering)."))
+		meta = (AllowPrivateAccess = "true"))
 	FEnemyPlacementRules M_EnemyPlacementRules;
 
+	/**
+	 * @note Used in: NeutralObjectsPlaced.
+	 * @note Why: Controls spacing and selection of neutral items relative to the player HQ and other neutrals.
+	 * @note Technical: Read by ExecutePlaceNeutralObjects for hop-distance filtering and preference biasing.
+	 * @note Notes: Min/Max values are hard bounds; Preference is a soft bias within those bounds.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Neutral Items",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: NeutralObjectsPlaced.\n"
-		                  "Why: Controls spacing and selection of neutral items relative to the player HQ and other neutrals.\n"
-		                  "Technical: Read by ExecutePlaceNeutralObjects for hop-distance filtering and preference biasing.\n"
-		                  "Notes: Min/Max values are hard bounds; Preference is a soft bias within those bounds."))
+		meta = (AllowPrivateAccess = "true"))
 	FNeutralItemPlacementRules M_NeutralItemPlacementRules;
 
+	/**
+	 * @note Used in: MissionsPlaced.
+	 * @note Why: Defines mission placement tiers, spacing, and adjacency requirements.
+	 * @note Technical: Read by ExecutePlaceMissions and per-mission selection logic.
+	 * @note Notes: Mix of hard constraints (filters) and preferences (ordering/bias).
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Missions",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: MissionsPlaced.\n"
-		                  "Why: Defines mission placement tiers, spacing, and adjacency requirements.\n"
-		                  "Technical: Read by ExecutePlaceMissions and per-mission selection logic.\n"
-		                  "Notes: Mix of hard constraints (filters) and preferences (ordering/bias)."))
+		meta = (AllowPrivateAccess = "true"))
 	FMissionPlacement M_MissionPlacementRules;
 
+	/**
+	 * @note Used in: EnemyObjectsPlaced and NeutralObjectsPlaced setup.
+	 * @note Why: Scales base counts by difficulty to tune content density.
+	 * @note Technical: Read before placement to compute required item counts and per-type quotas.
+	 * @note Notes: Determinism depends on Seed and difficulty settings staying fixed.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Counts & Difficulty",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: EnemyObjectsPlaced and NeutralObjectsPlaced setup.\n"
-		                  "Why: Scales base counts by difficulty to tune content density.\n"
-		                  "Technical: Read before placement to compute required item counts and per-type quotas.\n"
-		                  "Notes: Determinism depends on Seed and difficulty settings staying fixed."))
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignCountDifficultyTuning M_CountAndDifficultyTuning;
 
+	/**
+	 * @note Used in: Backtracking when a step fails.
+	 * @note Why: Lets designers decide whether to relax rules, retry, or abort per step.
+	 * @note Technical: Read by HandleStepFailure and GetFailurePolicyForStep.
+	 * @note Notes: Affects determinism because different policies change which steps retry.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
-		meta = (AllowPrivateAccess = "true",
-		        ToolTip = "Used in: Backtracking when a step fails.\n"
-		                  "Why: Lets designers decide whether to relax rules, retry, or abort per step.\n"
-		                  "Technical: Read by HandleStepFailure and GetFailurePolicyForStep.\n"
-		                  "Notes: Affects determinism because different policies change which steps retry."))
+		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignPlacementFailurePolicy M_PlacementFailurePolicy;
 };
