@@ -398,6 +398,7 @@ private:
 	void ClearPlacementState();
 	void ClearDerivedData();
 	void CacheAnchorConnectionDegrees();
+	void BuildChokepointScoresCache(const AAnchorPoint* OptionalHQAnchor);
 	void DebugNotifyAnchorPicked(const AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const;
 
 	/**
