@@ -6,6 +6,12 @@ class AAnchorPoint;
 
 namespace CampaignGenerationHelper
 {
+	/**
+	 * @brief Builds a hop-distance cache for all anchors reachable from the HQ.
+	 * @param HQAnchor Anchor that defines the hop-distance origin.
+	 * @param OutHopDistances Map of anchor keys to hop distances from the HQ.
+	 */
+	void BuildHopDistanceCache(const AAnchorPoint* HQAnchor, TMap<FGuid, int32>& OutHopDistances);
 	int32 HopsFromHQ(const AAnchorPoint* AnchorPoint, const AAnchorPoint* HQAnchor);
 	float XYDistanceFromHQ(const AAnchorPoint* AnchorPoint, const AAnchorPoint* HQAnchor);
 
