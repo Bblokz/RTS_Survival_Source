@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 #include "WorldCampaignDebugger.generated.h"
 
@@ -75,6 +76,14 @@ public:
 	float DisplayTimeAcceptedLocation = 5.0f;
 
 	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
+		meta = (ToolTip = "Maximum total rejection debug draws per placement attempt. Use <= 0 for unlimited. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
+	int32 MaxRejectionDrawsPerAttempt = 200;
+
+	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
+		meta = (ToolTip = "Maximum rejection debug draws per reason per placement attempt. Use <= 0 for unlimited. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
+	int32 MaxRejectionDrawsPerReason = 25;
+
+	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
 		meta = (ToolTip = "When enabled, show connection degree details where relevant. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
 	bool bDebugAnchorDegree = false;
 
@@ -101,6 +110,18 @@ public:
 	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
 		meta = (ToolTip = "When enabled, display mission placement failure reasons. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
 	bool bDebugFailedMissionPlacement = false;
+
+	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
+		meta = (ToolTip = "When enabled, display mission candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
+	bool bDebugMissionCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
+		meta = (ToolTip = "When enabled, display enemy candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
+	bool bDebugEnemyCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
+		meta = (ToolTip = "When enabled, display neutral candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
+	bool bDebugNeutralCandidateRejections = false;
 
 	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
 		meta = (ToolTip = "When enabled, include hop distance from HQ in mission placement debug. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
@@ -200,14 +221,51 @@ public:
 	void DebugMissionPlacementFailed(AAnchorPoint* AnchorPoint, EMapMission MissionType, const FString& Reason);
 
 private:
+	enum class EWorldCampaignRejectionItemType : uint8
+	{
+		Enemy,
+		Neutral,
+		Mission,
+		Unknown
+	};
+
+	struct FWorldCampaignRejectionKey
+	{
+		EWorldCampaignRejectionItemType ItemType = EWorldCampaignRejectionItemType::Unknown;
+		FString Reason;
+
+		bool operator==(const FWorldCampaignRejectionKey& Other) const
+		{
+			return ItemType == Other.ItemType && Reason == Other.Reason;
+		}
+
+		friend uint32 GetTypeHash(const FWorldCampaignRejectionKey& Key)
+		{
+			return HashCombine(GetTypeHash(static_cast<uint8>(Key.ItemType)), GetTypeHash(Key.Reason));
+		}
+	};
+
+	struct FWorldCampaignRejectionAttemptState
+	{
+		int32 AttemptIndex = INDEX_NONE;
+		int32 TotalRejections = 0;
+		TMap<FWorldCampaignRejectionKey, int32> RejectionsByReason;
+	};
+
 	struct FWorldCampaignAnchorDebugStackState
 	{
 		float LastEndTimeSeconds = 0.f;
 		int32 StackIndex = 0;
 	};
 
+	bool CanDrawRejectionForAttempt(ECampaignGenerationStep Step, EWorldCampaignRejectionItemType ItemType,
+	                                const FString& Reason);
+	int32 GetAttemptIndexForStep(ECampaignGenerationStep Step) const;
 	float GetStackedHeightOffset(AAnchorPoint* AnchorPoint, float Duration);
 	float UpdateStackState(FWorldCampaignAnchorDebugStackState& State, float CurrentTimeSeconds, float Duration);
+
+	// Tracks per-step rejection counts and attempt indices for debug throttling.
+	TMap<ECampaignGenerationStep, FWorldCampaignRejectionAttemptState> M_RejectionStateByStep;
 
 	// Tracks stack height and expiry times for anchors that have valid GUID keys.
 	TMap<FGuid, FWorldCampaignAnchorDebugStackState> M_DebugStateByAnchorKey;
