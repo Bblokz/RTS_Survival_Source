@@ -76,10 +76,98 @@ namespace
 		return AnchorLookup;
 	}
 
+	TArray<EMapEnemyItem> BuildEnemyPlacementPlan(const TMap<EMapEnemyItem, int32>& RequiredEnemyCounts)
+	{
+		TArray<EMapEnemyItem> PlacementPlan;
+		const TArray<EMapEnemyItem> EnemyTypes = GetSortedEnemyTypes(RequiredEnemyCounts);
+		for (const EMapEnemyItem EnemyType : EnemyTypes)
+		{
+			if (EnemyType == EMapEnemyItem::EnemyHQ || EnemyType == EMapEnemyItem::EnemyWall)
+			{
+				continue;
+			}
+
+			const int32 RequiredCount = RequiredEnemyCounts.FindRef(EnemyType);
+			for (int32 PlacementIndex = 0; PlacementIndex < RequiredCount; PlacementIndex++)
+			{
+				PlacementPlan.Add(EnemyType);
+			}
+		}
+
+		return PlacementPlan;
+	}
+
+	TArray<EMapMission> BuildMissionPlacementPlan(const FMissionPlacement& MissionPlacementRules)
+	{
+		TArray<EMapMission> PlacementPlan;
+		const TArray<EMapMission> MissionTypes = GetSortedMissionTypes(MissionPlacementRules.RulesByMission);
+		for (const EMapMission MissionType : MissionTypes)
+		{
+			PlacementPlan.Add(MissionType);
+		}
+
+		return PlacementPlan;
+	}
+
+	void AppendAnchorKeyIfValid(const FGuid& AnchorKey, TSet<FGuid>& OutAnchorKeys)
+	{
+		if (AnchorKey.IsValid())
+		{
+			OutAnchorKeys.Add(AnchorKey);
+		}
+	}
+
+	void AppendAnchorKeysFromTransaction(const FCampaignGenerationStepTransaction& Transaction,
+	                                     TSet<FGuid>& OutAnchorKeys)
+	{
+		AppendAnchorKeyIfValid(Transaction.MicroAnchorKey, OutAnchorKeys);
+		for (const FGuid& AnchorKey : Transaction.MicroAdditionalAnchorKeys)
+		{
+			AppendAnchorKeyIfValid(AnchorKey, OutAnchorKeys);
+		}
+
+		for (const TObjectPtr<AActor>& SpawnedActor : Transaction.SpawnedActors)
+		{
+			if (not IsValid(SpawnedActor))
+			{
+				continue;
+			}
+
+			const AWorldMapObject* MapObject = Cast<AWorldMapObject>(SpawnedActor);
+			if (not IsValid(MapObject))
+			{
+				continue;
+			}
+
+			AppendAnchorKeyIfValid(MapObject->GetAnchorKey(), OutAnchorKeys);
+		}
+	}
+
 	AAnchorPoint* FindAnchorByKey(const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup, const FGuid& AnchorKey)
 	{
 		const TObjectPtr<AAnchorPoint>* AnchorPtr = AnchorLookup.Find(AnchorKey);
 		return AnchorPtr ? AnchorPtr->Get() : nullptr;
+	}
+
+	void RemovePromotedWorldObjectsForAnchorKeys(const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors,
+	                                             const TSet<FGuid>& AnchorKeys)
+	{
+		if (AnchorKeys.Num() == 0)
+		{
+			return;
+		}
+
+		const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(CachedAnchors);
+		for (const FGuid& AnchorKey : AnchorKeys)
+		{
+			AAnchorPoint* AnchorPoint = FindAnchorByKey(AnchorLookup, AnchorKey);
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			AnchorPoint->RemovePromotedWorldObject();
+		}
 	}
 
 	bool IsAnchorOccupied(const FGuid& AnchorKey, const FWorldCampaignPlacementState& PlacementState)
@@ -2665,6 +2753,8 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 	M_StepTransactions.Reset();
 	M_StepAttemptIndices.Reset();
 	M_TotalAttemptCount = 0;
+	M_EnemyMicroPlacedCount = 0;
+	M_MissionMicroPlacedCount = 0;
 	M_GenerationStep = ECampaignGenerationStep::NotStarted;
 
 	TArray<TObjectPtr<AAnchorPoint>> AnchorPoints;
@@ -2784,6 +2874,12 @@ bool AGeneratorWorldCampaign::ExecuteStepWithTransaction(ECampaignGenerationStep
 		return false;
 	}
 
+	if (CompletedStep == ECampaignGenerationStep::EnemyObjectsPlaced
+		|| CompletedStep == ECampaignGenerationStep::MissionsPlaced)
+	{
+		return ExecuteStepWithMicroTransactions(CompletedStep, StepFunction);
+	}
+
 	FCampaignGenerationStepTransaction Transaction;
 	Transaction.CompletedStep = CompletedStep;
 	Transaction.PreviousPlacementState = M_PlacementState;
@@ -2795,6 +2891,21 @@ bool AGeneratorWorldCampaign::ExecuteStepWithTransaction(ECampaignGenerationStep
 	}
 
 	M_StepTransactions.Add(Transaction);
+	M_GenerationStep = CompletedStep;
+	ResetStepAttemptsFrom(CompletedStep);
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecuteStepWithMicroTransactions(ECampaignGenerationStep CompletedStep,
+                                                               bool (AGeneratorWorldCampaign::*StepFunction)(
+	                                                               FCampaignGenerationStepTransaction&))
+{
+	FCampaignGenerationStepTransaction UnusedTransaction;
+	if (not(this->*StepFunction)(UnusedTransaction))
+	{
+		return false;
+	}
+
 	M_GenerationStep = CompletedStep;
 	ResetStepAttemptsFrom(CompletedStep);
 	return true;
@@ -3178,16 +3289,8 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyWall(FCampaignGenerationStepTrans
 	return true;
 }
 
-bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction)
+bool AGeneratorWorldCampaign::ValidateEnemyObjectPlacementPrerequisites() const
 {
-	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
-
-	const int32 RequiredEnemyItems = GetRequiredEnemyItemCount(M_CountAndDifficultyTuning);
-	if (RequiredEnemyItems <= NoRequiredItems)
-	{
-		return true;
-	}
-
 	if (not GetIsValidEnemyHQAnchor())
 	{
 		return false;
@@ -3210,55 +3313,250 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTr
 		return false;
 	}
 
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ValidateMissionPlacementPrerequisites() const
+{
+	if (not GetIsValidPlayerHQAnchor())
+	{
+		return false;
+	}
+
+	if (M_PlacementState.CachedAnchors.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission placement failed: no cached anchors available."));
+		return false;
+	}
+
+	if (M_DerivedData.PlayerHQHopDistancesByAnchorKey.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission placement failed: player HQ hop cache is empty."));
+		return false;
+	}
+
+	return true;
+}
+
+void AGeneratorWorldCampaign::RollbackMicroPlacement(const FCampaignGenerationStepTransaction& Transaction)
+{
+	TSet<FGuid> AnchorKeysToClear;
+	AppendAnchorKeyIfValid(Transaction.MicroAnchorKey, AnchorKeysToClear);
+	for (const FGuid& AnchorKey : Transaction.MicroAdditionalAnchorKeys)
+	{
+		AppendAnchorKeyIfValid(AnchorKey, AnchorKeysToClear);
+	}
+
+	M_PlacementState = Transaction.PreviousPlacementState;
+	M_DerivedData = Transaction.PreviousDerivedData;
+	RemovePromotedWorldObjectsForAnchorKeys(M_PlacementState.CachedAnchors, AnchorKeysToClear);
+}
+
+bool AGeneratorWorldCampaign::TrySelectSingleEnemyPlacement(EMapEnemyItem EnemyTypeToPlace,
+                                                            FWorldCampaignPlacementState& WorkingPlacementState,
+                                                            FWorldCampaignDerivedData& WorkingDerivedData,
+                                                            TPair<TObjectPtr<AAnchorPoint>, EMapEnemyItem>&
+                                                            OutPromotion)
+{
+	constexpr int32 SinglePlacementCount = 1;
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::EnemyObjectsPlaced);
 	const FRuleRelaxationState RelaxationState = GetRelaxationState(
 		GetFailurePolicyForStep(ECampaignGenerationStep::EnemyObjectsPlaced),
 		AttemptIndex);
 	const int32 SafeZoneMaxHops = RelaxationState.bRelaxDistance ? 0 : M_PlayerHQPlacementRules.SafeZoneMaxHops;
 
-	FWorldCampaignPlacementState WorkingPlacementState = M_PlacementState;
-	FWorldCampaignDerivedData WorkingDerivedData = M_DerivedData;
 	const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(WorkingPlacementState.CachedAnchors);
-	const TMap<EMapEnemyItem, int32> RequiredEnemyCounts = BuildRequiredEnemyItemCounts(M_CountAndDifficultyTuning);
-	const TArray<EMapEnemyItem> EnemyTypes = GetSortedEnemyTypes(RequiredEnemyCounts);
+	const FEnemyItemRuleset* RulesetPtr = M_EnemyPlacementRules.RulesByEnemyItem.Find(EnemyTypeToPlace);
+	const FEnemyItemRuleset Ruleset = RulesetPtr ? *RulesetPtr : FEnemyItemRuleset();
 	TArray<TPair<TObjectPtr<AAnchorPoint>, EMapEnemyItem>> Promotions;
 
-	for (const EMapEnemyItem EnemyType : EnemyTypes)
+	if (not TryPlaceEnemyItemsForType(*this, EnemyTypeToPlace, SinglePlacementCount, Ruleset, AttemptIndex,
+	                                  RelaxationState, SafeZoneMaxHops, WorkingPlacementState, WorkingDerivedData,
+	                                  AnchorLookup, Promotions))
 	{
-		const int32* RequiredCountPtr = RequiredEnemyCounts.Find(EnemyType);
-		const int32 RequiredCount = RequiredCountPtr ? *RequiredCountPtr : 0;
-		if (RequiredCount <= 0)
+		return false;
+	}
+
+	if (Promotions.Num() != SinglePlacementCount)
+	{
+		return false;
+	}
+
+	OutPromotion = Promotions[0];
+	return IsValid(OutPromotion.Key);
+}
+
+bool AGeneratorWorldCampaign::TrySelectSingleMissionPlacement(EMapMission MissionTypeToPlace,
+                                                              int32 MicroIndexWithinParent,
+                                                              FWorldCampaignPlacementState& WorkingPlacementState,
+                                                              FWorldCampaignDerivedData& WorkingDerivedData,
+                                                              TPair<TObjectPtr<AAnchorPoint>, EMapMission>&
+                                                              OutPromotion,
+                                                              TArray<TPair<TObjectPtr<AAnchorPoint>,
+                                                                  EMapNeutralObjectType>>& OutCompanionPromotions)
+{
+	constexpr int32 SinglePlacementCount = 1;
+	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::MissionsPlaced);
+	const FRuleRelaxationState RelaxationState = GetRelaxationState(
+		GetFailurePolicyForStep(ECampaignGenerationStep::MissionsPlaced),
+		AttemptIndex);
+
+	const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(WorkingPlacementState.CachedAnchors);
+	TArray<TPair<TObjectPtr<AAnchorPoint>, EMapMission>> Promotions;
+
+	if (not TryPlaceMissionForType(*this, MissionTypeToPlace, MicroIndexWithinParent, AttemptIndex, RelaxationState,
+	                               M_MissionPlacementRules, M_NeutralItemPlacementRules, WorkingPlacementState,
+	                               WorkingDerivedData, AnchorLookup, Promotions, OutCompanionPromotions))
+	{
+		return false;
+	}
+
+	if (Promotions.Num() != SinglePlacementCount)
+	{
+		return false;
+	}
+
+	OutPromotion = Promotions[0];
+	return IsValid(OutPromotion.Key);
+}
+
+bool AGeneratorWorldCampaign::TryFinalizeMissionMicroPlacement(
+	const TPair<TObjectPtr<AAnchorPoint>, EMapMission>& Promotion,
+	const TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>>& CompanionPromotions,
+	FCampaignGenerationStepTransaction& OutMicroTransaction)
+{
+	for (const TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>& CompanionPromotion : CompanionPromotions)
+	{
+		if (not IsValid(CompanionPromotion.Key))
 		{
-			continue;
+			RollbackMicroPlacement(OutMicroTransaction);
+			return false;
 		}
 
-		const FEnemyItemRuleset* RulesetPtr = M_EnemyPlacementRules.RulesByEnemyItem.Find(EnemyType);
-		const FEnemyItemRuleset Ruleset = RulesetPtr ? *RulesetPtr : FEnemyItemRuleset();
-
-		if (not TryPlaceEnemyItemsForType(*this, EnemyType, RequiredCount, Ruleset, AttemptIndex, RelaxationState,
-		                                  SafeZoneMaxHops, WorkingPlacementState, WorkingDerivedData, AnchorLookup,
-		                                  Promotions))
+		const FGuid CompanionKey = CompanionPromotion.Key->GetAnchorKey();
+		if (CompanionKey != OutMicroTransaction.MicroAnchorKey)
 		{
-			return false;
+			OutMicroTransaction.MicroAdditionalAnchorKeys.Add(CompanionKey);
 		}
 	}
 
-	M_PlacementState = WorkingPlacementState;
-	M_DerivedData = WorkingDerivedData;
-	for (const TPair<TObjectPtr<AAnchorPoint>, EMapEnemyItem>& Promotion : Promotions)
+	AWorldMapObject* SpawnedMissionObject = Promotion.Key->OnMissionPromotion(
+		Promotion.Value,
+		ECampaignGenerationStep::MissionsPlaced);
+	if (not IsValid(SpawnedMissionObject))
 	{
-		if (not IsValid(Promotion.Key))
+		RollbackMicroPlacement(OutMicroTransaction);
+		return false;
+	}
+
+	OutMicroTransaction.SpawnedActors.Add(SpawnedMissionObject);
+	for (const TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>& CompanionPromotion : CompanionPromotions)
+	{
+		if (not IsValid(CompanionPromotion.Key))
 		{
-			continue;
+			RollbackMicroPlacement(OutMicroTransaction);
+			return false;
 		}
 
-		AWorldMapObject* SpawnedObject = Promotion.Key->OnEnemyItemPromotion(
-			Promotion.Value,
-			ECampaignGenerationStep::EnemyObjectsPlaced);
-		if (IsValid(SpawnedObject))
+		AWorldMapObject* SpawnedCompanionObject = CompanionPromotion.Key->OnNeutralItemPromotion(
+			CompanionPromotion.Value,
+			ECampaignGenerationStep::MissionsPlaced);
+		if (not IsValid(SpawnedCompanionObject))
 		{
-			OutTransaction.SpawnedActors.Add(SpawnedObject);
+			RollbackMicroPlacement(OutMicroTransaction);
+			return false;
 		}
+
+		OutMicroTransaction.SpawnedActors.Add(SpawnedCompanionObject);
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecutePlaceSingleEnemyObject(EMapEnemyItem EnemyTypeToPlace,
+                                                            int32 PlacementOrdinalWithinType,
+                                                            int32 MicroIndexWithinParent,
+                                                            FCampaignGenerationStepTransaction& OutMicroTransaction)
+{
+	// NOTE: If this step spawns actors, add them to OutMicroTransaction.SpawnedActors for rollback.
+	(void)PlacementOrdinalWithinType;
+
+	if (not ValidateEnemyObjectPlacementPrerequisites())
+	{
+		return false;
+	}
+
+	FWorldCampaignPlacementState WorkingPlacementState = M_PlacementState;
+	FWorldCampaignDerivedData WorkingDerivedData = M_DerivedData;
+	TPair<TObjectPtr<AAnchorPoint>, EMapEnemyItem> Promotion;
+
+	OutMicroTransaction.PreviousPlacementState = M_PlacementState;
+	OutMicroTransaction.PreviousDerivedData = M_DerivedData;
+	if (not TrySelectSingleEnemyPlacement(EnemyTypeToPlace, WorkingPlacementState, WorkingDerivedData, Promotion))
+	{
+		return false;
+	}
+
+	if (not IsValid(Promotion.Key))
+	{
+		return false;
+	}
+
+	OutMicroTransaction.CompletedStep = ECampaignGenerationStep::EnemyObjectsPlaced;
+	OutMicroTransaction.bIsMicroTransaction = true;
+	OutMicroTransaction.MicroParentStep = ECampaignGenerationStep::EnemyObjectsPlaced;
+	OutMicroTransaction.MicroAnchorKey = Promotion.Key->GetAnchorKey();
+	OutMicroTransaction.MicroItemType = EMapItemType::EnemyItem;
+	OutMicroTransaction.MicroIndexWithinParent = MicroIndexWithinParent;
+
+	M_PlacementState = WorkingPlacementState;
+	M_DerivedData = WorkingDerivedData;
+
+	AWorldMapObject* SpawnedObject = Promotion.Key->OnEnemyItemPromotion(
+		Promotion.Value,
+		ECampaignGenerationStep::EnemyObjectsPlaced);
+	if (not IsValid(SpawnedObject))
+	{
+		RollbackMicroPlacement(OutMicroTransaction);
+		return false;
+	}
+
+	OutMicroTransaction.SpawnedActors.Add(SpawnedObject);
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
+	(void)OutTransaction;
+	const int32 RequiredEnemyItems = GetRequiredEnemyItemCount(M_CountAndDifficultyTuning);
+	if (RequiredEnemyItems <= NoRequiredItems)
+	{
+		return true;
+	}
+
+	const TMap<EMapEnemyItem, int32> RequiredEnemyCounts = BuildRequiredEnemyItemCounts(M_CountAndDifficultyTuning);
+	const TArray<EMapEnemyItem> EnemyPlacementPlan = BuildEnemyPlacementPlan(RequiredEnemyCounts);
+	if (EnemyPlacementPlan.Num() == 0)
+	{
+		return true;
+	}
+
+	UpdateMicroPlacementProgressFromTransactions();
+	const int32 AlreadyPlacedCount = FMath::Clamp(M_EnemyMicroPlacedCount, 0, EnemyPlacementPlan.Num());
+	for (int32 MicroIndex = AlreadyPlacedCount; MicroIndex < EnemyPlacementPlan.Num(); MicroIndex++)
+	{
+		const EMapEnemyItem EnemyTypeToPlace = EnemyPlacementPlan[MicroIndex];
+		const int32 PlacementOrdinalWithinType = M_DerivedData.EnemyItemPlacedCounts.FindRef(EnemyTypeToPlace);
+		FCampaignGenerationStepTransaction MicroTransaction;
+		if (not ExecutePlaceSingleEnemyObject(EnemyTypeToPlace, PlacementOrdinalWithinType, MicroIndex,
+		                                      MicroTransaction))
+		{
+			return false;
+		}
+
+		M_StepTransactions.Add(MicroTransaction);
+		M_EnemyMicroPlacedCount = MicroIndex + 1;
 	}
 
 	return true;
@@ -3342,88 +3640,74 @@ bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStep
 	return true;
 }
 
+bool AGeneratorWorldCampaign::ExecutePlaceSingleMission(EMapMission MissionTypeToPlace, int32 MicroIndexWithinParent,
+                                                        FCampaignGenerationStepTransaction& OutMicroTransaction)
+{
+	// NOTE: If this step spawns actors, add them to OutMicroTransaction.SpawnedActors for rollback.
+	if (not ValidateMissionPlacementPrerequisites())
+	{
+		return false;
+	}
+
+	FWorldCampaignPlacementState WorkingPlacementState = M_PlacementState;
+	FWorldCampaignDerivedData WorkingDerivedData = M_DerivedData;
+	TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>> CompanionPromotions;
+	TPair<TObjectPtr<AAnchorPoint>, EMapMission> Promotion;
+
+	OutMicroTransaction.PreviousPlacementState = M_PlacementState;
+	OutMicroTransaction.PreviousDerivedData = M_DerivedData;
+	if (not TrySelectSingleMissionPlacement(MissionTypeToPlace, MicroIndexWithinParent, WorkingPlacementState,
+	                                        WorkingDerivedData, Promotion, CompanionPromotions))
+	{
+		return false;
+	}
+
+	if (not IsValid(Promotion.Key))
+	{
+		return false;
+	}
+
+	OutMicroTransaction.CompletedStep = ECampaignGenerationStep::MissionsPlaced;
+	OutMicroTransaction.bIsMicroTransaction = true;
+	OutMicroTransaction.MicroParentStep = ECampaignGenerationStep::MissionsPlaced;
+	OutMicroTransaction.MicroAnchorKey = Promotion.Key->GetAnchorKey();
+	OutMicroTransaction.MicroItemType = EMapItemType::Mission;
+	OutMicroTransaction.MicroIndexWithinParent = MicroIndexWithinParent;
+
+	M_PlacementState = WorkingPlacementState;
+	M_DerivedData = WorkingDerivedData;
+	return TryFinalizeMissionMicroPlacement(Promotion, CompanionPromotions, OutMicroTransaction);
+}
+
 bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
-
+	(void)OutTransaction;
 	const int32 RequiredMissions = GetRequiredMissionCount(M_MissionPlacementRules);
 	if (RequiredMissions <= NoRequiredItems)
 	{
 		return true;
 	}
 
-	if (not GetIsValidPlayerHQAnchor())
+	const TArray<EMapMission> MissionPlacementPlan = BuildMissionPlacementPlan(M_MissionPlacementRules);
+	if (MissionPlacementPlan.Num() == 0)
 	{
-		return false;
+		return true;
 	}
 
-	if (M_PlacementState.CachedAnchors.Num() == 0)
+	UpdateMicroPlacementProgressFromTransactions();
+	const int32 AlreadyPlacedCount = FMath::Clamp(M_MissionMicroPlacedCount, 0, MissionPlacementPlan.Num());
+	for (int32 MicroIndex = AlreadyPlacedCount; MicroIndex < MissionPlacementPlan.Num(); MicroIndex++)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission placement failed: no cached anchors available."));
-		return false;
-	}
-
-	if (M_DerivedData.PlayerHQHopDistancesByAnchorKey.Num() == 0)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission placement failed: player HQ hop cache is empty."));
-		return false;
-	}
-
-	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::MissionsPlaced);
-	const FRuleRelaxationState RelaxationState = GetRelaxationState(
-		GetFailurePolicyForStep(ECampaignGenerationStep::MissionsPlaced),
-		AttemptIndex);
-
-	FWorldCampaignPlacementState WorkingPlacementState = M_PlacementState;
-	FWorldCampaignDerivedData WorkingDerivedData = M_DerivedData;
-	const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(WorkingPlacementState.CachedAnchors);
-	const TArray<EMapMission> MissionTypes = GetSortedMissionTypes(M_MissionPlacementRules.RulesByMission);
-	TArray<TPair<TObjectPtr<AAnchorPoint>, EMapMission>> Promotions;
-	TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>> CompanionPromotions;
-
-	for (int32 MissionIndex = 0; MissionIndex < MissionTypes.Num(); MissionIndex++)
-	{
-		const EMapMission MissionType = MissionTypes[MissionIndex];
-		if (not TryPlaceMissionForType(*this, MissionType, MissionIndex, AttemptIndex, RelaxationState,
-		                               M_MissionPlacementRules, M_NeutralItemPlacementRules, WorkingPlacementState,
-		                               WorkingDerivedData, AnchorLookup, Promotions, CompanionPromotions))
+		const EMapMission MissionTypeToPlace = MissionPlacementPlan[MicroIndex];
+		FCampaignGenerationStepTransaction MicroTransaction;
+		if (not ExecutePlaceSingleMission(MissionTypeToPlace, MicroIndex, MicroTransaction))
 		{
 			return false;
 		}
-	}
 
-	M_PlacementState = WorkingPlacementState;
-	M_DerivedData = WorkingDerivedData;
-	for (const TPair<TObjectPtr<AAnchorPoint>, EMapMission>& Promotion : Promotions)
-	{
-		if (not IsValid(Promotion.Key))
-		{
-			continue;
-		}
-
-		AWorldMapObject* SpawnedObject = Promotion.Key->OnMissionPromotion(
-			Promotion.Value,
-			ECampaignGenerationStep::MissionsPlaced);
-		if (IsValid(SpawnedObject))
-		{
-			OutTransaction.SpawnedActors.Add(SpawnedObject);
-		}
-	}
-
-	for (const TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>& Promotion : CompanionPromotions)
-	{
-		if (not IsValid(Promotion.Key))
-		{
-			continue;
-		}
-
-		AWorldMapObject* SpawnedObject = Promotion.Key->OnNeutralItemPromotion(
-			Promotion.Value,
-			ECampaignGenerationStep::MissionsPlaced);
-		if (IsValid(SpawnedObject))
-		{
-			OutTransaction.SpawnedActors.Add(SpawnedObject);
-		}
+		M_StepTransactions.Add(MicroTransaction);
+		M_MissionMicroPlacedCount = MicroIndex + 1;
 	}
 
 	return true;
@@ -3630,6 +3914,21 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 		return false;
 	}
 
+	const int32 TrailingMicroTransactions = CountTrailingMicroTransactionsForStep(FailedStep);
+	if (TrailingMicroTransactions > 0
+		&& (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced
+			|| FailedStep == ECampaignGenerationStep::MissionsPlaced))
+	{
+		UndoLastTransaction();
+		InOutStepIndex = StepOrder.IndexOfByKey(FailedStep);
+		if (InOutStepIndex == INDEX_NONE)
+		{
+			InOutStepIndex = 0;
+		}
+
+		return true;
+	}
+
 	const int32 AttemptIndex = GetStepAttemptIndex(FailedStep);
 	if (FailurePolicy == EPlacementFailurePolicy::BreakDistanceRules_ThenBackTrack
 		&& AttemptIndex <= MaxRelaxationAttempts)
@@ -3676,6 +3975,8 @@ void AGeneratorWorldCampaign::UndoLastTransaction()
 	}
 
 	const FCampaignGenerationStepTransaction Transaction = M_StepTransactions.Pop();
+	TSet<FGuid> AnchorKeysToClear;
+	AppendAnchorKeysFromTransaction(Transaction, AnchorKeysToClear);
 	for (const TObjectPtr<AActor>& SpawnedActor : Transaction.SpawnedActors)
 	{
 		if (not IsValid(SpawnedActor))
@@ -3686,17 +3987,7 @@ void AGeneratorWorldCampaign::UndoLastTransaction()
 		SpawnedActor->Destroy();
 	}
 
-	TArray<TObjectPtr<AAnchorPoint>> AnchorPoints;
-	GatherAnchorPoints(AnchorPoints);
-	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
-	{
-		if (not IsValid(AnchorPoint))
-		{
-			continue;
-		}
-
-		AnchorPoint->RemovePromotedWorldObject();
-	}
+	RemovePromotedWorldObjectsForAnchorKeys(M_PlacementState.CachedAnchors, AnchorKeysToClear);
 
 	switch (Transaction.CompletedStep)
 	{
@@ -3710,6 +4001,7 @@ void AGeneratorWorldCampaign::UndoLastTransaction()
 	M_PlacementState = Transaction.PreviousPlacementState;
 	M_DerivedData = Transaction.PreviousDerivedData;
 	M_GenerationStep = GetPrerequisiteStep(Transaction.CompletedStep);
+	UpdateMicroPlacementProgressFromTransactions();
 }
 
 void AGeneratorWorldCampaign::UndoConnections(const FCampaignGenerationStepTransaction& Transaction)
@@ -3737,6 +4029,29 @@ void AGeneratorWorldCampaign::UndoConnections(const FCampaignGenerationStepTrans
 	}
 
 	M_GeneratedConnections.Reset();
+}
+
+int32 AGeneratorWorldCampaign::CountTrailingMicroTransactionsForStep(ECampaignGenerationStep Step) const
+{
+	int32 TrailingCount = 0;
+	for (int32 TransactionIndex = M_StepTransactions.Num() - 1; TransactionIndex >= 0; TransactionIndex--)
+	{
+		const FCampaignGenerationStepTransaction& Transaction = M_StepTransactions[TransactionIndex];
+		if (Transaction.CompletedStep != Step || not Transaction.bIsMicroTransaction)
+		{
+			break;
+		}
+
+		TrailingCount++;
+	}
+
+	return TrailingCount;
+}
+
+void AGeneratorWorldCampaign::UpdateMicroPlacementProgressFromTransactions()
+{
+	M_EnemyMicroPlacedCount = CountTrailingMicroTransactionsForStep(ECampaignGenerationStep::EnemyObjectsPlaced);
+	M_MissionMicroPlacedCount = CountTrailingMicroTransactionsForStep(ECampaignGenerationStep::MissionsPlaced);
 }
 
 void AGeneratorWorldCampaign::ClearPlacementState()
