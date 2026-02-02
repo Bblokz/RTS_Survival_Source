@@ -305,6 +305,27 @@ namespace
 		}
 	}
 
+	float GetEnemyWallPreferenceScore(EEnemyTopologySearchStrategy Preference, int32 ConnectionDegree,
+	                                  float ChokepointScore)
+	{
+		switch (Preference)
+		{
+		case EEnemyTopologySearchStrategy::PreferLowDegree:
+			return -static_cast<float>(ConnectionDegree);
+		case EEnemyTopologySearchStrategy::PreferHighDegree:
+			return static_cast<float>(ConnectionDegree);
+		case EEnemyTopologySearchStrategy::PreferDeadEnds:
+			return ConnectionDegree == 1 ? 1.f : 0.f;
+		case EEnemyTopologySearchStrategy::PreferChokepoints:
+			return ChokepointScore;
+		case EEnemyTopologySearchStrategy::PreferNearMinBound:
+		case EEnemyTopologySearchStrategy::PreferNearMaxBound:
+		case EEnemyTopologySearchStrategy::None:
+		default:
+			return 0.f;
+		}
+	}
+
 	float GetTopologyPreferenceScore(ETopologySearchStrategy Preference, float Value)
 	{
 		if (Preference == ETopologySearchStrategy::PreferMax)
@@ -715,6 +736,64 @@ namespace
 		});
 
 		const int32 CandidateIndex = (AttemptIndex + ExistingCount) % Candidates.Num();
+		OutCandidate = Candidates[CandidateIndex];
+		return IsValid(OutCandidate.AnchorPoint);
+	}
+
+	bool TrySelectEnemyWallPlacementCandidate(const AGeneratorWorldCampaign& Generator,
+	                                          const FEnemyWallPlacementRules& PlacementRules,
+	                                          const FWorldCampaignPlacementState& PlacementState,
+	                                          const FWorldCampaignDerivedData& DerivedData,
+	                                          int32 AttemptIndex,
+	                                          FPlacementCandidate& OutCandidate)
+	{
+		TArray<FPlacementCandidate> Candidates;
+		for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : PlacementRules.AnchorCandidates)
+		{
+			if (not IsValid(CandidateAnchor))
+			{
+				continue;
+			}
+
+			if (not Generator.IsAnchorCached(CandidateAnchor))
+			{
+				continue;
+			}
+
+			const FGuid CandidateKey = CandidateAnchor->GetAnchorKey();
+			if (IsAnchorOccupied(CandidateKey, PlacementState))
+			{
+				continue;
+			}
+
+			const int32 ConnectionDegree = Generator.GetAnchorConnectionDegree(CandidateAnchor);
+			const float ChokepointScore = DerivedData.ChokepointScoresByAnchorKey.FindRef(CandidateKey);
+			const float PreferenceScore = GetEnemyWallPreferenceScore(PlacementRules.Preference, ConnectionDegree,
+			                                                          ChokepointScore);
+
+			FPlacementCandidate Candidate;
+			Candidate.AnchorPoint = CandidateAnchor;
+			Candidate.AnchorKey = CandidateKey;
+			Candidate.Score = PreferenceScore;
+			Candidates.Add(Candidate);
+		}
+
+		if (Candidates.Num() == 0)
+		{
+			return false;
+		}
+
+		Algo::Sort(Candidates, [](const FPlacementCandidate& Left, const FPlacementCandidate& Right)
+		{
+			if (Left.Score != Right.Score)
+			{
+				return Left.Score > Right.Score;
+			}
+
+			return AAnchorPoint::IsAnchorKeyLess(Left.AnchorKey, Right.AnchorKey);
+		});
+
+		const int32 CandidateIndex = AttemptIndex % Candidates.Num();
 		OutCandidate = Candidates[CandidateIndex];
 		return IsValid(OutCandidate.AnchorPoint);
 	}
@@ -1437,12 +1516,21 @@ namespace
 	                                        const FWorldCampaignPlacementState& WorkingPlacementState,
 	                                        const FWorldCampaignDerivedData& WorkingDerivedData,
 	                                        const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                        const TArray<TObjectPtr<AAnchorPoint>>* CandidateSourceOverride,
 	                                        FPlacementCandidate& OutCandidate)
 	{
+		const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = CandidateSourceOverride
+			                                                           ? *CandidateSourceOverride
+			                                                           : WorkingPlacementState.CachedAnchors;
 		TArray<FPlacementCandidate> Candidates;
-		for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : WorkingPlacementState.CachedAnchors)
+		for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : CandidateSource)
 		{
 			if (not IsValid(CandidateAnchor))
+			{
+				continue;
+			}
+
+			if (CandidateSourceOverride != nullptr && not Generator.IsAnchorCached(CandidateAnchor))
 			{
 				continue;
 			}
@@ -1696,10 +1784,21 @@ namespace
 			EffectiveRules.ConnectionPreference = ETopologySearchStrategy::NotSet;
 		}
 
+		const bool bOverridePlacementWithArray = MissionRulesPtr->bOverridePlacementWithArray;
+		if (bOverridePlacementWithArray && MissionRulesPtr->OverridePlacementAnchorCandidates.Num() == 0)
+		{
+			return false;
+		}
+
+		const TArray<TObjectPtr<AAnchorPoint>>* CandidateSourceOverride = bOverridePlacementWithArray
+			                                                                  ? &MissionRulesPtr->OverridePlacementAnchorCandidates
+			                                                                  : nullptr;
+
 		FPlacementCandidate SelectedCandidate;
 		if (not TrySelectMissionPlacementCandidate(Generator, EffectiveRules, MissionType, AttemptIndex, MissionIndex,
 		                                           RelaxationState, NeutralRules, WorkingPlacementState,
-		                                           WorkingDerivedData, AnchorLookup, SelectedCandidate))
+		                                           WorkingDerivedData, AnchorLookup, CandidateSourceOverride,
+		                                           SelectedCandidate))
 		{
 			if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 			{
@@ -1782,6 +1881,22 @@ namespace
 				{
 					DebugInfo.bHasNeutralRequirement = true;
 					DebugInfo.RequiredNeutralType = EffectiveRules.RequiredNeutralItemType;
+				}
+
+				if (bOverridePlacementWithArray)
+				{
+					DebugInfo.bUsesOverrideArray = true;
+					DebugInfo.bOverrideArrayUsesConnectionBounds = EffectiveRules.MinConnections > 0
+						|| EffectiveRules.MaxConnections > 0;
+					DebugInfo.OverrideMinConnections = EffectiveRules.MinConnections;
+					DebugInfo.OverrideMaxConnections = EffectiveRules.MaxConnections;
+					DebugInfo.bOverrideArrayUsesHopsBounds = EffectiveRules.bUseHopsDistanceFromHQ;
+					DebugInfo.OverrideMinHopsFromHQ = EffectiveRules.MinHopsFromHQ;
+					DebugInfo.OverrideMaxHopsFromHQ = EffectiveRules.MaxHopsFromHQ;
+					DebugInfo.OverrideConnectionPreference = EffectiveRules.ConnectionPreference;
+					DebugInfo.OverrideHopsPreference = EffectiveRules.bUseHopsDistanceFromHQ
+						                                   ? EffectiveRules.HopsDistancePreference
+						                                   : ETopologySearchStrategy::NotSet;
 				}
 
 				CampaignDebugger->DebugMissionPlacementAccepted(SelectedCandidate.AnchorPoint, DebugInfo);
@@ -2032,32 +2147,43 @@ namespace
 	                                   TArray<ECampaignGenerationStep>& OutSteps)
 	{
 		OutSteps.Reset();
-		if (FailedStep == ECampaignGenerationStep::MissionsPlaced)
-		{
-			OutSteps.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
-			OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
-			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
-			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
-			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
-			return;
-		}
+	if (FailedStep == ECampaignGenerationStep::MissionsPlaced)
+	{
+		OutSteps.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
+		OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+		OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
+		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+		return;
+	}
 
-		if (FailedStep == ECampaignGenerationStep::NeutralObjectsPlaced)
-		{
-			OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
-			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
-			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
-			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
-			return;
-		}
+	if (FailedStep == ECampaignGenerationStep::NeutralObjectsPlaced)
+	{
+		OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+		OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
+		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+		return;
+	}
 
-		if (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced)
-		{
-			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
-			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
-			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
-			return;
-		}
+	if (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced)
+	{
+		OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
+		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+		return;
+	}
+
+	if (FailedStep == ECampaignGenerationStep::EnemyWallPlaced)
+	{
+		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+		return;
+	}
 
 		if (FailedStep == ECampaignGenerationStep::EnemyHQPlaced)
 		{
@@ -2177,6 +2303,18 @@ void AGeneratorWorldCampaign::PlaceEnemyHQStep()
 	}
 
 	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ);
+}
+
+void AGeneratorWorldCampaign::PlaceEnemyWallStep()
+{
+	if (not CanExecuteStep(ECampaignGenerationStep::EnemyWallPlaced))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PlaceEnemyWallStep called out of order."));
+		return;
+	}
+
+	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyWallPlaced,
+	                           &AGeneratorWorldCampaign::ExecutePlaceEnemyWall);
 }
 
 void AGeneratorWorldCampaign::PlaceEnemyObjectsStep()
@@ -2707,6 +2845,57 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 	return true;
 }
 
+bool AGeneratorWorldCampaign::ExecutePlaceEnemyWall(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
+
+	if (not GetIsValidEnemyHQAnchor())
+	{
+		return false;
+	}
+
+	if (M_PlacementState.CachedAnchors.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy wall placement failed: no cached anchors available."));
+		return false;
+	}
+
+	if (M_EnemyWallPlacementRules.AnchorCandidates.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy wall placement failed: no anchor candidates provided."));
+		return false;
+	}
+
+	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::EnemyWallPlaced);
+	FPlacementCandidate SelectedCandidate;
+	if (not TrySelectEnemyWallPlacementCandidate(*this, M_EnemyWallPlacementRules, M_PlacementState, M_DerivedData,
+	                                             AttemptIndex, SelectedCandidate))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy wall placement failed: no valid anchor candidates found."));
+		return false;
+	}
+
+	M_PlacementState.EnemyItemsByAnchorKey.Add(SelectedCandidate.AnchorKey, EMapEnemyItem::EnemyWall);
+	const int32 ExistingCount = M_DerivedData.EnemyItemPlacedCounts.FindRef(EMapEnemyItem::EnemyWall);
+	M_DerivedData.EnemyItemPlacedCounts.Add(EMapEnemyItem::EnemyWall, ExistingCount + 1);
+
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		DebugNotifyAnchorPicked(SelectedCandidate.AnchorPoint, TEXT("Enemy Wall"), FColor::Orange);
+	}
+
+	AWorldMapObject* SpawnedObject = SelectedCandidate.AnchorPoint->OnEnemyItemPromotion(
+		EMapEnemyItem::EnemyWall,
+		ECampaignGenerationStep::EnemyWallPlaced);
+	if (not IsValid(SpawnedObject))
+	{
+		return true;
+	}
+
+	OutTransaction.SpawnedActors.Add(SpawnedObject);
+	return true;
+}
+
 bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
@@ -2964,6 +3153,7 @@ bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 	StepOrder.Add(ECampaignGenerationStep::ConnectionsCreated);
 	StepOrder.Add(ECampaignGenerationStep::PlayerHQPlaced);
 	StepOrder.Add(ECampaignGenerationStep::EnemyHQPlaced);
+	StepOrder.Add(ECampaignGenerationStep::EnemyWallPlaced);
 	StepOrder.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
 	StepOrder.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
 	StepOrder.Add(ECampaignGenerationStep::MissionsPlaced);
@@ -2983,6 +3173,9 @@ bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 			break;
 		case ECampaignGenerationStep::EnemyHQPlaced:
 			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ;
+			break;
+		case ECampaignGenerationStep::EnemyWallPlaced:
+			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyWall;
 			break;
 		case ECampaignGenerationStep::EnemyObjectsPlaced:
 			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyObjects;
@@ -3029,8 +3222,10 @@ ECampaignGenerationStep AGeneratorWorldCampaign::GetPrerequisiteStep(ECampaignGe
 		return ECampaignGenerationStep::ConnectionsCreated;
 	case ECampaignGenerationStep::EnemyHQPlaced:
 		return ECampaignGenerationStep::PlayerHQPlaced;
-	case ECampaignGenerationStep::EnemyObjectsPlaced:
+	case ECampaignGenerationStep::EnemyWallPlaced:
 		return ECampaignGenerationStep::EnemyHQPlaced;
+	case ECampaignGenerationStep::EnemyObjectsPlaced:
+		return ECampaignGenerationStep::EnemyWallPlaced;
 	case ECampaignGenerationStep::NeutralObjectsPlaced:
 		return ECampaignGenerationStep::EnemyObjectsPlaced;
 	case ECampaignGenerationStep::MissionsPlaced:
@@ -3054,6 +3249,8 @@ ECampaignGenerationStep AGeneratorWorldCampaign::GetNextStep(ECampaignGeneration
 	case ECampaignGenerationStep::PlayerHQPlaced:
 		return ECampaignGenerationStep::EnemyHQPlaced;
 	case ECampaignGenerationStep::EnemyHQPlaced:
+		return ECampaignGenerationStep::EnemyWallPlaced;
+	case ECampaignGenerationStep::EnemyWallPlaced:
 		return ECampaignGenerationStep::EnemyObjectsPlaced;
 	case ECampaignGenerationStep::EnemyObjectsPlaced:
 		return ECampaignGenerationStep::NeutralObjectsPlaced;
@@ -3104,6 +3301,10 @@ EPlacementFailurePolicy AGeneratorWorldCampaign::GetFailurePolicyForStep(ECampai
 	case ECampaignGenerationStep::EnemyHQPlaced:
 		return M_PlacementFailurePolicy.PlaceEnemyHQPolicy != EPlacementFailurePolicy::NotSet
 			       ? M_PlacementFailurePolicy.PlaceEnemyHQPolicy
+			       : GlobalPolicy;
+	case ECampaignGenerationStep::EnemyWallPlaced:
+		return M_PlacementFailurePolicy.PlaceEnemyWallPolicy != EPlacementFailurePolicy::NotSet
+			       ? M_PlacementFailurePolicy.PlaceEnemyWallPolicy
 			       : GlobalPolicy;
 	case ECampaignGenerationStep::EnemyObjectsPlaced:
 		return M_PlacementFailurePolicy.PlaceEnemyObjectsPolicy != EPlacementFailurePolicy::NotSet

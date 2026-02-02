@@ -26,6 +26,14 @@ namespace
 		const UEnum* MissionEnum = StaticEnum<EMapMission>();
 		return MissionEnum ? MissionEnum->GetNameStringByValue(static_cast<int64>(MissionType)) : TEXT("Mission");
 	}
+
+	FString GetTopologyPreferenceName(ETopologySearchStrategy Preference)
+	{
+		const UEnum* PreferenceEnum = StaticEnum<ETopologySearchStrategy>();
+		return PreferenceEnum
+			       ? PreferenceEnum->GetNameStringByValue(static_cast<int64>(Preference))
+			       : TEXT("Preference");
+	}
 }
 
 UWorldCampaignDebugger::UWorldCampaignDebugger()
@@ -270,6 +278,33 @@ void UWorldCampaignDebugger::DebugMissionPlacementAccepted(AAnchorPoint* AnchorP
 		if (bDisplayNeutralItemRequirementForMission && Info.bHasNeutralRequirement)
 		{
 			Parts.Add(FString::Printf(TEXT("NeedsNeutral:%s"), *GetNeutralItemName(Info.RequiredNeutralType)));
+		}
+
+		if (Info.bUsesOverrideArray)
+		{
+			Parts.Add(TEXT("OverrideArray"));
+
+			if (Info.bOverrideArrayUsesConnectionBounds)
+			{
+				Parts.Add(FString::Printf(TEXT("Conn:%d-%d"), Info.OverrideMinConnections, Info.OverrideMaxConnections));
+			}
+
+			if (Info.bOverrideArrayUsesHopsBounds)
+			{
+				Parts.Add(FString::Printf(TEXT("Hops:%d-%d"), Info.OverrideMinHopsFromHQ, Info.OverrideMaxHopsFromHQ));
+			}
+
+			if (Info.OverrideConnectionPreference != ETopologySearchStrategy::NotSet)
+			{
+				Parts.Add(FString::Printf(TEXT("PrefConn:%s"),
+				                          *GetTopologyPreferenceName(Info.OverrideConnectionPreference)));
+			}
+
+			if (Info.OverrideHopsPreference != ETopologySearchStrategy::NotSet)
+			{
+				Parts.Add(FString::Printf(TEXT("PrefHops:%s"),
+				                          *GetTopologyPreferenceName(Info.OverrideHopsPreference)));
+			}
 		}
 
 		DrawAcceptedAtAnchor(AnchorPoint, FString::Join(Parts, TEXT(" | ")));

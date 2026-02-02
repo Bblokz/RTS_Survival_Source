@@ -17,8 +17,10 @@ enum class ECampaignGenerationStep : uint8
 	ConnectionsCreated,
 	/** Player HQ placed on an anchor; next step is EnemyHQPlaced. */
 	PlayerHQPlaced,
-	/** Enemy HQ placed after the player HQ; next step is EnemyObjectsPlaced. */
+	/** Enemy HQ placed after the player HQ; next step is EnemyWallPlaced. */
 	EnemyHQPlaced,
+	/** Enemy wall placed after the enemy HQ; next step is EnemyObjectsPlaced. */
+	EnemyWallPlaced,
 	/** Enemy items placed across the graph; next step is NeutralObjectsPlaced. */
 	EnemyObjectsPlaced,
 	/** Neutral items placed after enemy items; next step is MissionsPlaced. */

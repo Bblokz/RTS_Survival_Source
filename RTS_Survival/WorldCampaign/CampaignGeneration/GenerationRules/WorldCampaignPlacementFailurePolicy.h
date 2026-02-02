@@ -59,6 +59,17 @@ struct FWorldCampaignPlacementFailurePolicy
 	EPlacementFailurePolicy PlaceEnemyHQPolicy = EPlacementFailurePolicy::NotSet;
 
 	/**
+	 * Policy used when the EnemyWallPlaced step fails.
+	 * Example: Use InstantBackTrack to retry wall placement without widening the candidate list.
+	 * @note Used in: HandleStepFailure for EnemyWallPlaced.
+	 * @note Why: Controls retry/backtrack behavior for the wall placement step.
+	 * @note Technical: Determines whether to retry the step or undo prior steps.
+	 * @note Notes: Affects determinism by altering retry ordering.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Policy")
+	EPlacementFailurePolicy PlaceEnemyWallPolicy = EPlacementFailurePolicy::NotSet;
+
+	/**
 	 * Policy used when the EnemyObjectsPlaced step fails.
 	 * Example: Use BreakDistanceRules_ThenBackTrack to relax spacing if enemy clusters are too strict.
 	 * @note Used in: HandleStepFailure for EnemyObjectsPlaced.

@@ -9,6 +9,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/EnemyHQPlacementRules.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/EnemyWallPlacementRules.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/EnemyPlacementRules/EnemyPlacementRules.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/MissionPlacementRules.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/NeutralItemPlacementRules.h"
@@ -134,6 +135,7 @@ struct FWorldCampaignPlacementState
 	 * @note Why: Records which enemy item type was placed at each anchor for later filtering and undo.
 	 * @note Technical: Written during enemy placement, keyed by anchor GUID for deterministic lookup.
 	 * @note Notes: Acts as a hard occupancy map; a key present means the anchor is consumed.
+	 * @note Used in: EnemyWallPlaced.
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, EMapEnemyItem> EnemyItemsByAnchorKey;
@@ -203,6 +205,7 @@ struct FWorldCampaignDerivedData
 	 * @note Why: Tracks how many enemy items of each type have been placed.
 	 * @note Technical: Updated as items are spawned; compared against required counts.
 	 * @note Notes: Hard constraint; when counts are met, additional placement is skipped.
+	 * @note Used in: EnemyWallPlaced.
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<EMapEnemyItem, int32> EnemyItemPlacedCounts;
@@ -340,6 +343,10 @@ public:
 
 	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|Enemy",
 		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyHQPlaced"))
+	void PlaceEnemyWallStep();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|Enemy",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyWallPlaced"))
 	void PlaceEnemyObjectsStep();
 
 	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|Neutral",
@@ -379,6 +386,7 @@ private:
 	bool ExecuteCreateConnections(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceHQ(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceEnemyHQ(FCampaignGenerationStepTransaction& OutTransaction);
+	bool ExecutePlaceEnemyWall(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceNeutralObjects(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceMissions(FCampaignGenerationStepTransaction& OutTransaction);
@@ -727,6 +735,16 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy HQ",
 		meta = (AllowPrivateAccess = "true"))
 	FEnemyHQPlacementRules M_EnemyHQPlacementRules;
+
+	/**
+	 * @note Used in: EnemyWallPlaced.
+	 * @note Why: Defines the anchor candidates and preference for placing the enemy wall.
+	 * @note Technical: Read by ExecutePlaceEnemyWall when selecting the wall anchor.
+	 * @note Notes: Only candidates in this list are considered; empty list triggers failure.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Enemy Wall",
+		meta = (AllowPrivateAccess = "true"))
+	FEnemyWallPlacementRules M_EnemyWallPlacementRules;
 
 	/**
 	 * @note Used in: EnemyObjectsPlaced.
