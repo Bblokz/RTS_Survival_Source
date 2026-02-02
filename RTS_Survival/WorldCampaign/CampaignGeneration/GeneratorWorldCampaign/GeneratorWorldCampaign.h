@@ -478,6 +478,7 @@ public:
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
+	// NOTE: EditCondition disables CallInEditor clicks; avoid relying on it alone if you want runtime error logs.
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
 		meta = (DisplayPriority = 1))
 	void EraseAllGeneration();
@@ -577,7 +578,7 @@ private:
 	                               FCampaignGenerationStepTransaction& OutMicroTransaction);
 	bool ValidateEnemyObjectPlacementPrerequisites() const;
 	bool ValidateMissionPlacementPrerequisites() const;
-	void RollbackMicroPlacement(const FCampaignGenerationStepTransaction& Transaction);
+	void RollbackMicroPlacementAndDestroyActors(FCampaignGenerationStepTransaction& InOutTransaction);
 	/**
 	 * @brief Selects one enemy placement while preserving deterministic ordering for micro steps.
 	 * @param EnemyTypeToPlace Enemy item type to place.
@@ -638,6 +639,8 @@ private:
 	void UndoLastTransaction();
 	void UndoConnections(const FCampaignGenerationStepTransaction& Transaction);
 	int32 CountTrailingMicroTransactionsForStep(ECampaignGenerationStep Step) const;
+	bool IsStepEarlierThan(ECampaignGenerationStep StepToCheck, ECampaignGenerationStep ReferenceStep) const;
+	int32 CountMicroTransactionsForStepSinceLastInvalidation(ECampaignGenerationStep MacroStep) const;
 	void UpdateMicroPlacementProgressFromTransactions();
 	void ClearPlacementState();
 	void ClearDerivedData();
