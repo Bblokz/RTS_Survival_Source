@@ -129,7 +129,7 @@ void UWorldCampaignDebugger::DrawInfoAtAnchor(AAnchorPoint* AnchorPoint, const F
 		const float HeightOffset = GetStackedHeightOffset(AnchorPoint, DurationOverride);
 		const FVector AnchorLocation = AnchorPoint->GetActorLocation();
 		RTSFunctionLibrary::DrawDebugAtLocation(this, AnchorLocation + FVector(0.f, 0.f, HeightOffset), Text, Color,
-			                                    DurationOverride);
+		                                        DurationOverride);
 	}
 }
 
@@ -286,7 +286,8 @@ void UWorldCampaignDebugger::DebugMissionPlacementAccepted(AAnchorPoint* AnchorP
 
 			if (Info.bOverrideArrayUsesConnectionBounds)
 			{
-				Parts.Add(FString::Printf(TEXT("Conn:%d-%d"), Info.OverrideMinConnections, Info.OverrideMaxConnections));
+				Parts.Add(FString::Printf(TEXT("Conn:%d-%d"), Info.OverrideMinConnections,
+				                          Info.OverrideMaxConnections));
 			}
 
 			if (Info.bOverrideArrayUsesHopsBounds)
@@ -354,7 +355,7 @@ bool UWorldCampaignDebugger::CanDrawRejectionForAttempt(ECampaignGenerationStep 
 
 		if (MaxRejectionDrawsPerReason > 0)
 		{
-			const FWorldCampaignRejectionKey Key{ ItemType, Reason };
+			const FWorldCampaignRejectionKey Key{ItemType, Reason};
 			int32& ReasonCount = AttemptState.RejectionsByReason.FindOrAdd(Key);
 			if (ReasonCount >= MaxRejectionDrawsPerReason)
 			{
@@ -367,8 +368,10 @@ bool UWorldCampaignDebugger::CanDrawRejectionForAttempt(ECampaignGenerationStep 
 		AttemptState.TotalRejections++;
 		return true;
 	}
-
-	return true;
+	else
+	{
+		return true;
+	}
 }
 
 int32 UWorldCampaignDebugger::GetAttemptIndexForStep(ECampaignGenerationStep Step) const
@@ -383,8 +386,10 @@ int32 UWorldCampaignDebugger::GetAttemptIndexForStep(ECampaignGenerationStep Ste
 
 		return Generator->GetStepAttemptIndex(Step);
 	}
-
-	return INDEX_NONE;
+	else
+	{
+		return INDEX_NONE;
+	}
 }
 
 float UWorldCampaignDebugger::GetStackedHeightOffset(AAnchorPoint* AnchorPoint, float Duration)

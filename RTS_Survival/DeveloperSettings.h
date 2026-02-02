@@ -1416,7 +1416,8 @@ namespace DeveloperSettings
 	{
 		constexpr bool GNomadicSkeletalAttachments_Compile_DebugSymbols = false;
 		constexpr bool GCampaignConnectionGeneration_Compile_DebugSymbols = false;
-		constexpr bool GCampaignBacktracking_Compile_DebugSymbols = false;
+		constexpr bool GCampaignBacktracking_Compile_DebugSymbols = true;
+		constexpr bool GCampaignDebugBestOption_Compile_DebugSymbols = true;
 		// Overlap logic; tanks evasion.
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
