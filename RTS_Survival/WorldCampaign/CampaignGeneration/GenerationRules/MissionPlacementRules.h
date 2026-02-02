@@ -331,6 +331,78 @@ struct FPerMissionRules
 	TArray<TObjectPtr<AAnchorPoint>> OverridePlacementAnchorCandidates;
 
 	/**
+	 * Minimum connection degree when bOverridePlacementWithArray is enabled.
+	 * Example: Set to 2 to require at least two connections for the override anchors.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Overrides tier topology bounds for override-driven placement.
+	 * @note Technical: Clamped against OverrideMaxConnections before filtering.
+	 * @note Notes: Defaults to 0 to avoid restricting when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Override",
+		meta = (EditCondition = "bOverridePlacementWithArray"))
+	int32 OverrideMinConnections = 0;
+
+	/**
+	 * Maximum connection degree when bOverridePlacementWithArray is enabled.
+	 * Example: Lower this to prevent placement on highly connected anchors.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Overrides tier topology bounds for override-driven placement.
+	 * @note Technical: Clamped to be >= OverrideMinConnections before filtering.
+	 * @note Notes: Defaults to a large value so it does not restrict when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Override",
+		meta = (EditCondition = "bOverridePlacementWithArray"))
+	int32 OverrideMaxConnections = TNumericLimits<int32>::Max();
+
+	/**
+	 * Connection preference when bOverridePlacementWithArray is enabled.
+	 * Example: PreferMax to bias toward highly connected anchors.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Overrides tier preference to control override candidate scoring.
+	 * @note Technical: Applied as a soft preference in candidate ordering.
+	 * @note Notes: NotSet disables preference weighting.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Override",
+		meta = (EditCondition = "bOverridePlacementWithArray"))
+	ETopologySearchStrategy OverrideConnectionPreference = ETopologySearchStrategy::NotSet;
+
+	/**
+	 * Minimum hops from the player HQ when bOverridePlacementWithArray is enabled.
+	 * Example: Set to 1 to prevent the mission from spawning directly on the HQ anchor.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Overrides tier hop bounds for override-driven placement.
+	 * @note Technical: Clamped against OverrideMaxHopsFromPlayerHQ before filtering.
+	 * @note Notes: Defaults to 0 to avoid restricting when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Override",
+		meta = (EditCondition = "bOverridePlacementWithArray"))
+	int32 OverrideMinHopsFromPlayerHQ = 0;
+
+	/**
+	 * Maximum hops from the player HQ when bOverridePlacementWithArray is enabled.
+	 * Example: Lower this to keep the override mission close to the start.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Overrides tier hop bounds for override-driven placement.
+	 * @note Technical: Clamped to be >= OverrideMinHopsFromPlayerHQ before filtering.
+	 * @note Notes: Defaults to a large value so it does not restrict when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Override",
+		meta = (EditCondition = "bOverridePlacementWithArray"))
+	int32 OverrideMaxHopsFromPlayerHQ = TNumericLimits<int32>::Max();
+
+	/**
+	 * Hop-distance preference when bOverridePlacementWithArray is enabled.
+	 * Example: PreferMin to pull the override mission toward the HQ side of the range.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Overrides tier hop preference to control override candidate scoring.
+	 * @note Technical: Applied as a soft preference in candidate ordering.
+	 * @note Notes: NotSet disables preference weighting.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission|Override",
+		meta = (EditCondition = "bOverridePlacementWithArray"))
+	ETopologySearchStrategy OverrideHopsPreference = ETopologySearchStrategy::NotSet;
+
+	/**
 	 * Override rules when bOverrideTierRules is enabled.
 	 * Example: Override MinHopsFromHQ to force a special mission to appear within two hops.
 	 * @note Used in: MissionsPlaced when bOverrideTierRules is true.

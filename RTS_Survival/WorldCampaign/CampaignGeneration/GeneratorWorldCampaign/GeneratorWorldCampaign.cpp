@@ -1388,6 +1388,19 @@ namespace
 		return PreferenceScore;
 	}
 
+	float GetOverrideMissionPreferenceScore(ETopologySearchStrategy OverrideConnectionPreference,
+	                                        ETopologySearchStrategy OverrideHopsPreference,
+	                                        int32 ConnectionDegree,
+	                                        int32 HopDistanceFromHQ)
+	{
+		float PreferenceScore = 0.f;
+		PreferenceScore += GetTopologyPreferenceScore(OverrideConnectionPreference,
+		                                              static_cast<float>(ConnectionDegree));
+		PreferenceScore += GetTopologyPreferenceScore(OverrideHopsPreference,
+		                                              static_cast<float>(HopDistanceFromHQ));
+		return PreferenceScore;
+	}
+
 	bool PassesMissionTopologyRules(const FMissionTierRules& EffectiveRules, int32 ConnectionDegree)
 	{
 		return ConnectionDegree >= EffectiveRules.MinConnections
@@ -1506,6 +1519,207 @@ namespace
 		return true;
 	}
 
+	bool TrySelectMissionPlacementCandidateOverride(AGeneratorWorldCampaign& Generator,
+	                                                const FMissionTierRules& EffectiveRules,
+	                                                int32 AttemptIndex,
+	                                                int32 MissionIndex,
+	                                                const FRuleRelaxationState& RelaxationState,
+	                                                const FNeutralItemPlacementRules& NeutralRules,
+	                                                const FWorldCampaignPlacementState& WorkingPlacementState,
+	                                                const FWorldCampaignDerivedData& WorkingDerivedData,
+	                                                const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                                const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource,
+	                                                int32 OverrideMinConnections,
+	                                                int32 OverrideMaxConnections,
+	                                                ETopologySearchStrategy OverrideConnectionPreference,
+	                                                int32 OverrideMinHopsFromPlayerHQ,
+	                                                int32 OverrideMaxHopsFromPlayerHQ,
+	                                                ETopologySearchStrategy OverrideHopsPreference,
+	                                                FPlacementCandidate& OutCandidate)
+	{
+		TArray<FPlacementCandidate> Candidates;
+		for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : CandidateSource)
+		{
+			if (not IsValid(CandidateAnchor))
+			{
+				continue;
+			}
+
+			if (not Generator.IsAnchorCached(CandidateAnchor))
+			{
+				continue;
+			}
+
+			const FGuid CandidateKey = CandidateAnchor->GetAnchorKey();
+			const bool bAllowNeutralStacking = EffectiveRules.bNeutralItemRequired;
+			if (IsAnchorOccupiedForMission(CandidateKey, WorkingPlacementState, bAllowNeutralStacking))
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("occupied"));
+					}
+				}
+
+				continue;
+			}
+
+			if (EffectiveRules.bNeutralItemRequired)
+			{
+				if (not HasNeutralTypeAtAnchor(WorkingPlacementState, CandidateKey,
+				                               EffectiveRules.RequiredNeutralItemType))
+				{
+					if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+					{
+						if (Generator.GetIsValidCampaignDebugger())
+						{
+							UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+							CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor,
+							                                       TEXT("neutral requirement missing"));
+						}
+					}
+
+					continue;
+				}
+			}
+
+			int32 HopDistanceFromHQ = GetCachedHopDistance(
+				WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
+				CandidateKey);
+			if (HopDistanceFromHQ == INDEX_NONE)
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("no hop cache"));
+					}
+				}
+
+				continue;
+			}
+
+			if (HopDistanceFromHQ < OverrideMinHopsFromPlayerHQ
+				|| HopDistanceFromHQ > OverrideMaxHopsFromPlayerHQ)
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("hop range"));
+					}
+				}
+
+				continue;
+			}
+
+			if (EffectiveRules.bUseXYDistanceFromHQ)
+			{
+				const float XYDistanceFromHQ = CampaignGenerationHelper::XYDistanceFromHQ(
+					CandidateAnchor,
+					WorkingPlacementState.PlayerHQAnchor);
+				if (XYDistanceFromHQ < EffectiveRules.MinXYDistanceFromHQ
+					|| XYDistanceFromHQ > EffectiveRules.MaxXYDistanceFromHQ)
+				{
+					if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+					{
+						if (Generator.GetIsValidCampaignDebugger())
+						{
+							UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+							CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("xy range"));
+						}
+					}
+
+					continue;
+				}
+			}
+
+			const int32 ConnectionDegree = Generator.GetAnchorConnectionDegree(CandidateAnchor);
+			if (ConnectionDegree < OverrideMinConnections || ConnectionDegree > OverrideMaxConnections)
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("topology violation"));
+					}
+				}
+
+				continue;
+			}
+
+			float NearestMissionHopDistance = 0.f;
+			float NearestMissionXYDistance = 0.f;
+			if (not TryGetMissionSpacingData(EffectiveRules, CandidateAnchor, AnchorLookup,
+			                                 WorkingPlacementState, NearestMissionHopDistance,
+			                                 NearestMissionXYDistance))
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("spacing violation"));
+					}
+				}
+
+				continue;
+			}
+
+			FPlacementCandidate Candidate;
+			Candidate.AnchorPoint = CandidateAnchor;
+			Candidate.AnchorKey = CandidateKey;
+			Candidate.Score = GetOverrideMissionPreferenceScore(OverrideConnectionPreference,
+			                                                    OverrideHopsPreference,
+			                                                    ConnectionDegree,
+			                                                    HopDistanceFromHQ);
+			Candidate.HopDistanceFromHQ = HopDistanceFromHQ;
+
+			const FMapObjectAdjacencyRequirement& AdjacencyRequirement = EffectiveRules.AdjacencyRequirement;
+			if (not TryApplyMissionAdjacencyRequirement(AdjacencyRequirement, CandidateAnchor, NeutralRules,
+			                                            RelaxationState, WorkingPlacementState, WorkingDerivedData,
+			                                            AnchorLookup, Candidate))
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("adjacency missing"));
+					}
+				}
+
+				continue;
+			}
+
+			Candidates.Add(Candidate);
+		}
+
+		if (Candidates.Num() == 0)
+		{
+			return false;
+		}
+
+		Algo::Sort(Candidates, [](const FPlacementCandidate& Left, const FPlacementCandidate& Right)
+		{
+			if (Left.Score != Right.Score)
+			{
+				return Left.Score > Right.Score;
+			}
+
+			return AAnchorPoint::IsAnchorKeyLess(Left.AnchorKey, Right.AnchorKey);
+		});
+
+		const int32 CandidateIndex = (AttemptIndex + MissionIndex) % Candidates.Num();
+		OutCandidate = Candidates[CandidateIndex];
+		return IsValid(OutCandidate.AnchorPoint);
+	}
+
 	bool TrySelectMissionPlacementCandidate(AGeneratorWorldCampaign& Generator,
 	                                        const FMissionTierRules& EffectiveRules,
 	                                        EMapMission MissionType,
@@ -1517,8 +1731,32 @@ namespace
 	                                        const FWorldCampaignDerivedData& WorkingDerivedData,
 	                                        const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
 	                                        const TArray<TObjectPtr<AAnchorPoint>>* CandidateSourceOverride,
+	                                        bool bOverridePlacementWithArray,
+	                                        int32 OverrideMinConnections,
+	                                        int32 OverrideMaxConnections,
+	                                        ETopologySearchStrategy OverrideConnectionPreference,
+	                                        int32 OverrideMinHopsFromPlayerHQ,
+	                                        int32 OverrideMaxHopsFromPlayerHQ,
+	                                        ETopologySearchStrategy OverrideHopsPreference,
 	                                        FPlacementCandidate& OutCandidate)
 	{
+		if (bOverridePlacementWithArray)
+		{
+			if (CandidateSourceOverride == nullptr)
+			{
+				return false;
+			}
+
+			return TrySelectMissionPlacementCandidateOverride(Generator, EffectiveRules, AttemptIndex,
+			                                                  MissionIndex, RelaxationState, NeutralRules,
+			                                                  WorkingPlacementState, WorkingDerivedData, AnchorLookup,
+			                                                  *CandidateSourceOverride, OverrideMinConnections,
+			                                                  OverrideMaxConnections, OverrideConnectionPreference,
+			                                                  OverrideMinHopsFromPlayerHQ,
+			                                                  OverrideMaxHopsFromPlayerHQ, OverrideHopsPreference,
+			                                                  OutCandidate);
+		}
+
 		const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = CandidateSourceOverride
 			                                                           ? *CandidateSourceOverride
 			                                                           : WorkingPlacementState.CachedAnchors;
@@ -1787,8 +2025,31 @@ namespace
 		const bool bOverridePlacementWithArray = MissionRulesPtr->bOverridePlacementWithArray;
 		if (bOverridePlacementWithArray && MissionRulesPtr->OverridePlacementAnchorCandidates.Num() == 0)
 		{
+			const UEnum* MissionEnum = StaticEnum<EMapMission>();
+			const FString MissionName = MissionEnum
+				                            ? MissionEnum->GetNameStringByValue(
+					                            static_cast<int64>(MissionType))
+				                            : TEXT("Mission");
+			const FString ErrorMessage = FString::Printf(
+				TEXT("Mission placement failed: override anchor list empty for %s."),
+				*MissionName);
+			RTSFunctionLibrary::ReportError(ErrorMessage);
 			return false;
 		}
+
+		const int32 EffectiveOverrideMinConnections = FMath::Min(MissionRulesPtr->OverrideMinConnections,
+		                                                         MissionRulesPtr->OverrideMaxConnections);
+		const int32 EffectiveOverrideMaxConnections = FMath::Max(MissionRulesPtr->OverrideMinConnections,
+		                                                         MissionRulesPtr->OverrideMaxConnections);
+		const ETopologySearchStrategy EffectiveOverrideConnectionPreference =
+			MissionRulesPtr->OverrideConnectionPreference;
+		const int32 EffectiveOverrideMinHopsFromPlayerHQ = FMath::Min(
+			MissionRulesPtr->OverrideMinHopsFromPlayerHQ,
+			MissionRulesPtr->OverrideMaxHopsFromPlayerHQ);
+		const int32 EffectiveOverrideMaxHopsFromPlayerHQ = FMath::Max(
+			MissionRulesPtr->OverrideMinHopsFromPlayerHQ,
+			MissionRulesPtr->OverrideMaxHopsFromPlayerHQ);
+		const ETopologySearchStrategy EffectiveOverrideHopsPreference = MissionRulesPtr->OverrideHopsPreference;
 
 		const TArray<TObjectPtr<AAnchorPoint>>* CandidateSourceOverride = bOverridePlacementWithArray
 			                                                                  ? &MissionRulesPtr->OverridePlacementAnchorCandidates
@@ -1798,7 +2059,12 @@ namespace
 		if (not TrySelectMissionPlacementCandidate(Generator, EffectiveRules, MissionType, AttemptIndex, MissionIndex,
 		                                           RelaxationState, NeutralRules, WorkingPlacementState,
 		                                           WorkingDerivedData, AnchorLookup, CandidateSourceOverride,
-		                                           SelectedCandidate))
+		                                           bOverridePlacementWithArray, EffectiveOverrideMinConnections,
+		                                           EffectiveOverrideMaxConnections,
+		                                           EffectiveOverrideConnectionPreference,
+		                                           EffectiveOverrideMinHopsFromPlayerHQ,
+		                                           EffectiveOverrideMaxHopsFromPlayerHQ,
+		                                           EffectiveOverrideHopsPreference, SelectedCandidate))
 		{
 			if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 			{
@@ -1886,17 +2152,14 @@ namespace
 				if (bOverridePlacementWithArray)
 				{
 					DebugInfo.bUsesOverrideArray = true;
-					DebugInfo.bOverrideArrayUsesConnectionBounds = EffectiveRules.MinConnections > 0
-						|| EffectiveRules.MaxConnections > 0;
-					DebugInfo.OverrideMinConnections = EffectiveRules.MinConnections;
-					DebugInfo.OverrideMaxConnections = EffectiveRules.MaxConnections;
-					DebugInfo.bOverrideArrayUsesHopsBounds = EffectiveRules.bUseHopsDistanceFromHQ;
-					DebugInfo.OverrideMinHopsFromHQ = EffectiveRules.MinHopsFromHQ;
-					DebugInfo.OverrideMaxHopsFromHQ = EffectiveRules.MaxHopsFromHQ;
-					DebugInfo.OverrideConnectionPreference = EffectiveRules.ConnectionPreference;
-					DebugInfo.OverrideHopsPreference = EffectiveRules.bUseHopsDistanceFromHQ
-						                                   ? EffectiveRules.HopsDistancePreference
-						                                   : ETopologySearchStrategy::NotSet;
+					DebugInfo.bOverrideArrayUsesConnectionBounds = true;
+					DebugInfo.OverrideMinConnections = EffectiveOverrideMinConnections;
+					DebugInfo.OverrideMaxConnections = EffectiveOverrideMaxConnections;
+					DebugInfo.bOverrideArrayUsesHopsBounds = true;
+					DebugInfo.OverrideMinHopsFromHQ = EffectiveOverrideMinHopsFromPlayerHQ;
+					DebugInfo.OverrideMaxHopsFromHQ = EffectiveOverrideMaxHopsFromPlayerHQ;
+					DebugInfo.OverrideConnectionPreference = EffectiveOverrideConnectionPreference;
+					DebugInfo.OverrideHopsPreference = EffectiveOverrideHopsPreference;
 				}
 
 				CampaignDebugger->DebugMissionPlacementAccepted(SelectedCandidate.AnchorPoint, DebugInfo);
