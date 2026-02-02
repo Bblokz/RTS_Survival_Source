@@ -881,33 +881,33 @@ namespace
 						|| EffectiveRules.EnemyHQSpacing.Preference == EEnemyTopologySearchStrategy::PreferHighDegree
 						|| EffectiveRules.EnemyHQSpacing.Preference == EEnemyTopologySearchStrategy::PreferDeadEnds;
 
-					if (CampaignDebugger->bDebugEnemyHQHops)
+					if (Generator.bM_DebugEnemyHQHops)
 					{
 						DebugInfo.HopFromEnemyHQ = GetCachedHopDistance(
 							WorkingDerivedData.EnemyHQHopDistancesByAnchorKey,
 							SelectedCandidate.AnchorKey);
 					}
 
-					if (CampaignDebugger->bDebugPlayerHQHops && DebugInfo.bSafeZoneRelevant)
+					if (Generator.bM_DebugPlayerHQHops && DebugInfo.bSafeZoneRelevant)
 					{
 						DebugInfo.HopFromPlayerHQ = GetCachedHopDistance(
 							WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
 							SelectedCandidate.AnchorKey);
 					}
 
-					if (CampaignDebugger->bDebugAnchorDegree && DebugInfo.bIncludeAnchorDegree)
+					if (Generator.bM_DebugAnchorDegree && DebugInfo.bIncludeAnchorDegree)
 					{
 						DebugInfo.AnchorDegree = Generator.GetAnchorConnectionDegree(SelectedCandidate.AnchorPoint);
 					}
 
-					if (CampaignDebugger->bDisplayVariationEnemyObjectPlacement && bUsedVariant)
+					if (Generator.bM_DisplayVariationEnemyObjectPlacement && bUsedVariant)
 					{
 						DebugInfo.bHasVariant = true;
 						DebugInfo.VariantIndex = SelectedVariantIndex;
 						DebugInfo.VariantCount = EnabledVariantCount;
 					}
 
-					if (CampaignDebugger->bDisplayHopsFromSameEnemyItems)
+					if (Generator.bM_DisplayHopsFromSameEnemyItems)
 					{
 						DebugInfo.MinSameTypeHopDistance = GetMinHopDistanceToSameEnemyType(
 							SelectedCandidate.AnchorPoint,
@@ -1085,14 +1085,14 @@ namespace
 					FWorldCampaignNeutralPlacementDebugInfo DebugInfo;
 					DebugInfo.NeutralType = NeutralType;
 
-					if (CampaignDebugger->bDebugPlayerHQHops)
+					if (Generator.bM_DebugPlayerHQHops)
 					{
 						DebugInfo.HopFromPlayerHQ = GetCachedHopDistance(
 							WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
 							SelectedCandidate.AnchorKey);
 					}
 
-					if (CampaignDebugger->bDisplayHopsFromOtherNeutralItems)
+					if (Generator.bM_DisplayHopsFromOtherNeutralItems)
 					{
 						DebugInfo.MinHopFromOtherNeutral = GetMinHopDistanceToOtherNeutralItems(
 							SelectedCandidate.AnchorPoint,
@@ -2074,7 +2074,7 @@ namespace
 				}
 
 				UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
-				if (not CampaignDebugger->bDebugFailedMissionPlacement)
+				if (not Generator.bM_DebugFailedMissionPlacement)
 				{
 					return false;
 				}
@@ -2105,14 +2105,14 @@ namespace
 				FWorldCampaignMissionPlacementDebugInfo DebugInfo;
 				DebugInfo.MissionType = MissionType;
 
-				if (CampaignDebugger->bDisplayHopsFromHQForMissions)
+				if (Generator.bM_DisplayHopsFromHQForMissions)
 				{
 					DebugInfo.HopFromHQ = GetCachedHopDistance(
 						WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
 						SelectedCandidate.AnchorKey);
 				}
 
-				if (CampaignDebugger->bDebugMissionSpacingHops && EffectiveRules.bUseMissionSpacingHops
+				if (Generator.bM_DebugMissionSpacingHops && EffectiveRules.bUseMissionSpacingHops
 					&& WorkingPlacementState.MissionsByAnchorKey.Num() > 0)
 				{
 					float NearestMissionHopDistance = -1.f;
@@ -2127,7 +2127,7 @@ namespace
 					DebugInfo.bUsesMissionSpacingHops = true;
 				}
 
-				if (CampaignDebugger->bDisplayMinMaxConnectionsForMissionPlacement)
+				if (Generator.bM_DisplayMinMaxConnectionsForMissionPlacement)
 				{
 					DebugInfo.bUsesConnectionRules = EffectiveRules.MinConnections > 0
 						|| EffectiveRules.MaxConnections > 0;
@@ -2135,7 +2135,7 @@ namespace
 					DebugInfo.MaxConnections = EffectiveRules.MaxConnections;
 				}
 
-				if (CampaignDebugger->bDisplayMissionAdjacencyRequirements
+				if (Generator.bM_DisplayMissionAdjacencyRequirements
 					&& EffectiveRules.AdjacencyRequirement.bEnabled)
 				{
 					DebugInfo.bHasAdjacencyRequirement = true;
@@ -2143,7 +2143,7 @@ namespace
 						EffectiveRules.AdjacencyRequirement);
 				}
 
-				if (CampaignDebugger->bDisplayNeutralItemRequirementForMission && EffectiveRules.bNeutralItemRequired)
+				if (Generator.bM_DisplayNeutralItemRequirementForMission && EffectiveRules.bNeutralItemRequired)
 				{
 					DebugInfo.bHasNeutralRequirement = true;
 					DebugInfo.RequiredNeutralType = EffectiveRules.RequiredNeutralItemType;
@@ -2516,23 +2516,32 @@ AGeneratorWorldCampaign::AGeneratorWorldCampaign()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	M_ConnectionClass = AConnection::StaticClass();
+	M_WorldCampaignDebugger = CreateDefaultSubobject<UWorldCampaignDebugger>(TEXT("WorldCampaignDebugger"));
+	ApplyDebuggerSettingsToComponent();
+}
+
+void AGeneratorWorldCampaign::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	ApplyDebuggerSettingsToComponent();
 }
 
 void AGeneratorWorldCampaign::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
-	UWorldCampaignDebugger* CampaignDebugger = FindComponentByClass<UWorldCampaignDebugger>();
-	M_CampaignDebugger = CampaignDebugger;
-
-	if (not IsValid(CampaignDebugger))
-	{
-		const FString ErrorText = FString::Printf(
-			TEXT("WorldCampaignGenerator %s expected component UWorldCampaignDebugger. Add it to the generator BP instance so EditAnywhere debug settings are editable."),
-			*GetName());
-		RTSFunctionLibrary::ReportError(ErrorText);
-	}
+	ApplyDebuggerSettingsToComponent();
 }
+
+#if WITH_EDITOR
+void AGeneratorWorldCampaign::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	ApplyDebuggerSettingsToComponent();
+}
+#endif
 
 void AGeneratorWorldCampaign::CreateConnectionsStep()
 {
@@ -2712,6 +2721,16 @@ void AGeneratorWorldCampaign::DebugDrawAllConnections() const
 	}
 }
 
+void AGeneratorWorldCampaign::ApplyDebuggerSettingsToComponent()
+{
+	if (not GetIsValidCampaignDebugger())
+	{
+		return;
+	}
+
+	M_WorldCampaignDebugger->ApplySettingsFromGenerator(*this);
+}
+
 bool AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor() const
 {
 	if (not IsValid(M_PlacementState.PlayerHQAnchor))
@@ -2740,9 +2759,9 @@ bool AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor() const
 
 bool AGeneratorWorldCampaign::GetIsValidCampaignDebugger() const
 {
-	if (not M_CampaignDebugger.IsValid())
+	if (not IsValid(M_WorldCampaignDebugger))
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_CampaignDebugger"),
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_WorldCampaignDebugger"),
 		                                                      TEXT("AGeneratorWorldCampaign::GetIsValidCampaignDebugger"),
 		                                                      this);
 		return false;
@@ -2753,7 +2772,7 @@ bool AGeneratorWorldCampaign::GetIsValidCampaignDebugger() const
 
 UWorldCampaignDebugger* AGeneratorWorldCampaign::GetCampaignDebugger() const
 {
-	return M_CampaignDebugger.Get();
+	return M_WorldCampaignDebugger;
 }
 
 bool AGeneratorWorldCampaign::ExecuteStepWithTransaction(ECampaignGenerationStep CompletedStep,
