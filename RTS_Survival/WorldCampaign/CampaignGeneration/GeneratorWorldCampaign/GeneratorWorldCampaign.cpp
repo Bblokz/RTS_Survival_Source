@@ -965,7 +965,8 @@ namespace
 	                                 FWorldCampaignPlacementState& WorkingPlacementState,
 	                                 FWorldCampaignDerivedData& WorkingDerivedData,
 	                                 const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
-	                                 TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>>& OutPromotions)
+	                                 TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>>& OutPromotions,
+	                                 AGeneratorWorldCampaign& Generator)
 	{
 		for (int32 PlacementIndex = 0; PlacementIndex < RequiredCount; PlacementIndex++)
 		{
@@ -2843,7 +2844,7 @@ bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStep
 
 		if (not TryPlaceNeutralItemsForType(NeutralType, RequiredCount, AttemptIndex, RelaxationState,
 		                                    M_NeutralItemPlacementRules, WorkingPlacementState, WorkingDerivedData,
-		                                    AnchorLookup, Promotions))
+		                                    AnchorLookup, Promotions, *this))
 		{
 			return false;
 		}
