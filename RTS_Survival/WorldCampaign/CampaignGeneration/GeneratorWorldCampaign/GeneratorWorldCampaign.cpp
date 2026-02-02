@@ -17,7 +17,7 @@
 namespace
 {
 	constexpr int32 MaxStepAttempts = 25;
-	constexpr int32 MaxTotalAttempts = 200;
+	constexpr int32 MaxTotalAttempts = 90000;
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr int32 MaxRelaxationAttempts = 3;
 	constexpr int32 RelaxedHopDistanceMax = TNumericLimits<int32>::Max();
@@ -59,7 +59,7 @@ namespace
 
 	constexpr float SegmentIntersectionTolerance = 0.01f;
 	constexpr int32 NoRequiredItems = 0;
-	
+
 	TArray<EMapEnemyItem> GetSortedEnemyTypes(const TMap<EMapEnemyItem, int32>& EnemyItemCounts)
 	{
 		TArray<EMapEnemyItem> EnemyTypes;
@@ -70,7 +70,7 @@ namespace
 		});
 		return EnemyTypes;
 	}
-	
+
 	TArray<EMapMission> GetSortedMissionTypes(const TMap<EMapMission, FPerMissionRules>& MissionRules)
 	{
 		TArray<EMapMission> MissionTypes;
@@ -81,7 +81,7 @@ namespace
 		});
 		return MissionTypes;
 	}
-	
+
 
 	TMap<FGuid, TObjectPtr<AAnchorPoint>> BuildAnchorLookup(const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors)
 	{
@@ -360,7 +360,6 @@ namespace
 	}
 
 
-
 	TArray<EMapNeutralObjectType> GetSortedNeutralTypes(const TMap<EMapNeutralObjectType, int32>& NeutralItemCounts)
 	{
 		TArray<EMapNeutralObjectType> NeutralTypes;
@@ -496,9 +495,23 @@ namespace
 	                             const FWorldCampaignPlacementState& WorkingPlacementState,
 	                             const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup)
 	{
+		TArray<FGuid> SortedEnemyAnchorKeys;
+		SortedEnemyAnchorKeys.Reserve(WorkingPlacementState.EnemyItemsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapEnemyItem>& ExistingPair : WorkingPlacementState.EnemyItemsByAnchorKey)
 		{
-			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingPair.Key);
+			SortedEnemyAnchorKeys.Add(ExistingPair.Key);
+		}
+
+		Algo::Sort(SortedEnemyAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& ExistingAnchorKey : SortedEnemyAnchorKeys)
+		{
+			const EMapEnemyItem ExistingEnemyType = WorkingPlacementState.EnemyItemsByAnchorKey.FindRef(
+				ExistingAnchorKey);
+			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingAnchorKey);
 			if (not IsValid(ExistingAnchor))
 			{
 				continue;
@@ -510,14 +523,11 @@ namespace
 				return false;
 			}
 
-			if (ExistingPair.Value == EnemyType)
-			{
-				if (HopDistance < EffectiveRules.ItemSpacing.MinEnemySeparationHopsSameType)
-				{
-					return false;
-				}
-			}
-			else if (HopDistance < EffectiveRules.ItemSpacing.MinEnemySeparationHopsOtherType)
+			const int32 RequiredMinHops = (ExistingEnemyType == EnemyType)
+				                              ? EffectiveRules.ItemSpacing.MinEnemySeparationHopsSameType
+				                              : EffectiveRules.ItemSpacing.MinEnemySeparationHopsOtherType;
+
+			if (HopDistance < RequiredMinHops)
 			{
 				return false;
 			}
@@ -549,9 +559,21 @@ namespace
 	{
 		const int32 MaxHopsFromNeutralClamped = FMath::Max(PlacementRules.MinHopsFromOtherNeutralItems,
 		                                                   PlacementRules.MaxHopsFromOtherNeutralItems);
+		TArray<FGuid> SortedNeutralAnchorKeys;
+		SortedNeutralAnchorKeys.Reserve(WorkingPlacementState.NeutralItemsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapNeutralObjectType>& ExistingPair : WorkingPlacementState.NeutralItemsByAnchorKey)
 		{
-			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingPair.Key);
+			SortedNeutralAnchorKeys.Add(ExistingPair.Key);
+		}
+
+		Algo::Sort(SortedNeutralAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& ExistingAnchorKey : SortedNeutralAnchorKeys)
+		{
+			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingAnchorKey);
 			if (not IsValid(ExistingAnchor))
 			{
 				continue;
@@ -579,14 +601,28 @@ namespace
 	                                       const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup)
 	{
 		int32 MinHopDistance = INDEX_NONE;
+		TArray<FGuid> SortedEnemyAnchorKeys;
+		SortedEnemyAnchorKeys.Reserve(WorkingPlacementState.EnemyItemsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapEnemyItem>& ExistingPair : WorkingPlacementState.EnemyItemsByAnchorKey)
 		{
-			if (ExistingPair.Value != EnemyType)
+			SortedEnemyAnchorKeys.Add(ExistingPair.Key);
+		}
+
+		Algo::Sort(SortedEnemyAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& ExistingAnchorKey : SortedEnemyAnchorKeys)
+		{
+			const EMapEnemyItem ExistingEnemyType = WorkingPlacementState.EnemyItemsByAnchorKey.FindRef(
+				ExistingAnchorKey);
+			if (ExistingEnemyType != EnemyType)
 			{
 				continue;
 			}
 
-			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingPair.Key);
+			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingAnchorKey);
 			if (not IsValid(ExistingAnchor))
 			{
 				continue;
@@ -612,9 +648,21 @@ namespace
 	                                           const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup)
 	{
 		int32 MinHopDistance = INDEX_NONE;
+		TArray<FGuid> SortedNeutralAnchorKeys;
+		SortedNeutralAnchorKeys.Reserve(WorkingPlacementState.NeutralItemsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapNeutralObjectType>& ExistingPair : WorkingPlacementState.NeutralItemsByAnchorKey)
 		{
-			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingPair.Key);
+			SortedNeutralAnchorKeys.Add(ExistingPair.Key);
+		}
+
+		Algo::Sort(SortedNeutralAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& ExistingAnchorKey : SortedNeutralAnchorKeys)
+		{
+			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingAnchorKey);
 			if (not IsValid(ExistingAnchor))
 			{
 				continue;
@@ -798,11 +846,11 @@ namespace
 			const int32 ConnectionDegree = Generator.GetAnchorConnectionDegree(CandidateAnchor);
 			const float ChokepointScore = WorkingDerivedData.ChokepointScoresByAnchorKey.FindRef(CandidateKey);
 			const float PreferenceScore = GetEnemyPreferenceScore(EffectiveRules.EnemyHQSpacing.Preference,
-			                                                     ConnectionDegree,
-			                                                     ChokepointScore,
-			                                                     HopDistanceFromEnemyHQ,
-			                                                     EffectiveRules.EnemyHQSpacing.MinHopsFromEnemyHQ,
-			                                                     EffectiveRules.EnemyHQSpacing.MaxHopsFromEnemyHQ);
+			                                                      ConnectionDegree,
+			                                                      ChokepointScore,
+			                                                      HopDistanceFromEnemyHQ,
+			                                                      EffectiveRules.EnemyHQSpacing.MinHopsFromEnemyHQ,
+			                                                      EffectiveRules.EnemyHQSpacing.MaxHopsFromEnemyHQ);
 
 			FPlacementCandidate Candidate;
 			Candidate.AnchorPoint = CandidateAnchor;
@@ -1063,7 +1111,8 @@ namespace
 					if (Generator.GetIsValidCampaignDebugger())
 					{
 						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
-						CampaignDebugger->DebugNeutralPlacementRejected(CandidateAnchor, NeutralType, TEXT("no hop cache"));
+						CampaignDebugger->DebugNeutralPlacementRejected(CandidateAnchor, NeutralType,
+						                                                TEXT("no hop cache"));
 					}
 				}
 
@@ -1162,7 +1211,8 @@ namespace
 			}
 
 			FPlacementCandidate SelectedCandidate;
-			if (not TrySelectNeutralPlacementCandidate(Generator, NeutralType, PlacementRules, AttemptIndex, ExistingCount,
+			if (not TrySelectNeutralPlacementCandidate(Generator, NeutralType, PlacementRules, AttemptIndex,
+			                                           ExistingCount,
 			                                           WorkingPlacementState, WorkingDerivedData, AnchorLookup,
 			                                           SelectedCandidate))
 			{
@@ -1212,14 +1262,29 @@ namespace
 	{
 		const EMapNeutralObjectType RequiredNeutralType =
 			static_cast<EMapNeutralObjectType>(Requirement.RawByteSpecificItemSubtype);
+		TArray<FGuid> SortedNeutralAnchorKeys;
+		SortedNeutralAnchorKeys.Reserve(WorkingPlacementState.NeutralItemsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapNeutralObjectType>& NeutralPair : WorkingPlacementState.NeutralItemsByAnchorKey)
 		{
-			if (NeutralPair.Value != RequiredNeutralType)
+			SortedNeutralAnchorKeys.Add(NeutralPair.Key);
+		}
+
+		Algo::Sort(SortedNeutralAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& NeutralAnchorKey : SortedNeutralAnchorKeys)
+		{
+			const EMapNeutralObjectType NeutralTypeAtAnchor =
+				WorkingPlacementState.NeutralItemsByAnchorKey.FindRef(NeutralAnchorKey);
+
+			if (NeutralTypeAtAnchor != RequiredNeutralType)
 			{
 				continue;
 			}
 
-			AAnchorPoint* NeutralAnchor = FindAnchorByKey(AnchorLookup, NeutralPair.Key);
+			AAnchorPoint* NeutralAnchor = FindAnchorByKey(AnchorLookup, NeutralAnchorKey);
 			if (not IsValid(NeutralAnchor))
 			{
 				continue;
@@ -1231,6 +1296,9 @@ namespace
 				InOutDistances.Add(HopDistance);
 			}
 		}
+
+		// Optional: keep the output stable too (if later code ever uses ordering).
+		InOutDistances.Sort();
 	}
 
 	void AppendMissionAdjacencyMatches(const FMapObjectAdjacencyRequirement& Requirement,
@@ -1241,14 +1309,27 @@ namespace
 	{
 		const EMapMission RequiredMissionType =
 			static_cast<EMapMission>(Requirement.RawByteSpecificItemSubtype);
+		TArray<FGuid> SortedMissionAnchorKeys;
+		SortedMissionAnchorKeys.Reserve(WorkingPlacementState.MissionsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapMission>& MissionPair : WorkingPlacementState.MissionsByAnchorKey)
 		{
-			if (MissionPair.Value != RequiredMissionType)
+			SortedMissionAnchorKeys.Add(MissionPair.Key);
+		}
+
+		Algo::Sort(SortedMissionAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& MissionAnchorKey : SortedMissionAnchorKeys)
+		{
+			const EMapMission MissionTypeAtAnchor = WorkingPlacementState.MissionsByAnchorKey.FindRef(MissionAnchorKey);
+			if (MissionTypeAtAnchor != RequiredMissionType)
 			{
 				continue;
 			}
 
-			AAnchorPoint* MissionAnchor = FindAnchorByKey(AnchorLookup, MissionPair.Key);
+			AAnchorPoint* MissionAnchor = FindAnchorByKey(AnchorLookup, MissionAnchorKey);
 			if (not IsValid(MissionAnchor))
 			{
 				continue;
@@ -1260,6 +1341,8 @@ namespace
 				InOutDistances.Add(HopDistance);
 			}
 		}
+
+		InOutDistances.Sort();
 	}
 
 	void AppendEnemyAdjacencyMatches(const FMapObjectAdjacencyRequirement& Requirement,
@@ -1270,14 +1353,27 @@ namespace
 	{
 		const EMapEnemyItem RequiredEnemyType =
 			static_cast<EMapEnemyItem>(Requirement.RawByteSpecificItemSubtype);
+		TArray<FGuid> SortedEnemyAnchorKeys;
+		SortedEnemyAnchorKeys.Reserve(WorkingPlacementState.EnemyItemsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : WorkingPlacementState.EnemyItemsByAnchorKey)
 		{
-			if (EnemyPair.Value != RequiredEnemyType)
+			SortedEnemyAnchorKeys.Add(EnemyPair.Key);
+		}
+
+		Algo::Sort(SortedEnemyAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& EnemyAnchorKey : SortedEnemyAnchorKeys)
+		{
+			const EMapEnemyItem EnemyTypeAtAnchor = WorkingPlacementState.EnemyItemsByAnchorKey.FindRef(EnemyAnchorKey);
+			if (EnemyTypeAtAnchor != RequiredEnemyType)
 			{
 				continue;
 			}
 
-			AAnchorPoint* EnemyAnchor = FindAnchorByKey(AnchorLookup, EnemyPair.Key);
+			AAnchorPoint* EnemyAnchor = FindAnchorByKey(AnchorLookup, EnemyAnchorKey);
 			if (not IsValid(EnemyAnchor))
 			{
 				continue;
@@ -1289,6 +1385,8 @@ namespace
 				InOutDistances.Add(HopDistance);
 			}
 		}
+
+		InOutDistances.Sort();
 	}
 
 	void AppendPlayerAdjacencyMatches(const FMapObjectAdjacencyRequirement& Requirement,
@@ -1516,9 +1614,21 @@ namespace
 		OutNearestMissionHopDistance = static_cast<float>(RelaxedHopDistanceMax);
 		OutNearestMissionXYDistance = RelaxedDistanceMax;
 
+		TArray<FGuid> SortedMissionAnchorKeys;
+		SortedMissionAnchorKeys.Reserve(WorkingPlacementState.MissionsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapMission>& MissionPair : WorkingPlacementState.MissionsByAnchorKey)
 		{
-			AAnchorPoint* MissionAnchor = FindAnchorByKey(AnchorLookup, MissionPair.Key);
+			SortedMissionAnchorKeys.Add(MissionPair.Key);
+		}
+
+		Algo::Sort(SortedMissionAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& MissionAnchorKey : SortedMissionAnchorKeys)
+		{
+			AAnchorPoint* MissionAnchor = FindAnchorByKey(AnchorLookup, MissionAnchorKey);
 			if (not IsValid(MissionAnchor))
 			{
 				continue;
@@ -1534,21 +1644,19 @@ namespace
 
 				const int32 MaxSpacingClamped = FMath::Max(EffectiveRules.MinMissionSpacingHops,
 				                                           EffectiveRules.MaxMissionSpacingHops);
-				if (HopDistance < EffectiveRules.MinMissionSpacingHops
-					|| HopDistance > MaxSpacingClamped)
+				if (HopDistance < EffectiveRules.MinMissionSpacingHops || HopDistance > MaxSpacingClamped)
 				{
 					return false;
 				}
 
-				OutNearestMissionHopDistance = FMath::Min(OutNearestMissionHopDistance,
-				                                          static_cast<float>(HopDistance));
+				OutNearestMissionHopDistance =
+					FMath::Min(OutNearestMissionHopDistance, static_cast<float>(HopDistance));
 			}
 
 			if (EffectiveRules.bUseMissionSpacingXY)
 			{
 				const float XYDistance = CampaignGenerationHelper::XYDistanceFromHQ(CandidateAnchor, MissionAnchor);
-				if (XYDistance < EffectiveRules.MinMissionSpacingXY
-					|| XYDistance > EffectiveRules.MaxMissionSpacingXY)
+				if (XYDistance < EffectiveRules.MinMissionSpacingXY || XYDistance > EffectiveRules.MaxMissionSpacingXY)
 				{
 					return false;
 				}
@@ -1580,7 +1688,7 @@ namespace
 			WorkingPlacementState,
 			AnchorLookup);
 		const bool bHasAdjacency = HasMinimumAdjacentMatches(MatchingHopDistances,
-		                                                    Requirement.MinMatchingCount);
+		                                                     Requirement.MinMatchingCount);
 		if (bHasAdjacency)
 		{
 			return true;
@@ -1850,8 +1958,8 @@ namespace
 		}
 
 		const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = CandidateSourceOverride
-			                                                           ? *CandidateSourceOverride
-			                                                           : WorkingPlacementState.CachedAnchors;
+			                                                          ? *CandidateSourceOverride
+			                                                          : WorkingPlacementState.CachedAnchors;
 		TArray<FPlacementCandidate> Candidates;
 		for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : CandidateSource)
 		{
@@ -2144,7 +2252,8 @@ namespace
 		const ETopologySearchStrategy EffectiveOverrideHopsPreference = MissionRulesPtr->OverrideHopsPreference;
 
 		const TArray<TObjectPtr<AAnchorPoint>>* CandidateSourceOverride = bOverridePlacementWithArray
-			                                                                  ? &MissionRulesPtr->OverridePlacementAnchorCandidates
+			                                                                  ? &MissionRulesPtr->
+			                                                                  OverridePlacementAnchorCandidates
 			                                                                  : nullptr;
 
 		FPlacementCandidate SelectedCandidate;
@@ -2282,6 +2391,7 @@ namespace
 
 		return true;
 	}
+
 	TArray<FAnchorCandidate> BuildAndSortCandidates(AAnchorPoint* AnchorPoint,
 	                                                const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
 	                                                const int32 MaxConnections,
@@ -2502,43 +2612,43 @@ namespace
 	                                   TArray<ECampaignGenerationStep>& OutSteps)
 	{
 		OutSteps.Reset();
-	if (FailedStep == ECampaignGenerationStep::MissionsPlaced)
-	{
-		OutSteps.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
-		OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
-		OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
-		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
-		return;
-	}
+		if (FailedStep == ECampaignGenerationStep::MissionsPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
 
-	if (FailedStep == ECampaignGenerationStep::NeutralObjectsPlaced)
-	{
-		OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
-		OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
-		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
-		return;
-	}
+		if (FailedStep == ECampaignGenerationStep::NeutralObjectsPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
 
-	if (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced)
-	{
-		OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
-		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
-		return;
-	}
+		if (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::EnemyWallPlaced);
+			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
 
-	if (FailedStep == ECampaignGenerationStep::EnemyWallPlaced)
-	{
-		OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
-		OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
-		return;
-	}
+		if (FailedStep == ECampaignGenerationStep::EnemyWallPlaced)
+		{
+			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
+			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			return;
+		}
 
 		if (FailedStep == ECampaignGenerationStep::EnemyHQPlaced)
 		{
@@ -2856,7 +2966,8 @@ bool AGeneratorWorldCampaign::GetIsValidCampaignDebugger() const
 	if (not IsValid(M_WorldCampaignDebugger))
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_WorldCampaignDebugger"),
-		                                                      TEXT("AGeneratorWorldCampaign::GetIsValidCampaignDebugger"),
+		                                                      TEXT(
+			                                                      "AGeneratorWorldCampaign::GetIsValidCampaignDebugger"),
 		                                                      this);
 		return false;
 	}
@@ -3342,7 +3453,8 @@ bool AGeneratorWorldCampaign::ValidateMissionPlacementPrerequisites() const
 	return true;
 }
 
-void AGeneratorWorldCampaign::RollbackMicroPlacementAndDestroyActors(FCampaignGenerationStepTransaction& InOutTransaction)
+void AGeneratorWorldCampaign::RollbackMicroPlacementAndDestroyActors(
+	FCampaignGenerationStepTransaction& InOutTransaction)
 {
 	TSet<FGuid> AnchorKeysToClear;
 	for (const TObjectPtr<AActor>& SpawnedActor : InOutTransaction.SpawnedActors)
@@ -3408,7 +3520,8 @@ bool AGeneratorWorldCampaign::TrySelectSingleMissionPlacement(EMapMission Missio
                                                               TPair<TObjectPtr<AAnchorPoint>, EMapMission>&
                                                               OutPromotion,
                                                               TArray<TPair<TObjectPtr<AAnchorPoint>,
-                                                                  EMapNeutralObjectType>>& OutCompanionPromotions)
+                                                                           EMapNeutralObjectType>>&
+                                                              OutCompanionPromotions)
 {
 	constexpr int32 SinglePlacementCount = 1;
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::MissionsPlaced);
@@ -4309,7 +4422,7 @@ bool AGeneratorWorldCampaign::IsAnchorCached(const AAnchorPoint* AnchorPoint) co
 		return false;
 	}
 
-	for ( TWeakObjectPtr<AAnchorPoint> CachedAnchor : M_PlacementState.CachedAnchors)
+	for (TWeakObjectPtr<AAnchorPoint> CachedAnchor : M_PlacementState.CachedAnchors)
 	{
 		if (CachedAnchor.Get() == AnchorPoint)
 		{
@@ -4639,7 +4752,7 @@ bool AGeneratorWorldCampaign::TryCreateConnection(AAnchorPoint* AnchorPoint, AAn
 		SpawnLocation,
 		FRotator::ZeroRotator,
 		SpawnParameters);
-	
+
 	if (not IsValid(NewConnection))
 	{
 		return false;
