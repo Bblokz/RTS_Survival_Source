@@ -329,6 +329,97 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show connection degree details where relevant. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Anchor Degree"))
+	bool bM_DebugAnchorDegree = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include player HQ hop distances in debug strings where applicable. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Player HQ Hops"))
+	bool bM_DebugPlayerHQHops = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include enemy HQ hop distances in enemy placement debug strings. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Enemy HQ Hops"))
+	bool bM_DebugEnemyHQHops = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show variant selection info for enemy placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Variation Enemy Object Placement"))
+	bool bM_DisplayVariationEnemyObjectPlacement = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show hop distance to nearest same enemy type after placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Hops From Same Enemy Items"))
+	bool bM_DisplayHopsFromSameEnemyItems = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show hop distance to other neutral items. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Hops From Other Neutral Items"))
+	bool bM_DisplayHopsFromOtherNeutralItems = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display mission placement failure reasons. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Failed Mission Placement"))
+	bool bM_DebugFailedMissionPlacement = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display mission candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Mission Candidate Rejections"))
+	bool bM_DebugMissionCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display enemy candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Enemy Candidate Rejections"))
+	bool bM_DebugEnemyCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display neutral candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Neutral Candidate Rejections"))
+	bool bM_DebugNeutralCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include hop distance from HQ in mission placement debug. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Hops From HQ For Missions"))
+	bool bM_DisplayHopsFromHQForMissions = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include mission spacing hop distances when spacing rules are active. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Mission Spacing Hops"))
+	bool bM_DebugMissionSpacingHops = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show min/max connection requirements for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Min Max Connections For Mission Placement"))
+	bool bM_DisplayMinMaxConnectionsForMissionPlacement = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show adjacency requirement summaries for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Mission Adjacency Requirements"))
+	bool bM_DisplayMissionAdjacencyRequirements = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show required neutral item type for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Neutral Item Requirement For Mission"))
+	bool bM_DisplayNeutralItemRequirementForMission = true;
+	
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -732,95 +823,7 @@ private:
 		        DisplayName = "Max Rejection Draws Per Reason"))
 	int32 M_MaxRejectionDrawsPerReason = 25;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, show connection degree details where relevant. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Anchor Degree"))
-	bool bM_DebugAnchorDegree = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, include player HQ hop distances in debug strings where applicable. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Player HQ Hops"))
-	bool bM_DebugPlayerHQHops = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, include enemy HQ hop distances in enemy placement debug strings. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Enemy HQ Hops"))
-	bool bM_DebugEnemyHQHops = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, show variant selection info for enemy placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Display Variation Enemy Object Placement"))
-	bool bM_DisplayVariationEnemyObjectPlacement = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, show hop distance to nearest same enemy type after placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Display Hops From Same Enemy Items"))
-	bool bM_DisplayHopsFromSameEnemyItems = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, show hop distance to other neutral items. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Display Hops From Other Neutral Items"))
-	bool bM_DisplayHopsFromOtherNeutralItems = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, display mission placement failure reasons. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Failed Mission Placement"))
-	bool bM_DebugFailedMissionPlacement = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, display mission candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Mission Candidate Rejections"))
-	bool bM_DebugMissionCandidateRejections = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, display enemy candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Enemy Candidate Rejections"))
-	bool bM_DebugEnemyCandidateRejections = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, display neutral candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Neutral Candidate Rejections"))
-	bool bM_DebugNeutralCandidateRejections = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, include hop distance from HQ in mission placement debug. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Display Hops From HQ For Missions"))
-	bool bM_DisplayHopsFromHQForMissions = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, include mission spacing hop distances when spacing rules are active. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Debug Mission Spacing Hops"))
-	bool bM_DebugMissionSpacingHops = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, show min/max connection requirements for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Display Min Max Connections For Mission Placement"))
-	bool bM_DisplayMinMaxConnectionsForMissionPlacement = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, show adjacency requirement summaries for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Display Mission Adjacency Requirements"))
-	bool bM_DisplayMissionAdjacencyRequirements = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
-		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
-		        ToolTip = "When enabled, show required neutral item type for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
-		        DisplayName = "Display Neutral Item Requirement For Mission"))
-	bool bM_DisplayNeutralItemRequirementForMission = true;
 
 	/**
 	 * @note Used in: DebugDrawAllConnections.
