@@ -3342,17 +3342,28 @@ bool AGeneratorWorldCampaign::ValidateMissionPlacementPrerequisites() const
 	return true;
 }
 
-void AGeneratorWorldCampaign::RollbackMicroPlacement(const FCampaignGenerationStepTransaction& Transaction)
+void AGeneratorWorldCampaign::RollbackMicroPlacementAndDestroyActors(FCampaignGenerationStepTransaction& InOutTransaction)
 {
 	TSet<FGuid> AnchorKeysToClear;
-	AppendAnchorKeyIfValid(Transaction.MicroAnchorKey, AnchorKeysToClear);
-	for (const FGuid& AnchorKey : Transaction.MicroAdditionalAnchorKeys)
+	for (const TObjectPtr<AActor>& SpawnedActor : InOutTransaction.SpawnedActors)
+	{
+		if (not IsValid(SpawnedActor))
+		{
+			continue;
+		}
+
+		SpawnedActor->Destroy();
+	}
+	InOutTransaction.SpawnedActors.Reset();
+
+	AppendAnchorKeyIfValid(InOutTransaction.MicroAnchorKey, AnchorKeysToClear);
+	for (const FGuid& AnchorKey : InOutTransaction.MicroAdditionalAnchorKeys)
 	{
 		AppendAnchorKeyIfValid(AnchorKey, AnchorKeysToClear);
 	}
 
-	M_PlacementState = Transaction.PreviousPlacementState;
-	M_DerivedData = Transaction.PreviousDerivedData;
+	M_PlacementState = InOutTransaction.PreviousPlacementState;
+	M_DerivedData = InOutTransaction.PreviousDerivedData;
 	RemovePromotedWorldObjectsForAnchorKeys(M_PlacementState.CachedAnchors, AnchorKeysToClear);
 }
 
@@ -3433,7 +3444,7 @@ bool AGeneratorWorldCampaign::TryFinalizeMissionMicroPlacement(
 	{
 		if (not IsValid(CompanionPromotion.Key))
 		{
-			RollbackMicroPlacement(OutMicroTransaction);
+			RollbackMicroPlacementAndDestroyActors(OutMicroTransaction);
 			return false;
 		}
 
@@ -3449,7 +3460,7 @@ bool AGeneratorWorldCampaign::TryFinalizeMissionMicroPlacement(
 		ECampaignGenerationStep::MissionsPlaced);
 	if (not IsValid(SpawnedMissionObject))
 	{
-		RollbackMicroPlacement(OutMicroTransaction);
+		RollbackMicroPlacementAndDestroyActors(OutMicroTransaction);
 		return false;
 	}
 
@@ -3458,7 +3469,7 @@ bool AGeneratorWorldCampaign::TryFinalizeMissionMicroPlacement(
 	{
 		if (not IsValid(CompanionPromotion.Key))
 		{
-			RollbackMicroPlacement(OutMicroTransaction);
+			RollbackMicroPlacementAndDestroyActors(OutMicroTransaction);
 			return false;
 		}
 
@@ -3467,7 +3478,7 @@ bool AGeneratorWorldCampaign::TryFinalizeMissionMicroPlacement(
 			ECampaignGenerationStep::MissionsPlaced);
 		if (not IsValid(SpawnedCompanionObject))
 		{
-			RollbackMicroPlacement(OutMicroTransaction);
+			RollbackMicroPlacementAndDestroyActors(OutMicroTransaction);
 			return false;
 		}
 
@@ -3521,7 +3532,7 @@ bool AGeneratorWorldCampaign::ExecutePlaceSingleEnemyObject(EMapEnemyItem EnemyT
 		ECampaignGenerationStep::EnemyObjectsPlaced);
 	if (not IsValid(SpawnedObject))
 	{
-		RollbackMicroPlacement(OutMicroTransaction);
+		RollbackMicroPlacementAndDestroyActors(OutMicroTransaction);
 		return false;
 	}
 
@@ -3991,19 +4002,15 @@ void AGeneratorWorldCampaign::UndoLastTransaction()
 		SpawnedActor->Destroy();
 	}
 
-	RemovePromotedWorldObjectsForAnchorKeys(M_PlacementState.CachedAnchors, AnchorKeysToClear);
-
-	switch (Transaction.CompletedStep)
-	{
-	case ECampaignGenerationStep::ConnectionsCreated:
-		UndoConnections(Transaction);
-		break;
-	default:
-		break;
-	}
-
 	M_PlacementState = Transaction.PreviousPlacementState;
 	M_DerivedData = Transaction.PreviousDerivedData;
+	RemovePromotedWorldObjectsForAnchorKeys(M_PlacementState.CachedAnchors, AnchorKeysToClear);
+
+	if (Transaction.CompletedStep == ECampaignGenerationStep::ConnectionsCreated)
+	{
+		UndoConnections(Transaction);
+	}
+
 	M_GenerationStep = GetPrerequisiteStep(Transaction.CompletedStep);
 	UpdateMicroPlacementProgressFromTransactions();
 }
@@ -4052,10 +4059,54 @@ int32 AGeneratorWorldCampaign::CountTrailingMicroTransactionsForStep(ECampaignGe
 	return TrailingCount;
 }
 
+bool AGeneratorWorldCampaign::IsStepEarlierThan(ECampaignGenerationStep StepToCheck,
+                                                ECampaignGenerationStep ReferenceStep) const
+{
+	if (StepToCheck == ReferenceStep)
+	{
+		return false;
+	}
+
+	ECampaignGenerationStep CurrentStep = StepToCheck;
+	while (CurrentStep != ECampaignGenerationStep::Finished)
+	{
+		CurrentStep = GetNextStep(CurrentStep);
+		if (CurrentStep == ReferenceStep)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+int32 AGeneratorWorldCampaign::CountMicroTransactionsForStepSinceLastInvalidation(
+	ECampaignGenerationStep MacroStep) const
+{
+	int32 MicroTransactionCount = 0;
+	for (int32 TransactionIndex = M_StepTransactions.Num() - 1; TransactionIndex >= 0; TransactionIndex--)
+	{
+		const FCampaignGenerationStepTransaction& Transaction = M_StepTransactions[TransactionIndex];
+		if (IsStepEarlierThan(Transaction.CompletedStep, MacroStep))
+		{
+			break;
+		}
+
+		if (Transaction.CompletedStep == MacroStep && Transaction.bIsMicroTransaction)
+		{
+			MicroTransactionCount++;
+		}
+	}
+
+	return MicroTransactionCount;
+}
+
 void AGeneratorWorldCampaign::UpdateMicroPlacementProgressFromTransactions()
 {
-	M_EnemyMicroPlacedCount = CountTrailingMicroTransactionsForStep(ECampaignGenerationStep::EnemyObjectsPlaced);
-	M_MissionMicroPlacedCount = CountTrailingMicroTransactionsForStep(ECampaignGenerationStep::MissionsPlaced);
+	M_EnemyMicroPlacedCount =
+		CountMicroTransactionsForStepSinceLastInvalidation(ECampaignGenerationStep::EnemyObjectsPlaced);
+	M_MissionMicroPlacedCount =
+		CountMicroTransactionsForStepSinceLastInvalidation(ECampaignGenerationStep::MissionsPlaced);
 }
 
 void AGeneratorWorldCampaign::ClearPlacementState()
