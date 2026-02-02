@@ -278,6 +278,60 @@ struct FCampaignGenerationStepTransaction
 	 */
 	UPROPERTY()
 	FWorldCampaignDerivedData PreviousDerivedData;
+
+	/**
+	 * @note Used in: EnemyObjectsPlaced and MissionsPlaced micro transactions.
+	 * @note Why: Indicates this transaction represents a single item placement.
+	 * @note Technical: Checked by backtracking to undo per-item placements.
+	 * @note Notes: Macro steps keep this false.
+	 */
+	UPROPERTY()
+	bool bIsMicroTransaction = false;
+
+	/**
+	 * @note Used in: Micro transaction debugging and rollback.
+	 * @note Why: Tracks which macro step owns this micro placement.
+	 * @note Technical: Set for micro transactions only.
+	 * @note Notes: Defaults to NotStarted when unused.
+	 */
+	UPROPERTY()
+	ECampaignGenerationStep MicroParentStep = ECampaignGenerationStep::NotStarted;
+
+	/**
+	 * @note Used in: Undo for micro placements.
+	 * @note Why: Identifies the anchor that was promoted in this micro step.
+	 * @note Technical: Used to avoid clearing promotions on unrelated anchors.
+	 * @note Notes: Invalid for non-micro transactions.
+	 */
+	UPROPERTY()
+	FGuid MicroAnchorKey;
+
+	/**
+	 * @note Used in: Debugging micro placements.
+	 * @note Why: Labels the type of item placed during this micro transaction.
+	 * @note Technical: Set for micro transactions only.
+	 * @note Notes: Defaults to None when unused.
+	 */
+	UPROPERTY()
+	EMapItemType MicroItemType = EMapItemType::None;
+
+	/**
+	 * @note Used in: Debugging and deterministic replay.
+	 * @note Why: Records the zero-based placement index within the macro plan.
+	 * @note Technical: Set for micro transactions only.
+	 * @note Notes: INDEX_NONE when unused.
+	 */
+	UPROPERTY()
+	int32 MicroIndexWithinParent = INDEX_NONE;
+
+	/**
+	 * @note Used in: Mission micro placements with companion neutrals.
+	 * @note Why: Ensures companion anchor promotions are rolled back together.
+	 * @note Technical: Filled only when companion anchors differ from the primary.
+	 * @note Notes: Empty for most transactions.
+	 */
+	UPROPERTY()
+	TArray<FGuid> MicroAdditionalAnchorKeys;
 };
 
 // Must be in Ustruct for GC tracking.
@@ -485,6 +539,15 @@ private:
 	 */
 	bool ExecuteStepWithTransaction(ECampaignGenerationStep CompletedStep,
 	                                bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&));
+	/**
+	 * @brief Executes steps that push per-item micro transactions without adding a macro transaction.
+	 * @param CompletedStep Step state that will be marked as completed on success.
+	 * @param StepFunction Function that performs micro-placement and pushes its own transactions.
+	 * @return true if the step executed successfully.
+	 */
+	bool ExecuteStepWithMicroTransactions(ECampaignGenerationStep CompletedStep,
+	                                      bool (AGeneratorWorldCampaign::*StepFunction)(
+		                                      FCampaignGenerationStepTransaction&));
 	bool ExecuteCreateConnections(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceHQ(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceEnemyHQ(FCampaignGenerationStepTransaction& OutTransaction);
@@ -492,6 +555,68 @@ private:
 	bool ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceNeutralObjects(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceMissions(FCampaignGenerationStepTransaction& OutTransaction);
+	/**
+	 * @brief Places a single enemy item so backtracking can undo one object at a time.
+	 * @param EnemyTypeToPlace Type of enemy item to place.
+	 * @param PlacementOrdinalWithinType Index of this type among already placed items.
+	 * @param MicroIndexWithinParent Index within the overall placement plan.
+	 * @param OutMicroTransaction Transaction storing pre-placement state and spawned actor.
+	 * @return true if the item placed and spawned successfully.
+	 */
+	bool ExecutePlaceSingleEnemyObject(EMapEnemyItem EnemyTypeToPlace, int32 PlacementOrdinalWithinType,
+	                                   int32 MicroIndexWithinParent,
+	                                   FCampaignGenerationStepTransaction& OutMicroTransaction);
+	/**
+	 * @brief Places a single mission so backtracking can undo one mission at a time.
+	 * @param MissionTypeToPlace Mission type to place.
+	 * @param MicroIndexWithinParent Index within the overall placement plan.
+	 * @param OutMicroTransaction Transaction storing pre-placement state and spawned actors.
+	 * @return true if the mission and any companion placement succeeded.
+	 */
+	bool ExecutePlaceSingleMission(EMapMission MissionTypeToPlace, int32 MicroIndexWithinParent,
+	                               FCampaignGenerationStepTransaction& OutMicroTransaction);
+	bool ValidateEnemyObjectPlacementPrerequisites() const;
+	bool ValidateMissionPlacementPrerequisites() const;
+	void RollbackMicroPlacement(const FCampaignGenerationStepTransaction& Transaction);
+	/**
+	 * @brief Selects one enemy placement while preserving deterministic ordering for micro steps.
+	 * @param EnemyTypeToPlace Enemy item type to place.
+	 * @param WorkingPlacementState Working placement state to mutate on success.
+	 * @param WorkingDerivedData Working derived data to mutate on success.
+	 * @param OutPromotion Selected anchor and enemy type pair.
+	 * @return true if a placement candidate was selected.
+	 */
+	bool TrySelectSingleEnemyPlacement(EMapEnemyItem EnemyTypeToPlace,
+	                                   FWorldCampaignPlacementState& WorkingPlacementState,
+	                                   FWorldCampaignDerivedData& WorkingDerivedData,
+	                                   TPair<TObjectPtr<AAnchorPoint>, EMapEnemyItem>& OutPromotion);
+	/**
+	 * @brief Selects one mission placement while preserving deterministic ordering for micro steps.
+	 * @param MissionTypeToPlace Mission type to place.
+	 * @param MicroIndexWithinParent Index within the mission placement plan.
+	 * @param WorkingPlacementState Working placement state to mutate on success.
+	 * @param WorkingDerivedData Working derived data to mutate on success.
+	 * @param OutPromotion Selected anchor and mission type pair.
+	 * @param OutCompanionPromotions Companion neutral promotions when required.
+	 * @return true if a placement candidate was selected.
+	 */
+	bool TrySelectSingleMissionPlacement(EMapMission MissionTypeToPlace, int32 MicroIndexWithinParent,
+	                                     FWorldCampaignPlacementState& WorkingPlacementState,
+	                                     FWorldCampaignDerivedData& WorkingDerivedData,
+	                                     TPair<TObjectPtr<AAnchorPoint>, EMapMission>& OutPromotion,
+	                                     TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>>&
+	                                     OutCompanionPromotions);
+	/**
+	 * @brief Finalizes mission micro placement by spawning objects and recording anchors.
+	 * @param Promotion Selected mission anchor and type.
+	 * @param CompanionPromotions Companion neutral placements tied to the mission.
+	 * @param OutMicroTransaction Transaction to populate with spawned actors and anchor keys.
+	 * @return true if all mission-related spawns succeeded.
+	 */
+	bool TryFinalizeMissionMicroPlacement(const TPair<TObjectPtr<AAnchorPoint>, EMapMission>& Promotion,
+	                                      const TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>>&
+	                                      CompanionPromotions,
+	                                      FCampaignGenerationStepTransaction& OutMicroTransaction);
 
 	bool ExecuteAllStepsWithBacktracking();
 	bool CanExecuteStep(ECampaignGenerationStep CompletedStep) const;
@@ -512,6 +637,8 @@ private:
 	                       const TArray<ECampaignGenerationStep>& StepOrder);
 	void UndoLastTransaction();
 	void UndoConnections(const FCampaignGenerationStepTransaction& Transaction);
+	int32 CountTrailingMicroTransactionsForStep(ECampaignGenerationStep Step) const;
+	void UpdateMicroPlacementProgressFromTransactions();
 	void ClearPlacementState();
 	void ClearDerivedData();
 	void CacheAnchorConnectionDegrees();
@@ -746,6 +873,26 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
 		meta = (AllowPrivateAccess = "true"))
 	TMap<ECampaignGenerationStep, int32> M_StepAttemptIndices;
+
+	/**
+	 * @note Used in: EnemyObjectsPlaced micro placement.
+	 * @note Why: Tracks how many enemy items are placed within the current macro step.
+	 * @note Technical: Recomputed from micro transactions after undo or reset.
+	 * @note Notes: Not persisted across completed macro steps.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
+	int32 M_EnemyMicroPlacedCount = 0;
+
+	/**
+	 * @note Used in: MissionsPlaced micro placement.
+	 * @note Why: Tracks how many missions are placed within the current macro step.
+	 * @note Technical: Recomputed from micro transactions after undo or reset.
+	 * @note Notes: Not persisted across completed macro steps.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
+	int32 M_MissionMicroPlacedCount = 0;
 
 	/**
 	 * @note Used in: Backtracking guardrails.
