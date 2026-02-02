@@ -2889,7 +2889,7 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyWall(FCampaignGenerationStepTrans
 		ECampaignGenerationStep::EnemyWallPlaced);
 	if (not IsValid(SpawnedObject))
 	{
-		return true;
+		return false;
 	}
 
 	OutTransaction.SpawnedActors.Add(SpawnedObject);

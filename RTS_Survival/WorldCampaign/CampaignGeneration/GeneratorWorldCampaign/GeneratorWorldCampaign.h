@@ -369,6 +369,7 @@ public:
 	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
 	bool GetIsValidCampaignDebugger() const;
 	UWorldCampaignDebugger* GetCampaignDebugger() const;
+	bool IsAnchorCached(const AAnchorPoint* AnchorPoint) const;
 	
 
 private:
@@ -440,7 +441,6 @@ private:
 	void CacheGeneratedState(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints);
 
 	bool ValidateGenerationRules() const;
-	bool IsAnchorCached(const AAnchorPoint* AnchorPoint) const;
 	/**
 	 * @brief Filters and sorts HQ anchor candidates so retries stay deterministic.
 	 * @param CandidateSource Input anchors to evaluate.
