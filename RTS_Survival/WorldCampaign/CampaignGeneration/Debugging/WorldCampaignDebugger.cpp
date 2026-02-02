@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 
 namespace
@@ -36,6 +37,7 @@ void UWorldCampaignDebugger::ClearAllDebugState()
 {
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 	{
+		M_RejectionStateByStep.Reset();
 		M_DebugStateByAnchorKey.Reset();
 		M_DebugStateByAnchorPointer.Reset();
 	}
@@ -53,6 +55,49 @@ void UWorldCampaignDebugger::DrawRejectedAtAnchor(AAnchorPoint* AnchorPoint, con
 {
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 	{
+		const bool bHasEnemyPrefix = Text.StartsWith(TEXT("Enemy "));
+		const bool bHasNeutralPrefix = Text.StartsWith(TEXT("Neutral "));
+		const bool bHasMissionPrefix = Text.StartsWith(TEXT("Mission "));
+
+		EWorldCampaignRejectionItemType ItemType = EWorldCampaignRejectionItemType::Mission;
+		ECampaignGenerationStep Step = ECampaignGenerationStep::MissionsPlaced;
+		bool bShouldDrawByToggle = true;
+
+		if (bHasEnemyPrefix)
+		{
+			ItemType = EWorldCampaignRejectionItemType::Enemy;
+			Step = ECampaignGenerationStep::EnemyObjectsPlaced;
+			bShouldDrawByToggle = bDebugEnemyCandidateRejections;
+		}
+		else if (bHasNeutralPrefix)
+		{
+			ItemType = EWorldCampaignRejectionItemType::Neutral;
+			Step = ECampaignGenerationStep::NeutralObjectsPlaced;
+			bShouldDrawByToggle = bDebugNeutralCandidateRejections;
+		}
+		else if (bHasMissionPrefix)
+		{
+			ItemType = EWorldCampaignRejectionItemType::Mission;
+			Step = ECampaignGenerationStep::MissionsPlaced;
+			bShouldDrawByToggle = true;
+		}
+		else
+		{
+			ItemType = EWorldCampaignRejectionItemType::Mission;
+			Step = ECampaignGenerationStep::MissionsPlaced;
+			bShouldDrawByToggle = bDebugMissionCandidateRejections;
+		}
+
+		if (not bShouldDrawByToggle)
+		{
+			return;
+		}
+
+		if (not CanDrawRejectionForAttempt(Step, ItemType, Text))
+		{
+			return;
+		}
+
 		DrawInfoAtAnchor(AnchorPoint, Text, DisplayTimeRejectedLocation, Color);
 	}
 }
@@ -128,8 +173,19 @@ void UWorldCampaignDebugger::DebugEnemyPlacementRejected(AAnchorPoint* AnchorPoi
 {
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 	{
+		if (not bDebugEnemyCandidateRejections)
+		{
+			return;
+		}
+
+		if (not CanDrawRejectionForAttempt(ECampaignGenerationStep::EnemyObjectsPlaced,
+		                                   EWorldCampaignRejectionItemType::Enemy, Reason))
+		{
+			return;
+		}
+
 		const FString Text = FString::Printf(TEXT("Enemy %s: %s"), *GetEnemyItemName(EnemyType), *Reason);
-		DrawRejectedAtAnchor(AnchorPoint, Text, FColor::Red);
+		DrawInfoAtAnchor(AnchorPoint, Text, DisplayTimeRejectedLocation, FColor::Red);
 	}
 }
 
@@ -163,8 +219,19 @@ void UWorldCampaignDebugger::DebugNeutralPlacementRejected(AAnchorPoint* AnchorP
 {
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 	{
+		if (not bDebugNeutralCandidateRejections)
+		{
+			return;
+		}
+
+		if (not CanDrawRejectionForAttempt(ECampaignGenerationStep::NeutralObjectsPlaced,
+		                                   EWorldCampaignRejectionItemType::Neutral, Reason))
+		{
+			return;
+		}
+
 		const FString Text = FString::Printf(TEXT("Neutral %s: %s"), *GetNeutralItemName(NeutralType), *Reason);
-		DrawRejectedAtAnchor(AnchorPoint, Text, FColor::Red);
+		DrawInfoAtAnchor(AnchorPoint, Text, DisplayTimeRejectedLocation, FColor::Red);
 	}
 }
 
@@ -219,9 +286,70 @@ void UWorldCampaignDebugger::DebugMissionPlacementFailed(AAnchorPoint* AnchorPoi
 			return;
 		}
 
+		if (not CanDrawRejectionForAttempt(ECampaignGenerationStep::MissionsPlaced,
+		                                   EWorldCampaignRejectionItemType::Mission, Reason))
+		{
+			return;
+		}
+
 		const FString Text = FString::Printf(TEXT("Mission %s: %s"), *GetMissionName(MissionType), *Reason);
-		DrawRejectedAtAnchor(AnchorPoint, Text, FColor::Red);
+		DrawInfoAtAnchor(AnchorPoint, Text, DisplayTimeRejectedLocation, FColor::Red);
 	}
+}
+
+bool UWorldCampaignDebugger::CanDrawRejectionForAttempt(ECampaignGenerationStep Step,
+                                                        EWorldCampaignRejectionItemType ItemType,
+                                                        const FString& Reason)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		const int32 AttemptIndex = GetAttemptIndexForStep(Step);
+		FWorldCampaignRejectionAttemptState& AttemptState = M_RejectionStateByStep.FindOrAdd(Step);
+		if (AttemptState.AttemptIndex != AttemptIndex)
+		{
+			AttemptState.AttemptIndex = AttemptIndex;
+			AttemptState.TotalRejections = 0;
+			AttemptState.RejectionsByReason.Reset();
+		}
+
+		if (MaxRejectionDrawsPerAttempt > 0 && AttemptState.TotalRejections >= MaxRejectionDrawsPerAttempt)
+		{
+			return false;
+		}
+
+		if (MaxRejectionDrawsPerReason > 0)
+		{
+			const FWorldCampaignRejectionKey Key{ ItemType, Reason };
+			int32& ReasonCount = AttemptState.RejectionsByReason.FindOrAdd(Key);
+			if (ReasonCount >= MaxRejectionDrawsPerReason)
+			{
+				return false;
+			}
+
+			ReasonCount++;
+		}
+
+		AttemptState.TotalRejections++;
+		return true;
+	}
+
+	return true;
+}
+
+int32 UWorldCampaignDebugger::GetAttemptIndexForStep(ECampaignGenerationStep Step) const
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		const AGeneratorWorldCampaign* Generator = Cast<AGeneratorWorldCampaign>(GetOwner());
+		if (not IsValid(Generator))
+		{
+			return INDEX_NONE;
+		}
+
+		return Generator->GetStepAttemptIndex(Step);
+	}
+
+	return INDEX_NONE;
 }
 
 float UWorldCampaignDebugger::GetStackedHeightOffset(AAnchorPoint* AnchorPoint, float Duration)
