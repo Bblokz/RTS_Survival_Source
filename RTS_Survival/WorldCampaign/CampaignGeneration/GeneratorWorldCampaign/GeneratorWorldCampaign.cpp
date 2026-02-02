@@ -120,18 +120,6 @@ namespace
 		return PlacementPlan;
 	}
 
-	TArray<EMapMission> BuildMissionPlacementPlan(const FMissionPlacement& MissionPlacementRules)
-	{
-		TArray<EMapMission> PlacementPlan;
-		const TArray<EMapMission> MissionTypes = GetSortedMissionTypes(MissionPlacementRules.RulesByMission);
-		for (const EMapMission MissionType : MissionTypes)
-		{
-			PlacementPlan.Add(MissionType);
-		}
-
-		return PlacementPlan;
-	}
-
 	void AppendAnchorKeyIfValid(const FGuid& AnchorKey, TSet<FGuid>& OutAnchorKeys)
 	{
 		if (AnchorKey.IsValid())
@@ -2603,11 +2591,6 @@ namespace
 		return TotalRequired;
 	}
 
-	int32 GetRequiredMissionCount(const FMissionPlacement& MissionRules)
-	{
-		return MissionRules.RulesByMission.Num();
-	}
-
 	void BuildBacktrackEscalationSteps(ECampaignGenerationStep FailedStep,
 	                                   TArray<ECampaignGenerationStep>& OutSteps)
 	{
@@ -2719,6 +2702,8 @@ AGeneratorWorldCampaign::AGeneratorWorldCampaign()
 	PrimaryActorTick.bCanEverTick = false;
 	M_ConnectionClass = AConnection::StaticClass();
 	M_WorldCampaignDebugger = CreateDefaultSubobject<UWorldCampaignDebugger>(TEXT("WorldCampaignDebugger"));
+	M_ExcludedMissionsFromMapPlacement.Add(EMapMission::FirstCampaignClearRoad);
+	M_ExcludedMissionsFromMapPlacement.Add(EMapMission::SecondCampaignBuildBase);
 	ApplyDebuggerSettingsToComponent();
 }
 
@@ -3453,6 +3438,33 @@ bool AGeneratorWorldCampaign::ValidateMissionPlacementPrerequisites() const
 	return true;
 }
 
+bool AGeneratorWorldCampaign::GetIsMissionExcludedFromPlacement(const EMapMission MissionType) const
+{
+	if (M_ExcludedMissionsFromMapPlacement.Num() == 0)
+	{
+		return false;
+	}
+
+	return M_ExcludedMissionsFromMapPlacement.Contains(MissionType);
+}
+
+TArray<EMapMission> AGeneratorWorldCampaign::BuildMissionPlacementPlanFiltered() const
+{
+	TArray<EMapMission> PlacementPlan;
+	const TArray<EMapMission> MissionTypes = GetSortedMissionTypes(M_MissionPlacementRules.RulesByMission);
+	for (const EMapMission MissionType : MissionTypes)
+	{
+		if (GetIsMissionExcludedFromPlacement(MissionType))
+		{
+			continue;
+		}
+
+		PlacementPlan.Add(MissionType);
+	}
+
+	return PlacementPlan;
+}
+
 void AGeneratorWorldCampaign::RollbackMicroPlacementAndDestroyActors(
 	FCampaignGenerationStepTransaction& InOutTransaction)
 {
@@ -3811,14 +3823,9 @@ bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransa
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
 	(void)OutTransaction;
-	const int32 RequiredMissions = GetRequiredMissionCount(M_MissionPlacementRules);
+	const TArray<EMapMission> MissionPlacementPlan = BuildMissionPlacementPlanFiltered();
+	const int32 RequiredMissions = MissionPlacementPlan.Num();
 	if (RequiredMissions <= NoRequiredItems)
-	{
-		return true;
-	}
-
-	const TArray<EMapMission> MissionPlacementPlan = BuildMissionPlacementPlan(M_MissionPlacementRules);
-	if (MissionPlacementPlan.Num() == 0)
 	{
 		return true;
 	}
