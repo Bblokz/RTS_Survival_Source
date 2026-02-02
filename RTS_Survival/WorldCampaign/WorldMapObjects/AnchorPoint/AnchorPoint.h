@@ -41,7 +41,6 @@ public:
 
 	static bool IsAnchorKeyLess(const FGuid& Left, const FGuid& Right);
 
-	void DebugDrawAnchorState(const FString& Label, const FColor& Color, float Duration) const;
 	void DebugDrawConnectionTo(const AAnchorPoint* OtherAnchor, const FColor& Color, float Duration) const;
 
 	void InitializeCampaignSettings(const UWorldCampaignSettings* Settings);

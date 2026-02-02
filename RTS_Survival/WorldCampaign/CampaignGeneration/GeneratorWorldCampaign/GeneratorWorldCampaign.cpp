@@ -7,6 +7,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "EngineUtils.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Debugging/WorldCampaignDebugger.h"
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
@@ -18,7 +19,6 @@ namespace
 	constexpr int32 MaxStepAttempts = 25;
 	constexpr int32 MaxTotalAttempts = 200;
 	constexpr int32 AttemptSeedMultiplier = 13;
-	constexpr float DebugAnchorDurationSeconds = 10.f;
 	constexpr int32 MaxRelaxationAttempts = 3;
 	constexpr int32 RelaxedHopDistanceMax = TNumericLimits<int32>::Max();
 	constexpr float RelaxedDistanceMax = TNumericLimits<float>::Max();
@@ -377,31 +377,6 @@ namespace
 		return RelaxationState;
 	}
 
-	bool PassesEnemyDistanceRules(const FEnemyItemPlacementRules& EffectiveRules,
-	                              const FGuid& CandidateKey,
-	                              int32 HopDistanceFromEnemyHQ,
-	                              int32 SafeZoneMaxHops,
-	                              const FWorldCampaignDerivedData& WorkingDerivedData)
-	{
-		const int32 MinHopsFromEnemyHQ = EffectiveRules.EnemyHQSpacing.MinHopsFromEnemyHQ;
-		const int32 MaxHopsFromEnemyHQ = FMath::Max(MinHopsFromEnemyHQ,
-		                                            EffectiveRules.EnemyHQSpacing.MaxHopsFromEnemyHQ);
-		if (HopDistanceFromEnemyHQ < MinHopsFromEnemyHQ || HopDistanceFromEnemyHQ > MaxHopsFromEnemyHQ)
-		{
-			return false;
-		}
-
-		if (SafeZoneMaxHops <= 0)
-		{
-			return true;
-		}
-
-		const int32 HopDistanceFromPlayerHQ = GetCachedHopDistance(
-			WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
-			CandidateKey);
-		return HopDistanceFromPlayerHQ == INDEX_NONE || HopDistanceFromPlayerHQ > SafeZoneMaxHops;
-	}
-
 	bool PassesEnemySpacingRules(const FEnemyItemPlacementRules& EffectiveRules,
 	                             const AAnchorPoint* CandidateAnchor,
 	                             EMapEnemyItem EnemyType,
@@ -485,6 +460,122 @@ namespace
 		return true;
 	}
 
+	int32 GetMinHopDistanceToSameEnemyType(const AAnchorPoint* CandidateAnchor,
+	                                       EMapEnemyItem EnemyType,
+	                                       const FWorldCampaignPlacementState& WorkingPlacementState,
+	                                       const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup)
+	{
+		int32 MinHopDistance = INDEX_NONE;
+		for (const TPair<FGuid, EMapEnemyItem>& ExistingPair : WorkingPlacementState.EnemyItemsByAnchorKey)
+		{
+			if (ExistingPair.Value != EnemyType)
+			{
+				continue;
+			}
+
+			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingPair.Key);
+			if (not IsValid(ExistingAnchor))
+			{
+				continue;
+			}
+
+			const int32 HopDistance = CampaignGenerationHelper::HopsFromHQ(CandidateAnchor, ExistingAnchor);
+			if (HopDistance == INDEX_NONE)
+			{
+				continue;
+			}
+
+			if (MinHopDistance == INDEX_NONE || HopDistance < MinHopDistance)
+			{
+				MinHopDistance = HopDistance;
+			}
+		}
+
+		return MinHopDistance;
+	}
+
+	int32 GetMinHopDistanceToOtherNeutralItems(const AAnchorPoint* CandidateAnchor,
+	                                           const FWorldCampaignPlacementState& WorkingPlacementState,
+	                                           const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup)
+	{
+		int32 MinHopDistance = INDEX_NONE;
+		for (const TPair<FGuid, EMapNeutralObjectType>& ExistingPair : WorkingPlacementState.NeutralItemsByAnchorKey)
+		{
+			AAnchorPoint* ExistingAnchor = FindAnchorByKey(AnchorLookup, ExistingPair.Key);
+			if (not IsValid(ExistingAnchor))
+			{
+				continue;
+			}
+
+			const int32 HopDistance = CampaignGenerationHelper::HopsFromHQ(CandidateAnchor, ExistingAnchor);
+			if (HopDistance == INDEX_NONE)
+			{
+				continue;
+			}
+
+			if (MinHopDistance == INDEX_NONE || HopDistance < MinHopDistance)
+			{
+				MinHopDistance = HopDistance;
+			}
+		}
+
+		return MinHopDistance;
+	}
+
+	FString BuildAdjacencyRequirementSummary(const FMapObjectAdjacencyRequirement& Requirement)
+	{
+		if (not Requirement.bEnabled)
+		{
+			return FString();
+		}
+
+		const UEnum* ItemTypeEnum = StaticEnum<EMapItemType>();
+		const FString ItemTypeName = ItemTypeEnum
+			                             ? ItemTypeEnum->GetNameStringByValue(
+				                             static_cast<int64>(Requirement.RequiredItemType))
+			                             : TEXT("Item");
+
+		FString SubTypeName;
+		if (Requirement.RequiredItemType == EMapItemType::NeutralItem)
+		{
+			const UEnum* NeutralEnum = StaticEnum<EMapNeutralObjectType>();
+			SubTypeName = NeutralEnum
+				              ? NeutralEnum->GetNameStringByValue(
+					              static_cast<int64>(Requirement.RawByteSpecificItemSubtype))
+				              : TEXT("Neutral");
+		}
+		else if (Requirement.RequiredItemType == EMapItemType::Mission)
+		{
+			const UEnum* MissionEnum = StaticEnum<EMapMission>();
+			SubTypeName = MissionEnum
+				              ? MissionEnum->GetNameStringByValue(
+					              static_cast<int64>(Requirement.RawByteSpecificItemSubtype))
+				              : TEXT("Mission");
+		}
+		else if (Requirement.RequiredItemType == EMapItemType::EnemyItem)
+		{
+			const UEnum* EnemyEnum = StaticEnum<EMapEnemyItem>();
+			SubTypeName = EnemyEnum
+				              ? EnemyEnum->GetNameStringByValue(
+					              static_cast<int64>(Requirement.RawByteSpecificItemSubtype))
+				              : TEXT("Enemy");
+		}
+
+		const UEnum* PolicyEnum = StaticEnum<EAdjacencyPolicy>();
+		const FString PolicyName = PolicyEnum
+			                           ? PolicyEnum->GetNameStringByValue(
+				                           static_cast<int64>(Requirement.Policy))
+			                           : TEXT("Policy");
+
+		if (SubTypeName.IsEmpty())
+		{
+			return FString::Printf(TEXT("Adj:%s Hops<=%d %s"), *ItemTypeName, Requirement.MaxHops, *PolicyName);
+		}
+
+		return FString::Printf(TEXT("Adj:%s(%s) Hops<=%d %s"), *ItemTypeName, *SubTypeName, Requirement.MaxHops,
+		                       *PolicyName);
+	}
+
 	bool TrySelectEnemyPlacementCandidate(AGeneratorWorldCampaign& Generator,
 	                                      const FEnemyItemPlacementRules& EffectiveRules,
 	                                      EMapEnemyItem EnemyType,
@@ -507,6 +598,15 @@ namespace
 			const FGuid CandidateKey = CandidateAnchor->GetAnchorKey();
 			if (IsAnchorOccupied(CandidateKey, WorkingPlacementState))
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugEnemyPlacementRejected(CandidateAnchor, EnemyType, TEXT("occupied"));
+					}
+				}
+
 				continue;
 			}
 
@@ -515,18 +615,70 @@ namespace
 				CandidateKey);
 			if (HopDistanceFromEnemyHQ == INDEX_NONE)
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugEnemyPlacementRejected(CandidateAnchor, EnemyType, TEXT("no hop cache"));
+					}
+				}
+
 				continue;
 			}
 
-			if (not PassesEnemyDistanceRules(EffectiveRules, CandidateKey, HopDistanceFromEnemyHQ, SafeZoneMaxHops,
-			                                 WorkingDerivedData))
+			const int32 MinHopsFromEnemyHQ = EffectiveRules.EnemyHQSpacing.MinHopsFromEnemyHQ;
+			const int32 MaxHopsFromEnemyHQ = FMath::Max(MinHopsFromEnemyHQ,
+			                                            EffectiveRules.EnemyHQSpacing.MaxHopsFromEnemyHQ);
+			if (HopDistanceFromEnemyHQ < MinHopsFromEnemyHQ || HopDistanceFromEnemyHQ > MaxHopsFromEnemyHQ)
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugEnemyPlacementRejected(CandidateAnchor, EnemyType,
+						                                              TEXT("enemyHQ hops out of bounds"));
+					}
+				}
+
 				continue;
+			}
+
+			if (SafeZoneMaxHops > 0)
+			{
+				const int32 HopDistanceFromPlayerHQ = GetCachedHopDistance(
+					WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
+					CandidateKey);
+				if (HopDistanceFromPlayerHQ != INDEX_NONE && HopDistanceFromPlayerHQ <= SafeZoneMaxHops)
+				{
+					if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+					{
+						if (Generator.GetIsValidCampaignDebugger())
+						{
+							UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+							CampaignDebugger->DebugEnemyPlacementRejected(CandidateAnchor, EnemyType,
+							                                              TEXT("safe zone"));
+						}
+					}
+
+					continue;
+				}
 			}
 
 			if (not PassesEnemySpacingRules(EffectiveRules, CandidateAnchor, EnemyType, WorkingPlacementState,
 			                                AnchorLookup))
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugEnemyPlacementRejected(CandidateAnchor, EnemyType,
+						                                              TEXT("intersects spacing"));
+					}
+				}
+
 				continue;
 			}
 
@@ -583,6 +735,9 @@ namespace
 		{
 			const int32 ExistingCount = WorkingDerivedData.EnemyItemPlacedCounts.FindRef(EnemyType);
 			FEnemyItemPlacementRules EffectiveRules = Ruleset.BaseRules;
+			int32 SelectedVariantIndex = INDEX_NONE;
+			int32 EnabledVariantCount = 0;
+			bool bUsedVariant = false;
 
 			if (Ruleset.VariantMode == EEnemyRuleVariantSelectionMode::CycleByPlacementIndex)
 			{
@@ -597,8 +752,11 @@ namespace
 
 				if (EnabledVariants.Num() > 0)
 				{
-					const int32 VariantIndex = ExistingCount % EnabledVariants.Num();
-					const FEnemyItemPlacementVariant& SelectedVariant = EnabledVariants[VariantIndex];
+					EnabledVariantCount = EnabledVariants.Num();
+					SelectedVariantIndex = ExistingCount % EnabledVariantCount;
+					bUsedVariant = true;
+
+					const FEnemyItemPlacementVariant& SelectedVariant = EnabledVariants[SelectedVariantIndex];
 					if (SelectedVariant.bOverrideRules)
 					{
 						EffectiveRules = SelectedVariant.OverrideRules;
@@ -631,6 +789,58 @@ namespace
 				return false;
 			}
 
+			if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+			{
+				if (Generator.GetIsValidCampaignDebugger())
+				{
+					UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+					FWorldCampaignEnemyPlacementDebugInfo DebugInfo;
+					DebugInfo.EnemyType = EnemyType;
+					DebugInfo.bSafeZoneRelevant = SafeZoneMaxHops > 0;
+					DebugInfo.bIncludeAnchorDegree =
+						EffectiveRules.EnemyHQSpacing.Preference == EEnemyTopologySearchStrategy::PreferLowDegree
+						|| EffectiveRules.EnemyHQSpacing.Preference == EEnemyTopologySearchStrategy::PreferHighDegree
+						|| EffectiveRules.EnemyHQSpacing.Preference == EEnemyTopologySearchStrategy::PreferDeadEnds;
+
+					if (CampaignDebugger->bDebugEnemyHQHops)
+					{
+						DebugInfo.HopFromEnemyHQ = GetCachedHopDistance(
+							WorkingDerivedData.EnemyHQHopDistancesByAnchorKey,
+							SelectedCandidate.AnchorKey);
+					}
+
+					if (CampaignDebugger->bDebugPlayerHQHops && DebugInfo.bSafeZoneRelevant)
+					{
+						DebugInfo.HopFromPlayerHQ = GetCachedHopDistance(
+							WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
+							SelectedCandidate.AnchorKey);
+					}
+
+					if (CampaignDebugger->bDebugAnchorDegree && DebugInfo.bIncludeAnchorDegree)
+					{
+						DebugInfo.AnchorDegree = Generator.GetAnchorConnectionDegree(SelectedCandidate.AnchorPoint);
+					}
+
+					if (CampaignDebugger->bDisplayVariationEnemyObjectPlacement && bUsedVariant)
+					{
+						DebugInfo.bHasVariant = true;
+						DebugInfo.VariantIndex = SelectedVariantIndex;
+						DebugInfo.VariantCount = EnabledVariantCount;
+					}
+
+					if (CampaignDebugger->bDisplayHopsFromSameEnemyItems)
+					{
+						DebugInfo.MinSameTypeHopDistance = GetMinHopDistanceToSameEnemyType(
+							SelectedCandidate.AnchorPoint,
+							EnemyType,
+							WorkingPlacementState,
+							AnchorLookup);
+					}
+
+					CampaignDebugger->DebugEnemyPlacementAccepted(SelectedCandidate.AnchorPoint, DebugInfo);
+				}
+			}
+
 			WorkingPlacementState.EnemyItemsByAnchorKey.Add(SelectedCandidate.AnchorKey, EnemyType);
 			WorkingDerivedData.EnemyItemPlacedCounts.Add(EnemyType, ExistingCount + 1);
 			OutPromotions.Add({SelectedCandidate.AnchorPoint, EnemyType});
@@ -639,7 +849,9 @@ namespace
 		return true;
 	}
 
-	bool TrySelectNeutralPlacementCandidate(const FNeutralItemPlacementRules& PlacementRules,
+	bool TrySelectNeutralPlacementCandidate(AGeneratorWorldCampaign& Generator,
+	                                        EMapNeutralObjectType NeutralType,
+	                                        const FNeutralItemPlacementRules& PlacementRules,
 	                                        int32 AttemptIndex,
 	                                        int32 ExistingCount,
 	                                        const FWorldCampaignPlacementState& WorkingPlacementState,
@@ -658,22 +870,64 @@ namespace
 			const FGuid CandidateKey = CandidateAnchor->GetAnchorKey();
 			if (IsAnchorOccupied(CandidateKey, WorkingPlacementState))
 			{
-				continue;
-			}
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugNeutralPlacementRejected(CandidateAnchor, NeutralType, TEXT("occupied"));
+					}
+				}
 
-			if (not PassesNeutralDistanceRules(PlacementRules, CandidateKey, WorkingDerivedData))
-			{
-				continue;
-			}
-
-			if (not PassesNeutralSpacingRules(PlacementRules, CandidateAnchor, WorkingPlacementState, AnchorLookup))
-			{
 				continue;
 			}
 
 			const int32 HopDistanceFromHQ = GetCachedHopDistance(
 				WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
 				CandidateKey);
+			if (HopDistanceFromHQ == INDEX_NONE)
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugNeutralPlacementRejected(CandidateAnchor, NeutralType, TEXT("no hop cache"));
+					}
+				}
+
+				continue;
+			}
+
+			const int32 MaxHopsFromHQClamped = FMath::Max(PlacementRules.MinHopsFromHQ, PlacementRules.MaxHopsFromHQ);
+			if (HopDistanceFromHQ < PlacementRules.MinHopsFromHQ || HopDistanceFromHQ > MaxHopsFromHQClamped)
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugNeutralPlacementRejected(CandidateAnchor, NeutralType, TEXT("hop band"));
+					}
+				}
+
+				continue;
+			}
+
+			if (not PassesNeutralSpacingRules(PlacementRules, CandidateAnchor, WorkingPlacementState, AnchorLookup))
+			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DebugNeutralPlacementRejected(CandidateAnchor, NeutralType, TEXT("spacing"));
+					}
+				}
+
+				continue;
+			}
+
 			FPlacementCandidate Candidate;
 			Candidate.AnchorPoint = CandidateAnchor;
 			Candidate.AnchorKey = CandidateKey;
@@ -736,11 +990,38 @@ namespace
 			}
 
 			FPlacementCandidate SelectedCandidate;
-			if (not TrySelectNeutralPlacementCandidate(PlacementRules, AttemptIndex, ExistingCount,
+			if (not TrySelectNeutralPlacementCandidate(Generator, NeutralType, PlacementRules, AttemptIndex, ExistingCount,
 			                                           WorkingPlacementState, WorkingDerivedData, AnchorLookup,
 			                                           SelectedCandidate))
 			{
 				return false;
+			}
+
+			if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+			{
+				if (Generator.GetIsValidCampaignDebugger())
+				{
+					UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+					FWorldCampaignNeutralPlacementDebugInfo DebugInfo;
+					DebugInfo.NeutralType = NeutralType;
+
+					if (CampaignDebugger->bDebugPlayerHQHops)
+					{
+						DebugInfo.HopFromPlayerHQ = GetCachedHopDistance(
+							WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
+							SelectedCandidate.AnchorKey);
+					}
+
+					if (CampaignDebugger->bDisplayHopsFromOtherNeutralItems)
+					{
+						DebugInfo.MinHopFromOtherNeutral = GetMinHopDistanceToOtherNeutralItems(
+							SelectedCandidate.AnchorPoint,
+							WorkingPlacementState,
+							AnchorLookup);
+					}
+
+					CampaignDebugger->DebugNeutralPlacementAccepted(SelectedCandidate.AnchorPoint, DebugInfo);
+				}
 			}
 
 			WorkingPlacementState.NeutralItemsByAnchorKey.Add(SelectedCandidate.AnchorKey, NeutralType);
@@ -1027,46 +1308,6 @@ namespace
 		return PreferenceScore;
 	}
 
-	bool PassesMissionDistanceRules(const FMissionTierRules& EffectiveRules,
-	                                const AAnchorPoint* CandidateAnchor,
-	                                const FGuid& CandidateKey,
-	                                const FWorldCampaignPlacementState& WorkingPlacementState,
-	                                const FWorldCampaignDerivedData& WorkingDerivedData)
-	{
-		if (EffectiveRules.bUseHopsDistanceFromHQ)
-		{
-			const int32 HopDistanceFromHQ = GetCachedHopDistance(
-				WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
-				CandidateKey);
-			if (HopDistanceFromHQ == INDEX_NONE)
-			{
-				return false;
-			}
-
-			const int32 MaxHopsFromHQClamped = FMath::Max(EffectiveRules.MinHopsFromHQ,
-			                                              EffectiveRules.MaxHopsFromHQ);
-			if (HopDistanceFromHQ < EffectiveRules.MinHopsFromHQ
-				|| HopDistanceFromHQ > MaxHopsFromHQClamped)
-			{
-				return false;
-			}
-		}
-
-		if (EffectiveRules.bUseXYDistanceFromHQ)
-		{
-			const float XYDistanceFromHQ = CampaignGenerationHelper::XYDistanceFromHQ(
-				CandidateAnchor,
-				WorkingPlacementState.PlayerHQAnchor);
-			if (XYDistanceFromHQ < EffectiveRules.MinXYDistanceFromHQ
-				|| XYDistanceFromHQ > EffectiveRules.MaxXYDistanceFromHQ)
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
 	bool PassesMissionTopologyRules(const FMissionTierRules& EffectiveRules, int32 ConnectionDegree)
 	{
 		return ConnectionDegree >= EffectiveRules.MinConnections
@@ -1187,6 +1428,7 @@ namespace
 
 	bool TrySelectMissionPlacementCandidate(AGeneratorWorldCampaign& Generator,
 	                                        const FMissionTierRules& EffectiveRules,
+	                                        EMapMission MissionType,
 	                                        int32 AttemptIndex,
 	                                        int32 MissionIndex,
 	                                        const FRuleRelaxationState& RelaxationState,
@@ -1208,6 +1450,15 @@ namespace
 			const bool bAllowNeutralStacking = EffectiveRules.bNeutralItemRequired;
 			if (IsAnchorOccupiedForMission(CandidateKey, WorkingPlacementState, bAllowNeutralStacking))
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("occupied"));
+					}
+				}
+
 				continue;
 			}
 
@@ -1216,19 +1467,91 @@ namespace
 				if (not HasNeutralTypeAtAnchor(WorkingPlacementState, CandidateKey,
 				                               EffectiveRules.RequiredNeutralItemType))
 				{
+					if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+					{
+						if (Generator.GetIsValidCampaignDebugger())
+						{
+							UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+							CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor,
+							                                       TEXT("neutral requirement missing"));
+						}
+					}
+
 					continue;
 				}
 			}
 
-			if (not PassesMissionDistanceRules(EffectiveRules, CandidateAnchor, CandidateKey,
-			                                   WorkingPlacementState, WorkingDerivedData))
+			int32 HopDistanceFromHQ = INDEX_NONE;
+			if (EffectiveRules.bUseHopsDistanceFromHQ)
 			{
-				continue;
+				HopDistanceFromHQ = GetCachedHopDistance(
+					WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
+					CandidateKey);
+				if (HopDistanceFromHQ == INDEX_NONE)
+				{
+					if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+					{
+						if (Generator.GetIsValidCampaignDebugger())
+						{
+							UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+							CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("no hop cache"));
+						}
+					}
+
+					continue;
+				}
+
+				const int32 MaxHopsFromHQClamped = FMath::Max(EffectiveRules.MinHopsFromHQ,
+				                                              EffectiveRules.MaxHopsFromHQ);
+				if (HopDistanceFromHQ < EffectiveRules.MinHopsFromHQ
+					|| HopDistanceFromHQ > MaxHopsFromHQClamped)
+				{
+					if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+					{
+						if (Generator.GetIsValidCampaignDebugger())
+						{
+							UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+							CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("hop range"));
+						}
+					}
+
+					continue;
+				}
+			}
+
+			if (EffectiveRules.bUseXYDistanceFromHQ)
+			{
+				const float XYDistanceFromHQ = CampaignGenerationHelper::XYDistanceFromHQ(
+					CandidateAnchor,
+					WorkingPlacementState.PlayerHQAnchor);
+				if (XYDistanceFromHQ < EffectiveRules.MinXYDistanceFromHQ
+					|| XYDistanceFromHQ > EffectiveRules.MaxXYDistanceFromHQ)
+				{
+					if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+					{
+						if (Generator.GetIsValidCampaignDebugger())
+						{
+							UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+							CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("xy range"));
+						}
+					}
+
+					continue;
+				}
 			}
 
 			const int32 ConnectionDegree = Generator.GetAnchorConnectionDegree(CandidateAnchor);
 			if (not PassesMissionTopologyRules(EffectiveRules, ConnectionDegree))
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("topology violation"));
+					}
+				}
+
 				continue;
 			}
 
@@ -1238,6 +1561,15 @@ namespace
 			                                 WorkingPlacementState, NearestMissionHopDistance,
 			                                 NearestMissionXYDistance))
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("spacing violation"));
+					}
+				}
+
 				continue;
 			}
 
@@ -1247,12 +1579,22 @@ namespace
 			Candidate.Score = GetMissionPreferenceScore(EffectiveRules, CandidateAnchor, WorkingPlacementState,
 			                                            WorkingDerivedData, NearestMissionHopDistance,
 			                                            NearestMissionXYDistance, ConnectionDegree);
+			Candidate.HopDistanceFromHQ = HopDistanceFromHQ;
 
 			const FMapObjectAdjacencyRequirement& AdjacencyRequirement = EffectiveRules.AdjacencyRequirement;
 			if (not TryApplyMissionAdjacencyRequirement(AdjacencyRequirement, CandidateAnchor, NeutralRules,
 			                                            RelaxationState, WorkingPlacementState, WorkingDerivedData,
 			                                            AnchorLookup, Candidate))
 			{
+				if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+				{
+					if (Generator.GetIsValidCampaignDebugger())
+					{
+						UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+						CampaignDebugger->DrawRejectedAtAnchor(CandidateAnchor, TEXT("adjacency missing"));
+					}
+				}
+
 				continue;
 			}
 
@@ -1354,11 +1696,95 @@ namespace
 		}
 
 		FPlacementCandidate SelectedCandidate;
-		if (not TrySelectMissionPlacementCandidate(Generator, EffectiveRules, AttemptIndex, MissionIndex,
+		if (not TrySelectMissionPlacementCandidate(Generator, EffectiveRules, MissionType, AttemptIndex, MissionIndex,
 		                                           RelaxationState, NeutralRules, WorkingPlacementState,
 		                                           WorkingDerivedData, AnchorLookup, SelectedCandidate))
 		{
+			if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+			{
+				if (not Generator.GetIsValidCampaignDebugger())
+				{
+					return false;
+				}
+
+				UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+				if (not CampaignDebugger->bDebugFailedMissionPlacement)
+				{
+					return false;
+				}
+
+				AAnchorPoint* DebugAnchor = WorkingPlacementState.PlayerHQAnchor.Get();
+				if (not IsValid(DebugAnchor))
+				{
+					return false;
+				}
+
+				const FString Reason = FString::Printf(
+					TEXT("no candidates (attempt %d, relax D:%d S:%d P:%d)"),
+					AttemptIndex,
+					RelaxationState.bRelaxDistance ? 1 : 0,
+					RelaxationState.bRelaxSpacing ? 1 : 0,
+					RelaxationState.bRelaxPreference ? 1 : 0);
+				CampaignDebugger->DebugMissionPlacementFailed(DebugAnchor, MissionType, Reason);
+			}
+
 			return false;
+		}
+
+		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+		{
+			if (Generator.GetIsValidCampaignDebugger())
+			{
+				UWorldCampaignDebugger* CampaignDebugger = Generator.GetCampaignDebugger();
+				FWorldCampaignMissionPlacementDebugInfo DebugInfo;
+				DebugInfo.MissionType = MissionType;
+
+				if (CampaignDebugger->bDisplayHopsFromHQForMissions)
+				{
+					DebugInfo.HopFromHQ = GetCachedHopDistance(
+						WorkingDerivedData.PlayerHQHopDistancesByAnchorKey,
+						SelectedCandidate.AnchorKey);
+				}
+
+				if (CampaignDebugger->bDebugMissionSpacingHops && EffectiveRules.bUseMissionSpacingHops
+					&& WorkingPlacementState.MissionsByAnchorKey.Num() > 0)
+				{
+					float NearestMissionHopDistance = -1.f;
+					float NearestMissionXYDistance = 0.f;
+					if (TryGetMissionSpacingData(EffectiveRules, SelectedCandidate.AnchorPoint, AnchorLookup,
+					                             WorkingPlacementState, NearestMissionHopDistance,
+					                             NearestMissionXYDistance))
+					{
+						DebugInfo.NearestMissionHopDistance = NearestMissionHopDistance;
+					}
+
+					DebugInfo.bUsesMissionSpacingHops = true;
+				}
+
+				if (CampaignDebugger->bDisplayMinMaxConnectionsForMissionPlacement)
+				{
+					DebugInfo.bUsesConnectionRules = EffectiveRules.MinConnections > 0
+						|| EffectiveRules.MaxConnections > 0;
+					DebugInfo.MinConnections = EffectiveRules.MinConnections;
+					DebugInfo.MaxConnections = EffectiveRules.MaxConnections;
+				}
+
+				if (CampaignDebugger->bDisplayMissionAdjacencyRequirements
+					&& EffectiveRules.AdjacencyRequirement.bEnabled)
+				{
+					DebugInfo.bHasAdjacencyRequirement = true;
+					DebugInfo.AdjacencySummary = BuildAdjacencyRequirementSummary(
+						EffectiveRules.AdjacencyRequirement);
+				}
+
+				if (CampaignDebugger->bDisplayNeutralItemRequirementForMission && EffectiveRules.bNeutralItemRequired)
+				{
+					DebugInfo.bHasNeutralRequirement = true;
+					DebugInfo.RequiredNeutralType = EffectiveRules.RequiredNeutralItemType;
+				}
+
+				CampaignDebugger->DebugMissionPlacementAccepted(SelectedCandidate.AnchorPoint, DebugInfo);
+			}
 		}
 
 		WorkingPlacementState.MissionsByAnchorKey.Add(SelectedCandidate.AnchorKey, MissionType);
@@ -1702,6 +2128,22 @@ AGeneratorWorldCampaign::AGeneratorWorldCampaign()
 	M_ConnectionClass = AConnection::StaticClass();
 }
 
+void AGeneratorWorldCampaign::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	UWorldCampaignDebugger* CampaignDebugger = FindComponentByClass<UWorldCampaignDebugger>();
+	M_CampaignDebugger = CampaignDebugger;
+
+	if (not IsValid(CampaignDebugger))
+	{
+		const FString ErrorText = FString::Printf(
+			TEXT("WorldCampaignGenerator %s expected component UWorldCampaignDebugger. Add it to the generator BP instance so EditAnywhere debug settings are editable."),
+			*GetName());
+		RTSFunctionLibrary::ReportError(ErrorText);
+	}
+}
+
 void AGeneratorWorldCampaign::CreateConnectionsStep()
 {
 	if (not CanExecuteStep(ECampaignGenerationStep::ConnectionsCreated))
@@ -1826,6 +2268,17 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 		AnchorPoint->RemovePromotedWorldObject();
 		AnchorPoint->ClearConnections();
 	}
+
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		if (not GetIsValidCampaignDebugger())
+		{
+			return;
+		}
+
+		UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+		CampaignDebugger->ClearAllDebugState();
+	}
 }
 
 void AGeneratorWorldCampaign::DebugDrawAllConnections() const
@@ -1859,28 +2312,46 @@ void AGeneratorWorldCampaign::DebugDrawAllConnections() const
 
 bool AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor() const
 {
-	if (IsValid(M_PlacementState.PlayerHQAnchor))
+	if (not IsValid(M_PlacementState.PlayerHQAnchor))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.PlayerHQAnchor"),
+		                                                      TEXT("AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor"),
+		                                                      this);
+		return false;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.PlayerHQAnchor"),
-	                                                      TEXT("AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor"),
-	                                                      this);
-	return false;
+	return true;
 }
 
 bool AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor() const
 {
-	if (IsValid(M_PlacementState.EnemyHQAnchor))
+	if (not IsValid(M_PlacementState.EnemyHQAnchor))
 	{
-		return true;
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.EnemyHQAnchor"),
+		                                                      TEXT("AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor"),
+		                                                      this);
+		return false;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlacementState.EnemyHQAnchor"),
-	                                                      TEXT("AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor"),
-	                                                      this);
-	return false;
+	return true;
+}
+
+bool AGeneratorWorldCampaign::GetIsValidCampaignDebugger() const
+{
+	if (not M_CampaignDebugger.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_CampaignDebugger"),
+		                                                      TEXT("AGeneratorWorldCampaign::GetIsValidCampaignDebugger"),
+		                                                      this);
+		return false;
+	}
+
+	return true;
+}
+
+UWorldCampaignDebugger* AGeneratorWorldCampaign::GetCampaignDebugger() const
+{
+	return M_CampaignDebugger.Get();
 }
 
 bool AGeneratorWorldCampaign::ExecuteStepWithTransaction(ECampaignGenerationStep CompletedStep,
@@ -1999,9 +2470,12 @@ void AGeneratorWorldCampaign::GenerateConnectionsForAnchors(const TArray<TObject
 			continue;
 		}
 
-		if constexpr (DeveloperSettings::Debugging::GCampaignConnectionGeneration_Compile_DebugSymbols)
+		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 		{
-			DebugNotifyAnchorProcessing(AnchorPoint, TEXT("Processing"), FColor::Cyan);
+			if constexpr (DeveloperSettings::Debugging::GCampaignConnectionGeneration_Compile_DebugSymbols)
+			{
+				DebugNotifyAnchorProcessing(AnchorPoint, TEXT("Processing"), FColor::Cyan);
+			}
 		}
 
 		GeneratePhasePreferredConnections(AnchorPoint, AnchorPoints, OutDesiredConnections, ExistingSegments);
@@ -2925,7 +3399,7 @@ void AGeneratorWorldCampaign::BuildChokepointScoresCache(const AAnchorPoint* Opt
 	}
 }
 
-void AGeneratorWorldCampaign::DebugNotifyAnchorPicked(const AAnchorPoint* AnchorPoint, const FString& Label,
+void AGeneratorWorldCampaign::DebugNotifyAnchorPicked(AAnchorPoint* AnchorPoint, const FString& Label,
                                                       const FColor& Color) const
 {
 	if (not IsValid(AnchorPoint))
@@ -2933,7 +3407,14 @@ void AGeneratorWorldCampaign::DebugNotifyAnchorPicked(const AAnchorPoint* Anchor
 		return;
 	}
 
-	AnchorPoint->DebugDrawAnchorState(Label, Color, DebugAnchorDurationSeconds);
+	if (not GetIsValidCampaignDebugger())
+	{
+		return;
+	}
+
+	UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+
+	CampaignDebugger->DrawAcceptedAtAnchor(AnchorPoint, Label, Color);
 }
 
 bool AGeneratorWorldCampaign::ValidateGenerationRules() const
@@ -3493,7 +3974,7 @@ void AGeneratorWorldCampaign::AddThirdConnectionSegment(AConnection* Connection,
 	ExistingSegments.Add(Segment);
 }
 
-void AGeneratorWorldCampaign::DebugNotifyAnchorProcessing(const AAnchorPoint* AnchorPoint, const FString& Label,
+void AGeneratorWorldCampaign::DebugNotifyAnchorProcessing(AAnchorPoint* AnchorPoint, const FString& Label,
                                                           const FColor& Color) const
 {
 	if (not IsValid(AnchorPoint))
@@ -3501,8 +3982,15 @@ void AGeneratorWorldCampaign::DebugNotifyAnchorProcessing(const AAnchorPoint* An
 		return;
 	}
 
+	if (not GetIsValidCampaignDebugger())
+	{
+		return;
+	}
+
+	UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+
 	constexpr float DebugDuration = 10.f;
-	AnchorPoint->DebugDrawAnchorState(Label, Color, DebugDuration);
+	CampaignDebugger->DrawInfoAtAnchor(AnchorPoint, Label, DebugDuration, Color);
 }
 
 void AGeneratorWorldCampaign::DebugDrawConnection(const AConnection* Connection, const FColor& Color) const
