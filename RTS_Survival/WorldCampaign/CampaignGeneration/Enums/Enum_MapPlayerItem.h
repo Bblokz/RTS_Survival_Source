@@ -12,6 +12,8 @@ enum class EMapPlayerItem : uint8
 {
 	/** No player item assigned; treated as empty for player-side placement. */
 	None,
+	/** The main player headquarters, placed during the PlayerHQPlaced step. */
+	PlayerHQ,
 	/** Player factory node used to extend production access from the HQ. */
 	Factory,
 	/** Player airfield node used to open air routes from the starting region. */

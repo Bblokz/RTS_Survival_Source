@@ -7,6 +7,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "EngineUtils.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
@@ -347,6 +348,11 @@ namespace
 	FRuleRelaxationState GetRelaxationState(EPlacementFailurePolicy Policy, int32 AttemptIndex)
 	{
 		FRuleRelaxationState RelaxationState;
+		if (Policy == EPlacementFailurePolicy::InstantBackTrack)
+		{
+			return RelaxationState;
+		}
+
 		if (Policy != EPlacementFailurePolicy::BreakDistanceRules_ThenBackTrack)
 		{
 			return RelaxationState;
@@ -1816,6 +1822,7 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 			continue;
 		}
 
+		AnchorPoint->RemovePromotedWorldObject();
 		AnchorPoint->ClearConnections();
 	}
 }
@@ -1957,6 +1964,7 @@ bool AGeneratorWorldCampaign::PrepareAnchorsForConnectionGeneration(TArray<TObje
 		return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
 	});
 
+	const UWorldCampaignSettings* CampaignSettings = UWorldCampaignSettings::Get();
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : OutAnchorPoints)
 	{
 		if (not IsValid(AnchorPoint))
@@ -1964,6 +1972,8 @@ bool AGeneratorWorldCampaign::PrepareAnchorsForConnectionGeneration(TArray<TObje
 			continue;
 		}
 
+		AnchorPoint->InitializeCampaignSettings(CampaignSettings);
+		AnchorPoint->RemovePromotedWorldObject();
 		AnchorPoint->ClearConnections();
 	}
 
@@ -2041,7 +2051,6 @@ void AGeneratorWorldCampaign::CacheGeneratedState(const TArray<TObjectPtr<AAncho
 bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
-	(void)OutTransaction;
 
 	if (M_PlacementState.CachedAnchors.Num() == 0)
 	{
@@ -2122,13 +2131,22 @@ bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction&
 		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Player HQ"), FColor::Green);
 	}
 
+	if (IsValid(AnchorPoint))
+	{
+		AWorldMapObject* SpawnedObject = AnchorPoint->OnPlayerItemPromotion(EMapPlayerItem::PlayerHQ,
+		                                                                    ECampaignGenerationStep::PlayerHQPlaced);
+		if (IsValid(SpawnedObject))
+		{
+			OutTransaction.SpawnedActors.Add(SpawnedObject);
+		}
+	}
+
 	return true;
 }
 
 bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
-	(void)OutTransaction;
 
 	if (not GetIsValidPlayerHQAnchor())
 	{
@@ -2200,13 +2218,22 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Enemy HQ"), FColor::Red);
 	}
 
+	if (IsValid(AnchorPoint))
+	{
+		AWorldMapObject* SpawnedObject = AnchorPoint->OnEnemyItemPromotion(EMapEnemyItem::EnemyHQ,
+		                                                                   ECampaignGenerationStep::EnemyHQPlaced);
+		if (IsValid(SpawnedObject))
+		{
+			OutTransaction.SpawnedActors.Add(SpawnedObject);
+		}
+	}
+
 	return true;
 }
 
 bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
-	(void)OutTransaction;
 
 	const int32 RequiredEnemyItems = GetRequiredEnemyItemCount(M_CountAndDifficultyTuning);
 	if (RequiredEnemyItems <= NoRequiredItems)
@@ -2278,7 +2305,13 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTr
 			continue;
 		}
 
-		Promotion.Key->OnEnemyItemPromotion(Promotion.Value);
+		AWorldMapObject* SpawnedObject = Promotion.Key->OnEnemyItemPromotion(
+			Promotion.Value,
+			ECampaignGenerationStep::EnemyObjectsPlaced);
+		if (IsValid(SpawnedObject))
+		{
+			OutTransaction.SpawnedActors.Add(SpawnedObject);
+		}
 	}
 
 	return true;
@@ -2287,7 +2320,6 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTr
 bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
-	(void)OutTransaction;
 
 	const int32 RequiredNeutralItems = GetRequiredNeutralItemCount(M_CountAndDifficultyTuning);
 	if (RequiredNeutralItems <= NoRequiredItems)
@@ -2351,7 +2383,13 @@ bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStep
 			continue;
 		}
 
-		Promotion.Key->OnNeutralItemPromotion(Promotion.Value);
+		AWorldMapObject* SpawnedObject = Promotion.Key->OnNeutralItemPromotion(
+			Promotion.Value,
+			ECampaignGenerationStep::NeutralObjectsPlaced);
+		if (IsValid(SpawnedObject))
+		{
+			OutTransaction.SpawnedActors.Add(SpawnedObject);
+		}
 	}
 
 	return true;
@@ -2360,7 +2398,6 @@ bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStep
 bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransaction& OutTransaction)
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
-	(void)OutTransaction;
 
 	const int32 RequiredMissions = GetRequiredMissionCount(M_MissionPlacementRules);
 	if (RequiredMissions <= NoRequiredItems)
@@ -2417,7 +2454,13 @@ bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransa
 			continue;
 		}
 
-		Promotion.Key->OnMissionPromotion(Promotion.Value);
+		AWorldMapObject* SpawnedObject = Promotion.Key->OnMissionPromotion(
+			Promotion.Value,
+			ECampaignGenerationStep::MissionsPlaced);
+		if (IsValid(SpawnedObject))
+		{
+			OutTransaction.SpawnedActors.Add(SpawnedObject);
+		}
 	}
 
 	for (const TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>& Promotion : CompanionPromotions)
@@ -2427,7 +2470,13 @@ bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransa
 			continue;
 		}
 
-		Promotion.Key->OnNeutralItemPromotion(Promotion.Value);
+		AWorldMapObject* SpawnedObject = Promotion.Key->OnNeutralItemPromotion(
+			Promotion.Value,
+			ECampaignGenerationStep::MissionsPlaced);
+		if (IsValid(SpawnedObject))
+		{
+			OutTransaction.SpawnedActors.Add(SpawnedObject);
+		}
 	}
 
 	return true;
@@ -2676,6 +2725,18 @@ void AGeneratorWorldCampaign::UndoLastTransaction()
 		}
 
 		SpawnedActor->Destroy();
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> AnchorPoints;
+	GatherAnchorPoints(AnchorPoints);
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		AnchorPoint->RemovePromotedWorldObject();
 	}
 
 	switch (Transaction.CompletedStep)
