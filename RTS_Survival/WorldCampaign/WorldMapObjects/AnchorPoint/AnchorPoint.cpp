@@ -133,22 +133,6 @@ bool AAnchorPoint::IsAnchorKeyLess(const FGuid& Left, const FGuid& Right)
 	return Left.D < Right.D;
 }
 
-void AAnchorPoint::DebugDrawAnchorState(const FString& Label, const FColor& Color, float Duration) const
-{
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return;
-	}
-
-	const FVector AnchorLocation = GetActorLocation();
-	constexpr float DebugSphereRadius = 75.f;
-	constexpr int32 DebugSphereSegments = 12;
-	constexpr float DebugTextHeightOffset = 100.f;
-	DrawDebugSphere(World, AnchorLocation, DebugSphereRadius, DebugSphereSegments, Color, false, Duration);
-	DrawDebugString(World, AnchorLocation + FVector(0.f, 0.f, DebugTextHeightOffset), Label, nullptr, Color, Duration);
-}
-
 void AAnchorPoint::DebugDrawConnectionTo(const AAnchorPoint* OtherAnchor, const FColor& Color, float Duration) const
 {
 	if (not IsValid(OtherAnchor))

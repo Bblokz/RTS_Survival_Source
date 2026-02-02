@@ -19,6 +19,7 @@
 
 class AAnchorPoint;
 class AConnection;
+class UWorldCampaignDebugger;
 
 namespace WorldCampaignDebugDefaults
 {
@@ -321,6 +322,8 @@ class RTS_SURVIVAL_API AGeneratorWorldCampaign : public AActor
 public:
 	AGeneratorWorldCampaign();
 
+	virtual void PostInitializeComponents() override;
+
 	UFUNCTION(CallInEditor, Category = "World Campaign|Connection Generation",
 		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::NotStarted"))
 	void CreateConnectionsStep();
@@ -355,6 +358,8 @@ public:
 	void DebugDrawAllConnections() const;
 
 	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
+	bool GetIsValidCampaignDebugger() const;
+	UWorldCampaignDebugger* GetCampaignDebugger() const;
 	
 
 private:
@@ -399,7 +404,7 @@ private:
 	void ClearDerivedData();
 	void CacheAnchorConnectionDegrees();
 	void BuildChokepointScoresCache(const AAnchorPoint* OptionalHQAnchor);
-	void DebugNotifyAnchorPicked(const AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const;
+	void DebugNotifyAnchorPicked(AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const;
 
 	/**
 	 * @brief Prepares anchors for a deterministic connection pass so retries start cleanly.
@@ -574,7 +579,7 @@ private:
 	void AddThirdConnectionSegment(AConnection* Connection, AAnchorPoint* ThirdAnchor, const FVector& JunctionLocation,
 	                               TArray<FConnectionSegment>& ExistingSegments) const;
 
-	void DebugNotifyAnchorProcessing(const AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const;
+	void DebugNotifyAnchorProcessing(AAnchorPoint* AnchorPoint, const FString& Label, const FColor& Color) const;
 	void DebugDrawConnection(const AConnection* Connection, const FColor& Color) const;
 	void DebugDrawThreeWay(const AConnection* Connection, const FColor& Color) const;
 	void DrawDebugConnectionLine(UWorld* World, const FVector& Start, const FVector& End, const FColor& Color) const;
@@ -770,4 +775,7 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
 		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignPlacementFailurePolicy M_PlacementFailurePolicy;
+
+	UPROPERTY()
+	TWeakObjectPtr<UWorldCampaignDebugger> M_CampaignDebugger;
 };
