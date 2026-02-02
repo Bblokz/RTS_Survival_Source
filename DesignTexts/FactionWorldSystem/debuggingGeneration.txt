@@ -1,0 +1,46 @@
+﻿can you write a prompt for codex to add various debugging using the 	static void DrawDebugAtLocation(
+		const UObject* WorldContext,
+		const FVector& Location,
+		const FString& Text,
+		FColor Color = FColor::White,
+		float Duration = 5.0f);
+
+Froim the class RTS_SURVIVAL_API RTSFunctionLibrary
+Here is how i want it organized:
+a special UWorldCampaignDebugger derived from actor component that is expected to be added on the bp instance of the world generator *not added as subobject* as that leads to me not being able to change the edit anywhere settings on that component.
+this componennt will be found at post init of the world generator and if not do report error.
+
+with settings that are exposed as editanywhere:
+float DefaultDebugHeightOffset = 300 
+float AddedHeightIfStillDisplaying = 200
+DisplayTimeRejectedLocation = 3 // for any debug above an achorpoint that was rejected for placement
+DisplayTimeAcceptedLocation = 5 // for any debug above an anchorpoint that was accepted for placement
+
+bool bDebugAnchorDegree = false whether to display the degree of the anchor of the selected anchor for placement for this object IF the rules for the placement of it did care about that.
+bool bDebugPlayerHQHops = false whether to display the hops from the player HQ if the placement of this object cared about it.
+bool bDebugEnemyHQHops = false Whether to display the hops from the enemy HQ if the placement of this object cared about it.
+bool bDisplayVariationEnemyObjectPlacement = true whether to show a debug print with variation and the variation index/number when we use a variation of placement rules for this particular object (this will be displayed on the successfull placement of that enemy object)
+bool bDisplayHopsFromSameEnemyItems = true whether to display the hops from enemy items that are of the same item after the succesfull placement.
+bool bDisplayHopsFromOtherNeutralItems = true whether to display the hops from other neutral items after a neutral item was succesfully placed.
+
+bool bDebugFailedMissionPlacement = false whether to display debug info when a mission placement fails; if set to true also display
+what caused the failure (make it concise!)
+bool bDisplayHopsFromHQForMissions = true whether to display the hops from the HQ on succesfull mission placement.
+bool bDebugMissionSpacingHops = true whether to display the hops from other missions on succesfull mission placement (only show
+if the mission rules for  the placement of this mision cared about that spacing)
+bool bDisplayMinMaxConnectionsForMissionPlacement = true whether to display the min/max connection counts for mission placement on succesfull placement.
+b DisplayMissionAdjacencyRequirements = true whether to display adjacency requirements for mission placement on succesfull placement.
+bool bDisplayNeutralItemRequirementForMission = true if the mission needed to be placed on top of a neutral item, display that requirement on succesfull placement.
+
+
+How this component needs to work: it needs to keep track for each aanchor it has debugged for how long ago that was (keep track of time stamps)
+so that if the same anchor is debugged again within the added height time it will add the added height offset to the debug height so messages never overlap!
+make sure all data on this component of debugging is wiped when the designer elects to clear all the generation data on the world generator!
+
+provide the full prompt for codex to implement this and make sure codex moves any previous debugging of in world strings on 
+aanchor points to the responsibility of this component.
+Finally; make sure codex implements it in such a way that there is no extra CPU overhead when
+
+		constexpr bool GCampaignBacktracking_Compile_DebugSymbols is set to false.
+		
+		provide the full prompt
