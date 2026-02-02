@@ -327,43 +327,52 @@ class RTS_SURVIVAL_API AGeneratorWorldCampaign : public AActor
 public:
 	AGeneratorWorldCampaign();
 
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 
-	UFUNCTION(CallInEditor, Category = "World Campaign|Connection Generation",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::NotStarted"))
-	void CreateConnectionsStep();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|HQ",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::ConnectionsCreated"))
-	void PlaceHQStep();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|HQ",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::PlayerHQPlaced"))
-	void PlaceEnemyHQStep();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|Enemy",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyHQPlaced"))
-	void PlaceEnemyWallStep();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|Enemy",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyWallPlaced"))
-	void PlaceEnemyObjectsStep();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|Neutral",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyObjectsPlaced"))
-	void PlaceNeutralObjectsStep();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Placement|Missions",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::NeutralObjectsPlaced"))
-	void PlaceMissionsStep();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Generation")
-	void ExecuteAllSteps();
-
-	UFUNCTION(CallInEditor, Category = "World Campaign|Generation")
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (DisplayPriority = 1))
 	void EraseAllGeneration();
 
-	UFUNCTION(CallInEditor, Category = "World Campaign|Debug")
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::NotStarted", DisplayPriority = 2))
+	void CreateConnectionsStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::ConnectionsCreated",
+		        DisplayPriority = 3))
+	void PlaceHQStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::PlayerHQPlaced", DisplayPriority = 4))
+	void PlaceEnemyHQStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyHQPlaced", DisplayPriority = 5))
+	void PlaceEnemyWallStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyWallPlaced", DisplayPriority = 6))
+	void PlaceEnemyObjectsStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyObjectsPlaced", DisplayPriority = 7))
+	void PlaceNeutralObjectsStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::NeutralObjectsPlaced",
+		        DisplayPriority = 8))
+	void PlaceMissionsStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (DisplayPriority = 9))
+	void ExecuteAllSteps();
+
+	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
+		meta = (DisplayPriority = 1))
 	void DebugDrawAllConnections() const;
 
 	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
@@ -373,6 +382,7 @@ public:
 	
 
 private:
+	void ApplyDebuggerSettingsToComponent();
 	bool GetIsValidPlayerHQAnchor() const;
 	bool GetIsValidEnemyHQAnchor() const;
 
@@ -686,14 +696,140 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<AConnection>> M_GeneratedConnections;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "Base Z offset for debug text drawn at anchors. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Default Debug Height Offset"))
+	float M_DefaultDebugHeightOffset = 300.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "Additional Z offset per stacked message while previous debug text is still displaying. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Added Height If Still Displaying"))
+	float M_AddedHeightIfStillDisplaying = 200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "Display time for rejected placement debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Time Rejected Location"))
+	float M_DisplayTimeRejectedLocation = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "Display time for accepted placement debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Time Accepted Location"))
+	float M_DisplayTimeAcceptedLocation = 5.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "Maximum total rejection debug draws per placement attempt. Use <= 0 for unlimited. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Max Rejection Draws Per Attempt"))
+	int32 M_MaxRejectionDrawsPerAttempt = 200;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "Maximum rejection debug draws per reason per placement attempt. Use <= 0 for unlimited. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Max Rejection Draws Per Reason"))
+	int32 M_MaxRejectionDrawsPerReason = 25;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show connection degree details where relevant. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Anchor Degree"))
+	bool bM_DebugAnchorDegree = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include player HQ hop distances in debug strings where applicable. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Player HQ Hops"))
+	bool bM_DebugPlayerHQHops = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include enemy HQ hop distances in enemy placement debug strings. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Enemy HQ Hops"))
+	bool bM_DebugEnemyHQHops = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show variant selection info for enemy placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Variation Enemy Object Placement"))
+	bool bM_DisplayVariationEnemyObjectPlacement = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show hop distance to nearest same enemy type after placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Hops From Same Enemy Items"))
+	bool bM_DisplayHopsFromSameEnemyItems = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show hop distance to other neutral items. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Hops From Other Neutral Items"))
+	bool bM_DisplayHopsFromOtherNeutralItems = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display mission placement failure reasons. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Failed Mission Placement"))
+	bool bM_DebugFailedMissionPlacement = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display mission candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Mission Candidate Rejections"))
+	bool bM_DebugMissionCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display enemy candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Enemy Candidate Rejections"))
+	bool bM_DebugEnemyCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, display neutral candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Neutral Candidate Rejections"))
+	bool bM_DebugNeutralCandidateRejections = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include hop distance from HQ in mission placement debug. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Hops From HQ For Missions"))
+	bool bM_DisplayHopsFromHQForMissions = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, include mission spacing hop distances when spacing rules are active. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Debug Mission Spacing Hops"))
+	bool bM_DebugMissionSpacingHops = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show min/max connection requirements for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Min Max Connections For Mission Placement"))
+	bool bM_DisplayMinMaxConnectionsForMissionPlacement = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show adjacency requirement summaries for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Mission Adjacency Requirements"))
+	bool bM_DisplayMissionAdjacencyRequirements = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
+		        ToolTip = "When enabled, show required neutral item type for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",
+		        DisplayName = "Display Neutral Item Requirement For Mission"))
+	bool bM_DisplayNeutralItemRequirementForMission = true;
+
 	/**
 	 * @note Used in: DebugDrawAllConnections.
 	 * @note Why: Keeps debug lines visible long enough for inspection without pausing the editor.
 	 * @note Technical: Passed into DrawDebugLine as Duration for every segment.
 	 * @note Notes: Does not affect generation; purely debug visualization.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Debug",
-		meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2))
 	float M_DebugConnectionDrawDurationSeconds = WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds;
 
 	/**
@@ -702,8 +838,8 @@ private:
 	 * @note Technical: Passed into DrawDebugLine as line thickness.
 	 * @note Notes: This is visual-only; does not affect collision or selection.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Debug",
-		meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2))
 	float M_DebugConnectionLineThickness = WorldCampaignDebugDefaults::ConnectionLineThickness;
 
 	/**
@@ -712,8 +848,8 @@ private:
 	 * @note Technical: Added to the Z of anchor and junction locations before drawing.
 	 * @note Notes: Visual-only; does not affect any placement logic.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Debug",
-		meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
+		meta = (AllowPrivateAccess = "true", DisplayPriority = 2))
 	float M_DebugConnectionDrawHeightOffset = WorldCampaignDebugDefaults::ConnectionDrawHeightOffset;
 
 	/**
@@ -796,6 +932,6 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	FWorldCampaignPlacementFailurePolicy M_PlacementFailurePolicy;
 
-	UPROPERTY()
-	TWeakObjectPtr<UWorldCampaignDebugger> M_CampaignDebugger;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWorldCampaignDebugger> M_WorldCampaignDebugger;
 };

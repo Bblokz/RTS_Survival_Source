@@ -41,6 +41,31 @@ UWorldCampaignDebugger::UWorldCampaignDebugger()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+void UWorldCampaignDebugger::ApplySettingsFromGenerator(const AGeneratorWorldCampaign& Generator)
+{
+	DefaultDebugHeightOffset = Generator.M_DefaultDebugHeightOffset;
+	AddedHeightIfStillDisplaying = Generator.M_AddedHeightIfStillDisplaying;
+	DisplayTimeRejectedLocation = Generator.M_DisplayTimeRejectedLocation;
+	DisplayTimeAcceptedLocation = Generator.M_DisplayTimeAcceptedLocation;
+	MaxRejectionDrawsPerAttempt = Generator.M_MaxRejectionDrawsPerAttempt;
+	MaxRejectionDrawsPerReason = Generator.M_MaxRejectionDrawsPerReason;
+	bDebugAnchorDegree = Generator.bM_DebugAnchorDegree;
+	bDebugPlayerHQHops = Generator.bM_DebugPlayerHQHops;
+	bDebugEnemyHQHops = Generator.bM_DebugEnemyHQHops;
+	bDisplayVariationEnemyObjectPlacement = Generator.bM_DisplayVariationEnemyObjectPlacement;
+	bDisplayHopsFromSameEnemyItems = Generator.bM_DisplayHopsFromSameEnemyItems;
+	bDisplayHopsFromOtherNeutralItems = Generator.bM_DisplayHopsFromOtherNeutralItems;
+	bDebugFailedMissionPlacement = Generator.bM_DebugFailedMissionPlacement;
+	bDebugMissionCandidateRejections = Generator.bM_DebugMissionCandidateRejections;
+	bDebugEnemyCandidateRejections = Generator.bM_DebugEnemyCandidateRejections;
+	bDebugNeutralCandidateRejections = Generator.bM_DebugNeutralCandidateRejections;
+	bDisplayHopsFromHQForMissions = Generator.bM_DisplayHopsFromHQForMissions;
+	bDebugMissionSpacingHops = Generator.bM_DebugMissionSpacingHops;
+	bDisplayMinMaxConnectionsForMissionPlacement = Generator.bM_DisplayMinMaxConnectionsForMissionPlacement;
+	bDisplayMissionAdjacencyRequirements = Generator.bM_DisplayMissionAdjacencyRequirements;
+	bDisplayNeutralItemRequirementForMission = Generator.bM_DisplayNeutralItemRequirementForMission;
+}
+
 void UWorldCampaignDebugger::ClearAllDebugState()
 {
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)

@@ -12,6 +12,7 @@
 #include "WorldCampaignDebugger.generated.h"
 
 class AAnchorPoint;
+class AGeneratorWorldCampaign;
 
 struct FWorldCampaignEnemyPlacementDebugInfo
 {
@@ -59,7 +60,7 @@ struct FWorldCampaignMissionPlacementDebugInfo
 };
 
 /**
- * @brief Add to the world campaign generator blueprint to control in-world text debugging.
+ * @brief Default subobject on the world campaign generator for in-world text debugging.
  */
 UCLASS(ClassGroup=(WorldCampaign), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UWorldCampaignDebugger : public UActorComponent
@@ -69,89 +70,7 @@ class RTS_SURVIVAL_API UWorldCampaignDebugger : public UActorComponent
 public:
 	UWorldCampaignDebugger();
 
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "Base Z offset for debug text drawn at anchors. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	float DefaultDebugHeightOffset = 300.0f;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "Additional Z offset per stacked message while previous debug text is still displaying. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	float AddedHeightIfStillDisplaying = 200.0f;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "Display time for rejected placement debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	float DisplayTimeRejectedLocation = 3.0f;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "Display time for accepted placement debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	float DisplayTimeAcceptedLocation = 5.0f;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "Maximum total rejection debug draws per placement attempt. Use <= 0 for unlimited. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	int32 MaxRejectionDrawsPerAttempt = 200;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "Maximum rejection debug draws per reason per placement attempt. Use <= 0 for unlimited. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	int32 MaxRejectionDrawsPerReason = 25;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, show connection degree details where relevant. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugAnchorDegree = false;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, include player HQ hop distances in debug strings where applicable. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugPlayerHQHops = false;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, include enemy HQ hop distances in enemy placement debug strings. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugEnemyHQHops = false;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, show variant selection info for enemy placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDisplayVariationEnemyObjectPlacement = true;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, show hop distance to nearest same enemy type after placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDisplayHopsFromSameEnemyItems = true;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, show hop distance to other neutral items. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDisplayHopsFromOtherNeutralItems = true;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, display mission placement failure reasons. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugFailedMissionPlacement = false;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, display mission candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugMissionCandidateRejections = false;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, display enemy candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugEnemyCandidateRejections = false;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, display neutral candidate rejection debug text. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugNeutralCandidateRejections = false;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, include hop distance from HQ in mission placement debug. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDisplayHopsFromHQForMissions = true;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, include mission spacing hop distances when spacing rules are active. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDebugMissionSpacingHops = true;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, show min/max connection requirements for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDisplayMinMaxConnectionsForMissionPlacement = true;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, show adjacency requirement summaries for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDisplayMissionAdjacencyRequirements = true;
-
-	UPROPERTY(EditAnywhere, Category = "World Campaign|Debug",
-		meta = (ToolTip = "When enabled, show required neutral item type for mission placement. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols."))
-	bool bDisplayNeutralItemRequirementForMission = true;
+	void ApplySettingsFromGenerator(const AGeneratorWorldCampaign& Generator);
 
 	/**
 	 * @brief Clears stacked debug state so new text starts at the default height.
@@ -231,6 +150,28 @@ public:
 	void DebugMissionPlacementFailed(AAnchorPoint* AnchorPoint, EMapMission MissionType, const FString& Reason);
 
 private:
+	float DefaultDebugHeightOffset = 300.0f;
+	float AddedHeightIfStillDisplaying = 200.0f;
+	float DisplayTimeRejectedLocation = 3.0f;
+	float DisplayTimeAcceptedLocation = 5.0f;
+	int32 MaxRejectionDrawsPerAttempt = 200;
+	int32 MaxRejectionDrawsPerReason = 25;
+	bool bDebugAnchorDegree = false;
+	bool bDebugPlayerHQHops = false;
+	bool bDebugEnemyHQHops = false;
+	bool bDisplayVariationEnemyObjectPlacement = true;
+	bool bDisplayHopsFromSameEnemyItems = true;
+	bool bDisplayHopsFromOtherNeutralItems = true;
+	bool bDebugFailedMissionPlacement = false;
+	bool bDebugMissionCandidateRejections = false;
+	bool bDebugEnemyCandidateRejections = false;
+	bool bDebugNeutralCandidateRejections = false;
+	bool bDisplayHopsFromHQForMissions = true;
+	bool bDebugMissionSpacingHops = true;
+	bool bDisplayMinMaxConnectionsForMissionPlacement = true;
+	bool bDisplayMissionAdjacencyRequirements = true;
+	bool bDisplayNeutralItemRequirementForMission = true;
+
 	enum class EWorldCampaignRejectionItemType : uint8
 	{
 		Enemy,
