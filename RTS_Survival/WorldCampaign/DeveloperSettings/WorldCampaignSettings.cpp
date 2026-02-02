@@ -4,6 +4,8 @@
 
 UWorldCampaignSettings::UWorldCampaignSettings()
 {
+	CategoryName = TEXT("Game");
+	SectionName = TEXT("World Campaign");
 }
 
 const UWorldCampaignSettings* UWorldCampaignSettings::Get()

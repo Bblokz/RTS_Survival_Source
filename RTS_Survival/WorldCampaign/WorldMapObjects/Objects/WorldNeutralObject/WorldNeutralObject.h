@@ -22,5 +22,5 @@ public:
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "World Campaign|World Objects", meta = (AllowPrivateAccess = "true"))
-	EMapNeutralObjectType M_NeutralObjectType = EMapNeutralObjectType::NotSet;
+	EMapNeutralObjectType M_NeutralObjectType = EMapNeutralObjectType::None;
 };
