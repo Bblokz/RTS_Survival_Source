@@ -319,6 +319,8 @@ class RTS_SURVIVAL_API AGeneratorWorldCampaign : public AActor
 {
 	GENERATED_BODY()
 
+	friend class UWorldCampaignDebugger;
+
 public:
 	AGeneratorWorldCampaign();
 
