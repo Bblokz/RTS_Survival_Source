@@ -59,6 +59,29 @@ namespace
 
 	constexpr float SegmentIntersectionTolerance = 0.01f;
 	constexpr int32 NoRequiredItems = 0;
+	
+	TArray<EMapEnemyItem> GetSortedEnemyTypes(const TMap<EMapEnemyItem, int32>& EnemyItemCounts)
+	{
+		TArray<EMapEnemyItem> EnemyTypes;
+		EnemyItemCounts.GetKeys(EnemyTypes);
+		EnemyTypes.Sort([](const EMapEnemyItem Left, const EMapEnemyItem Right)
+		{
+			return static_cast<uint8>(Left) < static_cast<uint8>(Right);
+		});
+		return EnemyTypes;
+	}
+	
+	TArray<EMapMission> GetSortedMissionTypes(const TMap<EMapMission, FPerMissionRules>& MissionRules)
+	{
+		TArray<EMapMission> MissionTypes;
+		MissionRules.GetKeys(MissionTypes);
+		MissionTypes.Sort([](const EMapMission Left, const EMapMission Right)
+		{
+			return static_cast<uint8>(Left) < static_cast<uint8>(Right);
+		});
+		return MissionTypes;
+	}
+	
 
 	TMap<FGuid, TObjectPtr<AAnchorPoint>> BuildAnchorLookup(const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors)
 	{
@@ -336,16 +359,7 @@ namespace
 		}
 	}
 
-	TArray<EMapEnemyItem> GetSortedEnemyTypes(const TMap<EMapEnemyItem, int32>& EnemyItemCounts)
-	{
-		TArray<EMapEnemyItem> EnemyTypes;
-		EnemyItemCounts.GetKeys(EnemyTypes);
-		EnemyTypes.Sort([](const EMapEnemyItem Left, const EMapEnemyItem Right)
-		{
-			return static_cast<uint8>(Left) < static_cast<uint8>(Right);
-		});
-		return EnemyTypes;
-	}
+
 
 	TArray<EMapNeutralObjectType> GetSortedNeutralTypes(const TMap<EMapNeutralObjectType, int32>& NeutralItemCounts)
 	{
@@ -358,16 +372,6 @@ namespace
 		return NeutralTypes;
 	}
 
-	TArray<EMapMission> GetSortedMissionTypes(const TMap<EMapMission, FPerMissionRules>& MissionRules)
-	{
-		TArray<EMapMission> MissionTypes;
-		MissionRules.GetKeys(MissionTypes);
-		MissionTypes.Sort([](const EMapMission Left, const EMapMission Right)
-		{
-			return static_cast<uint8>(Left) < static_cast<uint8>(Right);
-		});
-		return MissionTypes;
-	}
 
 	float GetEnemyPreferenceScore(EEnemyTopologySearchStrategy Preference, int32 ConnectionDegree,
 	                              float ChokepointScore, int32 HopDistanceFromEnemyHQ,
