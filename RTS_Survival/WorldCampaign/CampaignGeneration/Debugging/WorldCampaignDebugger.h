@@ -8,6 +8,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/TopologySearchStrategy/Enum_TopologySearchStrategy.h"
 #include "WorldCampaignDebugger.generated.h"
 
 class AAnchorPoint;
@@ -40,10 +41,19 @@ struct FWorldCampaignMissionPlacementDebugInfo
 	float NearestMissionHopDistance = -1.f;
 	int32 MinConnections = 0;
 	int32 MaxConnections = 0;
+	int32 OverrideMinConnections = 0;
+	int32 OverrideMaxConnections = 0;
+	int32 OverrideMinHopsFromHQ = 0;
+	int32 OverrideMaxHopsFromHQ = 0;
 	bool bUsesConnectionRules = false;
 	bool bUsesMissionSpacingHops = false;
 	bool bHasAdjacencyRequirement = false;
 	bool bHasNeutralRequirement = false;
+	bool bUsesOverrideArray = false;
+	bool bOverrideArrayUsesConnectionBounds = false;
+	bool bOverrideArrayUsesHopsBounds = false;
+	ETopologySearchStrategy OverrideConnectionPreference = ETopologySearchStrategy::NotSet;
+	ETopologySearchStrategy OverrideHopsPreference = ETopologySearchStrategy::NotSet;
 	FString AdjacencySummary;
 	EMapNeutralObjectType RequiredNeutralType = EMapNeutralObjectType::None;
 };

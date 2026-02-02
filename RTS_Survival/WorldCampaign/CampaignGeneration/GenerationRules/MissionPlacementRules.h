@@ -9,6 +9,8 @@
 
 #include "MissionPlacementRules.generated.h"
 
+class AAnchorPoint;
+
 /**
  * @brief Tier-level placement rules applied during MissionsPlaced, which runs after
  *        NeutralObjectsPlaced and before Finished in campaign generation.
@@ -304,6 +306,29 @@ struct FPerMissionRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission")
 	bool bOverrideTierRules = false;
+
+	/**
+	 * If true, only consider the specified anchor list for this mission placement.
+	 * Example: Enable this to force a mission to appear on a curated set of anchors.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Allows designers to restrict mission placement to specific anchors.
+	 * @note Technical: Candidate selection only considers anchors from OverridePlacementAnchorCandidates.
+	 * @note Notes: If no candidates are valid, mission placement fails for this mission.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission")
+	bool bOverridePlacementWithArray = false;
+
+	/**
+	 * Candidate anchors used when bOverridePlacementWithArray is true.
+	 * Example: Populate with anchor actors that match the narrative requirements of this mission.
+	 * @note Used in: MissionsPlaced when bOverridePlacementWithArray is true.
+	 * @note Why: Explicitly constrains mission placement to designer-selected anchors.
+	 * @note Technical: Filtered against cached anchors and occupancy before selection.
+	 * @note Notes: Invalid or uncached anchors are ignored during filtering.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission",
+		meta = (EditCondition = "bOverridePlacementWithArray"))
+	TArray<TObjectPtr<AAnchorPoint>> OverridePlacementAnchorCandidates;
 
 	/**
 	 * Override rules when bOverrideTierRules is enabled.

@@ -14,6 +14,8 @@ enum class EMapEnemyItem : uint8
 	None,
 	/** The main enemy headquarters, already placed in the EnemyHQPlaced step. */
 	EnemyHQ,
+	/** Enemy wall segment placed as a distinct anchor-based defense line. */
+	EnemyWall,
 	/** Enemy factory structure used to expand production routes after HQ placement. */
 	Factory,
 	/** Enemy airfield item typically placed to extend threat range mid-campaign. */
