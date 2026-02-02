@@ -4,12 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapPlayerItem.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 #include "AnchorPoint.generated.h"
 
 class AConnection;
+class AWorldMapObject;
+class UWorldCampaignSettings;
 
 /**
  * @brief Anchor actors are placed on the campaign map and serve as stable nodes for generated connections.
@@ -40,26 +44,20 @@ public:
 	void DebugDrawAnchorState(const FString& Label, const FColor& Color, float Duration) const;
 	void DebugDrawConnectionTo(const AAnchorPoint* OtherAnchor, const FColor& Color, float Duration) const;
 
-	UFUNCTION(BlueprintCallable, Category = "World Campaign|Anchor")
-	void OnEnemyItemPromotion(EMapEnemyItem EnemyItemType);
+	void InitializeCampaignSettings(const UWorldCampaignSettings* Settings);
 
-	UFUNCTION(BlueprintCallable, Category = "World Campaign|Anchor")
-	void OnNeutralItemPromotion(EMapNeutralObjectType NeutralObjectType);
+	AWorldMapObject* OnEnemyItemPromotion(EMapEnemyItem EnemyItemType, ECampaignGenerationStep GenerationStep);
+	AWorldMapObject* OnNeutralItemPromotion(EMapNeutralObjectType NeutralObjectType, ECampaignGenerationStep GenerationStep);
+	AWorldMapObject* OnMissionPromotion(EMapMission MissionType, ECampaignGenerationStep GenerationStep);
+	AWorldMapObject* OnPlayerItemPromotion(EMapPlayerItem PlayerItemType, ECampaignGenerationStep GenerationStep);
 
-	UFUNCTION(BlueprintCallable, Category = "World Campaign|Anchor")
-	void OnMissionPromotion(EMapMission MissionType);
-
-	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Anchor")
-	void BP_OnEnemyItemPromotion(EMapEnemyItem EnemyItemType);
-
-	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Anchor")
-	void BP_OnNeutralItemPromotion(EMapNeutralObjectType NeutralObjectType);
-
-	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Anchor")
-	void BP_OnMissionPromotion(EMapMission MissionType);
+	void RemovePromotedWorldObject();
+	bool GetHasPromotedWorldObject() const;
+	AWorldMapObject* GetPromotedWorldObject() const;
 
 private:
 	void EnsureAnchorKeyIsInitialized();
+	bool GetIsValidWorldCampaignSettings() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
 	FGuid M_AnchorKey;
@@ -69,4 +67,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<AAnchorPoint>> M_NeighborAnchors;
+
+	UPROPERTY(VisibleAnywhere, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
+	TWeakObjectPtr<const UWorldCampaignSettings> M_WorldCampaignSettings;
+
+	UPROPERTY(VisibleAnywhere, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
+	TWeakObjectPtr<AWorldMapObject> M_PromotedWorldObject;
 };
