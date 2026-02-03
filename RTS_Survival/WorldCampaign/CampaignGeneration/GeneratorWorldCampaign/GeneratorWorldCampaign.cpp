@@ -34,6 +34,8 @@ namespace
 	constexpr float AnchorGridLineThickness = 0.5f;
 	constexpr float AnchorGridBoundsLineThickness = 1.f;
 	constexpr float AnchorPointSpawnZ = 0.f;
+	constexpr int32 PlayerHQForcePlacementSeedOffset = 4021;
+	constexpr int32 EnemyHQForcePlacementSeedOffset = 4027;
 	const FName GeneratedAnchorTag(TEXT("WC_GeneratedAnchor"));
 	constexpr uint64 Mix64Increment = 0x9E3779B97F4A7C15ull;
 	constexpr uint64 Mix64MultiplierA = 0xBF58476D1CE4E5B9ull;
@@ -4094,61 +4096,91 @@ bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction&
 		                                                          ? M_PlayerHQPlacementRules.AnchorCandidates
 		                                                          : M_PlacementState.CachedAnchors;
 
+	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::PlayerHQPlaced);
 	TArray<TObjectPtr<AAnchorPoint>> Candidates;
+	bool bShouldForcePlacement = false;
 	if (not BuildHQAnchorCandidates(CandidateSource, M_PlayerHQPlacementRules.MinAnchorDegreeForHQ,
 	                                MaxAnchorDegreeUnlimited, nullptr, Candidates))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: no valid anchor candidates found."));
-		return false;
+		bShouldForcePlacement = true;
 	}
 
-	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::PlayerHQPlaced);
 	TArray<TObjectPtr<AAnchorPoint>> NeighborhoodCandidates;
-	NeighborhoodCandidates.Reserve(Candidates.Num());
-	for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : Candidates)
+	if (not bShouldForcePlacement)
 	{
-		if (not IsValid(CandidateAnchor))
+		NeighborhoodCandidates.Reserve(Candidates.Num());
+		for (const TObjectPtr<AAnchorPoint>& CandidateAnchor : Candidates)
 		{
-			continue;
-		}
-
-		TMap<FGuid, int32> HopDistances;
-		CampaignGenerationHelper::BuildHopDistanceCache(CandidateAnchor, HopDistances);
-
-		int32 NearbyAnchorCount = 0;
-		for (const TPair<FGuid, int32>& Pair : HopDistances)
-		{
-			if (Pair.Value <= 0)
+			if (not IsValid(CandidateAnchor))
 			{
 				continue;
 			}
 
-			if (Pair.Value > M_PlayerHQPlacementRules.MinAnchorsWithinHopsRange)
+			TMap<FGuid, int32> HopDistances;
+			CampaignGenerationHelper::BuildHopDistanceCache(CandidateAnchor, HopDistances);
+
+			int32 NearbyAnchorCount = 0;
+			for (const TPair<FGuid, int32>& Pair : HopDistances)
+			{
+				if (Pair.Value <= 0)
+				{
+					continue;
+				}
+
+				if (Pair.Value > M_PlayerHQPlacementRules.MinAnchorsWithinHopsRange)
+				{
+					continue;
+				}
+
+				NearbyAnchorCount++;
+			}
+
+			if (NearbyAnchorCount < M_PlayerHQPlacementRules.MinAnchorsWithinHops)
 			{
 				continue;
 			}
 
-			NearbyAnchorCount++;
+			NeighborhoodCandidates.Add(CandidateAnchor);
 		}
-
-		if (NearbyAnchorCount < M_PlayerHQPlacementRules.MinAnchorsWithinHops)
-		{
-			continue;
-		}
-
-		NeighborhoodCandidates.Add(CandidateAnchor);
 	}
 
-	if (NeighborhoodCandidates.Num() == 0)
+	if (not bShouldForcePlacement && NeighborhoodCandidates.Num() == 0)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: no candidates met neighborhood rules."));
-		return false;
+		bShouldForcePlacement = true;
 	}
 
-	AAnchorPoint* AnchorPoint = SelectAnchorCandidateByAttempt(NeighborhoodCandidates, AttemptIndex);
-	if (not IsValid(AnchorPoint))
+	AAnchorPoint* AnchorPoint = nullptr;
+	if (not bShouldForcePlacement)
+	{
+		AnchorPoint = SelectAnchorCandidateByAttempt(NeighborhoodCandidates, AttemptIndex);
+	}
+
+	if (not bShouldForcePlacement && not IsValid(AnchorPoint))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: selected anchor was invalid."));
+		bShouldForcePlacement = true;
+	}
+
+	if (bShouldForcePlacement)
+	{
+		TArray<TObjectPtr<AAnchorPoint>> ForcedCandidates;
+		if (not BuildHQAnchorCandidates(CandidateSource, 0, MaxAnchorDegreeUnlimited, nullptr, ForcedCandidates))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: forced placement had no anchors."));
+			return false;
+		}
+
+		const int32 SeedOffset = PlayerHQForcePlacementSeedOffset + (AttemptIndex * AttemptSeedMultiplier);
+		FRandomStream RandomStream(M_PlacementState.SeedUsed + SeedOffset);
+		const int32 ForcedIndex = RandomStream.RandRange(0, ForcedCandidates.Num() - 1);
+		AnchorPoint = ForcedCandidates[ForcedIndex].Get();
+	}
+
+	if (not IsValid(AnchorPoint))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player HQ placement failed: forced selection was invalid."));
 		return false;
 	}
 
@@ -4162,15 +4194,14 @@ bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction&
 		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Player HQ"), FColor::Green);
 	}
 
-	if (IsValid(AnchorPoint))
+	AWorldMapObject* SpawnedObject = AnchorPoint->OnPlayerItemPromotion(EMapPlayerItem::PlayerHQ,
+	                                                                    ECampaignGenerationStep::PlayerHQPlaced);
+	if (not IsValid(SpawnedObject))
 	{
-		AWorldMapObject* SpawnedObject = AnchorPoint->OnPlayerItemPromotion(EMapPlayerItem::PlayerHQ,
-		                                                                    ECampaignGenerationStep::PlayerHQPlaced);
-		if (IsValid(SpawnedObject))
-		{
-			OutTransaction.SpawnedActors.Add(SpawnedObject);
-		}
+		return true;
 	}
+
+	OutTransaction.SpawnedActors.Add(SpawnedObject);
 
 	return true;
 }
@@ -4191,22 +4222,25 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 	}
 
 	constexpr int32 MinAnchorDegreeFloor = 0;
+	constexpr int32 MaxAnchorDegreeUnlimited = TNumericLimits<int32>::Max();
 	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = M_EnemyHQPlacementRules.AnchorCandidates.Num() > 0
 		                                                          ? M_EnemyHQPlacementRules.AnchorCandidates
 		                                                          : M_PlacementState.CachedAnchors;
 
 	TArray<TObjectPtr<AAnchorPoint>> Candidates;
+	bool bShouldForcePlacement = false;
 	const int32 MinAnchorDegree = FMath::Max(MinAnchorDegreeFloor, M_EnemyHQPlacementRules.MinAnchorDegree);
 	const int32 MaxAnchorDegree = FMath::Max(MinAnchorDegree, M_EnemyHQPlacementRules.MaxAnchorDegree);
 	if (not BuildHQAnchorCandidates(CandidateSource, MinAnchorDegree, MaxAnchorDegree,
 	                                M_PlacementState.PlayerHQAnchor.Get(), Candidates))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: no valid anchor candidates found."));
-		return false;
+		bShouldForcePlacement = true;
 	}
 
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::EnemyHQPlaced);
-	if (M_EnemyHQPlacementRules.AnchorDegreePreference != ETopologySearchStrategy::NotSet)
+	if (not bShouldForcePlacement
+		&& M_EnemyHQPlacementRules.AnchorDegreePreference != ETopologySearchStrategy::NotSet)
 	{
 		const bool bPreferMax = M_EnemyHQPlacementRules.AnchorDegreePreference == ETopologySearchStrategy::PreferMax;
 		Algo::Sort(Candidates, [this, bPreferMax](const TObjectPtr<AAnchorPoint>& Left,
@@ -4233,10 +4267,37 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 		});
 	}
 
-	AAnchorPoint* AnchorPoint = SelectAnchorCandidateByAttempt(Candidates, AttemptIndex);
-	if (not IsValid(AnchorPoint))
+	AAnchorPoint* AnchorPoint = nullptr;
+	if (not bShouldForcePlacement)
+	{
+		AnchorPoint = SelectAnchorCandidateByAttempt(Candidates, AttemptIndex);
+	}
+
+	if (not bShouldForcePlacement && not IsValid(AnchorPoint))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: selected anchor was invalid."));
+		bShouldForcePlacement = true;
+	}
+
+	if (bShouldForcePlacement)
+	{
+		TArray<TObjectPtr<AAnchorPoint>> ForcedCandidates;
+		if (not BuildHQAnchorCandidates(CandidateSource, MinAnchorDegreeFloor, MaxAnchorDegreeUnlimited,
+		                                M_PlacementState.PlayerHQAnchor.Get(), ForcedCandidates))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: forced placement had no anchors."));
+			return false;
+		}
+
+		const int32 SeedOffset = EnemyHQForcePlacementSeedOffset + (AttemptIndex * AttemptSeedMultiplier);
+		FRandomStream RandomStream(M_PlacementState.SeedUsed + SeedOffset);
+		const int32 ForcedIndex = RandomStream.RandRange(0, ForcedCandidates.Num() - 1);
+		AnchorPoint = ForcedCandidates[ForcedIndex].Get();
+	}
+
+	if (not IsValid(AnchorPoint))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: forced selection was invalid."));
 		return false;
 	}
 
@@ -4249,15 +4310,14 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Enemy HQ"), FColor::Red);
 	}
 
-	if (IsValid(AnchorPoint))
+	AWorldMapObject* SpawnedObject = AnchorPoint->OnEnemyItemPromotion(EMapEnemyItem::EnemyHQ,
+	                                                                   ECampaignGenerationStep::EnemyHQPlaced);
+	if (not IsValid(SpawnedObject))
 	{
-		AWorldMapObject* SpawnedObject = AnchorPoint->OnEnemyItemPromotion(EMapEnemyItem::EnemyHQ,
-		                                                                   ECampaignGenerationStep::EnemyHQPlaced);
-		if (IsValid(SpawnedObject))
-		{
-			OutTransaction.SpawnedActors.Add(SpawnedObject);
-		}
+		return true;
 	}
+
+	OutTransaction.SpawnedActors.Add(SpawnedObject);
 
 	return true;
 }
