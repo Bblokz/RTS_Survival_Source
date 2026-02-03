@@ -267,7 +267,7 @@ void UWorldCampaignDebugger::DrawInfoAtAnchor(AAnchorPoint* AnchorPoint, const F
 
 		const float HeightOffset = GetStackedHeightOffset(AnchorPoint, DurationOverride);
 		const FVector AnchorLocation = AnchorPoint->GetActorLocation();
-		RTSFunctionLibrary::DrawDebugAtLocation(this, AnchorLocation + FVector(0.f, 0.f, HeightOffset), Text, Color,
+		RTSFunctionLibrary::DrawDebugAtLocation(World, AnchorLocation + FVector(0.f, 0.f, HeightOffset), Text, Color,
 		                                        DurationOverride);
 	}
 }
