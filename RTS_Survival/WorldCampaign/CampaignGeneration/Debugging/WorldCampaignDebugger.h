@@ -148,6 +148,8 @@ public:
 	 */
 	void DrawInfoAtAnchor(AAnchorPoint* AnchorPoint, const FString& Text, float DurationOverride,
 	                      FColor Color = FColor::White);
+	void DebugDrawPlayerHQHopAtAnchor(AAnchorPoint* AnchorPoint, int32 HopCount);
+	void DebugDrawEnemyHQHopAtAnchor(AAnchorPoint* AnchorPoint, int32 HopCount);
 
 	/**
 	 * @brief Builds and draws enemy placement acceptance details.
