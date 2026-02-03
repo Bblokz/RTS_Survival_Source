@@ -12,6 +12,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Boundary/WorldSplineBoundary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
 namespace
@@ -24,6 +25,13 @@ namespace
 	constexpr float RelaxedDistanceMax = TNumericLimits<float>::Max();
 	constexpr int32 MaxChokepointPairSamples = 48;
 	constexpr int32 ChokepointSeedOffset = 7919;
+	constexpr int32 AnchorPointSeedOffset = 15401;
+	constexpr float AnchorPointGridJitterFraction = 0.49f;
+	constexpr int32 MaxDebugGridCells = 400;
+	constexpr float AnchorBoundaryLineThickness = 2.f;
+	constexpr float AnchorGridLineThickness = 0.5f;
+	constexpr float AnchorGridBoundsLineThickness = 1.f;
+	constexpr float AnchorPointSpawnZ = 0.f;
 
 	struct FAnchorCandidate
 	{
@@ -236,6 +244,360 @@ namespace
 	{
 		const int32* CachedDistance = HopDistancesByAnchorKey.Find(AnchorKey);
 		return CachedDistance ? *CachedDistance : INDEX_NONE;
+	}
+
+	bool IsPointInsidePolygon(const FVector2D& Point, const TArray<FVector2D>& Polygon)
+	{
+		const int32 PointCount = Polygon.Num();
+		if (PointCount < 3)
+		{
+			return false;
+		}
+
+		bool bIsInside = false;
+		for (int32 PointIndex = 0, PreviousIndex = PointCount - 1; PointIndex < PointCount; PreviousIndex = PointIndex++)
+		{
+			const FVector2D& CurrentPoint = Polygon[PointIndex];
+			const FVector2D& PreviousPoint = Polygon[PreviousIndex];
+			const bool bShouldTest = (CurrentPoint.Y > Point.Y) != (PreviousPoint.Y > Point.Y);
+			if (not bShouldTest)
+			{
+				continue;
+			}
+
+			const float Denominator = PreviousPoint.Y - CurrentPoint.Y;
+			if (FMath::IsNearlyZero(Denominator))
+			{
+				continue;
+			}
+
+			const float IntersectionX = (PreviousPoint.X - CurrentPoint.X)
+				* (Point.Y - CurrentPoint.Y) / Denominator + CurrentPoint.X;
+			if (Point.X < IntersectionX)
+			{
+				bIsInside = not bIsInside;
+			}
+		}
+
+		return bIsInside;
+	}
+
+	void GetPolygonBounds(const TArray<FVector2D>& Polygon, FVector2D& OutMin, FVector2D& OutMax)
+	{
+		OutMin = FVector2D::ZeroVector;
+		OutMax = FVector2D::ZeroVector;
+		if (Polygon.Num() == 0)
+		{
+			return;
+		}
+
+		OutMin = Polygon[0];
+		OutMax = Polygon[0];
+		for (int32 PointIndex = 1; PointIndex < Polygon.Num(); PointIndex++)
+		{
+			const FVector2D& Point = Polygon[PointIndex];
+			OutMin.X = FMath::Min(OutMin.X, Point.X);
+			OutMin.Y = FMath::Min(OutMin.Y, Point.Y);
+			OutMax.X = FMath::Max(OutMax.X, Point.X);
+			OutMax.Y = FMath::Max(OutMax.Y, Point.Y);
+		}
+	}
+
+	bool IsFarEnoughFromAnchors(const FVector2D& Candidate, const TArray<TObjectPtr<AAnchorPoint>>& ExistingAnchors,
+	                            const TArray<TObjectPtr<AAnchorPoint>>& NewAnchors, float MinDistanceSquared)
+	{
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : ExistingAnchors)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			const FVector AnchorLocation = AnchorPoint->GetActorLocation();
+			const FVector2D AnchorLocation2D(AnchorLocation.X, AnchorLocation.Y);
+			if (FVector2D::DistSquared(AnchorLocation2D, Candidate) < MinDistanceSquared)
+			{
+				return false;
+			}
+		}
+
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : NewAnchors)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			const FVector AnchorLocation = AnchorPoint->GetActorLocation();
+			const FVector2D AnchorLocation2D(AnchorLocation.X, AnchorLocation.Y);
+			if (FVector2D::DistSquared(AnchorLocation2D, Candidate) < MinDistanceSquared)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool TryGetSingleSplineBoundary(UWorld* World, AWorldSplineBoundary*& OutBoundary)
+	{
+		OutBoundary = nullptr;
+		if (not IsValid(World))
+		{
+			return false;
+		}
+
+		int32 BoundaryCount = 0;
+		for (TActorIterator<AWorldSplineBoundary> It(World); It; ++It)
+		{
+			AWorldSplineBoundary* Boundary = *It;
+			if (not IsValid(Boundary))
+			{
+				continue;
+			}
+
+			OutBoundary = Boundary;
+			BoundaryCount++;
+		}
+
+		if (BoundaryCount == 1 && IsValid(OutBoundary))
+		{
+			return true;
+		}
+
+		if (BoundaryCount == 0)
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: no WorldSplineBoundary found."));
+			return false;
+		}
+
+		RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: multiple WorldSplineBoundary actors found."));
+		OutBoundary = nullptr;
+		return false;
+	}
+
+	struct FAnchorPointGridDefinition
+	{
+		FVector2D BoundsMin = FVector2D::ZeroVector;
+		FVector2D BoundsMax = FVector2D::ZeroVector;
+		int32 GridCountX = 0;
+		int32 GridCountY = 0;
+		int32 CellCount = 0;
+		float CellSize = 0.f;
+		float JitterRange = 0.f;
+		int32 StartIndex = 0;
+	};
+
+	bool ValidateAnchorPointGenerationSettings(const FAnchorPointGenerationSettings& Settings, FString& OutError)
+	{
+		if (Settings.M_MinNewAnchorPoints < 0)
+		{
+			OutError = TEXT("Anchor point generation failed: MinNewAnchorPoints must be >= 0.");
+			return false;
+		}
+
+		if (Settings.M_MaxNewAnchorPoints < Settings.M_MinNewAnchorPoints)
+		{
+			OutError = TEXT("Anchor point generation failed: MaxNewAnchorPoints < MinNewAnchorPoints.");
+			return false;
+		}
+
+		if (Settings.M_GridCellSize <= 0.f)
+		{
+			OutError = TEXT("Anchor point generation failed: GridCellSize must be > 0.");
+			return false;
+		}
+
+		if (Settings.M_MinDistanceBetweenAnchorPoints < 0.f)
+		{
+			OutError = TEXT("Anchor point generation failed: MinDistanceBetweenAnchorPoints must be >= 0.");
+			return false;
+		}
+
+		if (Settings.M_SplineSampleSpacing <= 0.f)
+		{
+			OutError = TEXT("Anchor point generation failed: SplineSampleSpacing must be > 0.");
+			return false;
+		}
+
+		return true;
+	}
+
+	bool TryBuildSplineBoundaryPolygon(UWorld* World, const FAnchorPointGenerationSettings& Settings,
+	                                   TArray<FVector2D>& OutPolygon)
+	{
+		OutPolygon.Reset();
+		AWorldSplineBoundary* Boundary = nullptr;
+		if (not TryGetSingleSplineBoundary(World, Boundary))
+		{
+			return false;
+		}
+
+		Boundary->EnsureClosedLoop();
+		Boundary->GetSampledPolygon2D(Settings.M_SplineSampleSpacing, OutPolygon);
+		if (OutPolygon.Num() < 3)
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: spline boundary polygon is invalid."));
+			return false;
+		}
+
+		return true;
+	}
+
+	bool BuildAnchorPointGridDefinition(const TArray<FVector2D>& Polygon, float CellSize, FRandomStream& RandomStream,
+	                                    FAnchorPointGridDefinition& OutGrid)
+	{
+		if (CellSize <= 0.f)
+		{
+			return false;
+		}
+
+		GetPolygonBounds(Polygon, OutGrid.BoundsMin, OutGrid.BoundsMax);
+		OutGrid.CellSize = CellSize;
+		OutGrid.GridCountX = FMath::Max(1, FMath::CeilToInt((OutGrid.BoundsMax.X - OutGrid.BoundsMin.X) / CellSize));
+		OutGrid.GridCountY = FMath::Max(1, FMath::CeilToInt((OutGrid.BoundsMax.Y - OutGrid.BoundsMin.Y) / CellSize));
+		OutGrid.CellCount = OutGrid.GridCountX * OutGrid.GridCountY;
+		if (OutGrid.CellCount <= 0)
+		{
+			return false;
+		}
+
+		OutGrid.StartIndex = RandomStream.RandRange(0, OutGrid.CellCount - 1);
+		OutGrid.JitterRange = CellSize * AnchorPointGridJitterFraction;
+		return true;
+	}
+
+	bool SpawnAnchorsInGrid(UWorld* World, TSubclassOf<AAnchorPoint> AnchorClass, FRandomStream& RandomStream,
+	                        const FAnchorPointGridDefinition& GridDefinition,
+	                        const TArray<FVector2D>& BoundaryPolygon,
+	                        const TArray<TObjectPtr<AAnchorPoint>>& ExistingAnchors, int32 TargetCount,
+	                        FCampaignGenerationStepTransaction& OutTransaction,
+	                        TArray<TObjectPtr<AAnchorPoint>>& OutNewAnchors, float MinDistanceSquared)
+	{
+		if (not IsValid(World))
+		{
+			return false;
+		}
+
+		for (int32 OffsetIndex = 0; OffsetIndex < GridDefinition.CellCount; OffsetIndex++)
+		{
+			if (OutNewAnchors.Num() >= TargetCount)
+			{
+				break;
+			}
+
+			const int32 CellIndex = (GridDefinition.StartIndex + OffsetIndex) % GridDefinition.CellCount;
+			const int32 CellX = CellIndex % GridDefinition.GridCountX;
+			const int32 CellY = CellIndex / GridDefinition.GridCountX;
+			const FVector2D CellMin(GridDefinition.BoundsMin.X + CellX * GridDefinition.CellSize,
+			                        GridDefinition.BoundsMin.Y + CellY * GridDefinition.CellSize);
+			const FVector2D CellMax(CellMin.X + GridDefinition.CellSize, CellMin.Y + GridDefinition.CellSize);
+			const FVector2D CellCenter(CellMin.X + GridDefinition.CellSize * 0.5f,
+			                           CellMin.Y + GridDefinition.CellSize * 0.5f);
+			const float JitterX = RandomStream.FRandRange(-GridDefinition.JitterRange, GridDefinition.JitterRange);
+			const float JitterY = RandomStream.FRandRange(-GridDefinition.JitterRange, GridDefinition.JitterRange);
+			FVector2D Candidate(CellCenter.X + JitterX, CellCenter.Y + JitterY);
+			Candidate.X = FMath::Clamp(Candidate.X, CellMin.X, CellMax.X);
+			Candidate.Y = FMath::Clamp(Candidate.Y, CellMin.Y, CellMax.Y);
+
+			if (not IsPointInsidePolygon(Candidate, BoundaryPolygon))
+			{
+				continue;
+			}
+
+			if (not IsFarEnoughFromAnchors(Candidate, ExistingAnchors, OutNewAnchors, MinDistanceSquared))
+			{
+				continue;
+			}
+
+			const FVector SpawnLocation(Candidate.X, Candidate.Y, AnchorPointSpawnZ);
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AAnchorPoint* SpawnedAnchor = World->SpawnActor<AAnchorPoint>(AnchorClass, SpawnLocation,
+			                                                              FRotator::ZeroRotator, SpawnParams);
+			if (not IsValid(SpawnedAnchor))
+			{
+				RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: spawn failed."));
+				return false;
+			}
+
+			OutTransaction.SpawnedActors.Add(SpawnedAnchor);
+			OutNewAnchors.Add(SpawnedAnchor);
+		}
+
+		return true;
+	}
+
+	void DrawBoundaryPolygon(UWorld* World, const TArray<FVector2D>& BoundaryPolygon, float HeightOffset,
+	                         float Duration, const FColor& LineColor)
+	{
+		if (not IsValid(World))
+		{
+			return;
+		}
+
+		for (int32 PointIndex = 0; PointIndex < BoundaryPolygon.Num(); PointIndex++)
+		{
+			const int32 NextIndex = (PointIndex + 1) % BoundaryPolygon.Num();
+			const FVector Start(BoundaryPolygon[PointIndex].X, BoundaryPolygon[PointIndex].Y, HeightOffset);
+			const FVector End(BoundaryPolygon[NextIndex].X, BoundaryPolygon[NextIndex].Y, HeightOffset);
+			DrawDebugLine(World, Start, End, LineColor, false, Duration, 0, AnchorBoundaryLineThickness);
+		}
+	}
+
+	void DrawAnchorGrid(UWorld* World, const TArray<FVector2D>& BoundaryPolygon, float CellSize, float HeightOffset,
+	                    float Duration)
+	{
+		if (not IsValid(World))
+		{
+			return;
+		}
+
+		if (CellSize <= 0.f)
+		{
+			return;
+		}
+
+		FVector2D BoundsMin;
+		FVector2D BoundsMax;
+		GetPolygonBounds(BoundaryPolygon, BoundsMin, BoundsMax);
+
+		const int32 GridCountX = FMath::Max(1, FMath::CeilToInt((BoundsMax.X - BoundsMin.X) / CellSize));
+		const int32 GridCountY = FMath::Max(1, FMath::CeilToInt((BoundsMax.Y - BoundsMin.Y) / CellSize));
+		const int32 CellCount = GridCountX * GridCountY;
+
+		const FColor GridColor = FColor::Cyan;
+		if (CellCount > MaxDebugGridCells)
+		{
+			const FVector BoxMin(BoundsMin.X, BoundsMin.Y, HeightOffset);
+			const FVector BoxMax(BoundsMax.X, BoundsMax.Y, HeightOffset);
+			DrawDebugLine(World, BoxMin, FVector(BoxMax.X, BoxMin.Y, HeightOffset), GridColor, false, Duration, 0,
+			              AnchorGridBoundsLineThickness);
+			DrawDebugLine(World, FVector(BoxMax.X, BoxMin.Y, HeightOffset), BoxMax, GridColor, false, Duration, 0,
+			              AnchorGridBoundsLineThickness);
+			DrawDebugLine(World, BoxMax, FVector(BoxMin.X, BoxMax.Y, HeightOffset), GridColor, false, Duration, 0,
+			              AnchorGridBoundsLineThickness);
+			DrawDebugLine(World, FVector(BoxMin.X, BoxMax.Y, HeightOffset), BoxMin, GridColor, false, Duration, 0,
+			              AnchorGridBoundsLineThickness);
+			return;
+		}
+
+		for (int32 CellIndex = 0; CellIndex < CellCount; CellIndex++)
+		{
+			const int32 CellX = CellIndex % GridCountX;
+			const int32 CellY = CellIndex / GridCountX;
+			const FVector2D CellMin(BoundsMin.X + CellX * CellSize, BoundsMin.Y + CellY * CellSize);
+			const FVector2D CellMax(CellMin.X + CellSize, CellMin.Y + CellSize);
+			const FVector BottomLeft(CellMin.X, CellMin.Y, HeightOffset);
+			const FVector BottomRight(CellMax.X, CellMin.Y, HeightOffset);
+			const FVector TopRight(CellMax.X, CellMax.Y, HeightOffset);
+			const FVector TopLeft(CellMin.X, CellMax.Y, HeightOffset);
+
+			DrawDebugLine(World, BottomLeft, BottomRight, GridColor, false, Duration, 0, AnchorGridLineThickness);
+			DrawDebugLine(World, BottomRight, TopRight, GridColor, false, Duration, 0, AnchorGridLineThickness);
+			DrawDebugLine(World, TopRight, TopLeft, GridColor, false, Duration, 0, AnchorGridLineThickness);
+			DrawDebugLine(World, TopLeft, BottomLeft, GridColor, false, Duration, 0, AnchorGridLineThickness);
+		}
 	}
 
 	bool BuildShortestPathKeys(const AAnchorPoint* StartAnchor,
@@ -2603,6 +2965,7 @@ namespace
 			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			OutSteps.Add(ECampaignGenerationStep::AnchorPointsGenerated);
 			return;
 		}
 
@@ -2613,6 +2976,7 @@ namespace
 			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			OutSteps.Add(ECampaignGenerationStep::AnchorPointsGenerated);
 			return;
 		}
 
@@ -2622,6 +2986,7 @@ namespace
 			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			OutSteps.Add(ECampaignGenerationStep::AnchorPointsGenerated);
 			return;
 		}
 
@@ -2630,6 +2995,7 @@ namespace
 			OutSteps.Add(ECampaignGenerationStep::EnemyHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			OutSteps.Add(ECampaignGenerationStep::AnchorPointsGenerated);
 			return;
 		}
 
@@ -2637,12 +3003,21 @@ namespace
 		{
 			OutSteps.Add(ECampaignGenerationStep::PlayerHQPlaced);
 			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			OutSteps.Add(ECampaignGenerationStep::AnchorPointsGenerated);
 			return;
 		}
 
 		if (FailedStep == ECampaignGenerationStep::PlayerHQPlaced)
 		{
 			OutSteps.Add(ECampaignGenerationStep::ConnectionsCreated);
+			OutSteps.Add(ECampaignGenerationStep::AnchorPointsGenerated);
+			return;
+		}
+
+		if (FailedStep == ECampaignGenerationStep::ConnectionsCreated)
+		{
+			OutSteps.Add(ECampaignGenerationStep::AnchorPointsGenerated);
+			OutSteps.Add(ECampaignGenerationStep::NotStarted);
 		}
 	}
 
@@ -2702,6 +3077,7 @@ AGeneratorWorldCampaign::AGeneratorWorldCampaign()
 	PrimaryActorTick.bCanEverTick = false;
 	M_ConnectionClass = AConnection::StaticClass();
 	M_WorldCampaignDebugger = CreateDefaultSubobject<UWorldCampaignDebugger>(TEXT("WorldCampaignDebugger"));
+	M_AnchorPointGenerationSettings.M_GeneratedAnchorPointClass = AAnchorPoint::StaticClass();
 	M_ExcludedMissionsFromMapPlacement.Add(EMapMission::FirstCampaignClearRoad);
 	M_ExcludedMissionsFromMapPlacement.Add(EMapMission::SecondCampaignBuildBase);
 	ApplyDebuggerSettingsToComponent();
@@ -2729,6 +3105,18 @@ void AGeneratorWorldCampaign::PostEditChangeProperty(FPropertyChangedEvent& Prop
 	ApplyDebuggerSettingsToComponent();
 }
 #endif
+
+void AGeneratorWorldCampaign::GenerateAnchorPointsStep()
+{
+	if (not CanExecuteStep(ECampaignGenerationStep::AnchorPointsGenerated))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("GenerateAnchorPointsStep called out of order."));
+		return;
+	}
+
+	ExecuteStepWithTransaction(ECampaignGenerationStep::AnchorPointsGenerated,
+	                           &AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints);
+}
 
 void AGeneratorWorldCampaign::CreateConnectionsStep()
 {
@@ -2921,6 +3309,47 @@ void AGeneratorWorldCampaign::DebugDrawAllConnections() const
 	}
 }
 
+void AGeneratorWorldCampaign::DebugDrawSplineBoundaryArea()
+{
+	if (not M_AnchorPointGenerationSettings.bM_DebugDrawSplineBoundary)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	AWorldSplineBoundary* Boundary = nullptr;
+	if (not TryGetSingleSplineBoundary(World, Boundary))
+	{
+		return;
+	}
+
+	Boundary->EnsureClosedLoop();
+
+	TArray<FVector2D> BoundaryPolygon;
+	Boundary->GetSampledPolygon2D(M_AnchorPointGenerationSettings.M_SplineSampleSpacing, BoundaryPolygon);
+	if (BoundaryPolygon.Num() < 3)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("DebugDrawSplineBoundaryArea failed: spline boundary polygon is invalid."));
+		return;
+	}
+
+	const float HeightOffset = M_AnchorPointGenerationSettings.M_DebugDrawBoundaryZOffset;
+	const float Duration = M_AnchorPointGenerationSettings.M_DebugDrawBoundaryDuration;
+	DrawBoundaryPolygon(World, BoundaryPolygon, HeightOffset, Duration, FColor::Green);
+
+	if (not M_AnchorPointGenerationSettings.bM_DebugDrawGeneratedGrid)
+	{
+		return;
+	}
+
+	DrawAnchorGrid(World, BoundaryPolygon, M_AnchorPointGenerationSettings.M_GridCellSize, HeightOffset, Duration);
+}
+
 void AGeneratorWorldCampaign::ShowPlacementReport()
 {
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
@@ -3033,6 +3462,82 @@ bool AGeneratorWorldCampaign::ExecuteStepWithMicroTransactions(ECampaignGenerati
 
 	M_GenerationStep = CompletedStep;
 	ResetStepAttemptsFrom(CompletedStep);
+	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	if (not M_AnchorPointGenerationSettings.bM_EnableGeneratedAnchorPoints)
+	{
+		return true;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	FString ErrorMessage;
+	if (not ValidateAnchorPointGenerationSettings(M_AnchorPointGenerationSettings, ErrorMessage))
+	{
+		RTSFunctionLibrary::ReportError(ErrorMessage);
+		return false;
+	}
+
+	TArray<FVector2D> BoundaryPolygon;
+	if (not TryBuildSplineBoundaryPolygon(World, M_AnchorPointGenerationSettings, BoundaryPolygon))
+	{
+		return false;
+	}
+
+	TSubclassOf<AAnchorPoint> AnchorClass = M_AnchorPointGenerationSettings.M_GeneratedAnchorPointClass;
+	if (not AnchorClass)
+	{
+		AnchorClass = AAnchorPoint::StaticClass();
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> ExistingAnchors;
+	GatherAnchorPoints(ExistingAnchors);
+
+	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::AnchorPointsGenerated);
+	const int32 SeedOffset = AttemptIndex * AttemptSeedMultiplier;
+	FRandomStream RandomStream(M_CountAndDifficultyTuning.Seed + SeedOffset + AnchorPointSeedOffset);
+
+	const int32 PreferredTargetCount = RandomStream.RandRange(M_AnchorPointGenerationSettings.M_MinNewAnchorPoints,
+	                                                          M_AnchorPointGenerationSettings.M_MaxNewAnchorPoints);
+	const int32 RequiredCount = M_AnchorPointGenerationSettings.M_MinNewAnchorPoints;
+	if (PreferredTargetCount <= 0 && RequiredCount == 0)
+	{
+		return true;
+	}
+
+	const float MinDistanceSquared = FMath::Square(M_AnchorPointGenerationSettings.M_MinDistanceBetweenAnchorPoints);
+	FAnchorPointGridDefinition GridDefinition;
+	if (not BuildAnchorPointGridDefinition(BoundaryPolygon, M_AnchorPointGenerationSettings.M_GridCellSize,
+	                                       RandomStream, GridDefinition))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: grid had no cells."));
+		return false;
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> NewAnchors;
+
+	if (not SpawnAnchorsInGrid(World, AnchorClass, RandomStream, GridDefinition, BoundaryPolygon, ExistingAnchors,
+	                           PreferredTargetCount, OutTransaction, NewAnchors, MinDistanceSquared))
+	{
+		return false;
+	}
+
+	if (NewAnchors.Num() < RequiredCount)
+	{
+		const FString ErrorMessage = FString::Printf(
+			TEXT("Anchor point generation failed: spawned %d of required %d anchors."),
+			NewAnchors.Num(), RequiredCount);
+		RTSFunctionLibrary::ReportError(ErrorMessage);
+		return false;
+	}
+
 	return true;
 }
 
@@ -3923,6 +4428,7 @@ bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 	}
 
 	TArray<ECampaignGenerationStep> StepOrder;
+	StepOrder.Add(ECampaignGenerationStep::AnchorPointsGenerated);
 	StepOrder.Add(ECampaignGenerationStep::ConnectionsCreated);
 	StepOrder.Add(ECampaignGenerationStep::PlayerHQPlaced);
 	StepOrder.Add(ECampaignGenerationStep::EnemyHQPlaced);
@@ -3938,6 +4444,9 @@ bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 		bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&) = nullptr;
 		switch (StepToExecute)
 		{
+		case ECampaignGenerationStep::AnchorPointsGenerated:
+			StepFunction = &AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints;
+			break;
 		case ECampaignGenerationStep::ConnectionsCreated:
 			StepFunction = &AGeneratorWorldCampaign::ExecuteCreateConnections;
 			break;
@@ -4006,8 +4515,10 @@ ECampaignGenerationStep AGeneratorWorldCampaign::GetPrerequisiteStep(ECampaignGe
 {
 	switch (CompletedStep)
 	{
-	case ECampaignGenerationStep::ConnectionsCreated:
+	case ECampaignGenerationStep::AnchorPointsGenerated:
 		return ECampaignGenerationStep::NotStarted;
+	case ECampaignGenerationStep::ConnectionsCreated:
+		return ECampaignGenerationStep::AnchorPointsGenerated;
 	case ECampaignGenerationStep::PlayerHQPlaced:
 		return ECampaignGenerationStep::ConnectionsCreated;
 	case ECampaignGenerationStep::EnemyHQPlaced:
@@ -4033,6 +4544,8 @@ ECampaignGenerationStep AGeneratorWorldCampaign::GetNextStep(ECampaignGeneration
 	switch (CurrentStep)
 	{
 	case ECampaignGenerationStep::NotStarted:
+		return ECampaignGenerationStep::AnchorPointsGenerated;
+	case ECampaignGenerationStep::AnchorPointsGenerated:
 		return ECampaignGenerationStep::ConnectionsCreated;
 	case ECampaignGenerationStep::ConnectionsCreated:
 		return ECampaignGenerationStep::PlayerHQPlaced;
@@ -4080,6 +4593,8 @@ EPlacementFailurePolicy AGeneratorWorldCampaign::GetFailurePolicyForStep(ECampai
 	const EPlacementFailurePolicy GlobalPolicy = M_PlacementFailurePolicy.GlobalPolicy;
 	switch (FailedStep)
 	{
+	case ECampaignGenerationStep::AnchorPointsGenerated:
+		return GlobalPolicy;
 	case ECampaignGenerationStep::ConnectionsCreated:
 		return M_PlacementFailurePolicy.CreateConnectionsPolicy != EPlacementFailurePolicy::NotSet
 			       ? M_PlacementFailurePolicy.CreateConnectionsPolicy
