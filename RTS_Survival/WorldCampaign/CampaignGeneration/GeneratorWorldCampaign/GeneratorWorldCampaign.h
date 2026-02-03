@@ -586,10 +586,18 @@ public:
 
 	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
 		meta = (DisplayPriority = 2))
-	void DebugDrawSplineBoundaryArea();
+	void DebugDrawPlayerHQHops() const;
 
 	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
 		meta = (DisplayPriority = 3))
+	void DebugDrawEnemyHQHops() const;
+
+	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
+		meta = (DisplayPriority = 4))
+	void DebugDrawSplineBoundaryArea();
+
+	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
+		meta = (DisplayPriority = 5))
 	void ShowPlacementReport();
 
 	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
