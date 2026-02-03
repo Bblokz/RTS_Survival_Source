@@ -2,6 +2,7 @@
 
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Debugging/WorldCampaignDebugger.h"
 
+#include "Algo/Sort.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
@@ -9,6 +10,9 @@
 
 namespace
 {
+	constexpr int32 PlacementReportMaxChunkChars = 650;
+	constexpr int32 PlacementReportRateDivisorMin = 1;
+
 	FString GetEnemyItemName(EMapEnemyItem EnemyType)
 	{
 		const UEnum* EnemyEnum = StaticEnum<EMapEnemyItem>();
@@ -33,6 +37,116 @@ namespace
 		return PreferenceEnum
 			       ? PreferenceEnum->GetNameStringByValue(static_cast<int64>(Preference))
 			       : TEXT("Preference");
+	}
+
+	FString FormatRemovalRate(const int32 NumRemoved, const int32 NumPlaced)
+	{
+		const int32 SafePlacedCount = FMath::Max(PlacementReportRateDivisorMin, NumPlaced);
+		const float RemovalRate = 100.f * static_cast<float>(NumRemoved) / static_cast<float>(SafePlacedCount);
+		return FString::Printf(TEXT("%.0f%%"), RemovalRate);
+	}
+
+	FString FormatAverageAttempts(const int32 TotalPlacementAttempts, const int32 SuccessfulPlacements)
+	{
+		const int32 SafeSuccessfulPlacements = FMath::Max(PlacementReportRateDivisorMin, SuccessfulPlacements);
+		const float AverageAttempts = static_cast<float>(TotalPlacementAttempts)
+		                              / static_cast<float>(SafeSuccessfulPlacements);
+		return FString::Printf(TEXT("%.1f"), AverageAttempts);
+	}
+
+	void AppendLineToChunks(const FString& Line, TArray<FString>& OutChunks)
+	{
+		if (OutChunks.Num() == 0)
+		{
+			OutChunks.Add(Line);
+			return;
+		}
+
+		FString& CurrentChunk = OutChunks.Last();
+		const int32 AdditionalCharacters = Line.Len() + 1;
+		if (CurrentChunk.Len() + AdditionalCharacters > PlacementReportMaxChunkChars)
+		{
+			OutChunks.Add(Line);
+			return;
+		}
+
+		CurrentChunk.Append(TEXT("\n"));
+		CurrentChunk.Append(Line);
+	}
+
+	template <typename TStats>
+	void IncrementRemovalBucket(TStats& Stats, const ECampaignGenerationStep FailureStep)
+	{
+		if (FailureStep == ECampaignGenerationStep::MissionsPlaced)
+		{
+			Stats.RemovedDueToMissions++;
+			return;
+		}
+
+		if (FailureStep == ECampaignGenerationStep::NeutralObjectsPlaced)
+		{
+			Stats.RemovedDueToNeutralPlacement++;
+			return;
+		}
+
+		if (FailureStep == ECampaignGenerationStep::EnemyObjectsPlaced
+			|| FailureStep == ECampaignGenerationStep::EnemyWallPlaced)
+		{
+			Stats.RemovedDueToEnemyPlacement++;
+			return;
+		}
+
+		if (FailureStep == ECampaignGenerationStep::EnemyHQPlaced
+			|| FailureStep == ECampaignGenerationStep::PlayerHQPlaced)
+		{
+			Stats.RemovedDueToHQPlacement++;
+		}
+	}
+
+	template <typename TKey, typename TStats>
+	bool GetHasReportActivity(const TKey Key, const TMap<TKey, TStats>& ReportMap)
+	{
+		const TStats* StatsPtr = ReportMap.Find(Key);
+		if (StatsPtr == nullptr)
+		{
+			return false;
+		}
+
+		return StatsPtr->NumPlaced > 0 || StatsPtr->NumRemoved > 0 || StatsPtr->TotalPlacementAttempts > 0;
+	}
+
+	int32 SumTotalAttempts(const TMap<EMapEnemyItem, FEnemyReportStats>& EnemyReport,
+	                       const TMap<EMapMission, FMissionReportStats>& MissionReport)
+	{
+		int32 TotalPlacementAttempts = 0;
+		for (const TPair<EMapEnemyItem, FEnemyReportStats>& Entry : EnemyReport)
+		{
+			TotalPlacementAttempts += Entry.Value.TotalPlacementAttempts;
+		}
+
+		for (const TPair<EMapMission, FMissionReportStats>& Entry : MissionReport)
+		{
+			TotalPlacementAttempts += Entry.Value.TotalPlacementAttempts;
+		}
+
+		return TotalPlacementAttempts;
+	}
+
+	int32 SumTotalBacktracks(const TMap<EMapEnemyItem, FEnemyReportStats>& EnemyReport,
+	                         const TMap<EMapMission, FMissionReportStats>& MissionReport)
+	{
+		int32 TotalBacktracks = 0;
+		for (const TPair<EMapEnemyItem, FEnemyReportStats>& Entry : EnemyReport)
+		{
+			TotalBacktracks += Entry.Value.NumTimesCausedBacktrack;
+		}
+
+		for (const TPair<EMapMission, FMissionReportStats>& Entry : MissionReport)
+		{
+			TotalBacktracks += Entry.Value.NumTimesCausedBacktrack;
+		}
+
+		return TotalBacktracks;
 	}
 }
 
@@ -355,6 +469,237 @@ void UWorldCampaignDebugger::DebugMissionPlacementFailed(AAnchorPoint* AnchorPoi
 
 		const FString Text = FString::Printf(TEXT("Mission %s: %s"), *GetMissionName(MissionType), *Reason);
 		DrawInfoAtAnchor(AnchorPoint, Text, DisplayTimeRejectedLocation, FColor::Red);
+	}
+}
+
+void UWorldCampaignDebugger::Report_ResetPlacementReport()
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		M_EnemyReport.Reset();
+		M_MissionReport.Reset();
+		M_NeutralReport.Reset();
+	}
+}
+
+void UWorldCampaignDebugger::Report_OnAttemptEnemy(const EMapEnemyItem Type)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		FEnemyReportStats& Stats = M_EnemyReport.FindOrAdd(Type);
+		Stats.TotalPlacementAttempts++;
+		Stats.AttemptsSinceLastSuccess++;
+	}
+}
+
+void UWorldCampaignDebugger::Report_OnPlacedEnemy(const EMapEnemyItem Type)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		FEnemyReportStats& Stats = M_EnemyReport.FindOrAdd(Type);
+		const int32 AttemptsUsed = FMath::Max(PlacementReportRateDivisorMin, Stats.AttemptsSinceLastSuccess);
+		Stats.SuccessfulPlacements++;
+		Stats.NumPlaced++;
+		Stats.MaxAttemptsForSuccess = FMath::Max(Stats.MaxAttemptsForSuccess, AttemptsUsed);
+		Stats.AttemptsSinceLastSuccess = 0;
+	}
+}
+
+void UWorldCampaignDebugger::Report_OnAttemptMission(const EMapMission Type)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		FMissionReportStats& Stats = M_MissionReport.FindOrAdd(Type);
+		Stats.TotalPlacementAttempts++;
+		Stats.AttemptsSinceLastSuccess++;
+	}
+}
+
+void UWorldCampaignDebugger::Report_OnPlacedMission(const EMapMission Type)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		FMissionReportStats& Stats = M_MissionReport.FindOrAdd(Type);
+		const int32 AttemptsUsed = FMath::Max(PlacementReportRateDivisorMin, Stats.AttemptsSinceLastSuccess);
+		Stats.SuccessfulPlacements++;
+		Stats.NumPlaced++;
+		Stats.MaxAttemptsForSuccess = FMath::Max(Stats.MaxAttemptsForSuccess, AttemptsUsed);
+		Stats.AttemptsSinceLastSuccess = 0;
+	}
+}
+
+void UWorldCampaignDebugger::Report_OnUndoneMicro(const FCampaignGenerationStepTransaction& Transaction,
+                                                  const ECampaignGenerationStep FailureStep)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (not Transaction.bIsMicroTransaction)
+		{
+			return;
+		}
+
+		if (Transaction.MicroItemType == EMapItemType::EnemyItem)
+		{
+			const EMapEnemyItem EnemyType = Transaction.MicroEnemyItemType;
+			if (EnemyType == EMapEnemyItem::None)
+			{
+				return;
+			}
+
+			FEnemyReportStats& Stats = M_EnemyReport.FindOrAdd(EnemyType);
+			Stats.NumRemoved++;
+			Stats.NumTimesCausedBacktrack++;
+			IncrementRemovalBucket(Stats, FailureStep);
+			return;
+		}
+
+		if (Transaction.MicroItemType == EMapItemType::Mission)
+		{
+			const EMapMission MissionType = Transaction.MicroMissionType;
+			if (MissionType == EMapMission::None)
+			{
+				return;
+			}
+
+			FMissionReportStats& Stats = M_MissionReport.FindOrAdd(MissionType);
+			Stats.NumRemoved++;
+			Stats.NumTimesCausedBacktrack++;
+			IncrementRemovalBucket(Stats, FailureStep);
+		}
+	}
+}
+
+void UWorldCampaignDebugger::Report_PrintPlacementReport(const AGeneratorWorldCampaign& Generator) const
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		const bool bWasSuccessful = Generator.M_GenerationStep == ECampaignGenerationStep::Finished;
+		const int32 TotalPlacementAttempts = SumTotalAttempts(M_EnemyReport, M_MissionReport);
+		const int32 TotalBacktracks = SumTotalBacktracks(M_EnemyReport, M_MissionReport);
+		const FString ResultLabel = bWasSuccessful ? TEXT("FINISHED") : TEXT("FAILED");
+		const FString HeaderLine = FString::Printf(
+			TEXT("Placement Report %s | Seed=%d | TotalAttempts=%d | Backtracks=%d"),
+			*ResultLabel,
+			Generator.M_PlacementState.SeedUsed,
+			TotalPlacementAttempts,
+			TotalBacktracks);
+
+		TArray<FString> Lines;
+		Lines.Add(HeaderLine);
+
+		TArray<EMapEnemyItem> EnemyKeys;
+		M_EnemyReport.GetKeys(EnemyKeys);
+		Algo::Sort(EnemyKeys, [](const EMapEnemyItem Left, const EMapEnemyItem Right)
+		{
+			return static_cast<uint8>(Left) < static_cast<uint8>(Right);
+		});
+
+		Lines.Add(TEXT("Enemies:"));
+		bool bHasEnemyLines = false;
+		for (const EMapEnemyItem EnemyType : EnemyKeys)
+		{
+			if (not GetHasReportActivity(EnemyType, M_EnemyReport))
+			{
+				continue;
+			}
+
+			const FEnemyReportStats& Stats = M_EnemyReport.FindChecked(EnemyType);
+			const int32 NetPlaced = Stats.NumPlaced - Stats.NumRemoved;
+			const FString RemovalRateText = FormatRemovalRate(Stats.NumRemoved, Stats.NumPlaced);
+			const FString AverageAttemptsText = FormatAverageAttempts(Stats.TotalPlacementAttempts,
+			                                                         Stats.SuccessfulPlacements);
+			const FString Line = FString::Printf(
+				TEXT("Enemy %s: placed=%d removed=%d net=%d rate=%s caused=%d avgTry=%s maxTry=%d ")
+				TEXT("removedBy(Mis/Neu/En/HQ)=%d/%d/%d/%d"),
+				*GetEnemyItemName(EnemyType),
+				Stats.NumPlaced,
+				Stats.NumRemoved,
+				NetPlaced,
+				*RemovalRateText,
+				Stats.NumTimesCausedBacktrack,
+				*AverageAttemptsText,
+				Stats.MaxAttemptsForSuccess,
+				Stats.RemovedDueToMissions,
+				Stats.RemovedDueToNeutralPlacement,
+				Stats.RemovedDueToEnemyPlacement,
+				Stats.RemovedDueToHQPlacement);
+			Lines.Add(Line);
+			bHasEnemyLines = true;
+		}
+
+		if (not bHasEnemyLines)
+		{
+			Lines.Add(TEXT("Enemy items: no activity recorded."));
+		}
+
+		TArray<EMapMission> MissionKeys;
+		M_MissionReport.GetKeys(MissionKeys);
+		Algo::Sort(MissionKeys, [](const EMapMission Left, const EMapMission Right)
+		{
+			return static_cast<uint8>(Left) < static_cast<uint8>(Right);
+		});
+
+		Lines.Add(TEXT("Missions:"));
+		bool bHasMissionLines = false;
+		for (const EMapMission MissionType : MissionKeys)
+		{
+			if (not GetHasReportActivity(MissionType, M_MissionReport))
+			{
+				continue;
+			}
+
+			const FMissionReportStats& Stats = M_MissionReport.FindChecked(MissionType);
+			const int32 NetPlaced = Stats.NumPlaced - Stats.NumRemoved;
+			const FString RemovalRateText = FormatRemovalRate(Stats.NumRemoved, Stats.NumPlaced);
+			const FString AverageAttemptsText = FormatAverageAttempts(Stats.TotalPlacementAttempts,
+			                                                         Stats.SuccessfulPlacements);
+			const FString Line = FString::Printf(
+				TEXT("Mission %s: placed=%d removed=%d net=%d rate=%s caused=%d avgTry=%s maxTry=%d ")
+				TEXT("removedBy(Mis/Neu/En/HQ)=%d/%d/%d/%d"),
+				*GetMissionName(MissionType),
+				Stats.NumPlaced,
+				Stats.NumRemoved,
+				NetPlaced,
+				*RemovalRateText,
+				Stats.NumTimesCausedBacktrack,
+				*AverageAttemptsText,
+				Stats.MaxAttemptsForSuccess,
+				Stats.RemovedDueToMissions,
+				Stats.RemovedDueToNeutralPlacement,
+				Stats.RemovedDueToEnemyPlacement,
+				Stats.RemovedDueToHQPlacement);
+			Lines.Add(Line);
+			bHasMissionLines = true;
+		}
+
+		if (not bHasMissionLines)
+		{
+			Lines.Add(TEXT("Missions: no activity recorded."));
+		}
+
+		Lines.Add(TEXT("Neutrals: not tracked in this report."));
+
+		TArray<FString> Chunks;
+		for (const FString& Line : Lines)
+		{
+			AppendLineToChunks(Line, Chunks);
+		}
+
+		const int32 TotalPages = Chunks.Num();
+		if (TotalPages > 1)
+		{
+			for (int32 PageIndex = 0; PageIndex < TotalPages; PageIndex++)
+			{
+				Chunks[PageIndex].Append(TEXT("\n"));
+				Chunks[PageIndex].Append(
+					FString::Printf(TEXT("Page (%d/%d)"), PageIndex + 1, TotalPages));
+			}
+		}
+
+		for (const FString& Chunk : Chunks)
+		{
+			RTSFunctionLibrary::DisplayNotification(Chunk);
+		}
 	}
 }
 
