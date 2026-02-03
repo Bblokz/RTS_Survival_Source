@@ -61,6 +61,31 @@ void AAnchorPoint::PostLoad()
 	EnsureAnchorKeyIsInitialized();
 }
 
+void AAnchorPoint::SetAnchorKey(const FGuid& InAnchorKey, bool bAllowOverwrite)
+{
+	if (not InAnchorKey.IsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Anchor key assignment failed: provided key is invalid."));
+		return;
+	}
+
+	if (M_AnchorKey.IsValid())
+	{
+		if (M_AnchorKey == InAnchorKey)
+		{
+			return;
+		}
+
+		if (not bAllowOverwrite)
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Anchor key assignment failed: key already initialized."));
+			return;
+		}
+	}
+
+	M_AnchorKey = InAnchorKey;
+}
+
 int32 AAnchorPoint::GetConnectionCount() const
 {
 	return M_Connections.Num();
