@@ -5022,6 +5022,23 @@ EPlacementFailurePolicy AGeneratorWorldCampaign::GetFailurePolicyForStep(ECampai
 	}
 }
 
+int32 AGeneratorWorldCampaign::GetMicroUndoDepthForFailure(ECampaignGenerationStep FailedStep,
+                                                           int32 FailedStepAttemptIndex,
+                                                           int32 TrailingMicroTransactions) const
+{
+	if (FailedStep != ECampaignGenerationStep::EnemyObjectsPlaced
+		&& FailedStep != ECampaignGenerationStep::MissionsPlaced)
+	{
+		return 0;
+	}
+
+	const int32 MinimumWindow = 1;
+	const int32 MinimumDepth = 1;
+	const int32 Window = FMath::Max(MinimumWindow, M_PlacementFailurePolicy.EscalationAttempts);
+	const int32 Depth = MinimumDepth + (FailedStepAttemptIndex / Window);
+	return FMath::Clamp(Depth, MinimumDepth, TrailingMicroTransactions);
+}
+
 bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedStep, int32& InOutStepIndex,
                                                 const TArray<ECampaignGenerationStep>& StepOrder)
 {
@@ -5047,6 +5064,7 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 		return false;
 	}
 
+	const int32 AttemptIndex = GetStepAttemptIndex(FailedStep);
 	const int32 TrailingMicroTransactions = CountTrailingMicroTransactionsForStep(FailedStep);
 	if (TrailingMicroTransactions > 0
 		&& (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced
@@ -5058,7 +5076,16 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 			M_Report_CurrentFailureStep = FailedStep;
 		}
 
-		UndoLastTransaction();
+		const int32 UndoDepth = GetMicroUndoDepthForFailure(FailedStep, AttemptIndex, TrailingMicroTransactions);
+		for (int32 UndoIndex = 0; UndoIndex < UndoDepth; ++UndoIndex)
+		{
+			if (M_StepTransactions.Num() == 0)
+			{
+				break;
+			}
+
+			UndoLastTransaction();
+		}
 
 		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
 		{
@@ -5075,7 +5102,6 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 		return true;
 	}
 
-	const int32 AttemptIndex = GetStepAttemptIndex(FailedStep);
 	if (FailurePolicy == EPlacementFailurePolicy::BreakDistanceRules_ThenBackTrack
 		&& AttemptIndex <= MaxRelaxationAttempts)
 	{
