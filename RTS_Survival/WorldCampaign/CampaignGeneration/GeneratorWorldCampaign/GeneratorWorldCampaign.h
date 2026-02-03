@@ -447,6 +447,11 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
 
+	float GetDebugRangeOffset() const { return WorldCampaignDebugDefaults::ConnectionDrawHeightOffset; }
+	float GetDebugDisplaySeconds() const { return WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds; }
+	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
+	const FWorldCampaignPlacementState & GetPlacementState() const { return M_PlacementState; }
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
 		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
 		        ToolTip = "When enabled, show connection degree details where relevant. Compile-guarded by DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols.",

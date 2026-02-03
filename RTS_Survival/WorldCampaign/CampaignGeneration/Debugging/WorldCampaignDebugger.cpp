@@ -271,15 +271,15 @@ namespace
 			return;
 		}
 
-		const FVector HeightOffset(0.f, 0.f, Generator.M_DebugConnectionDrawHeightOffset);
+		const FVector HeightOffset(0.f, 0.f, Generator.GetDebugRangeOffset());
 		DrawDebugLine(World,
 		              AnchorA->GetActorLocation() + HeightOffset,
 		              AnchorB->GetActorLocation() + HeightOffset,
 		              Color,
 		              false,
-		              Generator.M_DebugConnectionDrawDurationSeconds,
+		              Generator.GetDebugDisplaySeconds(),
 		              0,
-		              Generator.M_DebugConnectionLineThickness);
+		              Generator.GetDebugLineThickness());
 	}
 
 	bool TryDrawMissionPath(const AGeneratorWorldCampaign& Generator, const AAnchorPoint* MissionAnchor,
@@ -332,21 +332,21 @@ namespace
 		OutMissionKeys.Reset();
 		OutErrorText.Reset();
 
-		const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors = Generator.M_PlacementState.CachedAnchors;
+		const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors = Generator.GetPlacementState().CachedAnchors;
 		if (CachedAnchors.Num() == 0)
 		{
 			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: cached anchors are empty.");
 			return false;
 		}
 
-		const TMap<FGuid, EMapMission>& MissionsByAnchorKey = Generator.M_PlacementState.MissionsByAnchorKey;
+		const TMap<FGuid, EMapMission>& MissionsByAnchorKey = Generator.GetPlacementState().MissionsByAnchorKey;
 		if (MissionsByAnchorKey.Num() == 0)
 		{
 			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: no mission anchors found.");
 			return false;
 		}
 
-		if (Generator.M_PlacementState.CachedConnections.Num() == 0)
+		if (Generator.GetPlacementState().CachedConnections.Num() == 0)
 		{
 			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: no cached connections found.");
 			return false;
