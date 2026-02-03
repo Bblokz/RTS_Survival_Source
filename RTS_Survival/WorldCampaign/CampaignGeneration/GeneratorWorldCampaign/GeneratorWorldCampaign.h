@@ -316,6 +316,24 @@ struct FCampaignGenerationStepTransaction
 	EMapItemType MicroItemType = EMapItemType::None;
 
 	/**
+	 * @note Used in: Debug placement reporting for EnemyObjectsPlaced micro transactions.
+	 * @note Why: Tracks which enemy type was placed so undo can attribute removal pressure.
+	 * @note Technical: Set only when MicroItemType is EnemyItem.
+	 * @note Notes: Defaults to None when unused.
+	 */
+	UPROPERTY()
+	EMapEnemyItem MicroEnemyItemType = EMapEnemyItem::None;
+
+	/**
+	 * @note Used in: Debug placement reporting for MissionsPlaced micro transactions.
+	 * @note Why: Tracks which mission type was placed so undo can attribute removal pressure.
+	 * @note Technical: Set only when MicroItemType is Mission.
+	 * @note Notes: Defaults to None when unused.
+	 */
+	UPROPERTY()
+	EMapMission MicroMissionType = EMapMission::None;
+
+	/**
 	 * @note Used in: Debugging and deterministic replay.
 	 * @note Why: Records the zero-based placement index within the macro plan.
 	 * @note Technical: Set for micro transactions only.
@@ -520,6 +538,10 @@ public:
 	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
 		meta = (DisplayPriority = 1))
 	void DebugDrawAllConnections() const;
+
+	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
+		meta = (DisplayPriority = 2))
+	void ShowPlacementReport();
 
 	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
 	bool GetIsValidCampaignDebugger() const;
@@ -1093,4 +1115,8 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UWorldCampaignDebugger> M_WorldCampaignDebugger;
+
+	// Tracks when undo operations are attributed to backtracking failures for reporting.
+	bool bM_Report_UndoContextActive = false;
+	ECampaignGenerationStep M_Report_CurrentFailureStep = ECampaignGenerationStep::NotStarted;
 };

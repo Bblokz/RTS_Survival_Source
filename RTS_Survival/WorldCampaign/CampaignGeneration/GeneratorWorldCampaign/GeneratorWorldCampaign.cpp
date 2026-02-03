@@ -2879,6 +2879,17 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 		UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
 		CampaignDebugger->ClearAllDebugState();
 	}
+
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (not GetIsValidCampaignDebugger())
+		{
+			return;
+		}
+
+		UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+		CampaignDebugger->Report_ResetPlacementReport();
+	}
 }
 
 void AGeneratorWorldCampaign::DebugDrawAllConnections() const
@@ -2907,6 +2918,20 @@ void AGeneratorWorldCampaign::DebugDrawAllConnections() const
 	for (const TObjectPtr<AConnection>& Connection : *ConnectionsToDraw)
 	{
 		DrawDebugConnectionForActor(World, Connection, HeightOffset, BaseConnectionColor, ThreeWayConnectionColor);
+	}
+}
+
+void AGeneratorWorldCampaign::ShowPlacementReport()
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (not GetIsValidCampaignDebugger())
+		{
+			return;
+		}
+
+		UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+		CampaignDebugger->Report_PrintPlacementReport(*this);
 	}
 }
 
@@ -3497,6 +3522,15 @@ bool AGeneratorWorldCampaign::TrySelectSingleEnemyPlacement(EMapEnemyItem EnemyT
                                                             TPair<TObjectPtr<AAnchorPoint>, EMapEnemyItem>&
                                                             OutPromotion)
 {
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (GetIsValidCampaignDebugger())
+		{
+			UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+			CampaignDebugger->Report_OnAttemptEnemy(EnemyTypeToPlace);
+		}
+	}
+
 	constexpr int32 SinglePlacementCount = 1;
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::EnemyObjectsPlaced);
 	const FRuleRelaxationState RelaxationState = GetRelaxationState(
@@ -3535,6 +3569,15 @@ bool AGeneratorWorldCampaign::TrySelectSingleMissionPlacement(EMapMission Missio
                                                                            EMapNeutralObjectType>>&
                                                               OutCompanionPromotions)
 {
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (GetIsValidCampaignDebugger())
+		{
+			UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+			CampaignDebugger->Report_OnAttemptMission(MissionTypeToPlace);
+		}
+	}
+
 	constexpr int32 SinglePlacementCount = 1;
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::MissionsPlaced);
 	const FRuleRelaxationState RelaxationState = GetRelaxationState(
@@ -3647,6 +3690,7 @@ bool AGeneratorWorldCampaign::ExecutePlaceSingleEnemyObject(EMapEnemyItem EnemyT
 	OutMicroTransaction.MicroParentStep = ECampaignGenerationStep::EnemyObjectsPlaced;
 	OutMicroTransaction.MicroAnchorKey = Promotion.Key->GetAnchorKey();
 	OutMicroTransaction.MicroItemType = EMapItemType::EnemyItem;
+	OutMicroTransaction.MicroEnemyItemType = EnemyTypeToPlace;
 	OutMicroTransaction.MicroIndexWithinParent = MicroIndexWithinParent;
 
 	M_PlacementState = WorkingPlacementState;
@@ -3693,6 +3737,15 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyObjects(FCampaignGenerationStepTr
 		                                      MicroTransaction))
 		{
 			return false;
+		}
+
+		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+		{
+			if (GetIsValidCampaignDebugger())
+			{
+				UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+				CampaignDebugger->Report_OnPlacedEnemy(EnemyTypeToPlace);
+			}
 		}
 
 		M_StepTransactions.Add(MicroTransaction);
@@ -3812,6 +3865,7 @@ bool AGeneratorWorldCampaign::ExecutePlaceSingleMission(EMapMission MissionTypeT
 	OutMicroTransaction.MicroParentStep = ECampaignGenerationStep::MissionsPlaced;
 	OutMicroTransaction.MicroAnchorKey = Promotion.Key->GetAnchorKey();
 	OutMicroTransaction.MicroItemType = EMapItemType::Mission;
+	OutMicroTransaction.MicroMissionType = MissionTypeToPlace;
 	OutMicroTransaction.MicroIndexWithinParent = MicroIndexWithinParent;
 
 	M_PlacementState = WorkingPlacementState;
@@ -3841,6 +3895,15 @@ bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransa
 			return false;
 		}
 
+		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+		{
+			if (GetIsValidCampaignDebugger())
+			{
+				UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+				CampaignDebugger->Report_OnPlacedMission(MissionTypeToPlace);
+			}
+		}
+
 		M_StepTransactions.Add(MicroTransaction);
 		M_MissionMicroPlacedCount = MicroIndex + 1;
 	}
@@ -3850,6 +3913,15 @@ bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransa
 
 bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 {
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (GetIsValidCampaignDebugger())
+		{
+			UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+			CampaignDebugger->Report_ResetPlacementReport();
+		}
+	}
+
 	TArray<ECampaignGenerationStep> StepOrder;
 	StepOrder.Add(ECampaignGenerationStep::ConnectionsCreated);
 	StepOrder.Add(ECampaignGenerationStep::PlayerHQPlaced);
@@ -3900,11 +3972,28 @@ bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 
 		if (not HandleStepFailure(StepToExecute, StepIndex, StepOrder))
 		{
+			if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+			{
+				if (GetIsValidCampaignDebugger())
+				{
+					UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+					CampaignDebugger->Report_PrintPlacementReport(*this);
+				}
+			}
+
 			return false;
 		}
 	}
 
 	M_GenerationStep = ECampaignGenerationStep::Finished;
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (GetIsValidCampaignDebugger())
+		{
+			UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+			CampaignDebugger->Report_PrintPlacementReport(*this);
+		}
+	}
 	return true;
 }
 
@@ -4054,7 +4143,20 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 		&& (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced
 			|| FailedStep == ECampaignGenerationStep::MissionsPlaced))
 	{
+		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+		{
+			bM_Report_UndoContextActive = true;
+			M_Report_CurrentFailureStep = FailedStep;
+		}
+
 		UndoLastTransaction();
+
+		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+		{
+			bM_Report_UndoContextActive = false;
+			M_Report_CurrentFailureStep = ECampaignGenerationStep::NotStarted;
+		}
+
 		InOutStepIndex = StepOrder.IndexOfByKey(FailedStep);
 		if (InOutStepIndex == INDEX_NONE)
 		{
@@ -4087,9 +4189,21 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 	const int32 AvailableTransactions = M_StepTransactions.Num();
 	const int32 UndoCount = FMath::Min(TransactionsToUndo, AvailableTransactions);
 
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		bM_Report_UndoContextActive = true;
+		M_Report_CurrentFailureStep = FailedStep;
+	}
+
 	for (int32 StepCount = 0; StepCount < UndoCount; StepCount++)
 	{
 		UndoLastTransaction();
+	}
+
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		bM_Report_UndoContextActive = false;
+		M_Report_CurrentFailureStep = ECampaignGenerationStep::NotStarted;
 	}
 
 	InOutStepIndex = StepOrder.IndexOfByKey(GetNextStep(M_GenerationStep));
@@ -4133,6 +4247,15 @@ void AGeneratorWorldCampaign::UndoLastTransaction()
 
 	M_GenerationStep = GetPrerequisiteStep(Transaction.CompletedStep);
 	UpdateMicroPlacementProgressFromTransactions();
+
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
+	{
+		if (bM_Report_UndoContextActive && GetIsValidCampaignDebugger())
+		{
+			UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+			CampaignDebugger->Report_OnUndoneMicro(Transaction, M_Report_CurrentFailureStep);
+		}
+	}
 }
 
 void AGeneratorWorldCampaign::UndoConnections(const FCampaignGenerationStepTransaction& Transaction)

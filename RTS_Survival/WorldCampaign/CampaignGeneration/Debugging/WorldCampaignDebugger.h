@@ -13,6 +13,7 @@
 
 class AAnchorPoint;
 class AGeneratorWorldCampaign;
+struct FCampaignGenerationStepTransaction;
 
 struct FWorldCampaignEnemyPlacementDebugInfo
 {
@@ -57,6 +58,51 @@ struct FWorldCampaignMissionPlacementDebugInfo
 	ETopologySearchStrategy OverrideHopsPreference = ETopologySearchStrategy::NotSet;
 	FString AdjacencySummary;
 	EMapNeutralObjectType RequiredNeutralType = EMapNeutralObjectType::None;
+};
+
+struct FEnemyReportStats
+{
+	int32 NumPlaced = 0;
+	int32 NumRemoved = 0;
+	int32 NumTimesCausedBacktrack = 0;
+	int32 TotalPlacementAttempts = 0;
+	int32 SuccessfulPlacements = 0;
+	int32 MaxAttemptsForSuccess = 0;
+	int32 AttemptsSinceLastSuccess = 0;
+	int32 RemovedDueToMissions = 0;
+	int32 RemovedDueToNeutralPlacement = 0;
+	int32 RemovedDueToEnemyPlacement = 0;
+	int32 RemovedDueToHQPlacement = 0;
+};
+
+struct FMissionReportStats
+{
+	int32 NumPlaced = 0;
+	int32 NumRemoved = 0;
+	int32 NumTimesCausedBacktrack = 0;
+	int32 TotalPlacementAttempts = 0;
+	int32 SuccessfulPlacements = 0;
+	int32 MaxAttemptsForSuccess = 0;
+	int32 AttemptsSinceLastSuccess = 0;
+	int32 RemovedDueToMissions = 0;
+	int32 RemovedDueToNeutralPlacement = 0;
+	int32 RemovedDueToEnemyPlacement = 0;
+	int32 RemovedDueToHQPlacement = 0;
+};
+
+struct FNeutralReportStats
+{
+	int32 NumPlaced = 0;
+	int32 NumRemoved = 0;
+	int32 NumTimesCausedBacktrack = 0;
+	int32 TotalPlacementAttempts = 0;
+	int32 SuccessfulPlacements = 0;
+	int32 MaxAttemptsForSuccess = 0;
+	int32 AttemptsSinceLastSuccess = 0;
+	int32 RemovedDueToMissions = 0;
+	int32 RemovedDueToNeutralPlacement = 0;
+	int32 RemovedDueToEnemyPlacement = 0;
+	int32 RemovedDueToHQPlacement = 0;
 };
 
 /**
@@ -149,6 +195,24 @@ public:
 	 */
 	void DebugMissionPlacementFailed(AAnchorPoint* AnchorPoint, EMapMission MissionType, const FString& Reason);
 
+	void Report_ResetPlacementReport();
+	void Report_OnAttemptEnemy(EMapEnemyItem Type);
+	void Report_OnPlacedEnemy(EMapEnemyItem Type);
+	void Report_OnAttemptMission(EMapMission Type);
+	void Report_OnPlacedMission(EMapMission Type);
+	/**
+	 * @brief Attributes a micro transaction undo to backtracking pressure by failure step.
+	 * @param Transaction Micro transaction that was undone.
+	 * @param FailureStep Step that triggered the undo.
+	 */
+	void Report_OnUndoneMicro(const FCampaignGenerationStepTransaction& Transaction,
+	                          ECampaignGenerationStep FailureStep);
+	/**
+	 * @brief Emits a placement difficulty report so designers can review problematic items.
+	 * @param Generator Generator used for context such as seed and attempt counts.
+	 */
+	void Report_PrintPlacementReport(const AGeneratorWorldCampaign& Generator) const;
+
 private:
 	float DefaultDebugHeightOffset = 50.0f;
 	float AddedHeightIfStillDisplaying = 25.0f;
@@ -223,4 +287,13 @@ private:
 
 	// Tracks stack height and expiry times for anchors without GUID keys.
 	TMap<TWeakObjectPtr<AAnchorPoint>, FWorldCampaignAnchorDebugStackState> M_DebugStateByAnchorPointer;
+
+	// Tracks placement report stats per enemy type.
+	TMap<EMapEnemyItem, FEnemyReportStats> M_EnemyReport;
+
+	// Tracks placement report stats per mission type.
+	TMap<EMapMission, FMissionReportStats> M_MissionReport;
+
+	// Tracks placement report stats per neutral type (optional instrumentation).
+	TMap<EMapNeutralObjectType, FNeutralReportStats> M_NeutralReport;
 };
