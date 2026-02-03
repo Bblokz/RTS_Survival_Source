@@ -152,6 +152,12 @@ public:
 	void DebugDrawEnemyHQHopAtAnchor(AAnchorPoint* AnchorPoint, int32 HopCount);
 
 	/**
+	 * @brief Draws shortest-path connection chains from missions to the player HQ for graph inspection.
+	 * @param Generator Generator that owns cached anchors and debug draw settings.
+	 */
+	void DebugDrawMissionPathsToPlayerHQ(const AGeneratorWorldCampaign& Generator);
+
+	/**
 	 * @brief Builds and draws enemy placement acceptance details.
 	 * @param AnchorPoint Anchor used as the debug draw location.
 	 * @param Info Structured info for the placement summary.
