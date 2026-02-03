@@ -77,6 +77,31 @@ namespace
 		bool bRelaxPreference = false;
 	};
 
+	enum class EFailSafeItemKind : uint8
+	{
+		Enemy = 0,
+		Neutral = 1,
+		Mission = 2
+	};
+
+	struct FFailSafeItem
+	{
+		EFailSafeItemKind Kind = EFailSafeItemKind::Enemy;
+		uint8 RawEnumValue = 0;
+		float MinDistance = 0.f;
+		EMapEnemyItem EnemyType = EMapEnemyItem::None;
+		EMapNeutralObjectType NeutralType = EMapNeutralObjectType::None;
+		EMapMission MissionType = EMapMission::None;
+	};
+
+	struct FFailSafePlacementTotals
+	{
+		int32 EnemyPlaced = 0;
+		int32 NeutralPlaced = 0;
+		int32 MissionPlaced = 0;
+		int32 Discarded = 0;
+	};
+
 	struct FClosestConnectionCandidate
 	{
 		TWeakObjectPtr<AConnection> Connection;
@@ -395,6 +420,13 @@ namespace
 		return false;
 	}
 
+	bool IsTimeoutFailSafeStep(const ECampaignGenerationStep Step)
+	{
+		return Step == ECampaignGenerationStep::EnemyObjectsPlaced
+			|| Step == ECampaignGenerationStep::NeutralObjectsPlaced
+			|| Step == ECampaignGenerationStep::MissionsPlaced;
+	}
+
 	bool IsAnchorOccupiedForMission(const FGuid& AnchorKey, const FWorldCampaignPlacementState& PlacementState,
 	                                const bool bAllowNeutralStacking)
 	{
@@ -419,6 +451,61 @@ namespace
 		}
 
 		return false;
+	}
+
+	void BuildFailSafeEmptyAnchors(const TArray<TObjectPtr<AAnchorPoint>>& CandidateAnchors,
+	                               const FWorldCampaignPlacementState& PlacementState,
+	                               const AAnchorPoint* PlayerHQAnchor,
+	                               TArray<FEmptyAnchorDistance>& OutEmptyAnchors,
+	                               bool& bOutHasValidHQ)
+	{
+		bOutHasValidHQ = IsValid(PlayerHQAnchor);
+		OutEmptyAnchors.Reset();
+		if (CandidateAnchors.Num() == 0)
+		{
+			return;
+		}
+
+		const FVector PlayerHQWorldLocation = bOutHasValidHQ
+			                                      ? PlayerHQAnchor->GetActorLocation()
+			                                      : FVector::ZeroVector;
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : CandidateAnchors)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+			if (IsAnchorOccupied(AnchorKey, PlacementState))
+			{
+				continue;
+			}
+
+			FEmptyAnchorDistance Entry;
+			Entry.AnchorPoint = AnchorPoint;
+			Entry.AnchorKey = AnchorKey;
+			if (bOutHasValidHQ)
+			{
+				const FVector AnchorLocation = AnchorPoint->GetActorLocation();
+				const float DeltaX = AnchorLocation.X - PlayerHQWorldLocation.X;
+				const float DeltaY = AnchorLocation.Y - PlayerHQWorldLocation.Y;
+				Entry.DistanceSquared = DeltaX * DeltaX + DeltaY * DeltaY;
+			}
+
+			OutEmptyAnchors.Add(Entry);
+		}
+
+		constexpr float DistanceTolerance = 0.001f;
+		OutEmptyAnchors.Sort([](const FEmptyAnchorDistance& Left, const FEmptyAnchorDistance& Right)
+		{
+			if (not FMath::IsNearlyEqual(Left.DistanceSquared, Right.DistanceSquared, DistanceTolerance))
+			{
+				return Left.DistanceSquared < Right.DistanceSquared;
+			}
+
+			return AAnchorPoint::IsAnchorKeyLess(Left.AnchorKey, Right.AnchorKey);
+		});
 	}
 
 	int32 GetCachedHopDistance(const TMap<FGuid, int32>& HopDistancesByAnchorKey, const FGuid& AnchorKey)
@@ -3173,6 +3260,321 @@ namespace
 		return RequiredCounts;
 	}
 
+	void AppendMissingEnemyItems(const FWorldCampaignCountDifficultyTuning& Tuning,
+	                             const FWorldCampaignDerivedData& DerivedData,
+	                             TArray<EMapEnemyItem>& OutMissingItems)
+	{
+		const TMap<EMapEnemyItem, int32> RequiredCounts = BuildRequiredEnemyItemCounts(Tuning);
+		const TArray<EMapEnemyItem> EnemyTypes = GetSortedEnemyTypes(RequiredCounts);
+		for (const EMapEnemyItem EnemyType : EnemyTypes)
+		{
+			if (EnemyType == EMapEnemyItem::EnemyHQ || EnemyType == EMapEnemyItem::EnemyWall)
+			{
+				continue;
+			}
+
+			const int32 Required = RequiredCounts.FindRef(EnemyType);
+			const int32 Placed = DerivedData.EnemyItemPlacedCounts.FindRef(EnemyType);
+			const int32 Missing = FMath::Max(0, Required - Placed);
+			for (int32 MissingIndex = 0; MissingIndex < Missing; ++MissingIndex)
+			{
+				OutMissingItems.Add(EnemyType);
+			}
+		}
+	}
+
+	void AppendMissingNeutralItems(const FWorldCampaignCountDifficultyTuning& Tuning,
+	                               const FWorldCampaignDerivedData& DerivedData,
+	                               TArray<EMapNeutralObjectType>& OutMissingItems)
+	{
+		const TMap<EMapNeutralObjectType, int32> RequiredCounts = BuildRequiredNeutralItemCounts(Tuning);
+		const TArray<EMapNeutralObjectType> NeutralTypes = GetSortedNeutralTypes(RequiredCounts);
+		for (const EMapNeutralObjectType NeutralType : NeutralTypes)
+		{
+			const int32 Required = RequiredCounts.FindRef(NeutralType);
+			const int32 Placed = DerivedData.NeutralItemPlacedCounts.FindRef(NeutralType);
+			const int32 Missing = FMath::Max(0, Required - Placed);
+			for (int32 MissingIndex = 0; MissingIndex < Missing; ++MissingIndex)
+			{
+				OutMissingItems.Add(NeutralType);
+			}
+		}
+	}
+
+	void AppendMissingMissions(const TArray<EMapMission>& PlacementPlan,
+	                           const FWorldCampaignDerivedData& DerivedData,
+	                           TArray<EMapMission>& OutMissingMissions)
+	{
+		TMap<EMapMission, int32> RemainingPlacedCounts = DerivedData.MissionPlacedCounts;
+		for (const EMapMission MissionType : PlacementPlan)
+		{
+			int32* RemainingCount = RemainingPlacedCounts.Find(MissionType);
+			if (RemainingCount && *RemainingCount > 0)
+			{
+				--(*RemainingCount);
+				continue;
+			}
+
+			OutMissingMissions.Add(MissionType);
+		}
+	}
+
+	void BuildFailSafeItemsToPlace(const FWorldCampaignCountDifficultyTuning& Tuning,
+	                               const FWorldCampaignDerivedData& DerivedData,
+	                               const TArray<EMapMission>& MissionPlacementPlan,
+	                               const TFunctionRef<float(EMapEnemyItem)>& GetEnemyMinDistance,
+	                               const TFunctionRef<float(EMapNeutralObjectType)>& GetNeutralMinDistance,
+	                               const TFunctionRef<float(EMapMission)>& GetMissionMinDistance,
+	                               TArray<FFailSafeItem>& OutItems)
+	{
+		TArray<EMapEnemyItem> MissingEnemyItems;
+		AppendMissingEnemyItems(Tuning, DerivedData, MissingEnemyItems);
+		TArray<EMapNeutralObjectType> MissingNeutralItems;
+		AppendMissingNeutralItems(Tuning, DerivedData, MissingNeutralItems);
+		TArray<EMapMission> MissingMissions;
+		AppendMissingMissions(MissionPlacementPlan, DerivedData, MissingMissions);
+
+		OutItems.Reset();
+		OutItems.Reserve(MissingEnemyItems.Num() + MissingNeutralItems.Num() + MissingMissions.Num());
+		for (const EMapEnemyItem EnemyType : MissingEnemyItems)
+		{
+			FFailSafeItem Item;
+			Item.Kind = EFailSafeItemKind::Enemy;
+			Item.RawEnumValue = static_cast<uint8>(EnemyType);
+			Item.MinDistance = GetEnemyMinDistance(EnemyType);
+			Item.EnemyType = EnemyType;
+			OutItems.Add(Item);
+		}
+
+		for (const EMapNeutralObjectType NeutralType : MissingNeutralItems)
+		{
+			FFailSafeItem Item;
+			Item.Kind = EFailSafeItemKind::Neutral;
+			Item.RawEnumValue = static_cast<uint8>(NeutralType);
+			Item.MinDistance = GetNeutralMinDistance(NeutralType);
+			Item.NeutralType = NeutralType;
+			OutItems.Add(Item);
+		}
+
+		for (const EMapMission MissionType : MissingMissions)
+		{
+			FFailSafeItem Item;
+			Item.Kind = EFailSafeItemKind::Mission;
+			Item.RawEnumValue = static_cast<uint8>(MissionType);
+			Item.MinDistance = GetMissionMinDistance(MissionType);
+			Item.MissionType = MissionType;
+			OutItems.Add(Item);
+		}
+
+		constexpr float DistanceTolerance = 0.001f;
+		OutItems.Sort([](const FFailSafeItem& Left, const FFailSafeItem& Right)
+		{
+			if (not FMath::IsNearlyEqual(Left.MinDistance, Right.MinDistance, DistanceTolerance))
+			{
+				return Left.MinDistance < Right.MinDistance;
+			}
+
+			if (Left.Kind != Right.Kind)
+			{
+				return static_cast<uint8>(Left.Kind) < static_cast<uint8>(Right.Kind);
+			}
+
+			return Left.RawEnumValue < Right.RawEnumValue;
+		});
+	}
+
+	bool TryPlaceFailSafeItem(const FFailSafeItem& Item, const FEmptyAnchorDistance& AnchorEntry,
+	                          const ECampaignGenerationStep FailedStep,
+	                          FWorldCampaignPlacementState& InOutPlacementState,
+	                          FWorldCampaignDerivedData& InOutDerivedData,
+	                          FCampaignGenerationStepTransaction& InOutTransaction,
+	                          FFailSafePlacementTotals& InOutTotals)
+	{
+		AAnchorPoint* AnchorPoint = AnchorEntry.AnchorPoint.Get();
+		if (not IsValid(AnchorPoint))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Timeout fail-safe: anchor pointer is invalid."));
+			return false;
+		}
+
+		const FGuid AnchorKey = AnchorEntry.AnchorKey;
+		AWorldMapObject* SpawnedObject = nullptr;
+		if (Item.Kind == EFailSafeItemKind::Enemy)
+		{
+			InOutPlacementState.EnemyItemsByAnchorKey.Add(AnchorKey, Item.EnemyType);
+			int32& PlacedCount = InOutDerivedData.EnemyItemPlacedCounts.FindOrAdd(Item.EnemyType);
+			PlacedCount++;
+			SpawnedObject = AnchorPoint->OnEnemyItemPromotion(Item.EnemyType, FailedStep);
+			if (not IsValid(SpawnedObject))
+			{
+				InOutPlacementState.EnemyItemsByAnchorKey.Remove(AnchorKey);
+				PlacedCount = FMath::Max(0, PlacedCount - 1);
+				if (PlacedCount == 0)
+				{
+					InOutDerivedData.EnemyItemPlacedCounts.Remove(Item.EnemyType);
+				}
+
+				RTSFunctionLibrary::ReportError(TEXT("Timeout fail-safe: failed to spawn enemy item."));
+				return false;
+			}
+
+			InOutTotals.EnemyPlaced++;
+		}
+		else if (Item.Kind == EFailSafeItemKind::Neutral)
+		{
+			InOutPlacementState.NeutralItemsByAnchorKey.Add(AnchorKey, Item.NeutralType);
+			int32& PlacedCount = InOutDerivedData.NeutralItemPlacedCounts.FindOrAdd(Item.NeutralType);
+			PlacedCount++;
+			SpawnedObject = AnchorPoint->OnNeutralItemPromotion(Item.NeutralType, FailedStep);
+			if (not IsValid(SpawnedObject))
+			{
+				InOutPlacementState.NeutralItemsByAnchorKey.Remove(AnchorKey);
+				PlacedCount = FMath::Max(0, PlacedCount - 1);
+				if (PlacedCount == 0)
+				{
+					InOutDerivedData.NeutralItemPlacedCounts.Remove(Item.NeutralType);
+				}
+
+				RTSFunctionLibrary::ReportError(TEXT("Timeout fail-safe: failed to spawn neutral item."));
+				return false;
+			}
+
+			InOutTotals.NeutralPlaced++;
+		}
+		else
+		{
+			InOutPlacementState.MissionsByAnchorKey.Add(AnchorKey, Item.MissionType);
+			int32& PlacedCount = InOutDerivedData.MissionPlacedCounts.FindOrAdd(Item.MissionType);
+			PlacedCount++;
+			SpawnedObject = AnchorPoint->OnMissionPromotion(Item.MissionType, FailedStep);
+			if (not IsValid(SpawnedObject))
+			{
+				InOutPlacementState.MissionsByAnchorKey.Remove(AnchorKey);
+				PlacedCount = FMath::Max(0, PlacedCount - 1);
+				if (PlacedCount == 0)
+				{
+					InOutDerivedData.MissionPlacedCounts.Remove(Item.MissionType);
+				}
+
+				RTSFunctionLibrary::ReportError(TEXT("Timeout fail-safe: failed to spawn mission."));
+				return false;
+			}
+
+			InOutTotals.MissionPlaced++;
+		}
+
+		InOutTransaction.SpawnedActors.Add(SpawnedObject);
+		return true;
+	}
+
+	void AssignFailSafeItemsByDistance(const TArray<FFailSafeItem>& ItemsToPlace, const bool bUseDistanceFilter,
+	                                   const ECampaignGenerationStep FailedStep,
+	                                   TArray<FEmptyAnchorDistance>& InOutEmptyAnchors,
+	                                   FWorldCampaignPlacementState& InOutPlacementState,
+	                                   FWorldCampaignDerivedData& InOutDerivedData,
+	                                   FCampaignGenerationStepTransaction& InOutTransaction,
+	                                   FFailSafePlacementTotals& InOutTotals,
+	                                   TArray<FFailSafeItem>& OutRemainingItems)
+	{
+		OutRemainingItems.Reset();
+		if (not bUseDistanceFilter)
+		{
+			OutRemainingItems.Append(ItemsToPlace);
+			return;
+		}
+
+		for (const FFailSafeItem& Item : ItemsToPlace)
+		{
+			bool bPlaced = false;
+			const float MinDistanceSquared = Item.MinDistance * Item.MinDistance;
+			for (int32 AnchorIndex = 0; AnchorIndex < InOutEmptyAnchors.Num(); ++AnchorIndex)
+			{
+				const FEmptyAnchorDistance& Candidate = InOutEmptyAnchors[AnchorIndex];
+				if (Candidate.DistanceSquared < MinDistanceSquared)
+				{
+					continue;
+				}
+
+				if (not TryPlaceFailSafeItem(Item, Candidate, FailedStep, InOutPlacementState, InOutDerivedData,
+				                             InOutTransaction, InOutTotals))
+				{
+					continue;
+				}
+
+				InOutEmptyAnchors.RemoveAt(AnchorIndex);
+				bPlaced = true;
+				break;
+			}
+
+			if (not bPlaced)
+			{
+				OutRemainingItems.Add(Item);
+			}
+		}
+	}
+
+	void AssignFailSafeItemsFallback(const TArray<FFailSafeItem>& RemainingItems,
+	                                 const ECampaignGenerationStep FailedStep,
+	                                 const FWorldCampaignPlacementFailurePolicy& FailurePolicy, const int32 SeedUsed,
+	                                 const TArray<FEmptyAnchorDistance>& EmptyAnchors,
+	                                 FWorldCampaignPlacementState& InOutPlacementState,
+	                                 FWorldCampaignDerivedData& InOutDerivedData,
+	                                 FCampaignGenerationStepTransaction& InOutTransaction,
+	                                 FFailSafePlacementTotals& InOutTotals)
+	{
+		if (RemainingItems.Num() == 0)
+		{
+			return;
+		}
+
+		RTSFunctionLibrary::ReportError(TEXT("Timeout fail-safe: not enough anchors satisfying min-distance rules; "
+			"falling back to random assignment."));
+		if (EmptyAnchors.Num() == 0)
+		{
+			InOutTotals.Discarded += RemainingItems.Num();
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("Timeout fail-safe: not enough empty anchors; %d items could not be placed and were discarded."),
+				RemainingItems.Num()));
+			return;
+		}
+
+		TArray<FEmptyAnchorDistance> ShuffledAnchors = EmptyAnchors;
+		const int32 SeedOffset = FailurePolicy.TimeoutFailSafeSeedOffset;
+		FRandomStream RandomStream(SeedUsed + SeedOffset + static_cast<int32>(FailedStep));
+		CampaignGenerationHelper::DeterministicShuffle(ShuffledAnchors, RandomStream);
+
+		int32 AnchorIndex = 0;
+		for (const FFailSafeItem& Item : RemainingItems)
+		{
+			bool bPlaced = false;
+			while (AnchorIndex < ShuffledAnchors.Num())
+			{
+				const FEmptyAnchorDistance& Candidate = ShuffledAnchors[AnchorIndex];
+				if (TryPlaceFailSafeItem(Item, Candidate, FailedStep, InOutPlacementState, InOutDerivedData,
+				                         InOutTransaction, InOutTotals))
+				{
+					AnchorIndex++;
+					bPlaced = true;
+					break;
+				}
+
+				AnchorIndex++;
+			}
+
+			if (not bPlaced)
+			{
+				InOutTotals.Discarded++;
+			}
+		}
+
+		if (InOutTotals.Discarded > 0)
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("Timeout fail-safe: not enough empty anchors; %d items could not be placed and were discarded."),
+				InOutTotals.Discarded));
+		}
+	}
+
 	int32 GetRequiredEnemyItemCount(const FWorldCampaignCountDifficultyTuning& Tuning)
 	{
 		int32 TotalRequired = 0;
@@ -5099,21 +5501,146 @@ int32 AGeneratorWorldCampaign::GetMicroUndoDepthForFailure(ECampaignGenerationSt
 	return FMath::Clamp(Depth, MinimumDepth, TrailingMicroTransactions);
 }
 
+float AGeneratorWorldCampaign::GetFailSafeMinDistanceForEnemy(const EMapEnemyItem EnemyType) const
+{
+	return M_PlacementFailurePolicy.MinDistancePlayerHQEnemyItemByType.FindRef(EnemyType);
+}
+
+float AGeneratorWorldCampaign::GetFailSafeMinDistanceForNeutral(const EMapNeutralObjectType NeutralType) const
+{
+	return M_PlacementFailurePolicy.MinDistancePlayerHQNeutralByType.FindRef(NeutralType);
+}
+
+float AGeneratorWorldCampaign::GetFailSafeMinDistanceForMission(const EMapMission MissionType) const
+{
+	const FPerMissionRules* MissionRulesPtr = M_MissionPlacementRules.RulesByMission.Find(MissionType);
+	if (MissionRulesPtr == nullptr)
+	{
+		return 0.0f;
+	}
+
+	const EMissionTier MissionTier = MissionRulesPtr->Tier;
+	switch (MissionTier)
+	{
+	case EMissionTier::Tier1:
+		return M_PlacementFailurePolicy.MinDistancePlayerHQTier1Mission;
+	case EMissionTier::Tier2:
+		return M_PlacementFailurePolicy.MinDistancePlayerHQTier2Mission;
+	case EMissionTier::Tier3:
+		return M_PlacementFailurePolicy.MinDistancePlayerHQTier3Mission;
+	case EMissionTier::Tier4:
+		return M_PlacementFailurePolicy.MinDistancePlayerHQTier4Mission;
+	case EMissionTier::NotSet:
+	default:
+		return 0.0f;
+	}
+}
+
+bool AGeneratorWorldCampaign::TryBuildTimeoutFailSafeAnchors(TArray<FEmptyAnchorDistance>& OutEmptyAnchors,
+                                                             bool& bOutHasValidPlayerHQAnchor) const
+{
+	TArray<TObjectPtr<AAnchorPoint>> CandidateAnchors = M_PlacementState.CachedAnchors;
+	if (CandidateAnchors.Num() == 0)
+	{
+		GatherAnchorPoints(CandidateAnchors);
+	}
+
+	if (CandidateAnchors.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Timeout fail-safe: no anchors available for placement."));
+		return false;
+	}
+
+	BuildFailSafeEmptyAnchors(CandidateAnchors, M_PlacementState, M_PlacementState.PlayerHQAnchor.Get(),
+	                          OutEmptyAnchors, bOutHasValidPlayerHQAnchor);
+	return true;
+}
+
+bool AGeneratorWorldCampaign::TryApplyTimeoutFailSafePlacement(const ECampaignGenerationStep FailedStep)
+{
+	bool bHasValidPlayerHQAnchor = false;
+	TArray<FEmptyAnchorDistance> EmptyAnchors;
+	if (not TryBuildTimeoutFailSafeAnchors(EmptyAnchors, bHasValidPlayerHQAnchor))
+	{
+		return false;
+	}
+
+	if (EmptyAnchors.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Timeout fail-safe: no empty anchors available for placement."));
+		return true;
+	}
+
+	const TArray<EMapMission> MissionPlacementPlan = BuildMissionPlacementPlanFiltered();
+	TArray<FFailSafeItem> ItemsToPlace;
+	BuildFailSafeItemsToPlace(M_CountAndDifficultyTuning, M_DerivedData, MissionPlacementPlan,
+	                          [this](const EMapEnemyItem EnemyType)
+	                          {
+		                          return GetFailSafeMinDistanceForEnemy(EnemyType);
+	                          },
+	                          [this](const EMapNeutralObjectType NeutralType)
+	                          {
+		                          return GetFailSafeMinDistanceForNeutral(NeutralType);
+	                          },
+	                          [this](const EMapMission MissionType)
+	                          {
+		                          return GetFailSafeMinDistanceForMission(MissionType);
+	                          },
+	                          ItemsToPlace);
+
+	if (ItemsToPlace.Num() == 0)
+	{
+		RTSFunctionLibrary::DisplayNotification(TEXT("Timeout fail-safe placed: Enemy 0, Neutral 0, Missions 0. "
+			"Discarded: 0."));
+		return true;
+	}
+
+	FCampaignGenerationStepTransaction FailSafeTransaction;
+	FailSafeTransaction.CompletedStep = FailedStep;
+	FailSafeTransaction.PreviousPlacementState = M_PlacementState;
+	FailSafeTransaction.PreviousDerivedData = M_DerivedData;
+
+	FFailSafePlacementTotals Totals;
+	TArray<FFailSafeItem> RemainingItems;
+	AssignFailSafeItemsByDistance(ItemsToPlace, bHasValidPlayerHQAnchor, FailedStep, EmptyAnchors, M_PlacementState,
+	                              M_DerivedData, FailSafeTransaction, Totals, RemainingItems);
+	AssignFailSafeItemsFallback(RemainingItems, FailedStep, M_PlacementFailurePolicy, M_PlacementState.SeedUsed,
+	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals);
+
+	if (FailSafeTransaction.SpawnedActors.Num() > 0)
+	{
+		M_StepTransactions.Add(FailSafeTransaction);
+	}
+
+	RTSFunctionLibrary::DisplayNotification(FString::Printf(
+		TEXT("Timeout fail-safe placed: Enemy %d, Neutral %d, Missions %d. Discarded: %d."),
+		Totals.EnemyPlaced, Totals.NeutralPlaced, Totals.MissionPlaced, Totals.Discarded));
+	return true;
+}
+
 bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedStep, int32& InOutStepIndex,
                                                 const TArray<ECampaignGenerationStep>& StepOrder)
 {
 	IncrementStepAttempt(FailedStep);
 	M_TotalAttemptCount++;
 
-	if (GetStepAttemptIndex(FailedStep) > MaxStepAttempts)
+	const bool bStepAttemptsExceeded = GetStepAttemptIndex(FailedStep) > MaxStepAttempts;
+	const bool bTotalAttemptsExceeded = M_TotalAttemptCount > MaxTotalAttempts;
+	if (bStepAttemptsExceeded || bTotalAttemptsExceeded)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Generation failed: maximum step attempts exceeded."));
-		return false;
-	}
+		if (M_PlacementFailurePolicy.bEnableTimeoutFailSafe && IsTimeoutFailSafeStep(FailedStep))
+		{
+			if (TryApplyTimeoutFailSafePlacement(FailedStep))
+			{
+				M_GenerationStep = ECampaignGenerationStep::Finished;
+				InOutStepIndex = StepOrder.Num();
+				return true;
+			}
+		}
 
-	if (M_TotalAttemptCount > MaxTotalAttempts)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Generation failed: maximum total attempts exceeded."));
+		RTSFunctionLibrary::ReportError(bStepAttemptsExceeded
+			                                ? TEXT("Generation failed: maximum step attempts exceeded.")
+			                                : TEXT("Generation failed: maximum total attempts exceeded."));
 		return false;
 	}
 

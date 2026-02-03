@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/PlacementFailurePolicy/Enum_PlacementFailurePolicy.h"
 
 #include "WorldCampaignPlacementFailurePolicy.generated.h"
@@ -22,6 +24,79 @@ struct FWorldCampaignPlacementFailurePolicy
 		meta = (ClampMin = "1", ClampMax = "1024",
 			ToolTip = "Micro-transaction escalation window. After this many failed micro-undo retries at the current depth, the generator escalates by also undoing one more previous micro transaction."))
 	int32 EscalationAttempts = 32;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement when attempts exceed limits.
+	 * @note Why: Enables a deterministic best-effort placement instead of hard-failing.
+	 * @note Technical: Checked by HandleStepFailure before returning false.
+	 * @note Notes: Disabling restores the previous hard-fail behavior.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy")
+	bool bEnableTimeoutFailSafe = true;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement fallback shuffle.
+	 * @note Why: Adds a stable offset to the deterministic random stream seed.
+	 * @note Technical: Combined with SeedUsed and the failed step to shuffle remaining anchors.
+	 * @note Notes: Adjust only if you need different deterministic fallback ordering.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
+		meta = (ClampMin = "0", ClampMax = "100000"))
+	int32 TimeoutFailSafeSeedOffset = 5501;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement.
+	 * @note Why: Sets minimum XY distance from Player HQ for Tier1 missions.
+	 * @note Technical: Compared against squared XY distance in the fail-safe pass.
+	 * @note Notes: Defaults to 0 to allow placement anywhere when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy")
+	float MinDistancePlayerHQTier1Mission = 0.0f;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement.
+	 * @note Why: Sets minimum XY distance from Player HQ for Tier2 missions.
+	 * @note Technical: Compared against squared XY distance in the fail-safe pass.
+	 * @note Notes: Defaults to 0 to allow placement anywhere when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy")
+	float MinDistancePlayerHQTier2Mission = 0.0f;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement.
+	 * @note Why: Sets minimum XY distance from Player HQ for Tier3 missions.
+	 * @note Technical: Compared against squared XY distance in the fail-safe pass.
+	 * @note Notes: Defaults to 0 to allow placement anywhere when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy")
+	float MinDistancePlayerHQTier3Mission = 0.0f;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement.
+	 * @note Why: Sets minimum XY distance from Player HQ for Tier4 missions.
+	 * @note Technical: Compared against squared XY distance in the fail-safe pass.
+	 * @note Notes: Defaults to 0 to allow placement anywhere when unset.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy")
+	float MinDistancePlayerHQTier4Mission = 0.0f;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement.
+	 * @note Why: Per-enemy-type minimum XY distance from Player HQ.
+	 * @note Technical: Missing keys default to 0.0f in FindRef.
+	 * @note Notes: Use for last-resort spacing when the generator times out.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy")
+	TMap<EMapEnemyItem, float> MinDistancePlayerHQEnemyItemByType;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement.
+	 * @note Why: Per-neutral-type minimum XY distance from Player HQ.
+	 * @note Technical: Missing keys default to 0.0f in FindRef.
+	 * @note Notes: Applies only to the fail-safe placement pass.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy")
+	TMap<EMapNeutralObjectType, float> MinDistancePlayerHQNeutralByType;
 
 	/**
 	 * Global fallback policy when a step-specific policy is not set.
