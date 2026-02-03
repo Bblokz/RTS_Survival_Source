@@ -3531,10 +3531,10 @@ bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationSte
 
 	if (NewAnchors.Num() < RequiredCount)
 	{
-		const FString ErrorMessage = FString::Printf(
+		const FString NewErrorMessage = FString::Printf(
 			TEXT("Anchor point generation failed: spawned %d of required %d anchors."),
 			NewAnchors.Num(), RequiredCount);
-		RTSFunctionLibrary::ReportError(ErrorMessage);
+		RTSFunctionLibrary::ReportError(NewErrorMessage);
 		return false;
 	}
 
