@@ -3504,6 +3504,20 @@ void AGeneratorWorldCampaign::DebugDrawEnemyHQHops() const
 	}
 }
 
+void AGeneratorWorldCampaign::DebugDrawMissionPathsToPlayerHQ() const
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		if (not GetIsValidCampaignDebugger())
+		{
+			return;
+		}
+
+		UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+		CampaignDebugger->DebugDrawMissionPathsToPlayerHQ(*this);
+	}
+}
+
 void AGeneratorWorldCampaign::DebugDrawSplineBoundaryArea()
 {
 	if (not M_AnchorPointGenerationSettings.bM_DebugDrawSplineBoundary)
