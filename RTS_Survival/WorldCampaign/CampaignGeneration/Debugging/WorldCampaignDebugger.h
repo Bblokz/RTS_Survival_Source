@@ -150,8 +150,8 @@ public:
 	void DebugMissionPlacementFailed(AAnchorPoint* AnchorPoint, EMapMission MissionType, const FString& Reason);
 
 private:
-	float DefaultDebugHeightOffset = 300.0f;
-	float AddedHeightIfStillDisplaying = 200.0f;
+	float DefaultDebugHeightOffset = 50.0f;
+	float AddedHeightIfStillDisplaying = 25.0f;
 	float DisplayTimeRejectedLocation = 3.0f;
 	float DisplayTimeAcceptedLocation = 5.0f;
 	int32 MaxRejectionDrawsPerAttempt = 200;
