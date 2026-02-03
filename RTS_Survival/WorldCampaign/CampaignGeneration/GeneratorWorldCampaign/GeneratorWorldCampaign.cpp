@@ -32,6 +32,20 @@ namespace
 	constexpr float AnchorGridLineThickness = 0.5f;
 	constexpr float AnchorGridBoundsLineThickness = 1.f;
 	constexpr float AnchorPointSpawnZ = 0.f;
+	constexpr uint64 Mix64Increment = 0x9E3779B97F4A7C15ull;
+	constexpr uint64 Mix64MultiplierA = 0xBF58476D1CE4E5B9ull;
+	constexpr uint64 Mix64MultiplierB = 0x94D049BB133111EBull;
+	constexpr int32 Mix64ShiftA = 30;
+	constexpr int32 Mix64ShiftB = 27;
+	constexpr int32 Mix64ShiftC = 31;
+	constexpr uint64 HashCombineSaltA = 0xD6E8FEB86659FD93ull;
+	constexpr uint64 HashCombineSaltB = 0xA5A356281F9B0F1Bull;
+	constexpr uint64 HashCombineSaltC = 0xC13FA9A902A6328Full;
+	constexpr uint64 HashCombineSaltD = 0x91E10DA5C79E7B1Dull;
+	constexpr uint64 HashCombineSaltE = 0xF1357AEA2E62A9C5ull;
+	constexpr uint64 AnchorKeySeedSaltA = 0xA9B4C3D2E1F0ABCDull;
+	constexpr uint64 AnchorKeySeedSaltB = 0x1D2C3B4A59687766ull;
+	constexpr uint64 Lower32BitMask = 0xFFFFFFFFull;
 
 	struct FAnchorCandidate
 	{
@@ -67,6 +81,33 @@ namespace
 
 	constexpr float SegmentIntersectionTolerance = 0.01f;
 	constexpr int32 NoRequiredItems = 0;
+
+	uint64 Mix64(uint64 Value)
+	{
+		Value += Mix64Increment;
+		Value = (Value ^ (Value >> Mix64ShiftA)) * Mix64MultiplierA;
+		Value = (Value ^ (Value >> Mix64ShiftB)) * Mix64MultiplierB;
+		return Value ^ (Value >> Mix64ShiftC);
+	}
+
+	uint64 HashCombine64(uint64 Seed, uint64 V0, uint64 V1, uint64 V2, uint64 V3)
+	{
+		uint64 Result = Seed;
+		Result ^= Mix64(V0 + HashCombineSaltA);
+		Result ^= Mix64(V1 + HashCombineSaltB);
+		Result ^= Mix64(V2 + HashCombineSaltC);
+		Result ^= Mix64(V3 + HashCombineSaltD);
+		return Mix64(Result + HashCombineSaltE);
+	}
+
+	FGuid MakeDeterministicGuid(uint64 SeedA, uint64 SeedB)
+	{
+		const uint32 A = static_cast<uint32>(SeedA >> 32);
+		const uint32 B = static_cast<uint32>(SeedA & Lower32BitMask);
+		const uint32 C = static_cast<uint32>(SeedB >> 32);
+		const uint32 D = static_cast<uint32>(SeedB & Lower32BitMask);
+		return FGuid(A, B, C, D);
+	}
 
 	TArray<EMapEnemyItem> GetSortedEnemyTypes(const TMap<EMapEnemyItem, int32>& EnemyItemCounts)
 	{
@@ -348,6 +389,8 @@ namespace
 		}
 
 		int32 BoundaryCount = 0;
+		AWorldSplineBoundary* SingleBoundary = nullptr;
+		TArray<FString> BoundaryNames;
 		for (TActorIterator<AWorldSplineBoundary> It(World); It; ++It)
 		{
 			AWorldSplineBoundary* Boundary = *It;
@@ -356,12 +399,17 @@ namespace
 				continue;
 			}
 
-			OutBoundary = Boundary;
 			BoundaryCount++;
+			BoundaryNames.Add(Boundary->GetName());
+			if (BoundaryCount == 1)
+			{
+				SingleBoundary = Boundary;
+			}
 		}
 
-		if (BoundaryCount == 1 && IsValid(OutBoundary))
+		if (BoundaryCount == 1 && IsValid(SingleBoundary))
 		{
+			OutBoundary = SingleBoundary;
 			return true;
 		}
 
@@ -371,7 +419,12 @@ namespace
 			return false;
 		}
 
-		RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: multiple WorldSplineBoundary actors found."));
+		const FString BoundaryList = BoundaryNames.Num() > 0 ? FString::Join(BoundaryNames, TEXT(", "))
+		                                                     : TEXT("UnknownBoundaries");
+		const FString ErrorMessage = FString::Printf(
+			TEXT("Anchor point generation failed: multiple WorldSplineBoundary actors found (%s)."),
+			*BoundaryList);
+		RTSFunctionLibrary::ReportError(ErrorMessage);
 		OutBoundary = nullptr;
 		return false;
 	}
@@ -467,11 +520,12 @@ namespace
 		return true;
 	}
 
-	bool SpawnAnchorsInGrid(UWorld* World, TSubclassOf<AAnchorPoint> AnchorClass, FRandomStream& RandomStream,
+	bool SpawnAnchorsInGrid(UWorld* World, const AGeneratorWorldCampaign* Generator,
+	                        TSubclassOf<AAnchorPoint> AnchorClass, FRandomStream& RandomStream,
 	                        const FAnchorPointGridDefinition& GridDefinition,
 	                        const TArray<FVector2D>& BoundaryPolygon,
 	                        const TArray<TObjectPtr<AAnchorPoint>>& ExistingAnchors, int32 TargetCount,
-	                        FCampaignGenerationStepTransaction& OutTransaction,
+	                        int32 StepAttemptIndex, FCampaignGenerationStepTransaction& OutTransaction,
 	                        TArray<TObjectPtr<AAnchorPoint>>& OutNewAnchors, float MinDistanceSquared)
 	{
 		if (not IsValid(World))
@@ -479,6 +533,12 @@ namespace
 			return false;
 		}
 
+		if (not IsValid(Generator))
+		{
+			return false;
+		}
+
+		int32 SpawnOrdinal = 0;
 		for (int32 OffsetIndex = 0; OffsetIndex < GridDefinition.CellCount; OffsetIndex++)
 		{
 			if (OutNewAnchors.Num() >= TargetCount)
@@ -511,18 +571,26 @@ namespace
 			}
 
 			const FVector SpawnLocation(Candidate.X, Candidate.Y, AnchorPointSpawnZ);
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			AAnchorPoint* SpawnedAnchor = World->SpawnActor<AAnchorPoint>(AnchorClass, SpawnLocation,
-			                                                              FRotator::ZeroRotator, SpawnParams);
+			const FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
+			AAnchorPoint* SpawnedAnchor = World->SpawnActorDeferred<AAnchorPoint>(AnchorClass, SpawnTransform, nullptr,
+			                                                                      nullptr,
+			                                                                      ESpawnActorCollisionHandlingMethod::
+			                                                                      AlwaysSpawn);
 			if (not IsValid(SpawnedAnchor))
 			{
 				RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: spawn failed."));
 				return false;
 			}
 
+			const FGuid DeterministicKey = Generator->BuildGeneratedAnchorKey_Deterministic(
+				StepAttemptIndex,
+				CellIndex,
+				SpawnOrdinal);
+			SpawnedAnchor->SetAnchorKey(DeterministicKey, true);
+			SpawnedAnchor->FinishSpawning(SpawnTransform);
 			OutTransaction.SpawnedActors.Add(SpawnedAnchor);
 			OutNewAnchors.Add(SpawnedAnchor);
+			SpawnOrdinal++;
 		}
 
 		return true;
@@ -3499,6 +3567,32 @@ bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationSte
 
 	TArray<TObjectPtr<AAnchorPoint>> ExistingAnchors;
 	GatherAnchorPoints(ExistingAnchors);
+	TArray<TObjectPtr<AAnchorPoint>> SortedExistingAnchors;
+	SortedExistingAnchors.Reserve(ExistingAnchors.Num());
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : ExistingAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		SortedExistingAnchors.Add(AnchorPoint);
+	}
+
+	SortedExistingAnchors.Sort([](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
+	{
+		if (not IsValid(Left))
+		{
+			return false;
+		}
+
+		if (not IsValid(Right))
+		{
+			return true;
+		}
+
+		return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
+	});
 
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::AnchorPointsGenerated);
 	const int32 SeedOffset = AttemptIndex * AttemptSeedMultiplier;
@@ -3523,8 +3617,9 @@ bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationSte
 
 	TArray<TObjectPtr<AAnchorPoint>> NewAnchors;
 
-	if (not SpawnAnchorsInGrid(World, AnchorClass, RandomStream, GridDefinition, BoundaryPolygon, ExistingAnchors,
-	                           PreferredTargetCount, OutTransaction, NewAnchors, MinDistanceSquared))
+	if (not SpawnAnchorsInGrid(World, this, AnchorClass, RandomStream, GridDefinition, BoundaryPolygon,
+	                           SortedExistingAnchors, PreferredTargetCount, AttemptIndex, OutTransaction, NewAnchors,
+	                           MinDistanceSquared))
 	{
 		return false;
 	}
@@ -5223,6 +5318,25 @@ void AGeneratorWorldCampaign::GatherAnchorPoints(TArray<TObjectPtr<AAnchorPoint>
 
 		OutAnchorPoints.Add(AnchorPoint);
 	}
+}
+
+FGuid AGeneratorWorldCampaign::BuildGeneratedAnchorKey_Deterministic(int32 StepAttemptIndex, int32 CellIndex,
+                                                                      int32 SpawnOrdinal) const
+{
+	const uint64 BaseSeed = static_cast<uint64>(M_CountAndDifficultyTuning.Seed);
+	const uint64 SeedA = HashCombine64(
+		BaseSeed,
+		AnchorKeySeedSaltA,
+		static_cast<uint64>(StepAttemptIndex),
+		static_cast<uint64>(CellIndex),
+		static_cast<uint64>(SpawnOrdinal));
+	const uint64 SeedB = HashCombine64(
+		BaseSeed,
+		AnchorKeySeedSaltB,
+		static_cast<uint64>(StepAttemptIndex),
+		static_cast<uint64>(CellIndex),
+		static_cast<uint64>(SpawnOrdinal));
+	return MakeDeterministicGuid(SeedA, SeedB);
 }
 
 void AGeneratorWorldCampaign::AssignDesiredConnections(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,

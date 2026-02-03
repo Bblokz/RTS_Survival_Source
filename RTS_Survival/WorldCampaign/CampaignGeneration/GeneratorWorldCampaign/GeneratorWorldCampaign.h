@@ -787,6 +787,15 @@ private:
 	void GatherAnchorPoints(TArray<TObjectPtr<AAnchorPoint>>& OutAnchorPoints) const;
 
 	/**
+	 * @brief Builds a deterministic key so generated anchors stay stable across retries.
+	 * @param StepAttemptIndex Attempt index for the generated-anchor step.
+	 * @param CellIndex Grid cell index used for placement.
+	 * @param SpawnOrdinal Ordinal of the spawn within the step.
+	 * @return Deterministic anchor key for generated anchors.
+	 */
+	FGuid BuildGeneratedAnchorKey_Deterministic(int32 StepAttemptIndex, int32 CellIndex, int32 SpawnOrdinal) const;
+
+	/**
 	 * @brief Assigns stable desired connection counts so the generator can target a per-node degree.
 	 * @param AnchorPoints Anchors to receive desired connection counts.
 	 * @param RandomStream Stream used to keep the assignment deterministic.

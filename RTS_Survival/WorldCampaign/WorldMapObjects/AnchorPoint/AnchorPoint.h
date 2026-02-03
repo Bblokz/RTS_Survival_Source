@@ -30,6 +30,13 @@ public:
 	virtual void PostLoad() override;
 
 	FGuid GetAnchorKey() const { return M_AnchorKey; }
+
+	/**
+	 * @brief Sets a deterministic key before construction so generated anchors sort consistently.
+	 * @param InAnchorKey Key to assign for this anchor.
+	 * @param bAllowOverwrite Whether to replace an existing key.
+	 */
+	void SetAnchorKey(const FGuid& InAnchorKey, bool bAllowOverwrite = false);
 	int32 GetConnectionCount() const;
 
 	const TArray<TObjectPtr<AAnchorPoint>>& GetNeighborAnchors() const { return M_NeighborAnchors; }
