@@ -274,6 +274,13 @@ struct FWorldCampaignDerivedData
 	TMap<EMapMission, int32> MissionPlacedCounts;
 };
 
+struct FEmptyAnchorDistance
+{
+	TObjectPtr<AAnchorPoint> AnchorPoint = nullptr;
+	FGuid AnchorKey;
+	float DistanceSquared = 0.f;
+};
+
 USTRUCT(BlueprintType)
 struct FCampaignGenerationStepTransaction
 {
@@ -749,6 +756,23 @@ private:
 	 */
 	bool HandleStepFailure(ECampaignGenerationStep FailedStep, int32& InOutStepIndex,
 	                       const TArray<ECampaignGenerationStep>& StepOrder);
+	/**
+	 * @brief Applies a deterministic last-resort placement pass when attempts exceed limits.
+	 * @param FailedStep Step that exceeded attempt limits and triggered the fail-safe.
+	 * @return true when the fail-safe ran; false when required data is missing.
+	 */
+	bool TryApplyTimeoutFailSafePlacement(ECampaignGenerationStep FailedStep);
+	/**
+	 * @brief Collects empty anchors for timeout fail-safe placement and reports missing prerequisites.
+	 * @param OutEmptyAnchors Sorted empty anchors with distance metadata for placement.
+	 * @param bOutHasValidPlayerHQAnchor Whether the Player HQ anchor is valid for distance filtering.
+	 * @return true when anchor data is available; false when anchors are missing entirely.
+	 */
+	bool TryBuildTimeoutFailSafeAnchors(TArray<FEmptyAnchorDistance>& OutEmptyAnchors,
+	                                    bool& bOutHasValidPlayerHQAnchor) const;
+	float GetFailSafeMinDistanceForMission(EMapMission MissionType) const;
+	float GetFailSafeMinDistanceForEnemy(EMapEnemyItem EnemyType) const;
+	float GetFailSafeMinDistanceForNeutral(EMapNeutralObjectType NeutralType) const;
 	void UndoLastTransaction();
 	void UndoConnections(const FCampaignGenerationStepTransaction& Transaction);
 	int32 CountTrailingMicroTransactionsForStep(ECampaignGenerationStep Step) const;
