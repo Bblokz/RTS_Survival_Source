@@ -95,53 +95,18 @@ namespace
 		}
 	}
 
-	bool GetHasAnyNeighborConnections(const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors)
+	void BuildAdjacencyFromCachedConnections(const TArray<TObjectPtr<AConnection>>& CachedConnections,
+	                                         const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                         TMap<FGuid, TArray<FGuid>>& OutAdjacencyByKey)
 	{
-		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : CachedAnchors)
+		OutAdjacencyByKey.Reset();
+		auto AddAdjacencyLink = [&OutAdjacencyByKey](const FGuid& FromKey, const FGuid& ToKey)
 		{
-			if (not IsValid(AnchorPoint))
-			{
-				continue;
-			}
+			TArray<FGuid>& NeighborKeys = OutAdjacencyByKey.FindOrAdd(FromKey);
+			NeighborKeys.AddUnique(ToKey);
+		};
 
-			if (AnchorPoint->GetNeighborAnchors().Num() > 0)
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	void GetSortedNeighborAnchors(const AAnchorPoint* AnchorPoint,
-	                              TArray<TObjectPtr<AAnchorPoint>>& OutNeighbors)
-	{
-		OutNeighbors.Reset();
-		if (not IsValid(AnchorPoint))
-		{
-			return;
-		}
-
-		OutNeighbors = AnchorPoint->GetNeighborAnchors();
-		OutNeighbors.RemoveAll([](const TObjectPtr<AAnchorPoint>& Neighbor)
-		{
-			return not IsValid(Neighbor);
-		});
-		OutNeighbors.Sort([](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
-		{
-			return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
-		});
-	}
-
-	AConnection* FindConnectionBetweenAnchors(const AAnchorPoint* AnchorA, const AAnchorPoint* AnchorB)
-	{
-		if (not IsValid(AnchorA) || not IsValid(AnchorB))
-		{
-			return nullptr;
-		}
-
-		const TArray<TObjectPtr<AConnection>>& Connections = AnchorA->GetConnections();
-		for (const TObjectPtr<AConnection>& Connection : Connections)
+		for (const TObjectPtr<AConnection>& Connection : CachedConnections)
 		{
 			if (not IsValid(Connection))
 			{
@@ -149,28 +114,187 @@ namespace
 			}
 
 			const TArray<TObjectPtr<AAnchorPoint>>& ConnectedAnchors = Connection->GetConnectedAnchors();
-			if (ConnectedAnchors.Contains(AnchorB))
+			if (ConnectedAnchors.Num() < 2)
 			{
-				return Connection;
+				continue;
+			}
+
+			const TObjectPtr<AAnchorPoint>& AnchorA = ConnectedAnchors[0];
+			const TObjectPtr<AAnchorPoint>& AnchorB = ConnectedAnchors[1];
+			const FGuid AnchorKeyA = IsValid(AnchorA) ? AnchorA->GetAnchorKey() : FGuid();
+			const FGuid AnchorKeyB = IsValid(AnchorB) ? AnchorB->GetAnchorKey() : FGuid();
+			if (AnchorLookup.Contains(AnchorKeyA) && AnchorLookup.Contains(AnchorKeyB))
+			{
+				AddAdjacencyLink(AnchorKeyA, AnchorKeyB);
+				AddAdjacencyLink(AnchorKeyB, AnchorKeyA);
+			}
+
+			if (ConnectedAnchors.Num() < 3)
+			{
+				continue;
+			}
+
+			const TObjectPtr<AAnchorPoint>& AnchorC = ConnectedAnchors[2];
+			const FGuid AnchorKeyC = IsValid(AnchorC) ? AnchorC->GetAnchorKey() : FGuid();
+			if (AnchorLookup.Contains(AnchorKeyC) && AnchorLookup.Contains(AnchorKeyA))
+			{
+				AddAdjacencyLink(AnchorKeyC, AnchorKeyA);
+				AddAdjacencyLink(AnchorKeyA, AnchorKeyC);
+			}
+
+			if (AnchorLookup.Contains(AnchorKeyC) && AnchorLookup.Contains(AnchorKeyB))
+			{
+				AddAdjacencyLink(AnchorKeyC, AnchorKeyB);
+				AddAdjacencyLink(AnchorKeyB, AnchorKeyC);
 			}
 		}
 
-		return nullptr;
+		for (TPair<FGuid, TArray<FGuid>>& Entry : OutAdjacencyByKey)
+		{
+			Entry.Value.Sort([](const FGuid& Left, const FGuid& Right)
+			{
+				return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+			});
+		}
 	}
 
-	bool TryBuildShortestPathKeys_Deterministic(const AAnchorPoint* StartAnchor, const AAnchorPoint* TargetAnchor,
-	                                            const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	bool TryValidateCachedConnections(const TArray<TObjectPtr<AConnection>>& CachedConnections,
+	                                  const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                  FString& OutErrorText)
+	{
+		int32 MissingConnectedAnchorCount = 0;
+		int32 InvalidConnectionCount = 0;
+		for (const TObjectPtr<AConnection>& Connection : CachedConnections)
+		{
+			if (not IsValid(Connection))
+			{
+				InvalidConnectionCount++;
+				continue;
+			}
+
+			const TArray<TObjectPtr<AAnchorPoint>>& ConnectedAnchors = Connection->GetConnectedAnchors();
+			for (const TObjectPtr<AAnchorPoint>& ConnectedAnchor : ConnectedAnchors)
+			{
+				if (not IsValid(ConnectedAnchor))
+				{
+					MissingConnectedAnchorCount++;
+					continue;
+				}
+
+				const FGuid ConnectedAnchorKey = ConnectedAnchor->GetAnchorKey();
+				if (not ConnectedAnchorKey.IsValid() || not AnchorLookup.Contains(ConnectedAnchorKey))
+				{
+					MissingConnectedAnchorCount++;
+				}
+			}
+		}
+
+		if (InvalidConnectionCount == 0 && MissingConnectedAnchorCount == 0)
+		{
+			return true;
+		}
+
+		OutErrorText = FString::Printf(
+			TEXT("DebugDrawMissionPathsToPlayerHQ: cached connections invalid: %d missing anchors, %d invalid connections."),
+			MissingConnectedAnchorCount,
+			InvalidConnectionCount);
+		return false;
+	}
+
+	bool TryBuildMissionKeys(const TMap<FGuid, EMapMission>& MissionsByAnchorKey,
+	                         const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                         TArray<FGuid>& OutMissionKeys,
+	                         FString& OutWarningText)
+	{
+		int32 MissingMissionAnchorCount = 0;
+		for (const TPair<FGuid, EMapMission>& MissionEntry : MissionsByAnchorKey)
+		{
+			if (AnchorLookup.Contains(MissionEntry.Key))
+			{
+				OutMissionKeys.Add(MissionEntry.Key);
+			}
+			else
+			{
+				MissingMissionAnchorCount++;
+			}
+		}
+
+		if (OutMissionKeys.Num() == 0)
+		{
+			OutWarningText = TEXT("DebugDrawMissionPathsToPlayerHQ: no valid mission anchors found.");
+			return false;
+		}
+
+		if (MissingMissionAnchorCount > 0)
+		{
+			OutWarningText = FString::Printf(
+				TEXT("DebugDrawMissionPathsToPlayerHQ: %d mission anchors missing from cached anchors."),
+				MissingMissionAnchorCount);
+		}
+
+		return true;
+	}
+
+	bool TryGetMissionPathPlacementState(const AGeneratorWorldCampaign& Generator,
+	                                     const TArray<TObjectPtr<AAnchorPoint>>*& OutCachedAnchors,
+	                                     const TArray<TObjectPtr<AConnection>>*& OutCachedConnections,
+	                                     const TMap<FGuid, EMapMission>*& OutMissionsByAnchorKey,
+	                                     FString& OutErrorText)
+	{
+		OutCachedAnchors = &Generator.GetPlacementState().CachedAnchors;
+		if (OutCachedAnchors->Num() == 0)
+		{
+			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: cached anchors are empty.");
+			return false;
+		}
+
+		OutMissionsByAnchorKey = &Generator.GetPlacementState().MissionsByAnchorKey;
+		if (OutMissionsByAnchorKey->Num() == 0)
+		{
+			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: no mission anchors found.");
+			return false;
+		}
+
+		OutCachedConnections = &Generator.GetPlacementState().CachedConnections;
+		if (OutCachedConnections->Num() == 0)
+		{
+			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: no cached connections found.");
+			return false;
+		}
+
+		return true;
+	}
+
+	bool TryValidatePlayerHQAnchorKey(const FGuid& PlayerHQAnchorKey,
+	                                  const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                  FString& OutErrorText)
+	{
+		if (not PlayerHQAnchorKey.IsValid())
+		{
+			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: player HQ anchor key is invalid.");
+			return false;
+		}
+
+		if (not AnchorLookup.Contains(PlayerHQAnchorKey))
+		{
+			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: player HQ anchor key not found in anchor lookup.");
+			return false;
+		}
+
+		return true;
+	}
+
+	bool TryBuildShortestPathKeys_Deterministic(const FGuid& StartKey, const FGuid& TargetKey,
+	                                            const TMap<FGuid, TArray<FGuid>>& AdjacencyByKey,
 	                                            TArray<FGuid>& OutPathKeys)
 	{
 		OutPathKeys.Reset();
-		if (not IsValid(StartAnchor) || not IsValid(TargetAnchor))
+		if (not StartKey.IsValid() || not TargetKey.IsValid())
 		{
 			return false;
 		}
 
-		const FGuid StartKey = StartAnchor->GetAnchorKey();
-		const FGuid TargetKey = TargetAnchor->GetAnchorKey();
-		if (not StartKey.IsValid() || not TargetKey.IsValid())
+		if (not AdjacencyByKey.Contains(StartKey) || not AdjacencyByKey.Contains(TargetKey))
 		{
 			return false;
 		}
@@ -191,23 +315,15 @@ namespace
 		FGuid CurrentKey;
 		while (Frontier.Dequeue(CurrentKey))
 		{
-			const TObjectPtr<AAnchorPoint>* CurrentAnchorPtr = AnchorLookup.Find(CurrentKey);
-			if (CurrentAnchorPtr == nullptr || not IsValid(*CurrentAnchorPtr))
+			const TArray<FGuid>* NeighborKeysPtr = AdjacencyByKey.Find(CurrentKey);
+			if (NeighborKeysPtr == nullptr)
 			{
 				continue;
 			}
 
-			TArray<TObjectPtr<AAnchorPoint>> SortedNeighbors;
-			GetSortedNeighborAnchors(CurrentAnchorPtr->Get(), SortedNeighbors);
-			for (const TObjectPtr<AAnchorPoint>& Neighbor : SortedNeighbors)
+			for (const FGuid& NeighborKey : *NeighborKeysPtr)
 			{
-				if (not IsValid(Neighbor))
-				{
-					continue;
-				}
-
-				const FGuid NeighborKey = Neighbor->GetAnchorKey();
-				if (not NeighborKey.IsValid() || VisitedKeys.Contains(NeighborKey))
+				if (VisitedKeys.Contains(NeighborKey))
 				{
 					continue;
 				}
@@ -252,39 +368,10 @@ namespace
 		return true;
 	}
 
-	void DrawPathSegment(const AGeneratorWorldCampaign& Generator, const AAnchorPoint* AnchorA,
-	                     const AAnchorPoint* AnchorB, const FColor& Color)
-	{
-		if (not IsValid(AnchorA) || not IsValid(AnchorB))
-		{
-			return;
-		}
-
-		if (FindConnectionBetweenAnchors(AnchorA, AnchorB) == nullptr)
-		{
-			return;
-		}
-
-		UWorld* World = Generator.GetWorld();
-		if (not IsValid(World))
-		{
-			return;
-		}
-
-		const FVector HeightOffset(0.f, 0.f, Generator.GetDebugRangeOffset());
-		DrawDebugLine(World,
-		              AnchorA->GetActorLocation() + HeightOffset,
-		              AnchorB->GetActorLocation() + HeightOffset,
-		              Color,
-		              false,
-		              Generator.GetDebugDisplaySeconds(),
-		              0,
-		              Generator.GetDebugLineThickness());
-	}
-
 	bool TryDrawMissionPath(const AGeneratorWorldCampaign& Generator, const AAnchorPoint* MissionAnchor,
 	                        const AAnchorPoint* PlayerHQAnchor,
 	                        const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                        const TMap<FGuid, TArray<FGuid>>& AdjacencyByKey,
 	                        const FColor& PathColor)
 	{
 		if (not IsValid(MissionAnchor) || not IsValid(PlayerHQAnchor))
@@ -297,8 +384,15 @@ namespace
 			return true;
 		}
 
+		const FGuid MissionKey = MissionAnchor->GetAnchorKey();
+		const FGuid PlayerHQKey = PlayerHQAnchor->GetAnchorKey();
+		if (not MissionKey.IsValid() || not PlayerHQKey.IsValid())
+		{
+			return false;
+		}
+
 		TArray<FGuid> PathKeys;
-		if (not TryBuildShortestPathKeys_Deterministic(MissionAnchor, PlayerHQAnchor, AnchorLookup, PathKeys))
+		if (not TryBuildShortestPathKeys_Deterministic(MissionKey, PlayerHQKey, AdjacencyByKey, PathKeys))
 		{
 			return false;
 		}
@@ -309,16 +403,36 @@ namespace
 			return true;
 		}
 
-		for (int32 PathIndex = 0; PathIndex < PathKeyCount - 1; PathIndex++)
+		TArray<const AAnchorPoint*> PathAnchors;
+		PathAnchors.Reserve(PathKeyCount);
+		for (const FGuid& PathKey : PathKeys)
 		{
-			const TObjectPtr<AAnchorPoint>* StartAnchorPtr = AnchorLookup.Find(PathKeys[PathIndex]);
-			const TObjectPtr<AAnchorPoint>* EndAnchorPtr = AnchorLookup.Find(PathKeys[PathIndex + 1]);
-			if (StartAnchorPtr == nullptr || EndAnchorPtr == nullptr)
+			const TObjectPtr<AAnchorPoint>* PathAnchorPtr = AnchorLookup.Find(PathKey);
+			if (PathAnchorPtr == nullptr || not IsValid(*PathAnchorPtr))
 			{
-				continue;
+				return false;
 			}
 
-			DrawPathSegment(Generator, StartAnchorPtr->Get(), EndAnchorPtr->Get(), PathColor);
+			PathAnchors.Add(PathAnchorPtr->Get());
+		}
+
+		UWorld* World = Generator.GetWorld();
+		if (not IsValid(World))
+		{
+			return false;
+		}
+
+		const FVector HeightOffset(0.f, 0.f, Generator.GetDebugRangeOffset());
+		for (int32 PathIndex = 0; PathIndex < PathAnchors.Num() - 1; PathIndex++)
+		{
+			DrawDebugLine(World,
+			              PathAnchors[PathIndex]->GetActorLocation() + HeightOffset,
+			              PathAnchors[PathIndex + 1]->GetActorLocation() + HeightOffset,
+			              PathColor,
+			              false,
+			              Generator.GetDebugDisplaySeconds(),
+			              0,
+			              Generator.GetDebugLineThickness());
 		}
 
 		return true;
@@ -332,40 +446,45 @@ namespace
 		OutMissionKeys.Reset();
 		OutErrorText.Reset();
 
-		const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors = Generator.GetPlacementState().CachedAnchors;
-		if (CachedAnchors.Num() == 0)
+		const TArray<TObjectPtr<AAnchorPoint>>* CachedAnchors = nullptr;
+		const TArray<TObjectPtr<AConnection>>* CachedConnections = nullptr;
+		const TMap<FGuid, EMapMission>* MissionsByAnchorKey = nullptr;
+		if (not TryGetMissionPathPlacementState(Generator, CachedAnchors, CachedConnections,
+		                                        MissionsByAnchorKey, OutErrorText))
 		{
-			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: cached anchors are empty.");
 			return false;
 		}
 
-		const TMap<FGuid, EMapMission>& MissionsByAnchorKey = Generator.GetPlacementState().MissionsByAnchorKey;
-		if (MissionsByAnchorKey.Num() == 0)
-		{
-			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: no mission anchors found.");
-			return false;
-		}
-
-		if (Generator.GetPlacementState().CachedConnections.Num() == 0)
-		{
-			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: no cached connections found.");
-			return false;
-		}
-
-		if (not GetHasAnyNeighborConnections(CachedAnchors))
-		{
-			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: anchor neighbors are empty.");
-			return false;
-		}
-
-		BuildAnchorLookup(CachedAnchors, OutAnchorLookup);
+		BuildAnchorLookup(*CachedAnchors, OutAnchorLookup);
 		if (OutAnchorLookup.Num() == 0)
 		{
 			OutErrorText = TEXT("DebugDrawMissionPathsToPlayerHQ: anchor lookup is empty.");
 			return false;
 		}
 
-		MissionsByAnchorKey.GetKeys(OutMissionKeys);
+		if (not TryValidatePlayerHQAnchorKey(Generator.GetPlacementState().PlayerHQAnchorKey,
+		                                     OutAnchorLookup, OutErrorText))
+		{
+			return false;
+		}
+
+		if (not TryValidateCachedConnections(*CachedConnections, OutAnchorLookup, OutErrorText))
+		{
+			return false;
+		}
+
+		FString WarningText;
+		if (not TryBuildMissionKeys(*MissionsByAnchorKey, OutAnchorLookup, OutMissionKeys, WarningText))
+		{
+			OutErrorText = WarningText;
+			return false;
+		}
+
+		if (not WarningText.IsEmpty())
+		{
+			OutErrorText = WarningText;
+		}
+
 		OutMissionKeys.Sort([](const FGuid& Left, const FGuid& Right)
 		{
 			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
@@ -626,13 +745,25 @@ void UWorldCampaignDebugger::DebugDrawMissionPathsToPlayerHQ(const AGeneratorWor
 		TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup;
 		TArray<FGuid> MissionKeys;
 		FString ErrorText;
-		if (not TryBuildMissionPathInputs(Generator, AnchorLookup, MissionKeys, ErrorText))
+		const bool bHasValidInputs = TryBuildMissionPathInputs(Generator, AnchorLookup, MissionKeys, ErrorText);
+		if (not ErrorText.IsEmpty())
 		{
-			if (not ErrorText.IsEmpty())
-			{
-				RTSFunctionLibrary::DisplayNotification(ErrorText);
-			}
+			RTSFunctionLibrary::DisplayNotification(ErrorText);
+		}
 
+		if (not bHasValidInputs)
+		{
+			return;
+		}
+
+		TMap<FGuid, TArray<FGuid>> AdjacencyByKey;
+		BuildAdjacencyFromCachedConnections(Generator.GetPlacementState().CachedConnections,
+		                                    AnchorLookup,
+		                                    AdjacencyByKey);
+		if (AdjacencyByKey.Num() == 0)
+		{
+			RTSFunctionLibrary::DisplayNotification(
+				TEXT("DebugDrawMissionPathsToPlayerHQ: adjacency map is empty."));
 			return;
 		}
 
@@ -655,7 +786,8 @@ void UWorldCampaignDebugger::DebugDrawMissionPathsToPlayerHQ(const AGeneratorWor
 			}
 
 			const FColor PathColor = MissionColors[MissionIndex % MissionColors.Num()];
-			if (TryDrawMissionPath(Generator, MissionAnchorPtr->Get(), PlayerHQAnchor, AnchorLookup, PathColor))
+			if (TryDrawMissionPath(Generator, MissionAnchorPtr->Get(), PlayerHQAnchor, AnchorLookup,
+			                       AdjacencyByKey, PathColor))
 			{
 				DrawnCount++;
 			}
