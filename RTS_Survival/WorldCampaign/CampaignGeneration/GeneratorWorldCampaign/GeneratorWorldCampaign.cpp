@@ -3377,6 +3377,86 @@ void AGeneratorWorldCampaign::DebugDrawAllConnections() const
 	}
 }
 
+void AGeneratorWorldCampaign::DebugDrawPlayerHQHops() const
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		UWorld* World = GetWorld();
+		if (not IsValid(World))
+		{
+			return;
+		}
+
+		if (not GetIsValidCampaignDebugger())
+		{
+			return;
+		}
+
+		if (M_DerivedData.PlayerHQHopDistancesByAnchorKey.Num() == 0)
+		{
+			return;
+		}
+
+		UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+			const int32* HopCount = M_DerivedData.PlayerHQHopDistancesByAnchorKey.Find(AnchorKey);
+			if (HopCount == nullptr || *HopCount == INDEX_NONE)
+			{
+				continue;
+			}
+
+			CampaignDebugger->DebugDrawPlayerHQHopAtAnchor(AnchorPoint, *HopCount);
+		}
+	}
+}
+
+void AGeneratorWorldCampaign::DebugDrawEnemyHQHops() const
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		UWorld* World = GetWorld();
+		if (not IsValid(World))
+		{
+			return;
+		}
+
+		if (not GetIsValidCampaignDebugger())
+		{
+			return;
+		}
+
+		if (M_DerivedData.EnemyHQHopDistancesByAnchorKey.Num() == 0)
+		{
+			return;
+		}
+
+		UWorldCampaignDebugger* CampaignDebugger = GetCampaignDebugger();
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+			const int32* HopCount = M_DerivedData.EnemyHQHopDistancesByAnchorKey.Find(AnchorKey);
+			if (HopCount == nullptr || *HopCount == INDEX_NONE)
+			{
+				continue;
+			}
+
+			CampaignDebugger->DebugDrawEnemyHQHopAtAnchor(AnchorPoint, *HopCount);
+		}
+	}
+}
+
 void AGeneratorWorldCampaign::DebugDrawSplineBoundaryArea()
 {
 	if (not M_AnchorPointGenerationSettings.bM_DebugDrawSplineBoundary)

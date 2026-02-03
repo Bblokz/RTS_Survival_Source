@@ -272,6 +272,22 @@ void UWorldCampaignDebugger::DrawInfoAtAnchor(AAnchorPoint* AnchorPoint, const F
 	}
 }
 
+void UWorldCampaignDebugger::DebugDrawPlayerHQHopAtAnchor(AAnchorPoint* AnchorPoint, int32 HopCount)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		DrawInfoAtAnchor(AnchorPoint, FString::FromInt(HopCount), DisplayTimeAcceptedLocation, FColor::Blue);
+	}
+}
+
+void UWorldCampaignDebugger::DebugDrawEnemyHQHopAtAnchor(AAnchorPoint* AnchorPoint, int32 HopCount)
+{
+	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
+	{
+		DrawInfoAtAnchor(AnchorPoint, FString::FromInt(HopCount), DisplayTimeAcceptedLocation, FColor::Red);
+	}
+}
+
 void UWorldCampaignDebugger::DebugEnemyPlacementAccepted(AAnchorPoint* AnchorPoint,
                                                          const FWorldCampaignEnemyPlacementDebugInfo& Info)
 {
