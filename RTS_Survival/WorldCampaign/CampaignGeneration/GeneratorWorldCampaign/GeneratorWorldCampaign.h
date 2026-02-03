@@ -578,6 +578,8 @@ private:
 	                               FCampaignGenerationStepTransaction& OutMicroTransaction);
 	bool ValidateEnemyObjectPlacementPrerequisites() const;
 	bool ValidateMissionPlacementPrerequisites() const;
+	bool GetIsMissionExcludedFromPlacement(EMapMission MissionType) const;
+	TArray<EMapMission> BuildMissionPlacementPlanFiltered() const;
 	void RollbackMicroPlacementAndDestroyActors(FCampaignGenerationStepTransaction& InOutTransaction);
 	/**
 	 * @brief Selects one enemy placement while preserving deterministic ordering for micro steps.
@@ -1064,6 +1066,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Missions",
 		meta = (AllowPrivateAccess = "true"))
 	FMissionPlacement M_MissionPlacementRules;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Missions",
+		meta = (AllowPrivateAccess = "true"))
+	TArray<EMapMission> M_ExcludedMissionsFromMapPlacement;
 
 	/**
 	 * @note Used in: EnemyObjectsPlaced and NeutralObjectsPlaced setup.
