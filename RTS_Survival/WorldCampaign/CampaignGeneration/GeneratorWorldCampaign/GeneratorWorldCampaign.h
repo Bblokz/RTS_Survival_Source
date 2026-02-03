@@ -599,10 +599,14 @@ public:
 
 	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
 		meta = (DisplayPriority = 4))
-	void DebugDrawSplineBoundaryArea();
+	void DebugDrawMissionPathsToPlayerHQ() const;
 
 	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
 		meta = (DisplayPriority = 5))
+	void DebugDrawSplineBoundaryArea();
+
+	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
+		meta = (DisplayPriority = 6))
 	void ShowPlacementReport();
 
 	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
