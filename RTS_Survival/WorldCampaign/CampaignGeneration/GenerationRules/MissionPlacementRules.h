@@ -424,6 +424,12 @@ struct FMissionPlacement
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Missions",
+		meta = (ClampMin = "0", ClampMax = "10",
+			ToolTip =
+			"Deterministic bias strength toward hop-preferred anchors (PreferMin/PreferMax). 0 keeps old cycling behavior; higher values increase hop-alignment."))
+	int32 M_HopsPreferenceStrength = 3;
+
 	/**
 	 * Default rules per mission tier.
 	 * Example: Tighten Tier1 distances while expanding Tier4 to push late missions to the outskirts.
