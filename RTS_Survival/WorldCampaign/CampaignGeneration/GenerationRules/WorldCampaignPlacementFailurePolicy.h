@@ -15,6 +15,15 @@ struct FWorldCampaignPlacementFailurePolicy
 	GENERATED_BODY()
 
 	/**
+	 * Micro-transaction escalation window. After this many failed micro-undo retries at the current depth,
+	 * the generator escalates by also undoing one more previous micro transaction.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
+		meta = (ClampMin = "1", ClampMax = "1024",
+			ToolTip = "Micro-transaction escalation window. After this many failed micro-undo retries at the current depth, the generator escalates by also undoing one more previous micro transaction."))
+	int32 EscalationAttempts = 32;
+
+	/**
 	 * Global fallback policy when a step-specific policy is not set.
 	 * Example: Use InstantBackTrack to immediately roll back failed steps during iteration.
 	 * @note Used in: HandleStepFailure when a step-specific policy is NotSet.
