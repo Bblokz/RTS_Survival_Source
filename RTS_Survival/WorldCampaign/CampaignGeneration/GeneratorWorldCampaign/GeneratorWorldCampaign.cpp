@@ -27,11 +27,14 @@ namespace
 	constexpr int32 ChokepointSeedOffset = 7919;
 	constexpr int32 AnchorPointSeedOffset = 15401;
 	constexpr float AnchorPointGridJitterFraction = 0.49f;
+	constexpr int32 AnchorPointJitterAttemptsMin = 1;
+	constexpr int32 AnchorPointJitterAttemptsMax = 32;
 	constexpr int32 MaxDebugGridCells = 400;
 	constexpr float AnchorBoundaryLineThickness = 2.f;
 	constexpr float AnchorGridLineThickness = 0.5f;
 	constexpr float AnchorGridBoundsLineThickness = 1.f;
 	constexpr float AnchorPointSpawnZ = 0.f;
+	const FName GeneratedAnchorTag(TEXT("WC_GeneratedAnchor"));
 	constexpr uint64 Mix64Increment = 0x9E3779B97F4A7C15ull;
 	constexpr uint64 Mix64MultiplierA = 0xBF58476D1CE4E5B9ull;
 	constexpr uint64 Mix64MultiplierB = 0x94D049BB133111EBull;
@@ -467,6 +470,16 @@ namespace
 			return false;
 		}
 
+		if (Settings.M_JitterAttemptsPerCell < AnchorPointJitterAttemptsMin
+			|| Settings.M_JitterAttemptsPerCell > AnchorPointJitterAttemptsMax)
+		{
+			OutError = FString::Printf(
+				TEXT("Anchor point generation failed: JitterAttemptsPerCell must be between %d and %d."),
+				AnchorPointJitterAttemptsMin,
+				AnchorPointJitterAttemptsMax);
+			return false;
+		}
+
 		if (Settings.M_SplineSampleSpacing <= 0.f)
 		{
 			OutError = TEXT("Anchor point generation failed: SplineSampleSpacing must be > 0.");
@@ -525,7 +538,8 @@ namespace
 	                        const FAnchorPointGridDefinition& GridDefinition,
 	                        const TArray<FVector2D>& BoundaryPolygon,
 	                        const TArray<TObjectPtr<AAnchorPoint>>& ExistingAnchors, int32 TargetCount,
-	                        int32 StepAttemptIndex, FCampaignGenerationStepTransaction& OutTransaction,
+	                        int32 StepAttemptIndex, int32 JitterAttemptsPerCell,
+	                        FCampaignGenerationStepTransaction& OutTransaction,
 	                        TArray<TObjectPtr<AAnchorPoint>>& OutNewAnchors, float MinDistanceSquared)
 	{
 		if (not IsValid(World))
@@ -534,6 +548,11 @@ namespace
 		}
 
 		if (not IsValid(Generator))
+		{
+			return false;
+		}
+
+		if (JitterAttemptsPerCell < AnchorPointJitterAttemptsMin)
 		{
 			return false;
 		}
@@ -554,43 +573,53 @@ namespace
 			const FVector2D CellMax(CellMin.X + GridDefinition.CellSize, CellMin.Y + GridDefinition.CellSize);
 			const FVector2D CellCenter(CellMin.X + GridDefinition.CellSize * 0.5f,
 			                           CellMin.Y + GridDefinition.CellSize * 0.5f);
-			const float JitterX = RandomStream.FRandRange(-GridDefinition.JitterRange, GridDefinition.JitterRange);
-			const float JitterY = RandomStream.FRandRange(-GridDefinition.JitterRange, GridDefinition.JitterRange);
-			FVector2D Candidate(CellCenter.X + JitterX, CellCenter.Y + JitterY);
-			Candidate.X = FMath::Clamp(Candidate.X, CellMin.X, CellMax.X);
-			Candidate.Y = FMath::Clamp(Candidate.Y, CellMin.Y, CellMax.Y);
-
-			if (not IsPointInsidePolygon(Candidate, BoundaryPolygon))
+			for (int32 AttemptInCell = 0; AttemptInCell < JitterAttemptsPerCell; AttemptInCell++)
 			{
-				continue;
-			}
+				if (OutNewAnchors.Num() >= TargetCount)
+				{
+					break;
+				}
 
-			if (not IsFarEnoughFromAnchors(Candidate, ExistingAnchors, OutNewAnchors, MinDistanceSquared))
-			{
-				continue;
-			}
+				const float JitterX = RandomStream.FRandRange(-GridDefinition.JitterRange, GridDefinition.JitterRange);
+				const float JitterY = RandomStream.FRandRange(-GridDefinition.JitterRange, GridDefinition.JitterRange);
+				FVector2D Candidate(CellCenter.X + JitterX, CellCenter.Y + JitterY);
+				Candidate.X = FMath::Clamp(Candidate.X, CellMin.X, CellMax.X);
+				Candidate.Y = FMath::Clamp(Candidate.Y, CellMin.Y, CellMax.Y);
 
-			const FVector SpawnLocation(Candidate.X, Candidate.Y, AnchorPointSpawnZ);
-			const FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
-			AAnchorPoint* SpawnedAnchor = World->SpawnActorDeferred<AAnchorPoint>(AnchorClass, SpawnTransform, nullptr,
-			                                                                      nullptr,
-			                                                                      ESpawnActorCollisionHandlingMethod::
-			                                                                      AlwaysSpawn);
-			if (not IsValid(SpawnedAnchor))
-			{
-				RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: spawn failed."));
-				return false;
-			}
+				if (not IsPointInsidePolygon(Candidate, BoundaryPolygon))
+				{
+					continue;
+				}
 
-			const FGuid DeterministicKey = Generator->BuildGeneratedAnchorKey_Deterministic(
-				StepAttemptIndex,
-				CellIndex,
-				SpawnOrdinal);
-			SpawnedAnchor->SetAnchorKey(DeterministicKey, true);
-			SpawnedAnchor->FinishSpawning(SpawnTransform);
-			OutTransaction.SpawnedActors.Add(SpawnedAnchor);
-			OutNewAnchors.Add(SpawnedAnchor);
-			SpawnOrdinal++;
+				if (not IsFarEnoughFromAnchors(Candidate, ExistingAnchors, OutNewAnchors, MinDistanceSquared))
+				{
+					continue;
+				}
+
+				const FVector SpawnLocation(Candidate.X, Candidate.Y, AnchorPointSpawnZ);
+				const FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
+				AAnchorPoint* SpawnedAnchor = World->SpawnActorDeferred<AAnchorPoint>(AnchorClass, SpawnTransform, nullptr,
+				                                                                      nullptr,
+				                                                                      ESpawnActorCollisionHandlingMethod::
+				                                                                      AlwaysSpawn);
+				if (not IsValid(SpawnedAnchor))
+				{
+					RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: spawn failed."));
+					return false;
+				}
+
+				const FGuid DeterministicKey = Generator->BuildGeneratedAnchorKey_Deterministic(
+					StepAttemptIndex,
+					CellIndex,
+					SpawnOrdinal);
+				SpawnedAnchor->SetAnchorKey(DeterministicKey, true);
+				SpawnedAnchor->FinishSpawning(SpawnTransform);
+				SpawnedAnchor->Tags.AddUnique(GeneratedAnchorTag);
+				OutTransaction.SpawnedActors.Add(SpawnedAnchor);
+				OutNewAnchors.Add(SpawnedAnchor);
+				SpawnOrdinal++;
+				break;
+			}
 		}
 
 		return true;
@@ -3302,6 +3331,24 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 		}
 	}
 
+	UWorld* World = GetWorld();
+	if (IsValid(World))
+	{
+		for (TActorIterator<AAnchorPoint> It(World); It; ++It)
+		{
+			AAnchorPoint* AnchorPoint = *It;
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			if (AnchorPoint->Tags.Contains(GeneratedAnchorTag))
+			{
+				AnchorPoint->Destroy();
+			}
+		}
+	}
+
 	ClearExistingConnections();
 	ClearPlacementState();
 	ClearDerivedData();
@@ -3617,6 +3664,7 @@ bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationSte
 {
 	if (not M_AnchorPointGenerationSettings.bM_EnableGeneratedAnchorPoints)
 	{
+		RTSFunctionLibrary::DisplayNotification(TEXT("Anchor generation disabled; skipping."));
 		return true;
 	}
 
@@ -3686,6 +3734,10 @@ bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationSte
 		return true;
 	}
 
+	const int32 JitterAttemptsPerCell = FMath::Clamp(
+		M_AnchorPointGenerationSettings.M_JitterAttemptsPerCell,
+		AnchorPointJitterAttemptsMin,
+		AnchorPointJitterAttemptsMax);
 	const float MinDistanceSquared = FMath::Square(M_AnchorPointGenerationSettings.M_MinDistanceBetweenAnchorPoints);
 	FAnchorPointGridDefinition GridDefinition;
 	if (not BuildAnchorPointGridDefinition(BoundaryPolygon, M_AnchorPointGenerationSettings.M_GridCellSize,
@@ -3698,20 +3750,18 @@ bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationSte
 	TArray<TObjectPtr<AAnchorPoint>> NewAnchors;
 
 	if (not SpawnAnchorsInGrid(World, this, AnchorClass, RandomStream, GridDefinition, BoundaryPolygon,
-	                           SortedExistingAnchors, PreferredTargetCount, AttemptIndex, OutTransaction, NewAnchors,
-	                           MinDistanceSquared))
+	                           SortedExistingAnchors, PreferredTargetCount, AttemptIndex, JitterAttemptsPerCell,
+	                           OutTransaction, NewAnchors, MinDistanceSquared))
 	{
 		return false;
 	}
 
-	if (NewAnchors.Num() < RequiredCount)
-	{
-		const FString NewErrorMessage = FString::Printf(
-			TEXT("Anchor point generation failed: spawned %d of required %d anchors."),
-			NewAnchors.Num(), RequiredCount);
-		RTSFunctionLibrary::ReportError(NewErrorMessage);
-		return false;
-	}
+	const FString NotificationMessage = FString::Printf(
+		TEXT("Anchor generation: spawned %d / preferred %d (min %d)."),
+		NewAnchors.Num(),
+		PreferredTargetCount,
+		RequiredCount);
+	RTSFunctionLibrary::DisplayNotification(NotificationMessage);
 
 	return true;
 }
