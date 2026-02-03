@@ -80,6 +80,11 @@ struct FAnchorPointGenerationSettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
 	float M_MinDistanceBetweenAnchorPoints = 1000.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation",
+		meta = (ClampMin = "1", ClampMax = "32",
+			ToolTip = "Number of randomized jitter samples attempted per grid cell when trying to place anchors."))
+	int32 M_JitterAttemptsPerCell = 4;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
 	float M_GridCellSize = 1000.f;
 
