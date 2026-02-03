@@ -250,7 +250,8 @@ namespace
 		const uint64 HashValue = HashCombine64(static_cast<uint64>(SeedUsed),
 		                                       static_cast<uint64>(MissionType),
 		                                       static_cast<uint64>(MissionIndex),
-		                                       static_cast<uint64>(AttemptIndex));
+		                                       static_cast<uint64>(AttemptIndex),
+		                                       static_cast<uint64>(CandidateCount));
 		const uint64 Pick = TotalWeight > 0 ? HashValue % TotalWeight : 0;
 
 		uint64 CumulativeWeight = 0;
