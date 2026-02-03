@@ -11,8 +11,10 @@
 UENUM(BlueprintType)
 enum class ECampaignGenerationStep : uint8
 {
-	/** Initial state before any generation occurs; next step is ConnectionsCreated. */
+	/** Initial state before any generation occurs; next step is AnchorPointsGenerated. */
 	NotStarted,
+	/** Anchor points generated within the spline boundary; next step is ConnectionsCreated. */
+	AnchorPointsGenerated,
 	/** Connection graph created between anchors; next step is PlayerHQPlaced. */
 	ConnectionsCreated,
 	/** Player HQ placed on an anchor; next step is EnemyHQPlaced. */

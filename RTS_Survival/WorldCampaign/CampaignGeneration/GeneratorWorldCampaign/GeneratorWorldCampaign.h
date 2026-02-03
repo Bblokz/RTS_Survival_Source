@@ -20,6 +20,7 @@
 
 class AAnchorPoint;
 class AConnection;
+class AWorldSplineBoundary;
 class UWorldCampaignDebugger;
 
 namespace WorldCampaignDebugDefaults
@@ -60,6 +61,45 @@ struct FConnectionGenerationRules
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World Campaign|Connection Generation")
 	float MaxPreferredDistance = 5000.f;
+};
+
+USTRUCT(BlueprintType)
+struct FAnchorPointGenerationSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	bool bM_EnableGeneratedAnchorPoints = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	int32 M_MinNewAnchorPoints = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	int32 M_MaxNewAnchorPoints = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	float M_MinDistanceBetweenAnchorPoints = 1000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	float M_GridCellSize = 1000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	float M_SplineSampleSpacing = 250.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	TSubclassOf<AAnchorPoint> M_GeneratedAnchorPointClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	bool bM_DebugDrawSplineBoundary = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	bool bM_DebugDrawGeneratedGrid = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	float M_DebugDrawBoundaryDuration = 10.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	float M_DebugDrawBoundaryZOffset = 50.f;
 };
 
 USTRUCT(BlueprintType)
@@ -503,36 +543,41 @@ public:
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
 		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::NotStarted", DisplayPriority = 2))
+	void GenerateAnchorPointsStep();
+
+	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::AnchorPointsGenerated",
+		        DisplayPriority = 3))
 	void CreateConnectionsStep();
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
 		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::ConnectionsCreated",
-		        DisplayPriority = 3))
+		        DisplayPriority = 4))
 	void PlaceHQStep();
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::PlayerHQPlaced", DisplayPriority = 4))
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::PlayerHQPlaced", DisplayPriority = 5))
 	void PlaceEnemyHQStep();
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyHQPlaced", DisplayPriority = 5))
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyHQPlaced", DisplayPriority = 6))
 	void PlaceEnemyWallStep();
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyWallPlaced", DisplayPriority = 6))
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyWallPlaced", DisplayPriority = 7))
 	void PlaceEnemyObjectsStep();
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
-		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyObjectsPlaced", DisplayPriority = 7))
+		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::EnemyObjectsPlaced", DisplayPriority = 8))
 	void PlaceNeutralObjectsStep();
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
 		meta = (EditCondition = "M_GenerationStep == ECampaignGenerationStep::NeutralObjectsPlaced",
-		        DisplayPriority = 8))
+		        DisplayPriority = 9))
 	void PlaceMissionsStep();
 
 	UFUNCTION(CallInEditor, Category = "00 - World Campaign|Generation",
-		meta = (DisplayPriority = 9))
+		meta = (DisplayPriority = 10))
 	void ExecuteAllSteps();
 
 	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
@@ -541,6 +586,10 @@ public:
 
 	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
 		meta = (DisplayPriority = 2))
+	void DebugDrawSplineBoundaryArea();
+
+	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
+		meta = (DisplayPriority = 3))
 	void ShowPlacementReport();
 
 	int32 GetAnchorConnectionDegree(const AAnchorPoint* AnchorPoint) const;
@@ -571,6 +620,7 @@ private:
 	bool ExecuteStepWithMicroTransactions(ECampaignGenerationStep CompletedStep,
 	                                      bool (AGeneratorWorldCampaign::*StepFunction)(
 		                                      FCampaignGenerationStepTransaction&));
+	bool ExecuteGenerateAnchorPoints(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecuteCreateConnections(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceHQ(FCampaignGenerationStepTransaction& OutTransaction);
 	bool ExecutePlaceEnemyHQ(FCampaignGenerationStepTransaction& OutTransaction);
@@ -853,7 +903,7 @@ private:
 
 	/**
 	 * @note Used in: Editor button gating for step execution.
-	 * @note Why: Enforces the ordered generation pipeline (ConnectionsCreated -> ... -> MissionsPlaced).
+	 * @note Why: Enforces the ordered generation pipeline (AnchorPointsGenerated -> ... -> MissionsPlaced).
 	 * @note Technical: Each CallInEditor step checks this enum via EditCondition to enable buttons.
 	 * @note Notes: Changing it manually can desync cached data; intended for controlled progression.
 	 */
@@ -940,6 +990,16 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Generation",
 		meta = (AllowPrivateAccess = "true"))
 	FConnectionGenerationRules ConnectionGenerationRules;
+
+	/**
+	 * @note Used in: AnchorPointsGenerated.
+	 * @note Why: Controls how anchor points are generated inside the spline boundary.
+	 * @note Technical: Read by ExecuteGenerateAnchorPoints for deterministic placement.
+	 * @note Notes: Changes take effect on the next anchor generation run.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation",
+		meta = (AllowPrivateAccess = "true"))
+	FAnchorPointGenerationSettings M_AnchorPointGenerationSettings;
 
 	/**
 	 * @note Used in: ConnectionsCreated.
