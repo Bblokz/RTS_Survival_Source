@@ -16,8 +16,8 @@
 
 namespace
 {
-	constexpr int32 MaxStepAttempts = 25;
-	constexpr int32 MaxTotalAttempts = 90000;
+	constexpr int32 MaxStepAttempts = 10000;
+	constexpr int32 MaxTotalAttempts = 120000;
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr int32 MaxRelaxationAttempts = 3;
 	constexpr int32 RelaxedHopDistanceMax = TNumericLimits<int32>::Max();

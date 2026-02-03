@@ -79,20 +79,20 @@ namespace
 	{
 		if (FailureStep == ECampaignGenerationStep::MissionsPlaced)
 		{
-			Stats.RemovedDueToMissions++;
+			++Stats.RemovedDueToMissions;
 			return;
 		}
 
 		if (FailureStep == ECampaignGenerationStep::NeutralObjectsPlaced)
 		{
-			Stats.RemovedDueToNeutralPlacement++;
+			++Stats.RemovedDueToNeutralPlacement;
 			return;
 		}
 
 		if (FailureStep == ECampaignGenerationStep::EnemyObjectsPlaced
 			|| FailureStep == ECampaignGenerationStep::EnemyWallPlaced)
 		{
-			Stats.RemovedDueToEnemyPlacement++;
+			++Stats.RemovedDueToEnemyPlacement;
 			return;
 		}
 
