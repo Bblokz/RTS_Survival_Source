@@ -134,6 +134,140 @@ namespace
 		return MissionTypes;
 	}
 
+	bool ShouldUseHopWeightedMissionSelection(const FMissionTierRules& EffectiveRules,
+	                                          const FMissionPlacement& MissionPlacementRules,
+	                                          const ETopologySearchStrategy HopsPreference)
+	{
+		if (not EffectiveRules.bUseHopsDistanceFromHQ)
+		{
+			return false;
+		}
+
+		if (HopsPreference != ETopologySearchStrategy::PreferMin
+			&& HopsPreference != ETopologySearchStrategy::PreferMax)
+		{
+			return false;
+		}
+
+		return MissionPlacementRules.M_HopsPreferenceStrength > 0;
+	}
+
+	void BuildMissionScoreBandIndices(const TArray<FPlacementCandidate>& Candidates,
+	                                  TArray<int32>& OutSelectableIndices)
+	{
+		const int32 ScoreBandMinCount = 3;
+		const float ScoreBandTolerance = 0.001f;
+		const int32 CandidateCount = Candidates.Num();
+		const float BestScore = Candidates[0].Score;
+		OutSelectableIndices.Reset();
+		OutSelectableIndices.Reserve(CandidateCount);
+
+		for (int32 CandidateIndex = 0; CandidateIndex < CandidateCount; CandidateIndex++)
+		{
+			if (FMath::IsNearlyEqual(Candidates[CandidateIndex].Score, BestScore, ScoreBandTolerance))
+			{
+				OutSelectableIndices.Add(CandidateIndex);
+			}
+		}
+
+		if (OutSelectableIndices.Num() >= ScoreBandMinCount)
+		{
+			return;
+		}
+
+		OutSelectableIndices.Reset();
+		for (int32 CandidateIndex = 0; CandidateIndex < CandidateCount; CandidateIndex++)
+		{
+			OutSelectableIndices.Add(CandidateIndex);
+		}
+	}
+
+	int32 GetTargetHopDistanceFromCandidates(const TArray<FPlacementCandidate>& Candidates,
+	                                         const TArray<int32>& SelectableIndices,
+	                                         const ETopologySearchStrategy HopsPreference)
+	{
+		int32 TargetHop = Candidates[SelectableIndices[0]].HopDistanceFromHQ;
+		for (const int32 CandidateIndex : SelectableIndices)
+		{
+			const int32 HopDistance = Candidates[CandidateIndex].HopDistanceFromHQ;
+			if (HopsPreference == ETopologySearchStrategy::PreferMin)
+			{
+				TargetHop = FMath::Min(TargetHop, HopDistance);
+			}
+			else
+			{
+				TargetHop = FMath::Max(TargetHop, HopDistance);
+			}
+		}
+
+		return TargetHop;
+	}
+
+	int32 GetHopPreferenceWeight(const int32 EffectiveMaxWeight,
+	                             const int32 EffectiveFalloff,
+	                             const int32 CandidateHopDistance,
+	                             const int32 TargetHopDistance)
+	{
+		const int32 Delta = FMath::Abs(CandidateHopDistance - TargetHopDistance);
+		return FMath::Max(1, EffectiveMaxWeight - Delta * EffectiveFalloff);
+	}
+
+	int32 SelectMissionCandidateIndexDeterministic(const TArray<FPlacementCandidate>& Candidates,
+	                                               const FMissionTierRules& EffectiveRules,
+	                                               const FMissionPlacement& MissionPlacementRules,
+	                                               const ETopologySearchStrategy HopsPreference,
+	                                               const EMapMission MissionType,
+	                                               const int32 AttemptIndex,
+	                                               const int32 MissionIndex,
+	                                               const int32 SeedUsed)
+	{
+		const int32 CandidateCount = Candidates.Num();
+		if (not ShouldUseHopWeightedMissionSelection(EffectiveRules, MissionPlacementRules, HopsPreference))
+		{
+			return (AttemptIndex + MissionIndex) % CandidateCount;
+		}
+
+		TArray<int32> SelectableIndices;
+		BuildMissionScoreBandIndices(Candidates, SelectableIndices);
+		const int32 TargetHop = GetTargetHopDistanceFromCandidates(Candidates, SelectableIndices, HopsPreference);
+
+		const int32 BaseMaxWeight = 32;
+		const int32 BaseFalloffPerDelta = 8;
+		const int32 StrengthMaxWeightMultiplier = 16;
+		const int32 EffectiveMaxWeight = BaseMaxWeight
+			+ MissionPlacementRules.M_HopsPreferenceStrength * StrengthMaxWeightMultiplier;
+		const int32 EffectiveFalloff = FMath::Max(1, BaseFalloffPerDelta
+			- MissionPlacementRules.M_HopsPreferenceStrength);
+
+		uint64 TotalWeight = 0;
+		for (const int32 CandidateIndex : SelectableIndices)
+		{
+			const int32 Weight = GetHopPreferenceWeight(EffectiveMaxWeight, EffectiveFalloff,
+			                                            Candidates[CandidateIndex].HopDistanceFromHQ, TargetHop);
+			TotalWeight += static_cast<uint64>(Weight);
+		}
+
+		const uint64 HashValue = HashCombine64(static_cast<uint64>(SeedUsed),
+		                                       static_cast<uint64>(MissionType),
+		                                       static_cast<uint64>(MissionIndex),
+		                                       static_cast<uint64>(AttemptIndex));
+		const uint64 Pick = TotalWeight > 0 ? HashValue % TotalWeight : 0;
+
+		uint64 CumulativeWeight = 0;
+		for (const int32 CandidateIndex : SelectableIndices)
+		{
+			const int32 Weight = GetHopPreferenceWeight(EffectiveMaxWeight, EffectiveFalloff,
+			                                            Candidates[CandidateIndex].HopDistanceFromHQ, TargetHop);
+			CumulativeWeight += static_cast<uint64>(Weight);
+			if (Pick < CumulativeWeight)
+			{
+				return CandidateIndex;
+			}
+		}
+
+		return SelectableIndices.Last();
+	}
+
 
 	TMap<FGuid, TObjectPtr<AAnchorPoint>> BuildAnchorLookup(const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors)
 	{
@@ -2167,7 +2301,9 @@ namespace
 	}
 
 	bool TrySelectMissionPlacementCandidateOverride(AGeneratorWorldCampaign& Generator,
+	                                                const FMissionPlacement& MissionPlacementRules,
 	                                                const FMissionTierRules& EffectiveRules,
+	                                                EMapMission MissionType,
 	                                                int32 AttemptIndex,
 	                                                int32 MissionIndex,
 	                                                const FRuleRelaxationState& RelaxationState,
@@ -2362,12 +2498,21 @@ namespace
 			return AAnchorPoint::IsAnchorKeyLess(Left.AnchorKey, Right.AnchorKey);
 		});
 
-		const int32 CandidateIndex = (AttemptIndex + MissionIndex) % Candidates.Num();
+		const int32 CandidateIndex = SelectMissionCandidateIndexDeterministic(
+			Candidates,
+			EffectiveRules,
+			MissionPlacementRules,
+			OverrideHopsPreference,
+			MissionType,
+			AttemptIndex,
+			MissionIndex,
+			WorkingPlacementState.SeedUsed);
 		OutCandidate = Candidates[CandidateIndex];
 		return IsValid(OutCandidate.AnchorPoint);
 	}
 
 	bool TrySelectMissionPlacementCandidate(AGeneratorWorldCampaign& Generator,
+	                                        const FMissionPlacement& MissionPlacementRules,
 	                                        const FMissionTierRules& EffectiveRules,
 	                                        EMapMission MissionType,
 	                                        int32 AttemptIndex,
@@ -2394,7 +2539,8 @@ namespace
 				return false;
 			}
 
-			return TrySelectMissionPlacementCandidateOverride(Generator, EffectiveRules, AttemptIndex,
+			return TrySelectMissionPlacementCandidateOverride(Generator, MissionPlacementRules, EffectiveRules,
+			                                                  MissionType, AttemptIndex,
 			                                                  MissionIndex, RelaxationState, NeutralRules,
 			                                                  WorkingPlacementState, WorkingDerivedData, AnchorLookup,
 			                                                  *CandidateSourceOverride, OverrideMinConnections,
@@ -2590,7 +2736,15 @@ namespace
 			return AAnchorPoint::IsAnchorKeyLess(Left.AnchorKey, Right.AnchorKey);
 		});
 
-		const int32 CandidateIndex = (AttemptIndex + MissionIndex) % Candidates.Num();
+		const int32 CandidateIndex = SelectMissionCandidateIndexDeterministic(
+			Candidates,
+			EffectiveRules,
+			MissionPlacementRules,
+			EffectiveRules.HopsDistancePreference,
+			MissionType,
+			AttemptIndex,
+			MissionIndex,
+			WorkingPlacementState.SeedUsed);
 		OutCandidate = Candidates[CandidateIndex];
 		return IsValid(OutCandidate.AnchorPoint);
 	}
@@ -2704,11 +2858,11 @@ namespace
 			                                                                  : nullptr;
 
 		FPlacementCandidate SelectedCandidate;
-		if (not TrySelectMissionPlacementCandidate(Generator, EffectiveRules, MissionType, AttemptIndex, MissionIndex,
-		                                           RelaxationState, NeutralRules, WorkingPlacementState,
-		                                           WorkingDerivedData, AnchorLookup, CandidateSourceOverride,
-		                                           bOverridePlacementWithArray, EffectiveOverrideMinConnections,
-		                                           EffectiveOverrideMaxConnections,
+		if (not TrySelectMissionPlacementCandidate(Generator, MissionPlacementRules, EffectiveRules, MissionType,
+		                                           AttemptIndex, MissionIndex, RelaxationState, NeutralRules,
+		                                           WorkingPlacementState, WorkingDerivedData, AnchorLookup,
+		                                           CandidateSourceOverride, bOverridePlacementWithArray,
+		                                           EffectiveOverrideMinConnections, EffectiveOverrideMaxConnections,
 		                                           EffectiveOverrideConnectionPreference,
 		                                           EffectiveOverrideMinHopsFromPlayerHQ,
 		                                           EffectiveOverrideMaxHopsFromPlayerHQ,
