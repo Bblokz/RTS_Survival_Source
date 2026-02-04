@@ -6,8 +6,12 @@
 #include "Components/AudioComponent.h"
 #include "FactionUnitPreview.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/FactionSystem/Factions/Factions.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/W_FactionDifficultyPicker.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionPopup.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionSelectionMenu.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/W_FactionWorldGenerationSettings.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -110,6 +114,107 @@ void AFactionPlayerController::StopAnnouncementSound()
 	}
 }
 
+void AFactionPlayerController::HandleLaunchCampaignRequested(const ERTSFaction SelectedFaction)
+{
+	M_SelectedFaction = SelectedFaction;
+
+	if (GetIsValidFactionSelectionMenu())
+	{
+		M_FactionSelectionMenu->RemoveFromParent();
+		M_FactionSelectionMenu.Reset();
+	}
+
+	InitFactionDifficultyPicker();
+	InitInputModeForWidget(M_FactionDifficultyPicker.Get());
+}
+
+void AFactionPlayerController::HandleFactionDifficultyChosen(
+	const int32 DifficultyPercentage,
+	const ERTSGameDifficulty SelectedDifficulty)
+{
+	M_SelectedGameDifficulty.DifficultyPercentage = DifficultyPercentage;
+	M_SelectedGameDifficulty.DifficultyLevel = SelectedDifficulty;
+	M_SelectedGameDifficulty.bIsInitialized = true;
+
+	if (GetIsValidFactionDifficultyPicker())
+	{
+		M_FactionDifficultyPicker->RemoveFromParent();
+		M_FactionDifficultyPicker.Reset();
+	}
+
+	InitFactionWorldGenerationSettings();
+
+	if (GetIsValidFactionWorldGenerationSettings())
+	{
+		M_FactionWorldGenerationSettings->SetDifficultyText(M_SelectedGameDifficulty.DifficultyLevel);
+	}
+
+	InitInputModeForWidget(M_FactionWorldGenerationSettings.Get());
+}
+
+void AFactionPlayerController::HandleWorldGenerationBackRequested()
+{
+	if (GetIsValidFactionWorldGenerationSettings())
+	{
+		M_FactionWorldGenerationSettings->RemoveFromParent();
+		M_FactionWorldGenerationSettings.Reset();
+	}
+
+	InitFactionDifficultyPicker();
+	InitInputModeForWidget(M_FactionDifficultyPicker.Get());
+}
+
+void AFactionPlayerController::HandleWorldGenerationSettingsGenerated(const FCampaignGenerationSettings& Settings)
+{
+	if (M_SelectedFaction == ERTSFaction::NotInitialised)
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::HandleWorldGenerationSettingsGenerated - Faction was not selected."
+		);
+		return;
+	}
+
+	if (not M_SelectedGameDifficulty.bIsInitialized)
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::HandleWorldGenerationSettingsGenerated - Difficulty was not selected."
+		);
+		return;
+	}
+
+	if (GetIsValidFactionWorldGenerationSettings())
+	{
+		M_FactionWorldGenerationSettings->RemoveFromParent();
+		M_FactionWorldGenerationSettings.Reset();
+	}
+
+	URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (RTSGameInstance == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::HandleWorldGenerationSettingsGenerated - Failed to get RTS game instance."
+		);
+		return;
+	}
+
+	RTSGameInstance->SetCampaignGenerationSettings(Settings);
+	RTSGameInstance->SetPlayerFaction(M_SelectedFaction);
+	RTSGameInstance->SetSelectedGameDifficulty(M_SelectedGameDifficulty);
+
+	if (M_CampaignWorld.IsNull())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_CampaignWorld",
+			"AFactionPlayerController::HandleWorldGenerationSettingsGenerated",
+			this
+		);
+		return;
+	}
+
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, M_CampaignWorld);
+}
+
 void AFactionPlayerController::HandleAnnouncementFinished()
 {
 	if (not GetIsValidFactionSelectionMenu())
@@ -183,6 +288,54 @@ void AFactionPlayerController::InitFactionSelectionMenu()
 	FactionSelectionMenu->AddToViewport();
 	FactionSelectionMenu->SetFactionPlayerController(this);
 	M_FactionSelectionMenu = FactionSelectionMenu;
+}
+
+void AFactionPlayerController::InitFactionDifficultyPicker()
+{
+	if (not GetIsValidFactionDifficultyPickerClass())
+	{
+		return;
+	}
+
+	UW_FactionDifficultyPicker* FactionDifficultyPicker = CreateWidget<UW_FactionDifficultyPicker>(
+		this,
+		M_FactionDifficultyPickerClass
+	);
+	if (not IsValid(FactionDifficultyPicker))
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::InitFactionDifficultyPicker - Failed to create faction difficulty picker widget."
+		);
+		return;
+	}
+
+	FactionDifficultyPicker->AddToViewport();
+	FactionDifficultyPicker->SetFactionPlayerController(this);
+	M_FactionDifficultyPicker = FactionDifficultyPicker;
+}
+
+void AFactionPlayerController::InitFactionWorldGenerationSettings()
+{
+	if (not GetIsValidFactionWorldGenerationSettingsClass())
+	{
+		return;
+	}
+
+	UW_FactionWorldGenerationSettings* WorldGenerationSettings = CreateWidget<UW_FactionWorldGenerationSettings>(
+		this,
+		M_FactionWorldGenerationSettingsClass
+	);
+	if (not IsValid(WorldGenerationSettings))
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::InitFactionWorldGenerationSettings - Failed to create world generation settings widget."
+		);
+		return;
+	}
+
+	WorldGenerationSettings->AddToViewport();
+	WorldGenerationSettings->SetFactionPlayerController(this);
+	M_FactionWorldGenerationSettings = WorldGenerationSettings;
 }
 
 void AFactionPlayerController::InitPreviewReferences()
@@ -437,6 +590,70 @@ bool AFactionPlayerController::GetIsValidFactionSelectionMenu() const
 			this,
 			"M_FactionSelectionMenu",
 			"GetIsValidFactionSelectionMenu",
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool AFactionPlayerController::GetIsValidFactionDifficultyPickerClass() const
+{
+	if (M_FactionDifficultyPickerClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_FactionDifficultyPickerClass",
+			"GetIsValidFactionDifficultyPickerClass",
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool AFactionPlayerController::GetIsValidFactionDifficultyPicker() const
+{
+	if (not M_FactionDifficultyPicker.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_FactionDifficultyPicker",
+			"GetIsValidFactionDifficultyPicker",
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool AFactionPlayerController::GetIsValidFactionWorldGenerationSettingsClass() const
+{
+	if (M_FactionWorldGenerationSettingsClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_FactionWorldGenerationSettingsClass",
+			"GetIsValidFactionWorldGenerationSettingsClass",
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool AFactionPlayerController::GetIsValidFactionWorldGenerationSettings() const
+{
+	if (not M_FactionWorldGenerationSettings.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_FactionWorldGenerationSettings",
+			"GetIsValidFactionWorldGenerationSettings",
 			this
 		);
 		return false;

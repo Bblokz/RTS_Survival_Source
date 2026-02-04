@@ -4,7 +4,6 @@
 
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
-#include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -202,16 +201,19 @@ void UW_FactionSelectionMenu::ApplyFactionAvailability()
 
 void UW_FactionSelectionMenu::SelectGermanBreakthrough(const bool bForceAudio)
 {
+	M_SelectedFaction = ERTSFaction::GerBreakthroughDoctrine;
 	SelectFaction(M_GerBreakthroughSetting, bForceAudio, bM_HasPlayedGerBreakthroughAudio);
 }
 
 void UW_FactionSelectionMenu::SelectGermanThermoKorps(const bool bForceAudio)
 {
+	M_SelectedFaction = ERTSFaction::GerThermoKorps;
 	SelectFaction(M_GerThermoKorpsSetting, bForceAudio, bM_HasPlayedGerThermoKorpsAudio);
 }
 
 void UW_FactionSelectionMenu::SelectGermanItalianGame(const bool bForceAudio)
 {
+	M_SelectedFaction = ERTSFaction::GerItalianFaction;
 	SelectFaction(M_GerItalianGameSetting, bForceAudio, bM_HasPlayedGerItalianGameAudio);
 }
 
@@ -447,18 +449,12 @@ void UW_FactionSelectionMenu::HidePortrait()
 
 void UW_FactionSelectionMenu::LaunchCampaign()
 {
-	if (M_CampaignWorld.IsNull())
+	if (not GetIsValidPlayerController())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-			this,
-			"M_CampaignWorld",
-			"LaunchCampaign",
-			this
-		);
 		return;
 	}
 
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, M_CampaignWorld);
+	M_FactionPlayerController->HandleLaunchCampaignRequested(M_SelectedFaction);
 }
 
 bool UW_FactionSelectionMenu::GetIsValidPlayerController() const

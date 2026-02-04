@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
+#include "RTS_Survival/FactionSystem/Factions/Factions.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "W_FactionSelectionMenu.generated.h"
 
@@ -12,7 +13,6 @@ class AFactionPlayerController;
 class UButton;
 class UScrollBox;
 class USoundBase;
-class UWorld;
 class UW_FactionUnit;
 class UW_Portrait;
 
@@ -176,13 +176,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	FFactionMenuSetting M_GerItalianGameSetting;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
-	TSoftObjectPtr<UWorld> M_CampaignWorld;
-
 private:
 	UPROPERTY()
 	TWeakObjectPtr<AFactionPlayerController> M_FactionPlayerController;
 	void SetupFactionPlayerController();
+
+	ERTSFaction M_SelectedFaction = ERTSFaction::GerBreakthroughDoctrine;
 
 	bool bM_HasPlayedGerBreakthroughAudio = false;
 	bool bM_HasPlayedGerThermoKorpsAudio = false;

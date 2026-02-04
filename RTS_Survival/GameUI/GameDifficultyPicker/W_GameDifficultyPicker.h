@@ -43,6 +43,13 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UBorder> M_DifficultyInfoBorder;
 
+	/**
+	 * @brief Applies the selected difficulty and closes the picker once chosen.
+	 * @param DifficultyPercentage Percentage configured for the selected difficulty.
+	 * @param SelectedDifficulty Difficulty enum that was chosen by the player.
+	 */
+	virtual void OnDifficultyChosen(const int32 DifficultyPercentage, const ERTSGameDifficulty SelectedDifficulty);
+
 private:
 	UFUNCTION()
 	void OnNewToRTSDifficultyHovered();
@@ -92,13 +99,6 @@ private:
 	void HandleDifficultyHovered(const ERTSGameDifficulty HoveredDifficulty);
 	void HandleDifficultyUnhovered();
 	void HandleDifficultyClicked(const ERTSGameDifficulty SelectedDifficulty);
-
-	/**
-	 * @brief Applies the selected difficulty and closes the picker once chosen.
-	 * @param DifficultyPercentage Percentage configured for the selected difficulty.
-	 * @param SelectedDifficulty Difficulty enum that was chosen by the player.
-	 */
-	void OnDifficultyChosen(const int32 DifficultyPercentage, const ERTSGameDifficulty SelectedDifficulty);
 
 	void SetDifficultyInfoBorderVisible(const bool bIsVisible);
 	bool GetIsAnyDifficultyButtonHovered() const;
