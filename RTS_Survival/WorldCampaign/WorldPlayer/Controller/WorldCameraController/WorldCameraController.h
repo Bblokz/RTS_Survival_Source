@@ -35,14 +35,8 @@ public:
 	void ZoomIn();
 	void ZoomOut();
 
-	/**
-	 * @brief Provides a single routing point for Enhanced Input to update axis state.
-	 * @param bOnForward Whether forward/backward input should be applied.
-	 * @param AxisX The forward/backward axis value.
-	 * @param bOnRight Whether right/left input should be applied.
-	 * @param AxisY The right/left axis value.
-	 */
-	void ForwardRightMovement(bool bOnForward, float AxisX, bool bOnRight, float AxisY);
+	void ForwardMovement(float AxisValue);
+	void RightMovement(float AxisValue);
 
 	/**
 	 * @brief Allows Blueprint-driven campaign logic to move the camera to a target location.
@@ -53,9 +47,7 @@ public:
 private:
 	struct FWorldCameraAxisInputState
 	{
-		bool bM_IsForwardInputActive = false;
 		float M_ForwardAxisValue = 0.0f;
-		bool bM_IsRightInputActive = false;
 		float M_RightAxisValue = 0.0f;
 	};
 

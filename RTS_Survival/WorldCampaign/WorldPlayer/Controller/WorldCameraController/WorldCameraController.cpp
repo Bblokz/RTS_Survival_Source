@@ -92,12 +92,14 @@ void UWorldCameraController::ZoomOut()
 	CameraCarrier->SetActorLocation(NewLocation, true);
 }
 
-void UWorldCameraController::ForwardRightMovement(const bool bOnForward, const float AxisX, const bool bOnRight, const float AxisY)
+void UWorldCameraController::ForwardMovement(const float AxisValue)
 {
-	M_AxisInputState.bM_IsForwardInputActive = bOnForward;
-	M_AxisInputState.M_ForwardAxisValue = AxisX;
-	M_AxisInputState.bM_IsRightInputActive = bOnRight;
-	M_AxisInputState.M_RightAxisValue = AxisY;
+	M_AxisInputState.M_ForwardAxisValue = AxisValue;
+}
+
+void UWorldCameraController::RightMovement(const float AxisValue)
+{
+	M_AxisInputState.M_RightAxisValue = AxisValue;
 }
 
 void UWorldCameraController::MoveCameraTo(const FMovePlayerCamera& MoveRequest)
@@ -219,8 +221,13 @@ void UWorldCameraController::UpdateAxisMovement(const float DeltaTime)
 		return;
 	}
 
-	const float ForwardAxisValue = M_AxisInputState.bM_IsForwardInputActive ? M_AxisInputState.M_ForwardAxisValue : 0.0f;
-	const float RightAxisValue = M_AxisInputState.bM_IsRightInputActive ? M_AxisInputState.M_RightAxisValue : 0.0f;
+	constexpr float AxisDeadzone = KINDA_SMALL_NUMBER;
+	const float ForwardAxisValue = FMath::Abs(M_AxisInputState.M_ForwardAxisValue) > AxisDeadzone
+		? M_AxisInputState.M_ForwardAxisValue
+		: 0.0f;
+	const float RightAxisValue = FMath::Abs(M_AxisInputState.M_RightAxisValue) > AxisDeadzone
+		? M_AxisInputState.M_RightAxisValue
+		: 0.0f;
 	if (ForwardAxisValue == 0.0f && RightAxisValue == 0.0f)
 	{
 		return;
