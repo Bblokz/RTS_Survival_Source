@@ -33,10 +33,15 @@ void UW_FactionSelectionMenu::HandleAnnouncementFinished()
 void UW_FactionSelectionMenu::NativeConstruct()
 {
 	Super::NativeConstruct();
-
+	SetupFactionPlayerController();
 	SetupButtonBindings();
 	ApplyFactionAvailability();
 	SelectGermanBreakthrough(true);
+}
+
+void UW_FactionSelectionMenu::SetupFactionPlayerController()
+{
+	M_FactionPlayerController = Cast<AFactionPlayerController>(GetOwningPlayer());
 }
 
 void UW_FactionSelectionMenu::HandleGerBreakthroughClicked()

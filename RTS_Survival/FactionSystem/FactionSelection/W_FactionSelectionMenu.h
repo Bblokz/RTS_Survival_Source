@@ -182,6 +182,7 @@ protected:
 private:
 	UPROPERTY()
 	TWeakObjectPtr<AFactionPlayerController> M_FactionPlayerController;
+	void SetupFactionPlayerController();
 
 	bool bM_HasPlayedGerBreakthroughAudio = false;
 	bool bM_HasPlayedGerThermoKorpsAudio = false;
