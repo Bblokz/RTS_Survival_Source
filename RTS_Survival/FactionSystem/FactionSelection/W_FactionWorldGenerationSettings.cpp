@@ -7,7 +7,7 @@
 #include "Components/ComboBoxString.h"
 #include "Components/HorizontalBox.h"
 #include "Components/RichTextBlock.h"
-#include "Components/Slider.h"
+#include "Components/SpinBox.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -16,8 +16,8 @@
 
 namespace FactionWorldGenerationSettingsConstants
 {
-	constexpr float MinSeedValue = 0.0f;
-	constexpr float MaxSeedValue = static_cast<float>(MAX_int32);
+	constexpr int32 MinSeedValue = 0;
+	constexpr int32 MaxSeedValue = MAX_int32;
 }
 
 void UW_FactionWorldGenerationSettings::SetFactionPlayerController(AFactionPlayerController* FactionPlayerController)
@@ -50,7 +50,7 @@ void UW_FactionWorldGenerationSettings::NativeOnInitialized()
 		or not GetIsValidPersonalityBox()
 		or not GetIsValidPersonalityComboBox()
 		or not GetIsValidDifficultyText()
-		or not GetIsValidSeedSlider())
+		or not GetIsValidSeedSpinBox())
 	{
 		return;
 	}
@@ -68,8 +68,9 @@ void UW_FactionWorldGenerationSettings::NativeOnInitialized()
 	SetupPersonalityComboBox();
 	UpdateAdvancedSettingsVisibility(false);
 
-	M_SeedSlider->SetMinValue(FactionWorldGenerationSettingsConstants::MinSeedValue);
-	M_SeedSlider->SetMaxValue(FactionWorldGenerationSettingsConstants::MaxSeedValue);
+	M_SeedSpinBox->SetMinValue(FactionWorldGenerationSettingsConstants::MinSeedValue);
+	M_SeedSpinBox->SetMaxValue(FactionWorldGenerationSettingsConstants::MaxSeedValue);
+	M_SeedSpinBox->SetValue(FactionWorldGenerationSettingsConstants::MinSeedValue);
 }
 
 void UW_FactionWorldGenerationSettings::HandleBackClicked()
@@ -181,14 +182,12 @@ EEnemyWorldPersonality UW_FactionWorldGenerationSettings::GetSelectedPersonality
 
 int32 UW_FactionWorldGenerationSettings::GetSelectedSeed() const
 {
-	if (not GetIsValidSeedSlider())
+	if (not GetIsValidSeedSpinBox())
 	{
 		return 0;
 	}
 
-	const float SliderValue = M_SeedSlider->GetValue();
-	const int32 SeedValue = FMath::RoundToInt(SliderValue);
-	return FMath::Clamp(SeedValue, 0, MAX_int32);
+	return M_SeedSpinBox->GetValue();
 }
 
 bool UW_FactionWorldGenerationSettings::GetIsValidFactionPlayerController() const
@@ -335,17 +334,17 @@ bool UW_FactionWorldGenerationSettings::GetIsValidDifficultyText() const
 	return false;
 }
 
-bool UW_FactionWorldGenerationSettings::GetIsValidSeedSlider() const
+bool UW_FactionWorldGenerationSettings::GetIsValidSeedSpinBox() const
 {
-	if (IsValid(M_SeedSlider))
+	if (IsValid(M_SeedSpinBox))
 	{
 		return true;
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
-		"M_SeedSlider",
-		"UW_FactionWorldGenerationSettings::GetIsValidSeedSlider",
+		"M_SeedSpinBox",
+		"UW_FactionWorldGenerationSettings::GetIsValidSeedSpinBox",
 		this
 	);
 	return false;
