@@ -17,7 +17,7 @@
 
 namespace
 {
-	constexpr int32 MaxStepAttempts = 6000;
+	constexpr int32 MaxStepAttempts = 7000;
 	constexpr int32 MaxTotalAttempts = 8000;
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr int32 MaxRelaxationAttempts = 3;

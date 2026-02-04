@@ -6,22 +6,16 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "WorldCameraController/WorldCameraController.h"
 
+void AWorldPlayerController::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	M_WorldCameraController = FindComponentByClass<UWorldCameraController>();
+}
+
 void AWorldPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UWorldCameraController* FoundController = nullptr;
-	if (APawn* const PossessedPawn = GetPawn())
-	{
-		FoundController = PossessedPawn->FindComponentByClass<UWorldCameraController>();
-	}
-
-	if (not IsValid(FoundController))
-	{
-		FoundController = FindComponentByClass<UWorldCameraController>();
-	}
-
-	M_WorldCameraController = FoundController;
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)

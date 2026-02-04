@@ -24,7 +24,10 @@ class RTS_SURVIVAL_API AWorldPlayerController : public APlayerController
 	GENERATED_BODY()
 
 protected:
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
+
+	
 
 public:
 	UFUNCTION(BlueprintCallable)
