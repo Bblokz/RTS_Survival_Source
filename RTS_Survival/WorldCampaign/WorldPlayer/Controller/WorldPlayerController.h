@@ -15,7 +15,8 @@ class UWorldCameraController;
  * @note SetIsWorldCameraMovementDisabled: call in blueprint to enable or block camera input.
  * @note WorldCamera_ZoomIn: call in blueprint to route zoom input.
  * @note WorldCamera_ZoomOut: call in blueprint to route zoom input.
- * @note WorldCamera_ForwardRightMovement: call in blueprint to route movement axes.
+ * @note WorldCamera_ForwardMovement: call in blueprint to route forward/backward axis input.
+ * @note WorldCamera_RightMovement: call in blueprint to route right/left axis input.
  * @note WorldCamera_MoveTo: call in blueprint to move the camera to campaign locations.
  */
 UCLASS()
@@ -43,7 +44,10 @@ public:
 	void WorldCamera_ZoomOut();
 
 	UFUNCTION(BlueprintCallable)
-	void WorldCamera_ForwardRightMovement(bool bOnForward, float AxisX, bool bOnRight, float AxisY);
+	void WorldCamera_ForwardMovement(float AxisValue);
+
+	UFUNCTION(BlueprintCallable)
+	void WorldCamera_RightMovement(float AxisValue);
 
 	/**
 	 * @brief Provides a Blueprint routing point for move-to requests during the campaign map.

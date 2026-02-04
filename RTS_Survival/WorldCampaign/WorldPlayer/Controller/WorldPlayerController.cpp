@@ -58,18 +58,24 @@ void AWorldPlayerController::WorldCamera_ZoomOut()
 	M_WorldCameraController->ZoomOut();
 }
 
-void AWorldPlayerController::WorldCamera_ForwardRightMovement(
-	const bool bOnForward,
-	const float AxisX,
-	const bool bOnRight,
-	const float AxisY)
+void AWorldPlayerController::WorldCamera_ForwardMovement(const float AxisValue)
 {
 	if (not GetIsValidWorldCameraController())
 	{
 		return;
 	}
 
-	M_WorldCameraController->ForwardRightMovement(bOnForward, AxisX, bOnRight, AxisY);
+	M_WorldCameraController->ForwardMovement(AxisValue);
+}
+
+void AWorldPlayerController::WorldCamera_RightMovement(const float AxisValue)
+{
+	if (not GetIsValidWorldCameraController())
+	{
+		return;
+	}
+
+	M_WorldCameraController->RightMovement(AxisValue);
 }
 
 void AWorldPlayerController::WorldCamera_MoveTo(const FMovePlayerCamera& MoveRequest)
