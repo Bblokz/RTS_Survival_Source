@@ -17,8 +17,8 @@
 
 namespace
 {
-	constexpr int32 MaxStepAttempts = 10000;
-	constexpr int32 MaxTotalAttempts = 15000;
+	constexpr int32 MaxStepAttempts = 6000;
+	constexpr int32 MaxTotalAttempts = 8000;
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr int32 MaxRelaxationAttempts = 3;
 	constexpr int32 RelaxedHopDistanceMax = TNumericLimits<int32>::Max();
@@ -5887,7 +5887,7 @@ void AGeneratorWorldCampaign::ClearDerivedData()
 void AGeneratorWorldCampaign::CacheAnchorConnectionDegrees()
 {
 	M_DerivedData.AnchorConnectionDegreesByAnchorKey.Reset();
-	for (const TWeakObjectPtr<AAnchorPoint>& AnchorPointWeak : M_PlacementState.CachedAnchors)
+	for ( TWeakObjectPtr<AAnchorPoint> AnchorPointWeak : M_PlacementState.CachedAnchors)
 	{
 		AAnchorPoint* AnchorPoint = AnchorPointWeak.Get();
 		if (not IsValid(AnchorPoint))
