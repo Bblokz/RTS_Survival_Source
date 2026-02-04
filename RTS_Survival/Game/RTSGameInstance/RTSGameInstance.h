@@ -2,10 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioType.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTSGameInstance.generated.h"
 
 
+enum class ERTSFaction : uint8;
 class URTSMusicManager;
 class USoundClass;
 class USoundMix;
@@ -27,6 +30,13 @@ public:
     /** Blueprint can grab this and call InitMusicManager(...) on it. */
     UFUNCTION(BlueprintCallable, Category="Music")
     URTSMusicManager* GetMusicManager() const { return MusicManager; }
+
+	void SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings);
+	FCampaignGenerationSettings GetCampaignGenerationSettings() const;
+	void SetSelectedGameDifficulty(const FRTSGameDifficulty& Difficulty) { M_SelectedGameDifficulty = Difficulty; }
+	FRTSGameDifficulty GetSelectedGameDifficulty() const { return M_SelectedGameDifficulty; }
+	void SetPlayerFaction(const ERTSFaction Faction) { M_PlayerFaction = Faction; }
+	ERTSFaction GetPlayerFaction() const { return M_PlayerFaction; }
 
 protected:
     // Called on init when the music manager is setup and needs to be initialized.
@@ -61,5 +71,9 @@ private:
 
     // This is the map we start at, do not wait the extra seconds.
     bool bIsLoadingProfileMap;
+
+	FCampaignGenerationSettings M_CampaignGenerationSettings;
+	FRTSGameDifficulty M_SelectedGameDifficulty;
+	ERTSFaction M_PlayerFaction;
 
 };

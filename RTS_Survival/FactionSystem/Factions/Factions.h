@@ -9,5 +9,6 @@ enum class ERTSFaction : uint8
 {
 	NotInitialised,
 	GerBreakthroughDoctrine,
-	GerThermoKorps
+	GerThermoKorps,
+	GerItalianFaction
 };

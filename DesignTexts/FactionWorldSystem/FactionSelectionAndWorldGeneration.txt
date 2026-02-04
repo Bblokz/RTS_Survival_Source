@@ -1,0 +1,65 @@
+﻿faction decision -> launch campaign generation -> creates W_FactionDifficultySelector (overwrites OnDifficultyChosen)
+
+we need to refactor void UW_FactionSelectionMenu::LaunchCampaign().
+
+
+ you need to define new widgets for the faction system and make sure to hook up the settings chosen by the user to the game instance.
+ you will also need to refactor some functions in the faction system that deal with the LaunchCampaign.
+first define the UW_FactionDifficultyPicker that is derived from UW_GameDifficultyPicker make sure that the void UW_GameDifficultyPicker::OnDifficultyChosen(const int32 DifficultyPercentage, const ERTSGameDifficulty SelectedDifficulty)
+is changed  to virtual and overwritten in the UW_FactionDifficultyPicker.
+Make sure that the void UW_FactionSelectionMenu::LaunchCampaign() is rerouted to the AFactionPlayerController and make sure the
+AFactionPlayerController will have hte protected
+	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
+	TSoftObjectPtr<UWorld> M_CampaignWorld;
+while that will be removed form the UW_FactionSelectionMenu.
+
+make sure the faction selection menu has a ERTSFaction private that will be set to the right faction when the button associated with that faction is pressed.
+( the break through faction by default as we start with that one selected automatically)
+make sure that this selected faction enum is provided through the launch campaign button to the AFactionPlayerController and that the controller
+stores it.
+
+when we are at the launch campaign in the faction controller we first do a few other things before loading the map.
+0. store the faction selected.
+1. remove our faction selection menu.
+2. make sure there is a defaults setting for the derived class of UW_FactionDifficultyPicker and now that the faction menu
+is gone add that one to the view port. Make sure the UW_FactionDifficultyPicker gets a poitner to this controller to call back on when the player has
+selected their difficulty.
+now we wait till the player has selected.
+
+3. once the player has selected the difficulty we store that in the controller as well in a struct FRTSGameDifficulty together with the provided
+difficulty percentage from the UW_FactionDifficultyPicker.
+make sure the initialzied bool is also true on that struct.
+Then we remove the difficulty picker from the viewport.
+
+4. make sure the controller also a TSubclassOf UW_FactionWorldGenerationSettings that will be a new widget you need to create that has bind widgets for
+a button called M_Back
+a button called M_Generate
+a checkmark M_ShowAdvancedSettings by default false.
+a horizontal box M_ExtraDifficultyBox 
+a checkmark M_ExtaDifficulty
+a horizontal box M_PersonalityBox
+a ComboBoxString M_PersonalityComboBox 
+a M_DifficultyText rich text block.
+a M_SeedSlider going from zero to max int32.
+
+make sure this Personality comb box will display the values of EEnemyWorldPersonality and by default will be disabled/grayed out to
+be stuck at EEnemyWorldPersonality::Balanced (functionality to unlock this comes later)
+make sure that when the  M_ShowAdvancedSettings is checked that then
+the M_ExtraDifficultyBox and M_PersonalityBox are set to visible otherwise hidden (idem for their children)
+
+if the player clicks the back button make sure to notify the controller and then the controller will remove this widget from the viewport and re add the UW_FactionDifficultyPicker to the viewport.
+then after picking a new difficulty we will come back to this world generation settings widget.
+
+make sure that the difficulty elected is show with armor rich text tags using FRTSRichTextConverter. the text needs to be:
+Difficulty: [difficulty picked]
+
+once the player hits generate build  the FCampaignGenerationSettings struct (already existing in GameInstCampaignGenerationSettings.h)
+with the picked seed and if picked the extra difficulty bool and the personality enum ( if not picked it will be Balanced by default)
+and provide this back to the controller.
+the controller will then store these settings in the URTSGameInstance.
+it will then also store the picked faction in URTSGameInstance as well as the picked difficulty struct.
+finally it will load the M_CampaignWorld.
+
+
+
+

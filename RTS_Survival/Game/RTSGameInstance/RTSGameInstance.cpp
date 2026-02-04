@@ -23,6 +23,16 @@ void URTSGameInstance::Init()
 	InitializeAudioSettings();
 }
 
+void URTSGameInstance::SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings)
+{
+	M_CampaignGenerationSettings = Settings;
+}
+
+FCampaignGenerationSettings URTSGameInstance::GetCampaignGenerationSettings() const
+{
+	return M_CampaignGenerationSettings;
+}
+
 void URTSGameInstance::Shutdown()
 {
     if (MusicManager)
