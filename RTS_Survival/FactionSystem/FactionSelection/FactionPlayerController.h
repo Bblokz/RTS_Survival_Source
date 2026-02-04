@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
+#include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "FactionPlayerController.generated.h"
 
@@ -13,8 +15,12 @@ class ICommands;
 class UAudioComponent;
 class USoundBase;
 class UUserWidget;
+class UWorld;
+class UW_FactionDifficultyPicker;
 class UW_FactionPopup;
 class UW_FactionSelectionMenu;
+class UW_FactionWorldGenerationSettings;
+enum class ERTSFaction : uint8;
 
 USTRUCT(BlueprintType)
 struct FUnitPreviewActions
@@ -32,7 +38,14 @@ struct FUnitPreviewActions
 };
 
 /**
- * @brief Player controller that drives the faction selection menu and preview spawning for that map.
+ * @brief Player controller that drives the faction setup flow and preview spawning on the selection map.
+ *
+ * @details Widget flow handled by this controller:
+ * - Start: show the faction selection menu and preview units while the player browses.
+ * - Launch Campaign: store the selected faction, remove the menu, and show the faction difficulty picker.
+ * - Difficulty Selected: store the chosen difficulty and its percentage, remove the picker, and show world generation settings.
+ * - World Generation Settings: when confirmed, store campaign settings, difficulty, and faction in the game instance,
+ *   then load the campaign world. Back returns to the difficulty picker and repeats the flow.
  */
 UCLASS()
 class RTS_SURVIVAL_API AFactionPlayerController : public APlayerController
@@ -47,6 +60,10 @@ public:
 	void SpawnPreviewForTrainingOption(const FTrainingOption& TrainingOption);
 	void PlayAnnouncementSound(USoundBase* AnnouncementSound);
 	void StopAnnouncementSound();
+	void HandleLaunchCampaignRequested(const ERTSFaction SelectedFaction);
+	void HandleFactionDifficultyChosen(const int32 DifficultyPercentage, const ERTSGameDifficulty SelectedDifficulty);
+	void HandleWorldGenerationBackRequested();
+	void HandleWorldGenerationSettingsGenerated(const FCampaignGenerationSettings& Settings);
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
@@ -54,6 +71,15 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionSelectionMenu> M_FactionSelectionMenuClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
+	TSubclassOf<UW_FactionDifficultyPicker> M_FactionDifficultyPickerClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
+	TSubclassOf<UW_FactionWorldGenerationSettings> M_FactionWorldGenerationSettingsClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
+	TSoftObjectPtr<UWorld> M_CampaignWorld;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	FRotator M_PreviewSpawnRotation;
@@ -72,6 +98,12 @@ private:
 	TWeakObjectPtr<UW_FactionSelectionMenu> M_FactionSelectionMenu;
 
 	UPROPERTY()
+	TWeakObjectPtr<UW_FactionDifficultyPicker> M_FactionDifficultyPicker;
+
+	UPROPERTY()
+	TWeakObjectPtr<UW_FactionWorldGenerationSettings> M_FactionWorldGenerationSettings;
+
+	UPROPERTY()
 	TWeakObjectPtr<AFactionUnitPreview> M_FactionUnitPreview;
 
 	UPROPERTY()
@@ -85,6 +117,9 @@ private:
 
 	FTimerHandle M_PreviewAttackTimerHandle;
 
+	ERTSFaction M_SelectedFaction = ERTSFaction::NotInitialised;
+	FRTSGameDifficulty M_SelectedGameDifficulty;
+
 	UFUNCTION()
 	void HandleFactionPopupAccepted();
 
@@ -93,6 +128,8 @@ private:
 
 	void InitFactionPopup();
 	void InitFactionSelectionMenu();
+	void InitFactionDifficultyPicker();
+	void InitFactionWorldGenerationSettings();
 	void InitPreviewReferences();
 	void InitInputModeForWidget(UUserWidget* WidgetToFocus);
 	/**
@@ -112,6 +149,10 @@ private:
 	bool GetIsValidFactionPopup() const;
 	bool GetIsValidFactionSelectionMenuClass() const;
 	bool GetIsValidFactionSelectionMenu() const;
+	bool GetIsValidFactionDifficultyPickerClass() const;
+	bool GetIsValidFactionDifficultyPicker() const;
+	bool GetIsValidFactionWorldGenerationSettingsClass() const;
+	bool GetIsValidFactionWorldGenerationSettings() const;
 	bool GetIsValidFactionUnitPreview() const;
 	bool GetIsValidRTSAsyncSpawner() const;
 };
