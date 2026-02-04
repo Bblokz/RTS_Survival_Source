@@ -7,6 +7,7 @@
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
 #include "WorldPlayerController.generated.h"
 
+class AGeneratorWorldCampaign;
 class UWorldCameraController;
 
 /**
@@ -23,13 +24,6 @@ UCLASS()
 class RTS_SURVIVAL_API AWorldPlayerController : public APlayerController
 {
 	GENERATED_BODY()
-
-protected:
-	virtual void PostInitializeComponents() override;
-	virtual void BeginPlay() override;
-
-	
-
 public:
 	UFUNCTION(BlueprintCallable)
 	void SetIsWorldCameraMovementDisabled(bool bIsDisabled);
@@ -56,9 +50,24 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void WorldCamera_MoveTo(const FMovePlayerCamera& MoveRequest);
 
+protected:
+	virtual void PostInitializeComponents() override;
+	virtual void BeginPlay() override;
+
+	
+
+
+
 private:
 	bool GetIsValidWorldCameraController() const;
 
+	void Beginplay_HandleWorldGeneration();
+
 	UPROPERTY()
 	TWeakObjectPtr<UWorldCameraController> M_WorldCameraController;
+
+	UPROPERTY()
+	TWeakObjectPtr<AGeneratorWorldCampaign> M_WorldGenerator;
+	bool GetIsValidWorldGenerator() const;
+	FWorldgene
 };

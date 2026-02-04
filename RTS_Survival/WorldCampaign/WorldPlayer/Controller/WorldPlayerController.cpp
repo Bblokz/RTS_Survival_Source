@@ -3,7 +3,9 @@
 
 #include "WorldPlayerController.h"
 
+#include "EngineUtils.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
 
 void AWorldPlayerController::PostInitializeComponents()
@@ -15,7 +17,7 @@ void AWorldPlayerController::PostInitializeComponents()
 void AWorldPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
+	Beginplay_HandleWorldGeneration();
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)
@@ -102,4 +104,45 @@ bool AWorldPlayerController::GetIsValidWorldCameraController() const
 		this
 	);
 	return false;
+}
+
+void AWorldPlayerController::Beginplay_HandleWorldGeneration()
+{
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+	AGeneratorWorldCampaign* WorldGenerator = nullptr;
+	// Find the first instance of AGeneratorWorldCampaign in the world
+	for (TActorIterator<AGeneratorWorldCampaign> It(World); It; ++It)
+	{
+		WorldGenerator = *It;
+		if (WorldGenerator)
+		{
+			break;
+		}
+	}
+	if(not IsValid(WorldGenerator))
+	{
+		RTSFunctionLibrary::ReportError("did not find a valid world generator."
+								  "for the Beginplay_HandleWorldGeneration in WorldPlayerController");
+		return;
+	}
+	M_WorldGenerator = WorldGenerator;
+}
+
+bool AWorldPlayerController::GetIsValidWorldGenerator() const
+{
+	if(not M_WorldGenerator.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			TEXT("M_WorldGenerator"),
+			TEXT("GetIsValidWorldGenerator"),
+			this
+		);
+		return false;
+	}
+	return true;
 }
