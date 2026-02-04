@@ -12,6 +12,8 @@ class ARTSAsyncSpawner;
 class ICommands;
 class UAudioComponent;
 class USoundBase;
+class UUserWidget;
+class UW_FactionPopup;
 class UW_FactionSelectionMenu;
 
 USTRUCT(BlueprintType)
@@ -48,6 +50,9 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
+	TSubclassOf<UW_FactionPopup> M_FactionPopupClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionSelectionMenu> M_FactionSelectionMenuClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
@@ -59,6 +64,9 @@ protected:
 private:
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> M_AnnouncementAudioComponent = nullptr;
+
+	UPROPERTY()
+	TWeakObjectPtr<UW_FactionPopup> M_FactionPopup;
 
 	UPROPERTY()
 	TWeakObjectPtr<UW_FactionSelectionMenu> M_FactionSelectionMenu;
@@ -78,11 +86,15 @@ private:
 	FTimerHandle M_PreviewAttackTimerHandle;
 
 	UFUNCTION()
+	void HandleFactionPopupAccepted();
+
+	UFUNCTION()
 	void HandleAnnouncementFinished();
 
+	void InitFactionPopup();
 	void InitFactionSelectionMenu();
 	void InitPreviewReferences();
-	void InitInputMode();
+	void InitInputModeForWidget(UUserWidget* WidgetToFocus);
 	/**
 	 * @brief Captures the async spawn completion to update preview state and start idle actions.
 	 * @param TrainingOption The option that was requested for preview spawning.
@@ -96,6 +108,8 @@ private:
 	void ClearCurrentPreview();
 
 	bool GetIsValidAnnouncementAudioComponent() const;
+	bool GetIsValidFactionPopupClass() const;
+	bool GetIsValidFactionPopup() const;
 	bool GetIsValidFactionSelectionMenuClass() const;
 	bool GetIsValidFactionSelectionMenu() const;
 	bool GetIsValidFactionUnitPreview() const;

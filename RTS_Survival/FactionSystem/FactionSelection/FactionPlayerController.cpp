@@ -2,9 +2,11 @@
 
 #include "FactionPlayerController.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Components/AudioComponent.h"
 #include "FactionUnitPreview.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/W_FactionPopup.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionSelectionMenu.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -20,9 +22,8 @@ void AFactionPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	InitFactionSelectionMenu();
+	InitFactionPopup();
 	InitPreviewReferences();
-	InitInputMode();
 
 	if (GetIsValidAnnouncementAudioComponent())
 	{
@@ -119,6 +120,47 @@ void AFactionPlayerController::HandleAnnouncementFinished()
 	M_FactionSelectionMenu->HandleAnnouncementFinished();
 }
 
+void AFactionPlayerController::HandleFactionPopupAccepted()
+{
+	if (not GetIsValidFactionPopup())
+	{
+		return;
+	}
+
+	M_FactionPopup->RemoveFromParent();
+	M_FactionPopup.Reset();
+
+	InitFactionSelectionMenu();
+	InitInputModeForWidget(M_FactionSelectionMenu.Get());
+}
+
+void AFactionPlayerController::InitFactionPopup()
+{
+	if (not GetIsValidFactionPopupClass())
+	{
+		InitFactionSelectionMenu();
+		InitInputModeForWidget(M_FactionSelectionMenu.Get());
+		return;
+	}
+
+	UW_FactionPopup* FactionPopup = CreateWidget<UW_FactionPopup>(this, M_FactionPopupClass);
+	if (not IsValid(FactionPopup))
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::InitFactionPopup - Failed to create faction popup widget."
+		);
+		InitFactionSelectionMenu();
+		InitInputModeForWidget(M_FactionSelectionMenu.Get());
+		return;
+	}
+
+	FactionPopup->AddToViewport();
+	FactionPopup->OnPopupAccepted.AddUniqueDynamic(this, &AFactionPlayerController::HandleFactionPopupAccepted);
+	M_FactionPopup = FactionPopup;
+
+	InitInputModeForWidget(FactionPopup);
+}
+
 void AFactionPlayerController::InitFactionSelectionMenu()
 {
 	if (not GetIsValidFactionSelectionMenuClass())
@@ -176,15 +218,15 @@ void AFactionPlayerController::InitPreviewReferences()
 	}
 }
 
-void AFactionPlayerController::InitInputMode()
+void AFactionPlayerController::InitInputModeForWidget(UUserWidget* WidgetToFocus)
 {
-	if (not GetIsValidFactionSelectionMenu())
+	if (not IsValid(WidgetToFocus))
 	{
 		return;
 	}
 
 	FInputModeUIOnly InputMode;
-	InputMode.SetWidgetToFocus(M_FactionSelectionMenu->TakeWidget());
+	InputMode.SetWidgetToFocus(WidgetToFocus->TakeWidget());
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(InputMode);
 
@@ -331,6 +373,38 @@ bool AFactionPlayerController::GetIsValidAnnouncementAudioComponent() const
 			this,
 			"M_AnnouncementAudioComponent",
 			"GetIsValidAnnouncementAudioComponent",
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool AFactionPlayerController::GetIsValidFactionPopupClass() const
+{
+	if (M_FactionPopupClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_FactionPopupClass",
+			"GetIsValidFactionPopupClass",
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool AFactionPlayerController::GetIsValidFactionPopup() const
+{
+	if (not M_FactionPopup.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_FactionPopup",
+			"GetIsValidFactionPopup",
 			this
 		);
 		return false;
