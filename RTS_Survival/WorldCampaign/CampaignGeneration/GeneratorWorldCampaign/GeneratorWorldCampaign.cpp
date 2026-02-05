@@ -3468,6 +3468,40 @@ namespace
 		return true;
 	}
 
+	bool GetPassesSameKindSpacing(const FFailSafeItem& Item, const FEmptyAnchorDistance& Candidate,
+	                              const float MinimumSpacingSquared,
+	                              const TMap<EFailSafeItemKind, TArray<FVector2D>>& PlacedByKind)
+	{
+		if (MinimumSpacingSquared <= 0.0f)
+		{
+			return true;
+		}
+
+		const TArray<FVector2D>* ExistingPlacements = PlacedByKind.Find(Item.Kind);
+		if (not ExistingPlacements)
+		{
+			return true;
+		}
+
+		const FVector2D CandidateLocationXY(Candidate.Location.X, Candidate.Location.Y);
+		for (const FVector2D& ExistingLocationXY : *ExistingPlacements)
+		{
+			if (FVector2D::DistSquared(CandidateLocationXY, ExistingLocationXY) < MinimumSpacingSquared)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	void AddPlacedAnchorByKind(const FFailSafeItem& Item, const FEmptyAnchorDistance& AnchorEntry,
+	                           TMap<EFailSafeItemKind, TArray<FVector2D>>& InOutPlacedByKind)
+	{
+		const FVector2D PlacedLocationXY(AnchorEntry.Location.X, AnchorEntry.Location.Y);
+		InOutPlacedByKind.FindOrAdd(Item.Kind).Add(PlacedLocationXY);
+	}
+
 	void AssignFailSafeItemsByDistance(const TArray<FFailSafeItem>& ItemsToPlace, const bool bUseDistanceFilter,
 	                                   const ECampaignGenerationStep FailedStep,
 	                                   TArray<FEmptyAnchorDistance>& InOutEmptyAnchors,
@@ -3475,6 +3509,8 @@ namespace
 	                                   FWorldCampaignDerivedData& InOutDerivedData,
 	                                   FCampaignGenerationStepTransaction& InOutTransaction,
 	                                   FFailSafePlacementTotals& InOutTotals,
+	                                   TMap<EFailSafeItemKind, TArray<FVector2D>>& InOutPlacedByKind,
+	                                   const float MinSameKindXYSpacing,
 	                                   TArray<FFailSafeItem>& OutRemainingItems)
 	{
 		OutRemainingItems.Reset();
@@ -3484,6 +3520,7 @@ namespace
 			return;
 		}
 
+		const float MinSameKindSpacingSquared = MinSameKindXYSpacing * MinSameKindXYSpacing;
 		for (const FFailSafeItem& Item : ItemsToPlace)
 		{
 			bool bPlaced = false;
@@ -3496,12 +3533,18 @@ namespace
 					continue;
 				}
 
+				if (not GetPassesSameKindSpacing(Item, Candidate, MinSameKindSpacingSquared, InOutPlacedByKind))
+				{
+					continue;
+				}
+
 				if (not TryPlaceFailSafeItem(Item, Candidate, FailedStep, InOutPlacementState, InOutDerivedData,
 				                             InOutTransaction, InOutTotals))
 				{
 					continue;
 				}
 
+				AddPlacedAnchorByKind(Item, Candidate, InOutPlacedByKind);
 				InOutEmptyAnchors.RemoveAt(AnchorIndex);
 				bPlaced = true;
 				break;
@@ -3521,7 +3564,8 @@ namespace
 	                                 FWorldCampaignPlacementState& InOutPlacementState,
 	                                 FWorldCampaignDerivedData& InOutDerivedData,
 	                                 FCampaignGenerationStepTransaction& InOutTransaction,
-	                                 FFailSafePlacementTotals& InOutTotals)
+	                                 FFailSafePlacementTotals& InOutTotals,
+	                                 TMap<EFailSafeItemKind, TArray<FVector2D>>& InOutPlacedByKind)
 	{
 		if (RemainingItems.Num() == 0)
 		{
@@ -3544,6 +3588,8 @@ namespace
 		FRandomStream RandomStream(SeedUsed + SeedOffset + static_cast<int32>(FailedStep));
 		CampaignGenerationHelper::DeterministicShuffle(ShuffledAnchors, RandomStream);
 
+		const float MinSameKindSpacingSquared =
+			FailurePolicy.TimeoutFailSafeMinSameKindXYSpacing * FailurePolicy.TimeoutFailSafeMinSameKindXYSpacing;
 		int32 AnchorIndex = 0;
 		for (const FFailSafeItem& Item : RemainingItems)
 		{
@@ -3551,9 +3597,16 @@ namespace
 			while (AnchorIndex < ShuffledAnchors.Num())
 			{
 				const FEmptyAnchorDistance& Candidate = ShuffledAnchors[AnchorIndex];
+				if (not GetPassesSameKindSpacing(Item, Candidate, MinSameKindSpacingSquared, InOutPlacedByKind))
+				{
+					AnchorIndex++;
+					continue;
+				}
+
 				if (TryPlaceFailSafeItem(Item, Candidate, FailedStep, InOutPlacementState, InOutDerivedData,
 				                         InOutTransaction, InOutTotals))
 				{
+					AddPlacedAnchorByKind(Item, Candidate, InOutPlacedByKind);
 					AnchorIndex++;
 					bPlaced = true;
 					break;
@@ -5628,10 +5681,13 @@ bool AGeneratorWorldCampaign::TryApplyTimeoutFailSafePlacement(const ECampaignGe
 
 	FFailSafePlacementTotals Totals;
 	TArray<FFailSafeItem> RemainingItems;
+	TMap<EFailSafeItemKind, TArray<FVector2D>> PlacedByKind;
 	AssignFailSafeItemsByDistance(ItemsToPlace, bHasValidPlayerHQAnchor, FailedStep, EmptyAnchors, M_PlacementState,
-	                              M_DerivedData, FailSafeTransaction, Totals, RemainingItems);
+	                              M_DerivedData, FailSafeTransaction, Totals, PlacedByKind,
+	                              M_PlacementFailurePolicy.TimeoutFailSafeMinSameKindXYSpacing, RemainingItems);
 	AssignFailSafeItemsFallback(RemainingItems, FailedStep, M_PlacementFailurePolicy, M_PlacementState.SeedUsed,
-	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals);
+	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals,
+	                            PlacedByKind);
 
 	if (FailSafeTransaction.SpawnedActors.Num() > 0)
 	{
