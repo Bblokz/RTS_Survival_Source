@@ -107,7 +107,7 @@ namespace
 	{
 		FGuid AnchorKey;
 		EMapEnemyItem EnemyType = EMapEnemyItem::None;
-		int32 MinSameTypeHopDistance = INDEX_NONE;
+		int32 LocalDensity = 0;
 	};
 
 	struct FEnemyDeclusterSwapCandidate
@@ -129,6 +129,8 @@ namespace
 
 	constexpr float SegmentIntersectionTolerance = 0.01f;
 	constexpr int32 NoRequiredItems = 0;
+	constexpr float FailSafeEnemyDeclusterRadius = 6000.f;
+	constexpr float FailSafeEnemyDeclusterRadiusSquared = FailSafeEnemyDeclusterRadius * FailSafeEnemyDeclusterRadius;
 
 	uint64 Mix64(uint64 Value)
 	{
@@ -3679,62 +3681,160 @@ namespace
 		return TotalRequired;
 	}
 
-	int32 GetMinSameTypeHopDistanceForEnemyAnchor(const FGuid& AnchorKey, const EMapEnemyItem EnemyType,
-	                                              const FWorldCampaignPlacementState& PlacementState,
-	                                              const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
-	                                              const FGuid& IgnoreAnchorKeyA = FGuid(),
-	                                              const FGuid& IgnoreAnchorKeyB = FGuid())
+	bool GetIsSwappableEnemyType(const EMapEnemyItem EnemyType)
 	{
-		AAnchorPoint* TargetAnchor = FindAnchorByKey(AnchorLookup, AnchorKey);
-		if (not IsValid(TargetAnchor))
+		return EnemyType != EMapEnemyItem::EnemyHQ
+			&& EnemyType != EMapEnemyItem::EnemyWall
+			&& EnemyType != EMapEnemyItem::None;
+	}
+
+	bool TryGetAnchorLocationXY(const FGuid& AnchorKey,
+	                           const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                           FVector2D& OutLocationXY)
+	{
+		AAnchorPoint* AnchorPoint = FindAnchorByKey(AnchorLookup, AnchorKey);
+		if (not IsValid(AnchorPoint))
 		{
-			return INDEX_NONE;
+			return false;
 		}
 
-		int32 MinHopDistance = INDEX_NONE;
-		TArray<FGuid> SortedEnemyAnchorKeys;
-		SortedEnemyAnchorKeys.Reserve(PlacementState.EnemyItemsByAnchorKey.Num());
+		OutLocationXY = FVector2D(AnchorPoint->GetActorLocation());
+		return true;
+	}
+
+	void BuildSortedSwappableEnemyAnchors(const FWorldCampaignPlacementState& PlacementState,
+	                                     TArray<TPair<FGuid, EMapEnemyItem>>& OutSwappableAnchors)
+	{
+		OutSwappableAnchors.Reset();
+		OutSwappableAnchors.Reserve(PlacementState.EnemyItemsByAnchorKey.Num());
 		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : PlacementState.EnemyItemsByAnchorKey)
 		{
-			SortedEnemyAnchorKeys.Add(EnemyPair.Key);
+			if (not GetIsSwappableEnemyType(EnemyPair.Value))
+			{
+				continue;
+			}
+
+			OutSwappableAnchors.Add(EnemyPair);
 		}
 
-		Algo::Sort(SortedEnemyAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		OutSwappableAnchors.Sort([](const TPair<FGuid, EMapEnemyItem>& Left, const TPair<FGuid, EMapEnemyItem>& Right)
 		{
-			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+			return AAnchorPoint::IsAnchorKeyLess(Left.Key, Right.Key);
 		});
+	}
 
-		for (const FGuid& OtherAnchorKey : SortedEnemyAnchorKeys)
+	int32 ComputeEnemyLocalDensity(const FGuid& TargetAnchorKey,
+	                              const EMapEnemyItem TargetEnemyType,
+	                              const FVector2D& TargetLocationXY,
+	                              const TMap<FGuid, EMapEnemyItem>& EnemyTypesByAnchorKey,
+	                              const TMap<FGuid, FVector2D>& AnchorLocationsByKey)
+	{
+		int32 LocalDensity = 0;
+		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : EnemyTypesByAnchorKey)
 		{
-			if (OtherAnchorKey == AnchorKey || OtherAnchorKey == IgnoreAnchorKeyA || OtherAnchorKey == IgnoreAnchorKeyB)
+			if (EnemyPair.Key == TargetAnchorKey || EnemyPair.Value != TargetEnemyType)
 			{
 				continue;
 			}
 
-			if (PlacementState.EnemyItemsByAnchorKey.FindRef(OtherAnchorKey) != EnemyType)
+			const FVector2D* OtherLocationXY = AnchorLocationsByKey.Find(EnemyPair.Key);
+			if (OtherLocationXY == nullptr)
 			{
 				continue;
 			}
 
-			AAnchorPoint* OtherAnchor = FindAnchorByKey(AnchorLookup, OtherAnchorKey);
-			if (not IsValid(OtherAnchor))
+			if (FVector2D::DistSquared(TargetLocationXY, *OtherLocationXY) <= FailSafeEnemyDeclusterRadiusSquared)
 			{
-				continue;
-			}
-
-			const int32 HopDistance = CampaignGenerationHelper::HopsFromHQ(TargetAnchor, OtherAnchor);
-			if (HopDistance == INDEX_NONE)
-			{
-				continue;
-			}
-
-			if (MinHopDistance == INDEX_NONE || HopDistance < MinHopDistance)
-			{
-				MinHopDistance = HopDistance;
+				LocalDensity++;
 			}
 		}
 
-		return MinHopDistance;
+		return LocalDensity;
+	}
+
+	FString BuildCanonicalFailedEnemyDeclusterSwapPairKey(const FGuid& AnchorKeyA, const FGuid& AnchorKeyB)
+	{
+		FGuid CanonicalAnchorKeyA = AnchorKeyA;
+		FGuid CanonicalAnchorKeyB = AnchorKeyB;
+		if (AAnchorPoint::IsAnchorKeyLess(CanonicalAnchorKeyB, CanonicalAnchorKeyA))
+		{
+			Swap(CanonicalAnchorKeyA, CanonicalAnchorKeyB);
+		}
+
+		return CanonicalAnchorKeyA.ToString(EGuidFormats::DigitsWithHyphens)
+			+ TEXT("|")
+			+ CanonicalAnchorKeyB.ToString(EGuidFormats::DigitsWithHyphens);
+	}
+
+	void BuildImpactedEnemyDeclusterAnchorKeys(const FGuid& AnchorKeyA,
+	                                          const FGuid& AnchorKeyB,
+	                                          const TArray<TPair<FGuid, EMapEnemyItem>>& SortedSwappableAnchors,
+	                                          const TMap<FGuid, FVector2D>& AnchorLocationsByKey,
+	                                          TArray<FGuid>& OutImpactedAnchorKeys)
+	{
+		OutImpactedAnchorKeys.Reset();
+		const FVector2D* AnchorLocationA = AnchorLocationsByKey.Find(AnchorKeyA);
+		const FVector2D* AnchorLocationB = AnchorLocationsByKey.Find(AnchorKeyB);
+		if (AnchorLocationA == nullptr || AnchorLocationB == nullptr)
+		{
+			return;
+		}
+
+		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : SortedSwappableAnchors)
+		{
+			const FVector2D* CandidateLocation = AnchorLocationsByKey.Find(EnemyPair.Key);
+			if (CandidateLocation == nullptr)
+			{
+				continue;
+			}
+
+			if (FVector2D::DistSquared(*CandidateLocation, *AnchorLocationA) <= FailSafeEnemyDeclusterRadiusSquared
+				|| FVector2D::DistSquared(*CandidateLocation, *AnchorLocationB) <= FailSafeEnemyDeclusterRadiusSquared)
+			{
+				OutImpactedAnchorKeys.Add(EnemyPair.Key);
+			}
+		}
+	}
+
+
+	void AddSpawnedActorToFailSafeTransactionIfValid(AWorldMapObject* SpawnedActor,
+	                                                 FCampaignGenerationStepTransaction& InOutFailSafeTransaction)
+	{
+		if (not IsValid(SpawnedActor))
+		{
+			return;
+		}
+
+		InOutFailSafeTransaction.SpawnedActors.Add(SpawnedActor);
+	}
+	int32 ComputeImpactedEnemyDeclusterDensitySum(const TArray<FGuid>& ImpactedAnchorKeys,
+	                                             const TMap<FGuid, EMapEnemyItem>& EnemyTypesByAnchorKey,
+	                                             const TMap<FGuid, FVector2D>& AnchorLocationsByKey)
+	{
+		int32 DensitySum = 0;
+		for (const FGuid& ImpactedAnchorKey : ImpactedAnchorKeys)
+		{
+			const EMapEnemyItem* EnemyType = EnemyTypesByAnchorKey.Find(ImpactedAnchorKey);
+			if (EnemyType == nullptr || not GetIsSwappableEnemyType(*EnemyType))
+			{
+				continue;
+			}
+
+			const FVector2D* AnchorLocationXY = AnchorLocationsByKey.Find(ImpactedAnchorKey);
+			if (AnchorLocationXY == nullptr)
+			{
+				continue;
+			}
+
+			DensitySum += ComputeEnemyLocalDensity(
+				ImpactedAnchorKey,
+				*EnemyType,
+				*AnchorLocationXY,
+				EnemyTypesByAnchorKey,
+				AnchorLocationsByKey);
+		}
+
+		return DensitySum;
 	}
 
 	bool GetPassesEnemyTypeHQDistance(const AAnchorPoint* PlayerHQAnchor, const AAnchorPoint* CandidateAnchor,
@@ -3766,12 +3866,38 @@ namespace
 	{
 		FEnemyDeclusterSwapCandidate BestCandidate;
 
-		TArray<FEnemyDeclusterAnchorScore> AnchorScores;
-		AnchorScores.Reserve(PlacementState.EnemyItemsByAnchorKey.Num());
-		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : PlacementState.EnemyItemsByAnchorKey)
+		TArray<TPair<FGuid, EMapEnemyItem>> SortedSwappableAnchors;
+		BuildSortedSwappableEnemyAnchors(PlacementState, SortedSwappableAnchors);
+		if (SortedSwappableAnchors.Num() < 2)
 		{
-			if (EnemyPair.Value == EMapEnemyItem::EnemyHQ || EnemyPair.Value == EMapEnemyItem::EnemyWall
-				|| EnemyPair.Value == EMapEnemyItem::None)
+			return BestCandidate;
+		}
+
+		TMap<FGuid, FVector2D> AnchorLocationsByKey;
+		AnchorLocationsByKey.Reserve(SortedSwappableAnchors.Num());
+
+		TArray<FEnemyDeclusterAnchorScore> AnchorScores;
+		AnchorScores.Reserve(SortedSwappableAnchors.Num());
+		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : SortedSwappableAnchors)
+		{
+			FVector2D AnchorLocationXY = FVector2D::ZeroVector;
+			if (not TryGetAnchorLocationXY(EnemyPair.Key, AnchorLookup, AnchorLocationXY))
+			{
+				continue;
+			}
+
+			AnchorLocationsByKey.Add(EnemyPair.Key, AnchorLocationXY);
+		}
+
+		if (AnchorLocationsByKey.Num() < 2)
+		{
+			return BestCandidate;
+		}
+
+		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : SortedSwappableAnchors)
+		{
+			const FVector2D* AnchorLocationXY = AnchorLocationsByKey.Find(EnemyPair.Key);
+			if (AnchorLocationXY == nullptr)
 			{
 				continue;
 			}
@@ -3779,11 +3905,12 @@ namespace
 			FEnemyDeclusterAnchorScore Score;
 			Score.AnchorKey = EnemyPair.Key;
 			Score.EnemyType = EnemyPair.Value;
-			Score.MinSameTypeHopDistance = GetMinSameTypeHopDistanceForEnemyAnchor(
+			Score.LocalDensity = ComputeEnemyLocalDensity(
 				EnemyPair.Key,
 				EnemyPair.Value,
-				PlacementState,
-				AnchorLookup);
+				*AnchorLocationXY,
+				PlacementState.EnemyItemsByAnchorKey,
+				AnchorLocationsByKey);
 			AnchorScores.Add(Score);
 		}
 
@@ -3794,40 +3921,42 @@ namespace
 
 		AnchorScores.Sort([](const FEnemyDeclusterAnchorScore& Left, const FEnemyDeclusterAnchorScore& Right)
 		{
-			const int32 LeftSortValue = Left.MinSameTypeHopDistance == INDEX_NONE
-				                            ? TNumericLimits<int32>::Max()
-				                            : Left.MinSameTypeHopDistance;
-			const int32 RightSortValue = Right.MinSameTypeHopDistance == INDEX_NONE
-				                             ? TNumericLimits<int32>::Max()
-				                             : Right.MinSameTypeHopDistance;
-			if (LeftSortValue != RightSortValue)
+			if (Left.LocalDensity != Right.LocalDensity)
 			{
-				return LeftSortValue < RightSortValue;
+				return Left.LocalDensity > Right.LocalDensity;
 			}
 
 			return AAnchorPoint::IsAnchorKeyLess(Left.AnchorKey, Right.AnchorKey);
 		});
 
-		const int32 MaxCandidatesToEvaluate = FMath::Clamp(TopMCandidates, 2, AnchorScores.Num());
-		for (int32 IndexA = 0; IndexA < MaxCandidatesToEvaluate - 1; ++IndexA)
+		const int32 MaxBadAnchorsToEvaluate = FMath::Clamp(TopMCandidates, 1, AnchorScores.Num());
+		for (int32 IndexA = 0; IndexA < MaxBadAnchorsToEvaluate; ++IndexA)
 		{
-			for (int32 IndexB = IndexA + 1; IndexB < MaxCandidatesToEvaluate; ++IndexB)
+			const FEnemyDeclusterAnchorScore& AnchorA = AnchorScores[IndexA];
+			for (const TPair<FGuid, EMapEnemyItem>& EnemyPairB : SortedSwappableAnchors)
 			{
-				const FEnemyDeclusterAnchorScore& AnchorA = AnchorScores[IndexA];
-				const FEnemyDeclusterAnchorScore& AnchorB = AnchorScores[IndexB];
-				if (AnchorA.EnemyType == AnchorB.EnemyType)
+				if (EnemyPairB.Key == AnchorA.AnchorKey || EnemyPairB.Value == AnchorA.EnemyType)
 				{
 					continue;
 				}
 
+				const FString FailedSwapPairKey = BuildCanonicalFailedEnemyDeclusterSwapPairKey(
+					AnchorA.AnchorKey,
+					EnemyPairB.Key);
+				if (FailedSwapPairKeys.Contains(FailedSwapPairKey))
+				{
+					continue;
+				}
+
+
 				AAnchorPoint* AnchorPointA = FindAnchorByKey(AnchorLookup, AnchorA.AnchorKey);
-				AAnchorPoint* AnchorPointB = FindAnchorByKey(AnchorLookup, AnchorB.AnchorKey);
+				AAnchorPoint* AnchorPointB = FindAnchorByKey(AnchorLookup, EnemyPairB.Key);
 				if (not IsValid(AnchorPointA) || not IsValid(AnchorPointB))
 				{
 					continue;
 				}
 
-				const float MinDistanceForTypeAtA = GetFailSafeMinDistanceForEnemy(AnchorB.EnemyType);
+				const float MinDistanceForTypeAtA = GetFailSafeMinDistanceForEnemy(EnemyPairB.Value);
 				const float MinDistanceForTypeAtB = GetFailSafeMinDistanceForEnemy(AnchorA.EnemyType);
 				if (not GetPassesEnemyTypeHQDistance(PlayerHQAnchor, AnchorPointA, MinDistanceForTypeAtA)
 					|| not GetPassesEnemyTypeHQDistance(PlayerHQAnchor, AnchorPointB, MinDistanceForTypeAtB))
@@ -3835,55 +3964,58 @@ namespace
 					continue;
 				}
 
-				const FString FailedSwapPairKey = AnchorA.AnchorKey.ToString(EGuidFormats::DigitsWithHyphens) + TEXT("|")
-					+ AnchorB.AnchorKey.ToString(EGuidFormats::DigitsWithHyphens);
-				if (FailedSwapPairKeys.Contains(FailedSwapPairKey))
+				TArray<FGuid> ImpactedAnchorKeys;
+				BuildImpactedEnemyDeclusterAnchorKeys(
+					AnchorA.AnchorKey,
+					EnemyPairB.Key,
+					SortedSwappableAnchors,
+					AnchorLocationsByKey,
+					ImpactedAnchorKeys);
+				if (ImpactedAnchorKeys.Num() == 0)
 				{
 					continue;
 				}
 
-				const int32 OldScoreA = AnchorA.MinSameTypeHopDistance == INDEX_NONE
-					                    ? TNumericLimits<int32>::Max()
-					                    : AnchorA.MinSameTypeHopDistance;
-				const int32 OldScoreB = AnchorB.MinSameTypeHopDistance == INDEX_NONE
-					                    ? TNumericLimits<int32>::Max()
-					                    : AnchorB.MinSameTypeHopDistance;
-				const int32 NewScoreA = GetMinSameTypeHopDistanceForEnemyAnchor(
-					AnchorA.AnchorKey,
-					AnchorB.EnemyType,
-					PlacementState,
-					AnchorLookup,
-					AnchorA.AnchorKey,
-					AnchorB.AnchorKey);
-				const int32 NewScoreB = GetMinSameTypeHopDistanceForEnemyAnchor(
-					AnchorB.AnchorKey,
-					AnchorA.EnemyType,
-					PlacementState,
-					AnchorLookup,
-					AnchorA.AnchorKey,
-					AnchorB.AnchorKey);
+				const int32 BeforeSum = ComputeImpactedEnemyDeclusterDensitySum(
+					ImpactedAnchorKeys,
+					PlacementState.EnemyItemsByAnchorKey,
+					AnchorLocationsByKey);
 
-				const int32 EffectiveNewScoreA = NewScoreA == INDEX_NONE ? TNumericLimits<int32>::Max() : NewScoreA;
-				const int32 EffectiveNewScoreB = NewScoreB == INDEX_NONE ? TNumericLimits<int32>::Max() : NewScoreB;
-				const int32 Improvement = (EffectiveNewScoreA + EffectiveNewScoreB) - (OldScoreA + OldScoreB);
+				TMap<FGuid, EMapEnemyItem> EnemyTypesAfterSwap = PlacementState.EnemyItemsByAnchorKey;
+				EnemyTypesAfterSwap.Add(AnchorA.AnchorKey, EnemyPairB.Value);
+				EnemyTypesAfterSwap.Add(EnemyPairB.Key, AnchorA.EnemyType);
+				const int32 AfterSum = ComputeImpactedEnemyDeclusterDensitySum(
+					ImpactedAnchorKeys,
+					EnemyTypesAfterSwap,
+					AnchorLocationsByKey);
+
+				const int32 Improvement = BeforeSum - AfterSum;
 				if (Improvement <= 0)
 				{
 					continue;
 				}
 
-				if (not BestCandidate.bIsValid || Improvement > BestCandidate.Improvement
-					|| (Improvement == BestCandidate.Improvement
-						&& (AAnchorPoint::IsAnchorKeyLess(AnchorA.AnchorKey, BestCandidate.AnchorKeyA)
-							|| (AnchorA.AnchorKey == BestCandidate.AnchorKeyA
-								&& AAnchorPoint::IsAnchorKeyLess(AnchorB.AnchorKey, BestCandidate.AnchorKeyB)))))
+				const bool bImprovementWins = not BestCandidate.bIsValid || Improvement > BestCandidate.Improvement;
+				const bool bTieBreakWins = Improvement == BestCandidate.Improvement
+					&& (
+						AAnchorPoint::IsAnchorKeyLess(AnchorA.AnchorKey, BestCandidate.AnchorKeyA)
+						|| (AnchorA.AnchorKey == BestCandidate.AnchorKeyA
+							&& (AAnchorPoint::IsAnchorKeyLess(EnemyPairB.Key, BestCandidate.AnchorKeyB)
+								|| (EnemyPairB.Key == BestCandidate.AnchorKeyB
+									&& (static_cast<uint8>(AnchorA.EnemyType) < static_cast<uint8>(BestCandidate.EnemyTypeA)
+										|| (AnchorA.EnemyType == BestCandidate.EnemyTypeA
+											&& static_cast<uint8>(EnemyPairB.Value) < static_cast<uint8>(BestCandidate.EnemyTypeB)))))));
+				if (not bImprovementWins && not bTieBreakWins)
 				{
-					BestCandidate.AnchorKeyA = AnchorA.AnchorKey;
-					BestCandidate.AnchorKeyB = AnchorB.AnchorKey;
-					BestCandidate.EnemyTypeA = AnchorA.EnemyType;
-					BestCandidate.EnemyTypeB = AnchorB.EnemyType;
-					BestCandidate.Improvement = Improvement;
-					BestCandidate.bIsValid = true;
+					continue;
 				}
+
+				BestCandidate.AnchorKeyA = AnchorA.AnchorKey;
+				BestCandidate.AnchorKeyB = EnemyPairB.Key;
+				BestCandidate.EnemyTypeA = AnchorA.EnemyType;
+				BestCandidate.EnemyTypeB = EnemyPairB.Value;
+				BestCandidate.Improvement = Improvement;
+				BestCandidate.bIsValid = true;
 			}
 		}
 
@@ -3915,21 +4047,24 @@ namespace
 
 		AWorldMapObject* SpawnedObjectA = AnchorA->OnEnemyItemPromotion(SwapCandidate.EnemyTypeB, FailedStep);
 		AWorldMapObject* SpawnedObjectB = AnchorB->OnEnemyItemPromotion(SwapCandidate.EnemyTypeA, FailedStep);
-		if (IsValid(SpawnedObjectA) && IsValid(SpawnedObjectB))
+		const bool bSpawnedSwapObjects = IsValid(SpawnedObjectA) && IsValid(SpawnedObjectB);
+		if (bSpawnedSwapObjects)
 		{
-			InOutFailSafeTransaction.SpawnedActors.Add(SpawnedObjectA);
-			InOutFailSafeTransaction.SpawnedActors.Add(SpawnedObjectB);
+			AddSpawnedActorToFailSafeTransactionIfValid(SpawnedObjectA, InOutFailSafeTransaction);
+			AddSpawnedActorToFailSafeTransactionIfValid(SpawnedObjectB, InOutFailSafeTransaction);
 			return true;
 		}
 
 		InOutPlacementState = PlacementStateBeforeSwap;
 		InOutDerivedData = DerivedDataBeforeSwap;
-
 		AnchorA->RemovePromotedWorldObject();
 		AnchorB->RemovePromotedWorldObject();
 
 		AWorldMapObject* RestoredObjectA = AnchorA->OnEnemyItemPromotion(SwapCandidate.EnemyTypeA, FailedStep);
 		AWorldMapObject* RestoredObjectB = AnchorB->OnEnemyItemPromotion(SwapCandidate.EnemyTypeB, FailedStep);
+		AddSpawnedActorToFailSafeTransactionIfValid(RestoredObjectA, InOutFailSafeTransaction);
+		AddSpawnedActorToFailSafeTransactionIfValid(RestoredObjectB, InOutFailSafeTransaction);
+
 		if (not IsValid(RestoredObjectA) || not IsValid(RestoredObjectB))
 		{
 			RTSFunctionLibrary::ReportError(TEXT(
@@ -3989,9 +4124,9 @@ namespace
 				continue;
 			}
 
-			const FString FailedSwapPairKey = BestSwap.AnchorKeyA.ToString(EGuidFormats::DigitsWithHyphens)
-				+ TEXT("|")
-				+ BestSwap.AnchorKeyB.ToString(EGuidFormats::DigitsWithHyphens);
+			const FString FailedSwapPairKey = BuildCanonicalFailedEnemyDeclusterSwapPairKey(
+				BestSwap.AnchorKeyA,
+				BestSwap.AnchorKeyB);
 			FailedSwapPairKeys.Add(FailedSwapPairKey);
 		}
 	}
