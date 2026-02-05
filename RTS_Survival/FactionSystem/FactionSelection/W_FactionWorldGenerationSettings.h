@@ -57,7 +57,7 @@ protected:
 	TObjectPtr<URichTextBlock> M_DifficultyText = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<USpinBox<int32>> M_SeedSpinBox = nullptr;
+	TObjectPtr<USpinBox> M_SeedSpinBox = nullptr;
 
 private:
 	UPROPERTY()
