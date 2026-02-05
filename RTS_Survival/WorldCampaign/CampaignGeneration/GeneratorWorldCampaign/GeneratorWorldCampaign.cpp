@@ -3476,13 +3476,18 @@ namespace
 	                              const float MinimumSpacingSquared,
 	                              const TMap<EFailSafeItemKind, TArray<FVector2D>>& PlacedByKind)
 	{
+		if (not IsValid(Candidate.AnchorPoint))
+		{
+			return false;
+		}
+
 		if (MinimumSpacingSquared <= 0.0f)
 		{
 			return true;
 		}
 
 		const TArray<FVector2D>* ExistingPlacements = PlacedByKind.Find(Item.Kind);
-		if (not ExistingPlacements || not IsValid(Candidate.AnchorPoint))
+		if (not ExistingPlacements)
 		{
 			return true;
 		}
@@ -3503,6 +3508,11 @@ namespace
 	void AddPlacedAnchorByKind(const FFailSafeItem& Item, const FEmptyAnchorDistance& AnchorEntry,
 	                           TMap<EFailSafeItemKind, TArray<FVector2D>>& InOutPlacedByKind)
 	{
+		if (not IsValid(AnchorEntry.AnchorPoint))
+		{
+			return;
+		}
+
 		const FVector2D PlacedLocationXY(AnchorEntry.AnchorPoint->GetActorLocation().X, AnchorEntry.AnchorPoint->GetActorLocation().Y);
 		InOutPlacedByKind.FindOrAdd(Item.Kind).Add(PlacedLocationXY);
 	}
@@ -3519,21 +3529,15 @@ namespace
 	                                   TArray<FFailSafeItem>& OutRemainingItems)
 	{
 		OutRemainingItems.Reset();
-		if (not bUseDistanceFilter)
-		{
-			OutRemainingItems.Append(ItemsToPlace);
-			return;
-		}
-
 		const float MinSameKindSpacingSquared = MinSameKindXYSpacing * MinSameKindXYSpacing;
 		for (const FFailSafeItem& Item : ItemsToPlace)
 		{
 			bool bPlaced = false;
-			const float MinDistanceSquared = Item.MinDistance * Item.MinDistance;
+			const float MinDistanceSquared = bUseDistanceFilter ? Item.MinDistance * Item.MinDistance : 0.0f;
 			for (int32 AnchorIndex = 0; AnchorIndex < InOutEmptyAnchors.Num(); ++AnchorIndex)
 			{
 				const FEmptyAnchorDistance& Candidate = InOutEmptyAnchors[AnchorIndex];
-				if (Candidate.DistanceSquared < MinDistanceSquared)
+				if (bUseDistanceFilter && Candidate.DistanceSquared < MinDistanceSquared)
 				{
 					continue;
 				}
@@ -3569,8 +3573,7 @@ namespace
 	                                 FWorldCampaignPlacementState& InOutPlacementState,
 	                                 FWorldCampaignDerivedData& InOutDerivedData,
 	                                 FCampaignGenerationStepTransaction& InOutTransaction,
-	                                 FFailSafePlacementTotals& InOutTotals,
-	                                 TMap<EFailSafeItemKind, TArray<FVector2D>>& InOutPlacedByKind)
+	                                 FFailSafePlacementTotals& InOutTotals)
 	{
 		if (RemainingItems.Num() == 0)
 		{
@@ -3593,8 +3596,6 @@ namespace
 		FRandomStream RandomStream(SeedUsed + SeedOffset + static_cast<int32>(FailedStep));
 		CampaignGenerationHelper::DeterministicShuffle(ShuffledAnchors, RandomStream);
 
-		const float MinSameKindSpacingSquared =
-			FailurePolicy.TimeoutFailSafeMinSameKindXYSpacing * FailurePolicy.TimeoutFailSafeMinSameKindXYSpacing;
 		int32 AnchorIndex = 0;
 		for (const FFailSafeItem& Item : RemainingItems)
 		{
@@ -3602,16 +3603,9 @@ namespace
 			while (AnchorIndex < ShuffledAnchors.Num())
 			{
 				const FEmptyAnchorDistance& Candidate = ShuffledAnchors[AnchorIndex];
-				if (not GetPassesSameKindSpacing(Item, Candidate, MinSameKindSpacingSquared, InOutPlacedByKind))
-				{
-					AnchorIndex++;
-					continue;
-				}
-
 				if (TryPlaceFailSafeItem(Item, Candidate, FailedStep, InOutPlacementState, InOutDerivedData,
 				                         InOutTransaction, InOutTotals))
 				{
-					AddPlacedAnchorByKind(Item, Candidate, InOutPlacedByKind);
 					AnchorIndex++;
 					bPlaced = true;
 					break;
@@ -5692,8 +5686,7 @@ bool AGeneratorWorldCampaign::TryApplyTimeoutFailSafePlacement(const ECampaignGe
 	                              M_DerivedData, FailSafeTransaction, Totals, PlacedByKind,
 	                              M_PlacementFailurePolicy.TimeoutFailSafeMinSameKindXYSpacing, RemainingItems);
 	AssignFailSafeItemsFallback(RemainingItems, FailedStep, M_PlacementFailurePolicy, M_PlacementState.SeedUsed,
-	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals,
-	                            PlacedByKind);
+	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals);
 
 	if (FailSafeTransaction.SpawnedActors.Num() > 0)
 	{
