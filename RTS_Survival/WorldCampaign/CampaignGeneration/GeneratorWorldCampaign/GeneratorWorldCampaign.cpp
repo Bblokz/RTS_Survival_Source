@@ -265,7 +265,7 @@ namespace
 		const int32 EffectiveMaxWeight = BaseMaxWeight
 			+ MissionPlacementRules.M_HopsPreferenceStrength * StrengthMaxWeightMultiplier;
 		const int32 EffectiveFalloff = FMath::Max(1, BaseFalloffPerDelta
-			- MissionPlacementRules.M_HopsPreferenceStrength);
+		                                          - MissionPlacementRules.M_HopsPreferenceStrength);
 
 		uint64 TotalWeight = 0;
 		for (const int32 CandidateIndex : SelectableIndices)
@@ -524,7 +524,8 @@ namespace
 		}
 
 		bool bIsInside = false;
-		for (int32 PointIndex = 0, PreviousIndex = PointCount - 1; PointIndex < PointCount; PreviousIndex = PointIndex++)
+		for (int32 PointIndex = 0, PreviousIndex = PointCount - 1; PointIndex < PointCount; PreviousIndex = PointIndex
+		     ++)
 		{
 			const FVector2D& CurrentPoint = Polygon[PointIndex];
 			const FVector2D& PreviousPoint = Polygon[PreviousIndex];
@@ -647,8 +648,9 @@ namespace
 			return false;
 		}
 
-		const FString BoundaryList = BoundaryNames.Num() > 0 ? FString::Join(BoundaryNames, TEXT(", "))
-		                                                     : TEXT("UnknownBoundaries");
+		const FString BoundaryList = BoundaryNames.Num() > 0
+			                             ? FString::Join(BoundaryNames, TEXT(", "))
+			                             : TEXT("UnknownBoundaries");
 		const FString ErrorMessage = FString::Printf(
 			TEXT("Anchor point generation failed: multiple WorldSplineBoundary actors found (%s)."),
 			*BoundaryList);
@@ -728,7 +730,8 @@ namespace
 		Boundary->GetSampledPolygon2D(Settings.M_SplineSampleSpacing, OutPolygon);
 		if (OutPolygon.Num() < 3)
 		{
-			RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: spline boundary polygon is invalid."));
+			RTSFunctionLibrary::ReportError(
+				TEXT("Anchor point generation failed: spline boundary polygon is invalid."));
 			return false;
 		}
 
@@ -823,10 +826,11 @@ namespace
 
 				const FVector SpawnLocation(Candidate.X, Candidate.Y, AnchorPointSpawnZ);
 				const FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
-				AAnchorPoint* SpawnedAnchor = World->SpawnActorDeferred<AAnchorPoint>(AnchorClass, SpawnTransform, nullptr,
-				                                                                      nullptr,
-				                                                                      ESpawnActorCollisionHandlingMethod::
-				                                                                      AlwaysSpawn);
+				AAnchorPoint* SpawnedAnchor = World->SpawnActorDeferred<AAnchorPoint>(
+					AnchorClass, SpawnTransform, nullptr,
+					nullptr,
+					ESpawnActorCollisionHandlingMethod::
+					AlwaysSpawn);
 				if (not IsValid(SpawnedAnchor))
 				{
 					RTSFunctionLibrary::ReportError(TEXT("Anchor point generation failed: spawn failed."));
@@ -3478,12 +3482,13 @@ namespace
 		}
 
 		const TArray<FVector2D>* ExistingPlacements = PlacedByKind.Find(Item.Kind);
-		if (not ExistingPlacements)
+		if (not ExistingPlacements || not IsValid(Candidate.AnchorPoint))
 		{
 			return true;
 		}
 
-		const FVector2D CandidateLocationXY(Candidate.Location.X, Candidate.Location.Y);
+		const FVector2D CandidateLocationXY(Candidate.AnchorPoint->GetActorLocation().X,
+		                                    Candidate.AnchorPoint->GetActorLocation().Y);
 		for (const FVector2D& ExistingLocationXY : *ExistingPlacements)
 		{
 			if (FVector2D::DistSquared(CandidateLocationXY, ExistingLocationXY) < MinimumSpacingSquared)
@@ -3498,7 +3503,7 @@ namespace
 	void AddPlacedAnchorByKind(const FFailSafeItem& Item, const FEmptyAnchorDistance& AnchorEntry,
 	                           TMap<EFailSafeItemKind, TArray<FVector2D>>& InOutPlacedByKind)
 	{
-		const FVector2D PlacedLocationXY(AnchorEntry.Location.X, AnchorEntry.Location.Y);
+		const FVector2D PlacedLocationXY(AnchorEntry.AnchorPoint->GetActorLocation().X, AnchorEntry.AnchorPoint->GetActorLocation().Y);
 		InOutPlacedByKind.FindOrAdd(Item.Kind).Add(PlacedLocationXY);
 	}
 
@@ -3811,7 +3816,7 @@ void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* W
                                                        const FCampaignGenerationSettings CampaignGenerationSettings,
                                                        const FRTSGameDifficulty DifficultySettings)
 {
-	if(not IsValid(WorldPlayerController))
+	if (not IsValid(WorldPlayerController))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("InitializeWorldGenerator called with invalid WorldPlayerController."));
 		return;
@@ -3819,14 +3824,14 @@ void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* W
 	M_WorldPlayerController = WorldPlayerController;
 	M_CountAndDifficultyTuning.Seed = CampaignGenerationSettings.GenerationSeed;
 	M_CountAndDifficultyTuning.DifficultyLevel = DifficultySettings.DifficultyLevel;
-M_CountAndDifficultyTuning.DifficultyPercentage = DifficultySettings.DifficultyPercentage;	
-	if(CampaignGenerationSettings.bUsesExtraDifficultyPercentage)
+	M_CountAndDifficultyTuning.DifficultyPercentage = DifficultySettings.DifficultyPercentage;
+	if (CampaignGenerationSettings.bUsesExtraDifficultyPercentage)
 	{
-	 M_CountAndDifficultyTuning.DifficultyPercentage += M_CountAndDifficultyTuning.AddedDifficultyPercentage;
+		M_CountAndDifficultyTuning.DifficultyPercentage += M_CountAndDifficultyTuning.AddedDifficultyPercentage;
 	}
-	if(CampaignGenerationSettings.bNeedsToGenerateCampaign)
+	if (CampaignGenerationSettings.bNeedsToGenerateCampaign)
 	{
-	ExecuteAllSteps();
+		ExecuteAllSteps();
 		return;
 	}
 	RTSFunctionLibrary::DisplayNotification("No campaign generation requested for this map, is this a save?");
@@ -4181,7 +4186,8 @@ void AGeneratorWorldCampaign::DebugDrawSplineBoundaryArea()
 	Boundary->GetSampledPolygon2D(M_AnchorPointGenerationSettings.M_SplineSampleSpacing, BoundaryPolygon);
 	if (BoundaryPolygon.Num() < 3)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("DebugDrawSplineBoundaryArea failed: spline boundary polygon is invalid."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("DebugDrawSplineBoundaryArea failed: spline boundary polygon is invalid."));
 		return;
 	}
 
@@ -5969,7 +5975,7 @@ void AGeneratorWorldCampaign::ClearDerivedData()
 void AGeneratorWorldCampaign::CacheAnchorConnectionDegrees()
 {
 	M_DerivedData.AnchorConnectionDegreesByAnchorKey.Reset();
-	for ( TWeakObjectPtr<AAnchorPoint> AnchorPointWeak : M_PlacementState.CachedAnchors)
+	for (TWeakObjectPtr<AAnchorPoint> AnchorPointWeak : M_PlacementState.CachedAnchors)
 	{
 		AAnchorPoint* AnchorPoint = AnchorPointWeak.Get();
 		if (not IsValid(AnchorPoint))
@@ -6315,7 +6321,7 @@ void AGeneratorWorldCampaign::GatherAnchorPoints(TArray<TObjectPtr<AAnchorPoint>
 }
 
 FGuid AGeneratorWorldCampaign::BuildGeneratedAnchorKey_Deterministic(int32 StepAttemptIndex, int32 CellIndex,
-                                                                      int32 SpawnOrdinal) const
+                                                                     int32 SpawnOrdinal) const
 {
 	const uint64 BaseSeed = static_cast<uint64>(M_CountAndDifficultyTuning.Seed);
 	const uint64 SeedA = HashCombine64(
