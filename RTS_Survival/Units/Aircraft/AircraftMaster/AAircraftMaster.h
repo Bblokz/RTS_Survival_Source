@@ -84,6 +84,8 @@ public:
 	// Cosmetic for non gameplay actions.
 	void StartVerticalLanding_Preview();
 
+	void SetPreviewTakeOffHeight(const float NewTakeOffHeight);
+
 	/**
 	 * @brief Gather all weapon states for external systems (e.g., targeting UI or debugging).
 	 * @return Valid weapon state pointers only (invalid entries are filtered out).

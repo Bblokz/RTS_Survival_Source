@@ -14,6 +14,9 @@
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 AFactionPlayerController::AFactionPlayerController()
@@ -395,6 +398,8 @@ void AFactionPlayerController::HandlePreviewSpawned(
 	AActor* SpawnedActor,
 	const int32 SpawnRequestId)
 {
+	(void)TrainingOption;
+	(void)SpawnRequestId;
 
 	if (not IsValid(SpawnedActor))
 	{
@@ -403,22 +408,60 @@ void AFactionPlayerController::HandlePreviewSpawned(
 
 	SpawnedActor->SetActorRotation(M_PreviewSpawnRotation);
 	M_CurrentPreviewActor = SpawnedActor;
+	M_CurrentPreviewActorType = EPreviewActorType::None;
+	M_NextPreviewAction = EPreviewActionType::None;
 
-	ICommands* CommandsInterface = Cast<ICommands>(SpawnedActor);
-	if (CommandsInterface == nullptr)
+	if (ATankMaster* TankMaster = Cast<ATankMaster>(SpawnedActor))
 	{
-		M_CurrentCommandsInterface.SetObject(nullptr);
-		M_CurrentCommandsInterface.SetInterface(nullptr);
+		M_CurrentPreviewActorType = EPreviewActorType::Tank;
+
+		ICommands* CommandsInterface = Cast<ICommands>(TankMaster);
+		if (CommandsInterface == nullptr)
+		{
+			M_CurrentCommandsInterface.SetObject(nullptr);
+			M_CurrentCommandsInterface.SetInterface(nullptr);
+			return;
+		}
+
+		M_CurrentCommandsInterface.SetObject(TankMaster);
+		M_CurrentCommandsInterface.SetInterface(CommandsInterface);
+		SetupTankPreviewActions();
 		return;
 	}
 
-	M_CurrentCommandsInterface.SetObject(SpawnedActor);
-	M_CurrentCommandsInterface.SetInterface(CommandsInterface);
+	if (ASquadController* SquadController = Cast<ASquadController>(SpawnedActor))
+	{
+		M_CurrentPreviewActorType = EPreviewActorType::Squad;
 
-	ResetPreviewAttackTimer();
+		ICommands* CommandsInterface = Cast<ICommands>(SquadController);
+		if (CommandsInterface == nullptr)
+		{
+			M_CurrentCommandsInterface.SetObject(nullptr);
+			M_CurrentCommandsInterface.SetInterface(nullptr);
+			return;
+		}
+
+		M_CurrentCommandsInterface.SetObject(SquadController);
+		M_CurrentCommandsInterface.SetInterface(CommandsInterface);
+		SetupSquadPreviewActions();
+		return;
+	}
+
+	if (AAircraftMaster* AircraftMaster = Cast<AAircraftMaster>(SpawnedActor))
+	{
+		M_CurrentPreviewActorType = EPreviewActorType::Aircraft;
+		M_CurrentCommandsInterface.SetObject(nullptr);
+		M_CurrentCommandsInterface.SetInterface(nullptr);
+		AircraftMaster->SetPreviewTakeOffHeight(M_UnitPreviewActions.ZTakeOffOffset);
+		SetupAircraftPreviewActions();
+		return;
+	}
+
+	M_CurrentCommandsInterface.SetObject(nullptr);
+	M_CurrentCommandsInterface.SetInterface(nullptr);
 }
 
-void AFactionPlayerController::ResetPreviewAttackTimer()
+void AFactionPlayerController::ResetPreviewGeneralActionTimer()
 {
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -426,48 +469,176 @@ void AFactionPlayerController::ResetPreviewAttackTimer()
 		return;
 	}
 
-	World->GetTimerManager().ClearTimer(M_PreviewAttackTimerHandle);
+	World->GetTimerManager().ClearTimer(M_PreviewGeneralActionTimerHandle);
 
-	if (M_CurrentCommandsInterface.GetObject() == nullptr)
-	{
-		return;
-	}
-
-	const int32 LocationCount = M_UnitPreviewActions.GroundAttackLocations.Num();
-	if (LocationCount == 0)
-	{
-		return;
-	}
-
-	const float MinDelay = M_UnitPreviewActions.MinTimeTillGroundAttack;
-	const float MaxDelay = M_UnitPreviewActions.MaxTimeTillGroundAttack;
+	const float MinDelay = M_UnitPreviewActions.MinTimeTillGeneralAction;
+	const float MaxDelay = M_UnitPreviewActions.MaxTimeTillGeneralAction;
 	const float NextDelay = FMath::FRandRange(MinDelay, MaxDelay);
 
-	FTimerDelegate PreviewAttackDelegate;
+	FTimerDelegate PreviewActionDelegate;
 	TWeakObjectPtr<AFactionPlayerController> WeakThis(this);
-	PreviewAttackDelegate.BindLambda([WeakThis]()
+	PreviewActionDelegate.BindLambda([WeakThis]()
 	{
 		if (not WeakThis.IsValid())
 		{
 			return;
 		}
 
-		WeakThis->HandlePreviewAttackTimer();
+		WeakThis->HandlePreviewGeneralActionTimer();
 	});
 
-	World->GetTimerManager().SetTimer(M_PreviewAttackTimerHandle, PreviewAttackDelegate, NextDelay, false);
+	World->GetTimerManager().SetTimer(M_PreviewGeneralActionTimerHandle, PreviewActionDelegate, NextDelay, false);
 }
 
-void AFactionPlayerController::HandlePreviewAttackTimer()
+void AFactionPlayerController::HandlePreviewGeneralActionTimer()
 {
-	const int32 LocationCount = M_UnitPreviewActions.GroundAttackLocations.Num();
-	if (LocationCount == 0)
+	if (M_CurrentPreviewActorType == EPreviewActorType::Tank)
+	{
+		HandleTankPreviewAction();
+		return;
+	}
+
+	if (M_CurrentPreviewActorType == EPreviewActorType::Squad)
+	{
+		HandleSquadPreviewAction();
+		return;
+	}
+
+	if (M_CurrentPreviewActorType == EPreviewActorType::Aircraft)
+	{
+		HandleAircraftPreviewTakeOffAction();
+	}
+}
+
+void AFactionPlayerController::HandlePreviewAircraftComeDownTimer()
+{
+	AActor* CurrentPreviewActor = M_CurrentPreviewActor.Get();
+	AAircraftMaster* AircraftMaster = Cast<AAircraftMaster>(CurrentPreviewActor);
+	if (not IsValid(AircraftMaster))
 	{
 		return;
 	}
 
-	AActor* CommandsActor = Cast<AActor>(M_CurrentCommandsInterface.GetObject());
-	if (not IsValid(CommandsActor))
+	AircraftMaster->StartVerticalLanding_Preview();
+	ResetPreviewGeneralActionTimer();
+}
+
+void AFactionPlayerController::SetupTankPreviewActions()
+{
+	if (not GetIsValidCurrentCommandsInterface())
+	{
+		return;
+	}
+
+	if (not GetHasGroundAttackLocations())
+	{
+		return;
+	}
+
+	M_NextPreviewAction = GetRandomPreviewAction(EPreviewActionType::Rotate, EPreviewActionType::Attack);
+	ResetPreviewGeneralActionTimer();
+}
+
+void AFactionPlayerController::SetupSquadPreviewActions()
+{
+	if (not GetIsValidCurrentCommandsInterface())
+	{
+		return;
+	}
+
+	if (not GetHasGroundAttackLocations() || not GetHasSquadMovementLocations())
+	{
+		return;
+	}
+
+	M_NextPreviewAction = GetRandomPreviewAction(EPreviewActionType::Move, EPreviewActionType::Attack);
+	ResetPreviewGeneralActionTimer();
+}
+
+void AFactionPlayerController::SetupAircraftPreviewActions()
+{
+	M_NextPreviewAction = EPreviewActionType::TakeOff;
+	ResetPreviewGeneralActionTimer();
+}
+
+void AFactionPlayerController::HandleTankPreviewAction()
+{
+	if (M_NextPreviewAction == EPreviewActionType::Rotate)
+	{
+		HandleTankPreviewRotateAction();
+		FlipTankAction();
+		ResetPreviewGeneralActionTimer();
+		return;
+	}
+
+	if (M_NextPreviewAction == EPreviewActionType::Attack)
+	{
+		HandleTankPreviewAttackAction();
+		FlipTankAction();
+		ResetPreviewGeneralActionTimer();
+	}
+}
+
+void AFactionPlayerController::HandleSquadPreviewAction()
+{
+	if (M_NextPreviewAction == EPreviewActionType::Move)
+	{
+		HandleSquadPreviewMoveAction();
+		FlipSquadAction();
+		ResetPreviewGeneralActionTimer();
+		return;
+	}
+
+	if (M_NextPreviewAction == EPreviewActionType::Attack)
+	{
+		HandleSquadPreviewAttackAction();
+		FlipSquadAction();
+		ResetPreviewGeneralActionTimer();
+	}
+}
+
+void AFactionPlayerController::HandleAircraftPreviewTakeOffAction()
+{
+	AActor* CurrentPreviewActor = M_CurrentPreviewActor.Get();
+	AAircraftMaster* AircraftMaster = Cast<AAircraftMaster>(CurrentPreviewActor);
+	if (not IsValid(AircraftMaster))
+	{
+		return;
+	}
+
+	AircraftMaster->TakeOffFromGroundOrOwner();
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const float TimeTillComeDown = M_UnitPreviewActions.TimeTillOrderAircraftComeDown;
+	FTimerDelegate AircraftComeDownDelegate;
+	TWeakObjectPtr<AFactionPlayerController> WeakThis(this);
+	AircraftComeDownDelegate.BindLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->HandlePreviewAircraftComeDownTimer();
+	});
+
+	World->GetTimerManager().ClearTimer(M_PreviewAircraftComeDownTimerHandle);
+	World->GetTimerManager().SetTimer(M_PreviewAircraftComeDownTimerHandle, AircraftComeDownDelegate, TimeTillComeDown, false);
+}
+
+void AFactionPlayerController::HandleTankPreviewAttackAction()
+{
+	if (not GetIsValidCurrentCommandsInterface())
+	{
+		return;
+	}
+
+	if (not GetHasGroundAttackLocations())
 	{
 		return;
 	}
@@ -481,8 +652,208 @@ void AFactionPlayerController::HandlePreviewAttackTimer()
 	const FVector AttackLocation = GetRandomGroundAttackLocation();
 	const bool bSetUnitToIdle = true;
 	CommandsInterface->AttackGround(AttackLocation, bSetUnitToIdle);
+}
 
-	ResetPreviewAttackTimer();
+void AFactionPlayerController::HandleTankPreviewRotateAction()
+{
+	if (not GetIsValidCurrentCommandsInterface())
+	{
+		return;
+	}
+
+	ICommands* CommandsInterface = M_CurrentCommandsInterface.GetInterface();
+	if (CommandsInterface == nullptr)
+	{
+		return;
+	}
+
+	const FRotator Rotation = GetRandomTankPreviewRotation();
+	const bool bSetUnitToIdle = true;
+	CommandsInterface->RotateTowards(Rotation, bSetUnitToIdle);
+}
+
+void AFactionPlayerController::HandleSquadPreviewAttackAction()
+{
+	if (not GetIsValidCurrentCommandsInterface())
+	{
+		return;
+	}
+
+	if (not GetHasGroundAttackLocations())
+	{
+		return;
+	}
+
+	ICommands* CommandsInterface = M_CurrentCommandsInterface.GetInterface();
+	if (CommandsInterface == nullptr)
+	{
+		return;
+	}
+
+	const FVector AttackLocation = GetRandomGroundAttackLocation();
+	const bool bSetUnitToIdle = true;
+	CommandsInterface->AttackGround(AttackLocation, bSetUnitToIdle);
+}
+
+void AFactionPlayerController::HandleSquadPreviewMoveAction()
+{
+	if (not GetIsValidCurrentCommandsInterface())
+	{
+		return;
+	}
+
+	if (not GetHasSquadMovementLocations())
+	{
+		return;
+	}
+
+	ICommands* CommandsInterface = M_CurrentCommandsInterface.GetInterface();
+	if (CommandsInterface == nullptr)
+	{
+		return;
+	}
+
+	const FVector MoveLocation = GetRandomSquadMovementLocation();
+	const bool bSetUnitToIdle = true;
+	CommandsInterface->MoveToLocation(MoveLocation, bSetUnitToIdle, FRotator::ZeroRotator);
+}
+
+void AFactionPlayerController::FlipTankAction()
+{
+	if (M_NextPreviewAction == EPreviewActionType::Rotate)
+	{
+		M_NextPreviewAction = EPreviewActionType::Attack;
+		return;
+	}
+
+	M_NextPreviewAction = EPreviewActionType::Rotate;
+}
+
+void AFactionPlayerController::FlipSquadAction()
+{
+	if (M_NextPreviewAction == EPreviewActionType::Move)
+	{
+		M_NextPreviewAction = EPreviewActionType::Attack;
+		return;
+	}
+
+	M_NextPreviewAction = EPreviewActionType::Move;
+}
+
+FVector AFactionPlayerController::GetRandomSquadMovementLocation() const
+{
+	const int32 LocationCount = M_UnitPreviewActions.SquadMovementLocations.Num();
+	if (LocationCount == 0)
+	{
+		return FVector::ZeroVector;
+	}
+
+	const int32 FirstIndex = 0;
+	const int32 LastIndex = LocationCount - 1;
+	const int32 RandomIndex = FMath::RandRange(FirstIndex, LastIndex);
+	return M_UnitPreviewActions.SquadMovementLocations[RandomIndex];
+}
+
+FRotator AFactionPlayerController::GetRandomTankPreviewRotation() const
+{
+	if (not GetIsValidCurrentPreviewActor())
+	{
+		return FRotator::ZeroRotator;
+	}
+
+	const AActor* PreviewActor = M_CurrentPreviewActor.Get();
+	const FVector PreviewLocation = PreviewActor->GetActorLocation();
+	const FRotator CurrentRotation = PreviewActor->GetActorRotation();
+	const float RandomYawOffset = FMath::FRandRange(
+		M_UnitPreviewActions.MinYawOffsetForRotation,
+		M_UnitPreviewActions.MaxYawOffsetForRotation
+	);
+	const float PreviewForwardDistance = 600.0f;
+	const FRotator TargetRotationWithOffset(
+		0.0f,
+		CurrentRotation.Yaw + RandomYawOffset,
+		0.0f
+	);
+	const FVector RotationTargetLocation =
+		PreviewLocation + (TargetRotationWithOffset.Vector() * PreviewForwardDistance);
+	return (RotationTargetLocation - PreviewLocation).Rotation();
+}
+
+EPreviewActionType AFactionPlayerController::GetRandomPreviewAction(
+	const EPreviewActionType FirstAction,
+	const EPreviewActionType SecondAction) const
+{
+	const bool bUseFirstAction = FMath::RandBool();
+	if (bUseFirstAction)
+	{
+		return FirstAction;
+	}
+
+	return SecondAction;
+}
+
+bool AFactionPlayerController::GetIsValidCurrentCommandsInterface() const
+{
+	if (M_CurrentCommandsInterface.GetObject() != nullptr && M_CurrentCommandsInterface.GetInterface() != nullptr)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_CurrentCommandsInterface",
+		"GetIsValidCurrentCommandsInterface",
+		this
+	);
+	return false;
+}
+
+bool AFactionPlayerController::GetIsValidCurrentPreviewActor() const
+{
+	if (M_CurrentPreviewActor.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_CurrentPreviewActor",
+		"GetIsValidCurrentPreviewActor",
+		this
+	);
+	return false;
+}
+
+bool AFactionPlayerController::GetHasGroundAttackLocations() const
+{
+	if (M_UnitPreviewActions.GroundAttackLocations.Num() > 0)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_UnitPreviewActions.GroundAttackLocations",
+		"GetHasGroundAttackLocations",
+		this
+	);
+	return false;
+}
+
+bool AFactionPlayerController::GetHasSquadMovementLocations() const
+{
+	if (M_UnitPreviewActions.SquadMovementLocations.Num() > 0)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_UnitPreviewActions.SquadMovementLocations",
+		"GetHasSquadMovementLocations",
+		this
+	);
+	return false;
 }
 
 FVector AFactionPlayerController::GetRandomGroundAttackLocation() const
@@ -504,10 +875,26 @@ void AFactionPlayerController::ClearCurrentPreview()
 	UWorld* World = GetWorld();
 	if (IsValid(World))
 	{
-		World->GetTimerManager().ClearTimer(M_PreviewAttackTimerHandle);
+		World->GetTimerManager().ClearTimer(M_PreviewGeneralActionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_PreviewAircraftComeDownTimerHandle);
 	}
 
 	AActor* CurrentPreviewActor = M_CurrentPreviewActor.Get();
+	ASquadController* PreviewSquadController = Cast<ASquadController>(CurrentPreviewActor);
+	if (IsValid(PreviewSquadController))
+	{
+		TArray<ASquadUnit*> SquadUnits = PreviewSquadController->GetSquadUnitsChecked();
+		for (ASquadUnit* SquadUnit : SquadUnits)
+		{
+			if (not IsValid(SquadUnit))
+			{
+				continue;
+			}
+
+			SquadUnit->Destroy();
+		}
+	}
+
 	if (IsValid(CurrentPreviewActor))
 	{
 		CurrentPreviewActor->Destroy();
@@ -516,6 +903,8 @@ void AFactionPlayerController::ClearCurrentPreview()
 	M_CurrentPreviewActor.Reset();
 	M_CurrentCommandsInterface.SetObject(nullptr);
 	M_CurrentCommandsInterface.SetInterface(nullptr);
+	M_CurrentPreviewActorType = EPreviewActorType::None;
+	M_NextPreviewAction = EPreviewActionType::None;
 }
 
 bool AFactionPlayerController::GetIsValidAnnouncementAudioComponent() const

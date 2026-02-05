@@ -355,6 +355,11 @@ void AAircraftMaster::StartVerticalLanding_Preview()
 	StartVerticalLanding();
 }
 
+void AAircraftMaster::SetPreviewTakeOffHeight(const float NewTakeOffHeight)
+{
+	M_AircraftMovementSettings.TakeOffHeight = NewTakeOffHeight;
+}
+
 TArray<UWeaponState*> AAircraftMaster::GetAllAircraftWeapons() const
 {
 	TArray<UWeaponState*> MyValidWeapons = {};
