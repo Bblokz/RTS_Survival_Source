@@ -55,6 +55,24 @@ struct FWorldCampaignPlacementFailurePolicy
 	float TimeoutFailSafeMinSameKindXYSpacing = 0.f;
 
 	/**
+	 * @note Used in: Timeout fail-safe enemy decluster pass.
+	 * @note Why: Caps how many successful enemy-anchor swaps are applied after fail-safe placement.
+	 * @note Technical: 0 disables the swap pass; each successful swap consumes one budget unit.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
+		meta = (ClampMin = "0", ClampMax = "128"))
+	int32 TimeoutFailSafeEnemyDeclusterSwapBudget = 0;
+
+	/**
+	 * @note Used in: Timeout fail-safe enemy decluster pass.
+	 * @note Why: Limits candidate anchors evaluated per swap iteration for deterministic bounded work.
+	 * @note Technical: Selected from anchors with lowest same-type spacing score; min 2.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
+		meta = (ClampMin = "2", ClampMax = "512"))
+	int32 TimeoutFailSafeEnemyDeclusterTopMCandidates = 24;
+
+	/**
 	 * @note Used in: Timeout fail-safe placement.
 	 * @note Why: Sets minimum XY distance from Player HQ for Tier1 missions.
 	 * @note Technical: Compared against squared XY distance in the fail-safe pass.
