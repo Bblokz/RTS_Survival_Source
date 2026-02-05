@@ -103,6 +103,23 @@ namespace
 		int32 Discarded = 0;
 	};
 
+	struct FEnemyDeclusterAnchorScore
+	{
+		FGuid AnchorKey;
+		EMapEnemyItem EnemyType = EMapEnemyItem::None;
+		int32 MinSameTypeHopDistance = INDEX_NONE;
+	};
+
+	struct FEnemyDeclusterSwapCandidate
+	{
+		FGuid AnchorKeyA;
+		FGuid AnchorKeyB;
+		EMapEnemyItem EnemyTypeA = EMapEnemyItem::None;
+		EMapEnemyItem EnemyTypeB = EMapEnemyItem::None;
+		int32 Improvement = 0;
+		bool bIsValid = false;
+	};
+
 	struct FClosestConnectionCandidate
 	{
 		TWeakObjectPtr<AConnection> Connection;
@@ -3662,6 +3679,323 @@ namespace
 		return TotalRequired;
 	}
 
+	int32 GetMinSameTypeHopDistanceForEnemyAnchor(const FGuid& AnchorKey, const EMapEnemyItem EnemyType,
+	                                              const FWorldCampaignPlacementState& PlacementState,
+	                                              const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                              const FGuid& IgnoreAnchorKeyA = FGuid(),
+	                                              const FGuid& IgnoreAnchorKeyB = FGuid())
+	{
+		AAnchorPoint* TargetAnchor = FindAnchorByKey(AnchorLookup, AnchorKey);
+		if (not IsValid(TargetAnchor))
+		{
+			return INDEX_NONE;
+		}
+
+		int32 MinHopDistance = INDEX_NONE;
+		TArray<FGuid> SortedEnemyAnchorKeys;
+		SortedEnemyAnchorKeys.Reserve(PlacementState.EnemyItemsByAnchorKey.Num());
+		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : PlacementState.EnemyItemsByAnchorKey)
+		{
+			SortedEnemyAnchorKeys.Add(EnemyPair.Key);
+		}
+
+		Algo::Sort(SortedEnemyAnchorKeys, [](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+
+		for (const FGuid& OtherAnchorKey : SortedEnemyAnchorKeys)
+		{
+			if (OtherAnchorKey == AnchorKey || OtherAnchorKey == IgnoreAnchorKeyA || OtherAnchorKey == IgnoreAnchorKeyB)
+			{
+				continue;
+			}
+
+			if (PlacementState.EnemyItemsByAnchorKey.FindRef(OtherAnchorKey) != EnemyType)
+			{
+				continue;
+			}
+
+			AAnchorPoint* OtherAnchor = FindAnchorByKey(AnchorLookup, OtherAnchorKey);
+			if (not IsValid(OtherAnchor))
+			{
+				continue;
+			}
+
+			const int32 HopDistance = CampaignGenerationHelper::HopsFromHQ(TargetAnchor, OtherAnchor);
+			if (HopDistance == INDEX_NONE)
+			{
+				continue;
+			}
+
+			if (MinHopDistance == INDEX_NONE || HopDistance < MinHopDistance)
+			{
+				MinHopDistance = HopDistance;
+			}
+		}
+
+		return MinHopDistance;
+	}
+
+	bool GetPassesEnemyTypeHQDistance(const AAnchorPoint* PlayerHQAnchor, const AAnchorPoint* CandidateAnchor,
+	                                 const float MinDistance)
+	{
+		if (MinDistance <= 0.0f)
+		{
+			return true;
+		}
+
+		if (not IsValid(PlayerHQAnchor) || not IsValid(CandidateAnchor))
+		{
+			return false;
+		}
+
+		const FVector2D PlayerHQLocation = FVector2D(PlayerHQAnchor->GetActorLocation());
+		const FVector2D CandidateLocation = FVector2D(CandidateAnchor->GetActorLocation());
+		const float MinDistanceSquared = MinDistance * MinDistance;
+		return FVector2D::DistSquared(PlayerHQLocation, CandidateLocation) >= MinDistanceSquared;
+	}
+
+	FEnemyDeclusterSwapCandidate FindBestEnemyDeclusterSwap(
+		const FWorldCampaignPlacementState& PlacementState,
+		const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+		const AAnchorPoint* PlayerHQAnchor,
+		const int32 TopMCandidates,
+		const TFunctionRef<float(EMapEnemyItem)>& GetFailSafeMinDistanceForEnemy,
+		const TSet<FString>& FailedSwapPairKeys)
+	{
+		FEnemyDeclusterSwapCandidate BestCandidate;
+
+		TArray<FEnemyDeclusterAnchorScore> AnchorScores;
+		AnchorScores.Reserve(PlacementState.EnemyItemsByAnchorKey.Num());
+		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : PlacementState.EnemyItemsByAnchorKey)
+		{
+			if (EnemyPair.Value == EMapEnemyItem::EnemyHQ || EnemyPair.Value == EMapEnemyItem::EnemyWall
+				|| EnemyPair.Value == EMapEnemyItem::None)
+			{
+				continue;
+			}
+
+			FEnemyDeclusterAnchorScore Score;
+			Score.AnchorKey = EnemyPair.Key;
+			Score.EnemyType = EnemyPair.Value;
+			Score.MinSameTypeHopDistance = GetMinSameTypeHopDistanceForEnemyAnchor(
+				EnemyPair.Key,
+				EnemyPair.Value,
+				PlacementState,
+				AnchorLookup);
+			AnchorScores.Add(Score);
+		}
+
+		if (AnchorScores.Num() < 2)
+		{
+			return BestCandidate;
+		}
+
+		AnchorScores.Sort([](const FEnemyDeclusterAnchorScore& Left, const FEnemyDeclusterAnchorScore& Right)
+		{
+			const int32 LeftSortValue = Left.MinSameTypeHopDistance == INDEX_NONE
+				                            ? TNumericLimits<int32>::Max()
+				                            : Left.MinSameTypeHopDistance;
+			const int32 RightSortValue = Right.MinSameTypeHopDistance == INDEX_NONE
+				                             ? TNumericLimits<int32>::Max()
+				                             : Right.MinSameTypeHopDistance;
+			if (LeftSortValue != RightSortValue)
+			{
+				return LeftSortValue < RightSortValue;
+			}
+
+			return AAnchorPoint::IsAnchorKeyLess(Left.AnchorKey, Right.AnchorKey);
+		});
+
+		const int32 MaxCandidatesToEvaluate = FMath::Clamp(TopMCandidates, 2, AnchorScores.Num());
+		for (int32 IndexA = 0; IndexA < MaxCandidatesToEvaluate - 1; ++IndexA)
+		{
+			for (int32 IndexB = IndexA + 1; IndexB < MaxCandidatesToEvaluate; ++IndexB)
+			{
+				const FEnemyDeclusterAnchorScore& AnchorA = AnchorScores[IndexA];
+				const FEnemyDeclusterAnchorScore& AnchorB = AnchorScores[IndexB];
+				if (AnchorA.EnemyType == AnchorB.EnemyType)
+				{
+					continue;
+				}
+
+				AAnchorPoint* AnchorPointA = FindAnchorByKey(AnchorLookup, AnchorA.AnchorKey);
+				AAnchorPoint* AnchorPointB = FindAnchorByKey(AnchorLookup, AnchorB.AnchorKey);
+				if (not IsValid(AnchorPointA) || not IsValid(AnchorPointB))
+				{
+					continue;
+				}
+
+				const float MinDistanceForTypeAtA = GetFailSafeMinDistanceForEnemy(AnchorB.EnemyType);
+				const float MinDistanceForTypeAtB = GetFailSafeMinDistanceForEnemy(AnchorA.EnemyType);
+				if (not GetPassesEnemyTypeHQDistance(PlayerHQAnchor, AnchorPointA, MinDistanceForTypeAtA)
+					|| not GetPassesEnemyTypeHQDistance(PlayerHQAnchor, AnchorPointB, MinDistanceForTypeAtB))
+				{
+					continue;
+				}
+
+				const FString FailedSwapPairKey = AnchorA.AnchorKey.ToString(EGuidFormats::DigitsWithHyphens) + TEXT("|")
+					+ AnchorB.AnchorKey.ToString(EGuidFormats::DigitsWithHyphens);
+				if (FailedSwapPairKeys.Contains(FailedSwapPairKey))
+				{
+					continue;
+				}
+
+				const int32 OldScoreA = AnchorA.MinSameTypeHopDistance == INDEX_NONE
+					                    ? TNumericLimits<int32>::Max()
+					                    : AnchorA.MinSameTypeHopDistance;
+				const int32 OldScoreB = AnchorB.MinSameTypeHopDistance == INDEX_NONE
+					                    ? TNumericLimits<int32>::Max()
+					                    : AnchorB.MinSameTypeHopDistance;
+				const int32 NewScoreA = GetMinSameTypeHopDistanceForEnemyAnchor(
+					AnchorA.AnchorKey,
+					AnchorB.EnemyType,
+					PlacementState,
+					AnchorLookup,
+					AnchorA.AnchorKey,
+					AnchorB.AnchorKey);
+				const int32 NewScoreB = GetMinSameTypeHopDistanceForEnemyAnchor(
+					AnchorB.AnchorKey,
+					AnchorA.EnemyType,
+					PlacementState,
+					AnchorLookup,
+					AnchorA.AnchorKey,
+					AnchorB.AnchorKey);
+
+				const int32 EffectiveNewScoreA = NewScoreA == INDEX_NONE ? TNumericLimits<int32>::Max() : NewScoreA;
+				const int32 EffectiveNewScoreB = NewScoreB == INDEX_NONE ? TNumericLimits<int32>::Max() : NewScoreB;
+				const int32 Improvement = (EffectiveNewScoreA + EffectiveNewScoreB) - (OldScoreA + OldScoreB);
+				if (Improvement <= 0)
+				{
+					continue;
+				}
+
+				if (not BestCandidate.bIsValid || Improvement > BestCandidate.Improvement
+					|| (Improvement == BestCandidate.Improvement
+						&& (AAnchorPoint::IsAnchorKeyLess(AnchorA.AnchorKey, BestCandidate.AnchorKeyA)
+							|| (AnchorA.AnchorKey == BestCandidate.AnchorKeyA
+								&& AAnchorPoint::IsAnchorKeyLess(AnchorB.AnchorKey, BestCandidate.AnchorKeyB)))))
+				{
+					BestCandidate.AnchorKeyA = AnchorA.AnchorKey;
+					BestCandidate.AnchorKeyB = AnchorB.AnchorKey;
+					BestCandidate.EnemyTypeA = AnchorA.EnemyType;
+					BestCandidate.EnemyTypeB = AnchorB.EnemyType;
+					BestCandidate.Improvement = Improvement;
+					BestCandidate.bIsValid = true;
+				}
+			}
+		}
+
+		return BestCandidate;
+	}
+
+	bool TryApplyEnemyDeclusterSwap(const ECampaignGenerationStep FailedStep,
+	                                const FEnemyDeclusterSwapCandidate& SwapCandidate,
+	                                const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                FWorldCampaignPlacementState& InOutPlacementState,
+	                                FWorldCampaignDerivedData& InOutDerivedData,
+	                                FCampaignGenerationStepTransaction& InOutFailSafeTransaction)
+	{
+		AAnchorPoint* AnchorA = FindAnchorByKey(AnchorLookup, SwapCandidate.AnchorKeyA);
+		AAnchorPoint* AnchorB = FindAnchorByKey(AnchorLookup, SwapCandidate.AnchorKeyB);
+		if (not IsValid(AnchorA) || not IsValid(AnchorB))
+		{
+			return false;
+		}
+
+		const FWorldCampaignPlacementState PlacementStateBeforeSwap = InOutPlacementState;
+		const FWorldCampaignDerivedData DerivedDataBeforeSwap = InOutDerivedData;
+
+		InOutPlacementState.EnemyItemsByAnchorKey.Add(SwapCandidate.AnchorKeyA, SwapCandidate.EnemyTypeB);
+		InOutPlacementState.EnemyItemsByAnchorKey.Add(SwapCandidate.AnchorKeyB, SwapCandidate.EnemyTypeA);
+
+		AnchorA->RemovePromotedWorldObject();
+		AnchorB->RemovePromotedWorldObject();
+
+		AWorldMapObject* SpawnedObjectA = AnchorA->OnEnemyItemPromotion(SwapCandidate.EnemyTypeB, FailedStep);
+		AWorldMapObject* SpawnedObjectB = AnchorB->OnEnemyItemPromotion(SwapCandidate.EnemyTypeA, FailedStep);
+		if (IsValid(SpawnedObjectA) && IsValid(SpawnedObjectB))
+		{
+			InOutFailSafeTransaction.SpawnedActors.Add(SpawnedObjectA);
+			InOutFailSafeTransaction.SpawnedActors.Add(SpawnedObjectB);
+			return true;
+		}
+
+		InOutPlacementState = PlacementStateBeforeSwap;
+		InOutDerivedData = DerivedDataBeforeSwap;
+
+		AnchorA->RemovePromotedWorldObject();
+		AnchorB->RemovePromotedWorldObject();
+
+		AWorldMapObject* RestoredObjectA = AnchorA->OnEnemyItemPromotion(SwapCandidate.EnemyTypeA, FailedStep);
+		AWorldMapObject* RestoredObjectB = AnchorB->OnEnemyItemPromotion(SwapCandidate.EnemyTypeB, FailedStep);
+		if (not IsValid(RestoredObjectA) || not IsValid(RestoredObjectB))
+		{
+			RTSFunctionLibrary::ReportError(TEXT(
+				"Timeout fail-safe decluster swap rollback failed to restore original anchor promotions."));
+		}
+
+		return false;
+	}
+
+	void ApplyTimeoutFailSafeEnemyDeclusterSwaps(const ECampaignGenerationStep FailedStep,
+	                                            const FWorldCampaignPlacementFailurePolicy& FailurePolicy,
+	                                            const TFunctionRef<float(EMapEnemyItem)>&
+	                                            GetFailSafeMinDistanceForEnemy,
+	                                            FWorldCampaignPlacementState& InOutPlacementState,
+	                                            FWorldCampaignDerivedData& InOutDerivedData,
+	                                            FCampaignGenerationStepTransaction& InOutFailSafeTransaction)
+	{
+		const int32 SwapBudget = FMath::Max(0, FailurePolicy.TimeoutFailSafeEnemyDeclusterSwapBudget);
+		if (SwapBudget == 0)
+		{
+			return;
+		}
+
+		TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup;
+		AnchorLookup.Reserve(InOutPlacementState.CachedAnchors.Num());
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : InOutPlacementState.CachedAnchors)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			AnchorLookup.Add(AnchorPoint->GetAnchorKey(), AnchorPoint);
+		}
+
+		const int32 TopMCandidates = FMath::Max(2, FailurePolicy.TimeoutFailSafeEnemyDeclusterTopMCandidates);
+		TSet<FString> FailedSwapPairKeys;
+		int32 AppliedSwaps = 0;
+		while (AppliedSwaps < SwapBudget)
+		{
+			const FEnemyDeclusterSwapCandidate BestSwap = FindBestEnemyDeclusterSwap(
+				InOutPlacementState,
+				AnchorLookup,
+				InOutPlacementState.PlayerHQAnchor.Get(),
+				TopMCandidates,
+				GetFailSafeMinDistanceForEnemy,
+				FailedSwapPairKeys);
+			if (not BestSwap.bIsValid)
+			{
+				return;
+			}
+
+			if (TryApplyEnemyDeclusterSwap(FailedStep, BestSwap, AnchorLookup, InOutPlacementState,
+			                               InOutDerivedData, InOutFailSafeTransaction))
+			{
+				AppliedSwaps++;
+				continue;
+			}
+
+			const FString FailedSwapPairKey = BestSwap.AnchorKeyA.ToString(EGuidFormats::DigitsWithHyphens)
+				+ TEXT("|")
+				+ BestSwap.AnchorKeyB.ToString(EGuidFormats::DigitsWithHyphens);
+			FailedSwapPairKeys.Add(FailedSwapPairKey);
+		}
+	}
+
 	void BuildBacktrackEscalationSteps(ECampaignGenerationStep FailedStep,
 	                                   TArray<ECampaignGenerationStep>& OutSteps)
 	{
@@ -5687,6 +6021,16 @@ bool AGeneratorWorldCampaign::TryApplyTimeoutFailSafePlacement(const ECampaignGe
 	                              M_PlacementFailurePolicy.TimeoutFailSafeMinSameKindXYSpacing, RemainingItems);
 	AssignFailSafeItemsFallback(RemainingItems, FailedStep, M_PlacementFailurePolicy, M_PlacementState.SeedUsed,
 	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals);
+	ApplyTimeoutFailSafeEnemyDeclusterSwaps(
+		FailedStep,
+		M_PlacementFailurePolicy,
+		[this](const EMapEnemyItem EnemyType)
+		{
+			return GetFailSafeMinDistanceForEnemy(EnemyType);
+		},
+		M_PlacementState,
+		M_DerivedData,
+		FailSafeTransaction);
 
 	if (FailSafeTransaction.SpawnedActors.Num() > 0)
 	{
