@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/SpinBox.h"
 #include "W_FactionWorldGenerationSettings.generated.h"
 
 class AFactionPlayerController;
@@ -12,7 +13,6 @@ class UCheckBox;
 class UComboBoxString;
 class UHorizontalBox;
 class URichTextBlock;
-class USlider;
 
 enum class EEnemyWorldPersonality : uint8;
 enum class ERTSGameDifficulty : uint8;
@@ -57,7 +57,7 @@ protected:
 	TObjectPtr<URichTextBlock> M_DifficultyText = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<USlider> M_SeedSlider = nullptr;
+	TObjectPtr<USpinBox<int32>> M_SeedSpinBox = nullptr;
 
 private:
 	UPROPERTY()
@@ -85,5 +85,5 @@ private:
 	bool GetIsValidPersonalityBox() const;
 	bool GetIsValidPersonalityComboBox() const;
 	bool GetIsValidDifficultyText() const;
-	bool GetIsValidSeedSlider() const;
+	bool GetIsValidSeedSpinBox() const;
 };
