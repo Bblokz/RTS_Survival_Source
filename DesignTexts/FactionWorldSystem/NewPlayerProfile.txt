@@ -1,0 +1,30 @@
+﻿
+what needs to be saved.
+
+- player faction
+- player rank.
+- player current xp. (we calculate needed and therefore percentage based on the next rank xp threshold)
+- player unspent perk points.
+- Player perk progress per perk bar.
+- list of player unlocked technologies.
+- player worldmap resources
+
+
+
+The safe, common solution
+Flatten the profile into a pure data snapshot (USTRUCT) and store that inside the campaign save.
+That gives you exactly what you want:
+one campaign save file per campaign
+campaign-local “profile” (cards/perks/tech) is stored with that campaign
+loading Campaign A always loads Campaign A’s snapshot → fairness guaranteed
+Example shape (conceptual):
+USaveWorldCampaign
+FWorldCampaignState CampaignState
+FPlayerProfileSnapshot PlayerSnapshot ✅
+Where FPlayerProfileSnapshot contains the same arrays/ints you currently store in USavePlayerProfile:
+available cards
+selected cards (FCardSaveData)
+cards in units / tech
+max slots
+nomadic layouts
+perks, bought tech, currencies, etc.
