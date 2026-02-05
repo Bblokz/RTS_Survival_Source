@@ -23,19 +23,53 @@ class UW_FactionSelectionMenu;
 class UW_FactionWorldGenerationSettings;
 enum class ERTSFaction : uint8;
 
+UENUM()
+enum class EPreviewActionType : uint8
+{
+	None,
+	Attack,
+	Rotate,
+	Move,
+	TakeOff,
+};
+
+UENUM()
+enum class EPreviewActorType : uint8
+{
+	None,
+	Tank,
+	Squad,
+	Aircraft,
+};
+
 USTRUCT(BlueprintType)
 struct FUnitPreviewActions
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	float MinTimeTillGroundAttack = 0.0f;
+	float MinTimeTillGeneralAction = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	float MaxTimeTillGroundAttack = 0.0f;
+	float MaxTimeTillGeneralAction = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float MinYawOffsetForRotation = -45.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float MaxYawOffsetForRotation = 45.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float ZTakeOffOffset = 350.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	float TimeTillOrderAircraftComeDown = 6.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TArray<FVector> GroundAttackLocations;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	TArray<FVector> SquadMovementLocations;
 };
 
 /**
@@ -116,7 +150,11 @@ private:
 	UPROPERTY()
 	TScriptInterface<ICommands> M_CurrentCommandsInterface;
 
-	FTimerHandle M_PreviewAttackTimerHandle;
+	FTimerHandle M_PreviewGeneralActionTimerHandle;
+	FTimerHandle M_PreviewAircraftComeDownTimerHandle;
+
+	EPreviewActorType M_CurrentPreviewActorType = EPreviewActorType::None;
+	EPreviewActionType M_NextPreviewAction = EPreviewActionType::None;
 
 	ERTSFaction M_SelectedFaction = ERTSFaction::NotInitialised;
 	FRTSGameDifficulty M_SelectedGameDifficulty;
@@ -140,8 +178,34 @@ private:
 	 * @param SpawnRequestId The request identifier provided to the spawner.
 	 */
 	void HandlePreviewSpawned(const FTrainingOption& TrainingOption, AActor* SpawnedActor, const int32 SpawnRequestId);
-	void ResetPreviewAttackTimer();
-	void HandlePreviewAttackTimer();
+	void ResetPreviewGeneralActionTimer();
+	void HandlePreviewGeneralActionTimer();
+	void HandlePreviewAircraftComeDownTimer();
+
+	void SetupTankPreviewActions();
+	void SetupSquadPreviewActions();
+	void SetupAircraftPreviewActions();
+
+	void HandleTankPreviewAction();
+	void HandleSquadPreviewAction();
+	void HandleAircraftPreviewTakeOffAction();
+
+	void HandleTankPreviewAttackAction();
+	void HandleTankPreviewRotateAction();
+	void HandleSquadPreviewAttackAction();
+	void HandleSquadPreviewMoveAction();
+
+	void FlipTankAction();
+	void FlipSquadAction();
+	FVector GetRandomSquadMovementLocation() const;
+	FRotator GetRandomTankPreviewRotation() const;
+	EPreviewActionType GetRandomPreviewAction(
+		const EPreviewActionType FirstAction,
+		const EPreviewActionType SecondAction) const;
+	bool GetIsValidCurrentCommandsInterface() const;
+	bool GetIsValidCurrentPreviewActor() const;
+	bool GetHasGroundAttackLocations() const;
+	bool GetHasSquadMovementLocations() const;
 	FVector GetRandomGroundAttackLocation() const;
 	void ClearCurrentPreview();
 
