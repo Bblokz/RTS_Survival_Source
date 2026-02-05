@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/EditableTextBox.h"
 #include "Components/SpinBox.h"
 #include "W_FactionWorldGenerationSettings.generated.h"
 
@@ -59,6 +60,11 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<USpinBox> M_SeedSpinBox = nullptr;
 
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UEditableTextBox> M_SeedManualInput = nullptr;
+
+	bool bM_IsUpdatingSeedControls = false;
+
 private:
 	UPROPERTY()
 	TWeakObjectPtr<AFactionPlayerController> M_FactionPlayerController;
@@ -72,7 +78,17 @@ private:
 	UFUNCTION()
 	void HandleShowAdvancedSettingsChanged(const bool bIsChecked);
 
+	UFUNCTION()
+	void HandleSeedSpinBoxChanged(float SeedValue);
+
+	UFUNCTION()
+	void HandleManualSeedTextChanged(const FText& ManualSeedText);
+
 	void SetupPersonalityComboBox();
+	void SyncSeedInputFromSpinBox(const int32 SeedValue);
+	void SyncSeedSpinBoxFromManualInput(const FString& ManualSeedInput);
+	FString ExtractNumericSeedString(const FString& RawManualSeedInput) const;
+	int32 GetSanitizedSeedValue(const FString& NumericSeedInput) const;
 	void UpdateAdvancedSettingsVisibility(const bool bIsVisible);
 	EEnemyWorldPersonality GetSelectedPersonality() const;
 	int32 GetSelectedSeed() const;
@@ -86,4 +102,5 @@ private:
 	bool GetIsValidPersonalityComboBox() const;
 	bool GetIsValidDifficultyText() const;
 	bool GetIsValidSeedSpinBox() const;
+	bool GetIsValidSeedManualInput() const;
 };
