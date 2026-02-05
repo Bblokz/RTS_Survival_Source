@@ -30,4 +30,10 @@ struct FPlayerRankProgress
 {
 	GENERATED_BODY()
 	
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	int32 PlayerExp =0;
+	
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	ERTSPlayerRank PlayerRank = ERTSPlayerRank::Corporal;
+	
 };

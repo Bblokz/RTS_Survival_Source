@@ -18,9 +18,9 @@ USTRUCT()
 struct FPlayerPerkProgress
 {
 	GENERATED_BODY()
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
 	ERTSPerkType PerkType = ERTSPerkType::None;
 		
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
 	int32 CurrentLevel = 0;
 };

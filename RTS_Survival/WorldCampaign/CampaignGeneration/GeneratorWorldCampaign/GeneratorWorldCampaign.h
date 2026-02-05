@@ -325,7 +325,7 @@ struct FCampaignGenerationStepTransaction
 	FWorldCampaignPlacementState PreviousPlacementState;
 
 	/**
-	 * @note Used in: Undo for any step.
+	 * @note Used in: Undo for any sGtep.
 	 * @note Why: Snapshot of derived data before the step for consistent rollback.
 	 * @note Technical: Copied in ExecuteStepWithTransaction prior to mutation.
 	 * @note Notes: Keeps hop/degree caches aligned with placement state during backtracking.
