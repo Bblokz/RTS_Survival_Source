@@ -46,6 +46,16 @@ struct FWorldCampaignPlacementFailurePolicy
 
 	/**
 	 * @note Used in: Timeout fail-safe placement.
+	 * @note Why: Adds extra XY spacing between anchors selected for the same fail-safe item kind.
+	 * @note Technical: Compared against squared XY distance for previously placed same-kind anchors.
+	 * @note Notes: 0 disables this check to preserve previous behavior.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
+		meta = (ClampMin = "0.0"))
+	float TimeoutFailSafeMinSameKindXYSpacing = 0.f;
+
+	/**
+	 * @note Used in: Timeout fail-safe placement.
 	 * @note Why: Sets minimum XY distance from Player HQ for Tier1 missions.
 	 * @note Technical: Compared against squared XY distance in the fail-safe pass.
 	 * @note Notes: Defaults to 0 to allow placement anywhere when unset.
