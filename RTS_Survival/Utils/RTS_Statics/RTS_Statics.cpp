@@ -5,6 +5,7 @@
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
@@ -184,6 +185,17 @@ ACPPGameState* FRTS_Statics::GetGameState(const UObject* WorldContextObject)
 		{
 			return RTSGameState;
 		}
+	}
+	return nullptr;
+}
+
+URTSGameInstance* FRTS_Statics::GetRTSGameInstance(const UObject* WorldContextObject)
+{
+	URTSGameInstance* GameInstance = Cast<URTSGameInstance>(
+		UGameplayStatics::GetGameInstance(WorldContextObject));
+	if( IsValid(GameInstance))
+	{
+		return GameInstance;
 	}
 	return nullptr;
 }

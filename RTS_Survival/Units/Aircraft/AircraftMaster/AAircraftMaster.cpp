@@ -350,6 +350,11 @@ UAircraftOwnerComp* AAircraftMaster::GetOwnerAircraft() const
 	return nullptr;
 }
 
+void AAircraftMaster::StartVerticalLanding_Preview()
+{
+	StartVerticalLanding();
+}
+
 TArray<UWeaponState*> AAircraftMaster::GetAllAircraftWeapons() const
 {
 	TArray<UWeaponState*> MyValidWeapons = {};

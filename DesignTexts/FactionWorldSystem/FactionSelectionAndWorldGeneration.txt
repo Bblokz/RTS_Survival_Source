@@ -61,7 +61,8 @@ it will then also store the picked faction in URTSGameInstance as well as the pi
 finally it will load the M_CampaignWorld.
 
 
-you need to design the interaction between the 
+you need to design the interaction between the world player controller, the world generator campaign and the game instance.
+
 now for 
 
 

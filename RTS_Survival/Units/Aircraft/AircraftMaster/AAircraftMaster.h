@@ -81,6 +81,9 @@ public:
 	/** @return The current owner component or nullptr if orphaned. */
 	UAircraftOwnerComp* GetOwnerAircraft() const;
 
+	// Cosmetic for non gameplay actions.
+	void StartVerticalLanding_Preview();
+
 	/**
 	 * @brief Gather all weapon states for external systems (e.g., targeting UI or debugging).
 	 * @return Valid weapon state pointers only (invalid entries are filtered out).

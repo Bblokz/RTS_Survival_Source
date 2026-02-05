@@ -16,6 +16,14 @@ class USoundMix;
 /**
  * @brief Game instance that wires startup systems and exposes global managers to Blueprint.
  *
+ * @note On Faction and Campaign generation.
+ * the AFactionPlayerController::HandleWorldGenerationSettingsGenerated handles providing the :
+ * @note - FCampaignGenerationSettings after interaction with last widget
+ * @note - ERTSFaction selected by the player
+ * @note - FRTSGameDifficulty selected by the player
+ * @note at the begin play of the world player controller these settings are retrieved from the game instance and
+ * provided to the world generator.
+ *
  * Handles early audio setup and keeps persistent managers alive between map transitions.
  * @note SetupMusicManager: implement in Blueprint to finish music manager setup.
  */
