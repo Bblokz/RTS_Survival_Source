@@ -10,6 +10,7 @@
 #include "RTS_Survival/UnitData/VehicleData.h"
 
 
+class URTSGameInstance;
 class AMissionManager;
 class UAnimatedTextWidgetPoolManager;
 class UPlayerPortraitManager;
@@ -100,6 +101,8 @@ public:
 
 	/** @return A IsValid CPPGameState or null. */
 	static ACPPGameState* GetGameState(const UObject* WorldContextObject);
+
+	static URTSGameInstance* GetRTSGameInstance(const UObject* WorldContextObject);
 
 	/** @return A IsValid GameExplosionsManager or null. */
 	static UGameExplosionsManager* GetGameExplosionsManager(const UObject* WorldContextObject);

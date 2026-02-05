@@ -4,7 +4,9 @@
 #include "WorldPlayerController.h"
 
 #include "EngineUtils.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
 
@@ -17,7 +19,8 @@ void AWorldPlayerController::PostInitializeComponents()
 void AWorldPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	Beginplay_HandleWorldGeneration();
+	Beginplay_SetupWorldGenerator();
+	BeginPlay_InitWorldGeneratorWithGameInstance();
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)
@@ -106,7 +109,7 @@ bool AWorldPlayerController::GetIsValidWorldCameraController() const
 	return false;
 }
 
-void AWorldPlayerController::Beginplay_HandleWorldGeneration()
+void AWorldPlayerController::Beginplay_SetupWorldGenerator()
 {
 	UWorld* World = GetWorld();
 	if (not World)
@@ -123,18 +126,41 @@ void AWorldPlayerController::Beginplay_HandleWorldGeneration()
 			break;
 		}
 	}
-	if(not IsValid(WorldGenerator))
+	if (not IsValid(WorldGenerator))
 	{
 		RTSFunctionLibrary::ReportError("did not find a valid world generator."
-								  "for the Beginplay_HandleWorldGeneration in WorldPlayerController");
+			"for the Beginplay_HandleWorldGeneration in WorldPlayerController");
 		return;
 	}
 	M_WorldGenerator = WorldGenerator;
 }
 
+void AWorldPlayerController::BeginPlay_InitWorldGeneratorWithGameInstance()
+{
+	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not GameInstance)
+	{
+		RTSFunctionLibrary::ReportError(
+			"GameInstance not valid in WorldPlayerController::BeginPlay_InitWorldGeneratorWithGameInstance");
+		return;
+	}
+	const FCampaignGenerationSettings CampaignSettings = GameInstance->GetCampaignGenerationSettings();
+	const FRTSGameDifficulty SelectedDifficulty = GameInstance->GetSelectedGameDifficulty();
+	ERTSFaction PlayerFaction = GameInstance->GetPlayerFaction();
+	// Starts world generation if needed because of the settings.
+	M_WorldGenerator->InitializeWorldGenerator(
+		this,
+		CampaignSettings,
+		SelectedDifficulty
+	);
+	M_CampaignSettings = CampaignSettings;
+	M_SelectedDifficulty = SelectedDifficulty;
+	
+}
+
 bool AWorldPlayerController::GetIsValidWorldGenerator() const
 {
-	if(not M_WorldGenerator.IsValid())
+	if (not M_WorldGenerator.IsValid())
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 			this,

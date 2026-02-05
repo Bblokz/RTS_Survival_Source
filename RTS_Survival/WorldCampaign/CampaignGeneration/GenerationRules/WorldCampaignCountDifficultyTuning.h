@@ -132,48 +132,14 @@ struct FWorldCampaignCountDifficultyTuning
 	int32 Seed = 0;
 
 	/**
-	 * Raw difficulty percentage used to scale base counts.
-	 * Example: Raise this to 150 to increase overall spawn counts by 50%.
-	 * @note Used in: Count scaling before EnemyObjectsPlaced and NeutralObjectsPlaced.
-	 * @note Why: Primary tuning lever for overall content density.
-	 * @note Technical: Clamped to DifficultyPercentMin/Max, then compressed by LogCompressionStrength.
-	 * @note Notes: Hard multiplier; very high values can exceed anchor capacity.
+	 * Raw difficulty percentage used to scale difficulty percentage of missions.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	int32 DifficultyPercentage = 100;
 
-	/**
-	 * Minimum clamp for DifficultyPercentage before compression.
-	 * Example: Raise this if you never want the campaign to scale below a baseline density.
-	 * @note Used in: DifficultyPercentage clamping.
-	 * @note Why: Prevents difficulty scaling from dropping below a baseline.
-	 * @note Technical: Applied as a hard clamp before logarithmic compression.
-	 * @note Notes: Must be <= DifficultyPercentMax; affects all difficulties equally.
-	 */
+	// How much extra base difficulty percentage is added when this option was turned on for the campaign generation.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
-	int32 DifficultyPercentMin = WorldCampaignDifficultyDefaults::DifficultyPercentMin;
-
-	/**
-	 * Maximum clamp for DifficultyPercentage before compression.
-	 * Example: Lower this to prevent extreme content spikes on very high difficulty values.
-	 * @note Used in: DifficultyPercentage clamping.
-	 * @note Why: Prevents extreme scaling spikes from overpopulating the map.
-	 * @note Technical: Applied as a hard clamp before logarithmic compression.
-	 * @note Notes: Must be >= DifficultyPercentMin; too low may flatten difficulty differences.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
-	int32 DifficultyPercentMax = WorldCampaignDifficultyDefaults::DifficultyPercentMax;
-
-	/**
-	 * Strength of logarithmic compression applied to the difficulty percentage.
-	 * Example: Increase this to soften the impact of very high difficulty values.
-	 * @note Used in: Difficulty scaling.
-	 * @note Why: Softens the impact of high DifficultyPercentage values for smoother tuning.
-	 * @note Technical: Applied after clamping as a logarithmic compression factor.
-	 * @note Notes: Higher values reduce scaling variance; lower values preserve extremes.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
-	float LogCompressionStrength = WorldCampaignDifficultyDefaults::LogCompressionStrength;
+	int32 AddedDifficultyPercentage = 25;
 
 	/**
 	 * Base enemy item counts before difficulty scaling.

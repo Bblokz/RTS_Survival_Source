@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
@@ -18,6 +19,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/WorldCampaignPlacementFailurePolicy.h"
 #include "GeneratorWorldCampaign.generated.h"
 
+class AWorldPlayerController;
 class AAnchorPoint;
 class AConnection;
 class AWorldSplineBoundary;
@@ -453,6 +455,11 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
+
+	void InitializeWorldGenerator(
+		AWorldPlayerController* WorldPlayerController,
+		FCampaignGenerationSettings CampaignGenerationSettings, FRTSGameDifficulty DifficultySettings);
+	
 
 	float GetDebugRangeOffset() const { return WorldCampaignDebugDefaults::ConnectionDrawHeightOffset; }
 	float GetDebugDisplaySeconds() const { return WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds; }
@@ -1243,4 +1250,7 @@ private:
 	// Tracks when undo operations are attributed to backtracking failures for reporting.
 	bool bM_Report_UndoContextActive = false;
 	ECampaignGenerationStep M_Report_CurrentFailureStep = ECampaignGenerationStep::NotStarted;
+
+	UPROPERTY()
+	TWeakObjectPtr<AWorldPlayerController> M_WorldPlayerController;
 };

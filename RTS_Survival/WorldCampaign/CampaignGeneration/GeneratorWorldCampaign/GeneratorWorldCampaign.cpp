@@ -14,6 +14,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Boundary/WorldSplineBoundary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
 namespace
 {
@@ -3751,6 +3752,31 @@ void AGeneratorWorldCampaign::PostInitializeComponents()
 	Super::PostInitializeComponents();
 
 	ApplyDebuggerSettingsToComponent();
+}
+
+void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* WorldPlayerController,
+                                                       const FCampaignGenerationSettings CampaignGenerationSettings,
+                                                       const FRTSGameDifficulty DifficultySettings)
+{
+	if(not IsValid(WorldPlayerController))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("InitializeWorldGenerator called with invalid WorldPlayerController."));
+		return;
+	}
+	M_WorldPlayerController = WorldPlayerController;
+	M_CountAndDifficultyTuning.Seed = CampaignGenerationSettings.GenerationSeed;
+	M_CountAndDifficultyTuning.DifficultyLevel = DifficultySettings.DifficultyLevel;
+M_CountAndDifficultyTuning.DifficultyPercentage = DifficultySettings.DifficultyPercentage;	
+	if(CampaignGenerationSettings.bUsesExtraDifficultyPercentage)
+	{
+	 M_CountAndDifficultyTuning.DifficultyPercentage += M_CountAndDifficultyTuning.AddedDifficultyPercentage;
+	}
+	if(CampaignGenerationSettings.bNeedsToGenerateCampaign)
+	{
+	ExecuteAllSteps();
+		return;
+	}
+	RTSFunctionLibrary::DisplayNotification("No campaign generation requested for this map, is this a save?");
 }
 
 #if WITH_EDITOR

@@ -1,0 +1,39 @@
+﻿FOr the faction seleection menu when the user selects
+to preview an infantry unit aka a squadcontroller's squad make sure that after that squad controller is swapped for a differentp
+actor to  preview that the entire squad is cleaned up nicely (right now the squad units remain and only the squad contorller is immediatly removed)
+in additon add settings to the faction controller FUnitPreviewActions:
+change the min max for ground attack to min max general action.
+add a setting for for min max yaw offset for rotation; if the spawned preview is a Atankmaster then we can issue the rotate towards command.
+for this you have to calcualte the location in front of the vehicel with the random yaw offset as per our bounds in the setting then a rotation command
+for the vehicle can be ordered to wards that location so the player can see different sides of the vhicle.
+
+also add an array of vector for movement locations; these will only be used for squad controllers.
+to issue a movement order on the commands interface to randomly one of those locations (to mvoe the squad)
+
+for aircraft i want you to add a float called ZTakeOffofset.
+AAircraft master already has TakeOffFromGroundOrOwner but also add a public function to set the M_AircraftMovementSettings.TakeOffHeight.
+set that to the ZTakeOffOffset value from the faction controller settings when the preview is spawned so that the aircraft will take off to that height when the preview is spawneed.
+then in case we order a take off the aircraft will not fly to high.
+
+okay so now we have extra settings and various specific extra commands depending on the preview unit. here is how you need to implement it:
+when a new preview actor is chosen check if it is tank, squad or aircraft.
+if tank: randomly decide if we do a rotation first or attack first.
+then set the timer with the general action min max and when finished issue the command that was picked.
+after that set a new timer for the other command and flip flop between these actions. make sure we pick a random new rotation
+location everytime and a random new attack location from the array each time an attack command is issued.
+make sure to add plenty of private helpers just for the tank preview code path.
+
+for squads:
+randomly decide if we do a movement first or attack first.
+then set the timer with the general action min max and when finished issue the command that was picked.
+after that set a new timer for the other command and flip flop between these actions. make sure we pick a random new movement
+location from the array each time a movement command is issued and a random new attack location from the array each time an attack command is issued.
+
+for aircraft:
+when the preview is spawned set the take off height to the ZTakeOffOffset value from the faction controller settings.
+the aircraft will never be issued attack commands only a take off command which you have to issue directly to the aaircraft master.
+add an extra setting to  the FUnitPreviewActions of float TimeTillOrderAircraftComeDown which will fire off a timer after we issue the take off
+and when it finishes it will call StartVerticalLanding_Preview on the aaircraft to bring it down again.
+after that set a new timer for take off. etc.
+
+implement all of this for the faction controller.

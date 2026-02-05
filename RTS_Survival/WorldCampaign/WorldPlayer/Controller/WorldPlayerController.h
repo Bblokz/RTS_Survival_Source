@@ -4,9 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
+#include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
 #include "WorldPlayerController.generated.h"
 
+enum class ERTSFaction : uint8;
 class AGeneratorWorldCampaign;
 class UWorldCameraController;
 
@@ -54,14 +57,11 @@ protected:
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 
-	
-
-
-
 private:
 	bool GetIsValidWorldCameraController() const;
 
-	void Beginplay_HandleWorldGeneration();
+	void Beginplay_SetupWorldGenerator();
+	void BeginPlay_InitWorldGeneratorWithGameInstance();
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldCameraController> M_WorldCameraController;
@@ -69,5 +69,8 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AGeneratorWorldCampaign> M_WorldGenerator;
 	bool GetIsValidWorldGenerator() const;
-	FWorldgene
+FCampaignGenerationSettings M_CampaignSettings ;
+	FRTSGameDifficulty M_SelectedDifficulty ;
+	ERTSFaction M_PlayerFaction ;
+	
 };
