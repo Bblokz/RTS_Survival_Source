@@ -6,6 +6,7 @@
 #include "Components/CheckBox.h"
 #include "Components/ComboBoxString.h"
 #include "Components/HorizontalBox.h"
+#include "Components/EditableTextBox.h"
 #include "Components/RichTextBlock.h"
 #include "Components/SpinBox.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -50,7 +51,8 @@ void UW_FactionWorldGenerationSettings::NativeOnInitialized()
 		or not GetIsValidPersonalityBox()
 		or not GetIsValidPersonalityComboBox()
 		or not GetIsValidDifficultyText()
-		or not GetIsValidSeedSpinBox())
+		or not GetIsValidSeedSpinBox()
+		or not GetIsValidSeedManualInput())
 	{
 		return;
 	}
@@ -71,6 +73,10 @@ void UW_FactionWorldGenerationSettings::NativeOnInitialized()
 	M_SeedSpinBox->SetMinValue(FactionWorldGenerationSettingsConstants::MinSeedValue);
 	M_SeedSpinBox->SetMaxValue(FactionWorldGenerationSettingsConstants::MaxSeedValue);
 	M_SeedSpinBox->SetValue(FactionWorldGenerationSettingsConstants::MinSeedValue);
+	M_SeedSpinBox->OnValueChanged.AddDynamic(this, &UW_FactionWorldGenerationSettings::HandleSeedSpinBoxChanged);
+
+	M_SeedManualInput->OnTextChanged.AddDynamic(this, &UW_FactionWorldGenerationSettings::HandleManualSeedTextChanged);
+	SyncSeedInputFromSpinBox(FactionWorldGenerationSettingsConstants::MinSeedValue);
 }
 
 void UW_FactionWorldGenerationSettings::HandleBackClicked()
@@ -106,6 +112,91 @@ void UW_FactionWorldGenerationSettings::HandleGenerateClicked()
 void UW_FactionWorldGenerationSettings::HandleShowAdvancedSettingsChanged(const bool bIsChecked)
 {
 	UpdateAdvancedSettingsVisibility(bIsChecked);
+}
+
+
+void UW_FactionWorldGenerationSettings::HandleSeedSpinBoxChanged(const float SeedValue)
+{
+	if (bM_IsUpdatingSeedControls)
+	{
+		return;
+	}
+
+	SyncSeedInputFromSpinBox(FMath::RoundToInt(SeedValue));
+}
+
+void UW_FactionWorldGenerationSettings::HandleManualSeedTextChanged(const FText& ManualSeedText)
+{
+	if (bM_IsUpdatingSeedControls)
+	{
+		return;
+	}
+
+	SyncSeedSpinBoxFromManualInput(ManualSeedText.ToString());
+}
+
+void UW_FactionWorldGenerationSettings::SyncSeedInputFromSpinBox(const int32 SeedValue)
+{
+	if (not GetIsValidSeedManualInput())
+	{
+		return;
+	}
+
+	bM_IsUpdatingSeedControls = true;
+	M_SeedManualInput->SetText(FText::AsNumber(SeedValue));
+	bM_IsUpdatingSeedControls = false;
+}
+
+void UW_FactionWorldGenerationSettings::SyncSeedSpinBoxFromManualInput(const FString& ManualSeedInput)
+{
+	if (not GetIsValidSeedSpinBox())
+	{
+		return;
+	}
+
+	if (not GetIsValidSeedManualInput())
+	{
+		return;
+	}
+
+	const FString NumericSeedInput = ExtractNumericSeedString(ManualSeedInput);
+	const int32 SanitizedSeedValue = GetSanitizedSeedValue(NumericSeedInput);
+
+	bM_IsUpdatingSeedControls = true;
+	M_SeedManualInput->SetText(FText::FromString(NumericSeedInput));
+	M_SeedSpinBox->SetValue(SanitizedSeedValue);
+	bM_IsUpdatingSeedControls = false;
+}
+
+FString UW_FactionWorldGenerationSettings::ExtractNumericSeedString(const FString& RawManualSeedInput) const
+{
+	FString NumericSeedInput;
+	NumericSeedInput.Reserve(RawManualSeedInput.Len());
+
+	for (const TCHAR Character : RawManualSeedInput)
+	{
+		if (FChar::IsDigit(Character))
+		{
+			NumericSeedInput.AppendChar(Character);
+		}
+	}
+
+	return NumericSeedInput;
+}
+
+int32 UW_FactionWorldGenerationSettings::GetSanitizedSeedValue(const FString& NumericSeedInput) const
+{
+	if (NumericSeedInput.IsEmpty())
+	{
+		return FactionWorldGenerationSettingsConstants::MinSeedValue;
+	}
+
+	const int64 ParsedSeedValue = FCString::Atoi64(*NumericSeedInput);
+	return static_cast<int32>(FMath::Clamp<int64>(
+		ParsedSeedValue,
+		FactionWorldGenerationSettingsConstants::MinSeedValue,
+		FactionWorldGenerationSettingsConstants::MaxSeedValue
+	));
 }
 
 void UW_FactionWorldGenerationSettings::SetupPersonalityComboBox()
@@ -345,6 +436,22 @@ bool UW_FactionWorldGenerationSettings::GetIsValidSeedSpinBox() const
 		this,
 		"M_SeedSpinBox",
 		"UW_FactionWorldGenerationSettings::GetIsValidSeedSpinBox",
+		this
+	);
+	return false;
+}
+
+bool UW_FactionWorldGenerationSettings::GetIsValidSeedManualInput() const
+{
+	if (IsValid(M_SeedManualInput))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_SeedManualInput",
+		"UW_FactionWorldGenerationSettings::GetIsValidSeedManualInput",
 		this
 	);
 	return false;
