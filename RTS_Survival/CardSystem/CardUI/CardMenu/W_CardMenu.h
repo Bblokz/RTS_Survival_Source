@@ -8,8 +8,12 @@
 #include "RTS_Survival/CardSystem/CardUI/RTSCardWidgets/W_RTSCard.h"
 #include "RTS_Survival/CardSystem/ERTSCard/ERTSCard.h"
 #include "RTS_Survival/GameUI/Popup/PopupCaller/PopupCaller.h"
+#include "RTS_Survival/WorldCampaign/PlayerProfile/PlayerCardData/PlayerCardData.h"
 #include "W_CardMenu.generated.h"
 
+class UButton;
+class UW_WorldMenu;
+struct FPlayerProfileSaveData;
 enum class ERTSPopup : uint8;
 enum class ENomadicLayoutBuildingType : uint8;
 class UW_RTSPopup;
@@ -55,6 +59,14 @@ class RTS_SURVIVAL_API UW_CardMenu : public UUserWidget, public IPopupCaller
 	GENERATED_BODY()
 
 public:
+
+	/**
+	 * @brief
+	 * Sets up the card menu with the provided player profile.
+	 */
+	void SetupCardMenuFromProfile(const FPlayerCardSaveData& InPlayerProfileCardSaveData);
+	void InitCardMenu(UW_WorldMenu* WorldMenu);
+	
 	/**
 	 * @brief Handles card hover events to display the card in the appropriate card viewer.
 	 *
@@ -166,25 +178,13 @@ protected:
 	UPROPERTY(meta = (MultiLine = true, BindWidget))
 	URichTextBlock* BonusUnitText;
 
-	/**
-	 * @brief Handles the event when the "Start Game" button is clicked.
-	 *
-	 * Validates selected cards and checks for empty slots. If any required slots are not filled, it displays a popup. Otherwise, proceeds to start the game.
-	 *
-	 * @note This function interacts with the player profile and may trigger UI popups for incomplete selections.
-	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	void OnClickStartGame();
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> BackButton;
+
+	UFUNCTION()
+	void OnClickedBackButton();
 
 private:
-	/**
-	 * @brief Loads the player profile and initializes the card menu with the player's saved data.
-	 *
-	 * This function retrieves the player's saved cards, layouts, and settings from the player profile and initializes the card picker, unit card holder, tech resource card holder, and nomadic layout accordingly.
-	 *
-	 * @note If no profile is found, default test data is used to initialize the card menu.
-	 */
-	void LoadPlayerProfile();
 
 	/**
 	 * @brief Initializes the card picker (scroll box) with available cards.
@@ -438,7 +438,7 @@ private:
 	 */
 	TArray<ERTSCard> ConvertCardPairsToCardOnly(ICardHolder* Cardholder) const;
 
-	void SaveProfileLoadMap();
+	void CreateCardDataSaveStruct();
 
 
 	float M_OriginalCardScrollBoxHeight = 0.0f;
@@ -486,4 +486,13 @@ private:
 	TArray<ERTSCard> M_TestCards_TechHolder = {ERTSCard::Card_Resource_Metal, ERTSCard::Card_Ger_Tech_PzJager};
 	int32 TestCard_MaxUnitCards = 2;
 	int32 TestCard_MaxTechCards = 8;
+
+	bool bM_IsInitialized = false;
+	UPROPERTY()
+	TWeakObjectPtr<UW_WorldMenu> M_WorldMenu;
+	bool GetIsValidWorldMenu() const;
+
+	// The collective state of the card menu to save in the player profile.
+	UPROPERTY()
+	FPlayerCardSaveData M_PlayerCardData;
 };

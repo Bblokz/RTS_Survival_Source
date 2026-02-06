@@ -10,7 +10,64 @@ FString FRTS_Profile::M_SaveSlotName = TEXT("PlayerProfile");
 FString FRTS_Profile::M_BackupSaveSlotName = TEXT("PlayerProfile_Backup");
 int32 FRTS_Profile::M_UserIndex = 0;
 TStrongObjectPtr<USavePlayerProfile> FRTS_Profile::M_TestPlayerProfile = nullptr;
+namespace ProfileHelpers
+{
+	static void NormalizePlayerCardSaveData(FPlayerCardSaveData& InOutCardSaveData)
+	{
+		// Mirrors the legacy ProfileValidator behaviour:
+		// 1) Remove duplicate Tech/Train cards from PlayerAvailableCards (based on card name).
+		{
+			TSet<ERTSCard> SeenTechTrainCards;
+			TArray<int32> IndicesToRemove;
 
+			for (int32 CardIndex = 0; CardIndex < InOutCardSaveData.PlayerAvailableCards.Num(); ++CardIndex)
+			{
+				const ERTSCard Card = InOutCardSaveData.PlayerAvailableCards[CardIndex];
+				const FString CardName = Global_GetCardAsString(Card);
+
+				if (CardName.Contains(TEXT("Tech")) || CardName.Contains(TEXT("Train")))
+				{
+					if (SeenTechTrainCards.Contains(Card))
+					{
+						IndicesToRemove.Add(CardIndex);
+						RTSFunctionLibrary::PrintToLog(
+							FString::Printf(TEXT("Duplicate card '%s' found in PlayerAvailableCards and will be removed."), *CardName),
+							false);
+						continue;
+					}
+
+					SeenTechTrainCards.Add(Card);
+				}
+			}
+
+			for (int32 RemoveIndex = IndicesToRemove.Num() - 1; RemoveIndex >= 0; --RemoveIndex)
+			{
+				InOutCardSaveData.PlayerAvailableCards.RemoveAt(IndicesToRemove[RemoveIndex]);
+			}
+		}
+
+		// 2) Remove cards from PlayerAvailableCards that also appear in NomadicBuildingLayouts (remove first hit, legacy behaviour).
+		for (const FNomadicBuildingLayoutData& LayoutData : InOutCardSaveData.NomadicBuildingLayouts)
+		{
+			for (const ERTSCard& Card : LayoutData.Cards)
+			{
+				const int32 IndexInAvailable = InOutCardSaveData.PlayerAvailableCards.Find(Card);
+				if (IndexInAvailable == INDEX_NONE)
+				{
+					continue;
+				}
+
+				RTSFunctionLibrary::PrintToLog(
+					FString::Printf(
+						TEXT("Card '%s' found in both NomadicBuildingLayouts and PlayerAvailableCards. Removing from PlayerAvailableCards."),
+						*Global_GetCardAsString(Card)),
+					false);
+
+				InOutCardSaveData.PlayerAvailableCards.RemoveAt(IndexInAvailable);
+			}
+		}
+	}
+}
 
 
 FRTS_Profile::FRTS_Profile()
@@ -53,7 +110,27 @@ USavePlayerProfile* FRTS_Profile::LoadPlayerProfile()
     return LoadedProfile;
 }
 
+FPlayerCardSaveData FRTS_Profile::BuildPlayerCardSaveData(
+	TArray<ERTSCard> PlayerAvailableCards,
+	TArray<FCardSaveData> SelectedCards,
+	const int32 MaxCardsInUnits,
+	const int32 MaxCardsInTechResources,
+	TArray<FNomadicBuildingLayoutData> NomadicBuildingLayouts,
+	TArray<ERTSCard> CardsInUnits,
+	TArray<ERTSCard> CardsInTechResources)
+{
+	FPlayerCardSaveData OutCardSaveData;
+	OutCardSaveData.PlayerAvailableCards = MoveTemp(PlayerAvailableCards);
+	OutCardSaveData.SelectedCards = MoveTemp(SelectedCards);
+	OutCardSaveData.CardsInUnits = MoveTemp(CardsInUnits);
+	OutCardSaveData.CardsInTechResources = MoveTemp(CardsInTechResources);
+	OutCardSaveData.MaxCardsInUnits = MaxCardsInUnits;
+	OutCardSaveData.MaxCardsInTechResources = MaxCardsInTechResources;
+	OutCardSaveData.NomadicBuildingLayouts = MoveTemp(NomadicBuildingLayouts);
 
+	ProfileHelpers::NormalizePlayerCardSaveData(OutCardSaveData);
+	return OutCardSaveData;
+}
 
 void FRTS_Profile::ProfileValidator(USavePlayerProfile* Profile)
 {

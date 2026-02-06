@@ -15,6 +15,8 @@
 #include "RTS_Survival/GameUI/Popup/RTSPopupTypes.h"
 #include "RTS_Survival/GameUI/Popup/W_RTSPopup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/PlayerProfile/PlayerCardData/PlayerCardData.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 #include "Sound/SoundCue.h"
 
 // Initialize the static map outside of any functions, in the .cpp file
@@ -33,9 +35,16 @@ void UW_CardMenu::NativeConstruct()
 void UW_CardMenu::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
+
+	// Bind the BackButton click event to the OnClickedBackButton function
+	if (IsValid(BackButton))
+	{
+		BackButton->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedBackButton);
+	}
+
 	if (GetIsValidCardScrollBox())
 	{
-		// set the card scroll box height
+		// Set the card scroll box height
 		UCanvasPanelSlot* ScrollSlot = Cast<UCanvasPanelSlot>(M_CardScrollBox->Slot);
 		if (IsValid(ScrollSlot))
 		{
@@ -44,10 +53,11 @@ void UW_CardMenu::NativeOnInitialized()
 	}
 }
 
+
 void UW_CardMenu::OnPopupOK()
 {
 	// Saves the profile.
-	SaveProfileLoadMap();
+	CreateCardDataSaveStruct();
 }
 
 void UW_CardMenu::OnPopupBack()
@@ -56,6 +66,16 @@ void UW_CardMenu::OnPopupBack()
 	{
 		M_PopupWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
+}
+
+void UW_CardMenu::OnClickedBackButton()
+{
+	if (RegisterSelectedCardsAndCheckSlots())
+	{
+		return;
+	}
+	// Saves the card data in M_PlayerCardData.
+	CreateCardDataSaveStruct();
 }
 
 void UW_CardMenu::InitializeCardPicker(const TArray<ERTSCard>& AvailableCards,
@@ -372,49 +392,60 @@ TArray<ERTSCard> UW_CardMenu::ConvertCardPairsToCardOnly(ICardHolder* Cardholder
 	return Cards;
 }
 
-void UW_CardMenu::SaveProfileLoadMap()
+void UW_CardMenu::CreateCardDataSaveStruct()
 {
 	if (not GetIsValidCardScrollBox() || not GetIsValidUnitCardHolder() || not GetIsValidTechCardHolder() || not
 		GetIsValidNomadicLayout())
 	{
 		return;
 	}
+
 	TArray<ERTSCard> PlayerAvailableCards;
-	auto CardsScrollBox = M_CardScrollBox->GetNonEmptyCardsHeld();
-	for (auto EachCardInBox : CardsScrollBox)
+	const auto CardsScrollBox = M_CardScrollBox->GetNonEmptyCardsHeld();
+	PlayerAvailableCards.Reserve(CardsScrollBox.Num());
+	for (const auto& EachCardInBox : CardsScrollBox)
 	{
 		PlayerAvailableCards.Add(EachCardInBox.Key);
 	}
-	TArray<FCardSaveData> SelectedCardData;
 
-	for (auto EachCard : M_SelectedCards)
+	TArray<FCardSaveData> SelectedCardData;
+	SelectedCardData.Reserve(M_SelectedCards.Num());
+	for (UW_RTSCard* const EachSelectedCardWidget : M_SelectedCards)
 	{
+		if (not GetIsCardValid(EachSelectedCardWidget))
+		{
+			continue;
+		}
+
 		FCardSaveData CardData;
-		CardData.CardType = EachCard->GetCardType();
-		CardData.Resources = EachCard->GetResources();
-		CardData.Technology = EachCard->GetTechnology();
-		CardData.TrainingOption = EachCard->GetTrainngOption();
-		CardData.UnitToCreate = EachCard->GetUnitToCreate();
+		CardData.CardType = EachSelectedCardWidget->GetCardType();
+		CardData.Resources = EachSelectedCardWidget->GetResources();
+		CardData.Technology = EachSelectedCardWidget->GetTechnology();
+		CardData.TrainingOption = EachSelectedCardWidget->GetTrainngOption();
+		CardData.UnitToCreate = EachSelectedCardWidget->GetUnitToCreate();
 		SelectedCardData.Add(CardData);
 	}
+
 	TArray<ERTSCard> CardsInUnits = ConvertCardPairsToCardOnly(M_UnitCardHolder);
 	TArray<ERTSCard> CardsInTechResources = ConvertCardPairsToCardOnly(M_TechResourceCardHolder);
+
 	const int32 MaxUnitCards = M_UnitCardHolder->GetMaxCardsToHold();
 	const int32 MaxTechCards = M_TechResourceCardHolder->GetMaxCardsToHold();
+
 	TArray<FNomadicBuildingLayoutData> NomadicLayouts = M_NomadicLayout->GetBuildingLayoutData();
-	// for (auto EachSavedData : M_NomadicLayout->GetNomadicLayoutCardSaveData())
-	// {
-	// 	SelectedCardData.Add(EachSavedData);
-	// }
 
+	M_PlayerCardData = FRTS_Profile::BuildPlayerCardSaveData(
+		MoveTemp(PlayerAvailableCards),
+		MoveTemp(SelectedCardData),
+		MaxUnitCards,
+		MaxTechCards,
+		MoveTemp(NomadicLayouts),
+		MoveTemp(CardsInUnits),
+		MoveTemp(CardsInTechResources));
 
-	if (FRTS_Profile::SaveNewPlayerProfile(PlayerAvailableCards, SelectedCardData, MaxUnitCards, MaxTechCards,
-	                                       NomadicLayouts,
-	                                       CardsInUnits, CardsInTechResources))
-	{
-		UGameplayStatics::OpenLevelBySoftObjectPtr(this, LevelToLoad);
-	}
+	// UGameplayStatics::OpenLevelBySoftObjectPtr(this, LevelToLoad);
 }
+
 
 void UW_CardMenu::CreateCardsNotFilledPopup(const uint32& EmptyUnitSlots, const uint32 EmptyTechResourceSlots,
                                             const uint32 EmptyLayoutslots, const TArray<ECardType>& UnfilledLayouts,
@@ -503,6 +534,15 @@ void UW_CardMenu::DebugSelectedCards()
 	}
 }
 
+bool UW_CardMenu::GetIsValidWorldMenu() const
+{
+	if (not M_WorldMenu.IsValid())
+	{
+		return false;
+	}
+	return true;
+}
+
 
 void UW_CardMenu::InitCardMenu(
 	UW_CardHolder* NewTechCardHolder,
@@ -552,8 +592,7 @@ void UW_CardMenu::InitCardMenu(
 			CanvasSlot->SetZOrder(999); // Similarly, set a high Z-order value
 		}
 	}
-
-	LoadPlayerProfile();
+	bM_IsInitialized = true;
 }
 
 void UW_CardMenu::OnCardHovered(const bool bIsHover, ERTSCard Card, const bool bIsLeftSide)
@@ -671,25 +710,24 @@ void UW_CardMenu::ResetHoverSoundCooldown()
 }
 
 
-void UW_CardMenu::OnClickStartGame()
+void UW_CardMenu::SetupCardMenuFromProfile(const FPlayerCardSaveData& InPlayerProfileCardSaveData)
 {
-	if (RegisterSelectedCardsAndCheckSlots())
+
+	TArray<ERTSCard> AvailableCards = InPlayerProfileCardSaveData.PlayerAvailableCards;
+	TArray<ERTSCard> CardsInUnits = InPlayerProfileCardSaveData.CardsInUnits;
+	TArray<ERTSCard> CardsInTechResources = InPlayerProfileCardSaveData.CardsInTechResources;
+	TArray<FNomadicBuildingLayoutData> BuildingLayouts = InPlayerProfileCardSaveData.NomadicBuildingLayouts;
+
+	int32 MaxUnitCards = InPlayerProfileCardSaveData.MaxCardsInUnits;
+	int32 MaxTechCards = InPlayerProfileCardSaveData.MaxCardsInTechResources;
+
+	// Defensive fallback: if capacities are invalid, assume the struct was not initialized and use test data.
+	if (MaxUnitCards <= 0 || MaxTechCards <= 0)
 	{
-		return;
-	}
-	SaveProfileLoadMap();
-}
+		RTSFunctionLibrary::ReportError(
+			TEXT(
+				"UW_CardMenu::LoadPlayerProfile received invalid card save data (slot counts <= 0). Falling back to test data."));
 
-void UW_CardMenu::LoadPlayerProfile()
-{
-	TArray<ERTSCard> AvailableCards, CardsInUnits, CardsInTechResources;
-	int32 MaxUnitCards, MaxTechCards;
-	TArray<FNomadicBuildingLayoutData> BuildingLayouts;
-
-
-	const USavePlayerProfile* LoadedProfile = FRTS_Profile::LoadPlayerProfile();
-	if (!LoadedProfile)
-	{
 		AvailableCards = M_TestCards;
 		MaxUnitCards = TestCard_MaxUnitCards;
 		MaxTechCards = TestCard_MaxTechCards;
@@ -697,20 +735,14 @@ void UW_CardMenu::LoadPlayerProfile()
 		CardsInUnits = M_TestCards_UnitHolder;
 		CardsInTechResources = M_TestCards_TechHolder;
 	}
-	else
-	{
-		// Get the available cards
-		AvailableCards = LoadedProfile->M_PLayerAvailableCards;
-		MaxUnitCards = LoadedProfile->M_MaxCardsInUnits;
-		MaxTechCards = LoadedProfile->M_MaxCardsInTechResources;
-		BuildingLayouts = LoadedProfile->M_TNomadicBuildingLayouts;
-		CardsInUnits = LoadedProfile->M_CardsInUnits;
-		CardsInTechResources = LoadedProfile->M_CardsInTechResources;
-	}
 
-	// Initialize the card picker with these cards
 	InitializeCardPicker(AvailableCards, M_BlueprintCardClass);
 	InitializeUnitCardHolder(CardsInUnits, M_BlueprintCardClass, MaxUnitCards);
 	InitializeTechCardHolder(CardsInTechResources, M_BlueprintCardClass, MaxTechCards);
 	InitializeNomadicLayout(BuildingLayouts, M_NomadicBuildingLayoutClass, M_BlueprintCardClass);
+}
+
+void UW_CardMenu::InitCardMenu(UW_WorldMenu* WorldMenu)
+{
+	M_WorldMenu = WorldMenu;
 }

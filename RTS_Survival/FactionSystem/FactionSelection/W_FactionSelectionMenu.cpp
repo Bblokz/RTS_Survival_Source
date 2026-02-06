@@ -207,7 +207,7 @@ void UW_FactionSelectionMenu::SelectGermanBreakthrough(const bool bForceAudio)
 
 void UW_FactionSelectionMenu::SelectGermanThermoKorps(const bool bForceAudio)
 {
-	M_SelectedFaction = ERTSFaction::GerThermoKorps;
+	M_SelectedFaction = ERTSFaction::GerStrikeDivision;
 	SelectFaction(M_GerThermoKorpsSetting, bForceAudio, bM_HasPlayedGerThermoKorpsAudio);
 }
 
