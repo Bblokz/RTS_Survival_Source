@@ -8,6 +8,9 @@
 #include "WorldProfileAndUIManager.generated.h"
 
 
+class AWorldPlayerController;
+class UW_WorldMenu;
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UWorldProfileAndUIManager : public UActorComponent
 {
@@ -16,11 +19,23 @@ class RTS_SURVIVAL_API UWorldProfileAndUIManager : public UActorComponent
 public:
 	// Sets default values for this component's properties
 	UWorldProfileAndUIManager();
-	
-	void OnWorldLoaded(const bool bGeneratedNewWorld, ERTSFaction PlayerFaction);
+
+	void SetupWorldMenu(AWorldPlayerController* PlayerController);
+	void OnSetupUIForNewCampaign(ERTSFaction PlayerFaction);
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TSubclassOf<UW_WorldMenu> WorldMenuClass;
+
+private:
+	UPROPERTY()
+	TWeakObjectPtr<UW_WorldMenu> M_WorldMenu;
+	bool GetIsValidWorldMenu() const;
+	UPROPERTY()
+	TWeakObjectPtr<AWorldPlayerController> M_PlayerController;
+	bool GetIsValidPlayerController() const;
+ 
 };

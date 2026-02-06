@@ -62,9 +62,10 @@ private:
 	bool GetIsValidWorldCameraController() const;
 
 	void Beginplay_SetupWorldGenerator();
+	void BeginPlay_SetupWorldMenu();
 	// Generates the new world with the settings from the game instance if needed.
 	// returns whether a full new world was generated.
-	bool BeginPlay_GetGeneratedNewWorld();
+	void BeginPlay_GenerateOrLoadWorld();
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldCameraController> M_WorldCameraController;

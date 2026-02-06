@@ -22,7 +22,8 @@ void AWorldPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	Beginplay_SetupWorldGenerator();
-	BeginPlay_GetGeneratedNewWorld();
+	BeginPlay_SetupWorldMenu();
+	BeginPlay_GenerateOrLoadWorld();
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)
@@ -137,19 +138,33 @@ void AWorldPlayerController::Beginplay_SetupWorldGenerator()
 	M_WorldGenerator = WorldGenerator;
 }
 
-bool AWorldPlayerController::BeginPlay_GetGeneratedNewWorld()
+void AWorldPlayerController::BeginPlay_SetupWorldMenu()
 {
+	if (not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
+	M_WorldProfileAndUIManager->SetupWorldMenu(this);
+}
+
+void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
+{
+	if (not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
 	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	if (not GameInstance)
 	{
 		RTSFunctionLibrary::ReportError(
 			"GameInstance not valid in WorldPlayerController::BeginPlay_InitWorldGeneratorWithGameInstance");
-		return false;
+		return;
 	}
 	const FCampaignGenerationSettings CampaignSettings = GameInstance->GetCampaignGenerationSettings();
 	const FRTSGameDifficulty SelectedDifficulty = GameInstance->GetSelectedGameDifficulty();
 	ERTSFaction PlayerFaction = GameInstance->GetPlayerFaction();
 	// Starts world generation if needed because of the settings.
+	// todo need to handle loading a saved world here later.
 	M_WorldGenerator->InitializeWorldGenerator(
 		this,
 		CampaignSettings,
@@ -157,13 +172,19 @@ bool AWorldPlayerController::BeginPlay_GetGeneratedNewWorld()
 	);
 	M_CampaignSettings = CampaignSettings;
 	M_SelectedDifficulty = SelectedDifficulty;
-	return CampaignSettings.bNeedsToGenerateCampaign;
-	
+	if (CampaignSettings.bNeedsToGenerateCampaign)
+	{
+		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(PlayerFaction);
+	}
+	else
+	{
+		// todo in case the world was loaded from save we probably want to provide a const ref to the player profile data here later.
+	}
 }
 
 bool AWorldPlayerController::GetIsValidWorldProfileAndUIManager() const
 {
-	if(not M_WorldProfileAndUIManager.IsValid())
+	if (not M_WorldProfileAndUIManager.IsValid())
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 			this,
