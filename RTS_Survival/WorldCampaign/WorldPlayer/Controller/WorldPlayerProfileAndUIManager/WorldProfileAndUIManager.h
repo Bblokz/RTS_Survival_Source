@@ -5,12 +5,16 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
+#include "RTS_Survival/WorldCampaign/SaveSystem/Defaults/FPlayerFactionDefaultProfiles.h"
 #include "WorldProfileAndUIManager.generated.h"
 
 
 class AWorldPlayerController;
 class UW_WorldMenu;
 
+/**
+ * @brief Used by the world player controller to configure and drive the world menu UI.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UWorldProfileAndUIManager : public UActorComponent
 {
@@ -37,5 +41,11 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AWorldPlayerController> M_PlayerController;
 	bool GetIsValidPlayerController() const;
+
+	// Starter/default player profiles for NEW campaigns (no existing save).
+	UPROPERTY(EditDefaultsOnly, Category="Player Profile|Defaults", meta=(ShowOnlyInnerProperties))
+	FPlayerFactionDefaultProfiles M_DefaultPlayerProfiles;
+
+	FPlayerData GetDefaultPlayerDataForFaction(const ERTSFaction PlayerFaction) const;
  
 };

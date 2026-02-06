@@ -18,9 +18,9 @@ USTRUCT(BlueprintType)
 struct FPlayerPerkProgress
 {
 	GENERATED_BODY()
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	ERTSPerkType PerkType = ERTSPerkType::None;
 		
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	int32 CurrentLevel = 0;
 };

@@ -17,7 +17,7 @@ struct FPlayerCardSaveData
 	 * card picker. Cards that are currently slotted into holders/layouts should not also remain here
 	 * (the old ProfileValidator also enforced this for nomadic layouts). Duplicates represent quantity.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<ERTSCard> PlayerAvailableCards;
 
 	/**
@@ -27,7 +27,7 @@ struct FPlayerCardSaveData
 	 * This is the data the runtime loader uses to apply gameplay: spawn starting units, grant resource bonuses,
 	 * apply researched technologies, and (optionally) update nomadic training options.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<FCardSaveData> SelectedCards;
 
 	/**
@@ -36,7 +36,7 @@ struct FPlayerCardSaveData
 	 * Used to reconstruct the UI loadout when reopening the card menu. Should contain only non-empty unit cards
 	 * and should not exceed MaxCardsInUnits.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<ERTSCard> CardsInUnits;
 
 	/**
@@ -45,7 +45,7 @@ struct FPlayerCardSaveData
 	 * Used to reconstruct the UI loadout when reopening the card menu. Should contain only non-empty tech/resource
 	 * cards and should not exceed MaxCardsInTechResources.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<ERTSCard> CardsInTechResources;
 
 	/**
@@ -54,7 +54,7 @@ struct FPlayerCardSaveData
 	 * Determines how many unit slots exist in the UI and is used when validating whether all slots are filled
 	 * (e.g., before starting the game).
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	int32 MaxCardsInUnits = 0;
 
 	/**
@@ -63,7 +63,7 @@ struct FPlayerCardSaveData
 	 * Determines how many tech/resource slots exist in the UI and is used when validating whether all slots are filled
 	 * (e.g., before starting the game).
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	int32 MaxCardsInTechResources = 0;
 
 	/**
@@ -73,6 +73,6 @@ struct FPlayerCardSaveData
 	 * Used to reconstruct the nomadic layout UI and to validate empty layout slots. Cards listed here are treated
 	 * as “consumed by the layout” and should not also exist in PlayerAvailableCards.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="BuildingType"))
 	TArray<FNomadicBuildingLayoutData> NomadicBuildingLayouts;
 };
