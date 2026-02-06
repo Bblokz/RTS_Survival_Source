@@ -11,13 +11,13 @@ struct FArchiveItemSaveData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	ERTSArchiveItem ItemType = ERTSArchiveItem::None;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	FTrainingOption OptionalUnit  = FTrainingOption();
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	int32 SortingPriority = 0;
 };
 
@@ -26,9 +26,9 @@ struct FArchiveSaveData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
-	TArray<FArchiveItemSaveData> Items = {};
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="ItemType"))
+	TArray<FArchiveItemSaveData> Items;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	ERTSArchiveType ActiveSortingType = ERTSArchiveType::GameMechanics;
 };

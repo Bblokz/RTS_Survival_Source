@@ -38,7 +38,9 @@ void UWorldProfileAndUIManager::OnSetupUIForNewCampaign(ERTSFaction PlayerFactio
 	{
 		return;
 	}
-	
+
+	const FPlayerData DefaultPlayerData = GetDefaultPlayerDataForFaction(PlayerFaction);
+	M_WorldMenu->SetupUIForPlayerProfile(DefaultPlayerData);
 }
 
 
@@ -68,4 +70,23 @@ bool UWorldProfileAndUIManager::GetIsValidPlayerController() const
 		return false;
 	}
 	return true;
+}
+
+FPlayerData UWorldProfileAndUIManager::GetDefaultPlayerDataForFaction(const ERTSFaction PlayerFaction) const
+{
+	switch (PlayerFaction)
+	{
+		case ERTSFaction::GerBreakthroughDoctrine:
+			return M_DefaultPlayerProfiles.GerBreakthroughDoctrine;
+		case ERTSFaction::GerStrikeDivision:
+			return M_DefaultPlayerProfiles.GerStrikeDivision;
+		case ERTSFaction::GerItalianFaction:
+			return M_DefaultPlayerProfiles.GerItalianFaction;
+		default:
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("Unsupported faction in GetDefaultPlayerDataForFaction: %d"),
+				static_cast<int32>(PlayerFaction)
+			));
+			return M_DefaultPlayerProfiles.GerBreakthroughDoctrine;
+	}
 }

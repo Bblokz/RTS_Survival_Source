@@ -14,14 +14,14 @@ struct FPlayerPerkSaveData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	int32 UnspentPerkPoints = 0;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	FPlayerRankProgress RankProgress;
 
 	// Contains one progress data struct for each perk type supported in the UI.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="PerkType"))
 	TArray<FPlayerPerkProgress> PerkProgress;
 
 };
@@ -31,13 +31,13 @@ struct FPlayerData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	FPlayerPerkSaveData PerkData;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	FArchiveSaveData ArchiveData;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	FPlayerCardSaveData CardData;
 	
 	
