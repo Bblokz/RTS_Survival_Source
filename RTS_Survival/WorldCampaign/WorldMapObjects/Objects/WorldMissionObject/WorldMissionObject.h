@@ -16,7 +16,7 @@ class RTS_SURVIVAL_API AWorldMissionObject : public AWorldMapObject
 	GENERATED_BODY()
 
 public:
-	void InitializeForAnchor(AAnchorPoint* AnchorPoint, EMapMission MissionType);
+	void InitializeForAnchorWithMissionType(AAnchorPoint* AnchorPoint, EMapMission MissionType);
 
 	EMapMission GetMissionType() const { return M_MissionType; }
 

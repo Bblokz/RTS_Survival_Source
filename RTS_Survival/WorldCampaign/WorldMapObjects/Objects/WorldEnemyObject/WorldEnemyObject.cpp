@@ -2,7 +2,7 @@
 
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 
-void AWorldEnemyObject::InitializeForAnchor(AAnchorPoint* AnchorPoint, EMapEnemyItem EnemyItemType)
+void AWorldEnemyObject::InitializeForAnchorWithEnemyItem(AAnchorPoint* AnchorPoint, EMapEnemyItem EnemyItemType)
 {
 	AWorldMapObject::InitializeForAnchor(AnchorPoint);
 	M_EnemyItemType = EnemyItemType;

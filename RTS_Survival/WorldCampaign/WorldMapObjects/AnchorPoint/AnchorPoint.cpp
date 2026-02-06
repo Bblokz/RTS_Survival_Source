@@ -221,7 +221,7 @@ AWorldMapObject* AAnchorPoint::OnEnemyItemPromotion(EMapEnemyItem EnemyItemType,
 		return nullptr;
 	}
 
-	SpawnedObject->InitializeForAnchor(this, EnemyItemType);
+	SpawnedObject->InitializeForAnchorWithEnemyItem(this, EnemyItemType);
 	M_PromotedWorldObject = SpawnedObject;
 	return SpawnedObject;
 }
@@ -268,7 +268,7 @@ AWorldMapObject* AAnchorPoint::OnNeutralItemPromotion(EMapNeutralObjectType Neut
 		return nullptr;
 	}
 
-	SpawnedObject->InitializeForAnchor(this, NeutralObjectType);
+	SpawnedObject->InitializeForAnchorWithNeutralObjectType(this, NeutralObjectType);
 	M_PromotedWorldObject = SpawnedObject;
 	return SpawnedObject;
 }
@@ -314,7 +314,7 @@ AWorldMapObject* AAnchorPoint::OnMissionPromotion(EMapMission MissionType, ECamp
 		return nullptr;
 	}
 
-	SpawnedObject->InitializeForAnchor(this, MissionType);
+	SpawnedObject->InitializeForAnchorWithMissionType(this, MissionType);
 	M_PromotedWorldObject = SpawnedObject;
 	return SpawnedObject;
 }
@@ -361,7 +361,7 @@ AWorldMapObject* AAnchorPoint::OnPlayerItemPromotion(EMapPlayerItem PlayerItemTy
 		return nullptr;
 	}
 
-	SpawnedObject->InitializeForAnchor(this, PlayerItemType);
+	SpawnedObject->InitializeForAnchorWithPlayerItemType(this, PlayerItemType);
 	M_PromotedWorldObject = SpawnedObject;
 	return SpawnedObject;
 }

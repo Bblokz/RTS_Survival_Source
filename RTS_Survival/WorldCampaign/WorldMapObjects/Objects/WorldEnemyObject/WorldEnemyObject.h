@@ -16,7 +16,7 @@ class RTS_SURVIVAL_API AWorldEnemyObject : public AWorldMapObject
 	GENERATED_BODY()
 
 public:
-	void InitializeForAnchor(AAnchorPoint* AnchorPoint, EMapEnemyItem EnemyItemType);
+	void InitializeForAnchorWithEnemyItem(AAnchorPoint* AnchorPoint, EMapEnemyItem EnemyItemType);
 
 	EMapEnemyItem GetEnemyItemType() const { return M_EnemyItemType; }
 
