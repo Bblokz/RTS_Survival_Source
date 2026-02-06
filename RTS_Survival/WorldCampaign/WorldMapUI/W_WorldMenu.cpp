@@ -5,6 +5,7 @@
 
 #include "ArmyLayout/ArmyLayoutMenu/W_ArmyMenuLayout.h"
 #include "PerkSystem/PerkMenu/W_WorldPerkMenu.h"
+#include "RTS_Survival/CardSystem/CardUI/CardMenu/W_CardMenu.h"
 #include "RTS_Survival/GameUI/Archive/W_Archive/W_Archive.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
@@ -22,20 +23,21 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 		RTSFunctionLibrary::ReportError("Set None focus for world UI focus state!");
 		break;
 	case EWorldUIFocusState::CommandPerks:
-		UpdateSwitchers(MenuSettings.PerkArmyWorldFullUI_Index, MenuSettings.PerkMenuIndex);
+		SetPerkMenuVisibility(true);
+		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
-	case EWorldUIFocusState::ArmyLayout:
-		UpdateSwitchers(MenuSettings.PerkArmyWorldFullUI_Index, MenuSettings.ArmyLayoutMenuIndex);
+	case EWorldUIFocusState::CardMenu:
+		UpdateUISwitch(MenuSettings.CardMenuFullUI_Index);
 		break;
 	case EWorldUIFocusState::World:
-		UpdateSwitchers(MenuSettings.PerkArmyWorldFullUI_Index, 0);
-		SetMenuSwitcherVisibility(false);
+		SetPerkMenuVisibility(false);
+		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
 	case EWorldUIFocusState::Archive:
-		UpdateSwitchers(MenuSettings.ArchiveFullUI_Index, 0);
+		UpdateUISwitch(MenuSettings.ArchiveFullUI_Index);
 		break;
 	case EWorldUIFocusState::TechTree:
-		UpdateSwitchers(MenuSettings.TechTreeFullUI_Index, 0);
+		UpdateUISwitch(MenuSettings.TechTreeFullUI_Index);
 		break;
 	}
 }
@@ -45,35 +47,46 @@ void UW_WorldMenu::OnPlayerExitsArchive()
 	UpdateMenuForNewFocus(EWorldUIFocusState::World);
 }
 
-void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController)
+void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController,
+	UWorldProfileAndUIManager* PlayerProfileUIManager)
 {
 	M_PlayerController = WorldPlayerController;
 	(void)GetIsValidPlayerController();
+	M_PlayerProfileAndUIManager = PlayerProfileUIManager;
+	(void)GetIsValidProfileAndUIManager();
 	InitMenu_InitArchive();
 	InitMenu_InitHeader();
 	InitMenu_InitPerkUI();
+	InitMenu_InitCardMenu();
 }
 
-void UW_WorldMenu::UpdateSwitchers(const int32 FullUIIndex, const int32 MenuIndex) const
+void UW_WorldMenu::SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveData)
+{
+	if(not ArchiveMenu || not PerkMenu || not CardMenu )
+	{
+		RTSFunctionLibrary::ReportError("One of the world menu subwidgets is not valid, cannot setup world menu with player profile data.");
+		return;
+	}
+	PerkMenu->SetupUIWithPlayerProfile(PlayerProfileSaveData.PerkData);
+	CardMenu->SetupCardMenuFromProfile(PlayerProfileSaveData.CardData);
+	ArchiveMenu->SetupArchiveWithPlayerProfileSaveData(PlayerProfileSaveData.ArchiveData);
+}
+
+void UW_WorldMenu::UpdateUISwitch(const int32 FullUIIndex) const
 {
 	if (FullUISwitcher)
 	{
 		FullUISwitcher->SetActiveWidgetIndex(FullUIIndex);
 	}
-	if (MenuSwitcher)
-	{
-		MenuSwitcher->SetActiveWidgetIndex(MenuIndex);
-		SetMenuSwitcherVisibility(true);
-	}
 }
 
-void UW_WorldMenu::SetMenuSwitcherVisibility(const bool bVisible) const
+void UW_WorldMenu::SetPerkMenuVisibility(const bool bVisible) const
 {
 	const ESlateVisibility NewVis = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden;
 
-	if (MenuSwitcher)
+	if (PerkMenu)
 	{
-		MenuSwitcher->SetVisibility(NewVis);
+		PerkMenu->SetVisibility(NewVis);
 	}
 }
 
@@ -119,13 +132,28 @@ void UW_WorldMenu::InitMenu_InitPerkUI()
 	PerkMenu->InitPerkMenu(this);
 }
 
-void UW_WorldMenu::InitMenu_InitArmyLayout()
+void UW_WorldMenu::InitMenu_InitCardMenu()
 {
-	if(not ArmyLayoutMenu)
+	if(not CardMenu)
 	{
 		return;
 	}
-	ArmyLayoutMenu->InitArmyLayoutMenu(this);
+	CardMenu->InitCardMenu(this);
+}
+
+bool UW_WorldMenu::GetIsValidProfileAndUIManager() const
+{
+	if(not M_PlayerProfileAndUIManager.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_ProfileAndUIManager",
+			"UW_WorldMenu::GetIsValidProfileAndUIManager",
+			this
+		);
+		return false;
+	}
+	return true;
 }
 
 

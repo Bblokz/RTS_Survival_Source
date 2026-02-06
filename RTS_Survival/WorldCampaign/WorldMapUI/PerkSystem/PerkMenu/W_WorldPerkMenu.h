@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "RTS_Survival/WorldCampaign/PlayerProfile/PlayerWorldData/FPlayerData.h"
 #include "W_WorldPerkMenu.generated.h"
 
 class UW_WorldMenu;
@@ -18,6 +19,7 @@ class RTS_SURVIVAL_API UW_WorldPerkMenu : public UUserWidget
 
 public:
 	void InitPerkMenu(UW_WorldMenu* WorldMenu);
+	void SetupUIWithPlayerProfile(const FPlayerPerkSaveData& PlayerPerkSaveData);
 
 protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))

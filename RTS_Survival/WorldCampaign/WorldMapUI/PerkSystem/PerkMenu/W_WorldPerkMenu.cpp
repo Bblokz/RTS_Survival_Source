@@ -11,6 +11,11 @@ void UW_WorldPerkMenu::InitPerkMenu(UW_WorldMenu* WorldMenu)
 	M_WorldMenu = WorldMenu;	
 }
 
+void UW_WorldPerkMenu::SetupUIWithPlayerProfile(const FPlayerPerkSaveData& PlayerPerkSaveData)
+{
+	// todo.
+}
+
 bool UW_WorldPerkMenu::GetIsValidWorldMenu() const
 {
 	if(not M_WorldMenu.IsValid())

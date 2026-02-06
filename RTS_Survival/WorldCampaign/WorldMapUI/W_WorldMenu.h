@@ -6,10 +6,13 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/WidgetSwitcher.h"
 #include "Header/W_WorldUIHeader.h"
+#include "RTS_Survival/WorldCampaign/PlayerProfile/FPlayerProfileSaveData.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 #include "WorldUIFocusState/WorldUIFocusState.h"
 #include "W_WorldMenu.generated.h"
 
 
+class UW_CardMenu;
 class AWorldPlayerController;
 
 USTRUCT(BlueprintType)
@@ -17,15 +20,13 @@ struct FWorldMenuSettings
 {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	int32 PerkMenuIndex = 0;
-	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	int32 ArmyLayoutMenuIndex = 1;
-	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	int32 PerkArmyWorldFullUI_Index = 0;
+	int32 PerkWorldFullUI_Index = 0;
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	int32 ArchiveFullUI_Index = 1;
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	int32 TechTreeFullUI_Index = 2;
+	int32 CardMenuFullUI_Index = 2;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
+	int32 TechTreeFullUI_Index = 3;
 };
 
 class UW_Archive;
@@ -45,7 +46,8 @@ public:
 	EWorldUIFocusState GetCurrentMenuFocusState() const { return M_MenuFocusState; }
 	void OnPlayerExitsArchive();
 
-	void InitWorldMenu(AWorldPlayerController* WorldPlayerController);
+	void InitWorldMenu(AWorldPlayerController* WorldPlayerController, UWorldProfileAndUIManager* PlayerProfileUIManager);
+	void SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveData);
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
@@ -57,15 +59,11 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UWidgetSwitcher> FullUISwitcher;
 
-	// To switch between the CommandPerks and the ArmyLayout menus.
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
-	TObjectPtr<UWidgetSwitcher> MenuSwitcher;
-
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_WorldPerkMenu> PerkMenu;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
-	TObjectPtr<UW_ArmyLayoutMenu> ArmyLayoutMenu;
+	TObjectPtr<UW_CardMenu> CardMenu;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_Archive> ArchiveMenu;
@@ -74,8 +72,8 @@ private:
 	UPROPERTY()
 	EWorldUIFocusState M_MenuFocusState = EWorldUIFocusState::None;
 
-	void UpdateSwitchers(const int32 FullUIIndex, const int32 MenuIndex) const;
-	void SetMenuSwitcherVisibility(const bool bVisible) const;
+	void UpdateUISwitch(const int32 FullUIIndex) const;
+	void SetPerkMenuVisibility(const bool bVisible) const;
 	UPROPERTY()
 	TWeakObjectPtr<AWorldPlayerController> M_PlayerController;
 	bool GetIsValidPlayerController() const;
@@ -83,5 +81,9 @@ private:
 	void InitMenu_InitArchive();
 	void InitMenu_InitHeader();
 	void InitMenu_InitPerkUI();
-	void InitMenu_InitArmyLayout();
+	void InitMenu_InitCardMenu();
+
+	UPROPERTY()
+	TWeakObjectPtr<UWorldProfileAndUIManager> M_PlayerProfileAndUIManager;
+	bool GetIsValidProfileAndUIManager() const;
 };

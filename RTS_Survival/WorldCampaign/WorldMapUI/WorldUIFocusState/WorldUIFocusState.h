@@ -9,7 +9,7 @@ enum class EWorldUIFocusState : uint8
 {
 	None,
 	CommandPerks,
-	ArmyLayout,
+	CardMenu,
 	World,
 	Archive,
 	TechTree
