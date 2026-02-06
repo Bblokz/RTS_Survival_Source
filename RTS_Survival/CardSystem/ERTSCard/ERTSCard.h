@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/CardSystem/CardRarity/CardRarity.h"
+
+#include "ERTSCard.generated.h"
 // When adding a new type for layouts, make sure to also add a new NOmadicLayoutBuildingType in the NomadicLayoutBuilding.h
 // Make sure that the new cards in the datatable have the correct CardType assigned.
 UENUM(BlueprintType)
