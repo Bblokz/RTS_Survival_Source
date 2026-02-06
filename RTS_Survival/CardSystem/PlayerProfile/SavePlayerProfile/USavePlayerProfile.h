@@ -19,34 +19,26 @@ struct FCardSaveData
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
-	ECardType CardType;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	ECardType CardType = ECardType::StartingUnit;
 
 	// For Unit cards
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	FTrainingOption UnitToCreate;
 
 	// For Technology cards
-	UPROPERTY()
-	ETechnology Technology;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	ETechnology Technology = static_cast<ETechnology>(0);
 
 	// For Resource cards
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	FUnitCost Resources;
 
 	// For Training Option Cards in nomadic building layouts.
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	FTrainingOption TrainingOption;
-
-	FCardSaveData()
-		: CardType(ECardType::StartingUnit)
-		  , UnitToCreate()
-		  , Technology(static_cast<ETechnology>(0))
-		  , Resources()
-		  , TrainingOption()
-	{
-	}
 };
+
 
 UCLASS()
 class RTS_SURVIVAL_API USavePlayerProfile : public USaveGame

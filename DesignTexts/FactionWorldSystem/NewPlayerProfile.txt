@@ -8,6 +8,7 @@ what needs to be saved.
 - Player perk progress per perk bar.
 - list of player unlocked technologies.
 - player worldmap resources
+- Player Profile card data.
 
 
 

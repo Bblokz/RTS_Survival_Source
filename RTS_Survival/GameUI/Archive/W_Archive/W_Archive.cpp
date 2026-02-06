@@ -6,6 +6,7 @@
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/GameUI/Archive/W_ArchiveItem/W_ArchiveItem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 
 void UW_Archive::AddArchiveItem(const ERTSArchiveItem NewItem, const FTrainingOption OptionalUnit,
                                 const int32 SortingPriority)
@@ -42,10 +43,15 @@ void UW_Archive::AddArchiveItem(const ERTSArchiveItem NewItem, const FTrainingOp
 
 void UW_Archive::SetMainGameUIReference(UMainGameUI* MainGameUI)
 {
+	bM_IsSetupWithMainMenu = true;
 	M_MainGameUI = MainGameUI;
-	// Error check.
-	(void)GetIsValidMainMenu();
 }
+
+void UW_Archive::SetWorldMenuUIReference(UW_WorldMenu* WorldMenu)
+{
+	bM_IsSetupWithMainMenu = false;
+	M_WorldMenu = WorldMenu;
+};
 
 void UW_Archive::OnOpenArchive()
 {
@@ -101,23 +107,69 @@ void UW_Archive::SortForType(const ERTSArchiveType SortingType)
 
 void UW_Archive::ExitArchive() const
 {
-	if(not GetIsValidMainMenu())
+	if(bM_IsSetupWithMainMenu)
 	{
-		return;
+		ExitArchive_MainMenu();
 	}
-	M_MainGameUI->OnCloseArchive();
+	else
+	{
+		ExitArchive_WorldMenu();
+	}
 }
 
 bool UW_Archive::GetIsValidMainMenu() const
 {
+	if(not bM_IsSetupWithMainMenu)
+	{
+		RTSFunctionLibrary::ReportError("Attempted to check validity of main menu ui on the archive but the archive"
+			"has been setup with the world menu instead!");
+		return false;
+	}
 	if(M_MainGameUI.IsValid())
 	{
 		return true;
 	}
 	RTSFunctionLibrary::ReportError(
-		TEXT("No valid MainMenu reference on ArchiveManager. ")
-		TEXT("Ensure the class is set after loading on the MainGameUI."));
+		"Invalid main menu UI reference for archive manager,"
+		"\n Ensure that the main menu reference is set when opening the archive!");
 	return false;
+}
+
+void UW_Archive::ExitArchive_MainMenu() const
+{
+	if(not GetIsValidMainMenu())
+	{
+		return;
+	}
+	M_MainGameUI->OnCloseArchive();
+	
+}
+
+bool UW_Archive::GetIsValidWorldMenu() const
+{
+	if(bM_IsSetupWithMainMenu)
+	{
+		RTSFunctionLibrary::ReportError("Attempted to check validity of world menu ui on the archive but the archive"
+			"has been setup with the main menu instead!");
+		return false;
+	}
+	if(M_WorldMenu.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportError(
+		"Invalid world menu UI reference for archive manager,"
+		"\n Ensure that the world menu reference is set when opening the archive!");
+	return false;
+}
+
+void UW_Archive::ExitArchive_WorldMenu() const
+{
+	if(not GetIsValidWorldMenu())
+	{
+		return;
+	}
+	M_WorldMenu->OnPlayerExitsArchive();
 }
 
 UW_ArchiveItem* UW_Archive::CreateNewArchiveItem()

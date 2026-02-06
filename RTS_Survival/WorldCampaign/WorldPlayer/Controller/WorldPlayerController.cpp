@@ -9,18 +9,20 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
+#include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 
 void AWorldPlayerController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	M_WorldCameraController = FindComponentByClass<UWorldCameraController>();
+	M_WorldProfileAndUIManager = FindComponentByClass<UWorldProfileAndUIManager>();
 }
 
 void AWorldPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	Beginplay_SetupWorldGenerator();
-	BeginPlay_InitWorldGeneratorWithGameInstance();
+	BeginPlay_GetGeneratedNewWorld();
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)
@@ -135,14 +137,14 @@ void AWorldPlayerController::Beginplay_SetupWorldGenerator()
 	M_WorldGenerator = WorldGenerator;
 }
 
-void AWorldPlayerController::BeginPlay_InitWorldGeneratorWithGameInstance()
+bool AWorldPlayerController::BeginPlay_GetGeneratedNewWorld()
 {
 	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	if (not GameInstance)
 	{
 		RTSFunctionLibrary::ReportError(
 			"GameInstance not valid in WorldPlayerController::BeginPlay_InitWorldGeneratorWithGameInstance");
-		return;
+		return false;
 	}
 	const FCampaignGenerationSettings CampaignSettings = GameInstance->GetCampaignGenerationSettings();
 	const FRTSGameDifficulty SelectedDifficulty = GameInstance->GetSelectedGameDifficulty();
@@ -155,7 +157,23 @@ void AWorldPlayerController::BeginPlay_InitWorldGeneratorWithGameInstance()
 	);
 	M_CampaignSettings = CampaignSettings;
 	M_SelectedDifficulty = SelectedDifficulty;
+	return CampaignSettings.bNeedsToGenerateCampaign;
 	
+}
+
+bool AWorldPlayerController::GetIsValidWorldProfileAndUIManager() const
+{
+	if(not M_WorldProfileAndUIManager.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			TEXT("M_WorldProfileAndUIManager"),
+			TEXT("GetIsValidWorldProfileAndUIManager"),
+			this
+		);
+		return false;
+	}
+	return true;
 }
 
 bool AWorldPlayerController::GetIsValidWorldGenerator() const

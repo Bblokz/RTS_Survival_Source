@@ -14,13 +14,13 @@ enum class ERTSPerkType : uint8
 	Aircraft
 };
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FPlayerPerkProgress
 {
 	GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	ERTSPerkType PerkType = ERTSPerkType::None;
 		
-	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	int32 CurrentLevel = 0;
 };

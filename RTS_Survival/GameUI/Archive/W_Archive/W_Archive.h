@@ -7,6 +7,7 @@
 
 #include "W_Archive.generated.h"
 
+class UW_WorldMenu;
 class UMainGameUI;
 class UScrollBox;
 class UW_ArchiveItem;
@@ -41,6 +42,7 @@ class UW_Archive: public UUserWidget
 public:
 	void AddArchiveItem(const ERTSArchiveItem NewItem, const FTrainingOption OptionalUnit = FTrainingOption(), const int32 SortingPriority = 0);
 	void SetMainGameUIReference(UMainGameUI* MainGameUI);
+	void SetWorldMenuUIReference(UW_WorldMenu* WorldMenu);
 	void OnOpenArchive();
 protected:
 	UFUNCTION(BlueprintCallable)
@@ -64,9 +66,18 @@ private:
 	
 	UPROPERTY()
 	TSubclassOf<UW_ArchiveItem> M_ArchiveItemClass;
+	
+	bool bM_IsSetupWithMainMenu = false;
 
+	UPROPERTY()
 	TWeakObjectPtr<UMainGameUI> M_MainGameUI;
 	bool GetIsValidMainMenu() const;
+	void ExitArchive_MainMenu() const;
+	
+	UPROPERTY()
+	TWeakObjectPtr<UW_WorldMenu> M_WorldMenu;
+	bool GetIsValidWorldMenu() const;
+	void ExitArchive_WorldMenu() const;
 
 	UW_ArchiveItem* CreateNewArchiveItem();
 
