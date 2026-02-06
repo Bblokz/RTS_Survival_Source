@@ -4,17 +4,19 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "RTS_Survival/CardSystem/CardUI/CardMenu/W_CardMenu.h"
+#include "RTS_Survival/CardSystem/CardUI/CardMenu/LayoutProfileWidgets.h"
+#include "RTS_Survival/CardSystem/CardUI/NomadLayoutWidget/NomadicLayoutBuilding/NomadicLayoutBuildingType.h"
+#include "RTS_Survival/CardSystem/ERTSCard/ERTSCard.h"
 #include "W_NomadicLayout.generated.h"
 
 struct FCardSaveData;
-class UScrollBox;
 class UHorizontalBox;
 class UW_RTSCard;
 class UW_NomadicLayoutBuilding;
 struct FNomadicBuildingLayoutData;
+class UW_CardMenu;
 /**
- * 
+ * @brief Displays one nomadic building layout at a time while retaining data for all layouts.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_NomadicLayout : public UUserWidget
@@ -33,20 +35,43 @@ public:
 	TArray<FNomadicBuildingLayoutData> GetBuildingLayoutData() const;
 
 	TArray<ECardType> GetAllLayouts() const;
+
+	void SetFocusedLayoutProfile(const ELayoutProfileWidgets NewLayoutProfile);
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UScrollBox* BuildingLayoutScrollBox;
+	UHorizontalBox* BuildingLayoutBox;
 
 private:
 	UPROPERTY()
-	TArray<TObjectPtr<UW_NomadicLayoutBuilding>> M_BuildingLayoutWidgets;
+	TObjectPtr<UW_NomadicLayoutBuilding> M_BuildingLayoutWidget;
 
 	UPROPERTY()
-	TArray<TObjectPtr<UHorizontalBox>> M_HorizontalBoxes;
+	TArray<FNomadicBuildingLayoutData> M_BuildingLayoutsData;
 
-	/** @return Either the last horzontl box added that has not yet reached the maximum amount of building layouts, or a new horizontal box
-	 * which is added to the scroll box*/
-	UHorizontalBox* GetVacantHorizontalBox(int32& OutIndexInHzBox);
+	UPROPERTY()
+	TSubclassOf<UW_NomadicLayoutBuilding> M_BuildingLayoutClass;
+
+	UPROPERTY()
+	TSubclassOf<UW_RTSCard> M_CardClass;
+
+	UPROPERTY()
+	TWeakObjectPtr<UW_CardMenu> M_CardMenu;
+
+	UPROPERTY()
+	ELayoutProfileWidgets M_CurrentLayoutProfile = ELayoutProfileWidgets::Widgets_None;
+
+	UPROPERTY()
+	ENomadicLayoutBuildingType M_CurrentBuildingType = ENomadicLayoutBuildingType::Building_None;
+
+	void UpdateFocusedBuildingData();
+
+	int32 GetBuildingLayoutIndex(const ENomadicLayoutBuildingType BuildingType) const;
+
+	ENomadicLayoutBuildingType GetBuildingTypeFromLayoutProfile(const ELayoutProfileWidgets LayoutProfile) const;
+
+	ECardType GetCardTypeFromBuildingType(const ENomadicLayoutBuildingType BuildingType) const;
+
+	void AppendSelectedCardsFromLayouts(TArray<UW_RTSCard*>& OutSelectedCards) const;
 
 	bool GetIsScrollBoxValid() const;
 };

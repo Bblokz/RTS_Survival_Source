@@ -33,7 +33,11 @@ void UW_NomadicLayoutBuilding::InitNomadicLayoutBuilding(const FNomadicBuildingL
 								  "\n BuildingType attempted to create: Building_NONE");
 		return;
 	}
-	
+
+	CardScrollBox->ClearChildren();
+	M_CardsInScrollBox.Empty();
+	M_AllowedCardTypes.Empty();
+
 	M_Slots = BuildingData.Slots;
 	M_BuildingType = BuildingData.BuildingType;
 	for (const auto EachCardType : BuildingData.Cards)
@@ -125,7 +129,7 @@ void UW_NomadicLayoutBuilding::CreateCardOfType(const ERTSCard Type, const TSubc
 {
 	// Create the card widget
 	UW_RTSCard* CardWidget = CreateWidget<UW_RTSCard>(GetWorld(), InCardClass);
-	if (!IsValid(CardWidget))
+	if (not IsValid(CardWidget))
 	{
 		RTSFunctionLibrary::ReportError("Failed to create card widget in UW_NomadicLayoutBuilding"
 			"\n for card type: " + Global_GetCardAsString(Type));
@@ -169,6 +173,15 @@ void UW_NomadicLayoutBuilding::SetupAllowedCardsFromBuildingType(const ENomadicL
 		break;
 	case ENomadicLayoutBuildingType::Building_MechanicalDepot:
 		M_AllowedCardTypes = {ECardType::MechanicalDepotTrain, ECardType::Empty};
+		break;
+	case ENomadicLayoutBuildingType::Building_T2Factory:
+		M_AllowedCardTypes = {ECardType::T2FactoryTrain, ECardType::Empty};
+		break;
+	case ENomadicLayoutBuildingType::Building_Airbase:
+		M_AllowedCardTypes = {ECardType::AirbaseTrain, ECardType::Empty};
+		break;
+	case ENomadicLayoutBuildingType::Building_Experimental:
+		M_AllowedCardTypes = {ECardType::ExperimentalFactoryTrain, ECardType::Empty};
 		break;
 	}
 }

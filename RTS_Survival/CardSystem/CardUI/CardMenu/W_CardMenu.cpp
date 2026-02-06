@@ -35,6 +35,38 @@ void UW_CardMenu::NativeOnInitialized()
 	{
 		BackButton->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedBackButton);
 	}
+	if (IsValid(StartUnits))
+	{
+		StartUnits->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedStartUnitsButton);
+	}
+	if (IsValid(ModificationsResources))
+	{
+		ModificationsResources->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedModificationsResourcesButton);
+	}
+	if (IsValid(Barracks))
+	{
+		Barracks->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedBarracksButton);
+	}
+	if (IsValid(Mechanized))
+	{
+		Mechanized->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedMechanizedButton);
+	}
+	if (IsValid(Tier1Factory))
+	{
+		Tier1Factory->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedTier1FactoryButton);
+	}
+	if (IsValid(Tier2Factory))
+	{
+		Tier2Factory->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedTier2FactoryButton);
+	}
+	if (IsValid(Aircraft))
+	{
+		Aircraft->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedAircraftButton);
+	}
+	if (IsValid(Experimental))
+	{
+		Experimental->OnClicked.AddDynamic(this, &UW_CardMenu::OnClickedExperimentalButton);
+	}
 
 	if (GetIsValidCardScrollBox())
 	{
@@ -72,6 +104,76 @@ void UW_CardMenu::OnClickedBackButton()
 	// Saves the card data in M_PlayerCardData.
 	CreateCardDataSaveStruct();
 	GoBackToWorldMenu();
+}
+
+void UW_CardMenu::OnClickedStartUnitsButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_StartUnits);
+}
+
+void UW_CardMenu::OnClickedModificationsResourcesButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_TechAndResource);
+}
+
+void UW_CardMenu::OnClickedBarracksButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_BarracksTrain);
+	if (not GetIsValidNomadicLayout())
+	{
+		return;
+	}
+	M_NomadicLayout->SetFocusedLayoutProfile(ELayoutProfileWidgets::Widgets_BarracksTrain);
+}
+
+void UW_CardMenu::OnClickedMechanizedButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_MechanisedDepotTrain);
+	if (not GetIsValidNomadicLayout())
+	{
+		return;
+	}
+	M_NomadicLayout->SetFocusedLayoutProfile(ELayoutProfileWidgets::Widgets_MechanisedDepotTrain);
+}
+
+void UW_CardMenu::OnClickedTier1FactoryButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_ForgeTrain);
+	if (not GetIsValidNomadicLayout())
+	{
+		return;
+	}
+	M_NomadicLayout->SetFocusedLayoutProfile(ELayoutProfileWidgets::Widgets_ForgeTrain);
+}
+
+void UW_CardMenu::OnClickedTier2FactoryButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_T2FactoryTrain);
+	if (not GetIsValidNomadicLayout())
+	{
+		return;
+	}
+	M_NomadicLayout->SetFocusedLayoutProfile(ELayoutProfileWidgets::Widgets_T2FactoryTrain);
+}
+
+void UW_CardMenu::OnClickedAircraftButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_AirbaseTrain);
+	if (not GetIsValidNomadicLayout())
+	{
+		return;
+	}
+	M_NomadicLayout->SetFocusedLayoutProfile(ELayoutProfileWidgets::Widgets_AirbaseTrain);
+}
+
+void UW_CardMenu::OnClickedExperimentalButton()
+{
+	SwitchLayout(ELayoutProfileWidgets::Widgets_ExperimentalFactoryTrain);
+	if (not GetIsValidNomadicLayout())
+	{
+		return;
+	}
+	M_NomadicLayout->SetFocusedLayoutProfile(ELayoutProfileWidgets::Widgets_ExperimentalFactoryTrain);
 }
 
 void UW_CardMenu::InitializeCardPicker(const TArray<ERTSCard>& AvailableCards,
@@ -470,7 +572,7 @@ void UW_CardMenu::CreateCardsNotFilledPopup(const uint32& EmptyUnitSlots, const 
 
 	// Format Layout details dynamically based on UnfilledLayouts array
 	FText NomadicLayoutDetails;
-	if (!UnfilledLayouts.IsEmpty())
+	if (not UnfilledLayouts.IsEmpty())
 	{
 		FString LayoutDetails = "There are cards available for the following layouts:";
 		for (const auto& EachLayout : UnfilledLayouts)
