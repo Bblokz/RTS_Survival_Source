@@ -74,14 +74,67 @@ enum class ERTSCard : uint8
 	Card_Train_JagerKar98,
 	Card_Train_SteelFist,
 
+	// TrainingOptions -- Armored Cars (Mechanised Depot)
+	Card_Train_Sdkfz251,
+	Card_Train_Sdkfz250,
+	Card_Train_Sdkfz250_37mm,
+	Card_Train_Sdkfz251_PZIV,
+	Card_Train_Sdkfz251_22,
+	Card_Train_Puma,
+	Card_Train_Panzerwerfer,
+	Card_Train_Sdkfz_231,
+	Card_Train_Sdkfz_232_3,
+
 	// TrainingOptions -- Light Vehicles
-	Card_Train_PzII_F,
-	Card_Train_Pz38T,
-	Card_Train_Sdkfz_140,
-	Card_Train_PzI_150MM,
 	Card_Train_PzJager,
-	Card_Train_Hetzer,
+	Card_Train_PzI_Harvester,
+	Card_Train_PzI_Scout,
+	Card_Train_PzI_150MM,
+	Card_Train_Pz38T,
+	Card_Train_Pz38T_R,
+	Card_Train_PzII_F,
+	Card_Train_Sdkfz_140,
+
+	// TrainingOptions -- Medium Vehicles
+	Card_Train_PanzerIv,
+	Card_Train_PzIII_J,
+	Card_Train_PzIII_AA,
+	Card_Train_PzIII_FLamm,
+	Card_Train_PzIII_J_Commander,
+	Card_Train_PzIII_M,
+	Card_Train_PzIV_F1,
+	Card_Train_PzIV_F1_Commander,
+	Card_Train_PzIV_G,
+	Card_Train_PzIV_H,
+	Card_Train_Stug,
 	Card_Train_Marder,
+	Card_Train_PzIV_70,
+	Card_Train_Brumbar,
+	Card_Train_Hetzer,
+	Card_Train_Jaguar,
+
+	// TrainingOptions -- Heavy/Experimental Vehicles
+	Card_Train_PantherD,
+	Card_Train_PantherG,
+	Card_Train_PanzerV_III,
+	Card_Train_PanzerV_IV,
+	Card_Train_PantherII,
+	Card_Train_KeugelT38,
+	Card_Train_JagdPanther,
+	Card_Train_SturmTiger,
+	Card_Train_Tiger,
+	Card_Train_TigerH1,
+	Card_Train_KingTiger,
+	Card_Train_Tiger105,
+	Card_Train_E25,
+	Card_Train_JagdTiger,
+	Card_Train_Maus,
+	Card_Train_E100,
+
+	// TrainingOptions -- Aircraft
+	Card_Train_Bf109,
+	Card_Train_Ju87,
+	Card_Train_Me410,
 
 	// Ger Technology Cards
 	Card_Ger_Tech_PzJager,
@@ -162,21 +215,115 @@ static FString Global_GetCardAsString(const ERTSCard Card)
 		return "Card_Train_JagerKar98";
 	case ERTSCard::Card_Train_SteelFist:
 		return "Card_Train_SteelFist";
+	// Training Options -- Armored Cars (Mechanised Depot)
+	case ERTSCard::Card_Train_Sdkfz251:
+		return "Card_Train_Sdkfz251";
+	case ERTSCard::Card_Train_Sdkfz250:
+		return "Card_Train_Sdkfz250";
+	case ERTSCard::Card_Train_Sdkfz250_37mm:
+		return "Card_Train_Sdkfz250_37mm";
+	case ERTSCard::Card_Train_Sdkfz251_PZIV:
+		return "Card_Train_Sdkfz251_PZIV";
+	case ERTSCard::Card_Train_Sdkfz251_22:
+		return "Card_Train_Sdkfz251_22";
+	case ERTSCard::Card_Train_Puma:
+		return "Card_Train_Puma";
+	case ERTSCard::Card_Train_Panzerwerfer:
+		return "Card_Train_Panzerwerfer";
+	case ERTSCard::Card_Train_Sdkfz_231:
+		return "Card_Train_Sdkfz_231";
+	case ERTSCard::Card_Train_Sdkfz_232_3:
+		return "Card_Train_Sdkfz_232_3";
 	// Training Options -- Light Vehicles
-	case ERTSCard::Card_Train_PzII_F:
-		return "Card_Train_PzII_F";
-	case ERTSCard::Card_Train_Pz38T:
-		return "Card_Train_Pz38T";
-	case ERTSCard::Card_Train_Sdkfz_140:
-		return "Card_Train_Sdkfz_140";
-	case ERTSCard::Card_Train_PzI_150MM:
-		return "Card_Train_PzI_150MM";
 	case ERTSCard::Card_Train_PzJager:
 		return "Card_Train_PzJager";
-	case ERTSCard::Card_Train_Hetzer:
-		return "Card_Train_Hetzer";
+	case ERTSCard::Card_Train_PzI_Harvester:
+		return "Card_Train_PzI_Harvester";
+	case ERTSCard::Card_Train_PzI_Scout:
+		return "Card_Train_PzI_Scout";
+	case ERTSCard::Card_Train_PzII_F:
+		return "Card_Train_PzII_F";
+	case ERTSCard::Card_Train_PzI_150MM:
+		return "Card_Train_PzI_150MM";
+	case ERTSCard::Card_Train_Pz38T:
+		return "Card_Train_Pz38T";
+	case ERTSCard::Card_Train_Pz38T_R:
+		return "Card_Train_Pz38T_R";
+	case ERTSCard::Card_Train_Sdkfz_140:
+		return "Card_Train_Sdkfz_140";
+	// Training Options -- Medium Vehicles
+	case ERTSCard::Card_Train_PanzerIv:
+		return "Card_Train_PanzerIv";
+	case ERTSCard::Card_Train_PzIII_J:
+		return "Card_Train_PzIII_J";
+	case ERTSCard::Card_Train_PzIII_AA:
+		return "Card_Train_PzIII_AA";
+	case ERTSCard::Card_Train_PzIII_FLamm:
+		return "Card_Train_PzIII_FLamm";
+	case ERTSCard::Card_Train_PzIII_J_Commander:
+		return "Card_Train_PzIII_J_Commander";
+	case ERTSCard::Card_Train_PzIII_M:
+		return "Card_Train_PzIII_M";
+	case ERTSCard::Card_Train_PzIV_F1:
+		return "Card_Train_PzIV_F1";
+	case ERTSCard::Card_Train_PzIV_F1_Commander:
+		return "Card_Train_PzIV_F1_Commander";
+	case ERTSCard::Card_Train_PzIV_G:
+		return "Card_Train_PzIV_G";
+	case ERTSCard::Card_Train_PzIV_H:
+		return "Card_Train_PzIV_H";
+	case ERTSCard::Card_Train_Stug:
+		return "Card_Train_Stug";
 	case ERTSCard::Card_Train_Marder:
 		return "Card_Train_Marder";
+	case ERTSCard::Card_Train_PzIV_70:
+		return "Card_Train_PzIV_70";
+	case ERTSCard::Card_Train_Brumbar:
+		return "Card_Train_Brumbar";
+	case ERTSCard::Card_Train_Hetzer:
+		return "Card_Train_Hetzer";
+	case ERTSCard::Card_Train_Jaguar:
+		return "Card_Train_Jaguar";
+	// Training Options -- Heavy/Experimental Vehicles
+	case ERTSCard::Card_Train_PantherD:
+		return "Card_Train_PantherD";
+	case ERTSCard::Card_Train_PantherG:
+		return "Card_Train_PantherG";
+	case ERTSCard::Card_Train_PanzerV_III:
+		return "Card_Train_PanzerV_III";
+	case ERTSCard::Card_Train_PanzerV_IV:
+		return "Card_Train_PanzerV_IV";
+	case ERTSCard::Card_Train_PantherII:
+		return "Card_Train_PantherII";
+	case ERTSCard::Card_Train_KeugelT38:
+		return "Card_Train_KeugelT38";
+	case ERTSCard::Card_Train_JagdPanther:
+		return "Card_Train_JagdPanther";
+	case ERTSCard::Card_Train_SturmTiger:
+		return "Card_Train_SturmTiger";
+	case ERTSCard::Card_Train_Tiger:
+		return "Card_Train_Tiger";
+	case ERTSCard::Card_Train_TigerH1:
+		return "Card_Train_TigerH1";
+	case ERTSCard::Card_Train_KingTiger:
+		return "Card_Train_KingTiger";
+	case ERTSCard::Card_Train_Tiger105:
+		return "Card_Train_Tiger105";
+	case ERTSCard::Card_Train_E25:
+		return "Card_Train_E25";
+	case ERTSCard::Card_Train_JagdTiger:
+		return "Card_Train_JagdTiger";
+	case ERTSCard::Card_Train_Maus:
+		return "Card_Train_Maus";
+	case ERTSCard::Card_Train_E100:
+		return "Card_Train_E100";
+	// Training Options -- Aircraft
+	case ERTSCard::Card_Train_Bf109:
+		return "Card_Train_Bf109";
+	case ERTSCard::Card_Train_Ju87:
+		return "Card_Train_Ju87";
+	case ERTSCard::Card_Train_Me410:
+		return "Card_Train_Me410";
 	// Ger Technology Cards
 	case ERTSCard::Card_Ger_Tech_PzJager:
 		return "Card_Ger_Tech_PzJager";
