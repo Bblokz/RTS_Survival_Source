@@ -7,18 +7,17 @@
 #include "NomadicBuildingLayoutData.generated.h"
 
 
-
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FNomadicBuildingLayoutData
 {
 	GENERATED_BODY()
-	
-	UPROPERTY(SaveGame)
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	ENomadicLayoutBuildingType BuildingType = ENomadicLayoutBuildingType::Building_None;
 
-	UPROPERTY(SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<ERTSCard> Cards = {};
 
-	UPROPERTY(SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
 	int32 Slots = 0;
 };
