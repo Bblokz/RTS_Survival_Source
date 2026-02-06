@@ -19,17 +19,11 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 #include "Sound/SoundCue.h"
 
-// Initialize the static map outside of any functions, in the .cpp file
-TMap<ELayoutProfileWidgets, int32> UW_CardMenu::M_TMapLayoutToIndex = {
-	{ELayoutProfileWidgets::Widgets_UnitTechResources, 0},
-	{ELayoutProfileWidgets::Widgets_NomadicLayouts, 1}
-};
-
 
 void UW_CardMenu::NativeConstruct()
 {
 	Super::NativeConstruct();
-	M_CurrentLayoutProfile = ELayoutProfileWidgets::Widgets_UnitTechResources;
+	M_CurrentLayoutProfile = ELayoutProfileWidgets::Widgets_StartUnits;
 }
 
 void UW_CardMenu::NativeOnInitialized()
@@ -650,9 +644,28 @@ void UW_CardMenu::SwitchLayout(const ELayoutProfileWidgets NewLayoutProfile)
 	{
 		return;
 	}
-	if (M_TMapLayoutToIndex.Contains(NewLayoutProfile))
+	int32 NewLayoutIndex = -1;
+	switch (NewLayoutProfile) {
+	case ELayoutProfileWidgets::Widgets_None:
+		break;
+	case ELayoutProfileWidgets::Widgets_StartUnits:
+		NewLayoutIndex = CardMenuSettings.StartUnitsLayout_Index;
+		break;
+	case ELayoutProfileWidgets::Widgets_TechAndResource:
+		NewLayoutIndex = CardMenuSettings.ResourceAndTechLayout_Index;
+		break;
+	case ELayoutProfileWidgets::Widgets_BarracksTrain:
+	case ELayoutProfileWidgets::Widgets_MechanisedDepotTrain:
+	case ELayoutProfileWidgets::Widgets_ForgeTrain:
+	case ELayoutProfileWidgets::Widgets_T2FactoryTrain:
+	case ELayoutProfileWidgets::Widgets_AirbaseTrain:
+	case ELayoutProfileWidgets::Widgets_ExperimentalFactoryTrain:
+		NewLayoutIndex = CardMenuSettings.NomadicLayout_Index;
+		break;
+	}
+	if (NewLayoutIndex >= 0)
 	{
-		M_LayoutSwitcher->SetActiveWidgetIndex(M_TMapLayoutToIndex[NewLayoutProfile]);
+		M_LayoutSwitcher->SetActiveWidgetIndex(NewLayoutIndex);
 		M_CurrentLayoutProfile = NewLayoutProfile;
 		PlayRTSCardSound(ECardSound::Sound_SwitchLayout);
 	}

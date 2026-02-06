@@ -37,6 +37,19 @@ enum class ECardViewer
 	None
 };
 
+USTRUCT()
+struct FCardMenuSettings
+{
+	GENERATED_BODY()
+	UPROPERTY(EditDefaultsOnly, Category = "CardMenu")
+	int32 StartUnitsLayout_Index = 0;
+	UPROPERTY(EditDefaultsOnly, Category = "CardMenu")
+	int32 ResourceAndTechLayout_Index= 1;
+	UPROPERTY(EditDefaultsOnly, Category = "CardMenu")
+	int32 NomadicLayout_Index= 2;
+	
+};
+
 /**
  * @brief Manages the card menu UI, including initialization, card interactions, layout switching, and sound playback.
  *
@@ -180,6 +193,33 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> BackButton;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> StartUnits;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> ModificationsResources;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> Barracks;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> Mechanized;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton>	 Tier1Factory ;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> Tier2Factory;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> Aircraft;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UButton> Experimental;
+
+	UPROPERTY(EditDefaultsOnly, Category = "CardMenu")
+	FCardMenuSettings CardMenuSettings;
 
 	UFUNCTION()
 	void OnClickedBackButton();
@@ -475,7 +515,6 @@ private:
 
 	void DebugSelectedCards();
 
-	static TMap<ELayoutProfileWidgets, int32> M_TMapLayoutToIndex;
 
 	// Test data for initialization if no player profile is found.
 	TArray<ERTSCard> M_TestCards = {
