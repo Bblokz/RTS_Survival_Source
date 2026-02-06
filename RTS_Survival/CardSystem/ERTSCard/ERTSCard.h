@@ -93,23 +93,68 @@ enum class ERTSCard : uint8
 	Card_Train_SturmKommandos,
 	Card_Train_LightBringers,
 
-	// TrainingPOptions -- Mechanised Depot
-	
+
+	// TrainingOptions -- Armored Cars (Mechanised Depot)
+	Card_Train_Sdkfz251,
+	Card_Train_Sdkfz250,
+	Card_Train_Sdkfz250_37mm,
+	Card_Train_Sdkfz251_PZIV,
+	Card_Train_Sdkfz251_22,
+	Card_Train_Puma,
+	Card_Train_Panzerwerfer,
+	Card_Train_Sdkfz_231,
+	Card_Train_Sdkfz_232_3,
 
 	// TrainingOptions -- Light Vehicles
-	Card_Train_PzII_F,
-	Card_Train_Pz38T,
-	Card_Train_Sdkfz_140,
-	Card_Train_PzI_150MM,
 	Card_Train_PzJager,
-	Card_Train_Hetzer,
-	Card_Train_Marder,
+	Card_Train_PzI_Harvester,
+	Card_Train_PzI_Scout,
+	Card_Train_PzI_150MM,
+	Card_Train_Pz38T,
+	Card_Train_Pz38T_R,
+	Card_Train_PzII_F,
+	Card_Train_Sdkfz_140,
 
 	// TrainingOptions -- Medium Vehicles
+	Card_Train_PanzerIv,
+	Card_Train_PzIII_J,
+	Card_Train_PzIII_AA,
+	Card_Train_PzIII_FLamm,
+	Card_Train_PzIII_J_Commander,
+	Card_Train_PzIII_M,
+	Card_Train_PzIV_F1,
+	Card_Train_PzIV_F1_Commander,
+	Card_Train_PzIV_G,
+	Card_Train_PzIV_H,
+	Card_Train_Stug,
+	Card_Train_Marder,
+	Card_Train_PzIV_70,
+	Card_Train_Brumbar,
+	Card_Train_Hetzer,
+	Card_Train_Jaguar,
 
-	// TrainingOptions -- Airbase
+	// TrainingOptions -- Heavy/Experimental Vehicles
+	Card_Train_PantherD,
+	Card_Train_PantherG,
+	Card_Train_PanzerV_III,
+	Card_Train_PanzerV_IV,
+	Card_Train_PantherII,
+	Card_Train_KeugelT38,
+	Card_Train_JagdPanther,
+	Card_Train_SturmTiger,
+	Card_Train_Tiger,
+	Card_Train_TigerH1,
+	Card_Train_KingTiger,
+	Card_Train_Tiger105,
+	Card_Train_E25,
+	Card_Train_JagdTiger,
+	Card_Train_Maus,
+	Card_Train_E100,
 
-	// TrainingOptions -- Heavy and Experimental Vehicles
+	// TrainingOptions -- Aircraft
+	Card_Train_Bf109,
+	Card_Train_Ju87,
+	Card_Train_Me410,
 	
 	// Ger Technology Cards
 	Card_Ger_Tech_PzJager,
