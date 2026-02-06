@@ -4,6 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "RTS_Survival/GameUI/Archive/ArchiveItemTypes/ArchiveItemTypes.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
+#include "RTS_Survival/WorldCampaign/PlayerProfile/PlayerWorldData/ArchiveSaveData/FArchiveSaveData.h"
 
 #include "W_Archive.generated.h"
 
@@ -44,6 +45,7 @@ public:
 	void SetMainGameUIReference(UMainGameUI* MainGameUI);
 	void SetWorldMenuUIReference(UW_WorldMenu* WorldMenu);
 	void OnOpenArchive();
+	void SetupArchiveWithPlayerProfileSaveData(const FArchiveSaveData& ArchiveSaveData);
 protected:
 	UFUNCTION(BlueprintCallable)
 	void InitArchive(

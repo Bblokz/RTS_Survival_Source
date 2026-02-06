@@ -58,6 +58,11 @@ void UW_Archive::OnOpenArchive()
 	BP_OnOpenArchive();
 }
 
+void UW_Archive::SetupArchiveWithPlayerProfileSaveData(const FArchiveSaveData& ArchiveSaveData)
+{
+	// todo.
+}
+
 void UW_Archive::InitArchive(const TSubclassOf<UW_ArchiveItem>& ArchiveItemClass)
 {
 	M_ArchiveItemClass = ArchiveItemClass;

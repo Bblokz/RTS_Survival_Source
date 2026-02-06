@@ -69,7 +69,7 @@ void UW_WorldUIHeader::OnClickedArmyLayout()
 	{
 		return;
 	}
-	M_WorldMenu->UpdateMenuForNewFocus(EWorldUIFocusState::ArmyLayout);
+	M_WorldMenu->UpdateMenuForNewFocus(EWorldUIFocusState::CardMenu);
 }
 
 void UW_WorldUIHeader::OnClickedWorldMap()
