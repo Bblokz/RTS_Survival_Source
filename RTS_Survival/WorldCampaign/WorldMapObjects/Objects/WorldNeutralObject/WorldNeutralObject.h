@@ -16,7 +16,7 @@ class RTS_SURVIVAL_API AWorldNeutralObject : public AWorldMapObject
 	GENERATED_BODY()
 
 public:
-	void InitializeForAnchor(AAnchorPoint* AnchorPoint, EMapNeutralObjectType NeutralObjectType);
+	void InitializeForAnchorWithNeutralObjectType(AAnchorPoint* AnchorPoint, EMapNeutralObjectType NeutralObjectType);
 
 	EMapNeutralObjectType GetNeutralObjectType() const { return M_NeutralObjectType; }
 

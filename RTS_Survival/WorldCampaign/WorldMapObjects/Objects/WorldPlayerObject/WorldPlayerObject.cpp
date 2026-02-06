@@ -2,7 +2,7 @@
 
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldPlayerObject/WorldPlayerObject.h"
 
-void AWorldPlayerObject::InitializeForAnchor(AAnchorPoint* AnchorPoint, EMapPlayerItem PlayerItemType)
+void AWorldPlayerObject::InitializeForAnchorWithPlayerItemType(AAnchorPoint* AnchorPoint, EMapPlayerItem PlayerItemType)
 {
 	AWorldMapObject::InitializeForAnchor(AnchorPoint);
 	M_PlayerItemType = PlayerItemType;

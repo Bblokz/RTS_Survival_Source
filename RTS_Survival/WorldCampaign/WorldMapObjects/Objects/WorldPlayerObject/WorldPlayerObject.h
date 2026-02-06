@@ -16,7 +16,7 @@ class RTS_SURVIVAL_API AWorldPlayerObject : public AWorldMapObject
 	GENERATED_BODY()
 
 public:
-	void InitializeForAnchor(AAnchorPoint* AnchorPoint, EMapPlayerItem PlayerItemType);
+	void InitializeForAnchorWithPlayerItemType(AAnchorPoint* AnchorPoint, EMapPlayerItem PlayerItemType);
 
 	EMapPlayerItem GetPlayerItemType() const { return M_PlayerItemType; }
 
