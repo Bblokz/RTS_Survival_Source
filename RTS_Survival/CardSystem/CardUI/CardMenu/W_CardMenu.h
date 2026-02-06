@@ -495,4 +495,6 @@ private:
 	// The collective state of the card menu to save in the player profile.
 	UPROPERTY()
 	FPlayerCardSaveData M_PlayerCardData;
+
+	void GoBackToWorldMenu() const;
 };

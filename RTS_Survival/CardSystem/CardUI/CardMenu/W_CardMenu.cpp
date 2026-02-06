@@ -58,6 +58,7 @@ void UW_CardMenu::OnPopupOK()
 {
 	// Saves the profile.
 	CreateCardDataSaveStruct();
+	GoBackToWorldMenu();
 }
 
 void UW_CardMenu::OnPopupBack()
@@ -76,6 +77,7 @@ void UW_CardMenu::OnClickedBackButton()
 	}
 	// Saves the card data in M_PlayerCardData.
 	CreateCardDataSaveStruct();
+	GoBackToWorldMenu();
 }
 
 void UW_CardMenu::InitializeCardPicker(const TArray<ERTSCard>& AvailableCards,
@@ -541,6 +543,16 @@ bool UW_CardMenu::GetIsValidWorldMenu() const
 		return false;
 	}
 	return true;
+}
+
+void UW_CardMenu::GoBackToWorldMenu() const
+{
+	
+	if(not GetIsValidWorldMenu())
+	{
+		return;
+	}
+	M_WorldMenu->UpdateMenuForNewFocus(EWorldUIFocusState::World);
 }
 
 

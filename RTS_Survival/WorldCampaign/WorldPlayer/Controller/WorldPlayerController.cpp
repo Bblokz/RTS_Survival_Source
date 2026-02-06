@@ -145,6 +145,10 @@ void AWorldPlayerController::BeginPlay_SetupWorldMenu()
 		return;
 	}
 	M_WorldProfileAndUIManager->SetupWorldMenu(this);
+	FInputModeGameAndUI NewInputMode;
+	NewInputMode.SetHideCursorDuringCapture(false);
+	NewInputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+	SetInputMode(NewInputMode);
 }
 
 void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
