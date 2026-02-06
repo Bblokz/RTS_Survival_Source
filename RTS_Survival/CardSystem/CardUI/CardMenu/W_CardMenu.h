@@ -224,6 +224,30 @@ protected:
 	UFUNCTION()
 	void OnClickedBackButton();
 
+	UFUNCTION()
+	void OnClickedStartUnitsButton();
+
+	UFUNCTION()
+	void OnClickedModificationsResourcesButton();
+
+	UFUNCTION()
+	void OnClickedBarracksButton();
+
+	UFUNCTION()
+	void OnClickedMechanizedButton();
+
+	UFUNCTION()
+	void OnClickedTier1FactoryButton();
+
+	UFUNCTION()
+	void OnClickedTier2FactoryButton();
+
+	UFUNCTION()
+	void OnClickedAircraftButton();
+
+	UFUNCTION()
+	void OnClickedExperimentalButton();
+
 private:
 
 	/**
