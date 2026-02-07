@@ -149,6 +149,7 @@ void AWorldPlayerController::BeginPlay_SetupWorldMenu()
 	NewInputMode.SetHideCursorDuringCapture(false);
 	NewInputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
 	SetInputMode(NewInputMode);
+	bShowMouseCursor = true;
 }
 
 void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
