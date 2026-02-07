@@ -152,7 +152,7 @@ void UW_NomadicLayoutBuilding::CreateCardOfType(const ERTSCard Type, const TSubc
 		return;
 	}
 	ScaleBox->SetStretch(EStretch::UserSpecified);
-	ScaleBox->SetUserSpecifiedScale(0.5f);
+	ScaleBox->SetUserSpecifiedScale(CardsScale);
 	ScaleBox->SetStretchDirection(EStretchDirection::Both);
 	ScaleBox->AddChild(CardWidget);
 	CardScrollBox->AddChild(ScaleBox);

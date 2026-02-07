@@ -38,6 +38,8 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	UScrollBox* CardScrollBox;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float CardsScale = 1.2;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "NomadicLayoutBuilding")
 	void OnSetupNOmadicBuildingLayout(const ENomadicLayoutBuildingType BuildingType);
