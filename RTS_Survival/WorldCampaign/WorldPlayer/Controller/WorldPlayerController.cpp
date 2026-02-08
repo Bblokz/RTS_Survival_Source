@@ -4,12 +4,20 @@
 #include "WorldPlayerController.h"
 
 #include "EngineUtils.h"
+#include "WorldPlayerOutliner/PlayerWorldOutliner.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
+
+AWorldPlayerController::AWorldPlayerController()
+{
+	PrimaryActorTick.bCanEverTick = true;
+
+	M_PlayerWorldOutliner = CreateDefaultSubobject<UPlayerWorldOutliner>(TEXT("PlayerWorldOutliner"));
+}
 
 void AWorldPlayerController::PostInitializeComponents()
 {
@@ -24,6 +32,21 @@ void AWorldPlayerController::BeginPlay()
 	Beginplay_SetupWorldGenerator();
 	BeginPlay_SetupWorldMenu();
 	BeginPlay_GenerateOrLoadWorld();
+}
+
+void AWorldPlayerController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (not GetIsValidPlayerWorldOutliner())
+	{
+		return;
+	}
+
+	FHitResult HitResultCursorProjection;
+	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResultCursorProjection);
+	AActor* HitActor = bHit ? HitResultCursorProjection.GetActor() : nullptr;
+	M_PlayerWorldOutliner->OnPlayerTick(HitActor, HitResultCursorProjection.Location);
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)
@@ -107,6 +130,22 @@ bool AWorldPlayerController::GetIsValidWorldCameraController() const
 		this,
 		TEXT("M_WorldCameraController"),
 		TEXT("GetIsValidWorldCameraController"),
+		this
+	);
+	return false;
+}
+
+bool AWorldPlayerController::GetIsValidPlayerWorldOutliner() const
+{
+	if (IsValid(M_PlayerWorldOutliner))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_PlayerWorldOutliner"),
+		TEXT("GetIsValidPlayerWorldOutliner"),
 		this
 	);
 	return false;
