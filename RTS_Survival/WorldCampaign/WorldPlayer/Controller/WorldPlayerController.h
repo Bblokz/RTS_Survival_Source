@@ -13,6 +13,7 @@ class UWorldProfileAndUIManager;
 enum class ERTSFaction : uint8;
 class AGeneratorWorldCampaign;
 class UWorldCameraController;
+class UPlayerWorldOutliner;
 
 /**
  * @brief Controller used by the world campaign Blueprint to route Enhanced Input
@@ -29,6 +30,8 @@ class RTS_SURVIVAL_API AWorldPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 public:
+	AWorldPlayerController();
+
 	UFUNCTION(BlueprintCallable)
 	void SetIsWorldCameraMovementDisabled(bool bIsDisabled);
 
@@ -57,9 +60,11 @@ public:
 protected:
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 
 private:
 	bool GetIsValidWorldCameraController() const;
+	bool GetIsValidPlayerWorldOutliner() const;
 
 	void Beginplay_SetupWorldGenerator();
 	void BeginPlay_SetupWorldMenu();
@@ -69,6 +74,9 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldCameraController> M_WorldCameraController;
+
+	UPROPERTY()
+	TObjectPtr<UPlayerWorldOutliner> M_PlayerWorldOutliner = nullptr;
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldProfileAndUIManager> M_WorldProfileAndUIManager;
