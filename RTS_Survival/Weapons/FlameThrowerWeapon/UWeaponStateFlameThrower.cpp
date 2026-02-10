@@ -527,11 +527,18 @@ void UWeaponStateFlameThrower::EnqueueRayAsync(const int32 RayIndex, const FVect
 	const int32 SerialCopy   = Pending.Serial;
 	const int32 RayIndexCopy = RayIndex;
 
+	const TWeakObjectPtr<UWeaponStateFlameThrower> WeakWeaponStateFlameThrower = this;
 	FTraceDelegate TraceDelegate;
 	TraceDelegate.BindLambda(
-		[this, SerialCopy, RayIndexCopy](const FTraceHandle& /*Handle*/, FTraceDatum& TraceDatum)
+		[WeakWeaponStateFlameThrower, SerialCopy, RayIndexCopy](const FTraceHandle& /*Handle*/, FTraceDatum& TraceDatum)
 		{
-			this->OnSingleRayAsyncComplete(SerialCopy, RayIndexCopy, TraceDatum);
+			if (not WeakWeaponStateFlameThrower.IsValid())
+			{
+				return;
+			}
+
+			UWeaponStateFlameThrower* StrongWeaponStateFlameThrower = WeakWeaponStateFlameThrower.Get();
+			StrongWeaponStateFlameThrower->OnSingleRayAsyncComplete(SerialCopy, RayIndexCopy, TraceDatum);
 		});
 
 	World->AsyncLineTraceByChannel(

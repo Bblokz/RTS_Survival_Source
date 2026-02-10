@@ -18,10 +18,13 @@ void FOnArchiveLoadedCallbacks::CallbackOnArchiveReady(TFunction<void()> Callbac
 	// Not loaded yet; save the callback for later execution.
 	OnArchiveReady.AddLambda([WeakCallbackOwner, Callback]()->void
 	{
-		if (WeakCallbackOwner.IsValid())
+		if (not WeakCallbackOwner.IsValid())
 		{
-			Callback();
+			return;
 		}
+
+		UObject* StrongCallbackOwner = WeakCallbackOwner.Get();
+		Callback();
 	});
 }
 

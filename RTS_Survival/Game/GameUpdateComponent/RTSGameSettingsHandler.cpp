@@ -13,12 +13,19 @@ URTSGameSettingsHandler::URTSGameSettingsHandler()
 void URTSGameSettingsHandler::OnDeselectedDecalUpdate(bool bIsUsed)
 {
 	// We use a lambda to capter the this pointer to bind our member function as a callaback.
+	const TWeakObjectPtr<URTSGameSettingsHandler> WeakSettingsHandler = this;
 	UpdateComponentsOfTypeAsync<USelectionComponent, bool>(
 		this,
-		// capture this to call the member function as TFUNCTION cannot be used directly (without the class instance).
-		[this](const TArray<USelectionComponent*>& Components, ERTSGameSetting SettingUpdated, bool ValueUpdatedSetting)
+		// Capture a weak owner because callback execution is asynchronous.
+		[WeakSettingsHandler](const TArray<USelectionComponent*>& Components, ERTSGameSetting SettingUpdated, bool ValueUpdatedSetting)
 		{
-			this->UpdateSelectionComponentsCallBack(Components, SettingUpdated, ValueUpdatedSetting);
+			if (not WeakSettingsHandler.IsValid())
+			{
+				return;
+			}
+
+			URTSGameSettingsHandler* StrongSettingsHandler = WeakSettingsHandler.Get();
+			StrongSettingsHandler->UpdateSelectionComponentsCallBack(Components, SettingUpdated, ValueUpdatedSetting);
 		},
 		ERTSGameSetting::UseDeselectedDecals,
 		bIsUsed

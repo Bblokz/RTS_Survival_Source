@@ -106,6 +106,9 @@ private:
 	UPROPERTY()
 	UAudioComponent* M_FlyBySoundSystem = nullptr;
 
+
+	// Owning anim instance used for safe lambda callbacks into this controller.
+	TWeakObjectPtr<UAircraftAnimInstance> M_OwningAircraftAnimInstance;
 	// World cache for timers (set in Init).
 	TWeakObjectPtr<UWorld> M_World;
 

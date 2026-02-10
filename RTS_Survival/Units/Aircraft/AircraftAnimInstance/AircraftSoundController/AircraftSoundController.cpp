@@ -22,6 +22,7 @@ void FAircraftSoundController::InitEngineSound(AAircraftMaster* OwningAircraft,
 	}
 
 	// Cache world once (requested for timer convenience).
+	M_OwningAircraftAnimInstance = OwningAnimInst;
 	M_World = OwningAircraft->GetWorld();
 
 	// If we already have a valid component, don't create another one.
@@ -443,11 +444,18 @@ void FAircraftSoundController::FlyBySound_ScheduleNext()
 
 	const float Delay = FlyBySound_PickRandomDelay();
 
+	const TWeakObjectPtr<UAircraftAnimInstance> WeakOwningAircraftAnimInstance = M_OwningAircraftAnimInstance;
 	World->GetTimerManager().SetTimer(
 		M_FlyByTimer,
-		FTimerDelegate::CreateLambda([this]()
+		FTimerDelegate::CreateLambda([WeakOwningAircraftAnimInstance]()
 		{
-			FlyBySound_PlayNext();
+			if (not WeakOwningAircraftAnimInstance.IsValid())
+			{
+				return;
+			}
+
+			UAircraftAnimInstance* StrongOwningAircraftAnimInstance = WeakOwningAircraftAnimInstance.Get();
+			StrongOwningAircraftAnimInstance->AircraftSoundController.FlyBySound_PlayNext();
 		}),
 		Delay,
 		false
@@ -491,11 +499,18 @@ void FAircraftSoundController::FlyBySound_PlayNext()
 		UWorld* World = M_World.Get();
 		if (IsValid(World))
 		{
+			const TWeakObjectPtr<UAircraftAnimInstance> WeakOwningAircraftAnimInstance = M_OwningAircraftAnimInstance;
 			World->GetTimerManager().SetTimer(
 				M_FlyByDeactivateTimer,
-				FTimerDelegate::CreateLambda([this]()
+				FTimerDelegate::CreateLambda([WeakOwningAircraftAnimInstance]()
 				{
-					FlyBySound_DeactivateAfterPlay();
+					if (not WeakOwningAircraftAnimInstance.IsValid())
+					{
+						return;
+					}
+
+					UAircraftAnimInstance* StrongOwningAircraftAnimInstance = WeakOwningAircraftAnimInstance.Get();
+					StrongOwningAircraftAnimInstance->AircraftSoundController.FlyBySound_DeactivateAfterPlay();
 				}),
 				Duration,
 				false

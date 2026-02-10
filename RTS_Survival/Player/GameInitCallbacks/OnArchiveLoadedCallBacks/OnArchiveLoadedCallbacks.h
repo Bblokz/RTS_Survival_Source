@@ -24,11 +24,18 @@ struct FOnArchiveLoadedCallbacks
 	template <typename T>
 	void CallbackOnArchiveReady(void (T::*InCallback)(), T* InCallbackOwner)
 	{
-		TFunction<void()> BoundCallback = [InCallbackOwner, InCallback]()
+		const TWeakObjectPtr<T> WeakCallbackOwner = InCallbackOwner;
+		TFunction<void()> BoundCallback = [WeakCallbackOwner, InCallback]()
 		{
-			(InCallbackOwner->*InCallback)();
+			if (not WeakCallbackOwner.IsValid())
+			{
+				return;
+			}
+
+			T* StrongCallbackOwner = WeakCallbackOwner.Get();
+			(StrongCallbackOwner->*InCallback)();
 		};
-		CallbackOnMenuReady(BoundCallback, InCallbackOwner);
+		CallbackOnArchiveReady(BoundCallback, InCallbackOwner);
 	}
 
 private:

@@ -36,9 +36,16 @@ public:
 	template <typename T>
 	void CallbackOnProjectileMgrReady(void (T::*InCallback)(const TObjectPtr<ASmallArmsProjectileManager>&), T* InCallbackOwner)
 	{
-		TFunction<void(const TObjectPtr<ASmallArmsProjectileManager>&)> BoundCallback = [InCallbackOwner, InCallback](const TObjectPtr<ASmallArmsProjectileManager>& Manager)
+		const TWeakObjectPtr<T> WeakCallbackOwner = InCallbackOwner;
+		TFunction<void(const TObjectPtr<ASmallArmsProjectileManager>&)> BoundCallback = [WeakCallbackOwner, InCallback](const TObjectPtr<ASmallArmsProjectileManager>& Manager)
 		{
-			(InCallbackOwner->*InCallback)(Manager);
+			if (not WeakCallbackOwner.IsValid())
+			{
+				return;
+			}
+
+			T* StrongCallbackOwner = WeakCallbackOwner.Get();
+			(StrongCallbackOwner->*InCallback)(Manager);
 		};
 		CallbackOnProjectileMgrReady(BoundCallback, InCallbackOwner);
 	}

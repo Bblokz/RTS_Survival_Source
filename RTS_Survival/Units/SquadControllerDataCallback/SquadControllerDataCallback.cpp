@@ -16,10 +16,13 @@ void FSquadDataCallbacks::CallbackOnSquadDataLoaded(TFunction<void()> Callback,
 	// Otherwise, add the lambda to the delegate for later execution.
 	OnSquadDataReady.AddLambda([WeakCallbackOwner, Callback]()->void
 	{
-		if (WeakCallbackOwner.IsValid())
+		if (not WeakCallbackOwner.IsValid())
 		{
-			Callback();
+			return;
 		}
+
+		UObject* StrongCallbackOwner = WeakCallbackOwner.Get();
+		Callback();
 	});
 }
 
