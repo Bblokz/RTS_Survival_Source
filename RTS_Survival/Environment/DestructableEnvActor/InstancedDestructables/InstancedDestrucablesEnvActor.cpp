@@ -212,13 +212,20 @@ void AInstancedDestrucablesEnvActor::AsyncLoadDestroyedMesh() const
 	}
 	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
 	const FSoftObjectPath MeshPath = DestroyedMesh.ToSoftObjectPath();
-	Streamable.RequestAsyncLoad(MeshPath, FStreamableDelegate::CreateLambda([this]()
+	TWeakObjectPtr<AInstancedDestrucablesEnvActor> WeakInstancedDestructableActor = this;
+	Streamable.RequestAsyncLoad(MeshPath, FStreamableDelegate::CreateLambda([WeakInstancedDestructableActor]()
 	{
-		if (UStaticMesh* const LoadedMesh = DestroyedMesh.Get())
+		if (not WeakInstancedDestructableActor.IsValid())
 		{
-			if (M_DestroyedMeshComponent)
+			return;
+		}
+
+		AInstancedDestrucablesEnvActor* StrongInstancedDestructableActor = WeakInstancedDestructableActor.Get();
+		if (UStaticMesh* const LoadedMesh = StrongInstancedDestructableActor->DestroyedMesh.Get())
+		{
+			if (StrongInstancedDestructableActor->M_DestroyedMeshComponent)
 			{
-				M_DestroyedMeshComponent->SetStaticMesh(LoadedMesh);
+				StrongInstancedDestructableActor->M_DestroyedMeshComponent->SetStaticMesh(LoadedMesh);
 			}
 		}
 	}));
@@ -258,4 +265,3 @@ void AInstancedDestrucablesEnvActor::OnFoundClosestInstance(const int32 Instance
 	}
 	
 }
-

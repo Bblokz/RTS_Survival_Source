@@ -83,9 +83,16 @@ void UPlayerResourceManager::BeginPlay_InitResourceFullCheckTimerManager()
 	if (UWorld* World = GetWorld())
 	{
 		FTimerDelegate TimerDel;
-		TimerDel.BindLambda([this]()
+		TWeakObjectPtr<UPlayerResourceManager> WeakPlayerResourceManager = this;
+		TimerDel.BindLambda([WeakPlayerResourceManager]()
 		{
-			OnResourceFullCheck();
+			if (not WeakPlayerResourceManager.IsValid())
+			{
+				return;
+			}
+
+			UPlayerResourceManager* StrongPlayerResourceManager = WeakPlayerResourceManager.Get();
+			StrongPlayerResourceManager->OnResourceFullCheck();
 		});
 		float Interval = DeveloperSettings::GamePlay::Audio::CheckResourceStorageFullInterval;
 		World->GetTimerManager().SetTimer(M_ResourceFullCheckTimerManager,

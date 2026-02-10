@@ -733,7 +733,16 @@ void UAttachedRockets::StartReload()
 	{
 		const float ReloadTime = GetReloadFromFlux();
 		FTimerDelegate ReloadDelegate;
-		ReloadDelegate.BindWeakLambda(this, [this]()-> void { OnReloadFinished(); });
+		ReloadDelegate.BindWeakLambda(this, [WeakAttachedRockets = TWeakObjectPtr<UAttachedRockets>(this)]()-> void
+		{
+			if (not WeakAttachedRockets.IsValid())
+			{
+				return;
+			}
+
+			UAttachedRockets* StrongAttachedRockets = WeakAttachedRockets.Get();
+			StrongAttachedRockets->OnReloadFinished();
+		});
 		World->GetTimerManager().SetTimer(
 			M_ReloadTimerHandle,
 			ReloadDelegate,

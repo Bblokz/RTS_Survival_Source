@@ -906,14 +906,20 @@ void UAircraftOwnerComp::PlayDoorMontage(const int32 SocketIndex, const EAircraf
 		M_RoofAnimInst->SetAnimationSequenceForState(EAircraftSocketState::Open, SocketIndex);
 		World->GetTimerManager().SetTimer(
 			Rec.AnimTimerHandle,
-			FTimerDelegate::CreateWeakLambda(this, [this, SocketIndex]()
+			FTimerDelegate::CreateWeakLambda(this, [WeakAircraftOwnerComp = TWeakObjectPtr<UAircraftOwnerComp>(this), SocketIndex]()
 			{
-				if (not M_Sockets.IsValidIndex(SocketIndex))
+				if (not WeakAircraftOwnerComp.IsValid())
 				{
 					return;
 				}
-				M_Sockets[SocketIndex].SocketState = EAircraftSocketState::Open;
-				OnDoorOpened_GrantPending(SocketIndex);
+
+				UAircraftOwnerComp* StrongAircraftOwnerComp = WeakAircraftOwnerComp.Get();
+				if (not StrongAircraftOwnerComp->M_Sockets.IsValidIndex(SocketIndex))
+				{
+					return;
+				}
+				StrongAircraftOwnerComp->M_Sockets[SocketIndex].SocketState = EAircraftSocketState::Open;
+				StrongAircraftOwnerComp->OnDoorOpened_GrantPending(SocketIndex);
 			}),
 			FMath::Max(PlayTime, 0.01f), false);
 	}
@@ -923,13 +929,19 @@ void UAircraftOwnerComp::PlayDoorMontage(const int32 SocketIndex, const EAircraf
 		M_RoofAnimInst->SetAnimationSequenceForState(EAircraftSocketState::Closed, SocketIndex);
 		World->GetTimerManager().SetTimer(
 			Rec.AnimTimerHandle,
-			FTimerDelegate::CreateWeakLambda(this, [this, SocketIndex]()
+			FTimerDelegate::CreateWeakLambda(this, [WeakAircraftOwnerComp = TWeakObjectPtr<UAircraftOwnerComp>(this), SocketIndex]()
 			{
-				if (not M_Sockets.IsValidIndex(SocketIndex))
+				if (not WeakAircraftOwnerComp.IsValid())
 				{
 					return;
 				}
-				M_Sockets[SocketIndex].SocketState = EAircraftSocketState::Closed;
+
+				UAircraftOwnerComp* StrongAircraftOwnerComp = WeakAircraftOwnerComp.Get();
+				if (not StrongAircraftOwnerComp->M_Sockets.IsValidIndex(SocketIndex))
+				{
+					return;
+				}
+				StrongAircraftOwnerComp->M_Sockets[SocketIndex].SocketState = EAircraftSocketState::Closed;
 			}),
 			FMath::Max(PlayTime, 0.01f), false);
 	}
