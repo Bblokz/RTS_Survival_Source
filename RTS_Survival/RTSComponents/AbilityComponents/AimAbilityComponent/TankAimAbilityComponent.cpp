@@ -123,7 +123,9 @@ void UTankAimAbilityComponent::BeginAbilityDurationTimer()
 		{
 			return;
 		}
-		WeakThis->CheckTurretRotationAndStartBehaviour();
+
+		UTankAimAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->CheckTurretRotationAndStartBehaviour();
 	});
 	World->GetTimerManager().SetTimer(
 		M_TurretRotationCheckTimerHandle,
@@ -153,7 +155,9 @@ void UTankAimAbilityComponent::BeginPlay_CacheTurretNextTick()
 		{
 			return;
 		}
-		WeakThis->CacheTurretWithMostRange();
+
+		UTankAimAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->CacheTurretWithMostRange();
 	});
 	World->GetTimerManager().SetTimerForNextTick(CacheDelegate);
 }

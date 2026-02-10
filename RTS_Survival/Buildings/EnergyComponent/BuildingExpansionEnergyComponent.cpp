@@ -23,7 +23,9 @@ void UBuildingExpansionEnergyComponent::CacheOwnerMaterials()
 		{
 			return;
 		}
-		WeakThis->HandleBxpConstructed();
+
+		UBuildingExpansionEnergyComponent* StrongThis = WeakThis.Get();
+		StrongThis->HandleBxpConstructed();
 	});
 	BuildingExpansion->OnBxpPackingUp.AddLambda([WeakThis]()
 	{
@@ -31,7 +33,9 @@ void UBuildingExpansionEnergyComponent::CacheOwnerMaterials()
 		{
 			return;
 		}
-		WeakThis->HandleBxpPackingUp();
+
+		UBuildingExpansionEnergyComponent* StrongThis = WeakThis.Get();
+		StrongThis->HandleBxpPackingUp();
 	});
 	BuildingExpansion->OnBxpCancelPackingUp.AddLambda([WeakThis]()
 	{
@@ -39,7 +43,9 @@ void UBuildingExpansionEnergyComponent::CacheOwnerMaterials()
 		{
 			return;
 		}
-		WeakThis->HandleBxpCancelledPackingUp();
+
+		UBuildingExpansionEnergyComponent* StrongThis = WeakThis.Get();
+		StrongThis->HandleBxpCancelledPackingUp();
 	});
 
 	if (BuildingExpansion->GetStatus() == EBuildingExpansionStatus::BXS_Built)

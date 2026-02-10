@@ -228,7 +228,9 @@ void UAimAbilityComponent::StartBehaviourTimer(const float DurationSeconds)
 		{
 			return;
 		}
-		WeakThis->HandleBehaviourDurationFinished(true);
+
+		UAimAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->HandleBehaviourDurationFinished(true);
 	});
 	World->GetTimerManager().SetTimer(M_AbilityExecutionState.M_BehaviourDurationTimerHandle, BehaviourTimerDelegate, DurationSeconds, false);
 }
@@ -308,7 +310,9 @@ void UAimAbilityComponent::BeginPlay_AddAbility()
 		{
 			return;
 		}
-		WeakThis->AddAbilityToCommands();
+
+		UAimAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->AddAbilityToCommands();
 	});
 	World->GetTimerManager().SetTimerForNextTick(Del);
 }
@@ -335,7 +339,9 @@ void UAimAbilityComponent::AddAbilityToSquad(ASquadController* SquadController)
 		{
 			return;
 		}
-		WeakThis->AddAbilityToCommands();
+
+		UAimAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->AddAbilityToCommands();
 	};
 	SquadController->SquadDataCallbacks.CallbackOnSquadDataLoaded(ApplyLambda, WeakThis);
 }
@@ -466,7 +472,9 @@ void UAimAbilityComponent::StartMoveToRange(const FVector& TargetLocation, const
 		{
 			return;
 		}
-		WeakThis->OnMoveCheckTimer();
+
+		UAimAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->OnMoveCheckTimer();
 	});
 	World->GetTimerManager().SetTimer(
 		M_AbilityExecutionState.M_MoveToRangeTimerHandle,
