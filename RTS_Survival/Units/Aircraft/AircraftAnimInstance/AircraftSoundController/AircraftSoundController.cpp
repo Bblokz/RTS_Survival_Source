@@ -147,7 +147,8 @@ void FAircraftSoundController::Play_Airborne(UAircraftAnimInstance* OwningAircra
 		{
 			return;
 		}
-		const float Speed = WeakOwningAircraftAnimator->GetLastAirSpeed();
+		UAircraftAnimInstance* StrongOwningAircraftAnimator = WeakOwningAircraftAnimator.Get();
+		const float Speed = StrongOwningAircraftAnimator->GetLastAirSpeed();
 		UpdateEngineSound(Speed);
 	};
 	World->GetTimerManager().SetTimer(

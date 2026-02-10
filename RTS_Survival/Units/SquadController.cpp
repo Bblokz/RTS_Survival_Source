@@ -733,13 +733,18 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 	if (UWorld* World = GetWorld())
 	{
 		FTimerDelegate Del;
-		Del.BindWeakLambda(this, [this, MoveTo]()
+		Del.BindWeakLambda(this, [WeakSquadController = TWeakObjectPtr<ASquadController>(this), MoveTo]()
 		{
-			if (!IsValid(this)) return;
-			SetIsSpawning(true);
-			FVector MoveToProjected = ProjectLocationOnNavMesh(MoveTo, 200.0f, true);
-			FRotator FinalRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MoveToProjected);
-			MoveToLocation(MoveTo, true, FinalRotation);
+			if (not WeakSquadController.IsValid())
+			{
+				return;
+			}
+
+			ASquadController* StrongSquadController = WeakSquadController.Get();
+			StrongSquadController->SetIsSpawning(true);
+			const FVector MoveToProjected = StrongSquadController->ProjectLocationOnNavMesh(MoveTo, 200.0f, true);
+			const FRotator FinalRotation = UKismetMathLibrary::FindLookAtRotation(StrongSquadController->GetActorLocation(), MoveToProjected);
+			StrongSquadController->MoveToLocation(MoveTo, true, FinalRotation);
 		});
 		World->GetTimerManager().SetTimer(M_SpawningTimer, Del, 0.5, false);
 	}
