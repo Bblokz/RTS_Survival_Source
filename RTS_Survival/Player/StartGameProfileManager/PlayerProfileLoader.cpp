@@ -116,6 +116,7 @@ void UPlayerProfileLoader::LoadInUnits(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 	const float SpawnZ = SpawnCenter.Z;
 
 	int32 UnitIndex = 0;
+	const TWeakObjectPtr<UPlayerProfileLoader> WeakProfileLoader = this;
 	for (int32 Row = 0; Row < GridSize && UnitIndex < NumUnits; ++Row)
 	{
 		for (int32 Col = 0; Col < GridSize && UnitIndex < NumUnits; ++Col)
@@ -135,14 +136,20 @@ void UPlayerProfileLoader::LoadInUnits(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 			const FTrainingOption UnitOption = UnitsToSpawn[UnitIndex];
 
 			// Spawn the unit asynchronously at the calculated location
-			if (!AsyncSpawner->AsyncSpawnOptionAtLocation(
+			if (not AsyncSpawner->AsyncSpawnOptionAtLocation(
 				UnitOption,
 				UnitLocation,
 				this,
 				0,
-				[this](const FTrainingOption& Option, AActor* SpawnedActor,  const int32 ID)
+				[WeakProfileLoader](const FTrainingOption& Option, AActor* SpawnedActor, const int32 ID)
 				{
-					this->OnOptionSpawned(Option);
+					if (not WeakProfileLoader.IsValid())
+					{
+						return;
+					}
+
+					UPlayerProfileLoader* StrongProfileLoader = WeakProfileLoader.Get();
+					StrongProfileLoader->OnOptionSpawned(Option);
 				}))
 			{
 				const FString ErrorMessage = FString::Printf(
@@ -314,15 +321,22 @@ void UPlayerProfileLoader::RequestToSpawnHQ(TObjectPtr<ARTSAsyncSpawner> AsyncSp
 	const FTrainingOption HQOption = FTrainingOption(EAllUnitType::UNType_Nomadic,
 	                                                 static_cast<uint8>(ENomadicSubtype::Nomadic_GerHq));
 	M_IsProfileUnitSpawned.Add(HQOption, false);
+	const TWeakObjectPtr<UPlayerProfileLoader> WeakProfileLoader = this;
 
-	if (!AsyncSpawner->AsyncSpawnOptionAtLocation(
+	if (not AsyncSpawner->AsyncSpawnOptionAtLocation(
 		HQOption,
 		SpawnCenter,
 		this,
 		0,
-		[this](const FTrainingOption& Option, AActor* SpawnedActor, const int32 ID)
+		[WeakProfileLoader](const FTrainingOption& Option, AActor* SpawnedActor, const int32 ID)
 		{
-			this->OnOptionSpawned(Option);
+			if (not WeakProfileLoader.IsValid())
+			{
+				return;
+			}
+
+			UPlayerProfileLoader* StrongProfileLoader = WeakProfileLoader.Get();
+			StrongProfileLoader->OnOptionSpawned(Option);
 		}))
 	{
 		RTSFunctionLibrary::ReportError("Failed to spawn HQ at the camera location");

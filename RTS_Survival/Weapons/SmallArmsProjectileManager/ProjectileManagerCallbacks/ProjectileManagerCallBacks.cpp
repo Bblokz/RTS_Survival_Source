@@ -23,9 +23,12 @@ void FProjectileManagerCallBacks::CallbackOnProjectileMgrReady(
 	OnProjectileManagerLoaded.AddLambda(
 		[WeakCallbackOwner, Callback](const TObjectPtr<ASmallArmsProjectileManager>& Manager)
 		{
-			if (WeakCallbackOwner.IsValid())
+			if (not WeakCallbackOwner.IsValid())
 			{
-				Callback(Manager);
+				return;
 			}
+
+			UObject* StrongCallbackOwner = WeakCallbackOwner.Get();
+			Callback(Manager);
 		});
 }

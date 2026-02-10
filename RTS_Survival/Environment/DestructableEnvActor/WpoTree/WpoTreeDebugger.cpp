@@ -17,16 +17,17 @@ void FWpoTreeDebugger::StartDebugging(AWpoTree* WpoTree, const float WpoDisableD
 	M_MyTree = WpoTree;
 	M_WpoDisableDist = WpoDisableDist;
 	M_DebugLoc = WpoTree->GetActorLocation() + FVector(0, 0, DebugZOffset);
-	TWeakObjectPtr<AWpoTree> WeakMyTree = M_MyTree;
-	World->GetTimerManager().SetTimer(M_DebugTimerHandle, [this, WeakMyTree]()
+	const TWeakObjectPtr<AWpoTree> WeakMyTree = M_MyTree;
+	const float WpoDisableDistance = M_WpoDisableDist;
+	const FVector DebugLocation = M_DebugLoc;
+	World->GetTimerManager().SetTimer(M_DebugTimerHandle, [WeakMyTree, WpoDisableDistance, DebugLocation]()
 	{
 		if (not WeakMyTree.IsValid())
 		{
-			StopDebugging();
 			return;
 		}
 		AWpoTree* StrongMyTree = WeakMyTree.Get();
-		FString DebugString = "WPO disable at: " + FString::SanitizeFloat(M_WpoDisableDist);
+		FString DebugString = "WPO disable at: " + FString::SanitizeFloat(WpoDisableDistance);
 		// get distance from player camera.
 		APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(StrongMyTree, 0);
 		if(not CameraManager)
@@ -38,7 +39,7 @@ void FWpoTreeDebugger::StartDebugging(AWpoTree* WpoTree, const float WpoDisableD
 		
 		DrawDebugString(
 			StrongMyTree->GetWorld(),
-			M_DebugLoc,
+			DebugLocation,
 			DebugString,
 			nullptr,
 			FColor::White,

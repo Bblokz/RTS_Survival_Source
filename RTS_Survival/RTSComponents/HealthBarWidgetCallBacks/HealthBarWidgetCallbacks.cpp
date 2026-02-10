@@ -28,10 +28,18 @@ void FHealthBarWidgetCallbacks::CallbackOnHealthBarReady(
     // Otherwise, register to be called later (use the param from the delegate, don't capture a strong ptr).
     OnHealthBarWidgetReady.AddLambda([WeakCallbackOwner, Callback](UHealthComponent* InHealthComp)
     {
-        if (WeakCallbackOwner.IsValid() && IsValid(InHealthComp))
+        if (not WeakCallbackOwner.IsValid())
         {
-            Callback(InHealthComp);
+            return;
         }
+
+        UObject* StrongCallbackOwner = WeakCallbackOwner.Get();
+        if (not IsValid(InHealthComp))
+        {
+            return;
+        }
+
+        Callback(InHealthComp);
     });
 }
 

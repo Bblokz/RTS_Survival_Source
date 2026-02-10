@@ -61,10 +61,17 @@ void ADiginProgressBar::InitializeProgressBar(
 	ProgressWidgetComponent->SetWidgetClass(WidgetClass);
 	ProgressWidgetComponent->InitWidget();
 
+	const TWeakObjectPtr<ADiginProgressBar> WeakDigInProgressBar = this;
 	GetWorld()->GetTimerManager().SetTimerForNextTick(
-		[this]()
+		[WeakDigInProgressBar]()
 		{
-			FinishInitializeWidget();
+			if (not WeakDigInProgressBar.IsValid())
+			{
+				return;
+			}
+
+			ADiginProgressBar* StrongDigInProgressBar = WeakDigInProgressBar.Get();
+			StrongDigInProgressBar->FinishInitializeWidget();
 		}
 	);
 }

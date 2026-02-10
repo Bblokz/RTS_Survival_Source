@@ -683,11 +683,18 @@ void ATrackedTankMaster::OnRTSUnitSpawned_SetEnabled(const float TimeNotSelectab
 		return;
 	}
 
-	auto SetSelectableAfterDelay = [this]()
+	const TWeakObjectPtr<ATrackedTankMaster> WeakTrackedTankMaster = this;
+	auto SetSelectableAfterDelay = [WeakTrackedTankMaster]()
 	{
-		if (IsValid(SelectionComponent))
+		if (not WeakTrackedTankMaster.IsValid())
 		{
-			SelectionComponent->SetCanBeSelected(true);
+			return;
+		}
+
+		ATrackedTankMaster* StrongTrackedTankMaster = WeakTrackedTankMaster.Get();
+		if (IsValid(StrongTrackedTankMaster->SelectionComponent))
+		{
+			StrongTrackedTankMaster->SelectionComponent->SetCanBeSelected(true);
 		}
 	};
 	if (const UWorld* World = GetWorld())

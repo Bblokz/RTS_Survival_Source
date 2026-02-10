@@ -1349,16 +1349,29 @@ bool UTrainerComponent::RemoveInvalidRequirementItems_AndRefund()
 	// 4) If active item was removed → stop/reset progress bar & cancel async
 	if (bRemovedActiveItem)
 	{
+		const TWeakObjectPtr<UTrainerComponent> WeakTrainerComponent = this;
 		HandleActiveItemRemoved(
 			Kept.Num(),
 			RemovedActiveAsyncState,
-			[this](EStopTrainingQueueTimerReason Reason)
+			[WeakTrainerComponent](EStopTrainingQueueTimerReason Reason)
 			{
-				this->StopQueueTimer(Reason);
+				if (not WeakTrainerComponent.IsValid())
+				{
+					return;
+				}
+
+				UTrainerComponent* StrongTrainerComponent = WeakTrainerComponent.Get();
+				StrongTrainerComponent->StopQueueTimer(Reason);
 			},
-			[this](EAsyncTrainingRequestState State)
+			[WeakTrainerComponent](EAsyncTrainingRequestState State)
 			{
-				this->CancelAsyncLoadingRequest(State);
+				if (not WeakTrainerComponent.IsValid())
+				{
+					return;
+				}
+
+				UTrainerComponent* StrongTrainerComponent = WeakTrainerComponent.Get();
+				StrongTrainerComponent->CancelAsyncLoadingRequest(State);
 			},
 			bM_AtInsufficientResources);
 	}
@@ -1370,9 +1383,15 @@ bool UTrainerComponent::RemoveInvalidRequirementItems_AndRefund()
 	RestartTimerIfNeededAfterRemoval(
 		bRemovedActiveItem,
 		M_TTrainingQueue,
-		[this](bool bIsStartAfterPause)
+		[WeakTrainerComponent](bool bIsStartAfterPause)
 		{
-			this->StartQueueTimer(bIsStartAfterPause);
+			if (not WeakTrainerComponent.IsValid())
+			{
+				return;
+			}
+
+			UTrainerComponent* StrongTrainerComponent = WeakTrainerComponent.Get();
+			StrongTrainerComponent->StartQueueTimer(bIsStartAfterPause);
 		});
 
 
