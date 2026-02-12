@@ -1290,7 +1290,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 
 	// Handheld railgun with radixite rounds
 	WeaponData = {};
-	WeaponData.WeaponName = EWeaponName::GerRailGun;
+	WeaponData.WeaponName = EWeaponName::GerRailGun30MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
@@ -1313,7 +1313,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailGun, WeaponData);
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailGun30MM, WeaponData);
 
 	// Handheld railgun with radixite rounds
 	WeaponData = {};
@@ -2879,6 +2879,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ZIS_S_53_85MM, WeaponData);
 
 	{
+		// Faster reload for TD.
 		const float Su85ReloadSpeedMlt = 0.67f;
 
 		WeaponData.WeaponName = EWeaponName::D_5S_85MM_SU85;
@@ -3284,6 +3285,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.95f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::LB_1_100MM, WeaponData);
 
+	// Faster reload for TD.
+	WeaponData.ReloadSpeed *= 0.67;
 	WeaponData.WeaponName = EWeaponName::D_10S_100MM_SU100;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
@@ -4412,7 +4415,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 	// SU-85
 	{
-		const float SuMediumTankDestroyerBaseHealth = MediumTankHealthBase - OneLightTankShotHp;
+		const float SuMediumTankDestroyerBaseHealth = MediumTankHealthBase + OneLightTankShotHp;
 		const float SuMediumTankDestroyerHealthMlt = 1.2f;
 		const float SuMediumTankDestroyerHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			SuMediumTankDestroyerBaseHealth * SuMediumTankDestroyerHealthMlt, 10);

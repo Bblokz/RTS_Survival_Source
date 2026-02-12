@@ -79,7 +79,7 @@ enum class
 	Strahlkanone39 UMETA(DisplayName = "Strahlkanone 39 50MM PZ V/III"),
 
 	// Railgun Weapons
-	GerRailGun UMETA(DisplayName = "Ger Railgun 30MM"),
+	GerRailGun30MM UMETA(DisplayName = "Ger Railgun 30MM"),
 
 	// German Flame Weapons
 	Ashmaker05 UMETA(DisplayName = "ashmaker 05 (Very Light Flame Thrower)"),
@@ -335,7 +335,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::ZIS_6_107MM: return "ZIS-6";
 	case EWeaponName::Bazooka_50MM:
 		return "Bazooka";
-	case EWeaponName::GerRailGun:
+	case EWeaponName::GerRailGun30MM:
 		return "RailGun";
 	case EWeaponName::M920_AtSniper:
 		return "M920";
@@ -356,7 +356,7 @@ static bool Global_IsRifle(const EWeaponName WeaponName)
 {
 	switch (WeaponName)
 	{
-	case EWeaponName::GerRailGun:
+	case EWeaponName::GerRailGun30MM:
 	case EWeaponName::RailGunY:
 	case EWeaponName::SVT_40_7_62MM:
 	case EWeaponName::Fedrov_Avtomat:
@@ -383,7 +383,7 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 	// ---------------------------------------------------------------------
 	// Handheld laser weapons (Highest  tier)
 	// ---------------------------------------------------------------------
-	case EWeaponName::GerRailGun:
+	case EWeaponName::GerRailGun30MM:
 		return 1100;
 	case EWeaponName::RailGunY:
 		return 1095;
