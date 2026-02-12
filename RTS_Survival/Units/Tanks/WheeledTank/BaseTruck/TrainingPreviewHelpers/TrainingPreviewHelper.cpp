@@ -199,36 +199,44 @@ void FTrainingPreviewHelper::BeginAsyncLoadPreview(const TSoftObjectPtr<UStaticM
 
 	M_StreamableHandle = Streamable.RequestAsyncLoad(
 		Path,
-		FStreamableDelegate::CreateLambda([this, WeakPreview, WeakNomad, SoftMesh, OptionBeingLoaded]()
+		FStreamableDelegate::CreateLambda([WeakTrainingPreviewHelper = TWeakObjectPtr<UTrainingPreviewHelper>(this), WeakPreview, WeakNomad, SoftMesh, OptionBeingLoaded]()
 		{
+			if (not WeakTrainingPreviewHelper.IsValid())
+			{
+				return;
+			}
+			UTrainingPreviewHelper* StrongTrainingPreviewHelper = WeakTrainingPreviewHelper.Get();
+
 			if (not WeakPreview.IsValid() || not WeakNomad.IsValid())
 			{
 				return;
 			}
+			UStaticMeshComponent* StrongPreviewMeshComponent = WeakPreview.Get();
+			ANomadicVehicle* StrongNomad = WeakNomad.Get();
 
 			// If our active option changed while loading, ignore this callback.
-			if (!(OptionBeingLoaded == M_ActivePreviewTrainingOption))
+			if (not (OptionBeingLoaded == StrongTrainingPreviewHelper->M_ActivePreviewTrainingOption))
 			{
 				return;
 			}
 
 			// If we’re not in Building mode or should be hidden, set mesh but keep invisible.
-			const bool bInBuilding = WeakNomad->GetNomadicStatus() == ENomadStatus::Building;
+			const bool bInBuilding = StrongNomad->GetNomadicStatus() == ENomadStatus::Building;
 			UStaticMesh* Loaded = SoftMesh.Get();
 
 			if (not IsValid(Loaded))
 			{
 				RTSFunctionLibrary::ReportError("Training preview failed to load soft mesh: " + SoftMesh.ToString());
-				WeakPreview->SetVisibility(false, true);
+				StrongPreviewMeshComponent->SetVisibility(false, true);
 				return;
 			}
 
-			WeakPreview->SetStaticMesh(Loaded);
-			WeakPreview->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			WeakPreview->SetCanEverAffectNavigation(false);
-			WeakPreview->SetGenerateOverlapEvents(false);
+			StrongPreviewMeshComponent->SetStaticMesh(Loaded);
+			StrongPreviewMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			StrongPreviewMeshComponent->SetCanEverAffectNavigation(false);
+			StrongPreviewMeshComponent->SetGenerateOverlapEvents(false);
 
-			WeakPreview->SetVisibility(bInBuilding && bM_ShouldBeVisible, true);
+			StrongPreviewMeshComponent->SetVisibility(bInBuilding && StrongTrainingPreviewHelper->bM_ShouldBeVisible, true);
 		})
 	);
 }

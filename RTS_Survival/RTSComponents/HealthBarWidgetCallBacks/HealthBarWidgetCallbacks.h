@@ -36,9 +36,16 @@ struct FHealthBarWidgetCallbacks
 	template <typename T>
 	void CallbackOnHealthBarReady(void (T::*InCallback)(UHealthComponent*), T* InCallbackOwner)
 	{
-		TFunction<void(UHealthComponent*)> BoundCallback = [InCallbackOwner, InCallback](UHealthComponent* HealthComp)
+		const TWeakObjectPtr<T> WeakCallbackOwner = InCallbackOwner;
+		TFunction<void(UHealthComponent*)> BoundCallback = [WeakCallbackOwner, InCallback](UHealthComponent* HealthComp)
 		{
-			(InCallbackOwner->*InCallback)(HealthComp);
+			if (not WeakCallbackOwner.IsValid())
+			{
+				return;
+			}
+
+			T* StrongCallbackOwner = WeakCallbackOwner.Get();
+			(StrongCallbackOwner->*InCallback)(HealthComp);
 		};
 		CallbackOnHealthBarReady(BoundCallback, InCallbackOwner);
 	}

@@ -100,6 +100,8 @@ enum class ERTSCard : uint8
 	Card_Train_Sdkfz250_37mm,
 	Card_Train_Sdkfz251_PZIV,
 	Card_Train_Sdkfz251_22,
+	Card_Train_Sdkfz251_Mortar,
+	Card_Train_Sdkfz251_Transport,
 	Card_Train_Puma,
 	Card_Train_Panzerwerfer,
 	Card_Train_Sdkfz_231,

@@ -22,10 +22,13 @@ void FMainMenuUICallbacks::CallbackOnMenuReady(TFunction<void()> Callback, TWeak
 	// Otherwise, add the lambda to the delegate for later execution.
 	OnMainMenuUIReady.AddLambda([WeakCallbackOwner, Callback]()->void
 	{
-		if (WeakCallbackOwner.IsValid())
+		if (not WeakCallbackOwner.IsValid())
 		{
-			Callback();
+			return;
 		}
+
+		UObject* StrongCallbackOwner = WeakCallbackOwner.Get();
+		Callback();
 	});
 }
 

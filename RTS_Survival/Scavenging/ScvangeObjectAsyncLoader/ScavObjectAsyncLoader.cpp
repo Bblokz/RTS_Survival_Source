@@ -26,18 +26,27 @@ void AScavObjectAsyncLoader::BeginPlay()
 
     // Set a timer to wait for 2 seconds before trying to load the object
     FTimerHandle TimerHandle;
-    GetWorld()->GetTimerManager().SetTimer(TimerHandle, [this, OnScavObjectLoadedDelegate]()
+    TWeakObjectPtr<AScavObjectAsyncLoader> WeakScavObjectAsyncLoader = this;
+    GetWorld()->GetTimerManager().SetTimer(TimerHandle, [WeakScavObjectAsyncLoader, OnScavObjectLoadedDelegate]()
     {
-        if (ScavObjectToLoad.IsValid())
+        if (not WeakScavObjectAsyncLoader.IsValid())
+        {
+            return;
+        }
+
+        AScavObjectAsyncLoader* StrongScavObjectAsyncLoader = WeakScavObjectAsyncLoader.Get();
+        if (StrongScavObjectAsyncLoader->ScavObjectToLoad.IsValid())
         {
             // Class is already loaded, so call the delegate immediately
             OnScavObjectLoadedDelegate.ExecuteIfBound();
+            return;
         }
-        else
-        {
-            // Load the class asynchronously and bind the delegate to be called when loading is complete
-            UAssetManager::GetStreamableManager().RequestAsyncLoad(ScavObjectToLoad.ToSoftObjectPath(), OnScavObjectLoadedDelegate);
-        }
+
+        // Load the class asynchronously and bind the delegate to be called when loading is complete
+        UAssetManager::GetStreamableManager().RequestAsyncLoad(
+            StrongScavObjectAsyncLoader->ScavObjectToLoad.ToSoftObjectPath(),
+            OnScavObjectLoadedDelegate
+        );
     }, 2.0f, false);
 }
 
@@ -63,4 +72,3 @@ void AScavObjectAsyncLoader::OnScavObjectLoaded()
         Destroy();
     }
 }
-

@@ -486,13 +486,15 @@ void UBehaviourWeapon::RegisterSquadFullyLoadedCallback(ASquadController* SquadC
 			return;
 		}
 
-		if (WeakThis->bM_HasInitializedPostBeginPlayLogic)
+		UBehaviourWeapon* StrongThis = WeakThis.Get();
+
+		if (StrongThis->bM_HasInitializedPostBeginPlayLogic)
 		{
 			return;
 		}
 
 		ASquadController* LocalSquadController = nullptr;
-		if (not WeakThis->TryGetSquadController(LocalSquadController))
+		if (not StrongThis->TryGetSquadController(LocalSquadController))
 		{
 			return;
 		}
@@ -502,7 +504,7 @@ void UBehaviourWeapon::RegisterSquadFullyLoadedCallback(ASquadController* SquadC
 			return;
 		}
 
-		WeakThis->SchedulePostBeginPlayLogic();
+		StrongThis->SchedulePostBeginPlayLogic();
 	};
 
 	SquadController->SquadDataCallbacks.CallbackOnSquadDataLoaded(SquadLoadedCallback, this);

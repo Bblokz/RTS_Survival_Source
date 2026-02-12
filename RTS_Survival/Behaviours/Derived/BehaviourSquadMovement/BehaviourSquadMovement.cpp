@@ -87,7 +87,8 @@ void UBehaviourSquadMovement::RegisterSquadFullyLoadedCallback(ASquadController*
                         return;
                 }
 
-                WeakThis->HandleSquadDataLoaded();
+                UBehaviourSquadMovement* StrongThis = WeakThis.Get();
+                StrongThis->HandleSquadDataLoaded();
         };
 
         SquadController->SquadDataCallbacks.CallbackOnSquadDataLoaded(SquadLoadedCallback, this);

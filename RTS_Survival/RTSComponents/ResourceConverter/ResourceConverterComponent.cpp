@@ -132,7 +132,9 @@ bool UResourceConverterComponent::StartResourceTimer()
 		{
 			return;
 		}
-		WeakThis->OnResourceTick();
+
+		UResourceConverterComponent* StrongThis = WeakThis.Get();
+		StrongThis->OnResourceTick();
 	});
 
 	GetWorld()->GetTimerManager().SetTimer(

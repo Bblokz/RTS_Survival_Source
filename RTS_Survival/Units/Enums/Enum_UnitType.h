@@ -55,6 +55,8 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz250_37mm UMETA(DisplayName = "Ger ArmCar SdKfz 250 37mm"),
 	Tank_Sdkfz251_PZIV UMETA(DisplayName = "Ger ArmCar SdKfz 251 PzIV"),
 	Tank_Sdkfz251_22 UMETA(DisplayName = "Ger ArmCar SdKfz 251 75mm"),
+	Tank_Sdkfz251_Mortar UMETA(DisplayName = "Ger ArmCar SdKfz 251 Mortar"),
+	Tank_Sdkfz251_Transport UMETA(DisplayName = "Ger ArmCar SdKfz 251 Transport"),
 	Tank_Puma UMETA(DisplayName = "Ger ArmCar Puma"),
 	Tank_Panzerwerfer UMETA(DisplayName = "Ger ArmCar Panzerwerfer"),
 	Tank_Sdkfz_231 UMETA(DisplayName = "Ger SdKfz 231 8-rad 2cm"),
@@ -244,6 +246,8 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_Sdkfz250_37mm:
 	case ETankSubtype::Tank_Sdkfz251_PZIV:
 	case ETankSubtype::Tank_Sdkfz251_22:
+	case ETankSubtype::Tank_Sdkfz251_Mortar:
+	case ETankSubtype::Tank_Sdkfz251_Transport:
 	case ETankSubtype::Tank_Puma:
 	case ETankSubtype::Tank_Panzerwerfer:
 	case ETankSubtype::Tank_Sdkfz_231:
@@ -438,10 +442,15 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 
 static FString Global_GetTankDisplayName(ETankSubtype TankSubtype)
 {
+	if (TankSubtype == ETankSubtype::Tank_Sdkfz251_Mortar || TankSubtype == ETankSubtype::Tank_Sdkfz251_Transport)
+	{
+		return "sdkfz-251";
+	}
+
 	// Use StaticEnum to retrieve the UEnum* for ETankSubtype
 	static UEnum* EnumPtr = StaticEnum<ETankSubtype>();
 
-	if (!EnumPtr)
+	if (not EnumPtr)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ETankSubtype enum not found!"));
 		return FString("Unknown");

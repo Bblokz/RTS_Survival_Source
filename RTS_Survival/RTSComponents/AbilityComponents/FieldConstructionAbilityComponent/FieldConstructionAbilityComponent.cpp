@@ -133,7 +133,9 @@ void UFieldConstructionAbilityComponent::BeginPlay_AddAbility()
 			{
 				return;
 			}
-			WeakThis->AddAbilityToCommands();
+
+			UFieldConstructionAbilityComponent* StrongThis = WeakThis.Get();
+			StrongThis->AddAbilityToCommands();
 		});
 		World->GetTimerManager().SetTimerForNextTick(Del);
 	}
@@ -163,7 +165,9 @@ void UFieldConstructionAbilityComponent::AddAbilityToSquad(ASquadController* Squ
 		{
 			return;
 		}
-		WeakThis->AddAbilityToCommands();
+
+		UFieldConstructionAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->AddAbilityToCommands();
 	};
 	Squad->SquadDataCallbacks.CallbackOnSquadDataLoaded(ApplyLambda, WeakThis);
 }

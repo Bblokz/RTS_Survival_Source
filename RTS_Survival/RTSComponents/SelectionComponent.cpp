@@ -87,12 +87,17 @@ void USelectionComponent::SetDeselectedDecalSetting(const bool bNewUseDeselected
 			FTimerHandle RecheckTimerHandle;
 			GetWorld()->GetTimerManager().SetTimer(
 				RecheckTimerHandle,
-				FTimerDelegate::CreateWeakLambda(this, [this, bNewUseDeselectedDecal]()
+				FTimerDelegate::CreateWeakLambda(this, [WeakSelectionComponent = TWeakObjectPtr<USelectionComponent>(this), bNewUseDeselectedDecal]()
 				{
-					// If 'this' was GC’d, the lambda won't run
-					if (IsValid(this) && IsValid(M_SelectedDecalRef))
+					if (not WeakSelectionComponent.IsValid())
 					{
-						SetDeselectedDecalSetting(bNewUseDeselectedDecal);
+						return;
+					}
+
+					USelectionComponent* StrongSelectionComponent = WeakSelectionComponent.Get();
+					if (IsValid(StrongSelectionComponent->M_SelectedDecalRef))
+					{
+						StrongSelectionComponent->SetDeselectedDecalSetting(bNewUseDeselectedDecal);
 					}
 				}),
 				2.0f,

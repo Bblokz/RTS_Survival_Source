@@ -208,7 +208,9 @@ void UAttachedWeaponAbilityComponent::BeginPlay_SetupCallbackToProjectileManager
 		{
 			return;
 		}
-		WeakThis->OnProjectileManagerLoaded(ProjectileManager);
+
+		UAttachedWeaponAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->OnProjectileManagerLoaded(ProjectileManager);
 	};
 	GameState->RegisterCallbackForSmallArmsProjectileMgr(Callback, this);
 }
@@ -471,7 +473,9 @@ void UAttachedWeaponAbilityComponent::BeginPlay_AddAbility()
 		{
 			return;
 		}
-		WeakThis->AddAbilityToCommands();
+
+		UAttachedWeaponAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->AddAbilityToCommands();
 	});
 	World->GetTimerManager().SetTimerForNextTick(NextTickDelegate);
 }
@@ -534,7 +538,9 @@ void UAttachedWeaponAbilityComponent::StartFireLoop()
 		{
 			return;
 		}
-		WeakThis->HandleFireLoop();
+
+		UAttachedWeaponAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->HandleFireLoop();
 	});
 	World->GetTimerManager().SetTimer(
 		M_FireState.M_FireLoopTimerHandle,
@@ -549,7 +555,9 @@ void UAttachedWeaponAbilityComponent::StartFireLoop()
 		{
 			return;
 		}
-		WeakThis->HandleStopFiring();
+
+		UAttachedWeaponAbilityComponent* StrongThis = WeakThis.Get();
+		StrongThis->HandleStopFiring();
 	});
 	World->GetTimerManager().SetTimer(
 		M_FireState.M_StopFireTimerHandle,

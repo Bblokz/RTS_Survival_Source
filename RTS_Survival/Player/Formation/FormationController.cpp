@@ -948,10 +948,13 @@ FTimerDelegate UFormationController::MakeHideEffectsDelegate()
 {
 	return FTimerDelegate::CreateLambda([WeakThis = TWeakObjectPtr<UFormationController>(this)]()
 	{
-		if (UFormationController* This = WeakThis.Get())
+		if (not WeakThis.IsValid())
 		{
-			This->HideAllPooledEffectActors();
+			return;
 		}
+
+		UFormationController* StrongFormationController = WeakThis.Get();
+		StrongFormationController->HideAllPooledEffectActors();
 	});
 }
 
