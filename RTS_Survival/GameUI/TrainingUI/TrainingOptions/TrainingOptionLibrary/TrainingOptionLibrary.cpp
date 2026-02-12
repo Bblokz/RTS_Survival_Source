@@ -20,6 +20,15 @@ FString UTrainingOptionLibrary::GetTrainingOptionName(EAllUnitType UnitType, uin
 
 FString UTrainingOptionLibrary::GetTrainingOptionDisplayName(const EAllUnitType UnitType, const uint8 SubtypeValue)
 {
+	if (UnitType == EAllUnitType::UNType_Tank)
+	{
+		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(SubtypeValue);
+		if (TankSubtype == ETankSubtype::Tank_Sdkfz251_Mortar || TankSubtype == ETankSubtype::Tank_Sdkfz251_Transport)
+		{
+			return "sdkfz-251";
+		}
+	}
+
 	FString SubtypeName = GetEnumValueName(UnitType, SubtypeValue);
 
 	auto RemovePrefix = [](FString& InOutName, const FString& Prefix)

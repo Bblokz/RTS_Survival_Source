@@ -513,6 +513,62 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// GER ARMORED CARS
+
+	// Ger SdKfz 251/22
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_22)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Sdkfz251_22,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger SdKfz 251 Mortar
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Mortar)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Sdkfz251_Mortar,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger SdKfz 251 Transport
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Transport)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Sdkfz251_Transport,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 	// GER MEDIUM TANKS
 
 	// Ger Pz III J
