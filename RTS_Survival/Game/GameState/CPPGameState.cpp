@@ -3675,6 +3675,54 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz251_22, TankData);
 
+	// Sd.Kfz. 251 (Mortar)
+	{
+		const float MortarRadixiteCostMlt = 1.45f;
+		const float MortarVehiclePartsCostMlt = 1.33f;
+
+		TankData.MaxHealth = ArmoredCarHealthBase + 150;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 25;
+		TankData.TurretRotationSpeed = 14;
+		TankData.VehicleMaxSpeedKmh = 20;
+		TankData.VehicleReverseSpeedKmh = 15;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(
+				FMath::RoundToInt(ArmoredCarRadixiteCost * MortarRadixiteCostMlt),
+				10)},
+			{ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
+				ArmoredCarVehiclePartsCost * MortarVehiclePartsCostMlt)}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz251_Mortar, TankData);
+	}
+
+	// Sd.Kfz. 251 (Transport)
+	{
+		const float TransportRadixiteCostMlt = 1.3f;
+
+		TankData.MaxHealth = ArmoredCarHealthBase + 150;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 25;
+		TankData.TurretRotationSpeed = 14;
+		TankData.VehicleMaxSpeedKmh = 20;
+		TankData.VehicleReverseSpeedKmh = 15;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, FMath::RoundToInt(ArmoredCarRadixiteCost * TransportRadixiteCostMlt)},
+			{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz251_Transport, TankData);
+	}
+
 	// Sd.Kfz. 231
 	TankData.MaxHealth = ArmoredCarHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
@@ -6254,7 +6302,9 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Puma)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Panzerwerfer)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251))
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Mortar)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Transport))
 	};
 	NomadicData.BuildingAnimationTime = MechanizedDepotAnimationTime;
 	NomadicData.VehicleExpansionTime = T1TruckVehicleConversionTime;
