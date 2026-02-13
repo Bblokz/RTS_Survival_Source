@@ -221,6 +221,7 @@ private:
 	// Fills the WeaponDataHasMap of M_TWeaponDataHashMap with the data for each weapon name.
 	void InitAllGameWeaponData();
 	void InitAllGameSmallArmsWeapons();
+	void InitAllGameRailGunData();
 	void InitAllGameLaserWeapons();
 	void InitAllGameFlameWeapons();
 	void InitAllGameBombWeapons();

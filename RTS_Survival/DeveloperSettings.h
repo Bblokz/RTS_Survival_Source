@@ -628,7 +628,13 @@ namespace DeveloperSettings
 			inline constexpr float DamagePerMM_FireProjectileBonus = 0.5f;
 			inline constexpr float DamageBonusSmallArmsMlt = 1.25;
 			inline constexpr float SniperDamage = 100;
-			inline constexpr float RailGunDamageMlt = 1.5;
+			namespace RailGun
+			{
+				// Flat bonus damage added on top of the base cannon damage.
+				inline constexpr float DamageBonus = 20.f;
+				// Percentage bonus to apply to the base cannon range for rail gun variants.
+				inline constexpr float RangeBonusPercentage = 50.f;
+			}
 			inline constexpr float DamagePerTNTEquivalentGrams = 1.8f;
 			inline constexpr float DamageFluxPercentage = 10.f;
 			inline constexpr float CooldownFluxPercentage = 10.f;

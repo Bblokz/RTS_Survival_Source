@@ -549,6 +549,7 @@ void ACPPGameState::InitAllGameWeaponData()
 	InitAllGameFlameWeapons();
 	InitAllGameBombWeapons();
 	InitAllGameSmallArmsWeapons();
+	InitAllGameRailGunData();
 	InitAllGameLightWeapons();
 	InitAllGameMediumWeapons();
 	InitAllGameHeavyWeapons();
@@ -1288,59 +1289,6 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::M920_AtSniper, WeaponData);
 
-	// Handheld railgun with radixite rounds
-	WeaponData = {};
-	WeaponData.WeaponName = EWeaponName::GerRailGun30MM;
-	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
-	WeaponData.WeaponCalibre = 30;
-	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *
-		DeveloperSettings::GameBalance::Weapons::RailGunDamageMlt;
-	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
-	WeaponData.ArmorPen = 170.f;
-	WeaponData.ArmorPenMaxRange = 150.f;
-	WeaponData.MagCapacity = 6;
-	WeaponData.ReloadSpeed = 4.f;
-	WeaponData.BaseCooldown = 2.f;
-	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	// Low accuracy to make it worse vs infantry.
-	WeaponData.Accuracy = RifleAccuracy + 10;
-	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = 0.f;
-	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
-	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
-	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailGun30MM, WeaponData);
-
-	// Handheld railgun with radixite rounds
-	WeaponData = {};
-	WeaponData.WeaponName = EWeaponName::RailGunY;
-	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
-	WeaponData.WeaponCalibre = 40;
-	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *
-		DeveloperSettings::GameBalance::Weapons::RailGunDamageMlt;
-	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
-	WeaponData.ArmorPen = 190.f;
-	WeaponData.ArmorPenMaxRange = 170.f;
-	WeaponData.MagCapacity = 2;
-	WeaponData.ReloadSpeed = 3.f;
-	WeaponData.BaseCooldown = 2.2f;
-	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = RifleAccuracy + 10;
-	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = 0.f;
-	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
-	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
-	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RailGunY, WeaponData);
-
 	WeaponData.WeaponName = EWeaponName::PTRS_41_14_5MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_AP;
@@ -1801,6 +1749,101 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShrapnelPen = 0.f;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_TankMG_7_6MM, WeaponData);
+}
+
+void ACPPGameState::InitAllGameRailGunData()
+{
+	FWeaponData WeaponData;
+	using DeveloperSettings::GameBalance::Weapons::DamagePerMM;
+	using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
+	using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
+	using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
+	using DeveloperSettings::GameBalance::Weapons::ShrapnelAmountPerMM;
+	using DeveloperSettings::GameBalance::Weapons::ShrapnelRangePerMM;
+	using DeveloperSettings::GameBalance::Weapons::ShrapnelPenPerMM;
+	using namespace DeveloperSettings::GameBalance::Weapons::RailGun;
+	using DeveloperSettings::GameBalance::Ranges::LightCannonRange;
+	using DeveloperSettings::GameBalance::Ranges::MediumCannonRange;
+	using DeveloperSettings::GameBalance::Ranges::BasicSmallArmsRange;
+	using DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed;
+
+	const float RailGunRangeMultiplier = 1.f + RangeBonusPercentage / 100.f;
+	const float Base37MmCannonDamage = DamagePerMM * 37.f + 22.f * DamagePerTNTEquivalentGrams;
+
+	// Handheld railgun with radixite rounds.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::GerRailGun30MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
+	WeaponData.WeaponCalibre = 30;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre + DamageBonus;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
+	WeaponData.ArmorPen = 170.f;
+	WeaponData.ArmorPenMaxRange = 150.f;
+	WeaponData.MagCapacity = 6;
+	WeaponData.ReloadSpeed = 4.f;
+	WeaponData.BaseCooldown = 2.f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 80;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailGun30MM, WeaponData);
+
+	// Pz 38(t) railgun cannon.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::GerRailgun20MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
+	WeaponData.WeaponCalibre = 20;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = Base37MmCannonDamage + DamageBonus;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = LightCannonRange * RailGunRangeMultiplier;
+	WeaponData.ArmorPen = 65.f;
+	WeaponData.ArmorPenMaxRange = 50.f;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 3.3f;
+	WeaponData.BaseCooldown = 11.f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 85;
+	WeaponData.ShrapnelRange = 0.f;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0.f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailgun20MM, WeaponData);
+
+	// Handheld railgun with radixite rounds.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::RailGunY;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
+	WeaponData.WeaponCalibre = 40;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre + DamageBonus;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.ArmorPen = 190.f;
+	WeaponData.ArmorPenMaxRange = 170.f;
+	WeaponData.MagCapacity = 2;
+	WeaponData.ReloadSpeed = 3.f;
+	WeaponData.BaseCooldown = 2.2f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 80;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RailGunY, WeaponData);
 }
 
 void ACPPGameState::InitAllGameLightWeapons()
@@ -3549,6 +3592,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	using DeveloperSettings::GameBalance::UnitHealth::LightTankHealthBase;
 	using DeveloperSettings::GameBalance::UnitHealth::ArmoredCarHealthBase;
+	using DeveloperSettings::GameBalance::UnitHealth::MediumTankHealthBase;
 
 	// Abilities 
 	const TArray<FUnitAbilityEntry> BasicTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
@@ -3659,6 +3703,25 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz250, TankData);
+
+
+	// Sd.Kfz. 9 with 37mm AA cannon
+	TankData.MaxHealth = MediumTankHealthBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 25;
+	TankData.TurretRotationSpeed = 30;
+	TankData.VehicleMaxSpeedKmh = 20;
+	TankData.VehicleReverseSpeedKmh = 12;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, 100},
+		{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz9_37mm, TankData);
 
 	// Sd.Kfz. 251/22
 	TankData.MaxHealth = ArmoredCarHealthBase + 150;
@@ -3890,6 +3953,25 @@ void ACPPGameState::InitAllGameLightTankData()
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Pz38t_R, TankData);
 	}
+
+
+	// Pz 38(t) Railgun
+	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 40;
+	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleMaxSpeedKmh = 20;
+	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VisionRadius = T1TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost},
+		{ERTSResourceType::Resource_VehicleParts, LightMediumTankVehiclePartsCost}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetLightTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.25f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Pz38t_RailGun, TankData);
 
 	// Pz II F
 	TankData.MaxHealth = LightTankHealthBase;
@@ -6307,7 +6389,8 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Panzerwerfer)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Mortar)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Transport))
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Transport)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz9_37mm))
 	};
 	NomadicData.BuildingAnimationTime = MechanizedDepotAnimationTime;
 	NomadicData.VehicleExpansionTime = T1TruckVehicleConversionTime;
@@ -6348,6 +6431,7 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager))
 	};
