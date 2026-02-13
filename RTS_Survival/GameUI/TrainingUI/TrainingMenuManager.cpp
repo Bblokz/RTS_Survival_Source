@@ -495,6 +495,25 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+
+	// Ger Pz 38t Railgun
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Pz38t_RailGun,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 	// Ger SdKfz 140
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -563,6 +582,25 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			LightTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_Sdkfz251_Transport,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+
+	// Ger SdKfz 9 37mm
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Sdkfz9_37mm)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			ArmoredCarTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Sdkfz9_37mm,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);
