@@ -167,6 +167,7 @@ enum class
 	T_70_20k_45MM UMETA(DisplayName = "20-K 45MM T-70"),
 	Bofors_40MM UMETA(DisplayName = "Bofors 40MM (Bofors)"),
 	NS_37MM UMETA(DisplayName = "NS 37MM (NS-37)"),
+	RusTwin35MM UMETA(DisplayName = "Rus Twin 35MM (T-34-AA)"),
 
 	// Russian laser weapons
 	// infantry held
@@ -204,7 +205,8 @@ enum class
 	ZIS_6_107MM UMETA(DisplayName = "ZIS-6 107MM (KV-5)"),
 	QF_37In_94MM UMETA(DisplayName = "QF 37in 94MM"),
 	D_25T_122MM_IS3 UMETA(Displayname = "DT-25T 122MM (IS-3)"),
-	M_10T_152MM UMETA(DisplayName = "M-10T 152MM (KV-2)")
+	M_10T_152MM UMETA(DisplayName = "M-10T 152MM (KV-2)"),
+	ML_20S_152MM_SU152 UMETA(DisplayName = "ML-20S 152MM (SU-152)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -228,6 +230,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::L_14_122MM_Arc: return "L-14 Arc";
 	case EWeaponName::shVAK_20MM: return "shVAK";
 	case EWeaponName::NS_37MM: return "NS-37";
+	case EWeaponName::RusTwin35MM: return "Twin 35mm";
 	case EWeaponName::T26_45MM: return "20-K";
 	case EWeaponName::BT_7_20K_45MM: return "20-K";
 	case EWeaponName::T_70_20k_45MM: return "20-K";
@@ -266,6 +269,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::D_25T_122MM: return "D-25T";
 	case EWeaponName::D_25T_122MM_IS3: return "D-25T";
 	case EWeaponName::M_30S_122MM_SU122: return "M-30S";
+	case EWeaponName::ML_20S_152MM_SU152: return "ML-20S";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
 	case EWeaponName::Panzerwerfer: return "Panzerwerfer";

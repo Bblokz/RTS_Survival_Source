@@ -152,6 +152,8 @@ enum class ERTSCard : uint8
 	Card_Train_JagdTiger,
 	Card_Train_Maus,
 	Card_Train_E100,
+	Card_Train_T34_AA,
+	Card_Train_SU_152,
 
 	// TrainingOptions -- Aircraft
 	Card_Train_Bf109,

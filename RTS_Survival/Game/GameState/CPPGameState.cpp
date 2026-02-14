@@ -2065,6 +2065,35 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1.1;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::NS_37MM, WeaponData);
 
+	// T-34-AA twin 35mm autocannon (AA)
+	{
+		const float RusTwin35MmArmorPen = 54.f;
+
+		WeaponData.WeaponName = EWeaponName::RusTwin35MM;
+		WeaponData.DamageType = ERTSDamageType::Kinetic;
+		WeaponData.ShellType = EWeaponShellType::Shell_AP;
+		WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
+		WeaponData.WeaponCalibre = 35;
+		WeaponData.TNTExplosiveGrams = 15.6f;
+		WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+			+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * FlakCannonBonusDamageFactor;
+		WeaponData.DamageFlux = DamageFluxPercentage;
+		WeaponData.Range = LightCannonRange;
+		WeaponData.ArmorPen = RusTwin35MmArmorPen;
+		WeaponData.ArmorPenMaxRange = RusTwin35MmArmorPen - 11.f;
+		WeaponData.MagCapacity = 6;
+		WeaponData.ReloadSpeed = 4;
+		WeaponData.BaseCooldown = 0.33f;
+		WeaponData.CooldownFlux = 10;
+		WeaponData.Accuracy = 55;
+		WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+		WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+		WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+		WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1.05f;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::RusTwin35MM, WeaponData);
+	}
+
 	// KwK30 20mm
 	WeaponData.WeaponName = EWeaponName::KwK30_20MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -3463,6 +3492,30 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::M_10T_152MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::ML_20S_152MM_SU152;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+	WeaponData.WeaponCalibre = 152;
+	WeaponData.TNTExplosiveGrams = 1062;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.2, 100);
+	WeaponData.ArmorPen = 161;
+	WeaponData.ArmorPenMaxRange = 152;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 31.0f;
+	WeaponData.BaseCooldown = 1;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 82;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML_20S_152MM_SU152, WeaponData);
 }
 
 TArray<FBxpOptionData> ACPPGameState::InitBxpOptions(
@@ -4464,6 +4517,29 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_76, TankData);
 
+	// T-34-AA
+	{
+		const int32 T34AaVehiclePartsCostOffset = -25;
+		const int32 T34AaRadixiteCostOffset = -20;
+
+		TankData.MaxHealth = MediumTankHealthBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 49;
+		TankData.TurretRotationSpeed = 25;
+		TankData.VehicleMaxSpeedKmh = 26;
+		TankData.VehicleReverseSpeedKmh = 18;
+		TankData.VisionRadius = T2TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + T34AaRadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + T34AaVehiclePartsCostOffset}
+		});
+		TankData.Abilities = BasicTankAbilities;
+		TankData.ExperienceLevels = GetMediumTankExpLevels();
+		TankData.ExperienceWorth = BaseMediumTankExp;
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_AA, TankData);
+	}
+
 	// T-34/76L
 	{
 		const int32 T34_76_L_RadixiteCostOffset = 25;
@@ -5087,6 +5163,31 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.0f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_5, TankData);
+
+	// SU-152 (heavy tank destroyer)
+	{
+		const int32 Su152RadixiteCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			(T3MediumTankDestroyerRadixiteCost + MediumTankDestroyerRadixiteCost) * 0.5f, 10);
+		const int32 Su152VehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			(T3MediumTankDestroyerVehiclePartsCost + MediumTankDestroyerVehiclePartsCost) * 0.5f, 10);
+
+		TankData.MaxHealth = T3MediumTankBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 18;
+		TankData.TurretRotationSpeed = 8;
+		TankData.VehicleMaxSpeedKmh = 16;
+		TankData.VehicleReverseSpeedKmh = 7;
+		TankData.VisionRadius = T3TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Su152RadixiteCost},
+			{ERTSResourceType::Resource_VehicleParts, Su152VehiclePartsCost}
+		});
+		TankData.Abilities = BasicTankDestroyerAbilities;
+		TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.1f, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_152, TankData);
+	}
 }
 
 void ACPPGameState::InitAllGameAircraftData()

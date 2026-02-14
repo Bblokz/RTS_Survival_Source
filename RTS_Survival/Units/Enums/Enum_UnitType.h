@@ -122,6 +122,7 @@ enum class ETankSubtype : uint8
 	Tank_T34_85 UMETA(DisplayName = "Rus Medium T-34/85"),
 	Tank_T34_100 UMETA(DisplayName = "Rus Medium T-34/100"),
 	Tank_T34_76 UMETA(DisplayName = "Rus Medium T-34/76"),
+	Tank_T34_AA UMETA(DisplayName = "Rus Medium T-34-AA"),
 	Tank_T34_76_L UMETA(DisplayName = "Rus Medium T-34/76L"),
 	Tank_T34E UMETA(DisplayName = "Rus Medium T-34E"),
 	Tank_SU_85 UMETA(DisplayName = "Rus Medium SU-85"),
@@ -141,6 +142,7 @@ enum class ETankSubtype : uint8
 	Tank_IS_2 UMETA(DisplayName = "Rus Heavy IS-2"),
 	Tank_IS_3 UMETA(DisplayName = "Rus Heavy IS-3"),
 	Tank_KV_5 UMETA(DisplayName = "Rus Heavy KV-5"),
+	Tank_SU_152 UMETA(DisplayName = "Rus Heavy SU-152"),
 };
 
 
@@ -175,6 +177,7 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_IS_2:
 	case ETankSubtype::Tank_IS_3:
 	case ETankSubtype::Tank_KV_5:
+	case ETankSubtype::Tank_SU_152:
 		return true;
 	default:
 		return false;
@@ -204,6 +207,7 @@ static bool Global_GetIsMediumTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_T34_85:
 	case ETankSubtype::Tank_T34_100:
 	case ETankSubtype::Tank_T34_76:
+	case ETankSubtype::Tank_T34_AA:
 	case ETankSubtype::Tank_T34_76_L:
 	case ETankSubtype::Tank_T34E:
 	case ETankSubtype::Tank_SU_85:
