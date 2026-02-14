@@ -1280,6 +1280,8 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 
 	// Rus T-34/76
 	{
+		const int32 T34AaExtraTrainingSeconds = 12;
+
 		FTrainingOption ItemID = FTrainingOption(
 			EAllUnitType::UNType_Tank,
 			static_cast<uint8>(ETankSubtype::Tank_T34_76)
@@ -1294,6 +1296,21 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			ESquadSubtype::Squad_None
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+
+		FTrainingOption T34AaItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_T34_AA)
+		);
+
+		FTrainingOptionState T34AaTrainingOptionState = CreateTrainingOptionState(
+			T34AaItemID,
+			MediumTankTrainingTime + T34AaExtraTrainingSeconds * GameTimeMlt,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_T34_AA,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(T34AaItemID, T34AaTrainingOptionState);
 	}
 
 	// Rus T-34/85
@@ -1598,6 +1615,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			2 * T3HeavyTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_KV_5,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus SU-152
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_SU_152)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_SU_152,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);
