@@ -199,14 +199,8 @@ void FTrainingPreviewHelper::BeginAsyncLoadPreview(const TSoftObjectPtr<UStaticM
 
 	M_StreamableHandle = Streamable.RequestAsyncLoad(
 		Path,
-		FStreamableDelegate::CreateLambda([WeakTrainingPreviewHelper = TWeakObjectPtr<UTrainingPreviewHelper>(this), WeakPreview, WeakNomad, SoftMesh, OptionBeingLoaded]()
+		FStreamableDelegate::CreateLambda([ this, WeakPreview, WeakNomad, SoftMesh, OptionBeingLoaded ]()
 		{
-			if (not WeakTrainingPreviewHelper.IsValid())
-			{
-				return;
-			}
-			UTrainingPreviewHelper* StrongTrainingPreviewHelper = WeakTrainingPreviewHelper.Get();
-
 			if (not WeakPreview.IsValid() || not WeakNomad.IsValid())
 			{
 				return;
@@ -215,7 +209,7 @@ void FTrainingPreviewHelper::BeginAsyncLoadPreview(const TSoftObjectPtr<UStaticM
 			ANomadicVehicle* StrongNomad = WeakNomad.Get();
 
 			// If our active option changed while loading, ignore this callback.
-			if (not (OptionBeingLoaded == StrongTrainingPreviewHelper->M_ActivePreviewTrainingOption))
+			if (not (OptionBeingLoaded == this->M_ActivePreviewTrainingOption))
 			{
 				return;
 			}
@@ -236,7 +230,7 @@ void FTrainingPreviewHelper::BeginAsyncLoadPreview(const TSoftObjectPtr<UStaticM
 			StrongPreviewMeshComponent->SetCanEverAffectNavigation(false);
 			StrongPreviewMeshComponent->SetGenerateOverlapEvents(false);
 
-			StrongPreviewMeshComponent->SetVisibility(bInBuilding && StrongTrainingPreviewHelper->bM_ShouldBeVisible, true);
+			StrongPreviewMeshComponent->SetVisibility(bInBuilding && this->bM_ShouldBeVisible, true);
 		})
 	);
 }

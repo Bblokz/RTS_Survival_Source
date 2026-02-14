@@ -1379,6 +1379,7 @@ bool UTrainerComponent::RemoveInvalidRequirementItems_AndRefund()
 	// 5) Re-enqueue survivors (preserve order)
 	RequeueFromArray(M_TTrainingQueue, Kept);
 
+	const TWeakObjectPtr<UTrainerComponent> WeakTrainerComponent = this;
 	// 6) Restart timer if anything left and we removed the active item
 	RestartTimerIfNeededAfterRemoval(
 		bRemovedActiveItem,

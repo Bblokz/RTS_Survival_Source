@@ -197,7 +197,7 @@ void AInstancedDestrucablesEnvActor::OnInstanceDestroyed(const int32 InstanceInd
 }
 
 
-void AInstancedDestrucablesEnvActor::AsyncLoadDestroyedMesh() const
+void AInstancedDestrucablesEnvActor::AsyncLoadDestroyedMesh()
 {
 	// Set the static mesh for the destroyed instances.
 	if (not IsValid(M_DestroyedMeshComponent))

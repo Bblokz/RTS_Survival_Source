@@ -47,6 +47,8 @@ public:
 		StabilizerHysteresisDegrees = FMath::Max(0.0f, InDegrees);
 	}
 
+	FAircraftSoundController GetSoundController()const {return AircraftSoundController;};
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Propeller Animation")
 	FPropAnimationSettings PropellerAnimSettings;

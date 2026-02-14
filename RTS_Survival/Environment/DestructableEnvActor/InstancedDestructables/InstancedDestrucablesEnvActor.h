@@ -100,7 +100,7 @@ private:
 	void OnInstanceDestroyed(int32 InstanceIndex) const;
 
 	// loads the destroyed mesh and sets it on the destroyed mesh component.
-	void AsyncLoadDestroyedMesh() const;
+	void AsyncLoadDestroyedMesh();
 
 	void OnFoundClosestInstance(const int32 InstanceIndex, const float DamageToDeal);
 

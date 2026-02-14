@@ -455,7 +455,7 @@ void FAircraftSoundController::FlyBySound_ScheduleNext()
 			}
 
 			UAircraftAnimInstance* StrongOwningAircraftAnimInstance = WeakOwningAircraftAnimInstance.Get();
-			StrongOwningAircraftAnimInstance->AircraftSoundController.FlyBySound_PlayNext();
+			StrongOwningAircraftAnimInstance->GetSoundController().FlyBySound_PlayNext();
 		}),
 		Delay,
 		false
@@ -510,7 +510,7 @@ void FAircraftSoundController::FlyBySound_PlayNext()
 					}
 
 					UAircraftAnimInstance* StrongOwningAircraftAnimInstance = WeakOwningAircraftAnimInstance.Get();
-					StrongOwningAircraftAnimInstance->AircraftSoundController.FlyBySound_DeactivateAfterPlay();
+					StrongOwningAircraftAnimInstance->GetSoundController().FlyBySound_DeactivateAfterPlay();
 				}),
 				Duration,
 				false
