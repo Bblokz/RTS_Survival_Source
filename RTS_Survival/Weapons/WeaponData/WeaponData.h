@@ -23,6 +23,7 @@ class AArchProjectile;
 class AShellCase;
 class RTS_SURVIVAL_API AProjectile;
 class RTS_SURVIVAL_API ACPPController;
+class URTSHidableInstancedStaticMeshComponent;
 enum class EWeaponSystemType : uint8;
 enum class EWeaponName : uint8;
 enum class EWeaponFireMode : uint8;
@@ -620,6 +621,7 @@ protected:
 
 	virtual void OnStopFire();
 	virtual void OnDisableWeapon();
+	virtual void OnReloadFinished_PostReload();
 
 
 	// The explicit aim point for this shot.
@@ -1277,6 +1279,92 @@ struct FInitWeaponStateRocketProjectile : public FInitWeaponStateProjectile
 	FRocketWeaponSettings RocketSettings;
 };
 
+USTRUCT(Blueprintable, BlueprintType)
+struct FVerticalRocketWeaponSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UStaticMesh* RocketMesh = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<FName> FireSocketNames;
+
+	/**
+	 * @brief When enabled launch sockets are discovered from RocketsToSpawnBaseMesh sockets that contain SocketNameFilter.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bSetupWithAttachedRocketsMesh = false;
+
+	/** Base mesh used to spawn hideable rocket instances when bSetupWithAttachedRocketsMesh is true. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UStaticMesh* RocketsToSpawnBaseMesh = nullptr;
+
+	/** Any socket containing this text on RocketsToSpawnBaseMesh becomes a launch/instance socket. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FName AttachedRocketsSocketNameFilter = NAME_None;
+
+	/**
+	 * @brief Minimum vertical offset added to launch location to generate stage-1 apex.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="1.0", UIMin="1.0"))
+	float ApexZOffsetMin = 700.0f;
+
+	/**
+	 * @brief Maximum vertical offset added to launch location to generate stage-1 apex.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="1.0", UIMin="1.0"))
+	float ApexZOffsetMax = 1300.0f;
+
+	/**
+	 * @brief Minimum random cone angle used to offset apex horizontally while keeping chosen apex height.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0", ClampMax="89.0", UIMax="89.0"))
+	float RandomAngleOffsetMin = 0.0f;
+
+	/**
+	 * @brief Maximum random cone angle used to offset apex horizontally while keeping chosen apex height.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0", ClampMax="89.0", UIMax="89.0"))
+	float RandomAngleOffsetMax = 22.0f;
+
+	/**
+	 * @brief Curvature multiplier for stage-1 bezier. Values > 1 bend more, values < 1 flatten the curve.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.1", UIMin="0.1"))
+	float FirstStageBezierCurvature = 1.0f;
+
+	/**
+	 * @brief Distance in cm for stage-2 mini-arc before transitioning to final straight intercept.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="50.0", UIMin="50.0"))
+	float Stage2ArcDistance = 280.0f;
+
+	/**
+	 * @brief Upward offset in cm at the top of stage-2 mini-arc to soften direction changes.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float Stage2ArcHeight = 130.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.1", UIMin="0.1"))
+	float Stage1SpeedMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.1", UIMin="0.1"))
+	float Stage2ArcSpeedMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.1", UIMin="0.1"))
+	float Stage2StraightSpeedMultiplier = 1.2f;
+};
+
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateVerticalRocketProjectile : public FInitWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FVerticalRocketWeaponSettings VerticalRocketSettings;
+};
+
 /**
  * @brief Weapon state that fires a rocket with a curved opening swing before straight flight.
  */
@@ -1359,6 +1447,77 @@ private:
 	                                                      AProjectile* Projectile,
 	                                                      const FVector& LaunchLocation,
 	                                                      const FRotator& LaunchRotation,
+	                                                      const FVector& TargetLocation);
+};
+
+/**
+ * @brief Weapon state that fires rockets in a staged vertical profile with optional attached-rocket instance setup.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UVerticalRocketWeaponState : public UWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+public:
+	void InitVerticalRocketWeapon(
+		const int32 NewOwningPlayer,
+		const int32 NewWeaponIndex,
+		const EWeaponName NewWeaponName,
+		const EWeaponFireMode NewWeaponBurstMode,
+		TScriptInterface<IWeaponOwner> NewWeaponOwner,
+		UMeshComponent* NewMeshComponent,
+		const FName NewFireSocketName,
+		UWorld* NewWorld,
+		const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+		FWeaponVFX NewWeaponVFX,
+		FWeaponShellCase NewWeaponShellCase,
+		const FVerticalRocketWeaponSettings& NewVerticalRocketSettings,
+		const float NewBurstCooldown = 0.0f,
+		const int32 NewSingleBurstAmountMaxBurstAmount = 0,
+		const int32 NewMinBurstAmount = 0,
+		const bool bNewCreateShellCasingOnEveryRandomBurst = false);
+
+protected:
+	virtual void FireWeaponSystem() override;
+	virtual void CreateLaunchVfx(
+		const FVector& LaunchLocation,
+		const FVector& ForwardVector,
+		const bool bCreateShellCase = true) override;
+	virtual void OnReloadFinished_PostReload() override;
+
+private:
+	struct FVerticalRocketLaunchSocketData
+	{
+		FName SocketName = NAME_None;
+		FVector LaunchLocation = FVector::ZeroVector;
+		FVector ForwardVector = FVector::ZeroVector;
+		int32 HiddenInstanceIndex = INDEX_NONE;
+	};
+
+	UPROPERTY()
+	FVerticalRocketWeaponSettings M_VerticalRocketSettings;
+
+	UPROPERTY()
+	TArray<FName> M_LaunchSocketNames;
+
+	UPROPERTY()
+	TObjectPtr<URTSHidableInstancedStaticMeshComponent> M_AttachedRocketInstances;
+
+	UPROPERTY()
+	TMap<FName, int32> M_SocketToInstanceIndex;
+
+	int32 M_NextRocketSocketIndex = 0;
+
+	bool SetupAttachedRocketInstances();
+	void CollectLaunchSocketsFromAttachedRocketMesh();
+	FVerticalRocketLaunchSocketData GetVerticalRocketLaunchSocketData(const bool bAdvanceSocketIndex);
+	void FireProjectile(const FVector& TargetLocation);
+	void UnhideAllAttachedRocketInstances() const;
+	bool GetIsValidAttachedRocketInstances() const;
+
+	FORCEINLINE void FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+	                                                      AProjectile* Projectile,
+	                                                      const FVerticalRocketLaunchSocketData& LaunchData,
 	                                                      const FVector& TargetLocation);
 };
 

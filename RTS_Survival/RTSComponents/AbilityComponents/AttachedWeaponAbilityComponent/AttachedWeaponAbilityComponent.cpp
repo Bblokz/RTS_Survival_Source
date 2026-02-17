@@ -420,6 +420,20 @@ void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeapon(FInitWeaponSta
 	SetupRocketProjectileWeaponInternal(RocketProjectileParameters);
 }
 
+void UAttachedWeaponAbilityComponent::SetupVerticalRocketProjectileWeapon(
+	FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters)
+{
+	if (not TryPrepareWeaponParameters(VerticalRocketProjectileParameters, "SetupVerticalRocketProjectileWeapon"))
+	{
+		if (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::Uninitialized)
+		{
+			M_PendingVerticalRocketWeapons.Add(VerticalRocketProjectileParameters);
+		}
+		return;
+	}
+	SetupVerticalRocketProjectileWeaponInternal(VerticalRocketProjectileParameters);
+}
+
 void UAttachedWeaponAbilityComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)
 {
 	if (not TryPrepareWeaponParameters(MultiProjectileState, "SetupMultiProjectileWeapon"))
@@ -661,6 +675,7 @@ void UAttachedWeaponAbilityComponent::ProcessPendingWeaponSetups()
 	ProcessPendingFlameThrowerWeapons();
 	ProcessPendingProjectileWeapons();
 	ProcessPendingRocketWeapons();
+	ProcessPendingVerticalRocketWeapons();
 	ProcessPendingMultiProjectileWeapons();
 	ProcessPendingArchProjectileWeapons();
 }
@@ -767,6 +782,19 @@ void UAttachedWeaponAbilityComponent::ProcessPendingRocketWeapons()
 		}
 	}
 	M_PendingRocketWeapons.Reset();
+}
+
+void UAttachedWeaponAbilityComponent::ProcessPendingVerticalRocketWeapons()
+{
+	for (const FInitWeaponStateVerticalRocketProjectile& PendingRocket : M_PendingVerticalRocketWeapons)
+	{
+		FInitWeaponStateVerticalRocketProjectile Parameters = PendingRocket;
+		if (TryPrepareWeaponParameters(Parameters, "ProcessPendingVerticalRocketWeapons"))
+		{
+			SetupVerticalRocketProjectileWeaponInternal(Parameters);
+		}
+	}
+	M_PendingVerticalRocketWeapons.Reset();
 }
 
 void UAttachedWeaponAbilityComponent::ProcessPendingMultiProjectileWeapons()
@@ -894,6 +922,13 @@ bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStat
 		: PrepareSpawnedMeshParameters(MeshComponent, FunctionName);
 	WeaponParameters.MeshComponent = MeshComponent;
 	return bMeshReady;
+}
+
+bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(
+	FInitWeaponStateVerticalRocketProjectile& WeaponParameters,
+	const FString& FunctionName)
+{
+	return TryPrepareWeaponParameters(static_cast<FInitWeaponStateProjectile&>(WeaponParameters), FunctionName);
 }
 
 bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStateMultiProjectile& WeaponParameters,
@@ -1265,6 +1300,41 @@ void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeaponInternal(
 	M_AttachedWeapons.Add(RocketWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(RocketWeapon);
+}
+
+void UAttachedWeaponAbilityComponent::SetupVerticalRocketProjectileWeaponInternal(
+	const FInitWeaponStateVerticalRocketProjectile& VerticalRocketProjectileParameters)
+{
+	SetOwningPlayer(VerticalRocketProjectileParameters.OwningPlayer);
+	const int32 WeaponIndex = M_AttachedWeapons.Num();
+	UWorld* CurrentWorld = GetWorld();
+	if (not CurrentWorld)
+	{
+		RTSFunctionLibrary::ReportError("No world available in SetupVerticalRocketProjectileWeaponInternal for " + GetName());
+		return;
+	}
+
+	UVerticalRocketWeaponState* VerticalRocketProjectile = NewObject<UVerticalRocketWeaponState>(this);
+	VerticalRocketProjectile->InitVerticalRocketWeapon(
+		VerticalRocketProjectileParameters.OwningPlayer,
+		WeaponIndex,
+		VerticalRocketProjectileParameters.WeaponName,
+		VerticalRocketProjectileParameters.WeaponBurstMode,
+		VerticalRocketProjectileParameters.WeaponOwner,
+		VerticalRocketProjectileParameters.MeshComponent,
+		VerticalRocketProjectileParameters.FireSocketName,
+		CurrentWorld,
+		VerticalRocketProjectileParameters.ProjectileSystem,
+		VerticalRocketProjectileParameters.WeaponVFX,
+		VerticalRocketProjectileParameters.WeaponShellCase,
+		VerticalRocketProjectileParameters.VerticalRocketSettings,
+		VerticalRocketProjectileParameters.BurstCooldown,
+		VerticalRocketProjectileParameters.SingleBurstAmountMaxBurstAmount,
+		VerticalRocketProjectileParameters.MinBurstAmount,
+		VerticalRocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
+	M_AttachedWeapons.Add(VerticalRocketProjectile);
+	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(VerticalRocketProjectile);
 }
 
 void UAttachedWeaponAbilityComponent::SetupMultiProjectileWeaponInternal(

@@ -31,6 +31,7 @@ class UAudioComponent;
 class UProjectileMovementComponent;
 class UWeaponStateProjectile;
 struct FRocketWeaponSettings;
+struct FVerticalRocketWeaponSettings;
 
 /**
  * Collision of the projectile works by performing async traces
@@ -119,6 +120,12 @@ public:
 	                            const FVector& TargetLocation,
 	                            const float ProjectileSpeed,
 	                            const FRocketWeaponSettings& RocketSettings);
+
+	void SetupVerticalRocketLaunch(const FVector& LaunchLocation,
+	                               const FVector& ApexLocation,
+	                               const FVector& TargetLocation,
+	                               const float ProjectileSpeed,
+	                               const FVerticalRocketWeaponSettings& VerticalRocketSettings);
 
 	// Called by abilities using attach rockets to change the mesh on the rocket VFX.
 	void SetupAttachedRocketMesh(UStaticMesh* RocketMesh);
