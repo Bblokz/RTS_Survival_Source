@@ -25,5 +25,6 @@ enum class EBehaviourAbilityType : uint8
 	AdrenalineShot,
 	FlakShrapnelRounds,
 	FlameNapalmAbility,
+	PulseRepair,
 	
 };
