@@ -178,6 +178,52 @@ void AInfantryWeaponMaster::AutoEngage()
 	GetClosestTarget();
 }
 
+
+void AInfantryWeaponMaster::SetupSplitterArchProjectileWeapon(
+	FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters)
+{
+	SetOwningPlayer(SplitterArchProjParameters.OwningPlayer);
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWorld* SpawnWorld = GetWorld();
+	if (not SpawnWorld)
+	{
+		RTSFunctionLibrary::ReportError("World is null for infantry weapon: " + GetName());
+		return;
+	}
+
+	UWeaponStateSplitterArchProjectile* SplitterProjectile = NewObject<UWeaponStateSplitterArchProjectile>(this);
+	if (not SplitterProjectile)
+	{
+		RTSFunctionLibrary::ReportError("Failed to create splitter arch projectile state for infantry weapon: " + GetName());
+		return;
+	}
+
+	SplitterProjectile->InitSplitterArchProjectileWeapon(
+		SplitterArchProjParameters.OwningPlayer,
+		WeaponIndex,
+		SplitterArchProjParameters.WeaponName,
+		SplitterArchProjParameters.WeaponBurstMode,
+		SplitterArchProjParameters.WeaponOwner,
+		SplitterArchProjParameters.MeshComponent,
+		SplitterArchProjParameters.FireSocketName,
+		SpawnWorld,
+		SplitterArchProjParameters.ProjectileSystem,
+		SplitterArchProjParameters.WeaponVFX,
+		SplitterArchProjParameters.WeaponShellCase,
+		SplitterArchProjParameters.BurstCooldown,
+		SplitterArchProjParameters.SingleBurstAmountMaxBurstAmount,
+		SplitterArchProjParameters.MinBurstAmount,
+		SplitterArchProjParameters.CreateShellCasingOnEveryRandomBurst,
+		SplitterArchProjParameters.SplitterSettings);
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(SplitterProjectile, M_ProjectileManager.Get());
+	}
+
+	M_TWeapons.Add(SplitterProjectile);
+}
+
 void AInfantryWeaponMaster::SpecificEngage()
 {
 	if (not GetIsSquadUnitOwnerValid())

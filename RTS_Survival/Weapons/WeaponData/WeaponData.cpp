@@ -2271,6 +2271,340 @@ void UWeaponStateArchProjectile::FireProjectileWithShellAdjustedStats(const FWea
 	                             M_WeaponVfx.LaunchConcurrency);
 }
 
+
+
+void UWeaponStateSplitterArchProjectile::InitSplitterArchProjectileWeapon(
+	const int32 NewOwningPlayer,
+	const int32 NewWeaponIndex,
+	const EWeaponName NewWeaponName,
+	const EWeaponFireMode NewWeaponBurstMode,
+	TScriptInterface<IWeaponOwner> NewWeaponOwner,
+	UMeshComponent* NewMeshComponent,
+	const FName NewFireSocketName,
+	UWorld* NewWorld,
+	const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+	FWeaponVFX NewWeaponVFX,
+	FWeaponShellCase NewWeaponShellCase,
+	const float NewBurstCooldown,
+	const int32 NewSingleBurstAmountMaxBurstAmount,
+	const int32 NewMinBurstAmount,
+	const bool bNewCreateShellCasingOnEveryRandomBurst,
+	const FSplitterArcWeaponSettings& NewSplitterSettings)
+{
+	M_SplitterSettings = NewSplitterSettings;
+	InitProjectileWeapon(
+		NewOwningPlayer,
+		NewWeaponIndex,
+		NewWeaponName,
+		NewWeaponBurstMode,
+		NewWeaponOwner,
+		NewMeshComponent,
+		NewFireSocketName,
+		NewWorld,
+		ProjectileNiagaraSystem,
+		NewWeaponVFX,
+		NewWeaponShellCase,
+		NewBurstCooldown,
+		NewSingleBurstAmountMaxBurstAmount,
+		NewMinBurstAmount,
+		bNewCreateShellCasingOnEveryRandomBurst);
+}
+
+
+void UWeaponStateSplitterArchProjectile::FireWeaponSystem()
+{
+	if (not WeaponOwner)
+	{
+		return;
+	}
+
+	FireProjectile(WeaponOwner->GetTargetLocation(WeaponIndex));
+}
+
+void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLocationRaw)
+{
+	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+	if (not ProjectileManager)
+	{
+		return;
+	}
+
+	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
+	const FVector LaunchLocation = LaunchAndForward.Key;
+	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(TargetLocationRaw, WeaponData.Accuracy);
+
+	FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
+	if (LaunchDirection.IsNearlyZero())
+	{
+		LaunchDirection = LaunchAndForward.Value.GetSafeNormal();
+	}
+	const FRotator LaunchRotation = LaunchDirection.Rotation();
+
+	AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
+	if (not IsValid(SpawnedProjectile))
+	{
+		ReportErrorForWeapon("SPLITTER ARC weapon failed to get dormant projectile from pool manager.");
+		return;
+	}
+
+	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) ||
+		(WeaponData.ShellType == EWeaponShellType::Shell_APHE);
+	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
+	const FWeaponData ShellAdjustedData = (not bIsAPShell && not bIsFireShell)
+		? GLOBAL_GetWeaponDataForShellType(WeaponData)
+		: WeaponData;
+
+	constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	const float PenAdjustedWithGameFlux = FMath::RandRange(
+		ShellAdjustedData.ArmorPen * PenFluxFactorLow,
+		ShellAdjustedData.ArmorPen * PenFluxFactorHigh);
+	const float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorLow,
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorHigh);
+
+	FProjectileVfxSettings ProjectileVfxSettings;
+	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
+	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
+	ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
+
+	SpawnedProjectile->SetupProjectileForNewLaunch(this,
+	                                               WeaponData.DamageType,
+	                                               ShellAdjustedData.Range,
+	                                               ShellAdjustedData.BaseDamage,
+	                                               PenAdjustedWithGameFlux,
+	                                               PenMaxRangeAdjustedWithGameFlux,
+	                                               ShellAdjustedData.ShrapnelParticles,
+	                                               ShellAdjustedData.ShrapnelRange,
+	                                               ShellAdjustedData.ShrapnelDamage,
+	                                               ShellAdjustedData.ShrapnelPen,
+	                                               OwningPlayer,
+	                                               M_WeaponVfx.SurfaceImpactEffects,
+	                                               M_WeaponVfx.BounceEffect,
+	                                               M_WeaponVfx.BounceSound,
+	                                               M_WeaponVfx.ImpactScale,
+	                                               M_WeaponVfx.BounceScale,
+	                                               ShellAdjustedData.ProjectileMovementSpeed,
+	                                               LaunchLocation,
+	                                               LaunchRotation,
+	                                               M_WeaponVfx.ImpactAttenuation,
+	                                               M_WeaponVfx.ImpactConcurrency,
+	                                               ProjectileVfxSettings,
+	                                               WeaponData.ShellType,
+	                                               ActorsToIgnore,
+	                                               ShellAdjustedData.WeaponCalibre);
+
+	SpawnedProjectile->SetupArcedLaunch(
+		LaunchLocation,
+		TargetLocation,
+		ShellAdjustedData.ProjectileMovementSpeed,
+		ShellAdjustedData.Range,
+		M_SplitterSettings.ArchSettings,
+		M_WeaponVfx.LaunchAttenuation,
+		M_WeaponVfx.LaunchConcurrency);
+
+	const float TimeToApex = CalculateArcTimeToApex(LaunchLocation, TargetLocation);
+	if (TimeToApex <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	if (UWorld* CurrentWorld = World)
+	{
+		TWeakObjectPtr<UWeaponStateSplitterArchProjectile> WeakThis(this);
+		FTimerHandle SplitTimerHandle;
+		CurrentWorld->GetTimerManager().SetTimer(
+			SplitTimerHandle,
+			[WeakThis, WeakProjectile = TWeakObjectPtr<AProjectile>(SpawnedProjectile), TargetLocation]()
+			{
+				if (not WeakThis.IsValid() || not WeakProjectile.IsValid())
+				{
+					return;
+				}
+
+				WeakThis->SpawnSplitProjectilesAtApex(WeakProjectile->GetActorLocation(), TargetLocation);
+			},
+			TimeToApex,
+			false);
+	}
+}
+
+void UWeaponStateSplitterArchProjectile::SpawnSplitProjectilesAtApex(const FVector SplitLocation,
+	                                                                  const FVector OriginalTargetLocation)
+{
+	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+	if (not ProjectileManager)
+	{
+		return;
+	}
+
+	SpawnSplitEffects(SplitLocation);
+
+	const FWeaponData SplitProjectileData = BuildSplitProjectileData(WeaponData);
+	const int32 SplitProjectileCount = FMath::Max(M_SplitterSettings.SplitSettings.SplitProjectileCount, 1);
+	for (int32 SplitProjectileIndex = 0; SplitProjectileIndex < SplitProjectileCount; ++SplitProjectileIndex)
+	{
+		AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
+		if (not IsValid(SpawnedProjectile))
+		{
+			ReportErrorForWeapon("SPLITTER ARC failed to get a split projectile from the pool manager.");
+			continue;
+		}
+
+		const FVector SplitTargetLocation = BuildSplitTargetLocation(OriginalTargetLocation);
+		LaunchSplitProjectile(SplitProjectileData, SpawnedProjectile, SplitLocation, SplitTargetLocation);
+	}
+}
+
+void UWeaponStateSplitterArchProjectile::SpawnSplitEffects(const FVector& SplitLocation) const
+{
+	if (M_SplitterSettings.SplitSettings.SplitNiagaraSystem != nullptr)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			World,
+			M_SplitterSettings.SplitSettings.SplitNiagaraSystem,
+			SplitLocation,
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true,
+			ENCPoolMethod::AutoRelease,
+			true);
+	}
+
+	if (M_SplitterSettings.SplitSettings.SplitSound == nullptr)
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySoundAtLocation(
+		World,
+		M_SplitterSettings.SplitSettings.SplitSound,
+		SplitLocation,
+		FRotator::ZeroRotator,
+		1.0f,
+		1.0f,
+		0.0f,
+		M_SplitterSettings.SplitSettings.SplitSoundAttenuation,
+		M_SplitterSettings.SplitSettings.SplitSoundConcurrency);
+}
+
+FWeaponData UWeaponStateSplitterArchProjectile::BuildSplitProjectileData(const FWeaponData& SourceWeaponData) const
+{
+	FWeaponData SplitData = SourceWeaponData;
+	SplitData.WeaponCalibre = FMath::CeilToInt(SourceWeaponData.WeaponCalibre * M_SplitterSettings.SplitSettings.SplitCalibreMultiplier);
+	SplitData.BaseDamage *= M_SplitterSettings.SplitSettings.SplitDamageMultiplier;
+	SplitData.ArmorPen *= M_SplitterSettings.SplitSettings.SplitArmorPenMultiplier;
+	SplitData.ArmorPenMaxRange *= M_SplitterSettings.SplitSettings.SplitArmorPenMultiplier;
+	SplitData.ShrapnelRange *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
+	SplitData.ShrapnelDamage *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
+	SplitData.ShrapnelPen *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
+	return SplitData;
+}
+
+FVector UWeaponStateSplitterArchProjectile::BuildSplitTargetLocation(const FVector& OriginalTargetLocation) const
+{
+	const float SpreadRadius = M_SplitterSettings.SplitSettings.SplitSpreadRadius;
+	const FVector RandomOffset(
+		FMath::FRandRange(-SpreadRadius, SpreadRadius),
+		FMath::FRandRange(-SpreadRadius, SpreadRadius),
+		0.0f);
+	return OriginalTargetLocation + RandomOffset;
+}
+
+float UWeaponStateSplitterArchProjectile::CalculateArcTimeToApex(const FVector& LaunchLocation,
+	                                                              const FVector& TargetLocation) const
+{
+	if (World == nullptr)
+	{
+		return 0.0f;
+	}
+
+	const FVector LaunchToTarget = TargetLocation - LaunchLocation;
+	const FVector FlatDelta(LaunchToTarget.X, LaunchToTarget.Y, 0.0f);
+	const float HorizontalDistance = FlatDelta.Size();
+	const float GravityZ = World->GetGravityZ();
+	if (HorizontalDistance <= KINDA_SMALL_NUMBER || FMath::IsNearlyZero(GravityZ))
+	{
+		return 0.0f;
+	}
+
+	const float HighestPoint = FMath::Max(LaunchLocation.Z, TargetLocation.Z);
+	const float BaseApexHeight = HighestPoint + (HorizontalDistance * M_SplitterSettings.ArchSettings.ApexHeightMultiplier)
+		+ M_SplitterSettings.ArchSettings.ApexHeightOffset;
+	const float MinimumHeight = HighestPoint + M_SplitterSettings.ArchSettings.MinApexOffset;
+	const float DesiredApexHeight = FMath::Max(BaseApexHeight, MinimumHeight);
+	if (DesiredApexHeight <= LaunchLocation.Z)
+	{
+		return 0.0f;
+	}
+
+	const float Gravity = FMath::Abs(GravityZ);
+	const float BaseVerticalVelocity = FMath::Sqrt(2.0f * Gravity * (DesiredApexHeight - LaunchLocation.Z));
+	constexpr float MinCurvatureVerticalVelocityMultiplier = 0.25f;
+	constexpr float MaxCurvatureVerticalVelocityMultiplier = 4.0f;
+	const float CurvatureMultiplier = FMath::Clamp(
+		M_SplitterSettings.ArchSettings.CurvatureVerticalVelocityMultiplier,
+		MinCurvatureVerticalVelocityMultiplier,
+		MaxCurvatureVerticalVelocityMultiplier);
+	const float InitialVerticalVelocity = BaseVerticalVelocity * CurvatureMultiplier;
+	return InitialVerticalVelocity / Gravity;
+}
+
+void UWeaponStateSplitterArchProjectile::LaunchSplitProjectile(const FWeaponData& SplitProjectileData,
+	                                                           AProjectile* SpawnedProjectile,
+	                                                           const FVector& LaunchLocation,
+	                                                           const FVector& TargetLocation)
+{
+	const FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
+	if (LaunchDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	const FRotator LaunchRotation = LaunchDirection.Rotation();
+	FProjectileVfxSettings ProjectileVfxSettings;
+	ProjectileVfxSettings.ShellType = SplitProjectileData.ShellType;
+	ProjectileVfxSettings.WeaponCaliber = SplitProjectileData.WeaponCalibre;
+	ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
+
+	constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	const float PenAdjustedWithGameFlux = FMath::RandRange(
+		SplitProjectileData.ArmorPen * PenFluxFactorLow,
+		SplitProjectileData.ArmorPen * PenFluxFactorHigh);
+	const float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(
+		SplitProjectileData.ArmorPenMaxRange * PenFluxFactorLow,
+		SplitProjectileData.ArmorPenMaxRange * PenFluxFactorHigh);
+
+	SpawnedProjectile->SetupProjectileForNewLaunch(
+		this,
+		WeaponData.DamageType,
+		SplitProjectileData.Range,
+		SplitProjectileData.BaseDamage,
+		PenAdjustedWithGameFlux,
+		PenMaxRangeAdjustedWithGameFlux,
+		SplitProjectileData.ShrapnelParticles,
+		SplitProjectileData.ShrapnelRange,
+		SplitProjectileData.ShrapnelDamage,
+		SplitProjectileData.ShrapnelPen,
+		OwningPlayer,
+		M_WeaponVfx.SurfaceImpactEffects,
+		M_WeaponVfx.BounceEffect,
+		M_WeaponVfx.BounceSound,
+		M_WeaponVfx.ImpactScale,
+		M_WeaponVfx.BounceScale,
+		SplitProjectileData.ProjectileMovementSpeed,
+		LaunchLocation,
+		LaunchRotation,
+		M_WeaponVfx.ImpactAttenuation,
+		M_WeaponVfx.ImpactConcurrency,
+		ProjectileVfxSettings,
+		WeaponData.ShellType,
+		ActorsToIgnore,
+		SplitProjectileData.WeaponCalibre);
+}
+
 void UWeaponStateRocketProjectile::InitRocketProjectileWeapon(
 	const int32 NewOwningPlayer,
 	const int32 NewWeaponIndex,

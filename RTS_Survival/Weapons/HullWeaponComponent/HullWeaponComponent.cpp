@@ -541,6 +541,13 @@ bool UHullWeaponComponent::GetIsValidTurretOwner() const
 	return false;
 }
 
+
+void UHullWeaponComponent::SetupSplitterArchProjectileWeapon(
+	FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters)
+{
+	RTSFunctionLibrary::ReportError("SplitterArchProjectile weapons are not supported for HullWeaponComponent: " + GetName());
+}
+
 void UHullWeaponComponent::InitiateAutoEngageTimers()
 {
 	if (not EnsureWorldIsValid())

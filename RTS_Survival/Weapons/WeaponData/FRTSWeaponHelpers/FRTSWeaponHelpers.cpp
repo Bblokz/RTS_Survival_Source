@@ -160,6 +160,12 @@ void FRTSWeaponHelpers::SetupProjectileManagerForWeapon(UWeaponState* Weapon,
 		ArchProjectileWeapon->SetupProjectileManager(ProjectileManager);
 		return;
 	}
+	UWeaponStateSplitterArchProjectile* SplitterArchProjectileWeapon = Cast<UWeaponStateSplitterArchProjectile>(Weapon);
+	if (IsValid(SplitterArchProjectileWeapon))
+	{
+		SplitterArchProjectileWeapon->SetupProjectileManager(ProjectileManager);
+		return;
+	}
 }
 
 ERTSDeathType FRTSWeaponHelpers::TranslateDamageIntoDeathType(const ERTSDamageType DamageType)

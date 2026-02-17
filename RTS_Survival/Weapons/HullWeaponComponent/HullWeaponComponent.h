@@ -126,6 +126,8 @@ protected:
 
         UFUNCTION(BlueprintCallable)
         virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupSplitterArchProjectileWeapon(FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters) override;
 
         // ---- End Override IWeaponOwner ----
 
