@@ -475,6 +475,42 @@ void UHullWeaponComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProje
 	}
 }
 
+void UHullWeaponComponent::SetupVerticalRocketProjectileWeapon(
+	FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters)
+{
+	SetOwningPlayer(VerticalRocketProjectileParameters.OwningPlayer);
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for hull weapon: " + GetName());
+		return;
+	}
+	UVerticalRocketWeaponState* VerticalRocketProjectile = NewObject<UVerticalRocketWeaponState>(this);
+	VerticalRocketProjectile->InitVerticalRocketWeapon(
+		VerticalRocketProjectileParameters.OwningPlayer,
+		WeaponIndex,
+		VerticalRocketProjectileParameters.WeaponName,
+		VerticalRocketProjectileParameters.WeaponBurstMode,
+		VerticalRocketProjectileParameters.WeaponOwner,
+		VerticalRocketProjectileParameters.MeshComponent,
+		VerticalRocketProjectileParameters.FireSocketName,
+		World,
+		VerticalRocketProjectileParameters.ProjectileSystem,
+		VerticalRocketProjectileParameters.WeaponVFX,
+		VerticalRocketProjectileParameters.WeaponShellCase,
+		VerticalRocketProjectileParameters.VerticalRocketSettings,
+		VerticalRocketProjectileParameters.BurstCooldown,
+		VerticalRocketProjectileParameters.SingleBurstAmountMaxBurstAmount,
+		VerticalRocketProjectileParameters.MinBurstAmount,
+		VerticalRocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(VerticalRocketProjectile);
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(VerticalRocketProjectile, M_ProjectileManager.Get());
+	}
+}
+
 void UHullWeaponComponent::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
 {
         RTSFunctionLibrary::ReportError("ArchProjectile weapons are not supported for HullWeaponComponent: " + GetName());

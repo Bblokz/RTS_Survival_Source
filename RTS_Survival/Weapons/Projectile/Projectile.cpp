@@ -576,6 +576,128 @@ void AProjectile::SetupRocketSwingLaunch(const FVector& LaunchLocation,
 	ScheduleRocketSwingTransition(TargetLocation, LaunchSolution.StraightSpeed, LaunchSolution.CurveTime);
 }
 
+
+void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
+                                           const FVector& ApexLocation,
+                                           const FVector& TargetLocation,
+                                           const float ProjectileSpeed,
+                                           const FVerticalRocketWeaponSettings& VerticalRocketSettings)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
+	const float Stage1Speed = SafeProjectileSpeed * FMath::Max(VerticalRocketSettings.Stage1SpeedMultiplier, 0.1f);
+	const float Stage2ArcSpeed = SafeProjectileSpeed * FMath::Max(VerticalRocketSettings.Stage2ArcSpeedMultiplier, 0.1f);
+	const float Stage2StraightSpeed = SafeProjectileSpeed * FMath::Max(
+		VerticalRocketSettings.Stage2StraightSpeedMultiplier,
+		0.1f);
+
+	const FVector LaunchToApex = ApexLocation - LaunchLocation;
+	if (LaunchToApex.IsNearlyZero())
+	{
+		return;
+	}
+
+	const float CurvatureAlpha = FMath::Clamp(VerticalRocketSettings.FirstStageBezierCurvature, 0.1f, 5.0f);
+	FVector Stage1ControlPoint = FMath::Lerp(LaunchLocation, ApexLocation, 0.5f);
+	Stage1ControlPoint += FVector(0.0f, 0.0f, FVector::Distance(LaunchLocation, ApexLocation) * 0.25f * CurvatureAlpha);
+	FVector Stage1Direction = (Stage1ControlPoint - LaunchLocation).GetSafeNormal();
+	if (Stage1Direction.IsNearlyZero())
+	{
+		Stage1Direction = LaunchToApex.GetSafeNormal();
+	}
+
+	const float Stage1Distance = FVector::Distance(LaunchLocation, Stage1ControlPoint) + FVector::Distance(
+		Stage1ControlPoint,
+		ApexLocation);
+	const float Stage1Time = Stage1Distance / Stage1Speed;
+
+	FVector Stage2ArcAnchor = ApexLocation;
+	const FVector ApexToTarget = TargetLocation - ApexLocation;
+	const float ApexToTargetDistance = ApexToTarget.Size();
+	if (ApexToTargetDistance > KINDA_SMALL_NUMBER)
+	{
+		const float ArcDistance = FMath::Min(VerticalRocketSettings.Stage2ArcDistance, ApexToTargetDistance * 0.45f);
+		Stage2ArcAnchor = ApexLocation + (ApexToTarget.GetSafeNormal() * ArcDistance) + FVector(
+			0.0f,
+			0.0f,
+			VerticalRocketSettings.Stage2ArcHeight);
+	}
+
+	const FVector ApexToArc = Stage2ArcAnchor - ApexLocation;
+	const float Stage2ArcDistance = ApexToArc.Size();
+	const float Stage2ArcTime = Stage2ArcDistance > KINDA_SMALL_NUMBER ? Stage2ArcDistance / Stage2ArcSpeed : 0.0f;
+	const float Stage2StraightDistance = FVector::Distance(Stage2ArcAnchor, TargetLocation);
+	const float Stage2StraightTime = Stage2StraightDistance / Stage2StraightSpeed;
+
+	SetActorLocation(LaunchLocation);
+	SetActorRotation(Stage1Direction.Rotation());
+	M_ProjectileMovement->Activate();
+	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
+	M_ProjectileMovement->Velocity = Stage1Direction * Stage1Speed;
+	StartFlightTimers(Stage1Time + Stage2ArcTime + Stage2StraightTime);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		TWeakObjectPtr<AProjectile> WeakThis(this);
+		World->GetTimerManager().SetTimer(
+			M_RocketSwingTimerHandle,
+			[WeakThis, ApexLocation, Stage2ArcAnchor, TargetLocation, Stage2ArcSpeed, Stage2StraightSpeed, Stage2ArcTime]()
+			{
+				if (not WeakThis.IsValid() || not WeakThis->GetIsValidProjectileMovement())
+				{
+					return;
+				}
+
+				WeakThis->SetActorLocation(ApexLocation);
+				const FVector ApexArcDirection = (Stage2ArcAnchor - ApexLocation).GetSafeNormal();
+				if (ApexArcDirection.IsNearlyZero() || Stage2ArcTime <= 0.0f)
+				{
+					const FVector DirectDirection = (TargetLocation - WeakThis->GetActorLocation()).GetSafeNormal();
+					if (DirectDirection.IsNearlyZero())
+					{
+						return;
+					}
+					WeakThis->SetActorRotation(DirectDirection.Rotation());
+					WeakThis->M_ProjectileMovement->Velocity = DirectDirection * Stage2StraightSpeed;
+					return;
+				}
+
+				WeakThis->SetActorRotation(ApexArcDirection.Rotation());
+				WeakThis->M_ProjectileMovement->Velocity = ApexArcDirection * Stage2ArcSpeed;
+				if (UWorld* InnerWorld = WeakThis->GetWorld())
+				{
+					InnerWorld->GetTimerManager().ClearTimer(WeakThis->M_RocketSwingTimerHandle);
+					InnerWorld->GetTimerManager().SetTimer(
+						WeakThis->M_RocketSwingTimerHandle,
+						[WeakThis, Stage2ArcAnchor, TargetLocation, Stage2StraightSpeed]()
+						{
+							if (not WeakThis.IsValid() || not WeakThis->GetIsValidProjectileMovement())
+							{
+								return;
+							}
+							WeakThis->SetActorLocation(Stage2ArcAnchor);
+							const FVector StraightDirection = (TargetLocation - Stage2ArcAnchor).GetSafeNormal();
+							if (StraightDirection.IsNearlyZero())
+							{
+								return;
+							}
+							WeakThis->SetActorRotation(StraightDirection.Rotation());
+							WeakThis->M_ProjectileMovement->Velocity = StraightDirection * Stage2StraightSpeed;
+						},
+						Stage2ArcTime,
+						false);
+				}
+			},
+			Stage1Time,
+			false);
+	}
+}
+
 void AProjectile::LaunchStraightFallbackStartAscent(const FVector& LaunchLocation,
                                                     const FVector& TargetLocation,
                                                     const FVector& LaunchToTarget,

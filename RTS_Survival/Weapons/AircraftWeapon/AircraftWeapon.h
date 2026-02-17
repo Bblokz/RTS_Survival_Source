@@ -72,6 +72,7 @@ protected:
         virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) override;
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
+	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 	UFUNCTION(BlueprintCallable)
         virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
         UFUNCTION(BlueprintCallable)

@@ -312,6 +312,44 @@ void UAircraftWeapon::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjecti
 	}
 }
 
+void UAircraftWeapon::SetupVerticalRocketProjectileWeapon(
+	FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters)
+{
+	SetOwningPlayer(VerticalRocketProjectileParameters.OwningPlayer);
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for aircraft weapon: " + GetName());
+		return;
+	}
+	UVerticalRocketWeaponState* VerticalRocketProjectile = NewObject<UVerticalRocketWeaponState>(this);
+	VerticalRocketProjectile->InitVerticalRocketWeapon(
+		VerticalRocketProjectileParameters.OwningPlayer,
+		WeaponIndex,
+		VerticalRocketProjectileParameters.WeaponName,
+		VerticalRocketProjectileParameters.WeaponBurstMode,
+		VerticalRocketProjectileParameters.WeaponOwner,
+		VerticalRocketProjectileParameters.MeshComponent,
+		VerticalRocketProjectileParameters.FireSocketName,
+		World,
+		VerticalRocketProjectileParameters.ProjectileSystem,
+		VerticalRocketProjectileParameters.WeaponVFX,
+		VerticalRocketProjectileParameters.WeaponShellCase,
+		VerticalRocketProjectileParameters.VerticalRocketSettings,
+		VerticalRocketProjectileParameters.BurstCooldown,
+		VerticalRocketProjectileParameters.SingleBurstAmountMaxBurstAmount,
+		VerticalRocketProjectileParameters.MinBurstAmount,
+		VerticalRocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(VerticalRocketProjectile);
+	VerticalRocketProjectile->SetIsAircraftWeapon(true);
+	M_WeaponIndexToSocket.Add(WeaponIndex, VerticalRocketProjectileParameters.FireSocketName);
+	if (M_ProjectileManager.IsValid())
+	{
+		VerticalRocketProjectile->SetupProjectileManager(M_ProjectileManager.Get());
+	}
+}
+
 void UAircraftWeapon::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters)
 {
         RTSFunctionLibrary::ReportError(

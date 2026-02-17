@@ -13,6 +13,7 @@ struct FInitWeaponStateMultiHitLaser;
 struct FInitWeaponStateMultiTrace;
 struct FInitWeaponStateArchProjectile;
 struct FInitWeaponStateRocketProjectile;
+struct FInitWeaponStateVerticalRocketProjectile;
 struct FWeaponData;
 class ASquadController;
 class UWeaponState;
@@ -44,6 +45,7 @@ class RTS_SURVIVAL_API IWeaponOwner
 	friend class RTS_SURVIVAL_API UWeaponStateMultiProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateArchProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateRocketProjectile;
+	friend class RTS_SURVIVAL_API UVerticalRocketWeaponState;
 	friend class RTS_SURVIVAL_API UWeaponStateLaser;
 	friend class RTS_SURVIVAL_API UWeaponStateMultiHitLaser;
 	/** @return The array of weapons that this owner has. */
@@ -108,6 +110,9 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) = 0;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) = 0;
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)=0;

@@ -21,6 +21,9 @@
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "Trace/Trace.h"
 #include "WeaponOwner/WeaponOwner.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshSocket.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/HideableInstancedStaticMeshComponent/RTSHidableInstancedStaticMeshComponent.h"
 
 // === Global shell-color cache ================================================
 
@@ -994,6 +997,10 @@ void UWeaponState::OnDisableWeapon()
 	// Extra functionality for when the weapon is disabled.
 }
 
+void UWeaponState::OnReloadFinished_PostReload()
+{
+	// Extra functionality for weapon-specific post reload handling.
+}
 
 void UWeaponState::InitWeaponState(
 	int32 NewOwningPlayer,
@@ -1277,6 +1284,7 @@ void UWeaponState::OnReloadFinished()
 		M_CurrentMagCapacity = WeaponData.MagCapacity;
 		World->GetTimerManager().ClearTimer(M_WeaponTimerHandle);
 		WeaponOwner->OnReloadFinished(WeaponIndex);
+		OnReloadFinished_PostReload();
 		// Broadcast mag consumption.
 		OnMagConsumed.Broadcast(M_CurrentMagCapacity);
 	}
@@ -2495,5 +2503,373 @@ void UWeaponStateRocketProjectile::FireProjectileWithShellAdjustedStats(const FW
 	if (M_RocketSettings.RocketMesh)
 	{
 		Projectile->SetupAttachedRocketMesh(M_RocketSettings.RocketMesh);
+	}
+}
+
+void UVerticalRocketWeaponState::InitVerticalRocketWeapon(
+	const int32 NewOwningPlayer,
+	const int32 NewWeaponIndex,
+	const EWeaponName NewWeaponName,
+	const EWeaponFireMode NewWeaponBurstMode,
+	TScriptInterface<IWeaponOwner> NewWeaponOwner,
+	UMeshComponent* NewMeshComponent,
+	const FName NewFireSocketName,
+	UWorld* NewWorld,
+	const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+	FWeaponVFX NewWeaponVFX,
+	FWeaponShellCase NewWeaponShellCase,
+	const FVerticalRocketWeaponSettings& NewVerticalRocketSettings,
+	const float NewBurstCooldown,
+	const int32 NewSingleBurstAmountMaxBurstAmount,
+	const int32 NewMinBurstAmount,
+	const bool bNewCreateShellCasingOnEveryRandomBurst)
+{
+	M_VerticalRocketSettings = NewVerticalRocketSettings;
+	M_LaunchSocketNames = NewVerticalRocketSettings.FireSocketNames;
+	M_NextRocketSocketIndex = 0;
+
+	InitProjectileWeapon(
+		NewOwningPlayer,
+		NewWeaponIndex,
+		NewWeaponName,
+		NewWeaponBurstMode,
+		NewWeaponOwner,
+		NewMeshComponent,
+		NewFireSocketName,
+		NewWorld,
+		ProjectileNiagaraSystem,
+		NewWeaponVFX,
+		NewWeaponShellCase,
+		NewBurstCooldown,
+		NewSingleBurstAmountMaxBurstAmount,
+		NewMinBurstAmount,
+		bNewCreateShellCasingOnEveryRandomBurst);
+
+	if (M_VerticalRocketSettings.bSetupWithAttachedRocketsMesh)
+	{
+		CollectLaunchSocketsFromAttachedRocketMesh();
+		if (SetupAttachedRocketInstances())
+		{
+			WeaponData.MagCapacity = M_SocketToInstanceIndex.Num();
+			ForceInstantReload();
+		}
+	}
+}
+
+void UVerticalRocketWeaponState::FireWeaponSystem()
+{
+	if (not WeaponOwner)
+	{
+		return;
+	}
+
+	FireProjectile(WeaponOwner->GetTargetLocation(WeaponIndex));
+}
+
+void UVerticalRocketWeaponState::CreateLaunchVfx(
+	const FVector& /*LaunchLocation*/,
+	const FVector& /*ForwardVector*/,
+	const bool bCreateShellCase)
+{
+	if (not IsValid(MeshComponent) || not World)
+	{
+		return;
+	}
+
+	const FVerticalRocketLaunchSocketData LaunchData = GetVerticalRocketLaunchSocketData(false);
+	if (M_WeaponVfx.LaunchSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(World, M_WeaponVfx.LaunchSound, LaunchData.LaunchLocation,
+		                                      FRotator::ZeroRotator, 1, 1, 0,
+		                                      M_WeaponVfx.LaunchAttenuation, M_WeaponVfx.LaunchConcurrency);
+	}
+
+	CreateLaunchAndSmokeVfx(LaunchData.SocketName, LaunchData.ForwardVector.Rotation(), LaunchData.LaunchLocation);
+	if (bCreateShellCase)
+	{
+		WeaponShellCase.SpawnShellCase();
+	}
+}
+
+void UVerticalRocketWeaponState::OnReloadFinished_PostReload()
+{
+	UnhideAllAttachedRocketInstances();
+}
+
+void UVerticalRocketWeaponState::CollectLaunchSocketsFromAttachedRocketMesh()
+{
+	M_LaunchSocketNames.Reset();
+
+	const FString SocketNameFilter = M_VerticalRocketSettings.AttachedRocketsSocketNameFilter.ToString();
+	if (SocketNameFilter.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState requires AttachedRocketsSocketNameFilter when bSetupWithAttachedRocketsMesh is enabled.");
+		return;
+	}
+
+	if (IsValid(MeshComponent))
+	{
+		const TArray<FName> MeshSocketNames = MeshComponent->GetAllSocketNames();
+		for (const FName& SocketName : MeshSocketNames)
+		{
+			if (SocketName.ToString().Contains(SocketNameFilter))
+			{
+				M_LaunchSocketNames.Add(SocketName);
+			}
+		}
+	}
+
+	if (not M_LaunchSocketNames.IsEmpty())
+	{
+		return;
+	}
+
+	if (not M_VerticalRocketSettings.RocketsToSpawnBaseMesh)
+	{
+		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState failed to find launch sockets on MeshComponent and has no RocketsToSpawnBaseMesh fallback.");
+		return;
+	}
+
+	for (const UStaticMeshSocket* Socket : M_VerticalRocketSettings.RocketsToSpawnBaseMesh->Sockets)
+	{
+		if (not IsValid(Socket))
+		{
+			continue;
+		}
+
+		if (Socket->SocketName.ToString().Contains(SocketNameFilter))
+		{
+			M_LaunchSocketNames.Add(Socket->SocketName);
+		}
+	}
+
+	if (M_LaunchSocketNames.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState could not resolve any launch sockets for attached rockets setup.");
+	}
+}
+
+bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
+{
+	if (not IsValid(MeshComponent) || not IsValid(MeshComponent->GetOwner()))
+	{
+		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState requires a valid MeshComponent owner to create attached rocket instances.");
+		return false;
+	}
+
+	if (not M_VerticalRocketSettings.RocketMesh)
+	{
+		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState requires RocketMesh to spawn attached rocket instances.");
+		return false;
+	}
+
+	if (M_LaunchSocketNames.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState could not find any launch sockets for attached rocket setup.");
+		return false;
+	}
+
+	M_AttachedRocketInstances = NewObject<URTSHidableInstancedStaticMeshComponent>(
+		MeshComponent->GetOwner(),
+		TEXT("VerticalRocketWeaponAttachedInstances"));
+	if (not GetIsValidAttachedRocketInstances())
+	{
+		return false;
+	}
+
+	M_AttachedRocketInstances->AttachToComponent(MeshComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	M_AttachedRocketInstances->RegisterComponent();
+	M_AttachedRocketInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_AttachedRocketInstances->SetStaticMesh(M_VerticalRocketSettings.RocketMesh);
+
+	M_SocketToInstanceIndex.Reset();
+	for (const FName& SocketName : M_LaunchSocketNames)
+	{
+		if (not MeshComponent->DoesSocketExist(SocketName))
+		{
+			continue;
+		}
+
+		const FTransform SocketTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
+		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(SocketTransform, true);
+		if (InstanceIndex != INDEX_NONE)
+		{
+			M_SocketToInstanceIndex.Add(SocketName, InstanceIndex);
+		}
+	}
+
+	return not M_SocketToInstanceIndex.IsEmpty();
+}
+
+UVerticalRocketWeaponState::FVerticalRocketLaunchSocketData UVerticalRocketWeaponState::GetVerticalRocketLaunchSocketData(
+	const bool bAdvanceSocketIndex)
+{
+	FVerticalRocketLaunchSocketData LaunchData;
+	if (not IsValid(MeshComponent))
+	{
+		return LaunchData;
+	}
+
+	const bool bHasSocketOverrides = not M_LaunchSocketNames.IsEmpty();
+	const int32 SocketCount = M_LaunchSocketNames.Num();
+	const int32 SelectedSocketIndex = bHasSocketOverrides
+		? FMath::Clamp(M_NextRocketSocketIndex, 0, SocketCount - 1)
+		: 0;
+	const FName SelectedSocketName = bHasSocketOverrides ? M_LaunchSocketNames[SelectedSocketIndex] : FireSocketName;
+
+	if (bHasSocketOverrides && bAdvanceSocketIndex)
+	{
+		M_NextRocketSocketIndex = (SelectedSocketIndex + 1) % SocketCount;
+	}
+
+	LaunchData.SocketName = SelectedSocketName.IsNone() ? FireSocketName : SelectedSocketName;
+	const FQuat SocketRotation = MeshComponent->GetSocketQuaternion(LaunchData.SocketName);
+	LaunchData.LaunchLocation = MeshComponent->GetSocketLocation(LaunchData.SocketName);
+	LaunchData.ForwardVector = SocketRotation.GetForwardVector();
+	if (const int32* HiddenRocketIndex = M_SocketToInstanceIndex.Find(LaunchData.SocketName))
+	{
+		LaunchData.HiddenInstanceIndex = *HiddenRocketIndex;
+	}
+
+	return LaunchData;
+}
+
+void UVerticalRocketWeaponState::FireProjectile(const FVector& TargetLocationRaw)
+{
+	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+	if (not ProjectileManager)
+	{
+		return;
+	}
+
+	const FVerticalRocketLaunchSocketData LaunchData = GetVerticalRocketLaunchSocketData(true);
+
+	const FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+		TargetLocationRaw,
+		WeaponData.Accuracy);
+	FVector LaunchDirection = (TargetLocation - LaunchData.LaunchLocation).GetSafeNormal();
+	if (LaunchDirection.IsNearlyZero())
+	{
+		LaunchDirection = LaunchData.ForwardVector.GetSafeNormal();
+	}
+	const FRotator LaunchRotation = LaunchDirection.Rotation();
+
+	AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
+	if (not IsValid(SpawnedProjectile))
+	{
+		ReportErrorForWeapon("VERTICAL ROCKET PROJECTILE weapon failed to get dormant projectile from pool manager.");
+		return;
+	}
+
+	if (GetIsValidAttachedRocketInstances() && LaunchData.HiddenInstanceIndex != INDEX_NONE)
+	{
+		M_AttachedRocketInstances->SetInstanceHidden(LaunchData.HiddenInstanceIndex, true);
+	}
+
+	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType == EWeaponShellType::Shell_APHE);
+	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
+	if (not bIsAPShell && not bIsFireShell)
+	{
+		const FWeaponData ShellAdjustedData = GLOBAL_GetWeaponDataForShellType(WeaponData);
+		FireProjectileWithShellAdjustedStats(ShellAdjustedData, SpawnedProjectile, LaunchData, TargetLocation);
+		return;
+	}
+
+	FireProjectileWithShellAdjustedStats(WeaponData, SpawnedProjectile, LaunchData, TargetLocation);
+}
+
+void UVerticalRocketWeaponState::UnhideAllAttachedRocketInstances() const
+{
+	if (not GetIsValidAttachedRocketInstances())
+	{
+		return;
+	}
+
+	for (const TPair<FName, int32>& EachSocketToInstance : M_SocketToInstanceIndex)
+	{
+		M_AttachedRocketInstances->SetInstanceHidden(EachSocketToInstance.Value, false);
+	}
+}
+
+bool UVerticalRocketWeaponState::GetIsValidAttachedRocketInstances() const
+{
+	if (IsValid(M_AttachedRocketInstances))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_AttachedRocketInstances",
+		"GetIsValidAttachedRocketInstances",
+		this);
+	return false;
+}
+
+void UVerticalRocketWeaponState::FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+                                                                      AProjectile* Projectile,
+                                                                      const FVerticalRocketLaunchSocketData& LaunchData,
+                                                                      const FVector& TargetLocation)
+{
+	const float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	const float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	const float PenAdjustedWithGameFlux = FMath::RandRange(ShellAdjustedData.ArmorPen * PenFluxFactorLow,
+	                                                       ShellAdjustedData.ArmorPen * PenFluxFactorHigh);
+	const float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorLow,
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorHigh);
+
+	FProjectileVfxSettings ProjectileVfxSettings;
+	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
+	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
+	ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
+
+	const float ApexOffsetMin = FMath::Min(M_VerticalRocketSettings.ApexZOffsetMin, M_VerticalRocketSettings.ApexZOffsetMax);
+	const float ApexOffsetMax = FMath::Max(M_VerticalRocketSettings.ApexZOffsetMin, M_VerticalRocketSettings.ApexZOffsetMax);
+	const float RandomApexOffset = FMath::RandRange(ApexOffsetMin, ApexOffsetMax);
+	const float RandomAngleMin = FMath::Min(M_VerticalRocketSettings.RandomAngleOffsetMin, M_VerticalRocketSettings.RandomAngleOffsetMax);
+	const float RandomAngleMax = FMath::Max(M_VerticalRocketSettings.RandomAngleOffsetMin, M_VerticalRocketSettings.RandomAngleOffsetMax);
+	const float ApexConeAngle = FMath::RandRange(RandomAngleMin, RandomAngleMax);
+	const float ApexConeRadians = FMath::DegreesToRadians(ApexConeAngle);
+	const float HorizontalApexOffsetDistance = FMath::Tan(ApexConeRadians) * RandomApexOffset;
+	FVector HorizontalDirection = FVector::ForwardVector;
+	if (not LaunchData.ForwardVector.GetSafeNormal2D().IsNearlyZero())
+	{
+		HorizontalDirection = LaunchData.ForwardVector.GetSafeNormal2D();
+	}
+	const float HorizontalRotationYaw = FMath::RandRange(0.0f, 360.0f);
+	HorizontalDirection = FRotator(0.0f, HorizontalRotationYaw, 0.0f).RotateVector(HorizontalDirection);
+	const FVector ApexLocation = LaunchData.LaunchLocation
+		+ FVector(0.0f, 0.0f, RandomApexOffset)
+		+ HorizontalDirection * HorizontalApexOffsetDistance;
+
+	const FRotator LaunchRotation = (ApexLocation - LaunchData.LaunchLocation).Rotation();
+	Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
+	                                        ShellAdjustedData.BaseDamage, PenAdjustedWithGameFlux,
+	                                        PenMaxRangeAdjustedWithGameFlux,
+	                                        ShellAdjustedData.ShrapnelParticles, ShellAdjustedData.ShrapnelRange,
+	                                        ShellAdjustedData.ShrapnelDamage,
+	                                        ShellAdjustedData.ShrapnelPen, OwningPlayer,
+	                                        M_WeaponVfx.SurfaceImpactEffects, M_WeaponVfx.BounceEffect,
+	                                        M_WeaponVfx.BounceSound,
+	                                        M_WeaponVfx.ImpactScale,
+	                                        M_WeaponVfx.BounceScale,
+	                                        ShellAdjustedData.ProjectileMovementSpeed,
+	                                        LaunchData.LaunchLocation, LaunchRotation,
+	                                        M_WeaponVfx.ImpactAttenuation,
+	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
+	                                        ActorsToIgnore,
+	                                        ShellAdjustedData.WeaponCalibre);
+
+	Projectile->SetupVerticalRocketLaunch(
+		LaunchData.LaunchLocation,
+		ApexLocation,
+		TargetLocation,
+		ShellAdjustedData.ProjectileMovementSpeed,
+		M_VerticalRocketSettings);
+
+	if (M_VerticalRocketSettings.RocketMesh)
+	{
+		Projectile->SetupAttachedRocketMesh(M_VerticalRocketSettings.RocketMesh);
 	}
 }

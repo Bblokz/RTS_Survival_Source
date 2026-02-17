@@ -177,6 +177,7 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
+	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState) override;
@@ -214,6 +215,7 @@ private:
 	void ProcessPendingFlameThrowerWeapons();
 	void ProcessPendingProjectileWeapons();
 	void ProcessPendingRocketWeapons();
+	void ProcessPendingVerticalRocketWeapons();
 	void ProcessPendingMultiProjectileWeapons();
 	void ProcessPendingArchProjectileWeapons();
 	void ReportMissingInit(const FString& SetupFunctionName) const;
@@ -228,6 +230,7 @@ private:
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiTrace& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateRocketProjectile& WeaponParameters, const FString& FunctionName);
+	bool TryPrepareWeaponParameters(FInitWeaponStateVerticalRocketProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateArchProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateLaser& WeaponParameters, const FString& FunctionName);
@@ -248,6 +251,7 @@ private:
 	void SetupFlameThrowerWeaponInternal(const FInitWeaponStateFlameThrower& FlameWeaponParameters);
 	void SetupProjectileWeaponInternal(const FInitWeaponStateProjectile& ProjectileWeaponParameters);
 	void SetupRocketProjectileWeaponInternal(const FInitWeaponStateRocketProjectile& RocketProjectileParameters);
+	void SetupVerticalRocketProjectileWeaponInternal(const FInitWeaponStateVerticalRocketProjectile& VerticalRocketProjectileParameters);
 	void SetupMultiProjectileWeaponInternal(const FInitWeaponStateMultiProjectile& MultiProjectileState);
 	void SetupArchProjectileWeaponInternal(const FInitWeaponStateArchProjectile& ArchProjParameters);
 
@@ -276,6 +280,7 @@ private:
 	TArray<FInitWeaponStateFlameThrower> M_PendingFlameThrowerWeapons;
 	TArray<FInitWeaponStateProjectile> M_PendingProjectileWeapons;
 	TArray<FInitWeaponStateRocketProjectile> M_PendingRocketWeapons;
+	TArray<FInitWeaponStateVerticalRocketProjectile> M_PendingVerticalRocketWeapons;
 	TArray<FInitWeaponStateMultiProjectile> M_PendingMultiProjectileWeapons;
 	TArray<FInitWeaponStateArchProjectile> M_PendingArchProjectileWeapons;
 
