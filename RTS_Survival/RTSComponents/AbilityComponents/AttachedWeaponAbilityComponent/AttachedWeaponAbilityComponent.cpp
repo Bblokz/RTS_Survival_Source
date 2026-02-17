@@ -465,6 +465,22 @@ void UAttachedWeaponAbilityComponent::SetupPooledArchProjectileWeapon(FInitWeapo
 	SetupArchProjectileWeapon(ArchProjParameters);
 }
 
+
+void UAttachedWeaponAbilityComponent::SetupSplitterArchProjectileWeapon(
+	FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters)
+{
+	if (not TryPrepareWeaponParameters(SplitterArchProjParameters, "SetupSplitterArchProjectileWeapon"))
+	{
+		if (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::Uninitialized)
+		{
+			M_PendingSplitterArchProjectileWeapons.Add(SplitterArchProjParameters);
+		}
+		return;
+	}
+
+	SetupSplitterArchProjectileWeaponInternal(SplitterArchProjParameters);
+}
+
 void UAttachedWeaponAbilityComponent::BeginPlay_AddAbility()
 {
 	AActor* OwnerActor = GetOwner();
@@ -678,6 +694,7 @@ void UAttachedWeaponAbilityComponent::ProcessPendingWeaponSetups()
 	ProcessPendingVerticalRocketWeapons();
 	ProcessPendingMultiProjectileWeapons();
 	ProcessPendingArchProjectileWeapons();
+	ProcessPendingSplitterArchProjectileWeapons();
 }
 
 void UAttachedWeaponAbilityComponent::ProcessPendingDirectHitWeapons()
@@ -823,6 +840,19 @@ void UAttachedWeaponAbilityComponent::ProcessPendingArchProjectileWeapons()
 	M_PendingArchProjectileWeapons.Reset();
 }
 
+void UAttachedWeaponAbilityComponent::ProcessPendingSplitterArchProjectileWeapons()
+{
+	for (const FInitWeaponStateSplitterArchProjectile& PendingSplitter : M_PendingSplitterArchProjectileWeapons)
+	{
+		FInitWeaponStateSplitterArchProjectile Parameters = PendingSplitter;
+		if (TryPrepareWeaponParameters(Parameters, "ProcessPendingSplitterArchProjectileWeapons"))
+		{
+			SetupSplitterArchProjectileWeaponInternal(Parameters);
+		}
+	}
+	M_PendingSplitterArchProjectileWeapons.Reset();
+}
+
 void UAttachedWeaponAbilityComponent::ReportMissingInit(const FString& SetupFunctionName) const
 {
 	RTSFunctionLibrary::ReportError(
@@ -951,6 +981,25 @@ bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStat
 }
 
 bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStateArchProjectile& WeaponParameters,
+                                                                 const FString& FunctionName)
+{
+	CacheWeaponOwnerInParameters(WeaponParameters);
+
+	if (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::Uninitialized)
+	{
+		ReportMissingInit(FunctionName);
+		return false;
+	}
+
+	UMeshComponent* MeshComponent = WeaponParameters.MeshComponent;
+	const bool bMeshReady = (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::ExistingMesh)
+		? PrepareExistingMeshParameters(MeshComponent, FunctionName)
+		: PrepareSpawnedMeshParameters(MeshComponent, FunctionName);
+	WeaponParameters.MeshComponent = MeshComponent;
+	return bMeshReady;
+}
+
+bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStateSplitterArchProjectile& WeaponParameters,
                                                                  const FString& FunctionName)
 {
 	CacheWeaponOwnerInParameters(WeaponParameters);
@@ -1398,6 +1447,37 @@ void UAttachedWeaponAbilityComponent::SetupArchProjectileWeaponInternal(
 	SetupProjectileManagerIfReady(ArchWeapon);
 }
 
+void UAttachedWeaponAbilityComponent::SetupSplitterArchProjectileWeaponInternal(
+	const FInitWeaponStateSplitterArchProjectile& SplitterArchProjParameters)
+{
+	const int32 WeaponIndex = M_AttachedWeapons.Num();
+	M_OwningPlayer = SplitterArchProjParameters.OwningPlayer;
+	M_TargetingData.InitTargetStruct(M_OwningPlayer);
+
+	UWeaponStateSplitterArchProjectile* SplitterWeapon = NewObject<UWeaponStateSplitterArchProjectile>(this);
+	SplitterWeapon->InitSplitterArchProjectileWeapon(
+		SplitterArchProjParameters.OwningPlayer,
+		WeaponIndex,
+		SplitterArchProjParameters.WeaponName,
+		SplitterArchProjParameters.WeaponBurstMode,
+		SplitterArchProjParameters.WeaponOwner,
+		SplitterArchProjParameters.MeshComponent,
+		SplitterArchProjParameters.FireSocketName,
+		GetWorld(),
+		SplitterArchProjParameters.ProjectileSystem,
+		SplitterArchProjParameters.WeaponVFX,
+		SplitterArchProjParameters.WeaponShellCase,
+		SplitterArchProjParameters.BurstCooldown,
+		SplitterArchProjParameters.SingleBurstAmountMaxBurstAmount,
+		SplitterArchProjParameters.MinBurstAmount,
+		SplitterArchProjParameters.CreateShellCasingOnEveryRandomBurst,
+		SplitterArchProjParameters.SplitterSettings);
+
+	M_AttachedWeapons.Add(SplitterWeapon);
+	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(SplitterWeapon);
+}
+
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
@@ -1429,6 +1509,11 @@ void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponSt
 }
 
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateArchProjectile& WeaponParameters)
+{
+	WeaponParameters.WeaponOwner = this;
+}
+
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateSplitterArchProjectile& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }

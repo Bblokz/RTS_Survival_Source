@@ -361,6 +361,14 @@ void UAircraftWeapon::SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjec
         SetupArchProjectileWeapon(ArchProjParameters);
 }
 
+
+void UAircraftWeapon::SetupSplitterArchProjectileWeapon(
+	FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters)
+{
+	RTSFunctionLibrary::ReportError(
+		"SplitterArchProjectile weapons are not supported for aircraft weapon component: " + GetName());
+}
+
 void UAircraftWeapon::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTraceWeaponParameters)
 {
 	SetOwningPlayer(MultiTraceWeaponParameters.OwningPlayer);

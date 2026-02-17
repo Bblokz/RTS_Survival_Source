@@ -187,6 +187,8 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupSplitterArchProjectileWeapon(FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters) override;
 
 	// ---- End Override IWeaponOwner ----
 
@@ -218,6 +220,7 @@ private:
 	void ProcessPendingVerticalRocketWeapons();
 	void ProcessPendingMultiProjectileWeapons();
 	void ProcessPendingArchProjectileWeapons();
+	void ProcessPendingSplitterArchProjectileWeapons();
 	void ReportMissingInit(const FString& SetupFunctionName) const;
 
 	void BeginPlay_SetupCallbackToProjectileManager();
@@ -233,6 +236,7 @@ private:
 	bool TryPrepareWeaponParameters(FInitWeaponStateVerticalRocketProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateArchProjectile& WeaponParameters, const FString& FunctionName);
+	bool TryPrepareWeaponParameters(FInitWeaponStateSplitterArchProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateLaser& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiHitLaser& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateFlameThrower& WeaponParameters, const FString& FunctionName);
@@ -254,6 +258,8 @@ private:
 	void SetupVerticalRocketProjectileWeaponInternal(const FInitWeaponStateVerticalRocketProjectile& VerticalRocketProjectileParameters);
 	void SetupMultiProjectileWeaponInternal(const FInitWeaponStateMultiProjectile& MultiProjectileState);
 	void SetupArchProjectileWeaponInternal(const FInitWeaponStateArchProjectile& ArchProjParameters);
+	void SetupSplitterArchProjectileWeaponInternal(
+		const FInitWeaponStateSplitterArchProjectile& SplitterArchProjParameters);
 
 	void CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStatTrace& WeaponParameters);
@@ -262,6 +268,7 @@ private:
 	void CacheWeaponOwnerInParameters(FInitWeaponStateRocketProjectile& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiProjectile& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateArchProjectile& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateSplitterArchProjectile& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateLaser& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiHitLaser& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateFlameThrower& WeaponParameters);
@@ -283,6 +290,7 @@ private:
 	TArray<FInitWeaponStateVerticalRocketProjectile> M_PendingVerticalRocketWeapons;
 	TArray<FInitWeaponStateMultiProjectile> M_PendingMultiProjectileWeapons;
 	TArray<FInitWeaponStateArchProjectile> M_PendingArchProjectileWeapons;
+	TArray<FInitWeaponStateSplitterArchProjectile> M_PendingSplitterArchProjectileWeapons;
 
 	EAttachedWeaponAbilityMeshSetup M_WeaponMeshSetupState = EAttachedWeaponAbilityMeshSetup::Uninitialized;
 

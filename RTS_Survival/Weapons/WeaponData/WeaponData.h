@@ -19,6 +19,8 @@ enum class EProjectileNiagaraSystem : uint8;
 class UArmorCalculation;
 class ASmallArmsProjectileManager;
 class USoundBase;
+class USoundAttenuation;
+class USoundConcurrency;
 class AArchProjectile;
 class AShellCase;
 class RTS_SURVIVAL_API AProjectile;
@@ -1094,6 +1096,54 @@ struct FArchProjectileSettings
 	USoundBase* DescentSound = nullptr;
 };
 
+USTRUCT(BlueprintType)
+struct FSplitterArcWeaponSplitSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="1", UIMin="1"))
+	int32 SplitProjectileCount = 3;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float SplitSpreadRadius = 250.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float SplitCalibreMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float SplitDamageMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float SplitArmorPenMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float SplitAoeMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<USoundBase> SplitSound = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<USoundAttenuation> SplitSoundAttenuation = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<USoundConcurrency> SplitSoundConcurrency = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<UNiagaraSystem> SplitNiagaraSystem = nullptr;
+};
+
+USTRUCT(BlueprintType)
+struct FSplitterArcWeaponSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FArchProjectileSettings ArchSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FSplitterArcWeaponSplitSettings SplitSettings;
+};
+
 
 UCLASS()
 class UWeaponStateProjectile : public UWeaponState
@@ -1171,6 +1221,15 @@ struct FInitWeaponStateArchProjectile : public FInitWeaponStateProjectile
 	FArchProjectileSettings ArchSettings;
 };
 
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateSplitterArchProjectile : public FInitWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FSplitterArcWeaponSettings SplitterSettings;
+};
+
 
 /**
  * @brief Weapon state that fires arching projectiles.
@@ -1243,6 +1302,86 @@ private:
 	                                                      const FRotator& LaunchRotation,
 	                                                      const FVector& TargetLocation);
 };
+
+/**
+ * @brief Weapon state that launches one arcing projectile and splits it into pooled child projectiles at apex.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UWeaponStateSplitterArchProjectile : public UWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Initializes a splitter arc weapon so split logic is fully data driven from one setup call.
+	 * @param NewOwningPlayer Player index owning the weapon.
+	 * @param NewWeaponIndex Weapon array index on the owner.
+	 * @param NewWeaponName Identifier for this weapon.
+	 * @param NewWeaponBurstMode Burst mode configuration.
+	 * @param NewWeaponOwner Interface to the weapon owner.
+	 * @param NewMeshComponent Mesh used to anchor the fire socket.
+	 * @param NewFireSocketName Socket the projectile spawns from.
+	 * @param NewWorld World context for spawning.
+	 * @param ProjectileNiagaraSystem Niagara system used for base projectile VFX.
+	 * @param NewWeaponVFX VFX configuration for the weapon.
+	 * @param NewWeaponShellCase Shell casing configuration.
+	 * @param NewBurstCooldown Cooldown between bursts.
+	 * @param NewSingleBurstAmountMaxBurstAmount Burst count settings.
+	 * @param NewMinBurstAmount Minimum burst shots.
+	 * @param bNewCreateShellCasingOnEveryRandomBurst Should spawn shell casing each random burst.
+	 * @param NewSplitterSettings Settings for arc and split child projectile behaviour.
+	 */
+	void InitSplitterArchProjectileWeapon(
+		const int32 NewOwningPlayer,
+		const int32 NewWeaponIndex,
+		const EWeaponName NewWeaponName,
+		const EWeaponFireMode NewWeaponBurstMode,
+		TScriptInterface<IWeaponOwner> NewWeaponOwner,
+		UMeshComponent* NewMeshComponent,
+		const FName NewFireSocketName,
+		UWorld* NewWorld,
+		const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+		FWeaponVFX NewWeaponVFX,
+		FWeaponShellCase NewWeaponShellCase,
+		const float NewBurstCooldown = 0.0f,
+		const int32 NewSingleBurstAmountMaxBurstAmount = 0,
+		const int32 NewMinBurstAmount = 0,
+		const bool bNewCreateShellCasingOnEveryRandomBurst = false,
+		const FSplitterArcWeaponSettings& NewSplitterSettings = FSplitterArcWeaponSettings());
+
+protected:
+	virtual void FireWeaponSystem() override;
+
+private:
+	UPROPERTY()
+	FSplitterArcWeaponSettings M_SplitterSettings;
+
+
+	void FireProjectile(const FVector& TargetLocationRaw);
+
+	void SpawnSplitProjectilesAtApex(const FVector SplitLocation, const FVector OriginalTargetLocation);
+
+	void SpawnSplitEffects(const FVector& SplitLocation) const;
+
+	FWeaponData BuildSplitProjectileData(const FWeaponData& SourceWeaponData) const;
+
+	FVector BuildSplitTargetLocation(const FVector& OriginalTargetLocation) const;
+
+	float CalculateArcTimeToApex(const FVector& LaunchLocation, const FVector& TargetLocation) const;
+
+	/**
+	 * @brief Initializes and launches a child projectile using split-adjusted stats.
+	 * @param SplitProjectileData Base stat package after split multipliers.
+	 * @param SpawnedProjectile Dormant projectile taken from the shared pool.
+	 * @param LaunchLocation Split location used as launch origin.
+	 * @param TargetLocation Child target location generated by split spread settings.
+	 */
+	void LaunchSplitProjectile(const FWeaponData& SplitProjectileData,
+	                          AProjectile* SpawnedProjectile,
+	                          const FVector& LaunchLocation,
+	                          const FVector& TargetLocation);
+};
+
 USTRUCT(Blueprintable, BlueprintType)
 struct FRocketWeaponSettings
 {

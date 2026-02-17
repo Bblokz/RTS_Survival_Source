@@ -12,6 +12,7 @@ struct FInitWeaponStateLaser;
 struct FInitWeaponStateMultiHitLaser;
 struct FInitWeaponStateMultiTrace;
 struct FInitWeaponStateArchProjectile;
+struct FInitWeaponStateSplitterArchProjectile;
 struct FInitWeaponStateRocketProjectile;
 struct FInitWeaponStateVerticalRocketProjectile;
 struct FWeaponData;
@@ -44,6 +45,7 @@ class RTS_SURVIVAL_API IWeaponOwner
 	friend class RTS_SURVIVAL_API UWeaponStateProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateMultiProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateArchProjectile;
+	friend class RTS_SURVIVAL_API UWeaponStateSplitterArchProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateRocketProjectile;
 	friend class RTS_SURVIVAL_API UVerticalRocketWeaponState;
 	friend class RTS_SURVIVAL_API UWeaponStateLaser;
@@ -122,6 +124,9 @@ protected:
 
         UFUNCTION(BlueprintCallable)
         virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) = 0;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupSplitterArchProjectileWeapon(FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters) = 0;
 
 	/** @brief Setup a weapon that fires async traces from multiple sockets in parallel. */
 	UFUNCTION(BlueprintCallable)
