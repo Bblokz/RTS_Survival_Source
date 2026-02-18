@@ -1444,6 +1444,12 @@ struct FVerticalRocketWeaponSettings
 	FName AttachedRocketsSocketNameFilter = NAME_None;
 
 	/**
+	 * @brief Local offset from each launch socket used to place attached rocket instances for visual setup.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FVector LocalSocketAttachOffset = FVector::ZeroVector;
+
+	/**
 	 * @brief Minimum vertical offset added to launch location to generate stage-1 apex.
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="1.0", UIMin="1.0"))
