@@ -183,7 +183,7 @@ void AInfantryWeaponMaster::SetupSplitterArchProjectileWeapon(
 	FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters)
 {
 	SetOwningPlayer(SplitterArchProjParameters.OwningPlayer);
-	const int32 WeaponIndex = M_TWeapons.Num();
+	const int32 WeaponIndex = 0;
 	UWorld* SpawnWorld = GetWorld();
 	if (not SpawnWorld)
 	{
@@ -220,8 +220,7 @@ void AInfantryWeaponMaster::SetupSplitterArchProjectileWeapon(
 	{
 		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(SplitterProjectile, M_ProjectileManager.Get());
 	}
-
-	M_TWeapons.Add(SplitterProjectile);
+	WeaponState = SplitterProjectile;
 }
 
 void AInfantryWeaponMaster::SpecificEngage()
@@ -863,7 +862,7 @@ void AInfantryWeaponMaster::SetupVerticalRocketProjectileWeapon(
 	FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters)
 {
 	SetOwningPlayer(VerticalRocketProjectileParameters.OwningPlayer);
-	const int32 WeaponIndex = M_TWeapons.Num();
+	const int32 WeaponIndex = 0;
 	UWorld* World = GetWorld();
 	if (not World)
 	{
@@ -888,7 +887,7 @@ void AInfantryWeaponMaster::SetupVerticalRocketProjectileWeapon(
 		VerticalRocketProjectileParameters.SingleBurstAmountMaxBurstAmount,
 		VerticalRocketProjectileParameters.MinBurstAmount,
 		VerticalRocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
-	M_TWeapons.Add(VerticalRocketProjectile);
+	WeaponState = VerticalRocketProjectile;
 	if (M_ProjectileManager.IsValid())
 	{
 		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(VerticalRocketProjectile, M_ProjectileManager.Get());

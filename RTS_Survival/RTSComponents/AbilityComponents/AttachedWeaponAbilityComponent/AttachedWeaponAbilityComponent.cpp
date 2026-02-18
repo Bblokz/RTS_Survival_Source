@@ -1354,7 +1354,7 @@ void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeaponInternal(
 void UAttachedWeaponAbilityComponent::SetupVerticalRocketProjectileWeaponInternal(
 	const FInitWeaponStateVerticalRocketProjectile& VerticalRocketProjectileParameters)
 {
-	SetOwningPlayer(VerticalRocketProjectileParameters.OwningPlayer);
+	M_OwningPlayer  = VerticalRocketProjectileParameters.OwningPlayer;
 	const int32 WeaponIndex = M_AttachedWeapons.Num();
 	UWorld* CurrentWorld = GetWorld();
 	if (not CurrentWorld)

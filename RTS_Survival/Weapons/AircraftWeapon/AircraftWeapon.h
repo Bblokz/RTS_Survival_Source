@@ -47,7 +47,7 @@ public:
 	virtual void ForceSetAllWeaponsFullyReloaded() override;
 
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
-	
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -69,16 +69,19 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponParameters) override;
 	UFUNCTION(BlueprintCallable)
-        virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) override;
+	virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) override;
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
-	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 	UFUNCTION(BlueprintCallable)
-        virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
-        UFUNCTION(BlueprintCallable)
-        virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+	virtual void SetupVerticalRocketProjectileWeapon(
+		FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 	UFUNCTION(BlueprintCallable)
-	virtual void SetupSplitterArchProjectileWeapon(FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters) override;
+	virtual void SetupArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupPooledArchProjectileWeapon(FInitWeaponStateArchProjectile ArchProjParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void
+	SetupSplitterArchProjectileWeapon(FInitWeaponStateSplitterArchProjectile SplitterArchProjParameters) override;
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTraceWeaponParameters) override;
 	UFUNCTION(BlueprintCallable)
