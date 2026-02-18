@@ -3021,7 +3021,12 @@ bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
 		}
 
 		const FTransform SocketTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
-		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(SocketTransform, true);
+		FTransform RocketInstanceTransform = SocketTransform;
+		const FVector RocketInstanceLocation = SocketTransform.TransformPosition(
+			M_VerticalRocketSettings.LocalSocketAttachOffset);
+		RocketInstanceTransform.SetLocation(RocketInstanceLocation);
+
+		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(RocketInstanceTransform, true);
 		if (InstanceIndex != INDEX_NONE)
 		{
 			M_SocketToInstanceIndex.Add(SocketName, InstanceIndex);
