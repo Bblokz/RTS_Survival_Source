@@ -1430,16 +1430,16 @@ struct FVerticalRocketWeaponSettings
 	TArray<FName> FireSocketNames;
 
 	/**
-	 * @brief When enabled launch sockets are discovered from RocketsToSpawnBaseMesh sockets that contain SocketNameFilter.
+	 * @brief When enabled launch sockets are discovered from RocketsToSpawnBaseMeshComponent sockets that contain SocketNameFilter.
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bSetupWithAttachedRocketsMesh = false;
 
-	/** Base mesh used to spawn hideable rocket instances when bSetupWithAttachedRocketsMesh is true. */
+	/** Base mesh component used to discover and spawn hideable rocket instances when bSetupWithAttachedRocketsMesh is true. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	UStaticMesh* RocketsToSpawnBaseMesh = nullptr;
+	TWeakObjectPtr<UMeshComponent> RocketsToSpawnBaseMeshComponent = nullptr;
 
-	/** Any socket containing this text on RocketsToSpawnBaseMesh becomes a launch/instance socket. */
+	/** Any socket containing this text on RocketsToSpawnBaseMeshComponent becomes a launch/instance socket. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FName AttachedRocketsSocketNameFilter = NAME_None;
 
@@ -1649,6 +1649,7 @@ private:
 
 	bool SetupAttachedRocketInstances();
 	void CollectLaunchSocketsFromAttachedRocketMesh();
+	bool GetIsValidRocketsToSpawnBaseMeshComponent() const;
 	FVerticalRocketLaunchSocketData GetVerticalRocketLaunchSocketData(const bool bAdvanceSocketIndex);
 	void FireProjectile(const FVector& TargetLocation);
 	void UnhideAllAttachedRocketInstances() const;
