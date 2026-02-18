@@ -2958,22 +2958,18 @@ void UVerticalRocketWeaponState::CollectLaunchSocketsFromAttachedRocketMesh()
 		return;
 	}
 
-	if (not M_VerticalRocketSettings.RocketsToSpawnBaseMesh)
+	if (not GetIsValidRocketsToSpawnBaseMeshComponent())
 	{
-		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState failed to find launch sockets on MeshComponent and has no RocketsToSpawnBaseMesh fallback.");
+		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState failed to find launch sockets on MeshComponent and has no RocketsToSpawnBaseMeshComponent fallback.");
 		return;
 	}
 
-	for (const UStaticMeshSocket* Socket : M_VerticalRocketSettings.RocketsToSpawnBaseMesh->Sockets)
+	const TArray<FName> FallbackSocketNames = M_VerticalRocketSettings.RocketsToSpawnBaseMeshComponent->GetAllSocketNames();
+	for (const FName& SocketName : FallbackSocketNames)
 	{
-		if (not IsValid(Socket))
+		if (SocketName.ToString().Contains(SocketNameFilter))
 		{
-			continue;
-		}
-
-		if (Socket->SocketName.ToString().Contains(SocketNameFilter))
-		{
-			M_LaunchSocketNames.Add(Socket->SocketName);
+			M_LaunchSocketNames.Add(SocketName);
 		}
 	}
 
@@ -3033,6 +3029,22 @@ bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
 	}
 
 	return not M_SocketToInstanceIndex.IsEmpty();
+}
+
+bool UVerticalRocketWeaponState::GetIsValidRocketsToSpawnBaseMeshComponent() const
+{
+	if (M_VerticalRocketSettings.RocketsToSpawnBaseMeshComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_VerticalRocketSettings.RocketsToSpawnBaseMeshComponent",
+		"GetIsValidRocketsToSpawnBaseMeshComponent",
+		this);
+
+	return false;
 }
 
 UVerticalRocketWeaponState::FVerticalRocketLaunchSocketData UVerticalRocketWeaponState::GetVerticalRocketLaunchSocketData(
