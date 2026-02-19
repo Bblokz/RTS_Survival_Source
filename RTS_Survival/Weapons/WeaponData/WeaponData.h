@@ -1450,6 +1450,12 @@ struct FVerticalRocketWeaponSettings
 	FVector LocalSocketAttachOffset = FVector::ZeroVector;
 
 	/**
+	 * @brief Uniform/non-uniform scale applied to attached rocket instance component so designers can control rocket size.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FVector RocketScale = FVector(1.0f);
+
+	/**
 	 * @brief Minimum vertical offset added to launch location to generate stage-1 apex.
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="1.0", UIMin="1.0"))

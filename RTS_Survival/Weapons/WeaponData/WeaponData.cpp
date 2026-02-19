@@ -3011,6 +3011,7 @@ bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
 	M_AttachedRocketInstances->RegisterComponent();
 	M_AttachedRocketInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	M_AttachedRocketInstances->SetStaticMesh(M_VerticalRocketSettings.RocketMesh);
+	M_AttachedRocketInstances->SetRelativeScale3D(M_VerticalRocketSettings.RocketScale);
 
 	M_SocketToInstanceIndex.Reset();
 	for (const FName& SocketName : M_LaunchSocketNames)
