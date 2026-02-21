@@ -128,8 +128,60 @@ void UBehaviourComp::SwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToRepla
 	}
 }
 
+void UBehaviourComp::RefreshAllBehaviours()
+{
+	TArray<TSubclassOf<UBehaviour>> BehaviourClassesToReAdd;
+	for (UBehaviour* Behaviour : M_Behaviours)
+	{
+		if (Behaviour == nullptr)
+		{
+			continue;
+		}
+
+		const TSubclassOf<UBehaviour> BehaviourClass = Behaviour->GetClass();
+		if (BehaviourClass == nullptr)
+		{
+			continue;
+		}
+
+		BehaviourClassesToReAdd.Add(BehaviourClass);
+	}
+
+	if (bM_IsTickingBehaviours)
+	{
+		M_PendingRefreshBehaviourClasses = MoveTemp(BehaviourClassesToReAdd);
+		return;
+	}
+
+	ClearAllBehaviours();
+
+	for (const TSubclassOf<UBehaviour>& BehaviourClass : BehaviourClassesToReAdd)
+	{
+		AddBehaviour(BehaviourClass);
+	}
+}
+
+void UBehaviourComp::ProcessPendingRefreshAllBehaviours()
+{
+	if (M_PendingRefreshBehaviourClasses.IsEmpty())
+	{
+		return;
+	}
+
+	const TArray<TSubclassOf<UBehaviour>> PendingRefreshBehaviourClasses = M_PendingRefreshBehaviourClasses;
+	M_PendingRefreshBehaviourClasses.Empty();
+
+	ClearAllBehaviours();
+
+	for (const TSubclassOf<UBehaviour>& BehaviourClass : PendingRefreshBehaviourClasses)
+	{
+		AddBehaviour(BehaviourClass);
+	}
+}
+
 void UBehaviourComp::ProcessPendingOperations()
 {
+	ProcessPendingRefreshAllBehaviours();
 	ProcessPendingRemovals();
 	ProcessPendingSwaps();
 	ProcessPendingAdds();
