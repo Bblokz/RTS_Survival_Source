@@ -73,6 +73,12 @@ public:
 	void SwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToReplace, TSubclassOf<UBehaviour> BehaviourClassToAdd);
 
 	/**
+	 * @brief Rebuild all active behaviours by removing instances and re-adding their classes.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void RefreshAllBehaviours();
+
+	/**
 	 * @brief Debug draw current behaviours above the owning actor.
 	 * @param DurationSeconds How long the debug string should persist.
 	 */
@@ -114,6 +120,10 @@ protected:
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	/**
+	 * @brief Apply a deferred refresh-all request made while behaviour ticking was active.
+	 */
+	void ProcessPendingRefreshAllBehaviours();
 	/**
 	 * @brief Execute all pending behaviour operations after a tick loop.
 	 */
@@ -254,6 +264,9 @@ private:
 
 	UPROPERTY()
 	TArray<TSubclassOf<UBehaviour>> M_PendingSwapAdd;
+
+	UPROPERTY()
+	TArray<TSubclassOf<UBehaviour>> M_PendingRefreshBehaviourClasses;
 
 	bool bM_IsTickingBehaviours = false;
 
