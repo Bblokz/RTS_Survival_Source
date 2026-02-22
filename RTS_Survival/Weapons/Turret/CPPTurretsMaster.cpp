@@ -203,6 +203,30 @@ void ACPPTurretsMaster::DisableTurret()
 	DisableAllWeapons();
 }
 
+void ACPPTurretsMaster::ApplyMaterialToAllMeshComponents(UMaterialInterface* MaterialOverride) const
+{
+	if (not IsValid(MaterialOverride))
+	{
+		return;
+	}
+
+	TArray<UMeshComponent*> MeshComponents;
+	GetComponents<UMeshComponent>(MeshComponents);
+	for (UMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (not IsValid(MeshComponent))
+		{
+			continue;
+		}
+
+		const int32 MaterialCount = MeshComponent->GetNumMaterials();
+		for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; MaterialIndex++)
+		{
+			MeshComponent->SetMaterial(MaterialIndex, MaterialOverride);
+		}
+	}
+}
+
 void ACPPTurretsMaster::OnSetupTurret(AActor* OwnerOfTurret)
 {
 	if (M_AmmoTrackingState.bIsUsingWeaponAmmoTracker)

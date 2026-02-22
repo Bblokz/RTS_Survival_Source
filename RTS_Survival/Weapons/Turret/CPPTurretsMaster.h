@@ -166,6 +166,8 @@ public:
 	// Can be re-enabled by calling SetAutoEngageTargets or SetEngageSpecificTarget.
 	void DisableTurret();
 
+	void ApplyMaterialToAllMeshComponents(UMaterialInterface* MaterialOverride) const;
+
 	void OnSetupTurret(AActor* OwnerOfTurret);
 
 	float GetTurretRotationSpeed() const { return RotationSpeed; }

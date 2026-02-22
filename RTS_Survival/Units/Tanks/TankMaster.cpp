@@ -27,6 +27,7 @@
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "VehicleAI/Components/VehiclePathFollowingComponent.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -219,6 +220,8 @@ bool FTankStartGameAction::ExecuteStartAbility() const
 	case EAbilityID::IdCapture:
 		return M_TankMaster->CaptureActor(TargetActor, true) == ECommandQueueError::NoError;
 	case EAbilityID::IdReinforceSquad:
+		break;
+	case EAbilityID::IdSwapTurret:
 		break;
 	}
 	return true;
@@ -455,6 +458,16 @@ void ATankMaster::SetTurretsDisabled()
 			EachHullWeapon->DisableHullWeapon();
 		}
 	}
+}
+
+void ATankMaster::RemoveTurret(ACPPTurretsMaster* TurretToRemove)
+{
+	if (not IsValid(TurretToRemove))
+	{
+		return;
+	}
+
+	Turrets.RemoveSingleSwap(TurretToRemove);
 }
 
 void ATankMaster::ChildBpSetupArmor(TArray<UArmor*> MyArmorSetup)
@@ -798,6 +811,33 @@ void ATankMaster::ExecuteAttachedWeaponAbilityCommand(
 void ATankMaster::TerminateAttachedWeaponAbilityCommand(
 	const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
 {
+}
+
+void ATankMaster::ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType)
+{
+	BP_ExecuteTurretSwapCommand(TurretSwapAbilityType);
+
+	UTurretSwapComp* TurretSwapComp = FAbilityHelpers::GetTurretSwapAbilityComponent(TurretSwapAbilityType, this);
+	if (not IsValid(TurretSwapComp))
+	{
+		DoneExecutingCommand(EAbilityID::IdSwapTurret);
+		return;
+	}
+
+	TurretSwapComp->ExecuteTurretSwap();
+}
+
+void ATankMaster::TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType)
+{
+	BP_TerminateTurretSwapCommand(TurretSwapAbilityType);
+
+	UTurretSwapComp* TurretSwapComp = FAbilityHelpers::GetTurretSwapAbilityComponent(TurretSwapAbilityType, this);
+	if (not IsValid(TurretSwapComp))
+	{
+		return;
+	}
+
+	TurretSwapComp->TerminateTurretSwap();
 }
 
 void ATankMaster::ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)

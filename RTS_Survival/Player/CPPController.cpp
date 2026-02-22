@@ -3977,6 +3977,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdCancelAimAbility:
 		this->DirectActionButtonCancelAimAbility(static_cast<EAimAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
+	case EAbilityID::IdSwapTurret:
+		this->DirectActionButtonSwapTurret(static_cast<ETurretSwapAbility>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdApplyBehaviour:
 		this->DirectActionButtonBehaviourAbility(static_cast<EBehaviourAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
@@ -4886,6 +4889,32 @@ void ACPPController::DirectActionButtonCancelAimAbility(const EAimAbilityType Ai
 		PlayVoiceLineForPrimarySelected(
 			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdCancelAimAbility),
 			false);
+	}
+}
+
+void ACPPController::DirectActionButtonSwapTurret(const ETurretSwapAbility TurretSwapAbilityType)
+{
+	EnsureSelectionsAreRTSValid();
+
+	int32 CommandsExecuted = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (const auto EachPawn : TSelectedPawnMasters)
+	{
+		CommandsExecuted += EachPawn->SwapTurret(bResetCommandQueueFirst, TurretSwapAbilityType)
+			== ECommandQueueError::NoError;
+	}
+
+	for (const auto EachActor : TSelectedActorsMasters)
+	{
+		CommandsExecuted += EachActor->SwapTurret(bResetCommandQueueFirst, TurretSwapAbilityType)
+			== ECommandQueueError::NoError;
+	}
+
+	if (CommandsExecuted > 0)
+	{
+		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdSwapTurret),
+		                               false);
 	}
 }
 

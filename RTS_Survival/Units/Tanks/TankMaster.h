@@ -13,6 +13,7 @@
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
 #include "TankMaster.generated.h"
 
 class UTankEnergyComponent;
@@ -27,6 +28,7 @@ class UBehaviourComp;
 // Forward Declaration; reduce compile time; guard against cyclic dependencies.
 class RTS_SURVIVAL_API AAITankMaster;
 class RTS_SURVIVAL_API ACPPTurretsMaster;
+class UTurretSwapComp;
 
 USTRUCT()
 struct FTankStartGameAction
@@ -98,6 +100,7 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 	friend class AAITankMaster;
 	// For movement orders on the AI controller directly.
 	friend class UTankAimAbilityComponent;
+	friend class UTurretSwapComp;
 
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
@@ -200,6 +203,8 @@ protected:
 		}
 	}
 
+	void RemoveTurret(ACPPTurretsMaster* TurretToRemove);
+
 	/** @brief Adds the provided HullWeapon to the array keeping track of all HullWeapons on this tank. */
 	UFUNCTION(BlueprintCallable)
 	inline void SetupHullWeapon(UHullWeaponComponent* NewHullWeapon) { HullWeapons.Add(NewHullWeapon); }
@@ -289,8 +294,16 @@ protected:
 	virtual void ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
 	                                                 const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override;
 	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override;
+	virtual void ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override;
+	virtual void TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override;
 	virtual void ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
 	virtual void TerminateCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Commands")
+	void BP_ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Commands")
+	void BP_TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
 
 	virtual void SetUnitToIdleSpecificLogic() override;
 

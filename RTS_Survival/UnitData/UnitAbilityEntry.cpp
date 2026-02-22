@@ -2,6 +2,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 
 UGrenadeComponent* FAbilityHelpers::GetGrenadeAbilityCompOfType(const EGrenadeAbilityType Type,
 	const AActor* Actor)
@@ -74,6 +75,31 @@ UAttachedWeaponAbilityComponent* FAbilityHelpers::GetAttachedWeaponAbilityCompon
 		if (AbilityComponent->GetAttachedWeaponAbilityType() == Type)
 		{
 			return AbilityComponent;
+		}
+	}
+
+	return nullptr;
+}
+
+UTurretSwapComp* FAbilityHelpers::GetTurretSwapAbilityComponent(const ETurretSwapAbility Type, const AActor* Actor)
+{
+	if (not IsValid(Actor))
+	{
+		return nullptr;
+	}
+
+	TArray<UTurretSwapComp*> TurretSwapComponents;
+	Actor->GetComponents<UTurretSwapComp>(TurretSwapComponents);
+	for (UTurretSwapComp* TurretSwapComponent : TurretSwapComponents)
+	{
+		if (not IsValid(TurretSwapComponent))
+		{
+			continue;
+		}
+
+		if (TurretSwapComponent->GetCurrentActiveSwapAbilityType() == Type)
+		{
+			return TurretSwapComponent;
 		}
 	}
 

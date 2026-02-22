@@ -14,11 +14,13 @@
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
 
 #include "BuildingExpansion.generated.h"
 
 
 class UBuildingExpansionEnergyComponent;
+class UTurretSwapComp;
 struct FBxpData;
 class UCargo;
 class UWeaponState;
@@ -47,6 +49,8 @@ UCLASS()
 class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster, public ITurretOwner, public IAimOffsetProvider
 {
 	GENERATED_BODY()
+
+	friend class UTurretSwapComp;
 
 public:
 
@@ -231,6 +235,8 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	 void SetupTurret(ACPPTurretsMaster* NewTurret);
 
+	void RemoveTurret(ACPPTurretsMaster* TurretToRemove);
+
 	
 	/** @brief Adds the provided HullWeapon to the array keeping track of all HullWeapons on this bxp. */
 	UFUNCTION(BlueprintCallable)
@@ -254,6 +260,14 @@ protected:
 	virtual void ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
 	                                                 const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override final;
 	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override final;
+	virtual void ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override final;
+	virtual void TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override final;
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Commands")
+	void BP_ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Commands")
+	void BP_TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
 
 private:
 	

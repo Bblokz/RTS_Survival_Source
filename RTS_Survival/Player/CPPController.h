@@ -1291,6 +1291,7 @@ private:
 	void HideAttachedWeaponAbilityRadiusIfNeeded();
 	int32 AttachedWeaponAbilityRadiusIndex = -1;
 	void DirectActionButtonCancelAimAbility(const EAimAbilityType AimAbilityType);
+	void DirectActionButtonSwapTurret(const ETurretSwapAbility TurretSwapAbilityType);
 	void DirectActionButtonBehaviourAbility(const EBehaviourAbilityType Type);
 
 	void DirectActionButtonActivateModeAbility(const EModeAbilityType ModeType);
