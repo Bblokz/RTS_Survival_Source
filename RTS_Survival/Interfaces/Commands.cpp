@@ -16,6 +16,7 @@
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 
 
 UCommandData::UCommandData(const FObjectInitializer& ObjectInitializer)
@@ -472,7 +473,8 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 		|| (AbilityId == EAbilityID::IdCancelThrowGrenade)
 		|| (AbilityId == EAbilityID::IdAimAbility)
 		|| (AbilityId == EAbilityID::IdCancelAimAbility)
-		|| (AbilityId == EAbilityID::IdAttachedWeapon);
+		|| (AbilityId == EAbilityID::IdAttachedWeapon)
+		|| (AbilityId == EAbilityID::IdSwapTurret);
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
@@ -515,6 +517,11 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 	{
 		return " with attached weapon type: " + UEnum::GetValueAsString(
 			QueuedCommand.GetAttachedWeaponAbilitySubtype());
+	}
+
+	if (QueuedCommand.CommandType == EAbilityID::IdSwapTurret)
+	{
+		return " with turret swap type: " + UEnum::GetValueAsString(QueuedCommand.GetTurretSwapAbilitySubtype());
 	}
 
 	return FString{};
@@ -835,6 +842,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	case EAbilityID::IdAttachedWeapon:
 		{
 			M_Owner->ExecuteAttachedWeaponAbilityCommand(Cmd.TargetLocation, Cmd.GetAttachedWeaponAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdSwapTurret:
+		{
+			M_Owner->ExecuteTurretSwapCommand(Cmd.GetTurretSwapAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdCancelAimAbility:
@@ -1965,6 +1977,45 @@ ECommandQueueError ICommands::FireAttachedWeaponAbility(const FVector& TargetLoc
 	return Error;
 }
 
+ECommandQueueError ICommands::SwapTurret(const bool bSetUnitToIdle, const ETurretSwapAbility TurretSwapAbilityType)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	FUnitAbilityEntry TurretSwapAbilityEntry;
+	if (not FAbilityHelpers::GetHasTurretSwapAbility(UnitCommandData->GetAbilities(), TurretSwapAbilityType,
+	                                                 TurretSwapAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (TurretSwapAbilityEntry.CooldownRemaining > 0)
+	{
+		return ECommandQueueError::AbilityOnCooldown;
+	}
+
+	UTurretSwapComp* SwapComp = FAbilityHelpers::GetTurretSwapAbilityComponent(TurretSwapAbilityType, GetOwnerActor());
+	if (not IsValid(SwapComp))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdSwapTurret,
+		FVector::ZeroVector,
+		nullptr,
+		FRotator::ZeroRotator,
+		static_cast<int32>(TurretSwapAbilityType));
+}
+
 ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -2420,6 +2471,14 @@ void ICommands::TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbility
 {
 }
 
+void ICommands::ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType)
+{
+}
+
+void ICommands::TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType)
+{
+}
+
 void ICommands::ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType)
 {
 }
@@ -2791,6 +2850,23 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 			}
 
 			TerminateAttachedWeaponAbilityCommand(CurrentCommand->GetAttachedWeaponAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdSwapTurret:
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if (not CommandData)
+			{
+				return;
+			}
+
+			const FQueueCommand* CurrentCommand = CommandData->GetCurrentQueuedCommand();
+			if (CurrentCommand == nullptr)
+			{
+				return;
+			}
+
+			TerminateTurretSwapCommand(CurrentCommand->GetTurretSwapAbilitySubtype());
 		}
 		break;
 	case EAbilityID::IdCancelAimAbility:

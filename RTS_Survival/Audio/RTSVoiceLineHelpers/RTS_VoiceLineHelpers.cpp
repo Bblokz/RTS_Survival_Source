@@ -111,6 +111,8 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 	case EAbilityID::IdAimAbility:
 	case EAbilityID::IdCancelAimAbility:
 		return ERTSVoiceLine::Confirm;
+	case EAbilityID::IdSwapTurret:
+		return ERTSVoiceLine::Confirm;
 	}
 	RTSFunctionLibrary::ReportError("Could not translate ability: " + Global_GetAbilityIDAsString(Ability) +
 		"To voice line. Please check the enum and the translation function : GetVoiceLineFromAbility.");

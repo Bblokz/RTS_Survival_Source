@@ -25,6 +25,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializer):
@@ -396,6 +397,16 @@ void ABuildingExpansion::SetupTurret(ACPPTurretsMaster* NewTurret)
 	M_TTurrets.Add(NewTurret);
 }
 
+void ABuildingExpansion::RemoveTurret(ACPPTurretsMaster* TurretToRemove)
+{
+	if (not IsValid(TurretToRemove))
+	{
+		return;
+	}
+
+	M_TTurrets.RemoveSingleSwap(TurretToRemove);
+}
+
 void ABuildingExpansion::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
 }
@@ -526,6 +537,33 @@ void ABuildingExpansion::ExecuteAttachedWeaponAbilityCommand(
 void ABuildingExpansion::TerminateAttachedWeaponAbilityCommand(
 	const EAttachWeaponAbilitySubType AttachedWeaponAbilityType)
 {
+}
+
+void ABuildingExpansion::ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType)
+{
+	BP_ExecuteTurretSwapCommand(TurretSwapAbilityType);
+
+	UTurretSwapComp* TurretSwapComp = FAbilityHelpers::GetTurretSwapAbilityComponent(TurretSwapAbilityType, this);
+	if (not IsValid(TurretSwapComp))
+	{
+		DoneExecutingCommand(EAbilityID::IdSwapTurret);
+		return;
+	}
+
+	TurretSwapComp->ExecuteTurretSwap();
+}
+
+void ABuildingExpansion::TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType)
+{
+	BP_TerminateTurretSwapCommand(TurretSwapAbilityType);
+
+	UTurretSwapComp* TurretSwapComp = FAbilityHelpers::GetTurretSwapAbilityComponent(TurretSwapAbilityType, this);
+	if (not IsValid(TurretSwapComp))
+	{
+		return;
+	}
+
+	TurretSwapComp->TerminateTurretSwap();
 }
 
 void ABuildingExpansion::OnVerticalDestructionComplete()

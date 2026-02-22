@@ -10,6 +10,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
@@ -93,6 +94,11 @@ public:
 	EAttachWeaponAbilitySubType GetAttachedWeaponAbilitySubtype() const
 	{
 		return static_cast<EAttachWeaponAbilitySubType>(CustomType);
+	}
+
+	ETurretSwapAbility GetTurretSwapAbilitySubtype() const
+	{
+		return static_cast<ETurretSwapAbility>(CustomType);
 	}
 
 	FQueueCommand()
@@ -656,6 +662,17 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError FireAttachedWeaponAbility(const FVector& TargetLocation, const bool bSetUnitToIdle,
 	                                                     const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
+
+	/**
+	 * @brief Queues the turret swap command for units that expose subtype-driven turret swap components.
+	 * This indirection allows one ability id to represent two-way swaps while preserving cooldown and
+	 * command-card subtype transitions managed by the component itself.
+	 * @param bSetUnitToIdle Whether to clear queued commands before adding this command.
+	 * @param TurretSwapAbilityType Subtype used to locate the active turret swap component.
+	 * @return Whether the command could be added and is allowed by cooldown/ability ownership checks.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError SwapTurret(const bool bSetUnitToIdle, const ETurretSwapAbility TurretSwapAbilityType);
 	/**
 	 * @brief Determines whether the provided command is in the command queue.
 	 * @param CommandToCheck The command to check for.
@@ -851,6 +868,18 @@ protected:
 	virtual void ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
 	                                                 const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
 	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
+
+	/**
+	 * @brief Executes a turret swap ability subtype on the matching turret swap component.
+	 * @param TurretSwapAbilityType Subtype currently active on the command card.
+	 */
+	virtual void ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
+
+	/**
+	 * @brief Terminates an in-flight turret swap command.
+	 * @param TurretSwapAbilityType Subtype that was executing.
+	 */
+	virtual void TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
 
 	virtual void ExecuteRepairCommand(AActor* TargetActor);
 	virtual void TerminateRepairCommand();
