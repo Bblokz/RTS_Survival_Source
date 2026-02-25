@@ -40,6 +40,31 @@ bool AAssaultTank::TurnBase_Implementation(const float Degrees)
 	return true;
 }
 
+float AAssaultTank::GetCurrentTurretAngle_Implementation() const
+{
+    return 0.0f;
+}
+
+void AAssaultTank::SetTurretAngle_Implementation(const float NewAngle)
+{
+    (void)NewAngle;
+}
+
+void AAssaultTank::UpdateTargetPitch_Implementation(const float NewPitch)
+{
+    (void)NewPitch;
+}
+
+void AAssaultTank::PlaySingleFireAnimation_Implementation(const int32 WeaponIndex)
+{
+    (void)WeaponIndex;
+}
+
+void AAssaultTank::PlayBurstFireAnimation_Implementation(const int32 WeaponIndex)
+{
+    (void)WeaponIndex;
+}
+
 
 // Called when the game starts or when spawned
 void AAssaultTank::BeginPlay()

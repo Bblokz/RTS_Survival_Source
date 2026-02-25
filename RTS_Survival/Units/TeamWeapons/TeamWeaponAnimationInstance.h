@@ -38,6 +38,8 @@ struct FTeamWeaponGunSlot
 	GENERATED_BODY()
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	UAnimMontage* FireMontage = nullptr;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UAnimMontage* BurstFireMontage = nullptr;
 };
 
 // The playrates to use for the wheel animations (if used)
@@ -66,6 +68,8 @@ public:
 	void InitTeamWeaponAnimInst(const float DeploymentTime);
 	void PlayLegsWheelsSlotMontage(const ETeamWeaponMontage MontageType,
 	                               bool bWaitForMontage = true);
+	void PlayFireAnimation();
+	void PlayBurstFireAnimation();
 
 protected:
 	/**

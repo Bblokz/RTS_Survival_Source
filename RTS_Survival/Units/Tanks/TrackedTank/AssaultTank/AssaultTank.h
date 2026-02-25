@@ -19,6 +19,12 @@ public:
 
 	virtual bool TurnBase_Implementation(const float Degrees) override;
 
+	virtual float GetCurrentTurretAngle_Implementation() const override;
+    virtual void SetTurretAngle_Implementation(const float NewAngle) override;
+    virtual void UpdateTargetPitch_Implementation(const float NewPitch) override;
+    virtual void PlaySingleFireAnimation_Implementation(int32 WeaponIndex) override;
+    virtual void PlayBurstFireAnimation_Implementation(int32 WeaponIndex) override;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

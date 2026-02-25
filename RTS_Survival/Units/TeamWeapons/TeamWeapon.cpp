@@ -87,6 +87,58 @@ void ATeamWeapon::SetTurretOwnerActor(AActor* NewOwner)
 	OnSetupTurret(NewOwner);
 }
 
+float ATeamWeapon::GetCurrentTurretAngle_Implementation() const
+{
+    if (GetIsValidAnimInstance())
+    {
+        return M_AnimInstance->GetCurrentYawAngle();
+    }
+    return 0.0f;
+}
+
+
+void ATeamWeapon::SetTurretAngle_Implementation(float NewAngle)
+{
+	if(not GetIsValidAnimInstance())
+	{
+		return;
+	}
+	M_AnimInstance->SetYaw(NewAngle);
+}
+
+void ATeamWeapon::UpdateTargetPitch_Implementation(float NewPitch)
+{
+	if(not GetIsValidAnimInstance())
+	{
+		return;
+	}
+	M_AnimInstance->SetYaw(NewPitch);
+}
+
+bool ATeamWeapon::TurnBase_Implementation(float Degrees)
+{
+	// todo this should result in the team weapon having to pack up-> rotate -> deploy to engage target.
+	return false;
+}
+
+void ATeamWeapon::PlaySingleFireAnimation_Implementation(int32 WeaponIndex)
+{
+	if(not GetIsValidAnimInstance())
+	{
+		return;
+	}
+	M_AnimInstance->PlayFireAnimation();
+}
+
+void ATeamWeapon::PlayBurstFireAnimation_Implementation(int32 WeaponIndex)
+{
+	if(not GetIsValidAnimInstance())
+	{
+		return;
+	}
+	M_AnimInstance->PlayBurstFireAnimation();
+}
+
 
 bool ATeamWeapon::GetIsTargetWithinYawArc(const FVector& TargetLocation) const
 {

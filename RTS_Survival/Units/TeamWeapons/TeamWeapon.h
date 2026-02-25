@@ -130,6 +130,14 @@ public:
 
 	void SetTurretOwnerActor(AActor* NewOwner);
 
+	// Embedded turret interface ---------------------------
+	virtual float GetCurrentTurretAngle_Implementation() const override;
+    virtual void SetTurretAngle_Implementation(float NewAngle) override;
+    virtual void UpdateTargetPitch_Implementation(float NewPitch) override;
+    virtual bool TurnBase_Implementation(float Degrees) override;
+    virtual void PlaySingleFireAnimation_Implementation(int32 WeaponIndex) override;
+    virtual void PlayBurstFireAnimation_Implementation(int32 WeaponIndex) override;
+
 
 	/**
 	 * @brief Guards fire logic by enforcing the configured yaw arc for this emplacement.

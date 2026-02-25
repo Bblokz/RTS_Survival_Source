@@ -13,6 +13,11 @@ UCLASS()
 class RTS_SURVIVAL_API UTurretAnimInstance : public UAnimInstance
 {
 	GENERATED_BODY()
+public:
+	float GetCurrentYawAngle() const { return Yaw; }
+	float GetCurrentPitchAngle() const { return Pitch; }
+	inline void SetYaw(const float NewYaw) {Yaw = NewYaw; };
+	inline void SetPitch(const float NewPitch) {Pitch = NewPitch; };
 
 protected:
 	UPROPERTY(BlueprintReadWrite, Category = "TurretAnimInstance")

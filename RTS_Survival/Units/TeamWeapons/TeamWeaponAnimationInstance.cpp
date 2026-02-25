@@ -42,6 +42,29 @@ void UTeamWeaponAnimationInstance::PlayLegsWheelsSlotMontage(const ETeamWeaponMo
 	}
 }
 
+void UTeamWeaponAnimationInstance::PlayFireAnimation()
+{
+	if(not GunMontages.FireMontage)
+	{
+		RTSFunctionLibrary::ReportError("No valid FireMontage for team weapon anim instance: " + GetName() +
+			"\n check the anim instance defaults!");
+		return;
+	}
+	Montage_Play( GunMontages.FireMontage, 1.f);
+}
+
+void UTeamWeaponAnimationInstance::PlayBurstFireAnimation()
+{
+	
+	if(not GunMontages.BurstFireMontage)
+	{
+		RTSFunctionLibrary::ReportError("No valid FireMontage for team weapon anim instance: " + GetName() +
+			"\n check the anim instance defaults!");
+		return;
+	}
+	Montage_Play( GunMontages.BurstFireMontage, 1.f);
+}
+
 UAnimSequence* UTeamWeaponAnimationInstance::GetCurrentAOBaseSequence()
 {
 	if (not M_ActiveSequence)
