@@ -2,6 +2,7 @@
 
 #include "TeamWeapon.h"
 
+#include "TeamWeaponController.h"
 #include "TeamWeaponMover.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"

@@ -9,6 +9,7 @@
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/Embedded/EmbeddedTurretsMaster.h"
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
+#include "RTS_Survival/Weapons/Turret/Embedded/EmbededTurretInterface.h"
 #include "TeamWeapon.generated.h"
 
 class UHealthComponent;
@@ -68,7 +69,7 @@ struct FTeamWeaponConfig
  */
 UCLASS()
 class RTS_SURVIVAL_API ATeamWeapon : public AEmbeddedTurretsMaster, public IRTSNavAIInterface,
-                                    public IAimOffsetProvider, public IHealthBarOwner
+                                    public IAimOffsetProvider, public IHealthBarOwner, public IEmbeddedTurretInterface
 {
 	GENERATED_BODY()
 
