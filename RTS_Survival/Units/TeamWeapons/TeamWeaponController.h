@@ -6,24 +6,13 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "TeamWeaponMover.h"
+#include "TeamWeaponState/TeamWeaponState.h"
 #include "TeamWeaponController.generated.h"
 
 class ATeamWeapon;
 class UAnimatedTextWidgetPoolManager;
 class AActor;
 
-UENUM(BlueprintType)
-enum class ETeamWeaponState : uint8
-{
-	Uninitialized,
-	Spawning,
-	Ready_Packed,
-	Packing,
-	Moving,
-	Deploying,
-	Ready_Deployed,
-	Abandoned,
-};
 
 USTRUCT()
 struct FTeamWeaponCrewAssignment

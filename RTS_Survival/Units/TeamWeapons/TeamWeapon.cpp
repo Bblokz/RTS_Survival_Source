@@ -2,6 +2,7 @@
 
 #include "TeamWeapon.h"
 
+#include "TeamWeaponAnimationInstance.h"
 #include "TeamWeaponController.h"
 #include "TeamWeaponMover.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
@@ -17,10 +18,9 @@ void ATeamWeapon::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (GetIsValidHealthComponent())
-	{
-		M_HealthComponent->InitHealthAndResistance(M_TeamWeaponConfig.M_ResistanceData, 0.0f);
-	}
+	// Always first!
+	BeginPlay_InitAnimInstance();
+	BeginPlay_ApplyTeamWeaponConfig(M_TeamWeaponConfig);
 }
 
 void ATeamWeapon::PostInitializeComponents()
@@ -30,18 +30,42 @@ void ATeamWeapon::PostInitializeComponents()
 	M_HealthComponent = FindComponentByClass<UHealthComponent>();
 	M_RTSComponent = FindComponentByClass<URTSComponent>();
 	M_TeamWeaponMover = FindComponentByClass<UTeamWeaponMover>();
+	M_TeamWeaponMesh = FindComponentByClass<USkeletalMeshComponent>();
 
 	(void)GetIsValidHealthComponent();
 	(void)GetIsValidRTSComponent();
 	(void)GetIsValidTeamWeaponMover();
+	(void)GetIsValidTeamWeaponMesh();
 }
 
-void ATeamWeapon::ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewConfig)
+
+void ATeamWeapon::BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewConfig)
 {
 	M_TeamWeaponConfig = NewConfig;
 	if (GetIsValidHealthComponent())
 	{
 		M_HealthComponent->InitHealthAndResistance(M_TeamWeaponConfig.M_ResistanceData, 0.0f);
+	}
+	if (GetIsValidTeamWeaponMesh())
+	{
+		InitEmbeddedTurret(M_TeamWeaponMesh.Get(),
+		                   M_TeamWeaponConfig.M_EmbeddedSettings.TurretHeight,
+		                   true,
+		                   M_TeamWeaponConfig.M_YawArc.M_MinYaw,
+		                   M_TeamWeaponConfig.M_YawArc.M_MaxYaw,
+		                   this,
+		                   M_TeamWeaponConfig.M_EmbeddedSettings.bIsArtillery,
+		                   M_TeamWeaponConfig.M_EmbeddedSettings.ArtilleryDistanceUseMaxPitch);
+		if (GetIsValidAnimInstance())
+		{
+			M_AnimInstance->InitTeamWeaponAnimInst(M_TeamWeaponConfig.M_DeploymentTime);
+		}
+		InitTurretsMaster(M_TeamWeaponMesh.Get());
+		InitChildTurret(
+			M_TeamWeaponConfig.M_TurnSpeedYaw,
+			M_TeamWeaponConfig.M_YawArc.M_MinYaw,
+			M_TeamWeaponConfig.M_YawArc.M_MaxYaw,
+			EIdleRotation::Idle_Animate);
 	}
 }
 
@@ -59,8 +83,10 @@ void ATeamWeapon::SetTurretOwnerActor(AActor* NewOwner)
 	}
 
 	InitTurretOwner(NewOwner);
+	InitSelectionDelegatesOfOwner(NewOwner);
 	OnSetupTurret(NewOwner);
 }
+
 
 bool ATeamWeapon::GetIsTargetWithinYawArc(const FVector& TargetLocation) const
 {
@@ -126,4 +152,36 @@ bool ATeamWeapon::GetIsValidTeamWeaponMover() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TeamWeaponMover",
 	                                                      "ATeamWeapon::GetIsValidTeamWeaponMover", this);
 	return false;
+}
+
+bool ATeamWeapon::GetIsValidTeamWeaponMesh() const
+{
+	if (not M_TeamWeaponMesh.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TeamWeaponMesh",
+		                                                      "ATeamWeapon::GetIsValidTeamWeaponMesh", this);
+		return false;
+	}
+	return true;
+}
+
+void ATeamWeapon::BeginPlay_InitAnimInstance() const
+{
+	if (not GetIsValidTeamWeaponMesh())
+	{
+		return;
+	}
+	UTeamWeaponAnimationInstance* AnimInst = Cast<UTeamWeaponAnimationInstance>(M_TeamWeaponMesh->GetAnimInstance());
+	(void)GetIsValidAnimInstance();
+}
+
+bool ATeamWeapon::GetIsValidAnimInstance() const
+{
+	if (not M_AnimInstance.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_AnimInstance",
+		                                                      "ATeamWeapon::GetIsValidAnimInstance", this);
+		return false;
+	}
+	return true;
 }

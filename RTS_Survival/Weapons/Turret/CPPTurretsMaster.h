@@ -376,6 +376,7 @@ protected:
 	FTurretAimingSteeringState SteeringState;
 	
 	
+	void InitSelectionDelegatesOfOwner(AActor* OwnerOfTurret);
 
 private:
 	UPROPERTY()
@@ -532,7 +533,6 @@ private:
 	void OnTurretActive();
 	void OnTurretSelected();
 	void OnTurretDeselected();
-	void InitSelectionDelegatesOfOwner(AActor* OwnerOfTurret);
 
 
 

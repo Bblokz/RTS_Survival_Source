@@ -12,6 +12,8 @@
 #include "RTS_Survival/Weapons/Turret/Embedded/EmbededTurretInterface.h"
 #include "TeamWeapon.generated.h"
 
+class UTeamWeaponAnimationInstance;
+enum class ETeamWeaponMontage : uint8;
 class UHealthComponent;
 class URTSComponent;
 class UTeamWeaponMover;
@@ -24,69 +26,99 @@ struct FTeamWeaponYawArcSettings
 
 	// Minimum yaw (degrees) relative to the weapon's forward direction.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
-	float M_MinYaw = 0.0f;
+	float M_MinYaw = -20.f;
 
 	// Maximum yaw (degrees) relative to the weapon's forward direction. If 0, the weapon can rotate full 360.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
-	float M_MaxYaw = 0.0f;
+	float M_MaxYaw = 20.f;
 };
+
+
+USTRUCT(BlueprintType)
+struct FTeamWeaponPitchSettings
+{
+	GENERATED_BODY()
+
+	// Minimum yaw (degrees) relative to the weapon's forward direction.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
+	float M_MinPitch = -10.f;
+
+	// Maximum yaw (degrees) relative to the weapon's forward direction. If 0, the weapon can rotate full 360.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
+	float M_MaxPitch = 15.f;
+};
+
+USTRUCT(BlueprintType)
+struct FTeamWeaponEmbeddedSettings
+{
+	GENERATED_BODY()
+
+	// how high the weapon of the turret is from the ground.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|EmbeddedTurret")
+	float TurretHeight = 50.f;
+
+	// used for pitch calculations.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|EmbeddedTurret")
+	bool bIsArtillery = false;
+	// used for pitch calculations.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|EmbeddedTurret")
+	float ArtilleryDistanceUseMaxPitch = 500;
+};
+
 
 USTRUCT(BlueprintType)
 struct FTeamWeaponConfig
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	FTeamWeaponYawArcSettings M_YawArc;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
+	FTeamWeaponPitchSettings M_PitchSettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|EmbeddedTurret")
+	FTeamWeaponEmbeddedSettings M_EmbeddedSettings;
+
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	FResistanceAndDamageReductionData M_ResistanceData;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	float M_DeploymentTime = 0.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	int32 M_OperatorCount = 0;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	float M_TurnSpeedYaw = 0.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Text")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Text")
 	FString M_DeployingAnimatedText;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Text")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Text")
 	FString M_PackingAnimatedText;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Text")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Text")
 	FRTSVerticalAnimTextSettings M_AnimatedTextSettings;
 };
 
 /**
  * @brief Team weapon actor used by team-weapon squads to manage turret weapons, health, and crew sockets.
- * @note InitEmbeddedTurret: call in blueprint to bind the turret mesh and embedded owner for yaw/pitch updates.
+ * @note is derived from embeddedturret for which InitEmbeddedTurret DO NOT CALL IN BP this is done in cpp internally (using settings struct).
  * @note InitChildTurret: call in blueprint to set rotation/pitch limits and idle rotation style.
  * @note ApplyTeamWeaponConfig: call in blueprint to push config data to components (health/resistance/deploy time).
  */
 UCLASS()
 class RTS_SURVIVAL_API ATeamWeapon : public AEmbeddedTurretsMaster, public IRTSNavAIInterface,
-                                    public IAimOffsetProvider, public IHealthBarOwner, public IEmbeddedTurretInterface
+                                     public IAimOffsetProvider, public IHealthBarOwner, public IEmbeddedTurretInterface
 {
 	GENERATED_BODY()
 
 public:
 	ATeamWeapon();
-
-	/**
-	 * @brief Applies balance data so designers can tune the weapon without touching code.
-	 * Keeps the runtime state aligned with the latest blueprint configuration.
-	 *
-	 * @details Copies the config into the actor and propagates the values to dependent components
-	 *          (health, resistance, deploy time) so the runtime stays deterministic.
-	 *
-	 * @param NewConfig Configuration payload applied to this instance.
-	 */
-	UFUNCTION(BlueprintCallable, Category = "TeamWeapon")
-	void ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewConfig);
+	// To be called at beginplay; to init the various settings.
+	void BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewConfig);
 
 	const FTeamWeaponConfig& GetTeamWeaponConfig() const { return M_TeamWeaponConfig; }
 	int32 GetRequiredOperators() const { return M_TeamWeaponConfig.M_OperatorCount; }
@@ -97,6 +129,7 @@ public:
 	UTeamWeaponMover* GetTeamWeaponMover() const { return M_TeamWeaponMover; }
 
 	void SetTurretOwnerActor(AActor* NewOwner);
+
 
 	/**
 	 * @brief Guards fire logic by enforcing the configured yaw arc for this emplacement.
@@ -122,9 +155,9 @@ protected:
 	void BP_OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
 
 private:
-	bool GetIsValidHealthComponent() const;
-	bool GetIsValidRTSComponent() const;
-	bool GetIsValidTeamWeaponMover() const;
+	[[nodiscard]] bool GetIsValidHealthComponent() const;
+	[[nodiscard]] bool GetIsValidRTSComponent() const;
+	[[nodiscard]] bool GetIsValidTeamWeaponMover() const;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHealthComponent> M_HealthComponent;
@@ -143,4 +176,14 @@ private:
 
 	UPROPERTY()
 	TSubclassOf<UNavigationQueryFilter> M_DefaultQueryFilter = nullptr;
+
+	UPROPERTY()
+	TWeakObjectPtr<USkeletalMeshComponent> M_TeamWeaponMesh;
+	[[nodiscard]] bool GetIsValidTeamWeaponMesh() const;
+
+	void BeginPlay_InitAnimInstance() const;
+
+	UPROPERTY()
+	TWeakObjectPtr<UTeamWeaponAnimationInstance> M_AnimInstance = nullptr;
+	[[nodiscard]] bool GetIsValidAnimInstance() const;
 };

@@ -1,1 +1,7 @@
-﻿much like how the sq
+﻿i have started work on a general animation controller called UTeamWeaponAnimationInstance
+for which later both paks and mortars will derive their animation instances from.
+
+as you can see i have setup a system where we allow for playing two types of montages;
+either on the gun slot or on the legs and wheels slot.
+
+what i want is that the team weapon controller will play the montages on the 
