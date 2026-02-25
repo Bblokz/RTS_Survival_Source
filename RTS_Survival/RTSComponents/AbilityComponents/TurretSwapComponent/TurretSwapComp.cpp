@@ -4,6 +4,7 @@
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/Manager/RTSTimedProgressBarManager.h"
+#include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -45,7 +46,8 @@ void UTurretSwapComp::ExecuteTurretSwap()
 	ACPPTurretsMaster* CurrentTurret = Cast<ACPPTurretsMaster>(M_TurretChildActorComponent->GetChildActor());
 	if (not IsValid(CurrentTurret))
 	{
-		RTSFunctionLibrary::ReportError("UTurretSwapComp::ExecuteTurretSwap failed, current child actor is not a turret.");
+		RTSFunctionLibrary::ReportError(
+			"UTurretSwapComp::ExecuteTurretSwap failed, current child actor is not a turret.");
 		if (GetIsValidOwnerCommandsInterface())
 		{
 			M_OwnerCommandsInterface->DoneExecutingCommand(EAbilityID::IdSwapTurret);
@@ -89,10 +91,29 @@ void UTurretSwapComp::BeginPlay()
 		M_OwnerCommandsInterface.SetInterface(Cast<ICommands>(OwnerActor));
 	}
 
-	if (UWorld* World = GetWorld())
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
 	{
-		M_TimedProgressBarManager = URTSTimedProgressBarManager::Get(World);
+		return;
 	}
+
+	URTSTimedProgressBarWorldSubsystem* const TimedProgressBarSubsystem =
+		World->GetSubsystem<URTSTimedProgressBarWorldSubsystem>();
+
+	if (not IsValid(TimedProgressBarSubsystem))
+	{
+		// RTSFunctionLibrary::ReportError(TEXT("TimedProgressBarSubsystem missing"));
+		return;
+	}
+
+	URTSTimedProgressBarManager* const TimedProgressBarManager = TimedProgressBarSubsystem->
+		GetTimedProgressBarManager();
+	if (not IsValid(TimedProgressBarManager))
+	{
+		// RTSFunctionLibrary::ReportError(TEXT("TimedProgressBarManager invalid"));
+		return;
+	}
+
 
 	BeginPlay_AddAbility();
 }
