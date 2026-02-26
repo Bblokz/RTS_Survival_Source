@@ -203,6 +203,7 @@ private:
 	[[nodiscard]] bool GetIsValidTeamWeaponMesh() const;
 
 	void BeginPlay_InitAnimInstance();
+	void BeginPlay_ForceStartPackedState();
 
 	UPROPERTY()
 	TWeakObjectPtr<UTeamWeaponAnimationInstance> M_AnimInstance = nullptr;
