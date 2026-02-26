@@ -1021,7 +1021,7 @@ void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 	MoveGuardsToTeamWeapon();
 }
 
-void ATeamWeaponController::RotateControllerAndTeamWeapon(const float StepYaw) const
+void ATeamWeaponController::RotateControllerAndTeamWeapon(const float StepYaw)
 {
 	const FRotator RotationStep(0.0f, StepYaw, 0.0f);
 	const bool bSweep = false;
