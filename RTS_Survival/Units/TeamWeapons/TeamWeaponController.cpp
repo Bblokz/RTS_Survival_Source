@@ -1335,10 +1335,19 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 		return;
 	}
 
-	if (M_SpecificEngageTarget.Get() == nullptr)
+	AActor* SpecificEngageTarget = M_SpecificEngageTarget.Get();
+	if (SpecificEngageTarget == nullptr && IsValid(CallingTurret))
+	{
+		SpecificEngageTarget = CallingTurret->GetCurrentTargetActor();
+	}
+
+	if (SpecificEngageTarget == nullptr)
 	{
 		return;
 	}
+
+	M_SpecificEngageTarget = SpecificEngageTarget;
+	M_TeamWeapon->SetSpecificEngageTarget(SpecificEngageTarget);
 
 	const FVector MoveLocation = GetMoveLocationWithinTurretRange(TargetLocation, CallingTurret);
 	M_GuardEngageFlowTargetLocation = TargetLocation;
@@ -1355,6 +1364,8 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 
 void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
+	static_cast<void>(CallingTurret);
+
 	if (bM_IsTeamWeaponAbandoned)
 	{
 		return;
@@ -1373,7 +1384,10 @@ void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 	if (AActor* SpecificTarget = M_SpecificEngageTarget.Get())
 	{
 		M_TeamWeapon->SetSpecificEngageTarget(SpecificTarget);
+		return;
 	}
+
+	M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
 }
 
 void ATeamWeaponController::OnMountedWeaponTargetDestroyed(
