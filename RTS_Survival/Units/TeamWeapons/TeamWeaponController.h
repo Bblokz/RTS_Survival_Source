@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInUnit/DigInUnit.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "TeamWeaponMover.h"
 #include "TeamWeaponState/TeamWeaponState.h"
@@ -13,6 +14,7 @@ class ATeamWeapon;
 class UAnimatedTextWidgetPoolManager;
 class AActor;
 class UCrewPosition;
+class UDigInComponent;
 
 
 USTRUCT()
@@ -130,7 +132,7 @@ struct FTeamWeaponRotationRequest
  * Ensures the weapon follows the crew spacing so the emplacement stays aligned with its operators.
  */
 UCLASS()
-class RTS_SURVIVAL_API ATeamWeaponController : public ASquadController, public ITurretOwner
+class RTS_SURVIVAL_API ATeamWeaponController : public ASquadController, public ITurretOwner, public IDigInUnit
 {
 	GENERATED_BODY()
 
@@ -142,6 +144,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnAllSquadUnitsLoaded() override;
 	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
@@ -151,6 +154,10 @@ protected:
 	virtual void TerminateRotateTowardsCommand() override;
 	virtual void ExecuteAttackCommand(AActor* TargetActor) override;
 	virtual void TerminateAttackCommand() override;
+	virtual void ExecuteDigIn() override;
+	virtual void TerminateDigIn() override;
+	virtual void ExecuteBreakCover() override;
+	virtual void TerminateBreakCover() override;
 	virtual void OnUnitIdleAndNoNewCommands() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;
@@ -188,6 +195,7 @@ private:
 	bool GetIsValidTeamWeapon() const;
 	bool GetIsValidTeamWeaponMover() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
+	bool GetIsValidDigInComponent() const;
 
 	void BeginPlay_InitAnimatedTextWidgetPoolManager();
 
@@ -268,6 +276,13 @@ private:
 	virtual FRotator GetOwnerRotation() const override;
 	// ---- End ITurretOwner ----
 
+	// ---- IDigInUnit ----
+	virtual void OnStartDigIn() override;
+	virtual void OnDigInCompleted() override;
+	virtual void OnBreakCoverCompleted() override;
+	virtual void WallGotDestroyedForceBreakCover() override;
+	// ---- End IDigInUnit ----
+
 	UPROPERTY(EditDefaultsOnly, Category = "TeamWeapon")
 	TSubclassOf<ATeamWeapon> TeamWeaponClass;
 
@@ -329,6 +344,12 @@ private:
 
 	UPROPERTY()
 	bool bM_IsTeamWeaponAbandoned = false;
+
+	UPROPERTY()
+	TObjectPtr<UDigInComponent> M_DigInComponent;
+
+	UPROPERTY()
+	bool bM_ShouldExecuteDigInAfterDeploy = false;
 
 	UPROPERTY()
 	bool bM_IsShuttingDown = false;

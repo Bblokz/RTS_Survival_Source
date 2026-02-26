@@ -8,6 +8,7 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "Algo/Sort.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -43,6 +44,19 @@ void ATeamWeaponController::BeginPlay()
 	Super::BeginPlay();
 	BeginPlay_InitAnimatedTextWidgetPoolManager();
 	SetTeamWeaponState(ETeamWeaponState::Spawning);
+}
+
+void ATeamWeaponController::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	M_DigInComponent = FindComponentByClass<UDigInComponent>();
+
+	if (not GetIsValidDigInComponent())
+	{
+		return;
+	}
+
+	M_DigInComponent->SetupOwner(this);
 }
 
 void ATeamWeaponController::OnAllSquadUnitsLoaded()
@@ -169,6 +183,53 @@ void ATeamWeaponController::TerminateAttackCommand()
 	{
 		M_TeamWeapon->SetSpecificEngageTarget(nullptr);
 	}
+}
+
+void ATeamWeaponController::ExecuteDigIn()
+{
+	Super::ExecuteDigIn();
+
+	if (not GetIsValidDigInComponent())
+	{
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
+	{
+		M_DigInComponent->ExecuteDigInCommand();
+		return;
+	}
+
+	bM_ShouldExecuteDigInAfterDeploy = true;
+	M_PostDeployPackAction.Reset();
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	{
+		StartDeploying();
+	}
+}
+
+void ATeamWeaponController::TerminateDigIn()
+{
+	Super::TerminateDigIn();
+}
+
+void ATeamWeaponController::ExecuteBreakCover()
+{
+	Super::ExecuteBreakCover();
+	bM_ShouldExecuteDigInAfterDeploy = false;
+
+	if (not GetIsValidDigInComponent())
+	{
+		return;
+	}
+
+	M_DigInComponent->TerminateDigInCommand();
+}
+
+void ATeamWeaponController::TerminateBreakCover()
+{
+	Super::TerminateBreakCover();
 }
 
 void ATeamWeaponController::ExecutePatrolCommand(const FVector PatrolToLocation)
@@ -688,6 +749,12 @@ void ATeamWeaponController::StartDeployingTeamWeapon()
 void ATeamWeaponController::HandlePackingTimerFinished()
 {
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	if (bM_ShouldExecuteDigInAfterDeploy)
+	{
+		StartDeploying();
+		return;
+	}
+
 	TryIssuePostDeployPackAction();
 }
 
@@ -696,6 +763,17 @@ void ATeamWeaponController::HandleDeployingTimerFinished()
 	SetTeamWeaponState(ETeamWeaponState::Ready_Deployed);
 	bM_HasIssuedCrewPositionMovesForCurrentDeploy = false;
 	IssueMoveCrewToPositions();
+
+	if (bM_ShouldExecuteDigInAfterDeploy)
+	{
+		bM_ShouldExecuteDigInAfterDeploy = false;
+		if (GetIsValidDigInComponent())
+		{
+			M_DigInComponent->ExecuteDigInCommand();
+		}
+		return;
+	}
+
 	TryIssuePostDeployPackAction();
 }
 
@@ -1184,6 +1262,56 @@ bool ATeamWeaponController::GetIsValidAnimatedTextWidgetPoolManager() const
 	                                                      "ATeamWeaponController::GetIsValidAnimatedTextWidgetPoolManager",
 	                                                      this);
 	return false;
+}
+
+bool ATeamWeaponController::GetIsValidDigInComponent() const
+{
+	if (IsValid(M_DigInComponent))
+	{
+		return true;
+	}
+
+	// Team weapons can be configured without dig-in.
+	return false;
+}
+
+void ATeamWeaponController::OnStartDigIn()
+{
+	bM_ShouldExecuteDigInAfterDeploy = false;
+	FinishRotationRequest();
+
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->SetDigInHullRotationLocked(true);
+	}
+}
+
+void ATeamWeaponController::OnDigInCompleted()
+{
+	DoneExecutingCommand(EAbilityID::IdDigIn);
+}
+
+void ATeamWeaponController::OnBreakCoverCompleted()
+{
+	bM_ShouldExecuteDigInAfterDeploy = false;
+
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->SetDigInHullRotationLocked(false);
+	}
+
+	DoneExecutingCommand(EAbilityID::IdBreakCover);
+}
+
+void ATeamWeaponController::WallGotDestroyedForceBreakCover()
+{
+	const ECommandQueueError BreakCoverError = BreakCover(true);
+	if (BreakCoverError != ECommandQueueError::NoError)
+	{
+		RTSFunctionLibrary::ReportError("Failed to break cover after team weapon dig-in wall got destroyed"
+			"\n At function: ATeamWeaponController::WallGotDestroyedForceBreakCover"
+			"\n For squad: " + GetName());
+	}
 }
 
 int ATeamWeaponController::GetOwningPlayer()

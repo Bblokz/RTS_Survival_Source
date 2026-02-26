@@ -174,6 +174,7 @@ public:
 	void SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons);
 	void SetSpecificEngageTarget(AActor* TargetActor);
 	AActor* GetSpecificEngageTarget() const { return M_SpecificEngageTarget.Get(); }
+	void SetDigInHullRotationLocked(const bool bLocked);
 
 	// Embedded turret interface ---------------------------
 	virtual float GetCurrentTurretAngle_Implementation() const override;
@@ -251,4 +252,7 @@ private:
 	// Cached target used to re-enter specific engage after packing/moving temporarily disables turret logic.
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_SpecificEngageTarget;
+	// Mirrors assault tank behavior: while dug in the embedded turret cannot rotate the weapon base.
+	UPROPERTY()
+	bool bM_IsHullRotationLocked = false;
 };
