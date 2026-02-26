@@ -2301,6 +2301,9 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak36_37MM, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::Flak36_37MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak36_37MM_TW, WeaponData);
+
 	// Bofors 40mm
 	WeaponData.WeaponName = EWeaponName::Bofors_40MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -2317,6 +2320,9 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.Accuracy = 60;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Bofors_40MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::Bofors_40MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Bofors_40MM_TW, WeaponData);
 }
 
 void ACPPGameState::InitAllGameMediumWeapons()
@@ -2486,6 +2492,9 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.Accuracy = 90;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak38_50MM, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::Pak38_50MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak38_50MM_TW, WeaponData);
+
 	// Panzer IV F1, short barrel 75mm
 	// https://old-wiki.warthunder.com/KwK37_(75_mm)
 	WeaponData.WeaponName = EWeaponName::KwK37_75MM;
@@ -2581,6 +2590,9 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak40_3_L46_75MM, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::Pak40_3_L46_75MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak40_3_L46_75MM_TW, WeaponData);
+
 	WeaponData.WeaponName = EWeaponName::Pak40_3_L46_75MM_Sdkfz251;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ReloadSpeed = 5.9f;
@@ -2675,6 +2687,9 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ReloadSpeed = 5;
 	WeaponData.Accuracy = 80;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ZIS_3_76MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::ZIS_3_76MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ZIS_3_76MM_TW, WeaponData);
 
 	// SU-76 gun
 	{
@@ -2898,6 +2913,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Panzerwerfer, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::Nebelwerfer_150MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Nebelwerfer_150MM_TW, WeaponData);
+
 	// Bazooka (50mm; HEAT)
 	WeaponData.WeaponName = EWeaponName::Bazooka_50MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -2989,6 +3007,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::QF_37In_94MM, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::KS30_130MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KS30_130MM_TW, WeaponData);
+
 	// https://wiki.warthunder.com/IS-1#:~:text=...
 	// Better reload than the zis variant and better explosive filler.	
 	WeaponData.WeaponName = EWeaponName::DT_5_85MM;
@@ -3065,6 +3086,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak37_88MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::Flak37_88MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak37_88MM_TW, WeaponData);
 
 	// https://wiki.warthunder.com/Jagdpanther_G1
 	WeaponData.WeaponName = EWeaponName::Pak43_88MM;
@@ -3166,6 +3190,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = 0.5f * HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::LeFH_18_105MM, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::LeFH_18_105MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::LeFH_18_105MM_TW, WeaponData);
+
 	// Cramped turret; stock reload.
 	WeaponData.WeaponName = EWeaponName::sIG_33_150MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -3192,6 +3219,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sIG_33_150MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::sFH18_150MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sFH18_150MM_TW, WeaponData);
 
 	// https://old-wiki.warthunder.com/Brummbar
 	WeaponData.WeaponName = EWeaponName::Stu_H_43_L_12_150MM;
@@ -3248,6 +3278,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::Mortar_120MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM_TW, WeaponData);
+
 	// Mortar 80mm (HE)
 	WeaponData.WeaponName = EWeaponName::Mortar_80MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -3274,6 +3307,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_80MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::Mortar_80MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_80MM_TW, WeaponData);
 
 	// https://old-wiki.warthunder.com/Brummbar
 	WeaponData.WeaponName = EWeaponName::RW61_Mortar_380MM;
@@ -7093,7 +7129,196 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = EliteInfantryExp;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_CortexOfficer, SquadData);
 
+	InitAllGameAntiTankGunTWSquadData();
+	InitAllGameMortarTWSquadData();
+	InitAllGameFlakTWSquadData();
+	InitAllGameArtilleryTWSquadData();
+	InitAllGameMachineGunTWSquadData();
+
 	M_TEnemySquadDataHashMap = M_TPlayerSquadDataHashMap;
+}
+
+
+void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
+	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
+	using namespace DeveloperSettings::GameBalance::Experience;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantrySpeed;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantryAcceleration;
+
+	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+
+	FSquadData SquadData;
+	SquadData.MaxHealth = ArmoredInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = AntiTankGunTeamWeaponVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, AntiTankGunTeamWeaponRadixiteCost},
+		{ERTSResourceType::Resource_Metal, AntiTankGunTeamWeaponMetalCost}
+	});
+	SquadData.Abilities = TeamWeaponAbilities;
+	SquadData.ExperienceWorth = ArmoredInfantryExp;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0f;
+
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK38, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK40, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_57MM, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_76MM, SquadData);
+}
+
+void ACPPGameState::InitAllGameMortarTWSquadData()
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
+	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
+	using namespace DeveloperSettings::GameBalance::Experience;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantrySpeed;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantryAcceleration;
+
+	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+
+	FSquadData SquadData;
+	SquadData.MaxHealth = BasicInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = MortarTeamWeaponVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, MortarTeamWeaponRadixiteCost},
+		{ERTSResourceType::Resource_Metal, MortarTeamWeaponMetalCost}
+	});
+	SquadData.Abilities = TeamWeaponAbilities;
+	SquadData.ExperienceWorth = BaseInfantryExp;
+	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0f;
+
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_GrW42_80mm, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_80mm_Mortar, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_120mm_Mortar, SquadData);
+}
+
+void ACPPGameState::InitAllGameFlakTWSquadData()
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
+	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
+	using namespace DeveloperSettings::GameBalance::Experience;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantrySpeed;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantryAcceleration;
+
+	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+
+	FSquadData SquadData;
+	SquadData.MaxHealth = ArmoredInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = FlakTeamWeaponVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, FlakTeamWeaponRadixiteCost},
+		{ERTSResourceType::Resource_Metal, FlakTeamWeaponMetalCost}
+	});
+	SquadData.Abilities = TeamWeaponAbilities;
+	SquadData.ExperienceWorth = ArmoredInfantryExp;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0f;
+
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_37mmFlak, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_88mmFlak, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Bofors, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_KS30_130MM, SquadData);
+}
+
+void ACPPGameState::InitAllGameArtilleryTWSquadData()
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
+	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
+	using namespace DeveloperSettings::GameBalance::Experience;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantrySpeed;
+	using DeveloperSettings::GameBalance::InfantrySettings::SlowInfantryAcceleration;
+
+	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+
+	FSquadData SquadData;
+	SquadData.MaxHealth = ArmoredInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = ArtilleryTeamWeaponVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ArtilleryTeamWeaponRadixiteCost},
+		{ERTSResourceType::Resource_Metal, ArtilleryTeamWeaponMetalCost}
+	});
+	SquadData.Abilities = TeamWeaponAbilities;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0f;
+
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LefH18, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SFH18_150mm, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Nebelwerfer, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_M1938_122mm, SquadData);
+}
+
+void ACPPGameState::InitAllGameMachineGunTWSquadData()
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
+	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
+	using namespace DeveloperSettings::GameBalance::Experience;
+	using DeveloperSettings::GameBalance::InfantrySettings::BasicInfantrySpeed;
+	using DeveloperSettings::GameBalance::InfantrySettings::BasicInfantryAcceleration;
+
+	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
+	});
+
+	FSquadData SquadData;
+	SquadData.MaxHealth = BasicInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = MachineGunTeamWeaponVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, MachineGunTeamWeaponRadixiteCost}
+	});
+	SquadData.Abilities = TeamWeaponAbilities;
+	SquadData.ExperienceWorth = BaseInfantryExp;
+	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0f;
+
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LMGSquad, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Maxim, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_DShK, SquadData);
 }
 
 void ACPPGameState::NotifyPlayerGameSettingsLoaded()

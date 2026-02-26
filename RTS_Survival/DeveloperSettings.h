@@ -170,6 +170,26 @@ namespace DeveloperSettings
 			inline constexpr int32 EliteInfantryTrainingTime = RoundToNearestMultipleOf(
 				60.f * GameTimeMlt, 2);
 
+			// Team weapon squad training times.
+			inline constexpr int32 MachineGunTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				25.f * GameTimeMlt, 2);
+			inline constexpr int32 MediumAntiTankGunTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				50.f * GameTimeMlt, 2);
+			inline constexpr int32 HeavyAntiTankGunTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				65.f * GameTimeMlt, 2);
+			inline constexpr int32 MediumMortarTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				45.f * GameTimeMlt, 2);
+			inline constexpr int32 HeavyMortarTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				55.f * GameTimeMlt, 2);
+			inline constexpr int32 MediumFlakTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				50.f * GameTimeMlt, 2);
+			inline constexpr int32 HeavyFlakTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				70.f * GameTimeMlt, 2);
+			inline constexpr int32 MediumArtilleryTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				70.f * GameTimeMlt, 2);
+			inline constexpr int32 HeavyArtilleryTeamWeaponTrainingTime = RoundToNearestMultipleOf(
+				90.f * GameTimeMlt, 2);
+
 			// Harvester Training Time.
 			inline constexpr int32 HarvesterTrainingTime = RoundToNearestMultipleOf(
 				15.f * GameTimeMlt, 2);
@@ -390,6 +410,26 @@ namespace DeveloperSettings
 					static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
 				inline constexpr int32 CortextOfficerMetalCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+
+				// Team weapon squad costs.
+				inline constexpr int32 MachineGunTeamWeaponRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 AntiTankGunTeamWeaponRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(450 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 AntiTankGunTeamWeaponMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(180 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 MortarTeamWeaponRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(425 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 MortarTeamWeaponMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(140 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 FlakTeamWeaponRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(500 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 FlakTeamWeaponMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(220 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 ArtilleryTeamWeaponRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(600 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 ArtilleryTeamWeaponMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(260 * GameCostMlt * InfantryCostMlt));
 			}
 
 			namespace EnergySupplies
@@ -550,6 +590,11 @@ namespace DeveloperSettings
 				inline constexpr float SuperHeavyTankVision = 5000.f;
 
 				inline constexpr float InfantryVisionRadius = 4500.f;
+				inline constexpr float MachineGunTeamWeaponVisionRadius = 5000.f;
+				inline constexpr float AntiTankGunTeamWeaponVisionRadius = 5800.f;
+				inline constexpr float MortarTeamWeaponVisionRadius = 6500.f;
+				inline constexpr float FlakTeamWeaponVisionRadius = 6200.f;
+				inline constexpr float ArtilleryTeamWeaponVisionRadius = 7000.f;
 				inline constexpr float AircraftVisionRadius = 6000.f;
 			}
 		}

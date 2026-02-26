@@ -340,6 +340,11 @@ FBxpOptionData InitBxpOptionEntry(const EBuildingExpansionType Type,
 	TMap<ESquadSubtype, FSquadData> M_TEnemySquadDataHashMap;
 
 	void InitAllGameSquadData();
+	void InitAllGameAntiTankGunTWSquadData();
+	void InitAllGameMortarTWSquadData();
+	void InitAllGameFlakTWSquadData();
+	void InitAllGameArtilleryTWSquadData();
+	void InitAllGameMachineGunTWSquadData();
 
 	// Handels all game updates and settings.
 	UPROPERTY()

@@ -297,6 +297,28 @@ enum class ESquadSubtype: uint8
 	Squad_Ger_SturmKommandos UMETA(DisplayName = "Ger Elite Sturm Kommandos Squad (Dystopian with MG)"),
 	// Dystopian with Laser guns
 	Squad_Ger_LightBringers UMETA(DisplayName = "Ger Elite Light Bringers Squad (Dystopian with Laser guns)"),
+	// Team weapons: anti tank guns.
+	Squad_Ger_PaK38 UMETA(DisplayName = "Ger PaK 38"),
+	Squad_Ger_PaK40 UMETA(DisplayName = "Ger PaK 40"),
+	Squad_Rus_Zis_57MM UMETA(DisplayName = "Rus ZiS 57MM"),
+	Squad_Rus_Zis_76MM UMETA(DisplayName = "Rus ZiS 76MM"),
+	// Team weapons: anti air.
+	Squad_Ger_37mmFlak UMETA(DisplayName = "Ger 37MM Flak"),
+	Squad_Ger_88mmFlak UMETA(DisplayName = "Ger 88MM Flak"),
+	Squad_Rus_Bofors UMETA(DisplayName = "Rus Bofors"),
+	Squad_Rus_KS30_130MM UMETA(DisplayName = "Rus KS-30 130MM"),
+	// Team weapons: mortars.
+	Squad_Ger_GrW42_80mm UMETA(DisplayName = "Ger GrW42 80MM"),
+	Squad_Rus_80mm_Mortar UMETA(DisplayName = "Rus 80MM Mortar"),
+	Squad_Rus_120mm_Mortar UMETA(DisplayName = "Rus 120MM Mortar"),
+	// Team weapons: artillery.
+	Squad_Ger_LefH18 UMETA(DisplayName = "Ger leFH18"),
+	Squad_Ger_SFH18_150mm UMETA(DisplayName = "Ger sFH18 150MM"),
+	Squad_Ger_Nebelwerfer UMETA(DisplayName = "Ger Nebelwerfer"),
+	Squad_Rus_M1938_122mm UMETA(DisplayName = "Rus M1938 122MM"),
+	// Team weapons: machine guns.
+	Squad_Rus_Maxim UMETA(DisplayName = "Rus Maxim Team"),
+	Squad_Rus_DShK UMETA(DisplayName = "Rus DShK Team"),
 
 	// Ger mech walkers,
 	Squad_Ger_RedSpine UMETA(DisplayName = "Ger Red Spine Squad (Light mech walkers Etasphere01)"),
@@ -443,6 +465,40 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Light Bringers";
 	case ESquadSubtype::Squad_Rus_CortexOfficer:
 		return "Cortex Officer";
+	case ESquadSubtype::Squad_Ger_PaK38:
+		return "PaK 38";
+	case ESquadSubtype::Squad_Ger_PaK40:
+		return "PaK 40";
+	case ESquadSubtype::Squad_Rus_Zis_57MM:
+		return "ZiS-57";
+	case ESquadSubtype::Squad_Rus_Zis_76MM:
+		return "ZiS-76";
+	case ESquadSubtype::Squad_Ger_37mmFlak:
+		return "Flak 37mm";
+	case ESquadSubtype::Squad_Ger_88mmFlak:
+		return "Flak 88mm";
+	case ESquadSubtype::Squad_Rus_Bofors:
+		return "Bofors";
+	case ESquadSubtype::Squad_Rus_KS30_130MM:
+		return "KS-30";
+	case ESquadSubtype::Squad_Ger_GrW42_80mm:
+		return "GrW42";
+	case ESquadSubtype::Squad_Rus_80mm_Mortar:
+		return "80mm Mortar";
+	case ESquadSubtype::Squad_Rus_120mm_Mortar:
+		return "120mm Mortar";
+	case ESquadSubtype::Squad_Ger_LefH18:
+		return "leFH 18";
+	case ESquadSubtype::Squad_Ger_SFH18_150mm:
+		return "sFH 18";
+	case ESquadSubtype::Squad_Ger_Nebelwerfer:
+		return "Nebelwerfer";
+	case ESquadSubtype::Squad_Rus_M1938_122mm:
+		return "M1938 122mm";
+	case ESquadSubtype::Squad_Rus_Maxim:
+		return "Maxim Team";
+	case ESquadSubtype::Squad_Rus_DShK:
+		return "DShK Team";
 	default: ;
 	}
 	return "Unkown squad";

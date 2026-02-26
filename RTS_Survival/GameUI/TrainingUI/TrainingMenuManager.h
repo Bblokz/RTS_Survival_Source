@@ -139,6 +139,11 @@ private:
 	void InitAllGameAircraftTrainingOptions();
 	void InitAllGameNomadicTrainingOptions();
 	void InitAllGameSquadTrainingOptions();
+	void InitAllGameAntiTankGunTWTrainingOptions();
+	void InitAllGameMortarTWTrainingOptions();
+	void InitAllGameFlakTWTrainingOptions();
+	void InitAllGameArtilleryTWTrainingOptions();
+	void InitAllGameMachineGunTWTrainingOptions();
 
 	// Makes sure that training times are not too short to cause load issues on AsyncSpawner.
 	void PostInitTrainingOptions();
