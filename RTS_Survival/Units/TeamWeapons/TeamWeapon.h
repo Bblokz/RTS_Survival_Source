@@ -18,6 +18,7 @@ class UHealthComponent;
 class URTSComponent;
 class UTeamWeaponMover;
 class ATeamWeaponController;
+class UCrewPosition;
 
 USTRUCT(BlueprintType)
 struct FTeamWeaponYawArcSettings
@@ -133,6 +134,7 @@ public:
 	UTeamWeaponMover* GetTeamWeaponMover() const { return M_TeamWeaponMover; }
 
 	void SetTurretOwnerActor(AActor* NewOwner);
+	void GetCrewPositions(TArray<UCrewPosition*>& OutCrewPositions) const;
 
 	// Embedded turret interface ---------------------------
 	virtual float GetCurrentTurretAngle_Implementation() const override;

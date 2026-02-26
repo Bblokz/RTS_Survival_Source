@@ -5,6 +5,7 @@
 #include "TeamWeaponAnimationInstance.h"
 #include "TeamWeaponController.h"
 #include "TeamWeaponMover.h"
+#include "CrewPositions/CrewPosition.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -85,6 +86,12 @@ void ATeamWeapon::SetTurretOwnerActor(AActor* NewOwner)
 	InitTurretOwner(NewOwner);
 	InitSelectionDelegatesOfOwner(NewOwner);
 	OnSetupTurret(NewOwner);
+}
+
+void ATeamWeapon::GetCrewPositions(TArray<UCrewPosition*>& OutCrewPositions) const
+{
+	OutCrewPositions.Reset();
+	GetComponents<UCrewPosition>(OutCrewPositions);
 }
 
 float ATeamWeapon::GetCurrentTurretAngle_Implementation() const
