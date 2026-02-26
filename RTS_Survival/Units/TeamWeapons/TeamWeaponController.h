@@ -222,6 +222,7 @@ private:
 	void HandleDeployingTimerFinished();
 
 	void SetPostDeployPackActionForMove(const FVector MoveToLocation);
+	bool GetHasPendingMovePostDeployPackAction() const;
 
 	void SetPostDeployPackActionForRotate(const FRotator& DesiredRotation, const EAbilityID AbilityId,
 	                                 const bool bShouldTriggerDoneExecuting);
@@ -318,6 +319,13 @@ private:
 	// Prevents repeatedly issuing identical move orders while staying in the same deploy cycle.
 	UPROPERTY()
 	bool bM_HasIssuedCrewPositionMovesForCurrentDeploy = false;
+
+	// Target location used to push guard final positions slightly farther forward during engage repositioning.
+	UPROPERTY()
+	FVector M_GuardEngageFlowTargetLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	bool bM_HasGuardEngageFlowTargetLocation = false;
 
 	UPROPERTY()
 	bool bM_IsTeamWeaponAbandoned = false;

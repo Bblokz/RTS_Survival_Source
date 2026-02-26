@@ -148,6 +148,7 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 void ATeamWeaponController::TerminateAttackCommand()
 {
 	M_SpecificEngageTarget.Reset();
+	bM_HasGuardEngageFlowTargetLocation = false;
 
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)
 	{
@@ -237,6 +238,11 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 	if (not GetIsValidTeamWeapon())
 	{
 		return false;
+	}
+
+	if (GetHasPendingMovePostDeployPackAction())
+	{
+		return true;
 	}
 
 	SetPostDeployPackActionForRotate(DesiredRotation, EAbilityID::IdRotateTowards, false);
@@ -704,6 +710,11 @@ void ATeamWeaponController::SetPostDeployPackActionForMove(const FVector MoveToL
 		nullptr);
 }
 
+bool ATeamWeaponController::GetHasPendingMovePostDeployPackAction() const
+{
+	return M_PostDeployPackAction.GetAbilityId() == EAbilityID::IdMove;
+}
+
 void ATeamWeaponController::SetPostDeployPackActionForRotate(const FRotator& DesiredRotation,
                                                              const EAbilityID AbilityId,
                                                              const bool bShouldTriggerDoneExecuting)
@@ -901,6 +912,14 @@ void ATeamWeaponController::ApplyNonCrewOffsetToPath(FNavPathSharedPtr& UnitPath
 			                            : (UnitOffset * FMath::FRandRange(NonCrewMinOffsetScale, NonCrewMaxOffsetScale));
 		FNavPathPoint& PathPoint = UnitPath->GetPathPoints()[i];
 		PathPoint.Location += PointOffset;
+
+		if (bLast && bM_HasGuardEngageFlowTargetLocation && M_SpecificEngageTarget.IsValid() && GetIsValidTeamWeapon())
+		{
+			const float GuardEngageFlowDistanceCm = M_TeamWeapon->GetGuardEngageFlowDistanceCm();
+			const FVector DirectionToEngageTarget = (M_GuardEngageFlowTargetLocation - PathPoint.Location).GetSafeNormal();
+			PathPoint.Location += DirectionToEngageTarget * GuardEngageFlowDistanceCm;
+		}
+
 		PathPoint.Location = ProjectLocationOnNavMesh(PathPoint.Location, CrewPathProjectionHeight, false);
 	}
 }
@@ -1063,6 +1082,14 @@ void ATeamWeaponController::HandlePushedMoverArrived()
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	M_PostDeployPackAction.Reset();
+
+	if (M_SpecificEngageTarget.IsValid())
+	{
+		StartDeploying();
+		return;
+	}
+
+	bM_HasGuardEngageFlowTargetLocation = false;
 	DoneExecutingCommand(EAbilityID::IdMove);
 }
 
@@ -1071,6 +1098,7 @@ void ATeamWeaponController::HandlePushedMoverFailed(const FString& FailureReason
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	M_PostDeployPackAction.Reset();
+	bM_HasGuardEngageFlowTargetLocation = false;
 	if (GetIsGameShuttingDown())
 	{
 		DoneExecutingCommand(EAbilityID::IdMove);
@@ -1185,6 +1213,8 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 	}
 
 	const FVector MoveLocation = GetMoveLocationWithinTurretRange(TargetLocation, CallingTurret);
+	M_GuardEngageFlowTargetLocation = TargetLocation;
+	bM_HasGuardEngageFlowTargetLocation = true;
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed || M_TeamWeaponState == ETeamWeaponState::Deploying)
 	{
 		SetPostDeployPackActionForMove(MoveLocation);
