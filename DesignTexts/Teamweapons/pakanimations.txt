@@ -1,57 +1,85 @@
-﻿i have started work on a general animation controller called UTeamWeaponAnimationInstance
-for which later both paks and mortars will derive their animation instances from.
+﻿ you are going to implement various functions and constants for new squad data entries and subtypes to be used by the 
+ new team weapons derived blueprints.
+ 
+ under
+ void UTrainingMenuManager::InitAllGameSquadTrainingOptions()
+add new functions (privates) for init all antitankGunTWTrainingOptions, init all mortarTWTrainingOptions, init all flak team weapons data, init all artillery tw training options
+and init all machine gunTWTrainingOptions.
 
-as you can see i have setup a system where we allow for playing two types of montages;
-either on the gun slot or on the legs and wheels slot.
-the anim inst is set up with the deployment time to calculate how long montages need to last for packing and deploying.  
+we will need separate costs constants in the developer settings for each with the at guns, flak guns, artillery, and the mortar crews also costing
+some metal while mg teams only cost radixite.
+we need training time constants for them too; for each type of team weapon and also for the various sizes within those;
+medium at weapon heavy at weapon etc...
 
-make sure the team weapon controller will force to correct montage on the anim inst for packing and unpacking; using PlayLegsWheelsSlotMontage
-for the movement do not do anything for the movement montages yet.
+idem for InitAllGameSquadData there we need to call sub functions for the different types of team weapons as well.
+we also need to define new constants for their vision radii while the health will be reused from the infantry constants settings.
+for the ability arrays :
+AntiTankGun : attack, move, stop ,  no ability no ability
+		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility
+idem for mortars, Idem for artillery, Idem for flak guns and idem for machine gun team weapons.
 
-the rotation implementation is still missing the ExecuteRotateTowardsCommand and the terminate version of the icommands interace need to be implemented;
-if the team weapon is deploying at the time of the rotation command then instantly set it back to packed.
-then rotate it using the  M_TurnSpeedYaw also update the positions of the guards accoordingly maybe the crew can be attached
-and deattached in some way during a rotation so we do not need to reissue a movement command every tick of the rotation?
-if the team weapon was already deployed then first pack it and execute the rotation once packed up.
-if the team weapon was already packed then just execute the rotation command by starting the rotation.
+add the new squad subtypes:
+Squad_Ger_PaK38 
+Squad_Ger_PaK40
+Squad_Rus_Zis_57MM
+Squad_Rus_Zis_76MM
 
-for the rotation make use of a margin of 1 degree to determine if the weapon faces the direction needed.
+for aa team weapons:
+Squad_Ger_37mmFlak
+Squad_Ger_88mmFlak
+Squad_Rus_Bofors
+Squad_Rus_KS30_130MM
 
-after the team weapon faces the desired rotation then call done executing command for this rotation ability ID.
+mortar squads:
+Squad_Ger_GrW42_80mm
+Squad_Rus_80mm_Mortar
+Squad_Rus_120mm_Mortar
 
-also implement on unit idle and no new command on the team weapon controller; (function from icommands called
-specifically when no commands are left in the queue) in that case order the team weapon to deploy
-if not already; so that after any sequence of commands the team weapon will always end up in a deployed state and ready to fire.
+artillery squads:
+Squad_Ger_LefH18
+Squad_Ger_SFH18_150mm
+Squad_Ger_Nebelwerfer
+Squad_Rus_M1938_122mm
 
-because the team weapon is an assault turret (special turret; part of embedded turret) this means that if the
-target is out of yaw reach the embedded turret will ask through the interface to rotate base; this means we also need a
-setup for rotating that will not trigger a done exe command of a rotation command but an internal rotation.
-also for these rotations make sure the crew will updated their positions; we wait for packing if needed and
-rotate the exact same way except we do not trigger the done executing command!
 
-also implement the attack actor command for the team weapon controller; issue the attack to the squad units that are not guards as 
-in the base squad controller. for the team weapon set it to specific engage the actor pointer.
-The team weapon controller is the turret owner; so this means it will get the updates of 	virtual void OnTurretOutOfRange(
-                                                                                         		const FVector TargetLocation,
-                                                                                         		ACPPTurretsMaster* CallingTurret) = 0;
-                                                                                         			/**
-                                                                                                	 * @brief Notifies the owner that the current target is in range of the turret.
-                                                                                                	 * @param CallingTurret The turret that is in range.
-                                                                                                	 */
-                                                                                                	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) = 0;
-in the out of range function we want to move the team weapon to  a position (and crew and the guards) that is within range for the turret
-with 10% margin so it does not immediatly need to remanouvre again.
- if attack is issued
+Machine gun squads:
+Squad_Ger_LMGSquad (already exists but make sure the card for it exists too) and move its data implementation to the right
+setup function for all the game machine gun tw data.
+Rus_Squad_Maxim
+Rus_Squad_DShK
 
-when in range is called make sure the weapon deploys if not already done so.
+make sure that for all of these subtypes their squad data entries are defined in the correct
+function (depending on their type of team weapon) their display name is added under Global_GetSquadDisplayName where
+you need to give them good short names (these are used in the UI)
+make sure that the card type (for training the unit) exists.
 
-regarding the responsibility for montages; those need to be called on the team weapon actor. 
+in addition; make sure that the weapon subtype in EWeaponName exists for the team weapon and that their weapon data is
+added in the game state if needed. It is important that we do not reuse weapon types that are already in use by different
+units as the icon used in the UI depends on this so for example:
+there already exists a Flak36_37MM weapon that is used for buildings but for  the team weapon we need a data entry with te exact same
+stats but  a differt enum so we can assign a different image for it;
+so under 	// Flak 36 37mm
+         	WeaponData.WeaponName = EWeaponName::Flak36_37MM;
+         	WeaponData.DamageType = ERTSDamageType::Kinetic;
+         	WeaponData.WeaponCalibre = 37;
+         	WeaponData.TNTExplosiveGrams = 18.2f;
+         	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+         		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * FlakCannonBonusDamageFactor;
+         	WeaponData.ArmorPen = 45;
+         	WeaponData.ArmorPenMaxRange = 31;
+         	WeaponData.MagCapacity = 6;
+         	WeaponData.ReloadSpeed = 2;
+         	WeaponData.BaseCooldown = 0.38f;
+         	WeaponData.CooldownFlux = 10;
+         	WeaponData.Accuracy = 60;
+         	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
+         	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak36_37MM, WeaponData); add another entry with the new enum for the team weapon.
+make sure the display names for all the new weapons are added too.
 
-                                                                                         		
-Important note on when the weapon of the turret that is the team weapon actor are allowed to fire:
-make sure weapons are always disabled during:
-packing, deploying or packed state.
-and only enabled when the team weapon is fully deployed.
+note that Global_GetWeaponValue is not needed as these are not regular squad weapons.
 
-DO NOT MAKE ANY MISTAKES; double check your implementation for things that are still missing.
-Always follow the project's coding standards.
+when you are done the data entries for all the new squad team weapons must exists as well as their weapons
+double check that you did not forget any of the above steps for any of the new squad subtypes and their corresponding weapons.
