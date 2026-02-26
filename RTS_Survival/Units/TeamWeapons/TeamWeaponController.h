@@ -233,7 +233,8 @@ private:
 	void AttachCrewForRotation();
 	void DetachCrewAfterRotation();
 	void SnapOperatorsToCrewPositionsDuringRotation();
-	bool TryGetLandscapeTeleportLocationForCrewPosition(const FVector& CrewPositionLocation,
+	bool TryGetLandscapeTeleportLocationForCrewPosition(const ASquadUnit* SquadUnit,
+	                                                    const FVector& CrewPositionLocation,
 	                                                    FVector& OutTeleportLocation) const;
 	void MoveGuardsToRandomGuardPositions() const;
 	bool TryGetRandomGuardLocation(FVector& OutGuardLocation) const;

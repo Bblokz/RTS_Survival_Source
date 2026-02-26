@@ -10,6 +10,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -1354,7 +1355,7 @@ void ATeamWeaponController::SnapOperatorsToCrewPositionsDuringRotation()
 		}
 
 		FVector OperatorTeleportLocation = CrewPosition->GetComponentLocation();
-		if (not TryGetLandscapeTeleportLocationForCrewPosition(OperatorTeleportLocation, OperatorTeleportLocation))
+		if (not TryGetLandscapeTeleportLocationForCrewPosition(SquadUnit, OperatorTeleportLocation, OperatorTeleportLocation))
 		{
 			continue;
 		}
@@ -1368,10 +1369,16 @@ void ATeamWeaponController::SnapOperatorsToCrewPositionsDuringRotation()
 	}
 }
 
-bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const FVector& CrewPositionLocation,
+bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const ASquadUnit* SquadUnit,
+	const FVector& CrewPositionLocation,
 	FVector& OutTeleportLocation) const
 {
 	OutTeleportLocation = CrewPositionLocation;
+
+	if (not IsValid(SquadUnit))
+	{
+		return false;
+	}
 
 	if (GetIsGameShuttingDown())
 	{
@@ -1385,8 +1392,9 @@ bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const
 		return false;
 	}
 
-	const float TraceStartHeightCm = 500.0f;
-	const float TraceLengthCm = 2000.0f;
+	constexpr float TraceStartHeightCm = 500.0f;
+	constexpr float TraceLengthCm = 2000.0f;
+	constexpr float LandscapeClearanceCm = 2.0f;
 	const FVector TraceStart = CrewPositionLocation + FVector::UpVector * TraceStartHeightCm;
 	const FVector TraceEnd = TraceStart - FVector::UpVector * TraceLengthCm;
 
@@ -1403,7 +1411,14 @@ bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const
 		return false;
 	}
 
-	OutTeleportLocation.Z = LandscapeHitResult.ImpactPoint.Z;
+	const UCapsuleComponent* SquadCapsuleComponent = SquadUnit->GetCapsuleComponent();
+	if (not IsValid(SquadCapsuleComponent))
+	{
+		return false;
+	}
+
+	const float ScaledCapsuleHalfHeight = SquadCapsuleComponent->GetScaledCapsuleHalfHeight();
+	OutTeleportLocation.Z = LandscapeHitResult.ImpactPoint.Z + ScaledCapsuleHalfHeight + LandscapeClearanceCm;
 	return true;
 }
 
