@@ -233,6 +233,8 @@ private:
 	void AttachCrewForRotation();
 	void DetachCrewAfterRotation();
 	void SnapOperatorsToCrewPositionsDuringRotation();
+	bool TryGetLandscapeTeleportLocationForCrewPosition(const FVector& CrewPositionLocation,
+	                                                    FVector& OutTeleportLocation) const;
 	void MoveGuardsToRandomGuardPositions() const;
 	bool TryGetRandomGuardLocation(FVector& OutGuardLocation) const;
 	FVector GetMoveLocationWithinTurretRange(const FVector& TargetLocation, const ACPPTurretsMaster* CallingTurret) const;

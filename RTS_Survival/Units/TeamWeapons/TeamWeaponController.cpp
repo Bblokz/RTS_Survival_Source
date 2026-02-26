@@ -14,6 +14,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 
 namespace TeamWeaponControllerCrewPositionStatics
 {
@@ -130,7 +131,6 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 		M_TeamWeapon->SetSpecificEngageTarget(TargetActor);
 	}
 
-	M_UnitsCompletedCommand = 0;
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)
 	{
 		if (not GetIsValidSquadUnit(SquadUnit))
@@ -138,13 +138,10 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 			continue;
 		}
 
-		if (not GetIsCrewOperator(SquadUnit))
-		{
-			continue;
-		}
-
-		SquadUnit->ExecuteAttackCommand(TargetActor);
+		SquadUnit->TerminateAttackCommand();
 	}
+
+	M_UnitsCompletedCommand = 0;
 }
 
 void ATeamWeaponController::TerminateAttackCommand()
@@ -1187,6 +1184,13 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 	}
 
 	const FVector MoveLocation = GetMoveLocationWithinTurretRange(TargetLocation, CallingTurret);
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed || M_TeamWeaponState == ETeamWeaponState::Deploying)
+	{
+		SetPostDeployPackActionForMove(MoveLocation);
+		StartPacking();
+		return;
+	}
+
 	ExecuteMoveCommand(MoveLocation);
 }
 
@@ -1349,13 +1353,58 @@ void ATeamWeaponController::SnapOperatorsToCrewPositionsDuringRotation()
 			continue;
 		}
 
+		FVector OperatorTeleportLocation = CrewPosition->GetComponentLocation();
+		if (not TryGetLandscapeTeleportLocationForCrewPosition(OperatorTeleportLocation, OperatorTeleportLocation))
+		{
+			continue;
+		}
+
 		SquadUnit->SetActorLocationAndRotation(
-			CrewPosition->GetComponentLocation(),
+			OperatorTeleportLocation,
 			CrewPosition->GetComponentRotation(),
 			false,
 			nullptr,
 			ETeleportType::TeleportPhysics);
 	}
+}
+
+bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const FVector& CrewPositionLocation,
+	FVector& OutTeleportLocation) const
+{
+	OutTeleportLocation = CrewPositionLocation;
+
+	if (GetIsGameShuttingDown())
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError("World not valid in TryGetLandscapeTeleportLocationForCrewPosition");
+		return false;
+	}
+
+	const float TraceStartHeightCm = 500.0f;
+	const float TraceLengthCm = 2000.0f;
+	const FVector TraceStart = CrewPositionLocation + FVector::UpVector * TraceStartHeightCm;
+	const FVector TraceEnd = TraceStart - FVector::UpVector * TraceLengthCm;
+
+	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TeamWeaponCrewLandscapeSnap), false, this);
+	FHitResult LandscapeHitResult;
+	const bool bDidHitLandscape = World->LineTraceSingleByChannel(
+		LandscapeHitResult,
+		TraceStart,
+		TraceEnd,
+		COLLISION_TRACE_LANDSCAPE,
+		CollisionQueryParams);
+	if (not bDidHitLandscape)
+	{
+		return false;
+	}
+
+	OutTeleportLocation.Z = LandscapeHitResult.ImpactPoint.Z;
+	return true;
 }
 
 void ATeamWeaponController::MoveGuardsToRandomGuardPositions() const
