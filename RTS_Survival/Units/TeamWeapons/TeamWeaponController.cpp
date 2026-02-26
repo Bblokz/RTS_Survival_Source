@@ -356,10 +356,19 @@ void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSele
 void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID)
 {
 	const UCommandData* CommandData = GetIsValidCommandData();
-	if (CommandData && CommandData->GetCurrentActiveCommand() == EAbilityID::IdMove)
+	if (not CommandData)
+	{
+		Super::OnSquadUnitCommandComplete(CompletedAbilityID);
+		return;
+	}
+
+	const bool bIsMoveCompletion = CompletedAbilityID == EAbilityID::IdMove;
+	const bool bIsActiveMoveCommand = CommandData->GetCurrentActiveCommand() == EAbilityID::IdMove;
+	if (bIsMoveCompletion && bIsActiveMoveCommand && GetIsPushedWeaponLeadsMovementType())
 	{
 		return;
 	}
+
 	Super::OnSquadUnitCommandComplete(CompletedAbilityID);
 }
 
@@ -1160,14 +1169,13 @@ void ATeamWeaponController::HandlePushedMoverArrived()
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	M_PostDeployPackAction.Reset();
+	bM_HasGuardEngageFlowTargetLocation = false;
 
 	if (M_SpecificEngageTarget.IsValid())
 	{
 		StartDeploying();
-		return;
 	}
 
-	bM_HasGuardEngageFlowTargetLocation = false;
 	DoneExecutingCommand(EAbilityID::IdMove);
 }
 
@@ -1227,6 +1235,16 @@ bool ATeamWeaponController::GetIsValidTeamWeapon() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TeamWeapon",
 	                                                      "ATeamWeaponController::GetIsValidTeamWeapon", this);
 	return false;
+}
+
+bool ATeamWeaponController::GetIsPushedWeaponLeadsMovementType() const
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return false;
+	}
+
+	return M_TeamWeapon->GetMovementType() == ETeamWeaponMovementType::PushedWeaponLeads;
 }
 
 bool ATeamWeaponController::GetIsValidTeamWeaponMover() const
