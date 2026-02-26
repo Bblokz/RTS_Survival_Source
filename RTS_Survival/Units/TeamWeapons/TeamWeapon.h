@@ -116,6 +116,10 @@ struct FTeamWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Movement", meta = (ClampMin = "0.0"))
 	float M_GroundTraceLengthCm = 400.f;
 
+	// Extra forward distance guards may use while the team weapon repositions to engage a target.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Movement", meta = (ClampMin = "0.0"))
+	float M_GuardEngageFlowDistanceCm = 150.f;
+
 	// Used for rotating the weapon within the limits of the turret yaw settings as implemented in the embedded turret base.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	float WeaponYawRotationSpeed = 10.f;
@@ -156,6 +160,7 @@ public:
 	float GetPathAcceptanceRadiusCm() const { return M_TeamWeaponConfig.M_PathAcceptanceRadiusCm; }
 	float GetGroundTraceStartHeightCm() const { return M_TeamWeaponConfig.M_GroundTraceStartHeightCm; }
 	float GetGroundTraceLengthCm() const { return M_TeamWeaponConfig.M_GroundTraceLengthCm; }
+	float GetGuardEngageFlowDistanceCm() const { return M_TeamWeaponConfig.M_GuardEngageFlowDistanceCm; }
 
 	void SetTeamWeaponController(ATeamWeaponController* NewController);
 	UTeamWeaponMover* GetTeamWeaponMover() const { return M_TeamWeaponMover; }
