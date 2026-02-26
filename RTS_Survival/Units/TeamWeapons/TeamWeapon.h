@@ -80,7 +80,6 @@ struct FTeamWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|EmbeddedTurret")
 	FTeamWeaponEmbeddedSettings M_EmbeddedSettings;
 
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	FResistanceAndDamageReductionData M_ResistanceData;
 
