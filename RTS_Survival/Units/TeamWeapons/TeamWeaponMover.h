@@ -74,6 +74,7 @@ private:
 	bool TryGetGroundAdjustedLocation(const FVector& InProposedLocation, FVector& OutGroundAdjustedLocation) const;
 	void ApplyYawStepTowards(const FVector& MovementDirection, const float DeltaSeconds) const;
 	bool TryMoveWeaponWithSweep(const FVector& ProposedLocation, FVector& OutAppliedLocation) const;
+	void SyncControllerTransformToWeapon() const;
 	bool GetUsesLegacyCrewMode() const;
 	bool GetIsValidTeamWeapon() const;
 	bool GetIsValidTeamWeaponController() const;

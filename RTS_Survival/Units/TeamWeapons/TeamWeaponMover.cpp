@@ -147,6 +147,7 @@ void UTeamWeaponMover::StartPushedFollowPath(const FNavPathSharedPtr& InPath)
 	M_CurrentPathPointIndex = 0;
 	bM_IsPushedActive = true;
 	M_LastWeaponLocation = M_TeamWeapon->GetActorLocation();
+	SyncControllerTransformToWeapon();
 	UpdateTickEnabledState();
 }
 
@@ -375,6 +376,7 @@ void UTeamWeaponMover::UpdateOwnerLocationFromCrew()
 	}
 
 	M_TeamWeapon->SetActorLocation(CrewCenter);
+	SyncControllerTransformToWeapon();
 }
 
 void UTeamWeaponMover::UpdateMovementAnimationState(const float DeltaSeconds)
@@ -432,12 +434,28 @@ bool UTeamWeaponMover::TryGetGroundAdjustedLocation(const FVector& InProposedLoc
 		return false;
 	}
 
+	UWorld* World = M_TeamWeapon->GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
 	const FVector TraceStart = InProposedLocation + FVector::UpVector * M_TeamWeapon->GetGroundTraceStartHeightCm();
 	const FVector TraceEnd = TraceStart - FVector::UpVector * M_TeamWeapon->GetGroundTraceLengthCm();
 
 	FHitResult GroundHit;
 	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TeamWeaponGroundTrace), false, M_TeamWeapon.Get());
-	const bool bDidHit = M_TeamWeapon->GetWorld()->LineTraceSingleByChannel(
+	for (const FTeamWeaponCrewMemberOffset& CrewMemberOffset : M_CrewMembers)
+	{
+		if (not CrewMemberOffset.M_CrewMember.IsValid())
+		{
+			continue;
+		}
+
+		CollisionQueryParams.AddIgnoredActor(CrewMemberOffset.M_CrewMember.Get());
+	}
+
+	const bool bDidHit = World->LineTraceSingleByChannel(
 		GroundHit,
 		TraceStart,
 		TraceEnd,
@@ -467,6 +485,7 @@ void UTeamWeaponMover::ApplyYawStepTowards(const FVector& MovementDirection, con
 	const float AppliedYawStep = FMath::Clamp(DeltaYaw, -MaxYawStep, MaxYawStep);
 	const FRotator NewRotation(0.0f, CurrentYaw + AppliedYawStep, 0.0f);
 	M_TeamWeapon->SetActorRotation(NewRotation);
+	SyncControllerTransformToWeapon();
 }
 
 bool UTeamWeaponMover::TryMoveWeaponWithSweep(const FVector& ProposedLocation, FVector& OutAppliedLocation) const
@@ -480,12 +499,28 @@ bool UTeamWeaponMover::TryMoveWeaponWithSweep(const FVector& ProposedLocation, F
 	const bool bSweep = true;
 	const bool bMoved = M_TeamWeapon->SetActorLocation(ProposedLocation, bSweep, &HitResult, ETeleportType::None);
 	OutAppliedLocation = M_TeamWeapon->GetActorLocation();
-	if (bMoved)
+	if (not bMoved)
 	{
-		return true;
+		return false;
 	}
 
-	return false;
+	SyncControllerTransformToWeapon();
+	return true;
+}
+
+void UTeamWeaponMover::SyncControllerTransformToWeapon() const
+{
+	if (not GetIsValidTeamWeaponController())
+	{
+		return;
+	}
+
+	M_TeamWeaponController->SetActorLocationAndRotation(
+		M_TeamWeapon->GetActorLocation(),
+		M_TeamWeapon->GetActorRotation(),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
 }
 
 bool UTeamWeaponMover::GetUsesLegacyCrewMode() const
