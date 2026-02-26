@@ -217,6 +217,7 @@ private:
 	void StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
 	                         const EAbilityID CompletionAbilityId);
 	void TickRotationRequest(const float DeltaSeconds);
+	void RotateControllerAndTeamWeapon(const float StepYaw) const;
 	void FinishRotationRequest();
 	void AttachCrewForRotation();
 	void DetachCrewAfterRotation();
