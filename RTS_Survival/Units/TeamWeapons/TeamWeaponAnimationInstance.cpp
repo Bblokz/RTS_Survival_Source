@@ -111,7 +111,6 @@ UAnimSequence* UTeamWeaponAnimationInstance::GetCurrentAOBaseSequence()
 {
 	if (not M_ActiveSequence)
 	{
-		RTSFunctionLibrary::ReportError("No valid active sequence for team weapon anim instance: " + GetName());
 		return Sequences.DeployedSequence;
 	}
 	return M_ActiveSequence;

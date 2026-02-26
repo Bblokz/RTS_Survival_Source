@@ -103,6 +103,7 @@ enum class
 	Kwk34_Twin30MM UMETA(DisplayName = "Kwk34 Twin 30MM (PZ III AA)"),
 	Kwk37_20MM UMETA(DisplayName = "KwK 37 20MM (Sdkfz 140 2cm)"),
 	Flak36_37MM UMETA(DisplayName = "Flak36 37MM (Flak 36)"),
+	Flak36_37MM_TW UMETA(DisplayName = "Flak36 37MM TW"),
 
 
 	// German Medium calibre
