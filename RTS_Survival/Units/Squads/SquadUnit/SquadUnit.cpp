@@ -862,6 +862,11 @@ void ASquadUnit::MoveToAndBindOnCompleted(const FVector& MoveToLocation, const b
 	auto Result = M_AISquadUnit->MoveToLocation(MoveToLocation,
 	                                            DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius,
 	                                            true, bUsePathfinding, false, !bUsePathfinding, nullptr, true);
+	if (Result == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		return;
+	}
+
 	if (Result != EPathFollowingRequestResult::RequestSuccessful)
 	{
 		OnMoveToSelfPathFindingFailed(Result, MoveToLocation, MoveContext);
