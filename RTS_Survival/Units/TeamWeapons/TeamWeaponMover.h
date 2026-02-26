@@ -9,8 +9,7 @@
 class ASquadUnit;
 class ATeamWeapon;
 class ATeamWeaponController;
-class FNavigationPath;
-
+struct FNavigationPath;
 enum class ETeamWeaponMovementType : uint8;
 
 DECLARE_MULTICAST_DELEGATE(FOnPushedMoveArrived);

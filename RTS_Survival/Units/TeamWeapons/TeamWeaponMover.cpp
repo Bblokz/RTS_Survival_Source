@@ -334,7 +334,7 @@ bool UTeamWeaponMover::TryGetCrewCenterLocation(FVector& OutCenter) const
 
 bool UTeamWeaponMover::HaveCrewReachedDestination() const
 {
-	const float AcceptanceRadius = DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius;
+	const float ReachedAcceptanceRadius = DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius;
 	const float AcceptanceDistanceSquared = FMath::Square(AcceptanceRadius);
 
 	bool bHasValidCrewMember = false;
