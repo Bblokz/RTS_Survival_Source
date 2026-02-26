@@ -1252,7 +1252,7 @@ void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 	}
 
 	RotateControllerAndTeamWeapon(StepYaw);
-	MoveGuardsToTeamWeapon();
+	SnapOperatorsToCrewPositionsDuringRotation();
 }
 
 void ATeamWeaponController::RotateControllerAndTeamWeapon(const float StepYaw)
@@ -1267,8 +1267,10 @@ void ATeamWeaponController::FinishRotationRequest()
 {
 	const bool bShouldCallDoneExecuting = M_RotationRequest.bM_ShouldTriggerDoneExecuting;
 	const EAbilityID CompletionAbilityId = M_RotationRequest.M_CompletionAbilityId;
+	SnapOperatorsToCrewPositionsDuringRotation();
 	M_RotationRequest.Reset();
 	DetachCrewAfterRotation();
+	MoveGuardsToRandomGuardPositions();
 
 	if (bShouldCallDoneExecuting && CompletionAbilityId != EAbilityID::IdNoAbility)
 	{
@@ -1283,16 +1285,6 @@ void ATeamWeaponController::AttachCrewForRotation()
 		return;
 	}
 
-	for (ASquadUnit* SquadUnit : M_TSquadUnits)
-	{
-		if (not GetIsValidSquadUnit(SquadUnit))
-		{
-			continue;
-		}
-
-		SquadUnit->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
-	}
-
 	bM_AreCrewAttachedForRotation = true;
 }
 
@@ -1303,27 +1295,58 @@ void ATeamWeaponController::DetachCrewAfterRotation()
 		return;
 	}
 
-	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	bM_AreCrewAttachedForRotation = false;
+}
+
+void ATeamWeaponController::SnapOperatorsToCrewPositionsDuringRotation()
+{
+	if (not M_RotationRequest.bM_IsActive)
 	{
+		return;
+	}
+
+	if (not M_CrewAssignment.GetHasEnoughOperators())
+	{
+		return;
+	}
+
+	TArray<UCrewPosition*> CrewPositions;
+	if (not TryGetCrewPositionsSorted(CrewPositions))
+	{
+		return;
+	}
+
+	const int32 CrewSnapCount = FMath::Min(M_CrewAssignment.M_Operators.Num(), CrewPositions.Num());
+	for (int32 OperatorIndex = 0; OperatorIndex < CrewSnapCount; ++OperatorIndex)
+	{
+		ASquadUnit* SquadUnit = M_CrewAssignment.M_Operators[OperatorIndex].Get();
 		if (not GetIsValidSquadUnit(SquadUnit))
 		{
 			continue;
 		}
 
-		SquadUnit->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	}
+		UCrewPosition* CrewPosition = CrewPositions[OperatorIndex];
+		if (not IsValid(CrewPosition))
+		{
+			continue;
+		}
 
-	bM_AreCrewAttachedForRotation = false;
+		SquadUnit->SetActorLocationAndRotation(
+			CrewPosition->GetComponentLocation(),
+			CrewPosition->GetComponentRotation(),
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
+	}
 }
 
-void ATeamWeaponController::MoveGuardsToTeamWeapon()
+void ATeamWeaponController::MoveGuardsToRandomGuardPositions() const
 {
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
 	}
 
-	const FVector GuardLocation = M_TeamWeapon->GetActorLocation();
 	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
 	{
 		ASquadUnit* SquadUnit = GuardUnit.Get();
@@ -1332,8 +1355,40 @@ void ATeamWeaponController::MoveGuardsToTeamWeapon()
 			continue;
 		}
 
-		SquadUnit->SetActorLocation(GuardLocation);
+		FVector GuardLocation;
+		if (not TryGetRandomGuardLocation(GuardLocation))
+		{
+			continue;
+		}
+
+		TeamWeaponControllerCrewPositionStatics::IssueMoveToLocationForSquadUnit(
+			SquadUnit,
+			GuardLocation,
+			nullptr);
 	}
+}
+
+bool ATeamWeaponController::TryGetRandomGuardLocation(FVector& OutGuardLocation) const
+{
+	OutGuardLocation = FVector::ZeroVector;
+
+	if (not GetIsValidTeamWeapon())
+	{
+		return false;
+	}
+
+	const float ClampedGuardDistance = FMath::Max(M_GuardDistance, 0.0f);
+	const float MinGuardAngle = FMath::Min(M_GuardMinMaxAngle.X, M_GuardMinMaxAngle.Y);
+	const float MaxGuardAngle = FMath::Max(M_GuardMinMaxAngle.X, M_GuardMinMaxAngle.Y);
+	const float RandomGuardAngle = FMath::FRandRange(MinGuardAngle, MaxGuardAngle);
+
+	const FVector BehindDirection = (-M_TeamWeapon->GetActorForwardVector()).GetSafeNormal();
+	const FVector GuardDirection = FRotator(0.0f, RandomGuardAngle, 0.0f).RotateVector(BehindDirection).GetSafeNormal();
+	const FVector UnprojectedGuardLocation = M_TeamWeapon->GetActorLocation() + GuardDirection * ClampedGuardDistance;
+	const float GuardProjectionHeight = 300.0f;
+	OutGuardLocation = ProjectLocationOnNavMesh(UnprojectedGuardLocation, GuardProjectionHeight, false);
+
+	return true;
 }
 
 FVector ATeamWeaponController::GetMoveLocationWithinTurretRange(const FVector& TargetLocation,
