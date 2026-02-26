@@ -3,5 +3,12 @@ for which later both paks and mortars will derive their animation instances from
 
 as you can see i have setup a system where we allow for playing two types of montages;
 either on the gun slot or on the legs and wheels slot.
+the anim inst is set up with the deployment time to calculate how long montages need to last for packing and deploying.  
 
-what i want is that the team weapon controller will play the montages on the 
+the rotation implementation is still missing the ExecuteRotateTowardsCommand`and the terminate version of the icommands interace need to be implemented;
+if the team weapon is deploying at the time of the rotation command then instantly set it back to packed.
+then rotate it using the  M_TurnSpeedYaw also update the positions of the guards accoordingly
+
+because the team weapon is an assault turret (special turret; part of embedded turret) this means that if the
+target is out of yaw reach the embedded turret will ask through the interface to rotate base; this means we also need a
+setup for rotating that will not trigger a done exe command of a rotation command but an internal rotation.

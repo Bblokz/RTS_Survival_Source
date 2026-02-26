@@ -90,8 +90,13 @@ struct FTeamWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	int32 M_OperatorCount = 0;
 
+	// Rotation speed used for when packed and rotating towards a certain position.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
-	float M_TurnSpeedYaw = 0.0f;
+	float M_TurnSpeedYaw = 20.f;
+
+	// Used for rotating the weapon within the limits of the turret yaw settings as implemented in the embedded turret base.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
+	float WeaponYawRotationSpeed = 10.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Text")
 	FString M_DeployingAnimatedText;
