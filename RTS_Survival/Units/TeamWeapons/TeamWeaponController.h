@@ -12,6 +12,7 @@
 class ATeamWeapon;
 class UAnimatedTextWidgetPoolManager;
 class AActor;
+class UCrewPosition;
 
 
 USTRUCT()
@@ -186,6 +187,8 @@ private:
 	bool GetIsCrewOperator(const ASquadUnit* SquadUnit) const;
 	void ApplyCrewOffsetToPath(FNavPathSharedPtr& UnitPath, const FVector& CrewOffset) const;
 	void ApplyNonCrewOffsetToPath(FNavPathSharedPtr& UnitPath, const FVector& UnitOffset) const;
+	bool TryGetCrewPositionsSorted(TArray<UCrewPosition*>& OutCrewPositions) const;
+	void IssueMoveCrewToPositions();
 	void ShowDeployingAnimatedText() const;
 	void ShowPackingAnimatedText() const;
 
@@ -230,4 +233,8 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_DeployTimer;
+
+	// Prevents repeatedly issuing identical move orders while staying in the same deploy cycle.
+	UPROPERTY()
+	bool bM_HasIssuedCrewPositionMovesForCurrentDeploy = false;
 };
