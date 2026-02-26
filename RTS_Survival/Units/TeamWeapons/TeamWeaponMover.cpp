@@ -2,10 +2,12 @@
 
 #include "TeamWeaponMover.h"
 
+#include "TeamWeapon.h"
+#include "TeamWeaponController.h"
 #include "RTS_Survival/DeveloperSettings.h"
-#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "NavigationPath.h"
 
 UTeamWeaponMover::UTeamWeaponMover()
 {
@@ -16,41 +18,40 @@ UTeamWeaponMover::UTeamWeaponMover()
 void UTeamWeaponMover::BeginPlay()
 {
 	Super::BeginPlay();
-	M_OwnerTeamWeapon = Cast<ATeamWeapon>(GetOwner());
-	if (GetIsValidOwnerTeamWeapon())
+
+	if (GetIsValidTeamWeapon())
 	{
-		M_LastOwnerLocation = M_OwnerTeamWeapon->GetActorLocation();
+		M_LastWeaponLocation = M_TeamWeapon->GetActorLocation();
 	}
 
-	SetComponentTickEnabled(false);
+	UpdateTickEnabledState();
 }
 
-void UTeamWeaponMover::TickComponent(float DeltaTime, ELevelTick TickType,
-                                     FActorComponentTickFunction* ThisTickFunction)
+void UTeamWeaponMover::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (M_MoverState != ETeamWeaponMoverState::Moving)
+	if (bM_IsPushedActive)
 	{
+		UpdatePushedMovement(DeltaTime);
 		return;
 	}
 
-	UpdateOwnerLocationFromCrew();
-	UpdateMovementAnimationState();
-
-	if (not HaveCrewReachedDestination())
+	if (bM_IsLegacyFollowActive)
 	{
-		return;
+		UpdateLegacyMovement();
 	}
+}
 
-	SetComponentTickEnabled(false);
-	if (GetIsValidOwnerTeamWeapon())
+void UTeamWeaponMover::InitMover(ATeamWeapon* InTeamWeapon, ATeamWeaponController* InController)
+{
+	M_TeamWeapon = InTeamWeapon;
+	M_TeamWeaponController = InController;
+
+	if (GetIsValidTeamWeapon())
 	{
-		M_OwnerTeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
+		M_LastWeaponLocation = M_TeamWeapon->GetActorLocation();
 	}
-	bM_HasMoveRequest = false;
-	SetMoverState(ETeamWeaponMoverState::Idle);
-	OnMoverArrived.Broadcast();
 }
 
 void UTeamWeaponMover::SetCrewMembersToFollow(const TArray<FTeamWeaponCrewMemberOffset>& CrewMembers)
@@ -62,68 +63,6 @@ void UTeamWeaponMover::MoveWeaponToLocation(const FVector& Destination)
 {
 	M_MoveDestination = Destination;
 	bM_HasMoveRequest = true;
-	if (not bM_IsCrewReady)
-	{
-		SetMoverState(ETeamWeaponMoverState::AwaitingCrew);
-		return;
-	}
-
-	if (not GetIsOwnerValid())
-	{
-		AbortMove(TEXT("Owner missing"));
-		return;
-	}
-
-	if (not GetIsCrewDataValid())
-	{
-		AbortMove(TEXT("Crew data invalid"));
-		return;
-	}
-
-	SetMoverState(ETeamWeaponMoverState::Pathing);
-}
-
-void UTeamWeaponMover::BeginFollowingCrew()
-{
-	if (not bM_HasMoveRequest)
-	{
-		return;
-	}
-
-	if (not bM_IsCrewReady)
-	{
-		SetMoverState(ETeamWeaponMoverState::AwaitingCrew);
-		return;
-	}
-
-	if (not GetIsOwnerValid())
-	{
-		AbortMove(TEXT("Owner missing"));
-		return;
-	}
-
-	if (not GetIsCrewDataValid())
-	{
-		AbortMove(TEXT("Crew data invalid"));
-		return;
-	}
-
-	SetComponentTickEnabled(true);
-	SetMoverState(ETeamWeaponMoverState::Moving);
-	UpdateOwnerLocationFromCrew();
-	UpdateMovementAnimationState();
-}
-
-void UTeamWeaponMover::AbortMove(const FString& Reason)
-{
-	SetComponentTickEnabled(false);
-	if (GetIsValidOwnerTeamWeapon())
-	{
-		M_OwnerTeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
-	}
-	bM_HasMoveRequest = false;
-	SetMoverState(ETeamWeaponMoverState::Idle);
-	OnMoverFailed.Broadcast(Reason);
 }
 
 void UTeamWeaponMover::NotifyCrewReady(const bool bIsReady)
@@ -131,45 +70,229 @@ void UTeamWeaponMover::NotifyCrewReady(const bool bIsReady)
 	bM_IsCrewReady = bIsReady;
 }
 
-bool UTeamWeaponMover::GetIsMoving() const
+void UTeamWeaponMover::StartLegacyFollowCrew()
 {
-	return M_MoverState == ETeamWeaponMoverState::Moving;
-}
-
-void UTeamWeaponMover::SetMoverState(const ETeamWeaponMoverState NewState)
-{
-	if (M_MoverState == NewState)
+	if (not GetUsesLegacyCrewMode())
 	{
 		return;
 	}
-	M_MoverState = NewState;
-	OnMoverStateChanged.Broadcast(NewState);
-}
 
-bool UTeamWeaponMover::GetIsOwnerValid() const
-{
-	if (IsValid(GetOwner()))
+	if (not bM_HasMoveRequest)
 	{
-		return true;
+		return;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("Owner"), TEXT("UTeamWeaponMover::GetIsOwnerValid"),
-		                                                     GetOwner());
-	return false;
-}
-
-bool UTeamWeaponMover::GetIsValidOwnerTeamWeapon() const
-{
-	if (M_OwnerTeamWeapon.IsValid())
+	if (not bM_IsCrewReady)
 	{
-		return true;
+		OnPushedMoveFailed.Broadcast(TEXT("Crew not ready for movement"));
+		return;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this,
-	                                                      TEXT("M_OwnerTeamWeapon"),
-	                                                      TEXT("UTeamWeaponMover::GetIsValidOwnerTeamWeapon"),
-	                                                      GetOwner());
-	return false;
+	if (not GetIsValidTeamWeapon())
+	{
+		OnPushedMoveFailed.Broadcast(TEXT("Team weapon missing"));
+		return;
+	}
+
+	if (not GetIsCrewDataValid())
+	{
+		OnPushedMoveFailed.Broadcast(TEXT("Crew data invalid"));
+		return;
+	}
+
+	bM_IsLegacyFollowActive = true;
+	bM_IsPushedActive = false;
+	M_LastWeaponLocation = M_TeamWeapon->GetActorLocation();
+	UpdateTickEnabledState();
+	UpdateLegacyMovement();
+}
+
+void UTeamWeaponMover::StopLegacyFollowCrew()
+{
+	bM_IsLegacyFollowActive = false;
+	bM_HasMoveRequest = false;
+
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
+	}
+
+	UpdateTickEnabledState();
+}
+
+void UTeamWeaponMover::StartPushedFollowPath(const FNavPathSharedPtr& InPath)
+{
+	StopLegacyFollowCrew();
+
+	if (not GetIsValidTeamWeapon())
+	{
+		StopLegacyFollowCrew();
+		OnPushedMoveFailed.Broadcast(TEXT("Team weapon missing"));
+		return;
+	}
+
+	if (not GetIsValidTeamWeaponController())
+	{
+		OnPushedMoveFailed.Broadcast(TEXT("Team weapon controller missing"));
+		return;
+	}
+
+	if (not InPath.IsValid() || InPath->GetPathPoints().Num() == 0)
+	{
+		OnPushedMoveFailed.Broadcast(TEXT("Invalid pushed path"));
+		return;
+	}
+
+	M_PushedPath = InPath;
+	M_CurrentPathPointIndex = 0;
+	bM_IsPushedActive = true;
+	M_LastWeaponLocation = M_TeamWeapon->GetActorLocation();
+	UpdateTickEnabledState();
+}
+
+void UTeamWeaponMover::AbortPushedFollowPath(const FString& Reason)
+{
+	if (not bM_IsPushedActive)
+	{
+		return;
+	}
+
+	StopPushedMovement();
+	OnPushedMoveFailed.Broadcast(Reason);
+}
+
+bool UTeamWeaponMover::GetIsPushedFollowingPath() const
+{
+	return bM_IsPushedActive;
+}
+
+void UTeamWeaponMover::UpdateLegacyMovement()
+{
+	if (not GetUsesLegacyCrewMode())
+	{
+		StopLegacyFollowCrew();
+		return;
+	}
+
+	if (not GetIsValidTeamWeapon())
+	{
+		StopLegacyFollowCrew();
+		OnPushedMoveFailed.Broadcast(TEXT("Team weapon missing"));
+		return;
+	}
+
+	UpdateOwnerLocationFromCrew();
+	UpdateMovementAnimationState(0.0f);
+
+	if (not HaveCrewReachedDestination())
+	{
+		return;
+	}
+
+	StopLegacyFollowCrew();
+	OnPushedMoveArrived.Broadcast();
+}
+
+void UTeamWeaponMover::UpdatePushedMovement(const float DeltaSeconds)
+{
+	if (not bM_IsPushedActive)
+	{
+		return;
+	}
+
+	if (not GetIsValidTeamWeapon() || not GetIsValidPushedPath())
+	{
+		AbortPushedFollowPath(TEXT("Pushed movement dependencies became invalid"));
+		return;
+	}
+
+	if (DeltaSeconds <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const TArray<FNavPathPoint>& PathPoints = M_PushedPath->GetPathPoints();
+	if (M_CurrentPathPointIndex >= PathPoints.Num())
+	{
+		FinalizePushedArrived();
+		return;
+	}
+
+	const float AcceptanceRadiusCm = M_TeamWeapon->GetPathAcceptanceRadiusCm();
+	const FVector WeaponLocation = M_TeamWeapon->GetActorLocation();
+	if (TryAdvancePathIndexIfReachedTarget(WeaponLocation, AcceptanceRadiusCm))
+	{
+		if (M_CurrentPathPointIndex >= PathPoints.Num())
+		{
+			FinalizePushedArrived();
+			return;
+		}
+	}
+
+	const FVector TargetLocation = PathPoints[M_CurrentPathPointIndex].Location;
+	FVector DirectionToTarget = TargetLocation - WeaponLocation;
+	DirectionToTarget.Z = 0.0f;
+	const float DistanceToTarget2D = DirectionToTarget.Size();
+	if (DistanceToTarget2D <= KINDA_SMALL_NUMBER)
+	{
+		M_CurrentPathPointIndex++;
+		return;
+	}
+
+	const FVector MoveDirection = DirectionToTarget / DistanceToTarget2D;
+	const float MaxStepDistance = M_TeamWeapon->GetPushedMoveSpeedCmPerSec() * DeltaSeconds;
+	const float StepDistance = FMath::Min(MaxStepDistance, DistanceToTarget2D);
+	FVector ProposedLocation = WeaponLocation + MoveDirection * StepDistance;
+
+	FVector GroundAdjustedLocation = ProposedLocation;
+	if (TryGetGroundAdjustedLocation(ProposedLocation, GroundAdjustedLocation))
+	{
+		ProposedLocation = GroundAdjustedLocation;
+	}
+	else
+	{
+		ProposedLocation.Z = WeaponLocation.Z;
+	}
+
+	ApplyYawStepTowards(MoveDirection, DeltaSeconds);
+
+	FVector AppliedLocation = WeaponLocation;
+	if (not TryMoveWeaponWithSweep(ProposedLocation, AppliedLocation))
+	{
+		AbortPushedFollowPath(TEXT("Blocked while pushed-following path"));
+		return;
+	}
+
+	if (TryAdvancePathIndexIfReachedTarget(AppliedLocation, AcceptanceRadiusCm))
+	{
+		if (M_CurrentPathPointIndex >= PathPoints.Num())
+		{
+			FinalizePushedArrived();
+			return;
+		}
+	}
+
+	UpdateMovementAnimationState(DeltaSeconds);
+}
+
+void UTeamWeaponMover::FinalizePushedArrived()
+{
+	StopPushedMovement();
+	OnPushedMoveArrived.Broadcast();
+}
+
+void UTeamWeaponMover::StopPushedMovement()
+{
+	bM_IsPushedActive = false;
+	M_PushedPath.Reset();
+	M_CurrentPathPointIndex = 0;
+
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
+	}
+
+	UpdateTickEnabledState();
 }
 
 bool UTeamWeaponMover::GetIsCrewDataValid() const
@@ -180,7 +303,7 @@ bool UTeamWeaponMover::GetIsCrewDataValid() const
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_CrewMembers"),
-	                                                      TEXT("UTeamWeaponMover::GetIsCrewDataValid"));
+		TEXT("UTeamWeaponMover::GetIsCrewDataValid"), GetOwner());
 	return false;
 }
 
@@ -231,45 +354,187 @@ bool UTeamWeaponMover::HaveCrewReachedDestination() const
 		}
 	}
 
-	if (not bHasValidCrewMember)
-	{
-		return false;
-	}
-
-	return true;
+	return bHasValidCrewMember;
 }
 
 void UTeamWeaponMover::UpdateOwnerLocationFromCrew()
 {
-	if (not GetIsOwnerValid())
+	if (not GetIsValidTeamWeapon())
 	{
-		AbortMove(TEXT("Owner missing"));
+		StopLegacyFollowCrew();
+		OnPushedMoveFailed.Broadcast(TEXT("Team weapon missing"));
 		return;
 	}
 
 	FVector CrewCenter = FVector::ZeroVector;
 	if (not TryGetCrewCenterLocation(CrewCenter))
 	{
-		AbortMove(TEXT("Crew missing"));
+		StopLegacyFollowCrew();
+		OnPushedMoveFailed.Broadcast(TEXT("Crew missing"));
 		return;
 	}
 
-	AActor* OwnerActor = GetOwner();
-	OwnerActor->SetActorLocation(CrewCenter);
+	M_TeamWeapon->SetActorLocation(CrewCenter);
 }
 
-void UTeamWeaponMover::UpdateMovementAnimationState()
+void UTeamWeaponMover::UpdateMovementAnimationState(const float DeltaSeconds)
 {
-	if (not GetIsValidOwnerTeamWeapon())
+	if (not GetIsValidTeamWeapon())
 	{
 		return;
 	}
 
-	const FVector CurrentOwnerLocation = M_OwnerTeamWeapon->GetActorLocation();
-	const FVector FrameVelocity = CurrentOwnerLocation - M_LastOwnerLocation;
-	M_LastOwnerLocation = CurrentOwnerLocation;
+	const FVector CurrentOwnerLocation = M_TeamWeapon->GetActorLocation();
+	FVector Velocity = FVector::ZeroVector;
+	if (DeltaSeconds > KINDA_SMALL_NUMBER)
+	{
+		Velocity = (CurrentOwnerLocation - M_LastWeaponLocation) / DeltaSeconds;
+	}
+	else
+	{
+		Velocity = CurrentOwnerLocation - M_LastWeaponLocation;
+	}
 
-	constexpr float MovementSpeedThresholdCmPerFrame = 2.0f;
-	const bool bCurrentlyMoving = FrameVelocity.SizeSquared() > FMath::Square(MovementSpeedThresholdCmPerFrame);
-	M_OwnerTeamWeapon->NotifyMoverMovementState(bCurrentlyMoving, FrameVelocity);
+	M_LastWeaponLocation = CurrentOwnerLocation;
+
+	const bool bCurrentlyMoving = not Velocity.IsNearlyZero();
+	M_TeamWeapon->NotifyMoverMovementState(bCurrentlyMoving, Velocity);
+}
+
+bool UTeamWeaponMover::TryAdvancePathIndexIfReachedTarget(const FVector& WeaponLocation, const float AcceptanceRadiusCm)
+{
+	if (not GetIsValidPushedPath())
+	{
+		return false;
+	}
+
+	const TArray<FNavPathPoint>& PathPoints = M_PushedPath->GetPathPoints();
+	if (M_CurrentPathPointIndex >= PathPoints.Num())
+	{
+		return true;
+	}
+
+	const FVector TargetLocation = PathPoints[M_CurrentPathPointIndex].Location;
+	const FVector PlanarToTarget = FVector(TargetLocation.X - WeaponLocation.X, TargetLocation.Y - WeaponLocation.Y, 0.0f);
+	if (PlanarToTarget.SizeSquared() > FMath::Square(AcceptanceRadiusCm))
+	{
+		return false;
+	}
+
+	M_CurrentPathPointIndex++;
+	return true;
+}
+
+bool UTeamWeaponMover::TryGetGroundAdjustedLocation(const FVector& InProposedLocation, FVector& OutGroundAdjustedLocation) const
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return false;
+	}
+
+	const FVector TraceStart = InProposedLocation + FVector::UpVector * M_TeamWeapon->GetGroundTraceStartHeightCm();
+	const FVector TraceEnd = TraceStart - FVector::UpVector * M_TeamWeapon->GetGroundTraceLengthCm();
+
+	FHitResult GroundHit;
+	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TeamWeaponGroundTrace), false, M_TeamWeapon.Get());
+	const bool bDidHit = M_TeamWeapon->GetWorld()->LineTraceSingleByChannel(
+		GroundHit,
+		TraceStart,
+		TraceEnd,
+		ECC_Visibility,
+		CollisionQueryParams);
+	if (not bDidHit)
+	{
+		return false;
+	}
+
+	OutGroundAdjustedLocation = InProposedLocation;
+	OutGroundAdjustedLocation.Z = GroundHit.ImpactPoint.Z;
+	return true;
+}
+
+void UTeamWeaponMover::ApplyYawStepTowards(const FVector& MovementDirection, const float DeltaSeconds) const
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	const float DesiredYaw = MovementDirection.Rotation().Yaw;
+	const float CurrentYaw = M_TeamWeapon->GetActorRotation().Yaw;
+	const float DeltaYaw = FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw);
+	const float MaxYawStep = M_TeamWeapon->GetTurnSpeedYaw() * DeltaSeconds;
+	const float AppliedYawStep = FMath::Clamp(DeltaYaw, -MaxYawStep, MaxYawStep);
+	const FRotator NewRotation(0.0f, CurrentYaw + AppliedYawStep, 0.0f);
+	M_TeamWeapon->SetActorRotation(NewRotation);
+}
+
+bool UTeamWeaponMover::TryMoveWeaponWithSweep(const FVector& ProposedLocation, FVector& OutAppliedLocation) const
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return false;
+	}
+
+	FHitResult HitResult;
+	const bool bSweep = true;
+	const bool bMoved = M_TeamWeapon->SetActorLocation(ProposedLocation, bSweep, &HitResult, ETeleportType::None);
+	OutAppliedLocation = M_TeamWeapon->GetActorLocation();
+	if (bMoved)
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool UTeamWeaponMover::GetUsesLegacyCrewMode() const
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return true;
+	}
+
+	return M_TeamWeapon->GetMovementType() == ETeamWeaponMovementType::CrewFollowsWeapon;
+}
+
+bool UTeamWeaponMover::GetIsValidTeamWeapon() const
+{
+	if (M_TeamWeapon.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_TeamWeapon"),
+		TEXT("UTeamWeaponMover::GetIsValidTeamWeapon"), GetOwner());
+	return false;
+}
+
+bool UTeamWeaponMover::GetIsValidTeamWeaponController() const
+{
+	if (M_TeamWeaponController.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_TeamWeaponController"),
+		TEXT("UTeamWeaponMover::GetIsValidTeamWeaponController"), GetOwner());
+	return false;
+}
+
+bool UTeamWeaponMover::GetIsValidPushedPath() const
+{
+	if (M_PushedPath.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PushedPath"),
+		TEXT("UTeamWeaponMover::GetIsValidPushedPath"), GetOwner());
+	return false;
+}
+
+void UTeamWeaponMover::UpdateTickEnabledState()
+{
+	SetComponentTickEnabled(bM_IsLegacyFollowActive || bM_IsPushedActive);
 }

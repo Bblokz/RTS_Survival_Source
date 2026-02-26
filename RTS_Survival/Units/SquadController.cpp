@@ -1071,6 +1071,20 @@ void ASquadController::ExecuteRetreatCommand(const FVector RetreatLocation)
 
 ESquadPathFindingError ASquadController::GeneratePathsForSquadUnits(const FVector& MoveToLocation)
 {
+	FNavPathSharedPtr SquadPath;
+	const ESquadPathFindingError Error = GenerateBaseSquadPath(MoveToLocation, SquadPath);
+	if (Error != ESquadPathFindingError::NoError)
+	{
+		return Error;
+	}
+
+	return GeneratePaths_Assign(MoveToLocation, SquadPath);
+}
+
+ESquadPathFindingError ASquadController::GenerateBaseSquadPath(const FVector& MoveToLocation, FNavPathSharedPtr& OutSquadPath)
+{
+	OutSquadPath.Reset();
+
 	UWorld* World = nullptr;
 	UNavigationSystemV1* NavSystem = nullptr;
 	AAIController* AIController = nullptr;
@@ -1089,20 +1103,18 @@ ESquadPathFindingError ASquadController::GeneratePathsForSquadUnits(const FVecto
 	{
 		return Error;
 	}
-	FNavPathSharedPtr SquadPath;
 	// Step 3: Find path and perform error checking
-	Error = GeneratePaths_ExeQuery(NavSystem, PFQuery, SquadPath);
+	Error = GeneratePaths_ExeQuery(NavSystem, PFQuery, OutSquadPath);
 	if (Error != ESquadPathFindingError::NoError)
 	{
 		return Error;
 	}
-	if (not SquadPath.IsValid())
+	if (not OutSquadPath.IsValid())
 	{
 		return ESquadPathFindingError::PathResultIsInvalid;
 	}
 
-	// Step 4: Assign adjusted paths to each squad unit
-	return GeneratePaths_Assign(MoveToLocation, SquadPath);
+	return ESquadPathFindingError::NoError;
 }
 
 ESquadPathFindingError ASquadController::GeneratePaths_SetupNav(UWorld*& OutWorld,
