@@ -119,9 +119,9 @@ void ATeamWeapon::SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons)
 {
 	if (bEnableWeapons)
 	{
-		if (M_TargetingData.GetIsTargetValid())
+		if (TargetingData.GetIsTargetValid())
 		{
-			SetEngageSpecificTarget(M_TargetingData.GetTargetActor());
+			SetEngageSpecificTarget(TargetingData.GetTargetActor());
 			return;
 		}
 

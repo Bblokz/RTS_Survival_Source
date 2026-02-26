@@ -55,7 +55,7 @@ void ACPPTurretsMaster::SetEngageSpecificTarget(AActor* Target)
 		return;
 	}
 	// If already aiming at this actor: ignore.
-	if (M_TargetingData.GetTargetActor() == Target)
+	if (TargetingData.GetTargetActor() == Target)
 	{
 		return;
 	}
@@ -80,7 +80,7 @@ void ACPPTurretsMaster::SetEngageGroundLocation(const FVector& GroundLocation)
 
 	OnTurretActive();
 
-	M_TargetingData.SetTargetGround(GroundLocation);
+	TargetingData.SetTargetGround(GroundLocation);
 
 	// Use the specific-engage loop so we get OnTurretOutOfRange / OnTurretInRange callbacks to the owner (tank).
 	InitiateSpecificTargetTimers();
@@ -129,7 +129,7 @@ bool ACPPTurretsMaster::EnsureWorldIsValid()
 void ACPPTurretsMaster::SetOwningPlayer(const int32 NewOwningPlayer)
 {
 	M_OwningPlayer = NewOwningPlayer;
-	M_TargetingData.InitTargetStruct(M_OwningPlayer);
+	TargetingData.InitTargetStruct(M_OwningPlayer);
 }
 
 void ACPPTurretsMaster::InitiateAutoEngageTimers()
@@ -389,7 +389,7 @@ FVector& ACPPTurretsMaster::GetFireDirection(const int32 /*WeaponIndex*/)
 
 FVector& ACPPTurretsMaster::GetTargetLocation(const int32 WeaponIndex)
 {
-	return M_TargetingData.GetActiveTargetLocation();
+	return TargetingData.GetActiveTargetLocation();
 }
 
 bool ACPPTurretsMaster::AllowWeaponToReload(const int32 /*WeaponIndex*/) const
@@ -399,7 +399,7 @@ bool ACPPTurretsMaster::AllowWeaponToReload(const int32 /*WeaponIndex*/) const
 
 void ACPPTurretsMaster::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AActor* KilledActor)
 {
-	if (not M_TargetingData.WasKilledActorCurrentTarget(KilledActor))
+	if (not TargetingData.WasKilledActorCurrentTarget(KilledActor))
 	{
 		return;
 	}
@@ -407,7 +407,7 @@ void ACPPTurretsMaster::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AActor*
 	if (TurretOwner)
 	{
 		// Owner will dictate turret behaviour after this.
-		TurretOwner.GetInterface()->OnMountedWeaponTargetDestroyed(this, nullptr, M_TargetingData.GetTargetActor(),
+		TurretOwner.GetInterface()->OnMountedWeaponTargetDestroyed(this, nullptr, TargetingData.GetTargetActor(),
 		                                                           true);
 	}
 	else
@@ -1128,7 +1128,7 @@ void ACPPTurretsMaster::InitSelectionDelegatesOfOwner(AActor* OwnerOfTurret)
 void ACPPTurretsMaster::AutoEngage()
 {
 	// 1) Early out if no valid target.
-	if (not M_TargetingData.GetIsTargetValid())
+	if (not TargetingData.GetIsTargetValid())
 	{
 		StopAllWeaponsFire(true);
 		ResetTarget();
@@ -1138,7 +1138,7 @@ void ACPPTurretsMaster::AutoEngage()
 
 	// 2) Distance gate to max range.
 	const FVector MyLoc = GetActorLocation();
-	const FVector TgtLoc = M_TargetingData.GetActiveTargetLocation();
+	const FVector TgtLoc = TargetingData.GetActiveTargetLocation();
 	const bool bInRange = (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
 	if (not bInRange)
 	{
@@ -1149,7 +1149,7 @@ void ACPPTurretsMaster::AutoEngage()
 	}
 
 	// 3) Cheap aim selection tick before using location (may rotate aim point).
-	M_TargetingData.TickAimSelection();
+	TargetingData.TickAimSelection();
 
 	// 4) Rotate and, if aligned, fire.
 	RotateTurretToActor(nullptr /*unused now*/);
@@ -1166,14 +1166,14 @@ void ACPPTurretsMaster::AutoEngage()
 void ACPPTurretsMaster::SpecificEngage()
 {
 	// Target invalid => switch to auto engage and notify owner if needed.
-	if (not M_TargetingData.GetIsTargetValid() || not TurretOwner)
+	if (not TargetingData.GetIsTargetValid() || not TurretOwner)
 	{
 		SpecificEngage_OnTargetInvalid();
 		return;
 	}
 
 	// Distance check
-	const FVector TgtLoc = M_TargetingData.GetActiveTargetLocation();
+	const FVector TgtLoc = TargetingData.GetActiveTargetLocation();
 	const FVector MyLoc = GetActorLocation();
 	const bool bInRange = (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
 
@@ -1241,7 +1241,7 @@ void ACPPTurretsMaster::ResetTarget()
 {
 	bM_IsRotatedToEngage = false;
 	bM_IsFullyRotatedToTarget = false;
-	M_TargetingData.ResetTarget();
+	TargetingData.ResetTarget();
 	SteeringState.M_LastTargetPosition = FVector::ZeroVector;
 	OnTurretIdle();
 }
@@ -1256,11 +1256,11 @@ void ACPPTurretsMaster::SetTarget(AActor* NewTarget)
 	OnTurretActive();
 
 	// Store on struct (loads offsets / sets active location).
-	M_TargetingData.SetTargetActor(NewTarget);
+	TargetingData.SetTargetActor(NewTarget);
 
 	// Compute initial desired yaw from current turret transform to active location.
 	const FTransform CurrentTransform = GetTurretTransform();
-	SteeringState.M_TargetRotator = GetTargetRotation(M_TargetingData.GetActiveTargetLocation(),
+	SteeringState.M_TargetRotator = GetTargetRotation(TargetingData.GetActiveTargetLocation(),
 	                                                  CurrentTransform.GetLocation());
 	bM_IsRotatedToEngage = false;
 	bM_IsFullyRotatedToTarget = false;
@@ -1289,7 +1289,7 @@ void ACPPTurretsMaster::SetTarget(AActor* NewTarget)
 void ACPPTurretsMaster::RotateTurretToActor(const AActor* const /*Target*/)
 {
 	// TRACE_CPUPROFILER_EVENT_SCOPE(RotateTurretToActiveTarget);
-	const FVector TargetLocation = M_TargetingData.GetActiveTargetLocation();
+	const FVector TargetLocation = TargetingData.GetActiveTargetLocation();
 
 	bIsTargetRotatorUpdated = true;
 	SteeringState.M_LastTargetPosition = TargetLocation;
@@ -1469,7 +1469,7 @@ void ACPPTurretsMaster::StopAllWeaponsFire(const bool InvalidateTarget)
 
 	if (InvalidateTarget)
 	{
-		M_TargetingData.ResetTarget();
+		TargetingData.ResetTarget();
 	}
 
 	for (const auto EachWeapon : M_TWeapons)
@@ -1499,7 +1499,7 @@ void ACPPTurretsMaster::FireAllWeapons()
 	{
 		if (EachWeapon)
 		{
-			EachWeapon->Fire(M_TargetingData.GetActiveTargetLocation());
+			EachWeapon->Fire(TargetingData.GetActiveTargetLocation());
 		}
 	}
 }

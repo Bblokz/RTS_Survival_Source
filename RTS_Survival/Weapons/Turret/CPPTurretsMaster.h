@@ -182,9 +182,9 @@ protected:
 	void BP_PostInit();
 
 	// For embedded turret for struct interface.
-	FVector& GetActiveTargetLocation() { return M_TargetingData.GetActiveTargetLocation(); }
+	FVector& GetActiveTargetLocation() { return TargetingData.GetActiveTargetLocation(); }
 	// For embedded turret for struct interface.
-	bool HasValidTarget() const { return M_TargetingData.GetIsTargetValid(); }
+	bool HasValidTarget() const { return TargetingData.GetIsTargetValid(); }
 
 	/** @return The owning player for this turret to setup the weapon collisions.*/
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "InitWeaponOwner")
@@ -378,6 +378,10 @@ protected:
 	
 	
 	void InitSelectionDelegatesOfOwner(AActor* OwnerOfTurret);
+	
+	/** Unified targeting core for this weapon owner. */
+	UPROPERTY()
+	FWeaponTargetingData TargetingData;
 
 private:
 	UPROPERTY()
@@ -389,9 +393,7 @@ private:
 	// Whether the weapon is set to auto or specific engage.
 	EWeaponAIState M_WeaponAIState;
 
-	/** Unified targeting core for this weapon owner. */
-	UPROPERTY()
-	FWeaponTargetingData M_TargetingData;
+
 
 	bool EnsureWorldIsValid();
 	void SetOwningPlayer(const int32 NewOwningPlayer);
