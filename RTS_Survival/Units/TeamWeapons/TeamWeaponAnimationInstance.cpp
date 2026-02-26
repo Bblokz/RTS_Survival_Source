@@ -82,7 +82,7 @@ bool UTeamWeaponAnimationInstance::GetIsWheelsLegsMontage(const ETeamWeaponMonta
 		ETeamWeaponMontage::MoveForwardMontage);
 	const bool bIsDeployPack = (NewMontage == ETeamWeaponMontage::PackMontage || NewMontage ==
 		ETeamWeaponMontage::DeployMontage);
-	if (not bIsMovement || bIsDeployPack)
+	if (not bIsMovement && not bIsDeployPack)
 	{
 		return false;
 	}
@@ -168,16 +168,18 @@ void UTeamWeaponAnimationInstance::SetBaseSequenceToDeployed()
 UAnimMontage* UTeamWeaponAnimationInstance::GetMontageAndPlayrate(const ETeamWeaponMontage MontageType,
                                                                   float& OutPlayrate)
 {
-	const float SafeDeployTime = FMath::Max(GetMontageBaseTime(DeployAndMvtMontages.DeployToPacked), 0.25f);
+	const float BaseMontageTime = GetMontageBaseTime(DeployAndMvtMontages.DeployToPacked);
+	const float SafeDeploymentTime = FMath::Max(M_DeploymentTime, 0.01f);
+	const float SafeBaseMontageTime = FMath::Max(BaseMontageTime, 0.01f);
 	switch (MontageType)
 	{
 	case ETeamWeaponMontage::NoMontage:
 		return nullptr;
 	case ETeamWeaponMontage::DeployMontage:
-		OutPlayrate = -1 * SafeDeployTime / GetMontageBaseTime(DeployAndMvtMontages.DeployToPacked);
+		OutPlayrate = -SafeBaseMontageTime / SafeDeploymentTime;
 		return DeployAndMvtMontages.DeployToPacked;
 	case ETeamWeaponMontage::PackMontage:
-		OutPlayrate = SafeDeployTime / GetMontageBaseTime(DeployAndMvtMontages.DeployToPacked);
+		OutPlayrate = SafeBaseMontageTime / SafeDeploymentTime;
 		return DeployAndMvtMontages.DeployToPacked;
 	case ETeamWeaponMontage::MoveForwardMontage:
 		OutPlayrate = TWAnimSettings.FwdWheelsMovePlayRate;

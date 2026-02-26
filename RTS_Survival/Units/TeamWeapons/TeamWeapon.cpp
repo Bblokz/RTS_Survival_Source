@@ -94,6 +94,55 @@ void ATeamWeapon::GetCrewPositions(TArray<UCrewPosition*>& OutCrewPositions) con
 	GetComponents<UCrewPosition>(OutCrewPositions);
 }
 
+
+void ATeamWeapon::PlayPackingMontage(const bool bWaitForMontage) const
+{
+	if (not GetIsValidAnimInstance())
+	{
+		return;
+	}
+
+	M_AnimInstance->PlayLegsWheelsSlotMontage(ETeamWeaponMontage::PackMontage, bWaitForMontage);
+}
+
+void ATeamWeapon::PlayDeployingMontage(const bool bWaitForMontage) const
+{
+	if (not GetIsValidAnimInstance())
+	{
+		return;
+	}
+
+	M_AnimInstance->PlayLegsWheelsSlotMontage(ETeamWeaponMontage::DeployMontage, bWaitForMontage);
+}
+
+void ATeamWeapon::SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons)
+{
+	if (bEnableWeapons)
+	{
+		if (M_TargetingData.GetIsTargetValid())
+		{
+			SetEngageSpecificTarget(M_TargetingData.GetTargetActor());
+			return;
+		}
+
+		SetAutoEngageTargets(true);
+		return;
+	}
+
+	DisableTurret();
+}
+
+void ATeamWeapon::SetSpecificEngageTarget(AActor* TargetActor)
+{
+	if (not IsValid(TargetActor))
+	{
+		SetAutoEngageTargets(false);
+		return;
+	}
+
+	SetEngageSpecificTarget(TargetActor);
+}
+
 float ATeamWeapon::GetCurrentTurretAngle_Implementation() const
 {
     if (GetIsValidAnimInstance())
@@ -124,8 +173,14 @@ void ATeamWeapon::UpdateTargetPitch_Implementation(float NewPitch)
 
 bool ATeamWeapon::TurnBase_Implementation(float Degrees)
 {
-	// todo this should result in the team weapon having to pack up-> rotate -> deploy to engage target.
-	return false;
+	if (not GetIsValidTeamWeaponController())
+	{
+		return false;
+	}
+
+	const float DesiredYaw = GetActorRotation().Yaw + Degrees;
+	const FRotator DesiredRotation = FRotator(0.0f, DesiredYaw, 0.0f);
+	return M_TeamWeaponController->RequestInternalRotateTowards(DesiredRotation);
 }
 
 void ATeamWeapon::PlaySingleFireAnimation_Implementation(int32 WeaponIndex)
@@ -222,6 +277,18 @@ bool ATeamWeapon::GetIsValidTeamWeaponMesh() const
 		return false;
 	}
 	return true;
+}
+
+bool ATeamWeapon::GetIsValidTeamWeaponController() const
+{
+	if (M_TeamWeaponController.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TeamWeaponController",
+	                                                      "ATeamWeapon::GetIsValidTeamWeaponController", this);
+	return false;
 }
 
 void ATeamWeapon::BeginPlay_InitAnimInstance()

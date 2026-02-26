@@ -157,6 +157,7 @@ public:
 
 	virtual TArray<UWeaponState*> GetWeapons() override final;
 	int32 GetOwningPlayer();
+	float GetMaxWeaponRange() const { return FMath::Sqrt(M_WeaponRangeData.M_MaxWeaponRangeSquared); }
 
 	// Looks if the provided weapon is part of this turret, if so it upgrades the range on the weapon and
 	// adjusts the search range of this turret accordingly.
