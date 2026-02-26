@@ -1004,7 +1004,8 @@ void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 	const float DeltaYaw = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, M_RotationRequest.M_TargetRotation.Yaw);
 	if (FMath::Abs(DeltaYaw) <= RotationCompletionMarginDegrees)
 	{
-		SetActorRotation(FRotator(0.0f, M_RotationRequest.M_TargetRotation.Yaw, 0.0f));
+		const float RotationToTargetYaw = DeltaYaw;
+		RotateControllerAndTeamWeapon(RotationToTargetYaw);
 		FinishRotationRequest();
 		return;
 	}
@@ -1016,8 +1017,16 @@ void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 		StepYaw = DeltaYaw;
 	}
 
-	AddActorWorldRotation(FRotator(0.0f, StepYaw, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	RotateControllerAndTeamWeapon(StepYaw);
 	MoveGuardsToTeamWeapon();
+}
+
+void ATeamWeaponController::RotateControllerAndTeamWeapon(const float StepYaw) const
+{
+	const FRotator RotationStep(0.0f, StepYaw, 0.0f);
+	const bool bSweep = false;
+	AddActorWorldRotation(RotationStep, bSweep, nullptr, ETeleportType::TeleportPhysics);
+	M_TeamWeapon->AddActorWorldRotation(RotationStep, bSweep, nullptr, ETeleportType::TeleportPhysics);
 }
 
 void ATeamWeaponController::FinishRotationRequest()
