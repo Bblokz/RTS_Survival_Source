@@ -1318,6 +1318,12 @@ void ATeamWeaponController::DetachCrewAfterRotation()
 
 void ATeamWeaponController::MoveGuardsToTeamWeapon()
 {
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	const FVector GuardLocation = M_TeamWeapon->GetActorLocation();
 	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
 	{
 		ASquadUnit* SquadUnit = GuardUnit.Get();
@@ -1326,7 +1332,6 @@ void ATeamWeaponController::MoveGuardsToTeamWeapon()
 			continue;
 		}
 
-		const FVector GuardLocation = GetActorLocation();
 		SquadUnit->SetActorLocation(GuardLocation);
 	}
 }

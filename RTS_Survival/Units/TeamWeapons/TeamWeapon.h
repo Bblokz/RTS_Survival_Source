@@ -238,4 +238,7 @@ private:
 
 	UPROPERTY()
 	bool bM_IsMoverMoving = false;
+
+	UPROPERTY()
+	bool bM_LastForwardMovement = true;
 };
