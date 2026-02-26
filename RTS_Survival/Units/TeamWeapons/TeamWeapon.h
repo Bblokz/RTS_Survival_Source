@@ -173,6 +173,7 @@ public:
 	virtual bool GetUsesWheelMovementMontage() const;
 	void SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons);
 	void SetSpecificEngageTarget(AActor* TargetActor);
+	AActor* GetSpecificEngageTarget() const { return M_SpecificEngageTarget.Get(); }
 
 	// Embedded turret interface ---------------------------
 	virtual float GetCurrentTurretAngle_Implementation() const override;
@@ -246,4 +247,8 @@ private:
 
 	UPROPERTY()
 	bool bM_LastForwardMovement = true;
+
+	// Cached target used to re-enter specific engage after packing/moving temporarily disables turret logic.
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_SpecificEngageTarget;
 };

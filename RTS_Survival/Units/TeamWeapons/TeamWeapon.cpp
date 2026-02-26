@@ -169,26 +169,28 @@ bool ATeamWeapon::GetUsesWheelMovementMontage() const
 
 void ATeamWeapon::SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons)
 {
-	if (bEnableWeapons)
+	if (not bEnableWeapons)
 	{
-		if (TargetingData.GetIsTargetValid())
-		{
-			SetEngageSpecificTarget(TargetingData.GetTargetActor());
-			return;
-		}
-
-		SetAutoEngageTargets(true);
+		DisableTurret();
 		return;
 	}
 
-	DisableTurret();
+	if (AActor* SpecificEngageTarget = M_SpecificEngageTarget.Get())
+	{
+		SetEngageSpecificTarget(SpecificEngageTarget);
+		return;
+	}
+
+	SetAutoEngageTargets(true);
 }
 
 void ATeamWeapon::SetSpecificEngageTarget(AActor* TargetActor)
 {
+	M_SpecificEngageTarget = TargetActor;
+
 	if (not IsValid(TargetActor))
 	{
-		SetAutoEngageTargets(false);
+		SetAutoEngageTargets(true);
 		return;
 	}
 

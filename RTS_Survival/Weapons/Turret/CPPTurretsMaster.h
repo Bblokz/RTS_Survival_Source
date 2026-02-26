@@ -173,6 +173,7 @@ public:
 
 	float GetTurretRotationSpeed() const { return RotationSpeed; }
 	void SetTurretRotationSpeed(const float NewRotationSpeed) { RotationSpeed = NewRotationSpeed; }
+	AActor* GetCurrentTargetActor() const { return TargetingData.GetTargetActor(); }
 
 protected:
 	virtual void BeginPlay() override;
