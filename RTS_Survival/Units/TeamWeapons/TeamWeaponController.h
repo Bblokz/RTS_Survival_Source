@@ -178,6 +178,8 @@ private:
 	void HandleMoverArrived();
 	void HandleMoverFailed(const FString& FailureReason);
 	void SetTeamWeaponState(const ETeamWeaponState NewState);
+	void TryAbandonTeamWeaponForInsufficientCrew();
+	void AbandonTeamWeapon();
 	bool GetIsValidTeamWeapon() const;
 	bool GetIsValidTeamWeaponMover() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
@@ -225,6 +227,8 @@ private:
 	FVector GetMoveLocationWithinTurretRange(const FVector& TargetLocation, const ACPPTurretsMaster* CallingTurret) const;
 	void TryIssuePostDeployPackAction();
 	void IssuePostDeployPackAction();
+	void IssuePostDeployPackAction_Move();
+	void IssuePostDeployPackAction_Rotate();
 	void UpdateCrewMoveOffsets();
 	bool TryGetCrewMemberOffset(const ASquadUnit* SquadUnit, FVector& OutOffset) const;
 	bool GetIsCrewOperator(const ASquadUnit* SquadUnit) const;
@@ -291,4 +295,7 @@ private:
 	// Prevents repeatedly issuing identical move orders while staying in the same deploy cycle.
 	UPROPERTY()
 	bool bM_HasIssuedCrewPositionMovesForCurrentDeploy = false;
+
+	UPROPERTY()
+	bool bM_IsTeamWeaponAbandoned = false;
 };

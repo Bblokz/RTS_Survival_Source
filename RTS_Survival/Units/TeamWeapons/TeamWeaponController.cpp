@@ -56,6 +56,12 @@ void ATeamWeaponController::Tick(float DeltaSeconds)
 
 void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 {
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		Super::ExecuteMoveCommand(MoveToLocation);
+		return;
+	}
+
 	if (not GetIsValidTeamWeapon() || not GetIsValidTeamWeaponMover())
 	{
 		Super::ExecuteMoveCommand(MoveToLocation);
@@ -142,6 +148,15 @@ void ATeamWeaponController::ExecutePatrolCommand(const FVector PatrolToLocation)
 
 void ATeamWeaponController::ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand)
 {
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		if (IsQueueCommand)
+		{
+			DoneExecutingCommand(EAbilityID::IdRotateTowards);
+		}
+		return;
+	}
+
 	if (not GetIsValidTeamWeapon())
 	{
 		if (IsQueueCommand)
@@ -331,6 +346,11 @@ void ATeamWeaponController::SpawnTeamWeapon()
 void ATeamWeaponController::AssignCrewToTeamWeapon()
 {
 	M_CrewAssignment.Reset();
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
@@ -369,6 +389,12 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 	if (GetIsValidTeamWeaponMover())
 	{
 		M_TeamWeaponMover->NotifyCrewReady(M_CrewAssignment.GetHasEnoughOperators());
+	}
+
+	TryAbandonTeamWeaponForInsufficientCrew();
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return;
 	}
 
 	TryIssuePostDeployPackAction();
@@ -530,7 +556,13 @@ void ATeamWeaponController::SetPostDeployPackActionForRotate(const FRotator& Des
 
 void ATeamWeaponController::TryIssuePostDeployPackAction()
 {
-	if (not M_PostDeployPackAction.GetHasAction() && not M_PostDeployPackAction.GetHasRotation())
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		M_PostDeployPackAction.Reset();
+		return;
+	}
+
+	if (not M_PostDeployPackAction.GetHasAction())
 	{
 		return;
 	}
@@ -559,40 +591,50 @@ void ATeamWeaponController::IssuePostDeployPackAction()
 	switch (M_PostDeployPackAction.GetAbilityId())
 	{
 	case EAbilityID::IdMove:
-		if (not M_PostDeployPackAction.GetHasLocation())
-		{
-			M_PostDeployPackAction.Reset();
-			break;
-		}
-
-		if (not M_CrewAssignment.GetHasEnoughOperators())
-		{
-			M_TeamWeaponMover->MoveWeaponToLocation(M_PostDeployPackAction.GetTargetLocation());
-			M_PostDeployPackAction.Reset();
-			break;
-		}
-
-		StartMoveWithCrew(M_PostDeployPackAction.GetTargetLocation());
+		IssuePostDeployPackAction_Move();
 		break;
 
 	case EAbilityID::IdRotateTowards:
-		if (not M_PostDeployPackAction.GetHasRotation())
-		{
-			M_PostDeployPackAction.Reset();
-			break;
-		}
-
-		StartRotationRequest(
-			M_PostDeployPackAction.GetTargetRotation(),
-			M_PostDeployPackAction.GetShouldTriggerDoneExecuting(),
-			EAbilityID::IdRotateTowards);
-		M_PostDeployPackAction.Reset();
+		IssuePostDeployPackAction_Rotate();
 		break;
 
 	default:
 		M_PostDeployPackAction.Reset();
 		break;
 	}
+}
+
+void ATeamWeaponController::IssuePostDeployPackAction_Move()
+{
+	if (not M_PostDeployPackAction.GetHasLocation())
+	{
+		M_PostDeployPackAction.Reset();
+		return;
+	}
+
+	if (not M_CrewAssignment.GetHasEnoughOperators())
+	{
+		TryAbandonTeamWeaponForInsufficientCrew();
+		M_PostDeployPackAction.Reset();
+		return;
+	}
+
+	StartMoveWithCrew(M_PostDeployPackAction.GetTargetLocation());
+}
+
+void ATeamWeaponController::IssuePostDeployPackAction_Rotate()
+{
+	if (not M_PostDeployPackAction.GetHasRotation())
+	{
+		M_PostDeployPackAction.Reset();
+		return;
+	}
+
+	StartRotationRequest(
+		M_PostDeployPackAction.GetTargetRotation(),
+		M_PostDeployPackAction.GetShouldTriggerDoneExecuting(),
+		EAbilityID::IdRotateTowards);
+	M_PostDeployPackAction.Reset();
 }
 
 void ATeamWeaponController::UpdateCrewMoveOffsets()
@@ -883,6 +925,11 @@ void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
 
 bool ATeamWeaponController::GetIsValidTeamWeapon() const
 {
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return false;
+	}
+
 	if (IsValid(M_TeamWeapon))
 	{
 		return true;
@@ -895,6 +942,11 @@ bool ATeamWeaponController::GetIsValidTeamWeapon() const
 
 bool ATeamWeaponController::GetIsValidTeamWeaponMover() const
 {
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return false;
+	}
+
 	if (M_TeamWeaponMover.IsValid())
 	{
 		return true;
@@ -929,6 +981,11 @@ int ATeamWeaponController::GetOwningPlayer()
 
 void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret)
 {
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
@@ -945,6 +1002,11 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 
 void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
@@ -1100,6 +1162,11 @@ void ATeamWeaponController::MoveGuardsToTeamWeapon()
 FVector ATeamWeaponController::GetMoveLocationWithinTurretRange(const FVector& TargetLocation,
                                                                 const ACPPTurretsMaster* CallingTurret) const
 {
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return TargetLocation;
+	}
+
 	if (not IsValid(CallingTurret))
 	{
 		return TargetLocation;
@@ -1126,4 +1193,57 @@ FVector ATeamWeaponController::GetMoveLocationWithinTurretRange(const FVector& T
 FRotator ATeamWeaponController::GetOwnerRotation() const
 {
 	return GetActorRotation();
+}
+
+void ATeamWeaponController::TryAbandonTeamWeaponForInsufficientCrew()
+{
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
+	if (M_CrewAssignment.GetHasEnoughOperators())
+	{
+		return;
+	}
+
+	AbandonTeamWeapon();
+}
+
+void ATeamWeaponController::AbandonTeamWeapon()
+{
+	SetTeamWeaponState(ETeamWeaponState::Abandoned);
+	M_PostDeployPackAction.Reset();
+	FinishRotationRequest();
+
+	if (GetIsValidTeamWeaponMover())
+	{
+		M_TeamWeaponMover->AbortMove(TEXT("Team weapon abandoned due to insufficient operators"));
+	}
+
+	for (const TWeakObjectPtr<ASquadUnit>& CrewOperator : M_CrewAssignment.M_Operators)
+	{
+		ASquadUnit* SquadUnit = CrewOperator.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
+		if (not IsValid(InfantryWeapon))
+		{
+			continue;
+		}
+
+		InfantryWeapon->DisableWeaponSearch(true, false);
+	}
+
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->Destroy();
+	}
+
+	M_TeamWeapon = nullptr;
+	M_TeamWeaponMover = nullptr;
+	bM_IsTeamWeaponAbandoned = true;
 }
