@@ -3,6 +3,7 @@
 #include "TeamWeaponMover.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -15,6 +16,11 @@ UTeamWeaponMover::UTeamWeaponMover()
 void UTeamWeaponMover::BeginPlay()
 {
 	Super::BeginPlay();
+	M_OwnerTeamWeapon = Cast<ATeamWeapon>(GetOwner());
+	if (GetIsValidOwnerTeamWeapon())
+	{
+		M_LastOwnerLocation = M_OwnerTeamWeapon->GetActorLocation();
+	}
 
 	SetComponentTickEnabled(false);
 }
@@ -30,6 +36,7 @@ void UTeamWeaponMover::TickComponent(float DeltaTime, ELevelTick TickType,
 	}
 
 	UpdateOwnerLocationFromCrew();
+	UpdateMovementAnimationState();
 
 	if (not HaveCrewReachedDestination())
 	{
@@ -37,6 +44,10 @@ void UTeamWeaponMover::TickComponent(float DeltaTime, ELevelTick TickType,
 	}
 
 	SetComponentTickEnabled(false);
+	if (GetIsValidOwnerTeamWeapon())
+	{
+		M_OwnerTeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
+	}
 	bM_HasMoveRequest = false;
 	SetMoverState(ETeamWeaponMoverState::Idle);
 	OnMoverArrived.Broadcast();
@@ -100,11 +111,16 @@ void UTeamWeaponMover::BeginFollowingCrew()
 	SetComponentTickEnabled(true);
 	SetMoverState(ETeamWeaponMoverState::Moving);
 	UpdateOwnerLocationFromCrew();
+	UpdateMovementAnimationState();
 }
 
 void UTeamWeaponMover::AbortMove(const FString& Reason)
 {
 	SetComponentTickEnabled(false);
+	if (GetIsValidOwnerTeamWeapon())
+	{
+		M_OwnerTeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
+	}
 	bM_HasMoveRequest = false;
 	SetMoverState(ETeamWeaponMoverState::Idle);
 	OnMoverFailed.Broadcast(Reason);
@@ -139,6 +155,20 @@ bool UTeamWeaponMover::GetIsOwnerValid() const
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("Owner"), TEXT("UTeamWeaponMover::GetIsOwnerValid"),
 		                                                     GetOwner());
+	return false;
+}
+
+bool UTeamWeaponMover::GetIsValidOwnerTeamWeapon() const
+{
+	if (M_OwnerTeamWeapon.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this,
+	                                                      TEXT("M_OwnerTeamWeapon"),
+	                                                      TEXT("UTeamWeaponMover::GetIsValidOwnerTeamWeapon"),
+	                                                      GetOwner());
 	return false;
 }
 
@@ -226,4 +256,20 @@ void UTeamWeaponMover::UpdateOwnerLocationFromCrew()
 
 	AActor* OwnerActor = GetOwner();
 	OwnerActor->SetActorLocation(CrewCenter);
+}
+
+void UTeamWeaponMover::UpdateMovementAnimationState()
+{
+	if (not GetIsValidOwnerTeamWeapon())
+	{
+		return;
+	}
+
+	const FVector CurrentOwnerLocation = M_OwnerTeamWeapon->GetActorLocation();
+	const FVector FrameVelocity = CurrentOwnerLocation - M_LastOwnerLocation;
+	M_LastOwnerLocation = CurrentOwnerLocation;
+
+	constexpr float MovementSpeedThresholdCmPerFrame = 2.0f;
+	const bool bCurrentlyMoving = FrameVelocity.SizeSquared() > FMath::Square(MovementSpeedThresholdCmPerFrame);
+	M_OwnerTeamWeapon->NotifyMoverMovementState(bCurrentlyMoving, FrameVelocity);
 }

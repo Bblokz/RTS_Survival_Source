@@ -7,6 +7,7 @@
 #include "TeamWeaponMover.generated.h"
 
 class ASquadUnit;
+class ATeamWeapon;
 
 UENUM(BlueprintType)
 enum class ETeamWeaponMoverState : uint8
@@ -67,10 +68,12 @@ protected:
 private:
 	void SetMoverState(const ETeamWeaponMoverState NewState);
 	bool GetIsOwnerValid() const;
+	bool GetIsValidOwnerTeamWeapon() const;
 	bool GetIsCrewDataValid() const;
 	bool TryGetCrewCenterLocation(FVector& OutCenter) const;
 	bool HaveCrewReachedDestination() const;
 	void UpdateOwnerLocationFromCrew();
+	void UpdateMovementAnimationState();
 
 	UPROPERTY(EditDefaultsOnly, Category="TeamWeapon|Mover")
 	int32 M_CrewMembersRequiredToMove = 2;
@@ -89,4 +92,10 @@ private:
 
 	UPROPERTY()
 	ETeamWeaponMoverState M_MoverState = ETeamWeaponMoverState::Idle;
+
+	UPROPERTY()
+	TWeakObjectPtr<ATeamWeapon> M_OwnerTeamWeapon;
+
+	UPROPERTY()
+	FVector M_LastOwnerLocation = FVector::ZeroVector;
 };

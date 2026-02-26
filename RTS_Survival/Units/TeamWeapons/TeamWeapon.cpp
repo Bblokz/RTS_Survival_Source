@@ -115,6 +115,48 @@ void ATeamWeapon::PlayDeployingMontage(const bool bWaitForMontage) const
 	M_AnimInstance->PlayLegsWheelsSlotMontage(ETeamWeaponMontage::DeployMontage, bWaitForMontage);
 }
 
+void ATeamWeapon::NotifyMoverMovementState(const bool bIsMoving, const FVector& WorldVelocity)
+{
+	if (bM_IsMoverMoving == bIsMoving)
+	{
+		return;
+	}
+
+	bM_IsMoverMoving = bIsMoving;
+
+	if (not GetUsesWheelMovementMontage())
+	{
+		return;
+	}
+
+	if (not GetIsValidAnimInstance())
+	{
+		return;
+	}
+
+	if (not bIsMoving)
+	{
+		M_AnimInstance->StopMoveLoop();
+		return;
+	}
+
+	if (WorldVelocity.IsNearlyZero())
+	{
+		M_AnimInstance->StopMoveLoop();
+		return;
+	}
+
+	const FVector CurrentActorForwardVector = GetActorForwardVector();
+	const float ForwardDirectionDot = FVector::DotProduct(CurrentActorForwardVector, WorldVelocity.GetSafeNormal());
+	const bool bForwardMovement = ForwardDirectionDot >= 0.0f;
+	M_AnimInstance->StartMoveLoop(bForwardMovement);
+}
+
+bool ATeamWeapon::GetUsesWheelMovementMontage() const
+{
+	return false;
+}
+
 void ATeamWeapon::SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons)
 {
 	if (bEnableWeapons)

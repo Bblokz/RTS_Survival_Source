@@ -70,6 +70,8 @@ public:
 	                               bool bWaitForMontage = true);
 	void PlayFireAnimation();
 	void PlayBurstFireAnimation();
+	void StartMoveLoop(const bool bForward);
+	void StopMoveLoop();
 
 protected:
 	/**
@@ -104,7 +106,19 @@ private:
 	void SetBaseSequenceToDeployed();
 	UAnimMontage* GetMontageAndPlayrate(const ETeamWeaponMontage MontageType, float& OutPlayrate);
 	float GetMontageBaseTime(const UAnimMontage* Montage);
+	void OnMoveLoopMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	// Set at init; defines how long packing and deploying take.
 	float M_DeploymentTime;
+
+	UPROPERTY()
+	bool bM_IsMoveLoopActive = false;
+
+	UPROPERTY()
+	bool bM_MoveLoopForward = true;
+
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> M_MoveLoopMontage = nullptr;
+
+	FOnMontageEnded M_MoveLoopMontageEndedDelegate;
 };
