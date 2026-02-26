@@ -195,7 +195,7 @@ private:
 	TWeakObjectPtr<USkeletalMeshComponent> M_TeamWeaponMesh;
 	[[nodiscard]] bool GetIsValidTeamWeaponMesh() const;
 
-	void BeginPlay_InitAnimInstance() const;
+	void BeginPlay_InitAnimInstance();
 
 	UPROPERTY()
 	TWeakObjectPtr<UTeamWeaponAnimationInstance> M_AnimInstance = nullptr;

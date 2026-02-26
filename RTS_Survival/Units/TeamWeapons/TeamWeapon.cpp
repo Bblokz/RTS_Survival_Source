@@ -119,7 +119,7 @@ void ATeamWeapon::UpdateTargetPitch_Implementation(float NewPitch)
 	{
 		return;
 	}
-	M_AnimInstance->SetYaw(NewPitch);
+	M_AnimInstance->SetPitch(NewPitch);
 }
 
 bool ATeamWeapon::TurnBase_Implementation(float Degrees)
@@ -224,13 +224,14 @@ bool ATeamWeapon::GetIsValidTeamWeaponMesh() const
 	return true;
 }
 
-void ATeamWeapon::BeginPlay_InitAnimInstance() const
+void ATeamWeapon::BeginPlay_InitAnimInstance()
 {
 	if (not GetIsValidTeamWeaponMesh())
 	{
 		return;
 	}
 	UTeamWeaponAnimationInstance* AnimInst = Cast<UTeamWeaponAnimationInstance>(M_TeamWeaponMesh->GetAnimInstance());
+	M_AnimInstance = AnimInst;
 	(void)GetIsValidAnimInstance();
 }
 

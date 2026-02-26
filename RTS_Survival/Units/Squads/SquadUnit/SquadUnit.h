@@ -208,6 +208,15 @@ public:
 	// Called when we enter or exit cargo.
 	void OnUnitEnteredLeftCargo(UCargo* CargoComponentEntered, const bool bEnteredCargo) const;
 	void PlaySpatialVoiceLine(const ERTSVoiceLine VoiceLineType, const bool bIgnorePlayerCooldown) const;
+	
+	/**
+	 * @brief Moves the unit to the provided location using pathfinding on its own controller.
+	 * @param MoveToLocation The target location to move to.
+	 * @param AbilityToMoveFor
+	 * @post The active ability ID is set to IdMoveTo.
+	 */
+	void ExecuteMoveToSelfPathFinding(const FVector& MoveToLocation, const EAbilityID AbilityToMoveFor,
+	                                  bool bUsePathfinding = true);
 
 
 	int32 GetOwningPlayer() const;
@@ -338,14 +347,6 @@ protected:
 	/** Moves the unit along the provided path. */
 	void ExecuteMoveAlongPath(const FNavPathSharedPtr& Path, const EAbilityID AbilityToMoveFor);
 
-	/**
-	 * @brief Moves the unit to the provided location using pathfinding on its own controller.
-	 * @param MoveToLocation The target location to move to.
-	 * @param AbilityToMoveFor
-	 * @post The active ability ID is set to IdMoveTo.
-	 */
-	void ExecuteMoveToSelfPathFinding(const FVector& MoveToLocation, const EAbilityID AbilityToMoveFor,
-	                                  bool bUsePathfinding = true);
 
 	/**
 	 * @brief Stops the current movement command and sets the active ability ID to Idle.

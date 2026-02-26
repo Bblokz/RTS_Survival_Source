@@ -5,13 +5,53 @@ as you can see i have setup a system where we allow for playing two types of mon
 either on the gun slot or on the legs and wheels slot.
 the anim inst is set up with the deployment time to calculate how long montages need to last for packing and deploying.  
 
+make sure the team weapon controller will force to correct montage on the anim inst for packing and unpacking; using PlayLegsWheelsSlotMontage
+for the movement do not do anything for the movement montages yet.
+
 the rotation implementation is still missing the ExecuteRotateTowardsCommand and the terminate version of the icommands interace need to be implemented;
 if the team weapon is deploying at the time of the rotation command then instantly set it back to packed.
-then rotate it using the  M_TurnSpeedYaw also update the positions of the guards accoordingly
+then rotate it using the  M_TurnSpeedYaw also update the positions of the guards accoordingly maybe the crew can be attached
+and deattached in some way during a rotation so we do not need to reissue a movement command every tick of the rotation?
+if the team weapon was already deployed then first pack it and execute the rotation once packed up.
+if the team weapon was already packed then just execute the rotation command by starting the rotation.
+
+for the rotation make use of a margin of 1 degree to determine if the weapon faces the direction needed.
+
+after the team weapon faces the desired rotation then call done executing command for this rotation ability ID.
+
+also implement on unit idle and no new command on the team weapon controller; (function from icommands called
+specifically when no commands are left in the queue) in that case order the team weapon to deploy
+if not already; so that after any sequence of commands the team weapon will always end up in a deployed state and ready to fire.
 
 because the team weapon is an assault turret (special turret; part of embedded turret) this means that if the
 target is out of yaw reach the embedded turret will ask through the interface to rotate base; this means we also need a
 setup for rotating that will not trigger a done exe command of a rotation command but an internal rotation.
+also for these rotations make sure the crew will updated their positions; we wait for packing if needed and
+rotate the exact same way except we do not trigger the done executing command!
+
+also implement the attack actor command for the team weapon controller; issue the attack to the squad units that are not guards as 
+in the base squad controller. for the team weapon set it to specific engage the actor pointer.
+The team weapon controller is the turret owner; so this means it will get the updates of 	virtual void OnTurretOutOfRange(
+                                                                                         		const FVector TargetLocation,
+                                                                                         		ACPPTurretsMaster* CallingTurret) = 0;
+                                                                                         			/**
+                                                                                                	 * @brief Notifies the owner that the current target is in range of the turret.
+                                                                                                	 * @param CallingTurret The turret that is in range.
+                                                                                                	 */
+                                                                                                	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) = 0;
+in the out of range function we want to move the team weapon to  a position (and crew and the guards) that is within range for the turret
+with 10% margin so it does not immediatly need to remanouvre again.
+ if attack is issued
+
+when in range is called make sure the weapon deploys if not already done so.
+
+regarding the responsibility for montages; those need to be called on the team weapon actor. 
+
+                                                                                         		
+Important note on when the weapon of the turret that is the team weapon actor are allowed to fire:
+make sure weapons are always disabled during:
+packing, deploying or packed state.
+and only enabled when the team weapon is fully deployed.
 
 DO NOT MAKE ANY MISTAKES; double check your implementation for things that are still missing.
 Always follow the project's coding standards.
