@@ -123,31 +123,28 @@ void ATeamWeapon::PlayDeployingMontage(const bool bWaitForMontage) const
 
 void ATeamWeapon::NotifyMoverMovementState(const bool bIsMoving, const FVector& WorldVelocity)
 {
-	if (bM_IsMoverMoving == bIsMoving)
-	{
-		return;
-	}
-
-	bM_IsMoverMoving = bIsMoving;
-
 	if (not GetUsesWheelMovementMontage())
 	{
+		bM_IsMoverMoving = bIsMoving;
 		return;
 	}
 
 	if (not GetIsValidAnimInstance())
 	{
+		bM_IsMoverMoving = bIsMoving;
 		return;
 	}
 
 	if (not bIsMoving)
 	{
+		bM_IsMoverMoving = false;
 		M_AnimInstance->StopMoveLoop();
 		return;
 	}
 
 	if (WorldVelocity.IsNearlyZero())
 	{
+		bM_IsMoverMoving = false;
 		M_AnimInstance->StopMoveLoop();
 		return;
 	}
@@ -155,6 +152,13 @@ void ATeamWeapon::NotifyMoverMovementState(const bool bIsMoving, const FVector& 
 	const FVector CurrentActorForwardVector = GetActorForwardVector();
 	const float ForwardDirectionDot = FVector::DotProduct(CurrentActorForwardVector, WorldVelocity.GetSafeNormal());
 	const bool bForwardMovement = ForwardDirectionDot >= 0.0f;
+	if (bM_IsMoverMoving == bIsMoving && bForwardMovement == bM_LastForwardMovement)
+	{
+		return;
+	}
+
+	bM_IsMoverMoving = bIsMoving;
+	bM_LastForwardMovement = bForwardMovement;
 	M_AnimInstance->StartMoveLoop(bForwardMovement);
 }
 
