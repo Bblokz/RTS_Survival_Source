@@ -138,6 +138,8 @@ public:
 	ATeamWeaponController();
 	bool RequestInternalRotateTowards(const FRotator& DesiredRotation);
 
+	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

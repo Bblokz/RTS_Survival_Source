@@ -258,6 +258,24 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 	return true;
 }
 
+TArray<UWeaponState*> ATeamWeaponController::GetWeaponsOfSquad()
+{
+	
+	TArray<UWeaponState*> Weapons;
+	if(GetIsValidTeamWeapon())
+	{
+		Weapons = M_TeamWeapon->GetWeapons();
+	}
+	for (const auto EachSquadUnit : GetSquadUnitsChecked())
+	{
+		if (auto EachWeaponState = EachSquadUnit->GetWeaponState())
+		{
+			Weapons.Add(EachWeaponState);
+		}
+	}
+	return Weapons;
+}
+
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {

@@ -245,7 +245,7 @@ public:
 	virtual void UnstuckSquadMoveUp(const float ZOffset) override;
 
 
-	TArray<UWeaponState*> GetWeaponsOfSquad();
+	virtual TArray<UWeaponState*> GetWeaponsOfSquad();
 
 	virtual bool GetIsUnitInCombat() const override;
 
