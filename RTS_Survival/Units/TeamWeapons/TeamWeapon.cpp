@@ -22,6 +22,7 @@ void ATeamWeapon::BeginPlay()
 	// Always first!
 	BeginPlay_InitAnimInstance();
 	BeginPlay_ApplyTeamWeaponConfig(M_TeamWeaponConfig);
+	BeginPlay_ForceStartPackedState();
 }
 
 void ATeamWeapon::PostInitializeComponents()
@@ -73,6 +74,11 @@ void ATeamWeapon::BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewCo
 void ATeamWeapon::SetTeamWeaponController(ATeamWeaponController* NewController)
 {
 	M_TeamWeaponController = NewController;
+}
+
+void ATeamWeapon::BeginPlay_ForceStartPackedState()
+{
+	PlayPackingMontage(false);
 }
 
 void ATeamWeapon::SetTurretOwnerActor(AActor* NewOwner)
