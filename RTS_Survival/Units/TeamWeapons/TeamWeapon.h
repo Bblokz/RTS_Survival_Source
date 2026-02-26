@@ -20,6 +20,13 @@ class UTeamWeaponMover;
 class ATeamWeaponController;
 class UCrewPosition;
 
+UENUM(BlueprintType)
+enum class ETeamWeaponMovementType : uint8
+{
+	CrewFollowsWeapon,
+	PushedWeaponLeads
+};
+
 USTRUCT(BlueprintType)
 struct FTeamWeaponYawArcSettings
 {
@@ -94,6 +101,21 @@ struct FTeamWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	float M_TurnSpeedYaw = 20.f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Movement")
+	ETeamWeaponMovementType M_MovementType = ETeamWeaponMovementType::CrewFollowsWeapon;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Movement", meta = (ClampMin = "0.0"))
+	float M_PushedMoveSpeedCmPerSec = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Movement", meta = (ClampMin = "0.0"))
+	float M_PathAcceptanceRadiusCm = 60.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Movement", meta = (ClampMin = "0.0"))
+	float M_GroundTraceStartHeightCm = 120.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon|Movement", meta = (ClampMin = "0.0"))
+	float M_GroundTraceLengthCm = 400.f;
+
 	// Used for rotating the weapon within the limits of the turret yaw settings as implemented in the embedded turret base.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	float WeaponYawRotationSpeed = 10.f;
@@ -129,6 +151,11 @@ public:
 	int32 GetRequiredOperators() const { return M_TeamWeaponConfig.M_OperatorCount; }
 	float GetDeploymentTime() const { return M_TeamWeaponConfig.M_DeploymentTime; }
 	float GetTurnSpeedYaw() const { return M_TeamWeaponConfig.M_TurnSpeedYaw; }
+	ETeamWeaponMovementType GetMovementType() const { return M_TeamWeaponConfig.M_MovementType; }
+	float GetPushedMoveSpeedCmPerSec() const { return M_TeamWeaponConfig.M_PushedMoveSpeedCmPerSec; }
+	float GetPathAcceptanceRadiusCm() const { return M_TeamWeaponConfig.M_PathAcceptanceRadiusCm; }
+	float GetGroundTraceStartHeightCm() const { return M_TeamWeaponConfig.M_GroundTraceStartHeightCm; }
+	float GetGroundTraceLengthCm() const { return M_TeamWeaponConfig.M_GroundTraceLengthCm; }
 
 	void SetTeamWeaponController(ATeamWeaponController* NewController);
 	UTeamWeaponMover* GetTeamWeaponMover() const { return M_TeamWeaponMover; }

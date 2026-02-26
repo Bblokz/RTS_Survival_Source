@@ -640,6 +640,7 @@ protected:
 
 	/** Generates paths for each squad unit based on the move location. */
 	virtual ESquadPathFindingError GeneratePathsForSquadUnits(const FVector& MoveToLocation);
+	ESquadPathFindingError GenerateBaseSquadPath(const FVector& MoveToLocation, FNavPathSharedPtr& OutSquadPath);
 
 
 	/**

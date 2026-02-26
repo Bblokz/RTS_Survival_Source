@@ -143,6 +143,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnAllSquadUnitsLoaded() override;
 	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
+	virtual void TerminateMoveCommand() override;
 	virtual void ExecutePatrolCommand(const FVector PatrolToLocation) override;
 	virtual void ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand) override;
 	virtual void TerminateRotateTowardsCommand() override;
@@ -176,8 +177,8 @@ protected:
 private:
 	void SpawnTeamWeapon();
 	void AssignCrewToTeamWeapon();
-	void HandleMoverArrived();
-	void HandleMoverFailed(const FString& FailureReason);
+	void HandlePushedMoverArrived();
+	void HandlePushedMoverFailed(const FString& FailureReason);
 	void SetTeamWeaponState(const ETeamWeaponState NewState);
 	void TryAbandonTeamWeaponForInsufficientCrew();
 	void AbandonTeamWeapon();
@@ -198,6 +199,10 @@ private:
 	 * @param MoveToLocation Destination for the squad and team weapon.
 	 */
 	void StartMoveWithCrew(const FVector MoveToLocation);
+	void StartMoveWithPushedWeapon(const FVector MoveToLocation);
+	void ExecuteSquadMoveAlongAssignedPaths(const EAbilityID AbilityId) const;
+	void ApplyPushedMoveSpeedOverrideToSquad();
+	void RestorePushedMoveSpeedOverride();
 
 	/**
 	 * @brief Starts the deployment timer so the weapon returns to a firing-ready state.
@@ -263,6 +268,9 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UTeamWeaponMover> M_TeamWeaponMover;
+
+	UPROPERTY()
+	TMap<TObjectPtr<ASquadUnit>, float> M_PushedMoveOriginalUnitSpeeds;
 
 	UPROPERTY()
 	FTeamWeaponCrewAssignment M_CrewAssignment;

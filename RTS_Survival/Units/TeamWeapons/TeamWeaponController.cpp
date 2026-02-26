@@ -9,6 +9,7 @@
 #include "Algo/Sort.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -50,6 +51,13 @@ void ATeamWeaponController::OnAllSquadUnitsLoaded()
 
 void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	RestorePushedMoveSpeedOverride();
+
+	if (GetIsValidTeamWeaponMover())
+	{
+		M_TeamWeaponMover->AbortPushedFollowPath(TEXT("Team weapon controller ending play"));
+		M_TeamWeaponMover->StopLegacyFollowCrew();
+	}
 	bM_IsShuttingDown = true;
 
 	if (UWorld* World = GetWorld(); IsValid(World))
@@ -94,6 +102,18 @@ void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 	}
 
 	TryIssuePostDeployPackAction();
+}
+
+void ATeamWeaponController::TerminateMoveCommand()
+{
+	Super::TerminateMoveCommand();
+	RestorePushedMoveSpeedOverride();
+
+	if (GetIsValidTeamWeaponMover())
+	{
+		M_TeamWeaponMover->AbortPushedFollowPath(TEXT("Move command terminated"));
+		M_TeamWeaponMover->StopLegacyFollowCrew();
+	}
 }
 
 void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
@@ -212,6 +232,7 @@ void ATeamWeaponController::TerminateRotateTowardsCommand()
 	M_PostDeployPackAction.Reset();
 	FinishRotationRequest();
 }
+
 
 bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& DesiredRotation)
 {
@@ -352,8 +373,9 @@ void ATeamWeaponController::SpawnTeamWeapon()
 
 	if (GetIsValidTeamWeaponMover())
 	{
-		M_TeamWeaponMover->OnMoverArrived.AddUObject(this, &ATeamWeaponController::HandleMoverArrived);
-		M_TeamWeaponMover->OnMoverFailed.AddUObject(this, &ATeamWeaponController::HandleMoverFailed);
+		M_TeamWeaponMover->InitMover(M_TeamWeapon, this);
+		M_TeamWeaponMover->OnPushedMoveArrived.AddUObject(this, &ATeamWeaponController::HandlePushedMoverArrived);
+		M_TeamWeaponMover->OnPushedMoveFailed.AddUObject(this, &ATeamWeaponController::HandlePushedMoverFailed);
 	}
 
 	AssignCrewToTeamWeapon();
@@ -485,7 +507,7 @@ void ATeamWeaponController::StartMoveWithCrew(const FVector MoveToLocation)
 	UpdateCrewMoveOffsets();
 	if (M_CrewMoveOffsets.Num() == 0)
 	{
-		M_TeamWeaponMover->AbortMove(TEXT("No crew members for movement"));
+		M_TeamWeaponMover->AbortPushedFollowPath(TEXT("No crew members for movement"));
 		return;
 	}
 
@@ -493,8 +515,112 @@ void ATeamWeaponController::StartMoveWithCrew(const FVector MoveToLocation)
 	M_TeamWeaponMover->SetCrewMembersToFollow(M_CrewMoveOffsets);
 	M_TeamWeaponMover->MoveWeaponToLocation(MoveToLocation);
 	GeneralMoveToForAbility(MoveToLocation, EAbilityID::IdMove);
-	M_TeamWeaponMover->BeginFollowingCrew();
+	M_TeamWeaponMover->StartLegacyFollowCrew();
 	M_PostDeployPackAction.Reset();
+}
+
+void ATeamWeaponController::StartMoveWithPushedWeapon(const FVector MoveToLocation)
+{
+	if (not GetIsValidTeamWeapon() || not GetIsValidTeamWeaponMover())
+	{
+		return;
+	}
+
+	M_SquadUnitPaths.Empty();
+	UpdateCrewMoveOffsets();
+	FNavPathSharedPtr SquadPath;
+	const ESquadPathFindingError PathError = GenerateBaseSquadPath(MoveToLocation, SquadPath);
+	if (PathError != ESquadPathFindingError::NoError)
+	{
+		RTSFunctionLibrary::ReportError(GetSquadPathFindingErrorMsg(PathError));
+		DoneExecutingCommand(EAbilityID::IdMove);
+		return;
+	}
+
+	const ESquadPathFindingError AssignError = GeneratePaths_Assign(MoveToLocation, SquadPath);
+	if (AssignError != ESquadPathFindingError::NoError)
+	{
+		RTSFunctionLibrary::ReportError(GetSquadPathFindingErrorMsg(AssignError));
+		DoneExecutingCommand(EAbilityID::IdMove);
+		return;
+	}
+
+	ApplyPushedMoveSpeedOverrideToSquad();
+	SetTeamWeaponState(ETeamWeaponState::Moving);
+	ExecuteSquadMoveAlongAssignedPaths(EAbilityID::IdMove);
+	M_TeamWeaponMover->StartPushedFollowPath(SquadPath);
+	M_SquadUnitPaths.Empty();
+	M_PostDeployPackAction.Reset();
+}
+
+void ATeamWeaponController::ExecuteSquadMoveAlongAssignedPaths(const EAbilityID AbilityId) const
+{
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		const FNavPathSharedPtr* UnitPath = M_SquadUnitPaths.Find(SquadUnit);
+		if (UnitPath != nullptr && UnitPath->IsValid())
+		{
+			SquadUnit->ExecuteMoveAlongPath(*UnitPath, AbilityId);
+			continue;
+		}
+
+		SquadUnit->ExecuteMoveToSelfPathFinding(GetActorLocation(), AbilityId);
+	}
+}
+
+void ATeamWeaponController::ApplyPushedMoveSpeedOverrideToSquad()
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	const float PushedMoveSpeed = M_TeamWeapon->GetPushedMoveSpeedCmPerSec();
+	M_PushedMoveOriginalUnitSpeeds.Empty();
+
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		UCharacterMovementComponent* CharacterMovement = SquadUnit->GetCharacterMovement();
+		if (not IsValid(CharacterMovement))
+		{
+			continue;
+		}
+
+		M_PushedMoveOriginalUnitSpeeds.Add(SquadUnit, CharacterMovement->MaxWalkSpeed);
+		CharacterMovement->MaxWalkSpeed = PushedMoveSpeed;
+	}
+}
+
+void ATeamWeaponController::RestorePushedMoveSpeedOverride()
+{
+	for (const TPair<TObjectPtr<ASquadUnit>, float>& OriginalSpeedPair : M_PushedMoveOriginalUnitSpeeds)
+	{
+		ASquadUnit* SquadUnit = OriginalSpeedPair.Key;
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		UCharacterMovementComponent* CharacterMovement = SquadUnit->GetCharacterMovement();
+		if (not IsValid(CharacterMovement))
+		{
+			continue;
+		}
+
+		CharacterMovement->MaxWalkSpeed = OriginalSpeedPair.Value;
+	}
+
+	M_PushedMoveOriginalUnitSpeeds.Empty();
 }
 
 void ATeamWeaponController::StartDeployingTeamWeapon()
@@ -638,6 +764,12 @@ void ATeamWeaponController::IssuePostDeployPackAction_Move()
 	{
 		TryAbandonTeamWeaponForInsufficientCrew();
 		M_PostDeployPackAction.Reset();
+		return;
+	}
+
+	if (M_TeamWeapon->GetMovementType() == ETeamWeaponMovementType::PushedWeaponLeads)
+	{
+		StartMoveWithPushedWeapon(M_PostDeployPackAction.GetTargetLocation());
 		return;
 	}
 
@@ -910,15 +1042,17 @@ void ATeamWeaponController::ShowPackingAnimatedText() const
 		TeamWeaponConfig.M_AnimatedTextSettings);
 }
 
-void ATeamWeaponController::HandleMoverArrived()
+void ATeamWeaponController::HandlePushedMoverArrived()
 {
+	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	M_PostDeployPackAction.Reset();
 	DoneExecutingCommand(EAbilityID::IdMove);
 }
 
-void ATeamWeaponController::HandleMoverFailed(const FString& FailureReason)
+void ATeamWeaponController::HandlePushedMoverFailed(const FString& FailureReason)
 {
+	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	M_PostDeployPackAction.Reset();
 	if (GetIsGameShuttingDown())
@@ -1266,8 +1400,11 @@ void ATeamWeaponController::AbandonTeamWeapon()
 
 	if (GetIsValidTeamWeaponMover())
 	{
-		M_TeamWeaponMover->AbortMove(TEXT("Team weapon abandoned due to insufficient operators"));
+		M_TeamWeaponMover->AbortPushedFollowPath(TEXT("Team weapon abandoned due to insufficient operators"));
+		M_TeamWeaponMover->StopLegacyFollowCrew();
 	}
+
+	RestorePushedMoveSpeedOverride();
 
 	for (const TWeakObjectPtr<ASquadUnit>& CrewOperator : M_CrewAssignment.M_Operators)
 	{

@@ -3,24 +3,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "TeamWeaponMover.generated.h"
 
 class ASquadUnit;
 class ATeamWeapon;
+class ATeamWeaponController;
+class FNavigationPath;
 
-UENUM(BlueprintType)
-enum class ETeamWeaponMoverState : uint8
-{
-	Idle,
-	AwaitingCrew,
-	Pathing,
-	Moving
-};
+enum class ETeamWeaponMovementType : uint8;
 
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnTeamWeaponMoverStateChanged, ETeamWeaponMoverState /*NewState*/);
-DECLARE_MULTICAST_DELEGATE(FOnTeamWeaponMoverArrived);
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnTeamWeaponMoverFailed, const FString& /*FailureReason*/);
+DECLARE_MULTICAST_DELEGATE(FOnPushedMoveArrived);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnPushedMoveFailed, const FString& /*FailureReason*/);
 
 USTRUCT()
 struct FTeamWeaponCrewMemberOffset
@@ -35,48 +29,57 @@ struct FTeamWeaponCrewMemberOffset
 };
 
 /**
- * @brief Executes physical movement for packed team weapons and reports movement status to the controller.
+ * @brief Handles both legacy crew-follow and pushed path-follow movement for team weapons.
+ *
+ * Uses controller-generated nav paths and keeps movement-state notifications consistent for animation.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class RTS_SURVIVAL_API UTeamWeaponMover : public UActorComponent
+class RTS_SURVIVAL_API UTeamWeaponMover : public UPathFollowingComponent
 {
 	GENERATED_BODY()
 
 public:
 	UTeamWeaponMover();
 
+	void InitMover(ATeamWeapon* InTeamWeapon, ATeamWeaponController* InController);
 	void SetCrewMembersToFollow(const TArray<FTeamWeaponCrewMemberOffset>& CrewMembers);
+
+	void StartLegacyFollowCrew();
+	void StopLegacyFollowCrew();
 	void MoveWeaponToLocation(const FVector& Destination);
-	void BeginFollowingCrew();
-	void AbortMove(const FString& Reason);
 	void NotifyCrewReady(const bool bIsReady);
 
-	bool GetIsMoving() const;
-	ETeamWeaponMoverState GetMoverState() const { return M_MoverState; }
-	int32 GetCrewMembersRequiredToMove() const { return M_CrewMembersRequiredToMove; }
-	const FVector& GetCurrentDestination() const { return M_MoveDestination; }
+	void StartPushedFollowPath(const FNavPathSharedPtr& InPath);
+	void AbortPushedFollowPath(const FString& Reason);
+	bool GetIsPushedFollowingPath() const;
 
-	FOnTeamWeaponMoverStateChanged OnMoverStateChanged;
-	FOnTeamWeaponMoverArrived OnMoverArrived;
-	FOnTeamWeaponMoverFailed OnMoverFailed;
+	FOnPushedMoveArrived OnPushedMoveArrived;
+	FOnPushedMoveFailed OnPushedMoveFailed;
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
-	                           FActorComponentTickFunction* ThisTickFunction) override;
+		FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
-	void SetMoverState(const ETeamWeaponMoverState NewState);
-	bool GetIsOwnerValid() const;
-	bool GetIsValidOwnerTeamWeapon() const;
+	void UpdateLegacyMovement();
+	void UpdatePushedMovement(const float DeltaSeconds);
+	void FinalizePushedArrived();
+	void StopPushedMovement();
 	bool GetIsCrewDataValid() const;
 	bool TryGetCrewCenterLocation(FVector& OutCenter) const;
 	bool HaveCrewReachedDestination() const;
 	void UpdateOwnerLocationFromCrew();
-	void UpdateMovementAnimationState();
-
-	UPROPERTY(EditDefaultsOnly, Category="TeamWeapon|Mover")
-	int32 M_CrewMembersRequiredToMove = 2;
+	void UpdateMovementAnimationState(const float DeltaSeconds);
+	bool TryAdvancePathIndexIfReachedTarget(const FVector& WeaponLocation, const float AcceptanceRadiusCm);
+	bool TryGetGroundAdjustedLocation(const FVector& InProposedLocation, FVector& OutGroundAdjustedLocation) const;
+	void ApplyYawStepTowards(const FVector& MovementDirection, const float DeltaSeconds) const;
+	bool TryMoveWeaponWithSweep(const FVector& ProposedLocation, FVector& OutAppliedLocation) const;
+	bool GetUsesLegacyCrewMode() const;
+	bool GetIsValidTeamWeapon() const;
+	bool GetIsValidTeamWeaponController() const;
+	bool GetIsValidPushedPath() const;
+	void UpdateTickEnabledState();
 
 	UPROPERTY()
 	TArray<FTeamWeaponCrewMemberOffset> M_CrewMembers;
@@ -91,11 +94,22 @@ private:
 	bool bM_HasMoveRequest = false;
 
 	UPROPERTY()
-	ETeamWeaponMoverState M_MoverState = ETeamWeaponMoverState::Idle;
+	TWeakObjectPtr<ATeamWeapon> M_TeamWeapon;
 
 	UPROPERTY()
-	TWeakObjectPtr<ATeamWeapon> M_OwnerTeamWeapon;
+	TWeakObjectPtr<ATeamWeaponController> M_TeamWeaponController;
+
+	FNavPathSharedPtr M_PushedPath;
 
 	UPROPERTY()
-	FVector M_LastOwnerLocation = FVector::ZeroVector;
+	int32 M_CurrentPathPointIndex = 0;
+
+	UPROPERTY()
+	FVector M_LastWeaponLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	bool bM_IsLegacyFollowActive = false;
+
+	UPROPERTY()
+	bool bM_IsPushedActive = false;
 };
