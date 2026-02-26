@@ -2210,6 +2210,122 @@ void UTrainingMenuManager::InitAllGameSquadTrainingOptions()
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
+	InitAllGameAntiTankGunTWTrainingOptions();
+	InitAllGameMortarTWTrainingOptions();
+	InitAllGameFlakTWTrainingOptions();
+	InitAllGameArtilleryTWTrainingOptions();
+	InitAllGameMachineGunTWTrainingOptions();
+
+}
+
+
+void UTrainingMenuManager::InitAllGameAntiTankGunTWTrainingOptions()
+{
+	using namespace DeveloperSettings::GameBalance::TrainingTime;
+
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			TrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			SquadSubtype);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	};
+
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_PaK38, MediumAntiTankGunTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_PaK40, HeavyAntiTankGunTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Zis_57MM, MediumAntiTankGunTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Zis_76MM, HeavyAntiTankGunTeamWeaponTrainingTime);
+}
+
+void UTrainingMenuManager::InitAllGameMortarTWTrainingOptions()
+{
+	using namespace DeveloperSettings::GameBalance::TrainingTime;
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			TrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			SquadSubtype);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	};
+
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_GrW42_80mm, MediumMortarTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_80mm_Mortar, MediumMortarTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_120mm_Mortar, HeavyMortarTeamWeaponTrainingTime);
+}
+
+void UTrainingMenuManager::InitAllGameFlakTWTrainingOptions()
+{
+	using namespace DeveloperSettings::GameBalance::TrainingTime;
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			TrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			SquadSubtype);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	};
+
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_37mmFlak, MediumFlakTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_88mmFlak, HeavyFlakTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Bofors, MediumFlakTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_KS30_130MM, HeavyFlakTeamWeaponTrainingTime);
+}
+
+void UTrainingMenuManager::InitAllGameArtilleryTWTrainingOptions()
+{
+	using namespace DeveloperSettings::GameBalance::TrainingTime;
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			TrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			SquadSubtype);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	};
+
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_LefH18, MediumArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_SFH18_150mm, HeavyArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_Nebelwerfer, MediumArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_M1938_122mm, HeavyArtilleryTeamWeaponTrainingTime);
+}
+
+void UTrainingMenuManager::InitAllGameMachineGunTWTrainingOptions()
+{
+	using namespace DeveloperSettings::GameBalance::TrainingTime;
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			MachineGunTeamWeaponTrainingTime,
+			EAllUnitType::UNType_Squad,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_None,
+			SquadSubtype);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	};
+
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_LMGSquad);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Maxim);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_DShK);
 }
 
 void UTrainingMenuManager::PostInitTrainingOptions()

@@ -93,6 +93,25 @@ enum class ERTSCard : uint8
 	Card_Train_SturmKommandos,
 	Card_Train_LightBringers,
 
+	Card_Train_GerLMGSquad,
+	Card_Train_GerPaK38,
+	Card_Train_GerPaK40,
+	Card_Train_RusZiS57,
+	Card_Train_RusZiS76,
+	Card_Train_GerFlak37mm,
+	Card_Train_GerFlak88mm,
+	Card_Train_RusBofors,
+	Card_Train_RusKS30,
+	Card_Train_GerGrW42_80mm,
+	Card_Train_Rus80mmMortar,
+	Card_Train_Rus120mmMortar,
+	Card_Train_GerLeFH18,
+	Card_Train_GerSFH18_150mm,
+	Card_Train_GerNebelwerfer,
+	Card_Train_RusM1938_122mm,
+	Card_Train_RusMaxim,
+	Card_Train_RusDShK,
+
 
 	// TrainingOptions -- Armored Cars (Mechanised Depot)
 	Card_Train_Sdkfz251,

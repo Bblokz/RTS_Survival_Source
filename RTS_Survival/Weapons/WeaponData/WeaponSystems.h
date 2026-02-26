@@ -115,27 +115,35 @@ enum class
 	KwK42_75MM UMETA(DisplayName = "KwK42 75MM (Panther)"),
 	KWK42_75MM_PantherD UMETA(DisplayName = "KwK42 75MM PantherD"),
 	Pak38_50MM UMETA(DisplayName = "Pak38 50MM (Pak 38 BXP)"),
+	Pak38_50MM_TW UMETA(DisplayName = "Pak38 50MM TW"),
 	Pak40_3_L46_75MM UMETA(DisplayName = "Pak40 3/L46 75MM (Marder)"),
+	Pak40_3_L46_75MM_TW UMETA(DisplayName = "Pak40 3/L46 75MM TW"),
 	KwK44_L_36_5_75MM UMETA(DisplayName = "KwK44 L/36.5 75MM Mause Secondary"),
 	KwK44_L_36_5_75MM_E100 UMETA(DisplayName = "KwK44 L/36.5 75MM E100 Secondary"),
 	// German Heavy calibre
 	KwK36_88MM UMETA(DisplayName = "KwK36 88MM (Tiger)"),
 	Kwk36_88MM_TigerH1 UMETA(DisplayName = "KwK36 88MM TigerH1"),
 	Flak37_88MM UMETA(DisplaynName = "Flak37_88MM (Flak 88 BXP)"),
+	Flak37_88MM_TW UMETA(DisplayName = "Flak37 88MM TW"),
 	KwK43_88MM UMETA(DisplayName = "Kwk43 88MM (KingTiger)"),
 	Pak43_88MM UMETA(DisplayName = "Pak43 88MM (Jagdpanther)"),
 	KwK43_88MM_PantherII UMETA(DisplayName = "Kwk43 88MM PantherII"),
 	LeFH_18_105MM UMETA(DisplayName = "LeFH 18 105MM (Howitzer)"),
+	LeFH_18_105MM_TW UMETA(DisplayName = "LeFH 18 105MM TW"),
 	// German Super Heavy calibre
 	KwKL_68_105MM UMETA(DisplayName = "Kwkl/68 105MM KT 105"),
 	KwK44_128MM UMETA(DisplayName = "KwK44 128MM (Maus)"),
 	KwK44_128MM_E100 UMETA(DisplayName = "KwK44 128MM (E100)"),
 	sIG_33_150MM UMETA(DisplayName = "sIG 33 150MM (Sturmpanzer)"),
+	sFH18_150MM_TW UMETA(DisplayName = "sFH18 150MM TW"),
 	Stu_H_43_L_12_150MM UMETA(DisplayName = "StuH 43 L/12 150MM (Brumbar)"),
 	Panzerwerfer UMETA(DisplayName = "Panzerwerfer 150MM"),
+	Nebelwerfer_150MM_TW UMETA(DisplayName = "Nebelwerfer 150MM TW"),
 	RW61_Mortar_380MM UMETA(DisplayName = "RW61 Mortar 380MM (SturmTiger)"),
 	Mortar_120MM UMETA(DisplayName = "120MM Mortar"),
+	Mortar_120MM_TW UMETA(DisplayName = "120MM Mortar TW"),
 	Mortar_80MM UMETA(DisplayName = "80MM Mortar"),
+	Mortar_80MM_TW UMETA(DisplayName = "80MM Mortar TW"),
 	Mortar_40MM UMETA(DisplayName = "40MM Mortar"),
 	Panzerwerfer_Small UMETA(DisplayName = "Panzerwerfer 40MM"),
 
@@ -166,6 +174,7 @@ enum class
 	BT_7_20K_45MM UMETA(DisplayName = "20-K 45MM BT-7"),
 	T_70_20k_45MM UMETA(DisplayName = "20-K 45MM T-70"),
 	Bofors_40MM UMETA(DisplayName = "Bofors 40MM (Bofors)"),
+	Bofors_40MM_TW UMETA(DisplayName = "Bofors 40MM TW"),
 	NS_37MM UMETA(DisplayName = "NS 37MM (NS-37)"),
 	RusTwin35MM UMETA(DisplayName = "Rus Twin 35MM (T-34-AA)"),
 
@@ -184,6 +193,7 @@ enum class
 	ZIS_S_53_85MM UMETA(DisplayName = "ZIS 85mm (T34/85)"),
 	D_5S_85MM_SU85 UMETA(DisplayName = "D-5S 85MM (SU-85)"),
 	ZIS_3_76MM UMETA(DisplayName = "ZIS-3 76MM (ZIS-3)"),
+	ZIS_3_76MM_TW UMETA(DisplayName = "ZIS-3 76MM TW"),
 	ZIS_3_76MM_SU76 UMETA(DisplayName = "ZIS-3 76MM (SU-76)"),
 	DT_5_85MM UMETA(DisplayName = "DT-5 85mm (IS-1)"),
 	L_11_76MM UMETA(DisplayName = "L_11 76mm (KV-1 L-11)"),
@@ -206,7 +216,8 @@ enum class
 	QF_37In_94MM UMETA(DisplayName = "QF 37in 94MM"),
 	D_25T_122MM_IS3 UMETA(Displayname = "DT-25T 122MM (IS-3)"),
 	M_10T_152MM UMETA(DisplayName = "M-10T 152MM (KV-2)"),
-	ML_20S_152MM_SU152 UMETA(DisplayName = "ML-20S 152MM (SU-152)")
+	ML_20S_152MM_SU152 UMETA(DisplayName = "ML-20S 152MM (SU-152)"),
+	KS30_130MM_TW UMETA(DisplayName = "KS-30 130MM TW")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -258,6 +269,19 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Ba12_23MM: return "Ba12 23MM";
 	case EWeaponName::ZIS_S_53_85MM: return "ZiS-S-53";
 	case EWeaponName::D_5S_85MM_SU85: return "D-5S";
+
+	case EWeaponName::Flak36_37MM_TW: return "Flak 36 TW";
+	case EWeaponName::Pak38_50MM_TW: return "PaK 38 TW";
+	case EWeaponName::Pak40_3_L46_75MM_TW: return "PaK 40 TW";
+	case EWeaponName::Flak37_88MM_TW: return "Flak 37 TW";
+	case EWeaponName::LeFH_18_105MM_TW: return "leFH 18 TW";
+	case EWeaponName::sFH18_150MM_TW: return "sFH 18 TW";
+	case EWeaponName::Nebelwerfer_150MM_TW: return "Nebelwerfer TW";
+	case EWeaponName::Mortar_120MM_TW: return "120MM Mortar TW";
+	case EWeaponName::Mortar_80MM_TW: return "80MM Mortar TW";
+	case EWeaponName::Bofors_40MM_TW: return "Bofors TW";
+	case EWeaponName::ZIS_3_76MM_TW: return "ZiS-3 TW";
+	case EWeaponName::KS30_130MM_TW: return "KS-30 TW";
 	case EWeaponName::ZIS_3_76MM: return "ZiS-3";
 	case EWeaponName::ZIS_3_76MM_SU76: return "ZiS-3 SU-76";
 	case EWeaponName::DT_5_85MM: return "DT-5";
