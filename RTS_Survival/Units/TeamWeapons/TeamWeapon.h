@@ -173,6 +173,7 @@ public:
 	virtual bool GetUsesWheelMovementMontage() const;
 	void SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons);
 	void SetSpecificEngageTarget(AActor* TargetActor);
+	void SetDigInHullRotationLocked(const bool bLocked);
 
 	// Embedded turret interface ---------------------------
 	virtual float GetCurrentTurretAngle_Implementation() const override;
@@ -246,4 +247,8 @@ private:
 
 	UPROPERTY()
 	bool bM_LastForwardMovement = true;
+
+	// Mirrors assault tank behavior: while dug in the embedded turret cannot rotate the weapon base.
+	UPROPERTY()
+	bool bM_IsHullRotationLocked = false;
 };

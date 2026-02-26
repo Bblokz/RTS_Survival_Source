@@ -195,6 +195,11 @@ void ATeamWeapon::SetSpecificEngageTarget(AActor* TargetActor)
 	SetEngageSpecificTarget(TargetActor);
 }
 
+void ATeamWeapon::SetDigInHullRotationLocked(const bool bLocked)
+{
+	bM_IsHullRotationLocked = bLocked;
+}
+
 float ATeamWeapon::GetCurrentTurretAngle_Implementation() const
 {
     if (GetIsValidAnimInstance())
@@ -225,6 +230,11 @@ void ATeamWeapon::UpdateTargetPitch_Implementation(float NewPitch)
 
 bool ATeamWeapon::TurnBase_Implementation(float Degrees)
 {
+	if (bM_IsHullRotationLocked)
+	{
+		return false;
+	}
+
 	if (not GetIsValidTeamWeaponController())
 	{
 		return false;
