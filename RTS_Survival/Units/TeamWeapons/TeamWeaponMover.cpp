@@ -5,6 +5,7 @@
 #include "TeamWeapon.h"
 #include "TeamWeaponController.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "NavigationPath.h"
@@ -442,21 +443,12 @@ bool UTeamWeaponMover::TryGetGroundAdjustedLocation(const FVector& InProposedLoc
 
 	FHitResult GroundHit;
 	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TeamWeaponGroundTrace), false, M_TeamWeapon.Get());
-	for (const FTeamWeaponCrewMemberOffset& CrewMemberOffset : M_CrewMembers)
-	{
-		if (not CrewMemberOffset.M_CrewMember.IsValid())
-		{
-			continue;
-		}
-
-		CollisionQueryParams.AddIgnoredActor(CrewMemberOffset.M_CrewMember.Get());
-	}
 
 	const bool bDidHit = World->LineTraceSingleByChannel(
 		GroundHit,
 		TraceStart,
 		TraceEnd,
-		ECC_Visibility,
+		COLLISION_TRACE_LANDSCAPE,
 		CollisionQueryParams);
 	if (not bDidHit)
 	{
