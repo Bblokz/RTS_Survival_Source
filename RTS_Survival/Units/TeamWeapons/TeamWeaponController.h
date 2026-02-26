@@ -140,6 +140,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnAllSquadUnitsLoaded() override;
 	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
 	virtual void ExecutePatrolCommand(const FVector PatrolToLocation) override;
@@ -180,6 +181,7 @@ private:
 	void SetTeamWeaponState(const ETeamWeaponState NewState);
 	void TryAbandonTeamWeaponForInsufficientCrew();
 	void AbandonTeamWeapon();
+	bool GetIsGameShuttingDown() const;
 	bool GetIsValidTeamWeapon() const;
 	bool GetIsValidTeamWeaponMover() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
@@ -298,4 +300,7 @@ private:
 
 	UPROPERTY()
 	bool bM_IsTeamWeaponAbandoned = false;
+
+	UPROPERTY()
+	bool bM_IsShuttingDown = false;
 };

@@ -48,6 +48,18 @@ void ATeamWeaponController::OnAllSquadUnitsLoaded()
 	SpawnTeamWeapon();
 }
 
+void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	bM_IsShuttingDown = true;
+
+	if (UWorld* World = GetWorld(); IsValid(World))
+	{
+		World->GetTimerManager().ClearTimer(M_DeployTimer);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void ATeamWeaponController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -228,6 +240,11 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {
+	if (GetIsGameShuttingDown())
+	{
+		return;
+	}
+
 	Super::UnitInSquadDied(UnitDied, bUnitSelected, DeathType);
 	AssignCrewToTeamWeapon();
 }
@@ -346,6 +363,11 @@ void ATeamWeaponController::SpawnTeamWeapon()
 void ATeamWeaponController::AssignCrewToTeamWeapon()
 {
 	M_CrewAssignment.Reset();
+	if (GetIsGameShuttingDown())
+	{
+		return;
+	}
+
 	if (bM_IsTeamWeaponAbandoned)
 	{
 		return;
@@ -899,8 +921,19 @@ void ATeamWeaponController::HandleMoverFailed(const FString& FailureReason)
 {
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	M_PostDeployPackAction.Reset();
+	if (GetIsGameShuttingDown())
+	{
+		DoneExecutingCommand(EAbilityID::IdMove);
+		return;
+	}
+
 	RTSFunctionLibrary::ReportError("Team weapon mover failed: " + FailureReason);
 	DoneExecutingCommand(EAbilityID::IdMove);
+}
+
+bool ATeamWeaponController::GetIsGameShuttingDown() const
+{
+	return bM_IsShuttingDown || IsActorBeingDestroyed();
 }
 
 void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
@@ -925,7 +958,7 @@ void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
 
 bool ATeamWeaponController::GetIsValidTeamWeapon() const
 {
-	if (bM_IsTeamWeaponAbandoned)
+	if (bM_IsTeamWeaponAbandoned || GetIsGameShuttingDown())
 	{
 		return false;
 	}
@@ -942,7 +975,7 @@ bool ATeamWeaponController::GetIsValidTeamWeapon() const
 
 bool ATeamWeaponController::GetIsValidTeamWeaponMover() const
 {
-	if (bM_IsTeamWeaponAbandoned)
+	if (bM_IsTeamWeaponAbandoned || GetIsGameShuttingDown())
 	{
 		return false;
 	}
@@ -959,6 +992,11 @@ bool ATeamWeaponController::GetIsValidTeamWeaponMover() const
 
 bool ATeamWeaponController::GetIsValidAnimatedTextWidgetPoolManager() const
 {
+	if (GetIsGameShuttingDown())
+	{
+		return false;
+	}
+
 	if (M_AnimatedTextWidgetPoolManager.IsValid())
 	{
 		return true;
@@ -1197,6 +1235,11 @@ FRotator ATeamWeaponController::GetOwnerRotation() const
 
 void ATeamWeaponController::TryAbandonTeamWeaponForInsufficientCrew()
 {
+	if (GetIsGameShuttingDown())
+	{
+		return;
+	}
+
 	if (bM_IsTeamWeaponAbandoned)
 	{
 		return;
@@ -1212,6 +1255,11 @@ void ATeamWeaponController::TryAbandonTeamWeaponForInsufficientCrew()
 
 void ATeamWeaponController::AbandonTeamWeapon()
 {
+	if (GetIsGameShuttingDown())
+	{
+		return;
+	}
+
 	SetTeamWeaponState(ETeamWeaponState::Abandoned);
 	M_PostDeployPackAction.Reset();
 	FinishRotationRequest();
