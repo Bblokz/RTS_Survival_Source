@@ -12,6 +12,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 namespace TeamWeaponControllerCrewPositionStatics
 {
@@ -47,6 +48,12 @@ void ATeamWeaponController::OnAllSquadUnitsLoaded()
 	SpawnTeamWeapon();
 }
 
+void ATeamWeaponController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	TickRotationRequest(DeltaSeconds);
+}
+
 void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 {
 	if (not GetIsValidTeamWeapon() || not GetIsValidTeamWeaponMover())
@@ -71,6 +78,62 @@ void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 	TryIssuePostDeployPackAction();
 }
 
+void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
+{
+	if (not IsValid(TargetActor))
+	{
+		DoneExecutingCommand(EAbilityID::IdAttack);
+		return;
+	}
+
+	M_SpecificEngageTarget = TargetActor;
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->SetSpecificEngageTarget(TargetActor);
+	}
+
+	M_UnitsCompletedCommand = 0;
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		if (not GetIsCrewOperator(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->ExecuteAttackCommand(TargetActor);
+	}
+}
+
+void ATeamWeaponController::TerminateAttackCommand()
+{
+	M_SpecificEngageTarget.Reset();
+
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		if (not GetIsCrewOperator(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->TerminateAttackCommand();
+	}
+
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->SetSpecificEngageTarget(nullptr);
+	}
+}
+
 void ATeamWeaponController::ExecutePatrolCommand(const FVector PatrolToLocation)
 {
 	// We do not support patrol with team weapons.
@@ -79,7 +142,72 @@ void ATeamWeaponController::ExecutePatrolCommand(const FVector PatrolToLocation)
 
 void ATeamWeaponController::ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand)
 {
-	Super::ExecuteRotateTowardsCommand(RotateToRotator, IsQueueCommand);
+	if (not GetIsValidTeamWeapon())
+	{
+		if (IsQueueCommand)
+		{
+			DoneExecutingCommand(EAbilityID::IdRotateTowards);
+		}
+		return;
+	}
+
+	SetPostDeployPackActionForRotate(RotateToRotator, EAbilityID::IdRotateTowards, IsQueueCommand);
+
+	if (M_TeamWeaponState == ETeamWeaponState::Deploying)
+	{
+		if (UWorld* World = GetWorld(); IsValid(World))
+		{
+			World->GetTimerManager().ClearTimer(M_DeployTimer);
+		}
+		M_PostDeployPackAction.Reset();
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+		M_TeamWeapon->PlayPackingMontage(false);
+		StartRotationRequest(RotateToRotator, IsQueueCommand, EAbilityID::IdRotateTowards);
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
+	{
+		StartPacking();
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Packing)
+	{
+		return;
+	}
+
+	StartRotationRequest(RotateToRotator, IsQueueCommand, EAbilityID::IdRotateTowards);
+}
+
+void ATeamWeaponController::TerminateRotateTowardsCommand()
+{
+	M_PostDeployPackAction.Reset();
+	FinishRotationRequest();
+}
+
+bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& DesiredRotation)
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return false;
+	}
+
+	SetPostDeployPackActionForRotate(DesiredRotation, EAbilityID::IdRotateTowards, false);
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
+	{
+		StartPacking();
+		return true;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Packing || M_TeamWeaponState == ETeamWeaponState::Deploying)
+	{
+		return true;
+	}
+
+	StartRotationRequest(DesiredRotation, false, EAbilityID::IdRotateTowards);
+	return true;
 }
 
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
@@ -97,6 +225,16 @@ void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbili
 		return;
 	}
 	Super::OnSquadUnitCommandComplete(CompletedAbilityID);
+}
+
+void ATeamWeaponController::OnUnitIdleAndNoNewCommands()
+{
+	Super::OnUnitIdleAndNoNewCommands();
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	{
+		StartDeploying();
+	}
 }
 
 ESquadPathFindingError ATeamWeaponController::GeneratePaths_Assign(const FVector& MoveToLocation,
@@ -249,6 +387,7 @@ void ATeamWeaponController::StartPacking()
 	}
 
 	SetTeamWeaponState(ETeamWeaponState::Packing);
+	M_TeamWeapon->PlayPackingMontage(true);
 	ShowPackingAnimatedText();
 
 	const float DeploymentTime = M_TeamWeapon->GetDeploymentTime();
@@ -323,6 +462,7 @@ void ATeamWeaponController::StartDeployingTeamWeapon()
 	}
 
 	SetTeamWeaponState(ETeamWeaponState::Deploying);
+	M_TeamWeapon->PlayDeployingMontage(true);
 	bM_HasIssuedCrewPositionMovesForCurrentDeploy = false;
 	ShowDeployingAnimatedText();
 	IssueMoveCrewToPositions();
@@ -374,9 +514,23 @@ void ATeamWeaponController::SetPostDeployPackActionForMove(const FVector MoveToL
 		nullptr);
 }
 
+void ATeamWeaponController::SetPostDeployPackActionForRotate(const FRotator& DesiredRotation,
+                                                             const EAbilityID AbilityId,
+                                                             const bool bShouldTriggerDoneExecuting)
+{
+	M_PostDeployPackAction.InitForCommand(
+		AbilityId,
+		false,
+		FVector::ZeroVector,
+		true,
+		DesiredRotation,
+		nullptr,
+		bShouldTriggerDoneExecuting);
+}
+
 void ATeamWeaponController::TryIssuePostDeployPackAction()
 {
-	if (not M_PostDeployPackAction.GetHasAction())
+	if (not M_PostDeployPackAction.GetHasAction() && not M_PostDeployPackAction.GetHasRotation())
 	{
 		return;
 	}
@@ -419,6 +573,20 @@ void ATeamWeaponController::IssuePostDeployPackAction()
 		}
 
 		StartMoveWithCrew(M_PostDeployPackAction.GetTargetLocation());
+		break;
+
+	case EAbilityID::IdRotateTowards:
+		if (not M_PostDeployPackAction.GetHasRotation())
+		{
+			M_PostDeployPackAction.Reset();
+			break;
+		}
+
+		StartRotationRequest(
+			M_PostDeployPackAction.GetTargetRotation(),
+			M_PostDeployPackAction.GetShouldTriggerDoneExecuting(),
+			EAbilityID::IdRotateTowards);
+		M_PostDeployPackAction.Reset();
 		break;
 
 	default:
@@ -701,6 +869,11 @@ void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
 	}
 	M_TeamWeaponState = NewState;
 
+	if (M_TeamWeapon != nullptr)
+	{
+		M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(NewState == ETeamWeaponState::Ready_Deployed);
+	}
+
 	if (NewState == ETeamWeaponState::Packing || NewState == ETeamWeaponState::Moving ||
 		NewState == ETeamWeaponState::Ready_Packed)
 	{
@@ -761,12 +934,13 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 		return;
 	}
 
-	if (M_TeamWeaponState != ETeamWeaponState::Ready_Deployed)
+	if (M_SpecificEngageTarget.Get() == nullptr)
 	{
 		return;
 	}
 
-	ExecuteMoveCommand(TargetLocation);
+	const FVector MoveLocation = GetMoveLocationWithinTurretRange(TargetLocation, CallingTurret);
+	ExecuteMoveCommand(MoveLocation);
 }
 
 void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
@@ -779,6 +953,11 @@ void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
 	{
 		StartDeploying();
+	}
+
+	if (AActor* SpecificTarget = M_SpecificEngageTarget.Get())
+	{
+		M_TeamWeapon->SetSpecificEngageTarget(SpecificTarget);
 	}
 }
 
@@ -796,6 +975,143 @@ void ATeamWeaponController::OnFireWeapon(ACPPTurretsMaster* CallingTurret)
 
 void ATeamWeaponController::OnProjectileHit(const bool bBounced)
 {
+}
+
+void ATeamWeaponController::StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
+                                                   const EAbilityID CompletionAbilityId)
+{
+	M_RotationRequest.M_TargetRotation = DesiredRotation;
+	M_RotationRequest.bM_IsActive = true;
+	M_RotationRequest.bM_ShouldTriggerDoneExecuting = bShouldTriggerDoneExecuting;
+	M_RotationRequest.M_CompletionAbilityId = CompletionAbilityId;
+	AttachCrewForRotation();
+}
+
+void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
+{
+	if (not M_RotationRequest.bM_IsActive)
+	{
+		return;
+	}
+
+	if (not GetIsValidTeamWeapon())
+	{
+		FinishRotationRequest();
+		return;
+	}
+
+	const float RotationCompletionMarginDegrees = 1.0f;
+	const float DeltaYaw = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, M_RotationRequest.M_TargetRotation.Yaw);
+	if (FMath::Abs(DeltaYaw) <= RotationCompletionMarginDegrees)
+	{
+		SetActorRotation(FRotator(0.0f, M_RotationRequest.M_TargetRotation.Yaw, 0.0f));
+		FinishRotationRequest();
+		return;
+	}
+
+	const float TurnSpeedYaw = M_TeamWeapon->GetTurnSpeedYaw();
+	float StepYaw = FMath::Sign(DeltaYaw) * TurnSpeedYaw * DeltaSeconds;
+	if (FMath::Abs(StepYaw) > FMath::Abs(DeltaYaw))
+	{
+		StepYaw = DeltaYaw;
+	}
+
+	AddActorWorldRotation(FRotator(0.0f, StepYaw, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	MoveGuardsToTeamWeapon();
+}
+
+void ATeamWeaponController::FinishRotationRequest()
+{
+	const bool bShouldCallDoneExecuting = M_RotationRequest.bM_ShouldTriggerDoneExecuting;
+	const EAbilityID CompletionAbilityId = M_RotationRequest.M_CompletionAbilityId;
+	M_RotationRequest.Reset();
+	DetachCrewAfterRotation();
+
+	if (bShouldCallDoneExecuting && CompletionAbilityId != EAbilityID::IdNoAbility)
+	{
+		DoneExecutingCommand(CompletionAbilityId);
+	}
+}
+
+void ATeamWeaponController::AttachCrewForRotation()
+{
+	if (bM_AreCrewAttachedForRotation)
+	{
+		return;
+	}
+
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+	}
+
+	bM_AreCrewAttachedForRotation = true;
+}
+
+void ATeamWeaponController::DetachCrewAfterRotation()
+{
+	if (not bM_AreCrewAttachedForRotation)
+	{
+		return;
+	}
+
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	}
+
+	bM_AreCrewAttachedForRotation = false;
+}
+
+void ATeamWeaponController::MoveGuardsToTeamWeapon()
+{
+	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	{
+		ASquadUnit* SquadUnit = GuardUnit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		const FVector GuardLocation = GetActorLocation();
+		SquadUnit->SetActorLocation(GuardLocation);
+	}
+}
+
+FVector ATeamWeaponController::GetMoveLocationWithinTurretRange(const FVector& TargetLocation,
+                                                                const ACPPTurretsMaster* CallingTurret) const
+{
+	if (not IsValid(CallingTurret))
+	{
+		return TargetLocation;
+	}
+
+	const float RangeSafetyMargin = 0.9f;
+	const float MaxRange = CallingTurret->GetMaxWeaponRange();
+	if (MaxRange <= 0.0f)
+	{
+		return TargetLocation;
+	}
+
+	const FVector TeamWeaponLocation = GetActorLocation();
+	FVector DirectionToTarget = TargetLocation - TeamWeaponLocation;
+	if (DirectionToTarget.IsNearlyZero())
+	{
+		return TeamWeaponLocation;
+	}
+
+	DirectionToTarget.Normalize();
+	return TargetLocation - DirectionToTarget * (MaxRange * RangeSafetyMargin);
 }
 
 FRotator ATeamWeaponController::GetOwnerRotation() const

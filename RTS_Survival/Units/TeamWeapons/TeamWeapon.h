@@ -135,6 +135,10 @@ public:
 
 	void SetTurretOwnerActor(AActor* NewOwner);
 	void GetCrewPositions(TArray<UCrewPosition*>& OutCrewPositions) const;
+	void PlayPackingMontage(const bool bWaitForMontage) const;
+	void PlayDeployingMontage(const bool bWaitForMontage) const;
+	void SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons);
+	void SetSpecificEngageTarget(AActor* TargetActor);
 
 	// Embedded turret interface ---------------------------
 	virtual float GetCurrentTurretAngle_Implementation() const override;
@@ -184,6 +188,7 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<ATeamWeaponController> M_TeamWeaponController;
+	[[nodiscard]] bool GetIsValidTeamWeaponController() const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon", meta = (AllowPrivateAccess = "true"))
 	FTeamWeaponConfig M_TeamWeaponConfig;

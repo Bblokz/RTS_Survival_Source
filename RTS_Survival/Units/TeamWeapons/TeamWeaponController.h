@@ -55,6 +55,7 @@ struct FTeamWeaponPostDeployPackAction
 		bM_HasLocation = false;
 		bM_HasRotation = false;
 		bM_HasTargetActor = false;
+		bM_ShouldTriggerDoneExecuting = true;
 	}
 
 	/**
@@ -69,7 +70,8 @@ struct FTeamWeaponPostDeployPackAction
 	 * @param InTargetActor Optional actor target for actor-based commands.
 	 */
 	void InitForCommand(const EAbilityID AbilityId, const bool bInHasLocation, const FVector& InTargetLocation,
-	                    const bool bInHasRotation, const FRotator& InTargetRotation, AActor* InTargetActor)
+	                    const bool bInHasRotation, const FRotator& InTargetRotation, AActor* InTargetActor,
+	                    const bool bInShouldTriggerDoneExecuting = true)
 	{
 		Reset();
 		M_AbilityId = AbilityId;
@@ -79,6 +81,7 @@ struct FTeamWeaponPostDeployPackAction
 		M_TargetLocation = InTargetLocation;
 		M_TargetRotation = InTargetRotation;
 		M_TargetActor = InTargetActor;
+		bM_ShouldTriggerDoneExecuting = bInShouldTriggerDoneExecuting;
 	}
 
 	EAbilityID GetAbilityId() const { return M_AbilityId; }
@@ -86,6 +89,7 @@ struct FTeamWeaponPostDeployPackAction
 	bool GetHasLocation() const { return bM_HasLocation; }
 	bool GetHasRotation() const { return bM_HasRotation; }
 	bool GetHasTargetActor() const { return bM_HasTargetActor; }
+	bool GetShouldTriggerDoneExecuting() const { return bM_ShouldTriggerDoneExecuting; }
 	const FVector& GetTargetLocation() const { return M_TargetLocation; }
 	const FRotator& GetTargetRotation() const { return M_TargetRotation; }
 	TWeakObjectPtr<AActor> GetTargetActor() const { return M_TargetActor; }
@@ -98,6 +102,27 @@ private:
 	bool bM_HasLocation = false;
 	bool bM_HasRotation = false;
 	bool bM_HasTargetActor = false;
+	bool bM_ShouldTriggerDoneExecuting = true;
+};
+
+
+USTRUCT()
+struct FTeamWeaponRotationRequest
+{
+	GENERATED_BODY()
+
+	void Reset()
+	{
+		M_TargetRotation = FRotator::ZeroRotator;
+		bM_IsActive = false;
+		bM_ShouldTriggerDoneExecuting = false;
+		M_CompletionAbilityId = EAbilityID::IdNoAbility;
+	}
+
+	FRotator M_TargetRotation = FRotator::ZeroRotator;
+	bool bM_IsActive = false;
+	bool bM_ShouldTriggerDoneExecuting = false;
+	EAbilityID M_CompletionAbilityId = EAbilityID::IdNoAbility;
 };
 
 /**
@@ -111,6 +136,7 @@ class RTS_SURVIVAL_API ATeamWeaponController : public ASquadController, public I
 
 public:
 	ATeamWeaponController();
+	bool RequestInternalRotateTowards(const FRotator& DesiredRotation);
 
 protected:
 	virtual void BeginPlay() override;
@@ -118,6 +144,11 @@ protected:
 	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
 	virtual void ExecutePatrolCommand(const FVector PatrolToLocation) override;
 	virtual void ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand) override;
+	virtual void TerminateRotateTowardsCommand() override;
+	virtual void ExecuteAttackCommand(AActor* TargetActor) override;
+	virtual void TerminateAttackCommand() override;
+	virtual void OnUnitIdleAndNoNewCommands() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;
 	virtual void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID) override;
 
@@ -180,6 +211,17 @@ private:
 	void HandleDeployingTimerFinished();
 
 	void SetPostDeployPackActionForMove(const FVector MoveToLocation);
+
+	void SetPostDeployPackActionForRotate(const FRotator& DesiredRotation, const EAbilityID AbilityId,
+	                                 const bool bShouldTriggerDoneExecuting);
+	void StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
+	                         const EAbilityID CompletionAbilityId);
+	void TickRotationRequest(const float DeltaSeconds);
+	void FinishRotationRequest();
+	void AttachCrewForRotation();
+	void DetachCrewAfterRotation();
+	void MoveGuardsToTeamWeapon();
+	FVector GetMoveLocationWithinTurretRange(const FVector& TargetLocation, const ACPPTurretsMaster* CallingTurret) const;
 	void TryIssuePostDeployPackAction();
 	void IssuePostDeployPackAction();
 	void UpdateCrewMoveOffsets();
@@ -233,6 +275,17 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_DeployTimer;
+
+
+	UPROPERTY()
+	FTeamWeaponRotationRequest M_RotationRequest;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_SpecificEngageTarget;
+
+
+	UPROPERTY()
+	bool bM_AreCrewAttachedForRotation = false;
 
 	// Prevents repeatedly issuing identical move orders while staying in the same deploy cycle.
 	UPROPERTY()
