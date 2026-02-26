@@ -19,10 +19,7 @@ void UTeamWeaponMover::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (GetIsValidTeamWeapon())
-	{
-		M_LastWeaponLocation = M_TeamWeapon->GetActorLocation();
-	}
+
 
 	UpdateTickEnabledState();
 }
