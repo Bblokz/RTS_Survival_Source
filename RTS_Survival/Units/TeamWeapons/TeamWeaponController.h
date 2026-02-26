@@ -230,7 +230,9 @@ private:
 	void FinishRotationRequest();
 	void AttachCrewForRotation();
 	void DetachCrewAfterRotation();
-	void MoveGuardsToTeamWeapon();
+	void SnapOperatorsToCrewPositionsDuringRotation();
+	void MoveGuardsToRandomGuardPositions() const;
+	bool TryGetRandomGuardLocation(FVector& OutGuardLocation) const;
 	FVector GetMoveLocationWithinTurretRange(const FVector& TargetLocation, const ACPPTurretsMaster* CallingTurret) const;
 	void TryIssuePostDeployPackAction();
 	void IssuePostDeployPackAction();
@@ -262,6 +264,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "TeamWeapon")
 	TSubclassOf<ATeamWeapon> TeamWeaponClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TeamWeapon|Guard")
+	float M_GuardDistance = 350.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TeamWeapon|Guard")
+	FVector2D M_GuardMinMaxAngle = FVector2D(-150.0f, -30.0f);
 
 	UPROPERTY()
 	TObjectPtr<ATeamWeapon> M_TeamWeapon;
