@@ -13,6 +13,7 @@ class RTS_SURVIVAL_API AAntiTankGun : public ATeamWeapon
 
 public:
 	AAntiTankGun();
+	virtual bool GetUsesWheelMovementMontage() const override { return true; }
 
 protected:
 	virtual void BeginPlay() override;

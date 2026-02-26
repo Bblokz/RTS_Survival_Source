@@ -65,6 +65,48 @@ void UTeamWeaponAnimationInstance::PlayBurstFireAnimation()
 	Montage_Play( GunMontages.BurstFireMontage, 1.f);
 }
 
+void UTeamWeaponAnimationInstance::StartMoveLoop(const bool bForward)
+{
+	if (bM_IsMoveLoopActive && bM_MoveLoopForward == bForward && M_MoveLoopMontage && Montage_IsPlaying(M_MoveLoopMontage))
+	{
+		return;
+	}
+
+	float MoveMontagePlayRate = 1.0f;
+	const ETeamWeaponMontage MoveMontageType = bForward
+		? ETeamWeaponMontage::MoveForwardMontage
+		: ETeamWeaponMontage::MoveBackwardMontage;
+	UAnimMontage* MoveMontage = GetMontageAndPlayrate(MoveMontageType, MoveMontagePlayRate);
+	if (not MoveMontage)
+	{
+		return;
+	}
+
+	bM_IsMoveLoopActive = true;
+	bM_MoveLoopForward = bForward;
+	M_MoveLoopMontage = MoveMontage;
+
+	M_MoveLoopMontageEndedDelegate.Unbind();
+	M_MoveLoopMontageEndedDelegate.BindUObject(this, &UTeamWeaponAnimationInstance::OnMoveLoopMontageEnded);
+
+	Montage_Play(MoveMontage, MoveMontagePlayRate);
+	Montage_SetEndDelegate(M_MoveLoopMontageEndedDelegate, MoveMontage);
+}
+
+void UTeamWeaponAnimationInstance::StopMoveLoop()
+{
+	bM_IsMoveLoopActive = false;
+	M_MoveLoopMontageEndedDelegate.Unbind();
+
+	if (M_MoveLoopMontage && Montage_IsPlaying(M_MoveLoopMontage))
+	{
+		constexpr float MoveMontageBlendOutTime = 0.1f;
+		Montage_Stop(MoveMontageBlendOutTime, M_MoveLoopMontage);
+	}
+
+	M_MoveLoopMontage = nullptr;
+}
+
 UAnimSequence* UTeamWeaponAnimationInstance::GetCurrentAOBaseSequence()
 {
 	if (not M_ActiveSequence)
@@ -201,4 +243,19 @@ float UTeamWeaponAnimationInstance::GetMontageBaseTime(const UAnimMontage* Monta
 		return 1;
 	}
 	return Montage->GetPlayLength() * Montage->RateScale;
+}
+
+void UTeamWeaponAnimationInstance::OnMoveLoopMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (not bM_IsMoveLoopActive)
+	{
+		return;
+	}
+
+	if (bInterrupted)
+	{
+		return;
+	}
+
+	StartMoveLoop(bM_MoveLoopForward);
 }

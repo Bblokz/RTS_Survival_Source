@@ -137,6 +137,8 @@ public:
 	void GetCrewPositions(TArray<UCrewPosition*>& OutCrewPositions) const;
 	void PlayPackingMontage(const bool bWaitForMontage) const;
 	void PlayDeployingMontage(const bool bWaitForMontage) const;
+	void NotifyMoverMovementState(const bool bIsMoving, const FVector& WorldVelocity);
+	virtual bool GetUsesWheelMovementMontage() const;
 	void SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons);
 	void SetSpecificEngageTarget(AActor* TargetActor);
 
@@ -205,4 +207,7 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UTeamWeaponAnimationInstance> M_AnimInstance = nullptr;
 	[[nodiscard]] bool GetIsValidAnimInstance() const;
+
+	UPROPERTY()
+	bool bM_IsMoverMoving = false;
 };
