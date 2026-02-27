@@ -141,21 +141,23 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 		return;
 	}
 
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		Super::ExecuteAttackCommand(TargetActor);
+		return;
+	}
+
 	M_SpecificEngageTarget = TargetActor;
-	if (GetIsValidTeamWeapon())
+	SetPostDeployActionForAttack(TargetActor);
+	ApplyCrewRoleWeaponRestrictions();
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
 	{
-		M_TeamWeapon->SetSpecificEngageTarget(TargetActor);
+		StartDeploying();
+		return;
 	}
 
-	for (ASquadUnit* SquadUnit : M_TSquadUnits)
-	{
-		if (not GetIsValidSquadUnit(SquadUnit))
-		{
-			continue;
-		}
-
-		SquadUnit->TerminateAttackCommand();
-	}
+	TryIssuePostDeployAction();
 
 	M_UnitsCompletedCommand = 0;
 }
@@ -165,21 +167,8 @@ void ATeamWeaponController::TerminateAttackCommand()
 	M_SpecificEngageTarget.Reset();
 	M_PostDeployAction.Reset();
 	bM_HasGuardEngageFlowTargetLocation = false;
-
-	for (ASquadUnit* SquadUnit : M_TSquadUnits)
-	{
-		if (not GetIsValidSquadUnit(SquadUnit))
-		{
-			continue;
-		}
-
-		if (not GetIsCrewOperator(SquadUnit))
-		{
-			continue;
-		}
-
-		SquadUnit->TerminateAttackCommand();
-	}
+	TerminateSpecificEngageForGuards();
+	ApplyCrewRoleWeaponRestrictions();
 
 	if (GetIsValidTeamWeapon())
 	{
@@ -392,6 +381,7 @@ void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbili
 void ATeamWeaponController::OnUnitIdleAndNoNewCommands()
 {
 	Super::OnUnitIdleAndNoNewCommands();
+	ApplyCrewRoleWeaponRestrictions();
 
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
 	{
@@ -489,6 +479,7 @@ void ATeamWeaponController::SpawnTeamWeapon()
 
 	AssignCrewToTeamWeapon();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	StartDeploying();
 }
 
 void ATeamWeaponController::AssignCrewToTeamWeapon()
@@ -525,14 +516,6 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 		{
 			M_CrewAssignment.M_Operators.Add(SquadUnit);
 			OperatorIndex++;
-
-			AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
-			if (not IsValid(InfantryWeapon))
-			{
-				continue;
-			}
-
-			InfantryWeapon->DisableWeaponSearch(false, true);
 			continue;
 		}
 
@@ -549,6 +532,8 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 	{
 		return;
 	}
+
+	ApplyCrewRoleWeaponRestrictions();
 
 	TryIssuePostPackAction();
 }
@@ -1011,7 +996,68 @@ void ATeamWeaponController::IssuePostDeployAction_Attack()
 
 	M_SpecificEngageTarget = TargetActor;
 	M_TeamWeapon->SetSpecificEngageTarget(TargetActor);
+	IssueSpecificEngageForGuards(TargetActor);
+	ApplyCrewRoleWeaponRestrictions();
 	M_PostDeployAction.Reset();
+}
+
+void ATeamWeaponController::ApplyCrewRoleWeaponRestrictions() const
+{
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		if (not GetIsCrewOperator(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->TerminateAttackCommand();
+
+		AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
+		if (not IsValid(InfantryWeapon))
+		{
+			continue;
+		}
+
+		InfantryWeapon->DisableWeaponSearch(false, true);
+	}
+}
+
+void ATeamWeaponController::IssueSpecificEngageForGuards(AActor* TargetActor) const
+{
+	if (not IsValid(TargetActor))
+	{
+		return;
+	}
+
+	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	{
+		ASquadUnit* SquadUnit = GuardUnit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->ExecuteAttackCommand(TargetActor);
+	}
+}
+
+void ATeamWeaponController::TerminateSpecificEngageForGuards() const
+{
+	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	{
+		ASquadUnit* SquadUnit = GuardUnit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->TerminateAttackCommand();
+	}
 }
 
 void ATeamWeaponController::UpdateCrewMoveOffsets()
@@ -1320,6 +1366,8 @@ void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
 		M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(NewState == ETeamWeaponState::Ready_Deployed);
 	}
 
+	ApplyCrewRoleWeaponRestrictions();
+
 	if (NewState == ETeamWeaponState::Packing || NewState == ETeamWeaponState::Moving ||
 		NewState == ETeamWeaponState::Ready_Packed)
 	{
@@ -1472,7 +1520,7 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 	}
 
 	M_SpecificEngageTarget = SpecificEngageTarget;
-	M_TeamWeapon->SetSpecificEngageTarget(SpecificEngageTarget);
+	SetPostDeployActionForAttack(SpecificEngageTarget);
 
 	const FVector MoveLocation = GetMoveLocationWithinTurretRange(TargetLocation, CallingTurret);
 	M_GuardEngageFlowTargetLocation = TargetLocation;
@@ -1510,11 +1558,17 @@ void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 
 	if (AActor* SpecificTarget = M_SpecificEngageTarget.Get())
 	{
-		M_TeamWeapon->SetSpecificEngageTarget(SpecificTarget);
+		SetPostDeployActionForAttack(SpecificTarget);
+		TryIssuePostDeployAction();
 		return;
 	}
 
 	M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
+}
+
+bool ATeamWeaponController::GetIsReadyDeployed() const
+{
+	return M_TeamWeaponState == ETeamWeaponState::Ready_Deployed;
 }
 
 void ATeamWeaponController::OnMountedWeaponTargetDestroyed(

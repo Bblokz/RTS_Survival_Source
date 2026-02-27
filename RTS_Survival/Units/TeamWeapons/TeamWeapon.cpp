@@ -169,7 +169,7 @@ bool ATeamWeapon::GetUsesWheelMovementMontage() const
 
 void ATeamWeapon::SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons)
 {
-	if (not bEnableWeapons)
+	if (not bEnableWeapons || not GetIsControllerReadyDeployed())
 	{
 		DisableTurret();
 		return;
@@ -187,6 +187,11 @@ void ATeamWeapon::SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons)
 void ATeamWeapon::SetSpecificEngageTarget(AActor* TargetActor)
 {
 	M_SpecificEngageTarget = TargetActor;
+	if (not GetIsControllerReadyDeployed())
+	{
+		DisableTurret();
+		return;
+	}
 
 	if (not IsValid(TargetActor))
 	{
@@ -353,6 +358,16 @@ bool ATeamWeapon::GetIsValidTeamWeaponController() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TeamWeaponController",
 	                                                      "ATeamWeapon::GetIsValidTeamWeaponController", this);
 	return false;
+}
+
+bool ATeamWeapon::GetIsControllerReadyDeployed() const
+{
+	if (not GetIsValidTeamWeaponController())
+	{
+		return false;
+	}
+
+	return M_TeamWeaponController->GetIsReadyDeployed();
 }
 
 void ATeamWeapon::BeginPlay_InitAnimInstance()
