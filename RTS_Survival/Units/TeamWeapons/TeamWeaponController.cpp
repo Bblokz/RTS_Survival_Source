@@ -87,6 +87,14 @@ void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ATeamWeaponController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (CommandData != nullptr && CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack &&
+		not M_SpecificEngageTarget.IsValid())
+	{
+		HandleMainAttackTargetBecameInvalid(TEXT("Main target invalid during tick"));
+	}
+
 	TickRotationRequest(DeltaSeconds);
 }
 
@@ -262,7 +270,7 @@ void ATeamWeaponController::ExecuteRotateTowardsCommand(const FRotator RotateToR
 		M_PostDeployAction.Reset();
 		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 		M_TeamWeapon->PlayPackingMontage(false);
-		StartRotationRequest(RotateToRotator, IsQueueCommand, EAbilityID::IdRotateTowards);
+		StartRotationRequest(RotateToRotator, IsQueueCommand, EAbilityID::IdRotateTowards, false);
 		return;
 	}
 
@@ -277,7 +285,7 @@ void ATeamWeaponController::ExecuteRotateTowardsCommand(const FRotator RotateToR
 		return;
 	}
 
-	StartRotationRequest(RotateToRotator, IsQueueCommand, EAbilityID::IdRotateTowards);
+	StartRotationRequest(RotateToRotator, IsQueueCommand, EAbilityID::IdRotateTowards, false);
 }
 
 void ATeamWeaponController::TerminateRotateTowardsCommand()
@@ -325,7 +333,7 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 		return true;
 	}
 
-	StartRotationRequest(DesiredRotation, false, EAbilityID::IdRotateTowards);
+	StartRotationRequest(DesiredRotation, false, EAbilityID::IdRotateTowards, true);
 	return true;
 }
 
@@ -361,8 +369,20 @@ void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSele
 
 void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID)
 {
-	const UCommandData* CommandData = GetIsValidCommandData();
-	if (not CommandData)
+	if (CompletedAbilityID == EAbilityID::IdAttack)
+	{
+		UCommandData* CommandData = GetIsValidCommandData();
+		if (CommandData != nullptr && CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack &&
+			not M_SpecificEngageTarget.IsValid())
+		{
+			HandleMainAttackTargetBecameInvalid(TEXT("Guard reported target destroyed/invisible"));
+		}
+
+		return;
+	}
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (CommandData == nullptr)
 	{
 		Super::OnSquadUnitCommandComplete(CompletedAbilityID);
 		return;
@@ -924,7 +944,8 @@ void ATeamWeaponController::IssuePostPackAction_Rotate()
 	StartRotationRequest(
 		M_PostPackAction.GetTargetRotation(),
 		M_PostPackAction.GetShouldTriggerDoneExecuting(),
-		EAbilityID::IdRotateTowards);
+		EAbilityID::IdRotateTowards,
+		false);
 	M_PostPackAction.Reset();
 }
 
@@ -1058,6 +1079,57 @@ void ATeamWeaponController::TerminateSpecificEngageForGuards() const
 
 		SquadUnit->TerminateAttackCommand();
 	}
+}
+
+void ATeamWeaponController::HandleMainAttackTargetBecameInvalid(const FString& Reason)
+{
+	static_cast<void>(Reason);
+
+	if (GetIsGameShuttingDown() || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
+	M_SpecificEngageTarget.Reset();
+	M_PostDeployAction.Reset();
+	TerminateSpecificEngageForGuards();
+	ApplyCrewRoleWeaponRestrictions();
+
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->SetSpecificEngageTarget(nullptr);
+	}
+
+	bM_HasGuardEngageFlowTargetLocation = false;
+
+	if (M_RotationRequest.bM_IsActive)
+	{
+		FinishRotationRequest();
+	}
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (CommandData != nullptr && CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack)
+	{
+		DoneExecutingCommand(EAbilityID::IdAttack);
+		M_UnitsCompletedCommand = 0;
+	}
+
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	{
+		StartDeploying();
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
+	{
+		M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
+	}
+
 }
 
 void ATeamWeaponController::UpdateCrewMoveOffsets()
@@ -1577,6 +1649,49 @@ void ATeamWeaponController::OnMountedWeaponTargetDestroyed(
 	AActor* DestroyedActor,
 	const bool bWasDestroyedByOwnWeapons)
 {
+	static_cast<void>(CallingTurret);
+	static_cast<void>(CallingHullWeapon);
+	static_cast<void>(bWasDestroyedByOwnWeapons);
+
+	if (GetIsGameShuttingDown() || bM_IsTeamWeaponAbandoned || not IsValid(DestroyedActor))
+	{
+		return;
+	}
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	const bool bAttackActive = CommandData != nullptr &&
+		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+	AActor* MainTarget = M_SpecificEngageTarget.Get();
+
+	if (bAttackActive)
+	{
+		if (DestroyedActor == MainTarget)
+		{
+			HandleMainAttackTargetBecameInvalid(TEXT("Main target destroyed (team weapon turret)"));
+			return;
+		}
+
+		if (IsValid(MainTarget))
+		{
+			SetPostDeployActionForAttack(MainTarget);
+			TryIssuePostDeployAction();
+			return;
+		}
+
+		HandleMainAttackTargetBecameInvalid(TEXT("Main target invalid after non-main kill"));
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	{
+		StartDeploying();
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed && GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
+	}
 }
 
 void ATeamWeaponController::OnFireWeapon(ACPPTurretsMaster* CallingTurret)
@@ -1588,11 +1703,12 @@ void ATeamWeaponController::OnProjectileHit(const bool bBounced)
 }
 
 void ATeamWeaponController::StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
-                                                   const EAbilityID CompletionAbilityId)
+	const EAbilityID CompletionAbilityId, const bool bIsInternalTurretRotation)
 {
 	M_RotationRequest.M_TargetRotation = DesiredRotation;
 	M_RotationRequest.bM_IsActive = true;
 	M_RotationRequest.bM_ShouldTriggerDoneExecuting = bShouldTriggerDoneExecuting;
+	M_RotationRequest.bM_IsInternalTurretRotation = bIsInternalTurretRotation;
 	M_RotationRequest.M_CompletionAbilityId = CompletionAbilityId;
 	AttachCrewForRotation();
 }
@@ -1601,6 +1717,15 @@ void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 {
 	if (not M_RotationRequest.bM_IsActive)
 	{
+		return;
+	}
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	const bool bHasActiveAttackCommand = CommandData != nullptr &&
+		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+	if (M_RotationRequest.bM_IsInternalTurretRotation && bHasActiveAttackCommand && not M_SpecificEngageTarget.IsValid())
+	{
+		HandleMainAttackTargetBecameInvalid(TEXT("Main target invalid during rotation"));
 		return;
 	}
 
@@ -1643,6 +1768,7 @@ void ATeamWeaponController::FinishRotationRequest()
 {
 	const bool bShouldCallDoneExecuting = M_RotationRequest.bM_ShouldTriggerDoneExecuting;
 	const EAbilityID CompletionAbilityId = M_RotationRequest.M_CompletionAbilityId;
+	const bool bWasInternalTurretRotation = M_RotationRequest.bM_IsInternalTurretRotation;
 	SnapOperatorsToCrewPositionsDuringRotation();
 	M_RotationRequest.Reset();
 	DetachCrewAfterRotation();
@@ -1651,6 +1777,19 @@ void ATeamWeaponController::FinishRotationRequest()
 	if (bShouldCallDoneExecuting && CompletionAbilityId != EAbilityID::IdNoAbility)
 	{
 		DoneExecutingCommand(CompletionAbilityId);
+	}
+
+	if (bWasInternalTurretRotation && not bM_IsTeamWeaponAbandoned && GetIsValidTeamWeapon() &&
+		not GetHasPendingMovePostPackAction())
+	{
+		if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+		{
+			StartDeploying();
+		}
+		else if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
+		{
+			M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
+		}
 	}
 
 	TryIssuePostDeployAction();
