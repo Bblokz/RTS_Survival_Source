@@ -58,6 +58,7 @@ struct FTeamWeaponDeferredAction
 		bM_HasRotation = false;
 		bM_HasTargetActor = false;
 		bM_ShouldTriggerDoneExecuting = true;
+		bM_IsInternalTurretRotation = false;
 	}
 
 	/**
@@ -73,7 +74,8 @@ struct FTeamWeaponDeferredAction
 	 */
 	void InitForCommand(const EAbilityID AbilityId, const bool bInHasLocation, const FVector& InTargetLocation,
 	                    const bool bInHasRotation, const FRotator& InTargetRotation, AActor* InTargetActor,
-	                    const bool bInShouldTriggerDoneExecuting = true)
+	                    const bool bInShouldTriggerDoneExecuting = true,
+	                    const bool bInIsInternalTurretRotation = false)
 	{
 		Reset();
 		M_AbilityId = AbilityId;
@@ -84,6 +86,7 @@ struct FTeamWeaponDeferredAction
 		M_TargetRotation = InTargetRotation;
 		M_TargetActor = InTargetActor;
 		bM_ShouldTriggerDoneExecuting = bInShouldTriggerDoneExecuting;
+		bM_IsInternalTurretRotation = bInIsInternalTurretRotation;
 	}
 
 	EAbilityID GetAbilityId() const { return M_AbilityId; }
@@ -92,6 +95,7 @@ struct FTeamWeaponDeferredAction
 	bool GetHasRotation() const { return bM_HasRotation; }
 	bool GetHasTargetActor() const { return bM_HasTargetActor; }
 	bool GetShouldTriggerDoneExecuting() const { return bM_ShouldTriggerDoneExecuting; }
+	bool GetIsInternalTurretRotation() const { return bM_IsInternalTurretRotation; }
 	const FVector& GetTargetLocation() const { return M_TargetLocation; }
 	const FRotator& GetTargetRotation() const { return M_TargetRotation; }
 	TWeakObjectPtr<AActor> GetTargetActor() const { return M_TargetActor; }
@@ -105,6 +109,7 @@ private:
 	bool bM_HasRotation = false;
 	bool bM_HasTargetActor = false;
 	bool bM_ShouldTriggerDoneExecuting = true;
+	bool bM_IsInternalTurretRotation = false;
 };
 
 
@@ -237,8 +242,10 @@ private:
 	bool GetHasPendingMovePostPackAction() const;
 
 	void SetPostPackActionForRotate(const FRotator& DesiredRotation, const EAbilityID AbilityId,
-	                                 const bool bShouldTriggerDoneExecuting);
+	                                 const bool bShouldTriggerDoneExecuting,
+	                                 const bool bIsInternalTurretRotation);
 	void SetPostDeployActionForAttack(AActor* TargetActor);
+	bool GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor) const;
 	void ApplyCrewRoleWeaponRestrictions() const;
 	void IssueSpecificEngageForGuards(AActor* TargetActor) const;
 	void TerminateSpecificEngageForGuards() const;
