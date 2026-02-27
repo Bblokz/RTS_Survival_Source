@@ -193,6 +193,7 @@ private:
 	void AbandonTeamWeapon();
 	bool GetIsGameShuttingDown() const;
 	bool GetIsValidTeamWeapon() const;
+	bool GetIsPushedWeaponLeadsMovementType() const;
 	bool GetIsValidTeamWeaponMover() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
 	bool GetIsValidDigInComponent() const;
