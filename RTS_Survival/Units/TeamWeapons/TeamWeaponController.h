@@ -44,7 +44,7 @@ struct FTeamWeaponCrewAssignment
 };
 
 USTRUCT()
-struct FTeamWeaponPostDeployPackAction
+struct FTeamWeaponDeferredAction
 {
 	GENERATED_BODY()
 
@@ -61,7 +61,7 @@ struct FTeamWeaponPostDeployPackAction
 	}
 
 	/**
-	 * @brief Initializes the action payload so post-pack execution can be deterministic.
+	 * @brief Initializes the action payload so deferred execution can be deterministic.
 	 * Captures only the data needed for the intended command and clears unused fields.
 	 *
 	 * @param AbilityId Command to execute after packing or deploying completes.
@@ -230,11 +230,12 @@ private:
 	/** @brief Cached timer callback that finalizes the deployment sequence. */
 	void HandleDeployingTimerFinished();
 
-	void SetPostDeployPackActionForMove(const FVector MoveToLocation);
-	bool GetHasPendingMovePostDeployPackAction() const;
+	void SetPostPackActionForMove(const FVector MoveToLocation);
+	bool GetHasPendingMovePostPackAction() const;
 
-	void SetPostDeployPackActionForRotate(const FRotator& DesiredRotation, const EAbilityID AbilityId,
+	void SetPostPackActionForRotate(const FRotator& DesiredRotation, const EAbilityID AbilityId,
 	                                 const bool bShouldTriggerDoneExecuting);
+	void SetPostDeployActionForAttack(AActor* TargetActor);
 	void StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
 	                         const EAbilityID CompletionAbilityId);
 	void TickRotationRequest(const float DeltaSeconds);
@@ -249,10 +250,13 @@ private:
 	void MoveGuardsToRandomGuardPositions() const;
 	bool TryGetRandomGuardLocation(FVector& OutGuardLocation) const;
 	FVector GetMoveLocationWithinTurretRange(const FVector& TargetLocation, const ACPPTurretsMaster* CallingTurret) const;
-	void TryIssuePostDeployPackAction();
-	void IssuePostDeployPackAction();
-	void IssuePostDeployPackAction_Move();
-	void IssuePostDeployPackAction_Rotate();
+	void TryIssuePostPackAction();
+	void IssuePostPackAction();
+	void IssuePostPackAction_Move();
+	void IssuePostPackAction_Rotate();
+	void TryIssuePostDeployAction();
+	void IssuePostDeployAction();
+	void IssuePostDeployAction_Attack();
 	void UpdateCrewMoveOffsets();
 	bool TryGetCrewMemberOffset(const ASquadUnit* SquadUnit, FVector& OutOffset) const;
 	bool GetIsCrewOperator(const ASquadUnit* SquadUnit) const;
@@ -314,9 +318,13 @@ private:
 	UPROPERTY()
 	TArray<FTeamWeaponCrewMemberOffset> M_CrewMoveOffsets;
 
-	// Pending command data that should execute after packing/deploying completes.
+	// Pending command data that should execute after packing completes.
 	UPROPERTY()
-	FTeamWeaponPostDeployPackAction M_PostDeployPackAction;
+	FTeamWeaponDeferredAction M_PostPackAction;
+
+	// Pending command data that should execute after deploying completes.
+	UPROPERTY()
+	FTeamWeaponDeferredAction M_PostDeployAction;
 
 	UPROPERTY()
 	FTimerHandle M_DeployTimer;
