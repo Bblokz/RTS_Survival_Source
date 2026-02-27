@@ -139,6 +139,7 @@ class RTS_SURVIVAL_API ATeamWeaponController : public ASquadController, public I
 public:
 	ATeamWeaponController();
 	bool RequestInternalRotateTowards(const FRotator& DesiredRotation);
+	bool GetIsReadyDeployed() const;
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
 
@@ -236,6 +237,9 @@ private:
 	void SetPostPackActionForRotate(const FRotator& DesiredRotation, const EAbilityID AbilityId,
 	                                 const bool bShouldTriggerDoneExecuting);
 	void SetPostDeployActionForAttack(AActor* TargetActor);
+	void ApplyCrewRoleWeaponRestrictions() const;
+	void IssueSpecificEngageForGuards(AActor* TargetActor) const;
+	void TerminateSpecificEngageForGuards() const;
 	void StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
 	                         const EAbilityID CompletionAbilityId);
 	void TickRotationRequest(const float DeltaSeconds);

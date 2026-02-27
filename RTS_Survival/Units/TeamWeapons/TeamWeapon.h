@@ -225,6 +225,7 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<ATeamWeaponController> M_TeamWeaponController;
 	[[nodiscard]] bool GetIsValidTeamWeaponController() const;
+	[[nodiscard]] bool GetIsControllerReadyDeployed() const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon", meta = (AllowPrivateAccess = "true"))
 	FTeamWeaponConfig M_TeamWeaponConfig;
