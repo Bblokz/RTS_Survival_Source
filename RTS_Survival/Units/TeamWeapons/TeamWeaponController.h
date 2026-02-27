@@ -118,12 +118,14 @@ struct FTeamWeaponRotationRequest
 		M_TargetRotation = FRotator::ZeroRotator;
 		bM_IsActive = false;
 		bM_ShouldTriggerDoneExecuting = false;
+		bM_IsInternalTurretRotation = false;
 		M_CompletionAbilityId = EAbilityID::IdNoAbility;
 	}
 
 	FRotator M_TargetRotation = FRotator::ZeroRotator;
 	bool bM_IsActive = false;
 	bool bM_ShouldTriggerDoneExecuting = false;
+	bool bM_IsInternalTurretRotation = false;
 	EAbilityID M_CompletionAbilityId = EAbilityID::IdNoAbility;
 };
 
@@ -240,8 +242,9 @@ private:
 	void ApplyCrewRoleWeaponRestrictions() const;
 	void IssueSpecificEngageForGuards(AActor* TargetActor) const;
 	void TerminateSpecificEngageForGuards() const;
+	void HandleMainAttackTargetBecameInvalid(const FString& Reason);
 	void StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
-	                         const EAbilityID CompletionAbilityId);
+	                         const EAbilityID CompletionAbilityId, const bool bIsInternalTurretRotation);
 	void TickRotationRequest(const float DeltaSeconds);
 	void RotateControllerAndTeamWeapon(const float StepYaw);
 	void FinishRotationRequest();
