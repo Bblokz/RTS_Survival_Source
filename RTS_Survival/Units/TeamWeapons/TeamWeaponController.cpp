@@ -311,8 +311,19 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 		return true;
 	}
 
+	AActor* TargetActorForPostDeploy = M_SpecificEngageTarget.Get();
+	if (not IsValid(TargetActorForPostDeploy))
+	{
+		TargetActorForPostDeploy = M_TeamWeapon->GetSpecificEngageTarget();
+	}
+
+	if (IsValid(TargetActorForPostDeploy))
+	{
+		M_SpecificEngageTarget = TargetActorForPostDeploy;
+	}
+
 	SetPostPackActionForRotate(DesiredRotation, EAbilityID::IdRotateTowards, false);
-	SetPostDeployActionForAttack(M_SpecificEngageTarget.Get());
+	SetPostDeployActionForAttack(TargetActorForPostDeploy);
 
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
 	{
