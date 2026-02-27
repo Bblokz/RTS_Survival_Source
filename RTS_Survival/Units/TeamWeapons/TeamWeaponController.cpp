@@ -149,6 +149,11 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 		return;
 	}
 
+	if (GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(TargetActor))
+	{
+		return;
+	}
+
 	if (bM_IsTeamWeaponAbandoned)
 	{
 		Super::ExecuteAttackCommand(TargetActor);
@@ -258,7 +263,7 @@ void ATeamWeaponController::ExecuteRotateTowardsCommand(const FRotator RotateToR
 		return;
 	}
 
-	SetPostPackActionForRotate(RotateToRotator, EAbilityID::IdRotateTowards, IsQueueCommand);
+	SetPostPackActionForRotate(RotateToRotator, EAbilityID::IdRotateTowards, IsQueueCommand, false);
 
 	if (M_TeamWeaponState == ETeamWeaponState::Deploying)
 	{
@@ -308,18 +313,26 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 		return true;
 	}
 
-	AActor* TargetActorForPostDeploy = M_SpecificEngageTarget.Get();
-	if (not IsValid(TargetActorForPostDeploy))
+	UCommandData* CommandData = GetIsValidCommandData();
+	const bool bHasActiveAttackCommand = CommandData != nullptr &&
+		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+
+	AActor* TargetActorForPostDeploy = nullptr;
+	if (bHasActiveAttackCommand)
+	{
+		TargetActorForPostDeploy = M_SpecificEngageTarget.Get();
+		if (not IsValid(TargetActorForPostDeploy))
+		{
+			HandleMainAttackTargetBecameInvalid(TEXT("Main target invalid while queuing internal rotation"));
+			return false;
+		}
+	}
+	else
 	{
 		TargetActorForPostDeploy = M_TeamWeapon->GetSpecificEngageTarget();
 	}
 
-	if (IsValid(TargetActorForPostDeploy))
-	{
-		M_SpecificEngageTarget = TargetActorForPostDeploy;
-	}
-
-	SetPostPackActionForRotate(DesiredRotation, EAbilityID::IdRotateTowards, false);
+	SetPostPackActionForRotate(DesiredRotation, EAbilityID::IdRotateTowards, false, true);
 	SetPostDeployActionForAttack(TargetActorForPostDeploy);
 
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
@@ -826,7 +839,8 @@ bool ATeamWeaponController::GetHasPendingMovePostPackAction() const
 
 void ATeamWeaponController::SetPostPackActionForRotate(const FRotator& DesiredRotation,
 	const EAbilityID AbilityId,
-	const bool bShouldTriggerDoneExecuting)
+	const bool bShouldTriggerDoneExecuting,
+	const bool bIsInternalTurretRotation)
 {
 	M_PostPackAction.InitForCommand(
 		AbilityId,
@@ -835,7 +849,35 @@ void ATeamWeaponController::SetPostPackActionForRotate(const FRotator& DesiredRo
 		true,
 		DesiredRotation,
 		nullptr,
-		bShouldTriggerDoneExecuting);
+		bShouldTriggerDoneExecuting,
+		bIsInternalTurretRotation);
+}
+
+bool ATeamWeaponController::GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor) const
+{
+	if (not IsValid(NewTargetActor))
+	{
+		return false;
+	}
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (CommandData == nullptr)
+	{
+		return false;
+	}
+
+	if (CommandData->GetCurrentlyActiveCommandType() != EAbilityID::IdAttack)
+	{
+		return false;
+	}
+
+	AActor* CurrentMainTarget = M_SpecificEngageTarget.Get();
+	if (not IsValid(CurrentMainTarget))
+	{
+		return false;
+	}
+
+	return NewTargetActor != CurrentMainTarget;
 }
 
 void ATeamWeaponController::SetPostDeployActionForAttack(AActor* TargetActor)
@@ -945,7 +987,7 @@ void ATeamWeaponController::IssuePostPackAction_Rotate()
 		M_PostPackAction.GetTargetRotation(),
 		M_PostPackAction.GetShouldTriggerDoneExecuting(),
 		EAbilityID::IdRotateTowards,
-		false);
+		M_PostPackAction.GetIsInternalTurretRotation());
 	M_PostPackAction.Reset();
 }
 
@@ -1580,8 +1622,20 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 		return;
 	}
 
+	UCommandData* CommandData = GetIsValidCommandData();
+	const bool bHasActiveAttackCommand = CommandData != nullptr &&
+		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+
 	AActor* SpecificEngageTarget = M_SpecificEngageTarget.Get();
-	if (SpecificEngageTarget == nullptr && IsValid(CallingTurret))
+	if (bHasActiveAttackCommand)
+	{
+		if (not IsValid(SpecificEngageTarget))
+		{
+			HandleMainAttackTargetBecameInvalid(TEXT("Main target invalid while handling out of range"));
+			return;
+		}
+	}
+	else if (SpecificEngageTarget == nullptr && IsValid(CallingTurret))
 	{
 		SpecificEngageTarget = CallingTurret->GetCurrentTargetActor();
 	}
@@ -1779,17 +1833,10 @@ void ATeamWeaponController::FinishRotationRequest()
 		DoneExecutingCommand(CompletionAbilityId);
 	}
 
-	if (bWasInternalTurretRotation && not bM_IsTeamWeaponAbandoned && GetIsValidTeamWeapon() &&
-		not GetHasPendingMovePostPackAction())
+	if (bWasInternalTurretRotation && M_TeamWeaponState == ETeamWeaponState::Ready_Packed &&
+		not bM_IsTeamWeaponAbandoned && GetIsValidTeamWeapon() && not GetHasPendingMovePostPackAction())
 	{
-		if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
-		{
-			StartDeploying();
-		}
-		else if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
-		{
-			M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
-		}
+		StartDeploying();
 	}
 
 	TryIssuePostDeployAction();
