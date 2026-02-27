@@ -434,22 +434,18 @@ void UAttachedRockets::OnRocketLoadedAsync()
 void UAttachedRockets::CreateRocketInstances()
 {
 	AActor* OwnerActor = GetOwner();
-	if (!OwnerActor)
+	if (not OwnerActor)
 	{
 		ReportError(TEXT("Owner is invalid in CreateRocketInstances."));
 		return;
 	}
-
-	// A manual setup may have occured on a child actor comp; so we ensure to attach to the frame mesh as root.
-	USceneComponent* RootComp = bM_WasSetupManually ? M_FrameMeshComponent : OwnerActor->GetRootComponent();
-	if (!RootComp)
+	if (not EnsureFrameMeshCompIsValid())
 	{
-		ReportError(TEXT("Owner has no RootComponent to attach rocket instancer to."));
 		return;
 	}
 
 	M_RocketsInstances = NewObject<URTSHidableInstancedStaticMeshComponent>(OwnerActor);
-	if (M_RocketsInstances == nullptr)
+	if (not IsValid(M_RocketsInstances))
 	{
 		ReportError(TEXT("Failed to allocate UInstancedStaticMeshComponent for rockets."));
 		return;
@@ -460,7 +456,9 @@ void UAttachedRockets::CreateRocketInstances()
 	}
 	SetRocketInstancesCollision();
 
-	M_RocketsInstances->AttachToComponent(RootComp, FAttachmentTransformRules::KeepRelativeTransform);
+	M_RocketsInstances->SetUsingAbsoluteScale(true);
+	M_RocketsInstances->AttachToComponent(M_FrameMeshComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	M_RocketsInstances->SetWorldScale3D(FVector::OneVector);
 	M_RocketsInstances->SetStaticMesh(RocketMesh.Get());
 	M_RocketsInstances->RegisterComponent();
 
@@ -477,7 +475,7 @@ void UAttachedRockets::CreateRocketInstances()
 		FVector WorldLoc = FrameWorldXform.TransformPosition(LocCompSpace);
 		FQuat WorldRot = FrameWorldXform.TransformRotation(RotCompSpace);
 
-		FTransform InstWorldXform(WorldRot, WorldLoc);
+		FTransform InstWorldXform(WorldRot, WorldLoc, FVector::OneVector);
 		const int32 InstanceRocketIndex = M_RocketsInstances->AddInstance(InstWorldXform, true);
 		M_RocketIndexToSocketName.Add(InstanceRocketIndex, SockName);
 	}
