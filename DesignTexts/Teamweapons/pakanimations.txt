@@ -1,85 +1,20 @@
-﻿ you are going to implement various functions and constants for new squad data entries and subtypes to be used by the 
- new team weapons derived blueprints.
+﻿currently there is an issue with the attacking of targets through the attack execute command on the team weapons;
+ essentially when the team weapon is not in range the squad units will move closer but the weapon itsefl stays put and stays deployed
+ it seems to completely disregard guards and operators;
+ make sure that we always pack the weapon before moving and make sure that in the case that the weapon needs to be move closer to the target
+ the guards wait until the full squad can move just like with regular movement commands.
  
- under
- void UTrainingMenuManager::InitAllGameSquadTrainingOptions()
-add new functions (privates) for init all antitankGunTWTrainingOptions, init all mortarTWTrainingOptions, init all flak team weapons data, init all artillery tw training options
-and init all machine gunTWTrainingOptions.
-
-we will need separate costs constants in the developer settings for each with the at guns, flak guns, artillery, and the mortar crews also costing
-some metal while mg teams only cost radixite.
-we need training time constants for them too; for each type of team weapon and also for the various sizes within those;
-medium at weapon heavy at weapon etc...
-
-idem for InitAllGameSquadData there we need to call sub functions for the different types of team weapons as well.
-we also need to define new constants for their vision radii while the health will be reused from the infantry constants settings.
-for the ability arrays :
-AntiTankGun : attack, move, stop ,  no ability no ability
-		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdAttackGround,
-		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdNoAbility
-idem for mortars, Idem for artillery, Idem for flak guns and idem for machine gun team weapons.
-
-add the new squad subtypes:
-Squad_Ger_PaK38 
-Squad_Ger_PaK40
-Squad_Rus_Zis_57MM
-Squad_Rus_Zis_76MM
-
-for aa team weapons:
-Squad_Ger_37mmFlak
-Squad_Ger_88mmFlak
-Squad_Rus_Bofors
-Squad_Rus_KS30_130MM
-
-mortar squads:
-Squad_Ger_GrW42_80mm
-Squad_Rus_80mm_Mortar
-Squad_Rus_120mm_Mortar
-
-artillery squads:
-Squad_Ger_LefH18
-Squad_Ger_SFH18_150mm
-Squad_Ger_Nebelwerfer
-Squad_Rus_M1938_122mm
-
-
-Machine gun squads:
-Squad_Ger_LMGSquad (already exists but make sure the card for it exists too) and move its data implementation to the right
-setup function for all the game machine gun tw data.
-Rus_Squad_Maxim
-Rus_Squad_DShK
-
-make sure that for all of these subtypes their squad data entries are defined in the correct
-function (depending on their type of team weapon) their display name is added under Global_GetSquadDisplayName where
-you need to give them good short names (these are used in the UI)
-make sure that the card type (for training the unit) exists.
-
-in addition; make sure that the weapon subtype in EWeaponName exists for the team weapon and that their weapon data is
-added in the game state if needed. It is important that we do not reuse weapon types that are already in use by different
-units as the icon used in the UI depends on this so for example:
-there already exists a Flak36_37MM weapon that is used for buildings but for  the team weapon we need a data entry with te exact same
-stats but  a differt enum so we can assign a different image for it;
-so under 	// Flak 36 37mm
-         	WeaponData.WeaponName = EWeaponName::Flak36_37MM;
-         	WeaponData.DamageType = ERTSDamageType::Kinetic;
-         	WeaponData.WeaponCalibre = 37;
-         	WeaponData.TNTExplosiveGrams = 18.2f;
-         	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
-         		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * FlakCannonBonusDamageFactor;
-         	WeaponData.ArmorPen = 45;
-         	WeaponData.ArmorPenMaxRange = 31;
-         	WeaponData.MagCapacity = 6;
-         	WeaponData.ReloadSpeed = 2;
-         	WeaponData.BaseCooldown = 0.38f;
-         	WeaponData.CooldownFlux = 10;
-         	WeaponData.Accuracy = 60;
-         	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
-         	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak36_37MM, WeaponData); add another entry with the new enum for the team weapon.
-make sure the display names for all the new weapons are added too.
-
-note that Global_GetWeaponValue is not needed as these are not regular squad weapons.
-
-when you are done the data entries for all the new squad team weapons must exists as well as their weapons
-double check that you did not forget any of the above steps for any of the new squad subtypes and their corresponding weapons.
+ another issue is that sometimes the weapon operators are teleported to their location through the landscape this should not happen; make sure
+ to use landscape channel traces to find the valid locations and teleport them without moving through the landscape itself.
+ 
+ fix both of these issues and explain your work in chat.
+ 
+ look throug the digin component and how the void ATrackedTankMaster::ExecuteDigIn()
+ works and how it updates the tracked tank master when it is dug in. 
+ also look through the assault tank which is expected to use an embedded turret (like our team weapon) and how it locks it down when dug in and frees it after.
+ i want you to implement the dig in functionality for the team weapon in a similair way. make sure that when digging in the weapon actor can nolonger rotate
+ (like the assault tank) and is freed of this after the wall is destroyed or the unit uses undig.
+ make sure that the team weapon will only start execute of dig in on the dig in component (cache at post init like always) after it is deployed
+ so if it is not deployed at the time of exec the command first let it deploy (wait for montage) and then execute the dig in on the dig in component.
+ 
+ 
