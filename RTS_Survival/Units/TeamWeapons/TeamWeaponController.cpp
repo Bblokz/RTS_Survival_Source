@@ -1817,6 +1817,13 @@ void ATeamWeaponController::FinishRotationRequest()
 	const bool bShouldCallDoneExecuting = M_RotationRequest.bM_ShouldTriggerDoneExecuting;
 	const EAbilityID CompletionAbilityId = M_RotationRequest.M_CompletionAbilityId;
 	const bool bWasInternalTurretRotation = M_RotationRequest.bM_IsInternalTurretRotation;
+	UCommandData* CommandData = GetIsValidCommandData();
+	const bool bHasActiveAttackCommand = CommandData != nullptr &&
+		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+	const bool bHasPendingPostDeployAttack = M_PostDeployAction.GetAbilityId() == EAbilityID::IdAttack;
+	AActor* MainSpecificTarget = M_SpecificEngageTarget.Get();
+	const bool bHasSpecificEngageTarget = IsValid(MainSpecificTarget);
+	const bool bHasAttackIntent = bHasActiveAttackCommand || bHasPendingPostDeployAttack || bHasSpecificEngageTarget;
 	SnapOperatorsToCrewPositionsDuringRotation();
 	M_RotationRequest.Reset();
 	DetachCrewAfterRotation();
@@ -1827,10 +1834,17 @@ void ATeamWeaponController::FinishRotationRequest()
 		DoneExecutingCommand(CompletionAbilityId);
 	}
 
-	if (bWasInternalTurretRotation && M_TeamWeaponState == ETeamWeaponState::Ready_Packed &&
-		not bM_IsTeamWeaponAbandoned && GetIsValidTeamWeapon() && not GetHasPendingMovePostPackAction())
+	if ((bWasInternalTurretRotation || bHasAttackIntent) && not bM_IsTeamWeaponAbandoned && GetIsValidTeamWeapon() &&
+		not GetHasPendingMovePostPackAction())
 	{
-		StartDeploying();
+		if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+		{
+			StartDeploying();
+		}
+		else if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
+		{
+			M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
+		}
 	}
 
 	TryIssuePostDeployAction();
