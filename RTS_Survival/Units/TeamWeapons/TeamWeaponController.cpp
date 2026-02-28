@@ -148,6 +148,7 @@ void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 void ATeamWeaponController::TerminateMoveCommand()
 {
 	Super::TerminateMoveCommand();
+	CancelInternalOutOfRangeMove();
 	RestorePushedMoveSpeedOverride();
 
 	if (GetIsValidTeamWeaponMover())
@@ -193,6 +194,8 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 
 void ATeamWeaponController::TerminateAttackCommand()
 {
+	CancelInternalOutOfRangeMove();
+	M_PostPackAction.Reset();
 	M_SpecificEngageTarget.Reset();
 	M_PostDeployAction.Reset();
 	bM_HasGuardEngageFlowTargetLocation = false;
@@ -314,6 +317,7 @@ void ATeamWeaponController::TerminateRotateTowardsCommand()
 {
 	M_PostPackAction.Reset();
 	M_PostDeployAction.Reset();
+	CancelInternalOutOfRangeMove();
 	bM_HasCachedOutOfRangeMoveLocation = false;
 	FinishRotationRequest();
 }
@@ -431,6 +435,17 @@ void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbili
 
 void ATeamWeaponController::OnUnitIdleAndNoNewCommands()
 {
+	if (bM_HasInternalOutOfRangeReposition && M_TeamWeaponState == ETeamWeaponState::Moving)
+	{
+		if (GetIsValidTeamWeaponMover())
+		{
+			M_TeamWeaponMover->StopLegacyFollowCrew();
+		}
+
+		HandleInternalOutOfRangeMoveCompleted(true);
+		return;
+	}
+
 	Super::OnUnitIdleAndNoNewCommands();
 	ApplyCrewRoleWeaponRestrictions();
 
@@ -850,6 +865,71 @@ void ATeamWeaponController::SetPostPackActionForMove(const FVector MoveToLocatio
 		nullptr);
 }
 
+void ATeamWeaponController::StartInternalOutOfRangeReposition(const FVector MoveToLocation, AActor* TargetActor)
+{
+	if (not IsValid(TargetActor))
+	{
+		return;
+	}
+
+	bM_HasInternalOutOfRangeReposition = true;
+	M_SpecificEngageTarget = TargetActor;
+	SetPostPackActionForMove(MoveToLocation);
+	SetPostDeployActionForAttack(TargetActor);
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed || M_TeamWeaponState == ETeamWeaponState::Deploying)
+	{
+		StartPacking();
+		return;
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Packing)
+	{
+		return;
+	}
+
+	TryIssuePostPackAction();
+}
+
+void ATeamWeaponController::HandleInternalOutOfRangeMoveCompleted(const bool bMoveSucceeded)
+{
+	if (not bM_HasInternalOutOfRangeReposition)
+	{
+		return;
+	}
+
+	bM_HasInternalOutOfRangeReposition = false;
+
+	AActor* TargetActor = M_SpecificEngageTarget.Get();
+	if (not bMoveSucceeded || not IsValid(TargetActor))
+	{
+		HandleMainAttackTargetBecameInvalid(TEXT("Internal out-of-range move could not continue attack"));
+		return;
+	}
+
+	SetPostDeployActionForAttack(TargetActor);
+
+	if (M_TeamWeaponState == ETeamWeaponState::Moving)
+	{
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	}
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	{
+		StartDeploying();
+		return;
+	}
+
+	TryIssuePostDeployAction();
+}
+
+void ATeamWeaponController::CancelInternalOutOfRangeMove()
+{
+	bM_HasInternalOutOfRangeReposition = false;
+	bM_HasCachedOutOfRangeMoveLocation = false;
+	bM_HasGuardEngageFlowTargetLocation = false;
+}
+
 bool ATeamWeaponController::GetHasPendingMovePostPackAction() const
 {
 	return M_PostPackAction.GetAbilityId() == EAbilityID::IdMove;
@@ -1156,6 +1236,18 @@ void ATeamWeaponController::HandleMainAttackTargetBecameInvalid(const FString& R
 
 	bM_HasGuardEngageFlowTargetLocation = false;
 	bM_HasCachedOutOfRangeMoveLocation = false;
+	bM_HasInternalOutOfRangeReposition = false;
+
+	if (M_TeamWeaponState == ETeamWeaponState::Moving)
+	{
+		if (GetIsValidTeamWeaponMover())
+		{
+			M_TeamWeaponMover->AbortPushedFollowPath(TEXT("Main target invalid during internal reposition"));
+			M_TeamWeaponMover->StopLegacyFollowCrew();
+		}
+
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	}
 
 	if (M_RotationRequest.bM_IsActive)
 	{
@@ -1454,6 +1546,12 @@ void ATeamWeaponController::HandlePushedMoverArrived()
 	bM_HasCachedOutOfRangeMoveLocation = false;
 	bM_HasGuardEngageFlowTargetLocation = false;
 
+	if (bM_HasInternalOutOfRangeReposition)
+	{
+		HandleInternalOutOfRangeMoveCompleted(true);
+		return;
+	}
+
 	TryIssuePostDeployAction();
 
 	DoneExecutingCommand(EAbilityID::IdMove);
@@ -1463,6 +1561,12 @@ void ATeamWeaponController::HandlePushedMoverFailed(const FString& FailureReason
 {
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+
+	if (bM_HasInternalOutOfRangeReposition)
+	{
+		HandleInternalOutOfRangeMoveCompleted(false);
+		return;
+	}
 
 	if (bM_HasCachedOutOfRangeMoveLocation && M_SpecificEngageTarget.IsValid())
 	{
@@ -1684,16 +1788,7 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 	bM_HasCachedOutOfRangeMoveLocation = true;
 	M_GuardEngageFlowTargetLocation = TargetLocation;
 	bM_HasGuardEngageFlowTargetLocation = true;
-	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed || M_TeamWeaponState == ETeamWeaponState::Deploying)
-	{
-		SetPostPackActionForMove(MoveLocation);
-		SetPostDeployActionForAttack(SpecificEngageTarget);
-		StartPacking();
-		return;
-	}
-
-	ExecuteMoveCommand(MoveLocation);
-	SetPostDeployActionForAttack(SpecificEngageTarget);
+	StartInternalOutOfRangeReposition(MoveLocation, SpecificEngageTarget);
 }
 
 void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
