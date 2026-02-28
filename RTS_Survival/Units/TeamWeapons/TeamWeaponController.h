@@ -240,6 +240,9 @@ private:
 	void HandleDeployingTimerFinished();
 
 	void SetPostPackActionForMove(const FVector MoveToLocation);
+	void StartInternalOutOfRangeReposition(const FVector MoveToLocation, AActor* TargetActor);
+	void HandleInternalOutOfRangeMoveCompleted(const bool bMoveSucceeded);
+	void CancelInternalOutOfRangeMove();
 	bool GetHasPendingMovePostPackAction() const;
 
 	void SetPostPackActionForRotate(const FRotator& DesiredRotation, const EAbilityID AbilityId,
@@ -373,6 +376,10 @@ private:
 
 	UPROPERTY()
 	bool bM_HasCachedOutOfRangeMoveLocation = false;
+
+	// Tracks internal reposition flow used by team-weapon out-of-range attack handling.
+	UPROPERTY()
+	bool bM_HasInternalOutOfRangeReposition = false;
 
 	UPROPERTY()
 	bool bM_IsTeamWeaponAbandoned = false;
