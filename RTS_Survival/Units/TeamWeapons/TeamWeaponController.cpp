@@ -196,6 +196,7 @@ void ATeamWeaponController::TerminateAttackCommand()
 	M_SpecificEngageTarget.Reset();
 	M_PostDeployAction.Reset();
 	bM_HasGuardEngageFlowTargetLocation = false;
+	bM_HasCachedOutOfRangeMoveLocation = false;
 	TerminateSpecificEngageForGuards();
 	ApplyCrewRoleWeaponRestrictions();
 
@@ -313,6 +314,7 @@ void ATeamWeaponController::TerminateRotateTowardsCommand()
 {
 	M_PostPackAction.Reset();
 	M_PostDeployAction.Reset();
+	bM_HasCachedOutOfRangeMoveLocation = false;
 	FinishRotationRequest();
 }
 
@@ -432,7 +434,7 @@ void ATeamWeaponController::OnUnitIdleAndNoNewCommands()
 	Super::OnUnitIdleAndNoNewCommands();
 	ApplyCrewRoleWeaponRestrictions();
 
-	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	if (GetShouldAutoDeployOnIdle())
 	{
 		StartDeploying();
 	}
@@ -1153,6 +1155,7 @@ void ATeamWeaponController::HandleMainAttackTargetBecameInvalid(const FString& R
 	}
 
 	bM_HasGuardEngageFlowTargetLocation = false;
+	bM_HasCachedOutOfRangeMoveLocation = false;
 
 	if (M_RotationRequest.bM_IsActive)
 	{
@@ -1448,6 +1451,7 @@ void ATeamWeaponController::HandlePushedMoverArrived()
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	M_PostPackAction.Reset();
+	bM_HasCachedOutOfRangeMoveLocation = false;
 	bM_HasGuardEngageFlowTargetLocation = false;
 
 	TryIssuePostDeployAction();
@@ -1459,8 +1463,18 @@ void ATeamWeaponController::HandlePushedMoverFailed(const FString& FailureReason
 {
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+
+	if (bM_HasCachedOutOfRangeMoveLocation && M_SpecificEngageTarget.IsValid())
+	{
+		SetPostPackActionForMove(M_CachedOutOfRangeMoveLocation);
+		SetPostDeployActionForAttack(M_SpecificEngageTarget.Get());
+		TryIssuePostPackAction();
+		return;
+	}
+
 	M_PostPackAction.Reset();
 	M_PostDeployAction.Reset();
+	bM_HasCachedOutOfRangeMoveLocation = false;
 	bM_HasGuardEngageFlowTargetLocation = false;
 	if (GetIsGameShuttingDown())
 	{
@@ -1627,6 +1641,8 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 		return;
 	}
 
+	bM_HasCachedOutOfRangeMoveLocation = false;
+
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
@@ -1664,6 +1680,8 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 	SetPostDeployActionForAttack(SpecificEngageTarget);
 
 	const FVector MoveLocation = GetMoveLocationWithinTurretRange(TargetLocation, CallingTurret);
+	M_CachedOutOfRangeMoveLocation = MoveLocation;
+	bM_HasCachedOutOfRangeMoveLocation = true;
 	M_GuardEngageFlowTargetLocation = TargetLocation;
 	bM_HasGuardEngageFlowTargetLocation = true;
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed || M_TeamWeaponState == ETeamWeaponState::Deploying)
@@ -1686,6 +1704,8 @@ void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 	{
 		return;
 	}
+
+	bM_HasCachedOutOfRangeMoveLocation = false;
 
 	if (not GetIsValidTeamWeapon())
 	{
@@ -2079,6 +2099,38 @@ FRotator ATeamWeaponController::GetOwnerRotation() const
 	return GetActorRotation();
 }
 
+
+bool ATeamWeaponController::GetShouldAutoDeployOnIdle() const
+{
+	if (M_TeamWeaponState != ETeamWeaponState::Ready_Packed)
+	{
+		return false;
+	}
+
+	if (M_PostPackAction.GetHasAction())
+	{
+		return false;
+	}
+
+	if (bM_HasCachedOutOfRangeMoveLocation)
+	{
+		return false;
+	}
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (CommandData == nullptr)
+	{
+		return true;
+	}
+
+	const bool bHasActiveAttackCommand = CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+	if (bHasActiveAttackCommand && M_SpecificEngageTarget.IsValid())
+	{
+		return false;
+	}
+
+	return true;
+}
 void ATeamWeaponController::TryAbandonTeamWeaponForInsufficientCrew()
 {
 	if (GetIsGameShuttingDown())
@@ -2109,6 +2161,7 @@ void ATeamWeaponController::AbandonTeamWeapon()
 	SetTeamWeaponState(ETeamWeaponState::Abandoned);
 	M_PostPackAction.Reset();
 	M_PostDeployAction.Reset();
+	bM_HasCachedOutOfRangeMoveLocation = false;
 	FinishRotationRequest();
 
 	if (GetIsValidTeamWeaponMover())
