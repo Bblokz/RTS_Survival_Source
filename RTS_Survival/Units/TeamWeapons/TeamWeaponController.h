@@ -281,6 +281,7 @@ private:
 	void IssueMoveCrewToPositions();
 	void ShowDeployingAnimatedText() const;
 	void ShowPackingAnimatedText() const;
+	bool GetShouldAutoDeployOnIdle() const;
 
 	// ---- ITurretOwner ----
 	virtual int GetOwningPlayer() override;
@@ -365,6 +366,13 @@ private:
 
 	UPROPERTY()
 	bool bM_HasGuardEngageFlowTargetLocation = false;
+
+	// Cached fallback move location for out-of-range reposition retries when pushed movement fails.
+	UPROPERTY()
+	FVector M_CachedOutOfRangeMoveLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	bool bM_HasCachedOutOfRangeMoveLocation = false;
 
 	UPROPERTY()
 	bool bM_IsTeamWeaponAbandoned = false;
