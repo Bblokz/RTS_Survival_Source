@@ -175,12 +175,21 @@ void ATeamWeapon::SetWeaponsEnabledForTeamWeaponState(const bool bEnableWeapons)
 		return;
 	}
 
-	if (AActor* SpecificEngageTarget = M_SpecificEngageTarget.Get())
+	AActor* SpecificEngageTarget = M_SpecificEngageTarget.Get();
+	if (SpecificEngageTarget == nullptr)
+	{
+		M_SpecificEngageTarget.Reset();
+		SetAutoEngageTargets(true);
+		return;
+	}
+
+	if (IsValid(SpecificEngageTarget))
 	{
 		SetEngageSpecificTarget(SpecificEngageTarget);
 		return;
 	}
 
+	M_SpecificEngageTarget.Reset();
 	SetAutoEngageTargets(true);
 }
 
