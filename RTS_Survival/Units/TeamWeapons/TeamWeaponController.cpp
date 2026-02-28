@@ -1740,7 +1740,7 @@ int ATeamWeaponController::GetOwningPlayer()
 
 void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret)
 {
-	if (bM_IsTeamWeaponAbandoned)
+	if (bM_IsTeamWeaponAbandoned || not IsValid(CallingTurret))
 	{
 		return;
 	}
@@ -1748,11 +1748,6 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 	bM_HasCachedOutOfRangeMoveLocation = false;
 
 	if (not GetIsValidTeamWeapon())
-	{
-		return;
-	}
-
-	if (not IsValid(CallingTurret) || CallingTurret->GetOwner() != M_TeamWeapon)
 	{
 		return;
 	}
