@@ -1953,6 +1953,7 @@ void ATeamWeaponController::FinishRotationRequest()
 	const bool bShouldCallDoneExecuting = M_RotationRequest.bM_ShouldTriggerDoneExecuting;
 	const EAbilityID CompletionAbilityId = M_RotationRequest.M_CompletionAbilityId;
 	const bool bWasInternalTurretRotation = M_RotationRequest.bM_IsInternalTurretRotation;
+	const bool bHasPendingOutOfRangeReposition = bM_HasInternalOutOfRangeReposition || bM_HasCachedOutOfRangeMoveLocation;
 	UCommandData* CommandData = GetIsValidCommandData();
 	const bool bHasActiveAttackCommand = CommandData != nullptr &&
 		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
@@ -1970,7 +1971,8 @@ void ATeamWeaponController::FinishRotationRequest()
 		DoneExecutingCommand(CompletionAbilityId);
 	}
 
-	if ((bWasInternalTurretRotation || bHasAttackIntent) && not bM_IsTeamWeaponAbandoned && GetIsValidTeamWeapon() &&
+	if ((bWasInternalTurretRotation || bHasAttackIntent) && not bHasPendingOutOfRangeReposition &&
+		not bM_IsTeamWeaponAbandoned && GetIsValidTeamWeapon() &&
 		not GetHasPendingMovePostPackAction())
 	{
 		if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
@@ -2208,6 +2210,11 @@ bool ATeamWeaponController::GetShouldAutoDeployOnIdle()
 	}
 
 	if (bM_HasCachedOutOfRangeMoveLocation)
+	{
+		return false;
+	}
+
+	if (bM_HasInternalOutOfRangeReposition)
 	{
 		return false;
 	}
