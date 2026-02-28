@@ -98,6 +98,22 @@ void ATeamWeaponController::Tick(float DeltaSeconds)
 	TickRotationRequest(DeltaSeconds);
 }
 
+void ATeamWeaponController::UpdateControllerPositionToAverage()
+{
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		Super::UpdateControllerPositionToAverage();
+		return;
+	}
+
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	SetActorLocation(M_TeamWeapon->GetActorLocation());
+}
+
 void ATeamWeaponController::ExecuteMoveCommand(const FVector MoveToLocation)
 {
 	if (bM_IsTeamWeaponAbandoned)
@@ -1612,6 +1628,11 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 	}
 
 	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	if (not IsValid(CallingTurret) || CallingTurret->GetOwner() != M_TeamWeapon)
 	{
 		return;
 	}

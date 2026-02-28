@@ -798,7 +798,7 @@ protected:
 	 * This function is intended to be called repeatedly at a fixed interval.
 	 * @note Called every 0.33 seconds by a timer set in BeginPlay().
 	 */
-	void UpdateControllerPositionToAverage();
+	virtual void UpdateControllerPositionToAverage();
 
 	// Vision range of the squad propagated to the squad units.
 	float M_SquadVisionRange = 0.0f;
