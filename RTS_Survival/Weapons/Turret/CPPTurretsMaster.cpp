@@ -201,6 +201,8 @@ void ACPPTurretsMaster::DisableTurret()
 		M_WorldSpawnedIn->GetTimerManager().ClearTimer(M_WeaponSearchHandle);
 	}
 	DisableAllWeapons();
+	// reset target data.
+	TargetingData.ResetTarget();
 }
 
 void ACPPTurretsMaster::ApplyMaterialToAllMeshComponents(UMaterialInterface* MaterialOverride) const
