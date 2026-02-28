@@ -245,7 +245,7 @@ private:
 	                                 const bool bShouldTriggerDoneExecuting,
 	                                 const bool bIsInternalTurretRotation);
 	void SetPostDeployActionForAttack(AActor* TargetActor);
-	bool GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor) const;
+	bool GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor);
 	void ApplyCrewRoleWeaponRestrictions() const;
 	void IssueSpecificEngageForGuards(AActor* TargetActor) const;
 	void TerminateSpecificEngageForGuards() const;

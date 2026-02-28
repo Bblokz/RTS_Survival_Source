@@ -853,20 +853,14 @@ void ATeamWeaponController::SetPostPackActionForRotate(const FRotator& DesiredRo
 		bIsInternalTurretRotation);
 }
 
-bool ATeamWeaponController::GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor) const
+bool ATeamWeaponController::GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor)
 {
 	if (not IsValid(NewTargetActor))
 	{
 		return false;
 	}
 
-	UCommandData* CommandData = GetIsValidCommandData();
-	if (CommandData == nullptr)
-	{
-		return false;
-	}
-
-	if (CommandData->GetCurrentlyActiveCommandType() != EAbilityID::IdAttack)
+	if (GetCurrentActiveCommand() != EAbilityID::IdAttack)
 	{
 		return false;
 	}

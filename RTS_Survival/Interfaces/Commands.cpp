@@ -1093,6 +1093,16 @@ int32 ICommands::GetConstructionAbilityCount()
 	return Count;
 }
 
+EAbilityID ICommands::GetCurrentActiveCommand()
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return EAbilityID::IdNoAbility;
+	}
+	return UnitCommandData->GetCurrentActiveCommand();
+}
+
 int32 ICommands::GetQueuedFieldConstructionCommandCount(const EFieldConstructionType ConstructionType)
 {
 	const UCommandData* UnitCommandData = GetIsValidCommandData();
