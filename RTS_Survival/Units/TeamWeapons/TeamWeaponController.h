@@ -168,6 +168,7 @@ protected:
 	virtual void TerminateBreakCover() override;
 	virtual void OnUnitIdleAndNoNewCommands() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void UpdateControllerPositionToAverage() override;
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;
 	virtual void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID) override;
 
