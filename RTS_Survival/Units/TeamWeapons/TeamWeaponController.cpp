@@ -2100,7 +2100,7 @@ FRotator ATeamWeaponController::GetOwnerRotation() const
 }
 
 
-bool ATeamWeaponController::GetShouldAutoDeployOnIdle() const
+bool ATeamWeaponController::GetShouldAutoDeployOnIdle()
 {
 	if (M_TeamWeaponState != ETeamWeaponState::Ready_Packed)
 	{
@@ -2117,13 +2117,7 @@ bool ATeamWeaponController::GetShouldAutoDeployOnIdle() const
 		return false;
 	}
 
-	UCommandData* CommandData = GetIsValidCommandData();
-	if (CommandData == nullptr)
-	{
-		return true;
-	}
-
-	const bool bHasActiveAttackCommand = CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+	const bool bHasActiveAttackCommand = GetCurrentActiveCommand() == EAbilityID::IdAttack;
 	if (bHasActiveAttackCommand && M_SpecificEngageTarget.IsValid())
 	{
 		return false;

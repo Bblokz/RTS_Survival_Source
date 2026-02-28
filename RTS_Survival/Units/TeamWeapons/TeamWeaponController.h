@@ -281,7 +281,7 @@ private:
 	void IssueMoveCrewToPositions();
 	void ShowDeployingAnimatedText() const;
 	void ShowPackingAnimatedText() const;
-	bool GetShouldAutoDeployOnIdle() const;
+	bool GetShouldAutoDeployOnIdle();
 
 	// ---- ITurretOwner ----
 	virtual int GetOwningPlayer() override;
