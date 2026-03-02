@@ -390,6 +390,16 @@ TArray<UWeaponState*> ATeamWeaponController::GetWeaponsOfSquad()
 	return Weapons;
 }
 
+void ATeamWeaponController::OnControlledTeamWeaponDied()
+{
+	if (GetIsGameShuttingDown() || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
+	AbandonTeamWeapon();
+}
+
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {
