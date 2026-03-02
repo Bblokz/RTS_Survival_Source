@@ -72,6 +72,14 @@ struct FAttachedWeaponAbilitySettings
 	// The radius of the ability effect.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Radius = 300.0f;
+
+	// Allows overriding loaded weapon data directly from the attached weapon settings.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bEnableWeaponDataOverwrite = false;
+
+	// Applied to every weapon state after setup when bEnableWeaponDataOverwrite is true.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(EditCondition="bEnableWeaponDataOverwrite", EditConditionHides))
+	FWeaponData WeaponDataOverwrite;
 };
 
 /**
@@ -227,6 +235,7 @@ private:
 	void OnProjectileManagerLoaded(const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager);
 	void SetupProjectileManagerIfReady(UWeaponState* Weapon);
 	bool GetIsValidProjectileManager() const;
+	void OverwriteData(UWeaponState* WeaponState) const;
 
 	bool TryPrepareWeaponParameters(FInitWeaponStateDirectHit& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStatTrace& WeaponParameters, const FString& FunctionName);

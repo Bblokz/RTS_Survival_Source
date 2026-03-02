@@ -978,6 +978,13 @@ void UWeaponState::ChangeOwningPlayer(const int32 NewOwningPlayer)
 	}
 }
 
+void UWeaponState::OverwriteCachedWeaponData(const FWeaponData& NewWeaponData)
+{
+	WeaponData = NewWeaponData;
+	M_CurrentMagCapacity = WeaponData.MagCapacity;
+	RefreshDamageTypeClass();
+}
+
 void UWeaponState::BeginDestroy()
 {
 	if (World)

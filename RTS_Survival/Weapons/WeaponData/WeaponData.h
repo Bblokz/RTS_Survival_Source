@@ -614,6 +614,12 @@ public:
 
 	void ChangeOwningPlayer(const int32 NewOwningPlayer);
 
+	/**
+	 * @brief Overwrites the cached weapon data directly, bypassing lookup by enum/game state.
+	 * @param NewWeaponData The weapon values to cache on this state.
+	 */
+	void OverwriteCachedWeaponData(const FWeaponData& NewWeaponData);
+
 	FOnShellTypeChanged OnWeaponShellTypeChanged;
 
 	void SetIsAircraftWeapon(const bool NewbIsAircraftWeapon) { bIsAircraftWeapon = NewbIsAircraftWeapon; };
