@@ -8,6 +8,7 @@
 #include "CrewPositions/CrewPosition.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 ATeamWeapon::ATeamWeapon()
@@ -21,6 +22,7 @@ void ATeamWeapon::BeginPlay()
 
 	// Always first!
 	BeginPlay_InitAnimInstance();
+	BeginPlay_InitTeamWeaponCollision();
 	BeginPlay_ApplyTeamWeaponConfig(M_TeamWeaponConfig);
 	BeginPlay_ForceStartPackedState();
 }
@@ -74,6 +76,20 @@ void ATeamWeapon::BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewCo
 void ATeamWeapon::SetTeamWeaponController(ATeamWeaponController* NewController)
 {
 	M_TeamWeaponController = NewController;
+}
+
+void ATeamWeapon::BeginPlay_InitTeamWeaponCollision()
+{
+	if (not GetIsValidTeamWeaponMesh() || not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	const TArray<UMeshComponent*> TeamWeaponMeshes = {M_TeamWeaponMesh.Get()};
+	FRTS_CollisionSetup::SetupCollisionForTeamWeaponMeshes(
+		TeamWeaponMeshes,
+		M_RTSComponent->GetOwningPlayer()
+	);
 }
 
 void ATeamWeapon::BeginPlay_ForceStartPackedState()

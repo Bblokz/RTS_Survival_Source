@@ -366,6 +366,32 @@ void FRTS_CollisionSetup::SetupCollisionForHullMountedWeapon(UMeshComponent* Mes
 	MeshComponent->SetCanEverAffectNavigation(false);
 }
 
+void FRTS_CollisionSetup::SetupCollisionForTeamWeaponMeshes(const TArray<UMeshComponent*>& WeaponMeshes,
+	                                                         const uint8 OwningPlayer)
+{
+	for (UMeshComponent* WeaponMesh : WeaponMeshes)
+	{
+		if (not IsValid(WeaponMesh))
+		{
+			RTSFunctionLibrary::ReportError("WeaponMesh is invalid in SetupCollisionForTeamWeaponMeshes");
+			continue;
+		}
+
+		WeaponMesh->SetReceivesDecals(false);
+		WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		WeaponMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+		WeaponMesh->SetGenerateOverlapEvents(true);
+		WeaponMesh->SetCanEverAffectNavigation(false);
+		WeaponMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+		WeaponMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
+		WeaponMesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
+
+		const ECollisionChannel CollisionChannelToBlock =
+			OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
+		WeaponMesh->SetCollisionResponseToChannel(CollisionChannelToBlock, ECR_Block);
+	}
+}
+
 void FRTS_CollisionSetup::SetupInfantryWeaponCollision(UStaticMeshComponent* WeaponMesh)
 {
 	if (IsValid(WeaponMesh))
