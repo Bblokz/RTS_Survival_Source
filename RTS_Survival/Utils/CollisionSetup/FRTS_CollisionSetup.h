@@ -55,6 +55,13 @@ public:
 
 	static void SetupCollisionForHullMountedWeapon(UMeshComponent* MeshComponent);
 
+	/**
+	 * @brief Configures team-weapon meshes so world interaction and hit traces remain team-aware.
+	 * @param WeaponMeshes Mesh components that should receive team-weapon collision settings.
+	 * @param OwningPlayer Team owner used to select which weapon-hit trace channel should be blocked.
+	 */
+	static void SetupCollisionForTeamWeaponMeshes(const TArray<UMeshComponent*>& WeaponMeshes, uint8 OwningPlayer);
+
 	// ----------------- Collision Setup Infantry -----------------
 	static void SetupInfantryWeaponCollision(UStaticMeshComponent* WeaponMesh);
 

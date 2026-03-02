@@ -238,6 +238,7 @@ private:
 	[[nodiscard]] bool GetIsValidTeamWeaponMesh() const;
 
 	void BeginPlay_InitAnimInstance();
+	void BeginPlay_InitTeamWeaponCollision();
 	void BeginPlay_ForceStartPackedState();
 
 	UPROPERTY()
