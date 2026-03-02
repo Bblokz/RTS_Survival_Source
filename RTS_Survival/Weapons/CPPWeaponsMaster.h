@@ -48,7 +48,7 @@ class RTS_SURVIVAL_API ACPPWeaponsMaster : public AActorObjectsMaster
 	
 	UPROPERTY()
 	TSubclassOf<UDamageType> DamageType;
-	FDamageEvent DamageEvent;
+	FDamageEvent OnImpactDamageEvent;
 	
 
 	
