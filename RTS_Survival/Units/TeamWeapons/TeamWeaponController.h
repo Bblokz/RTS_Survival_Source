@@ -147,6 +147,7 @@ public:
 	ATeamWeaponController();
 	bool RequestInternalRotateTowards(const FRotator& DesiredRotation);
 	bool GetIsReadyDeployed() const;
+	void OnControlledTeamWeaponDied();
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
 

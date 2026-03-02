@@ -225,6 +225,11 @@ protected:
 	/** @brief Used to call death for this unit, override in childs*/
 	virtual void UnitDies(const ERTSDeathType DeathType)
 	{
+		if (GetIsValidTeamWeaponController())
+		{
+			M_TeamWeaponController->OnControlledTeamWeaponDied();
+		}
+
 		SetUnitDying();
 		OnUnitDies.Broadcast();
 		BP_OnUnitDies();
