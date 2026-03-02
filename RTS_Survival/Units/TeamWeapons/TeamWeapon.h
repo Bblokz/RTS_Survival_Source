@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
+#include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/Embedded/EmbeddedTurretsMaster.h"
@@ -19,6 +20,8 @@ class URTSComponent;
 class UTeamWeaponMover;
 class ATeamWeaponController;
 class UCrewPosition;
+
+DECLARE_MULTICAST_DELEGATE(FOnTeamWeaponUnitDies);
 
 UENUM(BlueprintType)
 enum class ETeamWeaponMovementType : uint8
@@ -175,6 +178,14 @@ public:
 	void SetSpecificEngageTarget(AActor* TargetActor);
 	AActor* GetSpecificEngageTarget() const { return M_SpecificEngageTarget.Get(); }
 	void SetDigInHullRotationLocked(const bool bLocked);
+	virtual float TakeDamage(
+		float DamageAmount,
+		FDamageEvent const& DamageEvent,
+		AController* EventInstigator,
+		AActor* DamageCauser) override;
+
+	// Delegate called when the team weapon dies.
+	FOnTeamWeaponUnitDies OnUnitDies;
 
 	// Embedded turret interface ---------------------------
 	virtual float GetCurrentTurretAngle_Implementation() const override;
@@ -207,6 +218,18 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "TeamWeapon")
 	void BP_OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "TeamWeapon")
+	void BP_OnUnitDies();
+
+	/** @brief Used to call death for this unit, override in childs*/
+	virtual void UnitDies(const ERTSDeathType DeathType)
+	{
+		SetUnitDying();
+		OnUnitDies.Broadcast();
+		BP_OnUnitDies();
+		Destroy();
+	}
 
 private:
 	[[nodiscard]] bool GetIsValidHealthComponent() const;
