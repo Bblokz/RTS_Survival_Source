@@ -24,6 +24,7 @@ FAttachedWeaponAbilitySettings::FAttachedWeaponAbilitySettings()
 	, Cooldown(5)
 	, AimAssistType(EPlayerAimAbilityTypes::None)
 	, Radius(300.0f)
+	, bEnableWeaponDataOverwrite(false)
 {
 }
 
@@ -261,6 +262,21 @@ bool UAttachedWeaponAbilityComponent::GetIsValidProjectileManager() const
 		this);
 
 	return false;
+}
+
+void UAttachedWeaponAbilityComponent::OverwriteData(UWeaponState* WeaponState) const
+{
+	if (not IsValid(WeaponState))
+	{
+		return;
+	}
+
+	if (not M_AttachedWeaponAbilitySettings.bEnableWeaponDataOverwrite)
+	{
+		return;
+	}
+
+	WeaponState->OverwriteCachedWeaponData(M_AttachedWeaponAbilitySettings.WeaponDataOverwrite);
 }
 
 void UAttachedWeaponAbilityComponent::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon)
@@ -1162,6 +1178,7 @@ void UAttachedWeaponAbilityComponent::SetupDirectHitWeaponInternal(
 		DirectHitWeaponParameters.CreateShellCasingOnEveryRandomBurst);
 
 	M_AttachedWeapons.Add(DirectHitWeapon);
+	OverwriteData(DirectHitWeapon);
 	UpdateAbilityRangeFromWeapons();
 }
 
@@ -1190,6 +1207,7 @@ void UAttachedWeaponAbilityComponent::SetupTraceWeaponInternal(const FInitWeapon
 		TraceWeaponParameters.TraceProjectileType);
 
 	M_AttachedWeapons.Add(TraceWeapon);
+	OverwriteData(TraceWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(TraceWeapon);
 }
@@ -1221,6 +1239,7 @@ void UAttachedWeaponAbilityComponent::SetupMultiTraceWeaponInternal(
 		MultiTraceWeaponParameters.TraceProjectileType);
 
 	M_AttachedWeapons.Add(MultiTraceWeapon);
+	OverwriteData(MultiTraceWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(MultiTraceWeapon);
 }
@@ -1243,6 +1262,7 @@ void UAttachedWeaponAbilityComponent::SetupLaserWeaponInternal(const FInitWeapon
 		LaserWeaponParameters.LaserWeaponSettings);
 
 	M_AttachedWeapons.Add(LaserWeapon);
+	OverwriteData(LaserWeapon);
 	UpdateAbilityRangeFromWeapons();
 }
 
@@ -1265,6 +1285,7 @@ void UAttachedWeaponAbilityComponent::SetupMultiHitLaserWeaponInternal(
 		LaserWeaponParameters.LaserWeaponSettings);
 
 	M_AttachedWeapons.Add(LaserWeapon);
+	OverwriteData(LaserWeapon);
 	UpdateAbilityRangeFromWeapons();
 }
 
@@ -1287,6 +1308,7 @@ void UAttachedWeaponAbilityComponent::SetupFlameThrowerWeaponInternal(
 		FlameWeaponParameters.FlameSettings);
 
 	M_AttachedWeapons.Add(FlameWeapon);
+	OverwriteData(FlameWeapon);
 	UpdateAbilityRangeFromWeapons();
 }
 
@@ -1316,6 +1338,7 @@ void UAttachedWeaponAbilityComponent::SetupProjectileWeaponInternal(
 		ProjectileWeaponParameters.CreateShellCasingOnEveryRandomBurst);
 
 	M_AttachedWeapons.Add(ProjectileWeapon);
+	OverwriteData(ProjectileWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(ProjectileWeapon);
 }
@@ -1347,6 +1370,7 @@ void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeaponInternal(
 		RocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
 
 	M_AttachedWeapons.Add(RocketWeapon);
+	OverwriteData(RocketWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(RocketWeapon);
 }
@@ -1382,6 +1406,7 @@ void UAttachedWeaponAbilityComponent::SetupVerticalRocketProjectileWeaponInterna
 		VerticalRocketProjectileParameters.MinBurstAmount,
 		VerticalRocketProjectileParameters.CreateShellCasingOnEveryRandomBurst);
 	M_AttachedWeapons.Add(VerticalRocketProjectile);
+	OverwriteData(VerticalRocketProjectile);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(VerticalRocketProjectile);
 }
@@ -1412,6 +1437,7 @@ void UAttachedWeaponAbilityComponent::SetupMultiProjectileWeaponInternal(
 		MultiProjectileState.CreateShellCasingOnEveryRandomBurst);
 
 	M_AttachedWeapons.Add(MultiProjectileWeapon);
+	OverwriteData(MultiProjectileWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(MultiProjectileWeapon);
 }
@@ -1443,6 +1469,7 @@ void UAttachedWeaponAbilityComponent::SetupArchProjectileWeaponInternal(
 		ArchProjParameters.ArchSettings);
 
 	M_AttachedWeapons.Add(ArchWeapon);
+	OverwriteData(ArchWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(ArchWeapon);
 }
@@ -1474,6 +1501,7 @@ void UAttachedWeaponAbilityComponent::SetupSplitterArchProjectileWeaponInternal(
 		SplitterArchProjParameters.SplitterSettings);
 
 	M_AttachedWeapons.Add(SplitterWeapon);
+	OverwriteData(SplitterWeapon);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(SplitterWeapon);
 }
