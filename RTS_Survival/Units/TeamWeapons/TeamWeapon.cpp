@@ -10,6 +10,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 ATeamWeapon::ATeamWeapon()
 {
@@ -230,6 +231,36 @@ void ATeamWeapon::SetSpecificEngageTarget(AActor* TargetActor)
 void ATeamWeapon::SetDigInHullRotationLocked(const bool bLocked)
 {
 	bM_IsHullRotationLocked = bLocked;
+}
+
+float ATeamWeapon::TakeDamage(
+	float DamageAmount,
+	FDamageEvent const& DamageEvent,
+	AController* EventInstigator,
+	AActor* DamageCauser)
+{
+	(void)EventInstigator;
+	(void)DamageCauser;
+	if (not IsUnitAlive())
+	{
+		// Do not trigger death logic for already dead units.
+		return 1.0f;
+	}
+
+	if (not GetIsValidHealthComponent())
+	{
+		return 1.0f;
+	}
+
+	const ERTSDamageType RTSDamageType = FRTSWeaponHelpers::GetRTSDamageType(DamageEvent);
+	if (not M_HealthComponent->TakeDamage(DamageAmount, RTSDamageType))
+	{
+		return 1.0f;
+	}
+
+	const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RTSDamageType);
+	UnitDies(DeathType);
+	return 0.0f;
 }
 
 float ATeamWeapon::GetCurrentTurretAngle_Implementation() const
