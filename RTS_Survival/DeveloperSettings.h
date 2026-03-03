@@ -84,6 +84,12 @@ namespace DeveloperSettings
 			inline const FVector2D VehiclePartsFromDestroyedVehicleMltRange = FVector2D(
 				PercentageVehiclePartsFromDestroyedVehicleMin / 100.f,
 				PercentageVehiclePartsFromDestroyedVehicleMax / 100.f);
+
+			inline constexpr int32 PercentageResourceFromDestroyedTeamWeaponMin = 40;
+			inline constexpr int32 PercentageResourceFromDestroyedTeamWeaponMax = 70;
+			inline const FVector2D ResourceFromDestroyedTeamWeaponMltRange = FVector2D(
+				PercentageResourceFromDestroyedTeamWeaponMin / 100.f,
+				PercentageResourceFromDestroyedTeamWeaponMax / 100.f);
 		}
 
 		namespace DigInWalls

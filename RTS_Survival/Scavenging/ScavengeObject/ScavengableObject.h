@@ -7,6 +7,7 @@
 #include "ScavengableObject.generated.h"
 
 enum class ETankSubtype : uint8;
+enum class ESquadSubtype : uint8;
 struct FWeightedDecalMaterial;
 class UGeometryCollection;
 class UScavRewardComponent;
@@ -107,6 +108,12 @@ protected:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="DestroyedVehicle")
 	void SetupAsDestroyedVehicle(const ETankSubtype TankSubtype);
+
+	/** @note Overwrites the rewards this scav object provides by using the cost of a destroyed team weapon.
+	 * @param SquadSubtype The team weapon squad subtype to use for scavenging rewards and time.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="DestroyedVehicle")
+	void SetupAsDestroyedTeamWeapon(const ESquadSubtype SquadSubtype);
 
 	/** IF this scavenging object needs to set a mesh manually call this in the constructor.
 	 * @note in post init components we try to find a component with the correct tag if the mesh comp was

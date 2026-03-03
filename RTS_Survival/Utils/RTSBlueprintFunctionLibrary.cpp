@@ -404,6 +404,53 @@ float URTSBlueprintFunctionLibrary::GetDestroyedTankVehiclePartsRewardAndScavTim
 	return VehicleParts;
 }
 
+float URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
+	UObject* WorldContextObject,
+	const ESquadSubtype SquadSubtype,
+	float& OutMetalReward,
+	float& OutVehiclePartsReward,
+	float& TimeToScavenge)
+{
+	using namespace DeveloperSettings::GameBalance::Resources;
+	constexpr float PartsPerScavengeTimeUnit = 70.f;
+
+	OutMetalReward = 0.f;
+	OutVehiclePartsReward = 0.f;
+	TimeToScavenge = ScavengeTimePer70Parts;
+
+	if (not IsValid(WorldContextObject))
+	{
+		return 0.f;
+	}
+
+	const ACPPGameState* GameState = FRTS_Statics::GetGameState(WorldContextObject);
+	if (not IsValid(GameState))
+	{
+		return 0.f;
+	}
+
+	const float DestroyedTeamWeaponResourceMlt = FMath::RandRange(
+		ResourceFromDestroyedTeamWeaponMltRange.X,
+		ResourceFromDestroyedTeamWeaponMltRange.Y
+	);
+	const TMap<ERTSResourceType, int32>& SquadCosts = GameState->GetSquadDataOfPlayer(1, SquadSubtype).Cost.ResourceCosts;
+
+	if (const int32* MetalCost = SquadCosts.Find(ERTSResourceType::Resource_Metal))
+	{
+		OutMetalReward = *MetalCost * DestroyedTeamWeaponResourceMlt;
+	}
+
+	if (const int32* VehiclePartsCost = SquadCosts.Find(ERTSResourceType::Resource_VehicleParts))
+	{
+		OutVehiclePartsReward = *VehiclePartsCost * DestroyedTeamWeaponResourceMlt;
+	}
+
+	const float TotalReward = OutMetalReward + OutVehiclePartsReward;
+	TimeToScavenge = (TotalReward / PartsPerScavengeTimeUnit) * ScavengeTimePer70Parts;
+
+	return TotalReward;
+}
+
 void URTSBlueprintFunctionLibrary::RTSSpawnDecal(const UObject* WorldContextObject, const ERTS_DecalType DecalType,
                                                  const FVector& SpawnLocation, const FVector2D& MinMaxSize,
                                                  const float LifeTime, const FVector2D& MinMaxXYOffset)
