@@ -267,6 +267,7 @@ private:
 	void FinishRotationRequest();
 	void AttachCrewForRotation();
 	void DetachCrewAfterRotation();
+	void SnapOperatorsToCrewPositions();
 	void SnapOperatorsToCrewPositionsDuringRotation();
 	bool TryGetLandscapeTeleportLocationForCrewPosition(const ASquadUnit* SquadUnit,
 	                                                    const FVector& CrewPositionLocation,
