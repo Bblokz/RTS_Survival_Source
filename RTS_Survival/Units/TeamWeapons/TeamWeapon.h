@@ -223,18 +223,7 @@ protected:
 	void BP_OnUnitDies();
 
 	/** @brief Used to call death for this unit, override in childs*/
-	virtual void UnitDies(const ERTSDeathType DeathType)
-	{
-		if (GetIsValidTeamWeaponController())
-		{
-			M_TeamWeaponController->OnControlledTeamWeaponDied();
-		}
-
-		SetUnitDying();
-		OnUnitDies.Broadcast();
-		BP_OnUnitDies();
-		Destroy();
-	}
+	virtual void UnitDies(const ERTSDeathType DeathType);
 
 private:
 	[[nodiscard]] bool GetIsValidHealthComponent() const;

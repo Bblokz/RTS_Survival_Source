@@ -265,17 +265,17 @@ float ATeamWeapon::TakeDamage(
 
 float ATeamWeapon::GetCurrentTurretAngle_Implementation() const
 {
-    if (GetIsValidAnimInstance())
-    {
-        return M_AnimInstance->GetCurrentYawAngle();
-    }
-    return 0.0f;
+	if (GetIsValidAnimInstance())
+	{
+		return M_AnimInstance->GetCurrentYawAngle();
+	}
+	return 0.0f;
 }
 
 
 void ATeamWeapon::SetTurretAngle_Implementation(float NewAngle)
 {
-	if(not GetIsValidAnimInstance())
+	if (not GetIsValidAnimInstance())
 	{
 		return;
 	}
@@ -284,7 +284,7 @@ void ATeamWeapon::SetTurretAngle_Implementation(float NewAngle)
 
 void ATeamWeapon::UpdateTargetPitch_Implementation(float NewPitch)
 {
-	if(not GetIsValidAnimInstance())
+	if (not GetIsValidAnimInstance())
 	{
 		return;
 	}
@@ -310,7 +310,7 @@ bool ATeamWeapon::TurnBase_Implementation(float Degrees)
 
 void ATeamWeapon::PlaySingleFireAnimation_Implementation(int32 WeaponIndex)
 {
-	if(not GetIsValidAnimInstance())
+	if (not GetIsValidAnimInstance())
 	{
 		return;
 	}
@@ -319,7 +319,7 @@ void ATeamWeapon::PlaySingleFireAnimation_Implementation(int32 WeaponIndex)
 
 void ATeamWeapon::PlayBurstFireAnimation_Implementation(int32 WeaponIndex)
 {
-	if(not GetIsValidAnimInstance())
+	if (not GetIsValidAnimInstance())
 	{
 		return;
 	}
@@ -355,6 +355,19 @@ void ATeamWeapon::GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const
 void ATeamWeapon::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
 {
 	BP_OnHealthChanged(PercentageLeft, bIsHealing);
+}
+
+void ATeamWeapon::UnitDies(const ERTSDeathType DeathType)
+{
+	if (GetIsValidTeamWeaponController())
+	{
+		M_TeamWeaponController->OnControlledTeamWeaponDied();
+	}
+
+	SetUnitDying();
+	OnUnitDies.Broadcast();
+	BP_OnUnitDies();
+	Destroy();
 }
 
 bool ATeamWeapon::GetIsValidHealthComponent() const
