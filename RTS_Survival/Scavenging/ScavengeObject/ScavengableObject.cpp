@@ -641,6 +641,35 @@ void AScavengeableObject::SetupAsDestroyedVehicle(const ETankSubtype TankSubtype
 	                      FScavengeAmount(true, VehiclePartsReward, 0, 0, 100));
 }
 
+void AScavengeableObject::SetupAsDestroyedTeamWeapon(const ESquadSubtype SquadSubtype)
+{
+	float MetalReward = 0.f;
+	float VehiclePartsReward = 0.f;
+	URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
+		this,
+		SquadSubtype,
+		MetalReward,
+		VehiclePartsReward,
+		ScavengeTime
+	);
+
+	ScavengeResources.Empty();
+	if (MetalReward > 0.f)
+	{
+		ScavengeResources.Add(
+			ERTSResourceType::Resource_Metal,
+			FScavengeAmount(true, FMath::RoundToInt(MetalReward), 0, 0, 100)
+		);
+	}
+
+	if (VehiclePartsReward > 0.f)
+	{
+		ScavengeResources.Add(
+			ERTSResourceType::Resource_VehicleParts,
+			FScavengeAmount(true, FMath::RoundToInt(VehiclePartsReward), 0, 0, 100)
+		);
+	}
+}
 
 void AScavengeableObject::SetScavengeMesh(UStaticMeshComponent* NewMeshComp)
 {

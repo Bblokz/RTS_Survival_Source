@@ -237,6 +237,23 @@ public:
 	static float GetDestroyedTankVehiclePartsRewardAndScavTime(UObject* WorldContextObject, ETankSubtype TankSubtype,
 	                                                           float& TimeToScavenge);
 
+	/**
+	 * @brief Uses team weapon costs to compute scav rewards and duration for destroyed variants.
+	 * @param WorldContextObject Context used to access the game state.
+	 * @param SquadSubtype Team weapon squad subtype whose costs are used.
+	 * @param OutMetalReward Scavenge reward in metal after destroyed-team-weapon multiplier.
+	 * @param OutVehiclePartsReward Scavenge reward in vehicle parts after multiplier.
+	 * @param TimeToScavenge Final scavenging time scaled by total reward amount.
+	 * @return Sum of the computed metal and vehicle parts rewards.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="UnitData")
+	static float GetDestroyedTeamWeaponRewardAndScavTime(
+		UObject* WorldContextObject,
+		ESquadSubtype SquadSubtype,
+		float& OutMetalReward,
+		float& OutVehiclePartsReward,
+		float& TimeToScavenge);
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="RTSDecal")
 	static void RTSSpawnDecal(const UObject* WorldContextObject,
