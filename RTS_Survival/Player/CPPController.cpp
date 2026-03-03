@@ -3829,7 +3829,10 @@ uint32 ACPPController::RotateUnitsToDirection(
 	{
 		commandsExe += EachPawn->RotateTowards(RotateToDirection, !bIsHoldingShift) == ECommandQueueError::NoError;
 	}
-	//todo implement rotation for squads.
+	for(const auto EachSquad : TSelectedSquadControllers)
+	{
+		commandsExe += EachSquad->RotateTowards(RotateToDirection, !bIsHoldingShift) == ECommandQueueError::NoError;
+	}
 	return commandsExe;
 }
 
