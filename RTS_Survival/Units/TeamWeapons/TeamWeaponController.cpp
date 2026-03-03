@@ -65,6 +65,7 @@ void ATeamWeaponController::OnAllSquadUnitsLoaded()
 {
 	Super::OnAllSquadUnitsLoaded();
 	SpawnTeamWeapon();
+	SnapOperatorsToCrewPositions();
 }
 
 void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -2147,6 +2148,11 @@ void ATeamWeaponController::SnapOperatorsToCrewPositionsDuringRotation()
 		return;
 	}
 
+	SnapOperatorsToCrewPositions();
+}
+
+void ATeamWeaponController::SnapOperatorsToCrewPositions()
+{
 	if (not M_CrewAssignment.GetHasEnoughOperators())
 	{
 		return;
