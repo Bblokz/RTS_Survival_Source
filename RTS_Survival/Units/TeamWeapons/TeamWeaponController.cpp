@@ -180,6 +180,7 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 	}
 
 	M_SpecificEngageTarget = TargetActor;
+	TerminateAttackGroundForGuards();
 	SetPostDeployActionForAttack(TargetActor);
 	ApplyCrewRoleWeaponRestrictions();
 
@@ -209,6 +210,49 @@ void ATeamWeaponController::TerminateAttackCommand()
 	{
 		M_TeamWeapon->SetSpecificEngageTarget(nullptr);
 	}
+}
+
+void ATeamWeaponController::ExecuteAttackGroundCommand(const FVector GroundLocation)
+{
+	if (GroundLocation.IsNearlyZero())
+	{
+		DoneExecutingCommand(EAbilityID::IdAttackGround);
+		return;
+	}
+
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		Super::ExecuteAttackGroundCommand(GroundLocation);
+		return;
+	}
+
+	M_SpecificEngageTarget.Reset();
+	TerminateSpecificEngageForGuards();
+	SetPostDeployActionForAttackGround(GroundLocation);
+	ApplyCrewRoleWeaponRestrictions();
+
+	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
+	{
+		StartDeploying();
+		return;
+	}
+
+	TryIssuePostDeployAction();
+	M_UnitsCompletedCommand = 0;
+}
+
+void ATeamWeaponController::TerminateAttackGroundCommand()
+{
+	M_PostDeployAction.Reset();
+	TerminateAttackGroundForGuards();
+	ApplyCrewRoleWeaponRestrictions();
+
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	M_TeamWeapon->SetAutoEngageTargets(false);
 }
 
 void ATeamWeaponController::ExecuteDigIn()
@@ -1001,6 +1045,24 @@ void ATeamWeaponController::SetPostDeployActionForAttack(AActor* TargetActor)
 		false);
 }
 
+void ATeamWeaponController::SetPostDeployActionForAttackGround(const FVector& GroundLocation)
+{
+	if (GroundLocation.IsNearlyZero())
+	{
+		M_PostDeployAction.Reset();
+		return;
+	}
+
+	M_PostDeployAction.InitForCommand(
+		EAbilityID::IdAttackGround,
+		true,
+		GroundLocation,
+		false,
+		FRotator::ZeroRotator,
+		nullptr,
+		false);
+}
+
 void ATeamWeaponController::TryIssuePostPackAction()
 {
 	if (bM_IsTeamWeaponAbandoned)
@@ -1139,6 +1201,10 @@ void ATeamWeaponController::IssuePostDeployAction()
 		IssuePostDeployAction_Attack();
 		break;
 
+	case EAbilityID::IdAttackGround:
+		IssuePostDeployAction_AttackGround();
+		break;
+
 	default:
 		M_PostDeployAction.Reset();
 		break;
@@ -1163,6 +1229,27 @@ void ATeamWeaponController::IssuePostDeployAction_Attack()
 	M_SpecificEngageTarget = TargetActor;
 	M_TeamWeapon->SetSpecificEngageTarget(TargetActor);
 	IssueSpecificEngageForGuards(TargetActor);
+	ApplyCrewRoleWeaponRestrictions();
+	M_PostDeployAction.Reset();
+}
+
+void ATeamWeaponController::IssuePostDeployAction_AttackGround()
+{
+	if (not M_PostDeployAction.GetHasLocation())
+	{
+		M_PostDeployAction.Reset();
+		return;
+	}
+
+	if (not GetIsValidTeamWeapon())
+	{
+		M_PostDeployAction.Reset();
+		return;
+	}
+
+	const FVector AttackGroundLocation = M_PostDeployAction.GetTargetLocation();
+	M_TeamWeapon->SetEngageGroundLocation(AttackGroundLocation);
+	IssueAttackGroundForGuards(AttackGroundLocation);
 	ApplyCrewRoleWeaponRestrictions();
 	M_PostDeployAction.Reset();
 }
@@ -1212,6 +1299,20 @@ void ATeamWeaponController::IssueSpecificEngageForGuards(AActor* TargetActor) co
 	}
 }
 
+void ATeamWeaponController::IssueAttackGroundForGuards(const FVector& GroundLocation) const
+{
+	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	{
+		ASquadUnit* SquadUnit = GuardUnit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->ExecuteAttackGroundCommand(GroundLocation);
+	}
+}
+
 void ATeamWeaponController::TerminateSpecificEngageForGuards() const
 {
 	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
@@ -1223,6 +1324,20 @@ void ATeamWeaponController::TerminateSpecificEngageForGuards() const
 		}
 
 		SquadUnit->TerminateAttackCommand();
+	}
+}
+
+void ATeamWeaponController::TerminateAttackGroundForGuards() const
+{
+	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	{
+		ASquadUnit* SquadUnit = GuardUnit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->TerminateAttackGroundCommand();
 	}
 }
 
@@ -2295,7 +2410,7 @@ void ATeamWeaponController::AbandonTeamWeapon()
 			continue;
 		}
 
-		InfantryWeapon->DisableWeaponSearch(true, false);
+		InfantryWeapon->SetAutoEngageTargets(false);
 	}
 
 	if (GetIsValidTeamWeapon())

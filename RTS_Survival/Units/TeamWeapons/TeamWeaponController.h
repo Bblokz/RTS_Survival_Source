@@ -163,6 +163,8 @@ protected:
 	virtual void TerminateRotateTowardsCommand() override;
 	virtual void ExecuteAttackCommand(AActor* TargetActor) override;
 	virtual void TerminateAttackCommand() override;
+	virtual void ExecuteAttackGroundCommand(const FVector GroundLocation) override;
+	virtual void TerminateAttackGroundCommand() override;
 	virtual void ExecuteDigIn() override;
 	virtual void TerminateDigIn() override;
 	virtual void ExecuteBreakCover() override;
@@ -250,10 +252,13 @@ private:
 	                                 const bool bShouldTriggerDoneExecuting,
 	                                 const bool bIsInternalTurretRotation);
 	void SetPostDeployActionForAttack(AActor* TargetActor);
+	void SetPostDeployActionForAttackGround(const FVector& GroundLocation);
 	bool GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor);
 	void ApplyCrewRoleWeaponRestrictions() const;
 	void IssueSpecificEngageForGuards(AActor* TargetActor) const;
+	void IssueAttackGroundForGuards(const FVector& GroundLocation) const;
 	void TerminateSpecificEngageForGuards() const;
+	void TerminateAttackGroundForGuards() const;
 	void HandleMainAttackTargetBecameInvalid(const FString& Reason);
 	void StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
 	                         const EAbilityID CompletionAbilityId, const bool bIsInternalTurretRotation);
@@ -276,6 +281,7 @@ private:
 	void TryIssuePostDeployAction();
 	void IssuePostDeployAction();
 	void IssuePostDeployAction_Attack();
+	void IssuePostDeployAction_AttackGround();
 	void UpdateCrewMoveOffsets();
 	bool TryGetCrewMemberOffset(const ASquadUnit* SquadUnit, FVector& OutOffset) const;
 	bool GetIsCrewOperator(const ASquadUnit* SquadUnit) const;
