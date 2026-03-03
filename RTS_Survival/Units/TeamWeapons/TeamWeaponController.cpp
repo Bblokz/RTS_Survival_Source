@@ -21,7 +21,7 @@
 namespace TeamWeaponControllerCrewPositionStatics
 {
 	void IssueMoveToLocationForSquadUnit(ASquadUnit* SquadUnit, const FVector& TargetLocation,
-		const TSubclassOf<UNavigationQueryFilter> QueryFilter)
+	                                     const TSubclassOf<UNavigationQueryFilter> QueryFilter)
 	{
 		static_cast<void>(QueryFilter);
 
@@ -39,10 +39,12 @@ ATeamWeaponController::ATeamWeaponController()
 	PrimaryActorTick.bCanEverTick = true;
 }
 
+
 void ATeamWeaponController::BeginPlay()
 {
-	Super::BeginPlay();
+	// Make sure widget pool manager ref is set prior to spawning.
 	BeginPlay_InitAnimatedTextWidgetPoolManager();
+	Super::BeginPlay();
 	SetTeamWeaponState(ETeamWeaponState::Spawning);
 }
 
@@ -374,9 +376,8 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 
 TArray<UWeaponState*> ATeamWeaponController::GetWeaponsOfSquad()
 {
-	
 	TArray<UWeaponState*> Weapons;
-	if(GetIsValidTeamWeapon())
+	if (GetIsValidTeamWeapon())
 	{
 		Weapons = M_TeamWeapon->GetWeapons();
 	}
@@ -522,7 +523,7 @@ void ATeamWeaponController::SpawnTeamWeapon()
 	if (not TeamWeaponClass)
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("TeamWeaponClass"),
-			                                                  TEXT("ATeamWeaponController::SpawnTeamWeapon"), this);
+		                                                      TEXT("ATeamWeaponController::SpawnTeamWeapon"), this);
 		return;
 	}
 
@@ -536,7 +537,7 @@ void ATeamWeaponController::SpawnTeamWeapon()
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	M_TeamWeapon = World->SpawnActor<ATeamWeapon>(TeamWeaponClass, GetActorLocation(), GetActorRotation(),
-	                                             SpawnParameters);
+	                                              SpawnParameters);
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
@@ -946,9 +947,9 @@ bool ATeamWeaponController::GetHasPendingMovePostPackAction() const
 }
 
 void ATeamWeaponController::SetPostPackActionForRotate(const FRotator& DesiredRotation,
-	const EAbilityID AbilityId,
-	const bool bShouldTriggerDoneExecuting,
-	const bool bIsInternalTurretRotation)
+                                                       const EAbilityID AbilityId,
+                                                       const bool bShouldTriggerDoneExecuting,
+                                                       const bool bIsInternalTurretRotation)
 {
 	M_PostPackAction.InitForCommand(
 		AbilityId,
@@ -1286,7 +1287,6 @@ void ATeamWeaponController::HandleMainAttackTargetBecameInvalid(const FString& R
 	{
 		M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
 	}
-
 }
 
 void ATeamWeaponController::UpdateCrewMoveOffsets()
@@ -1380,14 +1380,16 @@ void ATeamWeaponController::ApplyNonCrewOffsetToPath(FNavPathSharedPtr& UnitPath
 		const bool bLast = (i == UnitPath->GetPathPoints().Num() - 1);
 		const FVector PointOffset = bLast
 			                            ? GetFinalPathPointOffset(UnitOffset)
-			                            : (UnitOffset * FMath::FRandRange(NonCrewMinOffsetScale, NonCrewMaxOffsetScale));
+			                            : (UnitOffset * FMath::FRandRange(
+				                            NonCrewMinOffsetScale, NonCrewMaxOffsetScale));
 		FNavPathPoint& PathPoint = UnitPath->GetPathPoints()[i];
 		PathPoint.Location += PointOffset;
 
 		if (bLast && bM_HasGuardEngageFlowTargetLocation && M_SpecificEngageTarget.IsValid() && GetIsValidTeamWeapon())
 		{
 			const float GuardEngageFlowDistanceCm = M_TeamWeapon->GetGuardEngageFlowDistanceCm();
-			const FVector DirectionToEngageTarget = (M_GuardEngageFlowTargetLocation - PathPoint.Location).GetSafeNormal();
+			const FVector DirectionToEngageTarget = (M_GuardEngageFlowTargetLocation - PathPoint.Location).
+				GetSafeNormal();
 			PathPoint.Location += DirectionToEngageTarget * GuardEngageFlowDistanceCm;
 		}
 
@@ -1891,8 +1893,10 @@ void ATeamWeaponController::OnProjectileHit(const bool bBounced)
 {
 }
 
-void ATeamWeaponController::StartRotationRequest(const FRotator& DesiredRotation, const bool bShouldTriggerDoneExecuting,
-	const EAbilityID CompletionAbilityId, const bool bIsInternalTurretRotation)
+void ATeamWeaponController::StartRotationRequest(const FRotator& DesiredRotation,
+                                                 const bool bShouldTriggerDoneExecuting,
+                                                 const EAbilityID CompletionAbilityId,
+                                                 const bool bIsInternalTurretRotation)
 {
 	M_RotationRequest.M_TargetRotation = DesiredRotation;
 	M_RotationRequest.bM_IsActive = true;
@@ -1912,7 +1916,8 @@ void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 	UCommandData* CommandData = GetIsValidCommandData();
 	const bool bHasActiveAttackCommand = CommandData != nullptr &&
 		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
-	if (M_RotationRequest.bM_IsInternalTurretRotation && bHasActiveAttackCommand && not M_SpecificEngageTarget.IsValid())
+	if (M_RotationRequest.bM_IsInternalTurretRotation && bHasActiveAttackCommand && not M_SpecificEngageTarget.
+		IsValid())
 	{
 		HandleMainAttackTargetBecameInvalid(TEXT("Main target invalid during rotation"));
 		return;
@@ -1958,7 +1963,8 @@ void ATeamWeaponController::FinishRotationRequest()
 	const bool bShouldCallDoneExecuting = M_RotationRequest.bM_ShouldTriggerDoneExecuting;
 	const EAbilityID CompletionAbilityId = M_RotationRequest.M_CompletionAbilityId;
 	const bool bWasInternalTurretRotation = M_RotationRequest.bM_IsInternalTurretRotation;
-	const bool bHasPendingOutOfRangeReposition = bM_HasInternalOutOfRangeReposition || bM_HasCachedOutOfRangeMoveLocation;
+	const bool bHasPendingOutOfRangeReposition = bM_HasInternalOutOfRangeReposition ||
+		bM_HasCachedOutOfRangeMoveLocation;
 	UCommandData* CommandData = GetIsValidCommandData();
 	const bool bHasActiveAttackCommand = CommandData != nullptr &&
 		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
@@ -2047,7 +2053,8 @@ void ATeamWeaponController::SnapOperatorsToCrewPositionsDuringRotation()
 		}
 
 		FVector OperatorTeleportLocation = CrewPosition->GetComponentLocation();
-		if (not TryGetLandscapeTeleportLocationForCrewPosition(SquadUnit, OperatorTeleportLocation, OperatorTeleportLocation))
+		if (not TryGetLandscapeTeleportLocationForCrewPosition(SquadUnit, OperatorTeleportLocation,
+		                                                       OperatorTeleportLocation))
 		{
 			continue;
 		}
@@ -2062,8 +2069,8 @@ void ATeamWeaponController::SnapOperatorsToCrewPositionsDuringRotation()
 }
 
 bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const ASquadUnit* SquadUnit,
-	const FVector& CrewPositionLocation,
-	FVector& OutTeleportLocation) const
+                                                                           const FVector& CrewPositionLocation,
+                                                                           FVector& OutTeleportLocation) const
 {
 	OutTeleportLocation = CrewPositionLocation;
 
@@ -2232,6 +2239,7 @@ bool ATeamWeaponController::GetShouldAutoDeployOnIdle()
 
 	return true;
 }
+
 void ATeamWeaponController::TryAbandonTeamWeaponForInsufficientCrew()
 {
 	if (GetIsGameShuttingDown())

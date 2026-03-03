@@ -69,8 +69,8 @@ void ATeamWeapon::BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewCo
 		InitTurretsMaster(M_TeamWeaponMesh.Get());
 		InitChildTurret(
 			M_TeamWeaponConfig.WeaponYawRotationSpeed,
-			M_TeamWeaponConfig.M_YawArc.M_MinYaw,
-			M_TeamWeaponConfig.M_YawArc.M_MaxYaw,
+			M_TeamWeaponConfig.M_PitchSettings.M_MaxPitch,
+			M_TeamWeaponConfig.M_PitchSettings.M_MaxPitch,
 			EIdleRotation::Idle_Animate);
 	}
 }
