@@ -243,8 +243,9 @@ public:
 	 * @param SquadSubtype Team weapon squad subtype whose costs are used.
 	 * @param OutMetalReward Scavenge reward in metal after destroyed-team-weapon multiplier.
 	 * @param OutVehiclePartsReward Scavenge reward in vehicle parts after multiplier.
+	 * @param OutRadixiteReward Scavenge reward in radixite when team weapon has no metal or vehicle parts cost.
 	 * @param TimeToScavenge Final scavenging time scaled by total reward amount.
-	 * @return Sum of the computed metal and vehicle parts rewards.
+	 * @return Sum of the computed rewards.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="UnitData")
 	static float GetDestroyedTeamWeaponRewardAndScavTime(
@@ -252,6 +253,7 @@ public:
 		ESquadSubtype SquadSubtype,
 		float& OutMetalReward,
 		float& OutVehiclePartsReward,
+		float& OutRadixiteReward,
 		float& TimeToScavenge);
 
 

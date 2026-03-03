@@ -645,11 +645,13 @@ void AScavengeableObject::SetupAsDestroyedTeamWeapon(const ESquadSubtype SquadSu
 {
 	float MetalReward = 0.f;
 	float VehiclePartsReward = 0.f;
+	float RadixiteReward = 0.f;
 	URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
 		this,
 		SquadSubtype,
 		MetalReward,
 		VehiclePartsReward,
+		RadixiteReward,
 		ScavengeTime
 	);
 
@@ -667,6 +669,13 @@ void AScavengeableObject::SetupAsDestroyedTeamWeapon(const ESquadSubtype SquadSu
 		ScavengeResources.Add(
 			ERTSResourceType::Resource_VehicleParts,
 			FScavengeAmount(true, FMath::RoundToInt(VehiclePartsReward), 0, 0, 100)
+		);
+	}
+	if (RadixiteReward > 0.f)
+	{
+		ScavengeResources.Add(
+			ERTSResourceType::Resource_Radixite,
+			FScavengeAmount(true, FMath::RoundToInt(RadixiteReward), 0, 0, 100)
 		);
 	}
 }

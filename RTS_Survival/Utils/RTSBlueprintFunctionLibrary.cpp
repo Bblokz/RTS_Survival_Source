@@ -409,6 +409,7 @@ float URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
 	const ESquadSubtype SquadSubtype,
 	float& OutMetalReward,
 	float& OutVehiclePartsReward,
+	float& OutRadixiteReward,
 	float& TimeToScavenge)
 {
 	using namespace DeveloperSettings::GameBalance::Resources;
@@ -416,6 +417,7 @@ float URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
 
 	OutMetalReward = 0.f;
 	OutVehiclePartsReward = 0.f;
+	OutRadixiteReward = 0.f;
 	TimeToScavenge = ScavengeTimePer70Parts;
 
 	if (not IsValid(WorldContextObject))
@@ -445,7 +447,15 @@ float URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
 		OutVehiclePartsReward = *VehiclePartsCost * DestroyedTeamWeaponResourceMlt;
 	}
 
-	const float TotalReward = OutMetalReward + OutVehiclePartsReward;
+	if (OutMetalReward <= 0.f && OutVehiclePartsReward <= 0.f)
+	{
+		if (const int32* RadixiteCost = SquadCosts.Find(ERTSResourceType::Resource_Radixite))
+		{
+			OutRadixiteReward = *RadixiteCost * DestroyedTeamWeaponResourceMlt;
+		}
+	}
+
+	const float TotalReward = OutMetalReward + OutVehiclePartsReward + OutRadixiteReward;
 	TimeToScavenge = (TotalReward / PartsPerScavengeTimeUnit) * ScavengeTimePer70Parts;
 
 	return TotalReward;
