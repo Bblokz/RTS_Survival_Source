@@ -94,6 +94,9 @@ struct FTeamWeaponConfig
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	FResistanceAndDamageReductionData M_ResistanceData;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
+	float TeamWeaponHp = 200.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "TeamWeapon")
 	float M_DeploymentTime = 0.0f;

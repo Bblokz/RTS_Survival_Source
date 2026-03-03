@@ -50,7 +50,7 @@ void ATeamWeapon::BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewCo
 	M_TeamWeaponConfig = NewConfig;
 	if (GetIsValidHealthComponent())
 	{
-		M_HealthComponent->InitHealthAndResistance(M_TeamWeaponConfig.M_ResistanceData, 0.0f);
+		M_HealthComponent->InitHealthAndResistance(M_TeamWeaponConfig.M_ResistanceData, M_TeamWeaponConfig.TeamWeaponHp);
 	}
 	if (GetIsValidTeamWeaponMesh())
 	{
