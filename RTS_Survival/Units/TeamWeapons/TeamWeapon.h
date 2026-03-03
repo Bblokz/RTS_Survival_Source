@@ -157,7 +157,7 @@ public:
 	ATeamWeapon();
 	// To be called at beginplay; to init the various settings.
 	void BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewConfig);
-
+	void PlayFireAnim() const;
 	const FTeamWeaponConfig& GetTeamWeaponConfig() const { return M_TeamWeaponConfig; }
 	int32 GetRequiredOperators() const { return M_TeamWeaponConfig.M_OperatorCount; }
 	float GetDeploymentTime() const { return M_TeamWeaponConfig.M_DeploymentTime; }

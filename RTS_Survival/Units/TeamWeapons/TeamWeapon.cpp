@@ -70,9 +70,18 @@ void ATeamWeapon::BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewCo
 		InitChildTurret(
 			M_TeamWeaponConfig.WeaponYawRotationSpeed,
 			M_TeamWeaponConfig.M_PitchSettings.M_MaxPitch,
-			M_TeamWeaponConfig.M_PitchSettings.M_MaxPitch,
+			M_TeamWeaponConfig.M_PitchSettings.M_MinPitch,
 			EIdleRotation::Idle_Animate);
 	}
+}
+
+void ATeamWeapon::PlayFireAnim() const
+{
+	if(not GetIsValidAnimInstance())
+	{
+		return;
+	}
+	M_AnimInstance->PlayFireAnimation();
 }
 
 void ATeamWeapon::SetTeamWeaponController(ATeamWeaponController* NewController)

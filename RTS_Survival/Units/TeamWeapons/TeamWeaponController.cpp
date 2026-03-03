@@ -2002,6 +2002,12 @@ void ATeamWeaponController::OnMountedWeaponTargetDestroyed(
 
 void ATeamWeaponController::OnFireWeapon(ACPPTurretsMaster* CallingTurret)
 {
+	if(not IsValid(M_TeamWeapon))
+	{
+		return;
+	}
+	M_TeamWeapon->PlayFireAnim();
+		
 }
 
 void ATeamWeaponController::OnProjectileHit(const bool bBounced)

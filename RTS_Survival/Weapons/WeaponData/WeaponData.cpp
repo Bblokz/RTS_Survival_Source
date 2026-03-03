@@ -1813,7 +1813,7 @@ void UWeaponStateTrace::FireTrace(const FVector& Direction)
 	const FVector LaunchLocation = LaunchAndForward.Key;
 
 	// Use the provided direction for the trace
-	FVector TraceEnd = Direction * WeaponData.Range;
+	FVector TraceEnd = Direction * WeaponData.Range * DeveloperSettings::GameBalance::Ranges::TraceSimulationRangeMlt;
 	TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation, Direction, WeaponData.Range,
 	                                                      WeaponData.Accuracy, bIsAircraftWeapon);
 	if (0)

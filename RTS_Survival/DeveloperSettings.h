@@ -539,6 +539,8 @@ namespace DeveloperSettings
 
 		namespace Ranges
 		{
+			// How much further weapon trace is allowed to fly than its range; flight range = weapon range * this mlt.
+			inline constexpr float TraceSimulationRangeMlt = 1.5f;
 			inline constexpr float GameRangeMlt = 0.5f;
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(7000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(7500.f * GameRangeMlt);
