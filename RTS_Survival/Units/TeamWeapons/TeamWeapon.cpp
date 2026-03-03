@@ -6,6 +6,7 @@
 #include "TeamWeaponController.h"
 #include "TeamWeaponMover.h"
 #include "CrewPositions/CrewPosition.h"
+#include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
@@ -366,9 +367,19 @@ void ATeamWeapon::UnitDies(const ERTSDeathType DeathType)
 
 	SetUnitDying();
 	OnUnitDies.Broadcast();
+	// Assume destroy is called in here in some way.
 	BP_OnUnitDies();
-	Destroy();
 }
+
+void ATeamWeapon::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams,
+                                          const FCollapseFX CollapseFX)
+{
+	FRTS_Collapse::OnDestroySpawnActors(this,
+	                                    SpawnParams,
+	                                    CollapseFX);
+}
+
+
 
 bool ATeamWeapon::GetIsValidHealthComponent() const
 {

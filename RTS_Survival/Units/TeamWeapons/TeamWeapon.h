@@ -20,6 +20,7 @@ class URTSComponent;
 class UTeamWeaponMover;
 class ATeamWeaponController;
 class UCrewPosition;
+struct FDestroySpawnActorsParameters;
 
 DECLARE_MULTICAST_DELEGATE(FOnTeamWeaponUnitDies);
 
@@ -224,6 +225,17 @@ protected:
 
 	/** @brief Used to call death for this unit, override in childs*/
 	virtual void UnitDies(const ERTSDeathType DeathType);
+
+	
+	/**
+	 * @brief Destroy the bxp and spawn actors around the location.
+	 * @param SpawnParams Defines what actors to spawn and where.
+	 * @param CollapseFX Optional FX to play.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	virtual void DestroyAndSpawnActors(
+		const FDestroySpawnActorsParameters& SpawnParams,
+		FCollapseFX CollapseFX);
 
 private:
 	[[nodiscard]] bool GetIsValidHealthComponent() const;

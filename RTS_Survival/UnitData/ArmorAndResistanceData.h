@@ -46,17 +46,17 @@ struct FResistanceAndDamageReductionData
 	GENERATED_BODY()
 
 	// Has a multiplier per amor plate type.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FLaserRadiationDamageMlt LaserAndRadiationDamageMlt;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFireResistanceData FireResistanceData;
 
 	// Contains a multiplier for all damage types as well as a subtraction value.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FDamageReductionSettings AllDamageReductionSettings;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ETargetTypeIcon TargetTypeIcon = ETargetTypeIcon::None;
 	
 };
