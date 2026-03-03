@@ -2295,7 +2295,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ArmorPenMaxRange = 31;
 	WeaponData.MagCapacity = 6;
 	WeaponData.ReloadSpeed = 2;
-	WeaponData.BaseCooldown = 0.38f;
+	WeaponData.BaseCooldown = 0.15f;
 	WeaponData.CooldownFlux = 10;
 	WeaponData.Accuracy = 60;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;

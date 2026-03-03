@@ -1813,8 +1813,10 @@ void UWeaponStateTrace::FireTrace(const FVector& Direction)
 	const FVector LaunchLocation = LaunchAndForward.Key;
 
 	// Use the provided direction for the trace
-	FVector TraceEnd = Direction * WeaponData.Range * DeveloperSettings::GameBalance::Ranges::TraceSimulationRangeMlt;
-	TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation, Direction, WeaponData.Range,
+	FVector TraceEnd;
+	TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation, Direction,
+	                                                      WeaponData.Range *
+	                                                      DeveloperSettings::GameBalance::Ranges::TraceSimulationRangeMlt,
 	                                                      WeaponData.Accuracy, bIsAircraftWeapon);
 	if (0)
 	{
@@ -1869,7 +1871,7 @@ bool UWeaponStateTrace::DidTracePenArmorCalcComponent(UArmorCalculation* ArmorCa
                                                       const FHitResult& HitResult) const
 {
 	float RawArmorValue = 0.0f;
-	
+
 	EArmorPlate PlateHit = EArmorPlate::Plate_Front;
 	float AdjustedArmorPen = WeaponData.ArmorPen;
 	const FVector ImpactDirection = HitResult.TraceEnd - HitResult.TraceStart;
@@ -2116,7 +2118,7 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 
 	FProjectileVfxSettings ProjectileVfxSettings;
 	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
-	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre ;
+	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
 	ProjectileVfxSettings.ProjectileNiagaraSystem = M_ProjectileNiagaraSystem;
 
 	Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
@@ -2279,7 +2281,6 @@ void UWeaponStateArchProjectile::FireProjectileWithShellAdjustedStats(const FWea
 }
 
 
-
 void UWeaponStateSplitterArchProjectile::InitSplitterArchProjectileWeapon(
 	const int32 NewOwningPlayer,
 	const int32 NewWeaponIndex,
@@ -2338,7 +2339,8 @@ void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLoc
 
 	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
 	const FVector LaunchLocation = LaunchAndForward.Key;
-	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(TargetLocationRaw, WeaponData.Accuracy);
+	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+		TargetLocationRaw, WeaponData.Accuracy);
 
 	FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
 	if (LaunchDirection.IsNearlyZero())
@@ -2358,8 +2360,8 @@ void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLoc
 		(WeaponData.ShellType == EWeaponShellType::Shell_APHE);
 	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
 	const FWeaponData ShellAdjustedData = (not bIsAPShell && not bIsFireShell)
-		? GLOBAL_GetWeaponDataForShellType(WeaponData)
-		: WeaponData;
+		                                      ? GLOBAL_GetWeaponDataForShellType(WeaponData)
+		                                      : WeaponData;
 
 	constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
 	constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
@@ -2437,7 +2439,7 @@ void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLoc
 }
 
 void UWeaponStateSplitterArchProjectile::SpawnSplitProjectilesAtApex(const FVector SplitLocation,
-	                                                                  const FVector OriginalTargetLocation)
+                                                                     const FVector OriginalTargetLocation)
 {
 	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
 	if (not ProjectileManager)
@@ -2499,7 +2501,8 @@ void UWeaponStateSplitterArchProjectile::SpawnSplitEffects(const FVector& SplitL
 FWeaponData UWeaponStateSplitterArchProjectile::BuildSplitProjectileData(const FWeaponData& SourceWeaponData) const
 {
 	FWeaponData SplitData = SourceWeaponData;
-	SplitData.WeaponCalibre = FMath::CeilToInt(SourceWeaponData.WeaponCalibre * M_SplitterSettings.SplitSettings.SplitCalibreMultiplier);
+	SplitData.WeaponCalibre = FMath::CeilToInt(
+		SourceWeaponData.WeaponCalibre * M_SplitterSettings.SplitSettings.SplitCalibreMultiplier);
 	SplitData.BaseDamage *= M_SplitterSettings.SplitSettings.SplitDamageMultiplier;
 	SplitData.ArmorPen *= M_SplitterSettings.SplitSettings.SplitArmorPenMultiplier;
 	SplitData.ArmorPenMaxRange *= M_SplitterSettings.SplitSettings.SplitArmorPenMultiplier;
@@ -2520,7 +2523,7 @@ FVector UWeaponStateSplitterArchProjectile::BuildSplitTargetLocation(const FVect
 }
 
 float UWeaponStateSplitterArchProjectile::CalculateArcTimeToApex(const FVector& LaunchLocation,
-	                                                              const FVector& TargetLocation) const
+                                                                 const FVector& TargetLocation) const
 {
 	if (World == nullptr)
 	{
@@ -2537,7 +2540,8 @@ float UWeaponStateSplitterArchProjectile::CalculateArcTimeToApex(const FVector& 
 	}
 
 	const float HighestPoint = FMath::Max(LaunchLocation.Z, TargetLocation.Z);
-	const float BaseApexHeight = HighestPoint + (HorizontalDistance * M_SplitterSettings.ArchSettings.ApexHeightMultiplier)
+	const float BaseApexHeight = HighestPoint + (HorizontalDistance * M_SplitterSettings.ArchSettings.
+			ApexHeightMultiplier)
 		+ M_SplitterSettings.ArchSettings.ApexHeightOffset;
 	const float MinimumHeight = HighestPoint + M_SplitterSettings.ArchSettings.MinApexOffset;
 	const float DesiredApexHeight = FMath::Max(BaseApexHeight, MinimumHeight);
@@ -2559,9 +2563,9 @@ float UWeaponStateSplitterArchProjectile::CalculateArcTimeToApex(const FVector& 
 }
 
 void UWeaponStateSplitterArchProjectile::LaunchSplitProjectile(const FWeaponData& SplitProjectileData,
-	                                                           AProjectile* SpawnedProjectile,
-	                                                           const FVector& LaunchLocation,
-	                                                           const FVector& TargetLocation)
+                                                               AProjectile* SpawnedProjectile,
+                                                               const FVector& LaunchLocation,
+                                                               const FVector& TargetLocation)
 {
 	const FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
 	if (LaunchDirection.IsNearlyZero())
@@ -2706,11 +2710,11 @@ UWeaponStateRocketProjectile::GetRocketLaunchSocketData(const bool bAdvanceSocke
 	const bool bHasSocketOverrides = SocketCount > FirstSocketIndex;
 	const int32 MaxSocketIndex = SocketCount - SocketIndexIncrement;
 	const int32 SelectedSocketIndex = bHasSocketOverrides
-		? FMath::Clamp(M_NextRocketSocketIndex, FirstSocketIndex, MaxSocketIndex)
-		: FirstSocketIndex;
+		                                  ? FMath::Clamp(M_NextRocketSocketIndex, FirstSocketIndex, MaxSocketIndex)
+		                                  : FirstSocketIndex;
 	const FName SelectedSocketName = bHasSocketOverrides
-		? M_RocketSettings.FireSocketNames[SelectedSocketIndex]
-		: FireSocketName;
+		                                 ? M_RocketSettings.FireSocketNames[SelectedSocketIndex]
+		                                 : FireSocketName;
 
 	if (bHasSocketOverrides && bAdvanceSocketIndex)
 	{
@@ -2944,7 +2948,8 @@ void UVerticalRocketWeaponState::CollectLaunchSocketsFromAttachedRocketMesh()
 	const FString SocketNameFilter = M_VerticalRocketSettings.AttachedRocketsSocketNameFilter.ToString();
 	if (SocketNameFilter.IsEmpty())
 	{
-		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState requires AttachedRocketsSocketNameFilter when bSetupWithAttachedRocketsMesh is enabled.");
+		RTSFunctionLibrary::ReportError(
+			"UVerticalRocketWeaponState requires AttachedRocketsSocketNameFilter when bSetupWithAttachedRocketsMesh is enabled.");
 		return;
 	}
 
@@ -2967,11 +2972,13 @@ void UVerticalRocketWeaponState::CollectLaunchSocketsFromAttachedRocketMesh()
 
 	if (not GetIsValidRocketsToSpawnBaseMeshComponent())
 	{
-		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState failed to find launch sockets on MeshComponent and has no RocketsToSpawnBaseMeshComponent fallback.");
+		RTSFunctionLibrary::ReportError(
+			"UVerticalRocketWeaponState failed to find launch sockets on MeshComponent and has no RocketsToSpawnBaseMeshComponent fallback.");
 		return;
 	}
 
-	const TArray<FName> FallbackSocketNames = M_VerticalRocketSettings.RocketsToSpawnBaseMeshComponent->GetAllSocketNames();
+	const TArray<FName> FallbackSocketNames = M_VerticalRocketSettings.RocketsToSpawnBaseMeshComponent->
+	                                                                   GetAllSocketNames();
 	for (const FName& SocketName : FallbackSocketNames)
 	{
 		if (SocketName.ToString().Contains(SocketNameFilter))
@@ -2982,7 +2989,8 @@ void UVerticalRocketWeaponState::CollectLaunchSocketsFromAttachedRocketMesh()
 
 	if (M_LaunchSocketNames.IsEmpty())
 	{
-		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState could not resolve any launch sockets for attached rockets setup.");
+		RTSFunctionLibrary::ReportError(
+			"UVerticalRocketWeaponState could not resolve any launch sockets for attached rockets setup.");
 	}
 }
 
@@ -2990,19 +2998,22 @@ bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
 {
 	if (not IsValid(MeshComponent) || not IsValid(MeshComponent->GetOwner()))
 	{
-		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState requires a valid MeshComponent owner to create attached rocket instances.");
+		RTSFunctionLibrary::ReportError(
+			"UVerticalRocketWeaponState requires a valid MeshComponent owner to create attached rocket instances.");
 		return false;
 	}
 
 	if (not M_VerticalRocketSettings.RocketMesh)
 	{
-		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState requires RocketMesh to spawn attached rocket instances.");
+		RTSFunctionLibrary::ReportError(
+			"UVerticalRocketWeaponState requires RocketMesh to spawn attached rocket instances.");
 		return false;
 	}
 
 	if (M_LaunchSocketNames.IsEmpty())
 	{
-		RTSFunctionLibrary::ReportError("UVerticalRocketWeaponState could not find any launch sockets for attached rocket setup.");
+		RTSFunctionLibrary::ReportError(
+			"UVerticalRocketWeaponState could not find any launch sockets for attached rocket setup.");
 		return false;
 	}
 
@@ -3060,7 +3071,8 @@ bool UVerticalRocketWeaponState::GetIsValidRocketsToSpawnBaseMeshComponent() con
 	return false;
 }
 
-UVerticalRocketWeaponState::FVerticalRocketLaunchSocketData UVerticalRocketWeaponState::GetVerticalRocketLaunchSocketData(
+UVerticalRocketWeaponState::FVerticalRocketLaunchSocketData
+UVerticalRocketWeaponState::GetVerticalRocketLaunchSocketData(
 	const bool bAdvanceSocketIndex)
 {
 	FVerticalRocketLaunchSocketData LaunchData;
@@ -3072,8 +3084,8 @@ UVerticalRocketWeaponState::FVerticalRocketLaunchSocketData UVerticalRocketWeapo
 	const bool bHasSocketOverrides = not M_LaunchSocketNames.IsEmpty();
 	const int32 SocketCount = M_LaunchSocketNames.Num();
 	const int32 SelectedSocketIndex = bHasSocketOverrides
-		? FMath::Clamp(M_NextRocketSocketIndex, 0, SocketCount - 1)
-		: 0;
+		                                  ? FMath::Clamp(M_NextRocketSocketIndex, 0, SocketCount - 1)
+		                                  : 0;
 	const FName SelectedSocketName = bHasSocketOverrides ? M_LaunchSocketNames[SelectedSocketIndex] : FireSocketName;
 
 	if (bHasSocketOverrides && bAdvanceSocketIndex)
@@ -3125,7 +3137,8 @@ void UVerticalRocketWeaponState::FireProjectile(const FVector& TargetLocationRaw
 		M_AttachedRocketInstances->SetInstanceHidden(LaunchData.HiddenInstanceIndex, true);
 	}
 
-	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType == EWeaponShellType::Shell_APHE);
+	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
+		EWeaponShellType::Shell_APHE);
 	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
 	if (not bIsAPShell && not bIsFireShell)
 	{
@@ -3183,11 +3196,15 @@ void UVerticalRocketWeaponState::FireProjectileWithShellAdjustedStats(const FWea
 	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
 	ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
 
-	const float ApexOffsetMin = FMath::Min(M_VerticalRocketSettings.ApexZOffsetMin, M_VerticalRocketSettings.ApexZOffsetMax);
-	const float ApexOffsetMax = FMath::Max(M_VerticalRocketSettings.ApexZOffsetMin, M_VerticalRocketSettings.ApexZOffsetMax);
+	const float ApexOffsetMin = FMath::Min(M_VerticalRocketSettings.ApexZOffsetMin,
+	                                       M_VerticalRocketSettings.ApexZOffsetMax);
+	const float ApexOffsetMax = FMath::Max(M_VerticalRocketSettings.ApexZOffsetMin,
+	                                       M_VerticalRocketSettings.ApexZOffsetMax);
 	const float RandomApexOffset = FMath::RandRange(ApexOffsetMin, ApexOffsetMax);
-	const float RandomAngleMin = FMath::Min(M_VerticalRocketSettings.RandomAngleOffsetMin, M_VerticalRocketSettings.RandomAngleOffsetMax);
-	const float RandomAngleMax = FMath::Max(M_VerticalRocketSettings.RandomAngleOffsetMin, M_VerticalRocketSettings.RandomAngleOffsetMax);
+	const float RandomAngleMin = FMath::Min(M_VerticalRocketSettings.RandomAngleOffsetMin,
+	                                        M_VerticalRocketSettings.RandomAngleOffsetMax);
+	const float RandomAngleMax = FMath::Max(M_VerticalRocketSettings.RandomAngleOffsetMin,
+	                                        M_VerticalRocketSettings.RandomAngleOffsetMax);
 	const float ApexConeAngle = FMath::RandRange(RandomAngleMin, RandomAngleMax);
 	const float ApexConeRadians = FMath::DegreesToRadians(ApexConeAngle);
 	const float HorizontalApexOffsetDistance = FMath::Tan(ApexConeRadians) * RandomApexOffset;
