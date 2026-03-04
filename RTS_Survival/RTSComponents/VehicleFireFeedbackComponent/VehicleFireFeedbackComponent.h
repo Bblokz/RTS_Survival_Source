@@ -147,7 +147,7 @@ public:
 		ACPPTurretsMaster* InTurretMaster);
 
 	void OnTurretWeaponAdded(int32 WeaponIndex, UWeaponState* Weapon);
-	void NotifyWeaponFired(int32 WeaponIndex, int32 WeaponCalibre);
+	void NotifyWeaponFired(int32 WeaponIndex, int32 WeaponCalibre, float TurretWorldYawDegrees);
 
 protected:
 	virtual void BeginPlay() override;
@@ -193,7 +193,7 @@ private:
 	void EvaluateAllCurrentTurretWeapons();
 	void TryTrackWeapon(int32 WeaponIndex, UWeaponState* Weapon);
 	float GetNormalisedWeaponEnergy01(int32 WeaponCalibre) const;
-	void ApplyFeedbackKick(float NormalisedMuzzleEnergy);
+	void ApplyFeedbackKick(float NormalisedMuzzleEnergy, float TurretWorldYawDegrees);
 	void ApplyCriticallyDampedSpring(
 		float DeltaTime,
 		float Stiffness,
@@ -201,5 +201,6 @@ private:
 		FVector& InOutValue,
 		FVector& InOutVelocity) const;
 	void ApplyHullFeedbackTransform() const;
-	void TryResetRuntimeOffsetsToRest();
+	void SetTickEnabledForActiveRecoil();
+	void TryResetRuntimeOffsetsToRestAndSleep();
 };

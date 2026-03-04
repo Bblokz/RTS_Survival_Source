@@ -550,5 +550,6 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UVehicleFireFeedbackComponent> M_VehicleFireFeedbackComponent;
 
-	bool GetHasValidVehicleFireFeedbackComponent() const;
+	bool GetIsValidVehicleFireFeedbackComponent() const;
+	float GetTurretRootWorldYawDegrees() const;
 };

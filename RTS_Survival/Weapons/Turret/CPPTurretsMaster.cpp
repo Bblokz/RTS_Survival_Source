@@ -365,7 +365,7 @@ void ACPPTurretsMaster::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Wea
 		M_AmmoTrackingState.CheckIsWeaponToTrack(WeaponIndex, Weapon);
 	}
 
-	if (GetHasValidVehicleFireFeedbackComponent())
+	if (GetIsValidVehicleFireFeedbackComponent())
 	{
 		M_VehicleFireFeedbackComponent->OnTurretWeaponAdded(WeaponIndex, Weapon);
 	}
@@ -438,9 +438,12 @@ void ACPPTurretsMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeap
 {
 	BP_PlayWeaponAnimation(WeaponIndex, FireMode);
 
-	if (GetHasValidVehicleFireFeedbackComponent())
+	if (GetIsValidVehicleFireFeedbackComponent())
 	{
-		M_VehicleFireFeedbackComponent->NotifyWeaponFired(WeaponIndex, WeaponCalibre);
+		M_VehicleFireFeedbackComponent->NotifyWeaponFired(
+			WeaponIndex,
+			WeaponCalibre,
+			GetTurretRootWorldYawDegrees());
 	}
 
 	if (TurretOwner)
@@ -454,9 +457,30 @@ void ACPPTurretsMaster::SetVehicleFireFeedbackComponent(UVehicleFireFeedbackComp
 	M_VehicleFireFeedbackComponent = InVehicleFireFeedbackComponent;
 }
 
-bool ACPPTurretsMaster::GetHasValidVehicleFireFeedbackComponent() const
+bool ACPPTurretsMaster::GetIsValidVehicleFireFeedbackComponent() const
 {
-	return M_VehicleFireFeedbackComponent.IsValid();
+	if (M_VehicleFireFeedbackComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_VehicleFireFeedbackComponent",
+		"GetIsValidVehicleFireFeedbackComponent",
+		this);
+	return false;
+}
+
+float ACPPTurretsMaster::GetTurretRootWorldYawDegrees() const
+{
+	const USceneComponent* const TurretRootComponent = GetRootComponent();
+	if (not IsValid(TurretRootComponent))
+	{
+		return GetActorRotation().Yaw;
+	}
+
+	return TurretRootComponent->GetComponentRotation().Yaw;
 }
 
 void ACPPTurretsMaster::OnProjectileHit(const bool bBounced)
