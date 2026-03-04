@@ -63,6 +63,7 @@
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "SelectionHelpers/PlayerSelectionHelpers.h"
 #include "StartGameProfileManager/PlayerProfileLoader.h"
@@ -1623,6 +1624,11 @@ FRotationArrowTeamWeaponSettings ACPPController::GetTeamWeaponSettingsForRotatio
 		return Settings;
 	}
 	Settings.TeamWeaponArc = TeamWeaponController->GetTeamWeaponArc();
+	const TArray<UWeaponState*> TeamWeaponStates = TeamWeaponController->GetWeaponsOfSquad();
+	if (not TeamWeaponStates.IsEmpty() && IsValid(TeamWeaponStates[0]))
+	{
+		Settings.TeamWeaponRange = TeamWeaponStates[0]->GetRange();
+	}
 	Settings.bIsOnlyTeamWeaponSelected = true;
 	return Settings;
 }

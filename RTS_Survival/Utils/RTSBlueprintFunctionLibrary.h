@@ -373,6 +373,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
 	static void HideRTSRadiusById(const UObject* WorldContextObject, int32 ID);
 
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+	static void UpdateRTSRadiusArc(const UObject* WorldContextObject, int32 ID, float ArcAngle);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="UnitData")
 	static bool RTSIsValid(AActor* ActorToCheck);
 

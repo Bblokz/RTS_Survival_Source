@@ -71,6 +71,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
 	void AttachRTSRadiusToActor(int32 ID, AActor* TargetActor, FVector RelativeOffset);
 
+	/**
+	 * @brief Updates the weapon arc parameter for a pooled radius actor.
+	 * @param ID The id returned by CreateRTSRadius.
+	 * @param ArcAngle Desired turret arc in degrees.
+	 */
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+	void UpdateRTSRadiusArc(int32 ID, float ArcAngle);
+
 private:
 	// -------- Settings cache (loaded once at Initialize) --------
 	UPROPERTY()

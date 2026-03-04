@@ -8,6 +8,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+const FName URadiusComp::WeaponArcMaterialParameterName = TEXT("WeaponArc");
+
 URadiusComp::URadiusComp(): M_ZScale(0), M_RenderHeight(0), bM_IsEnabled(true)
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -87,7 +89,7 @@ void URadiusComp::UpdateRadius(float Radius)
 
 void URadiusComp::UpdateArc(const float ArcAngle)
 {
-	if(ArcAngle >=0.f)
+	if (ArcAngle >= 0.f)
 	{
 		M_ArcAngle = ArcAngle;
 	}
@@ -96,6 +98,20 @@ void URadiusComp::UpdateArc(const float ArcAngle)
 		// Interpret negative angle as a reset.
 		M_ArcAngle = 0.f;
 	}
+
+	if (not IsValid(RadiusMeshComponent))
+	{
+		return;
+	}
+
+	UMaterialInstanceDynamic* DynamicMaterial = RadiusMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+	if (not IsValid(DynamicMaterial))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create dynamic material in URadiusComp::UpdateArc");
+		return;
+	}
+
+	DynamicMaterial->SetScalarParameterValue(WeaponArcMaterialParameterName, M_ArcAngle);
 }
 
 void URadiusComp::SetMaterialScalarParameter(const FName ParameterName, const float RadiusCm)
@@ -171,10 +187,7 @@ void URadiusComp::UpdateMeshComponentTransform()
 	const FVector NewScale(ScaleValue, ScaleValue, M_ZScale);
 	RadiusMeshComponent->SetRelativeScale3D(NewScale);
 	RadiusMeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, M_RenderHeight));
-	if(M_ArcAngle > 0.f)
-	{
-		// todo set the material p
-	}
+	UpdateArc(M_ArcAngle);
 }
 
 

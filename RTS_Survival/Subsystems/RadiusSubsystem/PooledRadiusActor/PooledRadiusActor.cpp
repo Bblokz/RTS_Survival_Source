@@ -81,7 +81,7 @@ void APooledRadiusActor::InitRadiusActor(UStaticMesh* RadiusMesh, const float St
 
 void APooledRadiusActor::ActivateRadiusAt(const FVector& WorldLocation, const float Radius,
                                           UMaterialInterface* Material, const ERTSRadiusType RadiusType,
-                                          const bool bUseFullCircleMesh, const FName RadiusParameterName)
+                                          const bool bUseFullCircleMesh, const FName RadiusParameterName, const float ArcAngle)
 {
 	if (not GetIsValidRadiusComp())
 	{
@@ -106,6 +106,8 @@ void APooledRadiusActor::ActivateRadiusAt(const FVector& WorldLocation, const fl
 		M_RadiusComp->SetMaterialScalarParameter(RadiusParameterName, Radius);
 	}
 
+	M_RadiusComp->UpdateArc(ArcAngle);
+
 	SetActorHiddenInGame(false);
 	bM_InUse = true;
 	M_RadiusType = RadiusType;
@@ -119,6 +121,17 @@ void APooledRadiusActor::ActivateRadiusAt(const FVector& WorldLocation, const fl
 	{
 		M_LastUsedWorldSeconds = 0.0f;
 	}
+}
+
+
+void APooledRadiusActor::UpdateArc(const float ArcAngle)
+{
+	if (not GetIsValidRadiusComp())
+	{
+		return;
+	}
+
+	M_RadiusComp->UpdateArc(ArcAngle);
 }
 
 void APooledRadiusActor::DeactivateRadius()

@@ -726,6 +726,26 @@ void URTSBlueprintFunctionLibrary::HideRTSRadiusById(const UObject* WorldContext
     }
 }
 
+
+void URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(const UObject* WorldContextObject, const int32 ID, const float ArcAngle)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+	{
+		Subsystem->UpdateRTSRadiusArc(ID, ArcAngle);
+	}
+}
+
 bool URTSBlueprintFunctionLibrary::RTSIsValid(AActor* ActorToCheck)
 {
 	return RTSFunctionLibrary::RTSIsValid(ActorToCheck);

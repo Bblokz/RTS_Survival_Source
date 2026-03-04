@@ -15,6 +15,7 @@ struct FRotationArrowTeamWeaponSettings
 	GENERATED_BODY()
 	bool bIsOnlyTeamWeaponSelected = false;
 	float TeamWeaponArc = 0.f;
+	float TeamWeaponRange = 0.f;
 };
 USTRUCT(BlueprintType)
 struct FPlayerRotationArrowSettings
@@ -23,7 +24,7 @@ struct FPlayerRotationArrowSettings
 
 	void InitRotationArrowAction(
 		const FVector2D& InitialMouseScreenLocation,
-		const FVector& InitialMouseProjectedLocation, FRotationArrowTeamWeaponSettings TeamWeaponSettings);
+		const FVector& InitialMouseProjectedLocation, const FRotationArrowTeamWeaponSettings TeamWeaponSettings);
 	
 	void TickArrowRotation(
 		const FVector2D& MouseScreenLocation,
@@ -53,6 +54,10 @@ private:
 
 	void ResetForNextRotation();
 
+	void InitRotationArrowAction_TeamWeaponArcRadius(const FVector& InitialMouseProjectedLocation,
+	                                                 const FRotationArrowTeamWeaponSettings& TeamWeaponSettings);
+	void HideTeamWeaponArcRadius();
+
 	void RotateArrowToProjection(const FVector& MouseProjectedLocation) const;
 
 	// Set to true upon the start of the secondary click; will then tick every frame
@@ -64,6 +69,8 @@ private:
 	
 	UPROPERTY()
 	FVector2D M_OriginalMouseScreenLocation = FVector2D::ZeroVector;
+
+	int32 M_TeamWeaponArcRadiusId = -1;
 
 	void DebugArrow(const FString& Message, const FColor Color = FColor::Blue) const;
 };

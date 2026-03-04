@@ -49,11 +49,15 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Radius|Pool")
 	void ActivateRadiusAt(const FVector& WorldLocation, float Radius, UMaterialInterface* Material, ERTSRadiusType RadiusType,
-	                      bool bUseFullCircleMesh, FName RadiusParameterName);
+	                      bool bUseFullCircleMesh, FName RadiusParameterName, float ArcAngle = 0.0f);
 
 	/**
 	 * @brief Hides and deactivates this actor, detaches from any parent, and returns it to the pool.
 	 */
+
+	UFUNCTION(BlueprintCallable, Category="Radius|Pool")
+	void UpdateArc(const float ArcAngle);
+
 	UFUNCTION(BlueprintCallable, Category="Radius|Pool")
 	void DeactivateRadius();
 

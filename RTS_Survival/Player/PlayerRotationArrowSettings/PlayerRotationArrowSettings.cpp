@@ -3,9 +3,11 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Player/Formation/FormationMovement.h"
+#include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
+#include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 
 void FPlayerRotationArrowSettings::InitRotationArrowAction(const FVector2D& InitialMouseScreenLocation,
-                                                           const FVector& InitialMouseProjectedLocation, FRotationArrowTeamWeaponSettings TeamWeaponSettings)
+                                                           const FVector& InitialMouseProjectedLocation, const FRotationArrowTeamWeaponSettings TeamWeaponSettings)
 {
 	if (not EnsureRotationActorIsValid())
 	{
@@ -15,11 +17,57 @@ void FPlayerRotationArrowSettings::InitRotationArrowAction(const FVector2D& Init
 	bM_RotationArrowInitialized = true;
 	RotationArrowActor->SetActorHiddenInGame(true);
 	M_OriginalMouseScreenLocation = InitialMouseScreenLocation;
+	InitRotationArrowAction_TeamWeaponArcRadius(InitialMouseProjectedLocation, TeamWeaponSettings);
 	if constexpr (DeveloperSettings::Debugging::GPlayerRotationArrow_Compile_DebugSymbols)
 	{
 		const FString StartLocationAsString = RotationArrowActor->GetActorLocation().ToString();
 		DebugArrow("Rotation arrow initialized at: " + StartLocationAsString, FColor::Green);
 	}
+}
+
+
+void FPlayerRotationArrowSettings::InitRotationArrowAction_TeamWeaponArcRadius(const FVector& InitialMouseProjectedLocation,
+                                                                                const FRotationArrowTeamWeaponSettings& TeamWeaponSettings)
+{
+	const bool bShouldShowArcRadius = TeamWeaponSettings.bIsOnlyTeamWeaponSelected
+		&& TeamWeaponSettings.TeamWeaponArc > 0.0f
+		&& TeamWeaponSettings.TeamWeaponRange > 100.0f;
+
+	if (not bShouldShowArcRadius)
+	{
+		return;
+	}
+
+	M_TeamWeaponArcRadiusId = URTSBlueprintFunctionLibrary::CreateRTSRadius(
+		RotationArrowActor,
+		InitialMouseProjectedLocation,
+		TeamWeaponSettings.TeamWeaponRange,
+		ERTSRadiusType::FullCircle_TeamWeaponArc
+	);
+
+	if (M_TeamWeaponArcRadiusId < 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("FPlayerRotationArrowSettings::InitRotationArrowAction failed to create team weapon arc radius."));
+		return;
+	}
+
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(RotationArrowActor, M_TeamWeaponArcRadiusId, RotationArrowActor, ArrowOffset);
+	URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(RotationArrowActor, M_TeamWeaponArcRadiusId, TeamWeaponSettings.TeamWeaponArc);
+}
+
+void FPlayerRotationArrowSettings::HideTeamWeaponArcRadius()
+{
+	if (M_TeamWeaponArcRadiusId < 0)
+	{
+		return;
+	}
+
+	if (EnsureRotationActorIsValid())
+	{
+		URTSBlueprintFunctionLibrary::HideRTSRadiusById(RotationArrowActor, M_TeamWeaponArcRadiusId);
+	}
+
+	M_TeamWeaponArcRadiusId = -1;
 }
 
 void FPlayerRotationArrowSettings::TickArrowRotation(const FVector2D& MouseScreenLocation,
@@ -91,6 +139,7 @@ void FPlayerRotationArrowSettings::ResetForNextRotation()
 {
 	bM_RotationArrowInitialized = false;
 	bM_MouseMovedEnough = false;
+	HideTeamWeaponArcRadius();
 	if (EnsureRotationActorIsValid())
 	{
 		RotationArrowActor->SetActorHiddenInGame(true);
