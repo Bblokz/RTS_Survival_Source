@@ -42,7 +42,8 @@ namespace BounceVfx
 
 namespace CameraShakeWeaponHelpers
 {
-	void PopulateOptimizationDistanceHint(const UMeshComponent* SourceMeshComponent, FRTSCameraShakeRequest& InOutShakeRequest)
+	void PopulateOptimizationDistanceHint(const UMeshComponent* SourceMeshComponent,
+	                                      FRTSCameraShakeRequest& InOutShakeRequest)
 	{
 		if (not SourceMeshComponent)
 		{
@@ -55,7 +56,8 @@ namespace CameraShakeWeaponHelpers
 			return;
 		}
 
-		const URTSOptimizer* OwnerOptimizer = Cast<URTSOptimizer>(OwnerActor->GetComponentByClass(URTSOptimizer::StaticClass()));
+		const URTSOptimizer* OwnerOptimizer = Cast<URTSOptimizer>(
+			OwnerActor->GetComponentByClass(URTSOptimizer::StaticClass()));
 		if (not OwnerOptimizer)
 		{
 			return;
@@ -770,9 +772,9 @@ UWeaponState::~UWeaponState()
 
 float UWeaponState::GetTurretYawLimit() const
 {
-	if(not WeaponOwner || not IsValid(WeaponOwner.GetObject()))
+	if (not WeaponOwner || not IsValid(WeaponOwner.GetObject()))
 	{
-		return 0.f;	
+		return 0.f;
 	}
 	return WeaponOwner->GetTurretYawLimit();
 }
@@ -2060,6 +2062,17 @@ void UWeaponStateProjectile::OnProjectileHit(const bool bBounced) const
 void UWeaponStateProjectile::SetupProjectileManager(ASmallArmsProjectileManager* ProjectileManager)
 {
 	M_ProjectileManager = ProjectileManager;
+	if (M_ProjectileManager.IsValid() && M_ProjectileManager->GetWorld())
+	{
+		URTSCameraShakeSubsystem* CameraShakeSubsystem = M_ProjectileManager->GetWorld()->GetSubsystem<
+			URTSCameraShakeSubsystem>();
+		M_CameraShakeSubsystem = CameraShakeSubsystem;
+		if (not IsValid(CameraShakeSubsystem))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Projectile weapon failed to get camera shake subsystem from world. " + GetName());
+		}
+	}
 }
 
 void UWeaponStateProjectile::CopyStateFrom(const UWeaponStateProjectile* Other)
@@ -2073,17 +2086,14 @@ void UWeaponStateProjectile::FireWeaponSystem()
 		return;
 	}
 
-	if (World)
+	if (IsWeaponLargeEnoughForCameraShake() && M_CameraShakeSubsystem.IsValid())
 	{
-		if (URTSCameraShakeSubsystem* CameraShakeSubsystem = World->GetSubsystem<URTSCameraShakeSubsystem>())
-		{
-			FRTSCameraShakeRequest ShakeRequest;
-			ShakeRequest.M_EventType = ERTSCameraShakeEventType::WeaponFire;
-			ShakeRequest.M_CalibreMm = FMath::RoundToInt(WeaponData.WeaponCalibre);
-			ShakeRequest.M_WorldLocation = GetLaunchAndForwardVector().Key;
-			CameraShakeWeaponHelpers::PopulateOptimizationDistanceHint(MeshComponent, ShakeRequest);
-			CameraShakeSubsystem->RequestWeaponFireShake(ShakeRequest);
-		}
+		FRTSCameraShakeRequest ShakeRequest;
+		ShakeRequest.M_EventType = ERTSCameraShakeEventType::WeaponFire;
+		ShakeRequest.M_CalibreMm = FMath::RoundToInt(WeaponData.WeaponCalibre);
+		ShakeRequest.M_WorldLocation = GetLaunchAndForwardVector().Key;
+		CameraShakeWeaponHelpers::PopulateOptimizationDistanceHint(MeshComponent, ShakeRequest);
+		M_CameraShakeSubsystem->RequestWeaponFireShake(ShakeRequest);
 	}
 
 	FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));

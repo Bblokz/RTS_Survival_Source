@@ -6,6 +6,7 @@
 #include "Engine/DamageEvents.h"
 #include "NiagaraSystem.h"
 #include "RTSDamageTypes/RTSDamageTypes.h"
+#include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
 #include "RTS_Survival/Weapons/LaserWeapon/LaserWeaponData.h"
 #include "RTS_Survival/Weapons/Projectile/ProjectileVfxSettings/ProjectileVfxSettings.h"
@@ -15,6 +16,7 @@
 #include "WeaponData.generated.h"
 
 
+class URTSCameraShakeSubsystem;
 enum class EProjectileNiagaraSystem : uint8;
 class UArmorCalculation;
 class ASmallArmsProjectileManager;
@@ -1202,6 +1204,13 @@ private:
 	// Determines the type of projectile niagara system to set.
 	UPROPERTY()
 	EProjectileNiagaraSystem M_ProjectileNiagaraSystem;
+
+	UPROPERTY()
+	TWeakObjectPtr<URTSCameraShakeSubsystem> M_CameraShakeSubsystem;
+	inline bool IsWeaponLargeEnoughForCameraShake() const
+	{
+		return WeaponData.WeaponCalibre >= DeveloperSettings::Optimization::MinCalibreCameraShake;
+	}
 
 	TWeakObjectPtr<ASmallArmsProjectileManager> M_ProjectileManager;
 
