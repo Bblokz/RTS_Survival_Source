@@ -447,7 +447,7 @@ private:
 
 
 	void BeginPlay_DetermineMainWeapon();
-	void PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink();
+	void PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink() const;
 
 	// The actor targeted by this tank master.
 	UPROPERTY()

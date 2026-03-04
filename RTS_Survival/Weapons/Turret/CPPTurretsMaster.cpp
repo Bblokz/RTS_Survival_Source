@@ -464,11 +464,7 @@ bool ACPPTurretsMaster::GetIsValidVehicleFireFeedbackComponent() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		"M_VehicleFireFeedbackComponent",
-		"GetIsValidVehicleFireFeedbackComponent",
-		this);
+	// NO ERROR REPORT!! not all turrets will have a component for feedback.
 	return false;
 }
 

@@ -3,7 +3,6 @@
 #include "Camera/CameraShakeBase.h"
 #include "Camera/CameraTypes.h"
 #include "GameFramework/PlayerController.h"
-#include "GameFramework/PlayerCameraManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Camera/Settings/RTSCameraShakeDeveloperSettings.h"
 

@@ -413,6 +413,7 @@ void ATankMaster::PostInitializeComponents()
 	BehaviourComponent = BehaviourComp;
 	(void)GetIsValidBehaviourComponent();
 
+	// Note that not all tanks will have one of these.
 	M_VehicleFireFeedbackComponent = FindComponentByClass<UVehicleFireFeedbackComponent>();
 	PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink();
 
@@ -429,13 +430,13 @@ void ATankMaster::PostInitializeComponents()
 }
 
 
-void ATankMaster::PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink()
+void ATankMaster::PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink() const
 {
-	UVehicleFireFeedbackComponent* VehicleFireFeedbackComponent = M_VehicleFireFeedbackComponent.Get();
-	if (not VehicleFireFeedbackComponent)
+	if (not M_VehicleFireFeedbackComponent.IsValid())
 	{
 		return;
 	}
+	UVehicleFireFeedbackComponent* VehicleFireFeedbackComponent = M_VehicleFireFeedbackComponent.Get();
 
 	VehicleFireFeedbackComponent->SetOptimizationComponent(M_OptimizationComponent);
 }
@@ -922,8 +923,8 @@ void ATankMaster::OnTurretOutOfRange(
 	const float CurrentTimeSeconds = World->GetTimeSeconds();
 	const bool bIsAlreadyMoving = AITankController->GetMoveStatus() == EPathFollowingStatus::Moving;
 	const float TimeSinceLastRequestSeconds = bM_HasTurretOutOfRangeMoveRequest
-		? CurrentTimeSeconds - M_LastTurretOutOfRangeMoveRequestTimeSeconds
-		: DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
+		                                          ? CurrentTimeSeconds - M_LastTurretOutOfRangeMoveRequestTimeSeconds
+		                                          : DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
 	const bool bElapsedEnoughTime = TimeSinceLastRequestSeconds >=
 		DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
 
