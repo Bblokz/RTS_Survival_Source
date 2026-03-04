@@ -84,6 +84,11 @@ void ATeamWeapon::PlayFireAnim() const
 	M_AnimInstance->PlayFireAnimation();
 }
 
+void ATeamWeapon::OnTeamWeaponAbandoned()
+{
+	DisableTurret();
+}
+
 void ATeamWeapon::SetTeamWeaponController(ATeamWeaponController* NewController)
 {
 	M_TeamWeaponController = NewController;

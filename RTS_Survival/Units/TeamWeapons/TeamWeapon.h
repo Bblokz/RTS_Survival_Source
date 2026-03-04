@@ -168,6 +168,7 @@ public:
 	float GetGroundTraceStartHeightCm() const { return M_TeamWeaponConfig.M_GroundTraceStartHeightCm; }
 	float GetGroundTraceLengthCm() const { return M_TeamWeaponConfig.M_GroundTraceLengthCm; }
 	float GetGuardEngageFlowDistanceCm() const { return M_TeamWeaponConfig.M_GuardEngageFlowDistanceCm; }
+	void OnTeamWeaponAbandoned();
 
 	void SetTeamWeaponController(ATeamWeaponController* NewController);
 	UTeamWeaponMover* GetTeamWeaponMover() const { return M_TeamWeaponMover; }

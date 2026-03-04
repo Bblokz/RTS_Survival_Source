@@ -2445,7 +2445,7 @@ void ATeamWeaponController::AbandonTeamWeapon()
 
 	if (GetIsValidTeamWeapon())
 	{
-		M_TeamWeapon->Destroy();
+		M_TeamWeapon->OnTeamWeaponAbandoned();
 	}
 
 	M_TeamWeapon = nullptr;

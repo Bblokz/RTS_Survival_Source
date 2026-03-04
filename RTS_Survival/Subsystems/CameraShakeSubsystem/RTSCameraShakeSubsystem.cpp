@@ -271,7 +271,7 @@ void URTSCameraShakeSubsystem::TryPlayAggregatedShake(const float CurrentTimeSec
 		return;
 	}
 
-	PlayerController->PlayerCameraManager->StartCameraShake(LoadedShakeClass, ClampedIntensity);
+	PlayerController->PlayerCameraManager->StartCameraShake(LoadedShakeClass, ClampedIntensity, ECameraShakePlaySpace::World);
 }
 
 bool URTSCameraShakeSubsystem::GetIsRequestPassingGlobalThresholds(const FRTSCameraShakeRequest& Request) const

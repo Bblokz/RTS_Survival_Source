@@ -2105,14 +2105,7 @@ bool UWeaponStateProjectile::GetIsValidCameraShakeSubsystem() const
 	{
 		return true;
 	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		TEXT("M_CameraShakeSubsystem"),
-		TEXT("GetIsValidCameraShakeSubsystem"),
-		this
-	);
-
+	// No error as not all weapon states will be setup to use this.
 	return false;
 }
 
@@ -2123,13 +2116,7 @@ bool UWeaponStateProjectile::GetIsValidOwningActorOptimizationComponent() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		TEXT("M_OwningActorOptimizationComponent"),
-		TEXT("GetIsValidOwningActorOptimizationComponent"),
-		this
-	);
-
+	// No error; not all turrets are part of units that use this optimization component.
 	return false;
 }
 
