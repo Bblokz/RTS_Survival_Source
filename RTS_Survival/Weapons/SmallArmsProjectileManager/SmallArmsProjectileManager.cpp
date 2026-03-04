@@ -7,6 +7,7 @@
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 
 
 ASmallArmsProjectileManager::ASmallArmsProjectileManager()
@@ -76,6 +77,15 @@ void ASmallArmsProjectileManager::InitProjectileManager(UNiagaraSystem* Projecti
 	M_TankProjectileClass = TankProjectileClass;
 	M_TankProjectilesPool.CreateProjectilesForPool(
 		this, GetWorld(), TankProjectileClass, GetActorLocation());
+
+	URTSCameraShakeSubsystem* CameraShakeSubsystem = GetWorld()->GetSubsystem<URTSCameraShakeSubsystem>();
+	if (not CameraShakeSubsystem)
+	{
+		RTSFunctionLibrary::ReportError("Failed to set camera shake subsystem on tank projectile pool.");
+		return;
+	}
+
+	M_TankProjectilesPool.SetCameraShakeSubsystemForProjectiles(CameraShakeSubsystem);
 }
 
 

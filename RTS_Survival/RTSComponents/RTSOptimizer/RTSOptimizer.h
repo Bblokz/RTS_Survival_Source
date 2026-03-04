@@ -71,6 +71,7 @@ public:
 	URTSOptimizer();
 
 	void SetOptimizationEnabled(const bool bEnable);
+	ERTSOptimizationDistance GetCurrentOptimizationDistance() const;
 
 protected:
 	// Called when the game starts

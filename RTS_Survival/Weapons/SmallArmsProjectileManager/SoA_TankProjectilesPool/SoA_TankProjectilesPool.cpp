@@ -2,6 +2,7 @@
 
 #include "RTS_Survival/Weapons/Projectile/Projectile.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
+#include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 
 
 void FSoA_TankProjectilesPool::CreateProjectilesForPool(
@@ -62,4 +63,24 @@ AProjectile* FSoA_TankProjectilesPool::GetDormantProjectile()
 		}
 	}
 	return nullptr;
+}
+
+
+void FSoA_TankProjectilesPool::SetCameraShakeSubsystemForProjectiles(URTSCameraShakeSubsystem* CameraShakeSubsystem)
+{
+	if (not CameraShakeSubsystem)
+	{
+		RTSFunctionLibrary::ReportError("SetCameraShakeSubsystemForProjectiles received an invalid subsystem.");
+		return;
+	}
+
+	for (AProjectile* EachProjectile : Projectiles)
+	{
+		if (not EachProjectile)
+		{
+			continue;
+		}
+
+		EachProjectile->SetCameraShakeSubsystem(CameraShakeSubsystem);
+	}
 }

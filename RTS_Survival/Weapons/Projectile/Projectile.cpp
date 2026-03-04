@@ -26,6 +26,7 @@
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+#include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 
 // --- local helpers (file-scope) ------------------------------------------------
 namespace
@@ -244,6 +245,26 @@ void AProjectile::InitProjectilePoolSettings(const TWeakObjectPtr<ASmallArmsProj
 	}
 	M_ProjectilePoolSettings.ProjectileManager = Manager;
 	M_ProjectilePoolSettings.ProjectileIndex = Index;
+}
+
+void AProjectile::SetCameraShakeSubsystem(URTSCameraShakeSubsystem* CameraShakeSubsystem)
+{
+	M_CameraShakeSubsystem = CameraShakeSubsystem;
+}
+
+bool AProjectile::GetIsValidCameraShakeSubsystem() const
+{
+	if (M_CameraShakeSubsystem.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_CameraShakeSubsystem",
+		"GetIsValidCameraShakeSubsystem",
+		this);
+	return false;
 }
 
 void AProjectile::SetupProjectileForNewLaunch(
@@ -1370,6 +1391,15 @@ void AProjectile::HandleHitActorAndClearTimer(AActor* HitActor, const FVector& H
 void AProjectile::SpawnExplosionHandleAOE(const FVector& Location, const FRotator& HitRotation,
                                           const ERTSSurfaceType HitSurface, AActor* HitActor)
 {
+	if (GetIsValidCameraShakeSubsystem())
+	{
+		FRTSCameraShakeRequest ShakeRequest;
+		ShakeRequest.M_EventType = ERTSCameraShakeEventType::Explosion;
+		ShakeRequest.M_CalibreMm = M_WeaponCalibre;
+		ShakeRequest.M_WorldLocation = Location;
+		M_CameraShakeSubsystem->RequestExplosionShake(ShakeRequest);
+	}
+
 	// Resolve impact data once.
 	const FRTSSurfaceImpactData* const Data = FindImpactData(M_ImpactVfx, HitSurface);
 	if (!Data)

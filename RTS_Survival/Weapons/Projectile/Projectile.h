@@ -30,6 +30,7 @@ class UArmorCalculation;
 class UAudioComponent;
 class UProjectileMovementComponent;
 class UWeaponStateProjectile;
+class URTSCameraShakeSubsystem;
 struct FRocketWeaponSettings;
 struct FVerticalRocketWeaponSettings;
 
@@ -52,6 +53,8 @@ public:
 	void InitProjectilePoolSettings(
 		TWeakObjectPtr<ASmallArmsProjectileManager> Manager,
 		const int32 Index);
+
+	void SetCameraShakeSubsystem(URTSCameraShakeSubsystem* CameraShakeSubsystem);
 
 	void SetupProjectileForNewLaunch(
 		UWeaponStateProjectile* NewProjectileOwner,
@@ -197,6 +200,10 @@ private:
 
 	// The manager and index of this projectile in the pool.
 	FProjectilePoolSettings M_ProjectilePoolSettings;
+
+	UPROPERTY()
+	TWeakObjectPtr<URTSCameraShakeSubsystem> M_CameraShakeSubsystem;
+	bool GetIsValidCameraShakeSubsystem() const;
 
 	// Called when the projectile has finished its job for the current projectile owner.
 	void OnProjectileDormant();
