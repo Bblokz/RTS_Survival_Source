@@ -9,6 +9,7 @@
 #include "RTSOptimizer.generated.h"
 
 class ACPPController;
+class UVehicleFireFeedbackComponent;
 
 USTRUCT()
 struct FRTSTickingComponent
@@ -61,6 +62,18 @@ struct FSkeletonOptimizationSettings
 	bool bCastContactShadow = false;
 };
 
+USTRUCT()
+struct FRTSVehicleFireFeedbackOptimizationSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UVehicleFireFeedbackComponent> FireFeedbackComponent = nullptr;
+
+	UPROPERTY()
+	float BaseTickInterval = 0.f;
+};
+
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URTSOptimizer : public UActorComponent
@@ -72,6 +85,7 @@ public:
 
 	void SetOptimizationEnabled(const bool bEnable);
 	ERTSOptimizationDistance GetCurrentOptimizationDistance() const;
+	bool GetIsInFOV() const;
 
 protected:
 	// Called when the game starts
@@ -102,6 +116,9 @@ private:
 	UPROPERTY()
 	TArray<FSkeletonOptimizationSettings> M_SkeletalMeshComponents = {};
 
+	UPROPERTY()
+	TArray<FRTSVehicleFireFeedbackOptimizationSettings> M_VehicleFireFeedbackComponents = {};
+
 	FTimerHandle M_OptimizationTimer;
 
 	void OptimizeTick();
@@ -121,4 +138,7 @@ private:
 
 	void TickingComponentDetermineOptimizedTicks(
 		UActorComponent* TickingComponent);
+
+	void UpdateVehicleFireFeedbackComponentsForInFOV() const;
+	void UpdateVehicleFireFeedbackComponentsForOutFOVFar() const;
 };

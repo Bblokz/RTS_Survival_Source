@@ -4,6 +4,7 @@
 #include "RTSOptimizer.h"
 
 #include "RTSOptimizationDistance.h"
+#include "RTS_Survival/RTSComponents/VehicleFireFeedbackComponent/VehicleFireFeedbackComponent.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -50,6 +51,11 @@ void URTSOptimizer::SetOptimizationEnabled(const bool bEnable)
 ERTSOptimizationDistance URTSOptimizer::GetCurrentOptimizationDistance() const
 {
 	return M_PreviousOptimizationDistance;
+}
+
+bool URTSOptimizer::GetIsInFOV() const
+{
+	return M_PreviousOptimizationDistance == ERTSOptimizationDistance::InFOV;
 }
 
 
@@ -128,6 +134,8 @@ void URTSOptimizer::OptimizeTick()
 
 void URTSOptimizer::InFOVUpdateComponents()
 {
+	UpdateVehicleFireFeedbackComponentsForInFOV();
+
 	for (auto EachTicking : M_TickingComponentsNotSkeletal)
 	{
 		if (not EachTicking.TickingComponent)
@@ -160,6 +168,8 @@ void URTSOptimizer::InFOVUpdateComponents()
 
 void URTSOptimizer::OutFovCloseUpdateComponents()
 {
+	UpdateVehicleFireFeedbackComponentsForInFOV();
+
 	for (auto EachTicking : M_TickingComponentsNotSkeletal)
 	{
 		if (not EachTicking.TickingComponent)
@@ -194,6 +204,8 @@ void URTSOptimizer::OutFovCloseUpdateComponents()
 
 void URTSOptimizer::OutFovFarUpdateComponents()
 {
+	UpdateVehicleFireFeedbackComponentsForOutFOVFar();
+
 	for (auto EachTicking : M_TickingComponentsNotSkeletal)
 	{
 		if (not EachTicking.TickingComponent)
@@ -389,8 +401,44 @@ void URTSOptimizer::BeginPlay_SetupComponentReferences()
 	}
 }
 
+
+void URTSOptimizer::UpdateVehicleFireFeedbackComponentsForInFOV() const
+{
+	for (const auto EachFeedbackComponent : M_VehicleFireFeedbackComponents)
+	{
+		if (not EachFeedbackComponent.FireFeedbackComponent)
+		{
+			continue;
+		}
+
+		EachFeedbackComponent.FireFeedbackComponent->SetComponentTickInterval(EachFeedbackComponent.BaseTickInterval);
+	}
+}
+
+void URTSOptimizer::UpdateVehicleFireFeedbackComponentsForOutFOVFar() const
+{
+	for (const auto EachFeedbackComponent : M_VehicleFireFeedbackComponents)
+	{
+		if (not EachFeedbackComponent.FireFeedbackComponent)
+		{
+			continue;
+		}
+
+		EachFeedbackComponent.FireFeedbackComponent->ForceResetRecoilAndSleep();
+	}
+}
+
 void URTSOptimizer::TickingComponentDetermineOptimizedTicks(UActorComponent* TickingComponent)
 {
+	if (UVehicleFireFeedbackComponent* FireFeedbackComponent = Cast<UVehicleFireFeedbackComponent>(TickingComponent))
+	{
+		FRTSVehicleFireFeedbackOptimizationSettings Entry;
+		Entry.FireFeedbackComponent = FireFeedbackComponent;
+		Entry.BaseTickInterval = FireFeedbackComponent->GetComponentTickInterval();
+		M_VehicleFireFeedbackComponents.Add(Entry);
+		return;
+	}
+
 	FRTSTickingComponent Entry;
 	const bool bIsCharacterMovement = TickingComponent->IsA<UCharacterMovementComponent>();
 	const float TickTimeBase = TickingComponent->GetComponentTickInterval();

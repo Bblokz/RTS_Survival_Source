@@ -8,6 +8,7 @@ class ACPPTurretsMaster;
 class UStaticMeshComponent;
 class USkeletalMeshComponent;
 class UWeaponState;
+class URTSOptimizer;
 
 USTRUCT(BlueprintType)
 struct FVehicleFireFeedbackSettings
@@ -148,6 +149,8 @@ public:
 
 	void OnTurretWeaponAdded(int32 WeaponIndex, UWeaponState* Weapon);
 	void NotifyWeaponFired(int32 WeaponIndex, int32 WeaponCalibre, float TurretWorldYawDegrees);
+	void SetOptimizationComponent(URTSOptimizer* InOptimizer);
+	void ForceResetRecoilAndSleep();
 
 protected:
 	virtual void BeginPlay() override;
@@ -172,6 +175,9 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UWeaponState> M_TrackedWeapon;
 
+	UPROPERTY()
+	TWeakObjectPtr<URTSOptimizer> M_OptimizationComponent;
+
 	FVector M_BaseHullRelativeLocation = FVector::ZeroVector;
 	FRotator M_BaseHullRelativeRotation = FRotator::ZeroRotator;
 
@@ -188,6 +194,7 @@ private:
 	bool GetIsValidTrackRootMesh() const;
 	bool GetIsValidTurretMaster() const;
 	bool GetHasValidTrackedWeapon() const;
+	bool GetIsValidOptimizationComponent() const;
 
 	void CacheHullBaseTransform();
 	void EvaluateAllCurrentTurretWeapons();
