@@ -116,7 +116,7 @@ protected:
 	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override;
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override;
-	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode) override;
+	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre) override;
 	virtual void OnProjectileHit(const bool bBounced) override;
 	virtual void OnReloadStart(const int32 WeaponIndex, const float ReloadTime) override;
 	virtual void OnReloadFinished(const int32 WeaponIndex) override;

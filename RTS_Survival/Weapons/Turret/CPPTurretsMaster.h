@@ -252,7 +252,7 @@ protected:
 	 */
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override final;
 
-	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode) override;
+	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre) override;
 
 	virtual void OnProjectileHit(const bool bBounced) override;
 

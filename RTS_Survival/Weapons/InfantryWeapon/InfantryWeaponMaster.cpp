@@ -626,7 +626,7 @@ void AInfantryWeaponMaster::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AAc
 	CheckTargetKilled(KilledActor);
 }
 
-void AInfantryWeaponMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode)
+void AInfantryWeaponMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre)
 {
 	if(IsValid(M_OwningSquadUnit))
 	{

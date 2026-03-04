@@ -168,7 +168,7 @@ void UHullWeaponComponent::OnWeaponKilledActor(const int32 WeaponIndex, AActor* 
 }
 
 
-void UHullWeaponComponent::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode)
+void UHullWeaponComponent::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre)
 {
 	// No animations for hull components.
 }

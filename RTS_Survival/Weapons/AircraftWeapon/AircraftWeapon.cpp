@@ -152,7 +152,7 @@ void UAircraftWeapon::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AActor* K
 	M_TargetingData.ResetTarget();
 }
 
-void UAircraftWeapon::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode)
+void UAircraftWeapon::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre)
 {
 	if(not EnsureAircraftOwnerIsValid())
 	{

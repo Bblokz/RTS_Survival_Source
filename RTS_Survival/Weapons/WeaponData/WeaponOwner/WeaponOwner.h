@@ -89,7 +89,7 @@ protected:
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) = 0;
 
 	// Called when the weapon fires.
-	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode) = 0;
+	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre) = 0;
 
 	/**
 	 * Called when the weapon start reloading.

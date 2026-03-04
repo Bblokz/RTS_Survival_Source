@@ -428,7 +428,7 @@ void ACPPTurretsMaster::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AActor*
 	}
 }
 
-void ACPPTurretsMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode)
+void ACPPTurretsMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre)
 {
 	BP_PlayWeaponAnimation(WeaponIndex, FireMode);
 	if (TurretOwner)

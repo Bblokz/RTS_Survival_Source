@@ -313,7 +313,7 @@ void UAttachedWeaponAbilityComponent::OnWeaponKilledActor(const int32 WeaponInde
 {
 }
 
-void UAttachedWeaponAbilityComponent::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode)
+void UAttachedWeaponAbilityComponent::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre)
 {
 }
 

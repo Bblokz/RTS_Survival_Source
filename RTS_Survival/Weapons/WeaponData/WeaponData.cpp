@@ -1107,7 +1107,7 @@ void UWeaponState::FireSingleShot()
 				GetLaunchAndForwardVector().Value);
 			if (IsValid(WeaponOwner.GetObject()))
 			{
-				WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode);
+				WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
 			}
 			FireWeaponSystem();
 			M_CurrentMagCapacity--;
@@ -1145,7 +1145,7 @@ void UWeaponState::FireSingleBurst()
 				GetLaunchAndForwardVector().Value);
 			if (IsValid(WeaponOwner.GetObject()))
 			{
-				WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode);
+				WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
 			}
 			InitSingleBurstMode();
 		}
@@ -1214,7 +1214,7 @@ void UWeaponState::InitRandomBurst()
 	// One time animation for the full burst.
 	if (IsValid(WeaponOwner.GetObject()))
 	{
-		WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode);
+		WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
 	}
 
 
