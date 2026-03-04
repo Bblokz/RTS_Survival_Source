@@ -24,6 +24,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/HideableInstancedStaticMeshComponent/RTSHidableInstancedStaticMeshComponent.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
+#include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 
 // === Global shell-color cache ================================================
 
@@ -35,6 +37,32 @@ namespace BounceVfx
 	inline void ApplyScaleToHeHeatBounce(UNiagaraComponent* System, const float ScaleMlt)
 	{
 		System->SetFloatParameter(ScaleMltName, ScaleMlt);
+	}
+}
+
+namespace CameraShakeWeaponHelpers
+{
+	void PopulateOptimizationDistanceHint(const UMeshComponent* SourceMeshComponent, FRTSCameraShakeRequest& InOutShakeRequest)
+	{
+		if (not SourceMeshComponent)
+		{
+			return;
+		}
+
+		const AActor* OwnerActor = SourceMeshComponent->GetOwner();
+		if (not OwnerActor)
+		{
+			return;
+		}
+
+		const URTSOptimizer* OwnerOptimizer = Cast<URTSOptimizer>(OwnerActor->GetComponentByClass(URTSOptimizer::StaticClass()));
+		if (not OwnerOptimizer)
+		{
+			return;
+		}
+
+		InOutShakeRequest.bM_HasOptimizationDistanceHint = true;
+		InOutShakeRequest.M_OptimizationDistanceHint = OwnerOptimizer->GetCurrentOptimizationDistance();
 	}
 }
 
@@ -1255,7 +1283,7 @@ void UWeaponState::OnRandomBurst()
 void UWeaponState::OnStopBurstMode()
 {
 	// Clear burst timer.
-	if (IsValid(World))
+	if (World)
 	{
 		World->GetTimerManager().ClearTimer(M_WeaponTimerHandle);
 		// Notify once per completed burst (after all bullets of that burst were spent)
@@ -1319,7 +1347,7 @@ void UWeaponState::CoolDown()
 
 void UWeaponState::OnCoolDownFinished()
 {
-	if (IsValid(World))
+	if (World)
 	{
 		World->GetTimerManager().ClearTimer(M_WeaponTimerHandle);
 		bM_IsOnCooldown = false;
@@ -1403,7 +1431,7 @@ TPair<FVector, FVector> UWeaponState::GetLaunchAndForwardVector() const
 {
 	FVector LaunchLocation;
 	FVector ForwardVector;
-	if (IsValid(MeshComponent))
+	if (MeshComponent)
 	{
 		LaunchLocation = MeshComponent->GetSocketLocation(FireSocketName);
 		const FQuat SocketRotation = MeshComponent->GetSocketQuaternion(FireSocketName);
@@ -1412,7 +1440,7 @@ TPair<FVector, FVector> UWeaponState::GetLaunchAndForwardVector() const
 		// draw debug of socket forward vector 200 units.
 		if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
 		{
-			if (IsValid(World))
+			if (World)
 			{
 				DrawDebugLine(World, LaunchLocation, LaunchLocation + ForwardVector * 200, FColor::Red, false, 0.1f, 0,
 				              5.f);
@@ -1907,7 +1935,7 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
 	{
 		if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 		{
-			if (IsValid(World))
+			if (World)
 			{
 				DrawDebugString(World, TraceHit.ImpactPoint, "tracePen", nullptr, FColor::Red, 2.f);
 			}
@@ -2040,10 +2068,25 @@ void UWeaponStateProjectile::CopyStateFrom(const UWeaponStateProjectile* Other)
 
 void UWeaponStateProjectile::FireWeaponSystem()
 {
-	if (WeaponOwner)
+	if (not WeaponOwner)
 	{
-		FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
+		return;
 	}
+
+	if (World)
+	{
+		if (URTSCameraShakeSubsystem* CameraShakeSubsystem = World->GetSubsystem<URTSCameraShakeSubsystem>())
+		{
+			FRTSCameraShakeRequest ShakeRequest;
+			ShakeRequest.M_EventType = ERTSCameraShakeEventType::WeaponFire;
+			ShakeRequest.M_CalibreMm = FMath::RoundToInt(WeaponData.WeaponCalibre);
+			ShakeRequest.M_WorldLocation = GetLaunchAndForwardVector().Key;
+			CameraShakeWeaponHelpers::PopulateOptimizationDistanceHint(MeshComponent, ShakeRequest);
+			CameraShakeSubsystem->RequestWeaponFireShake(ShakeRequest);
+		}
+	}
+
+	FireProjectile(WeaponOwner->GetFireDirection(WeaponIndex));
 }
 
 bool UWeaponStateProjectile::GetIsValidProjectileManager() const
@@ -2741,7 +2784,7 @@ UWeaponStateRocketProjectile::GetRocketLaunchSocketData(const bool bAdvanceSocke
 	// draw debug of socket forward vector 200 units.
 	if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
 	{
-		if (IsValid(World))
+		if (World)
 		{
 			constexpr float DebugLineLength = 200.0f;
 			constexpr float DebugLineLifetime = 0.1f;
@@ -2962,7 +3005,7 @@ void UVerticalRocketWeaponState::CollectLaunchSocketsFromAttachedRocketMesh()
 		return;
 	}
 
-	if (IsValid(MeshComponent))
+	if (MeshComponent)
 	{
 		const TArray<FName> MeshSocketNames = MeshComponent->GetAllSocketNames();
 		for (const FName& SocketName : MeshSocketNames)

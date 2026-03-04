@@ -7,6 +7,7 @@
 
 class ASmallArmsProjectileManager;
 class AProjectile;
+class URTSCameraShakeSubsystem;
 
 USTRUCT()
 struct FSoA_TankProjectilesPool
@@ -31,4 +32,6 @@ struct FSoA_TankProjectilesPool
 		UWorld* World,
 		const TSubclassOf<AProjectile>& ProjectileClass,
 		const FVector& CreateLocation);
+
+	void SetCameraShakeSubsystemForProjectiles(URTSCameraShakeSubsystem* CameraShakeSubsystem);
 };

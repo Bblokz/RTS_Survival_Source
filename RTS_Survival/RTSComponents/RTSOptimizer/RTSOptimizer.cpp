@@ -47,6 +47,11 @@ void URTSOptimizer::SetOptimizationEnabled(const bool bEnable)
 	}
 }
 
+ERTSOptimizationDistance URTSOptimizer::GetCurrentOptimizationDistance() const
+{
+	return M_PreviousOptimizationDistance;
+}
+
 
 void URTSOptimizer::BeginPlay()
 {
