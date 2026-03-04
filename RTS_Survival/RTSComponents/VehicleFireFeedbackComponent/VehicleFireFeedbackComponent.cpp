@@ -2,6 +2,7 @@
 
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 UVehicleFireFeedbackComponent::UVehicleFireFeedbackComponent()
@@ -45,6 +46,11 @@ void UVehicleFireFeedbackComponent::NotifyWeaponFired(
 		return;
 	}
 
+	if (GetIsValidOptimizationComponent() && not M_OptimizationComponent->GetIsInFOV())
+	{
+		return;
+	}
+
 	if (M_TrackedWeaponCalibre != WeaponCalibre)
 	{
 		M_TrackedWeaponCalibre = WeaponCalibre;
@@ -53,6 +59,26 @@ void UVehicleFireFeedbackComponent::NotifyWeaponFired(
 
 	ApplyFeedbackKick(M_CachedTrackedEnergy01, TurretWorldYawDegrees);
 	SetTickEnabledForActiveRecoil();
+}
+
+void UVehicleFireFeedbackComponent::SetOptimizationComponent(URTSOptimizer* InOptimizer)
+{
+	M_OptimizationComponent = InOptimizer;
+}
+
+void UVehicleFireFeedbackComponent::ForceResetRecoilAndSleep()
+{
+	M_RecoilOffsetCm = FVector::ZeroVector;
+	M_RecoilVelocity = FVector::ZeroVector;
+	M_RecoilRotDeg = FVector::ZeroVector;
+	M_RecoilRotVelocity = FVector::ZeroVector;
+
+	if (GetIsValidHullMesh())
+	{
+		ApplyHullFeedbackTransform();
+	}
+
+	SetComponentTickEnabled(false);
 }
 
 void UVehicleFireFeedbackComponent::BeginPlay()
@@ -139,6 +165,21 @@ bool UVehicleFireFeedbackComponent::GetIsValidTurretMaster() const
 bool UVehicleFireFeedbackComponent::GetHasValidTrackedWeapon() const
 {
 	return M_TrackedWeapon.IsValid() && M_TrackedWeaponIndex != INDEX_NONE;
+}
+
+bool UVehicleFireFeedbackComponent::GetIsValidOptimizationComponent() const
+{
+	if (M_OptimizationComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_OptimizationComponent",
+		"GetIsValidOptimizationComponent",
+		this);
+	return false;
 }
 
 void UVehicleFireFeedbackComponent::CacheHullBaseTransform()

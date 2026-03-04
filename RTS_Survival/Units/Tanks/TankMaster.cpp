@@ -414,6 +414,7 @@ void ATankMaster::PostInitializeComponents()
 	(void)GetIsValidBehaviourComponent();
 
 	M_VehicleFireFeedbackComponent = FindComponentByClass<UVehicleFireFeedbackComponent>();
+	PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink();
 
 	TArray<USceneComponent*> SceneComponents;
 	GetRootComponent()->GetChildrenComponents(true, SceneComponents);
@@ -425,6 +426,18 @@ void ATankMaster::PostInitializeComponents()
 		}
 		EachSceneComp->SetCanEverAffectNavigation(false);
 	}
+}
+
+
+void ATankMaster::PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink()
+{
+	UVehicleFireFeedbackComponent* VehicleFireFeedbackComponent = M_VehicleFireFeedbackComponent.Get();
+	if (not VehicleFireFeedbackComponent)
+	{
+		return;
+	}
+
+	VehicleFireFeedbackComponent->SetOptimizationComponent(M_OptimizationComponent);
 }
 
 void ATankMaster::SetTurretsToAutoEngage(const bool bUseLastTarget)
