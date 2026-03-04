@@ -4,6 +4,8 @@
 #include "Camera/CameraTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/Camera/CameraPawn.h"
 #include "RTS_Survival/Camera/Settings/RTSCameraShakeDeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -158,10 +160,15 @@ void URTSCameraShakeSubsystem::Tick_FlushAggregationWindow(const float CurrentTi
 	}
 
 	FVector CameraLocation = FVector::ZeroVector;
-	FRotator CameraRotation = FRotator::ZeroRotator;
-	PlayerController->GetPlayerViewPoint(CameraLocation, CameraRotation);
-	const FVector CameraForward = CameraRotation.Vector();
-	const float HalfFovRadians = FMath::DegreesToRadians(PlayerController->PlayerCameraManager->GetFOVAngle() * 0.5f);
+	FVector CameraForward = FVector::ForwardVector;
+	float CameraFovDegrees = PlayerController->PlayerCameraManager->GetFOVAngle();
+	if (not GetActiveShakeCameraData(PlayerController, CameraLocation, CameraForward, CameraFovDegrees))
+	{
+		ResetAggregationWindow();
+		return;
+	}
+
+	const float HalfFovRadians = FMath::DegreesToRadians(CameraFovDegrees * 0.5f);
 	const float CosHalfFov = FMath::Cos(HalfFovRadians);
 
 	const float AggregatedIntensity = BuildAggregatedIntensity(CameraLocation, CameraForward, CosHalfFov);
@@ -418,4 +425,58 @@ APlayerController* URTSCameraShakeSubsystem::GetPrimaryPlayerController() const
 	}
 
 	return UGameplayStatics::GetPlayerController(World, RTSCameraShakeConstants::LocalPlayerIndex);
+}
+
+bool URTSCameraShakeSubsystem::GetActiveShakeCameraData(const APlayerController* PlayerController,
+	FVector& OutCameraLocation,
+	FVector& OutCameraForward,
+	float& OutCameraFovDegrees) const
+{
+	const ACPPController* RTSPlayerController = nullptr;
+	if (GetIsValidPlayerCameraController(PlayerController, RTSPlayerController))
+	{
+		const ACameraPawn* CameraPawn = RTSPlayerController->GetCameraPawn();
+		if (not IsValid(CameraPawn) || not IsValid(CameraPawn->GetCameraComponent()))
+		{
+			RTSFunctionLibrary::ReportError(
+				TEXT("RTSCameraShakeSubsystem failed to resolve the active RTS camera pawn/camera component for camera shake data.")
+			);
+		}
+		else
+		{
+			OutCameraLocation = CameraPawn->GetCameraComponent()->GetComponentLocation();
+			OutCameraForward = CameraPawn->GetCameraComponent()->GetForwardVector();
+			OutCameraFovDegrees = CameraPawn->GetCameraComponent()->FieldOfView;
+			return true;
+		}
+	}
+
+	if (not IsValid(PlayerController))
+	{
+		return false;
+	}
+
+	FRotator CameraRotation = FRotator::ZeroRotator;
+	PlayerController->GetPlayerViewPoint(OutCameraLocation, CameraRotation);
+	OutCameraForward = CameraRotation.Vector();
+
+	if (not IsValid(PlayerController->PlayerCameraManager))
+	{
+		return true;
+	}
+
+	OutCameraFovDegrees = PlayerController->PlayerCameraManager->GetFOVAngle();
+	return true;
+}
+
+bool URTSCameraShakeSubsystem::GetIsValidPlayerCameraController(const APlayerController* PlayerController,
+	const ACPPController*& OutRTSPlayerController) const
+{
+	OutRTSPlayerController = Cast<ACPPController>(PlayerController);
+	if (not IsValid(OutRTSPlayerController))
+	{
+		return false;
+	}
+
+	return true;
 }
