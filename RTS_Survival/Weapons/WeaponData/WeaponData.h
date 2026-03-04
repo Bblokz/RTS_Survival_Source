@@ -17,6 +17,7 @@
 
 
 class URTSCameraShakeSubsystem;
+class URTSOptimizer;
 enum class EProjectileNiagaraSystem : uint8;
 class UArmorCalculation;
 class ASmallArmsProjectileManager;
@@ -1195,6 +1196,8 @@ protected:
 	virtual void FireWeaponSystem() override;
 
 	bool GetIsValidProjectileManager() const;
+	bool GetIsValidCameraShakeSubsystem() const;
+	bool GetIsValidOwningActorOptimizationComponent() const;
 
 	ASmallArmsProjectileManager* GetProjectileManager() const;
 
@@ -1207,6 +1210,9 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<URTSCameraShakeSubsystem> M_CameraShakeSubsystem;
+
+	UPROPERTY()
+	TWeakObjectPtr<URTSOptimizer> M_OwningActorOptimizationComponent;
 	inline bool IsWeaponLargeEnoughForCameraShake() const
 	{
 		return WeaponData.WeaponCalibre >= DeveloperSettings::Optimization::MinCalibreCameraShake;
