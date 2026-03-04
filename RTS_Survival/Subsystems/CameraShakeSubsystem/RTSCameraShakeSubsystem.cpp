@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Camera/Settings/RTSCameraShakeDeveloperSettings.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace RTSCameraShakeConstants
 {
@@ -250,6 +251,23 @@ void URTSCameraShakeSubsystem::TryPlayAggregatedShake(const float CurrentTimeSec
 	const TSubclassOf<UCameraShakeBase> LoadedShakeClass = DesiredShakeClass.LoadSynchronous();
 	if (not IsValid(LoadedShakeClass))
 	{
+		return;
+	}
+
+	const UCameraShakeBase* ShakeClassDefaultObject = LoadedShakeClass->GetDefaultObject<UCameraShakeBase>();
+	if (not IsValid(ShakeClassDefaultObject))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("RTSCameraShakeSubsystem failed to read camera shake default object. Verify shake class setup in RTS Camera Shake settings.")
+		);
+		return;
+	}
+
+	if (not IsValid(ShakeClassDefaultObject->GetRootShakePattern()))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("RTSCameraShakeSubsystem camera shake class has no Root Shake Pattern configured. Using CameraShakeBase directly will not produce visible shake. Assign a configured camera shake asset or subclass.")
+		);
 		return;
 	}
 
