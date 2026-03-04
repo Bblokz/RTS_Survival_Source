@@ -24,5 +24,5 @@ enum class ERTSRadiusType : uint8
 	FullCircle_RadiationAura	      UMETA(DisplayName="FullCircle_RadiationAura"),
 	Fullcircle_HealAura	          UMETA(DisplayName="FullCircle_HealAura"),
 	FullCircle_PulseRepair          UMETA(DisplayName="FullCircle_PulseRepair"),
-	FullCircle_TeamWeaponArca    UMETA(DisplayName="FullCircle_TeamWeaponArc"),
+	FullCircle_TeamWeaponArc    UMETA(DisplayName="FullCircle_TeamWeaponArc"),
 };
