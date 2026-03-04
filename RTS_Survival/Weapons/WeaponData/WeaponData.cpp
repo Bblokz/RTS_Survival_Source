@@ -40,34 +40,6 @@ namespace BounceVfx
 	}
 }
 
-namespace CameraShakeWeaponHelpers
-{
-	void PopulateOptimizationDistanceHint(const UMeshComponent* SourceMeshComponent,
-	                                      FRTSCameraShakeRequest& InOutShakeRequest)
-	{
-		if (not SourceMeshComponent)
-		{
-			return;
-		}
-
-		const AActor* OwnerActor = SourceMeshComponent->GetOwner();
-		if (not OwnerActor)
-		{
-			return;
-		}
-
-		const URTSOptimizer* OwnerOptimizer = Cast<URTSOptimizer>(
-			OwnerActor->GetComponentByClass(URTSOptimizer::StaticClass()));
-		if (not OwnerOptimizer)
-		{
-			return;
-		}
-
-		InOutShakeRequest.bM_HasOptimizationDistanceHint = true;
-		InOutShakeRequest.M_OptimizationDistanceHint = OwnerOptimizer->GetCurrentOptimizationDistance();
-	}
-}
-
 namespace LaunchVfx
 {
 	// Runtime cache shared by all weapons.
@@ -2073,6 +2045,21 @@ void UWeaponStateProjectile::SetupProjectileManager(ASmallArmsProjectileManager*
 				"Projectile weapon failed to get camera shake subsystem from world. " + GetName());
 		}
 	}
+
+	M_OwningActorOptimizationComponent = nullptr;
+	if (not IsValid(MeshComponent))
+	{
+		return;
+	}
+
+	AActor* OwningActor = MeshComponent->GetOwner();
+	if (not IsValid(OwningActor))
+	{
+		return;
+	}
+
+	M_OwningActorOptimizationComponent = Cast<URTSOptimizer>(
+		OwningActor->GetComponentByClass(URTSOptimizer::StaticClass()));
 }
 
 void UWeaponStateProjectile::CopyStateFrom(const UWeaponStateProjectile* Other)
@@ -2086,13 +2073,15 @@ void UWeaponStateProjectile::FireWeaponSystem()
 		return;
 	}
 
-	if (IsWeaponLargeEnoughForCameraShake() && M_CameraShakeSubsystem.IsValid())
+	if (IsWeaponLargeEnoughForCameraShake() && GetIsValidCameraShakeSubsystem() &&
+		GetIsValidOwningActorOptimizationComponent())
 	{
 		FRTSCameraShakeRequest ShakeRequest;
 		ShakeRequest.M_EventType = ERTSCameraShakeEventType::WeaponFire;
 		ShakeRequest.M_CalibreMm = FMath::RoundToInt(WeaponData.WeaponCalibre);
 		ShakeRequest.M_WorldLocation = GetLaunchAndForwardVector().Key;
-		CameraShakeWeaponHelpers::PopulateOptimizationDistanceHint(MeshComponent, ShakeRequest);
+		ShakeRequest.bM_HasOptimizationDistanceHint = true;
+		ShakeRequest.M_OptimizationDistanceHint = M_OwningActorOptimizationComponent->GetCurrentOptimizationDistance();
 		M_CameraShakeSubsystem->RequestWeaponFireShake(ShakeRequest);
 	}
 
@@ -2109,6 +2098,41 @@ bool UWeaponStateProjectile::GetIsValidProjectileManager() const
 		"PROJECTILE Weapon is provided with an invalid projectile manager. " + GetName());
 	return false;
 }
+
+bool UWeaponStateProjectile::GetIsValidCameraShakeSubsystem() const
+{
+	if (M_CameraShakeSubsystem.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_CameraShakeSubsystem"),
+		TEXT("GetIsValidCameraShakeSubsystem"),
+		this
+	);
+
+	return false;
+}
+
+bool UWeaponStateProjectile::GetIsValidOwningActorOptimizationComponent() const
+{
+	if (M_OwningActorOptimizationComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_OwningActorOptimizationComponent"),
+		TEXT("GetIsValidOwningActorOptimizationComponent"),
+		this
+	);
+
+	return false;
+}
+
 
 ASmallArmsProjectileManager* UWeaponStateProjectile::GetProjectileManager() const
 {
