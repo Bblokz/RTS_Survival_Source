@@ -1,7 +1,6 @@
 #include "VehicleFireFeedbackComponent.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
@@ -55,7 +54,6 @@ void UVehicleFireFeedbackComponent::NotifyWeaponFired(const int32 WeaponIndex, c
 void UVehicleFireFeedbackComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	CacheHullBaseTransform();
 }
 
 void UVehicleFireFeedbackComponent::TickComponent(
