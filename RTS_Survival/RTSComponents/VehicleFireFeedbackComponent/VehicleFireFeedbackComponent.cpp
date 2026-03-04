@@ -7,7 +7,7 @@
 UVehicleFireFeedbackComponent::UVehicleFireFeedbackComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.bStartWithTickEnabled = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void UVehicleFireFeedbackComponent::InitializeFeedbackComponent(
@@ -35,7 +35,10 @@ void UVehicleFireFeedbackComponent::OnTurretWeaponAdded(const int32 WeaponIndex,
 	TryTrackWeapon(WeaponIndex, Weapon);
 }
 
-void UVehicleFireFeedbackComponent::NotifyWeaponFired(const int32 WeaponIndex, const int32 WeaponCalibre)
+void UVehicleFireFeedbackComponent::NotifyWeaponFired(
+	const int32 WeaponIndex,
+	const int32 WeaponCalibre,
+	const float TurretWorldYawDegrees)
 {
 	if (WeaponIndex != M_TrackedWeaponIndex)
 	{
@@ -48,7 +51,8 @@ void UVehicleFireFeedbackComponent::NotifyWeaponFired(const int32 WeaponIndex, c
 		M_CachedTrackedEnergy01 = GetNormalisedWeaponEnergy01(M_TrackedWeaponCalibre);
 	}
 
-	ApplyFeedbackKick(M_CachedTrackedEnergy01);
+	ApplyFeedbackKick(M_CachedTrackedEnergy01, TurretWorldYawDegrees);
+	SetTickEnabledForActiveRecoil();
 }
 
 void UVehicleFireFeedbackComponent::BeginPlay()
@@ -65,6 +69,7 @@ void UVehicleFireFeedbackComponent::TickComponent(
 
 	if (not GetIsValidHullMesh())
 	{
+		SetComponentTickEnabled(false);
 		return;
 	}
 
@@ -83,7 +88,7 @@ void UVehicleFireFeedbackComponent::TickComponent(
 		M_RecoilRotVelocity);
 
 	ApplyHullFeedbackTransform();
-	TryResetRuntimeOffsetsToRest();
+	TryResetRuntimeOffsetsToRestAndSleep();
 }
 
 bool UVehicleFireFeedbackComponent::GetIsValidHullMesh() const
@@ -198,11 +203,28 @@ float UVehicleFireFeedbackComponent::GetNormalisedWeaponEnergy01(const int32 Wea
 	return FMath::Clamp(NormalisedEnergy, 0.0f, 1.0f);
 }
 
-void UVehicleFireFeedbackComponent::ApplyFeedbackKick(const float NormalisedMuzzleEnergy)
+void UVehicleFireFeedbackComponent::ApplyFeedbackKick(
+	const float NormalisedMuzzleEnergy,
+	const float TurretWorldYawDegrees)
 {
 	const float ClampedEnergy = FMath::Clamp(NormalisedMuzzleEnergy, 0.0f, 1.0f);
+	const float RecoilKickMagnitudeCentimeters = M_FeedbackSettings.M_MaxBackCm * ClampedEnergy;
 
-	M_RecoilOffsetCm.X += -M_FeedbackSettings.M_MaxBackCm * ClampedEnergy;
+	FVector HullLocalKickDirection = -FVector::ForwardVector;
+	if (FMath::IsFinite(TurretWorldYawDegrees) && GetIsValidHullMesh())
+	{
+		const FVector TurretYawForwardWorld = FRotator(0.0f, TurretWorldYawDegrees, 0.0f).Vector();
+		const FVector HullLocalYawForward = M_HullMesh->GetComponentTransform()
+			.InverseTransformVectorNoScale(TurretYawForwardWorld)
+			.GetSafeNormal();
+
+		if (not HullLocalYawForward.IsNearlyZero())
+		{
+			HullLocalKickDirection = -HullLocalYawForward;
+		}
+	}
+
+	M_RecoilOffsetCm += HullLocalKickDirection * RecoilKickMagnitudeCentimeters;
 	M_RecoilRotDeg.X += M_FeedbackSettings.M_MaxPitchDeg * ClampedEnergy;
 
 	const float YawJitter = FMath::FRandRange(
@@ -232,7 +254,17 @@ void UVehicleFireFeedbackComponent::ApplyHullFeedbackTransform() const
 	M_HullMesh->SetRelativeLocationAndRotation(NewLocation, NewRotation);
 }
 
-void UVehicleFireFeedbackComponent::TryResetRuntimeOffsetsToRest()
+void UVehicleFireFeedbackComponent::SetTickEnabledForActiveRecoil()
+{
+	if (IsComponentTickEnabled())
+	{
+		return;
+	}
+
+	SetComponentTickEnabled(true);
+}
+
+void UVehicleFireFeedbackComponent::TryResetRuntimeOffsetsToRestAndSleep()
 {
 	if (M_RecoilOffsetCm.SizeSquared() > M_FeedbackSettings.M_SetToRestEpsilon)
 	{
@@ -258,4 +290,12 @@ void UVehicleFireFeedbackComponent::TryResetRuntimeOffsetsToRest()
 	M_RecoilVelocity = FVector::ZeroVector;
 	M_RecoilRotDeg = FVector::ZeroVector;
 	M_RecoilRotVelocity = FVector::ZeroVector;
+	ApplyHullFeedbackTransform();
+
+	if (not IsComponentTickEnabled())
+	{
+		return;
+	}
+
+	SetComponentTickEnabled(false);
 }
