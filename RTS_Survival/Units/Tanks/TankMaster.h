@@ -29,6 +29,7 @@ class UBehaviourComp;
 class RTS_SURVIVAL_API AAITankMaster;
 class RTS_SURVIVAL_API ACPPTurretsMaster;
 class UTurretSwapComp;
+class UVehicleFireFeedbackComponent;
 
 USTRUCT()
 struct FTankStartGameAction
@@ -477,6 +478,10 @@ private:
 	// Only implemented if derived blueprint has an attached harvester component.
 	UPROPERTY()
 	TObjectPtr<UHarvester> M_HarvesterComponent;
+
+	// Optional component used by specific tank blueprints for hull fire feedback.
+	UPROPERTY()
+	TWeakObjectPtr<UVehicleFireFeedbackComponent> M_VehicleFireFeedbackComponent;
 
 	// For adjusting the rotation.
 	FTimerHandle TimerHandle_CheckIfUpsideDown;
