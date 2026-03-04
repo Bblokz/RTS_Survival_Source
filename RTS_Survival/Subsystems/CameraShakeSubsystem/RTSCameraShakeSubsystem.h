@@ -6,6 +6,7 @@
 #include "RTSCameraShakeSubsystem.generated.h"
 
 class APlayerController;
+class ACPPController;
 
 UENUM()
 enum class ERTSCameraShakeEventType : uint8
@@ -102,4 +103,10 @@ private:
 	float GetEventSpecificDistanceForCalibre(const float NormalizedCalibre) const;
 
 	APlayerController* GetPrimaryPlayerController() const;
+	bool GetActiveShakeCameraData(const APlayerController* PlayerController,
+		FVector& OutCameraLocation,
+		FVector& OutCameraForward,
+		float& OutCameraFovDegrees) const;
+	bool GetIsValidPlayerCameraController(const APlayerController* PlayerController,
+		const ACPPController*& OutRTSPlayerController) const;
 };
