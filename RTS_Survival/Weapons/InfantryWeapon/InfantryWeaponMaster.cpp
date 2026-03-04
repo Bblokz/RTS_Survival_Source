@@ -591,6 +591,11 @@ void AInfantryWeaponMaster::RegisterIgnoreActor(AActor* ActorToIgnore, const boo
 	}
 }
 
+float AInfantryWeaponMaster::GetTurretYawLimit() const
+{
+	return 0.f;
+}
+
 void AInfantryWeaponMaster::OnWeaponAdded(const int32 /*WeaponIndex*/, UWeaponState* /*Weapon*/)
 {
 }

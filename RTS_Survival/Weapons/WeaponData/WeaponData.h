@@ -541,10 +541,12 @@ public:
 	// Virtual destructor for inheritance
 	virtual ~UWeaponState() override;
 
+	
 	/** Fired exactly once per shot for Single mode, and once per completed burst for burst modes.
 	 * Also fires with FULL MAG after reload*/
 	FOnMagConsumed OnMagConsumed;
 
+	float GetTurretYawLimit() const;
 	void UpgradeWeaponWithExtraShellType(const EWeaponShellType ExtraShellType);
 	void UpgradeWeaponWithRangeMlt(const float RangeMlt);
 

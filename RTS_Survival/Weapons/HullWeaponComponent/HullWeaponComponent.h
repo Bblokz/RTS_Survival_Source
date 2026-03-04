@@ -76,6 +76,8 @@ public:
 	
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
 
+	virtual float GetTurretYawLimit() const override;
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;

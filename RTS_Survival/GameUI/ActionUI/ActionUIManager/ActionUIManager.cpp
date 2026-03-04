@@ -185,9 +185,9 @@ void UActionUIManager::OnHoverSelectedUnitInfo(const bool bIsHover) const
 	}
 }
 
-void UActionUIManager::OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange)
+void UActionUIManager::OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange, const float TurretYawLimit)
 {
-	OnWeaponHoverHandleRangeRadius(bIsHover, WeaponHoveredRange);
+	OnWeaponHoverHandleRangeRadius(bIsHover, WeaponHoveredRange, TurretYawLimit);
 	if (not GetIsValidMainGameUI())
 	{
 		return;
@@ -732,7 +732,7 @@ void UActionUIManager::InitBehaviourUI(UMainGameUI* MainGameUI, ACPPController* 
 	SetBehaviourDescriptionVisibility(false);
 }
 
-void UActionUIManager::OnWeaponHoverHandleRangeRadius(const bool bIsHover, const float WeaponHoveredRange)
+void UActionUIManager::OnWeaponHoverHandleRangeRadius(const bool bIsHover, const float WeaponHoveredRange, const float TurretYawLimit)
 {
 	if (WeaponHoveredRange <= 100)
 	{

@@ -85,6 +85,19 @@ void URadiusComp::UpdateRadius(float Radius)
 	}
 }
 
+void URadiusComp::UpdateArc(const float ArcAngle)
+{
+	if(ArcAngle >=0.f)
+	{
+		M_ArcAngle = ArcAngle;
+	}
+	else
+	{
+		// Interpret negative angle as a reset.
+		M_ArcAngle = 0.f;
+	}
+}
+
 void URadiusComp::SetMaterialScalarParameter(const FName ParameterName, const float RadiusCm)
 {
 	if (ParameterName.IsNone())
@@ -158,6 +171,10 @@ void URadiusComp::UpdateMeshComponentTransform()
 	const FVector NewScale(ScaleValue, ScaleValue, M_ZScale);
 	RadiusMeshComponent->SetRelativeScale3D(NewScale);
 	RadiusMeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, M_RenderHeight));
+	if(M_ArcAngle > 0.f)
+	{
+		// todo set the material p
+	}
 }
 
 

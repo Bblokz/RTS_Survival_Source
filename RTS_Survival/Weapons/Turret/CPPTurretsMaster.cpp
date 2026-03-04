@@ -237,6 +237,11 @@ void ACPPTurretsMaster::OnSetupTurret(AActor* OwnerOfTurret)
 	}
 }
 
+float ACPPTurretsMaster::GetTurretYawLimit() const
+{
+	return 0.f;
+}
+
 void ACPPTurretsMaster::BeginPlay()
 {
 	// Calls beginplay on blueprint.

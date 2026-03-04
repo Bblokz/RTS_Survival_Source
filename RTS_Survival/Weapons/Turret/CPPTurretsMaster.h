@@ -175,6 +175,7 @@ public:
 	void SetTurretRotationSpeed(const float NewRotationSpeed) { RotationSpeed = NewRotationSpeed; }
 	AActor* GetCurrentTargetActor() const { return TargetingData.GetTargetActor(); }
 
+	virtual float GetTurretYawLimit() const override;
 protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;

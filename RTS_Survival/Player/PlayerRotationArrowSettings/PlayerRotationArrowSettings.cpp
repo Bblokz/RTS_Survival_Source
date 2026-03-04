@@ -5,7 +5,7 @@
 #include "RTS_Survival/Player/Formation/FormationMovement.h"
 
 void FPlayerRotationArrowSettings::InitRotationArrowAction(const FVector2D& InitialMouseScreenLocation,
-                                                           const FVector& InitialMouseProjectedLocation)
+                                                           const FVector& InitialMouseProjectedLocation, FRotationArrowTeamWeaponSettings TeamWeaponSettings)
 {
 	if (not EnsureRotationActorIsValid())
 	{

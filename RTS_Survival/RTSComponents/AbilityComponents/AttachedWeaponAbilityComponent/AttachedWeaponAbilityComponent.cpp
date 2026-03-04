@@ -195,6 +195,11 @@ void UAttachedWeaponAbilityComponent::RegisterIgnoreActor(AActor* ActorToIgnore,
 	}
 }
 
+float UAttachedWeaponAbilityComponent::GetTurretYawLimit() const
+{
+	return 0.f;
+}
+
 void UAttachedWeaponAbilityComponent::BeginPlay_SetupCallbackToProjectileManager()
 {
 	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);

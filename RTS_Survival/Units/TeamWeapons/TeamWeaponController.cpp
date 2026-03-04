@@ -446,6 +446,15 @@ void ATeamWeaponController::OnControlledTeamWeaponDied()
 	AbandonTeamWeapon();
 }
 
+float ATeamWeaponController::GetTeamWeaponArc() const
+{
+	if(not GetIsValidTeamWeapon())
+	{
+		return 0.0f;
+	}
+	return M_TeamWeapon->GetTeamWeaponConfig().M_YawArc.M_MaxYaw;
+}
+
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {

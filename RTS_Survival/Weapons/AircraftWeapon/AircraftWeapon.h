@@ -35,6 +35,7 @@ public:
 		M_LandedState = NewLandedState;
 	}
 
+
 	void ForceInstantReloadAllWeapons();
 
 	void AllWeaponsStopFire(const bool bStopReload, const bool bStopCoolDown);
@@ -47,6 +48,7 @@ public:
 	virtual void ForceSetAllWeaponsFullyReloaded() override;
 
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
+	virtual float GetTurretYawLimit() const override;
 
 protected:
 	// Called when the game starts

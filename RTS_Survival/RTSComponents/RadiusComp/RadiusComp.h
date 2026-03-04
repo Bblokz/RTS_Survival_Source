@@ -43,6 +43,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void UpdateRadius(float Radius);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void UpdateArc(const float ArcAngle);
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -78,6 +81,9 @@ private:
 
 	/** The desired radius to display. */
 	float M_Radius;
+
+	// The desired arc to use for team weapons.
+	float M_ArcAngle;
 
 	/** The units per scale factor. */
 	float M_UnitsPerScale;

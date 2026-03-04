@@ -105,7 +105,9 @@ void UW_WeaponItem::OnHoverWeaponItem(const bool bIsHover)
 	{
 		M_W_WeaponDescription->OnUnHover();
 	}
-	M_ActionUIManager->OnHoverWeaponItem(bIsHover, GetWeaponRange());
+	// Get yaw limitation from underlying embedded turret.
+	const float TurretYawLimit = M_LoadedWeaponState ? M_LoadedWeaponState->GetTurretYawLimit() : 0.f;
+	M_ActionUIManager->OnHoverWeaponItem(bIsHover, GetWeaponRange(), TurretYawLimit);
 }
 
 float UW_WeaponItem::GetWeaponRange() const

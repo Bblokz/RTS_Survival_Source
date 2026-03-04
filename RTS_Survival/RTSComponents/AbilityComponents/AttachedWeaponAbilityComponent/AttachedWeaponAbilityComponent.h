@@ -144,6 +144,7 @@ public:
 
 	virtual TArray<UWeaponState*> GetWeapons() override final;
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
+	virtual float GetTurretYawLimit() const override;
 
 protected:
 	virtual void PostInitProperties() override;

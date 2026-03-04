@@ -148,6 +148,7 @@ public:
 	bool RequestInternalRotateTowards(const FRotator& DesiredRotation);
 	bool GetIsReadyDeployed() const;
 	void OnControlledTeamWeaponDied();
+	float GetTeamWeaponArc() const;
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
 

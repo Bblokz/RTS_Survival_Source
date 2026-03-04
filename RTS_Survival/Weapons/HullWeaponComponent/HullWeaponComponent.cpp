@@ -128,6 +128,11 @@ void UHullWeaponComponent::RegisterIgnoreActor(AActor* ActorToIgnore, const bool
 	}
 }
 
+float UHullWeaponComponent::GetTurretYawLimit() const
+{
+	return M_HullWeaponSettings.MinMaxYaw.Y;
+}
+
 FVector& UHullWeaponComponent::GetFireDirection(const int32 WeaponIndex)
 {
 	return M_TargetDirectionVectorWorldSpace;

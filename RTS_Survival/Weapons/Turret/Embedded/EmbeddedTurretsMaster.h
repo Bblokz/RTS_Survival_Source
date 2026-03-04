@@ -54,6 +54,7 @@ public:
 		const bool bIsArtillery = false, const float
 		ArtilleryDistanceUseMaxPitch = 0.0f);
 
+	virtual float GetTurretYawLimit() const override;
 protected:
 	virtual void Tick(float DeltaSeconds) override;
 

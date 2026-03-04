@@ -78,6 +78,11 @@ void UAircraftWeapon::RegisterIgnoreActor(AActor* ActorToIgnore, const bool bReg
 	}
 }
 
+float UAircraftWeapon::GetTurretYawLimit() const
+{
+	return 0.f;
+}
+
 FVector& UAircraftWeapon::GetFireDirection(const int32 WeaponIndex)
 {
 	M_FireDir = FVector::ForwardVector;

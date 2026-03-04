@@ -56,6 +56,8 @@ class RTS_SURVIVAL_API IWeaponOwner
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) = 0;	
 	/** Force every weapon owned by this implementor to be instantly reloaded. */
 	virtual void ForceSetAllWeaponsFullyReloaded() = 0;
+	/** If the owner of the weapon is a type of embedded turret with yaw limitations then this will return a non zero value. */
+	virtual float GetTurretYawLimit() const = 0;
 	
 
 protected:

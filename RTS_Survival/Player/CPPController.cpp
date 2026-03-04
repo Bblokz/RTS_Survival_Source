@@ -57,6 +57,7 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
@@ -1502,7 +1503,7 @@ void ACPPController::SecondaryClickStart()
 	{
 		M_SecondaryStartMouseProjectedLocation = HitResult.Location;
 		M_SecondaryStartClickedActor = HitResult.GetActor();
-		PlayerRotationArrow.InitRotationArrowAction(MouseScreenPosition, HitResult.Location);
+		PlayerRotationArrow.InitRotationArrowAction(MouseScreenPosition, HitResult.Location, GetTeamWeaponSettingsForRotationArrow());
 	}
 	else
 	{
@@ -1599,6 +1600,31 @@ void ACPPController::RotateRight()
 	{
 		CPPConstructionPreviewRef->RotatePreviewClockwise();
 	}
+}
+
+FRotationArrowTeamWeaponSettings ACPPController::GetTeamWeaponSettingsForRotationArrow()
+{
+	EnsureSelectionsAreRTSValid();
+	FRotationArrowTeamWeaponSettings Settings;
+	const bool bPawnsSelected = not TSelectedPawnMasters.IsEmpty();
+	const bool bActorsSelected = not TSelectedActorsMasters.IsEmpty();
+	if(bPawnsSelected || bActorsSelected)
+	{
+		// Not just one team weapon selected.
+		return Settings;
+	}
+	if(TSelectedSquadControllers.Num() != 1)
+	{
+		return Settings;
+	}
+	const ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(TSelectedSquadControllers[0]);
+	if(not IsValid(TeamWeaponController))
+	{
+		return Settings;
+	}
+	Settings.TeamWeaponArc = TeamWeaponController->GetTeamWeaponArc();
+	Settings.bIsOnlyTeamWeaponSelected = true;
+	return Settings;
 }
 
 bool ACPPController::GetIsValidPlayerAimAbilityActor() const

@@ -856,6 +856,8 @@ private:
 	UPROPERTY()
 	bool bM_IsInTechTree;
 
+	FRotationArrowTeamWeaponSettings GetTeamWeaponSettingsForRotationArrow();
+
 	// An actor with a simple mesh and various materials for EPlayerAimAbilityTypes.
 	// use IsPlayerAimActive to determine if the ability is active.
 	UPROPERTY()

@@ -740,6 +740,15 @@ UWeaponState::~UWeaponState()
 {
 }
 
+float UWeaponState::GetTurretYawLimit() const
+{
+	if(not WeaponOwner || not IsValid(WeaponOwner.GetObject()))
+	{
+		return 0.f;	
+	}
+	return WeaponOwner->GetTurretYawLimit();
+}
+
 void UWeaponState::UpgradeWeaponWithExtraShellType(const EWeaponShellType ExtraShellType)
 {
 	WeaponData.ShellTypes.Add(ExtraShellType);

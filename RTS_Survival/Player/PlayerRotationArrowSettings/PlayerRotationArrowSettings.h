@@ -9,6 +9,13 @@
 class UFormationController;
 class ACPPController;
 
+USTRUCT()
+struct FRotationArrowTeamWeaponSettings
+{
+	GENERATED_BODY()
+	bool bIsOnlyTeamWeaponSelected = false;
+	float TeamWeaponArc = 0.f;
+};
 USTRUCT(BlueprintType)
 struct FPlayerRotationArrowSettings
 {
@@ -16,7 +23,7 @@ struct FPlayerRotationArrowSettings
 
 	void InitRotationArrowAction(
 		const FVector2D& InitialMouseScreenLocation,
-		const FVector& InitialMouseProjectedLocation);
+		const FVector& InitialMouseProjectedLocation, FRotationArrowTeamWeaponSettings TeamWeaponSettings);
 	
 	void TickArrowRotation(
 		const FVector2D& MouseScreenLocation,

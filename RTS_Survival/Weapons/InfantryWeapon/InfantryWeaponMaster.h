@@ -84,6 +84,7 @@ public:
 	UStaticMesh* GetWeaponMesh() const { return IsValid(WeaponMesh) ? WeaponMesh->GetStaticMesh() : nullptr; }
 
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
+	virtual float GetTurretYawLimit() const override;
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Weapon")

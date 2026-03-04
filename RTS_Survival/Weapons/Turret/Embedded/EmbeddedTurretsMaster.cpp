@@ -46,6 +46,11 @@ void AEmbeddedTurretsMaster::InitEmbeddedTurret(
     }
 }
 
+float AEmbeddedTurretsMaster::GetTurretYawLimit() const
+{
+	return M_MaxYaw;
+}
+
 void AEmbeddedTurretsMaster::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
