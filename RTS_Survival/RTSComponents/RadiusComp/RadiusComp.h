@@ -47,6 +47,8 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void UpdateArc(const float ArcAngle);
 
+	static const FName WeaponArcMaterialParameterName;
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetEnabled(bool bIsEnabled);

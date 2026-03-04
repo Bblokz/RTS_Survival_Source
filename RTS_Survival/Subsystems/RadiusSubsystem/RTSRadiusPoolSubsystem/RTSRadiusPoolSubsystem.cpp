@@ -104,6 +104,7 @@ bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Typ
 	case ERTSRadiusType::FullCircle_RadiationAura:
 	case ERTSRadiusType::Fullcircle_HealAura:
 	case ERTSRadiusType::FullCircle_PulseRepair:
+	case ERTSRadiusType::FullCircle_TeamWeaponArc:
 		return true;
 	default:
 		return false;
@@ -323,6 +324,24 @@ int32 URTSRadiusPoolSubsystem::CreateRTSRadius(const FVector Location, const flo
 void URTSRadiusPoolSubsystem::HideRTSRadiusById(const int32 ID)
 {
 	ReleaseById_Internal(ID, /*bSilentIfMissing*/ false);
+}
+
+
+void URTSRadiusPoolSubsystem::UpdateRTSRadiusArc(const int32 ID, const float ArcAngle)
+{
+	if (not GetIsValidWorld())
+	{
+		return;
+	}
+
+	APooledRadiusActor* RadiusActor = FindPooledActorById(ID);
+	if (not IsValid(RadiusActor))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(TEXT("RTS Radius Pool: Unknown id %d in UpdateRTSRadiusArc."), ID));
+		return;
+	}
+
+	RadiusActor->UpdateArc(ArcAngle);
 }
 
 void URTSRadiusPoolSubsystem::AttachRTSRadiusToActor(const int32 ID, AActor* TargetActor, const FVector RelativeOffset)

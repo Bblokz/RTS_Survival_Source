@@ -232,6 +232,6 @@ private:
 
 	void OnWeaponHoverHandleRangeRadius(const bool bIsHover, const float WeaponHoveredRange, const float TurretYawLimit);
 	int32 WeaponRangeRadiusActorIndex = -1;
-	void CreateWeaponRangeRadius(AActor* OwnerActor, const float WeaponHoveredRange);
+	void CreateWeaponRangeRadius(AActor* OwnerActor, const float WeaponHoveredRange, const float TurretYawLimit);
 	void HideWeaponRangeRadius();
 };

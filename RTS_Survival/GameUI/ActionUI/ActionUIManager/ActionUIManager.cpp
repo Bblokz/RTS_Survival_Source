@@ -755,7 +755,7 @@ void UActionUIManager::OnWeaponHoverHandleRangeRadius(const bool bIsHover, const
 
 	if (bIsHover)
 	{
-		CreateWeaponRangeRadius(M_PrimarySelectedICommands->GetOwnerActor(), WeaponHoveredRange);
+		CreateWeaponRangeRadius(M_PrimarySelectedICommands->GetOwnerActor(), WeaponHoveredRange, TurretYawLimit);
 
 		return;
 	}
@@ -766,21 +766,31 @@ void UActionUIManager::OnWeaponHoverHandleRangeRadius(const bool bIsHover, const
 }
 
 
-void UActionUIManager::CreateWeaponRangeRadius(AActor* OwnerActor, const float WeaponHoveredRange)
+void UActionUIManager::CreateWeaponRangeRadius(AActor* OwnerActor, const float WeaponHoveredRange, const float TurretYawLimit)
 {
 	if (not IsValid(OwnerActor))
 	{
 		return;
 	}
+	const bool bUseTeamWeaponArcRadius = TurretYawLimit > 0.0f;
+	const ERTSRadiusType RadiusType = bUseTeamWeaponArcRadius
+		? ERTSRadiusType::FullCircle_TeamWeaponArc
+		: ERTSRadiusType::FUllCircle_Weaponrange;
+
 	WeaponRangeRadiusActorIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(
 		OwnerActor,
 		OwnerActor->GetActorLocation(),
-		WeaponHoveredRange, ERTSRadiusType::FUllCircle_Weaponrange);
+		WeaponHoveredRange, RadiusType);
 	if (WeaponRangeRadiusActorIndex < 0)
 	{
 		RTSFunctionLibrary::ReportError(
 			"ActionUiManager::CreateWeaponRangeRadius: Failed to create radius actor!");
 		return;
+	}
+
+	if (bUseTeamWeaponArcRadius)
+	{
+		URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(OwnerActor, WeaponRangeRadiusActorIndex, TurretYawLimit);
 	}
 	const FVector RadiusOffset = FVector(0.f, 0.f, 25.f);
 	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(OwnerActor,
