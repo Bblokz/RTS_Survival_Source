@@ -149,6 +149,7 @@ public:
 	bool GetIsReadyDeployed() const;
 	void OnControlledTeamWeaponDied();
 	float GetTeamWeaponArc() const;
+	float GetTeamWeaponRange()const;
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
 

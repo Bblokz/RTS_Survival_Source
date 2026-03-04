@@ -455,6 +455,15 @@ float ATeamWeaponController::GetTeamWeaponArc() const
 	return M_TeamWeapon->GetTeamWeaponConfig().M_YawArc.M_MaxYaw;
 }
 
+float ATeamWeaponController::GetTeamWeaponRange() const
+{
+	if(not GetIsValidTeamWeapon())
+	{
+		return 0.0f;
+	}
+	return M_TeamWeapon->GetTurretRange();
+}
+
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {

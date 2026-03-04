@@ -154,6 +154,7 @@ public:
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
 
 	inline bool GetIsRotatedToEngage() const { return bM_IsRotatedToEngage; }
+	inline float GetTurretRange() const { return M_WeaponRangeData.M_MaxWeaponRange; }
 
 	virtual TArray<UWeaponState*> GetWeapons() override final;
 	int32 GetOwningPlayer();

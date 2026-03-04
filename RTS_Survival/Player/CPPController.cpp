@@ -1618,17 +1618,13 @@ FRotationArrowTeamWeaponSettings ACPPController::GetTeamWeaponSettingsForRotatio
 	{
 		return Settings;
 	}
-	const ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(TSelectedSquadControllers[0]);
+	 ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(TSelectedSquadControllers[0]);
 	if(not IsValid(TeamWeaponController))
 	{
 		return Settings;
 	}
 	Settings.TeamWeaponArc = TeamWeaponController->GetTeamWeaponArc();
-	const TArray<UWeaponState*> TeamWeaponStates = TeamWeaponController->GetWeaponsOfSquad();
-	if (not TeamWeaponStates.IsEmpty() && IsValid(TeamWeaponStates[0]))
-	{
-		Settings.TeamWeaponRange = TeamWeaponStates[0]->GetRange();
-	}
+	Settings.TeamWeaponRange = TeamWeaponController->GetTeamWeaponRange();
 	Settings.bIsOnlyTeamWeaponSelected = true;
 	return Settings;
 }
