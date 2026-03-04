@@ -25,6 +25,7 @@
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/RTSComponents/VehicleFireFeedbackComponent/VehicleFireFeedbackComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
@@ -391,7 +392,7 @@ void ATankMaster::PostInitializeComponents()
 	// Inits hp component and RTS component.
 	Super::PostInitializeComponents();
 	RTSNavCollision = FindComponentByClass<URTSNavCollision>();
-	if (!IsValid(RTSNavCollision))
+	if (not IsValid(RTSNavCollision))
 	{
 		RTSFunctionLibrary::ReportNullErrorComponent(
 			this,
@@ -402,7 +403,7 @@ void ATankMaster::PostInitializeComponents()
 	if (IsValid(PossibleHarvesterComp))
 	{
 		M_HarvesterComponent = Cast<UHarvester>(PossibleHarvesterComp);
-		if (!IsValid(M_HarvesterComponent))
+		if (not IsValid(M_HarvesterComponent))
 		{
 			RTSFunctionLibrary::ReportFailedCastError("PossibleHarvesterComp", "UHarvester",
 			                                          "ATankMaster::PostInitializeComponents");
@@ -411,6 +412,8 @@ void ATankMaster::PostInitializeComponents()
 	UBehaviourComp* BehaviourComp = FindComponentByClass<UBehaviourComp>();
 	BehaviourComponent = BehaviourComp;
 	(void)GetIsValidBehaviourComponent();
+
+	M_VehicleFireFeedbackComponent = FindComponentByClass<UVehicleFireFeedbackComponent>();
 
 	TArray<USceneComponent*> SceneComponents;
 	GetRootComponent()->GetChildrenComponents(true, SceneComponents);

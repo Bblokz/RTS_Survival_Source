@@ -13,6 +13,7 @@
 #include "RTS_Survival/GameUI/Healthbar/AmmoHealthBar/AmmoHpBarTrackerState/FAmmoHpBarTrackerState.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
+#include "RTS_Survival/RTSComponents/VehicleFireFeedbackComponent/VehicleFireFeedbackComponent.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -363,6 +364,11 @@ void ACPPTurretsMaster::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Wea
 	{
 		M_AmmoTrackingState.CheckIsWeaponToTrack(WeaponIndex, Weapon);
 	}
+
+	if (GetHasValidVehicleFireFeedbackComponent())
+	{
+		M_VehicleFireFeedbackComponent->OnTurretWeaponAdded(WeaponIndex, Weapon);
+	}
 }
 
 void ACPPTurretsMaster::OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, const float NewRange)
@@ -431,10 +437,26 @@ void ACPPTurretsMaster::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AActor*
 void ACPPTurretsMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre)
 {
 	BP_PlayWeaponAnimation(WeaponIndex, FireMode);
+
+	if (GetHasValidVehicleFireFeedbackComponent())
+	{
+		M_VehicleFireFeedbackComponent->NotifyWeaponFired(WeaponIndex, WeaponCalibre);
+	}
+
 	if (TurretOwner)
 	{
 		TurretOwner->OnFireWeapon(this);
 	}
+}
+
+void ACPPTurretsMaster::SetVehicleFireFeedbackComponent(UVehicleFireFeedbackComponent* InVehicleFireFeedbackComponent)
+{
+	M_VehicleFireFeedbackComponent = InVehicleFireFeedbackComponent;
+}
+
+bool ACPPTurretsMaster::GetHasValidVehicleFireFeedbackComponent() const
+{
+	return M_VehicleFireFeedbackComponent.IsValid();
 }
 
 void ACPPTurretsMaster::OnProjectileHit(const bool bBounced)

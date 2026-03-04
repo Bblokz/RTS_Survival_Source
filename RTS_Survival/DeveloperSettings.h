@@ -1402,6 +1402,9 @@ namespace DeveloperSettings
 
 	namespace Optimization
 	{
+		// Minimum weapon calibre that can trigger tank hull fire feedback.
+		inline constexpr int32 MinCalibreWeaponFeedback = 35;
+
 		// Below this distance we always consider the unit within FOV.
 		inline constexpr float DistanceAlwaysConsiderUnitInFOV = 4000.f;
 		inline constexpr float DistanceAlwaysConsiderUnitInFOVSquared = DistanceAlwaysConsiderUnitInFOV *

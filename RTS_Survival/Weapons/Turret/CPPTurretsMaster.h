@@ -21,6 +21,7 @@ struct FInitWeaponStateProjectile;
 struct FInitWeaponStateDirectHit;
 struct FInitWeaponStateProjectile;
 class ITurretOwner;
+class UVehicleFireFeedbackComponent;
 // Forward Declaration.
 class RTS_SURVIVAL_API ATankMaster;
 
@@ -177,6 +178,8 @@ public:
 	AActor* GetCurrentTargetActor() const { return TargetingData.GetTargetActor(); }
 
 	virtual float GetTurretYawLimit() const override;
+
+	void SetVehicleFireFeedbackComponent(UVehicleFireFeedbackComponent* InVehicleFireFeedbackComponent);
 protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
@@ -543,4 +546,9 @@ private:
 
 
 	FAmmoHpBarTrackerState M_AmmoTrackingState;
+
+	UPROPERTY()
+	TWeakObjectPtr<UVehicleFireFeedbackComponent> M_VehicleFireFeedbackComponent;
+
+	bool GetHasValidVehicleFireFeedbackComponent() const;
 };
