@@ -26,7 +26,7 @@ void UAnimMeshFeedbackComponent::CacheHullBaseTransform()
 		return;
 	}
 
-	M_BaseHullRelativeRotation = M_AnimatedMesh->GetRelativeRotation();
+	M_LastAppliedRecoilPitchDeg = 0.0f;
 }
 
 void UAnimMeshFeedbackComponent::ApplyFeedbackKick(
@@ -46,10 +46,17 @@ void UAnimMeshFeedbackComponent::ApplyHullFeedbackTransform() const
 		return;
 	}
 
-	const FRotator NewRotation = M_BaseHullRelativeRotation +
-		FRotator(M_RecoilRotDeg.X, 0.0f, 0.0f);
+	const FRotator CurrentRelativeRotation = M_AnimatedMesh->GetRelativeRotation();
+	const float BasePitchWithoutRecoil = CurrentRelativeRotation.Pitch - M_LastAppliedRecoilPitchDeg;
+	const float RecoilPitchToApply = M_RecoilRotDeg.X;
+
+	const FRotator NewRotation(
+		BasePitchWithoutRecoil + RecoilPitchToApply,
+		CurrentRelativeRotation.Yaw,
+		CurrentRelativeRotation.Roll);
 
 	M_AnimatedMesh->SetRelativeRotation(NewRotation);
+	M_LastAppliedRecoilPitchDeg = RecoilPitchToApply;
 }
 
 bool UAnimMeshFeedbackComponent::GetIsValidAnimatedMesh() const
