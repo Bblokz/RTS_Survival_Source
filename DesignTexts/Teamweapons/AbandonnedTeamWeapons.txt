@@ -1,0 +1,53 @@
+﻿we already have logic for a squad controller to TryRemanAbandonedTeamWeapon but we do not have any logic setup to order
+a squad controller to try man the team weapon. 
+add the ManAbandonedTeamWeapon to ECommandType and
+add the ManAbandonedTeamWeapon to eabilityID.
+also add two new valeus to the EAnnouncerVoiceLineType:
+1. NoSquadsSelectedForTeamWeapon
+2. NoSelectedSquadWithSufficientUnitsForTeamWeapon
+first implement the click logic of the cpp controller to recognize when an abandonned team weapon is clicked.
+because a team weapon is also an embedded turret and turrets are usually child actors of other actors the copmmand decoder would normally
+catch it in 	Decode_TurretParentRedirect(ClickedActor);
+make sure to call our abandon recongnizer before that it will be called Decode_TeamWeapon where we set the command to 
+ECommandType to ManAbandonedTeamWeapon and set the target actor to the team weapon if the weapon is abandonned.
+but we set the command type to attack and the target actor to the same teamweapon if it is not abandonned and owned by NOT player 1.
+lastely set it to alilied character if it is not abandonned and owned by player 1.
+make sure to not do anything in this func and continue if the clicked actor is not a team weapon.
+if we have ManAbandonedTeamWeapon as our command in the switch call IssueOrderManTeamWeapon with the target actor outabil activated and clicked location now:
+ in there check if we have a selected squad that can FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon; aka is it eligable? if so call the to be implemented function on
+ the icommand interface of the squad controller ManAbandonedTeamWeapon with the team wepeapon and
+ return that we executed one command after that. if no squads were selected then play the  NoSquadsSelectedForTeamWeapon on the announcer and
+ move each of the selected units to the clicked location.
+ if no squad is eligible; aka none of the selected squads passed the FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon check then play the NoSelectedSquadWithSufficientUnitsForTeamWeapon on the announcer and move each of the selected units to the clicked location.
+
+now on the implementation for the NoSquadsSelectedForTeamWeapon in the icommands interface.
+ only do these checks:
+ 	UCommandData* UnitCommandData = GetIsValidCommandData();
+ 	if (not IsValid(UnitCommandData))
+ 	{
+ 		return ECommandQueueError::CommandDataInvalid;
+ 	}
+ 	if (bSetUnitToIdle)
+ 	{
+ 		SetUnitToIdle();
+ 	}
+ 	and then add the ability to the commands with the supplied aactor that is supposed to be a team weapon; this is the actor target to save in the queue.
+ 	add the virtual execute and terminate functions for the ManAbandonedTeamWeapon and add their function calls at the correct places in the icommands interface;
+ 	ensure the entire interface is setup to support this new ability.
+ 	then on the squad controller override the execute of this ability and
+ 	implement it by calling the TryRemanAbandonedTeamWeapon,
+ 	immediately call done exe command of this ability if the cast fails, the tw is invalid or if TryRemanAbandonedTeamWeapon fails.
+ 	also call it after TryRemanAbandonedTeamWeapon succeeded.
+ 	
+ double check the entire logic flow from click to issue order to executing the command and make sure that after this the squad controllers can 
+ man a team weapon; if they have sufficient squad members.
+
+
+ it is very important that the execution of this ability does not depend on the command card of the squad (each squad is allwoed,
+ to try regardless of abilities so do not chekck  
+
+
+in DecodeTargetedActor before
+
+
+Decode_TurretParentRedirect add a new function to check if we clicked and abandonned team weapon and if so

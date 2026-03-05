@@ -165,6 +165,55 @@ void ATeamWeapon::OnTeamWeaponRemanned()
 	M_TeamWeaponDecalManager.DestroyDecal(this);
 }
 
+bool ATeamWeapon::ForceSetAbandonedStateForCapture(
+	TSubclassOf<ATeamWeaponController> DefaultLastTeamWeaponControllerClass)
+{
+	if (DefaultLastTeamWeaponControllerClass)
+	{
+		M_LastTeamWeaponControllerClass = DefaultLastTeamWeaponControllerClass;
+	}
+	else if (not M_LastTeamWeaponControllerClass)
+	{
+		ATeamWeaponController* TeamWeaponController = GetTeamWeaponController();
+		if (IsValid(TeamWeaponController))
+		{
+			M_LastTeamWeaponControllerClass = TeamWeaponController->GetClass();
+		}
+	}
+
+	ATeamWeaponController* TeamWeaponController = GetTeamWeaponController();
+	if (IsValid(TeamWeaponController))
+	{
+		TeamWeaponController->OnControlledTeamWeaponDied();
+	}
+	else
+	{
+		OnTeamWeaponAbandoned();
+		SetTeamWeaponController(nullptr);
+	}
+
+	if (not GetIsAbandoned())
+	{
+		OnTeamWeaponAbandoned();
+	}
+
+	if (not M_LastTeamWeaponControllerClass)
+	{
+		RTSFunctionLibrary::ReportError("Last team weapon controller class is not set after forcing abandoned state."
+			"\n At function: ATeamWeapon::ForceSetAbandonedStateForCapture");
+		return false;
+	}
+
+	if (GetSquadSubtypeFromRTSComponent() == ESquadSubtype::Squad_None)
+	{
+		RTSFunctionLibrary::ReportError("Team weapon squad subtype is invalid after forcing abandoned state."
+			"\n At function: ATeamWeapon::ForceSetAbandonedStateForCapture");
+		return false;
+	}
+
+	return true;
+}
+
 ESquadSubtype ATeamWeapon::GetSquadSubtypeFromRTSComponent() const
 {
 	if (not GetIsValidRTSComponent())

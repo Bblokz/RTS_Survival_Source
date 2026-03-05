@@ -16,20 +16,24 @@ void UTeamWeaponAnimationInstance::PlayLegsWheelsSlotMontage(const ETeamWeaponMo
 {
 	if (not GetIsWheelsLegsMontage(MontageType))
 	{
+		const FString OwningTwAsString = GetOwningActor() ? GetOwningActor()->GetName() : "NoOwningActor";
 		const FString MontageAsString = UEnum::GetValueAsString(MontageType);
 		RTSFunctionLibrary::ReportError(
 			"the montage:  " + MontageAsString + "\n is NOT a wheels legs montage slot type of montage!"
-			"\n but a request for playing such a montage was made!");
+			"\n but a request for playing such a montage was made!"
+			 "\n Onwing Actor: " + OwningTwAsString);
 		return;
 	}
 	float PlayRate = 1.f;
 	UAnimMontage* Montage = GetMontageAndPlayrate(MontageType, PlayRate);
 	if (not Montage)
 	{
+		const FString OwningTWAsString = GetOwningActor() ? GetOwningActor()->GetName() : "NoOwningActor";
 		const FString MontageAsString = UEnum::GetValueAsString(MontageType);
 		RTSFunctionLibrary::ReportError(
 			"the montage:  " + MontageAsString + "\n is null for playing in the legs and wheels slot!"
-			"\n check the anim instance defaults!");
+			"\n check the anim instance defaults!"
+   "\n Owning Actor: " + OwningTWAsString);
 		return;
 	}
 	if (bWaitForMontage)

@@ -387,7 +387,7 @@ void FRTS_CollisionSetup::SetupCollisionForTeamWeaponMeshes(const TArray<UMeshCo
 		WeaponMesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
 
 		const ECollisionChannel CollisionChannelToBlock =
-			OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
+			OwningPlayer != 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
 		WeaponMesh->SetCollisionResponseToChannel(CollisionChannelToBlock, ECR_Block);
 	}
 }

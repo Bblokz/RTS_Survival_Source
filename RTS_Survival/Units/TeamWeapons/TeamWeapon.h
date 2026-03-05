@@ -220,6 +220,9 @@ public:
 	float GetGuardEngageFlowDistanceCm() const { return M_TeamWeaponConfig.M_GuardEngageFlowDistanceCm; }
 	void OnTeamWeaponAbandoned();
 	void OnTeamWeaponRemanned();
+	UFUNCTION(BlueprintCallable, Category = "TeamWeapon|Abandoned")
+	bool ForceSetAbandonedStateForCapture(
+		TSubclassOf<ATeamWeaponController> DefaultLastTeamWeaponControllerClass = nullptr);
 	bool GetIsAbandoned() const { return bM_IsAbandoned; }
 	TSubclassOf<ATeamWeaponController> GetLastTeamWeaponControllerClass() const { return M_LastTeamWeaponControllerClass; }
 	ESquadSubtype GetSquadSubtypeFromRTSComponent() const;
