@@ -10,6 +10,7 @@
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/Embedded/EmbeddedTurretsMaster.h"
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
+#include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarVisibilitySettings.h"
 #include "RTS_Survival/Weapons/Turret/Embedded/EmbededTurretInterface.h"
 #include "TeamWeapon.generated.h"
 
@@ -145,6 +146,29 @@ struct FTeamWeaponConfig
 };
 
 USTRUCT(BlueprintType)
+struct FTeamWeaponAbandonedHealthBarState
+{
+	GENERATED_BODY()
+
+	FTeamWeaponAbandonedHealthBarState()
+	{
+		M_AbandonedHealthBarCustomization.bUseGreenRedGradient = false;
+		M_AbandonedHealthBarCustomization.bUseEnemyColorIfEnemy = false;
+		M_AbandonedHealthBarCustomization.OverWriteGradientColor = FLinearColor::White;
+	}
+
+	// Applied while the team weapon is abandoned so the state is visually distinct from crewed weapons.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|HealthBar")
+	FHealthBarCustomization M_AbandonedHealthBarCustomization;
+
+	UPROPERTY(Transient)
+	FHealthBarCustomization M_CachedCrewedHealthBarCustomization;
+
+	UPROPERTY(Transient)
+	bool bM_HasCachedCrewedHealthBarCustomization = false;
+};
+
+USTRUCT(BlueprintType)
 struct FTeamWeaponDecalManager
 {
 	GENERATED_BODY()
@@ -256,6 +280,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Decal")
 	FTeamWeaponDecalManager M_TeamWeaponDecalManager;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|HealthBar")
+	FTeamWeaponAbandonedHealthBarState M_AbandonedHealthBarState;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "TeamWeapon")
 	void BP_OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
 
@@ -277,6 +304,8 @@ protected:
 		FCollapseFX CollapseFX);
 
 private:
+	void ApplyAbandonedHealthBarCustomization();
+	void RestoreCrewedHealthBarCustomization();
 	[[nodiscard]] bool GetIsValidHealthComponent() const;
 	[[nodiscard]] bool GetIsValidRTSComponent() const;
 	[[nodiscard]] bool GetIsValidTeamWeaponMover() const;

@@ -154,12 +154,14 @@ void ATeamWeapon::OnTeamWeaponAbandoned()
 {
 	bM_IsAbandoned = true;
 	M_TeamWeaponDecalManager.CreateDecal(this);
+	ApplyAbandonedHealthBarCustomization();
 	DisableTurret();
 }
 
 void ATeamWeapon::OnTeamWeaponRemanned()
 {
 	bM_IsAbandoned = false;
+	RestoreCrewedHealthBarCustomization();
 	M_TeamWeaponDecalManager.DestroyDecal(this);
 }
 
@@ -193,6 +195,38 @@ void ATeamWeapon::SetTeamWeaponController(ATeamWeaponController* NewController)
 	}
 
 	M_TeamWeaponController = NewController;
+}
+
+void ATeamWeapon::ApplyAbandonedHealthBarCustomization()
+{
+	if (not GetIsValidHealthComponent())
+	{
+		return;
+	}
+
+	if (not M_AbandonedHealthBarState.bM_HasCachedCrewedHealthBarCustomization)
+	{
+		M_AbandonedHealthBarState.M_CachedCrewedHealthBarCustomization = M_HealthComponent->GetCustomizationSettings();
+		M_AbandonedHealthBarState.bM_HasCachedCrewedHealthBarCustomization = true;
+	}
+
+	M_HealthComponent->ChangeCustomizationSettings(M_AbandonedHealthBarState.M_AbandonedHealthBarCustomization);
+}
+
+void ATeamWeapon::RestoreCrewedHealthBarCustomization()
+{
+	if (not GetIsValidHealthComponent())
+	{
+		return;
+	}
+
+	if (not M_AbandonedHealthBarState.bM_HasCachedCrewedHealthBarCustomization)
+	{
+		return;
+	}
+
+	M_HealthComponent->ChangeCustomizationSettings(M_AbandonedHealthBarState.M_CachedCrewedHealthBarCustomization);
+	M_AbandonedHealthBarState.bM_HasCachedCrewedHealthBarCustomization = false;
 }
 
 void ATeamWeapon::BeginPlay_InitTeamWeaponCollision()
