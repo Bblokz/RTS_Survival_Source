@@ -33,5 +33,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<USkeletalMeshComponent> M_AnimatedMesh = nullptr;
 
+	// Tracks the recoil pitch that was last written to the mesh so we can preserve external yaw/roll drivers like AO.
+	mutable float M_LastAppliedRecoilPitchDeg = 0.0f;
+
 	bool GetIsValidAnimatedMesh() const;
 };
