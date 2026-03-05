@@ -9,7 +9,7 @@ class USkeletalMeshComponent;
 
 /**
  * @brief Allows turrets to drive recoil feedback on a single skeletal mesh using the same weapon-tracking flow.
- * Use this when no separate hull static mesh exists, while keeping turret setup identical to vehicle feedback.
+ * Use this when no separate hull static mesh exists and only pitch animation should be applied to avoid movement interference.
  * @note InitializeAnimMeshFeedbackComponent: call in blueprint with animated skeletal mesh + turret master.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
