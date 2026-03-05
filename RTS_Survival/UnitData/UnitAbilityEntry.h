@@ -21,6 +21,8 @@ class USquadReinforcementComponent;
 class UAimAbilityComponent;
 class UAttachedWeaponAbilityComponent;
 class UTurretSwapComp;
+class ASquadController;
+class ATeamWeapon;
 /**
  * @brief Ability entry containing metadata such as cooldown and custom type.
  */
@@ -263,6 +265,15 @@ namespace FAbilityHelpers
 	UAttachedWeaponAbilityComponent* GetAttachedWeaponAbilityComponent(const EAttachWeaponAbilitySubType Type,
 	                                                                   const AActor* Actor);
 	UTurretSwapComp* GetTurretSwapAbilityComponent(const ETurretSwapAbility Type, const AActor* Actor);
+
+	/**
+	 * @brief Returns whether a squad can currently reman a specific abandoned team weapon.
+	 * @param SquadController Candidate squad attempting the reman.
+	 * @param AbandonedTeamWeapon Team weapon candidate to reman.
+	 */
+	bool GetCanSquadRemanAbandonedTeamWeapon(
+		ASquadController* SquadController,
+		const ATeamWeapon* AbandonedTeamWeapon);
 
 
 	inline bool GetHasGrenadeAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,

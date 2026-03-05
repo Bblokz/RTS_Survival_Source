@@ -338,8 +338,8 @@ public:
 
 
 	/**
-	 * @brief Play a 3D (spatial) voice‐line at a world location.
-	 * @param PrimarySelectedUnit  The unit whose voice‐line category to use.
+	 * @brief Play a 3D (spatial) voice-line at a world location.
+	 * @param PrimarySelectedUnit  The unit whose voice-line category to use.
 	 * @param VoiceLineType        Which event (Select, Attack, etc.).
 	 * @param Location             World location to play the sound at.
 	 * @param bIgnorePlayerCooldown
@@ -651,6 +651,7 @@ public:
 	 * @post If this squad was primary selected then we refresh the game UI.
 	 */
 	void RemoveSquadFromSelectionAndUpdateUI(ASquadController* SquadControllerToRemove);
+	void ReplaceSelectedSquadControllerAndUpdateUI(ASquadController* OldSquad, ASquadController* NewSquad);
 
 	void RemoveActorFromSelectionAndUpdateUI(ASelectableActorObjectsMaster* ActorToRemove);
 	void RemovePawnFromSelectionAndUpdateUI(ASelectablePawnMaster* PawnToRemove);
@@ -672,7 +673,7 @@ public:
     *        determines which units to consider.
     *
     * @note Behavior by modifier keys:
-    * @note - Shift held: add only the on-screen units of that type that aren’t already selected.
+    * @note - Shift held: add only the on-screen units of that type that aren't already selected.
     * @note - Shift held (and ALL on-screen matches are already selected): remove those on-screen matches from the selection.
     * @note - Control held: clear current selection first, then select those on-screen matches.
     * @note - No modifier: clear current selection first, then select those on-screen matches.

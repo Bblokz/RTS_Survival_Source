@@ -19,8 +19,11 @@ class UHealthComponent;
 class URTSComponent;
 class UTeamWeaponMover;
 class ATeamWeaponController;
+class UDecalComponent;
+class UMaterialInterface;
 class UCrewPosition;
 struct FDestroySpawnActorsParameters;
+enum class ESquadSubtype : uint8;
 
 DECLARE_MULTICAST_DELEGATE(FOnTeamWeaponUnitDies);
 
@@ -141,6 +144,29 @@ struct FTeamWeaponConfig
 	FRTSVerticalAnimTextSettings M_AnimatedTextSettings;
 };
 
+USTRUCT(BlueprintType)
+struct FTeamWeaponDecalManager
+{
+	GENERATED_BODY()
+
+public:
+	void CreateDecal(ATeamWeapon* TeamWeapon);
+	void DestroyDecal(const ATeamWeapon* TeamWeapon);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Decal")
+	FVector M_DecalSize = FVector(32.f, 250.f, 250.f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Decal")
+	FVector M_DecalOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Decal")
+	TObjectPtr<UMaterialInterface> M_DecalMaterial = nullptr;
+
+private:
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UDecalComponent> M_TeamWeaponDecalComponent;
+};
+
 /**
  * @brief Team weapon actor used by team-weapon squads to manage turret weapons, health, and crew sockets.
  * @note is derived from embeddedturret for which InitEmbeddedTurret DO NOT CALL IN BP this is done in cpp internally (using settings struct).
@@ -169,8 +195,14 @@ public:
 	float GetGroundTraceLengthCm() const { return M_TeamWeaponConfig.M_GroundTraceLengthCm; }
 	float GetGuardEngageFlowDistanceCm() const { return M_TeamWeaponConfig.M_GuardEngageFlowDistanceCm; }
 	void OnTeamWeaponAbandoned();
+	void OnTeamWeaponRemanned();
+	bool GetIsAbandoned() const { return bM_IsAbandoned; }
+	TSubclassOf<ATeamWeaponController> GetLastTeamWeaponControllerClass() const { return M_LastTeamWeaponControllerClass; }
+	ESquadSubtype GetSquadSubtypeFromRTSComponent() const;
+	bool SetOwningPlayerRuntime(const uint8 NewOwningPlayer);
 
 	void SetTeamWeaponController(ATeamWeaponController* NewController);
+	ATeamWeaponController* GetTeamWeaponController() const { return M_TeamWeaponController.Get(); }
 	UTeamWeaponMover* GetTeamWeaponMover() const { return M_TeamWeaponMover; }
 
 	void SetTurretOwnerActor(AActor* NewOwner);
@@ -221,6 +253,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Decal")
+	FTeamWeaponDecalManager M_TeamWeaponDecalManager;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "TeamWeapon")
 	void BP_OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
 
@@ -257,6 +292,13 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<ATeamWeaponController> M_TeamWeaponController;
+
+	UPROPERTY()
+	TSubclassOf<ATeamWeaponController> M_LastTeamWeaponControllerClass = nullptr;
+
+	UPROPERTY()
+	bool bM_IsAbandoned = false;
+
 	[[nodiscard]] bool GetIsValidTeamWeaponController() const;
 	[[nodiscard]] bool GetIsControllerReadyDeployed() const;
 

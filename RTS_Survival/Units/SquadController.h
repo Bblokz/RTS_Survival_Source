@@ -41,6 +41,8 @@ class USquadReinforcementComponent;
 class USoundBase;
 class USoundAttenuation;
 class USoundConcurrency;
+class ATeamWeapon;
+class ATeamWeaponController;
 enum class ERTSDeathType : uint8;
 
 // Will only start to exe the action once the squad is fully loaded.
@@ -371,6 +373,7 @@ public:
 	OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo) override;
 
 	void OnSquadUnitOutOfRange(const FVector& TargetLocation);
+	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 
 	// ICommand interface helpers.
 	virtual FVector GetOwnerLocation() const override final;
@@ -632,6 +635,74 @@ protected:
 	bool GetIsValidPlayerController();
 
 	void BeginPlay_SetupPlayerController();
+	void SetShouldSkipInitialSquadUnitLoad(const bool bShouldSkipInitialLoad);
+
+private:
+	/**
+	 * @brief Validates caller and weapon preconditions before starting the reman handoff flow.
+	 * @param AbandonedTeamWeapon Candidate abandoned team weapon to capture.
+	 * @return True when this regular squad is allowed to continue reman setup.
+	 */
+	bool TryRemanAbandonedTeamWeapon_GetCanStartReman(ATeamWeapon* AbandonedTeamWeapon);
+
+	/**
+	 * @brief Extracts the required replacement-controller setup data from the abandoned weapon.
+	 * @param AbandonedTeamWeapon Candidate abandoned team weapon to capture.
+	 * @param OutTeamWeaponControllerClass Cached team-weapon controller class used for replacement spawn.
+	 * @param OutTeamWeaponSquadSubtype Squad subtype used to initialize replacement squad data.
+	 * @return True when the abandoned weapon provides valid reman setup data.
+	 */
+	bool TryRemanAbandonedTeamWeapon_TryGetSetupData(
+		ATeamWeapon* AbandonedTeamWeapon,
+		TSubclassOf<ATeamWeaponController>& OutTeamWeaponControllerClass,
+		ESquadSubtype& OutTeamWeaponSquadSubtype) const;
+
+	/**
+	 * @brief Spawns the replacement team-weapon controller at this squad location using deferred spawn.
+	 * @param TeamWeaponControllerClass Controller class chosen from abandoned weapon cache.
+	 * @return Spawned replacement controller, or nullptr when spawn/finish fails.
+	 */
+	ATeamWeaponController* TryRemanAbandonedTeamWeapon_SpawnReplacementController(
+		TSubclassOf<ATeamWeaponController> TeamWeaponControllerClass);
+
+	/**
+	 * @brief Applies RTS ownership/subtype and queues abandoned-weapon adoption on the replacement controller.
+	 * @param NewTeamWeaponController Replacement controller spawned for this handoff.
+	 * @param AbandonedTeamWeapon Candidate abandoned team weapon to capture.
+	 * @param TeamWeaponSquadSubtype Squad subtype copied from abandoned weapon RTS data.
+	 * @return True when replacement controller is fully prepared for unit transfer.
+	 */
+	bool TryRemanAbandonedTeamWeapon_ConfigureReplacementController(
+		ATeamWeaponController* NewTeamWeaponController,
+		ATeamWeapon* AbandonedTeamWeapon,
+		const ESquadSubtype TeamWeaponSquadSubtype) const;
+
+	/**
+	 * @brief Moves this squad's units into the replacement controller and runs its normal squad-load finish path.
+	 * @param NewTeamWeaponController Replacement controller that should receive squad units.
+	 * @param ValidSquadUnits Valid unit list transferred from this squad.
+	 */
+	void TryRemanAbandonedTeamWeapon_TransferUnitsToReplacementController(
+		ATeamWeaponController* NewTeamWeaponController,
+		const TArray<ASquadUnit*>& ValidSquadUnits) const;
+
+	/**
+	 * @brief Restores unit ownership and data state when replacement adoption fails after transfer.
+	 * @param NewTeamWeaponController Replacement controller that failed to complete adoption.
+	 * @param ValidSquadUnits Valid unit list that must be restored to this squad.
+	 */
+	void TryRemanAbandonedTeamWeapon_RollbackFailedTransfer(
+		ATeamWeaponController* NewTeamWeaponController,
+		const TArray<ASquadUnit*>& ValidSquadUnits);
+
+	/**
+	 * @brief Finalizes successful reman by preserving selection and removing this old controller safely.
+	 * @param NewTeamWeaponController Replacement controller that now owns squad + team weapon.
+	 */
+	void TryRemanAbandonedTeamWeapon_FinalizeSuccessfulTransfer(
+		ATeamWeaponController* NewTeamWeaponController);
+
+protected:
 	void PostInitializeComponents_SetupGrenadeComponent();
 	void PostInitializeComponent_SetupFieldConstructionAbilities();
 	UFieldConstructionAbilityComponent* GetFieldConstructionAbility(const EFieldConstructionType ConstructionType) const;
@@ -806,6 +877,9 @@ protected:
 	// How many units are left to spawn, if the squad is fully loaded and a timer handle
 	// to delay the initialization of the squad data if not all of the squad units are loaded in yet.
 	FSquadLoadingStatus M_SquadLoadingStatus;
+
+	// Set when a replacement controller receives already-existing squad units and should not spawn fresh units.
+	bool bM_ShouldSkipInitialSquadUnitLoad = false;
 
 	void Debug_Scavenging(const FString& DebugMessage) const;
 	void Debug_ItemPickup(const FString& DebugMessage) const;

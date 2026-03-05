@@ -150,6 +150,8 @@ public:
 	void OnControlledTeamWeaponDied();
 	float GetTeamWeaponArc() const;
 	float GetTeamWeaponRange()const;
+	bool PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
+	bool GetHasControlledTeamWeapon() const;
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
 
@@ -199,6 +201,7 @@ protected:
 
 private:
 	void SpawnTeamWeapon();
+	bool AdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	void AssignCrewToTeamWeapon();
 	void HandlePushedMoverArrived();
 	void HandlePushedMoverFailed(const FString& FailureReason);
@@ -294,6 +297,7 @@ private:
 	void IssueMoveCrewToPositions();
 	void ShowDeployingAnimatedText() const;
 	void ShowPackingAnimatedText() const;
+	void ShowAbandoningAnimatedText() const;
 	bool GetShouldAutoDeployOnIdle();
 
 	// ---- ITurretOwner ----
@@ -328,6 +332,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<ATeamWeapon> M_TeamWeapon;
+
+	UPROPERTY()
+	TWeakObjectPtr<ATeamWeapon> M_PendingAdoptedTeamWeapon;
 
 	UPROPERTY()
 	TWeakObjectPtr<UTeamWeaponMover> M_TeamWeaponMover;
@@ -402,4 +409,6 @@ private:
 
 	UPROPERTY()
 	bool bM_IsShuttingDown = false;
+
+	static const FString M_AbandoningAnimatedText;
 };

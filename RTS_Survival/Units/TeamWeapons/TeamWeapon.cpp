@@ -6,12 +6,78 @@
 #include "TeamWeaponController.h"
 #include "TeamWeaponMover.h"
 #include "CrewPositions/CrewPosition.h"
+#include "Components/DecalComponent.h"
+#include "Components/SceneComponent.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+
+void FTeamWeaponDecalManager::CreateDecal(ATeamWeapon* TeamWeapon)
+{
+	if (not IsValid(TeamWeapon))
+	{
+		RTSFunctionLibrary::ReportError("TeamWeapon not valid in FTeamWeaponDecalManager::CreateDecal");
+		return;
+	}
+
+	if (M_TeamWeaponDecalComponent.Get() != nullptr)
+	{
+		return;
+	}
+
+	UMaterialInterface* DecalMaterial = M_DecalMaterial.Get();
+	if (DecalMaterial == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("M_DecalMaterial not set in FTeamWeaponDecalManager::CreateDecal");
+		return;
+	}
+
+	USceneComponent* RootComponent = TeamWeapon->GetRootComponent();
+	if (not IsValid(RootComponent))
+	{
+		RTSFunctionLibrary::ReportError("RootComponent not valid in FTeamWeaponDecalManager::CreateDecal");
+		return;
+	}
+
+	UDecalComponent* DecalComponent = NewObject<UDecalComponent>(TeamWeapon);
+	if (not IsValid(DecalComponent))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create decal component in FTeamWeaponDecalManager::CreateDecal");
+		return;
+	}
+
+	DecalComponent->DecalSize = M_DecalSize;
+	DecalComponent->SetDecalMaterial(DecalMaterial);
+
+	TeamWeapon->AddInstanceComponent(DecalComponent);
+	DecalComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	DecalComponent->SetRelativeLocation(M_DecalOffset);
+	DecalComponent->RegisterComponent();
+
+	M_TeamWeaponDecalComponent = DecalComponent;
+}
+
+void FTeamWeaponDecalManager::DestroyDecal(const ATeamWeapon* TeamWeapon)
+{
+	if (not IsValid(TeamWeapon))
+	{
+		RTSFunctionLibrary::ReportError("TeamWeapon not valid in FTeamWeaponDecalManager::DestroyDecal");
+		return;
+	}
+
+	UDecalComponent* DecalComponent = M_TeamWeaponDecalComponent.Get();
+	if (DecalComponent == nullptr)
+	{
+		M_TeamWeaponDecalComponent.Reset();
+		return;
+	}
+
+	DecalComponent->DestroyComponent();
+	M_TeamWeaponDecalComponent.Reset();
+}
 
 ATeamWeapon::ATeamWeapon()
 {
@@ -86,11 +152,46 @@ void ATeamWeapon::PlayFireAnim() const
 
 void ATeamWeapon::OnTeamWeaponAbandoned()
 {
+	bM_IsAbandoned = true;
+	M_TeamWeaponDecalManager.CreateDecal(this);
 	DisableTurret();
+}
+
+void ATeamWeapon::OnTeamWeaponRemanned()
+{
+	bM_IsAbandoned = false;
+	M_TeamWeaponDecalManager.DestroyDecal(this);
+}
+
+ESquadSubtype ATeamWeapon::GetSquadSubtypeFromRTSComponent() const
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return ESquadSubtype::Squad_None;
+	}
+
+	return M_RTSComponent->GetSubtypeAsSquadSubtype();
+}
+
+bool ATeamWeapon::SetOwningPlayerRuntime(const uint8 NewOwningPlayer)
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return false;
+	}
+
+	M_RTSComponent->SetOwningPlayerRuntime(NewOwningPlayer);
+	BeginPlay_InitTeamWeaponCollision();
+	return true;
 }
 
 void ATeamWeapon::SetTeamWeaponController(ATeamWeaponController* NewController)
 {
+	if (IsValid(NewController))
+	{
+		M_LastTeamWeaponControllerClass = NewController->GetClass();
+	}
+
 	M_TeamWeaponController = NewController;
 }
 

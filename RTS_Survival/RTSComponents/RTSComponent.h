@@ -41,6 +41,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	inline uint8 GetOwningPlayer() const { return OwningPlayer; };
 
+	/**
+	 * @brief Runtime-safe wrapper to change owner without exposing protected internals.
+	 * @param NewOwningPlayer New owning player id.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetOwningPlayerRuntime(const uint8 NewOwningPlayer);
+
 	inline float GetFormationUnitInnerRadius() const { return FormationUnitInnerRadius; };
 
 	inline uint8 GetUnitSubType() const { return M_UnitSubType; };

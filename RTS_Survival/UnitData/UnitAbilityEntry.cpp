@@ -1,9 +1,33 @@
-﻿#include "UnitAbilityEntry.h"
+#include "UnitAbilityEntry.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 
+bool FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon(
+	ASquadController* SquadController,
+	const ATeamWeapon* AbandonedTeamWeapon)
+{
+	if (not IsValid(SquadController) || not IsValid(AbandonedTeamWeapon))
+	{
+		return false;
+	}
+
+	if (not AbandonedTeamWeapon->GetIsAbandoned())
+	{
+		return false;
+	}
+
+	const int32 RequiredOperators = AbandonedTeamWeapon->GetRequiredOperators();
+	if (RequiredOperators <= 0)
+	{
+		return false;
+	}
+
+	return SquadController->GetSquadUnitAmount() >= RequiredOperators;
+}
 UGrenadeComponent* FAbilityHelpers::GetGrenadeAbilityCompOfType(const EGrenadeAbilityType Type,
 	const AActor* Actor)
 {

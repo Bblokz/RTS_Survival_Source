@@ -2904,6 +2904,39 @@ void ACPPController::RemoveSquadFromSelectionAndUpdateUI(ASquadController* Squad
 	UpdateUIForSelectionAction(SelectionAction, nullptr);
 }
 
+void ACPPController::ReplaceSelectedSquadControllerAndUpdateUI(ASquadController* OldSquad, ASquadController* NewSquad)
+{
+	if (not IsValid(OldSquad) || not IsValid(NewSquad) || not GetIsValidGameUIController())
+	{
+		return;
+	}
+
+	EnsureSelectionsAreRTSValid();
+	if (not TSelectedSquadControllers.Contains(OldSquad))
+	{
+		return;
+	}
+
+	const int32 OldSquadIndex = TSelectedSquadControllers.IndexOfByKey(OldSquad);
+	if (OldSquadIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	OldSquad->SetSquadSelected(false);
+	if (not TSelectedSquadControllers.Contains(NewSquad))
+	{
+		TSelectedSquadControllers[OldSquadIndex] = NewSquad;
+	}
+	else
+	{
+		TSelectedSquadControllers.RemoveAt(OldSquadIndex);
+	}
+
+	NewSquad->SetSquadSelected(true);
+	UpdateUIForSelectionAction(ESelectionChangeAction::UnitRemoved_RebuildUIHierarchy, nullptr);
+}
+
 void ACPPController::RemoveActorFromSelectionAndUpdateUI(ASelectableActorObjectsMaster* ActorToRemove)
 {
 	if (!IsValid(ActorToRemove) || !GetIsValidGameUIController())

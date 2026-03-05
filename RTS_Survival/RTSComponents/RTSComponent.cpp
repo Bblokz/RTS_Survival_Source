@@ -235,6 +235,12 @@ void URTSComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 
+void URTSComponent::SetOwningPlayerRuntime(const uint8 NewOwningPlayer)
+{
+	ChangeOwningPlayer(NewOwningPlayer);
+}
+
+
 void URTSComponent::ChangeOwningPlayer(const uint8 NewOwningPlayer)
 {
 	if (NewOwningPlayer > 0 && OwningPlayer != NewOwningPlayer)

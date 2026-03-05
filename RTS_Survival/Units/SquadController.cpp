@@ -16,6 +16,8 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/PickupItems/Items/WeaponPickUp/WeaponPickup.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -42,6 +44,27 @@
 #include "Squads/SquadUnit/AISquadUnit/AISquadUnit.h"
 #include "Squads/SquadUnitHpComp/SquadUnitHealthComponent.h"
 #include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
+
+namespace SquadControllerRemanStatics
+{
+	void ReassignSquadUnitsToController(const TArray<ASquadUnit*>& SquadUnits, ASquadController* SquadController)
+	{
+		if (not IsValid(SquadController))
+		{
+			return;
+		}
+
+		for (ASquadUnit* SquadUnit : SquadUnits)
+		{
+			if (not IsValid(SquadUnit))
+			{
+				continue;
+			}
+
+			SquadUnit->SetSquadController(SquadController);
+		}
+	}
+}
 
 FSquadStartGameAction::FSquadStartGameAction()
 {
@@ -767,6 +790,237 @@ void ASquadController::OnSquadUnitOutOfRange(const FVector& TargetLocation)
 }
 
 
+bool ASquadController::TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon)
+{
+	if (not TryRemanAbandonedTeamWeapon_GetCanStartReman(AbandonedTeamWeapon))
+	{
+		return false;
+	}
+
+	TSubclassOf<ATeamWeaponController> TeamWeaponControllerClass = nullptr;
+	ESquadSubtype TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+	if (not TryRemanAbandonedTeamWeapon_TryGetSetupData(
+		AbandonedTeamWeapon,
+		TeamWeaponControllerClass,
+		TeamWeaponSquadSubtype))
+	{
+		return false;
+	}
+
+	ATeamWeaponController* NewTeamWeaponController =
+		TryRemanAbandonedTeamWeapon_SpawnReplacementController(TeamWeaponControllerClass);
+	if (not IsValid(NewTeamWeaponController))
+	{
+		return false;
+	}
+
+	if (not TryRemanAbandonedTeamWeapon_ConfigureReplacementController(
+		NewTeamWeaponController,
+		AbandonedTeamWeapon,
+		TeamWeaponSquadSubtype))
+	{
+		NewTeamWeaponController->Destroy();
+		return false;
+	}
+
+	const TArray<ASquadUnit*> ValidSquadUnits = GetSquadUnitsChecked();
+	TryRemanAbandonedTeamWeapon_TransferUnitsToReplacementController(NewTeamWeaponController, ValidSquadUnits);
+	if (not NewTeamWeaponController->GetHasControlledTeamWeapon())
+	{
+		TryRemanAbandonedTeamWeapon_RollbackFailedTransfer(NewTeamWeaponController, ValidSquadUnits);
+		return false;
+	}
+
+	TryRemanAbandonedTeamWeapon_FinalizeSuccessfulTransfer(NewTeamWeaponController);
+	return true;
+}
+
+bool ASquadController::TryRemanAbandonedTeamWeapon_GetCanStartReman(ATeamWeapon* AbandonedTeamWeapon)
+{
+	if (IsA(ATeamWeaponController::StaticClass()))
+	{
+		RTSFunctionLibrary::ReportError("TryRemanAbandonedTeamWeapon called on an ATeamWeaponController."
+			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_GetCanStartReman");
+		return false;
+	}
+
+	if (not GetIsSquadFullyLoaded())
+	{
+		RTSFunctionLibrary::ReportError("Squad is not fully loaded while trying to reman an abandoned team weapon."
+			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_GetCanStartReman");
+		return false;
+	}
+
+	if (not FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon(this, AbandonedTeamWeapon))
+	{
+		return false;
+	}
+
+	if (not GetIsValidRTSComponent())
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool ASquadController::TryRemanAbandonedTeamWeapon_TryGetSetupData(
+	ATeamWeapon* AbandonedTeamWeapon,
+	TSubclassOf<ATeamWeaponController>& OutTeamWeaponControllerClass,
+	ESquadSubtype& OutTeamWeaponSquadSubtype) const
+{
+	OutTeamWeaponControllerClass = nullptr;
+	OutTeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+
+	if (not IsValid(AbandonedTeamWeapon))
+	{
+		RTSFunctionLibrary::ReportError("AbandonedTeamWeapon not valid in "
+			"ASquadController::TryRemanAbandonedTeamWeapon_TryGetSetupData");
+		return false;
+	}
+
+	OutTeamWeaponControllerClass = AbandonedTeamWeapon->GetLastTeamWeaponControllerClass();
+	if (not OutTeamWeaponControllerClass)
+	{
+		RTSFunctionLibrary::ReportError("Abandoned team weapon has no cached team weapon controller class."
+			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_TryGetSetupData");
+		return false;
+	}
+
+	OutTeamWeaponSquadSubtype = AbandonedTeamWeapon->GetSquadSubtypeFromRTSComponent();
+	if (OutTeamWeaponSquadSubtype == ESquadSubtype::Squad_None)
+	{
+		RTSFunctionLibrary::ReportError("Abandoned team weapon has invalid squad subtype on RTS component."
+			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_TryGetSetupData");
+		return false;
+	}
+
+	return true;
+}
+
+ATeamWeaponController* ASquadController::TryRemanAbandonedTeamWeapon_SpawnReplacementController(
+	TSubclassOf<ATeamWeaponController> TeamWeaponControllerClass)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(
+			"World not valid in ASquadController::TryRemanAbandonedTeamWeapon_SpawnReplacementController");
+		return nullptr;
+	}
+
+	const FTransform SpawnTransform(GetActorRotation(), GetActorLocation());
+	ATeamWeaponController* NewTeamWeaponController = World->SpawnActorDeferred<ATeamWeaponController>(
+		TeamWeaponControllerClass,
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (not IsValid(NewTeamWeaponController))
+	{
+		RTSFunctionLibrary::ReportError("Failed to spawn deferred team weapon controller in reman flow."
+			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_SpawnReplacementController");
+		return nullptr;
+	}
+
+	ASquadController* NewControllerAsSquad = NewTeamWeaponController;
+	NewControllerAsSquad->SetShouldSkipInitialSquadUnitLoad(true);
+	UGameplayStatics::FinishSpawningActor(NewTeamWeaponController, SpawnTransform);
+	if (not IsValid(NewTeamWeaponController))
+	{
+		RTSFunctionLibrary::ReportError("Failed to finish spawning team weapon controller in reman flow."
+			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_SpawnReplacementController");
+		return nullptr;
+	}
+
+	return NewTeamWeaponController;
+}
+
+bool ASquadController::TryRemanAbandonedTeamWeapon_ConfigureReplacementController(
+	ATeamWeaponController* NewTeamWeaponController,
+	ATeamWeapon* AbandonedTeamWeapon,
+	const ESquadSubtype TeamWeaponSquadSubtype) const
+{
+	if (not IsValid(NewTeamWeaponController))
+	{
+		RTSFunctionLibrary::ReportError("NewTeamWeaponController not valid in "
+			"ASquadController::TryRemanAbandonedTeamWeapon_ConfigureReplacementController");
+		return false;
+	}
+
+	if (not GetIsValidRTSComponent())
+	{
+		return false;
+	}
+
+	URTSComponent* NewControllerRTS = NewTeamWeaponController->GetRTSComponent();
+	if (not IsValid(NewControllerRTS))
+	{
+		RTSFunctionLibrary::ReportError("New team weapon controller has invalid RTS component in reman flow."
+			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_ConfigureReplacementController");
+		return false;
+	}
+
+	NewControllerRTS->SetUnitType(EAllUnitType::UNType_Squad);
+	NewControllerRTS->SetUnitSubtype(ENomadicSubtype::Nomadic_None, ETankSubtype::Tank_None, TeamWeaponSquadSubtype);
+	NewControllerRTS->SetOwningPlayerRuntime(RTSComponent->GetOwningPlayer());
+
+	if (not NewTeamWeaponController->PrepareToAdoptAbandonedTeamWeapon(AbandonedTeamWeapon))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void ASquadController::TryRemanAbandonedTeamWeapon_TransferUnitsToReplacementController(
+	ATeamWeaponController* NewTeamWeaponController,
+	const TArray<ASquadUnit*>& ValidSquadUnits) const
+{
+	if (not IsValid(NewTeamWeaponController))
+	{
+		return;
+	}
+
+	SquadControllerRemanStatics::ReassignSquadUnitsToController(ValidSquadUnits, NewTeamWeaponController);
+	NewTeamWeaponController->M_TSquadUnits = ValidSquadUnits;
+	NewTeamWeaponController->M_SquadLoadingStatus.bM_HasInitializedData = false;
+	NewTeamWeaponController->M_SquadLoadingStatus.bM_HasFinishedLoading = true;
+	NewTeamWeaponController->M_SquadLoadingStatus.M_AmountOfSquadUnitsToLoad = 0;
+
+	ASquadController* NewControllerAsSquad = NewTeamWeaponController;
+	NewControllerAsSquad->OnAllSquadUnitsLoaded();
+}
+
+void ASquadController::TryRemanAbandonedTeamWeapon_RollbackFailedTransfer(
+	ATeamWeaponController* NewTeamWeaponController,
+	const TArray<ASquadUnit*>& ValidSquadUnits)
+{
+	SquadControllerRemanStatics::ReassignSquadUnitsToController(ValidSquadUnits, this);
+	M_SquadLoadingStatus.bM_HasInitializedData = false;
+	OnAllSquadUnitsLoaded();
+
+	if (not IsValid(NewTeamWeaponController))
+	{
+		return;
+	}
+
+	NewTeamWeaponController->M_TSquadUnits.Reset();
+	NewTeamWeaponController->Destroy();
+}
+
+void ASquadController::TryRemanAbandonedTeamWeapon_FinalizeSuccessfulTransfer(
+	ATeamWeaponController* NewTeamWeaponController)
+{
+	if (IsValid(PlayerController))
+	{
+		PlayerController->ReplaceSelectedSquadControllerAndUpdateUI(this, NewTeamWeaponController);
+	}
+
+	M_TSquadUnits.Reset();
+	Destroy();
+}
+
 void ASquadController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -777,6 +1031,12 @@ void ASquadController::BeginPlay()
 	{
 		CargoSquad->Init(this);
 	}
+
+	if (bM_ShouldSkipInitialSquadUnitLoad)
+	{
+		return;
+	}
+
 	// Start loading the squad units asynchronously
 	LoadSquadUnitsAsync();
 }
@@ -2106,7 +2366,7 @@ void ASquadController::TerminateEnterCargoCommand()
 	StopMovement();
 
 	// Note: Do not call ExitCargoImmediate() here; termination must not undo the result.
-	// (If you need a “cancel boarding” behavior later, expose one on UCargoSquad and gate it here.)
+	// (If you need a "cancel boarding" behavior later, expose one on UCargoSquad and gate it here.)
 }
 
 void ASquadController::ExecuteExitCargoCommand()
@@ -2946,6 +3206,11 @@ void ASquadController::BeginPlay_SetupPlayerController()
 {
 	PlayerController = FRTS_Statics::GetRTSController(this);
 	(void)GetIsValidPlayerController();
+}
+
+void ASquadController::SetShouldSkipInitialSquadUnitLoad(const bool bShouldSkipInitialLoad)
+{
+	bM_ShouldSkipInitialSquadUnitLoad = bShouldSkipInitialLoad;
 }
 
 void ASquadController::LoadSquadUnitsAsync()

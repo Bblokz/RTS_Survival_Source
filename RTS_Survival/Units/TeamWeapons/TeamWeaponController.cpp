@@ -34,6 +34,8 @@ namespace TeamWeaponControllerCrewPositionStatics
 	}
 }
 
+const FString ATeamWeaponController::M_AbandoningAnimatedText = TEXT("Abandoning!");
+
 ATeamWeaponController::ATeamWeaponController()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -464,6 +466,30 @@ float ATeamWeaponController::GetTeamWeaponRange() const
 	return M_TeamWeapon->GetTurretRange();
 }
 
+bool ATeamWeaponController::PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon)
+{
+	if (not IsValid(AbandonedTeamWeapon))
+	{
+		RTSFunctionLibrary::ReportError("AbandonedTeamWeapon not valid in ATeamWeaponController::PrepareToAdoptAbandonedTeamWeapon");
+		return false;
+	}
+
+	if (not AbandonedTeamWeapon->GetIsAbandoned())
+	{
+		RTSFunctionLibrary::ReportError("Attempted to adopt a team weapon that is not abandoned."
+			"\n At function: ATeamWeaponController::PrepareToAdoptAbandonedTeamWeapon");
+		return false;
+	}
+
+	M_PendingAdoptedTeamWeapon = AbandonedTeamWeapon;
+	return true;
+}
+
+bool ATeamWeaponController::GetHasControlledTeamWeapon() const
+{
+	return M_TeamWeapon != nullptr && not bM_IsTeamWeaponAbandoned;
+}
+
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {
@@ -579,10 +605,26 @@ ESquadPathFindingError ATeamWeaponController::GeneratePaths_Assign(const FVector
 
 void ATeamWeaponController::SpawnTeamWeapon()
 {
-	if (M_TeamWeapon)
+	if (M_TeamWeapon != nullptr)
 	{
 		return;
 	}
+
+	ATeamWeapon* PendingAdoptedTeamWeapon = M_PendingAdoptedTeamWeapon.Get();
+	if (PendingAdoptedTeamWeapon != nullptr)
+	{
+		M_PendingAdoptedTeamWeapon = nullptr;
+		if (not AdoptAbandonedTeamWeapon(PendingAdoptedTeamWeapon))
+		{
+			return;
+		}
+
+		AssignCrewToTeamWeapon();
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+		StartDeploying();
+		return;
+	}
+
 	if (not TeamWeaponClass)
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("TeamWeaponClass"),
@@ -613,6 +655,8 @@ void ATeamWeaponController::SpawnTeamWeapon()
 	if (GetIsValidTeamWeaponMover())
 	{
 		M_TeamWeaponMover->InitMover(M_TeamWeapon, this);
+		M_TeamWeaponMover->OnPushedMoveArrived.RemoveAll(this);
+		M_TeamWeaponMover->OnPushedMoveFailed.RemoveAll(this);
 		M_TeamWeaponMover->OnPushedMoveArrived.AddUObject(this, &ATeamWeaponController::HandlePushedMoverArrived);
 		M_TeamWeaponMover->OnPushedMoveFailed.AddUObject(this, &ATeamWeaponController::HandlePushedMoverFailed);
 	}
@@ -620,6 +664,67 @@ void ATeamWeaponController::SpawnTeamWeapon()
 	AssignCrewToTeamWeapon();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	StartDeploying();
+}
+
+bool ATeamWeaponController::AdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon)
+{
+	if (not IsValid(AbandonedTeamWeapon))
+	{
+		RTSFunctionLibrary::ReportError("AbandonedTeamWeapon not valid in ATeamWeaponController::AdoptAbandonedTeamWeapon");
+		return false;
+	}
+
+	if (not AbandonedTeamWeapon->GetIsAbandoned())
+	{
+		RTSFunctionLibrary::ReportError("Attempted to adopt a team weapon that is not abandoned."
+			"\n At function: ATeamWeaponController::AdoptAbandonedTeamWeapon");
+		return false;
+	}
+
+	bM_IsTeamWeaponAbandoned = false;
+
+	const int32 OwningPlayer = GetOwningPlayer();
+	if (OwningPlayer <= 0)
+	{
+		RTSFunctionLibrary::ReportError("Invalid owning player in ATeamWeaponController::AdoptAbandonedTeamWeapon");
+		return false;
+	}
+
+	ATeamWeaponController* PreviousController = AbandonedTeamWeapon->GetTeamWeaponController();
+	M_TeamWeapon = AbandonedTeamWeapon;
+	M_TeamWeapon->SetTeamWeaponController(this);
+	M_TeamWeapon->SetTurretOwnerActor(this);
+
+	if (not M_TeamWeapon->SetOwningPlayerRuntime(static_cast<uint8>(OwningPlayer)))
+	{
+		RTSFunctionLibrary::ReportError("Failed to set owning player on team weapon while adopting abandoned weapon."
+			"\n At function: ATeamWeaponController::AdoptAbandonedTeamWeapon");
+		M_TeamWeapon = nullptr;
+		return false;
+	}
+
+	M_TeamWeaponMover = M_TeamWeapon->GetTeamWeaponMover();
+	if (not GetIsValidTeamWeaponMover())
+	{
+		M_TeamWeapon = nullptr;
+		return false;
+	}
+
+	if (IsValid(PreviousController))
+	{
+		M_TeamWeaponMover->OnPushedMoveArrived.RemoveAll(PreviousController);
+		M_TeamWeaponMover->OnPushedMoveFailed.RemoveAll(PreviousController);
+	}
+
+	M_TeamWeaponMover->OnPushedMoveArrived.RemoveAll(this);
+	M_TeamWeaponMover->OnPushedMoveFailed.RemoveAll(this);
+	M_TeamWeaponMover->InitMover(M_TeamWeapon, this);
+	M_TeamWeaponMover->OnPushedMoveArrived.AddUObject(this, &ATeamWeaponController::HandlePushedMoverArrived);
+	M_TeamWeaponMover->OnPushedMoveFailed.AddUObject(this, &ATeamWeaponController::HandlePushedMoverFailed);
+
+	M_TeamWeapon->OnTeamWeaponRemanned();
+	bM_IsTeamWeaponAbandoned = false;
+	return true;
 }
 
 void ATeamWeaponController::AssignCrewToTeamWeapon()
@@ -1684,6 +1789,32 @@ void ATeamWeaponController::ShowPackingAnimatedText() const
 		TeamWeaponConfig.M_AnimatedTextSettings);
 }
 
+void ATeamWeaponController::ShowAbandoningAnimatedText() const
+{
+	if (not GetIsValidTeamWeapon() || not GetIsValidAnimatedTextWidgetPoolManager())
+	{
+		return;
+	}
+
+	const FTeamWeaponConfig& TeamWeaponConfig = M_TeamWeapon->GetTeamWeaponConfig();
+	FRTSVerticalAnimTextSettings AbandoningAnimatedTextSettings = TeamWeaponConfig.M_AnimatedTextSettings;
+	constexpr float AbandoningVisibleDuration = 1.0f;
+	constexpr float AbandoningHideDuration = 0.5f;
+	AbandoningAnimatedTextSettings.VisibleDuration = AbandoningVisibleDuration;
+	AbandoningAnimatedTextSettings.FadeOutDuration = AbandoningHideDuration;
+
+	constexpr bool bAutoWrap = false;
+	const float WrapWidth = 300.0f;
+	const TEnumAsByte<ETextJustify::Type> Justification = ETextJustify::Center;
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		M_AbandoningAnimatedText,
+		M_TeamWeapon->GetActorLocation(),
+		bAutoWrap,
+		WrapWidth,
+		Justification,
+		AbandoningAnimatedTextSettings);
+}
+
 void ATeamWeaponController::HandlePushedMoverArrived()
 {
 	RestorePushedMoveSpeedOverride();
@@ -2425,6 +2556,7 @@ void ATeamWeaponController::AbandonTeamWeapon()
 	}
 
 	RestorePushedMoveSpeedOverride();
+	ShowAbandoningAnimatedText();
 
 	for (const TWeakObjectPtr<ASquadUnit>& CrewOperator : M_CrewAssignment.M_Operators)
 	{
