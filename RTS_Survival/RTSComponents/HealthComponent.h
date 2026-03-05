@@ -129,6 +129,8 @@ public:
 
 	void ChangeVisibilitySettings(const FHealthBarVisibilitySettings& NewSettings);
 	FHealthBarVisibilitySettings GetVisibilitySettings() const;
+	void ChangeCustomizationSettings(const FHealthBarCustomization& NewSettings);
+	FHealthBarCustomization GetCustomizationSettings() const;
 
 	virtual void OnOverwiteHealthbarVisiblityPlayer(ERTSPlayerHealthBarVisibilityStrategy Strategy);
 	virtual void OnOverwiteHealthbarVisiblityEnemy(ERTSEnemyHealthBarVisibilityStrategy Strategy);

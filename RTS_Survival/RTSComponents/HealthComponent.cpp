@@ -247,6 +247,30 @@ FHealthBarVisibilitySettings UHealthComponent::GetVisibilitySettings() const
 	return VisibilitySettings;
 }
 
+void UHealthComponent::ChangeCustomizationSettings(const FHealthBarCustomization& NewSettings)
+{
+	CustomizationSettings = NewSettings;
+
+	if (not Widget_GetIsValidHealthBarWidget())
+	{
+		return;
+	}
+
+	int8 OwningPlayer = 0;
+	if (M_RTSComponent.IsValid())
+	{
+		OwningPlayer = M_RTSComponent->GetOwningPlayer();
+	}
+
+	M_HealthBarWidget->SetSettingsFromHealthComponent(this, CustomizationSettings, OwningPlayer);
+	UpdateHealthBar();
+}
+
+FHealthBarCustomization UHealthComponent::GetCustomizationSettings() const
+{
+	return CustomizationSettings;
+}
+
 void UHealthComponent::OnOverwiteHealthbarVisiblityPlayer(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
 {
 	if (Strategy == ERTSPlayerHealthBarVisibilityStrategy::NotInitialized ||
