@@ -134,7 +134,7 @@ struct FVehicleFireFeedbackSettings
  * @note InitializeFeedbackComponent: call in blueprint with track mesh, hull mesh and turret after components are ready.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class RTS_SURVIVAL_API UVehicleFireFeedbackComponent final : public UActorComponent
+class RTS_SURVIVAL_API UVehicleFireFeedbackComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
@@ -142,15 +142,15 @@ public:
 	UVehicleFireFeedbackComponent();
 
 	UFUNCTION(BlueprintCallable, Category="VehicleFireFeedback")
-	void InitializeFeedbackComponent(
+	virtual void InitializeFeedbackComponent(
 		USkeletalMeshComponent* InTrackRootMesh,
 		UStaticMeshComponent* InHullMesh,
 		ACPPTurretsMaster* InTurretMaster);
 
-	void OnTurretWeaponAdded(int32 WeaponIndex, UWeaponState* Weapon);
-	void NotifyWeaponFired(int32 WeaponIndex, int32 WeaponCalibre, float TurretWorldYawDegrees);
+	virtual void OnTurretWeaponAdded(int32 WeaponIndex, UWeaponState* Weapon);
+	virtual void NotifyWeaponFired(int32 WeaponIndex, int32 WeaponCalibre, float TurretWorldYawDegrees);
 	void SetOptimizationComponent(URTSOptimizer* InOptimizer);
-	void ForceResetRecoilAndSleep();
+	virtual void ForceResetRecoilAndSleep();
 
 protected:
 	virtual void BeginPlay() override;
@@ -162,7 +162,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback")
 	FVehicleFireFeedbackSettings M_FeedbackSettings;
 
-private:
+
+protected:
 	UPROPERTY()
 	TObjectPtr<USkeletalMeshComponent> M_TrackRootMesh = nullptr;
 
@@ -190,24 +191,24 @@ private:
 	int32 M_TrackedWeaponCalibre = 0;
 	float M_CachedTrackedEnergy01 = 0.0f;
 
-	bool GetIsValidHullMesh() const;
-	bool GetIsValidTrackRootMesh() const;
-	bool GetIsValidTurretMaster() const;
-	bool GetHasValidTrackedWeapon() const;
-	bool GetIsValidOptimizationComponent() const;
+	virtual bool GetIsValidHullMesh() const;
+	virtual bool GetIsValidTrackRootMesh() const;
+	virtual bool GetIsValidTurretMaster() const;
+	virtual bool GetHasValidTrackedWeapon() const;
+	virtual bool GetIsValidOptimizationComponent() const;
 
-	void CacheHullBaseTransform();
-	void EvaluateAllCurrentTurretWeapons();
-	void TryTrackWeapon(int32 WeaponIndex, UWeaponState* Weapon);
-	float GetNormalisedWeaponEnergy01(int32 WeaponCalibre) const;
-	void ApplyFeedbackKick(float NormalisedMuzzleEnergy, float TurretWorldYawDegrees);
-	void ApplyCriticallyDampedSpring(
+	virtual void CacheHullBaseTransform();
+	virtual void EvaluateAllCurrentTurretWeapons();
+	virtual void TryTrackWeapon(int32 WeaponIndex, UWeaponState* Weapon);
+	virtual float GetNormalisedWeaponEnergy01(int32 WeaponCalibre) const;
+	virtual void ApplyFeedbackKick(float NormalisedMuzzleEnergy, float TurretWorldYawDegrees);
+	virtual void ApplyCriticallyDampedSpring(
 		float DeltaTime,
 		float Stiffness,
 		float Damping,
 		FVector& InOutValue,
 		FVector& InOutVelocity) const;
-	void ApplyHullFeedbackTransform() const;
-	void SetTickEnabledForActiveRecoil();
-	void TryResetRuntimeOffsetsToRestAndSleep();
+	virtual void ApplyHullFeedbackTransform() const;
+	virtual void SetTickEnabledForActiveRecoil();
+	virtual void TryResetRuntimeOffsetsToRestAndSleep();
 };
