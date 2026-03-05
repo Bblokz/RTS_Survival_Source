@@ -178,6 +178,7 @@ enum class ECommandType : uint8
 	Repair,
 	EnterCargo,
 	CaptureActor,
+	ManAbandonedTeamWeapon,
 };
 
 static FString GetStringCommandType(const ECommandType CommandType)
@@ -210,6 +211,8 @@ static FString GetStringCommandType(const ECommandType CommandType)
 		return TEXT("Repair");
 	case ECommandType::CaptureActor:
 		return TEXT("CaptureActor");
+	case ECommandType::ManAbandonedTeamWeapon:
+		return TEXT("ManAbandonedTeamWeapon");
 	default:
 		return TEXT("Unknown");
 	}
@@ -1100,6 +1103,8 @@ private:
 		const FTargetUnion& Target,
 		FVector& ClickedLocation, const AActor* ClickedActor);
 	uint32 IssueOrderEnterCargo(AActor* CargoActor, EAbilityID& OutAbilityActivated);
+	uint32 IssueOrderManTeamWeapon(AActor* TeamWeaponActor, EAbilityID& OutAbilityActivated,
+	                              const FVector& ClickedLocation);
 
 	/**
 	 * @brief Checks if the provided allied actor can be repaired and if so attempts to repair with selected units

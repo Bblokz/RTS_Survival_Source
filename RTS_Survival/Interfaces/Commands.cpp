@@ -869,6 +869,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			M_Owner->ExecuteEnterCargoCommand(Cmd.TargetActor.Get());
 		}
 		break;
+	case EAbilityID::IdManAbandonedTeamWeapon:
+		{
+			M_Owner->ExecuteManAbandonedTeamWeaponCommand(Cmd.TargetActor.Get());
+		}
+		break;
 	case EAbilityID::IdExitCargo:
 		{
 			M_Owner->ExecuteExitCargoCommand();
@@ -1040,6 +1045,7 @@ bool UCommandData::IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) 
 	case EAbilityID::IdAttackGround:
 	case EAbilityID::IdReturnCargo:
 	case EAbilityID::IdEnterCargo:
+	case EAbilityID::IdManAbandonedTeamWeapon:
 	case EAbilityID::IdCapture:
 		return false;
 
@@ -2546,6 +2552,15 @@ void ICommands::TerminateEnterCargoCommand()
 	}
 }
 
+void ICommands::ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponActor)
+{
+	static_cast<void>(TeamWeaponActor);
+}
+
+void ICommands::TerminateManAbandonedTeamWeaponCommand()
+{
+}
+
 void ICommands::ExecuteExitCargoCommand()
 {
 	// Non-pure; override in concrete controllers. Typically:
@@ -2672,6 +2687,26 @@ ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUn
 		EAbilityID::IdEnterCargo,
 		FVector::ZeroVector,
 		CarrierActor,
+		FRotator::ZeroRotator);
+}
+
+ECommandQueueError ICommands::ManAbandonedTeamWeapon(AActor* TeamWeaponActor, const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdManAbandonedTeamWeapon,
+		FVector::ZeroVector,
+		TeamWeaponActor,
 		FRotator::ZeroRotator);
 }
 
@@ -2907,6 +2942,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdEnterCargo:
 		TerminateEnterCargoCommand();
+		break;
+	case EAbilityID::IdManAbandonedTeamWeapon:
+		TerminateManAbandonedTeamWeaponCommand();
 		break;
 	case EAbilityID::IdExitCargo:
 		TerminateExitCargoCommand();

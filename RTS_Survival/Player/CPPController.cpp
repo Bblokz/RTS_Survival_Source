@@ -57,7 +57,9 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
@@ -3353,6 +3355,9 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 	case ECommandType::EnterCargo:
 		AmountCommandsExe += IssueOrderEnterCargo(Target.TargetActor, OutAbilityActivated);
 		break;
+	case ECommandType::ManAbandonedTeamWeapon:
+		AmountCommandsExe += IssueOrderManTeamWeapon(Target.TargetActor, OutAbilityActivated, ClickedLocation);
+		break;
 	case ECommandType::EnemyCharacter:
 		OutAbilityActivated = EAbilityID::IdAttack;
 		AmountCommandsExe += OrderUnitsToAttackActor(Target.TargetCharacter);
@@ -3362,6 +3367,7 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 		OrderUnitsAttackGround(ClickedLocation);
 		break;
 	// Falls Through.
+	case ECommandType::Attack:
 	case ECommandType::EnemyActor:
 	case ECommandType::DestroyDestructableEnvActor:
 		OutAbilityActivated = EAbilityID::IdAttack;
@@ -3460,6 +3466,51 @@ uint32 ACPPController::IssueOrderEnterCargo(AActor* CargoActor, EAbilityID& OutA
 		Issued = MoveUnitsToLocation(CargoActor->GetActorLocation());
 	}
 	return Issued;
+}
+
+uint32 ACPPController::IssueOrderManTeamWeapon(
+	AActor* TeamWeaponActor,
+	EAbilityID& OutAbilityActivated,
+	const FVector& ClickedLocation)
+{
+	ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(TeamWeaponActor);
+	if (not IsValid(TeamWeapon))
+	{
+		OutAbilityActivated = EAbilityID::IdMove;
+		return MoveUnitsToLocation(ClickedLocation);
+	}
+
+	OutAbilityActivated = EAbilityID::IdManAbandonedTeamWeapon;
+
+	if (TSelectedSquadControllers.IsEmpty())
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NoSquadsSelectedForTeamWeapon, true, true);
+		OutAbilityActivated = EAbilityID::IdMove;
+		return MoveUnitsToLocation(ClickedLocation);
+	}
+
+	for (ASquadController* EachSquad : TSelectedSquadControllers)
+	{
+		if (not IsValid(EachSquad))
+		{
+			continue;
+		}
+
+		if (not FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon(EachSquad, TeamWeapon))
+		{
+			continue;
+		}
+
+		const ECommandQueueError QueueError = EachSquad->ManAbandonedTeamWeapon(TeamWeapon, not bIsHoldingShift);
+		if (QueueError == ECommandQueueError::NoError)
+		{
+			return 1;
+		}
+	}
+
+	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NoSelectedSquadWithSufficientUnitsForTeamWeapon, true, true);
+	OutAbilityActivated = EAbilityID::IdMove;
+	return MoveUnitsToLocation(ClickedLocation);
 }
 
 uint32 ACPPController::IssueOrderRepairAlly(AActor* AlliedActor, EAbilityID& OutIssuedAbility,
