@@ -2369,6 +2369,30 @@ void ASquadController::TerminateEnterCargoCommand()
 	// (If you need a "cancel boarding" behavior later, expose one on UCargoSquad and gate it here.)
 }
 
+void ASquadController::ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponActor)
+{
+	ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(TeamWeaponActor);
+	if (not IsValid(TeamWeapon))
+	{
+		DoneExecutingCommand(EAbilityID::IdManAbandonedTeamWeapon);
+		return;
+	}
+
+	if (not TeamWeapon->GetIsAbandoned())
+	{
+		DoneExecutingCommand(EAbilityID::IdManAbandonedTeamWeapon);
+		return;
+	}
+
+	if (not TryRemanAbandonedTeamWeapon(TeamWeapon))
+	{
+		DoneExecutingCommand(EAbilityID::IdManAbandonedTeamWeapon);
+		return;
+	}
+
+	DoneExecutingCommand(EAbilityID::IdManAbandonedTeamWeapon);
+}
+
 void ASquadController::ExecuteExitCargoCommand()
 {
 	// Explicit player command: exit immediately and mark command done from the component.

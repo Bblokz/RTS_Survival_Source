@@ -114,6 +114,8 @@ private:
 	/** @brief If a turret was clicked and it has a parent, redirect ClickedActor to the parent. */
 	void Decode_TurretParentRedirect(AActor*& ClickedActor) const;
 
+	bool Decode_TeamWeapon(AActor* ClickedActor, FTargetUnion& OutTarget, ECommandType& OutType) const;
+
 	/**
 	 * @brief Decode when the actor is a character.
 	 * @param ClickedActor Candidate actor (not null).

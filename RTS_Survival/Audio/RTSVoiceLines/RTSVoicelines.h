@@ -108,6 +108,8 @@ enum class EAnnouncerVoiceLineType : uint8
 	GamePaused,
 	GameResumed,
 	AbilityNotInRange,
+	NoSquadsSelectedForTeamWeapon,
+	NoSelectedSquadWithSufficientUnitsForTeamWeapon,
 	LowBaseEnergy,
 	BaseEnergyRestored,
 };

@@ -554,6 +554,8 @@ protected:
 	virtual void ExecuteEnterCargoCommand(AActor* CarrierActor) override;
 	virtual void TerminateEnterCargoCommand() override;
 
+	virtual void ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponActor) override;
+
 	virtual void ExecuteExitCargoCommand() override;
 	virtual void TerminateExitCargoCommand() override;
 	// Util to stop behaviour trees on any IcommandUnit.

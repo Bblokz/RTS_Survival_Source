@@ -732,6 +732,11 @@ public:
 		AActor* CarrierActor,
 		const bool bSetUnitToIdle);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError ManAbandonedTeamWeapon(
+		AActor* TeamWeaponActor,
+		const bool bSetUnitToIdle);
+
 	// Enqueue: exit from current carrier/transport.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError ExitCargo(const bool bSetUnitToIdle);
@@ -895,6 +900,9 @@ protected:
 
 	virtual void ExecuteEnterCargoCommand(AActor* CarrierActor);
 	virtual void TerminateEnterCargoCommand();
+
+	virtual void ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponActor);
+	virtual void TerminateManAbandonedTeamWeaponCommand();
 
 	virtual void ExecuteExitCargoCommand();
 	virtual void TerminateExitCargoCommand();

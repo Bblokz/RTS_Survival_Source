@@ -16,6 +16,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 namespace
@@ -36,10 +37,15 @@ ECommandType UPlayerCommandTypeDecoder::DecodeTargetedActor(AActor*& ClickedActo
 		return ECommandType::Movement;
 	}
 
+	ECommandType OutType;
+
+	if (Decode_TeamWeapon(ClickedActor, OutTarget, OutType))
+	{
+		return OutType;
+	}
+
 	// Normalize turrets to their owning parent (if any) before decoding.
 	Decode_TurretParentRedirect(ClickedActor);
-
-	ECommandType OutType;
 
 	if (Decode_CargoActor(ClickedActor, OutTarget, OutType))
 	{
@@ -91,6 +97,7 @@ EPlacementEffect UPlayerCommandTypeDecoder::DecodeCommandTypeIntoEffect(const EC
 	case ECommandType::Movement:
 	case ECommandType::AlliedCharacter:
 	case ECommandType::AlliedBuilding:
+	case ECommandType::ManAbandonedTeamWeapon:
 		return EPlacementEffect::Effect_Movement;
 	case ECommandType::EnemyActor:
 	case ECommandType::EnemyCharacter:
@@ -280,6 +287,34 @@ FRotator UPlayerCommandTypeDecoder::GetRotationFromClickedLocation(const FVector
 }
 
 // ------------------ Decode helpers ------------------
+
+bool UPlayerCommandTypeDecoder::Decode_TeamWeapon(
+	AActor* ClickedActor,
+	FTargetUnion& OutTarget,
+	ECommandType& OutType) const
+{
+	ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(ClickedActor);
+	if (not IsValid(TeamWeapon))
+	{
+		return false;
+	}
+
+	OutTarget.TargetActor = TeamWeapon;
+	if (TeamWeapon->GetIsAbandoned())
+	{
+		OutType = ECommandType::ManAbandonedTeamWeapon;
+		return true;
+	}
+
+	if (GetIsActorAlliedToPlayer(TeamWeapon))
+	{
+		OutType = ECommandType::AlliedCharacter;
+		return true;
+	}
+
+	OutType = ECommandType::Attack;
+	return true;
+}
 
 void UPlayerCommandTypeDecoder::Decode_TurretParentRedirect(AActor*& ClickedActor) const
 {

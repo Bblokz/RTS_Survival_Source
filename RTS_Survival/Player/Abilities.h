@@ -64,6 +64,7 @@ enum class EAbilityID : uint8
 	IdAimAbility,
 	IdCancelAimAbility,
 	IdSwapTurret,
+	IdManAbandonedTeamWeapon,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
@@ -118,6 +119,7 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdAimAbility: return TEXT("Aim Ability");
 	case EAbilityID::IdCancelAimAbility: return TEXT("Cancel Aim Ability");
 	case EAbilityID::IdSwapTurret: return TEXT("Swap Turret");
+	case EAbilityID::IdManAbandonedTeamWeapon: return TEXT("Man Abandoned Team Weapon");
 	default: return TEXT("Unknown Ability");
 	}
 }
