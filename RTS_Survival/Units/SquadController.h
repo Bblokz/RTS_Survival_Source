@@ -159,6 +159,27 @@ struct FTargetScavengeState
 };
 
 USTRUCT()
+struct FTargetManAbandonedTeamWeaponState
+{
+	GENERATED_BODY()
+
+	FTargetManAbandonedTeamWeaponState();
+
+	void Reset()
+	{
+		M_TargetTeamWeapon = nullptr;
+		bM_IsBusyManningTeamWeapon = false;
+	}
+
+	UPROPERTY()
+	ATeamWeapon* M_TargetTeamWeapon = nullptr;
+
+	// Becomes true once the squad started the reman flow to prevent repeated retries from move complete callbacks.
+	UPROPERTY()
+	bool bM_IsBusyManningTeamWeapon = false;
+};
+
+USTRUCT()
 struct FRepairState
 {
 	GENERATED_BODY()
@@ -374,6 +395,7 @@ public:
 
 	void OnSquadUnitOutOfRange(const FVector& TargetLocation);
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
+	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 
 	// ICommand interface helpers.
 	virtual FVector GetOwnerLocation() const override final;
@@ -555,6 +577,7 @@ protected:
 	virtual void TerminateEnterCargoCommand() override;
 
 	virtual void ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponActor) override;
+	virtual void TerminateManAbandonedTeamWeaponCommand() override;
 
 	virtual void ExecuteExitCargoCommand() override;
 	virtual void TerminateExitCargoCommand() override;
@@ -771,6 +794,9 @@ protected:
 	FTargetScavengeState M_TargetScavengeState;
 
 	UPROPERTY()
+	FTargetManAbandonedTeamWeaponState M_TargetManAbandonedTeamWeaponState;
+
+	UPROPERTY()
 	FRepairState M_RepairState;
 
 	UPROPERTY()
@@ -788,6 +814,7 @@ protected:
 	void OnItemCloseEnoughInstantPickup();
 
 	void CheckCloseEnoughToItemPickupAnyway();
+	void CheckCloseEnoughToManAbandonedTeamWeaponAnyway();
 
 	bool GetIsValidWeaponPickup(AWeaponPickup* TargetWeaponItem) const;
 
