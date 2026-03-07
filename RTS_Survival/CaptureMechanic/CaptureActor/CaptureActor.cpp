@@ -6,6 +6,8 @@
 #include "Components/MeshComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/RTSProgressBarType.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
 
@@ -23,6 +25,47 @@ void ACaptureActor::BeginPlay()
 	Super::BeginPlay();
 
 	M_CurrentCapturingPlayer = INDEX_NONE;
+
+	BeginPlay_ResolveHealthComponent();
+	BeginPlay_ApplyCapturableHealthBarCustomization();
+}
+
+
+void ACaptureActor::BeginPlay_ResolveHealthComponent()
+{
+	M_HealthComponent = FindComponentByClass<UHealthComponent>();
+}
+
+void ACaptureActor::BeginPlay_ApplyCapturableHealthBarCustomization()
+{
+	if (not CaptureHealthBarOverrideSettings.bOverrideHealthBarCustomizationWhenCapturable)
+	{
+		return;
+	}
+
+	if (not GetIsValidHealthComponent())
+	{
+		return;
+	}
+
+	M_HealthComponent->ChangeCustomizationSettings(CaptureHealthBarOverrideSettings.CapturableHealthBarCustomization);
+}
+
+bool ACaptureActor::GetIsValidHealthComponent() const
+{
+	if (IsValid(M_HealthComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_HealthComponent",
+		"GetIsValidHealthComponent",
+		this
+	);
+
+	return false;
 }
 
 void ACaptureActor::SetupCaptureLocations(UMeshComponent* MeshComp, const FName SocketNameContaining)
@@ -42,7 +85,7 @@ void ACaptureActor::SetupCaptureLocations(UMeshComponent* MeshComp, const FName 
 	}
 
 	const FString FilterString = SocketNameContaining.ToString();
-	const bool bHasFilter = !FilterString.IsEmpty();
+	const bool bHasFilter = not FilterString.IsEmpty();
 
 	const FVector ActorLocation = GetActorLocation();
 
@@ -136,7 +179,7 @@ FVector ACaptureActor::GetCaptureLocationClosestTo(const FVector& FromLocation)
 void ACaptureActor::OnCaptureProgressComplete()
 {
 	UWorld* World = GetWorld();
-	if (World)
+	if (World != nullptr)
 	{
 		World->GetTimerManager().ClearTimer(M_CaptureTimerHandle);
 	}

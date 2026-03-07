@@ -5,9 +5,33 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
+#include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarVisibilitySettings.h"
 #include "CaptureActor.generated.h"
 
 class UMeshComponent;
+class UHealthComponent;
+
+USTRUCT(BlueprintType)
+struct FCaptureActorHealthBarOverrideSettings
+{
+	GENERATED_BODY()
+
+	FCaptureActorHealthBarOverrideSettings()
+	{
+		CapturableHealthBarCustomization.bUseGreenRedGradient = false;
+		CapturableHealthBarCustomization.bUseEnemyColorIfEnemy = false;
+		CapturableHealthBarCustomization.OverWriteGradientColor = FLinearColor::White;
+		CapturableHealthBarCustomization.BackgroundColor = FLinearColor::Black;
+	}
+
+	// When true, this actor applies the capturable health bar colors so capture targets are easier to identify.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Capture|HealthBar")
+	bool bOverrideHealthBarCustomizationWhenCapturable = true;
+
+	// Applied when bOverrideHealthBarCustomizationWhenCapturable is enabled.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Capture|HealthBar")
+	FHealthBarCustomization CapturableHealthBarCustomization;
+};
 
 USTRUCT(Blueprintable)
 struct FCaptureSettings
@@ -67,11 +91,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Capture")
 	FCaptureSettings CaptureSettings;
 
+	/** Optional overwrite for health bar colors so capturable actors stand out. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Capture|HealthBar")
+	FCaptureActorHealthBarOverrideSettings CaptureHealthBarOverrideSettings;
+
 	/** Blueprint hook fired when a capture has completely finished. */
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCapturedByPlayer(const int32 Player);
 
 private:
+	void BeginPlay_ResolveHealthComponent();
+	void BeginPlay_ApplyCapturableHealthBarCustomization();
+	[[nodiscard]] bool GetIsValidHealthComponent() const;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UHealthComponent> M_HealthComponent = nullptr;
+
 	/** Cached socket locations relative to the actor location. */
 	UPROPERTY()
 	TArray<FVector> M_CaptureLocationsRelativeToWorldLocation;
