@@ -26,6 +26,11 @@ bool FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon(
 		return false;
 	}
 
+	if (SquadController->GetSquadAlreadyHasTeamWeapon())
+	{
+		return false;
+	}
+
 	return SquadController->GetSquadUnitAmount() >= RequiredOperators;
 }
 UGrenadeComponent* FAbilityHelpers::GetGrenadeAbilityCompOfType(const EGrenadeAbilityType Type,

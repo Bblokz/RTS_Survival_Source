@@ -490,6 +490,11 @@ bool ATeamWeaponController::GetHasControlledTeamWeapon() const
 	return M_TeamWeapon != nullptr && not bM_IsTeamWeaponAbandoned;
 }
 
+bool ATeamWeaponController::GetSquadAlreadyHasTeamWeapon() const
+{
+	return GetHasControlledTeamWeapon();
+}
+
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {

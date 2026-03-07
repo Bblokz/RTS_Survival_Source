@@ -152,6 +152,7 @@ public:
 	float GetTeamWeaponRange()const;
 	bool PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	bool GetHasControlledTeamWeapon() const;
+	virtual bool GetSquadAlreadyHasTeamWeapon() const override;
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
 

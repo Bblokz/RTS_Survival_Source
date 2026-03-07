@@ -353,7 +353,13 @@ FTargetPickupItemState::FTargetPickupItemState()
 
 FTargetScavengeState::FTargetScavengeState()
 	: M_TargetScavengeObject(nullptr)
-	  , bIsBusyScavenging(false)
+	, bIsBusyScavenging(false)
+{
+}
+
+FTargetManAbandonedTeamWeaponState::FTargetManAbandonedTeamWeaponState()
+	: M_TargetTeamWeapon(nullptr)
+	, bM_IsBusyManningTeamWeapon(false)
 {
 }
 
@@ -643,6 +649,11 @@ void ASquadController::OnSquadUnitCommandComplete(const EAbilityID CompletedAbil
 		CheckCloseEnoughToItemPickupAnyway();
 	}
 
+	if (CompletedAbilityID == EAbilityID::IdManAbandonedTeamWeapon)
+	{
+		CheckCloseEnoughToManAbandonedTeamWeaponAnyway();
+	}
+
 	// Special hand-off: when the EnterCargo move finishes for all units,
 	// we don't finish the command yet; let CargoSquad finalize (seat assignment & attach).
 	if (CompletedAbilityID == EAbilityID::IdEnterCargo && IsValid(CargoSquad))
@@ -835,11 +846,16 @@ bool ASquadController::TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWea
 	return true;
 }
 
+bool ASquadController::GetSquadAlreadyHasTeamWeapon() const
+{
+	return false;
+}
+
 bool ASquadController::TryRemanAbandonedTeamWeapon_GetCanStartReman(ATeamWeapon* AbandonedTeamWeapon)
 {
-	if (IsA(ATeamWeaponController::StaticClass()))
+	if (GetSquadAlreadyHasTeamWeapon())
 	{
-		RTSFunctionLibrary::ReportError("TryRemanAbandonedTeamWeapon called on an ATeamWeaponController."
+		RTSFunctionLibrary::ReportError("Squad already controls a team weapon and cannot reman another one."
 			"\n At function: ASquadController::TryRemanAbandonedTeamWeapon_GetCanStartReman");
 		return false;
 	}
@@ -2384,7 +2400,40 @@ void ASquadController::ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponAc
 		return;
 	}
 
-	if (not TryRemanAbandonedTeamWeapon(TeamWeapon))
+	M_UnitsCompletedCommand = 0;
+	M_TargetManAbandonedTeamWeaponState.M_TargetTeamWeapon = TeamWeapon;
+	M_TargetManAbandonedTeamWeaponState.bM_IsBusyManningTeamWeapon = false;
+
+	const float DistanceToTeamWeapon = GetDistanceToActor(TeamWeapon);
+	if (DistanceToTeamWeapon > DeveloperSettings::GamePlay::Navigation::SquadUnitWeaponPickupDistance)
+	{
+		GeneralMoveToForAbility(TeamWeapon->GetActorLocation(), EAbilityID::IdManAbandonedTeamWeapon);
+		return;
+	}
+
+	CheckCloseEnoughToManAbandonedTeamWeaponAnyway();
+}
+
+void ASquadController::TerminateManAbandonedTeamWeaponCommand()
+{
+	M_TargetManAbandonedTeamWeaponState.Reset();
+}
+
+void ASquadController::CheckCloseEnoughToManAbandonedTeamWeaponAnyway()
+{
+	ATeamWeapon* TargetTeamWeapon = M_TargetManAbandonedTeamWeaponState.M_TargetTeamWeapon;
+	if (not IsValid(TargetTeamWeapon) || M_TargetManAbandonedTeamWeaponState.bM_IsBusyManningTeamWeapon)
+	{
+		return;
+	}
+
+	if (GetDistanceToActor(TargetTeamWeapon) > DeveloperSettings::GamePlay::Navigation::SquadUnitWeaponPickupDistance)
+	{
+		return;
+	}
+
+	M_TargetManAbandonedTeamWeaponState.bM_IsBusyManningTeamWeapon = true;
+	if (not TryRemanAbandonedTeamWeapon(TargetTeamWeapon))
 	{
 		DoneExecutingCommand(EAbilityID::IdManAbandonedTeamWeapon);
 		return;
