@@ -3174,12 +3174,12 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::StaticArtilleryRange;
+	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
 	WeaponData.ArmorPen = 46 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 46 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.MagCapacity = 1;
 	// WeaponData.ReloadSpeed = 16.2;
-	WeaponData.ReloadSpeed = 3;
+	WeaponData.ReloadSpeed = 5;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 25;

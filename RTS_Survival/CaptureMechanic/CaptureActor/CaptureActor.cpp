@@ -7,7 +7,6 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
-#include "RTS_Survival/Utils/RTSFunctionLibrary.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/RTSProgressBarType.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
 
