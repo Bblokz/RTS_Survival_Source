@@ -3479,6 +3479,12 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 		WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::M_30S_122MM_SU122, WeaponData);
+
+		WeaponData.WeaponName = EWeaponName::M1938_122MM;
+		WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
+		WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
+		WeaponData.ReloadSpeed = 5.0f;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::M1938_122MM, WeaponData);
 	}
 
 	WeaponData.WeaponName = EWeaponName::D_25T_122MM_IS3;

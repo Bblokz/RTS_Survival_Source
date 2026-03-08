@@ -213,6 +213,7 @@ enum class
 	D_10S_100MM_SU100 UMETA(DisplayName = "D-10S 100MM (SU-100)"),
 	D_25T_122MM UMETA(DisplayName = "DT-25T 122MM (IS-2)"),
 	M_30S_122MM_SU122 UMETA(DisplayName = "M-30S 122MM (SU-122)"),
+	M1938_122MM UMETA(DisplayName = "M-1938 122MM (Howitzer)"),
 	ZIS_6_107MM UMETA(DisplayName = "ZIS-6 107MM (KV-5)"),
 	QF_37In_94MM UMETA(DisplayName = "QF 37in 94MM"),
 	D_25T_122MM_IS3 UMETA(Displayname = "DT-25T 122MM (IS-3)"),
@@ -294,6 +295,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::D_25T_122MM: return "D-25T";
 	case EWeaponName::D_25T_122MM_IS3: return "D-25T";
 	case EWeaponName::M_30S_122MM_SU122: return "M-30S";
+	case EWeaponName::M1938_122MM: return "M-1938";
 	case EWeaponName::ML_20S_152MM_SU152: return "ML-20S";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
@@ -632,6 +634,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "D_25T_122MM";
 	case EWeaponName::M_30S_122MM_SU122:
 		return "M_30S_122MM_SU122";
+	case EWeaponName::M1938_122MM:
+		return "M1938_122MM";
 	case EWeaponName::KwK44_L_36_5_75MM:
 		return "KwK44_L_36_5_75MM";
 	case EWeaponName::KwK44_128MM:
