@@ -175,6 +175,7 @@ protected:
 	virtual void ExecuteBreakCover() override;
 	virtual void TerminateBreakCover() override;
 	virtual void OnUnitIdleAndNoNewCommands() override;
+	virtual void OnSquadUnitOutOfRange(const FVector& TargetLocation) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void UpdateControllerPositionToAverage() override;
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;
@@ -229,6 +230,8 @@ private:
 	 */
 	void StartMoveWithCrew(const FVector MoveToLocation);
 	void StartMoveWithPushedWeapon(const FVector MoveToLocation);
+	void MoveGuardsCloserToTargetLocation(const FVector& MoveToLocation) const;
+	bool GetShouldMoveOnlyGuardsForOutOfRange() const;
 	void ExecuteSquadMoveAlongAssignedPaths(const EAbilityID AbilityId) const;
 	void ApplyPushedMoveSpeedOverrideToSquad();
 	void RestorePushedMoveSpeedOverride();
