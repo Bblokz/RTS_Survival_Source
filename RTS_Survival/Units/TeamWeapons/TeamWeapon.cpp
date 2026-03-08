@@ -11,6 +11,8 @@
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
+#include "RTS_Survival/RTSComponents/VehicleFireFeedbackComponent/AnimMeshFeedbackComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -82,6 +84,7 @@ void FTeamWeaponDecalManager::DestroyDecal(const ATeamWeapon* TeamWeapon)
 ATeamWeapon::ATeamWeapon()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	M_OptimizationComponent = CreateDefaultSubobject<URTSOptimizer>(TEXT("RTSOptimizer"));
 }
 
 void ATeamWeapon::BeginPlay()
@@ -103,11 +106,25 @@ void ATeamWeapon::PostInitializeComponents()
 	M_RTSComponent = FindComponentByClass<URTSComponent>();
 	M_TeamWeaponMover = FindComponentByClass<UTeamWeaponMover>();
 	M_TeamWeaponMesh = FindComponentByClass<USkeletalMeshComponent>();
+	M_AnimMeshFeedbackComponent = FindComponentByClass<UAnimMeshFeedbackComponent>();
 
 	(void)GetIsValidHealthComponent();
 	(void)GetIsValidRTSComponent();
 	(void)GetIsValidTeamWeaponMover();
 	(void)GetIsValidTeamWeaponMesh();
+	(void)GetIsValidOptimizationComponent();
+
+	if (not GetIsValidAnimMeshFeedbackComponent())
+	{
+		return;
+	}
+
+	if (not GetIsValidOptimizationComponent())
+	{
+		return;
+	}
+
+	M_AnimMeshFeedbackComponent->SetOptimizationComponent(M_OptimizationComponent);
 }
 
 
@@ -612,6 +629,30 @@ bool ATeamWeapon::GetIsValidTeamWeaponMover() const
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TeamWeaponMover",
 	                                                      "ATeamWeapon::GetIsValidTeamWeaponMover", this);
+	return false;
+}
+
+bool ATeamWeapon::GetIsValidOptimizationComponent() const
+{
+	if (IsValid(M_OptimizationComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_OptimizationComponent",
+	                                                      "ATeamWeapon::GetIsValidOptimizationComponent", this);
+	return false;
+}
+
+bool ATeamWeapon::GetIsValidAnimMeshFeedbackComponent() const
+{
+	if (M_AnimMeshFeedbackComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_AnimMeshFeedbackComponent",
+	                                                      "ATeamWeapon::GetIsValidAnimMeshFeedbackComponent", this);
 	return false;
 }
 
