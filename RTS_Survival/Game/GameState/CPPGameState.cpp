@@ -3270,7 +3270,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ReloadSpeed = 12.f;
 	WeaponData.BaseCooldown = MortarBaseCooldown;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy - 2;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -3279,6 +3279,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM, WeaponData);
 
 	WeaponData.WeaponName = EWeaponName::Mortar_120MM_TW;
+	WeaponData.MagCapacity = 3;
+	WeaponData.BaseCooldown = 1.f;
+	WeaponData.ReloadSpeed = 14.f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM_TW, WeaponData);
 
 	// Mortar 80mm (HE)
@@ -3322,7 +3325,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange* 1.33, 100);
+		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange* 1.33, 100);
 	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 	WeaponData.ArmorPen = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;

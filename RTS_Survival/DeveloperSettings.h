@@ -541,7 +541,7 @@ namespace DeveloperSettings
 		{
 			// How much further weapon trace is allowed to fly than its range; flight range = weapon range * this mlt.
 			inline constexpr float TraceSimulationRangeMlt = 1.5f;
-			inline constexpr float GameRangeMlt = 0.5f;
+			inline constexpr float GameRangeMlt = 0.67f;
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(7000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(7500.f * GameRangeMlt);
 			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
@@ -552,14 +552,14 @@ namespace DeveloperSettings
 			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
 			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(10000.f * GameRangeMlt);
 			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(13000.f * GameRangeMlt);
-			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(13000.f * GameRangeMlt);
 
 			// Medium artillery range ~105 mm howitzers
-			inline constexpr float MediumArtilleryRange = 15000.f * GameRangeMlt;
-			inline constexpr float HeavyArtilleryRange = 17500.f * GameRangeMlt;
+			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(15000.f * GameRangeMlt);
+			inline constexpr float MediumArtilleryRange = 18000.f * GameRangeMlt;
+			inline constexpr float HeavyArtilleryRange = 22000.f * GameRangeMlt;
 			
 			// Static artillery range  /  howitzers
-			inline constexpr float HowitzerArtilleryRange = 18000.f * GameRangeMlt;
+			inline constexpr float HowitzerArtilleryRange = 24000.f * GameRangeMlt;
 
 			// Laser weapons
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);
