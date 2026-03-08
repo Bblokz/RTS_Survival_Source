@@ -243,6 +243,12 @@ float ACPPTurretsMaster::GetTurretYawLimit() const
 	return 0.f;
 }
 
+float ACPPTurretsMaster::GetIdleAnimationYawTarget() const
+{
+	return FMath::RandRange(0.f, 360.f);
+}
+
+
 void ACPPTurretsMaster::BeginPlay()
 {
 	// Calls beginplay on blueprint.
@@ -1018,10 +1024,9 @@ void ACPPTurretsMaster::UpdateIdleAnimationRotation()
 		return;
 	}
 
-	// Choose a new random yaw value between 0 and 360 degrees.
-	const float RandomYaw = FMath::RandRange(0.f, 360.f);
+	const float IdleYawTarget = GetIdleAnimationYawTarget();
 	// Create a new target rotation with only yaw changed (no pitch or roll).
-	SteeringState.M_TargetRotator = FRotator(0.f, RandomYaw, 0.f);
+	SteeringState.M_TargetRotator = FRotator(0.f, IdleYawTarget, 0.f);
 
 	// Mark that we have not yet rotated to the new target rotation.
 	bM_IsFullyRotatedToTarget = false;

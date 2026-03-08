@@ -528,6 +528,9 @@ private:
 	/** Called on timer to update idle animation rotation. */
 	void UpdateIdleAnimationRotation();
 
+	/** Returns the next idle-animate yaw target in the rotation space used by the turret implementation. */
+	virtual float GetIdleAnimationYawTarget() const;
+
 	/** Starts the idle animation timer if the turret is set to Idle_Animate. */
 	void StartIdleAnimationTimer();
 
