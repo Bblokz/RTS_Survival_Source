@@ -13,6 +13,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 
@@ -95,6 +96,12 @@ bool UW_HoveringActor::TryBuildRTSActorHoverText(AActor* HoveredActor, bool& bOu
 	{
 		return false;
 	}
+
+	if (TryBuildAbandonedTeamWeaponHoverText(HoveredActor, bOutIsValidText, OutPadding, OutActorText))
+	{
+		return true;
+	}
+
 	if(RTSComponent->GetOwningPlayer() == 0)
 	{
 		if(TryBuildCargoHoverText(HoveredActor, bOutIsValidText, OutPadding, OutActorText))
@@ -133,6 +140,32 @@ bool UW_HoveringActor::TryBuildRTSActorHoverText(AActor* HoveredActor, bool& bOu
 	// Sets the name according to the subtype, also sets whether we could deduce a valid name.
 	OutActorText += (" " + RTSComponent->GetDisplayName(bOutIsValidText));
 	bOutIsValidText = true;
+	return true;
+}
+
+bool UW_HoveringActor::TryBuildAbandonedTeamWeaponHoverText(AActor* HoveredActor, bool& bOutIsValidText,
+	int32& OutPadding, FString& OutActorText) const
+{
+	if (not IsValid(HoveredActor))
+	{
+		return false;
+	}
+
+	const ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(HoveredActor);
+	if (not IsValid(TeamWeapon) || not TeamWeapon->GetIsAbandoned())
+	{
+		return false;
+	}
+
+	URTSComponent* RTSComponent = HoveredActor->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent))
+	{
+		return false;
+	}
+
+	bOutIsValidText = true;
+	OutPadding = 35;
+	OutActorText = GetAbandonedTeamWeaponText(TeamWeapon, RTSComponent);
 	return true;
 }
 
@@ -255,6 +288,22 @@ FString UW_HoveringActor::GetUnknownActorText(bool& bOutIsValidText) const
 {
 	bOutIsValidText = false;
 	return "Could not determine name";
+}
+
+FString UW_HoveringActor::GetAbandonedTeamWeaponText(const ATeamWeapon* TeamWeapon,
+	const URTSComponent* RTSComponent) const
+{
+	if (not IsValid(TeamWeapon) || not IsValid(RTSComponent))
+	{
+		return "abandonned team weapon requires operators";
+	}
+
+	bool bIsValidDisplayName = false;
+	const FString TeamWeaponDisplayName = RTSComponent->GetDisplayName(bIsValidDisplayName);
+	const FString ResolvedDisplayName = bIsValidDisplayName ? TeamWeaponDisplayName : "team weapon";
+	const FString RequiredOperators = FString::FromInt(TeamWeapon->GetRequiredOperators());
+
+	return "abandonned " + ResolvedDisplayName + " requires " + RequiredOperators + " operators";
 }
 
 FString UW_HoveringActor::GetResourceText(const UResourceComponent* ResourceComponent) const

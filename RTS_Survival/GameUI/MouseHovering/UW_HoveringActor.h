@@ -12,6 +12,7 @@ class URichTextBlock;
 class UResourceDropOff;
 class UCargo;
 class ICaptureInterface;
+class ATeamWeapon;
 
 /**
  * @brief Widget that shows actor info when the player hovers over actors in the world.
@@ -90,6 +91,17 @@ private:
 	                              FString& OutActorText) const;
 
 	/**
+	 * @brief Attempts to build hover text for abandoned team weapons that can be re-crewed.
+	 * @param HoveredActor Actor currently under the cursor.
+	 * @param bOutIsValidText True when abandoned team weapon text was produced.
+	 * @param OutPadding Optional padding override for the text widget.
+	 * @param OutActorText Resulting text when this returns true.
+	 * @return True if the actor was an abandoned team weapon and was handled.
+	 */
+	bool TryBuildAbandonedTeamWeaponHoverText(AActor* HoveredActor, bool& bOutIsValidText, int32& OutPadding,
+	                                         FString& OutActorText) const;
+
+	/**
 	 * @brief Attempts to build hover text for actors that are pure resources.
 	 * @param HoveredActor Actor currently under the cursor.
 	 * @param bOutIsValidText True when resource text was produced.
@@ -138,6 +150,14 @@ private:
 	 * @return Fallback text to display when the actor type is unknown.
 	 */
 	FString GetUnknownActorText(bool& bOutIsValidText) const;
+
+	/**
+	 * @brief Builds rich text for abandoned team weapons to explain recapture requirements.
+	 * @param TeamWeapon Hovered team weapon instance.
+	 * @param RTSComponent RTS component used to resolve the display name.
+	 * @return Rich text describing the abandoned weapon and required operators.
+	 */
+	FString GetAbandonedTeamWeaponText(const ATeamWeapon* TeamWeapon, const URTSComponent* RTSComponent) const;
 
 	/**
 	 * @brief Builds rich text for a resource node (type + amount remaining).
