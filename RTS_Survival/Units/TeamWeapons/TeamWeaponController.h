@@ -230,8 +230,6 @@ private:
 	 */
 	void StartMoveWithCrew(const FVector MoveToLocation);
 	void StartMoveWithPushedWeapon(const FVector MoveToLocation);
-	void MoveGuardsCloserToTargetLocation(const FVector& MoveToLocation) const;
-	bool GetShouldMoveOnlyGuardsForOutOfRange() const;
 	void ExecuteSquadMoveAlongAssignedPaths(const EAbilityID AbilityId) const;
 	void ApplyPushedMoveSpeedOverrideToSquad();
 	void RestorePushedMoveSpeedOverride();

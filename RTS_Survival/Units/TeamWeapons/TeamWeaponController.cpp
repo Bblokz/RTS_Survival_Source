@@ -565,15 +565,8 @@ void ATeamWeaponController::OnSquadUnitOutOfRange(const FVector& TargetLocation)
 	if (bM_IsTeamWeaponAbandoned)
 	{
 		Super::OnSquadUnitOutOfRange(TargetLocation);
-		return;
 	}
-
-	if (not GetShouldMoveOnlyGuardsForOutOfRange())
-	{
-		return;
-	}
-
-	MoveGuardsCloserToTargetLocation(TargetLocation);
+	// do not move guards or operators; the team weapon dictates the movement!
 }
 
 ESquadPathFindingError ATeamWeaponController::GeneratePaths_Assign(const FVector& MoveToLocation,
@@ -913,54 +906,7 @@ void ATeamWeaponController::StartMoveWithPushedWeapon(const FVector MoveToLocati
 	M_PostPackAction.Reset();
 }
 
-void ATeamWeaponController::MoveGuardsCloserToTargetLocation(const FVector& MoveToLocation) const
-{
-	constexpr float OutOfRangeMoveCloserProjectionHeight = 500.0f;
-	const FVector ProjectedLocation =
-		ProjectLocationOnNavMesh(MoveToLocation, OutOfRangeMoveCloserProjectionHeight, true);
-	const TSubclassOf<UNavigationQueryFilter> TeamWeaponQueryFilter = nullptr;
 
-	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
-	{
-		ASquadUnit* SquadUnit = GuardUnit.Get();
-		if (not GetIsValidSquadUnit(SquadUnit))
-		{
-			continue;
-		}
-
-		TeamWeaponControllerCrewPositionStatics::IssueMoveToLocationForSquadUnit(
-			SquadUnit,
-			ProjectedLocation,
-			TeamWeaponQueryFilter);
-	}
-
-	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
-	{
-		RTSFunctionLibrary::PrintString(
-			"TEAM WEAPON guards out of range while weapon is deployed; only guards move closer",
-			FColor::Red);
-	}
-}
-
-bool ATeamWeaponController::GetShouldMoveOnlyGuardsForOutOfRange() const
-{
-	if (M_TeamWeaponState != ETeamWeaponState::Ready_Deployed)
-	{
-		return false;
-	}
-
-	if (bM_HasInternalOutOfRangeReposition || bM_HasCachedOutOfRangeMoveLocation)
-	{
-		return false;
-	}
-
-	if (GetHasPendingMovePostPackAction())
-	{
-		return false;
-	}
-
-	return true;
-}
 
 void ATeamWeaponController::ExecuteSquadMoveAlongAssignedPaths(const EAbilityID AbilityId) const
 {

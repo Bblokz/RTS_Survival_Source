@@ -559,7 +559,7 @@ namespace DeveloperSettings
 			inline constexpr float HeavyArtilleryRange = 17500.f * GameRangeMlt;
 			
 			// Static artillery range  /  howitzers
-			inline constexpr float StaticArtilleryRange = 18000.f * GameRangeMlt;
+			inline constexpr float HowitzerArtilleryRange = 18000.f * GameRangeMlt;
 
 			// Laser weapons
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);

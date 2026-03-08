@@ -58,6 +58,9 @@ public:
 	// Sets default values for this component's properties
 	UHealthComponent();
 
+	void OnUnitHovered() const;
+	void OnUnitUnhovered() const;
+
 	/** Callback tracker for when the widget component is created and ready. */
 	FHealthBarWidgetCallbacks M_HealthBarWidgetCallbacks;
 
@@ -257,8 +260,6 @@ private:
 	// The selection component used to determine whether the HealthBar should be displayed.
 	TWeakObjectPtr<USelectionComponent> M_SelectionComponent;
 
-	void OnUnitHovered() const;
-	void OnUnitUnhovered() const;
 	void OnUnitSelected() const;
 	void OnUnitDeselected() const;
 

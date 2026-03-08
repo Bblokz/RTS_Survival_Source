@@ -393,7 +393,7 @@ public:
 	virtual void
 	OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo) override;
 
-	void OnSquadUnitOutOfRange(const FVector& TargetLocation);
+	virtual void OnSquadUnitOutOfRange(const FVector& TargetLocation);
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 

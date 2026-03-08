@@ -6333,6 +6333,20 @@ void ACPPController::OnActorHovered(AActor* HoveredActor, const bool bIsHovered)
 	if (USelectionComponent* Comp = HoveredActor->FindComponentByClass<USelectionComponent>())
 	{
 		Comp->OnUnitHoverChange(bIsHovered);
+		return;
+	}
+	UHealthComponent* HpComp = HoveredActor->FindComponentByClass<UHealthComponent>();
+	if (not HpComp)
+	{
+		return;
+	}
+	if(bIsHovered)
+	{
+		HpComp->OnUnitHovered();
+	}
+	else
+	{
+		HpComp->OnUnitUnhovered();	
 	}
 }
 
