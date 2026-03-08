@@ -51,6 +51,24 @@ float AEmbeddedTurretsMaster::GetTurretYawLimit() const
 	return M_MaxYaw;
 }
 
+float AEmbeddedTurretsMaster::GetIdleAnimationYawTarget() const
+{
+	if (not bM_IsAssaultTurret)
+	{
+		return Super::GetIdleAnimationYawTarget();
+	}
+
+	constexpr float IdleYawPaddingDegrees = 1.f;
+	const float MinIdleYaw = M_MinYaw + IdleYawPaddingDegrees;
+	const float MaxIdleYaw = M_MaxYaw - IdleYawPaddingDegrees;
+	if (MinIdleYaw > MaxIdleYaw)
+	{
+		return FMath::Clamp(M_MinYaw, M_MinYaw, M_MaxYaw);
+	}
+
+	return FMath::RandRange(MinIdleYaw, MaxIdleYaw);
+}
+
 void AEmbeddedTurretsMaster::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);

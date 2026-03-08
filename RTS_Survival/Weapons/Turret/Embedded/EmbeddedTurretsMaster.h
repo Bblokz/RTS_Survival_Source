@@ -55,6 +55,7 @@ public:
 		ArtilleryDistanceUseMaxPitch = 0.0f);
 
 	virtual float GetTurretYawLimit() const override;
+	virtual float GetIdleAnimationYawTarget() const override;
 protected:
 	virtual void Tick(float DeltaSeconds) override;
 
