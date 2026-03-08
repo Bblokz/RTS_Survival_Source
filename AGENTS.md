@@ -1,5 +1,7 @@
 # Unreal Engine C++ Coding Rules (AGENTS.md)
 
+> If you need to add a new ability, read `Docs/Abilities.md` first for the full controller/decoder/ICommands setup flow.
+
 Whenever you work on Unreal Engine C++ code for me, there are rules you **must** follow.  
 Ensure to follow the following coding style instructions when writing or refactoring code.
 
