@@ -23,6 +23,8 @@ class ATeamWeaponController;
 class UDecalComponent;
 class UMaterialInterface;
 class UCrewPosition;
+class UAnimMeshFeedbackComponent;
+class URTSOptimizer;
 struct FDestroySpawnActorsParameters;
 enum class ESquadSubtype : uint8;
 
@@ -312,6 +314,8 @@ private:
 	[[nodiscard]] bool GetIsValidHealthComponent() const;
 	[[nodiscard]] bool GetIsValidRTSComponent() const;
 	[[nodiscard]] bool GetIsValidTeamWeaponMover() const;
+	[[nodiscard]] bool GetIsValidOptimizationComponent() const;
+	[[nodiscard]] bool GetIsValidAnimMeshFeedbackComponent() const;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHealthComponent> M_HealthComponent;
@@ -321,6 +325,9 @@ private:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UTeamWeaponMover> M_TeamWeaponMover;
+
+	UPROPERTY()
+	TObjectPtr<URTSOptimizer> M_OptimizationComponent;
 
 	UPROPERTY()
 	TWeakObjectPtr<ATeamWeaponController> M_TeamWeaponController;
@@ -342,6 +349,10 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<USkeletalMeshComponent> M_TeamWeaponMesh;
+
+	UPROPERTY()
+	TWeakObjectPtr<UAnimMeshFeedbackComponent> M_AnimMeshFeedbackComponent;
+
 	[[nodiscard]] bool GetIsValidTeamWeaponMesh() const;
 
 	void BeginPlay_InitAnimInstance();
