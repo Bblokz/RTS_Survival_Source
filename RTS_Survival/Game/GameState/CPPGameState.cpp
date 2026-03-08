@@ -3193,6 +3193,22 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponName = EWeaponName::LeFH_18_105MM_TW;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::LeFH_18_105MM_TW, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::Morser_18_210MM_TW;
+	WeaponData.WeaponCalibre = 210;
+	WeaponData.TNTExplosiveGrams = 17200;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
+	WeaponData.ArmorPen = 35 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.ArmorPenMaxRange = 35 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.ReloadSpeed = 9;
+	WeaponData.Accuracy = 22;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Morser_18_210MM_TW, WeaponData);
+
 	// Cramped turret; stock reload.
 	WeaponData.WeaponName = EWeaponName::sIG_33_150MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -7290,6 +7306,16 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 	SquadData.ExperienceMultiplier = 1.0f;
 
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LefH18, SquadData);
+
+	constexpr int32 MorserAdditionalRadixiteCost = 200;
+	constexpr int32 MorserAdditionalMetalCost = 150;
+	FSquadData MorserSquadData = SquadData;
+	MorserSquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ArtilleryTeamWeaponRadixiteCost + MorserAdditionalRadixiteCost},
+		{ERTSResourceType::Resource_Metal, ArtilleryTeamWeaponMetalCost + MorserAdditionalMetalCost}
+	});
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_210MM_Morser, MorserSquadData);
+
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SFH18_150mm, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Nebelwerfer, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_M1938_122mm, SquadData);

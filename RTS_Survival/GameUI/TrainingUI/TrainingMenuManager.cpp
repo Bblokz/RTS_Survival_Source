@@ -2302,6 +2302,7 @@ void UTrainingMenuManager::InitAllGameArtilleryTWTrainingOptions()
 	};
 
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_LefH18, MediumArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_210MM_Morser, HeavyArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_SFH18_150mm, HeavyArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_Nebelwerfer, MediumArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_M1938_122mm, HeavyArtilleryTeamWeaponTrainingTime);

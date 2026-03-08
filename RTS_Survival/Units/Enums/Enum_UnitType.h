@@ -313,6 +313,7 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_120mm_Mortar UMETA(DisplayName = "Rus 120MM Mortar"),
 	// Team weapons: artillery.
 	Squad_Ger_LefH18 UMETA(DisplayName = "Ger leFH18"),
+	Squad_Ger_210MM_Morser UMETA(DisplayName = "Ger 210MM Morser"),
 	Squad_Ger_SFH18_150mm UMETA(DisplayName = "Ger sFH18 150MM"),
 	Squad_Ger_Nebelwerfer UMETA(DisplayName = "Ger Nebelwerfer"),
 	Squad_Rus_M1938_122mm UMETA(DisplayName = "Rus M1938 122MM"),
@@ -489,6 +490,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "120mm Mortar";
 	case ESquadSubtype::Squad_Ger_LefH18:
 		return "leFH 18";
+	case ESquadSubtype::Squad_Ger_210MM_Morser:
+		return "210MM Morser";
 	case ESquadSubtype::Squad_Ger_SFH18_150mm:
 		return "sFH 18";
 	case ESquadSubtype::Squad_Ger_Nebelwerfer:

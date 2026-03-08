@@ -131,6 +131,7 @@ enum class
 	KwK43_88MM_PantherII UMETA(DisplayName = "Kwk43 88MM PantherII"),
 	LeFH_18_105MM UMETA(DisplayName = "LeFH 18 105MM (Howitzer)"),
 	LeFH_18_105MM_TW UMETA(DisplayName = "LeFH 18 105MM TW"),
+	Morser_18_210MM_TW UMETA(DisplayName = "Morser 18 210MM TW"),
 	// German Super Heavy calibre
 	KwKL_68_105MM UMETA(DisplayName = "Kwkl/68 105MM KT 105"),
 	KwK44_128MM UMETA(DisplayName = "KwK44 128MM (Maus)"),
@@ -277,6 +278,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Pak40_3_L46_75MM_TW: return "PaK 40 TW";
 	case EWeaponName::Flak37_88MM_TW: return "Flak 37 TW";
 	case EWeaponName::LeFH_18_105MM_TW: return "leFH 18 TW";
+	case EWeaponName::Morser_18_210MM_TW: return "Morser 18 TW";
 	case EWeaponName::sFH18_150MM_TW: return "sFH 18 TW";
 	case EWeaponName::Nebelwerfer_150MM_TW: return "Nebelwerfer TW";
 	case EWeaponName::Mortar_120MM_TW: return "120MM Mortar TW";
@@ -708,6 +710,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Flak36_37MM";
 	case EWeaponName::LeFH_18_105MM:
 		return "LeFH_18_105MM";
+	case EWeaponName::Morser_18_210MM_TW:
+		return "Morser_18_210MM_TW";
 
 	default:
 		{
