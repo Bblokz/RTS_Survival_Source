@@ -14,6 +14,7 @@
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "TankMaster.generated.h"
 
 class UTankEnergyComponent;
@@ -30,6 +31,12 @@ class RTS_SURVIVAL_API AAITankMaster;
 class RTS_SURVIVAL_API ACPPTurretsMaster;
 class UTurretSwapComp;
 class UVehicleFireFeedbackComponent;
+class UVehicleTowComponent;
+class UTowedActorComponent;
+class UCargoSquad;
+class UCargo;
+class ATeamWeaponController;
+class ATeamWeapon;
 
 USTRUCT()
 struct FTankStartGameAction
@@ -325,6 +332,12 @@ protected:
 	virtual void ExecuteReturnCargoCommand() override final;
 	virtual void TerminateReturnCargoCommand() override final;
 
+	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype) override;
+	virtual void TerminateTowActorCommand() override;
+	virtual void ExecuteDetachTowCommand() override;
+	virtual void TerminateDetachTowCommand() override;
+	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
+
 	// For the harvester that uses resources that are stored in the harvester component.
 	// This function is used to adust the visuals of the harvester depending on the amount of resources stored.
 	virtual void OnResourceStorageChanged(int32 PercentageResourcesLeft, const ERTSResourceType ResourceType) override;
@@ -449,6 +462,25 @@ private:
 	void BeginPlay_DetermineMainWeapon();
 	void PostInitializeComponents_SetupVehicleFireFeedbackOptimizationLink() const;
 
+	bool GetIsValidVehicleTowComponent() const;
+	bool GetIsValidTowedActorComponent() const;
+
+	void ExecuteTowActorCommand_TowVehicle(AActor* TowTargetActor, UTowedActorComponent* TowedActorComponent);
+	void ExecuteTowActorCommand_TowTeamWeapon(class ATeamWeapon* TeamWeaponActor,
+	                                        class ATeamWeaponController* TeamWeaponController,
+	                                        UTowedActorComponent* TowedActorComponent);
+	bool ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(const AActor* TowTargetActor,
+	                                                       const UVehicleTowComponent* VehicleTowComp) const;
+	bool ExecuteDetachTowCommand_TryDetachSelfFromTow();
+	void ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor, UTowedActorComponent* TowedActorComponent);
+	void ExecuteDetachTowCommand_DetachTowedTeamWeapon(class ATeamWeaponController* TeamWeaponController);
+	bool GetTowTargetData(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype,
+	                    UTowedActorComponent*& OutTowedActorComponent,
+	                    class ATeamWeapon*& OutTeamWeaponActor,
+	                    class ATeamWeaponController*& OutTeamWeaponController) const;
+	bool GetIsValidVehicleTowComponentNoReport() const;
+	bool GetIsValidTowedActorComponentNoReport() const;
+
 	// The actor targeted by this tank master.
 	UPROPERTY()
 	AActor* M_TargetActor;
@@ -483,6 +515,12 @@ private:
 	// Optional component used by specific tank blueprints for hull fire feedback.
 	UPROPERTY()
 	TWeakObjectPtr<UVehicleFireFeedbackComponent> M_VehicleFireFeedbackComponent;
+
+	UPROPERTY()
+	TWeakObjectPtr<UVehicleTowComponent> M_VehicleTowComponent;
+
+	UPROPERTY()
+	TWeakObjectPtr<UTowedActorComponent> M_TowedActorComponent;
 
 	// For adjusting the rotation.
 	FTimerHandle TimerHandle_CheckIfUpsideDown;

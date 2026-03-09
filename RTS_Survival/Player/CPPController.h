@@ -51,6 +51,7 @@
 #include "RTS_Survival/UnitData/UnitCost.h"
 #include "SelectionHelpers/SelectionChangeAction.h"
 
+#include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "CPPController.generated.h"
 
 class UPlayerOutlineComponent;
@@ -159,6 +160,9 @@ UENUM(BlueprintType)
 enum class ECommandType : uint8
 {
 	Movement,
+	ClickedTowVehicle,
+	ClickedTowableActor,
+	DetachTow,
 	MoveRallyPoint,
 	Attack,
 	AttackGround,
@@ -213,6 +217,12 @@ static FString GetStringCommandType(const ECommandType CommandType)
 		return TEXT("CaptureActor");
 	case ECommandType::ManAbandonedTeamWeapon:
 		return TEXT("ManAbandonedTeamWeapon");
+	case ECommandType::ClickedTowVehicle:
+		return TEXT("ClickedTowVehicle");
+	case ECommandType::ClickedTowableActor:
+		return TEXT("ClickedTowableActor");
+	case ECommandType::DetachTow:
+		return TEXT("DetachTow");
 	default:
 		return TEXT("Unknown");
 	}
@@ -1105,6 +1115,12 @@ private:
 	uint32 IssueOrderEnterCargo(AActor* CargoActor, EAbilityID& OutAbilityActivated);
 	uint32 IssueOrderManTeamWeapon(AActor* TeamWeaponActor, EAbilityID& OutAbilityActivated,
 	                              const FVector& ClickedLocation);
+	uint32 IssueOrderTowActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
+	                         const FVector& ClickedLocation, const ETowType TowType);
+	uint32 IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
+	                                           const FVector& ClickedLocation);
+	uint32 IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
+	                                             const FVector& ClickedLocation, const ETowType TowType);
 
 	/**
 	 * @brief Checks if the provided allied actor can be repaired and if so attempts to repair with selected units

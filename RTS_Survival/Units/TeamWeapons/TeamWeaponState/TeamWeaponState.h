@@ -15,6 +15,7 @@ enum class ETeamWeaponState : uint8
 	Deploying,
 	Ready_Deployed,
 	Abandoned,
+	Towed,
 };
 
 

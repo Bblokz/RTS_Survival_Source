@@ -11,6 +11,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
@@ -99,6 +100,11 @@ public:
 	ETurretSwapAbility GetTurretSwapAbilitySubtype() const
 	{
 		return static_cast<ETurretSwapAbility>(CustomType);
+	}
+
+	ETowActorAbilitySubtypes GetTowActorAbilitySubtype() const
+	{
+		return static_cast<ETowActorAbilitySubtypes>(CustomType);
 	}
 
 	FQueueCommand()
@@ -736,6 +742,9 @@ public:
 	virtual ECommandQueueError ManAbandonedTeamWeapon(
 		AActor* TeamWeaponActor,
 		const bool bSetUnitToIdle);
+	virtual ECommandQueueError TowActor(AActor* ActorToTow, const ETowActorAbilitySubtypes TowSubtype,
+	                                   const bool bSetUnitToIdle);
+	virtual ECommandQueueError DetachTow(const bool bSetUnitToIdle);
 
 	// Enqueue: exit from current carrier/transport.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
@@ -903,6 +912,11 @@ protected:
 
 	virtual void ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponActor);
 	virtual void TerminateManAbandonedTeamWeaponCommand();
+	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype);
+	virtual void TerminateTowActorCommand();
+	virtual void ExecuteDetachTowCommand();
+	virtual void TerminateDetachTowCommand();
+	virtual void OnActorBeingTowed(AActor* TowingVehicle, class UVehicleTowComponent* TowComp);
 
 	virtual void ExecuteExitCargoCommand();
 	virtual void TerminateExitCargoCommand();

@@ -17,6 +17,10 @@
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/TowedActor/TowedActor.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 
 namespace TeamWeaponControllerCrewPositionStatics
 {
@@ -54,6 +58,7 @@ void ATeamWeaponController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	M_DigInComponent = FindComponentByClass<UDigInComponent>();
+	M_TowedActorComponent = FindComponentByClass<UTowedActorComponent>();
 
 	if (not GetIsValidDigInComponent())
 	{
@@ -540,6 +545,11 @@ void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbili
 
 void ATeamWeaponController::OnUnitIdleAndNoNewCommands()
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
 	if (bM_HasInternalOutOfRangeReposition && M_TeamWeaponState == ETeamWeaponState::Moving)
 	{
 		if (GetIsValidTeamWeaponMover())
@@ -799,6 +809,11 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 
 void ATeamWeaponController::StartPacking()
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
@@ -837,6 +852,11 @@ void ATeamWeaponController::StartPacking()
 
 void ATeamWeaponController::StartDeploying()
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
 	StartDeployingTeamWeapon();
 }
 
@@ -1702,6 +1722,11 @@ bool ATeamWeaponController::TryGetCrewPositionsSorted(TArray<UCrewPosition*>& Ou
 
 void ATeamWeaponController::IssueMoveCrewToPositions()
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
 	if (bM_HasIssuedCrewPositionMovesForCurrentDeploy)
 	{
 		return;
@@ -2033,6 +2058,11 @@ int ATeamWeaponController::GetOwningPlayer()
 
 void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret)
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
 	if (bM_IsTeamWeaponAbandoned || not IsValid(CallingTurret))
 	{
 		return;
@@ -2195,6 +2225,11 @@ void ATeamWeaponController::StartRotationRequest(const FRotator& DesiredRotation
 
 void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
 	if (not M_RotationRequest.bM_IsActive)
 	{
 		return;
@@ -2415,6 +2450,11 @@ bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const
 
 void ATeamWeaponController::MoveGuardsToRandomGuardPositions() const
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
 	if (not GetIsValidTeamWeapon())
 	{
 		return;
@@ -2599,4 +2639,103 @@ void ATeamWeaponController::AbandonTeamWeapon()
 	M_TeamWeapon = nullptr;
 	M_TeamWeaponMover = nullptr;
 	bM_IsTeamWeaponAbandoned = true;
+}
+
+
+bool ATeamWeaponController::GetIsValidTowedActorComponent() const
+{
+	if (M_TowedActorComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_TowedActorComponent",
+	                                                             "ATeamWeaponController::GetIsValidTowedActorComponent", this);
+	return false;
+}
+
+void ATeamWeaponController::ExecuteDetachTowCommand()
+{
+	if (not GetIsValidTowedActorComponent() || M_TowedActorComponent->IsTowFree())
+	{
+		DoneExecutingCommand(EAbilityID::IdDetachTow);
+		return;
+	}
+
+	ATankMaster* TowingTank = Cast<ATankMaster>(M_TowedActorComponent->GetTowingActor());
+	if (not IsValid(TowingTank))
+	{
+		M_TowedActorComponent->ClearTowRelationship();
+		DoneExecutingCommand(EAbilityID::IdDetachTow);
+		return;
+	}
+
+	ATeamWeapon* TeamWeaponActor = M_TeamWeapon;
+	if (not IsValid(TeamWeaponActor))
+	{
+		M_TowedActorComponent->ClearTowRelationship();
+		DoneExecutingCommand(EAbilityID::IdDetachTow);
+		return;
+	}
+
+	TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	FHitResult Hit;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	Params.AddIgnoredActor(TeamWeaponActor);
+	const FVector TraceStart = TeamWeaponActor->GetActorLocation() + FVector(0.0f, 0.0f, 300.0f);
+	const FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, 2000.0f);
+	if (UWorld* World = GetWorld())
+	{
+		if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params))
+		{
+			TeamWeaponActor->SetActorLocation(Hit.ImpactPoint);
+		}
+	}
+
+	UCargo* TankCargo = TowingTank->FindComponentByClass<UCargo>();
+	UCargoSquad* TeamWeaponCargoSquad = FindComponentByClass<UCargoSquad>();
+	if (not IsValid(TankCargo) || not IsValid(TeamWeaponCargoSquad))
+	{
+		RTSFunctionLibrary::ReportError("Missing cargo component during team weapon detach in ATeamWeaponController::ExecuteDetachTowCommand");
+	}
+	else
+	{
+		TeamWeaponCargoSquad->ExitCargoImmediate(false);
+	}
+
+	AssignCrewToTeamWeapon();
+	SnapOperatorsToCrewPositions();
+	MoveGuardsToRandomGuardPositions();
+
+	M_TowedActorComponent->RestoreAbilitiesAfterTow();
+	if (UVehicleTowComponent* TowingTowComp = M_TowedActorComponent->GetTowingVehicleTowComp())
+	{
+		TowingTowComp->ClearTowRelationship();
+	}
+	M_TowedActorComponent->ClearTowRelationship();
+	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	if (UCommandData* CommandData = GetIsValidCommandData())
+	{
+		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
+	}
+	DoneExecutingCommand(EAbilityID::IdDetachTow);
+}
+
+void ATeamWeaponController::TerminateDetachTowCommand()
+{
+}
+
+void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp)
+{
+	SetTeamWeaponState(ETeamWeaponState::Towed);
+	if (GetIsValidTowedActorComponent())
+	{
+		M_TowedActorComponent->SetTowRelationship(TowingVehicle, TowComp);
+		M_TowedActorComponent->RemoveAbilitiesWhileTowed();
+	}
+	if (UCommandData* CommandData = GetIsValidCommandData())
+	{
+		CommandData->SwapAbility(EAbilityID::IdTowActor, EAbilityID::IdDetachTow);
+	}
 }
