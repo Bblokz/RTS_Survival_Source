@@ -138,6 +138,9 @@ public:
 	void SetupTraceChannel(int NewOwningPlayer);
 	void HandleTimedExplosion();
 
+	// Forces the projectile back into its dormant pooled state immediately.
+	void SetProjectileDormant();
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

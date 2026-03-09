@@ -729,8 +729,8 @@ protected:
 	 * @param HitSurface
 	 * @param ImpactRotation
 	 */
-	void CreateWeaponImpact(const FVector& HitLocation, const ERTSSurfaceType HitSurface,
-	                        const FRotator& ImpactRotation = FRotator::ZeroRotator);
+	virtual void CreateWeaponImpact(const FVector& HitLocation, const ERTSSurfaceType HitSurface,
+	                                const FRotator& ImpactRotation = FRotator::ZeroRotator);
 
 	/**
 	 * Creates a bounce vfx of the provided weaponVFX.
@@ -1130,6 +1130,12 @@ struct FSplitterArcWeaponSplitSettings
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float SplitAoeMultiplier = 1.0f;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float SplitProjectileSpeedMultiplierMin = 0.85f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float SplitProjectileSpeedMultiplierMax = 1.15f;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TObjectPtr<USoundBase> SplitSound = nullptr;
 
@@ -1141,6 +1147,9 @@ struct FSplitterArcWeaponSplitSettings
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TObjectPtr<UNiagaraSystem> SplitNiagaraSystem = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<UNiagaraSystem> SplitProjectileImpactNiagaraSystem = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -1374,15 +1383,22 @@ public:
 
 protected:
 	virtual void FireWeaponSystem() override;
+	virtual void CreateWeaponImpact(const FVector& HitLocation, const ERTSSurfaceType HitSurface,
+	                                const FRotator& ImpactRotation = FRotator::ZeroRotator) override;
 
 private:
 	UPROPERTY()
 	FSplitterArcWeaponSettings M_SplitterSettings;
 
+	// Dedicated impact pool so split child projectiles can each use their own impact emitter instance.
+	UPROPERTY()
+	FWeaponImpactPool M_SplitProjectileImpactPool;
 
 	void FireProjectile(const FVector& TargetLocationRaw);
 
-	void SpawnSplitProjectilesAtApex(const FVector SplitLocation, const FVector OriginalTargetLocation);
+	void SpawnSplitProjectilesAtApex(const FVector SplitLocation,
+	                                 const FVector OriginalTargetLocation,
+	                                 AProjectile* MainProjectile);
 
 	void SpawnSplitEffects(const FVector& SplitLocation) const;
 
