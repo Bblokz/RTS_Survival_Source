@@ -1,0 +1,252 @@
+﻿You will implement the new towing system which will work by having two components:
+VehicleTow
+TowedActor
+And need tow new ability ids:
+TowActor
+DetachTow
+
+and the subtypes:
+ETowActorAbilitySubtypes
+{
+None,
+TowVehicle,
+TowTeamWeapon
+}
+
+also add this enum that will help with the different tow cases.
+ETowType
+{
+None,
+ClickedTowVehicle,
+ClickedTeamWeaponToTow,
+ClickedVehicleToTow,
+DetachTow
+}
+
+IMPORTANT NOTE: you can assume that the actor that will tow another actor is always derived from a tank master.
+
+the VehicleTow component will have the following settings; make sure these live in one struct together that is edit defaults:
+- FName TowSocketName; this will be the socket on the tow mesh that the towed actor will be attached to.
+- float AcceptanceRadiusToTow = 500; this is the acceptance radius that will be used when issuing a tow order to the towing vehicle, 
+this will determine how close the towing vehicle needs to get to the target actor before it can attach it and start towing it.
+
+
+the TowedActor component will have the following settings; make sure these live in one struct together that is edit defaults:
+- FVector AttachOffset; this is the offset at which the towed actor will be attached to the tow socket on the tow mesh. This is in local space of the socket.
+- FRotator AttachRotation; this is the rotation at which the towed actor will be attached to the tow socket on the tow mesh. This is in local space of the socket.
+- An array of EAbilityIDs that will be the abilities removed from the actor when it is being towed so the player cannot for example issue a move order to it
+by default make sure it only contains the attack and move abilities.
+-Int32 PrefferedDetachAbilityIndex: where the detach ability will be added to our icommands interface when we are towed.
+
+Runtime tow relationship state
+In addition to their edit-default settings, both tow components must store runtime state describing the active tow relationship. This runtime state is the source of truth for whether an actor is currently towing another actor or is currently being towed. This state must not be inferred from the currently active ability, the current command in the queue, or the current command card layout.
+
+The following runtime state must be added:
+
+For UVehicleTowComponent:
+
+TWeakObjectPtr<AActor> M_TowedActor;
+
+TWeakObjectPtr<UTowedActorComponent> M_TowedActorComp;
+
+ETowActorAbilitySubtypes M_CurrentTowSubtype = ETowActorAbilitySubtypes::None;
+
+For UTowedActorComponent:
+
+TWeakObjectPtr<AActor> M_TowingActor;
+
+TWeakObjectPtr<UVehicleTowComponent> M_TowingVehicleTowComp;
+
+This stored runtime state must be updated immediately when towing starts and cleared immediately when towing ends.
+IsTowFree() on both components must use this runtime relationship state instead of relying on command or ability state.
+
+This means:
+
+a towing vehicle is considered not tow free when its UVehicleTowComponent has a valid current towed actor/component and a non-None current tow subtype;
+
+a towed actor is considered not tow free when its UTowedActorComponent has a valid towing actor/component.
+
+This runtime subtype is also what must be used later to determine whether the currently attached actor is a vehicle or a team weapon during detach handling.
+
+make sure that for the VehicleTow and the TowedActor private UPROPERTY TWeakObjectPtrs to the respective comps are in the tank master
+and during the post init attempt to find these components. IMPORTANT: do not error report if not found; not all vehicles can be towed
+and or tow another actor!
+
+for the team weapon controller (not team weapon actor!) make sure that the TowedActor component is found (if any)
+and the weak pointer on it is set.
+
+Team weapon UTowedActorComponent ownership
+For team weapons, the UTowedActorComponent will live on the ATeamWeaponController, not on the ATeamWeapon actor itself. The controller is the authoritative owner for tow-related command state, ability removal/restoration, and detach handling for team weapons.
+When towing or detaching requires logic on the physical team weapon actor, it is the responsibility of the ATeamWeaponController to forward that logic to its controlled ATeamWeapon. This includes, but is not limited to, attaching and detaching the team weapon actor, setting its relative transform at the tow socket, resetting turret yaw and pitch, enabling or disabling turret behaviour, playing wheel animations, and any other weapon-specific visual or movement updates needed while towing.
+This keeps all team-weapon tow state centralized on the controller while still allowing the controller to operate on the actual team weapon actor that is being physically moved.
+
+it will also have a public c++ only init function on which the MeshComp will be set that is the mesh that will do the towing;
+
+
+the idea is that the towedactor component will allow for an actor to be attached to a VehicleTow actor and
+that it can be detached as well The abilties associated with this will not just rely on working with the components
+but also on specific logic that will be implemented over classes using the icommands interface.
+The towactor ability will always provide an aactor towing target that is the actor we expect to have the TowedActor component.
+the detachtow ability will not provide a target actor; when the public function for it on the icommands is called
+we have to make sure we use an FAbilityHelpers checker that looks if the TowedActor component is NOT tow free, meaning it is towed,
+otherwise there is no tow to detach from to execute this ability.
+
+Highlevel what needs implementation in terms of logic flow:
+
+Cpp controller function to issue order tow actor which either has provided an aactor to be towed 
+(has TowedActor comp) or an aactor that can Tow one of the selected actors either a Vehicle or a TeamWeapon 
+(atleast one of the selected actors has TowedActor comp ) the func will have an enum of TowType that distinguishes which is the case
+
+We also will need a new functions for the actor decoder that will identify when a VehicleTow actor is clicked and one for when
+ a towable actor is clicked (those checks rely on the respective components) and save the TargetActor
+ Then after that is determined the enum of what type of tow order is being issued can be determining by casting the TargetActor.
+
+In the issue order if we are towing check if one of the selected actors has VehicleTow and if it has IsTowFree()
+then order that vehicle to Tow that actor. If this is not the case and or the clicked actor (to be towed actor)
+is not tow free either then issue a move command to everyone towards it instead
+
+If the order is clicked tow vehicle and IsTowFree  then look for a tow free selected TowedActor,
+and if found order the clicked tow vehicle (so not nessecarily a selected unit, but the target actor in this case!) to 
+tow that found actor in our selection make sure to distinguish between the case of a team weapon and a vehicle being towed here as well.
+ If there is no tow free actor in the selection then issue move command towards the clicked tow vehicle.
+
+make sure the derivations of the same type of order each have their sub functions for clarity.
+
+for the detach order we do not need a second click (no clicked location or target actor needed) this is just a direct action button
+abiltiy where we order each selected actor that has a NON free TowedActor comp to detach from its tow; through the icommands
+interface as well as this can be different for each class.
+
+in all cases of a TowActor order being issued to a vehicle make sure the correct ETowActorAbilitySubtypes
+is supplied together with the tow target to the icommands so it can be used to help distinguish the ability in the queue.
+
+also in the icommands add a virtual public function to be called on a TowedActor when the towing starts; call this
+OnActorBeingTowed (AActor* TowingVehicle, UVehicleTow* TowComp) this will be overwritten in the team weapon controller
+and the tank master to implement specific logic for when they are being towed.
+   
+In the icommands add the execute, terminate, public order functions for both new abilties and ensure it is implemented properly.
+Make sure that the execute function of the TowActor Ability provides the actor that is targeted to tow.
+
+
+
+Make sure you analsye the relevant code before implementing.
+implement all new classes and funtions to ensure the tow system will work as this design document intents to.
+
+after everything is set up in the icommands for the new abilities:
+overwrite the execute of the TowActor in the TankMaster
+in there make sure the target is towable. (comp + tow free) add two subfunctions depending on the type:
+TowTeamWeapon, TowVehicle,
+in the first one check if our tank has a cargocomponent; this will be used to move the squad units of the team weapon into
+when we tow their team weapon. check if there is space for the amount of currently alive squad units of the team weapon.
+if not we call done executing command.
+if the squad fits the following needs to happen:
+then check if the vehicle is AcceptanceRadiusToTow or less away from the team weapon, if not issue a move command to ourselves towards the team weapon (with shift so it get squeued)
+and shift queue the same tow order as we have right now. then call done executing our current tow order so we can execute  that move next.
+
+if the vehicle is close enough:
+again check if the squad fits (squad units may have been added in the mean time)
+fully clear the command queue (set the team to idle) of the team weapon controller.
+all squad units, guards and operators, need to have their weapons enabled and visible.
+Immediate internal cargo transfer for team-weapon towing
+When a team weapon begins being towed, transferring its alive squad units into the towing tank’s cargo must use a dedicated immediate/internal cargo transfer path. This must not use the regular queued EnterCargo command flow.
+
+The reason for this is that the tow attach sequence must complete deterministically as one internal towing operation. Regular queued boarding would introduce command queue progression, asynchronous unit-level command completion, and timing dependencies that are not desirable for this towing flow.
+
+Therefore, if existing cargo functionality is not already suitable for immediate internal transfer, a dedicated internal API must be added for this case. This internal cargo transfer path must:
+
+validate cargo capacity for the number of currently alive squad units before transfer begins;
+
+immediately move valid squad units into the towing tank’s cargo without requiring per-unit queued EnterCargo commands;
+
+avoid relying on normal unit command completion callbacks to finish the tow sequence;
+
+be safe to use after the team weapon controller has already been forced to idle;
+
+allow the team weapon towing sequence to continue immediately once the squad has been placed into cargo.
+
+This internal path is only for the towing flow of team weapons and is separate from normal player-issued cargo boarding behaviour.
+then use the cargo component of the squad to add the squad units to the cargo component of the tank,
+carefully analyse if we need to add any functions or if we can use existing funtions in this case.
+then attach the team weapon using the attachOffset of the TowedActor component on the TeamWeapon and find the socket on
+ the tow mesh using the settings from the VehicleTow component. Also set the rotation on the teamweapon using the rotation
+ setting on the towedactor component as well: this rotation is in local space with respect to the socket!
+ make sure to enable physics on the team weapon's mesh. 
+ then set the anim instance of the team weapon to play the wheels backward anim montage.
+ make sure the turret is disabled of the team weapon (the team weapon is derived from the turret class)
+ make sure the yaw and pitch of the team weapon is set to zero.
+ set the weak pointer to the TowedActor Comp on our VehicleTow comp and the weak pointer to the VehicleTow comp on the TowedActor comp of the team weapon
+ when these are set the IsTowFree of both comps should return false and the team weapon should be considered to be towed by the tank.
+ then swap the tow ability command for the detach ability on the tank's command interface.
+ make sure the team weapon controller removes the abilities from the TowedActor comp and that the TowedActor comp caches them (both which index and what type) to be able to fully restore them.
+ after that we can call done executing command.
+ 
+ 
+ when towing another vehicle:
+ make sure we are close enough idem as for the team weapon tow.
+ if we are close enough:
+ set the to be towed vehicle to idle.
+ no need to change physics on it.
+ attach it with the offset and rotation.
+ make sure it removes its abilities as per its TowedActor component and caches them as well in that component.
+ set the pointers, idem as in the team weapon case.
+ after that call done executing command.
+ 
+ the terminate command of the tow will be left empty.
+ 
+Explicit team-weapon towed state
+The ATeamWeaponController must have an explicit runtime state indicating that the team weapon is currently being towed. This must be represented either by adding a dedicated ETeamWeaponState::Towed state or by adding a dedicated boolean such as bM_IsBeingTowed. A dedicated state enum entry is preferred because towing is a meaningful top-level team-weapon state and should be treated the same way as packing, deploying, moving, and abandoned.
+
+This state is required because the existing team-weapon controller contains logic for packing, deploying, moving, rotation requests, dig-in handling, auto-deploy on idle, guard repositioning, crew snapping, and out-of-range repositioning. While the team weapon is being towed, these flows must not continue running as if the team weapon were still operating independently.
+
+While the team weapon is in the towed state, the controller must gate or early-return from all logic that would otherwise try to operate the weapon normally, including at least:
+
+auto-deploy-on-idle logic;
+
+deploy or pack transitions;
+
+rotation request ticking and completion handling where not explicitly intended;
+
+turret out-of-range reposition flow;
+
+issuing crew move orders to weapon crew positions;
+
+moving guards to random guard positions;
+
+any other logic that assumes the team weapon and its crew are present in the world as a normal deployed or packed team weapon.
+
+Entering the towed state must happen immediately when the tow attach is completed.
+Leaving the towed state must happen immediately when the detach is completed.
+
+in the team weapon controller implement the detach function:
+first check if we are currently towing (IsTowFree false) if we are not towing then we cannot detach so we call done executing command.
+if we are then:
+- detach from the tow mesh.
+- do a line trace to find the landscape (see how we do this for operators) and place our team weapon there.
+- get the cargo component of the tank that is towing us (owning actor of the VehicleTow comp) if not found report error.
+- remove all squad units from the cargo component and place them around the team weapon as we do when spawning.
+- order the needed squad units to be guard or operators.
+- restore our abilities that were cached
+- set the weak pointer on the VehicleTow comp to null and the weak pointer on our TowedActor comp to null as well.
+call done executing command.
+
+in the tank master also implement the detach function:
+first check if we are towed (is tow free false on the Towedactor comp (if any) ) if we are
+then we interpret the ability as a detach order and we detach from the towing vehicle:
+- detach from the tow mesh.
+- do a line trace to find the landscape and place our tank there.
+- restore our abilities that were cached
+- set the weak pointer on the VehicleTow comp to null and the weak pointer on our TowedActor comp to null as well.
+done exe command.
+
+if we are not towed check if we are towing another actor (is tow free false on the VehicleTow comp) 
+if we are then we interpret the ability as a detach order for the towed actor and we detach it:
+- first check if the towed actor is a team weapon or a vehicle by checking the subtype of the tow ability that is currently active on our command interface, this will determine how we detach.
+- if it is a a team weapon them call  their detch function instead; this will handle the detach of the team weapon and the squad units inside it properly.
+call done executing command.
+if it is a vehicle then call its detach function which will handle the detach properly as well.
+call done executing command.
+
+
+Make sure you analsye the relevant code before implementing.
+implement all new classes and funtions to ensure the tow system will work as this design document intents to.
+
+
