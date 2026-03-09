@@ -231,6 +231,8 @@ struct FPlayerProfileLoadingStatus
 	// This means the player Resource Manager could not add resource bonuses provided by those cards immediately.
 	// Instead, the bonuses are now stored in the manager and await for the HQ to be spawned.
 	bool bInitializeHqResourceBonusesFromProfileCardsOnLoad = false;
+	// Mission manager configured starting resources should only be applied once after HQ spawn.
+	bool bM_HasAppliedMissionStartingResources = false;
 };
 
 /**
@@ -1607,6 +1609,7 @@ private:
 	 * @note OnLoadPlayerProfile
 	 */
 	void OnPlayerProfileLoadComplete();
+	void TryApplyMissionStartingResourcesAfterHQFound();
 
 
 	FPlayerProfileLoadingStatus M_PlayerProfileLoadingStatus;

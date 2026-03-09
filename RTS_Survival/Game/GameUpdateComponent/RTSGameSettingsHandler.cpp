@@ -41,15 +41,6 @@ void URTSGameSettingsHandler::UpdateGameSetting(ERTSGameSetting Setting, const b
 	case ERTSGameSetting::UseDeselectedDecals:
 		M_GameSettings.bUseDeselectedDecals = bValue;
 		break;
-	case ERTSGameSetting::StartRadixite:
-		M_GameSettings.StartRadixite = iValue;
-		break;
-	case ERTSGameSetting::StartMetal:
-		M_GameSettings.StartMetal = iValue;
-		break;
-	case ERTSGameSetting::StartVehicleParts:
-		M_GameSettings.StartVehicleParts = iValue;
-		break;
 	case ERTSGameSetting::StartFuel:
 		M_GameSettings.StartFuel = iValue;
 		break;
@@ -108,12 +99,6 @@ int32 URTSGameSettingsHandler::GetGameSetting<int32>(const ERTSGameSetting Setti
 {
 	switch (Setting)
 	{
-	case ERTSGameSetting::StartRadixite:
-		return M_GameSettings.StartRadixite;
-	case ERTSGameSetting::StartMetal:
-		return M_GameSettings.StartMetal;
-	case ERTSGameSetting::StartVehicleParts:
-		return M_GameSettings.StartVehicleParts;
 	case ERTSGameSetting::StartFuel:
 		return M_GameSettings.StartFuel;
 	case ERTSGameSetting::StartAmmo:
