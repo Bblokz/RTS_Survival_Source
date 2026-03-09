@@ -2389,6 +2389,14 @@ void UWeaponStateSplitterArchProjectile::InitSplitterArchProjectileWeapon(
 		NewSingleBurstAmountMaxBurstAmount,
 		NewMinBurstAmount,
 		bNewCreateShellCasingOnEveryRandomBurst);
+
+	const int32 ImpactPoolCapacity = FMath::Max(M_SplitterSettings.SplitSettings.SplitProjectileCount, 1);
+	M_SplitProjectileImpactPool.Initialize(
+		World,
+		M_WeaponVfx.ImpactAttenuation,
+		M_WeaponVfx.ImpactConcurrency,
+		ImpactPoolCapacity,
+		WeaponData.WeaponCalibre);
 }
 
 
@@ -2504,7 +2512,10 @@ void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLoc
 					return;
 				}
 
-				WeakThis->SpawnSplitProjectilesAtApex(WeakProjectile->GetActorLocation(), TargetLocation);
+				WeakThis->SpawnSplitProjectilesAtApex(
+					WeakProjectile->GetActorLocation(),
+					TargetLocation,
+					WeakProjectile.Get());
 			},
 			TimeToApex,
 			false);
@@ -2512,12 +2523,18 @@ void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLoc
 }
 
 void UWeaponStateSplitterArchProjectile::SpawnSplitProjectilesAtApex(const FVector SplitLocation,
-                                                                     const FVector OriginalTargetLocation)
+                                                                     const FVector OriginalTargetLocation,
+                                                                     AProjectile* MainProjectile)
 {
 	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
 	if (not ProjectileManager)
 	{
 		return;
+	}
+
+	if (IsValid(MainProjectile))
+	{
+		MainProjectile->SetProjectileDormant();
 	}
 
 	SpawnSplitEffects(SplitLocation);
@@ -2536,6 +2553,36 @@ void UWeaponStateSplitterArchProjectile::SpawnSplitProjectilesAtApex(const FVect
 		const FVector SplitTargetLocation = BuildSplitTargetLocation(OriginalTargetLocation);
 		LaunchSplitProjectile(SplitProjectileData, SpawnedProjectile, SplitLocation, SplitTargetLocation);
 	}
+}
+
+void UWeaponStateSplitterArchProjectile::CreateWeaponImpact(const FVector& HitLocation,
+                                                            const ERTSSurfaceType HitSurface,
+                                                            const FRotator& ImpactRotation)
+{
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	UNiagaraSystem* SplitImpactNiagaraSystem = M_SplitterSettings.SplitSettings.SplitProjectileImpactNiagaraSystem;
+	if (not IsValid(SplitImpactNiagaraSystem))
+	{
+		Super::CreateWeaponImpact(HitLocation, HitSurface, ImpactRotation);
+		return;
+	}
+
+	USoundBase* ImpactSound = nullptr;
+	if (const FRTSSurfaceImpactData* SurfaceData = M_WeaponVfx.SurfaceImpactEffects.Find(HitSurface))
+	{
+		ImpactSound = SurfaceData->ImpactSound;
+	}
+
+	M_SplitProjectileImpactPool.PlayImpact(
+		HitLocation,
+		ImpactRotation,
+		SplitImpactNiagaraSystem,
+		M_WeaponVfx.ImpactScale,
+		ImpactSound);
 }
 
 void UWeaponStateSplitterArchProjectile::SpawnSplitEffects(const FVector& SplitLocation) const
@@ -2582,6 +2629,14 @@ FWeaponData UWeaponStateSplitterArchProjectile::BuildSplitProjectileData(const F
 	SplitData.ShrapnelRange *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
 	SplitData.ShrapnelDamage *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
 	SplitData.ShrapnelPen *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
+
+	const float MinSpeedMultiplier = M_SplitterSettings.SplitSettings.SplitProjectileSpeedMultiplierMin;
+	const float MaxSpeedMultiplier = M_SplitterSettings.SplitSettings.SplitProjectileSpeedMultiplierMax;
+	const float SpeedMultiplierLow = FMath::Min(MinSpeedMultiplier, MaxSpeedMultiplier);
+	const float SpeedMultiplierHigh = FMath::Max(MinSpeedMultiplier, MaxSpeedMultiplier);
+	const float ProjectileSpeedMultiplier = FMath::FRandRange(SpeedMultiplierLow, SpeedMultiplierHigh);
+	SplitData.ProjectileMovementSpeed *= ProjectileSpeedMultiplier;
+
 	return SplitData;
 }
 

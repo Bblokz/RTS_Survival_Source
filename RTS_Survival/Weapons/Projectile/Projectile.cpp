@@ -1201,6 +1201,12 @@ void AProjectile::PostInit_SetupWidgetPoolManager()
 }
 
 
+
+void AProjectile::SetProjectileDormant()
+{
+	OnProjectileDormant();
+}
+
 void AProjectile::OnProjectileDormant()
 {
 	if (not GetIsValidProjectileMovement() || not GetIsValidProjectileManager())
