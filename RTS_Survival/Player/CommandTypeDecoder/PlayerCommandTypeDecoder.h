@@ -115,6 +115,8 @@ private:
 	void Decode_TurretParentRedirect(AActor*& ClickedActor) const;
 
 	bool Decode_TeamWeapon(AActor* ClickedActor, FTargetUnion& OutTarget, ECommandType& OutType) const;
+	bool Decode_TowVehicle(AActor* ClickedActor, FTargetUnion& OutTarget, ECommandType& OutType) const;
+	bool Decode_TowableActor(AActor* ClickedActor, FTargetUnion& OutTarget, ECommandType& OutType) const;
 
 	/**
 	 * @brief Decode when the actor is a character.

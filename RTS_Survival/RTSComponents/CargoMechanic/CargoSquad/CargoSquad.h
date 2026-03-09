@@ -57,6 +57,14 @@ public:
 	void ExecuteEnterCargo(AActor* TargetCargoActor);
 
 	/**
+	 * @brief Internal immediate cargo transfer used by towing flows.
+	 * @param TargetCargoActor Cargo owner actor to enter immediately.
+	 * @param bSwapAbilities Whether to swap enter/exit abilities.
+	 * @return True if immediate transfer succeeded.
+	 */
+	bool EnterCargoImmediateInternal(AActor* TargetCargoActor, const bool bSwapAbilities);
+
+	/**
 	 * @brief Called by the controller when all units completed the EnterCargo move (ability finished moving).
 	 *        Requests capacity & teleports/attaches the units to their assigned sockets, disables movement,
 	 *        and swaps the Enter/Exit abilities. Finally, it finishes the EnterCargo command.

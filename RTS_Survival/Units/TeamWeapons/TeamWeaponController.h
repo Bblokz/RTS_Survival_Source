@@ -15,6 +15,8 @@ class UAnimatedTextWidgetPoolManager;
 class AActor;
 class UCrewPosition;
 class UDigInComponent;
+class UTowedActorComponent;
+class UVehicleTowComponent;
 
 
 USTRUCT()
@@ -181,6 +183,10 @@ protected:
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;
 	virtual void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID) override;
 
+	virtual void ExecuteDetachTowCommand() override;
+	virtual void TerminateDetachTowCommand() override;
+	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
+
 	/**
 	 * @brief Assigns paths while preserving operator spacing so the weapon shadow stays stable.
 	 * Avoids random offsets for crew so the weapon remains centered on their formation.
@@ -216,6 +222,7 @@ private:
 	bool GetIsValidTeamWeaponMover() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
 	bool GetIsValidDigInComponent() const;
+	bool GetIsValidTowedActorComponent() const;
 
 	void BeginPlay_InitAnimatedTextWidgetPoolManager();
 
@@ -402,6 +409,9 @@ private:
 
 	UPROPERTY()
 	bool bM_IsTeamWeaponAbandoned = false;
+
+	UPROPERTY()
+	TWeakObjectPtr<UTowedActorComponent> M_TowedActorComponent;
 
 	UPROPERTY()
 	TObjectPtr<UDigInComponent> M_DigInComponent;

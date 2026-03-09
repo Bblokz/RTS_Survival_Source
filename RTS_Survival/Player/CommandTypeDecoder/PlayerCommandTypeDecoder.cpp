@@ -17,6 +17,8 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/VehicleTow/VehicleTow.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/TowedActor/TowedActor.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 namespace
@@ -40,6 +42,16 @@ ECommandType UPlayerCommandTypeDecoder::DecodeTargetedActor(AActor*& ClickedActo
 	ECommandType OutType;
 
 	if (Decode_TeamWeapon(ClickedActor, OutTarget, OutType))
+	{
+		return OutType;
+	}
+
+	if (Decode_TowVehicle(ClickedActor, OutTarget, OutType))
+	{
+		return OutType;
+	}
+
+	if (Decode_TowableActor(ClickedActor, OutTarget, OutType))
 	{
 		return OutType;
 	}
@@ -605,4 +617,41 @@ bool UPlayerCommandTypeDecoder::IsOfFaction(AActor* ClickedActor, const uint8 Ow
 		bIsAllied = RTSComp->GetOwningPlayer() == kPlayerOneId;
 	}
 	return bIsAllied;
+}
+
+
+bool UPlayerCommandTypeDecoder::Decode_TowVehicle(AActor* ClickedActor, FTargetUnion& OutTarget, ECommandType& OutType) const
+{
+	if (not IsValid(ClickedActor))
+	{
+		return false;
+	}
+
+	UVehicleTowComponent* VehicleTowComp = ClickedActor->FindComponentByClass<UVehicleTowComponent>();
+	if (not IsValid(VehicleTowComp))
+	{
+		return false;
+	}
+
+	OutTarget.TargetActor = ClickedActor;
+	OutType = ECommandType::ClickedTowVehicle;
+	return true;
+}
+
+bool UPlayerCommandTypeDecoder::Decode_TowableActor(AActor* ClickedActor, FTargetUnion& OutTarget, ECommandType& OutType) const
+{
+	if (not IsValid(ClickedActor))
+	{
+		return false;
+	}
+
+	UTowedActorComponent* TowedActorComp = ClickedActor->FindComponentByClass<UTowedActorComponent>();
+	if (not IsValid(TowedActorComp))
+	{
+		return false;
+	}
+
+	OutTarget.TargetActor = ClickedActor;
+	OutType = ECommandType::ClickedTowableActor;
+	return true;
 }
