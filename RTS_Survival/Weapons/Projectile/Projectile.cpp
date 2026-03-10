@@ -636,23 +636,14 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 		ApexLocation);
 	const float Stage1Time = Stage1Distance / Stage1Speed;
 
-	FVector Stage2ArcAnchor = ApexLocation;
-	const FVector ApexToTarget = TargetLocation - ApexLocation;
-	const float ApexToTargetDistance = ApexToTarget.Size();
-	if (ApexToTargetDistance > KINDA_SMALL_NUMBER)
-	{
-		const float ArcDistance = FMath::Min(VerticalRocketSettings.Stage2ArcDistance, ApexToTargetDistance * 0.45f);
-		Stage2ArcAnchor = ApexLocation + (ApexToTarget.GetSafeNormal() * ArcDistance) + FVector(
-			0.0f,
-			0.0f,
-			VerticalRocketSettings.Stage2ArcHeight);
-	}
-
-	const FVector ApexToArc = Stage2ArcAnchor - ApexLocation;
-	const float Stage2ArcDistance = ApexToArc.Size();
-	const float Stage2ArcTime = Stage2ArcDistance > KINDA_SMALL_NUMBER ? Stage2ArcDistance / Stage2ArcSpeed : 0.0f;
-	const float Stage2StraightDistance = FVector::Distance(Stage2ArcAnchor, TargetLocation);
-	const float Stage2StraightTime = Stage2StraightDistance / Stage2StraightSpeed;
+	const float Stage2ArcDistanceSetting = FMath::Max(VerticalRocketSettings.Stage2ArcDistance, 0.0f);
+	const FVector Stage2ArcHeightOffset = FVector(0.0f, 0.0f, VerticalRocketSettings.Stage2ArcHeight);
+	const float Stage2ArcTime = (Stage2ArcDistanceSetting > KINDA_SMALL_NUMBER || FMath::Abs(VerticalRocketSettings.Stage2ArcHeight) >
+		KINDA_SMALL_NUMBER)
+		? (FMath::Sqrt((Stage2ArcDistanceSetting * Stage2ArcDistanceSetting)
+			+ (VerticalRocketSettings.Stage2ArcHeight * VerticalRocketSettings.Stage2ArcHeight)) / Stage2ArcSpeed)
+		: 0.0f;
+	const float Stage2StraightTime = FVector::Distance(ApexLocation, TargetLocation) / Stage2StraightSpeed;
 
 	SetActorLocation(LaunchLocation);
 	SetActorRotation(Stage1Direction.Rotation());
@@ -667,16 +658,21 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 		TWeakObjectPtr<AProjectile> WeakThis(this);
 		World->GetTimerManager().SetTimer(
 			M_RocketSwingTimerHandle,
-			[WeakThis, ApexLocation, Stage2ArcAnchor, TargetLocation, Stage2ArcSpeed, Stage2StraightSpeed, Stage2ArcTime]()
+			[WeakThis, TargetLocation, Stage2ArcDistanceSetting, Stage2ArcHeightOffset, Stage2ArcSpeed, Stage2StraightSpeed,
+			 Stage2ArcTime]()
 			{
 				if (not WeakThis.IsValid() || not WeakThis->GetIsValidProjectileMovement())
 				{
 					return;
 				}
 
-				WeakThis->SetActorLocation(ApexLocation);
-				const FVector ApexArcDirection = (Stage2ArcAnchor - ApexLocation).GetSafeNormal();
-				if (ApexArcDirection.IsNearlyZero() || Stage2ArcTime <= 0.0f)
+				const FVector Stage2StartLocation = WeakThis->GetActorLocation();
+				const FVector Stage2StartToTarget = TargetLocation - Stage2StartLocation;
+				const FVector Stage2ArcAnchor = Stage2StartLocation
+					+ (Stage2StartToTarget.GetSafeNormal() * Stage2ArcDistanceSetting)
+					+ Stage2ArcHeightOffset;
+				const FVector Stage2ArcDirection = (Stage2ArcAnchor - Stage2StartLocation).GetSafeNormal();
+				if (Stage2ArcDirection.IsNearlyZero() || Stage2ArcTime <= 0.0f)
 				{
 					const FVector DirectDirection = (TargetLocation - WeakThis->GetActorLocation()).GetSafeNormal();
 					if (DirectDirection.IsNearlyZero())
@@ -688,21 +684,21 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 					return;
 				}
 
-				WeakThis->SetActorRotation(ApexArcDirection.Rotation());
-				WeakThis->M_ProjectileMovement->Velocity = ApexArcDirection * Stage2ArcSpeed;
+				WeakThis->SetActorRotation(Stage2ArcDirection.Rotation());
+				WeakThis->M_ProjectileMovement->Velocity = Stage2ArcDirection * Stage2ArcSpeed;
 				if (UWorld* InnerWorld = WeakThis->GetWorld())
 				{
 					InnerWorld->GetTimerManager().ClearTimer(WeakThis->M_RocketSwingTimerHandle);
 					InnerWorld->GetTimerManager().SetTimer(
 						WeakThis->M_RocketSwingTimerHandle,
-						[WeakThis, Stage2ArcAnchor, TargetLocation, Stage2StraightSpeed]()
+						[WeakThis, TargetLocation, Stage2StraightSpeed]()
 						{
 							if (not WeakThis.IsValid() || not WeakThis->GetIsValidProjectileMovement())
 							{
 								return;
 							}
-							WeakThis->SetActorLocation(Stage2ArcAnchor);
-							const FVector StraightDirection = (TargetLocation - Stage2ArcAnchor).GetSafeNormal();
+
+							const FVector StraightDirection = (TargetLocation - WeakThis->GetActorLocation()).GetSafeNormal();
 							if (StraightDirection.IsNearlyZero())
 							{
 								return;
