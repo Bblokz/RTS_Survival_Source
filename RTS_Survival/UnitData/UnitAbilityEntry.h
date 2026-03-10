@@ -11,10 +11,13 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionTypes/FieldConstructionTypes.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/TowedActor/TowedActor.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
 
+class ATeamWeaponController;
+class ATankMaster;
 class UGrenadeComponent;
 enum class EGrenadeAbilityType : uint8;
 class USquadReinforcementComponent;
@@ -61,6 +64,25 @@ namespace FAbilityHelpers
 		AbilityEntry.AbilityId = AbilityId;
 		return AbilityEntry;
 	}
+/**
+ * @brief Pure preview check for a tank -> team-weapon tow match.
+ *
+ * Returns true only when:
+ * - TowVehicle is valid and currently tow free,
+ * - TowVehicle has a valid cargo component,
+ * - TeamWeaponController is valid and still controls a team weapon,
+ * - the team weapon is currently tow free,
+ * - and the towing vehicle cargo can fit the team weapon crew's current alive unit count.
+ *
+ * @param TowVehicle Tank that would tow the team weapon.
+ * @param TeamWeaponController Team weapon controller whose controlled weapon would be towed.
+ * @param OutCompToTow
+ * @return True when this tow pairing is currently valid as a preview check.
+ */
+static bool GetCanTowTeamWeaponWithCurrentCargoCapacity(
+	const ATankMaster* TowVehicle,
+	const ATeamWeaponController* TeamWeaponController, UTowedActorComponent*& OutCompToTow);
+	
 
 	inline USquadReinforcementComponent* GetReinforcementAbilityComp(AActor* Actor)
 	{

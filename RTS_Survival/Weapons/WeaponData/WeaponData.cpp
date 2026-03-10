@@ -3153,7 +3153,9 @@ bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
 		return false;
 	}
 
-	M_AttachedRocketInstances->AttachToComponent(MeshComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	FAttachmentTransformRules AttachmentRules = FAttachmentTransformRules::KeepRelativeTransform;
+	AttachmentRules.ScaleRule = EAttachmentRule::KeepWorld;
+	M_AttachedRocketInstances->AttachToComponent(MeshComponent, AttachmentRules);
 	M_AttachedRocketInstances->RegisterComponent();
 	M_AttachedRocketInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	M_AttachedRocketInstances->SetStaticMesh(M_VerticalRocketSettings.RocketMesh);

@@ -440,6 +440,24 @@ UBehaviourComp* ASquadController::GetBehaviourComponentOfSquad() const
 	return BehaviourComponent;
 }
 
+int32 ASquadController::GetCurrentAliveSquadUnitCountPure() const
+{
+	int32 AliveSquadUnitCount = 0;
+
+	for (const ASquadUnit* const EachSquadUnit : M_TSquadUnits)
+	{
+		if (not IsValid(EachSquadUnit))
+		{
+			continue;
+		}
+
+		AliveSquadUnitCount++;
+	}
+
+	return AliveSquadUnitCount;
+}
+
+
 int32 ASquadController::GetSquadUnitAmount()
 {
 	EnsureSquadUnitsValid();

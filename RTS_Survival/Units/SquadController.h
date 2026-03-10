@@ -274,6 +274,14 @@ public:
 
 	UBehaviourComp* GetBehaviourComponentOfSquad() const;
 
+	/**
+     * @brief Pure runtime count of current alive/valid squad units.
+     * Uses the current squad array without compacting or mutating it.
+     *
+     * @return Number of currently valid squad units.
+     */
+    int32 GetCurrentAliveSquadUnitCountPure() const;
+
 	int32 GetSquadUnitAmount();
 
 	void SetSquadSpawnLocation(const FVector& SpawnLocation);
