@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "MissionSounds/MissionSounds.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
+#include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "MissionManager.generated.h"
 
 
@@ -13,6 +14,26 @@ class ACPPController;
 class UW_MissionWidgetManager;
 class UMissionBase;
 class UW_GameDifficultyPicker;
+
+USTRUCT(BlueprintType)
+struct FMissionStartingResources
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources", meta=(ClampMin="0"))
+	int32 M_Radixite = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources", meta=(ClampMin="0"))
+	int32 M_Metal = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources", meta=(ClampMin="0"))
+	int32 M_VehicleParts = 0;
+
+	bool GetHasAnyStartingResources() const
+	{
+		return M_Radixite > 0 || M_Metal > 0 || M_VehicleParts > 0;
+	}
+};
 
 /**
  * @brief Keeps track of the currently active missions with the active array.
@@ -53,6 +74,7 @@ public:
 	UW_Mission* OnMissionRequestSetupWidget(UMissionBase* RequestingMission);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlaySound2DForMission(USoundBase* SoundToPlay) const;
+	FMissionStartingResources GetMissionStartingResources() const { return M_MissionStartingResources; }
 
 	/**
 	 * @brief Calls load on the mission and adds it to the active missions array. 
@@ -67,6 +89,9 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadWrite, Category = "Missions")
 	TArray<UMissionBase*> Missions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources")
+	FMissionStartingResources M_MissionStartingResources;
 
 
 protected:

@@ -564,24 +564,6 @@ int32 UPlayerResourceManager::GetResourceStorage(ERTSResourceType Resource) cons
 
 void UPlayerResourceManager::InitializeResourcesSettings(URTSGameSettingsHandler* GameUpdate)
 {
-	if (not GetIsValidHQDropOff())
-	{
-		RTSFunctionLibrary::ReportError("Cannot init start resources for player as HQ DropOff is invalid!"
-			"\n See function InitializeResourcesSettings in PlayerResourceManager.cpp.");
-		return;
-	}
-	const int32 RadixiteStart = GameUpdate->GetGameSetting<int32>(ERTSGameSetting::StartRadixite);
-	M_PlayerResources[ERTSResourceType::Resource_Radixite].Amount += RadixiteStart;
-	M_HQDropOff->AddResourcesNotHarvested(ERTSResourceType::Resource_Radixite, RadixiteStart);
-
-	const int32 MetalStart = GameUpdate->GetGameSetting<int32>(ERTSGameSetting::StartMetal);
-	M_PlayerResources[ERTSResourceType::Resource_Metal].Amount = MetalStart;
-	M_HQDropOff->AddResourcesNotHarvested(ERTSResourceType::Resource_Metal, MetalStart);
-
-	const int32 VehiclePartsStart = GameUpdate->GetGameSetting<int32>(ERTSGameSetting::StartVehicleParts);
-	M_PlayerResources[ERTSResourceType::Resource_VehicleParts].Amount = VehiclePartsStart;
-	M_HQDropOff->AddResourcesNotHarvested(ERTSResourceType::Resource_VehicleParts, VehiclePartsStart);
-
 	M_PlayerResources[ERTSResourceType::Resource_Fuel].Amount = GameUpdate->GetGameSetting<int32>(
 		ERTSGameSetting::StartFuel);
 	M_PlayerResources[ERTSResourceType::Resource_Ammo].Amount = GameUpdate->GetGameSetting<int32>(
