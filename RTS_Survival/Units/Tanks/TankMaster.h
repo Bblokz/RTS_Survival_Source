@@ -151,6 +151,9 @@ public:
 	// -----End overwrite cargo interface-----
 
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
+	virtual void ExecuteDetachTowCommand() override;
+	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
+	
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -334,9 +337,7 @@ protected:
 
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype) override;
 	virtual void TerminateTowActorCommand() override;
-	virtual void ExecuteDetachTowCommand() override;
 	virtual void TerminateDetachTowCommand() override;
-	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
 
 	// For the harvester that uses resources that are stored in the harvester component.
 	// This function is used to adust the visuals of the harvester depending on the amount of resources stored.

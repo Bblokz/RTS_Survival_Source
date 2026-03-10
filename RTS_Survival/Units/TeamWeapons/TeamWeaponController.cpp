@@ -2,6 +2,8 @@
 
 #include "TeamWeaponController.h"
 
+#include <RTS_Survival/RTSComponents/TowMechanic/VehicleTow/VehicleTow.h>
+
 #include "TeamWeapon.h"
 #include "TeamWeaponMover.h"
 #include "CrewPositions/CrewPosition.h"

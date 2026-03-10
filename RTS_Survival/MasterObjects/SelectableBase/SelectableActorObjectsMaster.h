@@ -44,6 +44,10 @@ public:
 	virtual FString GetOwnerName() const override final;
 	virtual AActor* GetOwnerActor() override final;
 
+	/** @copydoc ICommands::GetCommandData()*/
+	virtual UCommandData* GetIsValidCommandData() override final;
+	
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void BeginDestroy() override;
@@ -79,8 +83,6 @@ protected:
 	virtual void SetUnitToIdleSpecificLogic() override;
 
 
-	/** @copydoc ICommands::GetCommandData()*/
-	virtual UCommandData* GetIsValidCommandData() override final;
 
 	/** @copydoc ICommands::DoneExecutingCommand */
 	UFUNCTION(BlueprintCallable, Category = "Commands", meta = (BlueprintProtected = "true"))

@@ -30,6 +30,8 @@ class RTS_SURVIVAL_API UVehicleTowComponent : public UActorComponent
 public:
 	UVehicleTowComponent();
 
+	// Will be called with the mesh component it needs in the derived blueprint.
+	UFUNCTION(BlueprintCallable)
 	void InitTowMesh(USceneComponent* TowMeshComponent);
 
 	bool IsTowFree() const;

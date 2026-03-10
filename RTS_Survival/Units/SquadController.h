@@ -405,6 +405,12 @@ public:
 	// IHealthBarOwner Interface.
 	virtual void OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing) override final;
 
+	/**
+	 * @return The command data used by this unit. Like MoveToLocations and TargetActors.
+	 */
+	virtual UCommandData* GetIsValidCommandData() override final;
+	
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -468,10 +474,6 @@ protected:
 	 */
 	virtual void SetUnitToIdleSpecificLogic() override;
 
-	/**
-	 * @return The command data used by this unit. Like MoveToLocations and TargetActors.
-	 */
-	virtual UCommandData* GetIsValidCommandData() override final;
 
 	// Called when the last command was terminated and the unit has no new commands in the queue.
 	virtual void OnUnitIdleAndNoNewCommands() override;

@@ -53,6 +53,9 @@ public:
 	virtual AActor* GetOwnerActor()  override final;
 	virtual float GetUnitRepairRadius() override;
 	
+	/** @copydoc ICommands::GetCommandData()*/
+	virtual UCommandData* GetIsValidCommandData() override final ;
+	
 
 protected:
 	virtual void BeginPlay() override;
@@ -75,8 +78,6 @@ protected:
 	virtual void SetUnitToIdleSpecificLogic() override;
 
 
-	/** @copydoc ICommands::GetCommandData()*/
-	virtual UCommandData* GetIsValidCommandData() override final ;
 
 	/** @copydoc ICommands::DoneExecutingCommand */
 	UFUNCTION(BlueprintCallable, Category = "Commands", meta = (BlueprintProtected = "true"))

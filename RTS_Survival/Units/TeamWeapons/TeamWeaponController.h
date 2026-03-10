@@ -157,6 +157,10 @@ public:
 	virtual bool GetSquadAlreadyHasTeamWeapon() const override;
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
+	virtual void ExecuteDetachTowCommand() override;
+
+	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
+	
 
 protected:
 	virtual void BeginPlay() override;
@@ -183,9 +187,7 @@ protected:
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;
 	virtual void OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID) override;
 
-	virtual void ExecuteDetachTowCommand() override;
 	virtual void TerminateDetachTowCommand() override;
-	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
 
 	/**
 	 * @brief Assigns paths while preserving operator spacing so the weapon shadow stays stable.

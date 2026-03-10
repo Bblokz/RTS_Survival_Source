@@ -6522,7 +6522,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 	}
 
 	OutAbilityActivated = EAbilityID::IdTowActor;
-	for (AActor* SelectedActor : TSelectedUnits)
+	for (AActor* SelectedActor : TSelectedActorsMasters)
 	{
 		if (not IsValid(SelectedActor))
 		{
@@ -6565,7 +6565,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetA
 		TowSubtype = ETowActorAbilitySubtypes::TowTeamWeapon;
 	}
 
-	for (AActor* SelectedActor : TSelectedUnits)
+	for (AActor* SelectedActor : TSelectedActorsMasters)
 	{
 		ATankMaster* SelectedTank = Cast<ATankMaster>(SelectedActor);
 		if (not IsValid(SelectedTank))

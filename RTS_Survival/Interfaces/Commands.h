@@ -764,6 +764,16 @@ public:
 	 */
 	virtual FString GetOwnerName() const =0;
 
+	virtual void OnActorBeingTowed(AActor* TowingVehicle, class UVehicleTowComponent* TowComp);
+
+	virtual void ExecuteDetachTowCommand();
+	
+	/**
+	 * @return The command data used by this unit. Like MoveToLocations and TargetActors.
+	 */
+	virtual UCommandData* GetIsValidCommandData() =0;
+	
+
 protected:
 	// Called when the last command was terminated and the unit has no new commands in the queue.
 	virtual void OnUnitIdleAndNoNewCommands();
@@ -914,9 +924,7 @@ protected:
 	virtual void TerminateManAbandonedTeamWeaponCommand();
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype);
 	virtual void TerminateTowActorCommand();
-	virtual void ExecuteDetachTowCommand();
 	virtual void TerminateDetachTowCommand();
-	virtual void OnActorBeingTowed(AActor* TowingVehicle, class UVehicleTowComponent* TowComp);
 
 	virtual void ExecuteExitCargoCommand();
 	virtual void TerminateExitCargoCommand();
@@ -937,10 +945,6 @@ protected:
 	 */
 	virtual void SetUnitToIdleSpecificLogic() =0;
 
-	/**
-	 * @return The command data used by this unit. Like MoveToLocations and TargetActors.
-	 */
-	virtual UCommandData* GetIsValidCommandData() =0;
 
 	// Util to stop behaviour trees on any IcommandUnit.
 	virtual void StopBehaviourTree() =0;

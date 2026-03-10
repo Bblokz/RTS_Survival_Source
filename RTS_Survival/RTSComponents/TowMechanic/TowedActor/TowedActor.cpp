@@ -125,7 +125,7 @@ void UTowedActorComponent::RestoreAbilitiesAfterTow()
 
 bool UTowedActorComponent::GetIsValidCommandsOwner() const
 {
-	if (IsValid(Cast<ICommands>(GetOwner())))
+	if (Cast<ICommands>(GetOwner()) != nullptr)
 	{
 		return true;
 	}
