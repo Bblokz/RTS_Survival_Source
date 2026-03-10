@@ -163,6 +163,30 @@ void UCargoSquad::ExecuteEnterCargo(AActor* TargetCargoActor)
     M_OwningController->RequestSquadMoveForAbility(Entrance, EAbilityID::IdEnterCargo);
 }
 
+
+
+bool UCargoSquad::EnterCargoImmediateInternal(AActor* TargetCargoActor, const bool bSwapAbilities)
+{
+	static_cast<void>(bSwapAbilities);
+	if (not GetIsValidController() || not IsEnterCargoRequestValid(TargetCargoActor))
+	{
+		return false;
+	}
+
+	UCargo* TargetCargo = TargetCargoActor->FindComponentByClass<UCargo>();
+	if (not IsValid(TargetCargo))
+	{
+		return false;
+	}
+
+	if (not OnPhysicallyEnteringCargo(TargetCargo))
+	{
+		return false;
+	}
+
+	FinalizeEnterCargo(TargetCargo);
+	return true;
+}
 void UCargoSquad::OnEnterCargo_MoveToEntranceCompleted()
 {
     if (not GetIsValidController())

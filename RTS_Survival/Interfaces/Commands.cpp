@@ -474,7 +474,8 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 		|| (AbilityId == EAbilityID::IdAimAbility)
 		|| (AbilityId == EAbilityID::IdCancelAimAbility)
 		|| (AbilityId == EAbilityID::IdAttachedWeapon)
-		|| (AbilityId == EAbilityID::IdSwapTurret);
+		|| (AbilityId == EAbilityID::IdSwapTurret)
+		|| (AbilityId == EAbilityID::IdTowActor);
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
@@ -522,6 +523,11 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 	if (QueuedCommand.CommandType == EAbilityID::IdSwapTurret)
 	{
 		return " with turret swap type: " + UEnum::GetValueAsString(QueuedCommand.GetTurretSwapAbilitySubtype());
+	}
+
+	if (QueuedCommand.CommandType == EAbilityID::IdTowActor)
+	{
+		return " with tow subtype: " + UEnum::GetValueAsString(QueuedCommand.GetTowActorAbilitySubtype());
 	}
 
 	return FString{};
@@ -906,6 +912,16 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			                                         Cmd.TargetRotator, StaticPreviewActor);
 		}
 		break;
+	case EAbilityID::IdTowActor:
+		{
+			M_Owner->ExecuteTowActorCommand(Cmd.TargetActor.Get(), Cmd.GetTowActorAbilitySubtype());
+		}
+		break;
+	case EAbilityID::IdDetachTow:
+		{
+			M_Owner->ExecuteDetachTowCommand();
+		}
+		break;
 	default:
 		RTSFunctionLibrary::PrintString(
 			"Command not implemented in ExecuteCommand: " + Global_GetAbilityIDAsString(Cmd.CommandType)
@@ -1047,6 +1063,7 @@ bool UCommandData::IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) 
 	case EAbilityID::IdEnterCargo:
 	case EAbilityID::IdManAbandonedTeamWeapon:
 	case EAbilityID::IdCapture:
+	case EAbilityID::IdTowActor:
 		return false;
 
 	default:
@@ -2710,6 +2727,47 @@ ECommandQueueError ICommands::ManAbandonedTeamWeapon(AActor* TeamWeaponActor, co
 		FRotator::ZeroRotator);
 }
 
+ECommandQueueError ICommands::TowActor(AActor* ActorToTow, const ETowActorAbilitySubtypes TowSubtype,
+                                    const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdTowActor, FVector::ZeroVector, ActorToTow,
+	                                              FRotator::ZeroRotator, static_cast<int32>(TowSubtype));
+}
+
+ECommandQueueError ICommands::DetachTow(const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdDetachTow);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdDetachTow, FVector::ZeroVector, nullptr,
+	                                              FRotator::ZeroRotator);
+}
+
 ECommandQueueError ICommands::ExitCargo(const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -2952,6 +3010,12 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdCapture:
 		TerminateCaptureCommand();
 		break;
+	case EAbilityID::IdTowActor:
+		TerminateTowActorCommand();
+		break;
+	case EAbilityID::IdDetachTow:
+		TerminateDetachTowCommand();
+		break;
 	case EAbilityID::IdApplyBehaviour:
 		// No terminate; behaviour auto expires.
 		break;
@@ -3004,4 +3068,27 @@ ECommandQueueError ICommands::GetIsAbilityOnCommandCardAndNotOnCooldown(const EA
 	}
 
 	return ECommandQueueError::NoError;
+}
+
+
+void ICommands::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype)
+{
+	DoneExecutingCommand(EAbilityID::IdTowActor);
+}
+
+void ICommands::TerminateTowActorCommand()
+{
+}
+
+void ICommands::ExecuteDetachTowCommand()
+{
+	DoneExecutingCommand(EAbilityID::IdDetachTow);
+}
+
+void ICommands::TerminateDetachTowCommand()
+{
+}
+
+void ICommands::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp)
+{
 }

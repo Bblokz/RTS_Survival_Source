@@ -60,6 +60,9 @@
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/VehicleTow/VehicleTow.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/TowedActor/TowedActor.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
@@ -3358,6 +3361,17 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 	case ECommandType::ManAbandonedTeamWeapon:
 		AmountCommandsExe += IssueOrderManTeamWeapon(Target.TargetActor, OutAbilityActivated, ClickedLocation);
 		break;
+	case ECommandType::ClickedTowVehicle:
+		AmountCommandsExe += IssueOrderTowActor(Target.TargetActor, OutAbilityActivated, ClickedLocation, ETowType::ClickedTowVehicle);
+		break;
+	case ECommandType::ClickedTowableActor:
+		{
+			const ETowType TowType = IsValid(Target.TargetActor) && Target.TargetActor->IsA(ATeamWeapon::StaticClass())
+				? ETowType::ClickedTeamWeaponToTow
+				: ETowType::ClickedVehicleToTow;
+			AmountCommandsExe += IssueOrderTowActor(Target.TargetActor, OutAbilityActivated, ClickedLocation, TowType);
+		}
+		break;
 	case ECommandType::EnemyCharacter:
 		OutAbilityActivated = EAbilityID::IdAttack;
 		AmountCommandsExe += OrderUnitsToAttackActor(Target.TargetCharacter);
@@ -6470,4 +6484,107 @@ bool ACPPController::GetIsGameWithChoosingStartingLocation()
 		RTSFunctionLibrary::PrintString("Game mode detected: " + StartByChoosing);
 	}
 	return bStartByPickingLocation;
+}
+
+
+uint32 ACPPController::IssueOrderTowActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
+                                         const FVector& ClickedLocation, const ETowType TowType)
+{
+	if (not IsValid(TowTargetActor))
+	{
+		OutAbilityActivated = EAbilityID::IdMove;
+		return MoveUnitsToLocation(ClickedLocation);
+	}
+
+	if (TowType == ETowType::ClickedTowVehicle)
+	{
+		return IssueOrderTowActor_ClickedTowVehicle(TowTargetActor, OutAbilityActivated, ClickedLocation);
+	}
+
+	return IssueOrderTowActor_ClickedTowableActor(TowTargetActor, OutAbilityActivated, ClickedLocation, TowType);
+}
+
+uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
+                                                           const FVector& ClickedLocation)
+{
+	ATankMaster* TowVehicle = Cast<ATankMaster>(TowTargetActor);
+	if (not IsValid(TowVehicle))
+	{
+		OutAbilityActivated = EAbilityID::IdMove;
+		return MoveUnitsToLocation(ClickedLocation);
+	}
+
+	UVehicleTowComponent* TowVehicleComp = TowVehicle->FindComponentByClass<UVehicleTowComponent>();
+	if (not IsValid(TowVehicleComp) || not TowVehicleComp->IsTowFree())
+	{
+		OutAbilityActivated = EAbilityID::IdMove;
+		return MoveUnitsToLocation(ClickedLocation);
+	}
+
+	OutAbilityActivated = EAbilityID::IdTowActor;
+	for (AActor* SelectedActor : TSelectedUnits)
+	{
+		if (not IsValid(SelectedActor))
+		{
+			continue;
+		}
+
+		UTowedActorComponent* SelectedTowedComp = SelectedActor->FindComponentByClass<UTowedActorComponent>();
+		if (not IsValid(SelectedTowedComp) || not SelectedTowedComp->IsTowFree())
+		{
+			continue;
+		}
+
+		const ETowActorAbilitySubtypes TowSubtype = SelectedActor->IsA(ATeamWeapon::StaticClass())
+			? ETowActorAbilitySubtypes::TowTeamWeapon
+			: ETowActorAbilitySubtypes::TowVehicle;
+		if (TowVehicle->TowActor(SelectedActor, TowSubtype, not bIsHoldingShift) == ECommandQueueError::NoError)
+		{
+			return 1;
+		}
+	}
+
+	OutAbilityActivated = EAbilityID::IdMove;
+	return MoveUnitsToLocation(ClickedLocation);
+}
+
+uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
+                                                             const FVector& ClickedLocation, const ETowType TowType)
+{
+	UTowedActorComponent* TargetTowedComp = TowTargetActor->FindComponentByClass<UTowedActorComponent>();
+	if (not IsValid(TargetTowedComp) || not TargetTowedComp->IsTowFree())
+	{
+		OutAbilityActivated = EAbilityID::IdMove;
+		return MoveUnitsToLocation(ClickedLocation);
+	}
+
+	OutAbilityActivated = EAbilityID::IdTowActor;
+	ETowActorAbilitySubtypes TowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+	if (TowType == ETowType::ClickedTeamWeaponToTow || TowTargetActor->IsA(ATeamWeapon::StaticClass()))
+	{
+		TowSubtype = ETowActorAbilitySubtypes::TowTeamWeapon;
+	}
+
+	for (AActor* SelectedActor : TSelectedUnits)
+	{
+		ATankMaster* SelectedTank = Cast<ATankMaster>(SelectedActor);
+		if (not IsValid(SelectedTank))
+		{
+			continue;
+		}
+
+		UVehicleTowComponent* VehicleTowComp = SelectedTank->FindComponentByClass<UVehicleTowComponent>();
+		if (not IsValid(VehicleTowComp) || not VehicleTowComp->IsTowFree())
+		{
+			continue;
+		}
+
+		if (SelectedTank->TowActor(TowTargetActor, TowSubtype, not bIsHoldingShift) == ECommandQueueError::NoError)
+		{
+			return 1;
+		}
+	}
+
+	OutAbilityActivated = EAbilityID::IdMove;
+	return MoveUnitsToLocation(ClickedLocation);
 }
