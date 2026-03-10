@@ -452,7 +452,8 @@ void ACPPController::ChangeKeyBinding(UInputAction* ActionToRebind, const FKey O
 
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
-		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<
+			URTSHotkeyProviderSubsystem>())
 		{
 			HotkeyProviderSubsystem->HandleKeyBindingChanged(ActionToRebind);
 		}
@@ -481,7 +482,8 @@ void ACPPController::UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey B
 
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
-		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<
+			URTSHotkeyProviderSubsystem>())
 		{
 			HotkeyProviderSubsystem->HandleKeyBindingChanged(ActionToUnbind);
 		}
@@ -1509,7 +1511,8 @@ void ACPPController::SecondaryClickStart()
 	{
 		M_SecondaryStartMouseProjectedLocation = HitResult.Location;
 		M_SecondaryStartClickedActor = HitResult.GetActor();
-		PlayerRotationArrow.InitRotationArrowAction(MouseScreenPosition, HitResult.Location, GetTeamWeaponSettingsForRotationArrow());
+		PlayerRotationArrow.InitRotationArrowAction(MouseScreenPosition, HitResult.Location,
+		                                            GetTeamWeaponSettingsForRotationArrow());
 	}
 	else
 	{
@@ -1614,17 +1617,17 @@ FRotationArrowTeamWeaponSettings ACPPController::GetTeamWeaponSettingsForRotatio
 	FRotationArrowTeamWeaponSettings Settings;
 	const bool bPawnsSelected = not TSelectedPawnMasters.IsEmpty();
 	const bool bActorsSelected = not TSelectedActorsMasters.IsEmpty();
-	if(bPawnsSelected || bActorsSelected)
+	if (bPawnsSelected || bActorsSelected)
 	{
 		// Not just one team weapon selected.
 		return Settings;
 	}
-	if(TSelectedSquadControllers.Num() != 1)
+	if (TSelectedSquadControllers.Num() != 1)
 	{
 		return Settings;
 	}
-	 ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(TSelectedSquadControllers[0]);
-	if(not IsValid(TeamWeaponController))
+	ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(TSelectedSquadControllers[0]);
+	if (not IsValid(TeamWeaponController))
 	{
 		return Settings;
 	}
@@ -3362,13 +3365,14 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 		AmountCommandsExe += IssueOrderManTeamWeapon(Target.TargetActor, OutAbilityActivated, ClickedLocation);
 		break;
 	case ECommandType::ClickedTowVehicle:
-		AmountCommandsExe += IssueOrderTowActor(Target.TargetActor, OutAbilityActivated, ClickedLocation, ETowType::ClickedTowVehicle);
+		AmountCommandsExe += IssueOrderTowActor(Target.TargetActor, OutAbilityActivated, ClickedLocation,
+		                                        ETowType::ClickedTowVehicle);
 		break;
 	case ECommandType::ClickedTowableActor:
 		{
 			const ETowType TowType = IsValid(Target.TargetActor) && Target.TargetActor->IsA(ATeamWeapon::StaticClass())
-				? ETowType::ClickedTeamWeaponToTow
-				: ETowType::ClickedVehicleToTow;
+				                         ? ETowType::ClickedTeamWeaponToTow
+				                         : ETowType::ClickedVehicleToTow;
 			AmountCommandsExe += IssueOrderTowActor(Target.TargetActor, OutAbilityActivated, ClickedLocation, TowType);
 		}
 		break;
@@ -3955,7 +3959,7 @@ uint32 ACPPController::RotateUnitsToDirection(
 	{
 		commandsExe += EachPawn->RotateTowards(RotateToDirection, !bIsHoldingShift) == ECommandQueueError::NoError;
 	}
-	for(const auto EachSquad : TSelectedSquadControllers)
+	for (const auto EachSquad : TSelectedSquadControllers)
 	{
 		commandsExe += EachSquad->RotateTowards(RotateToDirection, !bIsHoldingShift) == ECommandQueueError::NoError;
 	}
@@ -5043,7 +5047,7 @@ void ACPPController::DirectActionButtonSwapTurret(const ETurretSwapAbility Turre
 	if (CommandsExecuted > 0)
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdSwapTurret),
-		                               false);
+		                                false);
 	}
 }
 
@@ -6354,13 +6358,13 @@ void ACPPController::OnActorHovered(AActor* HoveredActor, const bool bIsHovered)
 	{
 		return;
 	}
-	if(bIsHovered)
+	if (bIsHovered)
 	{
 		HpComp->OnUnitHovered();
 	}
 	else
 	{
-		HpComp->OnUnitUnhovered();	
+		HpComp->OnUnitUnhovered();
 	}
 }
 
@@ -6488,7 +6492,7 @@ bool ACPPController::GetIsGameWithChoosingStartingLocation()
 
 
 uint32 ACPPController::IssueOrderTowActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
-                                         const FVector& ClickedLocation, const ETowType TowType)
+                                          const FVector& ClickedLocation, const ETowType TowType)
 {
 	if (not IsValid(TowTargetActor))
 	{
@@ -6505,7 +6509,7 @@ uint32 ACPPController::IssueOrderTowActor(AActor* TowTargetActor, EAbilityID& Ou
 }
 
 uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
-                                                           const FVector& ClickedLocation)
+                                                            const FVector& ClickedLocation)
 {
 	ATankMaster* TowVehicle = Cast<ATankMaster>(TowTargetActor);
 	if (not IsValid(TowVehicle))
@@ -6522,34 +6526,60 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 	}
 
 	OutAbilityActivated = EAbilityID::IdTowActor;
-	for (AActor* SelectedActor : TSelectedActorsMasters)
+	UTowedActorComponent* SelectedTowedComp = nullptr;
+	if (AActor* SelectedActor = FindSelectedActorWithFreeToTow(SelectedTowedComp))
 	{
-		if (not IsValid(SelectedActor))
-		{
-			continue;
-		}
-
-		UTowedActorComponent* SelectedTowedComp = SelectedActor->FindComponentByClass<UTowedActorComponent>();
-		if (not IsValid(SelectedTowedComp) || not SelectedTowedComp->IsTowFree())
-		{
-			continue;
-		}
-
-		const ETowActorAbilitySubtypes TowSubtype = SelectedActor->IsA(ATeamWeapon::StaticClass())
-			? ETowActorAbilitySubtypes::TowTeamWeapon
-			: ETowActorAbilitySubtypes::TowVehicle;
+		const ETowActorAbilitySubtypes TowSubtype = SelectedActor->IsA(ATeamWeaponController::StaticClass())
+			                                            ? ETowActorAbilitySubtypes::TowTeamWeapon
+			                                            : ETowActorAbilitySubtypes::TowVehicle;
 		if (TowVehicle->TowActor(SelectedActor, TowSubtype, not bIsHoldingShift) == ECommandQueueError::NoError)
 		{
 			return 1;
 		}
 	}
 
+
 	OutAbilityActivated = EAbilityID::IdMove;
 	return MoveUnitsToLocation(ClickedLocation);
 }
 
+AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp)
+{
+	EnsureSelectionsAreRTSValid();
+	for (auto EachSquadController : TSelectedSquadControllers)
+	{
+		UTowedActorComponent* TowedComp = EachSquadController->FindComponentByClass<UTowedActorComponent>();
+		if (IsValid(TowedComp) && TowedComp->IsTowFree())
+		{
+			OutTowedActorComp = TowedComp;
+			return EachSquadController;
+		}
+	}
+
+	for (auto EachPawn : TSelectedPawnMasters)
+	{
+		UTowedActorComponent* TowedComp = EachPawn->FindComponentByClass<UTowedActorComponent>();
+		if (IsValid(TowedComp) && TowedComp->IsTowFree())
+		{
+			OutTowedActorComp = TowedComp;
+			return EachPawn;
+		}
+	}
+	for (auto EachActor : TSelectedActorsMasters)
+	{
+		UTowedActorComponent* TowedComp = EachActor->FindComponentByClass<UTowedActorComponent>();
+		if (IsValid(TowedComp) && TowedComp->IsTowFree())
+		{
+			OutTowedActorComp = TowedComp;
+			return EachActor;
+		}
+	}
+	OutTowedActorComp = nullptr;
+	return nullptr;
+}
+
 uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
-                                                             const FVector& ClickedLocation, const ETowType TowType)
+                                                              const FVector& ClickedLocation, const ETowType TowType)
 {
 	UTowedActorComponent* TargetTowedComp = TowTargetActor->FindComponentByClass<UTowedActorComponent>();
 	if (not IsValid(TargetTowedComp) || not TargetTowedComp->IsTowFree())

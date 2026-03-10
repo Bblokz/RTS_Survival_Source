@@ -54,6 +54,7 @@
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "CPPController.generated.h"
 
+class UTowedActorComponent;
 class UPlayerOutlineComponent;
 class APlayerAimAbility;
 class UAttachedWeaponAbilityComponent;
@@ -1119,6 +1120,8 @@ private:
 	                         const FVector& ClickedLocation, const ETowType TowType);
 	uint32 IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
 	                                           const FVector& ClickedLocation);
+
+	AActor* FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp);
 	uint32 IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
 	                                             const FVector& ClickedLocation, const ETowType TowType);
 
