@@ -3,8 +3,13 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/TowedActor/TowedActor.h"
+#include "RTS_Survival/RTSComponents/TowMechanic/VehicleTow/VehicleTow.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 
 bool FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon(
 	ASquadController* SquadController,
@@ -33,8 +38,53 @@ bool FAbilityHelpers::GetCanSquadRemanAbandonedTeamWeapon(
 
 	return SquadController->GetSquadUnitAmount() >= RequiredOperators;
 }
+
+bool FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(
+	const ATankMaster* TowVehicle,
+	const ATeamWeaponController* TeamWeaponController, UTowedActorComponent*& OutCompToTow)
+{
+	OutCompToTow = nullptr;
+	if (not IsValid(TowVehicle))
+	{
+		return false;
+	}
+
+	if (not IsValid(TeamWeaponController))
+	{
+		return false;
+	}
+
+	const UVehicleTowComponent* const VehicleTowComponent = TowVehicle->FindComponentByClass<UVehicleTowComponent>();
+	if (not IsValid(VehicleTowComponent) || not VehicleTowComponent->IsTowFree())
+	{
+		return false;
+	}
+
+	const UCargo* const CargoComponent = TowVehicle->FindComponentByClass<UCargo>();
+	if (not IsValid(CargoComponent))
+	{
+		return false;
+	}
+
+	if (not TeamWeaponController->GetHasControlledTeamWeapon())
+	{
+		return false;
+	}
+
+	UTowedActorComponent* TowedActorComponent =
+		TeamWeaponController->FindComponentByClass<UTowedActorComponent>();
+	if (not IsValid(TowedActorComponent) || not TowedActorComponent->IsTowFree())
+	{
+		return false;
+	}
+
+	OutCompToTow = TowedActorComponent;
+	return CargoComponent->GetCanFitSquadPure(TeamWeaponController);
+}
+
+
 UGrenadeComponent* FAbilityHelpers::GetGrenadeAbilityCompOfType(const EGrenadeAbilityType Type,
-	const AActor* Actor)
+                                                                const AActor* Actor)
 {
 	if (not IsValid(Actor))
 	{

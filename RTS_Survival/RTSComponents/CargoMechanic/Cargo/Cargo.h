@@ -134,7 +134,23 @@ class RTS_SURVIVAL_API UCargo : public UActorComponent
 public:
 	UCargo();
 
-	
+	/**
+     * @brief Pure capacity check for a required number of squad units.
+     * Mirrors the seat/vacancy rules of RequestCanEnterCargo without mutating occupancy or vacancy state.
+     *
+     * @param RequiredUnitCount Number of units that would need a seat right now.
+     * @return True when this cargo is enabled, configured, has squad vacancy, and has enough empty seats.
+     */
+    bool GetCanFitSquadUnitCountPure(const int32 RequiredUnitCount) const;
+
+	/**
+     * @brief Pure capacity check for a specific squad.
+     * Uses the squad's current alive/valid unit count and does not mutate cargo or squad state.
+     *
+     * @param SquadController Squad that might enter this cargo.
+     * @return True when this cargo can currently fit the whole squad.
+     */
+    bool GetCanFitSquadPure(const ASquadController* SquadController) const;
 	/**
 	 * @brief Handle the case where all units of a squad died while still inside this cargo.
 	 *

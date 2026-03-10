@@ -6579,7 +6579,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 
 	OutAbilityActivated = EAbilityID::IdTowActor;
 	UTowedActorComponent* SelectedTowedComp = nullptr;
-	if (AActor* SelectedActor = FindSelectedActorWithFreeToTow(SelectedTowedComp))
+	if (AActor* SelectedActor = FindSelectedActorWithFreeToTow(SelectedTowedComp, TowVehicleComp))
 	{
 		const ETowActorAbilitySubtypes TowSubtype = SelectedActor->IsA(ATeamWeaponController::StaticClass())
 			                                            ? ETowActorAbilitySubtypes::TowTeamWeapon
@@ -6595,15 +6595,24 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 	return MoveUnitsToLocation(ClickedLocation);
 }
 
-AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp)
+AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp,
+	UVehicleTowComponent* VehicleCompTowing)
 {
 	EnsureSelectionsAreRTSValid();
+	ATankMaster* TowVehicle = Cast<ATankMaster>(VehicleCompTowing->GetOwner());
+	if(not TowVehicle)
+	{
+		return nullptr;
+	}
 	for (auto EachSquadController : TSelectedSquadControllers)
 	{
-		UTowedActorComponent* TowedComp = EachSquadController->FindComponentByClass<UTowedActorComponent>();
-		if (IsValid(TowedComp) && TowedComp->IsTowFree())
+		ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(EachSquadController);
+		if(not TeamWeaponController)
 		{
-			OutTowedActorComp = TowedComp;
+			continue;
+		}
+		if(FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(TowVehicle, TeamWeaponController, OutTowedActorComp))
+		{
 			return EachSquadController;
 		}
 	}

@@ -1123,7 +1123,7 @@ private:
 	uint32 IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
 	                                           const FVector& ClickedLocation);
 
-	AActor* FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp);
+	AActor* FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp, UVehicleTowComponent* VehicleCompTowing);
 	uint32 IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
 	                                             const FVector& ClickedLocation, const ETowType TowType);
 

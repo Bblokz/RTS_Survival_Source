@@ -33,6 +33,45 @@ UCargo::UCargo()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+bool UCargo::GetCanFitSquadUnitCountPure(const int32 RequiredUnitCount) const
+{
+	if (RequiredUnitCount <= 0)
+	{
+		return false;
+	}
+
+	if (not bM_IsEnabled)
+	{
+		return false;
+	}
+
+	if (not M_CargoMesh.IsValid())
+	{
+		return false;
+	}
+
+	if (not M_VacancyState.HasVacancy())
+	{
+		return false;
+	}
+
+	const int32 EmptySeatCount = M_SocketOccupancy.GetEmptySockets().Num();
+	return EmptySeatCount >= RequiredUnitCount;
+}
+
+bool UCargo::GetCanFitSquadPure(const ASquadController* SquadController) const
+{
+	if (not IsValid(SquadController))
+	{
+		return false;
+	}
+
+	const int32 RequiredUnitCount = SquadController->GetCurrentAliveSquadUnitCountPure();
+	return GetCanFitSquadUnitCountPure(RequiredUnitCount);
+}
+
+
+
 void UCargo::OnSquadCompletelyDiedInside(ASquadController* SquadController)
 {
 	if (not IsValid(SquadController))
@@ -238,34 +277,43 @@ FVector UCargo::GetClosestEntranceWorldLocation(const FVector& FromWorldLocation
 
 bool UCargo::RequestCanEnterCargo(ASquadController* SquadController, TMap<ASquadUnit*, FName>& OutAssignments)
 {
-        if (not bM_IsEnabled || not SquadController || not GetIsValidCargoMesh() || not M_VacancyState.HasVacancy())
-        {
-                return false;
-        }
-
-	const TArray<ASquadUnit*> Units = SquadController->GetSquadUnitsChecked();
 	OutAssignments.Reset();
 
-	TArray<FName> Empty = M_SocketOccupancy.GetEmptySockets();
-	if (Empty.Num() < Units.Num())
-		return false; // not enough seats for the whole squad
+	if (not IsValid(SquadController))
+	{
+		return false;
+	}
 
-        // seat everyone 1:1
-        for (int32 i = 0; i < Units.Num(); ++i)
-        {
-                ASquadUnit* Unit = Units[i];
-                if (not IsValid(Unit))
-                {
-                        continue;
-                }
-                const FName Sock = Empty[i];
-                OutAssignments.Add(Unit, Sock);
-                M_SocketOccupancy.M_SocketToUnit.Add(Sock, Unit);
-        }
+	if (not GetCanFitSquadPure(SquadController))
+	{
+		return false;
+	}
+
+	const TArray<ASquadUnit*> SquadUnits = SquadController->GetSquadUnitsChecked();
+	const TArray<FName> EmptySockets = M_SocketOccupancy.GetEmptySockets();
+
+	if (EmptySockets.Num() < SquadUnits.Num())
+	{
+		return false;
+	}
+
+	for (int32 SquadUnitIndex = 0; SquadUnitIndex < SquadUnits.Num(); ++SquadUnitIndex)
+	{
+		ASquadUnit* const SquadUnit = SquadUnits[SquadUnitIndex];
+		if (not IsValid(SquadUnit))
+		{
+			continue;
+		}
+
+		const FName SocketName = EmptySockets[SquadUnitIndex];
+		OutAssignments.Add(SquadUnit, SocketName);
+		M_SocketOccupancy.M_SocketToUnit.Add(SocketName, SquadUnit);
+	}
 
 	RegisterSquadAtVacancy(SquadController, true);
 	return true;
 }
+
 
 void UCargo::OnSquadEntered(ASquadController* SquadController)
 {
