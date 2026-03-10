@@ -38,6 +38,7 @@
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
+#include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Interfaces/Commands.h"
@@ -6091,6 +6092,7 @@ bool ACPPController::SetupPlayerHQReference()
 				if (GetIsValidPlayerResourceManager())
 				{
 					M_PlayerResourceManager->SetupPlayerHQDropOffReference(M_PlayerHQ);
+					TryApplyMissionStartingResourcesAfterHQFound();
 				}
 				break;
 			}
@@ -6422,11 +6424,61 @@ void ACPPController::LoadPlayerProfile(const FVector& SpawnCenterOfUnits, const 
 	}
 }
 
+
+void ACPPController::TryApplyMissionStartingResourcesAfterHQFound()
+{
+	if (M_PlayerProfileLoadingStatus.bM_HasAppliedMissionStartingResources)
+	{
+		return;
+	}
+	if (not GetIsValidPlayerResourceManager())
+	{
+		return;
+	}
+	if (not GetIsValidPlayerHQ())
+	{
+		return;
+	}
+	AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
+	if (not IsValid(MissionManager))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Could not apply mission starting resources because MissionManager is not valid.");
+		return;
+	}
+	const FMissionStartingResources StartingResources = MissionManager->GetMissionStartingResources();
+	if (not StartingResources.GetHasAnyStartingResources())
+	{
+		M_PlayerProfileLoadingStatus.bM_HasAppliedMissionStartingResources = true;
+		return;
+	}
+
+	TArray<TPair<ERTSResourceType, int32>> ResourceBonuses;
+	ResourceBonuses.Reserve(3);
+	if (StartingResources.M_Radixite > 0)
+	{
+		ResourceBonuses.Add(TPair<ERTSResourceType, int32>(ERTSResourceType::Resource_Radixite, StartingResources.M_Radixite));
+	}
+	if (StartingResources.M_Metal > 0)
+	{
+		ResourceBonuses.Add(TPair<ERTSResourceType, int32>(ERTSResourceType::Resource_Metal, StartingResources.M_Metal));
+	}
+	if (StartingResources.M_VehicleParts > 0)
+	{
+		ResourceBonuses.Add(TPair<ERTSResourceType, int32>(ERTSResourceType::Resource_VehicleParts, StartingResources.M_VehicleParts));
+	}
+
+	M_PlayerResourceManager->AddCustomResourceBonuses(ResourceBonuses);
+	M_PlayerResourceManager->OnPlayerProfileLoaded_SetupHQResourceBonuses();
+	M_PlayerProfileLoadingStatus.bM_HasAppliedMissionStartingResources = true;
+}
+
 void ACPPController::OnPlayerProfileLoadComplete()
 {
 	// Has to be first; also sets reference to the HQ DropOff for the player resource manager to add the player cards'
 	// resource changes.
 	SetupPlayerHQReference();
+	TryApplyMissionStartingResourcesAfterHQFound();
 	M_PlayerProfileLoadingStatus.bHasLoadedPlayerProfile = true;
 	if (M_PlayerProfileLoadingStatus.bInitializeResourcesSettingsOnLoad)
 	{
