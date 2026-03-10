@@ -37,6 +37,39 @@
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "VehicleAI/Components/VehiclePathFollowingComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "Components/SkeletalMeshComponent.h"
+
+namespace TankTowHelpers
+{
+	bool TryGetLandscapeSnapLocation(const UWorld* World, const AActor* ActorToIgnore, const FVector& CurrentLocation,
+	                                FVector& OutLocation)
+	{
+		if (not IsValid(World))
+		{
+			return false;
+		}
+
+		FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TankTowLandscapeSnap), false, ActorToIgnore);
+		FHitResult LandscapeHitResult;
+		const FVector TraceStart = CurrentLocation + FVector::UpVector * 500.0f;
+		const FVector TraceEnd = TraceStart - FVector::UpVector * 2000.0f;
+		const bool bDidHitLandscape = World->LineTraceSingleByChannel(
+			LandscapeHitResult,
+			TraceStart,
+			TraceEnd,
+			COLLISION_TRACE_LANDSCAPE,
+			CollisionQueryParams
+		);
+		if (not bDidHitLandscape)
+		{
+			return false;
+		}
+
+		OutLocation = LandscapeHitResult.ImpactPoint;
+		return true;
+	}
+}
 
 FTankStartGameAction::FTankStartGameAction()
 	: StartGameAction(EAbilityID::IdNoAbility)
@@ -1443,9 +1476,12 @@ void ATankMaster::ExecuteTowActorCommand_TowVehicle(AActor* TowTargetActor, UTow
 		Commands->SetUnitToIdle();
 		Commands->OnActorBeingTowed(this, M_VehicleTowComponent.Get());
 	}
+	else
+	{
+		TowedActorComponent->SetTowRelationship(this, M_VehicleTowComponent.Get());
+		TowedActorComponent->RemoveAbilitiesWhileTowed();
+	}
 
-	TowedActorComponent->SetTowRelationship(this, M_VehicleTowComponent.Get());
-	TowedActorComponent->RemoveAbilitiesWhileTowed();
 	M_VehicleTowComponent->SetTowRelationship(TowTargetActor, TowedActorComponent, ETowActorAbilitySubtypes::TowVehicle);
 	if (UCommandData* CommandData = GetIsValidCommandData())
 	{
@@ -1490,6 +1526,12 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
 	TeamWeaponActor->SetTurretAngle(0.0f);
 	TeamWeaponActor->UpdateTargetPitch(0.0f);
 	TeamWeaponActor->SetWeaponsEnabledForTeamWeaponState(false);
+
+	if (USkeletalMeshComponent* TeamWeaponMeshComponent = TeamWeaponActor->FindComponentByClass<USkeletalMeshComponent>())
+	{
+		TeamWeaponMeshComponent->SetSimulatePhysics(true);
+	}
+	TeamWeaponActor->NotifyMoverMovementState(true, -TeamWeaponActor->GetActorForwardVector());
 
 	TeamWeaponController->OnActorBeingTowed(this, M_VehicleTowComponent.Get());
 	M_VehicleTowComponent->SetTowRelationship(TeamWeaponActor, TowedActorComponent, ETowActorAbilitySubtypes::TowTeamWeapon);
@@ -1565,6 +1607,12 @@ bool ATankMaster::ExecuteDetachTowCommand_TryDetachSelfFromTow()
 	}
 
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	FVector LandscapeSnapLocation = FVector::ZeroVector;
+	if (TankTowHelpers::TryGetLandscapeSnapLocation(GetWorld(), this, GetActorLocation(), LandscapeSnapLocation))
+	{
+		SetActorLocation(LandscapeSnapLocation);
+	}
+
 	M_TowedActorComponent->RestoreAbilitiesAfterTow();
 	if (UVehicleTowComponent* TowingComp = M_TowedActorComponent->GetTowingVehicleTowComp())
 	{
@@ -1581,6 +1629,12 @@ bool ATankMaster::ExecuteDetachTowCommand_TryDetachSelfFromTow()
 void ATankMaster::ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor, UTowedActorComponent* TowedActorComponent)
 {
 	TowedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	FVector LandscapeSnapLocation = FVector::ZeroVector;
+	if (TankTowHelpers::TryGetLandscapeSnapLocation(GetWorld(), TowedActor, TowedActor->GetActorLocation(), LandscapeSnapLocation))
+	{
+		TowedActor->SetActorLocation(LandscapeSnapLocation);
+	}
+
 	TowedActorComponent->RestoreAbilitiesAfterTow();
 	if (ICommands* Commands = Cast<ICommands>(TowedActor))
 	{

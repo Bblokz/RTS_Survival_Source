@@ -2689,7 +2689,7 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 	const FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, 2000.0f);
 	if (UWorld* World = GetWorld())
 	{
-		if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params))
+		if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, Params))
 		{
 			TeamWeaponActor->SetActorLocation(Hit.ImpactPoint);
 		}
