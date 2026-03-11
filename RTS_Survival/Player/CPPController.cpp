@@ -6581,7 +6581,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 	UTowedActorComponent* SelectedTowedComp = nullptr;
 	if (AActor* SelectedActor = FindSelectedActorWithFreeToTow(SelectedTowedComp, TowVehicleComp))
 	{
-		const ETowActorAbilitySubtypes TowSubtype = SelectedActor->IsA(ATeamWeaponController::StaticClass())
+		const ETowActorAbilitySubtypes TowSubtype = SelectedActor->IsA(ATeamWeapon::StaticClass())
 			                                            ? ETowActorAbilitySubtypes::TowTeamWeapon
 			                                            : ETowActorAbilitySubtypes::TowVehicle;
 		if (TowVehicle->TowActor(SelectedActor, TowSubtype, not bIsHoldingShift) == ECommandQueueError::NoError)
@@ -6598,22 +6598,36 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp,
 	UVehicleTowComponent* VehicleCompTowing)
 {
+	OutTowedActorComp = nullptr;
+
+	if (not IsValid(VehicleCompTowing))
+	{
+		return nullptr;
+	}
+
 	EnsureSelectionsAreRTSValid();
 	ATankMaster* TowVehicle = Cast<ATankMaster>(VehicleCompTowing->GetOwner());
-	if(not TowVehicle)
+	if (not IsValid(TowVehicle))
 	{
 		return nullptr;
 	}
 	for (auto EachSquadController : TSelectedSquadControllers)
 	{
 		ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(EachSquadController);
-		if(not TeamWeaponController)
+		if (not IsValid(TeamWeaponController))
 		{
 			continue;
 		}
-		if(FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(TowVehicle, TeamWeaponController, OutTowedActorComp))
+
+		ATeamWeapon* ControlledTeamWeapon = TeamWeaponController->GetControlledTeamWeapon();
+		if (not IsValid(ControlledTeamWeapon))
 		{
-			return EachSquadController;
+			continue;
+		}
+
+		if (FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(TowVehicle, TeamWeaponController, OutTowedActorComp))
+		{
+			return ControlledTeamWeapon;
 		}
 	}
 
@@ -6635,7 +6649,6 @@ AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& Ou
 			return EachActor;
 		}
 	}
-	OutTowedActorComp = nullptr;
 	return nullptr;
 }
 
