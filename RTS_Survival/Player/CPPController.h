@@ -1124,6 +1124,17 @@ private:
 	                                           const FVector& ClickedLocation);
 
 	AActor* FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp, UVehicleTowComponent* VehicleCompTowing);
+	/**
+	 * @brief Resolves tow runtime data from click context so team-weapon tow state stays controller-owned.
+	 * @param TowTargetActor Clicked actor to evaluate for towability.
+	 * @param TowType High-level tow case derived from decoder/click context.
+	 * @param OutTowedActorComponent Towed component resolved from actor or owning team-weapon controller.
+	 * @param OutTowSubtype Tow subtype to queue for command disambiguation.
+	 * @return True when target can currently be towed.
+	 */
+	bool GetTowableTargetData(AActor* TowTargetActor, const ETowType TowType,
+	                        UTowedActorComponent*& OutTowedActorComponent,
+	                        ETowActorAbilitySubtypes& OutTowSubtype) const;
 	uint32 IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
 	                                             const FVector& ClickedLocation, const ETowType TowType);
 

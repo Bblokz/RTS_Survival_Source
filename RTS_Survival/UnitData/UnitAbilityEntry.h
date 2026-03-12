@@ -82,6 +82,8 @@ namespace FAbilityHelpers
 static bool GetCanTowTeamWeaponWithCurrentCargoCapacity(
 	const ATankMaster* TowVehicle,
 	const ATeamWeaponController* TeamWeaponController, UTowedActorComponent*& OutCompToTow);
+
+static bool GetCanExecuteDetachTow(const AActor* Actor);
 	
 
 	inline USquadReinforcementComponent* GetReinforcementAbilityComp(AActor* Actor)

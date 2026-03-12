@@ -1702,7 +1702,7 @@ bool ATankMaster::GetTowTargetData(AActor* TowTargetActor, const ETowActorAbilit
 		{
 			return false;
 		}
-		OutTowedActorComponent = OutTeamWeaponController->FindComponentByClass<UTowedActorComponent>();
+		OutTowedActorComponent = OutTeamWeaponActor->FindComponentByClass<UTowedActorComponent>();
 		return IsValid(OutTowedActorComponent);
 	}
 

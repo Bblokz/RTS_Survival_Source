@@ -320,6 +320,12 @@ bool UPlayerCommandTypeDecoder::Decode_TeamWeapon(
 
 	if (GetIsActorAlliedToPlayer(TeamWeapon))
 	{
+		if (TeamWeapon->FindComponentByClass<UTowedActorComponent>())
+		{
+			OutType = ECommandType::ClickedTowableActor;
+			return true;
+		}
+
 		OutType = ECommandType::AlliedCharacter;
 		return true;
 	}
