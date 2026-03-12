@@ -2753,6 +2753,11 @@ ECommandQueueError ICommands::DetachTow(const bool bSetUnitToIdle)
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
+	if (not FAbilityHelpers::GetCanExecuteDetachTow(GetOwnerActor()))
+	{
+		return ECommandQueueError::AbilityInvalidTarget;
+	}
+
 	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdDetachTow);
 	if (AbilityError != ECommandQueueError::NoError)
 	{

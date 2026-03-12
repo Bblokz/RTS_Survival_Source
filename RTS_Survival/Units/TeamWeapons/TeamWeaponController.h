@@ -154,6 +154,8 @@ public:
 	float GetTeamWeaponRange()const;
 	bool PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	bool GetHasControlledTeamWeapon() const;
+	UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport();
+	const UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport() const;
 	virtual bool GetSquadAlreadyHasTeamWeapon() const override;
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
@@ -225,6 +227,7 @@ private:
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
 	bool GetIsValidDigInComponent() const;
 	bool GetIsValidTowedActorComponent() const;
+	void ExecuteDetachTowCommand_ResetTowedVisualState(ATeamWeapon* TeamWeaponActor) const;
 
 	void BeginPlay_InitAnimatedTextWidgetPoolManager();
 

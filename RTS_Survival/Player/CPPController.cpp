@@ -6655,19 +6655,15 @@ AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& Ou
 uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
                                                               const FVector& ClickedLocation, const ETowType TowType)
 {
-	UTowedActorComponent* TargetTowedComp = TowTargetActor->FindComponentByClass<UTowedActorComponent>();
-	if (not IsValid(TargetTowedComp) || not TargetTowedComp->IsTowFree())
+	UTowedActorComponent* TargetTowedComp = nullptr;
+	ETowActorAbilitySubtypes TowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+	if (not GetTowableTargetData(TowTargetActor, TowType, TargetTowedComp, TowSubtype))
 	{
 		OutAbilityActivated = EAbilityID::IdMove;
 		return MoveUnitsToLocation(ClickedLocation);
 	}
 
 	OutAbilityActivated = EAbilityID::IdTowActor;
-	ETowActorAbilitySubtypes TowSubtype = ETowActorAbilitySubtypes::TowVehicle;
-	if (TowType == ETowType::ClickedTeamWeaponToTow || TowTargetActor->IsA(ATeamWeapon::StaticClass()))
-	{
-		TowSubtype = ETowActorAbilitySubtypes::TowTeamWeapon;
-	}
 
 	for (AActor* SelectedActor : TSelectedActorsMasters)
 	{
@@ -6691,4 +6687,44 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetA
 
 	OutAbilityActivated = EAbilityID::IdMove;
 	return MoveUnitsToLocation(ClickedLocation);
+}
+
+bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowType TowType,
+	UTowedActorComponent*& OutTowedActorComponent, ETowActorAbilitySubtypes& OutTowSubtype) const
+{
+	OutTowedActorComponent = nullptr;
+	OutTowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+
+	if (not IsValid(TowTargetActor))
+	{
+		return false;
+	}
+
+	const bool bIsTeamWeaponTowType = TowType == ETowType::ClickedTeamWeaponToTow || TowTargetActor->IsA(ATeamWeapon::StaticClass());
+	if (not bIsTeamWeaponTowType)
+	{
+		OutTowedActorComponent = TowTargetActor->FindComponentByClass<UTowedActorComponent>();
+		if (not IsValid(OutTowedActorComponent) || not OutTowedActorComponent->IsTowFree())
+		{
+			return false;
+		}
+
+		OutTowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+		return true;
+	}
+
+	ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(TowTargetActor);
+	if (not IsValid(TeamWeapon))
+	{
+		return false;
+	}
+
+	OutTowedActorComponent = TeamWeapon->FindComponentByClass<UTowedActorComponent>();
+	if (not IsValid(OutTowedActorComponent) || not OutTowedActorComponent->IsTowFree())
+	{
+		return false;
+	}
+
+	OutTowSubtype = ETowActorAbilitySubtypes::TowTeamWeapon;
+	return true;
 }

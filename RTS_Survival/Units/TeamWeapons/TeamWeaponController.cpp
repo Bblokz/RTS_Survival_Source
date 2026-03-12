@@ -14,6 +14,7 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -60,7 +61,7 @@ void ATeamWeaponController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	M_DigInComponent = FindComponentByClass<UDigInComponent>();
-	M_TowedActorComponent = FindComponentByClass<UTowedActorComponent>();
+	M_TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport();
 
 	if (not GetIsValidDigInComponent())
 	{
@@ -495,6 +496,41 @@ bool ATeamWeaponController::PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* Aband
 bool ATeamWeaponController::GetHasControlledTeamWeapon() const
 {
 	return M_TeamWeapon != nullptr && not bM_IsTeamWeaponAbandoned;
+}
+
+UTowedActorComponent* ATeamWeaponController::GetControlledTeamWeaponTowedActorComponentNoReport()
+{
+	if (not GetHasControlledTeamWeapon())
+	{
+		M_TowedActorComponent = nullptr;
+		return nullptr;
+	}
+
+	ATeamWeapon* ControlledTeamWeapon = M_TeamWeapon.Get();
+	if (not IsValid(ControlledTeamWeapon))
+	{
+		M_TowedActorComponent = nullptr;
+		return nullptr;
+	}
+
+	M_TowedActorComponent = ControlledTeamWeapon->FindComponentByClass<UTowedActorComponent>();
+	return M_TowedActorComponent.Get();
+}
+
+const UTowedActorComponent* ATeamWeaponController::GetControlledTeamWeaponTowedActorComponentNoReport() const
+{
+	if (not GetHasControlledTeamWeapon())
+	{
+		return nullptr;
+	}
+
+	const ATeamWeapon* ControlledTeamWeapon = M_TeamWeapon.Get();
+	if (not IsValid(ControlledTeamWeapon))
+	{
+		return nullptr;
+	}
+
+	return ControlledTeamWeapon->FindComponentByClass<UTowedActorComponent>();
 }
 
 bool ATeamWeaponController::GetSquadAlreadyHasTeamWeapon() const
@@ -2658,16 +2694,17 @@ bool ATeamWeaponController::GetIsValidTowedActorComponent() const
 
 void ATeamWeaponController::ExecuteDetachTowCommand()
 {
-	if (not GetIsValidTowedActorComponent() || M_TowedActorComponent->IsTowFree())
+	UTowedActorComponent* TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport();
+	if (not IsValid(TowedActorComponent) || TowedActorComponent->IsTowFree())
 	{
 		DoneExecutingCommand(EAbilityID::IdDetachTow);
 		return;
 	}
 
-	ATankMaster* TowingTank = Cast<ATankMaster>(M_TowedActorComponent->GetTowingActor());
+	ATankMaster* TowingTank = Cast<ATankMaster>(TowedActorComponent->GetTowingActor());
 	if (not IsValid(TowingTank))
 	{
-		M_TowedActorComponent->ClearTowRelationship();
+		TowedActorComponent->ClearTowRelationship();
 		DoneExecutingCommand(EAbilityID::IdDetachTow);
 		return;
 	}
@@ -2675,10 +2712,12 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 	ATeamWeapon* TeamWeaponActor = M_TeamWeapon;
 	if (not IsValid(TeamWeaponActor))
 	{
-		M_TowedActorComponent->ClearTowRelationship();
+		TowedActorComponent->ClearTowRelationship();
 		DoneExecutingCommand(EAbilityID::IdDetachTow);
 		return;
 	}
+
+	ExecuteDetachTowCommand_ResetTowedVisualState(TeamWeaponActor);
 
 	TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	FHitResult Hit;
@@ -2710,18 +2749,33 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 	SnapOperatorsToCrewPositions();
 	MoveGuardsToRandomGuardPositions();
 
-	M_TowedActorComponent->RestoreAbilitiesAfterTow();
-	if (UVehicleTowComponent* TowingTowComp = M_TowedActorComponent->GetTowingVehicleTowComp())
+	TowedActorComponent->RestoreAbilitiesAfterTow();
+	if (UVehicleTowComponent* TowingTowComp = TowedActorComponent->GetTowingVehicleTowComp())
 	{
 		TowingTowComp->ClearTowRelationship();
 	}
-	M_TowedActorComponent->ClearTowRelationship();
+	TowedActorComponent->ClearTowRelationship();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	if (UCommandData* CommandData = GetIsValidCommandData())
 	{
 		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
 	}
 	DoneExecutingCommand(EAbilityID::IdDetachTow);
+}
+
+void ATeamWeaponController::ExecuteDetachTowCommand_ResetTowedVisualState(ATeamWeapon* TeamWeaponActor) const
+{
+	if (not IsValid(TeamWeaponActor))
+	{
+		return;
+	}
+
+	TeamWeaponActor->NotifyMoverMovementState(false, FVector::ZeroVector);
+
+	if (USkeletalMeshComponent* TeamWeaponMeshComponent = TeamWeaponActor->FindComponentByClass<USkeletalMeshComponent>())
+	{
+		TeamWeaponMeshComponent->SetSimulatePhysics(false);
+	}
 }
 
 void ATeamWeaponController::TerminateDetachTowCommand()
@@ -2731,10 +2785,10 @@ void ATeamWeaponController::TerminateDetachTowCommand()
 void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp)
 {
 	SetTeamWeaponState(ETeamWeaponState::Towed);
-	if (GetIsValidTowedActorComponent())
+	if (UTowedActorComponent* TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport())
 	{
-		M_TowedActorComponent->SetTowRelationship(TowingVehicle, TowComp);
-		M_TowedActorComponent->RemoveAbilitiesWhileTowed();
+		TowedActorComponent->SetTowRelationship(TowingVehicle, TowComp);
+		TowedActorComponent->RemoveAbilitiesWhileTowed();
 	}
 	if (UCommandData* CommandData = GetIsValidCommandData())
 	{
