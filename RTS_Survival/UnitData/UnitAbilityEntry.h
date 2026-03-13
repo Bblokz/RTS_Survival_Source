@@ -11,7 +11,6 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionTypes/FieldConstructionTypes.h"
-#include "RTS_Survival/RTSComponents/TowMechanic/TowedActor/TowedActor.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
@@ -26,6 +25,7 @@ class UAttachedWeaponAbilityComponent;
 class UTurretSwapComp;
 class ASquadController;
 class ATeamWeapon;
+class UTowedActorComponent;
 /**
  * @brief Ability entry containing metadata such as cooldown and custom type.
  */
