@@ -6619,15 +6619,21 @@ AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& Ou
 			continue;
 		}
 
-		ATeamWeapon* ControlledTeamWeapon = TeamWeaponController->GetControlledTeamWeapon();
-		if (not IsValid(ControlledTeamWeapon))
+		UTowedActorComponent* ControlledTeamWeaponTowedComponent = TeamWeaponController->GetControlledTeamWeaponTowedActorComponentNoReport();
+		if (not IsValid(ControlledTeamWeaponTowedComponent))
+		{
+			continue;
+		}
+
+		AActor* ControlledTeamWeaponActor = ControlledTeamWeaponTowedComponent->GetOwner();
+		if (not IsValid(ControlledTeamWeaponActor))
 		{
 			continue;
 		}
 
 		if (FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(TowVehicle, TeamWeaponController, OutTowedActorComp))
 		{
-			return ControlledTeamWeapon;
+			return ControlledTeamWeaponActor;
 		}
 	}
 
