@@ -359,7 +359,7 @@ void AICBMActor::SpawnImpactEffects(const FVector& ImpactLocation, const ERTSSur
 	}
 }
 
-void AICBMActor::ApplyDirectDamage(const FHitResult& HitResult, AActor* HitActor) const
+void AICBMActor::ApplyDirectDamage(const FHitResult& HitResult, AActor* HitActor)
 {
 	if (not IsValid(HitActor))
 	{
@@ -397,7 +397,7 @@ void AICBMActor::ApplyDirectDamage(const FHitResult& HitResult, AActor* HitActor
 	AdjustedHitActor->TakeDamage(DamageToApply, DamageEvent, nullptr, this);
 }
 
-void AICBMActor::ApplyAOEDamage(const FVector& ImpactLocation, AActor* PrimaryHitActor) const
+void AICBMActor::ApplyAOEDamage(const FVector& ImpactLocation, AActor* PrimaryHitActor)
 {
 	if (M_LaunchSettings.WeaponData.ShrapnelRange <= 0.0f)
 	{

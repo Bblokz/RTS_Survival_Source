@@ -57,8 +57,8 @@ private:
 	void OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum);
 	void HandleImpact(const FHitResult& HitResult);
 	void SpawnImpactEffects(const FVector& ImpactLocation, const ERTSSurfaceType SurfaceType) const;
-	void ApplyDirectDamage(const FHitResult& HitResult, AActor* HitActor) const;
-	void ApplyAOEDamage(const FVector& ImpactLocation, AActor* PrimaryHitActor) const;
+	void ApplyDirectDamage(const FHitResult& HitResult, AActor* HitActor);
+	void ApplyAOEDamage(const FVector& ImpactLocation, AActor* PrimaryHitActor);
 
 	bool GetIsValidProjectileMovementComp() const;
 	bool GetIsValidOwningLaunchComponent() const;
