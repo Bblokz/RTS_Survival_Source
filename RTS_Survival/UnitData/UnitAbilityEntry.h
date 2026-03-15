@@ -79,11 +79,11 @@ namespace FAbilityHelpers
  * @param OutCompToTow
  * @return True when this tow pairing is currently valid as a preview check.
  */
-static bool GetCanTowTeamWeaponWithCurrentCargoCapacity(
+bool GetCanTowTeamWeaponWithCurrentCargoCapacity(
 	const ATankMaster* TowVehicle,
 	const ATeamWeaponController* TeamWeaponController, UTowedActorComponent*& OutCompToTow);
 
-static bool GetCanExecuteDetachTow(const AActor* Actor);
+bool GetCanExecuteDetachTow(const AActor* Actor);
 	
 
 	inline USquadReinforcementComponent* GetReinforcementAbilityComp(AActor* Actor)
