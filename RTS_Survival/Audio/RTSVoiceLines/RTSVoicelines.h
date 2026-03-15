@@ -167,7 +167,9 @@ enum class ERTSVoiceLineUnitType : uint8
 	AntiTankInfantry,
 	RusRegular,
 	RusHazmat,
-	RusElite
+	RusElite,
+	PAK,
+	FLAK
 };
 
 USTRUCT(BlueprintType)
