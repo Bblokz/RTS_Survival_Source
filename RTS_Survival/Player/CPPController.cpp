@@ -4279,7 +4279,9 @@ void ACPPController::ActionButtonTowActorSecondClick(AActor* ClickedActor, const
 	{
 		return;
 	}
-
+	ETowAbilityType TowAbilityType = M_GameUIController->GetTowActorTypeOfPrimarySelectedActor();
+	if(TowAbilityType == ETowAbilityType::DefaultTeamWeapon)
+	{
 	ATankMaster* ClickedTowVehicle = Cast<ATankMaster>(ClickedActor);
 	if (not IsValid(ClickedTowVehicle))
 	{
@@ -4348,6 +4350,18 @@ void ACPPController::ActionButtonTowActorSecondClick(AActor* ClickedActor, const
 	}
 
 	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+		
+	}
+	else
+	{
+		// todo we have select a vehicle that is looking for a towable team weapon; check if the clicked actor is a towable team weapon.
+		// and if so order the vehicle to tow it (if the vehicle is also tow free) otherwise do nothing.
+		// play either clickedActorCannotBeTowed if the clicked actor cannot be towed by our primary selected actor or play
+		// PrimaryActorCannotTow, all on the announcer.
+		// if we succeed play VehicleWillTowClickedActor on the announcer.
+	}
+
+
 }
 
 

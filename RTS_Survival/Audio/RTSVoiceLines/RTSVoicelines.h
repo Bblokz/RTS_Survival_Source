@@ -113,6 +113,9 @@ enum class EAnnouncerVoiceLineType : uint8
 	LowBaseEnergy,
 	BaseEnergyRestored,
 	clickedActorCannotTow,
+	clickedActorCannotBeTowed,
+	PrimaryActorCannotTow,
+	VehicleWillTowClickedActor
 };
 
 USTRUCT(BlueprintType)

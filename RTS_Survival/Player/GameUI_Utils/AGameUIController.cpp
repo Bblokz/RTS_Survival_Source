@@ -363,6 +363,32 @@ AActor* AGameUIController::GetPrimarySelectedUnit() const
 	return M_currentGameUIState.PrimarySelectedUnit;
 }
 
+ETowAbilityType AGameUIController::GetTowActorTypeOfPrimarySelectedActor() const
+{
+	constexpr ETowAbilityType DefaultTowType = ETowAbilityType::DefaultTeamWeapon;
+	AActor* Primary = GetPrimarySelectedUnit();
+	if(not IsValid(Primary))
+	{
+		return DefaultTowType;
+	}
+	ICommands* CommandsInterface = Cast<ICommands>(Primary);
+	if(not CommandsInterface)
+	{
+		return DefaultTowType;
+	}
+	TArray<FUnitAbilityEntry> AbilityEntries = CommandsInterface->GetUnitAbilityEntries();
+	for(auto EachEntry : AbilityEntries)
+	{
+		if(EachEntry.AbilityId != EAbilityID::IdTowActor)
+		{
+			continue;	
+		}
+		return static_cast<ETowAbilityType>(EachEntry.CustomType);
+	}
+	return DefaultTowType;
+	
+}
+
 void AGameUIController::IncrementGameUI_Index()
 {
 	M_ActiveGameUIArrayIndex++;

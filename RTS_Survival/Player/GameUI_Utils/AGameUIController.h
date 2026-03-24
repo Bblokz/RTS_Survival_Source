@@ -125,6 +125,10 @@ public:
 	/** @return  The primary selected unit as determined by the last update of the action UI. */
 	AActor* GetPrimarySelectedUnit() const;
 
+	// Used to get the specific tow type of this primary unit; either team weapon that needs a vehicle to tow it or
+	// a vehicle that needs an actor to be attached.
+	ETowAbilityType GetTowActorTypeOfPrimarySelectedActor()const;
+
 	
 
 	inline void SetPlayerController(ACPPController* NewController) { M_PlayerController = NewController; }
