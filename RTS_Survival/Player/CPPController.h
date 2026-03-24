@@ -1295,6 +1295,7 @@ private:
 	void ActionButtonAimAbility(const FVector& ClickedLocation, const EAimAbilityType AimAbilityType);
 	void ActionButtonAttachedWeaponAbility(const FVector& ClickedLocation,
 	                                       const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
+	void ActionButtonTowActorSecondClick(AActor* ClickedActor, const FVector& ClickedLocation);
 
 	// Stops Movement, BT Logic, targets and TCommand
 	// todo integrate with ICommands.
@@ -1314,6 +1315,7 @@ private:
 	void DirectActionButtonReturnToBase();
 	void DirectActionButtonRetreat();
 	void DirectActionButtonExitCargo();
+	void DirectActionButtonDetachTow();
 
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();
