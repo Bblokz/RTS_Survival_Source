@@ -112,6 +112,7 @@ enum class EAnnouncerVoiceLineType : uint8
 	NoSelectedSquadWithSufficientUnitsForTeamWeapon,
 	LowBaseEnergy,
 	BaseEnergyRestored,
+	clickedActorCannotTow,
 };
 
 USTRUCT(BlueprintType)
