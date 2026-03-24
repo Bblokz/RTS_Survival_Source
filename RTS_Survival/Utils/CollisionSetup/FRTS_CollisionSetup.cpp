@@ -383,6 +383,8 @@ void FRTS_CollisionSetup::SetupCollisionForTeamWeaponMeshes(const TArray<UMeshCo
 		WeaponMesh->SetGenerateOverlapEvents(true);
 		WeaponMesh->SetCanEverAffectNavigation(false);
 		WeaponMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+		// Block landscape object.
+		WeaponMesh->SetCollisionResponseToChannel(COLLISION_TRACE_LANDSCAPE, ECR_Block);
 		WeaponMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 		WeaponMesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
 

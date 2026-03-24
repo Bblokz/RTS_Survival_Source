@@ -64,7 +64,6 @@ public:
 	void RestoreAbilitiesAfterTow();
 
 private:
-	bool GetIsValidCommandsOwner() const;
 
 	UPROPERTY(EditDefaultsOnly, Category="Tow")
 	FTowedActorSettings M_TowedSettings;
@@ -77,4 +76,6 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UVehicleTowComponent> M_TowingVehicleTowComp;
+
+	 ICommands* GetOwningICommands() const;
 };

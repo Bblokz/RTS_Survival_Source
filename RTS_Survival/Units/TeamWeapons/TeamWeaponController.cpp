@@ -2771,11 +2771,6 @@ void ATeamWeaponController::ExecuteDetachTowCommand_ResetTowedVisualState(ATeamW
 	}
 
 	TeamWeaponActor->NotifyMoverMovementState(false, FVector::ZeroVector);
-
-	if (USkeletalMeshComponent* TeamWeaponMeshComponent = TeamWeaponActor->FindComponentByClass<USkeletalMeshComponent>())
-	{
-		TeamWeaponMeshComponent->SetSimulatePhysics(false);
-	}
 }
 
 void ATeamWeaponController::TerminateDetachTowCommand()

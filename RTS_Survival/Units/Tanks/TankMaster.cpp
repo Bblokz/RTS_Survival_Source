@@ -1527,10 +1527,6 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
 	TeamWeaponActor->UpdateTargetPitch(0.0f);
 	TeamWeaponActor->SetWeaponsEnabledForTeamWeaponState(false);
 
-	if (USkeletalMeshComponent* TeamWeaponMeshComponent = TeamWeaponActor->FindComponentByClass<USkeletalMeshComponent>())
-	{
-		TeamWeaponMeshComponent->SetSimulatePhysics(true);
-	}
 	TeamWeaponActor->NotifyMoverMovementState(true, -TeamWeaponActor->GetActorForwardVector());
 
 	TeamWeaponController->OnActorBeingTowed(this, M_VehicleTowComponent.Get());
