@@ -150,6 +150,45 @@ void UEnemyFormationController::GetActiveFormationData(TArray<FFormationData>& O
 	}
 }
 
+void UEnemyFormationController::RemoveActiveFormationsByID(const TArray<int32>& FormationIDs)
+{
+	for (const int32 FormationID : FormationIDs)
+	{
+		FFormationData* ActiveFormation = M_ActiveFormations.Find(FormationID);
+		if (not ActiveFormation)
+		{
+			continue;
+		}
+
+		for (FFormationUnitData& FormationUnit : ActiveFormation->FormationUnits)
+		{
+			if (not FormationUnit.IsValidFormationUnit())
+			{
+				continue;
+			}
+
+			if (not FormationUnit.MovementCompleteHandle.IsValid())
+			{
+				continue;
+			}
+
+			FormationUnit.Unit->OnUnitIdleAndNoNewCommandsDelegate.Remove(FormationUnit.MovementCompleteHandle);
+		}
+
+		M_ActiveFormations.Remove(FormationID);
+	}
+
+	if (M_ActiveFormations.Num() > 0)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_FormationCheckTimerHandle);
+	}
+}
+
 
 void UEnemyFormationController::BeginPlay()
 {

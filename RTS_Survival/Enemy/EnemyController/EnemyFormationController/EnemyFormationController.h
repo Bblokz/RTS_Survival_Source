@@ -68,6 +68,7 @@ public:
 
 	void DebugAllActiveFormations() const;
 	void GetActiveFormationData(TArray<FFormationData>& OutFormationData) const;
+	void RemoveActiveFormationsByID(const TArray<int32>& FormationIDs);
 
 protected:
 	// Called when the game starts

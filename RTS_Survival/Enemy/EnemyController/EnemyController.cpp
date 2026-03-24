@@ -474,9 +474,11 @@ void AEnemyController::RetreatAllFormations(
 
 	TArray<FRetreatElement> RetreatingSquadControllers;
 	TArray<FRetreatElement> ReverseRetreatUnits;
+	TArray<int32> FormationIDsToRemoveAfterRetreat;
 
 	for (const FFormationData& Formation : ActiveFormations)
 	{
+		bool bHasIssuedRetreatOrderForFormation = false;
 		const FVector RetreatLocation = Formation.AverageSpawnLocation;
 		for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
 		{
@@ -500,6 +502,7 @@ void AEnemyController::RetreatAllFormations(
 					RetreatElement.Unit = FormationUnit.Unit;
 					RetreatElement.RetreatLocation = RetreatLocation;
 					RetreatingSquadControllers.Add(RetreatElement);
+					bHasIssuedRetreatOrderForFormation = true;
 				}
 				continue;
 			}
@@ -511,7 +514,13 @@ void AEnemyController::RetreatAllFormations(
 				RetreatElement.Unit = FormationUnit.Unit;
 				RetreatElement.RetreatLocation = RetreatLocation;
 				ReverseRetreatUnits.Add(RetreatElement);
+				bHasIssuedRetreatOrderForFormation = true;
 			}
+		}
+
+		if (bHasIssuedRetreatOrderForFormation)
+		{
+			FormationIDsToRemoveAfterRetreat.Add(Formation.FormationID);
 		}
 	}
 
@@ -521,6 +530,8 @@ void AEnemyController::RetreatAllFormations(
 			"No valid retreat units found to track. \nAt AEnemyController::RetreatAllFormations()");
 		return;
 	}
+
+	M_FormationController->RemoveActiveFormationsByID(FormationIDsToRemoveAfterRetreat);
 
 	M_EnemyRetreatController->StartRetreat(
 		RetreatingSquadControllers,
