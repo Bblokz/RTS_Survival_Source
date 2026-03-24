@@ -1296,6 +1296,22 @@ private:
 	void ActionButtonAttachedWeaponAbility(const FVector& ClickedLocation,
 	                                       const EAttachWeaponAbilitySubType AttachedWeaponAbilityType);
 	void ActionButtonTowActorSecondClick(AActor* ClickedActor, const FVector& ClickedLocation);
+	/**
+	 * @brief Handles second-click tow when the primary selected unit is a towable actor.
+	 * @param PrimarySelectedActor Primary selected actor that should be attached to the clicked tow vehicle.
+	 * @param ClickedActor Candidate towing vehicle clicked by the player.
+	 * @param ClickedLocation World location used for command feedback VFX.
+	 */
+	void ActionButtonTowActorSecondClick_DefaultTeamWeapon(AActor* PrimarySelectedActor, AActor* ClickedActor,
+	                                                       const FVector& ClickedLocation);
+	/**
+	 * @brief Handles second-click tow when the primary selected unit is a towing vehicle.
+	 * @param PrimarySelectedActor Primary selected towing vehicle actor.
+	 * @param ClickedActor Candidate towable actor clicked by the player.
+	 * @param ClickedLocation World location used for command feedback VFX.
+	 */
+	void ActionButtonTowActorSecondClick_VehicleHook(AActor* PrimarySelectedActor, AActor* ClickedActor,
+	                                                 const FVector& ClickedLocation);
 
 	// Stops Movement, BT Logic, targets and TCommand
 	// todo integrate with ICommands.
