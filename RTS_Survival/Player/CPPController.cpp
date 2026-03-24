@@ -4141,6 +4141,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdReinforceSquad:
 		this->DirectActionButtonReinforce();
 		break;
+	case EAbilityID::IdDetachTow:
+		this->DirectActionButtonDetachTow();
+		break;
 	default:
 		// execute a button on the next click
 		bM_IsActionButtonActive = true;
@@ -4251,12 +4254,100 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		ActionButtonRepair(ClickedActor);
 		break;
 	case EAbilityID::IdTowActor:
-		// todo attempt to tow the primary selected actor with the clicked actor.
-			break;
+		ActionButtonTowActorSecondClick(ClickedActor, ClickedLocation);
+		break;
 	default:
 		break;
 	}
 	return true;
+}
+
+void ACPPController::ActionButtonTowActorSecondClick(AActor* ClickedActor, const FVector& ClickedLocation)
+{
+	if (not GetIsValidGameUIController())
+	{
+		return;
+	}
+
+	AActor* PrimarySelectedActor = M_GameUIController->GetPrimarySelectedUnit();
+	if (not IsValid(PrimarySelectedActor))
+	{
+		return;
+	}
+
+	if (not IsValid(ClickedActor))
+	{
+		return;
+	}
+
+	ATankMaster* ClickedTowVehicle = Cast<ATankMaster>(ClickedActor);
+	if (not IsValid(ClickedTowVehicle))
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+		return;
+	}
+
+	UVehicleTowComponent* ClickedTowVehicleComp = ClickedTowVehicle->FindComponentByClass<UVehicleTowComponent>();
+	if (not IsValid(ClickedTowVehicleComp) || not ClickedTowVehicleComp->IsTowFree())
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+		return;
+	}
+
+	AActor* TowTargetActor = PrimarySelectedActor;
+	UTowedActorComponent* PrimarySelectedTowedComponent = nullptr;
+	ETowActorAbilitySubtypes TowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+
+	if (ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(PrimarySelectedActor))
+	{
+		PrimarySelectedTowedComponent = TeamWeaponController->GetControlledTeamWeaponTowedActorComponentNoReport();
+		if (not IsValid(PrimarySelectedTowedComponent))
+		{
+			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+			return;
+		}
+
+		TowTargetActor = PrimarySelectedTowedComponent->GetOwner();
+		TowSubtype = ETowActorAbilitySubtypes::TowTeamWeapon;
+		if (not FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(
+			ClickedTowVehicle,
+			TeamWeaponController,
+			PrimarySelectedTowedComponent))
+		{
+			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+			return;
+		}
+	}
+	else
+	{
+		PrimarySelectedTowedComponent = PrimarySelectedActor->FindComponentByClass<UTowedActorComponent>();
+		if (not IsValid(PrimarySelectedTowedComponent) || not PrimarySelectedTowedComponent->IsTowFree())
+		{
+			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+			return;
+		}
+	}
+
+	if (not IsValid(TowTargetActor))
+	{
+		return;
+	}
+
+	if (ClickedTowVehicle->TowActor(TowTargetActor, TowSubtype, not bIsHoldingShift) == ECommandQueueError::NoError)
+	{
+		const bool bResetAllPlacementEffects = not bIsHoldingShift;
+		constexpr bool bForcePlayVoiceLine = false;
+		CreateVfxAndVoiceLineForIssuedCommand(
+			bResetAllPlacementEffects,
+			1,
+			ClickedLocation,
+			ECommandType::ClickedTowableActor,
+			EAbilityID::IdTowActor,
+			bForcePlayVoiceLine);
+		return;
+	}
+
+	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
 }
 
 
@@ -4832,6 +4923,41 @@ void ACPPController::DirectActionButtonExitCargo()
 		PlayVoiceLineForPrimarySelected(
 			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdExitCargo),
 			false /*bForcePlay*/);
+	}
+}
+
+void ACPPController::DirectActionButtonDetachTow()
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExecuted = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (ASquadController* EachSquad : TSelectedSquadControllers)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
+		{
+			continue;
+		}
+
+		CommandsExecuted += EachSquad->DetachTow(bResetCommandQueueFirst) == ECommandQueueError::NoError;
+	}
+
+	for (AActor* EachPawn : TSelectedPawnMasters)
+	{
+		ATankMaster* SelectedTank = Cast<ATankMaster>(EachPawn);
+		if (not IsValid(SelectedTank))
+		{
+			continue;
+		}
+
+		CommandsExecuted += SelectedTank->DetachTow(bResetCommandQueueFirst) == ECommandQueueError::NoError;
+	}
+
+	if (CommandsExecuted > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdDetachTow),
+			false);
 	}
 }
 
