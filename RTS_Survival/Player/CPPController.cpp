@@ -3367,13 +3367,13 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 		break;
 	case ECommandType::ClickedTowVehicle:
 		AmountCommandsExe += IssueOrderTowActor(Target.TargetActor, OutAbilityActivated, ClickedLocation,
-		                                        ETowType::ClickedTowVehicle);
+		                                        ETowOrderType::ClickedTowVehicle);
 		break;
 	case ECommandType::ClickedTowableActor:
 		{
-			const ETowType TowType = IsValid(Target.TargetActor) && Target.TargetActor->IsA(ATeamWeapon::StaticClass())
-				                         ? ETowType::ClickedTeamWeaponToTow
-				                         : ETowType::ClickedVehicleToTow;
+			const ETowOrderType TowType = IsValid(Target.TargetActor) && Target.TargetActor->IsA(ATeamWeapon::StaticClass())
+				                         ? ETowOrderType::ClickedTeamWeaponToTow
+				                         : ETowOrderType::ClickedVehicleToTow;
 			AmountCommandsExe += IssueOrderTowActor(Target.TargetActor, OutAbilityActivated, ClickedLocation, TowType);
 		}
 		break;
@@ -6673,7 +6673,7 @@ bool ACPPController::GetIsGameWithChoosingStartingLocation()
 
 
 uint32 ACPPController::IssueOrderTowActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
-                                          const FVector& ClickedLocation, const ETowType TowType)
+                                          const FVector& ClickedLocation, const ETowOrderType TowType)
 {
 	if (not IsValid(TowTargetActor))
 	{
@@ -6681,7 +6681,7 @@ uint32 ACPPController::IssueOrderTowActor(AActor* TowTargetActor, EAbilityID& Ou
 		return MoveUnitsToLocation(ClickedLocation);
 	}
 
-	if (TowType == ETowType::ClickedTowVehicle)
+	if (TowType == ETowOrderType::ClickedTowVehicle)
 	{
 		return IssueOrderTowActor_ClickedTowVehicle(TowTargetActor, OutAbilityActivated, ClickedLocation);
 	}
@@ -6721,7 +6721,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 
 
 	OutAbilityActivated = EAbilityID::IdMove;
-	return MoveUnitsToLocation(ClickedLocation);
+	return IssueOrderEnterCargo(TowVehicle, OutAbilityActivated);
 }
 
 AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& OutTowedActorComp,
@@ -6788,7 +6788,7 @@ AActor* ACPPController::FindSelectedActorWithFreeToTow(UTowedActorComponent*& Ou
 }
 
 uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
-                                                              const FVector& ClickedLocation, const ETowType TowType)
+                                                              const FVector& ClickedLocation, const ETowOrderType TowType)
 {
 	UTowedActorComponent* TargetTowedComp = nullptr;
 	ETowActorAbilitySubtypes TowSubtype = ETowActorAbilitySubtypes::TowVehicle;
@@ -6824,7 +6824,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetA
 	return MoveUnitsToLocation(ClickedLocation);
 }
 
-bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowType TowType,
+bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowOrderType TowType,
 	UTowedActorComponent*& OutTowedActorComponent, ETowActorAbilitySubtypes& OutTowSubtype) const
 {
 	OutTowedActorComponent = nullptr;
@@ -6835,7 +6835,7 @@ bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowType
 		return false;
 	}
 
-	const bool bIsTeamWeaponTowType = TowType == ETowType::ClickedTeamWeaponToTow || TowTargetActor->IsA(ATeamWeapon::StaticClass());
+	const bool bIsTeamWeaponTowType = TowType == ETowOrderType::ClickedTeamWeaponToTow || TowTargetActor->IsA(ATeamWeapon::StaticClass());
 	if (not bIsTeamWeaponTowType)
 	{
 		OutTowedActorComponent = TowTargetActor->FindComponentByClass<UTowedActorComponent>();

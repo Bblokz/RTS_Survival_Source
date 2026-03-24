@@ -3,6 +3,15 @@
 #include "CoreMinimal.h"
 #include "TowAbilityTypes.generated.h"
 
+UENUM()
+enum ETowAbilityType
+{
+	// Displays the ability as if owned by a team weapon; select tow vehicle to attach team weapon to.
+	DefaultTeamWeapon,
+	// Displays the ability as if owned by a vehicle; select towable actor to attach to vehicle.
+	VehicleHook,
+};
+
 UENUM(BlueprintType)
 enum class ETowActorAbilitySubtypes : uint8
 {
@@ -12,7 +21,7 @@ enum class ETowActorAbilitySubtypes : uint8
 };
 
 UENUM(BlueprintType)
-enum class ETowType : uint8
+enum class ETowOrderType : uint8
 {
 	None,
 	ClickedTowVehicle,

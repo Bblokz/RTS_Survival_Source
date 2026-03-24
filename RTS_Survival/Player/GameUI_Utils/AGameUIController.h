@@ -125,6 +125,8 @@ public:
 	/** @return  The primary selected unit as determined by the last update of the action UI. */
 	AActor* GetPrimarySelectedUnit() const;
 
+	
+
 	inline void SetPlayerController(ACPPController* NewController) { M_PlayerController = NewController; }
 
 	/**

@@ -71,7 +71,8 @@ bool FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(
 		return false;
 	}
 
-	const UTowedActorComponent* TowedActorComponent = TeamWeaponController->GetControlledTeamWeaponTowedActorComponentNoReport();
+	const UTowedActorComponent* TowedActorComponent = TeamWeaponController->
+		GetControlledTeamWeaponTowedActorComponentNoReport();
 	if (not IsValid(TowedActorComponent) || not TowedActorComponent->IsTowFree())
 	{
 		return false;
@@ -81,7 +82,7 @@ bool FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(
 	return CargoComponent->GetCanFitSquadPure(TeamWeaponController);
 }
 
-bool FAbilityHelpers::GetCanExecuteDetachTow(const AActor* Actor)
+bool FAbilityHelpers::GetCanExecuteDetachTow(AActor* Actor)
 {
 	if (not IsValid(Actor))
 	{
@@ -92,6 +93,15 @@ bool FAbilityHelpers::GetCanExecuteDetachTow(const AActor* Actor)
 	if (IsValid(TowedActorComponent) && not TowedActorComponent->IsTowFree())
 	{
 		return true;
+	}
+	if (Actor->IsA(ATeamWeaponController::StaticClass()))
+	{
+		ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(Actor);
+		if (TeamWeaponController && TeamWeaponController->GetControlledTeamWeaponTowedActorComponentNoReport() &&
+			not TeamWeaponController->GetControlledTeamWeaponTowedActorComponentNoReport()->IsTowFree())
+		{
+			return true;
+		}
 	}
 
 	const UVehicleTowComponent* VehicleTowComponent = Actor->FindComponentByClass<UVehicleTowComponent>();

@@ -83,7 +83,7 @@ bool GetCanTowTeamWeaponWithCurrentCargoCapacity(
 	const ATankMaster* TowVehicle,
 	const ATeamWeaponController* TeamWeaponController, UTowedActorComponent*& OutCompToTow);
 
-bool GetCanExecuteDetachTow(const AActor* Actor);
+bool GetCanExecuteDetachTow(AActor* Actor);
 	
 
 	inline USquadReinforcementComponent* GetReinforcementAbilityComp(AActor* Actor)

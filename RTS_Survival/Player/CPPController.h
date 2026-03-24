@@ -1119,7 +1119,7 @@ private:
 	uint32 IssueOrderManTeamWeapon(AActor* TeamWeaponActor, EAbilityID& OutAbilityActivated,
 	                              const FVector& ClickedLocation);
 	uint32 IssueOrderTowActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
-	                         const FVector& ClickedLocation, const ETowType TowType);
+	                         const FVector& ClickedLocation, const ETowOrderType TowType);
 	uint32 IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
 	                                           const FVector& ClickedLocation);
 
@@ -1132,11 +1132,11 @@ private:
 	 * @param OutTowSubtype Tow subtype to queue for command disambiguation.
 	 * @return True when target can currently be towed.
 	 */
-	bool GetTowableTargetData(AActor* TowTargetActor, const ETowType TowType,
+	bool GetTowableTargetData(AActor* TowTargetActor, const ETowOrderType TowType,
 	                        UTowedActorComponent*& OutTowedActorComponent,
 	                        ETowActorAbilitySubtypes& OutTowSubtype) const;
 	uint32 IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
-	                                             const FVector& ClickedLocation, const ETowType TowType);
+	                                             const FVector& ClickedLocation, const ETowOrderType TowType);
 
 	/**
 	 * @brief Checks if the provided allied actor can be repaired and if so attempts to repair with selected units

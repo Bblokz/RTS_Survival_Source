@@ -128,7 +128,7 @@ bool UVehicleFireFeedbackComponent::GetIsValidHullMesh() const
 		this,
 		"M_HullMesh",
 		"GetIsValidHullMesh",
-		this);
+		GetOwner());
 	return false;
 }
 
