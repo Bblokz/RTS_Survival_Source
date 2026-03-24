@@ -2771,6 +2771,7 @@ void ATeamWeaponController::ExecuteDetachTowCommand_ResetTowedVisualState(ATeamW
 	}
 
 	TeamWeaponActor->NotifyMoverMovementState(false, FVector::ZeroVector);
+
 }
 
 void ATeamWeaponController::TerminateDetachTowCommand()

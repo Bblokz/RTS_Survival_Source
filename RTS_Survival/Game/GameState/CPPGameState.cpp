@@ -7176,7 +7176,7 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdTowActor, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
 	});
 
@@ -7213,7 +7213,7 @@ void ACPPGameState::InitAllGameMortarTWSquadData()
 	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdTowActor, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
 	});
 
@@ -7249,7 +7249,7 @@ void ACPPGameState::InitAllGameFlakTWSquadData()
 	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdTowActor, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
 	});
 
@@ -7286,7 +7286,7 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdTowActor, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
 	});
 
@@ -7333,7 +7333,7 @@ void ACPPGameState::InitAllGameMachineGunTWSquadData()
 	const TArray<FUnitAbilityEntry> TeamWeaponAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdDigIn, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
-		EAbilityID::IdAttackGround, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround, EAbilityID::IdTowActor, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility
 	});
 

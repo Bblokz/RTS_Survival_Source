@@ -4250,6 +4250,11 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 	case EAbilityID::IdRepair:
 		ActionButtonRepair(ClickedActor);
 		break;
+	case EAbilityID::IdTowActor:
+		// todo attempt to tow the primary selected actor with the clicked actor.
+			break;
+	case EAbilityID::IdDetachTow:
+		// todo detach all actors that have that ability.
 	default:
 		break;
 	}
