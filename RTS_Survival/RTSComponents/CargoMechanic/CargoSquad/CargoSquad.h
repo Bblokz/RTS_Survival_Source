@@ -183,4 +183,6 @@ private:
     /** Safety counter to prevent infinite re-path loops when units cannot reach the entrance. */
     UPROPERTY()
     int32 M_RepathToEntranceAttempts = 0;
+
+	bool GetIsOwningSquadATeamWeapon()const;
 };

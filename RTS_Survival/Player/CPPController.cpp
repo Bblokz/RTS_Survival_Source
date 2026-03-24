@@ -6671,7 +6671,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetA
 
 	OutAbilityActivated = EAbilityID::IdTowActor;
 
-	for (AActor* SelectedActor : TSelectedActorsMasters)
+	for (AActor* SelectedActor : TSelectedPawnMasters)
 	{
 		ATankMaster* SelectedTank = Cast<ATankMaster>(SelectedActor);
 		if (not IsValid(SelectedTank))

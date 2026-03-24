@@ -621,8 +621,14 @@ bool UPlayerCommandTypeDecoder::IsOfFaction(AActor* ClickedActor, const uint8 Ow
 			return false;
 		}
 		bIsAllied = RTSComp->GetOwningPlayer() == kPlayerOneId;
+		return bIsAllied;
 	}
-	return bIsAllied;
+	URTSComponent* RTSComp = ClickedActor->FindComponentByClass<URTSComponent>();
+	if (not RTSComp)
+	{
+		return false;
+	}
+	return RTSComp->GetOwningPlayer() == kPlayerOneId;
 }
 
 

@@ -2,6 +2,7 @@
 
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/TowMechanic/VehicleTow/VehicleTow.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UTowedActorComponent::UTowedActorComponent()
@@ -68,12 +69,13 @@ UVehicleTowComponent* UTowedActorComponent::GetTowingVehicleTowComp() const
 
 void UTowedActorComponent::RemoveAbilitiesWhileTowed()
 {
-	if (not GetIsValidCommandsOwner())
+	ICommands* CommandsOwner = GetOwningICommands();
+	if (not CommandsOwner)
 	{
+		RTSFunctionLibrary::ReportError("The towed actor component could not find a valid icommands interface"
+			"on its owner nor the TeamWeaponController of the owner!");
 		return;
 	}
-
-	ICommands* CommandsOwner = Cast<ICommands>(GetOwner());
 	UCommandData* CommandData = CommandsOwner->GetIsValidCommandData();
 	if (not IsValid(CommandData))
 	{
@@ -103,12 +105,13 @@ void UTowedActorComponent::RemoveAbilitiesWhileTowed()
 
 void UTowedActorComponent::RestoreAbilitiesAfterTow()
 {
-	if (not GetIsValidCommandsOwner())
+	ICommands* CommandsOwner = GetOwningICommands();
+	if (not CommandsOwner)
 	{
+		RTSFunctionLibrary::ReportError("The towed actor component could not find a valid icommands interface"
+			"on its owner nor the TeamWeaponController of the owner!");
 		return;
 	}
-
-	ICommands* CommandsOwner = Cast<ICommands>(GetOwner());
 	UCommandData* CommandData = CommandsOwner->GetIsValidCommandData();
 	if (not IsValid(CommandData))
 	{
@@ -123,14 +126,18 @@ void UTowedActorComponent::RestoreAbilitiesAfterTow()
 	M_CachedRemovedAbilities.Reset();
 }
 
-bool UTowedActorComponent::GetIsValidCommandsOwner() const
-{
-	if (Cast<ICommands>(GetOwner()) != nullptr)
-	{
-		return true;
-	}
 
-	RTSFunctionLibrary::ReportError("UTowedActorComponent owner does not implement ICommands in "
-		"UTowedActorComponent::GetIsValidCommandsOwner");
-	return false;
+ICommands* UTowedActorComponent::GetOwningICommands() const
+{
+	if (not IsValid(GetOwner()))
+	{
+		return nullptr;
+	}
+	if (GetOwner()->IsA(ATeamWeaponController::StaticClass()))
+	{
+		ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(GetOwner());
+		return TeamWeaponController;
+	}
+	ICommands* CommandsOwner = Cast<ICommands>(GetOwner());
+	return CommandsOwner;
 }

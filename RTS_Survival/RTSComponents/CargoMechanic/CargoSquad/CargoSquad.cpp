@@ -9,6 +9,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 
 UCargoSquad::UCargoSquad()
 {
@@ -183,6 +184,7 @@ bool UCargoSquad::EnterCargoImmediateInternal(AActor* TargetCargoActor, const bo
 	{
 		return false;
 	}
+	
 
 	FinalizeEnterCargo(TargetCargo);
 	return true;
@@ -547,9 +549,12 @@ void UCargoSquad::FinalizeEnterCargo(UCargo* TargetCargo)
     M_CurrentCargo->OnSquadEntered(M_OwningController.Get());
     M_SquadCargoState = ESquadCargoState::Inside;
 
+	// Team Weapons cannot swap this ability.
+	if(not GetIsOwningSquadATeamWeapon())
+	{
     // Swap the UI ability Enter -> Exit.
     TrySwapAbilities(EAbilityID::IdEnterCargo, EAbilityID::IdExitCargo);
-
+	}
     // Hide nav abilities while inside cargo.
     SuspendNavAbilities_WhileInside();
 
@@ -623,4 +628,9 @@ void UCargoSquad::RestoreNavAbilities_AfterExit()
 	}
 
 	M_SuspendedNavAbilityIndices.Reset();
+}
+
+bool UCargoSquad::GetIsOwningSquadATeamWeapon() const
+{
+	return M_OwningController.IsValid() && M_OwningController->IsA(ATeamWeaponController::StaticClass());
 }
