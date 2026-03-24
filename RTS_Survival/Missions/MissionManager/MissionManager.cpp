@@ -4,6 +4,7 @@
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
+#include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -76,6 +77,35 @@ UW_Mission* AMissionManager::OnMissionRequestSetupWidget(UMissionBase* Requestin
 	RTSFunctionLibrary::ReportError("A mission requested a widget but could not get a free one"
 		"\n Mission : " + RequestingMission->GetName());
 	return nullptr;
+}
+
+UW_MissionTimer* AMissionManager::CreateAndInitMissionTimerWidget(TSubclassOf<UW_MissionTimer> MissionTimerWidgetClass,
+                                                                  const FText& TimerText,
+                                                                  float TimerInSeconds,
+                                                                  const FMissionTimerLifetimeSettings& LifetimeSettings)
+{
+	if (not EnsureValidPlayerController())
+	{
+		return nullptr;
+	}
+
+	if (not MissionTimerWidgetClass)
+	{
+		RTSFunctionLibrary::ReportError("Mission timer widget class is not set on mission manager.");
+		return nullptr;
+	}
+
+	UW_MissionTimer* MissionTimerWidget = CreateWidget<UW_MissionTimer>(M_PlayerController.Get(), MissionTimerWidgetClass);
+	if (not IsValid(MissionTimerWidget))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager failed to create mission timer widget.");
+		return nullptr;
+	}
+
+	constexpr int32 MissionTimerWidgetZOrder = 11;
+	MissionTimerWidget->AddToViewport(MissionTimerWidgetZOrder);
+	MissionTimerWidget->InitMissionTimer(TimerText, TimerInSeconds, LifetimeSettings);
+	return MissionTimerWidget;
 }
 
 void AMissionManager::PlaySound2DForMission(USoundBase* SoundToPlay) const

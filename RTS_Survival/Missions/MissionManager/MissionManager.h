@@ -9,7 +9,9 @@
 
 
 class UW_Mission;
+class UW_MissionTimer;
 struct FMissionWidgetState;
+struct FMissionTimerLifetimeSettings;
 class ACPPController;
 class UW_MissionWidgetManager;
 class UMissionBase;
@@ -72,6 +74,11 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FRTSGameDifficulty GetCurrentGameDifficulty() const;
 	UW_Mission* OnMissionRequestSetupWidget(UMissionBase* RequestingMission);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Timer")
+	UW_MissionTimer* CreateAndInitMissionTimerWidget(TSubclassOf<UW_MissionTimer> MissionTimerWidgetClass,
+	                                                 const FText& TimerText,
+	                                                 float TimerInSeconds,
+	                                                 const FMissionTimerLifetimeSettings& LifetimeSettings);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlaySound2DForMission(USoundBase* SoundToPlay) const;
 	FMissionStartingResources GetMissionStartingResources() const { return M_MissionStartingResources; }

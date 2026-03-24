@@ -22,7 +22,9 @@ struct FTrainingOption;
 class ARTSAsyncSpawner;
 class UMissionTrigger;
 class UW_Mission;
+class UW_MissionTimer;
 struct FMissionWidgetState;
+struct FMissionTimerLifetimeSettings;
 class AMissionManager;
 
 USTRUCT(Blueprintable)
@@ -91,6 +93,19 @@ public:
 	 * Derived classes can override if needed.
 	 */
 	virtual void TickMission(float DeltaTime);
+
+	/**
+	 * @brief Creates a mission timer through the manager so missions can start self-managed countdown widgets safely.
+	 * @param MissionTimerWidgetClass Widget class derived from W_MissionTimer to instantiate.
+	 * @param TimerText Label shown for the timer purpose.
+	 * @param TimerInSeconds Initial countdown duration in seconds.
+	 * @param LifetimeSettings Optional chained timer entries consumed after each expiration.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Timer")
+	UW_MissionTimer* SpawnMissionTimerWidget(TSubclassOf<UW_MissionTimer> MissionTimerWidgetClass,
+	                                         const FText& TimerText,
+	                                         float TimerInSeconds,
+	                                         const FMissionTimerLifetimeSettings& LifetimeSettings);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Widget")
 	FMissionWidgetState MissionWidgetState;

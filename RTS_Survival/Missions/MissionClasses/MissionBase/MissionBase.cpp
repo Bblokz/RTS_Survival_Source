@@ -11,6 +11,7 @@
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
+#include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
@@ -90,6 +91,24 @@ void UMissionBase::TickMission(float DeltaTime)
 {
 	// Default does nothing.
 	// Derived missions can implement per-frame updates if necessary.
+}
+
+UW_MissionTimer* UMissionBase::SpawnMissionTimerWidget(TSubclassOf<UW_MissionTimer> MissionTimerWidgetClass,
+                                                       const FText& TimerText,
+                                                       float TimerInSeconds,
+                                                       const FMissionTimerLifetimeSettings& LifetimeSettings)
+{
+	AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not MissionManager)
+	{
+		return nullptr;
+	}
+
+	return MissionManager->CreateAndInitMissionTimerWidget(
+		MissionTimerWidgetClass,
+		TimerText,
+		TimerInSeconds,
+		LifetimeSettings);
 }
 
 void UMissionBase::OnCleanUpMission()
