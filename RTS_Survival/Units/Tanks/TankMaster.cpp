@@ -25,6 +25,7 @@
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/Turret/Embedded/EmbededTurretInterface.h"
 #include "RTS_Survival/RTSComponents/VehicleFireFeedbackComponent/VehicleFireFeedbackComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
@@ -1523,8 +1524,8 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
 	);
 	TeamWeaponActor->SetActorRelativeLocation(TowedActorComponent->GetTowedSettings().AttachOffset);
 	TeamWeaponActor->SetActorRelativeRotation(TowedActorComponent->GetTowedSettings().AttachRotation);
-	TeamWeaponActor->SetTurretAngle(0.0f);
-	TeamWeaponActor->UpdateTargetPitch(0.0f);
+	IEmbeddedTurretInterface::Execute_SetTurretAngle(TeamWeaponActor, 0.0f);
+	IEmbeddedTurretInterface::Execute_UpdateTargetPitch(TeamWeaponActor, 0.0f);
 	TeamWeaponActor->SetWeaponsEnabledForTeamWeaponState(false);
 
 	TeamWeaponActor->NotifyMoverMovementState(true, -TeamWeaponActor->GetActorForwardVector());
