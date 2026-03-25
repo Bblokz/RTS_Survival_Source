@@ -475,6 +475,7 @@ private:
 	bool ExecuteDetachTowCommand_TryDetachSelfFromTow();
 	void ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor, UTowedActorComponent* TowedActorComponent);
 	void ExecuteDetachTowCommand_DetachTowedTeamWeapon(class ATeamWeaponController* TeamWeaponController);
+	void CleanupTowRelationshipsOnDeath();
 	bool GetTowTargetData(AActor* TowTargetActor, const ETowedActorTarget TowSubtype,
 	                    UTowedActorComponent*& OutTowedActorComponent,
 	                    class ATeamWeapon*& OutTeamWeaponActor,

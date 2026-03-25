@@ -227,6 +227,8 @@ private:
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
 	bool GetIsValidDigInComponent() const;
 	bool GetIsValidTowedActorComponent() const;
+	void ResetTowRelationshipOnTeamWeaponSide(const bool bDetachTeamWeaponActor, const bool bReleaseCargoSquadUnits);
+	void ReleaseCargoSquadUnitsFromTow();
 	void ExecuteDetachTowCommand_ResetTowedVisualState(ATeamWeapon* TeamWeaponActor) const;
 
 	void BeginPlay_InitAnimatedTextWidgetPoolManager();
