@@ -1,0 +1,204 @@
+you need to check my tow system for bugs and fix them you have to be very thorough and check every single detail of the system and
+give me a detailed brief of what you found and fixed.
+
+make sure your first undertand the different enums:
+uenum()
+enum etowabilitytype
+{
+	// displays the ability as if owned by a team weapon; select tow vehicle to attach team weapon to.
+	defaultteamweapon,
+	// displays the ability as if owned by a vehicle; select towable actor to attach to vehicle.
+	vehiclehook,
+}; this enum tells us if the ability set up at the unit is for being towed like a team weapon; in which case the ability being activated
+from the command card will prompt the player to click a vehicle that can tow it.
+or if it is part of a vehicle that can tow targets; in which case the ability being activated from the command card will prompt the player to click a towable target.
+
+uenum(blueprinttype)
+enum class etowedactortarget : uint8
+{
+	none,
+	towvehicle,
+	towteamweapon,
+};
+this enum tells us the target of the towing; could be vehicle or a team weapon this is mainly used in the execution side of the ability on the tank master
+as it needs to know what it is towing.
+
+uenum(blueprinttype)
+enum class etowordertype : uint8
+{
+	none,
+	clickedtowvehicle,
+	clickedteamweapontotow,
+	clickedvehicletotow,
+	detachtow,
+};
+this enum is used to determine the different types of how the ability will start given what was clicked by the player.
+
+note that the detach tow an instant abiltiy is that needs no second clicking.
+
+
+towing should be possible in two ways:
+a vehicle towing another vehicle where the towing vehicle has a uvehicletowcomponent and the towed vehicle has
+a utowedactorcomponent
+
+or a vehicle towing a team weapon; where the team weapon controller; ateamweaponcontroller, implements the ability;
+the team weapon starts with the  idtowactor abiilty in their command array but note that this is only a cosmetic
+that the player can use to then target a vehicle to tow it; the vehicle will actually execute its version of the execute 
+tow command (the team weapon controller does not implement it as it never tows anything).
+another thing to note is that the towed actor component for the team weapon controller is on the team weapon actor
+as that is the actor that gets towed while the team weapon squad units go inside the cargo component.
+
+also note that when towing a team weapon the provided actor target is the ateamweapon and not the team weapon contorller
+
+logic gets routed through the cppcontroller; i need you to analyse in depth the pahts starting from:
+-- void acppcontroller::actionbuttontowactorsecondclick(aactor* clickedactor, const fvector& clickedlocation)
+where i expect that if the primary selected actor has the team weapon tow ability then: we verify if the player clicked
+an actor with a vehicle tow and if the squad units of the team weapon fit with fabilityhelpers::getcantowteamweaponwithcurrentcargocapacity
+and give indication using the announcer to the player when things dont work.
+if the primary is a team weapon then we get the towedactor comp from the team weapon through the team weapon controller
+and get the tow target from the owner of that comp.
+if we did not have a teamweapon controlled as our primary then we look for a towed actor comp directly on the primary
+selected actor.
+
+the other second click variant is the acppcontroller::actionbuttontowactorsecondclick_vehiclehook.
+where we first check if we have a vehicle tow component on our primary selected actor and if we do
+then we check wshether we clicked a toable target; we provide the correct type of the ability to the command queue
+by casting the target against the team weapon class base.
+
+it is very important that you check whether the second click functions in the cpp controller are correct and instigate the
+correct tow ability.
+
+the idea is that both for the tankmaster as the team weapon controller & team weapon they start with the tow ability and swap
+to an detach tow abilty when towing; verify that in all senarios the team weapon controller is swapped back correctly to towactor
+when no longer being towed and when the actor towing it would be come invalid.
+also make sure that the squad units of the team weapon are correctly released when the team weapon detaches. maybe one function that 
+both resets the tow relation ship on the team weapon side of things and relaeses the squad units and puts them back at their spots would be good here.
+
+make sure that for the tank master the tow ability is also correctly swapped in all senarios; if the entire team weapon and all squad units died it needs 
+to swap the ability back.
+
+also do the following very explicitly:
+
+1. build a full towing state-machine and verify every transition
+map all valid runtime states for:
+- vehicle tow component
+- towed actor component
+- team weapon controller
+- team weapon actor
+- cargo / squad units
+- command card ability state
+
+for each state transition, verify:
+- attach
+- detach
+- towing actor dies
+- towed actor dies
+- team weapon dies
+- all crew die
+- some crew die
+- towing vehicle becomes invalid
+- towed actor component becomes invalid
+- match starts / begin play initialisation
+- end play / destruction
+- abandon / reman team weapon flow
+
+i want you to explicitly list any transition that is missing cleanup on one side of the relationship.
+
+2. verify symmetry of tow relationship cleanup
+every place that sets a tow relationship must have a matching cleanup path on both sides.
+check that all of these are always kept in sync:
+- uvehicletowcomponent::m_towedactor
+- uvehicletowcomponent::m_towedactorcomp
+- uvehicletowcomponent::m_currenttowsubtype
+- utowedactorcomponent::m_towingactor
+- utowedactorcomponent::m_towingvehicletowcomp
+- attachment / detachment state in the scene hierarchy
+- command card ability swap state
+- removed abilities cache state
+- team weapon state
+- cargo loaded state of squad units
+
+if one side clears and the other side does not, treat it as a bug.
+
+3. audit all early returns and invalid-object paths
+for every early return in attach / detach / second click / death / endplay logic, verify that:
+- abilities are restored correctly
+- detach tow swaps back correctly
+- relationship pointers are cleared on both sides
+- cargo squad is released if needed
+- team weapon state is not left as towed
+- no stale attachment remains
+- no stale command card ability remains
+- no cached removed abilities remain
+
+4. check for ability desync bugs
+verify that command card abilities always match the true runtime state.
+specifically check:
+- vehicle starts with tow and switches to detach only when actually towing
+- vehicle switches back to tow when tow target becomes invalid without manual detach
+- team weapon controller starts with tow and switches to detach only while actually being towed
+- team weapon controller switches back to tow when detach happens, towing vehicle dies, towing vehicle becomes invalid, team weapon is abandoned, team weapon is destroyed, or all squad units die
+- no duplicate idtowactor or iddetachtow abilities are inserted
+- no swap failure leaves both abilities missing
+
+5. verify acppcontroller second-click routing as a truth table
+create a full truth table for:
+- primary selected actor type
+- clicked actor type
+- etowabilitytype
+- etowordertype
+- etowedactortarget
+- expected executor
+- expected command payload
+- expected announcer feedback
+
+i want you to confirm the second-click functions are correct for every combination, including invalid combinations.
+if not correct, fix them.
+
+6. verify team weapon special-case ownership carefully
+because the team weapon controller owns the ability but the towed actor component is on the team weapon actor, verify there is no place that incorrectly assumes the controller itself is the towed actor.
+check that all attach, detach, death, and invalidation logic consistently uses:
+- ateamweaponcontroller for commands/ui
+- ateamweapon for physical towing target / attachment / towed component
+
+7. verify cargo and squad-unit lifecycle thoroughly
+when a team weapon is towed:
+- confirm squad units are loaded exactly once
+- confirm cargo capacity is validated before commit
+- confirm detach releases squad units exactly once
+- confirm released squad units are repositioned correctly
+- confirm squad units are not left hidden / stuck in cargo / uncommandable
+- confirm detach still works if some squad units died while being towed
+- confirm all-squad-dead and partial-squad-dead cases restore tow ability correctly on the towing actor
+
+8. check begin play / race conditions
+because uvehicletowcomponent adds its ability on the next tick, verify:
+- the tow ability is not added twice
+- swap logic does not run before the base ability exists
+- controller / command data is valid before ability insert or swap
+- team weapon controller and vehicle tow component cannot start in an inconsistent state
+
+9. check destruction and shutdown safety
+audit endplay, death handlers, and invalidation handlers.
+i want all towing relationships to be cleaned safely if either side is destroyed or unloading.
+no stale weak pointers, no stuck abilities, no stuck cargo state, no stale attachment.
+
+10. refactor recommendation
+if you find duplicated or partial cleanup logic, extract a single authoritative helper for:
+- resetting tow relationship on team-weapon side
+- releasing cargo squad units
+- restoring removed abilities
+- swapping command card state back to tow
+- clearing vehicle tow relationship
+
+use that helper everywhere instead of duplicating detach cleanup.
+
+11. deliverables
+give me:
+- a bug list
+- the root cause for each bug
+- the exact gameplay consequence
+- the files/functions changed
+- the final state-machine / transition matrix
+- a list of edge cases tested mentally
+- any remaining risks you could not fully verify from code alone

@@ -112,7 +112,8 @@ enum class EAnnouncerVoiceLineType : uint8
 	NoSelectedSquadWithSufficientUnitsForTeamWeapon,
 	LowBaseEnergy,
 	BaseEnergyRestored,
-	clickedActorCannotTow,
+	clickedActorCannotTowOurUnit,
+	clickedActorCannotTowUnitDuetoHavingEnoughCargoCapacity,
 	clickedActorCannotBeTowed,
 	PrimaryActorCannotTow,
 	VehicleWillTowClickedActor

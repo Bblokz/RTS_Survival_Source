@@ -2727,7 +2727,7 @@ ECommandQueueError ICommands::ManAbandonedTeamWeapon(AActor* TeamWeaponActor, co
 		FRotator::ZeroRotator);
 }
 
-ECommandQueueError ICommands::TowActor(AActor* ActorToTow, const ETowActorAbilitySubtypes TowSubtype,
+ECommandQueueError ICommands::TowActor(AActor* ActorToTow, const ETowedActorTarget TowSubtype,
                                     const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -3076,7 +3076,7 @@ ECommandQueueError ICommands::GetIsAbilityOnCommandCardAndNotOnCooldown(const EA
 }
 
 
-void ICommands::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype)
+void ICommands::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype)
 {
 	DoneExecutingCommand(EAbilityID::IdTowActor);
 }

@@ -120,12 +120,15 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 }
 
 bool FRTS_VoiceLineHelpers::NeedToPlayAnnouncerLineForAbility(const EAbilityID Ability,
-                                                              EAnnouncerVoiceLineType& OutAnnouncerLine)
+                                                              const ECommandType CommandTypeIssued, EAnnouncerVoiceLineType& OutAnnouncerLine)
 {
 	switch (Ability)
 	{
 	case EAbilityID::IdCapture:
 		OutAnnouncerLine = EAnnouncerVoiceLineType::SquadWillCaptureObjective;
+		return true;
+	case EAbilityID::IdTowActor:
+		OutAnnouncerLine = EAnnouncerVoiceLineType::VehicleWillTowClickedActor;
 		return true;
 	default:
 		return false;
