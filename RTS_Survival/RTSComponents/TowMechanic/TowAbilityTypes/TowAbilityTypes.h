@@ -13,7 +13,7 @@ enum ETowAbilityType
 };
 
 UENUM(BlueprintType)
-enum class ETowActorAbilitySubtypes : uint8
+enum class ETowedActorTarget : uint8
 {
 	None,
 	TowVehicle,

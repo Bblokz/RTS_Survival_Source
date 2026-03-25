@@ -15,7 +15,7 @@ void UVehicleTowComponent::InitTowMesh(USceneComponent* TowMeshComponent)
 
 bool UVehicleTowComponent::IsTowFree() const
 {
-	return not GetIsValidTowedActor() || not GetIsValidTowedActorComp() || M_CurrentTowSubtype == ETowActorAbilitySubtypes::None;
+	return not GetIsValidTowedActor() || not GetIsValidTowedActorComp() || M_CurrentTowSubtype == ETowedActorTarget::None;
 }
 
 bool UVehicleTowComponent::GetIsValidTowMeshComponent() const
@@ -39,7 +39,6 @@ bool UVehicleTowComponent::GetIsValidTowedActor() const
 	{
 		return true;
 	}
-
 	return false;
 }
 
@@ -54,18 +53,42 @@ bool UVehicleTowComponent::GetIsValidTowedActorComp() const
 }
 
 void UVehicleTowComponent::SetTowRelationship(AActor* TowedActor, UTowedActorComponent* TowedActorComp,
-                                              const ETowActorAbilitySubtypes TowSubtype)
+                                              const ETowedActorTarget TowSubtype)
 {
 	M_TowedActor = TowedActor;
 	M_TowedActorComp = TowedActorComp;
 	M_CurrentTowSubtype = TowSubtype;
 }
 
+void UVehicleTowComponent::SwapAbilityToDetachTow() const
+{
+	if(not GetIsValidICommands())
+	{
+		return;
+	}
+	FUnitAbilityEntry NewAbility;
+	NewAbility.AbilityId = EAbilityID::IdDetachTow;
+	NewAbility.CustomType = static_cast<int32>(ETowAbilityType::VehicleHook);
+	M_OwnerCommandsInterface->SwapAbility(EAbilityID::IdTowActor, NewAbility);
+}
+
+void UVehicleTowComponent::SwapAbilityToTow() const
+{
+	if(not GetIsValidICommands())
+	{
+		return;
+	}
+	FUnitAbilityEntry NewAbility;
+	NewAbility.AbilityId = EAbilityID::IdTowActor;
+	NewAbility.CustomType = static_cast<int32>(ETowAbilityType::VehicleHook);
+	M_OwnerCommandsInterface->SwapAbility(EAbilityID::IdDetachTow, NewAbility);
+}
+
 void UVehicleTowComponent::ClearTowRelationship()
 {
 	M_TowedActor = nullptr;
 	M_TowedActorComp = nullptr;
-	M_CurrentTowSubtype = ETowActorAbilitySubtypes::None;
+	M_CurrentTowSubtype = ETowedActorTarget::None;
 }
 
 USceneComponent* UVehicleTowComponent::GetTowMeshComponent() const
@@ -101,6 +124,7 @@ UTowedActorComponent* UVehicleTowComponent::GetTowedActorComp() const
 void UVehicleTowComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_SetupCommandsInterface();
 	if (UWorld* World = GetWorld())
 	{
 		TWeakObjectPtr<UVehicleTowComponent> WeakThis(this);
@@ -118,4 +142,40 @@ void UVehicleTowComponent::BeginPlay()
 		World->GetTimerManager().SetTimerForNextTick(Del);
 	}
 	
+}
+
+void UVehicleTowComponent::BeginPlay_SetupCommandsInterface()
+{
+	if(not GetOwner())
+	{
+		return;
+	}
+	ICommands* CommandsInterface = Cast<ICommands>(GetOwner());
+	M_OwnerCommandsInterface.SetInterface(CommandsInterface);
+	M_OwnerCommandsInterface.SetObject(GetOwner());
+	(void)GetIsValidICommands();
+}
+
+bool UVehicleTowComponent::GetIsValidICommands() const
+{
+	if(not IsValid(M_OwnerCommandsInterface.GetObject()))
+	{
+		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "NULL";
+		RTSFunctionLibrary::ReportError("The tow vehicle comp does not have access to a valid ICommands interface! Owner: " + OwnerName +
+			"\n vehicle tow;  " + GetName());
+		return false;;
+	}
+	return true;
+}
+
+void UVehicleTowComponent::AddAbilityToCommands() const
+{
+	if(not GetIsValidICommands())
+	{
+		return;
+	}
+	FUnitAbilityEntry NewAbility;
+	NewAbility.AbilityId = EAbilityID::IdTowActor;
+	NewAbility.CustomType = static_cast<int32>(ETowAbilityType::VehicleHook);
+	M_OwnerCommandsInterface->AddAbility(NewAbility, M_TowSettings.PreferredAbilityIndex);
 }

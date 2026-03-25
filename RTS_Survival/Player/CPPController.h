@@ -1134,7 +1134,7 @@ private:
 	 */
 	bool GetTowableTargetData(AActor* TowTargetActor, const ETowOrderType TowType,
 	                        UTowedActorComponent*& OutTowedActorComponent,
-	                        ETowActorAbilitySubtypes& OutTowSubtype) const;
+	                        ETowedActorTarget& OutTowSubtype) const;
 	uint32 IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetActor, EAbilityID& OutAbilityActivated,
 	                                             const FVector& ClickedLocation, const ETowOrderType TowType);
 

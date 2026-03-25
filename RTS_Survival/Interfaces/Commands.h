@@ -102,9 +102,9 @@ public:
 		return static_cast<ETurretSwapAbility>(CustomType);
 	}
 
-	ETowActorAbilitySubtypes GetTowActorAbilitySubtype() const
+	ETowedActorTarget GetTowActorAbilitySubtype() const
 	{
-		return static_cast<ETowActorAbilitySubtypes>(CustomType);
+		return static_cast<ETowedActorTarget>(CustomType);
 	}
 
 	FQueueCommand()
@@ -742,7 +742,7 @@ public:
 	virtual ECommandQueueError ManAbandonedTeamWeapon(
 		AActor* TeamWeaponActor,
 		const bool bSetUnitToIdle);
-	virtual ECommandQueueError TowActor(AActor* ActorToTow, const ETowActorAbilitySubtypes TowSubtype,
+	virtual ECommandQueueError TowActor(AActor* ActorToTow, const ETowedActorTarget TowSubtype,
 	                                   const bool bSetUnitToIdle);
 	virtual ECommandQueueError DetachTow(const bool bSetUnitToIdle);
 
@@ -922,7 +922,7 @@ protected:
 
 	virtual void ExecuteManAbandonedTeamWeaponCommand(AActor* TeamWeaponActor);
 	virtual void TerminateManAbandonedTeamWeaponCommand();
-	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype);
+	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype);
 	virtual void TerminateTowActorCommand();
 	virtual void TerminateDetachTowCommand();
 

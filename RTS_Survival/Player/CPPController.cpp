@@ -3721,7 +3721,7 @@ void ACPPController::CreateVfxAndVoiceLineForIssuedCommand(const bool bResetAllP
 	EAnnouncerVoiceLineType AnnouncerVoiceLine = EAnnouncerVoiceLineType::None;
 	// Check if this is a special ability case where we play a voice line with the announcer instead of the primary unit
 	// that has activated the ability.
-	if (FRTS_VoiceLineHelpers::NeedToPlayAnnouncerLineForAbility(AbilityActivated, AnnouncerVoiceLine))
+	if (FRTS_VoiceLineHelpers::NeedToPlayAnnouncerLineForAbility(AbilityActivated, CommandTypeIssued, AnnouncerVoiceLine))
 	{
 		PlayAnnouncerVoiceLine(AnnouncerVoiceLine, true, true);
 	}
@@ -4270,12 +4270,7 @@ void ACPPController::ActionButtonTowActorSecondClick(AActor* ClickedActor, const
 	}
 
 	AActor* PrimarySelectedActor = M_GameUIController->GetPrimarySelectedUnit();
-	if (not IsValid(PrimarySelectedActor))
-	{
-		return;
-	}
-
-	if (not IsValid(ClickedActor))
+	if (not IsValid(PrimarySelectedActor) || not IsValid(ClickedActor))
 	{
 		return;
 	}
@@ -4296,47 +4291,52 @@ void ACPPController::ActionButtonTowActorSecondClick_DefaultTeamWeapon(AActor* P
 	ATankMaster* ClickedTowVehicle = Cast<ATankMaster>(ClickedActor);
 	if (not IsValid(ClickedTowVehicle))
 	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTowOurUnit, false, true);
 		return;
 	}
 
 	UVehicleTowComponent* ClickedTowVehicleComp = ClickedTowVehicle->FindComponentByClass<UVehicleTowComponent>();
 	if (not IsValid(ClickedTowVehicleComp) || not ClickedTowVehicleComp->IsTowFree())
 	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTowOurUnit, false, true);
 		return;
 	}
 
 	AActor* TowTargetActor = PrimarySelectedActor;
 	UTowedActorComponent* PrimarySelectedTowedComponent = nullptr;
-	ETowActorAbilitySubtypes TowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+	ETowedActorTarget TowSubtype = ETowedActorTarget::TowVehicle;
 
 	if (ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(PrimarySelectedActor))
 	{
 		PrimarySelectedTowedComponent = TeamWeaponController->GetControlledTeamWeaponTowedActorComponentNoReport();
 		if (not IsValid(PrimarySelectedTowedComponent))
 		{
-			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+			RTSFunctionLibrary::ReportError("the ability activated was for towing but the primary selected actor (team weapon)"
+								   "has no towed actor component!! \n "
+								   + PrimarySelectedActor->GetName());
 			return;
 		}
 
 		TowTargetActor = PrimarySelectedTowedComponent->GetOwner();
-		TowSubtype = ETowActorAbilitySubtypes::TowTeamWeapon;
+		TowSubtype = ETowedActorTarget::TowTeamWeapon;
 		if (not FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(
 			ClickedTowVehicle,
 			TeamWeaponController,
 			PrimarySelectedTowedComponent))
 		{
-			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTowUnitDuetoHavingEnoughCargoCapacity,
+			
+				false, true);
 			return;
 		}
 	}
 	else
 	{
+		// For other actors that have the tow component set to team weapon
 		PrimarySelectedTowedComponent = PrimarySelectedActor->FindComponentByClass<UTowedActorComponent>();
 		if (not IsValid(PrimarySelectedTowedComponent) || not PrimarySelectedTowedComponent->IsTowFree())
 		{
-			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+			PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTowOurUnit, false, true);
 			return;
 		}
 	}
@@ -4354,61 +4354,47 @@ void ACPPController::ActionButtonTowActorSecondClick_DefaultTeamWeapon(AActor* P
 			bResetAllPlacementEffects,
 			1,
 			ClickedLocation,
-			ECommandType::ClickedTowableActor,
+			ECommandType::ClickedTowVehicle,
 			EAbilityID::IdTowActor,
 			bForcePlayVoiceLine);
 		return;
 	}
 
-	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTow, true, true);
+	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotTowOurUnit, false, true);
 }
 
 void ACPPController::ActionButtonTowActorSecondClick_VehicleHook(AActor* PrimarySelectedActor, AActor* ClickedActor,
 	                                                             const FVector& ClickedLocation)
 {
-	ATankMaster* SelectedTowVehicle = Cast<ATankMaster>(PrimarySelectedActor);
-	if (not IsValid(SelectedTowVehicle))
+	ICommands* PrimarySelectedCommandsInterface = Cast<ICommands>(PrimarySelectedActor);
+	if(not PrimarySelectedCommandsInterface)
 	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::PrimaryActorCannotTow, true, true);
+		return;
+	}
+	UVehicleTowComponent* PrimaryTowComp = PrimarySelectedActor->FindComponentByClass<UVehicleTowComponent>();
+	if (not IsValid(PrimaryTowComp) || not PrimaryTowComp->IsTowFree())
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::PrimaryActorCannotTow, false, true);
+		RTSFunctionLibrary::ReportError("the primary actor started an ability of VehicleHook for towing but either has"
+								  "no vehicle tow comp or is already towing somehting!"
+		  "\n Name: "+ PrimarySelectedActor->GetName());
+		return;
+	}
+	UTowedActorComponent* TowedActorComp = Cast<UTowedActorComponent>(ClickedActor->GetComponentByClass(UTowedActorComponent::StaticClass()));
+	if (not IsValid(TowedActorComp) || not TowedActorComp->IsTowFree())
+	{
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotBeTowed, false, true);
 		return;
 	}
 
-	UVehicleTowComponent* SelectedTowVehicleComp = SelectedTowVehicle->FindComponentByClass<UVehicleTowComponent>();
-	if (not IsValid(SelectedTowVehicleComp) || not SelectedTowVehicleComp->IsTowFree())
+	// Make sure that the vehicle that will execute the tow command knows whether it is a team weapon or vehicle target.
+	bool bIsTowingATeamWeapon = ClickedActor->IsA(ATeamWeapon::StaticClass() );
+	ETowedActorTarget TowTargetType = bIsTowingATeamWeapon ? ETowedActorTarget::TowTeamWeapon : ETowedActorTarget::TowVehicle;
+	
+	if( PrimarySelectedCommandsInterface->TowActor(ClickedActor, TowTargetType, not bIsHoldingShift) != ECommandQueueError::NoError)
 	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::PrimaryActorCannotTow, true, true);
-		return;
-	}
-
-	ATeamWeapon* ClickedTeamWeapon = Cast<ATeamWeapon>(ClickedActor);
-	if (not IsValid(ClickedTeamWeapon))
-	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotBeTowed, true, true);
-		return;
-	}
-
-	ATeamWeaponController* TeamWeaponController = ClickedTeamWeapon->GetTeamWeaponController();
-	if (not IsValid(TeamWeaponController))
-	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotBeTowed, true, true);
-		return;
-	}
-
-	UTowedActorComponent* TeamWeaponTowedActorComponent = nullptr;
-	if (not FAbilityHelpers::GetCanTowTeamWeaponWithCurrentCargoCapacity(
-		SelectedTowVehicle,
-		TeamWeaponController,
-		TeamWeaponTowedActorComponent))
-	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::clickedActorCannotBeTowed, true, true);
-		return;
-	}
-
-	if (SelectedTowVehicle->TowActor(ClickedTeamWeapon, ETowActorAbilitySubtypes::TowTeamWeapon, not bIsHoldingShift)
-		!= ECommandQueueError::NoError)
-	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::PrimaryActorCannotTow, true, true);
-		return;
+		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::PrimaryActorCannotTow, false, true);
+		return ;
 	}
 
 	const bool bResetAllPlacementEffects = not bIsHoldingShift;
@@ -4420,7 +4406,6 @@ void ACPPController::ActionButtonTowActorSecondClick_VehicleHook(AActor* Primary
 		ECommandType::ClickedTowableActor,
 		EAbilityID::IdTowActor,
 		bForcePlayVoiceLine);
-	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::VehicleWillTowClickedActor, true, true);
 }
 
 void ACPPController::ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLocation)
@@ -6782,9 +6767,9 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowVehicle(AActor* TowTargetAct
 	UTowedActorComponent* SelectedTowedComp = nullptr;
 	if (AActor* SelectedActor = FindSelectedActorWithFreeToTow(SelectedTowedComp, TowVehicleComp))
 	{
-		const ETowActorAbilitySubtypes TowSubtype = SelectedActor->IsA(ATeamWeapon::StaticClass())
-			                                            ? ETowActorAbilitySubtypes::TowTeamWeapon
-			                                            : ETowActorAbilitySubtypes::TowVehicle;
+		const ETowedActorTarget TowSubtype = SelectedActor->IsA(ATeamWeapon::StaticClass())
+			                                            ? ETowedActorTarget::TowTeamWeapon
+			                                            : ETowedActorTarget::TowVehicle;
 		if (TowVehicle->TowActor(SelectedActor, TowSubtype, not bIsHoldingShift) == ECommandQueueError::NoError)
 		{
 			return 1;
@@ -6863,7 +6848,7 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetA
                                                               const FVector& ClickedLocation, const ETowOrderType TowType)
 {
 	UTowedActorComponent* TargetTowedComp = nullptr;
-	ETowActorAbilitySubtypes TowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+	ETowedActorTarget TowSubtype = ETowedActorTarget::TowVehicle;
 	if (not GetTowableTargetData(TowTargetActor, TowType, TargetTowedComp, TowSubtype))
 	{
 		OutAbilityActivated = EAbilityID::IdMove;
@@ -6897,10 +6882,10 @@ uint32 ACPPController::IssueOrderTowActor_ClickedTowableActor(AActor* TowTargetA
 }
 
 bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowOrderType TowType,
-	UTowedActorComponent*& OutTowedActorComponent, ETowActorAbilitySubtypes& OutTowSubtype) const
+	UTowedActorComponent*& OutTowedActorComponent, ETowedActorTarget& OutTowSubtype) const
 {
 	OutTowedActorComponent = nullptr;
-	OutTowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+	OutTowSubtype = ETowedActorTarget::TowVehicle;
 
 	if (not IsValid(TowTargetActor))
 	{
@@ -6916,7 +6901,7 @@ bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowOrde
 			return false;
 		}
 
-		OutTowSubtype = ETowActorAbilitySubtypes::TowVehicle;
+		OutTowSubtype = ETowedActorTarget::TowVehicle;
 		return true;
 	}
 
@@ -6932,6 +6917,6 @@ bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowOrde
 		return false;
 	}
 
-	OutTowSubtype = ETowActorAbilitySubtypes::TowTeamWeapon;
+	OutTowSubtype = ETowedActorTarget::TowTeamWeapon;
 	return true;
 }
