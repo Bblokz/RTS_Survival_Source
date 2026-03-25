@@ -335,7 +335,7 @@ protected:
 	virtual void ExecuteReturnCargoCommand() override final;
 	virtual void TerminateReturnCargoCommand() override final;
 
-	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype) override;
+	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype) override;
 	virtual void TerminateTowActorCommand() override;
 	virtual void TerminateDetachTowCommand() override;
 
@@ -475,7 +475,7 @@ private:
 	bool ExecuteDetachTowCommand_TryDetachSelfFromTow();
 	void ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor, UTowedActorComponent* TowedActorComponent);
 	void ExecuteDetachTowCommand_DetachTowedTeamWeapon(class ATeamWeaponController* TeamWeaponController);
-	bool GetTowTargetData(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype,
+	bool GetTowTargetData(AActor* TowTargetActor, const ETowedActorTarget TowSubtype,
 	                    UTowedActorComponent*& OutTowedActorComponent,
 	                    class ATeamWeapon*& OutTeamWeaponActor,
 	                    class ATeamWeaponController*& OutTeamWeaponController) const;

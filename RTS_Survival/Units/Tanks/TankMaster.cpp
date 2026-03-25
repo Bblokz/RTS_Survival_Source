@@ -1421,7 +1421,7 @@ bool ATankMaster::GetIsValidTowedActorComponent() const
 	return false;
 }
 
-void ATankMaster::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype)
+void ATankMaster::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype)
 {
 	UTowedActorComponent* TowedActorComponent = nullptr;
 	ATeamWeapon* TeamWeaponActor = nullptr;
@@ -1452,7 +1452,7 @@ void ATankMaster::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowActor
 		return;
 	}
 
-	if (TowSubtype == ETowActorAbilitySubtypes::TowTeamWeapon)
+	if (TowSubtype == ETowedActorTarget::TowTeamWeapon)
 	{
 		ExecuteTowActorCommand_TowTeamWeapon(TeamWeaponActor, TeamWeaponController, TowedActorComponent);
 		return;
@@ -1483,7 +1483,7 @@ void ATankMaster::ExecuteTowActorCommand_TowVehicle(AActor* TowTargetActor, UTow
 		TowedActorComponent->RemoveAbilitiesWhileTowed();
 	}
 
-	M_VehicleTowComponent->SetTowRelationship(TowTargetActor, TowedActorComponent, ETowActorAbilitySubtypes::TowVehicle);
+	M_VehicleTowComponent->SetTowRelationship(TowTargetActor, TowedActorComponent, ETowedActorTarget::TowVehicle);
 	if (UCommandData* CommandData = GetIsValidCommandData())
 	{
 		CommandData->SwapAbility(EAbilityID::IdTowActor, EAbilityID::IdDetachTow);
@@ -1531,11 +1531,8 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
 	TeamWeaponActor->NotifyMoverMovementState(true, -TeamWeaponActor->GetActorForwardVector());
 
 	TeamWeaponController->OnActorBeingTowed(this, M_VehicleTowComponent.Get());
-	M_VehicleTowComponent->SetTowRelationship(TeamWeaponActor, TowedActorComponent, ETowActorAbilitySubtypes::TowTeamWeapon);
-	if (UCommandData* CommandData = GetIsValidCommandData())
-	{
-		CommandData->SwapAbility(EAbilityID::IdTowActor, EAbilityID::IdDetachTow);
-	}
+	M_VehicleTowComponent->SetTowRelationship(TeamWeaponActor, TowedActorComponent, ETowedActorTarget::TowTeamWeapon);
+	M_VehicleTowComponent->SwapAbilityToDetachTow();
 	DoneExecutingCommand(EAbilityID::IdTowActor);
 }
 
@@ -1574,12 +1571,13 @@ void ATankMaster::ExecuteDetachTowCommand()
 	if (not IsValid(TowedActor) || not IsValid(TowedActorComponent))
 	{
 		M_VehicleTowComponent->ClearTowRelationship();
+		M_VehicleTowComponent->SwapAbilityToTow();
 		DoneExecutingCommand(EAbilityID::IdDetachTow);
 		return;
 	}
 
-	const ETowActorAbilitySubtypes TowSubtype = M_VehicleTowComponent->GetCurrentTowSubtype();
-	if (TowSubtype == ETowActorAbilitySubtypes::TowTeamWeapon)
+	const ETowedActorTarget TowSubtype = M_VehicleTowComponent->GetCurrentTowSubtype();
+	if (TowSubtype == ETowedActorTarget::TowTeamWeapon)
 	{
 		if (ATeamWeapon* TeamWeaponActor = Cast<ATeamWeapon>(TowedActor))
 		{
@@ -1598,8 +1596,14 @@ void ATankMaster::ExecuteDetachTowCommand()
 
 bool ATankMaster::ExecuteDetachTowCommand_TryDetachSelfFromTow()
 {
-	if (not GetIsValidTowedActorComponentNoReport() || M_TowedActorComponent->IsTowFree())
+	const bool bHasValidTowComp = GetIsValidVehicleTowComponentNoReport();
+	if (not GetIsValidTowedActorComponentNoReport() || M_TowedActorComponent->IsTowFree() || not GetIsValidVehicleTowComponent())
 	{
+		// If we do have a valid tow comp then the towed comp (of the towed actor) is no longer valid so make sure we reset the ability.
+		if(bHasValidTowComp)
+		{
+			M_VehicleTowComponent->SwapAbilityToTow();
+		}
 		return false;
 	}
 
@@ -1616,10 +1620,7 @@ bool ATankMaster::ExecuteDetachTowCommand_TryDetachSelfFromTow()
 		TowingComp->ClearTowRelationship();
 	}
 	M_TowedActorComponent->ClearTowRelationship();
-	if (UCommandData* CommandData = GetIsValidCommandData())
-	{
-		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
-	}
+	M_VehicleTowComponent->SwapAbilityToTow();
 	return true;
 }
 
@@ -1639,20 +1640,16 @@ void ATankMaster::ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor,
 	}
 	TowedActorComponent->ClearTowRelationship();
 	M_VehicleTowComponent->ClearTowRelationship();
-	if (UCommandData* CommandData = GetIsValidCommandData())
-	{
-		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
-	}
+	M_VehicleTowComponent->SwapAbilityToTow();
+
 }
 
 void ATankMaster::ExecuteDetachTowCommand_DetachTowedTeamWeapon(ATeamWeaponController* TeamWeaponController)
 {
 	TeamWeaponController->ExecuteDetachTowCommand();
 	M_VehicleTowComponent->ClearTowRelationship();
-	if (UCommandData* CommandData = GetIsValidCommandData())
-	{
-		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
-	}
+	M_VehicleTowComponent->SwapAbilityToTow();
+
 }
 
 void ATankMaster::TerminateDetachTowCommand()
@@ -1674,7 +1671,7 @@ void ATankMaster::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent*
 	}
 }
 
-bool ATankMaster::GetTowTargetData(AActor* TowTargetActor, const ETowActorAbilitySubtypes TowSubtype,
+bool ATankMaster::GetTowTargetData(AActor* TowTargetActor, const ETowedActorTarget TowSubtype,
                                   UTowedActorComponent*& OutTowedActorComponent,
                                   ATeamWeapon*& OutTeamWeaponActor,
                                   ATeamWeaponController*& OutTeamWeaponController) const
@@ -1687,7 +1684,7 @@ bool ATankMaster::GetTowTargetData(AActor* TowTargetActor, const ETowActorAbilit
 		return false;
 	}
 
-	if (TowSubtype == ETowActorAbilitySubtypes::TowTeamWeapon)
+	if (TowSubtype == ETowedActorTarget::TowTeamWeapon)
 	{
 		OutTeamWeaponActor = Cast<ATeamWeapon>(TowTargetActor);
 		if (not IsValid(OutTeamWeaponActor))

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "VehicleTow.generated.h"
 
@@ -43,14 +44,16 @@ public:
 	bool GetIsValidTowedActorComp() const;
 
 	void SetTowRelationship(AActor* TowedActor, UTowedActorComponent* TowedActorComp,
-	                        const ETowActorAbilitySubtypes TowSubtype);
+	                        const ETowedActorTarget TowSubtype);
+	void SwapAbilityToDetachTow() const;
+	void SwapAbilityToTow() const;
 	void ClearTowRelationship();
 
 	const FVehicleTowSettings& GetTowSettings() const { return M_TowSettings; }
 	USceneComponent* GetTowMeshComponent() const;
 	AActor* GetTowedActor() const;
 	UTowedActorComponent* GetTowedActorComp() const;
-	ETowActorAbilitySubtypes GetCurrentTowSubtype() const { return M_CurrentTowSubtype; }
+	ETowedActorTarget GetCurrentTowSubtype() const { return M_CurrentTowSubtype; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -69,5 +72,12 @@ private:
 	TWeakObjectPtr<UTowedActorComponent> M_TowedActorComp;
 
 	UPROPERTY()
-	ETowActorAbilitySubtypes M_CurrentTowSubtype = ETowActorAbilitySubtypes::None;
+	ETowedActorTarget M_CurrentTowSubtype = ETowedActorTarget::None;
+
+	void BeginPlay_SetupCommandsInterface();
+	UPROPERTY()
+	TScriptInterface<ICommands> M_OwnerCommandsInterface;
+	[[nodiscard]] bool GetIsValidICommands() const;
+
+	void AddAbilityToCommands() const;
 };
