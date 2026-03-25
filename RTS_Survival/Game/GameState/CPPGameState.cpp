@@ -3735,6 +3735,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		EAbilityID::IdNoAbility
 	});
 
+
 	FTankData TankData;
 
 	// ------------------------------- GER Armored Cars -------------------------------

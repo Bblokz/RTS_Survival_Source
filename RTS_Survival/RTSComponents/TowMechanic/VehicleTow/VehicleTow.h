@@ -17,6 +17,9 @@ struct FVehicleTowSettings
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	float AcceptanceRadiusToTow = 500.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	int32 PreferredAbilityIndex = 10;
 };
 
 /**
@@ -48,6 +51,9 @@ public:
 	AActor* GetTowedActor() const;
 	UTowedActorComponent* GetTowedActorComp() const;
 	ETowActorAbilitySubtypes GetCurrentTowSubtype() const { return M_CurrentTowSubtype; }
+
+protected:
+	virtual void BeginPlay() override;
 
 private:
 	UPROPERTY(EditDefaultsOnly, Category="Tow")

@@ -97,3 +97,25 @@ UTowedActorComponent* UVehicleTowComponent::GetTowedActorComp() const
 
 	return nullptr;
 }
+
+void UVehicleTowComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	if (UWorld* World = GetWorld())
+	{
+		TWeakObjectPtr<UVehicleTowComponent> WeakThis(this);
+		auto SetupAbility = [WeakThis]()-> void
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->AddAbilityToCommands();
+		};
+		// Prevent race condition with tank master beginplay initialisation.
+		FTimerDelegate Del;
+		Del.BindLambda(SetupAbility);
+		World->GetTimerManager().SetTimerForNextTick(Del);
+	}
+	
+}
