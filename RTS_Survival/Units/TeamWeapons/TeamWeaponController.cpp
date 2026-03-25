@@ -94,6 +94,8 @@ void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_DeployTimer);
 	}
 
+	ResetTowRelationshipOnTeamWeaponSide(true, true);
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -2637,6 +2639,8 @@ void ATeamWeaponController::AbandonTeamWeapon()
 		return;
 	}
 
+	ResetTowRelationshipOnTeamWeaponSide(true, true);
+
 	SetTeamWeaponState(ETeamWeaponState::Abandoned);
 	M_PostPackAction.Reset();
 	M_PostDeployAction.Reset();
@@ -2701,10 +2705,10 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 		return;
 	}
 
-	ATankMaster* TowingTank = Cast<ATankMaster>(TowedActorComponent->GetTowingActor());
-	if (not IsValid(TowingTank))
+	if (not IsValid(Cast<ATankMaster>(TowedActorComponent->GetTowingActor())))
 	{
-		TowedActorComponent->ClearTowRelationship();
+		ResetTowRelationshipOnTeamWeaponSide(false, true);
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 		DoneExecutingCommand(EAbilityID::IdDetachTow);
 		return;
 	}
@@ -2712,7 +2716,8 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 	ATeamWeapon* TeamWeaponActor = M_TeamWeapon;
 	if (not IsValid(TeamWeaponActor))
 	{
-		TowedActorComponent->ClearTowRelationship();
+		ResetTowRelationshipOnTeamWeaponSide(false, true);
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 		DoneExecutingCommand(EAbilityID::IdDetachTow);
 		return;
 	}
@@ -2734,32 +2739,14 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 		}
 	}
 
-	UCargo* TankCargo = TowingTank->FindComponentByClass<UCargo>();
-	UCargoSquad* TeamWeaponCargoSquad = FindComponentByClass<UCargoSquad>();
-	if (not IsValid(TankCargo) || not IsValid(TeamWeaponCargoSquad))
-	{
-		RTSFunctionLibrary::ReportError("Missing cargo component during team weapon detach in ATeamWeaponController::ExecuteDetachTowCommand");
-	}
-	else
-	{
-		TeamWeaponCargoSquad->ExitCargoImmediate(false);
-	}
+	ReleaseCargoSquadUnitsFromTow();
 
 	AssignCrewToTeamWeapon();
 	SnapOperatorsToCrewPositions();
 	MoveGuardsToRandomGuardPositions();
 
-	TowedActorComponent->RestoreAbilitiesAfterTow();
-	if (UVehicleTowComponent* TowingTowComp = TowedActorComponent->GetTowingVehicleTowComp())
-	{
-		TowingTowComp->ClearTowRelationship();
-	}
-	TowedActorComponent->ClearTowRelationship();
+	ResetTowRelationshipOnTeamWeaponSide(false, false);
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
-	if (UCommandData* CommandData = GetIsValidCommandData())
-	{
-		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
-	}
 	DoneExecutingCommand(EAbilityID::IdDetachTow);
 }
 
@@ -2790,4 +2777,61 @@ void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTow
 	{
 		CommandData->SwapAbility(EAbilityID::IdTowActor, EAbilityID::IdDetachTow);
 	}
+}
+
+void ATeamWeaponController::ResetTowRelationshipOnTeamWeaponSide(const bool bDetachTeamWeaponActor,
+                                                                 const bool bReleaseCargoSquadUnits)
+{
+	UTowedActorComponent* TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport();
+	if (not IsValid(TowedActorComponent) || TowedActorComponent->IsTowFree())
+	{
+		return;
+	}
+
+	ATeamWeapon* TeamWeaponActor = M_TeamWeapon.Get();
+	if (bDetachTeamWeaponActor && IsValid(TeamWeaponActor))
+	{
+		ExecuteDetachTowCommand_ResetTowedVisualState(TeamWeaponActor);
+		TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	}
+
+	if (bReleaseCargoSquadUnits)
+	{
+		ReleaseCargoSquadUnitsFromTow();
+	}
+
+	TowedActorComponent->RestoreAbilitiesAfterTow();
+	if (UVehicleTowComponent* TowingTowComp = TowedActorComponent->GetTowingVehicleTowComp())
+	{
+		TowingTowComp->ClearTowRelationship();
+		TowingTowComp->SwapAbilityToTow();
+	}
+	TowedActorComponent->ClearTowRelationship();
+
+	if (UCommandData* CommandData = GetIsValidCommandData())
+	{
+		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
+	}
+}
+
+void ATeamWeaponController::ReleaseCargoSquadUnitsFromTow()
+{
+	UCargo* TankCargo = nullptr;
+	UTowedActorComponent* TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport();
+	if (IsValid(TowedActorComponent))
+	{
+		if (ATankMaster* TowingTank = Cast<ATankMaster>(TowedActorComponent->GetTowingActor()))
+		{
+			TankCargo = TowingTank->FindComponentByClass<UCargo>();
+		}
+	}
+
+	UCargoSquad* TeamWeaponCargoSquad = FindComponentByClass<UCargoSquad>();
+	if (not IsValid(TankCargo) || not IsValid(TeamWeaponCargoSquad))
+	{
+		RTSFunctionLibrary::ReportError("Missing cargo component during team weapon detach in ATeamWeaponController::ReleaseCargoSquadUnitsFromTow");
+		return;
+	}
+
+	TeamWeaponCargoSquad->ExitCargoImmediate(false);
 }

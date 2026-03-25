@@ -396,6 +396,8 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 	{
 		return;
 	}
+
+	CleanupTowRelationshipsOnDeath();
 	OnUnitDies_CheckForCargo(DeathType);
 	// Before announcer line; announcer is set to not interrupt.
 	FRTS_VoiceLineHelpers::PlayUnitDeathVoiceLineOnRadio(this);
@@ -1650,6 +1652,18 @@ void ATankMaster::ExecuteDetachTowCommand_DetachTowedTeamWeapon(ATeamWeaponContr
 	M_VehicleTowComponent->ClearTowRelationship();
 	M_VehicleTowComponent->SwapAbilityToTow();
 
+}
+
+void ATankMaster::CleanupTowRelationshipsOnDeath()
+{
+	const bool bIsTowingActor = GetIsValidVehicleTowComponentNoReport() && not M_VehicleTowComponent->IsTowFree();
+	const bool bIsTowedByActor = GetIsValidTowedActorComponentNoReport() && not M_TowedActorComponent->IsTowFree();
+	if (not bIsTowingActor && not bIsTowedByActor)
+	{
+		return;
+	}
+
+	ExecuteDetachTowCommand();
 }
 
 void ATankMaster::TerminateDetachTowCommand()
