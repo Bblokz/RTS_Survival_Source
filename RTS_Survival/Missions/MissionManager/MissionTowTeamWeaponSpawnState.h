@@ -33,7 +33,7 @@ struct FMissionTowTeamWeaponSpawnState
 	bool GetBelongsToRequest(const int32 RequestId) const;
 
 private:
-	static constexpr float TeamWeaponSpawnOffsetX = 300.0f;
+	static constexpr float TeamWeaponSpawnOffsetX = 50.0f;
 
 	int32 M_RequestId = INDEX_NONE;
 

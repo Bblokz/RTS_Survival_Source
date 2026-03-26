@@ -1,6 +1,7 @@
 #include "MissionTowTeamWeaponSpawnState.h"
 
 #include "MissionManager.h"
+#include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/RTSComponents/TowMechanic/TowedActor/TowedActor.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -181,8 +182,13 @@ bool FMissionTowTeamWeaponSpawnState::TryFinishInstantTow()
 		return false;
 	}
 
-	if (not M_TankActor->TryTowTeamWeaponInstant(TeamWeaponController, M_TeamWeaponActor.Get()))
+	const ECommandQueueError TowCommandError = M_TankActor->TowActor(
+		M_TeamWeaponActor.Get(),
+		ETowedActorTarget::TowTeamWeapon,
+		true);
+	if (TowCommandError != ECommandQueueError::NoError)
 	{
+		SetStateAsFailed("Mission tow spawn request failed: TowActor command returned error.");
 		return false;
 	}
 
