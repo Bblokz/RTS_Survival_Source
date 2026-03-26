@@ -28,6 +28,8 @@ public:
 	void LoadProfile(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner, const FVector& SpawnCenter, ACPPController* PlayerController,
 		const bool bDoNotLoadPlayerUnits = false);
 
+	TMap<FTrainingOption, bool> GetProfileUnitsSpawned() const { return M_IsProfileUnitSpawned; }
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;

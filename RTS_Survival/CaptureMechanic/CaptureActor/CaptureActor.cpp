@@ -47,7 +47,18 @@ void ACaptureActor::BeginPlay_ApplyCapturableHealthBarCustomization()
 		return;
 	}
 
-	M_HealthComponent->ChangeCustomizationSettings(CaptureHealthBarOverrideSettings.CapturableHealthBarCustomization);
+	TWeakObjectPtr<ACaptureActor> WeakThis(this);
+	auto HpLambda = [WeakThis](UHealthComponent* HpCompInitialized) -> void
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		HpCompInitialized->ChangeCustomizationSettings(
+			WeakThis->CaptureHealthBarOverrideSettings.CapturableHealthBarCustomization);
+	};
+
+	M_HealthComponent->M_HealthBarWidgetCallbacks.CallbackOnHealthBarReady(HpLambda, WeakThis);
 }
 
 bool ACaptureActor::GetIsValidHealthComponent() const
@@ -57,13 +68,8 @@ bool ACaptureActor::GetIsValidHealthComponent() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		"M_HealthComponent",
-		"GetIsValidHealthComponent",
-		this
-	);
 
+	// No error report; not all support a hp comp.
 	return false;
 }
 

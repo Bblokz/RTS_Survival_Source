@@ -1529,7 +1529,7 @@ private:
 
 	bool GetIsValidCommandTypeDecoder();
 	bool GetIsValidPlayerResourceManager() const;
-	bool GetIsValidPlayerHQ() const;
+	bool GetIsValidPlayerHQ(const bool bDoNotErrorReport);
 	bool GetIsValidPlayerAudioController() const;
 	bool GetIsValidPlayerPortraitManager() const;
 	bool GetIsValidPlayerCameraController() const;
