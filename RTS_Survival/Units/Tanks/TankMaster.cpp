@@ -1497,25 +1497,69 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
                                                        ATeamWeaponController* TeamWeaponController,
                                                        UTowedActorComponent* TowedActorComponent)
 {
-	if (not IsValid(TeamWeaponActor) || not IsValid(TeamWeaponController))
+	if (TryTowTeamWeapon_Internal(TeamWeaponActor, TeamWeaponController, TowedActorComponent, true))
 	{
-		DoneExecutingCommand(EAbilityID::IdTowActor);
 		return;
+	}
+
+	DoneExecutingCommand(EAbilityID::IdTowActor);
+}
+
+bool ATankMaster::TryTowTeamWeaponInstant(ATeamWeaponController* TeamWeaponController, ATeamWeapon* TeamWeaponActor)
+{
+	if (not IsValid(TeamWeaponController) || not IsValid(TeamWeaponActor))
+	{
+		RTSFunctionLibrary::ReportError("Tank instant tow failed: team weapon controller or actor is invalid.");
+		return false;
+	}
+
+	if (not GetIsValidVehicleTowComponent() || not M_VehicleTowComponent->GetIsValidTowMeshComponent())
+	{
+		return false;
+	}
+
+	if (not M_VehicleTowComponent->IsTowFree())
+	{
+		RTSFunctionLibrary::ReportError("Tank instant tow failed: towing vehicle is already towing another actor.");
+		return false;
+	}
+
+	UTowedActorComponent* TowedActorComponent = TeamWeaponActor->FindComponentByClass<UTowedActorComponent>();
+	if (not IsValid(TowedActorComponent))
+	{
+		RTSFunctionLibrary::ReportError("Tank instant tow failed: team weapon has no UTowedActorComponent.");
+		return false;
+	}
+
+	if (not TowedActorComponent->IsTowFree())
+	{
+		RTSFunctionLibrary::ReportError("Tank instant tow failed: team weapon is already in a tow relationship.");
+		return false;
+	}
+
+	return TryTowTeamWeapon_Internal(TeamWeaponActor, TeamWeaponController, TowedActorComponent, false);
+}
+
+bool ATankMaster::TryTowTeamWeapon_Internal(ATeamWeapon* TeamWeaponActor, ATeamWeaponController* TeamWeaponController,
+                                            UTowedActorComponent* TowedActorComponent,
+                                            const bool bDoneExecutingCommandAfterTow)
+{
+	if (not IsValid(TeamWeaponActor) || not IsValid(TeamWeaponController) || not IsValid(TowedActorComponent))
+	{
+		return false;
 	}
 
 	UCargo* TankCargo = FindComponentByClass<UCargo>();
 	UCargoSquad* TeamWeaponCargoSquad = TeamWeaponController->FindComponentByClass<UCargoSquad>();
 	if (not IsValid(TankCargo) || not IsValid(TeamWeaponCargoSquad))
 	{
-		DoneExecutingCommand(EAbilityID::IdTowActor);
-		return;
+		return false;
 	}
 
 	TeamWeaponController->SetUnitToIdle();
 	if (not TeamWeaponCargoSquad->EnterCargoImmediateInternal(this, false))
 	{
-		DoneExecutingCommand(EAbilityID::IdTowActor);
-		return;
+		return false;
 	}
 
 	TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
@@ -1535,7 +1579,13 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
 	TeamWeaponController->OnActorBeingTowed(this, M_VehicleTowComponent.Get());
 	M_VehicleTowComponent->SetTowRelationship(TeamWeaponActor, TowedActorComponent, ETowedActorTarget::TowTeamWeapon);
 	M_VehicleTowComponent->SwapAbilityToDetachTow();
-	DoneExecutingCommand(EAbilityID::IdTowActor);
+
+	if (bDoneExecutingCommandAfterTow)
+	{
+		DoneExecutingCommand(EAbilityID::IdTowActor);
+	}
+
+	return true;
 }
 
 bool ATankMaster::ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(const AActor* TowTargetActor,

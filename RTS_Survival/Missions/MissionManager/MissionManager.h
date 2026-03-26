@@ -5,6 +5,8 @@
 #include "MissionSounds/MissionSounds.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionManager.generated.h"
 
 
@@ -16,6 +18,7 @@ class ACPPController;
 class UW_MissionWidgetManager;
 class UMissionBase;
 class UW_GameDifficultyPicker;
+class AActor;
 
 USTRUCT(BlueprintType)
 struct FMissionStartingResources
@@ -81,6 +84,12 @@ public:
 	                                                 const FMissionTimerLifetimeSettings& LifetimeSettings);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlaySound2DForMission(USoundBase* SoundToPlay) const;
+
+	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
+		const FVector& TankSpawnLocation);
+	void HandleSpawnTowedTeamWeaponTankSpawned(int32 RequestId, AActor* SpawnedTankActor);
+	void HandleSpawnTowedTeamWeaponSquadSpawned(int32 RequestId, AActor* SpawnedSquadActor);
+	void HandleSpawnTowedTeamWeaponSquadReady(int32 RequestId);
 	FMissionStartingResources GetMissionStartingResources() const { return M_MissionStartingResources; }
 
 	/**
@@ -166,6 +175,16 @@ private:
 	UPROPERTY()
 	FRTSGameDifficulty M_GameDifficulty;
 
-	
+	UPROPERTY()
+	TArray<FMissionTowTeamWeaponSpawnState> M_TowedTeamWeaponSpawnStates;
+
+	int32 M_NextTowedTeamWeaponSpawnRequestId = 1;
+
+	FMissionTowTeamWeaponSpawnState* FindTowedTeamWeaponSpawnState(const int32 RequestId);
+	void TryCompleteTowedTeamWeaponSpawnRequest(const int32 RequestId);
+	void TickTowSpawnRequests();
+	void RemoveFinishedTowSpawnRequests();
+	bool EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeaponSpawnState* TowSpawnState) const;
+	bool EnsureValidTowAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
 
 };
