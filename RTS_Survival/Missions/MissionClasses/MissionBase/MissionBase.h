@@ -306,6 +306,16 @@ protected:
 	                                        const FVector SpawnLocation, const FRotator Rotation,
 	                                        const float Delay);
 
+	/**
+	 * @brief Spawns a tank and team-weapon squad asynchronously and links tow once both are ready.
+	 * @param TankSubtype Tank subtype used for the towing vehicle spawn.
+	 * @param SquadSubtype Squad subtype expected to be a team weapon controller.
+	 * @param SpawnLocation Spawn location for the tank; team weapon squad spawns behind this location.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
+	                          const FVector SpawnLocation);
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnAsyncSpawnComplete(const FTrainingOption TrainingOption, AActor* SpawnedActor, const int32 ID);
 

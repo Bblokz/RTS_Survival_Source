@@ -470,6 +470,10 @@ private:
 	void ExecuteTowActorCommand_TowTeamWeapon(class ATeamWeapon* TeamWeaponActor,
 	                                        class ATeamWeaponController* TeamWeaponController,
 	                                        UTowedActorComponent* TowedActorComponent);
+	bool TryTowTeamWeapon_Internal(class ATeamWeapon* TeamWeaponActor,
+	                              class ATeamWeaponController* TeamWeaponController,
+	                              UTowedActorComponent* TowedActorComponent,
+	                              const bool bDoneExecutingCommandAfterTow);
 	bool ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(const AActor* TowTargetActor,
 	                                                       const UVehicleTowComponent* VehicleTowComp) const;
 	bool ExecuteDetachTowCommand_TryDetachSelfFromTow();

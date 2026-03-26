@@ -715,6 +715,18 @@ void UMissionBase::AsyncSpawnActorAtLocationWithDelay(const FTrainingOption& Tra
 	M_DelaySpawnTimerHandles.Add(TimerHandle);
 }
 
+void UMissionBase::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
+                                        const FVector SpawnLocation)
+{
+	AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not IsValid(MissionManager))
+	{
+		return;
+	}
+
+	MissionManager->SpawnTowedTeamWeapon(TankSubtype, SquadSubtype, SpawnLocation);
+}
+
 void UMissionBase::MoveCamera(const FMovePlayerCamera CameraMove)
 {
 	SetCameraControllerReference();

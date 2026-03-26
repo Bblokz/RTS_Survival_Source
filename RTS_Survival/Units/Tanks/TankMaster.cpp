@@ -1497,25 +1497,34 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
                                                        ATeamWeaponController* TeamWeaponController,
                                                        UTowedActorComponent* TowedActorComponent)
 {
-	if (not IsValid(TeamWeaponActor) || not IsValid(TeamWeaponController))
+	if (TryTowTeamWeapon_Internal(TeamWeaponActor, TeamWeaponController, TowedActorComponent, true))
 	{
-		DoneExecutingCommand(EAbilityID::IdTowActor);
 		return;
+	}
+
+	DoneExecutingCommand(EAbilityID::IdTowActor);
+}
+
+bool ATankMaster::TryTowTeamWeapon_Internal(ATeamWeapon* TeamWeaponActor, ATeamWeaponController* TeamWeaponController,
+                                            UTowedActorComponent* TowedActorComponent,
+                                            const bool bDoneExecutingCommandAfterTow)
+{
+	if (not IsValid(TeamWeaponActor) || not IsValid(TeamWeaponController) || not IsValid(TowedActorComponent))
+	{
+		return false;
 	}
 
 	UCargo* TankCargo = FindComponentByClass<UCargo>();
 	UCargoSquad* TeamWeaponCargoSquad = TeamWeaponController->FindComponentByClass<UCargoSquad>();
 	if (not IsValid(TankCargo) || not IsValid(TeamWeaponCargoSquad))
 	{
-		DoneExecutingCommand(EAbilityID::IdTowActor);
-		return;
+		return false;
 	}
 
 	TeamWeaponController->SetUnitToIdle();
 	if (not TeamWeaponCargoSquad->EnterCargoImmediateInternal(this, false))
 	{
-		DoneExecutingCommand(EAbilityID::IdTowActor);
-		return;
+		return false;
 	}
 
 	TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
@@ -1535,7 +1544,13 @@ void ATankMaster::ExecuteTowActorCommand_TowTeamWeapon(ATeamWeapon* TeamWeaponAc
 	TeamWeaponController->OnActorBeingTowed(this, M_VehicleTowComponent.Get());
 	M_VehicleTowComponent->SetTowRelationship(TeamWeaponActor, TowedActorComponent, ETowedActorTarget::TowTeamWeapon);
 	M_VehicleTowComponent->SwapAbilityToDetachTow();
-	DoneExecutingCommand(EAbilityID::IdTowActor);
+
+	if (bDoneExecutingCommandAfterTow)
+	{
+		DoneExecutingCommand(EAbilityID::IdTowActor);
+	}
+
+	return true;
 }
 
 bool ATankMaster::ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(const AActor* TowTargetActor,
