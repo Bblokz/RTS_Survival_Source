@@ -230,6 +230,7 @@ private:
 	void ResetTowRelationshipOnTeamWeaponSide(const bool bDetachTeamWeaponActor, const bool bReleaseCargoSquadUnits);
 	void ReleaseCargoSquadUnitsFromTow();
 	void ExecuteDetachTowCommand_ResetTowedVisualState(ATeamWeapon* TeamWeaponActor) const;
+	void TickTowedWeaponAnimation();
 
 	void BeginPlay_InitAnimatedTextWidgetPoolManager();
 

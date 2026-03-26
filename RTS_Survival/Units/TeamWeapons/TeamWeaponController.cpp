@@ -111,6 +111,7 @@ void ATeamWeaponController::Tick(float DeltaSeconds)
 	}
 
 	TickRotationRequest(DeltaSeconds);
+	TickTowedWeaponAnimation();
 }
 
 void ATeamWeaponController::UpdateControllerPositionToAverage()
@@ -2767,6 +2768,11 @@ void ATeamWeaponController::TerminateDetachTowCommand()
 
 void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp)
 {
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->PlayPackingMontage(false);
+	}
+
 	SetTeamWeaponState(ETeamWeaponState::Towed);
 	if (UTowedActorComponent* TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport())
 	{
@@ -2777,6 +2783,8 @@ void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTow
 	{
 		CommandData->SwapAbility(EAbilityID::IdTowActor, EAbilityID::IdDetachTow);
 	}
+
+	TickTowedWeaponAnimation();
 }
 
 void ATeamWeaponController::ResetTowRelationshipOnTeamWeaponSide(const bool bDetachTeamWeaponActor,
@@ -2789,9 +2797,13 @@ void ATeamWeaponController::ResetTowRelationshipOnTeamWeaponSide(const bool bDet
 	}
 
 	ATeamWeapon* TeamWeaponActor = M_TeamWeapon.Get();
-	if (bDetachTeamWeaponActor && IsValid(TeamWeaponActor))
+	if (IsValid(TeamWeaponActor))
 	{
 		ExecuteDetachTowCommand_ResetTowedVisualState(TeamWeaponActor);
+	}
+
+	if (bDetachTeamWeaponActor && IsValid(TeamWeaponActor))
+	{
 		TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	}
 
@@ -2812,6 +2824,36 @@ void ATeamWeaponController::ResetTowRelationshipOnTeamWeaponSide(const bool bDet
 	{
 		CommandData->SwapAbility(EAbilityID::IdDetachTow, EAbilityID::IdTowActor);
 	}
+}
+
+void ATeamWeaponController::TickTowedWeaponAnimation()
+{
+	if (M_TeamWeaponState != ETeamWeaponState::Towed)
+	{
+		return;
+	}
+
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	UTowedActorComponent* TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport();
+	if (not IsValid(TowedActorComponent))
+	{
+		M_TeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
+		return;
+	}
+
+	AActor* TowingActor = TowedActorComponent->GetTowingActor();
+	if (not IsValid(TowingActor))
+	{
+		M_TeamWeapon->NotifyMoverMovementState(false, FVector::ZeroVector);
+		return;
+	}
+
+	const FVector TowingVelocity = TowingActor->GetVelocity();
+	M_TeamWeapon->NotifyMoverMovementState(not TowingVelocity.IsNearlyZero(), TowingVelocity);
 }
 
 void ATeamWeaponController::ReleaseCargoSquadUnitsFromTow()
