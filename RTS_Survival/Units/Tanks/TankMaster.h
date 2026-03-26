@@ -338,6 +338,7 @@ protected:
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype) override;
 	virtual void TerminateTowActorCommand() override;
 	virtual void TerminateDetachTowCommand() override;
+	bool TryTowTeamWeaponInstant(class ATeamWeaponController* TeamWeaponController, class ATeamWeapon* TeamWeaponActor);
 
 	// For the harvester that uses resources that are stored in the harvester component.
 	// This function is used to adust the visuals of the harvester depending on the amount of resources stored.
