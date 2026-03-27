@@ -78,6 +78,11 @@ void ATeamWeaponController::OnAllSquadUnitsLoaded()
 	SnapOperatorsToCrewPositions();
 }
 
+bool ATeamWeaponController::TryLoadSquadUnitsFromMapSetup()
+{
+	return TrySetupSquadUnitsAndTeamWeaponFromMapSetup();
+}
+
 void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	RestorePushedMoveSpeedOverride();
@@ -675,6 +680,14 @@ void ATeamWeaponController::SpawnTeamWeapon()
 		return;
 	}
 
+	if (bM_ShouldUseMapSetupControllerData && TrySetupTeamWeaponFromMapSetup())
+	{
+		AssignCrewToTeamWeapon();
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+		StartDeploying();
+		return;
+	}
+
 	ATeamWeapon* PendingAdoptedTeamWeapon = M_PendingAdoptedTeamWeapon.Get();
 	if (PendingAdoptedTeamWeapon != nullptr)
 	{
@@ -729,6 +742,115 @@ void ATeamWeaponController::SpawnTeamWeapon()
 	AssignCrewToTeamWeapon();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	StartDeploying();
+}
+
+bool ATeamWeaponController::TrySetupSquadUnitsAndTeamWeaponFromMapSetup()
+{
+	bM_ShouldUseMapSetupControllerData = false;
+
+	const bool bHasMapSetupSquadUnits = not M_MapSetupSquadUnits.IsEmpty();
+	const bool bHasMapSetupTeamWeapon = M_MapSetupTeamWeapon.IsValid();
+	if (not bHasMapSetupSquadUnits && not bHasMapSetupTeamWeapon)
+	{
+		return false;
+	}
+
+	if (bHasMapSetupSquadUnits != bHasMapSetupTeamWeapon)
+	{
+		RTSFunctionLibrary::ReportError(
+			"MapSetupController requires both M_MapSetupSquadUnits and M_MapSetupTeamWeapon to be set."
+			"\n At function: ATeamWeaponController::TrySetupSquadUnitsAndTeamWeaponFromMapSetup");
+		return false;
+	}
+
+	if (not TrySetupSquadUnitsFromMapSetup())
+	{
+		return false;
+	}
+
+	if (not TrySetupTeamWeaponFromMapSetup())
+	{
+		return false;
+	}
+
+	M_SquadLoadingStatus.bM_HasInitializedData = false;
+	M_SquadLoadingStatus.bM_HasFinishedLoading = true;
+	M_SquadLoadingStatus.M_AmountOfSquadUnitsToLoad = 0;
+	bM_ShouldUseMapSetupControllerData = true;
+	OnAllSquadUnitsLoaded();
+	return true;
+}
+
+bool ATeamWeaponController::TrySetupSquadUnitsFromMapSetup()
+{
+	M_TSquadUnits.Reset();
+	for (const TWeakObjectPtr<ASquadUnit>& SquadUnitWeak : M_MapSetupSquadUnits)
+	{
+		ASquadUnit* SquadUnit = SquadUnitWeak.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		SquadUnit->SetSquadController(this);
+		M_TSquadUnits.Add(SquadUnit);
+	}
+
+	if (M_TSquadUnits.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"MapSetupController did not contain any valid squad units."
+			"\n At function: ATeamWeaponController::TrySetupSquadUnitsFromMapSetup");
+		return false;
+	}
+
+	return true;
+}
+
+bool ATeamWeaponController::TrySetupTeamWeaponFromMapSetup()
+{
+	if (not GetIsValidMapSetupTeamWeapon())
+	{
+		return false;
+	}
+
+	if (M_TeamWeapon != nullptr)
+	{
+		return true;
+	}
+
+	M_TeamWeapon = M_MapSetupTeamWeapon.Get();
+	M_TeamWeapon->SetTeamWeaponController(this);
+	M_TeamWeapon->SetTurretOwnerActor(this);
+	M_TeamWeaponMover = M_TeamWeapon->GetTeamWeaponMover();
+
+	if (not GetIsValidTeamWeaponMover())
+	{
+		M_TeamWeapon = nullptr;
+		return false;
+	}
+
+	M_TeamWeaponMover->InitMover(M_TeamWeapon, this);
+	M_TeamWeaponMover->OnPushedMoveArrived.RemoveAll(this);
+	M_TeamWeaponMover->OnPushedMoveFailed.RemoveAll(this);
+	M_TeamWeaponMover->OnPushedMoveArrived.AddUObject(this, &ATeamWeaponController::HandlePushedMoverArrived);
+	M_TeamWeaponMover->OnPushedMoveFailed.AddUObject(this, &ATeamWeaponController::HandlePushedMoverFailed);
+	return true;
+}
+
+bool ATeamWeaponController::GetIsValidMapSetupTeamWeapon() const
+{
+	if (M_MapSetupTeamWeapon.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_MapSetupTeamWeapon"),
+		TEXT("ATeamWeaponController::GetIsValidMapSetupTeamWeapon"),
+		this);
+	return false;
 }
 
 bool ATeamWeaponController::AdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon)
