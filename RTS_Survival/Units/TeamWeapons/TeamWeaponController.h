@@ -228,6 +228,7 @@ private:
 	bool GetIsValidDigInComponent() const;
 	bool GetIsValidTowedActorComponent() const;
 	void ResetTowRelationshipOnTeamWeaponSide(const bool bDetachTeamWeaponActor, const bool bReleaseCargoSquadUnits);
+	void SetTeamWeaponAutoEngageEnabled(const bool bEnableAutoEngage) const;
 	void ReleaseCargoSquadUnitsFromTow();
 	void ExecuteDetachTowCommand_ResetTowedVisualState(ATeamWeapon* TeamWeaponActor) const;
 	void TickTowedWeaponAnimation();
