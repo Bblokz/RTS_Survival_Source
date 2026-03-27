@@ -1356,6 +1356,11 @@ void ASquadController::ExecuteRetreatCommand(const FVector RetreatLocation)
 		DoneExecutingCommand(EAbilityID::IdRetreat);
 		return;
 	}
+	
+	if (IsValid(CargoSquad))
+	{
+		CargoSquad->CheckCargoState(EAbilityID::IdRetreat);
+	}
 
 	M_UnitsCompletedCommand = 0;
 	BehaviourComponent->AddBehaviour(USquadRetreatBehaviour::StaticClass());
@@ -2237,6 +2242,10 @@ void ASquadController::ExecuteRepairCommand(AActor* TargetActor)
 		FRTSRepairHelpers::Debug_Repair("Unit not valid for repairs, Terminating command...");
 		DoneExecutingCommand(EAbilityID::IdRepair);
 		return;
+	}
+	if (IsValid(CargoSquad))
+	{
+		CargoSquad->CheckCargoState(EAbilityID::IdRepair);
 	}
 	EnsureSquadUnitsValid();
 	TArray<URepairComponent*> RepairComponents;

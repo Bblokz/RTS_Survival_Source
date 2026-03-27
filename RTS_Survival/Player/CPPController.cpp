@@ -3980,6 +3980,13 @@ uint32 ACPPController::RotateUnitsToLocation(const FVector& RotateLocation)
 		commandsExe += EachPawn->RotateTowards(LookAtRotation, !bIsHoldingShift) ==
 			ECommandQueueError::NoError;
 	}
+	for (const auto EachSquad : TSelectedSquadControllers)
+	{
+		const FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(
+			EachSquad->GetActorLocation(), RotateLocation);
+		commandsExe += EachSquad->RotateTowards(LookAtRotation, !bIsHoldingShift) ==
+			ECommandQueueError::NoError;
+	}
 	return commandsExe;
 }
 
