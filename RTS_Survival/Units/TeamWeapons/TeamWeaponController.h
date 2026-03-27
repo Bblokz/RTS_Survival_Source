@@ -168,6 +168,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual bool TryLoadSquadUnitsFromMapSetup() override;
 	virtual void OnAllSquadUnitsLoaded() override;
 	virtual void ExecuteMoveCommand(const FVector MoveToLocation) override;
 	virtual void TerminateMoveCommand() override;
@@ -213,7 +214,11 @@ protected:
 
 private:
 	void SpawnTeamWeapon();
+	bool TrySetupSquadUnitsAndTeamWeaponFromMapSetup();
+	bool TrySetupSquadUnitsFromMapSetup();
+	bool TrySetupTeamWeaponFromMapSetup();
 	bool AdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
+	bool GetIsValidMapSetupTeamWeapon() const;
 	void AssignCrewToTeamWeapon();
 	void HandlePushedMoverArrived();
 	void HandlePushedMoverFailed(const FString& FailureReason);
@@ -341,6 +346,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "TeamWeapon")
 	TSubclassOf<ATeamWeapon> TeamWeaponClass;
 
+	UPROPERTY(EditAnywhere, Category = "MapSetupController")
+	TArray<TWeakObjectPtr<ASquadUnit>> M_MapSetupSquadUnits;
+
+	UPROPERTY(EditAnywhere, Category = "MapSetupController")
+	TWeakObjectPtr<ATeamWeapon> M_MapSetupTeamWeapon;
+
 	UPROPERTY(EditDefaultsOnly, Category = "TeamWeapon|Guard")
 	float M_GuardDistance = 350.0f;
 
@@ -426,6 +437,9 @@ private:
 
 	UPROPERTY()
 	bool bM_ShouldExecuteDigInAfterDeploy = false;
+
+	UPROPERTY()
+	bool bM_ShouldUseMapSetupControllerData = false;
 
 	UPROPERTY()
 	bool bM_IsShuttingDown = false;

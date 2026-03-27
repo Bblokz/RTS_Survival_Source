@@ -644,6 +644,12 @@ protected:
 	/** Async load the squad unit classes */
 	virtual void LoadSquadUnitsAsync();
 
+	/**
+	 * @brief Allows derived controllers to use pre-placed map setup data instead of spawning units.
+	 * @return True when loading/spawn should stop because the derived class already configured squad units.
+	 */
+	virtual bool TryLoadSquadUnitsFromMapSetup();
+
 	/** Callback for when a squad unit class is loaded */
 	virtual void OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedClass);
 

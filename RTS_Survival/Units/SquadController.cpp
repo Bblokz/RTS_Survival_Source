@@ -3306,6 +3306,11 @@ void ASquadController::SetShouldSkipInitialSquadUnitLoad(const bool bShouldSkipI
 
 void ASquadController::LoadSquadUnitsAsync()
 {
+	if (TryLoadSquadUnitsFromMapSetup())
+	{
+		return;
+	}
+
 	// Create a StreamableManager to manage async loading
 	FStreamableManager& StreamableManager = UAssetManager::GetStreamableManager();
 	// Starts the grid generation at the actor location of the squad, later used at OnSquadUnitClassLoaded for the grid location.
@@ -3327,6 +3332,11 @@ void ASquadController::LoadSquadUnitsAsync()
 		                                   FStreamableDelegate::CreateUObject(
 			                                   this, &ASquadController::OnSquadUnitClassLoaded, SoftClass));
 	}
+}
+
+bool ASquadController::TryLoadSquadUnitsFromMapSetup()
+{
+	return false;
 }
 
 void ASquadController::OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedClass)
