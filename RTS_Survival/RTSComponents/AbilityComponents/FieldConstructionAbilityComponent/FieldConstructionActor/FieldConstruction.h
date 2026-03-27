@@ -9,6 +9,8 @@
 /**
  * @brief Actor spawned when squads build a field construction; handles collision and build visuals.
  */
+class UCargo;
+
 UCLASS()
 class RTS_SURVIVAL_API AFieldConstruction : public ADestructableEnvActor
 {
@@ -23,6 +25,7 @@ protected:
 	virtual void BeginPlay() override;
 
 	virtual void PostInitializeComponents() override;
+	virtual void OnUnitDies(const ERTSDeathType DeathType) override;
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<UStaticMeshComponent> FieldConstructionMesh;
 
@@ -55,4 +58,12 @@ private:
 	void ApplyPreviewMaterial();
 	void RestoreMaterialsOverTime();
 	void RestoreOriginalMaterialSlots(const float BuildProgress);
+	bool EnsureCargoComponentIsValid() const;
+
+	void OnUnitDies_HandleGarrisonState();
+
+	static const int32 DamagePercentage;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference")
+	TObjectPtr<UCargo> M_CargoComponent;
 };
