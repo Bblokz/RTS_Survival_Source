@@ -119,6 +119,38 @@ void AMissionManager::PlaySound2DForMission(USoundBase* SoundToPlay) const
 	UGameplayStatics::PlaySound2D(World, SoundToPlay, 1, 1, 0);
 }
 
+int32 AMissionManager::ScheduleMissionCallback(
+	const FMissionScheduledCallback& Callback,
+	const int32 TotalCalls,
+	const int32 IntervalSeconds,
+	UObject* CallbackOwner,
+	const bool bFireBeforeFirstInterval
+)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return INDEX_NONE;
+	}
+
+	return M_MissionScheduler->ScheduleCallback(
+		Callback,
+		TotalCalls,
+		IntervalSeconds,
+		CallbackOwner,
+		bFireBeforeFirstInterval
+	);
+}
+
+void AMissionManager::CancelAllCallbacksForObject(const UObject* CallbackOwner)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->CancelAllTasksForObject(CallbackOwner);
+}
+
 void AMissionManager::ActivateNewMission(UMissionBase* NewMission)
 {
 	if (not EnsureMissionIsValid(NewMission))
@@ -208,6 +240,7 @@ void AMissionManager::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_InitPlayerController();
+	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionWidgetManager();
 	BeginPlay_InitGameDifficultyPickerWidget();
 
@@ -338,6 +371,18 @@ void AMissionManager::BeginPlay_InitGameDifficultyPickerWidget()
 	DifficultyPickerWidget->AddToViewport(DifficultyWidgetZOrder);
 }
 
+void AMissionManager::BeginPlay_InitMissionScheduler()
+{
+	M_MissionScheduler = NewObject<UMissionScheduler>(this);
+	if (not IsValid(M_MissionScheduler))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create MissionScheduler");
+		return;
+	}
+
+	M_MissionScheduler->RegisterComponent();
+}
+
 bool AMissionManager::EnsureValidPlayerController() const
 {
 	if (M_PlayerController.IsValid())
@@ -345,6 +390,22 @@ bool AMissionManager::EnsureValidPlayerController() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportError("Player controller is not valid in mission manager.");
+	return false;
+}
+
+bool AMissionManager::GetIsValidMissionScheduler() const
+{
+	if (IsValid(M_MissionScheduler))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_MissionScheduler",
+		"GetIsValidMissionScheduler",
+		this
+	);
 	return false;
 }
 

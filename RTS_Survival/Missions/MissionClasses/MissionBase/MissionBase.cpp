@@ -111,8 +111,35 @@ UW_MissionTimer* UMissionBase::SpawnMissionTimerWidget(TSubclassOf<UW_MissionTim
 		LifetimeSettings);
 }
 
+int32 UMissionBase::ScheduleRepeatedCallback(
+	const FMissionScheduledCallback& Callback,
+	const int32 TotalCalls,
+	const int32 IntervalSeconds,
+	const bool bFireBeforeFirstInterval
+)
+{
+	if (not GetIsValidMissionManager())
+	{
+		RTSFunctionLibrary::ReportError("Mission tried to schedule callback while mission manager is invalid.");
+		return INDEX_NONE;
+	}
+
+	return GetMissionManagerChecked()->ScheduleMissionCallback(
+		Callback,
+		TotalCalls,
+		IntervalSeconds,
+		this,
+		bFireBeforeFirstInterval
+	);
+}
+
 void UMissionBase::OnCleanUpMission()
 {
+	if (GetIsValidMissionManager())
+	{
+		GetMissionManagerChecked()->CancelAllCallbacksForObject(this);
+	}
+
 	if (not GetWorld())
 	{
 		return;

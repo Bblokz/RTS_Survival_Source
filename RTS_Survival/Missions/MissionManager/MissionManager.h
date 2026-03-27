@@ -7,6 +7,7 @@
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "MissionTowTeamWeaponSpawnState.h"
+#include "MissionScheduler/MissionScheduler.h"
 #include "MissionManager.generated.h"
 
 
@@ -19,6 +20,7 @@ class UW_MissionWidgetManager;
 class UMissionBase;
 class UW_GameDifficultyPicker;
 class AActor;
+class UObject;
 
 USTRUCT(BlueprintType)
 struct FMissionStartingResources
@@ -84,6 +86,23 @@ public:
 	                                                 const FMissionTimerLifetimeSettings& LifetimeSettings);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlaySound2DForMission(USoundBase* SoundToPlay) const;
+	/**
+	 * @brief Routes mission callback scheduling to the dedicated scheduler component.
+	 * @param Callback Delegate to execute on schedule.
+	 * @param TotalCalls Total amount of executions requested.
+	 * @param IntervalSeconds Interval between calls in scheduler ticks.
+	 * @param CallbackOwner Owner object used for safety and cleanup.
+	 * @param bFireBeforeFirstInterval If true, one callback call happens immediately.
+	 * @return Task id when the callback stays scheduled, or INDEX_NONE when scheduling fails or finishes instantly.
+	 */
+	int32 ScheduleMissionCallback(
+		const FMissionScheduledCallback& Callback,
+		const int32 TotalCalls,
+		const int32 IntervalSeconds,
+		UObject* CallbackOwner,
+		const bool bFireBeforeFirstInterval = true
+	);
+	void CancelAllCallbacksForObject(const UObject* CallbackOwner);
 
 	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
 		const FVector& TankSpawnLocation);
@@ -148,10 +167,15 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 
+	UPROPERTY()
+	TObjectPtr<UMissionScheduler> M_MissionScheduler;
+
 	void BeginPlay_InitPlayerController();
 	void BeginPlay_InitMissionWidgetManager();
 	void BeginPlay_InitGameDifficultyPickerWidget();
+	void BeginPlay_InitMissionScheduler();
 	bool EnsureValidPlayerController() const;
+	bool GetIsValidMissionScheduler() const;
 
 	UPROPERTY()
 	UW_MissionWidgetManager* M_MissionWidgetManager;
