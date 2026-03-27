@@ -123,8 +123,10 @@ int32 AMissionManager::ScheduleMissionCallback(
 	const FMissionScheduledCallback& Callback,
 	const int32 TotalCalls,
 	const int32 IntervalSeconds,
+	const int32 InitialDelaySeconds,
 	UObject* CallbackOwner,
-	const bool bFireBeforeFirstInterval
+	const bool bFireBeforeFirstInterval,
+	const bool bRepeatForever
 )
 {
 	if (not GetIsValidMissionScheduler())
@@ -136,9 +138,35 @@ int32 AMissionManager::ScheduleMissionCallback(
 		Callback,
 		TotalCalls,
 		IntervalSeconds,
+		InitialDelaySeconds,
 		CallbackOwner,
-		bFireBeforeFirstInterval
+		bFireBeforeFirstInterval,
+		bRepeatForever
 	);
+}
+
+int32 AMissionManager::ScheduleSingleMissionCallback(
+	const FMissionScheduledCallback& Callback,
+	const int32 DelaySeconds,
+	UObject* CallbackOwner
+)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return INDEX_NONE;
+	}
+
+	return M_MissionScheduler->ScheduleSingleCallback(Callback, DelaySeconds, CallbackOwner);
+}
+
+void AMissionManager::CancelMissionCallback(const int32 TaskID)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->CancelTask(TaskID);
 }
 
 void AMissionManager::CancelAllCallbacksForObject(const UObject* CallbackOwner)
@@ -149,6 +177,96 @@ void AMissionManager::CancelAllCallbacksForObject(const UObject* CallbackOwner)
 	}
 
 	M_MissionScheduler->CancelAllTasksForObject(CallbackOwner);
+}
+
+void AMissionManager::PauseMissionCallback(const int32 TaskID)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->PauseTask(TaskID);
+}
+
+void AMissionManager::ResumeMissionCallback(const int32 TaskID)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->ResumeTask(TaskID);
+}
+
+void AMissionManager::PauseAllCallbacksForObject(const UObject* CallbackOwner)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->PauseAllTasksForObject(CallbackOwner);
+}
+
+void AMissionManager::ResumeAllCallbacksForObject(const UObject* CallbackOwner)
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->ResumeAllTasksForObject(CallbackOwner);
+}
+
+void AMissionManager::PauseAllCallbacks()
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->PauseAllTasks();
+}
+
+void AMissionManager::ResumeAllCallbacks()
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return;
+	}
+
+	M_MissionScheduler->ResumeAllTasks();
+}
+
+bool AMissionManager::GetIsMissionCallbackActive(const int32 TaskID) const
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return false;
+	}
+
+	return M_MissionScheduler->GetIsTaskActive(TaskID);
+}
+
+int32 AMissionManager::GetCallbackCountForObject(const UObject* CallbackOwner) const
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return 0;
+	}
+
+	return M_MissionScheduler->GetTaskCountForObject(CallbackOwner);
+}
+
+int32 AMissionManager::GetTotalScheduledCallbackCount() const
+{
+	if (not GetIsValidMissionScheduler())
+	{
+		return 0;
+	}
+
+	return M_MissionScheduler->GetTotalScheduledTaskCount();
 }
 
 void AMissionManager::ActivateNewMission(UMissionBase* NewMission)
