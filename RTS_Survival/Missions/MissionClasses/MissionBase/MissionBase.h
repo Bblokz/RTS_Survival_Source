@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/GameUI/Archive/ArchiveItemTypes/ArchiveItemTypes.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
+#include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "UObject/NoExportTypes.h"
@@ -106,6 +107,22 @@ public:
 	                                         const FText& TimerText,
 	                                         float TimerInSeconds,
 	                                         const FMissionTimerLifetimeSettings& LifetimeSettings);
+
+	/**
+	 * @brief Schedules a mission-owned callback through the manager for deterministic shared ticking.
+	 * @param Callback Delegate to execute.
+	 * @param TotalCalls Total amount of executions requested.
+	 * @param IntervalSeconds Interval between calls in scheduler ticks.
+	 * @param bFireBeforeFirstInterval If true, one call executes immediately before interval ticking starts.
+	 * @return Task id used for scheduler tracking, or INDEX_NONE when no scheduled task remains.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
+	int32 ScheduleRepeatedCallback(
+		const FMissionScheduledCallback& Callback,
+		const int32 TotalCalls,
+		const int32 IntervalSeconds,
+		const bool bFireBeforeFirstInterval = true
+	);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Widget")
 	FMissionWidgetState MissionWidgetState;
