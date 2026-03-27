@@ -11,6 +11,7 @@
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UPlayerAudioController::UPlayerAudioController()
@@ -90,6 +91,7 @@ void UPlayerAudioController::PlayVoiceLine(const AActor* PrimarySelectedUnit,
 	}
 
 	AdjustVoiceLineForCombatSituation(PrimarySelectedUnit, VoiceLineType, UnitType, bForcePlay);
+	AdjustVoiceLineForExpandedNomadic(PrimarySelectedUnit, VoiceLineType);
 
 	USoundBase* VoiceLine = GetVoiceLineFromTypes(UnitType, VoiceLineType);
 	if (not IsValid(VoiceLine))
@@ -116,7 +118,7 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 	{
 		return;
 	}
-	if(GetHasToPlayAnnouncerLineAs2DSound(Type))
+	if (GetHasToPlayAnnouncerLineAs2DSound(Type))
 	{
 		PlayAnnouncerLineAs2DSound(Type);
 		return;
@@ -127,14 +129,14 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 			"PlayerAudioController cannot play announcer voice lines without a valid resource audio component.");
 		return;
 	}
-	
-	    USoundBase* VoiceLine = GetAnnouncerVoiceLineFromType(Type);
 
-    UWorld* World = GetWorld();
-    if (not IsValid(World) || not IsValid(VoiceLine))
-    {
-        return;
-    }
+	USoundBase* VoiceLine = GetAnnouncerVoiceLineFromType(Type);
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || not IsValid(VoiceLine))
+	{
+		return;
+	}
 	const float Now = GetWorld()->GetTimeSeconds();
 	// if same type as last and on cooldown; do not spam the player.
 	if (IsSameAnnouncerVoiceLineAsPrevious(Type) && IsAnnouncerVoiceLineOnCooldown(Type, Now))
@@ -170,21 +172,21 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 			return;
 		}
 	}
-	    // Global per-type cooldown for non-custom announcer lines.
-        if (IsAnnouncerVoiceLineOnCooldown(Type, Now))
-        {
-            if (bQueueIfNotPlayed)
-            {
-                QueueAnnouncerLineIfNoAnnouncerLineIsQueued(Type, VoiceLine);
-            }
-            return;
-        }
+	// Global per-type cooldown for non-custom announcer lines.
+	if (IsAnnouncerVoiceLineOnCooldown(Type, Now))
+	{
+		if (bQueueIfNotPlayed)
+		{
+			QueueAnnouncerLineIfNoAnnouncerLineIsQueued(Type, VoiceLine);
+		}
+		return;
+	}
 	// Record that this is now the “current” line
 	M_CurrentVoiceLineState.SetCurrentVoiceLineAsAnnouncerVoiceLine(Type);
 
 	// Calculate its full block‐out time
 	const float NextAllowedTime = GetAnnouncerVoiceLineEndTimeAfterCooldown(Type, VoiceLine, Now);
-    M_AnnouncerPlayCooldownEndTimes.Add(Type, NextAllowedTime);
+	M_AnnouncerPlayCooldownEndTimes.Add(Type, NextAllowedTime);
 
 	// Fire it off
 	M_VoiceLineAudioComponent->SetSound(VoiceLine);
@@ -193,46 +195,46 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 
 
 void UPlayerAudioController::PlayCustomAnnouncerVoiceLine(
-    USoundBase* CustomVoiceLineSound,
-    const bool bQueueIfNotPlayed)
+	USoundBase* CustomVoiceLineSound,
+	const bool bQueueIfNotPlayed)
 {
-    if (not GetIsValidVoiceLineAudioComp() || not IsValid(CustomVoiceLineSound))
-    {
-        return;
-    }
+	if (not GetIsValidVoiceLineAudioComp() || not IsValid(CustomVoiceLineSound))
+	{
+		return;
+	}
 
-    // If a custom announcer voice line is playing then do not play; optionally queue one extra custom line.
-    if (M_CurrentVoiceLineState.IsCurrentCustomAnnouncerVoiceLine())
-    {
-        if (not bQueueIfNotPlayed)
-        {
-            return;
-        }
+	// If a custom announcer voice line is playing then do not play; optionally queue one extra custom line.
+	if (M_CurrentVoiceLineState.IsCurrentCustomAnnouncerVoiceLine())
+	{
+		if (not bQueueIfNotPlayed)
+		{
+			return;
+		}
 
-        if (M_QueuedAnnouncerVoiceLineEntry.IsCustomVoiceLine())
-        {
-            RTSFunctionLibrary::ReportError(
-                "Custom announcer voice line will be lost! There is already a custom line queued "
-                "and so the extra line that comes up now and is attempted to be queued will be lost!");
-            return;
-        }
+		if (M_QueuedAnnouncerVoiceLineEntry.IsCustomVoiceLine())
+		{
+			RTSFunctionLibrary::ReportError(
+				"Custom announcer voice line will be lost! There is already a custom line queued "
+				"and so the extra line that comes up now and is attempted to be queued will be lost!");
+			return;
+		}
 
-        QueueAnnouncerLineIfNoAnnouncerLineIsQueued(EAnnouncerVoiceLineType::Custom, CustomVoiceLineSound);
-        return;
-    }
+		QueueAnnouncerLineIfNoAnnouncerLineIsQueued(EAnnouncerVoiceLineType::Custom, CustomVoiceLineSound);
+		return;
+	}
 
-    // Interrupt any regular announcer or RTS voice lines.
-    if (M_VoiceLineAudioComponent->IsPlaying())
-    {
-        M_VoiceLineAudioComponent->Stop();
-    }
-    M_CurrentVoiceLineState.Reset();
+	// Interrupt any regular announcer or RTS voice lines.
+	if (M_VoiceLineAudioComponent->IsPlaying())
+	{
+		M_VoiceLineAudioComponent->Stop();
+	}
+	M_CurrentVoiceLineState.Reset();
 
-    M_VoiceLineAudioComponent->SetSound(CustomVoiceLineSound);
-    M_VoiceLineAudioComponent->Play();
+	M_VoiceLineAudioComponent->SetSound(CustomVoiceLineSound);
+	M_VoiceLineAudioComponent->Play();
 
-    // Record that this is now the “current” line.
-    M_CurrentVoiceLineState.SetCurrentVoiceLineAsAnnouncerVoiceLine(EAnnouncerVoiceLineType::Custom);
+	// Record that this is now the “current” line.
+	M_CurrentVoiceLineState.SetCurrentVoiceLineAsAnnouncerVoiceLine(EAnnouncerVoiceLineType::Custom);
 }
 
 void UPlayerAudioController::SetSuppressRegularVoiceLines(const bool bSuppress)
@@ -296,10 +298,9 @@ UAudioComponent* UPlayerAudioController::PlaySpatialVoiceLine(
 			const FString UnitTypeString = UEnum::GetValueAsString(UnitType);
 			const FString VoiceLineTypeString = UEnum::GetValueAsString(VoiceLineType);
 			DrawDebugString(GetWorld(), Location + FVector(0.f, 0.f, 500.f),
-				FText::FromString("Cannot play audio: " + VoiceLineTypeString +
-				                  " for unit type: " + UnitTypeString).ToString() + "\n missing voice line type data.",
-				                  nullptr, FColor::Red, 15.f, false, 2);
-			
+			                FText::FromString("Cannot play audio: " + VoiceLineTypeString +
+				                " for unit type: " + UnitTypeString).ToString() + "\n missing voice line type data.",
+			                nullptr, FColor::Red, 15.f, false, 2);
 		}
 		return nullptr;
 	}
@@ -376,9 +377,9 @@ void UPlayerAudioController::InitPlayerAudioPauseTimes(const TMap<ERTSVoiceLine,
 	M_AudioPauseTimes = ExtraPauseTimes;
 	M_VoiceLineAttenuationSettings = VoiceLineSpatialAttenuation;
 	M_VoiceLineConcurrencySettings = VoiceLineSpatialConcurrency;
-   // Announcer: PauseTimesAnnouncer holds the designer "extra pause" per type.
-    M_AnnouncerExtraPauseTimes = PauseTimesAnnouncer;
-    M_AnnouncerPlayCooldownEndTimes.Reset();
+	// Announcer: PauseTimesAnnouncer holds the designer "extra pause" per type.
+	M_AnnouncerExtraPauseTimes = PauseTimesAnnouncer;
+	M_AnnouncerPlayCooldownEndTimes.Reset();
 }
 
 void UPlayerAudioController::InitUnitVoiceLine(const FRTSVoiceLineSettings NewUnitVoiceLines)
@@ -511,9 +512,9 @@ void UPlayerAudioController::PlayAudio(USoundBase* VoiceLine,
 void UPlayerAudioController::HandleAudioFinished()
 {
 	M_CurrentVoiceLineState.Reset();
-	if(M_QueuedAnnouncerVoiceLineEntry.IsValid())
+	if (M_QueuedAnnouncerVoiceLineEntry.IsValid())
 	{
-		if(M_QueuedAnnouncerVoiceLineEntry.IsCustomVoiceLine())
+		if (M_QueuedAnnouncerVoiceLineEntry.IsCustomVoiceLine())
 		{
 			PlayCustomAnnouncerVoiceLine(M_QueuedAnnouncerVoiceLineEntry.VoiceLine, false);
 		}
@@ -587,13 +588,13 @@ float UPlayerAudioController::GetRTSVoiceLineEndTimeAfterCooldown(const ERTSVoic
 }
 
 float UPlayerAudioController::GetAnnouncerVoiceLineEndTimeAfterCooldown(
-    const EAnnouncerVoiceLineType VoiceLineType,
-    const USoundBase* ValidVoiceLine,
-    const float Now) const
+	const EAnnouncerVoiceLineType VoiceLineType,
+	const USoundBase* ValidVoiceLine,
+	const float Now) const
 {
-    const float Duration = ValidVoiceLine != nullptr ? ValidVoiceLine->GetDuration() : 0.0f;
-    const float ExtraPause = M_AnnouncerExtraPauseTimes.FindRef(VoiceLineType);
-    return Now + Duration + ExtraPause;
+	const float Duration = ValidVoiceLine != nullptr ? ValidVoiceLine->GetDuration() : 0.0f;
+	const float ExtraPause = M_AnnouncerExtraPauseTimes.FindRef(VoiceLineType);
+	return Now + Duration + ExtraPause;
 }
 
 
@@ -697,10 +698,10 @@ bool UPlayerAudioController::IsRTSVoiceLineOnCooldown(const float Now)
 	{
 		return false;
 	}
-		if (Now < M_VoiceLineCooldownEndTime)
-		{
-			return true;
-		}
+	if (Now < M_VoiceLineCooldownEndTime)
+	{
+		return true;
+	}
 	return false;
 }
 
@@ -710,21 +711,21 @@ bool UPlayerAudioController::IsSameRTSVoiceLineAsPrevious(const ERTSVoiceLine Vo
 }
 
 bool UPlayerAudioController::IsAnnouncerVoiceLineOnCooldown(
-    const EAnnouncerVoiceLineType VoiceLineType,
-    const float Now)
+	const EAnnouncerVoiceLineType VoiceLineType,
+	const float Now)
 {
-    if (not GetIsValidVoiceLineAudioComp())
-    {
-        return false;
-    }
+	if (not GetIsValidVoiceLineAudioComp())
+	{
+		return false;
+	}
 
-    const float* const CooldownEnd = M_AnnouncerPlayCooldownEndTimes.Find(VoiceLineType);
-    if (CooldownEnd == nullptr)
-    {
-        return false;
-    }
+	const float* const CooldownEnd = M_AnnouncerPlayCooldownEndTimes.Find(VoiceLineType);
+	if (CooldownEnd == nullptr)
+	{
+		return false;
+	}
 
-    return Now < *CooldownEnd;
+	return Now < *CooldownEnd;
 }
 
 bool UPlayerAudioController::IsSameAnnouncerVoiceLineAsPrevious(const EAnnouncerVoiceLineType VoiceLineType) const
@@ -742,7 +743,7 @@ void UPlayerAudioController::DebugAudioController(const FString& Message) const
 
 void UPlayerAudioController::AdjustVoiceLineForCombatSituation(const AActor* PrimarySelectedUnit,
                                                                ERTSVoiceLine& OutVoiceLineType,
-                                                               const ERTSVoiceLineUnitType OutVoiceLineUnitType,
+                                                               const ERTSVoiceLineUnitType VoiceLineUnitType,
                                                                bool& OutOverrideForcePlay)
 {
 	const URTSComponent* RTSComp = PrimarySelectedUnit->FindComponentByClass<URTSComponent>();
@@ -758,7 +759,7 @@ void UPlayerAudioController::AdjustVoiceLineForCombatSituation(const AActor* Pri
 	if (OutVoiceLineType == ERTSVoiceLine::Select)
 	{
 		DetermineSelectionVoiceLine(
-			OutVoiceLineUnitType,
+			VoiceLineUnitType,
 			bIsInCombat, bIsDamaged, OutVoiceLineType, OutOverrideForcePlay
 		);
 		return;
@@ -773,6 +774,20 @@ void UPlayerAudioController::AdjustVoiceLineForCombatSituation(const AActor* Pri
 	if (bIsInCombat)
 	{
 		OutVoiceLineType = FRTS_VoiceLineHelpers::GetStressedVoiceLineVersion(OutVoiceLineType);
+	}
+}
+
+void UPlayerAudioController::AdjustVoiceLineForExpandedNomadic(const AActor* ValidPrimarySelectedUnit,
+                                                               ERTSVoiceLine& OutVoiceLineType) const
+{
+	const ANomadicVehicle* Nomadic = Cast<ANomadicVehicle>(ValidPrimarySelectedUnit);
+	if (not IsValid(Nomadic))
+	{
+		return;
+	}
+	if (Nomadic->GetNomadicStatus() != ENomadStatus::Truck)
+	{
+		OutVoiceLineType = ERTSVoiceLine::ExpandedNomadic;
 	}
 }
 

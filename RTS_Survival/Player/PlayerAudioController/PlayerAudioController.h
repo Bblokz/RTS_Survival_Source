@@ -381,8 +381,11 @@ private:
 
 	void AdjustVoiceLineForCombatSituation(const AActor* PrimarySelectedUnit,
 	                                       ERTSVoiceLine& OutVoiceLineType,
-	                                       const ERTSVoiceLineUnitType OutVoiceLineUnitType,
+	                                       const ERTSVoiceLineUnitType VoiceLineUnitType,
 	                                       bool& OutOverrideForcePlay);
+
+void AdjustVoiceLineForExpandedNomadic(const AActor* ValidPrimarySelectedUnit,
+                                       ERTSVoiceLine& OutVoiceLineType) const;
 	/**
 	 * @brief Chooses the appropriate selection voice line variant based on combat, damage, and rapid re-selection.
 	 *

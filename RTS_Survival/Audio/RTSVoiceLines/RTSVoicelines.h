@@ -64,6 +64,7 @@ enum class ERTSVoiceLine : uint8
 	EnterPosition,
 	ExitPosition,
 	FallBackToHQ,
+	ExpandedNomadic,
 };
 
 UENUM(Blueprintable)
@@ -174,7 +175,8 @@ enum class ERTSVoiceLineUnitType : uint8
 	RusHazmat,
 	RusElite,
 	PAK,
-	FLAK
+	FLAK,
+	Harvester
 };
 
 USTRUCT(BlueprintType)

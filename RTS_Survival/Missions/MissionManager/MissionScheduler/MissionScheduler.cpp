@@ -13,12 +13,6 @@ void UMissionScheduler::BeginPlay()
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-			this,
-			"World",
-			"UMissionScheduler::BeginPlay",
-			this
-		);
 		return;
 	}
 

@@ -109,6 +109,8 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 	// For movement orders on the AI controller directly.
 	friend class UTankAimAbilityComponent;
 	friend class UTurretSwapComp;
+	friend struct FMissionTowTeamWeaponSpawnState;
+
 
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
