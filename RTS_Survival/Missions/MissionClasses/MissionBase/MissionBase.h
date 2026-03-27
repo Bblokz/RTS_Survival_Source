@@ -123,8 +123,8 @@ public:
 		const FMissionScheduledCallback& Callback,
 		const int32 TotalCalls,
 		const int32 IntervalSeconds,
-		const int32 InitialDelaySeconds = 0,
-		const TArray<AActor*>& RequiredActors = TArray<AActor*>(),
+		const int32 InitialDelaySeconds ,
+		const TArray<AActor*>& RequiredActors ,
 		const bool bFireBeforeFirstInterval = true,
 		const bool bRepeatForever = false
 	);
@@ -133,7 +133,7 @@ public:
 	int32 ScheduleSingleCallback(
 		const FMissionScheduledCallback& Callback,
 		const int32 DelaySeconds,
-		const TArray<AActor*>& RequiredActors = TArray<AActor*>()
+		const TArray<AActor*>& RequiredActors 
 	);
 
 	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")

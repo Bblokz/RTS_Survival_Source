@@ -116,7 +116,7 @@ int32 UMissionBase::ScheduleRepeatedCallback(
 	const int32 TotalCalls,
 	const int32 IntervalSeconds,
 	const int32 InitialDelaySeconds,
-	const TArray<AActor*>& RequiredActors,
+	const TArray<AActor*>& RequiredActors, 
 	const bool bFireBeforeFirstInterval,
 	const bool bRepeatForever
 )
