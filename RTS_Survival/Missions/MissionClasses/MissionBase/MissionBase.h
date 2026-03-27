@@ -414,6 +414,7 @@ private:
 
 	void RegisterScheduledTaskID(const int32 TaskID);
 	void RemoveTrackedTaskID(const int32 TaskID);
+	void PruneInactiveScheduledTaskIDs();
 
 	UPROPERTY()
 	FTimerHandle M_TextOnlyDurationHandle;

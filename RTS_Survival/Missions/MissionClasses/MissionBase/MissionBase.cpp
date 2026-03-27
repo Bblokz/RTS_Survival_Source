@@ -172,6 +172,13 @@ void UMissionBase::CancelScheduledCallback(const int32 TaskID)
 		return;
 	}
 
+	PruneInactiveScheduledTaskIDs();
+	if (not GetMissionManagerChecked()->GetIsMissionCallbackActive(TaskID))
+	{
+		RemoveTrackedTaskID(TaskID);
+		return;
+	}
+
 	GetMissionManagerChecked()->CancelMissionCallback(TaskID);
 	RemoveTrackedTaskID(TaskID);
 }
@@ -183,6 +190,7 @@ void UMissionBase::CancelAllScheduledCallbacks()
 		return;
 	}
 
+	PruneInactiveScheduledTaskIDs();
 	GetMissionManagerChecked()->CancelAllCallbacksForObject(this);
 	M_ScheduledTaskIds.Empty();
 }
@@ -744,6 +752,33 @@ void UMissionBase::RegisterScheduledTaskID(const int32 TaskID)
 void UMissionBase::RemoveTrackedTaskID(const int32 TaskID)
 {
 	M_ScheduledTaskIds.Remove(TaskID);
+}
+
+void UMissionBase::PruneInactiveScheduledTaskIDs()
+{
+	if (not GetIsValidMissionManager())
+	{
+		M_ScheduledTaskIds.Empty();
+		return;
+	}
+
+	const AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not MissionManager)
+	{
+		M_ScheduledTaskIds.Empty();
+		return;
+	}
+
+	for (int32 TaskIndex = M_ScheduledTaskIds.Num() - 1; TaskIndex >= 0; --TaskIndex)
+	{
+		const int32 TaskID = M_ScheduledTaskIds[TaskIndex];
+		if (MissionManager->GetIsMissionCallbackActive(TaskID))
+		{
+			continue;
+		}
+
+		M_ScheduledTaskIds.RemoveAtSwap(TaskIndex);
+	}
 }
 
 void UMissionBase::AsyncSpawnActor(
