@@ -2710,6 +2710,7 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 	{
 		ResetTowRelationshipOnTeamWeaponSide(false, true);
 		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+		SetTeamWeaponAutoEngageEnabled(true);
 		DoneExecutingCommand(EAbilityID::IdDetachTow);
 		return;
 	}
@@ -2748,7 +2749,18 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 
 	ResetTowRelationshipOnTeamWeaponSide(false, false);
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	SetTeamWeaponAutoEngageEnabled(true);
 	DoneExecutingCommand(EAbilityID::IdDetachTow);
+}
+
+void ATeamWeaponController::SetTeamWeaponAutoEngageEnabled(const bool bEnableAutoEngage) const
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	M_TeamWeapon->SetAutoEngageTargets(bEnableAutoEngage);
 }
 
 void ATeamWeaponController::ExecuteDetachTowCommand_ResetTowedVisualState(ATeamWeapon* TeamWeaponActor) const
@@ -2771,6 +2783,7 @@ void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTow
 	if (GetIsValidTeamWeapon())
 	{
 		M_TeamWeapon->PlayPackingMontage(false);
+		SetTeamWeaponAutoEngageEnabled(false);
 	}
 
 	SetTeamWeaponState(ETeamWeaponState::Towed);
