@@ -25,6 +25,20 @@ void UMissionScheduler::BeginPlay()
 	);
 }
 
+void UMissionScheduler::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_SchedulerTickHandle);
+	}
+
+	M_Tasks.Empty();
+	M_PendingTaskRemovals.Empty();
+	bM_IsTickingTasks = false;
+
+	Super::EndPlay(EndPlayReason);
+}
+
 int32 UMissionScheduler::ScheduleCallback(
 	const FMissionScheduledCallback& Callback,
 	const int32 TotalCalls,
@@ -129,13 +143,12 @@ void UMissionScheduler::CancelTask(const int32 TaskID)
 {
 	if (not M_Tasks.Contains(TaskID))
 	{
-		RTSFunctionLibrary::ReportError("Mission scheduler tried to cancel unknown task id.");
 		return;
 	}
 
 	if (bM_IsTickingTasks)
 	{
-		TickScheduler_MarkTaskForRemoval(TaskID);
+		AddTaskToPendingRemoval(TaskID);
 		return;
 	}
 
@@ -166,7 +179,7 @@ void UMissionScheduler::CancelAllTasksForObject(const UObject* CallbackOwner)
 	{
 		if (bM_IsTickingTasks)
 		{
-			TickScheduler_MarkTaskForRemoval(TaskID);
+			AddTaskToPendingRemoval(TaskID);
 			continue;
 		}
 
@@ -254,7 +267,7 @@ void UMissionScheduler::ResumeAllTasks()
 
 bool UMissionScheduler::GetIsTaskActive(const int32 TaskID) const
 {
-	return M_Tasks.Contains(TaskID) && not M_PendingTaskRemovals.Contains(TaskID);
+	return M_Tasks.Contains(TaskID) && not GetIsTaskPendingRemoval(TaskID);
 }
 
 int32 UMissionScheduler::GetTaskCountForObject(const UObject* CallbackOwner) const
@@ -268,7 +281,7 @@ int32 UMissionScheduler::GetTaskCountForObject(const UObject* CallbackOwner) con
 	int32 TaskCount = 0;
 	for (const auto& EachTaskPair : M_Tasks)
 	{
-		if (M_PendingTaskRemovals.Contains(EachTaskPair.Key))
+		if (GetIsTaskPendingRemoval(EachTaskPair.Key))
 		{
 			continue;
 		}
@@ -287,7 +300,18 @@ int32 UMissionScheduler::GetTaskCountForObject(const UObject* CallbackOwner) con
 
 int32 UMissionScheduler::GetTotalScheduledTaskCount() const
 {
-	return M_Tasks.Num() - M_PendingTaskRemovals.Num();
+	int32 ActiveTaskCount = 0;
+	for (const auto& EachTaskPair : M_Tasks)
+	{
+		if (GetIsTaskPendingRemoval(EachTaskPair.Key))
+		{
+			continue;
+		}
+
+		ActiveTaskCount++;
+	}
+
+	return ActiveTaskCount;
 }
 
 bool UMissionScheduler::GetIsValidScheduleInput(
@@ -336,13 +360,11 @@ bool UMissionScheduler::GetAreRequiredActorsInputValid(const TArray<AActor*>& Re
 {
 	for (const AActor* RequiredActor : RequiredActors)
 	{
-		if (IsValid(RequiredActor))
+		if (not IsValid(RequiredActor))
 		{
-			continue;
+			RTSFunctionLibrary::ReportError("Mission scheduler received an invalid required actor while scheduling callback.");
+			return false;
 		}
-
-		RTSFunctionLibrary::ReportError("Mission scheduler received an invalid required actor while scheduling callback.");
-		return false;
 	}
 
 	return true;
@@ -370,16 +392,16 @@ void UMissionScheduler::TickScheduler()
 	bM_IsTickingTasks = true;
 	for (const int32 TaskID : TaskIDs)
 	{
-		TickScheduler_ProcessTaskByID(TaskID);
+		TickScheduler_ProcessTaskById(TaskID);
 	}
 	bM_IsTickingTasks = false;
 
-	TickScheduler_FlushPendingTaskRemovals();
+	FlushPendingTaskRemovals();
 }
 
-void UMissionScheduler::TickScheduler_ProcessTaskByID(const int32 TaskID)
+void UMissionScheduler::TickScheduler_ProcessTaskById(const int32 TaskID)
 {
-	if (M_PendingTaskRemovals.Contains(TaskID))
+	if (GetIsTaskPendingRemoval(TaskID))
 	{
 		return;
 	}
@@ -392,7 +414,7 @@ void UMissionScheduler::TickScheduler_ProcessTaskByID(const int32 TaskID)
 
 	if (not GetIsValidTask(*Task))
 	{
-		TickScheduler_MarkTaskForRemoval(TaskID);
+		AddTaskToPendingRemoval(TaskID);
 		return;
 	}
 
@@ -407,44 +429,66 @@ void UMissionScheduler::TickScheduler_ProcessTaskByID(const int32 TaskID)
 		return;
 	}
 
-	TickScheduler_ExecuteTask(*Task);
+	TickScheduler_ExecuteTaskById(TaskID);
 }
 
-void UMissionScheduler::TickScheduler_ExecuteTask(FMissionScheduledTask& Task)
+void UMissionScheduler::TickScheduler_ExecuteTaskById(const int32 TaskID)
 {
-	if (not GetAreRequiredActorsValid(Task))
-	{
-		TickScheduler_MarkTaskForRemoval(Task.M_TaskID);
-		return;
-	}
-
-	Task.M_Callback.Execute();
-
-	if (M_PendingTaskRemovals.Contains(Task.M_TaskID))
+	FMissionScheduledTask* TaskToExecute = M_Tasks.Find(TaskID);
+	if (not TaskToExecute)
 	{
 		return;
 	}
 
-	if (not Task.bM_RepeatForever)
-	{
-		Task.M_RemainingExecutions--;
-	}
-
-	Task.M_TicksUntilNextExecution = Task.M_IntervalTicks;
-	if (Task.bM_RepeatForever || Task.M_RemainingExecutions > 0)
+	if (GetIsTaskPendingRemoval(TaskID))
 	{
 		return;
 	}
 
-	TickScheduler_MarkTaskForRemoval(Task.M_TaskID);
+	if (not GetAreRequiredActorsValid(*TaskToExecute))
+	{
+		AddTaskToPendingRemoval(TaskID);
+		return;
+	}
+
+	TaskToExecute->M_Callback.Execute();
+
+	FMissionScheduledTask* TaskAfterExecute = M_Tasks.Find(TaskID);
+	if (not TaskAfterExecute)
+	{
+		return;
+	}
+
+	if (GetIsTaskPendingRemoval(TaskID))
+	{
+		return;
+	}
+
+	if (not TaskAfterExecute->bM_RepeatForever)
+	{
+		TaskAfterExecute->M_RemainingExecutions--;
+	}
+
+	TaskAfterExecute->M_TicksUntilNextExecution = TaskAfterExecute->M_IntervalTicks;
+	if (TaskAfterExecute->bM_RepeatForever || TaskAfterExecute->M_RemainingExecutions > 0)
+	{
+		return;
+	}
+
+	AddTaskToPendingRemoval(TaskID);
 }
 
-void UMissionScheduler::TickScheduler_MarkTaskForRemoval(const int32 TaskID)
+void UMissionScheduler::AddTaskToPendingRemoval(const int32 TaskID)
 {
 	M_PendingTaskRemovals.Add(TaskID);
 }
 
-void UMissionScheduler::TickScheduler_FlushPendingTaskRemovals()
+bool UMissionScheduler::GetIsTaskPendingRemoval(const int32 TaskID) const
+{
+	return M_PendingTaskRemovals.Contains(TaskID);
+}
+
+void UMissionScheduler::FlushPendingTaskRemovals()
 {
 	for (const int32 TaskID : M_PendingTaskRemovals)
 	{

@@ -86,6 +86,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	bool GetIsValidScheduleInput(
@@ -100,10 +101,11 @@ private:
 	TArray<TWeakObjectPtr<AActor>> BuildRequiredActorWeakReferences(const TArray<AActor*>& RequiredActors) const;
 
 	void TickScheduler();
-	void TickScheduler_ProcessTaskByID(const int32 TaskID);
-	void TickScheduler_ExecuteTask(FMissionScheduledTask& Task);
-	void TickScheduler_MarkTaskForRemoval(const int32 TaskID);
-	void TickScheduler_FlushPendingTaskRemovals();
+	void TickScheduler_ProcessTaskById(const int32 TaskID);
+	void TickScheduler_ExecuteTaskById(const int32 TaskID);
+	void AddTaskToPendingRemoval(const int32 TaskID);
+	bool GetIsTaskPendingRemoval(const int32 TaskID) const;
+	void FlushPendingTaskRemovals();
 
 	bool GetIsValidTask(const FMissionScheduledTask& Task) const;
 	bool GetAreRequiredActorsValid(const FMissionScheduledTask& Task) const;
