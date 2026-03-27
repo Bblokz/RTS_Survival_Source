@@ -2099,12 +2099,7 @@ int ATeamWeaponController::GetOwningPlayer()
 
 void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret)
 {
-	if (M_TeamWeaponState == ETeamWeaponState::Towed)
-	{
-		return;
-	}
-
-	if (bM_IsTeamWeaponAbandoned || not IsValid(CallingTurret))
+	if (bM_IsTeamWeaponAbandoned || M_TeamWeaponState == ETeamWeaponState::Towed || not IsValid(CallingTurret))
 	{
 		return;
 	}
@@ -2154,7 +2149,7 @@ void ATeamWeaponController::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
 	static_cast<void>(CallingTurret);
 
-	if (bM_IsTeamWeaponAbandoned)
+	if (bM_IsTeamWeaponAbandoned || M_TeamWeaponState == ETeamWeaponState::Towed)
 	{
 		return;
 	}

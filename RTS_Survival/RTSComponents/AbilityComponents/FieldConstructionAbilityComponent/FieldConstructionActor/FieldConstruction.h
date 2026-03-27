@@ -64,6 +64,6 @@ private:
 
 	static const int32 DamagePercentage;
 
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference")
+	UPROPERTY()
 	TObjectPtr<UCargo> M_CargoComponent;
 };
