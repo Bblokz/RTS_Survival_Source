@@ -91,18 +91,37 @@ public:
 	 * @param Callback Delegate to execute on schedule.
 	 * @param TotalCalls Total amount of executions requested.
 	 * @param IntervalSeconds Interval between calls in scheduler ticks.
+	 * @param InitialDelaySeconds Initial delay before first non-immediate callback call.
 	 * @param CallbackOwner Owner object used for safety and cleanup.
 	 * @param bFireBeforeFirstInterval If true, one callback call happens immediately.
+	 * @param bRepeatForever If true, callback keeps running until canceled.
 	 * @return Task id when the callback stays scheduled, or INDEX_NONE when scheduling fails or finishes instantly.
 	 */
 	int32 ScheduleMissionCallback(
 		const FMissionScheduledCallback& Callback,
 		const int32 TotalCalls,
 		const int32 IntervalSeconds,
+		const int32 InitialDelaySeconds,
 		UObject* CallbackOwner,
-		const bool bFireBeforeFirstInterval = true
+		const bool bFireBeforeFirstInterval = true,
+		const bool bRepeatForever = false
 	);
+	int32 ScheduleSingleMissionCallback(
+		const FMissionScheduledCallback& Callback,
+		const int32 DelaySeconds,
+		UObject* CallbackOwner
+	);
+	void CancelMissionCallback(const int32 TaskID);
 	void CancelAllCallbacksForObject(const UObject* CallbackOwner);
+	void PauseMissionCallback(const int32 TaskID);
+	void ResumeMissionCallback(const int32 TaskID);
+	void PauseAllCallbacksForObject(const UObject* CallbackOwner);
+	void ResumeAllCallbacksForObject(const UObject* CallbackOwner);
+	void PauseAllCallbacks();
+	void ResumeAllCallbacks();
+	bool GetIsMissionCallbackActive(const int32 TaskID) const;
+	int32 GetCallbackCountForObject(const UObject* CallbackOwner) const;
+	int32 GetTotalScheduledCallbackCount() const;
 
 	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
 		const FVector& TankSpawnLocation);

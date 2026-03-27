@@ -115,7 +115,9 @@ int32 UMissionBase::ScheduleRepeatedCallback(
 	const FMissionScheduledCallback& Callback,
 	const int32 TotalCalls,
 	const int32 IntervalSeconds,
-	const bool bFireBeforeFirstInterval
+	const int32 InitialDelaySeconds,
+	const bool bFireBeforeFirstInterval,
+	const bool bRepeatForever
 )
 {
 	if (not GetIsValidMissionManager())
@@ -128,16 +130,50 @@ int32 UMissionBase::ScheduleRepeatedCallback(
 		Callback,
 		TotalCalls,
 		IntervalSeconds,
+		InitialDelaySeconds,
 		this,
-		bFireBeforeFirstInterval
+		bFireBeforeFirstInterval,
+		bRepeatForever
 	);
+}
+
+int32 UMissionBase::ScheduleSingleCallback(const FMissionScheduledCallback& Callback, const int32 DelaySeconds)
+{
+	if (not GetIsValidMissionManager())
+	{
+		RTSFunctionLibrary::ReportError("Mission tried to schedule single callback while mission manager is invalid.");
+		return INDEX_NONE;
+	}
+
+	return GetMissionManagerChecked()->ScheduleSingleMissionCallback(Callback, DelaySeconds, this);
+}
+
+void UMissionBase::CancelScheduledCallback(const int32 TaskID)
+{
+	if (not GetIsValidMissionManager())
+	{
+		RTSFunctionLibrary::ReportError("Mission tried to cancel callback while mission manager is invalid.");
+		return;
+	}
+
+	GetMissionManagerChecked()->CancelMissionCallback(TaskID);
+}
+
+void UMissionBase::CancelAllScheduledCallbacks()
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->CancelAllCallbacksForObject(this);
 }
 
 void UMissionBase::OnCleanUpMission()
 {
 	if (GetIsValidMissionManager())
 	{
-		GetMissionManagerChecked()->CancelAllCallbacksForObject(this);
+		CancelAllScheduledCallbacks();
 	}
 
 	if (not GetWorld())

@@ -113,7 +113,9 @@ public:
 	 * @param Callback Delegate to execute.
 	 * @param TotalCalls Total amount of executions requested.
 	 * @param IntervalSeconds Interval between calls in scheduler ticks.
+	 * @param InitialDelaySeconds Initial delay before first non-immediate callback call.
 	 * @param bFireBeforeFirstInterval If true, one call executes immediately before interval ticking starts.
+	 * @param bRepeatForever If true, callback keeps running until canceled.
 	 * @return Task id used for scheduler tracking, or INDEX_NONE when no scheduled task remains.
 	 */
 	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
@@ -121,8 +123,19 @@ public:
 		const FMissionScheduledCallback& Callback,
 		const int32 TotalCalls,
 		const int32 IntervalSeconds,
-		const bool bFireBeforeFirstInterval = true
+		const int32 InitialDelaySeconds = 0,
+		const bool bFireBeforeFirstInterval = true,
+		const bool bRepeatForever = false
 	);
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
+	int32 ScheduleSingleCallback(const FMissionScheduledCallback& Callback, const int32 DelaySeconds);
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
+	void CancelScheduledCallback(const int32 TaskID);
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
+	void CancelAllScheduledCallbacks();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Widget")
 	FMissionWidgetState MissionWidgetState;
