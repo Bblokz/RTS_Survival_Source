@@ -2,6 +2,7 @@
 
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/TowMechanic/VehicleTow/VehicleTow.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -129,15 +130,34 @@ void UTowedActorComponent::RestoreAbilitiesAfterTow()
 
 ICommands* UTowedActorComponent::GetOwningICommands() const
 {
-	if (not IsValid(GetOwner()))
+	AActor* OwningActor = GetOwner();
+	if (not IsValid(OwningActor))
 	{
 		return nullptr;
 	}
-	if (GetOwner()->IsA(ATeamWeaponController::StaticClass()))
+
+	if (OwningActor->IsA(ATeamWeaponController::StaticClass()))
 	{
-		ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(GetOwner());
+		ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(OwningActor);
 		return TeamWeaponController;
 	}
-	ICommands* CommandsOwner = Cast<ICommands>(GetOwner());
-	return CommandsOwner;
+
+	if (OwningActor->IsA(ATeamWeapon::StaticClass()))
+	{
+		ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(OwningActor);
+		if (not IsValid(TeamWeapon))
+		{
+			return nullptr;
+		}
+
+		ATeamWeaponController* TeamWeaponController = TeamWeapon->GetTeamWeaponController();
+		if (not IsValid(TeamWeaponController))
+		{
+			return nullptr;
+		}
+
+		return TeamWeaponController;
+	}
+
+	return Cast<ICommands>(OwningActor);
 }
