@@ -5,10 +5,12 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
 
+const int32 AFieldConstruction::DamagePercentage = 50;
 
 // Sets default values
 AFieldConstruction::AFieldConstruction(const FObjectInitializer& ObjectInitializer)
@@ -28,6 +30,18 @@ void AFieldConstruction::PostInitializeComponents()
 	Super::PostInitializeComponents();
 
 	FieldConstructionMesh = FindComponentByClass<UStaticMeshComponent>();
+	M_CargoComponent = FindComponentByClass<UCargo>();
+}
+
+void AFieldConstruction::OnUnitDies(const ERTSDeathType DeathType)
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+
+	OnUnitDies_HandleGarrisonState();
+	Super::OnUnitDies(DeathType);
 }
 
 bool AFieldConstruction::GetIsValidFieldConstructionMesh()
@@ -42,6 +56,26 @@ bool AFieldConstruction::GetIsValidFieldConstructionMesh()
 		"AFieldConstruction::GetIsValidFieldConstructionMesh",
 		this);
 	return false;
+}
+
+bool AFieldConstruction::EnsureCargoComponentIsValid() const
+{
+	if (not IsValid(M_CargoComponent))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void AFieldConstruction::OnUnitDies_HandleGarrisonState()
+{
+	if (not EnsureCargoComponentIsValid())
+	{
+		return;
+	}
+
+	M_CargoComponent->ApplyDamageToGarrisonedSquads(DamagePercentage);
 }
 
 void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles, const bool bOverlapTanks)
