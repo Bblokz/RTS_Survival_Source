@@ -29,11 +29,13 @@ int32 UMissionScheduler::ScheduleCallback(
 	const FMissionScheduledCallback& Callback,
 	const int32 TotalCalls,
 	const int32 IntervalSeconds,
+	const int32 InitialDelaySeconds,
 	UObject* CallbackOwner,
-	const bool bFireBeforeFirstInterval
+	const bool bFireBeforeFirstInterval,
+	const bool bRepeatForever
 )
 {
-	if (TotalCalls <= 0)
+	if (not bRepeatForever && TotalCalls <= 0)
 	{
 		RTSFunctionLibrary::ReportError("Mission scheduler callback total calls must be greater than zero.");
 		return INDEX_NONE;
@@ -42,6 +44,12 @@ int32 UMissionScheduler::ScheduleCallback(
 	if (IntervalSeconds <= 0)
 	{
 		RTSFunctionLibrary::ReportError("Mission scheduler callback interval must be greater than zero.");
+		return INDEX_NONE;
+	}
+
+	if (InitialDelaySeconds < 0)
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler callback initial delay cannot be negative.");
 		return INDEX_NONE;
 	}
 
@@ -57,14 +65,17 @@ int32 UMissionScheduler::ScheduleCallback(
 		return INDEX_NONE;
 	}
 
-	int32 RemainingExecutions = TotalCalls;
+	int32 RemainingExecutions = bRepeatForever ? 1 : TotalCalls;
 	if (bFireBeforeFirstInterval)
 	{
 		Callback.Execute();
-		RemainingExecutions--;
+		if (not bRepeatForever)
+		{
+			RemainingExecutions--;
+		}
 	}
 
-	if (RemainingExecutions <= 0)
+	if (not bRepeatForever && RemainingExecutions <= 0)
 	{
 		return INDEX_NONE;
 	}
@@ -73,13 +84,37 @@ int32 UMissionScheduler::ScheduleCallback(
 	NewTask.M_TaskID = M_NextTaskID++;
 	NewTask.M_RemainingExecutions = RemainingExecutions;
 	NewTask.M_IntervalTicks = IntervalSeconds;
-	NewTask.M_TicksUntilNextExecution = IntervalSeconds;
+	NewTask.M_InitialDelayTicks = InitialDelaySeconds;
+	NewTask.M_TicksUntilNextExecution = InitialDelaySeconds > 0 ? InitialDelaySeconds : IntervalSeconds;
 	NewTask.bM_FireBeforeFirstInterval = bFireBeforeFirstInterval;
+	NewTask.bM_RepeatForever = bRepeatForever;
 	NewTask.M_Callback = Callback;
 	NewTask.M_WeakOwner = CallbackOwner;
 	M_Tasks.Add(NewTask.M_TaskID, NewTask);
 
 	return NewTask.M_TaskID;
+}
+
+int32 UMissionScheduler::ScheduleSingleCallback(
+	const FMissionScheduledCallback& Callback,
+	const int32 DelaySeconds,
+	UObject* CallbackOwner
+)
+{
+	constexpr int32 SingleCallCount = 1;
+	constexpr int32 DefaultIntervalSeconds = 1;
+	constexpr bool bFireBeforeFirstInterval = false;
+	constexpr bool bRepeatForever = false;
+
+	return ScheduleCallback(
+		Callback,
+		SingleCallCount,
+		DefaultIntervalSeconds,
+		DelaySeconds,
+		CallbackOwner,
+		bFireBeforeFirstInterval,
+		bRepeatForever
+	);
 }
 
 void UMissionScheduler::CancelTask(const int32 TaskID)
@@ -119,6 +154,117 @@ void UMissionScheduler::CancelAllTasksForObject(const UObject* CallbackOwner)
 	}
 }
 
+void UMissionScheduler::PauseTask(const int32 TaskID)
+{
+	if (not M_Tasks.Contains(TaskID))
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler tried to pause unknown task id.");
+		return;
+	}
+
+	M_Tasks[TaskID].bM_IsPaused = true;
+}
+
+void UMissionScheduler::ResumeTask(const int32 TaskID)
+{
+	if (not M_Tasks.Contains(TaskID))
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler tried to resume unknown task id.");
+		return;
+	}
+
+	M_Tasks[TaskID].bM_IsPaused = false;
+}
+
+void UMissionScheduler::PauseAllTasksForObject(const UObject* CallbackOwner)
+{
+	if (not IsValid(CallbackOwner))
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler tried to pause tasks for invalid callback owner.");
+		return;
+	}
+
+	for (auto& EachTaskPair : M_Tasks)
+	{
+		FMissionScheduledTask& Task = EachTaskPair.Value;
+		if (Task.M_WeakOwner.Get() != CallbackOwner)
+		{
+			continue;
+		}
+
+		Task.bM_IsPaused = true;
+	}
+}
+
+void UMissionScheduler::ResumeAllTasksForObject(const UObject* CallbackOwner)
+{
+	if (not IsValid(CallbackOwner))
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler tried to resume tasks for invalid callback owner.");
+		return;
+	}
+
+	for (auto& EachTaskPair : M_Tasks)
+	{
+		FMissionScheduledTask& Task = EachTaskPair.Value;
+		if (Task.M_WeakOwner.Get() != CallbackOwner)
+		{
+			continue;
+		}
+
+		Task.bM_IsPaused = false;
+	}
+}
+
+void UMissionScheduler::PauseAllTasks()
+{
+	for (auto& EachTaskPair : M_Tasks)
+	{
+		EachTaskPair.Value.bM_IsPaused = true;
+	}
+}
+
+void UMissionScheduler::ResumeAllTasks()
+{
+	for (auto& EachTaskPair : M_Tasks)
+	{
+		EachTaskPair.Value.bM_IsPaused = false;
+	}
+}
+
+bool UMissionScheduler::GetIsTaskActive(const int32 TaskID) const
+{
+	return M_Tasks.Contains(TaskID);
+}
+
+int32 UMissionScheduler::GetTaskCountForObject(const UObject* CallbackOwner) const
+{
+	if (not IsValid(CallbackOwner))
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler tried to query task count for invalid callback owner.");
+		return 0;
+	}
+
+	int32 TaskCount = 0;
+	for (const auto& EachTaskPair : M_Tasks)
+	{
+		const FMissionScheduledTask& Task = EachTaskPair.Value;
+		if (Task.M_WeakOwner.Get() != CallbackOwner)
+		{
+			continue;
+		}
+
+		TaskCount++;
+	}
+
+	return TaskCount;
+}
+
+int32 UMissionScheduler::GetTotalScheduledTaskCount() const
+{
+	return M_Tasks.Num();
+}
+
 void UMissionScheduler::TickScheduler()
 {
 	TArray<int32> TaskIdsToRemove;
@@ -143,6 +289,11 @@ void UMissionScheduler::TickScheduler_ProcessTask(FMissionScheduledTask& Task, T
 		return;
 	}
 
+	if (Task.bM_IsPaused)
+	{
+		return;
+	}
+
 	Task.M_TicksUntilNextExecution--;
 	if (Task.M_TicksUntilNextExecution > 0)
 	{
@@ -150,10 +301,13 @@ void UMissionScheduler::TickScheduler_ProcessTask(FMissionScheduledTask& Task, T
 	}
 
 	Task.M_Callback.Execute();
-	Task.M_RemainingExecutions--;
+	if (not Task.bM_RepeatForever)
+	{
+		Task.M_RemainingExecutions--;
+	}
 	Task.M_TicksUntilNextExecution = Task.M_IntervalTicks;
 
-	if (Task.M_RemainingExecutions > 0)
+	if (Task.bM_RepeatForever || Task.M_RemainingExecutions > 0)
 	{
 		return;
 	}
@@ -173,5 +327,5 @@ bool UMissionScheduler::GetIsValidTask(const FMissionScheduledTask& Task) const
 		return false;
 	}
 
-	return Task.M_RemainingExecutions > 0;
+	return Task.bM_RepeatForever || Task.M_RemainingExecutions > 0;
 }
