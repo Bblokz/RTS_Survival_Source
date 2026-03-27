@@ -31,43 +31,48 @@ int32 UMissionScheduler::ScheduleCallback(
 	const int32 IntervalSeconds,
 	const int32 InitialDelaySeconds,
 	UObject* CallbackOwner,
+	const TArray<AActor*>& RequiredActors,
 	const bool bFireBeforeFirstInterval,
 	const bool bRepeatForever
 )
 {
-	if (not bRepeatForever && TotalCalls <= 0)
+	if (not GetIsValidScheduleInput(
+		Callback,
+		TotalCalls,
+		IntervalSeconds,
+		InitialDelaySeconds,
+		CallbackOwner,
+		bRepeatForever))
 	{
-		RTSFunctionLibrary::ReportError("Mission scheduler callback total calls must be greater than zero.");
 		return INDEX_NONE;
 	}
 
-	if (IntervalSeconds <= 0)
+	if (not GetAreRequiredActorsInputValid(RequiredActors))
 	{
-		RTSFunctionLibrary::ReportError("Mission scheduler callback interval must be greater than zero.");
 		return INDEX_NONE;
 	}
 
-	if (InitialDelaySeconds < 0)
-	{
-		RTSFunctionLibrary::ReportError("Mission scheduler callback initial delay cannot be negative.");
-		return INDEX_NONE;
-	}
-
-	if (not Callback.IsBound())
-	{
-		RTSFunctionLibrary::ReportError("Mission scheduler callback is not bound.");
-		return INDEX_NONE;
-	}
-
-	if (not IsValid(CallbackOwner))
-	{
-		RTSFunctionLibrary::ReportError("Mission scheduler callback owner is not valid.");
-		return INDEX_NONE;
-	}
+	const TArray<TWeakObjectPtr<AActor>> RequiredActorWeakReferences = BuildRequiredActorWeakReferences(RequiredActors);
 
 	int32 RemainingExecutions = bRepeatForever ? 1 : TotalCalls;
 	if (bFireBeforeFirstInterval)
 	{
+		FMissionScheduledTask ImmediateExecutionTask;
+		ImmediateExecutionTask.bM_RepeatForever = bRepeatForever;
+		ImmediateExecutionTask.M_Callback = Callback;
+		ImmediateExecutionTask.M_WeakOwner = CallbackOwner;
+		ImmediateExecutionTask.M_RequiredActors = RequiredActorWeakReferences;
+
+		if (not GetIsValidTask(ImmediateExecutionTask))
+		{
+			return INDEX_NONE;
+		}
+
+		if (not GetAreRequiredActorsValid(ImmediateExecutionTask))
+		{
+			return INDEX_NONE;
+		}
+
 		Callback.Execute();
 		if (not bRepeatForever)
 		{
@@ -80,16 +85,17 @@ int32 UMissionScheduler::ScheduleCallback(
 		return INDEX_NONE;
 	}
 
+	const int32 TicksUntilNextExecution = InitialDelaySeconds > 0 ? InitialDelaySeconds : IntervalSeconds;
+
 	FMissionScheduledTask NewTask;
 	NewTask.M_TaskID = M_NextTaskID++;
 	NewTask.M_RemainingExecutions = RemainingExecutions;
 	NewTask.M_IntervalTicks = IntervalSeconds;
-	NewTask.M_InitialDelayTicks = InitialDelaySeconds;
-	NewTask.M_TicksUntilNextExecution = InitialDelaySeconds > 0 ? InitialDelaySeconds : IntervalSeconds;
-	NewTask.bM_FireBeforeFirstInterval = bFireBeforeFirstInterval;
+	NewTask.M_TicksUntilNextExecution = TicksUntilNextExecution;
 	NewTask.bM_RepeatForever = bRepeatForever;
 	NewTask.M_Callback = Callback;
 	NewTask.M_WeakOwner = CallbackOwner;
+	NewTask.M_RequiredActors = RequiredActorWeakReferences;
 	M_Tasks.Add(NewTask.M_TaskID, NewTask);
 
 	return NewTask.M_TaskID;
@@ -98,7 +104,8 @@ int32 UMissionScheduler::ScheduleCallback(
 int32 UMissionScheduler::ScheduleSingleCallback(
 	const FMissionScheduledCallback& Callback,
 	const int32 DelaySeconds,
-	UObject* CallbackOwner
+	UObject* CallbackOwner,
+	const TArray<AActor*>& RequiredActors
 )
 {
 	constexpr int32 SingleCallCount = 1;
@@ -112,6 +119,7 @@ int32 UMissionScheduler::ScheduleSingleCallback(
 		DefaultIntervalSeconds,
 		DelaySeconds,
 		CallbackOwner,
+		RequiredActors,
 		bFireBeforeFirstInterval,
 		bRepeatForever
 	);
@@ -122,6 +130,12 @@ void UMissionScheduler::CancelTask(const int32 TaskID)
 	if (not M_Tasks.Contains(TaskID))
 	{
 		RTSFunctionLibrary::ReportError("Mission scheduler tried to cancel unknown task id.");
+		return;
+	}
+
+	if (bM_IsTickingTasks)
+	{
+		TickScheduler_MarkTaskForRemoval(TaskID);
 		return;
 	}
 
@@ -148,9 +162,15 @@ void UMissionScheduler::CancelAllTasksForObject(const UObject* CallbackOwner)
 		TaskIdsToRemove.Add(EachTaskPair.Key);
 	}
 
-	for (const int32 TaskId : TaskIdsToRemove)
+	for (const int32 TaskID : TaskIdsToRemove)
 	{
-		M_Tasks.Remove(TaskId);
+		if (bM_IsTickingTasks)
+		{
+			TickScheduler_MarkTaskForRemoval(TaskID);
+			continue;
+		}
+
+		M_Tasks.Remove(TaskID);
 	}
 }
 
@@ -234,7 +254,7 @@ void UMissionScheduler::ResumeAllTasks()
 
 bool UMissionScheduler::GetIsTaskActive(const int32 TaskID) const
 {
-	return M_Tasks.Contains(TaskID);
+	return M_Tasks.Contains(TaskID) && not M_PendingTaskRemovals.Contains(TaskID);
 }
 
 int32 UMissionScheduler::GetTaskCountForObject(const UObject* CallbackOwner) const
@@ -248,6 +268,11 @@ int32 UMissionScheduler::GetTaskCountForObject(const UObject* CallbackOwner) con
 	int32 TaskCount = 0;
 	for (const auto& EachTaskPair : M_Tasks)
 	{
+		if (M_PendingTaskRemovals.Contains(EachTaskPair.Key))
+		{
+			continue;
+		}
+
 		const FMissionScheduledTask& Task = EachTaskPair.Value;
 		if (Task.M_WeakOwner.Get() != CallbackOwner)
 		{
@@ -262,57 +287,171 @@ int32 UMissionScheduler::GetTaskCountForObject(const UObject* CallbackOwner) con
 
 int32 UMissionScheduler::GetTotalScheduledTaskCount() const
 {
-	return M_Tasks.Num();
+	return M_Tasks.Num() - M_PendingTaskRemovals.Num();
+}
+
+bool UMissionScheduler::GetIsValidScheduleInput(
+	const FMissionScheduledCallback& Callback,
+	const int32 TotalCalls,
+	const int32 IntervalSeconds,
+	const int32 InitialDelaySeconds,
+	const UObject* CallbackOwner,
+	const bool bRepeatForever
+) const
+{
+	if (not bRepeatForever && TotalCalls <= 0)
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler callback total calls must be greater than zero.");
+		return false;
+	}
+
+	if (IntervalSeconds <= 0)
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler callback interval must be greater than zero.");
+		return false;
+	}
+
+	if (InitialDelaySeconds < 0)
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler callback initial delay cannot be negative.");
+		return false;
+	}
+
+	if (not Callback.IsBound())
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler callback is not bound.");
+		return false;
+	}
+
+	if (not IsValid(CallbackOwner))
+	{
+		RTSFunctionLibrary::ReportError("Mission scheduler callback owner is not valid.");
+		return false;
+	}
+
+	return true;
+}
+
+bool UMissionScheduler::GetAreRequiredActorsInputValid(const TArray<AActor*>& RequiredActors) const
+{
+	for (const AActor* RequiredActor : RequiredActors)
+	{
+		if (IsValid(RequiredActor))
+		{
+			continue;
+		}
+
+		RTSFunctionLibrary::ReportError("Mission scheduler received an invalid required actor while scheduling callback.");
+		return false;
+	}
+
+	return true;
+}
+
+TArray<TWeakObjectPtr<AActor>> UMissionScheduler::BuildRequiredActorWeakReferences(
+	const TArray<AActor*>& RequiredActors) const
+{
+	TArray<TWeakObjectPtr<AActor>> RequiredActorWeakReferences;
+	RequiredActorWeakReferences.Reserve(RequiredActors.Num());
+
+	for (AActor* RequiredActor : RequiredActors)
+	{
+		RequiredActorWeakReferences.Add(RequiredActor);
+	}
+
+	return RequiredActorWeakReferences;
 }
 
 void UMissionScheduler::TickScheduler()
 {
-	TArray<int32> TaskIdsToRemove;
+	TArray<int32> TaskIDs;
+	M_Tasks.GetKeys(TaskIDs);
 
-	for (auto& EachTaskPair : M_Tasks)
+	bM_IsTickingTasks = true;
+	for (const int32 TaskID : TaskIDs)
 	{
-		FMissionScheduledTask& Task = EachTaskPair.Value;
-		TickScheduler_ProcessTask(Task, TaskIdsToRemove);
+		TickScheduler_ProcessTaskByID(TaskID);
 	}
+	bM_IsTickingTasks = false;
 
-	for (const int32 TaskId : TaskIdsToRemove)
-	{
-		M_Tasks.Remove(TaskId);
-	}
+	TickScheduler_FlushPendingTaskRemovals();
 }
 
-void UMissionScheduler::TickScheduler_ProcessTask(FMissionScheduledTask& Task, TArray<int32>& TaskIdsToRemove)
+void UMissionScheduler::TickScheduler_ProcessTaskByID(const int32 TaskID)
 {
-	if (not GetIsValidTask(Task))
-	{
-		TaskIdsToRemove.Add(Task.M_TaskID);
-		return;
-	}
-
-	if (Task.bM_IsPaused)
+	if (M_PendingTaskRemovals.Contains(TaskID))
 	{
 		return;
 	}
 
-	Task.M_TicksUntilNextExecution--;
-	if (Task.M_TicksUntilNextExecution > 0)
+	FMissionScheduledTask* Task = M_Tasks.Find(TaskID);
+	if (not Task)
 	{
+		return;
+	}
+
+	if (not GetIsValidTask(*Task))
+	{
+		TickScheduler_MarkTaskForRemoval(TaskID);
+		return;
+	}
+
+	if (Task->bM_IsPaused)
+	{
+		return;
+	}
+
+	Task->M_TicksUntilNextExecution--;
+	if (Task->M_TicksUntilNextExecution > 0)
+	{
+		return;
+	}
+
+	TickScheduler_ExecuteTask(*Task);
+}
+
+void UMissionScheduler::TickScheduler_ExecuteTask(FMissionScheduledTask& Task)
+{
+	if (not GetAreRequiredActorsValid(Task))
+	{
+		TickScheduler_MarkTaskForRemoval(Task.M_TaskID);
 		return;
 	}
 
 	Task.M_Callback.Execute();
+
+	if (M_PendingTaskRemovals.Contains(Task.M_TaskID))
+	{
+		return;
+	}
+
 	if (not Task.bM_RepeatForever)
 	{
 		Task.M_RemainingExecutions--;
 	}
-	Task.M_TicksUntilNextExecution = Task.M_IntervalTicks;
 
+	Task.M_TicksUntilNextExecution = Task.M_IntervalTicks;
 	if (Task.bM_RepeatForever || Task.M_RemainingExecutions > 0)
 	{
 		return;
 	}
 
-	TaskIdsToRemove.Add(Task.M_TaskID);
+	TickScheduler_MarkTaskForRemoval(Task.M_TaskID);
+}
+
+void UMissionScheduler::TickScheduler_MarkTaskForRemoval(const int32 TaskID)
+{
+	M_PendingTaskRemovals.Add(TaskID);
+}
+
+void UMissionScheduler::TickScheduler_FlushPendingTaskRemovals()
+{
+	for (const int32 TaskID : M_PendingTaskRemovals)
+	{
+		M_Tasks.Remove(TaskID);
+	}
+
+	M_PendingTaskRemovals.Empty();
 }
 
 bool UMissionScheduler::GetIsValidTask(const FMissionScheduledTask& Task) const
@@ -328,4 +467,19 @@ bool UMissionScheduler::GetIsValidTask(const FMissionScheduledTask& Task) const
 	}
 
 	return Task.bM_RepeatForever || Task.M_RemainingExecutions > 0;
+}
+
+bool UMissionScheduler::GetAreRequiredActorsValid(const FMissionScheduledTask& Task) const
+{
+	for (const TWeakObjectPtr<AActor>& RequiredActor : Task.M_RequiredActors)
+	{
+		if (RequiredActor.IsValid())
+		{
+			continue;
+		}
+
+		return false;
+	}
+
+	return true;
 }

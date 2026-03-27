@@ -116,6 +116,7 @@ int32 UMissionBase::ScheduleRepeatedCallback(
 	const int32 TotalCalls,
 	const int32 IntervalSeconds,
 	const int32 InitialDelaySeconds,
+	const TArray<AActor*>& RequiredActors,
 	const bool bFireBeforeFirstInterval,
 	const bool bRepeatForever
 )
@@ -126,18 +127,26 @@ int32 UMissionBase::ScheduleRepeatedCallback(
 		return INDEX_NONE;
 	}
 
-	return GetMissionManagerChecked()->ScheduleMissionCallback(
+	const int32 TaskID = GetMissionManagerChecked()->ScheduleMissionCallback(
 		Callback,
 		TotalCalls,
 		IntervalSeconds,
 		InitialDelaySeconds,
 		this,
+		RequiredActors,
 		bFireBeforeFirstInterval,
 		bRepeatForever
 	);
+
+	RegisterScheduledTaskID(TaskID);
+	return TaskID;
 }
 
-int32 UMissionBase::ScheduleSingleCallback(const FMissionScheduledCallback& Callback, const int32 DelaySeconds)
+int32 UMissionBase::ScheduleSingleCallback(
+	const FMissionScheduledCallback& Callback,
+	const int32 DelaySeconds,
+	const TArray<AActor*>& RequiredActors
+)
 {
 	if (not GetIsValidMissionManager())
 	{
@@ -145,7 +154,14 @@ int32 UMissionBase::ScheduleSingleCallback(const FMissionScheduledCallback& Call
 		return INDEX_NONE;
 	}
 
-	return GetMissionManagerChecked()->ScheduleSingleMissionCallback(Callback, DelaySeconds, this);
+	const int32 TaskID = GetMissionManagerChecked()->ScheduleSingleMissionCallback(
+		Callback,
+		DelaySeconds,
+		this,
+		RequiredActors
+	);
+	RegisterScheduledTaskID(TaskID);
+	return TaskID;
 }
 
 void UMissionBase::CancelScheduledCallback(const int32 TaskID)
@@ -157,6 +173,7 @@ void UMissionBase::CancelScheduledCallback(const int32 TaskID)
 	}
 
 	GetMissionManagerChecked()->CancelMissionCallback(TaskID);
+	RemoveTrackedTaskID(TaskID);
 }
 
 void UMissionBase::CancelAllScheduledCallbacks()
@@ -167,6 +184,17 @@ void UMissionBase::CancelAllScheduledCallbacks()
 	}
 
 	GetMissionManagerChecked()->CancelAllCallbacksForObject(this);
+	M_ScheduledTaskIds.Empty();
+}
+
+bool UMissionBase::GetIsScheduledTaskActive(const int32 TaskID) const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return false;
+	}
+
+	return GetMissionManagerChecked()->GetIsMissionCallbackActive(TaskID);
 }
 
 void UMissionBase::OnCleanUpMission()
@@ -174,6 +202,10 @@ void UMissionBase::OnCleanUpMission()
 	if (GetIsValidMissionManager())
 	{
 		CancelAllScheduledCallbacks();
+	}
+	else
+	{
+		M_ScheduledTaskIds.Empty();
 	}
 
 	if (not GetWorld())
@@ -697,6 +729,21 @@ bool UMissionBase::GetIsValidMissionManager() const
 	}
 	RTSFunctionLibrary::ReportError("Mission manager not valid for mission: " + GetName());
 	return false;
+}
+
+void UMissionBase::RegisterScheduledTaskID(const int32 TaskID)
+{
+	if (TaskID == INDEX_NONE)
+	{
+		return;
+	}
+
+	M_ScheduledTaskIds.Add(TaskID);
+}
+
+void UMissionBase::RemoveTrackedTaskID(const int32 TaskID)
+{
+	M_ScheduledTaskIds.Remove(TaskID);
 }
 
 void UMissionBase::AsyncSpawnActor(

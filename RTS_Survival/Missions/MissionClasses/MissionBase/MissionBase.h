@@ -124,18 +124,26 @@ public:
 		const int32 TotalCalls,
 		const int32 IntervalSeconds,
 		const int32 InitialDelaySeconds = 0,
+		const TArray<AActor*>& RequiredActors = TArray<AActor*>(),
 		const bool bFireBeforeFirstInterval = true,
 		const bool bRepeatForever = false
 	);
 
 	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
-	int32 ScheduleSingleCallback(const FMissionScheduledCallback& Callback, const int32 DelaySeconds);
+	int32 ScheduleSingleCallback(
+		const FMissionScheduledCallback& Callback,
+		const int32 DelaySeconds,
+		const TArray<AActor*>& RequiredActors = TArray<AActor*>()
+	);
 
 	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
 	void CancelScheduledCallback(const int32 TaskID);
 
 	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
 	void CancelAllScheduledCallbacks();
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
+	bool GetIsScheduledTaskActive(const int32 TaskID) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Widget")
 	FMissionWidgetState MissionWidgetState;
@@ -355,6 +363,10 @@ protected:
 private:
 	TWeakObjectPtr<AMissionManager> M_MissionManager;
 
+	// Used so mission cleanup can always cancel every task this mission created.
+	UPROPERTY()
+	TArray<int32> M_ScheduledTaskIds;
+
 	FTimerHandle M_LoadToStartTimerHandle;
 
 	void CleanUp_TimerHandles(const UWorld* World);
@@ -399,6 +411,9 @@ private:
 	bool EnsureNomadicIsValid(const TObjectPtr<ANomadicVehicle>& NomadicVehicle) const;
 	bool EnsureTankIsValid(const TObjectPtr<ATankMaster>& Tank) const;
 	bool EnsureSquadIsValid(const TObjectPtr<ASquadController>& SquadController) const;
+
+	void RegisterScheduledTaskID(const int32 TaskID);
+	void RemoveTrackedTaskID(const int32 TaskID);
 
 	UPROPERTY()
 	FTimerHandle M_TextOnlyDurationHandle;

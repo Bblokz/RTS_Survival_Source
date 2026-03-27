@@ -103,13 +103,15 @@ public:
 		const int32 IntervalSeconds,
 		const int32 InitialDelaySeconds,
 		UObject* CallbackOwner,
+		const TArray<AActor*>& RequiredActors = TArray<AActor*>(),
 		const bool bFireBeforeFirstInterval = true,
 		const bool bRepeatForever = false
 	);
 	int32 ScheduleSingleMissionCallback(
 		const FMissionScheduledCallback& Callback,
 		const int32 DelaySeconds,
-		UObject* CallbackOwner
+		UObject* CallbackOwner,
+		const TArray<AActor*>& RequiredActors = TArray<AActor*>()
 	);
 	void CancelMissionCallback(const int32 TaskID);
 	void CancelAllCallbacksForObject(const UObject* CallbackOwner);

@@ -125,6 +125,7 @@ int32 AMissionManager::ScheduleMissionCallback(
 	const int32 IntervalSeconds,
 	const int32 InitialDelaySeconds,
 	UObject* CallbackOwner,
+	const TArray<AActor*>& RequiredActors,
 	const bool bFireBeforeFirstInterval,
 	const bool bRepeatForever
 )
@@ -140,6 +141,7 @@ int32 AMissionManager::ScheduleMissionCallback(
 		IntervalSeconds,
 		InitialDelaySeconds,
 		CallbackOwner,
+		RequiredActors,
 		bFireBeforeFirstInterval,
 		bRepeatForever
 	);
@@ -148,7 +150,8 @@ int32 AMissionManager::ScheduleMissionCallback(
 int32 AMissionManager::ScheduleSingleMissionCallback(
 	const FMissionScheduledCallback& Callback,
 	const int32 DelaySeconds,
-	UObject* CallbackOwner
+	UObject* CallbackOwner,
+	const TArray<AActor*>& RequiredActors
 )
 {
 	if (not GetIsValidMissionScheduler())
@@ -156,7 +159,7 @@ int32 AMissionManager::ScheduleSingleMissionCallback(
 		return INDEX_NONE;
 	}
 
-	return M_MissionScheduler->ScheduleSingleCallback(Callback, DelaySeconds, CallbackOwner);
+	return M_MissionScheduler->ScheduleSingleCallback(Callback, DelaySeconds, CallbackOwner, RequiredActors);
 }
 
 void AMissionManager::CancelMissionCallback(const int32 TaskID)
@@ -382,14 +385,17 @@ void AMissionManager::SetMissionManagerWidgetClass(TSubclassOf<UW_MissionWidgetM
 
 void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	for (const auto Mission : Missions)
+	for (UMissionBase* Mission : M_ActiveMissions)
 	{
 		if (not EnsureMissionIsValid(Mission))
 		{
 			continue;
 		}
+
 		Mission->OnCleanUpMission();
 	}
+
+	M_ActiveMissions.Empty();
 	Super::EndPlay(EndPlayReason);
 }
 
