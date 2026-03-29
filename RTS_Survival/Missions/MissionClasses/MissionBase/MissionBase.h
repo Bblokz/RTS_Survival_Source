@@ -416,6 +416,42 @@ protected:
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
 	FTrainingOption SelectLightTankOnDifficulty() const;
 
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectT34OnDifficulty() const;
+
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectHeavyOnDifficulty() const;
+
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectTDOnDifficulty() const;
+
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectSuperHeavyOnDifficulty() const;
+
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
 	FTrainingOption SelectTankOptionPerDifficultySeeded(
 		TArray<ETankSubtype> NewToRTSTypes,
