@@ -3,6 +3,9 @@
 
 #include "DigInComponent.h"
 
+#include "Engine/BlueprintGeneratedClass.h"
+#include "Engine/SCS_Node.h"
+#include "Engine/SimpleConstructionScript.h"
 #include "DigInUnit/DigInUnit.h"
 #include "DigInWall/DigInWall.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
@@ -51,7 +54,7 @@ void UDigInComponent::SetupOwner(const TScriptInterface<IDigInUnit>& NewOwner)
 
 void UDigInComponent::ExecuteDigInCommand()
 {
-	if (not EnsureIsValidWallActorClass() || not GetIsValidOwningDigInUnit())
+	if (not EnsureIsValidWallActorClass() || not EnsureWallActorClassTemplatesAreValid() || not GetIsValidOwningDigInUnit())
 	{
 		return;
 	}
@@ -133,6 +136,54 @@ bool UDigInComponent::EnsureIsValidWallActorClass() const
 	RTSFunctionLibrary::ReportError("No valid wall actor class set for DigInComponent: " + GetName() +
 		"UDigInComponent::EnsureIsValidWallActorClass");
 	return false;
+}
+
+bool UDigInComponent::EnsureWallActorClassTemplatesAreValid() const
+{
+	const UClass* WallClass = WallActorClass.Get();
+	if (not IsValid(WallClass))
+	{
+		RTSFunctionLibrary::ReportError("WallActorClass is invalid in UDigInComponent::EnsureWallActorClassTemplatesAreValid");
+		return false;
+	}
+
+	const UBlueprintGeneratedClass* BlueprintGeneratedClass = Cast<UBlueprintGeneratedClass>(WallClass);
+	if (not IsValid(BlueprintGeneratedClass))
+	{
+		// Native class without blueprint component templates.
+		return true;
+	}
+
+	const USimpleConstructionScript* SimpleConstructionScript = BlueprintGeneratedClass->SimpleConstructionScript;
+	if (not IsValid(SimpleConstructionScript))
+	{
+		return true;
+	}
+
+	const TArray<USCS_Node*>& BlueprintNodes = SimpleConstructionScript->GetAllNodes();
+	for (const USCS_Node* BlueprintNode : BlueprintNodes)
+	{
+		if (not IsValid(BlueprintNode))
+		{
+			RTSFunctionLibrary::ReportError(
+				"DigIn wall class has invalid SCS node."
+				"\nClass: " + BlueprintGeneratedClass->GetName());
+			return false;
+		}
+
+		UActorComponent* ActualComponentTemplate = BlueprintNode->GetActualComponentTemplate(
+			const_cast<UBlueprintGeneratedClass*>(BlueprintGeneratedClass));
+		if (not IsValid(ActualComponentTemplate))
+		{
+			RTSFunctionLibrary::ReportError(
+				"DigIn wall class has invalid component template on an SCS node."
+				"\nClass: " + BlueprintGeneratedClass->GetName() +
+				"\nNode: " + BlueprintNode->GetVariableName().ToString());
+			return false;
+		}
+	}
+
+	return true;
 }
 
 FVector UDigInComponent::GetWallLocation() const

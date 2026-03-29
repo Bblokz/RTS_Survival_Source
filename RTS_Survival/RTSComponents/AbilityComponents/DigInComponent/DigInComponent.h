@@ -62,6 +62,7 @@ protected:
 	
 private:
 	bool EnsureIsValidWallActorClass() const;
+	bool EnsureWallActorClassTemplatesAreValid() const;
 
 	FVector GetWallLocation() const;
 	bool SpawnDigInWallActor(const FVector& SpawnLocation);

@@ -4,6 +4,7 @@
 
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "TimerManager.h"
 
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
@@ -46,23 +47,34 @@ EBTNodeResult::Type UTask_VehicleMoveTo::AbortTask(UBehaviorTreeComponent &Owner
 	return Super::AbortTask(OwnerComp, NodeMemory);
 }
 
-void UTask_VehicleMoveTo::OnTaskFinished(UBehaviorTreeComponent &OwnerComp, uint8 *NodeMemory, EBTNodeResult::Type TaskResult)
+void UTask_VehicleMoveTo::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
 {
-	const bool bwasReverse = bReverseTowardsTarget && VehiclePathComp;
-	// Allow task to finish if it succeeded or if it failed but we are in the goal acceptance radius.
-	// (TaskResult == EBTNodeResult::Failed && (VehiclePathComp && VehiclePathComp->GetIsInGoalAcceptanceRadius())))
+	const bool bWasReverse = bReverseTowardsTarget && VehiclePathComp;
 	if (TaskResult == EBTNodeResult::Succeeded)
 	{
-		ICommands *movedPawn = Cast<ICommands>(OwnerComp.GetAIOwner()->GetPawn());
-		if (movedPawn)
+		AAIController* const AIController = OwnerComp.GetAIOwner();
+		APawn* const ControlledPawn = IsValid(AIController) ? AIController->GetPawn() : nullptr;
+		if (IsValid(ControlledPawn))
 		{
-			if (bwasReverse)
+			const EAbilityID FinishedAbility = bWasReverse ? EAbilityID::IdReverseMove : EAbilityID::IdMove;
+			TWeakObjectPtr<APawn> WeakControlledPawn = ControlledPawn;
+			FTimerDelegate DeferredDoneDelegate;
+			DeferredDoneDelegate.BindLambda([WeakControlledPawn, FinishedAbility]()
 			{
-				movedPawn->DoneExecutingCommand(EAbilityID::IdReverseMove);
-			}
-			else
+				if (not WeakControlledPawn.IsValid())
+				{
+					return;
+				}
+				ICommands* MovedPawn = Cast<ICommands>(WeakControlledPawn.Get());
+				if (not MovedPawn)
+				{
+					return;
+				}
+				MovedPawn->DoneExecutingCommand(FinishedAbility);
+			});
+			if (UWorld* World = ControlledPawn->GetWorld())
 			{
-				movedPawn->DoneExecutingCommand(EAbilityID::IdMove);
+				World->GetTimerManager().SetTimerForNextTick(DeferredDoneDelegate);
 			}
 		}
 	}
