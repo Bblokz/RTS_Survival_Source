@@ -436,8 +436,152 @@ public:
 	// -------------------------------------------------------------------------
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetLightTank_T26();
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetLightTank_Ba12();
-	
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetLightTank_Ba14();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetLightTank_BT7();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetLightTank_BT7_4();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetLightTank_T70();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetLightTank_SU_76();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_T34_85();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_T34_100();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_T34_76();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_T34_AA();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_T34_76_L();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_T34E();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_SU_85();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_SU_85_L();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_SU_100();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_SU_122();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetMediumTank_T44_100L();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_T35();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_KV_1();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_KV_2();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_KV_1E();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_KV_1_Arc();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_T28();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_IS_1();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_KV_IS();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_IS_2();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_IS_3();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_KV_5();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_SU_152();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_HazmatEngineers();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_Mosin();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_Okhotnik();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_LargePTRS();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_RedHammer();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_RedHamerPTRS();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_ToxicGuard();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_GhostsOfStalingrad();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_Kvarc77();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_Tucha12T();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetSquad_CortexOfficer();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_Zis_57MM();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_Zis_76MM();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_Bofors();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_KS30_130MM();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_80mm_Mortar();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_120mm_Mortar();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_M1938_122mm();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_Maxim();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_DShK();
+
 };
