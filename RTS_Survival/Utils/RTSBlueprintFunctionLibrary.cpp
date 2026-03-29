@@ -899,16 +899,251 @@ void URTSBlueprintFunctionLibrary::DestroyAllBxpsInRange(
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_T26()
 {
-	FTrainingOption Option;
-	Option.UnitType = EAllUnitType::UNType_Tank;
-	Option.SubtypeValue = static_cast<uint8>(ETankSubtype::Tank_T26);
-	return Option;
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T26));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_Ba12()
 {
-	FTrainingOption Option;
-	Option.UnitType = EAllUnitType::UNType_Tank;
-	Option.SubtypeValue = static_cast<uint8>(ETankSubtype::Tank_Ba12);
-	return Option;
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Ba12));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_Ba14()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Ba14));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_BT7()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BT7));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_BT7_4()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BT7_4));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_T70()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T70));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_SU_76()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_76));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T34_85()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T34_85));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T34_100()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T34_100));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T34_76()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T34_76));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T34_AA()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T34_AA));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T34_76_L()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T34_76_L));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T34E()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T34E));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_SU_85()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_85));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_SU_85_L()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_85_L));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_SU_100()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_100));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_SU_122()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_122));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T44_100L()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T44_100L));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_T35()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T35));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_1()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_1));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_2()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_2));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_1E()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_1E));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_1_Arc()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_1_Arc));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_T28()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T28));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_IS_1()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_IS_1));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_IS()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_IS));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_IS_2()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_IS_2));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_IS_3()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_IS_3));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_5()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_5));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SU_152()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_152));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_HazmatEngineers()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_HazmatEngineers));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_Mosin()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_Okhotnik()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Okhotnik));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_LargePTRS()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_LargePTRS));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_RedHammer()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHammer));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_RedHamerPTRS()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHamerPTRS));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_ToxicGuard()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_ToxicGuard));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_GhostsOfStalingrad()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad,
+	                       static_cast<uint8>(ESquadSubtype::Squad_Rus_GhostsOfStalingrad));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_Kvarc77()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Kvarc77));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_Tucha12T()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Tucha12T));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_CortexOfficer()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_CortexOfficer));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_Zis_57MM()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Zis_57MM));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_Zis_76MM()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Zis_76MM));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_Bofors()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Bofors));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_KS30_130MM()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_KS30_130MM));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_80mm_Mortar()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_80mm_Mortar));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_120mm_Mortar()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_120mm_Mortar));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_M1938_122mm()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_M1938_122mm));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_Maxim()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Maxim));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_DShK()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_DShK));
 }
