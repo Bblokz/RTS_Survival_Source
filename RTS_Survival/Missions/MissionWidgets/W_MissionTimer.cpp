@@ -99,7 +99,7 @@ FString UW_MissionTimer::GetFormattedClockText() const
 
 	if (RemainingMinutes > 0)
 	{
-		return FString::Printf(TEXT("<Text_Armor>%d : %d</>"), RemainingMinutes, RemainingSeconds);
+		return FString::Printf(TEXT("<Text_Armor>%d:%d</>"), RemainingMinutes, RemainingSeconds);
 	}
 
 	if (RemainingSeconds < 10)

@@ -202,7 +202,7 @@ private:
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
 	void SetCampaignGenerationSettingsWithGameInstance();
-	void SetGameDifficultyWithGameInstance() const;
+	void SetGameDifficultyWithGameInstance();
 
 	UPROPERTY()
 	UW_MissionWidgetManager* M_MissionWidgetManager;

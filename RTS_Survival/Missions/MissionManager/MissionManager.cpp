@@ -554,7 +554,7 @@ void AMissionManager::SetCampaignGenerationSettingsWithGameInstance()
 	}
 }
 
-void AMissionManager::SetGameDifficultyWithGameInstance() const
+void AMissionManager::SetGameDifficultyWithGameInstance()
 {
 	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	if (not GameInstance)
@@ -569,6 +569,7 @@ void AMissionManager::SetGameDifficultyWithGameInstance() const
 								  "the mission manager requested it!"
 		  "\n see AMissionManager::SetGameDifficultyWithGameInstance");
 	}
+	M_GameDifficulty = GameDifficulty;
 }
 
 void AMissionManager::RemoveActiveMission(UMissionBase* Mission)

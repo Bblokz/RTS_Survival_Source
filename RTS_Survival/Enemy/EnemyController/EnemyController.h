@@ -11,6 +11,7 @@
 #include "EnemyController.generated.h"
 
 
+struct FTrainingOption;
 struct FAttackWaveElement;
 struct FAttackMoveWaveSettings;
 enum class EEnemyWaveType : uint8;
