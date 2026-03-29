@@ -434,10 +434,10 @@ public:
 	// -------------------------------------------------------------------------
 	//  ------------------------ TrainingOptions Utilities -------------------------
 	// -------------------------------------------------------------------------
-	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="TrainingOptions")
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetLightTank_T26();
 	
-	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="TrainingOptions")
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetLightTank_Ba12();
 	
 };
