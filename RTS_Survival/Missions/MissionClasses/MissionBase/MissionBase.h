@@ -28,6 +28,7 @@ struct FMissionWidgetState;
 struct FMissionTimerLifetimeSettings;
 class AMissionManager;
 
+
 USTRUCT(Blueprintable)
 struct FMissionState
 {
@@ -394,7 +395,7 @@ protected:
 	 * @note Brutal: RedHammer Ptrs
 	 * @note IronMan: RedHammer Ptrs
 	 */
-	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectSquadOnDifficultyAt() const;
 
 	/**
@@ -403,7 +404,7 @@ protected:
 	 * @note Brutal: RedHammer 
 	 * @note IronMan: RedHammer 
 	 */
-	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectSquadOnDifficultyAntiInfantry() const;
 
 	/**
@@ -412,8 +413,45 @@ protected:
 	 * @note Hard: t-70 or ba 14
 	 * @note Brutal and IronMan: t-28
 	 */
-	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectLightTankOnDifficulty() const;
+
+
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
+	FTrainingOption SelectT34OnDifficulty() const;
+
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
+	FTrainingOption SelectHeavyOnDifficulty() const;
+
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
+	FTrainingOption SelectTDOnDifficulty() const;
+
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
+	FTrainingOption SelectSuperHeavyOnDifficulty() const;
 
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectTankOptionPerDifficultySeeded(
@@ -421,6 +459,9 @@ protected:
 		TArray<ETankSubtype> NormalDiffTypes,
 		TArray<ETankSubtype> HardDiffTypes,
 		TArray<ETankSubtype> BrutalAndIronManTypes) const;
+	
+
+	
 
 
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")

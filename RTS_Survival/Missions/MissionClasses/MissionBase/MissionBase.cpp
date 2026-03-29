@@ -998,14 +998,15 @@ FTrainingOption UMissionBase::SelectSquadOnDifficultyAntiInfantry() const
 		break;
 	case ERTSGameDifficulty::Ironman:
 		Option.SubtypeValue = static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHammer);
-		break
+		break;
 	}
 	return Option;
 }
 
 FTrainingOption UMissionBase::SelectLightTankOnDifficulty() const
 {
-	const FTrainingOption BackupOption = FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BT7));
+	const FTrainingOption BackupOption = FTrainingOption(EAllUnitType::UNType_Tank,
+	                                                     static_cast<uint8>(ETankSubtype::Tank_BT7));
 	if (not GetIsValidMissionManager())
 	{
 		return BackupOption;
@@ -1030,6 +1031,49 @@ FTrainingOption UMissionBase::SelectLightTankOnDifficulty() const
 		return URTSBlueprintFunctionLibrary::GetHeavyTank_T28();
 	}
 	return BackupOption;
+}
+
+FTrainingOption UMissionBase::SelectT34OnDifficulty() const
+{
+	return SelectTankOptionPerDifficultySeeded(
+		{ETankSubtype::Tank_T34_76},
+		{ETankSubtype::Tank_T34_76_L, ETankSubtype::Tank_T34E},
+		{ETankSubtype::Tank_T34_85},
+		{ETankSubtype::Tank_T34_85, ETankSubtype::Tank_T34_100}
+	);
+}
+
+FTrainingOption UMissionBase::SelectHeavyOnDifficulty() const
+{
+	return SelectTankOptionPerDifficultySeeded(
+		{ETankSubtype::Tank_KV_1, ETankSubtype::Tank_T28},
+		{ETankSubtype::Tank_KV_1, ETankSubtype::Tank_KV_1E},
+		{ETankSubtype::Tank_KV_1E, ETankSubtype::Tank_KV_1, ETankSubtype::Tank_IS_1},
+		{ETankSubtype::Tank_KV_2, ETankSubtype::Tank_IS_2, ETankSubtype::Tank_KV_1_Arc}
+	);
+}
+
+FTrainingOption UMissionBase::SelectTDOnDifficulty() const
+{
+	return SelectTankOptionPerDifficultySeeded(
+		{ETankSubtype::Tank_SU_76},
+		{ETankSubtype::Tank_SU_85, ETankSubtype::Tank_T34_100},
+		{
+			ETankSubtype::Tank_SU_85, ETankSubtype::Tank_SU_100,
+			ETankSubtype::Tank_T34_100, ETankSubtype::Tank_T34_100, ETankSubtype::Tank_SU_100
+		},
+		{ETankSubtype::Tank_SU_100, ETankSubtype::Tank_T34_100, ETankSubtype::Tank_T34_100}
+	);
+}
+
+FTrainingOption UMissionBase::SelectSuperHeavyOnDifficulty() const
+{
+	return SelectTankOptionPerDifficultySeeded(
+		{ETankSubtype::Tank_IS_1, ETankSubtype::Tank_KV_1E},
+		{ETankSubtype::Tank_KV_1_Arc, ETankSubtype::Tank_IS_2},
+		{ETankSubtype::Tank_IS_3},
+		{ETankSubtype::Tank_IS_3, ETankSubtype::Tank_KV_5}
+	);
 }
 
 void UMissionBase::SetCameraControllerReference()
