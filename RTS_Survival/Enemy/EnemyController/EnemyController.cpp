@@ -11,6 +11,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatData.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
@@ -88,25 +89,6 @@ namespace EnemyControllerFieldConstruction
 		}
 	};
 
-	bool TryGetRandomTrainingOption(const FAttackWaveElement& WaveElement, FTrainingOption& OutTrainingOption)
-	{
-		if (WaveElement.UnitOptions.IsEmpty())
-		{
-			RTSFunctionLibrary::ReportError("Field construction wave element has no unit options.");
-			return false;
-		}
-
-		const int32 RandomIndex = FMath::RandRange(0, WaveElement.UnitOptions.Num() - 1);
-		if (not WaveElement.UnitOptions.IsValidIndex(RandomIndex))
-		{
-			RTSFunctionLibrary::ReportError(
-				"Field construction wave element random index was invalid.");
-			return false;
-		}
-
-		OutTrainingOption = WaveElement.UnitOptions[RandomIndex];
-		return true;
-	}
 }
 
 
@@ -120,6 +102,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_EnemyNavigationAIComponent = CreateDefaultSubobject<UEnemyNavigationAIComponent>(TEXT("EnemyNavigationAIComponent"));
 	M_EnemyStrategicAIComponent = CreateDefaultSubobject<UEnemyStrategicAIComponent>(TEXT("EnemyStrategicAIComponent"));
 	M_EnemyRetreatController = CreateDefaultSubobject<UEnemyRetreatController>(TEXT("EnemyRetreatController"));
+	CacheGenerationSeedFromGameInstance();
 	if(M_FormationController)
 	{
 		M_FormationController->InitFormationController(this);
@@ -351,7 +334,7 @@ void AEnemyController::CreateFieldConstructionOrderFromWaveElements(
 	for (const FAttackWaveElement& WaveElement : WaveElements)
 	{
 		FTrainingOption PickedOption;
-		if (not TryGetRandomTrainingOption(WaveElement, PickedOption))
+		if (not TryGetSeededTrainingOption(WaveElement, PickedOption))
 		{
 			continue;
 		}
@@ -570,6 +553,7 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 void AEnemyController::BeginPlay()
 {
 	Super::BeginPlay();
+	CacheGenerationSeedFromGameInstance();
 }
 
 
@@ -655,5 +639,72 @@ bool AEnemyController::GetIsValidEnemyRetreatController() const
 			this);
 		return false;
 	}
+	return true;
+}
+
+void AEnemyController::CacheGenerationSeedFromGameInstance()
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	UGameInstance* const GameInstance = World->GetGameInstance();
+	URTSGameInstance* const RTSGameInstance = Cast<URTSGameInstance>(GameInstance);
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError("Enemy controller could not cache generation seed from game instance.");
+		return;
+	}
+
+	const FCampaignGenerationSettings CampaignGenerationSettings = RTSGameInstance->GetCampaignGenerationSettings();
+	M_CachedGenerationSeed = CampaignGenerationSettings.GenerationSeed;
+}
+
+int32 AEnemyController::GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt) const
+{
+	if (OptionCount <= 0)
+	{
+		return INDEX_NONE;
+	}
+
+	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
+		+ static_cast<uint32>(DecisionSalt)
+		+ static_cast<uint32>(M_SeedDecisionCounter);
+	FRandomStream SeededRandomStream(static_cast<int32>(CombinedSeed));
+	++M_SeedDecisionCounter;
+	return SeededRandomStream.RandRange(0, OptionCount - 1);
+}
+
+float AEnemyController::GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt) const
+{
+	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
+		+ static_cast<uint32>(DecisionSalt)
+		+ static_cast<uint32>(M_SeedDecisionCounter);
+	FRandomStream SeededRandomStream(static_cast<int32>(CombinedSeed));
+	++M_SeedDecisionCounter;
+	return SeededRandomStream.FRandRange(MinValue, MaxValue);
+}
+
+bool AEnemyController::TryGetSeededTrainingOption(
+	const FAttackWaveElement& WaveElement,
+	FTrainingOption& OutTrainingOption) const
+{
+	if (WaveElement.UnitOptions.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("Field construction wave element has no unit options.");
+		return false;
+	}
+
+	const int32 SeededIndex = GetSeededIndex(WaveElement.UnitOptions.Num(), 173);
+	if (not WaveElement.UnitOptions.IsValidIndex(SeededIndex))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Field construction wave element seeded index was invalid.");
+		return false;
+	}
+
+	OutTrainingOption = WaveElement.UnitOptions[SeededIndex];
 	return true;
 }

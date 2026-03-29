@@ -8,6 +8,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -29,11 +30,13 @@ namespace EnemyFormationConstants
 UEnemyFormationController::UEnemyFormationController()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyFormationController::InitFormationController(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyFormationController::MoveFormationToLocation(TArray<ASquadController*> SquadControllers,
@@ -193,6 +196,7 @@ void UEnemyFormationController::RemoveActiveFormationsByID(const TArray<int32>& 
 void UEnemyFormationController::BeginPlay()
 {
 	Super::BeginPlay();
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyFormationController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -214,6 +218,54 @@ bool UEnemyFormationController::EnsureEnemyControllerIsValid()
 		"\n see UEnemyFormationController::EnsureEnemyControllerIsValid"));
 	M_EnemyController = Cast<AEnemyController>(GetOwner());
 	return M_EnemyController.IsValid();
+}
+
+void UEnemyFormationController::CacheGenerationSeedFromGameInstance()
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	UGameInstance* const GameInstance = World->GetGameInstance();
+	URTSGameInstance* const RTSGameInstance = Cast<URTSGameInstance>(GameInstance);
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError("Enemy formation controller could not cache generation seed from game instance.");
+		return;
+	}
+
+	const FCampaignGenerationSettings CampaignGenerationSettings = RTSGameInstance->GetCampaignGenerationSettings();
+	M_CachedGenerationSeed = CampaignGenerationSettings.GenerationSeed;
+}
+
+int32 UEnemyFormationController::GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt) const
+{
+	if (OptionCount <= 0)
+	{
+		return INDEX_NONE;
+	}
+
+	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
+		+ static_cast<uint32>(DecisionSalt)
+		+ static_cast<uint32>(M_SeedDecisionCounter);
+	FRandomStream SeededRandomStream(static_cast<int32>(CombinedSeed));
+	++M_SeedDecisionCounter;
+	return SeededRandomStream.RandRange(0, OptionCount - 1);
+}
+
+float UEnemyFormationController::GetSeededFloatInRange(
+	const float MinValue,
+	const float MaxValue,
+	const int32 DecisionSalt) const
+{
+	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
+		+ static_cast<uint32>(DecisionSalt)
+		+ static_cast<uint32>(M_SeedDecisionCounter);
+	FRandomStream SeededRandomStream(static_cast<int32>(CombinedSeed));
+	++M_SeedDecisionCounter;
+	return SeededRandomStream.FRandRange(MinValue, MaxValue);
 }
 
 void UEnemyFormationController::CheckFormations()
@@ -816,11 +868,12 @@ bool UEnemyFormationController::TryGetAttackMoveHelpLocation(
 
 	for (int32 TryIndex = 0; TryIndex < MaxTries; ++TryIndex)
 	{
-		const float RandomMlt = FMath::FRandRange(
+		const float RandomMlt = GetSeededFloatInRange(
 			AttackMoveSettings.HelpOffsetRadiusMltMin,
-			AttackMoveSettings.HelpOffsetRadiusMltMax);
+			AttackMoveSettings.HelpOffsetRadiusMltMax,
+			TryIndex + 131);
 		const float Distance = UnitInnerRadius * RandomMlt;
-		const float RandomAngleDegrees = FMath::FRandRange(0.f, FullCircleDegrees);
+		const float RandomAngleDegrees = GetSeededFloatInRange(0.f, FullCircleDegrees, TryIndex + 271);
 		const float RandomAngleRadians = FMath::DegreesToRadians(RandomAngleDegrees);
 		const FVector OffsetDirection(FMath::Cos(RandomAngleRadians), FMath::Sin(RandomAngleRadians), 0.f);
 		const FVector CandidateLocation = CombatUnitLocation + OffsetDirection * Distance;

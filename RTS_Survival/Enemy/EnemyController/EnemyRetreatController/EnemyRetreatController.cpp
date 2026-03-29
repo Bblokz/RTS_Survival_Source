@@ -6,6 +6,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -25,11 +26,13 @@ namespace EnemyRetreatControllerConstants
 UEnemyRetreatController::UEnemyRetreatController()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyRetreatController::InitRetreatController(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyRetreatController::StartRetreat(
@@ -121,6 +124,41 @@ bool UEnemyRetreatController::EnsureEnemyControllerIsValid() const
 		"UEnemyRetreatController::EnsureEnemyControllerIsValid",
 		this);
 	return false;
+}
+
+void UEnemyRetreatController::CacheGenerationSeedFromGameInstance()
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	UGameInstance* const GameInstance = World->GetGameInstance();
+	URTSGameInstance* const RTSGameInstance = Cast<URTSGameInstance>(GameInstance);
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError("Enemy retreat controller could not cache generation seed.");
+		return;
+	}
+
+	const FCampaignGenerationSettings CampaignGenerationSettings = RTSGameInstance->GetCampaignGenerationSettings();
+	M_CachedGenerationSeed = CampaignGenerationSettings.GenerationSeed;
+}
+
+int32 UEnemyRetreatController::GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt) const
+{
+	if (OptionCount <= 0)
+	{
+		return INDEX_NONE;
+	}
+
+	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
+		+ static_cast<uint32>(DecisionSalt)
+		+ static_cast<uint32>(M_SeedDecisionCounter);
+	FRandomStream SeededRandomStream(static_cast<int32>(CombinedSeed));
+	++M_SeedDecisionCounter;
+	return SeededRandomStream.RandRange(0, OptionCount - 1);
 }
 
 void UEnemyRetreatController::StartRetreatCheckTimer()

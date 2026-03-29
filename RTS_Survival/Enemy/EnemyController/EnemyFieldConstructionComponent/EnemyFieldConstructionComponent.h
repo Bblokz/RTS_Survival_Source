@@ -12,6 +12,7 @@ class AEnemyController;
 class ASquadController;
 class UEnemyNavigationAIComponent;
 class UFieldConstructionAbilityComponent;
+class URTSGameInstance;
 
 UENUM(BlueprintType)
 enum class EFieldConstructionStrategy : uint8
@@ -129,6 +130,9 @@ protected:
 private:
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 	bool EnsureEnemyControllerIsValid();
+	void CacheGenerationSeedFromGameInstance();
+	void InitializeSeededRandomStream(const int32 SeedValue) const;
+	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 
 	// Active orders processed by a single timer.
 	TArray<FEnemyFieldConstructionOrder> M_FieldConstructionOrders;
@@ -137,6 +141,10 @@ private:
 
 	float M_FieldConstructionOrderInterval = 20.f;
 	int32 M_NextFieldConstructionOrderId = 0;
+	int32 M_CachedGenerationSeed = 0;
+	// Deterministic random stream used for construction-strategy and type choices.
+	mutable FRandomStream M_SeededRandomStream;
+	mutable bool bM_HasSeededRandomStreamInitialised = false;
 
 	void StartFieldConstructionTimerIfNeeded();
 	void StopFieldConstructionTimerIfIdle();

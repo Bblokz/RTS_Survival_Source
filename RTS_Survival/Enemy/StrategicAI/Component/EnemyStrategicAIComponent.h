@@ -8,6 +8,7 @@
 #include "EnemyStrategicAIComponent.generated.h"
 
 class AEnemyController;
+class URTSGameInstance;
 
 /**
  * @brief Orchestrates strategic AI request batching and async processing for the enemy controller.
@@ -42,9 +43,13 @@ private:
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
 
 	bool EnsureEnemyControllerIsValid() const;
+	void CacheGenerationSeedFromGameInstance();
+	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 	void StartStrategicAIThinkingTimer();
 	void StopStrategicAIThinkingTimer();
 
 	void ProcessStrategicAIRequests();
 	void OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch);
+	int32 M_CachedGenerationSeed = 0;
+	mutable int32 M_SeedDecisionCounter = 0;
 };

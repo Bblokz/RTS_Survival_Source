@@ -9,6 +9,7 @@
 
 class AEnemyController;
 class ICommands;
+class URTSGameInstance;
 
 /**
  * @brief Tracks retreating units so the enemy controller can regroup or clean them up safely.
@@ -48,8 +49,12 @@ private:
 
 	FTimerHandle M_RetreatCheckTimerHandle;
 	int32 M_LastRetreatID = -1;
+	int32 M_CachedGenerationSeed = 0;
+	mutable int32 M_SeedDecisionCounter = 0;
 
 	bool EnsureEnemyControllerIsValid() const;
+	void CacheGenerationSeedFromGameInstance();
+	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 
 	void StartRetreatCheckTimer();
 	void StopRetreatCheckTimerIfIdle();
