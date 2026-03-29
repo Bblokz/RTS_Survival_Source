@@ -66,6 +66,7 @@ enum class EBuildingExpansionType : uint8
 	// Rus Buildings.
 	BTX_RusBarracks UMETA(DisplayName = "Rus Barracks"),
 	BTX_RusFactory UMETA(DisplayName = "Rus Factory"),
+	BTX_GerMarderStugFactory UMETA(DisplayName = "Ger Marder Stug Factory"),
 	BTX_RusAmmoStorage UMETA(DisplayName = "Rus Ammo Storage"),
 	BTX_RusResearchCenter UMETA(DisplayName = "Rus Research Center"),
 	BTX_RusPlatformFactory UMETA(DisplayName = "Rus Platform Factory"),
@@ -117,6 +118,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusPlatformFactory");
 	case EBuildingExpansionType::BTX_RusFactory:
 		return FString("BTX_RusFactory");
+	case EBuildingExpansionType::BTX_GerMarderStugFactory:
+		return FString("BTX_GerMarderStugFactory");
 	case EBuildingExpansionType::BTX_RusResearchCenter:
 		return FString("BTX_RusResearchCenter");
 	case EBuildingExpansionType::BXT_SolarSmall:
@@ -198,6 +201,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");
+	case EBuildingExpansionType::BTX_GerMarderStugFactory: return TEXT("Marder Stug Factory");
 	case EBuildingExpansionType::BTX_RusAmmoStorage: return TEXT("Ammo Storage");
 	case EBuildingExpansionType::BTX_RusResearchCenter: return TEXT("Research Center");
 	case EBuildingExpansionType::BTX_RusPlatformFactory: return TEXT("Platform Factory");

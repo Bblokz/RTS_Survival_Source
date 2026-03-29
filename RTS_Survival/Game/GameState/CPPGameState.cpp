@@ -5904,6 +5904,8 @@ void ACPPGameState::InitAllGameBxpData()
 	// -----------------------------------------------------------------------
 	// ----------------------------- RUS FACTORY ----------------------------
 	// -----------------------------------------------------------------------
+	constexpr int32 GerMarderStugFactoryHealth = 7000;
+
 	BxpData.ConstructionTime = T1BxpBuildTime;
 	BxpData.VisionRadius = 3 * T1BxpVisionRadius;
 	BxpData.Cost = FUnitCost({
@@ -5921,6 +5923,14 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 5, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFactory, BxpData);
+
+	// -----------------------------------------------------------------------
+	// ---------------------- GER MARDER STUG FACTORY -----------------------
+	// -----------------------------------------------------------------------
+	BxpData.Abilities = NotArmedBxpAbilities;
+	BxpData.Health = GerMarderStugFactoryHealth;
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_GerMarderStugFactory, BxpData);
 
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS PLATFORM FACTORY -----------------------
@@ -6661,6 +6671,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.BuildRadius = 0;
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
+		AsTech(EBuildingExpansionType::BTX_GerMarderStugFactory),
 	});
 
 	NomadicData.MaxAmountBuildingExpansions = 2;
