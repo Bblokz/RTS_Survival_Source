@@ -1,4 +1,5 @@
 ﻿#include "RTSGameInstance.h"
+#include "DeveloperSettings/RTSGameInstancePIEDeveloperSettings.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
@@ -22,18 +23,56 @@ void URTSGameInstance::Init()
 
 	InitializeAudioSettings();
 
-#if WITH_EDITOR
-	FCampaignGenerationSettings EditorSettings;
-	EditorSettings.bAreSettingsLoaded = true;
-	EditorSettings.GenerationSeed = 2323402;
-	EditorSettings.EnemyWorldPersonality = EEnemyWorldPersonality::Balanced;
-	SetCampaignGenerationSettings(EditorSettings);
+	ApplyPIEStartupOverrides();
+}
 
-	FRTSGameDifficulty EditorDifficulty;
-	EditorDifficulty.DifficultyLevel = ERTSGameDifficulty::Hard;
-	EditorDifficulty.DifficultyPercentage = 150;
-	EditorDifficulty.bIsInitialized = true;
-	SetSelectedGameDifficulty(EditorDifficulty);
+
+void URTSGameInstance::ApplyPIEStartupOverrides()
+{
+#if WITH_EDITOR
+	if (not GetShouldApplyPIEStartupOverrides())
+	{
+		return;
+	}
+
+	const URTSGameInstancePIEDeveloperSettings* const PIEStartupSettings = GetDefault<URTSGameInstancePIEDeveloperSettings>();
+	if (PIEStartupSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PIE startup settings were missing while initializing the game instance."));
+		return;
+	}
+
+	if (not PIEStartupSettings->bApplyPIEStartupOverrides)
+	{
+		return;
+	}
+
+	FCampaignGenerationSettings PIECampaignGenerationSettings;
+	PIECampaignGenerationSettings.bAreSettingsLoaded = true;
+	PIECampaignGenerationSettings.GenerationSeed = PIEStartupSettings->CampaignGenerationSeed;
+	PIECampaignGenerationSettings.EnemyWorldPersonality = PIEStartupSettings->EnemyWorldPersonality;
+	SetCampaignGenerationSettings(PIECampaignGenerationSettings);
+
+	FRTSGameDifficulty PIEGameDifficulty;
+	PIEGameDifficulty.DifficultyLevel = PIEStartupSettings->DifficultyLevel;
+	PIEGameDifficulty.DifficultyPercentage = PIEStartupSettings->DifficultyPercentage;
+	PIEGameDifficulty.bIsInitialized = true;
+	SetSelectedGameDifficulty(PIEGameDifficulty);
+#endif
+}
+
+bool URTSGameInstance::GetShouldApplyPIEStartupOverrides() const
+{
+#if WITH_EDITOR
+	const UWorld* const World = GetWorld();
+	if (World == nullptr)
+	{
+		return false;
+	}
+
+	return World->WorldType == EWorldType::PIE;
+#else
+	return false;
 #endif
 }
 

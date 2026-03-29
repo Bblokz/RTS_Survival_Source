@@ -54,6 +54,9 @@ protected:
     virtual void Shutdown() override;
 
 private:
+	void ApplyPIEStartupOverrides();
+	bool GetShouldApplyPIEStartupOverrides() const;
+
 	/** Our persistent music player. */
 	UPROPERTY()
 	URTSMusicManager* MusicManager;
