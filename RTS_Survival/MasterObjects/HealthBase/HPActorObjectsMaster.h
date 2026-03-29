@@ -97,7 +97,6 @@ protected:
 		Destroy();
 	}
 
-
 	/**
 	 * @brief Destroy the bxp and spawn actors around the location.
 	 * @param SpawnParams Defines what actors to spawn and where.

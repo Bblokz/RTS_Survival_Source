@@ -122,6 +122,8 @@ protected:
 		FVector(0, 25, 100), FVector(0, -25, 100)
 	};
 
+	UFUNCTION(BlueprintCallable,NotBlueprintable)
+	void SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> Primitives);
 	
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	UBehaviourComp* BehaviourComponent;

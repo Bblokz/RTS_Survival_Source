@@ -5900,7 +5900,6 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Abilities = ArmedBxpAbilities;
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_LeFH_150mm, BxpData);
 
-
 	// todo later fix the prices of these russian buildings when we have their counter parts for the player.
 	// -----------------------------------------------------------------------
 	// ----------------------------- RUS FACTORY ----------------------------

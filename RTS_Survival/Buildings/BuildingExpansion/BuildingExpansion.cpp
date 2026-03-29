@@ -8,6 +8,7 @@
 #include "BXPConstructionRules/BXPConstructionRules.h"
 #include "Interface/BuildingExpansionOwner.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/EnergyComponent/BuildingExpansionEnergyComponent.h"
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
@@ -228,6 +229,22 @@ TArray<ACPPTurretsMaster*> ABuildingExpansion::GetTurrets() const
 	}
 
 	return Turrets;
+}
+
+void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> Primitives)
+{
+	for(auto EachPrimitive : Primitives)
+	{
+		if (not IsValid(EachPrimitive))
+		{
+			continue;
+		}
+		EachPrimitive->SetCollisionResponseToAllChannels(ECR_Ignore);
+		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
+		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_LANDSCAPE, ECR_Overlap);
+		EachPrimitive->SetCollisionObjectType(COLLISION_OBJ_PLAYER);
+	
+	}
 }
 
 bool ABuildingExpansion::GetIsValidBehaviourComponent() const
