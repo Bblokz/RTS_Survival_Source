@@ -784,3 +784,8 @@ FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubt
 	Option.SubtypeValue = static_cast<uint8>(SquadOptions[Index]);
 	return Option;
 }
+
+int32 AMissionManager::GetGenerationSeed() const
+{
+	return M_CampaignGenerationSettings.GenerationSeed;
+}

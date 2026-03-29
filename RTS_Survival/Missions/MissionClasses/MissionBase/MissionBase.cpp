@@ -1229,6 +1229,85 @@ FTrainingOption UMissionBase::SelectSquadOptionPerDifficultySeeded(TArray<ESquad
 	return Option;
 }
 
+FTrainingOption UMissionBase::SelectMixOptionPerDifficultySeeded(
+	const FSeededDifficultyMixPool& NewToRTSMix,
+	const FSeededDifficultyMixPool& NormalMix,
+	const FSeededDifficultyMixPool& HardMix,
+	const FSeededDifficultyMixPool& BrutalAndIronManMix,
+	const FTrainingOption& FallbackOption) const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return FallbackOption;
+	}
+
+	const FSeededDifficultyMixPool SelectedDifficultyMix = SelectDifficultyMixPool(
+		NewToRTSMix,
+		NormalMix,
+		HardMix,
+		BrutalAndIronManMix
+	);
+	return SelectSeededOptionFromMixPool(SelectedDifficultyMix, FallbackOption);
+}
+
+FSeededDifficultyMixPool UMissionBase::SelectDifficultyMixPool(
+	const FSeededDifficultyMixPool& NewToRTSMix,
+	const FSeededDifficultyMixPool& NormalMix,
+	const FSeededDifficultyMixPool& HardMix,
+	const FSeededDifficultyMixPool& BrutalAndIronManMix) const
+{
+	switch (GetGameDifficulty().DifficultyLevel)
+	{
+	case ERTSGameDifficulty::NewToRTS:
+		return NewToRTSMix;
+	case ERTSGameDifficulty::Normal:
+		return NormalMix;
+	case ERTSGameDifficulty::Hard:
+		return HardMix;
+	case ERTSGameDifficulty::Brutal:
+		return BrutalAndIronManMix;
+	case ERTSGameDifficulty::Ironman:
+		return BrutalAndIronManMix;
+	}
+	return NewToRTSMix;
+}
+
+FTrainingOption UMissionBase::SelectSeededOptionFromMixPool(
+	const FSeededDifficultyMixPool& DifficultyMixPool,
+	const FTrainingOption& FallbackOption) const
+{
+	TArray<FTrainingOption> ValidOptions;
+	ValidOptions.Reserve(8);
+
+	const TArray<FTrainingOption> CandidateOptions = {
+		DifficultyMixPool.Option01,
+		DifficultyMixPool.Option02,
+		DifficultyMixPool.Option03,
+		DifficultyMixPool.Option04,
+		DifficultyMixPool.Option05,
+		DifficultyMixPool.Option06,
+		DifficultyMixPool.Option07,
+		DifficultyMixPool.Option08
+	};
+	for (const FTrainingOption& CandidateOption : CandidateOptions)
+	{
+		if (CandidateOption.IsNone())
+		{
+			continue;
+		}
+		ValidOptions.Add(CandidateOption);
+	}
+
+	if (ValidOptions.IsEmpty())
+	{
+		return FallbackOption;
+	}
+
+	const int32 Seed = GetMissionManagerChecked()->GetGenerationSeed();
+	const int32 SelectedIndex = Seed % ValidOptions.Num();
+	return ValidOptions[SelectedIndex];
+}
+
 
 bool UMissionBase::GetIsValidMissionWidget() const
 {

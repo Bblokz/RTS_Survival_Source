@@ -51,6 +51,37 @@ struct FMissionState
 	bool bTickOnMission = false;
 };
 
+USTRUCT(BlueprintType)
+struct FSeededDifficultyMixPool
+{
+	GENERATED_BODY()
+
+	// Designers can leave any option as default (None) to skip that slot.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option01 = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option02 = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option03 = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option04 = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option05 = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option06 = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option07 = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
+	FTrainingOption Option08 = FTrainingOption();
+};
+
 /**
  * Base class for missions.
  * Marking with EditInlineNew allows missions to be created as subobjects in the editor.
@@ -470,6 +501,25 @@ protected:
 		TArray<ESquadSubtype> NormalDiffTypes,
 		TArray<ESquadSubtype> HardDiffTypes,
 		TArray<ESquadSubtype> BrutalAndIronManTypes) const;
+
+	/**
+	 * @brief Picks one seeded training option from the difficulty-specific mix pools without requiring blueprint arrays.
+	 * @param NewToRTSMix Options used for NewToRTS difficulty.
+	 * @param NormalMix Options used for Normal difficulty.
+	 * @param HardMix Options used for Hard difficulty.
+	 * @param BrutalAndIronManMix Options used for Brutal and Ironman difficulties.
+	 * @param FallbackOption Returned if the selected difficulty pool has no valid options.
+	 * @return Seeded option from the selected difficulty mix, or fallback when all slots are None.
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
+	FTrainingOption SelectMixOptionPerDifficultySeeded(
+		const FSeededDifficultyMixPool& NewToRTSMix,
+		const FSeededDifficultyMixPool& NormalMix,
+		const FSeededDifficultyMixPool& HardMix,
+		const FSeededDifficultyMixPool& BrutalAndIronManMix,
+		const FTrainingOption& FallbackOption = FTrainingOption(EAllUnitType::UNType_Squad,
+		                                                        static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin))
+	) const;
 private:
 	TWeakObjectPtr<AMissionManager> M_MissionManager;
 
@@ -521,6 +571,18 @@ private:
 	bool EnsureNomadicIsValid(const TObjectPtr<ANomadicVehicle>& NomadicVehicle) const;
 	bool EnsureTankIsValid(const TObjectPtr<ATankMaster>& Tank) const;
 	bool EnsureSquadIsValid(const TObjectPtr<ASquadController>& SquadController) const;
+
+	FSeededDifficultyMixPool SelectDifficultyMixPool(
+		const FSeededDifficultyMixPool& NewToRTSMix,
+		const FSeededDifficultyMixPool& NormalMix,
+		const FSeededDifficultyMixPool& HardMix,
+		const FSeededDifficultyMixPool& BrutalAndIronManMix
+	) const;
+
+	FTrainingOption SelectSeededOptionFromMixPool(
+		const FSeededDifficultyMixPool& DifficultyMixPool,
+		const FTrainingOption& FallbackOption
+	) const;
 
 	void RegisterScheduledTaskID(const int32 TaskID);
 	void RemoveTrackedTaskID(const int32 TaskID);
