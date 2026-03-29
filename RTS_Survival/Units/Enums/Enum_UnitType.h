@@ -330,8 +330,10 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_HazmatEngineers UMETA(DisplayName = "Rus Hazmat Engineers"),
 	Squad_Rus_Mosin UMETA(DisplayName = "Rus Mosin Squad"),
 	Squad_Rus_Okhotnik UMETA(DisplayName = "Rus PTRS Squad (hunter)"),
+	Squad_Rus_LargePTRS UMETA(DisplayName = "Rus Large PTRS Squad"),
 	// Russian t2 squads.
 	Squad_Rus_RedHammer UMETA(DisplayName = "Rus Red Hammer Squad (LightGreen Hazmat PPSH and armored)"),
+	Squad_Rus_RedHamerPTRS UMETA(DisplayName = "Rus Red Hamer PTRS Squad"),
 	Squad_Rus_ToxicGuard UMETA(DisplayName = "Rus Toxic Guard Squad (LightGreen Hazmat with FlameThrower)"),
 	// Russian armory unlock.
 	Squad_Rus_GhostsOfStalingrad UMETA(DisplayName = "Rus Female Sniper"),
@@ -440,6 +442,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Iron Storm Squad";
 	case ESquadSubtype::Squad_Rus_RedHammer:
 		return "RedHammer Squad";
+	case ESquadSubtype::Squad_Rus_RedHamerPTRS:
+		return "RedHamerPTRS Squad";
 	case ESquadSubtype::Squad_Rus_ToxicGuard:
 		return "Toxic Guard Squad";
 	case ESquadSubtype::Squad_Rus_GhostsOfStalingrad:
@@ -450,6 +454,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Hazmat Engineers";
 	case ESquadSubtype::Squad_Rus_Okhotnik:
 		return "Okhotnik Squad";
+	case ESquadSubtype::Squad_Rus_LargePTRS:
+		return "Large PTRS Squad";
 	case ESquadSubtype::Squad_Rus_Kvarc77:
 		return "Kvarc 77 Squad";
 	case ESquadSubtype::Squad_Ger_SniperTeam:
