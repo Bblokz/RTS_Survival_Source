@@ -406,7 +406,6 @@ protected:
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
 	FTrainingOption SelectSquadOnDifficultyAntiInfantry() const;
 
-	
 	/**
 	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
 	 * @note Normal: t-26 or bt-7-4 or ba 14
@@ -416,7 +415,7 @@ protected:
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
 	FTrainingOption SelectLightTankOnDifficulty() const;
 
-	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectTankOptionPerDifficultySeeded(
 		TArray<ETankSubtype> NewToRTSTypes,
 		TArray<ETankSubtype> NormalDiffTypes,
@@ -424,7 +423,7 @@ protected:
 		TArray<ETankSubtype> BrutalAndIronManTypes) const;
 
 
-	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectSquadOptionPerDifficultySeeded(
 		TArray<ESquadSubtype> NewToRTSTypes,
 		TArray<ESquadSubtype> NormalDiffTypes,
