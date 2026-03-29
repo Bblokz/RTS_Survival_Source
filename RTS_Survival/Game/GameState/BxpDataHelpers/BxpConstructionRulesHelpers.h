@@ -59,6 +59,7 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BXT_88mmFlak, WithFootprint(FreeConstructionRules, 600.f, 600.f)},
 		{EBuildingExpansionType::BTX_Pak38, WithFootprint(FreeConstructionRules, 500.f, 500.f)},
 		{EBuildingExpansionType::BTX_LeFH_150mm, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
+		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---
 		{EBuildingExpansionType::BXT_SolarLarge, WithFootprint(FreeConstructionRules, 500.f, 500.f)},
