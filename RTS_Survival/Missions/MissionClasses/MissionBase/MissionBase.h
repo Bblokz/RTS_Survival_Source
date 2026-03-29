@@ -439,9 +439,10 @@ protected:
 	FTrainingOption SelectSquadOnDifficultyAntiInfantry() const;
 
 	/**
-	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
-	 * @note Normal: t-26 or bt-7-4 or ba 14
-	 * @note Hard: t-70 or ba 14
+	 * @brief Selects an early-war light tank pool that scales into guaranteed T-28 on top difficulties.
+	 * @note NewToRTS: ba-12 or bt-7 or bt-7-4
+	 * @note Normal: ba-14 or t-26 or bt-7-4
+	 * @note Hard: ba-14 or t-70
 	 * @note Brutal and IronMan: t-28
 	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
@@ -449,37 +450,41 @@ protected:
 
 
 	/**
-	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
-	 * @note Normal: t-26 or bt-7-4 or ba 14
-	 * @note Hard: t-70 or ba 14
-	 * @note Brutal and IronMan: t-28
+	 * @brief Selects medium T-34 variants that progress from early 76 models to late upgrades.
+	 * @note NewToRTS: t-34-76
+	 * @note Normal: t-34-76-l or t-34e
+	 * @note Hard: t-34-85
+	 * @note Brutal and IronMan: t-34-85 or t-34-100
 	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectT34OnDifficulty() const;
 
 	/**
-	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
-	 * @note Normal: t-26 or bt-7-4 or ba 14
-	 * @note Hard: t-70 or ba 14
-	 * @note Brutal and IronMan: t-28
+	 * @brief Selects heavy armor options with stronger pools as mission difficulty increases.
+	 * @note NewToRTS: kv-1 or t-28
+	 * @note Normal: kv-1 or kv-1e
+	 * @note Hard: kv-1e or kv-1 or is-1
+	 * @note Brutal and IronMan: kv-2 or is-2 or kv-1-arc
 	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectHeavyOnDifficulty() const;
 
 	/**
-	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
-	 * @note Normal: t-26 or bt-7-4 or ba 14
-	 * @note Hard: t-70 or ba 14
-	 * @note Brutal and IronMan: t-28
+	 * @brief Selects tank destroyer options, increasing access to SU-100 and T-34-100 at higher tiers.
+	 * @note NewToRTS: su-76
+	 * @note Normal: su-85 or t-34-100
+	 * @note Hard: su-85 or su-100 or t-34-100
+	 * @note Brutal and IronMan: su-100 or t-34-100
 	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectTDOnDifficulty() const;
 
 	/**
-	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
-	 * @note Normal: t-26 or bt-7-4 or ba 14
-	 * @note Hard: t-70 or ba 14
-	 * @note Brutal and IronMan: t-28
+	 * @brief Selects late-game armor options with top-end super-heavy choices on highest difficulties.
+	 * @note NewToRTS: is-1 or kv-1e
+	 * @note Normal: kv-1-arc or is-2
+	 * @note Hard: is-3
+	 * @note Brutal and IronMan: is-3 or kv-5
 	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectSuperHeavyOnDifficulty() const;
