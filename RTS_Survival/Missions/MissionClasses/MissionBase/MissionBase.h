@@ -393,6 +393,10 @@ protected:
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
 	FTrainingOption SelectSquadOnDifficultyAt();
 
+	// Get BA, T26 or
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectSquadOnDifficultyAt();
+
 private:
 	TWeakObjectPtr<AMissionManager> M_MissionManager;
 
@@ -453,4 +457,6 @@ private:
 	FTimerHandle M_TextOnlyDurationHandle;
 
 	void TextOnlyMission_SetAutoCompleteTimer();
+
+	FTrainingOption GetRandomTankOption(const ETankSubtype Subtype1, const ETankSubtype Subtype2);
 };

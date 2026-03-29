@@ -948,6 +948,22 @@ void UMissionBase::MoveCamera(const FMovePlayerCamera CameraMove)
 	M_PlayerCameraController->MoveCameraOverTime(CameraMove);
 }
 
+FTrainingOption UMissionBase::SelectSquadOnDifficultyAt()
+{
+	switch(GetGameDifficulty().DifficultyLevel) {
+	case ERTSGameDifficulty::NewToRTS:
+		return 
+	case ERTSGameDifficulty::Normal:
+		return
+	case ERTSGameDifficulty::Hard:
+		return
+	case ERTSGameDifficulty::Brutal:
+		return
+	case ERTSGameDifficulty::Ironman:
+		return
+	}
+}
+
 void UMissionBase::SetCameraControllerReference()
 {
 	if (not GetIsValidMissionManager())
@@ -1023,6 +1039,11 @@ void UMissionBase::TextOnlyMission_SetAutoCompleteTimer()
 	};
 	World->GetTimerManager().SetTimer(M_TextOnlyDurationHandle, AutoComplete, TextOnlyMissionDuration,
 	                                  false);
+}
+
+FTrainingOption UMissionBase::GetRandomTankOption(const ETankSubtype Subtype1, const ETankSubtype Subtype2)
+{
+	
 }
 
 
