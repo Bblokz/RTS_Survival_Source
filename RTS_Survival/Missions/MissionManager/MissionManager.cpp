@@ -471,6 +471,7 @@ void AMissionManager::BeginPlay_InitGameDifficultyAndSettings()
 	{
 		// The Game instance will determine the difficulty set.
 		SetGameDifficultyWithGameInstance();
+		return;
 	}
 	
 	if (not EnsureValidPlayerController())

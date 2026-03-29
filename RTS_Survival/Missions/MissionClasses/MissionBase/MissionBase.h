@@ -508,17 +508,14 @@ protected:
 	 * @param NormalMix Options used for Normal difficulty.
 	 * @param HardMix Options used for Hard difficulty.
 	 * @param BrutalAndIronManMix Options used for Brutal and Ironman difficulties.
-	 * @param FallbackOption Returned if the selected difficulty pool has no valid options.
 	 * @return Seeded option from the selected difficulty mix, or fallback when all slots are None.
 	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
 	FTrainingOption SelectMixOptionPerDifficultySeeded(
-		const FSeededDifficultyMixPool& NewToRTSMix,
-		const FSeededDifficultyMixPool& NormalMix,
-		const FSeededDifficultyMixPool& HardMix,
-		const FSeededDifficultyMixPool& BrutalAndIronManMix,
-		const FTrainingOption& FallbackOption = FTrainingOption(EAllUnitType::UNType_Squad,
-		                                                        static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin))
+		const FSeededDifficultyMixPool NewToRTSMix,
+		const FSeededDifficultyMixPool NormalMix,
+		const FSeededDifficultyMixPool HardMix,
+		const FSeededDifficultyMixPool BrutalAndIronManMix
 	) const;
 private:
 	TWeakObjectPtr<AMissionManager> M_MissionManager;

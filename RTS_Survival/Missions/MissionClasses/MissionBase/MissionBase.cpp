@@ -1230,12 +1230,13 @@ FTrainingOption UMissionBase::SelectSquadOptionPerDifficultySeeded(TArray<ESquad
 }
 
 FTrainingOption UMissionBase::SelectMixOptionPerDifficultySeeded(
-	const FSeededDifficultyMixPool& NewToRTSMix,
-	const FSeededDifficultyMixPool& NormalMix,
-	const FSeededDifficultyMixPool& HardMix,
-	const FSeededDifficultyMixPool& BrutalAndIronManMix,
-	const FTrainingOption& FallbackOption) const
+	const FSeededDifficultyMixPool NewToRTSMix,
+	const FSeededDifficultyMixPool NormalMix,
+	const FSeededDifficultyMixPool HardMix,
+	const FSeededDifficultyMixPool BrutalAndIronManMix) const
 {
+	const FTrainingOption FallbackOption = FTrainingOption(EAllUnitType::UNType_Squad,
+    		                                                       static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin));
 	if (not GetIsValidMissionManager())
 	{
 		return FallbackOption;
