@@ -154,6 +154,7 @@ public:
 	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
 	FTrainingOption SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const;
+	int32 GetGenerationSeed() const;
 
 protected:
 	// Called when the game starts or when spawned
