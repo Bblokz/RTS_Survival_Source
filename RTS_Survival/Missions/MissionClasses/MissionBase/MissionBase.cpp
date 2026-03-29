@@ -19,6 +19,7 @@
 #include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 UMissionBase::UMissionBase()
@@ -948,20 +949,87 @@ void UMissionBase::MoveCamera(const FMovePlayerCamera CameraMove)
 	M_PlayerCameraController->MoveCameraOverTime(CameraMove);
 }
 
-FTrainingOption UMissionBase::SelectSquadOnDifficultyAt()
+FTrainingOption UMissionBase::SelectSquadOnDifficultyAt() const
 {
-	switch(GetGameDifficulty().DifficultyLevel) {
-	case ERTSGameDifficulty::NewToRTS:
-		return 
-	case ERTSGameDifficulty::Normal:
-		return
-	case ERTSGameDifficulty::Hard:
-		return
-	case ERTSGameDifficulty::Brutal:
-		return
-	case ERTSGameDifficulty::Ironman:
-		return
+	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad,
+	                                         static_cast<uint8>(ESquadSubtype::Squad_Rus_Okhotnik));
+	if (not GetIsValidMissionManager())
+	{
+		return Option;
 	}
+	switch (GetGameDifficulty().DifficultyLevel)
+	{
+	case ERTSGameDifficulty::NewToRTS:
+		break;
+	case ERTSGameDifficulty::Normal:
+		break;
+	case ERTSGameDifficulty::Hard:
+		Option.SubtypeValue = static_cast<uint8>(ESquadSubtype::Squad_Rus_LargePTRS);
+		break;
+	case ERTSGameDifficulty::Brutal:
+		Option.SubtypeValue = static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHamerPTRS);
+		break;
+	case ERTSGameDifficulty::Ironman:
+		Option.SubtypeValue = static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHamerPTRS);
+		break;
+	}
+	return Option;
+}
+
+FTrainingOption UMissionBase::SelectSquadOnDifficultyAntiInfantry() const
+{
+	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad,
+	                                         static_cast<uint8>(ESquadSubtype::Squad_Rus_HazmatEngineers));
+	if (not GetIsValidMissionManager())
+	{
+		return Option;
+	}
+	switch (GetGameDifficulty().DifficultyLevel)
+	{
+	case ERTSGameDifficulty::NewToRTS:
+		break;
+	case ERTSGameDifficulty::Normal:
+		break;
+	case ERTSGameDifficulty::Hard:
+		Option.SubtypeValue = static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin);
+		break;
+	case ERTSGameDifficulty::Brutal:
+		Option.SubtypeValue = static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHammer);
+		break;
+	case ERTSGameDifficulty::Ironman:
+		Option.SubtypeValue = static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHammer);
+		break
+	}
+	return Option;
+}
+
+FTrainingOption UMissionBase::SelectLightTankOnDifficulty() const
+{
+	const FTrainingOption BackupOption = FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BT7));
+	if (not GetIsValidMissionManager())
+	{
+		return BackupOption;
+	}
+	switch (GetGameDifficulty().DifficultyLevel)
+	{
+	case ERTSGameDifficulty::NewToRTS:
+		return M_MissionManager->SelectSeededTankOption({
+			ETankSubtype::Tank_Ba12, ETankSubtype::Tank_BT7, ETankSubtype::Tank_BT7_4
+		});
+	case ERTSGameDifficulty::Normal:
+		return M_MissionManager->SelectSeededTankOption({
+			ETankSubtype::Tank_Ba14, ETankSubtype::Tank_T26, ETankSubtype::Tank_BT7_4
+		});
+	case ERTSGameDifficulty::Hard:
+		return M_MissionManager->SelectSeededTankOption({
+			ETankSubtype::Tank_Ba14, ETankSubtype::Tank_T70, ETankSubtype::Tank_T70
+		});
+	// Falls through (brutal and ironman always share)
+	case ERTSGameDifficulty::Brutal:
+	case ERTSGameDifficulty::Ironman:
+		return URTSBlueprintFunctionLibrary::GetHeavyTank_T28();
+	}
+	return BackupOption;
 }
 
 void UMissionBase::SetCameraControllerReference()
@@ -1041,9 +1109,80 @@ void UMissionBase::TextOnlyMission_SetAutoCompleteTimer()
 	                                  false);
 }
 
-FTrainingOption UMissionBase::GetRandomTankOptionWIthMissionSeed(const ETankSubtype Subtype1, const ETankSubtype Subtype2)
+FTrainingOption UMissionBase::SelectTankOptionPerDifficultySeeded(TArray<ETankSubtype> NewToRTSTypes,
+                                                                  TArray<ETankSubtype> NormalDiffTypes,
+                                                                  TArray<ETankSubtype> HardDiffTypes, TArray<
+	                                                                  ETankSubtype> BrutalAndIronManTypes) const
 {
-	
+	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T26));
+	if (not GetIsValidMissionManager())
+	{
+		return Option;
+	}
+	TArray<ETankSubtype> SelectedArray = NewToRTSTypes;
+	switch (GetGameDifficulty().DifficultyLevel)
+	{
+	case ERTSGameDifficulty::NewToRTS:
+		break;
+	case ERTSGameDifficulty::Normal:
+		SelectedArray = NormalDiffTypes;
+		break;
+	case ERTSGameDifficulty::Hard:
+		SelectedArray = HardDiffTypes;
+		break;
+	case ERTSGameDifficulty::Brutal:
+		SelectedArray = BrutalAndIronManTypes;
+		break;
+	case ERTSGameDifficulty::Ironman:
+		SelectedArray = BrutalAndIronManTypes;
+		break;
+	}
+
+	if (SelectedArray.Num() == 1)
+	{
+		Option = FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(SelectedArray[0]));
+		return Option;
+	}
+	Option = M_MissionManager->SelectSeededTankOption(SelectedArray);
+	return Option;
+}
+
+FTrainingOption UMissionBase::SelectSquadOptionPerDifficultySeeded(TArray<ESquadSubtype> NewToRTSTypes,
+                                                                   TArray<ESquadSubtype> NormalDiffTypes,
+                                                                   TArray<ESquadSubtype> HardDiffTypes,
+                                                                   TArray<ESquadSubtype> BrutalAndIronManTypes) const
+{
+	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad,
+	                                         static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin));
+	if (not GetIsValidMissionManager())
+	{
+		return Option;
+	}
+	TArray<ESquadSubtype> SelectedArray = NewToRTSTypes;
+	switch (GetGameDifficulty().DifficultyLevel)
+	{
+	case ERTSGameDifficulty::NewToRTS:
+		break;
+	case ERTSGameDifficulty::Normal:
+		SelectedArray = NormalDiffTypes;
+		break;
+	case ERTSGameDifficulty::Hard:
+		SelectedArray = HardDiffTypes;
+		break;
+	case ERTSGameDifficulty::Brutal:
+		SelectedArray = BrutalAndIronManTypes;
+		break;
+	case ERTSGameDifficulty::Ironman:
+		SelectedArray = BrutalAndIronManTypes;
+		break;
+	}
+	if (SelectedArray.Num() == 1)
+	{
+		Option = FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(SelectedArray[0]));
+		return Option;
+	}
+	Option = M_MissionManager->SelectSeededSquadOption(SelectedArray);
+	return Option;
 }
 
 

@@ -142,8 +142,8 @@ public:
 		const FMissionScheduledCallback& Callback,
 		const int32 TotalCalls,
 		const int32 IntervalSeconds,
-		const int32 InitialDelaySeconds ,
-		const TArray<AActor*>& RequiredActors ,
+		const int32 InitialDelaySeconds,
+		const TArray<AActor*>& RequiredActors,
 		const bool bFireBeforeFirstInterval = true,
 		const bool bRepeatForever = false
 	);
@@ -157,7 +157,7 @@ public:
 	int32 ScheduleSingleCallbackWithRequirement(
 		const FMissionScheduledCallback& Callback,
 		const int32 DelaySeconds,
-		const TArray<AActor*>& RequiredActors 
+		const TArray<AActor*>& RequiredActors
 	);
 
 	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
@@ -235,14 +235,13 @@ protected:
 		const float ProjectionScale = 1.f);
 
 
-
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FRTSGameDifficulty GetGameDifficulty() const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	int32 GetGameDifficultyPercentage() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
-	int32 GetGameDifficultyPercentageDividedBy(const int32 Divisor = 2)const;
+	int32 GetGameDifficultyPercentageDividedBy(const int32 Divisor = 2) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	bool GetIsGameDifficultyNormalOrHigher() const;
@@ -255,7 +254,7 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	bool GetIsGameDifficultyIronMan() const;
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	bool GetIsDifficultyAtLeast(const ERTSGameDifficulty DifficultyLevel) const;
 
@@ -389,17 +388,48 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);
 
-	// Depending on mission difficulty get hazmat squad  through ptrs to toxic guard to
+	/**
+	 * @brief Depending on mission difficulty get mosin-ptrs squad
+	 * @note Hard: large ptrs
+	 * @note Brutal: RedHammer Ptrs
+	 * @note IronMan: RedHammer Ptrs
+	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
-	FTrainingOption SelectSquadOnDifficultyAt();
+	FTrainingOption SelectSquadOnDifficultyAt() const;
 
-	// Get BA, T26 or
+	/**
+	 * @brief Depending on mission difficulty get Hazmat engineers squad
+	 * @note Hard: mosin squad
+	 * @note Brutal: RedHammer 
+	 * @note IronMan: RedHammer 
+	 */
 	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
-	FTrainingOption SelectSquadOnDifficultyAt();
+	FTrainingOption SelectSquadOnDifficultyAntiInfantry() const;
 
-	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
-	FTrainingOption GetRandomTankOptionWIthMissionSeed(const ETankSubtype Subtype1, const ETankSubtype Subtype2);
 	
+	/**
+	 * @brief Depending on mission difficulty get bt-7 or bt-7-4 or ba12
+	 * @note Normal: t-26 or bt-7-4 or ba 14
+	 * @note Hard: t-70 or ba 14
+	 * @note Brutal and IronMan: t-28
+	 */
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectLightTankOnDifficulty() const;
+
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectTankOptionPerDifficultySeeded(
+		TArray<ETankSubtype> NewToRTSTypes,
+		TArray<ETankSubtype> NormalDiffTypes,
+		TArray<ETankSubtype> HardDiffTypes,
+		TArray<ETankSubtype> BrutalAndIronManTypes) const;
+
+
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectSquadOptionPerDifficultySeeded(
+		TArray<ESquadSubtype> NewToRTSTypes,
+		TArray<ESquadSubtype> NormalDiffTypes,
+		TArray<ESquadSubtype> HardDiffTypes,
+		TArray<ESquadSubtype> BrutalAndIronManTypes) const;
 private:
 	TWeakObjectPtr<AMissionManager> M_MissionManager;
 
@@ -460,5 +490,4 @@ private:
 	FTimerHandle M_TextOnlyDurationHandle;
 
 	void TextOnlyMission_SetAutoCompleteTimer();
-
 };

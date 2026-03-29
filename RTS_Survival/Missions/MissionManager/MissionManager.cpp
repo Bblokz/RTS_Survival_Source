@@ -567,7 +567,6 @@ void AMissionManager::SetGameDifficultyWithGameInstance() const
 		RTSFunctionLibrary::ReportError("Game instance has no valid game difficulty loaded while"
 								  "the mission manager requested it!"
 		  "\n see AMissionManager::SetGameDifficultyWithGameInstance");
-		return;
 	}
 }
 
@@ -747,4 +746,41 @@ bool AMissionManager::EnsureValidTowAsyncSpawner(ARTSAsyncSpawner* RTSAsyncSpawn
 
 	RTSFunctionLibrary::ReportError("Mission manager failed SpawnTowedTeamWeapon because async spawner is invalid.");
 	return false;
+}
+
+FTrainingOption AMissionManager::SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const
+{
+	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T26));
+    // Ensure the array is not empty to avoid division by zero
+    if (TankOptions.Num() == 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("TankOptions array is empty. Returning default FTrainingOptions."));
+    	return Option;
+    }
+
+    // Use the GenerationSeed to determine the index
+    int32 Index = M_CampaignGenerationSettings.GenerationSeed % TankOptions.Num();
+
+    // Return the selected option
+	Option.SubtypeValue = static_cast<uint8>(TankOptions[Index]);
+	return Option;
+}
+
+FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const
+{
+	
+	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_HazmatEngineers));
+    // Ensure the array is not empty to avoid division by zero
+    if (SquadOptions.Num() == 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("SquadOptions array is empty. Returning default FTrainingOptions."));
+    	return Option;
+    }
+
+    // Use the GenerationSeed to determine the index
+    int32 Index = M_CampaignGenerationSettings.GenerationSeed % SquadOptions.Num();
+
+    // Return the selected option
+	Option.SubtypeValue = static_cast<uint8>(SquadOptions[Index]);
+	return Option;
 }

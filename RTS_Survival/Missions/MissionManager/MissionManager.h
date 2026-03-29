@@ -127,7 +127,7 @@ public:
 	int32 GetTotalScheduledCallbackCount() const;
 
 	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
-		const FVector& TankSpawnLocation);
+	                          const FVector& TankSpawnLocation);
 	void HandleSpawnTowedTeamWeaponTankSpawned(int32 RequestId, AActor* SpawnedTankActor);
 	void HandleSpawnTowedTeamWeaponSquadSpawned(int32 RequestId, AActor* SpawnedSquadActor);
 	void HandleSpawnTowedTeamWeaponSquadReady(int32 RequestId);
@@ -150,6 +150,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources")
 	FMissionStartingResources M_MissionStartingResources;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
+	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const;
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
+	FTrainingOption SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const;
 
 protected:
 	// Called when the game starts or when spawned
@@ -164,7 +168,7 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);
 
-	
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetMissionManagerWidgetClass(TSubclassOf<UW_MissionWidgetManager> WidgetClass);
 
@@ -173,9 +177,7 @@ protected:
 	// Optional: Tick to update missions if needed.
 	virtual void Tick(float DeltaSeconds) override;
 
-
 private:
-
 	// All missions that are currently active.
 	// Missions provided by the blueprint edit anywhere array.
 	UPROPERTY()
@@ -207,10 +209,10 @@ private:
 	void RemoveActiveMission(UMissionBase* Mission);
 
 	bool EnsureMissionIsValid(UMissionBase* Mission);
-	bool EnsureMissionWidgetIsValid()const;
+	bool EnsureMissionWidgetIsValid() const;
 	/** @return True when this mission in not in the active array and valid. */
 	bool EnsureMissionIsNotAlreadyActivated(UMissionBase* Mission);
-	
+
 	FMissionSoundSettings M_MissionSoundSettings;
 
 	void PlayMissionSound(EMissionSoundType SoundType);
@@ -237,5 +239,4 @@ private:
 	void RemoveFinishedTowSpawnRequests();
 	bool EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeaponSpawnState* TowSpawnState) const;
 	bool EnsureValidTowAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
-
 };
