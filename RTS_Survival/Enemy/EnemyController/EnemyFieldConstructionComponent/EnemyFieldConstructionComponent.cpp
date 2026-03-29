@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -79,11 +80,13 @@ UEnemyFieldConstructionComponent::UEnemyFieldConstructionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	M_FieldConstructionOrderInterval = EnemyFieldConstructionConstants::DefaultFieldConstructionIntervalSeconds;
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyFieldConstructionComponent::InitFieldConstructionComponent(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyFieldConstructionComponent::CreateFieldConstructionOrder(
@@ -148,6 +151,7 @@ void UEnemyFieldConstructionComponent::SetFieldConstructionOrderInterval(const f
 void UEnemyFieldConstructionComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyFieldConstructionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -171,6 +175,50 @@ bool UEnemyFieldConstructionComponent::EnsureEnemyControllerIsValid()
 		"\n see UEnemyFieldConstructionComponent::EnsureEnemyControllerIsValid"));
 	M_EnemyController = Cast<AEnemyController>(GetOwner());
 	return M_EnemyController.IsValid();
+}
+
+void UEnemyFieldConstructionComponent::CacheGenerationSeedFromGameInstance()
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	UGameInstance* const GameInstance = World->GetGameInstance();
+	URTSGameInstance* const RTSGameInstance = Cast<URTSGameInstance>(GameInstance);
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Enemy field construction component could not cache generation seed from game instance.");
+		return;
+	}
+
+	const FCampaignGenerationSettings CampaignGenerationSettings = RTSGameInstance->GetCampaignGenerationSettings();
+	M_CachedGenerationSeed = CampaignGenerationSettings.GenerationSeed;
+	InitializeSeededRandomStream(M_CachedGenerationSeed);
+}
+
+void UEnemyFieldConstructionComponent::InitializeSeededRandomStream(const int32 SeedValue) const
+{
+	M_SeededRandomStream.Initialize(SeedValue);
+	bM_HasSeededRandomStreamInitialised = true;
+}
+
+int32 UEnemyFieldConstructionComponent::GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt) const
+{
+	if (OptionCount <= 0)
+	{
+		return INDEX_NONE;
+	}
+
+	if (not bM_HasSeededRandomStreamInitialised)
+	{
+		InitializeSeededRandomStream(M_CachedGenerationSeed);
+	}
+
+	M_SeededRandomStream.RandRange(0, FMath::Max(DecisionSalt, 0));
+	return M_SeededRandomStream.RandRange(0, OptionCount - 1);
 }
 
 void UEnemyFieldConstructionComponent::StartFieldConstructionTimerIfNeeded()
@@ -537,8 +585,12 @@ void UEnemyFieldConstructionComponent::DetermineFieldConstructionStrategy(
 			return;
 		}
 
-		const int32 RandomIndex = FMath::RandRange(0, ValidStrategies.Num() - 1);
-		SelectedStrategy = ValidStrategies[RandomIndex];
+		const int32 SeededIndex = GetSeededIndex(ValidStrategies.Num(), 901);
+		if (not ValidStrategies.IsValidIndex(SeededIndex))
+		{
+			return;
+		}
+		SelectedStrategy = ValidStrategies[SeededIndex];
 	}
 
 	Order.Strategy = SelectedStrategy;
@@ -787,8 +839,12 @@ void UEnemyFieldConstructionComponent::AppendLocationPairs(
 		EFieldConstructionType SelectedType = ConstructionTypes[0];
 		if (bRandomizeTypes)
 		{
-			const int32 RandomIndex = FMath::RandRange(0, ConstructionTypeCount - 1);
-			SelectedType = ConstructionTypes[RandomIndex];
+			const int32 SeededIndex = GetSeededIndex(ConstructionTypeCount, LocationIndex + 31);
+			if (not ConstructionTypes.IsValidIndex(SeededIndex))
+			{
+				continue;
+			}
+			SelectedType = ConstructionTypes[SeededIndex];
 		}
 		else if (ConstructionTypes.IsValidIndex(LocationIndex))
 		{

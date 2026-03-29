@@ -10,6 +10,7 @@ class AEnemyController;
 class ARecastNavMesh;
 class ARoadSplineActor;
 class USplineComponent;
+class URTSGameInstance;
 
 UENUM(BlueprintType)
 enum class EOnProjectionFailedStrategy : uint8
@@ -108,6 +109,8 @@ private:
 
 	bool EnsureEnemyControllerIsValid() const;
 	bool GetIsValidRecastNavMesh() const;
+	void CacheGenerationSeedFromGameInstance();
+	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 
 	void CacheRecastNavMesh();
 	void CacheRoadSplineActors();
@@ -148,4 +151,6 @@ private:
 	void DebugOffsetAttempt(const FVector& OriginalLocation, const FVector& OffsetLocation, const FString& Context) const;
 	void DebugDefaultAreaResult(const FVector& Location, const bool bIsDefaultArea, const FString& Context) const;
 	void DebugBatchResult(const TArray<FVector>& Points, const FString& Context) const;
+	int32 M_CachedGenerationSeed = 0;
+	mutable int32 M_SeedDecisionCounter = 0;
 };

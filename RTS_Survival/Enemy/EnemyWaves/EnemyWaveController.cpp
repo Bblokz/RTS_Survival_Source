@@ -7,6 +7,7 @@
 #include "NavigationSystem.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -18,6 +19,7 @@ UEnemyWaveController::UEnemyWaveController()
 	PrimaryComponentTick.bCanEverTick = false;
 
 	PrimaryComponentTick.bStartWithTickEnabled = false;
+	CacheGenerationSeedFromGameInstance();
 }
 
 void UEnemyWaveController::StartNewAttackWave(
@@ -293,6 +295,7 @@ void UEnemyWaveController::StartSingleAttackMoveWave(
 void UEnemyWaveController::InitWaveController(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
+	CacheGenerationSeedFromGameInstance();
 }
 
 
@@ -301,6 +304,7 @@ void UEnemyWaveController::BeginPlay()
 	Super::BeginPlay();
 
 	M_NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
+	CacheGenerationSeedFromGameInstance();
 }
 
 bool UEnemyWaveController::EnsureEnemyControllerIsValid()
@@ -313,6 +317,51 @@ bool UEnemyWaveController::EnsureEnemyControllerIsValid()
 		"\n see UEnemyWaveController::EnsureEnemyControllerIsValid"));
 	M_EnemyController = Cast<AEnemyController>(GetOwner());
 	return M_EnemyController.IsValid();
+}
+
+void UEnemyWaveController::CacheGenerationSeedFromGameInstance()
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	UGameInstance* const GameInstance = World->GetGameInstance();
+	URTSGameInstance* const RTSGameInstance = Cast<URTSGameInstance>(GameInstance);
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError("Enemy wave controller could not cache generation seed from game instance.");
+		return;
+	}
+
+	const FCampaignGenerationSettings CampaignGenerationSettings = RTSGameInstance->GetCampaignGenerationSettings();
+	M_CachedGenerationSeed = CampaignGenerationSettings.GenerationSeed;
+}
+
+int32 UEnemyWaveController::GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt) const
+{
+	if (OptionCount <= 0)
+	{
+		return INDEX_NONE;
+	}
+
+	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
+		+ static_cast<uint32>(DecisionSalt)
+		+ static_cast<uint32>(M_SeedDecisionCounter);
+	FRandomStream SeededRandomStream(static_cast<int32>(CombinedSeed));
+	++M_SeedDecisionCounter;
+	return SeededRandomStream.RandRange(0, OptionCount - 1);
+}
+
+float UEnemyWaveController::GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt) const
+{
+	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
+		+ static_cast<uint32>(DecisionSalt)
+		+ static_cast<uint32>(M_SeedDecisionCounter);
+	FRandomStream SeededRandomStream(static_cast<int32>(CombinedSeed));
+	++M_SeedDecisionCounter;
+	return SeededRandomStream.FRandRange(MinValue, MaxValue);
 }
 
 void UEnemyWaveController::RemoveAttackWaveByIDAndInvalidateTimer(FAttackWave* AttackWave)
@@ -459,7 +508,8 @@ float UEnemyWaveController::GetIterationTimeForWave(FAttackWave* AttackWave) con
 	}
 	const float MinInterval = AttackWave->WaveInterval * (1.f - AttackWave->IntervalVarianceFraction);
 	const float MaxInterval = AttackWave->WaveInterval * (1.f + AttackWave->IntervalVarianceFraction);
-	return FMath::RandRange(MinInterval, MaxInterval) * GetWaveTimeMltDependingOnGenerators(AttackWave);
+	return GetSeededFloatInRange(MinInterval, MaxInterval, AttackWave->UniqueWaveID + 701)
+		* GetWaveTimeMltDependingOnGenerators(AttackWave);
 }
 
 float UEnemyWaveController::GetWaveTimeMltDependingOnGenerators(FAttackWave* AttackWave) const
@@ -583,7 +633,7 @@ bool UEnemyWaveController::SpawnUnitsForAttackWave(FAttackWave* AttackWave)
 bool UEnemyWaveController::GetRandomAttackWaveElementOption(const FAttackWaveElement& Element,
                                                             FTrainingOption& OutPickedOption) const
 {
-	const int32 Index = FMath::RandRange(0, Element.UnitOptions.Num() - 1);
+	const int32 Index = GetSeededIndex(Element.UnitOptions.Num(), 811);
 	if (Element.UnitOptions.IsValidIndex(Index))
 	{
 		OutPickedOption = Element.UnitOptions[Index];

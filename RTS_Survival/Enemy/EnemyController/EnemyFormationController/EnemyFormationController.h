@@ -13,6 +13,7 @@ class AEnemyController;
 class ATankMaster;
 class ASquadController;
 class UNavigationSystemV1;
+class URTSGameInstance;
 
 // Hash TWeakInterfacePtr<ICommands> by its underlying UObject*
 // Used for matching the radius of the unit with the icommand interface.
@@ -78,6 +79,9 @@ protected:
 private:
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 	bool EnsureEnemyControllerIsValid();
+	void CacheGenerationSeedFromGameInstance();
+	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
+	float GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt = 0) const;
 
 
 	TMap<int32, FFormationData> M_ActiveFormations;
@@ -193,6 +197,8 @@ private:
 	void OnInvalidSquadForFormation(const bool bHasReachedNext) const;
 
 	int32 M_LastUsedFormationID = -1;
+	int32 M_CachedGenerationSeed = 0;
+	mutable int32 M_SeedDecisionCounter = 0;
 
 	int32 GenerateUniqueFormationID()
 	{

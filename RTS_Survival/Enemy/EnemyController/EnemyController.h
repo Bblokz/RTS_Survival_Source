@@ -23,6 +23,7 @@ class UEnemyNavigationAIComponent;
 class UEnemyStrategicAIComponent;
 class ATankMaster;
 class ASquadController;
+class URTSGameInstance;
 
 /**
  * @brief Coordinates enemy formations and wave orchestration for AI-controlled assaults.
@@ -329,7 +330,15 @@ private:
 	bool GetIsValidEnemyNavigationAIComponent() const;
 	bool GetIsValidEnemyStrategicAIComponent() const;
 	bool GetIsValidEnemyRetreatController() const;
+	void CacheGenerationSeedFromGameInstance();
+	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
+	float GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt = 0) const;
+	bool TryGetSeededTrainingOption(
+		const FAttackWaveElement& WaveElement,
+		FTrainingOption& OutTrainingOption) const;
 
 	// Contains the supplies and other resource settings for waves and construction.
 	FEnemyResources M_Resources;
+	int32 M_CachedGenerationSeed = 0;
+	mutable int32 M_SeedDecisionCounter = 0;
 };

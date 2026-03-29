@@ -13,6 +13,7 @@ class ATankMaster;
 class AEnemyController;
 class ARTSAsyncSpawner;
 class UNavigationSystemV1;
+class URTSGameInstance;
 
 /**
  * @brief Coordinates the spawning and iteration of enemy attack waves for the enemy controller.
@@ -145,6 +146,9 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UNavigationSystemV1> M_NavigationSystem = nullptr;
 	bool EnsureEnemyControllerIsValid();
+	void CacheGenerationSeedFromGameInstance();
+	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
+	float GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt = 0) const;
 	TArray<FAttackWave> M_AttackWaves;
 	void RemoveAttackWaveByIDAndInvalidateTimer(FAttackWave* AttackWave);
 	FAttackWave* GetAttackWaveByID(const int32 UniqueID);
@@ -217,6 +221,8 @@ private:
 
 	// Used to identify to which wave was provided to the async spawner.
 	int32 CurrentUniqueWaveID = -1;
+	int32 M_CachedGenerationSeed = 0;
+	mutable int32 M_SeedDecisionCounter = 0;
 
 	int32 GetUniqueWaveID()
 	{
