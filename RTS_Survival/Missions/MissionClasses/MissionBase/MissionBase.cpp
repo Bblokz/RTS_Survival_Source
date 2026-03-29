@@ -116,10 +116,38 @@ int32 UMissionBase::ScheduleRepeatedCallback(
 	const int32 TotalCalls,
 	const int32 IntervalSeconds,
 	const int32 InitialDelaySeconds,
-	const TArray<AActor*>& RequiredActors, 
 	const bool bFireBeforeFirstInterval,
 	const bool bRepeatForever
 )
+{
+	if (not GetIsValidMissionManager())
+	{
+		RTSFunctionLibrary::ReportError("Mission tried to schedule callback while mission manager is invalid.");
+		return INDEX_NONE;
+	}
+
+	const TArray<AActor*> RequiredActors = {};
+	const int32 TaskID = GetMissionManagerChecked()->ScheduleMissionCallback(
+		Callback,
+		TotalCalls,
+		IntervalSeconds,
+		InitialDelaySeconds,
+		this,
+		RequiredActors,
+		bFireBeforeFirstInterval,
+		bRepeatForever
+	);
+
+	RegisterScheduledTaskID(TaskID);
+	return TaskID;
+}
+
+int32 UMissionBase::ScheduleRepeatedCallbackWithRequirement(const FMissionScheduledCallback& Callback,
+                                                            const int32 TotalCalls, const int32 IntervalSeconds,
+                                                            const int32 InitialDelaySeconds,
+                                                            const TArray<AActor*>& RequiredActors,
+                                                            const bool bFireBeforeFirstInterval,
+                                                            const bool bRepeatForever)
 {
 	if (not GetIsValidMissionManager())
 	{
@@ -144,9 +172,29 @@ int32 UMissionBase::ScheduleRepeatedCallback(
 
 int32 UMissionBase::ScheduleSingleCallback(
 	const FMissionScheduledCallback& Callback,
-	const int32 DelaySeconds,
-	const TArray<AActor*>& RequiredActors
+	const int32 DelaySeconds
 )
+{
+	if (not GetIsValidMissionManager())
+	{
+		RTSFunctionLibrary::ReportError("Mission tried to schedule single callback while mission manager is invalid.");
+		return INDEX_NONE;
+	}
+	const TArray<AActor*> RequiredActors = {};
+
+	const int32 TaskID = GetMissionManagerChecked()->ScheduleSingleMissionCallback(
+		Callback,
+		DelaySeconds,
+		this,
+		RequiredActors
+	);
+	RegisterScheduledTaskID(TaskID);
+	return TaskID;
+}
+
+int32 UMissionBase::ScheduleSingleCallbackWithRequirement(const FMissionScheduledCallback& Callback,
+                                                          const int32 DelaySeconds,
+                                                          const TArray<AActor*>& RequiredActors)
 {
 	if (not GetIsValidMissionManager())
 	{
@@ -341,6 +389,24 @@ FRTSGameDifficulty UMissionBase::GetGameDifficulty() const
 		return FRTSGameDifficulty();
 	}
 	return M_MissionManager->GetCurrentGameDifficulty();
+}
+
+int32 UMissionBase::GetGameDifficultyPercentage() const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return 100;
+	}
+	return M_MissionManager->GetCurrentGameDifficulty().DifficultyPercentage;
+}
+
+int32 UMissionBase::GetGameDifficultyPercentageDividedBy(const int32 Divisor) const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return FMath::Max(1, 100 / Divisor);
+	}
+	return FMath::Max(1, M_MissionManager->GetCurrentGameDifficulty().DifficultyPercentage / Divisor);
 }
 
 bool UMissionBase::GetIsGameDifficultyNormalOrHigher() const

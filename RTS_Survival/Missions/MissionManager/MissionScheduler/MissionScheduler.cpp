@@ -75,6 +75,7 @@ int32 UMissionScheduler::ScheduleCallback(
 		ImmediateExecutionTask.bM_RepeatForever = bRepeatForever;
 		ImmediateExecutionTask.M_Callback = Callback;
 		ImmediateExecutionTask.M_WeakOwner = CallbackOwner;
+		ImmediateExecutionTask.M_RemainingExecutions = RemainingExecutions;
 		ImmediateExecutionTask.M_RequiredActors = RequiredActorWeakReferences;
 
 		if (not GetIsValidTask(ImmediateExecutionTask))

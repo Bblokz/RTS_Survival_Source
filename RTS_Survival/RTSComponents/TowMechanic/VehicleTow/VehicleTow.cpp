@@ -15,7 +15,8 @@ void UVehicleTowComponent::InitTowMesh(USceneComponent* TowMeshComponent)
 
 bool UVehicleTowComponent::IsTowFree() const
 {
-	return not GetIsValidTowedActor() || not GetIsValidTowedActorComp() || M_CurrentTowSubtype == ETowedActorTarget::None;
+	return not GetIsValidTowedActor() || not GetIsValidTowedActorComp() || M_CurrentTowSubtype ==
+		ETowedActorTarget::None;
 }
 
 bool UVehicleTowComponent::GetIsValidTowMeshComponent() const
@@ -60,9 +61,9 @@ void UVehicleTowComponent::SetTowRelationship(AActor* TowedActor, UTowedActorCom
 	M_CurrentTowSubtype = TowSubtype;
 }
 
-void UVehicleTowComponent::SwapAbilityToDetachTow() const
+void UVehicleTowComponent::SwapAbilityToDetachTow()
 {
-	if(not GetIsValidICommands())
+	if (not GetIsValidICommands())
 	{
 		return;
 	}
@@ -72,9 +73,9 @@ void UVehicleTowComponent::SwapAbilityToDetachTow() const
 	M_OwnerCommandsInterface->SwapAbility(EAbilityID::IdTowActor, NewAbility);
 }
 
-void UVehicleTowComponent::SwapAbilityToTow() const
+void UVehicleTowComponent::SwapAbilityToTow()
 {
-	if(not GetIsValidICommands())
+	if (not GetIsValidICommands())
 	{
 		return;
 	}
@@ -141,12 +142,11 @@ void UVehicleTowComponent::BeginPlay()
 		Del.BindLambda(SetupAbility);
 		World->GetTimerManager().SetTimerForNextTick(Del);
 	}
-	
 }
 
 void UVehicleTowComponent::BeginPlay_SetupCommandsInterface()
 {
-	if(not GetOwner())
+	if (not GetOwner())
 	{
 		return;
 	}
@@ -156,21 +156,33 @@ void UVehicleTowComponent::BeginPlay_SetupCommandsInterface()
 	(void)GetIsValidICommands();
 }
 
-bool UVehicleTowComponent::GetIsValidICommands() const
+bool UVehicleTowComponent::GetIsValidICommands()
 {
-	if(not IsValid(M_OwnerCommandsInterface.GetObject()))
+	if (not IsValid(M_OwnerCommandsInterface.GetObject()))
 	{
-		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "NULL";
-		RTSFunctionLibrary::ReportError("The tow vehicle comp does not have access to a valid ICommands interface! Owner: " + OwnerName +
-			"\n vehicle tow;  " + GetName());
-		return false;;
+		if (not GetOwner())
+		{
+			return false;
+		}
+		ICommands* CommandsInterface = Cast<ICommands>(GetOwner());
+		M_OwnerCommandsInterface.SetInterface(CommandsInterface);
+		M_OwnerCommandsInterface.SetObject(GetOwner());
+		if (not IsValid(M_OwnerCommandsInterface->_getUObject()))
+		{
+			const FString OwnerName = GetOwner() ? GetOwner()->GetName() : "NULL";
+			RTSFunctionLibrary::ReportError(
+				"The tow vehicle comp does not have access to a valid ICommands interface! Owner: " + OwnerName +
+				"\n vehicle tow;  " + GetName());
+			return false;;
+		}
+		return true;
 	}
 	return true;
 }
 
-void UVehicleTowComponent::AddAbilityToCommands() const
+void UVehicleTowComponent::AddAbilityToCommands()
 {
-	if(not GetIsValidICommands())
+	if (not GetIsValidICommands())
 	{
 		return;
 	}

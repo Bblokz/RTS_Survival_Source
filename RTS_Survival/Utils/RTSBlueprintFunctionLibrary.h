@@ -430,4 +430,14 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Utilities|Array")
 	static void DestroyAllBxpsInRange(const FVector& Origin, float Range, const UObject* WorldContext);
+
+	// -------------------------------------------------------------------------
+	//  ------------------------ TrainingOptions Utilities -------------------------
+	// -------------------------------------------------------------------------
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="TrainingOptions")
+	static FTrainingOption GetLightTank_T26();
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="TrainingOptions")
+	static FTrainingOption GetLightTank_Ba12();
+	
 };

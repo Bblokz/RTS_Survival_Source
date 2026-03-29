@@ -45,8 +45,8 @@ public:
 
 	void SetTowRelationship(AActor* TowedActor, UTowedActorComponent* TowedActorComp,
 	                        const ETowedActorTarget TowSubtype);
-	void SwapAbilityToDetachTow() const;
-	void SwapAbilityToTow() const;
+	void SwapAbilityToDetachTow();
+	void SwapAbilityToTow();
 	void ClearTowRelationship();
 
 	const FVehicleTowSettings& GetTowSettings() const { return M_TowSettings; }
@@ -77,7 +77,7 @@ private:
 	void BeginPlay_SetupCommandsInterface();
 	UPROPERTY()
 	TScriptInterface<ICommands> M_OwnerCommandsInterface;
-	[[nodiscard]] bool GetIsValidICommands() const;
+	[[nodiscard]] bool GetIsValidICommands();
 
-	void AddAbilityToCommands() const;
+	void AddAbilityToCommands();
 };

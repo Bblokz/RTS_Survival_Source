@@ -2690,10 +2690,8 @@ ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUn
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
-	// Typically not on the command card; skip the card gate like CreateBuilding/ConvertToVehicle.
-	// If you *do* want to lock it behind abilities, uncomment the check below.
-	// const ECommandQueueError AbilityError = GetIsAbilityAllowedForUnit(EAbilityID::IdEnterCargo);
-	// if (AbilityError != ECommandQueueError::NoError) { return AbilityError; }
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdEnterCargo);
+	if (AbilityError != ECommandQueueError::NoError) { return AbilityError; }
 
 	if (bSetUnitToIdle)
 	{

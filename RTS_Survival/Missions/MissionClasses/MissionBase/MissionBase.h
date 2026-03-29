@@ -123,14 +123,38 @@ public:
 		const FMissionScheduledCallback& Callback,
 		const int32 TotalCalls,
 		const int32 IntervalSeconds,
+		const int32 InitialDelaySeconds,
+		const bool bFireBeforeFirstInterval = true,
+		const bool bRepeatForever = false
+	);
+	/**
+	 * @brief Schedules a mission-owned callback through the manager for deterministic shared ticking.
+	 * @param Callback Delegate to execute.
+	 * @param TotalCalls Total amount of executions requested.
+	 * @param IntervalSeconds Interval between calls in scheduler ticks.
+	 * @param InitialDelaySeconds Initial delay before first non-immediate callback call.
+	 * @param bFireBeforeFirstInterval If true, one call executes immediately before interval ticking starts.
+	 * @param bRepeatForever If true, callback keeps running until canceled.
+	 * @return Task id used for scheduler tracking, or INDEX_NONE when no scheduled task remains.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
+	int32 ScheduleRepeatedCallbackWithRequirement(
+		const FMissionScheduledCallback& Callback,
+		const int32 TotalCalls,
+		const int32 IntervalSeconds,
 		const int32 InitialDelaySeconds ,
 		const TArray<AActor*>& RequiredActors ,
 		const bool bFireBeforeFirstInterval = true,
 		const bool bRepeatForever = false
 	);
-
 	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
 	int32 ScheduleSingleCallback(
+		const FMissionScheduledCallback& Callback,
+		const int32 DelaySeconds
+	);
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Scheduler")
+	int32 ScheduleSingleCallbackWithRequirement(
 		const FMissionScheduledCallback& Callback,
 		const int32 DelaySeconds,
 		const TArray<AActor*>& RequiredActors 
@@ -214,6 +238,11 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FRTSGameDifficulty GetGameDifficulty() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	int32 GetGameDifficultyPercentage() const;
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	int32 GetGameDifficultyPercentageDividedBy(const int32 Divisor = 2)const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	bool GetIsGameDifficultyNormalOrHigher() const;
@@ -359,6 +388,10 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);
+
+	// Depending on mission difficulty get hazmat squad  through ptrs to toxic guard to
+	UFUNCTION(BlueprintPure, BlueprintCallable, NotBlueprintable)
+	FTrainingOption SelectSquadOnDifficultyAt();
 
 private:
 	TWeakObjectPtr<AMissionManager> M_MissionManager;

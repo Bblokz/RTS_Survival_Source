@@ -896,3 +896,19 @@ void URTSBlueprintFunctionLibrary::DestroyAllBxpsInRange(
 		}
 	}
 }
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_T26()
+{
+	FTrainingOption Option;
+	Option.UnitType = EAllUnitType::UNType_Tank;
+	Option.SubtypeValue = static_cast<uint8>(ETankSubtype::Tank_T26);
+	return Option;
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_Ba12()
+{
+	FTrainingOption Option;
+	Option.UnitType = EAllUnitType::UNType_Tank;
+	Option.SubtypeValue = static_cast<uint8>(ETankSubtype::Tank_Ba12);
+	return Option;
+}
