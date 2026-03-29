@@ -34,6 +34,7 @@ protected:
 	virtual void PostInitializeComponents() override;
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
 
 	virtual void UnitDies(const ERTSDeathType DeathType) override;
@@ -102,14 +103,16 @@ private:
 	void OnBuildingComplete();
 
 	void CreateProgressBar(const float TotalTime, const float StartPercentage);
-	void DestroyProgressBar() const;
+	void DestroyProgressBar();
 
 	bool EnsureProgressBarClassIsValid()const;
+	bool GetHasSpawnedProgressBarActor() const;
 
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> M_ChosenMesh = nullptr;
 
 	// Spawned at our location + Offset, has the world space progressbar rotating to the camera.
+	UPROPERTY()
 	TWeakObjectPtr<ADiginProgressBar> M_SpawnedProgressBarActor;
 
 	

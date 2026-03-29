@@ -69,10 +69,20 @@ void ADigInWall::BeginPlay()
 	Super::BeginPlay();
 }
 
+void ADigInWall::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	DestroyProgressBar();
+	Super::EndPlay(EndPlayReason);
+}
+
 void ADigInWall::BeginDestroy()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_WallBuildTimerHandle);
+	}
+	M_SpawnedProgressBarActor.Reset();
 	Super::BeginDestroy();
-	DestroyProgressBar();
 }
 
 void ADigInWall::UnitDies(const ERTSDeathType DeathType)
@@ -276,13 +286,13 @@ void ADigInWall::OnBuildingComplete()
 
 void ADigInWall::CreateProgressBar(const float TotalTime, const float StartPercentage)
 {
-	if (!EnsureProgressBarClassIsValid())
+	if (not EnsureProgressBarClassIsValid())
 	{
 		return;
 	}
 
 	// If we already have a spawned progress-bar actor, just reuse it:
-	if (M_SpawnedProgressBarActor.IsValid())
+	if (GetHasSpawnedProgressBarActor())
 	{
 		// Optionally, you could destroy the old one and respawn, but here
 		// we assume only one build cycle at a time.
@@ -290,7 +300,7 @@ void ADigInWall::CreateProgressBar(const float TotalTime, const float StartPerce
 	}
 
 	UWorld* World = GetWorld();
-	if (!World)
+	if (not World)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("ADigInWall::CreateProgressBar: GetWorld() returned nullptr"));
 		return;
@@ -312,7 +322,7 @@ void ADigInWall::CreateProgressBar(const float TotalTime, const float StartPerce
 		SpawnParams
 	);
 
-	if (!IsValid(NewBarActor))
+	if (not IsValid(NewBarActor))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to spawn ADiginProgressBar in CreateProgressBar"));
 		return;
@@ -330,13 +340,33 @@ void ADigInWall::CreateProgressBar(const float TotalTime, const float StartPerce
 	);
 }
 
-void ADigInWall::DestroyProgressBar() const
+void ADigInWall::DestroyProgressBar()
 {
-	if (M_SpawnedProgressBarActor.IsValid())
+	if (not GetHasSpawnedProgressBarActor())
 	{
-		M_SpawnedProgressBarActor->StopProgressBar();
-		M_SpawnedProgressBarActor->Destroy();
+		return;
 	}
+
+	if (IsGarbageCollecting())
+	{
+		M_SpawnedProgressBarActor.Reset();
+		return;
+	}
+
+	ADiginProgressBar* SpawnedProgressBarActor = M_SpawnedProgressBarActor.Get();
+	M_SpawnedProgressBarActor.Reset();
+	if (not IsValid(SpawnedProgressBarActor))
+	{
+		return;
+	}
+
+	SpawnedProgressBarActor->StopProgressBar();
+	SpawnedProgressBarActor->Destroy();
+}
+
+bool ADigInWall::GetHasSpawnedProgressBarActor() const
+{
+	return M_SpawnedProgressBarActor.IsValid();
 }
 
 
