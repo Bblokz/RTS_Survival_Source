@@ -1041,7 +1041,7 @@ void UMissionBase::TextOnlyMission_SetAutoCompleteTimer()
 	                                  false);
 }
 
-FTrainingOption UMissionBase::GetRandomTankOption(const ETankSubtype Subtype1, const ETankSubtype Subtype2)
+FTrainingOption UMissionBase::GetRandomTankOptionWIthMissionSeed(const ETankSubtype Subtype1, const ETankSubtype Subtype2)
 {
 	
 }

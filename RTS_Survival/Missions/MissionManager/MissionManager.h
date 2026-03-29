@@ -8,6 +8,7 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
+#include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "MissionManager.generated.h"
 
 
@@ -193,10 +194,12 @@ private:
 
 	void BeginPlay_InitPlayerController();
 	void BeginPlay_InitMissionWidgetManager();
-	void BeginPlay_InitGameDifficultyPickerWidget();
+	void BeginPlay_InitGameDifficultyAndSettings();
 	void BeginPlay_InitMissionScheduler();
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
+	void SetCampaignGenerationSettingsWithGameInstance();
+	void SetGameDifficultyWithGameInstance() const;
 
 	UPROPERTY()
 	UW_MissionWidgetManager* M_MissionWidgetManager;
@@ -219,6 +222,9 @@ private:
 
 	UPROPERTY()
 	FRTSGameDifficulty M_GameDifficulty;
+
+	UPROPERTY()
+	FCampaignGenerationSettings M_CampaignGenerationSettings;
 
 	UPROPERTY()
 	TArray<FMissionTowTeamWeaponSpawnState> M_TowedTeamWeaponSpawnStates;

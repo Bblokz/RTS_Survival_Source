@@ -22,5 +22,10 @@ struct FCampaignGenerationSettings
 	
 	UPROPERTY(BlueprintReadOnly)
 	EEnemyWorldPersonality EnemyWorldPersonality = EEnemyWorldPersonality::Balanced;
+
+	// Used by systems that cache these settings other than the world generator to know whether they have the up to date
+	// settings.
+	UPROPERTY(BlueprintReadOnly)
+	bool bAreSettingsLoaded = false;
 	
 };

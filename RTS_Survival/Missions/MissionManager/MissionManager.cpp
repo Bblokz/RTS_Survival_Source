@@ -1,6 +1,7 @@
 ﻿#include "MissionManager.h"
 
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
@@ -363,7 +364,7 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionWidgetManager();
-	BeginPlay_InitGameDifficultyPickerWidget();
+	BeginPlay_InitGameDifficultyAndSettings();
 
 	// Start all configured missions.
 	for (UMissionBase* Mission : Missions)
@@ -463,13 +464,15 @@ void AMissionManager::BeginPlay_InitMissionWidgetManager()
 	InitMissionManagerWidget();
 }
 
-void AMissionManager::BeginPlay_InitGameDifficultyPickerWidget()
+void AMissionManager::BeginPlay_InitGameDifficultyAndSettings()
 {
+	SetCampaignGenerationSettingsWithGameInstance();
 	if (not bSetGameDifficultyWithWidget)
 	{
-		return;
+		// The Game instance will determine the difficulty set.
+		SetGameDifficultyWithGameInstance();
 	}
-
+	
 	if (not EnsureValidPlayerController())
 	{
 		return;
@@ -531,6 +534,41 @@ bool AMissionManager::GetIsValidMissionScheduler() const
 		this
 	);
 	return false;
+}
+
+void AMissionManager::SetCampaignGenerationSettingsWithGameInstance()
+{
+	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not GameInstance)
+	{
+		RTSFunctionLibrary::ReportError("Could not get game instance in mission manager.");
+		return;
+	}
+	M_CampaignGenerationSettings = GameInstance->GetCampaignGenerationSettings();
+	if(not M_CampaignGenerationSettings.bAreSettingsLoaded)
+	{
+		RTSFunctionLibrary::ReportError("Game instance has no valid Campaign generattion settings loaded while"
+								  "the mission manager requested it!"
+		  "\n see AMissionManager::SetCampaignGenerationSettingsWithGameInstance");
+	}
+}
+
+void AMissionManager::SetGameDifficultyWithGameInstance() const
+{
+	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not GameInstance)
+	{
+		RTSFunctionLibrary::ReportError("Could not get game instance in mission manager.");
+		return;
+	}
+	const FRTSGameDifficulty GameDifficulty = GameInstance->GetSelectedGameDifficulty();
+	if (not GameDifficulty.bIsInitialized)
+	{
+		RTSFunctionLibrary::ReportError("Game instance has no valid game difficulty loaded while"
+								  "the mission manager requested it!"
+		  "\n see AMissionManager::SetGameDifficultyWithGameInstance");
+		return;
+	}
 }
 
 void AMissionManager::RemoveActiveMission(UMissionBase* Mission)

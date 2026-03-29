@@ -21,11 +21,26 @@ void URTSGameInstance::Init()
 	SetupMusicManager();
 
 	InitializeAudioSettings();
+
+#if WITH_EDITOR
+	FCampaignGenerationSettings EditorSettings;
+	EditorSettings.bAreSettingsLoaded = true;
+	EditorSettings.GenerationSeed = 2323402;
+	EditorSettings.EnemyWorldPersonality = EEnemyWorldPersonality::Balanced;
+	SetCampaignGenerationSettings(EditorSettings);
+
+	FRTSGameDifficulty EditorDifficulty;
+	EditorDifficulty.DifficultyLevel = ERTSGameDifficulty::Hard;
+	EditorDifficulty.DifficultyPercentage = 150;
+	EditorDifficulty.bIsInitialized = true;
+	SetSelectedGameDifficulty(EditorDifficulty);
+#endif
 }
 
 void URTSGameInstance::SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings)
 {
 	M_CampaignGenerationSettings = Settings;
+	M_CampaignGenerationSettings.bAreSettingsLoaded = true;
 }
 
 FCampaignGenerationSettings URTSGameInstance::GetCampaignGenerationSettings() const
@@ -35,12 +50,12 @@ FCampaignGenerationSettings URTSGameInstance::GetCampaignGenerationSettings() co
 
 void URTSGameInstance::Shutdown()
 {
-    if (MusicManager)
-    {
-        MusicManager->TeardownForOldWorld();
-        // no RemoveFromRoot needed since we never called AddToRoot()
-    }
-    Super::Shutdown();
+	if (MusicManager)
+	{
+		MusicManager->TeardownForOldWorld();
+		// no RemoveFromRoot needed since we never called AddToRoot()
+	}
+	Super::Shutdown();
 }
 
 void URTSGameInstance::InitializeAudioSettings()
