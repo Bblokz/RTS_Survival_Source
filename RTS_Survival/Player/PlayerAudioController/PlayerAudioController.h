@@ -190,9 +190,11 @@ public:
 	/**
 	 * 
 	 * @param Type The announcer line to play.
-	 * @param bQueueIfNotPlayed Will queue the line if queue is NOT taken by custom announcer voice line (those have priority). 
+	 * @param bQueueIfNotPlayed Will queue the line if queue is NOT taken by custom announcer voice line (those have priority).
+	 *
+	 * @return How long the announcer vl takes (if valid)
 	 */
-	void PlayAnnouncerVoiceLine(
+	float PlayAnnouncerVoiceLine(
 		const EAnnouncerVoiceLineType Type,
 		const bool bQueueIfNotPlayed = true,
 		const bool InterruptRegularVoiceLines = false);

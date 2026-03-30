@@ -343,10 +343,11 @@ public:
 	 * @param bQueueIfNotPlayed If not able to play the voice line, queue it.
 	 */
 	void PlayVoiceLine(const AActor* Unit, const ERTSVoiceLine VoiceLine, const bool bForcePlay = false,
-	                   const bool bQueueIfNotPlayed = false) const;
+	                    const bool bQueueIfNotPlayed = false) const;
 
-	void PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false,
-	                            bool bInterruptRegularVoiceLines = false) const;
+	/** @return How long the announcer vl takes (if valid)*/
+	float PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false,
+	                             bool bInterruptRegularVoiceLines = false) const;
 
 	// Suppresses all voice lines except the PlayCustomAnnouncer voicelines.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Audio")

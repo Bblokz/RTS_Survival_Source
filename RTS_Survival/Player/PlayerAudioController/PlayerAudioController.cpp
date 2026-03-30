@@ -102,9 +102,9 @@ void UPlayerAudioController::PlayVoiceLine(const AActor* PrimarySelectedUnit,
 	PlayAudio(VoiceLine, VoiceLineType, bForcePlay, bQueueIfNotPlayed);
 }
 
-void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType Type,
-                                                    const bool bQueueIfNotPlayed,
-                                                    const bool InterruptRegularVoiceLines)
+float UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType Type,
+                                                     const bool bQueueIfNotPlayed,
+                                                     const bool InterruptRegularVoiceLines)
 {
 	const bool bIsCustomLine = Type == EAnnouncerVoiceLineType::Custom;
 	if (bIsCustomLine)
@@ -112,37 +112,38 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 		RTSFunctionLibrary::ReportError(
 			"PlayerAudioController is asked to play a custom line using the wrong function: "
 			"PlayAnnouncerVoiceLine. Use PlayCustomAnnouncerVoiceLine instead.");
-		return;
+		return 0;
 	}
 	if (bM_SuppressRegularVoiceLines)
 	{
-		return;
+		return 0 ;
 	}
 	if (GetHasToPlayAnnouncerLineAs2DSound(Type))
 	{
 		PlayAnnouncerLineAs2DSound(Type);
-		return;
+		return 0 ;
 	}
 	if (not GetIsValidResourceAudioComponent())
 	{
 		RTSFunctionLibrary::ReportError(
 			"PlayerAudioController cannot play announcer voice lines without a valid resource audio component.");
-		return;
+		return 0;
 	}
 
 	USoundBase* VoiceLine = GetAnnouncerVoiceLineFromType(Type);
+	const float Duration = IsValid(VoiceLine) ? VoiceLine->GetDuration() : 0.f;
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World) || not IsValid(VoiceLine))
 	{
-		return;
+		return Duration;
 	}
 	const float Now = GetWorld()->GetTimeSeconds();
 	// if same type as last and on cooldown; do not spam the player.
 	if (IsSameAnnouncerVoiceLineAsPrevious(Type) && IsAnnouncerVoiceLineOnCooldown(Type, Now))
 	{
 		DebugAudioController("Announcer Voiceline of same type is on cooldown.");
-		return;
+		return  Duration;
 	}
 
 	// If a current announcer voice line is playing then do not play nor queue.
@@ -152,7 +153,7 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 		{
 			QueueAnnouncerLineIfNoAnnouncerLineIsQueued(Type, VoiceLine);
 		}
-		return;
+		return Duration;
 	}
 	if (M_CurrentVoiceLineState.IsCurrentVoiceLineRTSVoiceLine())
 	{
@@ -169,7 +170,7 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 			{
 				QueueAnnouncerLineIfNoAnnouncerLineIsQueued(Type, VoiceLine);
 			}
-			return;
+			return Duration;
 		}
 	}
 	// Global per-type cooldown for non-custom announcer lines.
@@ -179,7 +180,7 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 		{
 			QueueAnnouncerLineIfNoAnnouncerLineIsQueued(Type, VoiceLine);
 		}
-		return;
+		return Duration;
 	}
 	// Record that this is now the “current” line
 	M_CurrentVoiceLineState.SetCurrentVoiceLineAsAnnouncerVoiceLine(Type);
@@ -191,6 +192,7 @@ void UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTyp
 	// Fire it off
 	M_VoiceLineAudioComponent->SetSound(VoiceLine);
 	M_VoiceLineAudioComponent->Play();
+	return Duration;
 }
 
 

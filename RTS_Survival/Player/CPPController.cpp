@@ -622,14 +622,14 @@ void ACPPController::PlayVoiceLine(const AActor* Unit, const ERTSVoiceLine Voice
 	M_PlayerAudioController->PlayVoiceLine(Unit, VoiceLine, bForcePlay, bQueueIfNotPlayed);
 }
 
-void ACPPController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType VoiceLineType, const bool bQueueIfNotPlayed,
-                                            const bool bInterruptRegularVoiceLines) const
+float ACPPController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType VoiceLineType, const bool bQueueIfNotPlayed,
+                                             const bool bInterruptRegularVoiceLines) const
 {
 	if (not GetIsValidPlayerAudioController())
 	{
-		return;
+		return 0;
 	}
-	M_PlayerAudioController->PlayAnnouncerVoiceLine(VoiceLineType, bQueueIfNotPlayed, bInterruptRegularVoiceLines);
+	return M_PlayerAudioController->PlayAnnouncerVoiceLine(VoiceLineType, bQueueIfNotPlayed, bInterruptRegularVoiceLines);
 }
 
 void ACPPController::SetSuppressRegularVoiceLines(const bool bSuppress)
