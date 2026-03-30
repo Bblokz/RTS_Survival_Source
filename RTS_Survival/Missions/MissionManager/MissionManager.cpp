@@ -7,12 +7,14 @@
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
+#include "RTS_Survival/Missions/Defeat/W_Defeat.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Sound/SoundCue.h"
+#include "TimerManager.h"
 
 AMissionManager::AMissionManager()
 {
@@ -799,6 +801,129 @@ FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubt
     // Return the selected option
 	Option.SubtypeValue = static_cast<uint8>(SquadOptions[Index]);
 	return Option;
+}
+
+
+void AMissionManager::TriggerDefeat(const ERTSDefeatType DefeatType)
+{
+	if (DefeatType == ERTSDefeatType::Uninitialized)
+	{
+		RTSFunctionLibrary::ReportError("Mission manager received TriggerDefeat with Uninitialized defeat type.");
+		return;
+	}
+
+	if (DefeatType == ERTSDefeatType::LostHQ)
+	{
+		TriggerDefeat_LostHQ();
+		return;
+	}
+
+	TriggerDefeat_LockPauseAndShowWidget();
+}
+
+void AMissionManager::TriggerDefeat_LostHQ()
+{
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	const float AnnouncerDelaySeconds = FMath::Max(
+		0.0f,
+		M_PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::LostHQ, true, true)
+	);
+	if (AnnouncerDelaySeconds <= KINDA_SMALL_NUMBER)
+	{
+		TriggerDefeat_LockPauseAndShowWidget();
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("Mission manager failed TriggerDefeat_LostHQ because world is invalid.");
+		return;
+	}
+
+	const TWeakObjectPtr<AMissionManager> WeakMissionManager = this;
+	FTimerDelegate DefeatTimerDelegate;
+	DefeatTimerDelegate.BindLambda([WeakMissionManager]()
+	{
+		if (not WeakMissionManager.IsValid())
+		{
+			return;
+		}
+
+		WeakMissionManager->TriggerDefeat_LockPauseAndShowWidget();
+	});
+
+	FTimerHandle DefeatDelayTimerHandle;
+	World->GetTimerManager().SetTimer(
+		DefeatDelayTimerHandle,
+		DefeatTimerDelegate,
+		AnnouncerDelaySeconds,
+		false
+	);
+}
+
+void AMissionManager::TriggerDefeat_LockPauseAndShowWidget()
+{
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->PauseAndLockGame(true);
+	TriggerDefeat_ShowDefeatWidget();
+}
+
+void AMissionManager::TriggerDefeat_ShowDefeatWidget()
+{
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	if (not M_DefeatWidget)
+	{
+		if (not GetIsValidDefeatWidgetClass())
+		{
+			return;
+		}
+
+		UW_Defeat* CreatedDefeatWidget = CreateWidget<UW_Defeat>(M_PlayerController.Get(), M_DefeatWidgetClass);
+		if (not IsValid(CreatedDefeatWidget))
+		{
+			RTSFunctionLibrary::ReportError("Mission manager failed to create defeat widget from M_DefeatWidgetClass.");
+			return;
+		}
+
+		M_DefeatWidget = CreatedDefeatWidget;
+	}
+
+	if (M_DefeatWidget->IsInViewport())
+	{
+		return;
+	}
+
+	constexpr int32 DefeatWidgetZOrder = 300;
+	M_DefeatWidget->AddToViewport(DefeatWidgetZOrder);
+}
+
+bool AMissionManager::GetIsValidDefeatWidgetClass() const
+{
+	if (M_DefeatWidgetClass)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_DefeatWidgetClass",
+		"GetIsValidDefeatWidgetClass",
+		this
+	);
+	return false;
 }
 
 int32 AMissionManager::GetGenerationSeed() const
