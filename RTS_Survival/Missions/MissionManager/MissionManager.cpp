@@ -1,6 +1,7 @@
 ﻿#include "MissionManager.h"
 
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
@@ -15,6 +16,109 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Sound/SoundCue.h"
 #include "TimerManager.h"
+
+void FMissionEnemyUnitDestroyedCallbackState::Init(
+	UMissionBase* Mission,
+	const EEnemyUnitQueryType EnemyUnitQueryType,
+	const int32 CallbackID,
+	const TArray<AActor*>& TrackedActors)
+{
+	M_Mission = Mission;
+	M_EnemyUnitQueryType = EnemyUnitQueryType;
+	M_CallbackID = CallbackID;
+	M_AllTrackedActors.Empty();
+	M_RemainingTrackedActors.Empty();
+	bM_HasNotifiedMission = false;
+
+	for (AActor* TrackedActor : TrackedActors)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(TrackedActor))
+		{
+			continue;
+		}
+
+		M_AllTrackedActors.Add(TrackedActor);
+		M_RemainingTrackedActors.Add(TrackedActor);
+	}
+}
+
+bool FMissionEnemyUnitDestroyedCallbackState::GetIsTrackingActor(const AActor* Actor) const
+{
+	if (not IsValid(Actor))
+	{
+		return false;
+	}
+
+	for (const TWeakObjectPtr<AActor>& TrackedActor : M_RemainingTrackedActors)
+	{
+		if (TrackedActor.Get() == Actor)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void FMissionEnemyUnitDestroyedCallbackState::OnTrackedActorDestroyed(AActor* DestroyedActor)
+{
+	if (not IsValid(DestroyedActor))
+	{
+		return;
+	}
+
+	M_RemainingTrackedActors.Remove(DestroyedActor);
+}
+
+bool FMissionEnemyUnitDestroyedCallbackState::TryNotifyMission()
+{
+	if (M_RemainingTrackedActors.Num() > 0 || bM_HasNotifiedMission)
+	{
+		return false;
+	}
+
+	if (not M_Mission.IsValid())
+	{
+		bM_HasNotifiedMission = true;
+		return true;
+	}
+
+	M_Mission->OnEnemyUnitsDestroyedCallback(M_CallbackID, M_EnemyUnitQueryType);
+	bM_HasNotifiedMission = true;
+	return true;
+}
+
+bool FMissionEnemyUnitDestroyedCallbackState::GetShouldCleanup() const
+{
+	if (bM_HasNotifiedMission)
+	{
+		return true;
+	}
+
+	if (not M_Mission.IsValid())
+	{
+		return true;
+	}
+
+	return M_RemainingTrackedActors.IsEmpty();
+}
+
+TArray<AActor*> FMissionEnemyUnitDestroyedCallbackState::GetTrackedActorsForCleanup() const
+{
+	TArray<AActor*> TrackedActors;
+	for (const TWeakObjectPtr<AActor>& TrackedActor : M_AllTrackedActors)
+	{
+		AActor* TrackedActorRaw = TrackedActor.Get();
+		if (not IsValid(TrackedActorRaw))
+		{
+			continue;
+		}
+
+		TrackedActors.Add(TrackedActorRaw);
+	}
+
+	return TrackedActors;
+}
 
 AMissionManager::AMissionManager()
 {
@@ -275,6 +379,49 @@ int32 AMissionManager::GetTotalScheduledCallbackCount() const
 	return M_MissionScheduler->GetTotalScheduledTaskCount();
 }
 
+void AMissionManager::CallBackOnMissionWhenEnemyUnitsDestroyed(
+	const EEnemyUnitQueryType EnemyUnitQueryType,
+	TWeakObjectPtr<UMissionBase> Mission,
+	const int32 CallbackID)
+{
+	if (not Mission.IsValid())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager received enemy units destroyed callback request with invalid mission.");
+		return;
+	}
+
+	if (EnemyUnitQueryType == EEnemyUnitQueryType::None)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager received enemy units destroyed callback request with query type None.");
+		return;
+	}
+
+	const TArray<AActor*> EnemyActorsToTrack = GetEnemyActorsForQueryType(EnemyUnitQueryType);
+	if (EnemyActorsToTrack.IsEmpty())
+	{
+		Mission->OnEnemyUnitsDestroyedCallback(CallbackID, EnemyUnitQueryType);
+		return;
+	}
+
+	FMissionEnemyUnitDestroyedCallbackState NewCallbackState;
+	NewCallbackState.Init(Mission.Get(), EnemyUnitQueryType, CallbackID, EnemyActorsToTrack);
+	const TArray<AActor*> TrackedActors = NewCallbackState.GetTrackedActorsForCleanup();
+	if (TrackedActors.IsEmpty())
+	{
+		Mission->OnEnemyUnitsDestroyedCallback(CallbackID, EnemyUnitQueryType);
+		return;
+	}
+
+	for (AActor* TrackedActor : TrackedActors)
+	{
+		RegisterTrackedEnemyActor(TrackedActor);
+	}
+
+	M_EnemyUnitDestroyedCallbacks.Add(NewCallbackState);
+}
+
 void AMissionManager::ActivateNewMission(UMissionBase* NewMission)
 {
 	if (not EnsureMissionIsValid(NewMission))
@@ -402,6 +549,20 @@ void AMissionManager::SetMissionManagerWidgetClass(TSubclassOf<UW_MissionWidgetM
 
 void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	for (const TPair<TWeakObjectPtr<AActor>, int32>& TrackedActorPair : M_TrackedEnemyActorRefCounts)
+	{
+		AActor* TrackedActor = TrackedActorPair.Key.Get();
+		if (not IsValid(TrackedActor))
+		{
+			continue;
+		}
+
+		TrackedActor->OnDestroyed.RemoveDynamic(this, &AMissionManager::OnTrackedEnemyActorDestroyed);
+	}
+
+	M_TrackedEnemyActorRefCounts.Empty();
+	M_EnemyUnitDestroyedCallbacks.Empty();
+
 	for (UMissionBase* Mission : M_ActiveMissions)
 	{
 		if (not EnsureMissionIsValid(Mission))
@@ -437,6 +598,7 @@ void AMissionManager::Tick(float DeltaSeconds)
 	}
 	TickTowSpawnRequests();
 	RemoveFinishedTowSpawnRequests();
+	RemoveCompletedEnemyUnitDestroyedCallbacks();
 }
 
 void AMissionManager::InitMissionManagerWidget()
@@ -764,6 +926,123 @@ bool AMissionManager::EnsureValidTowAsyncSpawner(ARTSAsyncSpawner* RTSAsyncSpawn
 
 	RTSFunctionLibrary::ReportError("Mission manager failed SpawnTowedTeamWeapon because async spawner is invalid.");
 	return false;
+}
+
+bool AMissionManager::EnsureEnemyControllerIsValid(AEnemyController* EnemyController) const
+{
+	if (IsValid(EnemyController))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("Mission manager could not fetch a valid enemy controller.");
+	return false;
+}
+
+TArray<AActor*> AMissionManager::GetEnemyActorsForQueryType(const EEnemyUnitQueryType EnemyUnitQueryType) const
+{
+	TArray<AActor*> EnemyActors;
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	if (not EnsureEnemyControllerIsValid(EnemyController))
+	{
+		return EnemyActors;
+	}
+
+	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanks)
+	{
+		return EnemyController->GetAllTankActorsInFormations();
+	}
+
+	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackSquads)
+	{
+		return EnemyController->GetAllSquadControllerActorsInFormations();
+	}
+
+	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanksAndSquads)
+	{
+		EnemyActors = EnemyController->GetAllTankActorsInFormations();
+		EnemyActors.Append(EnemyController->GetAllSquadControllerActorsInFormations());
+		return EnemyActors;
+	}
+
+	return EnemyActors;
+}
+
+void AMissionManager::RegisterTrackedEnemyActor(AActor* EnemyActor)
+{
+	if (not RTSFunctionLibrary::RTSIsValid(EnemyActor))
+	{
+		return;
+	}
+
+	TWeakObjectPtr<AActor> WeakEnemyActor = EnemyActor;
+	const int32 ExistingRefCount = M_TrackedEnemyActorRefCounts.FindRef(WeakEnemyActor);
+	if (ExistingRefCount > 0)
+	{
+		M_TrackedEnemyActorRefCounts.Add(WeakEnemyActor, ExistingRefCount + 1);
+		return;
+	}
+
+	EnemyActor->OnDestroyed.AddDynamic(this, &AMissionManager::OnTrackedEnemyActorDestroyed);
+	M_TrackedEnemyActorRefCounts.Add(WeakEnemyActor, 1);
+}
+
+void AMissionManager::UnregisterTrackedEnemyActor(AActor* EnemyActor)
+{
+	if (EnemyActor == nullptr)
+	{
+		return;
+	}
+
+	TWeakObjectPtr<AActor> WeakEnemyActor = EnemyActor;
+	const int32 ExistingRefCount = M_TrackedEnemyActorRefCounts.FindRef(WeakEnemyActor);
+	if (ExistingRefCount <= 1)
+	{
+		M_TrackedEnemyActorRefCounts.Remove(WeakEnemyActor);
+		if (IsValid(EnemyActor))
+		{
+			EnemyActor->OnDestroyed.RemoveDynamic(this, &AMissionManager::OnTrackedEnemyActorDestroyed);
+		}
+		return;
+	}
+
+	M_TrackedEnemyActorRefCounts.Add(WeakEnemyActor, ExistingRefCount - 1);
+}
+
+void AMissionManager::RemoveCompletedEnemyUnitDestroyedCallbacks()
+{
+	for (int32 CallbackIndex = M_EnemyUnitDestroyedCallbacks.Num() - 1; CallbackIndex >= 0; --CallbackIndex)
+	{
+		FMissionEnemyUnitDestroyedCallbackState& CallbackState = M_EnemyUnitDestroyedCallbacks[CallbackIndex];
+		CallbackState.TryNotifyMission();
+		if (not CallbackState.GetShouldCleanup())
+		{
+			continue;
+		}
+
+		for (AActor* TrackedActor : CallbackState.GetTrackedActorsForCleanup())
+		{
+			UnregisterTrackedEnemyActor(TrackedActor);
+		}
+
+		M_EnemyUnitDestroyedCallbacks.RemoveAtSwap(CallbackIndex);
+	}
+}
+
+void AMissionManager::OnTrackedEnemyActorDestroyed(AActor* DestroyedActor)
+{
+	for (FMissionEnemyUnitDestroyedCallbackState& CallbackState : M_EnemyUnitDestroyedCallbacks)
+	{
+		if (not CallbackState.GetIsTrackingActor(DestroyedActor))
+		{
+			continue;
+		}
+
+		CallbackState.OnTrackedActorDestroyed(DestroyedActor);
+	}
+
+	UnregisterTrackedEnemyActor(DestroyedActor);
+	RemoveCompletedEnemyUnitDestroyedCallbacks();
 }
 
 FTrainingOption AMissionManager::SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const

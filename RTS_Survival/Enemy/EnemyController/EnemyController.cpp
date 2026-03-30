@@ -400,6 +400,16 @@ void AEnemyController::SetFieldConstructionOrderInterval(const float NewInterval
 	M_FieldConstructionComponent->SetFieldConstructionOrderInterval(NewIntervalSeconds);
 }
 
+TArray<AActor*> AEnemyController::GetAllTankActorsInFormations() const
+{
+	return GetAllFormationActorsByUnitType(false);
+}
+
+TArray<AActor*> AEnemyController::GetAllSquadControllerActorsInFormations() const
+{
+	return GetAllFormationActorsByUnitType(true);
+}
+
 void AEnemyController::DebugAllActiveFormations() const
 {
 	if(not GetIsValidFormationController())
@@ -707,4 +717,49 @@ bool AEnemyController::TryGetSeededTrainingOption(
 
 	OutTrainingOption = WaveElement.UnitOptions[SeededIndex];
 	return true;
+}
+
+TArray<AActor*> AEnemyController::GetAllFormationActorsByUnitType(const bool bGetSquadActors) const
+{
+	TArray<AActor*> ValidFormationActors;
+	if (not GetIsValidFormationController())
+	{
+		return ValidFormationActors;
+	}
+
+	TArray<FFormationData> ActiveFormations;
+	M_FormationController->GetActiveFormationData(ActiveFormations);
+
+	for (const FFormationData& FormationData : ActiveFormations)
+	{
+		for (const FFormationUnitData& FormationUnitData : FormationData.FormationUnits)
+		{
+			if (not FormationUnitData.Unit.IsValid())
+			{
+				continue;
+			}
+
+			ICommands* Commands = FormationUnitData.Unit.Get();
+			if (not Commands)
+			{
+				continue;
+			}
+
+			const bool bIsSquadUnit = Commands->GetIsSquadUnit();
+			if (bIsSquadUnit != bGetSquadActors)
+			{
+				continue;
+			}
+
+			AActor* OwnerActor = Commands->GetOwnerActor();
+			if (not RTSFunctionLibrary::RTSIsValid(OwnerActor))
+			{
+				continue;
+			}
+
+			ValidFormationActors.Add(OwnerActor);
+		}
+	}
+
+	return ValidFormationActors;
 }

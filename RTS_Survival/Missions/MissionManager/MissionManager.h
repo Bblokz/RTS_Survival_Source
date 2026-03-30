@@ -6,6 +6,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "EnemyUnitQueryType.h"
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -25,6 +26,7 @@ class UW_GameDifficultyPicker;
 class UW_Defeat;
 class AActor;
 class UObject;
+class AEnemyController;
 
 USTRUCT(BlueprintType)
 struct FMissionStartingResources
@@ -58,6 +60,32 @@ struct FPlayerFactionBackupData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup", meta=(EditCondition="bSetFactionManually"))
 	ERTSFaction PlayerFaction = ERTSFaction::NotInitialised;
 	
+};
+
+USTRUCT()
+struct FMissionEnemyUnitDestroyedCallbackState
+{
+	GENERATED_BODY()
+
+	void Init(
+		UMissionBase* Mission,
+		const EEnemyUnitQueryType EnemyUnitQueryType,
+		const int32 CallbackID,
+		const TArray<AActor*>& TrackedActors);
+
+	bool GetIsTrackingActor(const AActor* Actor) const;
+	void OnTrackedActorDestroyed(AActor* DestroyedActor);
+	bool TryNotifyMission();
+	bool GetShouldCleanup() const;
+	TArray<AActor*> GetTrackedActorsForCleanup() const;
+
+private:
+	TWeakObjectPtr<UMissionBase> M_Mission = nullptr;
+	EEnemyUnitQueryType M_EnemyUnitQueryType = EEnemyUnitQueryType::None;
+	int32 M_CallbackID = INDEX_NONE;
+	TSet<TWeakObjectPtr<AActor>> M_AllTrackedActors;
+	TSet<TWeakObjectPtr<AActor>> M_RemainingTrackedActors;
+	bool bM_HasNotifiedMission = false;
 };
 /**
  * @brief Keeps track of the currently active missions with the active array.
@@ -174,6 +202,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Defeat")
 	void TriggerDefeat(const ERTSDefeatType DefeatType);
+	void CallBackOnMissionWhenEnemyUnitsDestroyed(
+		const EEnemyUnitQueryType EnemyUnitQueryType,
+		TWeakObjectPtr<UMissionBase> Mission,
+		const int32 CallbackID);
 
 protected:
 	// Called when the game starts or when spawned
@@ -275,4 +307,15 @@ private:
 	void RemoveFinishedTowSpawnRequests();
 	bool EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeaponSpawnState* TowSpawnState) const;
 	bool EnsureValidTowAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
+	bool EnsureEnemyControllerIsValid(AEnemyController* EnemyController) const;
+	TArray<AActor*> GetEnemyActorsForQueryType(const EEnemyUnitQueryType EnemyUnitQueryType) const;
+	void RegisterTrackedEnemyActor(AActor* EnemyActor);
+	void UnregisterTrackedEnemyActor(AActor* EnemyActor);
+	void RemoveCompletedEnemyUnitDestroyedCallbacks();
+
+	UFUNCTION()
+	void OnTrackedEnemyActorDestroyed(AActor* DestroyedActor);
+
+	TArray<FMissionEnemyUnitDestroyedCallbackState> M_EnemyUnitDestroyedCallbacks;
+	TMap<TWeakObjectPtr<AActor>, int32> M_TrackedEnemyActorRefCounts;
 };
