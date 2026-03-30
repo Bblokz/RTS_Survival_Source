@@ -88,6 +88,22 @@ void UMissionBase::OnMissionFailed()
 	BP_OnMissionFailed();
 }
 
+void UMissionBase::StartNextMissionIgnoringTrigger()
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	if (not GetHasConfiguredNextMission())
+	{
+		return;
+	}
+
+	NextMission->bM_IgnoreTriggerOnMissionStart = true;
+	GetMissionManagerChecked()->ActivateNewMission(NextMission);
+}
+
 void UMissionBase::TickMission(float DeltaTime)
 {
 	// Default does nothing.
@@ -753,7 +769,12 @@ void UMissionBase::OnMissionStart()
 {
 	MissionState.bIsMissionStarted = true;
 	DebugMission("Starting mission " + GetName());
-	if (GetHasValidTrigger())
+	if (bM_IgnoreTriggerOnMissionStart)
+	{
+		bM_IgnoreTriggerOnMissionStart = false;
+		DebugMission("Mission trigger was bypassed by explicit start request. + " + GetName());
+	}
+	else if (GetHasValidTrigger())
 	{
 		DebugMission("Mission has a valid trigger. + " + GetName());
 		MissionTrigger->InitTrigger(this);
@@ -794,6 +815,19 @@ void UMissionBase::CleanUp_TimerHandles(const UWorld* World)
 bool UMissionBase::GetHasValidTrigger() const
 {
 	return IsValid(MissionTrigger) && MissionTrigger->GetTriggerType() != EMissionTriggerType::None;
+}
+
+bool UMissionBase::GetHasConfiguredNextMission() const
+{
+	if (NextMission)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"Mission attempted to start NextMission ignoring trigger, but no NextMission is configured."
+		"\n Mission : " + GetName());
+	return false;
 }
 
 bool UMissionBase::GetIsValidMissionManager() const

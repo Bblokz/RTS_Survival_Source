@@ -122,6 +122,10 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
 	void OnMissionFailed();
 
+	// Starts NextMission immediately and bypasses its trigger requirement for this activation.
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
+	void StartNextMissionIgnoringTrigger();
+
 	/** * Optional tick function for per-frame mission logic.
 	 * Derived classes can override if needed.
 	 */
@@ -545,6 +549,7 @@ private:
 	TWeakObjectPtr<UW_Mission> M_MissionWidget;
 
 	bool GetHasValidTrigger() const;
+	bool GetHasConfiguredNextMission() const;
 	bool GetIsValidMissionWidget() const;
 	// Free the associated widget so it is able to sever another mission base derived class.
 	void MarkWidgetAsFree() const;
@@ -606,4 +611,6 @@ private:
 	int32 M_NextAsyncSpawnId = 1;
 
 	void TextOnlyMission_SetAutoCompleteTimer();
+
+	bool bM_IgnoreTriggerOnMissionStart = false;
 };
