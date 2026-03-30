@@ -769,6 +769,11 @@ UMainGameUI* URTSBlueprintFunctionLibrary::GetMainGameUI(const UObject* WorldCon
 	return FRTS_Statics::GetMainGameUI(WorldContextObject);
 }
 
+AMissionManager* URTSBlueprintFunctionLibrary::GetMissionManager(const UObject* WorldContextObject)
+{
+	return FRTS_Statics::GetGameMissionManager(WorldContextObject);
+}
+
 FVector URTSBlueprintFunctionLibrary::RTSGetLocationAtRandomOffsetProjected(const UObject* WorldContext,
                                                                             const FVector& OriginalLocation,
                                                                             const FVector2D MinMaxXYOffset,

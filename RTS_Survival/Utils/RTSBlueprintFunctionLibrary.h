@@ -14,6 +14,7 @@
 #include "RTSBlueprintFunctionLibrary.generated.h"
 
 
+class AMissionManager;
 enum class ERTSRadiusType : uint8;
 enum class ERTSDamageType : uint8;
 class UPlayerPortraitManager;
@@ -385,6 +386,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="RTS_Statics")
 	static UMainGameUI* GetMainGameUI(const UObject* WorldContextObject);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="RTS_Statics")
+	static AMissionManager*  GetMissionManager(const UObject* WorldContextObject);
 
 	// ------------------------------- ------------------------ -------------------------------
 
