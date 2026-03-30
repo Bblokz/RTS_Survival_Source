@@ -126,6 +126,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
 	void StartNextMissionIgnoringTrigger();
 
+	/**
+	 * @brief Activates one mission from the TriggerableMissions array by index through the mission manager.
+	 * @param TriggerableMissionIndex Index in TriggerableMissions that should be activated.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
+	void TriggerMissionFromArray(const int32 TriggerableMissionIndex);
+
 	/** * Optional tick function for per-frame mission logic.
 	 * Derived classes can override if needed.
 	 */
@@ -211,6 +218,10 @@ public:
 	// Can be left null, or set to the next mission to start when this one is complete.	
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadWrite, Category = "BaseSettings")
 	UMissionBase* NextMission;
+
+	// Missions that can only be manually triggered from this mission through TriggerMissionFromArray.
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadWrite, Category = "BaseSettings")
+	TArray<UMissionBase*> TriggerableMissions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BaseSettings")
 	float LoadToStartDelay = 0.0f;
@@ -550,6 +561,7 @@ private:
 
 	bool GetHasValidTrigger() const;
 	bool GetHasConfiguredNextMission() const;
+	bool GetHasValidTriggerableMissionIndex(const int32 TriggerableMissionIndex) const;
 	bool GetIsValidMissionWidget() const;
 	// Free the associated widget so it is able to sever another mission base derived class.
 	void MarkWidgetAsFree() const;

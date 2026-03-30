@@ -104,6 +104,23 @@ void UMissionBase::StartNextMissionIgnoringTrigger()
 	GetMissionManagerChecked()->ActivateNewMission(NextMission);
 }
 
+void UMissionBase::TriggerMissionFromArray(const int32 TriggerableMissionIndex)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	if (not GetHasValidTriggerableMissionIndex(TriggerableMissionIndex))
+	{
+		return;
+	}
+
+	UMissionBase* MissionToTrigger = TriggerableMissions[TriggerableMissionIndex];
+	MissionToTrigger->bM_IgnoreTriggerOnMissionStart = true;
+	GetMissionManagerChecked()->ActivateNewMission(MissionToTrigger);
+}
+
 void UMissionBase::TickMission(float DeltaTime)
 {
 	// Default does nothing.
@@ -827,6 +844,30 @@ bool UMissionBase::GetHasConfiguredNextMission() const
 	RTSFunctionLibrary::ReportError(
 		"Mission attempted to start NextMission ignoring trigger, but no NextMission is configured."
 		"\n Mission : " + GetName());
+	return false;
+}
+
+bool UMissionBase::GetHasValidTriggerableMissionIndex(const int32 TriggerableMissionIndex) const
+{
+	if (not TriggerableMissions.IsValidIndex(TriggerableMissionIndex))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission attempted to trigger a mission from TriggerableMissions with an invalid index."
+			"\n Mission : " + GetName() +
+			"\n Index : " + FString::FromInt(TriggerableMissionIndex) +
+			"\n TriggerableMissions.Num() : " + FString::FromInt(TriggerableMissions.Num()));
+		return false;
+	}
+
+	if (IsValid(TriggerableMissions[TriggerableMissionIndex]))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"Mission attempted to trigger a mission from TriggerableMissions but the selected mission is null."
+		"\n Mission : " + GetName() +
+		"\n Index : " + FString::FromInt(TriggerableMissionIndex));
 	return false;
 }
 
