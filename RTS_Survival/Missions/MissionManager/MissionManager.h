@@ -8,6 +8,7 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "MissionManager.generated.h"
 
@@ -43,6 +44,19 @@ struct FMissionStartingResources
 	}
 };
 
+
+USTRUCT(BlueprintType)
+struct FPlayerFactionBackupData
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup")
+	bool bSetFactionManually = false;
+
+	// Only show if bSetFactionManually is true
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup", meta=(EditCondition="bSetFactionManually"))
+	ERTSFaction PlayerFaction = ERTSFaction::NotInitialised;
+	
+};
 /**
  * @brief Keeps track of the currently active missions with the active array.
  * Missions can have sub missions and can be added dynamically at runtime.
@@ -159,12 +173,16 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
 	bool bSetGameDifficultyWithWidget = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Difficulty")
 	TSubclassOf<UW_GameDifficultyPicker> M_GameDifficultyPickerWidgetClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup")
+	FPlayerFactionBackupData PlayerFactionBackupData;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);

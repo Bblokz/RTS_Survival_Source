@@ -44,7 +44,7 @@ public:
 	void SetSelectedGameDifficulty(const FRTSGameDifficulty& Difficulty) { M_SelectedGameDifficulty = Difficulty; }
 	FRTSGameDifficulty GetSelectedGameDifficulty() const { return M_SelectedGameDifficulty; }
 	void SetPlayerFaction(const ERTSFaction Faction) { M_PlayerFaction = Faction; }
-	ERTSFaction GetPlayerFaction() const { return M_PlayerFaction; }
+	ERTSFaction GetPlayerFaction() const ;
 
 protected:
     // Called on init when the music manager is setup and needs to be initialized.

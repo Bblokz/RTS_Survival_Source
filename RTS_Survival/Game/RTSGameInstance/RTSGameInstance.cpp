@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Sound/SoundClass.h"
@@ -85,6 +86,16 @@ void URTSGameInstance::SetCampaignGenerationSettings(const FCampaignGenerationSe
 FCampaignGenerationSettings URTSGameInstance::GetCampaignGenerationSettings() const
 {
 	return M_CampaignGenerationSettings;
+}
+
+ERTSFaction URTSGameInstance::GetPlayerFaction() const
+{
+	if(M_PlayerFaction == ERTSFaction::NotInitialised)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Player faction was requested before it was set. See GameInstance"));
+		return ERTSFaction::GerStrikeDivision;
+	}
+	return M_PlayerFaction;
 }
 
 void URTSGameInstance::Shutdown()

@@ -2,6 +2,7 @@
 
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
@@ -198,6 +199,19 @@ URTSGameInstance* FRTS_Statics::GetRTSGameInstance(const UObject* WorldContextOb
 		return GameInstance;
 	}
 	return nullptr;
+}
+
+ERTSFaction FRTS_Statics::GetPlayerFaction(const UObject* WorldContextObject)
+{
+	URTSGameInstance* GameInstance = GetRTSGameInstance(WorldContextObject);
+	if(not GameInstance)
+	{
+		const FString ObjectName = IsValid(WorldContextObject) ? WorldContextObject->GetName() : "Invalid Object";
+		RTSFunctionLibrary::ReportError("Could not get game instance for actor: " + ObjectName +
+			"\n See FRTS_Statics::GetPlayerFaction");
+		return ERTSFaction::GerStrikeDivision;
+	}
+	return GameInstance->GetPlayerFaction();
 }
 
 UGameExplosionsManager* FRTS_Statics::GetGameExplosionsManager(const UObject* WorldContextObject)

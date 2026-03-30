@@ -374,6 +374,20 @@ void AMissionManager::BeginPlay()
 	Missions.Empty();
 }
 
+void AMissionManager::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	if(PlayerFactionBackupData.bSetFactionManually)
+	{
+		URTSGameInstance* GameInstance =  FRTS_Statics::GetRTSGameInstance(this);
+		if(not GameInstance)
+		{
+			return;
+		}
+		GameInstance->SetPlayerFaction(PlayerFactionBackupData.PlayerFaction);
+	}
+}
+
 void AMissionManager::InitMissionSounds(const FMissionSoundSettings MissionSettings)
 {
 	M_MissionSoundSettings = MissionSettings;

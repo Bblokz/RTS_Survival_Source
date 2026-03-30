@@ -10,6 +10,7 @@
 #include "RTS_Survival/UnitData/VehicleData.h"
 
 
+enum class ERTSFaction : uint8;
 class URTSGameInstance;
 class AMissionManager;
 class UAnimatedTextWidgetPoolManager;
@@ -103,6 +104,8 @@ public:
 	static ACPPGameState* GetGameState(const UObject* WorldContextObject);
 
 	static URTSGameInstance* GetRTSGameInstance(const UObject* WorldContextObject);
+
+	static ERTSFaction GetPlayerFaction(const UObject* WorldContextObject);
 
 	/** @return A IsValid GameExplosionsManager or null. */
 	static UGameExplosionsManager* GetGameExplosionsManager(const UObject* WorldContextObject);

@@ -21,6 +21,7 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
@@ -32,9 +33,10 @@
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 
-void URTSBlueprintFunctionLibrary::ApplyRTSDamage(AActor* ActorToDamage, const ERTSDamageType DamageType, const float DamageAmount) 
+void URTSBlueprintFunctionLibrary::ApplyRTSDamage(AActor* ActorToDamage, const ERTSDamageType DamageType,
+                                                  const float DamageAmount)
 {
-	if(not IsValid(ActorToDamage))
+	if (not IsValid(ActorToDamage))
 	{
 		return;
 	}
@@ -435,7 +437,8 @@ float URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
 		ResourceFromDestroyedTeamWeaponMltRange.X,
 		ResourceFromDestroyedTeamWeaponMltRange.Y
 	);
-	const TMap<ERTSResourceType, int32>& SquadCosts = GameState->GetSquadDataOfPlayer(1, SquadSubtype).Cost.ResourceCosts;
+	const TMap<ERTSResourceType, int32>& SquadCosts = GameState->GetSquadDataOfPlayer(1, SquadSubtype).Cost.
+	                                                             ResourceCosts;
 
 	if (const int32* MetalCost = SquadCosts.Find(ERTSResourceType::Resource_Metal))
 	{
@@ -503,15 +506,17 @@ void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtLocation(const UObject* Wo
 }
 
 void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocket(const UObject* WorldContextObject,
-                                                                   const ERTS_ExplosionType ExplosionType, UMeshComponent* MeshComp, const bool bPlaySound, const float Delay)
+                                                                   const ERTS_ExplosionType ExplosionType,
+                                                                   UMeshComponent* MeshComp, const bool bPlaySound,
+                                                                   const float Delay)
 {
-	if(not IsValid(MeshComp) || not IsValid(WorldContextObject))
+	if (not IsValid(MeshComp) || not IsValid(WorldContextObject))
 	{
 		return;
 	}
 	// Get random socket location on mesh.
 	const TArray<FName> SocketNames = MeshComp->GetAllSocketNames();
-	if(SocketNames.Num() == 0)
+	if (SocketNames.Num() == 0)
 	{
 		return;
 	}
@@ -522,17 +527,18 @@ void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocket(const UObject
 }
 
 void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocketContaining(const UObject* WorldContextObject,
-	const ERTS_ExplosionType ExplosionType, UMeshComponent* MeshComp, const FString StringToContain,
-	const bool bPlaySound, const float Delay)
+                                                                             const ERTS_ExplosionType ExplosionType,
+                                                                             UMeshComponent* MeshComp,
+                                                                             const FString StringToContain,
+                                                                             const bool bPlaySound, const float Delay)
 {
-	
-	if(not IsValid(MeshComp) || not IsValid(WorldContextObject))
+	if (not IsValid(MeshComp) || not IsValid(WorldContextObject))
 	{
 		return;
 	}
 	// Get random socket location on mesh.
 	const TArray<FName> SocketNames = MeshComp->GetAllSocketNames();
-	if(SocketNames.Num() == 0)
+	if (SocketNames.Num() == 0)
 	{
 		return;
 	}
@@ -665,69 +671,71 @@ int URTSBlueprintFunctionLibrary::ActivateTimedProgressBarAnchored(const UObject
 }
 
 
-int32 URTSBlueprintFunctionLibrary::CreateRTSRadius(const UObject* WorldContextObject, const FVector& Location, float Radius, ERTSRadiusType Type, float LifeTime)
+int32 URTSBlueprintFunctionLibrary::CreateRTSRadius(const UObject* WorldContextObject, const FVector& Location,
+                                                    float Radius, ERTSRadiusType Type, float LifeTime)
 {
-    if (!IsValid(WorldContextObject))
-    {
-        return -1;
-    }
+	if (!IsValid(WorldContextObject))
+	{
+		return -1;
+	}
 
-    UWorld* World = WorldContextObject->GetWorld();
-    if (!World)
-    {
-        return -1;
-    }
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World)
+	{
+		return -1;
+	}
 
-    if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
-    {
-        return Subsystem->CreateRTSRadius(Location, Radius, Type, LifeTime);
-    }
+	if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+	{
+		return Subsystem->CreateRTSRadius(Location, Radius, Type, LifeTime);
+	}
 
-    return -1;
+	return -1;
 }
 
-void URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(const UObject* WorldContextObject, int32 ID, AActor* TargetActor, FVector RelativeOffset)
+void URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(const UObject* WorldContextObject, int32 ID,
+                                                          AActor* TargetActor, FVector RelativeOffset)
 {
+	if (!IsValid(WorldContextObject) || !IsValid(TargetActor))
+	{
+		return;
+	}
 
-    if (!IsValid(WorldContextObject) || !IsValid(TargetActor))
-    {
-        return; 
-    }
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World)
+	{
+		return;
+	}
 
-    UWorld* World = WorldContextObject->GetWorld();
-    if (!World)
-    {
-        return; 
-    }
-
-    if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
-    {
-        Subsystem->AttachRTSRadiusToActor(ID, TargetActor, RelativeOffset);
-    }
+	if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+	{
+		Subsystem->AttachRTSRadiusToActor(ID, TargetActor, RelativeOffset);
+	}
 }
 
 
 void URTSBlueprintFunctionLibrary::HideRTSRadiusById(const UObject* WorldContextObject, int32 ID)
 {
-    if (!IsValid(WorldContextObject))
-    {
-        return;
-    }
+	if (!IsValid(WorldContextObject))
+	{
+		return;
+	}
 
-    UWorld* World = WorldContextObject->GetWorld();
-    if (!World)
-    {
-        return;
-    }
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World)
+	{
+		return;
+	}
 
-    if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
-    {
-        Subsystem->HideRTSRadiusById(ID);
-    }
+	if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+	{
+		Subsystem->HideRTSRadiusById(ID);
+	}
 }
 
 
-void URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(const UObject* WorldContextObject, const int32 ID, const float ArcAngle)
+void URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(const UObject* WorldContextObject, const int32 ID,
+                                                      const float ArcAngle)
 {
 	if (not IsValid(WorldContextObject))
 	{
@@ -1146,4 +1154,49 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_Maxim()
 FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_DShK()
 {
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_DShK));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerCommandVehicle(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_J_Commander));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1_Commander));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1_Commander));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerLightMediumTank(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_J));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1));
+	}
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_M));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_G));
+	}
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_G));
 }
