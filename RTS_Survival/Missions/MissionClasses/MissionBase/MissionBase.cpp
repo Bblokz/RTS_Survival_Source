@@ -121,6 +121,11 @@ void UMissionBase::TriggerMissionFromArray(const int32 TriggerableMissionIndex)
 	GetMissionManagerChecked()->ActivateNewMission(MissionToTrigger);
 }
 
+void UMissionBase::OnEnemyUnitsDestroyedCallback(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType)
+{
+	BP_OnCallBackEnemyActorsDestroyed(ID, EnemyUnitQueryType);
+}
+
 void UMissionBase::TickMission(float DeltaTime)
 {
 	// Default does nothing.
@@ -472,6 +477,21 @@ bool UMissionBase::GetIsDifficultyAtLeast(const ERTSGameDifficulty DifficultyLev
 		return false;
 	}
 	return GetGameDifficulty().DifficultyLevel >= DifficultyLevel;
+}
+
+void UMissionBase::CallbackOnEnemyUnitsDestroyed(
+	const EEnemyUnitQueryType EnemyUnitQueryType,
+	const int32 ID)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->CallBackOnMissionWhenEnemyUnitsDestroyed(
+		EnemyUnitQueryType,
+		this,
+		ID);
 }
 
 

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/GameUI/Archive/ArchiveItemTypes/ArchiveItemTypes.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
+#include "RTS_Survival/Missions/MissionManager/EnemyUnitQueryType.h"
 #include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -132,6 +133,8 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
 	void TriggerMissionFromArray(const int32 TriggerableMissionIndex);
+
+	void OnEnemyUnitsDestroyedCallback(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType);
 
 	/** * Optional tick function for per-frame mission logic.
 	 * Derived classes can override if needed.
@@ -305,6 +308,11 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	bool GetIsDifficultyAtLeast(const ERTSGameDifficulty DifficultyLevel) const;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission")
+	void CallbackOnEnemyUnitsDestroyed(
+		const EEnemyUnitQueryType EnemyUnitQueryType,
+		const int32 ID);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AEnemyController* GetEnemyControllerChecked() const;
 
@@ -372,6 +380,9 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackSquadPickupWeapon(ASquadController* SquadController);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnCallBackEnemyActorsDestroyed(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Mission")
 	void DestroyActorsInRange(

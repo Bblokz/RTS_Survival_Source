@@ -232,6 +232,12 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetFieldConstructionOrderInterval(const float NewIntervalSeconds);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Enemy|Formation")
+	TArray<AActor*> GetAllTankActorsInFormations() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Enemy|Formation")
+	TArray<AActor*> GetAllSquadControllerActorsInFormations() const;
+
 
 	void DebugAllActiveFormations() const;
 
@@ -337,6 +343,7 @@ private:
 	bool TryGetSeededTrainingOption(
 		const FAttackWaveElement& WaveElement,
 		FTrainingOption& OutTrainingOption) const;
+	TArray<AActor*> GetAllFormationActorsByUnitType(const bool bGetSquadActors) const;
 
 	// Contains the supplies and other resource settings for waves and construction.
 	FEnemyResources M_Resources;
