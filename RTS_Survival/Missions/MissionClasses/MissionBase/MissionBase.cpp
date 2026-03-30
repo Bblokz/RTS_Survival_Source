@@ -848,6 +848,13 @@ void UMissionBase::PruneInactiveScheduledTaskIDs()
 	}
 }
 
+int32 UMissionBase::GetNextAsyncSpawnId()
+{
+	const int32 NextSpawnId = M_NextAsyncSpawnId;
+	++M_NextAsyncSpawnId;
+	return NextSpawnId;
+}
+
 void UMissionBase::AsyncSpawnActor(
 	const FTrainingOption& TrainingOption, const int32 ID, AActor* SpawnPointActor)
 {
@@ -925,6 +932,38 @@ void UMissionBase::AsyncSpawnActorAtLocationWithDelay(const FTrainingOption& Tra
 	FTimerHandle TimerHandle;
 	World->GetTimerManager().SetTimer(TimerHandle, DelayedSpawn, Delay, false);
 	M_DelaySpawnTimerHandles.Add(TimerHandle);
+}
+
+void UMissionBase::SpawnPlayerCommandVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerCommandVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetGerPlayerCommandVehicle(
+		this);
+	AsyncSpawnActorAtLocation(
+		PlayerCommandVehicleTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerLightMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerLightMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::
+		GetGerPlayerLightMediumTank(this);
+	AsyncSpawnActorAtLocation(
+		PlayerLightMediumVehicleTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank(this);
+	AsyncSpawnActorAtLocation(
+		PlayerMediumVehicleTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
 }
 
 void UMissionBase::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,

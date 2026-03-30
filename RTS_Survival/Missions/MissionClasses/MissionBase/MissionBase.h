@@ -404,6 +404,15 @@ protected:
 	                                        const FVector SpawnLocation, const FRotator Rotation,
 	                                        const float Delay);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerCommandVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerLightMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
+
 	/**
 	 * @brief Spawns a tank and team-weapon squad asynchronously and links tow once both are ready.
 	 * @param TankSubtype Tank subtype used for the towing vehicle spawn.
@@ -589,9 +598,12 @@ private:
 	void RegisterScheduledTaskID(const int32 TaskID);
 	void RemoveTrackedTaskID(const int32 TaskID);
 	void PruneInactiveScheduledTaskIDs();
+	int32 GetNextAsyncSpawnId();
 
 	UPROPERTY()
 	FTimerHandle M_TextOnlyDurationHandle;
+
+	int32 M_NextAsyncSpawnId = 1;
 
 	void TextOnlyMission_SetAutoCompleteTimer();
 };
