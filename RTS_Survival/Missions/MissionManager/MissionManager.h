@@ -10,6 +10,7 @@
 #include "MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
+#include "RTS_Survival/Missions/Defeat/RTSDefeatType.h"
 #include "MissionManager.generated.h"
 
 
@@ -21,6 +22,7 @@ class ACPPController;
 class UW_MissionWidgetManager;
 class UMissionBase;
 class UW_GameDifficultyPicker;
+class UW_Defeat;
 class AActor;
 class UObject;
 
@@ -170,6 +172,9 @@ public:
 	FTrainingOption SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const;
 	int32 GetGenerationSeed() const;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Defeat")
+	void TriggerDefeat(const ERTSDefeatType DefeatType);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -183,6 +188,9 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup")
 	FPlayerFactionBackupData PlayerFactionBackupData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Defeat")
+	TSubclassOf<UW_Defeat> M_DefeatWidgetClass;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);
@@ -226,6 +234,15 @@ private:
 	UW_MissionWidgetManager* M_MissionWidgetManager;
 
 	void RemoveActiveMission(UMissionBase* Mission);
+
+	UPROPERTY()
+	TObjectPtr<UW_Defeat> M_DefeatWidget;
+
+	void TriggerDefeat_LostHQ();
+	void TriggerDefeat_LockPauseAndShowWidget();
+	void TriggerDefeat_ShowDefeatWidget();
+	bool GetIsValidDefeatWidgetClass() const;
+
 
 	bool EnsureMissionIsValid(UMissionBase* Mission);
 	bool EnsureMissionWidgetIsValid() const;
