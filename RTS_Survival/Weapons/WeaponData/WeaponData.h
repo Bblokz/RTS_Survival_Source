@@ -134,86 +134,86 @@ struct FWeaponData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	EWeaponName WeaponName = EWeaponName::DEFAULT_WEAPON;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	ERTSDamageType DamageType = ERTSDamageType::None;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	EWeaponShellType ShellType = EWeaponShellType::Shell_AP;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	TArray<EWeaponShellType> ShellTypes = {EWeaponShellType::Shell_AP};
 
 	// Gun diameter in mm.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float WeaponCalibre = 0.f;
 
 	// Explosive payload tnt equivalent in grams.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float TNTExplosiveGrams = 0.f;
 
 	// Base damage dealt by one bullet.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float BaseDamage = 0.0f;
 
 	// Percentage variance used to create fluctuation in damage output.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	int32 DamageFlux = 0;
 
 	// Effective range of the weapon in centimeters.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float Range = 0.0f;
 
 	// Factor used for armor penetration calculations before damage application.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float ArmorPen = 0.0f;
 
 	// The armor pen at max range of the projectile.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float ArmorPenMaxRange = 0.0f;
 
 	// Maximum number of bullets in the magazine before requiring a reload.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	int32 MagCapacity = 0;
 
 	// Time taken to reload the entire magazine, measured in seconds.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float ReloadSpeed = 0.0f;
 
 	// Base cooldown time between individual shots, measured in seconds.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float BaseCooldown = 0.0f;
 
 	// Percentage variance used to create fluctuation in the cooldown and reload time.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	int32 CooldownFlux = 0;
 
 	// Accuracy rating of the weapon, ranging from 1 to 100 (100 indicating perfect accuracy).
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	int32 Accuracy = 0;
 
 	// Range of the Area of Effect (AOE) explosion in centimeters, applicable for AOE-enabled projectiles.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float ShrapnelRange = 0.0f;
 
 	// Damage dealt by each projectile in an AOE attack, relevant for AOE-enabled projectiles.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float ShrapnelDamage = 0.0f;
 
 	// Number of shrapnel particles generated in an AOE attack, applicable for AOE-enabled projectiles.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	int32 ShrapnelParticles = 0;
 
 	// Factor used for armor penetration calculations before damage application in AOE attacks.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float ShrapnelPen = 0.0f;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float ProjectileMovementSpeed = 6000;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	FBehaviourWeaponAttributes BehaviourAttributes;
 
 	void CopyWeaponDataValues(const FWeaponData* WeaponData);
