@@ -19,6 +19,7 @@ struct FWeaponData;
 class ASquadController;
 class UWeaponState;
 struct FInitWeaponStateProjectile;
+struct FInitWeaponStateRailgun;
 struct FInitWeaponStateDirectHit;
 enum class EWeaponFireMode : uint8;
 struct FInitWeaponStatTrace;
@@ -111,6 +112,9 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) = 0;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters) = 0;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) = 0;

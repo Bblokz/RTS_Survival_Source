@@ -185,6 +185,9 @@ protected:
 	virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) override;
 
 	UFUNCTION(BlueprintCallable)
+	virtual void SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters) override;
+
+	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 
@@ -225,6 +228,7 @@ private:
 	void ProcessPendingMultiHitLaserWeapons();
 	void ProcessPendingFlameThrowerWeapons();
 	void ProcessPendingProjectileWeapons();
+	void ProcessPendingRailgunWeapons();
 	void ProcessPendingRocketWeapons();
 	void ProcessPendingVerticalRocketWeapons();
 	void ProcessPendingMultiProjectileWeapons();
@@ -264,6 +268,7 @@ private:
 	void SetupMultiHitLaserWeaponInternal(const FInitWeaponStateMultiHitLaser& LaserWeaponParameters);
 	void SetupFlameThrowerWeaponInternal(const FInitWeaponStateFlameThrower& FlameWeaponParameters);
 	void SetupProjectileWeaponInternal(const FInitWeaponStateProjectile& ProjectileWeaponParameters);
+	void SetupRailgunWeaponInternal(const FInitWeaponStateRailgun& RailgunWeaponParameters);
 	void SetupRocketProjectileWeaponInternal(const FInitWeaponStateRocketProjectile& RocketProjectileParameters);
 	void SetupVerticalRocketProjectileWeaponInternal(const FInitWeaponStateVerticalRocketProjectile& VerticalRocketProjectileParameters);
 	void SetupMultiProjectileWeaponInternal(const FInitWeaponStateMultiProjectile& MultiProjectileState);
@@ -275,6 +280,7 @@ private:
 	void CacheWeaponOwnerInParameters(FInitWeaponStatTrace& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiTrace& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateProjectile& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateRailgun& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateRocketProjectile& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiProjectile& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateArchProjectile& WeaponParameters);
@@ -296,6 +302,7 @@ private:
 	TArray<FInitWeaponStateMultiHitLaser> M_PendingMultiHitLaserWeapons;
 	TArray<FInitWeaponStateFlameThrower> M_PendingFlameThrowerWeapons;
 	TArray<FInitWeaponStateProjectile> M_PendingProjectileWeapons;
+	TArray<FInitWeaponStateRailgun> M_PendingRailgunWeapons;
 	TArray<FInitWeaponStateRocketProjectile> M_PendingRocketWeapons;
 	TArray<FInitWeaponStateVerticalRocketProjectile> M_PendingVerticalRocketWeapons;
 	TArray<FInitWeaponStateMultiProjectile> M_PendingMultiProjectileWeapons;

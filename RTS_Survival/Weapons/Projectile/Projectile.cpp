@@ -1531,7 +1531,7 @@ void AProjectile::SetupNiagaraWithPrjVfxSettings(const FProjectileVfxSettings& N
 		}
 
 		// For AttachedRockets this will make sure the effect is not too large.
-		ScaleNiagaraSystemDependingOnType(NewSettings.ProjectileNiagaraSystem);
+		ScaleNiagaraSystemDependingOnType(NewSettings.ProjectileNiagaraSystem, NewSettings.WeaponCaliber);
 
 		if (GetCanSetParametersOnSystem(NewSettings.ProjectileNiagaraSystem))
 		{
@@ -1602,6 +1602,8 @@ bool AProjectile::GetCanSetParametersOnSystem(const EProjectileNiagaraSystem Typ
 	case EProjectileNiagaraSystem::AttachedRocket:
 		// Uses different settings!
 		return false;
+	case EProjectileNiagaraSystem::RailGun:
+		return true;
 	}
 	RTSFunctionLibrary::ReportError("Invalid projectile type for setting parameters: " +
 		FString::FromInt(static_cast<int32>(Type)));
@@ -1649,6 +1651,8 @@ float AProjectile::GetWidthOfShell(const float WeaponCalibre, const EWeaponShell
 		break;
 	case EWeaponShellType::Shell_Fire:
 		return ShellWidth * FireShellWidthMlt;
+	case EWeaponShellType::Shell_Railgun:
+		return ShellWidth * APShellWidthMlt;
 	}
 	RTSFunctionLibrary::ReportError("Invalid shell type for calculating width: " +
 		FString::FromInt(static_cast<int32>(ShellType)));
@@ -1672,13 +1676,33 @@ void AProjectile::DebugProjectile(const FString& Message) const
 	}
 }
 
-void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type) const
+void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type, const float WeaponCalibre) const
 {
 	if (Type == EProjectileNiagaraSystem::AttachedRocket)
 	{
 		M_NiagaraComponent->SetWorldScale3D(FVector(1.0f, 1.0f, 1.0f));
 		// Also restart to recreate rocket.
 		M_NiagaraComponent->ReinitializeSystem();
+	}
+	else if (Type == EProjectileNiagaraSystem::RailGun)
+	{
+		using namespace DeveloperSettings::GamePlay::Projectile::ProjectilesVfx;
+
+		constexpr float MinimumCalibreForUpscale = 30.0f;
+		constexpr float MaximumCalibreForUpscale = 120.0f;
+		constexpr float MinimumUpscaleFactor = 1.0f;
+		constexpr float MaximumUpscaleFactor = 2.0f;
+		constexpr int32 ScalingAxisIndex = 0; // 0=X, 1=Y, 2=Z.
+
+		const float CalibreAlpha = FMath::Clamp(
+			(WeaponCalibre - MinimumCalibreForUpscale) / (MaximumCalibreForUpscale - MinimumCalibreForUpscale),
+			0.0f,
+			1.0f);
+		const float CalibreScaleFactor = FMath::Lerp(MinimumUpscaleFactor, MaximumUpscaleFactor, CalibreAlpha);
+
+		FVector RailGunScale = RailGunProjectileScaleBase;
+		RailGunScale[ScalingAxisIndex] *= CalibreScaleFactor;
+		M_NiagaraComponent->SetWorldScale3D(RailGunScale);
 	}
 	else
 	{

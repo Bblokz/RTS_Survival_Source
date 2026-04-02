@@ -409,6 +409,26 @@ void UHullWeaponComponent::SetupProjectileWeapon(FInitWeaponStateProjectile Proj
 	}
 }
 
+void UHullWeaponComponent::SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters)
+{
+	SetOwningPlayer(RailgunWeaponParameters.ProjectileWeaponParameters.OwningPlayer);
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+
+	const int32 WeaponIndex = M_TWeapons.Num();
+	URailgunWeaponState* RailgunWeapon = NewObject<URailgunWeaponState>(this);
+	RailgunWeapon->InitRailgunWeapon(WeaponIndex, M_WorldSpawnedIn, RailgunWeaponParameters);
+	M_TWeapons.Add(RailgunWeapon);
+	UpdateHullWeaponRangeBasedOnWeapons();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(RailgunWeapon, M_ProjectileManager.Get());
+	}
+}
+
 void UHullWeaponComponent::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
 {
 	SetOwningPlayer(RocketProjectileParameters.OwningPlayer);

@@ -17,7 +17,8 @@ enum class EWeaponShellType : uint8
 	Shell_HE,
 	Shell_HEAT,
 	Shell_Fire,
-	Shell_Radixite
+	Shell_Radixite,
+	Shell_Railgun
 };
 
 static ERTSVoiceLine GetVoiceLineForShell(const EWeaponShellType ShellType)
@@ -43,6 +44,8 @@ static ERTSVoiceLine GetVoiceLineForShell(const EWeaponShellType ShellType)
 		return ERTSVoiceLine::LoadRadixite;
 	case EWeaponShellType::Shell_Radixite:
 		return ERTSVoiceLine::LoadRadixite;
+	case EWeaponShellType::Shell_Railgun:
+		return ERTSVoiceLine::LoadAP;
 		break;
 	}
 	return ERTSVoiceLine::LoadAP;

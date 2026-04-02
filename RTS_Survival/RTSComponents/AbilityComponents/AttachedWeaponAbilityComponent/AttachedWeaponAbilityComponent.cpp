@@ -428,6 +428,19 @@ void UAttachedWeaponAbilityComponent::SetupProjectileWeapon(FInitWeaponStateProj
 	SetupProjectileWeaponInternal(ProjectileWeaponParameters);
 }
 
+void UAttachedWeaponAbilityComponent::SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters)
+{
+	if (not TryPrepareWeaponParameters(RailgunWeaponParameters.ProjectileWeaponParameters, "SetupRailgunWeapon"))
+	{
+		if (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::Uninitialized)
+		{
+			M_PendingRailgunWeapons.Add(RailgunWeaponParameters);
+		}
+		return;
+	}
+	SetupRailgunWeaponInternal(RailgunWeaponParameters);
+}
+
 void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
 {
 	if (not TryPrepareWeaponParameters(RocketProjectileParameters, "SetupRocketProjectileWeapon"))
@@ -711,6 +724,7 @@ void UAttachedWeaponAbilityComponent::ProcessPendingWeaponSetups()
 	ProcessPendingMultiHitLaserWeapons();
 	ProcessPendingFlameThrowerWeapons();
 	ProcessPendingProjectileWeapons();
+	ProcessPendingRailgunWeapons();
 	ProcessPendingRocketWeapons();
 	ProcessPendingVerticalRocketWeapons();
 	ProcessPendingMultiProjectileWeapons();
@@ -807,6 +821,19 @@ void UAttachedWeaponAbilityComponent::ProcessPendingProjectileWeapons()
 		}
 	}
 	M_PendingProjectileWeapons.Reset();
+}
+
+void UAttachedWeaponAbilityComponent::ProcessPendingRailgunWeapons()
+{
+	for (const FInitWeaponStateRailgun& PendingRailgun : M_PendingRailgunWeapons)
+	{
+		FInitWeaponStateRailgun RailgunParameters = PendingRailgun;
+		if (TryPrepareWeaponParameters(RailgunParameters.ProjectileWeaponParameters, "ProcessPendingRailgunWeapons"))
+		{
+			SetupRailgunWeaponInternal(RailgunParameters);
+		}
+	}
+	M_PendingRailgunWeapons.Reset();
 }
 
 void UAttachedWeaponAbilityComponent::ProcessPendingRocketWeapons()
@@ -1348,6 +1375,22 @@ void UAttachedWeaponAbilityComponent::SetupProjectileWeaponInternal(
 	SetupProjectileManagerIfReady(ProjectileWeapon);
 }
 
+void UAttachedWeaponAbilityComponent::SetupRailgunWeaponInternal(
+	const FInitWeaponStateRailgun& RailgunWeaponParameters)
+{
+	const int32 WeaponIndex = M_AttachedWeapons.Num();
+	M_OwningPlayer = RailgunWeaponParameters.ProjectileWeaponParameters.OwningPlayer;
+	M_TargetingData.InitTargetStruct(M_OwningPlayer);
+
+	URailgunWeaponState* RailgunWeapon = NewObject<URailgunWeaponState>(this);
+	RailgunWeapon->InitRailgunWeapon(WeaponIndex, GetWorld(), RailgunWeaponParameters);
+
+	M_AttachedWeapons.Add(RailgunWeapon);
+	OverwriteData(RailgunWeapon);
+	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(RailgunWeapon);
+}
+
 void UAttachedWeaponAbilityComponent::SetupRocketProjectileWeaponInternal(
 	const FInitWeaponStateRocketProjectile& RocketProjectileParameters)
 {
@@ -1529,6 +1572,11 @@ void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponSt
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateProjectile& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
+}
+
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateRailgun& WeaponParameters)
+{
+	WeaponParameters.ProjectileWeaponParameters.WeaponOwner = this;
 }
 
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateRocketProjectile& WeaponParameters)

@@ -1086,6 +1086,29 @@ struct FInitWeaponStateProjectile : public FInitWeaponStateDirectHit
 	EProjectileNiagaraSystem ProjectileSystem = EProjectileNiagaraSystem::TankShell;
 };
 
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateRailgun
+{
+	GENERATED_BODY()
+
+	// Base projectile setup used by the railgun weapon state.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FInitWeaponStateProjectile ProjectileWeaponParameters;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<USoundBase> ReloadSound = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<USoundAttenuation> ReloadSoundAttenuation = nullptr;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<USoundConcurrency> ReloadSoundConcurrency = nullptr;
+
+	// Applied after base weapon data has been loaded from game state.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float ProjectileSpeedMultiplier = 1.0f;
+};
+
 USTRUCT(BlueprintType)
 struct FArchProjectileSettings
 {
@@ -1243,6 +1266,34 @@ private:
 	FORCEINLINE void FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData, AProjectile* Projectile,
 	                                                      const FVector& LaunchLocation,
 	                                                      const FRotator& LaunchRotation);
+};
+
+/**
+ * @brief Projectile-derived weapon state used for railguns with custom reload audio and speed scaling.
+ */
+UCLASS()
+class RTS_SURVIVAL_API URailgunWeaponState : public UWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+public:
+	void InitRailgunWeapon(
+		const int32 NewWeaponIndex,
+		UWorld* NewWorld,
+		const FInitWeaponStateRailgun& RailgunParameters);
+
+protected:
+	virtual void OnReloadFinished_PostReload() override;
+
+private:
+	UPROPERTY()
+	TObjectPtr<USoundBase> M_ReloadSound = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<USoundAttenuation> M_ReloadSoundAttenuation = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<USoundConcurrency> M_ReloadSoundConcurrency = nullptr;
 };
 
 USTRUCT(Blueprintable, BlueprintType)

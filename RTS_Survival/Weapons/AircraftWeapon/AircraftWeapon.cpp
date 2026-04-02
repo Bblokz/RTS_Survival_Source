@@ -280,6 +280,28 @@ void UAircraftWeapon::SetupProjectileWeapon(FInitWeaponStateProjectile Projectil
 	}
 }
 
+void UAircraftWeapon::SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters)
+{
+	SetOwningPlayer(RailgunWeaponParameters.ProjectileWeaponParameters.OwningPlayer);
+
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+
+	const int32 WeaponIndex = M_TWeapons.Num();
+	URailgunWeaponState* RailgunWeapon = NewObject<URailgunWeaponState>(this);
+	RailgunWeapon->InitRailgunWeapon(WeaponIndex, M_WorldSpawnedIn, RailgunWeaponParameters);
+	M_TWeapons.Add(RailgunWeapon);
+	RailgunWeapon->SetIsAircraftWeapon(true);
+	UpdateRangeBasedOnWeapons();
+	M_WeaponIndexToSocket.Add(WeaponIndex, RailgunWeaponParameters.ProjectileWeaponParameters.FireSocketName);
+	if (GetIsProjectileManagerLoaded())
+	{
+		RailgunWeapon->SetupProjectileManager(M_ProjectileManager.Get());
+	}
+}
+
 void UAircraftWeapon::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
 {
 	SetOwningPlayer(RocketProjectileParameters.OwningPlayer);

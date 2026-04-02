@@ -736,6 +736,30 @@ void ACPPTurretsMaster::SetupProjectileWeapon(FInitWeaponStateProjectile Project
 	}
 }
 
+void ACPPTurretsMaster::SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters)
+{
+	SetOwningPlayer(RailgunWeaponParameters.ProjectileWeaponParameters.OwningPlayer);
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for turret: " + GetName());
+		return;
+	}
+
+	URailgunWeaponState* RailgunWeapon = NewObject<URailgunWeaponState>(this);
+	RailgunWeapon->InitRailgunWeapon(
+		WeaponIndex,
+		World,
+		RailgunWeaponParameters);
+	M_TWeapons.Add(RailgunWeapon);
+	UpdateTurretRangeBasedOnWeapons();
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(RailgunWeapon, M_ProjectileManager.Get());
+	}
+}
+
 void ACPPTurretsMaster::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
 {
 	SetOwningPlayer(RocketProjectileParameters.OwningPlayer);

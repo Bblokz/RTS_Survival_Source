@@ -563,7 +563,7 @@ private:
 	UPROPERTY()
 	FVector M_BasicScale = FVector(1.0f, 1.0f, 1.0f);
 
-	void ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type) const;
+	void ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type, const float WeaponCalibre) const;
 
 	/**
 	 * @brief Checks the armor and rolls dice on whether a He or Heat projectile should explode on bounce.
