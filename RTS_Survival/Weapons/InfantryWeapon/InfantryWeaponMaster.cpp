@@ -788,6 +788,29 @@ void AInfantryWeaponMaster::SetupProjectileWeapon(FInitWeaponStateProjectile Pro
 	}
 }
 
+void AInfantryWeaponMaster::SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters)
+{
+	SetOwningPlayer(RailgunWeaponParameters.ProjectileWeaponParameters.OwningPlayer);
+
+	constexpr int32 WeaponIndex = 0;
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for SquadUnitWeapon: " + GetName());
+		return;
+	}
+
+	URailgunWeaponState* RailgunWeapon = NewObject<URailgunWeaponState>(this);
+	RailgunWeapon->InitRailgunWeapon(WeaponIndex, World, RailgunWeaponParameters);
+	WeaponState = RailgunWeapon;
+	SetupRange();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(WeaponState, M_ProjectileManager.Get());
+	}
+}
+
 void AInfantryWeaponMaster::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters)
 {
 	SetOwningPlayer(RocketProjectileParameters.OwningPlayer);

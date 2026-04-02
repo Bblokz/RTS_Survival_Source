@@ -201,7 +201,8 @@ bool FShellVfxOverwrites::UsesAPImpacts(const EWeaponShellType Type) const
 {
 	return Type == EWeaponShellType::Shell_AP
 		|| Type == EWeaponShellType::Shell_APHE
-		|| Type == EWeaponShellType::Shell_APHEBC;
+		|| Type == EWeaponShellType::Shell_APHEBC
+		|| Type == EWeaponShellType::Shell_Railgun;
 }
 
 bool FShellVfxOverwrites::GetShellUsesHeImpacts(const EWeaponShellType ShellType) const
@@ -268,6 +269,7 @@ FWeaponData GLOBAL_GetWeaponDataForShellType(const FWeaponData& OldWeaponData)
 	{
 	case EWeaponShellType::Shell_AP:
 	case EWeaponShellType::Shell_APHE:
+	case EWeaponShellType::Shell_Railgun:
 		// No change needed for AP and APHE, return the original data.
 		return NewWeaponData;
 
@@ -2163,7 +2165,7 @@ void UWeaponStateProjectile::FireProjectile(const FVector& TargetDirection)
 
 	// Apply shell type-specific data if necessary.
 	const bool bIsAPShell = WeaponData.ShellType == EWeaponShellType::Shell_AP || WeaponData.ShellType ==
-		EWeaponShellType::Shell_APHE;
+		EWeaponShellType::Shell_APHE || WeaponData.ShellType == EWeaponShellType::Shell_Railgun;
 	const bool bIsFireShell = WeaponData.ShellType == EWeaponShellType::Shell_Fire;
 	if (not bIsAPShell && not bIsFireShell)
 	{
@@ -2211,6 +2213,54 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
 	                                        ActorsToIgnore,
 	                                        ShellAdjustedData.WeaponCalibre);
+}
+
+void URailgunWeaponState::InitRailgunWeapon(
+	const int32 NewWeaponIndex,
+	UWorld* NewWorld,
+	const FInitWeaponStateRailgun& RailgunParameters)
+{
+	const FInitWeaponStateProjectile& ProjectileParameters = RailgunParameters.ProjectileWeaponParameters;
+	InitProjectileWeapon(
+		ProjectileParameters.OwningPlayer,
+		NewWeaponIndex,
+		ProjectileParameters.WeaponName,
+		ProjectileParameters.WeaponBurstMode,
+		ProjectileParameters.WeaponOwner,
+		ProjectileParameters.MeshComponent,
+		ProjectileParameters.FireSocketName,
+		NewWorld,
+		ProjectileParameters.ProjectileSystem,
+		ProjectileParameters.WeaponVFX,
+		ProjectileParameters.WeaponShellCase,
+		ProjectileParameters.BurstCooldown,
+		ProjectileParameters.SingleBurstAmountMaxBurstAmount,
+		ProjectileParameters.MinBurstAmount,
+		ProjectileParameters.CreateShellCasingOnEveryRandomBurst);
+
+	M_ReloadSound = RailgunParameters.ReloadSound;
+	M_ReloadSoundAttenuation = RailgunParameters.ReloadSoundAttenuation;
+	M_ReloadSoundConcurrency = RailgunParameters.ReloadSoundConcurrency;
+	WeaponData.ProjectileMovementSpeed *= RailgunParameters.ProjectileSpeedMultiplier;
+}
+
+void URailgunWeaponState::OnReloadFinished_PostReload()
+{
+	if (not IsValid(World) || not IsValid(MeshComponent) || not M_ReloadSound)
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySoundAtLocation(
+		World,
+		M_ReloadSound,
+		MeshComponent->GetComponentLocation(),
+		MeshComponent->GetComponentRotation(),
+		1.0f,
+		1.0f,
+		0.0f,
+		M_ReloadSoundAttenuation,
+		M_ReloadSoundConcurrency);
 }
 
 void UWeaponStateArchProjectile::InitArchProjectileWeapon(
@@ -2291,7 +2341,7 @@ void UWeaponStateArchProjectile::FireProjectile(const FVector& TargetLocationRaw
 
 	// Apply shell type-specific data if necessary.
 	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
-		EWeaponShellType::Shell_APHE);
+		EWeaponShellType::Shell_APHE) || (WeaponData.ShellType == EWeaponShellType::Shell_Railgun);
 	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
 	if (not bIsAPShell && not bIsFireShell)
 	{
@@ -2438,7 +2488,8 @@ void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLoc
 	}
 
 	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) ||
-		(WeaponData.ShellType == EWeaponShellType::Shell_APHE);
+		(WeaponData.ShellType == EWeaponShellType::Shell_APHE) ||
+		(WeaponData.ShellType == EWeaponShellType::Shell_Railgun);
 	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
 	const FWeaponData ShellAdjustedData = (not bIsAPShell && not bIsFireShell)
 		                                      ? GLOBAL_GetWeaponDataForShellType(WeaponData)
@@ -2911,7 +2962,7 @@ void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationR
 	}
 
 	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
-		EWeaponShellType::Shell_APHE);
+		EWeaponShellType::Shell_APHE) || (WeaponData.ShellType == EWeaponShellType::Shell_Railgun);
 	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
 	if (not bIsAPShell && not bIsFireShell)
 	{
@@ -3268,7 +3319,7 @@ void UVerticalRocketWeaponState::FireProjectile(const FVector& TargetLocationRaw
 	}
 
 	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
-		EWeaponShellType::Shell_APHE);
+		EWeaponShellType::Shell_APHE) || (WeaponData.ShellType == EWeaponShellType::Shell_Railgun);
 	const bool bIsFireShell = (WeaponData.ShellType == EWeaponShellType::Shell_Fire);
 	if (not bIsAPShell && not bIsFireShell)
 	{

@@ -1292,6 +1292,7 @@ namespace DeveloperSettings
 				inline constexpr float FireShellWidthMlt = 1.8f;
 				inline constexpr float HEATShellWidthMlt = 1.2f;
 				inline constexpr float APCRShellWidthMlt = 0.8;
+				inline const FVector RailGunProjectileScaleBase = FVector(1.0f, 1.0f, 1.0f);
 			}
 		}
 
