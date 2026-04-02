@@ -1844,6 +1844,56 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RailGunY, WeaponData);
+
+	// 50MM railgun.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::RailGun50MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_Railgun;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
+	WeaponData.WeaponCalibre = 50;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
+	WeaponData.ArmorPen = 260.f;
+	WeaponData.ArmorPenMaxRange = 240.f;
+	WeaponData.MagCapacity = 2;
+	WeaponData.ReloadSpeed = 4.5f;
+	WeaponData.BaseCooldown = 2.5f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 80;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RailGun50MM, WeaponData);
+
+	// 80MM railgun.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::RailGun80MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_Railgun;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
+	WeaponData.WeaponCalibre = 80;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
+	WeaponData.ArmorPen = 380.f;
+	WeaponData.ArmorPenMaxRange = 350.f;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 5.2f;
+	WeaponData.BaseCooldown = 3.0f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 78;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RailGun80MM, WeaponData);
 }
 
 void ACPPGameState::InitAllGameLightWeapons()
