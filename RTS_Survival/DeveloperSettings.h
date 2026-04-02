@@ -344,7 +344,7 @@ namespace DeveloperSettings
 				inline constexpr int32 JagerRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
 				inline constexpr int32 BasicSniperRadixiteCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(250 * GameCostMlt * InfantryCostMlt));
+					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
 				inline constexpr int32 ArmoredInfantryRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(325 * GameCostMlt * InfantryCostMlt));
 				inline constexpr int32 ArmoredInfantryMetalCost = RoundToNearestMultipleOfFive(
@@ -684,9 +684,9 @@ namespace DeveloperSettings
 			namespace RailGun
 			{
 				// Flat bonus damage added on top of the base cannon damage.
-				inline constexpr float DamageBonus = 20.f;
+				inline constexpr float DamageBonusMlt = 1.33;
 				// Percentage bonus to apply to the base cannon range for rail gun variants.
-				inline constexpr float RangeBonusPercentage = 50.f;
+				inline constexpr float RangeBonusPercentage = 20.f;
 			}
 			inline constexpr float DamagePerTNTEquivalentGrams = 1.8f;
 			inline constexpr float DamageFluxPercentage = 10.f;

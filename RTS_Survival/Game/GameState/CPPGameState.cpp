@@ -1770,15 +1770,15 @@ void ACPPGameState::InitAllGameRailGunData()
 	const float RailGunRangeMultiplier = 1.f + RangeBonusPercentage / 100.f;
 	const float Base37MmCannonDamage = DamagePerMM * 37.f + 22.f * DamagePerTNTEquivalentGrams;
 
-	// Handheld railgun with radixite rounds.
+	// Handheld railgun
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::GerRailGun30MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
+	WeaponData.ShellType = EWeaponShellType::Shell_Railgun;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 30;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre + DamageBonus;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *  DamageBonusMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
 	WeaponData.ArmorPen = 170.f;
@@ -1799,11 +1799,11 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::GerRailgun20MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
+	WeaponData.ShellType = EWeaponShellType::Shell_Railgun;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 20;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = Base37MmCannonDamage + DamageBonus;
+	WeaponData.BaseDamage = Base37MmCannonDamage *  DamageBonusMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = LightCannonRange * RailGunRangeMultiplier;
 	WeaponData.ArmorPen = 65.f;
@@ -1824,11 +1824,11 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::RailGunY;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_Radixite;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_Radixite};
+	WeaponData.ShellType = EWeaponShellType::Shell_Railgun;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 40;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre + DamageBonus;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *  DamageBonusMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = BasicSmallArmsRange;
 	WeaponData.ArmorPen = 190.f;
@@ -4469,6 +4469,15 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_G, TankData);
 
+
+	// PZ IV H; railgun vehicle.
+	TankData.TurretRotationSpeed = 18;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 100},
+		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 100}
+	});
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_H, TankData);
+
 	// Pz IV F1
 	TankData.MaxHealth = MediumTankHealthBase - 150;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
@@ -6846,8 +6855,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredInfantryRadixiteCost},
-		{ERTSResourceType::Resource_Metal, ArmoredInfantryMetalCost}
+		{ERTSResourceType::Resource_Radixite, 200},
+		{ERTSResourceType::Resource_Metal, 100}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceWorth = BaseInfantryExp + 5;
