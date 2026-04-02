@@ -13,6 +13,7 @@ enum class EProjectileNiagaraSystem : uint8
 	AAShell,
 	Bazooka,
 	AttachedRocket,
+	RailGun
 };
 
 enum class EWeaponShellType : uint8;

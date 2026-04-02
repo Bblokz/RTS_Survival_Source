@@ -1,30 +1,50 @@
-﻿You are going to implement the new hotkey feature which will integrate with the user settings to display the correct
-hotkey for action items ; UW_ItemActionUI of which the associated actions are IA_ActionButtonN where N is the index of that
-action ui item (const int32 IndexActionUIElm)
-the same goes for the control groups;  each control group has a UW_ControlGroupImage that now also holds a hotkey;
-the numbering of the control group actions goes like IA_ControlGroup1, IA_ControlGroup2 , ... till IA_ControlGroup10 so no zero.
-originally the controll group image used their index and used that to display their static hotkey with 	UFUNCTION(BlueprintImplementableEvent)
-                                                                                                       	void SetupControlGroupIndex(const int32 GroupIndex);
- you need to refactor this to use the new hotkey provider system as well; where index 0 for a control group image
- means action IA_ControlGroup1 and index 9 means IA_ControlGroup10.
+﻿you have to implement a new weapon system and add it to the weapondata.h
+make sure all the weapon owners get new functions to add it like how they have
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) = 0; already.
+	
+	the weapon will be derived form the projectile weapon and will use its own setup struct.
+	we will call it URailgunWeaponState and it needs its own settings struct.
+	
+	in that struct we need: all settings a regular projectile weapon has; put that regular struct as a member
+	and a sound base as well as att and concurrency for it for the sound called ReloadSound.
+	it also needs a multiplier for projectilespeed; that will be applied after in the init of this weapon the UWeaponSTate
+	base class has loaded the settings from the game state; we multiply the projectile speed by that value.
+	
+	IMPORTANT: make sure that the function void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type) const
+    will scale the naigara system differently when it is a railgun system. what we need is that the weapon calibre will also be supplied to 	SetupNiagaraWithPrjVfxSettings(ProjectileVfxSettings);
+    and then to 		ScaleNiagaraSystemDependingOnType(NewSettings.ProjectileNiagaraSystem);
+ in there check if it is a rail gun and if so use a new fvector saved at the weapon settings of the DeveloperSettings namespace and multiply it by a
+ scalar that depends on the weapon calibre; a minimum the scalar is always goning to be one but make sure as the calibre goes over 30 it will scale up so  that it reaches
+ twice the size at a calibre of 120. do make sure this only affects one axis of scaling by default the X one but make sure that in that function it 
+ is easy to change later ( a local constant that defines the axis to scale)
+ for attachedrockets still do 	if (Type == EProjectileNiagaraSystem::AttachedRocket)
+                              	{
+                              		M_NiagaraComponent->SetWorldScale3D(FVector(1.0f, 1.0f, 1.0f));
+                              		// Also restart to recreate rocket.
+                              		M_NiagaraComponent->ReinitializeSystem();
+                              	}
+                              	
+                              	and for others still do 		M_NiagaraComponent->SetWorldScale3D(M_BasicScale);
+  
+  
+  
+  IMPORTANT NOTE: make sure 		if (GetCanSetParametersOnSystem(NewSettings.ProjectileNiagaraSystem)) returns true
+  for railgun weapons and that it will allow for setting the color param and widgth param on  the niagara system (eventhough
+  this railgun will use a different niagara from regular projectiles; we assume they support these same user params!)
 
- Add a single “Hotkey Provider” (subsystem) that can answer: “Key for slot N?”
 
-Give UW_ItemActionUI zero knowledge of Enhanced Input internals.
-Instead:
-UW_ItemActionUI::InitActionUIElement(...) stores:
-owning controller (or local player reference)
-its IndexActionUIElm
-reference a subsystem
-Immediately (or on the next tick if you prefer), it asks:
-Provider → GetDisplayKeyForActionSlot(IndexActionUIElm)
-That provider does the actual work:
-Convert slot index → UInputAction* (IA_ActionButton[n])
-Query current mapping(s)
-Pick the “primary” key to display (keyboard vs gamepad rules)
-Return a display string/text suitable for your UW_HotKey RichTextBlock
-Result: each action button’s M_ActionItemHotKey just receives “F” / “1” / “Mouse4” / “RB” etc.
+	make sure that when the weapon reloads it plays that sound with the settings att and concurrency 
+	
+	further more we need to add a new shell type to EWeaponShellType called Shell_Railgun
+	but make sure that like AP rounds the settings of the weapon data do not get altered when this round is used;
+	it is purely cosmetic in that way (rail gun weapons will only support this round so the base settings as defined the game
+	state will do and dont need changing)
+i have already added a railgun type to EProjectileNiagaraSystem	.
+
+here is the idea for this weapon; it will be set up to use the railgun EProjectileNiagaraSystem and that will make the
+projectile select a different niagara system for it.
 
 
-make sure that as soon as the player updates the keybindings through the settings the subsystem is notified of this and has delegates
-for both action ui buttons and control group buttons so they can be updated with their new IA_ ... hotkey!
+so that is it; after your work ensure we have the new weapon available for all weapon owners with the customizable 
+projectile speed, reload sound, and the new niagara system settings for the railgun. also make sure that the scaling of the niagara system works correctly and that the sound plays on reload with the correct settings.
