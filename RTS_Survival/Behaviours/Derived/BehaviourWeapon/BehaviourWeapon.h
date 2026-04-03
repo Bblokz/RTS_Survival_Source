@@ -94,6 +94,7 @@ protected:
         virtual void OnStack(UBehaviour* StackedBehaviour) override;
 
 	bool GetIsWeaponCalibreLargeEnough(const UWeaponState* ValidWeapon) const;
+	bool GetIsWeaponCalibreWithinMaximum(const UWeaponState* ValidWeapon) const;
         
 
         /** @brief Determine whether this behaviour should be applied to the provided weapon. */
@@ -112,6 +113,11 @@ protected:
         // Otherwise; only weapons with a calibre equal to or larger than this value will receive the behaviour.
         UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Rules")
         float MinimalWeaponCalibreToApplyTo = 0.f;
+
+        // If set <=0 then no maximum calibre limit is applied.
+        // Otherwise; only weapons with a calibre equal to or smaller than this value will receive the behaviour.
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Rules")
+        float MaximumWeaponCalibreToApplyTo = 0.f;
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Attributes")
         FBehaviourWeaponAttributes BehaviourWeaponAttributes;

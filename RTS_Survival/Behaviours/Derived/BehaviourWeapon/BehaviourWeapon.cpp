@@ -80,12 +80,33 @@ bool UBehaviourWeapon::GetIsWeaponCalibreLargeEnough(const UWeaponState* ValidWe
 	{
 		return false;
 	}
+
+	return true;
+}
+
+bool UBehaviourWeapon::GetIsWeaponCalibreWithinMaximum(const UWeaponState* ValidWeapon) const
+{
+	if (MaximumWeaponCalibreToApplyTo <= 0.0f)
+	{
+		return true;
+	}
+
+	if (ValidWeapon->GetRawWeaponData().WeaponCalibre > MaximumWeaponCalibreToApplyTo)
+	{
+		return false;
+	}
+
 	return true;
 }
 
 bool UBehaviourWeapon::CheckRequirement(UWeaponState* WeaponState) const
 {
-	return GetIsWeaponCalibreLargeEnough(WeaponState);
+	if (not GetIsWeaponCalibreLargeEnough(WeaponState))
+	{
+		return false;
+	}
+
+	return GetIsWeaponCalibreWithinMaximum(WeaponState);
 }
 
 void UBehaviourWeapon::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
