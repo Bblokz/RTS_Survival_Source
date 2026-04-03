@@ -67,6 +67,8 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 	{
 	// Rail guns
 	case EWeaponName::GerRailGun30MM:
+	case EWeaponName::RailGun50MM:
+	case EWeaponName::RailGun80MM:
 	case EWeaponName::RailGunY:
 		return ESquadWeaponIcon::Railgun;
 	// Flame weapons

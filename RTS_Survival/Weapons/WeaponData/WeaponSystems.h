@@ -81,6 +81,8 @@ enum class
 	// Railgun Weapons
 	GerRailGun30MM UMETA(DisplayName = "Ger Railgun 30MM"),
 	GerRailgun20MM UMETA(DisplayName = "20 Rail"),
+	RailGun50MM UMETA(DisplayName = "50MM RailGun"),
+	RailGun80MM UMETA(DisplayName = "80MM RailGun"),
 
 	// German Flame Weapons
 	Ashmaker05 UMETA(DisplayName = "ashmaker 05 (Very Light Flame Thrower)"),
@@ -373,6 +375,10 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 		return "RailGun";
 	case EWeaponName::GerRailgun20MM:
 		return "20 Rail";
+	case EWeaponName::RailGun50MM:
+		return "50MM RailGun";
+	case EWeaponName::RailGun80MM:
+		return "80MM RailGun";
 	case EWeaponName::M920_AtSniper:
 		return "M920";
 	case EWeaponName::RailGunY:
@@ -393,6 +399,8 @@ static bool Global_IsRifle(const EWeaponName WeaponName)
 	switch (WeaponName)
 	{
 	case EWeaponName::GerRailGun30MM:
+	case EWeaponName::RailGun50MM:
+	case EWeaponName::RailGun80MM:
 	case EWeaponName::RailGunY:
 	case EWeaponName::SVT_40_7_62MM:
 	case EWeaponName::Fedrov_Avtomat:
@@ -421,8 +429,12 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 	// ---------------------------------------------------------------------
 	case EWeaponName::GerRailGun30MM:
 		return 1100;
+	case EWeaponName::RailGun80MM:
+		return 1099;
 	case EWeaponName::GerRailgun20MM:
 		return 1098;
+	case EWeaponName::RailGun50MM:
+		return 1097;
 	case EWeaponName::RailGunY:
 		return 1095;
 	// ---------------------------------------------------------------------
