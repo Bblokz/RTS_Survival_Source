@@ -1768,7 +1768,6 @@ void ACPPGameState::InitAllGameRailGunData()
 	using DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed;
 
 	const float RailGunRangeMultiplier = 1.f + RangeBonusPercentage / 100.f;
-	const float Base37MmCannonDamage = DamagePerMM * 37.f + 22.f * DamagePerTNTEquivalentGrams;
 
 	// Handheld railgun
 	WeaponData = {};
@@ -1787,7 +1786,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ReloadSpeed = 4.f;
 	WeaponData.BaseCooldown = 2.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 80;
+	WeaponData.Accuracy = 85;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -1803,13 +1802,13 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 20;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = Base37MmCannonDamage *  DamageBonusMlt;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *  DamageBonusMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = LightCannonRange * RailGunRangeMultiplier;
-	WeaponData.ArmorPen = 65.f;
-	WeaponData.ArmorPenMaxRange = 50.f;
+	WeaponData.ArmorPen = 110.f;
+	WeaponData.ArmorPenMaxRange = 98.f;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 3.3f;
+	WeaponData.ReloadSpeed = 4.f;
 	WeaponData.BaseCooldown = 11.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 85;
@@ -1834,10 +1833,10 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ArmorPen = 190.f;
 	WeaponData.ArmorPenMaxRange = 170.f;
 	WeaponData.MagCapacity = 2;
-	WeaponData.ReloadSpeed = 3.f;
+	WeaponData.ReloadSpeed = 4.5f;
 	WeaponData.BaseCooldown = 2.2f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 80;
+	WeaponData.Accuracy = 88;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -1859,10 +1858,10 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ArmorPen = 260.f;
 	WeaponData.ArmorPenMaxRange = 240.f;
 	WeaponData.MagCapacity = 2;
-	WeaponData.ReloadSpeed = 4.5f;
+	WeaponData.ReloadSpeed = 5.5f;
 	WeaponData.BaseCooldown = 2.5f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 80;
+	WeaponData.Accuracy = 88;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -1884,10 +1883,10 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ArmorPen = 380.f;
 	WeaponData.ArmorPenMaxRange = 350.f;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 5.2f;
+	WeaponData.ReloadSpeed = 7.f;
 	WeaponData.BaseCooldown = 3.0f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 78;
+	WeaponData.Accuracy = 90;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = 0.f;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
