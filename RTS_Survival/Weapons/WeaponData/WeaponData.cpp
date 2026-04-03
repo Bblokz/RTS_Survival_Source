@@ -1577,16 +1577,27 @@ UNiagaraComponent* UWeaponState::GetOrCreateLaunchNiagaraForSocket(
 		return nullptr;
 	}
 
-	// Return cached if still valid.
+	// Return cached if still valid and still using the desired launch effect.
 	if (TWeakObjectPtr<UNiagaraComponent>* Found = M_LaunchNiagaraBySocket.Find(SocketName))
 	{
-		if (Found->IsValid())
+		if (not Found->IsValid())
 		{
-			return Found->Get();
+			// weak ptr expired -> remove and recreate
+			M_LaunchNiagaraBySocket.Remove(SocketName);
+			RTSFunctionLibrary::ReportError("niagara component (CACHED) got invalid! respawning one!");
 		}
-		// weak ptr expired -> remove and recreate
-		M_LaunchNiagaraBySocket.Remove(SocketName);
-		RTSFunctionLibrary::ReportError("niagara component (CACHED) got invalid! respawning one!");
+		else
+		{
+			UNiagaraComponent* const CachedNiagaraComponent = Found->Get();
+			UNiagaraSystem* const DesiredLaunchEffect = M_WeaponVfx.LaunchEffectSettings.LaunchEffect;
+			if (CachedNiagaraComponent->GetAsset() == DesiredLaunchEffect)
+			{
+				return CachedNiagaraComponent;
+			}
+
+			CachedNiagaraComponent->DestroyComponent();
+			M_LaunchNiagaraBySocket.Remove(SocketName);
+		}
 	}
 
 	// Create once and attach to the muzzle socket (keeps designer scale/attachment).
