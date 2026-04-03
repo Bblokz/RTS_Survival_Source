@@ -3296,9 +3296,10 @@ void UVerticalRocketWeaponState::FireProjectile(const FVector& TargetLocationRaw
 
 	const FVerticalRocketLaunchSocketData LaunchData = GetVerticalRocketLaunchSocketData(true);
 
-	const FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
 		TargetLocationRaw,
 		WeaponData.Accuracy);
+	TargetLocation.Z = TargetLocationRaw.Z;
 	FVector LaunchDirection = (TargetLocation - LaunchData.LaunchLocation).GetSafeNormal();
 	if (LaunchDirection.IsNearlyZero())
 	{
