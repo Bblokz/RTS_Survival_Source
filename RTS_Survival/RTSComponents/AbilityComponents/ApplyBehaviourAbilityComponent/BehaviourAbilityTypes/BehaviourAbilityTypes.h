@@ -26,5 +26,9 @@ enum class EBehaviourAbilityType : uint8
 	FlakShrapnelRounds,
 	FlameNapalmAbility,
 	PulseRepair,
-	
+	SuperCharge,
+	HighVoltage,
+	SuppressiveShockline,
+	OverpressureRounds,
+	EngineOverclocking
 };

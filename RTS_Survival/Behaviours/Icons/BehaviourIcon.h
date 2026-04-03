@@ -39,4 +39,9 @@ enum class EBehaviourIcon : uint8
 	FallbackToHQ,
 	RocketBarrage,
 	LowPower,
+	OverpressureRounds,
+	SuppresiveShockline,
+	HighVoltage,
+	SuperCharge,
+	EngineOverclocking
 };
