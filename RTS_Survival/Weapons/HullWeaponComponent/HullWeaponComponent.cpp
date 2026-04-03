@@ -235,7 +235,9 @@ void UHullWeaponComponent::SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponPara
 		return;
 	}
 	const int32 WeaponIndex = M_TWeapons.Num();
-	UWeaponStateTrace* Trace = NewObject<UWeaponStateTrace>(this);
+	const FName UniqueName = MakeUniqueObjectName(this, UWeaponStateTrace::StaticClass());
+
+	UWeaponStateTrace* Trace = NewObject<UWeaponStateTrace>(this, UniqueName);
 	Trace->InitTraceWeapon(
 		TraceWeaponParameters.OwningPlayer,
 		WeaponIndex,

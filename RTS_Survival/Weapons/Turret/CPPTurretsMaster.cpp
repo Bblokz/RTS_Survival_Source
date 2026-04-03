@@ -440,7 +440,8 @@ void ACPPTurretsMaster::OnWeaponKilledActor(const int32 /*WeaponIndex*/, AActor*
 	}
 }
 
-void ACPPTurretsMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre)
+void ACPPTurretsMaster::PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode,
+                                            const int32 WeaponCalibre)
 {
 	BP_PlayWeaponAnimation(WeaponIndex, FireMode);
 
@@ -555,7 +556,9 @@ void ACPPTurretsMaster::SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponParamet
 		RTSFunctionLibrary::ReportError("World is null for turret: " + GetName());
 		return;
 	}
-	UWeaponStateTrace* Trace = NewObject<UWeaponStateTrace>(this);
+	const FName UniqueName = MakeUniqueObjectName(this, UWeaponStateTrace::StaticClass());
+
+	UWeaponStateTrace* Trace = NewObject<UWeaponStateTrace>(this, UniqueName);
 	Trace->InitTraceWeapon(
 		TraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
