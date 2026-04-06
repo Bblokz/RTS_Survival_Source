@@ -704,7 +704,6 @@ void UFormationController::BuildUnitAssignments(
 	{
 		int32 UnitIndex = INDEX_NONE;
 		float ForwardDistance = 0.f;
-		float AbsLateralOffset = 0.f;
 		float LateralOffset = 0.f;
 		int32 ActorId = 0;
 	};
@@ -714,7 +713,6 @@ void UFormationController::BuildUnitAssignments(
 		FVector Position;
 		FRotator Rotation;
 		float FrontPriority = 0.f;
-		float AbsLateralOffset = 0.f;
 		float LateralOffset = 0.f;
 		int32 StableIndex = 0;
 	};
@@ -730,7 +728,6 @@ void UFormationController::BuildUnitAssignments(
 		UnitPriority.UnitIndex = Index;
 		UnitPriority.ForwardDistance = FVector::DotProduct(M_OriginalLocation - Unit.OriginalLocation, ForwardVector);
 		UnitPriority.LateralOffset = FVector::DotProduct(Unit.OriginalLocation - M_OriginalLocation, RightVector);
-		UnitPriority.AbsLateralOffset = FMath::Abs(UnitPriority.LateralOffset);
 		UnitPriority.ActorId = Unit.SourceActor.IsValid() ? Unit.SourceActor->GetUniqueID() : Index;
 
 		FSlotPriority& SlotPriority = SlotsByType.FindOrAdd(Unit.UnitType).FindOrAdd(Unit.UnitSubType).AddDefaulted_GetRef();
@@ -739,23 +736,19 @@ void UFormationController::BuildUnitAssignments(
 		const FVector OffsetFromOrigin = Positions[Index] - M_OriginalLocation;
 		SlotPriority.FrontPriority = FVector::DotProduct(OffsetFromOrigin, ForwardVector);
 		SlotPriority.LateralOffset = FVector::DotProduct(OffsetFromOrigin, RightVector);
-		SlotPriority.AbsLateralOffset = FMath::Abs(SlotPriority.LateralOffset);
 		SlotPriority.StableIndex = Index;
 	}
 
 	auto UnitSortPredicate = [](const FUnitPriority& A, const FUnitPriority& B)
 	{
-		if (not FMath::IsNearlyEqual(A.ForwardDistance, B.ForwardDistance))
-		{
-			return A.ForwardDistance < B.ForwardDistance;
-		}
-		if (not FMath::IsNearlyEqual(A.AbsLateralOffset, B.AbsLateralOffset))
-		{
-			return A.AbsLateralOffset < B.AbsLateralOffset;
-		}
+		// Preserve lateral side first (left -> right) to minimize crossing.
 		if (not FMath::IsNearlyEqual(A.LateralOffset, B.LateralOffset))
 		{
 			return A.LateralOffset < B.LateralOffset;
+		}
+		if (not FMath::IsNearlyEqual(A.ForwardDistance, B.ForwardDistance))
+		{
+			return A.ForwardDistance < B.ForwardDistance;
 		}
 		if (A.ActorId != B.ActorId)
 		{
@@ -766,17 +759,14 @@ void UFormationController::BuildUnitAssignments(
 
 	auto SlotSortPredicate = [](const FSlotPriority& A, const FSlotPriority& B)
 	{
-		if (not FMath::IsNearlyEqual(A.FrontPriority, B.FrontPriority))
-		{
-			return A.FrontPriority > B.FrontPriority;
-		}
-		if (not FMath::IsNearlyEqual(A.AbsLateralOffset, B.AbsLateralOffset))
-		{
-			return A.AbsLateralOffset < B.AbsLateralOffset;
-		}
+		// Preserve slot sides first (left -> right), then fill front to back.
 		if (not FMath::IsNearlyEqual(A.LateralOffset, B.LateralOffset))
 		{
 			return A.LateralOffset < B.LateralOffset;
+		}
+		if (not FMath::IsNearlyEqual(A.FrontPriority, B.FrontPriority))
+		{
+			return A.FrontPriority > B.FrontPriority;
 		}
 		return A.StableIndex < B.StableIndex;
 	};
