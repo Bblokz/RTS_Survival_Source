@@ -105,3 +105,54 @@ For each `(UnitType, UnitSubType)` bucket with `N` units and `N` slots:
 - Add a debug draw line from original to assigned slot color-coded by bucket.
 
 This will make regression testing very quick when testing vehicle platoons.
+
+---
+
+## Follow-up issue: 2x2 rectangle row inversion within same priority
+
+### Symptom
+
+With four same-priority units in rectangle formation, the two units that started in the back row can sometimes
+take the front-row slots, while front-row units take back-row slots.
+
+### Root cause in current implementation
+
+After generating rectangle rows, `BuildUnitAssignments` performs a bucket-level re-sort for all units and slots
+of the same type/subtype. The current matching logic sorts by lateral offset first, and only then uses a
+forward/depth tie-break. This means row-membership is no longer explicitly preserved once units are flattened
+into a single subtype bucket.
+
+When depth values are close/noisy (or movement/override orientation changes the projection behavior), that
+secondary tie-break can produce front/back inversions even though lateral side ordering is preserved.
+
+### Two good solution options
+
+#### Option A (recommended): Row-aware two-stage assignment
+
+1. Keep current side-preserving sort as stage 1.
+2. Before pairing, partition each subtype bucket into row bands using forward projection of slot positions
+   (front row band, second row band, etc.).
+3. Partition units into the same number of row bands using forward projection from original locations.
+4. Match row band N units only to row band N slots.
+5. Inside each row band, sort by signed lateral offset and pair by index.
+
+**Why this works**
+- Explicitly prevents cross-row swaps.
+- Keeps the existing deterministic behavior and only adds a row constraint.
+- Lowest risk incremental change to current architecture.
+
+#### Option B: Min-cost assignment with explicit row-swap penalty
+
+1. Build full cost matrix per subtype bucket.
+2. Include terms for:
+   - lateral mismatch,
+   - forward mismatch,
+   - Euclidean travel distance.
+3. Add a large penalty term when a unit likely from back-row is mapped to front-row (and vice versa),
+   based on forward-rank buckets.
+4. Solve with Hungarian (or min-cost matching).
+
+**Why this works**
+- Handles irregular layouts better than hard row partitioning.
+- Lets you tune “strictness” of row preservation by penalty weight.
+- Can evolve into a globally better anti-crossing solver for all formations.
