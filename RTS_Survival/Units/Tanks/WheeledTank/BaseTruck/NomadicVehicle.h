@@ -507,6 +507,12 @@ private:
 	UPROPERTY()
 	float M_ConvertToVehicleTime;
 
+	// Stores the command card index from which move was removed when fully converted to building.
+	int32 M_CachedMoveAbilityIndex = INDEX_NONE;
+
+	// Tracks whether M_CachedMoveAbilityIndex currently contains a valid move index.
+	bool bM_HasCachedMoveAbilityIndex = false;
+
 	// Disables those components that are immediately disabled when the truck starts converting again.
 	void OnStartConvertToVehicle_HandleInstanceSpecificComponents();
 
@@ -519,6 +525,9 @@ private:
 	void OnFinishedConvertingToVehicle();
 
 	void OnFinishedConvertingToVehicle_HandleInstanceSpecificComponents();
+
+	// Once fully converted to vehicle, restore move at the exact same command card index.
+	void RestoreMoveAbilityAfterFinishedConvertingToVehicle();
 
 	UPROPERTY()
 	FTimerHandle ConvertToVehicleTimerHandle;
@@ -537,6 +546,9 @@ private:
 
 	// Renables the components that are only supposed to work when the vehicle is in building mode.
 	void OnFinishedConvertToBuilding_HandleInstanceSpecificComponents();
+
+	// Once fully converted to building, remove move from the command card and cache its previous index.
+	void RemoveMoveAbilityAfterFinishedConvertingToBuilding();
 
 	// Unpacks the airbase if this vehicle has aircraft logic.
 	void OnFinishedConvertToBuilding_UnpackAirbase();

@@ -4,6 +4,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/BuildRadiusComp/BuildRadiusComp.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpOwnerComp/BuildingExpansionOwnerComp.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
@@ -634,6 +635,7 @@ void ANomadicVehicle::OnFinishedConvertingToBuilding()
 	// IMPORTANT: set after status change to building!!
 	// Open command queue by calling cancel.
 	SetCommandQueueEnabled(true);
+	RemoveMoveAbilityAfterFinishedConvertingToBuilding();
 	// Propagate to blueprints.
 	BP_OnFinishedConvertingToBuilding();
 }
@@ -650,6 +652,39 @@ void ANomadicVehicle::OnFinishedConvertToBuilding_HandleInstanceSpecificComponen
 	// This component will now use the progress bar.
 	SetTrainingEnabled(true);
 	SetCargoEnabled(true);
+}
+
+void ANomadicVehicle::RemoveMoveAbilityAfterFinishedConvertingToBuilding()
+{
+	bM_HasCachedMoveAbilityIndex = false;
+	M_CachedMoveAbilityIndex = INDEX_NONE;
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return;
+	}
+
+	const TArray<FUnitAbilityEntry> CurrentAbilities = CommandData->GetAbilities();
+	const int32 MoveAbilityIndex = CurrentAbilities.IndexOfByPredicate([](const FUnitAbilityEntry& AbilityEntry)
+	{
+		return AbilityEntry.AbilityId == EAbilityID::IdMove;
+	});
+	if (MoveAbilityIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	M_CachedMoveAbilityIndex = MoveAbilityIndex;
+	bM_HasCachedMoveAbilityIndex = true;
+	if (not RemoveAbility(EAbilityID::IdMove))
+	{
+		RTSFunctionLibrary::ReportError("Failed to remove move ability for nomadic vehicle in building mode."
+			"\n At function: ANomadicVehicle::RemoveMoveAbilityAfterFinishedConvertingToBuilding"
+			"\n For nomadic vehicle: " + GetName());
+		bM_HasCachedMoveAbilityIndex = false;
+		M_CachedMoveAbilityIndex = INDEX_NONE;
+	}
 }
 
 void ANomadicVehicle::OnFinishedConvertToBuilding_UnpackAirbase()
@@ -1094,6 +1129,7 @@ void ANomadicVehicle::OnFinishedConvertingToVehicle()
 
 	// Set max health to vehicle health.
 	AdjustMaxHealthForConversion(true);
+	RestoreMoveAbilityAfterFinishedConvertingToVehicle();
 
 	// Destroy any resource visualisation.
 	DestroyAllResourceStorageMeshComponents();
@@ -1111,6 +1147,34 @@ void ANomadicVehicle::OnFinishedConvertingToVehicle_HandleInstanceSpecificCompon
 	{
 		M_AircraftOwnerComp->OnPackUpAirbaseComplete();
 	}
+}
+
+void ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle()
+{
+	if (not bM_HasCachedMoveAbilityIndex)
+	{
+		return;
+	}
+
+	for (const FUnitAbilityEntry& CurrentAbility : GetUnitAbilityEntries())
+	{
+		if (CurrentAbility.AbilityId == EAbilityID::IdMove)
+		{
+			bM_HasCachedMoveAbilityIndex = false;
+			M_CachedMoveAbilityIndex = INDEX_NONE;
+			return;
+		}
+	}
+
+	if (not AddAbility(EAbilityID::IdMove, M_CachedMoveAbilityIndex))
+	{
+		RTSFunctionLibrary::ReportError("Failed to restore move ability for nomadic vehicle after conversion."
+			"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
+			"\n For nomadic vehicle: " + GetName());
+	}
+
+	bM_HasCachedMoveAbilityIndex = false;
+	M_CachedMoveAbilityIndex = INDEX_NONE;
 }
 
 void ANomadicVehicle::SetDisableChaosVehicleMesh(const bool bDisable)
