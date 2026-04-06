@@ -134,19 +134,19 @@ struct FVehicleFireFeedbackSettings
 	 * unstable spring integration after hitches or stalls.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
-	float M_MaxSafeDeltaTimeSeconds = 0.12f;
+	float M_MaxSafeDeltaTimeSeconds = 0.2f;
 
 	/**
 	 * @brief Maximum absolute translation recoil offset before safety reset (centimeters).
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
-	float M_MaxSafeOffsetCm = 200.0f;
+	float M_MaxSafeOffsetCm = 400.0f;
 
 	/**
 	 * @brief Maximum absolute translation recoil velocity before safety reset (cm/s).
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
-	float M_MaxSafeVelocityCmPerSecond = 3000.0f;
+	float M_MaxSafeVelocityCmPerSecond = 10000.0f;
 
 	/**
 	 * @brief Maximum absolute recoil rotation before safety reset (degrees).
@@ -158,7 +158,7 @@ struct FVehicleFireFeedbackSettings
 	 * @brief Maximum absolute rotational recoil velocity before safety reset (deg/s).
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
-	float M_MaxSafeRotationVelocityDegPerSecond = 1080.0f;
+	float M_MaxSafeRotationVelocityDegPerSecond = 8080.0f;
 };
 
 /**

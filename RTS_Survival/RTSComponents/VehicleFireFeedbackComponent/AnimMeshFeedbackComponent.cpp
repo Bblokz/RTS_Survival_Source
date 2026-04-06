@@ -1,6 +1,18 @@
 #include "AnimMeshFeedbackComponent.h"
+#include "Math/UnrealMathUtility.h" // For FMath::IsFinite
+
 
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+bool IsFiniteVector(const FVector& Vector)
+{
+    return FMath::IsFinite(Vector.X) && FMath::IsFinite(Vector.Y) && FMath::IsFinite(Vector.Z);
+}
+
+bool IsFiniteRotator(const FRotator& Rotator)
+{
+    return FMath::IsFinite(Rotator.Pitch) && FMath::IsFinite(Rotator.Yaw) && FMath::IsFinite(Rotator.Roll);
+}
 
 void UAnimMeshFeedbackComponent::InitializeAnimMeshFeedbackComponent(
 	USkeletalMeshComponent* InAnimatedMesh,
@@ -78,7 +90,6 @@ void UAnimMeshFeedbackComponent::ApplyHullFeedbackTransform() const
 	{
 		return;
 	}
-
 	ApplyPreservedRecoilLocation();
 	ApplyPreservedRecoilRotation();
 }
@@ -122,9 +133,9 @@ FVector UAnimMeshFeedbackComponent::GetSignedAxisVector(const EAnimMeshRecoilSig
 void UAnimMeshFeedbackComponent::ApplyPreservedRecoilLocation() const
 {
 	const FVector CurrentRelativeLocation = M_AnimatedMesh->GetRelativeLocation();
-	if (not CurrentRelativeLocation.IsFinite()
-		|| not M_LastAppliedRecoilLocationOffsetCm.IsFinite()
-		|| not M_RecoilOffsetCm.IsFinite())
+	if (not IsFiniteVector( CurrentRelativeLocation)
+		|| not IsFiniteVector(M_LastAppliedRecoilLocationOffsetCm)
+		|| not IsFiniteVector(M_RecoilOffsetCm))
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("ApplyPreservedRecoilLocation cancelled because recoil location values are invalid."));
@@ -135,7 +146,7 @@ void UAnimMeshFeedbackComponent::ApplyPreservedRecoilLocation() const
 	const FVector BaseLocationWithoutRecoil = CurrentRelativeLocation - M_LastAppliedRecoilLocationOffsetCm;
 	const FVector RecoilLocationToApply = M_RecoilOffsetCm;
 	const FVector NewRelativeLocation = BaseLocationWithoutRecoil + RecoilLocationToApply;
-	if (not NewRelativeLocation.IsFinite())
+	if (not IsFiniteVector(NewRelativeLocation))
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("ApplyPreservedRecoilLocation cancelled because resulting location is invalid."));
@@ -150,7 +161,7 @@ void UAnimMeshFeedbackComponent::ApplyPreservedRecoilLocation() const
 void UAnimMeshFeedbackComponent::ApplyPreservedRecoilRotation() const
 {
 	const FRotator CurrentRelativeRotation = M_AnimatedMesh->GetRelativeRotation();
-	if (not CurrentRelativeRotation.IsFinite()
+	if (not IsFiniteRotator(CurrentRelativeRotation)
 		|| not FMath::IsFinite(M_LastAppliedRecoilPitchDeg)
 		|| not FMath::IsFinite(M_LastAppliedRecoilRollDeg))
 	{
@@ -180,7 +191,7 @@ void UAnimMeshFeedbackComponent::ApplyPreservedRecoilRotation() const
 		BasePitchWithoutRecoil + RecoilPitchToApplyDeg,
 		CurrentRelativeRotation.Yaw,
 		BaseRollWithoutRecoil + RecoilRollToApplyDeg);
-	if (not NewRotation.IsFinite())
+	if (not IsFiniteRotator(NewRotation))
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("ApplyPreservedRecoilRotation cancelled because resulting rotation is invalid."));
