@@ -211,6 +211,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bStartAsConvertedToBuilding = false;
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	UStaticMeshComponent* AddStaticMeshCompToBuildingMesh(const FName SocketName, UStaticMesh* Mesh);
+
 	// Settings used on the cargo component when we setup the cargo component after converting to building.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FNomadicCargoSettings CargoSettings;

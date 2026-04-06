@@ -289,6 +289,30 @@ void ANomadicVehicle::InitNomadicVehicle(
 	}
 }
 
+UStaticMeshComponent* ANomadicVehicle::AddStaticMeshCompToBuildingMesh(const FName SocketName, UStaticMesh* Mesh)
+{
+	if(not IsValid(BuildingMeshComponent) || not BuildingMeshComponent->DoesSocketExist(SocketName))
+	{
+		const FString BuildingMeshName  = IsValid(BuildingMeshComponent) && IsValid(BuildingMeshComponent->GetStaticMesh()) ? BuildingMeshComponent->GetStaticMesh()->GetName() : "Invalid";
+		RTSFunctionLibrary::ReportError("Cannot add static mesh component to building mesh because the socket does not exist!"
+			"\n Socket Name: " + SocketName.ToString() +
+			"\n Building Mesh: " + BuildingMeshName +
+			"\n Vehicle: " + GetName());
+		return nullptr;
+	}
+	UStaticMeshComponent* NewComp = NewObject<UStaticMeshComponent>(this);
+	if(not IsValid(NewComp))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create new static mesh component in ANomadicVehicle::AddStaticMeshCompToBuildingMesh");
+		return nullptr;
+	}
+	NewComp->SetStaticMesh(Mesh);
+	NewComp->Activate();
+	NewComp->RegisterComponent();
+	NewComp->AttachToComponent(BuildingMeshComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+	return NewComp;
+}
+
 void ANomadicVehicle::BeginPlay()
 {
 	Super::BeginPlay();
