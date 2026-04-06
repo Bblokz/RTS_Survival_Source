@@ -138,6 +138,10 @@ namespace DeveloperSettings
 			inline constexpr float T2TruckVehiclePackUpTime = 15 * GameBuildingTimeMlt;
 			inline constexpr float T2CommunicationCenterBuildingAnimationTime = 40 * GameBuildingTimeMlt;
 			inline constexpr float T2MedTankFactoryBuildingAnimationTime = 40 * GameBuildingTimeMlt;
+			// Nomadic T3 Building times.
+			inline constexpr float T3TruckVehicleConversionTime = 10 * GameBuildingTimeMlt;
+			inline constexpr float T3TruckVehiclePackUpTime = 20 * GameBuildingTimeMlt;
+			inline constexpr float T3ExperimentalUnitsFactoryBuildingAnimationTime = 50 * GameBuildingTimeMlt;
 
 
 			// Dig in walls building time settings.
@@ -252,8 +256,12 @@ namespace DeveloperSettings
 			// Nomadic T2
 			inline constexpr int32 NomadicT2CommunicationCenterTrainingTime =
 				RoundToNearestMultipleOf(35.f * GameTimeMlt, 2);
+			inline constexpr int32 NomadicT2ArmoryTrainingTime = RoundToNearestMultipleOf(
+				30.f * GameTimeMlt, 2);
 			inline constexpr int32 NomadicT2MedFactoryTrainingTime = RoundToNearestMultipleOf(
 				30.f * GameTimeMlt, 2);
+			inline constexpr int32 NomadicT3ExperimentalUnitsFactoryTrainingTime = RoundToNearestMultipleOf(
+				45.f * GameTimeMlt, 2);
 
 			// Bxp Training Times.
 			inline constexpr int32 T1BxpBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
@@ -448,8 +456,10 @@ namespace DeveloperSettings
 				inline constexpr int32 T1VehicleFactorySupply = -30;
 				inline constexpr int32 T2VehicleFactorySupply = -50;
 				inline constexpr int32 T2CommunicationCenterSupply = -40;
+				inline constexpr int32 T2ArmorySupply = -15;
 				inline constexpr int32 T2TrainingCenterSupply = -20;
 				inline constexpr int32 T2AirPadSupply = -40;
+				inline constexpr int32 T3ExperimentalUnitsFactorySupply = -60;
 			}
 
 			// ----------------------------------
@@ -487,6 +497,10 @@ namespace DeveloperSettings
 				static_cast<int32>(600 * GameCostMlt));
 			inline constexpr int32 NomadicT2CommunicationCenterMetalCost = RoundToNearestMultipleOfFive(
 				static_cast<int32>(300 * GameCostMlt));
+			inline constexpr int32 NomadicT2ArmoryRadixiteCost = RoundToNearestMultipleOfFive(
+				static_cast<int32>(350 * GameCostMlt));
+			inline constexpr int32 NomadicT2ArmoryMetalCost = RoundToNearestMultipleOfFive(
+				static_cast<int32>(250 * GameCostMlt));
 
 			inline constexpr int32 NomadicT2MedFactoryRadixiteCost = RoundToNearestMultipleOfFive(
 				static_cast<int32>(600 * GameCostMlt));
@@ -496,6 +510,11 @@ namespace DeveloperSettings
 			inline constexpr int32 NomadicT2AirbaseRadixiteCost = RoundToNearestMultipleOfFive(
 				static_cast<int32>(800 * GameCostMlt));
 			inline constexpr int32 NomadicT2AirbaseMetalCost = RoundToNearestMultipleOfFive(
+				static_cast<int32>(500 * GameCostMlt));
+
+			inline constexpr int32 NomadicT3ExperimentalUnitsFactoryRadixiteCost = RoundToNearestMultipleOfFive(
+				static_cast<int32>(1000 * GameCostMlt));
+			inline constexpr int32 NomadicT3ExperimentalUnitsFactoryMetalCost = RoundToNearestMultipleOfFive(
 				static_cast<int32>(500 * GameCostMlt));
 
 			// ----------------------------------
