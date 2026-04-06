@@ -185,12 +185,6 @@ void UResourceConverterComponent::OnResourceTick()
 
 	// 2) Ask PRM if we can pay this tick's cost.
 	UPlayerResourceManager* const PRM = M_PlayerResourceManager.Get();
-	if (not IsValid(PRM))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlayerResourceManager"),
-		                                                      TEXT("OnResourceTick"), GetOwner());
-		return;
-	}
 
 	const EPlayerError CanPay = PRM->GetCanPayForCost(Cost);
 	if (CanPay != EPlayerError::Error_None)
@@ -251,10 +245,8 @@ bool UResourceConverterComponent::HasEnough(const uint8 Player, const ERTSResour
                                             const int32 RequiredAbs) const
 {
 	// Delegate to GetCanPayForCost using a single-entry positive cost map.
-	if (not M_PlayerResourceManager.IsValid())
+	if (not GetIsValidPlayerResourceManager())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlayerResourceManager"),
-		                                                      TEXT("HasEnough"), GetOwner());
 		return false;
 	}
 
@@ -267,10 +259,8 @@ bool UResourceConverterComponent::ApplyDelta(const uint8 /*Player*/, const ERTSR
                                              const int32 Delta) const
 {
 	// Use PRM->AddResource for both positive (gain) and negative (cost) deltas.
-	if (not M_PlayerResourceManager.IsValid())
+	if (not GetIsValidPlayerResourceManager())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlayerResourceManager"),
-		                                                      TEXT("ApplyDelta"), GetOwner());
 		return false;
 	}
 	return M_PlayerResourceManager.Get()->AddResource(Res, Delta);
@@ -280,10 +270,8 @@ bool UResourceConverterComponent::TryApplyAllDeltasAtomic(
 	const uint8 /*Player*/,
 	const TMap<ERTSResourceType, int32>& Deltas) const
 {
-	if (not M_PlayerResourceManager.IsValid())
+	if (not GetIsValidPlayerResourceManager())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlayerResourceManager"),
-		                                                      TEXT("TryApplyAllDeltasAtomic"), GetOwner());
 		return false;
 	}
 
@@ -417,8 +405,9 @@ bool UResourceConverterComponent::Init_SetupResourceAndPoolManagers()
 {
 	M_PlayerResourceManager = FRTS_Statics::GetPlayerResourceManager(this);
 	const bool bSuccess = GetIsValidPlayerResourceManager();
-	const bool bAnimTextSuccess = GetAnimTextMgrFromWorld();
-	return bSuccess && bAnimTextSuccess;
+	// Optional manager for visuals only; conversion should still run without it.
+	(void)GetAnimTextMgrFromWorld();
+	return bSuccess;
 }
 
 bool UResourceConverterComponent::GetAnimTextMgrFromWorld()
@@ -426,8 +415,9 @@ bool UResourceConverterComponent::GetAnimTextMgrFromWorld()
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("ResourceConverter: GetWorld() invalid while loading AnimatedTextManager."));
+		RTSFunctionLibrary::ReportWarning(
+			TEXT("ResourceConverter: GetWorld() invalid while loading AnimatedTextManager. "
+				"Conversion continues without vertical text."));
 		return false;
 	}
 
@@ -435,16 +425,18 @@ bool UResourceConverterComponent::GetAnimTextMgrFromWorld()
 	UAnimatedTextWorldSubsystem* const Subsystem = World->GetSubsystem<UAnimatedTextWorldSubsystem>();
 	if (not IsValid(Subsystem))
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("ResourceConverter: Failed to get AnimatedTextWorldSubsystem from world."));
+		RTSFunctionLibrary::ReportWarning(
+			TEXT("ResourceConverter: Failed to get AnimatedTextWorldSubsystem from world. "
+				"Conversion continues without vertical text."));
 		return false;
 	}
 
 	UAnimatedTextWidgetPoolManager* const PoolManager = Subsystem->GetAnimatedTextWidgetPoolManager();
 	if (not IsValid(PoolManager))
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("ResourceConverter: AnimatedTextWidgetPoolManager is invalid on subsystem."));
+		RTSFunctionLibrary::ReportWarning(
+			TEXT("ResourceConverter: AnimatedTextWidgetPoolManager is invalid on subsystem. "
+				"Conversion continues without vertical text."));
 		return false;
 	}
 
