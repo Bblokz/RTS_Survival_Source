@@ -122,9 +122,26 @@ FVector UAnimMeshFeedbackComponent::GetSignedAxisVector(const EAnimMeshRecoilSig
 void UAnimMeshFeedbackComponent::ApplyPreservedRecoilLocation() const
 {
 	const FVector CurrentRelativeLocation = M_AnimatedMesh->GetRelativeLocation();
+	if (not CurrentRelativeLocation.IsFinite()
+		|| not M_LastAppliedRecoilLocationOffsetCm.IsFinite()
+		|| not M_RecoilOffsetCm.IsFinite())
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ApplyPreservedRecoilLocation cancelled because recoil location values are invalid."));
+		M_LastAppliedRecoilLocationOffsetCm = FVector::ZeroVector;
+		return;
+	}
+
 	const FVector BaseLocationWithoutRecoil = CurrentRelativeLocation - M_LastAppliedRecoilLocationOffsetCm;
 	const FVector RecoilLocationToApply = M_RecoilOffsetCm;
 	const FVector NewRelativeLocation = BaseLocationWithoutRecoil + RecoilLocationToApply;
+	if (not NewRelativeLocation.IsFinite())
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ApplyPreservedRecoilLocation cancelled because resulting location is invalid."));
+		M_LastAppliedRecoilLocationOffsetCm = FVector::ZeroVector;
+		return;
+	}
 
 	M_AnimatedMesh->SetRelativeLocation(NewRelativeLocation);
 	M_LastAppliedRecoilLocationOffsetCm = RecoilLocationToApply;
@@ -133,17 +150,44 @@ void UAnimMeshFeedbackComponent::ApplyPreservedRecoilLocation() const
 void UAnimMeshFeedbackComponent::ApplyPreservedRecoilRotation() const
 {
 	const FRotator CurrentRelativeRotation = M_AnimatedMesh->GetRelativeRotation();
+	if (not CurrentRelativeRotation.IsFinite()
+		|| not FMath::IsFinite(M_LastAppliedRecoilPitchDeg)
+		|| not FMath::IsFinite(M_LastAppliedRecoilRollDeg))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ApplyPreservedRecoilRotation cancelled because recoil rotation values are invalid."));
+		M_LastAppliedRecoilPitchDeg = 0.0f;
+		M_LastAppliedRecoilRollDeg = 0.0f;
+		return;
+	}
+
 	const float BasePitchWithoutRecoil = CurrentRelativeRotation.Pitch - M_LastAppliedRecoilPitchDeg;
 	const float BaseRollWithoutRecoil = CurrentRelativeRotation.Roll - M_LastAppliedRecoilRollDeg;
 
 	float RecoilPitchToApplyDeg = 0.0f;
 	float RecoilRollToApplyDeg = 0.0f;
 	GetCurrentRecoilPitchAndRoll(RecoilPitchToApplyDeg, RecoilRollToApplyDeg);
+	if (not FMath::IsFinite(RecoilPitchToApplyDeg) || not FMath::IsFinite(RecoilRollToApplyDeg))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ApplyPreservedRecoilRotation cancelled because recoil values are invalid."));
+		M_LastAppliedRecoilPitchDeg = 0.0f;
+		M_LastAppliedRecoilRollDeg = 0.0f;
+		return;
+	}
 
 	const FRotator NewRotation(
 		BasePitchWithoutRecoil + RecoilPitchToApplyDeg,
 		CurrentRelativeRotation.Yaw,
 		BaseRollWithoutRecoil + RecoilRollToApplyDeg);
+	if (not NewRotation.IsFinite())
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ApplyPreservedRecoilRotation cancelled because resulting rotation is invalid."));
+		M_LastAppliedRecoilPitchDeg = 0.0f;
+		M_LastAppliedRecoilRollDeg = 0.0f;
+		return;
+	}
 
 	M_AnimatedMesh->SetRelativeRotation(NewRotation);
 	M_LastAppliedRecoilPitchDeg = RecoilPitchToApplyDeg;

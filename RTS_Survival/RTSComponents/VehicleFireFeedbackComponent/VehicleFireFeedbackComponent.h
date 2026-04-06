@@ -126,6 +126,39 @@ struct FVehicleFireFeedbackSettings
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Optimisation")
 	float M_SetToRestEpsilon = 0.01f;
+
+	/**
+	 * @brief Maximum accepted DeltaTime for recoil simulation.
+	 *
+	 * If the current frame exceeds this value, recoil is cancelled and reset to avoid
+	 * unstable spring integration after hitches or stalls.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
+	float M_MaxSafeDeltaTimeSeconds = 0.12f;
+
+	/**
+	 * @brief Maximum absolute translation recoil offset before safety reset (centimeters).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
+	float M_MaxSafeOffsetCm = 200.0f;
+
+	/**
+	 * @brief Maximum absolute translation recoil velocity before safety reset (cm/s).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
+	float M_MaxSafeVelocityCmPerSecond = 3000.0f;
+
+	/**
+	 * @brief Maximum absolute recoil rotation before safety reset (degrees).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
+	float M_MaxSafeRotationDeg = 45.0f;
+
+	/**
+	 * @brief Maximum absolute rotational recoil velocity before safety reset (deg/s).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VehicleFireFeedback|Safety")
+	float M_MaxSafeRotationVelocityDegPerSecond = 1080.0f;
 };
 
 /**
@@ -211,4 +244,8 @@ protected:
 	virtual void ApplyHullFeedbackTransform() const;
 	virtual void SetTickEnabledForActiveRecoil();
 	virtual void TryResetRuntimeOffsetsToRestAndSleep();
+	virtual bool GetShouldCancelRecoilTickForUnsafeState(float DeltaTime) const;
+	virtual void CancelRecoilAndRestoreBase(const TCHAR* ReportReason);
+	virtual bool GetIsFiniteAndWithinAbsLimit(const FVector& Vector, float MaxAbsValue) const;
+	virtual bool GetIsFiniteAndWithinAbsLimit(float Value, float MaxAbsValue) const;
 };
