@@ -3,6 +3,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 UVehicleFireFeedbackComponent::UVehicleFireFeedbackComponent()
@@ -99,6 +100,12 @@ void UVehicleFireFeedbackComponent::TickComponent(
 		return;
 	}
 
+	if (GetShouldCancelRecoilTickForUnsafeState(DeltaTime))
+	{
+		CancelRecoilAndRestoreBase(TEXT("TickComponent detected invalid/extreme recoil state."));
+		return;
+	}
+
 	ApplyCriticallyDampedSpring(
 		DeltaTime,
 		M_FeedbackSettings.M_TranslationStiffness,
@@ -112,6 +119,12 @@ void UVehicleFireFeedbackComponent::TickComponent(
 		M_FeedbackSettings.M_RotationDamping,
 		M_RecoilRotDeg,
 		M_RecoilRotVelocity);
+
+	if (GetShouldCancelRecoilTickForUnsafeState(DeltaTime))
+	{
+		CancelRecoilAndRestoreBase(TEXT("TickComponent spring update produced invalid/extreme recoil state."));
+		return;
+	}
 
 	ApplyHullFeedbackTransform();
 	TryResetRuntimeOffsetsToRestAndSleep();
@@ -339,4 +352,81 @@ void UVehicleFireFeedbackComponent::TryResetRuntimeOffsetsToRestAndSleep()
 	}
 
 	SetComponentTickEnabled(false);
+}
+
+bool UVehicleFireFeedbackComponent::GetShouldCancelRecoilTickForUnsafeState(const float DeltaTime) const
+{
+	const float MaxSafeDeltaTimeSeconds = FMath::Max(0.0f, M_FeedbackSettings.M_MaxSafeDeltaTimeSeconds);
+	if (not FMath::IsFinite(DeltaTime) || DeltaTime < 0.0f)
+	{
+		return true;
+	}
+
+	if (DeltaTime > MaxSafeDeltaTimeSeconds)
+	{
+		return true;
+	}
+
+	if (not FMath::IsFinite(M_FeedbackSettings.M_TranslationStiffness)
+		|| not FMath::IsFinite(M_FeedbackSettings.M_TranslationDamping)
+		|| not FMath::IsFinite(M_FeedbackSettings.M_RotationStiffness)
+		|| not FMath::IsFinite(M_FeedbackSettings.M_RotationDamping))
+	{
+		return true;
+	}
+
+	const float MaxSafeOffsetCm = FMath::Max(0.0f, M_FeedbackSettings.M_MaxSafeOffsetCm);
+	if (not GetIsFiniteAndWithinAbsLimit(M_RecoilOffsetCm, MaxSafeOffsetCm))
+	{
+		return true;
+	}
+
+	const float MaxSafeVelocityCmPerSecond = FMath::Max(0.0f, M_FeedbackSettings.M_MaxSafeVelocityCmPerSecond);
+	if (not GetIsFiniteAndWithinAbsLimit(M_RecoilVelocity, MaxSafeVelocityCmPerSecond))
+	{
+		return true;
+	}
+
+	const float MaxSafeRotationDeg = FMath::Max(0.0f, M_FeedbackSettings.M_MaxSafeRotationDeg);
+	if (not GetIsFiniteAndWithinAbsLimit(M_RecoilRotDeg, MaxSafeRotationDeg))
+	{
+		return true;
+	}
+
+	const float MaxSafeRotationVelocityDegPerSecond = FMath::Max(
+		0.0f,
+		M_FeedbackSettings.M_MaxSafeRotationVelocityDegPerSecond);
+	return not GetIsFiniteAndWithinAbsLimit(M_RecoilRotVelocity, MaxSafeRotationVelocityDegPerSecond);
+}
+
+void UVehicleFireFeedbackComponent::CancelRecoilAndRestoreBase(const TCHAR* const ReportReason)
+{
+	RTSFunctionLibrary::ReportError(ReportReason);
+	ForceResetRecoilAndSleep();
+}
+
+bool UVehicleFireFeedbackComponent::GetIsFiniteAndWithinAbsLimit(
+	const FVector& Vector,
+	const float MaxAbsValue) const
+{
+	return GetIsFiniteAndWithinAbsLimit(Vector.X, MaxAbsValue)
+		&& GetIsFiniteAndWithinAbsLimit(Vector.Y, MaxAbsValue)
+		&& GetIsFiniteAndWithinAbsLimit(Vector.Z, MaxAbsValue);
+}
+
+bool UVehicleFireFeedbackComponent::GetIsFiniteAndWithinAbsLimit(
+	const float Value,
+	const float MaxAbsValue) const
+{
+	if (not FMath::IsFinite(Value))
+	{
+		return false;
+	}
+
+	if (not FMath::IsFinite(MaxAbsValue))
+	{
+		return false;
+	}
+
+	return FMath::Abs(Value) <= MaxAbsValue;
 }
