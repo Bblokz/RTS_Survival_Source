@@ -6407,13 +6407,14 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerMechanizedDepot)),
 		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerLightSteelForge)),
-		// todo armory.
-		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerArmory)),
 		FTrainingOption(EAllUnitType::UNType_Nomadic,
 		                static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter)),
 		FTrainingOption(EAllUnitType::UNType_Nomadic,
 		                static_cast<uint8>(ENomadicSubtype::Nomadic_GerAirbase)),
 		FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerMedTankFactory)),
+		FTrainingOption(EAllUnitType::UNType_Nomadic,
+		                static_cast<uint8>(ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory)),
 	};
 	// BuildingAnimationTime with vehicle expansion time is total deployment time.
 	NomadicData.BuildingAnimationTime = HQBuildingAnimationTime;
@@ -6718,6 +6719,40 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.ResourceDropOffCapacity = {};
 	M_TPlayerNomadicDataHashMap.Add(ENomadicSubtype::Nomadic_GerCommunicationCenter, NomadicData);
 
+	// ---------------------------------Nomadic Ger Armory----------------------------
+	NomadicData.Abilities = BasicNomadicAbilities;
+	NomadicData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, NomadicT2ArmoryRadixiteCost},
+		{ERTSResourceType::Resource_Metal, NomadicT2ArmoryMetalCost}
+	});
+	NomadicData.EnergySupply = T2ArmorySupply;
+	NomadicData.ExpansionRadius = T2ExpansionRadius;
+	NomadicData.BuildRadius = 0;
+	NomadicData.BuildingExpansionOptions = InitBxpOptions({
+		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
+	});
+
+	NomadicData.MaxAmountBuildingExpansions = 2;
+	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
+	NomadicData.ExperienceMultiplier = 1.0;
+	NomadicData.ExperienceWorth = T2NomadicExp;
+	NomadicData.TrainingOptions = {};
+	NomadicData.BuildingAnimationTime = T2CommunicationCenterBuildingAnimationTime;
+	NomadicData.VehicleExpansionTime = T2TruckVehicleConversionTime;
+	NomadicData.VehiclePackUpTime = T2TruckVehiclePackUpTime;
+	NomadicData.MaxHealthBuilding = T2NomadicBuildingHealth;
+	NomadicData.Building_ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+		NomadicData.MaxHealthBuilding);
+	NomadicData.MaxHealthVehicle = T2NomadicTruckHealth;
+	NomadicData.Vehicle_ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(
+		NomadicData.MaxHealthVehicle);
+	NomadicData.VisionRadiusAsBuilding = T2BuildingRadius;
+	NomadicData.VisionRadiusAsTruck = T2BuildingVisionRadius;
+	NomadicData.VehicleRotationSpeed = 40;
+	NomadicData.VehicleMaxSpeedKmh = 20;
+	NomadicData.ResourceDropOffCapacity = {};
+	M_TPlayerNomadicDataHashMap.Add(ENomadicSubtype::Nomadic_GerArmory, NomadicData);
+
 	// ---------------------------------T2 Nomadic Ger Medium Tank Factory----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
@@ -6830,6 +6865,47 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.ResourceDropOffCapacity = {};
 	NomadicData.RepairPowerMlt = 2.f;
 	M_TPlayerNomadicDataHashMap.Add(ENomadicSubtype::Nomadic_GerAirbase, NomadicData);
+
+	// ---------------------------------T3 Nomadic Ger Experimental Units Factory----------------------------
+	NomadicData.Abilities = BasicNomadicAbilities;
+	NomadicData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, NomadicT3ExperimentalUnitsFactoryRadixiteCost},
+		{ERTSResourceType::Resource_Metal, NomadicT3ExperimentalUnitsFactoryMetalCost}
+	});
+	NomadicData.EnergySupply = T3ExperimentalUnitsFactorySupply;
+	NomadicData.ExpansionRadius = T2ExpansionRadius;
+	NomadicData.BuildRadius = 0;
+	NomadicData.BuildingExpansionOptions = InitBxpOptions({
+		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
+	});
+
+	NomadicData.MaxAmountBuildingExpansions = 2;
+	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
+	NomadicData.ExperienceMultiplier = 1.0;
+	NomadicData.ExperienceWorth = T3NomadicExp;
+	NomadicData.TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherD)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_TigerH1)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Tiger105)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_JagdPanther)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SturmTiger)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Maus)),
+	};
+	NomadicData.BuildingAnimationTime = T3ExperimentalUnitsFactoryBuildingAnimationTime;
+	NomadicData.VehicleExpansionTime = T3TruckVehicleConversionTime;
+	NomadicData.VehiclePackUpTime = T3TruckVehiclePackUpTime;
+	NomadicData.MaxHealthBuilding = T3NomadicBuildingHealth;
+	NomadicData.Building_ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+		NomadicData.MaxHealthBuilding);
+	NomadicData.MaxHealthVehicle = T3NomadicTruckHealth;
+	NomadicData.Vehicle_ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(
+		NomadicData.MaxHealthVehicle);
+	NomadicData.VisionRadiusAsBuilding = T2BuildingRadius;
+	NomadicData.VisionRadiusAsTruck = T2BuildingVisionRadius;
+	NomadicData.VehicleRotationSpeed = 40;
+	NomadicData.VehicleMaxSpeedKmh = 20;
+	NomadicData.ResourceDropOffCapacity = {};
+	M_TPlayerNomadicDataHashMap.Add(ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory, NomadicData);
 
 	M_TEnemyNomadicDataHashMap = M_TPlayerNomadicDataHashMap;
 }

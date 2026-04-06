@@ -1872,6 +1872,29 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Train Armory
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Nomadic,
+			static_cast<uint8>(ENomadicSubtype::Nomadic_GerArmory)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			NomadicT2ArmoryTrainingTime,
+			EAllUnitType::UNType_Nomadic,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_GerArmory,
+			ESquadSubtype::Squad_None,
+			EAircraftSubtype::Aircarft_None,
+			FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(),
+			                                               FTrainingOption(EAllUnitType::UNType_Nomadic,
+			                                                               static_cast<uint8>(
+				                                                               ENomadicSubtype::Nomadic_GerBarracks)))
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 	// Train T2 Medium Tank Factory
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -1919,6 +1942,38 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 			                                               FTrainingOption(EAllUnitType::UNType_Nomadic,
 			                                                               static_cast<uint8>(
 				                                                               ENomadicSubtype::Nomadic_GerCommunicationCenter)))
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// -------------------------------------------------------------------------------------------------------
+	// -------------------------------------- T3 BUILDINGS
+	// -------------------------------------------------------------------------------------------------------
+
+	// Train T3 Experimental Units Factory
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Nomadic,
+			static_cast<uint8>(ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			NomadicT3ExperimentalUnitsFactoryTrainingTime,
+			EAllUnitType::UNType_Nomadic,
+			ETankSubtype::Tank_None,
+			ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory,
+			ESquadSubtype::Squad_None,
+			EAircraftSubtype::Aircarft_None,
+			FRTS_RequirementHelpers::CreateDouble_Unit_Unit(GetTransientPackage(),
+			                                                FTrainingOption(
+				                                                EAllUnitType::UNType_Nomadic,
+				                                                static_cast<uint8>(
+					                                                ENomadicSubtype::Nomadic_GerMedTankFactory)),
+			                                                FTrainingOption(
+				                                                EAllUnitType::UNType_Nomadic,
+				                                                static_cast<uint8>(
+					                                                ENomadicSubtype::Nomadic_GerArmory)))
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}

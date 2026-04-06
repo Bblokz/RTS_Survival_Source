@@ -36,10 +36,13 @@ enum class ENomadicSubtype : uint8
 	Nomadic_GerBarracks UMETA(DisplayName = "Ger Barracks"),
 	Nomadic_GerMechanizedDepot UMETA(DisplayName = "Ger Mechanized Depot"),
 	// Tier 2 -----------------
+	Nomadic_GerArmory UMETA(DisplayName = "Ger Armory"),
 	Nomadic_GerTrainingCentre UMETA(DisplayName = "Ger Training Centre"),
 	Nomadic_GerMedTankFactory UMETA(DisplayName = "Ger Medium Tank Factory"),
 	Nomadic_GerCommunicationCenter UMETA(DisplayName = "Ger Communication Center"),
 	Nomadic_GerAirbase UMETA(DisplayName = "Ger Airbase"),
+	// Tier 3 -----------------
+	Nomadic_GerExperimentalUnitsFactory UMETA(DisplayName = "Ger Experimental Units Factory"),
 };
 
 
@@ -403,10 +406,14 @@ static FString Global_GetNomadicDisplayName(const ENomadicSubtype NomadicSubType
 		return "Barracks";
 	case ENomadicSubtype::Nomadic_GerMechanizedDepot:
 		return "Mechanized Depot";
+	case ENomadicSubtype::Nomadic_GerArmory:
+		return "Armory";
 	case ENomadicSubtype::Nomadic_GerTrainingCentre:
 		return "Training Centre";
 	case ENomadicSubtype::Nomadic_GerAirbase:
 		return "Airbase";
+	case ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory:
+		return "Experimental Units Factory";
 		break;
 	}
 	return "None";
