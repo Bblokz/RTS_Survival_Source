@@ -8,6 +8,7 @@
 
 enum class ETankSubtype : uint8;
 enum class ESquadSubtype : uint8;
+enum class ENomadicSubtype : uint8;
 struct FWeightedDecalMaterial;
 class UGeometryCollection;
 class UScavRewardComponent;
@@ -114,6 +115,12 @@ protected:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="DestroyedVehicle")
 	void SetupAsDestroyedTeamWeapon(const ESquadSubtype SquadSubtype);
+
+	/** @note Overwrites scavenging rewards based on destroyed nomadic building cost with resource-specific scalers.
+	 * @param NomadicSubtype Nomadic subtype used as the base for metal/radixite reward and scavenge time.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="DestroyedVehicle")
+	void SetupAsDestroyedNomadic(const ENomadicSubtype NomadicSubtype);
 
 	/** IF this scavenging object needs to set a mesh manually call this in the constructor.
 	 * @note in post init components we try to find a component with the correct tag if the mesh comp was

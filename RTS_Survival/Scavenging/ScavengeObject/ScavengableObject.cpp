@@ -680,6 +680,36 @@ void AScavengeableObject::SetupAsDestroyedTeamWeapon(const ESquadSubtype SquadSu
 	}
 }
 
+void AScavengeableObject::SetupAsDestroyedNomadic(const ENomadicSubtype NomadicSubtype)
+{
+	float MetalReward = 0.f;
+	float RadixiteReward = 0.f;
+	URTSBlueprintFunctionLibrary::GetDestroyedNomadicRewardAndScavTime(
+		this,
+		NomadicSubtype,
+		MetalReward,
+		RadixiteReward,
+		ScavengeTime
+	);
+
+	ScavengeResources.Empty();
+	if (MetalReward > 0.f)
+	{
+		ScavengeResources.Add(
+			ERTSResourceType::Resource_Metal,
+			FScavengeAmount(true, FMath::RoundToInt(MetalReward), 0, 0, 100)
+		);
+	}
+
+	if (RadixiteReward > 0.f)
+	{
+		ScavengeResources.Add(
+			ERTSResourceType::Resource_Radixite,
+			FScavengeAmount(true, FMath::RoundToInt(RadixiteReward), 0, 0, 100)
+		);
+	}
+}
+
 void AScavengeableObject::SetScavengeMesh(UStaticMeshComponent* NewMeshComp)
 {
 	M_ScavengeMeshComp = NewMeshComp;
