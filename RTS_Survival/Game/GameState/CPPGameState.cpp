@@ -4412,10 +4412,10 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III J
 	TankData.MaxHealth = LightMediumTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
+	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 20;
-	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VehicleMaxSpeedKmh = 25;
+	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, LightMediumTankRadixiteCost},
@@ -4430,10 +4430,10 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III AA
 	TankData.MaxHealth = LightMediumTankBase + 50;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 20;
-	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VehicleRotationSpeed = 40;
+	TankData.TurretRotationSpeed = 35;
+	TankData.VehicleMaxSpeedKmh = 25;
+	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, LightMediumTankRadixiteCost + 100},
@@ -4448,10 +4448,10 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III J Commander (rockets)
 	TankData.MaxHealth = LightMediumTankBase + 150;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 20;
-	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VehicleRotationSpeed = 40;
+	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleMaxSpeedKmh = 25;
+	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, LightMediumTankRadixiteCost},
@@ -4466,10 +4466,10 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III M
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
+	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 20;
-	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VehicleMaxSpeedKmh = 22;
+	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost},
@@ -4485,10 +4485,10 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III FLAMM
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
+	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 20;
-	TankData.VehicleMaxSpeedKmh = 20;
-	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VehicleMaxSpeedKmh = 24;
+	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 200},
@@ -4584,10 +4584,10 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Brummbär
 	TankData.MaxHealth = MediumTankHealthBase + 400;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 20;
+	TankData.VehicleRotationSpeed = 30;
 	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 18;
-	TankData.VehicleReverseSpeedKmh = 10;
+	TankData.VehicleMaxSpeedKmh = 22;
+	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 150},
@@ -4602,10 +4602,10 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// StuG (medium TD) 
 	TankData.MaxHealth = MediumTankHealthBase - OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
+	TankData.VehicleRotationSpeed = 45;
 	TankData.TurretRotationSpeed = 15;
-	TankData.VehicleMaxSpeedKmh = 22;
-	TankData.VehicleReverseSpeedKmh = 12;
+	TankData.VehicleMaxSpeedKmh = 26;
+	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, MediumTankDestroyerRadixiteCost},

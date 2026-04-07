@@ -683,6 +683,8 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			InWorldDebug += "NavData: " + NavDataStr + "\n";
 			// Add steering:
 			InWorldDebug += "Steering Input: " + FString::SanitizeFloat(M_LastSteeringInput) + "\n";
+			// Add throttle:
+			InWorldDebug += "Throttle Input: " + FString::SanitizeFloat(M_LastThrottleInput) + "\n";
 
 			// NEW: resolve agent name using our registry (match by radius/height/class)
 			const URTSNavAgentRegistry* NavAgentRegistry = URTSNavAgentRegistry::Get(this);

@@ -85,7 +85,6 @@ void UTrackPhysicsMovement::BeginPlay()
 	BeginPlay_InitRuntimeTrackPhysicsTuningSnapshot();
 	SetActive(true);
 
-	// ...
 }
 
 void UTrackPhysicsMovement::BeginPlay_InitRuntimeTrackPhysicsTuningSnapshot()
