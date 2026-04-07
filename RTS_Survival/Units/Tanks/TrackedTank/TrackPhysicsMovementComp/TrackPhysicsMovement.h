@@ -18,7 +18,6 @@ USTRUCT(BlueprintType)
 struct FTrackAsyncForceMotorSettings
 {
 	GENERATED_BODY()
-
 	/** @brief Scales speed error into target longitudinal acceleration so throttle intent reaches target speed smoothly.
 	 * Example: if throttle response feels lazy, increase by +0.5; if it oscillates around target speed, decrease by -0.5.
 	 */
