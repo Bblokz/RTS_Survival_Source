@@ -9,6 +9,46 @@
 
 
 class RTS_SURVIVAL_API UChassisAnimInstance;
+namespace Chaos
+{
+	class FRigidBodyHandle_Internal;
+}
+
+USTRUCT(BlueprintType)
+struct FTrackAsyncForceMotorSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_SpeedErrorToAccelerationGain = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxLongitudinalAcceleration = 2500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_LongitudinalTractionCoefficient = 1.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_LateralSlipDamping = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxLateralForceRatio = 0.9f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_YawRateErrorToAccelerationGain = 7.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxYawAcceleration = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_YawInertiaScale = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxYawTorqueRatio = 0.75f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MinGroundConfidenceForFullAuthority = 0.65f;
+};
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UTrackPhysicsMovement : public UAsyncTickActorComponent
@@ -72,6 +112,14 @@ protected:
 	virtual void AsyncTick(float DeltaTime) override;
 
 private:
+	bool GetIsValidTankMesh() const;
+	bool GetIsValidTankAnimationBP() const;
+
+	void ApplyForceMotorForPathFollowing(
+		const float CurrentThrottle,
+		const float CurrentSteeringInDeg,
+		const Chaos::FRigidBodyHandle_Internal* RigidBody);
+
 	float M_TurnRate;
 	float M_InclineAngle = 0.0f;
 	float M_MeshTraceZOffset;
@@ -82,21 +130,28 @@ private:
 	// The skeletal mesh of this tank.
 	// Exists on both the tank as well as the physics track movement component for quick access.
 	UPROPERTY()
-	USkeletalMeshComponent* M_TankMesh;
+	TObjectPtr<USkeletalMeshComponent> M_TankMesh = nullptr;
 
 	// Exists both on the tank as well as the physics track movement component for quick accesss.
 	UPROPERTY()
-	UChassisAnimInstance* TankAnimationBP;
+	TObjectPtr<UChassisAnimInstance> M_TankAnimationBP = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor", meta=(AllowPrivateAccess=true))
+	FTrackAsyncForceMotorSettings M_ForceMotorSettings;
 
 	/**
 	 * Trace the landscape to find the incline angle.
 	 * @param OutGroundNormal The normal vector averaged over two points on the landscape.
 	 * @param OutIncline The calculated incline angle of the landscape
+	 * @param OutGroundConfidence Confidence [0-1] used to blend force authority on unreliable traces.
 	 * @param StartLocation
 	 * @return True if a successful trace was performed.
 	 */
-	bool PerformGroundTrace(FVector& OutGroundNormal, float& OutIncline, const FVector& StartLocation) const;
+	bool PerformGroundTrace(
+		FVector& OutGroundNormal,
+		float& OutIncline,
+		float& OutGroundConfidence,
+		const FVector& StartLocation) const;
 
 	TAtomic<float> M_CurrentThrottle{0.0f};
 	TAtomic<float> M_TrackForceMultiplier;
