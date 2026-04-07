@@ -70,20 +70,12 @@ void UTrackPhysicsMovement::InitTrackPhysicsMovement(
 }
 
 
-void UTrackPhysicsMovement::SetImpulseTorqueMultipliers(const float NewImpulseMultiplier,
-                                                        const float NewTorqueMultiplier)
-{
-	ImpulseMultiplier = NewImpulseMultiplier;
-	TorqueMultiplier = NewTorqueMultiplier;
-}
-
 // Called when the game starts
 void UTrackPhysicsMovement::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_InitRuntimeTrackPhysicsTuningSnapshot();
 	SetActive(true);
-
 }
 
 void UTrackPhysicsMovement::BeginPlay_InitRuntimeTrackPhysicsTuningSnapshot()
@@ -255,7 +247,8 @@ bool UTrackPhysicsMovement::PerformGroundTrace(FVector& OutGroundNormal, float& 
 
 	if (bHit and bHit2)
 	{
-		if (FVector::DotProduct(Hit.Normal, Hit2.Normal) < TrackPhysicsMovementConstants::GroundTraceConfidenceDotThreshold)
+		if (FVector::DotProduct(Hit.Normal, Hit2.Normal) <
+			TrackPhysicsMovementConstants::GroundTraceConfidenceDotThreshold)
 		{
 			return TryUseCachedGroundTraceSample(OutGroundNormal, OutIncline);
 		}
@@ -329,7 +322,8 @@ bool UTrackPhysicsMovement::TryGetGroundTraceFromSingleHit(
 			M_CachedGroundNormalX.Load(),
 			M_CachedGroundNormalY.Load(),
 			M_CachedGroundNormalZ.Load()).GetSafeNormal();
-		BlendedGroundNormal = (SingleHitNormal * TrackPhysicsMovementConstants::GroundTraceSingleHitCurrentNormalBlendAlpha)
+		BlendedGroundNormal = (SingleHitNormal *
+				TrackPhysicsMovementConstants::GroundTraceSingleHitCurrentNormalBlendAlpha)
 			+ (CachedNormal * (1.0f - TrackPhysicsMovementConstants::GroundTraceSingleHitCurrentNormalBlendAlpha));
 	}
 
@@ -355,7 +349,8 @@ bool UTrackPhysicsMovement::GetDesiredPlanarVelocityStrategyB(
 	const FVector CurrentLinearVelocity = RigidBody->V();
 	const FQuat CurrentRotation = RigidBody->R();
 	const float CurrentThrottle = M_CurrentThrottle.Load();
-	const float CurrentSignedForwardSpeed = FVector::DotProduct(CurrentLinearVelocity, CurrentRotation.GetForwardVector());
+	const float CurrentSignedForwardSpeed = FVector::DotProduct(CurrentLinearVelocity,
+	                                                            CurrentRotation.GetForwardVector());
 	const float TargetForwardSpeed = M_TrackForceMultiplier.Load() * CurrentThrottle;
 	const float BlendedTargetSpeed = FMath::FInterpTo(
 		CurrentSignedForwardSpeed,
@@ -385,7 +380,7 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 	const FVector VelocityCorrectionAcceleration =
 		VelocityError * M_RuntimeTrackPhysicsMovementTuningSnapshot.VelocityCorrectionGain;
 	const FVector ClampedVelocityCorrectionAcceleration = VelocityCorrectionAcceleration.GetClampedToMaxSize(
-		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration * ImpulseMultiplier);
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration);
 
 	const FVector RightDirection = RigidBody->R().GetRightVector();
 	const FVector PlanarRightDirection = FVector::VectorPlaneProject(RightDirection, GroundNormal).GetSafeNormal();
@@ -399,6 +394,16 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 
 void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandle_Internal* RigidBody) const
 {
+	const float CurrentSteeringDeg = M_CurrentSteeringInDeg.Load();
+	const float CurrentThrottle = M_CurrentThrottle.Load();
+
+	if (FMath::IsNearlyZero(CurrentThrottle, KINDA_SMALL_NUMBER))
+	{
+		// Deadzone logic.
+		UAsyncTickFunctions::ATP_SetAngularVelocityInDegrees(M_TankMesh, FVector(-1, 0, CurrentSteeringDeg),
+		                                                     false, NAME_None);
+		return;
+	}
 	const FVector UpDirection = RigidBody->R().GetUpVector();
 	const float CurrentYawRateRadians = FVector::DotProduct(RigidBody->W(), UpDirection);
 	const float TargetYawRateRadians = FMath::DegreesToRadians(
@@ -406,8 +411,8 @@ void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandl
 	const float YawRateError = TargetYawRateRadians - CurrentYawRateRadians;
 	const float DesiredYawAngularAcceleration = FMath::Clamp(
 		YawRateError * M_RuntimeTrackPhysicsMovementTuningSnapshot.YawRateCorrectionGain,
-		-M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration * TorqueMultiplier,
-		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration * TorqueMultiplier);
+		-M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration,
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration);
 
 	const Chaos::FMatrix33 WorldInertiaTensor = Chaos::FParticleUtilitiesXR::GetWorldInertia(RigidBody);
 	const float YawInertia = FMath::Max(

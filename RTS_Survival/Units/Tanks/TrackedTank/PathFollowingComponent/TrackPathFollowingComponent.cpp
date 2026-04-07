@@ -477,12 +477,6 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 	bM_IsInDeadzone = false;
 	bM_IsInReverseDeadzone = false;
 	UpdateReverseDeadzoneStateForNewPath();
-
-	// Debug message
-	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
-	{
-		RTSFunctionLibrary::PrintString("Path Updated: bIsStuck and timers reset!");
-	}
 }
 
 bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)

@@ -158,9 +158,6 @@ public:
 
 	inline void UpdateTurnRate(const float NewTurnRate) { M_TurnRate = NewTurnRate; }
 
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Testing")
-	void SetImpulseTorqueMultipliers(const float NewImpulseMultiplier, const float NewTorqueMultiplier);
-
 	/** @return The last throttle value that was not zero when navigating the previously followed path. */
 	inline float GetLastNoneZeroThrottle() const { return LastNoneZeroThrottle; }
 
@@ -241,9 +238,6 @@ private:
 	float M_TurnRate;
 	float M_InclineAngle = 0.0f;
 	float M_MeshTraceZOffset;
-
-	float ImpulseMultiplier = 1.0f;
-	float TorqueMultiplier = 1.0f;
 
 	// The skeletal mesh of this tank.
 	// Exists on both the tank as well as the physics track movement component for quick access.
