@@ -33,7 +33,7 @@ namespace TrackPhysicsMovementConstants
 	/** @brief Increase for longer vehicles to sample terrain further ahead; decrease if crest transitions become delayed. */
 	constexpr float GroundTraceForwardDistance = 200.0f;
 	/** @brief Increase when traces lose contact on sharp dips; decrease if traces incorrectly latch onto lower geometry. */
-	constexpr float GroundTraceDownDistance = 100.0f;
+	constexpr float GroundTraceDownDistance = 300.0f;
 	/** @brief Raise to reject noisy normals on broken terrain; lower if movement drops out too often on uneven ground. */
 	constexpr float GroundTraceConfidenceDotThreshold = 0.9f;
 	/** @brief Lower bound to avoid zero-inertia torque calculations on malformed or unloaded body data. */
