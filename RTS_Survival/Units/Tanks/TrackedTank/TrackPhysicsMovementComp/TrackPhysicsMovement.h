@@ -9,6 +9,76 @@
 
 
 class RTS_SURVIVAL_API UChassisAnimInstance;
+namespace Chaos
+{
+	class FRigidBodyHandle_Internal;
+}
+
+USTRUCT(BlueprintType)
+struct FTrackAsyncForceMotorSettings
+{
+	GENERATED_BODY()
+
+	/** @brief Scales speed error into target longitudinal acceleration so throttle intent reaches target speed smoothly.
+	 * Example: if throttle response feels lazy, increase by +0.5; if it oscillates around target speed, decrease by -0.5.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_SpeedErrorToAccelerationGain = 4.0f;
+
+	/** @brief Hard cap for requested forward/reverse acceleration in cm/s² to prevent aggressive force spikes.
+	 * Example: if uphill starts fail, raise by +200; if launches look arcade-like, lower by -200.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxLongitudinalAcceleration = 2500.0f;
+
+	/** @brief Converts estimated normal load into available drive traction; lower values reduce hill-climb authority and wheel-slip risk.
+	 * Example: if tracks spin too much on slopes, lower by -0.1; if vehicle cannot hold grade, increase by +0.1.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_LongitudinalTractionCoefficient = 1.4f;
+
+	/** @brief Damps body-right slip velocity to reduce ice-skating while still allowing controlled lateral compliance on uneven terrain.
+	 * Example: if sideways skating appears, increase by +1.0; if turns feel too sticky, decrease by -1.0.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_LateralSlipDamping = 8.0f;
+
+	/** @brief Fraction of longitudinal traction budget reserved for lateral slip correction to avoid sideways over-constraining.
+	 * Example: if lateral correction is weak on side slopes, increase by +0.05; if jitter appears on rough ground, lower by -0.05.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxLateralForceRatio = 0.9f;
+
+	/** @brief Scales yaw-rate error into yaw angular acceleration so steering behaves like a servo instead of instant angular velocity override.
+	 * Example: if steering reacts slowly, increase by +0.5; if it wobbles after turn-in, decrease by -0.5.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_YawRateErrorToAccelerationGain = 7.0f;
+
+	/** @brief Absolute limit for yaw angular acceleration in rad/s² to keep turn response stable during abrupt steering changes.
+	 * Example: if pivot turns stall, increase by +0.3; if snap-turns look unrealistic, decrease by -0.3.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxYawAcceleration = 4.0f;
+
+	/** @brief Multiplier applied to inertia-derived yaw moment estimate to tune rotational heaviness without changing vehicle mass setup.
+	 * Example: if hull feels too sluggish in yaw, lower by -0.05; if it rotates too freely, increase by +0.05.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_YawInertiaScale = 0.35f;
+
+	/** @brief Fraction of traction budget allowed for yaw torque output, preventing turn-in from overpowering contact constraints.
+	 * Example: if steering cannot bite under load, increase by +0.05; if terrain chatter appears while turning, decrease by -0.05.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MaxYawTorqueRatio = 0.75f;
+
+	/** @brief Ground-trace confidence threshold where full force authority is restored; below this value output is conservatively blended down.
+	 * Example: if force drops too often on uneven ground, lower by -0.05; if bad traces still cause jitter, increase by +0.05.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor")
+	float M_MinGroundConfidenceForFullAuthority = 0.65f;
+};
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UTrackPhysicsMovement : public UAsyncTickActorComponent
@@ -72,6 +142,14 @@ protected:
 	virtual void AsyncTick(float DeltaTime) override;
 
 private:
+	bool GetIsValidTankMesh() const;
+	bool GetIsValidTankAnimationBP() const;
+
+	void ApplyForceMotorForPathFollowing(
+		const float CurrentThrottle,
+		const float CurrentSteeringInDeg,
+		const Chaos::FRigidBodyHandle_Internal* RigidBody);
+
 	float M_TurnRate;
 	float M_InclineAngle = 0.0f;
 	float M_MeshTraceZOffset;
@@ -82,21 +160,28 @@ private:
 	// The skeletal mesh of this tank.
 	// Exists on both the tank as well as the physics track movement component for quick access.
 	UPROPERTY()
-	USkeletalMeshComponent* M_TankMesh;
+	TObjectPtr<USkeletalMeshComponent> M_TankMesh = nullptr;
 
 	// Exists both on the tank as well as the physics track movement component for quick accesss.
 	UPROPERTY()
-	UChassisAnimInstance* TankAnimationBP;
+	TObjectPtr<UChassisAnimInstance> M_TankAnimationBP = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|ForceMotor", meta=(AllowPrivateAccess=true))
+	FTrackAsyncForceMotorSettings M_ForceMotorSettings;
 
 	/**
 	 * Trace the landscape to find the incline angle.
 	 * @param OutGroundNormal The normal vector averaged over two points on the landscape.
 	 * @param OutIncline The calculated incline angle of the landscape
+	 * @param OutGroundConfidence Confidence [0-1] used to blend force authority on unreliable traces.
 	 * @param StartLocation
 	 * @return True if a successful trace was performed.
 	 */
-	bool PerformGroundTrace(FVector& OutGroundNormal, float& OutIncline, const FVector& StartLocation) const;
+	bool PerformGroundTrace(
+		FVector& OutGroundNormal,
+		float& OutIncline,
+		float& OutGroundConfidence,
+		const FVector& StartLocation) const;
 
 	TAtomic<float> M_CurrentThrottle{0.0f};
 	TAtomic<float> M_TrackForceMultiplier;
