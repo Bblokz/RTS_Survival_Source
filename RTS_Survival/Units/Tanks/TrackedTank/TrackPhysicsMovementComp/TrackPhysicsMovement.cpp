@@ -17,19 +17,19 @@ namespace TrackPhysicsMovementConstants
 	 */
 
 	/** @brief Raise when throttle response feels sluggish; lower when acceleration overshoots target speed. */
-	constexpr float DesiredSpeedInterpRate = 5.0f;
+	constexpr float DesiredSpeedInterpRate = 40.0f;
 	/** @brief Raise when steady-state speed error remains; lower when force corrections oscillate on rough terrain. */
-	constexpr float VelocityCorrectionGain = 6.0f;
+	constexpr float VelocityCorrectionGain = 10.0f; // was 6
 	/** @brief Raise for heavier vehicles that cannot climb; lower when vehicles surge or wheel-spin on command changes. */
-	constexpr float MaxCorrectionAcceleration = 2200.0f;
+	constexpr float MaxCorrectionAcceleration = 2500.0f;
 	/** @brief Raise when steering lags behind commanded yaw; lower when heading oscillates during corner entry. */
 	constexpr float YawRateCorrectionGain = 3.0f;
 	/** @brief Raise when turning authority is too weak; lower if fast steering causes tipping or jitter on slopes. */
-	constexpr float MaxYawAngularAcceleration = 8.0f;
+	constexpr float MaxYawAngularAcceleration = 20.0f; // was 8
 	/** @brief Set to -1 only if steering input direction is empirically reversed for this vehicle rig. */
 	constexpr float SteeringToYawDirectionSign = 1.0f;
 	/** @brief Raise when the vehicle side-slips or “ice skates”; lower if the chassis feels glued and cannot drift naturally. */
-	constexpr float LateralDampingFactor = 5.0f;
+	constexpr float LateralDampingFactor = 2.0f;
 	/** @brief Increase for longer vehicles to sample terrain further ahead; decrease if crest transitions become delayed. */
 	constexpr float GroundTraceForwardDistance = 200.0f;
 	/** @brief Increase when traces lose contact on sharp dips; decrease if traces incorrectly latch onto lower geometry. */
@@ -345,7 +345,7 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 		TrackPhysicsMovementConstants::LateralDampingFactor;
 	const FVector TotalAcceleration = ClampedVelocityCorrectionAcceleration + LateralDampingAcceleration;
 	const FVector DriveForce = TotalAcceleration * TankMass;
-	MutableBodyInstance->AddForce(DriveForce, false, true);
+	MutableBodyInstance->AddForce(DriveForce, false, false);
 }
 
 void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandle_Internal* RigidBody) const
@@ -375,7 +375,7 @@ void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandl
 		TankBodyInstance->GetBodyInertiaTensor().Z,
 		TrackPhysicsMovementConstants::MinimumYawInertia);
 	const FVector YawTorque = UpDirection * DesiredYawAngularAcceleration * YawInertia;
-	MutableBodyInstance->AddTorqueInRadians(YawTorque, false, true);
+	MutableBodyInstance->AddTorqueInRadians(YawTorque, false, false);
 }
 
 bool UTrackPhysicsMovement::GetIsValidTankMesh() const
