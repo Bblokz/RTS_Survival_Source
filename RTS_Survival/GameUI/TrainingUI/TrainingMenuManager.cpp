@@ -1973,7 +1973,7 @@ void UTrainingMenuManager::InitAllGameNomadicTrainingOptions()
 			                                                FTrainingOption(
 				                                                EAllUnitType::UNType_Nomadic,
 				                                                static_cast<uint8>(
-					                                                ENomadicSubtype::Nomadic_GerArmory)))
+					                                                ENomadicSubtype::Nomadic_GerCommunicationCenter)))
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
