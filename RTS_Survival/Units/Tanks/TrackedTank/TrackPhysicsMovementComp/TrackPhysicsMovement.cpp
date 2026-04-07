@@ -12,32 +12,17 @@
 namespace TrackPhysicsMovementConstants
 {
 	/**
-	 * @brief Shared Strategy-B tuning constants for tracked movement force execution.
-	 * Increase only the constant linked to the observed symptom so tuning stays predictable.
+	 * @brief Shared Strategy-B constants that remain global for all tracked vehicles.
 	 */
 
-	/** @brief Raise when throttle response feels sluggish; lower when acceleration overshoots target speed. */
-	constexpr float DesiredSpeedInterpRate = 40.0f;
-	/** @brief Raise when steady-state speed error remains; lower when force corrections oscillate on rough terrain. */
-	constexpr float VelocityCorrectionGain = 10.0f; // was 6
-	/** @brief Raise for heavier vehicles that cannot climb; lower when vehicles surge or wheel-spin on command changes. */
-	constexpr float MaxCorrectionAcceleration = 2500.0f;
-	/** @brief Raise when steering lags behind commanded yaw; lower when heading oscillates during corner entry. */
-	constexpr float YawRateCorrectionGain = 3.0f;
-	/** @brief Raise when turning authority is too weak; lower if fast steering causes tipping or jitter on slopes. */
-	constexpr float MaxYawAngularAcceleration = 20.0f; // was 8
 	/** @brief Set to -1 only if steering input direction is empirically reversed for this vehicle rig. */
 	constexpr float SteeringToYawDirectionSign = 1.0f;
-	/** @brief Raise when the vehicle side-slips or “ice skates”; lower if the chassis feels glued and cannot drift naturally. */
-	constexpr float LateralDampingFactor = 2.0f;
-	/** @brief Increase for longer vehicles to sample terrain further ahead; decrease if crest transitions become delayed. */
-	constexpr float GroundTraceForwardDistance = 200.0f;
-	/** @brief Increase when traces lose contact on sharp dips; decrease if traces incorrectly latch onto lower geometry. */
-	constexpr float GroundTraceDownDistance = 300.0f;
 	/** @brief Raise to reject noisy normals on broken terrain; lower if movement drops out too often on uneven ground. */
 	constexpr float GroundTraceConfidenceDotThreshold = 0.9f;
-	/** @brief Lower bound to avoid zero-inertia torque calculations on malformed or unloaded body data. */
-	constexpr float MinimumYawInertia = 1.0f;
+	/** @brief Blend weight for the current single-hit normal when one of the two terrain traces misses. */
+	constexpr float GroundTraceSingleHitCurrentNormalBlendAlpha = 0.7f;
+	/** @brief Number of consecutive failed trace frames that may still reuse the last valid ground sample. */
+	constexpr int32 GroundTraceFailureHoldFrames = 6;
 }
 
 
@@ -97,9 +82,15 @@ void UTrackPhysicsMovement::SetImpulseTorqueMultipliers(const float NewImpulseMu
 void UTrackPhysicsMovement::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_InitRuntimeTrackPhysicsTuningSnapshot();
 	SetActive(true);
 
 	// ...
+}
+
+void UTrackPhysicsMovement::BeginPlay_InitRuntimeTrackPhysicsTuningSnapshot()
+{
+	M_RuntimeTrackPhysicsMovementTuningSnapshot = M_TrackPhysicsMovementTuning;
 }
 
 void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
@@ -247,14 +238,15 @@ bool UTrackPhysicsMovement::PerformGroundTrace(FVector& OutGroundNormal, float& 
 	}
 
 	const FVector TraceOrigin = StartLocation + FVector(0, 0, M_MeshTraceZOffset);
-	const FVector ForwardOffset = M_TankMesh->GetForwardVector() * TrackPhysicsMovementConstants::GroundTraceForwardDistance;
+	const FVector ForwardOffset = M_TankMesh->GetForwardVector() *
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.GroundTraceForwardDistance;
 
 	const FVector Start = TraceOrigin - ForwardOffset;
-	const FVector End = Start - FVector(0, 0, TrackPhysicsMovementConstants::GroundTraceDownDistance);
+	const FVector End = Start - FVector(0, 0, M_RuntimeTrackPhysicsMovementTuningSnapshot.GroundTraceDownDistance);
 	FHitResult Hit;
 
 	const FVector Start2 = TraceOrigin + ForwardOffset;
-	const FVector End2 = Start2 - FVector(0, 0, TrackPhysicsMovementConstants::GroundTraceDownDistance);
+	const FVector End2 = Start2 - FVector(0, 0, M_RuntimeTrackPhysicsMovementTuningSnapshot.GroundTraceDownDistance);
 	FHitResult Hit2;
 
 
@@ -263,26 +255,96 @@ bool UTrackPhysicsMovement::PerformGroundTrace(FVector& OutGroundNormal, float& 
 	const bool bHit = World->LineTraceSingleByChannel(Hit, Start, End, COLLISION_TRACE_LANDSCAPE, Params);
 	const bool bHit2 = World->LineTraceSingleByChannel(Hit2, Start2, End2, COLLISION_TRACE_LANDSCAPE, Params);
 
-	if (not bHit || not bHit2)
+	if (bHit and bHit2)
+	{
+		if (FVector::DotProduct(Hit.Normal, Hit2.Normal) < TrackPhysicsMovementConstants::GroundTraceConfidenceDotThreshold)
+		{
+			return TryUseCachedGroundTraceSample(OutGroundNormal, OutIncline);
+		}
+
+		// compute the normal of the landscape.
+		OutGroundNormal = (Hit.Normal + Hit2.Normal) * 0.5;
+		OutGroundNormal.Normalize();
+
+		// Calculate the incline angle between the two points
+		const FVector InclineVector = Hit2.ImpactPoint - Hit.ImpactPoint;
+		const FVector HorizontalVector = FVector(InclineVector.X, InclineVector.Y, 0).GetSafeNormal();
+		OutIncline = FMath::RadiansToDegrees(
+			FMath::Acos(FVector::DotProduct(HorizontalVector, InclineVector.GetSafeNormal())));
+		CacheGroundTraceSample(OutGroundNormal, OutIncline);
+		return true;
+	}
+
+	if (bHit or bHit2)
+	{
+		return TryGetGroundTraceFromSingleHit(bHit, Hit, Hit2, OutGroundNormal, OutIncline);
+	}
+
+	return TryUseCachedGroundTraceSample(OutGroundNormal, OutIncline);
+}
+
+void UTrackPhysicsMovement::CacheGroundTraceSample(const FVector& GroundNormal, const float Incline) const
+{
+	M_CachedGroundNormalX.Store(GroundNormal.X);
+	M_CachedGroundNormalY.Store(GroundNormal.Y);
+	M_CachedGroundNormalZ.Store(GroundNormal.Z);
+	M_CachedInclineAngle.Store(Incline);
+	M_ConsecutiveGroundTraceFailureCount.Store(0);
+	bM_HasCachedGroundTraceSample.Store(true);
+}
+
+bool UTrackPhysicsMovement::TryUseCachedGroundTraceSample(FVector& OutGroundNormal, float& OutIncline) const
+{
+	const int32 ConsecutiveFailureCount = M_ConsecutiveGroundTraceFailureCount.Load() + 1;
+	M_ConsecutiveGroundTraceFailureCount.Store(ConsecutiveFailureCount);
+
+	if (not bM_HasCachedGroundTraceSample.Load())
 	{
 		return false;
 	}
 
-	if (FVector::DotProduct(Hit.Normal, Hit2.Normal) < TrackPhysicsMovementConstants::GroundTraceConfidenceDotThreshold)
+	if (ConsecutiveFailureCount > TrackPhysicsMovementConstants::GroundTraceFailureHoldFrames)
 	{
 		return false;
 	}
 
-	// compute the normal of the landscape.
-	OutGroundNormal = (Hit.Normal + Hit2.Normal) * 0.5;
-	OutGroundNormal.Normalize();
+	OutGroundNormal = FVector(
+		M_CachedGroundNormalX.Load(),
+		M_CachedGroundNormalY.Load(),
+		M_CachedGroundNormalZ.Load()).GetSafeNormal();
+	OutIncline = M_CachedInclineAngle.Load();
+	return true;
+}
 
-	// Calculate the incline angle between the two points
-	const FVector InclineVector = Hit2.ImpactPoint - Hit.ImpactPoint;
-	const FVector HorizontalVector = FVector(InclineVector.X, InclineVector.Y, 0).GetSafeNormal();
-	OutIncline = FMath::RadiansToDegrees(
-		FMath::Acos(FVector::DotProduct(HorizontalVector, InclineVector.GetSafeNormal())));
+bool UTrackPhysicsMovement::TryGetGroundTraceFromSingleHit(
+	const bool bFrontTraceHit,
+	const FHitResult& FrontHit,
+	const FHitResult& RearHit,
+	FVector& OutGroundNormal,
+	float& OutIncline) const
+{
+	const FVector SingleHitNormal = bFrontTraceHit ? FrontHit.Normal : RearHit.Normal;
+	FVector BlendedGroundNormal = SingleHitNormal;
+	if (bM_HasCachedGroundTraceSample.Load())
+	{
+		const FVector CachedNormal = FVector(
+			M_CachedGroundNormalX.Load(),
+			M_CachedGroundNormalY.Load(),
+			M_CachedGroundNormalZ.Load()).GetSafeNormal();
+		BlendedGroundNormal = (SingleHitNormal * TrackPhysicsMovementConstants::GroundTraceSingleHitCurrentNormalBlendAlpha)
+			+ (CachedNormal * (1.0f - TrackPhysicsMovementConstants::GroundTraceSingleHitCurrentNormalBlendAlpha));
+	}
 
+	OutGroundNormal = BlendedGroundNormal.GetSafeNormal();
+	if (bM_HasCachedGroundTraceSample.Load())
+	{
+		OutIncline = M_CachedInclineAngle.Load();
+	}
+	else
+	{
+		OutIncline = 0.0f;
+	}
+	CacheGroundTraceSample(OutGroundNormal, OutIncline);
 	return true;
 }
 
@@ -301,7 +363,7 @@ bool UTrackPhysicsMovement::GetDesiredPlanarVelocityStrategyB(
 		CurrentSignedForwardSpeed,
 		TargetForwardSpeed,
 		DeltaTime,
-		TrackPhysicsMovementConstants::DesiredSpeedInterpRate);
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.DesiredSpeedInterpRate);
 
 	float Incline;
 	if (not PerformGroundTrace(OutGroundNormal, Incline, RigidBody->X()))
@@ -334,15 +396,16 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 	const FVector CurrentLinearVelocity = RigidBody->V();
 	const float TankMass = TankBodyInstance->GetBodyMass();
 	const FVector VelocityError = DesiredPlanarVelocity - CurrentLinearVelocity;
-	const FVector VelocityCorrectionAcceleration = VelocityError * TrackPhysicsMovementConstants::VelocityCorrectionGain;
+	const FVector VelocityCorrectionAcceleration =
+		VelocityError * M_RuntimeTrackPhysicsMovementTuningSnapshot.VelocityCorrectionGain;
 	const FVector ClampedVelocityCorrectionAcceleration = VelocityCorrectionAcceleration.GetClampedToMaxSize(
-		TrackPhysicsMovementConstants::MaxCorrectionAcceleration * ImpulseMultiplier);
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration * ImpulseMultiplier);
 
 	const FVector RightDirection = RigidBody->R().GetRightVector();
 	const FVector PlanarRightDirection = FVector::VectorPlaneProject(RightDirection, GroundNormal).GetSafeNormal();
 	const float LateralSpeed = FVector::DotProduct(CurrentLinearVelocity, PlanarRightDirection);
 	const FVector LateralDampingAcceleration = -PlanarRightDirection * LateralSpeed *
-		TrackPhysicsMovementConstants::LateralDampingFactor;
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.LateralDampingFactor;
 	const FVector TotalAcceleration = ClampedVelocityCorrectionAcceleration + LateralDampingAcceleration;
 	const FVector DriveForce = TotalAcceleration * TankMass;
 	MutableBodyInstance->AddForce(DriveForce, false, false);
@@ -368,12 +431,12 @@ void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandl
 		M_CurrentSteeringInDeg.Load() * TrackPhysicsMovementConstants::SteeringToYawDirectionSign);
 	const float YawRateError = TargetYawRateRadians - CurrentYawRateRadians;
 	const float DesiredYawAngularAcceleration = FMath::Clamp(
-		YawRateError * TrackPhysicsMovementConstants::YawRateCorrectionGain,
-		-TrackPhysicsMovementConstants::MaxYawAngularAcceleration * TorqueMultiplier,
-		TrackPhysicsMovementConstants::MaxYawAngularAcceleration * TorqueMultiplier);
+		YawRateError * M_RuntimeTrackPhysicsMovementTuningSnapshot.YawRateCorrectionGain,
+		-M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration * TorqueMultiplier,
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration * TorqueMultiplier);
 	const float YawInertia = FMath::Max(
 		TankBodyInstance->GetBodyInertiaTensor().Z,
-		TrackPhysicsMovementConstants::MinimumYawInertia);
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.MinimumYawInertia);
 	const FVector YawTorque = UpDirection * DesiredYawAngularAcceleration * YawInertia;
 	MutableBodyInstance->AddTorqueInRadians(YawTorque, false, false);
 }
