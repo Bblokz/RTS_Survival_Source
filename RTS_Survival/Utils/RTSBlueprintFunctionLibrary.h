@@ -257,6 +257,23 @@ public:
 		float& OutRadixiteReward,
 		float& TimeToScavenge);
 
+	/**
+	 * @brief Uses nomadic building costs to compute scavenge rewards with per-resource downscaling.
+	 * @param WorldContextObject Context used to access the game state.
+	 * @param NomadicSubtype Nomadic subtype whose build costs are used as the reward source.
+	 * @param OutMetalReward Scavenge reward in metal after nomadic-metal multiplier.
+	 * @param OutRadixiteReward Scavenge reward in radixite after nomadic-radixite multiplier.
+	 * @param TimeToScavenge Final scavenging time scaled by total reward amount.
+	 * @return Sum of metal and radixite rewards.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="UnitData")
+	static float GetDestroyedNomadicRewardAndScavTime(
+		UObject* WorldContextObject,
+		ENomadicSubtype NomadicSubtype,
+		float& OutMetalReward,
+		float& OutRadixiteReward,
+		float& TimeToScavenge);
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="RTSDecal")
 	static void RTSSpawnDecal(const UObject* WorldContextObject,

@@ -90,6 +90,18 @@ namespace DeveloperSettings
 			inline const FVector2D ResourceFromDestroyedTeamWeaponMltRange = FVector2D(
 				PercentageResourceFromDestroyedTeamWeaponMin / 100.f,
 				PercentageResourceFromDestroyedTeamWeaponMax / 100.f);
+
+			inline constexpr int32 PercentageResourceFromDestroyedNomadicRadixiteMin = 35;
+			inline constexpr int32 PercentageResourceFromDestroyedNomadicRadixiteMax = 60;
+			inline const FVector2D ResourceFromDestroyedNomadicRadixiteMltRange = FVector2D(
+				PercentageResourceFromDestroyedNomadicRadixiteMin / 100.f,
+				PercentageResourceFromDestroyedNomadicRadixiteMax / 100.f);
+
+			inline constexpr int32 PercentageResourceFromDestroyedNomadicMetalMin = 30;
+			inline constexpr int32 PercentageResourceFromDestroyedNomadicMetalMax = 55;
+			inline const FVector2D ResourceFromDestroyedNomadicMetalMltRange = FVector2D(
+				PercentageResourceFromDestroyedNomadicMetalMin / 100.f,
+				PercentageResourceFromDestroyedNomadicMetalMax / 100.f);
 		}
 
 		namespace DigInWalls

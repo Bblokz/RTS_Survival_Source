@@ -464,6 +464,58 @@ float URTSBlueprintFunctionLibrary::GetDestroyedTeamWeaponRewardAndScavTime(
 	return TotalReward;
 }
 
+float URTSBlueprintFunctionLibrary::GetDestroyedNomadicRewardAndScavTime(
+	UObject* WorldContextObject,
+	const ENomadicSubtype NomadicSubtype,
+	float& OutMetalReward,
+	float& OutRadixiteReward,
+	float& TimeToScavenge)
+{
+	using namespace DeveloperSettings::GameBalance::Resources;
+	constexpr float PartsPerScavengeTimeUnit = 70.f;
+
+	OutMetalReward = 0.f;
+	OutRadixiteReward = 0.f;
+	TimeToScavenge = ScavengeTimePer70Parts;
+
+	if (not IsValid(WorldContextObject))
+	{
+		return 0.f;
+	}
+
+	const ACPPGameState* GameState = FRTS_Statics::GetGameState(WorldContextObject);
+	if (not IsValid(GameState))
+	{
+		return 0.f;
+	}
+
+	const TMap<ERTSResourceType, int32>& NomadicCosts = GameState->GetNomadicDataOfPlayer(1, NomadicSubtype).Cost.
+	                                                           ResourceCosts;
+
+	if (const int32* MetalCost = NomadicCosts.Find(ERTSResourceType::Resource_Metal))
+	{
+		const float DestroyedNomadicMetalMlt = FMath::RandRange(
+			ResourceFromDestroyedNomadicMetalMltRange.X,
+			ResourceFromDestroyedNomadicMetalMltRange.Y
+		);
+		OutMetalReward = *MetalCost * DestroyedNomadicMetalMlt;
+	}
+
+	if (const int32* RadixiteCost = NomadicCosts.Find(ERTSResourceType::Resource_Radixite))
+	{
+		const float DestroyedNomadicRadixiteMlt = FMath::RandRange(
+			ResourceFromDestroyedNomadicRadixiteMltRange.X,
+			ResourceFromDestroyedNomadicRadixiteMltRange.Y
+		);
+		OutRadixiteReward = *RadixiteCost * DestroyedNomadicRadixiteMlt;
+	}
+
+	const float TotalReward = OutMetalReward + OutRadixiteReward;
+	TimeToScavenge = (TotalReward / PartsPerScavengeTimeUnit) * ScavengeTimePer70Parts;
+
+	return TotalReward;
+}
+
 void URTSBlueprintFunctionLibrary::RTSSpawnDecal(const UObject* WorldContextObject, const ERTS_DecalType DecalType,
                                                  const FVector& SpawnLocation, const FVector2D& MinMaxSize,
                                                  const float LifeTime, const FVector2D& MinMaxXYOffset)
