@@ -7,7 +7,6 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/TrackedAnimationInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "PhysicsEngine/BodyInstance.h"
 
 namespace TrackPhysicsMovementConstants
 {
@@ -380,20 +379,8 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 	const FVector& DesiredPlanarVelocity,
 	const FVector& GroundNormal) const
 {
-	const FBodyInstance* TankBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
-	if (not TankBodyInstance)
-	{
-		return;
-	}
-
-	FBodyInstance* MutableBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
-	if (not MutableBodyInstance)
-	{
-		return;
-	}
-
 	const FVector CurrentLinearVelocity = RigidBody->V();
-	const float TankMass = TankBodyInstance->GetBodyMass();
+	const float TankMass = RigidBody->M();
 	const FVector VelocityError = DesiredPlanarVelocity - CurrentLinearVelocity;
 	const FVector VelocityCorrectionAcceleration =
 		VelocityError * M_RuntimeTrackPhysicsMovementTuningSnapshot.VelocityCorrectionGain;
@@ -407,23 +394,11 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 		M_RuntimeTrackPhysicsMovementTuningSnapshot.LateralDampingFactor;
 	const FVector TotalAcceleration = ClampedVelocityCorrectionAcceleration + LateralDampingAcceleration;
 	const FVector DriveForce = TotalAcceleration * TankMass;
-	MutableBodyInstance->AddForce(DriveForce, false, false);
+	UAsyncTickFunctions::ATP_AddForce(M_TankMesh, DriveForce, false, NAME_None);
 }
 
 void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandle_Internal* RigidBody) const
 {
-	const FBodyInstance* TankBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
-	if (not TankBodyInstance)
-	{
-		return;
-	}
-
-	FBodyInstance* MutableBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
-	if (not MutableBodyInstance)
-	{
-		return;
-	}
-
 	const FVector UpDirection = RigidBody->R().GetUpVector();
 	const float CurrentYawRateRadians = FVector::DotProduct(RigidBody->W(), UpDirection);
 	const float TargetYawRateRadians = FMath::DegreesToRadians(
@@ -433,11 +408,13 @@ void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandl
 		YawRateError * M_RuntimeTrackPhysicsMovementTuningSnapshot.YawRateCorrectionGain,
 		-M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration * TorqueMultiplier,
 		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxYawAngularAcceleration * TorqueMultiplier);
+
+	const Chaos::FMatrix33 WorldInertiaTensor = Chaos::FParticleUtilitiesXR::GetWorldInertia(RigidBody);
 	const float YawInertia = FMath::Max(
-		TankBodyInstance->GetBodyInertiaTensor().Z,
+		FVector::DotProduct(UpDirection, WorldInertiaTensor * UpDirection),
 		M_RuntimeTrackPhysicsMovementTuningSnapshot.MinimumYawInertia);
 	const FVector YawTorque = UpDirection * DesiredYawAngularAcceleration * YawInertia;
-	MutableBodyInstance->AddTorqueInRadians(YawTorque, false, false);
+	UAsyncTickFunctions::ATP_AddTorque(M_TankMesh, YawTorque, false, NAME_None);
 }
 
 bool UTrackPhysicsMovement::GetIsValidTankMesh() const
