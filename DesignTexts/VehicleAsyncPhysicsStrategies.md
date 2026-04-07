@@ -1,146 +1,140 @@
-# Vehicle Async Physics Tick: Force Execution Strategies
+# Vehicle Async Physics Tick: 3 Realistic but Controlled Force-Execution Strategies
 
-## Context Snapshot from Current Implementation
+## 1) Current Setup Analysis (from your code)
 
-From the current tracked tank async movement setup:
+Your current tracked movement path is split correctly into:
 
-- `UTrackPhysicsMovement::AsyncTick` directly overwrites angular velocity via `ATP_SetAngularVelocityInDegrees` and linear velocity via `ATP_SetLinearVelocity`. This gives excellent path adherence but continuously replaces physically simulated responses. 
-- Ground alignment is produced from two line traces in `PerformGroundTrace` and then movement is projected onto the averaged ground normal.
-- Path following already computes robust steering/throttle through PID (`UTrackPathFollowingComponent::UpdateDriving`) and sends those values to the movement component.
+- **Command generation** (path following + PID): throttle/steering intent is already stable.
+- **Actuation** (`UTrackPhysicsMovement::AsyncTick`): currently does hard state assignment.
 
-This means your control layer is strong; the weak point is the actuator model (velocity-setter), especially on slopes and terrain discontinuities.
+From the implementation:
 
----
+- Async tick sets yaw with `ATP_SetAngularVelocityInDegrees`.
+- Async tick sets linear velocity with `ATP_SetLinearVelocity` after projecting desired velocity onto the traced ground plane.
+- Ground orientation comes from two traces and averaged normal (`PerformGroundTrace`).
 
-## Strategy 1 — **Acceleration Servo (Force/Torque Motor with Slip-Limited Grip)**
+That architecture explains your observed behavior:
 
-### Core idea
-Keep your PID controller output exactly as-is (`Throttle`, `Steering`) but change the actuator from “set velocity now” to “drive toward target acceleration and yaw acceleration,” then apply **bounded force/torque** each async step.
-
-### Why it addresses your symptoms
-- Uphill/downhill realism improves because gravity remains part of the dynamics.
-- Uneven terrain no longer has its vertical/horizontal velocity obliterated each frame.
-- Ice-skating is mitigated by explicit lateral slip damping and traction limits rather than unconstrained additive force.
-
-### Async tick execution model
-1. Read rigid body state (velocity, angular velocity, orientation, mass, inertia).
-2. Compute desired forward speed from throttle (same current logic).
-3. Compute speed error and convert to target longitudinal acceleration (`a_target`).
-4. Compute required force `F_long = Mass * a_target` and clamp by traction budget:
-   - `|F_long| <= MuLong * NormalLoadEstimated`.
-5. Compute lateral slip velocity (body-right component of velocity) and apply damping force:
-   - `F_lat = -C_lat * V_lat` (clamped).
-6. Compute yaw rate error (`YawRateTarget - CurrentYawRate`) and apply torque motor:
-   - `TauYaw = Izz * aYawTarget`, clamped.
-7. Apply `AddForce`/`AddTorqueInRadians` at COM in async physics.
-
-### Terrain contact notes
-- Keep your two traces, but also compute a confidence value: both hits valid + similar normals + valid hit distances.
-- If confidence is low, reduce force authority (blend toward conservative mode) to avoid jitter and sudden body snaps.
-
-### PID compatibility
-Treat path-following PID output as **command intent**, not direct state assignment:
-- `Throttle` maps to desired speed / drive force request.
-- `Steering` maps to desired yaw rate / differential track torque request.
-
-This usually keeps your tuned path behavior while making body response physically plausible.
+1. **Slope realism issue**: direct velocity overwrite cancels natural gravity acceleration/deceleration every async frame.
+2. **Uneven-terrain sticking**: authority is concentrated into a single projected velocity target, while local contact quality can change rapidly.
+3. **“Ice skating” during AddForce experiments**: forces likely lacked a traction budget + lateral slip damping + saturation/rate limiting.
 
 ---
 
-## Strategy 2 — **Hybrid Constraint Controller (Soft Velocity Target + Physical Residual Forces)**
+## Strategy A — Acceleration Servo Motor (Force/Torque Only, No Direct Velocity Set)
 
-### Core idea
-Do not jump directly from hard velocity override to pure force drive in one step. Use a hybrid:
+### Concept
+Keep your existing PID output semantics untouched, but reinterpret them as **target acceleration / yaw acceleration intent**.
 
-- A **soft velocity servo** (low-gain, limited correction) handles precise controllability.
-- A **physical residual layer** (gravity-preserving force + anti-slip force + yaw torque) handles realism and terrain reaction.
+### Async physics execution
+1. Read body state (forward speed, yaw rate, mass/inertia, contact normal).
+2. Convert throttle to `TargetSpeed` (same as today).
+3. Compute speed error -> desired longitudinal accel.
+4. Compute drive force `F = Mass * Accel`, then **clamp by traction limit**.
+5. Compute yaw-rate error from steering -> desired yaw torque, also clamped.
+6. Add lateral slip damping force on the body-right axis.
+7. Apply `AddForce` + `AddTorque` in async tick.
 
-### Why it addresses your symptoms
-- You preserve the tight control quality of your existing setup.
-- You reduce unrealistic “gravity cancellation” by limiting direct velocity correction bandwidth.
-- You avoid skating by pairing limited correction with contact-aware friction damping.
+### Why this works
+- Gravity remains fully active, so hills feel natural.
+- PID remains useful because command meaning is preserved.
+- Skating is controlled through lateral damping + force saturation.
 
-### Async tick execution model
-1. Compute desired linear velocity in the ground tangent plane (as you do today).
-2. Compute velocity error `V_err = V_desired - V_current`.
-3. Convert only part of this error to correction acceleration:
-   - `a_corr = Clamp(KpVel * V_err + KdVel * dV_err, MaxAccelCorrection)`.
-4. Apply correction as force (`Mass * a_corr`) instead of direct set velocity.
-5. Add residual forces:
-   - Lateral anti-slip damping.
-   - Hill-hold assistance at low commanded speed (small force along uphill direction only when commanded throttle is near zero).
-6. For rotation, same concept:
-   - soft yaw-rate correction torque + steering feed-forward torque.
+### Minimal designer variables (keep simple)
+Use only **3 knobs**:
+- `MaxDriveAccel`
+- `MaxYawAccel`
+- `LateralDamping`
 
-### Key tuning levers
-- `MaxAccelCorrection`: start small; this prevents “teleport-like” velocity behavior.
-- `LateralDamping`: increase until skating disappears, then back off ~15%.
-- `YawTorqueLimit`: cap to prevent flip/jitter on rough terrain.
-
-### PID compatibility
-Your existing PID can remain almost untouched. It still outputs throttle/steering; this layer simply changes how that command reaches Chaos.
+Everything else can be internally derived from mass, gravity, and existing movement multipliers.
 
 ---
 
-## Strategy 3 — **Contact-Point Track Model (Per-Track Force Application + Grounded State Machine)**
+## Strategy B — Hybrid Soft-Velocity Servo (Recommended First Rollout)
 
-### Core idea
-Move from single-body force application to a simplified per-track contact model:
+### Concept
+Transitional architecture: retain a controlled amount of velocity error correction, but execute correction as **bounded acceleration force**, not hard velocity assignment.
 
-- Solve left/right track forces independently.
-- Apply forces at left/right contact points (or approximated sockets).
-- Introduce a small movement state machine for grounded confidence and stuck recovery modes.
+### Async physics execution
+1. Build desired velocity on ground tangent plane (same geometric logic you already trust).
+2. Compute velocity error.
+3. Convert error to correction acceleration with low gain.
+4. Clamp correction acceleration magnitude.
+5. Apply as force (`Mass * AccelCorrection`).
+6. Add yaw torque servo (bounded) and lateral anti-slip damping.
+7. If ground-trace confidence is low, scale authority down instead of fighting terrain.
 
-### Why it addresses your symptoms
-- Per-track forces naturally produce yaw from force differential and improve slope interaction.
-- Force-at-point produces believable pitch/roll effects over uneven terrain.
-- Stuck behavior becomes more controllable because you can explicitly switch modes (normal traction, low-confidence traction, unstuck pulse).
+### Why this works
+- You keep near-current path adherence.
+- You stop hard-cancelling gravity.
+- Much lower migration risk than jumping straight to full per-track modeling.
 
-### Async tick execution model
-1. Trace contact under left and right tracks separately (not just front/back centerline).
-2. Derive per-track normal load estimate.
-3. Convert `Throttle` and `Steering` into left/right drive demands:
-   - `DriveLeft = Throttle - Steering * TurnMix`
-   - `DriveRight = Throttle + Steering * TurnMix`
-4. For each track:
-   - Compute desired track-ground relative speed.
-   - Compute slip ratio.
-   - Convert to longitudinal force through a slip curve (piecewise linear is fine).
-   - Apply force at track contact point.
-5. Apply lateral scrub resistance per track to reduce sideways drift.
-6. Blend modes via grounded state machine:
-   - `FullyGrounded`: full authority.
-   - `PartiallyGrounded`: reduced force/torque and higher damping.
-   - `Ungrounded`: no drive force; only stabilization torques.
+### Minimal designer variables
+Use **3 knobs**:
+- `VelocityCorrectionGain`
+- `MaxCorrectionAccel`
+- `LateralDamping`
 
-### Stuck mitigation
-When detected stuck but commanded throttle exists:
-- Trigger controlled “traction pulse” windows (short boosted force with cooldown).
-- Temporarily widen trace footprint / increase suspension probe length.
-- Reduce steering authority during pulse to avoid digging in place.
-
-### PID compatibility
-This best preserves your current steering/throttle semantics because they map directly to differential track intent. It is the highest-effort option but usually gives the best “heavy tracked vehicle” feel.
+This is usually enough because your path follower already does most high-level control.
 
 ---
 
-## Recommended Rollout Plan
+## Strategy C — Per-Track Contact Force Model + 3-State Ground Confidence
 
-1. **Implement Strategy 2 first** (fastest risk-controlled migration).
-2. Add telemetry for:
-   - slope angle,
-   - grounded confidence,
-   - longitudinal slip,
-   - lateral slip,
-   - applied force/torque saturation.
-3. If realism gap remains, migrate to **Strategy 3** for tracked-vehicle fidelity.
-4. Keep Strategy 1 as fallback architecture for non-tracked vehicles and as a simpler shared motor model.
+### Concept
+Apply left/right track forces at track contact points so yaw and slope behavior emerge from force distribution, not body-level overrides.
+
+### Async physics execution
+1. Do per-track contact traces (left and right).
+2. Convert throttle + steering into left/right drive requests.
+3. For each track, compute longitudinal slip and generate force from a simple slip curve.
+4. Apply per-track lateral scrub damping.
+5. Run a tiny grounded-state execution policy:
+   - `FullyGrounded`: normal authority.
+   - `PartiallyGrounded`: reduced drive authority + stronger damping.
+   - `Ungrounded`: no drive force; stabilization only.
+
+### Why this works
+- Best realism on uneven terrain.
+- Better natural turning feel for tracked vehicles.
+- Gives explicit anti-stuck behavior by state-dependent force limits.
+
+### Minimal designer variables
+Keep it to **4 knobs**:
+- `TrackDriveForceMax`
+- `TrackSlipAtMaxForce`
+- `TrackLateralDamping`
+- `PartialGroundedAuthorityScale`
+
+(Everything else derived internally.)
 
 ---
 
-## Practical Guardrails (Important)
+## Recommended Adoption Order
 
-- Never combine unrestricted direct velocity override with unrestricted additive force in the same frame.
-- Any actuator should be saturating and rate-limited (force, torque, accel).
-- In low-contact-confidence frames, reduce authority rather than “fighting terrain.”
-- Keep gravity fully owned by Chaos; movement should add intent, not replace world physics.
+1. **Start with Strategy B** (best control/risk ratio).
+2. If skating persists, add Strategy A-style stricter traction clamping.
+3. If tracked realism is still insufficient, move to Strategy C.
+
+---
+
+## Practical Implementation Rules (important for all 3)
+
+1. Never mix unlimited velocity overwrite with unlimited additive forces in the same frame.
+2. Clamp **every** actuator output (longitudinal force, lateral force, yaw torque).
+3. Rate-limit command changes to avoid force spikes on trace jitter.
+4. Decrease control authority when trace confidence is low.
+5. Keep gravity fully owned by Chaos; your controller should add intent, not replace physics.
+
+---
+
+## A lightweight anti-stuck policy (no extra designer burden)
+
+Use internal logic (no new tunables required initially):
+
+- If throttle command is significant but forward speed stays near zero for a short window,
+- and slope/contact indicates partial grounding,
+- then apply a short traction pulse with reduced steering authority,
+- followed by cooldown.
+
+This solves many “stuck on uneven seam” cases without exposing more settings.

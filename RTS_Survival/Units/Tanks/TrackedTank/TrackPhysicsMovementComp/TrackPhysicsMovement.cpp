@@ -4,11 +4,41 @@
 #include "TrackPhysicsMovement.h"
 
 #include "AsyncTickFunctions.h"
-#include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/TrackedAnimationInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "PhysicsEngine/BodyInstance.h"
+
+namespace TrackPhysicsMovementConstants
+{
+	/**
+	 * @brief Shared Strategy-B tuning constants for tracked movement force execution.
+	 * Increase only the constant linked to the observed symptom so tuning stays predictable.
+	 */
+
+	/** @brief Raise when throttle response feels sluggish; lower when acceleration overshoots target speed. */
+	constexpr float DesiredSpeedInterpRate = 5.0f;
+	/** @brief Raise when steady-state speed error remains; lower when force corrections oscillate on rough terrain. */
+	constexpr float VelocityCorrectionGain = 6.0f;
+	/** @brief Raise for heavier vehicles that cannot climb; lower when vehicles surge or wheel-spin on command changes. */
+	constexpr float MaxCorrectionAcceleration = 2200.0f;
+	/** @brief Raise when steering lags behind commanded yaw; lower when heading oscillates during corner entry. */
+	constexpr float YawRateCorrectionGain = 3.0f;
+	/** @brief Raise when turning authority is too weak; lower if fast steering causes tipping or jitter on slopes. */
+	constexpr float MaxYawAngularAcceleration = 8.0f;
+	/** @brief Set to -1 only if steering input direction is empirically reversed for this vehicle rig. */
+	constexpr float SteeringToYawDirectionSign = 1.0f;
+	/** @brief Raise when the vehicle side-slips or “ice skates”; lower if the chassis feels glued and cannot drift naturally. */
+	constexpr float LateralDampingFactor = 5.0f;
+	/** @brief Increase for longer vehicles to sample terrain further ahead; decrease if crest transitions become delayed. */
+	constexpr float GroundTraceForwardDistance = 200.0f;
+	/** @brief Increase when traces lose contact on sharp dips; decrease if traces incorrectly latch onto lower geometry. */
+	constexpr float GroundTraceDownDistance = 100.0f;
+	/** @brief Raise to reject noisy normals on broken terrain; lower if movement drops out too often on uneven ground. */
+	constexpr float GroundTraceConfidenceDotThreshold = 0.9f;
+	/** @brief Lower bound to avoid zero-inertia torque calculations on malformed or unloaded body data. */
+	constexpr float MinimumYawInertia = 1.0f;
+}
 
 
 // Sets default values for this component's properties
@@ -44,7 +74,7 @@ void UTrackPhysicsMovement::InitTrackPhysicsMovement(
 
 	if (IsValid(NewTankAnimBp))
 	{
-		TankAnimationBP = NewTankAnimBp;
+		M_TankAnimationBP = NewTankAnimBp;
 	}
 	else
 	{
@@ -81,44 +111,26 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 		return;
 	}
 
-	if (!M_TankMesh)
+	if (not GetIsValidTankMesh())
 	{
 		return;
 	}
+
 	const Chaos::FRigidBodyHandle_Internal* RigidBody = UAsyncTickFunctions::GetInternalHandle(M_TankMesh, NAME_None);
-	if (!RigidBody)
+	if (not RigidBody)
 	{
 		return;
 	}
-	FVector BodyLocation = RigidBody->X();
 
-	float CurrentSpeed = RigidBody->V().Size();
-	// Read the variables atomically
-	const float CurrentThrottle = M_CurrentThrottle.Load();
-	const float CurrentSteeringInDeg = M_CurrentSteeringInDeg.Load();
-
-
-	// Apply angular velocity for rotation
-	UAsyncTickFunctions::ATP_SetAngularVelocityInDegrees(M_TankMesh, FVector(-1, 0, CurrentSteeringInDeg), false, NAME_None);
-	const FQuat CurrentRotation = RigidBody->R();
-
-	// Calculate desired forward force based on throttle input
-	const float TargetSpeed = M_TrackForceMultiplier.Load() * CurrentThrottle;
-
-	// Make sure that for reversing the interp uses two negative values!
-	CurrentSpeed *= FMath::Sign(CurrentThrottle);
-	// Best to use the same interp for all tanks and tweak variables in the controller instead.
-	const float BlendedSpeed = FMath::FInterpTo(CurrentSpeed, TargetSpeed, DeltaTime, 5.0f);
+	FVector DesiredPlanarVelocity;
 	FVector GroundNormal;
-	float Incline;
-	if (PerformGroundTrace(GroundNormal, Incline, RigidBody->X()))
+	if (not GetDesiredPlanarVelocityStrategyB(RigidBody, DeltaTime, DesiredPlanarVelocity, GroundNormal))
 	{
-		const FVector DesiredVelocity = CurrentRotation.GetForwardVector() * BlendedSpeed;
-		// Adjust velocity vector for landscape normal; ensures movement is strictly parallel to the landscape's incline.
-		const FVector CorrectedVelocity = FVector::VectorPlaneProject(DesiredVelocity, GroundNormal);
-
-		UAsyncTickFunctions::ATP_SetLinearVelocity(M_TankMesh, CorrectedVelocity, false, NAME_None);
+		return;
 	}
+
+	ApplyDriveForceStrategyB(RigidBody, DesiredPlanarVelocity, GroundNormal);
+	ApplyYawTorqueStrategyB(RigidBody);
 }
 
 void UTrackPhysicsMovement::UpdateTankMovement(
@@ -128,9 +140,9 @@ void UTrackPhysicsMovement::UpdateTankMovement(
 	const float Steering)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_PhysicsMovement);
-	if (not IsValid(M_TankMesh) || not IsValid(TankAnimationBP))
+	if (not GetIsValidMovementDependencies())
 	{
-		FName OwnerName = GetOwner() ? GetOwner()->GetFName() : NAME_None;
+		const FName OwnerName = GetOwner() ? GetOwner()->GetFName() : NAME_None;
 		RTSFunctionLibrary::PrintString(
 			"Stopping physics movement on: " + OwnerName.ToString() + " due to invalid TankMesh or TankAnimBp."
 			"\n Will disable async physics tick.");
@@ -143,11 +155,11 @@ void UTrackPhysicsMovement::UpdateTankMovement(
 	M_CurrentSteeringInDeg.Store(DesiredYawRate);
 	M_IsFollowingPath.Store(true);
 
-	if(Throttle != 0)
+	if (Throttle != 0)
 	{
 		LastNoneZeroThrottle = Throttle;
 	}
-	TankAnimationBP->SetMovementParameters(CurrentSpeed, DesiredYawRate, Throttle >= 0);
+	M_TankAnimationBP->SetMovementParameters(CurrentSpeed, DesiredYawRate, Throttle >= 0);
 	// if constexpr (DeveloperSettings::Debugging::GVehicle_Track_Movement_Compile_DebugSymbols)
 	// {
 	// 	FString Debug = "Game Thread: "
@@ -166,7 +178,7 @@ void UTrackPhysicsMovement::OnPathFollowingFinished()
 
 // 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_PhysicsMovement);
 // 	// // .5 ms for 100 vehicles.
-// 	if (IsValid(M_TankMesh) && IsValid(TankAnimationBP))
+// 	if (IsValid(M_TankMesh) && IsValid(M_TankAnimationBP))
 // 	{
 // 		if (FMath::IsNearlyZero(Throttle, KINDA_SMALL_NUMBER))
 // 		{
@@ -204,7 +216,7 @@ void UTrackPhysicsMovement::OnPathFollowingFinished()
 // 				DeveloperSettings::GamePlay::Navigation::TankTrackGravityMultiplier;
 // 			M_TankMesh->AddForce(GravityForce, NAME_None, true);
 // 	
-// 			TankAnimationBP->SetMovementParameters(CorrectedVelocity.Length(), DesiredYawRate, Throttle >= 0);
+// 			M_TankAnimationBP->SetMovementParameters(CorrectedVelocity.Length(), DesiredYawRate, Throttle >= 0);
 // 			M_InclineAngle = Incline;
 // 	
 // 			// if constexpr (DeveloperSettings::Debugging::GVehicle_Track_Movement_Compile_DebugSymbols)
@@ -223,34 +235,182 @@ void UTrackPhysicsMovement::OnPathFollowingFinished()
 bool UTrackPhysicsMovement::PerformGroundTrace(FVector& OutGroundNormal, float& OutIncline,
                                                const FVector& StartLocation) const
 {
-	FVector Start = M_TankMesh->GetComponentLocation() + FVector(0, 0, M_MeshTraceZOffset) - M_TankMesh->
-		GetForwardVector() * 200;
-	FVector End = Start - FVector(0, 0, 100);
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"World",
+			"PerformGroundTrace",
+			this);
+		return false;
+	}
+
+	const FVector TraceOrigin = StartLocation + FVector(0, 0, M_MeshTraceZOffset);
+	const FVector ForwardOffset = M_TankMesh->GetForwardVector() * TrackPhysicsMovementConstants::GroundTraceForwardDistance;
+
+	const FVector Start = TraceOrigin - ForwardOffset;
+	const FVector End = Start - FVector(0, 0, TrackPhysicsMovementConstants::GroundTraceDownDistance);
 	FHitResult Hit;
 
-	FVector Start2 = M_TankMesh->GetComponentLocation() + FVector(0, 0, M_MeshTraceZOffset) + M_TankMesh->
-		GetForwardVector() * 200;
-	FVector End2 = Start2 - FVector(0, 0, 100);
+	const FVector Start2 = TraceOrigin + ForwardOffset;
+	const FVector End2 = Start2 - FVector(0, 0, TrackPhysicsMovementConstants::GroundTraceDownDistance);
 	FHitResult Hit2;
 
 
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(GetOwner());
-	bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, COLLISION_TRACE_LANDSCAPE, Params);
-	bool bHit2 = GetWorld()->LineTraceSingleByChannel(Hit2, Start2, End2, COLLISION_TRACE_LANDSCAPE, Params);
+	const bool bHit = World->LineTraceSingleByChannel(Hit, Start, End, COLLISION_TRACE_LANDSCAPE, Params);
+	const bool bHit2 = World->LineTraceSingleByChannel(Hit2, Start2, End2, COLLISION_TRACE_LANDSCAPE, Params);
 
-	if (bHit && bHit2)
+	if (not bHit || not bHit2)
 	{
-		// compute the normal of the landscape.
-		OutGroundNormal = (Hit.Normal + Hit2.Normal) * 0.5;
-		OutGroundNormal.Normalize();
-
-		// Calculate the incline angle between the two points
-		FVector InclineVector = Hit2.ImpactPoint - Hit.ImpactPoint;
-		FVector HorizontalVector = FVector(InclineVector.X, InclineVector.Y, 0).GetSafeNormal();
-		OutIncline = FMath::RadiansToDegrees(
-			FMath::Acos(FVector::DotProduct(HorizontalVector, InclineVector.GetSafeNormal())));
+		return false;
 	}
 
-	return bHit && bHit2;
+	if (FVector::DotProduct(Hit.Normal, Hit2.Normal) < TrackPhysicsMovementConstants::GroundTraceConfidenceDotThreshold)
+	{
+		return false;
+	}
+
+	// compute the normal of the landscape.
+	OutGroundNormal = (Hit.Normal + Hit2.Normal) * 0.5;
+	OutGroundNormal.Normalize();
+
+	// Calculate the incline angle between the two points
+	const FVector InclineVector = Hit2.ImpactPoint - Hit.ImpactPoint;
+	const FVector HorizontalVector = FVector(InclineVector.X, InclineVector.Y, 0).GetSafeNormal();
+	OutIncline = FMath::RadiansToDegrees(
+		FMath::Acos(FVector::DotProduct(HorizontalVector, InclineVector.GetSafeNormal())));
+
+	return true;
+}
+
+bool UTrackPhysicsMovement::GetDesiredPlanarVelocityStrategyB(
+	const Chaos::FRigidBodyHandle_Internal* RigidBody,
+	const float DeltaTime,
+	FVector& OutDesiredPlanarVelocity,
+	FVector& OutGroundNormal) const
+{
+	const FVector CurrentLinearVelocity = RigidBody->V();
+	const FQuat CurrentRotation = RigidBody->R();
+	const float CurrentThrottle = M_CurrentThrottle.Load();
+	const float CurrentSignedForwardSpeed = FVector::DotProduct(CurrentLinearVelocity, CurrentRotation.GetForwardVector());
+	const float TargetForwardSpeed = M_TrackForceMultiplier.Load() * CurrentThrottle;
+	const float BlendedTargetSpeed = FMath::FInterpTo(
+		CurrentSignedForwardSpeed,
+		TargetForwardSpeed,
+		DeltaTime,
+		TrackPhysicsMovementConstants::DesiredSpeedInterpRate);
+
+	float Incline;
+	if (not PerformGroundTrace(OutGroundNormal, Incline, RigidBody->X()))
+	{
+		return false;
+	}
+
+	const FVector DesiredVelocity = CurrentRotation.GetForwardVector() * BlendedTargetSpeed;
+	OutDesiredPlanarVelocity = FVector::VectorPlaneProject(DesiredVelocity, OutGroundNormal);
+	return true;
+}
+
+void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
+	const Chaos::FRigidBodyHandle_Internal* RigidBody,
+	const FVector& DesiredPlanarVelocity,
+	const FVector& GroundNormal) const
+{
+	const FBodyInstance* TankBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
+	if (not TankBodyInstance)
+	{
+		return;
+	}
+
+	FBodyInstance* MutableBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
+	if (not MutableBodyInstance)
+	{
+		return;
+	}
+
+	const FVector CurrentLinearVelocity = RigidBody->V();
+	const float TankMass = TankBodyInstance->GetBodyMass();
+	const FVector VelocityError = DesiredPlanarVelocity - CurrentLinearVelocity;
+	const FVector VelocityCorrectionAcceleration = VelocityError * TrackPhysicsMovementConstants::VelocityCorrectionGain;
+	const FVector ClampedVelocityCorrectionAcceleration = VelocityCorrectionAcceleration.GetClampedToMaxSize(
+		TrackPhysicsMovementConstants::MaxCorrectionAcceleration * ImpulseMultiplier);
+
+	const FVector RightDirection = RigidBody->R().GetRightVector();
+	const FVector PlanarRightDirection = FVector::VectorPlaneProject(RightDirection, GroundNormal).GetSafeNormal();
+	const float LateralSpeed = FVector::DotProduct(CurrentLinearVelocity, PlanarRightDirection);
+	const FVector LateralDampingAcceleration = -PlanarRightDirection * LateralSpeed *
+		TrackPhysicsMovementConstants::LateralDampingFactor;
+	const FVector TotalAcceleration = ClampedVelocityCorrectionAcceleration + LateralDampingAcceleration;
+	const FVector DriveForce = TotalAcceleration * TankMass;
+	MutableBodyInstance->AddForce(DriveForce, false, true);
+}
+
+void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandle_Internal* RigidBody) const
+{
+	const FBodyInstance* TankBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
+	if (not TankBodyInstance)
+	{
+		return;
+	}
+
+	FBodyInstance* MutableBodyInstance = M_TankMesh->GetBodyInstance(NAME_None);
+	if (not MutableBodyInstance)
+	{
+		return;
+	}
+
+	const FVector UpDirection = RigidBody->R().GetUpVector();
+	const float CurrentYawRateRadians = FVector::DotProduct(RigidBody->W(), UpDirection);
+	const float TargetYawRateRadians = FMath::DegreesToRadians(
+		M_CurrentSteeringInDeg.Load() * TrackPhysicsMovementConstants::SteeringToYawDirectionSign);
+	const float YawRateError = TargetYawRateRadians - CurrentYawRateRadians;
+	const float DesiredYawAngularAcceleration = FMath::Clamp(
+		YawRateError * TrackPhysicsMovementConstants::YawRateCorrectionGain,
+		-TrackPhysicsMovementConstants::MaxYawAngularAcceleration * TorqueMultiplier,
+		TrackPhysicsMovementConstants::MaxYawAngularAcceleration * TorqueMultiplier);
+	const float YawInertia = FMath::Max(
+		TankBodyInstance->GetBodyInertiaTensor().Z,
+		TrackPhysicsMovementConstants::MinimumYawInertia);
+	const FVector YawTorque = UpDirection * DesiredYawAngularAcceleration * YawInertia;
+	MutableBodyInstance->AddTorqueInRadians(YawTorque, false, true);
+}
+
+bool UTrackPhysicsMovement::GetIsValidTankMesh() const
+{
+	if (IsValid(M_TankMesh))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_TankMesh",
+		"GetIsValidTankMesh",
+		this);
+	return false;
+}
+
+bool UTrackPhysicsMovement::GetIsValidTankAnimationBP() const
+{
+	if (IsValid(M_TankAnimationBP))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_TankAnimationBP",
+		"GetIsValidTankAnimationBP",
+		this);
+	return false;
+}
+
+bool UTrackPhysicsMovement::GetIsValidMovementDependencies() const
+{
+	const bool bIsValidTankMesh = GetIsValidTankMesh();
+	const bool bIsValidTankAnimationBP = GetIsValidTankAnimationBP();
+	return bIsValidTankMesh and bIsValidTankAnimationBP;
 }

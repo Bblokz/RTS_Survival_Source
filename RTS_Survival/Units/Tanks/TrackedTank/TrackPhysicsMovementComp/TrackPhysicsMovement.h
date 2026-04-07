@@ -9,7 +9,15 @@
 
 
 class RTS_SURVIVAL_API UChassisAnimInstance;
+namespace Chaos
+{
+	class FRigidBodyHandle_Internal;
+}
 
+/**
+ * @brief Receives throttle/steering commands from path following and applies them on async physics tick.
+ * Uses a bounded force and torque correction model so Chaos gravity and terrain contact stay visible.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UTrackPhysicsMovement : public UAsyncTickActorComponent
 {
@@ -39,8 +47,7 @@ public:
 		const float TankMeshZOffset);
 
 	/**
-	 * Moves the tank using physics and line traces the landscape to adjust the forward vector used.
-	 * Overrides physics linear velocity with calculated speed and custom gravity.
+	 * Moves the tank using bounded force and torque corrections aligned to the traced ground plane.
 	 * 
 	 * @param DeltaSeconds Time between previous two frames; used to lerp the change in speed.
 	 * @param CurrentSpeed The current speed of the tank.
@@ -72,6 +79,41 @@ protected:
 	virtual void AsyncTick(float DeltaTime) override;
 
 private:
+	/**
+	 * @brief Builds the ground-aligned velocity target used by Strategy B so gravity can remain fully simulated.
+	 * @param RigidBody Async rigid body handle used to read pose and velocity.
+	 * @param DeltaTime Async simulation delta time used for speed blending.
+	 * @param OutDesiredPlanarVelocity Velocity target projected onto the current ground plane.
+	 * @param OutGroundNormal Ground normal derived from validated terrain traces.
+	 * @return True when a reliable ground sample was found and a planar target can be used.
+	 */
+	bool GetDesiredPlanarVelocityStrategyB(
+		const Chaos::FRigidBodyHandle_Internal* RigidBody,
+		const float DeltaTime,
+		FVector& OutDesiredPlanarVelocity,
+		FVector& OutGroundNormal) const;
+
+	/**
+	 * @brief Applies bounded longitudinal correction and lateral damping so steering stays controlled without skating.
+	 * @param RigidBody Async rigid body handle used to read current velocity.
+	 * @param DesiredPlanarVelocity Ground-aligned velocity intent generated from throttle.
+	 * @param GroundNormal Ground normal used to keep damping parallel to terrain.
+	 */
+	void ApplyDriveForceStrategyB(
+		const Chaos::FRigidBodyHandle_Internal* RigidBody,
+		const FVector& DesiredPlanarVelocity,
+		const FVector& GroundNormal) const;
+
+	/**
+	 * @brief Applies bounded yaw torque from yaw-rate error to realize steering intent without direct angular overrides.
+	 * @param RigidBody Async rigid body handle used to read current angular velocity and orientation.
+	 */
+	void ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandle_Internal* RigidBody) const;
+
+	bool GetIsValidTankMesh() const;
+	bool GetIsValidTankAnimationBP() const;
+	bool GetIsValidMovementDependencies() const;
+
 	float M_TurnRate;
 	float M_InclineAngle = 0.0f;
 	float M_MeshTraceZOffset;
@@ -82,11 +124,11 @@ private:
 	// The skeletal mesh of this tank.
 	// Exists on both the tank as well as the physics track movement component for quick access.
 	UPROPERTY()
-	USkeletalMeshComponent* M_TankMesh;
+	TObjectPtr<USkeletalMeshComponent> M_TankMesh;
 
 	// Exists both on the tank as well as the physics track movement component for quick accesss.
 	UPROPERTY()
-	UChassisAnimInstance* TankAnimationBP;
+	TObjectPtr<UChassisAnimInstance> M_TankAnimationBP;
 
 
 	/**
