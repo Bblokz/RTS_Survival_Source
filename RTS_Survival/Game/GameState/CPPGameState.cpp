@@ -3792,10 +3792,10 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Puma
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 45;
+	TankData.VehicleRotationSpeed = 50;
 	TankData.TurretRotationSpeed = 14;
 	TankData.VehicleMaxSpeedKmh = 60;
-	TankData.VehicleReverseSpeedKmh = 35;
+	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
@@ -3816,8 +3816,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 30;
 		TankData.TurretRotationSpeed = 14;
-		TankData.VehicleMaxSpeedKmh = 35;
-		TankData.VehicleReverseSpeedKmh = 35;
+		TankData.VehicleMaxSpeedKmh = 40;
+		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 		TankData.Cost = FUnitCost({
@@ -3835,10 +3835,10 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 232/3
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 45;
+	TankData.VehicleRotationSpeed = 50;
 	TankData.TurretRotationSpeed = 20;
-	TankData.VehicleMaxSpeedKmh = 50;
-	TankData.VehicleReverseSpeedKmh = 35;
+	TankData.VehicleMaxSpeedKmh = 60;
+	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
@@ -3855,7 +3855,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 40;
-	TankData.VehicleMaxSpeedKmh = 50;
+	TankData.VehicleMaxSpeedKmh = 40;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = BaseArmoredCarExp;
@@ -3874,8 +3874,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 30;
-	TankData.VehicleMaxSpeedKmh = 45;
-	TankData.VehicleReverseSpeedKmh = 12;
+	TankData.VehicleMaxSpeedKmh = 40;
+	TankData.VehicleReverseSpeedKmh = 40;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
@@ -3892,8 +3892,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 45;
-	TankData.VehicleReverseSpeedKmh = 15;
+	TankData.VehicleMaxSpeedKmh = 40;
+	TankData.VehicleReverseSpeedKmh = 40;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
 	TankData.Cost = FUnitCost({
@@ -3914,8 +3914,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40;
 		TankData.TurretRotationSpeed = 14;
-		TankData.VehicleMaxSpeedKmh = 45;
-		TankData.VehicleReverseSpeedKmh = 15;
+		TankData.VehicleMaxSpeedKmh = 40;
+		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
 		TankData.Cost = FUnitCost({
@@ -3939,8 +3939,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40;
 		TankData.TurretRotationSpeed = 14;
-		TankData.VehicleMaxSpeedKmh = 45;
-		TankData.VehicleReverseSpeedKmh = 15;
+		TankData.VehicleMaxSpeedKmh = 40;
+		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
 		TankData.Cost = FUnitCost({
@@ -3956,10 +3956,10 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 231
 	TankData.MaxHealth = ArmoredCarHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
+	TankData.VehicleRotationSpeed = 50;
 	TankData.TurretRotationSpeed = 40;
-	TankData.VehicleMaxSpeedKmh = 55;
-	TankData.VehicleReverseSpeedKmh = 15;
+	TankData.VehicleMaxSpeedKmh = 60;
+	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = BaseArmoredCarExp;
 	TankData.Cost = FUnitCost({
@@ -3976,8 +3976,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 30;
 	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 25;
-	TankData.VehicleReverseSpeedKmh = 20;
+	TankData.VehicleMaxSpeedKmh = 40;
+	TankData.VehicleReverseSpeedKmh = 40;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.3f, 5);
 	TankData.Cost = FUnitCost({
@@ -3995,10 +3995,10 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// BA-12 
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 30;
+	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 35;
-	TankData.VehicleReverseSpeedKmh = 35;
+	TankData.VehicleMaxSpeedKmh = 60;
+	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
@@ -4013,10 +4013,10 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// BA-14 
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 30;
+	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 30;
-	TankData.VehicleMaxSpeedKmh = 35;
-	TankData.VehicleReverseSpeedKmh = 35;
+	TankData.VehicleMaxSpeedKmh = 60;
+	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
@@ -6338,7 +6338,7 @@ void ACPPGameState::InitAllGameBxpData()
 void ACPPGameState::InitAllGameNomadicData()
 {
 	TArray<FUnitAbilityEntry> BasicNomadicAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
-		EAbilityID::IdNoAbility, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
 		EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
@@ -6347,7 +6347,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	});
 
 	TArray<FUnitAbilityEntry> NomadicWithWeaponsAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
@@ -6363,7 +6363,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
 	using namespace DeveloperSettings::GameBalance::Experience;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::EnergySupplies;
-
+	
 	FNomadicData NomadicData;
 
 	// --------------------------------------------------
