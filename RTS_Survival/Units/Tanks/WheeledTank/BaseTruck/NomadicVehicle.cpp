@@ -658,6 +658,8 @@ void ANomadicVehicle::RemoveMoveAbilityAfterFinishedConvertingToBuilding()
 {
 	bM_HasCachedMoveAbilityIndex = false;
 	M_CachedMoveAbilityIndex = INDEX_NONE;
+	bM_HasCachedReverseMoveAbilityIndex = false;
+	M_CachedReverseMoveAbilityIndex = INDEX_NONE;
 
 	UCommandData* CommandData = GetIsValidCommandData();
 	if (not IsValid(CommandData))
@@ -670,20 +672,41 @@ void ANomadicVehicle::RemoveMoveAbilityAfterFinishedConvertingToBuilding()
 	{
 		return AbilityEntry.AbilityId == EAbilityID::IdMove;
 	});
-	if (MoveAbilityIndex == INDEX_NONE)
+	const int32 ReverseMoveAbilityIndex = CurrentAbilities.IndexOfByPredicate([](const FUnitAbilityEntry& AbilityEntry)
+	{
+		return AbilityEntry.AbilityId == EAbilityID::IdReverseMove;
+	});
+	if (MoveAbilityIndex == INDEX_NONE && ReverseMoveAbilityIndex == INDEX_NONE)
 	{
 		return;
 	}
 
-	M_CachedMoveAbilityIndex = MoveAbilityIndex;
-	bM_HasCachedMoveAbilityIndex = true;
-	if (not RemoveAbility(EAbilityID::IdMove))
+	if (MoveAbilityIndex != INDEX_NONE)
 	{
-		RTSFunctionLibrary::ReportError("Failed to remove move ability for nomadic vehicle in building mode."
-			"\n At function: ANomadicVehicle::RemoveMoveAbilityAfterFinishedConvertingToBuilding"
-			"\n For nomadic vehicle: " + GetName());
-		bM_HasCachedMoveAbilityIndex = false;
-		M_CachedMoveAbilityIndex = INDEX_NONE;
+		M_CachedMoveAbilityIndex = MoveAbilityIndex;
+		bM_HasCachedMoveAbilityIndex = true;
+		if (not RemoveAbility(EAbilityID::IdMove))
+		{
+			RTSFunctionLibrary::ReportError("Failed to remove move ability for nomadic vehicle in building mode."
+				"\n At function: ANomadicVehicle::RemoveMoveAbilityAfterFinishedConvertingToBuilding"
+				"\n For nomadic vehicle: " + GetName());
+			bM_HasCachedMoveAbilityIndex = false;
+			M_CachedMoveAbilityIndex = INDEX_NONE;
+		}
+	}
+
+	if (ReverseMoveAbilityIndex != INDEX_NONE)
+	{
+		M_CachedReverseMoveAbilityIndex = ReverseMoveAbilityIndex;
+		bM_HasCachedReverseMoveAbilityIndex = true;
+		if (not RemoveAbility(EAbilityID::IdReverseMove))
+		{
+			RTSFunctionLibrary::ReportError("Failed to remove reverse move ability for nomadic vehicle in building mode."
+				"\n At function: ANomadicVehicle::RemoveMoveAbilityAfterFinishedConvertingToBuilding"
+				"\n For nomadic vehicle: " + GetName());
+			bM_HasCachedReverseMoveAbilityIndex = false;
+			M_CachedReverseMoveAbilityIndex = INDEX_NONE;
+		}
 	}
 }
 
@@ -1151,30 +1174,82 @@ void ANomadicVehicle::OnFinishedConvertingToVehicle_HandleInstanceSpecificCompon
 
 void ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle()
 {
-	if (not bM_HasCachedMoveAbilityIndex)
+	if (not bM_HasCachedMoveAbilityIndex && not bM_HasCachedReverseMoveAbilityIndex)
 	{
 		return;
 	}
 
+	bool bMoveAbilityAlreadyExists = false;
+	bool bReverseMoveAbilityAlreadyExists = false;
 	for (const FUnitAbilityEntry& CurrentAbility : GetUnitAbilityEntries())
 	{
 		if (CurrentAbility.AbilityId == EAbilityID::IdMove)
 		{
-			bM_HasCachedMoveAbilityIndex = false;
-			M_CachedMoveAbilityIndex = INDEX_NONE;
-			return;
+			bMoveAbilityAlreadyExists = true;
+		}
+		if (CurrentAbility.AbilityId == EAbilityID::IdReverseMove)
+		{
+			bReverseMoveAbilityAlreadyExists = true;
 		}
 	}
 
-	if (not AddAbility(EAbilityID::IdMove, M_CachedMoveAbilityIndex))
+	const bool bCanRestoreMoveAbility = bM_HasCachedMoveAbilityIndex && not bMoveAbilityAlreadyExists;
+	const bool bCanRestoreReverseMoveAbility = bM_HasCachedReverseMoveAbilityIndex && not bReverseMoveAbilityAlreadyExists;
+
+	if (bCanRestoreMoveAbility && bCanRestoreReverseMoveAbility)
 	{
-		RTSFunctionLibrary::ReportError("Failed to restore move ability for nomadic vehicle after conversion."
-			"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
-			"\n For nomadic vehicle: " + GetName());
+		const bool bRestoreMoveFirst = M_CachedMoveAbilityIndex <= M_CachedReverseMoveAbilityIndex;
+		if (bRestoreMoveFirst)
+		{
+			if (not AddAbility(EAbilityID::IdMove, M_CachedMoveAbilityIndex))
+			{
+				RTSFunctionLibrary::ReportError("Failed to restore move ability for nomadic vehicle after conversion."
+					"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
+					"\n For nomadic vehicle: " + GetName());
+			}
+			if (not AddAbility(EAbilityID::IdReverseMove, M_CachedReverseMoveAbilityIndex))
+			{
+				RTSFunctionLibrary::ReportError("Failed to restore reverse move ability for nomadic vehicle after conversion."
+					"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
+					"\n For nomadic vehicle: " + GetName());
+			}
+		}
+		else
+		{
+			if (not AddAbility(EAbilityID::IdReverseMove, M_CachedReverseMoveAbilityIndex))
+			{
+				RTSFunctionLibrary::ReportError("Failed to restore reverse move ability for nomadic vehicle after conversion."
+					"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
+					"\n For nomadic vehicle: " + GetName());
+			}
+			if (not AddAbility(EAbilityID::IdMove, M_CachedMoveAbilityIndex))
+			{
+				RTSFunctionLibrary::ReportError("Failed to restore move ability for nomadic vehicle after conversion."
+					"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
+					"\n For nomadic vehicle: " + GetName());
+			}
+		}
+	}
+	else
+	{
+		if (bCanRestoreMoveAbility && not AddAbility(EAbilityID::IdMove, M_CachedMoveAbilityIndex))
+		{
+			RTSFunctionLibrary::ReportError("Failed to restore move ability for nomadic vehicle after conversion."
+				"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
+				"\n For nomadic vehicle: " + GetName());
+		}
+		if (bCanRestoreReverseMoveAbility && not AddAbility(EAbilityID::IdReverseMove, M_CachedReverseMoveAbilityIndex))
+		{
+			RTSFunctionLibrary::ReportError("Failed to restore reverse move ability for nomadic vehicle after conversion."
+				"\n At function: ANomadicVehicle::RestoreMoveAbilityAfterFinishedConvertingToVehicle"
+				"\n For nomadic vehicle: " + GetName());
+		}
 	}
 
 	bM_HasCachedMoveAbilityIndex = false;
 	M_CachedMoveAbilityIndex = INDEX_NONE;
+	bM_HasCachedReverseMoveAbilityIndex = false;
+	M_CachedReverseMoveAbilityIndex = INDEX_NONE;
 }
 
 void ANomadicVehicle::SetDisableChaosVehicleMesh(const bool bDisable)
