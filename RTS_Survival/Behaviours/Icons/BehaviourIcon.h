@@ -44,5 +44,6 @@ enum class EBehaviourIcon : uint8
 	HighVoltage,
 	SuperCharge,
 	EngineOverclocking,
-	ArmorPiercingBullets
+	ArmorPiercingBullets,
+	APCR_Rounds,
 };

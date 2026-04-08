@@ -32,4 +32,5 @@ enum class EBehaviourAbilityType : uint8
 	OverpressureRounds,
 	EngineOverclocking,
 	ArmorPiercingBullets,
+	APCR_Rounds,
 };
