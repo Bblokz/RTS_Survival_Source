@@ -417,7 +417,7 @@ void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandl
 	if (FMath::IsNearlyZero(CurrentThrottle, KINDA_SMALL_NUMBER))
 	{
 		// Deadzone logic.
-		FVector DeadzoneAngularVelocityDegrees;
+	FVector DeadzoneAngularVelocityDegrees;
 		if (TryGetDeadzoneAngularVelocityStrategyB(RigidBody, DeadzoneAngularVelocityDegrees))
 		{
 			UAsyncTickFunctions::ATP_SetAngularVelocityInDegrees(
