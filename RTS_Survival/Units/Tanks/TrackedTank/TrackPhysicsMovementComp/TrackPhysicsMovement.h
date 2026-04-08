@@ -104,6 +104,15 @@ struct FTrackPhysicsMovementTuning
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
 	float MinimumYawInertia = 1.0f;
+
+	/**
+	 * @brief Raise when slope transitions still feel too responsive; lower when uphill/downhill control becomes too weak.
+	 *
+	 * @note Scales both velocity-correction gain and max correction acceleration by Exp(-Scale * NormalizedSlopeAngle).
+	 * @note Higher values exponentially reduce correction authority on steeper ground so gravity remains more visible.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
+	float SlopeCorrectionExpDamping = 0.0f;
 };
 
 /**
