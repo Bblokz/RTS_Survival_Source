@@ -24,6 +24,8 @@ namespace TrackPhysicsMovementConstants
 	constexpr int32 GroundTraceFailureHoldFrames = 6;
 	/** @brief Upper bound used to normalize slope angle when applying exponential correction damping. */
 	constexpr float SlopeAngleNormalizationMaxDegrees = 90.0f;
+	/** @brief Preserve the small deadzone roll-bias used by the previous fallback implementation. */
+	constexpr float DeadzoneFallbackAngularVelocityXDegrees = -1.0f;
 }
 
 
@@ -415,8 +417,22 @@ void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandl
 	if (FMath::IsNearlyZero(CurrentThrottle, KINDA_SMALL_NUMBER))
 	{
 		// Deadzone logic.
-		UAsyncTickFunctions::ATP_SetAngularVelocityInDegrees(M_TankMesh, FVector(-1, 0, CurrentSteeringDeg),
-		                                                     false, NAME_None);
+		FVector DeadzoneAngularVelocityDegrees;
+		if (TryGetDeadzoneAngularVelocityStrategyB(RigidBody, DeadzoneAngularVelocityDegrees))
+		{
+			UAsyncTickFunctions::ATP_SetAngularVelocityInDegrees(
+				M_TankMesh,
+				DeadzoneAngularVelocityDegrees,
+				false,
+				NAME_None);
+			return;
+		}
+
+		UAsyncTickFunctions::ATP_SetAngularVelocityInDegrees(
+			M_TankMesh,
+			FVector(TrackPhysicsMovementConstants::DeadzoneFallbackAngularVelocityXDegrees, 0.0f, CurrentSteeringDeg),
+			false,
+			NAME_None);
 		return;
 	}
 	const FVector UpDirection = RigidBody->R().GetUpVector();
@@ -435,6 +451,27 @@ void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandl
 		M_RuntimeTrackPhysicsMovementTuningSnapshot.MinimumYawInertia);
 	const FVector YawTorque = UpDirection * DesiredYawAngularAcceleration * YawInertia;
 	UAsyncTickFunctions::ATP_AddTorque(M_TankMesh, YawTorque, false, NAME_None);
+}
+
+bool UTrackPhysicsMovement::TryGetDeadzoneAngularVelocityStrategyB(
+	const Chaos::FRigidBodyHandle_Internal* RigidBody,
+	FVector& OutAngularVelocityDegrees) const
+{
+	FVector GroundNormal;
+	float InclineAngle = 0.0f;
+	if (not PerformGroundTrace(GroundNormal, InclineAngle, RigidBody->X()))
+	{
+		return false;
+	}
+
+	const float TargetYawRateDegrees = M_CurrentSteeringInDeg.Load() *
+		TrackPhysicsMovementConstants::SteeringToYawDirectionSign;
+	const FVector GroundAlignedYawAngularVelocityDegrees = GroundNormal.GetSafeNormal() * TargetYawRateDegrees;
+	OutAngularVelocityDegrees = GroundAlignedYawAngularVelocityDegrees + FVector(
+		TrackPhysicsMovementConstants::DeadzoneFallbackAngularVelocityXDegrees,
+		0.0f,
+		0.0f);
+	return true;
 }
 
 bool UTrackPhysicsMovement::GetIsValidTankMesh() const

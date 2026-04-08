@@ -208,6 +208,16 @@ private:
 	 */
 	void ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandle_Internal* RigidBody) const;
 
+	/**
+	 * @brief Builds deadzone angular velocity around the traced ground normal to keep yaw turns terrain-conforming.
+	 * @param RigidBody Async rigid body handle used to read current position for terrain tracing.
+	 * @param OutAngularVelocityDegrees Resulting angular velocity in degrees/second for ATP_SetAngularVelocityInDegrees.
+	 * @return True when a valid terrain sample was found for normal-aligned yaw angular velocity.
+	 */
+	bool TryGetDeadzoneAngularVelocityStrategyB(
+		const Chaos::FRigidBodyHandle_Internal* RigidBody,
+		FVector& OutAngularVelocityDegrees) const;
+
 	bool GetIsValidTankMesh() const;
 	bool GetIsValidTankAnimationBP() const;
 	bool GetIsValidMovementDependencies() const;
