@@ -94,7 +94,7 @@ struct FTrackPhysicsMovementTuning
 	 * @note Affects whether the movement step can resolve a reliable ground plane for force projection.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
-	float GroundTraceDownDistance = 300.0f;
+	float GroundTraceDownDistance = 500.0f;
 
 	/**
 	 * @brief Lower bound to avoid zero-inertia torque calculations on malformed or unloaded body data.

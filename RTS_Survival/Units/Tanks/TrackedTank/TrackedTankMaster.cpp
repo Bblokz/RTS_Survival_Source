@@ -263,7 +263,7 @@ void ATrackedTankMaster::InitTrackedTank(
 	const float TankCornerOffset,
 	const float TankMeshZOffset, const float AngularDamping, const float LinearDamping,
 	const int32 Energy)
-{
+	{
 	if(Energy != 0 )
 	{
 		OnInit_FindEnergyComponent(Energy);
