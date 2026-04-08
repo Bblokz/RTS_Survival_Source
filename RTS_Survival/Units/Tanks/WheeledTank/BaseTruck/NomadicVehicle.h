@@ -513,6 +513,12 @@ private:
 	// Tracks whether M_CachedMoveAbilityIndex currently contains a valid move index.
 	bool bM_HasCachedMoveAbilityIndex = false;
 
+	// Stores the command card index from which reverse move was removed when fully converted to building.
+	int32 M_CachedReverseMoveAbilityIndex = INDEX_NONE;
+
+	// Tracks whether M_CachedReverseMoveAbilityIndex currently contains a valid reverse-move index.
+	bool bM_HasCachedReverseMoveAbilityIndex = false;
+
 	// Disables those components that are immediately disabled when the truck starts converting again.
 	void OnStartConvertToVehicle_HandleInstanceSpecificComponents();
 
