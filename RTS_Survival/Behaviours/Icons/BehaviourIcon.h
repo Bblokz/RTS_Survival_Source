@@ -43,5 +43,6 @@ enum class EBehaviourIcon : uint8
 	SuppresiveShockline,
 	HighVoltage,
 	SuperCharge,
-	EngineOverclocking
+	EngineOverclocking,
+	ArmorPiercingBullets
 };

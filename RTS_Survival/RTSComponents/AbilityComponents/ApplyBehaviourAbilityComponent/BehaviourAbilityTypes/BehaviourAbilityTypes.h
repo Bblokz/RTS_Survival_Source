@@ -30,5 +30,6 @@ enum class EBehaviourAbilityType : uint8
 	HighVoltage,
 	SuppressiveShockline,
 	OverpressureRounds,
-	EngineOverclocking
+	EngineOverclocking,
+	ArmorPiercingBullets,
 };
