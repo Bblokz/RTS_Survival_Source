@@ -6,6 +6,7 @@
 #include "RTS_Survival/Missions/MissionManager/EnemyUnitQueryType.h"
 #include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
+#include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "UObject/NoExportTypes.h"
 #include "Engine/OverlapResult.h"
@@ -454,6 +455,20 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);
+
+	/**
+	 * @brief Registers an additional camera blocking boundary through mission blueprint logic.
+	 * @param BoundaryRegistrationParams Boundary registration payload forwarded to the player camera controller.
+	 * @return True if the boundary registration succeeded.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Camera")
+	bool RegisterCameraBoundary(const FCameraBoundaryRegistrationParams& BoundaryRegistrationParams);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Camera")
+	bool RemoveCameraBoundaryById(FName BoundaryId);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Camera")
+	void RemoveAllCameraBoundaries();
 
 	/**
 	 * @brief Depending on mission difficulty get mosin-ptrs squad
