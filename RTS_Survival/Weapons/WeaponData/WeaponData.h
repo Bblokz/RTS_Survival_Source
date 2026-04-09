@@ -122,6 +122,8 @@ enum class EWeaponLaunchSettingsType : uint8
 	None,
 	// Color the launch vfx based on the shell type.
 	ColorByShellType,
+	// Set launch and smoke colors directly from LaunchEffectSettings.
+	DirectSetColorOnTanklaunchSmoke,
 	// Scale the lifetime and size directly based on struct settings.
 	DirectLifeTimeSizeScale
 };
@@ -256,6 +258,10 @@ struct FLaunchEffectSettings
 	// To directly scale the size; used for small arms launch effect settings.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float SizeMlt = 1.f;
+
+	// Direct color used by DirectSetColorOnTanklaunchSmoke.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FLinearColor DirectSetColorOnTanklaunchSmoke = FLinearColor::White;
 };
 
 // Provides different vfx for different shells
@@ -807,6 +813,7 @@ private:
 	void InitializeLaunchNiagaraStaticParams(UNiagaraComponent* NiagaraComp) const;
 
 	void SetColorByShellTypeInitParams(UNiagaraComponent* NiagaraComp) const;
+	void SetDirectSetColorOnTanklaunchSmokeInitParams(UNiagaraComponent* NiagaraComp) const;
 	void SetDirectLifeTimeSizeScaleInitParams(UNiagaraComponent* NiagaraComp) const;
 
 	/**
