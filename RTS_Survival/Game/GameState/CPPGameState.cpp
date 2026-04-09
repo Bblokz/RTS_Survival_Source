@@ -4337,6 +4337,18 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T70, TankData);
 
+	// T-70F (same combat stats as T-70, higher metal cost)
+	{
+		const float T70FMetalCostMultiplier = 1.3f;
+		const int32 T70FVehiclePartsCost = FMath::RoundToInt((LightTankVehiclePartsCost + 25) * T70FMetalCostMultiplier);
+
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost + 50},
+			{ERTSResourceType::Resource_VehicleParts, T70FVehiclePartsCost}
+		});
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T70F, TankData);
+	}
+
 	// SU-76 (light TD)
 	{
 		const float Su76HealthMlt = 1.2f;
@@ -5040,6 +5052,17 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Tiger, TankData);
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_TigerH1, TankData);
 
+	// Tiger Rail (same as Tiger H1 with increased metal cost)
+	{
+		const int32 TigerRailMetalCostIncrease = 250;
+
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost},
+			{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + TigerRailMetalCostIncrease}
+		});
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_TigerRail, TankData);
+	}
+
 
 	// Sturm Tiger
 	TankData.MaxHealth = T3HeavyTankBase + 400;
@@ -5120,6 +5143,18 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceWorth = MediumTankHealthBase;
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T28, TankData);
+
+	// T-28F (same combat stats as T-28, higher metal cost)
+	{
+		const float T28FMetalCostMultiplier = 1.3f;
+		const int32 T28FVehiclePartsCost = FMath::RoundToInt((T2HeavyTankVehiclePartsCost - 100) * T28FMetalCostMultiplier);
+
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, T2HeavyTankRadixiteCost - 250},
+			{ERTSResourceType::Resource_VehicleParts, T28FVehiclePartsCost}
+		});
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T28F, TankData);
+	}
 
 	// T-35 (super large)
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankBase * 2.0f, 10);
@@ -6886,6 +6921,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherD)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_TigerH1)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_TigerRail)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Tiger105)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_JagdPanther)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SturmTiger)),
