@@ -2132,7 +2132,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 		WeaponData.ArmorPenMaxRange = RusTwin35MmArmorPen - 11.f;
 		WeaponData.MagCapacity = 6;
 		WeaponData.ReloadSpeed = 4;
-		WeaponData.BaseCooldown = 0.33f;
+		WeaponData.BaseCooldown = 3.f;
 		WeaponData.CooldownFlux = 10;
 		WeaponData.Accuracy = 55;
 		WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
