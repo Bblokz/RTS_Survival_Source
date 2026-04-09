@@ -85,7 +85,7 @@ struct FTrackPhysicsMovementTuning
 	 * @note Determines how much upcoming slope information contributes to the averaged ground normal.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
-	float GroundTraceForwardDistance = 200.0f;
+	float GroundTraceForwardDistance = 100.0f;
 
 	/**
 	 * @brief Increase when traces lose contact on sharp dips; decrease if traces incorrectly latch onto lower geometry.
@@ -94,7 +94,7 @@ struct FTrackPhysicsMovementTuning
 	 * @note Affects whether the movement step can resolve a reliable ground plane for force projection.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
-	float GroundTraceDownDistance = 500.0f;
+	float GroundTraceDownDistance = 600.0f;
 
 	/**
 	 * @brief Lower bound to avoid zero-inertia torque calculations on malformed or unloaded body data.
@@ -145,7 +145,7 @@ public:
 		const float NewTrackForceMultiplier,
 		const float NewTurnRate,
 		UChassisAnimInstance* NewTankAnimBp,
-		const float TankMeshZOffset);
+		const float TankMeshZOffset = 200);
 
 	/**
 	 * Moves the tank using bounded force and torque corrections aligned to the traced ground plane.
