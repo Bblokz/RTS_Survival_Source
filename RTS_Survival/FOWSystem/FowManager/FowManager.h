@@ -261,6 +261,13 @@ private:
 	void UpdateDrawBuffer();
 
 	/**
+	 * @brief Pushes playable bounds to the player camera controller and retries for a short window if needed.
+	 *
+	 * This keeps camera bounds setup reliable when BeginPlay order differs between systems.
+	 */
+	void BeginPlay_InitTransferMapExtentToPlayerCamera();
+
+	/**
 	 * @brief Requests an update to the enemy vision system.
 	 *
 	 * @note Will only proceed if not already awaiting a previous enemy vision update.
@@ -296,6 +303,9 @@ private:
 
 	/** Counter for the number of attempts to start the Fog of War subsystem. */
 	int32 M_StartupAttempts;
+
+	/** Counter for delayed retries when pushing map bounds to the player camera controller. */
+	int32 M_BeginPlayBoundsTransferAttempts;
 
 	/**
 	 * @brief Ensures that all stored Fog of War components and their owners are valid.

@@ -9,9 +9,68 @@
 
 class USpringArmComponent;
 class ACameraPawn;
+class AActor;
+
+UENUM(BlueprintType)
+enum class ECameraBoundaryAxisSpace : uint8
+{
+	World = 0,
+	ActorLocal = 1
+};
+
+UENUM(BlueprintType, meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
+enum class ECameraBoundaryBlockedSides : uint8
+{
+	None = 0 UMETA(Hidden),
+	PositiveX = 1 << 0,
+	NegativeX = 1 << 1,
+	PositiveY = 1 << 2,
+	NegativeY = 1 << 3
+};
+ENUM_CLASS_FLAGS(ECameraBoundaryBlockedSides);
+
+USTRUCT(BlueprintType)
+struct FCameraBoundaryRegistrationParams
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|PlayableBounds")
+	FName M_BoundaryId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|PlayableBounds")
+	TObjectPtr<AActor> M_BoundaryActor = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|PlayableBounds")
+	bool bM_UseActorBoundsAsBoundary = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|PlayableBounds")
+	ECameraBoundaryAxisSpace M_AxisSpaceForBlockedSides = ECameraBoundaryAxisSpace::World;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|PlayableBounds", meta = (Bitmask, BitmaskEnum = "/Script/RTS_Survival.ECameraBoundaryBlockedSides"))
+	int32 M_BlockedSideFlags = 0;
+};
+
+USTRUCT()
+struct FPlayerCameraBoundaryPlaneConstraint
+{
+	GENERATED_BODY()
+
+	FVector M_PlaneOrigin = FVector::ZeroVector;
+	FVector M_PlaneNormal = FVector::ForwardVector;
+	bool bM_AllowPositiveSide = false;
+};
+
+USTRUCT()
+struct FPlayerCameraBoundarySubmissionCache
+{
+	GENERATED_BODY()
+
+	FName M_BoundaryId = NAME_None;
+	TArray<FPlayerCameraBoundaryPlaneConstraint> M_CachedPlaneConstraints = {};
+};
 
 /**
- * Player Camera Controller component.
+ * @brief Handles runtime camera movement requests and applies movement constraints for the local player.
  */
 UCLASS()
 class RTS_SURVIVAL_API UPlayerCameraController : public UActorComponent
@@ -42,6 +101,27 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ReferencesCasts")
 	void InitPlayerCameraController(ACameraPawn* NewCameraRef, USpringArmComponent* NewSpringarmRef);
+
+	/**
+	 * @brief Sets the playable-area bounds used to block camera movement beyond the map.
+	 * @param NewPlayableAreaCenter World-space center of the playable area.
+	 * @param NewPlayableAreaExtent Half-size of the playable square in Unreal units.
+	 */
+	void SetPlayableAreaBounds(const FVector& NewPlayableAreaCenter, float NewPlayableAreaExtent);
+
+	/**
+	 * @brief Registers an additional cached boundary that is evaluated together with FOW limits.
+	 * @param BoundaryRegistrationParams Defines the boundary actor, ID and blocked-side settings.
+	 * @return True if cached boundary constraints were generated and stored successfully.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Camera|PlayableBounds")
+	bool RegisterAdditionalCameraBoundary(const FCameraBoundaryRegistrationParams& BoundaryRegistrationParams);
+
+	UFUNCTION(BlueprintCallable, Category = "Camera|PlayableBounds")
+	bool RemoveAdditionalCameraBoundaryById(FName BoundaryId);
+
+	UFUNCTION(BlueprintCallable, Category = "Camera|PlayableBounds")
+	void RemoveAllAdditionalCameraBounds();
 
 	void ResetCameraToBaseZoomLevel() const;
 	void SetCustomCameraZoomLevel(const float NewZoomLevel) const;
@@ -122,5 +202,47 @@ private:
 		float& OutMouseY,
 		bool& bOutIsMouseInViewport) const;
 
+	bool GetCanMoveCameraByWorldDelta(const FVector& WorldDelta) const;
+	bool GetCanMoveCameraToLocation(const FVector& TargetCameraLocation) const;
+	bool GetAreAllPlaneConstraintsSatisfied(
+		const FVector& TargetCameraLocation,
+		const TArray<FPlayerCameraBoundaryPlaneConstraint>& PlaneConstraints) const;
+	bool GetIsBoundaryIdValidForRegistration(const FName& BoundaryId, const FString& CallingFunctionName) const;
+	bool GetCanBuildBoundaryFromActor(const AActor* BoundaryActor, const FString& CallingFunctionName) const;
+	bool GetHasSideFlag(const int32 BlockedSideFlags, const ECameraBoundaryBlockedSides SideFlag) const;
+	void SetFowBoundaryConstraints(const FVector& NewPlayableAreaCenter, const float NewPlayableAreaExtent);
+	void AddPlaneConstraint(
+		const FVector& PlaneOrigin,
+		const FVector& PlaneNormal,
+		const bool bAllowPositiveSide,
+		TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const;
+	void AddBoxBoundaryConstraints(const FBox& WorldSpaceBox, TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const;
+	/**
+	 * @brief Converts blocked-side settings into cached plane constraints so side rules are evaluated cheaply at runtime.
+	 * @param BoundaryActor Source actor that provides origin and optional local axis directions.
+	 * @param AxisSpaceForBlockedSides Chooses whether blocked side checks use world or actor-local axes.
+	 * @param BlockedSideFlags Bitmask of blocked sides that should become plane constraints.
+	 * @param OutConstraints Output array receiving generated constraints.
+	 */
+	void AddDirectionalSideConstraints(
+		const AActor* BoundaryActor,
+		const ECameraBoundaryAxisSpace AxisSpaceForBlockedSides,
+		const int32 BlockedSideFlags,
+		TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const;
+	void RebuildCachedAdditionalPlaneConstraints();
+	void TryMoveCameraByWorldDelta(const FVector& WorldDelta) const;
+	void TryMoveCameraToLocation(const FVector& TargetCameraLocation) const;
+
 	bool bM_IsCameraLocked = false;
+	bool bM_HasFowPlayableAreaBounds = false;
+	// Cached constraints generated from the FOW map center/extent.
+	UPROPERTY()
+	TArray<FPlayerCameraBoundaryPlaneConstraint> M_FowPlaneConstraints = {};
+
+	// Flattened constraints from all additional submissions, rebuilt only when registrations change.
+	UPROPERTY()
+	TArray<FPlayerCameraBoundaryPlaneConstraint> M_CachedAdditionalPlaneConstraints = {};
+
+	UPROPERTY()
+	TArray<FPlayerCameraBoundarySubmissionCache> M_AdditionalBoundarySubmissionCaches = {};
 };
