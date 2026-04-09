@@ -1545,8 +1545,11 @@ void UWeaponState::CreateLaunchAndSmokeVfx(
 		// Lazily push colors only when ShellType changed (also covers the "first time" path).
 		UpdateAllCachedLaunchColorsIfShellChanged();
 		break;
+	case EWeaponLaunchSettingsType::DirectSetColorOnTanklaunchSmoke:
+		// Color is set directly from struct values when niagara component was created; runtime update is a no-op.
+		break;
 	case EWeaponLaunchSettingsType::DirectLifeTimeSizeScale:
-		// Settings already set directly from struct values when niagara component was created.
+		// Settings are set directly from struct values when niagara component was created; runtime update is a no-op.
 		break;
 	}
 
@@ -1642,6 +1645,9 @@ void UWeaponState::InitializeLaunchNiagaraStaticParams(UNiagaraComponent* const 
 	case EWeaponLaunchSettingsType::ColorByShellType:
 		SetColorByShellTypeInitParams(NiagaraComp);
 		return;
+	case EWeaponLaunchSettingsType::DirectSetColorOnTanklaunchSmoke:
+		SetDirectSetColorOnTanklaunchSmokeInitParams(NiagaraComp);
+		return;
 	case EWeaponLaunchSettingsType::DirectLifeTimeSizeScale:
 		SetDirectLifeTimeSizeScaleInitParams(NiagaraComp);
 		return;
@@ -1687,6 +1693,15 @@ void UWeaponState::SetDirectLifeTimeSizeScaleInitParams(UNiagaraComponent* Niaga
 	const float SizeMlt = M_WeaponVfx.LaunchEffectSettings.SizeMlt;
 	NiagaraComp->SetFloatParameter(LaunchVfx::LifeTimeName, LifeTime);
 	NiagaraComp->SetFloatParameter(LaunchVfx::DirectSizeMltName, SizeMlt);
+}
+
+void UWeaponState::SetDirectSetColorOnTanklaunchSmokeInitParams(UNiagaraComponent* NiagaraComp) const
+{
+	SetColorByShellTypeInitParams(NiagaraComp);
+
+	const FLinearColor LaunchAndSmokeColor = M_WeaponVfx.LaunchEffectSettings.DirectSetColorOnTanklaunchSmoke;
+	NiagaraComp->SetColorParameter(LaunchVfx::WeaponShellColorName, LaunchAndSmokeColor);
+	NiagaraComp->SetColorParameter(LaunchVfx::GroundSmokeColor, LaunchAndSmokeColor);
 }
 
 void UWeaponState::UpdateAllCachedLaunchColorsIfShellChanged()
