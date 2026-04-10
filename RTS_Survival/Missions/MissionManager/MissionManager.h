@@ -27,6 +27,7 @@ class UW_Defeat;
 class AActor;
 class UObject;
 class AEnemyController;
+struct FStreamableHandle;
 
 USTRUCT(BlueprintType)
 struct FMissionStartingResources
@@ -60,6 +61,51 @@ struct FPlayerFactionBackupData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup", meta=(EditCondition="bSetFactionManually"))
 	ERTSFaction PlayerFaction = ERTSFaction::NotInitialised;
 	
+};
+
+USTRUCT(BlueprintType)
+struct FSeededSpawnTrainingOptionEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Seeded Spawn")
+	FTrainingOption TrainingOption = FTrainingOption();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Seeded Spawn")
+	FVector SpawnLocation = FVector::ZeroVector;
+};
+
+USTRUCT(BlueprintType)
+struct FSeededSpawnSoftActorEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Seeded Spawn")
+	TSoftClassPtr<AActor> ActorClass = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Seeded Spawn")
+	FVector SpawnLocation = FVector::ZeroVector;
+};
+
+USTRUCT(BlueprintType)
+struct FSeededSpawnChoice
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Seeded Spawn")
+	TArray<FSeededSpawnTrainingOptionEntry> TrainingOptionSpawns;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Seeded Spawn")
+	TArray<FSeededSpawnSoftActorEntry> SoftActorSpawns;
+};
+
+USTRUCT(BlueprintType)
+struct FSeededChoices
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Seeded Spawn")
+	TArray<FSeededSpawnChoice> Choices;
 };
 
 USTRUCT()
@@ -199,6 +245,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
 	FTrainingOption SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const;
 	int32 GetGenerationSeed() const;
+	/**
+	 * @brief Resolves one choice per seeded group and spawns the configured results deterministically from campaign seed.
+	 * @param SeededChoicesArray Groups of candidate spawn choices configured in blueprint.
+	 * @param WorldContextObject Context used for async spawn ownership and load callbacks.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray, UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Defeat")
 	void TriggerDefeat(const ERTSDefeatType DefeatType);
@@ -318,4 +371,15 @@ private:
 
 	TArray<FMissionEnemyUnitDestroyedCallbackState> M_EnemyUnitDestroyedCallbacks;
 	TMap<TWeakObjectPtr<AActor>, int32> M_TrackedEnemyActorRefCounts;
+
+	// Keep load handles alive until callback executes so async soft actor class loads are guaranteed.
+	TArray<TSharedPtr<FStreamableHandle>> M_SeededSpawnAssetLoadHandles;
+
+	void SpawnSeededChoice(const FSeededSpawnChoice& SeededChoice, UObject* WorldContextObject);
+	void SpawnSeededChoiceTrainingOptions(const TArray<FSeededSpawnTrainingOptionEntry>& TrainingOptionSpawns,
+	                                      UObject* WorldContextObject);
+	void SpawnSeededChoiceSoftActors(const TArray<FSeededSpawnSoftActorEntry>& SoftActorSpawns,
+	                                 UObject* WorldContextObject);
+	int32 GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex) const;
+	bool GetIsSeededChoiceConfigured(const FSeededSpawnChoice& SeededChoice) const;
 };

@@ -1,5 +1,7 @@
 ﻿#include "MissionManager.h"
 
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
@@ -1080,6 +1082,175 @@ FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubt
     // Return the selected option
 	Option.SubtypeValue = static_cast<uint8>(SquadOptions[Index]);
 	return Option;
+}
+
+void AMissionManager::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray, UObject* WorldContextObject)
+{
+	if (SeededChoicesArray.IsEmpty())
+	{
+		return;
+	}
+
+	for (int32 GroupIndex = 0; GroupIndex < SeededChoicesArray.Num(); ++GroupIndex)
+	{
+		const FSeededChoices& SeededChoicesGroup = SeededChoicesArray[GroupIndex];
+		if (SeededChoicesGroup.Choices.IsEmpty())
+		{
+			continue;
+		}
+
+		const int32 SelectedChoiceIndex = GetSeededChoiceIndex(SeededChoicesGroup.Choices, GroupIndex);
+		if (not SeededChoicesGroup.Choices.IsValidIndex(SelectedChoiceIndex))
+		{
+			continue;
+		}
+
+		const FSeededSpawnChoice& SelectedChoice = SeededChoicesGroup.Choices[SelectedChoiceIndex];
+		if (not GetIsSeededChoiceConfigured(SelectedChoice))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Mission manager selected a seeded choice with empty TrainingOptionSpawns and SoftActorSpawns."
+			);
+			continue;
+		}
+
+		SpawnSeededChoice(SelectedChoice, WorldContextObject);
+	}
+}
+
+void AMissionManager::SpawnSeededChoice(const FSeededSpawnChoice& SeededChoice, UObject* WorldContextObject)
+{
+	SpawnSeededChoiceTrainingOptions(SeededChoice.TrainingOptionSpawns, WorldContextObject);
+	SpawnSeededChoiceSoftActors(SeededChoice.SoftActorSpawns, WorldContextObject);
+}
+
+void AMissionManager::SpawnSeededChoiceTrainingOptions(
+	const TArray<FSeededSpawnTrainingOptionEntry>& TrainingOptionSpawns,
+	UObject* WorldContextObject)
+{
+	if (TrainingOptionSpawns.IsEmpty())
+	{
+		return;
+	}
+
+	ARTSAsyncSpawner* RTSAsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
+	if (not EnsureValidTowAsyncSpawner(RTSAsyncSpawner))
+	{
+		return;
+	}
+
+	UObject* SpawnOwner = IsValid(WorldContextObject) ? WorldContextObject : this;
+	for (const FSeededSpawnTrainingOptionEntry& TrainingOptionSpawn : TrainingOptionSpawns)
+	{
+		if (TrainingOptionSpawn.TrainingOption.IsNone())
+		{
+			continue;
+		}
+
+		constexpr int32 SpawnRequestID = INDEX_NONE;
+		const FRTSSpawnOptionAtLocationCallback EmptyCallback = FRTSSpawnOptionAtLocationCallback();
+		RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
+			TrainingOptionSpawn.TrainingOption,
+			TrainingOptionSpawn.SpawnLocation,
+			SpawnOwner,
+			SpawnRequestID,
+			EmptyCallback
+		);
+	}
+}
+
+void AMissionManager::SpawnSeededChoiceSoftActors(
+	const TArray<FSeededSpawnSoftActorEntry>& SoftActorSpawns,
+	UObject* WorldContextObject)
+{
+	if (SoftActorSpawns.IsEmpty())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	UObject* SpawnOwnerObject = IsValid(WorldContextObject) ? WorldContextObject : this;
+	AActor* SpawnOwnerActor = Cast<AActor>(SpawnOwnerObject);
+	if (not IsValid(SpawnOwnerActor))
+	{
+		SpawnOwnerActor = this;
+	}
+
+	for (const FSeededSpawnSoftActorEntry& SoftActorSpawn : SoftActorSpawns)
+	{
+		if (SoftActorSpawn.ActorClass.IsNull())
+		{
+			continue;
+		}
+
+		const TSoftClassPtr<AActor> ActorClassToLoad = SoftActorSpawn.ActorClass;
+		const FVector SpawnLocation = SoftActorSpawn.SpawnLocation;
+		const TWeakObjectPtr<AMissionManager> WeakMissionManager = this;
+		const TWeakObjectPtr<AActor> WeakSpawnOwner = SpawnOwnerActor;
+		TSharedPtr<FStreamableHandle> LoadingHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+			ActorClassToLoad.ToSoftObjectPath(),
+			FStreamableDelegate::CreateLambda([WeakMissionManager, WeakSpawnOwner, ActorClassToLoad, SpawnLocation]()
+			{
+				if (not WeakMissionManager.IsValid())
+				{
+					return;
+				}
+
+				UWorld* MissionWorld = WeakMissionManager->GetWorld();
+				if (not MissionWorld)
+				{
+					return;
+				}
+
+				UClass* LoadedClass = ActorClassToLoad.Get();
+				if (not IsValid(LoadedClass))
+				{
+					return;
+				}
+
+				FActorSpawnParameters SpawnParameters;
+				SpawnParameters.Owner = WeakSpawnOwner.IsValid() ? WeakSpawnOwner.Get() : WeakMissionManager.Get();
+				SpawnParameters.SpawnCollisionHandlingOverride =
+					ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+				MissionWorld->SpawnActor<AActor>(
+					LoadedClass,
+					SpawnLocation,
+					FRotator::ZeroRotator,
+					SpawnParameters
+				);
+			})
+		);
+
+		if (LoadingHandle.IsValid())
+		{
+			M_SeededSpawnAssetLoadHandles.Add(LoadingHandle);
+		}
+	}
+}
+
+int32 AMissionManager::GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex) const
+{
+	if (Choices.IsEmpty())
+	{
+		return INDEX_NONE;
+	}
+
+	const int32 CampaignSeed = GetGenerationSeed();
+	const uint32 SeedHash = HashCombineFast(
+		static_cast<uint32>(CampaignSeed),
+		static_cast<uint32>(GroupIndex + 1)
+	);
+	return static_cast<int32>(SeedHash % static_cast<uint32>(Choices.Num()));
+}
+
+bool AMissionManager::GetIsSeededChoiceConfigured(const FSeededSpawnChoice& SeededChoice) const
+{
+	return SeededChoice.TrainingOptionSpawns.Num() > 0 || SeededChoice.SoftActorSpawns.Num() > 0;
 }
 
 

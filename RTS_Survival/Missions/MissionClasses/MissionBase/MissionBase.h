@@ -450,6 +450,13 @@ protected:
 	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
 	                          const FVector SpawnLocation);
 
+	/**
+	 * @brief Resolves and spawns seeded choice groups through the mission manager for BP-authored map setups.
+	 * @param SeededChoicesArray Groups containing deterministic spawn choices keyed by campaign generation seed.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray);
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnAsyncSpawnComplete(const FTrainingOption TrainingOption, AActor* SpawnedActor, const int32 ID);
 
