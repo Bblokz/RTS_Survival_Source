@@ -112,7 +112,7 @@ protected:
 	 * @param NewTurnRate The turn rate of the tank. (default 30)
 	 * @param TrackedAnimBP The animation blueprint of the tank.
 	 * @param TankCornerOffset The offset used in pathfinding to offset points from navmesh corners.
-	 * @param TankMeshZOffset The offset of the tank mesh from the ground. (default 0)
+	 * @param TankMeshZOffset The offset of the tank mesh from the ground. (default 200)
 	 * can be used on tanks where the physics assistance makes the mesh go through the ground.
 	 * @param AngularDamping
 	 * @param LinearDamping
@@ -126,7 +126,7 @@ protected:
 		const float NewTurnRate,
 		UChassisAnimInstance* TrackedAnimBP,
 		const float TankCornerOffset,
-		const float TankMeshZOffset = 0.f, const float AngularDamping = 0, const float LinearDamping = 0, const int32 Energy
+		const float TankMeshZOffset = 200.f, const float AngularDamping = 0, const float LinearDamping = 0, const int32 Energy
 			= 0);
 
 	// Exists both on the tank and the physics track movement component for quick accesss.
