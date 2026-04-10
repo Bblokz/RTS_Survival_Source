@@ -3,6 +3,7 @@
 #include "PlayerCameraController.h"
 
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "GameFramework/Actor.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -39,7 +40,7 @@ void UPlayerCameraController::SetCameraMovementSpeedMultiplier(const float NewMu
 
 void UPlayerCameraController::ZoomIn()
 {
-	if (bM_IsPlayerInTechTreeOrArchive || !GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
+	if (bM_IsPlayerInTechTreeOrArchive || not GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -56,7 +57,7 @@ void UPlayerCameraController::ZoomIn()
 
 void UPlayerCameraController::ZoomOut()
 {
-	if (bM_IsPlayerInTechTreeOrArchive || !GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
+	if (bM_IsPlayerInTechTreeOrArchive || not GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -76,18 +77,110 @@ void UPlayerCameraController::InitPlayerCameraController(ACameraPawn* NewCameraR
 {
 	M_PlayerCamera = NewCameraRef;
 	M_SpringArmComponent = NewSpringarmRef;
-	if (M_SpringArmComponent)
+	if (not GetIsValidSpringArmComponent())
 	{
-		M_SpringArmComponent->PrimaryComponentTick.bCanEverTick = true;
-		M_SpringArmComponent->PrimaryComponentTick.bTickEvenWhenPaused = true;
-		M_SpringArmComponent->PrimaryComponentTick.bStartWithTickEnabled = true;
+		return;
 	}
+
+	M_SpringArmComponent->PrimaryComponentTick.bCanEverTick = true;
+	M_SpringArmComponent->PrimaryComponentTick.bTickEvenWhenPaused = true;
+	M_SpringArmComponent->PrimaryComponentTick.bStartWithTickEnabled = true;
 	M_BaseCameraZoomLevel = M_SpringArmComponent->TargetArmLength;
+}
+
+void UPlayerCameraController::SetPlayableAreaBounds(const FVector& NewPlayableAreaCenter, const float NewPlayableAreaExtent)
+{
+	SetFowBoundaryConstraints(NewPlayableAreaCenter, NewPlayableAreaExtent);
+}
+
+bool UPlayerCameraController::RegisterAdditionalCameraBoundary(
+	const FCameraBoundaryRegistrationParams& BoundaryRegistrationParams)
+{
+	if (not GetIsBoundaryIdValidForRegistration(BoundaryRegistrationParams.M_BoundaryId,
+	                                            "RegisterAdditionalCameraBoundary"))
+	{
+		return false;
+	}
+	if (not GetCanBuildBoundaryFromActor(BoundaryRegistrationParams.M_BoundaryActor,
+	                                     "RegisterAdditionalCameraBoundary"))
+	{
+		return false;
+	}
+
+	const AActor* const BoundaryActor = BoundaryRegistrationParams.M_BoundaryActor.Get();
+	TArray<FPlayerCameraBoundaryPlaneConstraint> CachedPlaneConstraints = {};
+	if (BoundaryRegistrationParams.bM_UseActorBoundsAsBoundary)
+	{
+		const FBox WorldSpaceActorBounds = BoundaryActor->GetComponentsBoundingBox(true);
+		AddBoxBoundaryConstraints(WorldSpaceActorBounds, CachedPlaneConstraints);
+	}
+
+	AddDirectionalSideConstraints(
+		BoundaryActor,
+		BoundaryRegistrationParams.M_AxisSpaceForBlockedSides,
+		BoundaryRegistrationParams.M_BlockedSideFlags,
+		CachedPlaneConstraints);
+	if (CachedPlaneConstraints.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"No camera boundary constraints were generated for boundary id: "
+			+ BoundaryRegistrationParams.M_BoundaryId.ToString()
+			+ "\n See function: UPlayerCameraController::RegisterAdditionalCameraBoundary()");
+		return false;
+	}
+
+	for (FPlayerCameraBoundarySubmissionCache& ExistingSubmission : M_AdditionalBoundarySubmissionCaches)
+	{
+		if (ExistingSubmission.M_BoundaryId != BoundaryRegistrationParams.M_BoundaryId)
+		{
+			continue;
+		}
+
+		ExistingSubmission.M_CachedPlaneConstraints = CachedPlaneConstraints;
+		RebuildCachedAdditionalPlaneConstraints();
+		return true;
+	}
+
+	FPlayerCameraBoundarySubmissionCache NewSubmission = {};
+	NewSubmission.M_BoundaryId = BoundaryRegistrationParams.M_BoundaryId;
+	NewSubmission.M_CachedPlaneConstraints = CachedPlaneConstraints;
+	M_AdditionalBoundarySubmissionCaches.Add(NewSubmission);
+	RebuildCachedAdditionalPlaneConstraints();
+	return true;
+}
+
+bool UPlayerCameraController::RemoveAdditionalCameraBoundaryById(const FName BoundaryId)
+{
+	if (not GetIsBoundaryIdValidForRegistration(BoundaryId, "RemoveAdditionalCameraBoundaryById"))
+	{
+		return false;
+	}
+
+	const int32 InitialSubmissionCount = M_AdditionalBoundarySubmissionCaches.Num();
+	M_AdditionalBoundarySubmissionCaches.RemoveAll(
+		[BoundaryId](const FPlayerCameraBoundarySubmissionCache& Submission)
+		{
+			return Submission.M_BoundaryId == BoundaryId;
+		});
+
+	if (M_AdditionalBoundarySubmissionCaches.Num() == InitialSubmissionCount)
+	{
+		return false;
+	}
+
+	RebuildCachedAdditionalPlaneConstraints();
+	return true;
+}
+
+void UPlayerCameraController::RemoveAllAdditionalCameraBounds()
+{
+	M_AdditionalBoundarySubmissionCaches.Empty();
+	M_CachedAdditionalPlaneConstraints.Empty();
 }
 
 void UPlayerCameraController::ResetCameraToBaseZoomLevel() const
 {
-	if (!GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
+	if (not GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -96,7 +189,7 @@ void UPlayerCameraController::ResetCameraToBaseZoomLevel() const
 
 void UPlayerCameraController::SetCustomCameraZoomLevel(const float NewZoomLevel) const
 {
-	if (!GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
+	if (not GetIsValidSpringArmComponent() || GetIsLockedOrDisabled())
 	{
 		return;
 	}
@@ -253,7 +346,7 @@ void UPlayerCameraController::EdgeScroll(const float DeltaTime)
 	const FRotator CamRot = M_PlayerCamera->GetActorRotation();
 	const FVector WorldDelta = CamRot.RotateVector(LocalDelta);
 
-	M_PlayerCamera->AddActorWorldOffset(WorldDelta, /*bSweep=*/ true);
+	TryMoveCameraByWorldDelta(WorldDelta);
 }
 
 
@@ -322,45 +415,35 @@ void UPlayerCameraController::ForwardRightMovement(const bool bOnForward, float 
 	{
 		return;
 	}
+
+	FVector LocalDelta = FVector::ZeroVector;
 	if (bOnForward)
 	{
 		AxisX = AxisX * DeveloperSettings::UIUX::DefaultCameraMovementSpeed;
 		AxisX = AxisX * DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
-
-		FVector DirectionVector;
-		DirectionVector.X = AxisX;
-		DirectionVector.Y = 0;
-		DirectionVector.Z = 0;
-
-		FTransform Transform = M_PlayerCamera->GetActorTransform();
-		FVector LocationVector = UKismetMathLibrary::TransformDirection(Transform, DirectionVector);
-		Transform = M_PlayerCamera->GetActorTransform();
-		LocationVector += Transform.GetLocation();
-		LocationVector.Z = 110; // Set Z to height of map.
-		M_PlayerCamera->SetActorLocation(LocationVector, true);
+		LocalDelta.X += AxisX;
 	}
+
 	if (bOnRight)
 	{
 		AxisY = AxisY * DeveloperSettings::UIUX::DefaultCameraMovementSpeed;
 		AxisY = AxisY * DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
-
-		FVector DirectionVector;
-		DirectionVector.X = 0;
-		DirectionVector.Y = AxisY;
-		DirectionVector.Z = 0;
-
-		FTransform Transform = M_PlayerCamera->GetActorTransform();
-		FVector LocationVector = UKismetMathLibrary::TransformDirection(Transform, DirectionVector);
-		Transform = M_PlayerCamera->GetActorTransform();
-		LocationVector += Transform.GetLocation();
-
-		M_PlayerCamera->SetActorLocation(LocationVector, true);
+		LocalDelta.Y += AxisY;
 	}
+
+	if (LocalDelta.IsNearlyZero())
+	{
+		return;
+	}
+
+	const FTransform CameraTransform = M_PlayerCamera->GetActorTransform();
+	const FVector WorldDelta = UKismetMathLibrary::TransformDirection(CameraTransform, LocalDelta);
+	TryMoveCameraByWorldDelta(WorldDelta);
 }
 
 void UPlayerCameraController::PanReset()
 {
-	if (GetIsLockedOrDisabled()|| bM_IsPlayerInTechTreeOrArchive || !GetIsValidCameraPawn())
+	if (GetIsLockedOrDisabled() || bM_IsPlayerInTechTreeOrArchive || not GetIsValidCameraPawn())
 	{
 		return;
 	}
@@ -372,7 +455,7 @@ void UPlayerCameraController::PanReset()
 
 void UPlayerCameraController::MoveCameraOverTime(const FMovePlayerCamera& NewMove)
 {
-	if (!GetIsValidCameraPawn() || not M_PlayerCamera->GetWorld())
+	if (not GetIsValidCameraPawn() || not M_PlayerCamera->GetWorld())
 	{
 		return;
 	}
@@ -413,7 +496,7 @@ void UPlayerCameraController::OnCameraMoveComplete()
 	// Ensure the camera is exactly at the target location.
 	if (GetIsValidCameraPawn())
 	{
-		M_PlayerCamera->SetActorLocation(CurrentMove.MoveToLocation, true);
+		TryMoveCameraToLocation(CurrentMove.MoveToLocation);
 	}
 	bIsCameraMoving = false;
 	// If there is a queued move, start it.
@@ -442,7 +525,7 @@ void UPlayerCameraController::TickComponent(float DeltaTime, ELevelTick TickType
 		float ElapsedTime = GetWorld()->GetTimeSeconds() - MoveStartTime;
 		float Alpha = (MoveDuration > 0.0f) ? FMath::Clamp(ElapsedTime / MoveDuration, 0.0f, 1.0f) : 1.0f;
 		FVector NewLocation = FMath::Lerp(MoveStartLocation, CurrentMove.MoveToLocation, Alpha);
-		M_PlayerCamera->SetActorLocation(NewLocation, true);
+		TryMoveCameraToLocation(NewLocation);
 	}
 	EdgeScroll(DeltaTime);
 }
@@ -450,4 +533,206 @@ void UPlayerCameraController::TickComponent(float DeltaTime, ELevelTick TickType
 bool UPlayerCameraController::GetIsLockedOrDisabled() const
 {
 	return bM_IsCameraLocked || bM_IsCameraMovementDisabled;
+}
+
+bool UPlayerCameraController::GetCanMoveCameraByWorldDelta(const FVector& WorldDelta) const
+{
+	if (not GetIsValidCameraPawn())
+	{
+		return false;
+	}
+
+	const FVector TargetCameraLocation = M_PlayerCamera->GetActorLocation() + WorldDelta;
+	return GetCanMoveCameraToLocation(TargetCameraLocation);
+}
+
+bool UPlayerCameraController::GetCanMoveCameraToLocation(const FVector& TargetCameraLocation) const
+{
+	if (bM_HasFowPlayableAreaBounds
+		&& not GetAreAllPlaneConstraintsSatisfied(TargetCameraLocation, M_FowPlaneConstraints))
+	{
+		return false;
+	}
+
+	return GetAreAllPlaneConstraintsSatisfied(TargetCameraLocation, M_CachedAdditionalPlaneConstraints);
+}
+
+bool UPlayerCameraController::GetAreAllPlaneConstraintsSatisfied(
+	const FVector& TargetCameraLocation,
+	const TArray<FPlayerCameraBoundaryPlaneConstraint>& PlaneConstraints) const
+{
+	constexpr float PlaneSignedDistanceTolerance = 0.1f;
+	for (const FPlayerCameraBoundaryPlaneConstraint& Constraint : PlaneConstraints)
+	{
+		const FVector Difference = TargetCameraLocation - Constraint.M_PlaneOrigin;
+		const float SignedDistance = FVector::DotProduct(Difference, Constraint.M_PlaneNormal);
+		if (Constraint.bM_AllowPositiveSide && SignedDistance >= -PlaneSignedDistanceTolerance)
+		{
+			continue;
+		}
+		if (not Constraint.bM_AllowPositiveSide && SignedDistance <= PlaneSignedDistanceTolerance)
+		{
+			continue;
+		}
+
+		return false;
+	}
+	return true;
+}
+
+bool UPlayerCameraController::GetIsBoundaryIdValidForRegistration(
+	const FName& BoundaryId,
+	const FString& CallingFunctionName) const
+{
+	if (BoundaryId != NAME_None)
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportError("Boundary id must be set."
+		"\n See function: UPlayerCameraController::" + CallingFunctionName + "()");
+	return false;
+}
+
+bool UPlayerCameraController::GetCanBuildBoundaryFromActor(
+	const AActor* BoundaryActor,
+	const FString& CallingFunctionName) const
+{
+	if (not IsValid(BoundaryActor))
+	{
+		RTSFunctionLibrary::ReportError("Boundary actor is not valid."
+			"\n See function: UPlayerCameraController::" + CallingFunctionName + "()");
+		return false;
+	}
+	return true;
+}
+
+bool UPlayerCameraController::GetHasSideFlag(
+	const int32 BlockedSideFlags,
+	const ECameraBoundaryBlockedSides SideFlag) const
+{
+	const int32 SideFlagValue = static_cast<int32>(SideFlag);
+	return (BlockedSideFlags & SideFlagValue) != 0;
+}
+
+void UPlayerCameraController::SetFowBoundaryConstraints(
+	const FVector& NewPlayableAreaCenter,
+	const float NewPlayableAreaExtent)
+{
+	M_FowPlaneConstraints.Empty();
+	bM_HasFowPlayableAreaBounds = NewPlayableAreaExtent > 0.0f;
+	if (not bM_HasFowPlayableAreaBounds)
+	{
+		return;
+	}
+
+	const FVector LeftBoundaryPoint = NewPlayableAreaCenter + FVector(-NewPlayableAreaExtent, 0.0f, 0.0f);
+	const FVector RightBoundaryPoint = NewPlayableAreaCenter + FVector(NewPlayableAreaExtent, 0.0f, 0.0f);
+	const FVector BottomBoundaryPoint = NewPlayableAreaCenter + FVector(0.0f, -NewPlayableAreaExtent, 0.0f);
+	const FVector TopBoundaryPoint = NewPlayableAreaCenter + FVector(0.0f, NewPlayableAreaExtent, 0.0f);
+
+	AddPlaneConstraint(LeftBoundaryPoint, FVector::ForwardVector, true, M_FowPlaneConstraints);
+	AddPlaneConstraint(RightBoundaryPoint, FVector::ForwardVector, false, M_FowPlaneConstraints);
+	AddPlaneConstraint(BottomBoundaryPoint, FVector::RightVector, true, M_FowPlaneConstraints);
+	AddPlaneConstraint(TopBoundaryPoint, FVector::RightVector, false, M_FowPlaneConstraints);
+}
+
+void UPlayerCameraController::AddPlaneConstraint(
+	const FVector& PlaneOrigin,
+	const FVector& PlaneNormal,
+	const bool bAllowPositiveSide,
+	TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const
+{
+	FPlayerCameraBoundaryPlaneConstraint NewConstraint = {};
+	NewConstraint.M_PlaneOrigin = PlaneOrigin;
+	NewConstraint.M_PlaneNormal = PlaneNormal.GetSafeNormal();
+	NewConstraint.bM_AllowPositiveSide = bAllowPositiveSide;
+	OutConstraints.Add(NewConstraint);
+}
+
+void UPlayerCameraController::AddBoxBoundaryConstraints(
+	const FBox& WorldSpaceBox,
+	TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const
+{
+	if (not WorldSpaceBox.IsValid)
+	{
+		return;
+	}
+
+	const FVector MinPoint = WorldSpaceBox.Min;
+	const FVector MaxPoint = WorldSpaceBox.Max;
+
+	const FVector LeftBoundaryPoint = FVector(MinPoint.X, 0.0f, 0.0f);
+	const FVector RightBoundaryPoint = FVector(MaxPoint.X, 0.0f, 0.0f);
+	const FVector BottomBoundaryPoint = FVector(0.0f, MinPoint.Y, 0.0f);
+	const FVector TopBoundaryPoint = FVector(0.0f, MaxPoint.Y, 0.0f);
+
+	AddPlaneConstraint(LeftBoundaryPoint, FVector::ForwardVector, true, OutConstraints);
+	AddPlaneConstraint(RightBoundaryPoint, FVector::ForwardVector, false, OutConstraints);
+	AddPlaneConstraint(BottomBoundaryPoint, FVector::RightVector, true, OutConstraints);
+	AddPlaneConstraint(TopBoundaryPoint, FVector::RightVector, false, OutConstraints);
+}
+
+void UPlayerCameraController::AddDirectionalSideConstraints(
+	const AActor* BoundaryActor,
+	const ECameraBoundaryAxisSpace AxisSpaceForBlockedSides,
+	const int32 BlockedSideFlags,
+	TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const
+{
+	if (not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveX)
+		&& not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeX)
+		&& not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveY)
+		&& not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeY))
+	{
+		return;
+	}
+
+	const FVector Origin = BoundaryActor->GetActorLocation();
+	const bool bUseActorLocalAxis = AxisSpaceForBlockedSides == ECameraBoundaryAxisSpace::ActorLocal;
+	const FVector AxisX = bUseActorLocalAxis ? BoundaryActor->GetActorForwardVector() : FVector::ForwardVector;
+	const FVector AxisY = bUseActorLocalAxis ? BoundaryActor->GetActorRightVector() : FVector::RightVector;
+	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveX))
+	{
+		AddPlaneConstraint(Origin, AxisX, false, OutConstraints);
+	}
+	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeX))
+	{
+		AddPlaneConstraint(Origin, AxisX, true, OutConstraints);
+	}
+	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveY))
+	{
+		AddPlaneConstraint(Origin, AxisY, false, OutConstraints);
+	}
+	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeY))
+	{
+		AddPlaneConstraint(Origin, AxisY, true, OutConstraints);
+	}
+}
+
+void UPlayerCameraController::RebuildCachedAdditionalPlaneConstraints()
+{
+	M_CachedAdditionalPlaneConstraints.Empty();
+	for (const FPlayerCameraBoundarySubmissionCache& Submission : M_AdditionalBoundarySubmissionCaches)
+	{
+		M_CachedAdditionalPlaneConstraints.Append(Submission.M_CachedPlaneConstraints);
+	}
+}
+
+void UPlayerCameraController::TryMoveCameraByWorldDelta(const FVector& WorldDelta) const
+{
+	if (not GetCanMoveCameraByWorldDelta(WorldDelta))
+	{
+		return;
+	}
+
+	M_PlayerCamera->AddActorWorldOffset(WorldDelta, true);
+}
+
+void UPlayerCameraController::TryMoveCameraToLocation(const FVector& TargetCameraLocation) const
+{
+	if (not GetCanMoveCameraToLocation(TargetCameraLocation))
+	{
+		return;
+	}
+
+	M_PlayerCamera->SetActorLocation(TargetCameraLocation, true);
 }

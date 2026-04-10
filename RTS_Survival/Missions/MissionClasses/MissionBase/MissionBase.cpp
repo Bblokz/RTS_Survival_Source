@@ -1083,6 +1083,39 @@ void UMissionBase::MoveCamera(const FMovePlayerCamera CameraMove)
 	M_PlayerCameraController->MoveCameraOverTime(CameraMove);
 }
 
+bool UMissionBase::RegisterCameraBoundary(const FCameraBoundaryRegistrationParams& BoundaryRegistrationParams)
+{
+	SetCameraControllerReference();
+	if (not GetIsValidPlayerCameraController())
+	{
+		return false;
+	}
+
+	return M_PlayerCameraController->RegisterAdditionalCameraBoundary(BoundaryRegistrationParams);
+}
+
+bool UMissionBase::RemoveCameraBoundaryById(const FName BoundaryId)
+{
+	SetCameraControllerReference();
+	if (not GetIsValidPlayerCameraController())
+	{
+		return false;
+	}
+
+	return M_PlayerCameraController->RemoveAdditionalCameraBoundaryById(BoundaryId);
+}
+
+void UMissionBase::RemoveAllCameraBoundaries()
+{
+	SetCameraControllerReference();
+	if (not GetIsValidPlayerCameraController())
+	{
+		return;
+	}
+
+	M_PlayerCameraController->RemoveAllAdditionalCameraBounds();
+}
+
 FTrainingOption UMissionBase::SelectSquadOnDifficultyAt() const
 {
 	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad,

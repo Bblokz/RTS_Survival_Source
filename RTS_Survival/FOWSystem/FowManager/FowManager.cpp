@@ -8,10 +8,14 @@
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowType.h"
 #include "RTS_Survival/FOWSystem/FowVisibilityInterface/FowVisibility.h"
+#include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 
 // Sets default values
@@ -40,6 +44,7 @@ AFowManager::AFowManager(const FObjectInitializer& ObjectInitializer)
 	M_DrawBuffer = {};
 	bM_IsPendingEnemyVisionUpdate = false;
 	M_StartupAttempts = 0;
+	M_BeginPlayBoundsTransferAttempts = 0;
 }
 
 void AFowManager::AddFowParticipant(UFowComp* FowComp)
@@ -165,6 +170,37 @@ UTextureRenderTarget2D* AFowManager::GetIsValidPassiveRT() const
 void AFowManager::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_InitTransferMapExtentToPlayerCamera();
+}
+
+void AFowManager::BeginPlay_InitTransferMapExtentToPlayerCamera()
+{
+	if (UPlayerCameraController* const PlayerCameraController = FRTS_Statics::GetPlayerCameraController(this))
+	{
+		PlayerCameraController->SetPlayableAreaBounds(GetActorLocation(), MapExtent);
+		return;
+	}
+
+	constexpr int32 MaxBeginPlayBoundsTransferAttempts = 30;
+	if (M_BeginPlayBoundsTransferAttempts >= MaxBeginPlayBoundsTransferAttempts)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Fow manager could not transfer map extent to player camera controller in begin play."
+			"\n See function: AFowManager::BeginPlay_InitTransferMapExtentToPlayerCamera()");
+		return;
+	}
+
+	const UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	++M_BeginPlayBoundsTransferAttempts;
+	const FTimerDelegate RetryDelegate = FTimerDelegate::CreateUObject(
+		this,
+		&AFowManager::BeginPlay_InitTransferMapExtentToPlayerCamera);
+	World->GetTimerManager().SetTimerForNextTick(RetryDelegate);
 }
 
 void AFowManager::BeginDestroy()
