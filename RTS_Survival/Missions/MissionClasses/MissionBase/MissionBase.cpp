@@ -1073,6 +1073,16 @@ void UMissionBase::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ES
 	MissionManager->SpawnTowedTeamWeapon(TankSubtype, SquadSubtype, SpawnLocation);
 }
 
+void UMissionBase::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->SpawnSeededChoiceGroups(SeededChoicesArray, this);
+}
+
 void UMissionBase::MoveCamera(const FMovePlayerCamera CameraMove)
 {
 	SetCameraControllerReference();
