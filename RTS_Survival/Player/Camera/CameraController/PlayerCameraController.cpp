@@ -6,7 +6,6 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Player/Camera/CameraPawn.h"
@@ -343,8 +342,8 @@ void UPlayerCameraController::EdgeScroll(const float DeltaTime)
 	);
 
 	// Rotate by camera yaw so “up” on screen follows the viewport
-	const FRotator CamRot = M_PlayerCamera->GetActorRotation();
-	const FVector WorldDelta = CamRot.RotateVector(LocalDelta);
+	const FRotator CameraYawOnlyRotation = FRotator(0.0f, M_PlayerCamera->GetActorRotation().Yaw, 0.0f);
+	const FVector WorldDelta = CameraYawOnlyRotation.RotateVector(LocalDelta);
 
 	TryMoveCameraByWorldDelta(WorldDelta);
 }
@@ -436,8 +435,8 @@ void UPlayerCameraController::ForwardRightMovement(const bool bOnForward, float 
 		return;
 	}
 
-	const FTransform CameraTransform = M_PlayerCamera->GetActorTransform();
-	const FVector WorldDelta = UKismetMathLibrary::TransformDirection(CameraTransform, LocalDelta);
+	const FRotator CameraYawOnlyRotation = FRotator(0.0f, M_PlayerCamera->GetActorRotation().Yaw, 0.0f);
+	const FVector WorldDelta = CameraYawOnlyRotation.RotateVector(LocalDelta);
 	TryMoveCameraByWorldDelta(WorldDelta);
 }
 
@@ -719,20 +718,34 @@ void UPlayerCameraController::RebuildCachedAdditionalPlaneConstraints()
 
 void UPlayerCameraController::TryMoveCameraByWorldDelta(const FVector& WorldDelta) const
 {
-	if (not GetCanMoveCameraByWorldDelta(WorldDelta))
+	if (not GetIsValidCameraPawn())
 	{
 		return;
 	}
 
-	M_PlayerCamera->AddActorWorldOffset(WorldDelta, true);
+	FVector HorizontalWorldDelta = WorldDelta;
+	HorizontalWorldDelta.Z = 0.0f;
+	if (not GetCanMoveCameraByWorldDelta(HorizontalWorldDelta))
+	{
+		return;
+	}
+
+	M_PlayerCamera->AddActorWorldOffset(HorizontalWorldDelta, true);
 }
 
 void UPlayerCameraController::TryMoveCameraToLocation(const FVector& TargetCameraLocation) const
 {
-	if (not GetCanMoveCameraToLocation(TargetCameraLocation))
+	if (not GetIsValidCameraPawn())
 	{
 		return;
 	}
 
-	M_PlayerCamera->SetActorLocation(TargetCameraLocation, true);
+	FVector HorizontalTargetLocation = TargetCameraLocation;
+	HorizontalTargetLocation.Z = M_PlayerCamera->GetActorLocation().Z;
+	if (not GetCanMoveCameraToLocation(HorizontalTargetLocation))
+	{
+		return;
+	}
+
+	M_PlayerCamera->SetActorLocation(HorizontalTargetLocation, true);
 }
