@@ -7,6 +7,7 @@
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "EnemyUnitQueryType.h"
+#include "MissionSpawnCommandQueueState.h"
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -218,9 +219,17 @@ public:
 
 	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
 	                          const FVector& TankSpawnLocation);
+	void SpawnActorAtLocationWithCommandQueue(
+		const FTrainingOption& TrainingOption,
+		const int32 SpawnId,
+		const FVector& SpawnLocation,
+		const FRotator& SpawnRotation,
+		const TArray<FMissionSpawnCommandQueueOrder>& CommandQueue,
+		UMissionBase* MissionOwner);
 	void HandleSpawnTowedTeamWeaponTankSpawned(int32 RequestId, AActor* SpawnedTankActor);
 	void HandleSpawnTowedTeamWeaponSquadSpawned(int32 RequestId, AActor* SpawnedSquadActor);
 	void HandleSpawnTowedTeamWeaponSquadReady(int32 RequestId);
+	void HandleSpawnActorWithCommandQueueSpawned(const int32 RequestId, AActor* SpawnedActor);
 	FMissionStartingResources GetMissionStartingResources() const { return M_MissionStartingResources; }
 
 	/**
@@ -352,14 +361,24 @@ private:
 	UPROPERTY()
 	TArray<FMissionTowTeamWeaponSpawnState> M_TowedTeamWeaponSpawnStates;
 
+	UPROPERTY()
+	TArray<FMissionSpawnCommandQueueState> M_SpawnCommandQueueStates;
+
 	int32 M_NextTowedTeamWeaponSpawnRequestId = 1;
+	int32 M_NextSpawnCommandQueueRequestId = 1;
 
 	FMissionTowTeamWeaponSpawnState* FindTowedTeamWeaponSpawnState(const int32 RequestId);
+	FMissionSpawnCommandQueueState* FindSpawnCommandQueueState(const int32 RequestId);
 	void TryCompleteTowedTeamWeaponSpawnRequest(const int32 RequestId);
+	void TryTickSpawnCommandQueueRequest(const int32 RequestId);
 	void TickTowSpawnRequests();
+	void TickSpawnCommandQueueRequests();
 	void RemoveFinishedTowSpawnRequests();
+	void RemoveFinishedSpawnCommandQueueRequests();
 	bool EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeaponSpawnState* TowSpawnState) const;
+	bool EnsureValidSpawnCommandQueueState(FMissionSpawnCommandQueueState* SpawnCommandQueueState) const;
 	bool EnsureValidTowAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
+	bool EnsureValidSpawnCommandQueueAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
 	bool EnsureEnemyControllerIsValid(AEnemyController* EnemyController) const;
 	TArray<AActor*> GetEnemyActorsForQueryType(const EEnemyUnitQueryType EnemyUnitQueryType) const;
 	void RegisterTrackedEnemyActor(AActor* EnemyActor);
