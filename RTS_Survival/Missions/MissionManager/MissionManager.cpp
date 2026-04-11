@@ -1148,7 +1148,7 @@ void AMissionManager::SpawnSeededChoiceTrainingOptions(
 		}
 
 		constexpr int32 SpawnRequestID = INDEX_NONE;
-		const FRTSSpawnOptionAtLocationCallback EmptyCallback = FRTSSpawnOptionAtLocationCallback();
+		const TFunction<void(const FTrainingOption&, AActor*, const int32)> EmptyCallback;
 		RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
 			TrainingOptionSpawn.TrainingOption,
 			TrainingOptionSpawn.SpawnLocation,

@@ -4458,7 +4458,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIII_AA, TankData);
 
 	// Pz III J Commander (rockets)
-	TankData.MaxHealth = LightMediumTankBase + 150;
+	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::CommandVehicleHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 20;
@@ -4558,7 +4558,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_F1, TankData);
 
 	// Pz IV F1 Commander
-	TankData.MaxHealth = MediumTankHealthBase - 150;
+	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::CommandVehicleHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40;
 	TankData.TurretRotationSpeed = 14;

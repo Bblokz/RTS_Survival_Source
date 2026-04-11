@@ -848,6 +848,7 @@ namespace DeveloperSettings
 			inline constexpr float LightTankHealthBase = RoundToNearestMultipleOfFive(450.f * OverallHealthMlt);
 			// T1.5 Between a light and medium tank, takes 6 light shots or 3 mediums shots on avg.
 			inline constexpr float LightMediumTankBase = RoundToNearestMultipleOfFive(600.f * OverallHealthMlt);
+			inline constexpr float CommandVehicleHp = RoundToNearestMultipleOfFive(1100.f * OverallHealthMlt);
 			// T2 medium calibre 75mm~85mm deals 220~260 damage. Base medium tank gets killed in 4 shots.
 			inline constexpr float MediumTankHealthBase = RoundToNearestMultipleOfFive(900.f * OverallHealthMlt);
 			// T2 heavy tank. A mid game heavy, not as durable as a T3 heavy tank, gets killed in 6 medium tank shots.

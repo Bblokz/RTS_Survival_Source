@@ -13,6 +13,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "MissionBase.generated.h"
 
+struct FSeededChoices;
 class ADestructableEnvActor;
 enum class ERTSPortraitTypes : uint8;
 class AEnemyController;
