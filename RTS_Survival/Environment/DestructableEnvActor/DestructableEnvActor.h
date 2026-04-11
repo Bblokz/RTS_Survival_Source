@@ -17,6 +17,8 @@ enum class ECrushDestructionType : uint8;
 class IRTSNavAgentInterface;
 enum class ERTSNavAgents : uint8;
 enum class ERTSDeathType : uint8;
+enum class ERTSDamageType : uint8;
+enum class ETriggerOverlapLogic : uint8;
 struct FDestroySpawnActorsParameters;
 struct FSwapToDestroyedMesh;
 class UNiagaraSystem;
@@ -24,6 +26,8 @@ struct FCollapseFX;
 struct FCollapseForce;
 struct FCollapseDuration;
 class UGeometryCollection;
+class UArmorCalculation;
+class UBehaviour;
 
 
 DECLARE_MULTICAST_DELEGATE(FOnDestructibleCollapse);
@@ -105,6 +109,91 @@ protected:
 	                               USoundBase* CollapseSound,
 	                               USoundAttenuation* Attenuation,
 	                               USoundConcurrency* Concurrency);
+
+	/**
+	 * @brief Blueprint-friendly wrapper for async AoE damage with falloff.
+	 * @param Epicenter Center location for the AoE query.
+	 * @param Radius Radius used for the sphere sweep.
+	 * @param BaseDamage Damage applied at epicenter before falloff.
+	 * @param DamageFalloffExponent Higher values increase damage drop-off.
+	 * @param DamageType Damage type used in the generated damage event.
+	 * @param OverlapLogic Which object channels should be targeted.
+	 * @param ActorsToIgnore Actors excluded from the query and damage.
+	 */
+	UFUNCTION(BlueprintCallable, Category="AOE")
+	void AOE_DealDamageInRadiusAsync(
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		ERTSDamageType DamageType,
+		ETriggerOverlapLogic OverlapLogic,
+		const TArray<AActor*>& ActorsToIgnore);
+
+	/**
+	 * @brief Blueprint-friendly wrapper for async AoE damage with rear armor handling.
+	 * @param Epicenter Center location for the AoE query.
+	 * @param Radius Radius used for the sphere sweep.
+	 * @param BaseDamage Damage applied at epicenter before falloff.
+	 * @param DamageFalloffExponent Higher values increase damage drop-off.
+	 * @param FullDmgArmorPen Armor value threshold for full damage.
+	 * @param ArmorPenFallOff Controls reduction curve between full and max armor pen.
+	 * @param MaxArmorPen Armor value where damage becomes fully negated.
+	 * @param DamageType Damage type used in the generated damage event.
+	 * @param OverlapLogic Which object channels should be targeted.
+	 * @param ActorsToIgnore Actors excluded from the query and damage.
+	 */
+	UFUNCTION(BlueprintCallable, Category="AOE")
+	void AOE_DealDamageVsRearArmorInRadiusAsync(
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		float FullDmgArmorPen,
+		float ArmorPenFallOff,
+		float MaxArmorPen,
+		ERTSDamageType DamageType,
+		ETriggerOverlapLogic OverlapLogic,
+		const TArray<AActor*>& ActorsToIgnore);
+
+	/**
+	 * @brief Blueprint-friendly wrapper for async AoE damage with custom armor callback.
+	 * @param Epicenter Center location for the AoE query.
+	 * @param Radius Radius used for the sphere sweep.
+	 * @param BaseDamage Damage applied at epicenter before falloff.
+	 * @param DamageFalloffExponent Higher values increase damage drop-off.
+	 * @param DamageType Damage type used in the generated damage event.
+	 * @param OverlapLogic Which object channels should be targeted.
+	 * @param ActorsToIgnore Actors excluded from the query and damage.
+	 */
+	UFUNCTION(BlueprintCallable, Category="AOE")
+	void AOE_DealDamageAndCustomArmorHandlingInRadiusAsync(
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		ERTSDamageType DamageType,
+		ETriggerOverlapLogic OverlapLogic,
+		const TArray<AActor*>& ActorsToIgnore);
+
+	/**
+	 * @brief Blueprint-friendly wrapper for async AoE behaviour application.
+	 * @param Epicenter Center location for the AoE query.
+	 * @param Radius Radius used for the sphere sweep.
+	 * @param BehaviourClass Behaviour to add on matching targets.
+	 * @param OverlapLogic Which object channels should be targeted.
+	 * @param ActorsToIgnore Actors excluded from the query and behaviour add.
+	 */
+	UFUNCTION(BlueprintCallable, Category="AOE")
+	void AOE_ApplyBehaviourInRadiusAsync(
+		const FVector& Epicenter,
+		float Radius,
+		TSubclassOf<UBehaviour> BehaviourClass,
+		ETriggerOverlapLogic OverlapLogic,
+		const TArray<AActor*>& ActorsToIgnore);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="AOE")
+	void BP_OnAOEArmorComponentHit(UArmorCalculation* ArmorCalculation, AActor* HitActor);
 
 
 	UFUNCTION(BlueprintCallable)
