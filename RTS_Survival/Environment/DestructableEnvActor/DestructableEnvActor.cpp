@@ -19,11 +19,32 @@
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTSDebugBreak/RTSDebugBreak.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 #include "VerticalCollapseOnCrushed/FVerticalCollapseOnCrushed.h"
+
+namespace
+{
+	TArray<TWeakObjectPtr<AActor>> BuildActorsToIgnoreWeakArray(const TArray<AActor*>& ActorsToIgnore)
+	{
+		TArray<TWeakObjectPtr<AActor>> WeakActorsToIgnore;
+		WeakActorsToIgnore.Reserve(ActorsToIgnore.Num());
+		for (AActor* const ActorToIgnore : ActorsToIgnore)
+		{
+			if (not IsValid(ActorToIgnore))
+			{
+				continue;
+			}
+
+			WeakActorsToIgnore.Add(ActorToIgnore);
+		}
+
+		return WeakActorsToIgnore;
+	}
+}
 
 
 ADestructableEnvActor::ADestructableEnvActor(const FObjectInitializer& ObjectInitializer)
@@ -132,6 +153,98 @@ void ADestructableEnvActor::ConfigureVerticalCollapse(UPrimitiveComponent* const
 		RTSFunctionLibrary::ReportError(TEXT("ConfigureVerticalCollapse: CollapseSpeedScale <= 0; clamping to 0.1."));
 	}
 	M_VerticalCollapseOnCrushed.Init(TargetPrimitive, CollapseSpeedScale, CollapseSound, Attenuation, Concurrency);
+}
+
+void ADestructableEnvActor::AOE_DealDamageInRadiusAsync(
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const ERTSDamageType DamageType,
+	const ETriggerOverlapLogic OverlapLogic,
+	const TArray<AActor*>& ActorsToIgnore)
+{
+	FRTS_AOE::DealDamageInRadiusAsync(
+		this,
+		Epicenter,
+		Radius,
+		BaseDamage,
+		DamageFalloffExponent,
+		DamageType,
+		OverlapLogic,
+		BuildActorsToIgnoreWeakArray(ActorsToIgnore));
+}
+
+void ADestructableEnvActor::AOE_DealDamageVsRearArmorInRadiusAsync(
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const float FullDmgArmorPen,
+	const float ArmorPenFallOff,
+	const float MaxArmorPen,
+	const ERTSDamageType DamageType,
+	const ETriggerOverlapLogic OverlapLogic,
+	const TArray<AActor*>& ActorsToIgnore)
+{
+	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+		this,
+		Epicenter,
+		Radius,
+		BaseDamage,
+		DamageFalloffExponent,
+		FullDmgArmorPen,
+		ArmorPenFallOff,
+		MaxArmorPen,
+		DamageType,
+		OverlapLogic,
+		BuildActorsToIgnoreWeakArray(ActorsToIgnore));
+}
+
+void ADestructableEnvActor::AOE_DealDamageAndCustomArmorHandlingInRadiusAsync(
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const ERTSDamageType DamageType,
+	const ETriggerOverlapLogic OverlapLogic,
+	const TArray<AActor*>& ActorsToIgnore)
+{
+	TWeakObjectPtr<ADestructableEnvActor> WeakThis(this);
+	FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
+		this,
+		Epicenter,
+		Radius,
+		BaseDamage,
+		DamageFalloffExponent,
+		DamageType,
+		OverlapLogic,
+		[WeakThis](UArmorCalculation* ArmorCalculation, AActor* HitActor)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->BP_OnAOEArmorComponentHit(ArmorCalculation, HitActor);
+		},
+		BuildActorsToIgnoreWeakArray(ActorsToIgnore));
+}
+
+void ADestructableEnvActor::AOE_ApplyBehaviourInRadiusAsync(
+	const FVector& Epicenter,
+	const float Radius,
+	const TSubclassOf<UBehaviour> BehaviourClass,
+	const ETriggerOverlapLogic OverlapLogic,
+	const TArray<AActor*>& ActorsToIgnore)
+{
+	FRTS_AOE::ApplyBehaviourInRadiusAsync(
+		this,
+		Epicenter,
+		Radius,
+		BehaviourClass,
+		OverlapLogic,
+		BuildActorsToIgnoreWeakArray(ActorsToIgnore));
 }
 
 
