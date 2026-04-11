@@ -197,6 +197,12 @@ void UHealthComponent::SetMaxHealth(const float NewMaxHealth)
 	UpdateHealthBar();
 }
 
+void UHealthComponent::AddHealth(const float HealthToAdd, const float DamageReductionToAdd)
+{
+	SetMaxHealth(GetMaxHealth() + HealthToAdd);
+	DamageReductionSettings.DamageReduction += DamageReductionToAdd;
+}
+
 bool UHealthComponent::Heal(const float HealAmount)
 {
 	bool bIsFullHealth = false;

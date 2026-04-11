@@ -231,6 +231,15 @@ TArray<ACPPTurretsMaster*> ABuildingExpansion::GetTurrets() const
 	return Turrets;
 }
 
+void ABuildingExpansion::AddAdditionalHealth(const float AddedHp, const float AddedDamageReduction) const
+{
+	if(not GetIsValidHealthComponent())
+	{
+		return;
+	}
+	HealthComponent->AddHealth(AddedHp, AddedDamageReduction);
+}
+
 void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> Primitives)
 {
 	for(auto EachPrimitive : Primitives)

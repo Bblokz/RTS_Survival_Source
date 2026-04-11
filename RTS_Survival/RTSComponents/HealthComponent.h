@@ -125,6 +125,10 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable)
 	virtual void SetMaxHealth(const float NewMaxHealth);
+	
+	UFUNCTION(BlueprintCallable)
+	void AddHealth(const float HealthToAdd, const float DamageReductionToAdd = 0);
+	
 
 	UFUNCTION(BlueprintCallable)
 	void InitHealthAndResistance(const FResistanceAndDamageReductionData& ResistanceData,

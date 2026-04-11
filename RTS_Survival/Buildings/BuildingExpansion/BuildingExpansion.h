@@ -116,6 +116,9 @@ public:
 	
 protected:
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void AddAdditionalHealth(const float AddedHp, const float AddedDamageReduction) const;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="AimOffset")
 	TArray<FVector> AimOffsetPoints = {
 		FVector(0, 0, 100), FVector(-50, 0, 100),
