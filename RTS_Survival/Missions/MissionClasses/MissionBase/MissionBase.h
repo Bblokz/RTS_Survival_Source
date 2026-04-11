@@ -5,6 +5,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Missions/MissionManager/EnemyUnitQueryType.h"
 #include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
+#include "RTS_Survival/Missions/MissionManager/MissionSpawnCommandQueueOrder.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -431,6 +432,19 @@ protected:
 	void AsyncSpawnActorAtLocationWithDelay(const FTrainingOption& TrainingOption, const int32 ID,
 	                                        const FVector SpawnLocation, const FRotator Rotation,
 	                                        const float Delay);
+
+	/**
+	 * @brief Spawns one unit asynchronously and queues designer-authored startup orders once the unit is fully ready.
+	 * @param TrainingOption Training option used by the async spawner.
+	 * @param ID Mission callback id forwarded to BP_OnAsyncSpawnComplete.
+	 * @param SpawnLocation World location used for the actor spawn.
+	 * @param Rotation Rotation applied after spawn callback resolves.
+	 * @param CommandQueue Orders executed in sequence; first order resets queue, remaining orders append.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "SpawnCreateActor")
+	void AsyncSpawnActorAtLocationWithQueue(const FTrainingOption& TrainingOption, const int32 ID,
+	                                        const FVector SpawnLocation, const FRotator Rotation,
+	                                        const TArray<FMissionSpawnCommandQueueOrder>& CommandQueue);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnPlayerCommandVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);

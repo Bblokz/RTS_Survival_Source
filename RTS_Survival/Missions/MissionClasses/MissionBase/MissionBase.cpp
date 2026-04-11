@@ -1029,6 +1029,27 @@ void UMissionBase::AsyncSpawnActorAtLocationWithDelay(const FTrainingOption& Tra
 	M_DelaySpawnTimerHandles.Add(TimerHandle);
 }
 
+void UMissionBase::AsyncSpawnActorAtLocationWithQueue(
+	const FTrainingOption& TrainingOption,
+	const int32 ID,
+	const FVector SpawnLocation,
+	const FRotator Rotation,
+	const TArray<FMissionSpawnCommandQueueOrder>& CommandQueue)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->SpawnActorAtLocationWithCommandQueue(
+		TrainingOption,
+		ID,
+		SpawnLocation,
+		Rotation,
+		CommandQueue,
+		this);
+}
+
 void UMissionBase::SpawnPlayerCommandVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
 	const FTrainingOption PlayerCommandVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetGerPlayerCommandVehicle(

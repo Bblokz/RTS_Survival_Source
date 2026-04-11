@@ -461,6 +461,46 @@ void AMissionManager::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const
 	}
 }
 
+void AMissionManager::SpawnActorAtLocationWithCommandQueue(
+	const FTrainingOption& TrainingOption,
+	const int32 SpawnId,
+	const FVector& SpawnLocation,
+	const FRotator& SpawnRotation,
+	const TArray<FMissionSpawnCommandQueueOrder>& CommandQueue,
+	UMissionBase* MissionOwner)
+{
+	ARTSAsyncSpawner* RTSAsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
+	if (not EnsureValidSpawnCommandQueueAsyncSpawner(RTSAsyncSpawner))
+	{
+		return;
+	}
+
+	FMissionSpawnCommandQueueState NewSpawnCommandQueueState;
+	const int32 RequestId = M_NextSpawnCommandQueueRequestId++;
+	NewSpawnCommandQueueState.Init(
+		RequestId,
+		this,
+		MissionOwner,
+		TrainingOption,
+		SpawnId,
+		SpawnLocation,
+		SpawnRotation,
+		CommandQueue);
+	M_SpawnCommandQueueStates.Add(NewSpawnCommandQueueState);
+
+	FMissionSpawnCommandQueueState* SpawnCommandQueueState = FindSpawnCommandQueueState(RequestId);
+	if (not EnsureValidSpawnCommandQueueState(SpawnCommandQueueState))
+	{
+		return;
+	}
+
+	if (not SpawnCommandQueueState->StartAsyncSpawn(RTSAsyncSpawner))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager failed to start SpawnActorAtLocationWithCommandQueue request.");
+		return;
+	}
+}
+
 void AMissionManager::HandleSpawnTowedTeamWeaponTankSpawned(const int32 RequestId, AActor* SpawnedTankActor)
 {
 	FMissionTowTeamWeaponSpawnState* TowSpawnState = FindTowedTeamWeaponSpawnState(RequestId);
@@ -507,6 +547,22 @@ void AMissionManager::HandleSpawnTowedTeamWeaponSquadReady(const int32 RequestId
 	}
 
 	TryCompleteTowedTeamWeaponSpawnRequest(RequestId);
+}
+
+void AMissionManager::HandleSpawnActorWithCommandQueueSpawned(const int32 RequestId, AActor* SpawnedActor)
+{
+	FMissionSpawnCommandQueueState* SpawnCommandQueueState = FindSpawnCommandQueueState(RequestId);
+	if (not EnsureValidSpawnCommandQueueState(SpawnCommandQueueState))
+	{
+		return;
+	}
+
+	if (not SpawnCommandQueueState->HandleSpawnedActor(SpawnedActor))
+	{
+		return;
+	}
+
+	TryTickSpawnCommandQueueRequest(RequestId);
 }
 
 void AMissionManager::BeginPlay()
@@ -599,7 +655,9 @@ void AMissionManager::Tick(float DeltaSeconds)
 		}
 	}
 	TickTowSpawnRequests();
+	TickSpawnCommandQueueRequests();
 	RemoveFinishedTowSpawnRequests();
+	RemoveFinishedSpawnCommandQueueRequests();
 	RemoveCompletedEnemyUnitDestroyedCallbacks();
 }
 
@@ -877,6 +935,18 @@ FMissionTowTeamWeaponSpawnState* AMissionManager::FindTowedTeamWeaponSpawnState(
 	return nullptr;
 }
 
+FMissionSpawnCommandQueueState* AMissionManager::FindSpawnCommandQueueState(const int32 RequestId)
+{
+	for (FMissionSpawnCommandQueueState& SpawnCommandQueueState : M_SpawnCommandQueueStates)
+	{
+		if (SpawnCommandQueueState.GetBelongsToRequest(RequestId))
+		{
+			return &SpawnCommandQueueState;
+		}
+	}
+	return nullptr;
+}
+
 void AMissionManager::TryCompleteTowedTeamWeaponSpawnRequest(const int32 RequestId)
 {
 	FMissionTowTeamWeaponSpawnState* TowSpawnState = FindTowedTeamWeaponSpawnState(RequestId);
@@ -887,11 +957,29 @@ void AMissionManager::TryCompleteTowedTeamWeaponSpawnRequest(const int32 Request
 	TowSpawnState->TryFinishInstantTow();
 }
 
+void AMissionManager::TryTickSpawnCommandQueueRequest(const int32 RequestId)
+{
+	FMissionSpawnCommandQueueState* SpawnCommandQueueState = FindSpawnCommandQueueState(RequestId);
+	if (not EnsureValidSpawnCommandQueueState(SpawnCommandQueueState))
+	{
+		return;
+	}
+	SpawnCommandQueueState->TickExecution();
+}
+
 void AMissionManager::RemoveFinishedTowSpawnRequests()
 {
 	M_TowedTeamWeaponSpawnStates.RemoveAll([](const FMissionTowTeamWeaponSpawnState& TowSpawnState)->bool
 	{
 		return TowSpawnState.GetIsFinished();
+	});
+}
+
+void AMissionManager::RemoveFinishedSpawnCommandQueueRequests()
+{
+	M_SpawnCommandQueueStates.RemoveAll([](const FMissionSpawnCommandQueueState& SpawnCommandQueueState)->bool
+	{
+		return SpawnCommandQueueState.GetIsFinished();
 	});
 }
 
@@ -908,6 +996,18 @@ void AMissionManager::TickTowSpawnRequests()
 	}
 }
 
+void AMissionManager::TickSpawnCommandQueueRequests()
+{
+	for (FMissionSpawnCommandQueueState& SpawnCommandQueueState : M_SpawnCommandQueueStates)
+	{
+		if (SpawnCommandQueueState.GetIsFinished())
+		{
+			continue;
+		}
+		SpawnCommandQueueState.TickExecution();
+	}
+}
+
 bool AMissionManager::EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeaponSpawnState* TowSpawnState) const
 {
 	if (TowSpawnState != nullptr)
@@ -919,6 +1019,17 @@ bool AMissionManager::EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeapon
 	return false;
 }
 
+bool AMissionManager::EnsureValidSpawnCommandQueueState(FMissionSpawnCommandQueueState* SpawnCommandQueueState) const
+{
+	if (SpawnCommandQueueState != nullptr)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("Mission manager could not find requested spawn command queue state.");
+	return false;
+}
+
 bool AMissionManager::EnsureValidTowAsyncSpawner(ARTSAsyncSpawner* RTSAsyncSpawner) const
 {
 	if (IsValid(RTSAsyncSpawner))
@@ -927,6 +1038,18 @@ bool AMissionManager::EnsureValidTowAsyncSpawner(ARTSAsyncSpawner* RTSAsyncSpawn
 	}
 
 	RTSFunctionLibrary::ReportError("Mission manager failed SpawnTowedTeamWeapon because async spawner is invalid.");
+	return false;
+}
+
+bool AMissionManager::EnsureValidSpawnCommandQueueAsyncSpawner(ARTSAsyncSpawner* RTSAsyncSpawner) const
+{
+	if (IsValid(RTSAsyncSpawner))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"Mission manager failed SpawnActorAtLocationWithCommandQueue because async spawner is invalid.");
 	return false;
 }
 
