@@ -21,12 +21,14 @@
 
 class UBuildingExpansionEnergyComponent;
 class UTurretSwapComp;
+class USoundCue;
 struct FBxpData;
 class UCargo;
 class UWeaponState;
 struct FCollapseFX;
 struct FCollapseForce;
 struct FCollapseDuration;
+struct FSwapToDestroyedMesh;
 class UGeometryCollection;
 enum class EBuildingExpansionStatus : uint8;
 enum class EBuildingExpansionType : uint8;
@@ -183,6 +185,14 @@ protected:
 		FCollapseForce CollapseForce,
 		FCollapseFX CollapseFX
 	);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
+	void CollapseMeshWithSwapping(
+		FSwapToDestroyedMesh CollapseParameters,
+		const bool bNoLongerBlockWeaponsPostCollapse = false,
+		UNiagaraSystem* AttachSystem = nullptr,
+		USoundCue* AttachSound = nullptr,
+		const FVector AttachOffset = FVector::ZeroVector);
 
 	/**
          * Setup all properties for the building expansion.
