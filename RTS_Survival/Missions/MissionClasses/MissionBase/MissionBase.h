@@ -102,6 +102,9 @@ class RTS_SURVIVAL_API UMissionBase : public UObject
 
 	// to call OnTriggerActivated.
 	friend class RTS_SURVIVAL_API UMissionTrigger;
+	// to call on spawn complete for bp.
+	friend struct FMissionSpawnCommandQueueState;
+
 
 public:
 	UMissionBase();
