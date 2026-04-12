@@ -11,6 +11,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/EnergyComponent/BuildingExpansionEnergyComponent.h"
+#include "RTS_Survival/Collapse/CollapseBySwapParameters.h"
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
@@ -685,6 +686,46 @@ void ABuildingExpansion::CollapseMesh(UGeometryCollectionComponent* GeoCollapseC
 {
 	FRTS_Collapse::CollapseMesh(this, GeoCollapseComp, GeoCollection, MeshToCollapse, CollapseDuration, CollapseForce,
 	                            CollapseFX);
+}
+
+void ABuildingExpansion::CollapseMeshWithSwapping(
+	const FSwapToDestroyedMesh CollapseParameters,
+	const bool bNoLongerBlockWeaponsPostCollapse,
+	UNiagaraSystem* AttachSystem,
+	USoundCue* AttachSound,
+	const FVector AttachOffset)
+{
+	if (not IsValid(CollapseParameters.ComponentToSwapOn))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot collapse mesh with swapping for building expansion: ComponentToSwapOn is not valid.");
+		return;
+	}
+
+	if (bNoLongerBlockWeaponsPostCollapse)
+	{
+		CollapseParameters.ComponentToSwapOn->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Ignore);
+		CollapseParameters.ComponentToSwapOn->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Ignore);
+	}
+
+	FRTS_Collapse::CollapseSwapMesh(this, CollapseParameters);
+	AttemptAttachSpawnSystem(CollapseParameters, AttachSystem);
+
+	if (IsValid(AttachSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			AttachSound,
+			AttachOffset,
+			FRotator::ZeroRotator,
+			1,
+			1,
+			0,
+			CollapseParameters.Attenuation,
+			CollapseParameters.SoundConcurrency,
+			nullptr,
+			nullptr);
+	}
 }
 
 void ABuildingExpansion::InitBuildingExpansion(
