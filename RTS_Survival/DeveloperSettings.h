@@ -1542,9 +1542,9 @@ namespace DeveloperSettings
 		constexpr bool GArchProjectile_Compile_DebugSymbols = false;
 		// Reinforcement provider and ability debug draws.
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
-		constexpr bool GPathFollowing_Compile_DebugSymbols = true;
-		constexpr bool GRTSNavAgents_Compile_DebugSymbols = true;
-		constexpr bool GPathFindingCosts_Compile_DebugSymbols = true;
+		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
+		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
+		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
 		// Wheel Animation

@@ -611,6 +611,10 @@ public:
 	static FTrainingOption GetGerPlayerLightMediumTank(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerMediumTank(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerJaguarOrPanzerIVG(UObject* WorldContext);
 
 private:
 	

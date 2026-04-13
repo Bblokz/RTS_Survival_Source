@@ -4,6 +4,7 @@
 #include "BuildingExpansion.h"
 
 #include "BuildingExpansionEnums.h"
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "BXPConstructionRules/BXPConstructionRules.h"
 #include "Interface/BuildingExpansionOwner.h"
@@ -1415,4 +1416,26 @@ void ABuildingExpansion::DebugDisplayMessage(const FString& Message) const
 	{
 		RTSFunctionLibrary::DisplayNotification(FText::FromString(Message));
 	}
+}
+
+void ABuildingExpansion::AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& CollapseParameters,
+	UNiagaraSystem* AttachSystem)
+{
+	if (not IsValid(AttachSystem))
+	{
+		return;
+	}
+	// Create component to attach the system to
+	const auto NiagaraComponent = NewObject<UNiagaraComponent>(this);
+	if (not IsValid(NiagaraComponent))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create niagara attach system for destructable actor: " + GetName());
+		return;
+	}
+	// attach wiht offset here.
+	NiagaraComponent->SetAsset(AttachSystem);
+	NiagaraComponent->AttachToComponent(CollapseParameters.ComponentToSwapOn,
+	                                    FAttachmentTransformRules::KeepRelativeTransform);
+	// Start system
+	NiagaraComponent->Activate();
 }

@@ -481,4 +481,5 @@ private:
 
 	void DebugDisplayMessage(const FString& Message) const;
 
+	void AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& CollapseParameters, UNiagaraSystem* AttachSystem);
 };

@@ -334,6 +334,11 @@ AMissionManager* UMissionBase::GetMissionManagerChecked() const
 	return M_MissionManager.Get();
 }
 
+bool UMissionBase::GetIsMissionComplete() const
+{
+	return MissionState.bIsMissionComplete;
+}
+
 TArray<FTrainingOption> UMissionBase::GetTrainingOptionsDifficultyAdjusted(TArray<FTrainingOption> EasyOptions,
                                                                            TArray<FTrainingOption> NormalOptions,
                                                                            TArray<FTrainingOption> HardOptions,
@@ -1075,6 +1080,27 @@ void UMissionBase::SpawnPlayerLightMediumVehicle(const FVector SpawnLocation, co
 void UMissionBase::SpawnPlayerMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
 	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank(this);
+	AsyncSpawnActorAtLocation(
+		PlayerMediumVehicleTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerPZIIIAAOrPZ38Rail(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	
+	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetPlayerPanzerIIIAAOrRail38T(this);
+	AsyncSpawnActorAtLocation(
+		PlayerMediumVehicleTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerJaguarOrPzIVG(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetPlayerJaguarOrPanzerIVG(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),

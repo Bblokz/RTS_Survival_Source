@@ -265,6 +265,9 @@ public:
 protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AMissionManager* GetMissionManagerChecked() const;
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	bool GetIsMissionComplete() const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	TArray<FTrainingOption> GetTrainingOptionsDifficultyAdjusted(TArray<FTrainingOption> EasyOptions,
@@ -457,6 +460,12 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnPlayerMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerPZIIIAAOrPZ38Rail(const FVector SpawnLocation, const FRotator SpawnRotation);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerJaguarOrPzIVG(const FVector SpawnLocation, const FRotator SpawnRotation);
 
 	/**
 	 * @brief Spawns a tank and team-weapon squad asynchronously and links tow once both are ready.
