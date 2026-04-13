@@ -58,6 +58,10 @@ struct FPlayerCameraBoundaryPlaneConstraint
 	FVector M_PlaneOrigin = FVector::ZeroVector;
 	FVector M_PlaneNormal = FVector::ForwardVector;
 	bool bM_AllowPositiveSide = false;
+	bool bM_HasSpanLimit = false;
+	FVector M_SpanAxis = FVector::RightVector;
+	float M_SpanAxisMin = 0.0f;
+	float M_SpanAxisMax = 0.0f;
 };
 
 USTRUCT()
@@ -210,13 +214,55 @@ private:
 	bool GetIsBoundaryIdValidForRegistration(const FName& BoundaryId, const FString& CallingFunctionName) const;
 	bool GetCanBuildBoundaryFromActor(const AActor* BoundaryActor, const FString& CallingFunctionName) const;
 	bool GetHasSideFlag(const int32 BlockedSideFlags, const ECameraBoundaryBlockedSides SideFlag) const;
+	bool GetHasAnyBlockedSideFlags(const int32 BlockedSideFlags) const;
 	void SetFowBoundaryConstraints(const FVector& NewPlayableAreaCenter, const float NewPlayableAreaExtent);
 	void AddPlaneConstraint(
 		const FVector& PlaneOrigin,
 		const FVector& PlaneNormal,
 		const bool bAllowPositiveSide,
 		TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const;
+	/**
+	 * @brief Builds a directional boundary from a specific boundary face and limits it to the opposite-axis span.
+	 * This keeps blocked movement local to the actor bounds instead of creating a global half-plane.
+	 * @param PlaneAxisValue Plane position on the plane-normal axis.
+	 * @param PlaneNormal Axis that determines the blocked side.
+	 * @param bAllowPositiveSide True when movement is allowed on the positive side of the plane.
+	 * @param SpanAxis Axis used to clamp where this boundary is active.
+	 * @param SpanAxisMin Lower span limit on SpanAxis.
+	 * @param SpanAxisMax Upper span limit on SpanAxis.
+	 * @param OutConstraints Output array receiving the generated constraint.
+	 */
+	void AddDirectionalSideConstraintWithSpan(
+		const float PlaneAxisValue,
+		const FVector& PlaneNormal,
+		const bool bAllowPositiveSide,
+		const FVector& SpanAxis,
+		const float SpanAxisMin,
+		const float SpanAxisMax,
+		TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const;
 	void AddBoxBoundaryConstraints(const FBox& WorldSpaceBox, TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const;
+	/**
+	 * @brief Calculates boundary-face positions and span limits from actor bounds in the selected axis space.
+	 * This allows side flags to block from the actor boundary face instead of from actor origin.
+	 * @param BoundaryActor Actor whose component bounds define the boundary area.
+	 * @param AxisSpaceForBlockedSides Chooses world or actor-local axes for side evaluation.
+	 * @param OutAxisX Returned X axis used for side checks.
+	 * @param OutAxisY Returned Y axis used for span checks.
+	 * @param OutMinX Returned minimum projection on OutAxisX.
+	 * @param OutMaxX Returned maximum projection on OutAxisX.
+	 * @param OutMinY Returned minimum projection on OutAxisY.
+	 * @param OutMaxY Returned maximum projection on OutAxisY.
+	 * @return True when valid axes and bounds were available to build directional constraints.
+	 */
+	bool TryGetBoundaryAxisExtents(
+		const AActor* BoundaryActor,
+		const ECameraBoundaryAxisSpace AxisSpaceForBlockedSides,
+		FVector& OutAxisX,
+		FVector& OutAxisY,
+		float& OutMinX,
+		float& OutMaxX,
+		float& OutMinY,
+		float& OutMaxY) const;
 	/**
 	 * @brief Converts blocked-side settings into cached plane constraints so side rules are evaluated cheaply at runtime.
 	 * @param BoundaryActor Source actor that provides origin and optional local axis directions.
