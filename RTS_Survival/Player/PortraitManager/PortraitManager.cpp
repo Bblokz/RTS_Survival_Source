@@ -60,6 +60,24 @@ void UPlayerPortraitManager::BeginPlay()
 
 }
 
+void UPlayerPortraitManager::StopCurrentPortraitPlayback()
+{
+	M_PortraitQueue.Reset();
+	bM_IsPortraitPlaying = false;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_CurrentPortraitTimerHandle);
+	}
+
+	if (not GetIsValidPortraitWidget())
+	{
+		return;
+	}
+
+	M_PortraitWidget->HidePortrait();
+}
+
 bool UPlayerPortraitManager::GetIsValidPortraitWidget() const
 {
 	if (M_PortraitWidget.IsValid())
