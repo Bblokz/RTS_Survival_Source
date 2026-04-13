@@ -8,6 +8,7 @@
 class AMissionManager;
 class ARTSAsyncSpawner;
 class ASquadController;
+class UBehaviour;
 class UMissionBase;
 class AActor;
 class ICommands;
@@ -30,6 +31,7 @@ struct FMissionSpawnCommandQueueState
 		const int32 InSpawnId,
 		const FVector& InSpawnLocation,
 		const FRotator& InSpawnRotation,
+		const TArray<TSubclassOf<UBehaviour>>& InBehavioursToApply,
 		const TArray<FMissionSpawnCommandQueueOrder>& InCommandQueue);
 	bool StartAsyncSpawn(ARTSAsyncSpawner* RTSAsyncSpawner);
 	bool HandleSpawnedActor(AActor* SpawnedActor);
@@ -61,6 +63,9 @@ private:
 	FRotator M_SpawnRotation = FRotator::ZeroRotator;
 
 	UPROPERTY()
+	TArray<TSubclassOf<UBehaviour>> M_BehavioursToApply;
+
+	UPROPERTY()
 	TArray<FMissionSpawnCommandQueueOrder> M_CommandQueue;
 
 	UPROPERTY()
@@ -85,6 +90,7 @@ private:
 	bool GetCanExecuteQueueOnSquadController(ASquadController* SquadController) const;
 	void NotifyMissionSpawnCompleted(AActor* SpawnedActor);
 	void SetSpawnedActorRotation();
+	bool ApplyQueuedBehaviours();
 	bool ExecuteQueuedOrders();
 	ECommandQueueError ExecuteSingleOrder(const FMissionSpawnCommandQueueOrder& Order, ICommands* CommandsInterface,
 	                                      const bool bSetUnitToIdle) const;

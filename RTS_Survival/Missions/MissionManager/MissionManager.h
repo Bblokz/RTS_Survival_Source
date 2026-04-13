@@ -224,6 +224,7 @@ public:
 		const int32 SpawnId,
 		const FVector& SpawnLocation,
 		const FRotator& SpawnRotation,
+		const TArray<TSubclassOf<class UBehaviour>>& BehavioursToApply,
 		const TArray<FMissionSpawnCommandQueueOrder>& CommandQueue,
 		UMissionBase* MissionOwner);
 	void HandleSpawnTowedTeamWeaponTankSpawned(int32 RequestId, AActor* SpawnedTankActor);
