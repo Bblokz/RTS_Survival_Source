@@ -159,6 +159,12 @@ public:
 	TArray<ATankMaster*> GetPlayerTanks(const uint8 Player) const;
 
 	/**
+	 * @brief Returns the first alive player tank configured as the command vehicle subtype.
+	 * @return First matching command vehicle tank, or nullptr if none are alive.
+	 */
+	ATankMaster* GetPlayerCommandVehicle() const;
+
+	/**
 	 * @brief Returns a target in provided range, stops searching if a UnitMaster Target was found.
 	 * @param PlayerSearch The team of the unit that is executing the search.
 	 * @param SearchRadius The range radius in which the target is searched.
