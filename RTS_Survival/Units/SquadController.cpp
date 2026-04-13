@@ -791,6 +791,11 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 			{
 				return;
 			}
+			if(not WeakSquadController->GetIsUnitIdle())
+			{
+				// Squad not IDLE!! makes use of command queue at spawn; do not override with standard movement command.
+				return;
+			}
 
 			ASquadController* StrongSquadController = WeakSquadController.Get();
 			StrongSquadController->SetIsSpawning(true);
