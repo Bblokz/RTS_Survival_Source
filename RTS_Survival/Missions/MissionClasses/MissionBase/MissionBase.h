@@ -127,7 +127,7 @@ public:
 	virtual void OnMissionComplete();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
-	void OnMissionFailed();
+	virtual void OnMissionFailed();
 
 	// Starts NextMission immediately and bypasses its trigger requirement for this activation.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
