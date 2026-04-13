@@ -608,13 +608,27 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerCommandVehicle(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerCommandVehicle(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerArmoredCar(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerLightTank(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerLightMediumTank(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerLightMediumTank(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerMediumTank(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerMediumTank(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerPanzerIIIAAOrRail38T(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerJaguarOrPanzerIVG(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerJaguarOrPanzerIVG(UObject* WorldContext);
 
 private:
 	
