@@ -8,5 +8,6 @@ enum class ERTSDefeatType : uint8
 {
 	Uninitialized,
 	LostHQ,
+	LostCommandVehicle,
 	LostMainObjective
 };
