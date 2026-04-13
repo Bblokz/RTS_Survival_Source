@@ -1039,6 +1039,7 @@ void UMissionBase::AsyncSpawnActorAtLocationWithQueue(
 	const int32 ID,
 	const FVector SpawnLocation,
 	const FRotator Rotation,
+	const TArray<TSubclassOf<class UBehaviour>>& BehavioursToApply,
 	const TArray<FMissionSpawnCommandQueueOrder>& CommandQueue)
 {
 	if (not GetIsValidMissionManager())
@@ -1051,6 +1052,7 @@ void UMissionBase::AsyncSpawnActorAtLocationWithQueue(
 		ID,
 		SpawnLocation,
 		Rotation,
+		BehavioursToApply,
 		CommandQueue,
 		this);
 }

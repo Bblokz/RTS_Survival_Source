@@ -1,6 +1,7 @@
 #include "MissionSpawnCommandQueueState.h"
 
 #include "MissionManager.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
@@ -16,6 +17,7 @@ void FMissionSpawnCommandQueueState::Init(
 	const int32 InSpawnId,
 	const FVector& InSpawnLocation,
 	const FRotator& InSpawnRotation,
+	const TArray<TSubclassOf<UBehaviour>>& InBehavioursToApply,
 	const TArray<FMissionSpawnCommandQueueOrder>& InCommandQueue)
 {
 	M_RequestId = InRequestId;
@@ -25,6 +27,7 @@ void FMissionSpawnCommandQueueState::Init(
 	M_SpawnId = InSpawnId;
 	M_SpawnLocation = InSpawnLocation;
 	M_SpawnRotation = InSpawnRotation;
+	M_BehavioursToApply = InBehavioursToApply;
 	M_CommandQueue = InCommandQueue;
 	M_SpawnedActor = nullptr;
 	M_TicksSinceSpawn = 0;
@@ -93,6 +96,8 @@ bool FMissionSpawnCommandQueueState::TickExecution()
 	{
 		return false;
 	}
+
+	ApplyQueuedBehaviours();
 
 	if (not ExecuteQueuedOrders())
 	{
@@ -254,6 +259,40 @@ bool FMissionSpawnCommandQueueState::ExecuteQueuedOrders()
 	}
 
 	return true;
+}
+
+void FMissionSpawnCommandQueueState::ApplyQueuedBehaviours() const
+{
+	if (M_BehavioursToApply.IsEmpty())
+	{
+		return;
+	}
+
+	AActor* SpawnedActor = M_SpawnedActor.Get();
+	if (not IsValid(SpawnedActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission spawn command queue failed to apply startup behaviours: spawned actor is invalid.");
+		return;
+	}
+
+	UBehaviourComp* BehaviourComponent = SpawnedActor->FindComponentByClass<UBehaviourComp>();
+	if (not IsValid(BehaviourComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission spawn command queue failed to apply startup behaviours: spawned actor has no behaviour component.");
+		return;
+	}
+
+	for (const TSubclassOf<UBehaviour>& BehaviourClass : M_BehavioursToApply)
+	{
+		if (not IsValid(BehaviourClass))
+		{
+			continue;
+		}
+
+		BehaviourComponent->AddBehaviour(BehaviourClass);
+	}
 }
 
 ECommandQueueError FMissionSpawnCommandQueueState::ExecuteSingleOrder(

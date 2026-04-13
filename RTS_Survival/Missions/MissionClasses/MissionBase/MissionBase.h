@@ -440,16 +440,18 @@ protected:
 	                                        const float Delay);
 
 	/**
-	 * @brief Spawns one unit asynchronously and queues designer-authored startup orders once the unit is fully ready.
+	 * @brief Spawns one unit asynchronously and applies startup behaviours and orders once the unit is fully ready.
 	 * @param TrainingOption Training option used by the async spawner.
 	 * @param ID Mission callback id forwarded to BP_OnAsyncSpawnComplete.
 	 * @param SpawnLocation World location used for the actor spawn.
 	 * @param Rotation Rotation applied after spawn callback resolves.
+	 * @param BehavioursToApply Optional behaviour classes added on the spawned actor behaviour component.
 	 * @param CommandQueue Orders executed in sequence; first order resets queue, remaining orders append.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "SpawnCreateActor")
 	void AsyncSpawnActorAtLocationWithQueue(const FTrainingOption& TrainingOption, const int32 ID,
 	                                        const FVector SpawnLocation, const FRotator Rotation,
+	                                        const TArray<TSubclassOf<class UBehaviour>>& BehavioursToApply,
 	                                        const TArray<FMissionSpawnCommandQueueOrder>& CommandQueue);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
