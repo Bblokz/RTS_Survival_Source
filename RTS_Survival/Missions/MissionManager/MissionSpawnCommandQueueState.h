@@ -90,7 +90,7 @@ private:
 	bool GetCanExecuteQueueOnSquadController(ASquadController* SquadController) const;
 	void NotifyMissionSpawnCompleted(AActor* SpawnedActor);
 	void SetSpawnedActorRotation();
-	bool ApplyQueuedBehaviours();
+	void ApplyQueuedBehaviours() const;
 	bool ExecuteQueuedOrders();
 	ECommandQueueError ExecuteSingleOrder(const FMissionSpawnCommandQueueOrder& Order, ICommands* CommandsInterface,
 	                                      const bool bSetUnitToIdle) const;

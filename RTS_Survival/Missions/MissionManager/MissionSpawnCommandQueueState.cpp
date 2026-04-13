@@ -97,10 +97,7 @@ bool FMissionSpawnCommandQueueState::TickExecution()
 		return false;
 	}
 
-	if (not ApplyQueuedBehaviours())
-	{
-		return false;
-	}
+	ApplyQueuedBehaviours();
 
 	if (not ExecuteQueuedOrders())
 	{
@@ -264,26 +261,27 @@ bool FMissionSpawnCommandQueueState::ExecuteQueuedOrders()
 	return true;
 }
 
-bool FMissionSpawnCommandQueueState::ApplyQueuedBehaviours()
+void FMissionSpawnCommandQueueState::ApplyQueuedBehaviours() const
 {
 	if (M_BehavioursToApply.IsEmpty())
 	{
-		return true;
+		return;
 	}
 
 	AActor* SpawnedActor = M_SpawnedActor.Get();
 	if (not IsValid(SpawnedActor))
 	{
-		CompleteAsFailed("Mission spawn command queue failed to apply startup behaviours: spawned actor is invalid.");
-		return false;
+		RTSFunctionLibrary::ReportError(
+			"Mission spawn command queue failed to apply startup behaviours: spawned actor is invalid.");
+		return;
 	}
 
 	UBehaviourComp* BehaviourComponent = SpawnedActor->FindComponentByClass<UBehaviourComp>();
 	if (not IsValid(BehaviourComponent))
 	{
-		CompleteAsFailed(
+		RTSFunctionLibrary::ReportError(
 			"Mission spawn command queue failed to apply startup behaviours: spawned actor has no behaviour component.");
-		return false;
+		return;
 	}
 
 	for (const TSubclassOf<UBehaviour>& BehaviourClass : M_BehavioursToApply)
@@ -295,8 +293,6 @@ bool FMissionSpawnCommandQueueState::ApplyQueuedBehaviours()
 
 		BehaviourComponent->AddBehaviour(BehaviourClass);
 	}
-
-	return true;
 }
 
 ECommandQueueError FMissionSpawnCommandQueueState::ExecuteSingleOrder(
