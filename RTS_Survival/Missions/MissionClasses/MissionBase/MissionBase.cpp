@@ -564,6 +564,15 @@ bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) 
 		RTSFunctionLibrary::ReportError("Mission cinematic take over failed!");
 		return false;
 	}
+
+	if (bCinematicStarted)
+	{
+		if (UPlayerPortraitManager* PlayerPortraitManager = FRTS_Statics::GetPlayerPortraitManager(this))
+		{
+			PlayerPortraitManager->StopCurrentPortraitPlayback();
+		}
+	}
+
 	ACPPController* PlayerController = FRTS_Statics::GetRTSController(M_MissionManager.Get());
 	if (not IsValid(PlayerController))
 	{
