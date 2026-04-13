@@ -108,7 +108,8 @@ bool UPlayerCameraController::RegisterAdditionalCameraBoundary(
 
 	const AActor* const BoundaryActor = BoundaryRegistrationParams.M_BoundaryActor.Get();
 	TArray<FPlayerCameraBoundaryPlaneConstraint> CachedPlaneConstraints = {};
-	if (BoundaryRegistrationParams.bM_UseActorBoundsAsBoundary)
+	const bool bHasAnyBlockedSideFlags = GetHasAnyBlockedSideFlags(BoundaryRegistrationParams.M_BlockedSideFlags);
+	if (BoundaryRegistrationParams.bM_UseActorBoundsAsBoundary && not bHasAnyBlockedSideFlags)
 	{
 		const FBox WorldSpaceActorBounds = BoundaryActor->GetComponentsBoundingBox(true);
 		AddBoxBoundaryConstraints(WorldSpaceActorBounds, CachedPlaneConstraints);
@@ -563,6 +564,16 @@ bool UPlayerCameraController::GetAreAllPlaneConstraintsSatisfied(
 	constexpr float PlaneSignedDistanceTolerance = 0.1f;
 	for (const FPlayerCameraBoundaryPlaneConstraint& Constraint : PlaneConstraints)
 	{
+		if (Constraint.bM_HasSpanLimit)
+		{
+			const float SpanAxisValue = FVector::DotProduct(TargetCameraLocation, Constraint.M_SpanAxis);
+			if (SpanAxisValue < Constraint.M_SpanAxisMin - PlaneSignedDistanceTolerance
+				|| SpanAxisValue > Constraint.M_SpanAxisMax + PlaneSignedDistanceTolerance)
+			{
+				continue;
+			}
+		}
+
 		const FVector Difference = TargetCameraLocation - Constraint.M_PlaneOrigin;
 		const float SignedDistance = FVector::DotProduct(Difference, Constraint.M_PlaneNormal);
 		if (Constraint.bM_AllowPositiveSide && SignedDistance >= -PlaneSignedDistanceTolerance)
@@ -613,6 +624,14 @@ bool UPlayerCameraController::GetHasSideFlag(
 	return (BlockedSideFlags & SideFlagValue) != 0;
 }
 
+bool UPlayerCameraController::GetHasAnyBlockedSideFlags(const int32 BlockedSideFlags) const
+{
+	return GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveX)
+		|| GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeX)
+		|| GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveY)
+		|| GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeY);
+}
+
 void UPlayerCameraController::SetFowBoundaryConstraints(
 	const FVector& NewPlayableAreaCenter,
 	const float NewPlayableAreaExtent)
@@ -648,6 +667,26 @@ void UPlayerCameraController::AddPlaneConstraint(
 	OutConstraints.Add(NewConstraint);
 }
 
+void UPlayerCameraController::AddDirectionalSideConstraintWithSpan(
+	const float PlaneAxisValue,
+	const FVector& PlaneNormal,
+	const bool bAllowPositiveSide,
+	const FVector& SpanAxis,
+	const float SpanAxisMin,
+	const float SpanAxisMax,
+	TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const
+{
+	FPlayerCameraBoundaryPlaneConstraint NewConstraint = {};
+	NewConstraint.M_PlaneOrigin = PlaneNormal * PlaneAxisValue;
+	NewConstraint.M_PlaneNormal = PlaneNormal.GetSafeNormal();
+	NewConstraint.bM_AllowPositiveSide = bAllowPositiveSide;
+	NewConstraint.bM_HasSpanLimit = true;
+	NewConstraint.M_SpanAxis = SpanAxis.GetSafeNormal();
+	NewConstraint.M_SpanAxisMin = SpanAxisMin;
+	NewConstraint.M_SpanAxisMax = SpanAxisMax;
+	OutConstraints.Add(NewConstraint);
+}
+
 void UPlayerCameraController::AddBoxBoundaryConstraints(
 	const FBox& WorldSpaceBox,
 	TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const
@@ -677,34 +716,105 @@ void UPlayerCameraController::AddDirectionalSideConstraints(
 	const int32 BlockedSideFlags,
 	TArray<FPlayerCameraBoundaryPlaneConstraint>& OutConstraints) const
 {
-	if (not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveX)
-		&& not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeX)
-		&& not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveY)
-		&& not GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeY))
+	if (not GetHasAnyBlockedSideFlags(BlockedSideFlags))
 	{
 		return;
 	}
 
-	const FVector Origin = BoundaryActor->GetActorLocation();
-	const bool bUseActorLocalAxis = AxisSpaceForBlockedSides == ECameraBoundaryAxisSpace::ActorLocal;
-	const FVector AxisX = bUseActorLocalAxis ? BoundaryActor->GetActorForwardVector() : FVector::ForwardVector;
-	const FVector AxisY = bUseActorLocalAxis ? BoundaryActor->GetActorRightVector() : FVector::RightVector;
+	FVector AxisX = FVector::ZeroVector;
+	FVector AxisY = FVector::ZeroVector;
+	float MinX = 0.0f;
+	float MaxX = 0.0f;
+	float MinY = 0.0f;
+	float MaxY = 0.0f;
+	if (not TryGetBoundaryAxisExtents(
+		BoundaryActor,
+		AxisSpaceForBlockedSides,
+		AxisX,
+		AxisY,
+		MinX,
+		MaxX,
+		MinY,
+		MaxY))
+	{
+		return;
+	}
+
 	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveX))
 	{
-		AddPlaneConstraint(Origin, AxisX, false, OutConstraints);
+		AddDirectionalSideConstraintWithSpan(MaxX, AxisX, false, AxisY, MinY, MaxY, OutConstraints);
 	}
 	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeX))
 	{
-		AddPlaneConstraint(Origin, AxisX, true, OutConstraints);
+		AddDirectionalSideConstraintWithSpan(MinX, AxisX, true, AxisY, MinY, MaxY, OutConstraints);
 	}
 	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::PositiveY))
 	{
-		AddPlaneConstraint(Origin, AxisY, false, OutConstraints);
+		AddDirectionalSideConstraintWithSpan(MaxY, AxisY, false, AxisX, MinX, MaxX, OutConstraints);
 	}
 	if (GetHasSideFlag(BlockedSideFlags, ECameraBoundaryBlockedSides::NegativeY))
 	{
-		AddPlaneConstraint(Origin, AxisY, true, OutConstraints);
+		AddDirectionalSideConstraintWithSpan(MinY, AxisY, true, AxisX, MinX, MaxX, OutConstraints);
 	}
+}
+
+bool UPlayerCameraController::TryGetBoundaryAxisExtents(
+	const AActor* BoundaryActor,
+	const ECameraBoundaryAxisSpace AxisSpaceForBlockedSides,
+	FVector& OutAxisX,
+	FVector& OutAxisY,
+	float& OutMinX,
+	float& OutMaxX,
+	float& OutMinY,
+	float& OutMaxY) const
+{
+	const bool bUseActorLocalAxis = AxisSpaceForBlockedSides == ECameraBoundaryAxisSpace::ActorLocal;
+	OutAxisX = bUseActorLocalAxis ? BoundaryActor->GetActorForwardVector() : FVector::ForwardVector;
+	OutAxisY = bUseActorLocalAxis ? BoundaryActor->GetActorRightVector() : FVector::RightVector;
+	OutAxisX = FVector(OutAxisX.X, OutAxisX.Y, 0.0f).GetSafeNormal();
+	OutAxisY = FVector(OutAxisY.X, OutAxisY.Y, 0.0f).GetSafeNormal();
+	if (OutAxisX.IsNearlyZero() || OutAxisY.IsNearlyZero())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot build directional camera boundary because a projected axis was zero."
+			"\n See function: UPlayerCameraController::TryGetBoundaryAxisExtents()");
+		return false;
+	}
+
+	const FBox WorldSpaceActorBounds = BoundaryActor->GetComponentsBoundingBox(true);
+	if (not WorldSpaceActorBounds.IsValid)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot build directional camera boundary because actor bounds were invalid."
+			"\n See function: UPlayerCameraController::TryGetBoundaryAxisExtents()");
+		return false;
+	}
+
+	const FVector MinPoint = WorldSpaceActorBounds.Min;
+	const FVector MaxPoint = WorldSpaceActorBounds.Max;
+	const TArray<FVector> BoxCorners =
+	{
+		FVector(MinPoint.X, MinPoint.Y, 0.0f),
+		FVector(MinPoint.X, MaxPoint.Y, 0.0f),
+		FVector(MaxPoint.X, MinPoint.Y, 0.0f),
+		FVector(MaxPoint.X, MaxPoint.Y, 0.0f)
+	};
+
+	OutMinX = TNumericLimits<float>::Max();
+	OutMaxX = TNumericLimits<float>::Lowest();
+	OutMinY = TNumericLimits<float>::Max();
+	OutMaxY = TNumericLimits<float>::Lowest();
+	for (const FVector& Corner : BoxCorners)
+	{
+		const float AxisXValue = FVector::DotProduct(Corner, OutAxisX);
+		const float AxisYValue = FVector::DotProduct(Corner, OutAxisY);
+		OutMinX = FMath::Min(OutMinX, AxisXValue);
+		OutMaxX = FMath::Max(OutMaxX, AxisXValue);
+		OutMinY = FMath::Min(OutMinY, AxisYValue);
+		OutMaxY = FMath::Max(OutMaxY, AxisYValue);
+	}
+
+	return true;
 }
 
 void UPlayerCameraController::RebuildCachedAdditionalPlaneConstraints()
