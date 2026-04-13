@@ -78,6 +78,7 @@ enum class EAnnouncerVoiceLineType : uint8
 	LostArmoredCar,
 	LostHarvester,
 	LostHQ,
+	DefeatLostCommander,
 	LostMediumVehicle,
 	LostHeavyVehicle,
 	LostNomadicBuilding_Truck,

@@ -1027,6 +1027,39 @@ TArray<ATankMaster*> UGameUnitManager::GetPlayerTanks(const uint8 Player) const
 	return M_TankMastersAliveEnemy;
 }
 
+ATankMaster* UGameUnitManager::GetPlayerCommandVehicle() const
+{
+	for (ATankMaster* EachTank : M_TankMastersAlivePlayer)
+	{
+		if (not IsValid(EachTank))
+		{
+			continue;
+		}
+
+		URTSComponent* TankRTSComponent = EachTank->GetRTSComponent();
+		if (not IsValid(TankRTSComponent))
+		{
+			continue;
+		}
+
+		if (TankRTSComponent->GetUnitType() != EAllUnitType::UNType_Tank)
+		{
+			continue;
+		}
+
+		const ETankSubtype TankSubtype = TankRTSComponent->GetSubtypeAsTankSubtype();
+		const bool bIsCommanderTank =
+			TankSubtype == ETankSubtype::Tank_PzIII_J_Commander
+			|| TankSubtype == ETankSubtype::Tank_PzIV_F1_Commander;
+		if (bIsCommanderTank)
+		{
+			return EachTank;
+		}
+	}
+
+	return nullptr;
+}
+
 
 AActor* UGameUnitManager::GetClosestTargetPreferSquadUnit(
 	const uint8 PlayerSearch,
