@@ -60,31 +60,41 @@ void URTSFireSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void URTSFireSubsystem::SpawnFireAtLocation(const ERTSFireType FireType,
-                                            const int32 TimeActiveSeconds,
-                                            const FVector& Location,
-                                            const FVector& Scale)
+int32 URTSFireSubsystem::SpawnFireAtLocation(const ERTSFireType FireType,
+                                             const float LifeTimeSeconds,
+                                             const FVector& Location,
+                                             const FVector& Scale)
 {
 	if (not GetIsValidFireManager())
 	{
-		return;
+		return INDEX_NONE;
 	}
 
-	M_FireManager->ActivateFireAtLocation(FireType, TimeActiveSeconds, Location, Scale);
+	return M_FireManager->ActivateFireAtLocation(FireType, LifeTimeSeconds, Location, Scale);
 }
 
-void URTSFireSubsystem::SpawnFireAttached(AActor* AttachActor,
-                                          const ERTSFireType FireType,
-                                          const int32 TimeActiveSeconds,
-                                          const FVector& AttachOffset,
-                                          const FVector& Scale)
+int32 URTSFireSubsystem::SpawnFireAttached(AActor* AttachActor,
+                                           const ERTSFireType FireType,
+                                           const float LifeTimeSeconds,
+                                           const FVector& AttachOffset,
+                                           const FVector& Scale)
 {
 	if (not GetIsValidFireManager())
 	{
-		return;
+		return INDEX_NONE;
 	}
 
-	M_FireManager->ActivateFireAttached(AttachActor, FireType, TimeActiveSeconds, AttachOffset, Scale);
+	return M_FireManager->ActivateFireAttached(AttachActor, FireType, LifeTimeSeconds, AttachOffset, Scale);
+}
+
+bool URTSFireSubsystem::StopFireByHandle(const int32 FireHandle)
+{
+	if (not GetIsValidFireManager())
+	{
+		return false;
+	}
+
+	return M_FireManager->StopFireByHandle(FireHandle);
 }
 
 bool URTSFireSubsystem::GetIsValidFireManager() const

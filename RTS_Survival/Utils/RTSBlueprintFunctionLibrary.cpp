@@ -25,6 +25,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -610,6 +611,83 @@ void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocketContaining(con
 	const FName RandomSocketName = FilteredSocketNames[RandomIndex];
 	const FVector SocketLocation = MeshComp->GetSocketLocation(RandomSocketName);
 	RTSSpawnExplosionAtLocation(WorldContextObject, ExplosionType, SocketLocation, bPlaySound, Delay);
+}
+
+int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAtLocation(
+	const UObject* WorldContextObject,
+	const ERTSFireType FireType,
+	const float LifeTimeSeconds,
+	const FVector& Location,
+	const FVector& Scale)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return INDEX_NONE;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not IsValid(World))
+	{
+		return INDEX_NONE;
+	}
+
+	URTSFireSubsystem* FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
+	if (not IsValid(FireSubsystem))
+	{
+		return INDEX_NONE;
+	}
+
+	return FireSubsystem->SpawnFireAtLocation(FireType, LifeTimeSeconds, Location, Scale);
+}
+
+int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAttached(
+	const UObject* WorldContextObject,
+	AActor* AttachActor,
+	const ERTSFireType FireType,
+	const float LifeTimeSeconds,
+	const FVector& AttachOffset,
+	const FVector& Scale)
+{
+	if (not IsValid(WorldContextObject) || not IsValid(AttachActor))
+	{
+		return INDEX_NONE;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not IsValid(World))
+	{
+		return INDEX_NONE;
+	}
+
+	URTSFireSubsystem* FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
+	if (not IsValid(FireSubsystem))
+	{
+		return INDEX_NONE;
+	}
+
+	return FireSubsystem->SpawnFireAttached(AttachActor, FireType, LifeTimeSeconds, AttachOffset, Scale);
+}
+
+bool URTSBlueprintFunctionLibrary::RTSStopFireByHandle(const UObject* WorldContextObject, const int32 FireHandle)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return false;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	URTSFireSubsystem* FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
+	if (not IsValid(FireSubsystem))
+	{
+		return false;
+	}
+
+	return FireSubsystem->StopFireByHandle(FireHandle);
 }
 
 void URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(const UObject* WorldContextObject,
