@@ -339,25 +339,30 @@ void ATankMaster::Tick(float DeltaSeconds)
 	// Normalize to [-180,180] range
 	RotationDifference.Normalize();
 	float TurnAmount = FMath::Sign(RotationDifference.Yaw) * TurnRate * DeltaSeconds;
+	bool bFinishedRotateTowardsThisTick = false;
 
 	// If we'd overshoot, clamp the turn
 	if (FMath::Abs(TurnAmount) > FMath::Abs(RotationDifference.Yaw))
 	{
 		TurnAmount = RotationDifference.Yaw;
 		bM_NeedToTurnTowardsTarget = false;
-		OnRotateTowardsFinished();
-		if (bM_IsRotationAQueueCommand)
-		{
-			DoneExecutingCommand(EAbilityID::IdRotateTowards);
-		}
-		else
-		{
-			// Finished a rotation command that was not queued.
-			OnFinishedStandaloneRotation();
-		}
+		bFinishedRotateTowardsThisTick = true;
 	}
 
 	ApplyRotateTowardsStep(TurnAmount, DeltaSeconds);
+	if (not bFinishedRotateTowardsThisTick)
+	{
+		return;
+	}
+
+	OnRotateTowardsFinished();
+	if (bM_IsRotationAQueueCommand)
+	{
+		DoneExecutingCommand(EAbilityID::IdRotateTowards);
+		return;
+	}
+	// Finished a rotation command that was not queued.
+	OnFinishedStandaloneRotation();
 }
 
 void ATankMaster::ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds)
