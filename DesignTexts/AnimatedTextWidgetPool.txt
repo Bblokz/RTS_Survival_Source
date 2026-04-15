@@ -1,36 +1,38 @@
-﻿I want you to create a new worldsubsystem for managing 'animated' widget texts that are pooled to 32 instances by default.
-my MODULE_API will be RTS_SURVIVAL_API
-the requirements for these widgets are the following:
-they have a public function that takes a string and puts it in the widget richtext block, this same public
-function needs to expose some useful variables for configuring when this text is line broken and how it is alighned.
-it will also have a struct param of type FRTSVerticalAnimTextSettings that will configure:
-- how long the text is visible at full opacity
-- how long the fade out time is
-- what the delta Z is that the text moves up (during both the visible and fade out time combined)
+﻿I need you to setup a subsytem, component, new actor class and add functions to mission manager and mission base for the following new feature:
 
-also note that all the widgets will  have to live in screen space widget components.
+trigger volumes that have callbacks registered with specific missions.
+we need a new component that will be added to the mission manager at the ctor called MissionTriggerVolumesManager
+this one will keep track of which TriggerArea is setup with which mission base.
 
-we will call the new widget class UW_RTSVerticalAnimatedText
+you need to create the ATriggerArea actor class which in post init needs to look for its collision component can be sphere or box collision.
 
-each of these widget will also have a bool bM_IsDormant that is true when the widget is not in use and false when it is in use.
-we will use this in the pooling system.
-the world subsystem will expose a pointer to this manager object that is simply a UObject derived called UAnimatedTextWidgetPoolManager
-through a ufunction also acessible in blueprints.
-this world subsystem will automatically create this object once the world is loaded and destroy it when the world is unloaded.
-after it is created it will call init on it which will spawn the pool of to be used widgets for this we expect that the actual class to use for the widgets
-is a blueprint derived from the UW_RTSVerticalAnimatedText class since this specific class needs to be known before the game starts define
-UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Animated Text"))
-class RTS_SURVIVAL_API UAnimatedTextSettings : public UDeveloperSettings
+you need to add a new DeveloperSettings class for allowing the designer to set the classes that are derived actors from ATriggerArea
+one for the rectangle one and one for the sphere one.
 
-so we can specify the speicfic derived widget in the project settings!
-Whenever someting is not set or cannot be created report errors with RTSFunctionLibrary::ReportError(const FString)
-
-Widget type/class : a very simple widget that has a rich text block bind widget 
-ool expansion policy: What happens if all 32 pooled widgets are in use and a new request comes in?
-in that case we issue a warning with RTSFunctionLibrary::ReportWarning(FString) and then we will reuse the widget 
-that has been active the longest. ( save the time stamp of when a widget was activated in a member variable of the widget class)
-
-Reset/recycle logic: When a widget finishes animating that is the fade is completed too ( opague + fade time) it will set itself to dormant.
-
-tick management: the wigets will have tick disabled; implement a custom tick function on the pool manager
-that controls all the animations of the active widgets; obviously this will ignore the dormant widgets.
+I want the mission base to be able to call wrapper functions that will create these trigger Area actors and have the following params,
+ there will be two versions CreateTriggerAreaSphere and CreateTriggerAreaRectangle.
+ the will get a location, frotator, a scale FVector (to apply scale to either the sphere or box collision component on the actors to be created),
+ a ETriggerOverlapLogic to determine whith which objects the trigger volume should trigger overlap events.
+ a float DelayBetweenCallbacks; for how long between callign the callback again on the mission base;
+ keep track of the time of when the last one was; if the next trigger is too early then ignore it.
+ int32 MaxCallbacks; for how many times the callback should be called before the trigger volume is destroyed, <0 for infinite.
+ integer ID; for the ID on the callback of the mission.
+ 
+ the callbacks on the mission should have the following signature; first calling a c++ function
+ with AActor* OverlappingActor, int32 TriggerID, ATriggerArea* TriggerVolume.
+ 
+ make sure that the cpp callback calls a BP_ callback of it, like we do for many of the other callback mechanics on the mission base.
+ 
+ make sure that the new component will load the classes from the DeveloperSettings at beginplay and use them when creating the trigger area actors.
+ 
+ IMPORTANT NOTE: when a volume has provided the param OverlapPlayer for ETriggerOverlapLogic then make sure it ovelaps
+ only  COLLISION_OBJ_PLAYER. but when it is set to overlap enemy then only overlap objects of COLLISION_OBJ_ENEMY
+ and in case of OverlapBoth overlap both.
+ 
+ also add functions to remove trigger volumes by ID and mission base associated with them; trigger volumes of different missions should be allowed to have the 
+ same ID. also multiple IDs for the same volumes for one mission should be allowed; in  that case destroy all of those  that have that ID.
+ 
+ make sure that when a mission completes that has trigger volumes assosiated that then these volumes are removed automatically.
+ 
+ fully implement the new feature.
+ 

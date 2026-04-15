@@ -444,6 +444,8 @@ protected:
 	bool GetIsValidSpatialVoiceLinePlayer() const;
 
 	virtual EAnnouncerVoiceLineType OverrideAnnouncerDeathVoiceLine(const EAnnouncerVoiceLineType OriginalLine) const;
+	
+	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds);
 
 private:
 	// Whether the vehicle is currently Turning.
@@ -555,7 +557,6 @@ private:
 	void OnUnitDies_DisableWeapons();
 	void OnUnitDies_CheckForCargo(const ERTSDeathType DeathType) const;
 	void OnUnitDies_AnnouncerDeathVoiceLine() const;
-	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds);
 	virtual void OnRotateTowardsFinished();
 
 	void ApplyMovementBehaviours();
