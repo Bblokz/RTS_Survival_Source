@@ -4,6 +4,7 @@
 #include "MissionTrigger.h"
 
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
+#include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 void UMissionTrigger::InitTrigger(UMissionBase* AssociatedMission)
@@ -13,18 +14,36 @@ void UMissionTrigger::InitTrigger(UMissionBase* AssociatedMission)
 
 void UMissionTrigger::TickTrigger()
 {
-	if(CheckTrigger() && EnsureMissionIsValid())
+	if (not CheckTrigger())
 	{
-		M_Mission->OnTriggerActivated();	
+		return;
 	}
+
+	if (not GetIsValidMission())
+	{
+		return;
+	}
+
+	M_Mission->OnTriggerActivated();
 }
 
-bool UMissionTrigger::EnsureMissionIsValid() const
+AMissionManager* UMissionTrigger::GetMissionManagerCheckedFromTrigger() const
 {
-	if(M_Mission.IsValid())
+	if (not GetIsValidMission())
 	{
-		return true;
+		return nullptr;
 	}
-	RTSFunctionLibrary::ReportError("Trigger: + " + GetName() + " has no valid mission.");
-	return false;
+
+	return M_Mission->GetMissionManagerChecked();
+}
+
+bool UMissionTrigger::GetIsValidMission() const
+{
+	if (not M_Mission.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("Trigger: + " + GetName() + " has no valid mission.");
+		return false;
+	}
+
+	return true;
 }

@@ -239,6 +239,7 @@ public:
 	 * at runtime.
 	 */
 	void ActivateNewMission(UMissionBase* NewMission);
+	bool GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const;
 
 	/**
 	 * Array of mission objects created as subobjects of the manager.
@@ -304,6 +305,9 @@ private:
 	// Missions provided by the blueprint edit anywhere array.
 	UPROPERTY()
 	TArray<UMissionBase*> M_ActiveMissions;
+
+	// Tracks exact mission classes that have completed to support class-driven trigger branching.
+	TSet<TSubclassOf<UMissionBase>> M_CompletedMissionClasses;
 
 	TSubclassOf<UW_MissionWidgetManager> M_WidgetManagerClass;
 
