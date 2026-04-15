@@ -163,6 +163,8 @@ protected:
 	virtual void ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand) override;
 	// Sets the tracks back to idle.
 	virtual void TerminateRotateTowardsCommand() override;
+	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds) override;
+	virtual void OnRotateTowardsFinished() override;
 	/** @param bDisabled Whether to enable or disable the unit. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "RTSUnitSpawning")
 	void BP_OnRTSUnitSpawned(const bool bDisabled);
@@ -235,5 +237,6 @@ private:
 	UTankEnergyComponent* M_TankEnergyComponent = nullptr;
 	void OnInit_FindEnergyComponent(const int32 MyEnergy);
 	
+	bool GetIsValidTrackPhysicsMovement() const;
 
 };
