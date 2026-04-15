@@ -6,6 +6,8 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
+#include "RTS_Survival/Missions/MissionManager/MissionTriggerVolumesManager/MissionTriggerVolumesManager.h"
+#include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
@@ -126,6 +128,7 @@ AMissionManager::AMissionManager()
 {
 	// Set to true to tick missions.
 	PrimaryActorTick.bCanEverTick = true;
+	M_MissionTriggerVolumesManager = CreateDefaultSubobject<UMissionTriggerVolumesManager>(TEXT("MissionTriggerVolumesManager"));
 }
 
 void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, const bool bPlaySound)
@@ -136,6 +139,7 @@ void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, cons
 	}
 
 	M_CompletedMissionClasses.Add(CompletedMission->GetClass());
+	RemoveAllMissionTriggerAreasForMission(CompletedMission);
 	RemoveActiveMission(CompletedMission);
 	if (bPlaySound)
 	{
@@ -150,6 +154,7 @@ void AMissionManager::OnAnyMissionStarted(UMissionBase* LoadedMission)
 
 void AMissionManager::OnAnyMissionFailed(UMissionBase* FailedMission)
 {
+	RemoveAllMissionTriggerAreasForMission(FailedMission);
 	RemoveActiveMission(FailedMission);
 	PlayMissionSound(EMissionSoundType::MissionFailed);
 }
@@ -387,6 +392,80 @@ int32 AMissionManager::GetTotalScheduledCallbackCount() const
 	return M_MissionScheduler->GetTotalScheduledTaskCount();
 }
 
+ATriggerArea* AMissionManager::CreateMissionTriggerAreaSphere(UMissionBase* Mission,
+                                                              const FVector& Location,
+                                                              const FRotator& Rotation,
+                                                              const FVector& Scale,
+                                                              const ETriggerOverlapLogic TriggerOverlapLogic,
+                                                              const float DelayBetweenCallbacks,
+                                                              const int32 MaxCallbacks,
+                                                              const int32 TriggerId)
+{
+	if (not GetIsValidMissionTriggerVolumesManager())
+	{
+		return nullptr;
+	}
+
+	return M_MissionTriggerVolumesManager->CreateTriggerAreaForMission(
+		Mission,
+		EMissionTriggerAreaShape::Sphere,
+		Location,
+		Rotation,
+		Scale,
+		TriggerOverlapLogic,
+		DelayBetweenCallbacks,
+		MaxCallbacks,
+		TriggerId
+	);
+}
+
+ATriggerArea* AMissionManager::CreateMissionTriggerAreaRectangle(UMissionBase* Mission,
+                                                                 const FVector& Location,
+                                                                 const FRotator& Rotation,
+                                                                 const FVector& Scale,
+                                                                 const ETriggerOverlapLogic TriggerOverlapLogic,
+                                                                 const float DelayBetweenCallbacks,
+                                                                 const int32 MaxCallbacks,
+                                                                 const int32 TriggerId)
+{
+	if (not GetIsValidMissionTriggerVolumesManager())
+	{
+		return nullptr;
+	}
+
+	return M_MissionTriggerVolumesManager->CreateTriggerAreaForMission(
+		Mission,
+		EMissionTriggerAreaShape::Rectangle,
+		Location,
+		Rotation,
+		Scale,
+		TriggerOverlapLogic,
+		DelayBetweenCallbacks,
+		MaxCallbacks,
+		TriggerId
+	);
+}
+
+void AMissionManager::RemoveMissionTriggerAreasById(UMissionBase* Mission, const int32 TriggerId)
+{
+	if (not GetIsValidMissionTriggerVolumesManager())
+	{
+		return;
+	}
+
+	M_MissionTriggerVolumesManager->RemoveTriggerAreasForMissionById(Mission, TriggerId);
+}
+
+void AMissionManager::RemoveAllMissionTriggerAreasForMission(UMissionBase* Mission)
+{
+	if (not GetIsValidMissionTriggerVolumesManager())
+	{
+		return;
+	}
+
+	M_MissionTriggerVolumesManager->RemoveAllTriggerAreasForMission(Mission);
+}
+
 void AMissionManager::CallBackOnMissionWhenEnemyUnitsDestroyed(
 	const EEnemyUnitQueryType EnemyUnitQueryType,
 	TWeakObjectPtr<UMissionBase> Mission,
@@ -589,6 +668,7 @@ void AMissionManager::BeginPlay()
 	M_CompletedMissionClasses.Empty();
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
+	BeginPlay_InitMissionTriggerVolumesManager();
 	BeginPlay_InitMissionWidgetManager();
 	BeginPlay_InitGameDifficultyAndSettings();
 
@@ -769,6 +849,11 @@ void AMissionManager::BeginPlay_InitMissionScheduler()
 	M_MissionScheduler->RegisterComponent();
 }
 
+void AMissionManager::BeginPlay_InitMissionTriggerVolumesManager()
+{
+	GetIsValidMissionTriggerVolumesManager();
+}
+
 bool AMissionManager::EnsureValidPlayerController() const
 {
 	if (M_PlayerController.IsValid())
@@ -790,6 +875,22 @@ bool AMissionManager::GetIsValidMissionScheduler() const
 		this,
 		"M_MissionScheduler",
 		"GetIsValidMissionScheduler",
+		this
+	);
+	return false;
+}
+
+bool AMissionManager::GetIsValidMissionTriggerVolumesManager() const
+{
+	if (IsValid(M_MissionTriggerVolumesManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_MissionTriggerVolumesManager",
+		"GetIsValidMissionTriggerVolumesManager",
 		this
 	);
 	return false;

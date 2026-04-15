@@ -10,6 +10,7 @@
 #include "MissionSpawnCommandQueueState.h"
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
+#include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Missions/Defeat/RTSDefeatType.h"
@@ -28,6 +29,8 @@ class UW_Defeat;
 class AActor;
 class UObject;
 class AEnemyController;
+class UMissionTriggerVolumesManager;
+class ATriggerArea;
 struct FStreamableHandle;
 
 USTRUCT(BlueprintType)
@@ -271,6 +274,51 @@ public:
 		TWeakObjectPtr<UMissionBase> Mission,
 		const int32 CallbackID);
 
+	/**
+	 * @brief Spawns a sphere trigger area and wires mission callback ownership in one safe path.
+	 * @param Mission Mission owner that receives callbacks.
+	 * @param Location World spawn location for the trigger actor.
+	 * @param Rotation Spawn rotation for the trigger actor.
+	 * @param Scale Scale payload applied to the trigger collision shape.
+	 * @param TriggerOverlapLogic Determines overlap channels used by the trigger collision.
+	 * @param DelayBetweenCallbacks Minimum delay between mission callback invocations.
+	 * @param MaxCallbacks Maximum amount of callbacks before auto-destroy, negative for infinite.
+	 * @param TriggerId Mission-defined identifier returned in callback.
+	 * @return Spawned trigger area actor or nullptr when setup failed.
+	 */
+	ATriggerArea* CreateMissionTriggerAreaSphere(UMissionBase* Mission,
+	                                            const FVector& Location,
+	                                            const FRotator& Rotation,
+	                                            const FVector& Scale,
+	                                            const ETriggerOverlapLogic TriggerOverlapLogic,
+	                                            const float DelayBetweenCallbacks,
+	                                            const int32 MaxCallbacks,
+	                                            const int32 TriggerId);
+
+	/**
+	 * @brief Spawns a box trigger area and wires mission callback ownership in one safe path.
+	 * @param Mission Mission owner that receives callbacks.
+	 * @param Location World spawn location for the trigger actor.
+	 * @param Rotation Spawn rotation for the trigger actor.
+	 * @param Scale Scale payload applied to the trigger collision shape.
+	 * @param TriggerOverlapLogic Determines overlap channels used by the trigger collision.
+	 * @param DelayBetweenCallbacks Minimum delay between mission callback invocations.
+	 * @param MaxCallbacks Maximum amount of callbacks before auto-destroy, negative for infinite.
+	 * @param TriggerId Mission-defined identifier returned in callback.
+	 * @return Spawned trigger area actor or nullptr when setup failed.
+	 */
+	ATriggerArea* CreateMissionTriggerAreaRectangle(UMissionBase* Mission,
+	                                               const FVector& Location,
+	                                               const FRotator& Rotation,
+	                                               const FVector& Scale,
+	                                               const ETriggerOverlapLogic TriggerOverlapLogic,
+	                                               const float DelayBetweenCallbacks,
+	                                               const int32 MaxCallbacks,
+	                                               const int32 TriggerId);
+
+	void RemoveMissionTriggerAreasById(UMissionBase* Mission, const int32 TriggerId);
+	void RemoveAllMissionTriggerAreasForMission(UMissionBase* Mission);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -320,12 +368,17 @@ private:
 	UPROPERTY()
 	TObjectPtr<UMissionScheduler> M_MissionScheduler;
 
+	UPROPERTY()
+	TObjectPtr<UMissionTriggerVolumesManager> M_MissionTriggerVolumesManager;
+
 	void BeginPlay_InitPlayerController();
 	void BeginPlay_InitMissionWidgetManager();
 	void BeginPlay_InitGameDifficultyAndSettings();
 	void BeginPlay_InitMissionScheduler();
+	void BeginPlay_InitMissionTriggerVolumesManager();
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
+	bool GetIsValidMissionTriggerVolumesManager() const;
 	void SetCampaignGenerationSettingsWithGameInstance();
 	void SetGameDifficultyWithGameInstance();
 

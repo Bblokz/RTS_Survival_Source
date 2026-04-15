@@ -7,6 +7,7 @@
 #include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Missions/MissionManager/MissionSpawnCommandQueueOrder.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
+#include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "UObject/NoExportTypes.h"
@@ -31,6 +32,7 @@ class UW_MissionTimer;
 struct FMissionWidgetState;
 struct FMissionTimerLifetimeSettings;
 class AMissionManager;
+class ATriggerArea;
 
 
 USTRUCT(Blueprintable)
@@ -401,6 +403,58 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackEnemyActorsDestroyed(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType);
+
+	/**
+	 * @brief Spawns a sphere trigger via mission manager so callback ownership and cleanup stay centralized.
+	 * @param Location World location for the spawned trigger actor.
+	 * @param Rotation World rotation for the spawned trigger actor.
+	 * @param Scale Shape scale applied to the trigger collision component.
+	 * @param TriggerOverlapLogic Overlap channel filter for player/enemy trigger behavior.
+	 * @param DelayBetweenCallbacks Minimum time between callback executions for this trigger.
+	 * @param MaxCallbacks Maximum callbacks before destroy, negative for infinite callbacks.
+	 * @param TriggerId Mission-defined callback identifier.
+	 * @return Spawned trigger actor or nullptr when creation failed.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|TriggerArea")
+	ATriggerArea* CreateTriggerAreaSphere(const FVector& Location,
+	                                      const FRotator& Rotation,
+	                                      const FVector& Scale,
+	                                      const ETriggerOverlapLogic TriggerOverlapLogic,
+	                                      const float DelayBetweenCallbacks,
+	                                      const int32 MaxCallbacks,
+	                                      const int32 TriggerId);
+
+	/**
+	 * @brief Spawns a rectangle trigger via mission manager so callback ownership and cleanup stay centralized.
+	 * @param Location World location for the spawned trigger actor.
+	 * @param Rotation World rotation for the spawned trigger actor.
+	 * @param Scale Shape scale applied to the trigger collision component.
+	 * @param TriggerOverlapLogic Overlap channel filter for player/enemy trigger behavior.
+	 * @param DelayBetweenCallbacks Minimum time between callback executions for this trigger.
+	 * @param MaxCallbacks Maximum callbacks before destroy, negative for infinite callbacks.
+	 * @param TriggerId Mission-defined callback identifier.
+	 * @return Spawned trigger actor or nullptr when creation failed.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|TriggerArea")
+	ATriggerArea* CreateTriggerAreaRectangle(const FVector& Location,
+	                                         const FRotator& Rotation,
+	                                         const FVector& Scale,
+	                                         const ETriggerOverlapLogic TriggerOverlapLogic,
+	                                         const float DelayBetweenCallbacks,
+	                                         const int32 MaxCallbacks,
+	                                         const int32 TriggerId);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|TriggerArea")
+	void RemoveTriggerAreasById(const int32 TriggerId);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|TriggerArea")
+	void RemoveAllTriggerAreas();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|TriggerArea")
+	virtual void OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Mission")
 	void DestroyActorsInRange(

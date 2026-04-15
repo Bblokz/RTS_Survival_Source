@@ -9,6 +9,7 @@
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
@@ -58,6 +59,7 @@ void UMissionBase::OnMissionComplete()
 	}
 	// Mark the widget as free to be able to be used by another mission.
 	MarkWidgetAsFree();
+	RemoveAllTriggerAreas();
 	MissionState.bIsMissionComplete = true;
 	// Stop any tick behaviour.
 	MissionState.bTickOnMission = false;
@@ -84,6 +86,7 @@ void UMissionBase::OnMissionFailed()
 		M_MissionManager->OnAnyMissionFailed(this);
 	}
 	// Mark the widget as free to be able to be used by another mission.
+	RemoveAllTriggerAreas();
 	MarkWidgetAsFree();
 	BP_OnMissionFailed();
 }
@@ -124,6 +127,81 @@ void UMissionBase::TriggerMissionFromArray(const int32 TriggerableMissionIndex)
 void UMissionBase::OnEnemyUnitsDestroyedCallback(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType)
 {
 	BP_OnCallBackEnemyActorsDestroyed(ID, EnemyUnitQueryType);
+}
+
+ATriggerArea* UMissionBase::CreateTriggerAreaSphere(const FVector& Location,
+                                                     const FRotator& Rotation,
+                                                     const FVector& Scale,
+                                                     const ETriggerOverlapLogic TriggerOverlapLogic,
+                                                     const float DelayBetweenCallbacks,
+                                                     const int32 MaxCallbacks,
+                                                     const int32 TriggerId)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return nullptr;
+	}
+
+	return GetMissionManagerChecked()->CreateMissionTriggerAreaSphere(
+		this,
+		Location,
+		Rotation,
+		Scale,
+		TriggerOverlapLogic,
+		DelayBetweenCallbacks,
+		MaxCallbacks,
+		TriggerId
+	);
+}
+
+ATriggerArea* UMissionBase::CreateTriggerAreaRectangle(const FVector& Location,
+                                                        const FRotator& Rotation,
+                                                        const FVector& Scale,
+                                                        const ETriggerOverlapLogic TriggerOverlapLogic,
+                                                        const float DelayBetweenCallbacks,
+                                                        const int32 MaxCallbacks,
+                                                        const int32 TriggerId)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return nullptr;
+	}
+
+	return GetMissionManagerChecked()->CreateMissionTriggerAreaRectangle(
+		this,
+		Location,
+		Rotation,
+		Scale,
+		TriggerOverlapLogic,
+		DelayBetweenCallbacks,
+		MaxCallbacks,
+		TriggerId
+	);
+}
+
+void UMissionBase::RemoveTriggerAreasById(const int32 TriggerId)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->RemoveMissionTriggerAreasById(this, TriggerId);
+}
+
+void UMissionBase::RemoveAllTriggerAreas()
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->RemoveAllMissionTriggerAreasForMission(this);
+}
+
+void UMissionBase::OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume)
+{
+	BP_OnTriggerAreaCallback(OverlappingActor, TriggerID, TriggerVolume);
 }
 
 void UMissionBase::TickMission(float DeltaTime)
@@ -297,6 +375,7 @@ void UMissionBase::OnCleanUpMission()
 	if (GetIsValidMissionManager())
 	{
 		CancelAllScheduledCallbacks();
+		RemoveAllTriggerAreas();
 	}
 	else
 	{
