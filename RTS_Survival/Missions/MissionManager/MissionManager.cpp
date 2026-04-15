@@ -130,6 +130,12 @@ AMissionManager::AMissionManager()
 
 void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, const bool bPlaySound)
 {
+	if (not EnsureMissionIsValid(CompletedMission))
+	{
+		return;
+	}
+
+	M_CompletedMissionClasses.Add(CompletedMission->GetClass());
 	RemoveActiveMission(CompletedMission);
 	if (bPlaySound)
 	{
@@ -434,6 +440,16 @@ void AMissionManager::ActivateNewMission(UMissionBase* NewMission)
 	NewMission->LoadMission(this);
 }
 
+bool AMissionManager::GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const
+{
+	if (not MissionClass)
+	{
+		return false;
+	}
+
+	return M_CompletedMissionClasses.Contains(MissionClass);
+}
+
 void AMissionManager::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
                                            const FVector& TankSpawnLocation)
 {
@@ -570,6 +586,7 @@ void AMissionManager::HandleSpawnActorWithCommandQueueSpawned(const int32 Reques
 void AMissionManager::BeginPlay()
 {
 	Super::BeginPlay();
+	M_CompletedMissionClasses.Empty();
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionWidgetManager();
@@ -622,6 +639,7 @@ void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	M_TrackedEnemyActorRefCounts.Empty();
 	M_EnemyUnitDestroyedCallbacks.Empty();
+	M_CompletedMissionClasses.Empty();
 
 	for (UMissionBase* Mission : M_ActiveMissions)
 	{

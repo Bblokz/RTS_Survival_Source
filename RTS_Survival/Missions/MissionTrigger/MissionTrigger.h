@@ -7,12 +7,14 @@
 #include "MissionTrigger.generated.h"
 
 class UMissionBase;
+class AMissionManager;
 
 UENUM(BlueprintType)
 enum class EMissionTriggerType : uint8
 {
     None        UMETA(DisplayName = "None"),
-    KillActors  UMETA(DisplayName = "Kill Actors")
+    KillActors  UMETA(DisplayName = "Kill Actors"),
+    MissionClassCompleted UMETA(DisplayName = "Mission Class Completed")
 };
 
 UCLASS(Abstract, Blueprintable, EditInlineNew)
@@ -28,14 +30,17 @@ public:
     void InitTrigger(UMissionBase* AssociatedMission);
 
     void TickTrigger();
+
 protected:
     // Check if the trigger condition is met.
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Mission Trigger")
     bool CheckTrigger() const;
     virtual bool CheckTrigger_Implementation() const { return false; }
 
+    AMissionManager* GetMissionManagerCheckedFromTrigger() const;
+
 private:
     TWeakObjectPtr<UMissionBase> M_Mission;
 
-    bool EnsureMissionIsValid() const;
+    bool GetIsValidMission() const;
 };
