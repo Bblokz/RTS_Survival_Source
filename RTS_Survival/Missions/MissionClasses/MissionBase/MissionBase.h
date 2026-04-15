@@ -371,9 +371,18 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnTankDies(ATankMaster* Tank);
-
+	
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackTankDies(ATankMaster* Tank);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void RegisterCallbackOnBXPDies(ABuildingExpansion* BuildingExpansion);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnCallBackBXPDies(ABuildingExpansion* Tank);
+	
+
+	
 
 	// Sets a timer to digin the provided vehicle; calls BP_OnCallBackTankDigin with the ID and Tank when finished.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -660,6 +669,7 @@ private:
 
 	bool EnsureNomadicIsValid(const TObjectPtr<ANomadicVehicle>& NomadicVehicle) const;
 	bool EnsureTankIsValid(const TObjectPtr<ATankMaster>& Tank) const;
+	bool EnsureBxpIsValid(const TObjectPtr<ABuildingExpansion>& BXP) const;
 	bool EnsureSquadIsValid(const TObjectPtr<ASquadController>& SquadController) const;
 
 	FSeededDifficultyMixPool SelectDifficultyMixPool(
