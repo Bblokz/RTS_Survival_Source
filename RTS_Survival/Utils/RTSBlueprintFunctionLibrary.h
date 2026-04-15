@@ -17,6 +17,7 @@
 class AMissionManager;
 enum class ERTSRadiusType : uint8;
 enum class ERTSDamageType : uint8;
+enum class ERTSFireType : uint8;
 class UPlayerPortraitManager;
 struct FTrainingOption;
 enum class ERTSProgressBarType : uint8;
@@ -307,6 +308,34 @@ public:
 		const FString StringToContain,
 		const bool bPlaySound,
 		const float Delay);
+
+	/**
+	 * @brief Wrapper so designers can spawn pooled fire without directly resolving the world subsystem.
+	 * @return Handle used to stop this specific fire later; INDEX_NONE when spawn fails.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|FireManager")
+	static int32 RTSSpawnFireAtLocation(
+		const UObject* WorldContextObject,
+		ERTSFireType FireType,
+		float LifeTimeSeconds,
+		const FVector& Location,
+		const FVector& Scale);
+
+	/**
+	 * @brief Wrapper so designers can attach pooled fire to actors without directly resolving the subsystem.
+	 * @return Handle used to stop this specific fire later; INDEX_NONE when spawn fails.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|FireManager")
+	static int32 RTSSpawnFireAttached(
+		const UObject* WorldContextObject,
+		AActor* AttachActor,
+		ERTSFireType FireType,
+		float LifeTimeSeconds,
+		const FVector& AttachOffset,
+		const FVector& Scale);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|FireManager")
+	static bool RTSStopFireByHandle(const UObject* WorldContextObject, int32 FireHandle);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|VerticalAnimatedTextManager")
 	static void RTSSpawnVerticalAnimatedTextAtLocation(
@@ -608,13 +637,27 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerCommandVehicle(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerCommandVehicle(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerArmoredCar(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerLightTank(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerLightMediumTank(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerLightMediumTank(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerMediumTank(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerMediumTank(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerPanzerIIIAAOrRail38T(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerJaguarOrPanzerIVG(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerJaguarOrPanzerIVG(UObject* WorldContext);
 
 private:
 	

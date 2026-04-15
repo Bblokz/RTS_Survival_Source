@@ -25,6 +25,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -610,6 +611,83 @@ void URTSBlueprintFunctionLibrary::RTSSpawnExplosionAtRandomSocketContaining(con
 	const FName RandomSocketName = FilteredSocketNames[RandomIndex];
 	const FVector SocketLocation = MeshComp->GetSocketLocation(RandomSocketName);
 	RTSSpawnExplosionAtLocation(WorldContextObject, ExplosionType, SocketLocation, bPlaySound, Delay);
+}
+
+int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAtLocation(
+	const UObject* WorldContextObject,
+	const ERTSFireType FireType,
+	const float LifeTimeSeconds,
+	const FVector& Location,
+	const FVector& Scale)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return INDEX_NONE;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not IsValid(World))
+	{
+		return INDEX_NONE;
+	}
+
+	URTSFireSubsystem* FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
+	if (not IsValid(FireSubsystem))
+	{
+		return INDEX_NONE;
+	}
+
+	return FireSubsystem->SpawnFireAtLocation(FireType, LifeTimeSeconds, Location, Scale);
+}
+
+int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAttached(
+	const UObject* WorldContextObject,
+	AActor* AttachActor,
+	const ERTSFireType FireType,
+	const float LifeTimeSeconds,
+	const FVector& AttachOffset,
+	const FVector& Scale)
+{
+	if (not IsValid(WorldContextObject) || not IsValid(AttachActor))
+	{
+		return INDEX_NONE;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not IsValid(World))
+	{
+		return INDEX_NONE;
+	}
+
+	URTSFireSubsystem* FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
+	if (not IsValid(FireSubsystem))
+	{
+		return INDEX_NONE;
+	}
+
+	return FireSubsystem->SpawnFireAttached(AttachActor, FireType, LifeTimeSeconds, AttachOffset, Scale);
+}
+
+bool URTSBlueprintFunctionLibrary::RTSStopFireByHandle(const UObject* WorldContextObject, const int32 FireHandle)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return false;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	URTSFireSubsystem* FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
+	if (not IsValid(FireSubsystem))
+	{
+		return false;
+	}
+
+	return FireSubsystem->StopFireByHandle(FireHandle);
 }
 
 void URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(const UObject* WorldContextObject,
@@ -1215,6 +1293,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_DShK()
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerCommandVehicle(UObject* WorldContext)
 {
+	return GetPlayerGerCommandVehicle(WorldContext);
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerCommandVehicle(UObject* WorldContext)
+{
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
 	{
@@ -1228,7 +1311,32 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerCommandVehicle(UObject
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1_Commander));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerArmoredCar(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Puma));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerLightTank(UObject* WorldContext)
+{
+	return GetPlayerGerLightMediumTank(WorldContext);
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerLightMediumTank(UObject* WorldContext)
+{
+	return GetPlayerGerLightMediumTank(WorldContext);
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerLightMediumTank(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
@@ -1245,6 +1353,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerLightMediumTank(UObjec
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank(UObject* WorldContext)
 {
+	return GetPlayerGerMediumTank(WorldContext);
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerMediumTank(UObject* WorldContext)
+{
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
 	{
@@ -1260,6 +1373,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank(UObject* Wo
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext)
 {
+	return GetPlayerGerPanzerIIIAAOrRail38T(WorldContext);
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerPanzerIIIAAOrRail38T(UObject* WorldContext)
+{
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
 	{
@@ -1274,6 +1392,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerPanzerIIIAAOrRail38T(UObj
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerJaguarOrPanzerIVG(UObject* WorldContext)
+{
+	return GetPlayerGerJaguarOrPanzerIVG(WorldContext);
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerJaguarOrPanzerIVG(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)

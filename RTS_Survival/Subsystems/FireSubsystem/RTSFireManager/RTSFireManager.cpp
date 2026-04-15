@@ -3,6 +3,7 @@
 #include "Components/SceneComponent.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
+#include "Engine/World.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/FirePoolSettings/RTSFirePoolSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -65,72 +66,106 @@ void ARTSFireManager::InitFireManager(const URTSFirePoolSettings* Settings)
 	InitPoolsFromSettings(Settings);
 }
 
-void ARTSFireManager::ActivateFireAtLocation(const ERTSFireType FireType,
-                                             const int32 TimeActiveSeconds,
-                                             const FVector& Location,
-                                             const FVector& Scale)
+int32 ARTSFireManager::ActivateFireAtLocation(const ERTSFireType FireType,
+                                              const float LifeTimeSeconds,
+                                              const FVector& Location,
+                                              const FVector& Scale)
 {
 	if (not GetIsValidWorld())
 	{
-		return;
+		return INDEX_NONE;
 	}
 
 	FRTSFirePool* Pool = M_FirePools.Find(FireType);
 	if (Pool == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAtLocation - fire type not configured."));
-		return;
+		return INDEX_NONE;
 	}
 
 	const int32 EntryIndex = AcquireEntryIndex(*Pool);
 	if (EntryIndex == INDEX_NONE)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAtLocation - failed to acquire entry."));
-		return;
+		return INDEX_NONE;
 	}
 
 	FRTSFirePoolEntry& Entry = Pool->M_Entries[EntryIndex];
-	if (not ActivateEntryAtLocation(Entry, TimeActiveSeconds, Location, Scale))
+	const int32 FireHandle = AcquireNextFireHandle();
+	if (not ActivateEntryAtLocation(Entry, LifeTimeSeconds, Location, Scale))
 	{
 		ReleaseEntryToPool(*Pool, EntryIndex);
+		return INDEX_NONE;
 	}
+
+	Entry.M_FireHandle = FireHandle;
+	StartLifeTimeDelegateIfNeeded(FireType, EntryIndex, LifeTimeSeconds);
+	return FireHandle;
 }
 
-void ARTSFireManager::ActivateFireAttached(AActor* AttachActor,
-                                           const ERTSFireType FireType,
-                                           const int32 TimeActiveSeconds,
-                                           const FVector& AttachOffset,
-                                           const FVector& Scale)
+int32 ARTSFireManager::ActivateFireAttached(AActor* AttachActor,
+                                            const ERTSFireType FireType,
+                                            const float LifeTimeSeconds,
+                                            const FVector& AttachOffset,
+                                            const FVector& Scale)
 {
 	if (not GetIsValidWorld())
 	{
-		return;
+		return INDEX_NONE;
 	}
 	if (not IsValid(AttachActor))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAttached - attach actor is invalid."));
-		return;
+		return INDEX_NONE;
 	}
 
 	FRTSFirePool* Pool = M_FirePools.Find(FireType);
 	if (Pool == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAttached - fire type not configured."));
-		return;
+		return INDEX_NONE;
 	}
 
 	const int32 EntryIndex = AcquireEntryIndex(*Pool);
 	if (EntryIndex == INDEX_NONE)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAttached - failed to acquire entry."));
-		return;
+		return INDEX_NONE;
 	}
 
 	FRTSFirePoolEntry& Entry = Pool->M_Entries[EntryIndex];
-	if (not ActivateEntryAttached(Entry, AttachActor, TimeActiveSeconds, AttachOffset, Scale))
+	const int32 FireHandle = AcquireNextFireHandle();
+	if (not ActivateEntryAttached(Entry, AttachActor, LifeTimeSeconds, AttachOffset, Scale))
 	{
 		ReleaseEntryToPool(*Pool, EntryIndex);
+		return INDEX_NONE;
 	}
+
+	Entry.M_FireHandle = FireHandle;
+	StartLifeTimeDelegateIfNeeded(FireType, EntryIndex, LifeTimeSeconds);
+	return FireHandle;
+}
+
+bool ARTSFireManager::StopFireByHandle(const int32 FireHandle)
+{
+	for (auto& PoolPair : M_FirePools)
+	{
+		FRTSFirePool& FirePool = PoolPair.Value;
+		const int32 EntryCount = FirePool.M_Entries.Num();
+		for (int32 EntryIndex = 0; EntryIndex < EntryCount; ++EntryIndex)
+		{
+			FRTSFirePoolEntry& FirePoolEntry = FirePool.M_Entries[EntryIndex];
+			if (not FirePoolEntry.bM_IsActive || FirePoolEntry.M_FireHandle != FireHandle)
+			{
+				continue;
+			}
+
+			ReleaseEntryToPool(FirePool, EntryIndex);
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void ARTSFireManager::InitPoolsFromSettings(const URTSFirePoolSettings* Settings)
@@ -205,10 +240,15 @@ void ARTSFireManager::ConfigureEntryDormant(FRTSFirePoolEntry& Entry) const
 	Entry.M_NiagaraComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 	Entry.M_ActivatedAtSeconds = RTSFireConstants::InactiveTimeSeconds;
 	Entry.M_TimeActiveSeconds = 0.0f;
+	Entry.M_FireHandle = INDEX_NONE;
 	Entry.bM_IsActive = false;
 	Entry.bM_IsAttached = false;
 	Entry.M_AttachedActor.Reset();
 	Entry.M_AttachOffset = FVector::ZeroVector;
+	if (GetWorld() != nullptr)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(Entry.M_DormantTimerHandle);
+	}
 }
 
 void ARTSFireManager::PrepareEntryForReuse(FRTSFirePoolEntry& Entry) const
@@ -217,7 +257,7 @@ void ARTSFireManager::PrepareEntryForReuse(FRTSFirePoolEntry& Entry) const
 }
 
 bool ARTSFireManager::ActivateEntryAtLocation(FRTSFirePoolEntry& Entry,
-                                              const int32 TimeActiveSeconds,
+                                              const float LifeTimeSeconds,
                                               const FVector& Location,
                                               const FVector& Scale) const
 {
@@ -236,7 +276,7 @@ bool ARTSFireManager::ActivateEntryAtLocation(FRTSFirePoolEntry& Entry,
 	Entry.M_NiagaraComponent->Activate(true);
 
 	Entry.M_ActivatedAtSeconds = GetWorld()->GetTimeSeconds();
-	Entry.M_TimeActiveSeconds = TimeActiveSeconds;
+	Entry.M_TimeActiveSeconds = LifeTimeSeconds;
 	Entry.bM_IsActive = true;
 	Entry.bM_IsAttached = false;
 	Entry.M_AttachedActor.Reset();
@@ -247,7 +287,7 @@ bool ARTSFireManager::ActivateEntryAtLocation(FRTSFirePoolEntry& Entry,
 
 bool ARTSFireManager::ActivateEntryAttached(FRTSFirePoolEntry& Entry,
                                             AActor* AttachActor,
-                                            const int32 TimeActiveSeconds,
+                                            const float LifeTimeSeconds,
                                             const FVector& AttachOffset,
                                             const FVector& Scale) const
 {
@@ -276,7 +316,7 @@ bool ARTSFireManager::ActivateEntryAttached(FRTSFirePoolEntry& Entry,
 	Entry.M_NiagaraComponent->Activate(true);
 
 	Entry.M_ActivatedAtSeconds = GetWorld()->GetTimeSeconds();
-	Entry.M_TimeActiveSeconds = TimeActiveSeconds;
+	Entry.M_TimeActiveSeconds = LifeTimeSeconds;
 	Entry.bM_IsActive = true;
 	Entry.bM_IsAttached = true;
 	Entry.M_AttachedActor = AttachActor;
@@ -293,6 +333,11 @@ void ARTSFireManager::ReleaseEntryToPool(FRTSFirePool& Pool, const int32 EntryIn
 	}
 
 	FRTSFirePoolEntry& Entry = Pool.M_Entries[EntryIndex];
+	if (not Entry.bM_IsActive)
+	{
+		return;
+	}
+
 	ConfigureEntryDormant(Entry);
 	Pool.M_FreeList.Add(EntryIndex);
 }
@@ -312,6 +357,19 @@ int32 ARTSFireManager::AcquireEntryIndex(FRTSFirePool& Pool)
 
 	PrepareEntryForReuse(Pool.M_Entries[OldestIndex]);
 	return OldestIndex;
+}
+
+int32 ARTSFireManager::AcquireNextFireHandle()
+{
+	const int32 AllocatedFireHandle = M_NextFireHandle;
+	++M_NextFireHandle;
+
+	if (M_NextFireHandle <= 0)
+	{
+		M_NextFireHandle = 1;
+	}
+
+	return AllocatedFireHandle;
 }
 
 int32 ARTSFireManager::FindOldestActiveEntryIndex(const FRTSFirePool& Pool) const
@@ -353,6 +411,67 @@ bool ARTSFireManager::ShouldEntryBeDormant(const FRTSFirePoolEntry& Entry, const
 		return false;
 	}
 	return (CurrentTimeSeconds - Entry.M_ActivatedAtSeconds) >= Entry.M_TimeActiveSeconds;
+}
+
+void ARTSFireManager::StartLifeTimeDelegateIfNeeded(
+	const ERTSFireType FireType,
+	const int32 EntryIndex,
+	const float LifeTimeSeconds)
+{
+	if (LifeTimeSeconds <= 0.0f)
+	{
+		return;
+	}
+	if (not GetIsValidWorld())
+	{
+		return;
+	}
+
+	FRTSFirePool* FirePool = M_FirePools.Find(FireType);
+	if (FirePool == nullptr || not FirePool->M_Entries.IsValidIndex(EntryIndex))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::StartLifeTimeDelegateIfNeeded - fire entry is invalid."));
+		return;
+	}
+
+	const int32 FireHandle = FirePool->M_Entries[EntryIndex].M_FireHandle;
+	const TWeakObjectPtr<ARTSFireManager> WeakThis(this);
+	FTimerDelegate DormantDelegate;
+	DormantDelegate.BindLambda([WeakThis, FireType, EntryIndex, FireHandle]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->HandleLifeTimeExpired(FireType, EntryIndex, FireHandle);
+	});
+
+	GetWorld()->GetTimerManager().SetTimer(
+		FirePool->M_Entries[EntryIndex].M_DormantTimerHandle,
+		DormantDelegate,
+		LifeTimeSeconds,
+		false);
+}
+
+void ARTSFireManager::HandleLifeTimeExpired(
+	const ERTSFireType FireType,
+	const int32 EntryIndex,
+	const int32 ExpectedFireHandle)
+{
+	FRTSFirePool* FirePool = M_FirePools.Find(FireType);
+	if (FirePool == nullptr || not FirePool->M_Entries.IsValidIndex(EntryIndex))
+	{
+		return;
+	}
+
+	const FRTSFirePoolEntry& FirePoolEntry = FirePool->M_Entries[EntryIndex];
+	if (not FirePoolEntry.bM_IsActive || FirePoolEntry.M_FireHandle != ExpectedFireHandle)
+	{
+		return;
+	}
+
+	ReleaseEntryToPool(*FirePool, EntryIndex);
 }
 
 bool ARTSFireManager::GetIsValidWorld() const

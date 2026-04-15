@@ -58,6 +58,10 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlayPortrait(ERTSPortraitTypes PortraitType, USoundBase* VoiceLine);
 
+	/** Immediately hide the active portrait and clear all queued portrait requests. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void StopCurrentPortraitPlayback();
+
 protected:
 	virtual void BeginPlay() override;
 
