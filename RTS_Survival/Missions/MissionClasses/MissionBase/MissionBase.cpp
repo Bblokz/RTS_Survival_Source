@@ -741,6 +741,23 @@ void UMissionBase::RegisterCallbackOnTankDies(ATankMaster* Tank)
 	Tank->OnUnitDies.AddLambda(MissionCallBack);
 }
 
+void UMissionBase::RegisterCallbackOnBXPDies(ABuildingExpansion* BuildingExpansion)
+{
+	if(not EnsureBxpIsValid(BuildingExpansion))
+	{
+		return;
+	}
+	TWeakObjectPtr<UMissionBase> WeakThis(this);
+	auto MissionCallBack = [WeakThis, BuildingExpansion]()-> void
+	{
+		if (WeakThis.IsValid())
+		{
+			WeakThis.Get()->BP_OnCallBackBXPDies(BuildingExpansion);
+		}
+	};
+	BuildingExpansion->OnUnitDies.AddLambda(MissionCallBack);
+}
+
 void UMissionBase::DiginFortifyVehicleOverTime(ATankMaster* Tank, const float TimeTillStartDigIn, const int32 ID)
 {
 	if (not EnsureTankIsValid(Tank) || TimeTillStartDigIn <= 0.0f)
@@ -1350,6 +1367,17 @@ bool UMissionBase::EnsureTankIsValid(const TObjectPtr<ATankMaster>& Tank) const
 	RTSFunctionLibrary::ReportError("For mission : " + GetName() +
 		" Tank is not valid!");
 	return false;
+}
+
+bool UMissionBase::EnsureBxpIsValid(const TObjectPtr<ABuildingExpansion>& BXP) const
+{
+	if (IsValid(BXP))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportError("For mission : " + GetName() +
+		" Building expansion is not valid!");
+	return false;		
 }
 
 bool UMissionBase::EnsureSquadIsValid(const TObjectPtr<ASquadController>& SquadController) const
