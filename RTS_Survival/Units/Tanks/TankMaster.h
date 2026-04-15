@@ -555,7 +555,8 @@ private:
 	void OnUnitDies_DisableWeapons();
 	void OnUnitDies_CheckForCargo(const ERTSDeathType DeathType) const;
 	void OnUnitDies_AnnouncerDeathVoiceLine() const;
-	void ApplyRotateTowardsStep(const float TurnAmountDegrees);
+	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds);
+	virtual void OnRotateTowardsFinished();
 
 	void ApplyMovementBehaviours();
 	void RemoveMovementBehaviours();

@@ -45,14 +45,16 @@ void ATrackedTankMaster::UpdateVehicle_Implementation(
 	float CalculatedBreak,
 	float CalculatedSteering)
 {
-	if (IsValid(TrackPhysicsMovement))
+	if (not GetIsValidTrackPhysicsMovement())
 	{
-		TrackPhysicsMovement->UpdateTankMovement(
-			DeltaTime,
-			CurrentSpeed,
-			CalculatedThrottle,
-			CalculatedSteering);
+		return;
 	}
+
+	TrackPhysicsMovement->UpdateTankMovement(
+		DeltaTime,
+		CurrentSpeed,
+		CalculatedThrottle,
+		CalculatedSteering);
 }
 
 void ATrackedTankMaster::SetRTSOverlapEvasionEnabled(const bool bEnabled)
@@ -66,25 +68,27 @@ void ATrackedTankMaster::SetRTSOverlapEvasionEnabled(const bool bEnabled)
 
 void ATrackedTankMaster::OnFinishedPathFollowing()
 {
-	if (IsValid(TrackPhysicsMovement))
+	if (not GetIsValidTrackPhysicsMovement())
 	{
-		TrackPhysicsMovement->OnPathFollowingFinished();
-
-		if (TrackPhysicsMovement->GetLastNoneZeroThrottle() < 0)
-		{
-			// We arrived in reverse.
-			bWasLastMovementReverse = true;
-
-			// If not forced; reverse clears the rotation.
-			if (not GetForceFinalRotationRegardlessOfReverse())
-			{
-				ResetRotateTowardsFinalMovementRotation();
-			}
-			return;
-		}
-
-		bWasLastMovementReverse = false;
+		return;
 	}
+
+	TrackPhysicsMovement->OnPathFollowingFinished();
+
+	if (TrackPhysicsMovement->GetLastNoneZeroThrottle() < 0)
+	{
+		// We arrived in reverse.
+		bWasLastMovementReverse = true;
+
+		// If not forced; reverse clears the rotation.
+		if (not GetForceFinalRotationRegardlessOfReverse())
+		{
+			ResetRotateTowardsFinalMovementRotation();
+		}
+		return;
+	}
+
+	bWasLastMovementReverse = false;
 }
 
 USkeletalMeshComponent* ATrackedTankMaster::GetTankMesh() const
@@ -102,11 +106,13 @@ void ATrackedTankMaster::UpgradeTurnRate(const float NewTurnRate)
 			"\n for tank: " + GetName());
 		return;
 	}
-	if (IsValid(TrackPhysicsMovement))
+	if (not GetIsValidTrackPhysicsMovement())
 	{
-		TrackPhysicsMovement->UpdateTurnRate(NewTurnRate);
-		TurnRate = NewTurnRate;
+		return;
 	}
+
+	TrackPhysicsMovement->UpdateTurnRate(NewTurnRate);
+	TurnRate = NewTurnRate;
 }
 
 void ATrackedTankMaster::OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo)
@@ -297,7 +303,7 @@ void ATrackedTankMaster::InitTrackedTank(
 	// The turn rate is also used by TankMaster to rotate towards a specific location.
 	TurnRate = NewTurnRate;
 	SetTankCornerOffset(TankCornerOffset);
-	if (IsValid(TrackPhysicsMovement))
+	if (GetIsValidTrackPhysicsMovement())
 	{
 		TrackPhysicsMovement->InitTrackPhysicsMovement(
 			Mesh,
@@ -447,6 +453,39 @@ void ATrackedTankMaster::TerminateRotateTowardsCommand()
 		TankAnimationBP->SetChassisAnimToIdle();
 	}
 	Super::TerminateRotateTowardsCommand();
+}
+
+void ATrackedTankMaster::ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds)
+{
+	if (not GetIsValidTrackPhysicsMovement() or ChassisMesh == nullptr)
+	{
+		Super::ApplyRotateTowardsStep(TurnAmountDegrees, DeltaSeconds);
+		return;
+	}
+
+	const float RotationSpeedPerTick = TurnRate * DeltaSeconds;
+	if (FMath::IsNearlyZero(RotationSpeedPerTick, KINDA_SMALL_NUMBER))
+	{
+		return;
+	}
+
+	const float SteeringCommand = FMath::Clamp(TurnAmountDegrees / RotationSpeedPerTick, -1.0f, 1.0f);
+	const float CurrentPlanarSpeed = ChassisMesh->GetComponentVelocity().Size2D();
+	constexpr float RotateTowardsThrottle = 0.0f;
+	TrackPhysicsMovement->UpdateTankMovement(
+		DeltaSeconds,
+		CurrentPlanarSpeed,
+		RotateTowardsThrottle,
+		SteeringCommand);
+}
+
+void ATrackedTankMaster::OnRotateTowardsFinished()
+{
+	if (not GetIsValidTrackPhysicsMovement())
+	{
+		return;
+	}
+	TrackPhysicsMovement->OnPathFollowingFinished();
 }
 
 void ATrackedTankMaster::ExecuteDigIn()
@@ -635,6 +674,21 @@ void ATrackedTankMaster::OnInit_FindEnergyComponent(const int32 MyEnergy)
 	M_TankEnergyComponent = FoundEnergyComp;
 	M_TankEnergyComponent->InitEnergyComponent(MyEnergy);
 	M_TankEnergyComponent->SetEnabled(true);
+}
+
+bool ATrackedTankMaster::GetIsValidTrackPhysicsMovement() const
+{
+	if (IsValid(TrackPhysicsMovement))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"TrackPhysicsMovement",
+		"GetIsValidTrackPhysicsMovement",
+		this);
+	return false;
 }
 
 void ATrackedTankMaster::BeginPlay_SetupExperienceComponent()
