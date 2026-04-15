@@ -345,6 +345,7 @@ void ATankMaster::Tick(float DeltaSeconds)
 	{
 		TurnAmount = RotationDifference.Yaw;
 		bM_NeedToTurnTowardsTarget = false;
+		OnRotateTowardsFinished();
 		if (bM_IsRotationAQueueCommand)
 		{
 			DoneExecutingCommand(EAbilityID::IdRotateTowards);
@@ -356,17 +357,27 @@ void ATankMaster::Tick(float DeltaSeconds)
 		}
 	}
 
-	ApplyRotateTowardsStep(TurnAmount);
+	ApplyRotateTowardsStep(TurnAmount, DeltaSeconds);
 }
 
-void ATankMaster::ApplyRotateTowardsStep(const float TurnAmountDegrees)
+void ATankMaster::ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds)
 {
+	constexpr float MinRotateDeltaSeconds = KINDA_SMALL_NUMBER;
+	if (DeltaSeconds < MinRotateDeltaSeconds)
+	{
+		return;
+	}
+
 	FHitResult SweepHitResult;
 	AddActorWorldRotation(
 		FRotator(0.0f, TurnAmountDegrees, 0.0f),
 		true,
 		&SweepHitResult,
 		ETeleportType::TeleportPhysics);
+}
+
+void ATankMaster::OnRotateTowardsFinished()
+{
 }
 
 void ATankMaster::BeginPlay()
@@ -670,6 +681,7 @@ void ATankMaster::TerminateRotateTowardsCommand()
 	Super::TerminateRotateTowardsCommand();
 	bM_NeedToTurnTowardsTarget = false;
 	bM_IsRotationAQueueCommand = false;
+	OnRotateTowardsFinished();
 }
 
 UHarvester* ATankMaster::GetIsHarvester()
