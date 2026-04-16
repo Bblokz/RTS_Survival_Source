@@ -291,7 +291,11 @@ void FRTS_Collapse::OnAssetLoadSucceeded(TSharedPtr<FCollapseTaskContext> Contex
 
 void FRTS_Collapse::HandleDestroyGeometry(TSharedPtr<FCollapseTaskContext> Context)
 {
-	if (!Context.IsValid()) return;
+	if (not Context.IsValid())
+	{
+		return;
+	}
+
 	AActor* Owner = Context->WeakOwner.Get();
 	UGeometryCollectionComponent* GeoComp = Context->WeakGeoComp.Get();
 	const bool bKeepGeoComponent = Context->CollapseDuration.bKeepGeometryVisibleAfterLifeTime;
@@ -299,6 +303,14 @@ void FRTS_Collapse::HandleDestroyGeometry(TSharedPtr<FCollapseTaskContext> Conte
 	{
 		GeoComp->DestroyComponent();
 	}
+
+	// Collapse can be configured to keep the owning actor alive after the geometry lifetime finishes.
+	// Explicitly clear any pre-existing lifespan so it does not disappear from unrelated actor settings.
+	if (not Context->CollapseDuration.bDestroyOwningActorAfterCollapse && IsValid(Owner))
+	{
+		Owner->SetLifeSpan(0.f);
+	}
+
 	if (Context->CollapseDuration.bDestroyOwningActorAfterCollapse && IsValid(Owner))
 	{
 		Owner->Destroy();
