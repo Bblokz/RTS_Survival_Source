@@ -692,6 +692,11 @@ void FWeaponImpactPool::Activate(
 	const FVector& NiagaraScale,
 	USoundBase* Sound, const bool bIsUsingHeBounceOverwrite)
 {
+	if (Location.ContainsNaN())
+	{
+		return;
+	}
+
 	// --- Niagara ---
 	if (UNiagaraComponent* NiagaraComp = GetOrCreateNiagara(Slot))
 	{
@@ -1355,7 +1360,7 @@ void UWeaponState::OnActorKilled(AActor* KilledActor) const
 void UWeaponState::CreateWeaponImpact(const FVector& HitLocation, const ERTSSurfaceType HitSurface,
                                       const FRotator& ImpactRotation)
 {
-	if (!IsValid(World))
+	if (not IsValid(World))
 	{
 		return;
 	}
@@ -1379,7 +1384,7 @@ void UWeaponState::CreateWeaponImpact(const FVector& HitLocation, const ERTSSurf
 
 void UWeaponState::CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal)
 {
-	if (!IsValid(World))
+	if (not IsValid(World))
 	{
 		return;
 	}
@@ -1843,7 +1848,7 @@ void UWeaponStateTrace::FireWeaponSystem()
 void UWeaponStateTrace::FireTrace(const FVector& Direction)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FireTrace);
-	if (!IsValid(World))
+	if (not IsValid(World))
 	{
 		return;
 	}
