@@ -264,6 +264,9 @@ public:
 
 	virtual void BeginDestroy() override;
 
+	virtual void OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume);
+	
+
 protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AMissionManager* GetMissionManagerChecked() const;
@@ -450,8 +453,6 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|TriggerArea")
 	void RemoveAllTriggerAreas();
 
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|TriggerArea")
-	virtual void OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume);
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume);
