@@ -1955,7 +1955,7 @@ void ASquadUnit::ReportPathFollowingResultError(const EPathFollowingResult::Type
 			"\n squad unit: " + GetName());
 		return;
 	case EPathFollowingResult::OffPath:
-		RTSFunctionLibrary::ReportError("path following result is Off path."
+		RTSFunctionLibrary::PrintString("path following result is Off path."
 			"\n squad unit: " + GetName());
 		return;
 	case EPathFollowingResult::Aborted:
@@ -1963,7 +1963,7 @@ void ASquadUnit::ReportPathFollowingResultError(const EPathFollowingResult::Type
 			"\n squad unit: " + GetName());
 		return;
 	case EPathFollowingResult::Invalid:
-		RTSFunctionLibrary::ReportError("path following result is Invalid."
+		RTSFunctionLibrary::PrintString("path following result is Invalid."
 			"\n squad unit: " + GetName());
 	}
 }

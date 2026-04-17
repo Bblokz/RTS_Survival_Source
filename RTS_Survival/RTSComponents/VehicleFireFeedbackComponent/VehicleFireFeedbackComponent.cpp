@@ -401,7 +401,8 @@ bool UVehicleFireFeedbackComponent::GetShouldCancelRecoilTickForUnsafeState(cons
 
 void UVehicleFireFeedbackComponent::CancelRecoilAndRestoreBase(const TCHAR* const ReportReason)
 {
-	RTSFunctionLibrary::ReportError(ReportReason);
+	// Do not spawm errors; log instead.
+	RTSFunctionLibrary::PrintString(ReportReason);
 	ForceResetRecoilAndSleep();
 }
 

@@ -20,6 +20,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Sound/SoundCue.h"
 #include "TimerManager.h"
+#include "RTS_Survival/Game/RTSGameInstance/DeveloperSettings/RTSGameInstancePIEDeveloperSettings.h"
 
 void FMissionEnemyUnitDestroyedCallbackState::Init(
 	UMissionBase* Mission,
@@ -128,7 +129,8 @@ AMissionManager::AMissionManager()
 {
 	// Set to true to tick missions.
 	PrimaryActorTick.bCanEverTick = true;
-	M_MissionTriggerVolumesManager = CreateDefaultSubobject<UMissionTriggerVolumesManager>(TEXT("MissionTriggerVolumesManager"));
+	M_MissionTriggerVolumesManager = CreateDefaultSubobject<UMissionTriggerVolumesManager>(
+		TEXT("MissionTriggerVolumesManager"));
 }
 
 void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, const bool bPlaySound)
@@ -216,7 +218,8 @@ UW_MissionTimer* AMissionManager::CreateAndInitMissionTimerWidget(TSubclassOf<UW
 		return nullptr;
 	}
 
-	UW_MissionTimer* MissionTimerWidget = CreateWidget<UW_MissionTimer>(M_PlayerController.Get(), MissionTimerWidgetClass);
+	UW_MissionTimer* MissionTimerWidget = CreateWidget<UW_MissionTimer>(M_PlayerController.Get(),
+	                                                                    MissionTimerWidgetClass);
 	if (not IsValid(MissionTimerWidget))
 	{
 		RTSFunctionLibrary::ReportError("Mission manager failed to create mission timer widget.");
@@ -593,7 +596,8 @@ void AMissionManager::SpawnActorAtLocationWithCommandQueue(
 
 	if (not SpawnCommandQueueState->StartAsyncSpawn(RTSAsyncSpawner))
 	{
-		RTSFunctionLibrary::ReportError("Mission manager failed to start SpawnActorAtLocationWithCommandQueue request.");
+		RTSFunctionLibrary::ReportError(
+			"Mission manager failed to start SpawnActorAtLocationWithCommandQueue request.");
 		return;
 	}
 }
@@ -683,10 +687,10 @@ void AMissionManager::BeginPlay()
 void AMissionManager::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	if(PlayerFactionBackupData.bSetFactionManually)
+	if (PlayerFactionBackupData.bSetFactionManually)
 	{
-		URTSGameInstance* GameInstance =  FRTS_Statics::GetRTSGameInstance(this);
-		if(not GameInstance)
+		URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+		if (not GameInstance)
 		{
 			return;
 		}
@@ -811,7 +815,7 @@ void AMissionManager::BeginPlay_InitGameDifficultyAndSettings()
 		SetGameDifficultyWithGameInstance();
 		return;
 	}
-	
+
 	if (not EnsureValidPlayerController())
 	{
 		return;
@@ -905,11 +909,11 @@ void AMissionManager::SetCampaignGenerationSettingsWithGameInstance()
 		return;
 	}
 	M_CampaignGenerationSettings = GameInstance->GetCampaignGenerationSettings();
-	if(not M_CampaignGenerationSettings.bAreSettingsLoaded)
+	if (not M_CampaignGenerationSettings.bAreSettingsLoaded)
 	{
 		RTSFunctionLibrary::ReportError("Game instance has no valid Campaign generattion settings loaded while"
-								  "the mission manager requested it!"
-		  "\n see AMissionManager::SetCampaignGenerationSettingsWithGameInstance");
+			"the mission manager requested it!"
+			"\n see AMissionManager::SetCampaignGenerationSettingsWithGameInstance");
 	}
 }
 
@@ -925,8 +929,11 @@ void AMissionManager::SetGameDifficultyWithGameInstance()
 	if (not GameDifficulty.bIsInitialized)
 	{
 		RTSFunctionLibrary::ReportError("Game instance has no valid game difficulty loaded while"
-								  "the mission manager requested it!"
-		  "\n see AMissionManager::SetGameDifficultyWithGameInstance");
+			"the mission manager requested it!"
+			"\n see AMissionManager::SetGameDifficultyWithGameInstance"
+			"\n WILL LOAD BACKUP PIE DIFFICULTY SETTINGS");
+		SetGameDifficultyWithBackupSettingsFromPIE();
+		return;
 	}
 	M_GameDifficulty = GameDifficulty;
 }
@@ -1090,7 +1097,7 @@ void AMissionManager::TryTickSpawnCommandQueueRequest(const int32 RequestId)
 
 void AMissionManager::RemoveFinishedTowSpawnRequests()
 {
-	M_TowedTeamWeaponSpawnStates.RemoveAll([](const FMissionTowTeamWeaponSpawnState& TowSpawnState)->bool
+	M_TowedTeamWeaponSpawnStates.RemoveAll([](const FMissionTowTeamWeaponSpawnState& TowSpawnState)-> bool
 	{
 		return TowSpawnState.GetIsFinished();
 	});
@@ -1098,7 +1105,7 @@ void AMissionManager::RemoveFinishedTowSpawnRequests()
 
 void AMissionManager::RemoveFinishedSpawnCommandQueueRequests()
 {
-	M_SpawnCommandQueueStates.RemoveAll([](const FMissionSpawnCommandQueueState& SpawnCommandQueueState)->bool
+	M_SpawnCommandQueueStates.RemoveAll([](const FMissionSpawnCommandQueueState& SpawnCommandQueueState)-> bool
 	{
 		return SpawnCommandQueueState.GetIsFinished();
 	});
@@ -1294,41 +1301,42 @@ void AMissionManager::OnTrackedEnemyActorDestroyed(AActor* DestroyedActor)
 FTrainingOption AMissionManager::SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const
 {
 	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T26));
-    // Ensure the array is not empty to avoid division by zero
-    if (TankOptions.Num() == 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("TankOptions array is empty. Returning default FTrainingOptions."));
-    	return Option;
-    }
+	// Ensure the array is not empty to avoid division by zero
+	if (TankOptions.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TankOptions array is empty. Returning default FTrainingOptions."));
+		return Option;
+	}
 
-    // Use the GenerationSeed to determine the index
-    int32 Index = M_CampaignGenerationSettings.GenerationSeed % TankOptions.Num();
+	// Use the GenerationSeed to determine the index
+	int32 Index = GetGenerationSeed() % TankOptions.Num();
 
-    // Return the selected option
+	// Return the selected option
 	Option.SubtypeValue = static_cast<uint8>(TankOptions[Index]);
 	return Option;
 }
 
 FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const
 {
-	
-	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_HazmatEngineers));
-    // Ensure the array is not empty to avoid division by zero
-    if (SquadOptions.Num() == 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("SquadOptions array is empty. Returning default FTrainingOptions."));
-    	return Option;
-    }
+	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad,
+	                                         static_cast<uint8>(ESquadSubtype::Squad_Rus_HazmatEngineers));
+	// Ensure the array is not empty to avoid division by zero
+	if (SquadOptions.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SquadOptions array is empty. Returning default FTrainingOptions."));
+		return Option;
+	}
 
-    // Use the GenerationSeed to determine the index
-    int32 Index = M_CampaignGenerationSettings.GenerationSeed % SquadOptions.Num();
+	// Use the GenerationSeed to determine the index
+	int32 Index = GetGenerationSeed() % SquadOptions.Num();
 
-    // Return the selected option
+	// Return the selected option
 	Option.SubtypeValue = static_cast<uint8>(SquadOptions[Index]);
 	return Option;
 }
 
-void AMissionManager::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray, UObject* WorldContextObject)
+void AMissionManager::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray,
+                                              UObject* WorldContextObject)
 {
 	if (SeededChoicesArray.IsEmpty())
 	{
@@ -1497,6 +1505,52 @@ bool AMissionManager::GetIsSeededChoiceConfigured(const FSeededSpawnChoice& Seed
 	return SeededChoice.TrainingOptionSpawns.Num() > 0 || SeededChoice.SoftActorSpawns.Num() > 0;
 }
 
+void AMissionManager::SetGameDifficultyWithBackupSettingsFromPIE()
+{
+	const URTSGameInstancePIEDeveloperSettings* const PIEStartupSettings = GetDefault<
+		URTSGameInstancePIEDeveloperSettings>();
+	if (PIEStartupSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PIE startup settings were missing while attempting to load"
+			"backup difficulty settings in mission manager."));
+		return;
+	}
+
+	if (not PIEStartupSettings->bApplyPIEStartupOverrides)
+	{
+		return;
+	}
+
+	FRTSGameDifficulty PIEGameDifficulty;
+	PIEGameDifficulty.DifficultyLevel = PIEStartupSettings->DifficultyLevel;
+	PIEGameDifficulty.DifficultyPercentage = PIEStartupSettings->DifficultyPercentage;
+	PIEGameDifficulty.bIsInitialized = true;
+	M_GameDifficulty = PIEGameDifficulty;
+}
+
+void AMissionManager::SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE()
+{
+	const URTSGameInstancePIEDeveloperSettings* const PIEStartupSettings = GetDefault<
+		URTSGameInstancePIEDeveloperSettings>();
+	if (PIEStartupSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("PIE startup settings were missing while attempting to load"
+			"backup difficulty settings in mission manager."));
+		return;
+	}
+
+	if (not PIEStartupSettings->bApplyPIEStartupOverrides)
+	{
+		return;
+	}
+
+	FCampaignGenerationSettings PIECampaignGenerationSettings;
+	PIECampaignGenerationSettings.bAreSettingsLoaded = true;
+	PIECampaignGenerationSettings.GenerationSeed = PIEStartupSettings->CampaignGenerationSeed;
+	PIECampaignGenerationSettings.EnemyWorldPersonality = PIEStartupSettings->EnemyWorldPersonality;
+	M_CampaignGenerationSettings = PIECampaignGenerationSettings;
+}
+
 
 void AMissionManager::TriggerDefeat(const ERTSDefeatType DefeatType)
 {
@@ -1620,7 +1674,13 @@ bool AMissionManager::GetIsValidDefeatWidgetClass() const
 	return false;
 }
 
-int32 AMissionManager::GetGenerationSeed() const
+int32 AMissionManager::GetGenerationSeed() 
 {
+	if(not M_CampaignGenerationSettings.bAreSettingsLoaded)
+	{
+		RTSFunctionLibrary::ReportError("Mission manager requested campaign generation seed but settings were not loaded."
+								  "\n WILL LOAD BACKUP PIE SETTINGS INSTEAD");
+		SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE();
+	}
 	return M_CampaignGenerationSettings.GenerationSeed;
 }

@@ -258,7 +258,7 @@ public:
 	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
 	FTrainingOption SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const;
-	int32 GetGenerationSeed() const;
+	int32 GetGenerationSeed();
 	/**
 	 * @brief Resolves one choice per seeded group and spawns the configured results deterministically from campaign seed.
 	 * @param SeededChoicesArray Groups of candidate spawn choices configured in blueprint.
@@ -459,4 +459,8 @@ private:
 	                                 UObject* WorldContextObject);
 	int32 GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex) const;
 	bool GetIsSeededChoiceConfigured(const FSeededSpawnChoice& SeededChoice) const;
+	// For testing as standalone game.
+	void SetGameDifficultyWithBackupSettingsFromPIE();
+	// For testing as standalone game.
+	void SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE();
 };
