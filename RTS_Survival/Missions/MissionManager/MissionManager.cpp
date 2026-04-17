@@ -1443,7 +1443,7 @@ void AMissionManager::OnTrackedEnemyActorDestroyed(AActor* DestroyedActor)
 	RemoveCompletedEnemyUnitDestroyedCallbacks();
 }
 
-FTrainingOption AMissionManager::SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const
+FTrainingOption AMissionManager::SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions)
 {
 	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T26));
 	// Ensure the array is not empty to avoid division by zero
@@ -1461,7 +1461,7 @@ FTrainingOption AMissionManager::SelectSeededTankOption(const TArray<ETankSubtyp
 	return Option;
 }
 
-FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const
+FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions)
 {
 	FTrainingOption Option = FTrainingOption(EAllUnitType::UNType_Squad,
 	                                         static_cast<uint8>(ESquadSubtype::Squad_Rus_HazmatEngineers));
@@ -1630,7 +1630,7 @@ void AMissionManager::SpawnSeededChoiceSoftActors(
 	}
 }
 
-int32 AMissionManager::GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex) const
+int32 AMissionManager::GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex)
 {
 	if (Choices.IsEmpty())
 	{

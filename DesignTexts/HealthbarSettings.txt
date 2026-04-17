@@ -1,189 +1,87 @@
-﻿In this game project: UW_EscapeMenuSettings manages the user settings.
-and saves them with the help of: class RTS_SURVIVAL_API URTSGameUserSettings : public UGameUserSettings
-it is also important that you know that the different unit arrays of player and enemy units are managed by the UGameUnitManager which is
-a component public gettable on the ACPPGameState.
-first i will go over the settings that need to be added ot the EscapeMenuSettings and then we will go over how to implement
-the new helpers and logic for the health component.
+﻿you are a c++ specialist and pefectionist.
 
-under game user settings dir define a new dir called GameplaySettings and in there define a new dir called
-HealthbarVisibilityStrategy and in there define HealthBarVisibilityStrategy.h
-where the new bp friendly enum classes will be defined:
-ERTSPlayerHealthBarVisibilityStrategy
-NotInitialized,
-UnitDefaults,
-AwaysVisible,
-VisibleWhenDamagedOnly,
-VisibleOnSelectionAndDamaged,
-VisibleOnSelectionOnly
-// The only one that will also adjust bDisplayOnHover in FHealthBarVisibilitySettings.
-NeverVisible
+you are going to implemeent the following new feature completely:
 
-Also define
-ERTSEnemyHealthBarVisibilityStrategy
-NotInitialized,
-UnitDefaults,
-AwaysVisible,
-VisibleWhenDamagedOnly
+Radixite growth component.
 
-also define in there an FText global_GetEnemyVisibilityStrategyText(ERTSEnemyHealthBarVisibilityStrategy Strategy)
-and FText global_GetPlayerVisibilityStrategyText(ERTSPlayerHealthBarVisibilityStrategy Strategy)
-and return for each value the space separated text version of the enum value.
+You will need to implement a new cpp class for the radixite groth feature.
+the radixite growth will have 2 main parts to it:
+expanding with growth decals(these will be material instances specifically) and expansing with groth nodes (these can be any actor derived class)
+The component needs to be configurable completely from blueprint edit defaults and will have a few edit anywhere settings.
+edit anywhere:
+growth direction bias: this will be a bitmask iteger that has options:
+no preference,
+World Pos X,
+World Neg X,
+World Pos Y,
+World Neg Y,
 
+when no preference is part of any of the combinations then we do not take into account any growth direction bias.
 
-define a getter for access for game play objects:
-	/**
-	 * @brief Returns the live RTS user settings singleton currently used by the engine.
-	 * This does not force a disk reload; it returns the in-memory instance.
-	 */
-	static const URTSGameUserSettings* Get();
-	const URTSGameUserSettings* URTSGameUserSettings::Get()
-    {
-    	UGameUserSettings* const BaseSettings = UGameUserSettings::GetGameUserSettings();
-    	if (BaseSettings == nullptr)
-    	{
-    		RTSFunctionLibrary::ReportError(TEXT("UGameUserSettings::GetGameUserSettings returned null."));
-    		return nullptr;
-    	}
-    
-    	const URTSGameUserSettings* const RTSSettings = Cast<URTSGameUserSettings>(BaseSettings);
-    	if (RTSSettings == nullptr)
-    	{
-    		RTSFunctionLibrary::ReportError(TEXT("GameUserSettings is not an instance of URTSGameUserSettings."));
-    		return nullptr;
-    	}
-    
-    	return RTSSettings;
-    }
-	
-now on the escape menu settings you need to define a new section called GamePlaySettings
-in there we need new drop downs and labels for: (note the abbreviations to not make the members have too long of names)
-OverwriteAllPlayerHpBarStrat which will have a drop down of ERTSPlayerHealthBarVisibilityStrategy set to NotInitialized by default 
-make sure the dropdowns of the following settings are set to UnitDefaults by default,
-and ofcourse use the text versions of the enum values:
-PlayerTankHpBarStrat which will have a drop down of ERTSPlayerHealthBarVisibilityStrategy
-PlayerSquadHpBarStrat which will have a drop down of ERTSPlayerHealthBarVisibilityStrategy
-PlayerNomadicHpBarStrat which will have a drop down of ERTSPlayerHealthBarVisibilityStrategy
-PlayerBxpHpBarStrat which will have a drop down of ERTSPlayerHealthBarVisibilityStrategy
-PlayerAircraftHpBarStrat which will have a drop down of ERTSPlayerHealthBarVisibilityStrategy
+growth direction bias probabilty: between 0 and 1, this will be the probability that we will use the growth direction bias when we are calculating growth directions.
+this will not be used if the growth direction bias is set to no preference.
 
-OverwriteAllEnemyHpBarStrat which will have a drop down of ERTSEnemyHealthBarVisibilityStrategy set to NotInitialized by default
-EnemyTankHpBarStrat which will have a drop down of ERTSEnemyHealthBarVisibilityStrategy
-EnemySquadHpBarStrat which will have a drop down of ERTSEnemyHealthBarVisibilityStrategy
-EnemyNomadicHpBarStrat which will have a drop down of ERTSEnemyHealthBarVisibilityStrategy
-EnemyBxpHpBarStrat which will have a drop down of ERTSEnemyHealthBarVisibilityStrategy
-EnemyAircraftHpBarStrat which will have a drop down of ERTSEnemyHealthBarVisibilityStrategy
+edit defaults settings:
+float IntervalNodeGrowth : how long between each growth node spawn, this will be used to determine how often we spawn growth nodes as the radixite grows.
+float IntervalDecalGrowth : how long between each growth decal spawn, this will be used to determine how often we spawn growth decals as the radixite grows.
 
-IMPORTANT NOTE: for the overwrite drop downs; if set by the user make sure it automatically adjusts 
-the other drop downs to the same picked value! (for quick setting of all health bars to the same strategy of that player)
+an array of FGrowthDecalOptions which contains a decal material instance and a float that is called AimAtRotationYaw,
+this rotation needs to be aplied for it to look like the decal aims at the direction of the growth, it needs to work in world Z but note
+that decal actors are always placed with -90,0 ° on the Y rotation so calculate properly for this aim rotation to work as intentded.
+it will also have a float DistanceCoveredAtScale1 which determines how far a decal reaches per scale of it. 
+so if set to 150 then when we scale the decal uniformly by 2 it will reach 300 units in the world.
 
-make sure there are also entries on the URTSGameUserSettings for all of these, initialzed with the same defaults.
+float MinDecalExpansionDistance, float MaxDecalExpansionDistance; these two settings will determine the minimum and maximum distance that the growth decals can expand when they spawn, this will be used to add some variation to the growth decals as they spawn.
+float DecalRotationOffset; the yaw angle used to rotate the next decal when expanding a decal from another decal; this will be used to have simmilair offset between decals in terms of their angle and it not being pure random which can
+look noisy.
 
-PART 2 (Health Component Init and new functions)
-now that we have a way for the player of setting all of these settings on the user settings struct lets go over how this needs to be 
-implemented on the health component side:
-make sure that on begin play; before adjusting to any of the user settings, the health bar will cache the 
-FHealthBarVisibilitySettings in an extra uproperty private called M_UnitDefaultHealthBarVisibilitySettings.
+underneath the array of FGrowthDecalOptions we will have
+int32 MaxDecalGrowth which will determine how many growth decals can be spawned at max, once this number is reached we will stop spawning growth decals until growth decals are destroyed (more on that later)
 
-in addition check if the bDisplayOnSelected is implemented at all; if not make sure to add to the delegates on the selection component
-DECLARE_MULTICAST_DELEGATE(FOnUnitSelected);
-DECLARE_MULTICAST_DELEGATE(FOnUnitDeselected); on the 
-class RTS_SURVIVAL_API USelectionComponent : public UActorComponent
-And make sure to save the FDelegateHandles so we can unbind them on a settings change; do the same for the hover
-		as right now we just have: M_SelectionComponent->OnUnitHovered.AddLambda(HoverLambda);
-		M_SelectionComponent->OnUnitUnHovered.AddLambda(UnHoverLambda);
-save all of these delegates in one UStruct declared above the health component for clarity.
+a struct, completely bp friendly called FGrowthNodeOptions:
+containing an array of actor classes.
+float MinRotation and float MaxRotation,
+int32 MaxSpawnedNodes how many it can spawn maximially. (after max nodes are spawned stop the spawning sequence and it will wait till an actor is destroyed then it will restart the spawning sequence)
+an int32 MaxDecalGrowthPerNode; for how many 'branches' of growth decals can start from a node.
 
+we also need a min and max int for how many decal growths we will have till we spawn a growth node. a growth node always needs to be spawned at the point a growth decal was aimed at but that needs to be the last
+decal of a 'branch' so lets say during the decal growth we pick to spawn 3 in a branch then the growth node potential point will be at the end of that branch.
 
-add two new public functions on the UHealthComponent called OnOverwiteHealthbarVisiblityPlayer and OnOverwiteHealthbarVisiblityEnemy
-which get the strategy enum set for them.
-Make sure these are virtual and on the USquadUnitHealthComponent make sure to error report and do nothing as we will not support changing the 
-hp visibility settings on squad units ; only on their controllers!
-continuation for other hp components: when called adjust the FHealthBarVisibilitySettings accordingly and note that we do not check for owning player; that
-will be the responsibility of the caller.
-after that call a new private function that will update the hp bar visibility post settings change that will also 
-check with the selection comp if it is selected in case our new FHealthBarVisibilitySettings require that and it will
-change the visibility accordingly.
+we also need a setting int32 MaxRetries; for how many times we attempt either type of spawn, when exhausted we wait for the next iteration.
 
-after caching the unit default health bar visibility settings in beginplay call a new virtual protected member on the hp component  
-a new function on the UGameUnitManager in case we are a USquadUnitHealthComponent overwrite it to just return and do nothing.
-for other hp components; this will call a new function on the UGameUnitManager that will  take in the calling component and
-will first get the rts comp of the owner actor and check if the player == 1 if so this is a player unit otherwise assume it is an enemy unit.
- get its owner and then try cast it to ANomadicVehicle if so we get the PlayerNomadicHpBarStrat from the settings if not
- try cast to  ATankMaster and get the PlayerTankHpBarStrat if not try cast to AAircraftUnit and get the PlayerAircraftHpBarStrat
- if not cast to ASquadUnitController and get the PlayerSquadHpBarStrat if this also fails it is not a unit that needs health bar settings so we return early.
- if the strategy enum is determined and it is not equal to NotInitialized OR UnitDefaults then it means it may change the settings
-  on the hp bar -> call the hp component OnOverwiteHealthbarVisiblityPlayer or enemy with the determined strategy.
+we also need a float ZLandscapeTraceOffset; that will be used to find the landscape height by tracing in 1/2 this above and 1/2 this below the point we want to spawn at, this will be used to make sure we spawn at the correct height on the landscape and not in the air or underground.
 
+an FVector ProjectionToNavMeshExtent; to use to find locations.
 
-PART 3 (User adjusts settings) 
-Now we go over what needs to happen when the user adjusts the settings on the escape menu settings:
-after applying the escape menu needs to provide only the changed settings to the UGameUnitManager function; for each setting we need a public function there.
-for example for the squad controller player hp bar strat we need a function that will:
-go through all squad controllers and propagate the setting to their hp components.
-we need one to do the same for all buidling expansions; for player and enemy. 
-etc. same for all the other unit types.
+how the spawning needs to work:
+for decal growth:
+pick one of our growth node points to start from that is not yet saturated (has not reached MaxDecalGrowthPerNode) then pick a direction using our bias if the bias probability does not win
+or we do not have a bias then we pick a random direction with yaw in all multiplicatives of DecalRotationOffset so if that is 10 then we pick in {0, 10, 20 ,... 350}
+we pick random in the range of MinDecalExpansionDistance and MaxDecalExpansionDistance for how far we want to expand in that direction, then we
+do a landscape trace in that direction from our start point with distance we use our ZLandscapeTraceOffset for the lenght of that trace which is completely in world Z.
+if we hit a location then project hte location to the nav mesh with our projection extent (ensure the navigation system is cached at begin play!!)
+if that succeeeds then:
+ we check with FRTSPathFindingHelpers::IsLocationInHighCostArea whether this point is at a High cost nav area
+if it is then this point is not valid (we need low cost) try again at a different point (till exhaustion)
+if the point failed to project or hit earlier also try again.
+if the point is cost valid then place the decal. after that start from that decal point (if there are still decals left for this 'branch')
+and use either - or + the offset for the angle, use the same distance (and hence the same scaling) and try placing idem.
+do this till the branch is complete.
 
-result the settings are now adjustable by the user, update their respective units in the game.
-can differ for player and enemy units. 
-and can be reset to their defaults.
-analyse the important notes for more spedific details:
-IMPORTANT NOTES:) Add gameplay settings
+IMPORTANT NOTE: do keep track of with which offset the (first of a branch) decals from a growth node point are spawend so that we never spawn over another decal with the same offset from that growth point!
+IMPORTANT NOTE 2: the owning actor of this component and its location needs to be the start growth node.
 
+for growth node spawning:
+we need to keep track of the grothnode points internally and keep weakpointers to where they are spawned.
+we also need to keep track of which growth nodes are reachable from which other nodes.
+we also need to register a callback on the destory of the spawned grwoth nodes actors; when they are destroyed
+and they were only reachable from one growth node then also destroy ALL growth decals linking those two growth nodes!
+and update the bookkeeping with how many decals and nodes remain.
 
+for placing the growth nodes: at a growth position that is vacant. note that new growth positions are already validated by placing those decals so make sure those projected and validated positions are cached.
 
-Add a new FRTSGameplaySettings struct and include it in FRTSSettingsSnapshot alongside Graphics/Audio/Controls.
+when a growth node is destroyed that linked to more than one other node( starting node or otherwise) then make sure to only delete the decal branches that whent out from that node but
+did not yet have a growth node at the end of it.
 
-Mirror every new HealthbarVisibility strategy field in three places:
-
-URTSGameUserSettings (UPROPERTY(config) fields, with correct defaults)
-
-URTSSettingsMenuSubsystem snapshots (M_CurrentSettings + M_PendingSettings)
-
-Snapshot plumbing: BuildSnapshotFromSettings() and ApplySnapshotToSettings(), plus SetPendingSettingsToDefaults().
-
-The settings menu widget must read/write these values only through the subsystem (load snapshot → populate UI; UI changes → SetPending… APIs).
-
-2) Apply gameplay settings on Apply (subsystem-owned), with diff-based propagation
-
-Gameplay settings must be applied inside URTSSettingsMenuSubsystem::ApplySettings(), not from UW_EscapeMenuSettings.
-
-Implementation requirement:
-
-Cache PreviousCurrentSettings = M_CurrentSettings before applying.
-
-Apply pending → update runtime → set M_CurrentSettings = M_PendingSettings.
-
-Compute diff between PreviousCurrentSettings and M_CurrentSettings and propagate only changed gameplay settings to UGameUnitManager.
-
-Rationale: keeps UI decoupled, makes “Apply” authoritative, avoids random gameplay objects reading disk or widget state, and guarantees consistent propagation.
-
-3) OverwriteAll = persisted (must not stomp on load)
-
-OverwriteAllPlayerHpBarStrat and OverwriteAllEnemyHpBarStrat are persisted in URTSGameUserSettings and included in the subsystem snapshots.
-
-Critical rule: persisted OverwriteAll values must not automatically overwrite per-unit-type settings during load / menu open.
-
-OverwriteAll should only trigger “set all other dropdowns” when the user changes it in the UI (selection callback), not when snapshots are loaded.
-
-On Apply: treat OverwriteAll as part of the saved data, but propagation should still follow the diff system:
-
-If OverwriteAll changed, propagate the “set all” behavior once (and/or propagate each affected per-type field that actually changed).
-
-CLARITY NOTES
-Strategy semantics
-
-VisibleOnSelectionAndDamaged is the inclusive OR case:
-The health bar is visible when selected OR damaged (not AND).
-
-BeginPlay + unit manager fallback
-
-On BeginPlay, each health component attempts to ask UGameUnitManager (via ACPPGameState) to apply user settings–driven visibility overrides.
-
-If the unit manager cannot find settings or cannot determine a strategy for this unit type, it must fall back to unit defaults (i.e., keep/restore the cached M_UnitDefaultHealthBarVisibilitySettings).
-
-
-
-
-
-
+fully implement this feature.
 

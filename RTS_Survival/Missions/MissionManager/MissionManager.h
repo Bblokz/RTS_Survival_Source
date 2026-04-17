@@ -7,9 +7,9 @@
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "EnemyUnitQueryType.h"
+#include "MissionCargoSquadWithVehicleSpawnState.h"
 #include "MissionSpawnCommandQueueState.h"
 #include "MissionTowTeamWeaponSpawnState.h"
-#include "MissionCargoSquadWithVehicleSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -22,6 +22,7 @@ class UW_Mission;
 class UW_MissionTimer;
 struct FMissionWidgetState;
 struct FMissionTimerLifetimeSettings;
+struct FMissionCargoSquadWithVehicleSpawnState;
 class ACPPController;
 class UW_MissionWidgetManager;
 class UMissionBase;
@@ -273,9 +274,9 @@ public:
 	FMissionStartingResources M_MissionStartingResources;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
-	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions) const;
+	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
-	FTrainingOption SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions) const;
+	FTrainingOption SelectSeededSquadOption(const TArray<ESquadSubtype>& SquadOptions);
 	int32 GetGenerationSeed();
 	/**
 	 * @brief Resolves one choice per seeded group and spawns the configured results deterministically from campaign seed.
@@ -484,7 +485,7 @@ private:
 	                                      UObject* WorldContextObject);
 	void SpawnSeededChoiceSoftActors(const TArray<FSeededSpawnSoftActorEntry>& SoftActorSpawns,
 	                                 UObject* WorldContextObject);
-	int32 GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex) const;
+	int32 GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex);
 	bool GetIsSeededChoiceConfigured(const FSeededSpawnChoice& SeededChoice) const;
 	// For testing as standalone game.
 	void SetGameDifficultyWithBackupSettingsFromPIE();
