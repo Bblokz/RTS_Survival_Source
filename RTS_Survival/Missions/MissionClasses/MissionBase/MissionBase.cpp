@@ -1227,6 +1227,27 @@ void UMissionBase::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ES
 	MissionManager->SpawnTowedTeamWeapon(TankSubtype, SquadSubtype, SpawnLocation);
 }
 
+void UMissionBase::SpawnCargoSquadWithVehicle(
+	const ETankSubtype TankSubtype,
+	const ESquadSubtype SquadSubtype,
+	const FVector SpawnLocation,
+	const FRotator SpawnRotation,
+	const FVector MoveLocationAfterEnter)
+{
+	AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not IsValid(MissionManager))
+	{
+		return;
+	}
+
+	MissionManager->SpawnCargoSquadWithVehicle(
+		TankSubtype,
+		SquadSubtype,
+		SpawnLocation,
+		SpawnRotation,
+		MoveLocationAfterEnter);
+}
+
 void UMissionBase::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray)
 {
 	if (not GetIsValidMissionManager())

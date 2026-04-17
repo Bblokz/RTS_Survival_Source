@@ -559,6 +559,43 @@ void AMissionManager::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const
 	}
 }
 
+void AMissionManager::SpawnCargoSquadWithVehicle(
+	const ETankSubtype TankSubtype,
+	const ESquadSubtype SquadSubtype,
+	const FVector& SpawnLocation,
+	const FRotator& SpawnRotation,
+	const FVector& MoveLocationAfterEnter)
+{
+	ARTSAsyncSpawner* RTSAsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
+	if (not EnsureValidTowAsyncSpawner(RTSAsyncSpawner))
+	{
+		return;
+	}
+
+	FMissionCargoSquadWithVehicleSpawnState NewCargoVehicleSpawnState;
+	const int32 RequestId = M_NextCargoVehicleSpawnRequestId++;
+	NewCargoVehicleSpawnState.Init(
+		RequestId,
+		this,
+		TankSubtype,
+		SquadSubtype,
+		SpawnLocation,
+		SpawnRotation,
+		MoveLocationAfterEnter);
+	M_CargoVehicleSpawnStates.Add(NewCargoVehicleSpawnState);
+
+	FMissionCargoSquadWithVehicleSpawnState* CargoVehicleSpawnState = FindCargoVehicleSpawnState(RequestId);
+	if (not EnsureValidCargoVehicleSpawnState(CargoVehicleSpawnState))
+	{
+		return;
+	}
+
+	if (not CargoVehicleSpawnState->StartAsyncSpawn(RTSAsyncSpawner))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager failed to start SpawnCargoSquadWithVehicle async requests.");
+	}
+}
+
 void AMissionManager::SpawnActorAtLocationWithCommandQueue(
 	const FTrainingOption& TrainingOption,
 	const int32 SpawnId,
@@ -648,6 +685,54 @@ void AMissionManager::HandleSpawnTowedTeamWeaponSquadReady(const int32 RequestId
 	}
 
 	TryCompleteTowedTeamWeaponSpawnRequest(RequestId);
+}
+
+void AMissionManager::HandleSpawnCargoVehicleTankSpawned(const int32 RequestId, AActor* SpawnedTankActor)
+{
+	FMissionCargoSquadWithVehicleSpawnState* CargoVehicleSpawnState = FindCargoVehicleSpawnState(RequestId);
+	if (not EnsureValidCargoVehicleSpawnState(CargoVehicleSpawnState))
+	{
+		return;
+	}
+
+	if (not CargoVehicleSpawnState->HandleTankSpawnedActor(SpawnedTankActor))
+	{
+		return;
+	}
+
+	TryProgressCargoVehicleSpawnRequest(RequestId);
+}
+
+void AMissionManager::HandleSpawnCargoVehicleSquadSpawned(const int32 RequestId, AActor* SpawnedSquadActor)
+{
+	FMissionCargoSquadWithVehicleSpawnState* CargoVehicleSpawnState = FindCargoVehicleSpawnState(RequestId);
+	if (not EnsureValidCargoVehicleSpawnState(CargoVehicleSpawnState))
+	{
+		return;
+	}
+
+	if (not CargoVehicleSpawnState->HandleSquadSpawnedActor(SpawnedSquadActor))
+	{
+		return;
+	}
+
+	TryProgressCargoVehicleSpawnRequest(RequestId);
+}
+
+void AMissionManager::HandleSpawnCargoVehicleSquadReady(const int32 RequestId)
+{
+	FMissionCargoSquadWithVehicleSpawnState* CargoVehicleSpawnState = FindCargoVehicleSpawnState(RequestId);
+	if (not EnsureValidCargoVehicleSpawnState(CargoVehicleSpawnState))
+	{
+		return;
+	}
+
+	if (not CargoVehicleSpawnState->HandleSquadDataReady())
+	{
+		return;
+	}
+
+	TryProgressCargoVehicleSpawnRequest(RequestId);
 }
 
 void AMissionManager::HandleSpawnActorWithCommandQueueSpawned(const int32 RequestId, AActor* SpawnedActor)
@@ -759,8 +844,10 @@ void AMissionManager::Tick(float DeltaSeconds)
 		}
 	}
 	TickTowSpawnRequests();
+	TickCargoVehicleSpawnRequests();
 	TickSpawnCommandQueueRequests();
 	RemoveFinishedTowSpawnRequests();
+	RemoveFinishedCargoVehicleSpawnRequests();
 	RemoveFinishedSpawnCommandQueueRequests();
 	RemoveCompletedEnemyUnitDestroyedCallbacks();
 }
@@ -1063,6 +1150,19 @@ FMissionTowTeamWeaponSpawnState* AMissionManager::FindTowedTeamWeaponSpawnState(
 	return nullptr;
 }
 
+FMissionCargoSquadWithVehicleSpawnState* AMissionManager::FindCargoVehicleSpawnState(const int32 RequestId)
+{
+	for (FMissionCargoSquadWithVehicleSpawnState& CargoVehicleSpawnState : M_CargoVehicleSpawnStates)
+	{
+		if (CargoVehicleSpawnState.GetBelongsToRequest(RequestId))
+		{
+			return &CargoVehicleSpawnState;
+		}
+	}
+
+	return nullptr;
+}
+
 FMissionSpawnCommandQueueState* AMissionManager::FindSpawnCommandQueueState(const int32 RequestId)
 {
 	for (FMissionSpawnCommandQueueState& SpawnCommandQueueState : M_SpawnCommandQueueStates)
@@ -1082,7 +1182,19 @@ void AMissionManager::TryCompleteTowedTeamWeaponSpawnRequest(const int32 Request
 	{
 		return;
 	}
+
 	TowSpawnState->TryFinishInstantTow();
+}
+
+void AMissionManager::TryProgressCargoVehicleSpawnRequest(const int32 RequestId)
+{
+	FMissionCargoSquadWithVehicleSpawnState* CargoVehicleSpawnState = FindCargoVehicleSpawnState(RequestId);
+	if (not EnsureValidCargoVehicleSpawnState(CargoVehicleSpawnState))
+	{
+		return;
+	}
+
+	CargoVehicleSpawnState->TryProgressState();
 }
 
 void AMissionManager::TryTickSpawnCommandQueueRequest(const int32 RequestId)
@@ -1100,6 +1212,14 @@ void AMissionManager::RemoveFinishedTowSpawnRequests()
 	M_TowedTeamWeaponSpawnStates.RemoveAll([](const FMissionTowTeamWeaponSpawnState& TowSpawnState)-> bool
 	{
 		return TowSpawnState.GetIsFinished();
+	});
+}
+
+void AMissionManager::RemoveFinishedCargoVehicleSpawnRequests()
+{
+	M_CargoVehicleSpawnStates.RemoveAll([](const FMissionCargoSquadWithVehicleSpawnState& CargoVehicleSpawnState)->bool
+	{
+		return CargoVehicleSpawnState.GetIsFinished();
 	});
 }
 
@@ -1124,6 +1244,19 @@ void AMissionManager::TickTowSpawnRequests()
 	}
 }
 
+void AMissionManager::TickCargoVehicleSpawnRequests()
+{
+	for (FMissionCargoSquadWithVehicleSpawnState& CargoVehicleSpawnState : M_CargoVehicleSpawnStates)
+	{
+		if (CargoVehicleSpawnState.GetIsFinished())
+		{
+			continue;
+		}
+
+		CargoVehicleSpawnState.TryProgressState();
+	}
+}
+
 void AMissionManager::TickSpawnCommandQueueRequests()
 {
 	for (FMissionSpawnCommandQueueState& SpawnCommandQueueState : M_SpawnCommandQueueStates)
@@ -1144,6 +1277,18 @@ bool AMissionManager::EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeapon
 	}
 
 	RTSFunctionLibrary::ReportError("Mission manager could not find requested tow spawn state.");
+	return false;
+}
+
+bool AMissionManager::EnsureValidCargoVehicleSpawnState(
+	FMissionCargoSquadWithVehicleSpawnState* CargoVehicleSpawnState) const
+{
+	if (CargoVehicleSpawnState != nullptr)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("Mission manager could not find requested cargo vehicle spawn state.");
 	return false;
 }
 
