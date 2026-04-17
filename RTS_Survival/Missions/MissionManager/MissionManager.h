@@ -9,6 +9,7 @@
 #include "EnemyUnitQueryType.h"
 #include "MissionSpawnCommandQueueState.h"
 #include "MissionTowTeamWeaponSpawnState.h"
+#include "MissionCargoSquadWithVehicleSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -222,6 +223,20 @@ public:
 
 	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
 	                          const FVector& TankSpawnLocation);
+	/**
+	 * @brief Spawns a cargo squad and vehicle, waits for squad load and cargo entry, then optionally orders movement.
+	 * @param TankSubtype Vehicle subtype used for spawn and cargo target.
+	 * @param SquadSubtype Squad subtype that should enter the vehicle cargo.
+	 * @param SpawnLocation World location used for the vehicle spawn.
+	 * @param SpawnRotation Rotation applied to vehicle and squad actors after spawn.
+	 * @param MoveLocationAfterEnter Optional move location; only executed after cargo enter succeeds.
+	 */
+	void SpawnCargoSquadWithVehicle(
+		const ETankSubtype TankSubtype,
+		const ESquadSubtype SquadSubtype,
+		const FVector& SpawnLocation,
+		const FRotator& SpawnRotation,
+		const FVector& MoveLocationAfterEnter = FVector::ZeroVector);
 	void SpawnActorAtLocationWithCommandQueue(
 		const FTrainingOption& TrainingOption,
 		const int32 SpawnId,
@@ -233,6 +248,9 @@ public:
 	void HandleSpawnTowedTeamWeaponTankSpawned(int32 RequestId, AActor* SpawnedTankActor);
 	void HandleSpawnTowedTeamWeaponSquadSpawned(int32 RequestId, AActor* SpawnedSquadActor);
 	void HandleSpawnTowedTeamWeaponSquadReady(int32 RequestId);
+	void HandleSpawnCargoVehicleTankSpawned(int32 RequestId, AActor* SpawnedTankActor);
+	void HandleSpawnCargoVehicleSquadSpawned(int32 RequestId, AActor* SpawnedSquadActor);
+	void HandleSpawnCargoVehicleSquadReady(int32 RequestId);
 	void HandleSpawnActorWithCommandQueueSpawned(const int32 RequestId, AActor* SpawnedActor);
 	FMissionStartingResources GetMissionStartingResources() const { return M_MissionStartingResources; }
 
@@ -420,20 +438,29 @@ private:
 	TArray<FMissionTowTeamWeaponSpawnState> M_TowedTeamWeaponSpawnStates;
 
 	UPROPERTY()
+	TArray<FMissionCargoSquadWithVehicleSpawnState> M_CargoVehicleSpawnStates;
+
+	UPROPERTY()
 	TArray<FMissionSpawnCommandQueueState> M_SpawnCommandQueueStates;
 
 	int32 M_NextTowedTeamWeaponSpawnRequestId = 1;
+	int32 M_NextCargoVehicleSpawnRequestId = 1;
 	int32 M_NextSpawnCommandQueueRequestId = 1;
 
 	FMissionTowTeamWeaponSpawnState* FindTowedTeamWeaponSpawnState(const int32 RequestId);
+	FMissionCargoSquadWithVehicleSpawnState* FindCargoVehicleSpawnState(const int32 RequestId);
 	FMissionSpawnCommandQueueState* FindSpawnCommandQueueState(const int32 RequestId);
 	void TryCompleteTowedTeamWeaponSpawnRequest(const int32 RequestId);
+	void TryProgressCargoVehicleSpawnRequest(const int32 RequestId);
 	void TryTickSpawnCommandQueueRequest(const int32 RequestId);
 	void TickTowSpawnRequests();
+	void TickCargoVehicleSpawnRequests();
 	void TickSpawnCommandQueueRequests();
 	void RemoveFinishedTowSpawnRequests();
+	void RemoveFinishedCargoVehicleSpawnRequests();
 	void RemoveFinishedSpawnCommandQueueRequests();
 	bool EnsureValidTowedTeamWeaponSpawnState(FMissionTowTeamWeaponSpawnState* TowSpawnState) const;
+	bool EnsureValidCargoVehicleSpawnState(FMissionCargoSquadWithVehicleSpawnState* CargoVehicleSpawnState) const;
 	bool EnsureValidSpawnCommandQueueState(FMissionSpawnCommandQueueState* SpawnCommandQueueState) const;
 	bool EnsureValidTowAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
 	bool EnsureValidSpawnCommandQueueAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
