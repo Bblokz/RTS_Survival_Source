@@ -544,6 +544,19 @@ protected:
 	                          const FVector SpawnLocation);
 
 	/**
+	 * @brief Spawns vehicle + squad, waits for squad load and cargo entry, then optionally orders vehicle move.
+	 * @param TankSubtype Vehicle subtype that is expected to contain a cargo component.
+	 * @param SquadSubtype Squad subtype to board into the vehicle.
+	 * @param SpawnLocation World location used for the vehicle spawn.
+	 * @param SpawnRotation Rotation applied to both spawned actors.
+	 * @param MoveLocationAfterEnter Optional move location issued after cargo entry; ignored when zero vector.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnCargoSquadWithVehicle(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
+	                                const FVector SpawnLocation, const FRotator SpawnRotation,
+	                                const FVector MoveLocationAfterEnter = FVector::ZeroVector);
+
+	/**
 	 * @brief Resolves and spawns seeded choice groups through the mission manager for BP-authored map setups.
 	 * @param SeededChoicesArray Groups containing deterministic spawn choices keyed by campaign generation seed.
 	 */
