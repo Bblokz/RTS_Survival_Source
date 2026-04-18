@@ -129,6 +129,59 @@ void UMissionBase::OnEnemyUnitsDestroyedCallback(const int32 ID, const EEnemyUni
 	BP_OnCallBackEnemyActorsDestroyed(ID, EnemyUnitQueryType);
 }
 
+int32 UMissionBase::DoesPlayerHaveAnySquadsOfType(const TArray<ESquadSubtype>& SquadTypes) const
+{
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError("Mission failed checking squads by type because game unit manager is invalid.");
+		return 0;
+	}
+
+	constexpr uint8 PlayerTeamId = 1;
+	return GameUnitManager->GetPlayerSquadCountOfTypes(PlayerTeamId, SquadTypes);
+}
+
+int32 UMissionBase::DoesPlayerHaveAnyTankMastersOfType(const TArray<ETankSubtype>& TankTypes) const
+{
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError("Mission failed checking tanks by type because game unit manager is invalid.");
+		return 0;
+	}
+
+	constexpr uint8 PlayerTeamId = 1;
+	return GameUnitManager->GetPlayerTankCountOfTypes(PlayerTeamId, TankTypes);
+}
+
+int32 UMissionBase::DoesPlayerHaveAnyBuildingExpansionsOfType(
+	const TArray<EBuildingExpansionType>& BuildingExpansionTypes) const
+{
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError("Mission failed checking building expansions by type because game unit manager is invalid.");
+		return 0;
+	}
+
+	constexpr uint8 PlayerTeamId = 1;
+	return GameUnitManager->GetPlayerBxpCountOfTypes(PlayerTeamId, BuildingExpansionTypes);
+}
+
+int32 UMissionBase::DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraftSubtype>& AircraftTypes) const
+{
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError("Mission failed checking aircraft by type because game unit manager is invalid.");
+		return 0;
+	}
+
+	constexpr uint8 PlayerTeamId = 1;
+	return GameUnitManager->GetPlayerAircraftCountOfTypes(PlayerTeamId, AircraftTypes);
+}
+
 ATriggerArea* UMissionBase::CreateTriggerAreaSphere(const FVector& Location,
                                                      const FRotator& Rotation,
                                                      const FVector& Scale,
