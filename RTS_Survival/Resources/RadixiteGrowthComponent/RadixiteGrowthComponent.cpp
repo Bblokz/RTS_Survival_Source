@@ -1,10 +1,21 @@
 #include "RadixiteGrowthComponent.h"
 
-#include "Engine/DecalActor.h"
 #include "NavigationSystem.h"
+#include "AI/NavigationSystemBase.h"
+#include "Engine/DecalActor.h"
+#include "Engine/World.h"
+#include "NavMesh/NavMeshPath.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSPathFindingHelpers/FRTSPathFindingHelpers.h"
+
+namespace RadixiteGrowthConstants
+{
+	constexpr float DecalSpawnPitch = -90.f;
+	constexpr float DecalSpawnRoll = 0.f;
+	constexpr float MinProjectionDistance = 1.f;
+	constexpr float DecalThickness = 16.f;
+}
 
 URadixiteGrowthComponent::URadixiteGrowthComponent()
 {
@@ -49,6 +60,7 @@ void URadixiteGrowthComponent::BeginPlay_InitRootGrowthNode()
 {
 	FRadixiteGrowthNodeRecord RootNode;
 	RootNode.NodeId = GetNextNodeId();
+	RootNode.bM_IsRootNode = true;
 	RootNode.Location = M_OwnerActor->GetActorLocation();
 	RootNode.SpawnedNodeActor = M_OwnerActor;
 	M_GrowthNodes.Add(RootNode);
@@ -62,6 +74,7 @@ void URadixiteGrowthComponent::BeginPlay_InitGrowthTimers()
 	}
 
 	const TWeakObjectPtr<URadixiteGrowthComponent> WeakThis(this);
+
 	GetWorld()->GetTimerManager().SetTimer(
 		M_TimerHandleDecalGrowth,
 		FTimerDelegate::CreateLambda([WeakThis]()
@@ -73,7 +86,7 @@ void URadixiteGrowthComponent::BeginPlay_InitGrowthTimers()
 
 			WeakThis->TickDecalGrowth();
 		}),
-		IntervalDecalGrowth,
+		M_IntervalDecalGrowth,
 		true);
 
 	GetWorld()->GetTimerManager().SetTimer(
@@ -87,7 +100,7 @@ void URadixiteGrowthComponent::BeginPlay_InitGrowthTimers()
 
 			WeakThis->TickNodeGrowth();
 		}),
-		IntervalNodeGrowth,
+		M_IntervalNodeGrowth,
 		true);
 }
 
@@ -105,40 +118,62 @@ void URadixiteGrowthComponent::TickNodeGrowth()
 
 void URadixiteGrowthComponent::CleanupInvalidReferences()
 {
-	for (int32 BranchIndex = M_DecalBranches.Num() - 1; BranchIndex >= 0; --BranchIndex)
+	for (FRadixiteGrowthBranchRecord& BranchRecord : M_DecalBranches)
 	{
-		FRadixiteGrowthBranchRecord& Branch = M_DecalBranches[BranchIndex];
-		for (int32 DecalIndex = Branch.SpawnedDecals.Num() - 1; DecalIndex >= 0; --DecalIndex)
-		{
-			if (not IsValid(Branch.SpawnedDecals[DecalIndex]))
-			{
-				Branch.SpawnedDecals.RemoveAt(DecalIndex);
-			}
-		}
+		CleanupInvalidBranchDecals(BranchRecord);
 	}
+
+	RemoveBranchesThatNoLongerHaveDecals();
 
 	for (int32 NodeIndex = M_GrowthNodes.Num() - 1; NodeIndex >= 0; --NodeIndex)
 	{
-		if (M_GrowthNodes[NodeIndex].NodeId == 0)
+		const FRadixiteGrowthNodeRecord& NodeRecord = M_GrowthNodes[NodeIndex];
+		if (NodeRecord.bM_IsRootNode)
 		{
 			continue;
 		}
 
-		if (M_GrowthNodes[NodeIndex].SpawnedNodeActor.IsValid())
+		if (NodeRecord.SpawnedNodeActor.IsValid())
 		{
 			continue;
 		}
 
-		const int32 DestroyedNodeId = M_GrowthNodes[NodeIndex].NodeId;
-		RemoveBranchesForNodeDestruction(DestroyedNodeId, M_GrowthNodes[NodeIndex].ConnectedNodeIds.Num());
+		const int32 DestroyedNodeId = NodeRecord.NodeId;
+		RemoveBranchesForNodeDestruction(DestroyedNodeId, NodeRecord.ConnectedNodeIds.Num());
 		RemoveNodeConnections(DestroyedNodeId);
 		M_GrowthNodes.RemoveAt(NodeIndex);
 	}
 }
 
+void URadixiteGrowthComponent::CleanupInvalidBranchDecals(FRadixiteGrowthBranchRecord& BranchRecord) const
+{
+	for (int32 DecalIndex = BranchRecord.SpawnedDecals.Num() - 1; DecalIndex >= 0; --DecalIndex)
+	{
+		if (IsValid(BranchRecord.SpawnedDecals[DecalIndex]))
+		{
+			continue;
+		}
+
+		BranchRecord.SpawnedDecals.RemoveAt(DecalIndex);
+	}
+}
+
+bool URadixiteGrowthComponent::GetHasAtLeastOneValidDecal(const FRadixiteGrowthBranchRecord& BranchRecord) const
+{
+	for (const TObjectPtr<ADecalActor> SpawnedDecal : BranchRecord.SpawnedDecals)
+	{
+		if (IsValid(SpawnedDecal))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool URadixiteGrowthComponent::TrySpawnDecalBranch()
 {
-	if (GetCurrentSpawnedDecalCount() >= MaxDecalGrowth)
+	if (GetCurrentSpawnedDecalCount() >= M_MaxDecalGrowth)
 	{
 		return false;
 	}
@@ -149,10 +184,10 @@ bool URadixiteGrowthComponent::TrySpawnDecalBranch()
 		return false;
 	}
 
-	for (int32 AttemptIndex = 0; AttemptIndex < MaxRetries; ++AttemptIndex)
+	for (int32 AttemptIndex = 0; AttemptIndex < M_MaxRetries; ++AttemptIndex)
 	{
-		const int32 PickedNodeId = UnsaturatedNodeIds[FMath::RandRange(0, UnsaturatedNodeIds.Num() - 1)];
-		if (TrySpawnDecalBranchForNode(PickedNodeId))
+		const int32 RandomNodeIndex = FMath::RandRange(0, UnsaturatedNodeIds.Num() - 1);
+		if (TrySpawnDecalBranchForNode(UnsaturatedNodeIds[RandomNodeIndex]))
 		{
 			return true;
 		}
@@ -163,9 +198,9 @@ bool URadixiteGrowthComponent::TrySpawnDecalBranch()
 
 bool URadixiteGrowthComponent::TrySpawnDecalBranchForNode(const int32 StartNodeId)
 {
-	const int32 NodeIndex = M_GrowthNodes.IndexOfByPredicate([StartNodeId](const FRadixiteGrowthNodeRecord& Node)
+	const int32 NodeIndex = M_GrowthNodes.IndexOfByPredicate([StartNodeId](const FRadixiteGrowthNodeRecord& NodeRecord)
 	{
-		return Node.NodeId == StartNodeId;
+		return NodeRecord.NodeId == StartNodeId;
 	});
 	if (not M_GrowthNodes.IsValidIndex(NodeIndex))
 	{
@@ -174,19 +209,19 @@ bool URadixiteGrowthComponent::TrySpawnDecalBranchForNode(const int32 StartNodeI
 
 	FRadixiteGrowthNodeRecord& StartNodeRecord = M_GrowthNodes[NodeIndex];
 	float InitialYaw = 0.f;
-	int32 YawBucket = INDEX_NONE;
-	if (not TryChooseInitialYaw(StartNodeRecord, InitialYaw, YawBucket))
+	int32 InitialYawBucket = INDEX_NONE;
+	if (not TryChooseInitialYaw(StartNodeRecord, InitialYaw, InitialYawBucket))
 	{
 		return false;
 	}
 
-	if (GrowthDecalOptions.Num() == 0)
+	if (M_GrowthDecalOptions.Num() == 0)
 	{
 		return false;
 	}
 
-	const int32 BranchLength = FMath::RandRange(MinDecalGrowthsUntilNode, MaxDecalGrowthsUntilNode);
-	const float SegmentDistance = FMath::FRandRange(MinDecalExpansionDistance, MaxDecalExpansionDistance);
+	const int32 BranchLength = FMath::RandRange(M_MinDecalGrowthsUntilNode, M_MaxDecalGrowthsUntilNode);
+	const float SegmentDistance = FMath::FRandRange(M_MinDecalExpansionDistance, M_MaxDecalExpansionDistance);
 	const float DirectionSign = FMath::RandBool() ? 1.f : -1.f;
 
 	TArray<FVector> BranchPoints;
@@ -208,25 +243,24 @@ bool URadixiteGrowthComponent::TrySpawnDecalBranchForNode(const int32 StartNodeI
 			SegmentYaw);
 		if (not IsValid(SpawnedDecal))
 		{
-			for (TObjectPtr<ADecalActor> DecalActor : SpawnedDecals)
+			for (const TObjectPtr<ADecalActor> SpawnedDecalActor : SpawnedDecals)
 			{
-				if (IsValid(DecalActor))
+				if (not IsValid(SpawnedDecalActor))
 				{
-					DecalActor->Destroy();
+					continue;
 				}
+
+				SpawnedDecalActor->Destroy();
 			}
 			return false;
 		}
 
 		SpawnedDecals.Add(SpawnedDecal);
-		if (PointIndex >= 0)
-		{
-			SegmentYaw += DirectionSign * DecalRotationOffset;
-		}
+		SegmentYaw += DirectionSign * M_DecalRotationOffset;
 	}
 
-	RegisterSpawnedBranch(StartNodeId, InitialYaw, BranchPoints.Last(), SpawnedDecals);
-	StartNodeRecord.UsedInitialYawOffsets.Add(YawBucket);
+	RegisterSpawnedBranch(StartNodeId, InitialYaw, InitialYawBucket, BranchPoints.Last(), SpawnedDecals);
+	StartNodeRecord.UsedInitialYawOffsets.Add(InitialYawBucket);
 	return true;
 }
 
@@ -241,12 +275,12 @@ bool URadixiteGrowthComponent::TryBuildBranchPoints(
 	OutBranchPoints.Reset();
 	OutBranchPoints.Add(StartLocation);
 
-	float YawToUse = InitialYaw;
+	float WorkingYaw = InitialYaw;
 	FVector CurrentLocation = StartLocation;
 	for (int32 SegmentIndex = 0; SegmentIndex < BranchLength; ++SegmentIndex)
 	{
-		const FVector Direction = FRotator(0.f, YawToUse, 0.f).Vector();
-		const FVector DesiredPoint = CurrentLocation + (Direction * SegmentDistance);
+		const FVector DirectionVector = FRotator(0.f, WorkingYaw, 0.f).Vector();
+		const FVector DesiredPoint = CurrentLocation + (DirectionVector * SegmentDistance);
 
 		FVector ValidatedPoint;
 		if (not TryGetValidGrowthPoint(DesiredPoint, ValidatedPoint))
@@ -256,7 +290,7 @@ bool URadixiteGrowthComponent::TryBuildBranchPoints(
 
 		OutBranchPoints.Add(ValidatedPoint);
 		CurrentLocation = ValidatedPoint;
-		YawToUse += DirectionSign * DecalRotationOffset;
+		WorkingYaw += DirectionSign * M_DecalRotationOffset;
 	}
 
 	return OutBranchPoints.Num() > 1;
@@ -269,26 +303,30 @@ bool URadixiteGrowthComponent::TryGetValidGrowthPoint(const FVector& DesiredPoin
 		return false;
 	}
 
-	const FVector TraceOffset(0.f, 0.f, ZLandscapeTraceOffset * 0.5f);
-	const FVector TraceStart = DesiredPoint + TraceOffset;
-	const FVector TraceEnd = DesiredPoint - TraceOffset;
+	const FVector VerticalTraceOffset(0.f, 0.f, M_ZLandscapeTraceOffset * 0.5f);
+	const FVector TraceStart = DesiredPoint + VerticalTraceOffset;
+	const FVector TraceEnd = DesiredPoint - VerticalTraceOffset;
 
 	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.bTraceComplex = false;
-
-	if (not GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
+	FCollisionQueryParams QueryParameters;
+	QueryParameters.bTraceComplex = false;
+	if (not GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
 	{
 		return false;
 	}
 
 	FNavLocation ProjectedLocation;
-	if (not M_NavigationSystem->ProjectPointToNavigation(HitResult.ImpactPoint, ProjectedLocation, ProjectionToNavMeshExtent))
+	if (not M_NavigationSystem->ProjectPointToNavigation(HitResult.ImpactPoint, ProjectedLocation, M_ProjectionToNavMeshExtent))
 	{
 		return false;
 	}
 
-	const FPathFindingQuery PathFindingQuery;
+	FPathFindingQuery PathFindingQuery;
+	if (not TryBuildHighCostQuery(PathFindingQuery, ProjectedLocation.Location))
+	{
+		return false;
+	}
+
 	if (FRTSPathFindingHelpers::IsLocationInHighCostArea(GetWorld(), ProjectedLocation.Location, PathFindingQuery))
 	{
 		return false;
@@ -298,14 +336,31 @@ bool URadixiteGrowthComponent::TryGetValidGrowthPoint(const FVector& DesiredPoin
 	return true;
 }
 
-bool URadixiteGrowthComponent::TrySpawnGrowthNodeFromPendingBranch()
+bool URadixiteGrowthComponent::TryBuildHighCostQuery(FPathFindingQuery& OutPathFindingQuery, const FVector& QueryLocation) const
 {
-	if (GetCurrentSpawnedNodeCount() >= GrowthNodeOptions.MaxSpawnedNodes)
+	if (not GetIsValidOwnerActor() || not GetIsValidNavigationSystem())
 	{
 		return false;
 	}
 
-	for (int32 AttemptIndex = 0; AttemptIndex < MaxRetries; ++AttemptIndex)
+	ANavigationData* DefaultNavigationData = M_NavigationSystem->GetDefaultNavDataInstance(FNavigationSystem::DontCreate);
+	if (not IsValid(DefaultNavigationData))
+	{
+		return false;
+	}
+
+	OutPathFindingQuery = FPathFindingQuery(M_OwnerActor.Get(), *DefaultNavigationData, QueryLocation, QueryLocation);
+	return true;
+}
+
+bool URadixiteGrowthComponent::TrySpawnGrowthNodeFromPendingBranch()
+{
+	if (GetCurrentSpawnedNodeCount() >= M_GrowthNodeOptions.MaxSpawnedNodes)
+	{
+		return false;
+	}
+
+	for (int32 AttemptIndex = 0; AttemptIndex < M_MaxRetries; ++AttemptIndex)
 	{
 		TArray<int32> PendingBranchIndices;
 		for (int32 BranchIndex = 0; BranchIndex < M_DecalBranches.Num(); ++BranchIndex)
@@ -320,8 +375,8 @@ bool URadixiteGrowthComponent::TrySpawnGrowthNodeFromPendingBranch()
 			return false;
 		}
 
-		const int32 PickedBranchIndex = PendingBranchIndices[FMath::RandRange(0, PendingBranchIndices.Num() - 1)];
-		if (TrySpawnGrowthNodeForBranch(M_DecalBranches[PickedBranchIndex]))
+		const int32 RandomPendingIndex = FMath::RandRange(0, PendingBranchIndices.Num() - 1);
+		if (TrySpawnGrowthNodeForBranch(M_DecalBranches[PendingBranchIndices[RandomPendingIndex]]))
 		{
 			return true;
 		}
@@ -348,14 +403,14 @@ bool URadixiteGrowthComponent::TrySpawnGrowthNodeForBranch(FRadixiteGrowthBranch
 		return false;
 	}
 
-	const float RandomYaw = FMath::FRandRange(GrowthNodeOptions.MinRotation, GrowthNodeOptions.MaxRotation);
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = M_OwnerActor.Get();
+	const float RandomYaw = FMath::FRandRange(M_GrowthNodeOptions.MinRotation, M_GrowthNodeOptions.MaxRotation);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = M_OwnerActor.Get();
 	AActor* SpawnedNodeActor = GetWorld()->SpawnActor<AActor>(
 		GrowthNodeClass,
 		BranchToGrow.PendingNodeLocation,
 		FRotator(0.f, RandomYaw, 0.f),
-		SpawnParams);
+		SpawnParameters);
 	if (not IsValid(SpawnedNodeActor))
 	{
 		return false;
@@ -369,6 +424,7 @@ bool URadixiteGrowthComponent::TrySpawnGrowthNodeForBranch(FRadixiteGrowthBranch
 void URadixiteGrowthComponent::RegisterSpawnedBranch(
 	const int32 StartNodeId,
 	const float InitialYaw,
+	const int32 InitialYawBucket,
 	const FVector& PendingNodeLocation,
 	const TArray<TObjectPtr<ADecalActor>>& SpawnedDecals)
 {
@@ -376,6 +432,7 @@ void URadixiteGrowthComponent::RegisterSpawnedBranch(
 	NewBranch.BranchId = GetNextBranchId();
 	NewBranch.StartNodeId = StartNodeId;
 	NewBranch.InitialYaw = InitialYaw;
+	NewBranch.InitialYawBucket = InitialYawBucket;
 	NewBranch.PendingNodeLocation = PendingNodeLocation;
 	NewBranch.bM_HasPendingGrowthNode = true;
 	NewBranch.SpawnedDecals = SpawnedDecals;
@@ -393,9 +450,9 @@ void URadixiteGrowthComponent::RegisterSpawnedGrowthNode(
 	NewNodeRecord.SpawnedNodeActor = SpawnedNodeActor;
 	NewNodeRecord.ConnectedNodeIds.Add(BranchToGrow.StartNodeId);
 
-	const int32 ParentNodeIndex = M_GrowthNodes.IndexOfByPredicate([&BranchToGrow](const FRadixiteGrowthNodeRecord& Node)
+	const int32 ParentNodeIndex = M_GrowthNodes.IndexOfByPredicate([&BranchToGrow](const FRadixiteGrowthNodeRecord& NodeRecord)
 	{
-		return Node.NodeId == BranchToGrow.StartNodeId;
+		return NodeRecord.NodeId == BranchToGrow.StartNodeId;
 	});
 	if (M_GrowthNodes.IsValidIndex(ParentNodeIndex))
 	{
@@ -424,21 +481,33 @@ void URadixiteGrowthComponent::RemoveBranchesForNodeDestruction(const int32 Dest
 {
 	for (int32 BranchIndex = M_DecalBranches.Num() - 1; BranchIndex >= 0; --BranchIndex)
 	{
-		FRadixiteGrowthBranchRecord& Branch = M_DecalBranches[BranchIndex];
-		const bool bIsBetweenNodeAndConnection = Branch.StartNodeId == DestroyedNodeId || Branch.EndNodeId == DestroyedNodeId;
-		if (ConnectionsCount <= 1 && bIsBetweenNodeAndConnection)
+		const FRadixiteGrowthBranchRecord& BranchRecord = M_DecalBranches[BranchIndex];
+		const bool bBranchTouchesDestroyedNode =
+			BranchRecord.StartNodeId == DestroyedNodeId || BranchRecord.EndNodeId == DestroyedNodeId;
+		if (ConnectionsCount <= 1 && bBranchTouchesDestroyedNode)
 		{
-			DestroyBranchDecals(Branch);
-			M_DecalBranches.RemoveAt(BranchIndex);
+			RemoveBranchByIndex(BranchIndex);
 			continue;
 		}
 
-		const bool bBranchStartedFromDestroyed = Branch.StartNodeId == DestroyedNodeId;
-		if (ConnectionsCount > 1 && bBranchStartedFromDestroyed && Branch.bM_HasPendingGrowthNode)
+		const bool bStartedAtDestroyedNode = BranchRecord.StartNodeId == DestroyedNodeId;
+		if (ConnectionsCount > 1 && bStartedAtDestroyedNode && BranchRecord.bM_HasPendingGrowthNode)
 		{
-			DestroyBranchDecals(Branch);
-			M_DecalBranches.RemoveAt(BranchIndex);
+			RemoveBranchByIndex(BranchIndex);
 		}
+	}
+}
+
+void URadixiteGrowthComponent::RemoveBranchesThatNoLongerHaveDecals()
+{
+	for (int32 BranchIndex = M_DecalBranches.Num() - 1; BranchIndex >= 0; --BranchIndex)
+	{
+		if (GetHasAtLeastOneValidDecal(M_DecalBranches[BranchIndex]))
+		{
+			continue;
+		}
+
+		RemoveBranchByIndex(BranchIndex);
 	}
 }
 
@@ -449,16 +518,37 @@ void URadixiteGrowthComponent::RemoveBranchByIndex(const int32 BranchIndex)
 		return;
 	}
 
-	DestroyBranchDecals(M_DecalBranches[BranchIndex]);
+	FRadixiteGrowthBranchRecord& BranchRecord = M_DecalBranches[BranchIndex];
+	ReleaseInitialYawBucket(BranchRecord);
+	DestroyBranchDecals(BranchRecord);
 	M_DecalBranches.RemoveAt(BranchIndex);
 }
 
 void URadixiteGrowthComponent::RemoveNodeConnections(const int32 DestroyedNodeId)
 {
-	for (FRadixiteGrowthNodeRecord& GrowthNode : M_GrowthNodes)
+	for (FRadixiteGrowthNodeRecord& NodeRecord : M_GrowthNodes)
 	{
-		GrowthNode.ConnectedNodeIds.Remove(DestroyedNodeId);
+		NodeRecord.ConnectedNodeIds.Remove(DestroyedNodeId);
 	}
+}
+
+void URadixiteGrowthComponent::ReleaseInitialYawBucket(const FRadixiteGrowthBranchRecord& BranchRecord)
+{
+	if (BranchRecord.InitialYawBucket == INDEX_NONE)
+	{
+		return;
+	}
+
+	const int32 SourceNodeIndex = M_GrowthNodes.IndexOfByPredicate([&BranchRecord](const FRadixiteGrowthNodeRecord& NodeRecord)
+	{
+		return NodeRecord.NodeId == BranchRecord.StartNodeId;
+	});
+	if (not M_GrowthNodes.IsValidIndex(SourceNodeIndex))
+	{
+		return;
+	}
+
+	M_GrowthNodes[SourceNodeIndex].UsedInitialYawOffsets.Remove(BranchRecord.InitialYawBucket);
 }
 
 bool URadixiteGrowthComponent::GetIsValidOwnerActor() const
@@ -508,36 +598,42 @@ bool URadixiteGrowthComponent::GetIsValidWorld() const
 
 int32 URadixiteGrowthComponent::GetCurrentSpawnedDecalCount() const
 {
-	int32 TotalDecals = 0;
-	for (const FRadixiteGrowthBranchRecord& Branch : M_DecalBranches)
+	int32 SpawnedDecalCount = 0;
+	for (const FRadixiteGrowthBranchRecord& BranchRecord : M_DecalBranches)
 	{
-		for (const TObjectPtr<ADecalActor> SpawnedDecal : Branch.SpawnedDecals)
+		for (const TObjectPtr<ADecalActor> SpawnedDecal : BranchRecord.SpawnedDecals)
 		{
-			if (IsValid(SpawnedDecal))
+			if (not IsValid(SpawnedDecal))
 			{
-				++TotalDecals;
+				continue;
 			}
+
+			++SpawnedDecalCount;
 		}
 	}
-	return TotalDecals;
+
+	return SpawnedDecalCount;
 }
 
 int32 URadixiteGrowthComponent::GetCurrentSpawnedNodeCount() const
 {
-	int32 SpawnedNodes = 0;
-	for (const FRadixiteGrowthNodeRecord& Node : M_GrowthNodes)
+	int32 SpawnedNodeCount = 0;
+	for (const FRadixiteGrowthNodeRecord& NodeRecord : M_GrowthNodes)
 	{
-		if (Node.NodeId == 0)
+		if (NodeRecord.bM_IsRootNode)
 		{
 			continue;
 		}
 
-		if (Node.SpawnedNodeActor.IsValid())
+		if (not NodeRecord.SpawnedNodeActor.IsValid())
 		{
-			++SpawnedNodes;
+			continue;
 		}
+
+		++SpawnedNodeCount;
 	}
-	return SpawnedNodes;
+
+	return SpawnedNodeCount;
 }
 
 int32 URadixiteGrowthComponent::GetNextNodeId()
@@ -552,40 +648,59 @@ int32 URadixiteGrowthComponent::GetNextBranchId()
 
 int32 URadixiteGrowthComponent::GetNodeIdByActor(const AActor* NodeActor) const
 {
-	for (const FRadixiteGrowthNodeRecord& Node : M_GrowthNodes)
+	for (const FRadixiteGrowthNodeRecord& NodeRecord : M_GrowthNodes)
 	{
-		if (Node.SpawnedNodeActor.Get() == NodeActor)
+		if (NodeRecord.SpawnedNodeActor.Get() == NodeActor)
 		{
-			return Node.NodeId;
+			return NodeRecord.NodeId;
 		}
 	}
 
 	return INDEX_NONE;
 }
 
+int32 URadixiteGrowthComponent::GetYawBucketFromYaw(const float YawToBucket) const
+{
+	const float RotationOffsetAbs = FMath::Abs(M_DecalRotationOffset);
+	if (RotationOffsetAbs < RadixiteGrowthConstants::MinProjectionDistance)
+	{
+		return INDEX_NONE;
+	}
+
+	const float NormalizedYaw = FMath::UnwindDegrees(YawToBucket);
+	const float PositiveYaw = NormalizedYaw < 0.f ? NormalizedYaw + 360.f : NormalizedYaw;
+	const int32 BucketCount = FMath::Max(1, FMath::FloorToInt(360.f / RotationOffsetAbs));
+	const int32 Bucket = FMath::FloorToInt(PositiveYaw / RotationOffsetAbs) % BucketCount;
+	return Bucket;
+}
+
 bool URadixiteGrowthComponent::TryGetUnsaturatedNodeIds(TArray<int32>& OutNodeIds) const
 {
 	OutNodeIds.Reset();
-
-	for (const FRadixiteGrowthNodeRecord& Node : M_GrowthNodes)
+	for (const FRadixiteGrowthNodeRecord& NodeRecord : M_GrowthNodes)
 	{
-		if (not Node.SpawnedNodeActor.IsValid())
+		if (not NodeRecord.SpawnedNodeActor.IsValid())
 		{
 			continue;
 		}
 
-		int32 BranchCount = 0;
-		for (const FRadixiteGrowthBranchRecord& Branch : M_DecalBranches)
+		int32 ActiveBranchCount = 0;
+		for (const FRadixiteGrowthBranchRecord& BranchRecord : M_DecalBranches)
 		{
-			if (Branch.StartNodeId == Node.NodeId)
+			if (BranchRecord.StartNodeId != NodeRecord.NodeId)
 			{
-				++BranchCount;
+				continue;
+			}
+
+			if (GetHasAtLeastOneValidDecal(BranchRecord))
+			{
+				++ActiveBranchCount;
 			}
 		}
 
-		if (BranchCount < GrowthNodeOptions.MaxDecalGrowthPerNode)
+		if (ActiveBranchCount < M_GrowthNodeOptions.MaxDecalGrowthPerNode)
 		{
-			OutNodeIds.Add(Node.NodeId);
+			OutNodeIds.Add(NodeRecord.NodeId);
 		}
 	}
 
@@ -597,46 +712,41 @@ bool URadixiteGrowthComponent::TryChooseInitialYaw(
 	float& OutYaw,
 	int32& OutYawBucket) const
 {
-	if (FMath::IsNearlyZero(DecalRotationOffset))
-	{
-		OutYaw = FMath::FRandRange(0.f, 360.f);
-		OutYawBucket = FMath::RoundToInt(OutYaw);
-		return true;
-	}
-
-	const int32 BucketCount = FMath::FloorToInt(360.f / FMath::Abs(DecalRotationOffset));
-	if (BucketCount <= 0)
-	{
-		return false;
-	}
-
-	TArray<int32> AvailableBuckets;
-	for (int32 Bucket = 0; Bucket < BucketCount; ++Bucket)
-	{
-		if (not NodeRecord.UsedInitialYawOffsets.Contains(Bucket))
-		{
-			AvailableBuckets.Add(Bucket);
-		}
-	}
-	if (AvailableBuckets.Num() == 0)
-	{
-		return false;
-	}
-
-	OutYawBucket = AvailableBuckets[FMath::RandRange(0, AvailableBuckets.Num() - 1)];
-	OutYaw = static_cast<float>(OutYawBucket) * FMath::Abs(DecalRotationOffset);
 	if (GetShouldUseDirectionalBias())
 	{
 		OutYaw = GetBiasedYaw();
-		OutYawBucket = FMath::RoundToInt(FMath::UnwindDegrees(OutYaw));
+		OutYawBucket = GetYawBucketFromYaw(OutYaw);
+		if (OutYawBucket == INDEX_NONE)
+		{
+			return false;
+		}
+
+		if (NodeRecord.UsedInitialYawOffsets.Contains(OutYawBucket))
+		{
+			return false;
+		}
+		return true;
 	}
+
+	const float RandomOffsetYaw = GetRandomOffsetYaw();
+	OutYawBucket = GetYawBucketFromYaw(RandomOffsetYaw);
+	if (OutYawBucket == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (NodeRecord.UsedInitialYawOffsets.Contains(OutYawBucket))
+	{
+		return false;
+	}
+
+	OutYaw = RandomOffsetYaw;
 	return true;
 }
 
 bool URadixiteGrowthComponent::GetShouldUseDirectionalBias() const
 {
-	const bool bHasNoPreference = (GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::NoPreference)) != 0;
-	if (bHasNoPreference)
+	if (GetShouldIgnoreDirectionalBias())
 	{
 		return false;
 	}
@@ -646,52 +756,53 @@ bool URadixiteGrowthComponent::GetShouldUseDirectionalBias() const
 		static_cast<int32>(ERadixiteGrowthDirectionBias::WorldNegX) |
 		static_cast<int32>(ERadixiteGrowthDirectionBias::WorldPosY) |
 		static_cast<int32>(ERadixiteGrowthDirectionBias::WorldNegY);
-	if ((GrowthDirectionBias & AxisMask) == 0)
+	if ((M_GrowthDirectionBias & AxisMask) == 0)
 	{
 		return false;
 	}
 
-	return FMath::FRandRange(0.f, 1.f) <= GrowthDirectionBiasProbability;
+	return FMath::FRandRange(0.f, 1.f) <= M_GrowthDirectionBiasProbability;
+}
+
+bool URadixiteGrowthComponent::GetShouldIgnoreDirectionalBias() const
+{
+	return (M_GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::NoPreference)) != 0;
 }
 
 float URadixiteGrowthComponent::GetBiasedYaw() const
 {
 	TArray<float> YawOptions;
-	if ((GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldPosX)) != 0)
+	if ((M_GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldPosX)) != 0)
 	{
 		YawOptions.Add(0.f);
 	}
-	if ((GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldNegX)) != 0)
+	if ((M_GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldNegX)) != 0)
 	{
 		YawOptions.Add(180.f);
 	}
-	if ((GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldPosY)) != 0)
+	if ((M_GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldPosY)) != 0)
 	{
 		YawOptions.Add(90.f);
 	}
-	if ((GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldNegY)) != 0)
+	if ((M_GrowthDirectionBias & static_cast<int32>(ERadixiteGrowthDirectionBias::WorldNegY)) != 0)
 	{
 		YawOptions.Add(270.f);
 	}
-
 	if (YawOptions.Num() == 0)
 	{
 		return GetRandomOffsetYaw();
 	}
 
-	return YawOptions[FMath::RandRange(0, YawOptions.Num() - 1)];
+	const int32 RandomYawIndex = FMath::RandRange(0, YawOptions.Num() - 1);
+	return YawOptions[RandomYawIndex];
 }
 
 float URadixiteGrowthComponent::GetRandomOffsetYaw() const
 {
-	if (FMath::IsNearlyZero(DecalRotationOffset))
-	{
-		return FMath::FRandRange(0.f, 360.f);
-	}
-
-	const int32 BucketCount = FMath::Max(1, FMath::FloorToInt(360.f / FMath::Abs(DecalRotationOffset)));
-	const int32 PickedBucket = FMath::RandRange(0, BucketCount - 1);
-	return static_cast<float>(PickedBucket) * FMath::Abs(DecalRotationOffset);
+	const float RotationOffsetAbs = FMath::Abs(M_DecalRotationOffset);
+	const int32 BucketCount = FMath::Max(1, FMath::FloorToInt(360.f / RotationOffsetAbs));
+	const int32 RandomBucket = FMath::RandRange(0, BucketCount - 1);
+	return static_cast<float>(RandomBucket) * RotationOffsetAbs;
 }
 
 TObjectPtr<ADecalActor> URadixiteGrowthComponent::SpawnGrowthDecal(
@@ -705,35 +816,50 @@ TObjectPtr<ADecalActor> URadixiteGrowthComponent::SpawnGrowthDecal(
 		return nullptr;
 	}
 
-	const FGrowthDecalOptions& DecalOption = GrowthDecalOptions[FMath::RandRange(0, GrowthDecalOptions.Num() - 1)];
-	if (not IsValid(DecalOption.DecalMaterial))
+	if (M_GrowthDecalOptions.Num() == 0)
+	{
+		return nullptr;
+	}
+
+	const int32 RandomDecalOptionIndex = FMath::RandRange(0, M_GrowthDecalOptions.Num() - 1);
+	const FGrowthDecalOptions& DecalOptions = M_GrowthDecalOptions[RandomDecalOptionIndex];
+	if (not IsValid(DecalOptions.DecalMaterial))
 	{
 		return nullptr;
 	}
 
 	const FVector SpawnLocation = (SegmentStart + SegmentEnd) * 0.5f;
-	const float Scale = SegmentDistance / FMath::Max(1.f, DecalOption.DistanceCoveredAtScale1);
-	const FRotator DecalRotation(-90.f, SegmentYaw + DecalOption.AimAtRotationYaw, 0.f);
-	AActor* SpawnedActor = GetWorld()->SpawnActor<ADecalActor>(ADecalActor::StaticClass(), SpawnLocation, DecalRotation);
-	ADecalActor* SpawnedDecalActor = Cast<ADecalActor>(SpawnedActor);
+	const float ScaleMultiplier = SegmentDistance / FMath::Max(1.f, DecalOptions.DistanceCoveredAtScale1);
+	const FRotator SpawnRotation(RadixiteGrowthConstants::DecalSpawnPitch,
+		SegmentYaw + DecalOptions.AimAtRotationYaw,
+		RadixiteGrowthConstants::DecalSpawnRoll);
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = M_OwnerActor.Get();
+	ADecalActor* SpawnedDecalActor = GetWorld()->SpawnActor<ADecalActor>(SpawnLocation, SpawnRotation, SpawnParameters);
 	if (not IsValid(SpawnedDecalActor))
 	{
 		return nullptr;
 	}
 
-	SpawnedDecalActor->SetDecalMaterial(DecalOption.DecalMaterial);
-	SpawnedDecalActor->SetActorScale3D(FVector(Scale, Scale, Scale));
+	SpawnedDecalActor->SetDecalMaterial(DecalOptions.DecalMaterial);
+	SpawnedDecalActor->SetDecalSize(FVector(
+		RadixiteGrowthConstants::DecalThickness,
+		SegmentDistance * 0.5f,
+		SegmentDistance * 0.5f));
+	SpawnedDecalActor->SetActorScale3D(FVector(ScaleMultiplier, ScaleMultiplier, ScaleMultiplier));
 	return SpawnedDecalActor;
 }
 
 TSubclassOf<AActor> URadixiteGrowthComponent::GetRandomGrowthNodeClass() const
 {
-	if (GrowthNodeOptions.GrowthNodeClasses.Num() == 0)
+	if (M_GrowthNodeOptions.GrowthNodeClasses.Num() == 0)
 	{
 		return nullptr;
 	}
 
-	return GrowthNodeOptions.GrowthNodeClasses[FMath::RandRange(0, GrowthNodeOptions.GrowthNodeClasses.Num() - 1)];
+	const int32 RandomNodeClassIndex = FMath::RandRange(0, M_GrowthNodeOptions.GrowthNodeClasses.Num() - 1);
+	return M_GrowthNodeOptions.GrowthNodeClasses[RandomNodeClassIndex];
 }
 
 void URadixiteGrowthComponent::HandleSpawnedGrowthNodeDestroyed(AActor* DestroyedActor)
@@ -744,9 +870,9 @@ void URadixiteGrowthComponent::HandleSpawnedGrowthNodeDestroyed(AActor* Destroye
 		return;
 	}
 
-	const int32 NodeIndex = M_GrowthNodes.IndexOfByPredicate([DestroyedNodeId](const FRadixiteGrowthNodeRecord& Node)
+	const int32 NodeIndex = M_GrowthNodes.IndexOfByPredicate([DestroyedNodeId](const FRadixiteGrowthNodeRecord& NodeRecord)
 	{
-		return Node.NodeId == DestroyedNodeId;
+		return NodeRecord.NodeId == DestroyedNodeId;
 	});
 	if (not M_GrowthNodes.IsValidIndex(NodeIndex))
 	{

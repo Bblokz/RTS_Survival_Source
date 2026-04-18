@@ -7,16 +7,17 @@
 class ADecalActor;
 class UNavigationSystemV1;
 class UMaterialInterface;
+struct FPathFindingQuery;
 
 UENUM(BlueprintType, meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
 enum class ERadixiteGrowthDirectionBias : uint8
 {
-	None = 0 UMETA(DisplayName = "No Preference"),
-	WorldPosX = 1 << 0 UMETA(DisplayName = "World Pos X"),
-	WorldNegX = 1 << 1 UMETA(DisplayName = "World Neg X"),
-	WorldPosY = 1 << 2 UMETA(DisplayName = "World Pos Y"),
-	WorldNegY = 1 << 3 UMETA(DisplayName = "World Neg Y"),
-	NoPreference = 1 << 4 UMETA(DisplayName = "No Preference (Disable Bias)")
+	None = 0 UMETA(Hidden),
+	NoPreference = 1 << 0 UMETA(DisplayName = "No Preference"),
+	WorldPosX = 1 << 1 UMETA(DisplayName = "World Pos X"),
+	WorldNegX = 1 << 2 UMETA(DisplayName = "World Neg X"),
+	WorldPosY = 1 << 3 UMETA(DisplayName = "World Pos Y"),
+	WorldNegY = 1 << 4 UMETA(DisplayName = "World Neg Y")
 };
 ENUM_CLASS_FLAGS(ERadixiteGrowthDirectionBias);
 
@@ -77,6 +78,9 @@ struct FRadixiteGrowthBranchRecord
 	float InitialYaw = 0.f;
 
 	UPROPERTY()
+	int32 InitialYawBucket = INDEX_NONE;
+
+	UPROPERTY()
 	FVector PendingNodeLocation = FVector::ZeroVector;
 
 	UPROPERTY()
@@ -92,6 +96,9 @@ struct FRadixiteGrowthNodeRecord
 	int32 NodeId = INDEX_NONE;
 
 	UPROPERTY()
+	bool bM_IsRootNode = false;
+
+	UPROPERTY()
 	FVector Location = FVector::ZeroVector;
 
 	UPROPERTY()
@@ -105,8 +112,8 @@ struct FRadixiteGrowthNodeRecord
 };
 
 /**
- * @brief Attach this component to a root radixite actor and configure growth settings in BP defaults.
- * The component expands decal branches, then grows node actors on validated branch endpoints.
+ * @brief Attach this component to a radixite owner actor and drive growth from BP defaults.
+ * It expands decal branches first, then spawns node actors at validated branch endpoints.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URadixiteGrowthComponent : public UActorComponent
@@ -128,9 +135,22 @@ private:
 	void TickDecalGrowth();
 	void TickNodeGrowth();
 	void CleanupInvalidReferences();
+	void CleanupInvalidBranchDecals(FRadixiteGrowthBranchRecord& BranchRecord) const;
+	bool GetHasAtLeastOneValidDecal(const FRadixiteGrowthBranchRecord& BranchRecord) const;
 
 	bool TrySpawnDecalBranch();
 	bool TrySpawnDecalBranchForNode(const int32 StartNodeId);
+
+	/**
+	 * @brief Builds and validates the full branch path before spawning decals to avoid partial placement.
+	 * @param StartLocation Source location for the first branch segment.
+	 * @param BranchLength Number of decal segments to build in this branch.
+	 * @param InitialYaw Starting yaw of the first segment.
+	 * @param DirectionSign +1 or -1 for offset rotation stepping.
+	 * @param SegmentDistance Segment length used for each decal step.
+	 * @param OutBranchPoints Ordered points from source to last segment endpoint.
+	 * @return True when every segment endpoint is valid and can be used for spawning.
+	 */
 	bool TryBuildBranchPoints(
 		const FVector& StartLocation,
 		const int32 BranchLength,
@@ -138,7 +158,15 @@ private:
 		const float DirectionSign,
 		const float SegmentDistance,
 		TArray<FVector>& OutBranchPoints) const;
+
+	/**
+	 * @brief Validates a growth point with landscape tracing, nav projection and nav-area-cost filtering.
+	 * @param DesiredPoint Candidate location before terrain projection.
+	 * @param OutValidatedPoint Final location on valid low-cost nav terrain.
+	 * @return True if the point is usable for decals and future node spawning.
+	 */
 	bool TryGetValidGrowthPoint(const FVector& DesiredPoint, FVector& OutValidatedPoint) const;
+	bool TryBuildHighCostQuery(FPathFindingQuery& OutPathFindingQuery, const FVector& QueryLocation) const;
 
 	bool TrySpawnGrowthNodeFromPendingBranch();
 	bool TrySpawnGrowthNodeForBranch(FRadixiteGrowthBranchRecord& BranchToGrow);
@@ -146,6 +174,7 @@ private:
 	void RegisterSpawnedBranch(
 		const int32 StartNodeId,
 		const float InitialYaw,
+		const int32 InitialYawBucket,
 		const FVector& PendingNodeLocation,
 		const TArray<TObjectPtr<ADecalActor>>& SpawnedDecals);
 	void RegisterSpawnedGrowthNode(
@@ -155,8 +184,10 @@ private:
 
 	void DestroyBranchDecals(FRadixiteGrowthBranchRecord& BranchRecord) const;
 	void RemoveBranchesForNodeDestruction(const int32 DestroyedNodeId, const int32 ConnectionsCount);
+	void RemoveBranchesThatNoLongerHaveDecals();
 	void RemoveBranchByIndex(const int32 BranchIndex);
 	void RemoveNodeConnections(const int32 DestroyedNodeId);
+	void ReleaseInitialYawBucket(const FRadixiteGrowthBranchRecord& BranchRecord);
 
 	bool GetIsValidOwnerActor() const;
 	bool GetIsValidNavigationSystem() const;
@@ -167,10 +198,12 @@ private:
 	int32 GetNextNodeId();
 	int32 GetNextBranchId();
 	int32 GetNodeIdByActor(const AActor* NodeActor) const;
+	int32 GetYawBucketFromYaw(const float YawToBucket) const;
 
 	bool TryGetUnsaturatedNodeIds(TArray<int32>& OutNodeIds) const;
 	bool TryChooseInitialYaw(const FRadixiteGrowthNodeRecord& NodeRecord, float& OutYaw, int32& OutYawBucket) const;
 	bool GetShouldUseDirectionalBias() const;
+	bool GetShouldIgnoreDirectionalBias() const;
 	float GetBiasedYaw() const;
 	float GetRandomOffsetYaw() const;
 
@@ -185,49 +218,49 @@ private:
 	void HandleSpawnedGrowthNodeDestroyed(AActor* DestroyedActor);
 
 	UPROPERTY(EditAnywhere, Category = "Radixite Growth|Bias", meta = (Bitmask, BitmaskEnum = "/Script/RTS_Survival.ERadixiteGrowthDirectionBias"))
-	int32 GrowthDirectionBias = static_cast<int32>(ERadixiteGrowthDirectionBias::None);
+	int32 M_GrowthDirectionBias = static_cast<int32>(ERadixiteGrowthDirectionBias::NoPreference);
 
 	UPROPERTY(EditAnywhere, Category = "Radixite Growth|Bias", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float GrowthDirectionBiasProbability = 0.5f;
+	float M_GrowthDirectionBiasProbability = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Intervals", meta = (ClampMin = "0.01"))
-	float IntervalNodeGrowth = 3.0f;
+	float M_IntervalNodeGrowth = 3.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Intervals", meta = (ClampMin = "0.01"))
-	float IntervalDecalGrowth = 0.35f;
+	float M_IntervalDecalGrowth = 0.35f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Decals")
-	TArray<FGrowthDecalOptions> GrowthDecalOptions;
+	TArray<FGrowthDecalOptions> M_GrowthDecalOptions;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Decals", meta = (ClampMin = "1.0"))
-	float MinDecalExpansionDistance = 100.f;
+	float M_MinDecalExpansionDistance = 100.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Decals", meta = (ClampMin = "1.0"))
-	float MaxDecalExpansionDistance = 250.f;
+	float M_MaxDecalExpansionDistance = 250.f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Decals")
-	float DecalRotationOffset = 10.f;
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Decals", meta = (ClampMin = "0.1"))
+	float M_DecalRotationOffset = 10.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Decals", meta = (ClampMin = "0"))
-	int32 MaxDecalGrowth = 100;
+	int32 M_MaxDecalGrowth = 100;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Nodes")
-	FGrowthNodeOptions GrowthNodeOptions;
+	FGrowthNodeOptions M_GrowthNodeOptions;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Nodes", meta = (ClampMin = "1"))
-	int32 MinDecalGrowthsUntilNode = 2;
+	int32 M_MinDecalGrowthsUntilNode = 2;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Nodes", meta = (ClampMin = "1"))
-	int32 MaxDecalGrowthsUntilNode = 4;
+	int32 M_MaxDecalGrowthsUntilNode = 4;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Spawning", meta = (ClampMin = "1"))
-	int32 MaxRetries = 6;
+	int32 M_MaxRetries = 6;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Spawning", meta = (ClampMin = "1.0"))
-	float ZLandscapeTraceOffset = 400.f;
+	float M_ZLandscapeTraceOffset = 400.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Spawning")
-	FVector ProjectionToNavMeshExtent = FVector(150.f, 150.f, 250.f);
+	FVector M_ProjectionToNavMeshExtent = FVector(150.f, 150.f, 250.f);
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_OwnerActor = nullptr;
@@ -235,9 +268,11 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UNavigationSystemV1> M_NavigationSystem = nullptr;
 
+	// Stores active growth-node graph connectivity and per-node used yaw buckets.
 	UPROPERTY()
 	TArray<FRadixiteGrowthNodeRecord> M_GrowthNodes;
 
+	// Tracks each spawned decal branch so node spawning and destruction cleanup stay deterministic.
 	UPROPERTY()
 	TArray<FRadixiteGrowthBranchRecord> M_DecalBranches;
 
