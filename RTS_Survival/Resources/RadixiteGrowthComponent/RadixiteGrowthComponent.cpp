@@ -2,9 +2,15 @@
 
 #include "NavigationSystem.h"
 #include "AI/NavigationSystemBase.h"
+#include "Components/AudioComponent.h"
 #include "Engine/DecalActor.h"
 #include "Engine/World.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "NavMesh/NavMeshPath.h"
+#include "Sound/SoundAttenuation.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundConcurrency.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSPathFindingHelpers/FRTSPathFindingHelpers.h"
@@ -12,9 +18,10 @@
 namespace RadixiteGrowthConstants
 {
 	constexpr float DecalSpawnPitch = -90.f;
+	constexpr float DecalSpawnYaw = 0.f;
 	constexpr float DecalSpawnRoll = 0.f;
 	constexpr float MinProjectionDistance = 1.f;
-	constexpr float DecalThickness = 2.f;
+	constexpr float DecalThickness = 16.f;
 }
 
 URadixiteGrowthComponent::URadixiteGrowthComponent()
@@ -34,6 +41,7 @@ void URadixiteGrowthComponent::BeginPlay()
 
 	BeginPlay_InitRootGrowthNode();
 	BeginPlay_InitGrowthTimers();
+	BeginPlay_InitOwnerDestructionCallback();
 }
 
 void URadixiteGrowthComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -42,7 +50,21 @@ void URadixiteGrowthComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(M_TimerHandleDecalGrowth);
 		World->GetTimerManager().ClearTimer(M_TimerHandleNodeGrowth);
+		World->GetTimerManager().ClearTimer(M_TimerHandleOwnerDestruction);
 	}
+
+	for (const TPair<TObjectPtr<ADecalActor>, FTimerHandle>& ActiveShrinkTimer : M_ActiveDecalShrinkTimers)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(ActiveShrinkTimer.Value);
+		}
+	}
+	M_ActiveDecalShrinkTimers.Empty();
+	TryDestroyRuntimeFxCache(M_DecalCreationFxCacheRuntime);
+	TryDestroyRuntimeFxCache(M_DecalDestructionFxCacheRuntime);
+	TryDestroyRuntimeFxCache(M_NodeCreationFxCacheRuntime);
+	TryDestroyRuntimeFxCache(M_NodeDestructionFxCacheRuntime);
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -104,6 +126,16 @@ void URadixiteGrowthComponent::BeginPlay_InitGrowthTimers()
 		true);
 }
 
+void URadixiteGrowthComponent::BeginPlay_InitOwnerDestructionCallback()
+{
+	if (not GetIsValidOwnerActor())
+	{
+		return;
+	}
+
+	M_OwnerActor->OnDestroyed.AddUniqueDynamic(this, &URadixiteGrowthComponent::HandleOwnerDestroyed);
+}
+
 void URadixiteGrowthComponent::TickDecalGrowth()
 {
 	CleanupInvalidReferences();
@@ -114,6 +146,49 @@ void URadixiteGrowthComponent::TickNodeGrowth()
 {
 	CleanupInvalidReferences();
 	TrySpawnGrowthNodeFromPendingBranch();
+}
+
+void URadixiteGrowthComponent::TickOwnerDestructionSequence()
+{
+	FRadixiteGrowthBranchRecord BranchToDestroy;
+	if (not TryPopNextDestructionBranch(BranchToDestroy))
+	{
+		StopOwnerDestructionSequence();
+		return;
+	}
+
+	for (TObjectPtr<ADecalActor> SpawnedDecal : BranchToDestroy.SpawnedDecals)
+	{
+		if (not IsValid(SpawnedDecal))
+		{
+			continue;
+		}
+
+		StartDecalShrinkAndDestroy(SpawnedDecal);
+	}
+
+	const int32 EndNodeId = BranchToDestroy.EndNodeId;
+	if (EndNodeId == INDEX_NONE)
+	{
+		return;
+	}
+
+	const int32 EndNodeIndex = M_GrowthNodes.IndexOfByPredicate([EndNodeId](const FRadixiteGrowthNodeRecord& NodeRecord)
+	{
+		return NodeRecord.NodeId == EndNodeId;
+	});
+	if (not M_GrowthNodes.IsValidIndex(EndNodeIndex))
+	{
+		return;
+	}
+
+	AActor* NodeActorToDestroy = M_GrowthNodes[EndNodeIndex].SpawnedNodeActor.Get();
+	if (not IsValid(NodeActorToDestroy))
+	{
+		return;
+	}
+
+	HandleNodeDestructionOverTime(NodeActorToDestroy);
 }
 
 void URadixiteGrowthComponent::CleanupInvalidReferences()
@@ -256,6 +331,7 @@ bool URadixiteGrowthComponent::TrySpawnDecalBranchForNode(const int32 StartNodeI
 		}
 
 		SpawnedDecals.Add(SpawnedDecal);
+		PlayCreationFxAtLocation(SpawnedDecal->GetActorLocation(), false);
 		SegmentYaw += DirectionSign * M_DecalRotationOffset;
 	}
 
@@ -417,6 +493,7 @@ bool URadixiteGrowthComponent::TrySpawnGrowthNodeForBranch(FRadixiteGrowthBranch
 	}
 
 	SpawnedNodeActor->OnDestroyed.AddUniqueDynamic(this, &URadixiteGrowthComponent::HandleSpawnedGrowthNodeDestroyed);
+	PlayCreationFxAtLocation(SpawnedNodeActor->GetActorLocation(), true);
 	RegisterSpawnedGrowthNode(BranchToGrow, SpawnedNodeActor, BranchToGrow.PendingNodeLocation);
 	return true;
 }
@@ -522,6 +599,241 @@ void URadixiteGrowthComponent::RemoveBranchByIndex(const int32 BranchIndex)
 	ReleaseInitialYawBucket(BranchRecord);
 	DestroyBranchDecals(BranchRecord);
 	M_DecalBranches.RemoveAt(BranchIndex);
+}
+
+void URadixiteGrowthComponent::DestroyAllGrowthContentImmediately()
+{
+	for (int32 BranchIndex = M_DecalBranches.Num() - 1; BranchIndex >= 0; --BranchIndex)
+	{
+		RemoveBranchByIndex(BranchIndex);
+	}
+
+	for (FRadixiteGrowthNodeRecord& NodeRecord : M_GrowthNodes)
+	{
+		if (NodeRecord.bM_IsRootNode)
+		{
+			continue;
+		}
+
+		AActor* NodeActor = NodeRecord.SpawnedNodeActor.Get();
+		if (not IsValid(NodeActor))
+		{
+			continue;
+		}
+
+		NodeActor->Destroy();
+	}
+}
+
+void URadixiteGrowthComponent::StartOwnerDestructionSequence()
+{
+	if (bM_IsOwnerDestructionSequenceActive)
+	{
+		return;
+	}
+
+	if (not GetIsValidWorld())
+	{
+		DestroyAllGrowthContentImmediately();
+		return;
+	}
+
+	bM_IsOwnerDestructionSequenceActive = true;
+	QueueDestructionBranchesInDistanceOrder();
+	if (M_OwnerDestructionBranchQueue.Num() == 0)
+	{
+		StopOwnerDestructionSequence();
+		return;
+	}
+
+	const TWeakObjectPtr<URadixiteGrowthComponent> WeakThis(this);
+	GetWorld()->GetTimerManager().SetTimer(
+		M_TimerHandleOwnerDestruction,
+		FTimerDelegate::CreateLambda([WeakThis]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->TickOwnerDestructionSequence();
+		}),
+		M_IntervalDestruction,
+		true);
+}
+
+void URadixiteGrowthComponent::StopOwnerDestructionSequence()
+{
+	bM_IsOwnerDestructionSequenceActive = false;
+	M_OwnerDestructionBranchQueue.Empty();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_TimerHandleOwnerDestruction);
+	}
+
+	if (M_ActiveDecalShrinkTimers.Num() > 0)
+	{
+		return;
+	}
+
+	TryDestroyRuntimeFxCache(M_DecalDestructionFxCacheRuntime);
+	TryDestroyRuntimeFxCache(M_NodeDestructionFxCacheRuntime);
+}
+
+bool URadixiteGrowthComponent::TryPopNextDestructionBranch(FRadixiteGrowthBranchRecord& OutBranchRecord)
+{
+	if (M_OwnerDestructionBranchQueue.Num() == 0)
+	{
+		return false;
+	}
+
+	const int32 BranchIndex = M_OwnerDestructionBranchQueue[0];
+	M_OwnerDestructionBranchQueue.RemoveAt(0);
+	if (not M_DecalBranches.IsValidIndex(BranchIndex))
+	{
+		return false;
+	}
+
+	OutBranchRecord = M_DecalBranches[BranchIndex];
+	ReleaseInitialYawBucket(M_DecalBranches[BranchIndex]);
+	M_DecalBranches.RemoveAt(BranchIndex);
+
+	for (int32 QueueIndex = 0; QueueIndex < M_OwnerDestructionBranchQueue.Num(); ++QueueIndex)
+	{
+		if (M_OwnerDestructionBranchQueue[QueueIndex] > BranchIndex)
+		{
+			--M_OwnerDestructionBranchQueue[QueueIndex];
+		}
+	}
+
+	return true;
+}
+
+void URadixiteGrowthComponent::QueueDestructionBranchesInDistanceOrder()
+{
+	M_OwnerDestructionBranchQueue.Reset();
+	if (not GetIsValidOwnerActor())
+	{
+		return;
+	}
+
+	const FVector OwnerLocation = M_OwnerActor->GetActorLocation();
+	TArray<TPair<int32, float>> QueueWithDistances;
+	QueueWithDistances.Reserve(M_DecalBranches.Num());
+	for (int32 BranchIndex = 0; BranchIndex < M_DecalBranches.Num(); ++BranchIndex)
+	{
+		const FRadixiteGrowthBranchRecord& BranchRecord = M_DecalBranches[BranchIndex];
+		const float BranchDistanceToOwner = FVector::DistSquared(OwnerLocation, BranchRecord.PendingNodeLocation);
+		QueueWithDistances.Add(TPair<int32, float>(BranchIndex, BranchDistanceToOwner));
+	}
+
+	QueueWithDistances.Sort([](const TPair<int32, float>& Left, const TPair<int32, float>& Right)
+	{
+		return Left.Value < Right.Value;
+	});
+
+	for (const TPair<int32, float>& QueueEntry : QueueWithDistances)
+	{
+		M_OwnerDestructionBranchQueue.Add(QueueEntry.Key);
+	}
+}
+
+void URadixiteGrowthComponent::StartDecalShrinkAndDestroy(ADecalActor* DecalToDestroy)
+{
+	if (not IsValid(DecalToDestroy))
+	{
+		return;
+	}
+
+	PlayDestructionFxAtLocation(DecalToDestroy->GetActorLocation(), false);
+	const FVector InitialScale = DecalToDestroy->GetActorScale3D();
+	const TWeakObjectPtr<ADecalActor> WeakDecal(DecalToDestroy);
+	float ElapsedTime = 0.f;
+
+	FTimerHandle ShrinkTimerHandle;
+	const TWeakObjectPtr<URadixiteGrowthComponent> WeakThis(this);
+	GetWorld()->GetTimerManager().SetTimer(
+		ShrinkTimerHandle,
+		FTimerDelegate::CreateLambda([WeakThis, WeakDecal, InitialScale, ElapsedTime]() mutable
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			if (not WeakDecal.IsValid())
+			{
+				return;
+			}
+
+			const float ShrinkTick = 0.03f;
+			ElapsedTime += ShrinkTick;
+			const float Alpha = FMath::Clamp(ElapsedTime / WeakThis->M_DecalShrinkTime, 0.f, 1.f);
+			const FVector NewScale = FMath::Lerp(InitialScale, FVector::ZeroVector, Alpha);
+			WeakDecal->SetActorScale3D(NewScale);
+
+			if (Alpha < 1.f)
+			{
+				return;
+			}
+
+			WeakDecal->Destroy();
+			if (not WeakThis->M_ActiveDecalShrinkTimers.Contains(WeakDecal.Get()))
+			{
+				return;
+			}
+
+			if (UWorld* World = WeakThis->GetWorld())
+			{
+				World->GetTimerManager().ClearTimer(WeakThis->M_ActiveDecalShrinkTimers[WeakDecal.Get()]);
+			}
+			WeakThis->M_ActiveDecalShrinkTimers.Remove(WeakDecal.Get());
+			if (WeakThis->M_ActiveDecalShrinkTimers.Num() > 0)
+			{
+				return;
+			}
+
+			if (WeakThis->bM_IsOwnerDestructionSequenceActive)
+			{
+				return;
+			}
+
+			WeakThis->TryDestroyRuntimeFxCache(WeakThis->M_DecalDestructionFxCacheRuntime);
+		}),
+		0.03f,
+		true);
+
+	M_ActiveDecalShrinkTimers.Add(DecalToDestroy, ShrinkTimerHandle);
+}
+
+void URadixiteGrowthComponent::HandleNodeDestructionOverTime(AActor* NodeActorToDestroy)
+{
+	if (not IsValid(NodeActorToDestroy))
+	{
+		return;
+	}
+
+	PlayDestructionFxAtLocation(NodeActorToDestroy->GetActorLocation(), true);
+	NodeActorToDestroy->SetLifeSpan(1.f);
+}
+
+void URadixiteGrowthComponent::TryDestroyRuntimeFxCache(FRadixiteGrowthFxCacheRuntime& FxCacheRuntime)
+{
+	if (IsValid(FxCacheRuntime.AudioComponent))
+	{
+		FxCacheRuntime.AudioComponent->Stop();
+		FxCacheRuntime.AudioComponent->DestroyComponent();
+	}
+
+	if (IsValid(FxCacheRuntime.NiagaraComponent))
+	{
+		FxCacheRuntime.NiagaraComponent->DeactivateImmediate();
+		FxCacheRuntime.NiagaraComponent->DestroyComponent();
+	}
+
+	FxCacheRuntime.AudioComponent = nullptr;
+	FxCacheRuntime.NiagaraComponent = nullptr;
 }
 
 void URadixiteGrowthComponent::RemoveNodeConnections(const int32 DestroyedNodeId)
@@ -829,10 +1141,16 @@ TObjectPtr<ADecalActor> URadixiteGrowthComponent::SpawnGrowthDecal(
 	}
 
 	const FVector SpawnLocation = (SegmentStart + SegmentEnd) * 0.5f;
-	const float ScaleMultiplier = SegmentDistance / FMath::Max(1.f, DecalOptions.DistanceCoveredAtScale1);
-	const FRotator SpawnRotation(RadixiteGrowthConstants::DecalSpawnPitch,
-		SegmentYaw + DecalOptions.AimAtRotationYaw,
+	const float ReachScale = SegmentDistance / FMath::Max(1.f, DecalOptions.DistanceCoveredAtScale1);
+	const float HalfReachAtScale1 = DecalOptions.DistanceCoveredAtScale1 * 0.5f;
+	const float HalfReachScaled = HalfReachAtScale1 * ReachScale;
+	const FRotator DecalProjectionRotation(
+		RadixiteGrowthConstants::DecalSpawnPitch,
+		RadixiteGrowthConstants::DecalSpawnYaw,
 		RadixiteGrowthConstants::DecalSpawnRoll);
+	const FRotator GrowthDirectionRotation(0.f, SegmentYaw + DecalOptions.AimAtRotationYaw, 0.f);
+	const FQuat SpawnRotationQuat = GrowthDirectionRotation.Quaternion() * DecalProjectionRotation.Quaternion();
+	const FRotator SpawnRotation = SpawnRotationQuat.Rotator();
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = M_OwnerActor.Get();
@@ -843,12 +1161,117 @@ TObjectPtr<ADecalActor> URadixiteGrowthComponent::SpawnGrowthDecal(
 	}
 
 	SpawnedDecalActor->SetDecalMaterial(DecalOptions.DecalMaterial);
-	SpawnedDecalActor->SetActorScale3D(FVector(
+	SpawnedDecalActor->SetDecalSize(FVector(
 		RadixiteGrowthConstants::DecalThickness,
-		SegmentDistance * 0.5f,
-		SegmentDistance * 0.5f));
-	SpawnedDecalActor->SetActorScale3D(FVector(ScaleMultiplier, ScaleMultiplier, ScaleMultiplier));
+		HalfReachScaled,
+		HalfReachScaled));
+	SpawnedDecalActor->SetActorScale3D(FVector::OneVector);
 	return SpawnedDecalActor;
+}
+
+void URadixiteGrowthComponent::PlayCreationFxAtLocation(const FVector& EffectLocation, const bool bIsNodeEffect)
+{
+	if (bIsNodeEffect)
+	{
+		PlayFxAtLocation(EffectLocation, M_NodeCreationFxSettings, M_NodeCreationFxCacheRuntime);
+		return;
+	}
+
+	PlayFxAtLocation(EffectLocation, M_DecalCreationFxSettings, M_DecalCreationFxCacheRuntime);
+}
+
+void URadixiteGrowthComponent::PlayDestructionFxAtLocation(const FVector& EffectLocation, const bool bIsNodeEffect)
+{
+	if (bIsNodeEffect)
+	{
+		PlayFxAtLocation(EffectLocation, M_NodeDestructionFxSettings, M_NodeDestructionFxCacheRuntime);
+		return;
+	}
+
+	PlayFxAtLocation(EffectLocation, M_DecalDestructionFxSettings, M_DecalDestructionFxCacheRuntime);
+}
+
+void URadixiteGrowthComponent::PlayFxAtLocation(
+	const FVector& EffectLocation,
+	const FGrowthFxSettings& GrowthFxSettings,
+	FRadixiteGrowthFxCacheRuntime& FxCacheRuntime)
+{
+	if (not GetIsValidWorld())
+	{
+		return;
+	}
+
+	UpdateCachedNiagaraFx(EffectLocation, GrowthFxSettings, FxCacheRuntime);
+	UpdateCachedAudioFx(EffectLocation, GrowthFxSettings, FxCacheRuntime);
+}
+
+void URadixiteGrowthComponent::UpdateCachedNiagaraFx(
+	const FVector& EffectLocation,
+	const FGrowthFxSettings& GrowthFxSettings,
+	FRadixiteGrowthFxCacheRuntime& FxCacheRuntime)
+{
+	if (not IsValid(GrowthFxSettings.NiagaraSystem))
+	{
+		return;
+	}
+
+	if (not IsValid(FxCacheRuntime.NiagaraComponent))
+	{
+		FxCacheRuntime.NiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(),
+			GrowthFxSettings.NiagaraSystem,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			false,
+			false,
+			ENCPoolMethod::None,
+			true);
+		if (not IsValid(FxCacheRuntime.NiagaraComponent))
+		{
+			return;
+		}
+	}
+	else
+	{
+		FxCacheRuntime.NiagaraComponent->SetAsset(GrowthFxSettings.NiagaraSystem);
+		FxCacheRuntime.NiagaraComponent->SetWorldLocation(EffectLocation);
+		FxCacheRuntime.NiagaraComponent->ResetSystem();
+		FxCacheRuntime.NiagaraComponent->Activate(true);
+	}
+}
+
+void URadixiteGrowthComponent::UpdateCachedAudioFx(
+	const FVector& EffectLocation,
+	const FGrowthFxSettings& GrowthFxSettings,
+	FRadixiteGrowthFxCacheRuntime& FxCacheRuntime)
+{
+	if (not IsValid(GrowthFxSettings.Sound))
+	{
+		return;
+	}
+
+	if (not IsValid(FxCacheRuntime.AudioComponent))
+	{
+		FxCacheRuntime.AudioComponent = NewObject<UAudioComponent>(this);
+		if (not IsValid(FxCacheRuntime.AudioComponent))
+		{
+			return;
+		}
+
+		FxCacheRuntime.AudioComponent->RegisterComponent();
+		FxCacheRuntime.AudioComponent->bAutoActivate = false;
+	}
+
+	FxCacheRuntime.AudioComponent->SetWorldLocation(EffectLocation);
+	FxCacheRuntime.AudioComponent->SetSound(GrowthFxSettings.Sound);
+	FxCacheRuntime.AudioComponent->AttenuationSettings = GrowthFxSettings.SoundAttenuation;
+	FxCacheRuntime.AudioComponent->ConcurrencySet.Reset();
+	if (IsValid(GrowthFxSettings.SoundConcurrency))
+	{
+		FxCacheRuntime.AudioComponent->ConcurrencySet.Add(GrowthFxSettings.SoundConcurrency);
+	}
+	FxCacheRuntime.AudioComponent->Play();
 }
 
 TSubclassOf<AActor> URadixiteGrowthComponent::GetRandomGrowthNodeClass() const
@@ -883,4 +1306,22 @@ void URadixiteGrowthComponent::HandleSpawnedGrowthNodeDestroyed(AActor* Destroye
 	RemoveBranchesForNodeDestruction(DestroyedNodeId, ConnectionsCount);
 	RemoveNodeConnections(DestroyedNodeId);
 	M_GrowthNodes.RemoveAt(NodeIndex);
+
+	if (GetCurrentSpawnedNodeCount() > 0 || bM_IsOwnerDestructionSequenceActive)
+	{
+		return;
+	}
+
+	TryDestroyRuntimeFxCache(M_NodeDestructionFxCacheRuntime);
+}
+
+void URadixiteGrowthComponent::HandleOwnerDestroyed(AActor* DestroyedActor)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_TimerHandleDecalGrowth);
+		World->GetTimerManager().ClearTimer(M_TimerHandleNodeGrowth);
+	}
+
+	StartOwnerDestructionSequence();
 }

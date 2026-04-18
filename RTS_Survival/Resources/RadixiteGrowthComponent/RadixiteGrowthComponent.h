@@ -7,6 +7,12 @@
 class ADecalActor;
 class UNavigationSystemV1;
 class UMaterialInterface;
+class UAudioComponent;
+class UNiagaraComponent;
+class UNiagaraSystem;
+class USoundAttenuation;
+class USoundBase;
+class USoundConcurrency;
 struct FPathFindingQuery;
 
 UENUM(BlueprintType, meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
@@ -55,6 +61,24 @@ struct FGrowthNodeOptions
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Growth Node", meta = (ClampMin = "0"))
 	int32 MaxDecalGrowthPerNode = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FGrowthFxSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Growth Fx")
+	TObjectPtr<UNiagaraSystem> NiagaraSystem = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Growth Fx")
+	TObjectPtr<USoundBase> Sound = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Growth Fx")
+	TObjectPtr<USoundAttenuation> SoundAttenuation = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Growth Fx")
+	TObjectPtr<USoundConcurrency> SoundConcurrency = nullptr;
 };
 
 USTRUCT()
@@ -111,6 +135,18 @@ struct FRadixiteGrowthNodeRecord
 	TSet<int32> UsedInitialYawOffsets;
 };
 
+USTRUCT()
+struct FRadixiteGrowthFxCacheRuntime
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraComponent> NiagaraComponent = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> AudioComponent = nullptr;
+};
+
 /**
  * @brief Attach this component to a radixite owner actor and drive growth from BP defaults.
  * It expands decal branches first, then spawns node actors at validated branch endpoints.
@@ -131,9 +167,11 @@ private:
 	void BeginPlay_InitCachedSystems();
 	void BeginPlay_InitRootGrowthNode();
 	void BeginPlay_InitGrowthTimers();
+	void BeginPlay_InitOwnerDestructionCallback();
 
 	void TickDecalGrowth();
 	void TickNodeGrowth();
+	void TickOwnerDestructionSequence();
 	void CleanupInvalidReferences();
 	void CleanupInvalidBranchDecals(FRadixiteGrowthBranchRecord& BranchRecord) const;
 	bool GetHasAtLeastOneValidDecal(const FRadixiteGrowthBranchRecord& BranchRecord) const;
@@ -183,6 +221,14 @@ private:
 		const FVector& SpawnLocation);
 
 	void DestroyBranchDecals(FRadixiteGrowthBranchRecord& BranchRecord) const;
+	void DestroyAllGrowthContentImmediately();
+	void StartOwnerDestructionSequence();
+	void StopOwnerDestructionSequence();
+	bool TryPopNextDestructionBranch(FRadixiteGrowthBranchRecord& OutBranchRecord);
+	void QueueDestructionBranchesInDistanceOrder();
+	void StartDecalShrinkAndDestroy(ADecalActor* DecalToDestroy);
+	void HandleNodeDestructionOverTime(AActor* NodeActorToDestroy);
+	void TryDestroyRuntimeFxCache(FRadixiteGrowthFxCacheRuntime& FxCacheRuntime);
 	void RemoveBranchesForNodeDestruction(const int32 DestroyedNodeId, const int32 ConnectionsCount);
 	void RemoveBranchesThatNoLongerHaveDecals();
 	void RemoveBranchByIndex(const int32 BranchIndex);
@@ -212,10 +258,27 @@ private:
 		const FVector& SegmentEnd,
 		const float SegmentDistance,
 		const float SegmentYaw);
+	void PlayCreationFxAtLocation(const FVector& EffectLocation, const bool bIsNodeEffect);
+	void PlayDestructionFxAtLocation(const FVector& EffectLocation, const bool bIsNodeEffect);
+	void PlayFxAtLocation(
+		const FVector& EffectLocation,
+		const FGrowthFxSettings& GrowthFxSettings,
+		FRadixiteGrowthFxCacheRuntime& FxCacheRuntime);
+	void UpdateCachedNiagaraFx(
+		const FVector& EffectLocation,
+		const FGrowthFxSettings& GrowthFxSettings,
+		FRadixiteGrowthFxCacheRuntime& FxCacheRuntime);
+	void UpdateCachedAudioFx(
+		const FVector& EffectLocation,
+		const FGrowthFxSettings& GrowthFxSettings,
+		FRadixiteGrowthFxCacheRuntime& FxCacheRuntime);
 	TSubclassOf<AActor> GetRandomGrowthNodeClass() const;
 
 	UFUNCTION()
 	void HandleSpawnedGrowthNodeDestroyed(AActor* DestroyedActor);
+
+	UFUNCTION()
+	void HandleOwnerDestroyed(AActor* DestroyedActor);
 
 	UPROPERTY(EditAnywhere, Category = "Radixite Growth|Bias", meta = (Bitmask, BitmaskEnum = "/Script/RTS_Survival.ERadixiteGrowthDirectionBias"))
 	int32 M_GrowthDirectionBias = static_cast<int32>(ERadixiteGrowthDirectionBias::NoPreference);
@@ -262,6 +325,24 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Spawning")
 	FVector M_ProjectionToNavMeshExtent = FVector(150.f, 150.f, 250.f);
 
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Destruction", meta = (ClampMin = "0.01"))
+	float M_IntervalDestruction = 0.1f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Destruction", meta = (ClampMin = "0.01"))
+	float M_DecalShrinkTime = 0.3f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Fx")
+	FGrowthFxSettings M_DecalCreationFxSettings;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Fx")
+	FGrowthFxSettings M_DecalDestructionFxSettings;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Fx")
+	FGrowthFxSettings M_NodeCreationFxSettings;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Fx")
+	FGrowthFxSettings M_NodeDestructionFxSettings;
+
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_OwnerActor = nullptr;
 
@@ -278,6 +359,24 @@ private:
 
 	FTimerHandle M_TimerHandleDecalGrowth;
 	FTimerHandle M_TimerHandleNodeGrowth;
+	FTimerHandle M_TimerHandleOwnerDestruction;
+
+	UPROPERTY()
+	FRadixiteGrowthFxCacheRuntime M_DecalCreationFxCacheRuntime;
+
+	UPROPERTY()
+	FRadixiteGrowthFxCacheRuntime M_DecalDestructionFxCacheRuntime;
+
+	UPROPERTY()
+	FRadixiteGrowthFxCacheRuntime M_NodeCreationFxCacheRuntime;
+
+	UPROPERTY()
+	FRadixiteGrowthFxCacheRuntime M_NodeDestructionFxCacheRuntime;
+
+	TMap<TObjectPtr<ADecalActor>, FTimerHandle> M_ActiveDecalShrinkTimers;
+	TArray<int32> M_OwnerDestructionBranchQueue;
+
+	bool bM_IsOwnerDestructionSequenceActive = false;
 
 	int32 M_NextNodeId = 0;
 	int32 M_NextBranchId = 0;
