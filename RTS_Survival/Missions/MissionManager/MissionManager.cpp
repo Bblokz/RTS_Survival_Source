@@ -140,7 +140,14 @@ void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, cons
 		return;
 	}
 
-	M_CompletedMissionClasses.Add(CompletedMission->GetClass());
+	const UClass* CompletedMissionClass = CompletedMission->GetClass();
+	if (not IsValid(CompletedMissionClass))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager could not resolve class for completed mission.");
+		return;
+	}
+
+	M_CompletedMissionClassPaths.Add(CompletedMissionClass->GetClassPathName());
 	RemoveAllMissionTriggerAreasForMission(CompletedMission);
 	RemoveActiveMission(CompletedMission);
 	if (bPlaySound)
@@ -529,7 +536,13 @@ bool AMissionManager::GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase>
 		return false;
 	}
 
-	return M_CompletedMissionClasses.Contains(MissionClass);
+	const UClass* MissionClassRaw = MissionClass.Get();
+	if (not IsValid(MissionClassRaw))
+	{
+		return false;
+	}
+
+	return M_CompletedMissionClassPaths.Contains(MissionClassRaw->GetClassPathName());
 }
 
 void AMissionManager::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
@@ -754,7 +767,7 @@ void AMissionManager::HandleSpawnActorWithCommandQueueSpawned(const int32 Reques
 void AMissionManager::BeginPlay()
 {
 	Super::BeginPlay();
-	M_CompletedMissionClasses.Empty();
+	M_CompletedMissionClassPaths.Empty();
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
@@ -808,7 +821,7 @@ void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	M_TrackedEnemyActorRefCounts.Empty();
 	M_EnemyUnitDestroyedCallbacks.Empty();
-	M_CompletedMissionClasses.Empty();
+	M_CompletedMissionClassPaths.Empty();
 
 	for (UMissionBase* Mission : M_ActiveMissions)
 	{

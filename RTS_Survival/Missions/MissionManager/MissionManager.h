@@ -374,7 +374,9 @@ private:
 	TArray<UMissionBase*> M_ActiveMissions;
 
 	// Tracks exact mission classes that have completed to support class-driven trigger branching.
-	TSet<TSubclassOf<UMissionBase>> M_CompletedMissionClasses;
+	// We store class paths instead of raw UClass pointers to avoid stale class pointer crashes when classes unload.
+	UPROPERTY(Transient)
+	TSet<FTopLevelAssetPath> M_CompletedMissionClassPaths;
 
 	TSubclassOf<UW_MissionWidgetManager> M_WidgetManagerClass;
 
