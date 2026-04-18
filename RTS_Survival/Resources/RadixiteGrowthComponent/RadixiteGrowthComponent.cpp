@@ -14,7 +14,7 @@ namespace RadixiteGrowthConstants
 	constexpr float DecalSpawnPitch = -90.f;
 	constexpr float DecalSpawnRoll = 0.f;
 	constexpr float MinProjectionDistance = 1.f;
-	constexpr float DecalThickness = 16.f;
+	constexpr float DecalThickness = 2.f;
 }
 
 URadixiteGrowthComponent::URadixiteGrowthComponent()
@@ -843,7 +843,7 @@ TObjectPtr<ADecalActor> URadixiteGrowthComponent::SpawnGrowthDecal(
 	}
 
 	SpawnedDecalActor->SetDecalMaterial(DecalOptions.DecalMaterial);
-	SpawnedDecalActor->SetDecalSize(FVector(
+	SpawnedDecalActor->SetActorScale3D(FVector(
 		RadixiteGrowthConstants::DecalThickness,
 		SegmentDistance * 0.5f,
 		SegmentDistance * 0.5f));
