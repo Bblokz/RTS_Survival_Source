@@ -1027,6 +1027,149 @@ TArray<ATankMaster*> UGameUnitManager::GetPlayerTanks(const uint8 Player) const
 	return M_TankMastersAliveEnemy;
 }
 
+int32 UGameUnitManager::GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const
+{
+	if (SquadTypes.Num() == 0)
+	{
+		return 0;
+	}
+
+	const TSet<ESquadSubtype> RequestedSquadTypes(SquadTypes);
+	const TArray<ASquadUnit*>& SquadUnits = Player == 1 ? M_SquadUnitAlivePlayer : M_SquadUnitsAliveEnemy;
+
+	int32 MatchingSquadCount = 0;
+	for (const ASquadUnit* SquadUnit : SquadUnits)
+	{
+		if (not IsValid(SquadUnit))
+		{
+			continue;
+		}
+
+		const URTSComponent* SquadRTSComponent = SquadUnit->GetRTSComponent();
+		if (not IsValid(SquadRTSComponent))
+		{
+			continue;
+		}
+
+		if (RequestedSquadTypes.Contains(SquadRTSComponent->GetSubtypeAsSquadSubtype()))
+		{
+			++MatchingSquadCount;
+		}
+	}
+
+	return MatchingSquadCount;
+}
+
+int32 UGameUnitManager::GetPlayerTankCountOfTypes(const uint8 Player, const TArray<ETankSubtype>& TankTypes) const
+{
+	if (TankTypes.Num() == 0)
+	{
+		return 0;
+	}
+
+	const TSet<ETankSubtype> RequestedTankTypes(TankTypes);
+	const TArray<ATankMaster*>& TankUnits = Player == 1 ? M_TankMastersAlivePlayer : M_TankMastersAliveEnemy;
+
+	int32 MatchingTankCount = 0;
+	for (const ATankMaster* TankUnit : TankUnits)
+	{
+		if (not IsValid(TankUnit))
+		{
+			continue;
+		}
+
+		const URTSComponent* TankRTSComponent = TankUnit->GetRTSComponent();
+		if (not IsValid(TankRTSComponent))
+		{
+			continue;
+		}
+
+		if (TankRTSComponent->GetUnitType() != EAllUnitType::UNType_Tank)
+		{
+			continue;
+		}
+
+		if (RequestedTankTypes.Contains(TankRTSComponent->GetSubtypeAsTankSubtype()))
+		{
+			++MatchingTankCount;
+		}
+	}
+
+	return MatchingTankCount;
+}
+
+int32 UGameUnitManager::GetPlayerBxpCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const
+{
+	if (BxpTypes.Num() == 0)
+	{
+		return 0;
+	}
+
+	const TSet<EBuildingExpansionType> RequestedBxpTypes(BxpTypes);
+	const TArray<ABuildingExpansion*>& BuildingExpansions = Player == 1 ? M_BxpAlivePlayer : M_BxpAliveEnemy;
+
+	int32 MatchingBxpCount = 0;
+	for (const ABuildingExpansion* BuildingExpansion : BuildingExpansions)
+	{
+		if (not IsValid(BuildingExpansion))
+		{
+			continue;
+		}
+
+		const URTSComponent* BuildingExpansionRTSComponent = BuildingExpansion->GetRTSComponent();
+		if (not IsValid(BuildingExpansionRTSComponent))
+		{
+			continue;
+		}
+
+		if (BuildingExpansionRTSComponent->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
+		{
+			continue;
+		}
+
+		if (RequestedBxpTypes.Contains(BuildingExpansionRTSComponent->GetSubtypeAsBxpSubtype()))
+		{
+			++MatchingBxpCount;
+		}
+	}
+
+	return MatchingBxpCount;
+}
+
+int32 UGameUnitManager::GetPlayerAircraftCountOfTypes(const uint8 Player,
+                                                       const TArray<EAircraftSubtype>& AircraftTypes) const
+{
+	if (AircraftTypes.Num() == 0)
+	{
+		return 0;
+	}
+
+	const TSet<EAircraftSubtype> RequestedAircraftTypes(AircraftTypes);
+	const TArray<AAircraftMaster*>& AircraftUnits = Player == 1 ? M_AircraftMastersAlivePlayer : M_AircraftMastersAliveEnemy;
+
+	int32 MatchingAircraftCount = 0;
+	for (const AAircraftMaster* AircraftUnit : AircraftUnits)
+	{
+		if (not IsValid(AircraftUnit))
+		{
+			continue;
+		}
+
+		const URTSComponent* AircraftRTSComponent = AircraftUnit->GetRTSComponent();
+		if (not IsValid(AircraftRTSComponent))
+		{
+			continue;
+		}
+
+		if (RequestedAircraftTypes.Contains(AircraftRTSComponent->GetSubtypeAsAircraftSubtype()))
+		{
+			++MatchingAircraftCount;
+		}
+	}
+
+	return MatchingAircraftCount;
+}
+
 ATankMaster* UGameUnitManager::GetPlayerCommandVehicle() const
 {
 	for (ATankMaster* EachTank : M_TankMastersAlivePlayer)

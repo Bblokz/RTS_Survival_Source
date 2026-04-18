@@ -18,6 +18,8 @@
 struct FSeededChoices;
 class ADestructableEnvActor;
 enum class ERTSPortraitTypes : uint8;
+enum class EBuildingExpansionType : uint8;
+enum class EAircraftSubtype : uint8;
 class AEnemyController;
 class ASquadController;
 class ATankMaster;
@@ -326,6 +328,18 @@ protected:
 	void CallbackOnEnemyUnitsDestroyed(
 		const EEnemyUnitQueryType EnemyUnitQueryType,
 		const int32 ID);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	int32 DoesPlayerHaveAnySquadsOfType(const TArray<ESquadSubtype>& SquadTypes) const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	int32 DoesPlayerHaveAnyTankMastersOfType(const TArray<ETankSubtype>& TankTypes) const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	int32 DoesPlayerHaveAnyBuildingExpansionsOfType(const TArray<EBuildingExpansionType>& BuildingExpansionTypes) const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	int32 DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraftSubtype>& AircraftTypes) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AEnemyController* GetEnemyControllerChecked() const;

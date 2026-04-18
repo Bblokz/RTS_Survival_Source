@@ -11,6 +11,8 @@
 #include "GameUnitManager.generated.h"
 
 class AAircraftMaster;
+enum class EAircraftSubtype : uint8;
+enum class EBuildingExpansionType : uint8;
 enum class ESquadSubtype : uint8;
 enum class ENomadicSubtype : uint8;
 enum class ETankSubtype : uint8;
@@ -157,6 +159,11 @@ public:
 	 * @param Player The player that owns the tanks
 	 */
 	TArray<ATankMaster*> GetPlayerTanks(const uint8 Player) const;
+
+	int32 GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const;
+	int32 GetPlayerTankCountOfTypes(const uint8 Player, const TArray<ETankSubtype>& TankTypes) const;
+	int32 GetPlayerBxpCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const;
+	int32 GetPlayerAircraftCountOfTypes(const uint8 Player, const TArray<EAircraftSubtype>& AircraftTypes) const;
 
 	/**
 	 * @brief Returns the first alive player tank configured as the command vehicle subtype.
