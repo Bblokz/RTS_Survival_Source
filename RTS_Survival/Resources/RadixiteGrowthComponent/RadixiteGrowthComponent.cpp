@@ -61,6 +61,16 @@ void URadixiteGrowthComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 	M_ActiveDecalShrinkTimers.Empty();
+
+	for (TPair<TObjectPtr<AActor>, FTimerHandle>& ActiveNodeSpawnAnimationTimer : M_ActiveNodeSpawnAnimationTimers)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(ActiveNodeSpawnAnimationTimer.Value);
+		}
+	}
+	M_ActiveNodeSpawnAnimationTimers.Empty();
+
 	TryDestroyRuntimeFxCache(M_DecalCreationFxCacheRuntime);
 	TryDestroyRuntimeFxCache(M_DecalDestructionFxCacheRuntime);
 	TryDestroyRuntimeFxCache(M_NodeCreationFxCacheRuntime);
@@ -84,6 +94,7 @@ void URadixiteGrowthComponent::BeginPlay_InitRootGrowthNode()
 	RootNode.NodeId = GetNextNodeId();
 	RootNode.bM_IsRootNode = true;
 	RootNode.Location = M_OwnerActor->GetActorLocation();
+	M_LastKnownOwnerLocation = RootNode.Location;
 	RootNode.SpawnedNodeActor = M_OwnerActor;
 	M_GrowthNodes.Add(RootNode);
 }
@@ -153,6 +164,7 @@ void URadixiteGrowthComponent::TickOwnerDestructionSequence()
 	FRadixiteGrowthBranchRecord BranchToDestroy;
 	if (not TryPopNextDestructionBranch(BranchToDestroy))
 	{
+		DestroyRemainingGrowthNodesForOwnerDestruction();
 		StopOwnerDestructionSequence();
 		return;
 	}
@@ -480,11 +492,12 @@ bool URadixiteGrowthComponent::TrySpawnGrowthNodeForBranch(FRadixiteGrowthBranch
 	}
 
 	const float RandomYaw = FMath::FRandRange(M_GrowthNodeOptions.MinRotation, M_GrowthNodeOptions.MaxRotation);
+	const FVector SpawnStartLocation = BranchToGrow.PendingNodeLocation - FVector(0.f, 0.f, M_NodeSpawnStartZOffset);
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = M_OwnerActor.Get();
 	AActor* SpawnedNodeActor = GetWorld()->SpawnActor<AActor>(
 		GrowthNodeClass,
-		BranchToGrow.PendingNodeLocation,
+		SpawnStartLocation,
 		FRotator(0.f, RandomYaw, 0.f),
 		SpawnParameters);
 	if (not IsValid(SpawnedNodeActor))
@@ -493,6 +506,7 @@ bool URadixiteGrowthComponent::TrySpawnGrowthNodeForBranch(FRadixiteGrowthBranch
 	}
 
 	SpawnedNodeActor->OnDestroyed.AddUniqueDynamic(this, &URadixiteGrowthComponent::HandleSpawnedGrowthNodeDestroyed);
+	StartNodeSpawnVerticalAnimation(SpawnedNodeActor, BranchToGrow.PendingNodeLocation);
 	PlayCreationFxAtLocation(SpawnedNodeActor->GetActorLocation(), true);
 	RegisterSpawnedGrowthNode(BranchToGrow, SpawnedNodeActor, BranchToGrow.PendingNodeLocation);
 	return true;
@@ -713,12 +727,7 @@ bool URadixiteGrowthComponent::TryPopNextDestructionBranch(FRadixiteGrowthBranch
 void URadixiteGrowthComponent::QueueDestructionBranchesInDistanceOrder()
 {
 	M_OwnerDestructionBranchQueue.Reset();
-	if (not GetIsValidOwnerActor())
-	{
-		return;
-	}
-
-	const FVector OwnerLocation = M_OwnerActor->GetActorLocation();
+	const FVector OwnerLocation = M_OwnerActor.IsValid() ? M_OwnerActor->GetActorLocation() : M_LastKnownOwnerLocation;
 	TArray<TPair<int32, float>> QueueWithDistances;
 	QueueWithDistances.Reserve(M_DecalBranches.Num());
 	for (int32 BranchIndex = 0; BranchIndex < M_DecalBranches.Num(); ++BranchIndex)
@@ -736,6 +745,25 @@ void URadixiteGrowthComponent::QueueDestructionBranchesInDistanceOrder()
 	for (const TPair<int32, float>& QueueEntry : QueueWithDistances)
 	{
 		M_OwnerDestructionBranchQueue.Add(QueueEntry.Key);
+	}
+}
+
+void URadixiteGrowthComponent::DestroyRemainingGrowthNodesForOwnerDestruction()
+{
+	for (const FRadixiteGrowthNodeRecord& NodeRecord : M_GrowthNodes)
+	{
+		if (NodeRecord.bM_IsRootNode)
+		{
+			continue;
+		}
+
+		AActor* NodeActorToDestroy = NodeRecord.SpawnedNodeActor.Get();
+		if (not IsValid(NodeActorToDestroy))
+		{
+			continue;
+		}
+
+		HandleNodeDestructionOverTime(NodeActorToDestroy);
 	}
 }
 
@@ -816,6 +844,75 @@ void URadixiteGrowthComponent::HandleNodeDestructionOverTime(AActor* NodeActorTo
 
 	PlayDestructionFxAtLocation(NodeActorToDestroy->GetActorLocation(), true);
 	NodeActorToDestroy->SetLifeSpan(1.f);
+}
+
+void URadixiteGrowthComponent::StartNodeSpawnVerticalAnimation(AActor* SpawnedNodeActor, const FVector& FinalSpawnLocation)
+{
+	if (not IsValid(SpawnedNodeActor))
+	{
+		return;
+	}
+
+	if (M_NodeSpawnVerticalAnimationTime <= 0.f)
+	{
+		SpawnedNodeActor->SetActorLocation(FinalSpawnLocation);
+		return;
+	}
+
+	if (not GetIsValidWorld())
+	{
+		SpawnedNodeActor->SetActorLocation(FinalSpawnLocation);
+		return;
+	}
+
+	const float AnimationTickInterval = 0.03f;
+	const FVector SpawnStartLocation = SpawnedNodeActor->GetActorLocation();
+	const TWeakObjectPtr<URadixiteGrowthComponent> WeakThis(this);
+	const TWeakObjectPtr<AActor> WeakNodeActor(SpawnedNodeActor);
+	float ElapsedAnimationTime = 0.f;
+
+	FTimerHandle NodeSpawnAnimationTimerHandle;
+	GetWorld()->GetTimerManager().SetTimer(
+		NodeSpawnAnimationTimerHandle,
+		FTimerDelegate::CreateLambda([WeakThis, WeakNodeActor, SpawnStartLocation, FinalSpawnLocation, ElapsedAnimationTime, AnimationTickInterval]() mutable
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			if (not WeakNodeActor.IsValid())
+			{
+				return;
+			}
+
+			ElapsedAnimationTime += AnimationTickInterval;
+			const float AnimationAlpha = FMath::Clamp(
+				ElapsedAnimationTime / WeakThis->M_NodeSpawnVerticalAnimationTime,
+				0.f,
+				1.f);
+			const FVector CurrentAnimationLocation = FMath::Lerp(SpawnStartLocation, FinalSpawnLocation, AnimationAlpha);
+			WeakNodeActor->SetActorLocation(CurrentAnimationLocation);
+			if (AnimationAlpha < 1.f)
+			{
+				return;
+			}
+
+			if (not WeakThis->M_ActiveNodeSpawnAnimationTimers.Contains(WeakNodeActor.Get()))
+			{
+				return;
+			}
+
+			if (UWorld* World = WeakThis->GetWorld())
+			{
+				World->GetTimerManager().ClearTimer(WeakThis->M_ActiveNodeSpawnAnimationTimers[WeakNodeActor.Get()]);
+			}
+			WeakThis->M_ActiveNodeSpawnAnimationTimers.Remove(WeakNodeActor.Get());
+		}),
+		AnimationTickInterval,
+		true);
+
+	M_ActiveNodeSpawnAnimationTimers.Add(SpawnedNodeActor, NodeSpawnAnimationTimerHandle);
 }
 
 void URadixiteGrowthComponent::TryDestroyRuntimeFxCache(FRadixiteGrowthFxCacheRuntime& FxCacheRuntime)
@@ -1318,6 +1415,11 @@ void URadixiteGrowthComponent::HandleSpawnedGrowthNodeDestroyed(AActor* Destroye
 
 void URadixiteGrowthComponent::HandleOwnerDestroyed(AActor* DestroyedActor)
 {
+	if (IsValid(DestroyedActor))
+	{
+		M_LastKnownOwnerLocation = DestroyedActor->GetActorLocation();
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_TimerHandleDecalGrowth);
