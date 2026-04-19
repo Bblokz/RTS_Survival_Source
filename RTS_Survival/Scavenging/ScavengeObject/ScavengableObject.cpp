@@ -176,6 +176,7 @@ void AScavengeableObject::OnScavengingComplete()
 
 	AsyncLoadAndCreateRewardWidget();
 
+	OnScavenged.Broadcast();
 
 	// Trigger destruction in ADestructibleActor with BP_OnUnitDies event for collapse mesh or swap mesh logic.
 	// Sets unit's bIsAlive=false;

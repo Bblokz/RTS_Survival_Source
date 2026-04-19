@@ -18,6 +18,7 @@
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Player/PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
+#include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
@@ -828,6 +829,23 @@ void UMissionBase::RegisterCallbackOnDestructibleCollapse(ADestructableEnvActor*
 		}
 	};
 	ActorToTrackWhenCollapse->OnDestructibleCollapse.AddLambda(MissionCallBack);
+}
+
+void UMissionBase::RegisterCallbackOnScavengableObjectScavenged(AScavengeableObject* ScavengableObject)
+{
+	if (not IsValid(ScavengableObject))
+	{
+		return;
+	}
+	TWeakObjectPtr<UMissionBase> WeakThis(this);
+	auto MissionCallBack = [WeakThis, ScavengableObject]()-> void
+	{
+		if (WeakThis.IsValid())
+		{
+			WeakThis.Get()->BP_OnCallBackScavengableObjectScavenged(ScavengableObject);
+		}
+	};
+	ScavengableObject->OnScavenged.AddLambda(MissionCallBack);
 }
 
 
