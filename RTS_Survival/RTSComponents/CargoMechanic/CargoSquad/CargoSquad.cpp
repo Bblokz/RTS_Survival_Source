@@ -368,25 +368,52 @@ bool UCargoSquad::AbilityRequiresOutside(const EAbilityID Ability)
 
 void UCargoSquad::AttachUnitAndDisableMovement(ASquadUnit* Unit, UCargo* Cargo, const FName& SocketName) const
 {
-        if (not IsValid(Unit) || not IsValid(Cargo) || not Cargo->GetIsValidCargoMesh())
-        {
-                return;
-        }
+	if (not IsValid(Unit) || not IsValid(Cargo) || not Cargo->GetIsValidCargoMesh())
+	{
+		return;
+	}
 
-        Unit->Force_TerminateMovement();
+	Unit->Force_TerminateMovement();
 	if (UCharacterMovementComponent* Move = Unit->GetCharacterMovement())
 	{
 		Move->StopMovementImmediately();
 		Move->DisableMovement();
 	}
 
-        // Compute desired world transform = (socket world) + (cargo seat offset in world space)
-        const FVector UnitOriginalScale = Unit->GetActorScale3D();
-        const FTransform SocketWorld = Cargo->GetSocketWorldTransform(SocketName);
+	// Compute desired world transform = (socket world) + (cargo seat offset in world space)
+	const FVector UnitOriginalScale = Unit->GetActorScale3D();
+	if (not GetIsFiniteVector(UnitOriginalScale))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UCargoSquad::AttachUnitAndDisableMovement -> Unit scale was non-finite."));
+		return;
+	}
 
-        FTransform DesiredWorld = SocketWorld;
-        DesiredWorld.SetLocation(SocketWorld.GetLocation() + Cargo->GetSeatOffset());
-        DesiredWorld.SetScale3D(UnitOriginalScale);
+	const FTransform SocketWorld = Cargo->GetSocketWorldTransform(SocketName);
+	if (not GetIsFiniteTransform(SocketWorld))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UCargoSquad::AttachUnitAndDisableMovement -> Socket transform was non-finite."));
+		return;
+	}
+
+	const FVector SeatOffset = Cargo->GetSeatOffset();
+	if (not GetIsFiniteVector(SeatOffset))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UCargoSquad::AttachUnitAndDisableMovement -> Seat offset was non-finite."));
+		return;
+	}
+
+	FTransform DesiredWorld = SocketWorld;
+	DesiredWorld.SetLocation(SocketWorld.GetLocation() + SeatOffset);
+	DesiredWorld.SetScale3D(UnitOriginalScale);
+	if (not GetIsFiniteTransform(DesiredWorld))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UCargoSquad::AttachUnitAndDisableMovement -> Desired world transform was non-finite."));
+		return;
+	}
 
 	if (UPrimitiveComponent* Mesh = Cargo->GetCargoMesh())
 	{
@@ -417,15 +444,31 @@ void UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance(ASquadUnit* Unit,
 		Move->SetMovementMode(MOVE_Walking);
 	}
 
-	const FVector Base = Cargo->GetClosestEntranceWorldLocation(
-		M_OwningController.IsValid() ? M_OwningController->GetActorLocation() : Unit->GetActorLocation());
+	const FVector ReferenceLocation = GetIsValidController()
+		? M_OwningController->GetActorLocation()
+		: Unit->GetActorLocation();
+	const FVector Base = Cargo->GetClosestEntranceWorldLocation(ReferenceLocation);
+	if (not GetIsFiniteVector(Base))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance -> Base location was non-finite."));
+		return;
+	}
 	// Small randomized ring to avoid overlap; navmesh projection can happen later by unit itself on next move.
 	const float Radius = 75.f;
 	const float AngleDeg = FMath::FRandRange(0.f, 360.f);
 	const FVector Offset = FVector(FMath::Cos(FMath::DegreesToRadians(AngleDeg)) * Radius,
 	                               FMath::Sin(FMath::DegreesToRadians(AngleDeg)) * Radius,
 	                               0.f);
-	Unit->SetActorLocation(Base + Offset);
+	const FVector ExitLocation = Base + Offset;
+	if (not GetIsFiniteVector(ExitLocation))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance -> Exit location was non-finite."));
+		return;
+	}
+
+	Unit->SetActorLocation(ExitLocation);
 }
 
 void UCargoSquad::TrySwapAbilities(const EAbilityID OldAbility, const EAbilityID NewAbility) const
@@ -493,7 +536,11 @@ bool UCargoSquad::ShouldRepathToEntrance(UCargo* TargetCargo, FVector& OutEntran
 	const TArray<ASquadUnit*> Units = M_OwningController->GetSquadUnitsChecked();
 	for (ASquadUnit* U : Units)
 	{
-		if (!IsValid(U)) { continue; }
+		if (not IsValid(U))
+		{
+			continue;
+		}
+
 		const float D = FVector::Dist(U->GetActorLocation(), OutEntranceNow);
 		MinDist = FMath::Min(MinDist, D);
 	}
@@ -531,6 +578,25 @@ bool UCargoSquad::OnPhysicallyEnteringCargo(UCargo* TargetCargo)
 		M_UnitSeatAssignments.Add(Unit, Socket);
 	}
 	return true;
+}
+
+bool UCargoSquad::GetIsFiniteVector(const FVector& Vector) const
+{
+	return FMath::IsFinite(Vector.X) && FMath::IsFinite(Vector.Y) && FMath::IsFinite(Vector.Z);
+}
+
+bool UCargoSquad::GetIsFiniteRotator(const FRotator& Rotator) const
+{
+	return FMath::IsFinite(Rotator.Pitch)
+		&& FMath::IsFinite(Rotator.Yaw)
+		&& FMath::IsFinite(Rotator.Roll);
+}
+
+bool UCargoSquad::GetIsFiniteTransform(const FTransform& Transform) const
+{
+	return GetIsFiniteVector(Transform.GetLocation())
+		&& GetIsFiniteRotator(Transform.GetRotation().Rotator())
+		&& GetIsFiniteVector(Transform.GetScale3D());
 }
 
 void UCargoSquad::FinalizeEnterCargo(UCargo* TargetCargo)

@@ -329,6 +329,9 @@ private:
 	UPROPERTY()
 	TScriptInterface<ICargoOwner> M_CargoOwner;
 	bool GetIsValidCargoOwner() const;
+	bool GetIsFiniteVector(const FVector& Vector) const;
+	bool GetIsFiniteRotator(const FRotator& Rotator) const;
+	bool GetIsFiniteTransform(const FTransform& Transform) const;
 
 
 

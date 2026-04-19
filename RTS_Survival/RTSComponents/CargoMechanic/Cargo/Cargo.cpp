@@ -265,6 +265,10 @@ FVector UCargo::GetClosestEntranceWorldLocation(const FVector& FromWorldLocation
 	for (const FName& Sock : M_EntranceSockets)
 	{
 		const FTransform T = GetSocketWorldTransform(Sock);
+		if (not GetIsFiniteTransform(T))
+		{
+			continue;
+		}
 		const float D = FVector::DistSquared(T.GetLocation(), FromWorldLocation);
 		if (D < BestDistSq)
 		{
@@ -350,15 +354,41 @@ void UCargo::OnSquadExited(ASquadController* SquadController, const TArray<ASqua
 
 FTransform UCargo::GetSocketWorldTransform(const FName& SocketName) const
 {
-	if (!GetIsValidCargoMesh()) return FTransform::Identity;
+	if (not GetIsValidCargoMesh())
+	{
+		return FTransform::Identity;
+	}
 
 	if (const USkeletalMeshComponent* Skel = Cast<USkeletalMeshComponent>(M_CargoMesh.Get()))
-		return Skel->GetSocketTransform(SocketName, RTS_World);
+	{
+		const FTransform SocketTransform = Skel->GetSocketTransform(SocketName, RTS_World);
+		if (GetIsFiniteTransform(SocketTransform))
+		{
+			return SocketTransform;
+		}
+	}
 
 	if (const UStaticMeshComponent* Stat = Cast<UStaticMeshComponent>(M_CargoMesh.Get()))
-		return Stat->GetSocketTransform(SocketName, RTS_World);
+	{
+		const FTransform SocketTransform = Stat->GetSocketTransform(SocketName, RTS_World);
+		if (GetIsFiniteTransform(SocketTransform))
+		{
+			return SocketTransform;
+		}
+	}
 
-	return GetOwner() ? GetOwner()->GetActorTransform() : FTransform::Identity;
+	RTSFunctionLibrary::ReportError(
+		TEXT("UCargo::GetSocketWorldTransform -> Returning fallback because socket transform was non-finite."));
+	if (GetOwner())
+	{
+		const FTransform OwnerTransform = GetOwner()->GetActorTransform();
+		if (GetIsFiniteTransform(OwnerTransform))
+		{
+			return OwnerTransform;
+		}
+	}
+
+	return FTransform::Identity;
 }
 
 void UCargo::BeginPlay()
@@ -439,6 +469,25 @@ void UCargo::CollectSocketNames(TArray<FName>& OutAllSockets) const
 			}
 		}
 	}
+}
+
+bool UCargo::GetIsFiniteVector(const FVector& Vector) const
+{
+	return FMath::IsFinite(Vector.X) && FMath::IsFinite(Vector.Y) && FMath::IsFinite(Vector.Z);
+}
+
+bool UCargo::GetIsFiniteRotator(const FRotator& Rotator) const
+{
+	return FMath::IsFinite(Rotator.Pitch)
+		&& FMath::IsFinite(Rotator.Yaw)
+		&& FMath::IsFinite(Rotator.Roll);
+}
+
+bool UCargo::GetIsFiniteTransform(const FTransform& Transform) const
+{
+	return GetIsFiniteVector(Transform.GetLocation())
+		&& GetIsFiniteRotator(Transform.GetRotation().Rotator())
+		&& GetIsFiniteVector(Transform.GetScale3D());
 }
 
 TArray<FName> UCargo::FilterSocketsContains(const TArray<FName>& In, const FString& Substring)

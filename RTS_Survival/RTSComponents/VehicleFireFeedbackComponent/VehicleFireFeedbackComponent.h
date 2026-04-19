@@ -248,4 +248,6 @@ protected:
 	virtual void CancelRecoilAndRestoreBase(const TCHAR* ReportReason);
 	virtual bool GetIsFiniteAndWithinAbsLimit(const FVector& Vector, float MaxAbsValue) const;
 	virtual bool GetIsFiniteAndWithinAbsLimit(float Value, float MaxAbsValue) const;
+	virtual bool GetIsFiniteVector(const FVector& Vector) const;
+	virtual bool GetIsFiniteRotator(const FRotator& Rotator) const;
 };
