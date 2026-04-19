@@ -1,6 +1,5 @@
 #include "Resource.h"
 
-#include "Components/DecalComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -11,7 +10,6 @@
 #include "ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
-#include "RTS_Survival/Procedural/SceneManipulationLibrary/FRTS_SceneManipulationLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 
@@ -219,47 +217,6 @@ void ACPPResourceMaster::AddToManuallyAddedMeshes(UStaticMeshComponent* MeshComp
 	}
 }
 
-float ACPPResourceMaster::SetCompRandomRotation(const float MinRotXY, const float MaxRotXY, const float MinRotZ,
-                                                const float MaxRotZ, USceneComponent* Component)
-{
-	return FRTS_SceneManipulationLibrary::SetCompRandomRotation(MinRotXY, MaxRotXY, MinRotZ, MaxRotZ, Component);
-}
-
-float ACPPResourceMaster::SetCompRandomScale(const float MinScale, const float MaxScale,
-                                             USceneComponent* Component)
-{
-	return FRTS_SceneManipulationLibrary::SetCompRandomScale(MinScale, MaxScale, Component);
-}
-
-float ACPPResourceMaster::SetComponentScaleOnAxis(const float MinScale, const float MaxScale, const bool bScaleX,
-                                                  const bool bScaleY, const bool bScaleZ, USceneComponent* Component)
-{
-	return FRTS_SceneManipulationLibrary::SetComponentScaleOnAxis(MinScale, MaxScale, bScaleX, bScaleY, bScaleZ, Component);
-}
-
-float ACPPResourceMaster::SetCompRandomOffset(const float MinOffsetXY, const float MaxOffsetXY,
-                                              USceneComponent* Component)
-{
-	return FRTS_SceneManipulationLibrary::SetCompRandomOffset(MinOffsetXY, MaxOffsetXY, Component);
-}
-
-TArray<int32> ACPPResourceMaster::SetRandomDecalsMaterials(
-	const TArray<FWeightedDecalMaterial>& DecalMaterials,
-	TArray<UDecalComponent*> DecalComponents
-)
-{
-	return FRTS_SceneManipulationLibrary::SetRandomDecalsMaterials(DecalMaterials, DecalComponents);
-}
-
-
-TArray<int32> ACPPResourceMaster::SetRandomStaticMesh(
-	const TArray<FWeightedStaticMesh>& Meshes,
-	TArray<UStaticMeshComponent*> Components
-)
-{
-	return FRTS_SceneManipulationLibrary::SetRandomStaticMesh(Meshes, Components);
-}
-
 int32 ACPPResourceMaster::CalculateResourceWorthFromScale(
 	const float BaseScale,
 	const int32 BaseWorth,
@@ -297,16 +254,6 @@ int32 ACPPResourceMaster::CalculateResourceWorthFromScale(
 	return FinalWorth;
 }
 
-void ACPPResourceMaster::CollapseMesh(UGeometryCollectionComponent* GeoCollapseComp,
-                                      const TSoftObjectPtr<UGeometryCollection> GeoCollection,
-                                      UMeshComponent* MeshToCollapse,
-                                      const FCollapseDuration CollapseDuration, const FCollapseForce CollapseForce,
-                                      const FCollapseFX CollapseFX)
-{
-	FRTS_Collapse::CollapseMesh(
-		this, GeoCollapseComp, GeoCollection, MeshToCollapse, CollapseDuration, CollapseForce, CollapseFX
-	);
-}
 
 
 void ACPPResourceMaster::ClearAttachments()

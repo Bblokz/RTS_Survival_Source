@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "ResourceSceneSetup/ResourceSceneSetup.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageOwner.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HPActorObjectsMaster.h"
 
@@ -46,7 +47,7 @@ class RTS_SURVIVAL_API ACPPController;
 
 
 UCLASS()
-class RTS_SURVIVAL_API ACPPResourceMaster : public AActorObjectsMaster, public IResourceStorageOwner
+class RTS_SURVIVAL_API ACPPResourceMaster : public ADestructableEnvActor, public IResourceStorageOwner
 {
 	GENERATED_BODY()
 
@@ -88,64 +89,6 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void AddToManuallyAddedMeshes(UStaticMeshComponent* MeshComponent);
 
-	/** @brief Add random degrees of rotation to the component; relatively to the current scene component rotation.
-	 * @return The chosen rotation. 
-	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
-	float SetCompRandomRotation(
-		const float MinRotXY,
-		const float MaxRotXY,
-		const float MinRotZ,
-		const float MaxRotZ,
-		USceneComponent* Component);
-
-	/** @brief Randomly, uniformly scale the component.
-	 * @return The chosen scale.
-	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
-	float SetCompRandomScale(
-		const float MinScale,
-		const float MaxScale,
-		USceneComponent* Component);
-
-	
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
-	float SetComponentScaleOnAxis(
-		const float MinScale,
-		const float MaxScale,
-		const bool bScaleX,
-		const bool bScaleY,
-		const bool bScaleZ,
-		USceneComponent* Component);
-
-	/** @brief Add Radom relatlive offset on X and Y to the relative location of the component.
-	 * @return The chosen offset.*/
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
-	float SetCompRandomOffset(
-		const float MinOffsetXY,
-		const float MaxOffsetXY,
-		USceneComponent* Component);
-
-	/**
-	 * Picks random materials for each decal based on weighted chances.
-	 * @return indices chosen from the provided array
-	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
-	TArray<int32> SetRandomDecalsMaterials(
-		const TArray<FWeightedDecalMaterial>& DecalMaterials,
-		TArray<UDecalComponent*> DecalComponents
-	);
-
-	/**
-	 * Picks random meshes for each component based on weighted chances.
-	 * @return indices chosen from the provided array
-	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
-	TArray<int32> SetRandomStaticMesh(
-		const TArray<FWeightedStaticMesh>& Meshes,
-		TArray<UStaticMeshComponent*> Components
-	);
-
 
 	/**
 	 * @brief Calculates a resource amount based on how much larger or smaller the actual scale is
@@ -176,16 +119,6 @@ protected:
 	// If set to true the constructor will no longer rebuild attachments.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bKeepCurrentAttachments = false;
-
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="SceneManipulation")
-	void CollapseMesh(
-		UGeometryCollectionComponent* GeoCollapseComp,
-		TSoftObjectPtr<UGeometryCollection> GeoCollection,
-		UMeshComponent* MeshToCollapse,
-		FCollapseDuration CollapseDuration,
-		FCollapseForce CollapseForce,
-		FCollapseFX CollapseFX
-	);
 
 
 private:
