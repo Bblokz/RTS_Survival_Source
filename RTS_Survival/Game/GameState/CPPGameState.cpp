@@ -5421,33 +5421,19 @@ TArray<FExperienceLevel> ACPPGameState::GetLightTankExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 100;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 250;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Health, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.1)
-	};
 	CulumativeExp += 450;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 600;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5457,32 +5443,19 @@ TArray<FExperienceLevel> ACPPGameState::GetLightTankDestroyerExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2)
-	};
 	CulumativeExp += 100;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 250;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.25),
-		FExperiencePerk(EExperiencePerkType::EP_Range, 1.25)
-	};
 	CulumativeExp += 450;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 600;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5492,32 +5465,19 @@ TArray<FExperienceLevel> ACPPGameState::GetArmoredCarExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2)
-	};
 	CulumativeExp += 70;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 150;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.2)
-	};
 	CulumativeExp += 275;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 425;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5527,33 +5487,19 @@ TArray<FExperienceLevel> ACPPGameState::GetLightMediumTankExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 150;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 400;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Health, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.1)
-	};
 	CulumativeExp += 700;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 850;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5563,33 +5509,19 @@ TArray<FExperienceLevel> ACPPGameState::GetMediumTankExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 200;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 500;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Health, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.1)
-	};
 	CulumativeExp += 800;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 1000;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5599,33 +5531,19 @@ TArray<FExperienceLevel> ACPPGameState::GetMediumTankDestroyerExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 200;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 500;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.25),
-		FExperiencePerk(EExperiencePerkType::EP_Range, 1.25)
-	};
 	CulumativeExp += 800;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 1000;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5635,33 +5553,19 @@ TArray<FExperienceLevel> ACPPGameState::GetHeavyTankExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 300;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 700;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Health, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.1)
-	};
 	CulumativeExp += 900;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 1200;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5671,33 +5575,19 @@ TArray<FExperienceLevel> ACPPGameState::GetHeavyTankDestroyerExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 300;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 700;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.25),
-		FExperiencePerk(EExperiencePerkType::EP_Range, 1.25)
-	};
 	CulumativeExp += 900;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 1200;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5707,33 +5597,19 @@ TArray<FExperienceLevel> ACPPGameState::GetNomadicTruckExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 100;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 250;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Health, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.1)
-	};
 	CulumativeExp += 450;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 600;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
@@ -5743,33 +5619,19 @@ TArray<FExperienceLevel> ACPPGameState::GetTier1InfantryExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 70;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 150;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.2)
-	};
 	CulumativeExp += 275;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 425;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	return Levels;
 }
 
@@ -5778,33 +5640,19 @@ TArray<FExperienceLevel> ACPPGameState::GetTier2InfantryExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 70;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 150;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.2)
-	};
 	CulumativeExp += 275;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 425;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	return Levels;
 }
 
@@ -5813,33 +5661,19 @@ TArray<FExperienceLevel> ACPPGameState::GetEliteInfantryExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 70;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 150;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.2)
-	};
 	CulumativeExp += 275;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 425;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	return Levels;
 }
 
@@ -5848,33 +5682,19 @@ TArray<FExperienceLevel> ACPPGameState::GetFighterExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	TArray<FExperiencePerk> ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.1),
-		FExperiencePerk(EExperiencePerkType::EP_Accuracy, 1.1)
-	};
 	CulumativeExp += 400;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.25)};
 	CulumativeExp += 700;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Health, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_SightRange, 1.1)
-	};
 	CulumativeExp += 1200;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	ExperiencePerks = {
-		FExperiencePerk(EExperiencePerkType::EP_Speed, 1.2),
-		FExperiencePerk(EExperiencePerkType::EP_ReloadSpeed, 1.1)
-	};
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	ExperiencePerks = {FExperiencePerk(EExperiencePerkType::EP_Damage, 1.25)};
 	CulumativeExp += 2000;
-	Levels.Add(FExperienceLevel(CulumativeExp, ExperiencePerks));
+	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }

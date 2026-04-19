@@ -1,6 +1,7 @@
 #include "ExperienceComponent.h"
 
 #include "ExperienceInterface/ExperienceInterface.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
@@ -133,12 +134,112 @@ bool URTSExperienceComp::GetIsValidOwner() const
 	return false;
 }
 
-void URTSExperienceComp::OnLevelUpOwner() const
+void URTSExperienceComp::OnLevelUpOwner()
 {
-	if (GetIsValidOwner())
+	if (not GetIsValidOwner())
 	{
-		M_Owner->OnUnitLevelUp();
+		return;
 	}
+
+	M_Owner->OnUnitLevelUp();
+	OnLevelUp_ApplyBehaviour();
+}
+
+void URTSExperienceComp::OnLevelUp_ApplyBehaviour()
+{
+	if (not GetIsValidOwnerActor())
+	{
+		return;
+	}
+
+	if (not TryCacheBehaviourComponent())
+	{
+		return;
+	}
+
+	if (not GetIsValidBehaviourComponent())
+	{
+		return;
+	}
+
+	const TSubclassOf<UBehaviour> BehaviourClass = GetLevelUpBehaviourClassForCurrentLevel();
+	if (not BehaviourClass)
+	{
+		Debug_Experience("No level-up behaviour class set for level index: " + FString::FromInt(M_UnitExperience.M_CurrentLevel));
+		return;
+	}
+
+	M_BehaviourComponent->AddBehaviour(BehaviourClass);
+}
+
+bool URTSExperienceComp::TryCacheBehaviourComponent()
+{
+	if (M_BehaviourComponent.IsValid())
+	{
+		return true;
+	}
+
+	AActor* OwnerActor = GetOwnerActor();
+	if (not IsValid(OwnerActor))
+	{
+		return false;
+	}
+
+	M_BehaviourComponent = OwnerActor->FindComponentByClass<UBehaviourComp>();
+	return M_BehaviourComponent.IsValid();
+}
+
+bool URTSExperienceComp::GetIsValidBehaviourComponent() const
+{
+	if (M_BehaviourComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_BehaviourComponent",
+		"GetIsValidBehaviourComponent",
+		GetOwnerActor()
+	);
+	return false;
+}
+
+bool URTSExperienceComp::GetIsValidOwnerActor() const
+{
+	if (IsValid(GetOwnerActor()))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_Owner (AActor)",
+		"GetIsValidOwnerActor",
+		GetOwner()
+	);
+	return false;
+}
+
+TSubclassOf<UBehaviour> URTSExperienceComp::GetLevelUpBehaviourClassForCurrentLevel() const
+{
+	if (LevelUpBehaviourPerLevel.IsValidIndex(M_UnitExperience.M_CurrentLevel))
+	{
+		return LevelUpBehaviourPerLevel[M_UnitExperience.M_CurrentLevel];
+	}
+
+	return nullptr;
+}
+
+AActor* URTSExperienceComp::GetOwnerActor() const
+{
+	if (not GetIsValidOwner())
+	{
+		return nullptr;
+	}
+
+	UObject* OwnerObject = M_Owner.GetObject();
+	return Cast<AActor>(OwnerObject);
 }
 
 float URTSExperienceComp::GetPercentageProgressToNextLevel(int32& OutExpNeededNextLevel,

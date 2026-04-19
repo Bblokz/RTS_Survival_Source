@@ -14,44 +14,6 @@ enum class EVeterancyIconSet : uint8
 	EVI_GerAircraft,
 };
 
-UENUM()
-enum class EExperiencePerkType : uint8
-{
-	EP_None,
-	EP_Health,
-	EP_Damage,
-	EP_Accuracy,
-	EP_Speed,
-	EP_SightRange,
-	EP_Range,
-	EP_ReloadSpeed,
-};
-
-USTRUCT()
-struct FExperiencePerk 
-{
-	GENERATED_BODY()
-
-    FExperiencePerk() 
-        : PerkType(EExperiencePerkType::EP_None)
-        , PerkValue(0.f)
-    {
-    }
-
-    FExperiencePerk(EExperiencePerkType Type, float Value)
-        : PerkType(Type)
-        , PerkValue(Value)
-    {
-    }
-
-
-	UPROPERTY()
-	EExperiencePerkType PerkType = EExperiencePerkType::EP_None;
-
-	UPROPERTY()
-	float PerkValue = 0.f;
-};
-
 USTRUCT()
 struct FExperienceLevel
 {
@@ -63,17 +25,14 @@ struct FExperienceLevel
     }
 
     // Parameterized constructor for convenience.
-    FExperienceLevel(const int32 ExperienceNeeded, const TArray<FExperiencePerk>& InPerks)
+    explicit FExperienceLevel(const int32 ExperienceNeeded)
         : CumulativeExperienceNeeded(ExperienceNeeded)
-        , Perks(InPerks)
     {
     }
 
 	UPROPERTY()
 	int32 CumulativeExperienceNeeded = 0.f;
 
-	UPROPERTY()
-	TArray<FExperiencePerk> Perks = {};
 };
 
 USTRUCT()
