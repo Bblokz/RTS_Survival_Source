@@ -202,8 +202,17 @@ void UVehicleFireFeedbackComponent::CacheHullBaseTransform()
 		return;
 	}
 
-	M_BaseHullRelativeLocation = M_HullMesh->GetRelativeLocation();
-	M_BaseHullRelativeRotation = M_HullMesh->GetRelativeRotation();
+	const FVector HullRelativeLocation = M_HullMesh->GetRelativeLocation();
+	const FRotator HullRelativeRotation = M_HullMesh->GetRelativeRotation();
+	if (not GetIsFiniteVector(HullRelativeLocation) || not GetIsFiniteRotator(HullRelativeRotation))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UVehicleFireFeedbackComponent::CacheHullBaseTransform -> Non-finite base hull transform."));
+		return;
+	}
+
+	M_BaseHullRelativeLocation = HullRelativeLocation;
+	M_BaseHullRelativeRotation = HullRelativeRotation;
 }
 
 void UVehicleFireFeedbackComponent::EvaluateAllCurrentTurretWeapons()
@@ -301,9 +310,20 @@ void UVehicleFireFeedbackComponent::ApplyCriticallyDampedSpring(
 
 void UVehicleFireFeedbackComponent::ApplyHullFeedbackTransform() const
 {
+	if (not GetIsValidHullMesh())
+	{
+		return;
+	}
+
 	const FVector NewLocation = M_BaseHullRelativeLocation + M_RecoilOffsetCm;
 	const FRotator NewRotation = M_BaseHullRelativeRotation +
 		FRotator(M_RecoilRotDeg.X, M_RecoilRotDeg.Y, M_RecoilRotDeg.Z);
+	if (not GetIsFiniteVector(NewLocation) || not GetIsFiniteRotator(NewRotation))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UVehicleFireFeedbackComponent::ApplyHullFeedbackTransform -> Non-finite hull feedback transform."));
+		return;
+	}
 
 	M_HullMesh->SetRelativeLocationAndRotation(NewLocation, NewRotation);
 }
@@ -430,4 +450,16 @@ bool UVehicleFireFeedbackComponent::GetIsFiniteAndWithinAbsLimit(
 	}
 
 	return FMath::Abs(Value) <= MaxAbsValue;
+}
+
+bool UVehicleFireFeedbackComponent::GetIsFiniteVector(const FVector& Vector) const
+{
+	return FMath::IsFinite(Vector.X) && FMath::IsFinite(Vector.Y) && FMath::IsFinite(Vector.Z);
+}
+
+bool UVehicleFireFeedbackComponent::GetIsFiniteRotator(const FRotator& Rotator) const
+{
+	return FMath::IsFinite(Rotator.Pitch)
+		&& FMath::IsFinite(Rotator.Yaw)
+		&& FMath::IsFinite(Rotator.Roll);
 }

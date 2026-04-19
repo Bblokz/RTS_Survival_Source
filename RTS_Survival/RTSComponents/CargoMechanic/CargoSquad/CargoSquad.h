@@ -185,4 +185,7 @@ private:
     int32 M_RepathToEntranceAttempts = 0;
 
 	bool GetIsOwningSquadATeamWeapon()const;
+	bool GetIsFiniteVector(const FVector& Vector) const;
+	bool GetIsFiniteRotator(const FRotator& Rotator) const;
+	bool GetIsFiniteTransform(const FTransform& Transform) const;
 };
