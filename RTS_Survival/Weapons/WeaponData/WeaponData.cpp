@@ -40,6 +40,29 @@ namespace BounceVfx
 	}
 }
 
+namespace WeaponImpactValidation
+{
+	// Guard against poisoning Niagara transforms with values that fail UE's DoubleFloat precision checks.
+	constexpr double MaxSafeWorldCoordinateCm = 1000000000.0;
+
+	bool GetIsFiniteVector(const FVector& Vector)
+	{
+		return FMath::IsFinite(Vector.X) && FMath::IsFinite(Vector.Y) && FMath::IsFinite(Vector.Z);
+	}
+
+	bool GetIsFiniteRotator(const FRotator& Rotator)
+	{
+		return FMath::IsFinite(Rotator.Roll) && FMath::IsFinite(Rotator.Pitch) && FMath::IsFinite(Rotator.Yaw);
+	}
+
+	bool GetIsSafeWorldLocation(const FVector& Location)
+	{
+		return GetIsFiniteVector(Location) && FMath::Abs(Location.X) <= MaxSafeWorldCoordinateCm
+			&& FMath::Abs(Location.Y) <= MaxSafeWorldCoordinateCm
+			&& FMath::Abs(Location.Z) <= MaxSafeWorldCoordinateCm;
+	}
+}
+
 namespace LaunchVfx
 {
 	// Runtime cache shared by all weapons.
@@ -692,8 +715,12 @@ void FWeaponImpactPool::Activate(
 	const FVector& NiagaraScale,
 	USoundBase* Sound, const bool bIsUsingHeBounceOverwrite)
 {
-	if (Location.ContainsNaN())
+	if (not WeaponImpactValidation::GetIsSafeWorldLocation(Location)
+		|| not WeaponImpactValidation::GetIsFiniteRotator(Rotation)
+		|| not WeaponImpactValidation::GetIsFiniteVector(NiagaraScale))
 	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("FWeaponImpactPool::Activate skipped due to unsafe Niagara transform input."));
 		return;
 	}
 
@@ -1955,7 +1982,7 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
 	}
 	// Trace bounce.
 	OutEndLocation = TraceHit.ImpactPoint;
-	CreateWeaponNonPenVfx(TraceHit.Location, ImpactRotation);
+	CreateWeaponNonPenVfx(TraceHit.ImpactPoint, ImpactRotation);
 }
 
 void UWeaponStateTrace::OnAsyncTraceNoHit(const FVector& TraceEnd)
