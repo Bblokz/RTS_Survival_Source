@@ -53,7 +53,7 @@ void URadixiteGrowthComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_TimerHandleOwnerDestruction);
 	}
 
-	for (const TPair<TObjectPtr<ADecalActor>, FTimerHandle>& ActiveShrinkTimer : M_ActiveDecalShrinkTimers)
+	for (TPair<TObjectPtr<ADecalActor>, FTimerHandle>& ActiveShrinkTimer : M_ActiveDecalShrinkTimers)
 	{
 		if (UWorld* World = GetWorld())
 		{
@@ -1161,11 +1161,12 @@ TObjectPtr<ADecalActor> URadixiteGrowthComponent::SpawnGrowthDecal(
 	}
 
 	SpawnedDecalActor->SetDecalMaterial(DecalOptions.DecalMaterial);
-	SpawnedDecalActor->SetDecalSize(FVector(
+	SpawnedDecalActor->SetActorScale3D(FVector(
 		RadixiteGrowthConstants::DecalThickness,
 		HalfReachScaled,
 		HalfReachScaled));
 	SpawnedDecalActor->SetActorScale3D(FVector::OneVector);
+	SpawnedDecalActor->SetActorRotation( SpawnedDecalActor->GetActorRotation() + FRotator(-90,0,0));
 	return SpawnedDecalActor;
 }
 

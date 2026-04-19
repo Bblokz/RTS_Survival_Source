@@ -629,7 +629,8 @@ float ACPPController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType Voice
 	{
 		return 0;
 	}
-	return M_PlayerAudioController->PlayAnnouncerVoiceLine(VoiceLineType, bQueueIfNotPlayed, bInterruptRegularVoiceLines);
+	return M_PlayerAudioController->PlayAnnouncerVoiceLine(VoiceLineType, bQueueIfNotPlayed,
+	                                                       bInterruptRegularVoiceLines);
 }
 
 void ACPPController::SetSuppressRegularVoiceLines(const bool bSuppress)
@@ -3643,13 +3644,14 @@ uint32 ACPPController::IssueOrderHarvestResource(ACPPResourceMaster* Resource,
 				ECommandQueueError::NoError;
 		}
 	}
-	if (AmountCommandsExe == 0)
+	if (AmountCommandsExe > 0)
 	{
-		// No harvesters selected, move to resource instead.
-		OutCommand = ECommandType::Movement;
-		OutIssuedAbility = EAbilityID::IdMove;
-		AmountCommandsExe = MoveUnitsToLocation(ClickedLocation);
+		return AmountCommandsExe;
 	}
+	// No harvesters selected, move to resource instead.
+	OutCommand = ECommandType::Movement;
+	OutIssuedAbility = EAbilityID::IdMove;
+	AmountCommandsExe = MoveUnitsToLocation(ClickedLocation);
 	return AmountCommandsExe;
 }
 
@@ -4440,7 +4442,7 @@ void ACPPController::ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLo
 		Command = ECommandType::DestroyScavengableObject;
 	}
 
-	if (Command == ECommandType::DestructableEnvActor)
+	if (Command == ECommandType::DestructableEnvActor || Command == ECommandType::HarvestResource)
 	{
 		// We switch the command to an attack command as the player wants to destroy an env object.
 		Command = ECommandType::DestroyDestructableEnvActor;

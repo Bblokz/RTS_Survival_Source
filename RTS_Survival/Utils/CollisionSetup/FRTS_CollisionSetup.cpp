@@ -536,6 +536,9 @@ void FRTS_CollisionSetup::SetupResourceMeshCollision(UMeshComponent* ResourceMes
 	// Make sure to block buildings.
 	ResourceMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 	ResourceMesh->SetGenerateOverlapEvents(true);
+	// Make sure it can be hit by weapons:
+	ResourceMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
+	ResourceMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
 }
 
 void FRTS_CollisionSetup::SetupResourceGeometryComponentCollision(UGeometryCollectionComponent* GeometryComponent)
