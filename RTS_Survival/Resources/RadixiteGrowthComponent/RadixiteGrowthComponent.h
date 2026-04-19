@@ -226,8 +226,10 @@ private:
 	void StopOwnerDestructionSequence();
 	bool TryPopNextDestructionBranch(FRadixiteGrowthBranchRecord& OutBranchRecord);
 	void QueueDestructionBranchesInDistanceOrder();
+	void DestroyRemainingGrowthNodesForOwnerDestruction();
 	void StartDecalShrinkAndDestroy(ADecalActor* DecalToDestroy);
 	void HandleNodeDestructionOverTime(AActor* NodeActorToDestroy);
+	void StartNodeSpawnVerticalAnimation(AActor* SpawnedNodeActor, const FVector& FinalSpawnLocation);
 	void TryDestroyRuntimeFxCache(FRadixiteGrowthFxCacheRuntime& FxCacheRuntime);
 	void RemoveBranchesForNodeDestruction(const int32 DestroyedNodeId, const int32 ConnectionsCount);
 	void RemoveBranchesThatNoLongerHaveDecals();
@@ -316,6 +318,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Nodes", meta = (ClampMin = "1"))
 	int32 M_MaxDecalGrowthsUntilNode = 4;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Nodes", meta = (ClampMin = "0.0"))
+	float M_NodeSpawnStartZOffset = 80.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Nodes", meta = (ClampMin = "0.01"))
+	float M_NodeSpawnVerticalAnimationTime = 0.35f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Radixite Growth|Spawning", meta = (ClampMin = "1"))
 	int32 M_MaxRetries = 6;
 
@@ -374,9 +382,11 @@ private:
 	FRadixiteGrowthFxCacheRuntime M_NodeDestructionFxCacheRuntime;
 
 	TMap<TObjectPtr<ADecalActor>, FTimerHandle> M_ActiveDecalShrinkTimers;
+	TMap<TObjectPtr<AActor>, FTimerHandle> M_ActiveNodeSpawnAnimationTimers;
 	TArray<int32> M_OwnerDestructionBranchQueue;
 
 	bool bM_IsOwnerDestructionSequenceActive = false;
+	FVector M_LastKnownOwnerLocation = FVector::ZeroVector;
 
 	int32 M_NextNodeId = 0;
 	int32 M_NextBranchId = 0;
