@@ -24,6 +24,7 @@ class AEnemyController;
 class ASquadController;
 class ATankMaster;
 class ANomadicVehicle;
+class AScavengeableObject;
 class UPlayerCameraController;
 struct FMovePlayerCamera;
 struct FTrainingOption;
@@ -375,6 +376,12 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackDestructibleCollapse(ADestructableEnvActor* ActorCollapsed);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void RegisterCallbackOnScavengableObjectScavenged(AScavengeableObject* ScavengableObject);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnCallBackScavengableObjectScavenged(AScavengeableObject* ScavengableObject);
 
 	/**
 	 * @brief To be able to execute logic when a specific nomadic vehicle converts to building or to truck state.

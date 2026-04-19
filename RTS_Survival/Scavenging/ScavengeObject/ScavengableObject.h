@@ -16,6 +16,8 @@ class ACPPController;
 class ASquadController;
 enum class ERTSResourceType : uint8;
 
+DECLARE_MULTICAST_DELEGATE(FOnScavenged);
+
 USTRUCT()
 struct FScavengeRewardSound
 {
@@ -86,6 +88,9 @@ public:
 
 	/** Provides scavenge positions for units */
 	TArray<FVector> GetScavengePositions(int32 NumUnits);
+
+	// Called when scavenging completes successfully.
+	FOnScavenged OnScavenged;
 
 protected:
 	virtual void PostInitializeComponents() override;
