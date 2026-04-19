@@ -31,7 +31,8 @@ void IExperienceInterface::IExpOnKilledActor(AActor* KilledActor) const
     const auto EnemyExperience = Cast<IExperienceProvider>(KilledActor);
     if(not EnemyExperience)
     {
-        Debug_Experience("Killed actor does not implement IExperienceProvider interface! actor: " + IsValid(KilledActor) ? KilledActor->GetName() : "Null");
+        const FString KilledActorName = IsValid(KilledActor) ? KilledActor->GetName() : FString("Null");
+        Debug_Experience("Killed actor does not implement IExperienceProvider interface! actor: " + KilledActorName);
         return;
     }
     const float EnemyXp = EnemyExperience->GetExperienceWorth();

@@ -14,6 +14,8 @@ enum class ETankSubtype : uint8;
 class ACPPGameState;
 struct FTrainingOption;
 class IExperienceInterface;
+class UBehaviourComp;
+class UBehaviour;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URTSExperienceComp : public UActorComponent
@@ -39,6 +41,10 @@ public:
 	//  Calculates and pushes the updated experience info to the UI.
 	void UpdateExperienceUI() const;
 
+	// Optional per-level behaviour classes that are applied when this unit reaches the corresponding level index.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Experience|LevelUp")
+	TArray<TSubclassOf<UBehaviour>> LevelUpBehaviourPerLevel;
+
 private:
 	UPROPERTY()
 	FUnitExperience M_UnitExperience;
@@ -49,12 +55,21 @@ private:
 	UPROPERTY()
 	TObjectPtr<UActionUIManager> M_ActionUIManager;
 
+	UPROPERTY()
+	TWeakObjectPtr<UBehaviourComp> M_BehaviourComponent;
+
 	int32 M_ExperienceWorth = 0;
 	// If ever needed to update the experience settings from the game state.
 	int8 M_OwningPlayer = 0;
 
 	bool GetIsValidOwner() const;
-	void OnLevelUpOwner() const;
+	bool GetIsValidOwnerActor() const;
+	bool GetIsValidBehaviourComponent() const;
+	void OnLevelUpOwner();
+	void OnLevelUp_ApplyBehaviour();
+	bool TryCacheBehaviourComponent();
+	TSubclassOf<UBehaviour> GetLevelUpBehaviourClassForCurrentLevel() const;
+	AActor* GetOwnerActor() const;
 
 	float GetPercentageProgressToNextLevel(int32& OutExpNeededNextLevel, int32 InCumulativeExp) const;
 	float GetPercentageProgressAtMaxLevel(int32& OutExpNeededNextLevel, int32 InCumulativeExp) const;

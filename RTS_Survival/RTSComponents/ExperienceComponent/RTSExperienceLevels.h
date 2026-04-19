@@ -25,6 +25,10 @@ enum class EExperiencePerkType : uint8
 	EP_SightRange,
 	EP_Range,
 	EP_ReloadSpeed,
+	EP_ArmorPen,
+	EP_AOEDmg,
+	EP_AOERange,
+	EP_TurretRotationSpeed,
 };
 
 USTRUCT()
