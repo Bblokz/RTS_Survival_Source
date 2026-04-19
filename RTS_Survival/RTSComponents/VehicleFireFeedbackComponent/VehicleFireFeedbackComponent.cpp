@@ -206,8 +206,6 @@ void UVehicleFireFeedbackComponent::CacheHullBaseTransform()
 	const FRotator HullRelativeRotation = M_HullMesh->GetRelativeRotation();
 	if (not GetIsFiniteVector(HullRelativeLocation) || not GetIsFiniteRotator(HullRelativeRotation))
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("UVehicleFireFeedbackComponent::CacheHullBaseTransform -> Non-finite base hull transform."));
 		return;
 	}
 
@@ -320,8 +318,6 @@ void UVehicleFireFeedbackComponent::ApplyHullFeedbackTransform() const
 		FRotator(M_RecoilRotDeg.X, M_RecoilRotDeg.Y, M_RecoilRotDeg.Z);
 	if (not GetIsFiniteVector(NewLocation) || not GetIsFiniteRotator(NewRotation))
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("UVehicleFireFeedbackComponent::ApplyHullFeedbackTransform -> Non-finite hull feedback transform."));
 		return;
 	}
 

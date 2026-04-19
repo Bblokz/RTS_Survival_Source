@@ -1246,8 +1246,8 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre + 10.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = BasicSmallArmsRange;
-	WeaponData.ArmorPen = 40.f;
-	WeaponData.ArmorPenMaxRange = 30.f;
+	WeaponData.ArmorPen = 53.f;
+	WeaponData.ArmorPenMaxRange = 45.f;
 	WeaponData.MagCapacity = 1;
 	WeaponData.ReloadSpeed = 4.f;
 	WeaponData.BaseCooldown = 1.f;
@@ -1289,7 +1289,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::M920_AtSniper, WeaponData);
 
-	WeaponData.WeaponName = EWeaponName::PTRS_41_14_5MM;
+	WeaponData.WeaponName = EWeaponName::PTRS_X_Tishina;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_AP;
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
@@ -1298,8 +1298,8 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre + 10.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = BasicSmallArmsRange;
-	WeaponData.ArmorPen = 100.f;
-	WeaponData.ArmorPenMaxRange = 80.f;
+	WeaponData.ArmorPen = 120.f;
+	WeaponData.ArmorPenMaxRange = 95.f;
 	WeaponData.MagCapacity = 8;
 	WeaponData.ReloadSpeed = 4.f;
 	WeaponData.BaseCooldown = 1.f;

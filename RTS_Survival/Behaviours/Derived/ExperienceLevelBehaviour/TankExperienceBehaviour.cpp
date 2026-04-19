@@ -6,6 +6,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "RTS_Survival/Units/Tanks/AITankMaster.h"
 
 void UTankExperienceBehaviour::OnAdded(AActor* BehaviourOwner)
 {
