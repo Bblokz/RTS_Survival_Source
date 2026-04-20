@@ -1,28 +1,40 @@
-﻿ you have to add a new eability ID callecd EAbilityID::IdRetreat
- 
- you have to add the direct action button logic for it in the cpp controller to activate this ability on all selected squads.
- you have to dervie a new behaviour from the beh UBehaviourSquadMovement called USquadRetreatbehaviour and in it set
- the max walk speed and max acceleration mlultipliers to 1.5f each to make the squad move faster when retreating.
- 
- you have to implement the Retreat ability in the icommands :
- the funtion  that adds it to the queue.
- the function that exedcutes it
- the function that terminate it.
- 
- it will store an FVector in the queue to use as the retreat location. in the cpp controller action button get the location of the
- hq (the player HQ is cached on the controller) and if vallid use GetLocationProjected  in the RTSFunctionLibrary.
- use projection scale of 2 and set the z bool to true.
- provide this projected location as the reatrea t location to the command for all the selected squads.
- 
- here is how i wnat you to implement the execute on the squad controller:
- // first check if the lcoation is not nearly zero if it is call done exe command immediately.
- then apply the retreat behaviour to the squad.
- then impelment a helper so that on all selected squad unit's their selection component we set them to
-  not be selectable. in addition look for the function to call on the cpp controller froom the squad controller to 
-  make the squad be removed from the selected squads array on the controller.
-  
- then move the squad for the eabilty ID retreat.
- 
- when the move is finished; first remove the behaviour ( the behaviour has to be set to be permanent btw)
- then call the helper to set the units back to be selectable.
- finally call done exe command.
+﻿You are a senior c++ developer and perfectionist.
+you need to implement the new RandomPatrolWithAttackMoves functionality for the enemy controller.
+you also need to wrap it in a function callable in bluepint derived UMissionBase instances like CreateSingleAttackMOveDifficulty conditional; 
+adding the conditional difficulty to setting around this patrol call as well.
+
+What it needs:
+an array of spawn locations
+an array of training options
+an array of patrol points
+
+// To pick the first patrol point directly instead of randomizing the first one.
+int32 OverrideFirstPatrolPointIndex
+
+int32 AmountIterationsAtPatrolPoint,
+float GuardTimePerPatrolPointIteration,
+float GuardSphereRadius
+
+as well as:
+const int32 MaxFormationWidth, 
+float TimeTillPatrol,
+const float FormationOffsetMultiplier,
+const float HelpOffsetRadiusMltMax,
+const float HelpOffsetRadiusMltMin,
+const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+const int32 MaxTriesFindNavPointForHelpOffset,
+const float ProjectionScale)
+
+so a lot of the params the attack move also has this is because we want the patrol units to not move to the next
+patrol point if there is one of the units that is still in combat. You also see the guard parameters which will be used
+as follows: once all units have reached the patrol location we go through a few iterations; in each interation (amount depending on the AmountIterationsAtPatrolPoint) 
+we pick a point in  the sphere that is centered at our current location and project it to the navmesh then order one of the 
+patrol units to move there, idem for all other patrol units; picking and mvoing to projected point so that they guard the area.
+we wait GuardTimePerPatrolPointIteration and after that if iterations remain we repeat if no iterations remain we see if we can move to the next random patrol point:
+we check if none of the units are in combat (if they are then send those who are not to help using the same logic as we have for attack moves (check that before implementing))
+if nobody is in combat we are free to move to a next point; we pick a random patrol point that is not our current point and everything repeats at infinity.
+ofcourse the logic stops once all patrol units are killed like we also do for the other attack move types.
+
+fully implement this feature add a seperate data structure where needed. 
+Make sure to check the attck move implementation to see how you should structure this logic.
+do not forget the wrapper for the mission base.
