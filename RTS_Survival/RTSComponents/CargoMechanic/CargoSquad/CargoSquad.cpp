@@ -454,21 +454,41 @@ void UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance(ASquadUnit* Unit,
 			TEXT("UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance -> Base location was non-finite."));
 		return;
 	}
-	// Small randomized ring to avoid overlap; navmesh projection can happen later by unit itself on next move.
-	const float Radius = 75.f;
-	const float AngleDeg = FMath::FRandRange(0.f, 360.f);
-	const FVector Offset = FVector(FMath::Cos(FMath::DegreesToRadians(AngleDeg)) * Radius,
-	                               FMath::Sin(FMath::DegreesToRadians(AngleDeg)) * Radius,
-	                               0.f);
-	const FVector ExitLocation = Base + Offset;
-	if (not GetIsFiniteVector(ExitLocation))
+	// Small randomized ring to avoid overlap when leaving cargo.
+	constexpr float ExitPlacementRadius = 75.f;
+	constexpr float DegreesInCircle = 360.f;
+	const float ExitPlacementAngleDegrees = FMath::FRandRange(0.f, DegreesInCircle);
+	const float ExitPlacementAngleRadians = FMath::DegreesToRadians(ExitPlacementAngleDegrees);
+	const FVector ExitPlacementOffset = FVector(
+		FMath::Cos(ExitPlacementAngleRadians) * ExitPlacementRadius,
+		FMath::Sin(ExitPlacementAngleRadians) * ExitPlacementRadius,
+		0.f
+	);
+	const FVector ExitLocationBeforeNavProjection = Base + ExitPlacementOffset;
+	if (not GetIsFiniteVector(ExitLocationBeforeNavProjection))
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance -> Exit location was non-finite."));
 		return;
 	}
 
-	Unit->SetActorLocation(ExitLocation);
+	constexpr float ExitNavProjectionRadiusMultiplier = 2.f;
+	const float ExitNavProjectionRadius = FMath::Max(
+		ExitPlacementRadius,
+		DeveloperSettings::GamePlay::Navigation::SquadUnitCargoEntranceAcceptanceRadius *
+			ExitNavProjectionRadiusMultiplier
+	);
+	const FVector ExitLocationProjectedToNavMesh = GetIsValidController()
+		? M_OwningController->FindNavigablePointNear(ExitLocationBeforeNavProjection, ExitNavProjectionRadius)
+		: ExitLocationBeforeNavProjection;
+	if (not GetIsFiniteVector(ExitLocationProjectedToNavMesh))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance -> Projected exit location was non-finite."));
+		return;
+	}
+
+	Unit->SetActorLocation(ExitLocationProjectedToNavMesh);
 }
 
 void UCargoSquad::TrySwapAbilities(const EAbilityID OldAbility, const EAbilityID NewAbility) const
