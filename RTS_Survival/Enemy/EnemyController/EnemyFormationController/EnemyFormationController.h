@@ -67,6 +67,19 @@ public:
 		const FAttackMoveWaveSettings& AttackMoveSettings,
 		const FVector& AverageSpawnLocation = FVector::ZeroVector);
 
+	void MoveRandomPatrolWithAttackMoveFormation(
+		TArray<ASquadController*> SquadControllers,
+		TArray<ATankMaster*> TankMasters,
+		const TArray<FVector>& PatrolPoints,
+		const int32 OverrideFirstPatrolPointIndex,
+		const int32 AmountIterationsAtPatrolPoint,
+		const float GuardTimePerPatrolPointIteration,
+		const float GuardSphereRadius,
+		int32 MaxFormationWidth,
+		const float FormationOffsetMlt,
+		const FAttackMoveWaveSettings& AttackMoveSettings,
+		const FVector& AverageSpawnLocation = FVector::ZeroVector);
+
 	void DebugAllActiveFormations() const;
 	void GetActiveFormationData(TArray<FFormationData>& OutFormationData) const;
 	void RemoveActiveFormationsByID(const TArray<int32>& FormationIDs);
@@ -150,6 +163,20 @@ private:
 		FFormationData& Formation,
 		const FVector& WaypointLocation,
 		const FRotator& WaypointDirection);
+	void HandleRandomPatrolWithAttackMoveFormation(FFormationData& Formation);
+	bool GetCanRandomPatrolGuardIterationExecute(
+		const FFormationData& Formation,
+		const float CurrentTimeSeconds) const;
+	void ExecuteRandomPatrolGuardIteration(FFormationData& Formation);
+	void TryMoveFormationUnitToRandomGuardLocation(
+		FFormationData& Formation,
+		FFormationUnitData& FormationUnit,
+		UNavigationSystemV1* NavSys);
+	void TryAdvanceRandomPatrolFormation(FFormationData& Formation);
+	int32 GetRandomNextPatrolPointIndex(const FFormationData& Formation) const;
+	FRotator GetRandomPatrolDirectionForPoint(const FFormationData& Formation, const int32 PatrolPointIndex) const;
+	int32 GetInitialPatrolPointIndex(const TArray<FVector>& PatrolPoints, const int32 OverrideFirstPatrolPointIndex,
+	                                 const int32 FormationID) const;
 
 	bool GetDoAllFormationUnitsReachedWaypoint(const FFormationData& Formation) const;
 	bool GetIsFormationUnitInCombat(const FFormationUnitData& FormationUnit) const;

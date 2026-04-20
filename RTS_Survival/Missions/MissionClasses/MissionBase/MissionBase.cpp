@@ -573,6 +573,60 @@ bool UMissionBase::CreateSingleAttackMoveDifficultyConditional(ERTSGameDifficult
 	return true;
 }
 
+bool UMissionBase::CreateSingleRandomPatrolWithAttackMoveDifficultyConditional(
+	ERTSGameDifficulty MinimalDifficulty,
+	TArray<FVector> SpawnLocations,
+	TArray<FTrainingOption> TrainingOptions,
+	TArray<FVector> PatrolPoints,
+	const int32 OverrideFirstPatrolPointIndex,
+	const int32 AmountIterationsAtPatrolPoint,
+	const float GuardTimePerPatrolPointIteration,
+	const float GuardSphereRadius,
+	const int32 MaxFormationWidth,
+	float TimeTillPatrol,
+	const float FormationOffsetMultiplier,
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale)
+{
+	AEnemyController* EnemyController = GetEnemyControllerChecked();
+	if (not EnemyController)
+	{
+		return false;
+	}
+	if (not GetIsDifficultyAtLeast(MinimalDifficulty))
+	{
+		return false;
+	}
+	if (TrainingOptions.IsEmpty() || SpawnLocations.IsEmpty() || PatrolPoints.Num() < 2)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission attempted to create random patrol with attack move but one of the required arrays is invalid!"
+			"\n Mission : " + GetName());
+		return false;
+	}
+
+	EnemyController->CreateSingleRandomPatrolWithAttackMoveWave(
+		SpawnLocations,
+		TrainingOptions,
+		PatrolPoints,
+		OverrideFirstPatrolPointIndex,
+		AmountIterationsAtPatrolPoint,
+		GuardTimePerPatrolPointIteration,
+		GuardSphereRadius,
+		MaxFormationWidth,
+		TimeTillPatrol,
+		FormationOffsetMultiplier,
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale);
+	return true;
+}
+
 
 FRTSGameDifficulty UMissionBase::GetGameDifficulty() const
 {

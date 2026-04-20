@@ -25,6 +25,7 @@ namespace EnemyFormationConstants
 	// WARNING; multiplied by 5 if previous teleport attempts failed; do not make this too high.
 	const float FindTeleportLocationProjectionExtent = 0.2f;
 	const int32 TeleportProjectionAttempts = 8;
+	const int32 GuardProjectionAttempts = 6;
 }
 
 UEnemyFormationController::UEnemyFormationController()
@@ -109,6 +110,83 @@ void UEnemyFormationController::MoveAttackMoveFormationToLocation(
 	NewFormation.AverageSpawnLocation = AverageSpawnLocation;
 
 	InitWaypointsAndDirections(NewFormation, FinalWaypointDirection, Waypoints);
+
+	TMap<TWeakInterfacePtr<ICommands>, float> MapGuidToFormationRadius;
+	for (auto EachSquad : SquadControllers)
+	{
+		if (not IsValid(EachSquad))
+		{
+			continue;
+		}
+		MapGuidToFormationRadius.Add(EachSquad, ExtractFormationRadiusForUnit(EachSquad));
+	}
+	for (auto EachTank : TankMasters)
+	{
+		if (not IsValid(EachTank))
+		{
+			continue;
+		}
+		MapGuidToFormationRadius.Add(EachTank, ExtractFormationRadiusForUnit(EachTank));
+	}
+
+	InitFormationOffsets(NewFormation, MapGuidToFormationRadius, MaxFormationWidth, FormationOffsetMlt);
+	SaveNewFormation(NewFormation);
+	StartFormationMovement(NewFormation);
+}
+
+void UEnemyFormationController::MoveRandomPatrolWithAttackMoveFormation(
+	TArray<ASquadController*> SquadControllers,
+	TArray<ATankMaster*> TankMasters,
+	const TArray<FVector>& PatrolPoints,
+	const int32 OverrideFirstPatrolPointIndex,
+	const int32 AmountIterationsAtPatrolPoint,
+	const float GuardTimePerPatrolPointIteration,
+	const float GuardSphereRadius,
+	int32 MaxFormationWidth,
+	const float FormationOffsetMlt,
+	const FAttackMoveWaveSettings& AttackMoveSettings,
+	const FVector& AverageSpawnLocation)
+{
+	if (not EnsureFormationRequestIsValid(SquadControllers, TankMasters, MaxFormationWidth))
+	{
+		return;
+	}
+	if (PatrolPoints.Num() < 2)
+	{
+		RTSFunctionLibrary::ReportError("Random patrol with attack move requires at least two patrol points.");
+		return;
+	}
+
+	FFormationData NewFormation;
+	const int32 FormationID = GenerateUniqueFormationID();
+	NewFormation.FormationID = FormationID;
+	NewFormation.AttackMoveSettings = AttackMoveSettings;
+	NewFormation.bIsAttackMoveFormation = true;
+	NewFormation.bIsRandomPatrolWithAttackMoveFormation = true;
+	NewFormation.AverageSpawnLocation = AverageSpawnLocation;
+	NewFormation.M_RandomPatrolWithAttackMoveState.M_PatrolPoints = PatrolPoints;
+	NewFormation.M_RandomPatrolWithAttackMoveState.M_Settings.OverrideFirstPatrolPointIndex = OverrideFirstPatrolPointIndex;
+	NewFormation.M_RandomPatrolWithAttackMoveState.M_Settings.AmountIterationsAtPatrolPoint = FMath::Max(
+		AmountIterationsAtPatrolPoint,
+		0);
+	NewFormation.M_RandomPatrolWithAttackMoveState.M_Settings.GuardTimePerPatrolPointIteration = FMath::Max(
+		GuardTimePerPatrolPointIteration,
+		0.f);
+	NewFormation.M_RandomPatrolWithAttackMoveState.M_Settings.GuardSphereRadius = FMath::Max(GuardSphereRadius, 50.f);
+
+	const int32 FirstPatrolPointIndex = GetInitialPatrolPointIndex(
+		PatrolPoints,
+		OverrideFirstPatrolPointIndex,
+		FormationID);
+	if (not PatrolPoints.IsValidIndex(FirstPatrolPointIndex))
+	{
+		RTSFunctionLibrary::ReportError("Failed to choose first patrol point for random patrol formation.");
+		return;
+	}
+	NewFormation.M_RandomPatrolWithAttackMoveState.M_CurrentPatrolPointIndex = FirstPatrolPointIndex;
+	const TArray<FVector> InitialWaypoints = {PatrolPoints[FirstPatrolPointIndex]};
+	const FRotator InitialDirection = GetRandomPatrolDirectionForPoint(NewFormation, FirstPatrolPointIndex);
+	InitWaypointsAndDirections(NewFormation, InitialDirection, InitialWaypoints);
 
 	TMap<TWeakInterfacePtr<ICommands>, float> MapGuidToFormationRadius;
 	for (auto EachSquad : SquadControllers)
@@ -305,6 +383,12 @@ void UEnemyFormationController::CheckFormations()
 		const FRotator& WayDir = Formation->FormationWaypointDirections[Formation->CurrentWaypointIndex];
 
 		UpdateFormationUnitMovementProgress(*Formation, WayLoc, WayDir, NavSys);
+
+		if (Formation->bIsRandomPatrolWithAttackMoveFormation)
+		{
+			HandleRandomPatrolWithAttackMoveFormation(*Formation);
+			continue;
+		}
 
 		if (Formation->bIsAttackMoveFormation)
 		{
@@ -676,6 +760,230 @@ void UEnemyFormationController::HandleAttackMoveFormation(
 	{
 		OnCompleteFormationReached(&Formation);
 	}
+}
+
+void UEnemyFormationController::HandleRandomPatrolWithAttackMoveFormation(FFormationData& Formation)
+{
+	HandleFormationIdleUnits(
+		Formation,
+		Formation.FormationWaypoints[Formation.CurrentWaypointIndex],
+		Formation.FormationWaypointDirections[Formation.CurrentWaypointIndex]);
+
+	if (not GetDoAllFormationUnitsReachedWaypoint(Formation))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	const float CurrentTimeSeconds = World->GetTimeSeconds();
+	bool bHasCombatUnits = false;
+	TArray<const FFormationUnitData*> CombatUnits;
+	GetCanAttackMoveFormationAdvance(
+		Formation,
+		CurrentTimeSeconds,
+		bHasCombatUnits,
+		CombatUnits);
+
+	if (bHasCombatUnits)
+	{
+		IssueAttackMoveHelpOrders(Formation, CombatUnits);
+		return;
+	}
+
+	FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
+	if (not PatrolState.bM_IsGuardingCurrentPatrolPoint)
+	{
+		PatrolState.bM_IsGuardingCurrentPatrolPoint = true;
+		PatrolState.M_CurrentGuardIteration = 0;
+		PatrolState.M_NextGuardIterationTimeSeconds = CurrentTimeSeconds;
+	}
+
+	if (GetCanRandomPatrolGuardIterationExecute(Formation, CurrentTimeSeconds))
+	{
+		ExecuteRandomPatrolGuardIteration(Formation);
+		PatrolState.M_CurrentGuardIteration++;
+		PatrolState.M_NextGuardIterationTimeSeconds = CurrentTimeSeconds +
+			PatrolState.M_Settings.GuardTimePerPatrolPointIteration;
+		return;
+	}
+
+	if (PatrolState.M_CurrentGuardIteration >= PatrolState.M_Settings.AmountIterationsAtPatrolPoint)
+	{
+		TryAdvanceRandomPatrolFormation(Formation);
+	}
+}
+
+bool UEnemyFormationController::GetCanRandomPatrolGuardIterationExecute(
+	const FFormationData& Formation,
+	const float CurrentTimeSeconds) const
+{
+	const FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
+	if (PatrolState.M_CurrentGuardIteration >= PatrolState.M_Settings.AmountIterationsAtPatrolPoint)
+	{
+		return false;
+	}
+	return CurrentTimeSeconds >= PatrolState.M_NextGuardIterationTimeSeconds;
+}
+
+void UEnemyFormationController::ExecuteRandomPatrolGuardIteration(FFormationData& Formation)
+{
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World);
+	if (not NavSys)
+	{
+		return;
+	}
+
+	for (FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		TryMoveFormationUnitToRandomGuardLocation(Formation, FormationUnit, NavSys);
+	}
+}
+
+void UEnemyFormationController::TryMoveFormationUnitToRandomGuardLocation(
+	FFormationData& Formation,
+	FFormationUnitData& FormationUnit,
+	UNavigationSystemV1* NavSys)
+{
+	if (not FormationUnit.IsValidFormationUnit())
+	{
+		return;
+	}
+
+	const FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
+	const int32 CurrentPatrolPointIndex = PatrolState.M_CurrentPatrolPointIndex;
+	if (not PatrolState.M_PatrolPoints.IsValidIndex(CurrentPatrolPointIndex))
+	{
+		return;
+	}
+
+	const FVector PatrolCenter = PatrolState.M_PatrolPoints[CurrentPatrolPointIndex];
+	for (int32 AttemptIndex = 0; AttemptIndex < EnemyFormationConstants::GuardProjectionAttempts; ++AttemptIndex)
+	{
+		const float RandomAngleRadians = FMath::DegreesToRadians(
+			GetSeededFloatInRange(
+				0.f,
+				360.f,
+				Formation.FormationID + PatrolState.M_CurrentGuardIteration + AttemptIndex + 3901));
+		const float RandomDistance = GetSeededFloatInRange(
+			0.f,
+			PatrolState.M_Settings.GuardSphereRadius,
+			Formation.FormationID + PatrolState.M_CurrentGuardIteration + AttemptIndex + 4701);
+		const FVector GuardOffset(
+			FMath::Cos(RandomAngleRadians) * RandomDistance,
+			FMath::Sin(RandomAngleRadians) * RandomDistance,
+			0.f);
+		const FVector CandidateLocation = PatrolCenter + GuardOffset;
+
+		bool bProjectionSuccess = false;
+		const FVector ProjectedLocation = RTSFunctionLibrary::GetLocationProjected_WithNavSystem(
+			NavSys,
+			CandidateLocation,
+			true,
+			bProjectionSuccess,
+			Formation.AttackMoveSettings.ProjectionScale);
+		if (not bProjectionSuccess)
+		{
+			continue;
+		}
+
+		const FRotator GuardRotation = UKismetMathLibrary::FindLookAtRotation(
+			FormationUnit.Unit->GetOwnerLocation(),
+			ProjectedLocation);
+		const ECommandQueueError Error = FormationUnit.Unit->MoveToLocation(ProjectedLocation, true, GuardRotation);
+		if (Error != ECommandQueueError::NoError)
+		{
+			OnUnitMovementError(FormationUnit.Unit, Error);
+		}
+		return;
+	}
+}
+
+void UEnemyFormationController::TryAdvanceRandomPatrolFormation(FFormationData& Formation)
+{
+	FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
+	const int32 NextPatrolPointIndex = GetRandomNextPatrolPointIndex(Formation);
+	if (not PatrolState.M_PatrolPoints.IsValidIndex(NextPatrolPointIndex))
+	{
+		return;
+	}
+
+	PatrolState.M_CurrentPatrolPointIndex = NextPatrolPointIndex;
+	PatrolState.bM_IsGuardingCurrentPatrolPoint = false;
+	PatrolState.M_CurrentGuardIteration = 0;
+
+	const FVector NextPatrolLocation = PatrolState.M_PatrolPoints[NextPatrolPointIndex];
+	const FRotator NextPatrolDirection = GetRandomPatrolDirectionForPoint(Formation, NextPatrolPointIndex);
+	Formation.FormationWaypoints = {NextPatrolLocation};
+	Formation.FormationWaypointDirections = {NextPatrolDirection};
+	Formation.CurrentWaypointIndex = 0;
+
+	for (FFormationUnitData& EachUnit : Formation.FormationUnits)
+	{
+		if (not EachUnit.IsValidFormationUnit())
+		{
+			continue;
+		}
+		MoveUnitToWayPoint(EachUnit, NextPatrolLocation, NextPatrolDirection, Formation.FormationID);
+	}
+}
+
+int32 UEnemyFormationController::GetRandomNextPatrolPointIndex(const FFormationData& Formation) const
+{
+	const FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
+	const int32 PatrolPointCount = PatrolState.M_PatrolPoints.Num();
+	if (PatrolPointCount <= 1)
+	{
+		return PatrolState.M_CurrentPatrolPointIndex;
+	}
+
+	const int32 CurrentIndex = PatrolState.M_CurrentPatrolPointIndex;
+	const int32 RandomIndex = GetSeededIndex(PatrolPointCount - 1, Formation.FormationID + 5811);
+	if (RandomIndex < CurrentIndex)
+	{
+		return RandomIndex;
+	}
+	return RandomIndex + 1;
+}
+
+FRotator UEnemyFormationController::GetRandomPatrolDirectionForPoint(
+	const FFormationData& Formation,
+	const int32 PatrolPointIndex) const
+{
+	const FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
+	const int32 NextPatrolPointIndex = GetRandomNextPatrolPointIndex(Formation);
+	if (PatrolState.M_PatrolPoints.IsValidIndex(NextPatrolPointIndex)
+		&& PatrolState.M_PatrolPoints.IsValidIndex(PatrolPointIndex)
+		&& NextPatrolPointIndex != PatrolPointIndex)
+	{
+		return UKismetMathLibrary::FindLookAtRotation(
+			PatrolState.M_PatrolPoints[PatrolPointIndex],
+			PatrolState.M_PatrolPoints[NextPatrolPointIndex]);
+	}
+	return FRotator::ZeroRotator;
+}
+
+int32 UEnemyFormationController::GetInitialPatrolPointIndex(
+	const TArray<FVector>& PatrolPoints,
+	const int32 OverrideFirstPatrolPointIndex,
+	const int32 FormationID) const
+{
+	if (PatrolPoints.IsValidIndex(OverrideFirstPatrolPointIndex))
+	{
+		return OverrideFirstPatrolPointIndex;
+	}
+
+	return GetSeededIndex(PatrolPoints.Num(), FormationID + 1811);
 }
 
 bool UEnemyFormationController::GetDoAllFormationUnitsReachedWaypoint(const FFormationData& Formation) const

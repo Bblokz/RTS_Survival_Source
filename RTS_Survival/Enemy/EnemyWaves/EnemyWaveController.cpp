@@ -292,6 +292,104 @@ void UEnemyWaveController::StartSingleAttackMoveWave(
 	}
 }
 
+void UEnemyWaveController::StartSingleRandomPatrolWithAttackMoveWave(
+	const EEnemyWaveType WaveType,
+	const TArray<FAttackWaveElement>& WaveElements,
+	const TArray<FVector>& PatrolPoints,
+	const int32 OverrideFirstPatrolPointIndex,
+	const int32 AmountIterationsAtPatrolPoint,
+	const float GuardTimePerPatrolPointIteration,
+	const float GuardSphereRadius,
+	const int32 MaxFormationWidth,
+	const float TimeTillPatrol,
+	AActor* WaveCreator,
+	const float FormationOffsetMultiplier,
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale)
+{
+	if (not GetIsValidSingleAttackWave(WaveType, WaveElements, PatrolPoints, WaveCreator))
+	{
+		return;
+	}
+	if (PatrolPoints.Num() < 2)
+	{
+		RTSFunctionLibrary::ReportError("Random patrol with attack move wave requires at least two patrol points.");
+		return;
+	}
+	if (not GetIsValidAttackMoveWaveSettings(
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale))
+	{
+		return;
+	}
+	if (not GetIsValidAsyncSpawner() || not EnsureEnemyControllerIsValid())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid async spawner or enemy controller for random patrol with attack move wave.");
+		return;
+	}
+
+	FAttackMoveWaveSettings AttackMoveSettings;
+	AttackMoveSettings.HelpOffsetRadiusMltMax = HelpOffsetRadiusMltMax;
+	AttackMoveSettings.HelpOffsetRadiusMltMin = HelpOffsetRadiusMltMin;
+	AttackMoveSettings.MaxAttackTimeBeforeAdvancingToNextWayPoint = MaxAttackTimeBeforeAdvancingToNextWayPoint;
+	AttackMoveSettings.MaxTriesFindNavPointForHelpOffset = MaxTriesFindNavPointForHelpOffset;
+	AttackMoveSettings.ProjectionScale = ProjectionScale;
+
+	FRandomPatrolWithAttackMoveSettings RandomPatrolSettings;
+	RandomPatrolSettings.OverrideFirstPatrolPointIndex = OverrideFirstPatrolPointIndex;
+	RandomPatrolSettings.AmountIterationsAtPatrolPoint = AmountIterationsAtPatrolPoint;
+	RandomPatrolSettings.GuardTimePerPatrolPointIteration = GuardTimePerPatrolPointIteration;
+	RandomPatrolSettings.GuardSphereRadius = GuardSphereRadius;
+	RandomPatrolSettings.AttackMoveSettings = AttackMoveSettings;
+
+	const int32 UniqueWaveID = GetUniqueWaveID();
+	const float ClampedTimeTillPatrol = FMath::Max(TimeTillPatrol, 0.f);
+	const bool bIsSingleWave = true;
+	constexpr bool bIsAttackMoveWave = false;
+	constexpr bool bIsRandomPatrolWithAttackMoveWave = true;
+	if (not CreateNewAttackWaveStruct(
+		UniqueWaveID,
+		WaveType,
+		WaveElements,
+		ClampedTimeTillPatrol,
+		0.f,
+		PatrolPoints,
+		FRotator::ZeroRotator,
+		MaxFormationWidth,
+		WaveCreator,
+		{},
+		0.f,
+		bIsSingleWave,
+		FormationOffsetMultiplier,
+		bIsAttackMoveWave,
+		AttackMoveSettings,
+		bIsRandomPatrolWithAttackMoveWave,
+		RandomPatrolSettings))
+	{
+		RTSFunctionLibrary::ReportError("failed to create struct for single random patrol with attack move wave!");
+		return;
+	}
+
+	FAttackWave* AttackWave = GetAttackWaveByID(UniqueWaveID);
+	if (not AttackWave)
+	{
+		return;
+	}
+	const bool bInstantStart = ClampedTimeTillPatrol <= 0.f;
+	if (not CreateAttackWaveTimer(AttackWave, bInstantStart))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to start random patrol with attack move wave timer for single wave, will remove the struct!");
+		RemoveAttackWaveByIDAndInvalidateTimer(AttackWave);
+	}
+}
+
 void UEnemyWaveController::InitWaveController(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
@@ -406,7 +504,9 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
                                                      const bool bIsSingleWave,
                                                      const float FormationOffsetMultiplier,
                                                      const bool bIsAttackMoveWave,
-                                                     const FAttackMoveWaveSettings& AttackMoveSettings)
+                                                     const FAttackMoveWaveSettings& AttackMoveSettings,
+                                                     const bool bIsRandomPatrolWithAttackMoveWave,
+                                                     const FRandomPatrolWithAttackMoveSettings& RandomPatrolWithAttackMoveSettings)
 {
 	// Sanity check for unique ID
 	if (not EnsureIDIsUnique(UniqueID))
@@ -435,6 +535,8 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
 	NewAttackWave.FormationOffsetMlt = FormationOffsetMultiplier;
 	NewAttackWave.AttackMoveSettings = AttackMoveSettings;
 	NewAttackWave.bIsAttackMoveWave = bIsAttackMoveWave;
+	NewAttackWave.bIsRandomPatrolWithAttackMoveWave = bIsRandomPatrolWithAttackMoveWave;
+	NewAttackWave.RandomPatrolWithAttackMoveSettings = RandomPatrolWithAttackMoveSettings;
 	M_AttackWaves.Add(NewAttackWave);
 	return true;
 }
@@ -728,6 +830,21 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 			Wave->MaxFormationWidth,
 			Wave->FormationOffsetMlt,
 			Wave->AttackMoveSettings,
+			AverageSpawnLocation);
+	}
+	else if (Wave->bIsRandomPatrolWithAttackMoveWave)
+	{
+		M_EnemyController->MoveRandomPatrolWithAttackMoveFormation(
+			WaveSquads,
+			WaveTanks,
+			Wave->Waypoints,
+			Wave->RandomPatrolWithAttackMoveSettings.OverrideFirstPatrolPointIndex,
+			Wave->RandomPatrolWithAttackMoveSettings.AmountIterationsAtPatrolPoint,
+			Wave->RandomPatrolWithAttackMoveSettings.GuardTimePerPatrolPointIteration,
+			Wave->RandomPatrolWithAttackMoveSettings.GuardSphereRadius,
+			Wave->MaxFormationWidth,
+			Wave->FormationOffsetMlt,
+			Wave->RandomPatrolWithAttackMoveSettings.AttackMoveSettings,
 			AverageSpawnLocation);
 	}
 	else

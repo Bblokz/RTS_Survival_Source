@@ -132,6 +132,43 @@ public:
 		const int32 MaxTriesFindNavPointForHelpOffset,
 		const float ProjectionScale);
 
+	/**
+	 * @brief Starts a one-off spawn wave that transitions into infinite random patrol with attack-move support.
+	 * @param WaveType Determines wave logic and whether an owning actor is required.
+	 * @param WaveElements Unit options and spawn points for this patrol wave.
+	 * @param PatrolPoints Patrol points selected at random after each guard cycle.
+	 * @param OverrideFirstPatrolPointIndex Optional first patrol point index override.
+	 * @param AmountIterationsAtPatrolPoint Number of guard iterations to execute at each patrol point.
+	 * @param GuardTimePerPatrolPointIteration Delay between guard iterations.
+	 * @param GuardSphereRadius Radius used to sample guard offsets around the active patrol point.
+	 * @param MaxFormationWidth Formation width for spawned units.
+	 * @param TimeTillPatrol Delay before first spawn execution.
+	 * @param WaveCreator Optional owner actor required by specific wave types.
+	 * @param FormationOffsetMultiplier Formation offset multiplier for movement.
+	 * @param HelpOffsetRadiusMltMax Max support offset multiplier used by attack move assist logic.
+	 * @param HelpOffsetRadiusMltMin Min support offset multiplier used by attack move assist logic.
+	 * @param MaxAttackTimeBeforeAdvancingToNextWayPoint Max combat linger time before advancing.
+	 * @param MaxTriesFindNavPointForHelpOffset Max attempts to project support positions.
+	 * @param ProjectionScale Nav projection scale for support positions.
+	 */
+	void StartSingleRandomPatrolWithAttackMoveWave(
+		const EEnemyWaveType WaveType,
+		const TArray<FAttackWaveElement>& WaveElements,
+		const TArray<FVector>& PatrolPoints,
+		const int32 OverrideFirstPatrolPointIndex,
+		const int32 AmountIterationsAtPatrolPoint,
+		const float GuardTimePerPatrolPointIteration,
+		const float GuardSphereRadius,
+		const int32 MaxFormationWidth,
+		const float TimeTillPatrol,
+		AActor* WaveCreator,
+		const float FormationOffsetMultiplier,
+		const float HelpOffsetRadiusMltMax,
+		const float HelpOffsetRadiusMltMin,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		const int32 MaxTriesFindNavPointForHelpOffset,
+		const float ProjectionScale);
+
 	void InitWaveController(
 		AEnemyController* EnemyController);
 
@@ -167,7 +204,9 @@ private:
 		const bool bIsSingleWave = false,
 		const float FormationOffsetMultiplier = 0,
 		const bool bIsAttackMoveWave = false,
-		const FAttackMoveWaveSettings& AttackMoveSettings = {});
+		const FAttackMoveWaveSettings& AttackMoveSettings = {},
+		const bool bIsRandomPatrolWithAttackMoveWave = false,
+		const FRandomPatrolWithAttackMoveSettings& RandomPatrolWithAttackMoveSettings = {});
 
 	bool CreateAttackWaveTimer(FAttackWave* AttackWave, bool bInstantStart);
 	// Uses the interval as well as the variance fractions to randomly get the wave iteration time.

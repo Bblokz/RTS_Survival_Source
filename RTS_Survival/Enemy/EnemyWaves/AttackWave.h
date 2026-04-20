@@ -53,6 +53,27 @@ struct FAttackMoveWaveSettings
 	float ProjectionScale = 1.f;
 };
 
+USTRUCT(Blueprintable)
+struct FRandomPatrolWithAttackMoveSettings
+{
+	GENERATED_BODY()
+
+	// To pick the first patrol point directly instead of randomizing the first one.
+	int32 OverrideFirstPatrolPointIndex = INDEX_NONE;
+
+	// Amount of guard iterations that are executed once the patrol destination is reached.
+	int32 AmountIterationsAtPatrolPoint = 0;
+
+	// Time in seconds between guard iterations while the patrol is holding position.
+	float GuardTimePerPatrolPointIteration = 0.f;
+
+	// Radius around the current patrol point for guard iteration movement projections.
+	float GuardSphereRadius = 0.f;
+
+	// Attack move logic that keeps patrol units supporting units in combat before advancing.
+	FAttackMoveWaveSettings AttackMoveSettings = {};
+};
+
 USTRUCT()
 struct FAttackWave
 {
@@ -105,6 +126,12 @@ struct FAttackWave
 
 	// When true the wave is handled as an attack move wave.
 	bool bIsAttackMoveWave = false;
+
+	// When true the wave starts as a random patrol with attack move combat support.
+	bool bIsRandomPatrolWithAttackMoveWave = false;
+
+	// Settings used when bIsRandomPatrolWithAttackMoveWave is true.
+	FRandomPatrolWithAttackMoveSettings RandomPatrolWithAttackMoveSettings = {};
 
 	UPROPERTY()
 	TArray<AActor*> SpawnedWaveUnits;

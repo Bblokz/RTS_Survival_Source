@@ -50,6 +50,31 @@ struct FFormationData
 	// Whether this formation uses attack move wave logic.
 	bool bIsAttackMoveFormation = false;
 
+	// Whether this formation uses random patrol with attack move support logic.
+	bool bIsRandomPatrolWithAttackMoveFormation = false;
+
+	// Runtime state for random patrol with attack move logic.
+	struct FRandomPatrolWithAttackMoveState
+	{
+		// All patrol points this formation can choose from.
+		TArray<FVector> M_PatrolPoints = {};
+
+		// Config values for patrol and guarding behavior.
+		FRandomPatrolWithAttackMoveSettings M_Settings = {};
+
+		// Current patrol point index inside M_PatrolPoints.
+		int32 M_CurrentPatrolPointIndex = INDEX_NONE;
+
+		// Current guard iteration count at the active patrol point.
+		int32 M_CurrentGuardIteration = 0;
+
+		// Time in seconds when the next guard iteration is allowed.
+		float M_NextGuardIterationTimeSeconds = 0.f;
+
+		// True while guard iterations are in progress for the current patrol point.
+		bool bM_IsGuardingCurrentPatrolPoint = false;
+	} M_RandomPatrolWithAttackMoveState;
+
 	FVector GetFormationUnitLocation();
 
 private:
