@@ -27,9 +27,11 @@ enum class EDigInType : uint8;
 class UGameDecalManager;
 class UGameExplosionsManager;
 class ASmallArmsProjectileManager;
+class UAudioComponent;
 enum class ETankSubtype : uint8;
 class UGameUnitManager;
 class RTS_SURVIVAL_API UGameResourceManager;
+class UNiagaraComponent;
 class UResourceComponent;
 class UResourceDropOff;
 class URTSGameSettingsHandler;
@@ -171,6 +173,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="GameTime")
 	FString GetGameTimeAsString(const EGameTimeUnit GameTimeUnit) const;
 
+	/**
+	 * @brief Plays the cached veterancy FX at the provided unit location for player one only.
+	 * @param VeterancyWorldLocation The location where the effect should be played.
+	 * @param bIsPlayerOneOwnedUnit Whether the promoted unit is owned by player one.
+	 */
+	void PlayVeterancyFX(const FVector& VeterancyWorldLocation, const bool bIsPlayerOneOwnedUnit);
+
 	// blueprint class derived from ASmallArmsProjectileManager to spawn to handle projectiles.
 	UPROPERTY(EditDefaultsOnly, Category="Projectile")
 	TSubclassOf<ASmallArmsProjectileManager> ProjectileManagerClass;
@@ -179,6 +188,7 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	virtual void PostInitializeComponents() override;
 
@@ -357,6 +367,19 @@ FBxpOptionData InitBxpOptionEntry(const EBuildingExpansionType Type,
 	
 	void InitializeSmallArmsProjectileManager();
 	void InitializeWeaponVFXSettings();
+	void BeginPlay_InitVeterancyFXCache();
+	void SetVeterancyFXDormant();
+	void HandleVeterancyFXActivation(const FVector& VeterancyWorldLocation);
+	bool GetIsValidVeterancyNiagaraComponent() const;
+	bool GetIsValidVeterancyAudioComponent() const;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraComponent> M_VeterancyNiagaraComponent;
+
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> M_VeterancyAudioComponent;
+
+	FTimerHandle M_VeterancyFXDormantTimerHandle;
 
 	 TWeakObjectPtr<UMaterialParameterCollectionInstance> M_MPC_Time_Instance;
 

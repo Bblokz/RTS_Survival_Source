@@ -2,6 +2,7 @@
 
 #include "ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
@@ -143,6 +144,49 @@ void URTSExperienceComp::OnLevelUpOwner()
 
 	M_Owner->OnUnitLevelUp();
 	OnLevelUp_ApplyBehaviour();
+	TryPlayVeterancyFX();
+}
+
+void URTSExperienceComp::TryPlayVeterancyFX() const
+{
+	if (not GetIsPlayerOneOwnedUnit())
+	{
+		return;
+	}
+
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	if (not IsValid(GameState))
+	{
+		RTSFunctionLibrary::ReportError("Cannot play veterancy FX because game state is null.");
+		return;
+	}
+
+	AActor* OwnerActor = GetOwnerActor();
+	if (not IsValid(OwnerActor))
+	{
+		return;
+	}
+
+	const FVector VeterancyWorldLocation = OwnerActor->GetActorLocation() + M_VeterancyFXLocationOffset;
+	const bool bIsPlayerOneOwnedUnit = GetIsPlayerOneOwnedUnit();
+	GameState->PlayVeterancyFX(VeterancyWorldLocation, bIsPlayerOneOwnedUnit);
+}
+
+bool URTSExperienceComp::GetIsPlayerOneOwnedUnit() const
+{
+	AActor* OwnerActor = GetOwnerActor();
+	if (not IsValid(OwnerActor))
+	{
+		return false;
+	}
+
+	const URTSComponent* RTSComponent = OwnerActor->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent))
+	{
+		return M_OwningPlayer == 1;
+	}
+
+	return RTSComponent->GetOwningPlayer() == 1;
 }
 
 void URTSExperienceComp::OnLevelUp_ApplyBehaviour()

@@ -45,6 +45,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Experience|LevelUp")
 	TArray<TSubclassOf<UBehaviour>> LevelUpBehaviourPerLevel;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Experience|LevelUp")
+	FVector M_VeterancyFXLocationOffset = FVector(0.f, 0.f, 120.f);
+
 private:
 	UPROPERTY()
 	FUnitExperience M_UnitExperience;
@@ -65,6 +68,8 @@ private:
 	bool GetIsValidOwner() const;
 	bool GetIsValidOwnerActor() const;
 	bool GetIsValidBehaviourComponent() const;
+	bool GetIsPlayerOneOwnedUnit() const;
+	void TryPlayVeterancyFX() const;
 	void OnLevelUpOwner();
 	void OnLevelUp_ApplyBehaviour();
 	bool TryCacheBehaviourComponent();
