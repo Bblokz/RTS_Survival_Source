@@ -37,6 +37,18 @@ void UW_Mission::InitMissionWidget(const FMissionWidgetState& WidgetState,
 	OnChangeWidgetState(WidgetType, WidgetState.TextSpeed);
 }
 
+void UW_Mission::RefreshMissionWidget(const FMissionWidgetState& WidgetState)
+{
+	if (not GetIsValidRichTextBlocks())
+	{
+		return;
+	}
+
+	M_RichTitle->SetText(WidgetState.MissionTitle);
+	M_RichDescription->SetText(WidgetState.MissionDescription);
+	M_NextButtonType = WidgetState.NextButtonType;
+}
+
 void UW_Mission::MarkWidgetAsFree()
 {
 	M_WidgetState = EMissionWidgetState::OMS_Minimized;

@@ -21,6 +21,7 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -64,6 +65,7 @@ void UMissionBase::OnMissionComplete()
 	MissionState.bIsMissionComplete = true;
 	// Stop any tick behaviour.
 	MissionState.bTickOnMission = false;
+	Tracking_ClearState();
 	DebugMission("Completed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -81,6 +83,7 @@ void UMissionBase::OnMissionComplete()
 void UMissionBase::OnMissionFailed()
 {
 	MissionState.bIsMissionComplete = true;
+	Tracking_ClearState();
 	DebugMission("Failed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -426,6 +429,7 @@ bool UMissionBase::GetIsScheduledTaskActive(const int32 TaskID) const
 
 void UMissionBase::OnCleanUpMission()
 {
+	Tracking_ClearState();
 	if (GetIsValidMissionManager())
 	{
 		CancelAllScheduledCallbacks();
@@ -443,6 +447,7 @@ void UMissionBase::OnCleanUpMission()
 	MarkWidgetAsFree();
 	GetWorld()->GetTimerManager().ClearTimer(M_LoadToStartTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(M_TextOnlyDurationHandle);
+	GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
 	CleanUp_TimerHandles(GetWorld());
 	BP_OnMissionCleanUp();
 }
@@ -454,6 +459,7 @@ void UMissionBase::BeginDestroy()
 	{
 		GetWorld()->GetTimerManager().ClearTimer(M_TextOnlyDurationHandle);
 		GetWorld()->GetTimerManager().ClearTimer(M_LoadToStartTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
 	}
 }
 
@@ -838,6 +844,293 @@ void UMissionBase::RegisterCallbackOnDestructibleCollapse(ADestructableEnvActor*
 		}
 	};
 	ActorToTrackWhenCollapse->OnDestructibleCollapse.AddLambda(MissionCallBack);
+}
+
+void UMissionBase::TrackingFunction(const EMissionTrackingType TrackingType,
+                                    const TArray<AActor*>& ActorsToTrack,
+                                    const float ValidityCheckInterval,
+                                    const FString& Prefix,
+                                    const FString& Partitive,
+                                    const FString& Postfix,
+                                    const ERTSRichText RichCountType)
+{
+	Tracking_ClearState();
+
+	if (TrackingType == EMissionTrackingType::NoTracking)
+	{
+		return;
+	}
+
+	M_MissionTrackingRuntimeState.TrackingType = TrackingType;
+	M_MissionTrackingRuntimeState.Prefix = Prefix;
+	M_MissionTrackingRuntimeState.Partitive = Partitive;
+	M_MissionTrackingRuntimeState.Postfix = Postfix;
+	M_MissionTrackingRuntimeState.RichCountType = RichCountType;
+	M_MissionTrackingRuntimeState.MaxCount = ActorsToTrack.Num();
+	M_MissionTrackingRuntimeState.CurrentCount = 0;
+
+	if (not Tracking_ConfigureActors(TrackingType, ActorsToTrack))
+	{
+		Tracking_ClearState();
+		return;
+	}
+
+	Tracking_ApplyWidgetTitleUpdate();
+
+	if (Tracking_GetHasReachedMaxCount())
+	{
+		Tracking_OnReachedMaxCount();
+		return;
+	}
+
+	Tracking_StartBackupValidityTimer(ValidityCheckInterval);
+}
+
+void UMissionBase::Tracking_ClearState()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
+	}
+
+	M_TrackedActors.Empty();
+	M_TrackingHasCountedInvalid.Empty();
+	M_MissionTrackingRuntimeState = FMissionTrackingRuntimeState();
+}
+
+bool UMissionBase::Tracking_ConfigureActors(const EMissionTrackingType TrackingType, const TArray<AActor*>& ActorsToTrack)
+{
+	M_TrackedActors.Reserve(ActorsToTrack.Num());
+	M_TrackingHasCountedInvalid.SetNum(ActorsToTrack.Num());
+
+	for (int32 TrackingIndex = 0; TrackingIndex < ActorsToTrack.Num(); ++TrackingIndex)
+	{
+		AActor* ActorToTrack = ActorsToTrack[TrackingIndex];
+		M_TrackedActors.Add(ActorToTrack);
+		M_TrackingHasCountedInvalid[TrackingIndex] = false;
+
+		if (not IsValid(ActorToTrack))
+		{
+			Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+			continue;
+		}
+
+		switch (TrackingType)
+		{
+		case EMissionTrackingType::TrackDestructablesCollapse:
+			Tracking_ConfigureDestructableActorAtIndex(ActorToTrack, TrackingIndex);
+			break;
+		case EMissionTrackingType::TrackOnActorsDestroyed:
+			Tracking_ConfigureActorDestroyedAtIndex(ActorToTrack, TrackingIndex);
+			break;
+		default:
+			break;
+		}
+	}
+
+	return true;
+}
+
+void UMissionBase::Tracking_ConfigureDestructableActorAtIndex(AActor* ActorToTrack, const int32 TrackingIndex)
+{
+	ADestructableEnvActor* DestructableActor = Cast<ADestructableEnvActor>(ActorToTrack);
+	if (not IsValid(DestructableActor))
+	{
+		Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+		return;
+	}
+
+	Tracking_RegisterDestructableCallbacks(DestructableActor, TrackingIndex);
+}
+
+void UMissionBase::Tracking_ConfigureActorDestroyedAtIndex(AActor* ActorToTrack, const int32 TrackingIndex)
+{
+	if (not IsValid(ActorToTrack))
+	{
+		Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+		return;
+	}
+
+	Tracking_RegisterActorDestroyedCallback(ActorToTrack, TrackingIndex);
+}
+
+void UMissionBase::Tracking_RegisterDestructableCallbacks(ADestructableEnvActor* DestructableActor, const int32 TrackingIndex)
+{
+	if (not IsValid(DestructableActor))
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<UMissionBase> WeakThis(this);
+	DestructableActor->OnDestructibleCollapse.AddLambda([WeakThis, TrackingIndex]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+	});
+}
+
+void UMissionBase::Tracking_RegisterActorDestroyedCallback(AActor* ActorToTrack, const int32 TrackingIndex)
+{
+	if (not IsValid(ActorToTrack))
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<UMissionBase> WeakThis(this);
+	ActorToTrack->OnDestroyed.AddLambda([WeakThis, TrackingIndex](AActor*)
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+	});
+}
+
+void UMissionBase::Tracking_StartBackupValidityTimer(const float ValidityCheckInterval)
+{
+	if (ValidityCheckInterval <= 0.0f)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<UMissionBase> WeakThis(this);
+	FTimerDelegate ValidityCheckTimerDelegate;
+	ValidityCheckTimerDelegate.BindLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->Tracking_CheckForInvalidActorsByTimer();
+	});
+
+	World->GetTimerManager().SetTimer(
+		M_TrackingValidityTimerHandle,
+		ValidityCheckTimerDelegate,
+		ValidityCheckInterval,
+		true
+	);
+}
+
+void UMissionBase::Tracking_OnActorInvalidatedByIndex(const int32 TrackingIndex)
+{
+	if (not M_TrackingHasCountedInvalid.IsValidIndex(TrackingIndex))
+	{
+		return;
+	}
+
+	if (M_TrackingHasCountedInvalid[TrackingIndex])
+	{
+		return;
+	}
+
+	M_TrackingHasCountedInvalid[TrackingIndex] = true;
+	M_MissionTrackingRuntimeState.CurrentCount += 1;
+	Tracking_ApplyWidgetTitleUpdate();
+
+	if (not Tracking_GetHasReachedMaxCount())
+	{
+		return;
+	}
+
+	Tracking_OnReachedMaxCount();
+}
+
+void UMissionBase::Tracking_CheckForInvalidActorsByTimer()
+{
+	for (int32 TrackingIndex = 0; TrackingIndex < M_TrackedActors.Num(); ++TrackingIndex)
+	{
+		if (M_TrackingHasCountedInvalid.IsValidIndex(TrackingIndex) && M_TrackingHasCountedInvalid[TrackingIndex])
+		{
+			continue;
+		}
+
+		AActor* TrackedActor = nullptr;
+		if (M_TrackedActors.IsValidIndex(TrackingIndex))
+		{
+			TrackedActor = M_TrackedActors[TrackingIndex].Get();
+		}
+
+		if (IsValid(TrackedActor))
+		{
+			continue;
+		}
+
+		Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+	}
+}
+
+void UMissionBase::Tracking_ApplyWidgetTitleUpdate()
+{
+	if (M_MissionTrackingRuntimeState.TrackingType == EMissionTrackingType::NoTracking)
+	{
+		return;
+	}
+
+	MissionWidgetState.MissionTitle = Tracking_BuildTitleText();
+
+	if (not GetHasMissionWidget())
+	{
+		return;
+	}
+
+	M_MissionWidget->RefreshMissionWidget(MissionWidgetState);
+}
+
+FText UMissionBase::Tracking_BuildTitleText() const
+{
+	const FString CurrentCountAsText = FString::FromInt(M_MissionTrackingRuntimeState.CurrentCount);
+	const FString MaxCountAsText = FString::FromInt(M_MissionTrackingRuntimeState.MaxCount);
+	const FString CountText = CurrentCountAsText + M_MissionTrackingRuntimeState.Partitive + MaxCountAsText;
+	const FString RichCountText = FRTSRichTextConverter::MakeRTSRich(CountText, M_MissionTrackingRuntimeState.RichCountType);
+
+	FString FinalTitleText;
+	if (not M_MissionTrackingRuntimeState.Prefix.IsEmpty())
+	{
+		FinalTitleText += M_MissionTrackingRuntimeState.Prefix + TEXT(" ");
+	}
+
+	FinalTitleText += RichCountText;
+
+	if (not M_MissionTrackingRuntimeState.Postfix.IsEmpty())
+	{
+		FinalTitleText += TEXT(" ") + M_MissionTrackingRuntimeState.Postfix;
+	}
+
+	return FText::FromString(FinalTitleText);
+}
+
+bool UMissionBase::Tracking_GetHasReachedMaxCount() const
+{
+	return M_MissionTrackingRuntimeState.CurrentCount >= M_MissionTrackingRuntimeState.MaxCount;
+}
+
+void UMissionBase::Tracking_OnReachedMaxCount()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
+	}
+
+	if (MissionState.bIsMissionComplete)
+	{
+		return;
+	}
+
+	OnMissionComplete();
 }
 
 void UMissionBase::RegisterCallbackOnScavengableObjectScavenged(AScavengeableObject* ScavengableObject)
@@ -1761,6 +2054,11 @@ bool UMissionBase::GetIsValidMissionWidget() const
 	}
 	RTSFunctionLibrary::ReportError("Mission widget not valid for mission: " + GetName());
 	return false;
+}
+
+bool UMissionBase::GetHasMissionWidget() const
+{
+	return M_MissionWidget.IsValid();
 }
 
 void UMissionBase::MarkWidgetAsFree() const

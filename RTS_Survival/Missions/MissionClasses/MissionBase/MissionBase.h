@@ -7,6 +7,8 @@
 #include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Missions/MissionManager/MissionSpawnCommandQueueOrder.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
+#include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionTrackingType.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -90,6 +92,33 @@ struct FSeededDifficultyMixPool
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Seeded Selection")
 	FTrainingOption Option08 = FTrainingOption();
+};
+
+USTRUCT()
+struct FMissionTrackingRuntimeState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 CurrentCount = 0;
+
+	UPROPERTY()
+	int32 MaxCount = 0;
+
+	UPROPERTY()
+	FString Prefix;
+
+	UPROPERTY()
+	FString Partitive = "/";
+
+	UPROPERTY()
+	FString Postfix;
+
+	UPROPERTY()
+	ERTSRichText RichCountType = ERTSRichText::Text_SubTitle;
+
+	UPROPERTY()
+	EMissionTrackingType TrackingType = EMissionTrackingType::NoTracking;
 };
 
 /**
@@ -377,6 +406,25 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnDestructibleCollapse(ADestructableEnvActor* ActorToTrackWhenCollapse);
+
+	/**
+	 * @brief Enables optional mission title tracking and refreshes the mission widget title when progress changes.
+	 * @param TrackingType Type of actor tracking to apply; NoTracking disables tracking.
+	 * @param ActorsToTrack Source actors used for tracking. Max count equals the original array length.
+	 * @param ValidityCheckInterval Optional backup poll interval; values <= 0 disable the timer.
+	 * @param Prefix Optional text rendered before the rich count block.
+	 * @param Partitive Separator inserted between current and max count.
+	 * @param Postfix Optional text rendered after the rich count block.
+	 * @param RichCountType Rich-text style applied to the count section.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Tracking")
+	void TrackingFunction(const EMissionTrackingType TrackingType,
+	                      const TArray<AActor*>& ActorsToTrack,
+	                      const float ValidityCheckInterval,
+	                      const FString& Prefix,
+	                      const FString& Partitive,
+	                      const FString& Postfix,
+	                      const ERTSRichText RichCountType);
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackDestructibleCollapse(ADestructableEnvActor* ActorCollapsed);
@@ -727,6 +775,7 @@ private:
 	bool GetHasConfiguredNextMission() const;
 	bool GetHasValidTriggerableMissionIndex(const int32 TriggerableMissionIndex) const;
 	bool GetIsValidMissionWidget() const;
+	bool GetHasMissionWidget() const;
 	// Free the associated widget so it is able to sever another mission base derived class.
 	void MarkWidgetAsFree() const;
 
@@ -785,9 +834,35 @@ private:
 	UPROPERTY()
 	FTimerHandle M_TextOnlyDurationHandle;
 
+	UPROPERTY()
+	FMissionTrackingRuntimeState M_MissionTrackingRuntimeState;
+
+	// Tracks actor validity transitions so each tracked element increments at most once.
+	UPROPERTY()
+	TArray<bool> M_TrackingHasCountedInvalid;
+
+	// Tracked actors that still need to be observed for invalidation.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> M_TrackedActors;
+
+	FTimerHandle M_TrackingValidityTimerHandle;
+
 	int32 M_NextAsyncSpawnId = 1;
 
 	void TextOnlyMission_SetAutoCompleteTimer();
+	void Tracking_ClearState();
+	bool Tracking_ConfigureActors(const EMissionTrackingType TrackingType, const TArray<AActor*>& ActorsToTrack);
+	void Tracking_ConfigureDestructableActorAtIndex(AActor* ActorToTrack, const int32 TrackingIndex);
+	void Tracking_ConfigureActorDestroyedAtIndex(AActor* ActorToTrack, const int32 TrackingIndex);
+	void Tracking_RegisterDestructableCallbacks(ADestructableEnvActor* DestructableActor, const int32 TrackingIndex);
+	void Tracking_RegisterActorDestroyedCallback(AActor* ActorToTrack, const int32 TrackingIndex);
+	void Tracking_StartBackupValidityTimer(const float ValidityCheckInterval);
+	void Tracking_OnActorInvalidatedByIndex(const int32 TrackingIndex);
+	void Tracking_CheckForInvalidActorsByTimer();
+	void Tracking_ApplyWidgetTitleUpdate();
+	FText Tracking_BuildTitleText() const;
+	bool Tracking_GetHasReachedMaxCount() const;
+	void Tracking_OnReachedMaxCount();
 
 	bool bM_IgnoreTriggerOnMissionStart = false;
 };
