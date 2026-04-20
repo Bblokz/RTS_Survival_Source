@@ -21,6 +21,9 @@
 #include "GameDecalManager/GameDecalManager.h"
 #include "GameExplosionManager/ExplosionManager.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "NiagaraComponent.h"
+#include "Components/AudioComponent.h"
+#include "RTS_Survival/Game/GameSettings/VeterancyFXSettings.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInType/DigInType.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
@@ -478,6 +481,7 @@ void ACPPGameState::BeginPlay()
 	NotifyPlayerGameSettingsLoaded();
 	InitializeSmallArmsProjectileManager();
 	InitializeWeaponVFXSettings();
+	BeginPlay_InitVeterancyFXCache();
 
 	SetActorTickEnabled(true);
 	StartClock();
@@ -487,6 +491,16 @@ void ACPPGameState::BeginPlay()
 		// Cap the FPS to 60
 		// GEngine->Exec(GetWorld(), TEXT("t.MaxFPS 60"));
 	}
+}
+
+void ACPPGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_VeterancyFXDormantTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void ACPPGameState::PostInitializeComponents()
@@ -7415,4 +7429,174 @@ void ACPPGameState::InitializeSmallArmsProjectileManager()
 void ACPPGameState::InitializeWeaponVFXSettings()
 {
 	GLOBAL_RefreshShellColorsFromSettings();
+}
+
+void ACPPGameState::BeginPlay_InitVeterancyFXCache()
+{
+	const UVeterancyFXSettings* VeterancyFXSettings = UVeterancyFXSettings::Get();
+	if (not IsValid(VeterancyFXSettings))
+	{
+		RTSFunctionLibrary::ReportError("VeterancyFXSettings is invalid in ACPPGameState::BeginPlay_InitVeterancyFXCache.");
+		return;
+	}
+
+	UNiagaraSystem* VeterancyNiagaraSystem = VeterancyFXSettings->M_VeterancyNiagaraSystem.LoadSynchronous();
+	if (not IsValid(VeterancyNiagaraSystem))
+	{
+		RTSFunctionLibrary::ReportError("M_VeterancyNiagaraSystem is not set in project settings.");
+		return;
+	}
+
+	USoundBase* VeterancySound = VeterancyFXSettings->M_VeterancySound.LoadSynchronous();
+	if (not IsValid(VeterancySound))
+	{
+		RTSFunctionLibrary::ReportError("M_VeterancySound is not set in project settings.");
+		return;
+	}
+
+	M_VeterancyNiagaraComponent = NewObject<UNiagaraComponent>(this, TEXT("M_VeterancyNiagaraComponent"));
+	if (not GetIsValidVeterancyNiagaraComponent())
+	{
+		return;
+	}
+
+	M_VeterancyNiagaraComponent->SetAutoActivate(false);
+	M_VeterancyNiagaraComponent->SetAsset(VeterancyNiagaraSystem);
+	M_VeterancyNiagaraComponent->SetAbsolute(true, true, true);
+	M_VeterancyNiagaraComponent->RegisterComponent();
+
+	M_VeterancyAudioComponent = NewObject<UAudioComponent>(this, TEXT("M_VeterancyAudioComponent"));
+	if (not GetIsValidVeterancyAudioComponent())
+	{
+		return;
+	}
+
+	M_VeterancyAudioComponent->SetAutoActivate(false);
+	M_VeterancyAudioComponent->SetSound(VeterancySound);
+	M_VeterancyAudioComponent->SetAbsolute(true, true, true);
+
+	USoundAttenuation* SoundAttenuation = VeterancyFXSettings->M_VeterancySoundAttenuation.LoadSynchronous();
+	if (IsValid(SoundAttenuation))
+	{
+		M_VeterancyAudioComponent->AttenuationSettings = SoundAttenuation;
+	}
+
+	USoundConcurrency* SoundConcurrency = VeterancyFXSettings->M_VeterancySoundConcurrency.LoadSynchronous();
+	if (IsValid(SoundConcurrency))
+	{
+		M_VeterancyAudioComponent->ConcurrencySet.Reset();
+		M_VeterancyAudioComponent->ConcurrencySet.Add(SoundConcurrency);
+	}
+
+	M_VeterancyAudioComponent->RegisterComponent();
+	SetVeterancyFXDormant();
+}
+
+void ACPPGameState::PlayVeterancyFX(const FVector& VeterancyWorldLocation, const bool bIsPlayerOneOwnedUnit)
+{
+	if (not bIsPlayerOneOwnedUnit)
+	{
+		return;
+	}
+
+	if (not GetIsValidVeterancyNiagaraComponent() || not GetIsValidVeterancyAudioComponent())
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_VeterancyFXDormantTimerHandle);
+	}
+
+	SetVeterancyFXDormant();
+	HandleVeterancyFXActivation(VeterancyWorldLocation);
+}
+
+void ACPPGameState::SetVeterancyFXDormant()
+{
+	if (GetIsValidVeterancyNiagaraComponent())
+	{
+		M_VeterancyNiagaraComponent->DeactivateImmediate();
+		M_VeterancyNiagaraComponent->SetVisibility(false);
+	}
+
+	if (GetIsValidVeterancyAudioComponent())
+	{
+		M_VeterancyAudioComponent->Stop();
+		M_VeterancyAudioComponent->SetPaused(false);
+	}
+}
+
+void ACPPGameState::HandleVeterancyFXActivation(const FVector& VeterancyWorldLocation)
+{
+	const UVeterancyFXSettings* VeterancyFXSettings = UVeterancyFXSettings::Get();
+	if (not IsValid(VeterancyFXSettings))
+	{
+		RTSFunctionLibrary::ReportError("VeterancyFXSettings is invalid in ACPPGameState::HandleVeterancyFXActivation.");
+		return;
+	}
+
+	M_VeterancyNiagaraComponent->SetWorldLocation(VeterancyWorldLocation);
+	M_VeterancyNiagaraComponent->SetVisibility(true);
+	M_VeterancyNiagaraComponent->Activate(true);
+
+	M_VeterancyAudioComponent->SetWorldLocation(VeterancyWorldLocation);
+	M_VeterancyAudioComponent->Play(0.f);
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	TWeakObjectPtr<ACPPGameState> WeakThis(this);
+	FTimerDelegate TimerDelegate;
+	TimerDelegate.BindLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->SetVeterancyFXDormant();
+	});
+	World->GetTimerManager().SetTimer(
+		M_VeterancyFXDormantTimerHandle,
+		TimerDelegate,
+		VeterancyFXSettings->M_VeterancyFXActiveDuration,
+		false
+	);
+}
+
+bool ACPPGameState::GetIsValidVeterancyNiagaraComponent() const
+{
+	if (IsValid(M_VeterancyNiagaraComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_VeterancyNiagaraComponent",
+		"GetIsValidVeterancyNiagaraComponent",
+		this
+	);
+	return false;
+}
+
+bool ACPPGameState::GetIsValidVeterancyAudioComponent() const
+{
+	if (IsValid(M_VeterancyAudioComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_VeterancyAudioComponent",
+		"GetIsValidVeterancyAudioComponent",
+		this
+	);
+	return false;
 }
