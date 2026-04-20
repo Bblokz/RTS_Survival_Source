@@ -503,6 +503,15 @@ TArray<FTrainingOption> UMissionBase::GetTrainingOptionsDifficultyAdjusted(TArra
 	return EasyOptions;
 }
 
+ERTSFaction UMissionBase::GetPlayerFaction() const
+{
+	if(not GetIsValidMissionManager())
+	{
+		return ERTSFaction::GerStrikeDivision;
+	}
+	return M_MissionManager->GetPlayerFaction();
+}
+
 bool UMissionBase::CreateSingleAttackMoveDifficultyConditional(ERTSGameDifficulty MinimalDifficulty,
                                                                TArray<FVector> SpawnLocations,
                                                                TArray<FTrainingOption> TrainingOptions,

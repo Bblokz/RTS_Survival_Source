@@ -175,6 +175,16 @@ void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, 
 	M_GameDifficulty.bIsInitialized = true;
 }
 
+ERTSFaction AMissionManager::GetPlayerFaction() const
+{
+	if(M_PlayerFaction == ERTSFaction::NotInitialised)
+	{
+		RTSFunctionLibrary::ReportError("Attempted to retreive player faction from mission manager before it was "
+								  "initialized!!");
+	}
+	return M_PlayerFaction;
+}
+
 FRTSGameDifficulty AMissionManager::GetCurrentGameDifficulty() const
 {
 	if (not M_GameDifficulty.bIsInitialized)
@@ -908,7 +918,7 @@ void AMissionManager::BeginPlay_InitMissionWidgetManager()
 
 void AMissionManager::BeginPlay_InitGameDifficultyAndSettings()
 {
-	SetCampaignGenerationSettingsWithGameInstance();
+	SetFactionAndCampaignGenerationSettingsWithGameInstance();
 	if (not bSetGameDifficultyWithWidget)
 	{
 		// The Game instance will determine the difficulty set.
@@ -1000,7 +1010,7 @@ bool AMissionManager::GetIsValidMissionTriggerVolumesManager() const
 	return false;
 }
 
-void AMissionManager::SetCampaignGenerationSettingsWithGameInstance()
+void AMissionManager::SetFactionAndCampaignGenerationSettingsWithGameInstance()
 {
 	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	if (not GameInstance)
@@ -1014,6 +1024,19 @@ void AMissionManager::SetCampaignGenerationSettingsWithGameInstance()
 		RTSFunctionLibrary::ReportError("Game instance has no valid Campaign generattion settings loaded while"
 			"the mission manager requested it!"
 			"\n see AMissionManager::SetCampaignGenerationSettingsWithGameInstance");
+	}
+	// Note that we do not clash with the player faction override settings in the mission manager as those are used
+	// at PostInit rather than beginplay.
+	if (GameInstance->GetPlayerFaction() == ERTSFaction::NotInitialised)
+	{
+		RTSFunctionLibrary::ReportError("Game instance has no valid player faction loaded while"
+			"the mission manager requested it!"
+			"\n see AMissionManager::SetFactionAndCampaignGenerationSettingsWithGameInstance");
+		M_PlayerFaction = ERTSFaction::GerStrikeDivision;
+	}
+	else
+	{
+		M_PlayerFaction = GameInstance->GetPlayerFaction();
 	}
 }
 
@@ -1230,7 +1253,7 @@ void AMissionManager::RemoveFinishedTowSpawnRequests()
 
 void AMissionManager::RemoveFinishedCargoVehicleSpawnRequests()
 {
-	M_CargoVehicleSpawnStates.RemoveAll([](const FMissionCargoSquadWithVehicleSpawnState& CargoVehicleSpawnState)->bool
+	M_CargoVehicleSpawnStates.RemoveAll([](const FMissionCargoSquadWithVehicleSpawnState& CargoVehicleSpawnState)-> bool
 	{
 		return CargoVehicleSpawnState.GetIsFinished();
 	});
@@ -1832,12 +1855,13 @@ bool AMissionManager::GetIsValidDefeatWidgetClass() const
 	return false;
 }
 
-int32 AMissionManager::GetGenerationSeed() 
+int32 AMissionManager::GetGenerationSeed()
 {
-	if(not M_CampaignGenerationSettings.bAreSettingsLoaded)
+	if (not M_CampaignGenerationSettings.bAreSettingsLoaded)
 	{
-		RTSFunctionLibrary::ReportError("Mission manager requested campaign generation seed but settings were not loaded."
-								  "\n WILL LOAD BACKUP PIE SETTINGS INSTEAD");
+		RTSFunctionLibrary::ReportError(
+			"Mission manager requested campaign generation seed but settings were not loaded."
+			"\n WILL LOAD BACKUP PIE SETTINGS INSTEAD");
 		SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE();
 	}
 	return M_CampaignGenerationSettings.GenerationSeed;

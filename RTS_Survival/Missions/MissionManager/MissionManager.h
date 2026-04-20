@@ -173,6 +173,8 @@ public:
 	void OnAnyMissionStarted(UMissionBase* LoadedMission);
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	ERTSFaction GetPlayerFaction() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FRTSGameDifficulty GetCurrentGameDifficulty() const;
 	UW_Mission* OnMissionRequestSetupWidget(UMissionBase* RequestingMission);
@@ -400,7 +402,7 @@ private:
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
 	bool GetIsValidMissionTriggerVolumesManager() const;
-	void SetCampaignGenerationSettingsWithGameInstance();
+	void SetFactionAndCampaignGenerationSettingsWithGameInstance();
 	void SetGameDifficultyWithGameInstance();
 
 	UPROPERTY()
@@ -437,6 +439,9 @@ private:
 	UPROPERTY()
 	FCampaignGenerationSettings M_CampaignGenerationSettings;
 
+	UPROPERTY()
+	ERTSFaction M_PlayerFaction;
+	
 	UPROPERTY()
 	TArray<FMissionTowTeamWeaponSpawnState> M_TowedTeamWeaponSpawnStates;
 

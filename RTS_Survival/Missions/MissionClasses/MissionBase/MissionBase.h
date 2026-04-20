@@ -15,6 +15,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "MissionBase.generated.h"
 
+enum class ERTSFaction : uint8;
 struct FSeededChoices;
 class ADestructableEnvActor;
 enum class ERTSPortraitTypes : uint8;
@@ -283,6 +284,9 @@ protected:
 	                                                             TArray<FTrainingOption> HardOptions,
 	                                                             TArray<FTrainingOption> BrutalOptions,
 	                                                             TArray<FTrainingOption> IronmanOptions) const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	ERTSFaction GetPlayerFaction() const;
 
 	// Only creates if the current game difficulty is at least the minimal difficulty specified.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)

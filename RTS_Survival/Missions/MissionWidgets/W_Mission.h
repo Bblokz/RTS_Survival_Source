@@ -13,7 +13,7 @@ class UWidgetSwitcher;
 enum class EMissionWidgetState : uint8;
 
 UCLASS()
-class RTS_SURVIVAL_API UW_Mission : public UUserWidget, public IRTSUIElement // <- add interface
+class RTS_SURVIVAL_API UW_Mission : public UUserWidget, public IRTSUIElement 
 {
 	GENERATED_BODY()
 

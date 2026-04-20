@@ -85,7 +85,7 @@ struct FTrackPhysicsMovementTuning
 	 * @note Determines how much upcoming slope information contributes to the averaged ground normal.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
-	float GroundTraceForwardDistance = 100.0f;
+	float GroundTraceForwardDistance = 25.f;
 
 	/**
 	 * @brief Increase when traces lose contact on sharp dips; decrease if traces incorrectly latch onto lower geometry.
