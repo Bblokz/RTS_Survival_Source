@@ -12,6 +12,9 @@ class URichTextBlock;
 class UWidgetSwitcher;
 enum class EMissionWidgetState : uint8;
 
+/**
+ * @brief Mission widget instances are pooled and reconfigured by missions through init/refresh calls.
+ */
 UCLASS()
 class RTS_SURVIVAL_API UW_Mission : public UUserWidget, public IRTSUIElement 
 {
@@ -22,6 +25,8 @@ public:
 	                       UMissionBase* AssociatedMission,
 	                       const bool bUseNextAsExpanded,
 	                       const bool bStartAsCollapsedWidget);
+
+	void RefreshMissionWidget(const FMissionWidgetState& WidgetState);
 
 	void MarkWidgetAsFree();
 
