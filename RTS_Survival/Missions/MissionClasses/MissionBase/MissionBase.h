@@ -855,7 +855,9 @@ private:
 	void Tracking_ConfigureDestructableActorAtIndex(AActor* ActorToTrack, const int32 TrackingIndex);
 	void Tracking_ConfigureActorDestroyedAtIndex(AActor* ActorToTrack, const int32 TrackingIndex);
 	void Tracking_RegisterDestructableCallbacks(ADestructableEnvActor* DestructableActor, const int32 TrackingIndex);
-	void Tracking_RegisterActorDestroyedCallback(AActor* ActorToTrack, const int32 TrackingIndex);
+	void Tracking_RegisterActorDestroyedCallback(AActor* ActorToTrack);
+	UFUNCTION()
+	void Tracking_OnTrackedActorDestroyed(AActor* DestroyedActor);
 	void Tracking_StartBackupValidityTimer(const float ValidityCheckInterval);
 	void Tracking_OnActorInvalidatedByIndex(const int32 TrackingIndex);
 	void Tracking_CheckForInvalidActorsByTimer();

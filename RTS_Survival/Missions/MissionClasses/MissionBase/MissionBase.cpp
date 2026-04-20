@@ -951,7 +951,7 @@ void UMissionBase::Tracking_ConfigureActorDestroyedAtIndex(AActor* ActorToTrack,
 		return;
 	}
 
-	Tracking_RegisterActorDestroyedCallback(ActorToTrack, TrackingIndex);
+	Tracking_RegisterActorDestroyedCallback(ActorToTrack);
 }
 
 void UMissionBase::Tracking_RegisterDestructableCallbacks(ADestructableEnvActor* DestructableActor, const int32 TrackingIndex)
@@ -973,23 +973,32 @@ void UMissionBase::Tracking_RegisterDestructableCallbacks(ADestructableEnvActor*
 	});
 }
 
-void UMissionBase::Tracking_RegisterActorDestroyedCallback(AActor* ActorToTrack, const int32 TrackingIndex)
+void UMissionBase::Tracking_RegisterActorDestroyedCallback(AActor* ActorToTrack)
 {
 	if (not IsValid(ActorToTrack))
 	{
 		return;
 	}
 
-	const TWeakObjectPtr<UMissionBase> WeakThis(this);
-	ActorToTrack->OnDestroyed.AddLambda([WeakThis, TrackingIndex](AActor*)
+	ActorToTrack->OnDestroyed.AddUniqueDynamic(this, &UMissionBase::Tracking_OnTrackedActorDestroyed);
+}
+
+void UMissionBase::Tracking_OnTrackedActorDestroyed(AActor* DestroyedActor)
+{
+	if (DestroyedActor == nullptr)
 	{
-		if (not WeakThis.IsValid())
+		return;
+	}
+
+	for (int32 TrackingIndex = 0; TrackingIndex < M_TrackedActors.Num(); ++TrackingIndex)
+	{
+		if (M_TrackedActors[TrackingIndex].Get() != DestroyedActor)
 		{
-			return;
+			continue;
 		}
 
-		WeakThis->Tracking_OnActorInvalidatedByIndex(TrackingIndex);
-	});
+		Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+	}
 }
 
 void UMissionBase::Tracking_StartBackupValidityTimer(const float ValidityCheckInterval)
