@@ -27,6 +27,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
+#include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 
 // --- local helpers (file-scope) ------------------------------------------------
 namespace
@@ -599,10 +600,10 @@ void AProjectile::SetupRocketSwingLaunch(const FVector& LaunchLocation,
 
 
 void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
-                                           const FVector& ApexLocation,
-                                           const FVector& TargetLocation,
-                                           const float ProjectileSpeed,
-                                           const FVerticalRocketWeaponSettings& VerticalRocketSettings)
+                                            const FVector& ApexLocation,
+                                            const FVector& TargetLocation,
+                                            const float ProjectileSpeed,
+                                            const FVerticalRocketWeaponSettings& VerticalRocketSettings)
 {
 	if (not GetIsValidProjectileMovement())
 	{
@@ -611,7 +612,8 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 
 	const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
 	const float Stage1Speed = SafeProjectileSpeed * FMath::Max(VerticalRocketSettings.Stage1SpeedMultiplier, 0.1f);
-	const float Stage2ArcSpeed = SafeProjectileSpeed * FMath::Max(VerticalRocketSettings.Stage2ArcSpeedMultiplier, 0.1f);
+	const float Stage2ArcSpeed = SafeProjectileSpeed *
+		FMath::Max(VerticalRocketSettings.Stage2ArcSpeedMultiplier, 0.1f);
 	const float Stage2StraightSpeed = SafeProjectileSpeed * FMath::Max(
 		VerticalRocketSettings.Stage2StraightSpeedMultiplier,
 		0.1f);
@@ -638,11 +640,13 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 
 	const float Stage2ArcDistanceSetting = FMath::Max(VerticalRocketSettings.Stage2ArcDistance, 0.0f);
 	const FVector Stage2ArcHeightOffset = FVector(0.0f, 0.0f, VerticalRocketSettings.Stage2ArcHeight);
-	const float Stage2ArcTime = (Stage2ArcDistanceSetting > KINDA_SMALL_NUMBER || FMath::Abs(VerticalRocketSettings.Stage2ArcHeight) >
-		KINDA_SMALL_NUMBER)
-		? (FMath::Sqrt((Stage2ArcDistanceSetting * Stage2ArcDistanceSetting)
-			+ (VerticalRocketSettings.Stage2ArcHeight * VerticalRocketSettings.Stage2ArcHeight)) / Stage2ArcSpeed)
-		: 0.0f;
+	const float Stage2ArcTime = (Stage2ArcDistanceSetting > KINDA_SMALL_NUMBER || FMath::Abs(
+			                            VerticalRocketSettings.Stage2ArcHeight) >
+		                            KINDA_SMALL_NUMBER)
+		                            ? (FMath::Sqrt((Stage2ArcDistanceSetting * Stage2ArcDistanceSetting)
+			                            + (VerticalRocketSettings.Stage2ArcHeight * VerticalRocketSettings.
+				                            Stage2ArcHeight)) / Stage2ArcSpeed)
+		                            : 0.0f;
 	const float Stage2StraightTime = FVector::Distance(ApexLocation, TargetLocation) / Stage2StraightSpeed;
 
 	SetActorLocation(LaunchLocation);
@@ -658,8 +662,9 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 		TWeakObjectPtr<AProjectile> WeakThis(this);
 		World->GetTimerManager().SetTimer(
 			M_RocketSwingTimerHandle,
-			[WeakThis, TargetLocation, Stage2ArcDistanceSetting, Stage2ArcHeightOffset, Stage2ArcSpeed, Stage2StraightSpeed,
-			 Stage2ArcTime]()
+			[WeakThis, TargetLocation, Stage2ArcDistanceSetting, Stage2ArcHeightOffset, Stage2ArcSpeed,
+				Stage2StraightSpeed,
+				Stage2ArcTime]()
 			{
 				if (not WeakThis.IsValid() || not WeakThis->GetIsValidProjectileMovement())
 				{
@@ -698,7 +703,8 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 								return;
 							}
 
-							const FVector StraightDirection = (TargetLocation - WeakThis->GetActorLocation()).GetSafeNormal();
+							const FVector StraightDirection = (TargetLocation - WeakThis->GetActorLocation()).
+								GetSafeNormal();
 							if (StraightDirection.IsNearlyZero())
 							{
 								return;
@@ -1171,13 +1177,13 @@ float AProjectile::GetRadixiteDamageDurationSeconds() const
 {
 	const float WeaponCalibre = static_cast<float>(M_WeaponCalibre);
 	const float ClampedCalibre = FMath::Clamp(WeaponCalibre,
-		RadixiteDamageConstants::MinCalibreMm,
-		RadixiteDamageConstants::MaxCalibreMm);
+	                                          RadixiteDamageConstants::MinCalibreMm,
+	                                          RadixiteDamageConstants::MaxCalibreMm);
 	const float InterpolationFactor = (ClampedCalibre - RadixiteDamageConstants::MinCalibreMm)
 		/ (RadixiteDamageConstants::MaxCalibreMm - RadixiteDamageConstants::MinCalibreMm);
 	return FMath::Lerp(RadixiteDamageConstants::MinDurationSeconds,
-		RadixiteDamageConstants::MaxDurationSeconds,
-		InterpolationFactor);
+	                   RadixiteDamageConstants::MaxDurationSeconds,
+	                   InterpolationFactor);
 }
 
 bool AProjectile::GetIsValidWidgetPoolManager() const
@@ -1195,7 +1201,6 @@ void AProjectile::PostInit_SetupWidgetPoolManager()
 {
 	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
 }
-
 
 
 void AProjectile::SetProjectileDormant()
@@ -1479,6 +1484,10 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		HandleProjectileBounce(HitResult, PlateHit, HitActor, MakeImpactOutwardRotationZ(HitResult));
 		return;
 	}
+	if constexpr (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
+	{
+		DebugArmorHit(RawArmorValue, EffectiveArmor, AdjustedArmorPen, HitResult.Location, not bShouldBounce);
+	}
 	OnArmorPen_DisplayText(HitResult.Location, PlateHit);
 	ProjectileHitPropagateNotification(false);
 
@@ -1659,14 +1668,6 @@ float AProjectile::GetWidthOfShell(const float WeaponCalibre, const EWeaponShell
 	return ShellWidth;
 }
 
-void AProjectile::DebugBounce(const FVector& Location) const
-{
-	if constexpr (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
-	{
-		DrawDebugString(
-			GetWorld(), Location, TEXT("Bounce!"), 0, FColor::Purple, 5.f, false, 1.f);
-	}
-}
 
 void AProjectile::DebugProjectile(const FString& Message) const
 {
@@ -1676,7 +1677,8 @@ void AProjectile::DebugProjectile(const FString& Message) const
 	}
 }
 
-void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type, const float WeaponCalibre) const
+void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type,
+                                                    const float WeaponCalibre) const
 {
 	if (Type == EProjectileNiagaraSystem::AttachedRocket)
 	{
@@ -1848,21 +1850,23 @@ void AProjectile::OnArmorPen_HeDisplayText(const FVector& Location)
 
 void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 {
-	if (M_WeaponCalibre < 45 || M_ShellType == EWeaponShellType::Shell_APCR || M_ShellType == EWeaponShellType::Shell_AP)
+	if (M_WeaponCalibre < 45 || M_ShellType == EWeaponShellType::Shell_APCR || M_ShellType ==
+		EWeaponShellType::Shell_AP)
 	{
 		return;
 	}
 	TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
 	ActorsToIgnore.Add(HitActor);
 	const float MaxArmorDamaged = M_ShrapnelArmorPen * 1.5;
-	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(M_ShrapnelParticles, 3, 0.5);
+	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(
+		M_ShrapnelParticles, 3, 0.5);
 	if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
 	{
-		RTSFunctionLibrary::PrintString(HitLocation, this,"AOE FallOff = " + FString::SanitizeFloat(DamageFallOff));
+		RTSFunctionLibrary::PrintString(HitLocation, this, "AOE FallOff = " + FString::SanitizeFloat(DamageFallOff));
 	}
 	ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == 1
-		? ETriggerOverlapLogic::OverlapEnemy
-		: ETriggerOverlapLogic::OverlapPlayer;
+		                                    ? ETriggerOverlapLogic::OverlapEnemy
+		                                    : ETriggerOverlapLogic::OverlapPlayer;
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		this,
 		HitLocation,
@@ -1875,7 +1879,34 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 		ERTSDamageType::Kinetic,
 		OverlapLogic,
 		ActorsToIgnore
-		);
+	);
+}
+
+void AProjectile::DebugArmorHit(const float Armor, const float EffectiveArmor, const float AdjustedPen,
+                                const FVector& HitLcation, const bool bArmorPenned)
+{
+	FString Message = "A" + FString::SanitizeFloat(Armor) + " EA" + FString::SanitizeFloat(EffectiveArmor) + " APen" +
+		FString::SanitizeFloat(AdjustedPen);
+	if (bArmorPenned)
+	{
+		Message = FRTSRichTextConverter::MakeRTSRich(Message, ERTSRichText::Text_Armor);
+	}
+	else
+	{
+		Message = FRTSRichTextConverter::MakeRTSRich(Message, ERTSRichText::Text_Bad14);
+	}
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = 100.f;
+	TextSettings.VisibleDuration = 1.f;
+	TextSettings.FadeOutDuration = 0.5f;
+	URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(
+		this,
+		Message,
+		HitLcation,
+		false, 400,
+		ETextJustify::Type::Center,
+		TextSettings
+	);
 }
 
 void AProjectile::PostInitializeComponents()

@@ -112,6 +112,9 @@ namespace DeveloperSettings
 
 		namespace Experience
 		{
+
+			inline constexpr float GlobalExpNeededMlt = 1.f;
+			
 			inline constexpr int32 BaseInfantryExp = 10;
 			inline constexpr int32 ArmoredInfantryExp = 15;
 			inline constexpr int32 HazmatInfantryExp = 15;
@@ -122,7 +125,10 @@ namespace DeveloperSettings
 			inline constexpr int32 BaseArmoredCarExp = 100;
 			inline constexpr int32 BaseLightMediumTankExp = 250;
 			inline constexpr int32 BaseMediumTankExp = 350;
+			inline constexpr int32 BaseSpecialMediumTankExp = 450;
+			inline constexpr int32 BaseT2HeavyTankExp = 550;
 			inline constexpr int32 BaseHeavyTankExp = 700;
+			inline constexpr int32 BaseSuperHeavyTankExp = 1100;
 
 			inline constexpr int32 T1NomadicExp = 300;
 			inline constexpr int32 T2NomadicExp = 500;
@@ -1542,8 +1548,8 @@ namespace DeveloperSettings
 		constexpr bool GArchProjectile_Compile_DebugSymbols = false;
 		// Reinforcement provider and ability debug draws.
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
-		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
-		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
+		constexpr bool GPathFollowing_Compile_DebugSymbols = true;
+		constexpr bool GRTSNavAgents_Compile_DebugSymbols = true;
 		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
@@ -1554,7 +1560,7 @@ namespace DeveloperSettings
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting
 		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
-		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
+		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = true;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Resistances_Compile_DebugSymbols = false;
 		constexpr bool GSquadUnit_Weapons_Compile_DebugSymbols = false;

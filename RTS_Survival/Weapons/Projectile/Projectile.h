@@ -556,7 +556,6 @@ private:
 	// To ensure that a projectile cannot trigger a voice line after a bounce.
 	bool bM_AlreadyNotified = false;
 
-	void DebugBounce(const FVector& Location) const;
 	void DebugProjectile(const FString& Message) const;
 
 	// Set to the value set in the derived blueprint.
@@ -582,4 +581,7 @@ private:
 	void OnArmorPen_HeDisplayText(const FVector& Location);
 
 	void HandleAoe(const FVector& HitLocation,AActor* HitActor);
+
+	void DebugArmorHit(const float Armor, const float EffectiveArmor, const float AdjustedPen,
+	                   const FVector& HitLcation, const bool bArmorPenned);
 };

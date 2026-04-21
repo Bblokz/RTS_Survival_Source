@@ -1791,13 +1791,13 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 30;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *  DamageBonusMlt;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
 	WeaponData.ArmorPen = 170.f;
 	WeaponData.ArmorPenMaxRange = 150.f;
-	WeaponData.MagCapacity = 6;
-	WeaponData.ReloadSpeed = 4.f;
+	WeaponData.MagCapacity = 3;
+	WeaponData.ReloadSpeed = 16.f;
 	WeaponData.BaseCooldown = 2.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 85;
@@ -1816,7 +1816,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 20;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *  DamageBonusMlt;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = LightCannonRange * RailGunRangeMultiplier;
 	WeaponData.ArmorPen = 110.f;
@@ -1841,7 +1841,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 40;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre *  DamageBonusMlt;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = BasicSmallArmsRange;
 	WeaponData.ArmorPen = 190.f;
@@ -1871,8 +1871,8 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
 	WeaponData.ArmorPen = 260.f;
 	WeaponData.ArmorPenMaxRange = 240.f;
-	WeaponData.MagCapacity = 2;
-	WeaponData.ReloadSpeed = 5.5f;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 8.f;
 	WeaponData.BaseCooldown = 2.5f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 88;
@@ -2638,7 +2638,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( MediumAssaultCannonRange * 1.2, 10);
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumAssaultCannonRange * 1.2, 10);
 	WeaponData.ArmorPen = 148;
 	WeaponData.ArmorPenMaxRange = 135;
 	WeaponData.MagCapacity = 1;
@@ -2820,7 +2820,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 			+ Kv1ArcWeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * Kv1ArcDamageMlt;
 		Kv1ArcWeaponData.DamageFlux = DamageFluxPercentage;
 		WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange* 0.92, 100);
+			DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 0.92, 100);
 		// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 		Kv1ArcWeaponData.ArmorPen = Kv1ArcArmorPen /
 			DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
@@ -3162,7 +3162,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.TNTExplosiveGrams = 109;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
-	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( DeveloperSettings::GameBalance::Ranges::HeavyAssaultCannonRange* 1.2, 10);
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::HeavyAssaultCannonRange * 1.2, 10);
 	WeaponData.ArmorPen = 232;
 	WeaponData.ArmorPenMaxRange = 222;
 	WeaponData.MagCapacity = 1;
@@ -3283,7 +3284,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-		DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange* 0.92, 100);
+		DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange * 0.92, 100);
 	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 	WeaponData.ArmorPen = 61 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 61 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
@@ -3373,7 +3374,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
 	WeaponData.ArmorPen = (MortarArmorPenPerMM * WeaponData.WeaponCalibre)
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = (MortarArmorPenPerMM * WeaponData.WeaponCalibre)
@@ -3404,7 +3406,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange* 1.33, 100);
+		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange * 1.33, 100);
 	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 	WeaponData.ArmorPen = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
@@ -3545,7 +3547,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 			+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 		WeaponData.DamageFlux = DamageFluxPercentage;
 		WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange* 1, 100);
+			DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange * 1, 100);
 		// He is the starting shell for this gun but the projectile multiplies with this factor so we neutralize it.
 		WeaponData.ArmorPen = Su122HeArmorPen / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 		WeaponData.ArmorPenMaxRange = Su122HeArmorPen /
@@ -3600,8 +3602,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.TNTExplosiveGrams = 1062;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
-		WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.33, 100);
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.33, 100);
 	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 	WeaponData.ArmorPen = 66 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 66 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
@@ -3835,10 +3837,14 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.VisionRadius = ArmoredCarVisionRadius;
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, FMath::RoundToInt(
-				 ArmoredCarMediumCalibreRadixiteCost * PanzerwerferRadixiteCostMlt)},
-			{ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
-				 ArmoredCarMediumCalibreVehiclePartsCost * PanzerwerferVehiclePartsCostMlt)}
+			{
+				ERTSResourceType::Resource_Radixite, FMath::RoundToInt(
+					ArmoredCarMediumCalibreRadixiteCost * PanzerwerferRadixiteCostMlt)
+			},
+			{
+				ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
+					ArmoredCarMediumCalibreVehiclePartsCost * PanzerwerferVehiclePartsCostMlt)
+			}
 		});
 		TankData.ExperienceLevels = GetArmoredCarExpLevels();
 		TankData.ExperienceMultiplier = 1.0f;
@@ -3909,7 +3915,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VehicleMaxSpeedKmh = 40;
 	TankData.VehicleReverseSpeedKmh = 40;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.3f, 5);
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, ArmoredCarRadixiteCost + 125},
 		{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost + 50}
@@ -3931,13 +3937,17 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.VehicleMaxSpeedKmh = 40;
 		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.3f, 5);
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(
-				FMath::RoundToInt(ArmoredCarRadixiteCost * MortarRadixiteCostMlt),
-				10)},
-			{ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
-				ArmoredCarVehiclePartsCost * MortarVehiclePartsCostMlt)}
+			{
+				ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(
+					FMath::RoundToInt(ArmoredCarRadixiteCost * MortarRadixiteCostMlt),
+					10)
+			},
+			{
+				ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
+					ArmoredCarVehiclePartsCost * MortarVehiclePartsCostMlt)
+			}
 		});
 		TankData.ExperienceLevels = GetArmoredCarExpLevels();
 		TankData.ExperienceMultiplier = 1.0f;
@@ -4120,10 +4130,14 @@ void ACPPGameState::InitAllGameLightTankData()
 		TankData.VehicleReverseSpeedKmh = 8;
 		TankData.VisionRadius = T1TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, FMath::RoundToInt(
-				 Panzer38TBaseRadixiteCost * Panzer38TRRadixiteCostMlt)},
-			{ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
-				 Panzer38TBaseVehiclePartsCost * Panzer38TRVehiclePartsCostMlt)}
+			{
+				ERTSResourceType::Resource_Radixite, FMath::RoundToInt(
+					Panzer38TBaseRadixiteCost * Panzer38TRRadixiteCostMlt)
+			},
+			{
+				ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
+					Panzer38TBaseVehiclePartsCost * Panzer38TRVehiclePartsCostMlt)
+			}
 		});
 		TankData.Abilities = BasicTankAbilities;
 		TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4354,7 +4368,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// T-70F (same combat stats as T-70, higher metal cost)
 	{
 		const float T70FMetalCostMultiplier = 1.3f;
-		const int32 T70FVehiclePartsCost = FMath::RoundToInt((LightTankVehiclePartsCost + 25) * T70FMetalCostMultiplier);
+		const int32 T70FVehiclePartsCost =
+			FMath::RoundToInt((LightTankVehiclePartsCost + 25) * T70FMetalCostMultiplier);
 
 		TankData.Cost = FUnitCost({
 			{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost + 50},
@@ -5161,7 +5176,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// T-28F (same combat stats as T-28, higher metal cost)
 	{
 		const float T28FMetalCostMultiplier = 1.3f;
-		const int32 T28FVehiclePartsCost = FMath::RoundToInt((T2HeavyTankVehiclePartsCost - 100) * T28FMetalCostMultiplier);
+		const int32 T28FVehiclePartsCost = FMath::RoundToInt(
+			(T2HeavyTankVehiclePartsCost - 100) * T28FMetalCostMultiplier);
 
 		TankData.Cost = FUnitCost({
 			{ERTSResourceType::Resource_Radixite, T2HeavyTankRadixiteCost - 250},
@@ -5342,7 +5358,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
+		TankData.VehicleRotationSpeed = 25;
 		TankData.TurretRotationSpeed = 8;
 		TankData.VehicleMaxSpeedKmh = 16;
 		TankData.VehicleReverseSpeedKmh = 7;
@@ -5432,21 +5448,23 @@ void ACPPGameState::InitAllGameAircraftData()
 
 TArray<FExperienceLevel> ACPPGameState::GetLightTankExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 100;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 175 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 250;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 300 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 450;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 450 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  600* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 600;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  900* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5454,21 +5472,24 @@ TArray<FExperienceLevel> ACPPGameState::GetLightTankExpLevels() const
 
 TArray<FExperienceLevel> ACPPGameState::GetLightTankDestroyerExpLevels() const
 {
+	
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 100;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 200 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 250;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 350 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 450;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 475 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  650* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 600;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  1000* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5476,21 +5497,23 @@ TArray<FExperienceLevel> ACPPGameState::GetLightTankDestroyerExpLevels() const
 
 TArray<FExperienceLevel> ACPPGameState::GetArmoredCarExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 70;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 100 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 150;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 250 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 275;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 375 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  500* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 425;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  750* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5498,21 +5521,23 @@ TArray<FExperienceLevel> ACPPGameState::GetArmoredCarExpLevels() const
 
 TArray<FExperienceLevel> ACPPGameState::GetLightMediumTankExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 150;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 250 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 400;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 550 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 700;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 750 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  900* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 850;
+	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  1150* GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -6216,7 +6241,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	});
 
 	TArray<FUnitAbilityEntry> NomadicWithWeaponsAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
-		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdAttackGround,
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
@@ -6232,7 +6258,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
 	using namespace DeveloperSettings::GameBalance::Experience;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::EnergySupplies;
-	
+
 	FNomadicData NomadicData;
 
 	// --------------------------------------------------
@@ -7199,7 +7225,8 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 
 	FSquadData SquadData;
 	SquadData.MaxHealth = ArmoredInfantryHealth;
-	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(SquadData.MaxHealth);
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = AntiTankGunTeamWeaponVisionRadius;
@@ -7272,7 +7299,8 @@ void ACPPGameState::InitAllGameFlakTWSquadData()
 
 	FSquadData SquadData;
 	SquadData.MaxHealth = ArmoredInfantryHealth;
-	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(SquadData.MaxHealth);
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = FlakTeamWeaponVisionRadius;
@@ -7309,7 +7337,8 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 
 	FSquadData SquadData;
 	SquadData.MaxHealth = ArmoredInfantryHealth;
-	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(SquadData.MaxHealth);
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
 	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = ArtilleryTeamWeaponVisionRadius;
@@ -7436,7 +7465,8 @@ void ACPPGameState::BeginPlay_InitVeterancyFXCache()
 	const UVeterancyFXSettings* VeterancyFXSettings = UVeterancyFXSettings::Get();
 	if (not IsValid(VeterancyFXSettings))
 	{
-		RTSFunctionLibrary::ReportError("VeterancyFXSettings is invalid in ACPPGameState::BeginPlay_InitVeterancyFXCache.");
+		RTSFunctionLibrary::ReportError(
+			"VeterancyFXSettings is invalid in ACPPGameState::BeginPlay_InitVeterancyFXCache.");
 		return;
 	}
 
@@ -7461,6 +7491,7 @@ void ACPPGameState::BeginPlay_InitVeterancyFXCache()
 	}
 
 	M_VeterancyNiagaraComponent->SetAutoActivate(false);
+	M_VeterancyNiagaraComponent->SetAutoDestroy(false);
 	M_VeterancyNiagaraComponent->SetAsset(VeterancyNiagaraSystem);
 	M_VeterancyNiagaraComponent->SetAbsolute(true, true, true);
 	M_VeterancyNiagaraComponent->RegisterComponent();
@@ -7533,12 +7564,15 @@ void ACPPGameState::HandleVeterancyFXActivation(const FVector& VeterancyWorldLoc
 	const UVeterancyFXSettings* VeterancyFXSettings = UVeterancyFXSettings::Get();
 	if (not IsValid(VeterancyFXSettings))
 	{
-		RTSFunctionLibrary::ReportError("VeterancyFXSettings is invalid in ACPPGameState::HandleVeterancyFXActivation.");
+		RTSFunctionLibrary::ReportError(
+			"VeterancyFXSettings is invalid in ACPPGameState::HandleVeterancyFXActivation.");
 		return;
 	}
 
 	M_VeterancyNiagaraComponent->SetWorldLocation(VeterancyWorldLocation);
 	M_VeterancyNiagaraComponent->SetVisibility(true);
+	// M_VeterancyNiagaraComponent->ReinitializeSystem();
+
 	M_VeterancyNiagaraComponent->Activate(true);
 
 	M_VeterancyAudioComponent->SetWorldLocation(VeterancyWorldLocation);
