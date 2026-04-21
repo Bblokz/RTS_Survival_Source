@@ -447,6 +447,7 @@ protected:
 	
 	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds);
 
+
 private:
 	// Whether the vehicle is currently Turning.
 	bool bM_NeedToTurnTowardsTarget;

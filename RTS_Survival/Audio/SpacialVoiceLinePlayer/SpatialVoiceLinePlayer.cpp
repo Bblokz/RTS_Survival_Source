@@ -95,21 +95,6 @@ void USpatialVoiceLinePlayer::PlaySpatialVoiceLine(
 	}
 	Debug_SpatialAllowed(VoiceLineType, Location);
 
-	// if(GetOwner())
-	// {
-	// 	ASquadUnit* OwningSquadUnit = Cast<ASquadUnit>(GetOwner());
-	// 	if(OwningSquadUnit)
-	// 	{
-	// 		if(OwningSquadUnit->GetRTSComponent())
-	// 		{
-	// 			if(OwningSquadUnit->GetRTSComponent()->GetOwningPlayer() != 1)
-	// 			{
-	// 				RTSFunctionLibrary::PrintString("enemy vl!");
-	// 			}
-	// 		}
-	// 	}
-	// }
-
 	// 1) Start spam cooldown immediately
 	float FluxPct = 0.f;
 	const float Base = GetBaseIntervalBetweenSpatialVoiceLines(FluxPct);

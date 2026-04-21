@@ -32,6 +32,9 @@
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowType.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundBase.h"
 #include "Sound/SoundConcurrency.h"
@@ -353,13 +356,13 @@ FTargetPickupItemState::FTargetPickupItemState()
 
 FTargetScavengeState::FTargetScavengeState()
 	: M_TargetScavengeObject(nullptr)
-	, bIsBusyScavenging(false)
+	  , bIsBusyScavenging(false)
 {
 }
 
 FTargetManAbandonedTeamWeaponState::FTargetManAbandonedTeamWeaponState()
 	: M_TargetTeamWeapon(nullptr)
-	, bM_IsBusyManningTeamWeapon(false)
+	  , bM_IsBusyManningTeamWeapon(false)
 {
 }
 
@@ -404,9 +407,9 @@ bool ASquadController::GetIsSquadUnit()
 void ASquadController::UnstuckSquadMoveUp(const float ZOffset)
 {
 	EnsureSquadUnitsValid();
-	for(auto EachSquadUnit: M_TSquadUnits)
+	for (auto EachSquadUnit : M_TSquadUnits)
 	{
-		FVector TeleportLocation = EachSquadUnit->GetActorLocation() + FVector(0,0,ZOffset);
+		FVector TeleportLocation = EachSquadUnit->GetActorLocation() + FVector(0, 0, ZOffset);
 		EachSquadUnit->SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::ResetPhysics);
 	}
 }
@@ -427,12 +430,11 @@ TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 
 bool ASquadController::GetIsUnitInCombat() const
 {
-	if(not GetIsValidRTSComponent())
+	if (not GetIsValidRTSComponent())
 	{
 		return false;
 	}
 	return RTSComponent->GetIsUnitInCombat();
-
 }
 
 UBehaviourComp* ASquadController::GetBehaviourComponentOfSquad() const
@@ -791,7 +793,7 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 			{
 				return;
 			}
-			if(not WeakSquadController->GetIsUnitIdle())
+			if (not WeakSquadController->GetIsUnitIdle())
 			{
 				// Squad not IDLE!! makes use of command queue at spawn; do not override with standard movement command.
 				return;
@@ -800,7 +802,8 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 			ASquadController* StrongSquadController = WeakSquadController.Get();
 			StrongSquadController->SetIsSpawning(true);
 			const FVector MoveToProjected = StrongSquadController->ProjectLocationOnNavMesh(MoveTo, 200.0f, true);
-			const FRotator FinalRotation = UKismetMathLibrary::FindLookAtRotation(StrongSquadController->GetActorLocation(), MoveToProjected);
+			const FRotator FinalRotation = UKismetMathLibrary::FindLookAtRotation(
+				StrongSquadController->GetActorLocation(), MoveToProjected);
 			StrongSquadController->MoveToLocation(MoveTo, true, FinalRotation);
 		});
 		World->GetTimerManager().SetTimer(M_SpawningTimer, Del, 0.5, false);
@@ -1209,6 +1212,21 @@ URTSExperienceComp* ASquadController::GetExperienceComponent() const
 void ASquadController::OnUnitLevelUp()
 {
 	// todo squad level up.
+	if (not GetIsValidSpatialVoiceLinePlayer())
+	{
+		return;
+	}
+	const bool bIsPrimarySelected = GetIsValidPlayerController()
+		                                ? PlayerController->GetPrimarySelectedUnit() == this
+		                                : false;
+	if (bIsPrimarySelected)
+	{
+		M_SpatialVoiceLinePlayer->PlayVoiceLineOverRadio(ERTSVoiceLine::UnitPromoted, true, true);
+	}
+	else
+	{
+		M_SpatialVoiceLinePlayer->PlaySpatialVoiceLine(ERTSVoiceLine::UnitPromoted, GetActorLocation(), true);
+	}
 }
 
 void ASquadController::OnSquadSubtypeSet(
@@ -1234,6 +1252,19 @@ void ASquadController::SetSquadVisionRange(const float NewVision)
 		{
 			EachSquadUnit->SetOwningPlayerAndStartFow(RTSComponent->GetOwningPlayer(), NewVision);
 		}
+	}
+	if (GetIsValidFowComponent())
+	{
+		// If the owning player is 1 then the unit is active in fow otherwise it is passive.
+		// the unit either has a vision bubble or is hidden/shown depending on their fow position.
+		// Note that squad units of the enemy should always have a vision radius and hence are passiveEnemyVision.
+		const EFowBehaviour FowBehaviour = RTSComponent->GetOwningPlayer() == 1
+			                                   ? EFowBehaviour::Fow_Active
+			                                   : EFowBehaviour::Fow_PassiveEnemyVision;
+		M_FowComponent->SetVisionRadius(M_SquadVisionRange);
+		// No start immediately as this squad could have been async loaded and does not participate yet.
+		// A timer is used instead.
+		M_FowComponent->StartFow(FowBehaviour, false);
 	}
 }
 
@@ -1279,6 +1310,22 @@ void ASquadController::PostInitializeComponents()
 
 	PostInitializeComponents_SetupGrenadeComponent();
 	PostInitializeComponent_SetupFieldConstructionAbilities();
+	PostInit_FindFOWComponent();
+	PostInit_FindSpatialVoiceLinePlayer();
+}
+
+void ASquadController::PostInit_FindFOWComponent()
+{
+	M_FowComponent = FindComponentByClass<UFowComp>();
+	// Error check.
+	(void)GetIsValidFowComponent();
+}
+
+void ASquadController::PostInit_FindSpatialVoiceLinePlayer()
+{
+	M_SpatialVoiceLinePlayer = FindComponentByClass<USpatialVoiceLinePlayer>();
+	// Error check.
+	(void)GetIsValidSpatialVoiceLinePlayer();
 }
 
 void ASquadController::PostInitializeComponents_SetupGrenadeComponent()
@@ -1361,7 +1408,7 @@ void ASquadController::ExecuteRetreatCommand(const FVector RetreatLocation)
 		DoneExecutingCommand(EAbilityID::IdRetreat);
 		return;
 	}
-	
+
 	if (IsValid(CargoSquad))
 	{
 		CargoSquad->CheckCargoState(EAbilityID::IdRetreat);
@@ -1385,7 +1432,8 @@ ESquadPathFindingError ASquadController::GeneratePathsForSquadUnits(const FVecto
 	return GeneratePaths_Assign(MoveToLocation, SquadPath);
 }
 
-ESquadPathFindingError ASquadController::GenerateBaseSquadPath(const FVector& MoveToLocation, FNavPathSharedPtr& OutSquadPath)
+ESquadPathFindingError ASquadController::GenerateBaseSquadPath(const FVector& MoveToLocation,
+                                                               FNavPathSharedPtr& OutSquadPath)
 {
 	OutSquadPath.Reset();
 
@@ -2030,6 +2078,27 @@ void ASquadController::OnSquadUnitArrivedAtThrowGrenadeLocation(ASquadUnit* Squa
 	}
 
 	GrenadeComponent->OnSquadUnitArrivedAtThrowLocation(SquadUnit);
+}
+
+bool ASquadController::GetIsValidSpatialVoiceLinePlayer() const
+{
+	if (not IsValid(M_SpatialVoiceLinePlayer))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "SpatialVoiceLinePlayer",
+		                                             "ASquadController::GetIsValidSpatialVoiceLinePlayer");
+		return false;
+	}
+	return true;
+}
+
+bool ASquadController::GetIsValidFowComponent() const
+{
+	if (not IsValid(M_FowComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(this, "FOWComponent", "ASquadController::GetIsValidFOWComponent");
+		return false;
+	}
+	return true;
 }
 
 float ASquadController::GetDistanceToActor(const TObjectPtr<AActor> TargetActor)

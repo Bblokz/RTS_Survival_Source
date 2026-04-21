@@ -315,12 +315,23 @@ FBxpOptionData InitBxpOptionEntry(const EBuildingExpansionType Type,
 	// ---- Experience Data ----
 	TArray<FExperienceLevel> GetLightTankExpLevels() const;
 	TArray<FExperienceLevel> GetLightTankDestroyerExpLevels() const;
+	// 30% on top of tank destroyer of this tank class.
+	TArray<FExperienceLevel> GetLightArtillerySpecialVehicleExpLevels() const;
 	TArray<FExperienceLevel> GetArmoredCarExpLevels() const;
 	TArray<FExperienceLevel> GetLightMediumTankExpLevels() const;
 	TArray<FExperienceLevel> GetMediumTankExpLevels() const;
+	// 30% on top of tank destroyer of this tank class.
+	TArray<FExperienceLevel> GetMediumArtillerySpecialVehicleExpLevels() const;
+	TArray<FExperienceLevel> GetCommandTankExpLevels() const;
 	TArray<FExperienceLevel> GetMediumTankDestroyerExpLevels() const;
 	TArray<FExperienceLevel> GetHeavyTankExpLevels() const;
+	TArray<FExperienceLevel> GetT2HeavyTankExpLevels() const;
 	TArray<FExperienceLevel> GetHeavyTankDestroyerExpLevels() const;
+	// 30% on top of tank destroyer of this tank class.
+	TArray<FExperienceLevel> GetHeavyArtillerySpecialVehicleExpLevels() const;
+	TArray<FExperienceLevel> GetSuperHeavyTankExpLevels() const;
+	TArray<FExperienceLevel> GetSuperHeavyTankDestroyerExpLevels() const;
+	TArray<FExperienceLevel> GetSuperHeavyArtillerySpecialVehicleExpLevels() const;
 	TArray<FExperienceLevel> GetNomadicTruckExpLevels() const;
 
 	TArray<FExperienceLevel> GetTier1InfantryExpLevels() const;

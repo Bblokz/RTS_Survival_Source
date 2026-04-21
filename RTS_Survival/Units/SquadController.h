@@ -18,6 +18,8 @@
 #include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
+class UFowComp;
+class USpatialVoiceLinePlayer;
 class UBehaviourComp;
 class RTS_SURVIVAL_API UFieldConstructionAbilityComponent; 
 class UWeaponState;
@@ -449,6 +451,7 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	UBehaviourComp* BehaviourComponent;
 
+
 	bool GetIsValidBehaviourComponent() const;
 
 	bool GetIsValidRTSComponent() const;
@@ -475,6 +478,8 @@ protected:
 
 
 	virtual void PostInitializeComponents() override;
+	void PostInit_FindFOWComponent();
+	void PostInit_FindSpatialVoiceLinePlayer();
 
 	/**
 	 * @brief Allows for custom unit-specific logic when the unit is reset for a new command.
@@ -743,7 +748,6 @@ private:
 	void TryRemanAbandonedTeamWeapon_FinalizeSuccessfulTransfer(
 		ATeamWeaponController* NewTeamWeaponController);
 
-protected:
 	void PostInitializeComponents_SetupGrenadeComponent();
 	void PostInitializeComponent_SetupFieldConstructionAbilities();
 	UFieldConstructionAbilityComponent* GetFieldConstructionAbility(const EFieldConstructionType ConstructionType) const;
@@ -817,6 +821,16 @@ protected:
 
 	UPROPERTY()
 	FCaptureState M_CaptureState;
+	
+	UPROPERTY()
+	USpatialVoiceLinePlayer* M_SpatialVoiceLinePlayer;
+	bool GetIsValidSpatialVoiceLinePlayer() const;
+	
+	UPROPERTY()
+	UFowComp* M_FowComponent;
+
+	bool GetIsValidFowComponent() const;
+	
 
 	/**
 	 * @param TargetActor The item to get the distance to.

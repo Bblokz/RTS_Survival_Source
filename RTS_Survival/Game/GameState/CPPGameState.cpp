@@ -3835,7 +3835,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.VehicleMaxSpeedKmh = 40;
 		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 2.f, 5);
 		TankData.Cost = FUnitCost({
 			{
 				ERTSResourceType::Resource_Radixite, FMath::RoundToInt(
@@ -3846,7 +3846,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 					ArmoredCarMediumCalibreVehiclePartsCost * PanzerwerferVehiclePartsCostMlt)
 			}
 		});
-		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
 		TankData.ExperienceMultiplier = 1.0f;
 		TankData.Abilities = TankAbilitiesWithRockets;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Panzerwerfer, TankData);
@@ -4140,8 +4140,9 @@ void ACPPGameState::InitAllGameLightTankData()
 			}
 		});
 		TankData.Abilities = BasicTankAbilities;
-		TankData.ExperienceLevels = GetLightTankExpLevels();
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.2f, 5);
+		// Special vehicle
+		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 2.f, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Pz38t_R, TankData);
 	}
@@ -4214,7 +4215,7 @@ void ACPPGameState::InitAllGameLightTankData()
 		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost + 20}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetLightTankExpLevels();
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.25f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz_140, TankData);
@@ -4268,8 +4269,8 @@ void ACPPGameState::InitAllGameLightTankData()
 		{ERTSResourceType::Resource_VehicleParts, LightTankDestroyerVehiclePartsCost + 40}
 	});
 	TankData.Abilities = BasicTankDestroyerAbilities;
-	TankData.ExperienceLevels = GetLightTankDestroyerExpLevels();
-	TankData.ExperienceWorth = BaseLightTankExp;
+	TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.5f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzI_15cm, TankData);
 
@@ -4287,7 +4288,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	});
 	TankData.Abilities = TankAbilitiesWithRockets;
 	TankData.ExperienceLevels = GetLightTankDestroyerExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.25f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 2.f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Hetzer, TankData);
 
@@ -4361,7 +4362,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.1f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.2f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T70, TankData);
 
@@ -4375,6 +4376,8 @@ void ACPPGameState::InitAllGameLightTankData()
 			{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost + 50},
 			{ERTSResourceType::Resource_VehicleParts, T70FVehiclePartsCost}
 		});
+		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 2.f, 5);
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T70F, TankData);
 	}
 
@@ -4388,7 +4391,7 @@ void ACPPGameState::InitAllGameLightTankData()
 		const float Su76ReverseSpeedKmh = 10.f;
 		const int32 Su76RadixiteCostOffset = 50;
 		const int32 Su76VehiclePartsCostOffset = 40;
-		const float Su76ExpWorthMlt = 1.2f;
+		const float Su76ExpWorthMlt = 1.5f;
 
 		TankData.MaxHealth = Su76Health;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
@@ -4499,8 +4502,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_VehicleParts, LightMediumTankVehiclePartsCost}
 	});
 	TankData.Abilities = TankAbilitiesWithRockets;
-	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 1.5f, 5);
+	TankData.ExperienceLevels = GetCommandTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 3.f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIII_J_Commander, TankData);
 
@@ -4517,7 +4520,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
+	TankData.ExperienceLevels = GetMediumTankExpLevels();
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 1.f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIII_M, TankData);
@@ -4536,8 +4539,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 100}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 0.95f, 5);
+	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 2.f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIII_FLamm, TankData);
 
@@ -4566,6 +4569,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 100},
 		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 100}
 	});
+	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 2.f, 5);
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_H, TankData);
 
 	// Pz IV F1
@@ -4581,8 +4586,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost - 50}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 0.8f);
+	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
+	TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 0.9f);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_F1, TankData);
 
@@ -4599,8 +4604,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost - 50}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 1.5f);
+	TankData.ExperienceLevels = GetCommandTankExpLevels();
+	TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 3.f);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_F1_Commander, TankData);
 
@@ -4617,8 +4622,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 100}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = BaseMediumTankExp;
+	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
+	TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 1.5f);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Jaguar, TankData);
 
@@ -4635,8 +4640,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 200}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 1.5f, 5);
+	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 2.5f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Brumbar, TankData);
 
@@ -4696,7 +4701,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 		});
 		TankData.Abilities = BasicTankAbilities;
 		TankData.ExperienceLevels = GetMediumTankExpLevels();
-		TankData.ExperienceWorth = BaseMediumTankExp;
+		TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 1.33f);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_AA, TankData);
 	}
@@ -4705,7 +4710,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	{
 		const int32 T34_76_L_RadixiteCostOffset = 25;
 		const int32 T34_76_L_VehiclePartsCostOffset = 120;
-		const float T34_76_L_ExpWorthMlt = 1.1f;
+		const float T34_76_L_ExpWorthMlt = 1.67f;
 
 		TankData.MaxHealth = MediumTankHealthBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
@@ -4719,7 +4724,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 			{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + T34_76_L_VehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankAbilities;
-		TankData.ExperienceLevels = GetMediumTankExpLevels();
+		TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			BaseMediumTankExp * T34_76_L_ExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
@@ -4740,7 +4745,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = BaseMediumTankExp;
+	TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 1.33f);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34E, TankData);
 
@@ -4758,7 +4763,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 1.25f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 1.45f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_85, TankData);
 
@@ -4776,7 +4781,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 1.5f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 2.2f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_100, TankData);
 
@@ -4793,13 +4798,13 @@ void ACPPGameState::InitAllGameMediumTankData()
 		const float Su85LaserHealthMlt = 1.1f;
 		const int32 Su85LaserRadixiteCostOffset = 150;
 		const int32 Su85LaserVehiclePartsCostOffset = 100;
-		const float Su85LaserExpWorthMlt = 1.2f;
+		const float Su85LaserExpWorthMlt = 2.25f;
 		const int32 Su100RadixiteCostOffset = 100;
 		const int32 Su100VehiclePartsCostOffset = 75;
 		const float Su100ExpWorthMlt = 1.1f;
 		const int32 Su122RadixiteCostOffset = 150;
 		const int32 Su122VehiclePartsCostOffset = 120;
-		const float Su122ExpWorthMlt = 1.2f;
+		const float Su122ExpWorthMlt = 1.5f;
 		const float Su122MaxSpeedKmh = 20.f;
 		const float Su122ReverseSpeedKmh = 10.f;
 
@@ -4816,7 +4821,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
-		TankData.ExperienceWorth = BaseMediumTankExp;
+		TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseMediumTankExp * 1.33f);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_85, TankData);
 
@@ -4839,7 +4844,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 			}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
-		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
+		TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			BaseMediumTankExp * Su85LaserExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
@@ -4875,7 +4880,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 			{ERTSResourceType::Resource_VehicleParts, MediumTankDestroyerVehiclePartsCost + Su122VehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
-		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
+		TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
 		TankData.ExperienceWorth =
 			RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * Su122ExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
@@ -4889,7 +4894,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 		const float T44LaserMaxSpeedKmh = 30.f;
 		const float T44LaserReverseSpeedKmh = 20.f;
 		const float T44LaserCostMlt = 2.0f;
-		const float T44LaserExpWorthMlt = 1.75f;
+		const float T44LaserExpWorthMlt = 3.5f;
 		const int32 T44LaserCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			T3MediumTankRadixiteCost * T44LaserCostMlt, 10);
 		const int32 T44LaserVehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
@@ -4907,7 +4912,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 			{ERTSResourceType::Resource_VehicleParts, T44LaserVehiclePartsCost}
 		});
 		TankData.Abilities = BasicTankAbilities;
-		TankData.ExperienceLevels = GetMediumTankExpLevels();
+		TankData.ExperienceLevels = GetHeavyTankExpLevels();
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			BaseMediumTankExp * T44LaserExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
@@ -4973,7 +4978,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	                                                          FAbilityHelpers::GetRocketAbilityEntry(
 		                                                          EAttachedRocketAbilityType::SmallRockets));
 	TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
-	TankData.ExperienceWorth = BaseHeavyTankExp;
+	TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseHeavyTankExp * 1.33f);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_JagdPanther, TankData);
 
@@ -4990,8 +4995,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetHeavyTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.0f, 5);
+	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp * 1.5f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Maus, TankData);
 	// E100 less health but more speed than Maus
@@ -5033,14 +5038,20 @@ void ACPPGameState::InitAllGameHeavyTankData()
 				RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankVehiclePartsCost * 2.0f, 5)
 			}
 		});
+		TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseHeavyTankExp * 2.f);
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PanzerV_IV, PzV_IV);
 
 		FTankData PzV_III = PzV_IV;
 		PzV_III.TurretRotationSpeed = 25;
+		TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseHeavyTankExp * 2.f);
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PanzerV_III, PzV_III);
 
 		FTankData PantherD = PzV_IV;
 		PantherD.TurretRotationSpeed = 12;
+		TankData.ExperienceLevels = GetHeavyTankExpLevels();
+		TankData.ExperienceWorth = BaseHeavyTankExp;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PantherD, PantherD);
 	}
 
@@ -5058,7 +5069,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.3f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.33f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PantherII, TankData);
 
@@ -5089,6 +5100,10 @@ void ACPPGameState::InitAllGameHeavyTankData()
 			{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost},
 			{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + TigerRailMetalCostIncrease}
 		});
+
+		TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseHeavyTankExp * 2.f);
+
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_TigerRail, TankData);
 	}
 
@@ -5112,8 +5127,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetHeavyTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.1f, 5);
+	TankData.ExperienceLevels = GetSuperHeavyArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp* 2.5, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SturmTiger, TankData);
 
@@ -5183,6 +5198,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 			{ERTSResourceType::Resource_Radixite, T2HeavyTankRadixiteCost - 250},
 			{ERTSResourceType::Resource_VehicleParts, T28FVehiclePartsCost}
 		});
+	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = MediumTankHealthBase * 2;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T28F, TankData);
 	}
 
@@ -5199,12 +5216,12 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, 200}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetHeavyTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.33f, 5);
+	TankData.ExperienceLevels = GetT2HeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T35, TankData);
 
-	// KV-1 (uses Medium exp levels per original)
+	// KV-1 (uses  T2 heavy tank as not as powerful as regular heavies)
 	TankData.MaxHealth = T2HeavyTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 15;
@@ -5217,8 +5234,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, T2HeavyTankVehiclePartsCost}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 1.33f, 5);
+	TankData.ExperienceLevels = GetT2HeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseT2HeavyTankExp* 1.0f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_1, TankData);
 
@@ -5235,8 +5252,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, T2HeavyTankVehiclePartsCost + 125}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetHeavyTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 1.85f, 5);
+	TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseT2HeavyTankExp* 2.5f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_2, TankData);
 
@@ -5253,10 +5270,12 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, T2HeavyTankVehiclePartsCost + 125}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 1.5f, 5);
+	TankData.ExperienceLevels = GetT2HeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseT2HeavyTankExp* 1.33f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_1E, TankData);
+	TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp* 2.5f, 5);
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_1_Arc, TankData);
 
 	// KV-IS (same speeds/vision as KV-1E per inheritance; health uses +2 * OneLightTankShot)
@@ -5272,8 +5291,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, T2HeavyTankVehiclePartsCost + 125}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 1.7f, 5);
+	TankData.ExperienceLevels = GetT2HeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseT2HeavyTankExp* 1.8f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_IS, TankData);
 
@@ -5326,8 +5345,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetHeavyTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.0f, 5);
+	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp*  1.0f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_IS_3, TankData);
 
@@ -5344,8 +5363,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
 	});
 	TankData.Abilities = BasicTankAbilities;
-	TankData.ExperienceLevels = GetHeavyTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.0f, 5);
+	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp* 1.67f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_5, TankData);
 
@@ -5369,7 +5388,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
-		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.1f, 5);
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.4f, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_152, TankData);
 	}
@@ -5452,19 +5471,19 @@ TArray<FExperienceLevel> ACPPGameState::GetLightTankExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 175 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(175 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 300 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(300 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 450 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(450 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  600* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(600 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  900* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(900 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5472,24 +5491,47 @@ TArray<FExperienceLevel> ACPPGameState::GetLightTankExpLevels() const
 
 TArray<FExperienceLevel> ACPPGameState::GetLightTankDestroyerExpLevels() const
 {
-	
 	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 200 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(200 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 350 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(350 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 475 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(475 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  650* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(650 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  1000* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1000 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+
+	return Levels;
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetLightArtillerySpecialVehicleExpLevels() const
+{
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(260 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(460 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(650 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(900 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1400 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5501,19 +5543,19 @@ TArray<FExperienceLevel> ACPPGameState::GetArmoredCarExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 100 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(100 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 250 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(250 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 375 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(375 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  500* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(500 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  750* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(750 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5525,19 +5567,19 @@ TArray<FExperienceLevel> ACPPGameState::GetLightMediumTankExpLevels() const
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 250 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(250 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 550 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(550 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf( 750 * GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(750 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  900* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(900 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp +=  RTSFunctionLibrary::RoundToNearestMultipleOf(  1150* GlobalExpNeededMlt, 5);
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1400 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5545,21 +5587,74 @@ TArray<FExperienceLevel> ACPPGameState::GetLightMediumTankExpLevels() const
 
 TArray<FExperienceLevel> ACPPGameState::GetMediumTankExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 200;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(400 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 500;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(700 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 800;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(850 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1300 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 1000;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2000 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+
+	return Levels;
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetMediumArtillerySpecialVehicleExpLevels() const
+{
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(600 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(980 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1225 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1800 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2900 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+
+	return Levels;
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetCommandTankExpLevels() const
+{
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(280 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(600 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(850 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1100 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1600 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 6
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2100 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5567,65 +5662,195 @@ TArray<FExperienceLevel> ACPPGameState::GetMediumTankExpLevels() const
 
 TArray<FExperienceLevel> ACPPGameState::GetMediumTankDestroyerExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 200;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(450 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 500;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(800 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 800;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(950 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1400 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 1000;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2200 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
+
 
 	return Levels;
 }
 
 TArray<FExperienceLevel> ACPPGameState::GetHeavyTankExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 300;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(800 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 700;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1450 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 900;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1700 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2500 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 1200;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(4000 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+
+
+	return Levels;
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetT2HeavyTankExpLevels() const
+{
+	
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(600 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1100 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1300 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2000 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(3000 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	return Levels;
+
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetHeavyTankDestroyerExpLevels() const
+{
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(900 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1500 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1800 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2700 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(4250 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+
+
+	return Levels;
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetHeavyArtillerySpecialVehicleExpLevels() const
+{
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1170 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1900 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2350 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(3500 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(5500 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
 }
 
-TArray<FExperienceLevel> ACPPGameState::GetHeavyTankDestroyerExpLevels() const
+TArray<FExperienceLevel> ACPPGameState::GetSuperHeavyTankExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 300;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1200 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 700;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1900 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 900;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2400 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(3500 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 1200;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(5700 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+
+	return Levels;
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetSuperHeavyTankDestroyerExpLevels() const
+{
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1500 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2300 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2800 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(3900 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(6000 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+
+	return Levels;
+}
+
+TArray<FExperienceLevel> ACPPGameState::GetSuperHeavyArtillerySpecialVehicleExpLevels() const
+{
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
+	TArray<FExperienceLevel> Levels;
+	float CulumativeExp = 0;
+	// Level 1
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1950 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 2
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2990 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 3
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(3580 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(5070 * GlobalExpNeededMlt, 5);
+	Levels.Add(FExperienceLevel(CulumativeExp));
+	// Level 5
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(7800 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;
@@ -5676,43 +5901,49 @@ TArray<FExperienceLevel> ACPPGameState::GetTier1InfantryExpLevels() const
 
 TArray<FExperienceLevel> ACPPGameState::GetTier2InfantryExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 70;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(100 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 150;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(250 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 275;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(375 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(500 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 425;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(750 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
+
 	return Levels;
 }
 
 TArray<FExperienceLevel> ACPPGameState::GetEliteInfantryExpLevels() const
 {
+	using DeveloperSettings::GameBalance::Experience::GlobalExpNeededMlt;
 	TArray<FExperienceLevel> Levels;
 	float CulumativeExp = 0;
 	// Level 1
-	CulumativeExp += 70;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(450 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 2
-	CulumativeExp += 150;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(800 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 3
-	CulumativeExp += 275;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(950 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(1400 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 425;
+	CulumativeExp += RTSFunctionLibrary::RoundToNearestMultipleOf(2200 * GlobalExpNeededMlt, 5);
 	Levels.Add(FExperienceLevel(CulumativeExp));
+
 	return Levels;
 }
 
@@ -5730,9 +5961,10 @@ TArray<FExperienceLevel> ACPPGameState::GetFighterExpLevels() const
 	CulumativeExp += 1200;
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 4
+	CulumativeExp += 1400;
 	Levels.Add(FExperienceLevel(CulumativeExp));
 	// Level 5
-	CulumativeExp += 2000;
+	CulumativeExp += 2100;
 	Levels.Add(FExperienceLevel(CulumativeExp));
 
 	return Levels;

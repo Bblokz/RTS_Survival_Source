@@ -264,6 +264,15 @@ void ACPPController::InitPortrait(UW_Portrait* PortraitWidget) const
 	M_PlayerPortraitManager->InitPortraitManager(PortraitWidget, GetPlayerAudioController());
 }
 
+AActor* ACPPController::GetPrimarySelectedUnit() const
+{
+	if(not GetIsValidGameUIController())
+	{
+		return nullptr;
+	}
+	return M_GameUIController->GetPrimarySelectedUnit();
+}
+
 
 void ACPPController::PauseGame(const ERTSPauseGameOptions PauseOption)
 {

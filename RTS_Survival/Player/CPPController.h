@@ -269,6 +269,8 @@ public:
 
 	void InitPortrait(UW_Portrait* PortraitWidget) const;
 
+	AActor* GetPrimarySelectedUnit() const;
+
 	/**
 	 * @brief Capture a screenshot of the current game viewport at its current size.
 	 * @param bIncludeUI Include UMG/Slate/HUD in the screenshot (engine handles this flag).

@@ -239,4 +239,6 @@ private:
 	
 	bool GetIsValidTrackPhysicsMovement() const;
 
+	void HandleVoiceLineOnLevelUp() const; 
+
 };

@@ -250,6 +250,7 @@ URTSExperienceComp* ATrackedTankMaster::GetExperienceComponent() const
 
 void ATrackedTankMaster::OnUnitLevelUp()
 {
+	HandleVoiceLineOnLevelUp();
 	BP_OnUnitLevelUp();
 }
 
@@ -269,8 +270,8 @@ void ATrackedTankMaster::InitTrackedTank(
 	const float TankCornerOffset,
 	const float TankMeshZOffset, const float AngularDamping, const float LinearDamping,
 	const int32 Energy)
-	{
-	if(Energy != 0 )
+{
+	if (Energy != 0)
 	{
 		OnInit_FindEnergyComponent(Energy);
 	}
@@ -664,11 +665,12 @@ bool ATrackedTankMaster::GetIsValidDigInComponent() const
 void ATrackedTankMaster::OnInit_FindEnergyComponent(const int32 MyEnergy)
 {
 	UTankEnergyComponent* FoundEnergyComp = FindComponentByClass<UTankEnergyComponent>();
-	if(not IsValid(FoundEnergyComp))
+	if (not IsValid(FoundEnergyComp))
 	{
-		RTSFunctionLibrary::ReportError("The tank could not find a UTankEnergyComponent on it eventhough it has non-zero energy!"
-								  "tank: " + GetName()
-								  + "\n Energy: " + FString::FromInt(MyEnergy));
+		RTSFunctionLibrary::ReportError(
+			"The tank could not find a UTankEnergyComponent on it eventhough it has non-zero energy!"
+			"tank: " + GetName()
+			+ "\n Energy: " + FString::FromInt(MyEnergy));
 		return;
 	}
 	M_TankEnergyComponent = FoundEnergyComp;
@@ -689,6 +691,25 @@ bool ATrackedTankMaster::GetIsValidTrackPhysicsMovement() const
 		"GetIsValidTrackPhysicsMovement",
 		this);
 	return false;
+}
+
+void ATrackedTankMaster::HandleVoiceLineOnLevelUp() const
+{
+	if (not GetIsValidSpatialVoiceLinePlayer())
+	{
+		return;
+	}
+	const bool bIsPrimarySelected = GetIsValidPlayerControler()
+		                                ? PlayerController->GetPrimarySelectedUnit() == this
+		                                : false;
+	if (bIsPrimarySelected)
+	{
+		GetSpatialVoiceLinePlayer()->PlayVoiceLineOverRadio(ERTSVoiceLine::UnitPromoted, true, true);
+	}
+	else
+	{
+		GetSpatialVoiceLinePlayer()->PlaySpatialVoiceLine(ERTSVoiceLine::UnitPromoted, GetActorLocation(), true);
+	}
 }
 
 void ATrackedTankMaster::BeginPlay_SetupExperienceComponent()

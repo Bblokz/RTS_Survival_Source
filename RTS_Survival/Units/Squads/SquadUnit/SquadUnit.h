@@ -330,6 +330,7 @@ protected:
 
 	// setup RTS comp, AI controller and Squad Anim instance.
 	virtual void PostInitializeComponents() override;
+	virtual void PostInitializeComponents() override;
 	/** @brief Initializes the Scavenger component with owner. */
 	void PostInitializeComp_InitScavengerComponent();
 	void PostInitializeComp_SetupSpatialVoiceLinePlayer();
