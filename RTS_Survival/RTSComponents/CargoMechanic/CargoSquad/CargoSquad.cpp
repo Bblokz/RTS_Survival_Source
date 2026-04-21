@@ -488,7 +488,10 @@ void UCargoSquad::DetachUnitEnableMovementAndPlaceNearEntrance(ASquadUnit* Unit,
 		return;
 	}
 
-	Unit->SetActorLocation(ExitLocationProjectedToNavMesh);
+	constexpr float ExitLocationWorldZOffset = 125.f;
+	const FVector ExitLocationWithWorldZOffset =
+		ExitLocationProjectedToNavMesh + FVector(0.f, 0.f, ExitLocationWorldZOffset);
+	Unit->SetActorLocation(ExitLocationWithWorldZOffset);
 }
 
 void UCargoSquad::TrySwapAbilities(const EAbilityID OldAbility, const EAbilityID NewAbility) const
