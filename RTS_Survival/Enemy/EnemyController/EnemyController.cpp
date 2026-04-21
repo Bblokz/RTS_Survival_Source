@@ -285,6 +285,63 @@ void AEnemyController::CreateSingleAttackMoveWave(
 		ProjectionScale);
 }
 
+void AEnemyController::CreateSingleRandomPatrolWithAttackMoveWave(
+	const TArray<FVector>& SpawnLocations,
+	const TArray<FTrainingOption>& TrainingOptions,
+	const TArray<FVector>& PatrolPoints,
+	const int32 OverrideFirstPatrolPointIndex,
+	const int32 AmountIterationsAtPatrolPoint,
+	const float GuardTimePerPatrolPointIteration,
+	const float GuardSphereRadius,
+	const int32 MaxFormationWidth,
+	const float TimeTillPatrol,
+	const float FormationOffsetMultiplier,
+	const float HelpOffsetRadiusMltMax,
+	const float HelpOffsetRadiusMltMin,
+	const float MaxAttackTimeBeforeAdvancingToNextWayPoint,
+	const int32 MaxTriesFindNavPointForHelpOffset,
+	const float ProjectionScale)
+{
+	if (not GetIsValidWaveController())
+	{
+		return;
+	}
+	if (SpawnLocations.IsEmpty() || TrainingOptions.IsEmpty() || PatrolPoints.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"CreateSingleRandomPatrolWithAttackMoveWave requires non-empty spawn locations, training options and patrol points.");
+		return;
+	}
+
+	TArray<FAttackWaveElement> WaveElements;
+	WaveElements.Reserve(SpawnLocations.Num());
+	for (const FVector& SpawnLocation : SpawnLocations)
+	{
+		FAttackWaveElement WaveElement;
+		WaveElement.SpawnLocation = SpawnLocation;
+		WaveElement.UnitOptions = TrainingOptions;
+		WaveElements.Add(WaveElement);
+	}
+
+	M_WaveController->StartSingleRandomPatrolWithAttackMoveWave(
+		EEnemyWaveType::Wave_NoOwningBuilding,
+		WaveElements,
+		PatrolPoints,
+		OverrideFirstPatrolPointIndex,
+		AmountIterationsAtPatrolPoint,
+		GuardTimePerPatrolPointIteration,
+		GuardSphereRadius,
+		MaxFormationWidth,
+		TimeTillPatrol,
+		nullptr,
+		FormationOffsetMultiplier,
+		HelpOffsetRadiusMltMax,
+		HelpOffsetRadiusMltMin,
+		MaxAttackTimeBeforeAdvancingToNextWayPoint,
+		MaxTriesFindNavPointForHelpOffset,
+		ProjectionScale);
+}
+
 void AEnemyController::CreateFieldConstructionOrder(
 	const TArray<ASquadController*>& SquadControllers,
 	const TArray<FVector>& ConstructionLocations,
@@ -439,6 +496,38 @@ void AEnemyController::MoveAttackMoveFormationToLocation(
 		TankMasters,
 		Waypoints,
 		FinalWaypointDirection,
+		MaxFormationWidth,
+		FormationOffsetMlt,
+		AttackMoveSettings,
+		AverageSpawnLocation);
+}
+
+void AEnemyController::MoveRandomPatrolWithAttackMoveFormation(
+	const TArray<ASquadController*>& SquadControllers,
+	const TArray<ATankMaster*>& TankMasters,
+	const TArray<FVector>& PatrolPoints,
+	const int32 OverrideFirstPatrolPointIndex,
+	const int32 AmountIterationsAtPatrolPoint,
+	const float GuardTimePerPatrolPointIteration,
+	const float GuardSphereRadius,
+	const int32 MaxFormationWidth,
+	const float FormationOffsetMlt,
+	const FAttackMoveWaveSettings& AttackMoveSettings,
+	const FVector& AverageSpawnLocation)
+{
+	if (not GetIsValidFormationController())
+	{
+		return;
+	}
+
+	M_FormationController->MoveRandomPatrolWithAttackMoveFormation(
+		SquadControllers,
+		TankMasters,
+		PatrolPoints,
+		OverrideFirstPatrolPointIndex,
+		AmountIterationsAtPatrolPoint,
+		GuardTimePerPatrolPointIteration,
+		GuardSphereRadius,
 		MaxFormationWidth,
 		FormationOffsetMlt,
 		AttackMoveSettings,

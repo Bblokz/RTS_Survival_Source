@@ -200,6 +200,42 @@ public:
 		const int32 MaxTriesFindNavPointForHelpOffset = 3,
 		const float ProjectionScale = 1.f);
 
+	/**
+	 * @brief Spawns one patrol group that cycles random patrol points while using attack-move support logic in combat.
+	 * @param SpawnLocations Spawn positions for each patrol unit that should be created.
+	 * @param TrainingOptions Unit options shared by every spawn location.
+	 * @param PatrolPoints Patrol points picked at random after each completed guard cycle.
+	 * @param OverrideFirstPatrolPointIndex Optional patrol point index used for the first patrol destination.
+	 * @param AmountIterationsAtPatrolPoint Number of guard iterations executed per reached patrol point.
+	 * @param GuardTimePerPatrolPointIteration Delay between guard iterations.
+	 * @param GuardSphereRadius Radius used to pick guard offsets around the active patrol point.
+	 * @param MaxFormationWidth Maximum row width used by the spawned patrol formation.
+	 * @param TimeTillPatrol Delay before this single patrol wave starts.
+	 * @param FormationOffsetMultiplier Multiplier for unit offsets in the formation.
+	 * @param HelpOffsetRadiusMltMax Max help offset multiplier used for attack-move assistance.
+	 * @param HelpOffsetRadiusMltMin Min help offset multiplier used for attack-move assistance.
+	 * @param MaxAttackTimeBeforeAdvancingToNextWayPoint Max combat linger time before the patrol may continue.
+	 * @param MaxTriesFindNavPointForHelpOffset Number of nav projection attempts for support positions.
+	 * @param ProjectionScale Projection scale used for nav projection checks.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void CreateSingleRandomPatrolWithAttackMoveWave(
+		const TArray<FVector>& SpawnLocations,
+		const TArray<FTrainingOption>& TrainingOptions,
+		const TArray<FVector>& PatrolPoints,
+		const int32 OverrideFirstPatrolPointIndex,
+		const int32 AmountIterationsAtPatrolPoint,
+		const float GuardTimePerPatrolPointIteration,
+		const float GuardSphereRadius,
+		const int32 MaxFormationWidth = 2,
+		const float TimeTillPatrol = 0.f,
+		const float FormationOffsetMultiplier = 1.f,
+		const float HelpOffsetRadiusMltMax = 1.2f,
+		const float HelpOffsetRadiusMltMin = 1.0f,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint = 0.f,
+		const int32 MaxTriesFindNavPointForHelpOffset = 3,
+		const float ProjectionScale = 1.f);
+
 
 	/**
 	 * @brief Assigns squads to construct field constructions at provided locations.
@@ -256,6 +292,33 @@ public:
 		const TArray<ATankMaster*>& TankMasters,
 		const TArray<FVector>& Waypoints,
 		const FRotator& FinalWaypointDirection,
+		const int32 MaxFormationWidth,
+		const float FormationOffsetMlt,
+		const FAttackMoveWaveSettings& AttackMoveSettings,
+		const FVector& AverageSpawnLocation = FVector::ZeroVector);
+
+	/**
+	 * @brief Starts movement logic for a formation that patrols random points and pauses to support combat.
+	 * @param SquadControllers Squads included in the patrol formation.
+	 * @param TankMasters Tanks included in the patrol formation.
+	 * @param PatrolPoints Patrol points the formation can visit.
+	 * @param OverrideFirstPatrolPointIndex Optional first patrol point index override.
+	 * @param AmountIterationsAtPatrolPoint Number of guard iterations per patrol point.
+	 * @param GuardTimePerPatrolPointIteration Delay between guard iterations.
+	 * @param GuardSphereRadius Radius used when sampling guard points around the patrol point.
+	 * @param MaxFormationWidth Maximum row width for offsets.
+	 * @param FormationOffsetMlt Formation offset multiplier.
+	 * @param AttackMoveSettings Shared attack-move assist and combat wait settings.
+	 * @param AverageSpawnLocation Average spawn location used for formation context.
+	 */
+	void MoveRandomPatrolWithAttackMoveFormation(
+		const TArray<ASquadController*>& SquadControllers,
+		const TArray<ATankMaster*>& TankMasters,
+		const TArray<FVector>& PatrolPoints,
+		const int32 OverrideFirstPatrolPointIndex,
+		const int32 AmountIterationsAtPatrolPoint,
+		const float GuardTimePerPatrolPointIteration,
+		const float GuardSphereRadius,
 		const int32 MaxFormationWidth,
 		const float FormationOffsetMlt,
 		const FAttackMoveWaveSettings& AttackMoveSettings,

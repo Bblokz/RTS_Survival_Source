@@ -334,6 +334,45 @@ protected:
 		const int32 MaxTriesFindNavPointForHelpOffset = 3,
 		const float ProjectionScale = 1.f);
 
+	/**
+	 * @brief Creates a random patrol with attack-move support only when the current difficulty meets the threshold.
+	 * @param MinimalDifficulty Minimal required difficulty level for spawning the patrol.
+	 * @param SpawnLocations Spawn positions used to create patrol units.
+	 * @param TrainingOptions Unit options that can be spawned at each spawn location.
+	 * @param PatrolPoints Patrol points picked at random after each guard cycle.
+	 * @param OverrideFirstPatrolPointIndex Optional first patrol point index override.
+	 * @param AmountIterationsAtPatrolPoint Number of guard iterations per patrol point.
+	 * @param GuardTimePerPatrolPointIteration Delay between guard iterations.
+	 * @param GuardSphereRadius Radius used when sampling guard offsets.
+	 * @param MaxFormationWidth Formation width used by the spawned patrol units.
+	 * @param TimeTillPatrol Delay before patrol starts.
+	 * @param FormationOffsetMultiplier Formation offset multiplier.
+	 * @param HelpOffsetRadiusMltMax Max support offset multiplier used by attack-move assistance.
+	 * @param HelpOffsetRadiusMltMin Min support offset multiplier used by attack-move assistance.
+	 * @param MaxAttackTimeBeforeAdvancingToNextWayPoint Max combat linger time before patrol advances.
+	 * @param MaxTriesFindNavPointForHelpOffset Max attempts for support nav projections.
+	 * @param ProjectionScale Nav projection scale used by assist logic.
+	 * @return True when the patrol request is submitted to the enemy controller.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	bool CreateSingleRandomPatrolWithAttackMoveDifficultyConditional(
+		ERTSGameDifficulty MinimalDifficulty,
+		TArray<FVector> SpawnLocations,
+		TArray<FTrainingOption> TrainingOptions,
+		TArray<FVector> PatrolPoints,
+		const int32 OverrideFirstPatrolPointIndex = INDEX_NONE,
+		const int32 AmountIterationsAtPatrolPoint = 3,
+		const float GuardTimePerPatrolPointIteration = 2.f,
+		const float GuardSphereRadius = 600.f,
+		const int32 MaxFormationWidth = 2,
+		float TimeTillPatrol = 0.f,
+		const float FormationOffsetMultiplier = 1.f,
+		const float HelpOffsetRadiusMltMax = 1.5f,
+		const float HelpOffsetRadiusMltMin = 1.2f,
+		const float MaxAttackTimeBeforeAdvancingToNextWayPoint = 0.f,
+		const int32 MaxTriesFindNavPointForHelpOffset = 3,
+		const float ProjectionScale = 1.f);
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FRTSGameDifficulty GetGameDifficulty() const;
