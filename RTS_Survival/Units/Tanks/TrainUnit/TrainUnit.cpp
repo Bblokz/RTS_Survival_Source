@@ -462,11 +462,23 @@ FRotator ATrainUnit::GetSplineRotationForCurrentMovementDirection(const float Di
 	return SplineRotation;
 }
 
-void ATrainUnit::ApplyActorTransformFromSplineDistance(const float DistanceAlongSpline)
+FVector ATrainUnit::GetSplineWorldLocationWithMovementOffset(const float DistanceAlongSpline) const
 {
-	const FVector ActorLocation = M_RoadSplineComponent->GetLocationAtDistanceAlongSpline(
+	FVector SplineLocation = M_RoadSplineComponent->GetLocationAtDistanceAlongSpline(
 		DistanceAlongSpline,
 		ESplineCoordinateSpace::World);
+	if (not GetIsValidTrainSplineMovementComponent())
+	{
+		return SplineLocation;
+	}
+
+	SplineLocation.Z += M_TrainSplineMovementComponent->GetSplineWorldZOffset();
+	return SplineLocation;
+}
+
+void ATrainUnit::ApplyActorTransformFromSplineDistance(const float DistanceAlongSpline)
+{
+	const FVector ActorLocation = GetSplineWorldLocationWithMovementOffset(DistanceAlongSpline);
 	const FRotator ActorRotation = GetSplineRotationForCurrentMovementDirection(DistanceAlongSpline);
 	SetActorLocationAndRotation(ActorLocation, ActorRotation, false, nullptr, ETeleportType::TeleportPhysics);
 }
@@ -475,9 +487,7 @@ void ATrainUnit::ApplyTrainTransforms_Forward(const float ClampedLocomotiveDista
 {
 	ApplyActorTransformFromSplineDistance(ClampedLocomotiveDistance);
 
-	const FVector LocomotiveLocation = M_RoadSplineComponent->GetLocationAtDistanceAlongSpline(
-		ClampedLocomotiveDistance,
-		ESplineCoordinateSpace::World);
+	const FVector LocomotiveLocation = GetSplineWorldLocationWithMovementOffset(ClampedLocomotiveDistance);
 	const FRotator LocomotiveRotation = GetSplineRotationForCurrentMovementDirection(ClampedLocomotiveDistance);
 	M_LocomotiveMesh->SetWorldLocationAndRotation(LocomotiveLocation, LocomotiveRotation);
 
@@ -491,9 +501,7 @@ void ATrainUnit::ApplyTrainTransforms_Forward(const float ClampedLocomotiveDista
 
 		const float StoredOffset = M_CartDistanceOffsets[CartIndex];
 		const float CartDistance = FMath::Clamp(ClampedLocomotiveDistance - StoredOffset, 0.0f, SplineLength);
-		const FVector CartLocation = M_RoadSplineComponent->GetLocationAtDistanceAlongSpline(
-			CartDistance,
-			ESplineCoordinateSpace::World);
+		const FVector CartLocation = GetSplineWorldLocationWithMovementOffset(CartDistance);
 		const FRotator CartRotation = GetSplineRotationForCurrentMovementDirection(CartDistance);
 		CartMesh->SetWorldLocationAndRotation(CartLocation, CartRotation);
 	}
@@ -505,9 +513,7 @@ void ATrainUnit::ApplyTrainTransforms_Reverse(const float ClampedLeaderDistance,
 
 	const float MaxCartOffset = GetMaxCartDistanceOffset();
 	const float ClampedLocomotiveDistance = FMath::Clamp(ClampedLeaderDistance - MaxCartOffset, 0.0f, SplineLength);
-	const FVector LocomotiveLocation = M_RoadSplineComponent->GetLocationAtDistanceAlongSpline(
-		ClampedLocomotiveDistance,
-		ESplineCoordinateSpace::World);
+	const FVector LocomotiveLocation = GetSplineWorldLocationWithMovementOffset(ClampedLocomotiveDistance);
 	const FRotator LocomotiveRotation = GetSplineRotationForCurrentMovementDirection(ClampedLocomotiveDistance);
 	M_LocomotiveMesh->SetWorldLocationAndRotation(LocomotiveLocation, LocomotiveRotation);
 
@@ -521,9 +527,7 @@ void ATrainUnit::ApplyTrainTransforms_Reverse(const float ClampedLeaderDistance,
 
 		const float StoredOffset = M_CartDistanceOffsets[CartIndex];
 		const float CartDistance = FMath::Clamp(ClampedLeaderDistance - (MaxCartOffset - StoredOffset), 0.0f, SplineLength);
-		const FVector CartLocation = M_RoadSplineComponent->GetLocationAtDistanceAlongSpline(
-			CartDistance,
-			ESplineCoordinateSpace::World);
+		const FVector CartLocation = GetSplineWorldLocationWithMovementOffset(CartDistance);
 		const FRotator CartRotation = GetSplineRotationForCurrentMovementDirection(CartDistance);
 		CartMesh->SetWorldLocationAndRotation(CartLocation, CartRotation);
 	}
