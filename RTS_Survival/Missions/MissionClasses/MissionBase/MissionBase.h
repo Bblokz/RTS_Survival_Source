@@ -675,6 +675,16 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray);
 
+	/**
+	 * @brief Repositions an actor to a deterministically selected location using the seeded choice-group algorithm.
+	 * @param ActorToPlace Actor that should be moved to one of the candidate locations.
+	 * @param CandidateLocations Candidate world locations to pick from.
+	 * @param GroupIndex Optional seeded group index salt; use distinct values for independent deterministic picks.
+	 * @return True when a valid location was selected and applied to the actor.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Seeded Selection")
+	bool PlaceActorAtSeededLocation(AActor* ActorToPlace, const TArray<FVector>& CandidateLocations, const int32 GroupIndex = 0) const;
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnAsyncSpawnComplete(const FTrainingOption TrainingOption, AActor* SpawnedActor, const int32 ID);
 
