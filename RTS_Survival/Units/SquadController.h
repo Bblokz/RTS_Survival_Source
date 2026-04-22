@@ -18,6 +18,7 @@
 #include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
+enum class EVeterancyIconSet : uint8;
 class UFowComp;
 class USpatialVoiceLinePlayer;
 class UBehaviourComp;
@@ -465,7 +466,7 @@ protected:
 	TObjectPtr<URTSExperienceComp> ExperienceComponent;
 
 	virtual URTSExperienceComp* GetExperienceComponent() const override final;
-	virtual void OnUnitLevelUp() override final;
+	virtual void OnUnitLevelUp(const int32 Level, const EVeterancyIconSet IconSetUsed) override final;
 
 	// ----------------- END EXPERIENCE INTERFACE -----------------
 
@@ -683,7 +684,7 @@ protected:
 	void BeginPlay_SetupPlayerController();
 	void SetShouldSkipInitialSquadUnitLoad(const bool bShouldSkipInitialLoad);
 
-private:
+protected:
 	/**
 	 * @brief Validates caller and weapon preconditions before starting the reman handoff flow.
 	 * @param AbandonedTeamWeapon Candidate abandoned team weapon to capture.
@@ -964,4 +965,5 @@ private:
 
 	void PlayAnnouncerLineNotEnoughSquadMembersToCapture();
 
+	void OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const;
 };

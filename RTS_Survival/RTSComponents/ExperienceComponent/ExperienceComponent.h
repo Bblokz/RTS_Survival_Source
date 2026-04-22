@@ -48,6 +48,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Experience|LevelUp")
 	FVector M_VeterancyFXLocationOffset = FVector(0.f, 0.f, 120.f);
 
+	// Overwrite what the unit is worth in xp.
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetExperienceWorth(const int32 NewExperienceWorth) { M_ExperienceWorth = NewExperienceWorth; };
+
 private:
 	UPROPERTY()
 	FUnitExperience M_UnitExperience;

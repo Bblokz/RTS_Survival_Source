@@ -27,6 +27,16 @@ UHealthComponent::UHealthComponent()
 	InitializeHealthLevelMap();
 }
 
+void UHealthComponent::UpdateRankIcon(const int32 NewRankLevel, const EVeterancyIconSet VeterancyIconSet) const
+{
+	
+	if (not Widget_GetIsValidHealthBarWidget())
+	{
+		return;	
+	}
+	M_HealthBarWidget->UpdateRankIcon(NewRankLevel, VeterancyIconSet);
+}
+
 void UHealthComponent::MakeHealthBarInvisible() const
 {
 	if (Widget_GetIsValidHealthBarWidget())

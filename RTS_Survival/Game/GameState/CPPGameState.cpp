@@ -7803,7 +7803,7 @@ void ACPPGameState::HandleVeterancyFXActivation(const FVector& VeterancyWorldLoc
 
 	M_VeterancyNiagaraComponent->SetWorldLocation(VeterancyWorldLocation);
 	M_VeterancyNiagaraComponent->SetVisibility(true);
-	// M_VeterancyNiagaraComponent->ReinitializeSystem();
+	M_VeterancyNiagaraComponent->ReinitializeSystem();
 
 	M_VeterancyNiagaraComponent->Activate(true);
 

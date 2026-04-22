@@ -1209,9 +1209,10 @@ URTSExperienceComp* ASquadController::GetExperienceComponent() const
 	return ExperienceComponent;
 }
 
-void ASquadController::OnUnitLevelUp()
+void ASquadController::OnUnitLevelUp(const int32 Level, const EVeterancyIconSet IconSetUsed)
 {
-	// todo squad level up.
+	// Update icon in healthbar.
+	OnLevelUp_UpdateHealthbarRankIcon(Level, IconSetUsed);
 	if (not GetIsValidSpatialVoiceLinePlayer())
 	{
 		return;
@@ -3321,6 +3322,15 @@ void ASquadController::PlayAnnouncerLineNotEnoughSquadMembersToCapture()
 		return;
 	}
 	PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::NotEnoughSquadUnitsToCapture, true, false);
+}
+
+void ASquadController::OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const
+{
+	if(not GetIsValidSquadHealthComponent())
+	{
+		return;
+	}
+	SquadHealthComponent->UpdateRankIcon(Level, IconSetUsed);
 }
 
 bool ASquadController::GetIsValidSquadUnit(const ASquadUnit* Unit) const

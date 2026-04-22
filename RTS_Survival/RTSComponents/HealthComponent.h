@@ -17,6 +17,7 @@
 
 #include "HealthComponent.generated.h"
 
+enum class EVeterancyIconSet : uint8;
 struct FResistanceAndDamageReductionData;
 class UWeaponState;
 enum class EWeaponShellType : uint8;
@@ -63,6 +64,9 @@ public:
 
 	/** Callback tracker for when the widget component is created and ready. */
 	FHealthBarWidgetCallbacks M_HealthBarWidgetCallbacks;
+
+	// If the derived BP of this healthbar supports a rank icon then this will update it.
+	void UpdateRankIcon(const int32 NewRankLevel, const EVeterancyIconSet VeterancyIconSet) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MakeHealthBarInvisible() const;

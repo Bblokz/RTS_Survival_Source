@@ -4,6 +4,7 @@
 #include "UObject/Interface.h"
 #include "ExperienceInterface.generated.h"
 
+enum class EVeterancyIconSet : uint8;
 class URTSExperienceComp;
 class FString;
 
@@ -42,7 +43,7 @@ protected:
     void IExpOnKilledActor(AActor* KilledActor) const;
     
     virtual URTSExperienceComp* GetExperienceComponent() const = 0;
-    virtual void OnUnitLevelUp() = 0;
+    virtual void OnUnitLevelUp(const int32 Level, const EVeterancyIconSet IconSetUsed) = 0;
 
 private:
     bool GetIsValidExperienceComponent() const;

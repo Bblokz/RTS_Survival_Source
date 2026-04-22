@@ -360,7 +360,7 @@ protected:
 		TArray<FVector> SpawnLocations,
 		TArray<FTrainingOption> TrainingOptions,
 		TArray<FVector> PatrolPoints,
-		const int32 OverrideFirstPatrolPointIndex = INDEX_NONE,
+		const int32 OverrideFirstPatrolPointIndex = -1,
 		const int32 AmountIterationsAtPatrolPoint = 3,
 		const float GuardTimePerPatrolPointIteration = 2.f,
 		const float GuardSphereRadius = 600.f,

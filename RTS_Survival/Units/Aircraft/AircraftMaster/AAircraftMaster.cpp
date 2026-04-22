@@ -677,7 +677,7 @@ URTSExperienceComp* AAircraftMaster::GetExperienceComponent() const
 	return ExperienceComponent;
 }
 
-void AAircraftMaster::OnUnitLevelUp()
+void AAircraftMaster::OnUnitLevelUp(const int32 Level, const EVeterancyIconSet IconSetUsed)
 {
 	BP_OnUnitLevelUp();
 }

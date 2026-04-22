@@ -14,6 +14,7 @@
 #include "RTSBlueprintFunctionLibrary.generated.h"
 
 
+enum class EVeterancyIconSet : uint8;
 class AMissionManager;
 enum class ERTSRadiusType : uint8;
 enum class ERTSDamageType : uint8;
@@ -188,6 +189,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable, Category="GameBalance")
 	static float BP_GetInfantryGameBalanceValue(const ERTSInfantryBalanceSetting InfantryBalanceSetting);
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable, Category="Veterancy")
+	static FString BP_GetVeterancyIconSetAsString(const EVeterancyIconSet IconSet) ;
 
 	// ------------------------------------------------------------
 	// --------------- Ammo Properties ----------------------------

@@ -291,6 +291,27 @@ float URTSBlueprintFunctionLibrary::BP_GetInfantryGameBalanceValue(
 	return 300;
 }
 
+FString URTSBlueprintFunctionLibrary::BP_GetVeterancyIconSetAsString(const EVeterancyIconSet IconSet)
+{
+	switch (IconSet)
+	{
+	case EVeterancyIconSet::EVI_None:
+		return "None";
+	case EVeterancyIconSet::EVI_GerVehicles:
+		return "GerVehicles";
+	case EVeterancyIconSet::EVI_GerInfantry:
+		return "GerInfantry";
+	case EVeterancyIconSet::EVI_GerAircraft:
+		return "GerAircraft";
+	case EVeterancyIconSet::EVI_RusVehicles:
+		return "RusVehicles";
+	case EVeterancyIconSet::EVI_RusInfantry:
+		return "RusInfantry";
+	default:
+		return "Unknown";
+	}	
+}
+
 FTankData URTSBlueprintFunctionLibrary::BP_GetTankDataOfPlayer(
 	const int32 PlayerOwningTank,
 	const ETankSubtype TankSubtype,

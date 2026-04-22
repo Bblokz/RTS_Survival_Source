@@ -231,7 +231,7 @@ protected:
 	virtual URTSExperienceComp* GetExperienceComponent() const override final;
 
 	/** @brief Level-up hook: propagate to BP for VFX, UI, and stat refresh. */
-	virtual void OnUnitLevelUp() override final;
+	virtual void OnUnitLevelUp(const int32 Level, const EVeterancyIconSet IconSetUsed) override final;
 
 	/** @brief XP source hook: award XP when we kill something. */
 	UFUNCTION(BlueprintImplementableEvent)

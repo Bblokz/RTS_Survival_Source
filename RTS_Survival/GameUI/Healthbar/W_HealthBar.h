@@ -50,6 +50,9 @@ public:
 	void UpdateMaxHealth(const float MaxHealth) const;
 	void UpdateMaxFireThreshold (const float MaxFireThreshold) const;
 
+	void UpdateRankIcon(const int32 NewRankLevel,
+	                         const EVeterancyIconSet VeterancyIconSet);
+
 	// For squad units, gets the icon from settings and loads it in blueprints.
         void UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings);
 	
@@ -62,13 +65,14 @@ public:
 	void ChangeTargetTypeIcon(const ETargetTypeIcon Icon, const int32 OwningPlayer);
 
 protected:
+	// Hides the rankicon immediatly if set.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitRTSHealthBar(
 		UWidgetAnimation* DamageAnimation, UMaterialInstanceDynamic* DMIHealthBar,
 		UMaterialInstanceDynamic* DMIDamagePoint,
 		FDamagePointDynamicMaterialParameter PointDamageParameters,
 		FHealthBarDynamicMaterialParameter HealthBarParameters, FHealthBarDMIColorParameter HealthBarColorParameters, UMaterialInstanceDynamic
-		* DMIFireThresholdBar, UImage* TargetTypeIconImage
+		* DMIFireThresholdBar, UImage* TargetTypeIconImage, UImage* RankIconImage
 	);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
@@ -97,6 +101,9 @@ protected:
 	TObjectPtr<UTextBlock> M_UnitNameText = nullptr;
 	
 	virtual void NativeOnInitialized() override;
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_UpdateRankIcon(const int32 NewRankLevel, const EVeterancyIconSet VeterancyIconSet);
+	
 
 private:
 	UPROPERTY()
@@ -105,6 +112,10 @@ private:
 	
 	UPROPERTY()
 	FTargetTypeIconState M_TargetTypeIconState;
+
+	UPROPERTY()
+	UImage* M_RankIconImage = nullptr;
+
 
 	FHealthBarCustomization M_CustomizationSettings;
 	// Set after adjusting the customization settings depending on the owning player.

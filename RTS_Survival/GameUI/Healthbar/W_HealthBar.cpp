@@ -85,6 +85,16 @@ void UW_HealthBar::UpdateMaxFireThreshold(const float MaxFireThreshold) const
 	M_DMI_FireThresholdBar->SetScalarParameterValue(M_HealthBarColorParameters.AmountSliceName, AmountSlices);
 }
 
+void UW_HealthBar::UpdateRankIcon(const int32 NewRankLevel, const EVeterancyIconSet VeterancyIconSet)
+{
+	if(not IsValid(M_RankIconImage))
+	{
+		// IMPORTANT: no error report as not all health bars will support rank icons.
+		return;
+	}
+	BP_UpdateRankIcon(NewRankLevel, VeterancyIconSet);
+}
+
 void UW_HealthBar::UpdateSquadWeaponIcon(const FSquadWeaponIconDisplaySettings& NewWeaponIconSettings)
 {
 	BP_UpdateSquadWeaponIcon(NewWeaponIconSettings);
@@ -130,7 +140,7 @@ void UW_HealthBar::InitRTSHealthBar(UWidgetAnimation* DamageAnimation, UMaterial
                                     PointDamageParameters, FHealthBarDynamicMaterialParameter HealthBarParameters,
                                     FHealthBarDMIColorParameter
                                     HealthBarColorParameters, UMaterialInstanceDynamic* DMIFireThresholdBar,
-                                    UImage* TargetTypeIconImage)
+                                    UImage* TargetTypeIconImage, UImage* RankIconImage)
 {
 	M_DamageAnimation = DamageAnimation;
 	M_DMI_HealthBar = DMIHealthBar;
@@ -139,6 +149,12 @@ void UW_HealthBar::InitRTSHealthBar(UWidgetAnimation* DamageAnimation, UMaterial
 	M_PointDamageParameters = PointDamageParameters;
 	M_HealthBarParameters = HealthBarParameters;
 	M_TargetTypeIconState.TargetTypeIconImage = TargetTypeIconImage;
+	M_RankIconImage = RankIconImage;
+	if(IsValid(M_RankIconImage))
+	{
+		// No error report as not all healthbars will support this icon!
+		M_RankIconImage->SetVisibility(ESlateVisibility::Hidden);
+	}
 	if (GetIsValidHealthBarDynamicMaterial())
 	{
 		// Initialise with 1.0f as the health bar is full at the start.

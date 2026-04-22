@@ -12,6 +12,8 @@ enum class EVeterancyIconSet : uint8
 	EVI_GerVehicles,
 	EVI_GerInfantry,
 	EVI_GerAircraft,
+	EVI_RusVehicles,
+	EVI_RusInfantry,
 };
 
 USTRUCT()

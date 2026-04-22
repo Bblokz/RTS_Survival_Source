@@ -142,7 +142,7 @@ void URTSExperienceComp::OnLevelUpOwner()
 		return;
 	}
 
-	M_Owner->OnUnitLevelUp();
+	M_Owner->OnUnitLevelUp(M_UnitExperience.M_CurrentLevel, M_UnitExperience.M_VeterancyIconSet);
 	OnLevelUp_ApplyBehaviour();
 	TryPlayVeterancyFX();
 }

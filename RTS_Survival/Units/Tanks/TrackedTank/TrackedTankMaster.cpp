@@ -248,8 +248,9 @@ URTSExperienceComp* ATrackedTankMaster::GetExperienceComponent() const
 	return ExperienceComponent;
 }
 
-void ATrackedTankMaster::OnUnitLevelUp()
+void ATrackedTankMaster::OnUnitLevelUp(const int32 Level, const EVeterancyIconSet IconSetUsed)
 {
+	OnLevelUp_UpdateHealthbarRankIcon(Level, IconSetUsed);
 	HandleVoiceLineOnLevelUp();
 	BP_OnUnitLevelUp();
 }
@@ -636,6 +637,15 @@ void ATrackedTankMaster::UpdateEngineSound() const
 		const float Speed = ChassisMesh->GetBoneLinearVelocity(NAME_None).Length();
 		M_EngineSoundComponent->SetFloatParameter(AudioSpeedParam, Speed);
 	}
+}
+
+void ATrackedTankMaster::OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const
+{
+	if(not GetIsValidHealthComponent())
+	{
+		return;
+	}
+	GetHealthComponent()->UpdateRankIcon(Level, IconSetUsed);
 }
 
 bool ATrackedTankMaster::EnsureValidExperienceComponent()

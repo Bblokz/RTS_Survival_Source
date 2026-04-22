@@ -97,7 +97,7 @@ protected:
 	
 
 	virtual URTSExperienceComp* GetExperienceComponent() const override final;
-	virtual void OnUnitLevelUp() override final;
+	virtual void OnUnitLevelUp(const int32 Level, const EVeterancyIconSet IconSetUsed) override final;
 
 
 	virtual void OnTankKilledAnyActor(AActor* KilledActor) override;
@@ -220,6 +220,8 @@ private:
 	FTimerHandle M_EngineSoundHandle;
 
 	FTimerDelegate M_EngineSoundDel;
+
+	void OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const;
 
 	bool EnsureValidExperienceComponent();
 
