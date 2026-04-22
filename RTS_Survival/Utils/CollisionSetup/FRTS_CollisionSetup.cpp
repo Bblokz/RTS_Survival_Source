@@ -314,6 +314,27 @@ void FRTS_CollisionSetup::SetupCollisionForMeshAttachedToTracks(UMeshComponent* 
 		"\n see RTSFunctionLibrary::SetupCollisionForMeshAttachedToTracks");
 }
 
+void FRTS_CollisionSetup::SetupCollisionForTrainMeshes(const TArray<UMeshComponent*>& MeshComponents, bool bIsPlayer1)
+{
+	const ECollisionChannel MyCollisionChannel = bIsPlayer1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
+	for (UMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (not IsValid(MeshComponent))
+		{
+			continue;
+		}
+
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		MeshComponent->SetReceivesDecals(false);
+		MeshComponent->SetGenerateOverlapEvents(false);
+		MeshComponent->SetCollisionObjectType(MyCollisionChannel);
+		MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+		MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+		SetupCollisionWithBuildingPreview_ForOwningPlayer(MeshComponent, bIsPlayer1);
+		MeshComponent->SetCollisionResponseToChannel(ECC_Destructible, ECR_Overlap);
+	}
+}
+
 void FRTS_CollisionSetup::SetupCollisionForNomadicMount(UMeshComponent* MeshComponent, const bool bOwnedByPlayer1)
 {
 	if (!IsValid(MeshComponent))

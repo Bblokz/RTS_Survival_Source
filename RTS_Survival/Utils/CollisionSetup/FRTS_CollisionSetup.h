@@ -51,6 +51,13 @@ public:
 
 	static void SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshComponent, bool bIsPlayer1);
 
+	/**
+	 * @brief Applies train collision in batch while keeping train meshes query-only and non-overlapping.
+	 * @param MeshComponents Meshes that should receive train collision setup.
+	 * @param bIsPlayer1 Whether collision channels should be configured for player 1 ownership.
+	 */
+	static void SetupCollisionForTrainMeshes(const TArray<UMeshComponent*>& MeshComponents, bool bIsPlayer1);
+
 	static void SetupCollisionForNomadicMount(UMeshComponent* MeshComponent, const bool bOwnedByPlayer1);
 
 	static void SetupCollisionForHullMountedWeapon(UMeshComponent* MeshComponent);

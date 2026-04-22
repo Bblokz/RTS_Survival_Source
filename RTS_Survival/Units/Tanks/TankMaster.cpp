@@ -574,6 +574,8 @@ void ATankMaster::ChildBpSetupArmor(TArray<UArmor*> MyArmorSetup)
 
 void ATankMaster::SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshToSetup, const bool bIsHarvester) const
 {
+	(void)bIsHarvester;
+
 	bool bOwnedByPlayer1 = false;
 	if (GetIsValidRTSComponent())
 	{
