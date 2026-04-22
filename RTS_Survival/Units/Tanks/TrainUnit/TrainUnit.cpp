@@ -4,6 +4,7 @@
 #include "Components/SplineComponent.h"
 #include "RTS_Survival/Environment/Splines/RoadSplineActor.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/TrainUnit/TrainSplineMovementComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -134,7 +135,7 @@ void ATrainUnit::ExecuteReverseCommand(const FVector ReverseToLocation)
 	float TargetDistanceAlongSpline = 0.0f;
 	if (not TryConvertWorldLocationToSplineDistance(ReverseToLocation, TargetDistanceAlongSpline))
 	{
-		DoneExecutingCommand(EAbilityID::IdReverse);
+		DoneExecutingCommand(EAbilityID::IdReverseMove);
 		return;
 	}
 
@@ -314,7 +315,7 @@ void ATrainUnit::OnReachedSplineMoveTarget()
 {
 	if (bM_LastMoveCommandWasReverse)
 	{
-		DoneExecutingCommand(EAbilityID::IdReverse);
+		DoneExecutingCommand(EAbilityID::IdReverseMove);
 		return;
 	}
 

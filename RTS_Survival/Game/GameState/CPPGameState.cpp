@@ -7724,7 +7724,6 @@ void ACPPGameState::BeginPlay_InitVeterancyFXCache()
 
 	M_VeterancyNiagaraComponent->SetAutoActivate(false);
 	M_VeterancyNiagaraComponent->SetAutoDestroy(false);
-	M_VeterancyNiagaraComponent->bIgnoreOwnerHiddenInGame = true;
 	M_VeterancyNiagaraComponent->SetAsset(VeterancyNiagaraSystem);
 	M_VeterancyNiagaraComponent->SetAbsolute(true, true, true);
 	M_VeterancyNiagaraComponent->SetHiddenInGame(false);
