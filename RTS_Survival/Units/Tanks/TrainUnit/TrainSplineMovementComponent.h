@@ -31,6 +31,7 @@ public:
 	bool GetIsMoving() const { return bM_IsMoving; }
 	float GetCurrentDistanceAlongSpline() const { return M_CurrentDistanceAlongSpline; }
 	float GetTargetDistanceAlongSpline() const { return M_TargetDistanceAlongSpline; }
+	float GetSplineWorldZOffset() const { return M_SplineWorldZOffset; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -71,6 +72,10 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="Spline Movement")
 	float M_MinBrakingDistance = 100.0f;
+
+	// Adds a world-space Z height offset on top of spline-evaluated positions for the whole train.
+	UPROPERTY(EditAnywhere, Category="Spline Movement")
+	float M_SplineWorldZOffset = 0.0f;
 
 	bool bM_IsMoving = false;
 	mutable bool bM_HasLoggedInvalidAssignedRoadSplineActor = false;
