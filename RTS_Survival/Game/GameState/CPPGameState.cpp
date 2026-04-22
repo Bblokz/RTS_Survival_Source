@@ -7724,9 +7724,11 @@ void ACPPGameState::BeginPlay_InitVeterancyFXCache()
 
 	M_VeterancyNiagaraComponent->SetAutoActivate(false);
 	M_VeterancyNiagaraComponent->SetAutoDestroy(false);
+	M_VeterancyNiagaraComponent->bIgnoreOwnerHiddenInGame = true;
 	M_VeterancyNiagaraComponent->SetAsset(VeterancyNiagaraSystem);
 	M_VeterancyNiagaraComponent->SetAbsolute(true, true, true);
-	M_VeterancyNiagaraComponent->RegisterComponent();
+	M_VeterancyNiagaraComponent->SetHiddenInGame(false);
+	M_VeterancyNiagaraComponent->RegisterComponentWithWorld(GetWorld());
 
 	M_VeterancyAudioComponent = NewObject<UAudioComponent>(this, TEXT("M_VeterancyAudioComponent"));
 	if (not GetIsValidVeterancyAudioComponent())
@@ -7802,6 +7804,7 @@ void ACPPGameState::HandleVeterancyFXActivation(const FVector& VeterancyWorldLoc
 	}
 
 	M_VeterancyNiagaraComponent->SetWorldLocation(VeterancyWorldLocation);
+	M_VeterancyNiagaraComponent->SetHiddenInGame(false);
 	M_VeterancyNiagaraComponent->SetVisibility(true);
 	M_VeterancyNiagaraComponent->ReinitializeSystem();
 
