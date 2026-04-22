@@ -1694,6 +1694,50 @@ void UMissionBase::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededC
 	GetMissionManagerChecked()->SpawnSeededChoiceGroups(SeededChoicesArray, this);
 }
 
+bool UMissionBase::PlaceActorAtSeededLocation(
+	AActor* ActorToPlace,
+	const TArray<FVector>& CandidateLocations,
+	const int32 GroupIndex) const
+{
+	if (not IsValid(ActorToPlace))
+	{
+		RTSFunctionLibrary::ReportError("PlaceActorAtSeededLocation failed because ActorToPlace was invalid.");
+		return false;
+	}
+
+	if (CandidateLocations.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"PlaceActorAtSeededLocation failed because CandidateLocations was empty."
+		);
+		return false;
+	}
+
+	if (not GetIsValidMissionManager())
+	{
+		return false;
+	}
+
+	const int32 CampaignSeed = GetMissionManagerChecked()->GetGenerationSeed();
+	const uint32 SeedHash = HashCombineFast(
+		static_cast<uint32>(CampaignSeed),
+		static_cast<uint32>(GroupIndex + 1)
+	);
+	const int32 SelectedLocationIndex = static_cast<int32>(
+		SeedHash % static_cast<uint32>(CandidateLocations.Num())
+	);
+	if (not CandidateLocations.IsValidIndex(SelectedLocationIndex))
+	{
+		RTSFunctionLibrary::ReportError(
+			"PlaceActorAtSeededLocation generated an invalid location index."
+		);
+		return false;
+	}
+
+	ActorToPlace->SetActorLocation(CandidateLocations[SelectedLocationIndex]);
+	return true;
+}
+
 void UMissionBase::MoveCamera(const FMovePlayerCamera CameraMove)
 {
 	SetCameraControllerReference();
