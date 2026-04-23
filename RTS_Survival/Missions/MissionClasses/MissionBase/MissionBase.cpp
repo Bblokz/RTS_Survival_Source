@@ -65,6 +65,11 @@ void UMissionBase::OnMissionComplete()
 	MissionState.bIsMissionComplete = true;
 	// Stop any tick behaviour.
 	MissionState.bTickOnMission = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+	}
+	M_AbilityCooldownCommands = nullptr;
 	Tracking_ClearState();
 	DebugMission("Completed mission " + GetName());
 	if (GetMissionManagerChecked())
@@ -83,6 +88,11 @@ void UMissionBase::OnMissionComplete()
 void UMissionBase::OnMissionFailed()
 {
 	MissionState.bIsMissionComplete = true;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+	}
+	M_AbilityCooldownCommands = nullptr;
 	Tracking_ClearState();
 	DebugMission("Failed mission " + GetName());
 	if (GetMissionManagerChecked())
@@ -430,6 +440,7 @@ bool UMissionBase::GetIsScheduledTaskActive(const int32 TaskID) const
 void UMissionBase::OnCleanUpMission()
 {
 	Tracking_ClearState();
+	M_AbilityCooldownCommands = nullptr;
 	if (GetIsValidMissionManager())
 	{
 		CancelAllScheduledCallbacks();
@@ -448,6 +459,7 @@ void UMissionBase::OnCleanUpMission()
 	GetWorld()->GetTimerManager().ClearTimer(M_LoadToStartTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(M_TextOnlyDurationHandle);
 	GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
+	GetWorld()->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
 	CleanUp_TimerHandles(GetWorld());
 	BP_OnMissionCleanUp();
 }
@@ -460,6 +472,7 @@ void UMissionBase::BeginDestroy()
 		GetWorld()->GetTimerManager().ClearTimer(M_TextOnlyDurationHandle);
 		GetWorld()->GetTimerManager().ClearTimer(M_LoadToStartTimerHandle);
 		GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
 	}
 }
 
@@ -1313,6 +1326,130 @@ void UMissionBase::RegisterCallBackOnPickUpWeapon(ASquadController* SquadControl
 		}
 	};
 	SquadController->OnWeaponPickup.AddLambda(MissionCallBack);
+}
+
+void UMissionBase::RegisterCallBackOnAbilityOnCoolDown(const EAbilityID AbilityId,
+                                                        int32 CustomType,
+                                                        TScriptInterface<ICommands> Commands)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"World",
+			"RegisterCallBackOnAbilityOnCoolDown",
+			this
+		);
+		return;
+	}
+
+	if (not IsValid(Commands.GetObject()) || Commands.GetInterface() == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("Mission failed to register ability cooldown callback because commands is invalid.");
+		return;
+	}
+
+	M_AbilityCooldownAbilityId = AbilityId;
+	M_AbilityCooldownCustomType = CustomType;
+	M_AbilityCooldownCommands = Commands;
+
+	constexpr float AbilityCooldownPollingIntervalSeconds = 1.0f;
+	World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+	World->GetTimerManager().SetTimer(
+		M_AbilityCooldownPollingTimerHandle,
+		this,
+		&UMissionBase::OnAbilityCooldownPollTimer,
+		AbilityCooldownPollingIntervalSeconds,
+		true
+	);
+}
+
+bool UMissionBase::GetIsValidAbilityCooldownCommands() const
+{
+	if (IsValid(M_AbilityCooldownCommands.GetObject()) && M_AbilityCooldownCommands.GetInterface() != nullptr)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_AbilityCooldownCommands",
+		"GetIsValidAbilityCooldownCommands",
+		this
+	);
+	return false;
+}
+
+void UMissionBase::OnAbilityOnCooldownCallback(const EAbilityID AbilityId,
+                                               const int32 CustomType,
+                                               const TScriptInterface<ICommands>& Commands)
+{
+	BP_OnCallBackAbilityUsed(AbilityId, CustomType, Commands);
+}
+
+void UMissionBase::OnAbilityCooldownPollTimer()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"World",
+			"OnAbilityCooldownPollTimer",
+			this
+		);
+		return;
+	}
+
+	if (not GetIsValidAbilityCooldownCommands())
+	{
+		World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+		return;
+	}
+
+	const UCommandData* UnitCommandData = M_AbilityCooldownCommands->GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+		RTSFunctionLibrary::ReportError("Mission failed ability cooldown callback because command data is invalid.");
+		return;
+	}
+
+	const TArray<FUnitAbilityEntry>& AbilityEntries = UnitCommandData->GetAbilities();
+	if (not GetHasAbilityCooldownStarted(AbilityEntries))
+	{
+		return;
+	}
+
+	OnAbilityOnCooldownCallback(
+		M_AbilityCooldownAbilityId,
+		M_AbilityCooldownCustomType,
+		M_AbilityCooldownCommands
+	);
+
+	World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+	M_AbilityCooldownCommands = nullptr;
+}
+
+bool UMissionBase::GetHasAbilityCooldownStarted(const TArray<FUnitAbilityEntry>& AbilityEntries) const
+{
+	for (const FUnitAbilityEntry& AbilityEntry : AbilityEntries)
+	{
+		if (AbilityEntry.AbilityId != M_AbilityCooldownAbilityId)
+		{
+			continue;
+		}
+
+		if (AbilityEntry.CustomType != M_AbilityCooldownCustomType)
+		{
+			continue;
+		}
+
+		return AbilityEntry.CooldownRemaining != 0;
+	}
+
+	return false;
 }
 
 void UMissionBase::DestroyActorsInRange(

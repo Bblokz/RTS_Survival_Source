@@ -8,6 +8,7 @@
 #include "RTS_Survival/Missions/MissionManager/MissionSpawnCommandQueueOrder.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionTrackingType.h"
+#include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
@@ -516,6 +517,12 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackSquadPickupWeapon(ASquadController* SquadController);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void RegisterCallBackOnAbilityOnCoolDown(const EAbilityID AbilityId, int32 CustomType, TScriptInterface<ICommands> Commands);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnCallBackAbilityUsed(const EAbilityID AbilityId, const int32 SubType, TScriptInterface<ICommands> Commands);
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackEnemyActorsDestroyed(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType);
 
@@ -862,6 +869,10 @@ private:
 	bool EnsureTankIsValid(const TObjectPtr<ATankMaster>& Tank) const;
 	bool EnsureBxpIsValid(const TObjectPtr<ABuildingExpansion>& BXP) const;
 	bool EnsureSquadIsValid(const TObjectPtr<ASquadController>& SquadController) const;
+	bool GetIsValidAbilityCooldownCommands() const;
+	void OnAbilityOnCooldownCallback(const EAbilityID AbilityId, const int32 CustomType, const TScriptInterface<ICommands>& Commands);
+	void OnAbilityCooldownPollTimer();
+	bool GetHasAbilityCooldownStarted(const TArray<FUnitAbilityEntry>& AbilityEntries) const;
 
 	FSeededDifficultyMixPool SelectDifficultyMixPool(
 		const FSeededDifficultyMixPool& NewToRTSMix,
@@ -895,6 +906,18 @@ private:
 	TArray<TWeakObjectPtr<AActor>> M_TrackedActors;
 
 	FTimerHandle M_TrackingValidityTimerHandle;
+
+	FTimerHandle M_AbilityCooldownPollingTimerHandle;
+
+	// Keeps a strong UObject reference for polling so interface access stays GC-safe.
+	UPROPERTY()
+	TScriptInterface<ICommands> M_AbilityCooldownCommands;
+
+	UPROPERTY()
+	EAbilityID M_AbilityCooldownAbilityId = EAbilityID::IdNoAbility;
+
+	UPROPERTY()
+	int32 M_AbilityCooldownCustomType = 0;
 
 	int32 M_NextAsyncSpawnId = 1;
 
