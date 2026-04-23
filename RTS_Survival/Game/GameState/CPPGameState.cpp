@@ -3754,6 +3754,7 @@ void ACPPGameState::InitAllGameTankData()
 	InitAllGameLightTankData();
 	InitAllGameMediumTankData();
 	InitAllGameHeavyTankData();
+	InitAllGameTrainData();
 
 	// VERY IMPORTANT; SET ENEMY DATA TOO.
 	M_TEnemyTankDataHashMap = M_TPlayerTankDataHashMap;
@@ -5392,6 +5393,105 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_152, TankData);
 	}
+}
+
+void ACPPGameState::InitAllGameTrainData()
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
+	using namespace DeveloperSettings::GameBalance::Experience;
+
+	const TArray<FUnitAbilityEntry> BasicTrainAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility
+	});
+
+	constexpr float TrainExperienceMultiplier = 1.0f;
+	constexpr int32 RoundExperienceTo = 5;
+
+	auto AddTrainData = [this, &BasicTrainAbilities](
+		const ETankSubtype TankSubtype,
+		const float TrainHealth,
+		const int32 TrainRotationSpeed,
+		const int32 TurretRotationSpeed,
+		const int32 TrainMaxSpeedKmh,
+		const int32 TrainReverseSpeedKmh,
+		const int32 RadixiteCost,
+		const int32 MetalCost,
+		const TArray<FExperienceLevel>& TrainExperienceLevels,
+		const int32 ExperienceWorth)
+	{
+		FTankData TankData;
+		TankData.MaxHealth = TrainHealth;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = TrainRotationSpeed;
+		TankData.TurretRotationSpeed = TurretRotationSpeed;
+		TankData.VehicleMaxSpeedKmh = TrainMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = TrainReverseSpeedKmh;
+		TankData.VisionRadius = TrainVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, RadixiteCost},
+			{ERTSResourceType::Resource_Metal, MetalCost}
+		});
+		TankData.Abilities = BasicTrainAbilities;
+		TankData.ExperienceLevels = TrainExperienceLevels;
+		TankData.ExperienceWorth = ExperienceWorth;
+		TankData.ExperienceMultiplier = TrainExperienceMultiplier;
+		M_TPlayerTankDataHashMap.Add(TankSubtype, TankData);
+	};
+
+	AddTrainData(
+		ETankSubtype::Tank_LightTrain,
+		LightTrainHealth,
+		7,
+		6,
+		18,
+		8,
+		700,
+		300,
+		GetHeavyTankExpLevels(),
+		RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.5f, RoundExperienceTo)
+	);
+	AddTrainData(
+		ETankSubtype::Tank_FuelTrain,
+		MediumTrainHealth,
+		6,
+		5,
+		16,
+		7,
+		1000,
+		500,
+		GetSuperHeavyTankExpLevels(),
+		RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp * 1.5f, RoundExperienceTo)
+	);
+	AddTrainData(
+		ETankSubtype::Tank_MediumTrain,
+		MediumTrainHealth,
+		6,
+		6,
+		15,
+		7,
+		1100,
+		600,
+		GetSuperHeavyTankExpLevels(),
+		RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp * 1.67f, RoundExperienceTo)
+	);
+	AddTrainData(
+		ETankSubtype::Tank_HeavyTrain,
+		HeavyTrainHealth,
+		5,
+		4,
+		12,
+		6,
+		1400,
+		800,
+		GetSuperHeavyTankExpLevels(),
+		RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp * 2.0f, RoundExperienceTo)
+	);
 }
 
 void ACPPGameState::InitAllGameAircraftData()
