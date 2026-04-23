@@ -310,6 +310,7 @@ FBxpOptionData InitBxpOptionEntry(const EBuildingExpansionType Type,
 	void InitAllGameLightTankData();
 	void InitAllGameMediumTankData();
 	void InitAllGameHeavyTankData();
+	void InitAllGameTrainData();
 	void InitAllGameAircraftData();
 
 	// ---- Experience Data ----

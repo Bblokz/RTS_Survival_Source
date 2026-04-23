@@ -149,6 +149,11 @@ enum class ETankSubtype : uint8
 	Tank_IS_3 UMETA(DisplayName = "Rus Heavy IS-3"),
 	Tank_KV_5 UMETA(DisplayName = "Rus Heavy KV-5"),
 	Tank_SU_152 UMETA(DisplayName = "Rus Heavy SU-152"),
+	// Russian trains.
+	Tank_FuelTrain UMETA(DisplayName = "Rus Train Fuel"),
+	Tank_LightTrain UMETA(DisplayName = "Rus Train Light"),
+	Tank_MediumTrain UMETA(DisplayName = "Rus Train Medium"),
+	Tank_HeavyTrain UMETA(DisplayName = "Rus Train Heavy"),
 };
 
 
