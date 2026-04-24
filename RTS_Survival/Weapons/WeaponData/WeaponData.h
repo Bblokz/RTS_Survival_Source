@@ -1114,6 +1114,14 @@ struct FInitWeaponStateRailgun
 	// Applied after base weapon data has been loaded from game state.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float ProjectileSpeedMultiplier = 1.0f;
+
+	// Armor penetration retained after a successful over-penetration.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
+	float PostPenArmorPenCarryOver = 0.8f;
+
+	// Over-penetration is allowed only when required penetration is at or below this percentage.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
+	float FloorArmorPenPercentageNeededAllowOverpen = 0.5f;
 };
 
 USTRUCT(BlueprintType)
@@ -1233,6 +1241,9 @@ public:
 
 protected:
 	virtual void FireWeaponSystem() override;
+	virtual bool GetCanArmorOverPenetrate() const;
+	virtual float GetPostPenArmorPenCarryOver() const;
+	virtual float GetFloorArmorPenPercentageNeededAllowOverpen() const;
 
 	bool GetIsValidProjectileManager() const;
 	bool GetIsValidCameraShakeSubsystem() const;
@@ -1291,6 +1302,9 @@ public:
 
 protected:
 	virtual void OnReloadFinished_PostReload() override;
+	virtual bool GetCanArmorOverPenetrate() const override;
+	virtual float GetPostPenArmorPenCarryOver() const override;
+	virtual float GetFloorArmorPenPercentageNeededAllowOverpen() const override;
 
 private:
 	UPROPERTY()
@@ -1301,6 +1315,12 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<USoundConcurrency> M_ReloadSoundConcurrency = nullptr;
+
+	UPROPERTY()
+	float M_PostPenArmorPenCarryOver = 0.8f;
+
+	UPROPERTY()
+	float M_FloorArmorPenPercentageNeededAllowOverpen = 0.5f;
 };
 
 USTRUCT(Blueprintable, BlueprintType)
