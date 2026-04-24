@@ -1701,10 +1701,14 @@ private:
 	FPauseGameState M_PauseGameState;
 
 	bool PauseGame_GetIsGameLocked() const;
+	bool PauseGame_GetIsPauseBlockedByCinematic() const;
 
 
 	void DebugPlayerSelection(const FString& Message, const FColor& Color = FColor::Blue) const;
 
 	UPROPERTY()
 	FTimerHandle M_HqReferenceHandle;
+
+	// Blocks pause input while cinematic takeover is active.
+	bool bM_IsCinematicTakeOverActive = false;
 };
