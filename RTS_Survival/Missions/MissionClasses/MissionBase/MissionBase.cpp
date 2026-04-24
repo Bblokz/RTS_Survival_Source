@@ -7,7 +7,10 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
+#include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
+#include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
@@ -780,21 +783,177 @@ bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) 
 		return false;
 	}
 
-	if (bCinematicStarted)
-	{
-		if (UPlayerPortraitManager* PlayerPortraitManager = FRTS_Statics::GetPlayerPortraitManager(this))
-		{
-			PlayerPortraitManager->StopCurrentPortraitPlayback();
-		}
-	}
-
 	ACPPController* PlayerController = FRTS_Statics::GetRTSController(M_MissionManager.Get());
 	if (not IsValid(PlayerController))
 	{
 		RTSFunctionLibrary::ReportError("Mission cinematic take over failed! Player controller is not valid!");
 		return false;
 	}
+
+	if (bCinematicStarted)
+	{
+		if (UPlayerPortraitManager* PlayerPortraitManager = FRTS_Statics::GetPlayerPortraitManager(this))
+		{
+			PlayerPortraitManager->StopCurrentPortraitPlayback();
+		}
+
+		if (not ApplyCinematicAudioVolumesFromMissionSettings())
+		{
+			RTSFunctionLibrary::ReportError("Mission cinematic take over failed! Could not apply cinematic audio settings.");
+			return false;
+		}
+	}
+	else if (not RestoreCinematicAudioVolumes())
+	{
+		RTSFunctionLibrary::ReportError("Mission cinematic take over failed! Could not restore cinematic audio settings.");
+		return false;
+	}
 	return PlayerController->OnCinematicTakeOver(bCinematicStarted);
+}
+
+bool UMissionBase::ApplyCinematicAudioVolumesFromMissionSettings() const
+{
+	const bool bShouldOverrideVoicelines = M_CinematicTakeOverVoicelinesVolume >= 0.0f;
+	const bool bShouldOverrideVfx = M_CinematicTakeOverVfxVolume >= 0.0f;
+	if (not bShouldOverrideVoicelines && not bShouldOverrideVfx)
+	{
+		M_CinematicAudioRuntimeState.bM_AudioOverridesAreApplied = false;
+		M_CinematicAudioRuntimeState.bM_AudioVolumesAreCached = false;
+		M_CinematicAudioRuntimeState.bM_OverrodeVoicelinesVolume = false;
+		M_CinematicAudioRuntimeState.bM_OverrodeVfxVolume = false;
+		return true;
+	}
+
+	const URTSGameUserSettings* const GameUserSettings = URTSGameUserSettings::Get();
+	if (GameUserSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not cache audio settings because URTSGameUserSettings was invalid."));
+		return false;
+	}
+
+	if (not M_CinematicAudioRuntimeState.bM_AudioVolumesAreCached)
+	{
+		M_CinematicAudioRuntimeState.M_CachedVoicelinesVolume = GameUserSettings->GetVoicelinesVolume();
+		M_CinematicAudioRuntimeState.M_CachedVfxVolume = GameUserSettings->GetSfxAndWeaponsVolume();
+		M_CinematicAudioRuntimeState.bM_AudioVolumesAreCached = true;
+	}
+
+	M_CinematicAudioRuntimeState.bM_OverrodeVoicelinesVolume = false;
+	M_CinematicAudioRuntimeState.bM_OverrodeVfxVolume = false;
+
+	if (bShouldOverrideVoicelines && not ApplyAudioVolumeOverride(ERTSAudioType::Voicelines, M_CinematicTakeOverVoicelinesVolume))
+	{
+		return false;
+	}
+	M_CinematicAudioRuntimeState.bM_OverrodeVoicelinesVolume = bShouldOverrideVoicelines;
+
+	if (bShouldOverrideVfx && not ApplyAudioVolumeOverride(ERTSAudioType::SFXAndWeapons, M_CinematicTakeOverVfxVolume))
+	{
+		return false;
+	}
+	M_CinematicAudioRuntimeState.bM_OverrodeVfxVolume = bShouldOverrideVfx;
+
+	M_CinematicAudioRuntimeState.bM_AudioOverridesAreApplied = true;
+	return true;
+}
+
+bool UMissionBase::RestoreCinematicAudioVolumes() const
+{
+	if (not M_CinematicAudioRuntimeState.bM_AudioOverridesAreApplied)
+	{
+		return true;
+	}
+
+	if (not M_CinematicAudioRuntimeState.bM_AudioVolumesAreCached)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission cinematic audio override restore failed because no cached values were available."));
+		return false;
+	}
+
+	if (M_CinematicAudioRuntimeState.bM_OverrodeVoicelinesVolume
+		&& not ApplyAudioVolumeOverride(ERTSAudioType::Voicelines, M_CinematicAudioRuntimeState.M_CachedVoicelinesVolume))
+	{
+		return false;
+	}
+
+	if (M_CinematicAudioRuntimeState.bM_OverrodeVfxVolume
+		&& not ApplyAudioVolumeOverride(ERTSAudioType::SFXAndWeapons, M_CinematicAudioRuntimeState.M_CachedVfxVolume))
+	{
+		return false;
+	}
+
+	M_CinematicAudioRuntimeState.bM_AudioOverridesAreApplied = false;
+	M_CinematicAudioRuntimeState.bM_AudioVolumesAreCached = false;
+	M_CinematicAudioRuntimeState.bM_OverrodeVoicelinesVolume = false;
+	M_CinematicAudioRuntimeState.bM_OverrodeVfxVolume = false;
+	return true;
+}
+
+bool UMissionBase::ApplyAudioVolumeOverride(const ERTSAudioType AudioType, const float VolumeToApply) const
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because World is invalid."));
+		return false;
+	}
+
+	const URTSAudioDeveloperSettings* const AudioSettings = GetDefault<URTSAudioDeveloperSettings>();
+	if (AudioSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because URTSAudioDeveloperSettings was invalid."));
+		return false;
+	}
+
+	if (AudioSettings->UserSettingsSoundMix.IsNull())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because UserSettingsSoundMix was not configured."));
+		return false;
+	}
+
+	const TSoftObjectPtr<USoundClass>* const FoundSoundClass = AudioSettings->SoundClassesByType.Find(AudioType);
+	if (FoundSoundClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the sound class mapping is missing."));
+		return false;
+	}
+
+	if (FoundSoundClass->IsNull())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the mapped sound class was null."));
+		return false;
+	}
+
+	USoundMix* const SettingsSoundMix = AudioSettings->UserSettingsSoundMix.LoadSynchronous();
+	if (SettingsSoundMix == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the settings sound mix failed to load."));
+		return false;
+	}
+
+	USoundClass* const SoundClassToOverride = FoundSoundClass->LoadSynchronous();
+	if (SoundClassToOverride == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the sound class failed to load."));
+		return false;
+	}
+
+	const float DefaultPitch = 1.0f;
+	const float DefaultFadeInTime = 0.0f;
+	const bool bApplyToChildren = true;
+
+	UGameplayStatics::SetSoundMixClassOverride(
+		World,
+		SettingsSoundMix,
+		SoundClassToOverride,
+		VolumeToApply,
+		DefaultPitch,
+		DefaultFadeInTime,
+		bApplyToChildren
+	);
+	UGameplayStatics::PushSoundMixModifier(World, SettingsSoundMix);
+
+	return true;
 }
 
 void UMissionBase::AddArchiveItem(const ERTSArchiveItem ItemType, const FTrainingOption OptionalUnit,
