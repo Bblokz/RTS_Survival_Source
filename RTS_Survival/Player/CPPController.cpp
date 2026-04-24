@@ -276,6 +276,12 @@ AActor* ACPPController::GetPrimarySelectedUnit() const
 
 void ACPPController::PauseGame(const ERTSPauseGameOptions PauseOption)
 {
+	const bool bAttemptPause = PauseOption == ERTSPauseGameOptions::ForcePause || PauseOption ==
+		ERTSPauseGameOptions::FlipFlop;
+	if (bAttemptPause && PauseGame_GetIsPauseBlockedByCinematic())
+	{
+		return;
+	}
 	if (PauseGame_GetIsGameLocked())
 	{
 		return;
@@ -535,6 +541,11 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 	// When we start a cinematic we ensure no optimization is happening, so we can show units outside the player FOV.
 	const bool bOptimizeAllUnitsInGame = !bStartCinematic;
 	GameUnitManager->SetAllUnitOptimizationEnabled(bOptimizeAllUnitsInGame);
+	if (bStartCinematic)
+	{
+		CloseEscapeMenu();
+	}
+	bM_IsCinematicTakeOverActive = bStartCinematic;
 	M_MainGameUI->SetMainMenuVisiblity(bMakeGameUIVisible);
 	M_PlayerCameraController->SetCameraMovementDisabled(bLockCamera);
 	SetSuppressRegularVoiceLines(bStartCinematic);
@@ -5867,6 +5878,17 @@ bool ACPPController::PauseGame_GetIsGameLocked() const
 	return false;
 }
 
+bool ACPPController::PauseGame_GetIsPauseBlockedByCinematic() const
+{
+	if (not bM_IsCinematicTakeOverActive)
+	{
+		return false;
+	}
+
+	RTSFunctionLibrary::DisplayNotification(FText::FromString("Pause is disabled during cinematic takeover"));
+	return true;
+}
+
 void ACPPController::DebugPlayerSelection(const FString& Message, const FColor& Color) const
 {
 	if constexpr (DeveloperSettings::Debugging::GPlayerSelection_Compile_DebugSymbols)
@@ -6403,6 +6425,11 @@ bool ACPPController::TryHandleEscapeMenuRotationArrowActive()
 
 void ACPPController::OnHitEscape()
 {
+	if (PauseGame_GetIsPauseBlockedByCinematic())
+	{
+		return;
+	}
+
 	if (TryHandleEscapeMenuBuildingModeActive())
 	{
 		return;
