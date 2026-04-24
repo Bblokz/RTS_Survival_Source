@@ -521,7 +521,7 @@ protected:
 	void RegisterCallBackOnAbilityOnCoolDown(const EAbilityID AbilityId, int32 CustomType, TScriptInterface<ICommands> Commands);
 
 	UFUNCTION(BlueprintImplementableEvent)
-	void BP_OnCallBackAbilityUsed(const EAbilityID AbilityId, const int32 SubType, TScriptInterface<ICommands> Commands);
+	void BP_OnCallBackAbilityUsed(const EAbilityID AbilityId, const int32 SubType, const TScriptInterface<ICommands>& Commands);
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackEnemyActorsDestroyed(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType);
