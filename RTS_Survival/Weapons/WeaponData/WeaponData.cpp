@@ -2195,6 +2195,21 @@ EProjectileNiagaraSystem UWeaponStateProjectile::GetProjectileNiagaraSystem() co
 	return M_ProjectileNiagaraSystem;
 }
 
+bool UWeaponStateProjectile::GetCanArmorOverPenetrate() const
+{
+	return false;
+}
+
+float UWeaponStateProjectile::GetPostPenArmorPenCarryOver() const
+{
+	return 0.0f;
+}
+
+float UWeaponStateProjectile::GetFloorArmorPenPercentageNeededAllowOverpen() const
+{
+	return 0.0f;
+}
+
 void UWeaponStateProjectile::FireProjectile(const FVector& TargetDirection)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_FireProjectile);
@@ -2253,6 +2268,9 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
 	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
 	ProjectileVfxSettings.ProjectileNiagaraSystem = M_ProjectileNiagaraSystem;
+	const bool bCanArmorOverPenetrate = GetCanArmorOverPenetrate();
+	const float PostPenArmorPenCarryOver = GetPostPenArmorPenCarryOver();
+	const float FloorArmorPenPercentageNeededAllowOverpen = GetFloorArmorPenPercentageNeededAllowOverpen();
 
 	Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
 	                                        ShellAdjustedData.BaseDamage,
@@ -2270,7 +2288,10 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 	                                        M_WeaponVfx.ImpactAttenuation,
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
 	                                        ActorsToIgnore,
-	                                        ShellAdjustedData.WeaponCalibre);
+	                                        ShellAdjustedData.WeaponCalibre,
+	                                        bCanArmorOverPenetrate,
+	                                        PostPenArmorPenCarryOver,
+	                                        FloorArmorPenPercentageNeededAllowOverpen);
 }
 
 void URailgunWeaponState::InitRailgunWeapon(
@@ -2299,7 +2320,24 @@ void URailgunWeaponState::InitRailgunWeapon(
 	M_ReloadSound = RailgunParameters.ReloadSound;
 	M_ReloadSoundAttenuation = RailgunParameters.ReloadSoundAttenuation;
 	M_ReloadSoundConcurrency = RailgunParameters.ReloadSoundConcurrency;
+	M_PostPenArmorPenCarryOver = RailgunParameters.PostPenArmorPenCarryOver;
+	M_FloorArmorPenPercentageNeededAllowOverpen = RailgunParameters.FloorArmorPenPercentageNeededAllowOverpen;
 	WeaponData.ProjectileMovementSpeed *= RailgunParameters.ProjectileSpeedMultiplier;
+}
+
+bool URailgunWeaponState::GetCanArmorOverPenetrate() const
+{
+	return true;
+}
+
+float URailgunWeaponState::GetPostPenArmorPenCarryOver() const
+{
+	return M_PostPenArmorPenCarryOver;
+}
+
+float URailgunWeaponState::GetFloorArmorPenPercentageNeededAllowOverpen() const
+{
+	return M_FloorArmorPenPercentageNeededAllowOverpen;
 }
 
 void URailgunWeaponState::OnReloadFinished_PostReload()

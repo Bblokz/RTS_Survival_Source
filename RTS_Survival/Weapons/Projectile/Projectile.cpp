@@ -289,7 +289,8 @@ void AProjectile::SetupProjectileForNewLaunch(
 	const FRotator& LaunchRotation, USoundAttenuation* ImpactAttenuation, USoundConcurrency* ImpactConcurrency,
 	const FProjectileVfxSettings&
 	ProjectileVfxSettings, const EWeaponShellType ShellType, const TArray<AActor*>& ActorsToIgnore, const int32
-	WeaponCalibre)
+	WeaponCalibre, const bool bCanArmorOverPenetrate, const float PostPenArmorPenCarryOver,
+	const float FloorArmorPenPercentageNeededAllowOverpen)
 {
 	M_ShellType = ShellType;
 	M_ProjectileOwner = NewProjectileOwner;
@@ -299,6 +300,9 @@ void AProjectile::SetupProjectileForNewLaunch(
 	M_FullDamage = Damage;
 	M_ArmorPen = ArmorPen;
 	M_ArmorPenAtMaxRange = ArmorPenMaxRange;
+	bM_CanArmorOverPenetrate = bCanArmorOverPenetrate;
+	M_PostPenArmorPenCarryOver = FMath::Clamp(PostPenArmorPenCarryOver, 0.0f, 1.0f);
+	M_FloorArmorPenPercentageNeededAllowOverpen = FMath::Clamp(FloorArmorPenPercentageNeededAllowOverpen, 0.0f, 1.0f);
 	M_ShrapnelParticles = ShrapnelParticles;
 	M_ShrapnelRange = ShrapnelRange;
 	M_ShrapnelDamage = ShrapnelDamage;
@@ -1463,6 +1467,38 @@ void AProjectile::OnHitArmorCalcComponent(UArmorCalculation* ArmorCalculation, c
 	}
 }
 
+bool AProjectile::GetCanArmorOverPenetrate(const float EffectiveArmor, const float AdjustedArmorPen) const
+{
+	if (not bM_CanArmorOverPenetrate || AdjustedArmorPen <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	const float ArmorPenPercentageNeededToPenetrate = EffectiveArmor / AdjustedArmorPen;
+	return ArmorPenPercentageNeededToPenetrate <= M_FloorArmorPenPercentageNeededAllowOverpen;
+}
+
+void AProjectile::OnOverPenetratingArmorHit(AActor* HitActor, const FHitResult& HitResult,
+                                            const ERTSSurfaceType HitSurface,
+                                            const FRotator& HitRotation, const float DamageMlt)
+{
+	if (not RTSFunctionLibrary::RTSIsValid(HitActor))
+	{
+		return;
+	}
+
+	M_DamageEvent.HitInfo.Location = HitResult.Location;
+	if (HitActor->TakeDamage(M_FullDamage * DamageMlt, M_DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
+	{
+		M_ProjectileOwner->OnProjectileKilledActor(HitActor);
+	}
+	ApplyRadixiteDamageBehaviour(HitActor);
+	SpawnExplosionHandleAOE(HitResult.Location, HitRotation, HitSurface, HitActor);
+	M_ActorsToIgnore.AddUnique(HitActor);
+	M_ArmorPen *= M_PostPenArmorPenCarryOver;
+	M_ArmorPenAtMaxRange *= M_PostPenArmorPenCarryOver;
+}
+
 void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
                                               AActor* HitActor)
 {
@@ -1493,6 +1529,13 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
 	constexpr float DamageMlt = 1.f;
+	if (GetCanArmorOverPenetrate(EffectiveArmor, AdjustedArmorPen))
+	{
+		OnOverPenetratingArmorHit(HitActor, HitResult, SurfaceTypeHit, MakeImpactOutwardRotationZ(HitResult), DamageMlt);
+		OnArmorOverPen_DisplayText(HitResult.Location);
+		return;
+	}
+
 	HandleHitActorAndClearTimer(
 		HitActor,
 		HitResult.Location,
@@ -1827,6 +1870,26 @@ void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPl
 
 	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
 		FRTSRichTextConverter::MakeRTSRich(PlateName + " hit!", ERTSRichText::Text_Exp),
+		Location, false,
+		350, ETextJustify::Type::Left,
+		TextSettings
+	);
+}
+
+void AProjectile::OnArmorOverPen_DisplayText(const FVector& Location)
+{
+	if (M_WeaponCalibre <= 35 || not GetIsValidWidgetPoolManager())
+	{
+		return;
+	}
+
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = 75.f;
+	TextSettings.VisibleDuration = 1.f;
+	TextSettings.FadeOutDuration = 1.f;
+
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		FRTSRichTextConverter::MakeRTSRich("Over-Pen", ERTSRichText::Text_Armor),
 		Location, false,
 		350, ETextJustify::Type::Left,
 		TextSettings

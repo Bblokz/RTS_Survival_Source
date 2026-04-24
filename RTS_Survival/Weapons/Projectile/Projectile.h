@@ -78,7 +78,10 @@ public:
 		const FRotator& LaunchRotation, USoundAttenuation* ImpactAttenuation,
 		USoundConcurrency* ImpactConcurrency, const FProjectileVfxSettings& ProjectileVfxSettings,
 		const EWeaponShellType
-		ShellType, const TArray<AActor*>& ActorsToIgnore, const int32 WeaponCalibre);
+		ShellType, const TArray<AActor*>& ActorsToIgnore, const int32 WeaponCalibre,
+		const bool bCanArmorOverPenetrate = false,
+		const float PostPenArmorPenCarryOver = 0.0f,
+		const float FloorArmorPenPercentageNeededAllowOverpen = 0.0f);
 
 	/**
 	 * @brief Launches the pooled projectile along an arced path using the provided arch settings.
@@ -245,6 +248,15 @@ private:
 
 	UPROPERTY()
 	float M_ArmorPenAtMaxRange = 0;
+
+	UPROPERTY()
+	float M_PostPenArmorPenCarryOver = 0.0f;
+
+	UPROPERTY()
+	float M_FloorArmorPenPercentageNeededAllowOverpen = 0.0f;
+
+	UPROPERTY()
+	bool bM_CanArmorOverPenetrate = false;
 
 	UPROPERTY()
 	FPointDamageEvent M_DamageEvent;
@@ -503,6 +515,9 @@ private:
 	                                             AActor* HitActor);
 	FORCEINLINE void ArmorCalc_FireProjectile(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
 	                                          AActor* HitActor);
+	bool GetCanArmorOverPenetrate(const float EffectiveArmor, const float AdjustedArmorPen) const;
+	void OnOverPenetratingArmorHit(AActor* HitActor, const FHitResult& HitResult, const ERTSSurfaceType HitSurface,
+	                               const FRotator& HitRotation, const float DamageMlt);
 
 	/** @brief Only notifies if the owning player is 1. */
 	void ProjectileHitPropagateNotification(const bool bBounced);
@@ -578,6 +593,7 @@ private:
 	bool CanHeHeatDamageOnBounce(EArmorPlate PlateHit, EArmorPlateDamageType& OutArmorPlateDamageType) const;
 	void CreateHeHeatBounceDamageText(const FVector& Location, const EArmorPlateDamageType DamageType) const;
 	void OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated);
+	void OnArmorOverPen_DisplayText(const FVector& Location);
 	void OnArmorPen_HeDisplayText(const FVector& Location);
 
 	void HandleAoe(const FVector& HitLocation,AActor* HitActor);
