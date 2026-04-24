@@ -1029,6 +1029,9 @@ void ACPPConstructionPreview::CreateGridOverlay()
 
 	// Force a neutral world rotation so the grid stays axis-aligned.
 	M_GridOverlay->SetActorRotation(FRotator::ZeroRotator);
+
+	// Hide the overlay by default so it does not appear at world origin before a build preview starts.
+	SetGridOverlayEnabled(false);
 }
 
 
