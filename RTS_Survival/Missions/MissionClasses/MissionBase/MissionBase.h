@@ -16,9 +16,11 @@
 #include "UObject/NoExportTypes.h"
 #include "Engine/OverlapResult.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "MissionBase.generated.h"
 
 enum class ERTSFaction : uint8;
+enum class ERTSAudioType : uint8;
 struct FSeededChoices;
 class ADestructableEnvActor;
 enum class ERTSPortraitTypes : uint8;
@@ -120,6 +122,30 @@ struct FMissionTrackingRuntimeState
 
 	UPROPERTY()
 	EMissionTrackingType TrackingType = EMissionTrackingType::NoTracking;
+};
+
+USTRUCT()
+struct FMissionCinematicAudioRuntimeState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bM_AudioVolumesAreCached = false;
+
+	UPROPERTY()
+	bool bM_AudioOverridesAreApplied = false;
+
+	UPROPERTY()
+	bool bM_OverrodeVoicelinesVolume = false;
+
+	UPROPERTY()
+	bool bM_OverrodeVfxVolume = false;
+
+	UPROPERTY()
+	float M_CachedVoicelinesVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	UPROPERTY()
+	float M_CachedVfxVolume = RTSGameUserSettingsRanges::DefaultVolume;
 };
 
 /**
@@ -433,6 +459,14 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Cinematics")
 	bool OnCinematicTakeOverFromMission(const bool bCinematicStarted) const;
+
+	// Temporary voiceline volume while mission cinematic takeover is active.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematics|Audio")
+	float M_CinematicTakeOverVoicelinesVolume = RTSGameUserSettingsRanges::DefaultVolume;
+
+	// Temporary VFX/SFX volume while mission cinematic takeover is active.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematics|Audio")
+	float M_CinematicTakeOverVfxVolume = RTSGameUserSettingsRanges::DefaultVolume;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void AddArchiveItem(const ERTSArchiveItem ItemType, const FTrainingOption OptionalUnit = FTrainingOption(),
@@ -853,6 +887,9 @@ private:
 	bool EnsureSpawnedActorIsValid(const AActor* SpawnedActor) const;
 
 	bool EnsureValidSpawnPoint(AActor* SpawnPointActor, const FTrainingOption& TrainingOption);
+	bool ApplyCinematicAudioVolumesFromMissionSettings() const;
+	bool RestoreCinematicAudioVolumes() const;
+	bool ApplyAudioVolumeOverride(const ERTSAudioType AudioType, const float VolumeToApply) const;
 
 	// To keep track of the rotations that we want for spawned actors
 	UPROPERTY()
@@ -896,6 +933,10 @@ private:
 
 	UPROPERTY()
 	FMissionTrackingRuntimeState M_MissionTrackingRuntimeState;
+
+	// Keeps a safe per-mission cache for temporary cinematic audio overrides.
+	UPROPERTY(Transient)
+	mutable FMissionCinematicAudioRuntimeState M_CinematicAudioRuntimeState;
 
 	// Tracks actor validity transitions so each tracked element increments at most once.
 	UPROPERTY()
