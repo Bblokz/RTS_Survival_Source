@@ -1531,8 +1531,14 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 	constexpr float DamageMlt = 1.f;
 	if (GetCanArmorOverPenetrate(EffectiveArmor, AdjustedArmorPen))
 	{
-		OnOverPenetratingArmorHit(HitActor, HitResult, SurfaceTypeHit, MakeImpactOutwardRotationZ(HitResult), DamageMlt);
+		OnOverPenetratingArmorHit(HitActor, HitResult, SurfaceTypeHit, MakeImpactOutwardRotationZ(HitResult),
+		                          DamageMlt);
 		OnArmorOverPen_DisplayText(HitResult.Location);
+		if (M_ProjectileMovement)
+		{
+			M_ProjectileMovement->MaxSpeed *=
+				DeveloperSettings::GameBalance::Weapons::RailGun::OverPenProjectileSpeedMlt;
+		}
 		return;
 	}
 
@@ -1878,7 +1884,7 @@ void AProjectile::OnArmorPen_DisplayText(const FVector& Location, const EArmorPl
 
 void AProjectile::OnArmorOverPen_DisplayText(const FVector& Location)
 {
-	if (M_WeaponCalibre <= 35 || not GetIsValidWidgetPoolManager())
+	if (M_WeaponCalibre <= 19 || not GetIsValidWidgetPoolManager())
 	{
 		return;
 	}
@@ -1889,7 +1895,7 @@ void AProjectile::OnArmorOverPen_DisplayText(const FVector& Location)
 	TextSettings.FadeOutDuration = 1.f;
 
 	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
-		FRTSRichTextConverter::MakeRTSRich("Over-Pen", ERTSRichText::Text_Armor),
+		FRTSRichTextConverter::MakeRTSRich("Over-Pen!!", ERTSRichText::Text_BBeh),
 		Location, false,
 		350, ETextJustify::Type::Left,
 		TextSettings
@@ -1960,7 +1966,7 @@ void AProjectile::DebugArmorHit(const float Armor, const float EffectiveArmor, c
 	}
 	FRTSVerticalAnimTextSettings TextSettings;
 	TextSettings.DeltaZ = 100.f;
-	TextSettings.VisibleDuration = 1.f;
+	TextSettings.VisibleDuration = 3.f;
 	TextSettings.FadeOutDuration = 0.5f;
 	URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(
 		this,

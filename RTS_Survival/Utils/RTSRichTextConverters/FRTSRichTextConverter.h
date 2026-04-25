@@ -57,6 +57,12 @@ enum class ERTSRichText : uint8
 	Text_Exp,
 	Text_Seats,
 	Text_Cursive,
+	Text_GBeh,
+	Text_BBeh,
+	Text_sGBeh,
+	Text_sBBeh,
+	Text_sExp,
+	Text_sArmor
 };
 
 
@@ -177,6 +183,18 @@ private:
 				return "<Text_Seats>";
 		case ERTSRichText::Text_Cursive:
 			return "<Text_Cursive>";
+			case ERTSRichText::Text_GBeh:
+				return "<Text_GBeh>";
+			case ERTSRichText::Text_BBeh:
+				return "<Text_BBeh>";
+		case ERTSRichText::Text_sGBeh:
+			return "<Text_sGBeh>";
+			case ERTSRichText::Text_sBBeh:
+				return "<Text_sBBeh>";
+			case ERTSRichText::Text_sExp:
+				return "<Text_sExp>";
+			case ERTSRichText::Text_sArmor:
+				return "<Text_sArmor>";
 		default:
 			return "";
 		}

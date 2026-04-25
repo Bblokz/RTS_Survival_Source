@@ -20,8 +20,18 @@ void URemoveRestoreAbilitiesComponent::BeginPlay()
 	{
 		return;
 	}
-
-	BeginPlay_RemoveConfiguredAbilities();
+	TWeakObjectPtr<URemoveRestoreAbilitiesComponent> WeakThis(this);
+	auto LambdaAfterBP = [WeakThis]()->void
+	{
+		if(not WeakThis.IsValid())
+		{
+			return;
+		}
+		const TStrongObjectPtr<URemoveRestoreAbilitiesComponent> StrongThis ( WeakThis.Get());
+		StrongThis->BeginPlay_RemoveConfiguredAbilities();
+	};
+	FTimerHandle TimerHandle;
+	GetWorld()->GetTimerManager().SetTimer(TimerHandle, LambdaAfterBP, 0.1f, false);
 }
 
 void URemoveRestoreAbilitiesComponent::RestoreAbility(const EAbilityID AbilityIdToRestore)

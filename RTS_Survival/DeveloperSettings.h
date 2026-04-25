@@ -722,9 +722,12 @@ namespace DeveloperSettings
 			namespace RailGun
 			{
 				// Flat bonus damage added on top of the base cannon damage which is dmg per mm
-				inline constexpr float DamageBonusMlt = 4;
+				inline constexpr float DamageBonusMlt =3;
 				// Percentage bonus to apply to the base cannon range for rail gun variants.
 				inline constexpr float RangeBonusPercentage = 20.f;
+				// What the projectile speed is multiplied with after Over penetration.
+				inline constexpr float OverPenProjectileSpeedMlt = 0.33f;
+				
 			}
 			inline constexpr float DamagePerTNTEquivalentGrams = 1.8f;
 			inline constexpr float DamageFluxPercentage = 10.f;
@@ -1552,8 +1555,8 @@ namespace DeveloperSettings
 		constexpr bool GArchProjectile_Compile_DebugSymbols = false;
 		// Reinforcement provider and ability debug draws.
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
-		constexpr bool GPathFollowing_Compile_DebugSymbols = true;
-		constexpr bool GRTSNavAgents_Compile_DebugSymbols = true;
+		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
+		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
 		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;

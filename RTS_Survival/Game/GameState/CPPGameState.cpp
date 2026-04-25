@@ -1822,7 +1822,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ArmorPen = 110.f;
 	WeaponData.ArmorPenMaxRange = 98.f;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 6.f;
+	WeaponData.ReloadSpeed = 7.f;
 	WeaponData.BaseCooldown = 11.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 85;
@@ -1872,7 +1872,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ArmorPen = 260.f;
 	WeaponData.ArmorPenMaxRange = 240.f;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 8.f;
+	WeaponData.ReloadSpeed = 10.f;
 	WeaponData.BaseCooldown = 2.5f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 88;
@@ -1897,7 +1897,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ArmorPen = 380.f;
 	WeaponData.ArmorPenMaxRange = 350.f;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 7.f;
+	WeaponData.ReloadSpeed = 12.f;
 	WeaponData.BaseCooldown = 3.0f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 90;
