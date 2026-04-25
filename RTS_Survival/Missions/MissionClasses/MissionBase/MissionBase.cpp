@@ -808,7 +808,15 @@ bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) 
 		RTSFunctionLibrary::ReportError("Mission cinematic take over failed! Could not restore cinematic audio settings.");
 		return false;
 	}
-	return PlayerController->OnCinematicTakeOver(bCinematicStarted);
+
+	const bool bCinematicTakeOverSucceeded = PlayerController->OnCinematicTakeOver(bCinematicStarted);
+	if (not bCinematicTakeOverSucceeded)
+	{
+		return false;
+	}
+
+	M_MissionManager->SetMissionWidgetManagerVisibility(not bCinematicStarted);
+	return true;
 }
 
 bool UMissionBase::ApplyCinematicAudioVolumesFromMissionSettings() const

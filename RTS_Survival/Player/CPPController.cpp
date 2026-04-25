@@ -544,6 +544,7 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 	if (bStartCinematic)
 	{
 		CloseEscapeMenu();
+		HandleHoveringBlockedState();
 	}
 	bM_IsCinematicTakeOverActive = bStartCinematic;
 	M_MainGameUI->SetMainMenuVisiblity(bMakeGameUIVisible);
@@ -6509,10 +6510,10 @@ bool ACPPController::GetIsValidConstructionPreview() const
 void ACPPController::UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
                                              const FHitResult& MouseHitResult, const bool bHit)
 {
-	if (bM_IsInTechTree)
+	if (bM_IsInTechTree || bM_IsCinematicTakeOverActive)
 	{
-		// Do not use the widget when in tech tree.
-		HideHoveringWidget();
+		// Do not use hovering widgets while blocked by top-level UI overlays or cinematic takeover.
+		HandleHoveringBlockedState();
 		return;
 	}
 	using DeveloperSettings::UIUX::HoverTime;
@@ -6567,6 +6568,18 @@ void ACPPController::UpdateHoveringActorInfo(float DeltaTime, const FVector2D Cu
 			M_HoveringActorWidget->SetPositionInViewport(CurrentMouseScreenPosition, false);
 		}
 	}
+}
+
+void ACPPController::HandleHoveringBlockedState()
+{
+	if (AActor* CurrentHoveredActor = M_CurrentHoveredActor.Get())
+	{
+		OnActorHovered(CurrentHoveredActor, false);
+		M_CurrentHoveredActor = nullptr;
+	}
+
+	M_TimeWithoutMouseMovement = 0.0f;
+	HideHoveringWidget();
 }
 
 
