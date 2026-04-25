@@ -568,6 +568,11 @@ private:
 	// time (in seconds) at which we last did a trace
 	double M_LastTraceTime;
 
+	// Start point used by async trace to sweep the full travelled segment between trace dispatches.
+	FVector M_LastTraceLocation = FVector::ZeroVector;
+
+	bool bM_HasLastTraceLocation = false;
+
 	// To ensure that a projectile cannot trigger a voice line after a bounce.
 	bool bM_AlreadyNotified = false;
 

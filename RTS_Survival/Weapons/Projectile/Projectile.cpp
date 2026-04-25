@@ -353,6 +353,8 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 		World->GetTimerManager().SetTimer(M_LineTraceTimerHandle, this, &AProjectile::PerformAsyncLineTrace,
 		                                  LineTraceInterval, true);
 		M_LastTraceTime = World->GetTimeSeconds() - LineTraceInterval;
+		M_LastTraceLocation = GetActorLocation();
+		bM_HasLastTraceLocation = true;
 		PerformAsyncLineTrace();
 	}
 }
@@ -1250,6 +1252,9 @@ void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator
 		M_ProjectileMovement->Velocity = Direction * ProjectileSpeed;
 		DebugProjectile("Projectile speed: " + FString::SanitizeFloat(ProjectileSpeed));
 	}
+
+	M_LastTraceLocation = NewLocation;
+	bM_HasLastTraceLocation = true;
 }
 
 bool AProjectile::GetIsValidProjectileManager() const
@@ -1272,19 +1277,34 @@ void AProjectile::OnNewDamageType(const ERTSDamageType DamageType)
 void AProjectile::PerformAsyncLineTrace()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_AsyncLineTrace);
-	if (!IsValid(M_ProjectileMovement))
+	if (not GetIsValidProjectileMovement())
 	{
 		return;
 	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	if (not bM_HasLastTraceLocation)
+	{
+		M_LastTraceLocation = GetActorLocation();
+		bM_HasLastTraceLocation = true;
+		return;
+	}
+
 	// Sample game time; respect dilation.
-	const double Now = GetWorld()->GetTimeSeconds();
-	const double Δtime = Now - M_LastTraceTime;
+	const double Now = World->GetTimeSeconds();
 	M_LastTraceTime = Now;
 
-	const FVector StartLocation = GetActorLocation();
+	const FVector StartLocation = M_LastTraceLocation;
+	const FVector CurrentLocation = GetActorLocation();
 	const FVector Dir = M_ProjectileMovement->Velocity.GetSafeNormal();
-	const float Speed = M_ProjectileMovement->Velocity.Size();
-	const FVector EndLocation = StartLocation + Dir * Speed * Δtime * 1.1;
+	constexpr float ForwardTracePaddingUnits = 10.0f;
+	const FVector EndLocation = CurrentLocation + (Dir * ForwardTracePaddingUnits);
+	M_LastTraceLocation = CurrentLocation;
 
 	FCollisionQueryParams TraceParams(FName(TEXT("ProjectileTrace")), false, this);
 	TraceParams.bTraceComplex = false;
@@ -1294,7 +1314,7 @@ void AProjectile::PerformAsyncLineTrace()
 	FTraceDelegate TraceDelegate;
 	TraceDelegate.BindUObject(this, &AProjectile::OnAsyncTraceComplete);
 
-	GetWorld()->AsyncLineTraceByChannel(
+	World->AsyncLineTraceByChannel(
 		EAsyncTraceType::Single,
 		StartLocation,
 		EndLocation,
