@@ -175,6 +175,17 @@ void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, 
 	M_GameDifficulty.bIsInitialized = true;
 }
 
+void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) const
+{
+	if (not EnsureMissionWidgetIsValid())
+	{
+		return;
+	}
+
+	const ESlateVisibility NewVisibility = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden;
+	M_MissionWidgetManager->SetVisibility(NewVisibility);
+}
+
 ERTSFaction AMissionManager::GetPlayerFaction() const
 {
 	if(M_PlayerFaction == ERTSFaction::NotInitialised)

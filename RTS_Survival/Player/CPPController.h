@@ -1640,6 +1640,7 @@ private:
 
 
 	// Helper methods
+	void HandleHoveringBlockedState();
 	void UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();
