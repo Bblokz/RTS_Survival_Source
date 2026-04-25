@@ -173,6 +173,7 @@ public:
 	void OnAnyMissionStarted(UMissionBase* LoadedMission);
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
+	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSFaction GetPlayerFaction() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
