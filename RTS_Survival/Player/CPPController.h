@@ -698,8 +698,15 @@ public:
     * @note - No modifier: clear current selection first, then select those on-screen matches.
     *
     * @post Ends by calling UpdateUIForSelectionAction with the proper action (hierarchy rebuild vs. selection-only).
-    */
+	 */
 	void SelectOnScreenUnitsOfSameTypeAs(AActor* BasisActor);
+
+	/**
+	 * @brief Resolves a selected unit from UI state and selects same-type units currently visible on screen.
+	 * @param UnitID Training option shown on the clicked selection tile.
+	 * @param SelectionArrayIndex Index inside the backing selection array for that tile.
+	 */
+	void SelectOnScreenUnitsOfType(const FTrainingOption& UnitID, int32 SelectionArrayIndex);
 
 	void SetCameraMovementSpeedMultiplier(const float NewMultiplier);
 	void SetCameraPanSpeedMultiplier(const float NewMultiplier);

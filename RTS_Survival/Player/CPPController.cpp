@@ -3144,10 +3144,59 @@ bool ACPPController::TryAdvancePrimaryToUnitType(const FTrainingOption& UnitID, 
 		&TSelectedActorsMasters, NewPrimarySelectedActor);
 }
 
+void ACPPController::SelectOnScreenUnitsOfType(const FTrainingOption& UnitID, int32 SelectionArrayIndex)
+{
+	EnsureSelectionsAreRTSValid();
+
+	AActor* BasisActor = nullptr;
+	switch (UnitID.UnitType)
+	{
+	case EAllUnitType::UNType_None:
+		return;
+	case EAllUnitType::UNType_Squad:
+		BasisActor = FPlayerSelectionHelpers::GetSquadAtIndexIfMatches(TSelectedSquadControllers, SelectionArrayIndex, UnitID);
+		break;
+	case EAllUnitType::UNType_Harvester:
+	// Falls through.
+	case EAllUnitType::UNType_Tank:
+	// Falls through.
+	case EAllUnitType::UNType_Nomadic:
+	// Falls through.
+	case EAllUnitType::UNType_Aircraft:
+		BasisActor = FPlayerSelectionHelpers::GetPawnAtIndexIfMatches(TSelectedPawnMasters, SelectionArrayIndex, UnitID);
+		break;
+	case EAllUnitType::UNType_BuildingExpansion:
+		BasisActor = FPlayerSelectionHelpers::GetActorAtIndexIfMatches(TSelectedActorsMasters, SelectionArrayIndex, UnitID);
+		break;
+	}
+
+	if (not IsValid(BasisActor))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("SelectOnScreenUnitsOfType: failed to resolve basis actor for %s at index %d."),
+			*UnitID.GetDisplayName(),
+			SelectionArrayIndex));
+		return;
+	}
+
+	SelectOnScreenUnitsOfSameTypeAs(BasisActor);
+}
+
 void ACPPController::SelectOnScreenUnitsOfSameTypeAs(AActor* BasisActor)
 {
-	if (!RTSFunctionLibrary::RTSIsValid(BasisActor))
+	if (not RTSFunctionLibrary::RTSIsValid(BasisActor))
 	{
+		return;
+	}
+	if (not IsValid(GetHUD()))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("SelectOnScreenUnitsOfSameTypeAs: HUD is invalid."));
+		return;
+	}
+	ACPPHUD* PlayerHUD = Cast<ACPPHUD>(GetHUD());
+	if (not IsValid(PlayerHUD))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("SelectOnScreenUnitsOfSameTypeAs: HUD is not ACPPHUD."));
 		return;
 	}
 
@@ -3183,141 +3232,93 @@ void ACPPController::SelectOnScreenUnitsOfSameTypeAs(AActor* BasisActor)
 		return;
 	}
 
-	// Screen bounds helper.
-	int32 ViewX = 0, ViewY = 0;
-	GetViewportSize(ViewX, ViewY);
-	if (ViewX <= 0 || ViewY <= 0)
+	TArray<ASquadUnit*> OnScreenSquadUnits;
+	TArray<ASelectableActorObjectsMaster*> OnScreenSelectableActors;
+	TArray<ASelectablePawnMaster*> OnScreenSelectablePawns;
+	PlayerHUD->GetAllSelectableUnitsOnScreen(OnScreenSquadUnits, OnScreenSelectableActors, OnScreenSelectablePawns);
+
+	TArray<ASquadUnit*> MatchingSquadUnits;
+	TArray<ASelectableActorObjectsMaster*> MatchingSelectableActors;
+	TArray<ASelectablePawnMaster*> MatchingSelectablePawns;
+
+	for (ASquadUnit* EachUnit : OnScreenSquadUnits)
+	{
+		if (not IsValid(EachUnit))
+		{
+			continue;
+		}
+
+		const ASquadController* SquadController = EachUnit->GetSquadControllerChecked();
+		if (not IsValid(SquadController))
+		{
+			continue;
+		}
+
+		const URTSComponent* SquadControllerRts = SquadController->FindComponentByClass<URTSComponent>();
+		if (not IsValid(SquadControllerRts))
+		{
+			continue;
+		}
+
+		if (SquadControllerRts->GetUnitTrainingOption() == TargetID)
+		{
+			MatchingSquadUnits.Add(EachUnit);
+		}
+	}
+
+	for (ASelectableActorObjectsMaster* EachActor : OnScreenSelectableActors)
+	{
+		if (not IsValid(EachActor) || not IsValid(EachActor->GetRTSComponent()))
+		{
+			continue;
+		}
+		if (EachActor->GetRTSComponent()->GetUnitTrainingOption() == TargetID)
+		{
+			MatchingSelectableActors.Add(EachActor);
+		}
+	}
+
+	for (ASelectablePawnMaster* EachPawn : OnScreenSelectablePawns)
+	{
+		if (not IsValid(EachPawn) || not IsValid(EachPawn->GetRTSComponent()))
+		{
+			continue;
+		}
+		if (EachPawn->GetRTSComponent()->GetUnitTrainingOption() == TargetID)
+		{
+			MatchingSelectablePawns.Add(EachPawn);
+		}
+	}
+
+	if (MatchingSquadUnits.Num() == 0 && MatchingSelectableActors.Num() == 0 && MatchingSelectablePawns.Num() == 0)
 	{
 		return;
 	}
 
-	auto IsOnScreen = [&](const FVector& WorldLocation) -> bool
-	{
-		FVector2D ScreenPos;
-		if (!ProjectWorldLocationToScreen(WorldLocation, ScreenPos, true))
-		{
-			return false;
-		}
-		const bool bInBounds = (ScreenPos.X >= 0.f && ScreenPos.X <= ViewX && ScreenPos.Y >= 0.f && ScreenPos.Y <=
-			ViewY);
-		if (!bInBounds)
-		{
-			return false;
-		}
-		// Basic "in front of camera" check
-		const FVector CamLoc = PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : FVector::ZeroVector;
-		const FVector CamFwd = PlayerCameraManager
-			                       ? PlayerCameraManager->GetCameraRotation().Vector()
-			                       : FVector::ForwardVector;
-		const FVector Dir = (WorldLocation - CamLoc).GetSafeNormal();
-		return FVector::DotProduct(CamFwd, Dir) > 0.f;
-	};
-
-	// Gather on-screen matches by category; we reuse the marquee-style internal helpers to minimize duplication.
-	TArray<ASquadUnit*> MarqueeSquadUnits;
-	TArray<ASelectableActorObjectsMaster*> MarqueeActors;
-	TArray<ASelectablePawnMaster*> MarqueePawns;
-
-	constexpr int32 PlayerIndex = 1; // local player ownership check used elsewhere in controller
-
-	switch (TargetID.UnitType)
-	{
-	case EAllUnitType::UNType_Squad:
-		for (TActorIterator<ASquadUnit> It(GetWorld()); It; ++It)
-		{
-			ASquadUnit* Unit = *It;
-			if (!RTSFunctionLibrary::RTSIsValid(Unit)) { continue; }
-			if (!IsOnScreen(Unit->GetActorLocation())) { continue; }
-
-			// Ownership and type match
-			const URTSComponent* UnitRTS = Unit->GetRTSComponent();
-			ASquadController* C = Unit->GetSquadControllerChecked();
-			const URTSComponent* CtrlRTS = C ? C->FindComponentByClass<URTSComponent>() : nullptr;
-
-			const bool bOwned = UnitRTS && UnitRTS->GetOwningPlayer() == PlayerIndex;
-			const FTrainingOption UnitTypeID = CtrlRTS
-				                                   ? CtrlRTS->GetUnitTrainingOption()
-				                                   : (UnitRTS ? UnitRTS->GetUnitTrainingOption() : FTrainingOption{});
-			if (bOwned && UnitTypeID == TargetID)
-			{
-				MarqueeSquadUnits.Add(Unit);
-			}
-		}
-		break;
-
-	case EAllUnitType::UNType_Harvester:
-	case EAllUnitType::UNType_Tank:
-	case EAllUnitType::UNType_Nomadic:
-	case EAllUnitType::UNType_Aircraft:
-		for (TActorIterator<ASelectablePawnMaster> It(GetWorld()); It; ++It)
-		{
-			ASelectablePawnMaster* PawnMaster = *It;
-			if (!RTSFunctionLibrary::RTSIsValid(PawnMaster)) { continue; }
-			if (!IsOnScreen(PawnMaster->GetActorLocation())) { continue; }
-
-			const URTSComponent* RTS = PawnMaster->GetRTSComponent();
-			if (!RTS || RTS->GetOwningPlayer() != PlayerIndex) { continue; }
-			if (RTS->GetUnitTrainingOption() == TargetID)
-			{
-				MarqueePawns.Add(PawnMaster);
-			}
-		}
-		break;
-
-	case EAllUnitType::UNType_BuildingExpansion:
-		for (TActorIterator<ASelectableActorObjectsMaster> It(GetWorld()); It; ++It)
-		{
-			ASelectableActorObjectsMaster* Act = *It;
-			if (!RTSFunctionLibrary::RTSIsValid(Act)) { continue; }
-			if (!IsOnScreen(Act->GetActorLocation())) { continue; }
-
-			const URTSComponent* RTS = Act->GetRTSComponent();
-			if (!RTS || RTS->GetOwningPlayer() != PlayerIndex) { continue; }
-			if (RTS->GetUnitTrainingOption() == TargetID)
-			{
-				MarqueeActors.Add(Act);
-			}
-		}
-		break;
-
-	default:
-		// Unknown / none: nothing to select.
-		return;
-	}
-
-	// Nothing visible of that type.
-	if (MarqueeSquadUnits.Num() == 0 && MarqueeActors.Num() == 0 && MarqueePawns.Num() == 0)
-	{
-		return;
-	}
-
-	// Decide how to mutate selection using existing marquee helpers.
 	ESelectionChangeAction ActionToApply = ESelectionChangeAction::SelectionInvariant;
-
-	// SHIFT: toggle-add, but if all targets are already selected -> remove them.
 	if (bIsHoldingShift)
 	{
 		const bool bOnlyAlreadySelected = Internal_IsMarqueeOnlyAlreadySelectedUnits(
-			MarqueeSquadUnits, MarqueeActors, MarqueePawns);
+			MatchingSquadUnits, MatchingSelectableActors, MatchingSelectablePawns);
 
 		if (bOnlyAlreadySelected)
 		{
-			ActionToApply = Internal_RemoveMarqueeFromSelection(MarqueeSquadUnits, MarqueeActors, MarqueePawns);
+			ActionToApply = Internal_RemoveMarqueeFromSelection(
+				MatchingSquadUnits, MatchingSelectableActors, MatchingSelectablePawns);
 		}
 		else
 		{
 			ActionToApply = Internal_MarqueeAddValidUniqueUnitsToSelection_UpdateArraysAndDecals(
-				MarqueeSquadUnits, MarqueeActors, MarqueePawns);
+				MatchingSquadUnits, MatchingSelectableActors, MatchingSelectablePawns);
 		}
 	}
 	else
 	{
-		// CTRL or no modifier: replace current selection with the on-screen matches.
 		const TSet<FTrainingOption> Before = FPlayerSelectionHelpers::BuildTrainingOptionSet(
 			TSelectedPawnMasters, TSelectedSquadControllers, TSelectedActorsMasters);
 
 		Internal_MarqueeFullSelectionReset_UpdateArraysAndDecals(
-			MarqueeSquadUnits, MarqueeActors, MarqueePawns);
+			MatchingSquadUnits, MatchingSelectableActors, MatchingSelectablePawns);
 
 		const TSet<FTrainingOption> After = FPlayerSelectionHelpers::BuildTrainingOptionSet(
 			TSelectedPawnMasters, TSelectedSquadControllers, TSelectedActorsMasters);

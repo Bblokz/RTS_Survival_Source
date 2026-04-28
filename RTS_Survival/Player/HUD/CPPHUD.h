@@ -25,6 +25,18 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	ACPPController* PLayerController;
 
+	/**
+	 * @brief Collects all selectable friendly units whose selection bounds intersect the current viewport.
+	 * @param OutSquadUnits Output array with all visible squad units.
+	 * @param OutSelectableActors Output array with all visible selectable actor masters.
+	 * @param OutSelectablePawns Output array with all visible selectable pawn masters.
+	 */
+	void GetAllSelectableUnitsOnScreen(
+		TArray<ASquadUnit*>& OutSquadUnits,
+		TArray<ASelectableActorObjectsMaster*>& OutSelectableActors,
+		TArray<ASelectablePawnMaster*>& OutSelectablePawns
+	);
+
 	/** @brief Starts unit selection using marquee. */
 	void StartSelection();
 
