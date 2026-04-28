@@ -8,6 +8,9 @@
 #include "RTS_Survival/GameUI/BottomCenterUI/SelectionUI/W_SelectionPanel/W_SelectionPanel.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Slate/SlateBrushAsset.h"
+#include "Input/Reply.h"
+#include "Input/Events.h"
+#include "InputCoreTypes.h"
 
 void UW_SelectedUnit::SetupSelectedUnitWidget(const FSelectedUnitsWidgetState& WidgetState)
 {
@@ -43,13 +46,50 @@ void UW_SelectedUnit::InitSelectionPanelOwner(UW_SelectionPanel* InOwner)
 
 void UW_SelectedUnit::OnClickedSelectedUnit()
 {
-	if (not M_SelectionPanelOwner.IsValid())
+	if (not GetIsValidSelectionPanelOwner())
 	{
-		RTSFunctionLibrary::ReportError(TEXT("UW_SelectedUnit click: owner panel invalid."));
 		return;
 	}
-	// Pass the cached state upward.
+
+	constexpr float DoubleClickThresholdSeconds = 0.30f;
+	const UWorld* CurrentWorld = GetWorld();
+	if (not IsValid(CurrentWorld))
+	{
+		M_SelectionPanelOwner.Get()->HandleSelectedUnitClicked(M_CurrentWidgetState);
+		return;
+	}
+
+	const float CurrentTimeSeconds = CurrentWorld->GetTimeSeconds();
+	const bool bIsDoubleClick =
+		(CurrentTimeSeconds - M_LastSelectedUnitClickTimeSeconds) <= DoubleClickThresholdSeconds;
+	M_LastSelectedUnitClickTimeSeconds = CurrentTimeSeconds;
+
+	if (bIsDoubleClick)
+	{
+		M_SelectionPanelOwner.Get()->HandleSelectedUnitDoubleClicked(M_CurrentWidgetState);
+		return;
+	}
+
 	M_SelectionPanelOwner.Get()->HandleSelectedUnitClicked(M_CurrentWidgetState);
+}
+
+FReply UW_SelectedUnit::NativeOnMouseButtonDoubleClick(
+	const FGeometry& InGeometry,
+	const FPointerEvent& InMouseEvent
+)
+{
+	const FReply ParentReply = Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
+	if (InMouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+	{
+		return ParentReply;
+	}
+	if (not GetIsValidSelectionPanelOwner())
+	{
+		return ParentReply;
+	}
+
+	M_SelectionPanelOwner.Get()->HandleSelectedUnitDoubleClicked(M_CurrentWidgetState);
+	return FReply::Handled();
 }
 
 void UW_SelectedUnit::CacheSelectedUnitState(const FSelectedUnitsWidgetState& NewState)
@@ -65,4 +105,15 @@ void UW_SelectedUnit::SetImage(USlateBrushAsset* ImageBrushAsset)
 	}
 	auto CurrBrush = SelectedUnitImage->GetBrush();
 	CurrBrush.SetResourceObject(ImageBrushAsset);
+}
+
+bool UW_SelectedUnit::GetIsValidSelectionPanelOwner() const
+{
+	if (M_SelectionPanelOwner.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("UW_SelectedUnit: selection panel owner is invalid."));
+	return false;
 }

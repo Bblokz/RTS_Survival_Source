@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Input/Reply.h"
 #include "SelectedUnitWidgetState/SelectedUnitsWidgetState.h"
 #include "W_SelectedUnit.generated.h"
 
@@ -30,6 +31,11 @@ public:
 
 	/** @brief The most recent state assigned via SetupSelectedUnitWidget (cached for click handling). */
 	const FSelectedUnitsWidgetState& GetCurrentState() const { return M_CurrentWidgetState; }
+
+	virtual FReply NativeOnMouseButtonDoubleClick(
+		const FGeometry& InGeometry,
+		const FPointerEvent& InMouseEvent
+	) override;
 
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -63,11 +69,15 @@ protected:
 	void SetImage(USlateBrushAsset* ImageBrushAsset);
 
 private:
+	bool GetIsValidSelectionPanelOwner() const;
+
 	/** Not owned here; panel lives in the widget tree. */
 	UPROPERTY()
 	TWeakObjectPtr<UW_SelectionPanel> M_SelectionPanelOwner;
 
 	UPROPERTY()
 	FSelectedUnitsWidgetState M_CurrentWidgetState;
+
+	float M_LastSelectedUnitClickTimeSeconds = -100.0f;
 
 };

@@ -117,6 +117,15 @@ void UW_SelectionPanel::HandleSelectedUnitClicked(const FSelectedUnitsWidgetStat
 		TEXT("UW_SelectionPanel: tile clicked; no primary-type setter available."), FColor::Cyan);
 }
 
+void UW_SelectionPanel::HandleSelectedUnitDoubleClicked(const FSelectedUnitsWidgetState& ClickedState)
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+	M_PlayerController->SelectOnScreenUnitsOfType(ClickedState.UnitID, ClickedState.SelectionArrayIndex);
+}
+
 void UW_SelectionPanel::HandleEnumerateClicked(const int32 NewPageIndex)
 {
 	if (M_CachedFlatStates.Num() == 0)

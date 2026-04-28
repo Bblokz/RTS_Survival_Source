@@ -49,6 +49,9 @@ public:
 	/** @brief Routed by UW_SelectedUnit on click; modifies player selection depending on modifiers. */
 	void HandleSelectedUnitClicked(const FSelectedUnitsWidgetState& ClickedState);
 
+	/** @brief Routed by UW_SelectedUnit on double click; selects all on-screen units of the same type. */
+	void HandleSelectedUnitDoubleClicked(const FSelectedUnitsWidgetState& ClickedState);
+
 	/** @brief Routed by UW_EnumerateUnitSelection on click; updates currently drawn page only. */
 	void HandleEnumerateClicked(int32 NewPageIndex);
 
