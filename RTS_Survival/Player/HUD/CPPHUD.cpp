@@ -17,6 +17,29 @@ FVector2D ACPPHUD::GetMousePosition2D() const
 	return FVector2D(PosX, PosY);
 }
 
+void ACPPHUD::GetAllSelectableUnitsOnScreen(
+	TArray<ASquadUnit*>& OutSquadUnits,
+	TArray<ASelectableActorObjectsMaster*>& OutSelectableActors,
+	TArray<ASelectablePawnMaster*>& OutSelectablePawns
+)
+{
+	int32 ViewportWidth = 0;
+	int32 ViewportHeight = 0;
+	GetOwningPlayerController()->GetViewportSize(ViewportWidth, ViewportHeight);
+	if (ViewportWidth <= 0 || ViewportHeight <= 0)
+	{
+		OutSquadUnits.Reset();
+		OutSelectableActors.Reset();
+		OutSelectablePawns.Reset();
+		return;
+	}
+
+	const FVector2D ScreenBottomRight(static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight));
+	GetSquadUnitsInSelectionRectangle(FVector2D::ZeroVector, ScreenBottomRight, OutSquadUnits, false);
+	GetSelectableActorsInRectangle(FVector2D::ZeroVector, ScreenBottomRight, OutSelectableActors, false);
+	GetSelectablePawnsInRectangle(FVector2D::ZeroVector, ScreenBottomRight, OutSelectablePawns, false);
+}
+
 
 void ACPPHUD::GetSquadUnitsInSelectionRectangle(const FVector2D& FirstPoint,
                                                 const FVector2D& SecondPoint,
