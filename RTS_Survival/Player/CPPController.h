@@ -105,6 +105,8 @@ class RTS_SURVIVAL_API ASelectableActorObjectsMaster;
 class RTS_SURVIVAL_API UPlayerProfileLoader;
 class UInputAction;
 class UInputMappingContext;
+class UMissionCinematicTakeOverSession;
+class UW_HoldToSkip;
 
 USTRUCT(BlueprintType)
 struct FPauseGameState
@@ -260,6 +262,7 @@ class RTS_SURVIVAL_API ACPPController : public APlayerController
 	friend class RTS_SURVIVAL_API UPlayerControlGroupManager;
 	friend class RTS_SURVIVAL_API UPlayerProfileLoader;
 	friend class RTS_SURVIVAL_API UPlayerResourceManager;
+	friend class UMissionCinematicTakeOverSession;
 	// For calling StartGameAtLocation with the picked location by the Start Location UI / Mngr.
 	friend class RTS_SURVIVAL_API UPlayerStartLocationManager;
 
@@ -815,6 +818,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "EscapeMenu")
 	FPlayerEscapeMenuSettings PlayerEscapeMenuSettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cinematics")
+	TSubclassOf<UW_HoldToSkip> M_HoldToSkipWidgetClass = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> M_DefaultInputMappingContext = nullptr;
@@ -1614,6 +1620,9 @@ private:
 	void DeactivateActionButton();
 
 	void EnsureEscapeMenuHelperInitialized();
+	bool GetIsValidHoldToSkipWidgetClass() const;
+	void SetActiveMissionCinematicTakeOverSession(UMissionCinematicTakeOverSession* CinematicSession);
+	void ClearActiveMissionCinematicTakeOverSession(const UMissionCinematicTakeOverSession* CinematicSession);
 	bool TryHandleEscapeMenuBuildingModeActive();
 	bool TryHandleEscapeMenuActionButtonActive();
 	bool TryHandleEscapeMenuRotationArrowActive();
@@ -1636,6 +1645,9 @@ private:
 
 	UPROPERTY()
 	UW_HoveringActor* M_HoveringActorWidget;
+
+	UPROPERTY()
+	TWeakObjectPtr<UMissionCinematicTakeOverSession> M_ActiveMissionCinematicTakeOverSession;
 
 	// Tracks mouse position for hovering logic
 	FVector2D M_LastFrameMousePosition;

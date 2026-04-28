@@ -174,7 +174,7 @@ void UPlayerCommandTypeDecoder::ResetAllPlacementEffects()
 {
 	for (const auto EachVfx : M_TSpawnedSystems)
 	{
-		if (EachVfx)
+		if (IsValid(EachVfx))
 		{
 			EachVfx->DestroyComponent();
 		}

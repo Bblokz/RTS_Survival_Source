@@ -35,10 +35,12 @@
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionCinematicTakeOverSession.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Interfaces/Commands.h"
@@ -6376,6 +6378,43 @@ void ACPPController::EnsureEscapeMenuHelperInitialized()
 	M_PlayerEscapeMenuHelper.InitEscapeMenuHelper(this);
 }
 
+bool ACPPController::GetIsValidHoldToSkipWidgetClass() const
+{
+	if (M_HoldToSkipWidgetClass != nullptr)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_HoldToSkipWidgetClass"),
+		TEXT("ACPPController::GetIsValidHoldToSkipWidgetClass"),
+		this
+	);
+	return false;
+}
+
+void ACPPController::SetActiveMissionCinematicTakeOverSession(UMissionCinematicTakeOverSession* CinematicSession)
+{
+	M_ActiveMissionCinematicTakeOverSession = CinematicSession;
+}
+
+void ACPPController::ClearActiveMissionCinematicTakeOverSession(
+	const UMissionCinematicTakeOverSession* CinematicSession)
+{
+	if (M_ActiveMissionCinematicTakeOverSession.Get() == nullptr)
+	{
+		return;
+	}
+
+	if (M_ActiveMissionCinematicTakeOverSession.Get() != CinematicSession)
+	{
+		return;
+	}
+
+	M_ActiveMissionCinematicTakeOverSession = nullptr;
+}
+
 bool ACPPController::GetIsValidDefaultInputMappingContext() const
 {
 	if (IsValid(M_DefaultInputMappingContext))
@@ -6427,6 +6466,12 @@ bool ACPPController::TryHandleEscapeMenuRotationArrowActive()
 
 void ACPPController::OnHitEscape()
 {
+	if (M_ActiveMissionCinematicTakeOverSession.Get() != nullptr)
+	{
+		M_ActiveMissionCinematicTakeOverSession->HandleControllerEscapePressed();
+		return;
+	}
+
 	if (PauseGame_GetIsPauseBlockedByCinematic())
 	{
 		return;

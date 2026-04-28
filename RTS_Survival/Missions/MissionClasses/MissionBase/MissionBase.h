@@ -36,6 +36,8 @@ struct FMovePlayerCamera;
 struct FTrainingOption;
 class ARTSAsyncSpawner;
 class UMissionTrigger;
+class UMissionCinematicTakeOverSession;
+class UMovieSceneSequencePlayer;
 class UW_Mission;
 class UW_MissionTimer;
 struct FMissionWidgetState;
@@ -166,6 +168,7 @@ class RTS_SURVIVAL_API UMissionBase : public UObject
 	friend class RTS_SURVIVAL_API UMissionTrigger;
 	// to call on spawn complete for bp.
 	friend struct FMissionSpawnCommandQueueState;
+	friend class UMissionCinematicTakeOverSession;
 
 
 public:
@@ -459,6 +462,19 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Cinematics")
 	bool OnCinematicTakeOverFromMission(const bool bCinematicStarted) const;
+
+	/**
+	 * @brief Starts a managed mission cinematic takeover and plays the provided runtime sequence player.
+	 * @param SequencePlayer Runtime playback instance that reports natural finish and external stop events.
+	 * @param bAllowOptionalSkipping Whether to show the hold-to-skip widget and allow Escape-based skipping.
+	 * @param bStartedSuccessfully True when takeover state, completion tracking, and playback startup all initialized successfully.
+	 * @return Session handle that later broadcasts the completion result, or nullptr when startup fails.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Cinematics")
+	UMissionCinematicTakeOverSession* OnCinematicTakeOverWithSkipping(
+		UMovieSceneSequencePlayer* SequencePlayer,
+		const bool bAllowOptionalSkipping,
+		bool& bStartedSuccessfully);
 
 	// Temporary voiceline volume while mission cinematic takeover is active.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cinematics|Audio")
@@ -927,6 +943,7 @@ private:
 	void RemoveTrackedTaskID(const int32 TaskID);
 	void PruneInactiveScheduledTaskIDs();
 	int32 GetNextAsyncSpawnId();
+	void ClearActiveCinematicTakeOverSession(const UMissionCinematicTakeOverSession* CinematicSession);
 
 	UPROPERTY()
 	FTimerHandle M_TextOnlyDurationHandle;
@@ -937,6 +954,10 @@ private:
 	// Keeps a safe per-mission cache for temporary cinematic audio overrides.
 	UPROPERTY(Transient)
 	mutable FMissionCinematicAudioRuntimeState M_CinematicAudioRuntimeState;
+
+	// Keeps the returned cinematic handle alive until it broadcasts completion or gets cancelled.
+	UPROPERTY()
+	TObjectPtr<UMissionCinematicTakeOverSession> M_ActiveCinematicTakeOverSession = nullptr;
 
 	// Tracks actor validity transitions so each tracked element increments at most once.
 	UPROPERTY()

@@ -28,6 +28,7 @@ public class RTS_Survival : ModuleRules
 			"PCG",
 			"DeveloperSettings",
 			"GameplayTags",
+			"MovieScene",
 			"UMG",
 			// Needed for UGameMapsSettings (EngineSettings/GameMapsSettings.h) used to read the project's default map when exiting to main menu.
 			"EngineSettings"
