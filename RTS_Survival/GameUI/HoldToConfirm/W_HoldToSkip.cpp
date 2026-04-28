@@ -2,6 +2,7 @@
 
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "InputCoreTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace HoldToSkipInternal
@@ -16,6 +17,8 @@ namespace HoldToSkipInternal
 void UW_HoldToSkip::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	SetIsFocusable(true);
 
 	if (M_HoldPromptText != nullptr)
 	{
@@ -42,6 +45,34 @@ void UW_HoldToSkip::NativeTick(const FGeometry& MyGeometry, const float InDeltaT
 
 	SetPromptOpacity(HoldToSkipInternal::FullProgress);
 	UpdateHoldProgress(InDeltaTime);
+}
+
+FReply UW_HoldToSkip::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() != EKeys::Escape)
+	{
+		return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+	}
+
+	StartHold();
+	return FReply::Handled();
+}
+
+FReply UW_HoldToSkip::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() != EKeys::Escape)
+	{
+		return Super::NativeOnKeyUp(InGeometry, InKeyEvent);
+	}
+
+	StopHold();
+	return FReply::Handled();
+}
+
+void UW_HoldToSkip::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
+{
+	Super::NativeOnFocusLost(InFocusEvent);
+	StopHold();
 }
 
 void UW_HoldToSkip::StartHold()

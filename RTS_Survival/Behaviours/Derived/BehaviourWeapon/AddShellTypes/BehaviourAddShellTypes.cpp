@@ -38,7 +38,10 @@ void UBehaviourAddShellTypes::AddShellTypesToWeapon(UWeaponState* WeaponState)
 	}
 
 	const TWeakObjectPtr<UWeaponState> WeaponStatePtr = WeaponState;
-	TArray<EWeaponShellType>& GrantedShellTypes = M_GrantedShellTypesPerWeapon.FindOrAdd(WeaponStatePtr);
+	FBehaviourAddShellTypesGrantedShellRecord& GrantedShellTypesRecord = M_GrantedShellTypesPerWeapon.FindOrAdd(
+		WeaponStatePtr
+	);
+	TArray<EWeaponShellType>& GrantedShellTypes = GrantedShellTypesRecord.GrantedShellTypes;
 
 	for (const EWeaponShellType ShellTypeToGrant : ShellTypesToGrant)
 	{
@@ -112,13 +115,15 @@ bool UBehaviourAddShellTypes::TryGetGrantedShellTypes(const TWeakObjectPtr<UWeap
 		return false;
 	}
 
-	const TArray<EWeaponShellType>* FoundGrantedShellTypes = M_GrantedShellTypesPerWeapon.Find(WeaponStatePtr);
-	if (FoundGrantedShellTypes == nullptr)
+	const FBehaviourAddShellTypesGrantedShellRecord* FoundGrantedShellTypesRecord = M_GrantedShellTypesPerWeapon.Find(
+		WeaponStatePtr
+	);
+	if (FoundGrantedShellTypesRecord == nullptr)
 	{
 		return false;
 	}
 
-	OutGrantedShellTypes = *FoundGrantedShellTypes;
+	OutGrantedShellTypes = FoundGrantedShellTypesRecord->GrantedShellTypes;
 	return true;
 }
 

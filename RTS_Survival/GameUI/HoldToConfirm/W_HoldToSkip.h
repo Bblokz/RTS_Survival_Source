@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Input/Events.h"
+#include "Input/Reply.h"
 #include "W_HoldToSkip.generated.h"
 
 class UProgressBar;
@@ -23,8 +25,8 @@ struct FHoldToSkipRuntimeState
 };
 
 /**
- * @brief Reusable hold-to-confirm widget driven by external input calls.
- * Use StartHold and StopHold from controllers or other systems to trigger a generic confirmation flow.
+ * @brief Presents a hold-to-skip prompt that owns the Escape key handling while it has focus.
+ * Missions show this during cinematic takeover so players can skip without reopening gameplay UI.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_HoldToSkip : public UUserWidget
@@ -34,6 +36,9 @@ class RTS_SURVIVAL_API UW_HoldToSkip : public UUserWidget
 public:
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
 
 	UFUNCTION(BlueprintCallable, Category="Hold To Confirm")
 	void StartHold();
@@ -80,7 +85,7 @@ private:
 	float M_ProgressInterpSpeed = 12.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hold To Confirm", meta=(AllowPrivateAccess="true"))
-	FText M_DefaultPromptText = FText::FromString(TEXT("Hold to confirm"));
+	FText M_DefaultPromptText = FText::FromString(TEXT("Hold Escape to skip"));
 
 	UPROPERTY(EditDefaultsOnly, Category="Hold To Confirm", meta=(AllowPrivateAccess="true", ClampMin="0.1"))
 	float M_IdleBlinkFrequency = 0.6f;

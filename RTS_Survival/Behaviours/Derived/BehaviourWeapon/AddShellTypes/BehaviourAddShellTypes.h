@@ -10,6 +10,15 @@
 class UWeaponState;
 enum class EWeaponShellType : uint8;
 
+USTRUCT()
+struct FBehaviourAddShellTypesGrantedShellRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<EWeaponShellType> GrantedShellTypes;
+};
+
 /**
  * @brief Weapon behaviour that grants extra shell options to eligible mounted weapons.
  * The shell list is additive while active and restores only behaviour-added shell types on removal.
@@ -35,6 +44,7 @@ private:
 		EWeaponShellType ShellTypeToRemove,
 		EWeaponShellType& OutReplacementShellType) const;
 
+	// Cache of shell types this behaviour instance added per weapon so only those grants are reverted later.
 	UPROPERTY()
-	TMap<TWeakObjectPtr<UWeaponState>, TArray<EWeaponShellType>> M_GrantedShellTypesPerWeapon;
+	TMap<TWeakObjectPtr<UWeaponState>, FBehaviourAddShellTypesGrantedShellRecord> M_GrantedShellTypesPerWeapon;
 };

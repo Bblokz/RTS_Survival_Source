@@ -11,6 +11,7 @@
 #include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
+#include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionCinematicTakeOverSession.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
@@ -442,6 +443,11 @@ bool UMissionBase::GetIsScheduledTaskActive(const int32 TaskID) const
 
 void UMissionBase::OnCleanUpMission()
 {
+	if (M_ActiveCinematicTakeOverSession != nullptr)
+	{
+		M_ActiveCinematicTakeOverSession->RequestCancel();
+	}
+
 	Tracking_ClearState();
 	M_AbilityCooldownCommands = nullptr;
 	if (GetIsValidMissionManager())
@@ -469,6 +475,11 @@ void UMissionBase::OnCleanUpMission()
 
 void UMissionBase::BeginDestroy()
 {
+	if (M_ActiveCinematicTakeOverSession != nullptr)
+	{
+		M_ActiveCinematicTakeOverSession->RequestCancel();
+	}
+
 	UObject::BeginDestroy();
 	if (GetWorld())
 	{
@@ -817,6 +828,51 @@ bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) 
 
 	M_MissionManager->SetMissionWidgetManagerVisibility(not bCinematicStarted);
 	return true;
+}
+
+UMissionCinematicTakeOverSession* UMissionBase::OnCinematicTakeOverWithSkipping(
+	UMovieSceneSequencePlayer* SequencePlayer,
+	const bool bAllowOptionalSkipping,
+	bool& bStartedSuccessfully)
+{
+	bStartedSuccessfully = false;
+
+	if (M_ActiveCinematicTakeOverSession != nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission already has an active cinematic takeover session."));
+		return nullptr;
+	}
+
+	UMissionCinematicTakeOverSession* const CinematicSession = NewObject<UMissionCinematicTakeOverSession>(this);
+	if (CinematicSession == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Failed to allocate a mission cinematic takeover session."));
+		return nullptr;
+	}
+
+	if (not CinematicSession->StartSession(this, SequencePlayer, bAllowOptionalSkipping))
+	{
+		return nullptr;
+	}
+
+	M_ActiveCinematicTakeOverSession = CinematicSession;
+	bStartedSuccessfully = true;
+	return CinematicSession;
+}
+
+void UMissionBase::ClearActiveCinematicTakeOverSession(const UMissionCinematicTakeOverSession* CinematicSession)
+{
+	if (M_ActiveCinematicTakeOverSession == nullptr)
+	{
+		return;
+	}
+
+	if (M_ActiveCinematicTakeOverSession != CinematicSession)
+	{
+		return;
+	}
+
+	M_ActiveCinematicTakeOverSession = nullptr;
 }
 
 bool UMissionBase::ApplyCinematicAudioVolumesFromMissionSettings() const
