@@ -248,6 +248,19 @@ struct FPlayerProfileLoadingStatus
 	bool bM_HasAppliedMissionStartingResources = false;
 };
 
+USTRUCT()
+struct FDoubleSelectionDetection
+{
+	GENERATED_BODY()
+
+	static constexpr double DoubleClickSelectionWindowSeconds = 0.30;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_LastClickedAlliedActor;
+
+	double M_LastClickedTimeSeconds = -1.0;
+};
+
 /**
  * @brief Main player controller used to route input, UI, and player gameplay setup.
  * @note InitPlayerController: call in blueprint to initialize runtime references.
@@ -1021,6 +1034,7 @@ private:
 
 	// If the player clicks a turret or a weapon of a unit we want to actually click the unit itself.
 	void ChangeClickedActorIfIsChildActor(AActor*& ClickedActor) const;
+	bool TryHandleDoubleSelectionOfOnScreenAlliedUnits(AActor* ClickedActor);
 
 	bool GetIsClickedUnitSelectable(AActor* ClickedActor) const;
 	bool IsAnyUnitSelected() const;
@@ -1103,6 +1117,9 @@ private:
 
 	// Used to see if the mouse was moved significantly enough to trigger a marquee selection.
 	FVector M_InitMousePosGameLeftClick;
+
+	// Tracks the most recent allied actor click to detect a second click for same-type on-screen selection.
+	FDoubleSelectionDetection M_DoubleSelectionDetection;
 
 	/**
 	 * @note: called after ActionButton related commands in main RC function, if there is no active ActionButton

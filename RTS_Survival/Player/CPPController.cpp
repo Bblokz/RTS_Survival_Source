@@ -1932,6 +1932,10 @@ void ACPPController::RegularPrimaryClick()
 
 	if (not IsAnyUnitSelected())
 	{
+		if (TryHandleDoubleSelectionOfOnScreenAlliedUnits(ClickedActor))
+		{
+			return;
+		}
 		// Possibly add allied unit to selection.
 		UpdateUIForSelectionAction(ClickUnit_GetSelectionAction(ClickedActor), ClickedActor);
 		return;
@@ -1965,6 +1969,10 @@ void ACPPController::RegularPrimaryClick()
 	}
 	else
 	{
+		if (TryHandleDoubleSelectionOfOnScreenAlliedUnits(ClickedActor))
+		{
+			return;
+		}
 		// Possibly add allied unit to selection.
 		UpdateUIForSelectionAction(ClickUnit_GetSelectionAction(ClickedActor), ClickedActor);
 	}
@@ -1979,6 +1987,37 @@ void ACPPController::RegularPrimaryClick()
 			RTSFunctionLibrary::PrintString("clicked actor is not valid at PrimaryClick()", FColor::Red);
 		}
 	}
+}
+
+bool ACPPController::TryHandleDoubleSelectionOfOnScreenAlliedUnits(AActor* ClickedActor)
+{
+	if (not GetIsClickedUnitSelectable(ClickedActor))
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	const double CurrentTimeSeconds = World->GetTimeSeconds();
+	const bool bClickedSameAlliedActor = M_DoubleSelectionDetection.M_LastClickedAlliedActor.Get() == ClickedActor;
+	const bool bWithinDoubleClickWindow =
+		(CurrentTimeSeconds - M_DoubleSelectionDetection.M_LastClickedTimeSeconds) <=
+		FDoubleSelectionDetection::DoubleClickSelectionWindowSeconds;
+
+	M_DoubleSelectionDetection.M_LastClickedAlliedActor = ClickedActor;
+	M_DoubleSelectionDetection.M_LastClickedTimeSeconds = CurrentTimeSeconds;
+
+	if (not bClickedSameAlliedActor || not bWithinDoubleClickWindow)
+	{
+		return false;
+	}
+
+	SelectOnScreenUnitsOfSameTypeAs(ClickedActor);
+	return true;
 }
 
 void ACPPController::PrimaryClickWhileSecondaryActive()
