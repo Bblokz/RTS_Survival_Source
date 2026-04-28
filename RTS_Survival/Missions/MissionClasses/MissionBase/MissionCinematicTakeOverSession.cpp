@@ -62,11 +62,13 @@ bool UMissionCinematicTakeOverSession::StartSession(
 
 	if (not bAllowOptionalSkipping)
 	{
+		M_SequencePlayer->Play();
 		return true;
 	}
 
 	if (CreateSkipWidget())
 	{
+		M_SequencePlayer->Play();
 		return true;
 	}
 
