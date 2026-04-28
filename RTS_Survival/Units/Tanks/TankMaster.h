@@ -155,6 +155,10 @@ public:
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
 	virtual void ExecuteDetachTowCommand() override;
 	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
+
+	// For mission programming.
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void ChangeAbilityCooldown(const EAbilityID AbilityId, const float NewCooldown, const int32 Subtype);
 	
 
 protected:

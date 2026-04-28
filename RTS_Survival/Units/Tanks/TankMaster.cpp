@@ -1729,10 +1729,21 @@ void ATankMaster::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent*
 	}
 }
 
+void ATankMaster::ChangeAbilityCooldown(const EAbilityID AbilityId, const float NewCooldown, const int32 Subtype)
+{
+	FUnitAbilityEntry NewAbility;
+	NewAbility.AbilityId = AbilityId;
+	NewAbility.CustomType= Subtype;
+	NewAbility.CooldownDuration = NewCooldown;
+	NewAbility.CooldownRemaining = 0.f;
+	
+	SwapAbility(AbilityId, NewAbility);
+}
+
 bool ATankMaster::GetTowTargetData(AActor* TowTargetActor, const ETowedActorTarget TowSubtype,
-                                  UTowedActorComponent*& OutTowedActorComponent,
-                                  ATeamWeapon*& OutTeamWeaponActor,
-                                  ATeamWeaponController*& OutTeamWeaponController) const
+                                   UTowedActorComponent*& OutTowedActorComponent,
+                                   ATeamWeapon*& OutTeamWeaponActor,
+                                   ATeamWeaponController*& OutTeamWeaponController) const
 {
 	OutTowedActorComponent = nullptr;
 	OutTeamWeaponActor = nullptr;
