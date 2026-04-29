@@ -332,6 +332,14 @@ void FRTS_CollisionSetup::SetupCollisionForTrainMeshes(const TArray<UMeshCompone
 		MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 		SetupCollisionWithBuildingPreview_ForOwningPlayer(MeshComponent, bIsPlayer1);
 		MeshComponent->SetCollisionResponseToChannel(ECC_Destructible, ECR_Overlap);
+		if (bIsPlayer1 == 1)
+		{
+			MeshComponent->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
+		}
+		else
+		{
+			MeshComponent->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
+		}
 	}
 }
 
@@ -388,7 +396,7 @@ void FRTS_CollisionSetup::SetupCollisionForHullMountedWeapon(UMeshComponent* Mes
 }
 
 void FRTS_CollisionSetup::SetupCollisionForTeamWeaponMeshes(const TArray<UMeshComponent*>& WeaponMeshes,
-	                                                         const uint8 OwningPlayer)
+                                                            const uint8 OwningPlayer)
 {
 	for (UMeshComponent* WeaponMesh : WeaponMeshes)
 	{
@@ -644,11 +652,13 @@ void FRTS_CollisionSetup::SetupDestructibleEnvActorGeometryComponentCollision(
 }
 
 void FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(UMeshComponent* FieldConstructionMesh,
-                                                              const int32 OwningPlayer, const bool bAlliedProjectilesHitObject, const bool bOverlapTanks)
+                                                              const int32 OwningPlayer,
+                                                              const bool bAlliedProjectilesHitObject,
+                                                              const bool bOverlapTanks)
 {
-	if(not IsValid(FieldConstructionMesh))
+	if (not IsValid(FieldConstructionMesh))
 	{
-		return ;
+		return;
 	}
 	FieldConstructionMesh->SetCollisionObjectType(ECC_Destructible);
 	FieldConstructionMesh->SetReceivesDecals(false);
@@ -660,12 +670,14 @@ void FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(UMeshComponent* Fi
 	// Block visibility for identifying this destructible when clicked by the player.
 	FieldConstructionMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	// Block weapons of opposite player.
-	FieldConstructionMesh->SetCollisionResponseToChannel(OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
-	                                        ECR_Block);
-	if(bAlliedProjectilesHitObject)
+	FieldConstructionMesh->SetCollisionResponseToChannel(
+		OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
+		ECR_Block);
+	if (bAlliedProjectilesHitObject)
 	{
 		// Also block allied projectiles.
-		FieldConstructionMesh->SetCollisionResponseToChannel(OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER,
+		FieldConstructionMesh->SetCollisionResponseToChannel(
+			OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER,
 			ECR_Block);
 	}
 	if (bOverlapTanks)
