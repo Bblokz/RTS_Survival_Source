@@ -22,6 +22,87 @@
 #include "TimerManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/DeveloperSettings/RTSGameInstancePIEDeveloperSettings.h"
 
+void FMissionSeededSpawnBatchState::Init(UMissionBase* Mission, const int32 CallbackID)
+{
+	M_Mission = Mission;
+	M_CallbackID = CallbackID;
+	M_PendingSpawnCount = 0;
+	bM_IsRegistrationComplete = false;
+	M_SpawnedActors.Reset();
+}
+
+int32 FMissionSeededSpawnBatchState::RegisterPendingSpawn()
+{
+	++M_PendingSpawnCount;
+	return M_SpawnedActors.Add(nullptr);
+}
+
+void FMissionSeededSpawnBatchState::CompletePendingSpawn(const int32 SpawnResultIndex, AActor* SpawnedActor)
+{
+	if (M_PendingSpawnCount <= 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission seeded spawn batch completed more async items than were registered."
+		);
+		return;
+	}
+
+	--M_PendingSpawnCount;
+	if (not M_SpawnedActors.IsValidIndex(SpawnResultIndex))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission seeded spawn batch produced an invalid spawn result index."
+		);
+		return;
+	}
+
+	if (IsValid(SpawnedActor))
+	{
+		M_SpawnedActors[SpawnResultIndex] = SpawnedActor;
+	}
+}
+
+bool FMissionSeededSpawnBatchState::GetHasPendingSpawns() const
+{
+	return M_PendingSpawnCount > 0;
+}
+
+void FMissionSeededSpawnBatchState::MarkRegistrationComplete()
+{
+	bM_IsRegistrationComplete = true;
+}
+
+bool FMissionSeededSpawnBatchState::GetCanNotifyMission() const
+{
+	return bM_IsRegistrationComplete && not GetHasPendingSpawns();
+}
+
+TWeakObjectPtr<UMissionBase> FMissionSeededSpawnBatchState::GetMission() const
+{
+	return M_Mission;
+}
+
+int32 FMissionSeededSpawnBatchState::GetCallbackID() const
+{
+	return M_CallbackID;
+}
+
+TArray<AActor*> FMissionSeededSpawnBatchState::GetValidSpawnedActors() const
+{
+	TArray<AActor*> ValidSpawnedActors;
+	ValidSpawnedActors.Reserve(M_SpawnedActors.Num());
+
+	for (const TWeakObjectPtr<AActor>& SpawnedActor : M_SpawnedActors)
+	{
+		if (SpawnedActor.IsValid())
+		{
+			ValidSpawnedActors.Add(SpawnedActor.Get());
+		}
+	}
+
+	return ValidSpawnedActors;
+}
+
 void FMissionEnemyUnitDestroyedCallbackState::Init(
 	UMissionBase* Mission,
 	const EEnemyUnitQueryType EnemyUnitQueryType,
@@ -1528,12 +1609,19 @@ FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubt
 }
 
 void AMissionManager::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray,
-                                              UObject* WorldContextObject)
+                                              UMissionBase* Mission,
+                                              const int32 ID)
 {
-	if (SeededChoicesArray.IsEmpty())
+	if (not EnsureMissionIsValid(Mission))
 	{
 		return;
 	}
+
+	const int32 SeededSpawnBatchRequestId = M_NextSeededSpawnBatchRequestId++;
+	FMissionSeededSpawnBatchState& SeededSpawnBatchState = M_SeededSpawnBatchStates.FindOrAdd(
+		SeededSpawnBatchRequestId
+	);
+	SeededSpawnBatchState.Init(Mission, ID);
 
 	for (int32 GroupIndex = 0; GroupIndex < SeededChoicesArray.Num(); ++GroupIndex)
 	{
@@ -1558,19 +1646,24 @@ void AMissionManager::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& Seed
 			continue;
 		}
 
-		SpawnSeededChoice(SelectedChoice, WorldContextObject);
+		SpawnSeededChoice(SelectedChoice, SeededSpawnBatchRequestId);
 	}
+
+	SeededSpawnBatchState.MarkRegistrationComplete();
+	TryCompleteSeededSpawnBatch(SeededSpawnBatchRequestId);
 }
 
-void AMissionManager::SpawnSeededChoice(const FSeededSpawnChoice& SeededChoice, UObject* WorldContextObject)
+void AMissionManager::SpawnSeededChoice(
+	const FSeededSpawnChoice& SeededChoice,
+	const int32 SeededSpawnBatchRequestId)
 {
-	SpawnSeededChoiceTrainingOptions(SeededChoice.TrainingOptionSpawns, WorldContextObject);
-	SpawnSeededChoiceSoftActors(SeededChoice.SoftActorSpawns, WorldContextObject);
+	SpawnSeededChoiceTrainingOptions(SeededChoice.TrainingOptionSpawns, SeededSpawnBatchRequestId);
+	SpawnSeededChoiceSoftActors(SeededChoice.SoftActorSpawns, SeededSpawnBatchRequestId);
 }
 
 void AMissionManager::SpawnSeededChoiceTrainingOptions(
 	const TArray<FSeededSpawnTrainingOptionEntry>& TrainingOptionSpawns,
-	UObject* WorldContextObject)
+	const int32 SeededSpawnBatchRequestId)
 {
 	if (TrainingOptionSpawns.IsEmpty())
 	{
@@ -1583,7 +1676,6 @@ void AMissionManager::SpawnSeededChoiceTrainingOptions(
 		return;
 	}
 
-	UObject* SpawnOwner = IsValid(WorldContextObject) ? WorldContextObject : this;
 	for (const FSeededSpawnTrainingOptionEntry& TrainingOptionSpawn : TrainingOptionSpawns)
 	{
 		if (TrainingOptionSpawn.TrainingOption.IsNone())
@@ -1591,38 +1683,55 @@ void AMissionManager::SpawnSeededChoiceTrainingOptions(
 			continue;
 		}
 
-		constexpr int32 SpawnRequestID = INDEX_NONE;
-		const TFunction<void(const FTrainingOption&, AActor*, const int32)> EmptyCallback;
-		RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
+		FMissionSeededSpawnBatchState* SeededSpawnBatchState = M_SeededSpawnBatchStates.Find(
+			SeededSpawnBatchRequestId
+		);
+		if (not SeededSpawnBatchState)
+		{
+			RTSFunctionLibrary::ReportError(
+				"Mission manager failed to find seeded spawn batch state before starting an async training-option spawn."
+			);
+			return;
+		}
+
+		const int32 SpawnResultIndex = SeededSpawnBatchState->RegisterPendingSpawn();
+
+		const TSharedRef<bool, ESPMode::NotThreadSafe> bCallbackTriggered = MakeShared<bool, ESPMode::NotThreadSafe>(
+			false
+		);
+		const TWeakObjectPtr<AMissionManager> WeakMissionManager(this);
+		const bool bRequestStarted = RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
 			TrainingOptionSpawn.TrainingOption,
 			TrainingOptionSpawn.SpawnLocation,
-			SpawnOwner,
-			SpawnRequestID,
-			EmptyCallback
+			this,
+			SeededSpawnBatchRequestId,
+			[WeakMissionManager, bCallbackTriggered, SpawnResultIndex](const FTrainingOption&, AActor* SpawnedActor,
+			                                                           const int32 ID)
+			{
+				*bCallbackTriggered = true;
+				if (not WeakMissionManager.IsValid())
+				{
+					return;
+				}
+
+				WeakMissionManager->HandleSeededSpawnBatchItemComplete(ID, SpawnResultIndex, SpawnedActor);
+			}
 		);
+
+		if (not bRequestStarted && not *bCallbackTriggered)
+		{
+			HandleSeededSpawnBatchItemComplete(SeededSpawnBatchRequestId, SpawnResultIndex, nullptr);
+		}
 	}
 }
 
 void AMissionManager::SpawnSeededChoiceSoftActors(
 	const TArray<FSeededSpawnSoftActorEntry>& SoftActorSpawns,
-	UObject* WorldContextObject)
+	const int32 SeededSpawnBatchRequestId)
 {
 	if (SoftActorSpawns.IsEmpty())
 	{
 		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (not World)
-	{
-		return;
-	}
-
-	UObject* SpawnOwnerObject = IsValid(WorldContextObject) ? WorldContextObject : this;
-	AActor* SpawnOwnerActor = Cast<AActor>(SpawnOwnerObject);
-	if (not IsValid(SpawnOwnerActor))
-	{
-		SpawnOwnerActor = this;
 	}
 
 	for (const FSeededSpawnSoftActorEntry& SoftActorSpawn : SoftActorSpawns)
@@ -1632,48 +1741,129 @@ void AMissionManager::SpawnSeededChoiceSoftActors(
 			continue;
 		}
 
+		FMissionSeededSpawnBatchState* SeededSpawnBatchState = M_SeededSpawnBatchStates.Find(
+			SeededSpawnBatchRequestId
+		);
+		if (not SeededSpawnBatchState)
+		{
+			RTSFunctionLibrary::ReportError(
+				"Mission manager failed to find seeded spawn batch state before starting an async soft-actor load."
+			);
+			return;
+		}
+
+		const int32 SpawnResultIndex = SeededSpawnBatchState->RegisterPendingSpawn();
+
 		const TSoftClassPtr<AActor> ActorClassToLoad = SoftActorSpawn.ActorClass;
 		const FVector SpawnLocation = SoftActorSpawn.SpawnLocation;
 		const TWeakObjectPtr<AMissionManager> WeakMissionManager = this;
-		const TWeakObjectPtr<AActor> WeakSpawnOwner = SpawnOwnerActor;
+		const TWeakObjectPtr<AActor> WeakSpawnOwner(this);
 		TSharedPtr<FStreamableHandle> LoadingHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
 			ActorClassToLoad.ToSoftObjectPath(),
-			FStreamableDelegate::CreateLambda([WeakMissionManager, WeakSpawnOwner, ActorClassToLoad, SpawnLocation]()
-			{
-				if (not WeakMissionManager.IsValid())
-				{
-					return;
-				}
-
-				UWorld* MissionWorld = WeakMissionManager->GetWorld();
-				if (not MissionWorld)
-				{
-					return;
-				}
-
-				UClass* LoadedClass = ActorClassToLoad.Get();
-				if (not IsValid(LoadedClass))
-				{
-					return;
-				}
-
-				FActorSpawnParameters SpawnParameters;
-				SpawnParameters.Owner = WeakSpawnOwner.IsValid() ? WeakSpawnOwner.Get() : WeakMissionManager.Get();
-				SpawnParameters.SpawnCollisionHandlingOverride =
-					ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-				MissionWorld->SpawnActor<AActor>(
-					LoadedClass,
+			FStreamableDelegate::CreateLambda(
+				[
+					WeakMissionManager,
+					WeakSpawnOwner,
+					ActorClassToLoad,
 					SpawnLocation,
-					FRotator::ZeroRotator,
-					SpawnParameters
-				);
-			})
+					SeededSpawnBatchRequestId,
+					SpawnResultIndex
+				]()
+				{
+					if (not WeakMissionManager.IsValid())
+					{
+						return;
+					}
+
+					WeakMissionManager->HandleSeededSpawnSoftActorLoadComplete(
+						SeededSpawnBatchRequestId,
+						SpawnResultIndex,
+						ActorClassToLoad,
+						SpawnLocation,
+						WeakSpawnOwner
+					);
+				})
 		);
 
 		if (LoadingHandle.IsValid())
 		{
 			M_SeededSpawnAssetLoadHandles.Add(LoadingHandle);
+			continue;
 		}
+
+		HandleSeededSpawnBatchItemComplete(SeededSpawnBatchRequestId, SpawnResultIndex, nullptr);
+	}
+}
+
+void AMissionManager::HandleSeededSpawnBatchItemComplete(
+	const int32 SeededSpawnBatchRequestId,
+	const int32 SpawnResultIndex,
+	AActor* SpawnedActor)
+{
+	FMissionSeededSpawnBatchState* SeededSpawnBatchState = M_SeededSpawnBatchStates.Find(
+		SeededSpawnBatchRequestId
+	);
+	if (not SeededSpawnBatchState)
+	{
+		return;
+	}
+
+	SeededSpawnBatchState->CompletePendingSpawn(SpawnResultIndex, SpawnedActor);
+	TryCompleteSeededSpawnBatch(SeededSpawnBatchRequestId);
+}
+
+void AMissionManager::HandleSeededSpawnSoftActorLoadComplete(
+	const int32 SeededSpawnBatchRequestId,
+	const int32 SpawnResultIndex,
+	const TSoftClassPtr<AActor>& ActorClassToLoad,
+	const FVector& SpawnLocation,
+	const TWeakObjectPtr<AActor>& WeakSpawnOwner)
+{
+	UWorld* MissionWorld = GetWorld();
+	if (not MissionWorld)
+	{
+		HandleSeededSpawnBatchItemComplete(SeededSpawnBatchRequestId, SpawnResultIndex, nullptr);
+		return;
+	}
+
+	UClass* LoadedClass = ActorClassToLoad.Get();
+	if (not IsValid(LoadedClass))
+	{
+		HandleSeededSpawnBatchItemComplete(SeededSpawnBatchRequestId, SpawnResultIndex, nullptr);
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = WeakSpawnOwner.IsValid() ? WeakSpawnOwner.Get() : this;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	AActor* SpawnedActor = MissionWorld->SpawnActor<AActor>(
+		LoadedClass,
+		SpawnLocation,
+		FRotator::ZeroRotator,
+		SpawnParameters
+	);
+	HandleSeededSpawnBatchItemComplete(SeededSpawnBatchRequestId, SpawnResultIndex, SpawnedActor);
+}
+
+void AMissionManager::TryCompleteSeededSpawnBatch(const int32 SeededSpawnBatchRequestId)
+{
+	FMissionSeededSpawnBatchState* SeededSpawnBatchState = M_SeededSpawnBatchStates.Find(
+		SeededSpawnBatchRequestId
+	);
+	if (not SeededSpawnBatchState || not SeededSpawnBatchState->GetCanNotifyMission())
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<UMissionBase> WeakMission = SeededSpawnBatchState->GetMission();
+	const int32 CallbackID = SeededSpawnBatchState->GetCallbackID();
+	const TArray<AActor*> SpawnedActors = SeededSpawnBatchState->GetValidSpawnedActors();
+	M_SeededSpawnBatchStates.Remove(SeededSpawnBatchRequestId);
+
+	if (WeakMission.IsValid())
+	{
+		WeakMission->OnSeededChoiceGroupsSpawnComplete(SpawnedActors, CallbackID);
 	}
 }
 

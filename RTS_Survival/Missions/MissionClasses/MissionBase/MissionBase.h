@@ -207,6 +207,13 @@ public:
 
 	void OnEnemyUnitsDestroyedCallback(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType);
 
+	/**
+	 * @brief Forwards the completed seeded spawn batch to mission-specific C++ or blueprint handling.
+	 * @param SpawnedActors Successfully spawned actors gathered from the entire seeded spawn request.
+	 * @param ID Mission-defined callback id associated with the originating SpawnSeededChoiceGroups call.
+	 */
+	void OnSeededChoiceGroupsSpawnComplete(const TArray<AActor*>& SpawnedActors, const int32 ID);
+
 	/** * Optional tick function for per-frame mission logic.
 	 * Derived classes can override if needed.
 	 */
@@ -728,9 +735,10 @@ protected:
 	/**
 	 * @brief Resolves and spawns seeded choice groups through the mission manager for BP-authored map setups.
 	 * @param SeededChoicesArray Groups containing deterministic spawn choices keyed by campaign generation seed.
+	 * @param ID Mission-defined callback id forwarded when the seeded spawn batch is fully complete.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
-	void SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray);
+	void SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray, const int32 ID);
 
 	/**
 	 * @brief Repositions an actor to a deterministically selected location using the seeded choice-group algorithm.
@@ -744,6 +752,9 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnAsyncSpawnComplete(const FTrainingOption TrainingOption, AActor* SpawnedActor, const int32 ID);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnSeededChoiceGroupsSpawnComplete(const TArray<AActor*>& SpawnedActors, const int32 ID);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);

@@ -115,6 +115,29 @@ struct FSeededChoices
 };
 
 USTRUCT()
+struct FMissionSeededSpawnBatchState
+{
+	GENERATED_BODY()
+
+	void Init(UMissionBase* Mission, const int32 CallbackID);
+	int32 RegisterPendingSpawn();
+	void CompletePendingSpawn(const int32 SpawnResultIndex, AActor* SpawnedActor);
+	void MarkRegistrationComplete();
+	bool GetHasPendingSpawns() const;
+	bool GetCanNotifyMission() const;
+	TWeakObjectPtr<UMissionBase> GetMission() const;
+	int32 GetCallbackID() const;
+	TArray<AActor*> GetValidSpawnedActors() const;
+
+private:
+	TWeakObjectPtr<UMissionBase> M_Mission = nullptr;
+	int32 M_CallbackID = INDEX_NONE;
+	int32 M_PendingSpawnCount = 0;
+	bool bM_IsRegistrationComplete = false;
+	TArray<TWeakObjectPtr<AActor>> M_SpawnedActors;
+};
+
+USTRUCT()
 struct FMissionEnemyUnitDestroyedCallbackState
 {
 	GENERATED_BODY()
@@ -284,10 +307,11 @@ public:
 	/**
 	 * @brief Resolves one choice per seeded group and spawns the configured results deterministically from campaign seed.
 	 * @param SeededChoicesArray Groups of candidate spawn choices configured in blueprint.
-	 * @param WorldContextObject Context used for async spawn ownership and load callbacks.
+	 * @param Mission Mission that owns the seeded spawn request and receives the completion callback.
+	 * @param ID Mission-defined callback id returned when the full seeded spawn batch is complete.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
-	void SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray, UObject* WorldContextObject);
+	void SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray, UMissionBase* Mission, const int32 ID);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Defeat")
 	void TriggerDefeat(const ERTSDefeatType DefeatType);
@@ -487,16 +511,36 @@ private:
 
 	// Keep load handles alive until callback executes so async soft actor class loads are guaranteed.
 	TArray<TSharedPtr<FStreamableHandle>> M_SeededSpawnAssetLoadHandles;
+	TMap<int32, FMissionSeededSpawnBatchState> M_SeededSpawnBatchStates;
 
-	void SpawnSeededChoice(const FSeededSpawnChoice& SeededChoice, UObject* WorldContextObject);
+	void SpawnSeededChoice(const FSeededSpawnChoice& SeededChoice, const int32 SeededSpawnBatchRequestId);
 	void SpawnSeededChoiceTrainingOptions(const TArray<FSeededSpawnTrainingOptionEntry>& TrainingOptionSpawns,
-	                                      UObject* WorldContextObject);
+	                                      const int32 SeededSpawnBatchRequestId);
 	void SpawnSeededChoiceSoftActors(const TArray<FSeededSpawnSoftActorEntry>& SoftActorSpawns,
-	                                 UObject* WorldContextObject);
+	                                 const int32 SeededSpawnBatchRequestId);
+	void HandleSeededSpawnBatchItemComplete(
+		const int32 SeededSpawnBatchRequestId,
+		const int32 SpawnResultIndex,
+		AActor* SpawnedActor);
+	/**
+	 * @brief Finishes one soft-class seeded spawn request so batch completion stays synchronized with async loads.
+	 * @param SeededSpawnBatchRequestId Internal batch id for the originating seeded spawn request.
+	 * @param SpawnResultIndex Output slot used to preserve deterministic callback ordering.
+	 * @param ActorClassToLoad Soft class that finished loading and should now be spawned.
+	 * @param SpawnLocation World location used for the spawned actor.
+	 * @param WeakSpawnOwner Actor owner forwarded to SpawnActor when still valid.
+	 */
+	void HandleSeededSpawnSoftActorLoadComplete(const int32 SeededSpawnBatchRequestId,
+	                                            const int32 SpawnResultIndex,
+	                                            const TSoftClassPtr<AActor>& ActorClassToLoad,
+	                                            const FVector& SpawnLocation,
+	                                            const TWeakObjectPtr<AActor>& WeakSpawnOwner);
+	void TryCompleteSeededSpawnBatch(const int32 SeededSpawnBatchRequestId);
 	int32 GetSeededChoiceIndex(const TArray<FSeededSpawnChoice>& Choices, const int32 GroupIndex);
 	bool GetIsSeededChoiceConfigured(const FSeededSpawnChoice& SeededChoice) const;
 	// For testing as standalone game.
 	void SetGameDifficultyWithBackupSettingsFromPIE();
 	// For testing as standalone game.
 	void SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE();
+	int32 M_NextSeededSpawnBatchRequestId = 1;
 };

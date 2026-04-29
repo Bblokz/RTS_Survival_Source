@@ -2044,14 +2044,19 @@ void UMissionBase::SpawnCargoSquadWithVehicle(
 		MoveLocationAfterEnter);
 }
 
-void UMissionBase::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray)
+void UMissionBase::SpawnSeededChoiceGroups(const TArray<FSeededChoices>& SeededChoicesArray, const int32 ID)
 {
 	if (not GetIsValidMissionManager())
 	{
 		return;
 	}
 
-	GetMissionManagerChecked()->SpawnSeededChoiceGroups(SeededChoicesArray, this);
+	GetMissionManagerChecked()->SpawnSeededChoiceGroups(SeededChoicesArray, this, ID);
+}
+
+void UMissionBase::OnSeededChoiceGroupsSpawnComplete(const TArray<AActor*>& SpawnedActors, const int32 ID)
+{
+	BP_OnSeededChoiceGroupsSpawnComplete(SpawnedActors, ID);
 }
 
 bool UMissionBase::PlaceActorAtSeededLocation(
