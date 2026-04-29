@@ -56,4 +56,5 @@ enum class EBehaviourIcon : uint8
 	TankVeterancy3,
 	TankVeterancy4,
 	TankVeterancy5,
+	VehicleStunned
 };

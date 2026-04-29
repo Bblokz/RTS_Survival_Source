@@ -5,6 +5,7 @@
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 namespace BehVehicleStunnedConstants
@@ -14,13 +15,37 @@ namespace BehVehicleStunnedConstants
 
 UBehVehicleStunned::UBehVehicleStunned()
 {
-	BehaviourStackRule = EBehaviourStackRule::Exclusive;
+	FRepeatedBehaviourTextSettings NewAnimatedTextSettings;
+	NewAnimatedTextSettings.AmountRepeats = 1;
+	NewAnimatedTextSettings.RepeatInterval =2.f;
+	NewAnimatedTextSettings.RepeatStrategy = EBehaviourRepeatedVerticalTextStrategy::PerAmountRepeats;
+	NewAnimatedTextSettings.TextSettings.bAutoWrap = false;
+	NewAnimatedTextSettings.TextSettings.bUseText= true;
+	
+	NewAnimatedTextSettings.TextSettings.InSettings.DeltaZ = 75.f;
+	NewAnimatedTextSettings.TextSettings.InSettings.VisibleDuration =2.f;
+	NewAnimatedTextSettings.TextSettings.InSettings.FadeOutDuration = 1.f;
+	
+	NewAnimatedTextSettings.TextSettings.InJustification = ETextJustify::Center;
+	NewAnimatedTextSettings.TextSettings.TextOffset = FVector(0,0,300);
+	NewAnimatedTextSettings.TextSettings.InWrapAt = 0;
+	NewAnimatedTextSettings.TextSettings.TextOnSubjects = FRTSRichTextConverter::MakeRTSRich("Crew Stunned!!", ERTSRichText::Text_Bad14);
+	AnimatedTextSettings = NewAnimatedTextSettings;
+	BehaviourLifeTime = EBehaviourLifeTime::Timed;
 	M_MaxStackCount = BehVehicleStunnedConstants::MaximumStackCount;
+	BehaviourStackRule = EBehaviourStackRule::Exclusive;
+	
+	BehaviourIcon = EBehaviourIcon::VehicleStunned;
+	M_TitleText = FRTSRichTextConverter::MakeRTSRich("Crew Stunned", ERTSRichText::Text_BadTitle);
+	M_DisplayText= "Weapons and movement are disabled.";
+	M_LifeTimeDuration = 4.0f;
+	bM_UsesTick = true;
 
 	M_AbilitiesToRemove =
 	{
 		EAbilityID::IdMove,
-		EAbilityID::IdReverseMove
+		EAbilityID::IdReverseMove,
+		EAbilityID::IdRotateTowards
 	};
 }
 

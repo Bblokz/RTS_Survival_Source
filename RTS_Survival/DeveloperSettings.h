@@ -748,6 +748,7 @@ namespace DeveloperSettings
 			// How much a projectile's penetration can differ from the base value in percentages
 			inline constexpr float ArmorPenFluxPercentage = 10.f;
 
+
 			// @ZEROaccuracy how many centimeters may the trace bullet be divereged on every axis?
 			inline constexpr float TraceBulletAccuracy = 400.f;
 			// @ZEROaccuracy how many centimeters may the trace bullet be divereged on every axis?
@@ -836,6 +837,10 @@ namespace DeveloperSettings
 				inline constexpr int32 Radixite_AccuracyDelta = -10;
 				// How much APHEBC changes the distance between min and max range pen (lerp factor)
 				inline constexpr float APHEBC_ArmorPenLerpFactor = 0.5f;
+
+			// Minimal callibre needed to stun vehicles with HE or HEAT rounds.
+			inline constexpr float StunCalibreThreshold = 100.f;
+				
 			}
 		}
 

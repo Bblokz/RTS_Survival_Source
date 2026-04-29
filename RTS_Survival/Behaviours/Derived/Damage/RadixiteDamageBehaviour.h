@@ -42,5 +42,8 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_DamageReceiver;
 
+	UPROPERTY()
+	float M_ReceiverDamageMultiplier = 1.f;
+
 	FDamageEvent M_DamageEvent;
 };

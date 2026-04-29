@@ -60,7 +60,7 @@ private:
 	float M_TurretRotationSpeedMultiplier = 0.3f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Behaviour|VehicleStunned", meta = (AllowPrivateAccess = "true"))
-	TArray<EAbilityID> M_AbilitiesToRemove;
+	TArray<EAbilityID> M_AbilitiesToRemove ;
 
 	UPROPERTY()
 	TWeakObjectPtr<ATankMaster> M_TankMaster;
