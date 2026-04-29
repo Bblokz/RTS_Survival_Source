@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "NiagaraDataInterfaceExport.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/GameUI/MiniMap/RTSMinimapIconHelpers.h"
 #include "FowManager.generated.h"
 
 class UNiagaraSystem;
@@ -89,6 +90,12 @@ public:
 	UTextureRenderTarget2D* GetIsValidActiveRT() const;
 	UTextureRenderTarget2D* GetIsValidPassiveRT() const;
 	inline float GetMapExtent () const { return MapExtent; }
+	inline float GetMiniMapTinyIconSizePixels() const { return MiniMapTinyIconSizePixels; }
+	inline float GetMiniMapSmallIconSizePixels() const { return MiniMapSmallIconSizePixels; }
+	inline float GetMiniMapMediumIconSizePixels() const { return MiniMapMediumIconSizePixels; }
+	inline float GetMiniMapLargeIconSizePixels() const { return MiniMapLargeIconSizePixels; }
+	FLinearColor GetMiniMapIconColorValue(const ERTSMinimapIconColor IconColor) const;
+	const TArray<FRTSMinimapIconDrawData>& GetMiniMapIconDrawData() const;
 
 protected:
 	/**
@@ -151,6 +158,30 @@ protected:
 	// Tick rate of the Fog of War subsystem (drawing the FoW)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings")
 	float FowTickRate;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	float MiniMapTinyIconSizePixels;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	float MiniMapSmallIconSizePixels;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	float MiniMapMediumIconSizePixels;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	float MiniMapLargeIconSizePixels;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	FLinearColor MiniMapColorDefaultEnemy;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	FLinearColor MiniMapColorBossEnemy;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	FLinearColor MiniMapColorDefaultPlayerUnit;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|MiniMap")
+	FLinearColor MiniMapColorPlayerBuilding;
 
 	// System to use to propagate units' vision and draw the FoW RT
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Niagara")
@@ -252,6 +283,13 @@ private:
 	 */
 	void AddPassiveFowParticipant(UFowComp* FowComp);
 
+	bool GetMiniMapUVFromWorldLocation(const FVector& WorldLocation, FVector2D& OutUV) const;
+
+	void AppendMiniMapIconDrawData(const TArray<TWeakObjectPtr<UFowComp>>& FowComponents,
+	                               TArray<FRTSMinimapIconDrawData>& OutMiniMapIcons) const;
+
+	void RefreshMiniMapIconDrawDataCache();
+
 	/**
 	 * @brief Updates the draw buffer with the locations and vision ranges of all active Fog of War components.
 	 *
@@ -347,6 +385,9 @@ private:
 	 * @return True if the extracted index is valid and within the bounds of the components array; false otherwise.
 	 */
 	bool GetValidParticleIndex(const FVector& ParticleVector, int32& OutIndex) const;
+
+	// Cached once on the FOW side so the minimap widget can paint without rebuilding icon data every frame.
+	TArray<FRTSMinimapIconDrawData> M_CachedMiniMapIconDrawData;
 
 	/** Set to true after we updated the readback buffer with all the passive components,
 	 * we do not allow additional readback buffer updates until this current one is answered.

@@ -4,10 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "RTS_Survival/GameUI/MiniMap/RTSMinimapIconHelpers.h"
 #include "FowComp.generated.h"
 
 enum class EFowBehaviour : uint8;
 class AFowManager;
+
+struct FFowCompMiniMapRuntimeState
+{
+	FVector M_WorldLocation = FVector::ZeroVector;
+	bool bM_HasCachedWorldLocation = false;
+	bool bM_ShouldDrawMiniMapIcon = false;
+};
 
 /**
  * @brief This component determines the Fog of War functionality of its owning actor.
@@ -82,7 +90,16 @@ public:
      *
      * @return The Fog of War behavior (active or passive).
      */
-    inline EFowBehaviour GetFowBehaviour() const { return M_FowBehaviour; };
+	inline EFowBehaviour GetFowBehaviour() const { return M_FowBehaviour; };
+
+	inline const FMinimapIconSettings& GetMiniMapIconSettings() const { return M_MinimapIconSettings; }
+	inline const FFowCompMiniMapRuntimeState& GetMiniMapRuntimeState() const { return M_MiniMapRuntimeState; }
+
+	bool GetShouldDrawMiniMapIcon() const;
+
+	void CacheMiniMapWorldLocation(const FVector& WorldLocation);
+
+	void SetShouldDrawMiniMapIcon(const bool bShouldDrawMiniMapIcon);
 
 protected:
     /**
@@ -106,6 +123,10 @@ protected:
     float VisionRadius;
 
 private:
+	void BeginPlay_InitMiniMapIconSettings();
+
+	void UpdateMiniMapIconSettingsFromOwnerRTSComponent();
+
     /** Reference to the Fog of War manager handling this component. */
     UPROPERTY()
     TWeakObjectPtr<AFowManager> M_FowManager;
@@ -117,6 +138,8 @@ private:
      * @note Attempts to retrieve the manager if not already valid.
      */
     bool GetIsValidFowManager();
+
+	void UpdateMiniMapIconSizeFromFowManager();
 
     /**
      * @brief Starts participation in the Fog of War system after a specified delay.
@@ -138,4 +161,18 @@ private:
 
     /** The Fog of War behavior of this component (active or passive). */
     EFowBehaviour M_FowBehaviour;
+
+	UPROPERTY()
+	EAllUnitType M_UnitType = EAllUnitType::UNType_None;
+
+	UPROPERTY()
+	uint8 M_UnitSubtype = 0;
+
+	bool bM_ShouldUseTinyMiniMapIcon = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MiniMap", meta = (AllowPrivateAccess = "true"))
+	FMinimapIconSettings M_MinimapIconSettings;
+
+	// Runtime minimap state is updated by the FOW manager and reused when rebuilding minimap icon draw data.
+	FFowCompMiniMapRuntimeState M_MiniMapRuntimeState;
 };

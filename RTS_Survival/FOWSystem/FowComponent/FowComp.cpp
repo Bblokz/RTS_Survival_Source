@@ -5,9 +5,11 @@
 
 #include "FowType.h"
 #include "RTS_Survival/DeveloperSettings.h"
-#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 
 UFowComp::UFowComp(): VisionRadius(0), M_FowManager(nullptr), M_FowParticpationHandle(),
@@ -58,6 +60,7 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 	if (M_FowBehaviour == EFowBehaviour::Fow_Active)
 	{
 		const FName VisionTag = DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+		SetShouldDrawMiniMapIcon(not FowOwner->IsHidden());
 		if (Visibility >= VisibleEnoughToRevealPlayer)
 		{
 			if (not FowOwner->Tags.Contains(TagUnitInEnemyVision))
@@ -79,6 +82,7 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 		return;
 	}
 
+	SetShouldDrawMiniMapIcon(Visibility >= VisibleEnoughToRevealEnemy);
 	if (Visibility >= VisibleEnoughToRevealEnemy)
 	{
 		FowOwner->SetActorHiddenInGame(false);
@@ -123,13 +127,25 @@ void UFowComp::BeginPlay()
 	Super::BeginPlay();
 
 	M_FowManager = FRTS_Statics::GetFowManager(this);
+	BeginPlay_InitMiniMapIconSettings();
+}
+
+void UFowComp::CacheMiniMapWorldLocation(const FVector& WorldLocation)
+{
+	M_MiniMapRuntimeState.M_WorldLocation = WorldLocation;
+	M_MiniMapRuntimeState.bM_HasCachedWorldLocation = true;
+}
+
+void UFowComp::SetShouldDrawMiniMapIcon(const bool bShouldDrawMiniMapIcon)
+{
+	M_MiniMapRuntimeState.bM_ShouldDrawMiniMapIcon = bShouldDrawMiniMapIcon;
 }
 
 void UFowComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	StopFowParticipation();
-	if (not GetWorld() || !M_FowParticpationHandle.IsValid())
+	if (not GetWorld() || not M_FowParticpationHandle.IsValid())
 	{
 		return;
 	}
@@ -147,6 +163,95 @@ bool UFowComp::GetIsValidFowManager()
 	return M_FowManager.IsValid();
 }
 
+void UFowComp::UpdateMiniMapIconSizeFromFowManager()
+{
+	if (not GetIsValidFowManager())
+	{
+		return;
+	}
+
+	AActor* const OwnerActor = GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		return;
+	}
+
+	if (bM_ShouldUseTinyMiniMapIcon)
+	{
+		M_MinimapIconSettings.M_IconSizePixels = M_FowManager->GetMiniMapTinyIconSizePixels();
+		return;
+	}
+
+	if (M_UnitType == EAllUnitType::UNType_None)
+	{
+		return;
+	}
+
+	M_MinimapIconSettings.M_IconSizePixels = FRTSMinimapIconHelpers::GetMiniMapIconSizePixels(
+		*M_FowManager.Get(),
+		OwnerActor,
+		M_UnitType,
+		M_UnitSubtype);
+}
+
+void UFowComp::BeginPlay_InitMiniMapIconSettings()
+{
+	AActor* const OwnerActor = GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		return;
+	}
+
+	bM_ShouldUseTinyMiniMapIcon = OwnerActor->IsA(ASquadUnit::StaticClass());
+	URTSComponent* const RTSComponent = OwnerActor->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent))
+	{
+		UpdateMiniMapIconSizeFromFowManager();
+		return;
+	}
+
+	UpdateMiniMapIconSettingsFromOwnerRTSComponent();
+	RTSComponent->OnSubTypeInitialized.AddUObject(this, &UFowComp::UpdateMiniMapIconSettingsFromOwnerRTSComponent);
+}
+
+void UFowComp::UpdateMiniMapIconSettingsFromOwnerRTSComponent()
+{
+	AActor* const OwnerActor = GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		return;
+	}
+
+	URTSComponent* const RTSComponent = OwnerActor->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+
+	M_UnitType = RTSComponent->GetUnitType();
+	M_UnitSubtype = RTSComponent->GetUnitSubType();
+	M_MinimapIconSettings.M_IconColor = FRTSMinimapIconHelpers::GetMiniMapIconColor(
+		*RTSComponent,
+		M_UnitType,
+		M_UnitSubtype);
+	UpdateMiniMapIconSizeFromFowManager();
+}
+
+bool UFowComp::GetShouldDrawMiniMapIcon() const
+{
+	if (M_MinimapIconSettings.M_IconSizePixels <= 0.0f)
+	{
+		return false;
+	}
+
+	if (not M_MiniMapRuntimeState.bM_HasCachedWorldLocation)
+	{
+		return false;
+	}
+
+	return M_MiniMapRuntimeState.bM_ShouldDrawMiniMapIcon;
+}
+
 void UFowComp::OnFowStartParticipation()
 {
 	if (not IsActive())
@@ -155,6 +260,13 @@ void UFowComp::OnFowStartParticipation()
 	}
 	if (GetIsValidFowManager())
 	{
+		UpdateMiniMapIconSizeFromFowManager();
+		AActor* const OwnerActor = GetOwner();
+		if (IsValid(OwnerActor))
+		{
+			CacheMiniMapWorldLocation(OwnerActor->GetActorLocation());
+			SetShouldDrawMiniMapIcon(M_FowBehaviour == EFowBehaviour::Fow_Active && not OwnerActor->IsHidden());
+		}
 		M_FowManager->AddFowParticipant(this);
 	}
 }

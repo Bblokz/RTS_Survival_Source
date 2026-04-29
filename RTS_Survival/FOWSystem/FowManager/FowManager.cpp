@@ -35,6 +35,14 @@ AFowManager::AFowManager(const FObjectInitializer& ObjectInitializer)
 	MapExtent = 0.0f;
 	RenderTargetSize = 0;
 	FowTickRate = 0.1f;
+	MiniMapTinyIconSizePixels = 1.0f;
+	MiniMapSmallIconSizePixels = 6.0f;
+	MiniMapMediumIconSizePixels = 8.0f;
+	MiniMapLargeIconSizePixels = 10.0f;
+	MiniMapColorDefaultEnemy = FLinearColor(1.0f, 0.0f, 0.0f, 1.0f);
+	MiniMapColorBossEnemy = FLinearColor(1.0f, 0.5f, 0.0f, 1.0f);
+	MiniMapColorDefaultPlayerUnit = FLinearColor(0.0f, 1.0f, 0.0f, 1.0f);
+	MiniMapColorPlayerBuilding = FLinearColor(0.0f, 1.0f, 0.0f, 1.0f);
 	FowSystem = nullptr;
 	FoWReadBackSystem = nullptr;
 	NiagaraDraw = nullptr;
@@ -49,7 +57,7 @@ AFowManager::AFowManager(const FObjectInitializer& ObjectInitializer)
 
 void AFowManager::AddFowParticipant(UFowComp* FowComp)
 {
-	if (!IsValid(FowComp))
+	if (not IsValid(FowComp))
 	{
 		RTSFunctionLibrary::ReportError("Invalid Fow component supplied to fow manager, will not add this fow"
 			"comp to participate!"
@@ -93,6 +101,7 @@ void AFowManager::RemoveFowParticipant(UFowComp* FowComp)
 	{
 		StopFow();
 	}
+	RefreshMiniMapIconDrawDataCache();
 }
 
 void AFowManager::ReceiveParticleData_Implementation(const TArray<FBasicParticleData>& Data,
@@ -166,6 +175,28 @@ UTextureRenderTarget2D* AFowManager::GetIsValidPassiveRT() const
 	return PassiveRT;
 }
 
+FLinearColor AFowManager::GetMiniMapIconColorValue(const ERTSMinimapIconColor IconColor) const
+{
+	switch (IconColor)
+	{
+	case ERTSMinimapIconColor::DefaultEnemy:
+		return MiniMapColorDefaultEnemy;
+	case ERTSMinimapIconColor::BossEnemy:
+		return MiniMapColorBossEnemy;
+	case ERTSMinimapIconColor::DefaultPlayerUnit:
+		return MiniMapColorDefaultPlayerUnit;
+	case ERTSMinimapIconColor::PlayerBuilding:
+		return MiniMapColorPlayerBuilding;
+	}
+
+	return MiniMapColorDefaultPlayerUnit;
+}
+
+const TArray<FRTSMinimapIconDrawData>& AFowManager::GetMiniMapIconDrawData() const
+{
+	return M_CachedMiniMapIconDrawData;
+}
+
 // Called when the game starts or when spawned
 void AFowManager::BeginPlay()
 {
@@ -216,6 +247,7 @@ void AFowManager::Tick(float DeltaTime)
 	UpdateDrawBuffer();
 	AskUpdateEnemyVision();
 	AskReadBack();
+	RefreshMiniMapIconDrawDataCache();
 }
 
 bool AFowManager::GetIsActiveParticipantUnique(UFowComp* FowComp) const
@@ -234,6 +266,68 @@ bool AFowManager::GetIsPassiveParticipantUnique(UFowComp* FowComp) const
 		return false;
 	}
 	return true;
+}
+
+bool AFowManager::GetMiniMapUVFromWorldLocation(const FVector& WorldLocation, FVector2D& OutUV) const
+{
+	const float MapSize = MapExtent * 2.0f;
+	if (MapSize <= 0.0f)
+	{
+		return false;
+	}
+
+	const FVector RelativeLocation = WorldLocation - GetActorLocation();
+	const FVector2D UV = FVector2D(RelativeLocation.X / MapSize, RelativeLocation.Y / MapSize)
+		+ FVector2D(0.5f, 0.5f);
+
+	if (not FMath::IsWithinInclusive(UV.X, 0.0f, 1.0f)
+		|| not FMath::IsWithinInclusive(UV.Y, 0.0f, 1.0f))
+	{
+		return false;
+	}
+
+	OutUV = UV;
+	return true;
+}
+
+void AFowManager::AppendMiniMapIconDrawData(const TArray<TWeakObjectPtr<UFowComp>>& FowComponents,
+                                            TArray<FRTSMinimapIconDrawData>& OutMiniMapIcons) const
+{
+	for (const TWeakObjectPtr<UFowComp>& EachComponent : FowComponents)
+	{
+		if (not EachComponent.IsValid())
+		{
+			continue;
+		}
+
+		const UFowComp* const FowComponent = EachComponent.Get();
+		if (not FowComponent->GetShouldDrawMiniMapIcon())
+		{
+			continue;
+		}
+
+		const FFowCompMiniMapRuntimeState& MiniMapRuntimeState = FowComponent->GetMiniMapRuntimeState();
+		FVector2D IconUV = FVector2D::ZeroVector;
+		if (not GetMiniMapUVFromWorldLocation(MiniMapRuntimeState.M_WorldLocation, IconUV))
+		{
+			continue;
+		}
+
+		const FMinimapIconSettings& IconSettings = FowComponent->GetMiniMapIconSettings();
+		FRTSMinimapIconDrawData& NewIcon = OutMiniMapIcons.AddDefaulted_GetRef();
+		NewIcon.M_UV = IconUV;
+		NewIcon.M_IconSizePixels = IconSettings.M_IconSizePixels;
+		NewIcon.M_IconColor = GetMiniMapIconColorValue(IconSettings.M_IconColor);
+	}
+}
+
+void AFowManager::RefreshMiniMapIconDrawDataCache()
+{
+	M_CachedMiniMapIconDrawData.Reset();
+	M_CachedMiniMapIconDrawData.Reserve(M_ActiveFowComponents.Num() + M_PassiveFowComponents.Num());
+
+	AppendMiniMapIconDrawData(M_ActiveFowComponents, M_CachedMiniMapIconDrawData);
+	AppendMiniMapIconDrawData(M_PassiveFowComponents, M_CachedMiniMapIconDrawData);
 }
 
 
@@ -290,7 +384,7 @@ void AFowManager::StopFow()
 
 void AFowManager::AddActiveFowParticipant(UFowComp* FowComp)
 {
-	if (!GetIsActiveParticipantUnique(FowComp))
+	if (not GetIsActiveParticipantUnique(FowComp))
 	{
 		RTSFunctionLibrary::ReportError("Fow component already participating in fow manager, will not add this fow"
 			"comp to partcipate again!"
@@ -305,6 +399,7 @@ void AFowManager::AddActiveFowParticipant(UFowComp* FowComp)
 	{
 		StartFow();
 	}
+	RefreshMiniMapIconDrawDataCache();
 }
 
 void AFowManager::AddPassiveFowParticipant(UFowComp* FowComp)
@@ -317,6 +412,7 @@ void AFowManager::AddPassiveFowParticipant(UFowComp* FowComp)
 		return;
 	}
 	M_PassiveFowComponents.Add(FowComp);
+	RefreshMiniMapIconDrawDataCache();
 }
 
 
@@ -328,12 +424,16 @@ void AFowManager::UpdateDrawBuffer()
 		return;
 	}
 	int32 Index = 0;
-	for (const auto EachComp : M_ActiveFowComponents)
+	for (const TWeakObjectPtr<UFowComp>& EachComp : M_ActiveFowComponents)
 	{
-		FVector Location = EachComp->GetOwner()->GetActorLocation();
+		AActor* const OwnerActor = EachComp->GetOwner();
+		const FVector OwnerWorldLocation = OwnerActor->GetActorLocation();
+		FVector Location = OwnerWorldLocation;
 		const float VisionRadius = EachComp->GetVisionRadius();
 		// Save the vision radius in the z component.
 		Location.Z = VisionRadius;
+		EachComp->CacheMiniMapWorldLocation(OwnerWorldLocation);
+		EachComp->SetShouldDrawMiniMapIcon(not OwnerActor->IsHidden());
 		M_DrawBuffer[Index] = Location;
 		Index++;
 	}
@@ -483,6 +583,7 @@ void AFowManager::OnInvalidNiagaraDraw()
 		"\n See function: AFowManager::UpdateDrawBuffer()"
 		"\n Active fow components will be cleared!");
 	M_ActiveFowComponents.Empty();
+	RefreshMiniMapIconDrawDataCache();
 	StopFow();
 }
 
@@ -530,11 +631,13 @@ void AFowManager::AskReadBack()
 
 void AFowManager::UpdateReadBackBuffer()
 {
+	M_CurrentReadBackPassiveComponents.Empty();
 	TArray<FVector2D> NiagaraData = {};
-	for (auto PassiveFowComp : M_PassiveFowComponents)
+	for (const TWeakObjectPtr<UFowComp>& PassiveFowComp : M_PassiveFowComponents)
 	{
 		M_CurrentReadBackPassiveComponents.Add(PassiveFowComp);
 		const FVector Location = PassiveFowComp->GetOwner()->GetActorLocation();
+		PassiveFowComp->CacheMiniMapWorldLocation(Location);
 		NiagaraData.Add(FVector2D(Location.X, Location.Y));
 	}
 	if (M_CurrentReadBackPassiveComponents.Num() > 0)
@@ -577,6 +680,7 @@ void AFowManager::OnReceivedReadBackUpdate(const TArray<FBasicParticleData>& Dat
 	}
 	// Clear the valid components requesting fog visibility.
 	M_CurrentReadBackPassiveComponents.Empty();
+	RefreshMiniMapIconDrawDataCache();
 }
 
 bool AFowManager::GetValidParticleIndex(const FVector& ParticleVector, int32& OutIndex) const

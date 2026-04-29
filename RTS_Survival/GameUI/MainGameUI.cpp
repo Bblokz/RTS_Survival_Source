@@ -1103,7 +1103,10 @@ void UMainGameUI::InitMiniMap(const TObjectPtr<AFowManager>& FowManager, const E
 	{
 		return;
 	}
-	M_MiniMap->InitMiniMapRTs(FowManager->GetIsValidActiveRT(), FowManager->GetIsValidPassiveRT());
+	M_MiniMap->InitMiniMapRTs(
+		FowManager->GetIsValidActiveRT(),
+		FowManager->GetIsValidPassiveRT(),
+		FowManager);
 	M_MiniMap->SetRenderTransform(Global_GetMiniMapTransform(StartDirection, M_MiniMap->GetRenderTransform()));
 }
 
