@@ -110,6 +110,7 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 	friend class UTankAimAbilityComponent;
 	friend class UTurretSwapComp;
 	friend struct FMissionTowTeamWeaponSpawnState;
+	friend class RTS_SURVIVAL_API UBehVehicleStunned;
 
 
 public:

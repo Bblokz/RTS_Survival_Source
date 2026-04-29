@@ -21,6 +21,7 @@
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "NiagaraSystem.h"
+#include "RTS_Survival/Behaviours/Derived/BehaviourVehicleStunned/BehVehicleStunned.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
@@ -1148,6 +1149,7 @@ void AProjectile::OnHitActor(
 			M_ProjectileOwner->OnProjectileKilledActor(HitActor);
 		}
 		ApplyRadixiteDamageBehaviour(HitActor);
+		He_Heat_AttemptStunOnPen(HitActor);
 		SpawnExplosionHandleAOE(HitLocation, HitRotation, HitSurface, HitActor);
 		OnProjectileDormant();
 	}
@@ -1529,9 +1531,6 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 	const float EffectiveArmor = ArmorCalculation->GetEffectiveArmorOnHit(
 		HitResult.Component, HitResult.Location, Velocity,
 		HitResult.ImpactNormal, RawArmorValue, AdjustedArmorPen, PlateHit);
-	// RTSFunctionLibrary::PrintString("Effective Armor: " + FString::SanitizeFloat(EffectiveArmor), FColor::Red);
-	// RTSFunctionLibrary::PrintString("Raw Armor: " + FString::SanitizeFloat(RawArmorValue), FColor::Blue);
-	// RTSFunctionLibrary::PrintString("Adjusted Pen: " + FString::SanitizeFloat(AdjustedArmorPen), FColor::Green);
 	const bool bShouldBounce = (EffectiveArmor >= AdjustedArmorPen) &&
 	(M_ArmorPen < DeveloperSettings::GameBalance::Weapons::Projectiles::AllowPenRegardlessOfAngleFactor *
 		RawArmorValue);
@@ -1803,6 +1802,7 @@ bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, con
 		//  damage, explosion and dormant.
 		HandleHitActorAndClearTimer(HitActor, Location, ERTSSurfaceType::Metal, HitRotator, DamageMlt);
 		CreateHeHeatBounceDamageText(Location, ArmorPlateDamage);
+		He_Heat_AttemptStunOnBounce(HitActor);
 		return true;
 	}
 	FRTSVerticalAnimTextSettings TextSettings;
@@ -1996,6 +1996,40 @@ void AProjectile::DebugArmorHit(const float Armor, const float EffectiveArmor, c
 		ETextJustify::Type::Center,
 		TextSettings
 	);
+}
+
+void AProjectile::He_Heat_AttemptStunOnBounce(const AActor* HitActor) const
+{
+	if (M_WeaponCalibre < DeveloperSettings::GameBalance::Weapons::Projectiles::StunCalibreThreshold || not
+		IsValid(HitActor))
+	{
+		return;
+	}
+	UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
+	if (not IsValid(BehaviourComponent))
+	{
+		return;
+	}
+	BehaviourComponent->AddBehaviour(UBehVehicleStunned::StaticClass());
+}
+
+void AProjectile::He_Heat_AttemptStunOnPen(const AActor* HitActor) const
+{
+	if (M_WeaponCalibre < DeveloperSettings::GameBalance::Weapons::Projectiles::StunCalibreThreshold)
+	{
+		return;
+	}
+	const bool bIsHe_Heat = M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT;
+	if (not bIsHe_Heat || not IsValid(HitActor))
+	{
+		return;
+	}
+	UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
+	if (not IsValid(BehaviourComponent))
+	{
+		return;
+	}
+	BehaviourComponent->AddBehaviour(UBehVehicleStunned::StaticClass());
 }
 
 void AProjectile::PostInitializeComponents()

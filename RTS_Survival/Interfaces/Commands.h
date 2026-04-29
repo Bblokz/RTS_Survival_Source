@@ -370,6 +370,7 @@ class RTS_SURVIVAL_API ICommands
 	friend UCommandData;
 	// To call DoneExecutingCommand.
 	friend class RTS_SURVIVAL_API UTask_VehicleMoveTo;
+	friend class RTS_SURVIVAL_API UBehVehicleStunned;
 
 public:
 	// Delegate called when the unit is idle and has no new commands in the queue.

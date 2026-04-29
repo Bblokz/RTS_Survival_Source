@@ -605,4 +605,7 @@ private:
 
 	void DebugArmorHit(const float Armor, const float EffectiveArmor, const float AdjustedPen,
 	                   const FVector& HitLcation, const bool bArmorPenned);
+
+	void He_Heat_AttemptStunOnBounce(const AActor* HitActor) const;
+	void He_Heat_AttemptStunOnPen(const AActor* HitActor) const;
 };

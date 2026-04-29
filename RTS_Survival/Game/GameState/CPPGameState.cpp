@@ -2545,6 +2545,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::PanzerRifle_50mm, WeaponData);
 
 	// Puma has faster reload.
+	WeaponData.MagCapacity = 1;
 	WeaponData.ReloadSpeed = 3.3f;
 	WeaponData.WeaponName = EWeaponName::KwK39_1_50MM_Puma;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK39_1_50MM_Puma, WeaponData);
