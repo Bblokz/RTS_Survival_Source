@@ -245,7 +245,7 @@ public:
 	 * Sets the squad controller for this unit.
 	 * @param SquadController The new squad controller.
 	 */
-	void SetSquadController(ASquadController* SquadController);
+	virtual void SetSquadController(ASquadController* SquadController);
 
 	/** 
 	 * @return The weapon state of this unit's infantry weapon, if valid; otherwise, nullptr.
@@ -261,9 +261,9 @@ public:
 	/** @return The socket to attach the secondary weapon mesh to. */
 	FName GetSecondaryWeaponSocketName() const { return SecondaryWeaponSocketName; }
 
-	void OnSpecificTargetInRange();
-	void OnSpecificTargetOutOfRange(const FVector& TargetLocation);
-	void OnSpecificTargetDestroyedOrInvisible();
+	virtual void OnSpecificTargetInRange();
+	virtual void OnSpecificTargetOutOfRange(const FVector& TargetLocation);
+	virtual void OnSpecificTargetDestroyedOrInvisible();
 
 	// IExperienceProvider interface
 	virtual int32 GetExperienceWorth() const override final { return M_ExperienceWorth; };
@@ -326,7 +326,7 @@ protected:
 
 
 	void OnSquadSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector& SquadUnitLocation);
-	void StrafeToLocation(const FVector& StrafeLocation);
+	virtual void StrafeToLocation(const FVector& StrafeLocation);
 
 	// setup RTS comp, AI controller and Squad Anim instance.
 	virtual void PostInitializeComponents() override;
@@ -352,7 +352,7 @@ protected:
 	/**
 	 * @brief Stops the current movement command and sets the active ability ID to Idle.
 	 */
-	void TerminateMovementCommand();
+	virtual void TerminateMovementCommand();
 
 	/**
 	 * @brief Moves the unit to the provided location and binds OnMoveCompleted to the MoveToLocation.
