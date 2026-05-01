@@ -197,6 +197,7 @@ public:
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
 	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
+	void SetMissionWidgetManagerFromMainGameUI(UW_MissionWidgetManager* MissionWidgetManager);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSFaction GetPlayerFaction() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -409,6 +410,8 @@ private:
 
 	void InitMissionManagerWidget();
 	void OnCouldNotInitWidgetManager() const;
+	void OnMainMenuReady_RegisterMissionWidget();
+	void TryBindMissionWidgetFromMainGameUI();
 
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
@@ -421,6 +424,7 @@ private:
 
 	void BeginPlay_InitPlayerController();
 	void BeginPlay_InitMissionWidgetManager();
+	void BeginPlay_RegisterMainGameUICallbackForMissionWidget();
 	void BeginPlay_InitGameDifficultyAndSettings();
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
