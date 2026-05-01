@@ -27,6 +27,7 @@ struct FInit_WeaponUI;
 class UW_BottomCenterUI;
 class UW_ArchiveNotificationHolder;
 class UW_Archive;
+class UW_MissionWidgetManager;
 enum class EMiniMapStartDirection : uint8;
 class AFowManager;
 class UW_MiniMap;
@@ -171,6 +172,8 @@ public:
 	void OpenTechTree();
 	void SetMainMenuVisiblity(const bool bVisible);
 	void SetMissionManagerWidget(UUserWidget* MissionManagerWidget);
+	void SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager);
+	UUserWidget* GetMissionManagerWidget() const;
 	/** @reutrn Whether the left click was consumed to close an open option menu. */
 	bool CLoseOptionUIOnLeftClick();
 
@@ -363,7 +366,8 @@ protected:
 		UW_TrainingDescription* NewTrainingDescription,
 		UW_ControlGroups* NewControlGroups,
 		UW_ArchiveNotificationHolder* NewArchiveNotificiationHolder, UW_BottomCenterUI* NewBottomCenterUI, UW_Portrait*
-		NewPortrait, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
+		NewPortrait, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget,
+		UW_MissionWidgetManager* NewMissionWidgetManager);
 
 	// The primary selected actor in the game.
 	UPROPERTY(BlueprintReadOnly, Category = "Primary Selection")

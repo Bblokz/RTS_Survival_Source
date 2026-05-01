@@ -197,6 +197,7 @@ public:
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
 	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
+	void SetMissionWidgetManagerFromMainGameUI(UW_MissionWidgetManager* MissionWidgetManager);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSFaction GetPlayerFaction() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -409,6 +410,10 @@ private:
 
 	void InitMissionManagerWidget();
 	void OnCouldNotInitWidgetManager() const;
+	void OnMainMenuReady_RegisterMissionWidget();
+	void OnMainMenuReady_StartConfiguredMissions();
+	void StartConfiguredMissionsIfNeeded();
+	void TryBindMissionWidgetFromMainGameUI();
 
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
@@ -421,6 +426,8 @@ private:
 
 	void BeginPlay_InitPlayerController();
 	void BeginPlay_InitMissionWidgetManager();
+	void BeginPlay_RegisterMainGameUICallbackForMissionWidget();
+	void BeginPlay_RegisterMainGameUICallbackForMissionStart();
 	void BeginPlay_InitGameDifficultyAndSettings();
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
@@ -455,8 +462,6 @@ private:
 	void PlayMissionLoaded();
 	void PlayMissionCompleted();
 	void PlayMissionFailed();
-
-	void ProvideMissionWidgetToMainGameUI() const;
 
 	UPROPERTY()
 	FRTSGameDifficulty M_GameDifficulty;
@@ -512,6 +517,7 @@ private:
 	// Keep load handles alive until callback executes so async soft actor class loads are guaranteed.
 	TArray<TSharedPtr<FStreamableHandle>> M_SeededSpawnAssetLoadHandles;
 	TMap<int32, FMissionSeededSpawnBatchState> M_SeededSpawnBatchStates;
+	bool bM_HasStartedConfiguredMissions = false;
 
 	void SpawnSeededChoice(const FSeededSpawnChoice& SeededChoice, const int32 SeededSpawnBatchRequestId);
 	void SpawnSeededChoiceTrainingOptions(const TArray<FSeededSpawnTrainingOptionEntry>& TrainingOptionSpawns,
