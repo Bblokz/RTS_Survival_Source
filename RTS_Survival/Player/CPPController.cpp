@@ -552,11 +552,6 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 	bM_IsCinematicTakeOverActive = bStartCinematic;
 	M_MainGameUI->SetMainMenuVisiblity(bMakeGameUIVisible);
 
-	if (not bStartCinematic)
-	{
-		RTSInputModeDefaults::ApplyRegularGameInputMode(this);
-	}
-
 	M_PlayerCameraController->SetCameraMovementDisabled(bLockCamera);
 	SetSuppressRegularVoiceLines(bStartCinematic);
 	return true;
