@@ -39,6 +39,8 @@
 #include "TrainingUI/TrainingDescription/W_TrainingDescription.h"
 #include "RTS_Survival/GameUI/Archive/W_ArchiveNotificationHolder/W_ArchiveNotificationHolder.h"
 #include "RTS_Survival/Utils/RTSInputModeDefaults.h"
+#include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
 
 
 void UMainGameUI::OpenTechTree()
@@ -96,6 +98,35 @@ void UMainGameUI::SetMainMenuVisiblity(const bool bVisible)
 void UMainGameUI::SetMissionManagerWidget(UUserWidget* MissionManagerWidget)
 {
 	M_MissionManagerWidget = MissionManagerWidget;
+}
+
+void UMainGameUI::SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager)
+{
+	if (not IsValid(MissionWidgetManager))
+	{
+		RTSFunctionLibrary::ReportError("SetMissionWidgetManagerForMissionManager was called with an invalid widget.");
+		return;
+	}
+
+	M_MissionManagerWidget = MissionWidgetManager;
+
+	AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
+	if (not IsValid(MissionManager))
+	{
+		return;
+	}
+
+	MissionManager->SetMissionWidgetManagerFromMainGameUI(MissionWidgetManager);
+}
+
+UUserWidget* UMainGameUI::GetMissionManagerWidget() const
+{
+	if (not M_MissionManagerWidget.IsValid())
+	{
+		return nullptr;
+	}
+
+	return M_MissionManagerWidget.Get();
 }
 
 bool UMainGameUI::CLoseOptionUIOnLeftClick()
