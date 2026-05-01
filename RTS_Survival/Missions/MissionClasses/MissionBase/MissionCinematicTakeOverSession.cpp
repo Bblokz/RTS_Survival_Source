@@ -13,7 +13,7 @@
 
 namespace MissionCinematicTakeOverSessionInternal
 {
-	constexpr int32 SkipWidgetZOrder = 2200;
+	constexpr int32 SkipWidgetZOrder = 0;
 }
 
 bool UMissionCinematicTakeOverSession::StartSession(
@@ -204,7 +204,7 @@ void UMissionCinematicTakeOverSession::ApplySkipWidgetInputMode() const
 
 void UMissionCinematicTakeOverSession::RestoreRegularInputModeIfNeeded() const
 {
-	if (not M_RuntimeState.bM_UsesSkipWidgetInputMode || not GetIsValidPlayerController(false))
+	if (not GetIsValidPlayerController(false))
 	{
 		return;
 	}
