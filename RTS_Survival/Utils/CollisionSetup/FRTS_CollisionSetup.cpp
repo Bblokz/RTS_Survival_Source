@@ -324,6 +324,7 @@ void FRTS_CollisionSetup::SetupCollisionForTrainMeshes(const TArray<UMeshCompone
 			continue;
 		}
 
+		
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		MeshComponent->SetReceivesDecals(false);
 		MeshComponent->SetGenerateOverlapEvents(false);

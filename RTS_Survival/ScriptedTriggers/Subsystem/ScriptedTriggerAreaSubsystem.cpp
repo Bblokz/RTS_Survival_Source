@@ -1,5 +1,6 @@
 #include "ScriptedTriggerAreaSubsystem.h"
 
+#include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
 #include "RTS_Survival/Missions/TriggerAreas/Settings/MissionTriggerAreaSettings.h"
 #include "RTS_Survival/ScriptedTriggers/Settings/ScriptedTriggerAreaSettings.h"
 
