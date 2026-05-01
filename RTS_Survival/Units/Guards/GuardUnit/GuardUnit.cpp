@@ -25,6 +25,7 @@ bool AGuardUnit::StartGuardMove(const FVector& TargetLocation)
 		return false;
 	}
 
+	RestoreMovementAfterInitialGuardWait();
 	return M_GuardMovementComponent->StartGuardMove(TargetLocation);
 }
 
@@ -44,11 +45,36 @@ void AGuardUnit::SetAutoGuardingEnabled(const bool bEnableAutoGuarding)
 
 	if (not bM_IsAutoGuardingEnabled)
 	{
+		RestoreMovementAfterInitialGuardWait();
 		StopGuardMove();
 		return;
 	}
 
 	SetWeaponToAutoEngageTargets(false);
+}
+
+void AGuardUnit::SetAwaitingInitialGuardMove(const bool bEnableAwaitingInitialGuardMove)
+{
+	if (not GetIsValidGuardMovementComponent())
+	{
+		return;
+	}
+
+	if (not bEnableAwaitingInitialGuardMove)
+	{
+		RestoreMovementAfterInitialGuardWait();
+		return;
+	}
+
+	if (not bM_IsAwaitingInitialGuardMove)
+	{
+		M_BaseGravityScale = M_GuardMovementComponent->GravityScale;
+	}
+
+	bM_IsAwaitingInitialGuardMove = true;
+	M_GuardMovementComponent->GravityScale = 0.0f;
+	M_GuardMovementComponent->StopMovementImmediately();
+	M_GuardMovementComponent->SetMovementMode(MOVE_None);
 }
 
 bool AGuardUnit::GetIsGuardMoveActive() const
@@ -103,6 +129,8 @@ void AGuardUnit::PostInitializeComponents()
 		return;
 	}
 
+	M_BaseGravityScale = M_GuardMovementComponent->GravityScale;
+
 	if (M_GuardMoveFinishedHandle.IsValid())
 	{
 		M_GuardMovementComponent->OnGuardMoveFinished.Remove(M_GuardMoveFinishedHandle);
@@ -121,11 +149,13 @@ void AGuardUnit::StrafeToLocation(const FVector& StrafeLocation)
 		return;
 	}
 
+	RestoreMovementAfterInitialGuardWait();
 	(void)M_GuardMovementComponent->StartGuardMove(StrafeLocation);
 }
 
 void AGuardUnit::TerminateMovementCommand()
 {
+	RestoreMovementAfterInitialGuardWait();
 	StopGuardMove();
 	Super::TerminateMovementCommand();
 }
@@ -148,4 +178,21 @@ bool AGuardUnit::GetIsValidGuardMovementComponent() const
 void AGuardUnit::HandleGuardMoveFinished(const bool bReachedDestination)
 {
 	OnGuardMoveFinished.Broadcast(this, bReachedDestination);
+}
+
+void AGuardUnit::RestoreMovementAfterInitialGuardWait()
+{
+	if (not bM_IsAwaitingInitialGuardMove)
+	{
+		return;
+	}
+
+	if (not GetIsValidGuardMovementComponent())
+	{
+		return;
+	}
+
+	bM_IsAwaitingInitialGuardMove = false;
+	M_GuardMovementComponent->GravityScale = M_BaseGravityScale;
+	M_GuardMovementComponent->SetMovementMode(MOVE_Walking);
 }

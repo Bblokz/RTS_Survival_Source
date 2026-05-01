@@ -25,6 +25,7 @@ public:
 	bool StartGuardMove(const FVector& TargetLocation);
 	void StopGuardMove();
 	void SetAutoGuardingEnabled(const bool bEnableAutoGuarding);
+	void SetAwaitingInitialGuardMove(const bool bEnableAwaitingInitialGuardMove);
 	bool GetIsGuardMoveActive() const;
 	bool GetIsAutoGuardingEnabled() const { return bM_IsAutoGuardingEnabled; }
 
@@ -44,8 +45,11 @@ private:
 	TObjectPtr<UGuardCharacterMovementComponent> M_GuardMovementComponent;
 
 	bool bM_IsAutoGuardingEnabled = false;
+	bool bM_IsAwaitingInitialGuardMove = false;
+	float M_BaseGravityScale = 1.0f;
 	FDelegateHandle M_GuardMoveFinishedHandle;
 
 	bool GetIsValidGuardMovementComponent() const;
 	void HandleGuardMoveFinished(const bool bReachedDestination);
+	void RestoreMovementAfterInitialGuardWait();
 };

@@ -399,6 +399,7 @@ void AGuardController::RemoveGuardRuntimeStateForUnit(const ASquadUnit* GuardUni
 void AGuardController::SpawnLoadedGuardUnitsAtSpawnPoints()
 {
 	M_TSquadUnits.Reset();
+	M_TSquadUnits.Reserve(M_SpawnPoints.Num());
 
 	const TArray<TSubclassOf<AGuardUnit>> OrderedGuardClasses = GetOrderedGuardClasses();
 	if (OrderedGuardClasses.IsEmpty())
@@ -420,10 +421,11 @@ void AGuardController::SpawnLoadedGuardUnitsAtSpawnPoints()
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride =
-		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	for (int32 SpawnPointIndex = 0; SpawnPointIndex < M_SpawnPoints.Num(); SpawnPointIndex++)
 	{
+		const FVector SpawnPoint = M_SpawnPoints[SpawnPointIndex];
 		const TSubclassOf<AGuardUnit> GuardClass = OrderedGuardClasses[SpawnPointIndex % OrderedGuardClasses.Num()];
 		if (GuardClass == nullptr)
 		{
@@ -435,7 +437,7 @@ void AGuardController::SpawnLoadedGuardUnitsAtSpawnPoints()
 
 		AGuardUnit* SpawnedGuardUnit = World->SpawnActor<AGuardUnit>(
 			GuardClass,
-			M_SpawnPoints[SpawnPointIndex],
+			SpawnPoint,
 			FRotator::ZeroRotator,
 			SpawnParameters);
 		if (not IsValid(SpawnedGuardUnit))
@@ -446,9 +448,22 @@ void AGuardController::SpawnLoadedGuardUnitsAtSpawnPoints()
 			continue;
 		}
 
+		SpawnedGuardUnit->SetActorLocation(SpawnPoint, false, nullptr, ETeleportType::TeleportPhysics);
 		SpawnedGuardUnit->SetSquadController(this);
+		SpawnedGuardUnit->SetAwaitingInitialGuardMove(true);
 		M_TSquadUnits.Add(SpawnedGuardUnit);
 	}
+
+	if (M_TSquadUnits.Num() == M_SpawnPoints.Num())
+	{
+		return;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"Guard controller spawned fewer guard units than authored spawn points."
+		"\n Controller: " + GetName() +
+		"\n Spawn points: " + FString::FromInt(M_SpawnPoints.Num()) +
+		"\n Spawned units: " + FString::FromInt(M_TSquadUnits.Num()));
 }
 
 void AGuardController::StopAutoGuardingPermanently()
