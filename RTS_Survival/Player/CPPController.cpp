@@ -68,6 +68,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
+#include "RTS_Survival/Utils/RTSInputModeDefaults.h"
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -268,7 +269,7 @@ void ACPPController::InitPortrait(UW_Portrait* PortraitWidget) const
 
 AActor* ACPPController::GetPrimarySelectedUnit() const
 {
-	if(not GetIsValidGameUIController())
+	if (not GetIsValidGameUIController())
 	{
 		return nullptr;
 	}
@@ -550,6 +551,7 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 	}
 	bM_IsCinematicTakeOverActive = bStartCinematic;
 	M_MainGameUI->SetMainMenuVisiblity(bMakeGameUIVisible);
+
 	M_PlayerCameraController->SetCameraMovementDisabled(bLockCamera);
 	SetSuppressRegularVoiceLines(bStartCinematic);
 	return true;
@@ -3195,7 +3197,8 @@ void ACPPController::SelectOnScreenUnitsOfType(const FTrainingOption& UnitID, in
 	case EAllUnitType::UNType_None:
 		return;
 	case EAllUnitType::UNType_Squad:
-		BasisActor = FPlayerSelectionHelpers::GetSquadAtIndexIfMatches(TSelectedSquadControllers, SelectionArrayIndex, UnitID);
+		BasisActor = FPlayerSelectionHelpers::GetSquadAtIndexIfMatches(TSelectedSquadControllers, SelectionArrayIndex,
+		                                                               UnitID);
 		break;
 	case EAllUnitType::UNType_Harvester:
 	// Falls through.
@@ -3204,10 +3207,12 @@ void ACPPController::SelectOnScreenUnitsOfType(const FTrainingOption& UnitID, in
 	case EAllUnitType::UNType_Nomadic:
 	// Falls through.
 	case EAllUnitType::UNType_Aircraft:
-		BasisActor = FPlayerSelectionHelpers::GetPawnAtIndexIfMatches(TSelectedPawnMasters, SelectionArrayIndex, UnitID);
+		BasisActor =
+			FPlayerSelectionHelpers::GetPawnAtIndexIfMatches(TSelectedPawnMasters, SelectionArrayIndex, UnitID);
 		break;
 	case EAllUnitType::UNType_BuildingExpansion:
-		BasisActor = FPlayerSelectionHelpers::GetActorAtIndexIfMatches(TSelectedActorsMasters, SelectionArrayIndex, UnitID);
+		BasisActor = FPlayerSelectionHelpers::GetActorAtIndexIfMatches(TSelectedActorsMasters, SelectionArrayIndex,
+		                                                               UnitID);
 		break;
 	}
 

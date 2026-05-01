@@ -18,9 +18,7 @@ namespace RTSInputModeDefaults
 
 			UMainGameUI* const MainMenuUI = PlayerController->GetMainMenuUI();
 			if (
-				not IsValid(MainMenuUI) ||
-				not MainMenuUI->IsInViewport() ||
-				not MainMenuUI->IsVisible())
+				not IsValid(MainMenuUI))
 			{
 				return nullptr;
 			}
@@ -41,8 +39,8 @@ namespace RTSInputModeDefaults
 		UWidget* const WidgetToFocus =
 			RTSInputModeDefaultsInternal::GetWidgetToFocusForRegularGameInputMode(PlayerController);
 		const EMouseLockMode MouseLockMode = WidgetToFocus != nullptr
-			? EMouseLockMode::DoNotLock
-			: EMouseLockMode::LockAlways;
+			                                     ? EMouseLockMode::DoNotLock
+			                                     : EMouseLockMode::LockAlways;
 
 		UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
 			PlayerController,
