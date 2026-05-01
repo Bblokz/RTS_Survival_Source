@@ -819,6 +819,9 @@ bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) 
 		RTSFunctionLibrary::ReportError("Mission cinematic take over failed! Could not restore cinematic audio settings.");
 		return false;
 	}
+	// Weird bug; when hiding and showing this cause the mission manager to be layed over the main menu?
+	M_MissionManager->SetMissionWidgetManagerVisibility(not bCinematicStarted);
+	
 
 	const bool bCinematicTakeOverSucceeded = PlayerController->OnCinematicTakeOver(bCinematicStarted);
 	if (not bCinematicTakeOverSucceeded)
@@ -826,7 +829,6 @@ bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) 
 		return false;
 	}
 
-	M_MissionManager->SetMissionWidgetManagerVisibility(not bCinematicStarted);
 	return true;
 }
 

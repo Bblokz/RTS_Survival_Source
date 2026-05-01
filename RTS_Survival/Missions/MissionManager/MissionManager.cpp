@@ -265,14 +265,19 @@ void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) con
 
 	const ESlateVisibility NewVisibility = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden;
 	M_MissionWidgetManager->SetVisibility(NewVisibility);
+	if (bVisible)
+	{
+		M_MissionWidgetManager->RemoveFromParent();
+		M_MissionWidgetManager->AddToViewport(0);
+	}
 }
 
 ERTSFaction AMissionManager::GetPlayerFaction() const
 {
-	if(M_PlayerFaction == ERTSFaction::NotInitialised)
+	if (M_PlayerFaction == ERTSFaction::NotInitialised)
 	{
 		RTSFunctionLibrary::ReportError("Attempted to retreive player faction from mission manager before it was "
-								  "initialized!!");
+			"initialized!!");
 	}
 	return M_PlayerFaction;
 }
@@ -1718,7 +1723,7 @@ void AMissionManager::SpawnSeededChoiceTrainingOptions(
 			}
 		);
 
-		if (not bRequestStarted && not *bCallbackTriggered)
+		if (not bRequestStarted && not*bCallbackTriggered)
 		{
 			HandleSeededSpawnBatchItemComplete(SeededSpawnBatchRequestId, SpawnResultIndex, nullptr);
 		}

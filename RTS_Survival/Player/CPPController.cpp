@@ -554,25 +554,6 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 
 	M_PlayerCameraController->SetCameraMovementDisabled(bLockCamera);
 	SetSuppressRegularVoiceLines(bStartCinematic);
-	// if (not bStartCinematic)
-	// {
-	// 	TWeakObjectPtr<ACPPController> WeakThis(this);
-	// 	auto RestoreGameUIOnNextTick = [WeakThis] () ->void
-	// 	{
-	// 		if(not WeakThis.IsValid())
-	// 		{
-	// 			return;
-	// 		}
-	// 		ACPPController* StrongThis = WeakThis.Get();
-	// 		
-	// 	RTSInputModeDefaults::ApplyRegularGameInputMode(StrongThis);
-	// 	};
-	// 	FTimerDelegate Del;
-	// 	Del.BindLambda(RestoreGameUIOnNextTick);
-	// 	GetWorldTimerManager().SetTimerForNextTick(
-	// 		Del
-	// 	);
-	// }
 	return true;
 }
 

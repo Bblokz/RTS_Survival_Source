@@ -147,7 +147,7 @@ bool UMissionCinematicTakeOverSession::CreateSkipWidget()
 	M_SkipWidget->AddToViewport(MissionCinematicTakeOverSessionInternal::SkipWidgetZOrder);
 	M_SkipWidget->OnHoldCompleted.AddDynamic(this, &ThisClass::HandleSkipHoldCompleted);
 	ApplySkipWidgetInputMode();
-	M_SkipWidget->SetFocus();
+	// M_SkipWidget->SetFocus();
 	M_RuntimeState.bM_UsesSkipWidgetInputMode = true;
 	return true;
 }
