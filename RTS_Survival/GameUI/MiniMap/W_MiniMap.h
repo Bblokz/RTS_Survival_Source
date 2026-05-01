@@ -60,7 +60,7 @@ protected:
 	                                       const FPointerEvent& InMouseEvent) override;
 
 private:
-	int32 DrawMiniMapIcons(const FSlateRect& MyCullingRect,
+	int32 DrawMiniMapIcons(const FGeometry& AllottedGeometry,
 	                      FSlateWindowElementList& OutDrawElements,
 	                      const int32 LayerId) const;
 

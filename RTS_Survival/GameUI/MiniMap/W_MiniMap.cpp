@@ -88,10 +88,10 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 		InWidgetStyle,
 		bParentEnabled);
 
-	return DrawMiniMapIcons(MyCullingRect, OutDrawElements, NextLayerId);
+	return DrawMiniMapIcons(AllottedGeometry, OutDrawElements, NextLayerId);
 }
 
-int32 UW_MiniMap::DrawMiniMapIcons(const FSlateRect& MyCullingRect,
+int32 UW_MiniMap::DrawMiniMapIcons(const FGeometry& AllottedGeometry,
                                    FSlateWindowElementList& OutDrawElements,
                                    const int32 LayerId) const
 {
@@ -120,7 +120,6 @@ int32 UW_MiniMap::DrawMiniMapIcons(const FSlateRect& MyCullingRect,
 		return LayerId;
 	}
 
-	(void)MyCullingRect;
 	const int32 IconLayerId = LayerId + 1;
 	for (const FRTSMinimapIconDrawData& EachIcon : MiniMapIconDrawData)
 	{
@@ -130,13 +129,16 @@ int32 UW_MiniMap::DrawMiniMapIcons(const FSlateRect& MyCullingRect,
 		}
 
 		const FVector2D IconSize = FVector2D(EachIcon.M_IconSizePixels, EachIcon.M_IconSizePixels);
-		const FVector2D IconTopLeft = FVector2D(
-			EachIcon.M_UV.X * MiniMapSize.X - (IconSize.X * 0.5f),
-			EachIcon.M_UV.Y * MiniMapSize.Y - (IconSize.Y * 0.5f));
-
-		const FPaintGeometry IconGeometry = MiniMapGeometry.ToPaintGeometry(
+		// Use the same full-image UV space as the render target material and camera minimap code paths.
+		const FVector2D IconCenterLocalToMiniMap = FVector2D(
+			EachIcon.M_UV.X * MiniMapSize.X,
+			EachIcon.M_UV.Y * MiniMapSize.Y);
+		const FVector2D IconCenterAbsolute = MiniMapGeometry.LocalToAbsolute(IconCenterLocalToMiniMap);
+		const FVector2D IconTopLeftInWidget = AllottedGeometry.AbsoluteToLocal(IconCenterAbsolute)
+			- (IconSize * 0.5f);
+		const FPaintGeometry IconGeometry = AllottedGeometry.ToPaintGeometry(
 			IconSize,
-			FSlateLayoutTransform(IconTopLeft));
+			FSlateLayoutTransform(IconTopLeftInWidget));
 		FSlateDrawElement::MakeBox(
 			OutDrawElements,
 			IconLayerId,
@@ -167,13 +169,15 @@ FReply UW_MiniMap::NativeOnMouseButtonDown(const FGeometry& InGeometry,
 		}
 
 		const FVector2D LocalPos = MiniMapGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
-		const FVector2D Size = MiniMapGeometry.GetLocalSize();
-		if (Size.X > 0 && Size.Y > 0)
+		const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+		if (MiniMapSize.X <= 0.0f || MiniMapSize.Y <= 0.0f)
 		{
-			const FVector2D UV = LocalPos / Size;
-			OnMiniMapClicked.Broadcast(UV);
-			return FReply::Handled();
+			return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 		}
+
+		const FVector2D UV = LocalPos / MiniMapSize;
+		OnMiniMapClicked.Broadcast(UV);
+		return FReply::Handled();
 	}
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }

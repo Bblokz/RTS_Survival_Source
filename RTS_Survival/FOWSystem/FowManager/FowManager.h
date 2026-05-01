@@ -285,6 +285,8 @@ private:
 
 	bool GetMiniMapUVFromWorldLocation(const FVector& WorldLocation, FVector2D& OutUV) const;
 
+	FVector GetMiniMapWorldLocationForIcon(const UFowComp& FowComponent) const;
+
 	void AppendMiniMapIconDrawData(const TArray<TWeakObjectPtr<UFowComp>>& FowComponents,
 	                               TArray<FRTSMinimapIconDrawData>& OutMiniMapIcons) const;
 
