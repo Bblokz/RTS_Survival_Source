@@ -366,7 +366,8 @@ protected:
 		UW_TrainingDescription* NewTrainingDescription,
 		UW_ControlGroups* NewControlGroups,
 		UW_ArchiveNotificationHolder* NewArchiveNotificiationHolder, UW_BottomCenterUI* NewBottomCenterUI, UW_Portrait*
-		NewPortrait, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
+		NewPortrait, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget,
+		UW_MissionWidgetManager* NewMissionWidgetManager);
 
 	// The primary selected actor in the game.
 	UPROPERTY(BlueprintReadOnly, Category = "Primary Selection")

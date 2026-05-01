@@ -891,14 +891,8 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
 	BeginPlay_InitMissionWidgetManager();
+	BeginPlay_RegisterMainGameUICallbackForMissionStart();
 	BeginPlay_InitGameDifficultyAndSettings();
-
-	// Start all configured missions.
-	for (UMissionBase* Mission : Missions)
-	{
-		ActivateNewMission(Mission);
-	}
-	Missions.Empty();
 }
 
 void AMissionManager::PostInitializeComponents()
@@ -990,7 +984,6 @@ void AMissionManager::InitMissionManagerWidget()
 
 	if (EnsureMissionWidgetIsValid())
 	{
-		ProvideMissionWidgetToMainGameUI();
 		return;
 	}
 
@@ -1039,10 +1032,49 @@ void AMissionManager::BeginPlay_RegisterMainGameUICallbackForMissionWidget()
 	);
 }
 
+void AMissionManager::BeginPlay_RegisterMainGameUICallbackForMissionStart()
+{
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->OnMainMenuCallbacks.CallbackOnMenuReady(
+		&AMissionManager::OnMainMenuReady_StartConfiguredMissions,
+		this
+	);
+}
+
 void AMissionManager::OnMainMenuReady_RegisterMissionWidget()
 {
 	TryBindMissionWidgetFromMainGameUI();
-	ProvideMissionWidgetToMainGameUI();
+}
+
+void AMissionManager::OnMainMenuReady_StartConfiguredMissions()
+{
+	TryBindMissionWidgetFromMainGameUI();
+	StartConfiguredMissionsIfNeeded();
+}
+
+void AMissionManager::StartConfiguredMissionsIfNeeded()
+{
+	if (bM_HasStartedConfiguredMissions)
+	{
+		return;
+	}
+
+	if (not EnsureMissionWidgetIsValid())
+	{
+		OnCouldNotInitWidgetManager();
+		return;
+	}
+
+	bM_HasStartedConfiguredMissions = true;
+	for (UMissionBase* Mission : Missions)
+	{
+		ActivateNewMission(Mission);
+	}
+	Missions.Empty();
 }
 
 void AMissionManager::TryBindMissionWidgetFromMainGameUI()
@@ -1309,16 +1341,6 @@ void AMissionManager::PlayMissionFailed()
 	}
 	UGameplayStatics::PlaySound2D(this, MissionFailedSound, 1, 1, 0,
 	                              M_MissionSoundSettings.MissionSoundConcurrency);
-}
-
-void AMissionManager::ProvideMissionWidgetToMainGameUI() const
-{
-	UMainGameUI* MainGameUI = FRTS_Statics::GetMainGameUI(this);
-	if (not MainGameUI)
-	{
-		return;
-	}
-	MainGameUI->SetMissionManagerWidget(M_MissionWidgetManager);
 }
 
 FMissionTowTeamWeaponSpawnState* AMissionManager::FindTowedTeamWeaponSpawnState(const int32 RequestId)

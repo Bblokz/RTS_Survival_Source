@@ -1447,7 +1447,8 @@ void UMainGameUI::InitMainGameUI(
 	UW_ControlGroups* NewControlGroups,
 	UW_ArchiveNotificationHolder* NewArchiveNotificiationHolder, UW_BottomCenterUI* NewBottomCenterUI,
 	UW_Portrait* NewPortrait,
-	FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget)
+	FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget,
+	UW_MissionWidgetManager* NewMissionWidgetManager)
 
 {
 	// M_TItemBuildingExpansionWidgets = NewBuildingExpansionWidgets;
@@ -1492,6 +1493,8 @@ void UMainGameUI::InitMainGameUI(
 	{
 		M_ArchiveNotificationHolder->SetMainMenuReference(this);
 	}
+
+	SetMissionWidgetManagerForMissionManager(NewMissionWidgetManager);
 	InitMainGameUI_HideWidgets();
 
 	SetupResources(NewPlayerResourceWidgets, NewPlayerController, NewPlayerEnergyBar, NewPlayerEnergyBarInfo);
