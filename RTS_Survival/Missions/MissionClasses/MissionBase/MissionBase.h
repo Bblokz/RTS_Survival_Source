@@ -473,7 +473,7 @@ protected:
 	/**
 	 * @brief Starts a managed mission cinematic takeover and plays the provided runtime sequence player.
 	 * @param SequencePlayer Runtime playback instance that reports natural finish and external stop events.
-	 * @param bAllowOptionalSkipping Whether to show the hold-to-skip widget and allow Escape-based skipping.
+	 * @param bAllowOptionalSkipping Whether to show the hold-to-skip widget and allow Space-based skipping.
 	 * @param bStartedSuccessfully True when takeover state, completion tracking, and playback startup all initialized successfully.
 	 * @return Session handle that later broadcasts the completion result, or nullptr when startup fails.
 	 */

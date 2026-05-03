@@ -18,5 +18,12 @@ namespace EnemyDirectControlConstants
 		inline constexpr bool DrawRegisteredUnitLabel = true;
 		inline constexpr bool DrawRegisteredUnitSphere = true;
 		inline constexpr bool ReportRegisterDeregister = true;
+
+		inline constexpr bool DebugRemoveDirectControlUnitFromFormations = true;
+
+		const FColor RemoveFromFormationColor = FColor::Red;
+		const float RemoveFromFormationZOffset = 500.f;
+		const float RemoveFromLocationDebugTime = 10.f;
+		const FColor RetreatGroupColor = FColor::Purple;
 	}
 }

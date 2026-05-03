@@ -83,7 +83,10 @@ public:
 	void DebugAllActiveFormations() const;
 	void GetActiveFormationData(TArray<FFormationData>& OutFormationData) const;
 	void RemoveActiveFormationsByID(const TArray<int32>& FormationIDs);
-	void RemoveUnitsFromAnyFormation(const TArray<ASquadController*>& SquadControllers, const TArray<ATankMaster*>& TankMasters);
+	// Checks if the provided units are active in any formations and if so removes them. also removes the formaiton
+	// if the formation becomes empty because of this. Returns the array of units that needed removal.
+	TArray<AActor*> RemoveUnitsFromAnyFormation(const TArray<ASquadController*>& SquadControllers,
+	                                            const TArray<ATankMaster*>& TankMasters);
 
 protected:
 	// Called when the game starts

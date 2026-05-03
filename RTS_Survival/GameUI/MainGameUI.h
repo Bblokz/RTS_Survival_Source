@@ -171,9 +171,8 @@ class RTS_SURVIVAL_API UMainGameUI : public UUserWidget, public IRTSUIElement
 public:
 	void OpenTechTree();
 	void SetMainMenuVisiblity(const bool bVisible);
-	void SetMissionManagerWidget(UUserWidget* MissionManagerWidget);
 	void SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager);
-	UUserWidget* GetMissionManagerWidget() const;
+	UW_MissionWidgetManager* GetMissionManagerWidget() const;
 	/** @reutrn Whether the left click was consumed to close an open option menu. */
 	bool CLoseOptionUIOnLeftClick();
 
@@ -436,7 +435,7 @@ private:
 	UTechTree* M_TechTree;
 
 	// Contains all missions.
-	TWeakObjectPtr<UUserWidget> M_MissionManagerWidget;
+	TWeakObjectPtr<UW_MissionWidgetManager> M_MissionManagerWidget;
 
 	UPROPERTY()
 	TObjectPtr<UW_Archive> M_Archive;

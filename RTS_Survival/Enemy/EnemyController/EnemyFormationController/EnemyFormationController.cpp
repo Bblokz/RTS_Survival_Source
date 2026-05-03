@@ -271,15 +271,15 @@ void UEnemyFormationController::RemoveActiveFormationsByID(const TArray<int32>& 
 }
 
 
-
-void UEnemyFormationController::RemoveUnitsFromAnyFormation(
+TArray<AActor*> UEnemyFormationController::RemoveUnitsFromAnyFormation(
 	const TArray<ASquadController*>& SquadControllers,
 	const TArray<ATankMaster*>& TankMasters)
 {
 	if (SquadControllers.IsEmpty() && TankMasters.IsEmpty())
 	{
-		return;
+		return {};
 	}
+	TArray<AActor*> ActorsRemoved;
 
 	TSet<TWeakObjectPtr<AActor>> UnitsToRemove;
 	for (ASquadController* SquadController : SquadControllers)
@@ -299,7 +299,7 @@ void UEnemyFormationController::RemoveUnitsFromAnyFormation(
 
 	if (UnitsToRemove.IsEmpty())
 	{
-		return;
+		return {};
 	}
 
 	TArray<int32> FormationsToRemove;
@@ -320,6 +320,7 @@ void UEnemyFormationController::RemoveUnitsFromAnyFormation(
 				continue;
 			}
 
+			ActorsRemoved.Add(FormationActor);
 			FormationData.FormationUnits.RemoveAtSwap(UnitIndex);
 		}
 
@@ -333,6 +334,7 @@ void UEnemyFormationController::RemoveUnitsFromAnyFormation(
 	{
 		M_ActiveFormations.Remove(FormationID);
 	}
+	return ActorsRemoved;
 }
 
 void UEnemyFormationController::BeginPlay()

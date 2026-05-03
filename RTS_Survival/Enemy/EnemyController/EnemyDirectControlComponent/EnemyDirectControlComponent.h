@@ -11,6 +11,18 @@ class UEnemyFormationController;
 struct FResultAlliedTanksToRetreat;
 struct FDamagedTanksRetreatGroup;
 
+USTRUCT()
+struct FDirectControlRetreatCache
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FDamagedTanksRetreatGroup> M_CachedRetreatGroups;
+
+	UPROPERTY()
+	int32 M_LastRequestID = INDEX_NONE;
+};
+
 /**
  * @brief Tracks units under direct enemy AI control and offers safe registration APIs for blueprints.
  * @note RegisterDirectControlUnit: call in blueprint when a unit should be controlled by direct control logic.
@@ -44,7 +56,7 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void DeregisterDirectControlUnits(const TArray<AActor*>& UnitActors);
 
-	void HandleRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult);
+	void HandleAsyncRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult);
 
 protected:
 	virtual void BeginPlay() override;
@@ -60,17 +72,8 @@ private:
 
 	FTimerHandle M_DirectControlTickTimerHandle;
 
-	USTRUCT()
-	struct FDirectControlRetreatCache
-	{
-		GENERATED_BODY()
-
-		UPROPERTY()
-		TArray<FDamagedTanksRetreatGroup> M_CachedRetreatGroups;
-
-		UPROPERTY()
-		int32 M_LastRequestID = INDEX_NONE;
-	} M_RetreatCache;
+	UPROPERTY()
+	FDirectControlRetreatCache M_RetreatCache;
 
 	bool EnsureEnemyControllerIsValid() const;
 	bool GetIsValidDirectControlUnitActor(const AActor* UnitActor) const;
@@ -91,4 +94,6 @@ private:
 	AActor* GetFirstValidDamagedTank(const FDamagedTanksRetreatGroup& RetreatGroup) const;
 	bool TryGetProjectedLocation(const FVector& OriginalLocation, FVector& OutProjectedLocation) const;
 	bool EnsureFormationControllerIsValid(UEnemyFormationController*& OutFormationController) const;
+
+	void Debug_RetreatUnitsRemovedFromFormations(const TArray<AActor*>& RemovedUnits) const;
 };

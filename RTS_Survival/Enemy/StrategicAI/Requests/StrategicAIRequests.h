@@ -208,6 +208,9 @@ struct FFindAlliedTanksToRetreat
  * hazmat engineers are sorted by distance to the group's average location and each selected
  * hazmat receives formation positions computed from its rotation and the group's size;
  * these FWeakActorLocations entries are appended to HazmatsWithFormationLocations.
+ *
+ * if no hazmats found then no locations;
+ * the locations are not projected.
  */
 USTRUCT()
 struct FDamagedTanksRetreatGroup

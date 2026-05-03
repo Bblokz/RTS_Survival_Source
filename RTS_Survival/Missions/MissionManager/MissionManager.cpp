@@ -266,24 +266,12 @@ void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) con
 
 	const ESlateVisibility NewVisibility = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden;
 	M_MissionWidgetManager->SetVisibility(NewVisibility);
-	if (bVisible)
-	{
-		M_MissionWidgetManager->RemoveFromParent();
-		M_MissionWidgetManager->AddToViewport(0);
-	}
+	// if (bVisible)
+	// {
+	// 	M_MissionWidgetManager->RemoveFromParent();
+	// 	M_MissionWidgetManager->AddToViewport(0);
+	// }
 }
-
-void AMissionManager::SetMissionWidgetManagerFromMainGameUI(UW_MissionWidgetManager* MissionWidgetManager)
-{
-	if (not IsValid(MissionWidgetManager))
-	{
-		RTSFunctionLibrary::ReportError("Mission widget manager provided by main game ui was invalid.");
-		return;
-	}
-
-	M_MissionWidgetManager = MissionWidgetManager;
-}
-
 ERTSFaction AMissionManager::GetPlayerFaction() const
 {
 	if (M_PlayerFaction == ERTSFaction::NotInitialised)
@@ -890,8 +878,6 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
-	BeginPlay_InitMissionWidgetManager();
-	BeginPlay_RegisterMainGameUICallbackForMissionStart();
 	BeginPlay_InitGameDifficultyAndSettings();
 }
 
@@ -980,7 +966,6 @@ void AMissionManager::Tick(float DeltaSeconds)
 
 void AMissionManager::InitMissionManagerWidget()
 {
-	TryBindMissionWidgetFromMainGameUI();
 
 	if (EnsureMissionWidgetIsValid())
 	{
@@ -1008,53 +993,20 @@ void AMissionManager::BeginPlay_InitPlayerController()
 	M_PlayerController = PlayerController;
 }
 
-void AMissionManager::BeginPlay_InitMissionWidgetManager()
+
+
+
+void AMissionManager::OnMainGameUIReadyAndInitialized(UW_MissionWidgetManager* MissionManagerWidget)
 {
 	if (not EnsureValidPlayerController())
 	{
 		return;
 	}
-
-	BeginPlay_RegisterMainGameUICallbackForMissionWidget();
-	InitMissionManagerWidget();
-}
-
-void AMissionManager::BeginPlay_RegisterMainGameUICallbackForMissionWidget()
-{
-	if (not EnsureValidPlayerController())
-	{
-		return;
-	}
-
-	M_PlayerController->OnMainMenuCallbacks.CallbackOnMenuReady(
-		&AMissionManager::OnMainMenuReady_RegisterMissionWidget,
-		this
-	);
-}
-
-void AMissionManager::BeginPlay_RegisterMainGameUICallbackForMissionStart()
-{
-	if (not EnsureValidPlayerController())
-	{
-		return;
-	}
-
-	M_PlayerController->OnMainMenuCallbacks.CallbackOnMenuReady(
-		&AMissionManager::OnMainMenuReady_StartConfiguredMissions,
-		this
-	);
-}
-
-void AMissionManager::OnMainMenuReady_RegisterMissionWidget()
-{
-	TryBindMissionWidgetFromMainGameUI();
-}
-
-void AMissionManager::OnMainMenuReady_StartConfiguredMissions()
-{
-	TryBindMissionWidgetFromMainGameUI();
+	SetMissionManagerWidget(MissionManagerWidget);
 	StartConfiguredMissionsIfNeeded();
 }
+
+
 
 void AMissionManager::StartConfiguredMissionsIfNeeded()
 {
@@ -1077,22 +1029,10 @@ void AMissionManager::StartConfiguredMissionsIfNeeded()
 	Missions.Empty();
 }
 
-void AMissionManager::TryBindMissionWidgetFromMainGameUI()
+void AMissionManager::SetMissionManagerWidget(UW_MissionWidgetManager* MissionManagerWidget)
 {
-	UMainGameUI* MainGameUI = FRTS_Statics::GetMainGameUI(this);
-	if (not IsValid(MainGameUI))
-	{
-		return;
-	}
 
-	UUserWidget* MissionWidget = MainGameUI->GetMissionManagerWidget();
-	UW_MissionWidgetManager* MissionWidgetManager = Cast<UW_MissionWidgetManager>(MissionWidget);
-	if (not IsValid(MissionWidgetManager))
-	{
-		return;
-	}
-
-	M_MissionWidgetManager = MissionWidgetManager;
+	M_MissionWidgetManager = MissionManagerWidget;
 }
 
 void AMissionManager::BeginPlay_InitGameDifficultyAndSettings()

@@ -197,7 +197,6 @@ public:
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
 	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
-	void SetMissionWidgetManagerFromMainGameUI(UW_MissionWidgetManager* MissionWidgetManager);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSFaction GetPlayerFaction() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -366,6 +365,9 @@ public:
 	void RemoveMissionTriggerAreasById(UMissionBase* Mission, const int32 TriggerId);
 	void RemoveAllMissionTriggerAreasForMission(UMissionBase* Mission);
 
+	void OnMainGameUIReadyAndInitialized(UW_MissionWidgetManager* MissionManagerWidget);
+	
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -410,10 +412,8 @@ private:
 
 	void InitMissionManagerWidget();
 	void OnCouldNotInitWidgetManager() const;
-	void OnMainMenuReady_RegisterMissionWidget();
-	void OnMainMenuReady_StartConfiguredMissions();
 	void StartConfiguredMissionsIfNeeded();
-	void TryBindMissionWidgetFromMainGameUI();
+	void SetMissionManagerWidget(UW_MissionWidgetManager* MissionManagerWidget);
 
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
@@ -425,9 +425,6 @@ private:
 	TObjectPtr<UMissionTriggerVolumesManager> M_MissionTriggerVolumesManager;
 
 	void BeginPlay_InitPlayerController();
-	void BeginPlay_InitMissionWidgetManager();
-	void BeginPlay_RegisterMainGameUICallbackForMissionWidget();
-	void BeginPlay_RegisterMainGameUICallbackForMissionStart();
 	void BeginPlay_InitGameDifficultyAndSettings();
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();

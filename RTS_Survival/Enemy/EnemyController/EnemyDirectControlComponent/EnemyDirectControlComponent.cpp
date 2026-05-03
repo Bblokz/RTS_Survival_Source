@@ -6,10 +6,9 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
-#include "RTS_Survival/Units/Squads/SquadController.h"
-#include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlConstants.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UEnemyDirectControlComponent::UEnemyDirectControlComponent()
@@ -275,7 +274,7 @@ ICommands* UEnemyDirectControlComponent::TryGetCommandsInterface(AActor* UnitAct
 }
 
 
-void UEnemyDirectControlComponent::HandleRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult)
+void UEnemyDirectControlComponent::HandleAsyncRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult)
 {
 	M_RetreatCache.M_LastRequestID = RetreatResult.RequestID;
 	M_RetreatCache.M_CachedRetreatGroups.Empty();
@@ -356,7 +355,12 @@ void UEnemyDirectControlComponent::RemoveRetreatGroupUnitsFromFormations(const F
 		}
 	}
 
-	FormationController->RemoveUnitsFromAnyFormation(NoSquads, DamagedTanks);
+	TArray<AActor*> RemovedUnits = FormationController->RemoveUnitsFromAnyFormation(NoSquads, DamagedTanks);
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols &&
+		EnemyDirectControlConstants::Debugging::DebugRemoveDirectControlUnitFromFormations)
+	{
+		Debug_RetreatUnitsRemovedFromFormations(RemovedUnits);
+	}
 }
 
 void UEnemyDirectControlComponent::IssueRetreatOrdersToDamagedTanks(const FDamagedTanksRetreatGroup& RetreatGroup)
@@ -406,7 +410,8 @@ void UEnemyDirectControlComponent::IssueHazmatSupportOrders(const FDamagedTanksR
 		HazmatCommands->MoveToLocation(ProjectedLocation, true, FRotator::ZeroRotator, false);
 
 		AActor* DamagedTankTarget = FirstDamagedTank;
-		if (RetreatGroup.DamagedTanks.IsValidIndex(DamagedTankIndex) && RetreatGroup.DamagedTanks[DamagedTankIndex].IsValid())
+		if (RetreatGroup.DamagedTanks.IsValidIndex(DamagedTankIndex) && RetreatGroup.DamagedTanks[DamagedTankIndex].
+			IsValid())
 		{
 			DamagedTankTarget = RetreatGroup.DamagedTanks[DamagedTankIndex].Get();
 		}
@@ -429,7 +434,8 @@ AActor* UEnemyDirectControlComponent::GetFirstValidDamagedTank(const FDamagedTan
 	return nullptr;
 }
 
-bool UEnemyDirectControlComponent::TryGetProjectedLocation(const FVector& OriginalLocation, FVector& OutProjectedLocation) const
+bool UEnemyDirectControlComponent::TryGetProjectedLocation(const FVector& OriginalLocation,
+                                                           FVector& OutProjectedLocation) const
 {
 	OutProjectedLocation = OriginalLocation;
 
@@ -447,7 +453,8 @@ bool UEnemyDirectControlComponent::TryGetProjectedLocation(const FVector& Origin
 	return EnemyNavigationAIComponent->GetNavigablePoint(OriginalLocation, 1.f, OutProjectedLocation);
 }
 
-bool UEnemyDirectControlComponent::EnsureFormationControllerIsValid(UEnemyFormationController*& OutFormationController) const
+bool UEnemyDirectControlComponent::EnsureFormationControllerIsValid(
+	UEnemyFormationController*& OutFormationController) const
 {
 	OutFormationController = nullptr;
 
@@ -464,4 +471,20 @@ bool UEnemyDirectControlComponent::EnsureFormationControllerIsValid(UEnemyFormat
 
 	RTSFunctionLibrary::ReportError("Enemy direct control component requires a valid enemy formation controller.");
 	return false;
+}
+
+void UEnemyDirectControlComponent::Debug_RetreatUnitsRemovedFromFormations(const TArray<AActor*>& RemovedUnits) const
+{
+	for (const auto EachUnit : RemovedUnits)
+	{
+		if (not IsValid(EachUnit))
+		{
+			continue;
+		}
+		using namespace EnemyDirectControlConstants::Debugging;
+		const FVector Location = EachUnit->GetActorLocation() + FVector(0, 0, RemoveFromFormationZOffset);
+
+		DrawDebugString(GetWorld(), Location, "REMOVED from formations for retreat", nullptr,
+		                RemoveFromFormationColor, RemoveFromLocationDebugTime, false, 1);
+	}
 }

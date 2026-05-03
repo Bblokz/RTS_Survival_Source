@@ -201,6 +201,6 @@ void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAI
 
 	for (const FResultAlliedTanksToRetreat& RetreatResult : ResultBatch.AlliedTanksToRetreatResults)
 	{
-		EnemyDirectControlComponent->HandleRetreatGroupResult(RetreatResult);
+		EnemyDirectControlComponent->HandleAsyncRetreatGroupResult(RetreatResult);
 	}
 }

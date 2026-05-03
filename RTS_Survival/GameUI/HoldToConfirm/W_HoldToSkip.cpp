@@ -49,7 +49,7 @@ void UW_HoldToSkip::NativeTick(const FGeometry& MyGeometry, const float InDeltaT
 
 FReply UW_HoldToSkip::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() != EKeys::Escape)
+	if (InKeyEvent.GetKey() != EKeys::SpaceBar)
 	{
 		return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 	}
@@ -60,7 +60,7 @@ FReply UW_HoldToSkip::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEve
 
 FReply UW_HoldToSkip::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() != EKeys::Escape)
+	if (InKeyEvent.GetKey() != EKeys::SpaceBar)
 	{
 		return Super::NativeOnKeyUp(InGeometry, InKeyEvent);
 	}

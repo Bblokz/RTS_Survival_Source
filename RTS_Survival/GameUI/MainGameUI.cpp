@@ -95,11 +95,6 @@ void UMainGameUI::SetMainMenuVisiblity(const bool bVisible)
 	}
 }
 
-void UMainGameUI::SetMissionManagerWidget(UUserWidget* MissionManagerWidget)
-{
-	M_MissionManagerWidget = MissionManagerWidget;
-}
-
 void UMainGameUI::SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager)
 {
 	if (not IsValid(MissionWidgetManager))
@@ -115,11 +110,11 @@ void UMainGameUI::SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManag
 	{
 		return;
 	}
+	MissionManager->OnMainGameUIReadyAndInitialized(MissionWidgetManager);
 
-	MissionManager->SetMissionWidgetManagerFromMainGameUI(MissionWidgetManager);
 }
 
-UUserWidget* UMainGameUI::GetMissionManagerWidget() const
+UW_MissionWidgetManager* UMainGameUI::GetMissionManagerWidget() const
 {
 	if (not M_MissionManagerWidget.IsValid())
 	{

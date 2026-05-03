@@ -25,7 +25,7 @@ struct FHoldToSkipRuntimeState
 };
 
 /**
- * @brief Presents a hold-to-skip prompt that owns the Escape key handling while it has focus.
+ * @brief Presents a hold-to-skip prompt that owns the Space key handling while it has focus.
  * Missions show this during cinematic takeover so players can skip without reopening gameplay UI.
  */
 UCLASS()
@@ -85,7 +85,7 @@ private:
 	float M_ProgressInterpSpeed = 12.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hold To Confirm", meta=(AllowPrivateAccess="true"))
-	FText M_DefaultPromptText = FText::FromString(TEXT("Hold Escape to skip"));
+	FText M_DefaultPromptText = FText::FromString(TEXT("Hold Space to skip"));
 
 	UPROPERTY(EditDefaultsOnly, Category="Hold To Confirm", meta=(AllowPrivateAccess="true", ClampMin="0.1"))
 	float M_IdleBlinkFrequency = 0.6f;

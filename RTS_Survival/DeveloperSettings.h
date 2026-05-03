@@ -1540,7 +1540,7 @@ namespace DeveloperSettings
 		constexpr bool GEnemyController_Compile_DebugSymbols = false;
 		constexpr bool GEnemyController_StrategicAI_Compile_DebugSymbols = false;
 		constexpr bool GEnemyController_NavDetector_DebugSymbols = false;
-		constexpr bool GEnemyController_DirectControl_Compile_DebugSymbols = false;
+		constexpr bool GEnemyController_DirectControl_Compile_DebugSymbols = true;
 		constexpr bool ExplosionsManager_Compile_DebugSymbols = false;
 		constexpr bool GPlayerStartLocations_Compile_DebugSymbols = false;
 		constexpr bool GCamera_Player_Compile_DebugSymbols = false;
