@@ -271,6 +271,70 @@ void UEnemyFormationController::RemoveActiveFormationsByID(const TArray<int32>& 
 }
 
 
+
+void UEnemyFormationController::RemoveUnitsFromAnyFormation(
+	const TArray<ASquadController*>& SquadControllers,
+	const TArray<ATankMaster*>& TankMasters)
+{
+	if (SquadControllers.IsEmpty() && TankMasters.IsEmpty())
+	{
+		return;
+	}
+
+	TSet<TWeakObjectPtr<AActor>> UnitsToRemove;
+	for (ASquadController* SquadController : SquadControllers)
+	{
+		if (IsValid(SquadController))
+		{
+			UnitsToRemove.Add(SquadController);
+		}
+	}
+	for (ATankMaster* TankMaster : TankMasters)
+	{
+		if (IsValid(TankMaster))
+		{
+			UnitsToRemove.Add(TankMaster);
+		}
+	}
+
+	if (UnitsToRemove.IsEmpty())
+	{
+		return;
+	}
+
+	TArray<int32> FormationsToRemove;
+	for (TPair<int32, FFormationData>& FormationPair : M_ActiveFormations)
+	{
+		FFormationData& FormationData = FormationPair.Value;
+		for (int32 UnitIndex = FormationData.FormationUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
+		{
+			const FFormationUnitData& FormationUnitData = FormationData.FormationUnits[UnitIndex];
+			AActor* FormationActor = Cast<AActor>(FormationUnitData.Unit.GetObject());
+			if (not IsValid(FormationActor))
+			{
+				continue;
+			}
+
+			if (not UnitsToRemove.Contains(FormationActor))
+			{
+				continue;
+			}
+
+			FormationData.FormationUnits.RemoveAtSwap(UnitIndex);
+		}
+
+		if (FormationData.FormationUnits.IsEmpty())
+		{
+			FormationsToRemove.Add(FormationPair.Key);
+		}
+	}
+
+	for (const int32 FormationID : FormationsToRemove)
+	{
+		M_ActiveFormations.Remove(FormationID);
+	}
+}
+
 void UEnemyFormationController::BeginPlay()
 {
 	Super::BeginPlay();

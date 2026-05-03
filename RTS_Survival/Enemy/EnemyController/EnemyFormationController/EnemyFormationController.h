@@ -83,6 +83,7 @@ public:
 	void DebugAllActiveFormations() const;
 	void GetActiveFormationData(TArray<FFormationData>& OutFormationData) const;
 	void RemoveActiveFormationsByID(const TArray<int32>& FormationIDs);
+	void RemoveUnitsFromAnyFormation(const TArray<ASquadController*>& SquadControllers, const TArray<ATankMaster*>& TankMasters);
 
 protected:
 	// Called when the game starts

@@ -8,6 +8,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatData.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
@@ -102,6 +103,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_EnemyNavigationAIComponent = CreateDefaultSubobject<UEnemyNavigationAIComponent>(TEXT("EnemyNavigationAIComponent"));
 	M_EnemyStrategicAIComponent = CreateDefaultSubobject<UEnemyStrategicAIComponent>(TEXT("EnemyStrategicAIComponent"));
 	M_EnemyRetreatController = CreateDefaultSubobject<UEnemyRetreatController>(TEXT("EnemyRetreatController"));
+	M_EnemyDirectControlComponent = CreateDefaultSubobject<UEnemyDirectControlComponent>(TEXT("EnemyDirectControlComponent"));
 	CacheGenerationSeedFromGameInstance();
 	if(M_FormationController)
 	{
@@ -127,6 +129,10 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	if (M_EnemyRetreatController)
 	{
 		M_EnemyRetreatController->InitRetreatController(this);
+	}
+	if (M_EnemyDirectControlComponent)
+	{
+		M_EnemyDirectControlComponent->InitDirectControlComponent(this);
 	}
 	
 }
@@ -639,6 +645,17 @@ UEnemyNavigationAIComponent* AEnemyController::GetEnemyNavigationAIComponent() c
 	return M_EnemyNavigationAIComponent;
 }
 
+
+UEnemyFormationController* AEnemyController::GetEnemyFormationController() const
+{
+	if (not GetIsValidFormationController())
+	{
+		return nullptr;
+	}
+
+	return M_FormationController;
+}
+
 UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() const
 {
 	if (not GetIsValidEnemyStrategicAIComponent())
@@ -647,6 +664,16 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 	}
 
 	return M_EnemyStrategicAIComponent;
+}
+
+UEnemyDirectControlComponent* AEnemyController::GetEnemyDirectControlComponent() const
+{
+	if (not GetIsValidEnemyDirectControlComponent())
+	{
+		return nullptr;
+	}
+
+	return M_EnemyDirectControlComponent;
 }
 
 void AEnemyController::BeginPlay()
@@ -738,6 +765,20 @@ bool AEnemyController::GetIsValidEnemyRetreatController() const
 			this);
 		return false;
 	}
+	return true;
+}
+bool AEnemyController::GetIsValidEnemyDirectControlComponent() const
+{
+	if (not IsValid(M_EnemyDirectControlComponent))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_EnemyDirectControlComponent",
+			"AEnemyController::GetIsValidEnemyDirectControlComponent",
+			this);
+		return false;
+	}
+
 	return true;
 }
 

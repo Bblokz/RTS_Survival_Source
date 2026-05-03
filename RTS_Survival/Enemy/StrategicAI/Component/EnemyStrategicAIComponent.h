@@ -27,6 +27,9 @@ public:
 	void QueueGetPlayerUnitCountsAndBaseRequest(const FGetPlayerUnitCountsAndBase& Request);
 	void QueueFindAlliedTanksToRetreatRequest(const FFindAlliedTanksToRetreat& Request);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request);
+
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 
 protected:
@@ -48,6 +51,7 @@ private:
 	void StartStrategicAIThinkingTimer();
 	void StopStrategicAIThinkingTimer();
 
+	void StrategicAiThinkStep();
 	void ProcessStrategicAIRequests();
 	void OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch);
 	int32 M_CachedGenerationSeed = 0;
