@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -37,6 +38,11 @@ void UEnemyStrategicAIComponent::QueueFindAlliedTanksToRetreatRequest(
 	const FFindAlliedTanksToRetreat& Request)
 {
 	M_PendingRequests.FindAlliedTanksToRetreatRequests.Add(Request);
+}
+
+void UEnemyStrategicAIComponent::RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request)
+{
+	QueueFindAlliedTanksToRetreatRequest(Request);
 }
 
 const FStrategicAIResultBatch& UEnemyStrategicAIComponent::GetLatestStrategicAIResults() const
@@ -124,11 +130,16 @@ void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer()
 	World->GetTimerManager().SetTimer(
 		M_StrategicAIThinkingTimerHandle,
 		this,
-		&UEnemyStrategicAIComponent::ProcessStrategicAIRequests,
+		&UEnemyStrategicAIComponent::StrategicAiThinkStep,
 		EnemyAISettings::EnemyStrategicAIThinkingSpeed,
 		true);
 }
 
+
+void UEnemyStrategicAIComponent::StrategicAiThinkStep()
+{
+	ProcessStrategicAIRequests();
+}
 void UEnemyStrategicAIComponent::StopStrategicAIThinkingTimer()
 {
 	if (UWorld* World = GetWorld())
@@ -171,4 +182,25 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch)
 {
 	M_LatestResults = ResultBatch;
+
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+
+	if (ResultBatch.AlliedTanksToRetreatResults.IsEmpty())
+	{
+		return;
+	}
+
+	UEnemyDirectControlComponent* EnemyDirectControlComponent = M_EnemyController->GetEnemyDirectControlComponent();
+	if (not IsValid(EnemyDirectControlComponent))
+	{
+		return;
+	}
+
+	for (const FResultAlliedTanksToRetreat& RetreatResult : ResultBatch.AlliedTanksToRetreatResults)
+	{
+		EnemyDirectControlComponent->HandleRetreatGroupResult(RetreatResult);
+	}
 }

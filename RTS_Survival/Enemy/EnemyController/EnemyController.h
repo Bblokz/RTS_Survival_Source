@@ -8,6 +8,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "EnemyController.generated.h"
 
 
@@ -22,6 +23,7 @@ class UEnemyFormationController;
 class UEnemyRetreatController;
 class UEnemyNavigationAIComponent;
 class UEnemyStrategicAIComponent;
+class UEnemyDirectControlComponent;
 class ATankMaster;
 class ASquadController;
 class URTSGameInstance;
@@ -359,8 +361,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyNavigationAIComponent* GetEnemyNavigationAIComponent() const;
 
+	UEnemyFormationController* GetEnemyFormationController() const;
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
+	UEnemyDirectControlComponent* GetEnemyDirectControlComponent() const;
 
 	// ------------------------------------------------------------
 	// END Enemy Resources Management
@@ -391,6 +398,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnemyRetreatController> M_EnemyRetreatController;
 
+	UPROPERTY()
+	TObjectPtr<UEnemyDirectControlComponent> M_EnemyDirectControlComponent;
+
 	TArray<TWeakObjectPtr<ATankMaster>> M_Tanks;
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 
@@ -400,6 +410,7 @@ private:
 	bool GetIsValidEnemyNavigationAIComponent() const;
 	bool GetIsValidEnemyStrategicAIComponent() const;
 	bool GetIsValidEnemyRetreatController() const;
+	bool GetIsValidEnemyDirectControlComponent() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 	float GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt = 0) const;
