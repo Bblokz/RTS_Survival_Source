@@ -240,6 +240,14 @@ void FGetAsyncTarget::ProcessStrategicAIRequests()
 				FStrategicAIHelpers::BuildAlliedTanksToRetreatResult(RetreatRequest, M_DetailedUnitStates));
 		}
 
+		Results.EnemyBaseClustersResults.Reserve(
+			Request.RequestBatch.FindEnemyBaseClustersRequests.Num());
+		for (const FFindEnemyBaseClusters& BaseClusterRequest : Request.RequestBatch.FindEnemyBaseClustersRequests)
+		{
+			Results.EnemyBaseClustersResults.Add(
+				FStrategicAIHelpers::BuildEnemyBaseClustersResult(BaseClusterRequest, M_DetailedUnitStates));
+		}
+
 		TFunction<void(const FStrategicAIResultBatch&)> Callback = MoveTemp(Request.Callback);
 		AsyncTask(ENamedThreads::GameThread,
 			[Callback = MoveTemp(Callback), Results = MoveTemp(Results)]() mutable

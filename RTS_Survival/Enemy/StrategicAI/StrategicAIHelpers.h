@@ -9,6 +9,8 @@ struct FGetPlayerUnitCountsAndBase;
 struct FResultAlliedTanksToRetreat;
 struct FResultClosestFlankableEnemyHeavy;
 struct FResultPlayerUnitCounts;
+struct FFindEnemyBaseClusters;
+struct FResultEnemyBaseClusters;
 
 namespace FStrategicAIHelpers
 {
@@ -89,5 +91,9 @@ namespace FStrategicAIHelpers
 	 */
 	FResultAlliedTanksToRetreat BuildAlliedTanksToRetreatResult(
 		const FFindAlliedTanksToRetreat& Request,
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
+
+	FResultEnemyBaseClusters BuildEnemyBaseClustersResult(
+		const FFindEnemyBaseClusters& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
 }
