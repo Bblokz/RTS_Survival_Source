@@ -1340,6 +1340,18 @@ void UMissionBase::Tracking_OnActorInvalidatedByIndex(const int32 TrackingIndex)
 
 	M_TrackingHasCountedInvalid[TrackingIndex] = true;
 	M_MissionTrackingRuntimeState.CurrentCount += 1;
+	AActor* TrackedActor = nullptr;
+	if (M_TrackedActors.IsValidIndex(TrackingIndex))
+	{
+		TrackedActor = M_TrackedActors[TrackingIndex].Get();
+	}
+
+	BP_OnTrackedActorInvalidated(
+		TrackedActor,
+		TrackingIndex,
+		M_MissionTrackingRuntimeState.CurrentCount,
+		M_MissionTrackingRuntimeState.MaxCount
+	);
 	Tracking_ApplyWidgetTitleUpdate();
 
 	if (not Tracking_GetHasReachedMaxCount())
@@ -1389,6 +1401,7 @@ void UMissionBase::Tracking_ApplyWidgetTitleUpdate()
 	}
 
 	M_MissionWidget->RefreshMissionWidget(MissionWidgetState);
+	M_MissionWidget->EnsureMissionShowsTitleOnly();
 }
 
 FText UMissionBase::Tracking_BuildTitleText() const

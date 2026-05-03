@@ -526,6 +526,9 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackDestructibleCollapse(ADestructableEnvActor* ActorCollapsed);
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Tracking")
+	void BP_OnTrackedActorInvalidated(AActor* TrackedActor, int32 TrackingIndex, int32 CurrentCount, int32 MaxCount);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnScavengableObjectScavenged(AScavengeableObject* ScavengableObject);
 
