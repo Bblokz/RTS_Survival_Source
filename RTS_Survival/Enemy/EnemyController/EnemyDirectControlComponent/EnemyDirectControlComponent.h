@@ -89,6 +89,7 @@ private:
 	void HandleRetreatGroup(const FDamagedTanksRetreatGroup& RetreatGroup);
 	void RegisterRetreatGroupUnits(const FDamagedTanksRetreatGroup& RetreatGroup);
 	void RemoveRetreatGroupUnitsFromFormations(const FDamagedTanksRetreatGroup& RetreatGroup);
+	void IgnoreHazmatsInFieldConstruction(FDamagedTanksRetreatGroup& RetreatGroup) const;
 	void IssueRetreatOrdersToDamagedTanks(const FDamagedTanksRetreatGroup& RetreatGroup);
 	void IssueHazmatSupportOrders(const FDamagedTanksRetreatGroup& RetreatGroup);
 	AActor* GetFirstValidDamagedTank(const FDamagedTanksRetreatGroup& RetreatGroup) const;
@@ -96,4 +97,5 @@ private:
 	bool EnsureFormationControllerIsValid(UEnemyFormationController*& OutFormationController) const;
 
 	void Debug_RetreatUnitsRemovedFromFormations(const TArray<AActor*>& RemovedUnits) const;
+	void Debug_IgnoredFieldconstructionHazmats(const TArray<AActor*>& IgnoredHazmatUnits) const;
 };

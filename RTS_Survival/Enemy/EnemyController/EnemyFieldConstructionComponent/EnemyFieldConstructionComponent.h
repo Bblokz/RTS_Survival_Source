@@ -9,10 +9,12 @@
 #include "EnemyFieldConstructionComponent.generated.h"
 
 class AEnemyController;
+class AActor;
 class ASquadController;
 class UEnemyNavigationAIComponent;
 class UFieldConstructionAbilityComponent;
 class URTSGameInstance;
+struct FWeakActorLocations;
 
 UENUM(BlueprintType)
 enum class EFieldConstructionStrategy : uint8
@@ -122,6 +124,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetFieldConstructionOrderInterval(const float NewIntervalSeconds);
+
+	TArray<AActor*> GetHazmatUnitsAlreadyAssignedToFieldConstruction(
+		const TArray<FWeakActorLocations>& HazmatUnits) const;
 
 protected:
 	virtual void BeginPlay() override;
