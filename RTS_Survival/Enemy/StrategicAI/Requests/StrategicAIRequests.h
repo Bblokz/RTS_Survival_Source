@@ -170,32 +170,32 @@ struct FResultPlayerUnitCounts
  * up to MaxIdleHazmatsToConsider with formation positions based on RetreatFormationDistance
  * and MaxFormationWidth.
  */
-USTRUCT()
+USTRUCT(Blueprintable, BlueprintType)
 struct FFindAlliedTanksToRetreat
 {
 	GENERATED_BODY()
 
 	FFindAlliedTanksToRetreat();
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RequestID;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxTanksToFind;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxDistanceFromOtherGroupMembers;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxIdleHazmatsToConsider;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxHealthRatioConsiderUnitToRetreat;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float RetreatFormationDistance;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxFormationWidth;
 };
 
