@@ -277,8 +277,13 @@ bool AFowManager::GetMiniMapUVFromWorldLocation(const FVector& WorldLocation, FV
 	}
 
 	const FVector RelativeLocation = WorldLocation - GetActorLocation();
-	const FVector2D UV = FVector2D(RelativeLocation.X / MapSize, RelativeLocation.Y / MapSize)
+	const FVector2D BaseUV = FVector2D(RelativeLocation.X / MapSize, RelativeLocation.Y / MapSize)
 		+ FVector2D(0.5f, 0.5f);
+
+	// Niagara draws vision circles in RT texel space; matching icon placement to texel centres keeps icons centred
+	// on top of their corresponding vision bubbles.
+	const float HalfTexelUVOffset = RenderTargetSize > 0 ? (0.5f / static_cast<float>(RenderTargetSize)) : 0.0f;
+	const FVector2D UV = BaseUV - FVector2D(HalfTexelUVOffset, HalfTexelUVOffset);
 
 	if (not FMath::IsWithinInclusive(UV.X, 0.0f, 1.0f)
 		|| not FMath::IsWithinInclusive(UV.Y, 0.0f, 1.0f))
