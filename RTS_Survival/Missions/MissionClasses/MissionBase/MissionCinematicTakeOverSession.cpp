@@ -222,6 +222,11 @@ void UMissionCinematicTakeOverSession::CompleteSession(const EMissionCinematicTa
 	M_RuntimeState.bM_HasCompleted = true;
 	M_RuntimeState.M_CompletionResult = CompletionResult;
 
+	if (GetIsValidMission(false))
+	{
+		M_Mission->ClearActiveCinematicTakeOverSession(this);
+	}
+
 	UnbindSequencePlayerDelegates();
 	RemoveSkipWidget();
 
@@ -239,11 +244,6 @@ void UMissionCinematicTakeOverSession::CompleteSession(const EMissionCinematicTa
 	RestoreRegularInputModeIfNeeded();
 	OnCompleted.Broadcast();
 	OnCompletedWithResult.Broadcast(CompletionResult);
-
-	if (GetIsValidMission(false))
-	{
-		M_Mission->ClearActiveCinematicTakeOverSession(this);
-	}
 }
 
 bool UMissionCinematicTakeOverSession::GetIsValidMission(const bool bReportError) const
