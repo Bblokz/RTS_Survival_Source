@@ -5,10 +5,12 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
 #include "EnemyStrategicAIComponent.generated.h"
 
 class AEnemyController;
 class URTSGameInstance;
+class UEnemyDirectControlComponent;
 
 /**
  * @brief Orchestrates strategic AI request batching and async processing for the enemy controller.
@@ -26,11 +28,13 @@ public:
 	void QueueFindClosestFlankableEnemyHeavyRequest(const FFindClosestFlankableEnemyHeavy& Request);
 	void QueueGetPlayerUnitCountsAndBaseRequest(const FGetPlayerUnitCountsAndBase& Request);
 	void QueueFindAlliedTanksToRetreatRequest(const FFindAlliedTanksToRetreat& Request);
+	void QueueFindEnemyBaseClustersRequest(const FFindEnemyBaseClusters& Request);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request);
 
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
+	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -42,6 +46,7 @@ private:
 
 	FStrategicAIRequestBatch M_PendingRequests;
 	FStrategicAIResultBatch M_LatestResults;
+	FStrategicAIBlackboard M_StrategicAIBlackboard;
 
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
 
@@ -54,6 +59,9 @@ private:
 	void StrategicAiThinkStep();
 	void ProcessStrategicAIRequests();
 	void OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch);
+	void ProcessEnemyBaseClusterResults(const TArray<FResultEnemyBaseClusters>& EnemyBaseClusterResults);
+	void ProcessAlliedTanksToRetreatResults(const TArray<FResultAlliedTanksToRetreat>& AlliedTanksToRetreatResults);
+	bool GetIsValidEnemyDirectControlComponent(UEnemyDirectControlComponent* EnemyDirectControlComponent) const;
 	int32 M_CachedGenerationSeed = 0;
 	mutable int32 M_SeedDecisionCounter = 0;
 };

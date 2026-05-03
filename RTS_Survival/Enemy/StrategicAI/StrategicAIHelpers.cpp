@@ -2,6 +2,7 @@
 
 #include "RTS_Survival/Game/GameState/GameUnitManager/AsyncUnitDetailedState/AsyncUnitDetailedState.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 
@@ -12,6 +13,138 @@ namespace StrategicAIHelperConstants
 	constexpr int32 MaxRetreatGroups = 3;
 	constexpr float FlankLeftYawOffset = -90.f;
 	constexpr float FlankRightYawOffset = 90.f;
+}
+
+FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
+	const FFindEnemyBaseClusters& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+{
+	FResultEnemyBaseClusters Result;
+	Result.RequestID = Request.RequestID;
+
+	const TSet<EBuildingExpansionType> CoreTypes(Request.CoreBuildingTypes);
+	const TSet<EBuildingExpansionType> SatelliteTypes(Request.SatelliteBuildingTypes);
+	if (CoreTypes.IsEmpty())
+	{
+		return Result;
+	}
+
+	TArray<FVector2D> CorePoints;
+	TArray<FVector2D> SatellitePoints;
+	for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
+	{
+		if (UnitState.OwningPlayer != StrategicAIHelperConstants::EnemyOwningId || UnitState.UnitType != EAllUnitType::UNType_BuildingExpansion)
+		{
+			continue;
+		}
+
+		const EBuildingExpansionType BuildingType = static_cast<EBuildingExpansionType>(UnitState.UnitSubtypeRaw);
+		const FVector2D XY(UnitState.UnitLocation.X, UnitState.UnitLocation.Y);
+		if (CoreTypes.Contains(BuildingType))
+		{
+			CorePoints.Add(XY);
+		}
+		else if (SatelliteTypes.Contains(BuildingType))
+		{
+			SatellitePoints.Add(XY);
+		}
+	}
+
+	const float EpsSq = FMath::Square(FMath::Max(0.f, Request.CoreClusterDistanceXY));
+	const int32 MinCoreNeighbors = FMath::Max(1, Request.MinCoreNeighbors);
+	TArray<int32> Labels;
+	Labels.Init(-1, CorePoints.Num());
+	int32 CurrentCluster = 0;
+	for (int32 PointIndex = 0; PointIndex < CorePoints.Num(); ++PointIndex)
+	{
+		if (Labels[PointIndex] != -1)
+		{
+			continue;
+		}
+		TArray<int32> Neighbors;
+		for (int32 NeighborIndex = 0; NeighborIndex < CorePoints.Num(); ++NeighborIndex)
+		{
+			if (FVector2D::DistSquared(CorePoints[PointIndex], CorePoints[NeighborIndex]) <= EpsSq)
+			{
+				Neighbors.Add(NeighborIndex);
+			}
+		}
+		if (Neighbors.Num() < MinCoreNeighbors)
+		{
+			Labels[PointIndex] = -2;
+			continue;
+		}
+		for (int32 NeighborId : Neighbors)
+		{
+			Labels[NeighborId] = CurrentCluster;
+		}
+		++CurrentCluster;
+	}
+
+	TArray<TArray<FVector2D>> ClusterPoints;
+	ClusterPoints.SetNum(CurrentCluster);
+	for (int32 PointIndex = 0; PointIndex < CorePoints.Num(); ++PointIndex)
+	{
+		if (Labels[PointIndex] >= 0)
+		{
+			ClusterPoints[Labels[PointIndex]].Add(CorePoints[PointIndex]);
+		}
+	}
+
+	for (const FVector2D& SatellitePoint : SatellitePoints)
+	{
+		int32 BestCluster = INDEX_NONE;
+		float BestDistSq = EpsSq;
+		for (int32 ClusterIndex = 0; ClusterIndex < ClusterPoints.Num(); ++ClusterIndex)
+		{
+			for (const FVector2D& CorePoint : ClusterPoints[ClusterIndex])
+			{
+				const float DistanceSq = FVector2D::DistSquared(SatellitePoint, CorePoint);
+				if (DistanceSq < BestDistSq)
+				{
+					BestDistSq = DistanceSq;
+					BestCluster = ClusterIndex;
+				}
+			}
+		}
+		if (BestCluster != INDEX_NONE)
+		{
+			ClusterPoints[BestCluster].Add(SatellitePoint);
+		}
+	}
+
+	struct FBaseScorePoint { float Score; FVector Point; };
+	TArray<FBaseScorePoint> ScoredBases;
+	for (const TArray<FVector2D>& Cluster : ClusterPoints)
+	{
+		if (Cluster.Num() < Request.MinTotalBuildingsPerBase)
+		{
+			continue;
+		}
+		FVector2D Sum = FVector2D::ZeroVector;
+		for (const FVector2D& Point : Cluster)
+		{
+			Sum += Point;
+		}
+		const FVector2D Center = Sum / static_cast<float>(Cluster.Num());
+		const float Score = static_cast<float>(Cluster.Num());
+		if (Score < Request.MinBaseScoreToReturn)
+		{
+			continue;
+		}
+		ScoredBases.Add({Score, FVector(Center.X, Center.Y, 0.f)});
+	}
+
+	ScoredBases.Sort([](const FBaseScorePoint& Left, const FBaseScorePoint& Right) { return Left.Score > Right.Score; });
+	const int32 MaxBases = FMath::Max(0, Request.MaxBasesToReturn);
+	const int32 BasesToTake = MaxBases == 0 ? ScoredBases.Num() : FMath::Min(MaxBases, ScoredBases.Num());
+	Result.BasePoints.Reserve(BasesToTake);
+	for (int32 Index = 0; Index < BasesToTake; ++Index)
+	{
+		Result.BasePoints.Add(ScoredBases[Index].Point);
+	}
+
+	return Result;
 }
 
 namespace StrategicAIHelperUtilities

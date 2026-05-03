@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 
 #include "StrategicAIRequests.generated.h"
 
@@ -255,6 +256,52 @@ struct FResultAlliedTanksToRetreat
 	FDamagedTanksRetreatGroup Group3;
 };
 
+USTRUCT()
+struct FFindEnemyBaseClusters
+{
+	GENERATED_BODY()
+
+	FFindEnemyBaseClusters();
+
+	UPROPERTY()
+	int32 RequestID;
+
+	UPROPERTY()
+	TArray<EBuildingExpansionType> CoreBuildingTypes;
+
+	UPROPERTY()
+	TArray<EBuildingExpansionType> SatelliteBuildingTypes;
+
+	UPROPERTY()
+	float CoreClusterDistanceXY;
+
+	UPROPERTY()
+	int32 MinCoreNeighbors;
+
+	UPROPERTY()
+	int32 MinTotalBuildingsPerBase;
+
+	UPROPERTY()
+	int32 MaxBasesToReturn;
+
+	UPROPERTY()
+	float MinBaseScoreToReturn;
+};
+
+USTRUCT()
+struct FResultEnemyBaseClusters
+{
+	GENERATED_BODY()
+
+	FResultEnemyBaseClusters();
+
+	UPROPERTY()
+	int32 RequestID;
+
+	UPROPERTY()
+	TArray<FVector> BasePoints;
+};
+
 /**
  * @brief Aggregates multiple strategic AI request types into a single async batch.
  * Used to enqueue all pending strategic AI queries for one async processing pass.
@@ -280,6 +327,9 @@ struct FStrategicAIRequestBatch
 
 	UPROPERTY()
 	TArray<FFindAlliedTanksToRetreat> FindAlliedTanksToRetreatRequests;
+
+	UPROPERTY()
+	TArray<FFindEnemyBaseClusters> FindEnemyBaseClustersRequests;
 };
 
 /**
@@ -307,4 +357,7 @@ struct FStrategicAIResultBatch
 
 	UPROPERTY()
 	TArray<FResultAlliedTanksToRetreat> AlliedTanksToRetreatResults;
+
+	UPROPERTY()
+	TArray<FResultEnemyBaseClusters> EnemyBaseClustersResults;
 };

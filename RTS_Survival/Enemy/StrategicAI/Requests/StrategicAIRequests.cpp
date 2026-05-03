@@ -58,6 +58,21 @@ FResultAlliedTanksToRetreat::FResultAlliedTanksToRetreat()
 {
 }
 
+FFindEnemyBaseClusters::FFindEnemyBaseClusters()
+	: RequestID(0)
+	, CoreClusterDistanceXY(0.f)
+	, MinCoreNeighbors(0)
+	, MinTotalBuildingsPerBase(0)
+	, MaxBasesToReturn(0)
+	, MinBaseScoreToReturn(0.f)
+{
+}
+
+FResultEnemyBaseClusters::FResultEnemyBaseClusters()
+	: RequestID(0)
+{
+}
+
 FStrategicAIRequestBatch::FStrategicAIRequestBatch()
 {
 }

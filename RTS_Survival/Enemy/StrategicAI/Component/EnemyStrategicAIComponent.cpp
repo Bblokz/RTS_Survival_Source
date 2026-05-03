@@ -40,6 +40,11 @@ void UEnemyStrategicAIComponent::QueueFindAlliedTanksToRetreatRequest(
 	M_PendingRequests.FindAlliedTanksToRetreatRequests.Add(Request);
 }
 
+void UEnemyStrategicAIComponent::QueueFindEnemyBaseClustersRequest(const FFindEnemyBaseClusters& Request)
+{
+	M_PendingRequests.FindEnemyBaseClustersRequests.Add(Request);
+}
+
 void UEnemyStrategicAIComponent::RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request)
 {
 	QueueFindAlliedTanksToRetreatRequest(Request);
@@ -48,6 +53,11 @@ void UEnemyStrategicAIComponent::RequestRetreatDamagedTanks(const FFindAlliedTan
 const FStrategicAIResultBatch& UEnemyStrategicAIComponent::GetLatestStrategicAIResults() const
 {
 	return M_LatestResults;
+}
+
+const FStrategicAIBlackboard& UEnemyStrategicAIComponent::GetStrategicAIBlackboard() const
+{
+	return M_StrategicAIBlackboard;
 }
 
 void UEnemyStrategicAIComponent::BeginPlay()
@@ -152,7 +162,8 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 {
 	if (M_PendingRequests.FindClosestFlankableEnemyHeavyRequests.IsEmpty()
 		&& M_PendingRequests.GetPlayerUnitCountsAndBaseRequests.IsEmpty()
-		&& M_PendingRequests.FindAlliedTanksToRetreatRequests.IsEmpty())
+		&& M_PendingRequests.FindAlliedTanksToRetreatRequests.IsEmpty()
+		&& M_PendingRequests.FindEnemyBaseClustersRequests.IsEmpty())
 	{
 		return;
 	}
@@ -182,25 +193,62 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch)
 {
 	M_LatestResults = ResultBatch;
+	ProcessEnemyBaseClusterResults(ResultBatch.EnemyBaseClustersResults);
+	ProcessAlliedTanksToRetreatResults(ResultBatch.AlliedTanksToRetreatResults);
+}
 
+void UEnemyStrategicAIComponent::ProcessEnemyBaseClusterResults(
+	const TArray<FResultEnemyBaseClusters>& EnemyBaseClusterResults)
+{
+	if (EnemyBaseClusterResults.IsEmpty())
+	{
+		return;
+	}
+
+	for (const FResultEnemyBaseClusters& BaseClusterResult : EnemyBaseClusterResults)
+	{
+		M_StrategicAIBlackboard.EnemyBasePoints = BaseClusterResult.BasePoints;
+	}
+}
+
+void UEnemyStrategicAIComponent::ProcessAlliedTanksToRetreatResults(
+	const TArray<FResultAlliedTanksToRetreat>& AlliedTanksToRetreatResults)
+{
 	if (not EnsureEnemyControllerIsValid())
 	{
 		return;
 	}
 
-	if (ResultBatch.AlliedTanksToRetreatResults.IsEmpty())
+	if (AlliedTanksToRetreatResults.IsEmpty())
 	{
 		return;
 	}
 
 	UEnemyDirectControlComponent* EnemyDirectControlComponent = M_EnemyController->GetEnemyDirectControlComponent();
-	if (not IsValid(EnemyDirectControlComponent))
+	if (not GetIsValidEnemyDirectControlComponent(EnemyDirectControlComponent))
 	{
 		return;
 	}
 
-	for (const FResultAlliedTanksToRetreat& RetreatResult : ResultBatch.AlliedTanksToRetreatResults)
+	for (const FResultAlliedTanksToRetreat& RetreatResult : AlliedTanksToRetreatResults)
 	{
 		EnemyDirectControlComponent->HandleAsyncRetreatGroupResult(RetreatResult);
 	}
+}
+
+bool UEnemyStrategicAIComponent::GetIsValidEnemyDirectControlComponent(
+	UEnemyDirectControlComponent* EnemyDirectControlComponent) const
+{
+	if (IsValid(EnemyDirectControlComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"EnemyDirectControlComponent",
+		"GetIsValidEnemyDirectControlComponent",
+		this);
+
+	return false;
 }
