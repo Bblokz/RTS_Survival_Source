@@ -20,6 +20,7 @@ namespace EnemyDirectControlConstants
 		inline constexpr bool ReportRegisterDeregister = true;
 
 		inline constexpr bool DebugRemoveDirectControlUnitFromFormations = true;
+		inline constexpr bool DebugIgnoredFieldconstructionHazmats = true;
 
 		const FColor RemoveFromFormationColor = FColor::Red;
 		const float RemoveFromFormationZOffset = 500.f;

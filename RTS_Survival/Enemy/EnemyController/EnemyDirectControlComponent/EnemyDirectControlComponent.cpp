@@ -3,6 +3,7 @@
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyFieldConstructionComponent/EnemyFieldConstructionComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
@@ -291,15 +292,17 @@ void UEnemyDirectControlComponent::HandleAsyncRetreatGroupResult(const FResultAl
 
 void UEnemyDirectControlComponent::HandleRetreatGroup(const FDamagedTanksRetreatGroup& RetreatGroup)
 {
-	if (RetreatGroup.DamagedTanks.IsEmpty())
+	FDamagedTanksRetreatGroup RetreatGroupCopy = RetreatGroup;
+	if (RetreatGroupCopy.DamagedTanks.IsEmpty())
 	{
 		return;
 	}
 
-	RegisterRetreatGroupUnits(RetreatGroup);
-	RemoveRetreatGroupUnitsFromFormations(RetreatGroup);
-	IssueRetreatOrdersToDamagedTanks(RetreatGroup);
-	IssueHazmatSupportOrders(RetreatGroup);
+	RegisterRetreatGroupUnits(RetreatGroupCopy);
+	RemoveRetreatGroupUnitsFromFormations(RetreatGroupCopy);
+	IgnoreHazmatsInFieldConstruction(RetreatGroupCopy);
+	IssueRetreatOrdersToDamagedTanks(RetreatGroupCopy);
+	IssueHazmatSupportOrders(RetreatGroupCopy);
 }
 
 void UEnemyDirectControlComponent::RegisterRetreatGroupUnits(const FDamagedTanksRetreatGroup& RetreatGroup)
@@ -360,6 +363,40 @@ void UEnemyDirectControlComponent::RemoveRetreatGroupUnitsFromFormations(const F
 		EnemyDirectControlConstants::Debugging::DebugRemoveDirectControlUnitFromFormations)
 	{
 		Debug_RetreatUnitsRemovedFromFormations(RemovedUnits);
+	}
+}
+
+void UEnemyDirectControlComponent::IgnoreHazmatsInFieldConstruction(FDamagedTanksRetreatGroup& RetreatGroup) const
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+
+	UEnemyFieldConstructionComponent* EnemyFieldConstructionComponent = M_EnemyController->
+		GetEnemyFieldConstructionComponent();
+	if (not IsValid(EnemyFieldConstructionComponent))
+	{
+		return;
+	}
+
+	const TArray<AActor*> HazmatUnitsToIgnore = EnemyFieldConstructionComponent->
+		GetHazmatUnitsAlreadyAssignedToFieldConstruction(RetreatGroup.HazmatsWithFormationLocations);
+	if (HazmatUnitsToIgnore.IsEmpty())
+	{
+		return;
+	}
+
+	RetreatGroup.HazmatsWithFormationLocations.RemoveAll(
+		[&HazmatUnitsToIgnore](const FWeakActorLocations& HazmatData)
+		{
+			return HazmatUnitsToIgnore.Contains(HazmatData.Actor.Get());
+		});
+
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols &&
+		EnemyDirectControlConstants::Debugging::DebugIgnoredFieldconstructionHazmats)
+	{
+		Debug_IgnoredFieldconstructionHazmats(HazmatUnitsToIgnore);
 	}
 }
 
@@ -485,6 +522,23 @@ void UEnemyDirectControlComponent::Debug_RetreatUnitsRemovedFromFormations(const
 		const FVector Location = EachUnit->GetActorLocation() + FVector(0, 0, RemoveFromFormationZOffset);
 
 		DrawDebugString(GetWorld(), Location, "REMOVED from formations for retreat", nullptr,
+		                RemoveFromFormationColor, RemoveFromLocationDebugTime, false, 1);
+	}
+}
+
+void UEnemyDirectControlComponent::Debug_IgnoredFieldconstructionHazmats(const TArray<AActor*>& IgnoredHazmatUnits) const
+{
+	for (const AActor* IgnoredHazmatUnit : IgnoredHazmatUnits)
+	{
+		if (not IsValid(IgnoredHazmatUnit))
+		{
+			continue;
+		}
+
+		using namespace EnemyDirectControlConstants::Debugging;
+		const FVector Location = IgnoredHazmatUnit->GetActorLocation() + FVector(0, 0, RemoveFromFormationZOffset);
+
+		DrawDebugString(GetWorld(), Location, "IGNORED for retreat (field construction)", nullptr,
 		                RemoveFromFormationColor, RemoveFromLocationDebugTime, false, 1);
 	}
 }

@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
+#include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -146,6 +147,52 @@ void UEnemyFieldConstructionComponent::SetFieldConstructionOrderInterval(const f
 				true);
 		}
 	}
+}
+
+TArray<AActor*> UEnemyFieldConstructionComponent::GetHazmatUnitsAlreadyAssignedToFieldConstruction(
+	const TArray<FWeakActorLocations>& HazmatUnits) const
+{
+	TArray<AActor*> HazmatUnitsToIgnoreForRetreat;
+	if (HazmatUnits.IsEmpty() || M_FieldConstructionOrders.IsEmpty())
+	{
+		return HazmatUnitsToIgnoreForRetreat;
+	}
+
+	for (const FWeakActorLocations& HazmatUnit : HazmatUnits)
+	{
+		AActor* HazmatActor = HazmatUnit.Actor.Get();
+		if (not IsValid(HazmatActor))
+		{
+			continue;
+		}
+
+		for (const FEnemyFieldConstructionOrder& FieldConstructionOrder : M_FieldConstructionOrders)
+		{
+			bool bHazmatFoundInFieldConstructionOrder = false;
+			for (const FEnemyFieldConstructionSquadEntry& SquadConstructionEntry : FieldConstructionOrder.SquadConstructionData)
+			{
+				ASquadController* SquadController = SquadConstructionEntry.SquadController.Get();
+				if (not IsValid(SquadController))
+				{
+					continue;
+				}
+
+				if (SquadController == HazmatActor)
+				{
+					HazmatUnitsToIgnoreForRetreat.AddUnique(HazmatActor);
+					bHazmatFoundInFieldConstructionOrder = true;
+					break;
+				}
+			}
+
+			if (bHazmatFoundInFieldConstructionOrder)
+			{
+				break;
+			}
+		}
+	}
+
+	return HazmatUnitsToIgnoreForRetreat;
 }
 
 void UEnemyFieldConstructionComponent::BeginPlay()
