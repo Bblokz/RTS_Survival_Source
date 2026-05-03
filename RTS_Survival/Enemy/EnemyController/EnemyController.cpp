@@ -666,6 +666,11 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 	return M_EnemyStrategicAIComponent;
 }
 
+UEnemyFieldConstructionComponent* AEnemyController::GetEnemyFieldConstructionComponent() const
+{
+	return M_FieldConstructionComponent;
+}
+
 UEnemyDirectControlComponent* AEnemyController::GetEnemyDirectControlComponent() const
 {
 	if (not GetIsValidEnemyDirectControlComponent())

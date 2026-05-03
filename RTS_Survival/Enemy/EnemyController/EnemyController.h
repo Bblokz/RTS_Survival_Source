@@ -365,6 +365,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
+	UEnemyFieldConstructionComponent* GetEnemyFieldConstructionComponent() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyDirectControlComponent* GetEnemyDirectControlComponent() const;
