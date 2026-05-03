@@ -27,6 +27,7 @@ public:
 	                       const bool bStartAsCollapsedWidget);
 
 	void RefreshMissionWidget(const FMissionWidgetState& WidgetState);
+	void EnsureMissionShowsTitleOnly();
 
 	void MarkWidgetAsFree();
 
@@ -87,4 +88,5 @@ private:
 
 	// Final visibility gate: global-hide wins; otherwise show if in-use.
 	void ApplyVisibilityPolicy(); 
+	bool GetIsExpandedState() const;
 };

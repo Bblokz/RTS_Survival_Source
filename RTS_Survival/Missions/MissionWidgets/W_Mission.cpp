@@ -49,6 +49,18 @@ void UW_Mission::RefreshMissionWidget(const FMissionWidgetState& WidgetState)
 	M_NextButtonType = WidgetState.NextButtonType;
 }
 
+void UW_Mission::EnsureMissionShowsTitleOnly()
+{
+	if (not GetIsExpandedState())
+	{
+		return;
+	}
+
+	constexpr EMissionWidgetState CollapsedState = EMissionWidgetState::OMS_Minimized;
+	M_WidgetState = CollapsedState;
+	OnChangeWidgetState(CollapsedState, EMissionTextSpeed::TS_None);
+}
+
 void UW_Mission::MarkWidgetAsFree()
 {
 	M_WidgetState = EMissionWidgetState::OMS_Minimized;
@@ -148,4 +160,10 @@ void UW_Mission::ApplyVisibilityPolicy()
 	}
 
 	SetVisibility(ESlateVisibility::Visible);
+}
+
+bool UW_Mission::GetIsExpandedState() const
+{
+	return M_WidgetState == EMissionWidgetState::OMS_Expanded
+		|| M_WidgetState == EMissionWidgetState::OMS_ExpandedNext;
 }
