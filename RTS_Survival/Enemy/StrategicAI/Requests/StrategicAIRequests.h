@@ -225,6 +225,10 @@ struct FDamagedTanksRetreatGroup
 
 	UPROPERTY()
 	TArray<FWeakActorLocations> HazmatsWithFormationLocations;
+
+	UPROPERTY()
+	EEnemyRetreatGroupState M_CurrentRetreatGroupState = EEnemyRetreatGroupState::NotInitialized;
+	
 };
 
 /**

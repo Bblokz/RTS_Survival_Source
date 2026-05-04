@@ -49,6 +49,21 @@ bool UEnemyDirectControlComponent::EnsureEnemyControllerIsValid() const
 	return false;
 }
 
+UEnemyStrategicAIComponent* UEnemyDirectControlComponent::GetValidStrategicAIComponent() const
+{
+	if(not EnsureEnemyControllerIsValid())
+	{
+		return nullptr;
+	}
+	UEnemyStrategicAIComponent* StrategicAIComponent = M_EnemyController->GetEnemyStrategicAIComponent();
+	if (IsValid(StrategicAIComponent))
+	{
+		return StrategicAIComponent;
+	}
+	RTSFunctionLibrary::ReportError("Enemy direct control component requires a valid strategic AI component.");
+	return nullptr;
+}
+
 bool UEnemyDirectControlComponent::GetIsValidDirectControlUnitActor(const AActor* UnitActor) const
 {
 	if (not IsValid(UnitActor))
@@ -106,13 +121,13 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 		return false;
 	}
 
-	if (M_RegisteredDirectControlUnits.Contains(UnitActor))
+	if (M_RegisteredIdleDirectControlUnits.Contains(UnitActor))
 	{
 		DebugReportRegisterDeregister("RegisterDirectControlUnit ignored duplicate unit: " + UnitActor->GetName());
 		return false;
 	}
 
-	M_RegisteredDirectControlUnits.Add(UnitActor);
+	M_RegisteredIdleDirectControlUnits.Add(UnitActor);
 	DebugReportRegisterDeregister("RegisterDirectControlUnit added unit: " + UnitActor->GetName());
 	return true;
 }
@@ -124,7 +139,7 @@ bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor
 		return false;
 	}
 
-	const int32 RemovedCount = M_RegisteredDirectControlUnits.Remove(UnitActor);
+	const int32 RemovedCount = M_RegisteredIdleDirectControlUnits.Remove(UnitActor);
 	if (RemovedCount <= 0)
 	{
 		DebugReportRegisterDeregister("DeregisterDirectControlUnit could not find unit: " + UnitActor->GetName());
@@ -137,16 +152,16 @@ bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor
 
 void UEnemyDirectControlComponent::ClearDirectControlUnits()
 {
-	M_RegisteredDirectControlUnits.Empty();
+	M_RegisteredIdleDirectControlUnits.Empty();
 	DebugReportRegisterDeregister("ClearDirectControlUnits removed all direct control units.");
 }
 
 TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() const
 {
 	TArray<AActor*> RegisteredActors;
-	RegisteredActors.Reserve(M_RegisteredDirectControlUnits.Num());
+	RegisteredActors.Reserve(M_RegisteredIdleDirectControlUnits.Num());
 
-	for (const TWeakObjectPtr<AActor>& RegisteredUnit : M_RegisteredDirectControlUnits)
+	for (const TWeakObjectPtr<AActor>& RegisteredUnit : M_RegisteredIdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{
@@ -183,15 +198,15 @@ void UEnemyDirectControlComponent::TickDirectControl()
 
 void UEnemyDirectControlComponent::RemoveInvalidRegisteredUnits()
 {
-	for (int32 UnitIndex = M_RegisteredDirectControlUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
+	for (int32 UnitIndex = M_RegisteredIdleDirectControlUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
 	{
-		const TWeakObjectPtr<AActor> RegisteredUnit = M_RegisteredDirectControlUnits[UnitIndex];
+		const TWeakObjectPtr<AActor> RegisteredUnit = M_RegisteredIdleDirectControlUnits[UnitIndex];
 		if (RegisteredUnit.IsValid())
 		{
 			continue;
 		}
 
-		M_RegisteredDirectControlUnits.RemoveAtSwap(UnitIndex);
+		M_RegisteredIdleDirectControlUnits.RemoveAtSwap(UnitIndex);
 	}
 }
 
@@ -208,7 +223,7 @@ void UEnemyDirectControlComponent::DebugDrawRegisteredDirectControlUnits() const
 		return;
 	}
 
-	for (const TWeakObjectPtr<AActor>& RegisteredUnit : M_RegisteredDirectControlUnits)
+	for (const TWeakObjectPtr<AActor>& RegisteredUnit : M_RegisteredIdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{
@@ -278,55 +293,39 @@ ICommands* UEnemyDirectControlComponent::TryGetCommandsInterface(AActor* UnitAct
 void UEnemyDirectControlComponent::HandleAsyncRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult)
 {
 	M_RetreatCache.M_LastRequestID = RetreatResult.RequestID;
-	M_RetreatCache.M_CachedRetreatGroups.Empty();
 
 	M_RetreatCache.M_CachedRetreatGroups.Add(RetreatResult.Group1);
 	M_RetreatCache.M_CachedRetreatGroups.Add(RetreatResult.Group2);
 	M_RetreatCache.M_CachedRetreatGroups.Add(RetreatResult.Group3);
 
-	for (const FDamagedTanksRetreatGroup& RetreatGroup : M_RetreatCache.M_CachedRetreatGroups)
+	TArray<FDamagedTanksRetreatGroup> NewGroups = { RetreatResult.Group1, RetreatResult.Group2, RetreatResult.Group3 };
+
+	for (FDamagedTanksRetreatGroup& RetreatGroup : NewGroups)
 	{
-		HandleRetreatGroup(RetreatGroup);
+		OnRetreatGroupFound(RetreatGroup);
 	}
 }
 
-void UEnemyDirectControlComponent::HandleRetreatGroup(const FDamagedTanksRetreatGroup& RetreatGroup)
+void UEnemyDirectControlComponent::OnRetreatGroupFound(FDamagedTanksRetreatGroup& RetreatGroup)
 {
-	FDamagedTanksRetreatGroup RetreatGroupCopy = RetreatGroup;
-	if (RetreatGroupCopy.DamagedTanks.IsEmpty())
+	if (RetreatGroup.DamagedTanks.IsEmpty())
 	{
 		return;
 	}
 
-	RegisterRetreatGroupUnits(RetreatGroupCopy);
-	RemoveRetreatGroupUnitsFromFormations(RetreatGroupCopy);
-	IgnoreHazmatsInFieldConstruction(RetreatGroupCopy);
-	IssueRetreatOrdersToDamagedTanks(RetreatGroupCopy);
-	IssueHazmatSupportOrders(RetreatGroupCopy);
+	RemoveRetreatGroupUnitsFromFormations(RetreatGroup);
+	IgnoreHazmatsInFieldConstruction(RetreatGroup);
+	IssueRetreatOrdersToDamagedTanks(RetreatGroup);
+	if(IsRetreatGroupDamagedTanksOnly(RetreatGroup))
+	{
+		MarkRetreatGroupTanksOnlyRetreating(RetreatGroup);
+		return;
+	}
+	
+	IssueHazmatSupportOrders(RetreatGroup);
+	MarkRetreatGroupHazmatsRepairing(RetreatGroup);
 }
 
-void UEnemyDirectControlComponent::RegisterRetreatGroupUnits(const FDamagedTanksRetreatGroup& RetreatGroup)
-{
-	for (const TWeakObjectPtr<AActor>& DamagedTank : RetreatGroup.DamagedTanks)
-	{
-		if (not DamagedTank.IsValid())
-		{
-			continue;
-		}
-
-		RegisterDirectControlUnit(DamagedTank.Get());
-	}
-
-	for (const FWeakActorLocations& HazmatData : RetreatGroup.HazmatsWithFormationLocations)
-	{
-		if (not HazmatData.Actor.IsValid())
-		{
-			continue;
-		}
-
-		RegisterDirectControlUnit(HazmatData.Actor.Get());
-	}
-}
 
 void UEnemyDirectControlComponent::RemoveRetreatGroupUnitsFromFormations(const FDamagedTanksRetreatGroup& RetreatGroup)
 {
@@ -400,6 +399,16 @@ void UEnemyDirectControlComponent::IgnoreHazmatsInFieldConstruction(FDamagedTank
 	}
 }
 
+bool UEnemyDirectControlComponent::IsRetreatGroupDamagedTanksOnly(const FDamagedTanksRetreatGroup& RetreatGroup) const
+{
+	return RetreatGroup.HazmatsWithFormationLocations.IsEmpty();
+}
+
+void UEnemyDirectControlComponent::MarkRetreatGroupTanksOnlyRetreating(FDamagedTanksRetreatGroup& RetreatGroup) const
+{
+	RetreatGroup.M_CurrentRetreatGroupState = EEnemyRetreatGroupState::TanksOnlyRetreating;
+}
+
 void UEnemyDirectControlComponent::IssueRetreatOrdersToDamagedTanks(const FDamagedTanksRetreatGroup& RetreatGroup)
 {
 	for (const TWeakObjectPtr<AActor>& DamagedTank : RetreatGroup.DamagedTanks)
@@ -456,6 +465,11 @@ void UEnemyDirectControlComponent::IssueHazmatSupportOrders(const FDamagedTanksR
 		HazmatCommands->RepairActor(DamagedTankTarget, false);
 		DamagedTankIndex = (DamagedTankIndex + 1) % FMath::Max(RetreatGroup.DamagedTanks.Num(), 1);
 	}
+}
+
+void UEnemyDirectControlComponent::MarkRetreatGroupHazmatsRepairing(FDamagedTanksRetreatGroup& RetreatGroup) const
+{
+	RetreatGroup.M_CurrentRetreatGroupState = EEnemyRetreatGroupState::HazmatsMoveAndRepairTanks;
 }
 
 AActor* UEnemyDirectControlComponent::GetFirstValidDamagedTank(const FDamagedTanksRetreatGroup& RetreatGroup) const

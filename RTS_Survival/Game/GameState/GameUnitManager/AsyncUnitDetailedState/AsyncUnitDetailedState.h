@@ -1,4 +1,4 @@
-﻿#pragma once
+﻿#ouragma once
 
 #include "CoreMinimal.h"
 

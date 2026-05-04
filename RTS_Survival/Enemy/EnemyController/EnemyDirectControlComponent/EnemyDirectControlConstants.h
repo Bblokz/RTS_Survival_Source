@@ -6,6 +6,8 @@ namespace EnemyDirectControlConstants
 {
 	inline constexpr float DirectControlTickRateSeconds = 3.f;
 
+	// Tick-rate for different types of 
+
 	inline constexpr float DebugDrawDurationSeconds = 3.25f;
 	inline constexpr float DebugTextOffsetZ = 260.f;
 	inline constexpr float DebugSphereRadius = 80.f;

@@ -2,8 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "DirectControl_Retreat/EnemyRetreatCache.h"
 #include "EnemyDirectControlComponent.generated.h"
 
+class UEnemyStrategicAIComponent;
 class AEnemyController;
 class AActor;
 class ICommands;
@@ -11,17 +13,6 @@ class UEnemyFormationController;
 struct FResultAlliedTanksToRetreat;
 struct FDamagedTanksRetreatGroup;
 
-USTRUCT()
-struct FDirectControlRetreatCache
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	TArray<FDamagedTanksRetreatGroup> M_CachedRetreatGroups;
-
-	UPROPERTY()
-	int32 M_LastRequestID = INDEX_NONE;
-};
 
 /**
  * @brief Tracks units under direct enemy AI control and offers safe registration APIs for blueprints.
@@ -68,7 +59,7 @@ private:
 
 	// Registry of units currently owned by direct control AI for issuing strategic orders.
 	UPROPERTY()
-	TArray<TWeakObjectPtr<AActor>> M_RegisteredDirectControlUnits;
+	TArray<TWeakObjectPtr<AActor>> M_RegisteredIdleDirectControlUnits;
 
 	FTimerHandle M_DirectControlTickTimerHandle;
 
@@ -76,6 +67,7 @@ private:
 	FDirectControlRetreatCache M_RetreatCache;
 
 	bool EnsureEnemyControllerIsValid() const;
+	UEnemyStrategicAIComponent* GetValidStrategicAIComponent() const;
 	bool GetIsValidDirectControlUnitActor(const AActor* UnitActor) const;
 
 	void StartDirectControlTickTimer();
@@ -86,12 +78,14 @@ private:
 	void DebugReportRegisterDeregister(const FString& Message) const;
 
 	ICommands* TryGetCommandsInterface(AActor* UnitActor) const;
-	void HandleRetreatGroup(const FDamagedTanksRetreatGroup& RetreatGroup);
-	void RegisterRetreatGroupUnits(const FDamagedTanksRetreatGroup& RetreatGroup);
+	void OnRetreatGroupFound(FDamagedTanksRetreatGroup& RetreatGroup);
 	void RemoveRetreatGroupUnitsFromFormations(const FDamagedTanksRetreatGroup& RetreatGroup);
 	void IgnoreHazmatsInFieldConstruction(FDamagedTanksRetreatGroup& RetreatGroup) const;
+	bool IsRetreatGroupDamagedTanksOnly(const FDamagedTanksRetreatGroup& RetreatGroup) const;
+	void MarkRetreatGroupTanksOnlyRetreating(FDamagedTanksRetreatGroup& RetreatGroup) const;
 	void IssueRetreatOrdersToDamagedTanks(const FDamagedTanksRetreatGroup& RetreatGroup);
 	void IssueHazmatSupportOrders(const FDamagedTanksRetreatGroup& RetreatGroup);
+	void MarkRetreatGroupHazmatsRepairing(FDamagedTanksRetreatGroup& RetreatGroup) const;
 	AActor* GetFirstValidDamagedTank(const FDamagedTanksRetreatGroup& RetreatGroup) const;
 	bool TryGetProjectedLocation(const FVector& OriginalLocation, FVector& OutProjectedLocation) const;
 	bool EnsureFormationControllerIsValid(UEnemyFormationController*& OutFormationController) const;
