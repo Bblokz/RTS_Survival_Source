@@ -198,6 +198,10 @@ struct FFindAlliedTanksToRetreat
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxFormationWidth;
+
+	// Units already assigned to active retreat groups and therefore excluded from new grouping.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<TWeakObjectPtr<AActor>> ExcludedRetreatUnitActors;
 };
 
 /**

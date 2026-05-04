@@ -47,7 +47,9 @@ void UEnemyStrategicAIComponent::QueueFindEnemyBaseClustersRequest(const FFindEn
 
 void UEnemyStrategicAIComponent::RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request)
 {
-	QueueFindAlliedTanksToRetreatRequest(Request);
+	FFindAlliedTanksToRetreat RequestToQueue = Request;
+	FillRetreatRequestExcludedUnits(RequestToQueue);
+	QueueFindAlliedTanksToRetreatRequest(RequestToQueue);
 }
 
 const FStrategicAIResultBatch& UEnemyStrategicAIComponent::GetLatestStrategicAIResults() const
@@ -251,4 +253,20 @@ bool UEnemyStrategicAIComponent::GetIsValidEnemyDirectControlComponent(
 		this);
 
 	return false;
+}
+
+void UEnemyStrategicAIComponent::FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+
+	UEnemyDirectControlComponent* EnemyDirectControlComponent = M_EnemyController->GetEnemyDirectControlComponent();
+	if (not GetIsValidEnemyDirectControlComponent(EnemyDirectControlComponent))
+	{
+		return;
+	}
+
+	RequestToFill.ExcludedRetreatUnitActors = EnemyDirectControlComponent->GetRetreatGroupUnitsToExclude();
 }
