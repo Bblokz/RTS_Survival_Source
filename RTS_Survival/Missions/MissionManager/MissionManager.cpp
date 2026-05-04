@@ -255,6 +255,7 @@ void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, 
 	M_GameDifficulty.DifficultyLevel = GameDifficulty;
 	M_GameDifficulty.DifficultyPercentage = NewDifficultyPercentage;
 	M_GameDifficulty.bIsInitialized = true;
+	PropagateGameDifficultyToEnemyStrategicAI(M_GameDifficulty);
 }
 
 void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) const
@@ -272,6 +273,7 @@ void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) con
 	// 	M_MissionWidgetManager->AddToViewport(0);
 	// }
 }
+
 ERTSFaction AMissionManager::GetPlayerFaction() const
 {
 	if (M_PlayerFaction == ERTSFaction::NotInitialised)
@@ -878,6 +880,7 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
+	BeginPlay_MoveAISettingsToStrategicAIBlackboard();
 	BeginPlay_InitGameDifficultyAndSettings();
 }
 
@@ -966,7 +969,6 @@ void AMissionManager::Tick(float DeltaSeconds)
 
 void AMissionManager::InitMissionManagerWidget()
 {
-
 	if (EnsureMissionWidgetIsValid())
 	{
 		return;
@@ -994,8 +996,6 @@ void AMissionManager::BeginPlay_InitPlayerController()
 }
 
 
-
-
 void AMissionManager::OnMainGameUIReadyAndInitialized(UW_MissionWidgetManager* MissionManagerWidget)
 {
 	if (not EnsureValidPlayerController())
@@ -1005,7 +1005,6 @@ void AMissionManager::OnMainGameUIReadyAndInitialized(UW_MissionWidgetManager* M
 	SetMissionManagerWidget(MissionManagerWidget);
 	StartConfiguredMissionsIfNeeded();
 }
-
 
 
 void AMissionManager::StartConfiguredMissionsIfNeeded()
@@ -1031,7 +1030,6 @@ void AMissionManager::StartConfiguredMissionsIfNeeded()
 
 void AMissionManager::SetMissionManagerWidget(UW_MissionWidgetManager* MissionManagerWidget)
 {
-
 	M_MissionWidgetManager = MissionManagerWidget;
 }
 
@@ -1085,6 +1083,24 @@ void AMissionManager::BeginPlay_InitMissionScheduler()
 void AMissionManager::BeginPlay_InitMissionTriggerVolumesManager()
 {
 	GetIsValidMissionTriggerVolumesManager();
+}
+
+void AMissionManager::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
+{
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	if (not EnemyController)
+	{
+		RTSFunctionLibrary::ReportError("Could not get enemy controller in mission manager.");
+		return;
+	}
+	FStrategicAIBlackboard* StrategicAIBlackboard = EnemyController->GetStrategicAIBlackboard();
+	if (not StrategicAIBlackboard)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Could not get strategic AI blackboard from enemy controller in mission manager.");
+		return;
+	}
+	StrategicAIBlackboard->StrategicAIMissionSettings = M_EnemyAIMissionSettings;
 }
 
 bool AMissionManager::EnsureValidPlayerController() const
@@ -1178,6 +1194,8 @@ void AMissionManager::SetGameDifficultyWithGameInstance()
 		return;
 	}
 	M_GameDifficulty = GameDifficulty;
+	PropagateGameDifficultyToEnemyStrategicAI(M_GameDifficulty);
+	
 }
 
 void AMissionManager::RemoveActiveMission(UMissionBase* Mission)
@@ -1948,6 +1966,23 @@ void AMissionManager::SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE
 	PIECampaignGenerationSettings.GenerationSeed = PIEStartupSettings->CampaignGenerationSeed;
 	PIECampaignGenerationSettings.EnemyWorldPersonality = PIEStartupSettings->EnemyWorldPersonality;
 	M_CampaignGenerationSettings = PIECampaignGenerationSettings;
+}
+
+void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDifficulty& GameDifficulty) const
+{
+	AEnemyController* EnemyAIController =  FRTS_Statics::GetEnemyController(this);
+	if (not EnsureEnemyControllerIsValid(EnemyAIController))
+	{
+		return;
+	}
+	FStrategicAIBlackboard* StrategicAIBlackboard = EnemyAIController->GetStrategicAIBlackboard();
+	if(not StrategicAIBlackboard)
+	{
+		RTSFunctionLibrary::ReportError("Failed to propagate the game difficulty to the enemy AI controller's blackboard"
+								  "as it is invalid!!");
+		return;
+	}
+	StrategicAIBlackboard->GameDifficulty = GameDifficulty;
 }
 
 

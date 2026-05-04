@@ -49,7 +49,6 @@ public:
 
 	void HandleAsyncRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult);
 
-	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	TArray<TWeakObjectPtr<AActor>> GetRetreatGroupUnitsToExclude() const;
 
 protected:

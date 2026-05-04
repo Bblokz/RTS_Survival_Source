@@ -60,11 +60,11 @@ FResultAlliedTanksToRetreat::FResultAlliedTanksToRetreat()
 
 FFindEnemyBaseClusters::FFindEnemyBaseClusters()
 	: RequestID(0)
-	, CoreClusterDistanceXY(0.f)
-	, MinCoreNeighbors(0)
-	, MinTotalBuildingsPerBase(0)
-	, MaxBasesToReturn(0)
-	, MinBaseScoreToReturn(0.f)
+	, CoreClusterDistanceXY(1500.f)
+	, MinCoreNeighbors(2)
+	, MinTotalBuildingsPerBase(4)
+	, MaxBasesToReturn(2)
+	, MinBaseScoreToReturn(100.f)
 {
 }
 

@@ -75,6 +75,7 @@ public:
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
 	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
+	FStrategicAIBlackboard* GetEditableStrategicAIBlackboardPointer();
 
 	// This request is periodically used to find the bases owned by the AI.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -118,8 +119,13 @@ private:
 	void OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch);
 	void ProcessEnemyBaseClusterResults(const TArray<FResultEnemyBaseClusters>& EnemyBaseClusterResults);
 	void ProcessAlliedTanksToRetreatResults(const TArray<FResultAlliedTanksToRetreat>& AlliedTanksToRetreatResults);
+	void ProcessPlayerUnitCountsAndBaseResults(const TArray<FResultPlayerUnitCounts>& PlayerUnitCountsAndBaseResults);
 	bool GetIsValidEnemyDirectControlComponent(UEnemyDirectControlComponent* EnemyDirectControlComponent) const;
 	void FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const;
 	int32 M_CachedGenerationSeed = 0;
 	mutable int32 M_SeedDecisionCounter = 0;
+
+	// --------------------- Debugging ---------------------------
+	void DebugBlackboardBasePoints()const;
+	void DebugBlackboardUnitCounts() const;
 };

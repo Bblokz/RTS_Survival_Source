@@ -666,6 +666,15 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 	return M_EnemyStrategicAIComponent;
 }
 
+FStrategicAIBlackboard* AEnemyController::GetStrategicAIBlackboard() const
+{
+	if(not GetIsValidEnemyStrategicAIComponent())
+	{
+		return nullptr;
+	}
+	return M_EnemyStrategicAIComponent->GetEditableStrategicAIBlackboardPointer();
+}
+
 UEnemyFieldConstructionComponent* AEnemyController::GetEnemyFieldConstructionComponent() const
 {
 	return M_FieldConstructionComponent;

@@ -375,7 +375,7 @@ struct FFindAlliedTanksToRetreat
 	 * @note Filled on async processing from caller-provided exclusion list before damaged tank collection.
 	 * @note Not filled when caller provides no exclusions for this batch entry.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> ExcludedRetreatUnitActors;
 };
 

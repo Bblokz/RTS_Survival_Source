@@ -9,5 +9,4 @@ enum class EEnemyWorldPersonality : uint8
 	Balanced,
 	Aggressive,
 	Defensive,
-	Expansive
 };

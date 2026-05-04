@@ -11,6 +11,7 @@
 #include "MissionSpawnCommandQueueState.h"
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionScheduler/MissionScheduler.h"
+#include "RTS_Survival/Enemy/EnemyAIBehaviour/EnemyAIBehaviour.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
@@ -54,6 +55,7 @@ struct FMissionStartingResources
 		return M_Radixite > 0 || M_Metal > 0 || M_VehicleParts > 0;
 	}
 };
+
 
 
 USTRUCT(BlueprintType)
@@ -299,6 +301,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources")
 	FMissionStartingResources M_MissionStartingResources;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy AI")
+	FEnemyAIMissionSettings M_EnemyAIMissionSettings;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
 	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
@@ -428,6 +433,7 @@ private:
 	void BeginPlay_InitGameDifficultyAndSettings();
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
+	void BeginPlay_MoveAISettingsToStrategicAIBlackboard() const;
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
 	bool GetIsValidMissionTriggerVolumesManager() const;
@@ -546,4 +552,6 @@ private:
 	// For testing as standalone game.
 	void SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE();
 	int32 M_NextSeededSpawnBatchRequestId = 1;
+
+	void PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDifficulty& GameDifficulty) const;
 };
