@@ -23,9 +23,21 @@ struct FWeakActorLocations
 
 	FWeakActorLocations();
 
+	/**
+	 * @brief Keeps the source actor tied to generated positions so consumers can issue follow-up orders.
+	 *
+	 * @note Filled on async processing when a valid unit candidate is accepted for a flank or retreat output entry.
+	 * @note Not filled when candidate filtering removes the unit before result materialization.
+	 */
 	UPROPERTY()
 	TWeakObjectPtr<AActor> Actor;
 
+	/**
+	 * @brief Carries precomputed world-space options to avoid recomputing tactical geometry on game thread.
+	 *
+	 * @note Filled on async processing immediately after Actor is chosen and helper functions generate position sets.
+	 * @note Not filled when no valid flank/formation points are produced for that actor.
+	 */
 	UPROPERTY()
 	TArray<FVector> Locations;
 };
@@ -48,27 +60,75 @@ struct FFindClosestFlankableEnemyHeavy
 
 	FFindClosestFlankableEnemyHeavy();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY()
 	int32 RequestID;
 
+	/**
+	 * @brief Defines the tactical origin used to prioritize which enemies are worth flanking first.
+	 *
+	 * @note Filled on async processing from the queued request before distance sorting begins.
+	 * @note Not filled when no flank request was enqueued for the current batch slot.
+	 */
 	UPROPERTY()
 	FVector StartSearchLocation;
 
+	/**
+	 * @brief Caps expensive flank generation so one request cannot monopolize async compute time.
+	 *
+	 * @note Filled on async processing from request tuning values before candidate truncation occurs.
+	 * @note Not filled when request construction is skipped by higher-level AI logic.
+	 */
 	UPROPERTY()
 	int32 MaxHeavyTanksToFlank;
 
+	/**
+	 * @brief Constrains per-target suggestion volume to keep downstream decision cost predictable.
+	 *
+	 * @note Filled on async processing as helper input when building flank arcs for each accepted heavy tank.
+	 * @note Not filled when no heavy tank survives filtering and no arc generation runs.
+	 */
 	UPROPERTY()
 	int32 MaxSuggestedFlankPositionsPerTank;
 
+	/**
+	 * @brief Controls lateral spread so generated flank points reflect intended maneuver aggression.
+	 *
+	 * @note Filled on async processing from request parameters right before flank position synthesis.
+	 * @note Not filled when request never reaches helper execution because batch processing aborts earlier.
+	 */
 	UPROPERTY()
 	float DeltaYawFromLeftRight;
 
+	/**
+	 * @brief Prevents unsafe or noisy close-range points from being proposed as flank destinations.
+	 *
+	 * @note Filled on async processing as lower distance constraint during flank point generation.
+	 * @note Not filled when no flank point generation is attempted for this request.
+	 */
 	UPROPERTY()
 	float MinDistanceToTank;
 
+	/**
+	 * @brief Prevents overextended maneuver suggestions that would break formation responsiveness.
+	 *
+	 * @note Filled on async processing as upper distance constraint during flank point generation.
+	 * @note Not filled when request is filtered out before helper invocation.
+	 */
 	UPROPERTY()
 	float MaxDistanceToTank;
 
+	/**
+	 * @brief Lets callers tune geometric spacing so flank suggestions match squad footprint needs.
+	 *
+	 * @note Filled on async processing before helper expands candidate flank offsets around each tank.
+	 * @note Not filled when no valid target tank exists for this request.
+	 */
 	UPROPERTY()
 	float FlankingPositionsSpreadScaler;
 };
@@ -90,9 +150,21 @@ struct FResultClosestFlankableEnemyHeavy
 
 	FResultClosestFlankableEnemyHeavy();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY()
 	int32 RequestID;
 
+	/**
+	 * @brief Returns target-scoped position bundles so the game thread can issue movement with minimal interpretation.
+	 *
+	 * @note Filled on async processing after each selected heavy tank receives generated flank locations.
+	 * @note Not filled when heavy-tank candidate set resolves to empty.
+	 */
 	UPROPERTY()
 	TArray<FWeakActorLocations> Locations;
 };
@@ -114,6 +186,12 @@ struct FGetPlayerUnitCountsAndBase
 
 	FGetPlayerUnitCountsAndBase();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY()
 	int32 RequestID;
 };
@@ -134,27 +212,75 @@ struct FResultPlayerUnitCounts
 
 	FResultPlayerUnitCounts();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY()
 	int32 RequestID;
 
+	/**
+	 * @brief Captures light armor presence to drive strategic weighting without rescanning all units later.
+	 *
+	 * @note Filled on async processing while iterating player-owned units and classifying tank subtype.
+	 * @note Not filled when player unit scan is skipped due to missing state snapshot.
+	 */
 	UPROPERTY()
 	int32 PlayerLightTanks;
 
+	/**
+	 * @brief Captures medium armor presence for midline pressure estimation in later planners.
+	 *
+	 * @note Filled on async processing while iterating player-owned units and classifying tank subtype.
+	 * @note Not filled when player unit scan cannot run for the batch.
+	 */
 	UPROPERTY()
 	int32 PlayerMediumTanks;
 
+	/**
+	 * @brief Captures heavy armor presence to influence threat and durability heuristics downstream.
+	 *
+	 * @note Filled on async processing while iterating player-owned units and classifying tank subtype.
+	 * @note Not filled when no valid unit-state snapshot is available.
+	 */
 	UPROPERTY()
 	int32 PlayerHeavyTanks;
 
+	/**
+	 * @brief Tracks infantry-style force count to support mixed-composition strategic responses.
+	 *
+	 * @note Filled on async processing when player squad unit entries are encountered in the state scan.
+	 * @note Not filled when request was not submitted in the current batch.
+	 */
 	UPROPERTY()
 	int32 PlayerSquads;
 
+	/**
+	 * @brief Represents auxiliary nomadic vehicle pressure without forcing multiple category passes.
+	 *
+	 * @note Filled on async processing for nomadic units that are neither HQ nor resource buildings.
+	 * @note Not filled when no qualifying nomadic units are found during scan.
+	 */
 	UPROPERTY()
 	int32 PlayerNomadicVehicles;
 
+	/**
+	 * @brief Provides a stable anchor point for macro-level pathing and threat evaluation decisions.
+	 *
+	 * @note Filled on async processing once the player nomadic HQ entry is identified in unit states.
+	 * @note Not filled when HQ is absent from snapshot or ownership/type checks fail.
+	 */
 	UPROPERTY()
 	FVector PlayerHQLocation;
 
+	/**
+	 * @brief Supplies strategic expansion anchors so pressure analysis can target economic footprint.
+	 *
+	 * @note Filled on async processing by appending locations of player-owned nomadic resource buildings.
+	 * @note Not filled when no matching buildings are present in scanned state.
+	 */
 	UPROPERTY()
 	TArray<FVector> PlayerResourceBuildings;
 };
@@ -178,28 +304,76 @@ struct FFindAlliedTanksToRetreat
 
 	FFindAlliedTanksToRetreat();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RequestID;
 
+	/**
+	 * @brief Bounds retreat grouping complexity so grouping remains fast under heavy combat load.
+	 *
+	 * @note Filled on async processing from request constraints before damaged-tank sorting and truncation.
+	 * @note Not filled when retreat request is absent from batch.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxTanksToFind;
 
+	/**
+	 * @brief Defines cohesion tolerance so retreat groups remain supportable by escorts.
+	 *
+	 * @note Filled on async processing before proximity-based grouping comparisons are executed.
+	 * @note Not filled when no damaged tanks qualify for grouping.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxDistanceFromOtherGroupMembers;
 
+	/**
+	 * @brief Limits escort search breadth to keep healer assignment work deterministic per group.
+	 *
+	 * @note Filled on async processing before idle hazmat candidate filtering and distance sorting.
+	 * @note Not filled when retreat request is skipped.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxIdleHazmatsToConsider;
 
+	/**
+	 * @brief Encodes retreat eligibility so only sufficiently damaged units enter regrouping logic.
+	 *
+	 * @note Filled on async processing as the health threshold during damaged-tank filtering.
+	 * @note Not filled when unit health data is unavailable for request execution.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxHealthRatioConsiderUnitToRetreat;
 
+	/**
+	 * @brief Tunes escort standoff distance so healers form practical support geometry around retreaters.
+	 *
+	 * @note Filled on async processing before hazmat formation positions are generated.
+	 * @note Not filled when no hazmats are assigned to any group.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float RetreatFormationDistance;
 
+	/**
+	 * @brief Caps formation breadth to prevent overly wide escort layouts that break control coherence.
+	 *
+	 * @note Filled on async processing as helper input while building retreat formation position sets.
+	 * @note Not filled when retreat formation generation is bypassed.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxFormationWidth;
 
 	// Units already assigned to active retreat groups and therefore excluded from new grouping.
+	/**
+	 * @brief Prevents duplicate assignment so units already committed to active retreats are not regrouped.
+	 *
+	 * @note Filled on async processing from caller-provided exclusion list before damaged tank collection.
+	 * @note Not filled when caller provides no exclusions for this batch entry.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<TWeakObjectPtr<AActor>> ExcludedRetreatUnitActors;
 };
@@ -224,12 +398,30 @@ struct FDamagedTanksRetreatGroup
 
 	FDamagedTanksRetreatGroup();
 
+	/**
+	 * @brief Persists grouped retreat members so follow-up commands target a consistent damaged cohort.
+	 *
+	 * @note Filled on async processing during proximity clustering of eligible damaged allied tanks.
+	 * @note Not filled when no damaged tanks satisfy retreat criteria.
+	 */
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> DamagedTanks;
 
+	/**
+	 * @brief Associates support units with ready-to-use formation points to speed game-thread order issuance.
+	 *
+	 * @note Filled on async processing after idle hazmats are matched and formation offsets are generated.
+	 * @note Not filled when no suitable hazmat escorts are discovered.
+	 */
 	UPROPERTY()
 	TArray<FWeakActorLocations> HazmatsWithFormationLocations;
 
+	/**
+	 * @brief Carries retreat lifecycle state so consumers can advance behavior without external bookkeeping.
+	 *
+	 * @note Filled on async processing with default not-initialized state, then updated later by gameplay systems.
+	 * @note Not filled only if struct construction itself is bypassed due to request failure.
+	 */
 	UPROPERTY()
 	EEnemyRetreatGroupState M_CurrentRetreatGroupState = EEnemyRetreatGroupState::NotInitialized;
 	
@@ -251,15 +443,39 @@ struct FResultAlliedTanksToRetreat
 
 	FResultAlliedTanksToRetreat();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY()
 	int32 RequestID;
 
+	/**
+	 * @brief Reserves deterministic primary slot so top-priority retreat cluster can be consumed predictably.
+	 *
+	 * @note Filled on async processing with first built retreat group when at least one group exists.
+	 * @note Not filled when zero groups are produced for the request.
+	 */
 	UPROPERTY()
 	FDamagedTanksRetreatGroup Group1;
 
+	/**
+	 * @brief Reserves deterministic secondary slot to avoid dynamic container handling in blueprint consumers.
+	 *
+	 * @note Filled on async processing with second built retreat group when at least two groups exist.
+	 * @note Not filled when fewer than two groups are produced.
+	 */
 	UPROPERTY()
 	FDamagedTanksRetreatGroup Group2;
 
+	/**
+	 * @brief Reserves deterministic tertiary slot for final retreat group without extra allocation churn.
+	 *
+	 * @note Filled on async processing with third built retreat group when at least three groups exist.
+	 * @note Not filled when fewer than three groups are produced.
+	 */
 	UPROPERTY()
 	FDamagedTanksRetreatGroup Group3;
 };
@@ -271,27 +487,75 @@ struct FFindEnemyBaseClusters
 
 	FFindEnemyBaseClusters();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY()
 	int32 RequestID;
 
+	/**
+	 * @brief Defines anchor structure classes so base clustering emphasizes strategic core infrastructure.
+	 *
+	 * @note Filled on async processing from request filters before scanning enemy building states.
+	 * @note Not filled when caller omits core type filters.
+	 */
 	UPROPERTY()
 	TArray<EBuildingExpansionType> CoreBuildingTypes;
 
+	/**
+	 * @brief Adds supporting structure classes so clusters capture full base footprint context.
+	 *
+	 * @note Filled on async processing from request filters alongside core type matching rules.
+	 * @note Not filled when caller omits satellite filters.
+	 */
 	UPROPERTY()
 	TArray<EBuildingExpansionType> SatelliteBuildingTypes;
 
+	/**
+	 * @brief Sets planar grouping radius so nearby core buildings collapse into one base candidate.
+	 *
+	 * @note Filled on async processing before cluster-neighbor searches are executed.
+	 * @note Not filled when cluster request is not queued.
+	 */
 	UPROPERTY()
 	float CoreClusterDistanceXY;
 
+	/**
+	 * @brief Applies density gate so sparse structures do not become false-positive base centers.
+	 *
+	 * @note Filled on async processing as minimum-neighbor threshold during core cluster validation.
+	 * @note Not filled when no core candidates are found.
+	 */
 	UPROPERTY()
 	int32 MinCoreNeighbors;
 
+	/**
+	 * @brief Requires enough total structures so returned bases reflect meaningful strategic investment.
+	 *
+	 * @note Filled on async processing before final cluster acceptance scoring.
+	 * @note Not filled when preliminary clustering yields no candidates.
+	 */
 	UPROPERTY()
 	int32 MinTotalBuildingsPerBase;
 
+	/**
+	 * @brief Prevents oversized outputs and keeps downstream planning bounded to top opportunities.
+	 *
+	 * @note Filled on async processing before score-sorted cluster truncation.
+	 * @note Not filled when no base clusters pass filters.
+	 */
 	UPROPERTY()
 	int32 MaxBasesToReturn;
 
+	/**
+	 * @brief Filters weak clusters so consumers only react to bases with sufficient strategic signal.
+	 *
+	 * @note Filled on async processing as score cutoff during final base selection.
+	 * @note Not filled when scoring stage is never reached.
+	 */
 	UPROPERTY()
 	float MinBaseScoreToReturn;
 };
@@ -303,9 +567,21 @@ struct FResultEnemyBaseClusters
 
 	FResultEnemyBaseClusters();
 
+	/**
+	 * @brief Preserves request/result pairing so async outputs can be matched without relying on array index assumptions.
+	 *
+	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
+	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 */
 	UPROPERTY()
 	int32 RequestID;
 
+	/**
+	 * @brief Provides compact base centroids so strategic systems can reason about enemy macro presence quickly.
+	 *
+	 * @note Filled on async processing after accepted base clusters are scored and converted to representative points.
+	 * @note Not filled when no clusters exceed required thresholds.
+	 */
 	UPROPERTY()
 	TArray<FVector> BasePoints;
 };
@@ -327,15 +603,39 @@ struct FStrategicAIRequestBatch
 
 	FStrategicAIRequestBatch();
 
+	/**
+	 * @brief Batches homogeneous flank queries to amortize async scheduling and callback overhead.
+	 *
+	 * @note Filled on async processing from queue contents before per-request helper execution loop begins.
+	 * @note Not filled when no flank requests were enqueued this frame.
+	 */
 	UPROPERTY()
 	TArray<FFindClosestFlankableEnemyHeavy> FindClosestFlankableEnemyHeavyRequests;
 
+	/**
+	 * @brief Batches economy/composition snapshots so strategic decisions share a consistent state sample.
+	 *
+	 * @note Filled on async processing from queue contents before count-building helper loop begins.
+	 * @note Not filled when no count/base requests were queued.
+	 */
 	UPROPERTY()
 	TArray<FGetPlayerUnitCountsAndBase> GetPlayerUnitCountsAndBaseRequests;
 
+	/**
+	 * @brief Batches retreat-planning work so damaged-unit triage is processed in one async pass.
+	 *
+	 * @note Filled on async processing from queue contents before retreat helper loop starts.
+	 * @note Not filled when retreat planners submit no work.
+	 */
 	UPROPERTY()
 	TArray<FFindAlliedTanksToRetreat> FindAlliedTanksToRetreatRequests;
 
+	/**
+	 * @brief Batches base-discovery queries to reuse the same async state snapshot efficiently.
+	 *
+	 * @note Filled on async processing from queue contents before base-cluster helper loop starts.
+	 * @note Not filled when no base-cluster requests are pending.
+	 */
 	UPROPERTY()
 	TArray<FFindEnemyBaseClusters> FindEnemyBaseClustersRequests;
 };
@@ -357,15 +657,39 @@ struct FStrategicAIResultBatch
 
 	FStrategicAIResultBatch();
 
+	/**
+	 * @brief Returns all flank outputs together to preserve request-order semantics through callback handoff.
+	 *
+	 * @note Filled on async processing by appending one result per flank request in iteration order.
+	 * @note Not filled when flank request array is empty.
+	 */
 	UPROPERTY()
 	TArray<FResultClosestFlankableEnemyHeavy> FindClosestFlankableEnemyHeavyResults;
 
+	/**
+	 * @brief Returns composition summaries together so planners can consume synchronized strategic counts.
+	 *
+	 * @note Filled on async processing by appending one summary per count request in iteration order.
+	 * @note Not filled when no count requests were processed.
+	 */
 	UPROPERTY()
 	TArray<FResultPlayerUnitCounts> PlayerUnitCountsResults;
 
+	/**
+	 * @brief Returns retreat grouping outputs as one block to simplify game-thread command orchestration.
+	 *
+	 * @note Filled on async processing by appending one retreat result per retreat request.
+	 * @note Not filled when retreat request array is empty.
+	 */
 	UPROPERTY()
 	TArray<FResultAlliedTanksToRetreat> AlliedTanksToRetreatResults;
 
+	/**
+	 * @brief Returns discovered base points in batch form to keep macro-target updates coherent.
+	 *
+	 * @note Filled on async processing by appending one cluster result per base-cluster request.
+	 * @note Not filled when no base-cluster requests were processed.
+	 */
 	UPROPERTY()
 	TArray<FResultEnemyBaseClusters> EnemyBaseClustersResults;
 };
