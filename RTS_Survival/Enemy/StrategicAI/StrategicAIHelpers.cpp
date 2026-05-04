@@ -305,6 +305,30 @@ namespace StrategicAIHelperUtilities
 		TArray<FVector> Locations;
 	};
 
+	bool GetIsExcludedRetreatUnit(
+		const FFindAlliedTanksToRetreat& Request,
+		const TWeakObjectPtr<AActor>& UnitActor)
+	{
+		if (not UnitActor.IsValid())
+		{
+			return false;
+		}
+
+		for (const TWeakObjectPtr<AActor>& ExcludedActor : Request.ExcludedRetreatUnitActors)
+		{
+			if (not ExcludedActor.IsValid())
+			{
+				continue;
+			}
+			if (ExcludedActor == UnitActor)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	TArray<const FAsyncDetailedUnitState*> GatherDamagedTanks(
 		const FFindAlliedTanksToRetreat& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
@@ -324,6 +348,10 @@ namespace StrategicAIHelperUtilities
 			{
 				continue;
 			}
+			if (GetIsExcludedRetreatUnit(Request, UnitState.UnitActorPtr))
+			{
+				continue;
+			}
 
 			DamagedTanks.Add(&UnitState);
 		}
@@ -336,7 +364,9 @@ namespace StrategicAIHelperUtilities
 		return DamagedTanks;
 	}
 
-	TArray<const FAsyncDetailedUnitState*> GatherIdleHazmats(const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+	TArray<const FAsyncDetailedUnitState*> GatherIdleHazmats(
+		const FFindAlliedTanksToRetreat& Request,
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 	{
 		TArray<const FAsyncDetailedUnitState*> IdleHazmats;
 		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
@@ -354,6 +384,10 @@ namespace StrategicAIHelperUtilities
 				continue;
 			}
 			if (UnitState.bIsInCombat)
+			{
+				continue;
+			}
+			if (GetIsExcludedRetreatUnit(Request, UnitState.UnitActorPtr))
 			{
 				continue;
 			}
@@ -609,7 +643,7 @@ FResultAlliedTanksToRetreat FStrategicAIHelpers::BuildAlliedTanksToRetreatResult
 	TArray<StrategicAIHelperUtilities::FDamagedTankGroupBuilder> Groups =
 		StrategicAIHelperUtilities::BuildDamagedTankGroups(DamagedTanks, Request);
 	const TArray<const FAsyncDetailedUnitState*> IdleHazmats =
-		StrategicAIHelperUtilities::GatherIdleHazmats(DetailedUnitStates);
+		StrategicAIHelperUtilities::GatherIdleHazmats(Request, DetailedUnitStates);
 
 	StrategicAIHelperUtilities::AppendHazmatsToGroups(Groups, IdleHazmats, Request);
 
