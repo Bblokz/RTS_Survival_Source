@@ -45,6 +45,12 @@ void UEnemyStrategicAIComponent::QueueFindEnemyBaseClustersRequest(const FFindEn
 	M_PendingRequests.FindEnemyBaseClustersRequests.Add(Request);
 }
 
+void UEnemyStrategicAIComponent::QueueFindLocationsUnderPlayerAttackRequest(
+	const FFindLocationsUnderPlayerAttack& Request)
+{
+	M_PendingRequests.FindLocationsUnderPlayerAttackRequests.Add(Request);
+}
+
 void UEnemyStrategicAIComponent::RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request)
 {
 	FFindAlliedTanksToRetreat RequestToQueue = Request;
@@ -98,9 +104,16 @@ void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const
 	M_PlayerUnitCountsBuildingCountsThinkTimer.LastTimeThought = Now;
 	M_PlayerUnitCountsBuildingCountsThinkTimer.ThinkingInterval =
 		EnemyAISettings::ThinkingTimers::UpdatePlayerCountsBaseLocations_Interval;
-	M_AIBaseLocationThinkTimer.ThinkStepDelegate.BindUObject(
+	M_PlayerUnitCountsBuildingCountsThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep);
 	M_AIThinkTimers.Add(&M_PlayerUnitCountsBuildingCountsThinkTimer);
+
+	M_LocationsUnderAttackThinkTimer.LastTimeThought = Now;
+	M_LocationsUnderAttackThinkTimer.ThinkingInterval =
+		EnemyAISettings::ThinkingTimers::UpdatePlayerCountsBaseLocations_Interval;
+	M_LocationsUnderAttackThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep);
+	M_AIThinkTimers.Add(&M_LocationsUnderAttackThinkTimer);
 }
 
 void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
@@ -111,6 +124,11 @@ void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
 void UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep()
 {
 	QueueGetPlayerUnitCountsAndBaseRequest(FindPlayerCountBase_TimerRequest);
+}
+
+void UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep()
+{
+	QueueFindLocationsUnderPlayerAttackRequest(FindLocationsUnderAttack_TimerRequest);
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
@@ -214,7 +232,8 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 	if (M_PendingRequests.FindClosestFlankableEnemyHeavyRequests.IsEmpty()
 		&& M_PendingRequests.GetPlayerUnitCountsAndBaseRequests.IsEmpty()
 		&& M_PendingRequests.FindAlliedTanksToRetreatRequests.IsEmpty()
-		&& M_PendingRequests.FindEnemyBaseClustersRequests.IsEmpty())
+		&& M_PendingRequests.FindEnemyBaseClustersRequests.IsEmpty()
+		&& M_PendingRequests.FindLocationsUnderPlayerAttackRequests.IsEmpty())
 	{
 		return;
 	}
@@ -247,6 +266,7 @@ void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAI
 	ProcessEnemyBaseClusterResults(ResultBatch.EnemyBaseClustersResults);
 	ProcessPlayerUnitCountsAndBaseResults(ResultBatch.PlayerUnitCountsResults);
 	ProcessAlliedTanksToRetreatResults(ResultBatch.AlliedTanksToRetreatResults);
+	ProcessLocationsUnderPlayerAttackResults(ResultBatch.LocationsUnderPlayerAttackResults);
 }
 
 void UEnemyStrategicAIComponent::ProcessEnemyBaseClusterResults(
@@ -307,6 +327,17 @@ void UEnemyStrategicAIComponent::ProcessPlayerUnitCountsAndBaseResults(
 	{
 		DebugBlackboardUnitCounts();
 	}
+}
+
+void UEnemyStrategicAIComponent::ProcessLocationsUnderPlayerAttackResults(
+	const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults)
+{
+	if (LocationsUnderPlayerAttackResults.IsEmpty())
+	{
+		return;
+	}
+
+	M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack = LocationsUnderPlayerAttackResults.Last();
 }
 
 bool UEnemyStrategicAIComponent::GetIsValidEnemyDirectControlComponent(

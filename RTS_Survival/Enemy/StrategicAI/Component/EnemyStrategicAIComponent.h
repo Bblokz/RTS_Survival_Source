@@ -68,6 +68,7 @@ public:
 	void QueueGetPlayerUnitCountsAndBaseRequest(const FGetPlayerUnitCountsAndBase& Request);
 	void QueueFindAlliedTanksToRetreatRequest(const FFindAlliedTanksToRetreat& Request);
 	void QueueFindEnemyBaseClustersRequest(const FFindEnemyBaseClusters& Request);
+	void QueueFindLocationsUnderPlayerAttackRequest(const FFindLocationsUnderPlayerAttack& Request);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request);
@@ -84,6 +85,10 @@ public:
 	// This request is periodically used to find the counts of the player units and buildings.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGetPlayerUnitCountsAndBase FindPlayerCountBase_TimerRequest;
+
+	// This request is periodically used to evaluate whether key locations are currently under player attack pressure.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FFindLocationsUnderPlayerAttack FindLocationsUnderAttack_TimerRequest;
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -106,6 +111,9 @@ private:
 	FAIThinkingTimerData M_PlayerUnitCountsBuildingCountsThinkTimer;
 	void PlayerUnitCountsBuildingCounts_ThinkStep();
 
+	FAIThinkingTimerData M_LocationsUnderAttackThinkTimer;
+	void LocationsUnderAttack_ThinkStep();
+
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
@@ -120,6 +128,7 @@ private:
 	void ProcessEnemyBaseClusterResults(const TArray<FResultEnemyBaseClusters>& EnemyBaseClusterResults);
 	void ProcessAlliedTanksToRetreatResults(const TArray<FResultAlliedTanksToRetreat>& AlliedTanksToRetreatResults);
 	void ProcessPlayerUnitCountsAndBaseResults(const TArray<FResultPlayerUnitCounts>& PlayerUnitCountsAndBaseResults);
+	void ProcessLocationsUnderPlayerAttackResults(const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults);
 	bool GetIsValidEnemyDirectControlComponent(UEnemyDirectControlComponent* EnemyDirectControlComponent) const;
 	void FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const;
 	int32 M_CachedGenerationSeed = 0;

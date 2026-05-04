@@ -149,6 +149,41 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 
 namespace StrategicAIHelperUtilities
 {
+	float GetUnitThreatWeight(
+		const FAsyncDetailedUnitState& UnitState,
+		const FFindLocationsUnderPlayerAttack& Request)
+	{
+		if (UnitState.UnitType == EAllUnitType::UNType_Squad)
+		{
+			return Request.SquadThreatScore;
+		}
+
+		if (UnitState.UnitType != EAllUnitType::UNType_Tank)
+		{
+			return 0.f;
+		}
+
+		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitState.UnitSubtypeRaw);
+		if (Global_GetIsArmoredCar(TankSubtype))
+		{
+			return Request.ArmoredCarThreatScore;
+		}
+		if (Global_GetIsLightTank(TankSubtype))
+		{
+			return Request.LightTankThreatScore;
+		}
+		if (Global_GetIsMediumTank(TankSubtype))
+		{
+			return Request.MediumTankThreatScore;
+		}
+		if (Global_GetIsHeavyTank(TankSubtype))
+		{
+			return Request.HeavyTankThreatScore;
+		}
+
+		return 0.f;
+	}
+
 	float GetClampedDistance(const float MinDistance, const float MaxDistance)
 	{
 		const float SafeMin = FMath::Max(0.f, FMath::Min(MinDistance, MaxDistance));
@@ -501,6 +536,97 @@ namespace StrategicAIHelperUtilities
 			}
 		}
 	}
+}
+
+FResultLocationsUnderPlayerAttack FStrategicAIHelpers::BuildLocationsUnderPlayerAttackResult(
+	const FFindLocationsUnderPlayerAttack& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+{
+	FResultLocationsUnderPlayerAttack Result;
+	Result.RequestID = Request.RequestID;
+
+	if (Request.LocationsToEvaluate.IsEmpty())
+	{
+		return Result;
+	}
+
+	const float MaxInfluenceRadius = FMath::Max(0.f, Request.MaxInfluenceRadius);
+	if (MaxInfluenceRadius <= 0.f)
+	{
+		return Result;
+	}
+
+	const float SafeDistanceExponent = FMath::Max(0.01f, Request.DistanceExponent);
+	const float MinimumThreatScore = FMath::Max(0.f, Request.MinimumThreatScoreToFlagLocation);
+	const float MinimumEffectiveAttackerCount = FMath::Max(0.f, Request.MinimumEffectiveAttackerCount);
+	const float GroupAmplifierPerExtraAttacker = FMath::Max(0.f, Request.GroupAmplifierPerExtraEffectiveAttacker);
+	const float InverseMaxInfluenceRadius = 1.f / MaxInfluenceRadius;
+
+	for (const FVector& EvaluatedLocation : Request.LocationsToEvaluate)
+	{
+		float RawThreatScore = 0.f;
+		float WeightedAttackerCount = 0.f;
+		float WeightedDistanceSum = 0.f;
+		FVector WeightedLocationSum = FVector::ZeroVector;
+		TArray<TWeakObjectPtr<AActor>> ContributingAttackerActors;
+
+		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
+		{
+			if (UnitState.OwningPlayer != StrategicAIHelperConstants::PlayerOwningId)
+			{
+				continue;
+			}
+
+			const float UnitThreatWeight = StrategicAIHelperUtilities::GetUnitThreatWeight(UnitState, Request);
+			if (UnitThreatWeight <= 0.f)
+			{
+				continue;
+			}
+
+			const float DistanceToLocation = FVector::Dist(UnitState.UnitLocation, EvaluatedLocation);
+			if (DistanceToLocation > MaxInfluenceRadius)
+			{
+				continue;
+			}
+
+			const float DistanceRatio = DistanceToLocation * InverseMaxInfluenceRadius;
+			const float DistanceFalloff = FMath::Pow(FMath::Max(0.f, 1.f - DistanceRatio), SafeDistanceExponent);
+			const float UnitThreatContribution = UnitThreatWeight * DistanceFalloff;
+			if (UnitThreatContribution <= 0.f)
+			{
+				continue;
+			}
+
+			RawThreatScore += UnitThreatContribution;
+			WeightedAttackerCount += FMath::Min(1.f, UnitThreatContribution);
+			WeightedDistanceSum += DistanceToLocation * UnitThreatContribution;
+			WeightedLocationSum += UnitState.UnitLocation * UnitThreatContribution;
+			ContributingAttackerActors.Add(UnitState.UnitActorPtr);
+		}
+
+		if (RawThreatScore <= 0.f)
+		{
+			continue;
+		}
+
+		const float ExtraAttackers = FMath::Max(0.f, WeightedAttackerCount - 1.f);
+		const float GroupAmplifier = 1.f + GroupAmplifierPerExtraAttacker * ExtraAttackers;
+		const float FinalThreatScore = RawThreatScore * GroupAmplifier;
+
+		if (FinalThreatScore < MinimumThreatScore || WeightedAttackerCount < MinimumEffectiveAttackerCount)
+		{
+			continue;
+		}
+
+		FPlayerAttackLocationEvaluation AttackEvaluation;
+		AttackEvaluation.LocationUnderAttack = EvaluatedLocation;
+		AttackEvaluation.AverageAttackerDistance = WeightedDistanceSum / RawThreatScore;
+		AttackEvaluation.AverageAttackerLocation = WeightedLocationSum / RawThreatScore;
+		AttackEvaluation.AttackingUnits = MoveTemp(ContributingAttackerActors);
+		Result.LocationsUnderAttack.Add(MoveTemp(AttackEvaluation));
+	}
+
+	return Result;
 }
 
 bool FStrategicAIHelpers::GetIsFlankableHeavyTank(const FAsyncDetailedUnitState& UnitState)
