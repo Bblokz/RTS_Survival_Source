@@ -289,6 +289,42 @@ ICommands* UEnemyDirectControlComponent::TryGetCommandsInterface(AActor* UnitAct
 	return Cast<ICommands>(UnitActor);
 }
 
+TArray<TWeakObjectPtr<AActor>> UEnemyDirectControlComponent::GetRetreatGroupUnitsToExclude() const
+{
+	TArray<TWeakObjectPtr<AActor>> UnitsToExclude;
+	for (const FDamagedTanksRetreatGroup& RetreatGroup : M_RetreatCache.M_CachedRetreatGroups)
+	{
+		AppendRetreatGroupUnitsToExclude(RetreatGroup, UnitsToExclude);
+	}
+
+	return UnitsToExclude;
+}
+
+void UEnemyDirectControlComponent::AppendRetreatGroupUnitsToExclude(
+	const FDamagedTanksRetreatGroup& RetreatGroup,
+	TArray<TWeakObjectPtr<AActor>>& OutUnitsToExclude) const
+{
+	for (const TWeakObjectPtr<AActor>& DamagedTank : RetreatGroup.DamagedTanks)
+	{
+		if (not DamagedTank.IsValid())
+		{
+			continue;
+		}
+
+		OutUnitsToExclude.AddUnique(DamagedTank);
+	}
+
+	for (const FWeakActorLocations& HazmatData : RetreatGroup.HazmatsWithFormationLocations)
+	{
+		if (not HazmatData.Actor.IsValid())
+		{
+			continue;
+		}
+
+		OutUnitsToExclude.AddUnique(HazmatData.Actor);
+	}
+}
+
 
 void UEnemyDirectControlComponent::HandleAsyncRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult)
 {

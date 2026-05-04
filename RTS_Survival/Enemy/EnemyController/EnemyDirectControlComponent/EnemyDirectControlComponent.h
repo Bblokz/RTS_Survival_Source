@@ -49,6 +49,9 @@ public:
 
 	void HandleAsyncRetreatGroupResult(const FResultAlliedTanksToRetreat& RetreatResult);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
+	TArray<TWeakObjectPtr<AActor>> GetRetreatGroupUnitsToExclude() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -76,6 +79,9 @@ private:
 	void RemoveInvalidRegisteredUnits();
 	void DebugDrawRegisteredDirectControlUnits() const;
 	void DebugReportRegisterDeregister(const FString& Message) const;
+	void AppendRetreatGroupUnitsToExclude(
+		const FDamagedTanksRetreatGroup& RetreatGroup,
+		TArray<TWeakObjectPtr<AActor>>& OutUnitsToExclude) const;
 
 	ICommands* TryGetCommandsInterface(AActor* UnitActor) const;
 	void OnRetreatGroupFound(FDamagedTanksRetreatGroup& RetreatGroup);
