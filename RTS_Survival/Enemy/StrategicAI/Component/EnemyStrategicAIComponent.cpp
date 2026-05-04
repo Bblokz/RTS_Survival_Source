@@ -87,20 +87,23 @@ void UEnemyStrategicAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 	Super::EndPlay(EndPlayReason);
 }
 
+
 void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const float Now)
 {
-	M_AIBaseLocationThinkTimer.LastTimeThought = Now;
-	M_AIBaseLocationThinkTimer.ThinkingInterval = EnemyAISettings::ThinkingTimers::UpdateAIBaseLocations_Interval;
-	M_AIBaseLocationThinkTimer.ThinkStepDelegate.BindUObject(
-		this, &UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep);
-	M_AIThinkTimers.Add(&M_AIBaseLocationThinkTimer);
+    // Initialize the first timer
+    M_AIBaseLocationThinkTimer.LastTimeThought = Now;
+    M_AIBaseLocationThinkTimer.ThinkingInterval = EnemyAISettings::ThinkingTimers::UpdateAIBaseLocations_Interval;
+    M_AIBaseLocationThinkTimer.ThinkStepDelegate.BindUObject(
+        this, &UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep);
+    M_AIThinkTimers.Add(&M_AIBaseLocationThinkTimer);
 
-	M_PlayerUnitCountsBuildingCountsThinkTimer.LastTimeThought = Now;
-	M_PlayerUnitCountsBuildingCountsThinkTimer.ThinkingInterval =
-		EnemyAISettings::ThinkingTimers::UpdatePlayerCountsBaseLocations_Interval;
-	M_AIBaseLocationThinkTimer.ThinkStepDelegate.BindUObject(
-		this, &UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep);
-	M_AIThinkTimers.Add(&M_PlayerUnitCountsBuildingCountsThinkTimer);
+    // Initialize the second timer
+    M_PlayerUnitCountsBuildingCountsThinkTimer.LastTimeThought = Now;
+    M_PlayerUnitCountsBuildingCountsThinkTimer.ThinkingInterval =
+        EnemyAISettings::ThinkingTimers::UpdatePlayerCountsBaseLocations_Interval;
+    M_PlayerUnitCountsBuildingCountsThinkTimer.ThinkStepDelegate.BindUObject(
+        this, &UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep);
+    M_AIThinkTimers.Add(&M_PlayerUnitCountsBuildingCountsThinkTimer);
 }
 
 void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
@@ -373,5 +376,6 @@ void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
 		TEXT("\n Found Player HQ: %d"), bFoundHQ ? 1 : 0);
 	DebugString += FString::Printf(
 		TEXT("\n Resource Buildings: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings.Num());
-	
+	RTSFunctionLibrary::PrintString(
+		DebugString,  FColor::Green, EnemyAISettings::Debugging::PlayerCountsDuration);
 }

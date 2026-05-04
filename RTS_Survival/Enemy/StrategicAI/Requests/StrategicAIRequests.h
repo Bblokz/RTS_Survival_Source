@@ -425,7 +425,6 @@ struct FDamagedTanksRetreatGroup
 	 */
 	UPROPERTY()
 	EEnemyRetreatGroupState M_CurrentRetreatGroupState = EEnemyRetreatGroupState::NotInitialized;
-	
 };
 
 /**
@@ -494,7 +493,7 @@ struct FFindEnemyBaseClusters
 	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
 	 * @note Not filled only for malformed requests that never enter the processing loop.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RequestID;
 
 	/**
@@ -503,34 +502,39 @@ struct FFindEnemyBaseClusters
 	 * @note Filled on async processing from request filters before scanning enemy building states.
 	 * @note Not filled when caller omits core type filters.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EBuildingExpansionType> CoreBuildingTypes;
 
 	/**
 	 * @brief Adds supporting structure classes so clusters capture full base footprint context.
 	 *
+	 * @note A satellite point is only allowed to attach to an already existing base cluster.
+	 * @note Sattelites cannot create clusters.
 	 * @note Filled on async processing from request filters alongside core type matching rules.
 	 * @note Not filled when caller omits satellite filters.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EBuildingExpansionType> SatelliteBuildingTypes;
 
 	/**
-	 * @brief Sets planar grouping radius so nearby core buildings collapse into one base candidate.
+	 * @brief Sets planar grouping radius so nearby core buildings collapse into one base candidate. Uses with the MinCoreNeighbors
+	 * where we look in this radius for neighbors; if this radius is low we may not find enough neighbors to facilitate a cluster.
 	 *
 	 * @note Filled on async processing before cluster-neighbor searches are executed.
 	 * @note Not filled when cluster request is not queued.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float CoreClusterDistanceXY;
 
 	/**
 	 * @brief Applies density gate so sparse structures do not become false-positive base centers.
+	* Higher MinCoreNeighbors = fewer bases found
+	* Lower MinCoreNeighbors = more bases found
 	 *
 	 * @note Filled on async processing as minimum-neighbor threshold during core cluster validation.
 	 * @note Not filled when no core candidates are found.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MinCoreNeighbors;
 
 	/**
@@ -539,7 +543,7 @@ struct FFindEnemyBaseClusters
 	 * @note Filled on async processing before final cluster acceptance scoring.
 	 * @note Not filled when preliminary clustering yields no candidates.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MinTotalBuildingsPerBase;
 
 	/**
@@ -548,7 +552,7 @@ struct FFindEnemyBaseClusters
 	 * @note Filled on async processing before score-sorted cluster truncation.
 	 * @note Not filled when no base clusters pass filters.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxBasesToReturn;
 
 	/**
@@ -557,7 +561,7 @@ struct FFindEnemyBaseClusters
 	 * @note Filled on async processing as score cutoff during final base selection.
 	 * @note Not filled when scoring stage is never reached.
 	 */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MinBaseScoreToReturn;
 };
 
