@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Enemy/EnemyAIBehaviour/EnemyAIBehaviour.h"
+#include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "StrategicAIBlackboard.generated.h"
 
