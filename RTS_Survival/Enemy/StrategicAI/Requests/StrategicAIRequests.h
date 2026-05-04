@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/DirectControl_Retreat/RetreatGroupState.h"
 
 #include "StrategicAIRequests.generated.h"
 
@@ -41,35 +42,35 @@ struct FWeakActorLocations
  * sorts candidates by distance, and then builds flank arc positions for up to
  * MaxHeavyTanksToFlank units using the request's yaw and distance settings.
  */
-USTRUCT()
+USTRUCT(Blueprintable)
 struct FFindClosestFlankableEnemyHeavy
 {
 	GENERATED_BODY()
 
 	FFindClosestFlankableEnemyHeavy();
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 RequestID;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector StartSearchLocation;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxHeavyTanksToFlank;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxSuggestedFlankPositionsPerTank;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float DeltaYawFromLeftRight;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MinDistanceToTank;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxDistanceToTank;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float FlankingPositionsSpreadScaler;
 };
 
@@ -107,7 +108,7 @@ struct FResultClosestFlankableEnemyHeavy
  * identifies the nomadic HQ to store its location, and collects nomadic resource building
  * locations; all results are accumulated into a single struct and returned.
  */
-USTRUCT()
+USTRUCT(Blueprintable)
 struct FGetPlayerUnitCountsAndBase
 {
 	GENERATED_BODY()
@@ -191,7 +192,7 @@ struct FFindAlliedTanksToRetreat
 	int32 MaxIdleHazmatsToConsider;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxHealthRatioConsiderUnitToRetreat;
+	float HealthRatioThresholdConsiderUnitToRetreat;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float RetreatFormationDistance;
@@ -260,35 +261,35 @@ struct FResultAlliedTanksToRetreat
 	FDamagedTanksRetreatGroup Group3;
 };
 
-USTRUCT()
+USTRUCT(Blueprintable)
 struct FFindEnemyBaseClusters
 {
 	GENERATED_BODY()
 
 	FFindEnemyBaseClusters();
 
-	UPROPERTY()
-	int32 RequestID;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RequestID ;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EBuildingExpansionType> CoreBuildingTypes;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EBuildingExpansionType> SatelliteBuildingTypes;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float CoreClusterDistanceXY;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MinCoreNeighbors;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MinTotalBuildingsPerBase;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxBasesToReturn;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MinBaseScoreToReturn;
 };
 

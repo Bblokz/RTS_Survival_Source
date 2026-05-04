@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "StrategicAIBlackboard.generated.h"
 
+class ARoadSplineActor;
+
 USTRUCT()
 struct FStrategicAIBlackboard
 {
@@ -10,4 +12,7 @@ struct FStrategicAIBlackboard
 
 	UPROPERTY()
 	TArray<FVector> EnemyBasePoints;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<ARoadSplineActor>> RoadSplineActors;
 };

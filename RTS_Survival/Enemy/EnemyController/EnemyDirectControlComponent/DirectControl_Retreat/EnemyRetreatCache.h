@@ -6,14 +6,6 @@
 
 struct FDamagedTanksRetreatGroup;
 
-UENUM()
-enum class EEnemyRetreatGroupState : uint8
-{
-	NotInitialized,
-	HazmatsMoveAndRepairTanks,
-	TanksOnlyRetreating,
-	TanksOnlyWaiting
-};
 
 
 USTRUCT()

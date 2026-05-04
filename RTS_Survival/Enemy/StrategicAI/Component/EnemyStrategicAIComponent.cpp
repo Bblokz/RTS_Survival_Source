@@ -60,9 +60,16 @@ const FStrategicAIBlackboard& UEnemyStrategicAIComponent::GetStrategicAIBlackboa
 	return M_StrategicAIBlackboard;
 }
 
+FStrategicAIBlackboard& UEnemyStrategicAIComponent::GetEditableStrategicAIBlackboard()
+{
+	return M_StrategicAIBlackboard;
+}
+
 void UEnemyStrategicAIComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	const float Now = GetWorld()->GetTimeSeconds();
+	BeginPlay_PreThinKStep_InitThinkingTimers(Now);
 	CacheGenerationSeedFromGameInstance();
 	StartStrategicAIThinkingTimer();
 }
@@ -71,6 +78,28 @@ void UEnemyStrategicAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 {
 	StopStrategicAIThinkingTimer();
 	Super::EndPlay(EndPlayReason);
+}
+
+void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const float Now)
+{
+	M_AIBaseLocationThinkTimer.LastTimeThought = Now;
+	M_AIBaseLocationThinkTimer.ThinkingInterval = EnemyAISettings::ThinkingTimers::UpdateAIBaseLocations_Interval;
+	M_AIBaseLocationThinkTimer.ThinkStepDelegate.BindUObject(this, &UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep);
+	M_AIThinkTimers.Add(&M_AIBaseLocationThinkTimer);
+	
+	M_PlayerUnitCountsBuildingCountsThinkTimer.LastTimeThought = Now;
+	M_PlayerUnitCountsBuildingCountsThinkTimer.ThinkingInterval = EnemyAISettings::ThinkingTimers::UpdatePlayerCountsBaseLocations_Interval;
+	M_AIBaseLocationThinkTimer.ThinkStepDelegate.BindUObject(this, &UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep);
+	M_AIThinkTimers.Add(&M_PlayerUnitCountsBuildingCountsThinkTimer);
+
+}
+
+void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
+{
+}
+
+void UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep()
+{
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const

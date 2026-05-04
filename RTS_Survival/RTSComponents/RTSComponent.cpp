@@ -8,6 +8,8 @@
 #include "RTS_Survival/UnitTests/TestTurrets/ATestTurretOwner.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "TacticalAIComponents/TacticalAISquad/EnemySquadTacticalAI.h"
+#include "TacticalAIComponents/TacticalAITank/EnemyTankTacticalAI.h"
 
 
 URTSComponent::URTSComponent()
@@ -34,6 +36,10 @@ void URTSComponent::SetUnitInCombat(const bool bInCombat)
 		return;
 	}
 	bM_IsUnitInCombat = true;
+	if(M_EnemyTatcicalAIComp.IsValid())
+	{
+		M_EnemyTatcicalAIComp->OnUnitInCombat();
+	}
 	TWeakObjectPtr<URTSComponent> WeakThis(this);
 	auto OnOutOfCombat = [WeakThis]()-> void
 	{
@@ -223,6 +229,7 @@ void URTSComponent::BeginPlay()
 			(void)AddUnitToGameState();
 		}
 	}
+	BeginPlay_DetermineCreateTacticalAI();
 }
 
 void URTSComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -365,3 +372,51 @@ void URTSComponent::CheckExposedUVariables()
 			GetOwner());
 	}
 }
+
+void URTSComponent::BeginPlay_DetermineCreateTacticalAI()
+{
+	if(OwningPlayer == 1 )
+	{
+		return;
+	}
+	if(UnitType == EAllUnitType::UNType_Tank)
+	{
+		CreateTankTacticalAIAtOwner();
+		return;
+	}
+	// Make sure to only create at the squad controller and not the squad units.
+	const ASquadController* OwnerSquad = Cast<ASquadController>(GetOwner());
+	if(UnitType == EAllUnitType::UNType_Squad && IsValid(OwnerSquad))
+	{
+		CreateSquadTacticalAIAtOwner();
+	}
+}
+
+void URTSComponent::CreateTankTacticalAIAtOwner()
+{
+	UEnemyTankTacticalAI* TankTacticalAI = NewObject<UEnemyTankTacticalAI>(GetOwner(), UEnemyTankTacticalAI::StaticClass());
+	if (IsValid(TankTacticalAI))
+	{
+		TankTacticalAI->RegisterComponent();
+		M_EnemyTatcicalAIComp = TankTacticalAI;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("Failed to create Tank Tactical AI Component at owner.");
+	}
+}
+
+void URTSComponent::CreateSquadTacticalAIAtOwner()
+{
+	UEnemySquadTacticalAI* SquadTacticalAI = NewObject<UEnemySquadTacticalAI>(GetOwner(), UEnemySquadTacticalAI::StaticClass());
+	if (IsValid(SquadTacticalAI))
+	{
+		SquadTacticalAI->RegisterComponent();
+		M_EnemyTatcicalAIComp = SquadTacticalAI;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError("Failed to create Squad Tactical AI Component at owner.");
+	}
+}
+

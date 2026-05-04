@@ -206,6 +206,7 @@ void UEnemyNavigationAIComponent::BeginPlay()
 	CacheGenerationSeedFromGameInstance();
 	CacheRecastNavMesh();
 	CacheRoadSplineActors();
+	PropagateRoadSplineActorsToEnemyAIBlackBoard();
 }
 
 void UEnemyNavigationAIComponent::CacheGenerationSeedFromGameInstance()
@@ -468,6 +469,32 @@ void UEnemyNavigationAIComponent::CacheRoadSplineActors()
 			continue;
 		}
 		M_RoadSplineActors.Add(RoadSplineActor);
+	}
+}
+
+void UEnemyNavigationAIComponent::PropagateRoadSplineActorsToEnemyAIBlackBoard() const
+{
+	if(not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+	AEnemyController* EnemyController = M_EnemyController.Get();
+	UEnemyStrategicAIComponent* StrategicAIComponent = EnemyController->GetEnemyStrategicAIComponent();
+	if(not IsValid(StrategicAIComponent))
+	{
+		RTSFunctionLibrary::ReportError("Could not get valid enemy strategic ai componenet to cache road spline actors"
+								  "at begin play in UEnemyNavigationAIComponent!");
+		return;
+	}
+	for(auto EachSpline :M_RoadSplineActors)
+	{
+		if(not EachSpline.IsValid())
+		{
+			continue;
+		}
+
+	StrategicAIComponent->GetEditableStrategicAIBlackboard().RoadSplineActors.Add(EachSpline.Get());
+		
 	}
 }
 
