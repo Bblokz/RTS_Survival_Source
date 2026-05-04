@@ -11,9 +11,11 @@
 #include "RTSComponent.generated.h"
 
 
+class UTacticalAIComp;
 DECLARE_MULTICAST_DELEGATE(FOnSubTypeInitialized);
 class RTS_SURVIVAL_API ACPPGameState;
 enum class EAllUnitType : uint8;
+
 
 /**
  * @brief Container for OwningPlayer and UnitType values.
@@ -158,5 +160,13 @@ private:
 	const float M_UnitInCombatTimeElapse = 5.f;
 
 	FTimerHandle M_UnitInCombatTimerHandle;
+
+	void BeginPlay_DetermineCreateTacticalAI();
+	void CreateTankTacticalAIAtOwner();
+	void CreateSquadTacticalAIAtOwner();
+	UPROPERTY()
+	TWeakObjectPtr<UTacticalAIComp> M_EnemyTatcicalAIComp = nullptr;
+
+
 	
 };

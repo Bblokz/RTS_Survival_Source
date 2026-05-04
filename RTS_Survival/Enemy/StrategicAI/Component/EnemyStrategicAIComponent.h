@@ -12,6 +12,45 @@ class AEnemyController;
 class URTSGameInstance;
 class UEnemyDirectControlComponent;
 
+DECLARE_DELEGATE(FAIThinkStepDelegate);
+
+USTRUCT()
+struct FAIThinkingTimerData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	float LastTimeThought = 0.f;
+
+	UPROPERTY()
+	float ThinkingInterval = 1.f;
+
+	FAIThinkStepDelegate ThinkStepDelegate;
+
+	bool ShouldThink(const float CurrentTime) const
+	{
+		return (CurrentTime - LastTimeThought) >= ThinkingInterval;
+	}
+
+	bool TryExecuteThinkStep(const float CurrentTime)
+	{
+		if (not ShouldThink(CurrentTime))
+		{
+			return false;
+		}
+
+		if (not ThinkStepDelegate.IsBound())
+		{
+			return false;
+		}
+
+		ThinkStepDelegate.Execute();
+		LastTimeThought = CurrentTime;
+		return true;
+	}
+	
+};
+
 /**
  * @brief Orchestrates strategic AI request batching and async processing for the enemy controller.
  */
@@ -35,7 +74,15 @@ public:
 
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
+	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
 
+	// This request is periodically used to find the bases owned by the AI.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FFindEnemyBaseClusters FindEnemyBase_TimerRequest;
+
+	// This request is periodically used to find the counts of the player units and buildings.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGetPlayerUnitCountsAndBase FindPlayerCountBase_TimerRequest;
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -49,6 +96,16 @@ private:
 	FStrategicAIBlackboard M_StrategicAIBlackboard;
 
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
+
+	void BeginPlay_PreThinKStep_InitThinkingTimers(const float Now);
+
+	FAIThinkingTimerData M_AIBaseLocationThinkTimer;
+	void AIBaseLocation_ThinkStep();
+
+	FAIThinkingTimerData M_PlayerUnitCountsBuildingCountsThinkTimer;
+	void PlayerUnitCountsBuildingCounts_ThinkStep();
+
+	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
 	void CacheGenerationSeedFromGameInstance();

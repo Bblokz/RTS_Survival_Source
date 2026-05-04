@@ -114,6 +114,7 @@ private:
 
 	void CacheRecastNavMesh();
 	void CacheRoadSplineActors();
+	void PropagateRoadSplineActorsToEnemyAIBlackBoard()const;
 
 	bool TryProjectPointToNavigation(
 		const FVector& OriginalLocation,

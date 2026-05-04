@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/DirectControl_Retreat/RetreatGroupState.h"
 
 #include "StrategicAIRequests.generated.h"
 
@@ -53,7 +54,7 @@ struct FWeakActorLocations
  * sorts candidates by distance, and then builds flank arc positions for up to
  * MaxHeavyTanksToFlank units using the request's yaw and distance settings.
  */
-USTRUCT()
+USTRUCT(Blueprintable)
 struct FFindClosestFlankableEnemyHeavy
 {
 	GENERATED_BODY()
@@ -179,7 +180,7 @@ struct FResultClosestFlankableEnemyHeavy
  * identifies the nomadic HQ to store its location, and collects nomadic resource building
  * locations; all results are accumulated into a single struct and returned.
  */
-USTRUCT()
+USTRUCT(Blueprintable)
 struct FGetPlayerUnitCountsAndBase
 {
 	GENERATED_BODY()
@@ -347,7 +348,7 @@ struct FFindAlliedTanksToRetreat
 	 * @note Not filled when unit health data is unavailable for request execution.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxHealthRatioConsiderUnitToRetreat;
+	float HealthRatioThresholdConsiderUnitToRetreat;
 
 	/**
 	 * @brief Tunes escort standoff distance so healers form practical support geometry around retreaters.
@@ -480,7 +481,7 @@ struct FResultAlliedTanksToRetreat
 	FDamagedTanksRetreatGroup Group3;
 };
 
-USTRUCT()
+USTRUCT(Blueprintable)
 struct FFindEnemyBaseClusters
 {
 	GENERATED_BODY()

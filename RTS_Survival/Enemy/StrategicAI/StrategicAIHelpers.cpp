@@ -344,7 +344,7 @@ namespace StrategicAIHelperUtilities
 			{
 				continue;
 			}
-			if (UnitState.HealthRatio > Request.MaxHealthRatioConsiderUnitToRetreat)
+			if (UnitState.HealthRatio > Request.HealthRatioThresholdConsiderUnitToRetreat)
 			{
 				continue;
 			}

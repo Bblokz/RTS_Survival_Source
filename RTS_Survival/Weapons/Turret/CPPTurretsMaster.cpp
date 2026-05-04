@@ -464,6 +464,9 @@ void ACPPTurretsMaster::SetVehicleFireFeedbackComponent(UVehicleFireFeedbackComp
 	M_VehicleFireFeedbackComponent = InVehicleFireFeedbackComponent;
 }
 
+bool ACPPTurretsMaster::BGetIsInRangeOfTarget() const
+{ return bM_IsInRange; }
+
 bool ACPPTurretsMaster::GetIsValidVehicleFireFeedbackComponent() const
 {
 	if (M_VehicleFireFeedbackComponent.IsValid())
@@ -1220,8 +1223,8 @@ void ACPPTurretsMaster::AutoEngage()
 	// 2) Distance gate to max range.
 	const FVector MyLoc = GetActorLocation();
 	const FVector TgtLoc = TargetingData.GetActiveTargetLocation();
-	const bool bInRange = (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
-	if (not bInRange)
+	bM_IsInRange= (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+	if (not bM_IsInRange)
 	{
 		StopAllWeaponsFire(true);
 		ResetTarget();
@@ -1256,12 +1259,12 @@ void ACPPTurretsMaster::SpecificEngage()
 	// Distance check
 	const FVector TgtLoc = TargetingData.GetActiveTargetLocation();
 	const FVector MyLoc = GetActorLocation();
-	const bool bInRange = (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+	bM_IsInRange = (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
 
 	// Still rotate even if not in range; owner reacts to range state.
 	RotateTurretToActor(nullptr /*unused*/);
 
-	if (bInRange)
+	if (bM_IsInRange)
 	{
 		TurretOwner.GetInterface()->OnTurretInRange(this);
 		if (bM_IsRotatedToEngage)

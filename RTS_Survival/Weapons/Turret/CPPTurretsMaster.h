@@ -180,6 +180,9 @@ public:
 	virtual float GetTurretYawLimit() const override;
 
 	void SetVehicleFireFeedbackComponent(UVehicleFireFeedbackComponent* InVehicleFireFeedbackComponent);
+
+	inline bool BGetIsInRangeOfTarget() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
@@ -490,6 +493,9 @@ private:
 	/** @brief sets ActorTarget to the closest enemy actor that is in range of the first weapon on this turret.*/
 	UFUNCTION()
 	void GetClosestTarget();
+
+	// Whether we are in range to the target to engage it.
+	bool bM_IsInRange = false;
 
 	/** @brief if the turret is rotated towards the target within margin to engage */
 	bool bM_IsRotatedToEngage = false;

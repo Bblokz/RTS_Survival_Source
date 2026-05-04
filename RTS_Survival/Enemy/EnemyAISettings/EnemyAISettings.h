@@ -14,5 +14,13 @@ namespace EnemyAISettings
 	// a large structure.
 	inline float EnemyStrategicAIThinkingSpeed = 5.f;
 
+	namespace ThinkingTimers
+	{
+		// How often the strategic Ai requests for finding its base locations. 
+		inline float UpdateAIBaseLocations_Interval = 30.f;
+		// How often the AI requests the counts of player light tanks, squads, nomadic buildings, resource building locations and hq location.
+		inline float UpdatePlayerCountsBaseLocations_Interval = 45.f;
+	}
+
 	inline float EnemyRetreatControllerCheckInterval = 8.4f;
 }
