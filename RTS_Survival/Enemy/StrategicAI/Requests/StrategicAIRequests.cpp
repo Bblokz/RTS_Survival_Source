@@ -73,6 +73,26 @@ FResultEnemyBaseClusters::FResultEnemyBaseClusters()
 {
 }
 
+FFindLocationsUnderPlayerAttack::FFindLocationsUnderPlayerAttack()
+	: RequestID(0)
+	, MaxInfluenceRadius(4500.f)
+	, DistanceExponent(1.6f)
+	, MinimumThreatScoreToFlagLocation(5.f)
+	, MinimumEffectiveAttackerCount(1.5f)
+	, GroupAmplifierPerExtraEffectiveAttacker(0.2f)
+	, SquadThreatScore(1.f)
+	, LightTankThreatScore(2.f)
+	, MediumTankThreatScore(3.5f)
+	, HeavyTankThreatScore(5.f)
+	, ArmoredCarThreatScore(1.25f)
+{
+}
+
+FResultLocationsUnderPlayerAttack::FResultLocationsUnderPlayerAttack()
+	: RequestID(0)
+{
+}
+
 FStrategicAIRequestBatch::FStrategicAIRequestBatch()
 {
 }

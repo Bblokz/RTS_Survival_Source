@@ -592,6 +592,112 @@ struct FResultEnemyBaseClusters
 };
 
 /**
+ * @brief Describes one location threat analysis query for player attack pressure.
+ * Used by async strategic AI to determine which defended points are under meaningful player attack risk.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FFindLocationsUnderPlayerAttack
+{
+	GENERATED_BODY()
+
+	FFindLocationsUnderPlayerAttack();
+
+	/** Identifier copied into results so callers can match async responses safely. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RequestID;
+
+	/** Candidate defended locations to evaluate against player-unit pressure. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FVector> LocationsToEvaluate;
+
+	/** Maximum distance where units still contribute pressure to a location. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxInfluenceRadius;
+
+	/** Shared distance falloff exponent; higher values make far units lose pressure faster. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float DistanceExponent;
+
+	/** Minimum final threat score needed before a location is considered under attack. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinimumThreatScoreToFlagLocation;
+
+	/** Minimum weighted attacker count required to avoid lone-unit false positives. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinimumEffectiveAttackerCount;
+
+	/** Amplifies multi-unit groups so larger formations can threaten from farther away. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float GroupAmplifierPerExtraEffectiveAttacker;
+
+	/** Score contribution for each nearby player squad. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SquadThreatScore;
+
+	/** Score contribution for each nearby player light tank. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float LightTankThreatScore;
+
+	/** Score contribution for each nearby player medium tank. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MediumTankThreatScore;
+
+	/** Score contribution for each nearby player heavy tank. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float HeavyTankThreatScore;
+
+	/** Score contribution for each nearby player armored car. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArmoredCarThreatScore;
+};
+
+/**
+ * @brief Holds one analyzed location that passed the under-attack criteria.
+ * Used by game-thread strategic logic to select responses without recomputing threat geometry.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FPlayerAttackLocationEvaluation
+{
+	GENERATED_BODY()
+
+	/** Defended location from the original request that was flagged under attack. */
+	UPROPERTY(BlueprintReadOnly)
+	FVector LocationUnderAttack = FVector::ZeroVector;
+
+	/** Weighted average distance of units considered attackers for this location. */
+	UPROPERTY(BlueprintReadOnly)
+	float AverageAttackerDistance = 0.f;
+
+	/** Weighted average world location of units considered attackers for this location. */
+	UPROPERTY(BlueprintReadOnly)
+	FVector AverageAttackerLocation = FVector::ZeroVector;
+
+	/** Player units that contributed to this location being flagged under attack. */
+	UPROPERTY(BlueprintReadOnly)
+	TArray<TWeakObjectPtr<AActor>> AttackingUnits;
+};
+
+/**
+ * @brief Returns all locations from a request that are currently under player attack pressure.
+ * Used to deliver compact, directly actionable attack-risk data back to strategic AI callers.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FResultLocationsUnderPlayerAttack
+{
+	GENERATED_BODY()
+
+	FResultLocationsUnderPlayerAttack();
+
+	/** Identifier copied from request so result routing remains deterministic. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 RequestID;
+
+	/** Locations flagged under attack with aggregate attacker metrics. */
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FPlayerAttackLocationEvaluation> LocationsUnderAttack;
+};
+
+/**
  * @brief Aggregates multiple strategic AI request types into a single async batch.
  * Used to enqueue all pending strategic AI queries for one async processing pass.
  *
@@ -643,6 +749,10 @@ struct FStrategicAIRequestBatch
 	 */
 	UPROPERTY()
 	TArray<FFindEnemyBaseClusters> FindEnemyBaseClustersRequests;
+
+	/** Batches attack-risk location evaluations so all points share one consistent unit snapshot. */
+	UPROPERTY()
+	TArray<FFindLocationsUnderPlayerAttack> FindLocationsUnderPlayerAttackRequests;
 };
 
 /**
@@ -697,4 +807,8 @@ struct FStrategicAIResultBatch
 	 */
 	UPROPERTY()
 	TArray<FResultEnemyBaseClusters> EnemyBaseClustersResults;
+
+	/** Returns under-attack location evaluations in request order for deterministic consumption. */
+	UPROPERTY()
+	TArray<FResultLocationsUnderPlayerAttack> LocationsUnderPlayerAttackResults;
 };

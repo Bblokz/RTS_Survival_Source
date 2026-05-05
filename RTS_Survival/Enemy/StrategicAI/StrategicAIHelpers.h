@@ -11,6 +11,8 @@ struct FResultClosestFlankableEnemyHeavy;
 struct FResultPlayerUnitCounts;
 struct FFindEnemyBaseClusters;
 struct FResultEnemyBaseClusters;
+struct FFindLocationsUnderPlayerAttack;
+struct FResultLocationsUnderPlayerAttack;
 
 namespace FStrategicAIHelpers
 {
@@ -95,5 +97,9 @@ namespace FStrategicAIHelpers
 
 	FResultEnemyBaseClusters BuildEnemyBaseClustersResult(
 		const FFindEnemyBaseClusters& Request,
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
+
+	FResultLocationsUnderPlayerAttack BuildLocationsUnderPlayerAttackResult(
+		const FFindLocationsUnderPlayerAttack& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
 }
