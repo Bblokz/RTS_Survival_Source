@@ -8,6 +8,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -1659,6 +1660,7 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 	{
 		Debug("Formation reached FINAL destination!");
 	}
+	RegisterValidFormationUnitsAsIdle(*Formation);
 	int32 InvalidUnitsInFormation = 0;
 	TWeakObjectPtr<UEnemyFormationController> WeakThis(this);
 	for (auto EachUnit : Formation->FormationUnits)
@@ -1681,6 +1683,43 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 	}
 	// remove only after we iterated otherwise we have dead mem.
 	M_ActiveFormations.Remove(Formation->FormationID);
+}
+
+void UEnemyFormationController::RegisterValidFormationUnitsAsIdle(const FFormationData& Formation)
+{
+	if (Formation.bIsRandomPatrolWithAttackMoveFormation)
+	{
+		return;
+	}
+
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+
+	UEnemyDirectControlComponent* EnemyDirectControlComponent = M_EnemyController->GetEnemyDirectControlComponent();
+	if (not IsValid(EnemyDirectControlComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("EnemyDirectControlComponent is invalid in RegisterValidFormationUnitsAsIdle."));
+		return;
+	}
+
+	TArray<AActor*> ValidFormationUnits;
+	for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		if (not FormationUnit.IsValidFormationUnit())
+		{
+			continue;
+		}
+
+		AActor* UnitActor = FormationUnit.Unit->GetOwnerActor();
+		if (RTSFunctionLibrary::RTSIsValid(UnitActor))
+		{
+			ValidFormationUnits.Add(UnitActor);
+		}
+	}
+
+	EnemyDirectControlComponent->RegisterDirectControlUnits(ValidFormationUnits);
 }
 
 void UEnemyFormationController::InitFormationOffsets(

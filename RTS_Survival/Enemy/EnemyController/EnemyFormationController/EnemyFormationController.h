@@ -12,6 +12,7 @@
 class AEnemyController;
 class ATankMaster;
 class ASquadController;
+class UEnemyDirectControlComponent;
 class UNavigationSystemV1;
 class URTSGameInstance;
 
@@ -294,6 +295,7 @@ private:
 		FFormationData* Formation);
 
 	void OnFormationReachedFinalDestination(FFormationData* Formation);
+	void RegisterValidFormationUnitsAsIdle(const FFormationData& Formation);
 
 	/** 
      * Populate FormationUnits[] with each unit’s offset vector 
