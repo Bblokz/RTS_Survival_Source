@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BlackboardIdleUnitEntry.h"
 #include "RTS_Survival/Enemy/EnemyAIBehaviour/EnemyAIBehaviour.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
@@ -14,6 +15,8 @@ struct FStrategicAIBlackboard
 	GENERATED_BODY()
 
 	FStrategicAIBlackboard();
+	UPROPERTY()
+	TArray<FBlackboardIdleUnitEntry> IdleDirectControlUnits;
 
 	UPROPERTY()
 	TArray<FVector> EnemyBasePoints;

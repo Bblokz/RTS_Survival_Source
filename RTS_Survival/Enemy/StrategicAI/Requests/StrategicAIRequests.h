@@ -673,7 +673,7 @@ struct FPlayerAttackLocationEvaluation
 	FVector AverageAttackerLocation = FVector::ZeroVector;
 
 	/** Player units that contributed to this location being flagged under attack. */
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> AttackingUnits;
 };
 
@@ -695,6 +695,7 @@ struct FResultLocationsUnderPlayerAttack
 	/** Locations flagged under attack with aggregate attacker metrics. */
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FPlayerAttackLocationEvaluation> LocationsUnderAttack;
+	
 };
 
 /**

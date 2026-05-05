@@ -8,6 +8,8 @@
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
 #include "EnemyStrategicAIComponent.generated.h"
 
+class UStochasticDecisionTree;
+struct FStochasticDecisionTree;
 class AEnemyController;
 class URTSGameInstance;
 class UEnemyDirectControlComponent;
@@ -48,11 +50,20 @@ struct FAIThinkingTimerData
 		LastTimeThought = CurrentTime;
 		return true;
 	}
-	
 };
 
 /**
  * @brief Orchestrates strategic AI request batching and async processing for the enemy controller.
+ * There are a few components to this:
+ * several _ThinkStep timers that execute once in every few think steps depending on their interval these execute automated
+ * requests on the async processor for which the templates are editable through the AI controller.
+ *
+ * At the core is a decision tree that is configured per level in the enemy ai controller this one lives on the AEnemyController
+ * which provides the pointer to this object at begin play.
+ *
+ * There is a blackboard that keeps track of various state of the game as well as of various results form the async processor
+ * see FStrategicAIBlackboard. This board is provided to the decision tree as well.
+ * 
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UEnemyStrategicAIComponent : public UActorComponent
@@ -62,7 +73,7 @@ class RTS_SURVIVAL_API UEnemyStrategicAIComponent : public UActorComponent
 public:
 	UEnemyStrategicAIComponent();
 
-	void InitStrategicAIComponent(AEnemyController* EnemyController);
+	void InitStrategicAIComponent(AEnemyController* EnemyController, UStochasticDecisionTree* StochasticDecisionTree);
 
 	void QueueFindClosestFlankableEnemyHeavyRequest(const FFindClosestFlankableEnemyHeavy& Request);
 	void QueueGetPlayerUnitCountsAndBaseRequest(const FGetPlayerUnitCountsAndBase& Request);
@@ -89,6 +100,7 @@ public:
 	// This request is periodically used to evaluate whether key locations are currently under player attack pressure.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindLocationsUnderPlayerAttack FindLocationsUnderAttack_TimerRequest;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -96,6 +108,11 @@ protected:
 private:
 	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
+
+
+	// Owned by the enemy controller for easy per-level adjustments in the instance.
+	UPROPERTY()
+	TWeakObjectPtr<UStochasticDecisionTree> M_StochasticDecisionTree;
 
 
 	FStrategicAIRequestBatch M_PendingRequests;
@@ -129,13 +146,14 @@ private:
 	void ProcessEnemyBaseClusterResults(const TArray<FResultEnemyBaseClusters>& EnemyBaseClusterResults);
 	void ProcessAlliedTanksToRetreatResults(const TArray<FResultAlliedTanksToRetreat>& AlliedTanksToRetreatResults);
 	void ProcessPlayerUnitCountsAndBaseResults(const TArray<FResultPlayerUnitCounts>& PlayerUnitCountsAndBaseResults);
-	void ProcessLocationsUnderPlayerAttackResults(const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults);
+	void ProcessLocationsUnderPlayerAttackResults(
+		const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults);
 	bool GetIsValidEnemyDirectControlComponent(UEnemyDirectControlComponent* EnemyDirectControlComponent) const;
 	void FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const;
 	int32 M_CachedGenerationSeed = 0;
 	mutable int32 M_SeedDecisionCounter = 0;
 
 	// --------------------- Debugging ---------------------------
-	void DebugBlackboardBasePoints()const;
+	void DebugBlackboardBasePoints() const;
 	void DebugBlackboardUnitCounts() const;
 };

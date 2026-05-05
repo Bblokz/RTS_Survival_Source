@@ -75,16 +75,16 @@ FResultEnemyBaseClusters::FResultEnemyBaseClusters()
 
 FFindLocationsUnderPlayerAttack::FFindLocationsUnderPlayerAttack()
 	: RequestID(0)
-	, MaxInfluenceRadius(4500.f)
+	, MaxInfluenceRadius(9000.f)
 	, DistanceExponent(1.6f)
 	, MinimumThreatScoreToFlagLocation(5.f)
 	, MinimumEffectiveAttackerCount(1.5f)
-	, GroupAmplifierPerExtraEffectiveAttacker(0.2f)
+	, GroupAmplifierPerExtraEffectiveAttacker(0.33f)
 	, SquadThreatScore(1.f)
 	, LightTankThreatScore(2.f)
 	, MediumTankThreatScore(3.5f)
 	, HeavyTankThreatScore(5.f)
-	, ArmoredCarThreatScore(1.25f)
+	, ArmoredCarThreatScore(1.5f)
 {
 }
 

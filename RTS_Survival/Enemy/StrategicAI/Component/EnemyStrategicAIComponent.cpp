@@ -16,11 +16,14 @@ UEnemyStrategicAIComponent::UEnemyStrategicAIComponent()
 	CacheGenerationSeedFromGameInstance();
 }
 
-void UEnemyStrategicAIComponent::InitStrategicAIComponent(AEnemyController* EnemyController)
+void UEnemyStrategicAIComponent::InitStrategicAIComponent(AEnemyController* EnemyController,
+	UStochasticDecisionTree* StochasticDecisionTree)
 {
+M_StochasticDecisionTree = StochasticDecisionTree;	
 	M_EnemyController = EnemyController;
 	CacheGenerationSeedFromGameInstance();
 }
+
 
 void UEnemyStrategicAIComponent::QueueFindClosestFlankableEnemyHeavyRequest(
 	const FFindClosestFlankableEnemyHeavy& Request)
@@ -111,7 +114,7 @@ void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const
 
 	M_LocationsUnderAttackThinkTimer.LastTimeThought = Now;
 	M_LocationsUnderAttackThinkTimer.ThinkingInterval =
-		EnemyAISettings::ThinkingTimers::UpdatePlayerCountsBaseLocations_Interval;
+		EnemyAISettings::ThinkingTimers::UpdateLocationsUnderPlayerAttack_Interval;
 	M_LocationsUnderAttackThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep);
 	M_AIThinkTimers.Add(&M_LocationsUnderAttackThinkTimer);
@@ -216,6 +219,10 @@ void UEnemyStrategicAIComponent::StrategicAiThinkStep()
 		}
 		// Sees if enough time has passed since last think step then calls delegate.
 		EachThinkTimer->TryExecuteThinkStep(Now);
+	}
+	if(M_StochasticDecisionTree.IsValid())
+	{
+		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_StrategicAIBlackboard);
 	}
 	ProcessStrategicAIRequests();
 }
@@ -337,7 +344,6 @@ void UEnemyStrategicAIComponent::ProcessLocationsUnderPlayerAttackResults(
 	{
 		return;
 	}
-
 	M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack = LocationsUnderPlayerAttackResults.Last();
 }
 
