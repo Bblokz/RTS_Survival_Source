@@ -93,6 +93,7 @@ void UEnemyStrategicAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 	Super::EndPlay(EndPlayReason);
 }
 
+
 void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const float Now)
 {
 	M_AIBaseLocationThinkTimer.LastTimeThought = Now;
@@ -404,5 +405,6 @@ void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
 		TEXT("\n Found Player HQ: %d"), bFoundHQ ? 1 : 0);
 	DebugString += FString::Printf(
 		TEXT("\n Resource Buildings: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings.Num());
-	
+	RTSFunctionLibrary::PrintString(
+		DebugString,  FColor::Green, EnemyAISettings::Debugging::PlayerCountsDuration);
 }

@@ -742,6 +742,14 @@ void ABuildingExpansion::InitBuildingExpansion(
 	const bool bLetBuildingMeshAffectNavMesh)
 {
 	const FBxpData MyData = GetBxpData(NewBuildingExpansionType);
+	if(GetIsValidRTSComponent())
+	{
+		RTSComponent->SetUnitSubtype(ENomadicSubtype::Nomadic_None,
+			 ETankSubtype::Tank_None,
+			 ESquadSubtype::Squad_None,
+			 NewBuildingExpansionType,
+			 EAircraftSubtype::Aircarft_None);
+	}
 	if (GetIsValidFowComponent())
 	{
 		FowComponent->SetVisionRadius(MyData.VisionRadius);

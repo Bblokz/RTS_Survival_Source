@@ -97,6 +97,7 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
+
 	FStrategicAIRequestBatch M_PendingRequests;
 	FStrategicAIResultBatch M_LatestResults;
 	FStrategicAIBlackboard M_StrategicAIBlackboard;
