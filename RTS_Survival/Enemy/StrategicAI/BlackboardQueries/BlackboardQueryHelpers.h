@@ -12,6 +12,22 @@ namespace BlackboardQueries
 		const int32 MinTanks,
 		ETankSubtype TankType);
 
+	bool HasAtLeastXArmoredCars(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinArmoredCars);
+
+	bool HasAtLeastXLightTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinLightTanks);
+
+	bool HasAtLeastXMediumTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinMediumTanks);
+
+	bool HasAtLeastXHeavyTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinHeavyTanks);
+
 	bool HasAtLeastXAircraft(
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinAircraft,
@@ -21,4 +37,10 @@ namespace BlackboardQueries
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinSquads,
 		ESquadSubtype SquadType);
+
+	bool HasValidPlayerHQLocation(
+		const FStrategicAIBlackboard& Blackboard);
+
+	bool HasValidPlayerResourceBuildingLocations(
+		const FStrategicAIBlackboard& Blackboard);
 }

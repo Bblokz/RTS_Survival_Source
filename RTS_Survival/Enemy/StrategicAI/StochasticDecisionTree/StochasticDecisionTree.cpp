@@ -56,9 +56,14 @@ void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds
 	{
 		return;
 	}
-	// const TArray<>
-	// const UStrategicAISubAction* PickedSubAction = StochasticHelpers::PickSubAction(
-	// 	PickedAction->GetSubActions(), bM_UseCachedGenerationSeed, M_CachedGenerationSeed, GameTimeSeconds);
+	const TArray<const UStrategicAISubAction*> SubActionsRequirementsMet = GetSubActionsThatHaveMetRequirements(
+		*PickedAction, Blackboard, GameTimeSeconds);
+	const UStrategicAISubAction* PickedSubAction = StochasticHelpers::PickSubAction(SubActionsRequirementsMet,
+		bM_UseCachedGenerationSeed, M_CachedGenerationSeed, GameTimeSeconds);
+	if(not EnsurePickedSubActionIsValid(PickedSubAction))
+	{
+		return;
+	}
 }
 
 bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
@@ -103,6 +108,45 @@ bool UStochasticDecisionTree::EnsurePickedActionIsValid(const FStrategicAIAction
 	return true;
 }
 
+bool UStochasticDecisionTree::EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const
+{
+	if (not PickedSubAction)
+	{
+		RTSFunctionLibrary::ReportError("Stochastic tree cannot use sub-action as it picked a null ptr!");
+		return false;
+	}
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
+	{
+		RTSFunctionLibrary::PrintString(
+			FString::Printf(TEXT("Stochastic tree picked sub-action %s"), *PickedSubAction->GetDebugString()),
+			FColor::Green, 5.f);		
+	}
+	return true;
+}
+
+void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubAction,
+	const FStrategicAIBlackboard& Blackboard) const
+{
+	switch (SubAction->SubtypeAction) {
+	case ESubtypeAction::DEFAULT_OBJECT:
+		RTSFunctionLibrary::ReportError("Stochastic tree cannot execute sub-action as it is a default object, likely meaning it was not properly set up in the data assets.");
+		break;
+	case ESubtypeAction::AttackMoveToPlayerUnits:
+		break;
+	case ESubtypeAction::AttackMoveToPlayerHQ:
+		break;
+	case ESubtypeAction::AttackMoveToPlayerResourceBuildings:
+		break;
+	case ESubtypeAction::AttackMoveSpecificPoint:
+		break;
+	case ESubtypeAction::DefendBase:
+		break;
+	case ESubtypeAction::DefendImportantMissionPoint:
+		break;
+	}
+}
+
 const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithValidSubActions(
 	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
 {
@@ -116,7 +160,7 @@ const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithV
 	for (const FStrategicAIAction& Action : M_ActionDefinitions)
 	{
 		const TArray<const UStrategicAISubAction*> ValidSubActions =
-			GetValidSubActionsForAction(Action, Blackboard, GameTimeSeconds);
+			GetSubActionsThatHaveMetRequirements(Action, Blackboard, GameTimeSeconds);
 
 		if (ValidSubActions.IsEmpty())
 		{
@@ -130,7 +174,7 @@ const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithV
 }
 
 
-const TArray<const UStrategicAISubAction*> UStochasticDecisionTree::GetValidSubActionsForAction(
+const TArray<const UStrategicAISubAction*> UStochasticDecisionTree::GetSubActionsThatHaveMetRequirements(
 	const FStrategicAIAction& Action,
 	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
 {

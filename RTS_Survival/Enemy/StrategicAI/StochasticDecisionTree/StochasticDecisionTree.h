@@ -86,6 +86,8 @@ private:
 	bool EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
 	void DebugActions(const TArray<const FStrategicAIAction*> ValidActions) const;
 	bool EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction)const;
+	bool EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const;
+	void ExecuteSubAction(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard) const;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	TArray<FStrategicAIAction> M_ActionDefinitions;
@@ -93,7 +95,7 @@ private:
 		const TArray<const FStrategicAIAction*> GetActionsWithValidSubActions(
 			const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const;
 
-	const TArray<const UStrategicAISubAction*> GetValidSubActionsForAction(
+	const TArray<const UStrategicAISubAction*> GetSubActionsThatHaveMetRequirements(
 		const FStrategicAIAction& Action,
 		const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const;
 	
