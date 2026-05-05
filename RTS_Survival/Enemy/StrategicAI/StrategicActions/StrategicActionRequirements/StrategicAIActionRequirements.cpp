@@ -1,6 +1,7 @@
 ﻿#include "StrategicAIActionRequirements.h"
 
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 FString UStrategicAIActionRequirement::GetDebugString() const
@@ -9,7 +10,7 @@ FString UStrategicAIActionRequirement::GetDebugString() const
 }
 
 bool UStrategicAIGameTimePassedRequirement::GetIsRequirementMet(
-	const FStrategicAIBlackboard& RequirementContext, const float GameTimeSeconds) const
+	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
 {
 	return GameTimeSeconds >= M_RequiredGameTimeSeconds;
 }
@@ -20,14 +21,14 @@ FString UStrategicAIGameTimePassedRequirement::GetDebugString() const
 }
 
 bool UStrategicAIActorIsValidRequirement::GetIsRequirementMet(
-	const FStrategicAIBlackboard& RequirementContext, const float GameTimeSeconds) const
+	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
 {
 	return GetIsValidRequiredActor();
 }
 
 bool UStrategicAIActorIsValidRequirement::GetIsValidRequiredActor() const
 {
-	if (IsValid(M_RequiredActor))
+	if (IsValid(RequiredActor))
 	{
 		return true;
 	}
@@ -39,5 +40,39 @@ bool UStrategicAIActorIsValidRequirement::GetIsValidRequiredActor() const
 
 FString UStrategicAIActorIsValidRequirement::GetDebugString() const
 {
-	return FString::Printf(TEXT("Actor Valid Req: %s"), *GetNameSafe(M_RequiredActor));
+	return FString::Printf(TEXT("Actor Valid Req: %s"), *GetNameSafe(RequiredActor));
+}
+
+bool UStrategicAIHasAtLeastIdleSquads::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
+                                                           const float GameTimeSeconds) const
+{
+	return BlackboardQueries::HasAtLeastXSquads(Blackboard, AmountIdleNeeded, RequiredSquadSubtype);	
+
+}
+
+FString UStrategicAIHasAtLeastIdleSquads::GetDebugString() const
+{
+	return FString::Printf(TEXT("Has Idle Squads Req: %d %s"), AmountIdleNeeded, *Global_GetSquadDisplayName(RequiredSquadSubtype));
+}
+
+bool UStrategicAIHasAtLeastIdleTanks::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
+                                                          const float GameTimeSeconds) const
+{
+	return BlackboardQueries::HasAtLeastXTanks(Blackboard, AmountIdleNeeded, RequiredTankSubtype);
+}
+
+FString UStrategicAIHasAtLeastIdleTanks::GetDebugString() const
+{
+	return FString::Printf(TEXT("Has Idle Tanks Req: %d %s"), AmountIdleNeeded, *Global_GetTankDisplayName(RequiredTankSubtype));
+}
+
+bool UStrategicAIHasAtLeastIdleAircraft::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
+                                                             const float GameTimeSeconds) const
+{
+	return BlackboardQueries::HasAtLeastXAircraft(Blackboard, AmountIdleNeeded, RequiredAircraftSubtype);
+}
+
+FString UStrategicAIHasAtLeastIdleAircraft::GetDebugString() const
+{
+	return FString::Printf(TEXT("Has Idle Aircraft Req: %d %s"), AmountIdleNeeded, *Global_GetAircraftDisplayName(RequiredAircraftSubtype));
 }
