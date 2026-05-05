@@ -49,9 +49,28 @@ bool UEnemyDirectControlComponent::EnsureEnemyControllerIsValid() const
 	return false;
 }
 
+bool UEnemyDirectControlComponent::EnsureIsValidBlackboard(FStrategicAIBlackboard*& OutBlackboard) const
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		OutBlackboard = nullptr;
+		return false;
+	}
+	FStrategicAIBlackboard* Blackboard = M_EnemyController->GetStrategicAIBlackboard();
+	if (not Blackboard)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Enemy direct control component requires a valid strategic AI blackboard but it cannot be found on the enemy controller.");
+		OutBlackboard = nullptr;
+		return false;
+	}
+	OutBlackboard = Blackboard;
+	return true;
+}
+
 UEnemyStrategicAIComponent* UEnemyDirectControlComponent::GetValidStrategicAIComponent() const
 {
-	if(not EnsureEnemyControllerIsValid())
+	if (not EnsureEnemyControllerIsValid())
 	{
 		return nullptr;
 	}
@@ -60,7 +79,9 @@ UEnemyStrategicAIComponent* UEnemyDirectControlComponent::GetValidStrategicAICom
 	{
 		return StrategicAIComponent;
 	}
-	RTSFunctionLibrary::ReportError("Enemy direct control component requires a valid strategic AI component.");
+	RTSFunctionLibrary::ReportError(
+		"Enemy direct control component requires a valid strategic AI component but it cannot be"
+		"found on the enemy controller.");
 	return nullptr;
 }
 
@@ -109,7 +130,8 @@ void UEnemyDirectControlComponent::StopDirectControlTickTimer()
 
 bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 {
-	if (not GetIsValidDirectControlUnitActor(UnitActor))
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not GetIsValidDirectControlUnitActor(UnitActor) || not EnsureIsValidBlackboard(Blackboard))
 	{
 		return false;
 	}
@@ -121,25 +143,26 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 		return false;
 	}
 
-	if (M_RegisteredIdleDirectControlUnits.Contains(UnitActor))
+	if (Blackboard->IdleDirectControlUnits.Contains(UnitActor))
 	{
 		DebugReportRegisterDeregister("RegisterDirectControlUnit ignored duplicate unit: " + UnitActor->GetName());
 		return false;
 	}
 
-	M_RegisteredIdleDirectControlUnits.Add(UnitActor);
+	Blackboard->IdleDirectControlUnits.Add(UnitActor);
 	DebugReportRegisterDeregister("RegisterDirectControlUnit added unit: " + UnitActor->GetName());
 	return true;
 }
 
 bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor)
 {
-	if (not GetIsValidDirectControlUnitActor(UnitActor))
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not GetIsValidDirectControlUnitActor(UnitActor) || not EnsureIsValidBlackboard(Blackboard))
 	{
 		return false;
 	}
 
-	const int32 RemovedCount = M_RegisteredIdleDirectControlUnits.Remove(UnitActor);
+	const int32 RemovedCount = Blackboard->IdleDirectControlUnits.Remove(UnitActor);
 	if (RemovedCount <= 0)
 	{
 		DebugReportRegisterDeregister("DeregisterDirectControlUnit could not find unit: " + UnitActor->GetName());
@@ -152,16 +175,27 @@ bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor
 
 void UEnemyDirectControlComponent::ClearDirectControlUnits()
 {
-	M_RegisteredIdleDirectControlUnits.Empty();
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureEnemyControllerIsValid() || not EnsureIsValidBlackboard(Blackboard))
+	{
+		return;
+	}
+		Blackboard->IdleDirectControlUnits.Empty();
 	DebugReportRegisterDeregister("ClearDirectControlUnits removed all direct control units.");
 }
 
 TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() const
 {
+	FStrategicAIBlackboard* Blackboard = nullptr;
 	TArray<AActor*> RegisteredActors;
-	RegisteredActors.Reserve(M_RegisteredIdleDirectControlUnits.Num());
+	
+	if(not EnsureIsValidBlackboard(Blackboard))
+	{
+		return  RegisteredActors;
+	}
+	RegisteredActors.Reserve(Blackboard->IdleDirectControlUnits.Num());
 
-	for (const TWeakObjectPtr<AActor>& RegisteredUnit : M_RegisteredIdleDirectControlUnits)
+	for (const TWeakObjectPtr<AActor>& RegisteredUnit : Blackboard->IdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{
@@ -198,15 +232,21 @@ void UEnemyDirectControlComponent::TickDirectControl()
 
 void UEnemyDirectControlComponent::RemoveInvalidRegisteredUnits()
 {
-	for (int32 UnitIndex = M_RegisteredIdleDirectControlUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if(not EnsureIsValidBlackboard(Blackboard))
 	{
-		const TWeakObjectPtr<AActor> RegisteredUnit = M_RegisteredIdleDirectControlUnits[UnitIndex];
+		return;
+	}
+	
+	for (int32 UnitIndex = Blackboard->IdleDirectControlUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
+	{
+		const TWeakObjectPtr<AActor> RegisteredUnit = Blackboard->IdleDirectControlUnits[UnitIndex];
 		if (RegisteredUnit.IsValid())
 		{
 			continue;
 		}
 
-		M_RegisteredIdleDirectControlUnits.RemoveAtSwap(UnitIndex);
+		Blackboard->IdleDirectControlUnits.RemoveAtSwap(UnitIndex);
 	}
 }
 
@@ -223,7 +263,12 @@ void UEnemyDirectControlComponent::DebugDrawRegisteredDirectControlUnits() const
 		return;
 	}
 
-	for (const TWeakObjectPtr<AActor>& RegisteredUnit : M_RegisteredIdleDirectControlUnits)
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if(not EnsureIsValidBlackboard(Blackboard))
+	{
+		return;
+	}
+	for (const TWeakObjectPtr<AActor>& RegisteredUnit : Blackboard->IdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{
@@ -334,7 +379,7 @@ void UEnemyDirectControlComponent::HandleAsyncRetreatGroupResult(const FResultAl
 	M_RetreatCache.M_CachedRetreatGroups.Add(RetreatResult.Group2);
 	M_RetreatCache.M_CachedRetreatGroups.Add(RetreatResult.Group3);
 
-	TArray<FDamagedTanksRetreatGroup> NewGroups = { RetreatResult.Group1, RetreatResult.Group2, RetreatResult.Group3 };
+	TArray<FDamagedTanksRetreatGroup> NewGroups = {RetreatResult.Group1, RetreatResult.Group2, RetreatResult.Group3};
 
 	for (FDamagedTanksRetreatGroup& RetreatGroup : NewGroups)
 	{
@@ -352,12 +397,12 @@ void UEnemyDirectControlComponent::OnRetreatGroupFound(FDamagedTanksRetreatGroup
 	RemoveRetreatGroupUnitsFromFormations(RetreatGroup);
 	IgnoreHazmatsInFieldConstruction(RetreatGroup);
 	IssueRetreatOrdersToDamagedTanks(RetreatGroup);
-	if(IsRetreatGroupDamagedTanksOnly(RetreatGroup))
+	if (IsRetreatGroupDamagedTanksOnly(RetreatGroup))
 	{
 		MarkRetreatGroupTanksOnlyRetreating(RetreatGroup);
 		return;
 	}
-	
+
 	IssueHazmatSupportOrders(RetreatGroup);
 	MarkRetreatGroupHazmatsRepairing(RetreatGroup);
 }
@@ -576,7 +621,8 @@ void UEnemyDirectControlComponent::Debug_RetreatUnitsRemovedFromFormations(const
 	}
 }
 
-void UEnemyDirectControlComponent::Debug_IgnoredFieldconstructionHazmats(const TArray<AActor*>& IgnoredHazmatUnits) const
+void UEnemyDirectControlComponent::Debug_IgnoredFieldconstructionHazmats(
+	const TArray<AActor*>& IgnoredHazmatUnits) const
 {
 	for (const AActor* IgnoredHazmatUnit : IgnoredHazmatUnits)
 	{

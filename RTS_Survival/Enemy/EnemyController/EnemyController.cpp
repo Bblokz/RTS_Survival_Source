@@ -124,7 +124,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	}
 	if (M_EnemyStrategicAIComponent)
 	{
-		M_EnemyStrategicAIComponent->InitStrategicAIComponent(this);
+		M_EnemyStrategicAIComponent->InitStrategicAIComponent(this, M_StochasticDecisionTree);
 	}
 	if (M_EnemyRetreatController)
 	{
@@ -135,6 +135,11 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 		M_EnemyDirectControlComponent->InitDirectControlComponent(this);
 	}
 	
+}
+
+UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
+{
+	return M_StochasticDecisionTree;
 }
 
 void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& SquadControllers,
@@ -694,6 +699,8 @@ void AEnemyController::BeginPlay()
 {
 	Super::BeginPlay();
 	CacheGenerationSeedFromGameInstance();
+	BeginPlay_MoveAISettingsToStrategicAIBlackboard();
+	BeginPlay_InitStochasticDecisionTree();
 }
 
 
@@ -716,6 +723,24 @@ void AEnemyController::PostInitializeComponents()
 	}
 
 	Subsystem->SetEnemyController(this);
+}
+
+void AEnemyController::BeginPlay_InitStochasticDecisionTree()
+{
+	M_StochasticDecisionTree->InitStochasticDecisionTree(M_EnemyStrategicAIComponent,
+	                                                     M_EnemyDirectControlComponent, this);
+}
+
+void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
+{
+	
+	FStrategicAIBlackboard* StrategicAIBlackboard = GetStrategicAIBlackboard();
+	if (not StrategicAIBlackboard)
+	{
+		RTSFunctionLibrary::ReportError("Could not move AI settings to strategic AI blackboard because strategic AI blackboard was invalid.");
+		return;
+	}
+	StrategicAIBlackboard->StrategicAIMissionSettings = M_EnemyAIMissionSettings;
 }
 
 bool AEnemyController::GetIsValidFormationController() const

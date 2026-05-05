@@ -9,6 +9,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "EnemyController.generated.h"
 
 
@@ -39,6 +40,8 @@ class RTS_SURVIVAL_API AEnemyController : public AActorObjectsMaster
 public:
 	// Sets default values for this actor's properties
 	AEnemyController(const FObjectInitializer& ObjectInitializer);
+
+	UStochasticDecisionTree* GetStrategicDecisionTree();
 
 	// Assumes the wave supply was already paid for!
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -367,7 +370,7 @@ public:
 	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
 
 	FStrategicAIBlackboard* GetStrategicAIBlackboard() const;
-	
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyFieldConstructionComponent* GetEnemyFieldConstructionComponent() const;
 
@@ -384,7 +387,19 @@ protected:
 
 	virtual void PostInitializeComponents() override;
 
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category="Strategic AI|Brain",
+		meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UStochasticDecisionTree> M_StochasticDecisionTree = nullptr;
+
+	// Settings for the strategic AI on this map.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Settings")
+	FEnemyAIMissionSettings M_EnemyAIMissionSettings;
+	
+
 private:
+	void BeginPlay_InitStochasticDecisionTree();
+	void BeginPlay_MoveAISettingsToStrategicAIBlackboard() const;
+	
 	UPROPERTY()
 	TObjectPtr<UEnemyFormationController> M_FormationController;
 

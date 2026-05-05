@@ -17,9 +17,11 @@ namespace EnemyAISettings
 	namespace ThinkingTimers
 	{
 		// How often the strategic Ai requests for finding its base locations. 
-		inline float UpdateAIBaseLocations_Interval = 20.f;
+		inline float UpdateAIBaseLocations_Interval = 35.f;
 		// How often the AI requests the counts of player light tanks, squads, nomadic buildings, resource building locations and hq location.
-		inline float UpdatePlayerCountsBaseLocations_Interval = 22.f;
+		inline float UpdatePlayerCountsBaseLocations_Interval = 25.f;
+		// How often the AI checks whether certain locations are at risk of player attacks.
+		inline float UpdateLocationsUnderPlayerAttack_Interval = 15.f;
 	}
 
 	namespace Debugging
@@ -29,6 +31,7 @@ namespace EnemyAISettings
 		inline constexpr float BaseLocationDebuggingRadius = 5000.f;
 		inline constexpr bool PlayerCountsDebugging = true;
 		inline constexpr float PlayerCountsDuration = 15.f;
+		inline constexpr bool StochasticDecisionTreeDebugging = true;
 		
 	}
 

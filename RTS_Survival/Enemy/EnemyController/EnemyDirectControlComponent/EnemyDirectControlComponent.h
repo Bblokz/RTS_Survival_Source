@@ -5,6 +5,7 @@
 #include "DirectControl_Retreat/EnemyRetreatCache.h"
 #include "EnemyDirectControlComponent.generated.h"
 
+struct FStrategicAIBlackboard;
 class UEnemyStrategicAIComponent;
 class AEnemyController;
 class AActor;
@@ -59,16 +60,13 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
-	// Registry of units currently owned by direct control AI for issuing strategic orders.
-	UPROPERTY()
-	TArray<TWeakObjectPtr<AActor>> M_RegisteredIdleDirectControlUnits;
-
 	FTimerHandle M_DirectControlTickTimerHandle;
 
 	UPROPERTY()
 	FDirectControlRetreatCache M_RetreatCache;
 
 	bool EnsureEnemyControllerIsValid() const;
+	bool EnsureIsValidBlackboard(FStrategicAIBlackboard*& OutBlackboard) const;
 	UEnemyStrategicAIComponent* GetValidStrategicAIComponent() const;
 	bool GetIsValidDirectControlUnitActor(const AActor* UnitActor) const;
 
