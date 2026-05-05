@@ -1,0 +1,75 @@
+﻿#pragma once
+
+#include "CoreMinimal.h"
+#include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicActions/StrategicActions.h"
+
+struct FStrategicAIAction;
+class UStrategicAISubAction;
+
+/**
+ * @namespace StochasticHelpers
+ * @brief Contains helper functions for weighted stochastic selection of strategic AI actions and subactions.
+ *
+ * All selection is based on linear probability distribution:
+ * Each option contributes its score linearly to the total distribution.
+ * 
+ * Deterministic mode:
+ * If bUseSeed is true, the result is deterministic for identical (Seed, Time).
+ */
+namespace StochasticHelpers
+{
+	/**
+	 * @brief Picks a weighted strategic action from a list of action pointers.
+	 *
+	 * Uses linear probability distribution based on action scores.
+	 * Example:
+	 * Scores [1, 2.5] → probabilities [1/3.5, 2.5/3.5].
+	 *
+	 * @param ActionDefinitions Array of action pointers to choose from.
+	 * @param bUseSeed If true, uses deterministic seeded randomness.
+	 * @param Seed Seed value for deterministic selection.
+	 * @param Time Time value combined with Seed for deterministic variation.
+	 * @return Pointer to the selected action, or nullptr if selection failed.
+	 */
+	const FStrategicAIAction* PickStrategicAction(
+		const TArray<const FStrategicAIAction*>& ActionDefinitions,
+		const bool bUseSeed,
+		const float Seed,
+		const float Time);
+
+	/**
+	 * @brief Picks a weighted sub-action from a list of subaction pointers.
+	 *
+	 * Uses linear probability distribution based on subaction scores.
+	 *
+	 * @param SubActions Array of subaction pointers to choose from.
+	 * @param bUseSeed If true, uses deterministic seeded randomness.
+	 * @param Seed Seed value for deterministic selection.
+	 * @param Time Time value combined with Seed for deterministic variation.
+	 * @return Pointer to the selected subaction, or nullptr if selection failed.
+	 */
+	const UStrategicAISubAction* PickSubAction(
+		const TArray<const UStrategicAISubAction*>& SubActions,
+		const bool bUseSeed,
+		const float Seed,
+		const float Time);
+
+/**
+ * @brief Retrieves the string representation of an EStrategicAITopLevelAction enum value.
+ *
+ * @param EnumValue The enum value to convert.
+ * @return FString representation of the enum value.
+ */
+inline FString GetStrategicAITopLevelActionAsString(const EStrategicAITopLevelAction EnumValue)
+{
+	const UEnum* const EnumPtr = StaticEnum<EStrategicAITopLevelAction>();
+	if (EnumPtr == nullptr)
+	{
+		return TEXT("Invalid Enum");
+	}
+
+	return EnumPtr->GetNameStringByValue(static_cast<int64>(EnumValue));
+}
+
+}

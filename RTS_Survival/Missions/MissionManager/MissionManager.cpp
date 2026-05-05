@@ -880,7 +880,6 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
-	BeginPlay_MoveAISettingsToStrategicAIBlackboard();
 	BeginPlay_InitGameDifficultyAndSettings();
 }
 
@@ -1083,24 +1082,6 @@ void AMissionManager::BeginPlay_InitMissionScheduler()
 void AMissionManager::BeginPlay_InitMissionTriggerVolumesManager()
 {
 	GetIsValidMissionTriggerVolumesManager();
-}
-
-void AMissionManager::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
-{
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
-	if (not EnemyController)
-	{
-		RTSFunctionLibrary::ReportError("Could not get enemy controller in mission manager.");
-		return;
-	}
-	FStrategicAIBlackboard* StrategicAIBlackboard = EnemyController->GetStrategicAIBlackboard();
-	if (not StrategicAIBlackboard)
-	{
-		RTSFunctionLibrary::ReportError(
-			"Could not get strategic AI blackboard from enemy controller in mission manager.");
-		return;
-	}
-	StrategicAIBlackboard->StrategicAIMissionSettings = M_EnemyAIMissionSettings;
 }
 
 bool AMissionManager::EnsureValidPlayerController() const

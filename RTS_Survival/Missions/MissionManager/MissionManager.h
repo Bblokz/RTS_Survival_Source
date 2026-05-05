@@ -301,8 +301,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources")
 	FMissionStartingResources M_MissionStartingResources;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy AI")
-	FEnemyAIMissionSettings M_EnemyAIMissionSettings;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
 	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions);
@@ -433,7 +431,6 @@ private:
 	void BeginPlay_InitGameDifficultyAndSettings();
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
-	void BeginPlay_MoveAISettingsToStrategicAIBlackboard() const;
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
 	bool GetIsValidMissionTriggerVolumesManager() const;
