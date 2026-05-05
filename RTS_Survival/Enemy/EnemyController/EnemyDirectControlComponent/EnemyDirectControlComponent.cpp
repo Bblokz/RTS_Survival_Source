@@ -162,7 +162,9 @@ bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor
 		return false;
 	}
 
-	const int32 RemovedCount = Blackboard->IdleDirectControlUnits.Remove(UnitActor);
+	const int32 RemovedCount = FBlackboardIdleUnitEntry::RemoveByUnitActor(
+		Blackboard->IdleDirectControlUnits,
+		UnitActor);
 	if (RemovedCount <= 0)
 	{
 		DebugReportRegisterDeregister("DeregisterDirectControlUnit could not find unit: " + UnitActor->GetName());
@@ -195,7 +197,7 @@ TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() 
 	}
 	RegisteredActors.Reserve(Blackboard->IdleDirectControlUnits.Num());
 
-	for (const TWeakObjectPtr<AActor>& RegisteredUnit : Blackboard->IdleDirectControlUnits)
+	for (const auto& RegisteredUnit : Blackboard->IdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{

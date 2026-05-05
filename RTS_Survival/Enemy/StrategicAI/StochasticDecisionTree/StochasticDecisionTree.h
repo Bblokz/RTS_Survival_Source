@@ -20,7 +20,6 @@ enum class EStrategicAITopLevelAction : uint8
 {
 	Attack,
 	Defend,
-	Patrol
 };
 
 // A main action the AI can take; has a bundle of sub-actions defined, the score contribures to whether this action is picked or not.
@@ -60,7 +59,7 @@ private:
 
 // The main brain component on the strategic AI, defines the main actions and sub-actions the AI can pick from,
 // as well as the scores of each action to influence their chances of being picked.
-// The main idea is to have a separate component doing the unit creation and adding those units to the direct control component as idle,
+// The main idea is to have a separate component doing the unit creation and adding those units to the blackboard as idle,
 // then after picking an action this component will go through those idle units and assign them to their action
 UCLASS(BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UStochasticDecisionTree final : public UObject
