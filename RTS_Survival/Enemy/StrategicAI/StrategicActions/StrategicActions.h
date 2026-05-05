@@ -1,0 +1,130 @@
+﻿#pragma once
+
+#include "CoreMinimal.h"
+#include "StrategicActionRequirements/StrategicAIActionRequirements.h"
+
+#include "StrategicActions.generated.h"
+
+UENUM(Blueprintable)
+enum class ESubtypeAction : uint8
+{
+	DEFAULT_OBJECT,
+	AttackMoveToPlayerUnits,
+	AttackMoveToPlayerHQ,
+	AttackMoveToPlayerResourceBuildings,
+	AttackMoveSpecificPoint,
+	DefendBase,
+	DefendImportantMissionPoint,
+};
+
+UCLASS(Abstract, BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAISubAction : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UStrategicAISubAction() = default;
+
+	UPROPERTY(VisibleAnywhere)
+	ESubtypeAction SubtypeAction = ESubtypeAction::DEFAULT_OBJECT;
+
+	float GetScore() const
+	{
+		return M_Score;
+	}
+
+	const TArray<TObjectPtr<UStrategicAIActionRequirement>>& GetRequirements() const
+	{
+		return M_Requirements;
+	}
+
+	bool GetAreRequirementsMet(
+		const FStrategicAIBlackboard& RequirementContext,
+		const float GameTimeSeconds) const;
+
+	virtual FString GetDebugString() const;
+
+protected:
+	FString GetRequirementsDebugString() const;
+
+private:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = true, ClampMin = "0.0"))
+	float M_Score = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	TArray<TObjectPtr<UStrategicAIActionRequirement>> M_Requirements;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_AttackMoveToPlayerUnits final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_AttackMoveToPlayerUnits();
+
+	virtual FString GetDebugString() const override;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_AttackMoveToPlayerHQ final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_AttackMoveToPlayerHQ();
+
+	virtual FString GetDebugString() const override;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_AttackMoveToPlayerResourceBuildings final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_AttackMoveToPlayerResourceBuildings();
+
+	virtual FString GetDebugString() const override;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_AttackSpecificPoint final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_AttackSpecificPoint();
+
+	const FVector& GetTargetPoint() const
+	{
+		return TargetPoint;
+	}
+
+	virtual FString GetDebugString() const override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true, MakeEditWidget = true))
+	FVector TargetPoint = FVector::ZeroVector;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_DefendBase final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_DefendBase();
+
+	virtual FString GetDebugString() const override;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_DefendImportantMissionPoint final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_DefendImportantMissionPoint();
+
+	virtual FString GetDebugString() const override;
+};
