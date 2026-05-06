@@ -80,6 +80,7 @@ public:
 	void QueueFindAlliedTanksToRetreatRequest(const FFindAlliedTanksToRetreat& Request);
 	void QueueFindEnemyBaseClustersRequest(const FFindEnemyBaseClusters& Request);
 	void QueueFindLocationsUnderPlayerAttackRequest(const FFindLocationsUnderPlayerAttack& Request);
+	void QueueFindPlayerUnitBulkLocationsRequest(const FFindPlayerUnitBulkLocations& Request);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request);
@@ -100,6 +101,10 @@ public:
 	// This request is periodically used to evaluate whether key locations are currently under player attack pressure.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindLocationsUnderPlayerAttack FindLocationsUnderAttack_TimerRequest;
+
+	// This request is periodically used to find player squad and tank force concentrations.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FFindPlayerUnitBulkLocations FindPlayerUnitBulkLocations_TimerRequest;
 
 protected:
 	virtual void BeginPlay() override;
@@ -132,6 +137,9 @@ private:
 	FAIThinkingTimerData M_LocationsUnderAttackThinkTimer;
 	void LocationsUnderAttack_ThinkStep();
 
+	FAIThinkingTimerData M_PlayerUnitBulkLocationsThinkTimer;
+	void PlayerUnitBulkLocations_ThinkStep();
+
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
@@ -148,6 +156,8 @@ private:
 	void ProcessPlayerUnitCountsAndBaseResults(const TArray<FResultPlayerUnitCounts>& PlayerUnitCountsAndBaseResults);
 	void ProcessLocationsUnderPlayerAttackResults(
 		const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults);
+	void ProcessPlayerUnitBulkLocationsResults(
+		const TArray<FResultPlayerUnitBulkLocations>& PlayerUnitBulkLocationsResults);
 	bool GetIsValidEnemyDirectControlComponent(UEnemyDirectControlComponent* EnemyDirectControlComponent) const;
 	void FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const;
 	int32 M_CachedGenerationSeed = 0;

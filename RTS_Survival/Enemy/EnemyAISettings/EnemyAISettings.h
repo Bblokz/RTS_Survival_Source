@@ -22,6 +22,8 @@ namespace EnemyAISettings
 		inline float UpdatePlayerCountsBaseLocations_Interval = 25.f;
 		// How often the AI checks whether certain locations are at risk of player attacks.
 		inline float UpdateLocationsUnderPlayerAttack_Interval = 15.f;
+		// How often the AI finds player squad and tank force concentrations.
+		inline float UpdatePlayerUnitBulkLocations_Interval = 15.f;
 	}
 
 	namespace Debugging

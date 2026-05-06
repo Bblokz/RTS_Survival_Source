@@ -184,6 +184,259 @@ namespace StrategicAIHelperUtilities
 		return 0.f;
 	}
 
+	float GetPlayerBulkWeight(
+		const FAsyncDetailedUnitState& UnitState,
+		const FFindPlayerUnitBulkLocations& Request)
+	{
+		if (UnitState.UnitType == EAllUnitType::UNType_Squad)
+		{
+			return Request.SquadBulkScore;
+		}
+
+		if (UnitState.UnitType != EAllUnitType::UNType_Tank)
+		{
+			return 0.f;
+		}
+
+		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitState.UnitSubtypeRaw);
+		if (Global_GetIsArmoredCar(TankSubtype))
+		{
+			return Request.ArmoredCarBulkScore;
+		}
+		if (Global_GetIsLightTank(TankSubtype))
+		{
+			return Request.LightTankBulkScore;
+		}
+		if (Global_GetIsMediumTank(TankSubtype))
+		{
+			return Request.MediumTankBulkScore;
+		}
+		if (Global_GetIsHeavyTank(TankSubtype))
+		{
+			return Request.HeavyTankBulkScore;
+		}
+
+		return 0.f;
+	}
+
+	struct FPlayerBulkCandidate
+	{
+		const FAsyncDetailedUnitState* UnitState = nullptr;
+		FVector2D LocationXY = FVector2D::ZeroVector;
+		float Weight = 0.f;
+	};
+
+	struct FPlayerBulkClusterBuilder
+	{
+		TArray<int32> CandidateIndices;
+	};
+
+	TArray<FPlayerBulkCandidate> GatherPlayerBulkCandidates(
+		const FFindPlayerUnitBulkLocations& Request,
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+	{
+		TArray<FPlayerBulkCandidate> Candidates;
+		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
+		{
+			if (UnitState.OwningPlayer != StrategicAIHelperConstants::PlayerOwningId)
+			{
+				continue;
+			}
+
+			const float UnitWeight = GetPlayerBulkWeight(UnitState, Request);
+			if (UnitWeight <= 0.f)
+			{
+				continue;
+			}
+
+			FPlayerBulkCandidate Candidate;
+			Candidate.UnitState = &UnitState;
+			Candidate.LocationXY = FVector2D(UnitState.UnitLocation.X, UnitState.UnitLocation.Y);
+			Candidate.Weight = UnitWeight;
+			Candidates.Add(Candidate);
+		}
+
+		return Candidates;
+	}
+
+	void AddUnassignedNeighborCandidates(
+		const TArray<FPlayerBulkCandidate>& Candidates,
+		const int32 SourceCandidateIndex,
+		const float ClusterRadiusSq,
+		TArray<int32>& CandidateLabels,
+		TArray<int32>& Frontier,
+		const int32 ClusterLabel)
+	{
+		for (int32 CandidateIndex = 0; CandidateIndex < Candidates.Num(); ++CandidateIndex)
+		{
+			if (CandidateLabels[CandidateIndex] != INDEX_NONE)
+			{
+				continue;
+			}
+
+			const float DistanceSq = FVector2D::DistSquared(
+				Candidates[SourceCandidateIndex].LocationXY,
+				Candidates[CandidateIndex].LocationXY);
+			if (DistanceSq > ClusterRadiusSq)
+			{
+				continue;
+			}
+
+			CandidateLabels[CandidateIndex] = ClusterLabel;
+			Frontier.Add(CandidateIndex);
+		}
+	}
+
+	FPlayerBulkClusterBuilder BuildPlayerBulkCluster(
+		const TArray<FPlayerBulkCandidate>& Candidates,
+		const int32 SeedCandidateIndex,
+		const float ClusterRadiusSq,
+		TArray<int32>& CandidateLabels,
+		const int32 ClusterLabel)
+	{
+		FPlayerBulkClusterBuilder Cluster;
+		TArray<int32> Frontier;
+		CandidateLabels[SeedCandidateIndex] = ClusterLabel;
+		Frontier.Add(SeedCandidateIndex);
+
+		while (not Frontier.IsEmpty())
+		{
+			const int32 CurrentCandidateIndex = Frontier.Last();
+			Frontier.RemoveAt(Frontier.Num() - 1, 1, false);
+			Cluster.CandidateIndices.Add(CurrentCandidateIndex);
+			AddUnassignedNeighborCandidates(
+				Candidates,
+				CurrentCandidateIndex,
+				ClusterRadiusSq,
+				CandidateLabels,
+				Frontier,
+				ClusterLabel);
+		}
+
+		return Cluster;
+	}
+
+	TArray<FPlayerBulkClusterBuilder> BuildPlayerBulkClusters(
+		const TArray<FPlayerBulkCandidate>& Candidates,
+		const float ClusterRadiusXY)
+	{
+		TArray<FPlayerBulkClusterBuilder> Clusters;
+		if (Candidates.IsEmpty())
+		{
+			return Clusters;
+		}
+
+		const float ClusterRadiusSq = FMath::Square(FMath::Max(0.f, ClusterRadiusXY));
+		TArray<int32> CandidateLabels;
+		CandidateLabels.Init(INDEX_NONE, Candidates.Num());
+		for (int32 CandidateIndex = 0; CandidateIndex < Candidates.Num(); ++CandidateIndex)
+		{
+			if (CandidateLabels[CandidateIndex] != INDEX_NONE)
+			{
+				continue;
+			}
+
+			const int32 ClusterLabel = Clusters.Num();
+			Clusters.Add(BuildPlayerBulkCluster(
+				Candidates,
+				CandidateIndex,
+				ClusterRadiusSq,
+				CandidateLabels,
+				ClusterLabel));
+		}
+
+		return Clusters;
+	}
+
+	void AddUnitTypeToBulkCounts(const FAsyncDetailedUnitState& UnitState, FPlayerUnitBulkLocation& BulkLocation)
+	{
+		if (UnitState.UnitType == EAllUnitType::UNType_Squad)
+		{
+			BulkLocation.SquadCount++;
+			return;
+		}
+
+		if (UnitState.UnitType != EAllUnitType::UNType_Tank)
+		{
+			return;
+		}
+
+		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitState.UnitSubtypeRaw);
+		if (Global_GetIsArmoredCar(TankSubtype))
+		{
+			BulkLocation.ArmoredCarCount++;
+			return;
+		}
+		if (Global_GetIsLightTank(TankSubtype))
+		{
+			BulkLocation.LightTankCount++;
+			return;
+		}
+		if (Global_GetIsMediumTank(TankSubtype))
+		{
+			BulkLocation.MediumTankCount++;
+			return;
+		}
+		if (Global_GetIsHeavyTank(TankSubtype))
+		{
+			BulkLocation.HeavyTankCount++;
+		}
+	}
+
+	bool TryBuildPlayerBulkLocation(
+		const FPlayerBulkClusterBuilder& Cluster,
+		const TArray<FPlayerBulkCandidate>& Candidates,
+		const FFindPlayerUnitBulkLocations& Request,
+		FPlayerUnitBulkLocation& OutBulkLocation)
+	{
+		const int32 MinUnitsPerBulk = FMath::Max(1, Request.MinUnitsPerBulk);
+		if (Cluster.CandidateIndices.Num() < MinUnitsPerBulk)
+		{
+			return false;
+		}
+
+		FVector WeightedLocationSum = FVector::ZeroVector;
+		float WeightedUnitCount = 0.f;
+		for (const int32 CandidateIndex : Cluster.CandidateIndices)
+		{
+			const FPlayerBulkCandidate& Candidate = Candidates[CandidateIndex];
+			WeightedLocationSum += Candidate.UnitState->UnitLocation * Candidate.Weight;
+			WeightedUnitCount += Candidate.Weight;
+		}
+
+		const float MinWeightedBulkScore = FMath::Max(0.f, Request.MinWeightedBulkScore);
+		if (WeightedUnitCount < MinWeightedBulkScore || WeightedUnitCount <= 0.f)
+		{
+			return false;
+		}
+
+		OutBulkLocation.BulkLocation = WeightedLocationSum / WeightedUnitCount;
+		OutBulkLocation.Score = WeightedUnitCount;
+		OutBulkLocation.WeightedUnitCount = WeightedUnitCount;
+		OutBulkLocation.UnitsInBulk.Reserve(Cluster.CandidateIndices.Num());
+
+		float DistanceSum = 0.f;
+		for (const int32 CandidateIndex : Cluster.CandidateIndices)
+		{
+			const FPlayerBulkCandidate& Candidate = Candidates[CandidateIndex];
+			const float DistanceFromCenter = FVector::Dist2D(
+				Candidate.UnitState->UnitLocation,
+				OutBulkLocation.BulkLocation);
+			DistanceSum += DistanceFromCenter;
+			OutBulkLocation.MaxUnitDistanceFromCenter = FMath::Max(
+				OutBulkLocation.MaxUnitDistanceFromCenter,
+				DistanceFromCenter);
+			OutBulkLocation.UnitsInBulk.Add(Candidate.UnitState->UnitActorPtr);
+			AddUnitTypeToBulkCounts(*Candidate.UnitState, OutBulkLocation);
+		}
+
+		OutBulkLocation.AverageUnitDistanceFromCenter =
+			DistanceSum / static_cast<float>(Cluster.CandidateIndices.Num());
+		const float MaxAverageBulkRadiusXY = FMath::Max(0.f, Request.MaxAverageBulkRadiusXY);
+		return MaxAverageBulkRadiusXY <= 0.f
+			|| OutBulkLocation.AverageUnitDistanceFromCenter <= MaxAverageBulkRadiusXY;
+	}
+
 	float GetClampedDistance(const float MinDistance, const float MaxDistance)
 	{
 		const float SafeMin = FMath::Max(0.f, FMath::Min(MinDistance, MaxDistance));
@@ -624,6 +877,43 @@ FResultLocationsUnderPlayerAttack FStrategicAIHelpers::BuildLocationsUnderPlayer
 		AttackEvaluation.AverageAttackerLocation = WeightedLocationSum / RawThreatScore;
 		AttackEvaluation.AttackingUnits = MoveTemp(ContributingAttackerActors);
 		Result.LocationsUnderAttack.Add(MoveTemp(AttackEvaluation));
+	}
+
+	return Result;
+}
+
+FResultPlayerUnitBulkLocations FStrategicAIHelpers::BuildPlayerUnitBulkLocationsResult(
+	const FFindPlayerUnitBulkLocations& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+{
+	FResultPlayerUnitBulkLocations Result;
+	Result.RequestID = Request.RequestID;
+
+	const TArray<StrategicAIHelperUtilities::FPlayerBulkCandidate> Candidates =
+		StrategicAIHelperUtilities::GatherPlayerBulkCandidates(Request, DetailedUnitStates);
+	const TArray<StrategicAIHelperUtilities::FPlayerBulkClusterBuilder> Clusters =
+		StrategicAIHelperUtilities::BuildPlayerBulkClusters(Candidates, Request.ClusterRadiusXY);
+
+	for (const StrategicAIHelperUtilities::FPlayerBulkClusterBuilder& Cluster : Clusters)
+	{
+		FPlayerUnitBulkLocation BulkLocation;
+		if (not StrategicAIHelperUtilities::TryBuildPlayerBulkLocation(Cluster, Candidates, Request, BulkLocation))
+		{
+			continue;
+		}
+
+		Result.PlayerUnitBulks.Add(MoveTemp(BulkLocation));
+	}
+
+	Result.PlayerUnitBulks.Sort([](const FPlayerUnitBulkLocation& Left, const FPlayerUnitBulkLocation& Right)
+	{
+		return Left.Score > Right.Score;
+	});
+
+	const int32 MaxBulksToReturn = FMath::Max(0, Request.MaxBulksToReturn);
+	if (MaxBulksToReturn > 0 && Result.PlayerUnitBulks.Num() > MaxBulksToReturn)
+	{
+		Result.PlayerUnitBulks.SetNum(MaxBulksToReturn);
 	}
 
 	return Result;

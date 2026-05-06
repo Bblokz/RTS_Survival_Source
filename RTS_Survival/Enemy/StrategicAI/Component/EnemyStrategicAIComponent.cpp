@@ -54,6 +54,12 @@ void UEnemyStrategicAIComponent::QueueFindLocationsUnderPlayerAttackRequest(
 	M_PendingRequests.FindLocationsUnderPlayerAttackRequests.Add(Request);
 }
 
+void UEnemyStrategicAIComponent::QueueFindPlayerUnitBulkLocationsRequest(
+	const FFindPlayerUnitBulkLocations& Request)
+{
+	M_PendingRequests.FindPlayerUnitBulkLocationsRequests.Add(Request);
+}
+
 void UEnemyStrategicAIComponent::RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request)
 {
 	FFindAlliedTanksToRetreat RequestToQueue = Request;
@@ -118,6 +124,13 @@ void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const
 	M_LocationsUnderAttackThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep);
 	M_AIThinkTimers.Add(&M_LocationsUnderAttackThinkTimer);
+
+	M_PlayerUnitBulkLocationsThinkTimer.LastTimeThought = Now;
+	M_PlayerUnitBulkLocationsThinkTimer.ThinkingInterval =
+		EnemyAISettings::ThinkingTimers::UpdatePlayerUnitBulkLocations_Interval;
+	M_PlayerUnitBulkLocationsThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep);
+	M_AIThinkTimers.Add(&M_PlayerUnitBulkLocationsThinkTimer);
 }
 
 void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
@@ -133,6 +146,11 @@ void UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep()
 void UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep()
 {
 	QueueFindLocationsUnderPlayerAttackRequest(FindLocationsUnderAttack_TimerRequest);
+}
+
+void UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep()
+{
+	QueueFindPlayerUnitBulkLocationsRequest(FindPlayerUnitBulkLocations_TimerRequest);
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
@@ -241,7 +259,8 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 		&& M_PendingRequests.GetPlayerUnitCountsAndBaseRequests.IsEmpty()
 		&& M_PendingRequests.FindAlliedTanksToRetreatRequests.IsEmpty()
 		&& M_PendingRequests.FindEnemyBaseClustersRequests.IsEmpty()
-		&& M_PendingRequests.FindLocationsUnderPlayerAttackRequests.IsEmpty())
+		&& M_PendingRequests.FindLocationsUnderPlayerAttackRequests.IsEmpty()
+		&& M_PendingRequests.FindPlayerUnitBulkLocationsRequests.IsEmpty())
 	{
 		return;
 	}
@@ -275,6 +294,7 @@ void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAI
 	ProcessPlayerUnitCountsAndBaseResults(ResultBatch.PlayerUnitCountsResults);
 	ProcessAlliedTanksToRetreatResults(ResultBatch.AlliedTanksToRetreatResults);
 	ProcessLocationsUnderPlayerAttackResults(ResultBatch.LocationsUnderPlayerAttackResults);
+	ProcessPlayerUnitBulkLocationsResults(ResultBatch.PlayerUnitBulkLocationsResults);
 }
 
 void UEnemyStrategicAIComponent::ProcessEnemyBaseClusterResults(
@@ -345,6 +365,16 @@ void UEnemyStrategicAIComponent::ProcessLocationsUnderPlayerAttackResults(
 		return;
 	}
 	M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack = LocationsUnderPlayerAttackResults.Last();
+}
+
+void UEnemyStrategicAIComponent::ProcessPlayerUnitBulkLocationsResults(
+	const TArray<FResultPlayerUnitBulkLocations>& PlayerUnitBulkLocationsResults)
+{
+	if (PlayerUnitBulkLocationsResults.IsEmpty())
+	{
+		return;
+	}
+	M_StrategicAIBlackboard.CurrentPlayerUnitBulkLocations = PlayerUnitBulkLocationsResults.Last();
 }
 
 bool UEnemyStrategicAIComponent::GetIsValidEnemyDirectControlComponent(

@@ -26,6 +26,9 @@ struct FStrategicAIBlackboard
 
 	UPROPERTY()
 	FResultLocationsUnderPlayerAttack CurrentLocationsUnderPlayerAttack;
+
+	UPROPERTY()
+	FResultPlayerUnitBulkLocations CurrentPlayerUnitBulkLocations;
 	
 	UPROPERTY()
 	TArray<TWeakObjectPtr<ARoadSplineActor>> RoadSplineActors;
