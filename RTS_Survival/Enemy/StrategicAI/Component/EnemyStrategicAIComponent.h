@@ -123,6 +123,7 @@ private:
 	FStrategicAIRequestBatch M_PendingRequests;
 	FStrategicAIResultBatch M_LatestResults;
 	FStrategicAIBlackboard M_StrategicAIBlackboard;
+	bool GetIsAllowedDirectControlUnits()const;
 
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
 

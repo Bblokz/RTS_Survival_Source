@@ -103,6 +103,11 @@ void UEnemyStrategicAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 }
 
 
+bool UEnemyStrategicAIComponent::GetIsAllowedDirectControlUnits() const
+{
+	return M_StrategicAIBlackboard.StrategicAIMissionSettings.bAllowDirectControlStochasticDecisionTree;
+}
+
 void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const float Now)
 {
 	M_AIBaseLocationThinkTimer.LastTimeThought = Now;
@@ -238,7 +243,7 @@ void UEnemyStrategicAIComponent::StrategicAiThinkStep()
 		// Sees if enough time has passed since last think step then calls delegate.
 		EachThinkTimer->TryExecuteThinkStep(Now);
 	}
-	if(M_StochasticDecisionTree.IsValid())
+	if(M_StochasticDecisionTree.IsValid() && GetIsAllowedDirectControlUnits())
 	{
 		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_StrategicAIBlackboard);
 	}
@@ -426,6 +431,8 @@ void UEnemyStrategicAIComponent::DebugBlackboardBasePoints() const
 void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
 {
 	FString DebugString = "\n-------- Player Counts --------";
+	DebugString += FString::Printf(
+		TEXT("\n Armored Cars: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerArmoredCars);
 	DebugString += FString::Printf(
 		TEXT("\n Light Tanks: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerLightTanks);
 	DebugString += FString::Printf(

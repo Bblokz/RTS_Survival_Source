@@ -1,6 +1,8 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicActions/StrategicActions.h"
 
 #include "StochasticDecisionTree.generated.h"
 
@@ -84,10 +86,14 @@ public:
 private:
 
 	bool EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
-	void DebugActions(const TArray<const FStrategicAIAction*> ValidActions) const;
 	bool EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction)const;
 	bool EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const;
 	void ExecuteSubAction(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard) const;
+
+	void Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerHQ(const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	TArray<FStrategicAIAction> M_ActionDefinitions;
@@ -118,4 +124,10 @@ private:
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
 	[[nodiscard]] bool EnsureIsValidEnemyController() const;
+
+	// Debug call over all actions regardless of requirements.
+	void DebugAllActionsPriorReqCheck()const;
+	// Called After removing those main actions of which all sub actions have no requirements met.
+	void DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
+	
 };

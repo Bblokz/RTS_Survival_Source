@@ -176,7 +176,7 @@ struct FResultClosestFlankableEnemyHeavy
  *
  * On the async thread, this request is passed to FStrategicAIHelpers::BuildPlayerUnitCountsResult
  * with the current M_DetailedUnitStates array. The helper iterates all player-owned units,
- * increments counts based on tank subtype (light/medium/heavy), increments squad counts,
+ * increments counts based on tank subtype (armored car/light/medium/heavy), increments squad counts,
  * identifies the nomadic HQ to store its location, and collects nomadic resource building
  * locations; all results are accumulated into a single struct and returned.
  */
@@ -202,7 +202,7 @@ struct FGetPlayerUnitCountsAndBase
  * Used as the async thread's condensed view of player force composition and base layout.
  *
  * On the async thread, values are populated by a full scan of M_DetailedUnitStates for
- * player-owned units. Tank subtypes increment light/medium/heavy counts, squads increment
+ * player-owned units. Tank subtypes increment armored car/light/medium/heavy counts, squads increment
  * PlayerSquads, nomadic HQ sets PlayerHQLocation, nomadic resource buildings append to
  * PlayerResourceBuildings, and remaining nomadic units increment PlayerNomadicVehicles.
  */
@@ -221,6 +221,15 @@ struct FResultPlayerUnitCounts
 	 */
 	UPROPERTY()
 	int32 RequestID;
+
+	/**
+	 * @brief Captures armored car presence for early vehicle pressure without rescanning all units later.
+	 *
+	 * @note Filled on async processing while iterating player-owned units and classifying tank subtype.
+	 * @note Not filled when player unit scan is skipped due to missing state snapshot.
+	 */
+	UPROPERTY()
+	int32 PlayerArmoredCars;
 
 	/**
 	 * @brief Captures light armor presence to drive strategic weighting without rescanning all units later.

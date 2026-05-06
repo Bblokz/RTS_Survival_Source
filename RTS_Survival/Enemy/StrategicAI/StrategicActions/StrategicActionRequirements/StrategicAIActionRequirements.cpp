@@ -43,6 +43,30 @@ FString UStrategicAIActorIsValidRequirement::GetDebugString() const
 	return FString::Printf(TEXT("Actor Valid Req: %s"), *GetNameSafe(RequiredActor));
 }
 
+bool UStrategicAIHasPlayerHQLocationRequirement::GetIsRequirementMet(
+	const FStrategicAIBlackboard& Blackboard,
+	const float GameTimeSeconds) const
+{
+	return BlackboardQueries::HasValidPlayerHQLocation(Blackboard);
+}
+
+FString UStrategicAIHasPlayerHQLocationRequirement::GetDebugString() const
+{
+	return TEXT("Has Player HQ Location Req");
+}
+
+bool UStrategicAIHasPlayerResourceBuildingLocationsRequirement::GetIsRequirementMet(
+	const FStrategicAIBlackboard& Blackboard,
+	const float GameTimeSeconds) const
+{
+	return BlackboardQueries::HasValidPlayerResourceBuildingLocations(Blackboard);
+}
+
+FString UStrategicAIHasPlayerResourceBuildingLocationsRequirement::GetDebugString() const
+{
+	return TEXT("Has Player Resource Building Locations Req");
+}
+
 bool UStrategicAIHasAtLeastIdleSquads::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
                                                            const float GameTimeSeconds) const
 {

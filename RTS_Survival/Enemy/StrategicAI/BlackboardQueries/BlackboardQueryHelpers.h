@@ -28,6 +28,34 @@ namespace BlackboardQueries
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinHeavyTanks);
 
+	bool HasAtLeastXPlayerTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinPlayerTanks);
+
+	bool HasAtLeastXPlayerArmoredCars(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinPlayerArmoredCars);
+
+	bool HasAtLeastXPlayerLightTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinPlayerLightTanks);
+
+	bool HasAtLeastXPlayerMediumTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinPlayerMediumTanks);
+
+	bool HasAtLeastXPlayerHeavyTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinPlayerHeavyTanks);
+
+	bool HasAtLeastXPlayerSquads(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinPlayerSquads);
+
+	bool HasAtLeastXPlayerNomadicVehicles(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinPlayerNomadicVehicles);
+
 	bool HasAtLeastXAircraft(
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinAircraft,

@@ -43,6 +43,13 @@ public:
 
 	UStochasticDecisionTree* GetStrategicDecisionTree();
 
+	// This is used to evaluate whether the AI can use its decision tree to manually control units that are 'idle' on the blackboard
+	// which makes them eligible for strategic AI commands that take direct control of units.
+	// Use this function to turn it on or off at runtime, use the settings struct on the instance in the map (M_EnemyAIMissionSettings)
+	// to set this on or off at the start of a mission.
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetAllowDirectControlStochasticDecisionTree(const bool bAllow);
+
 	// Assumes the wave supply was already paid for!
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveFormationToLocation(

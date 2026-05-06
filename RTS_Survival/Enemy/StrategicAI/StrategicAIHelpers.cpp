@@ -1006,22 +1006,8 @@ FResultPlayerUnitCounts FStrategicAIHelpers::BuildPlayerUnitCountsResult(
 		switch (UnitState.UnitType)
 		{
 		case EAllUnitType::UNType_Tank:
-		{
-			const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitState.UnitSubtypeRaw);
-			if (Global_GetIsLightTank(TankSubtype))
-			{
-				Result.PlayerLightTanks++;
-			}
-			else if (Global_GetIsMediumTank(TankSubtype))
-			{
-				Result.PlayerMediumTanks++;
-			}
-			else if (Global_GetIsHeavyTank(TankSubtype))
-			{
-				Result.PlayerHeavyTanks++;
-			}
+			StrategicAIHelperUtilities::AddPlayerTankUnitStateCount(Result, UnitState);
 			break;
-		}
 		case EAllUnitType::UNType_Squad:
 			Result.PlayerSquads++;
 			break;
