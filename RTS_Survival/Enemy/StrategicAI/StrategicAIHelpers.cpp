@@ -348,6 +348,37 @@ namespace StrategicAIHelperUtilities
 		return Clusters;
 	}
 
+	void AddPlayerTankUnitStateCount(
+		FResultPlayerUnitCounts& Result,
+		const FAsyncDetailedUnitState& UnitState)
+	{
+		if (UnitState.UnitType != EAllUnitType::UNType_Tank)
+		{
+			return;
+		}
+
+		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitState.UnitSubtypeRaw);
+		if (Global_GetIsArmoredCar(TankSubtype))
+		{
+			Result.PlayerArmoredCars++;
+			return;
+		}
+		if (Global_GetIsLightTank(TankSubtype))
+		{
+			Result.PlayerLightTanks++;
+			return;
+		}
+		if (Global_GetIsMediumTank(TankSubtype))
+		{
+			Result.PlayerMediumTanks++;
+			return;
+		}
+		if (Global_GetIsHeavyTank(TankSubtype))
+		{
+			Result.PlayerHeavyTanks++;
+		}
+	}
+
 	void AddUnitTypeToBulkCounts(const FAsyncDetailedUnitState& UnitState, FPlayerUnitBulkLocation& BulkLocation)
 	{
 		if (UnitState.UnitType == EAllUnitType::UNType_Squad)
