@@ -8,6 +8,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "StochasticHelpers/StochasticHelpers.h"
 
@@ -256,6 +257,11 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(TArray<FVector> AttackLo
 		M_AttackMoveWaveSettings,
 		AverageSpawnLocation
 	);
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
+	{
+		DebugPickedUnitsAndWayPoints(PickedUnits, WayPoints);
+	}
 }
 
 bool UStochasticDecisionTree::EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits,
@@ -505,6 +511,32 @@ void UStochasticDecisionTree::DebugPoint(const FVector& Point, const float Radiu
 		GetWorld(), Point + FVector(0, 0, Radius),
 		Text, nullptr, Color, Duration,
 		false);
+}
+
+void UStochasticDecisionTree::DebugPickedUnitsAndWayPoints(const FBlackboardIdleUnitsResult& Picked,
+	TArray<FVector> Waypoints)
+{
+	for(auto EachSquad : Picked.SquadControllers)
+	{
+		if(not EachSquad)
+		{
+			continue;
+		}
+		DrawDebugLine(GetWorld(), EachSquad->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
+	}
+	for(auto EachTank : Picked.TankMasters)
+	{
+		if(not EachTank)
+		{
+			continue;
+		}
+		DrawDebugLine(GetWorld(), EachTank->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
+	}
+	// Now draw the path with thickness 8.
+	for(int i = 0; i < Waypoints.Num() - 1; i++)
+	{
+		DrawDebugLine(GetWorld(), Waypoints[i], Waypoints[i + 1], FColor::Blue, false, 20.f, 0, 8.f);
+	}
 }
 
 
