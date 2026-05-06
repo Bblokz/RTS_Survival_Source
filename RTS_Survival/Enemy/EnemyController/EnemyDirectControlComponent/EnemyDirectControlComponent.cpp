@@ -10,6 +10,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlConstants.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitEntry.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -33,6 +34,35 @@ namespace
 
 		const int32 MaxAllowedPickCount = FMath::Min(MaxUnitsToPick, AvailableUnitCount);
 		return FMath::RandRange(MinUnitsToPick, MaxAllowedPickCount);
+	}
+
+	bool GetIsSupportedDirectControlUnitType(const EAllUnitType UnitType)
+	{
+		return UnitType == EAllUnitType::UNType_Squad || UnitType == EAllUnitType::UNType_Tank;
+	}
+
+	bool TrySetupIdleUnitEntryFromActor(AActor* UnitActor, FBlackboardIdleUnitEntry& OutIdleUnitEntry)
+	{
+		if (not IsValid(UnitActor))
+		{
+			return false;
+		}
+
+		const URTSComponent* RTSComponent = UnitActor->FindComponentByClass<URTSComponent>();
+		if (not IsValid(RTSComponent))
+		{
+			return false;
+		}
+
+		if (not GetIsSupportedDirectControlUnitType(RTSComponent->GetUnitType()))
+		{
+			return false;
+		}
+
+		OutIdleUnitEntry.SetIdleUnitActor(UnitActor);
+		OutIdleUnitEntry.UnitType = RTSComponent->GetUnitType();
+		OutIdleUnitEntry.UnitSubtypeRaw = static_cast<int32>(RTSComponent->GetUnitSubType());
+		return true;
 	}
 
 	bool GetIsSquadEntry(const FBlackboardIdleUnitEntry& Entry)
@@ -254,7 +284,15 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 		return false;
 	}
 
-	Blackboard->IdleDirectControlUnits.Add(UnitActor);
+	FBlackboardIdleUnitEntry IdleUnitEntry;
+	if (not TrySetupIdleUnitEntryFromActor(UnitActor, IdleUnitEntry))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Enemy direct control component can only register squad or tank units with a valid RTS component.");
+		return false;
+	}
+
+	Blackboard->IdleDirectControlUnits.Add(IdleUnitEntry);
 	DebugReportRegisterDeregister("RegisterDirectControlUnit added unit: " + UnitActor->GetName());
 	return true;
 }
@@ -287,7 +325,7 @@ void UEnemyDirectControlComponent::ClearDirectControlUnits()
 	{
 		return;
 	}
-		Blackboard->IdleDirectControlUnits.Empty();
+	Blackboard->IdleDirectControlUnits.Empty();
 	DebugReportRegisterDeregister("ClearDirectControlUnits removed all direct control units.");
 }
 
@@ -295,10 +333,10 @@ TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() 
 {
 	FStrategicAIBlackboard* Blackboard = nullptr;
 	TArray<AActor*> RegisteredActors;
-	
-	if(not EnsureIsValidBlackboard(Blackboard))
+
+	if (not EnsureIsValidBlackboard(Blackboard))
 	{
-		return  RegisteredActors;
+		return RegisteredActors;
 	}
 	RegisteredActors.Reserve(Blackboard->IdleDirectControlUnits.Num());
 
@@ -554,11 +592,11 @@ void UEnemyDirectControlComponent::TickDirectControl()
 void UEnemyDirectControlComponent::RemoveInvalidRegisteredUnits()
 {
 	FStrategicAIBlackboard* Blackboard = nullptr;
-	if(not EnsureIsValidBlackboard(Blackboard))
+	if (not EnsureIsValidBlackboard(Blackboard))
 	{
 		return;
 	}
-	
+
 	for (int32 UnitIndex = Blackboard->IdleDirectControlUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
 	{
 		const TWeakObjectPtr<AActor> RegisteredUnit = Blackboard->IdleDirectControlUnits[UnitIndex];
@@ -585,7 +623,7 @@ void UEnemyDirectControlComponent::DebugDrawRegisteredDirectControlUnits() const
 	}
 
 	FStrategicAIBlackboard* Blackboard = nullptr;
-	if(not EnsureIsValidBlackboard(Blackboard))
+	if (not EnsureIsValidBlackboard(Blackboard))
 	{
 		return;
 	}
