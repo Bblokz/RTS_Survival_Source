@@ -94,6 +94,26 @@ FResultLocationsUnderPlayerAttack::FResultLocationsUnderPlayerAttack()
 {
 }
 
+FFindPlayerUnitBulkLocations::FFindPlayerUnitBulkLocations()
+	: RequestID(0)
+	, ClusterRadiusXY(4500.f)
+	, MinUnitsPerBulk(3)
+	, MinWeightedBulkScore(4.f)
+	, MaxAverageBulkRadiusXY(3000.f)
+	, MaxBulksToReturn(3)
+	, SquadBulkScore(1.f)
+	, LightTankBulkScore(2.f)
+	, MediumTankBulkScore(3.5f)
+	, HeavyTankBulkScore(5.f)
+	, ArmoredCarBulkScore(1.5f)
+{
+}
+
+FResultPlayerUnitBulkLocations::FResultPlayerUnitBulkLocations()
+	: RequestID(0)
+{
+}
+
 FStrategicAIRequestBatch::FStrategicAIRequestBatch()
 {
 }

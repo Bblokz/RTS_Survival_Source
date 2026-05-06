@@ -13,6 +13,8 @@ struct FFindEnemyBaseClusters;
 struct FResultEnemyBaseClusters;
 struct FFindLocationsUnderPlayerAttack;
 struct FResultLocationsUnderPlayerAttack;
+struct FFindPlayerUnitBulkLocations;
+struct FResultPlayerUnitBulkLocations;
 
 namespace FStrategicAIHelpers
 {
@@ -101,5 +103,15 @@ namespace FStrategicAIHelpers
 
 	FResultLocationsUnderPlayerAttack BuildLocationsUnderPlayerAttackResult(
 		const FFindLocationsUnderPlayerAttack& Request,
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
+
+	/**
+	 * @brief Finds player mobile-combat concentrations so strategy can pick macro pressure points.
+	 * @param Request Clustering parameters and unit weights used to accept meaningful bulks.
+	 * @param DetailedUnitStates Unit snapshot data to cluster.
+	 * @return Result payload containing accepted squad/tank bulk locations.
+	 */
+	FResultPlayerUnitBulkLocations BuildPlayerUnitBulkLocationsResult(
+		const FFindPlayerUnitBulkLocations& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
 }

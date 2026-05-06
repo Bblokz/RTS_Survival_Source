@@ -708,13 +708,144 @@ struct FResultLocationsUnderPlayerAttack
 };
 
 /**
+ * @brief Describes one player force-concentration query for mobile combat units.
+ * Used by async strategic AI to find average locations of meaningful squad and tank bulks.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FFindPlayerUnitBulkLocations
+{
+	GENERATED_BODY()
+
+	FFindPlayerUnitBulkLocations();
+
+	/** Identifier copied into results so callers can match async responses safely. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RequestID;
+
+	/** Maximum planar distance where mobile combat units can belong to the same bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ClusterRadiusXY;
+
+	/** Minimum raw squad/tank count required before a bulk is strategically meaningful. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MinUnitsPerBulk;
+
+	/** Minimum weighted score required so low-value groups do not become macro targets. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinWeightedBulkScore;
+
+	/** Maximum accepted average spread from center; zero disables the spread gate. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxAverageBulkRadiusXY;
+
+	/** Caps returned force concentrations so downstream strategic choices stay bounded. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxBulksToReturn;
+
+	/** Score contribution for each player squad in a bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SquadBulkScore;
+
+	/** Score contribution for each player light tank in a bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float LightTankBulkScore;
+
+	/** Score contribution for each player medium tank in a bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MediumTankBulkScore;
+
+	/** Score contribution for each player heavy tank in a bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float HeavyTankBulkScore;
+
+	/** Score contribution for each player armored car in a bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArmoredCarBulkScore;
+};
+
+/**
+ * @brief Holds one accepted player force concentration for strategic decisions.
+ * Used by game-thread AI to target or avoid mobile groups without recomputing clustering.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FPlayerUnitBulkLocation
+{
+	GENERATED_BODY()
+
+	/** Weighted average world location of the accepted squad/tank bulk. */
+	UPROPERTY(BlueprintReadOnly)
+	FVector BulkLocation = FVector::ZeroVector;
+
+	/** Final weighted score used to sort stronger bulks before weaker ones. */
+	UPROPERTY(BlueprintReadOnly)
+	float Score = 0.f;
+
+	/** Sum of accepted unit weights so consumers can distinguish size from raw counts. */
+	UPROPERTY(BlueprintReadOnly)
+	float WeightedUnitCount = 0.f;
+
+	/** Average planar distance from units to the returned bulk center. */
+	UPROPERTY(BlueprintReadOnly)
+	float AverageUnitDistanceFromCenter = 0.f;
+
+	/** Farthest planar distance from any contributing unit to the returned bulk center. */
+	UPROPERTY(BlueprintReadOnly)
+	float MaxUnitDistanceFromCenter = 0.f;
+
+	/** Number of squads contributing to this bulk. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 SquadCount = 0;
+
+	/** Number of light tanks contributing to this bulk. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 LightTankCount = 0;
+
+	/** Number of medium tanks contributing to this bulk. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 MediumTankCount = 0;
+
+	/** Number of heavy tanks contributing to this bulk. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 HeavyTankCount = 0;
+
+	/** Number of armored cars contributing to this bulk. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 ArmoredCarCount = 0;
+
+	/** Player units that contributed to this mobile combat bulk. */
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> UnitsInBulk;
+};
+
+/**
+ * @brief Returns discovered player squad/tank force concentrations in score order.
+ * Used to feed strategic AI compact macro targets around the player's mobile army.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FResultPlayerUnitBulkLocations
+{
+	GENERATED_BODY()
+
+	FResultPlayerUnitBulkLocations();
+
+	/** Identifier copied from request so result routing remains deterministic. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 RequestID;
+
+	/** Accepted player mobile-combat bulks sorted from strongest to weakest. */
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FPlayerUnitBulkLocation> PlayerUnitBulks;
+};
+
+/**
  * @brief Aggregates multiple strategic AI request types into a single async batch.
  * Used to enqueue all pending strategic AI queries for one async processing pass.
  *
  * On the async thread, FGetAsyncTarget::ProcessStrategicAIRequests dequeues this batch and
  * processes each request array independently: it reserves result array capacity to match the
  * request counts, iterates each request, and calls the corresponding helper function using
- * the current M_DetailedUnitStates snapshot. The resulting arrays are assembled into a
+ * the current M_DetailedUnitStates snapshot, including player mobile-combat bulk clustering.
+ * The resulting arrays are assembled into a
  * FStrategicAIResultBatch before invoking the callback on the game thread.
  */
 USTRUCT()
@@ -763,6 +894,10 @@ struct FStrategicAIRequestBatch
 	/** Batches attack-risk location evaluations so all points share one consistent unit snapshot. */
 	UPROPERTY()
 	TArray<FFindLocationsUnderPlayerAttack> FindLocationsUnderPlayerAttackRequests;
+
+	/** Batches player-force clustering so macro targets share one consistent mobile-unit snapshot. */
+	UPROPERTY()
+	TArray<FFindPlayerUnitBulkLocations> FindPlayerUnitBulkLocationsRequests;
 };
 
 /**
@@ -771,8 +906,9 @@ struct FStrategicAIRequestBatch
  *
  * On the async thread, each result array is filled in the same order as its matching request
  * array: flank results are built from distance-sorted heavy tanks and flank arcs, unit counts
- * are built from a full player unit scan, and retreat groups are built from damaged tank
- * grouping plus hazmat formation assignments. The batch is moved into the callback lambda
+ * are built from a full player unit scan, retreat groups are built from damaged tank
+ * grouping plus hazmat formation assignments, and player bulk locations are built from
+ * clustered mobile combat units. The batch is moved into the callback lambda
  * that is dispatched to ENamedThreads::GameThread.
  */
 USTRUCT()
@@ -821,4 +957,8 @@ struct FStrategicAIResultBatch
 	/** Returns under-attack location evaluations in request order for deterministic consumption. */
 	UPROPERTY()
 	TArray<FResultLocationsUnderPlayerAttack> LocationsUnderPlayerAttackResults;
+
+	/** Returns player mobile-combat bulk locations in request order for deterministic consumption. */
+	UPROPERTY()
+	TArray<FResultPlayerUnitBulkLocations> PlayerUnitBulkLocationsResults;
 };
