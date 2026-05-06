@@ -39,6 +39,11 @@ FString UStrategicAISubAction::GetDebugString() const
 	return TEXT("DO NOT USE Default SubAction: ") + GetRequirementsDebugString();
 }
 
+FString UStrategicAISubAction::GetNameFromActionEnum() const
+{
+	return UEnum::GetValueAsString(SubtypeAction);
+}
+
 FString UStrategicAISubAction::GetRequirementsDebugString() const
 {
 	return GetRequirementsDebugStringForArray(M_NativeVisibleRequirements, TEXT("\n--Native Visible Requirements:"))

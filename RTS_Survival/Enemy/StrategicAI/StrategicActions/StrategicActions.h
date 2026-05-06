@@ -52,6 +52,8 @@ public:
 
 	virtual FString GetDebugString() const;
 
+	FString GetNameFromActionEnum()const;
+
 protected:
 	void AddNativeVisibleRequirement(UStrategicAIActionRequirement* Requirement);
 

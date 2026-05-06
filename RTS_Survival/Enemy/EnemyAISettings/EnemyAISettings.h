@@ -12,7 +12,7 @@ namespace EnemyAISettings
 	// How fast the enemy AI requests new strategic decisions from the async thread that processes them.
 	// Makes use of one large request structure and batch processes multiple units at once which are then written back in
 	// a large structure.
-	inline float EnemyStrategicAIThinkingSpeed = 5.f;
+	inline float EnemyStrategicAIThinkingSpeed = 6.f;
 
 	namespace ThinkingTimers
 	{
@@ -32,6 +32,7 @@ namespace EnemyAISettings
 		inline constexpr bool PlayerCountsDebugging = true;
 		inline constexpr float PlayerCountsDuration = 15.f;
 		inline constexpr bool StochasticDecisionTreeDebugging = true;
+		inline constexpr float StochasticActionsDebugTime = 5.f;
 		
 	}
 

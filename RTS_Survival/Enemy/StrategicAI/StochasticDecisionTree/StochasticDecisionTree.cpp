@@ -64,6 +64,7 @@ void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds
 	{
 		return;
 	}
+	ExecuteSubAction(PickedSubAction, Blackboard);
 }
 
 bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
@@ -81,14 +82,11 @@ bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<const FStrat
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
 	{
-		DebugActions(ValidActions);
+		DebugValidActions(ValidActions);
 	}
 	return true;
 }
 
-void UStochasticDecisionTree::DebugActions(const TArray<const FStrategicAIAction*> ValidActions) const
-{
-}
 
 bool UStochasticDecisionTree::EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction) const
 {
@@ -147,10 +145,21 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 	}
 }
 
+void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard)
+{
+	
+}
+
 const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithValidSubActions(
 	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
 {
 	TArray<const FStrategicAIAction*> ValidActions;
+
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
+	{
+		DebugAllActionsPriorReqCheck();
+	}
 
 	if (M_ActionDefinitions.IsEmpty())
 	{
@@ -247,6 +256,27 @@ bool UStochasticDecisionTree::EnsureIsValidEnemyController() const
 	}
 	return true;
 }
+
+void UStochasticDecisionTree::DebugAllActionsPriorReqCheck() const
+{
+	FString DebugString = "Actions Prior Req Check:\n";
+	for(auto EachMainAction : M_ActionDefinitions)
+	{
+		DebugString += EachMainAction.GetDebugString() + "\n";	
+	}
+		RTSFunctionLibrary::PrintString(DebugString, FColor::Purple, EnemyAISettings::Debugging::StochasticActionsDebugTime);
+}
+
+void UStochasticDecisionTree::DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
+{
+	FString DebugString = "\nValid Actions:";
+	for(auto EachValidAction : ValidActions)
+	{
+		DebugString += "\n-- " + EachValidAction->GetDebugString();
+	}
+	RTSFunctionLibrary::PrintString(DebugString, FColor::Green, EnemyAISettings::Debugging::StochasticActionsDebugTime);
+}
+
 
 bool UStochasticDecisionTree::EnsureStrategicComponentIsValid() const
 {

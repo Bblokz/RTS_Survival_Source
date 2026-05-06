@@ -142,6 +142,18 @@ UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
 	return M_StochasticDecisionTree;
 }
 
+void AEnemyController::SetAllowDirectControlStochasticDecisionTree(const bool bAllow)
+{
+	FStrategicAIBlackboard* StrategicAIBlackboard = GetStrategicAIBlackboard();
+	if(not StrategicAIBlackboard)
+	{
+		RTSFunctionLibrary::ReportError("Failed to set allow direct control for stochastic decision tree: Invalid strategic AI blackboard.");
+		return;
+	}
+	StrategicAIBlackboard->StrategicAIMissionSettings.bAllowDirectControlStochasticDecisionTree = bAllow;
+	
+}
+
 void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& SquadControllers,
                                                const TArray<ATankMaster*>& TankMasters,
                                                const TArray<FVector>& Waypoints,
