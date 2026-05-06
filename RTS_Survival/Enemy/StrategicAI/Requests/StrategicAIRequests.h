@@ -66,6 +66,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing by copying the inbound request identifier into each produced result payload.
 	 * @note Not filled only for malformed requests that never enter the processing loop.
+	 * @note Suggested start value: -1 (`INDEX_NONE`) so uninitialized requests are easy to detect during debugging.
 	 */
 	UPROPERTY()
 	int32 RequestID;
@@ -75,6 +76,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing from the queued request before distance sorting begins.
 	 * @note Not filled when no flank request was enqueued for the current batch slot.
+	 * @note Suggested start value: `FVector::ZeroVector` as a safe sentinel; caller logic should overwrite it with the squad or commander origin.
 	 */
 	UPROPERTY()
 	FVector StartSearchLocation;
@@ -84,6 +86,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing from request tuning values before candidate truncation occurs.
 	 * @note Not filled when request construction is skipped by higher-level AI logic.
+	 * @note Suggested start value: 3 to keep compute bounded while still allowing multi-target tactical choices.
 	 */
 	UPROPERTY()
 	int32 MaxHeavyTanksToFlank;
@@ -93,6 +96,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing as helper input when building flank arcs for each accepted heavy tank.
 	 * @note Not filled when no heavy tank survives filtering and no arc generation runs.
+	 * @note Suggested start value: 4 to provide meaningful variety (left/right plus alternates) without flooding selection logic.
 	 */
 	UPROPERTY()
 	int32 MaxSuggestedFlankPositionsPerTank;
@@ -102,6 +106,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing from request parameters right before flank position synthesis.
 	 * @note Not filled when request never reaches helper execution because batch processing aborts earlier.
+	 * @note Suggested start value: 35.0f degrees for clearly lateral movement while avoiding extreme detours.
 	 */
 	UPROPERTY()
 	float DeltaYawFromLeftRight;
@@ -111,6 +116,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing as lower distance constraint during flank point generation.
 	 * @note Not filled when no flank point generation is attempted for this request.
+	 * @note Suggested start value: 600.0f (6 m in UE units) to reduce collision/overlap risk near the tank hull.
 	 */
 	UPROPERTY()
 	float MinDistanceToTank;
@@ -120,6 +126,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing as upper distance constraint during flank point generation.
 	 * @note Not filled when request is filtered out before helper invocation.
+	 * @note Suggested start value: 1600.0f (16 m in UE units) to keep routes practical while still enabling wide flanks.
 	 */
 	UPROPERTY()
 	float MaxDistanceToTank;
@@ -129,6 +136,7 @@ struct FFindClosestFlankableEnemyHeavy
 	 *
 	 * @note Filled on async processing before helper expands candidate flank offsets around each tank.
 	 * @note Not filled when no valid target tank exists for this request.
+	 * @note Suggested start value: 1.0f to preserve baseline spacing; adjust upward/downward per unit size and maneuver width.
 	 */
 	UPROPERTY()
 	float FlankingPositionsSpreadScaler;
@@ -167,7 +175,7 @@ struct FResultClosestFlankableEnemyHeavy
 	 * @note Not filled when heavy-tank candidate set resolves to empty.
 	 */
 	UPROPERTY()
-	TArray<FWeakActorLocations> Locations;
+	TArray<FWeakActorLocations> FlankLocationsAroundHeavyTank;
 };
 
 /**

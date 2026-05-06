@@ -133,3 +133,42 @@ FString USubAction_DefendImportantMissionPoint::GetDebugString() const
 {
 	return TEXT("Defend Important Mission Point") + GetRequirementsDebugString();
 }
+
+USubAction_LightTanksAttackPlayerUnits::USubAction_LightTanksAttackPlayerUnits()
+{
+	SubtypeAction = ESubtypeAction::AttackMoveLightTanksToPlayerUnits;
+	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughLightTanks>(
+		TEXT("HasIdleLightTanksRequirement")));	
+}
+
+FString USubAction_LightTanksAttackPlayerUnits::GetDebugString() const
+{
+	return TEXT("Light Tanks Attack Player Units") + GetRequirementsDebugString();
+}
+
+USubAction_HeavyTankPushPlayerBaseOrUnits::USubAction_HeavyTankPushPlayerBaseOrUnits()
+{
+	SubtypeAction = ESubtypeAction::HeavyTankPushPlayerBaseOrUnits;
+	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughHeavyTanks>(
+		TEXT("HasIdleHeavyTanksRequirement")));
+	
+}
+
+FString USubAction_HeavyTankPushPlayerBaseOrUnits::GetDebugString() const
+{
+	return TEXT("Heavy Tank Push Player Base Or Units") + GetRequirementsDebugString();
+}
+
+USubAction_FlankPlayerHeavies::USubAction_FlankPlayerHeavies()
+{
+	SubtypeAction = ESubtypeAction::FlankPlayerHeavies;
+	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions>(
+		TEXT("DoesBlackboardHaveHeavyFlankPositions")));
+	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasAtLeastAnyIdleTanks>(
+	TEXT("HasAnyXTanksRequirement")));
+}
+
+FString USubAction_FlankPlayerHeavies::GetDebugString() const
+{
+	return TEXT("Flank Player Heavies") + GetRequirementsDebugString();
+}

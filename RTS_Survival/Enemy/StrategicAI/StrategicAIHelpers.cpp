@@ -1058,7 +1058,7 @@ FResultClosestFlankableEnemyHeavy FStrategicAIHelpers::BuildClosestFlankableEnem
 	});
 
 	const int32 CountToProcess = FMath::Min(MaxHeavyTanksToFlank, CandidateTanks.Num());
-	Result.Locations.Reserve(CountToProcess);
+	Result.FlankLocationsAroundHeavyTank.Reserve(CountToProcess);
 
 	for (int32 Index = 0; Index < CountToProcess; ++Index)
 	{
@@ -1071,10 +1071,10 @@ FResultClosestFlankableEnemyHeavy FStrategicAIHelpers::BuildClosestFlankableEnem
 		FWeakActorLocations FlankLocations;
 		FlankLocations.Actor = UnitState->UnitActorPtr;
 		FlankLocations.Locations = StrategicAIHelperUtilities::BuildFlankPositions(*UnitState, Request);
-		Result.Locations.Add(MoveTemp(FlankLocations));
+		Result.FlankLocationsAroundHeavyTank.Add(MoveTemp(FlankLocations));
 	}
 
-	StrategicAIHelperUtilities::RemoveNearZeroStrategicActorLocations(Result.Locations);
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicActorLocations(Result.FlankLocationsAroundHeavyTank);
 
 	return Result;
 }

@@ -25,6 +25,9 @@ struct FStrategicAIBlackboard
 	FResultPlayerUnitCounts CurrentPlayerUnitCounts;
 
 	UPROPERTY()
+	TArray<FResultClosestFlankableEnemyHeavy> AgreggatedHeavyTankFlankingResults;
+
+	UPROPERTY()
 	FResultLocationsUnderPlayerAttack CurrentLocationsUnderPlayerAttack;
 
 	UPROPERTY()

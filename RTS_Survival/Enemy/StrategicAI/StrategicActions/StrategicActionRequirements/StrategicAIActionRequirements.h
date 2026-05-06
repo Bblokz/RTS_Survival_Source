@@ -130,6 +130,25 @@ public:
 	virtual FString GetDebugString() const override;
 };
 
+
+/**
+ * @brief Used by strategic actions to require a minimum number of idle tanks of any subtype.
+ */
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIHasAtLeastAnyIdleTanks final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 AmountIdleNeeded = 1;
+
+	virtual FString GetDebugString() const override;
+};
+
 /**
  * @brief Used by strategic actions to require a minimum number of idle aircraft of one subtype.
  */
@@ -148,4 +167,68 @@ public:
 	int32 AmountIdleNeeded = 1;
 
 	virtual FString GetDebugString() const override;
+};
+
+
+// By default set to 4 light tanks needed.
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIHasEnoughLightTanks final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 AmountIdleNeeded = 4;
+	
+	virtual FString GetDebugString() const override;
+
+};
+
+
+// By default set to two heavy tanks needed.
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIHasEnoughHeavyTanks final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 AmountIdleNeeded = 2;
+	
+	virtual FString GetDebugString() const override;
+
+};
+
+// By default set to one player heavy tank needed.
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIDoesPlayerHaveHeavyTanks final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 AmountIdleNeeded = 1;
+	
+	virtual FString GetDebugString() const override;
+
+};
+
+
+// By default set to one player heavy tank needed.
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+	virtual FString GetDebugString() const override;
+
 };

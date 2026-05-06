@@ -13,6 +13,10 @@ namespace BlackboardQueries
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinTanks,
 		ETankSubtype TankType);
+	
+	bool HasAtLeastAnyXTanks(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinTanks);
 
 	bool HasAtLeastXArmoredCars(
 		const FStrategicAIBlackboard& Blackboard,
@@ -73,4 +77,11 @@ namespace BlackboardQueries
 
 	bool HasValidPlayerResourceBuildingLocations(
 		const FStrategicAIBlackboard& Blackboard);
+
+	bool HasValidPlayerHeavyTankFLankLocations(
+		const FStrategicAIBlackboard& Blackboard);
+
+	TArray<FVector> GetRandomLocationsOfIdleUnits(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 PreferredAmount = 3);
 }

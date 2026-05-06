@@ -105,6 +105,30 @@ bool BlackboardQueries::HasAtLeastXTanks(const FStrategicAIBlackboard& Blackboar
 	return false;
 }
 
+bool BlackboardQueries::HasAtLeastAnyXTanks(const FStrategicAIBlackboard& Blackboard, const int32 MinTanks)
+{
+	int32 FoundUnits = 0;
+	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
+	{
+		if (not EachIdleUnit.IdleUnit.IsValid())
+		{
+			continue;
+		}
+
+		if (EachIdleUnit.UnitType != EAllUnitType::UNType_Tank)
+		{
+			continue;
+		}
+	
+		FoundUnits++;
+		if (FoundUnits >= MinTanks)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 bool BlackboardQueries::HasAtLeastXArmoredCars(
 	const FStrategicAIBlackboard& Blackboard,
 	const int32 MinArmoredCars)
@@ -266,4 +290,67 @@ bool BlackboardQueries::HasValidPlayerResourceBuildingLocations(const FStrategic
 		}
 	}
 	return false;
+}
+
+bool BlackboardQueries::HasValidPlayerHeavyTankFLankLocations(const FStrategicAIBlackboard& Blackboard)
+{
+	for(auto EachHeavyTankFlanking: Blackboard.AgreggatedHeavyTankFlankingResults)
+	{
+		for(auto EachHeavyTank : EachHeavyTankFlanking.FlankLocationsAroundHeavyTank)
+		{
+			if(not EachHeavyTank.Locations.IsEmpty())
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+TArray<FVector> BlackboardQueries::GetRandomLocationsOfIdleUnits(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 PreferredAmount)
+{
+	if (PreferredAmount <= 0)
+	{
+		return TArray<FVector>();
+	}
+
+	if (Blackboard.IdleDirectControlUnits.IsEmpty())
+	{
+		return TArray<FVector>();
+	}
+
+	const int32 MaxLocationsToPick = FMath::Min(PreferredAmount, Blackboard.IdleDirectControlUnits.Num());
+	TArray<int32> RemainingIdleUnitIndices;
+	RemainingIdleUnitIndices.Reserve(Blackboard.IdleDirectControlUnits.Num());
+
+	for (int32 IdleUnitIndex = 0; IdleUnitIndex < Blackboard.IdleDirectControlUnits.Num(); ++IdleUnitIndex)
+	{
+		RemainingIdleUnitIndices.Add(IdleUnitIndex);
+	}
+
+	TArray<FVector> PickedLocations;
+	PickedLocations.Reserve(MaxLocationsToPick);
+
+	TSet<FVector> SeenLocations;
+	SeenLocations.Reserve(MaxLocationsToPick);
+
+	while (PickedLocations.Num() < MaxLocationsToPick && not RemainingIdleUnitIndices.IsEmpty())
+	{
+		const int32 RandomRemainingIndex = FMath::RandRange(0, RemainingIdleUnitIndices.Num() - 1);
+		const int32 PickedIdleUnitIndex = RemainingIdleUnitIndices[RandomRemainingIndex];
+		RemainingIdleUnitIndices.RemoveAtSwap(RandomRemainingIndex, 1, false);
+
+		const FVector IdleUnitLocation = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex].Get()->GetActorLocation();
+		if (SeenLocations.Contains(IdleUnitLocation))
+		{
+			continue;
+		}
+
+		SeenLocations.Add(IdleUnitLocation);
+		PickedLocations.Add(IdleUnitLocation);
+	}
+
+	return PickedLocations;
 }

@@ -82,6 +82,7 @@ public:
 	void QueueFindEnemyBaseClustersRequest(const FFindEnemyBaseClusters& Request);
 	void QueueFindLocationsUnderPlayerAttackRequest(const FFindLocationsUnderPlayerAttack& Request);
 	void QueueFindPlayerUnitBulkLocationsRequest(const FFindPlayerUnitBulkLocations& Request);
+	void QueueFindPlayerHeavyTankFlankLocationsRequest(const FFindClosestFlankableEnemyHeavy& Request);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request);
@@ -106,6 +107,11 @@ public:
 	// This request is periodically used to find player squad and tank force concentrations.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindPlayerUnitBulkLocations FindPlayerUnitBulkLocations_TimerRequest;
+	
+	// This request is periodically used to find player heavy tanks to flank
+	// there are several versions of this send to the async processor with different starting locations.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FFindClosestFlankableEnemyHeavy FindPlayerHeavyTankFlankLocations_TimerRequest;
 
 protected:
 	virtual void BeginPlay() override;
@@ -142,6 +148,9 @@ private:
 	FAIThinkingTimerData M_PlayerUnitBulkLocationsThinkTimer;
 	void PlayerUnitBulkLocations_ThinkStep();
 
+	FAIThinkingTimerData M_PlayerHeavyTankFlankLocationsThinkTimer;
+	void PlayerHeavyTankFlankLocations_ThinkStep();
+
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
@@ -153,6 +162,7 @@ private:
 	void StrategicAiThinkStep();
 	void ProcessStrategicAIRequests();
 	void OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch);
+	void ProcessClosestFlankableEnemyHeavyResults(const TArray<FResultClosestFlankableEnemyHeavy>& ClosestFlankableEnemyHeavyResults);
 	void ProcessEnemyBaseClusterResults(const TArray<FResultEnemyBaseClusters>& EnemyBaseClusterResults);
 	void ProcessAlliedTanksToRetreatResults(const TArray<FResultAlliedTanksToRetreat>& AlliedTanksToRetreatResults);
 	void ProcessPlayerUnitCountsAndBaseResults(const TArray<FResultPlayerUnitCounts>& PlayerUnitCountsAndBaseResults);

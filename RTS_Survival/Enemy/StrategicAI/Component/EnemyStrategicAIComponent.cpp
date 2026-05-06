@@ -5,6 +5,7 @@
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -26,7 +27,6 @@ void UEnemyStrategicAIComponent::InitStrategicAIComponent(AEnemyController* Enem
 	PreThinKStep_InitThinkingTimers(Now);
 	CacheGenerationSeedFromGameInstance();
 	StartStrategicAIThinkingTimer();
-	
 }
 
 
@@ -63,6 +63,12 @@ void UEnemyStrategicAIComponent::QueueFindPlayerUnitBulkLocationsRequest(
 	const FFindPlayerUnitBulkLocations& Request)
 {
 	M_PendingRequests.FindPlayerUnitBulkLocationsRequests.Add(Request);
+}
+
+void UEnemyStrategicAIComponent::QueueFindPlayerHeavyTankFlankLocationsRequest(
+	const FFindClosestFlankableEnemyHeavy& Request)
+{
+	M_PendingRequests.FindClosestFlankableEnemyHeavyRequests.Add(Request);
 }
 
 void UEnemyStrategicAIComponent::RequestRetreatDamagedTanks(const FFindAlliedTanksToRetreat& Request)
@@ -137,6 +143,13 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 	M_PlayerUnitBulkLocationsThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep);
 	M_AIThinkTimers.Add(&M_PlayerUnitBulkLocationsThinkTimer);
+
+	M_PlayerHeavyTankFlankLocationsThinkTimer.LastTimeThought = Now;
+	M_PlayerHeavyTankFlankLocationsThinkTimer.ThinkingInterval =
+		EnemyAISettings::ThinkingTimers::UpdatePlayerHeavyTankFlank_Interval;
+	M_PlayerHeavyTankFlankLocationsThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::PlayerHeavyTankFlankLocations_ThinkStep);
+	M_AIThinkTimers.Add(&M_PlayerHeavyTankFlankLocationsThinkTimer);
 }
 
 void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
@@ -157,6 +170,19 @@ void UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep()
 void UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep()
 {
 	QueueFindPlayerUnitBulkLocationsRequest(FindPlayerUnitBulkLocations_TimerRequest);
+}
+
+void UEnemyStrategicAIComponent::PlayerHeavyTankFlankLocations_ThinkStep()
+{
+	TArray<FVector> RandomIdleUnitLocations = BlackboardQueries::GetRandomLocationsOfIdleUnits(M_StrategicAIBlackboard, 3);
+	int32 RequestOrder = 0;
+	for(const FVector& Location : RandomIdleUnitLocations)
+	{
+		FindPlayerHeavyTankFlankLocations_TimerRequest.RequestID = RequestOrder;
+		FindPlayerHeavyTankFlankLocations_TimerRequest.StartSearchLocation = Location;
+		QueueFindPlayerHeavyTankFlankLocationsRequest(FindPlayerHeavyTankFlankLocations_TimerRequest);
+		++RequestOrder;
+	}
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
@@ -299,9 +325,36 @@ void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAI
 	M_LatestResults = ResultBatch;
 	ProcessEnemyBaseClusterResults(ResultBatch.EnemyBaseClustersResults);
 	ProcessPlayerUnitCountsAndBaseResults(ResultBatch.PlayerUnitCountsResults);
+	// IMPORTANT; after unit counts to quickly invalidate old flanking data.
+	ProcessClosestFlankableEnemyHeavyResults(ResultBatch.FindClosestFlankableEnemyHeavyResults);
 	ProcessAlliedTanksToRetreatResults(ResultBatch.AlliedTanksToRetreatResults);
 	ProcessLocationsUnderPlayerAttackResults(ResultBatch.LocationsUnderPlayerAttackResults);
 	ProcessPlayerUnitBulkLocationsResults(ResultBatch.PlayerUnitBulkLocationsResults);
+}
+
+void UEnemyStrategicAIComponent::ProcessClosestFlankableEnemyHeavyResults(
+	const TArray<FResultClosestFlankableEnemyHeavy>& ClosestFlankableEnemyHeavyResults)
+{
+	if (M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerHeavyTanks <= 0)
+	{
+		// Disregard data and clear all older flanking positions.
+		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Empty();
+		return;
+	}
+	const bool bHasNewEntries = ClosestFlankableEnemyHeavyResults.Num() > 0;
+	const bool bOldEntriesExceedTwiceTheRequestAmount = M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Num()
+		> 2 * FindPlayerHeavyTankFlankLocations_TimerRequest.MaxHeavyTanksToFlank;
+	if (bHasNewEntries && bOldEntriesExceedTwiceTheRequestAmount)
+	{
+		// The array already contains double the results we would obtain in one iteration and is likely old.
+		// Clearing old entries.
+		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Empty();
+	}
+	// Add new found entries if any.
+	if (bHasNewEntries)
+	{
+		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Append(ClosestFlankableEnemyHeavyResults);
+	}
 }
 
 void UEnemyStrategicAIComponent::ProcessEnemyBaseClusterResults(
@@ -431,7 +484,7 @@ void UEnemyStrategicAIComponent::ClearInvalidIdleUnitsFromBlackboard()
 {
 	TArray<FBlackboardIdleUnitEntry> ValidIdleUnits;
 	bool bWasAnyUnitInvalid = false;
-	for(auto EachIdleUnit : M_StrategicAIBlackboard.IdleDirectControlUnits)
+	for (auto EachIdleUnit : M_StrategicAIBlackboard.IdleDirectControlUnits)
 	{
 		if (RTSFunctionLibrary::RTSIsValidWeak(EachIdleUnit.IdleUnit))
 		{
@@ -442,9 +495,9 @@ void UEnemyStrategicAIComponent::ClearInvalidIdleUnitsFromBlackboard()
 			bWasAnyUnitInvalid = true;
 		}
 	}
-	if(bWasAnyUnitInvalid)
+	if (bWasAnyUnitInvalid)
 	{
-		M_StrategicAIBlackboard.IdleDirectControlUnits = ValidIdleUnits;	
+		M_StrategicAIBlackboard.IdleDirectControlUnits = ValidIdleUnits;
 	}
 }
 
@@ -461,7 +514,8 @@ void UEnemyStrategicAIComponent::DebugBlackboardBasePoints() const
 void UEnemyStrategicAIComponent::DebugBlackboardLocationsUnderAttack() const
 {
 	using namespace EnemyAISettings::Debugging;
-	for (const auto& EachUnderAttackLocation : M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack.LocationsUnderAttack)
+	for (const auto& EachUnderAttackLocation : M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack.
+	                                                                   LocationsUnderAttack)
 	{
 		DebugPoint(EachUnderAttackLocation.LocationUnderAttack, LocationUnderAttackDebuggingRadius, AttackLocationColor,
 		           LocationsUnderAttackDuration, "Location Under Player Attack");
@@ -473,10 +527,11 @@ void UEnemyStrategicAIComponent::DebugBlackboardLocationsUnderAttack() const
 void UEnemyStrategicAIComponent::DebugBlackboardBulkPlayerUnits() const
 {
 	using namespace EnemyAISettings::Debugging;
-	for(const auto& EachBulk : M_StrategicAIBlackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+	for (const auto& EachBulk : M_StrategicAIBlackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
 	{
 		FString DebugText = FString::Printf(TEXT("Player Unit Bulk: %d units"), EachBulk.UnitsInBulk.Num());
-		DebugPoint(EachBulk.BulkLocation, PlayerUnitBulkLocationDebuggingRadius, PlayerLocationColor, PlayerUnitBulkLocationDebugDuration, DebugText);
+		DebugPoint(EachBulk.BulkLocation, PlayerUnitBulkLocationDebuggingRadius, PlayerLocationColor,
+		           PlayerUnitBulkLocationDebugDuration, DebugText);
 	}
 }
 

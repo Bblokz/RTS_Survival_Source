@@ -10,6 +10,9 @@ enum class ESubtypeAction : uint8
 {
 	DEFAULT_OBJECT,
 	AttackMoveToPlayerUnits,
+	AttackMoveLightTanksToPlayerUnits,
+	HeavyTankPushPlayerBaseOrUnits,
+	FlankPlayerHeavies,
 	AttackMoveToPlayerHQ,
 	AttackMoveToPlayerResourceBuildings,
 	AttackMoveSpecificPoint,
@@ -149,6 +152,39 @@ class RTS_SURVIVAL_API USubAction_DefendImportantMissionPoint final : public USt
 
 public:
 	USubAction_DefendImportantMissionPoint();
+
+	virtual FString GetDebugString() const override;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_LightTanksAttackPlayerUnits final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_LightTanksAttackPlayerUnits();
+
+	virtual FString GetDebugString() const override;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_HeavyTankPushPlayerBaseOrUnits final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_HeavyTankPushPlayerBaseOrUnits();
+
+	virtual FString GetDebugString() const override;
+};
+
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API USubAction_FlankPlayerHeavies final : public UStrategicAISubAction
+{
+	GENERATED_BODY()
+
+public:
+	USubAction_FlankPlayerHeavies();
 
 	virtual FString GetDebugString() const override;
 };
