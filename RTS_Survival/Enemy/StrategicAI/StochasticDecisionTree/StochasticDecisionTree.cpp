@@ -148,6 +148,32 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard)
 {
+	const TArray<FVector> ValidAttackLocations = GetValidAttackPlayerUnitsLocations(Blackboard);
+}
+
+TArray<FVector> UStochasticDecisionTree::GetValidAttackPlayerUnitsLocations(
+	const FStrategicAIBlackboard& Blackboard) const
+{
+	TArray<FVector> ValidLocations;
+	for(const auto& EachBulk: Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+	{
+		if(not EachBulk.BulkLocation.IsNearlyZero())
+	}
+}
+
+void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(const FStrategicAIBlackboard& Blackboard)
+{
+	
+}
+
+void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard)
+{
+	
+}
+
+void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction,
+	const FStrategicAIBlackboard& Blackboard)
+{
 	
 }
 

@@ -17,9 +17,9 @@ UEnemyStrategicAIComponent::UEnemyStrategicAIComponent()
 }
 
 void UEnemyStrategicAIComponent::InitStrategicAIComponent(AEnemyController* EnemyController,
-	UStochasticDecisionTree* StochasticDecisionTree)
+                                                          UStochasticDecisionTree* StochasticDecisionTree)
 {
-M_StochasticDecisionTree = StochasticDecisionTree;	
+	M_StochasticDecisionTree = StochasticDecisionTree;
 	M_EnemyController = EnemyController;
 	CacheGenerationSeedFromGameInstance();
 }
@@ -243,7 +243,7 @@ void UEnemyStrategicAIComponent::StrategicAiThinkStep()
 		// Sees if enough time has passed since last think step then calls delegate.
 		EachThinkTimer->TryExecuteThinkStep(Now);
 	}
-	if(M_StochasticDecisionTree.IsValid() && GetIsAllowedDirectControlUnits())
+	if (M_StochasticDecisionTree.IsValid() && GetIsAllowedDirectControlUnits())
 	{
 		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_StrategicAIBlackboard);
 	}
@@ -370,6 +370,11 @@ void UEnemyStrategicAIComponent::ProcessLocationsUnderPlayerAttackResults(
 		return;
 	}
 	M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack = LocationsUnderPlayerAttackResults.Last();
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::LocationsUnderPlayerAttackDebugging)
+	{
+		DebugBlackboardLocationsUnderAttack();
+	}
 }
 
 void UEnemyStrategicAIComponent::ProcessPlayerUnitBulkLocationsResults(
@@ -380,6 +385,11 @@ void UEnemyStrategicAIComponent::ProcessPlayerUnitBulkLocationsResults(
 		return;
 	}
 	M_StrategicAIBlackboard.CurrentPlayerUnitBulkLocations = PlayerUnitBulkLocationsResults.Last();
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::PlayerUnitBulkDebugging)
+	{
+		DebugBlackboardBulkPlayerUnits();
+	}
 }
 
 bool UEnemyStrategicAIComponent::GetIsValidEnemyDirectControlComponent(
@@ -417,15 +427,45 @@ void UEnemyStrategicAIComponent::FillRetreatRequestExcludedUnits(FFindAlliedTank
 
 void UEnemyStrategicAIComponent::DebugBlackboardBasePoints() const
 {
-	for (auto EachLocation : M_StrategicAIBlackboard.EnemyBasePoints)
+	using namespace EnemyAISettings::Debugging;
+	for (const auto& EachLocation : M_StrategicAIBlackboard.EnemyBasePoints)
 	{
-		DrawDebugSphere(GetWorld(), EachLocation, EnemyAISettings::Debugging::BaseLocationDebuggingRadius, 20,
-		                FColor::Red, false, EnemyAISettings::Debugging::BaseLocationDebugDuration, 0, 5.f);
-		DrawDebugString(
-			GetWorld(), EachLocation + FVector(0, 0, EnemyAISettings::Debugging::BaseLocationDebuggingRadius),
-			TEXT("Enemy Base Location"), nullptr, FColor::Red, EnemyAISettings::Debugging::BaseLocationDebugDuration,
-			false);
+		DebugPoint(EachLocation, BaseLocationDebuggingRadius, EnemyLocationColor, BaseLocationDebugDuration,
+		           "Enemy Base Point");
 	}
+}
+
+void UEnemyStrategicAIComponent::DebugBlackboardLocationsUnderAttack() const
+{
+	using namespace EnemyAISettings::Debugging;
+	for (const auto& EachUnderAttackLocation : M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack.LocationsUnderAttack)
+	{
+		DebugPoint(EachUnderAttackLocation.LocationUnderAttack, LocationUnderAttackDebuggingRadius, AttackLocationColor,
+		           LocationsUnderAttackDuration, "Location Under Player Attack");
+		DebugPoint(EachUnderAttackLocation.AverageAttackerLocation, LocationUnderAttackDebuggingRadius,
+		           PlayerLocationColor, LocationsUnderAttackDuration, "avg Loc: attack location Units");
+	}
+}
+
+void UEnemyStrategicAIComponent::DebugBlackboardBulkPlayerUnits() const
+{
+	using namespace EnemyAISettings::Debugging;
+	for(const auto& EachBulk : M_StrategicAIBlackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+	{
+		FString DebugText = FString::Printf(TEXT("Player Unit Bulk: %d units"), EachBulk.UnitsInBulk.Num());
+		DebugPoint(EachBulk.BulkLocation, PlayerUnitBulkLocationDebuggingRadius, PlayerLocationColor, PlayerUnitBulkLocationDebugDuration, DebugText);
+	}
+}
+
+void UEnemyStrategicAIComponent::DebugPoint(const FVector& Point, const float Radius,
+                                            const FColor& Color, const float Duration, const FString& Text) const
+{
+	DrawDebugSphere(GetWorld(), Point, Radius, 20,
+	                Color, false, EnemyAISettings::Debugging::BaseLocationDebugDuration, 0, 5.f);
+	DrawDebugString(
+		GetWorld(), Point + FVector(0, 0, Radius),
+		Text, nullptr, Color, EnemyAISettings::Debugging::BaseLocationDebugDuration,
+		false);
 }
 
 void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
@@ -447,7 +487,8 @@ void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
 	DebugString += FString::Printf(
 		TEXT("\n Found Player HQ: %d"), bFoundHQ ? 1 : 0);
 	DebugString += FString::Printf(
-		TEXT("\n Resource Buildings: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings.Num());
+		TEXT("\n Resource Buildings: %d"),
+		M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings.Num());
 	RTSFunctionLibrary::PrintString(
-		DebugString,  FColor::Green, EnemyAISettings::Debugging::PlayerCountsDuration);
+		DebugString, FColor::Green, EnemyAISettings::Debugging::PlayerCountsDuration);
 }

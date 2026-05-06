@@ -91,6 +91,7 @@ private:
 	void ExecuteSubAction(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard) const;
 
 	void Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard);
+	TArray<FVector> GetValidAttackPlayerUnitsLocations(const FStrategicAIBlackboard& Blackboard) const;
 	void Exe_AttackMovePlayerHQ(const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMovePlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);

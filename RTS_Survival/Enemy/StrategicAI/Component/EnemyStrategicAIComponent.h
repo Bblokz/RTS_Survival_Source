@@ -166,5 +166,9 @@ private:
 
 	// --------------------- Debugging ---------------------------
 	void DebugBlackboardBasePoints() const;
+	void DebugBlackboardLocationsUnderAttack() const;
+	void DebugBlackboardBulkPlayerUnits()const;
+	void DebugPoint(const FVector& Point, const float Radius,
+	                const FColor& Color, const float Duration, const FString& Text)const;
 	void DebugBlackboardUnitCounts() const;
 };

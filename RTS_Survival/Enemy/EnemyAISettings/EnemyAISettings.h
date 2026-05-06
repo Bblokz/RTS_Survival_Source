@@ -14,28 +14,39 @@ namespace EnemyAISettings
 	// a large structure.
 	inline float EnemyStrategicAIThinkingSpeed = 6.f;
 
+	// todo remove.
+	inline constexpr float DEV_AI_ThinkTimers_Scaling = 0.33;
 	namespace ThinkingTimers
 	{
 		// How often the strategic Ai requests for finding its base locations. 
-		inline float UpdateAIBaseLocations_Interval = 35.f;
+		inline float UpdateAIBaseLocations_Interval = 35.f * DEV_AI_ThinkTimers_Scaling;
 		// How often the AI requests the counts of player light tanks, squads, nomadic buildings, resource building locations and hq location.
-		inline float UpdatePlayerCountsBaseLocations_Interval = 25.f;
+		inline float UpdatePlayerCountsBaseLocations_Interval = 25.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI checks whether certain locations are at risk of player attacks.
-		inline float UpdateLocationsUnderPlayerAttack_Interval = 15.f;
+		inline float UpdateLocationsUnderPlayerAttack_Interval = 15.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI finds player squad and tank force concentrations.
-		inline float UpdatePlayerUnitBulkLocations_Interval = 15.f;
+		inline float UpdatePlayerUnitBulkLocations_Interval = 15.f* DEV_AI_ThinkTimers_Scaling;
 	}
 
 	namespace Debugging
 	{
+		const FColor EnemyLocationColor = FColor::Purple;
+		const FColor PlayerLocationColor = FColor::Blue;
+		const FColor AttackLocationColor = FColor::Red;
 		inline constexpr bool BaseLocationDebugging = true;
-		inline constexpr float BaseLocationDebugDuration = 15.f;
+		inline constexpr float BaseLocationDebugDuration = 15.f* DEV_AI_ThinkTimers_Scaling;
 		inline constexpr float BaseLocationDebuggingRadius = 5000.f;
 		inline constexpr bool PlayerCountsDebugging = true;
-		inline constexpr float PlayerCountsDuration = 15.f;
+		inline constexpr float PlayerCountsDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
+		inline constexpr bool LocationsUnderPlayerAttackDebugging = true;
+		inline constexpr float LocationsUnderAttackDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
+		inline constexpr float LocationUnderAttackDebuggingRadius = 500.f;
+		inline constexpr bool PlayerUnitBulkDebugging= true;
+		inline constexpr float PlayerUnitBulkLocationDebuggingRadius = 250.f;
+		inline constexpr float PlayerUnitBulkLocationDebugDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
 		inline constexpr bool StochasticDecisionTreeDebugging = true;
+		// Should be lower than thinking speed
 		inline constexpr float StochasticActionsDebugTime = 5.f;
-		
 	}
 
 	inline float EnemyRetreatControllerCheckInterval = 8.4f;
