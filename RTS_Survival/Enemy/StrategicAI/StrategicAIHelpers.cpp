@@ -15,6 +15,57 @@ namespace StrategicAIHelperConstants
 	constexpr float FlankRightYawOffset = 90.f;
 }
 
+namespace StrategicAIHelperUtilities
+{
+	bool GetIsNearZeroStrategicLocation(const FVector& Location)
+	{
+		return Location.IsNearlyZero();
+	}
+
+	void RemoveNearZeroStrategicLocations(TArray<FVector>& Locations)
+	{
+		Locations.RemoveAll([](const FVector& Location)
+		{
+			return GetIsNearZeroStrategicLocation(Location);
+		});
+	}
+
+	void RemoveNearZeroStrategicActorLocations(TArray<FWeakActorLocations>& ActorLocations)
+	{
+		for (FWeakActorLocations& ActorLocation : ActorLocations)
+		{
+			RemoveNearZeroStrategicLocations(ActorLocation.Locations);
+		}
+
+		ActorLocations.RemoveAll([](const FWeakActorLocations& ActorLocation)
+		{
+			return ActorLocation.Locations.IsEmpty();
+		});
+	}
+
+	void RemoveNearZeroStrategicRetreatLocations(FDamagedTanksRetreatGroup& RetreatGroup)
+	{
+		RemoveNearZeroStrategicActorLocations(RetreatGroup.HazmatsWithFormationLocations);
+	}
+
+	void RemoveNearZeroStrategicAttackLocations(TArray<FPlayerAttackLocationEvaluation>& AttackLocations)
+	{
+		AttackLocations.RemoveAll([](const FPlayerAttackLocationEvaluation& AttackLocation)
+		{
+			return GetIsNearZeroStrategicLocation(AttackLocation.LocationUnderAttack);
+		});
+	}
+
+	void RemoveNearZeroStrategicPlayerBulks(TArray<FPlayerUnitBulkLocation>& PlayerUnitBulks)
+	{
+		PlayerUnitBulks.RemoveAll([](const FPlayerUnitBulkLocation& PlayerUnitBulk)
+		{
+			return GetIsNearZeroStrategicLocation(PlayerUnitBulk.BulkLocation);
+		});
+	}
+
+}
+
 FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 	const FFindEnemyBaseClusters& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
@@ -143,6 +194,8 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 	{
 		Result.BasePoints.Add(ScoredBases[Index].Point);
 	}
+
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicLocations(Result.BasePoints);
 
 	return Result;
 }
@@ -910,6 +963,8 @@ FResultLocationsUnderPlayerAttack FStrategicAIHelpers::BuildLocationsUnderPlayer
 		Result.LocationsUnderAttack.Add(MoveTemp(AttackEvaluation));
 	}
 
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicAttackLocations(Result.LocationsUnderAttack);
+
 	return Result;
 }
 
@@ -935,6 +990,8 @@ FResultPlayerUnitBulkLocations FStrategicAIHelpers::BuildPlayerUnitBulkLocations
 
 		Result.PlayerUnitBulks.Add(MoveTemp(BulkLocation));
 	}
+
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicPlayerBulks(Result.PlayerUnitBulks);
 
 	Result.PlayerUnitBulks.Sort([](const FPlayerUnitBulkLocation& Left, const FPlayerUnitBulkLocation& Right)
 	{
@@ -1017,6 +1074,8 @@ FResultClosestFlankableEnemyHeavy FStrategicAIHelpers::BuildClosestFlankableEnem
 		Result.Locations.Add(MoveTemp(FlankLocations));
 	}
 
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicActorLocations(Result.Locations);
+
 	return Result;
 }
 
@@ -1061,6 +1120,8 @@ FResultPlayerUnitCounts FStrategicAIHelpers::BuildPlayerUnitCountsResult(
 		}
 	}
 
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicLocations(Result.PlayerResourceBuildings);
+
 	return Result;
 }
 
@@ -1092,6 +1153,10 @@ FResultAlliedTanksToRetreat FStrategicAIHelpers::BuildAlliedTanksToRetreatResult
 	{
 		Result.Group3 = MoveTemp(Groups[2].Group);
 	}
+
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicRetreatLocations(Result.Group1);
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicRetreatLocations(Result.Group2);
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicRetreatLocations(Result.Group3);
 
 	return Result;
 }
