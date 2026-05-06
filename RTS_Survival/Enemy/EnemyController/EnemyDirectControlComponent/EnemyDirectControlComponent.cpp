@@ -589,7 +589,7 @@ void UEnemyDirectControlComponent::DebugDrawRegisteredDirectControlUnits() const
 	{
 		return;
 	}
-	for (const TWeakObjectPtr<AActor>& RegisteredUnit : Blackboard->IdleDirectControlUnits)
+	for (TWeakObjectPtr<AActor> RegisteredUnit : Blackboard->IdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{
