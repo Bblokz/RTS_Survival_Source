@@ -114,7 +114,7 @@ private:
 
 	void CacheRecastNavMesh();
 	void CacheRoadSplineActors();
-	void PropagateRoadSplineActorsToEnemyAIBlackBoard()const;
+	void PropagateRoadSplineActorsToEnemyAIBlackBoard() const;
 
 	bool TryProjectPointToNavigation(
 		const FVector& OriginalLocation,
@@ -149,7 +149,8 @@ private:
 
 	void DebugProjectionAttempt(const FVector& Location, const FVector& Extent, const FString& Context) const;
 	void DebugProjectionResult(const FVector& Location, const bool bSuccess, const FString& Context) const;
-	void DebugOffsetAttempt(const FVector& OriginalLocation, const FVector& OffsetLocation, const FString& Context) const;
+	void DebugOffsetAttempt(const FVector& OriginalLocation, const FVector& OffsetLocation,
+	                        const FString& Context) const;
 	void DebugDefaultAreaResult(const FVector& Location, const bool bIsDefaultArea, const FString& Context) const;
 	void DebugBatchResult(const TArray<FVector>& Points, const FString& Context) const;
 	int32 M_CachedGenerationSeed = 0;

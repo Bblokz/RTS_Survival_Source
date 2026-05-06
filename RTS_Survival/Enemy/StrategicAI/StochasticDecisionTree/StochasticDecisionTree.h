@@ -1,11 +1,16 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+#include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitsResult/FBlackboardIdleUnitsResult.h"
 #include "RTS_Survival/Enemy/StrategicAI/StrategicActions/StrategicActions.h"
 
 #include "StochasticDecisionTree.generated.h"
 
+struct FBlackboardIdleUnitsResult;
+class UEnemyFormationController;
+class UEnemyNavigationAIComponent;
 struct FStrategicAIBlackboard;
 class UEnemyStrategicAIComponent;
 class AEnemyController;
@@ -45,7 +50,7 @@ struct FStrategicAIAction
 		return M_SubActions;
 	}
 
-	FString GetDebugString()const;
+	FString GetDebugString() const;
 
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess=true))
@@ -79,33 +84,44 @@ public:
 	void InitStochasticDecisionTree(
 		UEnemyStrategicAIComponent* StrategicComponentWithBB,
 		UEnemyDirectControlComponent* DirectControlComponent,
-		AEnemyController* EnemyController);
+		UEnemyNavigationAIComponent* EnemyNavigationAI,
+		UEnemyFormationController* EnemyFormationController, AEnemyController* EnemyController);
 
+	// Note that prior to calling this all the idle units in the blackboard are RTSIsValid and
+	// all arrays of location vectors are check for near zero.
 	void DecisionTree_ThinkStep(const float GameTimeSeconds, const FStrategicAIBlackboard& Blackboard);
 
 private:
-
+	
 	bool EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
-	bool EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction)const;
+	bool EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction) const;
 	bool EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const;
-	void ExecuteSubAction(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard) const;
+	void ExecuteSubAction(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 
 	void Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard);
-	TArray<FVector> GetValidAttackPlayerUnitsLocations(const FStrategicAIBlackboard& Blackboard) const;
 	void Exe_AttackMovePlayerHQ(const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMovePlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
-	
+
+
+	// ------------------- Formation Logic Using Blackboard Idle units ------------------------
+	void CreateAttackMoveFormation(TArray<FVector> AttackLocations, const FStrategicAIBlackboard& Blackboard);
+	bool EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits, const FString& DebugContext);
+	int32 GetMaxFormationWidthForPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits) const;
+	FAttackMoveWaveSettings M_AttackMoveWaveSettings;
+	// Multiplies with the inner radius of the unit's RTS component to determine spacing in formation.
+	float M_AttackMoveWave_FormationOffsetMultiplier = 1.5f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	TArray<FStrategicAIAction> M_ActionDefinitions;
 
-		const TArray<const FStrategicAIAction*> GetActionsWithValidSubActions(
-			const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const;
+	const TArray<const FStrategicAIAction*> GetActionsWithValidSubActions(
+		const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const;
 
 	const TArray<const UStrategicAISubAction*> GetSubActionsThatHaveMetRequirements(
 		const FStrategicAIAction& Action,
 		const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const;
-	
+
 	void CacheGenerationSeedFromGameInstance();
 	// Generation seed from game instance.
 	int32 M_CachedGenerationSeed = 0;
@@ -115,20 +131,37 @@ private:
 	TWeakObjectPtr<UEnemyStrategicAIComponent> M_StrategicComponent = nullptr;
 	[[nodiscard]] bool EnsureStrategicComponentIsValid() const;
 
-
 	UPROPERTY()
 	TWeakObjectPtr<UEnemyDirectControlComponent> M_DirectControlComponent = nullptr;
 
 	[[nodiscard]] bool EnsureIsValidDirectControlComponent() const;
 
 	UPROPERTY()
+	TWeakObjectPtr<UEnemyNavigationAIComponent> M_EnemyNavigationAIComponent = nullptr;
+
+	[[nodiscard]] bool EnsureIsValidEnemyNavigationAIComponent() const;
+
+	UPROPERTY()
+	TWeakObjectPtr<UEnemyFormationController> M_EnemyFormationController = nullptr;
+
+	[[nodiscard]] bool EnsureIsValidEnemyFormation() const;
+
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
 	[[nodiscard]] bool EnsureIsValidEnemyController() const;
 
+	// ------------ Utils --------------------
+	TArray<FVector> GetProjectedPlayerBulkLocations(const FStrategicAIBlackboard& Blackboard);
+	TArray<FVector> GetProjectedPlayerAvgLocationAttackers(const FStrategicAIBlackboard& Blackboard) const;
+
+
 	// Debug call over all actions regardless of requirements.
-	void DebugAllActionsPriorReqCheck()const;
+	void DebugAllActionsPriorReqCheck() const;
 	// Called After removing those main actions of which all sub actions have no requirements met.
 	void DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
-	
+	void DebugAttackLocations(const TArray<FVector>& Locations, const FString& DebugContext) const;
+	void DebugPickedLocation(const FVector& PickedLocation ,const FString& DebugContext) const;
+	void DebugPoint(const FVector& Point, const float Radius,
+	                const FColor& Color, const float Duration, const FString& Text) const;
 };

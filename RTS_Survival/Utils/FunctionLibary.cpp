@@ -320,6 +320,15 @@ bool RTSFunctionLibrary::RTSIsValid(AActor* ActorToCheck)
 	return ActorToCheck->IsUnitAlive();
 }
 
+bool RTSFunctionLibrary::RTSIsValidWeak(const TWeakObjectPtr<AActor> ActorToCheck)
+{
+	if(not ActorToCheck.IsValid())
+	{
+		return false;
+	}
+	return ActorToCheck->IsUnitAlive();
+}
+
 bool RTSFunctionLibrary::RTSIsVisibleTarget(AActor* ActorToCheck, const int32 EnemyPlayerOfActor)
 {
 	if (!IsValid(ActorToCheck))

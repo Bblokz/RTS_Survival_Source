@@ -1,9 +1,11 @@
 ﻿#include "StochasticDecisionTree.h"
 
+#include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -24,18 +26,28 @@ FString FStrategicAIAction::GetDebugString() const
 
 UStochasticDecisionTree::UStochasticDecisionTree()
 {
+	M_AttackMoveWaveSettings.HelpOffsetRadiusMltMax = 2.f;
+	M_AttackMoveWaveSettings.HelpOffsetRadiusMltMin = 1.f;
+	M_AttackMoveWaveSettings.MaxAttackTimeBeforeAdvancingToNextWayPoint = 120.f;
+	M_AttackMoveWaveSettings.MaxTriesFindNavPointForHelpOffset = 5;
+	M_AttackMoveWaveSettings.ProjectionScale = 1.f;
 }
 
 void UStochasticDecisionTree::InitStochasticDecisionTree(
 	UEnemyStrategicAIComponent* StrategicComponentWithBB,
 	UEnemyDirectControlComponent* DirectControlComponent,
-	AEnemyController* EnemyController)
+	UEnemyNavigationAIComponent* EnemyNavigationAI,
+	UEnemyFormationController* EnemyFormationController, AEnemyController* EnemyController)
 {
 	M_StrategicComponent = StrategicComponentWithBB;
 	M_DirectControlComponent = DirectControlComponent;
+	M_EnemyNavigationAIComponent = EnemyNavigationAI;
+	M_EnemyFormationController = EnemyFormationController;
 	M_EnemyController = EnemyController;
 	(void)EnsureStrategicComponentIsValid();
 	(void)EnsureIsValidDirectControlComponent();
+	(void)EnsureIsValidEnemyNavigationAIComponent();
+	(void)EnsureIsValidEnemyFormation();
 	(void)EnsureIsValidEnemyController();
 }
 
@@ -60,7 +72,7 @@ void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds
 		*PickedAction, Blackboard, GameTimeSeconds);
 	const UStrategicAISubAction* PickedSubAction = StochasticHelpers::PickSubAction(SubActionsRequirementsMet,
 		bM_UseCachedGenerationSeed, M_CachedGenerationSeed, GameTimeSeconds);
-	if(not EnsurePickedSubActionIsValid(PickedSubAction))
+	if (not EnsurePickedSubActionIsValid(PickedSubAction))
 	{
 		return;
 	}
@@ -118,20 +130,26 @@ bool UStochasticDecisionTree::EnsurePickedSubActionIsValid(const UStrategicAISub
 	{
 		RTSFunctionLibrary::PrintString(
 			FString::Printf(TEXT("Stochastic tree picked sub-action %s"), *PickedSubAction->GetDebugString()),
-			FColor::Green, 5.f);		
+			FColor::Green, 5.f);
 	}
 	return true;
 }
 
 void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubAction,
-	const FStrategicAIBlackboard& Blackboard) const
+                                               const FStrategicAIBlackboard& Blackboard)
 {
-	switch (SubAction->SubtypeAction) {
+	if (not EnsureIsValidEnemyNavigationAIComponent() || not EnsureIsValidEnemyFormation())
+	{
+		return;
+	}
+	switch (SubAction->SubtypeAction)
+	{
 	case ESubtypeAction::DEFAULT_OBJECT:
-		RTSFunctionLibrary::ReportError("Stochastic tree cannot execute sub-action as it is a default object, likely meaning it was not properly set up in the data assets.");
+		RTSFunctionLibrary::ReportError(
+			"Stochastic tree cannot execute sub-action as it is a default object, likely meaning it was not properly set up in the data assets.");
 		break;
 	case ESubtypeAction::AttackMoveToPlayerUnits:
-		
+		Exe_AttackMovePlayerUnits(Blackboard);
 		break;
 	case ESubtypeAction::AttackMoveToPlayerHQ:
 		break;
@@ -148,34 +166,133 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard)
 {
-	const TArray<FVector> ValidAttackLocations = GetValidAttackPlayerUnitsLocations(Blackboard);
+	TArray<FVector> ValidAttackLocations;
+	ValidAttackLocations.Append(GetProjectedPlayerBulkLocations(Blackboard));
+	ValidAttackLocations.Append(GetProjectedPlayerAvgLocationAttackers(Blackboard));
+	// Note that this is not an error as projections may miss depending on player unit placement.
+	if (ValidAttackLocations.IsEmpty())
+	{
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+			EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
+		{
+			RTSFunctionLibrary::PrintString(
+				"StochasticTree: could not attack move player units as no valid locations found / projected",
+				FColor::Orange, EnemyAISettings::Debugging::StochasticActionsDebugTime);
+		}
+		return;
+	}
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
+	{
+		DebugAttackLocations(ValidAttackLocations, "Att Mv Player Units");
+	}
+	TArray<FVector> AttackLocations = StochasticHelpers::PickRandomClosestPair(ValidAttackLocations);
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
+	{
+		for (const auto& EachLocation : AttackLocations)
+		{
+			DebugPickedLocation(EachLocation, "Picked Att Mv Player Units");
+		}
+	}
+	CreateAttackMoveFormation(AttackLocations, Blackboard);
 }
 
-TArray<FVector> UStochasticDecisionTree::GetValidAttackPlayerUnitsLocations(
-	const FStrategicAIBlackboard& Blackboard) const
-{
-	TArray<FVector> ValidLocations;
-	for(const auto& EachBulk: Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
-	{
-		if(not EachBulk.BulkLocation.IsNearlyZero())
-	}
-}
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(const FStrategicAIBlackboard& Blackboard)
 {
-	
 }
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard)
 {
-	
 }
 
 void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction,
-	const FStrategicAIBlackboard& Blackboard)
+                                                          const FStrategicAIBlackboard& Blackboard)
 {
-	
 }
+
+void UStochasticDecisionTree::CreateAttackMoveFormation(TArray<FVector> AttackLocations,
+                                                        const FStrategicAIBlackboard& Blackboard)
+{
+	FBlackboardIdleUnitsResult PickedUnits = M_DirectControlComponent->PickRandomMaxIdleBlackboardUnits(5);
+	if (not EnsureHasNonZeroPickedUnits(PickedUnits,
+	                                    "Stochastic: cannot create attack move formation as zero units were picked"
+	                                    "from the blackboard"))
+	{
+		return;
+	}
+	TArray<FVector> WayPoints;
+	FRotator FinalMoveRotation;
+	const FVector StartLocation = StochasticHelpers::GetAverageLocationPickedBlackboardUnits(PickedUnits);
+	FVector AverageSpawnLocation;
+	FVector StartLocation_Projected = StartLocation;
+	if (StochasticHelpers::CanProjectNavigable_AveragePickedUnitLocation(M_EnemyNavigationAIComponent.Get(),
+	                                                                     StartLocation, StartLocation_Projected))
+	{
+		// We managed to project to the navigation mesh so start at our average unit location point.
+		StochasticHelpers::SortArrayByDistanceToLocation(AttackLocations, StartLocation_Projected);
+		WayPoints.Add(StartLocation_Projected);
+		WayPoints.Append(AttackLocations);
+		FinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation_Projected, AttackLocations.Last());
+		AverageSpawnLocation = StartLocation_Projected;
+	}
+	else
+	{
+		// Projection failed; still sort by distance to average location but do not start with going there
+		// as it may be unreachable.
+		StochasticHelpers::SortArrayByDistanceToLocation(AttackLocations, StartLocation);
+		WayPoints.Append(AttackLocations);
+		FinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, AttackLocations.Last());
+		AverageSpawnLocation = StartLocation;
+	}
+	M_EnemyFormationController->MoveAttackMoveFormationToLocation(
+		PickedUnits.SquadControllers,
+		PickedUnits.TankMasters,
+		WayPoints,
+		FinalMoveRotation,
+		GetMaxFormationWidthForPickedUnits(PickedUnits),
+		M_AttackMoveWave_FormationOffsetMultiplier,
+		M_AttackMoveWaveSettings,
+		AverageSpawnLocation
+	);
+}
+
+bool UStochasticDecisionTree::EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits,
+                                                          const FString& DebugContext)
+{
+	if (PickedUnits.SquadControllers.IsEmpty() && PickedUnits.TankMasters.IsEmpty())
+	{
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+			EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
+		{
+			RTSFunctionLibrary::PrintString(
+				DebugContext,
+				FColor::Orange, EnemyAISettings::Debugging::StochasticActionsDebugTime);
+		}
+		return false;
+	}
+	return true;
+}
+
+int32 UStochasticDecisionTree::GetMaxFormationWidthForPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits) const
+{
+	const int32 Amount = PickedUnits.SquadControllers.Num() + PickedUnits.TankMasters.Num();
+	if (Amount <= 4)
+	{
+		return 2;
+	}
+	if (Amount <= 8)
+	{
+		return 3;
+	}
+	if (Amount > 14)
+	{
+		return 5;
+	}
+	return 4;
+}
+
 
 const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithValidSubActions(
 	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
@@ -273,6 +390,28 @@ bool UStochasticDecisionTree::EnsureIsValidDirectControlComponent() const
 	return true;
 }
 
+bool UStochasticDecisionTree::EnsureIsValidEnemyNavigationAIComponent() const
+{
+	if (not M_EnemyNavigationAIComponent.IsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT(
+			"Stochastic decision tree failed to ensure valid enemy navigation AI component because the enemy navigation AI component is null."));
+		return false;
+	}
+	return true;
+}
+
+bool UStochasticDecisionTree::EnsureIsValidEnemyFormation() const
+{
+	if (not M_EnemyFormationController.IsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT(
+			"Stochastic decision tree failed to ensure valid enemy formation controller because the enemy formation controller is null."));
+		return false;
+	}
+	return true;
+}
+
 bool UStochasticDecisionTree::EnsureIsValidEnemyController() const
 {
 	if (not M_EnemyController.IsValid())
@@ -284,24 +423,88 @@ bool UStochasticDecisionTree::EnsureIsValidEnemyController() const
 	return true;
 }
 
+TArray<FVector> UStochasticDecisionTree::GetProjectedPlayerBulkLocations(const FStrategicAIBlackboard& Blackboard)
+{
+	TArray<FVector> ValidLocations;
+	// Note that arrays of vectors are always checks for is nearly zero on the async processor!
+	for (const auto& EachBulk : Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+	{
+		FVector OutProjected = FVector::ZeroVector;
+		if (StochasticHelpers::CanProjectNavigable_BulkLocation(M_EnemyNavigationAIComponent.Get(),
+		                                                        EachBulk.BulkLocation, OutProjected))
+		{
+			ValidLocations.Add(OutProjected);
+		}
+	}
+	return ValidLocations;
+}
+
+TArray<FVector> UStochasticDecisionTree::GetProjectedPlayerAvgLocationAttackers(
+	const FStrategicAIBlackboard& Blackboard) const
+{
+	TArray<FVector> ValidLocations;
+	// Note that arrays of vectors are always checks for is nearly zero on the async processor!
+	for (const auto& EachLocatonAttackerGroup : Blackboard.CurrentLocationsUnderPlayerAttack.LocationsUnderAttack)
+	{
+		FVector OutProjected = FVector::ZeroVector;
+		if (StochasticHelpers::CanProjectNavigable_BulkLocation(M_EnemyNavigationAIComponent.Get(),
+		                                                        EachLocatonAttackerGroup.AverageAttackerLocation,
+		                                                        OutProjected))
+		{
+			ValidLocations.Add(OutProjected);
+		}
+	}
+	return ValidLocations;
+}
+
 void UStochasticDecisionTree::DebugAllActionsPriorReqCheck() const
 {
 	FString DebugString = "Actions Prior Req Check:\n";
-	for(auto EachMainAction : M_ActionDefinitions)
+	for (auto EachMainAction : M_ActionDefinitions)
 	{
-		DebugString += EachMainAction.GetDebugString() + "\n";	
+		DebugString += EachMainAction.GetDebugString() + "\n";
 	}
-		RTSFunctionLibrary::PrintString(DebugString, FColor::Purple, EnemyAISettings::Debugging::StochasticActionsDebugTime);
+	RTSFunctionLibrary::PrintString(DebugString, FColor::Purple,
+	                                EnemyAISettings::Debugging::StochasticActionsDebugTime);
 }
 
 void UStochasticDecisionTree::DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
 {
 	FString DebugString = "\nValid Actions:";
-	for(auto EachValidAction : ValidActions)
+	for (auto EachValidAction : ValidActions)
 	{
 		DebugString += "\n-- " + EachValidAction->GetDebugString();
 	}
-	RTSFunctionLibrary::PrintString(DebugString, FColor::Green, EnemyAISettings::Debugging::StochasticActionsDebugTime);
+	RTSFunctionLibrary::PrintString(DebugString, FColor::Green,
+	                                EnemyAISettings::Debugging::StochasticActionsDebugTime);
+}
+
+void UStochasticDecisionTree::DebugAttackLocations(const TArray<FVector>& Locations, const FString& DebugContext) const
+{
+	using namespace EnemyAISettings::Debugging;
+	for (const FVector& EachLocation : Locations)
+	{
+		DebugPoint(EachLocation, StochasticActionsAttackLocationDebugRadius, AttackLocationColor,
+		           StochasticActionsDebugTime, DebugContext);
+	}
+}
+
+void UStochasticDecisionTree::DebugPickedLocation(const FVector& PickedLocation, const FString& DebugContext) const
+{
+	using namespace EnemyAISettings::Debugging;
+	DebugPoint(PickedLocation, PickedActionLocationRadius, PickedActionLocationColor, StochasticActionsDebugTime,
+	           DebugContext);
+}
+
+void UStochasticDecisionTree::DebugPoint(const FVector& Point, const float Radius, const FColor& Color,
+                                         const float Duration, const FString& Text) const
+{
+	DrawDebugSphere(GetWorld(), Point, Radius, 8,
+	                Color, false, Duration, 0, 2.f);
+	DrawDebugString(
+		GetWorld(), Point + FVector(0, 0, Radius),
+		Text, nullptr, Color, Duration,
+		false);
 }
 
 

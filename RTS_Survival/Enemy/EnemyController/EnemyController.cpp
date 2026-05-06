@@ -89,7 +89,6 @@ namespace EnemyControllerFieldConstruction
 			PendingSpawnCount = 0;
 		}
 	};
-
 }
 
 
@@ -99,20 +98,22 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bCanEverTick = false;
 	M_FormationController = CreateDefaultSubobject<UEnemyFormationController>(TEXT("FormationController"));
 	M_WaveController = CreateDefaultSubobject<UEnemyWaveController>(TEXT("WaveController"));
-	M_FieldConstructionComponent = CreateDefaultSubobject<UEnemyFieldConstructionComponent>(TEXT("FieldConstructionComponent"));
-	M_EnemyNavigationAIComponent = CreateDefaultSubobject<UEnemyNavigationAIComponent>(TEXT("EnemyNavigationAIComponent"));
+	M_FieldConstructionComponent = CreateDefaultSubobject<UEnemyFieldConstructionComponent>(
+		TEXT("FieldConstructionComponent"));
+	M_EnemyNavigationAIComponent = CreateDefaultSubobject<UEnemyNavigationAIComponent>(
+		TEXT("EnemyNavigationAIComponent"));
 	M_EnemyStrategicAIComponent = CreateDefaultSubobject<UEnemyStrategicAIComponent>(TEXT("EnemyStrategicAIComponent"));
 	M_EnemyRetreatController = CreateDefaultSubobject<UEnemyRetreatController>(TEXT("EnemyRetreatController"));
-	M_EnemyDirectControlComponent = CreateDefaultSubobject<UEnemyDirectControlComponent>(TEXT("EnemyDirectControlComponent"));
+	M_EnemyDirectControlComponent = CreateDefaultSubobject<UEnemyDirectControlComponent>(
+		TEXT("EnemyDirectControlComponent"));
 	CacheGenerationSeedFromGameInstance();
-	if(M_FormationController)
+	if (M_FormationController)
 	{
 		M_FormationController->InitFormationController(this);
 	}
-	if(M_WaveController)
+	if (M_WaveController)
 	{
 		M_WaveController->InitWaveController(this);
-
 	}
 	if (M_FieldConstructionComponent)
 	{
@@ -122,10 +123,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	{
 		M_EnemyNavigationAIComponent->InitNavigationAIComponent(this);
 	}
-	if (M_EnemyStrategicAIComponent)
-	{
-		M_EnemyStrategicAIComponent->InitStrategicAIComponent(this, M_StochasticDecisionTree);
-	}
+
 	if (M_EnemyRetreatController)
 	{
 		M_EnemyRetreatController->InitRetreatController(this);
@@ -134,7 +132,6 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	{
 		M_EnemyDirectControlComponent->InitDirectControlComponent(this);
 	}
-	
 }
 
 UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
@@ -145,13 +142,13 @@ UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
 void AEnemyController::SetAllowDirectControlStochasticDecisionTree(const bool bAllow)
 {
 	FStrategicAIBlackboard* StrategicAIBlackboard = GetStrategicAIBlackboard();
-	if(not StrategicAIBlackboard)
+	if (not StrategicAIBlackboard)
 	{
-		RTSFunctionLibrary::ReportError("Failed to set allow direct control for stochastic decision tree: Invalid strategic AI blackboard.");
+		RTSFunctionLibrary::ReportError(
+			"Failed to set allow direct control for stochastic decision tree: Invalid strategic AI blackboard.");
 		return;
 	}
 	StrategicAIBlackboard->StrategicAIMissionSettings.bAllowDirectControlStochasticDecisionTree = bAllow;
-	
 }
 
 void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& SquadControllers,
@@ -162,7 +159,7 @@ void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& 
                                                const float FormationOffsetMlt,
                                                const FVector& AverageSpawnLocation)
 {
-	if(not GetIsValidFormationController())
+	if (not GetIsValidFormationController())
 	{
 		return;
 	}
@@ -177,17 +174,20 @@ void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& 
 }
 
 void AEnemyController::CreateAttackWave(const EEnemyWaveType WaveType, const TArray<FAttackWaveElement>& WaveElements,
-                                        const float WaveInterval, const float IntervalVarianceFraction, const TArray<FVector>& Waypoints,
-                                        const FRotator& FinalWaypointDirection, const int32 MaxFormationWidth, const bool bInstantStart,
-                                        AActor* WaveCreator, TArray<AActor*> WaveTimerAffectingBuildings, const float PerAffectingBuildingTimerFraction, const
+                                        const float WaveInterval, const float IntervalVarianceFraction,
+                                        const TArray<FVector>& Waypoints,
+                                        const FRotator& FinalWaypointDirection, const int32 MaxFormationWidth,
+                                        const bool bInstantStart,
+                                        AActor* WaveCreator, TArray<AActor*> WaveTimerAffectingBuildings,
+                                        const float PerAffectingBuildingTimerFraction, const
                                         float FormationOffsetMultiplier)
 {
 	TArray<TWeakObjectPtr<AActor>> WeakBuildings;
-	for(AActor* Building : WaveTimerAffectingBuildings)
+	for (AActor* Building : WaveTimerAffectingBuildings)
 	{
 		WeakBuildings.Add(Building);
 	}
-	if(not GetIsValidWaveController())
+	if (not GetIsValidWaveController())
 	{
 		return;
 	}
@@ -492,9 +492,9 @@ TArray<AActor*> AEnemyController::GetAllSquadControllerActorsInFormations() cons
 
 void AEnemyController::DebugAllActiveFormations() const
 {
-	if(not GetIsValidFormationController())
+	if (not GetIsValidFormationController())
 	{
-	return;	
+		return;
 	}
 	M_FormationController->DebugAllActiveFormations();
 }
@@ -685,7 +685,7 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 
 FStrategicAIBlackboard* AEnemyController::GetStrategicAIBlackboard() const
 {
-	if(not GetIsValidEnemyStrategicAIComponent())
+	if (not GetIsValidEnemyStrategicAIComponent())
 	{
 		return nullptr;
 	}
@@ -713,6 +713,11 @@ void AEnemyController::BeginPlay()
 	CacheGenerationSeedFromGameInstance();
 	BeginPlay_MoveAISettingsToStrategicAIBlackboard();
 	BeginPlay_InitStochasticDecisionTree();
+	if (M_EnemyStrategicAIComponent)
+	{
+		M_EnemyStrategicAIComponent->InitStrategicAIComponent(this, M_StochasticDecisionTree);
+	}
+	
 }
 
 
@@ -740,16 +745,19 @@ void AEnemyController::PostInitializeComponents()
 void AEnemyController::BeginPlay_InitStochasticDecisionTree()
 {
 	M_StochasticDecisionTree->InitStochasticDecisionTree(M_EnemyStrategicAIComponent,
-	                                                     M_EnemyDirectControlComponent, this);
+	                                                     M_EnemyDirectControlComponent,
+	                                                     M_EnemyNavigationAIComponent,
+	                                                     M_FormationController,
+	                                                     this);
 }
 
 void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
 {
-	
 	FStrategicAIBlackboard* StrategicAIBlackboard = GetStrategicAIBlackboard();
 	if (not StrategicAIBlackboard)
 	{
-		RTSFunctionLibrary::ReportError("Could not move AI settings to strategic AI blackboard because strategic AI blackboard was invalid.");
+		RTSFunctionLibrary::ReportError(
+			"Could not move AI settings to strategic AI blackboard because strategic AI blackboard was invalid.");
 		return;
 	}
 	StrategicAIBlackboard->StrategicAIMissionSettings = M_EnemyAIMissionSettings;
@@ -757,7 +765,7 @@ void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
 
 bool AEnemyController::GetIsValidFormationController() const
 {
-	if(not IsValid(M_FormationController))
+	if (not IsValid(M_FormationController))
 	{
 		RTSFunctionLibrary::ReportError("Invalid formation controller on enemy controller!");
 		return false;
@@ -767,7 +775,7 @@ bool AEnemyController::GetIsValidFormationController() const
 
 bool AEnemyController::GetIsValidWaveController() const
 {
-	if(not IsValid(M_WaveController))
+	if (not IsValid(M_WaveController))
 	{
 		RTSFunctionLibrary::ReportError("Invalid wave controller for enemy controller!");
 		return false;
@@ -818,6 +826,7 @@ bool AEnemyController::GetIsValidEnemyRetreatController() const
 	}
 	return true;
 }
+
 bool AEnemyController::GetIsValidEnemyDirectControlComponent() const
 {
 	if (not IsValid(M_EnemyDirectControlComponent))
@@ -868,7 +877,8 @@ int32 AEnemyController::GetSeededIndex(const int32 OptionCount, const int32 Deci
 	return SeededRandomStream.RandRange(0, OptionCount - 1);
 }
 
-float AEnemyController::GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt) const
+float AEnemyController::GetSeededFloatInRange(const float MinValue, const float MaxValue,
+                                              const int32 DecisionSalt) const
 {
 	const uint32 CombinedSeed = static_cast<uint32>(M_CachedGenerationSeed)
 		+ static_cast<uint32>(DecisionSalt)

@@ -133,6 +133,7 @@ public:
 	 * @return True if the actor is valid and not pending kill.
 	 */
 	static bool RTSIsValid(AActor* ActorToCheck);
+	static bool RTSIsValidWeak(TWeakObjectPtr<AActor> ActorToCheck);
 
 	/**
 	 * @brief Check if the actor is a valid target for the unit, is alive and

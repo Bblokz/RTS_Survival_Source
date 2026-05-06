@@ -22,6 +22,11 @@ void UEnemyStrategicAIComponent::InitStrategicAIComponent(AEnemyController* Enem
 	M_StochasticDecisionTree = StochasticDecisionTree;
 	M_EnemyController = EnemyController;
 	CacheGenerationSeedFromGameInstance();
+	const float Now = GetWorld()->GetTimeSeconds();
+	PreThinKStep_InitThinkingTimers(Now);
+	CacheGenerationSeedFromGameInstance();
+	StartStrategicAIThinkingTimer();
+	
 }
 
 
@@ -90,10 +95,6 @@ FStrategicAIBlackboard* UEnemyStrategicAIComponent::GetEditableStrategicAIBlackb
 void UEnemyStrategicAIComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	const float Now = GetWorld()->GetTimeSeconds();
-	BeginPlay_PreThinKStep_InitThinkingTimers(Now);
-	CacheGenerationSeedFromGameInstance();
-	StartStrategicAIThinkingTimer();
 }
 
 void UEnemyStrategicAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -108,7 +109,7 @@ bool UEnemyStrategicAIComponent::GetIsAllowedDirectControlUnits() const
 	return M_StrategicAIBlackboard.StrategicAIMissionSettings.bAllowDirectControlStochasticDecisionTree;
 }
 
-void UEnemyStrategicAIComponent::BeginPlay_PreThinKStep_InitThinkingTimers(const float Now)
+void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now)
 {
 	M_AIBaseLocationThinkTimer.LastTimeThought = Now;
 	M_AIBaseLocationThinkTimer.ThinkingInterval = EnemyAISettings::ThinkingTimers::UpdateAIBaseLocations_Interval;
@@ -234,6 +235,7 @@ void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer()
 void UEnemyStrategicAIComponent::StrategicAiThinkStep()
 {
 	const float Now = GetWorld()->GetTimeSeconds();
+	ClearInvalidIdleUnitsFromBlackboard();
 	for (auto EachThinkTimer : M_AIThinkTimers)
 	{
 		if (not EachThinkTimer || not EachThinkTimer->ThinkStepDelegate.IsBound())
@@ -425,6 +427,27 @@ void UEnemyStrategicAIComponent::FillRetreatRequestExcludedUnits(FFindAlliedTank
 	RequestToFill.ExcludedRetreatUnitActors = EnemyDirectControlComponent->GetRetreatGroupUnitsToExclude();
 }
 
+void UEnemyStrategicAIComponent::ClearInvalidIdleUnitsFromBlackboard()
+{
+	TArray<FBlackboardIdleUnitEntry> ValidIdleUnits;
+	bool bWasAnyUnitInvalid = false;
+	for(auto EachIdleUnit : M_StrategicAIBlackboard.IdleDirectControlUnits)
+	{
+		if (RTSFunctionLibrary::RTSIsValidWeak(EachIdleUnit.IdleUnit))
+		{
+			ValidIdleUnits.Add(EachIdleUnit);
+		}
+		else
+		{
+			bWasAnyUnitInvalid = true;
+		}
+	}
+	if(bWasAnyUnitInvalid)
+	{
+		M_StrategicAIBlackboard.IdleDirectControlUnits = ValidIdleUnits;	
+	}
+}
+
 void UEnemyStrategicAIComponent::DebugBlackboardBasePoints() const
 {
 	using namespace EnemyAISettings::Debugging;
@@ -461,10 +484,10 @@ void UEnemyStrategicAIComponent::DebugPoint(const FVector& Point, const float Ra
                                             const FColor& Color, const float Duration, const FString& Text) const
 {
 	DrawDebugSphere(GetWorld(), Point, Radius, 20,
-	                Color, false, EnemyAISettings::Debugging::BaseLocationDebugDuration, 0, 5.f);
+	                Color, false, Duration, 0, 5.f);
 	DrawDebugString(
 		GetWorld(), Point + FVector(0, 0, Radius),
-		Text, nullptr, Color, EnemyAISettings::Debugging::BaseLocationDebugDuration,
+		Text, nullptr, Color, Duration,
 		false);
 }
 

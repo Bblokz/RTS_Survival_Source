@@ -32,13 +32,14 @@ public:
 
 	float GetRequiredGameTimeSeconds() const
 	{
-		return M_RequiredGameTimeSeconds;
+		return RequiredGameTimeSeconds;
 	}
 	virtual FString GetDebugString() const override;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess=true, ClampMin="0.0"))
+	float RequiredGameTimeSeconds = 0.0f;
+	
 
 private:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta=(AllowPrivateAccess=true, ClampMin="0.0"))
-	float M_RequiredGameTimeSeconds = 0.0f;
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)

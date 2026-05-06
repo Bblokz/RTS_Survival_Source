@@ -71,7 +71,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = true, ClampMin = "0.0"))
 	float M_Score = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
 	TArray<TObjectPtr<UStrategicAIActionRequirement>> M_Requirements;
 
 	// Native requirements are visible for designer clarity, but only C++ classes decide what is always enforced.

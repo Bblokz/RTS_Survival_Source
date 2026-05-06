@@ -1,10 +1,20 @@
-﻿#include "StochasticHelpers.h"
+#include "StochasticHelpers.h"
 
+#include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
+#include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitsResult/FBlackboardIdleUnitsResult.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Enemy/StrategicAI/StrategicActions/StrategicActions.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 
 namespace
 {
+	struct FClosestLocationPair
+	{
+		FVector FirstLocation = FVector::ZeroVector;
+		FVector SecondLocation = FVector::ZeroVector;
+	};
+
 	/**
 	 * @brief Generates a random value in range [0, MaxValue].
 	 *
@@ -41,7 +51,7 @@ namespace
 	 * @param Time Time value.
 	 * @return Selected pointer or nullptr.
 	 */
-	template<typename T>
+	template <typename T>
 	const T* PickWeightedInternal(
 		const TArray<const T*>& Options,
 		const TFunctionRef<float(const T&)> GetScore,
@@ -89,6 +99,81 @@ namespace
 
 		return nullptr;
 	}
+
+	TArray<FVector> GetUniqueLocations(const TArray<FVector>& Locations)
+	{
+		TArray<FVector> UniqueLocations;
+		UniqueLocations.Reserve(Locations.Num());
+
+		TSet<FVector> SeenLocations;
+		SeenLocations.Reserve(Locations.Num());
+
+		for (const FVector& EachLocation : Locations)
+		{
+			if (SeenLocations.Contains(EachLocation))
+			{
+				continue;
+			}
+
+			SeenLocations.Add(EachLocation);
+			UniqueLocations.Add(EachLocation);
+		}
+
+		return UniqueLocations;
+	}
+
+	int32 FindClosestLocationIndex(const TArray<FVector>& Locations, const int32 SourceIndex)
+	{
+		if (not Locations.IsValidIndex(SourceIndex))
+		{
+			return INDEX_NONE;
+		}
+
+		int32 ClosestLocationIndex = INDEX_NONE;
+		float ClosestDistanceSquared = 0.0f;
+
+		for (int32 CandidateIndex = 0; CandidateIndex < Locations.Num(); ++CandidateIndex)
+		{
+			if (CandidateIndex == SourceIndex)
+			{
+				continue;
+			}
+
+			const float CandidateDistanceSquared =
+				FVector::DistSquared(Locations[SourceIndex], Locations[CandidateIndex]);
+
+			if (ClosestLocationIndex == INDEX_NONE || CandidateDistanceSquared < ClosestDistanceSquared)
+			{
+				ClosestLocationIndex = CandidateIndex;
+				ClosestDistanceSquared = CandidateDistanceSquared;
+			}
+		}
+
+		return ClosestLocationIndex;
+	}
+
+	TArray<FClosestLocationPair> BuildClosestLocationPairs(const TArray<FVector>& Locations)
+	{
+		TArray<FClosestLocationPair> ClosestPairs;
+		ClosestPairs.Reserve(Locations.Num());
+
+		for (int32 LocationIndex = 0; LocationIndex < Locations.Num(); ++LocationIndex)
+		{
+			const int32 ClosestLocationIndex = FindClosestLocationIndex(Locations, LocationIndex);
+			if (ClosestLocationIndex == INDEX_NONE)
+			{
+				continue;
+			}
+
+			ClosestPairs.Add(
+				{
+					Locations[LocationIndex],
+					Locations[ClosestLocationIndex]
+				});
+		}
+
+		return ClosestPairs;
+	}
 }
 
 namespace StochasticHelpers
@@ -135,5 +220,150 @@ namespace StochasticHelpers
 			bUseSeed,
 			Seed,
 			Time);
+	}
+
+	FVector PickRandomLocation(const TArray<FVector>& Locations)
+	{
+		if (Locations.Num() <= 0)
+		{
+			return FVector::ZeroVector;
+		}
+		const int32 Index = FMath::RandRange(0, Locations.Num() - 1);
+		return Locations[Index];
+	}
+
+	TArray<FVector> PickRandomMaxLocations(const TArray<FVector>& Locations, const int32 MaxLocations)
+	{
+		if (MaxLocations <= 0)
+		{
+			return TArray<FVector>();
+		}
+
+		const TArray<FVector> UniqueLocations = GetUniqueLocations(Locations);
+		if (UniqueLocations.IsEmpty())
+		{
+			return TArray<FVector>();
+		}
+
+		const int32 LocationCountToPick = FMath::Min(MaxLocations, UniqueLocations.Num());
+		TArray<int32> RemainingLocationIndices;
+		RemainingLocationIndices.Reserve(UniqueLocations.Num());
+
+		for (int32 LocationIndex = 0; LocationIndex < UniqueLocations.Num(); ++LocationIndex)
+		{
+			RemainingLocationIndices.Add(LocationIndex);
+		}
+
+		TArray<FVector> PickedLocations;
+		PickedLocations.Reserve(LocationCountToPick);
+
+		for (int32 PickedCount = 0; PickedCount < LocationCountToPick; ++PickedCount)
+		{
+			const int32 RandomRemainingIndex =
+				FMath::RandRange(0, RemainingLocationIndices.Num() - 1);
+			const int32 PickedLocationIndex = RemainingLocationIndices[RandomRemainingIndex];
+			PickedLocations.Add(UniqueLocations[PickedLocationIndex]);
+			RemainingLocationIndices.RemoveAtSwap(RandomRemainingIndex, 1, false);
+		}
+
+		return PickedLocations;
+	}
+
+	TArray<FVector> PickRandomClosestPair(const TArray<FVector>& Locations)
+	{
+		if (Locations.IsEmpty())
+		{
+			return TArray<FVector>();
+		}
+
+		if (Locations.Num() == 1)
+		{
+			return {Locations[0]};
+		}
+
+		const TArray<FClosestLocationPair> ClosestPairs = BuildClosestLocationPairs(Locations);
+		if (ClosestPairs.IsEmpty())
+		{
+			return TArray<FVector>();
+		}
+
+		const int32 RandomPairIndex = FMath::RandRange(0, ClosestPairs.Num() - 1);
+		const FClosestLocationPair& PickedPair = ClosestPairs[RandomPairIndex];
+
+		TArray<FVector> PickedLocations;
+		PickedLocations.Reserve(2);
+		PickedLocations.Add(PickedPair.FirstLocation);
+		PickedLocations.Add(PickedPair.SecondLocation);
+		return PickedLocations;
+	}
+
+	bool CanProjectNavigable_BulkLocation(const UEnemyNavigationAIComponent* NavComp, const FVector& BulkLocation,
+	                                      FVector& OutProjectedLocation)
+	{
+		return NavComp->GetNavigablePoint(BulkLocation, 5.0,
+		                                  OutProjectedLocation,
+		                                  EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
+	bool CanProjectNavigable_AverageLocationAttacker(const UEnemyNavigationAIComponent* NavComp,
+	                                                 const FVector& AvgAttackerLoc, FVector& OutProjectedLocation)
+	{
+		return NavComp->GetNavigablePoint(AvgAttackerLoc, 8.0,
+		                                  OutProjectedLocation,
+		                                  EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
+	bool CanProjectNavigable_AveragePickedUnitLocation(const UEnemyNavigationAIComponent* NavComp,
+	                                                   const FVector& AverageUnitLocation,
+	                                                   FVector& OutProjectedLocation)
+	{
+		// Try get this point on default nav cost first.
+		// Do not make this to high as it risk overshooting.
+		constexpr float ProjectionScaleDefault = 3.f;
+		if (not NavComp->GetNavPointDefaultCosts(AverageUnitLocation, ProjectionScaleDefault, OutProjectedLocation,
+		                                         EOnProjectionFailedStrategy::LookAtDoubleExtent))
+		{
+			return NavComp->GetNavigablePoint(AverageUnitLocation, 15.0,
+			                                  OutProjectedLocation,
+			                                  EOnProjectionFailedStrategy::LookAtDoubleExtent);
+		}
+		return true;
+	}
+
+	FVector GetAverageLocationPickedBlackboardUnits(const FBlackboardIdleUnitsResult& PickedBlackboardUnits)
+	{
+		const int32 TankCount = PickedBlackboardUnits.TankMasters.Num();
+		const int32 SquadCount = PickedBlackboardUnits.SquadControllers.Num();
+		const int32 TotalUnitCount = TankCount + SquadCount;
+		if (TotalUnitCount <= 0)
+		{
+			return FVector::ZeroVector;
+		}
+
+		FVector SummedLocations = FVector::ZeroVector;
+
+		for (const TObjectPtr<ATankMaster>& TankMaster : PickedBlackboardUnits.TankMasters)
+		{
+			SummedLocations += TankMaster->GetActorLocation();
+		}
+
+		for (const TObjectPtr<ASquadController>& SquadController : PickedBlackboardUnits.SquadControllers)
+		{
+			SummedLocations += SquadController->GetActorLocation();
+		}
+
+		const float InverseUnitCount = 1.0f / static_cast<float>(TotalUnitCount);
+		return SummedLocations * InverseUnitCount;
+	}
+
+	void SortArrayByDistanceToLocation(TArray<FVector>& OutLocations, const FVector& TargetLocation)
+	{
+		// compute the squared distance to the target location for each location and sort based on that
+		OutLocations.Sort([&](const FVector& A, const FVector& B)
+		{
+			const float DistASq = FVector::DistSquared(A, TargetLocation);
+			const float DistBSq = FVector::DistSquared(B, TargetLocation);
+			return DistASq < DistBSq;
+		});
 	}
 }

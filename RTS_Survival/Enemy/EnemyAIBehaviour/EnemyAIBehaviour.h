@@ -31,6 +31,14 @@ struct FEnemyAIMissionSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAllowDirectControlStochasticDecisionTree = false;
 
+	// What is the minimal amount of units needed in the blackboard to start a strategic attack move?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MinUnitsInAttackWave = 2;
+	
+	// Maximally how many units can be randomly picked from the blackboard to participate in a strategic Attack move?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxUnitsInAttackWave = 8;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAllowBuilding = false;
 

@@ -8,9 +8,114 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlConstants.h"
+#include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitEntry.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+namespace
+{
+	int32 GetRandomMinMaxPickCount(
+		const int32 MinUnitsToPick,
+		const int32 MaxUnitsToPick,
+		const int32 AvailableUnitCount)
+	{
+		if (MinUnitsToPick < 0 || MaxUnitsToPick <= 0)
+		{
+			return 0;
+		}
+
+		if (MinUnitsToPick > MaxUnitsToPick || AvailableUnitCount < MinUnitsToPick)
+		{
+			return 0;
+		}
+
+		const int32 MaxAllowedPickCount = FMath::Min(MaxUnitsToPick, AvailableUnitCount);
+		return FMath::RandRange(MinUnitsToPick, MaxAllowedPickCount);
+	}
+
+	bool GetIsSquadEntry(const FBlackboardIdleUnitEntry& Entry)
+	{
+		return Entry.UnitType == EAllUnitType::UNType_Squad;
+	}
+
+	bool GetIsTankEntry(const FBlackboardIdleUnitEntry& Entry)
+	{
+		return Entry.UnitType == EAllUnitType::UNType_Tank;
+	}
+
+	bool GetIsHazmatEngineerSquadEntry(const FBlackboardIdleUnitEntry& Entry)
+	{
+		if (Entry.UnitType != EAllUnitType::UNType_Squad)
+		{
+			return false;
+		}
+
+		const ESquadSubtype SquadSubtype = static_cast<ESquadSubtype>(Entry.UnitSubtypeRaw);
+		return SquadSubtype == ESquadSubtype::Squad_Rus_HazmatEngineers;
+	}
+
+	bool GetIsNotHazmatEngineerSquadEntry(const FBlackboardIdleUnitEntry& Entry)
+	{
+		return not GetIsHazmatEngineerSquadEntry(Entry);
+	}
+
+	template <typename EntryPredicateType>
+	bool TryPickRandomMatchingEntry(
+		TArray<FBlackboardIdleUnitEntry>& IdleEntries,
+		const EntryPredicateType& EntryPredicate,
+		FBlackboardIdleUnitEntry& OutPickedEntry)
+	{
+		TArray<int32> MatchingEntryIndices;
+		MatchingEntryIndices.Reserve(IdleEntries.Num());
+
+		for (int32 EntryIndex = 0; EntryIndex < IdleEntries.Num(); ++EntryIndex)
+		{
+			if (EntryPredicate(IdleEntries[EntryIndex]))
+			{
+				MatchingEntryIndices.Add(EntryIndex);
+			}
+		}
+
+		if (MatchingEntryIndices.Num() <= 0)
+		{
+			return false;
+		}
+
+		const int32 RandomMatchingEntryArrayIndex = FMath::RandRange(0, MatchingEntryIndices.Num() - 1);
+		const int32 RandomIdleEntryIndex = MatchingEntryIndices[RandomMatchingEntryArrayIndex];
+		OutPickedEntry = IdleEntries[RandomIdleEntryIndex];
+		IdleEntries.RemoveAtSwap(RandomIdleEntryIndex);
+		return true;
+	}
+
+	template <typename EntryPredicateType>
+	void PickRandomEntriesFromMatchingSet(
+		TArray<FBlackboardIdleUnitEntry>& IdleEntries,
+		const EntryPredicateType& EntryPredicate,
+		const int32 TargetPickCount,
+		TArray<FBlackboardIdleUnitEntry>& OutPickedEntries)
+	{
+		while (OutPickedEntries.Num() < TargetPickCount)
+		{
+			FBlackboardIdleUnitEntry PickedEntry;
+			if (not TryPickRandomMatchingEntry(IdleEntries, EntryPredicate, PickedEntry))
+			{
+				return;
+			}
+
+			OutPickedEntries.Add(PickedEntry);
+		}
+	}
+
+	FBlackboardIdleUnitsResult SetupResultFromPickedEntries(const TArray<FBlackboardIdleUnitEntry>& PickedEntries)
+	{
+		FBlackboardIdleUnitsResult PickedUnits;
+		PickedUnits.SetupResultForPickedEntries(PickedEntries);
+		return PickedUnits;
+	}
+}
 
 UEnemyDirectControlComponent::UEnemyDirectControlComponent()
 {
@@ -209,6 +314,220 @@ TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() 
 
 	return RegisteredActors;
 }
+
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMaxIdleBlackboardUnits(const int32 MaxUnitsToPick) const
+{
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureIsValidBlackboard(Blackboard))
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	if (MaxUnitsToPick <= 0 || Blackboard->IdleDirectControlUnits.Num() <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	const int32 MaxPicksToProcess = FMath::Min(MaxUnitsToPick, Blackboard->IdleDirectControlUnits.Num());
+	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	PickedBlackboardEntries.Reserve(MaxPicksToProcess);
+
+	while (PickedBlackboardEntries.Num() < MaxPicksToProcess && Blackboard->IdleDirectControlUnits.Num() > 0)
+	{
+		const int32 RandomIdleUnitIndex = FMath::RandRange(0, Blackboard->IdleDirectControlUnits.Num() - 1);
+		const FBlackboardIdleUnitEntry PickedEntry = Blackboard->IdleDirectControlUnits[RandomIdleUnitIndex];
+
+		// Remove immediately so the same unit can never be picked twice.
+		Blackboard->IdleDirectControlUnits.RemoveAtSwap(RandomIdleUnitIndex);
+		PickedBlackboardEntries.Add(PickedEntry);
+	}
+
+	return SetupResultFromPickedEntries(PickedBlackboardEntries);
+}
+
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMinMaxIdleBlackboardUnits(
+	const int32 MinUnitsToPick,
+	const int32 MaxUnitsToPick) const
+{
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureIsValidBlackboard(Blackboard))
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	const int32 UnitsToPick = GetRandomMinMaxPickCount(
+		MinUnitsToPick,
+		MaxUnitsToPick,
+		Blackboard->IdleDirectControlUnits.Num());
+	if (UnitsToPick <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	PickedBlackboardEntries.Reserve(UnitsToPick);
+
+	while (PickedBlackboardEntries.Num() < UnitsToPick)
+	{
+		const int32 RandomIdleUnitIndex = FMath::RandRange(0, Blackboard->IdleDirectControlUnits.Num() - 1);
+		PickedBlackboardEntries.Add(Blackboard->IdleDirectControlUnits[RandomIdleUnitIndex]);
+		Blackboard->IdleDirectControlUnits.RemoveAtSwap(RandomIdleUnitIndex);
+	}
+
+	return SetupResultFromPickedEntries(PickedBlackboardEntries);
+}
+
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferSquad_PickRandomMinMax(
+	const int32 MinUnitsToPick,
+	const int32 MaxUnitsToPick) const
+{
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureIsValidBlackboard(Blackboard))
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	const int32 UnitsToPick = GetRandomMinMaxPickCount(
+		MinUnitsToPick,
+		MaxUnitsToPick,
+		Blackboard->IdleDirectControlUnits.Num());
+	if (UnitsToPick <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	PickedBlackboardEntries.Reserve(UnitsToPick);
+
+	PickRandomEntriesFromMatchingSet(
+		Blackboard->IdleDirectControlUnits,
+		GetIsSquadEntry,
+		UnitsToPick,
+		PickedBlackboardEntries);
+	PickRandomEntriesFromMatchingSet(
+		Blackboard->IdleDirectControlUnits,
+		GetIsTankEntry,
+		UnitsToPick,
+		PickedBlackboardEntries);
+
+	return SetupResultFromPickedEntries(PickedBlackboardEntries);
+}
+
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferTank_PickRandomMinMax(
+	const int32 MinUnitsToPick,
+	const int32 MaxUnitsToPick) const
+{
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureIsValidBlackboard(Blackboard))
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	const int32 UnitsToPick = GetRandomMinMaxPickCount(
+		MinUnitsToPick,
+		MaxUnitsToPick,
+		Blackboard->IdleDirectControlUnits.Num());
+	if (UnitsToPick <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	PickedBlackboardEntries.Reserve(UnitsToPick);
+
+	PickRandomEntriesFromMatchingSet(
+		Blackboard->IdleDirectControlUnits,
+		GetIsTankEntry,
+		UnitsToPick,
+		PickedBlackboardEntries);
+	PickRandomEntriesFromMatchingSet(
+		Blackboard->IdleDirectControlUnits,
+		GetIsSquadEntry,
+		UnitsToPick,
+		PickedBlackboardEntries);
+
+	return SetupResultFromPickedEntries(PickedBlackboardEntries);
+}
+
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferNoHazmats_PickRandomMinMax(
+	const int32 MinUnitsToPick,
+	const int32 MaxUnitsToPick) const
+{
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureIsValidBlackboard(Blackboard))
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	const int32 UnitsToPick = GetRandomMinMaxPickCount(
+		MinUnitsToPick,
+		MaxUnitsToPick,
+		Blackboard->IdleDirectControlUnits.Num());
+	if (UnitsToPick <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	PickedBlackboardEntries.Reserve(UnitsToPick);
+
+	PickRandomEntriesFromMatchingSet(
+		Blackboard->IdleDirectControlUnits,
+		GetIsNotHazmatEngineerSquadEntry,
+		UnitsToPick,
+		PickedBlackboardEntries);
+
+	if (PickedBlackboardEntries.Num() < MinUnitsToPick)
+	{
+		PickRandomEntriesFromMatchingSet(
+			Blackboard->IdleDirectControlUnits,
+			GetIsHazmatEngineerSquadEntry,
+			MinUnitsToPick,
+			PickedBlackboardEntries);
+	}
+
+	return SetupResultFromPickedEntries(PickedBlackboardEntries);
+}
+
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::IdleHazmatEngineers_PickRandomMinMax(
+	const int32 MinUnitsToPick,
+	const int32 MaxUnitsToPick) const
+{
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureIsValidBlackboard(Blackboard))
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	int32 AvailableHazmatCount = 0;
+	for (const FBlackboardIdleUnitEntry& IdleEntry : Blackboard->IdleDirectControlUnits)
+	{
+		if (GetIsHazmatEngineerSquadEntry(IdleEntry))
+		{
+			++AvailableHazmatCount;
+		}
+	}
+
+	const int32 UnitsToPick = GetRandomMinMaxPickCount(
+		MinUnitsToPick,
+		MaxUnitsToPick,
+		AvailableHazmatCount);
+	if (UnitsToPick <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	PickedBlackboardEntries.Reserve(UnitsToPick);
+	PickRandomEntriesFromMatchingSet(
+		Blackboard->IdleDirectControlUnits,
+		GetIsHazmatEngineerSquadEntry,
+		UnitsToPick,
+		PickedBlackboardEntries);
+
+	return SetupResultFromPickedEntries(PickedBlackboardEntries);
+}
+
 
 void UEnemyDirectControlComponent::RegisterDirectControlUnits(const TArray<AActor*>& UnitActors)
 {

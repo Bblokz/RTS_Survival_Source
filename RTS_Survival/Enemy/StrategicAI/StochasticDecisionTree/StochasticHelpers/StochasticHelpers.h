@@ -6,6 +6,7 @@
 
 struct FStrategicAIAction;
 class UStrategicAISubAction;
+struct FBlackboardIdleUnitsResult;
 
 /**
  * @namespace StochasticHelpers
@@ -54,6 +55,60 @@ namespace StochasticHelpers
 		const bool bUseSeed,
 		const float Seed,
 		const float Time);
+
+	
+	FVector PickRandomLocation(const TArray<FVector>& Locations);
+
+	/**
+	 * @brief Picks up to MaxLocations random unique locations without picking the same location twice.
+	 *
+	 * @param Locations Source locations.
+	 * @param MaxLocations Maximum number of locations to return.
+	 * @return Randomly picked locations with no duplicates.
+	 */
+	TArray<FVector> PickRandomMaxLocations(const TArray<FVector>& Locations, int32 MaxLocations);
+
+	/**
+	 * @brief Builds closest-neighbour pairs and returns one random pair.
+	 *
+	 * If only one location exists, it returns an array containing that single location.
+	 *
+	 * @param Locations Source locations.
+	 * @return Either 0, 1, or 2 locations depending on input size.
+	 */
+	TArray<FVector> PickRandomClosestPair(const TArray<FVector>& Locations);
+
+	/**
+	 * @brief Computes a shared tactical anchor from picked units so follow-up logic can reason from one stable center.
+	 *
+	 * Uses one accumulation pass over tanks and squads and one final reciprocal multiply for the average.
+	 * Assumes all picked entries are valid by contract and performs no validity checks.
+	 *
+	 * @param PickedBlackboardUnits Picked tank/squad result that contributes actor world locations.
+	 * @return Average world location across all picked units, or ZeroVector when no units were picked.
+	 */
+	FVector GetAverageLocationPickedBlackboardUnits(const FBlackboardIdleUnitsResult& PickedBlackboardUnits);
+
+	// Specifically for bulk locations which should be projected the same way everytime.
+	bool CanProjectNavigable_BulkLocation(
+		const UEnemyNavigationAIComponent* NavComp, const FVector& BulkLocation, FVector& OutProjectedLocation);
+
+	// Specifically for avg attacker (player unit groups) locations which should be projected the same way everytime.
+	// Uses larger extension as attackers may be spread.
+	bool CanProjectNavigable_AverageLocationAttacker(
+		const UEnemyNavigationAIComponent* NavComp, const FVector& AvgAttackerLoc, FVector& OutProjectedLocation);
+	
+	// Specifically for average picked blackboard units location.
+	bool CanProjectNavigable_AveragePickedUnitLocation(
+		const UEnemyNavigationAIComponent* NavComp,
+		const FVector& AverageUnitLocation,
+		FVector& OutProjectedLocation);
+
+	void SortArrayByDistanceToLocation(TArray<FVector>& OutLocations, const FVector& TargetLocation);
+
+	
+		
+	
 
 /**
  * @brief Retrieves the string representation of an EStrategicAITopLevelAction enum value.

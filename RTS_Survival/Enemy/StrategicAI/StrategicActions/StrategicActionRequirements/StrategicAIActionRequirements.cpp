@@ -12,12 +12,12 @@ FString UStrategicAIActionRequirement::GetDebugString() const
 bool UStrategicAIGameTimePassedRequirement::GetIsRequirementMet(
 	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
 {
-	return GameTimeSeconds >= M_RequiredGameTimeSeconds;
+	return GameTimeSeconds >= RequiredGameTimeSeconds;
 }
 
 FString UStrategicAIGameTimePassedRequirement::GetDebugString() const
 {
-		return FString::Printf(TEXT("Time Req: %f sec"), M_RequiredGameTimeSeconds);
+		return FString::Printf(TEXT("Time Req: %f sec"), RequiredGameTimeSeconds);
 }
 
 bool UStrategicAIActorIsValidRequirement::GetIsRequirementMet(

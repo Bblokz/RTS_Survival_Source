@@ -33,6 +33,8 @@ namespace EnemyAISettings
 		const FColor EnemyLocationColor = FColor::Purple;
 		const FColor PlayerLocationColor = FColor::Blue;
 		const FColor AttackLocationColor = FColor::Red;
+		const FColor PickedActionLocationColor = FColor::Green;
+		inline constexpr float PickedActionLocationRadius = 300.f;
 		inline constexpr bool BaseLocationDebugging = true;
 		inline constexpr float BaseLocationDebugDuration = 15.f* DEV_AI_ThinkTimers_Scaling;
 		inline constexpr float BaseLocationDebuggingRadius = 5000.f;
@@ -47,6 +49,7 @@ namespace EnemyAISettings
 		inline constexpr bool StochasticDecisionTreeDebugging = true;
 		// Should be lower than thinking speed
 		inline constexpr float StochasticActionsDebugTime = 5.f;
+		inline constexpr float StochasticActionsAttackLocationDebugRadius = 200.f;
 	}
 
 	inline float EnemyRetreatControllerCheckInterval = 8.4f;

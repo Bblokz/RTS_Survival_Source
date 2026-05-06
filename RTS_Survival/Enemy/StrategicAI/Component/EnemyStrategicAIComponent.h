@@ -73,6 +73,7 @@ class RTS_SURVIVAL_API UEnemyStrategicAIComponent : public UActorComponent
 public:
 	UEnemyStrategicAIComponent();
 
+	// Called at begin play of enemy controller.
 	void InitStrategicAIComponent(AEnemyController* EnemyController, UStochasticDecisionTree* StochasticDecisionTree);
 
 	void QueueFindClosestFlankableEnemyHeavyRequest(const FFindClosestFlankableEnemyHeavy& Request);
@@ -127,7 +128,7 @@ private:
 
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
 
-	void BeginPlay_PreThinKStep_InitThinkingTimers(const float Now);
+	void PreThinKStep_InitThinkingTimers(const float Now);
 
 	FAIThinkingTimerData M_AIBaseLocationThinkTimer;
 	void AIBaseLocation_ThinkStep();
@@ -163,6 +164,8 @@ private:
 	void FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const;
 	int32 M_CachedGenerationSeed = 0;
 	mutable int32 M_SeedDecisionCounter = 0;
+
+	void ClearInvalidIdleUnitsFromBlackboard();
 
 	// --------------------- Debugging ---------------------------
 	void DebugBlackboardBasePoints() const;

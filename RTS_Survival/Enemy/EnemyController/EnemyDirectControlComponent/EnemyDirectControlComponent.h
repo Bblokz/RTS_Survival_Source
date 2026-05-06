@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "DirectControl_Retreat/EnemyRetreatCache.h"
+#include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitsResult/FBlackboardIdleUnitsResult.h"
 #include "EnemyDirectControlComponent.generated.h"
 
 struct FStrategicAIBlackboard;
@@ -41,6 +42,57 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	TArray<AActor*> GetRegisteredDirectControlUnits() const;
+
+	/** @brief Randomly drains up to Max units from idle entries and removes each pick immediately to avoid re-selection.
+	 *  @param MaxUnitsToPick Upper limit for how many idle entries may be consumed from the blackboard.
+	 *  @return Typed pick result built from the entries that were removed.
+	 */
+	FBlackboardIdleUnitsResult PickRandomMaxIdleBlackboardUnits(const int32 MaxUnitsToPick) const;
+
+	/** @brief Chooses a random target count in [Min, Max] (bounded by availability) and only mutates when Min is reachable.
+	 *  @param MinUnitsToPick Minimum required picks; if unavailable, the blackboard remains unchanged.
+	 *  @param MaxUnitsToPick Upper bound for random pick count before availability clamping.
+	 *  @return Typed pick result for removed entries, or empty when the minimum cannot be satisfied.
+	 */
+	FBlackboardIdleUnitsResult PickRandomMinMaxIdleBlackboardUnits(
+		const int32 MinUnitsToPick,
+		const int32 MaxUnitsToPick) const;
+
+	/** @brief Resolves a min-max random target, consumes squads first, then tanks if squad supply is exhausted.
+	 *  @param MinUnitsToPick Minimum required picks; no removal happens if this threshold cannot be met.
+	 *  @param MaxUnitsToPick Upper bound for the random pick target before availability clamping.
+	 *  @return Typed pick result reflecting entries removed under squad-first priority.
+	 */
+	FBlackboardIdleUnitsResult PreferSquad_PickRandomMinMax(
+		const int32 MinUnitsToPick,
+		const int32 MaxUnitsToPick) const;
+
+	/** @brief Resolves a min-max random target, consumes tanks first, then squads if tank supply is exhausted.
+	 *  @param MinUnitsToPick Minimum required picks; no removal happens if this threshold cannot be met.
+	 *  @param MaxUnitsToPick Upper bound for the random pick target before availability clamping.
+	 *  @return Typed pick result reflecting entries removed under tank-first priority.
+	 */
+	FBlackboardIdleUnitsResult PreferTank_PickRandomMinMax(
+		const int32 MinUnitsToPick,
+		const int32 MaxUnitsToPick) const;
+
+	/** @brief Runs regular min-max picking while excluding hazmat squads, then relaxes that rule only to recover Min.
+	 *  @param MinUnitsToPick Minimum required picks; mutation is skipped when total availability cannot satisfy it.
+	 *  @param MaxUnitsToPick Upper bound for random target picks before availability clamping.
+	 *  @return Typed pick result favoring non-hazmat entries and using hazmats only as minimum-recovery fallback.
+	 */
+	FBlackboardIdleUnitsResult PreferNoHazmats_PickRandomMinMax(
+		const int32 MinUnitsToPick,
+		const int32 MaxUnitsToPick) const;
+
+	/** @brief Applies min-max gating against hazmat-only availability and consumes only hazmat engineer squad entries.
+	 *  @param MinUnitsToPick Minimum required hazmat picks; failure leaves the blackboard unchanged.
+	 *  @param MaxUnitsToPick Upper bound for random hazmat pick target after hazmat availability clamp.
+	 *  @return Typed pick result for removed hazmat engineer entries only.
+	 */
+	FBlackboardIdleUnitsResult IdleHazmatEngineers_PickRandomMinMax(
+		const int32 MinUnitsToPick,
+		const int32 MaxUnitsToPick) const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterDirectControlUnits(const TArray<AActor*>& UnitActors);

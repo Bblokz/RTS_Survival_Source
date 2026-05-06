@@ -7,6 +7,8 @@ struct FStrategicAIBlackboard;
 
 namespace BlackboardQueries
 {
+
+	
 	bool HasAtLeastXTanks(
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinTanks,
