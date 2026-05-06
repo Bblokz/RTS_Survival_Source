@@ -397,6 +397,8 @@ void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
 {
 	FString DebugString = "\n-------- Player Counts --------";
 	DebugString += FString::Printf(
+		TEXT("\n Armored Cars: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerArmoredCars);
+	DebugString += FString::Printf(
 		TEXT("\n Light Tanks: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerLightTanks);
 	DebugString += FString::Printf(
 		TEXT("\n Medium Tanks: %d"), M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerMediumTanks);

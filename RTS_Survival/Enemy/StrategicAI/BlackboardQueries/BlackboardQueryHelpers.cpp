@@ -133,6 +133,60 @@ bool BlackboardQueries::HasAtLeastXHeavyTanks(
 	return HasAtLeastXTanksMatchingSubtypeCategory(Blackboard, MinHeavyTanks, Global_GetIsHeavyTank);
 }
 
+bool BlackboardQueries::HasAtLeastXPlayerTanks(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 MinPlayerTanks)
+{
+	const FResultPlayerUnitCounts& PlayerUnitCounts = Blackboard.CurrentPlayerUnitCounts;
+	const int32 PlayerTankCount = PlayerUnitCounts.PlayerArmoredCars
+		+ PlayerUnitCounts.PlayerLightTanks
+		+ PlayerUnitCounts.PlayerMediumTanks
+		+ PlayerUnitCounts.PlayerHeavyTanks;
+	return PlayerTankCount >= MinPlayerTanks;
+}
+
+bool BlackboardQueries::HasAtLeastXPlayerArmoredCars(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 MinPlayerArmoredCars)
+{
+	return Blackboard.CurrentPlayerUnitCounts.PlayerArmoredCars >= MinPlayerArmoredCars;
+}
+
+bool BlackboardQueries::HasAtLeastXPlayerLightTanks(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 MinPlayerLightTanks)
+{
+	return Blackboard.CurrentPlayerUnitCounts.PlayerLightTanks >= MinPlayerLightTanks;
+}
+
+bool BlackboardQueries::HasAtLeastXPlayerMediumTanks(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 MinPlayerMediumTanks)
+{
+	return Blackboard.CurrentPlayerUnitCounts.PlayerMediumTanks >= MinPlayerMediumTanks;
+}
+
+bool BlackboardQueries::HasAtLeastXPlayerHeavyTanks(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 MinPlayerHeavyTanks)
+{
+	return Blackboard.CurrentPlayerUnitCounts.PlayerHeavyTanks >= MinPlayerHeavyTanks;
+}
+
+bool BlackboardQueries::HasAtLeastXPlayerSquads(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 MinPlayerSquads)
+{
+	return Blackboard.CurrentPlayerUnitCounts.PlayerSquads >= MinPlayerSquads;
+}
+
+bool BlackboardQueries::HasAtLeastXPlayerNomadicVehicles(
+	const FStrategicAIBlackboard& Blackboard,
+	const int32 MinPlayerNomadicVehicles)
+{
+	return Blackboard.CurrentPlayerUnitCounts.PlayerNomadicVehicles >= MinPlayerNomadicVehicles;
+}
+
 bool BlackboardQueries::HasAtLeastXAircraft(const FStrategicAIBlackboard& Blackboard, const int32 MinAircraft,
                                             EAircraftSubtype AircraftType)
 {

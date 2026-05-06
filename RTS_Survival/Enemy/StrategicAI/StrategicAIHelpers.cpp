@@ -184,6 +184,29 @@ namespace StrategicAIHelperUtilities
 		return 0.f;
 	}
 
+	void AddPlayerTankUnitStateCount(
+		FResultPlayerUnitCounts& Result,
+		const FAsyncDetailedUnitState& UnitState)
+	{
+		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitState.UnitSubtypeRaw);
+		if (Global_GetIsArmoredCar(TankSubtype))
+		{
+			Result.PlayerArmoredCars++;
+		}
+		else if (Global_GetIsLightTank(TankSubtype))
+		{
+			Result.PlayerLightTanks++;
+		}
+		else if (Global_GetIsMediumTank(TankSubtype))
+		{
+			Result.PlayerMediumTanks++;
+		}
+		else if (Global_GetIsHeavyTank(TankSubtype))
+		{
+			Result.PlayerHeavyTanks++;
+		}
+	}
+
 	float GetClampedDistance(const float MinDistance, const float MaxDistance)
 	{
 		const float SafeMin = FMath::Max(0.f, FMath::Min(MinDistance, MaxDistance));
@@ -716,22 +739,8 @@ FResultPlayerUnitCounts FStrategicAIHelpers::BuildPlayerUnitCountsResult(
 		switch (UnitState.UnitType)
 		{
 		case EAllUnitType::UNType_Tank:
-		{
-			const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitState.UnitSubtypeRaw);
-			if (Global_GetIsLightTank(TankSubtype))
-			{
-				Result.PlayerLightTanks++;
-			}
-			else if (Global_GetIsMediumTank(TankSubtype))
-			{
-				Result.PlayerMediumTanks++;
-			}
-			else if (Global_GetIsHeavyTank(TankSubtype))
-			{
-				Result.PlayerHeavyTanks++;
-			}
+			StrategicAIHelperUtilities::AddPlayerTankUnitStateCount(Result, UnitState);
 			break;
-		}
 		case EAllUnitType::UNType_Squad:
 			Result.PlayerSquads++;
 			break;

@@ -63,6 +63,34 @@ public:
 
 };
 
+/**
+ * @brief Used by strategic actions that need a known player HQ target before running.
+ */
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIHasPlayerHQLocationRequirement final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+	virtual FString GetDebugString() const override;
+};
+
+/**
+ * @brief Used by strategic actions that need at least one known player resource building target.
+ */
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIHasPlayerResourceBuildingLocationsRequirement final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+	virtual FString GetDebugString() const override;
+};
+
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UStrategicAIHasAtLeastIdleSquads final : public UStrategicAIActionRequirement
 {

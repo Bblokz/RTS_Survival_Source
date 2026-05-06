@@ -17,6 +17,9 @@ enum class ESubtypeAction : uint8
 	DefendImportantMissionPoint,
 };
 
+/**
+ * @brief Used as instanced tree entries that score and gate strategic AI commands.
+ */
 UCLASS(Abstract, BlueprintType, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UStrategicAISubAction : public UObject
 {
@@ -38,6 +41,11 @@ public:
 		return M_Requirements;
 	}
 
+	const TArray<TObjectPtr<UStrategicAIActionRequirement>>& GetNativeVisibleRequirements() const
+	{
+		return M_NativeVisibleRequirements;
+	}
+
 	bool GetAreRequirementsMet(
 		const FStrategicAIBlackboard& RequirementContext,
 		const float GameTimeSeconds) const;
@@ -45,14 +53,28 @@ public:
 	virtual FString GetDebugString() const;
 
 protected:
+	void AddNativeVisibleRequirement(UStrategicAIActionRequirement* Requirement);
+
 	FString GetRequirementsDebugString() const;
 
 private:
+	bool GetAreRequirementsMetForArray(
+		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+		const FStrategicAIBlackboard& RequirementContext,
+		const float GameTimeSeconds) const;
+	FString GetRequirementsDebugStringForArray(
+		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+		const FString& HeaderText) const;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = true, ClampMin = "0.0"))
 	float M_Score = 1.0f;
 
 	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
 	TArray<TObjectPtr<UStrategicAIActionRequirement>> M_Requirements;
+
+	// Native requirements are visible for designer clarity, but only C++ classes decide what is always enforced.
+	UPROPERTY(VisibleAnywhere, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	TArray<TObjectPtr<UStrategicAIActionRequirement>> M_NativeVisibleRequirements;
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)

@@ -29,6 +29,7 @@ FGetPlayerUnitCountsAndBase::FGetPlayerUnitCountsAndBase()
 
 FResultPlayerUnitCounts::FResultPlayerUnitCounts()
 	: RequestID(0)
+	, PlayerArmoredCars(0)
 	, PlayerLightTanks(0)
 	, PlayerMediumTanks(0)
 	, PlayerHeavyTanks(0)

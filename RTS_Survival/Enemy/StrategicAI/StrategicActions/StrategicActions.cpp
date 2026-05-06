@@ -4,7 +4,21 @@ bool UStrategicAISubAction::GetAreRequirementsMet(
 	const FStrategicAIBlackboard& RequirementContext,
 	const float GameTimeSeconds) const
 {
-	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : M_Requirements)
+	return GetAreRequirementsMetForArray(M_NativeVisibleRequirements, RequirementContext, GameTimeSeconds)
+		&& GetAreRequirementsMetForArray(M_Requirements, RequirementContext, GameTimeSeconds);
+}
+
+void UStrategicAISubAction::AddNativeVisibleRequirement(UStrategicAIActionRequirement* Requirement)
+{
+	M_NativeVisibleRequirements.Add(Requirement);
+}
+
+bool UStrategicAISubAction::GetAreRequirementsMetForArray(
+	const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+	const FStrategicAIBlackboard& RequirementContext,
+	const float GameTimeSeconds) const
+{
+	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : Requirements)
 	{
 		if (EachRequirement == nullptr)
 		{
@@ -27,9 +41,17 @@ FString UStrategicAISubAction::GetDebugString() const
 
 FString UStrategicAISubAction::GetRequirementsDebugString() const
 {
-	FString DebugString = TEXT("\n--Requirements:");
+	return GetRequirementsDebugStringForArray(M_NativeVisibleRequirements, TEXT("\n--Native Visible Requirements:"))
+		+ GetRequirementsDebugStringForArray(M_Requirements, TEXT("\n--Requirements:"));
+}
 
-	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : M_Requirements)
+FString UStrategicAISubAction::GetRequirementsDebugStringForArray(
+	const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+	const FString& HeaderText) const
+{
+	FString DebugString = HeaderText;
+
+	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : Requirements)
 	{
 		if (EachRequirement == nullptr)
 		{
@@ -56,6 +78,8 @@ FString USubAction_AttackMoveToPlayerUnits::GetDebugString() const
 USubAction_AttackMoveToPlayerHQ::USubAction_AttackMoveToPlayerHQ()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveToPlayerHQ;
+	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasPlayerHQLocationRequirement>(
+		TEXT("HasPlayerHQLocationRequirement")));
 }
 
 FString USubAction_AttackMoveToPlayerHQ::GetDebugString() const
@@ -66,6 +90,8 @@ FString USubAction_AttackMoveToPlayerHQ::GetDebugString() const
 USubAction_AttackMoveToPlayerResourceBuildings::USubAction_AttackMoveToPlayerResourceBuildings()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveToPlayerResourceBuildings;
+	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasPlayerResourceBuildingLocationsRequirement>(
+		TEXT("HasPlayerResourceBuildingLocationsRequirement")));
 }
 
 FString USubAction_AttackMoveToPlayerResourceBuildings::GetDebugString() const
