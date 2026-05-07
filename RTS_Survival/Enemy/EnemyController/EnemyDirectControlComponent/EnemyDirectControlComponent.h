@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "DirectControl_Retreat/EnemyRetreatCache.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitsResult/FBlackboardIdleUnitsResult.h"
+#include "RTS_Survival/Enemy/StrategicAI/IdleUnitSelectionPolicy.h"
 #include "EnemyDirectControlComponent.generated.h"
 
 struct FStrategicAIBlackboard;
@@ -57,6 +58,13 @@ public:
 	FBlackboardIdleUnitsResult PickRandomMinMaxIdleBlackboardUnits(
 		const int32 MinUnitsToPick,
 		const int32 MaxUnitsToPick) const;
+
+	/** @brief Applies subaction-built selection rules while keeping blackboard mutation inside direct control.
+	 *  @param SelectionPolicy Fallback min/max plus any requirement-driven unit buckets to consume.
+	 *  @return Typed pick result, or empty if required buckets/minimum cannot be satisfied.
+	 */
+	FBlackboardIdleUnitsResult PickIdleBlackboardUnitsByPolicy(
+		const FIdleUnitSelectionPolicy& SelectionPolicy) const;
 
 	/** @brief Resolves a min-max random target, consumes squads first, then tanks if squad supply is exhausted.
 	 *  @param MinUnitsToPick Minimum required picks; no removal happens if this threshold cannot be met.

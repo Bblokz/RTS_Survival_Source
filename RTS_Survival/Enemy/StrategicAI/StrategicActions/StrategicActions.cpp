@@ -1,11 +1,27 @@
 ﻿#include "StrategicActions.h"
 
+#include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+
 bool UStrategicAISubAction::GetAreRequirementsMet(
 	const FStrategicAIBlackboard& RequirementContext,
 	const float GameTimeSeconds) const
 {
 	return GetAreRequirementsMetForArray(M_NativeVisibleRequirements, RequirementContext, GameTimeSeconds)
 		&& GetAreRequirementsMetForArray(M_Requirements, RequirementContext, GameTimeSeconds);
+}
+
+FIdleUnitSelectionPolicy UStrategicAISubAction::BuildIdleUnitSelectionPolicy(
+	const FStrategicAIBlackboard& Blackboard) const
+{
+	FIdleUnitSelectionPolicy SelectionPolicy;
+	SelectionPolicy.SetupFallbackMinMax(
+		Blackboard.StrategicAIMissionSettings.MinUnitsInAttackWave,
+		Blackboard.StrategicAIMissionSettings.MaxUnitsInAttackWave);
+
+	AddRequirementSelectionRulesToPolicy(M_NativeVisibleRequirements, SelectionPolicy);
+	AddRequirementSelectionRulesToPolicy(M_Requirements, SelectionPolicy);
+	SelectionPolicy.NormalizeMinMax();
+	return SelectionPolicy;
 }
 
 void UStrategicAISubAction::AddNativeVisibleRequirement(UStrategicAIActionRequirement* Requirement)
@@ -68,6 +84,21 @@ FString UStrategicAISubAction::GetRequirementsDebugStringForArray(
 	}
 
 	return DebugString;
+}
+
+void UStrategicAISubAction::AddRequirementSelectionRulesToPolicy(
+	const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+	FIdleUnitSelectionPolicy& SelectionPolicy) const
+{
+	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : Requirements)
+	{
+		if (EachRequirement == nullptr)
+		{
+			continue;
+		}
+
+		EachRequirement->ContributeToIdleUnitSelectionPolicy(SelectionPolicy);
+	}
 }
 
 USubAction_AttackMoveToPlayerUnits::USubAction_AttackMoveToPlayerUnits()

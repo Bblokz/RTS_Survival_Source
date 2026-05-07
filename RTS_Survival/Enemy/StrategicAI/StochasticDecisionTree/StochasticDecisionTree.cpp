@@ -139,7 +139,9 @@ bool UStochasticDecisionTree::EnsurePickedSubActionIsValid(const UStrategicAISub
 void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubAction,
                                                const FStrategicAIBlackboard& Blackboard)
 {
-	if (not EnsureIsValidEnemyNavigationAIComponent() || not EnsureIsValidEnemyFormation())
+	if (not EnsureIsValidDirectControlComponent()
+		|| not EnsureIsValidEnemyNavigationAIComponent()
+		|| not EnsureIsValidEnemyFormation())
 	{
 		return;
 	}
@@ -150,19 +152,23 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 			"Stochastic tree cannot execute sub-action as it is a default object, likely meaning it was not properly set up in the data assets.");
 		break;
 	case ESubtypeAction::AttackMoveToPlayerUnits:
-		Exe_AttackMovePlayerUnits(Blackboard);
+		Exe_AttackMovePlayerUnits(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::AttackMoveToPlayerHQ:
+		Exe_AttackMovePlayerHQ(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::AttackMoveToPlayerResourceBuildings:
+		Exe_AttackMovePlayerResourceBuildings(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::AttackMoveSpecificPoints:
+		Exe_AttackMoveSpecificPoint(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::DefendBase:
 		break;
 	case ESubtypeAction::DefendImportantMissionPoint:
 		break;
 	case ESubtypeAction::AttackMoveLightTanksToPlayerUnits:
+		Exe_AttackMovePlayerUnits(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::HeavyTankPushPlayerBaseOrUnits:
 		break;
@@ -171,7 +177,9 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 	}
 }
 
-void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(
+	const UStrategicAISubAction* SubAction,
+	const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> ValidAttackLocations;
 	ValidAttackLocations.Append(GetProjectedPlayerBulkLocations(Blackboard));
@@ -202,27 +210,45 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(const FStrategicAIBlackb
 			DebugPickedLocation(EachLocation, "Picked Att Mv Player Units");
 		}
 	}
-	CreateAttackMoveFormation(AttackLocations, Blackboard);
+	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
 
-void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(
+	const UStrategicAISubAction* SubAction,
+	const FStrategicAIBlackboard& Blackboard)
 {
+	(void)SubAction;
+	(void)Blackboard;
 }
 
-void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(
+	const UStrategicAISubAction* SubAction,
+	const FStrategicAIBlackboard& Blackboard)
 {
+	(void)SubAction;
+	(void)Blackboard;
 }
 
 void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction,
                                                           const FStrategicAIBlackboard& Blackboard)
 {
+	(void)SubAction;
+	(void)Blackboard;
 }
 
-void UStochasticDecisionTree::CreateAttackMoveFormation(TArray<FVector> AttackLocations,
-                                                        const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::CreateAttackMoveFormation(
+	const UStrategicAISubAction* SubAction,
+	TArray<FVector> AttackLocations,
+	const FStrategicAIBlackboard& Blackboard)
 {
-	FBlackboardIdleUnitsResult PickedUnits = M_DirectControlComponent->PickRandomMaxIdleBlackboardUnits(5);
+	if (not IsValid(SubAction))
+	{
+		return;
+	}
+
+	const FIdleUnitSelectionPolicy SelectionPolicy = SubAction->BuildIdleUnitSelectionPolicy(Blackboard);
+	FBlackboardIdleUnitsResult PickedUnits = M_DirectControlComponent->PickIdleBlackboardUnitsByPolicy(SelectionPolicy);
 	if (not EnsureHasNonZeroPickedUnits(PickedUnits,
 	                                    "Stochastic: cannot create attack move formation as zero units were picked"
 	                                    "from the blackboard"))
