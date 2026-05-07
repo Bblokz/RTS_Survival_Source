@@ -156,11 +156,17 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 		break;
 	case ESubtypeAction::AttackMoveToPlayerResourceBuildings:
 		break;
-	case ESubtypeAction::AttackMoveSpecificPoint:
+	case ESubtypeAction::AttackMoveSpecificPoints:
 		break;
 	case ESubtypeAction::DefendBase:
 		break;
 	case ESubtypeAction::DefendImportantMissionPoint:
+		break;
+	case ESubtypeAction::AttackMoveLightTanksToPlayerUnits:
+		break;
+	case ESubtypeAction::HeavyTankPushPlayerBaseOrUnits:
+		break;
+	case ESubtypeAction::FlankPlayerHeavies:
 		break;
 	}
 }

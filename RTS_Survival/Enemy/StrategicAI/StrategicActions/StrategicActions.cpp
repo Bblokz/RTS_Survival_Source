@@ -104,14 +104,15 @@ FString USubAction_AttackMoveToPlayerResourceBuildings::GetDebugString() const
 	return TEXT("Attack Move To Player Resource Buildings") + GetRequirementsDebugString();
 }
 
-USubAction_AttackSpecificPoint::USubAction_AttackSpecificPoint()
+USubAction_AttackSpecificPoints::USubAction_AttackSpecificPoints()
 {
-	SubtypeAction = ESubtypeAction::AttackMoveSpecificPoint;
+	SubtypeAction = ESubtypeAction::AttackMoveSpecificPoints;
 }
 
-FString USubAction_AttackSpecificPoint::GetDebugString() const
+FString USubAction_AttackSpecificPoints::GetDebugString() const
 {
-	return TEXT("Attack Move To Specific Point: ") + TargetPoint.ToString() + GetRequirementsDebugString();
+	FString DebugString = TEXT("Attack Move To Specific Points") + GetRequirementsDebugString();
+	return DebugString;
 }
 
 USubAction_DefendBase::USubAction_DefendBase()

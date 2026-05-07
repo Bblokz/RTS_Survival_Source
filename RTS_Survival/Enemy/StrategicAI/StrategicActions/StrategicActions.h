@@ -15,7 +15,7 @@ enum class ESubtypeAction : uint8
 	FlankPlayerHeavies,
 	AttackMoveToPlayerHQ,
 	AttackMoveToPlayerResourceBuildings,
-	AttackMoveSpecificPoint,
+	AttackMoveSpecificPoints,
 	DefendBase,
 	DefendImportantMissionPoint,
 };
@@ -116,22 +116,22 @@ public:
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
-class RTS_SURVIVAL_API USubAction_AttackSpecificPoint final : public UStrategicAISubAction
+class RTS_SURVIVAL_API USubAction_AttackSpecificPoints final : public UStrategicAISubAction
 {
 	GENERATED_BODY()
 
 public:
-	USubAction_AttackSpecificPoint();
+	USubAction_AttackSpecificPoints();
 
-	const FVector& GetTargetPoint() const
+	const TArray<FVector>& GetTargetPoint() const
 	{
-		return TargetPoint;
+		return TargetPoints;
 	}
 
 	virtual FString GetDebugString() const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true, MakeEditWidget = true))
-	FVector TargetPoint = FVector::ZeroVector;
+	TArray<FVector> TargetPoints ={}; 
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
