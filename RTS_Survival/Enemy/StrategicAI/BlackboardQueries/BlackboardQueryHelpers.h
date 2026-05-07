@@ -8,7 +8,8 @@ struct FStrategicAIBlackboard;
 namespace BlackboardQueries
 {
 
-	
+
+
 	bool HasAtLeastXTanks(
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinTanks,
@@ -17,6 +18,10 @@ namespace BlackboardQueries
 	bool HasAtLeastAnyXTanks(
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinTanks);
+
+	bool HasAtLeastAnyXIdleUnits(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinIdleUnits);
 
 	bool HasAtLeastXArmoredCars(
 		const FStrategicAIBlackboard& Blackboard,

@@ -4,74 +4,74 @@
 
 namespace
 {
-bool HasAtLeastXUnitsOfType(
-	const FStrategicAIBlackboard* const Blackboard,
-	const int32 MinUnits,
-	const EAllUnitType UnitType)
-{
-	if (not Blackboard)
+	bool HasAtLeastXUnitsOfType(
+		const FStrategicAIBlackboard* const Blackboard,
+		const int32 MinUnits,
+		const EAllUnitType UnitType)
 	{
+		if (not Blackboard)
+		{
+			return false;
+		}
+
+		int32 FoundUnits = 0;
+		for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard->IdleDirectControlUnits)
+		{
+			if (not EachIdleUnit.IdleUnit.IsValid())
+			{
+				continue;
+			}
+
+			if (EachIdleUnit.UnitType != UnitType)
+			{
+				continue;
+			}
+
+			FoundUnits++;
+			if (FoundUnits >= MinUnits)
+			{
+				return true;
+			}
+		}
+
 		return false;
 	}
 
-	int32 FoundUnits = 0;
-	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard->IdleDirectControlUnits)
+	using FTankSubtypeMatcher = bool (*)(ETankSubtype);
+
+	bool HasAtLeastXTanksMatchingSubtypeCategory(
+		const FStrategicAIBlackboard& Blackboard,
+		const int32 MinTanks,
+		const FTankSubtypeMatcher GetIsMatchingSubtype)
 	{
-		if (not EachIdleUnit.IdleUnit.IsValid())
+		int32 FoundUnits = 0;
+		for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 		{
-			continue;
+			if (not EachIdleUnit.IdleUnit.IsValid())
+			{
+				continue;
+			}
+
+			if (EachIdleUnit.UnitType != EAllUnitType::UNType_Tank)
+			{
+				continue;
+			}
+
+			const ETankSubtype TankSubtype = static_cast<ETankSubtype>(EachIdleUnit.UnitSubtypeRaw);
+			if (not GetIsMatchingSubtype(TankSubtype))
+			{
+				continue;
+			}
+
+			FoundUnits++;
+			if (FoundUnits >= MinTanks)
+			{
+				return true;
+			}
 		}
 
-		if (EachIdleUnit.UnitType != UnitType)
-		{
-			continue;
-		}
-
-		FoundUnits++;
-		if (FoundUnits >= MinUnits)
-		{
-			return true;
-		}
+		return false;
 	}
-
-	return false;
-}
-
-using FTankSubtypeMatcher = bool (*)(ETankSubtype);
-
-bool HasAtLeastXTanksMatchingSubtypeCategory(
-	const FStrategicAIBlackboard& Blackboard,
-	const int32 MinTanks,
-	const FTankSubtypeMatcher GetIsMatchingSubtype)
-{
-	int32 FoundUnits = 0;
-	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
-	{
-		if (not EachIdleUnit.IdleUnit.IsValid())
-		{
-			continue;
-		}
-
-		if (EachIdleUnit.UnitType != EAllUnitType::UNType_Tank)
-		{
-			continue;
-		}
-
-		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(EachIdleUnit.UnitSubtypeRaw);
-		if (not GetIsMatchingSubtype(TankSubtype))
-		{
-			continue;
-		}
-
-		FoundUnits++;
-		if (FoundUnits >= MinTanks)
-		{
-			return true;
-		}
-	}
-
-	return false;
-}
 }
 
 bool BlackboardQueries::HasAtLeastXTanks(const FStrategicAIBlackboard& Blackboard, const int32 MinTanks,
@@ -119,9 +119,28 @@ bool BlackboardQueries::HasAtLeastAnyXTanks(const FStrategicAIBlackboard& Blackb
 		{
 			continue;
 		}
-	
+
 		FoundUnits++;
 		if (FoundUnits >= MinTanks)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool BlackboardQueries::HasAtLeastAnyXIdleUnits(const FStrategicAIBlackboard& Blackboard, const int32 MinIdleUnits)
+{
+	int32 FoundUnits = 0;
+	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
+	{
+		if (not EachIdleUnit.IdleUnit.IsValid())
+		{
+			continue;
+		}
+
+		FoundUnits++;
+		if (FoundUnits >= MinIdleUnits)
 		{
 			return true;
 		}
@@ -214,7 +233,6 @@ bool BlackboardQueries::HasAtLeastXPlayerNomadicVehicles(
 bool BlackboardQueries::HasAtLeastXAircraft(const FStrategicAIBlackboard& Blackboard, const int32 MinAircraft,
                                             EAircraftSubtype AircraftType)
 {
-
 	int32 FoundUnits = 0;
 	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 	{
@@ -244,9 +262,8 @@ bool BlackboardQueries::HasAtLeastXAircraft(const FStrategicAIBlackboard& Blackb
 }
 
 bool BlackboardQueries::HasAtLeastXSquads(const FStrategicAIBlackboard& Blackboard, const int32 MinSquads,
-                                          ESquadSubtype SquadType) 
+                                          ESquadSubtype SquadType)
 {
-
 	int32 FoundUnits = 0;
 	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 	{
@@ -282,7 +299,7 @@ bool BlackboardQueries::HasValidPlayerHQLocation(const FStrategicAIBlackboard& B
 
 bool BlackboardQueries::HasValidPlayerResourceBuildingLocations(const FStrategicAIBlackboard& Blackboard)
 {
-	for(auto EachLoc : Blackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings)
+	for (auto EachLoc : Blackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings)
 	{
 		if (not EachLoc.IsNearlyZero())
 		{
@@ -294,11 +311,11 @@ bool BlackboardQueries::HasValidPlayerResourceBuildingLocations(const FStrategic
 
 bool BlackboardQueries::HasValidPlayerHeavyTankFLankLocations(const FStrategicAIBlackboard& Blackboard)
 {
-	for(auto EachHeavyTankFlanking: Blackboard.AgreggatedHeavyTankFlankingResults)
+	for (auto EachHeavyTankFlanking : Blackboard.AgreggatedHeavyTankFlankingResults)
 	{
-		for(auto EachHeavyTank : EachHeavyTankFlanking.FlankLocationsAroundHeavyTank)
+		for (auto EachHeavyTank : EachHeavyTankFlanking.FlankLocationsAroundHeavyTank)
 		{
-			if(not EachHeavyTank.Locations.IsEmpty())
+			if (not EachHeavyTank.Locations.IsEmpty())
 			{
 				return true;
 			}
@@ -342,7 +359,8 @@ TArray<FVector> BlackboardQueries::GetRandomLocationsOfIdleUnits(
 		const int32 PickedIdleUnitIndex = RemainingIdleUnitIndices[RandomRemainingIndex];
 		RemainingIdleUnitIndices.RemoveAtSwap(RandomRemainingIndex, 1, false);
 
-		const FVector IdleUnitLocation = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex].Get()->GetActorLocation();
+		const FVector IdleUnitLocation = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex].Get()->
+			GetActorLocation();
 		if (SeenLocations.Contains(IdleUnitLocation))
 		{
 			continue;

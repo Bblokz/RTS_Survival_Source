@@ -67,6 +67,17 @@ FString UStrategicAIHasPlayerResourceBuildingLocationsRequirement::GetDebugStrin
 	return TEXT("Has Player Resource Building Locations Req");
 }
 
+bool UStrategicAIHasAtLeastAnyIdleUnits::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
+	const float GameTimeSeconds) const
+{
+	return BlackboardQueries::HasAtLeastAnyXIdleUnits(Blackboard, AmountIdleNeeded);
+}
+
+FString UStrategicAIHasAtLeastAnyIdleUnits::GetDebugString() const
+{
+	return Super::GetDebugString();
+}
+
 bool UStrategicAIHasAtLeastIdleSquads::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
                                                            const float GameTimeSeconds) const
 {

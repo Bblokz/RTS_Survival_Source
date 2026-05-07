@@ -92,6 +92,26 @@ public:
 	virtual FString GetDebugString() const override;
 };
 
+
+
+/**
+ * @brief Used by strategic actions to require a minimum number of idle tanks and squads of any subtype.
+ */
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UStrategicAIHasAtLeastAnyIdleUnits final : public UStrategicAIActionRequirement
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 AmountIdleNeeded = 1;
+
+	virtual FString GetDebugString() const override;
+};
+
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UStrategicAIHasAtLeastIdleSquads final : public UStrategicAIActionRequirement
 {
@@ -144,7 +164,7 @@ public:
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 1;
+	int32 AmountIdleNeeded = 3;
 
 	virtual FString GetDebugString() const override;
 };
