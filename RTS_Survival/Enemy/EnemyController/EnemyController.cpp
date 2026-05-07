@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "EnemyController.h"
@@ -127,10 +127,6 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	if (M_EnemyRetreatController)
 	{
 		M_EnemyRetreatController->InitRetreatController(this);
-	}
-	if (M_EnemyDirectControlComponent)
-	{
-		M_EnemyDirectControlComponent->InitDirectControlComponent(this);
 	}
 }
 

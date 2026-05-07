@@ -125,6 +125,7 @@ private:
 	UPROPERTY()
 	FDirectControlRetreatCache M_RetreatCache;
 
+	void BeginPlay_CacheEnemyControllerFromOwner();
 	bool EnsureEnemyControllerIsValid() const;
 	bool EnsureIsValidBlackboard(FStrategicAIBlackboard*& OutBlackboard) const;
 	UEnemyStrategicAIComponent* GetValidStrategicAIComponent() const;

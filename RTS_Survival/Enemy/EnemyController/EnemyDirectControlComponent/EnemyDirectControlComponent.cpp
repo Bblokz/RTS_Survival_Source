@@ -400,7 +400,24 @@ void UEnemyDirectControlComponent::InitDirectControlComponent(AEnemyController* 
 void UEnemyDirectControlComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_CacheEnemyControllerFromOwner();
 	StartDirectControlTickTimer();
+}
+
+void UEnemyDirectControlComponent::BeginPlay_CacheEnemyControllerFromOwner()
+{
+	AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	if (not IsValid(EnemyController))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"EnemyController",
+			"UEnemyDirectControlComponent::BeginPlay_CacheEnemyControllerFromOwner",
+			this);
+		return;
+	}
+
+	InitDirectControlComponent(EnemyController);
 }
 
 void UEnemyDirectControlComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -411,9 +428,17 @@ void UEnemyDirectControlComponent::EndPlay(const EEndPlayReason::Type EndPlayRea
 
 bool UEnemyDirectControlComponent::EnsureEnemyControllerIsValid() const
 {
-	if (M_EnemyController.IsValid())
+	const AEnemyController* EnemyController = M_EnemyController.Get();
+	if (IsValid(EnemyController) && EnemyController == GetOwner())
 	{
 		return true;
+	}
+
+	if (IsValid(EnemyController))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Enemy direct control component has a cached enemy controller that does not match its owning actor.");
+		return false;
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
