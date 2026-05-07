@@ -6,6 +6,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
+#include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
 #include "RTS_Survival/Resources/Resource.h"
@@ -3146,6 +3147,14 @@ void ICommands::ExecuteRegisterUnitAsBlackboardIdleCommand()
 	{
 		DoneExecutingCommand(EAbilityID::IdRegisterUnitAsBlackboardIdle);
 		return;
+	}
+	using namespace EnemyAISettings;
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		Debugging::RegisteringByIcommandsDebugging)
+	{
+		const FVector Location = OwnerActor->GetActorLocation() + FVector(0,0, Debugging::RegisteringByICommandsOffset);
+		const FString DebugText = "Blackboard Idle through Icommands!";
+		DrawDebugString(OwnerActor->GetWorld(), Location, DebugText, nullptr, FColor::Red, 20.0f, false);
 	}
 
 	EnemyDirectControlComponent->RegisterDirectControlUnit(OwnerActor);

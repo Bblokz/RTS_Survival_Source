@@ -53,6 +53,8 @@ namespace EnemyAISettings
 		// Should be lower than thinking speed
 		inline constexpr float StochasticActionsDebugTime = 5.f;
 		inline constexpr float StochasticActionsAttackLocationDebugRadius = 200.f;
+		inline constexpr float RegisteringByICommandsOffset = 300.f;
+		inline constexpr bool  RegisteringByIcommandsDebugging= true;
 	}
 
 	inline float EnemyRetreatControllerCheckInterval = 8.4f;
