@@ -102,6 +102,9 @@ private:
 	void Exe_AttackMovePlayerHQ(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMovePlayerResourceBuildings(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMoveLightTanksToPlayerUnits(const FStrategicAIBlackboard& Blackboard);
+	void Exe_HeavyTankPushPlayerBaseOrUnits(const FStrategicAIBlackboard& Blackboard);
+	void Exe_FlankPlayerHeavies(const FStrategicAIBlackboard& Blackboard);
 
 
 	// ------------------- Formation Logic Using Blackboard Idle units ------------------------
@@ -157,6 +160,13 @@ private:
 	// ------------ Utils --------------------
 	TArray<FVector> GetProjectedPlayerBulkLocations(const FStrategicAIBlackboard& Blackboard);
 	TArray<FVector> GetProjectedPlayerAvgLocationAttackers(const FStrategicAIBlackboard& Blackboard) const;
+	TArray<FVector> GetProjectedPlayerHQLocation(const FStrategicAIBlackboard& Blackboard) const;
+	TArray<FVector> GetProjectedPlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard) const;
+	TArray<FVector> GetProjectedPlayerBaseLocations(const FStrategicAIBlackboard& Blackboard) const;
+	TArray<FVector> GetProjectedAttackSpecificPoints(const TArray<FVector>& TargetPoints) const;
+	TArray<FWeakActorLocations> GetProjectedAgreggatedHeavyTankFlankingPositions(
+		const FStrategicAIBlackboard& Blackboard) const;
+	FWeakActorLocations ProjectHeavyTankFlankLocations(const FWeakActorLocations& FlankLocations) const;
 
 
 	// Debug call over all actions regardless of requirements.
@@ -165,6 +175,7 @@ private:
 	void DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
 	void DebugAttackLocations(const TArray<FVector>& Locations, const FString& DebugContext) const;
 	void DebugPickedLocation(const FVector& PickedLocation ,const FString& DebugContext) const;
+	void DebugFlankPositions(const TArray<FWeakActorLocations>& FlankPositions, const FString& DebugContext) const;
 	void DebugPoint(const FVector& Point, const float Radius,
 	                const FColor& Color, const float Duration, const FString& Text) const;
 	void DebugPickedUnitsAndWayPoints(const FBlackboardIdleUnitsResult& Picked,

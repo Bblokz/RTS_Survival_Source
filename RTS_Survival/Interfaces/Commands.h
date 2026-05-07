@@ -747,6 +747,9 @@ public:
 	                                   const bool bSetUnitToIdle);
 	virtual ECommandQueueError DetachTow(const bool bSetUnitToIdle);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	ECommandQueueError RegisterAsBlackboardIdle(const bool bSetUnitToIdle);
+
 	// Enqueue: exit from current carrier/transport.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError ExitCargo(const bool bSetUnitToIdle);
@@ -926,6 +929,8 @@ protected:
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype);
 	virtual void TerminateTowActorCommand();
 	virtual void TerminateDetachTowCommand();
+	void ExecuteRegisterUnitAsBlackboardIdleCommand();
+	void TerminateRegisterUnitAsBlackboardIdleCommand();
 
 	virtual void ExecuteExitCargoCommand();
 	virtual void TerminateExitCargoCommand();
