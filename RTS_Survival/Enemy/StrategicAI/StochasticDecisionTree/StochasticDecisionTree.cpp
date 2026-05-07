@@ -53,12 +53,12 @@ void UStochasticDecisionTree::InitStochasticDecisionTree(
 }
 
 void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds,
-                                                     const FStrategicAIBlackboard& Blackboard)
+                                                     FStrategicAIBlackboard* Blackboard)
 {
 	// Filter top level actions to only get those of which we do have sub-actions to pick from that are not
 	// blocked by requirements.
 	const TArray<const FStrategicAIAction*> ValidActions =
-		GetActionsWithValidSubActions(Blackboard, GameTimeSeconds);
+		GetActionsWithValidSubActions(*Blackboard, GameTimeSeconds);
 	if (not EnsureHasAnyValidActions(ValidActions))
 	{
 		return;
@@ -70,14 +70,14 @@ void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds
 		return;
 	}
 	const TArray<const UStrategicAISubAction*> SubActionsRequirementsMet = GetSubActionsThatHaveMetRequirements(
-		*PickedAction, Blackboard, GameTimeSeconds);
+		*PickedAction, *Blackboard, GameTimeSeconds);
 	const UStrategicAISubAction* PickedSubAction = StochasticHelpers::PickSubAction(SubActionsRequirementsMet,
 		bM_UseCachedGenerationSeed, M_CachedGenerationSeed, GameTimeSeconds);
 	if (not EnsurePickedSubActionIsValid(PickedSubAction))
 	{
 		return;
 	}
-	ExecuteSubAction(PickedSubAction, Blackboard);
+	ExecuteSubAction(PickedSubAction, *Blackboard);
 }
 
 bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
@@ -154,10 +154,10 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 		Exe_AttackMovePlayerUnits(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::AttackMoveToPlayerHQ:
-		Exe_AttackMovePlayerHQ(Blackboard);
+		Exe_AttackMovePlayerHQ(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::AttackMoveToPlayerResourceBuildings:
-		Exe_AttackMovePlayerResourceBuildings(Blackboard);
+		Exe_AttackMovePlayerResourceBuildings(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::AttackMoveSpecificPoints:
 		Exe_AttackMoveSpecificPoint(SubAction, Blackboard);
@@ -167,13 +167,13 @@ void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubA
 	case ESubtypeAction::DefendImportantMissionPoint:
 		break;
 	case ESubtypeAction::AttackMoveLightTanksToPlayerUnits:
-		Exe_AttackMoveLightTanksToPlayerUnits(Blackboard);
+		Exe_AttackMoveLightTanksToPlayerUnits(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::HeavyTankPushPlayerBaseOrUnits:
-		Exe_HeavyTankPushPlayerBaseOrUnits(Blackboard);
+		Exe_HeavyTankPushPlayerBaseOrUnits(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::FlankPlayerHeavies:
-		Exe_FlankPlayerHeavies(Blackboard);
+		Exe_FlankPlayerHeavies(SubAction, Blackboard);
 		break;
 	}
 }
@@ -219,8 +219,6 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(
 	const UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
-	(void)SubAction;
-	(void)Blackboard;
 	TArray<FVector> AttackLocations = GetProjectedPlayerHQLocation(Blackboard);
 	if (AttackLocations.IsEmpty())
 	{
@@ -238,15 +236,13 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(
 	{
 		DebugAttackLocations(AttackLocations, "Att Mv Player HQ");
 	}
-	CreateAttackMoveFormation(AttackLocations, Blackboard);
+	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(
 	const UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
-	(void)SubAction;
-	(void)Blackboard;
 	TArray<FVector> AttackLocations = GetProjectedPlayerResourceBuildings(Blackboard);
 	if (AttackLocations.IsEmpty())
 	{
@@ -264,14 +260,12 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(
 	{
 		DebugAttackLocations(AttackLocations, "Att Mv Player Resources");
 	}
-	CreateAttackMoveFormation(AttackLocations, Blackboard);
+	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
 void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction,
                                                           const FStrategicAIBlackboard& Blackboard)
 {
-	(void)SubAction;
-	(void)Blackboard;
 	const USubAction_AttackSpecificPoints* AttackSpecificPoints =
 		Cast<USubAction_AttackSpecificPoints>(SubAction);
 	if (not IsValid(AttackSpecificPoints))
@@ -307,10 +301,11 @@ void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(const UStrategicAISubA
 	{
 		DebugAttackLocations(AttackLocations, "Att Mv Specific Points");
 	}
-	CreateAttackMoveFormation(AttackLocations, Blackboard);
+	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(const UStrategicAISubAction* SubAction,
+                                                                    const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> ValidAttackLocations;
 	ValidAttackLocations.Append(GetProjectedPlayerBulkLocations(Blackboard));
@@ -349,12 +344,14 @@ void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(const FStrat
 			DebugPickedLocation(EachLocation, "Picked Light Tank Att Mv");
 		}
 	}
-	CreateAttackMoveFormation(AttackLocations, Blackboard);
+	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_HeavyTankPushPlayerBaseOrUnits(const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::Exe_HeavyTankPushPlayerBaseOrUnits(const UStrategicAISubAction* SubAction,
+                                                                 const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> ValidAttackLocations = GetProjectedPlayerBaseLocations(Blackboard);
+	// If we have no player base location data then go attack units instead.
 	if (ValidAttackLocations.IsEmpty())
 	{
 		ValidAttackLocations.Append(GetProjectedPlayerBulkLocations(Blackboard));
@@ -378,13 +375,14 @@ void UStochasticDecisionTree::Exe_HeavyTankPushPlayerBaseOrUnits(const FStrategi
 	}
 
 	constexpr int32 MaxPick = 3;
-	TArray<FVector> AttackLocations = StochasticHelpers::ExhaustivePick(ValidAttackLocations, MaxPick);
-	CreateAttackMoveFormation(AttackLocations, Blackboard);
+	const TArray<FVector> AttackLocations = StochasticHelpers::ExhaustivePick(ValidAttackLocations, MaxPick);
+	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_FlankPlayerHeavies(const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::Exe_FlankPlayerHeavies(const UStrategicAISubAction* SubAction,
+                                                     const FStrategicAIBlackboard& Blackboard)
 {
-	TArray<FWeakActorLocations> FlankingPositions = GetProjectedAgreggatedHeavyTankFlankingPositions(Blackboard);
+	TArray<FWeakActorLocations> FlankingPositions = GetProjectedAggregatedHeavyTankFlankingPositions(Blackboard);
 	if (FlankingPositions.IsEmpty())
 	{
 		if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
@@ -401,7 +399,7 @@ void UStochasticDecisionTree::Exe_FlankPlayerHeavies(const FStrategicAIBlackboar
 	{
 		DebugFlankPositions(FlankingPositions, "Flank Player Heavies");
 	}
-	CreateFlankingAttack(FlankingPositions, Blackboard);
+	CreateFlankingAttack(SubAction, FlankingPositions, Blackboard);
 }
 
 void UStochasticDecisionTree::CreateAttackMoveFormation(
@@ -415,6 +413,8 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 	}
 
 	const FIdleUnitSelectionPolicy SelectionPolicy = SubAction->BuildIdleUnitSelectionPolicy(Blackboard);
+	// NOTE: if not enough units could be picked because one of the requirement rules cannot be satisfied then all of those
+	// units that were picked prior to the failure are returned to the blackboard (picking simulation happens on copy data)
 	FBlackboardIdleUnitsResult PickedUnits = M_DirectControlComponent->PickIdleBlackboardUnitsByPolicy(SelectionPolicy);
 	if (not EnsureHasNonZeroPickedUnits(PickedUnits,
 	                                    "Stochastic: cannot create attack move formation as zero units were picked"
@@ -463,11 +463,82 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 	}
 }
 
-void UStochasticDecisionTree::CreateFlankingAttack(const TArray<FWeakActorLocations>& FlankingPositions,
+void UStochasticDecisionTree::CreateFlankingAttack(const UStrategicAISubAction* SubAction,
+                                                   const TArray<FWeakActorLocations>& FlankingPositions,
                                                    const FStrategicAIBlackboard& Blackboard)
 {
-	(void)FlankingPositions;
-	(void)Blackboard;
+	if (not IsValid(SubAction))
+	{
+		return;
+	}
+
+	const FIdleUnitSelectionPolicy SelectionPolicy = SubAction->BuildIdleUnitSelectionPolicy(Blackboard);
+	// NOTE: if not enough units could be picked because one of the requirement rules cannot be satisfied then all of those
+	// units that were picked prior to the failure are returned to the blackboard (picking simulation happens on copy data)
+	FBlackboardIdleUnitsResult PickedUnits = M_DirectControlComponent->PickIdleBlackboardUnitsByPolicy(SelectionPolicy);
+	if (not EnsureHasNonZeroPickedUnits(PickedUnits,
+	                                    "Stochastic: cannot FLANK player heavies as zero units were picked"
+	                                    "from the blackboard"))
+	{
+		return;
+	}
+	TArray<ICommands*> CommandUnits = GetCommandsArrayOfUnits(PickedUnits);
+	const TArray<TPair<FVector, TWeakObjectPtr<AActor>>> TotalLocations = GetTotalAggregatedWeakActorLocations(
+		FlankingPositions);
+	const int32 MaxIndex = FMath::Min(CommandUnits.Num(), TotalLocations.Num()) - 1;
+	// The first order given needs to overwrite whatever else was in the queue.
+	bool bRestOrderQueue = true;
+	for (int32 i = 0; i <= MaxIndex; ++i)
+	{
+		ICommands* CommandUnit = CommandUnits[i];
+		const FVector TargetLocation = TotalLocations[i].Key;
+		const bool bIsValidTarget = TotalLocations[i].Value.IsValid();
+		if (bIsValidTarget)
+		{
+			const FRotator FinalRotation = UKismetMathLibrary::FindLookAtRotation(
+				TargetLocation, TotalLocations[i].Value->GetActorLocation());
+			(void)IssueMoveOrder(CommandUnit, TargetLocation, bRestOrderQueue, FinalRotation);
+			bRestOrderQueue = false;
+			// The to flank actor is valid so we move, attack and then add back to blackboard.
+			(void)IssueAttackOrder(CommandUnit, TotalLocations[i].Value, bRestOrderQueue);
+		}
+		if (not IssueRegisterWithBlackboardOrder(CommandUnit, bRestOrderQueue))
+		{
+			RTSFunctionLibrary::ReportError("Failed to register unit with blackboard after attack-move orders"
+				"for flanking attack");
+		}
+	}
+	const int32 MaxIndexUnits = CommandUnits.Num() - 1;
+	if(MaxIndex < MaxIndexUnits)
+	{
+		// There were more picked units that locations to engage from; provide these units back to the blackboard.
+		for(int j = MaxIndex + 1; j <= MaxIndexUnits; ++j)
+		{
+			ICommands* CommandUnit = CommandUnits[j];
+			if (not IssueRegisterWithBlackboardOrder(CommandUnit, bRestOrderQueue))
+			{
+				RTSFunctionLibrary::ReportError("Failed to register unit with blackboard after attack-move orders"
+					"for flanking attack for excess units that had no flank location");
+			}
+		}
+	}
+}
+
+TArray<TPair<FVector, TWeakObjectPtr<AActor>>> UStochasticDecisionTree::GetTotalAggregatedWeakActorLocations(
+	const TArray<FWeakActorLocations>& WeakActorLocations) const
+{
+	TArray<TPair<FVector, TWeakObjectPtr<AActor>>> Locations;
+	for (auto Each : WeakActorLocations)
+	{
+		for (auto EachLocation : Each.Locations)
+		{
+			TPair<FVector, TWeakObjectPtr<AActor>> Pair;
+			Pair.Key = EachLocation;
+			Pair.Value = Each.Actor;
+			Locations.Add(Pair);
+		}
+	}
+	return Locations;
 }
 
 bool UStochasticDecisionTree::EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits,
@@ -505,6 +576,56 @@ int32 UStochasticDecisionTree::GetMaxFormationWidthForPickedUnits(const FBlackbo
 	return 4;
 }
 
+
+TArray<ICommands*> UStochasticDecisionTree::GetCommandsArrayOfUnits(const FBlackboardIdleUnitsResult& PickedUnits) const
+{
+	TArray<ICommands*> CommandUnits;
+	for (auto EachSquad : PickedUnits.SquadControllers)
+	{
+		CommandUnits.Add(EachSquad.Get());
+	}
+	for (auto EachTank : PickedUnits.TankMasters)
+	{
+		CommandUnits.Add(EachTank.Get());
+	}
+	return CommandUnits;
+}
+
+bool UStochasticDecisionTree::IssueMoveOrder(ICommands* UnitToCommand, const FVector& TargetLocation,
+                                             const bool bResetOrderQueue,
+                                             const FRotator& FinishedMovementRotation) const
+{
+	if (not UnitToCommand)
+	{
+		return false;
+	}
+	return UnitToCommand->MoveToLocation(TargetLocation, bResetOrderQueue, FinishedMovementRotation,
+	                                     true) == ECommandQueueError::NoError;
+}
+
+bool UStochasticDecisionTree::IssueAttackOrder(ICommands* UnitToCommand, const TWeakObjectPtr<AActor> TargetActor,
+                                               const bool bResetOrderQueue) const
+{
+	if (not UnitToCommand)
+	{
+		return false;
+	}
+	if (not TargetActor.IsValid())
+	{
+		return false;
+	}
+	return UnitToCommand->AttackActor(TargetActor.Get(), bResetOrderQueue) == ECommandQueueError::NoError;
+}
+
+bool UStochasticDecisionTree::IssueRegisterWithBlackboardOrder(ICommands* UnitToCommand,
+                                                               const bool bResetOrderQueue) const
+{
+	if (not UnitToCommand)
+	{
+		return false;
+	}
+	return UnitToCommand->RegisterAsBlackboardIdle(bResetOrderQueue) == ECommandQueueError::NoError;
+}
 
 const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithValidSubActions(
 	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
@@ -674,8 +795,8 @@ TArray<FVector> UStochasticDecisionTree::GetProjectedPlayerHQLocation(const FStr
 	TArray<FVector> ValidLocations;
 	FVector OutProjected = FVector::ZeroVector;
 	if (StochasticHelpers::CanProjectNavigable_PlayerHQLocation(M_EnemyNavigationAIComponent.Get(),
-	                                                          Blackboard.CurrentPlayerUnitCounts.PlayerHQLocation,
-	                                                          OutProjected))
+	                                                            Blackboard.CurrentPlayerUnitCounts.PlayerHQLocation,
+	                                                            OutProjected))
 	{
 		ValidLocations.Add(OutProjected);
 	}
@@ -690,8 +811,8 @@ TArray<FVector> UStochasticDecisionTree::GetProjectedPlayerResourceBuildings(
 	{
 		FVector OutProjected = FVector::ZeroVector;
 		if (StochasticHelpers::CanProjectNavigable_PlayerResourceBuildingLocation(M_EnemyNavigationAIComponent.Get(),
-		                                                                    EachResourceBuildingLocation,
-		                                                                    OutProjected))
+			EachResourceBuildingLocation,
+			OutProjected))
 		{
 			ValidLocations.Add(OutProjected);
 		}
@@ -713,9 +834,13 @@ TArray<FVector> UStochasticDecisionTree::GetProjectedAttackSpecificPoints(const 
 	TArray<FVector> ValidLocations;
 	for (const FVector& EachTargetPoint : TargetPoints)
 	{
+		if (EachTargetPoint.IsNearlyZero())
+		{
+			continue;
+		}
 		FVector OutProjected = FVector::ZeroVector;
 		if (StochasticHelpers::CanProjectNavigable_AttackSpecificPoint(M_EnemyNavigationAIComponent.Get(),
-		                                                         EachTargetPoint, OutProjected))
+		                                                               EachTargetPoint, OutProjected))
 		{
 			ValidLocations.Add(OutProjected);
 		}
@@ -723,7 +848,7 @@ TArray<FVector> UStochasticDecisionTree::GetProjectedAttackSpecificPoints(const 
 	return ValidLocations;
 }
 
-TArray<FWeakActorLocations> UStochasticDecisionTree::GetProjectedAgreggatedHeavyTankFlankingPositions(
+TArray<FWeakActorLocations> UStochasticDecisionTree::GetProjectedAggregatedHeavyTankFlankingPositions(
 	const FStrategicAIBlackboard& Blackboard) const
 {
 	TArray<FWeakActorLocations> ValidFlankingPositions;
@@ -752,7 +877,7 @@ FWeakActorLocations UStochasticDecisionTree::ProjectHeavyTankFlankLocations(
 	{
 		FVector OutProjected = FVector::ZeroVector;
 		if (StochasticHelpers::CanProjectNavigable_FlankLocation(M_EnemyNavigationAIComponent.Get(),
-		                                                       EachFlankLocation, OutProjected))
+		                                                         EachFlankLocation, OutProjected))
 		{
 			ProjectedFlankLocations.Locations.Add(OutProjected);
 		}
@@ -825,26 +950,26 @@ void UStochasticDecisionTree::DebugPoint(const FVector& Point, const float Radiu
 }
 
 void UStochasticDecisionTree::DebugPickedUnitsAndWayPoints(const FBlackboardIdleUnitsResult& Picked,
-	TArray<FVector> Waypoints)
+                                                           TArray<FVector> Waypoints)
 {
-	for(auto EachSquad : Picked.SquadControllers)
+	for (auto EachSquad : Picked.SquadControllers)
 	{
-		if(not EachSquad)
+		if (not EachSquad)
 		{
 			continue;
 		}
 		DrawDebugLine(GetWorld(), EachSquad->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
 	}
-	for(auto EachTank : Picked.TankMasters)
+	for (auto EachTank : Picked.TankMasters)
 	{
-		if(not EachTank)
+		if (not EachTank)
 		{
 			continue;
 		}
 		DrawDebugLine(GetWorld(), EachTank->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
 	}
 	// Now draw the path with thickness 8.
-	for(int i = 0; i < Waypoints.Num() - 1; i++)
+	for (int i = 0; i < Waypoints.Num() - 1; i++)
 	{
 		DrawDebugLine(GetWorld(), Waypoints[i], Waypoints[i + 1], FColor::Blue, false, 20.f, 0, 8.f);
 	}

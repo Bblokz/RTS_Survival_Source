@@ -89,10 +89,9 @@ public:
 
 	// Note that prior to calling this all the idle units in the blackboard are RTSIsValid and
 	// all arrays of location vectors are check for near zero.
-	void DecisionTree_ThinkStep(const float GameTimeSeconds, const FStrategicAIBlackboard& Blackboard);
+	void DecisionTree_ThinkStep(const float GameTimeSeconds, FStrategicAIBlackboard* Blackboard);
 
 private:
-	
 	bool EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
 	bool EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction) const;
 	bool EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const;
@@ -100,11 +99,14 @@ private:
 
 	void Exe_AttackMovePlayerUnits(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMovePlayerHQ(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMovePlayerResourceBuildings(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerResourceBuildings(const UStrategicAISubAction* SubAction,
+	                                           const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMoveLightTanksToPlayerUnits(const FStrategicAIBlackboard& Blackboard);
-	void Exe_HeavyTankPushPlayerBaseOrUnits(const FStrategicAIBlackboard& Blackboard);
-	void Exe_FlankPlayerHeavies(const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMoveLightTanksToPlayerUnits(const UStrategicAISubAction* SubAction,
+	                                           const FStrategicAIBlackboard& Blackboard);
+	void Exe_HeavyTankPushPlayerBaseOrUnits(const UStrategicAISubAction* SubAction,
+	                                        const FStrategicAIBlackboard& Blackboard);
+	void Exe_FlankPlayerHeavies(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 
 
 	// ------------------- Formation Logic Using Blackboard Idle units ------------------------
@@ -112,11 +114,24 @@ private:
 		const UStrategicAISubAction* SubAction,
 		TArray<FVector> AttackLocations,
 		const FStrategicAIBlackboard& Blackboard);
+	void CreateFlankingAttack(
+		const UStrategicAISubAction* SubAction,
+		const TArray<FWeakActorLocations>& FlankingPositions,
+		const FStrategicAIBlackboard& Blackboard);
+	TArray<TPair<FVector, TWeakObjectPtr<AActor>>> GetTotalAggregatedWeakActorLocations(const TArray<FWeakActorLocations>& WeakActorLocations) const;
 	bool EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits, const FString& DebugContext);
 	int32 GetMaxFormationWidthForPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits) const;
 	FAttackMoveWaveSettings M_AttackMoveWaveSettings;
 	// Multiplies with the inner radius of the unit's RTS component to determine spacing in formation.
 	float M_AttackMoveWave_FormationOffsetMultiplier = 1.5f;
+
+	// ------------------- Issue Orders to Picked Blackboard Units ------------------------
+	TArray<ICommands*> GetCommandsArrayOfUnits(const FBlackboardIdleUnitsResult& PickedUnits) const;
+	bool IssueMoveOrder(ICommands* UnitToCommand, const FVector& TargetLocation, const bool bResetOrderQueue = false,
+	                    const FRotator& FinishedMovementRotation = {}) const;
+	bool IssueAttackOrder(ICommands* UnitToCommand, TWeakObjectPtr<AActor> TargetActor,
+	                      const bool bResetOrderQueue = false) const;
+	bool IssueRegisterWithBlackboardOrder(ICommands* UnitToCommand, const bool bResetOrderQueue = false) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	TArray<FStrategicAIAction> M_ActionDefinitions;
@@ -164,7 +179,7 @@ private:
 	TArray<FVector> GetProjectedPlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard) const;
 	TArray<FVector> GetProjectedPlayerBaseLocations(const FStrategicAIBlackboard& Blackboard) const;
 	TArray<FVector> GetProjectedAttackSpecificPoints(const TArray<FVector>& TargetPoints) const;
-	TArray<FWeakActorLocations> GetProjectedAgreggatedHeavyTankFlankingPositions(
+	TArray<FWeakActorLocations> GetProjectedAggregatedHeavyTankFlankingPositions(
 		const FStrategicAIBlackboard& Blackboard) const;
 	FWeakActorLocations ProjectHeavyTankFlankLocations(const FWeakActorLocations& FlankLocations) const;
 
@@ -174,10 +189,10 @@ private:
 	// Called After removing those main actions of which all sub actions have no requirements met.
 	void DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
 	void DebugAttackLocations(const TArray<FVector>& Locations, const FString& DebugContext) const;
-	void DebugPickedLocation(const FVector& PickedLocation ,const FString& DebugContext) const;
+	void DebugPickedLocation(const FVector& PickedLocation, const FString& DebugContext) const;
 	void DebugFlankPositions(const TArray<FWeakActorLocations>& FlankPositions, const FString& DebugContext) const;
 	void DebugPoint(const FVector& Point, const float Radius,
 	                const FColor& Color, const float Duration, const FString& Text) const;
 	void DebugPickedUnitsAndWayPoints(const FBlackboardIdleUnitsResult& Picked,
-		TArray<FVector> Waypoints);
+	                                  TArray<FVector> Waypoints);
 };

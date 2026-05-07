@@ -263,7 +263,7 @@ namespace StochasticHelpers
 				FMath::RandRange(0, RemainingLocationIndices.Num() - 1);
 			const int32 PickedLocationIndex = RemainingLocationIndices[RandomRemainingIndex];
 			PickedLocations.Add(UniqueLocations[PickedLocationIndex]);
-			RemainingLocationIndices.RemoveAtSwap(RandomRemainingIndex, 1, false);
+			RemainingLocationIndices.RemoveAtSwap(RandomRemainingIndex, 1, EAllowShrinking::No);
 		}
 
 		return PickedLocations;
@@ -373,6 +373,7 @@ namespace StochasticHelpers
 	{
 		// Keep this projection tight so async-generated flank positions stay close to their tactical intent.
 		constexpr float ProjectionScale = 1.f;
+		// No failed strategy to prevent points from being too far from their original non-projected location.
 		return NavComp->GetNavigablePoint(FlankLocation, ProjectionScale,
 		                                  OutProjectedLocation,
 		                                  EOnProjectionFailedStrategy::None);

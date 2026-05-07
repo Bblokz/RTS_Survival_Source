@@ -748,7 +748,7 @@ public:
 	virtual ECommandQueueError DetachTow(const bool bSetUnitToIdle);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
-	ECommandQueueError RegisterAsBlackboardIdle(const bool bSetUnitToIdle);
+	virtual ECommandQueueError RegisterAsBlackboardIdle(const bool bSetUnitToIdle);
 
 	// Enqueue: exit from current carrier/transport.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")

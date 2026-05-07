@@ -1,6 +1,7 @@
 ﻿#include "StrategicActions.h"
 
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 bool UStrategicAISubAction::GetAreRequirementsMet(
 	const FStrategicAIBlackboard& RequirementContext,
@@ -13,15 +14,61 @@ bool UStrategicAISubAction::GetAreRequirementsMet(
 FIdleUnitSelectionPolicy UStrategicAISubAction::BuildIdleUnitSelectionPolicy(
 	const FStrategicAIBlackboard& Blackboard) const
 {
+	// Start with mission defaults so every SubAction has a valid selection range even when no requirement contributes selection constraints.
 	FIdleUnitSelectionPolicy SelectionPolicy;
-	SelectionPolicy.SetupFallbackMinMax(
-		Blackboard.StrategicAIMissionSettings.MinUnitsInAttackWave,
-		Blackboard.StrategicAIMissionSettings.MaxUnitsInAttackWave);
+	SetupFallbackMinMaxSelectionPolicy(Blackboard, SelectionPolicy);
 
+	/*
+	 * WHY this merge step exists:
+	 * - We aggregate policy contributions from both native and data-driven requirement lists so unit picking follows
+	 *   the same gameplay constraints that were used to validate whether the action is allowed.
+	 *
+	 * How requirement types affect the policy:
+	 * - Requirements that call AddMinimumIdleUnitsContribution(...) only raise MinUnitsToPick (generic count floor).
+	 * - Requirements that call AddRequiredRule(...) add explicit composition constraints (for example AnyTank,
+	 *   TankSubtype, SquadSubtype, TankCategory), and also raise MinUnitsToPick to at least the total required-rule count.
+	 * - Requirements that only implement GetIsRequirementMet(...) act as action gates and do not change selection
+	 *   composition directly.
+	 *
+	 * What if a requirement does not override ContributeToIdleUnitSelectionPolicy(...):
+	 * - It contributes nothing to selection policy (base implementation is intentionally no-op).
+	 * - That requirement can still block/allow action execution through GetIsRequirementMet(...).
+	 * - Min/Max then remain driven by fallback mission settings plus any other requirements that did contribute.
+	 */
 	AddRequirementSelectionRulesToPolicy(M_NativeVisibleRequirements, SelectionPolicy);
 	AddRequirementSelectionRulesToPolicy(M_Requirements, SelectionPolicy);
 	SelectionPolicy.NormalizeMinMax();
 	return SelectionPolicy;
+}
+
+void UStrategicAISubAction::SetupFallbackMinMaxSelectionPolicy(
+	const FStrategicAIBlackboard& Blackboard,
+	FIdleUnitSelectionPolicy& SelectionPolicy) const
+{
+	const int32 MissionMinUnitsToPick = Blackboard.StrategicAIMissionSettings.MinPickedUnitsForAction;
+	const int32 MissionMaxUnitsToPick = Blackboard.StrategicAIMissionSettings.MaxPickedUnitsForAction;
+	if (not bOverwriteMissionSettingsMinMaxUnitsNeeded)
+	{
+		SelectionPolicy.SetupFallbackMinMax(MissionMinUnitsToPick, MissionMaxUnitsToPick);
+		return;
+	}
+
+	constexpr int32 MinAllowedPickCount = 0;
+	const bool bHasNegativeOverride =
+		MinUnitsNeededOverwrite < MinAllowedPickCount || MaxUnitsNeededOverwrite < MinAllowedPickCount;
+	const bool bIsBothOverrideValuesZero =
+		MinUnitsNeededOverwrite == MinAllowedPickCount && MaxUnitsNeededOverwrite == MinAllowedPickCount;
+	const bool bIsInvalidMinMaxRange = MinUnitsNeededOverwrite > MaxUnitsNeededOverwrite;
+	if (bHasNegativeOverride || bIsBothOverrideValuesZero || bIsInvalidMinMaxRange)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Strategic AI SubAction has invalid Min/Max overwrite values while overwrite is enabled.")
+			TEXT(" Falling back to mission MinPickedUnitsForAction/MaxPickedUnitsForAction."));
+		SelectionPolicy.SetupFallbackMinMax(MissionMinUnitsToPick, MissionMaxUnitsToPick);
+		return;
+	}
+
+	SelectionPolicy.SetupFallbackMinMax(MinUnitsNeededOverwrite, MaxUnitsNeededOverwrite);
 }
 
 void UStrategicAISubAction::AddNativeVisibleRequirement(UStrategicAIActionRequirement* Requirement)
@@ -170,7 +217,7 @@ USubAction_LightTanksAttackPlayerUnits::USubAction_LightTanksAttackPlayerUnits()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveLightTanksToPlayerUnits;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughLightTanks>(
-		TEXT("HasIdleLightTanksRequirement")));	
+		TEXT("HasIdleLightTanksRequirement")));
 }
 
 FString USubAction_LightTanksAttackPlayerUnits::GetDebugString() const
@@ -183,7 +230,6 @@ USubAction_HeavyTankPushPlayerBaseOrUnits::USubAction_HeavyTankPushPlayerBaseOrU
 	SubtypeAction = ESubtypeAction::HeavyTankPushPlayerBaseOrUnits;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughHeavyTanks>(
 		TEXT("HasIdleHeavyTanksRequirement")));
-	
 }
 
 FString USubAction_HeavyTankPushPlayerBaseOrUnits::GetDebugString() const
@@ -197,7 +243,7 @@ USubAction_FlankPlayerHeavies::USubAction_FlankPlayerHeavies()
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions>(
 		TEXT("DoesBlackboardHaveHeavyFlankPositions")));
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasAtLeastAnyIdleTanks>(
-	TEXT("HasAnyXTanksRequirement")));
+		TEXT("HasAnyXTanksRequirement")));
 }
 
 FString USubAction_FlankPlayerHeavies::GetDebugString() const

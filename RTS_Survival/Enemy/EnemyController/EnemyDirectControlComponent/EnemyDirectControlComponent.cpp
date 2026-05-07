@@ -17,6 +17,19 @@
 
 namespace
 {
+	/**
+	 * @brief Chooses a random pick count in a safe range for min/max selection rules.
+	 * @details This helper protects callers from invalid configuration and impossible requests.
+	 * It first rejects invalid ranges (negative min, non-positive max, min > max) and also
+	 * rejects cases where available units are below the required minimum. If valid, it clamps
+	 * the upper bound to what is actually available, then returns a random integer in that
+	 * inclusive range using Unreal's RNG.
+	 * @param MinUnitsToPick Minimum required units from policy/config.
+	 * @param MaxUnitsToPick Maximum allowed units from policy/config.
+	 * @param AvailableUnitCount Number of currently available candidates.
+	 * @return A valid random count, or 0 when request/config is not satisfiable.
+	 * @note Why: Centralizes guard logic so selection call sites do not duplicate validation.
+	 */
 	int32 GetRandomMinMaxPickCount(
 		const int32 MinUnitsToPick,
 		const int32 MaxUnitsToPick,
@@ -36,11 +49,29 @@ namespace
 		return FMath::RandRange(MinUnitsToPick, MaxAllowedPickCount);
 	}
 
+	/**
+	 * @brief Checks whether a unit type is supported for this direct-control idle-unit flow.
+	 * @details Only squad and tank are currently accepted into the blackboard idle-entry path.
+	 * Unsupported types are filtered out early.
+	 * @param UnitType Unit type to check.
+	 * @return True when type is supported by this feature.
+	 * @note Why: Keeps inclusion policy explicit in one place for future extension.
+	 */
 	bool GetIsSupportedDirectControlUnitType(const EAllUnitType UnitType)
 	{
 		return UnitType == EAllUnitType::UNType_Squad || UnitType == EAllUnitType::UNType_Tank;
 	}
 
+	/**
+	 * @brief Converts an actor into a valid idle-unit blackboard entry when possible.
+	 * @details Performs strict guards in sequence: actor valid, RTS component exists,
+	 * component type is supported. Only then writes output fields. Returning false means
+	 * caller should ignore this actor for idle selection.
+	 * @param UnitActor Source actor candidate.
+	 * @param OutIdleUnitEntry Output entry to populate on success.
+	 * @return True if output entry was successfully initialized.
+	 * @note Why: Isolates actor-to-entry translation and all eligibility checks in one function.
+	 */
 	bool TrySetupIdleUnitEntryFromActor(AActor* UnitActor, FBlackboardIdleUnitEntry& OutIdleUnitEntry)
 	{
 		if (not IsValid(UnitActor))
@@ -65,16 +96,38 @@ namespace
 		return true;
 	}
 
+	/**
+	 * @brief Predicate: checks whether an entry is a squad.
+	 * @details Simple reusable predicate used in filtering/picking code.
+	 * @param Entry Idle entry to test.
+	 * @return True when entry type is squad.
+	 * @note Why: Improves readability when passed as a predicate function.
+	 */
 	bool GetIsSquadEntry(const FBlackboardIdleUnitEntry& Entry)
 	{
 		return Entry.UnitType == EAllUnitType::UNType_Squad;
 	}
 
+	/**
+	 * @brief Predicate: checks whether an entry is a tank.
+	 * @details Simple reusable predicate used in filtering/picking code.
+	 * @param Entry Idle entry to test.
+	 * @return True when entry type is tank.
+	 * @note Why: Avoids repeating type comparisons at call sites.
+	 */
 	bool GetIsTankEntry(const FBlackboardIdleUnitEntry& Entry)
 	{
 		return Entry.UnitType == EAllUnitType::UNType_Tank;
 	}
 
+	/**
+	 * @brief Predicate: checks whether an entry is specifically a Hazmat Engineer squad.
+	 * @details Verifies squad type first, then interprets raw subtype and compares against
+	 * Hazmat Engineer enum value.
+	 * @param Entry Idle entry to test.
+	 * @return True when entry is a Hazmat Engineer squad.
+	 * @note Why: Encapsulates subtype cast/compare details in one place.
+	 */
 	bool GetIsHazmatEngineerSquadEntry(const FBlackboardIdleUnitEntry& Entry)
 	{
 		if (Entry.UnitType != EAllUnitType::UNType_Squad)
@@ -86,17 +139,38 @@ namespace
 		return SquadSubtype == ESquadSubtype::Squad_Rus_HazmatEngineers;
 	}
 
+	/**
+	 * @brief Predicate inverse of Hazmat Engineer squad check.
+	 * @details Returns true for every entry that is not Hazmat Engineer squad.
+	 * @param Entry Idle entry to test.
+	 * @return True when entry is not Hazmat Engineer squad.
+	 * @note Why: Improves expressiveness in call sites requiring exclusion filters.
+	 */
 	bool GetIsNotHazmatEngineerSquadEntry(const FBlackboardIdleUnitEntry& Entry)
 	{
 		return not GetIsHazmatEngineerSquadEntry(Entry);
 	}
 
-
+	/**
+	 * @brief Validity predicate for idle entries.
+	 * @details Thin wrapper over entry's internal validity check.
+	 * @param Entry Idle entry to test.
+	 * @return True when entry has a valid backing actor/reference.
+	 * @note Why: Useful as a named predicate when passing into generic picker/filter functions.
+	 */
 	bool GetIsValidIdleUnitEntry(const FBlackboardIdleUnitEntry& Entry)
 	{
 		return Entry.IsValid();
 	}
 
+	/**
+	 * @brief Matches a tank subtype against a high-level tank category.
+	 * @details Maps category enum to existing global helper classifiers.
+	 * @param TankSubtype Concrete tank subtype.
+	 * @param TankCategory Category rule to satisfy.
+	 * @return True when subtype belongs to requested category.
+	 * @note Why: Separates category semantics from rule-evaluation core logic.
+	 */
 	bool GetIsTankCategoryMatch(
 		const ETankSubtype TankSubtype,
 		const EIdleUnitSelectionTankCategory TankCategory)
@@ -116,6 +190,15 @@ namespace
 		return false;
 	}
 
+	/**
+	 * @brief Evaluates whether one idle entry satisfies one selection rule.
+	 * @details This is the central rule matcher. It rejects invalid entries first, then dispatches
+	 * by rule type and checks exact constraints (unit class, subtype equality, or tank category).
+	 * @param Entry Candidate entry.
+	 * @param Rule Required selection rule from policy.
+	 * @return True when candidate satisfies the rule.
+	 * @note Why: Single source of truth for rule semantics keeps behavior consistent everywhere.
+	 */
 	bool GetDoesEntryMatchSelectionRule(
 		const FBlackboardIdleUnitEntry& Entry,
 		const FIdleUnitSelectionRule& Rule)
@@ -145,6 +228,13 @@ namespace
 		return false;
 	}
 
+	/**
+	 * @brief Counts only valid idle entries from an array.
+	 * @details Iterates entries and increments count when entry validity passes.
+	 * @param IdleEntries Candidate entries.
+	 * @return Number of valid entries.
+	 * @note Why: Lets higher-level logic reason about usable capacity, not raw array size.
+	 */
 	int32 CountValidIdleUnitEntries(const TArray<FBlackboardIdleUnitEntry>& IdleEntries)
 	{
 		int32 ValidEntryCount = 0;
@@ -161,6 +251,17 @@ namespace
 		return ValidEntryCount;
 	}
 
+	/**
+	 * @brief Chooses a random final total pick count under current policy bounds.
+	 * @details Enforces two dynamic constraints: cannot pick below already-picked count,
+	 * and cannot pick above available units. If these constraints make the range invalid,
+	 * returns 0.
+	 * @param SelectionPolicy Policy containing min/max desired picks.
+	 * @param AlreadyPickedUnitCount Count already guaranteed by required-rule phase.
+	 * @param AvailableUnitCount Count still available for consideration.
+	 * @return Random target total pick count, or 0 when impossible.
+	 * @note Why: Required picks and random extra picks must stay coherent with runtime state.
+	 */
 	int32 GetRandomPickCountForPolicy(
 		const FIdleUnitSelectionPolicy& SelectionPolicy,
 		const int32 AlreadyPickedUnitCount,
@@ -176,6 +277,14 @@ namespace
 		return FMath::RandRange(MinUnitsToPick, MaxUnitsToPick);
 	}
 
+	/**
+	 * @brief Removes picked actors from the blackboard pool to avoid duplicate future picks.
+	 * @details Iterates picked entries, validates actor pointers, and removes matching actor
+	 * entries from source blackboard list.
+	 * @param PickedEntries Entries already selected.
+	 * @param BlackboardEntries Mutable source pool to prune.
+	 * @note Why: Enforces uniqueness across selection stages and future policy applications.
+	 */
 	void RemovePickedEntriesFromBlackboard(
 		const TArray<FBlackboardIdleUnitEntry>& PickedEntries,
 		TArray<FBlackboardIdleUnitEntry>& BlackboardEntries)
@@ -192,6 +301,18 @@ namespace
 		}
 	}
 
+	/**
+	 * @brief Template helper that picks exactly one random entry matching a caller-provided predicate.
+	 * @details The function scans the array, collects indices that satisfy EntryPredicate, randomly
+	 * chooses one matching index, copies that entry to OutPickedEntry, and removes it from IdleEntries
+	 * via RemoveAtSwap for efficient O(1) removal.
+	 * @tparam EntryPredicateType Callable type taking `(const FBlackboardIdleUnitEntry&)` and returning bool.
+	 * @param IdleEntries Mutable candidate pool. Chosen entry is removed.
+	 * @param EntryPredicate Matching logic supplied by caller (lambda/function/functor).
+	 * @param OutPickedEntry Output selected entry.
+	 * @return True when a matching entry was found and removed; false otherwise.
+	 * @note Why: Generic building block so many rule types can reuse the same randomized pick flow.
+	 */
 	template <typename EntryPredicateType>
 	bool TryPickRandomMatchingEntry(
 		TArray<FBlackboardIdleUnitEntry>& IdleEntries,
@@ -221,6 +342,17 @@ namespace
 		return true;
 	}
 
+	/**
+	 * @brief Template helper that repeatedly picks random matching entries until a target total is reached.
+	 * @details Uses TryPickRandomMatchingEntry in a loop. Stops when OutPickedEntries reaches TargetPickCount
+	 * or when no more matching entries can be found. It never forces invalid picks.
+	 * @tparam EntryPredicateType Callable type taking `(const FBlackboardIdleUnitEntry&)` and returning bool.
+	 * @param IdleEntries Mutable candidate pool (shrinks as picks succeed).
+	 * @param EntryPredicate Matching logic supplied by caller.
+	 * @param TargetPickCount Desired final total count in OutPickedEntries.
+	 * @param OutPickedEntries Accumulator containing picks from previous and current stages.
+	 * @note Why: Encodes required-rule and random-fill behavior once, while allowing custom match logic.
+	 */
 	template <typename EntryPredicateType>
 	void PickRandomEntriesFromMatchingSet(
 		TArray<FBlackboardIdleUnitEntry>& IdleEntries,
@@ -240,6 +372,13 @@ namespace
 		}
 	}
 
+	/**
+	 * @brief Creates a result object from final picked entries.
+	 * @details Wraps result construction and setup in one helper for concise call sites.
+	 * @param PickedEntries Final selected entries.
+	 * @return Result object ready for caller consumption.
+	 * @note Why: Keeps selection code focused on picking logic, not output-object ceremony.
+	 */
 	FBlackboardIdleUnitsResult SetupResultFromPickedEntries(const TArray<FBlackboardIdleUnitEntry>& PickedEntries)
 	{
 		FBlackboardIdleUnitsResult PickedUnits;
@@ -527,19 +666,24 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickIdleBlackboardUnits
 	}
 
 	const int32 AvailableUnitCount = CountValidIdleUnitEntries(Blackboard->IdleDirectControlUnits);
+	// Avoid random/policy logic when there is no usable data to satisfy any rule.
 	if (AvailableUnitCount <= 0)
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
+	// We pick from a local copy first so the blackboard stays unchanged unless the full selection succeeds.
 	TArray<FBlackboardIdleUnitEntry> CandidateBlackboardEntries = Blackboard->IdleDirectControlUnits;
 	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	// Reserve upfront to reduce reallocations during repeated Add calls.
 	PickedBlackboardEntries.Reserve(FMath::Min(SelectionPolicy.MaxUnitsToPick, AvailableUnitCount));
 
 	for (const FIdleUnitSelectionRule& RequiredRule : SelectionPolicy.RequiredRules)
 	{
 		const int32 PickedCountBeforeRule = PickedBlackboardEntries.Num();
 		const int32 TargetPickCountAfterRule = PickedCountBeforeRule + RequiredRule.RequiredAmount;
+
+		// Required rules are enforced first so hard constraints are guaranteed before optional random fill.
 		PickRandomEntriesFromMatchingSet(
 			CandidateBlackboardEntries,
 			[&RequiredRule](const FBlackboardIdleUnitEntry& IdleEntry)
@@ -549,12 +693,14 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickIdleBlackboardUnits
 			TargetPickCountAfterRule,
 			PickedBlackboardEntries);
 
+		//  Partial rule satisfaction is treated as a full failure to keep behavior predictable.
 		if (PickedBlackboardEntries.Num() < TargetPickCountAfterRule)
 		{
 			return FBlackboardIdleUnitsResult();
 		}
 	}
 
+	// Final target count is decided after required picks so min/max policy stays coherent with guaranteed picks.
 	const int32 UnitsToPick = GetRandomPickCountForPolicy(
 		SelectionPolicy,
 		PickedBlackboardEntries.Num(),
@@ -564,12 +710,14 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickIdleBlackboardUnits
 		return FBlackboardIdleUnitsResult();
 	}
 
+	// WHY: After hard constraints are met, we fill remaining slots from any valid leftover candidates.
 	PickRandomEntriesFromMatchingSet(
 		CandidateBlackboardEntries,
 		GetIsValidIdleUnitEntry,
 		UnitsToPick,
 		PickedBlackboardEntries);
 
+	// WHY: Commit to blackboard only at the end, so failed attempts never mutate shared state.
 	RemovePickedEntriesFromBlackboard(PickedBlackboardEntries, Blackboard->IdleDirectControlUnits);
 	return SetupResultFromPickedEntries(PickedBlackboardEntries);
 }

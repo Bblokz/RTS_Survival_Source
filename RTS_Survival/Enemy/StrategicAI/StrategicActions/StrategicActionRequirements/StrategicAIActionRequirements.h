@@ -129,7 +129,7 @@ public:
 	ESquadSubtype RequiredSquadSubtype = ESquadSubtype::Squad_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 1;
+	int32 AmountIdleSpecificSquadsNeeded = 1;
 	
 	virtual FString GetDebugString() const override;
 
@@ -151,7 +151,7 @@ public:
 	ETankSubtype RequiredTankSubtype = ETankSubtype::Tank_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 1;
+	int32 AmountIdleOfSpecificTanksNeeded = 1;
 
 	virtual FString GetDebugString() const override;
 };
@@ -170,7 +170,7 @@ public:
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 3;
+	int32 AmountIdleTanksNeeded = 3;
 
 	virtual FString GetDebugString() const override;
 };
@@ -190,7 +190,7 @@ public:
 	EAircraftSubtype RequiredAircraftSubtype = EAircraftSubtype::Aircarft_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 1;
+	int32 AmountIdleAircraftNeeded = 1;
 
 	virtual FString GetDebugString() const override;
 };
@@ -207,7 +207,7 @@ public:
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 4;
+	int32 AmountIdleLightTanksNeeded = 4;
 	
 	virtual FString GetDebugString() const override;
 
@@ -225,7 +225,7 @@ public:
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 2;
+	int32 AmountIdleHeavyTanksNeeded = 2;
 	
 	virtual FString GetDebugString() const override;
 
@@ -241,7 +241,7 @@ public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleNeeded = 1;
+	int32 AmountPlayerHeaviesNeeded = 1;
 	
 	virtual FString GetDebugString() const override;
 
@@ -253,6 +253,8 @@ UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions final : public UStrategicAIActionRequirement
 {
 	GENERATED_BODY()
+public:
+	
 
 public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;

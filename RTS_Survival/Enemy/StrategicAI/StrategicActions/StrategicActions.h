@@ -54,9 +54,11 @@ public:
 		const float GameTimeSeconds) const;
 
 	virtual FString GetDebugString() const;
+	// We aggregate policy contributions from both native and data-driven (Designer-added) requirement lists so unit picking follows
+	// the same gameplay constraints that were used to validate whether the action is allowed.
 	virtual FIdleUnitSelectionPolicy BuildIdleUnitSelectionPolicy(const FStrategicAIBlackboard& Blackboard) const;
 
-	FString GetNameFromActionEnum()const;
+	FString GetNameFromActionEnum() const;
 
 protected:
 	void AddNativeVisibleRequirement(UStrategicAIActionRequirement* Requirement);
@@ -75,7 +77,16 @@ private:
 		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
 		FIdleUnitSelectionPolicy& SelectionPolicy) const;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = true, ClampMin = "0.0"))
+	/**
+	 * @brief Applies either mission fallback min/max or SubAction override values to selection policy.
+	 * @param Blackboard Provides mission-level fallback min/max values.
+	 * @param SelectionPolicy Policy instance that receives the chosen min/max setup.
+	 */
+	void SetupFallbackMinMaxSelectionPolicy(
+		const FStrategicAIBlackboard& Blackboard,
+		FIdleUnitSelectionPolicy& SelectionPolicy) const;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true, ClampMin = "0.0"))
 	float M_Score = 1.0f;
 
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
@@ -84,6 +95,31 @@ private:
 	// Native requirements are visible for designer clarity, but only C++ classes decide what is always enforced.
 	UPROPERTY(VisibleAnywhere, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
 	TArray<TObjectPtr<UStrategicAIActionRequirement>> M_NativeVisibleRequirements;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		meta = (AllowPrivateAccess = true ))
+	bool bOverwriteMissionSettingsMinMaxUnitsNeeded = false;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		meta = (
+			AllowPrivateAccess = true,
+			EditCondition="bOverwriteMissionSettingsMinMaxUnitsNeeded",
+			ClampMin = "0"
+			))
+	int32 MinUnitsNeededOverwrite = 0;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		meta = (
+			AllowPrivateAccess = true,
+			EditCondition = "bOverwriteMissionSettingsMinMaxUnitsNeeded",
+			ClampMin = "0"))
+	int32 MaxUnitsNeededOverwrite = 0;
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
@@ -135,7 +171,7 @@ public:
 	virtual FString GetDebugString() const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true, MakeEditWidget = true))
-	TArray<FVector> TargetPoints ={}; 
+	TArray<FVector> TargetPoints = {};
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)

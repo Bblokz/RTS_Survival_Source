@@ -677,6 +677,45 @@ namespace StrategicAIHelperUtilities
 		TArray<FVector> Locations;
 	};
 
+	bool GetIsLocationWithinRetreatGroup(
+		const FDamagedTankGroupBuilder& GroupBuilder,
+		const FVector& UnitLocation,
+		const float MaxDistanceFromOtherGroupMembers)
+	{
+		for (const FVector& GroupMemberLocation : GroupBuilder.Locations)
+		{
+			if (FVector::Dist(GroupMemberLocation, UnitLocation) <= MaxDistanceFromOtherGroupMembers)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool TryAddDamagedTankToExistingRetreatGroup(
+		TArray<FDamagedTankGroupBuilder>& Groups,
+		const FAsyncDetailedUnitState& UnitState,
+		const float MaxDistanceFromOtherGroupMembers)
+	{
+		for (FDamagedTankGroupBuilder& GroupBuilder : Groups)
+		{
+			if (not GetIsLocationWithinRetreatGroup(
+				GroupBuilder,
+				UnitState.UnitLocation,
+				MaxDistanceFromOtherGroupMembers))
+			{
+				continue;
+			}
+
+			GroupBuilder.Group.DamagedTanks.Add(UnitState.UnitActorPtr);
+			GroupBuilder.Locations.Add(UnitState.UnitLocation);
+			return true;
+		}
+
+		return false;
+	}
+
 	bool GetIsExcludedRetreatUnit(
 		const FFindAlliedTanksToRetreat& Request,
 		const TWeakObjectPtr<AActor>& UnitActor)
@@ -788,27 +827,10 @@ namespace StrategicAIHelperUtilities
 				continue;
 			}
 
-			bool bAddedToGroup = false;
-			for (FDamagedTankGroupBuilder& GroupBuilder : Groups)
-			{
-				for (const FVector& Location : GroupBuilder.Locations)
-				{
-					if (FVector::Dist(Location, UnitState->UnitLocation) <= Request.MaxDistanceFromOtherGroupMembers)
-					{
-						GroupBuilder.Group.DamagedTanks.Add(UnitState->UnitActorPtr);
-						GroupBuilder.Locations.Add(UnitState->UnitLocation);
-						bAddedToGroup = true;
-						break;
-					}
-				}
-
-				if (bAddedToGroup)
-				{
-					break;
-				}
-			}
-
-			if (bAddedToGroup)
+			if (TryAddDamagedTankToExistingRetreatGroup(
+				Groups,
+				*UnitState,
+				Request.MaxDistanceFromOtherGroupMembers))
 			{
 				continue;
 			}

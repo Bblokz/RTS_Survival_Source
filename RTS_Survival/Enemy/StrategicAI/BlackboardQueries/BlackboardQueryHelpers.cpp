@@ -357,7 +357,7 @@ TArray<FVector> BlackboardQueries::GetRandomLocationsOfIdleUnits(
 	{
 		const int32 RandomRemainingIndex = FMath::RandRange(0, RemainingIdleUnitIndices.Num() - 1);
 		const int32 PickedIdleUnitIndex = RemainingIdleUnitIndices[RandomRemainingIndex];
-		RemainingIdleUnitIndices.RemoveAtSwap(RandomRemainingIndex, 1, false);
+		RemainingIdleUnitIndices.RemoveAtSwap(RandomRemainingIndex, 1, EAllowShrinking::No);
 
 		const FVector IdleUnitLocation = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex].Get()->
 			GetActorLocation();

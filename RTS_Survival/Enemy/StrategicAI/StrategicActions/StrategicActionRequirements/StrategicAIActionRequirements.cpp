@@ -87,111 +87,122 @@ FString UStrategicAIHasAtLeastAnyIdleUnits::GetDebugString() const
 bool UStrategicAIHasAtLeastIdleSquads::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
                                                            const float GameTimeSeconds) const
 {
-	return BlackboardQueries::HasAtLeastXSquads(Blackboard, AmountIdleNeeded, RequiredSquadSubtype);	
+	return BlackboardQueries::HasAtLeastXSquads(Blackboard, AmountIdleSpecificSquadsNeeded, RequiredSquadSubtype);	
 
 }
 
 void UStrategicAIHasAtLeastIdleSquads::ContributeToIdleUnitSelectionPolicy(
 	FIdleUnitSelectionPolicy& SelectionPolicy) const
 {
-	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateSquadSubtypeRule(AmountIdleNeeded, RequiredSquadSubtype));
+	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateSquadSubtypeRule(AmountIdleSpecificSquadsNeeded, RequiredSquadSubtype));
 }
 
 FString UStrategicAIHasAtLeastIdleSquads::GetDebugString() const
 {
-	return FString::Printf(TEXT("Has Idle Squads Req: %d %s"), AmountIdleNeeded, *Global_GetSquadDisplayName(RequiredSquadSubtype));
+	return FString::Printf(TEXT("Has Idle Squads Req: %d %s"), AmountIdleSpecificSquadsNeeded, *Global_GetSquadDisplayName(RequiredSquadSubtype));
 }
 
 bool UStrategicAIHasAtLeastIdleTanks::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
                                                           const float GameTimeSeconds) const
 {
-	return BlackboardQueries::HasAtLeastXTanks(Blackboard, AmountIdleNeeded, RequiredTankSubtype);
+	return BlackboardQueries::HasAtLeastXTanks(Blackboard, AmountIdleOfSpecificTanksNeeded, RequiredTankSubtype);
 }
 
 void UStrategicAIHasAtLeastIdleTanks::ContributeToIdleUnitSelectionPolicy(
 	FIdleUnitSelectionPolicy& SelectionPolicy) const
 {
-	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateTankSubtypeRule(AmountIdleNeeded, RequiredTankSubtype));
+	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateTankSubtypeRule(AmountIdleOfSpecificTanksNeeded, RequiredTankSubtype));
 }
 
 FString UStrategicAIHasAtLeastIdleTanks::GetDebugString() const
 {
-	return FString::Printf(TEXT("Has Idle Tanks Req: %d %s"), AmountIdleNeeded, *Global_GetTankDisplayName(RequiredTankSubtype));
+	return FString::Printf(TEXT("Has Idle Tanks Req: %d %s"), AmountIdleOfSpecificTanksNeeded, *Global_GetTankDisplayName(RequiredTankSubtype));
 }
 
 bool UStrategicAIHasAtLeastAnyIdleTanks::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
 	const float GameTimeSeconds) const
 {
-	return BlackboardQueries::HasAtLeastAnyXTanks(Blackboard, AmountIdleNeeded);
+	return BlackboardQueries::HasAtLeastAnyXTanks(Blackboard, AmountIdleTanksNeeded);
 }
 
 void UStrategicAIHasAtLeastAnyIdleTanks::ContributeToIdleUnitSelectionPolicy(
 	FIdleUnitSelectionPolicy& SelectionPolicy) const
 {
-	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateAnyTankRule(AmountIdleNeeded));
+	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateAnyTankRule(AmountIdleTanksNeeded));
 }
 
 FString UStrategicAIHasAtLeastAnyIdleTanks::GetDebugString() const
 {
-	return FString::Printf(TEXT("Has Idle Tanks Req: %d Any Tank Type"), AmountIdleNeeded);
+	return FString::Printf(TEXT("Has Idle Tanks Req: %d Any Tank Type"), AmountIdleTanksNeeded);
 }
 
 bool UStrategicAIHasAtLeastIdleAircraft::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
                                                              const float GameTimeSeconds) const
 {
-	return BlackboardQueries::HasAtLeastXAircraft(Blackboard, AmountIdleNeeded, RequiredAircraftSubtype);
+	return BlackboardQueries::HasAtLeastXAircraft(Blackboard, AmountIdleAircraftNeeded, RequiredAircraftSubtype);
 }
 
 FString UStrategicAIHasAtLeastIdleAircraft::GetDebugString() const
 {
-	return FString::Printf(TEXT("Has Idle Aircraft Req: %d %s"), AmountIdleNeeded, *Global_GetAircraftDisplayName(RequiredAircraftSubtype));
+	return FString::Printf(TEXT("Has Idle Aircraft Req: %d %s"), AmountIdleAircraftNeeded, *Global_GetAircraftDisplayName(RequiredAircraftSubtype));
 }
 
 bool UStrategicAIHasEnoughLightTanks::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
 	const float GameTimeSeconds) const
 {
-	return BlackboardQueries::HasAtLeastXLightTanks(Blackboard, AmountIdleNeeded);
+	return BlackboardQueries::HasAtLeastXLightTanks(Blackboard, AmountIdleLightTanksNeeded);
 }
 
 void UStrategicAIHasEnoughLightTanks::ContributeToIdleUnitSelectionPolicy(
 	FIdleUnitSelectionPolicy& SelectionPolicy) const
 {
 	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateTankCategoryRule(
-		AmountIdleNeeded,
+		AmountIdleLightTanksNeeded,
 		EIdleUnitSelectionTankCategory::LightTank));
 }
 
 FString UStrategicAIHasEnoughLightTanks::GetDebugString() const
 {
-	return FString::Printf(TEXT("Has Idle Light Tanks Req: %d"), AmountIdleNeeded);
+	return FString::Printf(TEXT("Has Idle Light Tanks Req: %d"), AmountIdleLightTanksNeeded);
 }
 
 bool UStrategicAIHasEnoughHeavyTanks::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
 	const float GameTimeSeconds) const
 {
-	return BlackboardQueries::HasAtLeastXHeavyTanks(Blackboard, AmountIdleNeeded);
+	return BlackboardQueries::HasAtLeastXHeavyTanks(Blackboard, AmountIdleHeavyTanksNeeded);
 }
 
 void UStrategicAIHasEnoughHeavyTanks::ContributeToIdleUnitSelectionPolicy(
 	FIdleUnitSelectionPolicy& SelectionPolicy) const
 {
 	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateTankCategoryRule(
-		AmountIdleNeeded,
+		AmountIdleHeavyTanksNeeded,
 		EIdleUnitSelectionTankCategory::HeavyTank));
 }
 
 FString UStrategicAIHasEnoughHeavyTanks::GetDebugString() const
 {
-	return FString::Printf(TEXT("Has Idle Heavy Tanks Req: %d"), AmountIdleNeeded);	
+	return FString::Printf(TEXT("Has Idle Heavy Tanks Req: %d"), AmountIdleHeavyTanksNeeded);	
 }
 
 bool UStrategicAIDoesPlayerHaveHeavyTanks::GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard,
 	const float GameTimeSeconds) const
 {
-	return BlackboardQueries::HasAtLeastXPlayerHeavyTanks(Blackboard, AmountIdleNeeded);
+	return BlackboardQueries::HasAtLeastXPlayerHeavyTanks(Blackboard, AmountPlayerHeaviesNeeded);
 }
 
 FString UStrategicAIDoesPlayerHaveHeavyTanks::GetDebugString() const
 {
-	return FString::Printf(TEXT("Player Has Heavy Tanks Req: %d"), AmountIdleNeeded);
+	return FString::Printf(TEXT("Player Has Heavy Tanks Req: %d"), AmountPlayerHeaviesNeeded);
+}
+
+bool UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions::GetIsRequirementMet(
+	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
+{
+	return BlackboardQueries::HasValidPlayerHeavyTankFLankLocations(Blackboard);
+}
+
+FString UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions::GetDebugString() const
+{
+	return Super::GetDebugString();
 }

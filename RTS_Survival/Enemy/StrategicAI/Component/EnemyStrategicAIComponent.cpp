@@ -273,7 +273,7 @@ void UEnemyStrategicAIComponent::StrategicAiThinkStep()
 	}
 	if (M_StochasticDecisionTree.IsValid() && GetIsAllowedDirectControlUnits())
 	{
-		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_StrategicAIBlackboard);
+		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, &M_StrategicAIBlackboard);
 	}
 	ProcessStrategicAIRequests();
 }
