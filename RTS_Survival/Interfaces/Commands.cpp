@@ -4,6 +4,7 @@
 #include "Commands.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
@@ -17,6 +18,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 
 UCommandData::UCommandData(const FObjectInitializer& ObjectInitializer)
@@ -922,6 +924,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			M_Owner->ExecuteDetachTowCommand();
 		}
 		break;
+	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
+		{
+			M_Owner->ExecuteRegisterUnitAsBlackboardIdleCommand();
+		}
+		break;
 	default:
 		RTSFunctionLibrary::PrintString(
 			"Command not implemented in ExecuteCommand: " + Global_GetAbilityIDAsString(Cmd.CommandType)
@@ -1064,6 +1071,7 @@ bool UCommandData::IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) 
 	case EAbilityID::IdManAbandonedTeamWeapon:
 	case EAbilityID::IdCapture:
 	case EAbilityID::IdTowActor:
+	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
 		return false;
 
 	default:
@@ -2771,6 +2779,26 @@ ECommandQueueError ICommands::DetachTow(const bool bSetUnitToIdle)
 	                                              FRotator::ZeroRotator);
 }
 
+ECommandQueueError ICommands::RegisterAsBlackboardIdle(const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdRegisterUnitAsBlackboardIdle,
+		FVector::ZeroVector,
+		nullptr,
+		FRotator::ZeroRotator);
+}
+
 ECommandQueueError ICommands::ExitCargo(const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -3019,6 +3047,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdDetachTow:
 		TerminateDetachTowCommand();
 		break;
+	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
+		TerminateRegisterUnitAsBlackboardIdleCommand();
+		break;
 	case EAbilityID::IdApplyBehaviour:
 		// No terminate; behaviour auto expires.
 		break;
@@ -3089,6 +3120,39 @@ void ICommands::ExecuteDetachTowCommand()
 }
 
 void ICommands::TerminateDetachTowCommand()
+{
+}
+
+void ICommands::ExecuteRegisterUnitAsBlackboardIdleCommand()
+{
+	AActor* OwnerActor = GetOwnerActor();
+	if (not IsValid(OwnerActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Unable to register unit as blackboard idle because the ICommands owner actor is invalid.");
+		DoneExecutingCommand(EAbilityID::IdRegisterUnitAsBlackboardIdle);
+		return;
+	}
+
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(OwnerActor);
+	if (not IsValid(EnemyController))
+	{
+		DoneExecutingCommand(EAbilityID::IdRegisterUnitAsBlackboardIdle);
+		return;
+	}
+
+	UEnemyDirectControlComponent* EnemyDirectControlComponent = EnemyController->GetEnemyDirectControlComponent();
+	if (not IsValid(EnemyDirectControlComponent))
+	{
+		DoneExecutingCommand(EAbilityID::IdRegisterUnitAsBlackboardIdle);
+		return;
+	}
+
+	EnemyDirectControlComponent->RegisterDirectControlUnit(OwnerActor);
+	DoneExecutingCommand(EAbilityID::IdRegisterUnitAsBlackboardIdle);
+}
+
+void ICommands::TerminateRegisterUnitAsBlackboardIdleCommand()
 {
 }
 
