@@ -54,6 +54,7 @@ public:
 		const float GameTimeSeconds) const;
 
 	virtual FString GetDebugString() const;
+	virtual FIdleUnitSelectionPolicy BuildIdleUnitSelectionPolicy(const FStrategicAIBlackboard& Blackboard) const;
 
 	FString GetNameFromActionEnum()const;
 
@@ -70,6 +71,9 @@ private:
 	FString GetRequirementsDebugStringForArray(
 		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
 		const FString& HeaderText) const;
+	void AddRequirementSelectionRulesToPolicy(
+		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+		FIdleUnitSelectionPolicy& SelectionPolicy) const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = true, ClampMin = "0.0"))
 	float M_Score = 1.0f;

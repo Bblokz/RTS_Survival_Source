@@ -98,9 +98,9 @@ private:
 	bool EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const;
 	void ExecuteSubAction(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 
-	void Exe_AttackMovePlayerUnits(const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMovePlayerHQ(const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMovePlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerUnits(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerHQ(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerResourceBuildings(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMoveLightTanksToPlayerUnits(const FStrategicAIBlackboard& Blackboard);
 	void Exe_HeavyTankPushPlayerBaseOrUnits(const FStrategicAIBlackboard& Blackboard);
@@ -108,9 +108,10 @@ private:
 
 
 	// ------------------- Formation Logic Using Blackboard Idle units ------------------------
-	void CreateAttackMoveFormation(TArray<FVector> AttackLocations, const FStrategicAIBlackboard& Blackboard);
-	void CreateFlankingAttack(const TArray<FWeakActorLocations>& FlankingPositions,
-	                          const FStrategicAIBlackboard& Blackboard);
+	void CreateAttackMoveFormation(
+		const UStrategicAISubAction* SubAction,
+		TArray<FVector> AttackLocations,
+		const FStrategicAIBlackboard& Blackboard);
 	bool EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits, const FString& DebugContext);
 	int32 GetMaxFormationWidthForPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits) const;
 	FAttackMoveWaveSettings M_AttackMoveWaveSettings;

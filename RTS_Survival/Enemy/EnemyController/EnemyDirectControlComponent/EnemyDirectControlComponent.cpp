@@ -91,6 +91,107 @@ namespace
 		return not GetIsHazmatEngineerSquadEntry(Entry);
 	}
 
+
+	bool GetIsValidIdleUnitEntry(const FBlackboardIdleUnitEntry& Entry)
+	{
+		return Entry.IsValid();
+	}
+
+	bool GetIsTankCategoryMatch(
+		const ETankSubtype TankSubtype,
+		const EIdleUnitSelectionTankCategory TankCategory)
+	{
+		switch (TankCategory)
+		{
+		case EIdleUnitSelectionTankCategory::ArmoredCar:
+			return Global_GetIsArmoredCar(TankSubtype);
+		case EIdleUnitSelectionTankCategory::LightTank:
+			return Global_GetIsLightTank(TankSubtype);
+		case EIdleUnitSelectionTankCategory::MediumTank:
+			return Global_GetIsMediumTank(TankSubtype);
+		case EIdleUnitSelectionTankCategory::HeavyTank:
+			return Global_GetIsHeavyTank(TankSubtype);
+		}
+
+		return false;
+	}
+
+	bool GetDoesEntryMatchSelectionRule(
+		const FBlackboardIdleUnitEntry& Entry,
+		const FIdleUnitSelectionRule& Rule)
+	{
+		if (not Entry.IsValid())
+		{
+			return false;
+		}
+
+		switch (Rule.RuleType)
+		{
+		case EIdleUnitSelectionRuleType::AnyIdleUnit:
+			return true;
+		case EIdleUnitSelectionRuleType::AnyTank:
+			return Entry.UnitType == EAllUnitType::UNType_Tank;
+		case EIdleUnitSelectionRuleType::TankSubtype:
+			return Entry.UnitType == EAllUnitType::UNType_Tank
+				&& Entry.UnitSubtypeRaw == static_cast<int32>(Rule.RequiredTankSubtype);
+		case EIdleUnitSelectionRuleType::SquadSubtype:
+			return Entry.UnitType == EAllUnitType::UNType_Squad
+				&& Entry.UnitSubtypeRaw == static_cast<int32>(Rule.RequiredSquadSubtype);
+		case EIdleUnitSelectionRuleType::TankCategory:
+			return Entry.UnitType == EAllUnitType::UNType_Tank
+				&& GetIsTankCategoryMatch(static_cast<ETankSubtype>(Entry.UnitSubtypeRaw), Rule.RequiredTankCategory);
+		}
+
+		return false;
+	}
+
+	int32 CountValidIdleUnitEntries(const TArray<FBlackboardIdleUnitEntry>& IdleEntries)
+	{
+		int32 ValidEntryCount = 0;
+		for (const FBlackboardIdleUnitEntry& IdleEntry : IdleEntries)
+		{
+			if (not IdleEntry.IsValid())
+			{
+				continue;
+			}
+
+			++ValidEntryCount;
+		}
+
+		return ValidEntryCount;
+	}
+
+	int32 GetRandomPickCountForPolicy(
+		const FIdleUnitSelectionPolicy& SelectionPolicy,
+		const int32 AlreadyPickedUnitCount,
+		const int32 AvailableUnitCount)
+	{
+		const int32 MinUnitsToPick = FMath::Max(SelectionPolicy.MinUnitsToPick, AlreadyPickedUnitCount);
+		const int32 MaxUnitsToPick = FMath::Min(SelectionPolicy.MaxUnitsToPick, AvailableUnitCount);
+		if (MinUnitsToPick > MaxUnitsToPick)
+		{
+			return 0;
+		}
+
+		return FMath::RandRange(MinUnitsToPick, MaxUnitsToPick);
+	}
+
+	void RemovePickedEntriesFromBlackboard(
+		const TArray<FBlackboardIdleUnitEntry>& PickedEntries,
+		TArray<FBlackboardIdleUnitEntry>& BlackboardEntries)
+	{
+		for (const FBlackboardIdleUnitEntry& PickedEntry : PickedEntries)
+		{
+			AActor* const PickedActor = PickedEntry.Get();
+			if (not IsValid(PickedActor))
+			{
+				continue;
+			}
+
+			FBlackboardIdleUnitEntry::RemoveByUnitActor(BlackboardEntries, PickedActor);
+		}
+	}
+
 	template <typename EntryPredicateType>
 	bool TryPickRandomMatchingEntry(
 		TArray<FBlackboardIdleUnitEntry>& IdleEntries,
@@ -412,6 +513,64 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMinMaxIdleBla
 		Blackboard->IdleDirectControlUnits.RemoveAtSwap(RandomIdleUnitIndex);
 	}
 
+	return SetupResultFromPickedEntries(PickedBlackboardEntries);
+}
+
+
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickIdleBlackboardUnitsByPolicy(
+	const FIdleUnitSelectionPolicy& SelectionPolicy) const
+{
+	FStrategicAIBlackboard* Blackboard = nullptr;
+	if (not EnsureIsValidBlackboard(Blackboard))
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	const int32 AvailableUnitCount = CountValidIdleUnitEntries(Blackboard->IdleDirectControlUnits);
+	if (AvailableUnitCount <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	TArray<FBlackboardIdleUnitEntry> CandidateBlackboardEntries = Blackboard->IdleDirectControlUnits;
+	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
+	PickedBlackboardEntries.Reserve(FMath::Min(SelectionPolicy.MaxUnitsToPick, AvailableUnitCount));
+
+	for (const FIdleUnitSelectionRule& RequiredRule : SelectionPolicy.RequiredRules)
+	{
+		const int32 PickedCountBeforeRule = PickedBlackboardEntries.Num();
+		const int32 TargetPickCountAfterRule = PickedCountBeforeRule + RequiredRule.RequiredAmount;
+		PickRandomEntriesFromMatchingSet(
+			CandidateBlackboardEntries,
+			[&RequiredRule](const FBlackboardIdleUnitEntry& IdleEntry)
+			{
+				return GetDoesEntryMatchSelectionRule(IdleEntry, RequiredRule);
+			},
+			TargetPickCountAfterRule,
+			PickedBlackboardEntries);
+
+		if (PickedBlackboardEntries.Num() < TargetPickCountAfterRule)
+		{
+			return FBlackboardIdleUnitsResult();
+		}
+	}
+
+	const int32 UnitsToPick = GetRandomPickCountForPolicy(
+		SelectionPolicy,
+		PickedBlackboardEntries.Num(),
+		AvailableUnitCount);
+	if (UnitsToPick <= 0)
+	{
+		return FBlackboardIdleUnitsResult();
+	}
+
+	PickRandomEntriesFromMatchingSet(
+		CandidateBlackboardEntries,
+		GetIsValidIdleUnitEntry,
+		UnitsToPick,
+		PickedBlackboardEntries);
+
+	RemovePickedEntriesFromBlackboard(PickedBlackboardEntries, Blackboard->IdleDirectControlUnits);
 	return SetupResultFromPickedEntries(PickedBlackboardEntries);
 }
 
