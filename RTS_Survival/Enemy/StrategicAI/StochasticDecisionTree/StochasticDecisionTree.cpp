@@ -321,7 +321,7 @@ void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(const FStrat
 	}
 
 	const FVector PickedAttackLocation = StochasticHelpers::PickRandomLocation(ValidAttackLocations);
-	ValidAttackLocations.RemoveSingleSwap(PickedAttackLocation, false);
+	ValidAttackLocations.RemoveSingleSwap(PickedAttackLocation, EAllowShrinking::No);
 
 	TArray<FVector> AttackLocations;
 	AttackLocations.Reserve(3);
