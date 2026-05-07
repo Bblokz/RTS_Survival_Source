@@ -65,6 +65,32 @@ protected:
 
 	FString GetRequirementsDebugString() const;
 
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		meta = (AllowPrivateAccess = true ))
+	bool bOverwriteMissionSettingsMinMaxUnitsNeeded = false;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		meta = (
+			AllowPrivateAccess = true,
+			EditCondition="bOverwriteMissionSettingsMinMaxUnitsNeeded",
+			ClampMin = "0"
+			))
+	int32 MinUnitsNeededOverwrite = 0;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		meta = (
+			AllowPrivateAccess = true,
+			EditCondition = "bOverwriteMissionSettingsMinMaxUnitsNeeded",
+			ClampMin = "0"))
+	int32 MaxUnitsNeededOverwrite = 0;
+	
+
 private:
 	bool GetAreRequirementsMetForArray(
 		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
@@ -96,30 +122,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Instanced, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
 	TArray<TObjectPtr<UStrategicAIActionRequirement>> M_NativeVisibleRequirements;
 
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (AllowPrivateAccess = true ))
-	bool bOverwriteMissionSettingsMinMaxUnitsNeeded = false;
 
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (
-			AllowPrivateAccess = true,
-			EditCondition="bOverwriteMissionSettingsMinMaxUnitsNeeded",
-			ClampMin = "0"
-			))
-	int32 MinUnitsNeededOverwrite = 0;
-
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (
-			AllowPrivateAccess = true,
-			EditCondition = "bOverwriteMissionSettingsMinMaxUnitsNeeded",
-			ClampMin = "0"))
-	int32 MaxUnitsNeededOverwrite = 0;
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)

@@ -207,7 +207,7 @@ public:
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 AmountIdleLightTanksNeeded = 4;
+	int32 AmountIdleLightTanksNeeded =5;
 	
 	virtual FString GetDebugString() const override;
 

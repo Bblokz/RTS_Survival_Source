@@ -218,6 +218,9 @@ USubAction_LightTanksAttackPlayerUnits::USubAction_LightTanksAttackPlayerUnits()
 	SubtypeAction = ESubtypeAction::AttackMoveLightTanksToPlayerUnits;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughLightTanks>(
 		TEXT("HasIdleLightTanksRequirement")));
+	bOverwriteMissionSettingsMinMaxUnitsNeeded = true;
+	MinUnitsNeededOverwrite = 5;
+	MaxUnitsNeededOverwrite = 5;
 }
 
 FString USubAction_LightTanksAttackPlayerUnits::GetDebugString() const
@@ -230,6 +233,10 @@ USubAction_HeavyTankPushPlayerBaseOrUnits::USubAction_HeavyTankPushPlayerBaseOrU
 	SubtypeAction = ESubtypeAction::HeavyTankPushPlayerBaseOrUnits;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughHeavyTanks>(
 		TEXT("HasIdleHeavyTanksRequirement")));
+	bOverwriteMissionSettingsMinMaxUnitsNeeded = true;
+	MinUnitsNeededOverwrite = 2;
+	MaxUnitsNeededOverwrite = 10;
+	
 }
 
 FString USubAction_HeavyTankPushPlayerBaseOrUnits::GetDebugString() const
