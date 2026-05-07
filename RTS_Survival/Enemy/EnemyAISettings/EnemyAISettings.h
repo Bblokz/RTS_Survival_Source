@@ -36,6 +36,7 @@ namespace EnemyAISettings
 		const FColor PlayerLocationColor = FColor::Blue;
 		const FColor AttackLocationColor = FColor::Red;
 		const FColor PickedActionLocationColor = FColor::Green;
+		const FColor FlankLocationColor = FColor::Orange;
 		inline constexpr float PickedActionLocationRadius = 300.f;
 		inline constexpr bool BaseLocationDebugging = true;
 		inline constexpr float BaseLocationDebugDuration = 15.f* DEV_AI_ThinkTimers_Scaling;

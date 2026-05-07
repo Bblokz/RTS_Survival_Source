@@ -297,6 +297,33 @@ namespace StochasticHelpers
 		return PickedLocations;
 	}
 
+	TArray<FVector> PickPairOfPointsClosestTo(const FVector& OriginalPoint, const TArray<FVector>& Locations)
+	{
+		if (Locations.IsEmpty())
+		{
+			return TArray<FVector>();
+		}
+
+		if (Locations.Num() == 1)
+		{
+			return {Locations[0]};
+		}
+
+		TArray<FVector> SortedLocations = Locations;
+		SortArrayByDistanceToLocation(SortedLocations, OriginalPoint);
+
+		TArray<FVector> PickedLocations;
+		PickedLocations.Reserve(2);
+		PickedLocations.Add(SortedLocations[0]);
+		PickedLocations.Add(SortedLocations[1]);
+		return PickedLocations;
+	}
+
+	TArray<FVector> ExhaustivePick(const TArray<FVector>& Locations, const int32 MaxPick)
+	{
+		return PickRandomMaxLocations(Locations, MaxPick);
+	}
+
 	bool CanProjectNavigable_BulkLocation(const UEnemyNavigationAIComponent* NavComp, const FVector& BulkLocation,
 	                                      FVector& OutProjectedLocation)
 	{
@@ -311,6 +338,44 @@ namespace StochasticHelpers
 		return NavComp->GetNavigablePoint(AvgAttackerLoc, 8.0,
 		                                  OutProjectedLocation,
 		                                  EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
+	bool CanProjectNavigable_PlayerHQLocation(const UEnemyNavigationAIComponent* NavComp,
+	                                            const FVector& PlayerHQLocation, FVector& OutProjectedLocation)
+	{
+		constexpr float ProjectionScale = 3.f;
+		return NavComp->GetNavigablePoint(PlayerHQLocation, ProjectionScale,
+		                                  OutProjectedLocation,
+		                                  EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
+	bool CanProjectNavigable_PlayerResourceBuildingLocation(const UEnemyNavigationAIComponent* NavComp,
+	                                                        const FVector& PlayerResourceBuildingLocation,
+	                                                        FVector& OutProjectedLocation)
+	{
+		constexpr float ProjectionScale = 3.f;
+		return NavComp->GetNavigablePoint(PlayerResourceBuildingLocation, ProjectionScale,
+		                                  OutProjectedLocation,
+		                                  EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
+	bool CanProjectNavigable_AttackSpecificPoint(const UEnemyNavigationAIComponent* NavComp,
+	                                             const FVector& SpecificPoint, FVector& OutProjectedLocation)
+	{
+		constexpr float ProjectionScale = 3.f;
+		return NavComp->GetNavigablePoint(SpecificPoint, ProjectionScale,
+		                                  OutProjectedLocation,
+		                                  EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
+	bool CanProjectNavigable_FlankLocation(const UEnemyNavigationAIComponent* NavComp, const FVector& FlankLocation,
+	                                       FVector& OutProjectedLocation)
+	{
+		// Keep this projection tight so async-generated flank positions stay close to their tactical intent.
+		constexpr float ProjectionScale = 1.f;
+		return NavComp->GetNavigablePoint(FlankLocation, ProjectionScale,
+		                                  OutProjectedLocation,
+		                                  EOnProjectionFailedStrategy::None);
 	}
 
 	bool CanProjectNavigable_AveragePickedUnitLocation(const UEnemyNavigationAIComponent* NavComp,
