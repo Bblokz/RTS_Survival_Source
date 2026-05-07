@@ -7,7 +7,6 @@
 #include "RTS_Survival/Enemy/StrategicAI/IdleUnitSelectionPolicy.h"
 #include "EnemyDirectControlComponent.generated.h"
 
-struct FStrategicAIBlackboard;
 class UEnemyStrategicAIComponent;
 class AEnemyController;
 class AActor;
@@ -127,7 +126,6 @@ private:
 
 	void BeginPlay_CacheEnemyControllerFromOwner();
 	bool EnsureEnemyControllerIsValid() const;
-	bool EnsureIsValidBlackboard(FStrategicAIBlackboard*& OutBlackboard) const;
 	UEnemyStrategicAIComponent* GetValidStrategicAIComponent() const;
 	bool GetIsValidDirectControlUnitActor(const AActor* UnitActor) const;
 

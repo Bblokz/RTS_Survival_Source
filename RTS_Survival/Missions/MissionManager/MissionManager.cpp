@@ -1956,14 +1956,16 @@ void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDi
 	{
 		return;
 	}
-	FStrategicAIBlackboard* StrategicAIBlackboard = EnemyAIController->GetStrategicAIBlackboard();
-	if(not StrategicAIBlackboard)
+	UEnemyStrategicAIComponent* const StrategicAIComponent = EnemyAIController->GetEnemyStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		RTSFunctionLibrary::ReportError("Failed to propagate the game difficulty to the enemy AI controller's blackboard"
-								  "as it is invalid!!");
+								  "as its strategic AI component is invalid!!");
 		return;
 	}
-	StrategicAIBlackboard->GameDifficulty = GameDifficulty;
+
+	FStrategicAIBlackboard& StrategicAIBlackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	StrategicAIBlackboard.GameDifficulty = GameDifficulty;
 }
 
 

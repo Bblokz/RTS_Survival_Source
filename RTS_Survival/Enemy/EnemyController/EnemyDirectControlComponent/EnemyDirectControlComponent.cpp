@@ -449,32 +449,13 @@ bool UEnemyDirectControlComponent::EnsureEnemyControllerIsValid() const
 	return false;
 }
 
-bool UEnemyDirectControlComponent::EnsureIsValidBlackboard(FStrategicAIBlackboard*& OutBlackboard) const
-{
-	if (not EnsureEnemyControllerIsValid())
-	{
-		OutBlackboard = nullptr;
-		return false;
-	}
-	FStrategicAIBlackboard* Blackboard = M_EnemyController->GetStrategicAIBlackboard();
-	if (not Blackboard)
-	{
-		RTSFunctionLibrary::ReportError(
-			"Enemy direct control component requires a valid strategic AI blackboard but it cannot be found on the enemy controller.");
-		OutBlackboard = nullptr;
-		return false;
-	}
-	OutBlackboard = Blackboard;
-	return true;
-}
-
 UEnemyStrategicAIComponent* UEnemyDirectControlComponent::GetValidStrategicAIComponent() const
 {
 	if (not EnsureEnemyControllerIsValid())
 	{
 		return nullptr;
 	}
-	UEnemyStrategicAIComponent* StrategicAIComponent = M_EnemyController->GetEnemyStrategicAIComponent();
+	UEnemyStrategicAIComponent* const StrategicAIComponent = M_EnemyController->GetEnemyStrategicAIComponent();
 	if (IsValid(StrategicAIComponent))
 	{
 		return StrategicAIComponent;
@@ -530,11 +511,18 @@ void UEnemyDirectControlComponent::StopDirectControlTickTimer()
 
 bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not GetIsValidDirectControlUnitActor(UnitActor) || not EnsureIsValidBlackboard(Blackboard))
+	if (not GetIsValidDirectControlUnitActor(UnitActor))
 	{
 		return false;
 	}
+
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
+	{
+		return false;
+	}
+
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
 
 	if (TryGetCommandsInterface(UnitActor) == nullptr)
 	{
@@ -543,7 +531,7 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 		return false;
 	}
 
-	if (Blackboard->IdleDirectControlUnits.Contains(UnitActor))
+	if (Blackboard.IdleDirectControlUnits.Contains(UnitActor))
 	{
 		DebugReportRegisterDeregister("RegisterDirectControlUnit ignored duplicate unit: " + UnitActor->GetName());
 		return false;
@@ -557,21 +545,28 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 		return false;
 	}
 
-	Blackboard->IdleDirectControlUnits.Add(IdleUnitEntry);
+	Blackboard.IdleDirectControlUnits.Add(IdleUnitEntry);
 	DebugReportRegisterDeregister("RegisterDirectControlUnit added unit: " + UnitActor->GetName());
 	return true;
 }
 
 bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor)
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not GetIsValidDirectControlUnitActor(UnitActor) || not EnsureIsValidBlackboard(Blackboard))
+	if (not GetIsValidDirectControlUnitActor(UnitActor))
 	{
 		return false;
 	}
 
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
+	{
+		return false;
+	}
+
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
 	const int32 RemovedCount = FBlackboardIdleUnitEntry::RemoveByUnitActor(
-		Blackboard->IdleDirectControlUnits,
+		Blackboard.IdleDirectControlUnits,
 		UnitActor);
 	if (RemovedCount <= 0)
 	{
@@ -585,27 +580,30 @@ bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor
 
 void UEnemyDirectControlComponent::ClearDirectControlUnits()
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureEnemyControllerIsValid() || not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return;
 	}
-	Blackboard->IdleDirectControlUnits.Empty();
+
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	Blackboard.IdleDirectControlUnits.Empty();
 	DebugReportRegisterDeregister("ClearDirectControlUnits removed all direct control units.");
 }
 
 TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
 	TArray<AActor*> RegisteredActors;
-
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return RegisteredActors;
 	}
-	RegisteredActors.Reserve(Blackboard->IdleDirectControlUnits.Num());
 
-	for (const auto& RegisteredUnit : Blackboard->IdleDirectControlUnits)
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	RegisteredActors.Reserve(Blackboard.IdleDirectControlUnits.Num());
+
+	for (const auto& RegisteredUnit : Blackboard.IdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{
@@ -620,28 +618,30 @@ TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() 
 
 FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMaxIdleBlackboardUnits(const int32 MaxUnitsToPick) const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
-	if (MaxUnitsToPick <= 0 || Blackboard->IdleDirectControlUnits.Num() <= 0)
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
+	if (MaxUnitsToPick <= 0 || Blackboard.IdleDirectControlUnits.Num() <= 0)
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
-	const int32 MaxPicksToProcess = FMath::Min(MaxUnitsToPick, Blackboard->IdleDirectControlUnits.Num());
+	const int32 MaxPicksToProcess = FMath::Min(MaxUnitsToPick, Blackboard.IdleDirectControlUnits.Num());
 	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
 	PickedBlackboardEntries.Reserve(MaxPicksToProcess);
 
-	while (PickedBlackboardEntries.Num() < MaxPicksToProcess && Blackboard->IdleDirectControlUnits.Num() > 0)
+	while (PickedBlackboardEntries.Num() < MaxPicksToProcess && Blackboard.IdleDirectControlUnits.Num() > 0)
 	{
-		const int32 RandomIdleUnitIndex = FMath::RandRange(0, Blackboard->IdleDirectControlUnits.Num() - 1);
-		const FBlackboardIdleUnitEntry PickedEntry = Blackboard->IdleDirectControlUnits[RandomIdleUnitIndex];
+		const int32 RandomIdleUnitIndex = FMath::RandRange(0, Blackboard.IdleDirectControlUnits.Num() - 1);
+		const FBlackboardIdleUnitEntry PickedEntry = Blackboard.IdleDirectControlUnits[RandomIdleUnitIndex];
 
 		// Remove immediately so the same unit can never be picked twice.
-		Blackboard->IdleDirectControlUnits.RemoveAtSwap(RandomIdleUnitIndex);
+		Blackboard.IdleDirectControlUnits.RemoveAtSwap(RandomIdleUnitIndex);
 		PickedBlackboardEntries.Add(PickedEntry);
 	}
 
@@ -652,16 +652,18 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMinMaxIdleBla
 	const int32 MinUnitsToPick,
 	const int32 MaxUnitsToPick) const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
 	const int32 UnitsToPick = GetRandomMinMaxPickCount(
 		MinUnitsToPick,
 		MaxUnitsToPick,
-		Blackboard->IdleDirectControlUnits.Num());
+		Blackboard.IdleDirectControlUnits.Num());
 	if (UnitsToPick <= 0)
 	{
 		return FBlackboardIdleUnitsResult();
@@ -672,9 +674,9 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMinMaxIdleBla
 
 	while (PickedBlackboardEntries.Num() < UnitsToPick)
 	{
-		const int32 RandomIdleUnitIndex = FMath::RandRange(0, Blackboard->IdleDirectControlUnits.Num() - 1);
-		PickedBlackboardEntries.Add(Blackboard->IdleDirectControlUnits[RandomIdleUnitIndex]);
-		Blackboard->IdleDirectControlUnits.RemoveAtSwap(RandomIdleUnitIndex);
+		const int32 RandomIdleUnitIndex = FMath::RandRange(0, Blackboard.IdleDirectControlUnits.Num() - 1);
+		PickedBlackboardEntries.Add(Blackboard.IdleDirectControlUnits[RandomIdleUnitIndex]);
+		Blackboard.IdleDirectControlUnits.RemoveAtSwap(RandomIdleUnitIndex);
 	}
 
 	return SetupResultFromPickedEntries(PickedBlackboardEntries);
@@ -684,13 +686,15 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMinMaxIdleBla
 FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickIdleBlackboardUnitsByPolicy(
 	const FIdleUnitSelectionPolicy& SelectionPolicy) const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
-	const int32 AvailableUnitCount = CountValidIdleUnitEntries(Blackboard->IdleDirectControlUnits);
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
+	const int32 AvailableUnitCount = CountValidIdleUnitEntries(Blackboard.IdleDirectControlUnits);
 	// Avoid random/policy logic when there is no usable data to satisfy any rule.
 	if (AvailableUnitCount <= 0)
 	{
@@ -698,7 +702,7 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickIdleBlackboardUnits
 	}
 
 	// We pick from a local copy first so the blackboard stays unchanged unless the full selection succeeds.
-	TArray<FBlackboardIdleUnitEntry> CandidateBlackboardEntries = Blackboard->IdleDirectControlUnits;
+	TArray<FBlackboardIdleUnitEntry> CandidateBlackboardEntries = Blackboard.IdleDirectControlUnits;
 	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
 	// Reserve upfront to reduce reallocations during repeated Add calls.
 	PickedBlackboardEntries.Reserve(FMath::Min(SelectionPolicy.MaxUnitsToPick, AvailableUnitCount));
@@ -743,7 +747,7 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickIdleBlackboardUnits
 		PickedBlackboardEntries);
 
 	// WHY: Commit to blackboard only at the end, so failed attempts never mutate shared state.
-	RemovePickedEntriesFromBlackboard(PickedBlackboardEntries, Blackboard->IdleDirectControlUnits);
+	RemovePickedEntriesFromBlackboard(PickedBlackboardEntries, Blackboard.IdleDirectControlUnits);
 	return SetupResultFromPickedEntries(PickedBlackboardEntries);
 }
 
@@ -751,16 +755,18 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferSquad_PickRandomM
 	const int32 MinUnitsToPick,
 	const int32 MaxUnitsToPick) const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
 	const int32 UnitsToPick = GetRandomMinMaxPickCount(
 		MinUnitsToPick,
 		MaxUnitsToPick,
-		Blackboard->IdleDirectControlUnits.Num());
+		Blackboard.IdleDirectControlUnits.Num());
 	if (UnitsToPick <= 0)
 	{
 		return FBlackboardIdleUnitsResult();
@@ -770,12 +776,12 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferSquad_PickRandomM
 	PickedBlackboardEntries.Reserve(UnitsToPick);
 
 	PickRandomEntriesFromMatchingSet(
-		Blackboard->IdleDirectControlUnits,
+		Blackboard.IdleDirectControlUnits,
 		GetIsSquadEntry,
 		UnitsToPick,
 		PickedBlackboardEntries);
 	PickRandomEntriesFromMatchingSet(
-		Blackboard->IdleDirectControlUnits,
+		Blackboard.IdleDirectControlUnits,
 		GetIsTankEntry,
 		UnitsToPick,
 		PickedBlackboardEntries);
@@ -787,16 +793,18 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferTank_PickRandomMi
 	const int32 MinUnitsToPick,
 	const int32 MaxUnitsToPick) const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
 	const int32 UnitsToPick = GetRandomMinMaxPickCount(
 		MinUnitsToPick,
 		MaxUnitsToPick,
-		Blackboard->IdleDirectControlUnits.Num());
+		Blackboard.IdleDirectControlUnits.Num());
 	if (UnitsToPick <= 0)
 	{
 		return FBlackboardIdleUnitsResult();
@@ -806,12 +814,12 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferTank_PickRandomMi
 	PickedBlackboardEntries.Reserve(UnitsToPick);
 
 	PickRandomEntriesFromMatchingSet(
-		Blackboard->IdleDirectControlUnits,
+		Blackboard.IdleDirectControlUnits,
 		GetIsTankEntry,
 		UnitsToPick,
 		PickedBlackboardEntries);
 	PickRandomEntriesFromMatchingSet(
-		Blackboard->IdleDirectControlUnits,
+		Blackboard.IdleDirectControlUnits,
 		GetIsSquadEntry,
 		UnitsToPick,
 		PickedBlackboardEntries);
@@ -823,16 +831,18 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferNoHazmats_PickRan
 	const int32 MinUnitsToPick,
 	const int32 MaxUnitsToPick) const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
 	const int32 UnitsToPick = GetRandomMinMaxPickCount(
 		MinUnitsToPick,
 		MaxUnitsToPick,
-		Blackboard->IdleDirectControlUnits.Num());
+		Blackboard.IdleDirectControlUnits.Num());
 	if (UnitsToPick <= 0)
 	{
 		return FBlackboardIdleUnitsResult();
@@ -842,7 +852,7 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferNoHazmats_PickRan
 	PickedBlackboardEntries.Reserve(UnitsToPick);
 
 	PickRandomEntriesFromMatchingSet(
-		Blackboard->IdleDirectControlUnits,
+		Blackboard.IdleDirectControlUnits,
 		GetIsNotHazmatEngineerSquadEntry,
 		UnitsToPick,
 		PickedBlackboardEntries);
@@ -850,7 +860,7 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PreferNoHazmats_PickRan
 	if (PickedBlackboardEntries.Num() < MinUnitsToPick)
 	{
 		PickRandomEntriesFromMatchingSet(
-			Blackboard->IdleDirectControlUnits,
+			Blackboard.IdleDirectControlUnits,
 			GetIsHazmatEngineerSquadEntry,
 			MinUnitsToPick,
 			PickedBlackboardEntries);
@@ -863,14 +873,16 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::IdleHazmatEngineers_Pic
 	const int32 MinUnitsToPick,
 	const int32 MaxUnitsToPick) const
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return FBlackboardIdleUnitsResult();
 	}
 
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
 	int32 AvailableHazmatCount = 0;
-	for (const FBlackboardIdleUnitEntry& IdleEntry : Blackboard->IdleDirectControlUnits)
+	for (const FBlackboardIdleUnitEntry& IdleEntry : Blackboard.IdleDirectControlUnits)
 	{
 		if (GetIsHazmatEngineerSquadEntry(IdleEntry))
 		{
@@ -890,7 +902,7 @@ FBlackboardIdleUnitsResult UEnemyDirectControlComponent::IdleHazmatEngineers_Pic
 	TArray<FBlackboardIdleUnitEntry> PickedBlackboardEntries;
 	PickedBlackboardEntries.Reserve(UnitsToPick);
 	PickRandomEntriesFromMatchingSet(
-		Blackboard->IdleDirectControlUnits,
+		Blackboard.IdleDirectControlUnits,
 		GetIsHazmatEngineerSquadEntry,
 		UnitsToPick,
 		PickedBlackboardEntries);
@@ -923,21 +935,23 @@ void UEnemyDirectControlComponent::TickDirectControl()
 
 void UEnemyDirectControlComponent::RemoveInvalidRegisteredUnits()
 {
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return;
 	}
 
-	for (int32 UnitIndex = Blackboard->IdleDirectControlUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+
+	for (int32 UnitIndex = Blackboard.IdleDirectControlUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
 	{
-		const TWeakObjectPtr<AActor> RegisteredUnit = Blackboard->IdleDirectControlUnits[UnitIndex];
+		const TWeakObjectPtr<AActor> RegisteredUnit = Blackboard.IdleDirectControlUnits[UnitIndex];
 		if (RegisteredUnit.IsValid())
 		{
 			continue;
 		}
 
-		Blackboard->IdleDirectControlUnits.RemoveAtSwap(UnitIndex);
+		Blackboard.IdleDirectControlUnits.RemoveAtSwap(UnitIndex);
 	}
 }
 
@@ -954,12 +968,14 @@ void UEnemyDirectControlComponent::DebugDrawRegisteredDirectControlUnits() const
 		return;
 	}
 
-	FStrategicAIBlackboard* Blackboard = nullptr;
-	if (not EnsureIsValidBlackboard(Blackboard))
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		return;
 	}
-	for (TWeakObjectPtr<AActor> RegisteredUnit : Blackboard->IdleDirectControlUnits)
+
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	for (TWeakObjectPtr<AActor> RegisteredUnit : Blackboard.IdleDirectControlUnits)
 	{
 		if (not RegisteredUnit.IsValid())
 		{
