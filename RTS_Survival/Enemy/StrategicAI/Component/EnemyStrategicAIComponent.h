@@ -90,7 +90,6 @@ public:
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
 	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
-	FStrategicAIBlackboard* GetEditableStrategicAIBlackboardPointer();
 
 	// This request is periodically used to find the bases owned by the AI.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

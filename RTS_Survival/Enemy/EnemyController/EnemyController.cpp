@@ -141,14 +141,16 @@ UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
 
 void AEnemyController::SetAllowDirectControlStochasticDecisionTree(const bool bAllow)
 {
-	FStrategicAIBlackboard* StrategicAIBlackboard = GetStrategicAIBlackboard();
-	if (not StrategicAIBlackboard)
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		RTSFunctionLibrary::ReportError(
-			"Failed to set allow direct control for stochastic decision tree: Invalid strategic AI blackboard.");
+			"Failed to set allow direct control for stochastic decision tree: Invalid strategic AI component.");
 		return;
 	}
-	StrategicAIBlackboard->StrategicAIMissionSettings.bAllowDirectControlStochasticDecisionTree = bAllow;
+
+	FStrategicAIBlackboard& StrategicAIBlackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	StrategicAIBlackboard.StrategicAIMissionSettings.bAllowDirectControlStochasticDecisionTree = bAllow;
 }
 
 void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& SquadControllers,
@@ -683,15 +685,6 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 	return M_EnemyStrategicAIComponent;
 }
 
-FStrategicAIBlackboard* AEnemyController::GetStrategicAIBlackboard() const
-{
-	if (not GetIsValidEnemyStrategicAIComponent())
-	{
-		return nullptr;
-	}
-	return M_EnemyStrategicAIComponent->GetEditableStrategicAIBlackboardPointer();
-}
-
 UEnemyFieldConstructionComponent* AEnemyController::GetEnemyFieldConstructionComponent() const
 {
 	return M_FieldConstructionComponent;
@@ -753,14 +746,16 @@ void AEnemyController::BeginPlay_InitStochasticDecisionTree()
 
 void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
 {
-	FStrategicAIBlackboard* StrategicAIBlackboard = GetStrategicAIBlackboard();
-	if (not StrategicAIBlackboard)
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
 	{
 		RTSFunctionLibrary::ReportError(
-			"Could not move AI settings to strategic AI blackboard because strategic AI blackboard was invalid.");
+			"Could not move AI settings to strategic AI blackboard because strategic AI component was invalid.");
 		return;
 	}
-	StrategicAIBlackboard->StrategicAIMissionSettings = M_EnemyAIMissionSettings;
+
+	FStrategicAIBlackboard& StrategicAIBlackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	StrategicAIBlackboard.StrategicAIMissionSettings = M_EnemyAIMissionSettings;
 }
 
 bool AEnemyController::GetIsValidFormationController() const

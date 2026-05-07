@@ -53,12 +53,12 @@ void UStochasticDecisionTree::InitStochasticDecisionTree(
 }
 
 void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds,
-                                                     FStrategicAIBlackboard* Blackboard)
+                                                     FStrategicAIBlackboard& Blackboard)
 {
 	// Filter top level actions to only get those of which we do have sub-actions to pick from that are not
 	// blocked by requirements.
 	const TArray<const FStrategicAIAction*> ValidActions =
-		GetActionsWithValidSubActions(*Blackboard, GameTimeSeconds);
+		GetActionsWithValidSubActions(Blackboard, GameTimeSeconds);
 	if (not EnsureHasAnyValidActions(ValidActions))
 	{
 		return;
@@ -674,12 +674,12 @@ const TArray<const UStrategicAISubAction*> UStochasticDecisionTree::GetSubAction
 
 	for (const TObjectPtr<UStrategicAISubAction>& SubAction : SubActions)
 	{
-		if (!IsValid(SubAction))
+		if (not IsValid(SubAction))
 		{
 			continue;
 		}
 
-		if (!SubAction->GetAreRequirementsMet(Blackboard, GameTimeSeconds))
+		if (not SubAction->GetAreRequirementsMet(Blackboard, GameTimeSeconds))
 		{
 			continue;
 		}

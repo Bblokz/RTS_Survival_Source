@@ -5,17 +5,12 @@
 namespace
 {
 	bool HasAtLeastXUnitsOfType(
-		const FStrategicAIBlackboard* const Blackboard,
+		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinUnits,
 		const EAllUnitType UnitType)
 	{
-		if (not Blackboard)
-		{
-			return false;
-		}
-
 		int32 FoundUnits = 0;
-		for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard->IdleDirectControlUnits)
+		for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 		{
 			if (not EachIdleUnit.IdleUnit.IsValid())
 			{

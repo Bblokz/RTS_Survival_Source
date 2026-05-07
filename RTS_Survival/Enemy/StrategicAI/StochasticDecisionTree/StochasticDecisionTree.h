@@ -89,7 +89,7 @@ public:
 
 	// Note that prior to calling this all the idle units in the blackboard are RTSIsValid and
 	// all arrays of location vectors are check for near zero.
-	void DecisionTree_ThinkStep(const float GameTimeSeconds, FStrategicAIBlackboard* Blackboard);
+	void DecisionTree_ThinkStep(const float GameTimeSeconds, FStrategicAIBlackboard& Blackboard);
 
 private:
 	bool EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
