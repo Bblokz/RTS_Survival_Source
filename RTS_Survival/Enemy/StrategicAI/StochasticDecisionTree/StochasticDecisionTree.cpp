@@ -432,8 +432,6 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 		return;
 	}
 
-	TArray<FVector> WayPoints;
-	FRotator FinalMoveRotation;
 	const FVector StartLocation = StochasticHelpers::GetAverageLocationPickedBlackboardUnits(PickedUnits);
 	FVector AverageSpawnLocation = StartLocation;
 	FVector StartLocation_Projected = StartLocation;
@@ -447,13 +445,14 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 		bStartLocationIsProjected = true;
 	}
 
-	BuildAttackMoveWayPoints(
-		SubAction, AverageSpawnLocation, bStartLocationIsProjected, AttackLocations, WayPoints, FinalMoveRotation);
+	TArray<FVector> WayPoints = BuildAttackMoveWayPoints(
+		AverageSpawnLocation, bStartLocationIsProjected, AttackLocations);
 	if (WayPoints.IsEmpty())
 	{
 		return;
 	}
 
+	const FRotator FinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(AverageSpawnLocation, WayPoints.Last());
 	M_EnemyFormationController->MoveAttackMoveFormationToLocation(
 		PickedUnits.SquadControllers,
 		PickedUnits.TankMasters,
@@ -472,39 +471,38 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 }
 
 
-void UStochasticDecisionTree::BuildAttackMoveWayPoints(
-	const UStrategicAISubAction* SubAction,
+TArray<FVector> UStochasticDecisionTree::BuildAttackMoveWayPoints(
 	const FVector& StartLocation,
 	const bool bStartLocationIsProjected,
-	TArray<FVector> AttackLocations,
-	TArray<FVector>& OutWayPoints,
-	FRotator& OutFinalMoveRotation) const
+	TArray<FVector> AttackLocations) const
 {
+	TArray<FVector> WayPoints;
 	if (AttackLocations.IsEmpty())
 	{
-		return;
+		return WayPoints;
 	}
 
 	StochasticHelpers::SortArrayByDistanceToLocation(AttackLocations, StartLocation);
-	if (SubAction->SubtypeAction == ESubtypeAction::AttackMoveToPlayerHQ &&
-		TryBuildPlayerHQAttackPath(StartLocation, AttackLocations.Last(), OutWayPoints))
+	if (PathFindAttackPath(StartLocation, AttackLocations[0], bStartLocationIsProjected, WayPoints))
 	{
-		OutFinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, OutWayPoints.Last());
-		return;
+		AttackLocations.RemoveAt(0, 1, EAllowShrinking::No);
+		WayPoints.Append(AttackLocations);
+		return WayPoints;
 	}
 
 	if (bStartLocationIsProjected)
 	{
-		OutWayPoints.Add(StartLocation);
+		WayPoints.Add(StartLocation);
 	}
 
-	OutWayPoints.Append(AttackLocations);
-	OutFinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, AttackLocations.Last());
+	WayPoints.Append(AttackLocations);
+	return WayPoints;
 }
 
-bool UStochasticDecisionTree::TryBuildPlayerHQAttackPath(
+bool UStochasticDecisionTree::PathFindAttackPath(
 	const FVector& StartLocation,
 	const FVector& TargetLocation,
+	const bool bStartLocationIsProjected,
 	TArray<FVector>& OutWayPoints) const
 {
 	const FStochasticPathFindingParams PathFindingParams{
@@ -512,7 +510,8 @@ bool UStochasticDecisionTree::TryBuildPlayerHQAttackPath(
 		M_EnemyNavigationAIComponent.Get(),
 		StartLocation,
 		TargetLocation,
-		M_AttackMovePlayerHQPathFindingSettings
+		M_AttackMovePathFindingSettings,
+		bStartLocationIsProjected
 	};
 
 	TArray<FVector> PathPoints = StochasticHelpers::BuildNavigablePathPoints(PathFindingParams);

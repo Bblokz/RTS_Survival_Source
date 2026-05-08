@@ -226,7 +226,10 @@ namespace
 	{
 		TArray<FVector> SourcePathPoints;
 		SourcePathPoints.Reserve(NavigationPath.PathPoints.Num() + 2);
-		AddUniquePathPoint(SourcePathPoints, Params.StartLocation);
+		if (Params.bUseStartLocationAsFirstPathPoint)
+		{
+			AddUniquePathPoint(SourcePathPoints, Params.StartLocation);
+		}
 
 		for (const FVector& PathPoint : NavigationPath.PathPoints)
 		{
@@ -261,7 +264,7 @@ namespace
 		float DistanceUntilNextPoint = SafeAveragePointDistance;
 
 		ResampledPathPoints.Reserve(MaxIntermediatePathPoints + 2);
-		AddUniquePathPoint(ResampledPathPoints, Params.StartLocation);
+		AddUniquePathPoint(ResampledPathPoints, SourcePathPoints[0]);
 
 		for (int32 PointIndex = 1; PointIndex < SourcePathPoints.Num(); ++PointIndex)
 		{
