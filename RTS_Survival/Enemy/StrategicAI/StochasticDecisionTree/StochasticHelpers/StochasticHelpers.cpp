@@ -1,5 +1,9 @@
-#include "StochasticHelpers.h"
+﻿#include "StochasticHelpers.h"
 
+#include "DrawDebugHelpers.h"
+#include "NavigationPath.h"
+#include "NavigationSystem.h"
+#include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitsResult/FBlackboardIdleUnitsResult.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
@@ -174,6 +178,172 @@ namespace
 
 		return ClosestPairs;
 	}
+	bool ArePathPointsNearlyEqual(const FVector& FirstPoint, const FVector& SecondPoint)
+	{
+		constexpr float DuplicatePointToleranceSquared = 1.f;
+		return FVector::DistSquared(FirstPoint, SecondPoint) <= DuplicatePointToleranceSquared;
+	}
+
+	void AddUniquePathPoint(TArray<FVector>& OutPathPoints, const FVector& PathPoint)
+	{
+		if (OutPathPoints.IsEmpty())
+		{
+			OutPathPoints.Add(PathPoint);
+			return;
+		}
+
+		if (ArePathPointsNearlyEqual(OutPathPoints.Last(), PathPoint))
+		{
+			return;
+		}
+
+		OutPathPoints.Add(PathPoint);
+	}
+
+	FVector ProjectPathPointOrUseOriginal(const FStochasticPathFindingParams& Params, const FVector& PathPoint)
+	{
+		if (not IsValid(Params.NavComp))
+		{
+			return PathPoint;
+		}
+
+		FVector ProjectedLocation = FVector::ZeroVector;
+		if (Params.NavComp->GetNavigablePoint(
+			PathPoint,
+			Params.Settings.ProjectionScale,
+			ProjectedLocation,
+			EOnProjectionFailedStrategy::LookAtDoubleExtent))
+		{
+			return ProjectedLocation;
+		}
+
+		return PathPoint;
+	}
+
+	TArray<FVector> BuildSourcePathPoints(
+		const FStochasticPathFindingParams& Params,
+		const UNavigationPath& NavigationPath)
+	{
+		TArray<FVector> SourcePathPoints;
+		SourcePathPoints.Reserve(NavigationPath.PathPoints.Num() + 2);
+		AddUniquePathPoint(SourcePathPoints, Params.StartLocation);
+
+		for (const FVector& PathPoint : NavigationPath.PathPoints)
+		{
+			AddUniquePathPoint(SourcePathPoints, PathPoint);
+		}
+
+		AddUniquePathPoint(SourcePathPoints, Params.TargetLocation);
+		return SourcePathPoints;
+	}
+
+	void AppendProjectedPathPoint(
+		const FStochasticPathFindingParams& Params,
+		const FVector& PathPoint,
+		TArray<FVector>& OutPathPoints)
+	{
+		AddUniquePathPoint(OutPathPoints, ProjectPathPointOrUseOriginal(Params, PathPoint));
+	}
+
+	TArray<FVector> ResamplePathPoints(
+		const FStochasticPathFindingParams& Params,
+		const UNavigationPath& NavigationPath)
+	{
+		const TArray<FVector> SourcePathPoints = BuildSourcePathPoints(Params, NavigationPath);
+		TArray<FVector> ResampledPathPoints;
+		if (SourcePathPoints.Num() < 2)
+		{
+			return ResampledPathPoints;
+		}
+
+		const float SafeAveragePointDistance = FMath::Max(Params.Settings.AveragePathPointDistance, 100.f);
+		const int32 MaxIntermediatePathPoints = FMath::Max(Params.Settings.MaxIntermediatePathPoints, 0);
+		float DistanceUntilNextPoint = SafeAveragePointDistance;
+
+		ResampledPathPoints.Reserve(MaxIntermediatePathPoints + 2);
+		AddUniquePathPoint(ResampledPathPoints, Params.StartLocation);
+
+		for (int32 PointIndex = 1; PointIndex < SourcePathPoints.Num(); ++PointIndex)
+		{
+			FVector SegmentStart = SourcePathPoints[PointIndex - 1];
+			const FVector SegmentEnd = SourcePathPoints[PointIndex];
+			float SegmentLength = FVector::Distance(SegmentStart, SegmentEnd);
+
+			while (SegmentLength >= DistanceUntilNextPoint && ResampledPathPoints.Num() - 1 < MaxIntermediatePathPoints)
+			{
+				const FVector Direction = (SegmentEnd - SegmentStart).GetSafeNormal();
+				const FVector NewPathPoint = SegmentStart + Direction * DistanceUntilNextPoint;
+				AppendProjectedPathPoint(Params, NewPathPoint, ResampledPathPoints);
+
+				SegmentStart = NewPathPoint;
+				SegmentLength = FVector::Distance(SegmentStart, SegmentEnd);
+				DistanceUntilNextPoint = SafeAveragePointDistance;
+			}
+
+			DistanceUntilNextPoint -= SegmentLength;
+			if (DistanceUntilNextPoint <= KINDA_SMALL_NUMBER)
+			{
+				DistanceUntilNextPoint = SafeAveragePointDistance;
+			}
+		}
+
+		if (ResampledPathPoints.Num() > 1 &&
+			FVector::Distance(
+				ResampledPathPoints.Last(),
+				Params.TargetLocation) < Params.Settings.MinimumFinalSegmentDistance)
+		{
+			ResampledPathPoints.RemoveAt(ResampledPathPoints.Num() - 1, 1, EAllowShrinking::No);
+		}
+
+		AddUniquePathPoint(ResampledPathPoints, Params.TargetLocation);
+		return ResampledPathPoints;
+	}
+
+	void DebugDrawPathFindingResult(const FStochasticPathFindingParams& Params, const TArray<FVector>& PathPoints)
+	{
+		if constexpr (EnemyAISettings::Debugging::StochasticPathFindingDebugging)
+		{
+			if (PathPoints.IsEmpty() || not IsValid(Params.WorldContextObject))
+			{
+				return;
+			}
+
+			UWorld* World = Params.WorldContextObject->GetWorld();
+			if (not IsValid(World))
+			{
+				return;
+			}
+
+			const FVector DebugOffset(0.f, 0.f, Params.Settings.DebugDrawZOffset);
+			for (int32 PathPointIndex = 0; PathPointIndex < PathPoints.Num(); ++PathPointIndex)
+			{
+				const FVector DebugLocation = PathPoints[PathPointIndex] + DebugOffset;
+				DrawDebugSphere(
+					World,
+					DebugLocation,
+					Params.Settings.DebugSphereRadius,
+					Params.Settings.DebugSphereSegments,
+					FColor::Orange,
+					false,
+					Params.Settings.DebugDrawDuration);
+
+				if (not PathPoints.IsValidIndex(PathPointIndex + 1))
+				{
+					continue;
+				}
+
+				DrawDebugDirectionalArrow(
+					World,
+					DebugLocation,
+					PathPoints[PathPointIndex + 1] + DebugOffset,
+					Params.Settings.DebugSphereRadius,
+					FColor::Orange,
+					false,
+					Params.Settings.DebugDrawDuration);
+			}
+		}
+	}
+
 }
 
 namespace StochasticHelpers
@@ -322,6 +492,29 @@ namespace StochasticHelpers
 	TArray<FVector> ExhaustivePick(const TArray<FVector>& Locations, const int32 MaxPick)
 	{
 		return PickRandomMaxLocations(Locations, MaxPick);
+	}
+
+	TArray<FVector> BuildNavigablePathPoints(const FStochasticPathFindingParams& Params)
+	{
+		TArray<FVector> PathPoints;
+		if (not IsValid(Params.WorldContextObject))
+		{
+			return PathPoints;
+		}
+
+		UObject* WorldContextObject = const_cast<UObject*>(Params.WorldContextObject);
+		UNavigationPath* NavigationPath = UNavigationSystemV1::FindPathToLocationSynchronously(
+			WorldContextObject,
+			Params.StartLocation,
+			Params.TargetLocation);
+		if (not IsValid(NavigationPath) || NavigationPath->PathPoints.Num() < 2)
+		{
+			return PathPoints;
+		}
+
+		PathPoints = ResamplePathPoints(Params, *NavigationPath);
+		DebugDrawPathFindingResult(Params, PathPoints);
+		return PathPoints;
 	}
 
 	bool CanProjectNavigable_BulkLocation(const UEnemyNavigationAIComponent* NavComp, const FVector& BulkLocation,

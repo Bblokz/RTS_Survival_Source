@@ -64,10 +64,43 @@ private:
 };
 
 
-// The main brain component on the strategic AI, defines the main actions and sub-actions the AI can pick from,
-// as well as the scores of each action to influence their chances of being picked.
-// The main idea is to have a separate component doing the unit creation and adding those units to the blackboard as idle,
-// then after picking an action this component will go through those idle units and assign them to their action
+
+/**
+ * @brief Tuned by designers to split long strategic attack moves into cheaper, easier-to-follow path chunks.
+ */
+USTRUCT(BlueprintType)
+struct FStochasticPathFindingSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="100.0"))
+	float AveragePathPointDistance = 10000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
+	int32 MaxIntermediatePathPoints = 12;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0.1"))
+	float ProjectionScale = 3.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0.0"))
+	float MinimumFinalSegmentDistance = 2000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0.0"))
+	float DebugDrawZOffset = 50.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0.0"))
+	float DebugSphereRadius = 200.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="4"))
+	int32 DebugSphereSegments = 12;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0.0"))
+	float DebugDrawDuration = 5.f;
+};
+
+/**
+ * @brief Used by the enemy strategic AI component to pick scored sub-actions and assign idle units to the chosen order.
+ */
 UCLASS(BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UStochasticDecisionTree final : public UObject
 {
@@ -118,10 +151,40 @@ private:
 		const UStrategicAISubAction* SubAction,
 		const TArray<FWeakActorLocations>& FlankingPositions,
 		const FStrategicAIBlackboard& Blackboard);
+	/**
+	 * @brief Keeps HQ attack waves on chunked paths while preserving existing fallback waypoint behavior.
+	 * @param SubAction Chosen action that decides whether HQ path resampling applies.
+	 * @param StartLocation Average picked-unit location after the projection attempt.
+	 * @param bStartLocationIsProjected Whether non-HQ fallback may safely prepend the start point.
+	 * @param AttackLocations Candidate attack targets to sort from the wave start.
+	 * @param OutWayPoints Final movement route for the formation controller.
+	 * @param OutFinalMoveRotation Facing direction based on the final waypoint.
+	 */
+	void BuildAttackMoveWayPoints(
+		const UStrategicAISubAction* SubAction,
+		const FVector& StartLocation,
+		bool bStartLocationIsProjected,
+		TArray<FVector> AttackLocations,
+		TArray<FVector>& OutWayPoints,
+		FRotator& OutFinalMoveRotation) const;
+	/**
+	 * @brief Isolates HQ path generation so failed nav path work can fall back to the old direct HQ target.
+	 * @param StartLocation Average picked-unit location used as the path start.
+	 * @param TargetLocation Projected player HQ location used as the path end.
+	 * @param OutWayPoints Start, sampled path points, and final target when pathfinding succeeds.
+	 * @return True when a usable HQ path was generated.
+	 */
+	bool TryBuildPlayerHQAttackPath(
+		const FVector& StartLocation,
+		const FVector& TargetLocation,
+		TArray<FVector>& OutWayPoints) const;
 	TArray<TPair<FVector, TWeakObjectPtr<AActor>>> GetTotalAggregatedWeakActorLocations(const TArray<FWeakActorLocations>& WeakActorLocations) const;
 	bool EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits, const FString& DebugContext);
 	int32 GetMaxFormationWidthForPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits) const;
 	FAttackMoveWaveSettings M_AttackMoveWaveSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
+	FStochasticPathFindingSettings M_AttackMovePlayerHQPathFindingSettings;
 	// Multiplies with the inner radius of the unit's RTS component to determine spacing in formation.
 	float M_AttackMoveWave_FormationOffsetMultiplier = 1.5f;
 
