@@ -6,7 +6,17 @@
 
 struct FStrategicAIAction;
 class UStrategicAISubAction;
+class UEnemyNavigationAIComponent;
 struct FBlackboardIdleUnitsResult;
+
+struct FStochasticPathFindingParams
+{
+	const UObject* WorldContextObject = nullptr;
+	const UEnemyNavigationAIComponent* NavComp = nullptr;
+	FVector StartLocation = FVector::ZeroVector;
+	FVector TargetLocation = FVector::ZeroVector;
+	FStochasticPathFindingSettings Settings;
+};
 
 /**
  * @namespace StochasticHelpers
@@ -96,6 +106,13 @@ namespace StochasticHelpers
 	 * @return Unique random picks in picked order.
 	 */
 	TArray<FVector> ExhaustivePick(const TArray<FVector>& Locations, int32 MaxPick);
+
+	/**
+	 * @brief Resamples an actual nav path so long strategic moves advance through manageable chunks.
+	 * @param Params Groups the world, navigation, endpoints, density, projection, cap, and debug settings.
+	 * @return Start-to-target path when pathfinding succeeds; empty when no valid nav path could be built.
+	 */
+	TArray<FVector> BuildNavigablePathPoints(const FStochasticPathFindingParams& Params);
 
 	/**
 	 * @brief Computes a shared tactical anchor from picked units so follow-up logic can reason from one stable center.
