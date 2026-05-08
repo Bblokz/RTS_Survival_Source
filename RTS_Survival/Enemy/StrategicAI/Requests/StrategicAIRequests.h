@@ -497,6 +497,274 @@ struct FResultAlliedTanksToRetreat
 	FDamagedTanksRetreatGroup Group3;
 };
 
+
+/**
+ * @brief Tunes how enemy-base defense arc candidates are generated from detected base footprints.
+ * Used by designers to keep async defense points useful without requiring game-thread placement logic.
+ */
+USTRUCT(BlueprintType)
+struct FEnemyBaseDefenseArcCandidateParams
+{
+	GENERATED_BODY()
+
+	FEnemyBaseDefenseArcCandidateParams();
+
+	/**
+	 * @brief Limits how many player approach locations can create arcs for each base.
+	 *
+	 * @note Higher values defend more simultaneous attack directions but can quickly spend the candidate budget.
+	 * @note Set to 0 to ignore player locations and skip defense arc creation while still returning base locations.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxThreatLocationsPerBase;
+
+	/**
+	 * @brief Merges nearby player locations so one attack group does not create duplicate defensive arcs.
+	 *
+	 * @note Measured in XY world units before candidate arcs are generated for a base.
+	 * @note Use larger values when player bulk locations are noisy or updated frequently.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ThreatLocationMergeDistanceXY;
+
+	/**
+	 * @brief Merges player locations that attack from almost the same direction relative to a base.
+	 *
+	 * @note Measured as angle difference around the base center, not distance between player groups.
+	 * @note Larger values reduce duplicate front-line arcs when several player groups approach from one side.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ThreatDirectionMergeAngleDegrees;
+
+	/**
+	 * @brief Limits how many front-side buildings can anchor arcs for one player approach direction.
+	 *
+	 * @note Higher values defend wider bases better but produce more candidates before the result cap is applied.
+	 * @note Anchors are chosen from core and satellite buildings already accepted into the detected base cluster.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxAnchorBuildingsPerThreatDirection;
+
+	/**
+	 * @brief Biases anchor selection toward core buildings because losing them is strategically worse.
+	 *
+	 * @note Values above SatelliteBuildingAnchorWeight make arcs prefer core structures on the threatened side.
+	 * @note Keep this near 1 when satellite defenses should be just as likely as core defenses.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float CoreBuildingAnchorWeight;
+
+	/**
+	 * @brief Biases anchor selection for satellite buildings that extend the defendable base footprint.
+	 *
+	 * @note Values above CoreBuildingAnchorWeight make arcs prefer outlying satellite structures.
+	 * @note Keep this positive so satellite buildings can still create forward defense positions.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SatelliteBuildingAnchorWeight;
+
+	/**
+	 * @brief Keeps generated positions from sitting too close to their defended building anchor.
+	 *
+	 * @note Measured in XY world units from the anchor building that created the arc.
+	 * @note Use a value above the largest defender/building collision buffer to avoid overlap.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinOffsetFromDefendedBuildingXY;
+
+	/**
+	 * @brief Sets the intended front-line distance from the defended building toward the player approach.
+	 *
+	 * @note Arc rows are created around this distance before row offsets and small random jitter are applied.
+	 * @note This is the main control for whether defenders stand tight to the base or screen ahead of it.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float PreferredOffsetFromDefendedBuildingXY;
+
+	/**
+	 * @brief Prevents generated positions from drifting too far away from the building they defend.
+	 *
+	 * @note Candidates beyond this XY distance from their anchor are discarded after random jitter is applied.
+	 * @note Keep this higher than PreferredOffsetFromDefendedBuildingXY plus expected row offsets.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxOffsetFromDefendedBuildingXY;
+
+	/**
+	 * @brief Keeps generated positions clear of every core or satellite building in the defended base.
+	 *
+	 * @note This catches cases where an arc around one anchor would overlap another nearby building.
+	 * @note Measured in XY world units against the accepted cluster footprint only.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinOffsetFromAnyBaseBuildingXY;
+
+	/**
+	 * @brief Filters final defense positions that would be too close to existing CPU-owned units.
+	 *
+	 * @note Applied after all arc candidates are accumulated so defenders avoid stacking on allied units or structures.
+	 * @note Set to 0 to disable this final allied-unit spacing filter.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinDistanceDefPositionFromAlliedUnits;
+
+	/**
+	 * @brief Controls how many candidate unit slots are produced across each individual arc row.
+	 *
+	 * @note Odd values place one candidate on the center approach direction and usually look best.
+	 * @note Values below 1 disable arc point creation.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 PointsPerArc;
+
+	/**
+	 * @brief Sets the total horizontal fan width for each defense arc.
+	 *
+	 * @note Wider arcs cover broad attacks, while narrow arcs create compact guard groups.
+	 * @note Measured in degrees around the direction from the defended building to the player location.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArcAngleDegrees;
+
+	/**
+	 * @brief Creates layered defensive rows for each selected building and player approach direction.
+	 *
+	 * @note More rows improve visual depth and tactical fallback options but increase candidate count quickly.
+	 * @note Values below 1 disable arc row creation.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 ArcRowsPerAnchor;
+
+	/**
+	 * @brief Separates layered arc rows so defenders do not stand on the same front line.
+	 *
+	 * @note Added to PreferredOffsetFromDefendedBuildingXY for each additional row.
+	 * @note Keep this near expected unit spacing so rows are distinct but still support each other.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArcRowOffsetXY;
+
+	/**
+	 * @brief Widens later arc rows so outer defenders naturally cover a broader front.
+	 *
+	 * @note A value of 1 keeps all rows the same width; values above 1 widen each row progressively.
+	 * @note Small increases usually look best because the arc should not swing wildly between rows.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArcRowAngleScale;
+
+	/**
+	 * @brief Removes generated candidates that are too close to already accepted defense positions.
+	 *
+	 * @note Applied while candidates are added and again helps when multiple anchors produce overlapping arcs.
+	 * @note Use a value near the intended defender footprint or formation spacing.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinPointSpacingXY;
+
+	/**
+	 * @brief Adds mild location variation so repeated requests do not create identical formations.
+	 *
+	 * @note The random offset is clamped in XY and then validated against building and unit spacing rules.
+	 * @note Keep this much lower than MinPointSpacingXY to avoid unstable-looking formations.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float PositionJitterXY;
+
+	/**
+	 * @brief Adds mild row-distance variation without changing the overall defensive shape.
+	 *
+	 * @note Expressed as a fraction of the row distance, so 0.08 means up to eight percent variation.
+	 * @note Keep this small to avoid defenders jumping too far between async updates.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArcDistanceJitterRatio;
+
+	/**
+	 * @brief Offsets side-unit facing from the center threat direction for a more natural arc.
+	 *
+	 * @note Center candidates face the player most directly while edge candidates rotate up to this amount.
+	 * @note Measured in degrees and combined with the small random yaw jitter.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxYawOffsetFromThreatDegrees;
+
+	/**
+	 * @brief Slightly increases yaw variation on outer rows so layered arcs do not look cloned.
+	 *
+	 * @note A value of 1 keeps row yaw variation identical; values above 1 widen outer row facings.
+	 * @note Keep this subtle to preserve the main rule that defenders face the player approach.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float OuterArcYawScale;
+
+	/**
+	 * @brief Adds small random facing variation after the formation yaw is calculated.
+	 *
+	 * @note This prevents repeated requests from returning identical rotations for the same geometry.
+	 * @note Keep this low so defenders still clearly face the relevant player location.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float YawJitterDegrees;
+
+	/**
+	 * @brief Merges final candidates that land nearly on top of each other.
+	 *
+	 * @note Useful when neighboring anchors or multiple player directions create overlapping arc positions.
+	 * @note This is separate from MinPointSpacingXY so designers can tune visual spacing and duplicate cleanup independently.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float DuplicateCandidateMergeDistanceXY;
+
+	/**
+	 * @brief Caps candidate count per accepted base before results are returned to the game thread.
+	 *
+	 * @note The best early-generated candidates are kept, so lower values favor closer threats and stronger anchors.
+	 * @note Set to 0 to allow all candidates for each base, bounded only by the total result cap.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxDefensePointCandidatesPerBase;
+
+	/**
+	 * @brief Caps total defense candidates across all returned bases in this async result.
+	 *
+	 * @note Prevents large base counts or many threat directions from producing expensive result payloads.
+	 * @note Set to 0 to allow all generated candidates after validation and duplicate filtering.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxDefensePointCandidatesTotal;
+};
+
+/**
+ * @brief Carries one async-generated defensive placement candidate and its intended facing.
+ * Used by strategic consumers to place defenders without recalculating threat-facing rotation on the game thread.
+ */
+USTRUCT(BlueprintType)
+struct FDefensePositions
+{
+	GENERATED_BODY()
+
+	FDefensePositions();
+
+	/**
+	 * @brief Marks where a defender can stand while protecting one detected enemy base.
+	 *
+	 * @note Filled only when player locations were supplied and arc generation produced valid candidates.
+	 * @note Not filled for base-only requests or candidates filtered by spacing rules.
+	 */
+	UPROPERTY()
+	FVector Location;
+
+	/**
+	 * @brief Stores the world yaw that faces the defended arc toward the relevant player approach.
+	 *
+	 * @note Filled alongside Location so consumers can orient units consistently with the generated arc.
+	 * @note Includes small designer-controlled variation to avoid identical repeated formations.
+	 */
+	UPROPERTY()
+	float YawRotation;
+};
+
 USTRUCT(Blueprintable)
 struct FFindEnemyBaseClusters
 {
@@ -532,6 +800,24 @@ struct FFindEnemyBaseClusters
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EBuildingExpansionType> SatelliteBuildingTypes;
+
+	/**
+	 * @brief Supplies player attack positions that should shape optional base-defense arc candidates.
+	 *
+	 * @note Base locations are still found when this is empty; only DefensePointCandidates are skipped.
+	 * @note Filled by callers from current player unit, bulk, or pressure locations before queuing the async request.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FVector> PlayerUnitLocationsToDefendAgainst;
+
+	/**
+	 * @brief Controls optional arc candidate generation around detected base buildings.
+	 *
+	 * @note Used only when PlayerUnitLocationsToDefendAgainst contains at least one usable location.
+	 * @note Base cluster detection still uses the core and satellite settings below.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FEnemyBaseDefenseArcCandidateParams DefenseArcCandidateParams;
 
 	/**
 	 * @brief Sets planar grouping radius so nearby core buildings collapse into one base candidate. Uses with the MinCoreNeighbors
@@ -606,6 +892,15 @@ struct FResultEnemyBaseClusters
 	 */
 	UPROPERTY()
 	TArray<FVector> BasePoints;
+
+	/**
+	 * @brief Provides optional unit placement candidates for defending detected bases against supplied player positions.
+	 *
+	 * @note Filled after base clustering only when PlayerUnitLocationsToDefendAgainst produced valid arc candidates.
+	 * @note Not filled when the request asks only for base locations or all candidates fail spacing filters.
+	 */
+	UPROPERTY()
+	TArray<FDefensePositions> DefensePointCandidates;
 };
 
 /**
