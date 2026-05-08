@@ -441,7 +441,8 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 	if (StochasticHelpers::CanProjectNavigable_AveragePickedUnitLocation(M_EnemyNavigationAIComponent.Get(),
 	                                                                     StartLocation, StartLocation_Projected))
 	{
-		// We managed to project to the navigation mesh so start at our average unit location point.
+		// We managed to project to the navigation mesh so start at our average unit location point that is now on the
+		// nav mesh.
 		AverageSpawnLocation = StartLocation_Projected;
 		bStartLocationIsProjected = true;
 	}
@@ -474,7 +475,7 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 void UStochasticDecisionTree::BuildAttackMoveWayPoints(
 	const UStrategicAISubAction* SubAction,
 	const FVector& StartLocation,
-	bool bStartLocationIsProjected,
+	const bool bStartLocationIsProjected,
 	TArray<FVector> AttackLocations,
 	TArray<FVector>& OutWayPoints,
 	FRotator& OutFinalMoveRotation) const
