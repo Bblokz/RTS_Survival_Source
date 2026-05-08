@@ -50,6 +50,7 @@ namespace EnemyAISettings
 		inline constexpr float PlayerUnitBulkLocationDebuggingRadius = 250.f;
 		inline constexpr float PlayerUnitBulkLocationDebugDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
 		inline constexpr bool StochasticDecisionTreeDebugging = true;
+		inline constexpr bool StochasticPathFindingDebugging = true;
 		// Should be lower than thinking speed
 		inline constexpr float StochasticActionsDebugTime = 5.f;
 		inline constexpr float StochasticActionsAttackLocationDebugRadius = 200.f;

@@ -422,30 +422,28 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 	{
 		return;
 	}
+
 	TArray<FVector> WayPoints;
 	FRotator FinalMoveRotation;
 	const FVector StartLocation = StochasticHelpers::GetAverageLocationPickedBlackboardUnits(PickedUnits);
-	FVector AverageSpawnLocation;
+	FVector AverageSpawnLocation = StartLocation;
 	FVector StartLocation_Projected = StartLocation;
+	bool bStartLocationIsProjected = false;
 	if (StochasticHelpers::CanProjectNavigable_AveragePickedUnitLocation(M_EnemyNavigationAIComponent.Get(),
 	                                                                     StartLocation, StartLocation_Projected))
 	{
 		// We managed to project to the navigation mesh so start at our average unit location point.
-		StochasticHelpers::SortArrayByDistanceToLocation(AttackLocations, StartLocation_Projected);
-		WayPoints.Add(StartLocation_Projected);
-		WayPoints.Append(AttackLocations);
-		FinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation_Projected, AttackLocations.Last());
 		AverageSpawnLocation = StartLocation_Projected;
+		bStartLocationIsProjected = true;
 	}
-	else
+
+	BuildAttackMoveWayPoints(
+		SubAction, AverageSpawnLocation, bStartLocationIsProjected, AttackLocations, WayPoints, FinalMoveRotation);
+	if (WayPoints.IsEmpty())
 	{
-		// Projection failed; still sort by distance to average location but do not start with going there
-		// as it may be unreachable.
-		StochasticHelpers::SortArrayByDistanceToLocation(AttackLocations, StartLocation);
-		WayPoints.Append(AttackLocations);
-		FinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, AttackLocations.Last());
-		AverageSpawnLocation = StartLocation;
+		return;
 	}
+
 	M_EnemyFormationController->MoveAttackMoveFormationToLocation(
 		PickedUnits.SquadControllers,
 		PickedUnits.TankMasters,
@@ -461,6 +459,60 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 	{
 		DebugPickedUnitsAndWayPoints(PickedUnits, WayPoints);
 	}
+}
+
+
+void UStochasticDecisionTree::BuildAttackMoveWayPoints(
+	const UStrategicAISubAction* SubAction,
+	const FVector& StartLocation,
+	bool bStartLocationIsProjected,
+	TArray<FVector> AttackLocations,
+	TArray<FVector>& OutWayPoints,
+	FRotator& OutFinalMoveRotation) const
+{
+	if (AttackLocations.IsEmpty())
+	{
+		return;
+	}
+
+	StochasticHelpers::SortArrayByDistanceToLocation(AttackLocations, StartLocation);
+	if (SubAction->SubtypeAction == ESubtypeAction::AttackMoveToPlayerHQ &&
+		TryBuildPlayerHQAttackPath(StartLocation, AttackLocations.Last(), OutWayPoints))
+	{
+		OutFinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, OutWayPoints.Last());
+		return;
+	}
+
+	if (bStartLocationIsProjected)
+	{
+		OutWayPoints.Add(StartLocation);
+	}
+
+	OutWayPoints.Append(AttackLocations);
+	OutFinalMoveRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, AttackLocations.Last());
+}
+
+bool UStochasticDecisionTree::TryBuildPlayerHQAttackPath(
+	const FVector& StartLocation,
+	const FVector& TargetLocation,
+	TArray<FVector>& OutWayPoints) const
+{
+	const FStochasticPathFindingParams PathFindingParams{
+		this,
+		M_EnemyNavigationAIComponent.Get(),
+		StartLocation,
+		TargetLocation,
+		M_AttackMovePlayerHQPathFindingSettings
+	};
+
+	TArray<FVector> PathPoints = StochasticHelpers::BuildNavigablePathPoints(PathFindingParams);
+	if (PathPoints.IsEmpty())
+	{
+		return false;
+	}
+
+	OutWayPoints = MoveTemp(PathPoints);
+	return true;
 }
 
 void UStochasticDecisionTree::CreateFlankingAttack(const UStrategicAISubAction* SubAction,
