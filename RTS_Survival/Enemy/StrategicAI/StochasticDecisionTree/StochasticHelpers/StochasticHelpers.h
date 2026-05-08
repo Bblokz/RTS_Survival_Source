@@ -16,6 +16,7 @@ struct FStochasticPathFindingParams
 	FVector StartLocation = FVector::ZeroVector;
 	FVector TargetLocation = FVector::ZeroVector;
 	FStochasticPathFindingSettings Settings;
+	bool bUseStartLocationAsFirstPathPoint = true;
 };
 
 /**

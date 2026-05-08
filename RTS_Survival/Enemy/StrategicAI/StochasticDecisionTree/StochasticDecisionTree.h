@@ -154,31 +154,28 @@ private:
 		const TArray<FWeakActorLocations>& FlankingPositions,
 		const FStrategicAIBlackboard& Blackboard);
 	/**
-	 * @brief Keeps HQ attack waves on chunked paths while preserving existing fallback waypoint behavior.
-	 * @param SubAction Chosen action that decides whether HQ path resampling applies.
+	 * @brief Builds general attack-move routes through navigation so every wave can share the same fallback rules.
 	 * @param StartLocation Average picked-unit location after the projection attempt.
-	 * @param bStartLocationIsProjected Whether non-HQ fallback may safely prepend the start point.
+	 * @param bStartLocationIsProjected Whether the start can be safely preserved as the first waypoint.
 	 * @param AttackLocations Candidate attack targets to sort from the wave start.
-	 * @param OutWayPoints Final movement route for the formation controller.
-	 * @param OutFinalMoveRotation Facing direction based on the final waypoint.
+	 * @return Final movement route for the formation controller.
 	 */
-	void BuildAttackMoveWayPoints(
-		const UStrategicAISubAction* SubAction,
+	TArray<FVector> BuildAttackMoveWayPoints(
 		const FVector& StartLocation,
 		bool bStartLocationIsProjected,
-		TArray<FVector> AttackLocations,
-		TArray<FVector>& OutWayPoints,
-		FRotator& OutFinalMoveRotation) const;
+		TArray<FVector> AttackLocations) const;
 	/**
-	 * @brief Isolates HQ path generation so failed nav path work can fall back to the old direct HQ target.
+	 * @brief Isolates attack path generation so failed nav path work can fall back to direct target waypoints.
 	 * @param StartLocation Average picked-unit location used as the path start.
-	 * @param TargetLocation Projected player HQ location used as the path end.
-	 * @param OutWayPoints Start, sampled path points, and final target when pathfinding succeeds.
-	 * @return True when a usable HQ path was generated.
+	 * @param TargetLocation First sorted attack location used as the path end.
+	 * @param bStartLocationIsProjected Whether the path should preserve StartLocation as its first point.
+	 * @param OutWayPoints Start/path points/final target when pathfinding succeeds.
+	 * @return True when a usable attack path was generated.
 	 */
-	bool TryBuildPlayerHQAttackPath(
+	bool PathFindAttackPath(
 		const FVector& StartLocation,
 		const FVector& TargetLocation,
+		bool bStartLocationIsProjected,
 		TArray<FVector>& OutWayPoints) const;
 	TArray<TPair<FVector, TWeakObjectPtr<AActor>>> GetTotalAggregatedWeakActorLocations(const TArray<FWeakActorLocations>& WeakActorLocations) const;
 	bool EnsureHasNonZeroPickedUnits(const FBlackboardIdleUnitsResult& PickedUnits, const FString& DebugContext);
@@ -186,7 +183,7 @@ private:
 	FAttackMoveWaveSettings M_AttackMoveWaveSettings;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
-	FStochasticPathFindingSettings M_AttackMovePlayerHQPathFindingSettings;
+	FStochasticPathFindingSettings M_AttackMovePathFindingSettings;
 	// Multiplies with the inner radius of the unit's RTS component to determine spacing in formation.
 	float M_AttackMoveWave_FormationOffsetMultiplier = 1.5f;
 
