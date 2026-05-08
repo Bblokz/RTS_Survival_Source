@@ -59,6 +59,41 @@ FResultAlliedTanksToRetreat::FResultAlliedTanksToRetreat()
 {
 }
 
+FEnemyBaseDefenseArcCandidateParams::FEnemyBaseDefenseArcCandidateParams()
+	: MaxThreatLocationsPerBase(3)
+	, ThreatLocationMergeDistanceXY(3000.f)
+	, ThreatDirectionMergeAngleDegrees(25.f)
+	, MaxAnchorBuildingsPerThreatDirection(2)
+	, CoreBuildingAnchorWeight(1.25f)
+	, SatelliteBuildingAnchorWeight(1.f)
+	, MinOffsetFromDefendedBuildingXY(700.f)
+	, PreferredOffsetFromDefendedBuildingXY(1500.f)
+	, MaxOffsetFromDefendedBuildingXY(3500.f)
+	, MinOffsetFromAnyBaseBuildingXY(600.f)
+	, MinDistanceDefPositionFromAlliedUnits(500.f)
+	, PointsPerArc(5)
+	, ArcAngleDegrees(90.f)
+	, ArcRowsPerAnchor(2)
+	, ArcRowOffsetXY(900.f)
+	, ArcRowAngleScale(1.15f)
+	, MinPointSpacingXY(650.f)
+	, PositionJitterXY(150.f)
+	, ArcDistanceJitterRatio(0.06f)
+	, MaxYawOffsetFromThreatDegrees(25.f)
+	, OuterArcYawScale(1.1f)
+	, YawJitterDegrees(4.f)
+	, DuplicateCandidateMergeDistanceXY(500.f)
+	, MaxDefensePointCandidatesPerBase(24)
+	, MaxDefensePointCandidatesTotal(48)
+{
+}
+
+FDefensePositions::FDefensePositions()
+	: Location(FVector::ZeroVector)
+	, YawRotation(0.f)
+{
+}
+
 FFindEnemyBaseClusters::FFindEnemyBaseClusters()
 	: RequestID(0)
 	, CoreClusterDistanceXY(1500.f)

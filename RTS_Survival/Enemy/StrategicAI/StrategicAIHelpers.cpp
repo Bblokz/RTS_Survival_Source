@@ -64,6 +64,544 @@ namespace StrategicAIHelperUtilities
 		});
 	}
 
+	struct FEnemyBasePoint
+	{
+		FVector2D Location = FVector2D::ZeroVector;
+		bool bIsCoreBuilding = false;
+	};
+
+	struct FEnemyBaseClusterCandidate
+	{
+		TArray<FEnemyBasePoint> BuildingPoints;
+		FVector Point = FVector::ZeroVector;
+		float Score = 0.f;
+	};
+
+	struct FDefenseArcAnchorCandidate
+	{
+		FVector2D Location = FVector2D::ZeroVector;
+		float Score = 0.f;
+	};
+
+	void GatherEnemyBaseRequestPoints(
+		const FFindEnemyBaseClusters& Request,
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+		TArray<FVector2D>& OutCorePoints,
+		TArray<FVector2D>& OutSatellitePoints,
+		TArray<FVector>& OutAlliedUnitLocations)
+	{
+		const TSet<EBuildingExpansionType> CoreTypes(Request.CoreBuildingTypes);
+		const TSet<EBuildingExpansionType> SatelliteTypes(Request.SatelliteBuildingTypes);
+		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
+		{
+			if (UnitState.OwningPlayer != StrategicAIHelperConstants::EnemyOwningId)
+			{
+				continue;
+			}
+
+			OutAlliedUnitLocations.Add(UnitState.UnitLocation);
+			if (UnitState.UnitType != EAllUnitType::UNType_BuildingExpansion)
+			{
+				continue;
+			}
+
+			const EBuildingExpansionType BuildingType = static_cast<EBuildingExpansionType>(UnitState.UnitSubtypeRaw);
+			const FVector2D UnitLocationXY(UnitState.UnitLocation.X, UnitState.UnitLocation.Y);
+			if (CoreTypes.Contains(BuildingType))
+			{
+				OutCorePoints.Add(UnitLocationXY);
+				continue;
+			}
+
+			if (SatelliteTypes.Contains(BuildingType))
+			{
+				OutSatellitePoints.Add(UnitLocationXY);
+			}
+		}
+	}
+
+	TArray<int32> BuildCoreClusterLabels(
+		const TArray<FVector2D>& CorePoints,
+		const float CoreClusterDistanceXY,
+		const int32 RequestedMinCoreNeighbors,
+		int32& OutClusterCount)
+	{
+		const float ClusterDistanceSq = FMath::Square(FMath::Max(0.f, CoreClusterDistanceXY));
+		const int32 MinCoreNeighbors = FMath::Max(1, RequestedMinCoreNeighbors);
+		TArray<int32> Labels;
+		Labels.Init(INDEX_NONE, CorePoints.Num());
+		OutClusterCount = 0;
+
+		for (int32 PointIndex = 0; PointIndex < CorePoints.Num(); ++PointIndex)
+		{
+			if (Labels[PointIndex] != INDEX_NONE)
+			{
+				continue;
+			}
+
+			TArray<int32> Neighbors;
+			for (int32 NeighborIndex = 0; NeighborIndex < CorePoints.Num(); ++NeighborIndex)
+			{
+				if (FVector2D::DistSquared(CorePoints[PointIndex], CorePoints[NeighborIndex]) <= ClusterDistanceSq)
+				{
+					Neighbors.Add(NeighborIndex);
+				}
+			}
+
+			if (Neighbors.Num() < MinCoreNeighbors)
+			{
+				Labels[PointIndex] = -2;
+				continue;
+			}
+
+			for (const int32 NeighborId : Neighbors)
+			{
+				Labels[NeighborId] = OutClusterCount;
+			}
+			++OutClusterCount;
+		}
+
+		return Labels;
+	}
+
+	TArray<FEnemyBaseClusterCandidate> BuildCoreBaseClusters(
+		const TArray<FVector2D>& CorePoints,
+		const TArray<int32>& Labels,
+		const int32 ClusterCount)
+	{
+		TArray<FEnemyBaseClusterCandidate> Clusters;
+		Clusters.SetNum(ClusterCount);
+		for (int32 PointIndex = 0; PointIndex < CorePoints.Num(); ++PointIndex)
+		{
+			if (not Labels.IsValidIndex(PointIndex) || Labels[PointIndex] < 0)
+			{
+				continue;
+			}
+
+			FEnemyBasePoint BasePoint;
+			BasePoint.Location = CorePoints[PointIndex];
+			BasePoint.bIsCoreBuilding = true;
+			Clusters[Labels[PointIndex]].BuildingPoints.Add(BasePoint);
+		}
+
+		return Clusters;
+	}
+
+	void AttachSatellitePointsToBaseClusters(
+		const TArray<FVector2D>& SatellitePoints,
+		const float MaxAttachDistanceXY,
+		TArray<FEnemyBaseClusterCandidate>& Clusters)
+	{
+		const float MaxAttachDistanceSq = FMath::Square(FMath::Max(0.f, MaxAttachDistanceXY));
+		for (const FVector2D& SatellitePoint : SatellitePoints)
+		{
+			int32 BestCluster = INDEX_NONE;
+			float BestDistanceSq = MaxAttachDistanceSq;
+			for (int32 ClusterIndex = 0; ClusterIndex < Clusters.Num(); ++ClusterIndex)
+			{
+				for (const FEnemyBasePoint& BasePoint : Clusters[ClusterIndex].BuildingPoints)
+				{
+					const float DistanceSq = FVector2D::DistSquared(SatellitePoint, BasePoint.Location);
+					if (DistanceSq < BestDistanceSq)
+					{
+						BestDistanceSq = DistanceSq;
+						BestCluster = ClusterIndex;
+					}
+				}
+			}
+
+			if (BestCluster == INDEX_NONE)
+			{
+				continue;
+			}
+
+			FEnemyBasePoint BasePoint;
+			BasePoint.Location = SatellitePoint;
+			BasePoint.bIsCoreBuilding = false;
+			Clusters[BestCluster].BuildingPoints.Add(BasePoint);
+		}
+	}
+
+	bool TryFinalizeBaseCluster(
+		const FFindEnemyBaseClusters& Request,
+		FEnemyBaseClusterCandidate& Cluster)
+	{
+		if (Cluster.BuildingPoints.Num() < Request.MinTotalBuildingsPerBase)
+		{
+			return false;
+		}
+
+		FVector2D Sum = FVector2D::ZeroVector;
+		for (const FEnemyBasePoint& BasePoint : Cluster.BuildingPoints)
+		{
+			Sum += BasePoint.Location;
+		}
+
+		const FVector2D Center = Sum / static_cast<float>(Cluster.BuildingPoints.Num());
+		Cluster.Score = static_cast<float>(Cluster.BuildingPoints.Num());
+		Cluster.Point = FVector(Center.X, Center.Y, 0.f);
+		return Cluster.Score >= Request.MinBaseScoreToReturn;
+	}
+
+	TArray<FEnemyBaseClusterCandidate> BuildAcceptedEnemyBaseClusters(
+		const FFindEnemyBaseClusters& Request,
+		const TArray<FVector2D>& CorePoints,
+		const TArray<FVector2D>& SatellitePoints)
+	{
+		int32 ClusterCount = 0;
+		const TArray<int32> Labels = BuildCoreClusterLabels(
+			CorePoints,
+			Request.CoreClusterDistanceXY,
+			Request.MinCoreNeighbors,
+			ClusterCount);
+		TArray<FEnemyBaseClusterCandidate> Clusters = BuildCoreBaseClusters(CorePoints, Labels, ClusterCount);
+		AttachSatellitePointsToBaseClusters(SatellitePoints, Request.CoreClusterDistanceXY, Clusters);
+
+		TArray<FEnemyBaseClusterCandidate> AcceptedClusters;
+		for (FEnemyBaseClusterCandidate& Cluster : Clusters)
+		{
+			if (TryFinalizeBaseCluster(Request, Cluster))
+			{
+				AcceptedClusters.Add(Cluster);
+			}
+		}
+		AcceptedClusters.Sort([](const FEnemyBaseClusterCandidate& Left, const FEnemyBaseClusterCandidate& Right)
+		{
+			return Left.Score > Right.Score;
+		});
+
+		const int32 MaxBases = FMath::Max(0, Request.MaxBasesToReturn);
+		if (MaxBases > 0 && AcceptedClusters.Num() > MaxBases)
+		{
+			AcceptedClusters.SetNum(MaxBases);
+		}
+
+		return AcceptedClusters;
+	}
+
+	float GetAngleDifferenceDegrees(const float LeftAngleDegrees, const float RightAngleDegrees)
+	{
+		return FMath::Abs(FMath::FindDeltaAngleDegrees(LeftAngleDegrees, RightAngleDegrees));
+	}
+
+	TArray<FVector> BuildMergedThreatLocationsForBase(
+		const FFindEnemyBaseClusters& Request,
+		const FEnemyBaseClusterCandidate& Cluster)
+	{
+		TArray<FVector> ThreatLocations = Request.PlayerUnitLocationsToDefendAgainst;
+		RemoveNearZeroStrategicLocations(ThreatLocations);
+		ThreatLocations.Sort([&Cluster](const FVector& Left, const FVector& Right)
+		{
+			return FVector::DistSquared2D(Left, Cluster.Point) < FVector::DistSquared2D(Right, Cluster.Point);
+		});
+
+		TArray<FVector> MergedLocations;
+		const int32 MaxThreatLocations = FMath::Max(0, Request.DefenseArcCandidateParams.MaxThreatLocationsPerBase);
+		if (MaxThreatLocations <= 0)
+		{
+			return MergedLocations;
+		}
+
+		const float MergeDistanceSq = FMath::Square(FMath::Max(0.f, Request.DefenseArcCandidateParams.ThreatLocationMergeDistanceXY));
+		const float MergeAngle = FMath::Max(0.f, Request.DefenseArcCandidateParams.ThreatDirectionMergeAngleDegrees);
+		for (const FVector& ThreatLocation : ThreatLocations)
+		{
+			const float ThreatYaw = (ThreatLocation - Cluster.Point).Rotation().Yaw;
+			const bool bAlreadyRepresented = MergedLocations.ContainsByPredicate(
+				[&](const FVector& MergedLocation)
+				{
+					const float MergedYaw = (MergedLocation - Cluster.Point).Rotation().Yaw;
+					return FVector::DistSquared2D(ThreatLocation, MergedLocation) <= MergeDistanceSq
+						|| GetAngleDifferenceDegrees(ThreatYaw, MergedYaw) <= MergeAngle;
+				});
+			if (bAlreadyRepresented)
+			{
+				continue;
+			}
+
+			MergedLocations.Add(ThreatLocation);
+			if (MergedLocations.Num() >= MaxThreatLocations)
+			{
+				break;
+			}
+		}
+
+		return MergedLocations;
+	}
+
+	TArray<FDefenseArcAnchorCandidate> BuildDefenseArcAnchors(
+		const FFindEnemyBaseClusters& Request,
+		const FEnemyBaseClusterCandidate& Cluster,
+		const FVector& ThreatLocation)
+	{
+		TArray<FDefenseArcAnchorCandidate> Anchors;
+		const FVector2D BaseCenterXY(Cluster.Point.X, Cluster.Point.Y);
+		const FVector2D ThreatDirection = (FVector2D(ThreatLocation.X, ThreatLocation.Y) - BaseCenterXY).GetSafeNormal();
+		if (ThreatDirection.IsNearlyZero())
+		{
+			return Anchors;
+		}
+
+		for (const FEnemyBasePoint& BasePoint : Cluster.BuildingPoints)
+		{
+			const FVector2D FromCenter = BasePoint.Location - BaseCenterXY;
+			const float FrontSideScore = FVector2D::DotProduct(FromCenter.GetSafeNormal(), ThreatDirection);
+			const float BuildingWeight = BasePoint.bIsCoreBuilding
+				? Request.DefenseArcCandidateParams.CoreBuildingAnchorWeight
+				: Request.DefenseArcCandidateParams.SatelliteBuildingAnchorWeight;
+
+			FDefenseArcAnchorCandidate Anchor;
+			Anchor.Location = BasePoint.Location;
+			Anchor.Score = FrontSideScore + FMath::Max(0.f, BuildingWeight);
+			Anchors.Add(Anchor);
+		}
+
+		Anchors.Sort([](const FDefenseArcAnchorCandidate& Left, const FDefenseArcAnchorCandidate& Right)
+		{
+			return Left.Score > Right.Score;
+		});
+		const int32 MaxAnchors = FMath::Max(0, Request.DefenseArcCandidateParams.MaxAnchorBuildingsPerThreatDirection);
+		if (MaxAnchors > 0 && Anchors.Num() > MaxAnchors)
+		{
+			Anchors.SetNum(MaxAnchors);
+		}
+
+		return Anchors;
+	}
+
+	bool GetIsFarEnoughFromBaseBuildings(
+		const FVector& CandidateLocation,
+		const FEnemyBaseClusterCandidate& Cluster,
+		const float MinDistanceXY)
+	{
+		const float MinDistanceSq = FMath::Square(FMath::Max(0.f, MinDistanceXY));
+		return not Cluster.BuildingPoints.ContainsByPredicate(
+			[&](const FEnemyBasePoint& BasePoint)
+			{
+				return FVector2D::DistSquared(
+					FVector2D(CandidateLocation.X, CandidateLocation.Y),
+					BasePoint.Location) < MinDistanceSq;
+			});
+	}
+
+	bool GetIsFarEnoughFromDefenseCandidates(
+		const FVector& CandidateLocation,
+		const TArray<FDefensePositions>& DefenseCandidates,
+		const float MinDistanceXY)
+	{
+		const float MinDistanceSq = FMath::Square(FMath::Max(0.f, MinDistanceXY));
+		return not DefenseCandidates.ContainsByPredicate(
+			[&](const FDefensePositions& DefenseCandidate)
+			{
+				return FVector::DistSquared2D(CandidateLocation, DefenseCandidate.Location) < MinDistanceSq;
+			});
+	}
+
+	void TryAddDefenseArcCandidate(
+		const FFindEnemyBaseClusters& Request,
+		const FEnemyBaseClusterCandidate& Cluster,
+		const FVector2D& AnchorLocation,
+		const FVector& CandidateLocation,
+		const float CandidateYaw,
+		TArray<FDefensePositions>& OutDefenseCandidates)
+	{
+		const float AnchorDistance = FVector2D::Distance(
+			FVector2D(CandidateLocation.X, CandidateLocation.Y),
+			AnchorLocation);
+		if (AnchorDistance < Request.DefenseArcCandidateParams.MinOffsetFromDefendedBuildingXY
+			|| AnchorDistance > Request.DefenseArcCandidateParams.MaxOffsetFromDefendedBuildingXY)
+		{
+			return;
+		}
+
+		if (not GetIsFarEnoughFromBaseBuildings(
+			CandidateLocation,
+			Cluster,
+			Request.DefenseArcCandidateParams.MinOffsetFromAnyBaseBuildingXY))
+		{
+			return;
+		}
+
+		if (not GetIsFarEnoughFromDefenseCandidates(
+			CandidateLocation,
+			OutDefenseCandidates,
+			Request.DefenseArcCandidateParams.MinPointSpacingXY))
+		{
+			return;
+		}
+
+		FDefensePositions DefensePosition;
+		DefensePosition.Location = CandidateLocation;
+		DefensePosition.YawRotation = CandidateYaw;
+		OutDefenseCandidates.Add(DefensePosition);
+	}
+
+	void BuildDefenseArcRowCandidates(
+		const FFindEnemyBaseClusters& Request,
+		const FEnemyBaseClusterCandidate& Cluster,
+		const FDefenseArcAnchorCandidate& Anchor,
+		const FVector& ThreatLocation,
+		const int32 RowIndex,
+		FRandomStream& RandomStream,
+		TArray<FDefensePositions>& OutDefenseCandidates)
+	{
+		const int32 PointsPerArc = FMath::Max(0, Request.DefenseArcCandidateParams.PointsPerArc);
+		if (PointsPerArc <= 0)
+		{
+			return;
+		}
+
+		const FVector AnchorLocation3D(Anchor.Location.X, Anchor.Location.Y, Cluster.Point.Z);
+		const float DirectionToThreatYaw = (ThreatLocation - AnchorLocation3D).Rotation().Yaw;
+		const float RowDistanceBase = Request.DefenseArcCandidateParams.PreferredOffsetFromDefendedBuildingXY
+			+ Request.DefenseArcCandidateParams.ArcRowOffsetXY * static_cast<float>(RowIndex);
+		const float RowAngle = Request.DefenseArcCandidateParams.ArcAngleDegrees
+			* FMath::Pow(Request.DefenseArcCandidateParams.ArcRowAngleScale, static_cast<float>(RowIndex));
+		const float RowYawScale = FMath::Pow(Request.DefenseArcCandidateParams.OuterArcYawScale, static_cast<float>(RowIndex));
+
+		for (int32 PointIndex = 0; PointIndex < PointsPerArc; ++PointIndex)
+		{
+			const float ArcAlpha = PointsPerArc == 1
+				? 0.5f
+				: static_cast<float>(PointIndex) / static_cast<float>(PointsPerArc - 1);
+			const float CenteredAlpha = ArcAlpha - 0.5f;
+			const float PointYaw = DirectionToThreatYaw + CenteredAlpha * RowAngle;
+			const float DistanceJitter = RowDistanceBase * Request.DefenseArcCandidateParams.ArcDistanceJitterRatio
+				* RandomStream.FRandRange(-1.f, 1.f);
+			const FVector Direction = FRotator(0.f, PointYaw, 0.f).Vector();
+			FVector CandidateLocation = AnchorLocation3D + Direction * (RowDistanceBase + DistanceJitter);
+			CandidateLocation.X += RandomStream.FRandRange(
+				-Request.DefenseArcCandidateParams.PositionJitterXY,
+				Request.DefenseArcCandidateParams.PositionJitterXY);
+			CandidateLocation.Y += RandomStream.FRandRange(
+				-Request.DefenseArcCandidateParams.PositionJitterXY,
+				Request.DefenseArcCandidateParams.PositionJitterXY);
+
+			const float YawOffset = CenteredAlpha
+				* Request.DefenseArcCandidateParams.MaxYawOffsetFromThreatDegrees
+				* RowYawScale;
+			const float CandidateYaw = (ThreatLocation - CandidateLocation).Rotation().Yaw + YawOffset
+				+ RandomStream.FRandRange(
+					-Request.DefenseArcCandidateParams.YawJitterDegrees,
+					Request.DefenseArcCandidateParams.YawJitterDegrees);
+			TryAddDefenseArcCandidate(
+				Request,
+				Cluster,
+				Anchor.Location,
+				CandidateLocation,
+				CandidateYaw,
+				OutDefenseCandidates);
+		}
+	}
+
+	void BuildDefenseArcCandidatesForBase(
+		const FFindEnemyBaseClusters& Request,
+		const FEnemyBaseClusterCandidate& Cluster,
+		FRandomStream& RandomStream,
+		TArray<FDefensePositions>& OutDefenseCandidates)
+	{
+		const TArray<FVector> ThreatLocations = BuildMergedThreatLocationsForBase(Request, Cluster);
+		const int32 StartCandidateCount = OutDefenseCandidates.Num();
+		const int32 MaxCandidatesPerBase = FMath::Max(0, Request.DefenseArcCandidateParams.MaxDefensePointCandidatesPerBase);
+		for (const FVector& ThreatLocation : ThreatLocations)
+		{
+			const TArray<FDefenseArcAnchorCandidate> Anchors = BuildDefenseArcAnchors(Request, Cluster, ThreatLocation);
+			for (const FDefenseArcAnchorCandidate& Anchor : Anchors)
+			{
+				const int32 ArcRows = FMath::Max(0, Request.DefenseArcCandidateParams.ArcRowsPerAnchor);
+				for (int32 RowIndex = 0; RowIndex < ArcRows; ++RowIndex)
+				{
+					BuildDefenseArcRowCandidates(
+						Request,
+						Cluster,
+						Anchor,
+						ThreatLocation,
+						RowIndex,
+						RandomStream,
+						OutDefenseCandidates);
+
+					if (MaxCandidatesPerBase > 0 && OutDefenseCandidates.Num() - StartCandidateCount >= MaxCandidatesPerBase)
+					{
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	void RemoveDefenseCandidatesTooCloseToAlliedUnits(
+		const FFindEnemyBaseClusters& Request,
+		const TArray<FVector>& AlliedUnitLocations,
+		TArray<FDefensePositions>& DefenseCandidates)
+	{
+		const float MinDistance = FMath::Max(0.f, Request.DefenseArcCandidateParams.MinDistanceDefPositionFromAlliedUnits);
+		if (MinDistance <= 0.f || AlliedUnitLocations.IsEmpty())
+		{
+			return;
+		}
+
+		const float MinDistanceSq = FMath::Square(MinDistance);
+		DefenseCandidates.RemoveAll([&](const FDefensePositions& DefenseCandidate)
+		{
+			return AlliedUnitLocations.ContainsByPredicate([&](const FVector& AlliedUnitLocation)
+			{
+				return FVector::DistSquared2D(DefenseCandidate.Location, AlliedUnitLocation) < MinDistanceSq;
+			});
+		});
+	}
+
+	void RemoveDuplicateDefenseCandidates(
+		const FFindEnemyBaseClusters& Request,
+		TArray<FDefensePositions>& DefenseCandidates)
+	{
+		const float MergeDistance = FMath::Max(0.f, Request.DefenseArcCandidateParams.DuplicateCandidateMergeDistanceXY);
+		if (MergeDistance <= 0.f)
+		{
+			return;
+		}
+
+		TArray<FDefensePositions> UniqueCandidates;
+		UniqueCandidates.Reserve(DefenseCandidates.Num());
+		for (const FDefensePositions& DefenseCandidate : DefenseCandidates)
+		{
+			if (GetIsFarEnoughFromDefenseCandidates(DefenseCandidate.Location, UniqueCandidates, MergeDistance))
+			{
+				UniqueCandidates.Add(DefenseCandidate);
+			}
+		}
+
+		DefenseCandidates = MoveTemp(UniqueCandidates);
+	}
+
+	void BuildDefenseArcCandidatesForBases(
+		const FFindEnemyBaseClusters& Request,
+		const TArray<FEnemyBaseClusterCandidate>& Clusters,
+		const TArray<FVector>& AlliedUnitLocations,
+		TArray<FDefensePositions>& OutDefenseCandidates)
+	{
+		if (Request.PlayerUnitLocationsToDefendAgainst.IsEmpty())
+		{
+			return;
+		}
+
+		FRandomStream RandomStream(
+			static_cast<int32>(FPlatformTime::Cycles64())
+			^ Request.RequestID
+			^ Request.PlayerUnitLocationsToDefendAgainst.Num());
+		for (const FEnemyBaseClusterCandidate& Cluster : Clusters)
+		{
+			BuildDefenseArcCandidatesForBase(Request, Cluster, RandomStream, OutDefenseCandidates);
+		}
+
+		RemoveDuplicateDefenseCandidates(Request, OutDefenseCandidates);
+		RemoveDefenseCandidatesTooCloseToAlliedUnits(Request, AlliedUnitLocations, OutDefenseCandidates);
+		const int32 MaxCandidatesTotal = FMath::Max(0, Request.DefenseArcCandidateParams.MaxDefensePointCandidatesTotal);
+		if (MaxCandidatesTotal > 0 && OutDefenseCandidates.Num() > MaxCandidatesTotal)
+		{
+			OutDefenseCandidates.SetNum(MaxCandidatesTotal);
+		}
+	}
+
 }
 
 FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
@@ -72,130 +610,35 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 {
 	FResultEnemyBaseClusters Result;
 	Result.RequestID = Request.RequestID;
-
-	const TSet<EBuildingExpansionType> CoreTypes(Request.CoreBuildingTypes);
-	const TSet<EBuildingExpansionType> SatelliteTypes(Request.SatelliteBuildingTypes);
-	if (CoreTypes.IsEmpty())
+	if (Request.CoreBuildingTypes.IsEmpty())
 	{
 		return Result;
 	}
 
 	TArray<FVector2D> CorePoints;
 	TArray<FVector2D> SatellitePoints;
-	for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
-	{
-		if (UnitState.OwningPlayer != StrategicAIHelperConstants::EnemyOwningId || UnitState.UnitType != EAllUnitType::UNType_BuildingExpansion)
-		{
-			continue;
-		}
+	TArray<FVector> AlliedUnitLocations;
+	StrategicAIHelperUtilities::GatherEnemyBaseRequestPoints(
+		Request,
+		DetailedUnitStates,
+		CorePoints,
+		SatellitePoints,
+		AlliedUnitLocations);
 
-		const EBuildingExpansionType BuildingType = static_cast<EBuildingExpansionType>(UnitState.UnitSubtypeRaw);
-		const FVector2D XY(UnitState.UnitLocation.X, UnitState.UnitLocation.Y);
-		if (CoreTypes.Contains(BuildingType))
-		{
-			CorePoints.Add(XY);
-		}
-		else if (SatelliteTypes.Contains(BuildingType))
-		{
-			SatellitePoints.Add(XY);
-		}
-	}
-
-	const float EpsSq = FMath::Square(FMath::Max(0.f, Request.CoreClusterDistanceXY));
-	const int32 MinCoreNeighbors = FMath::Max(1, Request.MinCoreNeighbors);
-	TArray<int32> Labels;
-	Labels.Init(-1, CorePoints.Num());
-	int32 CurrentCluster = 0;
-	for (int32 PointIndex = 0; PointIndex < CorePoints.Num(); ++PointIndex)
+	const TArray<StrategicAIHelperUtilities::FEnemyBaseClusterCandidate> BaseClusters =
+		StrategicAIHelperUtilities::BuildAcceptedEnemyBaseClusters(Request, CorePoints, SatellitePoints);
+	Result.BasePoints.Reserve(BaseClusters.Num());
+	for (const StrategicAIHelperUtilities::FEnemyBaseClusterCandidate& BaseCluster : BaseClusters)
 	{
-		if (Labels[PointIndex] != -1)
-		{
-			continue;
-		}
-		TArray<int32> Neighbors;
-		for (int32 NeighborIndex = 0; NeighborIndex < CorePoints.Num(); ++NeighborIndex)
-		{
-			if (FVector2D::DistSquared(CorePoints[PointIndex], CorePoints[NeighborIndex]) <= EpsSq)
-			{
-				Neighbors.Add(NeighborIndex);
-			}
-		}
-		if (Neighbors.Num() < MinCoreNeighbors)
-		{
-			Labels[PointIndex] = -2;
-			continue;
-		}
-		for (int32 NeighborId : Neighbors)
-		{
-			Labels[NeighborId] = CurrentCluster;
-		}
-		++CurrentCluster;
-	}
-
-	TArray<TArray<FVector2D>> ClusterPoints;
-	ClusterPoints.SetNum(CurrentCluster);
-	for (int32 PointIndex = 0; PointIndex < CorePoints.Num(); ++PointIndex)
-	{
-		if (Labels[PointIndex] >= 0)
-		{
-			ClusterPoints[Labels[PointIndex]].Add(CorePoints[PointIndex]);
-		}
-	}
-
-	for (const FVector2D& SatellitePoint : SatellitePoints)
-	{
-		int32 BestCluster = INDEX_NONE;
-		float BestDistSq = EpsSq;
-		for (int32 ClusterIndex = 0; ClusterIndex < ClusterPoints.Num(); ++ClusterIndex)
-		{
-			for (const FVector2D& CorePoint : ClusterPoints[ClusterIndex])
-			{
-				const float DistanceSq = FVector2D::DistSquared(SatellitePoint, CorePoint);
-				if (DistanceSq < BestDistSq)
-				{
-					BestDistSq = DistanceSq;
-					BestCluster = ClusterIndex;
-				}
-			}
-		}
-		if (BestCluster != INDEX_NONE)
-		{
-			ClusterPoints[BestCluster].Add(SatellitePoint);
-		}
-	}
-
-	struct FBaseScorePoint { float Score; FVector Point; };
-	TArray<FBaseScorePoint> ScoredBases;
-	for (const TArray<FVector2D>& Cluster : ClusterPoints)
-	{
-		if (Cluster.Num() < Request.MinTotalBuildingsPerBase)
-		{
-			continue;
-		}
-		FVector2D Sum = FVector2D::ZeroVector;
-		for (const FVector2D& Point : Cluster)
-		{
-			Sum += Point;
-		}
-		const FVector2D Center = Sum / static_cast<float>(Cluster.Num());
-		const float Score = static_cast<float>(Cluster.Num());
-		if (Score < Request.MinBaseScoreToReturn)
-		{
-			continue;
-		}
-		ScoredBases.Add({Score, FVector(Center.X, Center.Y, 0.f)});
-	}
-
-	ScoredBases.Sort([](const FBaseScorePoint& Left, const FBaseScorePoint& Right) { return Left.Score > Right.Score; });
-	const int32 MaxBases = FMath::Max(0, Request.MaxBasesToReturn);
-	const int32 BasesToTake = MaxBases == 0 ? ScoredBases.Num() : FMath::Min(MaxBases, ScoredBases.Num());
-	Result.BasePoints.Reserve(BasesToTake);
-	for (int32 Index = 0; Index < BasesToTake; ++Index)
-	{
-		Result.BasePoints.Add(ScoredBases[Index].Point);
+		Result.BasePoints.Add(BaseCluster.Point);
 	}
 
 	StrategicAIHelperUtilities::RemoveNearZeroStrategicLocations(Result.BasePoints);
+	StrategicAIHelperUtilities::BuildDefenseArcCandidatesForBases(
+		Request,
+		BaseClusters,
+		AlliedUnitLocations,
+		Result.DefensePointCandidates);
 
 	return Result;
 }
