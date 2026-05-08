@@ -108,6 +108,8 @@ private:
 	                                        const FStrategicAIBlackboard& Blackboard);
 	void Exe_FlankPlayerHeavies(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 
+	void Exe_DefendBase(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+
 
 	// ------------------- Formation Logic Using Blackboard Idle units ------------------------
 	void CreateAttackMoveFormation(
@@ -175,6 +177,7 @@ private:
 	// ------------ Utils --------------------
 	TArray<FVector> GetProjectedPlayerBulkLocations(const FStrategicAIBlackboard& Blackboard);
 	TArray<FVector> GetProjectedPlayerAvgLocationAttackers(const FStrategicAIBlackboard& Blackboard) const;
+	TArray<FVector> GetProjectedLocationsUnderAttack(const FStrategicAIBlackboard& Blackboard) const;
 	TArray<FVector> GetProjectedPlayerHQLocation(const FStrategicAIBlackboard& Blackboard) const;
 	TArray<FVector> GetProjectedPlayerResourceBuildings(const FStrategicAIBlackboard& Blackboard) const;
 	TArray<FVector> GetProjectedPlayerBaseLocations(const FStrategicAIBlackboard& Blackboard) const;

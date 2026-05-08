@@ -402,6 +402,15 @@ void UStochasticDecisionTree::Exe_FlankPlayerHeavies(const UStrategicAISubAction
 	CreateFlankingAttack(SubAction, FlankingPositions, Blackboard);
 }
 
+void UStochasticDecisionTree::Exe_DefendBase(const UStrategicAISubAction* SubAction,
+	const FStrategicAIBlackboard& Blackboard)
+{
+	// Prioritize defending base points that are under attack, if any.
+	TArray<FVector> LocationsToDefend = GetProjectedLocationsUnderAttack(Blackboard);
+	
+	
+}
+
 void UStochasticDecisionTree::CreateAttackMoveFormation(
 	const UStrategicAISubAction* SubAction,
 	TArray<FVector> AttackLocations,
@@ -783,6 +792,23 @@ TArray<FVector> UStochasticDecisionTree::GetProjectedPlayerAvgLocationAttackers(
 		if (StochasticHelpers::CanProjectNavigable_BulkLocation(M_EnemyNavigationAIComponent.Get(),
 		                                                        EachLocatonAttackerGroup.AverageAttackerLocation,
 		                                                        OutProjected))
+		{
+			ValidLocations.Add(OutProjected);
+		}
+	}
+	return ValidLocations;
+}
+
+TArray<FVector> UStochasticDecisionTree::GetProjectedLocationsUnderAttack(
+	const FStrategicAIBlackboard& Blackboard) const
+{
+	TArray<FVector> ValidLocations;
+	for (const auto& EachLocatonUnderAttack : Blackboard.CurrentLocationsUnderPlayerAttack.LocationsUnderAttack)
+	{
+		FVector OutProjected = FVector::ZeroVector;
+		if (StochasticHelpers::CanProjectNavigable_BulkLocation(M_EnemyNavigationAIComponent.Get(),
+		                                                              EachLocatonUnderAttack.LocationUnderAttack,
+		                                                              OutProjected))
 		{
 			ValidLocations.Add(OutProjected);
 		}
