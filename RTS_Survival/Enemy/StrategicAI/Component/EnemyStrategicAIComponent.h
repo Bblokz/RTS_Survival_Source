@@ -63,6 +63,15 @@ struct FAIThinkingTimerData
  *
  * There is a blackboard that keeps track of various state of the game as well as of various results form the async processor
  * see FStrategicAIBlackboard. This board is provided to the decision tree as well.
+ *
+ * @note ---- Regarding Idle enemy Units ----
+ * @note 'Idle' meaning no AI task in this context units are stored on the blackboard and added by the direct control component.
+ * @note they are either added by explicitly providing their ptr to direct control or by executing their icommands ability (no CommandCard)
+ * @note that adds them.
+ * @note ---- On Selecting Idle Units ----
+ * @note each subaction has a set of requirements either designer added or native.
+ * @note each requirement attributes to the selection rules if applicable, for example, the requirement have at least 6 light tanks
+ * @note will add a rule that upon the sub action being executed the selected units will be filtered for 6 light tanks first.
  * 
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -137,6 +146,7 @@ private:
 
 	FAIThinkingTimerData M_AIBaseLocationThinkTimer;
 	void AIBaseLocation_ThinkStep();
+	void AddPlayerUnitLocationsForDefensePositionsOfEnemyBases(FFindEnemyBaseClusters& OutFindBaseRequest) ;
 
 	FAIThinkingTimerData M_PlayerUnitCountsBuildingCountsThinkTimer;
 	void PlayerUnitCountsBuildingCounts_ThinkStep();

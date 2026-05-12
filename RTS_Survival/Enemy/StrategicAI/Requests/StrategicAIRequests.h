@@ -807,7 +807,7 @@ struct FFindEnemyBaseClusters
 	 * @note Base locations are still found when this is empty; only DefensePointCandidates are skipped.
 	 * @note Filled by callers from current player unit, bulk, or pressure locations before queuing the async request.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FVector> PlayerUnitLocationsToDefendAgainst;
 
 	/**

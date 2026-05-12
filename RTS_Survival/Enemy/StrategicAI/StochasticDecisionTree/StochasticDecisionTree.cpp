@@ -466,7 +466,7 @@ void UStochasticDecisionTree::CreateAttackMoveFormation(
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
 	{
-		DebugPickedUnitsAndWayPoints(PickedUnits, WayPoints);
+		// DebugPickedUnitsAndWayPoints(PickedUnits, WayPoints);
 	}
 }
 
@@ -485,6 +485,7 @@ TArray<FVector> UStochasticDecisionTree::BuildAttackMoveWayPoints(
 	StochasticHelpers::SortArrayByDistanceToLocation(AttackLocations, StartLocation);
 	if (PathFindAttackPath(StartLocation, AttackLocations[0], bStartLocationIsProjected, WayPoints))
 	{
+		// Remove first entry as it is already part of path.
 		AttackLocations.RemoveAt(0, 1, EAllowShrinking::No);
 		WayPoints.Append(AttackLocations);
 		return WayPoints;

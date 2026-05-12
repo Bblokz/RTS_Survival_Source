@@ -150,7 +150,42 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 
 void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
 {
+	// Add player avg attackers locations and add hq, resource building locations for potential attack locs.
+	AddPlayerUnitLocationsForDefensePositionsOfEnemyBases(FindEnemyBase_TimerRequest);
 	QueueFindEnemyBaseClustersRequest(FindEnemyBase_TimerRequest);
+}
+
+void UEnemyStrategicAIComponent::AddPlayerUnitLocationsForDefensePositionsOfEnemyBases(
+	FFindEnemyBaseClusters& OutFindBaseRequest)
+{
+	if (BlackboardQueries::HasValidPlayerAttackingLocations(M_StrategicAIBlackboard))
+	{
+		for (const auto& EachUnderAttLoc : M_StrategicAIBlackboard.CurrentLocationsUnderPlayerAttack.
+		                                                           LocationsUnderAttack)
+		{
+			// Always checked for near zero on async processor!
+			OutFindBaseRequest.PlayerUnitLocationsToDefendAgainst.Add(EachUnderAttLoc.AverageAttackerLocation);
+		}
+	}
+	if (BlackboardQueries::HasValidPlayerUnitBulkLocations(M_StrategicAIBlackboard))
+	{
+		// Always checked for near zero on async processor!
+		for (const auto& EachBulk : M_StrategicAIBlackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+		{
+			OutFindBaseRequest.PlayerUnitLocationsToDefendAgainst.Add(EachBulk.BulkLocation);
+		}
+	}
+	if (BlackboardQueries::HasValidPlayerHQLocation(M_StrategicAIBlackboard))
+	{
+		OutFindBaseRequest.PlayerUnitLocationsToDefendAgainst.Add(
+			M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerHQLocation);
+	}
+	if (BlackboardQueries::HasValidPlayerResourceBuildingLocations(M_StrategicAIBlackboard))
+	{
+		// Note that any locations in a locations array on the blackboard are always checked for near zero!
+		OutFindBaseRequest.PlayerUnitLocationsToDefendAgainst.Append(
+			M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings);
+	}
 }
 
 void UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep()
@@ -170,9 +205,10 @@ void UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep()
 
 void UEnemyStrategicAIComponent::PlayerHeavyTankFlankLocations_ThinkStep()
 {
-	TArray<FVector> RandomIdleUnitLocations = BlackboardQueries::GetRandomLocationsOfIdleUnits(M_StrategicAIBlackboard, 3);
+	TArray<FVector> RandomIdleUnitLocations = BlackboardQueries::GetRandomLocationsOfIdleUnits(
+		M_StrategicAIBlackboard, 16);
 	int32 RequestOrder = 0;
-	for(const FVector& Location : RandomIdleUnitLocations)
+	for (const FVector& Location : RandomIdleUnitLocations)
 	{
 		FindPlayerHeavyTankFlankLocations_TimerRequest.RequestID = RequestOrder;
 		FindPlayerHeavyTankFlankLocations_TimerRequest.StartSearchLocation = Location;

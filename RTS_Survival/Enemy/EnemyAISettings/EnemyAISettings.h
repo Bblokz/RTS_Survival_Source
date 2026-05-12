@@ -27,7 +27,7 @@ namespace EnemyAISettings
 		// How often the AI finds player squad and tank force concentrations.
 		inline float UpdatePlayerUnitBulkLocations_Interval = 15.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI finds player Heavy tanks to flank
-		inline float UpdatePlayerHeavyTankFlank_Interval = 18.f* DEV_AI_ThinkTimers_Scaling;
+		inline float UpdatePlayerHeavyTankFlank_Interval = 3.f* DEV_AI_ThinkTimers_Scaling;
 	}
 
 	namespace Debugging

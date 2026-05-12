@@ -82,6 +82,12 @@ namespace BlackboardQueries
 
 	bool HasValidPlayerResourceBuildingLocations(
 		const FStrategicAIBlackboard& Blackboard);
+	
+	bool HasValidPlayerAttackingLocations(
+		const FStrategicAIBlackboard& Blackboard);
+	
+	bool HasValidPlayerUnitBulkLocations(
+		const FStrategicAIBlackboard& Blackboard);
 
 	bool HasValidPlayerHeavyTankFLankLocations(
 		const FStrategicAIBlackboard& Blackboard);

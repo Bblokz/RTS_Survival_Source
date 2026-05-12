@@ -294,14 +294,18 @@ bool BlackboardQueries::HasValidPlayerHQLocation(const FStrategicAIBlackboard& B
 
 bool BlackboardQueries::HasValidPlayerResourceBuildingLocations(const FStrategicAIBlackboard& Blackboard)
 {
-	for (auto EachLoc : Blackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings)
-	{
-		if (not EachLoc.IsNearlyZero())
-		{
-			return true;
-		}
-	}
-	return false;
+	// Note that any locations stored in an array are always check for not near-zero on async processor.
+	return not Blackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings.IsEmpty();
+}
+
+bool BlackboardQueries::HasValidPlayerAttackingLocations(const FStrategicAIBlackboard& Blackboard)
+{
+	return not Blackboard.CurrentLocationsUnderPlayerAttack.LocationsUnderAttack.IsEmpty();
+}
+
+bool BlackboardQueries::HasValidPlayerUnitBulkLocations(const FStrategicAIBlackboard& Blackboard)
+{
+	return not Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks.IsEmpty();
 }
 
 bool BlackboardQueries::HasValidPlayerHeavyTankFLankLocations(const FStrategicAIBlackboard& Blackboard)
