@@ -205,16 +205,31 @@ void UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep()
 
 void UEnemyStrategicAIComponent::PlayerHeavyTankFlankLocations_ThinkStep()
 {
-	TArray<FVector> RandomIdleUnitLocations = BlackboardQueries::GetRandomLocationsOfIdleUnits(
-		M_StrategicAIBlackboard, 16);
-	int32 RequestOrder = 0;
-	for (const FVector& Location : RandomIdleUnitLocations)
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
 	{
-		FindPlayerHeavyTankFlankLocations_TimerRequest.RequestID = RequestOrder;
-		FindPlayerHeavyTankFlankLocations_TimerRequest.StartSearchLocation = Location;
-		QueueFindPlayerHeavyTankFlankLocationsRequest(FindPlayerHeavyTankFlankLocations_TimerRequest);
-		++RequestOrder;
+		return;
 	}
+
+	RemoveExpiredHeavyTankFlankingResults(World->GetTimeSeconds());
+	FindPlayerHeavyTankFlankLocations_TimerRequest.RequestID = 0;
+	QueueFindPlayerHeavyTankFlankLocationsRequest(FindPlayerHeavyTankFlankLocations_TimerRequest);
+}
+
+void UEnemyStrategicAIComponent::RemoveExpiredHeavyTankFlankingResults(const float CurrentTimeSeconds)
+{
+	const float ResultMaxAgeSeconds = FindPlayerHeavyTankFlankLocations_TimerRequest.ResultMaxAgeSeconds;
+	if (ResultMaxAgeSeconds < 0.f)
+	{
+		return;
+	}
+
+	M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.RemoveAll(
+		[CurrentTimeSeconds, ResultMaxAgeSeconds](const FResultClosestFlankableEnemyHeavy& Result)
+		{
+			return Result.ResultTimestampSeconds < 0.f
+				|| CurrentTimeSeconds - Result.ResultTimestampSeconds > ResultMaxAgeSeconds;
+		});
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
@@ -373,19 +388,25 @@ void UEnemyStrategicAIComponent::ProcessClosestFlankableEnemyHeavyResults(
 		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Empty();
 		return;
 	}
-	const bool bHasNewEntries = ClosestFlankableEnemyHeavyResults.Num() > 0;
-	const bool bOldEntriesExceedTwiceTheRequestAmount = M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Num()
-		> 2 * FindPlayerHeavyTankFlankLocations_TimerRequest.MaxHeavyTanksToFlank;
-	if (bHasNewEntries && bOldEntriesExceedTwiceTheRequestAmount)
+
+	if (ClosestFlankableEnemyHeavyResults.IsEmpty())
 	{
-		// The array already contains double the results we would obtain in one iteration and is likely old.
-		// Clearing old entries.
-		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Empty();
+		return;
 	}
-	// Add new found entries if any.
-	if (bHasNewEntries)
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
 	{
-		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Append(ClosestFlankableEnemyHeavyResults);
+		return;
+	}
+
+	const float CurrentTimeSeconds = World->GetTimeSeconds();
+	M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Reset(ClosestFlankableEnemyHeavyResults.Num());
+	for (const FResultClosestFlankableEnemyHeavy& Result : ClosestFlankableEnemyHeavyResults)
+	{
+		FResultClosestFlankableEnemyHeavy ResultWithTimestamp = Result;
+		ResultWithTimestamp.ResultTimestampSeconds = CurrentTimeSeconds;
+		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Add(MoveTemp(ResultWithTimestamp));
 	}
 }
 

@@ -68,10 +68,10 @@ namespace FStrategicAIHelpers
 	bool GetIsHazmatEngineer(const FAsyncDetailedUnitState&);
 
 	/**
-	 * @brief Builds flankable heavy tank targets for the async strategic AI batch.
+	 * @brief Builds flank locations for combat-active player heavy tanks in the async strategic AI batch.
 	 * @param Request Flanking parameters to shape the output positions.
 	 * @param DetailedUnitStates Unit snapshot data to search for heavy tanks.
-	 * @return Result payload that maps each chosen tank to suggested flank positions.
+	 * @return Result payload that maps each combat-active player heavy tank to suggested flank positions.
 	 */
 	FResultClosestFlankableEnemyHeavy BuildClosestFlankableEnemyHeavyResult(
 		const FFindClosestFlankableEnemyHeavy& Request,

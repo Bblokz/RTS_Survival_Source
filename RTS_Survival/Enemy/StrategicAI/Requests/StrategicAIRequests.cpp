@@ -7,8 +7,7 @@ FWeakActorLocations::FWeakActorLocations()
 
 FFindClosestFlankableEnemyHeavy::FFindClosestFlankableEnemyHeavy()
 	: RequestID(0)
-	, StartSearchLocation(FVector::ZeroVector)
-	, MaxHeavyTanksToFlank(0)
+	, ResultMaxAgeSeconds(30.f)
 	, MaxSuggestedFlankPositionsPerTank(0)
 	, DeltaYawFromLeftRight(0.f)
 	, MinDistanceToTank(0.f)
@@ -19,6 +18,7 @@ FFindClosestFlankableEnemyHeavy::FFindClosestFlankableEnemyHeavy()
 
 FResultClosestFlankableEnemyHeavy::FResultClosestFlankableEnemyHeavy()
 	: RequestID(0)
+	, ResultTimestampSeconds(-1.f)
 {
 }
 

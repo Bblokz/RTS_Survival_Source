@@ -116,8 +116,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindPlayerUnitBulkLocations FindPlayerUnitBulkLocations_TimerRequest;
 	
-	// This request is periodically used to find player heavy tanks to flank
-	// there are several versions of this send to the async processor with different starting locations.
+	// This request is periodically used to find combat-active player heavy tanks to flank.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindClosestFlankableEnemyHeavy FindPlayerHeavyTankFlankLocations_TimerRequest;
 
@@ -159,6 +158,7 @@ private:
 
 	FAIThinkingTimerData M_PlayerHeavyTankFlankLocationsThinkTimer;
 	void PlayerHeavyTankFlankLocations_ThinkStep();
+	void RemoveExpiredHeavyTankFlankingResults(const float CurrentTimeSeconds);
 
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
