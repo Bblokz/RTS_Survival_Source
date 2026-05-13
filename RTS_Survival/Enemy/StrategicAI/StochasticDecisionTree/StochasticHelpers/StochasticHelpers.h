@@ -44,7 +44,7 @@ namespace StochasticHelpers
 	 * @param Time Time value combined with Seed for deterministic variation.
 	 * @return Pointer to the selected action, or nullptr if selection failed.
 	 */
-	const FStrategicAIAction* PickStrategicAction(
+	FStrategicAIAction* PickStrategicAction(
 		const TArray<FStrategicAIAction*>& ActionDefinitions,
 		const bool bUseSeed,
 		const float Seed,
