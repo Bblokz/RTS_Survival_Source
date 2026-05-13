@@ -30,7 +30,7 @@ namespace
 		const float Time,
 		const float MaxValue)
 	{
-		if (!bUseSeed)
+		if (not bUseSeed)
 		{
 			return FMath::FRandRange(0.0f, MaxValue);
 		}
@@ -48,7 +48,7 @@ namespace
 	 * @brief Generic weighted picker for pointer arrays.
 	 *
 	 * @tparam T Type of object.
-	 * @param Options Array of const pointers.
+	 * @param Options Array of pointers.
 	 * @param GetScore Lambda returning score for an option.
 	 * @param bUseSeed Deterministic toggle.
 	 * @param Seed Seed value.
@@ -57,17 +57,17 @@ namespace
 	 */
 	template <typename T>
 	T* PickWeightedInternal(
-		const TArray<const T*>& Options,
-		const TFunctionRef<float(const T&)> GetScore,
+		const TArray<T*>& Options,
+		const TFunctionRef<float(T&)> GetScore,
 		const bool bUseSeed,
 		const float Seed,
 		const float Time)
 	{
 		float TotalScore = 0.0f;
 
-		for (const T* Option : Options)
+		for (T* Option : Options)
 		{
-			if (!Option)
+			if (not Option)
 			{
 				continue;
 			}
@@ -85,9 +85,9 @@ namespace
 
 		float RunningScore = 0.0f;
 
-		for (const T* Option : Options)
+		for (T* Option : Options)
 		{
-			if (!Option)
+			if (not Option)
 			{
 				continue;
 			}
@@ -351,7 +351,7 @@ namespace
 
 namespace StochasticHelpers
 {
-	const FStrategicAIAction* PickStrategicAction(
+	FStrategicAIAction* PickStrategicAction(
 		const TArray<FStrategicAIAction*>& ActionDefinitions,
 		const bool bUseSeed,
 		const float Seed,
@@ -374,7 +374,7 @@ namespace StochasticHelpers
 	}
 
 	UStrategicAISubAction* PickSubAction(
-		const TArray< UStrategicAISubAction*>& SubActions,
+		const TArray<UStrategicAISubAction*>& SubActions,
 		const bool bUseSeed,
 		const float Seed,
 		const float Time)

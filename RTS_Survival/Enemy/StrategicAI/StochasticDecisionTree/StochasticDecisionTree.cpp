@@ -57,19 +57,19 @@ void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds
 {
 	// Filter top level actions to only get those of which we do have sub-actions to pick from that are not
 	// blocked by requirements.
-	const TArray<const FStrategicAIAction*> ValidActions =
+	TArray<FStrategicAIAction*> ValidActions =
 		GetActionsWithValidSubActions(Blackboard, GameTimeSeconds);
 	if (not EnsureHasAnyValidActions(ValidActions))
 	{
 		return;
 	}
-	const FStrategicAIAction* PickedAction = StochasticHelpers::PickStrategicAction(
+	FStrategicAIAction* PickedAction = StochasticHelpers::PickStrategicAction(
 		ValidActions, bM_UseCachedGenerationSeed, M_CachedGenerationSeed, GameTimeSeconds);
 	if (not EnsurePickedActionIsValid(PickedAction))
 	{
 		return;
 	}
-	const TArray<const UStrategicAISubAction*> SubActionsRequirementsMet = GetSubActionsThatHaveMetRequirements(
+	TArray<UStrategicAISubAction*> SubActionsRequirementsMet = GetSubActionsThatHaveMetRequirements(
 		*PickedAction, Blackboard, GameTimeSeconds);
 	UStrategicAISubAction* PickedSubAction = StochasticHelpers::PickSubAction(SubActionsRequirementsMet,
 		bM_UseCachedGenerationSeed, M_CachedGenerationSeed, GameTimeSeconds);
@@ -80,7 +80,7 @@ void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds
 	ExecuteSubAction(PickedSubAction, Blackboard, GameTimeSeconds);
 }
 
-bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
+bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<FStrategicAIAction*>& ValidActions) const
 {
 	if (ValidActions.IsEmpty())
 	{
@@ -101,7 +101,7 @@ bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<const FStrat
 }
 
 
-bool UStochasticDecisionTree::EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction) const
+bool UStochasticDecisionTree::EnsurePickedActionIsValid(FStrategicAIAction* PickedAction) const
 {
 	if (not PickedAction)
 	{
@@ -119,7 +119,7 @@ bool UStochasticDecisionTree::EnsurePickedActionIsValid(const FStrategicAIAction
 	return true;
 }
 
-bool UStochasticDecisionTree::EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const
+bool UStochasticDecisionTree::EnsurePickedSubActionIsValid(UStrategicAISubAction* PickedSubAction) const
 {
 	if (not PickedSubAction)
 	{
@@ -180,7 +180,7 @@ void UStochasticDecisionTree::ExecuteSubAction(UStrategicAISubAction* SubAction,
 }
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(
-	const UStrategicAISubAction* SubAction,
+	UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> ValidAttackLocations;
@@ -217,7 +217,7 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(
 
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(
-	const UStrategicAISubAction* SubAction,
+	UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> AttackLocations = GetProjectedPlayerHQLocation(Blackboard);
@@ -241,7 +241,7 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(
 }
 
 void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(
-	const UStrategicAISubAction* SubAction,
+	UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> AttackLocations = GetProjectedPlayerResourceBuildings(Blackboard);
@@ -264,10 +264,10 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(
 	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction,
+void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(UStrategicAISubAction* SubAction,
                                                           const FStrategicAIBlackboard& Blackboard)
 {
-	const USubAction_AttackSpecificPoints* AttackSpecificPoints =
+	USubAction_AttackSpecificPoints* AttackSpecificPoints =
 		Cast<USubAction_AttackSpecificPoints>(SubAction);
 	if (not IsValid(AttackSpecificPoints))
 	{
@@ -305,7 +305,7 @@ void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(const UStrategicAISubA
 	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(const UStrategicAISubAction* SubAction,
+void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(UStrategicAISubAction* SubAction,
                                                                     const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> ValidAttackLocations;
@@ -348,7 +348,7 @@ void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(const UStrat
 	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_HeavyTankPushPlayerBaseOrUnits(const UStrategicAISubAction* SubAction,
+void UStochasticDecisionTree::Exe_HeavyTankPushPlayerBaseOrUnits(UStrategicAISubAction* SubAction,
                                                                  const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FVector> ValidAttackLocations = GetProjectedPlayerBaseLocations(Blackboard);
@@ -380,7 +380,7 @@ void UStochasticDecisionTree::Exe_HeavyTankPushPlayerBaseOrUnits(const UStrategi
 	CreateAttackMoveFormation(SubAction, AttackLocations, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_FlankPlayerHeavies(const UStrategicAISubAction* SubAction,
+void UStochasticDecisionTree::Exe_FlankPlayerHeavies(UStrategicAISubAction* SubAction,
                                                      const FStrategicAIBlackboard& Blackboard)
 {
 	TArray<FWeakActorLocations> FlankingPositions = GetProjectedAggregatedHeavyTankFlankingPositions(Blackboard);
@@ -403,7 +403,7 @@ void UStochasticDecisionTree::Exe_FlankPlayerHeavies(const UStrategicAISubAction
 	CreateFlankingAttack(SubAction, FlankingPositions, Blackboard);
 }
 
-void UStochasticDecisionTree::Exe_DefendBase(const UStrategicAISubAction* SubAction,
+void UStochasticDecisionTree::Exe_DefendBase(UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
 	// Prioritize defending base points that are under attack, if any.
@@ -413,7 +413,7 @@ void UStochasticDecisionTree::Exe_DefendBase(const UStrategicAISubAction* SubAct
 }
 
 void UStochasticDecisionTree::CreateAttackMoveFormation(
-	const UStrategicAISubAction* SubAction,
+	UStrategicAISubAction* SubAction,
 	TArray<FVector> AttackLocations,
 	const FStrategicAIBlackboard& Blackboard)
 {
@@ -526,7 +526,7 @@ bool UStochasticDecisionTree::PathFindAttackPath(
 	return true;
 }
 
-void UStochasticDecisionTree::CreateFlankingAttack(const UStrategicAISubAction* SubAction,
+void UStochasticDecisionTree::CreateFlankingAttack(UStrategicAISubAction* SubAction,
                                                    const TArray<FWeakActorLocations>& FlankingPositions,
                                                    const FStrategicAIBlackboard& Blackboard)
 {
@@ -690,10 +690,10 @@ bool UStochasticDecisionTree::IssueRegisterWithBlackboardOrder(ICommands* UnitTo
 	return UnitToCommand->RegisterAsBlackboardIdle(bResetOrderQueue) == ECommandQueueError::NoError;
 }
 
-const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithValidSubActions(
-	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
+TArray<FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithValidSubActions(
+	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds)
 {
-	TArray<const FStrategicAIAction*> ValidActions;
+	TArray<FStrategicAIAction*> ValidActions;
 
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		EnemyAISettings::Debugging::StochasticDecisionTreeDebugging)
@@ -706,9 +706,9 @@ const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithV
 		return ValidActions;
 	}
 
-	for (const FStrategicAIAction& Action : M_ActionDefinitions)
+	for (FStrategicAIAction& Action : M_ActionDefinitions)
 	{
-		const TArray<const UStrategicAISubAction*> ValidSubActions =
+		TArray<UStrategicAISubAction*> ValidSubActions =
 			GetSubActionsThatHaveMetRequirements(Action, Blackboard, GameTimeSeconds);
 
 		if (ValidSubActions.IsEmpty())
@@ -723,19 +723,19 @@ const TArray<const FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithV
 }
 
 
-const TArray<const UStrategicAISubAction*> UStochasticDecisionTree::GetSubActionsThatHaveMetRequirements(
-	const FStrategicAIAction& Action,
+TArray<UStrategicAISubAction*> UStochasticDecisionTree::GetSubActionsThatHaveMetRequirements(
+	FStrategicAIAction& Action,
 	const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const
 {
-	TArray<const UStrategicAISubAction*> ValidSubActions;
+	TArray<UStrategicAISubAction*> ValidSubActions;
 
-	const TArray<TObjectPtr<UStrategicAISubAction>>& SubActions = Action.GetSubActions();
+	TArray<TObjectPtr<UStrategicAISubAction>>& SubActions = Action.GetSubActions();
 	if (SubActions.IsEmpty())
 	{
 		return ValidSubActions;
 	}
 
-	for (const TObjectPtr<UStrategicAISubAction>& SubAction : SubActions)
+	for (TObjectPtr<UStrategicAISubAction>& SubAction : SubActions)
 	{
 		if (not IsValid(SubAction))
 		{
@@ -976,7 +976,7 @@ void UStochasticDecisionTree::DebugAllActionsPriorReqCheck() const
 	                                EnemyAISettings::Debugging::StochasticActionsDebugTime);
 }
 
-void UStochasticDecisionTree::DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
+void UStochasticDecisionTree::DebugValidActions(const TArray<FStrategicAIAction*>& ValidActions) const
 {
 	FString DebugString = "\nValid Actions:";
 	for (auto EachValidAction : ValidActions)
