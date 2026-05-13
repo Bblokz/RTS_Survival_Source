@@ -65,6 +65,11 @@ struct FEnemyLevelTraining
 	
 	FEnemyLevelTraining();
 
+
+	// Scales how much the AI can train;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TrainingPointsPerMinute = 3;
+
 	TArray<EBuildingExpansionType> GetUniqueBuildingTypesForTechLevels();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
