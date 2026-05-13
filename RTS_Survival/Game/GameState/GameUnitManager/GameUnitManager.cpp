@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 
 #include "GameUnitManager.h"
@@ -1134,6 +1134,52 @@ int32 UGameUnitManager::GetPlayerBxpTotalCountOfTypes(const uint8 Player, const 
 	}
 
 	return MatchingBxpCount;
+}
+
+TMap<EBuildingExpansionType, int32> UGameUnitManager::GetPlayerBxpCountsByType(
+	const uint8 Player,
+	const TArray<EBuildingExpansionType>& BxpTypes) const
+{
+	TMap<EBuildingExpansionType, int32> BxpCountsByType;
+	for (const EBuildingExpansionType BxpType : BxpTypes)
+	{
+		BxpCountsByType.FindOrAdd(BxpType) = 0;
+	}
+
+	if (BxpCountsByType.Num() == 0)
+	{
+		return BxpCountsByType;
+	}
+
+	const TArray<ABuildingExpansion*>& BuildingExpansions = Player == 1 ? M_BxpAlivePlayer : M_BxpAliveEnemy;
+	for (const ABuildingExpansion* BuildingExpansion : BuildingExpansions)
+	{
+		if (not IsValid(BuildingExpansion))
+		{
+			continue;
+		}
+
+		const URTSComponent* BuildingExpansionRTSComponent = BuildingExpansion->GetRTSComponent();
+		if (not IsValid(BuildingExpansionRTSComponent))
+		{
+			continue;
+		}
+
+		if (BuildingExpansionRTSComponent->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
+		{
+			continue;
+		}
+
+		int32* const BxpCount = BxpCountsByType.Find(BuildingExpansionRTSComponent->GetSubtypeAsBxpSubtype());
+		if (BxpCount == nullptr)
+		{
+			continue;
+		}
+
+		++(*BxpCount);
+	}
+
+	return BxpCountsByType;
 }
 
 int32 UGameUnitManager::GetPlayerAircraftCountOfTypes(const uint8 Player,
