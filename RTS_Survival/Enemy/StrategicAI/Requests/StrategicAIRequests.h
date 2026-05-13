@@ -866,6 +866,32 @@ struct FFindEnemyBaseClusters
 };
 
 USTRUCT()
+struct FEnemyBasePointCoreBuildings
+{
+	GENERATED_BODY()
+
+	FEnemyBasePointCoreBuildings();
+
+	/**
+	 * @brief Provides the cluster centroid so strategic systems can reason about enemy macro presence quickly.
+	 *
+	 * @note Filled on async processing after an accepted base cluster is scored and converted to a representative point.
+	 * @note Not filled when no cluster exceeds required thresholds.
+	 */
+	UPROPERTY()
+	FVector BaseLocation;
+
+	/**
+	 * @brief Keeps production-critical buildings tied to their detected base for later spawning decisions.
+	 *
+	 * @note Filled on async processing from core building actors that contributed to this base cluster.
+	 * @note Weak pointers may be invalid by the time game-thread consumers inspect the result.
+	 */
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> CoreBuildingActors;
+};
+
+USTRUCT()
 struct FResultEnemyBaseClusters
 {
 	GENERATED_BODY()
@@ -882,13 +908,13 @@ struct FResultEnemyBaseClusters
 	int32 RequestID;
 
 	/**
-	 * @brief Provides compact base centroids so strategic systems can reason about enemy macro presence quickly.
+	 * @brief Provides detected base centroids with their associated production-critical buildings.
 	 *
 	 * @note Filled on async processing after accepted base clusters are scored and converted to representative points.
 	 * @note Not filled when no clusters exceed required thresholds.
 	 */
 	UPROPERTY()
-	TArray<FVector> BasePoints;
+	TArray<FEnemyBasePointCoreBuildings> BasePoints;
 
 	/**
 	 * @brief Provides optional unit placement candidates for defending detected bases against supplied player positions.
