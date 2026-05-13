@@ -45,7 +45,7 @@ namespace StochasticHelpers
 	 * @return Pointer to the selected action, or nullptr if selection failed.
 	 */
 	const FStrategicAIAction* PickStrategicAction(
-		const TArray<const FStrategicAIAction*>& ActionDefinitions,
+		const TArray<FStrategicAIAction*>& ActionDefinitions,
 		const bool bUseSeed,
 		const float Seed,
 		const float Time);
@@ -61,8 +61,8 @@ namespace StochasticHelpers
 	 * @param Time Time value combined with Seed for deterministic variation.
 	 * @return Pointer to the selected subaction, or nullptr if selection failed.
 	 */
-	const UStrategicAISubAction* PickSubAction(
-		const TArray<const UStrategicAISubAction*>& SubActions,
+	UStrategicAISubAction* PickSubAction(
+		const TArray<UStrategicAISubAction*>& SubActions,
 		const bool bUseSeed,
 		const float Seed,
 		const float Time);

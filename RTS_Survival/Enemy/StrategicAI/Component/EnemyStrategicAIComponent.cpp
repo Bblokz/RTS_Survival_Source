@@ -308,7 +308,9 @@ void UEnemyStrategicAIComponent::RemoveExpiredHeavyTankFlankingResults(const flo
 
 void UEnemyStrategicAIComponent::Training_ThinkStep()
 {
-		
+	// todo spend points on types of units to train that are allowed as per data FEnemyStrategicTrainingState.
+	// needs to take into account: required units from action requirements weighted by how long that action has not been performed.
+	// 
 }
 
 void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()

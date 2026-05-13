@@ -3,6 +3,16 @@
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+void UStrategicAISubAction::OnActionExecuted(const float Now)
+{
+	M_TimeStampLastExecution = Now;
+}
+
+float UStrategicAISubAction::GetLastTimeActionExecuted()
+{
+	return M_TimeStampLastExecution;
+}
+
 bool UStrategicAISubAction::GetAreRequirementsMet(
 	const FStrategicAIBlackboard& RequirementContext,
 	const float GameTimeSeconds) const

@@ -56,7 +56,7 @@ namespace
 	 * @return Selected pointer or nullptr.
 	 */
 	template <typename T>
-	const T* PickWeightedInternal(
+	T* PickWeightedInternal(
 		const TArray<const T*>& Options,
 		const TFunctionRef<float(const T&)> GetScore,
 		const bool bUseSeed,
@@ -352,7 +352,7 @@ namespace
 namespace StochasticHelpers
 {
 	const FStrategicAIAction* PickStrategicAction(
-		const TArray<const FStrategicAIAction*>& ActionDefinitions,
+		const TArray<FStrategicAIAction*>& ActionDefinitions,
 		const bool bUseSeed,
 		const float Seed,
 		const float Time)
@@ -364,7 +364,7 @@ namespace StochasticHelpers
 
 		return PickWeightedInternal<FStrategicAIAction>(
 			ActionDefinitions,
-			[](const FStrategicAIAction& Action)
+			[](FStrategicAIAction& Action)
 			{
 				return Action.GetScore();
 			},
@@ -373,8 +373,8 @@ namespace StochasticHelpers
 			Time);
 	}
 
-	const UStrategicAISubAction* PickSubAction(
-		const TArray<const UStrategicAISubAction*>& SubActions,
+	UStrategicAISubAction* PickSubAction(
+		const TArray< UStrategicAISubAction*>& SubActions,
 		const bool bUseSeed,
 		const float Seed,
 		const float Time)
@@ -386,7 +386,7 @@ namespace StochasticHelpers
 
 		return PickWeightedInternal<UStrategicAISubAction>(
 			SubActions,
-			[](const UStrategicAISubAction& SubAction)
+			[](UStrategicAISubAction& SubAction)
 			{
 				return SubAction.GetScore();
 			},

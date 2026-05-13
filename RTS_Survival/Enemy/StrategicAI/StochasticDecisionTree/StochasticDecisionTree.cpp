@@ -71,13 +71,13 @@ void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds
 	}
 	const TArray<const UStrategicAISubAction*> SubActionsRequirementsMet = GetSubActionsThatHaveMetRequirements(
 		*PickedAction, Blackboard, GameTimeSeconds);
-	const UStrategicAISubAction* PickedSubAction = StochasticHelpers::PickSubAction(SubActionsRequirementsMet,
+	UStrategicAISubAction* PickedSubAction = StochasticHelpers::PickSubAction(SubActionsRequirementsMet,
 		bM_UseCachedGenerationSeed, M_CachedGenerationSeed, GameTimeSeconds);
 	if (not EnsurePickedSubActionIsValid(PickedSubAction))
 	{
 		return;
 	}
-	ExecuteSubAction(PickedSubAction, Blackboard);
+	ExecuteSubAction(PickedSubAction, Blackboard, GameTimeSeconds);
 }
 
 bool UStochasticDecisionTree::EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const
@@ -136,14 +136,15 @@ bool UStochasticDecisionTree::EnsurePickedSubActionIsValid(const UStrategicAISub
 	return true;
 }
 
-void UStochasticDecisionTree::ExecuteSubAction(const UStrategicAISubAction* SubAction,
-                                               const FStrategicAIBlackboard& Blackboard)
+void UStochasticDecisionTree::ExecuteSubAction(UStrategicAISubAction* SubAction,
+                                               const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds)
 {
 	if (not EnsureIsValidDirectControlComponent() || not EnsureIsValidEnemyNavigationAIComponent()
 		|| not EnsureIsValidEnemyFormation())
 	{
 		return;
 	}
+	SubAction->OnActionExecuted(GameTimeSeconds);
 	switch (SubAction->SubtypeAction)
 	{
 	case ESubtypeAction::DEFAULT_OBJECT:

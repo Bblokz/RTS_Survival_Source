@@ -128,7 +128,7 @@ private:
 	bool EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
 	bool EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction) const;
 	bool EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const;
-	void ExecuteSubAction(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void ExecuteSubAction(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds);
 
 	void Exe_AttackMovePlayerUnits(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 	void Exe_AttackMovePlayerHQ(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);

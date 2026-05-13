@@ -34,6 +34,9 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	ESubtypeAction SubtypeAction = ESubtypeAction::DEFAULT_OBJECT;
 
+	void OnActionExecuted(const float Now);
+	float GetLastTimeActionExecuted();
+
 	float GetScore() const
 	{
 		return M_Score;
@@ -92,6 +95,7 @@ protected:
 	
 
 private:
+	float M_TimeStampLastExecution = 0.f;
 	bool GetAreRequirementsMetForArray(
 		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
 		const FStrategicAIBlackboard& RequirementContext,
