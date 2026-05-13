@@ -34,6 +34,11 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 		// ETankSubtype::Tank_SU_76,
 	};
 
+	MediumTankOptions.TechLevel = EEnemyAITechLevel::MediumTanks;
+	MediumTankOptions.TypesUnlockingThisLevel = {};
+	MediumTankOptions.TrainableSquadSubtypes = {};
+	MediumTankOptions.TrainableTankSubtypes = {};
+
 	Tier2Options.TechLevel = EEnemyAITechLevel::Tier2;
 	Tier2Options.TypesUnlockingThisLevel = {
 		EBuildingExpansionType::BTX_RusResearchCenter,
@@ -103,32 +108,24 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 	};
 }
 
-TArray<EBuildingExpansionType> FEnemyLevelTraining::GetUniqueBuildingTypesForTechLevels()
+TArray<EBuildingExpansionType> FEnemyLevelTraining::GetUniqueBuildingTypesForTechLevels() const
 {
 	TArray<EBuildingExpansionType> UniqueTypes;
-	for(const auto& EachType: BasicInfantryOptions.TypesUnlockingThisLevel)
+
+	auto AddUniqueBuildingTypes = [&UniqueTypes](const FEnemyTrainingOptionsForTechLevel& TrainingOptions)
 	{
-	UniqueTypes.AddUnique(EachType);
-	}
-	for(const auto& EachType: LightTankOptions.TypesUnlockingThisLevel)
-	{
-		UniqueTypes.AddUnique(EachType);
-	}
-	for(const auto& EachType: Tier2Options.TypesUnlockingThisLevel)
-	{
-		UniqueTypes.AddUnique(EachType);
-	}
-	for(const auto& EachType: AdvancedInfantryOptions.TypesUnlockingThisLevel)
-	{
-		UniqueTypes.AddUnique(EachType);
-	}
-	for(const auto& EachType: Tier3Options.TypesUnlockingThisLevel)
-	{
-		UniqueTypes.AddUnique(EachType);
-	}
-	for(const auto& EachType: ExperimentalOptions.TypesUnlockingThisLevel)
-	{
-		UniqueTypes.AddUnique(EachType);
-	}
+		for (const EBuildingExpansionType EachType : TrainingOptions.TypesUnlockingThisLevel)
+		{
+			UniqueTypes.AddUnique(EachType);
+		}
+	};
+
+	AddUniqueBuildingTypes(BasicInfantryOptions);
+	AddUniqueBuildingTypes(LightTankOptions);
+	AddUniqueBuildingTypes(MediumTankOptions);
+	AddUniqueBuildingTypes(Tier2Options);
+	AddUniqueBuildingTypes(AdvancedInfantryOptions);
+	AddUniqueBuildingTypes(Tier3Options);
+	AddUniqueBuildingTypes(ExperimentalOptions);
 	return UniqueTypes;
 }

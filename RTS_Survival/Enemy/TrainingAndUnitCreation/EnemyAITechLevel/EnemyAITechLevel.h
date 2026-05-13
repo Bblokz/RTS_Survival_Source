@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 
@@ -65,12 +65,11 @@ struct FEnemyLevelTraining
 	
 	FEnemyLevelTraining();
 
-
 	// Scales how much the AI can train;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TrainingPointsPerMinute = 3;
 
-	TArray<EBuildingExpansionType> GetUniqueBuildingTypesForTechLevels();
+	TArray<EBuildingExpansionType> GetUniqueBuildingTypesForTechLevels() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FEnemyTrainingOptionsForTechLevel BasicInfantryOptions ;

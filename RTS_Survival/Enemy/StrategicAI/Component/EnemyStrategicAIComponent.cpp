@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "EnemyStrategicAIComponent.h"
 
@@ -10,6 +10,35 @@
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+
+namespace EnemyStrategicAITrainingRequirements
+{
+	bool GetIsTechLevelUnlockedByBxpCounts(
+		const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
+		const TMap<EBuildingExpansionType, int32>& BxpCountsByType)
+	{
+		for (const EBuildingExpansionType RequiredBxpType : TrainingOptions.TypesUnlockingThisLevel)
+		{
+			const int32* const BxpCount = BxpCountsByType.Find(RequiredBxpType);
+			if (BxpCount != nullptr && *BxpCount > 0)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void UpdateTechLevelUnlockedMapForOptions(
+		TMap<EEnemyAITechLevel, bool>& TechLevelUnlockedMap,
+		const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
+		const TMap<EBuildingExpansionType, int32>& BxpCountsByType)
+	{
+		TechLevelUnlockedMap.Add(
+			TrainingOptions.TechLevel,
+			GetIsTechLevelUnlockedByBxpCounts(TrainingOptions, BxpCountsByType));
+	}
+}
 
 UEnemyStrategicAIComponent::UEnemyStrategicAIComponent()
 {
@@ -277,12 +306,48 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 
 void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 {
-	if(not EnsureIsValidUnitManager())
+	if (not EnsureIsValidUnitManager())
 	{
 		return;
 	}
-	// Todo helper on unit manager to get a mapping from ebuilding expansion type to count for specific player in this case player 2 (enemy)
-	TArray<EBuildingExpansionType>
+
+	constexpr uint8 EnemyPlayerIndex = 2;
+	FEnemyLevelTraining& EnemyLevelTraining = M_TrainingState.EnemyLevelTraining;
+	const TArray<EBuildingExpansionType> RequiredBxpTypes = EnemyLevelTraining.GetUniqueBuildingTypesForTechLevels();
+	const TMap<EBuildingExpansionType, int32> BxpCountsByType = M_GameUnitManager->GetPlayerBxpCountsByType(
+		EnemyPlayerIndex,
+		RequiredBxpTypes);
+
+	TMap<EEnemyAITechLevel, bool>& TechLevelUnlockedMap = M_TrainingState.TechLevelUnlockedMap;
+	TechLevelUnlockedMap.Empty();
+	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+		TechLevelUnlockedMap,
+		EnemyLevelTraining.BasicInfantryOptions,
+		BxpCountsByType);
+	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+		TechLevelUnlockedMap,
+		EnemyLevelTraining.LightTankOptions,
+		BxpCountsByType);
+	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+		TechLevelUnlockedMap,
+		EnemyLevelTraining.MediumTankOptions,
+		BxpCountsByType);
+	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+		TechLevelUnlockedMap,
+		EnemyLevelTraining.Tier2Options,
+		BxpCountsByType);
+	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+		TechLevelUnlockedMap,
+		EnemyLevelTraining.AdvancedInfantryOptions,
+		BxpCountsByType);
+	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+		TechLevelUnlockedMap,
+		EnemyLevelTraining.Tier3Options,
+		BxpCountsByType);
+	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+		TechLevelUnlockedMap,
+		EnemyLevelTraining.ExperimentalOptions,
+		BxpCountsByType);
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
@@ -615,9 +680,9 @@ void UEnemyStrategicAIComponent::ClearInvalidIdleUnitsFromBlackboard()
 void UEnemyStrategicAIComponent::DebugBlackboardBasePoints() const
 {
 	using namespace EnemyAISettings::Debugging;
-	for (const auto& EachLocation : M_Blackboard.EnemyBasePoints)
+	for (const FEnemyBasePointCoreBuildings& BasePoint : M_StrategicAIBlackboard.EnemyBasePoints)
 	{
-		DebugPoint(EachLocation, BaseLocationDebuggingRadius, EnemyLocationColor, BaseLocationDebugDuration,
+		DebugPoint(BasePoint.BaseLocation, BaseLocationDebuggingRadius, EnemyLocationColor, BaseLocationDebugDuration,
 		           "Enemy Base Point");
 	}
 }

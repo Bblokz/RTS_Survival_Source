@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -163,6 +163,16 @@ public:
 	int32 GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const;
 	int32 GetPlayerTankCountOfTypes(const uint8 Player, const TArray<ETankSubtype>& TankTypes) const;
 	int32 GetPlayerBxpTotalCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const;
+
+	/**
+	 * @brief Counts only the requested building expansion types in one pass over that player's live BXPs.
+	 * @param Player The player that owns the building expansions.
+	 * @param BxpTypes The building expansion types that need explicit count entries.
+	 * @return Mapping with every requested type present, including zero-count types.
+	 */
+	TMap<EBuildingExpansionType, int32> GetPlayerBxpCountsByType(
+		const uint8 Player,
+		const TArray<EBuildingExpansionType>& BxpTypes) const;
 	
 	int32 GetPlayerAircraftCountOfTypes(const uint8 Player, const TArray<EAircraftSubtype>& AircraftTypes) const;
 

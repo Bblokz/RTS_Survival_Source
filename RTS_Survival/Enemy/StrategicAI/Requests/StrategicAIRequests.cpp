@@ -104,6 +104,11 @@ FFindEnemyBaseClusters::FFindEnemyBaseClusters()
 {
 }
 
+FEnemyBasePointCoreBuildings::FEnemyBasePointCoreBuildings()
+	: BaseLocation(FVector::ZeroVector)
+{
+}
+
 FResultEnemyBaseClusters::FResultEnemyBaseClusters()
 	: RequestID(0)
 {

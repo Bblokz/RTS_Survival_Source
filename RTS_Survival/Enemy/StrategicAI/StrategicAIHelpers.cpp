@@ -67,7 +67,14 @@ namespace StrategicAIHelperUtilities
 	struct FEnemyBasePoint
 	{
 		FVector2D Location = FVector2D::ZeroVector;
+		TWeakObjectPtr<AActor> CoreBuildingActor;
 		bool bIsCoreBuilding = false;
+	};
+
+	struct FEnemyCoreBuildingClusterPoint
+	{
+		FVector2D Location = FVector2D::ZeroVector;
+		TWeakObjectPtr<AActor> Actor;
 	};
 
 	struct FEnemyBaseClusterCandidate
@@ -86,7 +93,7 @@ namespace StrategicAIHelperUtilities
 	void GatherEnemyBaseRequestPoints(
 		const FFindEnemyBaseClusters& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
-		TArray<FVector2D>& OutCorePoints,
+		TArray<FEnemyCoreBuildingClusterPoint>& OutCorePoints,
 		TArray<FVector2D>& OutSatellitePoints,
 		TArray<FVector>& OutAlliedUnitLocations)
 	{
@@ -109,7 +116,10 @@ namespace StrategicAIHelperUtilities
 			const FVector2D UnitLocationXY(UnitState.UnitLocation.X, UnitState.UnitLocation.Y);
 			if (CoreTypes.Contains(BuildingType))
 			{
-				OutCorePoints.Add(UnitLocationXY);
+				FEnemyCoreBuildingClusterPoint CorePoint;
+				CorePoint.Location = UnitLocationXY;
+				CorePoint.Actor = UnitState.UnitActorPtr;
+				OutCorePoints.Add(CorePoint);
 				continue;
 			}
 
@@ -121,7 +131,7 @@ namespace StrategicAIHelperUtilities
 	}
 
 	TArray<int32> BuildCoreClusterLabels(
-		const TArray<FVector2D>& CorePoints,
+		const TArray<FEnemyCoreBuildingClusterPoint>& CorePoints,
 		const float CoreClusterDistanceXY,
 		const int32 RequestedMinCoreNeighbors,
 		int32& OutClusterCount)
@@ -142,7 +152,7 @@ namespace StrategicAIHelperUtilities
 			TArray<int32> Neighbors;
 			for (int32 NeighborIndex = 0; NeighborIndex < CorePoints.Num(); ++NeighborIndex)
 			{
-				if (FVector2D::DistSquared(CorePoints[PointIndex], CorePoints[NeighborIndex]) <= ClusterDistanceSq)
+				if (FVector2D::DistSquared(CorePoints[PointIndex].Location, CorePoints[NeighborIndex].Location) <= ClusterDistanceSq)
 				{
 					Neighbors.Add(NeighborIndex);
 				}
@@ -165,7 +175,7 @@ namespace StrategicAIHelperUtilities
 	}
 
 	TArray<FEnemyBaseClusterCandidate> BuildCoreBaseClusters(
-		const TArray<FVector2D>& CorePoints,
+		const TArray<FEnemyCoreBuildingClusterPoint>& CorePoints,
 		const TArray<int32>& Labels,
 		const int32 ClusterCount)
 	{
@@ -179,7 +189,8 @@ namespace StrategicAIHelperUtilities
 			}
 
 			FEnemyBasePoint BasePoint;
-			BasePoint.Location = CorePoints[PointIndex];
+			BasePoint.Location = CorePoints[PointIndex].Location;
+			BasePoint.CoreBuildingActor = CorePoints[PointIndex].Actor;
 			BasePoint.bIsCoreBuilding = true;
 			Clusters[Labels[PointIndex]].BuildingPoints.Add(BasePoint);
 		}
@@ -245,7 +256,7 @@ namespace StrategicAIHelperUtilities
 
 	TArray<FEnemyBaseClusterCandidate> BuildAcceptedEnemyBaseClusters(
 		const FFindEnemyBaseClusters& Request,
-		const TArray<FVector2D>& CorePoints,
+		const TArray<FEnemyCoreBuildingClusterPoint>& CorePoints,
 		const TArray<FVector2D>& SatellitePoints)
 	{
 		int32 ClusterCount = 0;
@@ -277,6 +288,31 @@ namespace StrategicAIHelperUtilities
 		}
 
 		return AcceptedClusters;
+	}
+
+	FEnemyBasePointCoreBuildings BuildEnemyBasePointCoreBuildings(const FEnemyBaseClusterCandidate& Cluster)
+	{
+		FEnemyBasePointCoreBuildings BasePoint;
+		BasePoint.BaseLocation = Cluster.Point;
+		for (const FEnemyBasePoint& BuildingPoint : Cluster.BuildingPoints)
+		{
+			if (not BuildingPoint.bIsCoreBuilding)
+			{
+				continue;
+			}
+
+			BasePoint.CoreBuildingActors.Add(BuildingPoint.CoreBuildingActor);
+		}
+
+		return BasePoint;
+	}
+
+	void RemoveNearZeroStrategicEnemyBasePoints(TArray<FEnemyBasePointCoreBuildings>& BasePoints)
+	{
+		BasePoints.RemoveAll([](const FEnemyBasePointCoreBuildings& BasePoint)
+		{
+			return GetIsNearZeroStrategicLocation(BasePoint.BaseLocation);
+		});
 	}
 
 	float GetAngleDifferenceDegrees(const float LeftAngleDegrees, const float RightAngleDegrees)
@@ -615,7 +651,7 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 		return Result;
 	}
 
-	TArray<FVector2D> CorePoints;
+	TArray<StrategicAIHelperUtilities::FEnemyCoreBuildingClusterPoint> CorePoints;
 	TArray<FVector2D> SatellitePoints;
 	TArray<FVector> AlliedUnitLocations;
 	StrategicAIHelperUtilities::GatherEnemyBaseRequestPoints(
@@ -630,10 +666,10 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 	Result.BasePoints.Reserve(BaseClusters.Num());
 	for (const StrategicAIHelperUtilities::FEnemyBaseClusterCandidate& BaseCluster : BaseClusters)
 	{
-		Result.BasePoints.Add(BaseCluster.Point);
+		Result.BasePoints.Add(StrategicAIHelperUtilities::BuildEnemyBasePointCoreBuildings(BaseCluster));
 	}
 
-	StrategicAIHelperUtilities::RemoveNearZeroStrategicLocations(Result.BasePoints);
+	StrategicAIHelperUtilities::RemoveNearZeroStrategicEnemyBasePoints(Result.BasePoints);
 	StrategicAIHelperUtilities::BuildDefenseArcCandidatesForBases(
 		Request,
 		BaseClusters,
