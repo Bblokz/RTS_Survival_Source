@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 
@@ -65,7 +65,7 @@ struct FEnemyLevelTraining
 	
 	FEnemyLevelTraining();
 
-	TArray<EBuildingExpansionType> GetUniqueBuildingTypesForTechLevels();
+	TArray<EBuildingExpansionType> GetUniqueBuildingTypesForTechLevels() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FEnemyTrainingOptionsForTechLevel BasicInfantryOptions ;
