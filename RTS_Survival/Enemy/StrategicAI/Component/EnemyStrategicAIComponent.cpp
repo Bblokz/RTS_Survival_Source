@@ -213,6 +213,13 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 	M_TrainingRequirementsThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep);
 	M_AIThinkTimers.Add(&M_TrainingRequirementsThinkTimer);
+
+	M_TrainingPointsThinkTimer.LastTimeThought = Now;
+	M_TrainingPointsThinkTimer.ThinkingInterval =
+		EnemyAISettings::ThinkingTimers::UpdateEnemyTrainingPoints_Interval;
+	M_TrainingRequirementsThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep);
+	M_AIThinkTimers.Add(&M_TrainingPointsThinkTimer);
 }
 
 void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
@@ -301,7 +308,7 @@ void UEnemyStrategicAIComponent::RemoveExpiredHeavyTankFlankingResults(const flo
 
 void UEnemyStrategicAIComponent::Training_ThinkStep()
 {
-	
+		
 }
 
 void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
@@ -348,6 +355,12 @@ void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.ExperimentalOptions,
 		BxpCountsByType);
+}
+
+void UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep()
+{
+	const int32 MultiplierPerInterval = FMath::Max(1, EnemyAISettings::ThinkingTimers::UpdateEnemyTrainingPoints_Interval / 60);
+	M_TrainingState.TrainingPoints += M_TrainingState.EnemyLevelTraining.TrainingPointsPerMinute * MultiplierPerInterval;
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
@@ -417,13 +430,13 @@ void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer()
 	World->GetTimerManager().SetTimer(
 		M_StrategicAIThinkingTimerHandle,
 		this,
-		&UEnemyStrategicAIComponent::StrategicAiThinkStep,
+		&UEnemyStrategicAIComponent::StrategicAiThinkingLoop,
 		EnemyAISettings::EnemyStrategicAIThinkingSpeed,
 		true);
 }
 
 
-void UEnemyStrategicAIComponent::StrategicAiThinkStep()
+void UEnemyStrategicAIComponent::StrategicAiThinkingLoop()
 {
 	const float Now = GetWorld()->GetTimeSeconds();
 	ClearInvalidIdleUnitsFromBlackboard();
@@ -439,6 +452,10 @@ void UEnemyStrategicAIComponent::StrategicAiThinkStep()
 	if (M_StochasticDecisionTree.IsValid() && GetIsAllowedDirectControlUnits())
 	{
 		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_Blackboard);
+	}
+	if(GetIsAllowedUnitTraining())
+	{
+		Training_ThinkStep();
 	}
 	ProcessStrategicAIRequests();
 }
@@ -680,7 +697,7 @@ void UEnemyStrategicAIComponent::ClearInvalidIdleUnitsFromBlackboard()
 void UEnemyStrategicAIComponent::DebugBlackboardBasePoints() const
 {
 	using namespace EnemyAISettings::Debugging;
-	for (const FEnemyBasePointCoreBuildings& BasePoint : M_StrategicAIBlackboard.EnemyBasePoints)
+	for (const FEnemyBasePointCoreBuildings& BasePoint : M_Blackboard.EnemyBasePoints)
 	{
 		DebugPoint(BasePoint.BaseLocation, BaseLocationDebuggingRadius, EnemyLocationColor, BaseLocationDebugDuration,
 		           "Enemy Base Point");

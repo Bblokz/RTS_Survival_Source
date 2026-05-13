@@ -752,6 +752,12 @@ void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
 
 	FStrategicAIBlackboard& StrategicAIBlackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
 	StrategicAIBlackboard.StrategicAIMissionSettings = M_EnemyAIMissionSettings;
+	// The settings regarding which units are unlocked at which tech level for this map.
+	// Also contains training points per minute the enemy gets as well as the starting training points.
+	FEnemyStrategicTrainingState& TrainingState = StrategicAIComponent->GetEditableEnemyTrainingState();
+	TrainingState.EnemyLevelTraining  = M_EnemyLevelTraining;
+	TrainingState.TrainingPoints = M_EnemyLevelTraining.TrainingPointsStart;
+	
 }
 
 bool AEnemyController::GetIsValidFormationController() const

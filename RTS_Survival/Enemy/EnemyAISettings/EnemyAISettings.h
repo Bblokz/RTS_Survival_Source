@@ -30,6 +30,9 @@ namespace EnemyAISettings
 		inline float UpdatePlayerHeavyTankFlank_Interval = 3.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI checks for what tech level it is at given the buildings it has created / are on the map.
 		inline float UpdateAITechLevel_Interval = 42.f* DEV_AI_ThinkTimers_Scaling;
+		// How often the enemy AI gets new training points depending on the setting in the EnemyController
+		// Ensure this is a multiple of 60 as the training points are calculated per minute.
+		inline float UpdateEnemyTrainingPoints_Interval = 60.f* DEV_AI_ThinkTimers_Scaling;
 	}
 
 	namespace Debugging

@@ -65,7 +65,10 @@ struct FEnemyLevelTraining
 	
 	FEnemyLevelTraining();
 
-	// Scales how much the AI can train;
+	// With how many points does the AI start for training? Note that 10 = one light tank.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 TrainingPointsStart = 10;
+	// Scales how much the AI can train; 10 points is one light tank.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TrainingPointsPerMinute = 3;
 

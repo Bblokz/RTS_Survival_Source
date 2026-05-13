@@ -146,6 +146,8 @@ private:
 	FStrategicAIRequestBatch M_PendingRequests;
 	FStrategicAIResultBatch M_LatestResults;
 	FStrategicAIBlackboard M_Blackboard;
+	// The starting amount of training points is set when the enemy ai controller propagates the settings.
+	// See void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
 	FEnemyStrategicTrainingState M_TrainingState;
 	bool GetIsAllowedDirectControlUnits()const;
 	bool GetIsAllowedUnitTraining()const;
@@ -176,6 +178,9 @@ private:
 	FAIThinkingTimerData M_TrainingRequirementsThinkTimer;
 	void TrainingRequirements_ThinkStep();
 
+	FAIThinkingTimerData M_TrainingPointsThinkTimer;
+	void GetTrainingPoints_ThinkStep();
+
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
@@ -184,7 +189,7 @@ private:
 	void StartStrategicAIThinkingTimer();
 	void StopStrategicAIThinkingTimer();
 
-	void StrategicAiThinkStep();
+	void StrategicAiThinkingLoop();
 	void ProcessStrategicAIRequests();
 	void OnStrategicAIResultsReceived(const FStrategicAIResultBatch& ResultBatch);
 	void ProcessClosestFlankableEnemyHeavyResults(const TArray<FResultClosestFlankableEnemyHeavy>& ClosestFlankableEnemyHeavyResults);
