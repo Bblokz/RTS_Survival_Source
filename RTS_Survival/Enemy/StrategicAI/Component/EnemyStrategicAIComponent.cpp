@@ -408,6 +408,11 @@ void UEnemyStrategicAIComponent::ProcessClosestFlankableEnemyHeavyResults(
 		ResultWithTimestamp.ResultTimestampSeconds = CurrentTimeSeconds;
 		M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults.Add(MoveTemp(ResultWithTimestamp));
 	}
+	if(DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::FlankPositionsDebugging)
+	{
+		DebugFlankingPositiions();
+	}
 }
 
 void UEnemyStrategicAIComponent::ProcessEnemyBaseClusterResults(
@@ -622,4 +627,17 @@ void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
 		M_StrategicAIBlackboard.CurrentPlayerUnitCounts.PlayerResourceBuildings.Num());
 	RTSFunctionLibrary::PrintString(
 		DebugString, FColor::Green, EnemyAISettings::Debugging::PlayerCountsDuration);
+}
+
+void UEnemyStrategicAIComponent::DebugFlankingPositiions() const
+{
+for(auto EachFlank : M_StrategicAIBlackboard.AgreggatedHeavyTankFlankingResults)
+{
+	for(const auto& EachHeavyLocations : EachFlank.FlankLocationsAroundHeavyTank)
+		for(const auto& EachLocation : EachHeavyLocations.Locations)
+		{
+			DrawDebugSphere(GetWorld(), EachLocation, 33.f, 20,
+			                EnemyAISettings::Debugging::FlankLocationColor, false, 2.f, 0, 5.f);
+		}
+}
 }

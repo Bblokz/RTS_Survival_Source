@@ -46,6 +46,7 @@ namespace EnemyAISettings
 		inline constexpr bool LocationsUnderPlayerAttackDebugging = true;
 		inline constexpr float LocationsUnderAttackDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
 		inline constexpr float LocationUnderAttackDebuggingRadius = 500.f;
+		inline constexpr bool FlankPositionsDebugging = true;
 		inline constexpr bool PlayerUnitBulkDebugging= true;
 		inline constexpr float PlayerUnitBulkLocationDebuggingRadius = 250.f;
 		inline constexpr float PlayerUnitBulkLocationDebugDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
