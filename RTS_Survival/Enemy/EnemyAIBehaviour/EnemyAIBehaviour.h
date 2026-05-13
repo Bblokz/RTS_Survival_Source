@@ -39,6 +39,11 @@ struct FEnemyAIMissionSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxPickedUnitsForAction = 8;
 
+
+	// Whether the AI can train units based on the buildings available to it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bAllowUnitTraining = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAllowBuilding = false;
 

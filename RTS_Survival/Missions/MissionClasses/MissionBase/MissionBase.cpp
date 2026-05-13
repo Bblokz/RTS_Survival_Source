@@ -184,7 +184,7 @@ int32 UMissionBase::DoesPlayerHaveAnyBuildingExpansionsOfType(
 	}
 
 	constexpr uint8 PlayerTeamId = 1;
-	return GameUnitManager->GetPlayerBxpCountOfTypes(PlayerTeamId, BuildingExpansionTypes);
+	return GameUnitManager->GetPlayerBxpTotalCountOfTypes(PlayerTeamId, BuildingExpansionTypes);
 }
 
 int32 UMissionBase::DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraftSubtype>& AircraftTypes) const

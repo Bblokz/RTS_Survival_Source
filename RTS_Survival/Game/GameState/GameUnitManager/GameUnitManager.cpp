@@ -1098,7 +1098,7 @@ int32 UGameUnitManager::GetPlayerTankCountOfTypes(const uint8 Player, const TArr
 	return MatchingTankCount;
 }
 
-int32 UGameUnitManager::GetPlayerBxpCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const
+int32 UGameUnitManager::GetPlayerBxpTotalCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const
 {
 	if (BxpTypes.Num() == 0)
 	{

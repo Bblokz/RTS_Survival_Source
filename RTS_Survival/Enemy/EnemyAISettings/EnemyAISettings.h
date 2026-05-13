@@ -28,6 +28,8 @@ namespace EnemyAISettings
 		inline float UpdatePlayerUnitBulkLocations_Interval = 15.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI finds player Heavy tanks to flank
 		inline float UpdatePlayerHeavyTankFlank_Interval = 3.f* DEV_AI_ThinkTimers_Scaling;
+		// How often the AI checks for what tech level it is at given the buildings it has created / are on the map.
+		inline float UpdateAITechLevel_Interval = 42.f* DEV_AI_ThinkTimers_Scaling;
 	}
 
 	namespace Debugging

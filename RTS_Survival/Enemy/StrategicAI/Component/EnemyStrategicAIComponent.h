@@ -6,8 +6,10 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/StrategicTrainingState/StrategicTrainingState.h"
 #include "EnemyStrategicAIComponent.generated.h"
 
+class UGameUnitManager;
 class UStochasticDecisionTree;
 struct FStochasticDecisionTree;
 class AEnemyController;
@@ -99,6 +101,7 @@ public:
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
 	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
+	FEnemyStrategicTrainingState& GetEditableEnemyTrainingState();
 
 	// This request is periodically used to find the bases owned by the AI.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -125,6 +128,12 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+
+	void BeginPlay_CacheUnitManager();
+
+	UPROPERTY()
+	TWeakObjectPtr<UGameUnitManager> M_GameUnitManager = nullptr;
+	bool EnsureIsValidUnitManager();
 	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
@@ -136,8 +145,10 @@ private:
 
 	FStrategicAIRequestBatch M_PendingRequests;
 	FStrategicAIResultBatch M_LatestResults;
-	FStrategicAIBlackboard M_StrategicAIBlackboard;
+	FStrategicAIBlackboard M_Blackboard;
+	FEnemyStrategicTrainingState M_TrainingState;
 	bool GetIsAllowedDirectControlUnits()const;
+	bool GetIsAllowedUnitTraining()const;
 
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
 
@@ -159,6 +170,11 @@ private:
 	FAIThinkingTimerData M_PlayerHeavyTankFlankLocationsThinkTimer;
 	void PlayerHeavyTankFlankLocations_ThinkStep();
 	void RemoveExpiredHeavyTankFlankingResults(const float CurrentTimeSeconds);
+	
+	void Training_ThinkStep();
+	
+	FAIThinkingTimerData M_TrainingRequirementsThinkTimer;
+	void TrainingRequirements_ThinkStep();
 
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 

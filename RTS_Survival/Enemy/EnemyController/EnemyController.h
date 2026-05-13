@@ -10,6 +10,7 @@
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
 #include "EnemyController.generated.h"
 
 
@@ -400,12 +401,16 @@ protected:
 	// Settings for the strategic AI on this map.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Settings")
 	FEnemyAIMissionSettings M_EnemyAIMissionSettings;
-	
+	// Holds the Tank and squad training options unlocked for a given tech level as well as the building types needed to unlock
+	// that tech level.
+	// Can be adjusted per map.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Settings")
+	FEnemyLevelTraining M_EnemyLevelTraining;
 
 private:
 	void BeginPlay_InitStochasticDecisionTree();
 	void BeginPlay_MoveAISettingsToStrategicAIBlackboard() const;
-	
+
 	UPROPERTY()
 	TObjectPtr<UEnemyFormationController> M_FormationController;
 
