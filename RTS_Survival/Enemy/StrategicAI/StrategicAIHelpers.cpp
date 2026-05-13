@@ -1486,25 +1486,17 @@ FResultClosestFlankableEnemyHeavy FStrategicAIHelpers::BuildClosestFlankableEnem
 	const FFindClosestFlankableEnemyHeavy& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 {
-	struct FDistanceEntry
-	{
-		float Distance = 0.f;
-		const FAsyncDetailedUnitState* UnitState = nullptr;
-	};
-
 	FResultClosestFlankableEnemyHeavy Result;
 	Result.RequestID = Request.RequestID;
+	Result.FlankLocationsAroundHeavyTank.Reserve(DetailedUnitStates.Num());
 
-	const int32 MaxHeavyTanksToFlank = FMath::Max(0, Request.MaxHeavyTanksToFlank);
-	if (MaxHeavyTanksToFlank == 0)
-	{
-		return Result;
-	}
-
-	TArray<FDistanceEntry> CandidateTanks;
 	for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 	{
 		if (UnitState.OwningPlayer != StrategicAIHelperConstants::PlayerOwningId)
+		{
+			continue;
+		}
+		if (not UnitState.bIsInCombat)
 		{
 			continue;
 		}
@@ -1513,29 +1505,9 @@ FResultClosestFlankableEnemyHeavy FStrategicAIHelpers::BuildClosestFlankableEnem
 			continue;
 		}
 
-		const float Distance = FVector::Dist(Request.StartSearchLocation, UnitState.UnitLocation);
-		CandidateTanks.Add({Distance, &UnitState});
-	}
-
-	CandidateTanks.Sort([](const FDistanceEntry& Left, const FDistanceEntry& Right)
-	{
-		return Left.Distance < Right.Distance;
-	});
-
-	const int32 CountToProcess = FMath::Min(MaxHeavyTanksToFlank, CandidateTanks.Num());
-	Result.FlankLocationsAroundHeavyTank.Reserve(CountToProcess);
-
-	for (int32 Index = 0; Index < CountToProcess; ++Index)
-	{
-		const FAsyncDetailedUnitState* UnitState = CandidateTanks[Index].UnitState;
-		if (not UnitState)
-		{
-			continue;
-		}
-
 		FWeakActorLocations FlankLocations;
-		FlankLocations.Actor = UnitState->UnitActorPtr;
-		FlankLocations.Locations = StrategicAIHelperUtilities::BuildFlankPositions(*UnitState, Request);
+		FlankLocations.Actor = UnitState.UnitActorPtr;
+		FlankLocations.Locations = StrategicAIHelperUtilities::BuildFlankPositions(UnitState, Request);
 		Result.FlankLocationsAroundHeavyTank.Add(MoveTemp(FlankLocations));
 	}
 

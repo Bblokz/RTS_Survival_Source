@@ -44,15 +44,14 @@ struct FWeakActorLocations
 };
 
 /**
- * @brief Requests flank positions around the closest flankable enemy heavy tanks.
+ * @brief Requests flank positions around combat-active player heavy tanks.
  * Used by the async thread to drive heavy-tank flanking queries off detailed unit state.
  *
  * On the async thread, each request is dequeued from the batch and passed to
  * FStrategicAIHelpers::BuildClosestFlankableEnemyHeavyResult with the latest
- * M_DetailedUnitStates snapshot. The helper filters for player-owned units, checks the
- * tank subtype to ensure it is a heavy tank, computes distance to StartSearchLocation,
- * sorts candidates by distance, and then builds flank arc positions for up to
- * MaxHeavyTanksToFlank units using the request's yaw and distance settings.
+ * M_DetailedUnitStates snapshot. The helper filters for player-owned units currently in
+ * combat, checks the tank subtype to ensure it is a heavy tank, and then builds flank
+ * arc positions for every matching target using the request's yaw and distance settings.
  */
 USTRUCT(Blueprintable)
 struct FFindClosestFlankableEnemyHeavy
@@ -72,24 +71,13 @@ struct FFindClosestFlankableEnemyHeavy
 	int32 RequestID;
 
 	/**
-	 * @brief Defines the tactical origin used to prioritize which enemies are worth flanking first.
+	 * @brief Limits how long strategic decisions may reuse flank data after the game thread receives it.
 	 *
-	 * @note Filled on async processing from the queued request before distance sorting begins.
-	 * @note Not filled when no flank request was enqueued for the current batch slot.
-	 * @note Suggested start value: `FVector::ZeroVector` as a safe sentinel; caller logic should overwrite it with the squad or commander origin.
+	 * @note Used by the heavy-tank flank think step to remove stale result payloads from the blackboard.
+	 * @note Suggested start value: 30.0f so flank orders refresh regularly without thrashing async work.
 	 */
-	UPROPERTY()
-	FVector StartSearchLocation;
-
-	/**
-	 * @brief Caps expensive flank generation so one request cannot monopolize async compute time.
-	 *
-	 * @note Filled on async processing from request tuning values before candidate truncation occurs.
-	 * @note Not filled when request construction is skipped by higher-level AI logic.
-	 * @note Suggested start value: 3 to keep compute bounded while still allowing multi-target tactical choices.
-	 */
-	UPROPERTY()
-	int32 MaxHeavyTanksToFlank;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ResultMaxAgeSeconds;
 
 	/**
 	 * @brief Constrains per-target suggestion volume to keep downstream decision cost predictable.
@@ -146,11 +134,11 @@ struct FFindClosestFlankableEnemyHeavy
  * @brief Returns per-heavy-tank flank positions computed for a flankable enemy search.
  * Used to feed the game thread a list of flank locations tied to specific target actors.
  *
- * On the async thread, the result is built by iterating the closest qualifying heavy tanks,
+ * On the async thread, the result is built by iterating qualifying player heavy tanks in combat,
  * creating an FWeakActorLocations entry per tank, and filling it with the tank's UnitActorPtr
  * and flank positions derived from StrategicAIHelperUtilities::BuildFlankPositions. The
- * result array is reserved based on MaxHeavyTanksToFlank, populated in sorted-distance order,
- * and then moved into the result batch before the callback is posted to the game thread.
+ * result array is reserved for the player heavy tanks currently in combat and then moved
+ * into the result batch before the callback is posted to the game thread.
  */
 USTRUCT()
 struct FResultClosestFlankableEnemyHeavy
@@ -167,6 +155,15 @@ struct FResultClosestFlankableEnemyHeavy
 	 */
 	UPROPERTY()
 	int32 RequestID;
+
+	/**
+	 * @brief Lets the strategic blackboard remove stale flank suggestions independently of async completion order.
+	 *
+	 * @note Filled on the game thread when ProcessClosestFlankableEnemyHeavyResults accepts the result payload.
+	 * @note Not filled for results that are discarded before they reach the strategic blackboard.
+	 */
+	UPROPERTY()
+	float ResultTimestampSeconds;
 
 	/**
 	 * @brief Returns target-scoped position bundles so the game thread can issue movement with minimal interpretation.
