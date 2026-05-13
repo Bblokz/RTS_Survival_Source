@@ -162,7 +162,8 @@ public:
 
 	int32 GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const;
 	int32 GetPlayerTankCountOfTypes(const uint8 Player, const TArray<ETankSubtype>& TankTypes) const;
-	int32 GetPlayerBxpCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const;
+	int32 GetPlayerBxpTotalCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const;
+	
 	int32 GetPlayerAircraftCountOfTypes(const uint8 Player, const TArray<EAircraftSubtype>& AircraftTypes) const;
 
 	/**
