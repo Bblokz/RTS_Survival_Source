@@ -12,9 +12,14 @@ USTRUCT()
 struct FEnemyStrategicTrainingState
 {
 	GENERATED_BODY()
-
+	// The start value is set by the Enemy controller when propagating the settings to the strategic ai component.
+	UPROPERTY()
+	int32 TrainingPoints = 0;
+	
 	UPROPERTY()
 	TMap<EEnemyAITechLevel, bool> TechLevelUnlockedMap = {};
-
-	 FEnemyLevelTraining EnemyLevelTraining;
+	
+	UPROPERTY()
+	 FEnemyLevelTraining EnemyLevelTraining = {};
+	
 };
