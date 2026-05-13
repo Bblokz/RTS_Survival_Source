@@ -19,7 +19,7 @@ struct FStrategicAIBlackboard
 	TArray<FBlackboardIdleUnitEntry> IdleDirectControlUnits;
 
 	UPROPERTY()
-	TArray<FVector> EnemyBasePoints;
+	TArray<FEnemyBasePointCoreBuildings> EnemyBasePoints;
 
 	UPROPERTY()
 	FResultPlayerUnitCounts CurrentPlayerUnitCounts;

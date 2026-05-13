@@ -562,9 +562,9 @@ void UEnemyStrategicAIComponent::ClearInvalidIdleUnitsFromBlackboard()
 void UEnemyStrategicAIComponent::DebugBlackboardBasePoints() const
 {
 	using namespace EnemyAISettings::Debugging;
-	for (const auto& EachLocation : M_StrategicAIBlackboard.EnemyBasePoints)
+	for (const FEnemyBasePointCoreBuildings& BasePoint : M_StrategicAIBlackboard.EnemyBasePoints)
 	{
-		DebugPoint(EachLocation, BaseLocationDebuggingRadius, EnemyLocationColor, BaseLocationDebugDuration,
+		DebugPoint(BasePoint.BaseLocation, BaseLocationDebuggingRadius, EnemyLocationColor, BaseLocationDebugDuration,
 		           "Enemy Base Point");
 	}
 }
