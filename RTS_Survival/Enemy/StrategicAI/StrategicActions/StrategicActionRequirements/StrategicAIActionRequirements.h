@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Enemy/StrategicAI/IdleUnitSelectionPolicy.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/StrategicTrainingState/EnemyTrainingPressureTypes.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "UObject/Object.h"
 #include "StrategicAIActionRequirements.generated.h"
@@ -21,6 +22,25 @@ public:
 		return true;
 	}
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const
+	{
+	}
+	virtual bool GetShouldBlockTrainingPressureWhenUnmet(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const
+	{
+		return not GetIsRequirementMet(Blackboard, GameTimeSeconds);
+	}
+
+	virtual bool GetIsUnitTrainingPressureRequirement() const
+	{
+		return false;
+	}
+
+	virtual void AddMissingUnitTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float PressureAmount,
+		const FString& SourceDebugName,
+		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const
 	{
 	}
 	virtual FString GetDebugString() const;
@@ -109,6 +129,15 @@ class RTS_SURVIVAL_API UStrategicAIHasAtLeastAnyIdleUnits final : public UStrate
 public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
+	virtual bool GetShouldBlockTrainingPressureWhenUnmet(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const override;
+	virtual bool GetIsUnitTrainingPressureRequirement() const override;
+	virtual void AddMissingUnitTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float PressureAmount,
+		const FString& SourceDebugName,
+		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 AmountIdleNeeded = 1;
@@ -124,6 +153,15 @@ class RTS_SURVIVAL_API UStrategicAIHasAtLeastIdleSquads final : public UStrategi
 public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
+	virtual bool GetShouldBlockTrainingPressureWhenUnmet(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const override;
+	virtual bool GetIsUnitTrainingPressureRequirement() const override;
+	virtual void AddMissingUnitTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float PressureAmount,
+		const FString& SourceDebugName,
+		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	ESquadSubtype RequiredSquadSubtype = ESquadSubtype::Squad_None;
@@ -146,6 +184,15 @@ class RTS_SURVIVAL_API UStrategicAIHasAtLeastIdleTanks final : public UStrategic
 public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
+	virtual bool GetShouldBlockTrainingPressureWhenUnmet(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const override;
+	virtual bool GetIsUnitTrainingPressureRequirement() const override;
+	virtual void AddMissingUnitTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float PressureAmount,
+		const FString& SourceDebugName,
+		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	ETankSubtype RequiredTankSubtype = ETankSubtype::Tank_None;
@@ -168,6 +215,15 @@ class RTS_SURVIVAL_API UStrategicAIHasAtLeastAnyIdleTanks final : public UStrate
 public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
+	virtual bool GetShouldBlockTrainingPressureWhenUnmet(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const override;
+	virtual bool GetIsUnitTrainingPressureRequirement() const override;
+	virtual void AddMissingUnitTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float PressureAmount,
+		const FString& SourceDebugName,
+		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 AmountIdleTanksNeeded = 3;
@@ -205,6 +261,15 @@ class RTS_SURVIVAL_API UStrategicAIHasEnoughLightTanks final : public UStrategic
 public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
+	virtual bool GetShouldBlockTrainingPressureWhenUnmet(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const override;
+	virtual bool GetIsUnitTrainingPressureRequirement() const override;
+	virtual void AddMissingUnitTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float PressureAmount,
+		const FString& SourceDebugName,
+		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 AmountIdleLightTanksNeeded =5;
@@ -223,6 +288,15 @@ class RTS_SURVIVAL_API UStrategicAIHasEnoughHeavyTanks final : public UStrategic
 public:
 	virtual bool GetIsRequirementMet(const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const override;
 	virtual void ContributeToIdleUnitSelectionPolicy(FIdleUnitSelectionPolicy& SelectionPolicy) const override;
+	virtual bool GetShouldBlockTrainingPressureWhenUnmet(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const override;
+	virtual bool GetIsUnitTrainingPressureRequirement() const override;
+	virtual void AddMissingUnitTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float PressureAmount,
+		const FString& SourceDebugName,
+		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 AmountIdleHeavyTanksNeeded = 2;

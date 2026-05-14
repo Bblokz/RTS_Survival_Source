@@ -11,6 +11,7 @@
 
 class UGameUnitManager;
 class UStochasticDecisionTree;
+class UStrategicAISubAction;
 struct FStochasticDecisionTree;
 class AEnemyController;
 class URTSGameInstance;
@@ -174,6 +175,20 @@ private:
 	void RemoveExpiredHeavyTankFlankingResults(const float CurrentTimeSeconds);
 	
 	void Training_ThinkStep();
+
+	FAIThinkingTimerData M_TrainingPressureThinkTimer;
+	/**
+	 * @brief Updates pressure on its own cadence so unit production demand is not tied to order execution frequency.
+	 */
+	void TrainingPressure_ThinkStep();
+	/**
+	 * @brief Converts one strategic sub-action into pressure without allowing target/time-gated actions to bias training.
+	 * @param SubAction Strategic option that can emit missing-unit or general-purpose training pressure.
+	 * @param GameTimeSeconds Current world time used to age sub-action pressure.
+	 */
+	void AccumulateTrainingPressureFromSubAction(
+		const UStrategicAISubAction* SubAction,
+		const float GameTimeSeconds);
 	
 	FAIThinkingTimerData M_TrainingRequirementsThinkTimer;
 	void TrainingRequirements_ThinkStep();
@@ -184,6 +199,7 @@ private:
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
+	bool EnsureStochasticDecisionTreeIsValid() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 	void StartStrategicAIThinkingTimer();

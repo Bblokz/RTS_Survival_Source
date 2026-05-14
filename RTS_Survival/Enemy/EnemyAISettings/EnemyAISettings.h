@@ -30,9 +30,22 @@ namespace EnemyAISettings
 		inline float UpdatePlayerHeavyTankFlank_Interval = 3.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI checks for what tech level it is at given the buildings it has created / are on the map.
 		inline float UpdateAITechLevel_Interval = 42.f* DEV_AI_ThinkTimers_Scaling;
+		// How often the enemy AI updates training pressure from strategic sub-actions.
+		inline float UpdateEnemyTrainingPressure_Interval = 12.f * DEV_AI_ThinkTimers_Scaling;
 		// How often the enemy AI gets new training points depending on the setting in the EnemyController
 		// Ensure this is a multiple of 60 as the training points are calculated per minute.
 		inline float UpdateEnemyTrainingPoints_Interval = 60.f* DEV_AI_ThinkTimers_Scaling;
+	}
+
+	namespace TrainingPressure
+	{
+		inline constexpr float MinimumTrainingBucketPressure = 0.01f;
+		inline constexpr float PickedBucketRemainingPressureMultiplier = 0.35f;
+		inline constexpr float RecentPickPenaltyMultiplier = 0.75f;
+		inline constexpr float TrainingPressureAgeRampSeconds = 300.f;
+		inline constexpr float TrainingPressureMaxAgeBonusMultiplier = 2.f;
+		inline constexpr int32 RecentTrainingSelectionHistorySize = 5;
+		inline constexpr int32 MaxRecentDebugEntries = 12;
 	}
 
 	namespace Debugging
@@ -57,6 +70,8 @@ namespace EnemyAISettings
 		inline constexpr float PlayerUnitBulkLocationDebugDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
 		inline constexpr bool StochasticDecisionTreeDebugging = true;
 		inline constexpr bool StochasticPathFindingDebugging = true;
+		inline constexpr bool TrainingPressureDebugging = true;
+		inline constexpr float TrainingPressureDebugDuration = 5.f;
 		// Should be lower than thinking speed
 		inline constexpr float StochasticActionsDebugTime = 5.f;
 		inline constexpr float StochasticActionsAttackLocationDebugRadius = 200.f;

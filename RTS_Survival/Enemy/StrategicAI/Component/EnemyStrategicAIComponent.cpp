@@ -1,4 +1,4 @@
-// Copyright (C) Bas Blokzijl - All rights reserved.
+﻿// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "EnemyStrategicAIComponent.h"
 
@@ -6,6 +6,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
+#include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -207,6 +208,13 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 		this, &UEnemyStrategicAIComponent::PlayerHeavyTankFlankLocations_ThinkStep);
 	M_AIThinkTimers.Add(&M_PlayerHeavyTankFlankLocationsThinkTimer);
 
+	M_TrainingPressureThinkTimer.LastTimeThought = Now;
+	M_TrainingPressureThinkTimer.ThinkingInterval =
+		EnemyAISettings::ThinkingTimers::UpdateEnemyTrainingPressure_Interval;
+	M_TrainingPressureThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::TrainingPressure_ThinkStep);
+	M_AIThinkTimers.Add(&M_TrainingPressureThinkTimer);
+
 	M_TrainingRequirementsThinkTimer.LastTimeThought = Now;
 	M_TrainingRequirementsThinkTimer.ThinkingInterval =
 		EnemyAISettings::ThinkingTimers::UpdateAITechLevel_Interval;
@@ -217,7 +225,7 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 	M_TrainingPointsThinkTimer.LastTimeThought = Now;
 	M_TrainingPointsThinkTimer.ThinkingInterval =
 		EnemyAISettings::ThinkingTimers::UpdateEnemyTrainingPoints_Interval;
-	M_TrainingRequirementsThinkTimer.ThinkStepDelegate.BindUObject(
+	M_TrainingPointsThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep);
 	M_AIThinkTimers.Add(&M_TrainingPointsThinkTimer);
 }
@@ -313,6 +321,53 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 	// 
 }
 
+
+void UEnemyStrategicAIComponent::TrainingPressure_ThinkStep()
+{
+	if (not GetIsAllowedUnitTraining())
+	{
+		return;
+	}
+
+	if (not EnsureStochasticDecisionTreeIsValid())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const float GameTimeSeconds = World->GetTimeSeconds();
+	const TArray<FStrategicAIAction>& ActionDefinitions = M_StochasticDecisionTree->GetActionDefinitions();
+	for (const FStrategicAIAction& ActionDefinition : ActionDefinitions)
+	{
+		for (const TObjectPtr<UStrategicAISubAction>& SubAction : ActionDefinition.GetSubActions())
+		{
+			AccumulateTrainingPressureFromSubAction(SubAction.Get(), GameTimeSeconds);
+		}
+	}
+}
+
+void UEnemyStrategicAIComponent::AccumulateTrainingPressureFromSubAction(
+	const UStrategicAISubAction* SubAction,
+	const float GameTimeSeconds)
+{
+	if (not IsValid(SubAction))
+	{
+		return;
+	}
+
+	TArray<FEnemyStrategicTrainingPressureContribution> PressureContributions;
+	SubAction->BuildTrainingPressureContributions(M_Blackboard, GameTimeSeconds, PressureContributions);
+	for (const FEnemyStrategicTrainingPressureContribution& PressureContribution : PressureContributions)
+	{
+		M_TrainingState.AddTrainingPressureContribution(PressureContribution);
+	}
+}
+
 void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 {
 	if (not EnsureIsValidUnitManager())
@@ -376,6 +431,23 @@ bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
 		this,
 		"M_EnemyController",
 		"EnsureEnemyControllerIsValid",
+		this);
+
+	return false;
+}
+
+
+bool UEnemyStrategicAIComponent::EnsureStochasticDecisionTreeIsValid() const
+{
+	if (M_StochasticDecisionTree.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_StochasticDecisionTree",
+		"EnsureStochasticDecisionTreeIsValid",
 		this);
 
 	return false;
@@ -451,7 +523,7 @@ void UEnemyStrategicAIComponent::StrategicAiThinkingLoop()
 		// Sees if enough time has passed since last think step then calls delegate.
 		EachThinkTimer->TryExecuteThinkStep(Now);
 	}
-	if (M_StochasticDecisionTree.IsValid() && GetIsAllowedDirectControlUnits())
+	if (GetIsAllowedDirectControlUnits() && EnsureStochasticDecisionTreeIsValid())
 	{
 		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_Blackboard);
 	}
