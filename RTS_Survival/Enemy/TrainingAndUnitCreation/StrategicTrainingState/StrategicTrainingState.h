@@ -104,14 +104,17 @@ struct FEnemyStrategicTrainingState
 	FEnemyStrategicTrainingSelection PickAndSpendTrainingSelection();
 
 	// The start value is set by the Enemy controller when propagating the settings to the strategic ai component.
+	// see void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
+	// see void UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep()
 	UPROPERTY()
 	int32 TrainingPoints = 0;
-	
-	// Caches unlocked levels so training decisions can be cheap and not query buildings every pressure update.
+
+	// Contains the result of TrainingRequirements_ThinkStep which checks if the correct building expansion is built
+	// to unlock each tech level. 
 	UPROPERTY()
 	TMap<EEnemyAITechLevel, bool> TechLevelUnlockedMap = {};
-	
-	// Mission-authored training options live here because the bucket result still needs tech-aware translation later.
+
+	// Contains the units available per tech level.
 	UPROPERTY()
 	FEnemyLevelTraining EnemyLevelTraining = {};
 

@@ -83,13 +83,41 @@ void FEnemyStrategicTrainingBuckets::AddPressureContribution(
 
 FEnemyStrategicTrainingSelection FEnemyStrategicTrainingBuckets::PickAndSpendTrainingSelection()
 {
+	// The selection is intentionally built in two independent parts:
+	// - Focus decides the broad unit family, such as squads, light tanks, medium tanks, or heavy tanks.
+	// - Specialty decides the tactical reason, such as anti-tank pressure or another role bias.
+	//
+	// Keeping these separate lets later training code combine a broad family with a role preference
+	// instead of forcing every strategic pressure source to name one exact trainable unit.
 	FEnemyStrategicTrainingSelection Selection;
+
+	// Pick the strongest weighted focus bucket before spending any pressure.
+	// This must happen before SpendPickedFocus because spending lowers the selected bucket,
+	// and lowering it first would make the returned selection no longer represent the bucket state
+	// that won this decision.
 	Selection.Focus = PickFocusBucket();
+
+	// Pick the strongest weighted specialty bucket before spending any pressure.
+	// This is also done before any spending so focus and specialty are both chosen from the same
+	// pre-spend snapshot of strategic demand.
 	Selection.Specialty = PickSpecialtyBucket();
 
+	// After the focus has been selected, spend part of that bucket so the same focus does not
+	// automatically dominate every future training decision.
+	//
+	// The spend is not a full reset. The selected bucket keeps a remaining fraction of its pressure,
+	// which means a genuinely important long-term need can still win again later, but weaker competing
+	// buckets get a chance to catch up.
 	SpendPickedFocus(Selection.Focus);
+
+	// Spend the selected specialty independently from the focus.
+	// This allows, for example, the AI to reduce repeated AntiTank specialty pressure without also
+	// erasing all pressure for the selected unit family.
 	SpendPickedSpecialty(Selection.Specialty);
 
+	// When training-pressure debugging is compiled in and enabled, print the post-spend bucket state.
+	// Printing after spending is intentional: designers can see what pressure remains for the next
+	// decision instead of only seeing the state that existed before this selection consumed part of it.
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		EnemyAISettings::Debugging::TrainingPressureDebugging)
 	{
@@ -97,6 +125,8 @@ FEnemyStrategicTrainingSelection FEnemyStrategicTrainingBuckets::PickAndSpendTra
 			EnemyAISettings::Debugging::TrainingPressureDebugDuration);
 	}
 
+	// Return the already-picked result so the caller can use this focus/specialty pair for the next
+	// tech-aware training choice.
 	return Selection;
 }
 

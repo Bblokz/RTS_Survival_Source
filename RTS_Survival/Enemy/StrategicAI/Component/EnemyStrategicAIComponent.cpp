@@ -7,39 +7,11 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyTrainingHelpers/EnemyTrainingHelpers.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
-
-namespace EnemyStrategicAITrainingRequirements
-{
-	bool GetIsTechLevelUnlockedByBxpCounts(
-		const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
-		const TMap<EBuildingExpansionType, int32>& BxpCountsByType)
-	{
-		for (const EBuildingExpansionType RequiredBxpType : TrainingOptions.TypesUnlockingThisLevel)
-		{
-			const int32* const BxpCount = BxpCountsByType.Find(RequiredBxpType);
-			if (BxpCount != nullptr && *BxpCount > 0)
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	void UpdateTechLevelUnlockedMapForOptions(
-		TMap<EEnemyAITechLevel, bool>& TechLevelUnlockedMap,
-		const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
-		const TMap<EBuildingExpansionType, int32>& BxpCountsByType)
-	{
-		TechLevelUnlockedMap.Add(
-			TrainingOptions.TechLevel,
-			GetIsTechLevelUnlockedByBxpCounts(TrainingOptions, BxpCountsByType));
-	}
-}
 
 UEnemyStrategicAIComponent::UEnemyStrategicAIComponent()
 {
@@ -324,12 +296,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 
 void UEnemyStrategicAIComponent::TrainingPressure_ThinkStep()
 {
-	if (not GetIsAllowedUnitTraining())
-	{
-		return;
-	}
-
-	if (not EnsureStochasticDecisionTreeIsValid())
+	if (not GetIsAllowedUnitTraining() || not EnsureStochasticDecisionTreeIsValid())
 	{
 		return;
 	}
@@ -377,6 +344,7 @@ void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 
 	constexpr uint8 EnemyPlayerIndex = 2;
 	FEnemyLevelTraining& EnemyLevelTraining = M_TrainingState.EnemyLevelTraining;
+	// This accumulates all the buidling types needed for the various tech levels;
 	const TArray<EBuildingExpansionType> RequiredBxpTypes = EnemyLevelTraining.GetUniqueBuildingTypesForTechLevels();
 	const TMap<EBuildingExpansionType, int32> BxpCountsByType = M_GameUnitManager->GetPlayerBxpCountsByType(
 		EnemyPlayerIndex,
@@ -384,31 +352,31 @@ void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 
 	TMap<EEnemyAITechLevel, bool>& TechLevelUnlockedMap = M_TrainingState.TechLevelUnlockedMap;
 	TechLevelUnlockedMap.Empty();
-	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+	EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.BasicInfantryOptions,
 		BxpCountsByType);
-	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+	EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.LightTankOptions,
 		BxpCountsByType);
-	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+	EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.MediumTankOptions,
 		BxpCountsByType);
-	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+	EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.Tier2Options,
 		BxpCountsByType);
-	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+	EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.AdvancedInfantryOptions,
 		BxpCountsByType);
-	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+	EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.Tier3Options,
 		BxpCountsByType);
-	EnemyStrategicAITrainingRequirements::UpdateTechLevelUnlockedMapForOptions(
+	EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
 		TechLevelUnlockedMap,
 		EnemyLevelTraining.ExperimentalOptions,
 		BxpCountsByType);

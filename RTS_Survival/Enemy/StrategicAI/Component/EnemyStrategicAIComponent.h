@@ -191,6 +191,7 @@ private:
 		const float GameTimeSeconds);
 	
 	FAIThinkingTimerData M_TrainingRequirementsThinkTimer;
+	// Updates the requirements mapping in the training state depending on the building expansions the AI owns.
 	void TrainingRequirements_ThinkStep();
 
 	FAIThinkingTimerData M_TrainingPointsThinkTimer;

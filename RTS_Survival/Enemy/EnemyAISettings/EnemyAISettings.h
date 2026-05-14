@@ -71,7 +71,7 @@ namespace EnemyAISettings
 		inline constexpr bool StochasticDecisionTreeDebugging = true;
 		inline constexpr bool StochasticPathFindingDebugging = true;
 		inline constexpr bool TrainingPressureDebugging = true;
-		inline constexpr float TrainingPressureDebugDuration = 5.f;
+		inline constexpr float TrainingPressureDebugDuration =15.f;
 		// Should be lower than thinking speed
 		inline constexpr float StochasticActionsDebugTime = 5.f;
 		inline constexpr float StochasticActionsAttackLocationDebugRadius = 200.f;

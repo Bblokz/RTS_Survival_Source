@@ -19,49 +19,84 @@ void UStrategicAISubAction::BuildTrainingPressureContributions(
 	const float GameTimeSeconds,
 	TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions) const
 {
+	// Some sub-actions are only meant to command existing units.
+	// If this flag is disabled, the action should not influence future production at all,
+	// even if its requirements are currently unmet.
 	if (not bM_ContributesTrainingPressure)
 	{
 		return;
 	}
 
+	// First check whether any native requirement blocks training pressure completely.
+	// Native requirements are code-created requirements that are always part of this sub-action.
+	// If one of these fails for a reason production cannot solve, such as missing target data,
+	// then adding training pressure would be misleading.
 	const bool bIsBlockedByNativeRequirement = GetIsBlockedByTrainingPressureRequirement(
 		M_NativeVisibleRequirements,
 		Blackboard,
 		GameTimeSeconds);
+
+	// Designer requirements are checked separately because they are authored on the sub-action data.
+	// They can also represent gates that production cannot fix, for example a required time,
+	// player location, or other strategic condition.
 	const bool bIsBlockedByDesignerRequirement = GetIsBlockedByTrainingPressureRequirement(
 		M_Requirements,
 		Blackboard,
 		GameTimeSeconds);
+
+	// If either requirement group contains a non-trainable blocker, stop immediately.
+	// This prevents the AI from training units for a plan that is impossible for reasons
+	// unrelated to available unit counts.
 	if (bIsBlockedByNativeRequirement || bIsBlockedByDesignerRequirement)
 	{
 		return;
 	}
 
+	// At this point, the action is allowed to create training pressure.
+	// Before adding the generic/base pressure from the sub-action itself, we look for unmet
+	// unit-count requirements. Missing-unit requirements are more specific than the fallback
+	// pressure settings, because they can say exactly which focus bucket should receive pressure.
 	bool bBlockedByNonUnitRequirement = false;
+
+	// Native requirements are processed first because they are part of the sub-action's built-in logic.
+	// If a native missing-unit requirement emits pressure, we return after that so the same action
+	// does not also add generic fallback pressure and double-count the same strategic need.
 	const bool bHasNativeUnitRequirements = TryBuildMissingUnitRequirementPressureContributions(
 		M_NativeVisibleRequirements,
 		Blackboard,
 		GameTimeSeconds,
 		OutPressureContributions,
 		bBlockedByNonUnitRequirement);
+
 	if (bHasNativeUnitRequirements)
 	{
 		return;
 	}
 
+	// If native requirements did not emit unit pressure, try the designer-authored requirements.
+	// This allows designers to add missing-unit gates in data and have those gates become
+	// production pressure when the action cannot currently run due to lacking units.
 	const bool bHasDesignerUnitRequirements = TryBuildMissingUnitRequirementPressureContributions(
 		M_Requirements,
 		Blackboard,
 		GameTimeSeconds,
 		OutPressureContributions,
 		bBlockedByNonUnitRequirement);
+
+	// As with native requirements, a designer missing-unit requirement is considered the specific
+	// reason for training pressure. We return here to avoid adding the broader fallback pressure
+	// on top of the more precise requirement pressure.
 	if (bHasDesignerUnitRequirements)
 	{
 		return;
 	}
 
+	// No requirement blocked pressure, and no missing-unit requirement gave us a more specific reason.
+	// In that case, add the sub-action's base pressure contribution. This is the fallback path for
+	// actions that should bias future production even when they are not waiting on a concrete unit gate.
 	AddBaseTrainingPressureContribution(OutPressureContributions, GameTimeSeconds);
 }
+
 
 bool UStrategicAISubAction::GetAreRequirementsMet(
 	const FStrategicAIBlackboard& RequirementContext,
@@ -221,6 +256,9 @@ bool UStrategicAISubAction::GetIsBlockedByTrainingPressureRequirement(
 		}
 
 		const bool bRequirementMet = EachRequirement->GetIsRequirementMet(Blackboard, GameTimeSeconds);
+		// Only return true when this requirement fails AND it blocks training pressure (e.g. no locations available
+		// or game time not reached certain point) those are examples where training pressure would be misleading
+		// as the cause is not some missing unit!
 		if (not bRequirementMet && EachRequirement->GetShouldBlockTrainingPressureWhenUnmet(Blackboard, GameTimeSeconds))
 		{
 			return true;
@@ -237,15 +275,35 @@ bool UStrategicAISubAction::TryBuildMissingUnitRequirementPressureContributions(
 	TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
 	bool& bOutBlockedByNonUnitRequirement) const
 {
+	// This flag answers a very specific question for the caller:
+	// "Did this requirement list contain any unit-training requirement at all?"
+	//
+	// That matters even if every unit requirement is already met, because the caller uses this
+	// to avoid adding generic fallback pressure on top of a requirement-driven action.
 	bool bHasUnitRequirements = false;
+
 	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : Requirements)
 	{
+		// A null requirement cannot safely be evaluated.
+		// We skip it instead of failing the whole pressure pass because designer-authored arrays can
+		// temporarily contain empty entries while being edited, and an empty slot should not create
+		// false training pressure.
 		if (EachRequirement == nullptr)
 		{
 			continue;
 		}
 
+		// Evaluate the requirement once and reuse the result for both blocker checks and unit-pressure checks.
+		// This keeps the logic consistent inside this loop iteration and avoids asking the same requirement
+		// for its state multiple times.
 		const bool bRequirementMet = EachRequirement->GetIsRequirementMet(Blackboard, GameTimeSeconds);
+
+		// Non-unit gates must be handled before unit-pressure conversion.
+		//
+		// Example: an action might need both "player HQ location is known" and "2 idle tanks".
+		// If the HQ location is unknown, training more tanks will not make this action executable.
+		// In that case, any pressure already added by earlier requirements in this same pass would be
+		// misleading, so we clear it and tell the caller that a non-unit blocker stopped pressure.
 		if (not bRequirementMet && EachRequirement->GetShouldBlockTrainingPressureWhenUnmet(Blackboard, GameTimeSeconds))
 		{
 			OutPressureContributions.Reset();
@@ -253,25 +311,57 @@ bool UStrategicAISubAction::TryBuildMissingUnitRequirementPressureContributions(
 			return false;
 		}
 
+		// Requirements that are not marked as unit-training pressure requirements are only gates.
+		// If they are met, they do not add pressure.
+		// If they are unmet and reached this point, they also did not block pressure, so they can be ignored
+		// for the purpose of missing-unit pressure generation.
 		if (not EachRequirement->GetIsUnitTrainingPressureRequirement())
 		{
 			continue;
 		}
 
+		// From this point onward, the requirement list is known to contain at least one unit requirement.
+		// We record that even if this particular requirement is already met, because the caller should then
+		// know that this action's production intent is requirement-driven rather than fallback-driven.
 		bHasUnitRequirements = true;
+
+		// A unit requirement that is already satisfied should not create more demand.
+		// We continue looking because a later unit requirement in the same list may still be unmet and may
+		// need to emit pressure.
 		if (bRequirementMet)
 		{
 			continue;
 		}
 
+		// This is the first unmet unit requirement that production can help solve.
+		// We emit pressure through the requirement itself so the requirement can decide the correct focus
+		// bucket, for example light tanks, heavy tanks, squads, or spread pressure for "any idle unit".
+		//
+		// The pressure amount comes from the sub-action so action age/importance stays centralized.
+		// The debug name combines the owning action and the requirement so later bucket debug output can
+		// explain exactly why this pressure was added.
+		// The specialty pressure is passed through from the sub-action because the action usually knows the
+		// tactical role it wanted, while the requirement usually knows the broad unit family it is missing.
 		EachRequirement->AddMissingUnitTrainingPressureContribution(
 			OutPressureContributions,
 			GetTrainingPressureAmount(GameTimeSeconds),
 			GetNameFromActionEnum() + TEXT(" -> ") + EachRequirement->GetDebugString(),
 			M_SpecialtyPressure);
+
+		// Return true because this requirement list produced requirement-specific training pressure.
+		// The caller should not add fallback/base pressure after this, otherwise the same blocked action
+		// would be counted twice.
 		return true;
 	}
 
+	// If we reach the end, no unmet unit requirement emitted pressure.
+	//
+	// Returning true still has meaning here: it says "this list contained unit requirements, but they were
+	// already satisfied." The caller can then avoid adding generic fallback pressure for an action whose
+	// unit requirements do not currently need help.
+	//
+	// Returning false means this list had no unit-training requirements, so the caller may still consider
+	// generic fallback pressure if no other requirement list handled the action.
 	return bHasUnitRequirements;
 }
 

@@ -1,6 +1,7 @@
 ﻿#include "EnemyTrainingHelpers.h"
 
 #include "InputBehavior.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 
 int32 EnemyTrainingHelpers::GetSquadTrainingPointCost(const ESquadSubtype SquadType)
@@ -109,4 +110,30 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 		"GetTankTrainingPointsCost was called with an invalid tank type. Returning 10 cost."
 		"\n type: " + UEnum::GetValueAsString(TankType)));
 	return 10;
+}
+
+bool EnemyTrainingHelpers::GetIsTechLevelUnlockedByBxpCounts(
+	const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
+	const TMap<EBuildingExpansionType, int32>& BxpCountsByType)
+{
+	for (const EBuildingExpansionType RequiredBxpType : TrainingOptions.TypesUnlockingThisLevel)
+	{
+		const int32* const BxpCount = BxpCountsByType.Find(RequiredBxpType);
+		if (BxpCount != nullptr && *BxpCount > 0)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(
+	TMap<EEnemyAITechLevel, bool>& TechLevelUnlockedMap,
+	const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
+	const TMap<EBuildingExpansionType, int32>& BxpCountsByType)
+{
+	TechLevelUnlockedMap.Add(
+		TrainingOptions.TechLevel,
+		GetIsTechLevelUnlockedByBxpCounts(TrainingOptions, BxpCountsByType));
 }
