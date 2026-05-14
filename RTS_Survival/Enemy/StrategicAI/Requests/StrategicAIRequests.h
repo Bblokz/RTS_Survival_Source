@@ -927,6 +927,73 @@ struct FResultEnemyBaseClusters
 };
 
 /**
+ * @brief Requests construction locations around existing defense points for future AI build orders.
+ * Currently generates cleaned hedgehog arc points aimed at player force bulk locations.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FFindConstructionLocations
+{
+	GENERATED_BODY()
+
+	FFindConstructionLocations();
+
+	/** Identifier copied into results so callers can match async responses safely. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RequestID;
+
+	/** Defensive anchors supplied by enemy base cluster defense point generation. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FDefensePositions> DefensePositions;
+
+	/** Player force centers used to decide which way each hedgehog arc should face. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FVector> PlayerBulkLocations;
+
+	/** Inner arc distance measured from a defense point toward the selected player bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinOffsetTowardsPlayer;
+
+	/** Outer arc distance measured from a defense point toward the selected player bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxOffsetTowardsPlayer;
+
+	/** Placements per 1000 Unreal units of generated arc length. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float PlacementDensity;
+
+	/** Shared left-to-right angle for every generated hedgehog arc. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArcAngleDegrees;
+
+	/** Pulls the arc apex back toward the defended location, making the parabola more pointy. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ArcDepth;
+
+	/** Final cleanup removes generated placement points closer than this planar distance. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float CleanupDistance;
+};
+
+/**
+ * @brief Returns cleaned construction points that can be passed directly to field construction orders.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FResultConstructionLocations
+{
+	GENERATED_BODY()
+
+	FResultConstructionLocations();
+
+	/** Identifier copied from request so result routing remains deterministic. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 RequestID;
+
+	/** Cleaned construction locations after all generated arc points have been de-duplicated. */
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FVector> ConstructionLocations;
+};
+
+/**
  * @brief Describes one location threat analysis query for player attack pressure.
  * Used by async strategic AI to determine which defended points are under meaningful player attack risk.
  */
@@ -1224,6 +1291,10 @@ struct FStrategicAIRequestBatch
 	/** Batches player-force clustering so macro targets share one consistent mobile-unit snapshot. */
 	UPROPERTY()
 	TArray<FFindPlayerUnitBulkLocations> FindPlayerUnitBulkLocationsRequests;
+
+	/** Batches construction-location queries so future build orders can consume cleaned placement points. */
+	UPROPERTY()
+	TArray<FFindConstructionLocations> FindConstructionLocationsRequests;
 };
 
 /**
@@ -1287,4 +1358,8 @@ struct FStrategicAIResultBatch
 	/** Returns player mobile-combat bulk locations in request order for deterministic consumption. */
 	UPROPERTY()
 	TArray<FResultPlayerUnitBulkLocations> PlayerUnitBulkLocationsResults;
+
+	/** Returns cleaned construction locations in request order for deterministic consumption. */
+	UPROPERTY()
+	TArray<FResultConstructionLocations> ConstructionLocationsResults;
 };

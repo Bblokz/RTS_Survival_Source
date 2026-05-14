@@ -114,6 +114,22 @@ FResultEnemyBaseClusters::FResultEnemyBaseClusters()
 {
 }
 
+FFindConstructionLocations::FFindConstructionLocations()
+	: RequestID(0)
+	, MinOffsetTowardsPlayer(1000.f)
+	, MaxOffsetTowardsPlayer(2200.f)
+	, PlacementDensity(1.f)
+	, ArcAngleDegrees(90.f)
+	, ArcDepth(450.f)
+	, CleanupDistance(350.f)
+{
+}
+
+FResultConstructionLocations::FResultConstructionLocations()
+	: RequestID(0)
+{
+}
+
 FFindLocationsUnderPlayerAttack::FFindLocationsUnderPlayerAttack()
 	: RequestID(0)
 	, MaxInfluenceRadius(9000.f)

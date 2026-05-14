@@ -13,6 +13,9 @@ namespace StrategicAIHelperConstants
 	constexpr int32 MaxRetreatGroups = 3;
 	constexpr float FlankLeftYawOffset = -90.f;
 	constexpr float FlankRightYawOffset = 90.f;
+	constexpr float ConstructionArcUnitsPerDensityStep = 1000.f;
+	constexpr float ConstructionArcDuplicateOffsetTolerance = 1.f;
+	constexpr float MaxConstructionArcAngleDegrees = 170.f;
 }
 
 namespace StrategicAIHelperUtilities
@@ -636,6 +639,215 @@ namespace StrategicAIHelperUtilities
 		{
 			OutDefenseCandidates.SetNum(MaxCandidatesTotal);
 		}
+	}
+
+	struct FConstructionLocationCandidate
+	{
+		FVector Location = FVector::ZeroVector;
+		float Priority = 0.f;
+	};
+
+	bool TryGetClosestPlayerBulkLocation(
+		const FVector& DefenseLocation,
+		const TArray<FVector>& PlayerBulkLocations,
+		FVector& OutPlayerBulkLocation)
+	{
+		float BestDistanceSq = FLT_MAX;
+		bool bHasFoundLocation = false;
+		for (const FVector& PlayerBulkLocation : PlayerBulkLocations)
+		{
+			if (GetIsNearZeroStrategicLocation(PlayerBulkLocation))
+			{
+				continue;
+			}
+
+			const float DistanceSq = FVector::DistSquared2D(DefenseLocation, PlayerBulkLocation);
+			if (DistanceSq >= BestDistanceSq)
+			{
+				continue;
+			}
+
+			BestDistanceSq = DistanceSq;
+			OutPlayerBulkLocation = PlayerBulkLocation;
+			bHasFoundLocation = true;
+		}
+
+		return bHasFoundLocation;
+	}
+
+	FVector GetDirectionFromDefenseToPlayer(const FDefensePositions& DefensePosition, const FVector& PlayerBulkLocation)
+	{
+		FVector DirectionToPlayer = PlayerBulkLocation - DefensePosition.Location;
+		DirectionToPlayer.Z = 0.f;
+		if (not DirectionToPlayer.IsNearlyZero())
+		{
+			return DirectionToPlayer.GetSafeNormal();
+		}
+
+		FVector FallbackDirection = FRotator(0.f, DefensePosition.YawRotation, 0.f).Vector();
+		FallbackDirection.Z = 0.f;
+		return FallbackDirection.GetSafeNormal();
+	}
+
+	TArray<float> GetConstructionArcOffsets(const FFindConstructionLocations& Request)
+	{
+		TArray<float> Offsets;
+		const float MinOffset = FMath::Max(
+			0.f,
+			FMath::Min(Request.MinOffsetTowardsPlayer, Request.MaxOffsetTowardsPlayer));
+		const float MaxOffset = FMath::Max(
+			0.f,
+			FMath::Max(Request.MinOffsetTowardsPlayer, Request.MaxOffsetTowardsPlayer));
+		if (MaxOffset > 0.f)
+		{
+			Offsets.Add(MaxOffset);
+		}
+
+		if (MinOffset > 0.f
+			&& FMath::Abs(MaxOffset - MinOffset)
+			> StrategicAIHelperConstants::ConstructionArcDuplicateOffsetTolerance)
+		{
+			Offsets.Add(MinOffset);
+		}
+
+		return Offsets;
+	}
+
+	int32 GetConstructionArcPointCount(const FFindConstructionLocations& Request, const float OffsetDistance)
+	{
+		const float ClampedArcAngleDegrees = FMath::Clamp(
+			Request.ArcAngleDegrees,
+			0.f,
+			StrategicAIHelperConstants::MaxConstructionArcAngleDegrees);
+		const float ArcLength = 2.f * PI * OffsetDistance * (ClampedArcAngleDegrees / 360.f);
+		const float RequestedDensity = FMath::Max(0.f, Request.PlacementDensity);
+		const int32 PointCount = FMath::CeilToInt(
+			(ArcLength / StrategicAIHelperConstants::ConstructionArcUnitsPerDensityStep) * RequestedDensity);
+		return FMath::Max(3, PointCount);
+	}
+
+	void AppendConstructionArcCandidates(
+		const FFindConstructionLocations& Request,
+		const FDefensePositions& DefensePosition,
+		const FVector& PlayerBulkLocation,
+		const float OffsetDistance,
+		TArray<FConstructionLocationCandidate>& OutCandidates)
+	{
+		const FVector DirectionToPlayer = GetDirectionFromDefenseToPlayer(DefensePosition, PlayerBulkLocation);
+		if (DirectionToPlayer.IsNearlyZero())
+		{
+			return;
+		}
+
+		const float ClampedArcAngleDegrees = FMath::Clamp(
+			Request.ArcAngleDegrees,
+			0.f,
+			StrategicAIHelperConstants::MaxConstructionArcAngleDegrees);
+		const float HalfArcAngleRadians = FMath::DegreesToRadians(ClampedArcAngleDegrees * 0.5f);
+		const float HalfChordLength = FMath::Tan(HalfArcAngleRadians) * OffsetDistance;
+		const float ArcDepth = FMath::Max(0.f, Request.ArcDepth);
+		const int32 PointCount = GetConstructionArcPointCount(Request, OffsetDistance);
+		const FVector DirectionToDefense = -DirectionToPlayer;
+		const FVector RightVector(-DirectionToPlayer.Y, DirectionToPlayer.X, 0.f);
+		const FVector ArcCenter = DefensePosition.Location + DirectionToPlayer * OffsetDistance;
+
+		for (int32 PointIndex = 0; PointIndex < PointCount; ++PointIndex)
+		{
+			const float ArcAlpha = static_cast<float>(PointIndex) / static_cast<float>(PointCount - 1);
+			const float CenteredAlpha = (ArcAlpha - 0.5f) * 2.f;
+			const float LateralOffset = CenteredAlpha * HalfChordLength;
+			const float ParabolicDepth = ArcDepth * (1.f - FMath::Square(CenteredAlpha));
+
+			FConstructionLocationCandidate Candidate;
+			Candidate.Location = ArcCenter + RightVector * LateralOffset + DirectionToDefense * ParabolicDepth;
+			Candidate.Location.Z = DefensePosition.Location.Z;
+			Candidate.Priority = OffsetDistance;
+			OutCandidates.Add(Candidate);
+		}
+	}
+
+	void AppendConstructionCandidatesForDefensePosition(
+		const FFindConstructionLocations& Request,
+		const FDefensePositions& DefensePosition,
+		const TArray<float>& ArcOffsets,
+		TArray<FConstructionLocationCandidate>& OutCandidates)
+	{
+		if (GetIsNearZeroStrategicLocation(DefensePosition.Location))
+		{
+			return;
+		}
+
+		FVector PlayerBulkLocation = FVector::ZeroVector;
+		if (not TryGetClosestPlayerBulkLocation(DefensePosition.Location, Request.PlayerBulkLocations, PlayerBulkLocation))
+		{
+			return;
+		}
+
+		for (const float ArcOffset : ArcOffsets)
+		{
+			AppendConstructionArcCandidates(Request, DefensePosition, PlayerBulkLocation, ArcOffset, OutCandidates);
+		}
+	}
+
+	bool GetIsFarEnoughFromAcceptedConstructionLocations(
+		const FVector& CandidateLocation,
+		const TArray<FVector>& AcceptedLocations,
+		const float CleanupDistanceSq)
+	{
+		return not AcceptedLocations.ContainsByPredicate(
+			[&](const FVector& AcceptedLocation)
+			{
+				return FVector::DistSquared2D(CandidateLocation, AcceptedLocation) < CleanupDistanceSq;
+			});
+	}
+
+	TArray<FVector> CleanupConstructionLocationCandidates(
+		TArray<FConstructionLocationCandidate> Candidates,
+		const float CleanupDistance)
+	{
+		Candidates.Sort([](const FConstructionLocationCandidate& Left, const FConstructionLocationCandidate& Right)
+		{
+			return Left.Priority > Right.Priority;
+		});
+
+		TArray<FVector> CleanedLocations;
+		CleanedLocations.Reserve(Candidates.Num());
+		const float CleanupDistanceSq = FMath::Square(FMath::Max(0.f, CleanupDistance));
+		for (const FConstructionLocationCandidate& Candidate : Candidates)
+		{
+			if (GetIsNearZeroStrategicLocation(Candidate.Location))
+			{
+				continue;
+			}
+
+			if (CleanupDistanceSq > 0.f
+				&& not GetIsFarEnoughFromAcceptedConstructionLocations(Candidate.Location, CleanedLocations, CleanupDistanceSq))
+			{
+				continue;
+			}
+
+			CleanedLocations.Add(Candidate.Location);
+		}
+
+		return CleanedLocations;
+	}
+
+	TArray<FVector> BuildCleanedConstructionLocations(const FFindConstructionLocations& Request)
+	{
+		const TArray<float> ArcOffsets = GetConstructionArcOffsets(Request);
+		if (ArcOffsets.IsEmpty() || Request.DefensePositions.IsEmpty() || Request.PlayerBulkLocations.IsEmpty()
+			|| Request.PlacementDensity <= 0.f || Request.ArcAngleDegrees <= 0.f)
+		{
+			return {};
+		}
+
+		TArray<FConstructionLocationCandidate> Candidates;
+		for (const FDefensePositions& DefensePosition : Request.DefensePositions)
+		{
+			AppendConstructionCandidatesForDefensePosition(Request, DefensePosition, ArcOffsets, Candidates);
+		}
+
+		return CleanupConstructionLocationCandidates(MoveTemp(Candidates), Request.CleanupDistance);
 	}
 
 }
@@ -1693,4 +1905,13 @@ bool FStrategicAIHelpers::GetIsHazmatEngineer(const FAsyncDetailedUnitState& Uni
 	}
 	const ESquadSubtype SquadSubtype = static_cast<ESquadSubtype>(UnitState.UnitSubtypeRaw);
 	return SquadSubtype == ESquadSubtype::Squad_Rus_HazmatEngineers;
+}
+
+FResultConstructionLocations FStrategicAIHelpers::BuildConstructionLocationsResult(
+	const FFindConstructionLocations& Request)
+{
+	FResultConstructionLocations Result;
+	Result.RequestID = Request.RequestID;
+	Result.ConstructionLocations = StrategicAIHelperUtilities::BuildCleanedConstructionLocations(Request);
+	return Result;
 }
