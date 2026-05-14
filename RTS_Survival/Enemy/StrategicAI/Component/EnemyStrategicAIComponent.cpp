@@ -2,6 +2,7 @@
 
 #include "EnemyStrategicAIComponent.h"
 
+#include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
@@ -65,6 +66,12 @@ void UEnemyStrategicAIComponent::QueueFindPlayerUnitBulkLocationsRequest(
 	const FFindPlayerUnitBulkLocations& Request)
 {
 	M_PendingRequests.FindPlayerUnitBulkLocationsRequests.Add(Request);
+}
+
+void UEnemyStrategicAIComponent::QueueFindConstructionLocationsRequest(
+	const FFindConstructionLocations& Request)
+{
+	M_PendingRequests.FindConstructionLocationsRequests.Add(Request);
 }
 
 void UEnemyStrategicAIComponent::QueueFindPlayerHeavyTankFlankLocationsRequest(
@@ -173,6 +180,13 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 		this, &UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep);
 	M_AIThinkTimers.Add(&M_PlayerUnitBulkLocationsThinkTimer);
 
+	M_ConstructionLocationsThinkTimer.LastTimeThought = Now;
+	M_ConstructionLocationsThinkTimer.ThinkingInterval =
+		EnemyAISettings::ThinkingTimers::UpdateConstructionLocations_Interval;
+	M_ConstructionLocationsThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::ConstructionLocations_ThinkStep);
+	M_AIThinkTimers.Add(&M_ConstructionLocationsThinkTimer);
+
 	M_PlayerHeavyTankFlankLocationsThinkTimer.LastTimeThought = Now;
 	M_PlayerHeavyTankFlankLocationsThinkTimer.ThinkingInterval =
 		EnemyAISettings::ThinkingTimers::UpdatePlayerHeavyTankFlank_Interval;
@@ -255,6 +269,35 @@ void UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep()
 void UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep()
 {
 	QueueFindPlayerUnitBulkLocationsRequest(FindPlayerUnitBulkLocations_TimerRequest);
+}
+
+void UEnemyStrategicAIComponent::ConstructionLocations_ThinkStep()
+{
+	FFindConstructionLocations RequestToQueue = FindConstructionLocations_TimerRequest;
+	FillConstructionLocationsTimerRequest(RequestToQueue);
+	if (RequestToQueue.DefensePositions.IsEmpty() || RequestToQueue.PlayerBulkLocations.IsEmpty())
+	{
+		return;
+	}
+
+	QueueFindConstructionLocationsRequest(RequestToQueue);
+}
+
+void UEnemyStrategicAIComponent::FillConstructionLocationsTimerRequest(
+	FFindConstructionLocations& RequestToFill) const
+{
+	RequestToFill.DefensePositions = M_Blackboard.CurrentBaseDefensePositions;
+	RequestToFill.PlayerBulkLocations.Reset();
+	RequestToFill.PlayerBulkLocations.Reserve(M_Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks.Num());
+	for (const FPlayerUnitBulkLocation& PlayerUnitBulk : M_Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+	{
+		if (PlayerUnitBulk.BulkLocation.IsNearlyZero())
+		{
+			continue;
+		}
+
+		RequestToFill.PlayerBulkLocations.Add(PlayerUnitBulk.BulkLocation);
+	}
 }
 
 void UEnemyStrategicAIComponent::PlayerHeavyTankFlankLocations_ThinkStep()
@@ -517,7 +560,8 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 		&& M_PendingRequests.FindAlliedTanksToRetreatRequests.IsEmpty()
 		&& M_PendingRequests.FindEnemyBaseClustersRequests.IsEmpty()
 		&& M_PendingRequests.FindLocationsUnderPlayerAttackRequests.IsEmpty()
-		&& M_PendingRequests.FindPlayerUnitBulkLocationsRequests.IsEmpty())
+		&& M_PendingRequests.FindPlayerUnitBulkLocationsRequests.IsEmpty()
+		&& M_PendingRequests.FindConstructionLocationsRequests.IsEmpty())
 	{
 		return;
 	}
@@ -554,6 +598,7 @@ void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAI
 	ProcessAlliedTanksToRetreatResults(ResultBatch.AlliedTanksToRetreatResults);
 	ProcessLocationsUnderPlayerAttackResults(ResultBatch.LocationsUnderPlayerAttackResults);
 	ProcessPlayerUnitBulkLocationsResults(ResultBatch.PlayerUnitBulkLocationsResults);
+	ProcessConstructionLocationsResults(ResultBatch.ConstructionLocationsResults);
 }
 
 void UEnemyStrategicAIComponent::ProcessClosestFlankableEnemyHeavyResults(
@@ -603,6 +648,7 @@ void UEnemyStrategicAIComponent::ProcessEnemyBaseClusterResults(
 	for (const FResultEnemyBaseClusters& BaseClusterResult : EnemyBaseClusterResults)
 	{
 		M_Blackboard.EnemyBasePoints = BaseClusterResult.BasePoints;
+		M_Blackboard.CurrentBaseDefensePositions = BaseClusterResult.DefensePointCandidates;
 	}
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		EnemyAISettings::Debugging::BaseLocationDebugging)
@@ -679,6 +725,22 @@ void UEnemyStrategicAIComponent::ProcessPlayerUnitBulkLocationsResults(
 		EnemyAISettings::Debugging::PlayerUnitBulkDebugging)
 	{
 		DebugBlackboardBulkPlayerUnits();
+	}
+}
+
+void UEnemyStrategicAIComponent::ProcessConstructionLocationsResults(
+	const TArray<FResultConstructionLocations>& ConstructionLocationsResults)
+{
+	if (ConstructionLocationsResults.IsEmpty())
+	{
+		return;
+	}
+
+	M_Blackboard.CurrentConstructionLocations = ConstructionLocationsResults.Last();
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::ConstructionLocationsDebugging)
+	{
+		DebugConstructionLocations();
 	}
 }
 
@@ -767,6 +829,20 @@ void UEnemyStrategicAIComponent::DebugBlackboardBulkPlayerUnits() const
 		FString DebugText = FString::Printf(TEXT("Player Unit Bulk: %d units"), EachBulk.UnitsInBulk.Num());
 		DebugPoint(EachBulk.BulkLocation, PlayerUnitBulkLocationDebuggingRadius, PlayerLocationColor,
 		           PlayerUnitBulkLocationDebugDuration, DebugText);
+	}
+}
+
+void UEnemyStrategicAIComponent::DebugConstructionLocations() const
+{
+	using namespace EnemyAISettings::Debugging;
+	for (const FVector& ConstructionLocation : M_Blackboard.CurrentConstructionLocations.ConstructionLocations)
+	{
+		DebugPoint(
+			ConstructionLocation,
+			ConstructionLocationDebuggingRadius,
+			ConstructionLocationColor,
+			ConstructionLocationDebugDuration,
+			TEXT("Construction Location"));
 	}
 }
 

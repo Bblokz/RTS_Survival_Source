@@ -8,6 +8,8 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "StochasticHelpers/StochasticHelpers.h"
@@ -164,6 +166,7 @@ void UStochasticDecisionTree::ExecuteSubAction(UStrategicAISubAction* SubAction,
 		Exe_AttackMoveSpecificPoint(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::DefendBase:
+		Exe_DefendBase(SubAction, Blackboard);
 		break;
 	case ESubtypeAction::DefendImportantMissionPoint:
 		break;
@@ -404,12 +407,275 @@ void UStochasticDecisionTree::Exe_FlankPlayerHeavies(UStrategicAISubAction* SubA
 }
 
 void UStochasticDecisionTree::Exe_DefendBase(UStrategicAISubAction* SubAction,
+                                             const FStrategicAIBlackboard& Blackboard)
+{
+	const USubAction_DefendBase* DefendBaseSubAction = Cast<USubAction_DefendBase>(SubAction);
+	if (not IsValid(DefendBaseSubAction))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Stochastic tree could not execute DefendBase with invalid sub-action type."));
+		return;
+	}
+
+	const TArray<FDefensePositions> DefensePositions = GetProjectedBaseDefensePositions(Blackboard);
+	DefendBase_MoveTanksToDefensePositions(DefensePositions, Blackboard);
+	DefendBase_CreateHedgehogs(*DefendBaseSubAction, Blackboard);
+}
+
+void UStochasticDecisionTree::DefendBase_MoveTanksToDefensePositions(
+	const TArray<FDefensePositions>& DefensePositions,
 	const FStrategicAIBlackboard& Blackboard)
 {
-	// Prioritize defending base points that are under attack, if any.
-	TArray<FVector> LocationsToDefend = GetProjectedLocationsUnderAttack(Blackboard);
-	
-	
+	if (DefensePositions.IsEmpty())
+	{
+		return;
+	}
+
+	const int32 TankCountToPick = FMath::Min(CountIdleTankEntries(Blackboard), DefensePositions.Num());
+	if (TankCountToPick <= 0)
+	{
+		return;
+	}
+
+	const TArray<FDefensePositions> PickedDefensePositions = PickUniqueDefensePositions(
+		DefensePositions,
+		TankCountToPick);
+	FBlackboardIdleUnitsResult PickedTanks = PickIdleTanksForDefense(TankCountToPick);
+	const int32 MaxOrderIndex = FMath::Min(PickedTanks.TankMasters.Num(), PickedDefensePositions.Num()) - 1;
+	for (int32 OrderIndex = 0; OrderIndex <= MaxOrderIndex; ++OrderIndex)
+	{
+		IssueDefendBaseTankOrders(PickedTanks.TankMasters[OrderIndex].Get(), PickedDefensePositions[OrderIndex]);
+	}
+}
+
+void UStochasticDecisionTree::DefendBase_CreateHedgehogs(
+	const USubAction_DefendBase& DefendBaseSubAction,
+	const FStrategicAIBlackboard& Blackboard)
+{
+	TArray<FVector> ProjectedHedgehogLocations = GetProjectedHedgehogConstructionLocations(Blackboard);
+	if (ProjectedHedgehogLocations.IsEmpty())
+	{
+		return;
+	}
+
+	const int32 IdleHazmatCount = CountIdleHazmatEntries(Blackboard);
+	if (IdleHazmatCount <= 0)
+	{
+		return;
+	}
+
+	const int32 MaxLocationsPerHazmat = FMath::Max(
+		1,
+		DefendBaseSubAction.GetMaxHedgehogConstructionPointsPerHazmat());
+	const int32 MaxHedgehogLocationsToUse = IdleHazmatCount * MaxLocationsPerHazmat;
+	ProjectedHedgehogLocations = StochasticHelpers::ExhaustivePick(
+		ProjectedHedgehogLocations,
+		MaxHedgehogLocationsToUse);
+	const int32 HazmatCountToPick = FMath::Min(
+		IdleHazmatCount,
+		FMath::DivideAndRoundUp(ProjectedHedgehogLocations.Num(), MaxLocationsPerHazmat));
+	if (HazmatCountToPick <= 0)
+	{
+		return;
+	}
+
+	FBlackboardIdleUnitsResult PickedHazmats = PickIdleHazmatsForHedgehogs(HazmatCountToPick);
+	int32 NextHedgehogLocationIndex = 0;
+	for (TObjectPtr<ASquadController>& SquadController : PickedHazmats.SquadControllers)
+	{
+		NextHedgehogLocationIndex = IssueHedgehogConstructionOrders(
+			SquadController.Get(),
+			ProjectedHedgehogLocations,
+			NextHedgehogLocationIndex,
+			MaxLocationsPerHazmat);
+	}
+}
+
+TArray<FDefensePositions> UStochasticDecisionTree::GetProjectedBaseDefensePositions(
+	const FStrategicAIBlackboard& Blackboard) const
+{
+	TArray<FDefensePositions> ProjectedDefensePositions;
+	ProjectedDefensePositions.Reserve(Blackboard.CurrentBaseDefensePositions.Num());
+	for (const FDefensePositions& DefensePosition : Blackboard.CurrentBaseDefensePositions)
+	{
+		FDefensePositions ProjectedDefensePosition;
+		if (not TryProjectBaseDefensePosition(DefensePosition, ProjectedDefensePosition))
+		{
+			continue;
+		}
+
+		const bool bAlreadyHasProjectedLocation = ProjectedDefensePositions.ContainsByPredicate(
+			[&ProjectedDefensePosition](const FDefensePositions& ExistingDefensePosition)
+			{
+				constexpr float DuplicateLocationTolerance = 1.f;
+				return ExistingDefensePosition.Location.Equals(
+					ProjectedDefensePosition.Location,
+					DuplicateLocationTolerance);
+			});
+		if (not bAlreadyHasProjectedLocation)
+		{
+			ProjectedDefensePositions.Add(ProjectedDefensePosition);
+		}
+	}
+
+	return ProjectedDefensePositions;
+}
+
+bool UStochasticDecisionTree::TryProjectBaseDefensePosition(
+	const FDefensePositions& DefensePosition,
+	FDefensePositions& OutProjectedDefensePosition) const
+{
+	FVector ProjectedLocation = FVector::ZeroVector;
+	if (not StochasticHelpers::CanProjectNavigable_BaseDefensePosition(
+		M_EnemyNavigationAIComponent.Get(),
+		DefensePosition.Location,
+		ProjectedLocation))
+	{
+		return false;
+	}
+
+	OutProjectedDefensePosition = DefensePosition;
+	OutProjectedDefensePosition.Location = ProjectedLocation;
+	return true;
+}
+
+TArray<FVector> UStochasticDecisionTree::GetProjectedHedgehogConstructionLocations(
+	const FStrategicAIBlackboard& Blackboard) const
+{
+	TArray<FVector> ProjectedHedgehogLocations;
+	ProjectedHedgehogLocations.Reserve(Blackboard.CurrentConstructionLocations.ConstructionLocations.Num());
+	for (const FVector& HedgehogLocation : Blackboard.CurrentConstructionLocations.ConstructionLocations)
+	{
+		FVector ProjectedLocation = FVector::ZeroVector;
+		if (not StochasticHelpers::CanProjectNavigable_HedgehogConstructionLocation(
+			M_EnemyNavigationAIComponent.Get(),
+			HedgehogLocation,
+			ProjectedLocation))
+		{
+			continue;
+		}
+
+		const bool bAlreadyHasProjectedLocation = ProjectedHedgehogLocations.ContainsByPredicate(
+			[&ProjectedLocation](const FVector& ExistingLocation)
+			{
+				constexpr float DuplicateLocationTolerance = 1.f;
+				return ExistingLocation.Equals(ProjectedLocation, DuplicateLocationTolerance);
+			});
+		if (not bAlreadyHasProjectedLocation)
+		{
+			ProjectedHedgehogLocations.Add(ProjectedLocation);
+		}
+	}
+
+	return ProjectedHedgehogLocations;
+}
+
+TArray<FDefensePositions> UStochasticDecisionTree::PickUniqueDefensePositions(
+	const TArray<FDefensePositions>& DefensePositions,
+	const int32 MaxPositions) const
+{
+	TArray<FDefensePositions> RemainingDefensePositions = DefensePositions;
+	TArray<FDefensePositions> PickedDefensePositions;
+	const int32 PositionsToPick = FMath::Min(MaxPositions, RemainingDefensePositions.Num());
+	PickedDefensePositions.Reserve(PositionsToPick);
+
+	while (PickedDefensePositions.Num() < PositionsToPick)
+	{
+		const int32 PickedIndex = FMath::RandRange(0, RemainingDefensePositions.Num() - 1);
+		PickedDefensePositions.Add(RemainingDefensePositions[PickedIndex]);
+		RemainingDefensePositions.RemoveAtSwap(PickedIndex, 1, EAllowShrinking::No);
+	}
+
+	return PickedDefensePositions;
+}
+
+int32 UStochasticDecisionTree::CountIdleTankEntries(const FStrategicAIBlackboard& Blackboard) const
+{
+	int32 IdleTankCount = 0;
+	for (const FBlackboardIdleUnitEntry& IdleUnitEntry : Blackboard.IdleDirectControlUnits)
+	{
+		if (IdleUnitEntry.IsValid() && IdleUnitEntry.UnitType == EAllUnitType::UNType_Tank)
+		{
+			++IdleTankCount;
+		}
+	}
+
+	return IdleTankCount;
+}
+
+int32 UStochasticDecisionTree::CountIdleHazmatEntries(const FStrategicAIBlackboard& Blackboard) const
+{
+	int32 IdleHazmatCount = 0;
+	for (const FBlackboardIdleUnitEntry& IdleUnitEntry : Blackboard.IdleDirectControlUnits)
+	{
+		const bool bIsHazmat = IdleUnitEntry.UnitType == EAllUnitType::UNType_Squad
+			&& IdleUnitEntry.UnitSubtypeRaw == static_cast<int32>(ESquadSubtype::Squad_Rus_HazmatEngineers);
+		if (IdleUnitEntry.IsValid() && bIsHazmat)
+		{
+			++IdleHazmatCount;
+		}
+	}
+
+	return IdleHazmatCount;
+}
+
+FBlackboardIdleUnitsResult UStochasticDecisionTree::PickIdleTanksForDefense(const int32 TankCountToPick) const
+{
+	FIdleUnitSelectionPolicy SelectionPolicy;
+	SelectionPolicy.SetupFallbackMinMax(TankCountToPick, TankCountToPick);
+	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateAnyTankRule(TankCountToPick));
+	return M_DirectControlComponent->PickIdleBlackboardUnitsByPolicy(SelectionPolicy);
+}
+
+FBlackboardIdleUnitsResult UStochasticDecisionTree::PickIdleHazmatsForHedgehogs(const int32 HazmatCountToPick) const
+{
+	FIdleUnitSelectionPolicy SelectionPolicy;
+	SelectionPolicy.SetupFallbackMinMax(HazmatCountToPick, HazmatCountToPick);
+	SelectionPolicy.AddRequiredRule(FIdleUnitSelectionRule::CreateSquadSubtypeRule(
+		HazmatCountToPick,
+		ESquadSubtype::Squad_Rus_HazmatEngineers));
+	return M_DirectControlComponent->PickIdleBlackboardUnitsByPolicy(SelectionPolicy);
+}
+
+void UStochasticDecisionTree::IssueDefendBaseTankOrders(
+	ATankMaster* TankMaster,
+	const FDefensePositions& DefensePosition) const
+{
+	ICommands* CommandUnit = TankMaster;
+	const FRotator DefenseRotation(0.f, DefensePosition.YawRotation, 0.f);
+	(void)IssueMoveOrder(CommandUnit, DefensePosition.Location, true, DefenseRotation);
+	(void)IssueRotateOrder(CommandUnit, DefenseRotation, false);
+	(void)IssueDigInOrder(CommandUnit, false);
+	(void)IssueRegisterWithBlackboardOrder(CommandUnit, false);
+}
+
+int32 UStochasticDecisionTree::IssueHedgehogConstructionOrders(
+	ASquadController* SquadController,
+	const TArray<FVector>& HedgehogLocations,
+	const int32 StartLocationIndex,
+	const int32 MaxLocationsForSquad) const
+{
+	if (not IsValid(SquadController))
+	{
+		return StartLocationIndex;
+	}
+
+	ICommands* CommandUnit = SquadController;
+	int32 NextLocationIndex = StartLocationIndex;
+	int32 AssignedLocationCount = 0;
+	while (HedgehogLocations.IsValidIndex(NextLocationIndex) && AssignedLocationCount < MaxLocationsForSquad)
+	{
+		const bool bResetOrderQueue = AssignedLocationCount == 0;
+		if (IssueHedgehogConstructionOrder(CommandUnit, HedgehogLocations[NextLocationIndex], bResetOrderQueue))
+		{
+			++AssignedLocationCount;
+		}
+
+		++NextLocationIndex;
+	}
+
+	(void)IssueRegisterWithBlackboardOrder(CommandUnit, AssignedLocationCount == 0);
+	return NextLocationIndex;
 }
 
 void UStochasticDecisionTree::CreateAttackMoveFormation(
@@ -678,6 +944,47 @@ bool UStochasticDecisionTree::IssueAttackOrder(ICommands* UnitToCommand, const T
 		return false;
 	}
 	return UnitToCommand->AttackActor(TargetActor.Get(), bResetOrderQueue) == ECommandQueueError::NoError;
+}
+
+bool UStochasticDecisionTree::IssueRotateOrder(
+	ICommands* UnitToCommand,
+	const FRotator& TargetRotation,
+	const bool bResetOrderQueue) const
+{
+	if (not UnitToCommand)
+	{
+		return false;
+	}
+
+	return UnitToCommand->RotateTowards(TargetRotation, bResetOrderQueue) == ECommandQueueError::NoError;
+}
+
+bool UStochasticDecisionTree::IssueDigInOrder(ICommands* UnitToCommand, const bool bResetOrderQueue) const
+{
+	if (not UnitToCommand)
+	{
+		return false;
+	}
+
+	return UnitToCommand->DigIn(bResetOrderQueue) == ECommandQueueError::NoError;
+}
+
+bool UStochasticDecisionTree::IssueHedgehogConstructionOrder(
+	ICommands* UnitToCommand,
+	const FVector& ConstructionLocation,
+	const bool bResetOrderQueue) const
+{
+	if (not UnitToCommand)
+	{
+		return false;
+	}
+
+	return UnitToCommand->FieldConstruction(
+		EFieldConstructionType::RussianHedgeHog,
+		bResetOrderQueue,
+		ConstructionLocation,
+		FRotator::ZeroRotator,
+		nullptr) == ECommandQueueError::NoError;
 }
 
 bool UStochasticDecisionTree::IssueRegisterWithBlackboardOrder(ICommands* UnitToCommand,

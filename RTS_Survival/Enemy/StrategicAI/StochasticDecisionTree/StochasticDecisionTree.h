@@ -16,6 +16,10 @@ class UEnemyStrategicAIComponent;
 class AEnemyController;
 class UEnemyDirectControlComponent;
 class UStrategicAISubAction;
+class USubAction_DefendBase;
+class ASquadController;
+class ATankMaster;
+class ICommands;
 
 
 /**
@@ -147,7 +151,42 @@ private:
 	void Exe_FlankPlayerHeavies(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 
 	void Exe_DefendBase(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
-
+	/**
+	 * @brief Splits defense execution so tanks can consume base points before Hazmats consume construction points.
+	 * @param DefensePositions Projected base-defense points, already unique candidates from the async cluster result.
+	 * @param Blackboard Current idle-unit context used to pick available tanks.
+	 */
+	void DefendBase_MoveTanksToDefensePositions(
+		const TArray<FDefensePositions>& DefensePositions,
+		const FStrategicAIBlackboard& Blackboard);
+	/**
+	 * @brief Keeps obstacle construction independent from tank placement so either side can still run when the other lacks units.
+	 * @param DefendBaseSubAction Provides the per-Hazmat construction cap exposed to designers.
+	 * @param Blackboard Current idle-unit and construction-location context.
+	 */
+	void DefendBase_CreateHedgehogs(
+		const USubAction_DefendBase& DefendBaseSubAction,
+		const FStrategicAIBlackboard& Blackboard);
+	TArray<FDefensePositions> GetProjectedBaseDefensePositions(const FStrategicAIBlackboard& Blackboard) const;
+	bool TryProjectBaseDefensePosition(
+		const FDefensePositions& DefensePosition,
+		FDefensePositions& OutProjectedDefensePosition) const;
+	TArray<FVector> GetProjectedHedgehogConstructionLocations(const FStrategicAIBlackboard& Blackboard) const;
+	TArray<FDefensePositions> PickUniqueDefensePositions(
+		const TArray<FDefensePositions>& DefensePositions,
+		const int32 MaxPositions) const;
+	int32 CountIdleTankEntries(const FStrategicAIBlackboard& Blackboard) const;
+	int32 CountIdleHazmatEntries(const FStrategicAIBlackboard& Blackboard) const;
+	FBlackboardIdleUnitsResult PickIdleTanksForDefense(const int32 TankCountToPick) const;
+	FBlackboardIdleUnitsResult PickIdleHazmatsForHedgehogs(const int32 HazmatCountToPick) const;
+	void IssueDefendBaseTankOrders(
+		ATankMaster* TankMaster,
+		const FDefensePositions& DefensePosition) const;
+	int32 IssueHedgehogConstructionOrders(
+		ASquadController* SquadController,
+		const TArray<FVector>& HedgehogLocations,
+		int32 StartLocationIndex,
+		int32 MaxLocationsForSquad) const;
 
 	// ------------------- Formation Logic Using Blackboard Idle units ------------------------
 	void CreateAttackMoveFormation(
@@ -198,6 +237,13 @@ private:
 	                    const FRotator& FinishedMovementRotation = {}) const;
 	bool IssueAttackOrder(ICommands* UnitToCommand, TWeakObjectPtr<AActor> TargetActor,
 	                      const bool bResetOrderQueue = false) const;
+	bool IssueRotateOrder(ICommands* UnitToCommand, const FRotator& TargetRotation,
+	                      const bool bResetOrderQueue = false) const;
+	bool IssueDigInOrder(ICommands* UnitToCommand, const bool bResetOrderQueue = false) const;
+	bool IssueHedgehogConstructionOrder(
+		ICommands* UnitToCommand,
+		const FVector& ConstructionLocation,
+		const bool bResetOrderQueue = false) const;
 	bool IssueRegisterWithBlackboardOrder(ICommands* UnitToCommand, const bool bResetOrderQueue = false) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))

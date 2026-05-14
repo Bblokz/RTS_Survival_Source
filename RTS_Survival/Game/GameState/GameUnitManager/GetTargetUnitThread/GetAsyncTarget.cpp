@@ -265,6 +265,15 @@ void FGetAsyncTarget::ProcessStrategicAIRequests()
 				FStrategicAIHelpers::BuildPlayerUnitBulkLocationsResult(BulkLocationsRequest, M_DetailedUnitStates));
 		}
 
+		Results.ConstructionLocationsResults.Reserve(
+			Request.RequestBatch.FindConstructionLocationsRequests.Num());
+		for (const FFindConstructionLocations& ConstructionLocationsRequest :
+			Request.RequestBatch.FindConstructionLocationsRequests)
+		{
+			Results.ConstructionLocationsResults.Add(
+				FStrategicAIHelpers::BuildConstructionLocationsResult(ConstructionLocationsRequest));
+		}
+
 		TFunction<void(const FStrategicAIResultBatch&)> Callback = MoveTemp(Request.Callback);
 		AsyncTask(ENamedThreads::GameThread,
 			[Callback = MoveTemp(Callback), Results = MoveTemp(Results)]() mutable

@@ -15,6 +15,8 @@ struct FFindLocationsUnderPlayerAttack;
 struct FResultLocationsUnderPlayerAttack;
 struct FFindPlayerUnitBulkLocations;
 struct FResultPlayerUnitBulkLocations;
+struct FFindConstructionLocations;
+struct FResultConstructionLocations;
 
 namespace FStrategicAIHelpers
 {
@@ -114,4 +116,11 @@ namespace FStrategicAIHelpers
 	FResultPlayerUnitBulkLocations BuildPlayerUnitBulkLocationsResult(
 		const FFindPlayerUnitBulkLocations& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
+	/**
+	 * @brief Builds cleaned construction locations from defense points and player bulk-facing arcs.
+	 * @param Request Defense anchors, player bulk locations, and arc cleanup settings.
+	 * @return Result payload containing only de-duplicated construction locations.
+	 */
+	FResultConstructionLocations BuildConstructionLocationsResult(const FFindConstructionLocations& Request);
+
 }

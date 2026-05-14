@@ -251,6 +251,9 @@ public:
 	TArray<FVector> TargetPoints = {};
 };
 
+/**
+ * @brief Configures base-defense execution so tanks hold points while Hazmats build nearby obstacles.
+ */
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API USubAction_DefendBase final : public UStrategicAISubAction
 {
@@ -259,7 +262,16 @@ class RTS_SURVIVAL_API USubAction_DefendBase final : public UStrategicAISubActio
 public:
 	USubAction_DefendBase();
 
+	int32 GetMaxHedgehogConstructionPointsPerHazmat() const
+	{
+		return M_MaxHedgehogConstructionPointsPerHazmat;
+	}
+
 	virtual FString GetDebugString() const override;
+
+private:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess=true, ClampMin="1"))
+	int32 M_MaxHedgehogConstructionPointsPerHazmat = 3;
 };
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
