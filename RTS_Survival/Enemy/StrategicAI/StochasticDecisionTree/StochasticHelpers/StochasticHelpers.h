@@ -152,6 +152,14 @@ namespace StochasticHelpers
 	bool CanProjectNavigable_FlankLocation(
 		const UEnemyNavigationAIComponent* NavComp, const FVector& FlankLocation, FVector& OutProjectedLocation);
 
+	// Specifically for base-defense points that should remain close to the async generated landscape position.
+	bool CanProjectNavigable_BaseDefensePosition(
+		const UEnemyNavigationAIComponent* NavComp, const FVector& DefensePosition, FVector& OutProjectedLocation);
+
+	// Specifically for hedgehog construction positions generated from base-defense arcs.
+	bool CanProjectNavigable_HedgehogConstructionLocation(
+		const UEnemyNavigationAIComponent* NavComp, const FVector& ConstructionLocation, FVector& OutProjectedLocation);
+
 	// Specifically for average picked blackboard units location.
 	bool CanProjectNavigable_AveragePickedUnitLocation(
 		const UEnemyNavigationAIComponent* NavComp,
