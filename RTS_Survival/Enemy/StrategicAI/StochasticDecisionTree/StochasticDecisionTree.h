@@ -45,6 +45,11 @@ struct FStrategicAIAction
 		return M_Score;
 	}
 
+	TArray<TObjectPtr<UStrategicAISubAction>>& GetSubActions()
+	{
+		return M_SubActions;
+	}
+
 	const TArray<TObjectPtr<UStrategicAISubAction>>& GetSubActions() const
 	{
 		return M_SubActions;
@@ -125,32 +130,32 @@ public:
 	void DecisionTree_ThinkStep(const float GameTimeSeconds, FStrategicAIBlackboard& Blackboard);
 
 private:
-	bool EnsureHasAnyValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
-	bool EnsurePickedActionIsValid(const FStrategicAIAction* PickedAction) const;
-	bool EnsurePickedSubActionIsValid(const UStrategicAISubAction* PickedSubAction) const;
+	bool EnsureHasAnyValidActions(const TArray<FStrategicAIAction*>& ValidActions) const;
+	bool EnsurePickedActionIsValid(FStrategicAIAction* PickedAction) const;
+	bool EnsurePickedSubActionIsValid(UStrategicAISubAction* PickedSubAction) const;
 	void ExecuteSubAction(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds);
 
-	void Exe_AttackMovePlayerUnits(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMovePlayerHQ(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMovePlayerResourceBuildings(const UStrategicAISubAction* SubAction,
+	void Exe_AttackMovePlayerUnits(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerHQ(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMovePlayerResourceBuildings(UStrategicAISubAction* SubAction,
 	                                           const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMoveSpecificPoint(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
-	void Exe_AttackMoveLightTanksToPlayerUnits(const UStrategicAISubAction* SubAction,
+	void Exe_AttackMoveSpecificPoint(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_AttackMoveLightTanksToPlayerUnits(UStrategicAISubAction* SubAction,
 	                                           const FStrategicAIBlackboard& Blackboard);
-	void Exe_HeavyTankPushPlayerBaseOrUnits(const UStrategicAISubAction* SubAction,
+	void Exe_HeavyTankPushPlayerBaseOrUnits(UStrategicAISubAction* SubAction,
 	                                        const FStrategicAIBlackboard& Blackboard);
-	void Exe_FlankPlayerHeavies(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_FlankPlayerHeavies(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 
-	void Exe_DefendBase(const UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
+	void Exe_DefendBase(UStrategicAISubAction* SubAction, const FStrategicAIBlackboard& Blackboard);
 
 
 	// ------------------- Formation Logic Using Blackboard Idle units ------------------------
 	void CreateAttackMoveFormation(
-		const UStrategicAISubAction* SubAction,
+		UStrategicAISubAction* SubAction,
 		TArray<FVector> AttackLocations,
 		const FStrategicAIBlackboard& Blackboard);
 	void CreateFlankingAttack(
-		const UStrategicAISubAction* SubAction,
+		UStrategicAISubAction* SubAction,
 		const TArray<FWeakActorLocations>& FlankingPositions,
 		const FStrategicAIBlackboard& Blackboard);
 	/**
@@ -198,11 +203,11 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess="true"))
 	TArray<FStrategicAIAction> M_ActionDefinitions;
 
-	const TArray<const FStrategicAIAction*> GetActionsWithValidSubActions(
-		const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const;
+	TArray<FStrategicAIAction*> GetActionsWithValidSubActions(
+		const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds);
 
-	const TArray<const UStrategicAISubAction*> GetSubActionsThatHaveMetRequirements(
-		const FStrategicAIAction& Action,
+	TArray<UStrategicAISubAction*> GetSubActionsThatHaveMetRequirements(
+		FStrategicAIAction& Action,
 		const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds) const;
 
 	void CacheGenerationSeedFromGameInstance();
@@ -250,7 +255,7 @@ private:
 	// Debug call over all actions regardless of requirements.
 	void DebugAllActionsPriorReqCheck() const;
 	// Called After removing those main actions of which all sub actions have no requirements met.
-	void DebugValidActions(const TArray<const FStrategicAIAction*> ValidActions) const;
+	void DebugValidActions(const TArray<FStrategicAIAction*>& ValidActions) const;
 	void DebugAttackLocations(const TArray<FVector>& Locations, const FString& DebugContext) const;
 	void DebugPickedLocation(const FVector& PickedLocation, const FString& DebugContext) const;
 	void DebugFlankPositions(const TArray<FWeakActorLocations>& FlankPositions, const FString& DebugContext) const;
