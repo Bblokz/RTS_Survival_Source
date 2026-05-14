@@ -1,6 +1,7 @@
 ﻿#include "StrategicActions.h"
 
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+#include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 void UStrategicAISubAction::OnActionExecuted(const float Now)
@@ -11,6 +12,55 @@ void UStrategicAISubAction::OnActionExecuted(const float Now)
 float UStrategicAISubAction::GetLastTimeActionExecuted()
 {
 	return M_TimeStampLastExecution;
+}
+
+void UStrategicAISubAction::BuildTrainingPressureContributions(
+	const FStrategicAIBlackboard& Blackboard,
+	const float GameTimeSeconds,
+	TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions) const
+{
+	if (not bM_ContributesTrainingPressure)
+	{
+		return;
+	}
+
+	const bool bIsBlockedByNativeRequirement = GetIsBlockedByTrainingPressureRequirement(
+		M_NativeVisibleRequirements,
+		Blackboard,
+		GameTimeSeconds);
+	const bool bIsBlockedByDesignerRequirement = GetIsBlockedByTrainingPressureRequirement(
+		M_Requirements,
+		Blackboard,
+		GameTimeSeconds);
+	if (bIsBlockedByNativeRequirement || bIsBlockedByDesignerRequirement)
+	{
+		return;
+	}
+
+	bool bBlockedByNonUnitRequirement = false;
+	const bool bHasNativeUnitRequirements = TryBuildMissingUnitRequirementPressureContributions(
+		M_NativeVisibleRequirements,
+		Blackboard,
+		GameTimeSeconds,
+		OutPressureContributions,
+		bBlockedByNonUnitRequirement);
+	if (bHasNativeUnitRequirements)
+	{
+		return;
+	}
+
+	const bool bHasDesignerUnitRequirements = TryBuildMissingUnitRequirementPressureContributions(
+		M_Requirements,
+		Blackboard,
+		GameTimeSeconds,
+		OutPressureContributions,
+		bBlockedByNonUnitRequirement);
+	if (bHasDesignerUnitRequirements)
+	{
+		return;
+	}
+
+	AddBaseTrainingPressureContribution(OutPressureContributions, GameTimeSeconds);
 }
 
 bool UStrategicAISubAction::GetAreRequirementsMet(
@@ -158,9 +208,110 @@ void UStrategicAISubAction::AddRequirementSelectionRulesToPolicy(
 	}
 }
 
+bool UStrategicAISubAction::GetIsBlockedByTrainingPressureRequirement(
+	const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+	const FStrategicAIBlackboard& Blackboard,
+	const float GameTimeSeconds) const
+{
+	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : Requirements)
+	{
+		if (EachRequirement == nullptr)
+		{
+			continue;
+		}
+
+		const bool bRequirementMet = EachRequirement->GetIsRequirementMet(Blackboard, GameTimeSeconds);
+		if (not bRequirementMet && EachRequirement->GetShouldBlockTrainingPressureWhenUnmet(Blackboard, GameTimeSeconds))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool UStrategicAISubAction::TryBuildMissingUnitRequirementPressureContributions(
+	const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+	const FStrategicAIBlackboard& Blackboard,
+	const float GameTimeSeconds,
+	TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+	bool& bOutBlockedByNonUnitRequirement) const
+{
+	bool bHasUnitRequirements = false;
+	for (const TObjectPtr<UStrategicAIActionRequirement>& EachRequirement : Requirements)
+	{
+		if (EachRequirement == nullptr)
+		{
+			continue;
+		}
+
+		const bool bRequirementMet = EachRequirement->GetIsRequirementMet(Blackboard, GameTimeSeconds);
+		if (not bRequirementMet && EachRequirement->GetShouldBlockTrainingPressureWhenUnmet(Blackboard, GameTimeSeconds))
+		{
+			OutPressureContributions.Reset();
+			bOutBlockedByNonUnitRequirement = true;
+			return false;
+		}
+
+		if (not EachRequirement->GetIsUnitTrainingPressureRequirement())
+		{
+			continue;
+		}
+
+		bHasUnitRequirements = true;
+		if (bRequirementMet)
+		{
+			continue;
+		}
+
+		EachRequirement->AddMissingUnitTrainingPressureContribution(
+			OutPressureContributions,
+			GetTrainingPressureAmount(GameTimeSeconds),
+			GetNameFromActionEnum() + TEXT(" -> ") + EachRequirement->GetDebugString(),
+			M_SpecialtyPressure);
+		return true;
+	}
+
+	return bHasUnitRequirements;
+}
+
+void UStrategicAISubAction::AddBaseTrainingPressureContribution(
+	TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+	const float GameTimeSeconds) const
+{
+	FEnemyStrategicTrainingPressureContribution PressureContribution;
+	PressureContribution.FocusPressure = M_FocusPressure;
+	PressureContribution.SpecialtyPressure = M_SpecialtyPressure;
+	PressureContribution.PressureAmount = GetTrainingPressureAmount(GameTimeSeconds);
+	PressureContribution.SourceDebugName = GetNameFromActionEnum();
+
+	const bool bHasNoBaseTrainingPressure = M_FocusPressure == EAITrainingFocus::NoFocus
+		&& M_SpecialtyPressure == EAITrainingFocusSpecialty::NoTrainingPressure;
+	if (bHasNoBaseTrainingPressure)
+	{
+		return;
+	}
+
+	PressureContribution.bSpreadFocusPressureAcrossAllBuckets = M_FocusPressure == EAITrainingFocus::NoFocus;
+	OutPressureContributions.Add(PressureContribution);
+}
+
+float UStrategicAISubAction::GetTrainingPressureAmount(const float GameTimeSeconds) const
+{
+	const float TimeSinceLastExecution = FMath::Max(0.f, GameTimeSeconds - M_TimeStampLastExecution);
+	const float AgeBonusMultiplier = FMath::Clamp(
+		TimeSinceLastExecution / EnemyAISettings::TrainingPressure::TrainingPressureAgeRampSeconds,
+		0.f,
+		EnemyAISettings::TrainingPressure::TrainingPressureMaxAgeBonusMultiplier);
+
+	return FMath::Max(0.f, M_Score) * FMath::Max(0.f, M_BaseTrainingPressureAmount) * (1.f + AgeBonusMultiplier);
+}
+
 USubAction_AttackMoveToPlayerUnits::USubAction_AttackMoveToPlayerUnits()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveToPlayerUnits;
+	M_FocusPressure = EAITrainingFocus::Infantry;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::AntiInfantry;
 }
 
 FString USubAction_AttackMoveToPlayerUnits::GetDebugString() const
@@ -171,6 +322,8 @@ FString USubAction_AttackMoveToPlayerUnits::GetDebugString() const
 USubAction_AttackMoveToPlayerHQ::USubAction_AttackMoveToPlayerHQ()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveToPlayerHQ;
+	M_FocusPressure = EAITrainingFocus::MediumTanks;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::SpecialWeaponCarrier;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasPlayerHQLocationRequirement>(
 		TEXT("HasPlayerHQLocationRequirement")));
 }
@@ -183,6 +336,8 @@ FString USubAction_AttackMoveToPlayerHQ::GetDebugString() const
 USubAction_AttackMoveToPlayerResourceBuildings::USubAction_AttackMoveToPlayerResourceBuildings()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveToPlayerResourceBuildings;
+	M_FocusPressure = EAITrainingFocus::LightTanks;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::GeneralPurpose;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasPlayerResourceBuildingLocationsRequirement>(
 		TEXT("HasPlayerResourceBuildingLocationsRequirement")));
 }
@@ -195,6 +350,7 @@ FString USubAction_AttackMoveToPlayerResourceBuildings::GetDebugString() const
 USubAction_AttackSpecificPoints::USubAction_AttackSpecificPoints()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveSpecificPoints;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::GeneralPurpose;
 }
 
 FString USubAction_AttackSpecificPoints::GetDebugString() const
@@ -206,6 +362,8 @@ FString USubAction_AttackSpecificPoints::GetDebugString() const
 USubAction_DefendBase::USubAction_DefendBase()
 {
 	SubtypeAction = ESubtypeAction::DefendBase;
+	M_FocusPressure = EAITrainingFocus::Infantry;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::AntiInfantry;
 }
 
 FString USubAction_DefendBase::GetDebugString() const
@@ -216,6 +374,8 @@ FString USubAction_DefendBase::GetDebugString() const
 USubAction_DefendImportantMissionPoint::USubAction_DefendImportantMissionPoint()
 {
 	SubtypeAction = ESubtypeAction::DefendImportantMissionPoint;
+	M_FocusPressure = EAITrainingFocus::Infantry;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::GeneralPurpose;
 }
 
 FString USubAction_DefendImportantMissionPoint::GetDebugString() const
@@ -226,6 +386,8 @@ FString USubAction_DefendImportantMissionPoint::GetDebugString() const
 USubAction_LightTanksAttackPlayerUnits::USubAction_LightTanksAttackPlayerUnits()
 {
 	SubtypeAction = ESubtypeAction::AttackMoveLightTanksToPlayerUnits;
+	M_FocusPressure = EAITrainingFocus::LightTanks;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::GeneralPurpose;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughLightTanks>(
 		TEXT("HasIdleLightTanksRequirement")));
 	bOverwriteMissionSettingsMinMaxUnitsNeeded = true;
@@ -241,6 +403,8 @@ FString USubAction_LightTanksAttackPlayerUnits::GetDebugString() const
 USubAction_HeavyTankPushPlayerBaseOrUnits::USubAction_HeavyTankPushPlayerBaseOrUnits()
 {
 	SubtypeAction = ESubtypeAction::HeavyTankPushPlayerBaseOrUnits;
+	M_FocusPressure = EAITrainingFocus::HeavyTanks;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::AntiInfantry;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasEnoughHeavyTanks>(
 		TEXT("HasIdleHeavyTanksRequirement")));
 	bOverwriteMissionSettingsMinMaxUnitsNeeded = true;
@@ -257,6 +421,8 @@ FString USubAction_HeavyTankPushPlayerBaseOrUnits::GetDebugString() const
 USubAction_FlankPlayerHeavies::USubAction_FlankPlayerHeavies()
 {
 	SubtypeAction = ESubtypeAction::FlankPlayerHeavies;
+	M_FocusPressure = EAITrainingFocus::LightTanks;
+	M_SpecialtyPressure = EAITrainingFocusSpecialty::AntiTank;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions>(
 		TEXT("DoesBlackboardHaveHeavyFlankPositions")));
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasAtLeastAnyIdleTanks>(

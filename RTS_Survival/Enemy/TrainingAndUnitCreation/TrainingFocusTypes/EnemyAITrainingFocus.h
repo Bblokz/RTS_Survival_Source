@@ -16,7 +16,8 @@ enum class EAITrainingFocus : uint8
 UENUM(BlueprintType)
 enum class EAITrainingFocusSpecialty: uint8
 {
-	NoSpecialty,
+	NoTrainingPressure,
+	GeneralPurpose,
 	AntiTank,
 	AntiInfantry,
 	SpecialWeaponCarrier

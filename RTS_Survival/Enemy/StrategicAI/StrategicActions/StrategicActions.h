@@ -57,6 +57,10 @@ public:
 		const float GameTimeSeconds) const;
 
 	virtual FString GetDebugString() const;
+	void BuildTrainingPressureContributions(
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds,
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions) const;
 	// We aggregate policy contributions from both native and data-driven (Designer-added) requirement lists so unit picking follows
 	// the same gameplay constraints that were used to validate whether the action is allowed.
 	virtual FIdleUnitSelectionPolicy BuildIdleUnitSelectionPolicy(const FStrategicAIBlackboard& Blackboard) const;
@@ -92,6 +96,18 @@ protected:
 			EditCondition = "bOverwriteMissionSettingsMinMaxUnitsNeeded",
 			ClampMin = "0"))
 	int32 MaxUnitsNeededOverwrite = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	bool bM_ContributesTrainingPressure = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	EAITrainingFocus M_FocusPressure = EAITrainingFocus::NoFocus;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	EAITrainingFocusSpecialty M_SpecialtyPressure = EAITrainingFocusSpecialty::NoTrainingPressure;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true, ClampMin = "0.0"))
+	float M_BaseTrainingPressureAmount = 1.f;
 	
 
 private:
@@ -106,6 +122,20 @@ private:
 	void AddRequirementSelectionRulesToPolicy(
 		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
 		FIdleUnitSelectionPolicy& SelectionPolicy) const;
+	bool GetIsBlockedByTrainingPressureRequirement(
+		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds) const;
+	bool TryBuildMissingUnitRequirementPressureContributions(
+		const TArray<TObjectPtr<UStrategicAIActionRequirement>>& Requirements,
+		const FStrategicAIBlackboard& Blackboard,
+		const float GameTimeSeconds,
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		bool& bOutBlockedByNonUnitRequirement) const;
+	void AddBaseTrainingPressureContribution(
+		TArray<FEnemyStrategicTrainingPressureContribution>& OutPressureContributions,
+		const float GameTimeSeconds) const;
+	float GetTrainingPressureAmount(const float GameTimeSeconds) const;
 
 	/**
 	 * @brief Applies either mission fallback min/max or SubAction override values to selection policy.
