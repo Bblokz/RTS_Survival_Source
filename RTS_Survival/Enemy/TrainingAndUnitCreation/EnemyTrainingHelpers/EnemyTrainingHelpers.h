@@ -7,7 +7,7 @@ enum class ESquadSubtype : uint8;
 enum class ETankSubtype : uint8;
 enum class EBuildingExpansionType : uint8;
 struct FEnemyTrainingOptionsForTechLevel;
-enum EEnemyAITechLevel : uint8;
+enum class EEnemyAITechLevel : uint8;
 
 namespace EnemyTrainingHelpers
 {

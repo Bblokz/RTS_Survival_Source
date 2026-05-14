@@ -10,7 +10,7 @@ enum class ETankSubtype : uint8;
 struct FTrainingOption;
 
 UENUM(BlueprintType)
-enum EEnemyAITechLevel : uint8
+enum class EEnemyAITechLevel : uint8
 {
 	NotInitialized,
 	// Has a barracks of some kind to train infantry.

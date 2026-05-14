@@ -7,7 +7,7 @@
 #include "StrategicTrainingState.generated.h"
 
 
-enum EEnemyAITechLevel : uint8;
+enum class EEnemyAITechLevel : uint8;
 
 /**
  * @brief Stores strategic demand until future training logic spends it on available unit options.
