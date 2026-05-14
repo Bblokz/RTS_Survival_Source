@@ -575,6 +575,32 @@ namespace StochasticHelpers
 		                                  EOnProjectionFailedStrategy::None);
 	}
 
+	bool CanProjectNavigable_BaseDefensePosition(
+		const UEnemyNavigationAIComponent* NavComp,
+		const FVector& DefensePosition,
+		FVector& OutProjectedLocation)
+	{
+		constexpr float ProjectionScale = 3.0f;
+		return NavComp->GetNavigablePoint(
+			DefensePosition,
+			ProjectionScale,
+			OutProjectedLocation,
+			EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
+	bool CanProjectNavigable_HedgehogConstructionLocation(
+		const UEnemyNavigationAIComponent* NavComp,
+		const FVector& ConstructionLocation,
+		FVector& OutProjectedLocation)
+	{
+		constexpr float ProjectionScale = 3.0f;
+		return NavComp->GetNavigablePoint(
+			ConstructionLocation,
+			ProjectionScale,
+			OutProjectedLocation,
+			EOnProjectionFailedStrategy::LookAtDoubleExtent);
+	}
+
 	bool CanProjectNavigable_AveragePickedUnitLocation(const UEnemyNavigationAIComponent* NavComp,
 	                                                   const FVector& AverageUnitLocation,
 	                                                   FVector& OutProjectedLocation)
