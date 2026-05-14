@@ -94,6 +94,7 @@ public:
 	void QueueFindEnemyBaseClustersRequest(const FFindEnemyBaseClusters& Request);
 	void QueueFindLocationsUnderPlayerAttackRequest(const FFindLocationsUnderPlayerAttack& Request);
 	void QueueFindPlayerUnitBulkLocationsRequest(const FFindPlayerUnitBulkLocations& Request);
+	void QueueFindConstructionLocationsRequest(const FFindConstructionLocations& Request);
 	void QueueFindPlayerHeavyTankFlankLocationsRequest(const FFindClosestFlankableEnemyHeavy& Request);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -119,6 +120,10 @@ public:
 	// This request is periodically used to find player squad and tank force concentrations.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindPlayerUnitBulkLocations FindPlayerUnitBulkLocations_TimerRequest;
+
+	// This request is periodically used to build construction locations from base defense points.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FFindConstructionLocations FindConstructionLocations_TimerRequest;
 	
 	// This request is periodically used to find combat-active player heavy tanks to flank.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -170,6 +175,10 @@ private:
 	FAIThinkingTimerData M_PlayerUnitBulkLocationsThinkTimer;
 	void PlayerUnitBulkLocations_ThinkStep();
 
+	FAIThinkingTimerData M_ConstructionLocationsThinkTimer;
+	void ConstructionLocations_ThinkStep();
+	void FillConstructionLocationsTimerRequest(FFindConstructionLocations& RequestToFill) const;
+
 	FAIThinkingTimerData M_PlayerHeavyTankFlankLocationsThinkTimer;
 	void PlayerHeavyTankFlankLocations_ThinkStep();
 	void RemoveExpiredHeavyTankFlankingResults(const float CurrentTimeSeconds);
@@ -216,6 +225,8 @@ private:
 		const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults);
 	void ProcessPlayerUnitBulkLocationsResults(
 		const TArray<FResultPlayerUnitBulkLocations>& PlayerUnitBulkLocationsResults);
+	void ProcessConstructionLocationsResults(
+		const TArray<FResultConstructionLocations>& ConstructionLocationsResults);
 	bool GetIsValidEnemyDirectControlComponent(UEnemyDirectControlComponent* EnemyDirectControlComponent) const;
 	void FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const;
 	int32 M_CachedGenerationSeed = 0;
@@ -227,6 +238,7 @@ private:
 	void DebugBlackboardBasePoints() const;
 	void DebugBlackboardLocationsUnderAttack() const;
 	void DebugBlackboardBulkPlayerUnits()const;
+	void DebugConstructionLocations() const;
 	void DebugPoint(const FVector& Point, const float Radius,
 	                const FColor& Color, const float Duration, const FString& Text)const;
 	void DebugBlackboardUnitCounts() const;

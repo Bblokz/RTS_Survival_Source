@@ -26,6 +26,8 @@ namespace EnemyAISettings
 		inline float UpdateLocationsUnderPlayerAttack_Interval = 15.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI finds player squad and tank force concentrations.
 		inline float UpdatePlayerUnitBulkLocations_Interval = 15.f* DEV_AI_ThinkTimers_Scaling;
+		// How often the AI builds construction locations from defense positions and player force concentrations.
+		inline float UpdateConstructionLocations_Interval = 15.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI finds player Heavy tanks to flank
 		inline float UpdatePlayerHeavyTankFlank_Interval = 3.f* DEV_AI_ThinkTimers_Scaling;
 		// How often the AI checks for what tech level it is at given the buildings it has created / are on the map.
@@ -55,6 +57,7 @@ namespace EnemyAISettings
 		const FColor AttackLocationColor = FColor::Red;
 		const FColor PickedActionLocationColor = FColor::Green;
 		const FColor FlankLocationColor = FColor::Orange;
+		const FColor ConstructionLocationColor = FColor::Cyan;
 		inline constexpr float PickedActionLocationRadius = 300.f;
 		inline constexpr bool BaseLocationDebugging = true;
 		inline constexpr float BaseLocationDebugDuration = 15.f* DEV_AI_ThinkTimers_Scaling;
@@ -68,6 +71,9 @@ namespace EnemyAISettings
 		inline constexpr bool PlayerUnitBulkDebugging= true;
 		inline constexpr float PlayerUnitBulkLocationDebuggingRadius = 250.f;
 		inline constexpr float PlayerUnitBulkLocationDebugDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
+		inline constexpr bool ConstructionLocationsDebugging = true;
+		inline constexpr float ConstructionLocationDebuggingRadius = 250.f;
+		inline constexpr float ConstructionLocationDebugDuration = 14.f* DEV_AI_ThinkTimers_Scaling;
 		inline constexpr bool StochasticDecisionTreeDebugging = true;
 		inline constexpr bool StochasticPathFindingDebugging = true;
 		inline constexpr bool TrainingPressureDebugging = true;

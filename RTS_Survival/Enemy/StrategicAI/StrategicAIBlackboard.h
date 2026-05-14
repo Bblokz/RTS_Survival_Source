@@ -22,6 +22,9 @@ struct FStrategicAIBlackboard
 	TArray<FEnemyBasePointCoreBuildings> EnemyBasePoints;
 
 	UPROPERTY()
+	TArray<FDefensePositions> CurrentBaseDefensePositions;
+
+	UPROPERTY()
 	FResultPlayerUnitCounts CurrentPlayerUnitCounts;
 
 	UPROPERTY()
@@ -32,6 +35,9 @@ struct FStrategicAIBlackboard
 
 	UPROPERTY()
 	FResultPlayerUnitBulkLocations CurrentPlayerUnitBulkLocations;
+
+	UPROPERTY()
+	FResultConstructionLocations CurrentConstructionLocations;
 	
 	UPROPERTY()
 	TArray<TWeakObjectPtr<ARoadSplineActor>> RoadSplineActors;
