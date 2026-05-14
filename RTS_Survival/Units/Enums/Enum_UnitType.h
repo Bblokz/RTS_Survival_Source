@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Enum_UnitType.generated.h"
@@ -234,6 +234,29 @@ static bool Global_GetIsMediumTank(const ETankSubtype TankSubtype)
 	}
 }
 
+
+static bool Global_GetIsTankDestroyer(const ETankSubtype TankSubtype)
+{
+	switch (TankSubtype)
+	{
+	case ETankSubtype::Tank_PzJager:
+	case ETankSubtype::Tank_Marder:
+	case ETankSubtype::Tank_PzIV_70:
+	case ETankSubtype::Tank_Hetzer:
+	case ETankSubtype::Tank_JagdPanther:
+	case ETankSubtype::Tank_E25:
+	case ETankSubtype::Tank_JagdTiger:
+	case ETankSubtype::Tank_SU_76:
+	case ETankSubtype::Tank_SU_85:
+	case ETankSubtype::Tank_SU_85_L:
+	case ETankSubtype::Tank_SU_100:
+	case ETankSubtype::Tank_SU_152:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static bool Global_GetIsLightTank(const ETankSubtype TankSubtype)
 {
 	switch (TankSubtype)
@@ -355,6 +378,25 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_Tucha12T UMETA(DisplayName = "Rus Fedrov Cyborg Squad"),
 	Squad_Rus_CortexOfficer UMETA(DisplayName = "Rus Cortex Officer: heavily armored cyborg"),
 };
+
+
+static bool Global_GetIsAntiTankSquad(const ESquadSubtype SquadSubtype)
+{
+	switch (SquadSubtype)
+	{
+	case ESquadSubtype::Squad_Ger_PanzerGrenadiere:
+	case ESquadSubtype::Squad_Ger_PaK38:
+	case ESquadSubtype::Squad_Ger_PaK40:
+	case ESquadSubtype::Squad_Rus_Zis_57MM:
+	case ESquadSubtype::Squad_Rus_Zis_76MM:
+	case ESquadSubtype::Squad_Rus_Okhotnik:
+	case ESquadSubtype::Squad_Rus_LargePTRS:
+	case ESquadSubtype::Squad_Rus_RedHamerPTRS:
+		return true;
+	default:
+		return false;
+	}
+}
 
 // For translating training options of aircraft into a row index for the training data it is important that the enum value
 // starts with Aircraft_.

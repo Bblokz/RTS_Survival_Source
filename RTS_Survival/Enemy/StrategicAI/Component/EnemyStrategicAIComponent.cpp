@@ -331,8 +331,265 @@ void UEnemyStrategicAIComponent::RemoveExpiredHeavyTankFlankingResults(const flo
 
 void UEnemyStrategicAIComponent::Training_ThinkStep()
 {
-	// Todo firgure out how to spend the training points.
-	FEnemyStrategicTrainingSelection Selection =  M_TrainingState.PickAndSpendTrainingSelection();
+	if (Training_TryCreateReservedTrainingBatch())
+	{
+		return;
+	}
+
+	TArray<ETankSubtype> AvailableTankSubtypes;
+	TArray<ESquadSubtype> AvailableSquadSubtypes;
+	Training_CollectAvailableTrainingOptions(AvailableTankSubtypes, AvailableSquadSubtypes);
+	if (AvailableTankSubtypes.IsEmpty() && AvailableSquadSubtypes.IsEmpty())
+	{
+		return;
+	}
+
+	const FEnemyStrategicTrainingSelection Selection = M_TrainingState.PickAndSpendTrainingSelection();
+	const bool bHasTrainingSelection = Selection.Focus != EAITrainingFocus::NoFocus
+		|| Selection.Specialty != EAITrainingFocusSpecialty::NoTrainingPressure;
+	if (not bHasTrainingSelection)
+	{
+		return;
+	}
+
+	TArray<ETankSubtype> FilteredTankSubtypes;
+	TArray<ESquadSubtype> FilteredSquadSubtypes;
+	Training_FilterTrainingOptionsForSelection(
+		Selection,
+		AvailableTankSubtypes,
+		AvailableSquadSubtypes,
+		FilteredTankSubtypes,
+		FilteredSquadSubtypes);
+	if (FilteredTankSubtypes.IsEmpty() && FilteredSquadSubtypes.IsEmpty())
+	{
+		return;
+	}
+
+	const FEnemyStrategicAITrainingBatch TrainingBatch = Training_BuildRandomTrainingBatch(
+		FilteredTankSubtypes,
+		FilteredSquadSubtypes);
+	if (TrainingBatch.IsEmpty())
+	{
+		return;
+	}
+
+	if (Training_TrySpendTrainingPoints(TrainingBatch.TrainingPointCost))
+	{
+		CreateTrainingBatch(TrainingBatch.TankSubtypes, TrainingBatch.SquadSubtypes);
+		return;
+	}
+
+	M_TrainingReservation.ReserveBatch(TrainingBatch);
+}
+
+bool UEnemyStrategicAIComponent::Training_TryCreateReservedTrainingBatch()
+{
+	if (not M_TrainingReservation.HasReservation())
+	{
+		return false;
+	}
+
+	const FEnemyStrategicAITrainingBatch& ReservedTrainingBatch = M_TrainingReservation.ReservedTrainingBatch;
+	if (not Training_TrySpendTrainingPoints(ReservedTrainingBatch.TrainingPointCost))
+	{
+		return true;
+	}
+
+	CreateTrainingBatch(ReservedTrainingBatch.TankSubtypes, ReservedTrainingBatch.SquadSubtypes);
+	M_TrainingReservation.Reset();
+	return true;
+}
+
+void UEnemyStrategicAIComponent::Training_CollectAvailableTrainingOptions(
+	TArray<ETankSubtype>& OutTankSubtypes,
+	TArray<ESquadSubtype>& OutSquadSubtypes) const
+{
+	const FEnemyLevelTraining& EnemyLevelTraining = M_TrainingState.EnemyLevelTraining;
+	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.BasicInfantryOptions, OutTankSubtypes, OutSquadSubtypes);
+	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.LightTankOptions, OutTankSubtypes, OutSquadSubtypes);
+	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.MediumTankOptions, OutTankSubtypes, OutSquadSubtypes);
+	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.Tier2Options, OutTankSubtypes, OutSquadSubtypes);
+	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.AdvancedInfantryOptions, OutTankSubtypes, OutSquadSubtypes);
+	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.Tier3Options, OutTankSubtypes, OutSquadSubtypes);
+	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.ExperimentalOptions, OutTankSubtypes, OutSquadSubtypes);
+}
+
+void UEnemyStrategicAIComponent::Training_AddUnlockedTrainingOptions(
+	const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
+	TArray<ETankSubtype>& OutTankSubtypes,
+	TArray<ESquadSubtype>& OutSquadSubtypes) const
+{
+	const bool* const bIsTechLevelUnlocked = M_TrainingState.TechLevelUnlockedMap.Find(TrainingOptions.TechLevel);
+	if (bIsTechLevelUnlocked == nullptr || not *bIsTechLevelUnlocked)
+	{
+		return;
+	}
+
+	OutTankSubtypes.Append(TrainingOptions.TrainableTankSubtypes);
+	OutSquadSubtypes.Append(TrainingOptions.TrainableSquadSubtypes);
+}
+
+void UEnemyStrategicAIComponent::Training_FilterTrainingOptionsForSelection(
+	const FEnemyStrategicTrainingSelection& Selection,
+	const TArray<ETankSubtype>& TankSubtypes,
+	const TArray<ESquadSubtype>& SquadSubtypes,
+	TArray<ETankSubtype>& OutTankSubtypes,
+	TArray<ESquadSubtype>& OutSquadSubtypes) const
+{
+	for (const ETankSubtype TankSubtype : TankSubtypes)
+	{
+		if (Training_GetDoesTankFitSelection(TankSubtype, Selection))
+		{
+			OutTankSubtypes.Add(TankSubtype);
+		}
+	}
+
+	for (const ESquadSubtype SquadSubtype : SquadSubtypes)
+	{
+		if (Training_GetDoesSquadFitSelection(SquadSubtype, Selection))
+		{
+			OutSquadSubtypes.Add(SquadSubtype);
+		}
+	}
+}
+
+bool UEnemyStrategicAIComponent::Training_GetDoesTankFitSelection(
+	const ETankSubtype TankSubtype,
+	const FEnemyStrategicTrainingSelection& Selection) const
+{
+	if (Selection.Focus == EAITrainingFocus::Infantry)
+	{
+		return false;
+	}
+
+	if (Selection.Focus == EAITrainingFocus::LightTanks && not Global_GetIsLightTank(TankSubtype))
+	{
+		return false;
+	}
+
+	if (Selection.Focus == EAITrainingFocus::MediumTanks && not Global_GetIsMediumTank(TankSubtype))
+	{
+		return false;
+	}
+
+	if (Selection.Focus == EAITrainingFocus::HeavyTanks && not Global_GetIsHeavyTank(TankSubtype))
+	{
+		return false;
+	}
+
+	if (Selection.Specialty == EAITrainingFocusSpecialty::AntiTank)
+	{
+		return Global_GetIsTankDestroyer(TankSubtype);
+	}
+
+	if (Selection.Specialty == EAITrainingFocusSpecialty::AntiInfantry)
+	{
+		return not Global_GetIsTankDestroyer(TankSubtype);
+	}
+
+	return true;
+}
+
+bool UEnemyStrategicAIComponent::Training_GetDoesSquadFitSelection(
+	const ESquadSubtype SquadSubtype,
+	const FEnemyStrategicTrainingSelection& Selection) const
+{
+	if (Selection.Focus != EAITrainingFocus::NoFocus && Selection.Focus != EAITrainingFocus::Infantry)
+	{
+		return false;
+	}
+
+	if (Selection.Specialty == EAITrainingFocusSpecialty::AntiTank)
+	{
+		return Global_GetIsAntiTankSquad(SquadSubtype);
+	}
+
+	if (Selection.Specialty == EAITrainingFocusSpecialty::AntiInfantry)
+	{
+		return not Global_GetIsAntiTankSquad(SquadSubtype);
+	}
+
+	return true;
+}
+
+FEnemyStrategicAITrainingBatch UEnemyStrategicAIComponent::Training_BuildRandomTrainingBatch(
+	const TArray<ETankSubtype>& TankSubtypes,
+	const TArray<ESquadSubtype>& SquadSubtypes) const
+{
+	FEnemyStrategicAITrainingBatch TrainingBatch;
+	const int32 TotalOptionCount = TankSubtypes.Num() + SquadSubtypes.Num();
+	if (TotalOptionCount <= 0)
+	{
+		return TrainingBatch;
+	}
+
+	const FEnemyAIMissionSettings& MissionSettings = M_Blackboard.StrategicAIMissionSettings;
+	const int32 MinUnitsTrainedPerBatch = FMath::Max(1, MissionSettings.MinUnitsTrainedPerBatch);
+	const int32 MaxUnitsTrainedPerBatch = FMath::Max(MinUnitsTrainedPerBatch, MissionSettings.MaxUnitsTrainedPerBatch);
+	const int32 UnitPickRange = MaxUnitsTrainedPerBatch - MinUnitsTrainedPerBatch + 1;
+	const int32 UnitsToPick = MinUnitsTrainedPerBatch + GetSeededIndex(UnitPickRange);
+	for (int32 UnitPickIndex = 0; UnitPickIndex < UnitsToPick; ++UnitPickIndex)
+	{
+		const int32 OptionIndex = GetSeededIndex(TotalOptionCount, UnitPickIndex);
+		if (TankSubtypes.IsValidIndex(OptionIndex))
+		{
+			TrainingBatch.TankSubtypes.Add(TankSubtypes[OptionIndex]);
+			continue;
+		}
+
+		const int32 SquadOptionIndex = OptionIndex - TankSubtypes.Num();
+		if (SquadSubtypes.IsValidIndex(SquadOptionIndex))
+		{
+			TrainingBatch.SquadSubtypes.Add(SquadSubtypes[SquadOptionIndex]);
+		}
+	}
+
+	TrainingBatch.TrainingPointCost = Training_GetTrainingBatchCost(
+		TrainingBatch.TankSubtypes,
+		TrainingBatch.SquadSubtypes);
+	return TrainingBatch;
+}
+
+int32 UEnemyStrategicAIComponent::Training_GetTrainingBatchCost(
+	const TArray<ETankSubtype>& TankSubtypes,
+	const TArray<ESquadSubtype>& SquadSubtypes) const
+{
+	int32 TrainingPointCost = 0;
+	for (const ETankSubtype TankSubtype : TankSubtypes)
+	{
+		TrainingPointCost += EnemyTrainingHelpers::GetTankTrainingPointsCost(TankSubtype);
+	}
+
+	for (const ESquadSubtype SquadSubtype : SquadSubtypes)
+	{
+		TrainingPointCost += EnemyTrainingHelpers::GetSquadTrainingPointCost(SquadSubtype);
+	}
+
+	return TrainingPointCost;
+}
+
+bool UEnemyStrategicAIComponent::Training_TrySpendTrainingPoints(const int32 TrainingPointCost)
+{
+	if (TrainingPointCost <= 0)
+	{
+		return false;
+	}
+
+	if (M_TrainingState.TrainingPoints < TrainingPointCost)
+	{
+		return false;
+	}
+
+	M_TrainingState.TrainingPoints -= TrainingPointCost;
+	return true;
+}
+
+void UEnemyStrategicAIComponent::CreateTrainingBatch(
+	const TArray<ETankSubtype>& TankSubtypes,
+	const TArray<ESquadSubtype>& SquadSubtypes)
+{
+	static_cast<void>(TankSubtypes);
+	static_cast<void>(SquadSubtypes);
 }
 
 
