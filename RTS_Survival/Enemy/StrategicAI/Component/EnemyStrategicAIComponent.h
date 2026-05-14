@@ -55,6 +55,64 @@ struct FAIThinkingTimerData
 	}
 };
 
+
+USTRUCT()
+struct FEnemyStrategicAITrainingBatch
+{
+	GENERATED_BODY()
+
+	bool IsEmpty() const
+	{
+		return TankSubtypes.IsEmpty() && SquadSubtypes.IsEmpty();
+	}
+
+	void Reset()
+	{
+		TankSubtypes.Empty();
+		SquadSubtypes.Empty();
+		TrainingPointCost = 0;
+	}
+
+	UPROPERTY()
+	TArray<ETankSubtype> TankSubtypes;
+
+	UPROPERTY()
+	TArray<ESquadSubtype> SquadSubtypes;
+
+	UPROPERTY()
+	int32 TrainingPointCost = 0;
+};
+
+USTRUCT()
+struct FEnemyStrategicAITrainingReservation
+{
+	GENERATED_BODY()
+
+	bool HasReservation() const
+	{
+		return bHasReservedTrainingBatch && not ReservedTrainingBatch.IsEmpty();
+	}
+
+	void ReserveBatch(const FEnemyStrategicAITrainingBatch& TrainingBatch)
+	{
+		ReservedTrainingBatch = TrainingBatch;
+		bHasReservedTrainingBatch = not ReservedTrainingBatch.IsEmpty();
+	}
+
+	void Reset()
+	{
+		bHasReservedTrainingBatch = false;
+		ReservedTrainingBatch.Reset();
+	}
+
+	// Keeps an unaffordable strategic choice intact so cheap options do not consume points meant for heavier units.
+	UPROPERTY()
+	bool bHasReservedTrainingBatch = false;
+
+	UPROPERTY()
+	FEnemyStrategicAITrainingBatch ReservedTrainingBatch;
+};
+
 /**
  * @brief Orchestrates strategic AI request batching and async processing for the enemy controller.
  * There are a few components to this:
@@ -155,6 +213,8 @@ private:
 	// The starting amount of training points is set when the enemy ai controller propagates the settings.
 	// See void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
 	FEnemyStrategicTrainingState M_TrainingState;
+	// Keeps an unaffordable picked batch active until enough training points have accumulated.
+	FEnemyStrategicAITrainingReservation M_TrainingReservation;
 	bool GetIsAllowedDirectControlUnits()const;
 	bool GetIsAllowedUnitTraining()const;
 
@@ -184,6 +244,72 @@ private:
 	void RemoveExpiredHeavyTankFlankingResults(const float CurrentTimeSeconds);
 	
 	void Training_ThinkStep();
+	bool Training_TryCreateReservedTrainingBatch();
+	/**
+	 * @brief Builds the currently unlocked candidate pool before pressure filtering so reserved batches only use legal tech.
+	 * @param OutTankSubtypes Filled with unlocked tank options from every available tech level.
+	 * @param OutSquadSubtypes Filled with unlocked squad options from every available tech level.
+	 */
+	void Training_CollectAvailableTrainingOptions(
+		TArray<ETankSubtype>& OutTankSubtypes,
+		TArray<ESquadSubtype>& OutSquadSubtypes) const;
+	/**
+	 * @brief Adds one tech-level option set only when its cached unlock state says it can be trained.
+	 * @param TrainingOptions Mission-authored options for a single tech level.
+	 * @param OutTankSubtypes Accumulates unlocked tank options.
+	 * @param OutSquadSubtypes Accumulates unlocked squad options.
+	 */
+	void Training_AddUnlockedTrainingOptions(
+		const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
+		TArray<ETankSubtype>& OutTankSubtypes,
+		TArray<ESquadSubtype>& OutSquadSubtypes) const;
+	/**
+	 * @brief Narrows unlocked options to what can satisfy the broad pressure buckets before random batch selection.
+	 * @param Selection Focus and specialty picked from accumulated training pressure.
+	 * @param TankSubtypes Unfiltered unlocked tank options.
+	 * @param SquadSubtypes Unfiltered unlocked squad options.
+	 * @param OutTankSubtypes Filled with tanks matching the selection.
+	 * @param OutSquadSubtypes Filled with squads matching the selection.
+	 */
+	void Training_FilterTrainingOptionsForSelection(
+		const FEnemyStrategicTrainingSelection& Selection,
+		const TArray<ETankSubtype>& TankSubtypes,
+		const TArray<ESquadSubtype>& SquadSubtypes,
+		TArray<ETankSubtype>& OutTankSubtypes,
+		TArray<ESquadSubtype>& OutSquadSubtypes) const;
+	bool Training_GetDoesTankFitSelection(
+		const ETankSubtype TankSubtype,
+		const FEnemyStrategicTrainingSelection& Selection) const;
+	bool Training_GetDoesSquadFitSelection(
+		const ESquadSubtype SquadSubtype,
+		const FEnemyStrategicTrainingSelection& Selection) const;
+	/**
+	 * @brief Randomly samples with replacement so a reservation can represent multiple copies of one useful option.
+	 * @param TankSubtypes Filtered tank options.
+	 * @param SquadSubtypes Filtered squad options.
+	 * @return Batch with selected options and their total training-point cost.
+	 */
+	FEnemyStrategicAITrainingBatch Training_BuildRandomTrainingBatch(
+		const TArray<ETankSubtype>& TankSubtypes,
+		const TArray<ESquadSubtype>& SquadSubtypes) const;
+	/**
+	 * @brief Sums helper-defined costs so point reservation uses the same prices as immediate training.
+	 * @param TankSubtypes Tanks selected for the batch.
+	 * @param SquadSubtypes Squads selected for the batch.
+	 * @return Total training points needed for the batch.
+	 */
+	int32 Training_GetTrainingBatchCost(
+		const TArray<ETankSubtype>& TankSubtypes,
+		const TArray<ESquadSubtype>& SquadSubtypes) const;
+	bool Training_TrySpendTrainingPoints(const int32 TrainingPointCost);
+	/**
+	 * @brief Isolated hook for later spawning/training once reservation logic has paid for the exact batch.
+	 * @param TankSubtypes Tank subtypes to create.
+	 * @param SquadSubtypes Squad subtypes to create.
+	 */
+	void CreateTrainingBatch(
+		const TArray<ETankSubtype>& TankSubtypes,
+		const TArray<ESquadSubtype>& SquadSubtypes);
 
 	FAIThinkingTimerData M_TrainingPressureThinkTimer;
 	/**

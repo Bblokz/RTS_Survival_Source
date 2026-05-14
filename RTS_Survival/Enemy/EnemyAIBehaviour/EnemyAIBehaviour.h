@@ -39,6 +39,14 @@ struct FEnemyAIMissionSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxPickedUnitsForAction = 8;
 
+	// Minimum amount of units the strategic AI tries to include in one training batch.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1"))
+	int32 MinUnitsTrainedPerBatch = 1;
+
+	// Maximum amount of units the strategic AI tries to include in one training batch.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1"))
+	int32 MaxUnitsTrainedPerBatch = 3;
+
 
 	// Whether the AI can train units based on the buildings available to it.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
