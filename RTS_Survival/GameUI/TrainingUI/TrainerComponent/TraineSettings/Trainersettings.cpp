@@ -1,0 +1,1 @@
+﻿#include "Trainersettings.h"

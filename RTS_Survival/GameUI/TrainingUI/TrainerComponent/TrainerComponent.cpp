@@ -5,6 +5,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "RallyPointActor/RallyPoint.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/Interface/Trainer.h"
 #include "RTS_Survival/Requirement/RTSRequirement.h"
@@ -143,6 +144,27 @@ void UTrainerComponent::InitUTrainerComponent(
 	SetTrainingEnabled(TrainerSettings.StartEnabled);
 	InitTrainerComp_StartRequirementCheckTimer();
 	// Store and spawn the rally point actor (hidden), ignoring collisions.
+}
+
+void UTrainerComponent::InitTrainerAsEnemyTrainerComponent(
+	TScriptInterface<ITrainer> Trainer, FTrainerSettings TrainerSettings, UTimeProgressBarWidget* OptionalProgressBar,
+	const bool bUseTrainingPreview)
+{
+	M_TrainerSettings = TrainerSettings;
+	M_OwningTrainer = Trainer;
+	M_TrainerSettings.bIsEnemyTrainer = true;
+	M_TrainerSettings.bUsesProgressionBar = IsValid(OptionalProgressBar);
+	M_OwnerProgressBar = OptionalProgressBar;
+	bM_UseTrainingPreview = bUseTrainingPreview;
+	
+	SetTrainingEnabled(TrainerSettings.StartEnabled);
+	const AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	if(not EnemyController)
+	{
+		return;
+	}
+	EnemyController->AddTrainingComponentToAIBlackboard(this);
+	
 }
 
 

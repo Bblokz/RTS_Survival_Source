@@ -696,6 +696,28 @@ UEnemyDirectControlComponent* AEnemyController::GetEnemyDirectControlComponent()
 	return M_EnemyDirectControlComponent;
 }
 
+void AEnemyController::AddTrainingComponentToAIBlackboard(UTrainerComponent* EnemyTrainer) const
+{
+	if(not IsValid(EnemyTrainer))
+	{
+		RTSFunctionLibrary::ReportError("Enemy trainer component provided for blackboard is not valid!");
+		return;
+	}
+	if(not EnemyTrainer->GetTrainerSettings().bIsEnemyTrainer)
+	{
+		RTSFunctionLibrary::ReportError("Provided trainer component for blackboard is not set up as enemy trainer!");
+	}
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Could not add enemy trainer component to blackboard because strategic AI component was invalid.");
+		return;
+	}
+	FStrategicAIBlackboard& StrategicAIBlackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	StrategicAIBlackboard.TrainerComponents.AddUnique(EnemyTrainer);
+}
+
 void AEnemyController::BeginPlay()
 {
 	Super::BeginPlay();

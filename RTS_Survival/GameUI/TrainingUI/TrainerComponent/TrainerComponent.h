@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Containers/Queue.h"
+#include "TraineSettings/Trainersettings.h"
 #include "TrainingQueueItem/QueueItem.h"
 
 #include "TrainerComponent.generated.h"
@@ -21,26 +22,6 @@ class ARTSAsyncSpawner;
 class ACPPController;
 class UTrainingMenuManager;
 
-USTRUCT(Blueprintable)
-struct FTrainerSettings
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	float TimeNotSelectable = 2.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	UMeshComponent* TrainingMesh = nullptr;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName SpawnSocketName = "None";
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName DefaultWayPointSocketName = "None";
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	bool StartEnabled = false;
-};
 
 USTRUCT()
 struct FTrainingEnabled
@@ -79,6 +60,8 @@ public:
 	// Sets default values for this component's properties
 	UTrainerComponent();
 
+	FTrainerSettings GetTrainerSettings() const { return M_TrainerSettings; }
+
 	bool GetUseTrainingPreview() const { return bM_UseTrainingPreview; }
 
 	/**
@@ -113,6 +96,14 @@ public:
 		TScriptInterface<ITrainer> Trainer,
 		FTrainerSettings TrainerSettings,
 		UTimeProgressBarWidget* ProgressBar, TSubclassOf<ARTSRallyPointActor> RallyPointActorClass, const bool
+		bUseTrainingPreview);
+
+	// Setup for enemy training can opt to not use the progression bar.
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="ReferenceCasts")
+	void InitTrainerAsEnemyTrainerComponent(
+		TScriptInterface<ITrainer> Trainer,
+		FTrainerSettings TrainerSettings,
+		UTimeProgressBarWidget* OptionalProgressBar, const bool
 		bUseTrainingPreview);
 
 

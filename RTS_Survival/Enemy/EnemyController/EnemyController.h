@@ -14,6 +14,7 @@
 #include "EnemyController.generated.h"
 
 
+class UTrainerComponent;
 struct FTrainingOption;
 struct FAttackWaveElement;
 struct FAttackMoveWaveSettings;
@@ -383,6 +384,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyDirectControlComponent* GetEnemyDirectControlComponent() const;
+
+	void AddTrainingComponentToAIBlackboard(UTrainerComponent* EnemyTrainer) const;
 
 	// ------------------------------------------------------------
 	// END Enemy Resources Management
