@@ -11,6 +11,7 @@
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyTrainingHelpers/EnemyTrainingHelpers.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -590,6 +591,25 @@ void UEnemyStrategicAIComponent::CreateTrainingBatch(
 {
 	static_cast<void>(TankSubtypes);
 	static_cast<void>(SquadSubtypes);
+}
+
+bool UEnemyStrategicAIComponent::GetValidTrainerComponentLocationFromBlackboard(FTransform& OutSpawnTransform) const
+{
+	OutSpawnTransform = FTransform::Identity;
+	for(TWeakObjectPtr<UTrainerComponent> EachEnemyTrainer : M_Blackboard.TrainerComponents)
+	{
+		if(not EachEnemyTrainer.IsValid())
+		{
+			continue;
+		}
+		if(not EachEnemyTrainer->GetSpawnTransform(OutSpawnTransform))
+		{
+			continue;
+		}
+		return true;
+	}
+	RTSFunctionLibrary::ReportError("Enemy strategic AI could not get valid trainer component location from blackboard.");
+	return false;
 }
 
 

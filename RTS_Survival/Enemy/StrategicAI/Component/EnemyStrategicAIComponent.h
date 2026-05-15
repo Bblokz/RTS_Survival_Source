@@ -311,6 +311,8 @@ private:
 		const TArray<ETankSubtype>& TankSubtypes,
 		const TArray<ESquadSubtype>& SquadSubtypes);
 
+	bool GetValidTrainerComponentLocationFromBlackboard(FTransform& OutSpawnTransform) const;
+
 	FAIThinkingTimerData M_TrainingPressureThinkTimer;
 	/**
 	 * @brief Updates pressure on its own cadence so unit production demand is not tied to order execution frequency.

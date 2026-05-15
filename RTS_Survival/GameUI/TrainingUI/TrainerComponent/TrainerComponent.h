@@ -60,6 +60,8 @@ public:
 	// Sets default values for this component's properties
 	UTrainerComponent();
 
+	bool GetSpawnTransform(FTransform& OutTransform) const;
+	
 	FTrainerSettings GetTrainerSettings() const { return M_TrainerSettings; }
 
 	bool GetUseTrainingPreview() const { return bM_UseTrainingPreview; }
@@ -325,7 +327,6 @@ private:
 	UPROPERTY()
 	FTrainerSettings M_TrainerSettings;
 
-	bool GetSpawnTransform(FTransform& OutTransform) const;
 
 	FVector GetDefaultWayPoint() const;
 
