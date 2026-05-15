@@ -77,6 +77,9 @@ public:
 	static UPlayerAudioController* GetPlayerAudioController(const UObject* WorldContextObject);
 
 	static AMissionManager* GetGameMissionManager(const UObject* WorldContextObject);
+
+	/** @return Whether the active mission difficulty has enabled mutation behaviours. */
+	static bool AreMutationsOn(const UObject* WorldContextObject);
 	// -------------------- End Player Related Objects --------------------
 
 	/** @return Whether the player is holding down the shift key. */

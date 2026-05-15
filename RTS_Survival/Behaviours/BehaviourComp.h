@@ -8,8 +8,11 @@
 #include "BehaviourComp.generated.h"
 
 class UBehaviour;
+class URTSComponent;
 class UActionUIManager;
 class UAnimatedTextWidgetPoolManager;
+enum class EMutatorClass : uint8;
+enum class ETankSubtype : uint8;
 
 struct FBehaviourCompAnimatedTextState
 {
@@ -231,6 +234,11 @@ private:
 	void ClearAllBehaviours();
 
 	void NotifyActionUIManagerOfBehaviourUpdate();
+	void BeginPlay_InitMutations();
+	const URTSComponent* GetOwnerRTSComponent() const;
+	bool TryGetMutationClassForRTSComponent(const URTSComponent& RTSComponent, EMutatorClass& OutMutatorClass) const;
+	bool TryGetMutationClassForTankSubtype(const ETankSubtype TankSubtype, EMutatorClass& OutMutatorClass) const;
+	void AddRandomMutationFromMutators(const TArray<TSubclassOf<UBehaviour>>& Mutators);
 	bool GetIsValidActionUIManager() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
 	void BeginPlay_InitAnimatedTextWidgetPoolManager();
