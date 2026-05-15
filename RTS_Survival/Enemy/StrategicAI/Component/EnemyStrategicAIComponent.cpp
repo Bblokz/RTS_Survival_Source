@@ -128,13 +128,13 @@ void UEnemyStrategicAIComponent::BeginPlay_CacheUnitManager()
 
 bool UEnemyStrategicAIComponent::EnsureIsValidUnitManager()
 {
-	if(not M_GameUnitManager.IsValid())
+	if (not M_GameUnitManager.IsValid())
 	{
 		M_GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
-		if(not M_GameUnitManager.IsValid())
+		if (not M_GameUnitManager.IsValid())
 		{
 			RTSFunctionLibrary::ReportError("Enemy strategic AI requires a valid game unit manager but "
-								   "cannot get it through helper function in FRTS_Statics.");
+				"cannot get it through helper function in FRTS_Statics.");
 			return false;
 		}
 	}
@@ -230,7 +230,7 @@ void UEnemyStrategicAIComponent::AddPlayerUnitLocationsForDefensePositionsOfEnem
 	if (BlackboardQueries::HasValidPlayerAttackingLocations(M_Blackboard))
 	{
 		for (const auto& EachUnderAttLoc : M_Blackboard.CurrentLocationsUnderPlayerAttack.
-		                                                           LocationsUnderAttack)
+		                                                LocationsUnderAttack)
 		{
 			// Always checked for near zero on async processor!
 			OutFindBaseRequest.PlayerUnitLocationsToDefendAgainst.Add(EachUnderAttLoc.AverageAttackerLocation);
@@ -330,10 +330,34 @@ void UEnemyStrategicAIComponent::RemoveExpiredHeavyTankFlankingResults(const flo
 		});
 }
 
+/**
+* AI chooses a batch.
+
+AI cannot afford it.
+
+AI stores it as M_TrainingReservation.
+
+Every later Training_ThinkStep() tries to pay for that exact batch first.
+
+If still too expensive, the reservation blocks new random training choices.
+
+Training points accumulate elsewhere over time.
+
+Eventually the AI has enough points.
+
+Training_TrySpendTrainingPoints() succeeds.
+
+The reserved batch is created.
+
+M_TrainingReservation.Reset() clears the reservation.
+
+The next training think step can evaluate fresh pressure again.
+ */
 void UEnemyStrategicAIComponent::Training_ThinkStep()
 {
 	// Reserved batches are handled first so saved pressure cannot be replaced by cheaper random picks.
-	if (Training_TryCreateReservedTrainingBatch())
+	// “Do I currently have at least ReservedTrainingBatch.TrainingPointCost training points?”
+	if (Training_HandleReservedTrainingBatchIfAny())
 	{
 		return;
 	}
@@ -348,6 +372,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 	}
 
 	// Spending the selected buckets here prevents the same strategic need from dominating every think step.
+	// As picked buckets get pressure removed.
 	const FEnemyStrategicTrainingSelection Selection = M_TrainingState.PickAndSpendTrainingSelection();
 	const bool bHasTrainingSelection = Selection.Focus != EAITrainingFocus::NoFocus
 		|| Selection.Specialty != EAITrainingFocusSpecialty::NoTrainingPressure;
@@ -356,7 +381,8 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 		return;
 	}
 
-	// Apply the broad strategic selection after unlock checks so random batching only sees useful, legal choices.
+	// Apply the broad strategic selection after unlock checks so random batching only sees useful,
+	// currently trainable and selection-compatible choices.
 	TArray<ETankSubtype> FilteredTankSubtypes;
 	TArray<ESquadSubtype> FilteredSquadSubtypes;
 	Training_FilterTrainingOptionsForSelection(
@@ -389,7 +415,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 	M_TrainingReservation.ReserveBatch(TrainingBatch);
 }
 
-bool UEnemyStrategicAIComponent::Training_TryCreateReservedTrainingBatch()
+bool UEnemyStrategicAIComponent::Training_HandleReservedTrainingBatchIfAny()
 {
 	// Returning false lets the caller continue with new pressure only when no previous choice is waiting.
 	if (not M_TrainingReservation.HasReservation())
@@ -398,6 +424,7 @@ bool UEnemyStrategicAIComponent::Training_TryCreateReservedTrainingBatch()
 	}
 
 	const FEnemyStrategicAITrainingBatch& ReservedTrainingBatch = M_TrainingReservation.ReservedTrainingBatch;
+	// “Do I currently have at least ReservedTrainingBatch.TrainingPointCost training points?”
 	if (not Training_TrySpendTrainingPoints(ReservedTrainingBatch.TrainingPointCost))
 	{
 		// The reservation still owns this think step, preventing new random batches from stealing saved points.
@@ -430,7 +457,7 @@ void UEnemyStrategicAIComponent::Training_AddUnlockedTrainingOptions(
 	TArray<ESquadSubtype>& OutSquadSubtypes) const
 {
 	const bool* const bIsTechLevelUnlocked = M_TrainingState.TechLevelUnlockedMap.Find(TrainingOptions.TechLevel);
-	if (bIsTechLevelUnlocked == nullptr || not *bIsTechLevelUnlocked)
+	if (bIsTechLevelUnlocked == nullptr || not*bIsTechLevelUnlocked)
 	{
 		return;
 	}
@@ -600,27 +627,71 @@ void UEnemyStrategicAIComponent::CreateTrainingBatch(
 	const TArray<ETankSubtype>& TankSubtypes,
 	const TArray<ESquadSubtype>& SquadSubtypes)
 {
-	static_cast<void>(TankSubtypes);
-	static_cast<void>(SquadSubtypes);
+	FTransform SpawnTransform;
+	if(not GetValidTrainingSpawnTransform(SpawnTransform))
+	{
+		return;
+	}
+		
+}
+
+bool UEnemyStrategicAIComponent::GetValidTrainingSpawnTransform(FTransform& OutTransform)
+{
+	if (not GetValidTrainerComponentLocationFromBlackboard(OutTransform))
+	{
+		if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+			EnemyAISettings::Debugging::TrainingPressureDebugging)
+		{
+			RTSFunctionLibrary::PrintString(
+				"Enemy strategic AI cannot create training batch because it cannot get valid spawn "
+				"transform from trainer component on blackboard.", FColor::Red);
+		}
+		if (not GetRandomEnemyBaseClusterSpawnTransform(OutTransform))
+		{
+			if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+				EnemyAISettings::Debugging::TrainingPressureDebugging)
+			{
+				RTSFunctionLibrary::PrintString(
+					"Enemy strategic AI cannot create training batch because it cannot get valid spawn "
+					"transform from random enemy base cluster either.", FColor::Red);
+				return false;
+			}
+		}
+		return true;
+	}
+	return true;
 }
 
 bool UEnemyStrategicAIComponent::GetValidTrainerComponentLocationFromBlackboard(FTransform& OutSpawnTransform) const
 {
 	OutSpawnTransform = FTransform::Identity;
-	for(TWeakObjectPtr<UTrainerComponent> EachEnemyTrainer : M_Blackboard.TrainerComponents)
+	for (TWeakObjectPtr<UTrainerComponent> EachEnemyTrainer : M_Blackboard.TrainerComponents)
 	{
-		if(not EachEnemyTrainer.IsValid())
+		if (not EachEnemyTrainer.IsValid())
 		{
 			continue;
 		}
-		if(not EachEnemyTrainer->GetSpawnTransform(OutSpawnTransform))
+		if (not EachEnemyTrainer->GetSpawnTransform(OutSpawnTransform))
 		{
 			continue;
 		}
 		return true;
 	}
-	RTSFunctionLibrary::ReportError("Enemy strategic AI could not get valid trainer component location from blackboard.");
+	RTSFunctionLibrary::ReportError(
+		"Enemy strategic AI could not get valid trainer component location from blackboard.");
 	return false;
+}
+
+bool UEnemyStrategicAIComponent::GetRandomEnemyBaseClusterSpawnTransform(FTransform& OutSpawnTransform) const
+{
+	if (M_Blackboard.EnemyBasePoints.IsEmpty())
+	{
+		return false;
+	}
+	const FEnemyBasePointCoreBuildings RandomBasePoint = M_Blackboard.EnemyBasePoints[FMath::RandRange(
+		0, M_Blackboard.EnemyBasePoints.Num() - 1)];
+	OutSpawnTransform.SetLocation(RandomBasePoint.BaseLocation);
+	return true;
 }
 
 
@@ -714,8 +785,10 @@ void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 
 void UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep()
 {
-	const int32 MultiplierPerInterval = FMath::Max(1, EnemyAISettings::ThinkingTimers::UpdateEnemyTrainingPoints_Interval / 60);
-	M_TrainingState.TrainingPoints += M_TrainingState.EnemyLevelTraining.TrainingPointsPerMinute * MultiplierPerInterval;
+	const int32 MultiplierPerInterval = FMath::Max(
+		1, EnemyAISettings::ThinkingTimers::UpdateEnemyTrainingPoints_Interval / 60);
+	M_TrainingState.TrainingPoints += M_TrainingState.EnemyLevelTraining.TrainingPointsPerMinute *
+		MultiplierPerInterval;
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
@@ -825,7 +898,7 @@ void UEnemyStrategicAIComponent::StrategicAiThinkingLoop()
 	{
 		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_Blackboard);
 	}
-	if(GetIsAllowedUnitTraining())
+	if (GetIsAllowedUnitTraining())
 	{
 		Training_ThinkStep();
 	}
@@ -917,7 +990,7 @@ void UEnemyStrategicAIComponent::ProcessClosestFlankableEnemyHeavyResults(
 		ResultWithTimestamp.ResultTimestampSeconds = CurrentTimeSeconds;
 		M_Blackboard.AgreggatedHeavyTankFlankingResults.Add(MoveTemp(ResultWithTimestamp));
 	}
-	if(DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+	if (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		EnemyAISettings::Debugging::FlankPositionsDebugging)
 	{
 		DebugFlankingPositiions();
@@ -1099,7 +1172,7 @@ void UEnemyStrategicAIComponent::DebugBlackboardLocationsUnderAttack() const
 {
 	using namespace EnemyAISettings::Debugging;
 	for (const auto& EachUnderAttackLocation : M_Blackboard.CurrentLocationsUnderPlayerAttack.
-	                                                                   LocationsUnderAttack)
+	                                                        LocationsUnderAttack)
 	{
 		DebugPoint(EachUnderAttackLocation.LocationUnderAttack, LocationUnderAttackDebuggingRadius, AttackLocationColor,
 		           LocationsUnderAttackDuration, "Location Under Player Attack");
@@ -1171,13 +1244,13 @@ void UEnemyStrategicAIComponent::DebugBlackboardUnitCounts() const
 
 void UEnemyStrategicAIComponent::DebugFlankingPositiions() const
 {
-for(auto EachFlank : M_Blackboard.AgreggatedHeavyTankFlankingResults)
-{
-	for(const auto& EachHeavyLocations : EachFlank.FlankLocationsAroundHeavyTank)
-		for(const auto& EachLocation : EachHeavyLocations.Locations)
-		{
-			DrawDebugSphere(GetWorld(), EachLocation, 33.f, 20,
-			                EnemyAISettings::Debugging::FlankLocationColor, false, 2.f, 0, 5.f);
-		}
-}
+	for (auto EachFlank : M_Blackboard.AgreggatedHeavyTankFlankingResults)
+	{
+		for (const auto& EachHeavyLocations : EachFlank.FlankLocationsAroundHeavyTank)
+			for (const auto& EachLocation : EachHeavyLocations.Locations)
+			{
+				DrawDebugSphere(GetWorld(), EachLocation, 33.f, 20,
+				                EnemyAISettings::Debugging::FlankLocationColor, false, 2.f, 0, 5.f);
+			}
+	}
 }

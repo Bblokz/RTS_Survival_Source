@@ -242,9 +242,23 @@ private:
 	FAIThinkingTimerData M_PlayerHeavyTankFlankLocationsThinkTimer;
 	void PlayerHeavyTankFlankLocations_ThinkStep();
 	void RemoveExpiredHeavyTankFlankingResults(const float CurrentTimeSeconds);
+
 	
+/**
+-AI chooses a batch.
+-AI cannot afford it.
+-AI stores it as M_TrainingReservation.
+-Every later Training_ThinkStep() tries to pay for that exact batch first.
+-If still too expensive, the reservation blocks new random training choices.
+-Training points accumulate elsewhere over time.
+-Eventually the AI has enough points.
+-Training_TrySpendTrainingPoints() succeeds.
+-The reserved batch is created.
+-M_TrainingReservation.Reset() clears the reservation.
+-The next training think step can evaluate fresh pressure again.
+ */
 	void Training_ThinkStep();
-	bool Training_TryCreateReservedTrainingBatch();
+	bool Training_HandleReservedTrainingBatchIfAny();
 	/**
 	 * @brief Builds the currently unlocked candidate pool before pressure filtering so reserved batches only use legal tech.
 	 * @param OutTankSubtypes Filled with unlocked tank options from every available tech level.
@@ -311,7 +325,12 @@ private:
 		const TArray<ETankSubtype>& TankSubtypes,
 		const TArray<ESquadSubtype>& SquadSubtypes);
 
+	bool GetValidTrainingSpawnTransform(FTransform& OutTransform);
+
 	bool GetValidTrainerComponentLocationFromBlackboard(FTransform& OutSpawnTransform) const;
+
+	bool GetRandomEnemyBaseClusterSpawnTransform(FTransform& OutSpawnTransform) const;
+	
 
 	FAIThinkingTimerData M_TrainingPressureThinkTimer;
 	/**
