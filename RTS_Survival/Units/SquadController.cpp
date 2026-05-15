@@ -483,6 +483,11 @@ bool ASquadController::GetIsSquadFullyLoaded() const
 	return M_SquadLoadingStatus.bM_HasFinishedLoading;
 }
 
+bool ASquadController::GetIsSquadFullyLoadedAndInitialized() const
+{
+	return M_SquadLoadingStatus.bM_HasFinishedLoading && M_SquadLoadingStatus.bM_HasInitializedData;
+}
+
 void ASquadController::PlaySquadUnitLostVoiceLine()
 {
 	if (not GetIsValidPlayerController())
@@ -3197,6 +3202,11 @@ void ASquadController::InitSquadData()
 	SquadDataCallbacks.SetDataLoaded(true);
 	SquadDataCallbacks.OnSquadDataReady.Broadcast();
 	M_SquadLoadingStatus.bM_HasInitializedData = true;
+	if (not bM_HasBroadcastSquadFullyLoaded)
+	{
+		bM_HasBroadcastSquadFullyLoaded = true;
+		OnSquadFullyLoaded.Broadcast(this);
+	}
 }
 
 void ASquadController::InitSquadData_SetValues(const float MaxWalkSpeed, const float MaxAcceleration,

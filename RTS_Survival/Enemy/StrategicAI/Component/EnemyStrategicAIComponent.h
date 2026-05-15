@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/StrategicTrainingState/StrategicTrainingState.h"
 #include "EnemyStrategicAIComponent.generated.h"
 
@@ -16,6 +17,7 @@ struct FStochasticDecisionTree;
 class AEnemyController;
 class URTSGameInstance;
 class UEnemyDirectControlComponent;
+class ASquadController;
 
 DECLARE_DELEGATE(FAIThinkStepDelegate);
 
@@ -111,6 +113,32 @@ struct FEnemyStrategicAITrainingReservation
 
 	UPROPERTY()
 	FEnemyStrategicAITrainingBatch ReservedTrainingBatch;
+};
+
+
+USTRUCT()
+struct FEnemyStrategicAITrainingSpawnBatch
+{
+	GENERATED_BODY()
+
+	bool HasMoreTrainingOptions() const
+	{
+		return TrainingOptionsToSpawn.IsValidIndex(NextTrainingOptionIndex);
+	}
+
+	UPROPERTY()
+	TArray<FTrainingOption> TrainingOptionsToSpawn;
+
+	UPROPERTY()
+	FVector SpawnLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	int32 NextTrainingOptionIndex = 0;
+
+	UPROPERTY()
+	int32 BatchID = INDEX_NONE;
+
+	FTimerHandle TimerHandle;
 };
 
 /**
@@ -215,6 +243,9 @@ private:
 	FEnemyStrategicTrainingState M_TrainingState;
 	// Keeps an unaffordable picked batch active until enough training points have accumulated.
 	FEnemyStrategicAITrainingReservation M_TrainingReservation;
+	// Each paid batch owns its own timer so overlapping training batches do not interrupt each other.
+	TArray<FEnemyStrategicAITrainingSpawnBatch> M_ActiveTrainingSpawnBatches;
+	int32 M_NextTrainingSpawnBatchID = 1;
 	bool GetIsAllowedDirectControlUnits()const;
 	bool GetIsAllowedUnitTraining()const;
 
@@ -324,6 +355,44 @@ private:
 	void CreateTrainingBatch(
 		const TArray<ETankSubtype>& TankSubtypes,
 		const TArray<ESquadSubtype>& SquadSubtypes);
+	/**
+	 * @brief Converts paid subtype picks into async-spawner options while dropping invalid placeholder subtypes.
+	 * @param TankSubtypes Tank subtypes selected by strategic training.
+	 * @param SquadSubtypes Squad subtypes selected by strategic training.
+	 * @param OutTrainingOptions Filled in spawn order for a single batch timer.
+	 */
+	void CreateTrainingOptionsToSpawn(
+		const TArray<ETankSubtype>& TankSubtypes,
+		const TArray<ESquadSubtype>& SquadSubtypes,
+		TArray<FTrainingOption>& OutTrainingOptions) const;
+	/**
+	 * @brief Projects the trainer/base location before spawning so async units start on navigable ground.
+	 * @param TrainingLocation Desired spawn location from trainer or base fallback.
+	 * @param OutProjectedTrainingLocation Filled with the navmesh location when projection succeeds.
+	 * @return True when the location can be used for spawning.
+	 */
+	bool TryProjectTrainingLocationToNavmesh(
+		const FVector& TrainingLocation,
+		FVector& OutProjectedTrainingLocation) const;
+	/**
+	 * @brief Creates an independent timer for one paid batch so other batches can overlap safely.
+	 * @param TrainingOptionsToSpawn Options this timer will spawn one-by-one.
+	 * @param SpawnLocation Projected spawn location shared by the batch.
+	 */
+	void StartTrainingSpawnBatchTimer(
+		const TArray<FTrainingOption>& TrainingOptionsToSpawn,
+		const FVector& SpawnLocation);
+	void TrainingSpawnBatchTimerTick(const int32 BatchID);
+	void StopTrainingSpawnBatchTimer(const int32 BatchID);
+	void OnBlackboardUnitSpawned(
+		const FTrainingOption& TrainingOption,
+		AActor* SpawnedActor,
+		const int32 ID,
+		const FVector& TrainingLocation);
+	void OnBlackboardSquadFullyLoaded(ASquadController* SquadController);
+	void IssueOrdersToSpawnedBlackboardUnit(AActor* SpawnedActor);
+	bool TryGetRandomBlackboardDefensePosition(FDefensePositions& OutDefensePosition) const;
+	void DebugTrainedUnit(const FTrainingOption& TrainingOption, const FVector& TrainingLocation) const;
 
 	bool GetValidTrainingSpawnTransform(FTransform& OutTransform);
 

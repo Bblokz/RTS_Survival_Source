@@ -39,6 +39,12 @@ namespace EnemyAISettings
 		inline float UpdateEnemyTrainingPoints_Interval = 60.f* DEV_AI_ThinkTimers_Scaling;
 	}
 
+	namespace UnitTraining
+	{
+		// Delay between enemy strategic AI training spawns so a batch does not appear at once.
+		inline float TrainingBatchSpawnInterval = 1.f;
+	}
+
 	namespace TrainingPressure
 	{
 		inline constexpr float MinimumTrainingBucketPressure = 0.01f;
