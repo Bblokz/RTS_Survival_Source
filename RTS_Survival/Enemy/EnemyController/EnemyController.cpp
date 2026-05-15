@@ -755,6 +755,11 @@ void AEnemyController::PostInitializeComponents()
 
 void AEnemyController::BeginPlay_InitStochasticDecisionTree()
 {
+	if(not IsValid(M_StochasticDecisionTree))
+	{
+		RTSFunctionLibrary::ReportError("No stochastic decision tree was added to the enemy contorller!");
+		return;
+	}
 	M_StochasticDecisionTree->InitStochasticDecisionTree(M_EnemyStrategicAIComponent,
 	                                                     M_EnemyDirectControlComponent,
 	                                                     M_EnemyNavigationAIComponent,
