@@ -8,10 +8,14 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
+#include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticHelpers/StochasticHelpers.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyTrainingHelpers/EnemyTrainingHelpers.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
+#include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -117,6 +121,16 @@ void UEnemyStrategicAIComponent::BeginPlay()
 void UEnemyStrategicAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopStrategicAIThinkingTimer();
+	UWorld* World = GetWorld();
+	if (IsValid(World))
+	{
+		for (FEnemyStrategicAITrainingSpawnBatch& SpawnBatch : M_ActiveTrainingSpawnBatches)
+		{
+			World->GetTimerManager().ClearTimer(SpawnBatch.TimerHandle);
+		}
+	}
+
+	M_ActiveTrainingSpawnBatches.Empty();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -627,12 +641,283 @@ void UEnemyStrategicAIComponent::CreateTrainingBatch(
 	const TArray<ETankSubtype>& TankSubtypes,
 	const TArray<ESquadSubtype>& SquadSubtypes)
 {
-	FTransform SpawnTransform;
-	if(not GetValidTrainingSpawnTransform(SpawnTransform))
+	TArray<FTrainingOption> TrainingOptionsToSpawn;
+	CreateTrainingOptionsToSpawn(TankSubtypes, SquadSubtypes, TrainingOptionsToSpawn);
+	if (TrainingOptionsToSpawn.IsEmpty())
 	{
 		return;
 	}
-		
+
+	FTransform SpawnTransform;
+	if (not GetValidTrainingSpawnTransform(SpawnTransform))
+	{
+		return;
+	}
+
+	FVector ProjectedSpawnLocation = FVector::ZeroVector;
+	if (not TryProjectTrainingLocationToNavmesh(SpawnTransform.GetLocation(), ProjectedSpawnLocation))
+	{
+		return;
+	}
+
+	StartTrainingSpawnBatchTimer(TrainingOptionsToSpawn, ProjectedSpawnLocation);
+}
+
+void UEnemyStrategicAIComponent::CreateTrainingOptionsToSpawn(
+	const TArray<ETankSubtype>& TankSubtypes,
+	const TArray<ESquadSubtype>& SquadSubtypes,
+	TArray<FTrainingOption>& OutTrainingOptions) const
+{
+	OutTrainingOptions.Reset();
+	OutTrainingOptions.Reserve(TankSubtypes.Num() + SquadSubtypes.Num());
+	for (const ETankSubtype TankSubtype : TankSubtypes)
+	{
+		if (TankSubtype == ETankSubtype::Tank_None)
+		{
+			continue;
+		}
+
+		OutTrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(TankSubtype)));
+	}
+
+	for (const ESquadSubtype SquadSubtype : SquadSubtypes)
+	{
+		if (SquadSubtype == ESquadSubtype::Squad_None)
+		{
+			continue;
+		}
+
+		OutTrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype)));
+	}
+}
+
+bool UEnemyStrategicAIComponent::TryProjectTrainingLocationToNavmesh(
+	const FVector& TrainingLocation,
+	FVector& OutProjectedTrainingLocation) const
+{
+	return StochasticHelpers::CanProjectNavigable_TrainingLocation(
+		this,
+		TrainingLocation,
+		OutProjectedTrainingLocation);
+}
+
+void UEnemyStrategicAIComponent::StartTrainingSpawnBatchTimer(
+	const TArray<FTrainingOption>& TrainingOptionsToSpawn,
+	const FVector& SpawnLocation)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	FEnemyStrategicAITrainingSpawnBatch& SpawnBatch = M_ActiveTrainingSpawnBatches.AddDefaulted_GetRef();
+	SpawnBatch.TrainingOptionsToSpawn = TrainingOptionsToSpawn;
+	SpawnBatch.SpawnLocation = SpawnLocation;
+	SpawnBatch.BatchID = M_NextTrainingSpawnBatchID++;
+
+	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakThis(this);
+	FTimerDelegate TimerDelegate;
+	TimerDelegate.BindLambda([WeakThis, BatchID = SpawnBatch.BatchID]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->TrainingSpawnBatchTimerTick(BatchID);
+	});
+
+	constexpr float MinimumTrainingSpawnInterval = 0.01f;
+	const float TrainingSpawnInterval = FMath::Max(
+		EnemyAISettings::UnitTraining::TrainingBatchSpawnInterval,
+		MinimumTrainingSpawnInterval);
+	World->GetTimerManager().SetTimer(
+		SpawnBatch.TimerHandle,
+		TimerDelegate,
+		TrainingSpawnInterval,
+		true,
+		TrainingSpawnInterval);
+}
+
+void UEnemyStrategicAIComponent::TrainingSpawnBatchTimerTick(const int32 BatchID)
+{
+	FEnemyStrategicAITrainingSpawnBatch* SpawnBatch = M_ActiveTrainingSpawnBatches.FindByPredicate(
+		[BatchID](const FEnemyStrategicAITrainingSpawnBatch& Batch)
+		{
+			return Batch.BatchID == BatchID;
+		});
+	if (SpawnBatch == nullptr || not SpawnBatch->HasMoreTrainingOptions())
+	{
+		StopTrainingSpawnBatchTimer(BatchID);
+		return;
+	}
+
+	ARTSAsyncSpawner* RTSAsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
+	if (not IsValid(RTSAsyncSpawner))
+	{
+		StopTrainingSpawnBatchTimer(BatchID);
+		return;
+	}
+
+	const FTrainingOption TrainingOption = SpawnBatch->TrainingOptionsToSpawn[SpawnBatch->NextTrainingOptionIndex];
+	const int32 SpawnID = SpawnBatch->NextTrainingOptionIndex;
+	++SpawnBatch->NextTrainingOptionIndex;
+
+	const FVector TrainingLocation = SpawnBatch->SpawnLocation;
+	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakThis(this);
+	const bool bRequestStarted = RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
+		TrainingOption,
+		TrainingLocation,
+		this,
+		SpawnID,
+		[WeakThis, TrainingLocation](const FTrainingOption& SpawnedTrainingOption, AActor* SpawnedActor, const int32 ID)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->OnBlackboardUnitSpawned(SpawnedTrainingOption, SpawnedActor, ID, TrainingLocation);
+		});
+
+	if (not bRequestStarted)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Enemy strategic AI failed to start async spawn for training option: " + TrainingOption.GetTrainingName());
+	}
+
+	if (not SpawnBatch->HasMoreTrainingOptions())
+	{
+		StopTrainingSpawnBatchTimer(BatchID);
+	}
+}
+
+void UEnemyStrategicAIComponent::StopTrainingSpawnBatchTimer(const int32 BatchID)
+{
+	const int32 BatchIndex = M_ActiveTrainingSpawnBatches.IndexOfByPredicate(
+		[BatchID](const FEnemyStrategicAITrainingSpawnBatch& Batch)
+		{
+			return Batch.BatchID == BatchID;
+		});
+	if (not M_ActiveTrainingSpawnBatches.IsValidIndex(BatchIndex))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (IsValid(World))
+	{
+		World->GetTimerManager().ClearTimer(M_ActiveTrainingSpawnBatches[BatchIndex].TimerHandle);
+	}
+
+	M_ActiveTrainingSpawnBatches.RemoveAtSwap(BatchIndex);
+}
+
+void UEnemyStrategicAIComponent::OnBlackboardUnitSpawned(
+	const FTrainingOption& TrainingOption,
+	AActor* SpawnedActor,
+	const int32 ID,
+	const FVector& TrainingLocation)
+{
+	(void)ID;
+	if (not IsValid(SpawnedActor))
+	{
+		return;
+	}
+
+	DebugTrainedUnit(TrainingOption, TrainingLocation);
+	if (TrainingOption.UnitType != EAllUnitType::UNType_Squad)
+	{
+		IssueOrdersToSpawnedBlackboardUnit(SpawnedActor);
+		return;
+	}
+
+	ASquadController* SquadController = Cast<ASquadController>(SpawnedActor);
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+
+	if (SquadController->GetIsSquadFullyLoadedAndInitialized())
+	{
+		IssueOrdersToSpawnedBlackboardUnit(SquadController);
+		return;
+	}
+
+	SquadController->OnSquadFullyLoaded.AddUObject(this, &UEnemyStrategicAIComponent::OnBlackboardSquadFullyLoaded);
+}
+
+void UEnemyStrategicAIComponent::OnBlackboardSquadFullyLoaded(ASquadController* SquadController)
+{
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+
+	SquadController->OnSquadFullyLoaded.RemoveAll(this);
+	IssueOrdersToSpawnedBlackboardUnit(SquadController);
+}
+
+void UEnemyStrategicAIComponent::IssueOrdersToSpawnedBlackboardUnit(AActor* SpawnedActor)
+{
+	ICommands* Commands = Cast<ICommands>(SpawnedActor);
+	if (Commands == nullptr)
+	{
+		return;
+	}
+
+	constexpr bool bResetOrderQueue = true;
+	if (Commands->RegisterAsBlackboardIdle(bResetOrderQueue) != ECommandQueueError::NoError)
+	{
+		return;
+	}
+
+	FDefensePositions DefensePosition;
+	if (not TryGetRandomBlackboardDefensePosition(DefensePosition))
+	{
+		return;
+	}
+
+	constexpr bool bQueueOrder = false;
+	Commands->MoveToLocation(
+		DefensePosition.Location,
+		bQueueOrder,
+		FRotator(0.f, DefensePosition.YawRotation, 0.f),
+		true);
+}
+
+bool UEnemyStrategicAIComponent::TryGetRandomBlackboardDefensePosition(FDefensePositions& OutDefensePosition) const
+{
+	if (M_Blackboard.CurrentBaseDefensePositions.IsEmpty())
+	{
+		return false;
+	}
+
+	const int32 DefensePositionIndex = GetSeededIndex(M_Blackboard.CurrentBaseDefensePositions.Num());
+	if (not M_Blackboard.CurrentBaseDefensePositions.IsValidIndex(DefensePositionIndex))
+	{
+		return false;
+	}
+
+	OutDefensePosition = M_Blackboard.CurrentBaseDefensePositions[DefensePositionIndex];
+	return true;
+}
+
+void UEnemyStrategicAIComponent::DebugTrainedUnit(
+	const FTrainingOption& TrainingOption,
+	const FVector& TrainingLocation) const
+{
+	constexpr float TrainedUnitDebugSphereRadius = 100.f;
+	const FString TrainedUnitDebugText = FString::Printf(
+		TEXT("trained : %s"),
+		*TrainingOption.GetDisplayName());
+	DebugPoint(
+		TrainingLocation,
+		TrainedUnitDebugSphereRadius,
+		FColor::Green,
+		EnemyAISettings::Debugging::TrainingPressureDebugDuration,
+		TrainedUnitDebugText);
 }
 
 bool UEnemyStrategicAIComponent::GetValidTrainingSpawnTransform(FTransform& OutTransform)

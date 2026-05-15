@@ -601,6 +601,42 @@ namespace StochasticHelpers
 			EOnProjectionFailedStrategy::LookAtDoubleExtent);
 	}
 
+	bool CanProjectNavigable_TrainingLocation(
+		const UObject* WorldContextObject,
+		const FVector& TrainingLocation,
+		FVector& OutProjectedLocation)
+	{
+		if (not IsValid(WorldContextObject))
+		{
+			return false;
+		}
+
+		UWorld* World = WorldContextObject->GetWorld();
+		if (not IsValid(World))
+		{
+			return false;
+		}
+
+		UNavigationSystemV1* NavSystem = UNavigationSystemV1::GetCurrent(World);
+		if (not IsValid(NavSystem))
+		{
+			return false;
+		}
+
+		FNavLocation ProjectedLocation;
+		constexpr float ProjectionExtent = 2.f;
+		if (not NavSystem->ProjectPointToNavigation(
+			TrainingLocation,
+			ProjectedLocation,
+			FVector(ProjectionExtent)))
+		{
+			return false;
+		}
+
+		OutProjectedLocation = ProjectedLocation.Location;
+		return true;
+	}
+
 	bool CanProjectNavigable_AveragePickedUnitLocation(const UEnemyNavigationAIComponent* NavComp,
 	                                                   const FVector& AverageUnitLocation,
 	                                                   FVector& OutProjectedLocation)

@@ -47,6 +47,7 @@ class USoundConcurrency;
 class ATeamWeapon;
 class ATeamWeaponController;
 enum class ERTSDeathType : uint8;
+class ASquadController;
 
 // Will only start to exe the action once the squad is fully loaded.
 USTRUCT()
@@ -117,6 +118,7 @@ struct FSquadSpawnLocation
 };
 
 DECLARE_MULTICAST_DELEGATE(FOnWeaponPickup);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnSquadFullyLoaded, ASquadController*);
 
 USTRUCT()
 struct FTargetPickupItemState
@@ -303,6 +305,11 @@ public:
 
 
 	bool GetIsSquadFullyLoaded() const;
+	bool GetIsSquadFullyLoadedAndInitialized() const;
+
+	// Fired once when async-created squad units are available for commands that need squad members.
+	FOnSquadFullyLoaded OnSquadFullyLoaded;
+
 	void PlaySquadUnitLostVoiceLine();
 
 	// Updates the decal and selection logic for the squad units their selection components.
@@ -940,6 +947,7 @@ protected:
 
 	// Set when a replacement controller receives already-existing squad units and should not spawn fresh units.
 	bool bM_ShouldSkipInitialSquadUnitLoad = false;
+	bool bM_HasBroadcastSquadFullyLoaded = false;
 
 	void Debug_Scavenging(const FString& DebugMessage) const;
 	void Debug_ItemPickup(const FString& DebugMessage) const;

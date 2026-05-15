@@ -156,6 +156,10 @@ namespace StochasticHelpers
 	bool CanProjectNavigable_BaseDefensePosition(
 		const UEnemyNavigationAIComponent* NavComp, const FVector& DefensePosition, FVector& OutProjectedLocation);
 
+	// Specifically for enemy strategic training locations, uses a tight direct navmesh extent for spawn stability.
+	bool CanProjectNavigable_TrainingLocation(
+		const UObject* WorldContextObject, const FVector& TrainingLocation, FVector& OutProjectedLocation);
+
 	// Specifically for hedgehog construction positions generated from base-defense arcs.
 	bool CanProjectNavigable_HedgehogConstructionLocation(
 		const UEnemyNavigationAIComponent* NavComp, const FVector& ConstructionLocation, FVector& OutProjectedLocation);
