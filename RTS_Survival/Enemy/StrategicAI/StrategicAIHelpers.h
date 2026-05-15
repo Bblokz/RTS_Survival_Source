@@ -17,6 +17,8 @@ struct FFindPlayerUnitBulkLocations;
 struct FResultPlayerUnitBulkLocations;
 struct FFindConstructionLocations;
 struct FResultConstructionLocations;
+struct FEnemyBasePointCoreBuildings;
+struct FEnemyBasePointSatelliteBuildings;
 
 namespace FStrategicAIHelpers
 {
@@ -117,10 +119,15 @@ namespace FStrategicAIHelpers
 		const FFindPlayerUnitBulkLocations& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates);
 	/**
-	 * @brief Builds cleaned construction locations from defense points and player bulk-facing arcs.
+	 * @brief Builds cleaned construction locations while keeping new field builds outside known enemy bases.
 	 * @param Request Defense anchors, player bulk locations, and arc cleanup settings.
-	 * @return Result payload containing only de-duplicated construction locations.
+	 * @param CachedEnemyBaseCoreBuildings Latest accepted core buildings used for wide base-exclusion filtering.
+	 * @param CachedEnemyBaseSatelliteBuildings Latest accepted satellite buildings used for tighter base-exclusion filtering.
+	 * @return Result payload containing only de-duplicated and base-filtered construction locations.
 	 */
-	FResultConstructionLocations BuildConstructionLocationsResult(const FFindConstructionLocations& Request);
+	FResultConstructionLocations BuildConstructionLocationsResult(
+		const FFindConstructionLocations& Request,
+		const TArray<FEnemyBasePointCoreBuildings>& CachedEnemyBaseCoreBuildings,
+		const TArray<FEnemyBasePointSatelliteBuildings>& CachedEnemyBaseSatelliteBuildings);
 
 }
