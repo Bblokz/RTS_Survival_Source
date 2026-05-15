@@ -332,11 +332,13 @@ void UEnemyStrategicAIComponent::RemoveExpiredHeavyTankFlankingResults(const flo
 
 void UEnemyStrategicAIComponent::Training_ThinkStep()
 {
+	// Reserved batches are handled first so saved pressure cannot be replaced by cheaper random picks.
 	if (Training_TryCreateReservedTrainingBatch())
 	{
 		return;
 	}
 
+	// Build the legal unit pool first, because pressure should only be spent when trainable options exist.
 	TArray<ETankSubtype> AvailableTankSubtypes;
 	TArray<ESquadSubtype> AvailableSquadSubtypes;
 	Training_CollectAvailableTrainingOptions(AvailableTankSubtypes, AvailableSquadSubtypes);
@@ -345,6 +347,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 		return;
 	}
 
+	// Spending the selected buckets here prevents the same strategic need from dominating every think step.
 	const FEnemyStrategicTrainingSelection Selection = M_TrainingState.PickAndSpendTrainingSelection();
 	const bool bHasTrainingSelection = Selection.Focus != EAITrainingFocus::NoFocus
 		|| Selection.Specialty != EAITrainingFocusSpecialty::NoTrainingPressure;
@@ -353,6 +356,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 		return;
 	}
 
+	// Apply the broad strategic selection after unlock checks so random batching only sees useful, legal choices.
 	TArray<ETankSubtype> FilteredTankSubtypes;
 	TArray<ESquadSubtype> FilteredSquadSubtypes;
 	Training_FilterTrainingOptionsForSelection(
@@ -366,6 +370,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 		return;
 	}
 
+	// Pick exact units last so availability, pressure, and cost all describe the same batch.
 	const FEnemyStrategicAITrainingBatch TrainingBatch = Training_BuildRandomTrainingBatch(
 		FilteredTankSubtypes,
 		FilteredSquadSubtypes);
@@ -374,6 +379,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 		return;
 	}
 
+	// Immediate spending keeps affordable responses fast; reservation preserves unaffordable intent for future income.
 	if (Training_TrySpendTrainingPoints(TrainingBatch.TrainingPointCost))
 	{
 		CreateTrainingBatch(TrainingBatch.TankSubtypes, TrainingBatch.SquadSubtypes);
@@ -385,6 +391,7 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 
 bool UEnemyStrategicAIComponent::Training_TryCreateReservedTrainingBatch()
 {
+	// Returning false lets the caller continue with new pressure only when no previous choice is waiting.
 	if (not M_TrainingReservation.HasReservation())
 	{
 		return false;
@@ -393,9 +400,11 @@ bool UEnemyStrategicAIComponent::Training_TryCreateReservedTrainingBatch()
 	const FEnemyStrategicAITrainingBatch& ReservedTrainingBatch = M_TrainingReservation.ReservedTrainingBatch;
 	if (not Training_TrySpendTrainingPoints(ReservedTrainingBatch.TrainingPointCost))
 	{
+		// The reservation still owns this think step, preventing new random batches from stealing saved points.
 		return true;
 	}
 
+	// Once the exact reserved batch is paid for, clear the reservation so fresh pressure can be evaluated next time.
 	CreateTrainingBatch(ReservedTrainingBatch.TankSubtypes, ReservedTrainingBatch.SquadSubtypes);
 	M_TrainingReservation.Reset();
 	return true;
@@ -437,6 +446,7 @@ void UEnemyStrategicAIComponent::Training_FilterTrainingOptionsForSelection(
 	TArray<ETankSubtype>& OutTankSubtypes,
 	TArray<ESquadSubtype>& OutSquadSubtypes) const
 {
+	// Keep tanks and squads in separate pools because later batch construction must preserve their different spawn paths.
 	for (const ETankSubtype TankSubtype : TankSubtypes)
 	{
 		if (Training_GetDoesTankFitSelection(TankSubtype, Selection))
@@ -445,6 +455,7 @@ void UEnemyStrategicAIComponent::Training_FilterTrainingOptionsForSelection(
 		}
 	}
 
+	// Run the same selection over infantry so mixed focus/specialty pressure can still pick either type.
 	for (const ESquadSubtype SquadSubtype : SquadSubtypes)
 	{
 		if (Training_GetDoesSquadFitSelection(SquadSubtype, Selection))
