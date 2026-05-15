@@ -3,9 +3,11 @@
 #include "BehaviourComp.h"
 
 #include "Behaviour.h"
+#include "Mutators/MutatorSettings.h"
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -13,6 +15,7 @@ namespace BehaviourCompConstants
 {
 	constexpr float ComponentTickIntervalSeconds = 2.f;
 	constexpr float DebugDrawHeight = 500.f;
+	constexpr uint8 EnemyPlayerId = 2;
 }
 
 UBehaviourComp::UBehaviourComp()
@@ -27,6 +30,7 @@ void UBehaviourComp::BeginPlay()
 	Super::BeginPlay();
 
 	BeginPlay_InitAnimatedTextWidgetPoolManager();
+	BeginPlay_InitMutations();
 	UpdateComponentTickEnabled();
 }
 
@@ -621,6 +625,123 @@ void UBehaviourComp::NotifyActionUIManagerOfBehaviourUpdate()
 	}
 
 	M_ActionUIManager->RefreshBehaviourUIForComponent(this);
+}
+
+void UBehaviourComp::BeginPlay_InitMutations()
+{
+	if (not FRTS_Statics::AreMutationsOn(this))
+	{
+		return;
+	}
+
+	const URTSComponent* RTSComponent = GetOwnerRTSComponent();
+	if (RTSComponent == nullptr)
+	{
+		return;
+	}
+
+	if (RTSComponent->GetOwningPlayer() != BehaviourCompConstants::EnemyPlayerId)
+	{
+		return;
+	}
+
+	EMutatorClass MutatorClass = EMutatorClass::Squad;
+	if (not TryGetMutationClassForRTSComponent(*RTSComponent, MutatorClass))
+	{
+		return;
+	}
+
+	const UMutatorSettings* MutatorSettings = UMutatorSettings::Get();
+	if (MutatorSettings == nullptr)
+	{
+		return;
+	}
+
+	AddRandomMutationFromMutators(MutatorSettings->GetMutatorsForClass(MutatorClass));
+}
+
+const URTSComponent* UBehaviourComp::GetOwnerRTSComponent() const
+{
+	const AActor* OwnerActor = GetOwner();
+	if (OwnerActor == nullptr)
+	{
+		return nullptr;
+	}
+
+	return OwnerActor->FindComponentByClass<URTSComponent>();
+}
+
+bool UBehaviourComp::TryGetMutationClassForRTSComponent(const URTSComponent& RTSComponent,
+                                                        EMutatorClass& OutMutatorClass) const
+{
+	switch (RTSComponent.GetUnitType())
+	{
+	case EAllUnitType::UNType_Squad:
+		OutMutatorClass = EMutatorClass::Squad;
+		return true;
+	case EAllUnitType::UNType_Tank:
+		return TryGetMutationClassForTankSubtype(RTSComponent.GetSubtypeAsTankSubtype(), OutMutatorClass);
+	default:
+		return false;
+	}
+}
+
+bool UBehaviourComp::TryGetMutationClassForTankSubtype(const ETankSubtype TankSubtype,
+                                                       EMutatorClass& OutMutatorClass) const
+{
+	if (Global_GetIsTankDestroyer(TankSubtype))
+	{
+		OutMutatorClass = EMutatorClass::TankDestroyer;
+		return true;
+	}
+
+	if (Global_GetIsArmoredCar(TankSubtype))
+	{
+		OutMutatorClass = EMutatorClass::ArmoredCar;
+		return true;
+	}
+
+	if (Global_GetIsLightTank(TankSubtype))
+	{
+		OutMutatorClass = EMutatorClass::LightTank;
+		return true;
+	}
+
+	if (Global_GetIsMediumTank(TankSubtype))
+	{
+		OutMutatorClass = EMutatorClass::MediumTank;
+		return true;
+	}
+
+	if (Global_GetIsHeavyTank(TankSubtype))
+	{
+		OutMutatorClass = EMutatorClass::HeavyTank;
+		return true;
+	}
+
+	return false;
+}
+
+void UBehaviourComp::AddRandomMutationFromMutators(const TArray<TSubclassOf<UBehaviour>>& Mutators)
+{
+	TArray<TSubclassOf<UBehaviour>> ValidMutators;
+	for (const TSubclassOf<UBehaviour>& Mutator : Mutators)
+	{
+		if (Mutator == nullptr)
+		{
+			continue;
+		}
+
+		ValidMutators.Add(Mutator);
+	}
+
+	if (ValidMutators.IsEmpty())
+	{
+		return;
+	}
+
+	const int32 MutatorIndex = FMath::RandRange(0, ValidMutators.Num() - 1);
+	AddBehaviour(ValidMutators[MutatorIndex]);
 }
 
 bool UBehaviourComp::GetIsValidActionUIManager() const

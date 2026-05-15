@@ -29,6 +29,9 @@ struct FRTSGameDifficulty
 	UPROPERTY(BlueprintReadWrite)
 	bool bIsInitialized = false;
 
+	UPROPERTY(BlueprintReadWrite)
+	bool bUseMutations = false;
+
 	bool IsNormalOrHigher() const
 	{
 		return DifficultyLevel >= ERTSGameDifficulty::Normal;
