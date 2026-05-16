@@ -889,6 +889,26 @@ struct FEnemyBasePointCoreBuildings
 	 */
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> CoreBuildingActors;
+
+	/** Core building centers cached so async construction filtering never dereferences weak actors. */
+	UPROPERTY()
+	TArray<FVector> CoreBuildingLocations;
+};
+
+USTRUCT()
+struct FEnemyBasePointSatelliteBuildings
+{
+	GENERATED_BODY()
+
+	FEnemyBasePointSatelliteBuildings();
+
+	/** Center of the accepted base these non-isolated satellite buildings were attached to. */
+	UPROPERTY()
+	FVector BaseLocation;
+
+	/** Satellite building centers that were accepted as part of a detected base footprint. */
+	UPROPERTY()
+	TArray<FVector> SatelliteBuildingLocations;
 };
 
 USTRUCT()
@@ -915,6 +935,15 @@ struct FResultEnemyBaseClusters
 	 */
 	UPROPERTY()
 	TArray<FEnemyBasePointCoreBuildings> BasePoints;
+
+	/**
+	 * @brief Provides accepted satellite buildings so async construction filters can protect the whole base footprint.
+	 *
+	 * @note Filled only for satellite buildings attached to an accepted core cluster.
+	 * @note Isolated satellite buildings are omitted so construction is not blocked by stray structures.
+	 */
+	UPROPERTY()
+	TArray<FEnemyBasePointSatelliteBuildings> SatelliteBasePoints;
 
 	/**
 	 * @brief Provides optional unit placement candidates for defending detected bases against supplied player positions.

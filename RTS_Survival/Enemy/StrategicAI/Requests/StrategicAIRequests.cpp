@@ -109,6 +109,11 @@ FEnemyBasePointCoreBuildings::FEnemyBasePointCoreBuildings()
 {
 }
 
+FEnemyBasePointSatelliteBuildings::FEnemyBasePointSatelliteBuildings()
+	: BaseLocation(FVector::ZeroVector)
+{
+}
+
 FResultEnemyBaseClusters::FResultEnemyBaseClusters()
 	: RequestID(0)
 {

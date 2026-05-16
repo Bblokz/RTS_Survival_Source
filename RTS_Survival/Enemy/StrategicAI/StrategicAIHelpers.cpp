@@ -16,6 +16,8 @@ namespace StrategicAIHelperConstants
 	constexpr float ConstructionArcUnitsPerDensityStep = 1000.f;
 	constexpr float ConstructionArcDuplicateOffsetTolerance = 1.f;
 	constexpr float MaxConstructionArcAngleDegrees = 170.f;
+	constexpr float CoreBuildingConstructionExclusionRadiusXY = 6000.f;
+	constexpr float SatelliteBuildingConstructionExclusionRadiusXY = 3000.f;
 }
 
 namespace StrategicAIHelperUtilities
@@ -293,6 +295,11 @@ namespace StrategicAIHelperUtilities
 		return AcceptedClusters;
 	}
 
+	FVector GetVectorFromBasePointLocation(const FEnemyBasePoint& BuildingPoint)
+	{
+		return FVector(BuildingPoint.Location.X, BuildingPoint.Location.Y, 0.f);
+	}
+
 	FEnemyBasePointCoreBuildings BuildEnemyBasePointCoreBuildings(const FEnemyBaseClusterCandidate& Cluster)
 	{
 		FEnemyBasePointCoreBuildings BasePoint;
@@ -305,6 +312,24 @@ namespace StrategicAIHelperUtilities
 			}
 
 			BasePoint.CoreBuildingActors.Add(BuildingPoint.CoreBuildingActor);
+			BasePoint.CoreBuildingLocations.Add(GetVectorFromBasePointLocation(BuildingPoint));
+		}
+
+		return BasePoint;
+	}
+
+	FEnemyBasePointSatelliteBuildings BuildEnemyBasePointSatelliteBuildings(const FEnemyBaseClusterCandidate& Cluster)
+	{
+		FEnemyBasePointSatelliteBuildings BasePoint;
+		BasePoint.BaseLocation = Cluster.Point;
+		for (const FEnemyBasePoint& BuildingPoint : Cluster.BuildingPoints)
+		{
+			if (BuildingPoint.bIsCoreBuilding)
+			{
+				continue;
+			}
+
+			BasePoint.SatelliteBuildingLocations.Add(GetVectorFromBasePointLocation(BuildingPoint));
 		}
 
 		return BasePoint;
@@ -315,6 +340,15 @@ namespace StrategicAIHelperUtilities
 		BasePoints.RemoveAll([](const FEnemyBasePointCoreBuildings& BasePoint)
 		{
 			return GetIsNearZeroStrategicLocation(BasePoint.BaseLocation);
+		});
+	}
+
+	void RemoveInvalidStrategicEnemySatelliteBasePoints(TArray<FEnemyBasePointSatelliteBuildings>& BasePoints)
+	{
+		BasePoints.RemoveAll([](const FEnemyBasePointSatelliteBuildings& BasePoint)
+		{
+			return GetIsNearZeroStrategicLocation(BasePoint.BaseLocation)
+				|| BasePoint.SatelliteBuildingLocations.IsEmpty();
 		});
 	}
 
@@ -801,9 +835,71 @@ namespace StrategicAIHelperUtilities
 			});
 	}
 
+	bool GetIsInsideEnemyBaseConstructionExclusionRadius(
+		const FVector& ConstructionLocation,
+		const TArray<FVector>& BuildingLocations,
+		const float ExclusionRadiusSq)
+	{
+		return BuildingLocations.ContainsByPredicate(
+			[&ConstructionLocation, ExclusionRadiusSq](const FVector& BuildingLocation)
+			{
+				return FVector::DistSquared2D(ConstructionLocation, BuildingLocation) <= ExclusionRadiusSq;
+			});
+	}
+
+	bool GetIsInsideEnemyBaseCoreConstructionExclusion(
+		const FVector& ConstructionLocation,
+		const TArray<FEnemyBasePointCoreBuildings>& CachedEnemyBaseCoreBuildings)
+	{
+		const float CoreExclusionRadiusSq = FMath::Square(
+			StrategicAIHelperConstants::CoreBuildingConstructionExclusionRadiusXY);
+		return CachedEnemyBaseCoreBuildings.ContainsByPredicate(
+			[&ConstructionLocation, CoreExclusionRadiusSq](const FEnemyBasePointCoreBuildings& BasePoint)
+			{
+				return GetIsInsideEnemyBaseConstructionExclusionRadius(
+					ConstructionLocation,
+					BasePoint.CoreBuildingLocations,
+					CoreExclusionRadiusSq);
+			});
+	}
+
+	bool GetIsInsideEnemyBaseSatelliteConstructionExclusion(
+		const FVector& ConstructionLocation,
+		const TArray<FEnemyBasePointSatelliteBuildings>& CachedEnemyBaseSatelliteBuildings)
+	{
+		const float SatelliteExclusionRadiusSq = FMath::Square(
+			StrategicAIHelperConstants::SatelliteBuildingConstructionExclusionRadiusXY);
+		return CachedEnemyBaseSatelliteBuildings.ContainsByPredicate(
+			[&ConstructionLocation, SatelliteExclusionRadiusSq](
+				const FEnemyBasePointSatelliteBuildings& BasePoint)
+			{
+				return GetIsInsideEnemyBaseConstructionExclusionRadius(
+					ConstructionLocation,
+					BasePoint.SatelliteBuildingLocations,
+					SatelliteExclusionRadiusSq);
+			});
+	}
+
+	bool GetIsInsideEnemyBaseConstructionExclusion(
+		const FVector& ConstructionLocation,
+		const TArray<FEnemyBasePointCoreBuildings>& CachedEnemyBaseCoreBuildings,
+		const TArray<FEnemyBasePointSatelliteBuildings>& CachedEnemyBaseSatelliteBuildings)
+	{
+		if (GetIsInsideEnemyBaseCoreConstructionExclusion(ConstructionLocation, CachedEnemyBaseCoreBuildings))
+		{
+			return true;
+		}
+
+		return GetIsInsideEnemyBaseSatelliteConstructionExclusion(
+			ConstructionLocation,
+			CachedEnemyBaseSatelliteBuildings);
+	}
+
 	TArray<FVector> CleanupConstructionLocationCandidates(
 		TArray<FConstructionLocationCandidate> Candidates,
-		const float CleanupDistance)
+		const float CleanupDistance,
+		const TArray<FEnemyBasePointCoreBuildings>& CachedEnemyBaseCoreBuildings,
+		const TArray<FEnemyBasePointSatelliteBuildings>& CachedEnemyBaseSatelliteBuildings)
 	{
 		Candidates.Sort([](const FConstructionLocationCandidate& Left, const FConstructionLocationCandidate& Right)
 		{
@@ -820,6 +916,14 @@ namespace StrategicAIHelperUtilities
 				continue;
 			}
 
+			if (GetIsInsideEnemyBaseConstructionExclusion(
+				Candidate.Location,
+				CachedEnemyBaseCoreBuildings,
+				CachedEnemyBaseSatelliteBuildings))
+			{
+				continue;
+			}
+
 			if (CleanupDistanceSq > 0.f
 				&& not GetIsFarEnoughFromAcceptedConstructionLocations(Candidate.Location, CleanedLocations, CleanupDistanceSq))
 			{
@@ -832,7 +936,10 @@ namespace StrategicAIHelperUtilities
 		return CleanedLocations;
 	}
 
-	TArray<FVector> BuildCleanedConstructionLocations(const FFindConstructionLocations& Request)
+	TArray<FVector> BuildCleanedConstructionLocations(
+		const FFindConstructionLocations& Request,
+		const TArray<FEnemyBasePointCoreBuildings>& CachedEnemyBaseCoreBuildings,
+		const TArray<FEnemyBasePointSatelliteBuildings>& CachedEnemyBaseSatelliteBuildings)
 	{
 		const TArray<float> ArcOffsets = GetConstructionArcOffsets(Request);
 		if (ArcOffsets.IsEmpty() || Request.DefensePositions.IsEmpty() || Request.PlayerBulkLocations.IsEmpty()
@@ -847,7 +954,11 @@ namespace StrategicAIHelperUtilities
 			AppendConstructionCandidatesForDefensePosition(Request, DefensePosition, ArcOffsets, Candidates);
 		}
 
-		return CleanupConstructionLocationCandidates(MoveTemp(Candidates), Request.CleanupDistance);
+		return CleanupConstructionLocationCandidates(
+			MoveTemp(Candidates),
+			Request.CleanupDistance,
+			CachedEnemyBaseCoreBuildings,
+			CachedEnemyBaseSatelliteBuildings);
 	}
 
 }
@@ -876,12 +987,15 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 	const TArray<StrategicAIHelperUtilities::FEnemyBaseClusterCandidate> BaseClusters =
 		StrategicAIHelperUtilities::BuildAcceptedEnemyBaseClusters(Request, CorePoints, SatellitePoints);
 	Result.BasePoints.Reserve(BaseClusters.Num());
+	Result.SatelliteBasePoints.Reserve(BaseClusters.Num());
 	for (const StrategicAIHelperUtilities::FEnemyBaseClusterCandidate& BaseCluster : BaseClusters)
 	{
 		Result.BasePoints.Add(StrategicAIHelperUtilities::BuildEnemyBasePointCoreBuildings(BaseCluster));
+		Result.SatelliteBasePoints.Add(StrategicAIHelperUtilities::BuildEnemyBasePointSatelliteBuildings(BaseCluster));
 	}
 
 	StrategicAIHelperUtilities::RemoveNearZeroStrategicEnemyBasePoints(Result.BasePoints);
+	StrategicAIHelperUtilities::RemoveInvalidStrategicEnemySatelliteBasePoints(Result.SatelliteBasePoints);
 	StrategicAIHelperUtilities::BuildDefenseArcCandidatesForBases(
 		Request,
 		BaseClusters,
@@ -1908,10 +2022,15 @@ bool FStrategicAIHelpers::GetIsHazmatEngineer(const FAsyncDetailedUnitState& Uni
 }
 
 FResultConstructionLocations FStrategicAIHelpers::BuildConstructionLocationsResult(
-	const FFindConstructionLocations& Request)
+	const FFindConstructionLocations& Request,
+	const TArray<FEnemyBasePointCoreBuildings>& CachedEnemyBaseCoreBuildings,
+	const TArray<FEnemyBasePointSatelliteBuildings>& CachedEnemyBaseSatelliteBuildings)
 {
 	FResultConstructionLocations Result;
 	Result.RequestID = Request.RequestID;
-	Result.ConstructionLocations = StrategicAIHelperUtilities::BuildCleanedConstructionLocations(Request);
+	Result.ConstructionLocations = StrategicAIHelperUtilities::BuildCleanedConstructionLocations(
+		Request,
+		CachedEnemyBaseCoreBuildings,
+		CachedEnemyBaseSatelliteBuildings);
 	return Result;
 }

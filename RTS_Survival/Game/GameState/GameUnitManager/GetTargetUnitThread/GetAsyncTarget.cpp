@@ -9,6 +9,12 @@ FGetAsyncTarget::FGetAsyncTarget()
 	M_Thread = FRunnableThread::Create(this, TEXT("AsyncGetTargetThread"));
 }
 
+void FGetAsyncTarget::FEnemyBaseClusterAsyncCache::UpdateFromResult(const FResultEnemyBaseClusters& Result)
+{
+	CoreBuildingsByBase = Result.BasePoints;
+	SatelliteBuildingsByBase = Result.SatelliteBasePoints;
+}
+
 FGetAsyncTarget::~FGetAsyncTarget()
 {
 	if (M_Thread)
@@ -244,8 +250,11 @@ void FGetAsyncTarget::ProcessStrategicAIRequests()
 			Request.RequestBatch.FindEnemyBaseClustersRequests.Num());
 		for (const FFindEnemyBaseClusters& BaseClusterRequest : Request.RequestBatch.FindEnemyBaseClustersRequests)
 		{
-			Results.EnemyBaseClustersResults.Add(
-				FStrategicAIHelpers::BuildEnemyBaseClustersResult(BaseClusterRequest, M_DetailedUnitStates));
+			FResultEnemyBaseClusters BaseClusterResult = FStrategicAIHelpers::BuildEnemyBaseClustersResult(
+				BaseClusterRequest,
+				M_DetailedUnitStates);
+			M_EnemyBaseClusterAsyncCache.UpdateFromResult(BaseClusterResult);
+			Results.EnemyBaseClustersResults.Add(MoveTemp(BaseClusterResult));
 		}
 
 		Results.LocationsUnderPlayerAttackResults.Reserve(
@@ -271,7 +280,10 @@ void FGetAsyncTarget::ProcessStrategicAIRequests()
 			Request.RequestBatch.FindConstructionLocationsRequests)
 		{
 			Results.ConstructionLocationsResults.Add(
-				FStrategicAIHelpers::BuildConstructionLocationsResult(ConstructionLocationsRequest));
+				FStrategicAIHelpers::BuildConstructionLocationsResult(
+					ConstructionLocationsRequest,
+					M_EnemyBaseClusterAsyncCache.CoreBuildingsByBase,
+					M_EnemyBaseClusterAsyncCache.SatelliteBuildingsByBase));
 		}
 
 		TFunction<void(const FStrategicAIResultBatch&)> Callback = MoveTemp(Request.Callback);

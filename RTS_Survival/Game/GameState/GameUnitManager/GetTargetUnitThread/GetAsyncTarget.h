@@ -89,12 +89,24 @@ private:
 		TFunction<void(const FStrategicAIResultBatch&)> Callback;
 	};
 
+	/** Keeps the latest accepted base footprint available for construction requests without rescanning units. */
+	struct FEnemyBaseClusterAsyncCache
+	{
+		void UpdateFromResult(const FResultEnemyBaseClusters& Result);
+
+		TArray<FEnemyBasePointCoreBuildings> CoreBuildingsByBase;
+		TArray<FEnemyBasePointSatelliteBuildings> SatelliteBuildingsByBase;
+	};
+
 	/** Mapping of Actor IDs to their Target-type and location */
 	TMap<uint32, TPair<ETargetPreference, FVector>> M_PlayerActorData;
 	TMap<uint32, TPair<ETargetPreference, FVector>> M_EnemyActorData;
 
 	/** Detailed unit state snapshot used by strategic AI requests. */
 	TArray<FAsyncDetailedUnitState> M_DetailedUnitStates;
+
+	/** Latest async base-cluster result used to keep construction candidates outside enemy bases. */
+	FEnemyBaseClusterAsyncCache M_EnemyBaseClusterAsyncCache;
 
 	/** Queue of target requests */
 	TQueue<FTargetRequest> M_RequestQueue;
