@@ -223,6 +223,8 @@ bool FSquadStartGameAction::ExecuteStartAbility() const
 		return M_MySquad->CaptureActor(TargetActor, true) == ECommandQueueError::NoError;
 	case EAbilityID::IdReinforceSquad:
 		break;
+	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
+		return M_MySquad->RegisterAsBlackboardIdle(true) == ECommandQueueError::NoError;
 	}
 	return true;
 }

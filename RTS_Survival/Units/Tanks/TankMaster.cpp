@@ -261,6 +261,8 @@ bool FTankStartGameAction::ExecuteStartAbility() const
 		return M_TankMaster->CaptureActor(TargetActor, true) == ECommandQueueError::NoError;
 	case EAbilityID::IdReinforceSquad:
 		break;
+	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
+		return M_TankMaster->RegisterAsBlackboardIdle(true) == ECommandQueueError::NoError;
 	case EAbilityID::IdSwapTurret:
 		break;
 	}
