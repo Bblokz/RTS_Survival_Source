@@ -57,6 +57,8 @@ void UStochasticDecisionTree::InitStochasticDecisionTree(
 void UStochasticDecisionTree::DecisionTree_ThinkStep(const float GameTimeSeconds,
                                                      FStrategicAIBlackboard& Blackboard)
 {
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_DecisionTree")
 	// Filter top level actions to only get those of which we do have sub-actions to pick from that are not
 	// blocked by requirements.
 	TArray<FStrategicAIAction*> ValidActions =
@@ -141,6 +143,8 @@ bool UStochasticDecisionTree::EnsurePickedSubActionIsValid(UStrategicAISubAction
 void UStochasticDecisionTree::ExecuteSubAction(UStrategicAISubAction* SubAction,
                                                const FStrategicAIBlackboard& Blackboard, const float GameTimeSeconds)
 {
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_ExecuteSubAction")
 	if (not EnsureIsValidDirectControlComponent() || not EnsureIsValidEnemyNavigationAIComponent()
 		|| not EnsureIsValidEnemyFormation())
 	{
@@ -186,6 +190,8 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerUnits(
 	UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_Exe_AttackMovePlayerUnits")
 	TArray<FVector> ValidAttackLocations;
 	ValidAttackLocations.Append(GetProjectedPlayerBulkLocations(Blackboard));
 	ValidAttackLocations.Append(GetProjectedPlayerAvgLocationAttackers(Blackboard));
@@ -223,6 +229,7 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerHQ(
 	UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_Exe_AttackMovePlayerHQ")
 	TArray<FVector> AttackLocations = GetProjectedPlayerHQLocation(Blackboard);
 	if (AttackLocations.IsEmpty())
 	{
@@ -247,6 +254,7 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(
 	UStrategicAISubAction* SubAction,
 	const FStrategicAIBlackboard& Blackboard)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_Exe_AttackMovePlayerResourceBuildings")
 	TArray<FVector> AttackLocations = GetProjectedPlayerResourceBuildings(Blackboard);
 	if (AttackLocations.IsEmpty())
 	{
@@ -270,6 +278,7 @@ void UStochasticDecisionTree::Exe_AttackMovePlayerResourceBuildings(
 void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(UStrategicAISubAction* SubAction,
                                                           const FStrategicAIBlackboard& Blackboard)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_Exe_AttackMoveSpecificPoint")
 	USubAction_AttackSpecificPoints* AttackSpecificPoints =
 		Cast<USubAction_AttackSpecificPoints>(SubAction);
 	if (not IsValid(AttackSpecificPoints))
@@ -311,6 +320,7 @@ void UStochasticDecisionTree::Exe_AttackMoveSpecificPoint(UStrategicAISubAction*
 void UStochasticDecisionTree::Exe_AttackMoveLightTanksToPlayerUnits(UStrategicAISubAction* SubAction,
                                                                     const FStrategicAIBlackboard& Blackboard)
 {
+		TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_Exe_AttackMoveLightTanksToPlayerUnits");
 	TArray<FVector> ValidAttackLocations;
 	ValidAttackLocations.Append(GetProjectedPlayerBulkLocations(Blackboard));
 	ValidAttackLocations.Append(GetProjectedPlayerAvgLocationAttackers(Blackboard));
@@ -409,6 +419,7 @@ void UStochasticDecisionTree::Exe_FlankPlayerHeavies(UStrategicAISubAction* SubA
 void UStochasticDecisionTree::Exe_DefendBase(UStrategicAISubAction* SubAction,
                                              const FStrategicAIBlackboard& Blackboard)
 {
+		TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_Exe_DefendBase");
 	const USubAction_DefendBase* DefendBaseSubAction = Cast<USubAction_DefendBase>(SubAction);
 	if (not IsValid(DefendBaseSubAction))
 	{

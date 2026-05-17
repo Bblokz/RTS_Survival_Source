@@ -1537,10 +1537,10 @@ namespace DeveloperSettings
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
 		// Debug enemy controller
-		constexpr bool GEnemyController_Compile_DebugSymbols = true;
-		constexpr bool GEnemyController_StrategicAI_Compile_DebugSymbols = true;
+		constexpr bool GEnemyController_Compile_DebugSymbols = false;
+		constexpr bool GEnemyController_StrategicAI_Compile_DebugSymbols = false;
 		constexpr bool GEnemyController_NavDetector_DebugSymbols = false;
-		constexpr bool GEnemyController_DirectControl_Compile_DebugSymbols = true;
+		constexpr bool GEnemyController_DirectControl_Compile_DebugSymbols = false;
 		constexpr bool ExplosionsManager_Compile_DebugSymbols = false;
 		constexpr bool GPlayerStartLocations_Compile_DebugSymbols = false;
 		constexpr bool GCamera_Player_Compile_DebugSymbols = false;

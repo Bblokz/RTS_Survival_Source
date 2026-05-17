@@ -2,6 +2,8 @@
 
 #include "EnemyStrategicAIComponent.h"
 
+
+
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
@@ -369,6 +371,8 @@ The next training think step can evaluate fresh pressure again.
  */
 void UEnemyStrategicAIComponent::Training_ThinkStep()
 {
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_TrainingThinkStep");
 	// Reserved batches are handled first so saved pressure cannot be replaced by cheaper random picks.
 	// “Do I currently have at least ReservedTrainingBatch.TrainingPointCost training points?”
 	if (Training_HandleReservedTrainingBatchIfAny())
@@ -1168,6 +1172,8 @@ void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer()
 
 void UEnemyStrategicAIComponent::StrategicAiThinkingLoop()
 {
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_ThinkingLoop")
 	const float Now = GetWorld()->GetTimeSeconds();
 	ClearInvalidIdleUnitsFromBlackboard();
 	for (auto EachThinkTimer : M_AIThinkTimers)
@@ -1200,6 +1206,8 @@ void UEnemyStrategicAIComponent::StopStrategicAIThinkingTimer()
 
 void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 {
+	
+	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_ProcessLoops")
 	if (M_PendingRequests.FindClosestFlankableEnemyHeavyRequests.IsEmpty()
 		&& M_PendingRequests.GetPlayerUnitCountsAndBaseRequests.IsEmpty()
 		&& M_PendingRequests.FindAlliedTanksToRetreatRequests.IsEmpty()
