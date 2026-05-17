@@ -874,9 +874,9 @@ namespace DeveloperSettings
 			inline constexpr float T3HeavyTankBase = RoundToNearestMultipleOfFive(2000.f * OverallHealthMlt);
 			// Super heavy tank, the most durable vehicle in the game, gets killed in 8 heavy tank shots.
 			inline constexpr float SuperHeavyTankBase = RoundToNearestMultipleOfFive(2800.f * OverallHealthMlt);
-			inline constexpr float LightTrainHealth = RoundToNearestMultipleOfFive(3000.f * OverallHealthMlt);
-			inline constexpr float MediumTrainHealth = RoundToNearestMultipleOfFive(5000.f * OverallHealthMlt);
-			inline constexpr float HeavyTrainHealth = RoundToNearestMultipleOfFive(7000.f * OverallHealthMlt);
+			inline constexpr float LightTrainHealth = RoundToNearestMultipleOfFive(4000.f * OverallHealthMlt);
+			inline constexpr float MediumTrainHealth = RoundToNearestMultipleOfFive(7000.f * OverallHealthMlt);
+			inline constexpr float HeavyTrainHealth = RoundToNearestMultipleOfFive(10000.f * OverallHealthMlt);
 
 			// How much Health on the destroyed version of the tank.
 			inline constexpr float DestroyedTankHealthFraction = 0.8;
