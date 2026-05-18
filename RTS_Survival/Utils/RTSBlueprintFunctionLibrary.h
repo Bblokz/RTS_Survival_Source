@@ -637,21 +637,30 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetTeamWeapon_DShK();
-	
+
+	// PZ IV for breakthrough; PZ III for strike division.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerCommandVehicle(UObject* WorldContext);
+	// PZ IV for breakthrough; PZ III for strike division.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerGerCommandVehicle(UObject* WorldContext);
+
+	// Sdkfz 22 with 75mm or up-armored puma for strike division
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetPlayerGerArmoredCar(UObject* WorldContext);
+	static FTrainingOption GetPlayerSpecialArmoredCar(UObject* WorldContext);
+	// Sdkfz with rockets for break through; sdkfz 250 for strike division.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetPlayerGerLightTank(UObject* WorldContext);
+	static FTrainingOption GetPlayerGerArmoredCarTransport250_251Mortar(UObject* WorldContext);
+	// Returns panzer IV H for break through; panzer III M otherwise.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerLightMediumTank(UObject* WorldContext);
+	// Panzer IV F for break through; panzer III J for strike division.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerGerLightMediumTank(UObject* WorldContext);
+	// Returns panzer IV H for break through; panzer III M otherwise.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerMediumTank(UObject* WorldContext);
+	// Returns panzer IV H for break through; panzer III M otherwise.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerGerMediumTank(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")

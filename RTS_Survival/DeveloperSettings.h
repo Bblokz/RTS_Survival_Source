@@ -602,8 +602,8 @@ namespace DeveloperSettings
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);
 
 			// Flame weapons
-			inline constexpr float LightFlameRange = RoundToNearestMultipleOf(900 * GameRangeMlt, 5);
-			inline constexpr float MediumFlameRange = RoundToNearestMultipleOf(1500 * GameRangeMlt, 5);
+			inline constexpr float LightFlameRange = RoundToNearestMultipleOf(1800 * GameRangeMlt, 5);
+			inline constexpr float MediumFlameRange = RoundToNearestMultipleOf(3000 * GameRangeMlt, 5);
 		}
 
 		namespace VisionRadii
