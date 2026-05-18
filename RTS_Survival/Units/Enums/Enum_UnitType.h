@@ -154,6 +154,8 @@ enum class ETankSubtype : uint8
 	Tank_LightTrain UMETA(DisplayName = "Rus Train Light"),
 	Tank_MediumTrain UMETA(DisplayName = "Rus Train Medium"),
 	Tank_HeavyTrain UMETA(DisplayName = "Rus Train Heavy"),
+	// Appended to preserve existing serialized subtype values.
+	Tank_FlamePuma UMETA(DisplayName = "Ger ArmCar Flame Puma"),
 };
 
 
@@ -293,6 +295,7 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_Sdkfz251_Mortar:
 	case ETankSubtype::Tank_Sdkfz251_Transport:
 	case ETankSubtype::Tank_Puma:
+	case ETankSubtype::Tank_FlamePuma:
 	case ETankSubtype::Tank_Panzerwerfer:
 	case ETankSubtype::Tank_Sdkfz_231:
 	case ETankSubtype::Tank_Sdkfz_232_3:

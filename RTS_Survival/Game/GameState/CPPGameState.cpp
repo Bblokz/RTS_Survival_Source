@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 #include "CPPGameState.h"
 
@@ -3808,12 +3808,17 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// ------------------------------- GER Armored Cars -------------------------------
 
 	// Puma
-	TankData.MaxHealth = LightTankHealthBase;
+	const float PumaMaxHealth = LightTankHealthBase;
+	const float PumaVehicleRotationSpeed = 50.0f;
+	const float PumaTurretRotationSpeed = 14.0f;
+	const float PumaVehicleSpeedKmh = 60.0f;
+
+	TankData.MaxHealth = PumaMaxHealth;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 50;
-	TankData.TurretRotationSpeed = 14;
-	TankData.VehicleMaxSpeedKmh = 60;
-	TankData.VehicleReverseSpeedKmh = 60;
+	TankData.VehicleRotationSpeed = PumaVehicleRotationSpeed;
+	TankData.TurretRotationSpeed = PumaTurretRotationSpeed;
+	TankData.VehicleMaxSpeedKmh = PumaVehicleSpeedKmh;
+	TankData.VehicleReverseSpeedKmh = PumaVehicleSpeedKmh;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
@@ -3824,6 +3829,28 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Puma, TankData);
+
+	// Flame Puma
+	const float FlamePumaHealthMultiplier = 2.0f;
+	const float FlamePumaTurretRotationMultiplier = 3.0f;
+	const float FlamePumaTopSpeedMultiplier = 0.75f;
+
+	TankData.MaxHealth = PumaMaxHealth * FlamePumaHealthMultiplier;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = PumaVehicleRotationSpeed;
+	TankData.TurretRotationSpeed = PumaTurretRotationSpeed * FlamePumaTurretRotationMultiplier;
+	TankData.VehicleMaxSpeedKmh = PumaVehicleSpeedKmh * FlamePumaTopSpeedMultiplier;
+	TankData.VehicleReverseSpeedKmh = PumaVehicleSpeedKmh * FlamePumaTopSpeedMultiplier;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.8f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost},
+		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_FlamePuma, TankData);
 
 	// Panzerwerfer
 	{
@@ -6845,6 +6872,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);
 	NomadicData.TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Puma)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_FlamePuma)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Panzerwerfer)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Mortar)),
