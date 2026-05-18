@@ -205,7 +205,9 @@ enum class ERTSCard : uint8
 	Card_High_Blueprint_Construction,
 	Card_High_Blueprint_Energy,
 
-	Card_EasterEgg
+	Card_EasterEgg,
+	// Appended to preserve existing serialized card values.
+	Card_Train_FlamePuma
 };
 
 static FString Global_GetCardAsString(const ERTSCard Card)
