@@ -55,7 +55,7 @@ bool FMissionTowTeamWeaponSpawnState::StartAsyncSpawn(ARTSAsyncSpawner* RTSAsync
 				return;
 			}
 			WeakMissionManager->HandleSpawnTowedTeamWeaponTankSpawned(RequestId, SpawnedActor);
-		});
+		}, FRotator::ZeroRotator);
 
 	const bool bSquadSpawnRequestStarted = RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
 		M_SquadTrainingOption,
@@ -69,7 +69,7 @@ bool FMissionTowTeamWeaponSpawnState::StartAsyncSpawn(ARTSAsyncSpawner* RTSAsync
 				return;
 			}
 			WeakMissionManager->HandleSpawnTowedTeamWeaponSquadSpawned(RequestId, SpawnedActor);
-		});
+		}, FRotator::ZeroRotator);
 
 	return bTankSpawnRequestStarted && bSquadSpawnRequestStarted;
 }

@@ -1731,7 +1731,7 @@ void AMissionManager::SpawnSeededChoiceTrainingOptions(
 				}
 
 				WeakMissionManager->HandleSeededSpawnBatchItemComplete(ID, SpawnResultIndex, SpawnedActor);
-			}
+			}, FRotator::ZeroRotator
 		);
 
 		if (not bRequestStarted && not*bCallbackTriggered)

@@ -149,6 +149,7 @@ public:
      * @param CallbackOwner The owner of the callback function.
      * @param SpawnID
      * @param OnSpawnedCallback The callback function to call when the unit is spawned.
+     * @param OptionalRotation
      * @return Whether the request could be made successfully.
      */
 	bool AsyncSpawnOptionAtLocation(
@@ -156,7 +157,8 @@ public:
 		const FVector& Location,
 		TWeakObjectPtr<UObject> CallbackOwner,
 		const int32 SpawnID,
-		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback);
+		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback, const FRotator
+		& OptionalRotation);
 
 
 	UFUNCTION(BlueprintCallable, Category = "ReferenceCasts")
@@ -321,13 +323,14 @@ private:
 	 * @param Location The location where the unit should be spawned.
 	 * @param ID The external spawn id to forward to the caller.
 	 * @param SpawnRequestId The internal request id used to find the callback.
+	 * @param SpawnRotation
 	 */
 	void OnAsyncSpawnOptionAtLocationComplete(
 		const FSoftObjectPath& AssetPath,
 		const FTrainingOption TrainingOption,
 		const FVector& Location,
 		const int32 ID,
-		const int32 SpawnRequestId);
+		const int32 SpawnRequestId, const FRotator& SpawnRotation);
 
 	bool IsTrainerNotInQueue(const TWeakObjectPtr<UTrainerComponent> TrainerComponent);
 

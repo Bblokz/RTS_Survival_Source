@@ -71,7 +71,7 @@ void AFactionPlayerController::SpawnPreviewForTrainingOption(const FTrainingOpti
 			}
 
 			WeakThis->HandlePreviewSpawned(SpawnedOption, SpawnedActor, SpawnRequestId);
-		}
+		}, FRotator::ZeroRotator
 	);
 
 	if (not bRequestStarted)

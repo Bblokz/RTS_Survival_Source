@@ -722,7 +722,7 @@ bool UEnemyWaveController::SpawnUnitsForAttackWave(FAttackWave* AttackWave)
 			SpawnInfo.Location,
 			this,
 			AttackWave->UniqueWaveID,
-			OnSpawned))
+			OnSpawned, FRotator::ZeroRotator))
 		{
 			M_EnemyController->AddToWaveSupply(1);
 			AttackWave->AwaitingSpawnsTillStartMoving--;

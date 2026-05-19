@@ -460,7 +460,7 @@ void AEnemyController::CreateFieldConstructionOrderFromWaveElements(
 			SpawnRequest.SpawnLocation,
 			WeakEnemyController,
 			CurrentSpawnRequestId,
-			OnSpawned))
+			OnSpawned, FRotator::ZeroRotator))
 		{
 			SpawnContext->RegisterSpawnFailure();
 			SpawnContext->NotifySpawnComplete();

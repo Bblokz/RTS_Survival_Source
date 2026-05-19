@@ -64,7 +64,7 @@ bool FMissionCargoSquadWithVehicleSpawnState::StartAsyncSpawn(ARTSAsyncSpawner* 
 			}
 
 			WeakMissionManager->HandleSpawnCargoVehicleTankSpawned(RequestId, SpawnedActor);
-		});
+		}, FRotator::ZeroRotator);
 
 	const bool bSquadSpawnRequestStarted = RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
 		M_SquadTrainingOption,
@@ -79,7 +79,7 @@ bool FMissionCargoSquadWithVehicleSpawnState::StartAsyncSpawn(ARTSAsyncSpawner* 
 			}
 
 			WeakMissionManager->HandleSpawnCargoVehicleSquadSpawned(RequestId, SpawnedActor);
-		});
+		}, FRotator::ZeroRotator);
 
 	return bTankSpawnRequestStarted && bSquadSpawnRequestStarted;
 }

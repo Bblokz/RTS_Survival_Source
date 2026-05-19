@@ -741,7 +741,7 @@ void ACPPController::SpawnReinforcementAttackWave(
 			WaveElement.SpawnLocation,
 			this,
 			SpawnIdForUnit,
-			OnSpawned))
+			OnSpawned, FRotator::ZeroRotator))
 		{
 			RTSFunctionLibrary::ReportError(
 				"Failed to request async reinforcement spawn in SpawnReinforcementAttackWave.");

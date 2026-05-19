@@ -1890,7 +1890,7 @@ void UMissionBase::AsyncSpawnActor(
 			                                              return;
 		                                              }
 		                                              WeakThis->OnAsyncSpawnComplete(Option, SpawnedActor, ID);
-	                                              });
+	                                              }, FRotator::ZeroRotator);
 }
 
 
@@ -1912,7 +1912,7 @@ void UMissionBase::AsyncSpawnActorAtLocation(const FTrainingOption& TrainingOpti
 			                                              return;
 		                                              }
 		                                              WeakThis->OnAsyncSpawnComplete(Option, SpawnedActor, ID);
-	                                              });
+	                                              }, FRotator::ZeroRotator);
 }
 
 

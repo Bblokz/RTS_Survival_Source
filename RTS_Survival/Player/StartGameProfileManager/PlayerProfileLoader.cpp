@@ -150,7 +150,7 @@ void UPlayerProfileLoader::LoadInUnits(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 
 					UPlayerProfileLoader* StrongProfileLoader = WeakProfileLoader.Get();
 					StrongProfileLoader->OnOptionSpawned(Option);
-				}))
+				}, FRotator::ZeroRotator))
 			{
 				const FString ErrorMessage = FString::Printf(
 					TEXT("Failed to spawn unit '%s' at location (%f, %f, %f)"),
@@ -337,7 +337,7 @@ void UPlayerProfileLoader::RequestToSpawnHQ(TObjectPtr<ARTSAsyncSpawner> AsyncSp
 
 			UPlayerProfileLoader* StrongProfileLoader = WeakProfileLoader.Get();
 			StrongProfileLoader->OnOptionSpawned(Option);
-		}))
+		}, FRotator::ZeroRotator))
 	{
 		RTSFunctionLibrary::ReportError("Failed to spawn HQ at the camera location");
 	}

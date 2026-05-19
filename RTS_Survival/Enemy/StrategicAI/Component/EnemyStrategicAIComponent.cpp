@@ -783,7 +783,7 @@ void UEnemyStrategicAIComponent::TrainingSpawnBatchTimerTick(const int32 BatchID
 			}
 
 			WeakThis->OnBlackboardUnitSpawned(SpawnedTrainingOption, SpawnedActor, ID, TrainingLocation);
-		});
+		}, FRotator::ZeroRotator);
 
 	if (not bRequestStarted)
 	{

@@ -430,7 +430,8 @@ void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 	const FTrainingOption TrainingOption,
 	const FVector& Location,
 	const int32 ID,
-	const int32 SpawnRequestId)
+	const int32 SpawnRequestId,
+	const FRotator& SpawnRotation)
 {
 	// Resolve the loaded asset
 	UObject* LoadedAsset = AssetPath.ResolveObject();
@@ -465,7 +466,7 @@ void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 	}
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	AActor* SpawnedActor = World->SpawnActor<AActor>(
-		AssetClass, Location, FRotator::ZeroRotator, SpawnParams);
+		AssetClass, Location, SpawnRotation, SpawnParams);
 
 	if (not IsValid(SpawnedActor))
 	{
@@ -571,7 +572,8 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
                                                   TWeakObjectPtr<UObject> CallbackOwner,
                                                   const int32 SpawnID, TFunction<void(
 	                                                  const FTrainingOption&, AActor* SpawnedActor,
-	                                                  const int32 ID)> OnSpawnedCallback)
+	                                                  const int32 ID)> OnSpawnedCallback,
+                                                  const FRotator& OptionalRotation)
 {
 	// Validate the TrainingOption
 	if (TrainingOption.IsNone())
@@ -611,7 +613,7 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 			TrainingOption,
 			Location,
 			SpawnID,
-			SpawnRequestId);
+			SpawnRequestId, OptionalRotation);
 	}
 	else
 	{
@@ -620,7 +622,7 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 
 		const TWeakObjectPtr<ARTSAsyncSpawner> WeakThis(this);
 		FStreamableDelegate Delegate = FStreamableDelegate::CreateLambda(
-			[WeakThis, AssetPath, TrainingOption, Location, SpawnID, SpawnRequestId]()
+			[WeakThis, AssetPath, TrainingOption, Location, SpawnID, SpawnRequestId, OptionalRotation]()
 			{
 				if (not WeakThis.IsValid())
 				{
@@ -631,7 +633,8 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 					TrainingOption,
 					Location,
 					SpawnID,
-					SpawnRequestId);
+					SpawnRequestId,
+					OptionalRotation);
 			});
 
 		TSharedPtr<FStreamableHandle> LoadingHandle = M_StreamableManager.RequestAsyncLoad(

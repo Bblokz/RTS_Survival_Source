@@ -62,7 +62,7 @@ bool FMissionSpawnCommandQueueState::StartAsyncSpawn(ARTSAsyncSpawner* RTSAsyncS
 				return;
 			}
 			WeakMissionManager->HandleSpawnActorWithCommandQueueSpawned(RequestId, SpawnedActor);
-		});
+		}, M_SpawnRotation);
 }
 
 bool FMissionSpawnCommandQueueState::HandleSpawnedActor(AActor* SpawnedActor)
