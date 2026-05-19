@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
+#include "GameInstMapLoading/RTSGameInstMapToLoad.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTSGameInstance.generated.h"
@@ -38,6 +39,10 @@ public:
     /** Blueprint can grab this and call InitMusicManager(...) on it. */
     UFUNCTION(BlueprintCallable, Category="Music")
     URTSMusicManager* GetMusicManager() const { return MusicManager; }
+
+	void SetMapToLoad(TSoftObjectPtr<UWorld> MapToLoad);
+	void ResetMapToLoadToNull();
+	TSoftObjectPtr<UWorld> GetMapToLoad() const;
 
 	void SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings);
 	FCampaignGenerationSettings GetCampaignGenerationSettings() const;
@@ -86,5 +91,7 @@ private:
 	FCampaignGenerationSettings M_CampaignGenerationSettings;
 	FRTSGameDifficulty M_SelectedGameDifficulty;
 	ERTSFaction M_PlayerFaction;
+	// Keeps track of what map to load next.
+	FRTSGameInstMapToLoad M_MapToLoad;
 
 };

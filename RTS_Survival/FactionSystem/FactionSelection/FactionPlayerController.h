@@ -113,6 +113,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionWorldGenerationSettings> M_FactionWorldGenerationSettingsClass;
 
+	// This is not used if the game instance has a valid map to load set; in which case we take that map instead.
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSoftObjectPtr<UWorld> M_CampaignWorld;
 

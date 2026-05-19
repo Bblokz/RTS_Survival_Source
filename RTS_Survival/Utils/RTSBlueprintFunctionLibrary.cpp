@@ -22,6 +22,7 @@
 #include "RTS_Survival/GameUI/Pooled_TimedProgressBars/Pooling/WorldSubSystem/RTSTimedProgressBarWorldSubsystem.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
@@ -1441,4 +1442,33 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerJaguarOrPanzerIVG(UObj
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_G));
 	}
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_G));
+}
+
+TSoftObjectPtr<UWorld> URTSBlueprintFunctionLibrary::GetRTSMapToLoad(const UObject* WorldContextObject)
+{
+	if(not IsValid(WorldContextObject))
+	{
+		return nullptr;
+	}
+	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(WorldContextObject);
+	if(not IsValid(GameInstance))
+	{
+		return nullptr;
+	}
+	return GameInstance->GetMapToLoad();
+}
+
+void URTSBlueprintFunctionLibrary::SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad)
+{
+	
+	if(not IsValid(WorldContextObject))
+	{
+		return ;
+	}
+	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(WorldContextObject);
+	if(not IsValid(GameInstance))
+	{
+		return ;
+	}
+	GameInstance->SetMapToLoad(MapToLoad);
 }

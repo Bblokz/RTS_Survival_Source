@@ -77,6 +77,21 @@ bool URTSGameInstance::GetShouldApplyPIEStartupOverrides() const
 #endif
 }
 
+void URTSGameInstance::SetMapToLoad(TSoftObjectPtr<UWorld> MapToLoad)
+{
+	M_MapToLoad.SetMapToLoad(MapToLoad);
+}
+
+void URTSGameInstance::ResetMapToLoadToNull()
+{
+	M_MapToLoad.Reset();
+}
+
+TSoftObjectPtr<UWorld> URTSGameInstance::GetMapToLoad() const
+{
+	return M_MapToLoad.GetMapToLoad();
+}
+
 void URTSGameInstance::SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings)
 {
 	M_CampaignGenerationSettings = Settings;

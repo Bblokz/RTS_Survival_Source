@@ -672,6 +672,11 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerGerJaguarOrPanzerIVG(UObject* WorldContext);
 
+
+	// Game instance helpers.
+	TSoftObjectPtr<UWorld> GetRTSMapToLoad(const UObject* WorldContextObject);
+	void SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad);
+
 private:
 	
 
