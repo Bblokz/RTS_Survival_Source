@@ -103,9 +103,62 @@ private:
 	void OnPosses_ConfigureBlockingDectionDistanceWithRTSRadius(ATankMaster* MyControlledTank);
 
 	void OnFindPath_ClearOverlapsForNewMovement() const;
+
+	/**
+	 * @brief Runs the move request and retries once recovery teleports are applied.
+	 * @param Location The desired world-space destination for this command.
+	 * @param GoalAcceptanceRadius The acceptance radius used for this move request.
+	 * @return True when any attempt starts path following, false when all attempts fail.
+	 */
+	bool TryMoveToLocationWithOffNavRecovery(const FVector& Location, const float GoalAcceptanceRadius);
+
+	/**
+	 * @brief Attempts to recover from an off-nav start by projecting and teleporting the controlled pawn.
+	 * @param Location Current move destination used to key retry exhaustion for this command.
+	 * @return True when recovery changed actor position and a retry should be attempted.
+	 */
+	bool TryRecoverFromOffNavStartForMoveLocation(const FVector& Location);
+
+	/**
+	 * @brief Finds the nav-projected location used by off-nav recovery checks.
+	 * @param OutProjectedLocation Receives the nearest projected nav location when available.
+	 * @return True when nav projection succeeds for the current pawn location.
+	 */
+	bool TryProjectPawnLocationToNavigation(FVector& OutProjectedLocation) const;
+
+	/**
+	 * @brief Validates whether a nav projection is far enough to confidently classify the pawn as off-nav.
+	 * @param CurrentLocation Current pawn world location.
+	 * @param ProjectedLocation Projected navmesh location derived from CurrentLocation.
+	 * @return True when projection delta exceeds strict off-nav thresholds.
+	 */
+	bool GetIsOffNavProjectionDeltaSignificant(const FVector& CurrentLocation, const FVector& ProjectedLocation) const;
+
+	/**
+	 * @brief Converts a move destination into a stable key so retry exhaustion is scoped per target bucket.
+	 * @param Location Destination to quantise into a retry key.
+	 * @return Grid key used by off-nav retry tracking.
+	 */
+	FIntVector BuildMoveLocationRetryKey(const FVector& Location) const;
+
+	/**
+	 * @brief Checks and increments the retry budget for a move target bucket.
+	 * @param Location Destination whose retry budget should be consumed.
+	 * @return True when another retry is allowed, false when the bucket is exhausted.
+	 */
+	bool TryConsumeOffNavRetryBudgetForLocation(const FVector& Location);
+
+	/**
+	 * @brief Clears retry exhaustion state for a destination once movement succeeds.
+	 * @param Location Destination whose retry tracking should be reset.
+	 */
+	void ResetOffNavRetryBudgetForLocation(const FVector& Location);
 	
 	UPROPERTY()
 	TObjectPtr<UTrackPathFollowingComponent> m_VehiclePathComp;
+
+	// Tracks how many off-nav recovery teleports were consumed per quantised destination.
+	TMap<FIntVector, int32> M_OffNavRetriesPerLocation;
 
 	/**
 	 * @brief Centralises tank-only cost-limit debug drawing so it cannot affect move execution.
@@ -117,5 +170,11 @@ private:
 	void DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath, const FAIMoveRequest& MoveRequest) const;
 	void DebugPathFollowingResult(const FPathFollowingResult& Result) const;
 	void DebugPathFollowingResult_Draw(const FString& DebugText, const FColor& DebugColor, const ATankMaster* ValidTankMaster) const;
+
+	inline static constexpr int32 M_MaxOffNavRecoveryRetriesPerLocation = 2;
+	inline static constexpr float M_OffNavRetryGridSizeUnits = 200.f;
+	inline static constexpr float M_OffNavProjectionDelta2DThresholdUnits = 160.f;
+	inline static constexpr float M_OffNavProjectionDeltaZThresholdUnits = 120.f;
+	inline static constexpr FVector M_OffNavProjectionExtent = FVector(80.f, 80.f, 220.f);
 
 };
