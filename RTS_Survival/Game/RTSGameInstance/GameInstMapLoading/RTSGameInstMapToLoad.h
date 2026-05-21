@@ -11,10 +11,8 @@ struct FRTSGameInstMapToLoad
 	FRTSGameInstMapToLoad();
 
 public:
-	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetMapToLoad( TSoftObjectPtr<UWorld> NewMapToLoad);
 
-	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	TSoftObjectPtr<UWorld> GetMapToLoad() const ;
 
 	// Resets the stored map reference to null.
@@ -22,10 +20,10 @@ public:
 
 private:
 	// Keeps track of the next map to load.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY()
 	TSoftObjectPtr<UWorld> NextMapToLoad = nullptr;
 
 	// To check for map validation; was the map pointer supposed to be set at all?
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY()
 	bool bIsInitialized = false;
 };

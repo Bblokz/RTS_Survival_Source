@@ -61,6 +61,7 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz251_Mortar UMETA(DisplayName = "Ger ArmCar SdKfz 251 Mortar"),
 	Tank_Sdkfz251_Transport UMETA(DisplayName = "Ger ArmCar SdKfz 251 Transport"),
 	Tank_Puma UMETA(DisplayName = "Ger ArmCar Puma"),
+	Tank_FlamePuma UMETA(DisplayName = "Ger ArmCar Flame Puma"),
 	Tank_Panzerwerfer UMETA(DisplayName = "Ger ArmCar Panzerwerfer"),
 	Tank_Sdkfz_231 UMETA(DisplayName = "Ger SdKfz 231 8-rad 2cm"),
 	Tank_Sdkfz_232_3 UMETA(DisplayName = "Ger SdKfz 232/3 8-rad 75mm Puma"),
@@ -154,8 +155,6 @@ enum class ETankSubtype : uint8
 	Tank_LightTrain UMETA(DisplayName = "Rus Train Light"),
 	Tank_MediumTrain UMETA(DisplayName = "Rus Train Medium"),
 	Tank_HeavyTrain UMETA(DisplayName = "Rus Train Heavy"),
-	// Appended to preserve existing serialized subtype values.
-	Tank_FlamePuma UMETA(DisplayName = "Ger ArmCar Flame Puma"),
 };
 
 

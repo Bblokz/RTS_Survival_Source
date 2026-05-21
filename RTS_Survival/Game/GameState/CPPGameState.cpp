@@ -1797,7 +1797,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ArmorPen = 170.f;
 	WeaponData.ArmorPenMaxRange = 150.f;
 	WeaponData.MagCapacity = 3;
-	WeaponData.ReloadSpeed = 16.f;
+	WeaponData.ReloadSpeed = 10.f;
 	WeaponData.BaseCooldown = 2.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 85;

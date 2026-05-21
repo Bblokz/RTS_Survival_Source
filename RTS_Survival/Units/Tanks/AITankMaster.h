@@ -175,6 +175,6 @@ private:
 	inline static constexpr float M_OffNavRetryGridSizeUnits = 200.f;
 	inline static constexpr float M_OffNavProjectionDelta2DThresholdUnits = 160.f;
 	inline static constexpr float M_OffNavProjectionDeltaZThresholdUnits = 120.f;
-	inline static constexpr FVector M_OffNavProjectionExtent = FVector(80.f, 80.f, 220.f);
+	inline static FVector M_OffNavProjectionExtent = FVector(300.f, 300.f, 300.f);
 
 };
