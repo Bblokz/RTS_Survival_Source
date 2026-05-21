@@ -477,6 +477,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+
+	// Ger Pz II Flame
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_PZII_Flame)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_PZII_Flame,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
 	// Ger Pz 38t
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -728,6 +746,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			MediumTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_PzIV_H,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger Pz IV Rockets
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_PZIV_Rockets,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);

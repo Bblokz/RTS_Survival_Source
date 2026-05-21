@@ -4419,6 +4419,24 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzII_F, TankData);
 
+	// Pz II Flame
+	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankHealthBase * 1.3f, 10);
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 40;
+	TankData.TurretRotationSpeed = 24;
+	TankData.VehicleMaxSpeedKmh = 20;
+	TankData.VehicleReverseSpeedKmh = 7;
+	TankData.VisionRadius = T1TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost},
+		{ERTSResourceType::Resource_VehicleParts, RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankVehiclePartsCost * 1.5f, 5)}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetLightTankExpLevels();
+	TankData.ExperienceWorth = BaseLightTankExp;
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PZII_Flame, TankData);
+
 	// Pz I Harvester
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
@@ -4807,6 +4825,17 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 2.f, 5);
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_H, TankData);
+
+	// PZ IV Rockets
+	TankData.TurretRotationSpeed = 18;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 200},
+		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 150}
+	});
+	TankData.Abilities = TankAbilitiesWithRockets;
+	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 2.f, 5);
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PZIV_Rockets, TankData);
 
 	// Pz IV F1
 	TankData.MaxHealth = MediumTankHealthBase - 150;
@@ -7122,6 +7151,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);
 	NomadicData.TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZII_Flame)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun)),
@@ -7235,6 +7265,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.ExperienceWorth = T2NomadicExp;
 	NomadicData.TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_G)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1)),
 	};
 
