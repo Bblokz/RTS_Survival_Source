@@ -304,7 +304,7 @@ void AUT_StabilityManager::SpawnBatch(bool bIsPlayer)
 				}
 
 				// Bind to OnDestroyed
-				NewActor->OnDestroyed.AddDynamic(this, &AUT_StabilityManager::OnActorBeginDestroyCallback);
+				NewActor->OnDestroyed.AddUniqueDynamic(this, &AUT_StabilityManager::OnActorBeginDestroyCallback);
 
 				if (bIsPlayer)
 				{

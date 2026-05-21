@@ -1525,7 +1525,7 @@ void AMissionManager::RegisterTrackedEnemyActor(AActor* EnemyActor)
 		return;
 	}
 
-	EnemyActor->OnDestroyed.AddDynamic(this, &AMissionManager::OnTrackedEnemyActorDestroyed);
+	EnemyActor->OnDestroyed.AddUniqueDynamic(this, &AMissionManager::OnTrackedEnemyActorDestroyed);
 	M_TrackedEnemyActorRefCounts.Add(WeakEnemyActor, 1);
 }
 
