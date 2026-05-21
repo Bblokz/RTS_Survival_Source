@@ -1662,7 +1662,6 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 	}
 	RegisterValidFormationUnitsAsIdle(*Formation);
 	int32 InvalidUnitsInFormation = 0;
-	TWeakObjectPtr<UEnemyFormationController> WeakThis(this);
 	for (auto EachUnit : Formation->FormationUnits)
 	{
 		AActor* UnitAsActor = EachUnit.Unit->GetOwnerActor();
@@ -1672,8 +1671,8 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 			FScriptDelegate DestroyedDelegate;
 			DestroyedDelegate.BindUFunction(this, FName("OnFormationUnitDiedPostReachFinal"));
 
-			UnitAsActor->OnDestroyed.Add(DestroyedDelegate);
-			continue;;
+			UnitAsActor->OnDestroyed.AddUnique(DestroyedDelegate);
+			continue;
 		}
 		InvalidUnitsInFormation++;
 	}
