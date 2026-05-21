@@ -112,9 +112,8 @@ namespace DeveloperSettings
 
 		namespace Experience
 		{
-
 			inline constexpr float GlobalExpNeededMlt = 1.f;
-			
+
 			inline constexpr int32 BaseInfantryExp = 10;
 			inline constexpr int32 ArmoredInfantryExp = 15;
 			inline constexpr int32 HazmatInfantryExp = 15;
@@ -594,7 +593,7 @@ namespace DeveloperSettings
 			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(15000.f * GameRangeMlt);
 			inline constexpr float MediumArtilleryRange = 18000.f * GameRangeMlt;
 			inline constexpr float HeavyArtilleryRange = 22000.f * GameRangeMlt;
-			
+
 			// Static artillery range  /  howitzers
 			inline constexpr float HowitzerArtilleryRange = 24000.f * GameRangeMlt;
 
@@ -698,13 +697,13 @@ namespace DeveloperSettings
 
 			namespace ArmorAndModules
 			{
-				inline  TMap<EArmorPlateDamageType, int32> PlateTypeToHeHeatDamageChance =
+				inline TMap<EArmorPlateDamageType, int32> PlateTypeToHeHeatDamageChance =
 				{
 					{EArmorPlateDamageType::DamageFront, 25},
 					{EArmorPlateDamageType::DamageSides, 33},
 					{EArmorPlateDamageType::DamageRear, 50}
 				};
-				
+
 				inline TMap<EArmorPlateDamageType, float> PlateTypeToHeHeatDamageMlt =
 				{
 					{EArmorPlateDamageType::DamageFront, 0.15f},
@@ -719,16 +718,22 @@ namespace DeveloperSettings
 			inline constexpr float DamagePerMM_FireProjectileBonus = 0.5f;
 			inline constexpr float DamageBonusSmallArmsMlt = 1.25;
 			inline constexpr float SniperDamage = 100;
+
+			namespace Mortars
+			{
+				inline constexpr float MortarArmorPenPerMM = 320.f / 380.f;
+			}
+
 			namespace RailGun
 			{
 				// Flat bonus damage added on top of the base cannon damage which is dmg per mm
-				inline constexpr float DamageBonusMlt =3;
+				inline constexpr float DamageBonusMlt = 3;
 				// Percentage bonus to apply to the base cannon range for rail gun variants.
 				inline constexpr float RangeBonusPercentage = 20.f;
 				// What the projectile speed is multiplied with after Over penetration.
 				inline constexpr float OverPenProjectileSpeedMlt = 0.33f;
-				
 			}
+
 			inline constexpr float DamagePerTNTEquivalentGrams = 1.8f;
 			inline constexpr float DamageFluxPercentage = 10.f;
 			inline constexpr float CooldownFluxPercentage = 10.f;
@@ -838,9 +843,8 @@ namespace DeveloperSettings
 				// How much APHEBC changes the distance between min and max range pen (lerp factor)
 				inline constexpr float APHEBC_ArmorPenLerpFactor = 0.5f;
 
-			// Minimal callibre needed to stun vehicles with HE or HEAT rounds.
-			inline constexpr float StunCalibreThreshold = 100.f;
-				
+				// Minimal callibre needed to stun vehicles with HE or HEAT rounds.
+				inline constexpr float StunCalibreThreshold = 100.f;
 			}
 		}
 
@@ -894,11 +898,11 @@ namespace DeveloperSettings
 			inline constexpr float T2NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
 			inline constexpr float T2NomadicBuildingHealth = RoundToNearestMultipleOfFive(6000 * OverallHealthMlt);
 			inline constexpr float T3NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
-			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive( 8000 * OverallHealthMlt);
+			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive(8000 * OverallHealthMlt);
 
 			// Building expansions health settings.
 			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(700 * OverallHealthMlt);
-			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1000* OverallHealthMlt);
+			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
 			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
 			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500 * OverallHealthMlt);
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);

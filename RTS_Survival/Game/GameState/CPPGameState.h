@@ -241,6 +241,7 @@ private:
 	void InitAllGameLaserWeapons();
 	void InitAllGameFlameWeapons();
 	void InitAllGameBombWeapons();
+	void InitAllGameMortarRocketWeapons();
 	void InitAllGameLightWeapons();
 	void InitAllGameMediumWeapons();
 	void InitAllGameHeavyWeapons();

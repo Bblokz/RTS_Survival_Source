@@ -107,6 +107,10 @@ enum class
 	Flak36_37MM UMETA(DisplayName = "Flak36 37MM (Flak 36)"),
 	Flak36_37MM_TW UMETA(DisplayName = "Flak36 37MM TW"),
 
+	// Ger vertical Rocket Weapons
+	Rocket_30mm UMETA(DisplayName = "30MM Vertical Rocket (Sdkfz140 Rocket)"),
+	Rocket_50mm UMETA(DisplayName = "50MM Vertical Rocket (PZ IV Rocket)"),
+
 
 	// German Medium calibre
 	Pak_t_L_43_47MM UMETA(DisplayName = "Pak(t) L/43 47MM (PanzerJager I)"),
@@ -318,6 +322,8 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Kwk31_30MM: return "KwK 31";
 	case EWeaponName::Kwk36_88MM_TigerH1: return "KwK 36";
 	case EWeaponName::Kwk37_20MM: return "Kwk 37";
+		case EWeaponName::Rocket_30mm: return "Rockets";
+		case EWeaponName::Rocket_50mm: return "Rockets";
 	case EWeaponName::Kwk32_35MM: return "Kwk 32";
 	case EWeaponName::sIG_33_150MM: return "s.I.G. 33";
 	case EWeaponName::STG44_7_92MM: return "STG 44";
@@ -666,6 +672,10 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Kwk31_30MM";
 	case EWeaponName::Kwk37_20MM:
 		return "Kwk37_20MM";
+	case EWeaponName::Rocket_30mm:
+		return "Rocket_30mm";
+	case EWeaponName::Rocket_50mm:
+		return "Rocket_50mm";
 	case EWeaponName::sIG_33_150MM:
 		return "sIG_33_150MM";
 	case EWeaponName::Panzerwerfer:
