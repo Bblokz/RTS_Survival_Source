@@ -23,6 +23,7 @@
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "NiagaraComponent.h"
 #include "Components/AudioComponent.h"
+#include "RTS_Survival/FactionSystem/Factions/Factions.h"
 #include "RTS_Survival/Game/GameSettings/VeterancyFXSettings.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
@@ -635,7 +636,7 @@ void ACPPGameState::SetupBreakThroughTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Hetzer)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_H)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Brumbar)),
-		/* todo: panzer IV rockets type */ FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets)),
 		FTrainingOption(),
 		FTrainingOption()
 	};
@@ -706,7 +707,7 @@ void ACPPGameState::SetupStrikeDivisionTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
-		/* todo: panzer II Flame subtype */ FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZII_Flame)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_J)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder)),
