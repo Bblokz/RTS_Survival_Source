@@ -3300,13 +3300,11 @@ bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
 		return false;
 	}
 
-	FAttachmentTransformRules AttachmentRules = FAttachmentTransformRules::KeepRelativeTransform;
-	AttachmentRules.ScaleRule = EAttachmentRule::KeepWorld;
-	M_AttachedRocketInstances->AttachToComponent(MeshComponent, AttachmentRules);
+	M_AttachedRocketInstances->AttachToComponent(MeshComponent, FAttachmentTransformRules::KeepRelativeTransform);
+	M_AttachedRocketInstances->SetRelativeTransform(FTransform::Identity);
 	M_AttachedRocketInstances->RegisterComponent();
 	M_AttachedRocketInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	M_AttachedRocketInstances->SetStaticMesh(M_VerticalRocketSettings.RocketMesh);
-	M_AttachedRocketInstances->SetRelativeScale3D(M_VerticalRocketSettings.RocketScale);
 
 	M_SocketToInstanceIndex.Reset();
 	for (const FName& SocketName : M_LaunchSocketNames)
@@ -3316,13 +3314,14 @@ bool UVerticalRocketWeaponState::SetupAttachedRocketInstances()
 			continue;
 		}
 
-		const FTransform SocketTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
-		FTransform RocketInstanceTransform = SocketTransform;
-		const FVector RocketInstanceLocation = SocketTransform.TransformPosition(
+		const FTransform SocketRelativeTransform = MeshComponent->GetSocketTransform(SocketName, RTS_Component);
+		FTransform RocketInstanceTransform = SocketRelativeTransform;
+		const FVector RocketInstanceLocation = SocketRelativeTransform.TransformPosition(
 			M_VerticalRocketSettings.LocalSocketAttachOffset);
 		RocketInstanceTransform.SetLocation(RocketInstanceLocation);
+		RocketInstanceTransform.SetScale3D(M_VerticalRocketSettings.RocketScale);
 
-		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(RocketInstanceTransform, true);
+		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(RocketInstanceTransform, false);
 		if (InstanceIndex != INDEX_NONE)
 		{
 			M_SocketToInstanceIndex.Add(SocketName, InstanceIndex);
