@@ -24,6 +24,7 @@
 #include "NiagaraComponent.h"
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/Game/GameSettings/VeterancyFXSettings.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInType/DigInType.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
@@ -509,6 +510,12 @@ void ACPPGameState::PostInitializeComponents()
 	// Initialize the explosion manager on the subsystem.
 	InitExplMgrOnSubsystem();
 	InitDecalMgrOnSubSystem();
+	PostInitializeComponents_SetupNomadicTrainingOptionsByFaction();
+}
+
+void ACPPGameState::PostInitializeComponents_SetupNomadicTrainingOptionsByFaction()
+{
+	SetupNomadicTrainingOptionsForFaction();
 }
 
 void ACPPGameState::SetupMPCTime(UMaterialParameterCollection* MPC_Time)
@@ -547,6 +554,205 @@ void ACPPGameState::InitDecalMgrOnSubSystem()
 		return;
 	}
 	DecalMgrSubsystem->SetDecalManager(M_GameDecalManager);
+}
+
+void ACPPGameState::SetupNomadicTrainingOptionsForFaction()
+{
+	const URTSGameInstance* GameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (not IsValid(GameInstance))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "GameInstance",
+			"SetupNomadicTrainingOptionsForFaction", this);
+		return;
+	}
+
+	const ERTSFaction PlayerFaction = GameInstance->GetPlayerFaction();
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::GerBreakthroughDoctrine:
+		SetupBreakThroughTrainingOptions();
+		return;
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		SetupStrikeDivisionTrainingOptions();
+		return;
+	default:
+		SetupStrikeDivisionTrainingOptions();
+		return;
+	}
+}
+
+void ACPPGameState::SetupBreakThroughTrainingOptions()
+{
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerBarracks].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Scavengers)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_JagerTruppKar98k)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SteelFistAssaultSquad)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Gebirgsjagerin)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SturmPionieren)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_IronStorm)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PanzerGrenadiere)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_37mmFlak)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Vultures)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SniperTeam)),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_LightBringers)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SturmKommandos)),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMechanizedDepot].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250_37mm)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_140)),
+		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_231)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PaK38)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_LefH18)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PaK40))
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerLightSteelForge].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder)),
+		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMedTankFactory].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Stug)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_G)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Hetzer)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_H)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Brumbar)),
+		/* todo: panzer IV rockets type */ FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerAirbase].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Ju87)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Me410)),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_E25)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_TigerH1)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_JagdTiger)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_TigerRail)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SturmTiger)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KingTiger)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Tiger105)),
+		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_210MM_Morser)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Maus)),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+}
+
+void ACPPGameState::SetupStrikeDivisionTrainingOptions()
+{
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerBarracks].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Scavengers)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_JagerTruppKar98k)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SteelFistAssaultSquad)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Gebirgsjagerin)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SturmPionieren)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_FeuerSturm)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PanzerGrenadiere)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_37mmFlak)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Vultures)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SniperTeam)),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_LightBringers)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SturmKommandos)),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMechanizedDepot].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Mortar)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_22)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Puma)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_FlamePuma)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_231)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PaK38)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz9_37mm)),
+		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SFH18_150mm)),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_88mmFlak)),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerLightSteelForge].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
+		/* todo: panzer II Flame subtype */ FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_J)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_AA)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMedTankFactory].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Stug)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_M)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Hetzer)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_FLamm)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Brumbar)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Jaguar)),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerAirbase].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Ju87)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Me410)),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption()
+	};
+
+	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_E25)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherD)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_JagdPanther)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PanzerV_III)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SturmTiger)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherII)),
+		/* todo: panther II Howitzer */ FTrainingOption(),
+		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_210MM_Morser)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_E100)),
+		FTrainingOption(),
+		FTrainingOption()
+	};
 }
 
 

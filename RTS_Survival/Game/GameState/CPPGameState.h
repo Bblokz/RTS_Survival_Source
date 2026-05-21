@@ -35,7 +35,9 @@ class UNiagaraComponent;
 class UResourceComponent;
 class UResourceDropOff;
 class URTSGameSettingsHandler;
+class URTSGameInstance;
 enum class EWeaponName : uint8;
+enum class ERTSFaction : uint8;
 // Forward Declaration
 class RTS_SURVIVAL_API ACPPResourceMaster;
 class RTS_SURVIVAL_API ATankMaster;
@@ -191,6 +193,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	virtual void PostInitializeComponents() override;
+	void PostInitializeComponents_SetupNomadicTrainingOptionsByFaction();
 
 	// Call at begin play; will ini the MPC time material collection to save world time.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -220,6 +223,9 @@ private:
 	// Sets the reference on the ExplosionManagerSubsystem.
 	void InitExplMgrOnSubsystem();
 	void InitDecalMgrOnSubSystem();
+	void SetupNomadicTrainingOptionsForFaction();
+	void SetupBreakThroughTrainingOptions();
+	void SetupStrikeDivisionTrainingOptions();
 
 	int M_GameTimeDays;
 	int M_GameTimeHours;
