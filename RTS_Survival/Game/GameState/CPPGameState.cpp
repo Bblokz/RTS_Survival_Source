@@ -1463,8 +1463,8 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RW61_Mortar_380MM, WeaponData);
 
-	// Panzerwerfer small (40mm; HEAT)
-	WeaponData.WeaponName = EWeaponName::Panzerwerfer_Small;
+	// Mortar 120mm (HE)
+	WeaponData.WeaponName = EWeaponName::Mortar_120MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
 	WeaponData.ShellTypes = { EWeaponShellType::Shell_HEAT };
