@@ -5697,6 +5697,26 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_IS_3, TankData);
 
+	// IS-3 Flame (super heavy variant)
+	constexpr float Is3FlameHealthMultiplier = 1.5f;
+	constexpr float Is3FlameTurretRotationMultiplier = 4.0f / 3.0f;
+	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::SuperHeavyTankBase * Is3FlameHealthMultiplier;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 25;
+	TankData.TurretRotationSpeed = FMath::RoundToInt(14.0f * Is3FlameTurretRotationMultiplier);
+	TankData.VehicleMaxSpeedKmh = 17;
+	TankData.VehicleReverseSpeedKmh = 9;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, SuperHeavyTankRadixiteCost},
+		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp*  1.0f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_IS_3_Flame, TankData);
+
 	// KV-5 (super heavy)
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::SuperHeavyTankBase + 2 * OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
