@@ -4,6 +4,7 @@
 #include "RTSBlueprintFunctionLibrary.h"
 
 #include "NavigationSystem.h"
+#include "NavigationPath.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Statics/RTS_Statics.h"
 #include "RTS_Statics/SubSystems/DecalManagerSubsystem/DecalManagerSubsystem.h"
@@ -177,6 +178,50 @@ FText URTSBlueprintFunctionLibrary::BP_FixArmorTagSpacing(const FText& SourceTex
 	}
 
 	return FText::FromString(Working);
+}
+
+UNavigationPath* URTSBlueprintFunctionLibrary::BP_CombineNavigationPath(UObject* WorldContextObject,
+                                                                         const UNavigationPath* PathA,
+                                                                         const UNavigationPath* PathB)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return nullptr;
+	}
+
+	if (not IsValid(PathA) || not IsValid(PathB))
+	{
+		return nullptr;
+	}
+
+	UNavigationPath* CombinedNavigationPath = NewObject<UNavigationPath>(WorldContextObject);
+
+	if (not IsValid(CombinedNavigationPath))
+	{
+		return nullptr;
+	}
+
+	CombinedNavigationPath->PathPoints = PathA->PathPoints;
+
+	if (PathB->PathPoints.Num() == 0)
+	{
+		return CombinedNavigationPath;
+	}
+
+	const int32 AmountPathPointsA = CombinedNavigationPath->PathPoints.Num();
+
+	if (AmountPathPointsA > 0 && CombinedNavigationPath->PathPoints.Last().Equals(PathB->PathPoints[0]))
+	{
+		for (int32 PathPointIndex = 1; PathPointIndex < PathB->PathPoints.Num(); ++PathPointIndex)
+		{
+			CombinedNavigationPath->PathPoints.Add(PathB->PathPoints[PathPointIndex]);
+		}
+
+		return CombinedNavigationPath;
+	}
+
+	CombinedNavigationPath->PathPoints.Append(PathB->PathPoints);
+	return CombinedNavigationPath;
 }
 
 FString URTSBlueprintFunctionLibrary::BP_GetTechString(const ETechnology Tech)
