@@ -770,6 +770,7 @@ void ACPPGameState::InitAllGameWeaponData()
 	InitAllGameFlameWeapons();
 	InitAllGameBombWeapons();
 	InitAllGameSmallArmsWeapons();
+	InitAllGameMortarRocketWeapons();
 	InitAllGameRailGunData();
 	InitAllGameLightWeapons();
 	InitAllGameMediumWeapons();
