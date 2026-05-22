@@ -20,6 +20,7 @@ enum class ERTSRadiusType : uint8;
 enum class ERTSDamageType : uint8;
 enum class ERTSFireType : uint8;
 class UPlayerPortraitManager;
+class UNavigationPath;
 struct FTrainingOption;
 enum class ERTSProgressBarType : uint8;
 struct FRTSVerticalAnimTextSettings;
@@ -167,6 +168,18 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable, Category="Utilities|Text")
 	static FText BP_FixArmorTagSpacing(const FText& SourceText);
+
+	/**
+	 * @brief Appends two navigation results into one path so AI can continue movement without recalculating
+	 * the already known sections.
+	 * @param WorldContextObject Context used as outer for the created navigation path object.
+	 * @param PathA First path section to keep at the front.
+	 * @param PathB Second path section appended after PathA.
+	 * @return A new UNavigationPath containing merged points, or nullptr when inputs are invalid.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Utilities|Navigation", meta=(WorldContext="WorldContextObject"))
+	static UNavigationPath* BP_CombineNavigationPath(UObject* WorldContextObject, const UNavigationPath* PathA,
+	                                                 const UNavigationPath* PathB);
 
 	// ------------------------------------------------------------
 	// ------------ Tech Tree and Abilities string translations ------------
