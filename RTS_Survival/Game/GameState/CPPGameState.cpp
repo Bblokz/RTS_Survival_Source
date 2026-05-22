@@ -1315,16 +1315,11 @@ void ACPPGameState::InitAllGameBombWeapons()
 
 void ACPPGameState::InitAllGameMortarRocketWeapons()
 {
-	// ---------------- Light: 20mm–49mm (inclusive) ----------------
-
 	FWeaponData WeaponData;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerMM;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
 	using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
 	using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
-
-	constexpr float FlakCannonBonusDamageFactor = 1 +
-		DeveloperSettings::GameBalance::Weapons::DamageBonusFlakAmmoPercentage / 100.f;
 
 	// Shrapnel settings.
 	using DeveloperSettings::GameBalance::Weapons::ShrapnelAmountPerMM;
@@ -1333,29 +1328,21 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	using DeveloperSettings::GameBalance::Weapons::ShrapnelDamagePerTNTGram;
 	using DeveloperSettings::GameBalance::Weapons::MortarAOEMlt;
 
-	// Projectile Settings.
+	// Projectile settings.
 	using DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed;
-	using DeveloperSettings::GamePlay::Projectile::HighVelocityProjectileSpeed;
+	using DeveloperSettings::GamePlay::Projectile::HEProjectileSpeed;
 
-	// Range Settings.
-	using DeveloperSettings::GameBalance::Ranges::LightCannonRange;
-	using DeveloperSettings::GameBalance::Ranges::LightAssaultCannonRange;
-	using DeveloperSettings::GameBalance::Ranges::BasicSmallArmsRange;
-	using DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange;
-	
-	const float PanzerSchreckTNTPerMM = 55.f / 88.f;
-	const float PanzerSchreckArmorPenPerMM = 150.f / 88.f;
-	const float PanzerSchreckArmorPenMaxRangePerMM = 100.f / 88.f;
-	const int32 PanzerwerferMagCapacity = 10;
-	const float PanzerwerferReloadSpeed = 10.f;
-	const float PanzerwerferBaseCooldown = 0.5f;
-
+	constexpr float PanzerSchreckTntPerMM = 55.f / 88.f;
+	constexpr float PanzerSchreckArmorPenPerMM = 150.f / 88.f;
+	constexpr float PanzerSchreckArmorPenMaxRangePerMM = 100.f / 88.f;
+	constexpr float PanzerwerferProjectileSpeedMultiplier = 0.9f;
 
 	// Mortar 40mm (HE)
+	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::Mortar_40MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_HE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HE };
 	WeaponData.WeaponCalibre = 40;
 	WeaponData.TNTExplosiveGrams = 60;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
@@ -1373,20 +1360,116 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;;
-	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
-	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelPenMlt;
+	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelPenMlt;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_40MM, WeaponData);
-	
+
+	// Mortar 120mm (HE)
+	WeaponData.WeaponName = EWeaponName::Mortar_120MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_HE;
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HE };
+	WeaponData.WeaponCalibre = 120;
+	WeaponData.TNTExplosiveGrams = 100 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) /  DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange, 100);
+	WeaponData.ArmorPen = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.ArmorPenMaxRange = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.MagCapacity = 1.f;
+	WeaponData.ReloadSpeed = 12.f;
+	WeaponData.BaseCooldown = 1.f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy - 2;
+	WeaponData.ShrapnelRange = (WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt) / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
+	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::Mortar_120MM_TW;
+	WeaponData.MagCapacity = 3;
+	WeaponData.BaseCooldown = 1.f;
+	WeaponData.ReloadSpeed = 14.f;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM_TW, WeaponData);
+
+	// Mortar 80mm (HE)
+	WeaponData.WeaponName = EWeaponName::Mortar_80MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_HE;
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HE };
+	WeaponData.WeaponCalibre = 80;
+	WeaponData.TNTExplosiveGrams = 80 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) /  DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
+	WeaponData.ArmorPen = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.ArmorPenMaxRange = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.MagCapacity = 1.f;
+	WeaponData.ReloadSpeed = 10.f;
+	WeaponData.BaseCooldown = 1.f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
+	WeaponData.ShrapnelRange = (WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt) / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
+	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_80MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::Mortar_80MM_TW;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_80MM_TW, WeaponData);
+
+	// https://old-wiki.warthunder.com/Brummbar
+	WeaponData.WeaponName = EWeaponName::RW61_Mortar_380MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_HE;
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HE };
+	WeaponData.WeaponCalibre = 380;
+	WeaponData.TNTExplosiveGrams = 3400;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange * 1.33, 100);
+	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
+	WeaponData.ArmorPen = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.ArmorPenMaxRange = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 30.f;
+	WeaponData.BaseCooldown = 1;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 80;
+	WeaponData.ShrapnelRange = 700;
+	WeaponData.ShrapnelDamage = 800;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM * 2;
+	WeaponData.ShrapnelPen = 82;
+	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RW61_Mortar_380MM, WeaponData);
 
 	// Panzerwerfer small (40mm; HEAT)
 	WeaponData.WeaponName = EWeaponName::Panzerwerfer_Small;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_HEAT};
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HEAT };
 	WeaponData.WeaponCalibre = 40;
-	WeaponData.TNTExplosiveGrams = PanzerSchreckTNTPerMM * WeaponData.WeaponCalibre;
+	WeaponData.TNTExplosiveGrams = PanzerSchreckTntPerMM * WeaponData.WeaponCalibre;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
@@ -1395,26 +1478,25 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = (PanzerSchreckArmorPenMaxRangePerMM * WeaponData.WeaponCalibre)
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
-	WeaponData.MagCapacity = PanzerwerferMagCapacity;
-	WeaponData.ReloadSpeed = PanzerwerferReloadSpeed;
-	WeaponData.BaseCooldown = PanzerwerferBaseCooldown;
+	WeaponData.MagCapacity = 10;
+	WeaponData.ReloadSpeed = 10.f;
+	WeaponData.BaseCooldown = 0.5f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 20;
+	WeaponData.Accuracy = 20.f;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
-	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * PanzerwerferProjectileSpeedMultiplier;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Panzerwerfer_Small, WeaponData);
 
-	
-	// Small Rocket weapon (30mm; HEAT)
-	WeaponData.WeaponName = EWeaponName::Panzerwerfer_Small;
+	// Mounted on top of the skdfz 140 rocket barrage vehicle.
+	WeaponData.WeaponName = EWeaponName::Rocket_30mm;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_HEAT};
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HEAT };
 	WeaponData.WeaponCalibre = 30;
-	WeaponData.TNTExplosiveGrams = PanzerSchreckTNTPerMM * WeaponData.WeaponCalibre;
+	WeaponData.TNTExplosiveGrams = PanzerSchreckTntPerMM * WeaponData.WeaponCalibre;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
@@ -1423,26 +1505,25 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = (PanzerSchreckArmorPenMaxRangePerMM * WeaponData.WeaponCalibre)
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
-	// Mounted on top of the skdfz 140 rocket barrage vehicle.
 	WeaponData.MagCapacity = 9;
-	WeaponData.ReloadSpeed = 15;
-	WeaponData.BaseCooldown = 0.5;
+	WeaponData.ReloadSpeed = 15.f;
+	WeaponData.BaseCooldown = 0.5f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 33;
+	WeaponData.Accuracy = 33.f;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
-	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * PanzerwerferProjectileSpeedMultiplier;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Rocket_30mm, WeaponData);
-	
-	// Medium Rocket weapon (50mm; HEAT and bonus tnt)
-	WeaponData.WeaponName = EWeaponName::Panzerwerfer_Small;
+
+	// Used on panzer IV rocket; has 3 rockets on top of the turret.
+	WeaponData.WeaponName = EWeaponName::Rocket_50mm;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_HEAT};
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HEAT };
 	WeaponData.WeaponCalibre = 50;
-	WeaponData.TNTExplosiveGrams = PanzerSchreckTNTPerMM * WeaponData.WeaponCalibre + 40;
+	WeaponData.TNTExplosiveGrams = PanzerSchreckTntPerMM * WeaponData.WeaponCalibre + 40.f;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
@@ -1451,20 +1532,19 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = (PanzerSchreckArmorPenMaxRangePerMM * WeaponData.WeaponCalibre)
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
-	// Used on panzer IV rocket; has 3 rockets on top of the turret.
 	WeaponData.MagCapacity = 3;
 	WeaponData.ReloadSpeed = 15.f;
 	WeaponData.BaseCooldown = 2.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 33;
+	WeaponData.Accuracy = 33.f;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
-	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * PanzerwerferProjectileSpeedMultiplier;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Rocket_50mm, WeaponData);
-	
 }
+
 
 
 void ACPPGameState::InitAllGameSmallArmsWeapons()
@@ -3631,97 +3711,6 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Stu_H_43_L_12_150MM, WeaponData);
 
 
-	// Mortar 120mm (HE)
-	WeaponData.WeaponName = EWeaponName::Mortar_120MM;
-	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_HE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
-	WeaponData.WeaponCalibre = 120;
-	WeaponData.TNTExplosiveGrams = 100 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
-	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) /  DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
-	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumArtilleryRange, 100);
-	WeaponData.ArmorPen = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
-		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.ArmorPenMaxRange = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
-		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.MagCapacity = 1.f;
-	WeaponData.ReloadSpeed = 12.f;
-	WeaponData.BaseCooldown = 1.f;
-	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy - 2;
-	WeaponData.ShrapnelRange = (WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt) / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
-	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
-	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
-	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM, WeaponData);
-
-	WeaponData.WeaponName = EWeaponName::Mortar_120MM_TW;
-	WeaponData.MagCapacity = 3;
-	WeaponData.BaseCooldown = 1.f;
-	WeaponData.ReloadSpeed = 14.f;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM_TW, WeaponData);
-
-	// Mortar 80mm (HE)
-	WeaponData.WeaponName = EWeaponName::Mortar_80MM;
-	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_HE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
-	WeaponData.TNTExplosiveGrams = 80 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
-	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) /  DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
-	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
-	WeaponData.ArmorPen = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
-		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.ArmorPenMaxRange = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
-		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.MagCapacity = 1.f;
-	WeaponData.ReloadSpeed = 10.f;
-	WeaponData.BaseCooldown = 1.f;
-	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
-	WeaponData.ShrapnelRange = (WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt) / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
-	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
-	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
-	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_80MM, WeaponData);
-
-	WeaponData.WeaponName = EWeaponName::Mortar_80MM_TW;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_80MM_TW, WeaponData);
-
-	// https://old-wiki.warthunder.com/Brummbar
-	WeaponData.WeaponName = EWeaponName::RW61_Mortar_380MM;
-	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_HE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
-	WeaponData.WeaponCalibre = 380;
-	WeaponData.TNTExplosiveGrams = 3400;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
-	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange * 1.33, 100);
-	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
-	WeaponData.ArmorPen = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.ArmorPenMaxRange = 320 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 30.f;
-	WeaponData.BaseCooldown = 1;
-	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 80;
-	WeaponData.ShrapnelRange = 700;
-	WeaponData.ShrapnelDamage = 800;
-	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM * 2;
-	WeaponData.ShrapnelPen = 82;
-	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RW61_Mortar_380MM, WeaponData);
 
 	// https://wiki.warthunder.com/Maus
 	WeaponData.WeaponName = EWeaponName::KwK44_128MM;
