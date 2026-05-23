@@ -35,6 +35,9 @@ public:
 	UMaterialInterface* RoadMaterial;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline")
+	bool bUseCollision = true;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline")
 	bool bAllowDecals = true;
 
 

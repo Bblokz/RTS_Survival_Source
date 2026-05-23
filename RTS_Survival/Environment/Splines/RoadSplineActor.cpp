@@ -16,7 +16,7 @@ ARoadSplineActor::ARoadSplineActor()
 	RoadMesh = nullptr;
 	RoadMaterial = nullptr;
 	ForwardAxis = ESplineMeshAxis::X;
-	if(RoadSpline)
+	if (RoadSpline)
 	{
 		RoadSpline->CastShadow = false;
 		RoadSpline->bCastDynamicShadow = false;
@@ -88,7 +88,14 @@ void ARoadSplineActor::BuildRoad()
 			SplineMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 			SplineMeshComp->SetCastShadow(true);
 
-			FRTS_CollisionSetup::SetupGroundEnvActorCollision(SplineMeshComp, false, false);
+			if (bUseCollision)
+			{
+				FRTS_CollisionSetup::SetupGroundEnvActorCollision(SplineMeshComp, false, false);
+			}
+			else
+			{
+				FRTS_CollisionSetup::SetupSplineNoCollision(SplineMeshComp);
+			}
 
 			// Add the newly created component to our array for tracking.
 			SplineMeshComponents.Add(SplineMeshComp);
@@ -110,7 +117,7 @@ void ARoadSplineActor::BeginPlay()
 			Spline->DestroyComponent();
 		}
 	}
-	
+
 
 	// Ensure the road is built when the actor begins play.
 	BuildRoad();

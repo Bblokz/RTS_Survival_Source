@@ -722,6 +722,17 @@ void FRTS_CollisionSetup::SetupGroundEnvActorCollision(UMeshComponent* GroundEnv
 	GroundEnvActorMesh->SetCanEverAffectNavigation(bAffectNavigation);
 }
 
+void FRTS_CollisionSetup::SetupSplineNoCollision(UMeshComponent* SplineMesh)
+{
+	if(not IsValid(SplineMesh))
+	{
+		return;
+	}
+	SplineMesh->SetCollisionEnabled(ECollisionEnabled::Type::NoCollision);
+	// ignore everything.
+	SplineMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+}
+
 void FRTS_CollisionSetup::SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh)
 {
 	if (IsValid(PickupMesh))

@@ -105,6 +105,8 @@ public:
 	static void SetupGroundEnvActorCollision(UMeshComponent* GroundEnvActorMesh, const bool bAllowBuilding,
 	                                         const bool bAffectNavigation);
 
+	static void SetupSplineNoCollision(UMeshComponent* SplineMesh);
+
 	static void SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh);
 
 	// Will dynamically be allied or not with this player by blocking or ignoring the trace channel used to hit the enemies of that player.
