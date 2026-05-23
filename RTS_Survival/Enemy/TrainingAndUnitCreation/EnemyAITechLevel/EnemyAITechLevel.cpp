@@ -101,6 +101,7 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 	ExperimentalOptions.TrainableSquadSubtypes = {};
 	ExperimentalOptions.TrainableTankSubtypes = {
 		ETankSubtype::Tank_IS_3,
+		ETankSubtype::Tank_IS_3_Flame,
 		ETankSubtype::Tank_KV_5,
 		// todo finish unit type.
 		// ETankSubtype::Tank_T44_100L,
