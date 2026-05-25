@@ -20,6 +20,9 @@ protected:
 	virtual void OnMissionComplete() override;
 	virtual void OnMissionFailed() override;
 
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnFoundCommandVehicle(ATankMaster* CommandVehicle);
+
 private:
 	void ClearMissionTimers();
 	void TryFindAndBindPlayerCommandVehicle();
