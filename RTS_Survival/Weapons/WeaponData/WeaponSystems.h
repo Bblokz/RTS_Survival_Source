@@ -77,6 +77,7 @@ enum class
 	LB14 UMETA(DisplayName = "LB 14 30MM (handheld LaserWeapon"),
 	LightStorm UMETA(DisplayName = "LightStorm 30MM (Light Laser MG handheld)"),
 	Strahlkanone39 UMETA(DisplayName = "Strahlkanone 39 50MM PZ V/III"),
+	JagdtigerSonnensturm128L UMETA(DisplayName = "Sonnensturm 128L (Jagdtiger Siege Laser)"),
 
 	// Railgun Weapons
 	GerRailGun30MM UMETA(DisplayName = "Ger Railgun 30MM"),
@@ -299,6 +300,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::F_34_76MM: return "F-34";
 	case EWeaponName::Kwk34_Twin30MM: return "Kwk 34 Twin";
 	case EWeaponName::Strahlkanone39: return "Strahlkn. 39";
+	case EWeaponName::JagdtigerSonnensturm128L: return "Sonnensturm 128L";
 	case EWeaponName::L_10_76MM: return "L-10";
 	case EWeaponName::D_25T_122MM: return "D-25T";
 	case EWeaponName::D_25T_122MM_IS3: return "D-25T";
