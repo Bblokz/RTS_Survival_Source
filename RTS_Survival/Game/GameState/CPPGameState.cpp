@@ -896,6 +896,7 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	const float T34LuchDamage = Luch50LBaseDamage * LaserWeaponDamageMlt;
 	const float LuchDamage = Luch85LBaseDamage * LaserWeaponDamageMlt;
 	const float ZaryaDamage = Zarya100LBaseDamage * LaserWeaponDamageMlt;
+	constexpr float JagdtigerSonnensturmBaseDamage = 48.f;
 
 	WeaponData.WeaponName = EWeaponName::Luch_50L;
 	WeaponData.DamageType = ERTSDamageType::Laser;
@@ -965,6 +966,29 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	WeaponData.ShrapnelPen = 0;
 	WeaponData.ProjectileMovementSpeed = 0;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Zarya_100L, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::JagdtigerSonnensturm128L;
+	WeaponData.DamageType = ERTSDamageType::Laser;
+	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
+	WeaponData.WeaponCalibre = 128.f;
+	WeaponData.TNTExplosiveGrams = 0;
+	WeaponData.BaseDamage = JagdtigerSonnensturmBaseDamage * LaserWeaponDamageMlt;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumLaserWeaponRange;
+	WeaponData.ArmorPen = 0;
+	WeaponData.ArmorPenMaxRange = 0;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 8;
+	WeaponData.BaseCooldown = 0.25;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 100;
+	WeaponData.ShrapnelRange = 0;
+	WeaponData.ShrapnelDamage = 0;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0;
+	WeaponData.ProjectileMovementSpeed = 0;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::JagdtigerSonnensturm128L, WeaponData);
 }
 
 void ACPPGameState::InitAllGameFlameWeapons()
