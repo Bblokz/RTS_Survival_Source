@@ -1629,6 +1629,17 @@ void ASquadController::GeneralMoveToForAbility(const FVector& MoveToLocation, co
 
 void ASquadController::TerminateMoveCommand()
 {
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return;
+	}
+
+	if (CommandData->GetHasQueuedMovementCommandAfterActive())
+	{
+		return;
+	}
+
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)
 	{
 		if (GetIsValidSquadUnit(SquadUnit))

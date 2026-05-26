@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
 #include "VehicleAI/VehicleAIController.h"
 #include "AITankMaster.generated.h"
@@ -60,7 +61,19 @@ public:
 
 	inline void SetMoveToLocation(const FVector& Location) {m_MoveToLocation = Location;};
 
+	/**
+	 * @brief Keeps movement issuing in C++ so tracked tanks can bypass BT handoff gaps that cause COL stutter.
+	 * @param Location Destination used for the active move request.
+	 * @note Direct controller move requests need explicit queue-completion wiring in OnMoveCompleted.
+	 */
 	void MoveToLocationWithGoalAcceptance(const FVector Location);
+
+	/**
+	 * @brief Stores which movement ability should be completed when the controller reports success.
+	 * @param CompletionAbility Queue ability id expected to complete on successful arrival.
+	 * @note This keeps DoneExecutingCommand source-of-truth in C++ when BT move task is not the movement owner.
+	 */
+	void SetQueuedMovementCompletionAbility(const EAbilityID CompletionAbility);
 
 	// Ensures harvesters keep UE blocked-move detection disabled throughout harvesting.
 	void SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress);
@@ -156,6 +169,9 @@ private:
 	
 	UPROPERTY()
 	TObjectPtr<UTrackPathFollowingComponent> m_VehiclePathComp;
+
+	bool bM_HasQueuedMovementCompletionAbility = false;
+	EAbilityID M_QueuedMovementCompletionAbility = EAbilityID::IdNoAbility;
 
 	// Tracks how many off-nav recovery teleports were consumed per quantised destination.
 	TMap<FIntVector, int32> M_OffNavRetriesPerLocation;
