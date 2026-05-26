@@ -15,6 +15,17 @@ class UAttachedRockets;
 class RTS_SURVIVAL_API UChassisAnimInstance;
 class RTS_SURVIVAL_API UTrackPhysicsMovement;
 
+USTRUCT()
+struct FTrackedTankQueuedMoveState
+{
+	GENERATED_BODY()
+
+	FVector M_TargetLocation = FVector::ZeroVector;
+	bool bM_HasPendingQueuedMove = false;
+	bool bM_IsReverse = false;
+	bool bM_IsStationaryWhenQueued = true;
+};
+
 /**
  * Uses ATankMaster Logic for turrets and custom chaos physics for movement.
  * @note Setup in Child Blueprints:
@@ -240,7 +251,38 @@ private:
 	void OnInit_FindEnergyComponent(const int32 MyEnergy);
 	
 	bool GetIsValidTrackPhysicsMovement() const;
+	bool GetIsValidAITankController();
+	bool GetIsValidTankAnimationBP() const;
+
+	/**
+	 * @brief Preserves stable path quality for first move while preventing repeated chain delays that reintroduce COL stutter.
+	 * @param TargetLocation Requested move destination.
+	 * @param bIsReverse Whether the queued request should keep reverse path-follow mode.
+	 * @note A stationary start uses nav-settle delay, but chained movement while already moving skips full delay.
+	 */
+	void ExecuteTrackedMoveWithNavSettleDelay(const FVector& TargetLocation, const bool bIsReverse);
+
+	/**
+	 * @brief Keeps timer callback logic isolated so deferred issue always reuses the same request state gate.
+	 * @note This avoids duplicate direct issue paths when rapid command spam replaces pending requests.
+	 */
+	void ExecuteTrackedMoveWithNavSettleDelay_Deferred();
+
+	/**
+	 * @brief Executes the already-normalized move request so queue completion and reverse mode stay in sync.
+	 * @param TargetLocation Destination that passed delay/coalescing policy.
+	 * @param bIsReverse Whether completion should map to reverse movement semantics.
+	 * @note Always set queued movement completion ability before issuing controller move request.
+	 */
+	void ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse);
 
 	void HandleVoiceLineOnLevelUp() const; 
+
+	// Aggregates the currently requested move so stationary starts can wait for nav settle, while chains can repath instantly.
+	UPROPERTY()
+	FTrackedTankQueuedMoveState M_QueuedMoveState;
+
+	UPROPERTY()
+	FTimerHandle M_DeferredTrackedMoveHandle;
 
 };
