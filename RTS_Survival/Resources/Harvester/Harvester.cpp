@@ -798,11 +798,10 @@ void UHarvester::OnMoveToTargetResourceFinished(FAIRequestID RequestID, const FP
 		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindResource);
 		return;
 	}
-	const FVector HarvesterLocation = GetHarvesterLocation();
-	if (Result.Code != EPathFollowingResult::Success)
+	const bool bDidMoveRequestSucceed = Result.Code == EPathFollowingResult::Success;
+	if (not bDidMoveRequestSucceed)
 	{
-		const float AcceptanceRadius = M_ResourceAcceptanceRadius;
-		if (FVector::Distance(HarvesterLocation, M_OccupiedHarvestingLocation.Location) < AcceptanceRadius)
+		if (GetIsHarvesterCloseEnoughToGoal(M_OccupiedHarvestingLocation.Location))
 		{
 			HarvestDebug("Harvester failed to reach resource by request but is close enough!", FColor::Orange);
 		}
@@ -811,12 +810,23 @@ void UHarvester::OnMoveToTargetResourceFinished(FAIRequestID RequestID, const FP
 			// NEW: Try a real unstuck first (to a projected midpoint), not immediate teleport.
 			ResetHarvesterLocation(); // free the spot before trying recovery
 			HarvestDebug("Move to resource failed; attempt UNSTUCK (no instant teleport)", FColor::Orange);
-			UnstuckHarvesterTowardsLocation(HarvesterLocation,
+			UnstuckHarvesterTowardsLocation(GetHarvesterLocation(),
 			                                M_OccupiedHarvestingLocation.Location,
 			                                EHarvesterAIAction::MoveToResource);
 			return;
 		}
 	}
+
+	if (not GetIsHarvesterCloseEnoughToGoal(M_OccupiedHarvestingLocation.Location))
+	{
+		ResetHarvesterLocation(); // free the spot before trying recovery
+		HarvestDebug("Move to resource reported success but harvester is not close enough; re-attempt movement", FColor::Orange);
+		UnstuckHarvesterTowardsLocation(GetHarvesterLocation(),
+		                                M_OccupiedHarvestingLocation.Location,
+		                                EHarvesterAIAction::MoveToResource);
+		return;
+	}
+
 	HarvestAIExecuteAction(EHarvesterAIAction::PlayHarvestAnimation);
 }
 
@@ -1025,26 +1035,31 @@ void UHarvester::OnMoveToDropOffFinished(FAIRequestID RequestID, const FPathFoll
 		return;
 	}
 
-	if (Result.Code == EPathFollowingResult::Success)
+	if (Result.Code == EPathFollowingResult::Success && GetIsHarvesterCloseEnoughToGoal(M_TargetDropOff->GetDropOffLocationNotThreadSafe()))
 	{
 		HarvestDebug("at drop off location; Drop off resources", FColor::Green);
 		HarvestAIExecuteAction(EHarvesterAIAction::DropOff);
 		return;
 	}
 
-	const FVector HarvesterLocation = GetHarvesterLocation();
 	const FVector TargetLocation = M_TargetDropOff->GetDropOffLocationNotThreadSafe();
-	if (FVector::Distance(HarvesterLocation, TargetLocation) < M_ResourceAcceptanceRadius)
+	if (GetIsHarvesterCloseEnoughToGoal(TargetLocation))
 	{
 		HarvestDebug("Harvester failed to reach drop of by request but is close enough!", FColor::Orange);
 		HarvestAIExecuteAction(EHarvesterAIAction::DropOff);
 		return;
 	}
 	// NEW: Try proper unstuck first; only teleport if allowed once for this goal.
-	HarvestDebug("Move to drop-off failed; attempt UNSTUCK (no instant teleport)", FColor::Orange);
-	UnstuckHarvesterTowardsLocation(HarvesterLocation,
+	HarvestDebug("Move to drop-off ended before reaching goal; attempt UNSTUCK (no instant teleport)", FColor::Orange);
+	UnstuckHarvesterTowardsLocation(GetHarvesterLocation(),
 	                                TargetLocation,
 	                                EHarvesterAIAction::MoveToDropOff);
+}
+
+bool UHarvester::GetIsHarvesterCloseEnoughToGoal(const FVector& GoalLocation) const
+{
+	const FVector HarvesterLocation = GetHarvesterLocation();
+	return FVector::Distance(HarvesterLocation, GoalLocation) < M_ResourceAcceptanceRadius;
 }
 
 void UHarvester::HarvestAIAction_HarvestTargetResource()

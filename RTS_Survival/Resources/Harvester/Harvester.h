@@ -188,6 +188,9 @@ private:
 	 */
 	void OnMoveToDropOffFinished(FAIRequestID RequestID, const FPathFollowingResult& Result);
 
+	/** @return Whether the harvester location is within acceptance radius of GoalLocation. */
+	bool GetIsHarvesterCloseEnoughToGoal(const FVector& GoalLocation) const;
+
 
 	// Harvests the target resource.
 	void HarvestAIAction_HarvestTargetResource();
