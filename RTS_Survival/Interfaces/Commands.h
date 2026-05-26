@@ -202,7 +202,6 @@ public:
 	 * @note This preserves queue encapsulation while enabling chain-specific movement policies.
 	 */
 	bool GetHasPreviousMovementCommandBeforeActive() const;
-	bool GetHasPreviousMovementCommandBeforeActive() const;
 
 	EAbilityID GetCurrentlyActiveCommandType() const;
 
