@@ -15,6 +15,17 @@ class UAttachedRockets;
 class RTS_SURVIVAL_API UChassisAnimInstance;
 class RTS_SURVIVAL_API UTrackPhysicsMovement;
 
+USTRUCT()
+struct FTrackedTankQueuedMoveState
+{
+	GENERATED_BODY()
+
+	FVector M_TargetLocation = FVector::ZeroVector;
+	bool bM_HasPendingQueuedMove = false;
+	bool bM_IsReverse = false;
+	bool bM_IsStationaryWhenQueued = true;
+};
+
 /**
  * Uses ATankMaster Logic for turrets and custom chaos physics for movement.
  * @note Setup in Child Blueprints:
@@ -240,7 +251,20 @@ private:
 	void OnInit_FindEnergyComponent(const int32 MyEnergy);
 	
 	bool GetIsValidTrackPhysicsMovement() const;
+	bool GetIsValidAITankController() const;
+	bool GetIsValidTankAnimationBP() const;
+	bool GetHasQueuedMovementCommandAfterActive() const;
+	void ExecuteTrackedMoveWithNavSettleDelay(const FVector& TargetLocation, const bool bIsReverse);
+	void ExecuteTrackedMoveWithNavSettleDelay_Deferred();
+	void ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse);
 
 	void HandleVoiceLineOnLevelUp() const; 
+
+	// Aggregates the currently requested move so stationary starts can wait for nav settle, while chains can repath instantly.
+	UPROPERTY()
+	FTrackedTankQueuedMoveState M_QueuedMoveState;
+
+	UPROPERTY()
+	FTimerHandle M_DeferredTrackedMoveHandle;
 
 };
