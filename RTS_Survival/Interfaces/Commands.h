@@ -196,6 +196,14 @@ public:
 	 */
 	bool GetHasQueuedMovementCommandAfterActive() const;
 
+	/**
+	 * @brief Allows movement executors to detect chain handoff and skip stationary-start delay between consecutive moves.
+	 * @return True when the command before the active one was move or reverse move.
+	 * @note This preserves queue encapsulation while enabling chain-specific movement policies.
+	 */
+	bool GetHasPreviousMovementCommandBeforeActive() const;
+	bool GetHasPreviousMovementCommandBeforeActive() const;
+
 	EAbilityID GetCurrentlyActiveCommandType() const;
 
 	bool GetIsQueueFull() const;

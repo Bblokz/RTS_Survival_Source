@@ -402,10 +402,23 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& Tar
 		return;
 	}
 
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return;
+	}
+
+	constexpr float MovingSpeedThresholdUnitsPerSecond = 3.f;
+	const bool bIsMovingNow = GetVelocity().SizeSquared2D() > FMath::Square(MovingSpeedThresholdUnitsPerSecond);
+	const bool bIsMovementChainTransition = CommandData->GetHasPreviousMovementCommandBeforeActive();
+	const bool bShouldSkipNavSettleDelay = bIsMovingNow || bIsMovementChainTransition;
+
 	M_QueuedMoveState.M_TargetLocation = TargetLocation;
 	M_QueuedMoveState.bM_HasPendingQueuedMove = true;
 	M_QueuedMoveState.bM_IsReverse = bIsReverse;
-	M_QueuedMoveState.bM_IsStationaryWhenQueued = GetVelocity().SizeSquared2D() < FMath::Square(10.f);
+	M_QueuedMoveState.bM_IsStationaryWhenQueued = not bShouldSkipNavSettleDelay;
+	// NOTE: This is the authoritative coalescing point for queued tracked moves.
+	// Any later command issued before the timer fires overwrites these fields by design.
 
 	if (GetWorld() == nullptr)
 	{
@@ -439,6 +452,8 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred()
 
 	ExecuteTrackedMoveNow(M_QueuedMoveState.M_TargetLocation, M_QueuedMoveState.bM_IsReverse);
 	M_QueuedMoveState.bM_HasPendingQueuedMove = false;
+	// NOTE: Pending flag is cleared only after the request is consumed by ExecuteTrackedMoveNow,
+	// so delayed callbacks cannot double-issue movement for the same queued state snapshot.
 }
 
 void ATrackedTankMaster::ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse)

@@ -27,6 +27,25 @@ struct FTrackedTankQueuedMoveState
 };
 
 /**
+ * @brief Stores the latest coalesced tracked-move request so nav-settle and chain continuity use one shared state source.
+ * @note This struct intentionally represents only the newest request; rapid command spam overwrites stale pending data.
+ */
+USTRUCT()
+struct FTrackedTankQueuedMoveState
+{
+	GENERATED_BODY()
+
+	// Destination that will be issued once delay/coalescing policy allows movement.
+	FVector M_TargetLocation = FVector::ZeroVector;
+	// True while a request is waiting for deferred issue; cleared immediately after ExecuteTrackedMoveNow consumes it.
+	bool bM_HasPendingQueuedMove = false;
+	// Preserves whether the pending request should complete as reverse movement semantics.
+	bool bM_IsReverse = false;
+	// Captures whether request began from near-stationary speed to decide if nav-settle delay should be applied.
+	bool bM_IsStationaryWhenQueued = true;
+};
+
+/**
  * Uses ATankMaster Logic for turrets and custom chaos physics for movement.
  * @note Setup in Child Blueprints:
  * @note 0) Call InitTrackedTank to setup bones on which forces are applied to move the tank.
