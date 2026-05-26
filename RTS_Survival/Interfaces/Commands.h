@@ -189,6 +189,21 @@ public:
 	 */
 	EAbilityID GetCurrentActiveCommand() const;
 
+	/**
+	 * @brief Used by movement executors to avoid tearing down locomotion between chained move commands.
+	 * @return True when the command after the active one is move or reverse move.
+	 * @note Keep queue-index ownership inside UCommandData so derived classes do not depend on CurrentIndex internals.
+	 */
+	bool GetHasQueuedMovementCommandAfterActive() const;
+
+	/**
+	 * @brief Allows movement executors to detect chain handoff and skip stationary-start delay between consecutive moves.
+	 * @return True when the command before the active one was move or reverse move.
+	 * @note This preserves queue encapsulation while enabling chain-specific movement policies.
+	 */
+	bool GetHasPreviousMovementCommandBeforeActive() const;
+	bool GetHasPreviousMovementCommandBeforeActive() const;
+
 	EAbilityID GetCurrentlyActiveCommandType() const;
 
 	bool GetIsQueueFull() const;

@@ -6,6 +6,7 @@
 #include "TrackedAnimationInstance.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "TimerManager.h"
 #include "PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
@@ -318,21 +319,7 @@ void ATrackedTankMaster::InitTrackedTank(
 
 void ATrackedTankMaster::ExecuteMoveCommand(const FVector MoveToLocation)
 {
-	if (not GetIsValidAIController())
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(
-			this, "AITankController", "ATrackedTankMaster::ExecuteMoveCommand");
-		return;
-	}
-
-	if (UTrackPathFollowingComponent* TrackPFC = Cast<UTrackPathFollowingComponent>(
-		AITankController->GetPathFollowingComponent()))
-	{
-		TrackPFC->SetReverse(false);
-	}
-
-	AITankController->SetMoveToLocation(MoveToLocation);
-	ExecuteCommandMoveBP(false);
+	ExecuteTrackedMoveWithNavSettleDelay(MoveToLocation, false);
 	if (GetIsValidRTSNavCollision())
 	{
 		RTSNavCollision->EnableAffectNavmesh(false);
@@ -344,48 +331,28 @@ void ATrackedTankMaster::ExecuteMoveCommand(const FVector MoveToLocation)
 void ATrackedTankMaster::TerminateMoveCommand()
 {
 	Super::TerminateMoveCommand();
-	StopBehaviourTree();
-	if (IsValid(TankAnimationBP))
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
 	{
+		return;
+	}
+	const bool bHasQueuedMovementCommandAfterActive = CommandData->GetHasQueuedMovementCommandAfterActive();
+	if (not bHasQueuedMovementCommandAfterActive)
+	{
+		StopBehaviourTree();
+		if (not GetIsValidTankAnimationBP())
+		{
+			return;
+		}
 		// Stop all animations.
 		TankAnimationBP->SetChassisAnimToIdle();
-	}
-	else
-	{
-		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "TankAnimationBP",
-		                                                  "ATrackedTankMaster::TerminateMoveCommand()");
 	}
 	CheckFootPrintForOverlaps();
 }
 
 void ATrackedTankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
 {
-	if (not IsValid(AITankController))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(
-			this, "AITankController", "ATrackedTankMaster::ExecuteReverseCommand");
-		return;
-	}
-
-	// 1) Provide the target to the AI controller (same as normal move)
-	AITankController->SetMoveToLocation(ReverseToLocation);
-
-	// 2) Force the vehicle path follower into reverse mode
-	if (UPathFollowingComponent* PFC = AITankController->GetPathFollowingComponent())
-	{
-		if (UTrackPathFollowingComponent* TrackPFC = Cast<UTrackPathFollowingComponent>(PFC))
-		{
-			TrackPFC->SetReverse(true);
-		}
-		else
-		{
-			RTSFunctionLibrary::ReportFailedCastError(
-				"PathFollowingComponent", "UTrackPathFollowingComponent",
-				"ATrackedTankMaster::ExecuteReverseCommand");
-		}
-	}
-
-	ExecuteCommandMoveBP(true);
+	ExecuteTrackedMoveWithNavSettleDelay(ReverseToLocation, true);
 
 	if (GetIsValidRTSNavCollision())
 	{
@@ -397,31 +364,114 @@ void ATrackedTankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
 
 void ATrackedTankMaster::TerminateReverseCommand()
 {
-	// Reset reverse enforcement and stop movement/BT
-	if (IsValid(AITankController))
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
 	{
-		if (UTrackPathFollowingComponent* TrackPFC =
-			Cast<UTrackPathFollowingComponent>(AITankController->GetPathFollowingComponent()))
+		return;
+	}
+	const bool bHasQueuedMovementCommandAfterActive = CommandData->GetHasQueuedMovementCommandAfterActive();
+	if (not bHasQueuedMovementCommandAfterActive)
+	{
+		// Reset reverse enforcement and stop movement/BT
+		if (GetIsValidAITankController())
 		{
-			TrackPFC->SetReverse(false);
+			if (UTrackPathFollowingComponent* TrackPFC =
+				Cast<UTrackPathFollowingComponent>(AITankController->GetPathFollowingComponent()))
+			{
+				TrackPFC->SetReverse(false);
+			}
+			AITankController->StopMovement();
 		}
-		AITankController->StopMovement();
-	}
+		StopBehaviourTree();
 
-	StopBehaviourTree();
-
-	// Return chassis to idle, mirroring TerminateMoveCommand
-	if (IsValid(TankAnimationBP))
-	{
+		// Return chassis to idle, mirroring TerminateMoveCommand
+		if (not GetIsValidTankAnimationBP())
+		{
+			return;
+		}
 		TankAnimationBP->SetChassisAnimToIdle();
-	}
-	else
-	{
-		RTSFunctionLibrary::ReportNullErrorInitialisation(
-			this, "TankAnimationBP", "ATrackedTankMaster::TerminateReverseCommand()");
 	}
 
 	Super::TerminateReverseCommand();
+}
+
+void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& TargetLocation, const bool bIsReverse)
+{
+	if (not GetIsValidAITankController())
+	{
+		return;
+	}
+
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return;
+	}
+
+	constexpr float MovingSpeedThresholdUnitsPerSecond = 3.f;
+	const bool bIsMovingNow = GetVelocity().SizeSquared2D() > FMath::Square(MovingSpeedThresholdUnitsPerSecond);
+	const bool bIsMovementChainTransition = CommandData->GetHasPreviousMovementCommandBeforeActive();
+	const bool bShouldSkipNavSettleDelay = bIsMovingNow || bIsMovementChainTransition;
+
+	M_QueuedMoveState.M_TargetLocation = TargetLocation;
+	M_QueuedMoveState.bM_HasPendingQueuedMove = true;
+	M_QueuedMoveState.bM_IsReverse = bIsReverse;
+	M_QueuedMoveState.bM_IsStationaryWhenQueued = not bShouldSkipNavSettleDelay;
+	// NOTE: This is the authoritative coalescing point for queued tracked moves.
+	// Any later command issued before the timer fires overwrites these fields by design.
+
+	if (GetWorld() == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay - World is null.");
+		return;
+	}
+
+	GetWorld()->GetTimerManager().ClearTimer(M_DeferredTrackedMoveHandle);
+
+	if (M_QueuedMoveState.bM_IsStationaryWhenQueued)
+	{
+		constexpr float NavSettleDelaySeconds = 0.4f;
+		GetWorld()->GetTimerManager().SetTimer(
+			M_DeferredTrackedMoveHandle,
+			this,
+			&ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred,
+			NavSettleDelaySeconds,
+			false);
+		return;
+	}
+
+	ExecuteTrackedMoveWithNavSettleDelay_Deferred();
+}
+
+void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred()
+{
+	if (not M_QueuedMoveState.bM_HasPendingQueuedMove)
+	{
+		return;
+	}
+
+	ExecuteTrackedMoveNow(M_QueuedMoveState.M_TargetLocation, M_QueuedMoveState.bM_IsReverse);
+	M_QueuedMoveState.bM_HasPendingQueuedMove = false;
+	// NOTE: Pending flag is cleared only after the request is consumed by ExecuteTrackedMoveNow,
+	// so delayed callbacks cannot double-issue movement for the same queued state snapshot.
+}
+
+void ATrackedTankMaster::ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse)
+{
+	if (not GetIsValidAITankController())
+	{
+		return;
+	}
+
+	if (UTrackPathFollowingComponent* TrackPFC = Cast<UTrackPathFollowingComponent>(AITankController->GetPathFollowingComponent()))
+	{
+		TrackPFC->SetReverse(bIsReverse);
+	}
+
+	AITankController->SetMoveToLocation(TargetLocation);
+	AITankController->SetQueuedMovementCompletionAbility(bIsReverse ? EAbilityID::IdReverseMove : EAbilityID::IdMove);
+	AITankController->MoveToLocationWithGoalAcceptance(TargetLocation);
+	bWasLastMovementReverse = bIsReverse;
 }
 
 
@@ -699,6 +749,34 @@ bool ATrackedTankMaster::GetIsValidTrackPhysicsMovement() const
 		this,
 		"TrackPhysicsMovement",
 		"GetIsValidTrackPhysicsMovement",
+		this);
+	return false;
+}
+
+bool ATrackedTankMaster::GetIsValidAITankController()
+{
+	if (GetIsValidAIController())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"AITankController",
+		"GetIsValidAITankController",
+		this);
+	return false;
+}
+
+bool ATrackedTankMaster::GetIsValidTankAnimationBP() const
+{
+	if (IsValid(TankAnimationBP))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"TankAnimationBP",
+		"GetIsValidTankAnimationBP",
 		this);
 	return false;
 }

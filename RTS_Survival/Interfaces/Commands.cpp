@@ -325,6 +325,30 @@ EAbilityID UCommandData::GetCurrentActiveCommand() const
 	return GetCurrentlyActiveCommandType();
 }
 
+bool UCommandData::GetHasQueuedMovementCommandAfterActive() const
+{
+	const int32 NextCommandIndex = CurrentIndex + 1;
+	if (NextCommandIndex < 0 || NextCommandIndex >= NumCommands)
+	{
+		return false;
+	}
+
+	const EAbilityID NextCommandAbility = M_TCommands[NextCommandIndex].CommandType;
+	return NextCommandAbility == EAbilityID::IdMove || NextCommandAbility == EAbilityID::IdReverseMove;
+}
+
+bool UCommandData::GetHasPreviousMovementCommandBeforeActive() const
+{
+	const int32 PreviousCommandIndex = CurrentIndex - 1;
+	if (PreviousCommandIndex < 0 || PreviousCommandIndex >= NumCommands)
+	{
+		return false;
+	}
+
+	const EAbilityID PreviousCommandAbility = M_TCommands[PreviousCommandIndex].CommandType;
+	return PreviousCommandAbility == EAbilityID::IdMove || PreviousCommandAbility == EAbilityID::IdReverseMove;
+}
+
 
 /** Return the currently active command's EAbilityID. */
 EAbilityID UCommandData::GetCurrentlyActiveCommandType() const
