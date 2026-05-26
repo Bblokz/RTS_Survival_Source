@@ -372,7 +372,9 @@ void ATrackedTankMaster::TerminateReverseCommand()
 	const bool bHasQueuedMovementCommandAfterActive = CommandData->GetHasQueuedMovementCommandAfterActive();
 	if (not bHasQueuedMovementCommandAfterActive)
 	{
-		// Reset reverse enforcement and stop movement/BT
+		// Reset reverse enforcement and stop behaviour tree.
+		// Important: do not hard-stop movement here, because reverse-to-reverse command transitions
+		// can pass through terminate on override flows and we want to preserve movement continuity.
 		if (GetIsValidAITankController())
 		{
 			if (UTrackPathFollowingComponent* TrackPFC =
@@ -380,7 +382,6 @@ void ATrackedTankMaster::TerminateReverseCommand()
 			{
 				TrackPFC->SetReverse(false);
 			}
-			AITankController->StopMovement();
 		}
 		StopBehaviourTree();
 

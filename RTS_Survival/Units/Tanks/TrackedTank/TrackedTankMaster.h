@@ -34,7 +34,6 @@ struct FTrackedTankQueuedMoveState
 	bool bM_IsStationaryWhenQueued = true;
 };
 
-
 /**
  * Uses ATankMaster Logic for turrets and custom chaos physics for movement.
  * @note Setup in Child Blueprints:
