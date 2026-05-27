@@ -6,7 +6,6 @@
 #include "BrainComponent.h"
 #include "NavigationSystem.h"
 #include "NavigationData.h"
-#include "ToolBuilderUtil.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Behaviours/Derived/BehaviourSquadRetreat/SquadRetreatBehaviour.h"

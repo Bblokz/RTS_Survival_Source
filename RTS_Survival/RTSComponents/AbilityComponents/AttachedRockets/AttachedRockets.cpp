@@ -452,7 +452,7 @@ void UAttachedRockets::CreateRocketInstances()
 	}
 	if (IsValid(Optional_RocketMaterial) && RocketMesh.IsValid())
 	{
-		RocketMesh.Get()->SetMaterial(0, Optional_RocketMaterial);
+		M_RocketsInstances->SetMaterial(0, Optional_RocketMaterial);
 	}
 	SetRocketInstancesCollision();
 

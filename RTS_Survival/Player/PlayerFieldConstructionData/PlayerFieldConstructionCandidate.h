@@ -18,15 +18,15 @@ struct FFieldConstructionCandidate
 	UPROPERTY()
 	TWeakObjectPtr<UFieldConstructionAbilityComponent> FieldConstructionAbilityComponent = nullptr;
 
-	// Actors that failed (dead, cooldown, etc.) get their GUID cached here so we can skip them next selection pass.
+	// Actors that failed (dead, cooldown, etc.) are cached here so we can skip them next selection pass.
 	UPROPERTY()
-	TArray<FGuid> ExcludedCandidateActorGuids;
+	TArray<TWeakObjectPtr<AActor>> ExcludedCandidateActors;
 
 	inline void Reset()
 	{
 		FieldConstructionAbilityComponent = nullptr;
 		FieldConstructionActor = nullptr;
-		ExcludedCandidateActorGuids.Reset();
+		ExcludedCandidateActors.Reset();
 	}
 
 	inline void AddExcludedCandidateActor(AActor* const ActorToExclude)
@@ -36,13 +36,17 @@ struct FFieldConstructionCandidate
 			return;
 		}
 
-		const FGuid ActorGuid = ActorToExclude->GetActorGuid();
-		if (not ActorGuid.IsValid())
+		ExcludedCandidateActors.RemoveAll([](const TWeakObjectPtr<AActor>& CachedActor)
+		{
+			return not CachedActor.IsValid();
+		});
+
+		if (GetIsExcludedCandidateActor(ActorToExclude))
 		{
 			return;
 		}
 
-		ExcludedCandidateActorGuids.AddUnique(ActorGuid);
+		ExcludedCandidateActors.Add(ActorToExclude);
 	}
 
 	inline bool GetIsExcludedCandidateActor(AActor* const CandidateActor) const
@@ -52,13 +56,15 @@ struct FFieldConstructionCandidate
 			return false;
 		}
 
-		const FGuid ActorGuid = CandidateActor->GetActorGuid();
-		if (not ActorGuid.IsValid())
+		for (const TWeakObjectPtr<AActor>& ExcludedCandidateActor : ExcludedCandidateActors)
 		{
-			return false;
+			if (ExcludedCandidateActor.Get() == CandidateActor)
+			{
+				return true;
+			}
 		}
 
-		return ExcludedCandidateActorGuids.Contains(ActorGuid);
+		return false;
 	}
 
 	inline ICommands* GetCommandInterface() const
