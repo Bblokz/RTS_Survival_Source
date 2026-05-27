@@ -2,7 +2,7 @@
 
 #include "ResourceConverterComponent.h"
 
-#include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
@@ -68,6 +68,7 @@ void UResourceConverterComponent::InitResourceConverter(const FResourceConverter
 	{
 		return;
 	}
+	Init_SetupOptionalTickAudioComponent();
 
 	// Validate tick rate.
 	if (M_Settings.Tick.TickRate <= 0.f)
@@ -240,6 +241,22 @@ bool UResourceConverterComponent::GetIsValidAnimatedTextManager() const
 	return false;
 }
 
+bool UResourceConverterComponent::GetIsValidOnTickAudioComponent() const
+{
+	if (IsValid(M_OnTickAudioComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_OnTickAudioComponent"),
+		TEXT("GetIsValidOnTickAudioComponent"),
+		this
+	);
+	return false;
+}
+
 
 bool UResourceConverterComponent::HasEnough(const uint8 Player, const ERTSResourceType Res,
                                             const int32 RequiredAbs) const
@@ -362,19 +379,13 @@ void UResourceConverterComponent::PlayTickSoundAtOwner() const
 	{
 		return;
 	}
-	const AActor* Owner = GetOwner();
-	if (not IsValid(Owner))
+
+	if (not GetIsValidOnTickAudioComponent())
 	{
 		return;
 	}
-	UGameplayStatics::PlaySoundAtLocation(
-		this,
-		M_Settings.OnTickSound,
-		Owner->GetActorLocation() + M_Settings.VerticalText.TextOffset,
-		1.f, 1.f, 0.f,
-		M_Settings.OnTickAttenuation,
-		M_Settings.OnTickConcurrency
-	);
+
+	M_OnTickAudioComponent->Play(0.f);
 }
 
 // ===== utilities =====
@@ -408,6 +419,54 @@ bool UResourceConverterComponent::Init_SetupResourceAndPoolManagers()
 	// Optional manager for visuals only; conversion should still run without it.
 	(void)GetAnimTextMgrFromWorld();
 	return bSuccess;
+}
+
+void UResourceConverterComponent::Init_SetupOptionalTickAudioComponent()
+{
+	if (not IsValid(M_Settings.OnTickSound))
+	{
+		return;
+	}
+
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Owner is invalid while creating tick audio component."));
+		return;
+	}
+
+	if (IsValid(M_OnTickAudioComponent))
+	{
+		M_OnTickAudioComponent->Stop();
+		M_OnTickAudioComponent->DestroyComponent();
+		M_OnTickAudioComponent = nullptr;
+	}
+
+	M_OnTickAudioComponent = NewObject<UAudioComponent>(Owner, TEXT("ResourceConverterTickAudioComponent"));
+	if (not GetIsValidOnTickAudioComponent())
+	{
+		return;
+	}
+
+	M_OnTickAudioComponent->SetAutoActivate(false);
+	M_OnTickAudioComponent->SetSound(M_Settings.OnTickSound);
+	M_OnTickAudioComponent->bAutoDestroy = false;
+	M_OnTickAudioComponent->bIsUISound = false;
+
+	if (IsValid(M_Settings.OnTickAttenuation))
+	{
+		M_OnTickAudioComponent->AttenuationSettings = M_Settings.OnTickAttenuation;
+	}
+
+	if (IsValid(M_Settings.OnTickConcurrency))
+	{
+		M_OnTickAudioComponent->ConcurrencySet.Reset();
+		M_OnTickAudioComponent->ConcurrencySet.Add(M_Settings.OnTickConcurrency);
+	}
+
+	M_OnTickAudioComponent->SetupAttachment(Owner->GetRootComponent());
+	M_OnTickAudioComponent->SetRelativeLocation(M_Settings.VerticalText.TextOffset);
+	M_OnTickAudioComponent->RegisterComponent();
 }
 
 bool UResourceConverterComponent::GetAnimTextMgrFromWorld()
