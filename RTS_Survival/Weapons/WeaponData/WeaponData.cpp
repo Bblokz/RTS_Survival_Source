@@ -1136,12 +1136,12 @@ void UWeaponState::FireSingleShot()
 {
 	if (M_CurrentMagCapacity > 0)
 	{
-		if (!bM_IsOnCooldown)
+		if (not bM_IsOnCooldown)
 		{
 			CreateLaunchVfx(
 				GetLaunchAndForwardVector().Key,
 				GetLaunchAndForwardVector().Value);
-			if (IsValid(WeaponOwner.GetObject()))
+			if (GetShouldPlayWeaponAnimationBeforeFire() && IsValid(WeaponOwner.GetObject()))
 			{
 				WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
 			}
@@ -1174,12 +1174,12 @@ void UWeaponState::FireSingleBurst()
 	// Check if there are enough bullets left for the burst.
 	if (M_CurrentMagCapacity >= M_MaxBurstAmount)
 	{
-		if (!bM_IsOnCooldown)
+		if (not bM_IsOnCooldown)
 		{
 			CreateLaunchVfx(
 				GetLaunchAndForwardVector().Key,
 				GetLaunchAndForwardVector().Value);
-			if (IsValid(WeaponOwner.GetObject()))
+			if (GetShouldPlayWeaponAnimationBeforeFire() && IsValid(WeaponOwner.GetObject()))
 			{
 				WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
 			}
@@ -1308,6 +1308,11 @@ void UWeaponState::OnStopBurstMode()
 void UWeaponState::FireWeaponSystem()
 {
 	// Implemented in childs.
+}
+
+bool UWeaponState::GetShouldPlayWeaponAnimationBeforeFire() const
+{
+	return true;
 }
 
 void UWeaponState::Reload()

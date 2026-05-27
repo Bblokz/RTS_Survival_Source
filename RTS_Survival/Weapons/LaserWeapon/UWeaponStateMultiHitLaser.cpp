@@ -67,6 +67,11 @@ void UWeaponStateMultiHitLaser::CreateLaunchVfx(
 	ScheduleLaserAfterStartupSound();
 }
 
+bool UWeaponStateMultiHitLaser::GetShouldPlayWeaponAnimationBeforeFire() const
+{
+	return false;
+}
+
 void UWeaponStateMultiHitLaser::BeginDestroy()
 {
 	if (World)
@@ -158,6 +163,11 @@ void UWeaponStateMultiHitLaser::StartLaserAfterStartupSound()
 	{
 		RTSFunctionLibrary::ReportError("Multi-hit laser tried to fire without a valid world.");
 		return;
+	}
+
+	if (IsValid(WeaponOwner.GetObject()))
+	{
+		WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
 	}
 
 	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
