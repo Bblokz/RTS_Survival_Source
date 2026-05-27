@@ -277,7 +277,15 @@ void UWeaponStateMultiHitLaser::OnMultiHitLaserAsyncTraceComplete(
 		const int32 MaxHitCount = FMath::Max(1, M_MultiHitLaserWeaponSettings.MaxHits);
 		int32 HitsProcessed = 0;
 		TSet<AActor*> HitActors;
-		for (const FHitResult& TraceHit : TraceDatum.OutHits)
+		TArray<FHitResult> SortedHits = TraceDatum.OutHits;
+		SortedHits.Sort([LaunchLocation](const FHitResult& LeftHit, const FHitResult& RightHit)
+		{
+			const float LeftDistance = FVector::DistSquared(LaunchLocation, LeftHit.ImpactPoint);
+			const float RightDistance = FVector::DistSquared(LaunchLocation, RightHit.ImpactPoint);
+			return LeftDistance < RightDistance;
+		});
+
+		for (const FHitResult& TraceHit : SortedHits)
 		{
 			AActor* HitActor = nullptr;
 			const float DamageToDeal = GetDamageToDealAndVerifyHitActor(TraceHit, HitActor);
