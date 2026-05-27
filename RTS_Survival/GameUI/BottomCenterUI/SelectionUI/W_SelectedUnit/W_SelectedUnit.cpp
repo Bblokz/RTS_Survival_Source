@@ -99,12 +99,12 @@ void UW_SelectedUnit::CacheSelectedUnitState(const FSelectedUnitsWidgetState& Ne
 
 void UW_SelectedUnit::SetImage(USlateBrushAsset* ImageBrushAsset)
 {
-	if(not IsValid(SelectedUnitImage) || not IsValid(ImageBrushAsset))
+	if (not IsValid(SelectedUnitImage) || not IsValid(ImageBrushAsset))
 	{
 		return;
 	}
-	auto CurrBrush = SelectedUnitImage->GetBrush();
-	CurrBrush.SetResourceObject(ImageBrushAsset);
+
+	SelectedUnitImage->SetBrushFromAsset(ImageBrushAsset);
 }
 
 bool UW_SelectedUnit::GetIsValidSelectionPanelOwner() const
