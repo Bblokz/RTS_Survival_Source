@@ -3913,8 +3913,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 
 	WeaponData.WeaponName = EWeaponName::D_25T_122MM_IS3;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
-	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
-	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
+	WeaponData.ShellTypes = { EWeaponShellType::Shell_HEAT, EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
 	WeaponData.WeaponCalibre = 122;
 	WeaponData.TNTExplosiveGrams = 562;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
@@ -5552,6 +5552,24 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.5f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KingTiger, TankData);
+	
+	// JagdTiger Tiger
+	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 20;
+	TankData.TurretRotationSpeed = 19;
+	TankData.VehicleMaxSpeedKmh = 15;
+	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost + 400},
+		{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + 400}
+	});
+	TankData.Abilities = BasicTankDestroyerAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_JagdTiger, TankData);
 
 	// Tiger 105 (same as King Tiger with higher cost and exp)
 	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;

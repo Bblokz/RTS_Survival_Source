@@ -167,7 +167,7 @@ void UWeaponStateMultiHitLaser::StartLaserAfterStartupSound()
 
 	if (IsValid(WeaponOwner.GetObject()))
 	{
-		WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
+		WeaponOwner->PlayWeaponAnimation(WeaponIndex, GetMyFireMode(), WeaponData.WeaponCalibre);
 	}
 
 	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();

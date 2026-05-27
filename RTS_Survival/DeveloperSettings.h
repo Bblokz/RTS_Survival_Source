@@ -640,7 +640,7 @@ namespace DeveloperSettings
 				inline constexpr float MortarTeamWeaponVisionRadius = 6500.f;
 				inline constexpr float FlakTeamWeaponVisionRadius = 6200.f;
 				inline constexpr float ArtilleryTeamWeaponVisionRadius = 7000.f;
-				inline constexpr float AircraftVisionRadius = 6000.f;
+				inline constexpr float AircraftVisionRadius = 12000.f;
 			}
 		}
 

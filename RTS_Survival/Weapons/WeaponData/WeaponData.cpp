@@ -1607,6 +1607,11 @@ void UWeaponState::OnCooldownShutDown()
 	}
 }
 
+EWeaponFireMode UWeaponState::GetMyFireMode() const
+{
+	return M_WeaponFireMode;
+}
+
 UNiagaraComponent* UWeaponState::GetOrCreateLaunchNiagaraForSocket(
 	const FName& SocketName,
 	const FRotator& /*LaunchRotation*/,

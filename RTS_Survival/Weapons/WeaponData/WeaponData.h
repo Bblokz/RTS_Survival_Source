@@ -789,6 +789,8 @@ protected:
 	UPROPERTY()
 	TArray<AActor*> ActorsToIgnore;
 
+	EWeaponFireMode GetMyFireMode()const;
+
 private:
 	// Pools world-space impact Niagara & audio per-weapon. NEW
 	UPROPERTY()
