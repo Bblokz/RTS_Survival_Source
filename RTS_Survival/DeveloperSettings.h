@@ -1120,11 +1120,11 @@ namespace DeveloperSettings
 		{
 			// Infantry Speed Settings.
 			inline constexpr float BasicInfantrySpeed = 500.f;
-			inline constexpr float BasicInfantryAcceleration = 900;
+			inline constexpr float BasicInfantryAcceleration = 1350.f;
 			inline constexpr float FastInfantrySpeed = 700.f;
-			inline constexpr float FastInfantryAcceleration = 1200;
+			inline constexpr float FastInfantryAcceleration = 1800.f;
 			inline constexpr float SlowInfantrySpeed = 400.f;
-			inline constexpr float SlowInfantryAcceleration = 700;
+			inline constexpr float SlowInfantryAcceleration = 1050.f;
 		}
 	}
 
