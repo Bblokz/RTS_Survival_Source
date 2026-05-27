@@ -244,7 +244,7 @@ struct FAimPositionMontages
 	UAnimMontage* Welding;
 	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category = "Misc Full Body Montages")
-	UAnimMontage* GrenadePullAndThrow;
+	UAnimMontage* GrenadePullAndThrow = nullptr;
 };
 
 /**
