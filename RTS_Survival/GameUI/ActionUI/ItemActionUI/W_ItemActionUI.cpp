@@ -21,7 +21,7 @@ void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility, const int3
 void UW_ItemActionUI::InitActionUIElement(
 	ACPPController* PlayerController,
 	const int32 IndexActionUIElm, UActionUIManager* ActionUIManager)
-{
+{	
 	if (not IsValid(PlayerController))
 	{
 		RTSFunctionLibrary::ReportError("UW_ItemActionUI received an invalid player controller during init.");

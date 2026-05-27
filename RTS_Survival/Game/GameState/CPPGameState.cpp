@@ -1385,7 +1385,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram
+	WeaponData.ShrapnelDamage = 5 + 1.45*WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
@@ -1416,7 +1416,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy - 2;
 	WeaponData.ShrapnelRange = (WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt) / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
+	WeaponData.ShrapnelDamage = 1.45* WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
@@ -1452,7 +1452,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
 	WeaponData.ShrapnelRange = (WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt) / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
+	WeaponData.ShrapnelDamage = 1.45*WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;

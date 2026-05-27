@@ -690,6 +690,20 @@ public:
 	TSoftObjectPtr<UWorld> GetRTSMapToLoad(const UObject* WorldContextObject);
 	void SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad);
 
+	// String Utils
+	UFUNCTION(BlueprintPure, Category = "RTS_StringUtils")
+	static FString BP_GetRichTextStringFromDataTableString(const FString& DataTableString);
+
+	UFUNCTION(BlueprintPure, Category = "RTS_StringUtils")
+	static FText BP_GetRichTextFromDataTableText(const FText& DataTableText);
+
+	
+	UFUNCTION(BlueprintPure, Category = "RTS_StringUtils")
+	static FText BP_GetRichTextTextFromDataTableString(const FString& DataTableString);
+
+	UFUNCTION(BlueprintPure, Category = "RTS_StringUtils")
+	static FText BP_GetRichTextTextFromDataTableText(const FText& DataTableText);
+
 private:
 	
 

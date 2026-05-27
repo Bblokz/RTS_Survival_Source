@@ -1517,3 +1517,45 @@ void URTSBlueprintFunctionLibrary::SetRTSMapToLoad(const UObject* WorldContextOb
 	}
 	GameInstance->SetMapToLoad(MapToLoad);
 }
+
+FString URTSBlueprintFunctionLibrary::BP_GetRichTextStringFromDataTableString(const FString& DataTableString)
+{
+	if (DataTableString.IsEmpty())
+	{
+		return FString();
+	}
+
+	FString RichTextString = DataTableString;
+
+	// Convert escaped DataTable line breaks into real RichTextBlock line breaks.
+	RichTextString.ReplaceInline(TEXT("\\r\\n"), TEXT("\n"), ESearchCase::CaseSensitive);
+	RichTextString.ReplaceInline(TEXT("\\n"), TEXT("\n"), ESearchCase::CaseSensitive);
+
+	// Optional readable alternative for DataTables.
+	RichTextString.ReplaceInline(TEXT("<br>"), TEXT("\n"), ESearchCase::IgnoreCase);
+
+	return RichTextString;
+}
+
+FText URTSBlueprintFunctionLibrary::BP_GetRichTextFromDataTableText(const FText& DataTableText)
+{
+	const FString RichTextString = BP_GetRichTextStringFromDataTableString(DataTableText.ToString());
+	return FText::FromString(RichTextString);
+}
+
+FText URTSBlueprintFunctionLibrary::BP_GetRichTextTextFromDataTableString(const FString& DataTableString)
+{
+	const FString RichTextString = BP_GetRichTextStringFromDataTableString(DataTableString);
+	return FText::FromString(RichTextString);
+}
+
+FText URTSBlueprintFunctionLibrary::BP_GetRichTextTextFromDataTableText(const FText& DataTableText)
+{
+	if (DataTableText.IsEmpty())
+	{
+		return FText::GetEmpty();
+	}
+
+	const FString RichTextString = BP_GetRichTextStringFromDataTableString(DataTableText.ToString());
+	return FText::FromString(RichTextString);
+}
