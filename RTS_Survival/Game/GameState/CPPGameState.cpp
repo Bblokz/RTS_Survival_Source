@@ -619,6 +619,7 @@ void ACPPGameState::SetupBreakThroughTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1)),
@@ -707,6 +708,7 @@ void ACPPGameState::SetupStrikeDivisionTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZII_Flame)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_J)),
@@ -800,6 +802,29 @@ void ACPPGameState::InitAllGameLaserWeapons()
 	using DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed;
 
 	// Note: laser uses iterations (configurable in the BP that uses this weapon)
+	WeaponData.WeaponName = EWeaponName::PzJagerLaser35;
+	WeaponData.DamageType = ERTSDamageType::Laser;
+	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE};
+	WeaponData.WeaponCalibre = 35.f;
+	WeaponData.TNTExplosiveGrams = 0;
+	WeaponData.BaseDamage = Strahlkanone39BaseDamage * LaserWeaponDamageMlt;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumLaserWeaponRange;
+	WeaponData.ArmorPen = 0;
+	WeaponData.ArmorPenMaxRange = 0;
+	WeaponData.MagCapacity = 3;
+	WeaponData.ReloadSpeed = 7.5f;
+	WeaponData.BaseCooldown = 0.25;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 100;
+	WeaponData.ShrapnelRange = 0;
+	WeaponData.ShrapnelDamage = 0;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0;
+	WeaponData.ProjectileMovementSpeed = 0;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::PzJagerLaser35, WeaponData);
+
 	WeaponData.WeaponName = EWeaponName::Strahlkanone39;
 	WeaponData.DamageType = ERTSDamageType::Laser;
 	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
@@ -4599,6 +4624,12 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzJager, TankData);
 
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, LightTankDestroyerRadixiteCost},
+		{ERTSResourceType::Resource_VehicleParts, RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankDestroyerVehiclePartsCost * 1.5f, 5)}
+	});
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzJagerLaser, TankData);
+
 	// Marder (light TD)
 	TankData.MaxHealth = LightMediumTankBase - OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
@@ -7284,7 +7315,8 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager))
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser))
 	};
 	NomadicData.BuildingAnimationTime = LightTankFactoryBuildingAnimationTime;
 	NomadicData.VehicleExpansionTime = T1TruckVehicleConversionTime;

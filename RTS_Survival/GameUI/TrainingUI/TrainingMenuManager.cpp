@@ -405,6 +405,25 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Ger PzJager Laser
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankDestroyerTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_PzJagerLaser,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None,
+			{}, FRTS_RequirementHelpers::CreateTechRequirement(GetTransientPackage(), ETechnology::Tech_PzJager)
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 	// Ger Pz I Harvester
 	{
 		FTrainingOption ItemID = FTrainingOption(

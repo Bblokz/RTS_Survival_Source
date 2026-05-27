@@ -477,7 +477,8 @@ void FRTS_Profile::InitializeTestProfile()
 	ForgeLayout.BuildingType = ENomadicLayoutBuildingType::Building_Forge;
 	ForgeLayout.Cards = {
 		ERTSCard::Card_Train_Pz38T, ERTSCard::Card_Train_PzII_F, ERTSCard::Card_Train_PzI_150MM,
-		ERTSCard::Card_Train_PzJager, ERTSCard::Card_Train_Marder, ERTSCard::Card_Train_Hetzer
+		ERTSCard::Card_Train_PzJager, ERTSCard::Card_Train_PzJagerLaser, ERTSCard::Card_Train_Marder,
+		ERTSCard::Card_Train_Hetzer
 	};
 	ForgeLayout.Slots = 7;
 
