@@ -181,7 +181,7 @@ public:
 
 	void SetVehicleFireFeedbackComponent(UVehicleFireFeedbackComponent* InVehicleFireFeedbackComponent);
 
-	inline bool BGetIsInRangeOfTarget() const;
+	bool BGetIsInRangeOfTarget() const;
 
 protected:
 	virtual void BeginPlay() override;

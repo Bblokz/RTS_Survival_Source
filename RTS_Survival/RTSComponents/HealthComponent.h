@@ -89,7 +89,7 @@ public:
 	void SetLocalLocation(const FVector& NewLocation) const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	inline float GetHealthPercentage() const { return CurrentHealth / MaxHealth; };
-	inline UWidgetComponent* GetHealthBarWidgetComp() const;
+	UWidgetComponent* GetHealthBarWidgetComp() const;
 
 	void ChangeTargetIconType(const ETargetTypeIcon NewIconType);
 
