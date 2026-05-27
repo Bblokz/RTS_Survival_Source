@@ -14,6 +14,7 @@
 class URTSComponent;
 class UPlayerResourceManager;
 class UAnimatedTextWidgetPoolManager;
+class UAudioComponent;
 
 /**
  * @brief Container for vertical text layout/styling to use with the pooled system.
@@ -160,6 +161,10 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UAnimatedTextWidgetPoolManager> M_AnimatedTextManager;
 
+	// Optional persistent audio component created on owner when OnTickSound is configured.
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> M_OnTickAudioComponent = nullptr;
+
 	// ======= Helpers / flow =======
 
 	/** Start/refresh the timer from current settings; return false if not possible. */
@@ -175,6 +180,7 @@ private:
 	bool GetIsValidRTSComponent() const;
 	bool GetIsValidPlayerResourceManager() const;
 	bool GetIsValidAnimatedTextManager() const;
+	bool GetIsValidOnTickAudioComponent() const;
 
 	// ---- Adapter helpers to your PlayerResourceManager API ----
 	/**
@@ -198,6 +204,7 @@ private:
 	// ---- Animated text / audio helpers ----
 	void ShowResourceTextAtOwner(const TMap<ERTSResourceType, int32>& AppliedDeltas) const;
 	void PlayTickSoundAtOwner() const;
+	void Init_SetupOptionalTickAudioComponent();
 
 	// ---- Small utilities ----
 	/** Clamp the map to max 2 entries for UI; logs and truncates deterministically. */
