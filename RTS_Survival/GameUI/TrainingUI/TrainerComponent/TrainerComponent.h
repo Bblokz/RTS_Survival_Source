@@ -88,8 +88,8 @@ public:
 	inline bool GetIsAbleToTrain() const { return M_TrainingEnabled.bIsAbleToTrain; }
 
 	/** @return True if the queue is paused. */
-	inline bool GetIsPaused() const;
-	inline bool GetIsQueueEmpty() const;
+	bool GetIsPaused() const;
+	bool GetIsQueueEmpty() const;
 
 	// Note if you use training preview ensure that the building mesh on the nomadic vehicle has a socket named TrainingPreview.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="ReferenceCasts")

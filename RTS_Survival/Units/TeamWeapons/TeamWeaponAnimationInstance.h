@@ -79,7 +79,7 @@ protected:
 	 * @return The current aim offset sequence that is the base pose, based on the current aim offset type.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
-	inline UAnimSequence* GetCurrentAOBaseSequence();
+	UAnimSequence* GetCurrentAOBaseSequence();
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Settings")
 	FTeamWeaponAnimSettings TWAnimSettings;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Animations|Sequences")

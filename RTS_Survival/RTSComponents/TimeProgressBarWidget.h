@@ -52,9 +52,9 @@ public:
     float GetTimeElapsed() const;
 
     /** @brief Sets the local location of the progress bar. */
-    inline void SetLocalLocation(const FVector& NewLocation) const ; 
+    void SetLocalLocation(const FVector& NewLocation) const ; 
 
-    inline FVector GetLocalLocation() const;
+    FVector GetLocalLocation() const;
 
 protected:
     // Called when the game starts or the widget is created
