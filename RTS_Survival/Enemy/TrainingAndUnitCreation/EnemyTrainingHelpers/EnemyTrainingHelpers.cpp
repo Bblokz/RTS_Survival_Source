@@ -1,6 +1,5 @@
 ﻿#include "EnemyTrainingHelpers.h"
 
-#include "InputBehavior.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "NavFilters/NavigationQueryFilter.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/ERTSNavAgents.h"
 #include "UObject/Interface.h"
 
