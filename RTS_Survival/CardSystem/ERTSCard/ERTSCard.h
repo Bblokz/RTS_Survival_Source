@@ -128,6 +128,7 @@ enum class ERTSCard : uint8
 
 	// TrainingOptions -- Light Vehicles
 	Card_Train_PzJager,
+	Card_Train_PzJagerLaser,
 	Card_Train_PzI_Harvester,
 	Card_Train_PzI_Scout,
 	Card_Train_PzI_150MM,

@@ -69,6 +69,7 @@ enum class ETankSubtype : uint8
 
 	// German Light tanks.
 	Tank_PzJager UMETA(DisplayName = "Ger Light PzJager"),
+	Tank_PzJagerLaser UMETA(DisplayName = "Ger Light PzJager Laser"),
 	Tank_PzI_Harvester UMETA(DisplayName = "Ger Light Pz I Harvester"),
 	Tank_PzI_Scout UMETA(DisplayName = "Ger Light Pz I Scout"),
 	Tank_PzI_15cm UMETA(DisplayName = "Ger Light Pz I 15cm"),
@@ -246,6 +247,7 @@ static bool Global_GetIsTankDestroyer(const ETankSubtype TankSubtype)
 	switch (TankSubtype)
 	{
 	case ETankSubtype::Tank_PzJager:
+	case ETankSubtype::Tank_PzJagerLaser:
 	case ETankSubtype::Tank_Marder:
 	case ETankSubtype::Tank_PzIV_70:
 	case ETankSubtype::Tank_Hetzer:
@@ -268,6 +270,7 @@ static bool Global_GetIsLightTank(const ETankSubtype TankSubtype)
 	switch (TankSubtype)
 	{
 	case ETankSubtype::Tank_PzJager:
+	case ETankSubtype::Tank_PzJagerLaser:
 	case ETankSubtype::Tank_PzI_Scout:
 	case ETankSubtype::Tank_PzI_15cm:
 	case ETankSubtype::Tank_Pz38t:
