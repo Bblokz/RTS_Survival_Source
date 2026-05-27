@@ -696,6 +696,7 @@ protected:
 
 	void FireSingleShot();
 	void FireSingleBurst();
+	virtual bool GetShouldPlayWeaponAnimationBeforeFire() const;
 	void FireRandomBurst();
 
 	virtual void FireWeaponSystem();

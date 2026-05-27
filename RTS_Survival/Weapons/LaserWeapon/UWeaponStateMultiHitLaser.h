@@ -38,6 +38,7 @@ protected:
 	virtual void FireWeaponSystem() override;
 	virtual void CreateLaunchVfx(const FVector& LaunchLocation, const FVector& ForwardVector,
 	                             const bool bCreateShellCase) override;
+	virtual bool GetShouldPlayWeaponAnimationBeforeFire() const override;
 	virtual void BeginDestroy() override;
 	virtual void OnStopFire() override;
 	virtual void FireTraceIteration(const int32 PulseSerial) override;
