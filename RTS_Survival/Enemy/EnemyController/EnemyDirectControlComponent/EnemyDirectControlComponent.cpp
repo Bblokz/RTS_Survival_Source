@@ -616,7 +616,8 @@ TArray<AActor*> UEnemyDirectControlComponent::GetRegisteredDirectControlUnits() 
 	return RegisteredActors;
 }
 
-FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMaxIdleBlackboardUnits(const int32 MaxUnitsToPick) const
+FBlackboardIdleUnitsResult UEnemyDirectControlComponent::PickRandomMaxIdleBlackboardUnits(
+	const int32 MaxUnitsToPick) const
 {
 	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
 	if (not IsValid(StrategicAIComponent))
@@ -957,61 +958,59 @@ void UEnemyDirectControlComponent::RemoveInvalidRegisteredUnits()
 
 void UEnemyDirectControlComponent::DebugDrawRegisteredDirectControlUnits() const
 {
-	if constexpr (not DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols)
 	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return;
-	}
-
-	UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
-	if (not IsValid(StrategicAIComponent))
-	{
-		return;
-	}
-
-	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
-	for (TWeakObjectPtr<AActor> RegisteredUnit : Blackboard.IdleDirectControlUnits)
-	{
-		if (not RegisteredUnit.IsValid())
+		UWorld* World = GetWorld();
+		if (not IsValid(World))
 		{
-			continue;
+			return;
 		}
 
-		const FVector UnitLocation = RegisteredUnit->GetActorLocation();
-
-		if constexpr (
-			EnemyDirectControlConstants::Debugging::DrawRegisteredUnitLabel
-			&& DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols)
+		UEnemyStrategicAIComponent* const StrategicAIComponent = GetValidStrategicAIComponent();
+		if (not IsValid(StrategicAIComponent))
 		{
-			DrawDebugString(
-				World,
-				UnitLocation + FVector(0.f, 0.f, EnemyDirectControlConstants::DebugTextOffsetZ),
-				TEXT("Direct Control"),
-				nullptr,
-				FColor::Red,
-				EnemyDirectControlConstants::DebugDrawDurationSeconds,
-				true);
+			return;
 		}
 
-		if constexpr (
-			EnemyDirectControlConstants::Debugging::DrawRegisteredUnitSphere
-			&& DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols)
+		FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+		for (TWeakObjectPtr<AActor> RegisteredUnit : Blackboard.IdleDirectControlUnits)
 		{
-			DrawDebugSphere(
-				World,
-				UnitLocation + FVector(0.f, 0.f, EnemyDirectControlConstants::DebugSphereOffsetZ),
-				EnemyDirectControlConstants::DebugSphereRadius,
-				EnemyDirectControlConstants::DebugSphereSegments,
-				FColor::Red,
-				false,
-				EnemyDirectControlConstants::DebugDrawDurationSeconds,
-				0,
-				EnemyDirectControlConstants::DebugSphereThickness);
+			if (not RegisteredUnit.IsValid())
+			{
+				continue;
+			}
+
+			const FVector UnitLocation = RegisteredUnit->GetActorLocation();
+
+			if constexpr (
+				EnemyDirectControlConstants::Debugging::DrawRegisteredUnitLabel
+				&& DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols)
+			{
+				DrawDebugString(
+					World,
+					UnitLocation + FVector(0.f, 0.f, EnemyDirectControlConstants::DebugTextOffsetZ),
+					TEXT("Direct Control"),
+					nullptr,
+					FColor::Red,
+					EnemyDirectControlConstants::DebugDrawDurationSeconds,
+					true);
+			}
+
+			if constexpr (
+				EnemyDirectControlConstants::Debugging::DrawRegisteredUnitSphere
+				&& DeveloperSettings::Debugging::GEnemyController_DirectControl_Compile_DebugSymbols)
+			{
+				DrawDebugSphere(
+					World,
+					UnitLocation + FVector(0.f, 0.f, EnemyDirectControlConstants::DebugSphereOffsetZ),
+					EnemyDirectControlConstants::DebugSphereRadius,
+					EnemyDirectControlConstants::DebugSphereSegments,
+					FColor::Red,
+					false,
+					EnemyDirectControlConstants::DebugDrawDurationSeconds,
+					0,
+					EnemyDirectControlConstants::DebugSphereThickness);
+			}
 		}
 	}
 }

@@ -20,7 +20,9 @@ ARTSActorSpline::ARTSActorSpline()
 	if (ActorSpline)
 	{
 		ActorSpline->SetMobility(EComponentMobility::Movable);
+#if WITH_EDITOR
 		ActorSpline->bAllowDiscontinuousSpline = true;
+#endif
 		ActorSpline->CastShadow = false;
 		ActorSpline->bCastDynamicShadow = false;
 	}

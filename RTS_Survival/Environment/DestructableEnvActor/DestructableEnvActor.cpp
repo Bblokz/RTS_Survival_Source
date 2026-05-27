@@ -66,12 +66,14 @@ void ADestructableEnvActor::SetupCrushDestructionOverlap(UPrimitiveComponent* Ov
 	{
 		return;
 	}
-	
+
+#if !UE_BUILD_SHIPPING
 	RTS_ENSURE(OverlapComponent && OverlapComponent->GetGenerateOverlapEvents());
 	RTS_ENSURE(OverlapComponent && OverlapComponent->GetCollisionResponseToChannel(COLLISION_OBJ_PLAYER) == ECR_Overlap)
 	;
-	M_CrushDeathType = CrushDeathType;
+#endif
 
+	M_CrushDeathType = CrushDeathType;
 
 
 	// Make sure overlap events will fire.
@@ -320,7 +322,6 @@ void ADestructableEnvActor::CollapseMeshWithSwapping(
 	USoundCue* AttachSound,
 	const FVector AttachOffset)
 {
-	
 	OnDestructibleCollapse.Broadcast();
 	if (not IsValid(CollapseParameters.ComponentToSwapOn))
 	{
@@ -368,7 +369,6 @@ void ADestructableEnvActor::DestroyAndSpawnActors(const FDestroySpawnActorsParam
 void ADestructableEnvActor::VerticalDestruction(const FRTSVerticalCollapseSettings& CollapseSettings,
                                                 const FCollapseFX& CollapseFX)
 {
-	
 	OnDestructibleCollapse.Broadcast();
 	TWeakObjectPtr<ADestructableEnvActor> WeakThis(this);
 	auto OnFinished = [WeakThis]()
@@ -511,16 +511,16 @@ void ADestructableEnvActor::HandleBeginOverlap_HeavyTank(UPrimitiveComponent* Ov
 	switch (M_CrushDeathType)
 	{
 	case ECrushDeathType::Impulse:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		M_ImpulseOnCrushed.QueueImpulseFromOverlap(OverlappedComponent, OtherComp, bFromSweep, SweepResult, GetWorld());
 		break;
 	case ECrushDeathType::VerticalCollapse:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		M_VerticalCollapseOnCrushed.QueueCollapseFromOverlap(OverlappedComponent, OtherComp, bFromSweep, SweepResult,
 		                                                     GetWorld());
 		break;
 	case ECrushDeathType::RegularDeath:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		OnUnitDies(ERTSDeathType::Scavenging);
 		break;
 	default:
@@ -547,16 +547,16 @@ void ADestructableEnvActor::HandleBeginOverlap_MediumOrHeavy(UPrimitiveComponent
 	switch (M_CrushDeathType)
 	{
 	case ECrushDeathType::Impulse:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		M_ImpulseOnCrushed.QueueImpulseFromOverlap(OverlappedComponent, OtherComp, bFromSweep, SweepResult, GetWorld());
 		break;
 	case ECrushDeathType::VerticalCollapse:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		M_VerticalCollapseOnCrushed.QueueCollapseFromOverlap(OverlappedComponent, OtherComp, bFromSweep, SweepResult,
 		                                                     GetWorld());
 		break;
 	case ECrushDeathType::RegularDeath:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		OnUnitDies(ERTSDeathType::Scavenging);
 		break;
 	default:
@@ -583,17 +583,17 @@ void ADestructableEnvActor::HandleBeginOverlap_AnyTank(UPrimitiveComponent* Over
 	switch (M_CrushDeathType)
 	{
 	case ECrushDeathType::Impulse:
-		
-	OnDestructibleCollapse.Broadcast();
+
+		OnDestructibleCollapse.Broadcast();
 		M_ImpulseOnCrushed.QueueImpulseFromOverlap(OverlappedComponent, OtherComp, bFromSweep, SweepResult, GetWorld());
 		break;
 	case ECrushDeathType::VerticalCollapse:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		M_VerticalCollapseOnCrushed.QueueCollapseFromOverlap(OverlappedComponent, OtherComp, bFromSweep, SweepResult,
 		                                                     GetWorld());
 		break;
 	case ECrushDeathType::RegularDeath:
-	OnDestructibleCollapse.Broadcast();
+		OnDestructibleCollapse.Broadcast();
 		OnUnitDies(ERTSDeathType::Scavenging);
 		break;
 	default:
