@@ -38,6 +38,7 @@ private:
         UPROPERTY()
         TWeakObjectPtr<UW_BehaviourContainer> M_BehaviourContainer;
 
+        UPROPERTY()
         FBehaviourUIData M_BehaviourUIData;
 
         UPROPERTY()
