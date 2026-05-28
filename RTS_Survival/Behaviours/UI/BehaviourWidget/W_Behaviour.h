@@ -12,6 +12,7 @@ class UButton;
 class UImage;
 class UW_BehaviourContainer;
 class UBehaviourButtonSettings;
+struct FSlateBrush;
 
 /**
  * @brief Widget representing a single behaviour entry in the behaviour container.
@@ -41,10 +42,12 @@ private:
         bool GetIsValidBehaviourContainer() const;
         bool GetIsValidBehaviourButton() const;
         bool GetIsValidBehaviourImage() const;
+        static bool GetIsValidBehaviourButtonSettings(const UBehaviourButtonSettings* BehaviourButtonSettings);
 
         static const UBehaviourButtonSettings* GetBehaviourButtonSettings();
 
         void ApplyBehaviourIcon();
+        void ClearBehaviourIconBrush() const;
 
         UFUNCTION()
         void OnHoveredButton();
