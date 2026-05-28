@@ -3,20 +3,14 @@
 #include "Components/Image.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarIcons/HealthBarIcons.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "Slate/SlateBrushAsset.h"
-
 bool FTargetTypeIconState::GetImplementsTargetTypeIcon() const
 {
-	if (TargetTypeIconImage.IsValid())
-	{
-		return true;
-	}
-	return false;
+	return GetIsValidTargetTypeIconImage();
 }
 
 void FTargetTypeIconState::SetNewTargetTypeIcon(const int8 OwningPlayer, const ETargetTypeIcon NewTargetTypeIcon, const AActor* ActorContext)
 {
-	if (not TargetTypeIconImage.IsValid())
+	if (not GetIsValidTargetTypeIconImage())
 	{
 		return;
 	}
@@ -29,7 +23,7 @@ void FTargetTypeIconState::SetNewTargetTypeIcon(const int8 OwningPlayer, const E
 		return;
 	}
 
-	TargetTypeIconImage->SetBrushFromAsset(OwningPlayer == 1
+	TargetTypeIconImage->SetBrushFromTexture(OwningPlayer == 1
 		                                         ? TypeToBrush[NewTargetTypeIcon].PlayerBrush
 		                                         : TypeToBrush[NewTargetTypeIcon].EnemyBrush);
 }
@@ -44,5 +38,16 @@ bool FTargetTypeIconState::IsTypeContainedAndValid(const ETargetTypeIcon Type, c
 	OwnerName = "Actor context: "  + OwnerName;
 	RTSFunctionLibrary::ReportError("The target type icon brushes are not set correctly"
 		"\n For Type: " + UEnum::GetValueAsString(Type));
+	return false;
+}
+
+bool FTargetTypeIconState::GetIsValidTargetTypeIconImage() const
+{
+	if (TargetTypeIconImage.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("FTargetTypeIconState: TargetTypeIconImage is invalid.");
 	return false;
 }

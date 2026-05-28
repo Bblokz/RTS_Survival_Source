@@ -4,7 +4,7 @@
 
 #include "TargetTypeIconState.generated.h"
 
-class USlateBrushAsset;
+class UTexture2D;
 enum class ETargetTypeIcon : uint8;
 class UImage;
 
@@ -14,10 +14,10 @@ struct FTargetTypeIconBrushes
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<USlateBrushAsset> PlayerBrush = nullptr;
+	TObjectPtr<UTexture2D> PlayerBrush = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<USlateBrushAsset> EnemyBrush = nullptr;
+	TObjectPtr<UTexture2D> EnemyBrush = nullptr;
 };
 
 USTRUCT(Blueprintable)
@@ -36,5 +36,6 @@ struct FTargetTypeIconState
 	TMap<ETargetTypeIcon, FTargetTypeIconBrushes> TypeToBrush;
 
 private:
+	bool GetIsValidTargetTypeIconImage() const;
 	bool IsTypeContainedAndValid(const ETargetTypeIcon Type, const AActor* ActorContext);
 };
