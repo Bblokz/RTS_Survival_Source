@@ -7,6 +7,7 @@
 #include "RTS_Survival/Behaviours/ProjectSettings/BehaviourButtonSettings.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourContainer/W_BehaviourContainer.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "Styling/SlateBrush.h"
 
 void UW_Behaviour::InitBehaviourWidget(UW_BehaviourContainer* InBehaviourContainer)
 {
@@ -101,8 +102,28 @@ bool UW_Behaviour::GetIsValidBehaviourImage() const
 
 const UBehaviourButtonSettings* UW_Behaviour::GetBehaviourButtonSettings()
 {
-        static const UBehaviourButtonSettings* CachedSettings = UBehaviourButtonSettings::Get();
-        return CachedSettings;
+        return UBehaviourButtonSettings::Get();
+}
+
+bool UW_Behaviour::GetIsValidBehaviourButtonSettings(const UBehaviourButtonSettings* BehaviourButtonSettings)
+{
+        if (IsValid(BehaviourButtonSettings))
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportError(TEXT("UW_Behaviour::GetIsValidBehaviourButtonSettings: Behaviour button settings are invalid."));
+        return false;
+}
+
+void UW_Behaviour::ClearBehaviourIconBrush() const
+{
+        if (not GetIsValidBehaviourImage())
+        {
+                return;
+        }
+
+        BehaviourImage->SetBrush(FSlateBrush());
 }
 
 void UW_Behaviour::ApplyBehaviourIcon()
@@ -113,9 +134,9 @@ void UW_Behaviour::ApplyBehaviourIcon()
         }
 
         const UBehaviourButtonSettings* BehaviourButtonSettings = GetBehaviourButtonSettings();
-        if (not IsValid(BehaviourButtonSettings))
+        if (not GetIsValidBehaviourButtonSettings(BehaviourButtonSettings))
         {
-                RTSFunctionLibrary::ReportError(TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to access behaviour button settings."));
+                ClearBehaviourIconBrush();
                 return;
         }
 
@@ -128,6 +149,7 @@ void UW_Behaviour::ApplyBehaviourIcon()
                 RTSFunctionLibrary::ReportError(
                         TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to find icon texture for behaviour icon.")
                         "\n Icon: " + IconAsString);
+                ClearBehaviourIconBrush();
                 return;
         }
 
