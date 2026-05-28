@@ -10,6 +10,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSDebugBreak/RTSDebugBreak.h"
 
 namespace BehaviourCompConstants
 {
@@ -71,11 +72,13 @@ void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 void UBehaviourComp::AddBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
 {
+	RTS_ENSUREMSGF(IsValid(BehaviourClass), TEXT("Invalid BehaviourClass provided to AddBehaviour: %s"), *GetNameSafe(BehaviourClass));
 	AddBehaviourInternal(BehaviourClass, TOptional<float>());
 }
 
 void UBehaviourComp::AddBehaviourWithDuration(TSubclassOf<UBehaviour> BehaviourClass, const float CustomLifetimeSeconds)
 {
+	RTS_ENSUREMSGF(IsValid(BehaviourClass), TEXT("Invalid BehaviourClass provided to AddBehaviourWithDuration: %s"), *GetNameSafe(BehaviourClass));
 	AddBehaviourInternal(BehaviourClass, CustomLifetimeSeconds);
 }
 

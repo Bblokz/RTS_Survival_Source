@@ -17,7 +17,7 @@ public class RTS_SurvivalTarget : TargetRules
 			BuildEnvironment = TargetBuildEnvironment.Unique;
 			// this causes crashes in shipping when set to true https://issues.unrealengine.com/issue/UE-171275
 			// (was true by default)
-			bUseChecksInShipping = false;
+			bUseChecksInShipping = true;
 			bUseLoggingInShipping = true;
 		}
 

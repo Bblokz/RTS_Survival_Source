@@ -53,6 +53,7 @@ void UW_SelectedUnitDescription::NativeOnInitialized()
 	{
 		TMap<ETargetTypeIcon, FTargetTypeIconBrushes> ResolvedMap;
 		Settings->ResolveTypeToBrushMap(ResolvedMap);
+		ensureMsgf(ResolvedMap.Num(), TEXT("Could not obtain a map with any target type icons from the project settings!"));
 
 		if (ResolvedMap.Num() > 0)
 		{

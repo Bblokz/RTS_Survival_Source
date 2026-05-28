@@ -22,13 +22,13 @@ void UTargetTypeIconSettings::ResolveTypeToBrushMap(TMap<ETargetTypeIcon, FTarge
 		FTargetTypeIconBrushes Resolved;
 
 		// LoadSynchronous() is fine here because settings are read rarely (e.g., on init)
-		Resolved.PlayerBrush = Pair.Value.PlayerBrush.IsNull()
+		Resolved.PlayerBrush = Pair.Value.PlayerTexture.IsNull()
 			? nullptr
-			: Pair.Value.PlayerBrush.LoadSynchronous();
+			: Pair.Value.PlayerTexture.LoadSynchronous();
 
-		Resolved.EnemyBrush = Pair.Value.EnemyBrush.IsNull()
+		Resolved.EnemyBrush = Pair.Value.EnemyTexture.IsNull()
 			? nullptr
-			: Pair.Value.EnemyBrush.LoadSynchronous();
+			: Pair.Value.EnemyTexture.LoadSynchronous();
 
 		OutMap.Add(Pair.Key, MoveTemp(Resolved));
 	}

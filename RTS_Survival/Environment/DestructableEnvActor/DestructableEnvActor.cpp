@@ -67,12 +67,8 @@ void ADestructableEnvActor::SetupCrushDestructionOverlap(UPrimitiveComponent* Ov
 		return;
 	}
 
-#if !UE_BUILD_SHIPPING
 	RTS_ENSURE(OverlapComponent && OverlapComponent->GetGenerateOverlapEvents());
-	RTS_ENSURE(OverlapComponent && OverlapComponent->GetCollisionResponseToChannel(COLLISION_OBJ_PLAYER) == ECR_Overlap)
-	;
-#endif
-
+	RTS_ENSURE(OverlapComponent && OverlapComponent->GetCollisionResponseToChannel(COLLISION_OBJ_PLAYER) == ECR_Overlap);
 	M_CrushDeathType = CrushDeathType;
 
 

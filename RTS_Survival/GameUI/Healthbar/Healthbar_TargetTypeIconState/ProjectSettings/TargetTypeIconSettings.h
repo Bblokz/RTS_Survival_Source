@@ -14,11 +14,11 @@ struct FTargetTypeIconBrushes_Soft
 
 	/** Player icon texture (soft ref so it can live in config). */
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category="Icons")
-	TSoftObjectPtr<UTexture2D> PlayerBrush;
+	TSoftObjectPtr<UTexture2D> PlayerTexture;
 
 	/** Enemy icon texture (soft ref so it can live in config). */
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category="Icons")
-	TSoftObjectPtr<UTexture2D> EnemyBrush;
+	TSoftObjectPtr<UTexture2D> EnemyTexture;
 };
 
 /**

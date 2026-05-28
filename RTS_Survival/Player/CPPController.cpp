@@ -70,6 +70,7 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSInputModeDefaults.h"
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
+#include "RTS_Survival/Utils/RTSDebugBreak/RTSDebugBreak.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
@@ -797,6 +798,7 @@ void ACPPController::SetCameraMovementDisabled(const bool bDisable) const
 
 void ACPPController::TabThroughActionUIHierarchy()
 {
+	checkf(false, TEXT("TabThroughActionUIHierarchy Test!") );
 	if (GetIsValidGameUIController())
 	{
 		// Calls UpdateActionUI in the PlayerController blueprint if needed.
