@@ -8,8 +8,9 @@
 #include "RTS_Survival/Behaviours/Lifetime/BehaviourLifeTime.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+#include "Styling/SlateBrush.h"
 
-void UW_BehaviourDescription::SetupDescription(const FBehaviourUIData& InBehaviourUIData) const
+void UW_BehaviourDescription::SetupDescription(const FBehaviourUIData& InBehaviourUIData)
 {
 	if (not DescriptionBox || not TitleBox)
 	{
@@ -46,21 +47,46 @@ void UW_BehaviourDescription::SetupLifeTimeDescription(const FBehaviourUIData& I
 	}
 }
 
-void UW_BehaviourDescription::SetupStyle(const FBehaviourUIData& InBehaviourUIData) const
+void UW_BehaviourDescription::SetupStyle(const FBehaviourUIData& InBehaviourUIData)
 {
-	if(not BehaviourBorder)
+	if (not BehaviourBorder)
 	{
 		return;
 	}
-	if(not BehaviourDescriptionStyles.Contains(InBehaviourUIData.BuffDebuffType))
+
+	const FBehaviourDescriptionStyle* Style = BehaviourDescriptionStyles.Find(InBehaviourUIData.BuffDebuffType);
+	if (Style == nullptr)
 	{
 		const FString TypeAsString = UEnum::GetValueAsString(InBehaviourUIData.BuffDebuffType);
 		RTSFunctionLibrary::ReportError(
 			TEXT("UW_BehaviourDescription::SetupStyle: No style found for given BuffDebuffType!"
 				"\n type: " + TypeAsString));
+		ClearBehaviourPanelBrush();
 		return;
 	}
-	const FBehaviourDescriptionStyle& Style = BehaviourDescriptionStyles[InBehaviourUIData.BuffDebuffType];
-	BehaviourBorder->SetBrushFromTexture(Style.PanelTexture);
+
+	if (not IsValid(Style->PanelTexture))
+	{
+		const FString TypeAsString = UEnum::GetValueAsString(InBehaviourUIData.BuffDebuffType);
+		RTSFunctionLibrary::ReportError(
+			TEXT("UW_BehaviourDescription::SetupStyle: Style panel texture is invalid!"
+				"\n type: " + TypeAsString));
+		ClearBehaviourPanelBrush();
+		return;
+	}
+
+	M_AppliedPanelTexture = Style->PanelTexture;
+	BehaviourBorder->SetBrushFromTexture(M_AppliedPanelTexture);
 	
+}
+
+void UW_BehaviourDescription::ClearBehaviourPanelBrush()
+{
+	if (not BehaviourBorder)
+	{
+		return;
+	}
+
+	M_AppliedPanelTexture = nullptr;
+	BehaviourBorder->SetBrush(FSlateNoResource());
 }

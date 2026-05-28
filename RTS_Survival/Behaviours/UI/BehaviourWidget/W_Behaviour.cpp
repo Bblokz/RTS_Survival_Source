@@ -116,14 +116,15 @@ bool UW_Behaviour::GetIsValidBehaviourButtonSettings(const UBehaviourButtonSetti
         return false;
 }
 
-void UW_Behaviour::ClearBehaviourIconBrush() const
+void UW_Behaviour::ClearBehaviourIconBrush()
 {
         if (not GetIsValidBehaviourImage())
         {
                 return;
         }
 
-        BehaviourImage->SetBrush(FSlateBrush());
+        M_AppliedIconTexture = nullptr;
+        BehaviourImage->SetBrush(FSlateNoResource());
 }
 
 void UW_Behaviour::ApplyBehaviourIcon()
@@ -153,5 +154,6 @@ void UW_Behaviour::ApplyBehaviourIcon()
                 return;
         }
 
-        BehaviourImage->SetBrushFromTexture(BehaviourStyle->IconTexture);
+        M_AppliedIconTexture = BehaviourStyle->IconTexture;
+        BehaviourImage->SetBrushFromTexture(M_AppliedIconTexture);
 }
