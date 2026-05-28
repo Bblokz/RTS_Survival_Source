@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
-#include "Slate/SlateBrushAsset.h"
+#include "Engine/Texture2D.h"
 #include "TargetTypeIconSettings.generated.h"
 
 enum class ETargetTypeIcon : uint8;
@@ -12,13 +12,13 @@ struct FTargetTypeIconBrushes_Soft
 {
 	GENERATED_BODY()
 
-	/** Player brush (soft ref so it can live in config). */
+	/** Player icon texture (soft ref so it can live in config). */
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category="Icons")
-	TSoftObjectPtr<USlateBrushAsset> PlayerBrush;
+	TSoftObjectPtr<UTexture2D> PlayerBrush;
 
-	/** Enemy brush (soft ref so it can live in config). */
+	/** Enemy icon texture (soft ref so it can live in config). */
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category="Icons")
-	TSoftObjectPtr<USlateBrushAsset> EnemyBrush;
+	TSoftObjectPtr<UTexture2D> EnemyBrush;
 };
 
 /**

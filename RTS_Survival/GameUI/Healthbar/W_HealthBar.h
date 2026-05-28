@@ -8,7 +8,6 @@
 #include "Healthbar_TargetTypeIconState/TargetTypeIconState.h"
 #include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarSettings.h"
 #include "RTS_Survival/Units/Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIconSettings/SquadWeaponIconSettings.h"
-#include "Slate/SlateBrushAsset.h"
 
 #include "W_HealthBar.generated.h"
 
