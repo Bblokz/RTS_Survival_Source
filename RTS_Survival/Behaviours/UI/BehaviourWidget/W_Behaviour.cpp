@@ -157,5 +157,5 @@ void UW_Behaviour::ApplyBehaviourIcon()
         }
 
         M_AppliedIconTexture = BehaviourStyle->IconTexture;
-        BehaviourImage->SetBrushFromTexture(M_AppliedIconTexture, true);
+        BehaviourImage->SetBrushFromTexture(M_AppliedIconTexture, false);
 }

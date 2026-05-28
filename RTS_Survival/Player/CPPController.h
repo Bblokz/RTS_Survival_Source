@@ -621,7 +621,7 @@ public:
 	 */
 	void SelectUnitsFromMarquee(const TArray<ASquadUnit*>& MarqueeSquadUnits,
 	                            const TArray<ASelectableActorObjectsMaster*>& MarqueeSelectableActors,
-	                            const TArray<ASelectablePawnMaster*>& MarqueeSelectablePawns);
+	                            const TArray<ASelectablePawnMaster*>& tarqueeSelectablePawns);
 
 	/**
 	 * @brief Empties all selection arrays and sets status to deselected for those actors that were selected.

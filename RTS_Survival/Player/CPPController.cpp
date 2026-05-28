@@ -798,7 +798,6 @@ void ACPPController::SetCameraMovementDisabled(const bool bDisable) const
 
 void ACPPController::TabThroughActionUIHierarchy()
 {
-	checkf(false, TEXT("TabThroughActionUIHierarchy Test!") );
 	if (GetIsValidGameUIController())
 	{
 		// Calls UpdateActionUI in the PlayerController blueprint if needed.
