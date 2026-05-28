@@ -10,6 +10,7 @@
 struct FBehaviourUIData;
 class UButton;
 class UImage;
+class UTexture2D;
 class UW_BehaviourContainer;
 class UBehaviourButtonSettings;
 struct FSlateBrush;
@@ -37,7 +38,11 @@ private:
         UPROPERTY()
         TWeakObjectPtr<UW_BehaviourContainer> M_BehaviourContainer;
 
+        UPROPERTY()
         FBehaviourUIData M_BehaviourUIData;
+
+        UPROPERTY()
+        TObjectPtr<UTexture2D> M_AppliedIconTexture = nullptr;
 
         bool GetIsValidBehaviourContainer() const;
         bool GetIsValidBehaviourButton() const;
@@ -47,7 +52,7 @@ private:
         static const UBehaviourButtonSettings* GetBehaviourButtonSettings();
 
         void ApplyBehaviourIcon();
-        void ClearBehaviourIconBrush() const;
+        void ClearBehaviourIconBrush();
 
         UFUNCTION()
         void OnHoveredButton();

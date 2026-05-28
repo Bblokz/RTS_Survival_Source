@@ -22,6 +22,8 @@ void UW_Behaviour::InitBehaviourWidget(UW_BehaviourContainer* InBehaviourContain
                 return;
         }
 
+        BehaviourButton->OnHovered.RemoveDynamic(this, &UW_Behaviour::OnHoveredButton);
+        BehaviourButton->OnUnhovered.RemoveDynamic(this, &UW_Behaviour::OnUnHoverButton);
         BehaviourButton->OnHovered.AddDynamic(this, &UW_Behaviour::OnHoveredButton);
         BehaviourButton->OnUnhovered.AddDynamic(this, &UW_Behaviour::OnUnHoverButton);
 }
@@ -116,14 +118,15 @@ bool UW_Behaviour::GetIsValidBehaviourButtonSettings(const UBehaviourButtonSetti
         return false;
 }
 
-void UW_Behaviour::ClearBehaviourIconBrush() const
+void UW_Behaviour::ClearBehaviourIconBrush()
 {
         if (not GetIsValidBehaviourImage())
         {
                 return;
         }
 
-        BehaviourImage->SetBrush(FSlateBrush());
+        M_AppliedIconTexture = nullptr;
+        BehaviourImage->SetBrush(FSlateNoResource());
 }
 
 void UW_Behaviour::ApplyBehaviourIcon()
@@ -153,5 +156,6 @@ void UW_Behaviour::ApplyBehaviourIcon()
                 return;
         }
 
-        BehaviourImage->SetBrushFromTexture(BehaviourStyle->IconTexture);
+        M_AppliedIconTexture = BehaviourStyle->IconTexture;
+        BehaviourImage->SetBrushFromTexture(M_AppliedIconTexture, true);
 }
