@@ -339,7 +339,12 @@ void ATrackedTankMaster::TerminateMoveCommand()
 	const bool bHasQueuedMovementCommandAfterActive = CommandData->GetHasQueuedMovementCommandAfterActive();
 	if (not bHasQueuedMovementCommandAfterActive)
 	{
+		CancelPendingTrackedMove();
 		StopBehaviourTree();
+		if (GetIsValidAITankController())
+		{
+			AITankController->StopMovement();
+		}
 		if (not GetIsValidTankAnimationBP())
 		{
 			return;
@@ -372,6 +377,7 @@ void ATrackedTankMaster::TerminateReverseCommand()
 	const bool bHasQueuedMovementCommandAfterActive = CommandData->GetHasQueuedMovementCommandAfterActive();
 	if (not bHasQueuedMovementCommandAfterActive)
 	{
+		CancelPendingTrackedMove();
 		// Reset reverse enforcement and stop behaviour tree.
 		// Important: do not hard-stop movement here, because reverse-to-reverse command transitions
 		// can pass through terminate on override flows and we want to preserve movement continuity.
@@ -384,6 +390,10 @@ void ATrackedTankMaster::TerminateReverseCommand()
 			}
 		}
 		StopBehaviourTree();
+		if (GetIsValidAITankController())
+		{
+			AITankController->StopMovement();
+		}
 
 		// Return chassis to idle, mirroring TerminateMoveCommand
 		if (not GetIsValidTankAnimationBP())
@@ -455,6 +465,19 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred()
 	M_QueuedMoveState.bM_HasPendingQueuedMove = false;
 	// NOTE: Pending flag is cleared only after the request is consumed by ExecuteTrackedMoveNow,
 	// so delayed callbacks cannot double-issue movement for the same queued state snapshot.
+}
+
+void ATrackedTankMaster::CancelPendingTrackedMove()
+{
+	M_QueuedMoveState.bM_HasPendingQueuedMove = false;
+
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_DeferredTrackedMoveHandle);
 }
 
 void ATrackedTankMaster::ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse)
