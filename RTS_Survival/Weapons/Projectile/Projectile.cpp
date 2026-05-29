@@ -344,6 +344,7 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 	{
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
@@ -663,69 +664,129 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 	M_ProjectileMovement->Velocity = Stage1Direction * Stage1Speed;
 	StartFlightTimers(Stage1Time + Stage2ArcTime + Stage2StraightTime);
 
-	if (UWorld* World = GetWorld())
+	ScheduleVerticalRocketTransitions(
+		TargetLocation,
+		Stage2ArcDistanceSetting,
+		Stage2ArcHeightOffset,
+		Stage2ArcSpeed,
+		Stage2StraightSpeed,
+		Stage1Time,
+		Stage2ArcTime);
+}
+
+void AProjectile::TransitionVerticalRocketToArcOrStraight(const FVector& TargetLocation,
+                                                          const float Stage2ArcDistanceSetting,
+                                                          const FVector& Stage2ArcHeightOffset,
+                                                          const float Stage2ArcSpeed,
+                                                          const float Stage2StraightSpeed,
+                                                          const float Stage2ArcTime)
+{
+	if (not GetIsValidProjectileMovement())
 	{
-		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
-		TWeakObjectPtr<AProjectile> WeakThis(this);
-		World->GetTimerManager().SetTimer(
-			M_RocketSwingTimerHandle,
-			[WeakThis, TargetLocation, Stage2ArcDistanceSetting, Stage2ArcHeightOffset, Stage2ArcSpeed,
-				Stage2StraightSpeed,
-				Stage2ArcTime]()
-			{
-				if (not WeakThis.IsValid() || not WeakThis->GetIsValidProjectileMovement())
-				{
-					return;
-				}
-
-				const FVector Stage2StartLocation = WeakThis->GetActorLocation();
-				const FVector Stage2StartToTarget = TargetLocation - Stage2StartLocation;
-				const FVector Stage2ArcAnchor = Stage2StartLocation
-					+ (Stage2StartToTarget.GetSafeNormal() * Stage2ArcDistanceSetting)
-					+ Stage2ArcHeightOffset;
-				const FVector Stage2ArcDirection = (Stage2ArcAnchor - Stage2StartLocation).GetSafeNormal();
-				if (Stage2ArcDirection.IsNearlyZero() || Stage2ArcTime <= 0.0f)
-				{
-					const FVector DirectDirection = (TargetLocation - WeakThis->GetActorLocation()).GetSafeNormal();
-					if (DirectDirection.IsNearlyZero())
-					{
-						return;
-					}
-					WeakThis->SetActorRotation(DirectDirection.Rotation());
-					WeakThis->M_ProjectileMovement->Velocity = DirectDirection * Stage2StraightSpeed;
-					return;
-				}
-
-				WeakThis->SetActorRotation(Stage2ArcDirection.Rotation());
-				WeakThis->M_ProjectileMovement->Velocity = Stage2ArcDirection * Stage2ArcSpeed;
-				if (UWorld* InnerWorld = WeakThis->GetWorld())
-				{
-					InnerWorld->GetTimerManager().ClearTimer(WeakThis->M_RocketSwingTimerHandle);
-					InnerWorld->GetTimerManager().SetTimer(
-						WeakThis->M_RocketSwingTimerHandle,
-						[WeakThis, TargetLocation, Stage2StraightSpeed]()
-						{
-							if (not WeakThis.IsValid() || not WeakThis->GetIsValidProjectileMovement())
-							{
-								return;
-							}
-
-							const FVector StraightDirection = (TargetLocation - WeakThis->GetActorLocation()).
-								GetSafeNormal();
-							if (StraightDirection.IsNearlyZero())
-							{
-								return;
-							}
-							WeakThis->SetActorRotation(StraightDirection.Rotation());
-							WeakThis->M_ProjectileMovement->Velocity = StraightDirection * Stage2StraightSpeed;
-						},
-						Stage2ArcTime,
-						false);
-				}
-			},
-			Stage1Time,
-			false);
+		return;
 	}
+
+	const FVector Stage2StartLocation = GetActorLocation();
+	const FVector Stage2StartToTarget = TargetLocation - Stage2StartLocation;
+	const FVector Stage2ArcAnchor = Stage2StartLocation
+		+ (Stage2StartToTarget.GetSafeNormal() * Stage2ArcDistanceSetting)
+		+ Stage2ArcHeightOffset;
+	const FVector Stage2ArcDirection = (Stage2ArcAnchor - Stage2StartLocation).GetSafeNormal();
+	if (Stage2ArcDirection.IsNearlyZero() || Stage2ArcTime <= 0.0f)
+	{
+		TransitionVerticalRocketToStraight(TargetLocation, Stage2StraightSpeed);
+		return;
+	}
+
+	SetActorRotation(Stage2ArcDirection.Rotation());
+	M_ProjectileMovement->Velocity = Stage2ArcDirection * Stage2ArcSpeed;
+}
+
+void AProjectile::TransitionVerticalRocketToStraight(const FVector& TargetLocation, const float Stage2StraightSpeed)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	const FVector StraightDirection = (TargetLocation - GetActorLocation()).GetSafeNormal();
+	if (StraightDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	SetActorRotation(StraightDirection.Rotation());
+	M_ProjectileMovement->Velocity = StraightDirection * Stage2StraightSpeed;
+}
+
+void AProjectile::ScheduleVerticalRocketTransitions(const FVector& TargetLocation,
+                                                    const float Stage2ArcDistanceSetting,
+                                                    const FVector& Stage2ArcHeightOffset,
+                                                    const float Stage2ArcSpeed,
+                                                    const float Stage2StraightSpeed,
+                                                    const float Stage1Time,
+                                                    const float Stage2ArcTime)
+{
+	if (Stage1Time <= 0.0f)
+	{
+		TransitionVerticalRocketToArcOrStraight(
+			TargetLocation,
+			Stage2ArcDistanceSetting,
+			Stage2ArcHeightOffset,
+			Stage2ArcSpeed,
+			Stage2StraightSpeed,
+			Stage2ArcTime);
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+	World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+	const TWeakObjectPtr<AProjectile> WeakThis(this);
+	World->GetTimerManager().SetTimer(
+		M_RocketSwingTimerHandle,
+		[WeakThis, TargetLocation, Stage2ArcDistanceSetting, Stage2ArcHeightOffset, Stage2ArcSpeed,
+			Stage2StraightSpeed, Stage2ArcTime]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->TransitionVerticalRocketToArcOrStraight(
+				TargetLocation,
+				Stage2ArcDistanceSetting,
+				Stage2ArcHeightOffset,
+				Stage2ArcSpeed,
+				Stage2StraightSpeed,
+				Stage2ArcTime);
+		},
+		Stage1Time,
+		false);
+
+	if (Stage2ArcTime <= 0.0f)
+	{
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		M_VerticalRocketStraightTimerHandle,
+		[WeakThis, TargetLocation, Stage2StraightSpeed]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->TransitionVerticalRocketToStraight(TargetLocation, Stage2StraightSpeed);
+		},
+		Stage1Time + Stage2ArcTime,
+		false);
 }
 
 void AProjectile::LaunchStraightFallbackStartAscent(const FVector& LaunchLocation,
@@ -890,6 +951,7 @@ void AProjectile::TransitionRocketSwingToStraight(const FVector& TargetLocation,
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 	}
 
 	const FVector CurrentLocation = GetActorLocation();
@@ -917,6 +979,7 @@ void AProjectile::ScheduleRocketSwingTransition(const FVector& TargetLocation,
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		TWeakObjectPtr<AProjectile> WeakThis(this);
 		World->GetTimerManager().SetTimer(
 			M_RocketSwingTimerHandle,
@@ -1117,6 +1180,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 	}
 	StopDescentSound();
 }
@@ -1131,6 +1195,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 	}
 	StopDescentSound();
 }
@@ -1234,6 +1299,7 @@ void AProjectile::OnProjectileDormant()
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
+		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 	}
 	M_ProjectilePoolSettings.ProjectileManager->OnTankProjectileDormant(M_ProjectilePoolSettings.ProjectileIndex);
 }
