@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -380,6 +380,41 @@ private:
 
 	void TransitionRocketSwingToStraight(const FVector& TargetLocation, const float StraightSpeed);
 	void ScheduleRocketSwingTransition(const FVector& TargetLocation, const float StraightSpeed, const float CurveTime);
+
+	/**
+	 * @brief Schedules both vertical-rocket transitions up front to avoid changing timer handles from a timer callback.
+	 * @param TargetLocation Final target after accuracy deviation.
+	 * @param Stage2ArcDistanceSetting Horizontal distance used to bend the second stage.
+	 * @param Stage2ArcHeightOffset Vertical offset used to bend the second stage.
+	 * @param Stage2ArcSpeed Speed used while curving away from the apex.
+	 * @param Stage2StraightSpeed Speed used by the final straight approach.
+	 * @param Stage1Time Delay before leaving the vertical launch stage.
+	 * @param Stage2ArcTime Delay between the curved second stage and final straight approach.
+	 */
+	void ScheduleVerticalRocketTransitions(const FVector& TargetLocation,
+	                                       const float Stage2ArcDistanceSetting,
+	                                       const FVector& Stage2ArcHeightOffset,
+	                                       const float Stage2ArcSpeed,
+	                                       const float Stage2StraightSpeed,
+	                                       const float Stage1Time,
+	                                       const float Stage2ArcTime);
+	/**
+	 * @brief Applies the second-stage arc, or immediately uses the final approach if no safe arc exists.
+	 * @param TargetLocation Final target after accuracy deviation.
+	 * @param Stage2ArcDistanceSetting Horizontal distance used to bend the second stage.
+	 * @param Stage2ArcHeightOffset Vertical offset used to bend the second stage.
+	 * @param Stage2ArcSpeed Speed used while curving away from the apex.
+	 * @param Stage2StraightSpeed Speed used by the final straight approach.
+	 * @param Stage2ArcTime Duration of the curved second stage.
+	 */
+	void TransitionVerticalRocketToArcOrStraight(const FVector& TargetLocation,
+	                                             const float Stage2ArcDistanceSetting,
+	                                             const FVector& Stage2ArcHeightOffset,
+	                                             const float Stage2ArcSpeed,
+	                                             const float Stage2StraightSpeed,
+	                                             const float Stage2ArcTime);
+	void TransitionVerticalRocketToStraight(const FVector& TargetLocation, const float Stage2StraightSpeed);
+
 	/**
 	 * @brief Straight-line fallback when no arcing parameters can be computed.
 	 * @param LaunchLocation Spawn location for the projectile.
@@ -559,6 +594,9 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_RocketSwingTimerHandle;
+
+	UPROPERTY()
+	FTimerHandle M_VerticalRocketStraightTimerHandle;
 
 	UPROPERTY()
 	TWeakObjectPtr<UAudioComponent> M_DescentAudioComponent;
