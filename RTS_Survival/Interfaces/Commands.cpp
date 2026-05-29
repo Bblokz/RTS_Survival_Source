@@ -1482,7 +1482,9 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 	if (not FAbilityHelpers::GetHasBehaviourAbility(UnitCommandData->GetAbilities(), BehaviourAbility,
 	                                                BehaviourAbilityEntry))
 	{
+		return ECommandQueueError::AbilityNotAllowed;
 	}
+
 	if (BehaviourAbilityEntry.CooldownRemaining > 0)
 	{
 		return ECommandQueueError::AbilityOnCooldown;
