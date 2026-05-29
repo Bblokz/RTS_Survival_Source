@@ -182,6 +182,8 @@ public:
 	 */
 	ATankMaster* GetPlayerCommandVehicle() const;
 
+	ANomadicVehicle* GetPlayerHQ()const;
+
 	/**
 	 * @brief Returns a target in provided range, stops searching if a UnitMaster Target was found.
 	 * @param PlayerSearch The team of the unit that is executing the search.

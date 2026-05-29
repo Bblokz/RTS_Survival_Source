@@ -1559,3 +1559,23 @@ FText URTSBlueprintFunctionLibrary::BP_GetRichTextTextFromDataTableText(const FT
 	const FString RichTextString = BP_GetRichTextStringFromDataTableString(DataTableText.ToString());
 	return FText::FromString(RichTextString);
 }
+
+ATankMaster* URTSBlueprintFunctionLibrary::GetPlayerCommandVehicle(const UObject* WorldContextObject)
+{
+	const UGameUnitManager* UnitManager=  FRTS_Statics::GetGameUnitManager(WorldContextObject);
+	if(not IsValid(UnitManager))
+	{
+		return nullptr;
+	}
+	return UnitManager->GetPlayerCommandVehicle();
+}
+
+ANomadicVehicle* URTSBlueprintFunctionLibrary::GetPlayerHQ(const UObject* WorldContextObject)
+{
+	const UGameUnitManager* UnitManager=  FRTS_Statics::GetGameUnitManager(WorldContextObject);
+	if(not IsValid(UnitManager))
+	{
+		return nullptr;
+	}
+	return UnitManager->GetPlayerHQ();
+}

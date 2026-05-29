@@ -301,7 +301,8 @@ bool UGameUnitManager::TryApplyHealthBarVisibilityFromUserSettings(UHealthCompon
 		return false;
 	}
 
-	URTSComponent* const RTSComponent = Cast<URTSComponent>(OwnerActor->GetComponentByClass(URTSComponent::StaticClass()));
+	URTSComponent* const RTSComponent = Cast<URTSComponent>(
+		OwnerActor->GetComponentByClass(URTSComponent::StaticClass()));
 	if (RTSComponent == nullptr)
 	{
 		return false;
@@ -390,7 +391,8 @@ void UGameUnitManager::ApplyPlayerSquadHealthBarVisibilityStrategy(const ERTSPla
 	}
 }
 
-void UGameUnitManager::ApplyPlayerNomadicHealthBarVisibilityStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+void UGameUnitManager::ApplyPlayerNomadicHealthBarVisibilityStrategy(
+	const ERTSPlayerHealthBarVisibilityStrategy Strategy)
 {
 	for (AActor* Actor : M_ActorsAlivePlayer)
 	{
@@ -427,7 +429,8 @@ void UGameUnitManager::ApplyPlayerBxpHealthBarVisibilityStrategy(const ERTSPlaye
 	}
 }
 
-void UGameUnitManager::ApplyPlayerAircraftHealthBarVisibilityStrategy(const ERTSPlayerHealthBarVisibilityStrategy Strategy)
+void UGameUnitManager::ApplyPlayerAircraftHealthBarVisibilityStrategy(
+	const ERTSPlayerHealthBarVisibilityStrategy Strategy)
 {
 	for (AAircraftMaster* Aircraft : M_AircraftMastersAlivePlayer)
 	{
@@ -521,7 +524,8 @@ void UGameUnitManager::ApplyEnemyBxpHealthBarVisibilityStrategy(const ERTSEnemyH
 	}
 }
 
-void UGameUnitManager::ApplyEnemyAircraftHealthBarVisibilityStrategy(const ERTSEnemyHealthBarVisibilityStrategy Strategy)
+void UGameUnitManager::ApplyEnemyAircraftHealthBarVisibilityStrategy(
+	const ERTSEnemyHealthBarVisibilityStrategy Strategy)
 {
 	for (AAircraftMaster* Aircraft : M_AircraftMastersAliveEnemy)
 	{
@@ -1098,7 +1102,8 @@ int32 UGameUnitManager::GetPlayerTankCountOfTypes(const uint8 Player, const TArr
 	return MatchingTankCount;
 }
 
-int32 UGameUnitManager::GetPlayerBxpTotalCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const
+int32 UGameUnitManager::GetPlayerBxpTotalCountOfTypes(const uint8 Player,
+                                                      const TArray<EBuildingExpansionType>& BxpTypes) const
 {
 	if (BxpTypes.Num() == 0)
 	{
@@ -1183,7 +1188,7 @@ TMap<EBuildingExpansionType, int32> UGameUnitManager::GetPlayerBxpCountsByType(
 }
 
 int32 UGameUnitManager::GetPlayerAircraftCountOfTypes(const uint8 Player,
-                                                       const TArray<EAircraftSubtype>& AircraftTypes) const
+                                                      const TArray<EAircraftSubtype>& AircraftTypes) const
 {
 	if (AircraftTypes.Num() == 0)
 	{
@@ -1191,7 +1196,9 @@ int32 UGameUnitManager::GetPlayerAircraftCountOfTypes(const uint8 Player,
 	}
 
 	const TSet<EAircraftSubtype> RequestedAircraftTypes(AircraftTypes);
-	const TArray<AAircraftMaster*>& AircraftUnits = Player == 1 ? M_AircraftMastersAlivePlayer : M_AircraftMastersAliveEnemy;
+	const TArray<AAircraftMaster*>& AircraftUnits = Player == 1
+		                                                ? M_AircraftMastersAlivePlayer
+		                                                : M_AircraftMastersAliveEnemy;
 
 	int32 MatchingAircraftCount = 0;
 	for (const AAircraftMaster* AircraftUnit : AircraftUnits)
@@ -1249,6 +1256,36 @@ ATankMaster* UGameUnitManager::GetPlayerCommandVehicle() const
 	return nullptr;
 }
 
+ANomadicVehicle* UGameUnitManager::GetPlayerHQ() const
+{
+	for (ATankMaster* EachPlayerTank : M_TankMastersAlivePlayer)
+	{
+		if (not IsValid(EachPlayerTank))
+		{
+			continue;
+		}
+
+		URTSComponent* NomadicRTSComp = EachPlayerTank->GetRTSComponent();
+		if (not IsValid(NomadicRTSComp))
+		{
+			continue;
+		}
+
+		if (NomadicRTSComp->GetUnitType() != EAllUnitType::UNType_Nomadic)
+		{
+			continue;
+		}
+
+		const ENomadicSubtype NomadicSubtype = NomadicRTSComp->GetSubtypeAsNomadicSubtype();
+		const bool bIsHQ = NomadicSubtype == ENomadicSubtype::Nomadic_GerHq;
+		if (bIsHQ)
+		{
+			return Cast<ANomadicVehicle>(EachPlayerTank);
+		}
+	}
+	return nullptr;
+}
+
 
 AActor* UGameUnitManager::GetClosestTargetPreferSquadUnit(
 	const uint8 PlayerSearch,
@@ -1258,15 +1295,15 @@ AActor* UGameUnitManager::GetClosestTargetPreferSquadUnit(
 	AActor* Target = nullptr;
 	float Closest = MAX_FLT;
 
-	const TArray<ASquadUnit*>*   EnemySquadUnits = &M_SquadUnitsAliveEnemy;
-	const TArray<ATankMaster*>*  EnemyTanks      = &M_TankMastersAliveEnemy;
+	const TArray<ASquadUnit*>* EnemySquadUnits = &M_SquadUnitsAliveEnemy;
+	const TArray<ATankMaster*>* EnemyTanks = &M_TankMastersAliveEnemy;
 	const TArray<ABuildingExpansion*>* EnemyBxps = &M_BxpAliveEnemy;
 
 	if (PlayerSearch != 1)
 	{
 		EnemySquadUnits = &M_SquadUnitAlivePlayer;
-		EnemyTanks      = &M_TankMastersAlivePlayer;
-		EnemyBxps       = &M_BxpAlivePlayer;
+		EnemyTanks = &M_TankMastersAlivePlayer;
+		EnemyBxps = &M_BxpAlivePlayer;
 	}
 
 	auto Consider = [&](AActor* Candidate)
@@ -1302,15 +1339,15 @@ AActor* UGameUnitManager::GetClosestTargetPreferTank(
 	AActor* Target = nullptr;
 	float Closest = MAX_FLT;
 
-	const TArray<ATankMaster*>*  EnemyTanks      = &M_TankMastersAliveEnemy;
-	const TArray<ASquadUnit*>*   EnemySquads     = &M_SquadUnitsAliveEnemy;
+	const TArray<ATankMaster*>* EnemyTanks = &M_TankMastersAliveEnemy;
+	const TArray<ASquadUnit*>* EnemySquads = &M_SquadUnitsAliveEnemy;
 	const TArray<ABuildingExpansion*>* EnemyBxps = &M_BxpAliveEnemy;
 
 	if (PlayerSearch != 1)
 	{
-		EnemyTanks  = &M_TankMastersAlivePlayer;
+		EnemyTanks = &M_TankMastersAlivePlayer;
 		EnemySquads = &M_SquadUnitAlivePlayer;
-		EnemyBxps   = &M_BxpAlivePlayer;
+		EnemyBxps = &M_BxpAlivePlayer;
 	}
 
 	auto Consider = [&](AActor* Candidate)
@@ -1348,17 +1385,17 @@ AActor* UGameUnitManager::GetClosestTarget(
 	AActor* Target = nullptr;
 	float Closest = MAX_FLT;
 
-	const TArray<ASquadUnit*>*   EnemySquads = &M_SquadUnitsAliveEnemy;
-	const TArray<ATankMaster*>*  EnemyTanks  = &M_TankMastersAliveEnemy;
-	const TArray<AActor*>*       EnemyActors = &M_ActorsAliveEnemy;
+	const TArray<ASquadUnit*>* EnemySquads = &M_SquadUnitsAliveEnemy;
+	const TArray<ATankMaster*>* EnemyTanks = &M_TankMastersAliveEnemy;
+	const TArray<AActor*>* EnemyActors = &M_ActorsAliveEnemy;
 	const TArray<ABuildingExpansion*>* EnemyBxps = &M_BxpAliveEnemy;
 
 	if (PlayerSearch != 1)
 	{
 		EnemySquads = &M_SquadUnitAlivePlayer;
-		EnemyTanks  = &M_TankMastersAlivePlayer;
+		EnemyTanks = &M_TankMastersAlivePlayer;
 		EnemyActors = &M_ActorsAlivePlayer;
-		EnemyBxps   = &M_BxpAlivePlayer;
+		EnemyBxps = &M_BxpAlivePlayer;
 	}
 
 	auto Consider = [&](AActor* Candidate)
@@ -1372,9 +1409,9 @@ AActor* UGameUnitManager::GetClosestTarget(
 		}
 	};
 
-	for (ATankMaster* T : *EnemyTanks)   { Consider(T); }
-	for (ASquadUnit* U : *EnemySquads)   { Consider(U); }
-	for (AActor* A : *EnemyActors)       { Consider(A); }
+	for (ATankMaster* T : *EnemyTanks) { Consider(T); }
+	for (ASquadUnit* U : *EnemySquads) { Consider(U); }
+	for (AActor* A : *EnemyActors) { Consider(A); }
 	// NEW: BXPs too
 	for (ABuildingExpansion* B : *EnemyBxps) { Consider(B); }
 
@@ -1406,7 +1443,7 @@ AActor* UGameUnitManager::FindUnitForPlayer(const FTrainingOption& TrainingOptio
 	case EAllUnitType::UNType_Nomadic:
 		return FindNomadicUnitOfPlayer(static_cast<ENomadicSubtype>(TrainingOption.SubtypeValue), OwningPlayer);
 	case EAllUnitType::UNType_BuildingExpansion:
-		return FindBxpUnitOfPlayer(static_cast<EBuildingExpansionType> (TrainingOption.SubtypeValue), OwningPlayer);
+		return FindBxpUnitOfPlayer(static_cast<EBuildingExpansionType>(TrainingOption.SubtypeValue), OwningPlayer);
 	default:
 		RTSFunctionLibrary::ReportError("Unknown unit type in GetFirstUnitOfTypeForPlayer"
 			"\n at function GetFirstUnitOfTypeForPlayer in CPPGameState.cpp");
@@ -1479,8 +1516,8 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
                                     TMap<uint32, TPair<ETargetPreference, FVector>>& OutActorData)
 {
 	TArray<ATankMaster*>* TargetTankMasters;
-	TArray<ASquadUnit*>*  TargetSquadUnits;
-	TArray<AActor*>*      OtherTargetActors;
+	TArray<ASquadUnit*>* TargetSquadUnits;
+	TArray<AActor*>* OtherTargetActors;
 	TArray<ABuildingExpansion*>* TargetBxps;
 	TMap<uint32, AActor*>* CurrentActorIDMapping;
 
@@ -1490,19 +1527,19 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 
 	if (bGetPlayerUnits)
 	{
-		TargetTankMasters       = &M_TankMastersAlivePlayer;
-		TargetSquadUnits        = &M_SquadUnitAlivePlayer;
-		OtherTargetActors       = &M_ActorsAlivePlayer;
-		TargetBxps              = &M_BxpAlivePlayer;
-		CurrentActorIDMapping   = &M_PlayerActorIDToActorMap;
+		TargetTankMasters = &M_TankMastersAlivePlayer;
+		TargetSquadUnits = &M_SquadUnitAlivePlayer;
+		OtherTargetActors = &M_ActorsAlivePlayer;
+		TargetBxps = &M_BxpAlivePlayer;
+		CurrentActorIDMapping = &M_PlayerActorIDToActorMap;
 	}
 	else
 	{
-		TargetTankMasters       = &M_TankMastersAliveEnemy;
-		TargetSquadUnits        = &M_SquadUnitsAliveEnemy;
-		OtherTargetActors       = &M_ActorsAliveEnemy;
-		TargetBxps              = &M_BxpAliveEnemy;
-		CurrentActorIDMapping   = &M_EnemyActorIDToActorMap;
+		TargetTankMasters = &M_TankMastersAliveEnemy;
+		TargetSquadUnits = &M_SquadUnitsAliveEnemy;
+		OtherTargetActors = &M_ActorsAliveEnemy;
+		TargetBxps = &M_BxpAliveEnemy;
+		CurrentActorIDMapping = &M_EnemyActorIDToActorMap;
 	}
 
 	// Clear previous mapping.
@@ -1527,7 +1564,7 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		}
 		const uint32 ActorID = EachTank->GetUniqueID();
 		CurrentActorIDMapping->Add(ActorID, EachTank);
-		OutActorData.Add({ ActorID, CreatePair(EachTank->GetActorLocation(), ETargetPreference::Tank) });
+		OutActorData.Add({ActorID, CreatePair(EachTank->GetActorLocation(), ETargetPreference::Tank)});
 	}
 
 	// Squads
@@ -1539,7 +1576,7 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		}
 		const uint32 ActorID = EachSquadUnit->GetUniqueID();
 		CurrentActorIDMapping->Add(ActorID, EachSquadUnit);
-		OutActorData.Add({ ActorID, CreatePair(EachSquadUnit->GetActorLocation(), ETargetPreference::Infantry) });
+		OutActorData.Add({ActorID, CreatePair(EachSquadUnit->GetActorLocation(), ETargetPreference::Infantry)});
 	}
 
 	//  BXPs
@@ -1561,6 +1598,7 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 			FColor::Purple);
 	}
 }
+
 void UGameUnitManager::AddActorData(const int32 EnemyOfActor,
                                     AActor* Actor,
                                     TMap<uint32, AActor*>* CurrentActorIDMapping,

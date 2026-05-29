@@ -14,6 +14,7 @@
 #include "RTSBlueprintFunctionLibrary.generated.h"
 
 
+class ANomadicVehicle;
 enum class EVeterancyIconSet : uint8;
 class AMissionManager;
 enum class ERTSRadiusType : uint8;
@@ -703,6 +704,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "RTS_StringUtils")
 	static FText BP_GetRichTextTextFromDataTableText(const FText& DataTableText);
+
+	
+	UFUNCTION(BlueprintPure, Category = "PlayerUtility")
+	static ATankMaster* GetPlayerCommandVehicle(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintPure, Category = "PlayerUtility")
+	static ANomadicVehicle* GetPlayerHQ(const UObject* WorldContextObject);
 
 private:
 	
