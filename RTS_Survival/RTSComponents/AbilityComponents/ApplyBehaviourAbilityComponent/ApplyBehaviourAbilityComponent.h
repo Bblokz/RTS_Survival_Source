@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -38,10 +38,12 @@ struct FApplyBehaviourAbilitySettings
 	TSubclassOf<UBehaviour> BehaviourApplied;
 };
 
-// THe done executing is done in the icommands as this ability is instantly complete.
-// Adds an abilty to the command card of the unit with a specfic sub type of this ability set with EBehaviourAbilityType.
-// execute is adding the behaviour to the unit's behaviour component.
-// Terminate is no-op.
+/**
+ * @brief Adds a command-card ability that applies one behaviour to the owning unit.
+ *
+ * The component registers its ability with ICommands, then executes by adding its configured
+ * behaviour class to the owner's BehaviourComp.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UApplyBehaviourAbilityComponent : public UActorComponent
 {
@@ -65,13 +67,18 @@ protected:
 	FApplyBehaviourAbilitySettings BehaviourAbilitySettings;
 
 private:
+	void RefreshOwnerReferences();
+
+	UPROPERTY()
 	TWeakObjectPtr<UBehaviourComp> M_OwnerBehaviourComponent;
 	bool GetIsValidOwnerBehaviourComponent() const;
+
 	UPROPERTY()
 	TScriptInterface<ICommands> M_OwnerCommandsInterface;
 	bool GetIsValidOwnerCommandsInterface() const;
 
 	FString GetDebugName() const;
+	bool GetIsValidBehaviourApplied() const;
 	void BeginPlay_CheckSettings() const;
 
 	void BeginPlay_AddAbility();

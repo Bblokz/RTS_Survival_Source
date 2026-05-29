@@ -72,13 +72,29 @@ void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 void UBehaviourComp::AddBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
 {
-	RTS_ENSUREMSGF(IsValid(BehaviourClass), TEXT("Invalid BehaviourClass provided to AddBehaviour: %s"), *GetNameSafe(BehaviourClass));
+	if (not IsValid(BehaviourClass))
+	{
+		RTS_ENSUREMSGF(
+			false,
+			TEXT("Invalid BehaviourClass provided to AddBehaviour: %s"),
+			*GetNameSafe(BehaviourClass));
+		return;
+	}
+
 	AddBehaviourInternal(BehaviourClass, TOptional<float>());
 }
 
 void UBehaviourComp::AddBehaviourWithDuration(TSubclassOf<UBehaviour> BehaviourClass, const float CustomLifetimeSeconds)
 {
-	RTS_ENSUREMSGF(IsValid(BehaviourClass), TEXT("Invalid BehaviourClass provided to AddBehaviourWithDuration: %s"), *GetNameSafe(BehaviourClass));
+	if (not IsValid(BehaviourClass))
+	{
+		RTS_ENSUREMSGF(
+			false,
+			TEXT("Invalid BehaviourClass provided to AddBehaviourWithDuration: %s"),
+			*GetNameSafe(BehaviourClass));
+		return;
+	}
+
 	AddBehaviourInternal(BehaviourClass, CustomLifetimeSeconds);
 }
 

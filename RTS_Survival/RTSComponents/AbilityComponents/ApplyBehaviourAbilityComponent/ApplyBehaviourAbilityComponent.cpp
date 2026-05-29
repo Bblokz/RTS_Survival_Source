@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "ApplyBehaviourAbilityComponent.h"
@@ -31,6 +31,12 @@ void UApplyBehaviourAbilityComponent::ExecuteBehaviourAbility() const
 	{
 		return;
 	}
+
+	if (not GetIsValidBehaviourApplied())
+	{
+		return;
+	}
+
 	M_OwnerBehaviourComponent->AddBehaviour(BehaviourAbilitySettings.BehaviourApplied);
 }
 
@@ -46,26 +52,15 @@ EBehaviourAbilityType UApplyBehaviourAbilityComponent::GetBehaviourAbilityType()
 void UApplyBehaviourAbilityComponent::PostInitProperties()
 {
 	Super::PostInitProperties();
-	if (not GetOwner())
-	{
-		return;
-	}
-	// Attempt to cast the owner to the ICommands interface
-	ICommands* CommandsInterface = Cast<ICommands>(GetOwner());
-	if (CommandsInterface)
-	{
-		M_OwnerCommandsInterface.SetInterface(CommandsInterface);
-		M_OwnerCommandsInterface.SetObject(GetOwner());
-	}
-	M_OwnerBehaviourComponent = Cast<UBehaviourComp>(
-		GetOwner()->GetComponentByClass(UBehaviourComp::StaticClass())
-	);
+	RefreshOwnerReferences();
 }
 
 
 void UApplyBehaviourAbilityComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	RefreshOwnerReferences();
 	// Error checks.
 	(void)GetIsValidOwnerCommandsInterface();
 	(void)GetIsValidOwnerBehaviourComponent();
@@ -73,24 +68,63 @@ void UApplyBehaviourAbilityComponent::BeginPlay()
 	BeginPlay_AddAbility();
 }
 
+void UApplyBehaviourAbilityComponent::RefreshOwnerReferences()
+{
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		M_OwnerBehaviourComponent.Reset();
+		M_OwnerCommandsInterface.SetInterface(nullptr);
+		M_OwnerCommandsInterface.SetObject(nullptr);
+		return;
+	}
+
+	ICommands* CommandsInterface = Cast<ICommands>(Owner);
+	M_OwnerCommandsInterface.SetInterface(CommandsInterface);
+	M_OwnerCommandsInterface.SetObject(CommandsInterface != nullptr ? Owner : nullptr);
+	M_OwnerBehaviourComponent = Owner->FindComponentByClass<UBehaviourComp>();
+}
+
 bool UApplyBehaviourAbilityComponent::GetIsValidOwnerBehaviourComponent() const
 {
-	if (not M_OwnerBehaviourComponent.IsValid())
+	if (M_OwnerBehaviourComponent.IsValid())
 	{
-		RTSFunctionLibrary::ReportError("Owner behaviour component is not valid at : " + GetDebugName());
-		return false;
+		return true;
 	}
-	return true;
+
+	const_cast<UApplyBehaviourAbilityComponent*>(this)->RefreshOwnerReferences();
+	if (M_OwnerBehaviourComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_OwnerBehaviourComponent",
+		"GetIsValidOwnerBehaviourComponent",
+		this);
+	return false;
 }
 
 bool UApplyBehaviourAbilityComponent::GetIsValidOwnerCommandsInterface() const
 {
-	if (not IsValid(M_OwnerCommandsInterface.GetObject()))
+	if (IsValid(M_OwnerCommandsInterface.GetObject()))
 	{
-		RTSFunctionLibrary::ReportError("Owner as icommands is not valid at: " + GetDebugName());
-		return false;
+		return true;
 	}
-	return true;
+
+	const_cast<UApplyBehaviourAbilityComponent*>(this)->RefreshOwnerReferences();
+	if (IsValid(M_OwnerCommandsInterface.GetObject()))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_OwnerCommandsInterface",
+		"GetIsValidOwnerCommandsInterface",
+		this);
+	return false;
 }
 
 FString UApplyBehaviourAbilityComponent::GetDebugName() const
@@ -103,13 +137,24 @@ FString UApplyBehaviourAbilityComponent::GetDebugName() const
 	return "Null Owner";
 }
 
+bool UApplyBehaviourAbilityComponent::GetIsValidBehaviourApplied() const
+{
+	if (IsValid(BehaviourAbilitySettings.BehaviourApplied))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"BehaviourAbilitySettings.BehaviourApplied",
+		"GetIsValidBehaviourApplied",
+		this);
+	return false;
+}
+
 void UApplyBehaviourAbilityComponent::BeginPlay_CheckSettings() const
 {
-	if (not IsValid(BehaviourAbilitySettings.BehaviourApplied))
-	{
-		RTSFunctionLibrary::ReportError("No valid behaviour class on behaviour ability component."
-			+ GetDebugName());
-	}
+	(void)GetIsValidBehaviourApplied();
 	if (BehaviourAbilitySettings.Cooldown <= 0)
 	{
 		RTSFunctionLibrary::ReportError("cooldown on behaviour Ability is not valid!" + GetDebugName());
