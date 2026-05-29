@@ -257,9 +257,8 @@ bool AAITankMaster::TryMoveToLocationWithOffNavRecovery(const FVector& Location,
 	MoveRequest.SetAcceptanceRadius(GoalAcceptanceRadius);
 	MoveRequest.SetUsePathfinding(true);
 	MoveRequest.SetAllowPartialPath(true);
-	MoveRequest.SetNavigationFilter(NavFilterTank);
+	MoveRequest.SetNavigationFilter(DefaultNavigationFilterClass);
 	
-		
 
 	const FPathFollowingRequestResult MoveResult = MoveTo(MoveRequest, nullptr);
 	if (MoveResult.Code == EPathFollowingRequestResult::RequestSuccessful ||
