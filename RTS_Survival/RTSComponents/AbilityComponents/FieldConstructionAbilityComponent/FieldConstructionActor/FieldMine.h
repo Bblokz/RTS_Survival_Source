@@ -85,6 +85,8 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
 
+	virtual void OnUnitDies(const ERTSDeathType DeathType) override;
+
 	// Blueprint configuration for the mine behaviour.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Mine")
 	FMineSettings MineSettings;
@@ -124,7 +126,7 @@ private:
 	                          UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
 	                          const FHitResult& SweepResult);
 
-	void TriggerMineForActor(AActor& TriggeringActor);
+	void TriggerMineForActor(AActor* TriggeringActor);
 	void HandleMineDetonation();
 
 	bool DoesNavAgentTriggerMine(const AActor& OtherActor) const;

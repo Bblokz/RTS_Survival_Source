@@ -56,6 +56,13 @@ void AFieldMine::PostInitializeComponents()
 	M_TriggerSphere = FindComponentByClass<USphereComponent>();
 }
 
+void AFieldMine::OnUnitDies(const ERTSDeathType DeathType)
+{
+	// DO NOT call super as it will kill the mine prematurely.
+	SetUnitDying();
+	
+}
+
 void AFieldMine::BeginPlay_DisableMineMeshCollision()
 {
 	if (not GetIsValidFieldConstructionMesh())
@@ -128,13 +135,13 @@ void AFieldMine::OnMineTriggerOverlap(UPrimitiveComponent* /*OverlappedComponent
 		return;
 	}
 
-	TriggerMineForActor(*OtherActor);
+	TriggerMineForActor(OtherActor);
 }
 
-void AFieldMine::TriggerMineForActor(AActor& TriggeringActor)
+void AFieldMine::TriggerMineForActor(AActor* TriggeringActor)
 {
 	bM_HasTriggered = true;
-	M_TargetActor = &TriggeringActor;
+	M_TargetActor = TriggeringActor;
 	M_CachedDamage = CalculateMineDamage();
 
 	if (GetIsValidTriggerSphere())
