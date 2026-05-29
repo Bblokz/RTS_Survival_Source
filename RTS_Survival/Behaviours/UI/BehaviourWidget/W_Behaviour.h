@@ -13,6 +13,8 @@ class UImage;
 class UTexture2D;
 class UW_BehaviourContainer;
 class UBehaviourButtonSettings;
+class UBehaviourIconStyleDataAsset;
+struct FBehaviourIconWidgetStyle;
 struct FSlateBrush;
 
 /**
@@ -48,10 +50,15 @@ private:
         bool GetIsValidBehaviourButton() const;
         bool GetIsValidBehaviourImage() const;
         static bool GetIsValidBehaviourButtonSettings(const UBehaviourButtonSettings* BehaviourButtonSettings);
+        static bool GetIsValidBehaviourIconStyleDataAsset(
+                const UBehaviourIconStyleDataAsset* BehaviourIconStyleDataAsset);
 
         static const UBehaviourButtonSettings* GetBehaviourButtonSettings();
 
         void ApplyBehaviourIcon();
+        const FBehaviourIconWidgetStyle* GetBehaviourIconWidgetStyle(
+                const UBehaviourIconStyleDataAsset* BehaviourIconStyleDataAsset) const;
+        bool ApplyBehaviourIconTexture(const FBehaviourIconWidgetStyle& BehaviourIconWidgetStyle);
         void ClearBehaviourIconBrush();
 
         UFUNCTION()
