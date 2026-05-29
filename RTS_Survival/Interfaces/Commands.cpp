@@ -337,6 +337,16 @@ bool UCommandData::GetHasQueuedMovementCommandAfterActive() const
 	return NextCommandAbility == EAbilityID::IdMove || NextCommandAbility == EAbilityID::IdReverseMove;
 }
 
+bool UCommandData::GetIsCurrentCommandAMovementCommand() const
+{
+	if(CurrentIndex < 0 || CurrentIndex >= NumCommands)
+	{
+		return false;
+	}
+	const EAbilityID CurrentCommandAbility = M_TCommands[CurrentIndex].CommandType;
+	return CurrentCommandAbility == EAbilityID::IdMove || CurrentCommandAbility == EAbilityID::IdReverseMove;
+}
+
 bool UCommandData::GetHasPreviousMovementCommandBeforeActive() const
 {
 	const int32 PreviousCommandIndex = CurrentIndex - 1;
@@ -1176,7 +1186,6 @@ void ICommands::UnstuckSquadMoveUp(const float ZOffset)
 
 void ICommands::SetRTSOverlapEvasionEnabled(const bool bEnabled)
 {
-	
 }
 
 bool ICommands::GetIsUnitInCombat() const
@@ -2673,14 +2682,23 @@ void ICommands::SetUnitToIdle()
 {
 	if (UCommandData* UnitCommandData = GetIsValidCommandData())
 	{
-		// Terminate logic for the last active command type.
-		const EAbilityID LastActiveCommand = UnitCommandData->GetCurrentActiveCommand();
-		TerminateCommand(LastActiveCommand);
+		TerminateActiveCommand(UnitCommandData);
 		// Clear command queue.
 		UnitCommandData->ClearCommands();
 		// Custom reset logic that is unit-specific.
 		SetUnitToIdleSpecificLogic();
 	}
+}
+
+void ICommands::TerminateActiveCommand(const UCommandData* CommandData)
+{
+	if (not CommandData)
+	{
+		return;
+	}
+	// Terminate logic for the last active command type.
+	const EAbilityID LastActiveCommand = CommandData->GetCurrentActiveCommand();
+	TerminateCommand(LastActiveCommand);
 }
 
 void ICommands::OnUnitIdleAndNoNewCommands()
@@ -2761,7 +2779,7 @@ ECommandQueueError ICommands::ManAbandonedTeamWeapon(AActor* TeamWeaponActor, co
 }
 
 ECommandQueueError ICommands::TowActor(AActor* ActorToTow, const ETowedActorTarget TowSubtype,
-                                    const bool bSetUnitToIdle)
+                                       const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not IsValid(UnitCommandData))
@@ -3178,7 +3196,8 @@ void ICommands::ExecuteRegisterUnitAsBlackboardIdleCommand()
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		Debugging::RegisteringByIcommandsDebugging)
 	{
-		const FVector Location = OwnerActor->GetActorLocation() + FVector(0,0, Debugging::RegisteringByICommandsOffset);
+		const FVector Location = OwnerActor->GetActorLocation() +
+			FVector(0, 0, Debugging::RegisteringByICommandsOffset);
 		const FString DebugText = "Blackboard Idle through Icommands!";
 		DrawDebugString(OwnerActor->GetWorld(), Location, DebugText, nullptr, FColor::Red, 20.0f, false);
 	}

@@ -196,6 +196,9 @@ public:
 	 */
 	bool GetHasQueuedMovementCommandAfterActive() const;
 
+	// Returns true if we are currently move to or reversing.
+	bool GetIsCurrentCommandAMovementCommand()const;
+
 	/**
 	 * @brief Allows movement executors to detect chain handoff and skip stationary-start delay between consecutive moves.
 	 * @return True when the command before the active one was move or reverse move.
@@ -740,6 +743,8 @@ public:
 	 * @post Unit is ready to execute a (new) command.
 	 */
 	void SetUnitToIdle();
+
+	void TerminateActiveCommand(const UCommandData* CommandData);
 
 	/** @brief Executes the next command in Commands, or sets unit to idle state.
 	 * @param AbilityFinished: The ability that has finished executing.
