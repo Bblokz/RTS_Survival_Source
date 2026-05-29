@@ -1648,6 +1648,11 @@ void ASquadController::TerminateMoveCommand()
 	}
 }
 
+void ASquadController::TerminateMoveCommandForMovementReplacement()
+{
+	Super::TerminateMoveCommandForMovementReplacement();
+}
+
 void ASquadController::TerminateRetreatCommand()
 {
 	TerminateMoveCommand();
@@ -2247,6 +2252,11 @@ void ASquadController::ExecuteReverseCommand(const FVector ReverseToLocation)
 void ASquadController::TerminateReverseCommand()
 {
 	TerminateMoveCommand();
+}
+
+void ASquadController::TerminateReverseCommandForMovementReplacement()
+{
+	TerminateMoveCommandForMovementReplacement();
 }
 
 void ASquadController::ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand)

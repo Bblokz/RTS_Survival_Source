@@ -809,6 +809,12 @@ protected:
 	/** @brief Stops all logic used for move commands..*/
 	virtual void TerminateMoveCommand();
 
+	/**
+	 * @brief Used when a new immediate move replaces an active move before it can see the next queued move.
+	 * This preserves locomotion so rapid movement commands do not create move-stop-move behaviour.
+	 */
+	virtual void TerminateMoveCommandForMovementReplacement();
+
 	virtual void ExecuteReinforceCommand(AActor* ReinforcementTarget);
 	virtual void TerminateReinforceCommand();
 
@@ -843,6 +849,12 @@ protected:
 
 	/** @brief Run when the unit finished their turn towards command.*/
 	virtual void TerminateReverseCommand();
+
+	/**
+	 * @brief Used when a new immediate move replaces an active reverse move before queue chaining is visible.
+	 * This preserves locomotion so rapid movement commands do not create reverse-stop-move behaviour.
+	 */
+	virtual void TerminateReverseCommandForMovementReplacement();
 
 	/**
 	 * @brief Rotates the unit towards the specified rotator.
@@ -996,6 +1008,18 @@ protected:
 private:
 	// Called on DoneExecutingCommand.
 	void TerminateCommand(EAbilityID AbilityToKill);
+
+	/**
+	 * @brief Chooses full idle reset or movement-preserving replacement before adding an immediate move.
+	 * @param UnitCommandData Command queue state that still contains the active command being replaced.
+	 */
+	void PrepareForImmediateMovementCommand(UCommandData* UnitCommandData);
+
+	/**
+	 * @brief Routes active move/reverse termination through replacement hooks before the queue is cleared.
+	 * @param CommandData Command queue state used to identify which movement command is currently active.
+	 */
+	void TerminateActiveMovementCommandForMovementReplacement(const UCommandData* CommandData);
 
 	ECommandQueueError GetIsAbilityOnCommandCardAndNotOnCooldown(const EAbilityID AbilityToCheck);
 };

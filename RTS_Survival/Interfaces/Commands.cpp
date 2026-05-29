@@ -1362,7 +1362,7 @@ ECommandQueueError ICommands::MoveToLocation(
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		PrepareForImmediateMovementCommand(UnitCommandData);
 	}
 	// By default this is false which means that the vehicle reversing to the location will completely disregard the
 	// final rotation set. This is set to true when the player uses a rotation arrow to determine the final rotation,
@@ -1697,7 +1697,7 @@ ECommandQueueError ICommands::ReverseUnitToLocation(
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		PrepareForImmediateMovementCommand(UnitCommandData);
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdReverseMove, Location, nullptr, FRotator::ZeroRotator);
@@ -2323,6 +2323,14 @@ void ICommands::TerminateMoveCommand()
 	}
 }
 
+void ICommands::TerminateMoveCommandForMovementReplacement()
+{
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	{
+		RTSFunctionLibrary::PrintString("Terminated move command for movement replacement! (in ICommands)");
+	}
+}
+
 void ICommands::ExecuteReinforceCommand(AActor* ReinforcementTarget)
 {
 }
@@ -2678,6 +2686,14 @@ void ICommands::TerminateReverseCommand()
 	}
 }
 
+void ICommands::TerminateReverseCommandForMovementReplacement()
+{
+	if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
+	{
+		RTSFunctionLibrary::PrintString("Terminated reverse command for movement replacement! (in ICommands)");
+	}
+}
+
 void ICommands::SetUnitToIdle()
 {
 	if (UCommandData* UnitCommandData = GetIsValidCommandData())
@@ -2699,6 +2715,45 @@ void ICommands::TerminateActiveCommand(const UCommandData* CommandData)
 	// Terminate logic for the last active command type.
 	const EAbilityID LastActiveCommand = CommandData->GetCurrentActiveCommand();
 	TerminateCommand(LastActiveCommand);
+}
+
+void ICommands::PrepareForImmediateMovementCommand(UCommandData* UnitCommandData)
+{
+	if (not IsValid(UnitCommandData))
+	{
+		return;
+	}
+
+	if (not UnitCommandData->GetIsCurrentCommandAMovementCommand())
+	{
+		SetUnitToIdle();
+		return;
+	}
+
+	TerminateActiveMovementCommandForMovementReplacement(UnitCommandData);
+	UnitCommandData->ClearCommands();
+	SetUnitToIdleSpecificLogic();
+}
+
+void ICommands::TerminateActiveMovementCommandForMovementReplacement(const UCommandData* CommandData)
+{
+	if (not CommandData)
+	{
+		return;
+	}
+
+	const EAbilityID LastActiveCommand = CommandData->GetCurrentActiveCommand();
+	switch (LastActiveCommand)
+	{
+	case EAbilityID::IdMove:
+		TerminateMoveCommandForMovementReplacement();
+		break;
+	case EAbilityID::IdReverseMove:
+		TerminateReverseCommandForMovementReplacement();
+		break;
+	default:
+		break;
+	}
 }
 
 void ICommands::OnUnitIdleAndNoNewCommands()
