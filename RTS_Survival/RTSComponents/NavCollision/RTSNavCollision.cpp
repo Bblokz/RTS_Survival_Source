@@ -26,13 +26,15 @@ URTSNavCollision::URTSNavCollision()
 
 void URTSNavCollision::EnableAffectNavmesh(bool bEnable)
 {
+	if (bM_IsAffectingNavmesh == bEnable)
+	{
+		return;
+	}
+
+	bM_IsAffectingNavmesh = bEnable;
+
 	SetNavigationRelevancy(bEnable);
-
-	// Force refresh of modifiers so the navmesh updates immediately
 	RefreshNavigationModifiers();
-
-	// Extra safety: request nav system to rebuild octree for owner
-	// RequestNavMeshRefresh();
 }
 
 void URTSNavCollision::BeginPlay()

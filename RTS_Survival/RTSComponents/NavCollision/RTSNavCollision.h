@@ -52,4 +52,6 @@ private:
 	bool EnsureIsValidNavSystem()const;
 
 	void BeginPlay_SetupNavigationFilters();
+
+	bool bM_IsAffectingNavmesh = true;
 };
