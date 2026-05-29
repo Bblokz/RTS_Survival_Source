@@ -336,22 +336,19 @@ void ATrackedTankMaster::TerminateMoveCommand()
 	{
 		return;
 	}
-	const bool bHasQueuedMovementCommandAfterActive = CommandData->GetHasQueuedMovementCommandAfterActive();
-	if (not bHasQueuedMovementCommandAfterActive)
+
+	if (not CommandData->GetHasQueuedMovementCommandAfterActive())
 	{
-		CancelPendingTrackedMove();
-		StopBehaviourTree();
-		if (GetIsValidAITankController())
-		{
-			AITankController->StopMovement();
-		}
-		if (not GetIsValidTankAnimationBP())
-		{
-			return;
-		}
-		// Stop all animations.
-		TankAnimationBP->SetChassisAnimToIdle();
+		FullyStopTrackedMovementCommand();
 	}
+
+	CheckFootPrintForOverlaps();
+}
+
+void ATrackedTankMaster::TerminateMoveCommandForMovementReplacement()
+{
+	Super::TerminateMoveCommandForMovementReplacement();
+	CancelPendingTrackedMove();
 	CheckFootPrintForOverlaps();
 }
 
@@ -374,36 +371,20 @@ void ATrackedTankMaster::TerminateReverseCommand()
 	{
 		return;
 	}
-	const bool bHasQueuedMovementCommandAfterActive = CommandData->GetHasQueuedMovementCommandAfterActive();
-	if (not bHasQueuedMovementCommandAfterActive)
-	{
-		CancelPendingTrackedMove();
-		// Reset reverse enforcement and stop behaviour tree.
-		// Important: do not hard-stop movement here, because reverse-to-reverse command transitions
-		// can pass through terminate on override flows and we want to preserve movement continuity.
-		if (GetIsValidAITankController())
-		{
-			if (UTrackPathFollowingComponent* TrackPFC =
-				Cast<UTrackPathFollowingComponent>(AITankController->GetPathFollowingComponent()))
-			{
-				TrackPFC->SetReverse(false);
-			}
-		}
-		StopBehaviourTree();
-		if (GetIsValidAITankController())
-		{
-			AITankController->StopMovement();
-		}
 
-		// Return chassis to idle, mirroring TerminateMoveCommand
-		if (not GetIsValidTankAnimationBP())
-		{
-			return;
-		}
-		TankAnimationBP->SetChassisAnimToIdle();
+	if (not CommandData->GetHasQueuedMovementCommandAfterActive())
+	{
+		ResetTrackedReversePathFollowing();
+		FullyStopTrackedMovementCommand();
 	}
 
 	Super::TerminateReverseCommand();
+}
+
+void ATrackedTankMaster::TerminateReverseCommandForMovementReplacement()
+{
+	Super::TerminateReverseCommandForMovementReplacement();
+	CancelPendingTrackedMove();
 }
 
 void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& TargetLocation, const bool bIsReverse)
@@ -465,6 +446,41 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred()
 	M_QueuedMoveState.bM_HasPendingQueuedMove = false;
 	// NOTE: Pending flag is cleared only after the request is consumed by ExecuteTrackedMoveNow,
 	// so delayed callbacks cannot double-issue movement for the same queued state snapshot.
+}
+
+void ATrackedTankMaster::ResetTrackedReversePathFollowing()
+{
+	if (not GetIsValidAITankController())
+	{
+		return;
+	}
+
+	UTrackPathFollowingComponent* TrackPathFollowingComponent =
+		Cast<UTrackPathFollowingComponent>(AITankController->GetPathFollowingComponent());
+	if (not IsValid(TrackPathFollowingComponent))
+	{
+		return;
+	}
+
+	TrackPathFollowingComponent->SetReverse(false);
+}
+
+void ATrackedTankMaster::FullyStopTrackedMovementCommand()
+{
+	CancelPendingTrackedMove();
+	StopBehaviourTree();
+	if (GetIsValidAITankController())
+	{
+		AITankController->StopMovement();
+	}
+
+	if (not GetIsValidTankAnimationBP())
+	{
+		return;
+	}
+
+	// Stop all animations.
+	TankAnimationBP->SetChassisAnimToIdle();
 }
 
 void ATrackedTankMaster::CancelPendingTrackedMove()

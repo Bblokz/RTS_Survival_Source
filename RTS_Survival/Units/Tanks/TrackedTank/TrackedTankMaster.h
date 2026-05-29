@@ -169,8 +169,20 @@ protected:
 	/** @copydoc ICommands::Fini */
 	virtual void TerminateMoveCommand() override;
 
+	/**
+	 * @brief Clears stale deferred move state without braking when an immediate move replaces active movement.
+	 * This lets tracked tanks accept rapid movement spam without resetting locomotion between destinations.
+	 */
+	virtual void TerminateMoveCommandForMovementReplacement() override;
+
 	virtual void ExecuteReverseCommand(const FVector ReverseToLocation) override;
 	virtual void TerminateReverseCommand() override;
+
+	/**
+	 * @brief Clears stale deferred reverse state without braking when immediate movement replaces active reverse.
+	 * This keeps the tank moving while the replacement command installs its own forward/reverse request.
+	 */
+	virtual void TerminateReverseCommandForMovementReplacement() override;
 
 
 	virtual void StopMovement() override final;
@@ -283,6 +295,18 @@ private:
 	 * @note Always set queued movement completion ability before issuing controller move request.
 	 */
 	void ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse);
+
+	/**
+	 * @brief Resets reverse path-following only during full reverse termination.
+	 * Replacement moves skip this because the new request will immediately set the correct reverse mode.
+	 */
+	void ResetTrackedReversePathFollowing();
+
+	/**
+	 * @brief Centralizes full tracked movement shutdown so replacement termination can avoid braking.
+	 * Used when no movement command follows and the tank really should stop.
+	 */
+	void FullyStopTrackedMovementCommand();
 
 	void CancelPendingTrackedMove();
 

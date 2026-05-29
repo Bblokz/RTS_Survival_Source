@@ -508,6 +508,12 @@ protected:
 
 	/** @brief Stops all logic used for move commands.*/
 	virtual void TerminateMoveCommand() override;
+
+	/**
+	 * @brief Keeps squad units moving when a rapid immediate move replaces the active move.
+	 * The regular terminate path would stop every squad unit before the replacement move is queued.
+	 */
+	virtual void TerminateMoveCommandForMovementReplacement() override;
 	virtual void TerminateRetreatCommand() override;
 
 	virtual void ExecuteReinforceCommand(AActor* ReinforcementTarget) override;
@@ -567,6 +573,12 @@ protected:
 
 	/** @brief Run when the unit finished their turn towards command.*/
 	virtual void TerminateReverseCommand() override;
+
+	/**
+	 * @brief Mirrors move replacement because squad reverse commands are executed as regular squad movement.
+	 * This prevents a reverse replacement from stopping units before the new movement target is queued.
+	 */
+	virtual void TerminateReverseCommandForMovementReplacement() override;
 
 	/**
 	 * @brief Rotates the unit towards the specified rotator.
