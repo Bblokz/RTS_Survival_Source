@@ -284,6 +284,8 @@ private:
 	 */
 	void ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse);
 
+	void CancelPendingTrackedMove();
+
 	void HandleVoiceLineOnLevelUp() const; 
 
 	// Aggregates the currently requested move so stationary starts can wait for nav settle, while chains can repath instantly.
