@@ -851,6 +851,15 @@ void ASquadUnit::TerminateMovementCommand()
 	StopMovementAndClearPath();
 }
 
+void ASquadUnit::TerminateMovementCommandDoNotKillVelocity()
+{
+	if (GetIsValidAISquadUnit())
+	{
+		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
+		M_CurrentPath.Reset();
+	}
+}
+
 void ASquadUnit::MoveToAndBindOnCompleted(const FVector& MoveToLocation, const bool bUsePathfinding,
                                           const EAbilityID MoveContext)
 {

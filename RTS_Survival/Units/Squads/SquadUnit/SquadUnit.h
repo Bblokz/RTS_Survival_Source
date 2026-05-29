@@ -354,6 +354,8 @@ protected:
 	 */
 	virtual void TerminateMovementCommand();
 
+	virtual void TerminateMovementCommandDoNotKillVelocity();
+
 	/**
 	 * @brief Moves the unit to the provided location and binds OnMoveCompleted to the MoveToLocation.
 	 * @note This function does not alter the active ability ID.

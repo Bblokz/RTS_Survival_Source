@@ -1636,21 +1636,35 @@ void ASquadController::TerminateMoveCommand()
 
 	if (CommandData->GetHasQueuedMovementCommandAfterActive())
 	{
-		return;
-	}
-
-	for (ASquadUnit* SquadUnit : M_TSquadUnits)
-	{
-		if (GetIsValidSquadUnit(SquadUnit))
+		for (ASquadUnit* SquadUnit : M_TSquadUnits)
 		{
-			SquadUnit->TerminateMovementCommand();
+			if (GetIsValidSquadUnit(SquadUnit))
+			{
+				SquadUnit->TerminateMovementCommandDoNotKillVelocity();
+			}
+		}
+	}
+	else
+	{
+		for (ASquadUnit* SquadUnit : M_TSquadUnits)
+		{
+			if (GetIsValidSquadUnit(SquadUnit))
+			{
+				SquadUnit->TerminateMovementCommand();
+			}
 		}
 	}
 }
 
 void ASquadController::TerminateMoveCommandForMovementReplacement()
 {
-	Super::TerminateMoveCommandForMovementReplacement();
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (GetIsValidSquadUnit(SquadUnit))
+		{
+			SquadUnit->TerminateMovementCommandDoNotKillVelocity();
+		}
+	}
 }
 
 void ASquadController::TerminateRetreatCommand()
@@ -3358,7 +3372,7 @@ void ASquadController::PlayAnnouncerLineNotEnoughSquadMembersToCapture()
 
 void ASquadController::OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const
 {
-	if(not GetIsValidSquadHealthComponent())
+	if (not GetIsValidSquadHealthComponent())
 	{
 		return;
 	}

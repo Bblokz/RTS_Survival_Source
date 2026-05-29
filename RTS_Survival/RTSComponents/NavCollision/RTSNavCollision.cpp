@@ -32,7 +32,7 @@ void URTSNavCollision::EnableAffectNavmesh(bool bEnable)
 	RefreshNavigationModifiers();
 
 	// Extra safety: request nav system to rebuild octree for owner
-	RequestNavMeshRefresh();
+	// RequestNavMeshRefresh();
 }
 
 void URTSNavCollision::BeginPlay()
@@ -44,21 +44,21 @@ void URTSNavCollision::BeginPlay()
 	if (not IsValid(OwnerActor))
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-			this, "OwnerActor", "RequestNavMeshRefresh");
+			this, "OwnerActor", "BeginPlay");
 		return;
 	}
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
-		RTSFunctionLibrary::ReportError("World invalid in RequestNavMeshRefresh\nComponent: " + GetName());
+		RTSFunctionLibrary::ReportError("World invalid in BeginPlay\nComponent: " + GetName());
 		return;
 	}
 
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 	if (not IsValid(NavSys))
 	{
-		RTSFunctionLibrary::ReportError("NavigationSystem invalid in RequestNavMeshRefresh\nComponent: " + GetName());
+		RTSFunctionLibrary::ReportError("NavigationSystem invalid in BeginPlay\nComponent: " + GetName());
 		return;
 	}
 	M_NavSystem = NavSys;
@@ -100,10 +100,10 @@ void URTSNavCollision::BeginPlay_SetupNavigationFilters()
 	}
 	if (RTSComp->GetOwningPlayer() == 1)
 	{
-		AreaClass = NavCollisionSettings.PlayerNavigationFilter;
+		SetAreaClass(NavCollisionSettings.PlayerNavigationFilter);
 	}
 	else
 	{
-		AreaClass = NavCollisionSettings.EnemyNavigationFilter;
+		SetAreaClass(NavCollisionSettings.EnemyNavigationFilter);
 	}
 }

@@ -377,7 +377,7 @@ void ATrackedTankMaster::TerminateReverseCommand()
 		ResetTrackedReversePathFollowing();
 		FullyStopTrackedMovementCommand();
 	}
-
+	CheckFootPrintForOverlaps();
 	Super::TerminateReverseCommand();
 }
 
@@ -503,7 +503,8 @@ void ATrackedTankMaster::ExecuteTrackedMoveNow(const FVector& TargetLocation, co
 		return;
 	}
 
-	if (UTrackPathFollowingComponent* TrackPFC = Cast<UTrackPathFollowingComponent>(AITankController->GetPathFollowingComponent()))
+	if (UTrackPathFollowingComponent* TrackPFC = Cast<UTrackPathFollowingComponent>(
+		AITankController->GetPathFollowingComponent()))
 	{
 		TrackPFC->SetReverse(bIsReverse);
 	}
@@ -731,7 +732,7 @@ void ATrackedTankMaster::UpdateEngineSound() const
 
 void ATrackedTankMaster::OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const
 {
-	if(not GetIsValidHealthComponent())
+	if (not GetIsValidHealthComponent())
 	{
 		return;
 	}
