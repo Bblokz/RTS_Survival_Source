@@ -5,6 +5,7 @@
 #include "Components/Button.h"
 #include "Components/Image.h"
 #include "RTS_Survival/Behaviours/ProjectSettings/BehaviourButtonSettings.h"
+#include "RTS_Survival/Behaviours/Icons/BehaviourIconStyleDataAsset.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourContainer/W_BehaviourContainer.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Styling/SlateBrush.h"
@@ -118,6 +119,20 @@ bool UW_Behaviour::GetIsValidBehaviourButtonSettings(const UBehaviourButtonSetti
         return false;
 }
 
+bool UW_Behaviour::GetIsValidBehaviourIconStyleDataAsset(
+        const UBehaviourIconStyleDataAsset* BehaviourIconStyleDataAsset)
+{
+        if (IsValid(BehaviourIconStyleDataAsset))
+        {
+                return true;
+        }
+
+        RTSFunctionLibrary::ReportError(
+                TEXT("UW_Behaviour::GetIsValidBehaviourIconStyleDataAsset: Behaviour icon style Data Asset is not configured "
+                     "or could not be loaded."));
+        return false;
+}
+
 void UW_Behaviour::ClearBehaviourIconBrush()
 {
         if (not GetIsValidBehaviourImage())
@@ -143,19 +158,57 @@ void UW_Behaviour::ApplyBehaviourIcon()
                 return;
         }
 
-        const TMap<EBehaviourIcon, FBehaviourWidgetStyle>& ResolvedBehaviourIconStyles =
-                BehaviourButtonSettings->GetResolvedBehaviourIconStyles();
-        const FBehaviourWidgetStyle* BehaviourStyle = ResolvedBehaviourIconStyles.Find(M_BehaviourUIData.BehaviourIcon);
-        if (not BehaviourStyle || not IsValid(BehaviourStyle->IconTexture))
+        const UBehaviourIconStyleDataAsset* BehaviourIconStyleDataAsset =
+                BehaviourButtonSettings->GetBehaviourIconStyleDataAsset();
+        if (not GetIsValidBehaviourIconStyleDataAsset(BehaviourIconStyleDataAsset))
         {
-                const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
-                RTSFunctionLibrary::ReportError(
-                        TEXT("UW_Behaviour::ApplyBehaviourIcon: Unable to find icon texture for behaviour icon.")
-                        "\n Icon: " + IconAsString);
                 ClearBehaviourIconBrush();
                 return;
         }
 
-        M_AppliedIconTexture = BehaviourStyle->IconTexture;
+        const FBehaviourIconWidgetStyle* BehaviourIconWidgetStyle =
+                GetBehaviourIconWidgetStyle(BehaviourIconStyleDataAsset);
+        if (not BehaviourIconWidgetStyle)
+        {
+                ClearBehaviourIconBrush();
+                return;
+        }
+
+        if (not ApplyBehaviourIconTexture(*BehaviourIconWidgetStyle))
+        {
+                ClearBehaviourIconBrush();
+        }
+}
+
+const FBehaviourIconWidgetStyle* UW_Behaviour::GetBehaviourIconWidgetStyle(
+        const UBehaviourIconStyleDataAsset* BehaviourIconStyleDataAsset) const
+{
+        const FBehaviourIconWidgetStyle* BehaviourIconWidgetStyle =
+                BehaviourIconStyleDataAsset->FindBehaviourIconStyle(M_BehaviourUIData.BehaviourIcon);
+        if (BehaviourIconWidgetStyle)
+        {
+                return BehaviourIconWidgetStyle;
+        }
+
+        const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
+        RTSFunctionLibrary::ReportError(
+                TEXT("UW_Behaviour::GetBehaviourIconWidgetStyle: Unable to find style for behaviour icon.")
+                "\n Icon: " + IconAsString);
+        return nullptr;
+}
+
+bool UW_Behaviour::ApplyBehaviourIconTexture(const FBehaviourIconWidgetStyle& BehaviourIconWidgetStyle)
+{
+        if (not IsValid(BehaviourIconWidgetStyle.IconTexture))
+        {
+                const FString IconAsString = UEnum::GetValueAsString(M_BehaviourUIData.BehaviourIcon);
+                RTSFunctionLibrary::ReportError(
+                        TEXT("UW_Behaviour::ApplyBehaviourIconTexture: Behaviour icon style has an invalid texture.")
+                        "\n Icon: " + IconAsString);
+                return false;
+        }
+
+        M_AppliedIconTexture = BehaviourIconWidgetStyle.IconTexture;
         BehaviourImage->SetBrushFromTexture(M_AppliedIconTexture, false);
+        return true;
 }
