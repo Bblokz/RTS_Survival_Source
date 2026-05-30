@@ -72,6 +72,15 @@ public:
 	void AttachRTSRadiusToActor(int32 ID, AActor* TargetActor, FVector RelativeOffset);
 
 	/**
+	 * @brief Attach an active radius while keeping it upright and following only the target yaw.
+	 * @param ID The id returned by CreateRTSRadius.
+	 * @param TargetActor Actor to follow for location and yaw.
+	 * @param RelativeOffset Offset applied as relative location while attached.
+	 */
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+	void AttachRTSRadiusToActorYawOnly(int32 ID, AActor* TargetActor, FVector RelativeOffset);
+
+	/**
 	 * @brief Updates the weapon arc parameter for a pooled radius actor.
 	 * @param ID The id returned by CreateRTSRadius.
 	 * @param ArcAngle Desired turret arc in degrees.

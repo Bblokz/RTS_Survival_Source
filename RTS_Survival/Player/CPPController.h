@@ -58,6 +58,9 @@ class UTowedActorComponent;
 class UPlayerOutlineComponent;
 class APlayerAimAbility;
 class UAttachedWeaponAbilityComponent;
+class ATankMaster;
+class UHullWeaponComponent;
+class UWeaponState;
 class UPlayerPortraitManager;
 class UW_Portrait;
 struct FNomadicPreviewAttachments;
@@ -1674,12 +1677,23 @@ private:
 	TWeakObjectPtr<AActor> LastHoveredActor;
 	TWeakObjectPtr<AActor> M_CurrentHoveredActor;
 
+	int32 M_HoverWeaponRangeRadiusActorIndex = -1;
 
 	// Helper methods
 	void HandleHoveringBlockedState();
 	void UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();
+	void UpdateHoverWeaponRangeRadiusForActor(AActor* NewHoveredActor);
+	void CreateHoverWeaponRangeRadius(AActor* HoveredActor, float WeaponRange);
+	void HideHoverWeaponRangeRadius();
+	bool TryGetMaxHoverWeaponRange(const AActor* HoveredActor, float& OutWeaponRange) const;
+	bool TryGetMaxTankWeaponRange(const ATankMaster* TankMaster, float& OutWeaponRange) const;
+	bool TryGetMaxBuildingExpansionWeaponRange(
+		const ABuildingExpansion* BuildingExpansion,
+		float& OutWeaponRange) const;
+	bool TryGetSquadUnitWeaponRange(const ASquadUnit* SquadUnit, float& OutWeaponRange) const;
+	void TryUpdateMaxRangeFromWeapons(const TArray<UWeaponState*>& Weapons, float& InOutWeaponRange) const;
 	bool GetIsValidHoverWidget();
 	void OnActorHovered(AActor* HoveredActor, const bool bIsHovered) const;
 	// The new actor may be null; which causes the previous outlined actor to no longer be outlined.

@@ -24,6 +24,7 @@ public:
 
 	// AActor
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	/**
 	 * @brief Initializes the radius component and marks this actor as dormant (hidden and not in use).
@@ -76,6 +77,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Radius|Pool")
 	void AttachToTargetActor(AActor* TargetActor, const FVector& RelativeOffset);
 
+	/**
+	 * @brief Attach while ignoring target pitch/roll so ground-facing radius meshes stay upright.
+	 * @param TargetActor Actor whose location and yaw should drive the radius actor.
+	 * @param RelativeOffset Local-space offset after attachment.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Radius|Pool")
+	void AttachToTargetActorYawOnly(AActor* TargetActor, const FVector& RelativeOffset);
+
 	/** Pool API expected by the subsystem. */
 	inline void SetPoolId(const int32 InId) { M_PoolId = InId; }
 	inline int32 GetPoolId() const { return M_PoolId; }
@@ -88,6 +97,7 @@ private:
 	/** Validity helper as per rule 0.5. */
 	bool GetIsValidRadiusComp() const;
 	bool GetIsValidRootScene() const;
+	void UpdateYawOnlyRotationFromTarget();
 
 private:
 	/** Root scene so attached components (and radius mesh) always have a valid parent. */
@@ -112,4 +122,7 @@ private:
 
 	// Timestamp when last activated (world seconds); used for LRU fallback.
 	float M_LastUsedWorldSeconds = 0.0f;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_YawOnlyAttachTarget;
 };
