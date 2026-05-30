@@ -11,7 +11,7 @@
 
 APooledRadiusActor::APooledRadiusActor()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	// Ensure we always have a root (fixes "Owner has no RootComponent" in URadiusComp::BeginPlay / ShowRadius).
@@ -41,6 +41,12 @@ void APooledRadiusActor::BeginPlay()
 {
 	Super::BeginPlay();
 	SetActorHiddenInGame(true);
+}
+
+void APooledRadiusActor::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	UpdateYawOnlyRotationFromTarget();
 }
 
 bool APooledRadiusActor::GetIsValidRadiusComp() const
@@ -83,15 +89,19 @@ void APooledRadiusActor::ActivateRadiusAt(const FVector& WorldLocation, const fl
                                           UMaterialInterface* Material, const ERTSRadiusType RadiusType,
                                           const bool bUseFullCircleMesh, const FName RadiusParameterName, const float ArcAngle)
 {
-	if (not GetIsValidRadiusComp())
+	if (not GetIsValidRadiusComp() || not GetIsValidRootScene())
 	{
 		return;
 	}
 
 	// Ensure detached activation (caller may attach later).
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-
+	M_YawOnlyAttachTarget = nullptr;
+	SetActorTickEnabled(false);
+	SetActorEnableCollision(false);
+	GetRootComponent()->SetUsingAbsoluteRotation(false);
 	SetActorLocation(WorldLocation);
+	SetActorRotation(FRotator::ZeroRotator);
 
 	if (IsValid(Material))
 	{
@@ -136,13 +146,17 @@ void APooledRadiusActor::UpdateArc(const float ArcAngle)
 
 void APooledRadiusActor::DeactivateRadius()
 {
-	if (not GetIsValidRadiusComp())
+	if (not GetIsValidRadiusComp() || not GetIsValidRootScene())
 	{
 		return;
 	}
 
 	// If attached, keep world transform and detach so Hide is always safe.
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	M_YawOnlyAttachTarget = nullptr;
+	SetActorTickEnabled(false);
+	SetActorEnableCollision(false);
+	GetRootComponent()->SetUsingAbsoluteRotation(false);
 
 	M_RadiusComp->HideRadius();
 	SetActorHiddenInGame(true);
@@ -165,9 +179,51 @@ void APooledRadiusActor::AttachToTargetActor(AActor* TargetActor, const FVector&
 		RTSFunctionLibrary::ReportError(TEXT("APooledRadiusActor::AttachToTargetActor - TargetActor invalid."));
 		return;
 	}
+	if (not GetIsValidRootScene())
+	{
+		return;
+	}
+
+	M_YawOnlyAttachTarget = nullptr;
+	SetActorTickEnabled(false);
+	SetActorEnableCollision(false);
+	GetRootComponent()->SetUsingAbsoluteRotation(false);
 
 	// Attach and apply requested local offset; zero rotation by default.
 	AttachToActor(TargetActor, FAttachmentTransformRules::KeepWorldTransform);
 	SetActorRelativeLocation(RelativeOffset);
 	SetActorRelativeRotation(FRotator::ZeroRotator);
+}
+
+void APooledRadiusActor::AttachToTargetActorYawOnly(AActor* TargetActor, const FVector& RelativeOffset)
+{
+	if (not IsValid(TargetActor))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("APooledRadiusActor::AttachToTargetActorYawOnly - TargetActor invalid."));
+		return;
+	}
+	if (not GetIsValidRootScene())
+	{
+		return;
+	}
+
+	AttachToActor(TargetActor, FAttachmentTransformRules::KeepWorldTransform);
+	SetActorRelativeLocation(RelativeOffset);
+	GetRootComponent()->SetUsingAbsoluteRotation(true);
+	M_YawOnlyAttachTarget = TargetActor;
+	SetActorTickEnabled(true);
+	UpdateYawOnlyRotationFromTarget();
+}
+
+void APooledRadiusActor::UpdateYawOnlyRotationFromTarget()
+{
+	AActor* TargetActor = M_YawOnlyAttachTarget.Get();
+	if (not IsValid(TargetActor))
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	const FRotator TargetRotation = TargetActor->GetActorRotation();
+	SetActorRotation(FRotator(0.0f, TargetRotation.Yaw, 0.0f));
 }

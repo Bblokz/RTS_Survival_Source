@@ -911,6 +911,27 @@ void URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(const UObject* WorldCo
 }
 
 
+void URTSBlueprintFunctionLibrary::AttachRTSRadiusToActorYawOnly(const UObject* WorldContextObject, int32 ID,
+                                                                 AActor* TargetActor, FVector RelativeOffset)
+{
+	if (not IsValid(WorldContextObject) || not IsValid(TargetActor))
+	{
+		return;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	if (URTSRadiusPoolSubsystem* Subsystem = World->GetSubsystem<URTSRadiusPoolSubsystem>())
+	{
+		Subsystem->AttachRTSRadiusToActorYawOnly(ID, TargetActor, RelativeOffset);
+	}
+}
+
+
 void URTSBlueprintFunctionLibrary::HideRTSRadiusById(const UObject* WorldContextObject, int32 ID)
 {
 	if (!IsValid(WorldContextObject))

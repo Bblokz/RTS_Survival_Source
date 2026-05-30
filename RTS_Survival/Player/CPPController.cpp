@@ -72,6 +72,7 @@
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
 #include "RTS_Survival/Utils/RTSDebugBreak/RTSDebugBreak.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
@@ -6628,13 +6629,19 @@ void ACPPController::UpdateHoveringActorInfo(float DeltaTime, const FVector2D Cu
 			FColor::Yellow);
 	}
 
-	if (bMouseMoved || UnderCursorActor != M_CurrentHoveredActor.Get())
+	const bool bHoveredActorChanged = UnderCursorActor != M_CurrentHoveredActor.Get();
+	if (bMouseMoved || bHoveredActorChanged)
 	{
 		// Mark possible previous actor as unhovered.
 		if (M_CurrentHoveredActor.IsValid())
 		{
 			OnActorHovered(M_CurrentHoveredActor.Get(), false);
 		}
+		if (bHoveredActorChanged)
+		{
+			UpdateHoverWeaponRangeRadiusForActor(UnderCursorActor);
+		}
+
 		// If mouse moved or actor changed, reset timer and hide widget
 		M_TimeWithoutMouseMovement = 0.0f;
 		M_CurrentHoveredActor = UnderCursorActor;
@@ -6670,6 +6677,7 @@ void ACPPController::HandleHoveringBlockedState()
 	}
 
 	M_TimeWithoutMouseMovement = 0.0f;
+	HideHoverWeaponRangeRadius();
 	HideHoveringWidget();
 }
 
@@ -6679,6 +6687,169 @@ void ACPPController::HideHoveringWidget()
 	if (GetIsValidHoverWidget())
 	{
 		M_HoveringActorWidget->HideWidget();
+	}
+}
+
+void ACPPController::UpdateHoverWeaponRangeRadiusForActor(AActor* NewHoveredActor)
+{
+	HideHoverWeaponRangeRadius();
+
+	float WeaponRange = 0.0f;
+	if (not TryGetMaxHoverWeaponRange(NewHoveredActor, WeaponRange))
+	{
+		return;
+	}
+
+	CreateHoverWeaponRangeRadius(NewHoveredActor, WeaponRange);
+}
+
+void ACPPController::CreateHoverWeaponRangeRadius(AActor* HoveredActor, const float WeaponRange)
+{
+	if (not IsValid(HoveredActor) || WeaponRange <= 0.0f)
+	{
+		return;
+	}
+
+	M_HoverWeaponRangeRadiusActorIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(
+		this,
+		HoveredActor->GetActorLocation(),
+		WeaponRange,
+		ERTSRadiusType::FUllCircle_Weaponrange);
+	if (M_HoverWeaponRangeRadiusActorIndex < 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ACPPController::CreateHoverWeaponRangeRadius - Failed to create hover weapon radius."));
+		return;
+	}
+
+	constexpr float HoverWeaponRadiusVerticalOffset = 25.0f;
+	const FVector RadiusOffset = FVector(0.0f, 0.0f, HoverWeaponRadiusVerticalOffset);
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActorYawOnly(
+		this,
+		M_HoverWeaponRangeRadiusActorIndex,
+		HoveredActor,
+		RadiusOffset);
+}
+
+void ACPPController::HideHoverWeaponRangeRadius()
+{
+	if (M_HoverWeaponRangeRadiusActorIndex < 0)
+	{
+		return;
+	}
+
+	URTSBlueprintFunctionLibrary::HideRTSRadiusById(this, M_HoverWeaponRangeRadiusActorIndex);
+	M_HoverWeaponRangeRadiusActorIndex = -1;
+}
+
+bool ACPPController::TryGetMaxHoverWeaponRange(const AActor* HoveredActor, float& OutWeaponRange) const
+{
+	OutWeaponRange = 0.0f;
+	if (not IsValid(HoveredActor))
+	{
+		return false;
+	}
+
+	if (const ATankMaster* TankMaster = Cast<ATankMaster>(HoveredActor))
+	{
+		return TryGetMaxTankWeaponRange(TankMaster, OutWeaponRange);
+	}
+
+	if (const ABuildingExpansion* BuildingExpansion = Cast<ABuildingExpansion>(HoveredActor))
+	{
+		return TryGetMaxBuildingExpansionWeaponRange(BuildingExpansion, OutWeaponRange);
+	}
+
+	if (const ASquadUnit* SquadUnit = Cast<ASquadUnit>(HoveredActor))
+	{
+		return TryGetSquadUnitWeaponRange(SquadUnit, OutWeaponRange);
+	}
+
+	return false;
+}
+
+bool ACPPController::TryGetMaxTankWeaponRange(const ATankMaster* TankMaster, float& OutWeaponRange) const
+{
+	OutWeaponRange = 0.0f;
+	if (not IsValid(TankMaster))
+	{
+		return false;
+	}
+
+	for (ACPPTurretsMaster* Turret : TankMaster->GetTurrets())
+	{
+		if (not IsValid(Turret))
+		{
+			continue;
+		}
+
+		TryUpdateMaxRangeFromWeapons(Turret->GetWeapons(), OutWeaponRange);
+	}
+
+	for (UHullWeaponComponent* HullWeapon : TankMaster->GetHullWeapons())
+	{
+		if (not IsValid(HullWeapon))
+		{
+			continue;
+		}
+
+		TryUpdateMaxRangeFromWeapons(HullWeapon->GetWeapons(), OutWeaponRange);
+	}
+
+	return OutWeaponRange > 0.0f;
+}
+
+bool ACPPController::TryGetMaxBuildingExpansionWeaponRange(
+	const ABuildingExpansion* BuildingExpansion,
+	float& OutWeaponRange) const
+{
+	OutWeaponRange = 0.0f;
+	if (not IsValid(BuildingExpansion))
+	{
+		return false;
+	}
+
+	for (ACPPTurretsMaster* Turret : BuildingExpansion->GetTurrets())
+	{
+		if (not IsValid(Turret))
+		{
+			continue;
+		}
+
+		TryUpdateMaxRangeFromWeapons(Turret->GetWeapons(), OutWeaponRange);
+	}
+
+	return OutWeaponRange > 0.0f;
+}
+
+bool ACPPController::TryGetSquadUnitWeaponRange(const ASquadUnit* SquadUnit, float& OutWeaponRange) const
+{
+	OutWeaponRange = 0.0f;
+	if (not IsValid(SquadUnit))
+	{
+		return false;
+	}
+
+	const UWeaponState* WeaponState = SquadUnit->GetWeaponState();
+	if (not IsValid(WeaponState))
+	{
+		return false;
+	}
+
+	OutWeaponRange = WeaponState->GetRange();
+	return OutWeaponRange > 0.0f;
+}
+
+void ACPPController::TryUpdateMaxRangeFromWeapons(const TArray<UWeaponState*>& Weapons, float& InOutWeaponRange) const
+{
+	for (const UWeaponState* WeaponState : Weapons)
+	{
+		if (not IsValid(WeaponState))
+		{
+			continue;
+		}
+
+		InOutWeaponRange = FMath::Max(InOutWeaponRange, WeaponState->GetRange());
 	}
 }
 

@@ -364,10 +364,35 @@ void URTSRadiusPoolSubsystem::AttachRTSRadiusToActor(const int32 ID, AActor* Tar
 		return;
 	}
 
-	// Attach and apply offset
-	RadiusActor->AttachToActor(TargetActor, FAttachmentTransformRules::KeepWorldTransform);
-	RadiusActor->SetActorRelativeLocation(RelativeOffset);
-	RadiusActor->SetActorRelativeRotation(FRotator::ZeroRotator);
+	RadiusActor->AttachToTargetActor(TargetActor, RelativeOffset);
+}
+
+
+void URTSRadiusPoolSubsystem::AttachRTSRadiusToActorYawOnly(
+	const int32 ID,
+	AActor* TargetActor,
+	const FVector RelativeOffset)
+{
+	if (not GetIsValidWorld())
+	{
+		return;
+	}
+
+	if (not IsValid(TargetActor))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("RTS Radius Pool: Yaw-only attach target actor is invalid."));
+		return;
+	}
+
+	APooledRadiusActor* RadiusActor = FindPooledActorById(ID);
+	if (not IsValid(RadiusActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("RTS Radius Pool: Unknown id %d in AttachRTSRadiusToActorYawOnly."), ID));
+		return;
+	}
+
+	RadiusActor->AttachToTargetActorYawOnly(TargetActor, RelativeOffset);
 }
 
 void URTSRadiusPoolSubsystem::ReleaseById_Internal(const int32 Id, const bool bSilentIfMissing)
