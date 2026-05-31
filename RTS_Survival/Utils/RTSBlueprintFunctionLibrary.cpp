@@ -24,6 +24,7 @@
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
@@ -1537,6 +1538,60 @@ void URTSBlueprintFunctionLibrary::SetRTSMapToLoad(const UObject* WorldContextOb
 		return ;
 	}
 	GameInstance->SetMapToLoad(MapToLoad);
+}
+
+
+FName URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIcon(const UObject* WorldContextObject,
+                                                            const FName IconId,
+                                                            const EMinimapIconType IconType,
+                                                            const FVector WorldLocation)
+{
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(WorldContextObject);
+	if (not IsValid(FowManager))
+	{
+		return NAME_None;
+	}
+
+	return FowManager->AddCustomMiniMapIcon(IconId, IconType, WorldLocation);
+}
+
+FName URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIconAttachedToActor(const UObject* WorldContextObject,
+                                                                           const FName IconId,
+                                                                           const EMinimapIconType IconType,
+                                                                           const FVector WorldLocation,
+                                                                           AActor* AttachedActor)
+{
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(WorldContextObject);
+	if (not IsValid(FowManager))
+	{
+		return NAME_None;
+	}
+
+	return FowManager->AddCustomMiniMapIconAttachedToActor(IconId, IconType, WorldLocation, AttachedActor);
+}
+
+bool URTSBlueprintFunctionLibrary::BP_RemoveCustomMiniMapIcon(const UObject* WorldContextObject, const FName IconId)
+{
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(WorldContextObject);
+	if (not IsValid(FowManager))
+	{
+		return false;
+	}
+
+	return FowManager->RemoveCustomMiniMapIcon(IconId);
+}
+
+bool URTSBlueprintFunctionLibrary::BP_SwapCustomMiniMapIcon(const UObject* WorldContextObject,
+                                                            const FName IconId,
+                                                            const EMinimapIconType NewIconType)
+{
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(WorldContextObject);
+	if (not IsValid(FowManager))
+	{
+		return false;
+	}
+
+	return FowManager->SwapCustomMiniMapIcon(IconId, NewIconType);
 }
 
 FString URTSBlueprintFunctionLibrary::BP_GetRichTextStringFromDataTableString(const FString& DataTableString)

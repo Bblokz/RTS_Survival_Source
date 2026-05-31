@@ -11,6 +11,7 @@
 
 class AFowManager;
 class UImage;
+class UTexture2D;
 
 /** Delegate broadcast whenever the mini‐map is clicked, giving UV in [0,1]. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMiniMapClicked, FVector2D, LocalClickUV);
@@ -60,9 +61,22 @@ protected:
 	                                       const FPointerEvent& InMouseEvent) override;
 
 private:
-	int32 DrawMiniMapIcons(const FGeometry& AllottedGeometry,
-	                      FSlateWindowElementList& OutDrawElements,
-	                      const int32 LayerId) const;
+	int32 DrawMiniMapUnitColorIcons(const FGeometry& AllottedGeometry,
+	                                FSlateWindowElementList& OutDrawElements,
+	                                const int32 LayerId) const;
+
+	int32 DrawCustomMiniMapTextureIcons(const FGeometry& AllottedGeometry,
+	                                   FSlateWindowElementList& OutDrawElements,
+	                                   const int32 LayerId) const;
+
+	void DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawData& IconDrawData,
+	                                  const FGeometry& MiniMapGeometry,
+	                                  const FGeometry& AllottedGeometry,
+	                                  const FVector2D& MiniMapSize,
+	                                  FSlateWindowElementList& OutDrawElements,
+	                                  const int32 LayerId) const;
+
+	FSlateBrush* GetCustomMiniMapIconBrush(UTexture2D* Texture) const;
 
 	UPROPERTY()
 	TObjectPtr<AFowManager> M_FowManager = nullptr;
@@ -70,4 +84,6 @@ private:
 	mutable bool bM_HasReportedMissingFowManager = false;
 
 	FSlateRoundedBoxBrush M_MinimapIconBrush = FSlateRoundedBoxBrush(FLinearColor::White);
+
+	mutable TMap<UTexture2D*, FSlateBrush> M_CustomMinimapIconBrushes;
 };

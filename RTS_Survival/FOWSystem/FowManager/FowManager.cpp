@@ -10,6 +10,8 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconDataAsset.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/RTSMinimapDeveloperSettings.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowType.h"
 #include "RTS_Survival/FOWSystem/FowVisibilityInterface/FowVisibility.h"
@@ -53,6 +55,8 @@ AFowManager::AFowManager(const FObjectInitializer& ObjectInitializer)
 	bM_IsPendingEnemyVisionUpdate = false;
 	M_StartupAttempts = 0;
 	M_BeginPlayBoundsTransferAttempts = 0;
+	M_CustomMiniMapIcons = {};
+	M_CachedCustomMiniMapIconDrawData = {};
 }
 
 void AFowManager::AddFowParticipant(UFowComp* FowComp)
@@ -197,10 +201,113 @@ const TArray<FRTSMinimapIconDrawData>& AFowManager::GetMiniMapIconDrawData() con
 	return M_CachedMiniMapIconDrawData;
 }
 
+const TArray<FRTSMinimapCustomIconDrawData>& AFowManager::GetCustomMiniMapIconDrawData()
+{
+	RefreshCustomMiniMapIconDrawDataCache();
+	return M_CachedCustomMiniMapIconDrawData;
+}
+
+FName AFowManager::AddCustomMiniMapIcon(const FName IconId,
+                                        const EMinimapIconType IconType,
+                                        const FVector& WorldLocation)
+{
+	if (not GetCanAddCustomMiniMapIcon(IconId, IconType))
+	{
+		return NAME_None;
+	}
+
+	FFowManagerCustomMinimapIcon& NewCustomIcon = M_CustomMiniMapIcons.Add(IconId);
+	NewCustomIcon.M_IconId = IconId;
+	NewCustomIcon.M_IconType = IconType;
+	NewCustomIcon.M_WorldLocation = WorldLocation;
+	NewCustomIcon.bM_IsAttachedToActor = false;
+
+	RefreshCustomMiniMapIconDrawDataCache();
+	return IconId;
+}
+
+FName AFowManager::AddCustomMiniMapIconAttachedToActor(const FName IconId,
+                                                       const EMinimapIconType IconType,
+                                                       const FVector& WorldLocation,
+                                                       AActor* AttachedActor)
+{
+	if (not IsValid(AttachedActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add attached custom minimap icon because the attached actor is invalid."
+			"\n See function: AFowManager::AddCustomMiniMapIconAttachedToActor");
+		return NAME_None;
+	}
+
+	if (not GetCanAddCustomMiniMapIcon(IconId, IconType))
+	{
+		return NAME_None;
+	}
+
+	FFowManagerCustomMinimapIcon& NewCustomIcon = M_CustomMiniMapIcons.Add(IconId);
+	NewCustomIcon.M_IconId = IconId;
+	NewCustomIcon.M_IconType = IconType;
+	NewCustomIcon.M_WorldLocation = WorldLocation;
+	NewCustomIcon.M_AttachedActor = AttachedActor;
+	NewCustomIcon.bM_IsAttachedToActor = true;
+
+	RefreshCustomMiniMapIconDrawDataCache();
+	return IconId;
+}
+
+bool AFowManager::RemoveCustomMiniMapIcon(const FName IconId)
+{
+	if (IconId.IsNone())
+	{
+		return false;
+	}
+
+	const int32 RemovedIcons = M_CustomMiniMapIcons.Remove(IconId);
+	if (RemovedIcons <= 0)
+	{
+		return false;
+	}
+
+	RefreshCustomMiniMapIconDrawDataCache();
+	return true;
+}
+
+bool AFowManager::SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType)
+{
+	if (IconId.IsNone())
+	{
+		return false;
+	}
+
+	if (NewIconType == EMinimapIconType::None)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot swap custom minimap icon to EMinimapIconType::None."
+			"\n See function: AFowManager::SwapCustomMiniMapIcon");
+		return false;
+	}
+
+	if (not FindValidCustomMiniMapIcon(NewIconType))
+	{
+		return false;
+	}
+
+	FFowManagerCustomMinimapIcon* const CustomIcon = M_CustomMiniMapIcons.Find(IconId);
+	if (CustomIcon == nullptr)
+	{
+		return false;
+	}
+
+	CustomIcon->M_IconType = NewIconType;
+	RefreshCustomMiniMapIconDrawDataCache();
+	return true;
+}
+
 // Called when the game starts or when spawned
 void AFowManager::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_InitMinimapIconDataAsset();
 	BeginPlay_InitTransferMapExtentToPlayerCamera();
 }
 
@@ -333,6 +440,166 @@ void AFowManager::RefreshMiniMapIconDrawDataCache()
 
 	AppendMiniMapIconDrawData(M_ActiveFowComponents, M_CachedMiniMapIconDrawData);
 	AppendMiniMapIconDrawData(M_PassiveFowComponents, M_CachedMiniMapIconDrawData);
+}
+
+void AFowManager::RefreshCustomMiniMapIconDrawDataCache()
+{
+	M_CachedCustomMiniMapIconDrawData.Reset();
+	M_CachedCustomMiniMapIconDrawData.Reserve(M_CustomMiniMapIcons.Num());
+
+	TArray<FName> InvalidAttachedIconIds;
+	for (TPair<FName, FFowManagerCustomMinimapIcon>& CustomIconPair : M_CustomMiniMapIcons)
+	{
+		FFowManagerCustomMinimapIcon& CustomIcon = CustomIconPair.Value;
+		if (not UpdateCustomMinimapIconWorldLocation(CustomIcon))
+		{
+			InvalidAttachedIconIds.Add(CustomIconPair.Key);
+			continue;
+		}
+
+		AppendCustomMiniMapIconDrawData(CustomIcon);
+	}
+
+	for (const FName InvalidAttachedIconId : InvalidAttachedIconIds)
+	{
+		M_CustomMiniMapIcons.Remove(InvalidAttachedIconId);
+	}
+}
+
+bool AFowManager::GetIsValidMinimapIconDataAsset() const
+{
+	if (IsValid(M_MinimapIconDataAsset))
+	{
+		bM_HasReportedMissingMinimapIconDataAsset = false;
+		return true;
+	}
+
+	if (not bM_HasReportedMissingMinimapIconDataAsset)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_MinimapIconDataAsset",
+			"GetIsValidMinimapIconDataAsset",
+			this);
+		bM_HasReportedMissingMinimapIconDataAsset = true;
+	}
+	return false;
+}
+
+bool AFowManager::GetCanAddCustomMiniMapIcon(const FName IconId, const EMinimapIconType IconType) const
+{
+	if (IconId.IsNone())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add custom minimap icon because the supplied icon ID is NAME_None."
+			"\n See function: AFowManager::GetCanAddCustomMiniMapIcon");
+		return false;
+	}
+
+	if (IconType == EMinimapIconType::None)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add custom minimap icon with EMinimapIconType::None."
+			"\n See function: AFowManager::GetCanAddCustomMiniMapIcon");
+		return false;
+	}
+
+	if (M_CustomMiniMapIcons.Contains(IconId))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add custom minimap icon because the supplied icon ID already exists."
+			"\n Icon ID: " + IconId.ToString() +
+			"\n See function: AFowManager::GetCanAddCustomMiniMapIcon");
+		return false;
+	}
+
+	return FindValidCustomMiniMapIcon(IconType) != nullptr;
+}
+
+void AFowManager::BeginPlay_InitMinimapIconDataAsset()
+{
+	const URTSMinimapDeveloperSettings* const MinimapSettings = GetDefault<URTSMinimapDeveloperSettings>();
+	if (MinimapSettings == nullptr)
+	{
+		return;
+	}
+
+	M_MinimapIconDataAsset = MinimapSettings->M_MinimapIconDataAsset.LoadSynchronous();
+	bM_HasReportedMissingMinimapIconDataAsset = false;
+}
+
+const FMinimapIcon* AFowManager::FindValidCustomMiniMapIcon(const EMinimapIconType IconType) const
+{
+	if (not GetIsValidMinimapIconDataAsset())
+	{
+		return nullptr;
+	}
+
+	const FMinimapIcon* const MinimapIcon = M_MinimapIconDataAsset->FindMinimapIcon(IconType);
+	if (MinimapIcon == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot find custom minimap icon type in the minimap icon data asset."
+			"\n Icon type: " + UEnum::GetValueAsString(IconType) +
+			"\n See function: AFowManager::FindValidCustomMiniMapIcon");
+		return nullptr;
+	}
+
+	if (MinimapIcon->M_SizeXY <= 0.0f)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Custom minimap icon size must be larger than zero."
+			"\n Icon type: " + UEnum::GetValueAsString(IconType) +
+			"\n See function: AFowManager::FindValidCustomMiniMapIcon");
+		return nullptr;
+	}
+
+	if (not IsValid(MinimapIcon->M_Texture))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Custom minimap icon texture is invalid."
+			"\n Icon type: " + UEnum::GetValueAsString(IconType) +
+			"\n See function: AFowManager::FindValidCustomMiniMapIcon");
+		return nullptr;
+	}
+
+	return MinimapIcon;
+}
+
+void AFowManager::AppendCustomMiniMapIconDrawData(const FFowManagerCustomMinimapIcon& CustomIcon)
+{
+	FVector2D IconUV = FVector2D::ZeroVector;
+	if (not GetMiniMapUVFromWorldLocation(CustomIcon.M_WorldLocation, IconUV))
+	{
+		return;
+	}
+
+	const FMinimapIcon* const MinimapIcon = FindValidCustomMiniMapIcon(CustomIcon.M_IconType);
+	if (MinimapIcon == nullptr)
+	{
+		return;
+	}
+
+	FRTSMinimapCustomIconDrawData& NewIcon = M_CachedCustomMiniMapIconDrawData.AddDefaulted_GetRef();
+	NewIcon.M_UV = IconUV;
+	NewIcon.M_IconSizePixels = MinimapIcon->M_SizeXY;
+	NewIcon.M_Texture = MinimapIcon->M_Texture;
+}
+
+bool AFowManager::UpdateCustomMinimapIconWorldLocation(FFowManagerCustomMinimapIcon& CustomIcon) const
+{
+	if (not CustomIcon.bM_IsAttachedToActor)
+	{
+		return true;
+	}
+
+	if (not CustomIcon.M_AttachedActor.IsValid())
+	{
+		return false;
+	}
+
+	CustomIcon.M_WorldLocation = CustomIcon.M_AttachedActor->GetActorLocation();
+	return true;
 }
 
 
