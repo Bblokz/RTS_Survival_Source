@@ -7,6 +7,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "RTS_Survival/GameUI/MiniMap/RTSMinimapIconHelpers.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "W_MiniMap.generated.h"
 
 struct FRTSMinimapCustomIconDrawData;
@@ -31,7 +32,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	UImage* GetIsValidMiniMapImg() const;
 
-	AFowManager* GetIsValidFowManager();
+	AFowManager* GetIsValidFowManager() const;
 
 	/** @brief Sets up the dynamic material’s Active/Passive render targets and Fog of War manager. */
 	void InitMiniMapRTs(const TObjectPtr<UTexture>& Active,
@@ -49,6 +50,8 @@ protected:
 
 	virtual void NativeConstruct() override;
 
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
 	virtual int32 NativePaint(const FPaintArgs& Args,
 	                          const FGeometry& AllottedGeometry,
 	                          const FSlateRect& MyCullingRect,
@@ -64,7 +67,7 @@ protected:
 private:
 	int32 DrawMiniMapUnitColorIcons(const FGeometry& AllottedGeometry,
 	                                FSlateWindowElementList& OutDrawElements,
-	                                const int32 LayerId);
+	                                const int32 LayerId) const;
 
 	int32 DrawCustomMiniMapTextureIcons(const FGeometry& AllottedGeometry,
 	                                   FSlateWindowElementList& OutDrawElements,
@@ -75,18 +78,20 @@ private:
 	                                  const FGeometry& AllottedGeometry,
 	                                  const FVector2D& MiniMapSize,
 	                                  FSlateWindowElementList& OutDrawElements,
-	                                  const int32 LayerId);
+	                                  const int32 LayerId) const;
 
-	FSlateBrush* GetCustomMiniMapIconBrush(UTexture2D* Texture);
+	void RefreshCustomMiniMapIconBrushes();
+
+	const FSlateBrush* GetCustomMiniMapIconBrush(const EMinimapIconType IconType) const;
 
 	UPROPERTY()
 	TObjectPtr<AFowManager> M_FowManager = nullptr;
 
-	bool bM_HasReportedMissingFowManager = false;
+	mutable bool bM_HasReportedMissingFowManager = false;
 
 	UPROPERTY()
 	FSlateRoundedBoxBrush M_MinimapIconBrush = FSlateRoundedBoxBrush(FLinearColor::White);
 
 	UPROPERTY()
-	TMap<UTexture2D*, FSlateBrush> M_CustomMinimapIconBrushes;
+	TMap<EMinimapIconType, FSlateBrush> M_CustomMinimapIconBrushes;
 };
