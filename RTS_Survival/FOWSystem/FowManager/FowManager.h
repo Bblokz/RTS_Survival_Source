@@ -29,10 +29,19 @@ struct FFowManagerCustomMinimapIcon
 	FVector M_WorldLocation = FVector::ZeroVector;
 
 	UPROPERTY()
+	FRotator M_WorldRotation = FRotator::ZeroRotator;
+
+	UPROPERTY()
+	FRotator M_StaticWorldRotation = FRotator::ZeroRotator;
+
+	UPROPERTY()
 	TWeakObjectPtr<AActor> M_AttachedActor = nullptr;
 
 	UPROPERTY()
 	bool bM_IsAttachedToActor = false;
+
+	UPROPERTY()
+	bool bM_UseStaticRotation = false;
 };
 
 /**
@@ -127,11 +136,13 @@ public:
 	 * @param IconId Stable ID used by mission/gameplay code to remove or swap this icon later.
 	 * @param IconType Data asset key deciding which texture and size to draw.
 	 * @param WorldLocation World-space location represented by this icon.
+	 * @param WorldRotation World-space rotation projected onto minimap 2D space for this icon.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
 	FName AddCustomMiniMapIcon(const FName IconId,
 	                           const EMinimapIconType IconType,
-	                           const FVector& WorldLocation);
+	                           const FVector& WorldLocation,
+	                           const FRotator& WorldRotation);
 
 	/**
 	 * @brief Adds an always-visible texture icon that follows an actor while it remains valid.
@@ -139,13 +150,17 @@ public:
 	 * @param IconId Stable ID used by mission/gameplay code to remove or swap this icon later.
 	 * @param IconType Data asset key deciding which texture and size to draw.
 	 * @param WorldLocation Initial world-space location cached before the actor location is refreshed.
-	 * @param AttachedActor Actor whose world location drives this icon until it becomes invalid.
+	 * @param AttachedActor Actor whose location and optionally rotation drives this icon until it becomes invalid.
+	 * @param StaticWorldRotation Rotation used when the icon should not follow actor rotation.
+	 * @param bUseStaticRotation True when the supplied static rotation should be used at all times.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
 	FName AddCustomMiniMapIconAttachedToActor(const FName IconId,
 	                                          const EMinimapIconType IconType,
 	                                          const FVector& WorldLocation,
-	                                          AActor* AttachedActor);
+	                                          AActor* AttachedActor,
+	                                          const FRotator& StaticWorldRotation,
+	                                          const bool bUseStaticRotation);
 
 	bool RemoveCustomMiniMapIcon(const FName IconId);
 
@@ -358,7 +373,9 @@ private:
 
 	void AppendCustomMiniMapIconDrawData(const FFowManagerCustomMinimapIcon& CustomIcon);
 
-	bool UpdateCustomMinimapIconWorldLocation(FFowManagerCustomMinimapIcon& CustomIcon) const;
+	bool UpdateCustomMinimapIconAttachedActorTransform(FFowManagerCustomMinimapIcon& CustomIcon) const;
+
+	float GetCustomMinimapIconRotationDegrees(const FRotator& WorldRotation) const;
 
 	/**
 	 * @brief Updates the draw buffer with the locations and vision ranges of all active Fog of War components.

@@ -209,7 +209,8 @@ const TArray<FRTSMinimapCustomIconDrawData>& AFowManager::GetCustomMiniMapIconDr
 
 FName AFowManager::AddCustomMiniMapIcon(const FName IconId,
                                         const EMinimapIconType IconType,
-                                        const FVector& WorldLocation)
+                                        const FVector& WorldLocation,
+                                        const FRotator& WorldRotation)
 {
 	if (not GetCanAddCustomMiniMapIcon(IconId, IconType))
 	{
@@ -220,6 +221,7 @@ FName AFowManager::AddCustomMiniMapIcon(const FName IconId,
 	NewCustomIcon.M_IconId = IconId;
 	NewCustomIcon.M_IconType = IconType;
 	NewCustomIcon.M_WorldLocation = WorldLocation;
+	NewCustomIcon.M_WorldRotation = WorldRotation;
 	NewCustomIcon.bM_IsAttachedToActor = false;
 
 	RefreshCustomMiniMapIconDrawDataCache();
@@ -229,7 +231,9 @@ FName AFowManager::AddCustomMiniMapIcon(const FName IconId,
 FName AFowManager::AddCustomMiniMapIconAttachedToActor(const FName IconId,
                                                        const EMinimapIconType IconType,
                                                        const FVector& WorldLocation,
-                                                       AActor* AttachedActor)
+                                                       AActor* AttachedActor,
+                                                       const FRotator& StaticWorldRotation,
+                                                       const bool bUseStaticRotation)
 {
 	if (not IsValid(AttachedActor))
 	{
@@ -248,8 +252,11 @@ FName AFowManager::AddCustomMiniMapIconAttachedToActor(const FName IconId,
 	NewCustomIcon.M_IconId = IconId;
 	NewCustomIcon.M_IconType = IconType;
 	NewCustomIcon.M_WorldLocation = WorldLocation;
+	NewCustomIcon.M_WorldRotation = bUseStaticRotation ? StaticWorldRotation : AttachedActor->GetActorRotation();
+	NewCustomIcon.M_StaticWorldRotation = StaticWorldRotation;
 	NewCustomIcon.M_AttachedActor = AttachedActor;
 	NewCustomIcon.bM_IsAttachedToActor = true;
+	NewCustomIcon.bM_UseStaticRotation = bUseStaticRotation;
 
 	RefreshCustomMiniMapIconDrawDataCache();
 	return IconId;
@@ -451,7 +458,7 @@ void AFowManager::RefreshCustomMiniMapIconDrawDataCache()
 	for (TPair<FName, FFowManagerCustomMinimapIcon>& CustomIconPair : M_CustomMiniMapIcons)
 	{
 		FFowManagerCustomMinimapIcon& CustomIcon = CustomIconPair.Value;
-		if (not UpdateCustomMinimapIconWorldLocation(CustomIcon))
+		if (not UpdateCustomMinimapIconAttachedActorTransform(CustomIcon))
 		{
 			InvalidAttachedIconIds.Add(CustomIconPair.Key);
 			continue;
@@ -583,10 +590,11 @@ void AFowManager::AppendCustomMiniMapIconDrawData(const FFowManagerCustomMinimap
 	FRTSMinimapCustomIconDrawData& NewIcon = M_CachedCustomMiniMapIconDrawData.AddDefaulted_GetRef();
 	NewIcon.M_UV = IconUV;
 	NewIcon.M_IconSizePixels = MinimapIcon->M_SizeXY;
+	NewIcon.M_RotationDegrees = GetCustomMinimapIconRotationDegrees(CustomIcon.M_WorldRotation);
 	NewIcon.M_Texture = MinimapIcon->M_Texture;
 }
 
-bool AFowManager::UpdateCustomMinimapIconWorldLocation(FFowManagerCustomMinimapIcon& CustomIcon) const
+bool AFowManager::UpdateCustomMinimapIconAttachedActorTransform(FFowManagerCustomMinimapIcon& CustomIcon) const
 {
 	if (not CustomIcon.bM_IsAttachedToActor)
 	{
@@ -598,8 +606,17 @@ bool AFowManager::UpdateCustomMinimapIconWorldLocation(FFowManagerCustomMinimapI
 		return false;
 	}
 
-	CustomIcon.M_WorldLocation = CustomIcon.M_AttachedActor->GetActorLocation();
+	const AActor* const AttachedActor = CustomIcon.M_AttachedActor.Get();
+	CustomIcon.M_WorldLocation = AttachedActor->GetActorLocation();
+	CustomIcon.M_WorldRotation = CustomIcon.bM_UseStaticRotation
+		? CustomIcon.M_StaticWorldRotation
+		: AttachedActor->GetActorRotation();
 	return true;
+}
+
+float AFowManager::GetCustomMinimapIconRotationDegrees(const FRotator& WorldRotation) const
+{
+	return WorldRotation.Yaw;
 }
 
 

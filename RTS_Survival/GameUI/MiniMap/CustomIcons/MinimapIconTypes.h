@@ -35,5 +35,6 @@ struct FRTSMinimapCustomIconDrawData
 {
 	FVector2D M_UV = FVector2D::ZeroVector;
 	float M_IconSizePixels = 0.0f;
+	float M_RotationDegrees = 0.0f;
 	TWeakObjectPtr<UTexture2D> M_Texture = nullptr;
 };

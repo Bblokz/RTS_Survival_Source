@@ -713,13 +713,15 @@ public:
 	 * @param IconId Stable ID used to remove or swap this icon later.
 	 * @param IconType Data asset key deciding which custom texture and size to draw.
 	 * @param WorldLocation World-space location represented by this icon.
+	 * @param WorldRotation World-space rotation projected onto minimap 2D space for this icon.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MiniMap", meta = (WorldContext = "WorldContextObject"))
 	static FName BP_AddCustomMiniMapIcon(const UObject* WorldContextObject,
 	                                     FName IconId,
 	                                     EMinimapIconType IconType,
-	                                     FVector WorldLocation);
+	                                     FVector WorldLocation,
+	                                     FRotator WorldRotation);
 
 	/**
 	 * @brief Adds an always-visible minimap texture icon that follows an actor while valid.
@@ -728,7 +730,9 @@ public:
 	 * @param IconId Stable ID used to remove or swap this icon later.
 	 * @param IconType Data asset key deciding which custom texture and size to draw.
 	 * @param WorldLocation Initial world-space location cached before the actor location is refreshed.
-	 * @param AttachedActor Actor whose location drives this icon until it becomes invalid.
+	 * @param AttachedActor Actor whose location and optionally rotation drives this icon until it becomes invalid.
+	 * @param StaticWorldRotation Rotation used when the icon should not follow actor rotation.
+	 * @param bUseStaticRotation True when the supplied static rotation should be used at all times.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MiniMap", meta = (WorldContext = "WorldContextObject"))
@@ -736,7 +740,9 @@ public:
 	                                                    FName IconId,
 	                                                    EMinimapIconType IconType,
 	                                                    FVector WorldLocation,
-	                                                    AActor* AttachedActor);
+	                                                    AActor* AttachedActor,
+	                                                    FRotator StaticWorldRotation,
+	                                                    bool bUseStaticRotation);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MiniMap", meta = (WorldContext = "WorldContextObject"))
 	static bool BP_RemoveCustomMiniMapIcon(const UObject* WorldContextObject, FName IconId);
