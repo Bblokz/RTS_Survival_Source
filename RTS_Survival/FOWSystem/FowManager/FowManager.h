@@ -6,11 +6,34 @@
 #include "NiagaraDataInterfaceExport.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/GameUI/MiniMap/RTSMinimapIconHelpers.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "FowManager.generated.h"
 
 class UNiagaraSystem;
 class UNiagaraComponent;
 class UFowComp;
+class UMinimapIconDataAsset;
+
+USTRUCT()
+struct FFowManagerCustomMinimapIcon
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FName M_IconId = NAME_None;
+
+	UPROPERTY()
+	EMinimapIconType M_IconType = EMinimapIconType::None;
+
+	UPROPERTY()
+	FVector M_WorldLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_AttachedActor = nullptr;
+
+	UPROPERTY()
+	bool bM_IsAttachedToActor = false;
+};
 
 /**
  * @brief The fow manager keeps track of all the fow components and updates the fow render targets,
@@ -96,6 +119,37 @@ public:
 	inline float GetMiniMapLargeIconSizePixels() const { return MiniMapLargeIconSizePixels; }
 	FLinearColor GetMiniMapIconColorValue(const ERTSMinimapIconColor IconColor) const;
 	const TArray<FRTSMinimapIconDrawData>& GetMiniMapIconDrawData() const;
+	const TArray<FRTSMinimapCustomIconDrawData>& GetCustomMiniMapIconDrawData();
+
+	/**
+	 * @brief Adds an always-visible texture icon at a fixed world location.
+	 *
+	 * @param IconId Stable ID used by mission/gameplay code to remove or swap this icon later.
+	 * @param IconType Data asset key deciding which texture and size to draw.
+	 * @param WorldLocation World-space location represented by this icon.
+	 * @return The added ID on success; NAME_None if the icon could not be added.
+	 */
+	FName AddCustomMiniMapIcon(const FName IconId,
+	                           const EMinimapIconType IconType,
+	                           const FVector& WorldLocation);
+
+	/**
+	 * @brief Adds an always-visible texture icon that follows an actor while it remains valid.
+	 *
+	 * @param IconId Stable ID used by mission/gameplay code to remove or swap this icon later.
+	 * @param IconType Data asset key deciding which texture and size to draw.
+	 * @param WorldLocation Initial world-space location cached before the actor location is refreshed.
+	 * @param AttachedActor Actor whose world location drives this icon until it becomes invalid.
+	 * @return The added ID on success; NAME_None if the icon could not be added.
+	 */
+	FName AddCustomMiniMapIconAttachedToActor(const FName IconId,
+	                                          const EMinimapIconType IconType,
+	                                          const FVector& WorldLocation,
+	                                          AActor* AttachedActor);
+
+	bool RemoveCustomMiniMapIcon(const FName IconId);
+
+	bool SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType);
 
 protected:
 	/**
@@ -292,6 +346,20 @@ private:
 
 	void RefreshMiniMapIconDrawDataCache();
 
+	void RefreshCustomMiniMapIconDrawDataCache();
+
+	bool GetIsValidMinimapIconDataAsset() const;
+
+	bool GetCanAddCustomMiniMapIcon(const FName IconId, const EMinimapIconType IconType) const;
+
+	void BeginPlay_InitMinimapIconDataAsset();
+
+	const FMinimapIcon* FindValidCustomMiniMapIcon(const EMinimapIconType IconType) const;
+
+	void AppendCustomMiniMapIconDrawData(const FFowManagerCustomMinimapIcon& CustomIcon);
+
+	bool UpdateCustomMinimapIconWorldLocation(FFowManagerCustomMinimapIcon& CustomIcon) const;
+
 	/**
 	 * @brief Updates the draw buffer with the locations and vision ranges of all active Fog of War components.
 	 *
@@ -388,8 +456,18 @@ private:
 	 */
 	bool GetValidParticleIndex(const FVector& ParticleVector, int32& OutIndex) const;
 
-	// Cached once on the FOW side so the minimap widget can paint without rebuilding icon data every frame.
+	// Cached once on the FOW side so the minimap widget can paint without rebuilding unit icon data every frame.
 	TArray<FRTSMinimapIconDrawData> M_CachedMiniMapIconDrawData;
+
+	UPROPERTY()
+	TObjectPtr<UMinimapIconDataAsset> M_MinimapIconDataAsset = nullptr;
+
+	UPROPERTY()
+	TMap<FName, FFowManagerCustomMinimapIcon> M_CustomMiniMapIcons;
+
+	TArray<FRTSMinimapCustomIconDrawData> M_CachedCustomMiniMapIconDrawData;
+
+	mutable bool bM_HasReportedMissingMinimapIconDataAsset = false;
 
 	/** Set to true after we updated the readback buffer with all the passive components,
 	 * we do not allow additional readback buffer updates until this current one is answered.

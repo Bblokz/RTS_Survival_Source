@@ -8,6 +8,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/CardSystem/ERTSCard/ERTSCard.h"
 #include "RTS_Survival/Game/GameState/GameDecalManager/GameDecalManager.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "RTS_Survival/Resources/ResourceSceneSetup/ResourceSceneSetup.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -704,6 +705,44 @@ public:
 	// Game instance helpers.
 	TSoftObjectPtr<UWorld> GetRTSMapToLoad(const UObject* WorldContextObject);
 	void SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad);
+
+	/**
+	 * @brief Adds an always-visible minimap texture icon through the active FOW manager.
+	 *
+	 * @param WorldContextObject Object used to find the active world and FOW manager.
+	 * @param IconId Stable ID used to remove or swap this icon later.
+	 * @param IconType Data asset key deciding which custom texture and size to draw.
+	 * @param WorldLocation World-space location represented by this icon.
+	 * @return The added ID on success; NAME_None if the icon could not be added.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MiniMap", meta = (WorldContext = "WorldContextObject"))
+	static FName BP_AddCustomMiniMapIcon(const UObject* WorldContextObject,
+	                                     FName IconId,
+	                                     EMinimapIconType IconType,
+	                                     FVector WorldLocation);
+
+	/**
+	 * @brief Adds an always-visible minimap texture icon that follows an actor while valid.
+	 *
+	 * @param WorldContextObject Object used to find the active world and FOW manager.
+	 * @param IconId Stable ID used to remove or swap this icon later.
+	 * @param IconType Data asset key deciding which custom texture and size to draw.
+	 * @param WorldLocation Initial world-space location cached before the actor location is refreshed.
+	 * @param AttachedActor Actor whose location drives this icon until it becomes invalid.
+	 * @return The added ID on success; NAME_None if the icon could not be added.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MiniMap", meta = (WorldContext = "WorldContextObject"))
+	static FName BP_AddCustomMiniMapIconAttachedToActor(const UObject* WorldContextObject,
+	                                                    FName IconId,
+	                                                    EMinimapIconType IconType,
+	                                                    FVector WorldLocation,
+	                                                    AActor* AttachedActor);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MiniMap", meta = (WorldContext = "WorldContextObject"))
+	static bool BP_RemoveCustomMiniMapIcon(const UObject* WorldContextObject, FName IconId);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MiniMap", meta = (WorldContext = "WorldContextObject"))
+	static bool BP_SwapCustomMiniMapIcon(const UObject* WorldContextObject, FName IconId, EMinimapIconType NewIconType);
 
 	// String Utils
 	UFUNCTION(BlueprintPure, Category = "RTS_StringUtils")

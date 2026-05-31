@@ -4,6 +4,7 @@
 #include "W_MiniMap.h"
 
 #include "Components/Image.h"
+#include "Engine/Texture2D.h"
 #include "Rendering/DrawElements.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -88,12 +89,13 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 		InWidgetStyle,
 		bParentEnabled);
 
-	return DrawMiniMapIcons(AllottedGeometry, OutDrawElements, NextLayerId);
+	const int32 IconLayerId = DrawMiniMapUnitColorIcons(AllottedGeometry, OutDrawElements, NextLayerId);
+	return DrawCustomMiniMapTextureIcons(AllottedGeometry, OutDrawElements, IconLayerId);
 }
 
-int32 UW_MiniMap::DrawMiniMapIcons(const FGeometry& AllottedGeometry,
-                                   FSlateWindowElementList& OutDrawElements,
-                                   const int32 LayerId) const
+int32 UW_MiniMap::DrawMiniMapUnitColorIcons(const FGeometry& AllottedGeometry,
+                                            FSlateWindowElementList& OutDrawElements,
+                                            const int32 LayerId) const
 {
 	AFowManager* const FowManager = GetIsValidFowManager();
 	if (not IsValid(FowManager))
@@ -180,4 +182,103 @@ FReply UW_MiniMap::NativeOnMouseButtonDown(const FGeometry& InGeometry,
 		return FReply::Handled();
 	}
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+
+int32 UW_MiniMap::DrawCustomMiniMapTextureIcons(const FGeometry& AllottedGeometry,
+                                                FSlateWindowElementList& OutDrawElements,
+                                                const int32 LayerId) const
+{
+	AFowManager* const FowManager = GetIsValidFowManager();
+	if (not IsValid(FowManager))
+	{
+		return LayerId;
+	}
+
+	const UImage* const MiniMapImage = GetIsValidMiniMapImg();
+	if (not IsValid(MiniMapImage))
+	{
+		return LayerId;
+	}
+
+	const FGeometry MiniMapGeometry = MiniMapImage->GetCachedGeometry();
+	const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+	if (MiniMapSize.X <= 0.0f || MiniMapSize.Y <= 0.0f)
+	{
+		return LayerId;
+	}
+
+	const TArray<FRTSMinimapCustomIconDrawData>& CustomMiniMapIconDrawData = FowManager->GetCustomMiniMapIconDrawData();
+	if (CustomMiniMapIconDrawData.Num() <= 0)
+	{
+		return LayerId;
+	}
+
+	const int32 IconLayerId = LayerId + 1;
+	for (const FRTSMinimapCustomIconDrawData& EachIcon : CustomMiniMapIconDrawData)
+	{
+		DrawCustomMiniMapTextureIcon(
+			EachIcon,
+			MiniMapGeometry,
+			AllottedGeometry,
+			MiniMapSize,
+			OutDrawElements,
+			IconLayerId);
+	}
+
+	return IconLayerId;
+}
+
+void UW_MiniMap::DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawData& IconDrawData,
+                                              const FGeometry& MiniMapGeometry,
+                                              const FGeometry& AllottedGeometry,
+                                              const FVector2D& MiniMapSize,
+                                              FSlateWindowElementList& OutDrawElements,
+                                              const int32 LayerId) const
+{
+	UTexture2D* const IconTexture = IconDrawData.M_Texture.Get();
+	if (IconDrawData.M_IconSizePixels <= 0.0f || not IsValid(IconTexture))
+	{
+		return;
+	}
+
+	FSlateBrush* const IconBrush = GetCustomMiniMapIconBrush(IconTexture);
+	if (IconBrush == nullptr)
+	{
+		return;
+	}
+
+	const FVector2D IconSize = FVector2D(IconDrawData.M_IconSizePixels, IconDrawData.M_IconSizePixels);
+	const FVector2D IconCenterLocalToMiniMap = FVector2D(
+		IconDrawData.M_UV.X * MiniMapSize.X,
+		IconDrawData.M_UV.Y * MiniMapSize.Y);
+	const FVector2D IconCenterAbsolute = MiniMapGeometry.LocalToAbsolute(IconCenterLocalToMiniMap);
+	const FVector2D IconTopLeftInWidget = AllottedGeometry.AbsoluteToLocal(IconCenterAbsolute)
+		- (IconSize * 0.5f);
+	const FPaintGeometry IconGeometry = AllottedGeometry.ToPaintGeometry(
+		IconSize,
+		FSlateLayoutTransform(IconTopLeftInWidget));
+	FSlateDrawElement::MakeBox(
+		OutDrawElements,
+		LayerId,
+		IconGeometry,
+		IconBrush,
+		ESlateDrawEffect::None,
+		FLinearColor::White);
+}
+
+FSlateBrush* UW_MiniMap::GetCustomMiniMapIconBrush(UTexture2D* Texture) const
+{
+	if (not IsValid(Texture))
+	{
+		return nullptr;
+	}
+
+	FSlateBrush& IconBrush = M_CustomMinimapIconBrushes.FindOrAdd(Texture);
+	IconBrush.SetResourceObject(Texture);
+	IconBrush.ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+	IconBrush.DrawAs = ESlateBrushDrawType::Image;
+	IconBrush.Tiling = ESlateBrushTileType::NoTile;
+	IconBrush.Mirroring = ESlateBrushMirrorType::NoMirror;
+	return &IconBrush;
 }
