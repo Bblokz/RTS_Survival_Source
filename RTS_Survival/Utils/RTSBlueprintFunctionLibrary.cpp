@@ -1544,7 +1544,8 @@ void URTSBlueprintFunctionLibrary::SetRTSMapToLoad(const UObject* WorldContextOb
 FName URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIcon(const UObject* WorldContextObject,
                                                             const FName IconId,
                                                             const EMinimapIconType IconType,
-                                                            const FVector WorldLocation)
+                                                            const FVector WorldLocation,
+                                                            const FRotator WorldRotation)
 {
 	AFowManager* const FowManager = FRTS_Statics::GetFowManager(WorldContextObject);
 	if (not IsValid(FowManager))
@@ -1552,14 +1553,16 @@ FName URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIcon(const UObject* World
 		return NAME_None;
 	}
 
-	return FowManager->AddCustomMiniMapIcon(IconId, IconType, WorldLocation);
+	return FowManager->AddCustomMiniMapIcon(IconId, IconType, WorldLocation, WorldRotation);
 }
 
 FName URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIconAttachedToActor(const UObject* WorldContextObject,
                                                                            const FName IconId,
                                                                            const EMinimapIconType IconType,
                                                                            const FVector WorldLocation,
-                                                                           AActor* AttachedActor)
+                                                                           AActor* AttachedActor,
+                                                                           const FRotator StaticWorldRotation,
+                                                                           const bool bUseStaticRotation)
 {
 	AFowManager* const FowManager = FRTS_Statics::GetFowManager(WorldContextObject);
 	if (not IsValid(FowManager))
@@ -1567,7 +1570,13 @@ FName URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIconAttachedToActor(const
 		return NAME_None;
 	}
 
-	return FowManager->AddCustomMiniMapIconAttachedToActor(IconId, IconType, WorldLocation, AttachedActor);
+	return FowManager->AddCustomMiniMapIconAttachedToActor(
+		IconId,
+		IconType,
+		WorldLocation,
+		AttachedActor,
+		StaticWorldRotation,
+		bUseStaticRotation);
 }
 
 bool URTSBlueprintFunctionLibrary::BP_RemoveCustomMiniMapIcon(const UObject* WorldContextObject, const FName IconId)

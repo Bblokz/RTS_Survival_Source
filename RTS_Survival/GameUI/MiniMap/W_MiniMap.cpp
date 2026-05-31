@@ -258,12 +258,15 @@ void UW_MiniMap::DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawDat
 	const FPaintGeometry IconGeometry = AllottedGeometry.ToPaintGeometry(
 		IconSize,
 		FSlateLayoutTransform(IconTopLeftInWidget));
-	FSlateDrawElement::MakeBox(
+	FSlateDrawElement::MakeRotatedBox(
 		OutDrawElements,
 		LayerId,
 		IconGeometry,
 		IconBrush,
 		ESlateDrawEffect::None,
+		FMath::DegreesToRadians(IconDrawData.M_RotationDegrees),
+		TOptional<FVector2D>(IconSize * 0.5f),
+		ERotationSpace::RelativeToElement,
 		FLinearColor::White);
 }
 
