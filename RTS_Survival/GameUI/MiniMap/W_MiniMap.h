@@ -9,6 +9,7 @@
 #include "RTS_Survival/GameUI/MiniMap/RTSMinimapIconHelpers.h"
 #include "W_MiniMap.generated.h"
 
+struct FRTSMinimapCustomIconDrawData;
 class AFowManager;
 class UImage;
 class UTexture2D;
@@ -30,7 +31,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	UImage* GetIsValidMiniMapImg() const;
 
-	AFowManager* GetIsValidFowManager() const;
+	AFowManager* GetIsValidFowManager();
 
 	/** @brief Sets up the dynamic material’s Active/Passive render targets and Fog of War manager. */
 	void InitMiniMapRTs(const TObjectPtr<UTexture>& Active,
@@ -63,7 +64,7 @@ protected:
 private:
 	int32 DrawMiniMapUnitColorIcons(const FGeometry& AllottedGeometry,
 	                                FSlateWindowElementList& OutDrawElements,
-	                                const int32 LayerId) const;
+	                                const int32 LayerId);
 
 	int32 DrawCustomMiniMapTextureIcons(const FGeometry& AllottedGeometry,
 	                                   FSlateWindowElementList& OutDrawElements,
@@ -74,16 +75,18 @@ private:
 	                                  const FGeometry& AllottedGeometry,
 	                                  const FVector2D& MiniMapSize,
 	                                  FSlateWindowElementList& OutDrawElements,
-	                                  const int32 LayerId) const;
+	                                  const int32 LayerId);
 
-	FSlateBrush* GetCustomMiniMapIconBrush(UTexture2D* Texture) const;
+	FSlateBrush* GetCustomMiniMapIconBrush(UTexture2D* Texture);
 
 	UPROPERTY()
 	TObjectPtr<AFowManager> M_FowManager = nullptr;
 
-	mutable bool bM_HasReportedMissingFowManager = false;
+	bool bM_HasReportedMissingFowManager = false;
 
+	UPROPERTY()
 	FSlateRoundedBoxBrush M_MinimapIconBrush = FSlateRoundedBoxBrush(FLinearColor::White);
 
-	mutable TMap<UTexture2D*, FSlateBrush> M_CustomMinimapIconBrushes;
+	UPROPERTY()
+	TMap<UTexture2D*, FSlateBrush> M_CustomMinimapIconBrushes;
 };

@@ -19,7 +19,7 @@ UImage* UW_MiniMap::GetIsValidMiniMapImg() const
 	return MiniMapImg;
 }
 
-AFowManager* UW_MiniMap::GetIsValidFowManager() const
+AFowManager* UW_MiniMap::GetIsValidFowManager()
 {
 	if (IsValid(M_FowManager))
 	{
@@ -95,9 +95,9 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 
 int32 UW_MiniMap::DrawMiniMapUnitColorIcons(const FGeometry& AllottedGeometry,
                                             FSlateWindowElementList& OutDrawElements,
-                                            const int32 LayerId) const
+                                            const int32 LayerId)
 {
-	AFowManager* const FowManager = GetIsValidFowManager();
+	AFowManager* FowManager = GetIsValidFowManager();
 	if (not IsValid(FowManager))
 	{
 		return LayerId;
@@ -234,7 +234,7 @@ void UW_MiniMap::DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawDat
                                               const FGeometry& AllottedGeometry,
                                               const FVector2D& MiniMapSize,
                                               FSlateWindowElementList& OutDrawElements,
-                                              const int32 LayerId) const
+                                              const int32 LayerId)
 {
 	UTexture2D* const IconTexture = IconDrawData.M_Texture.Get();
 	if (IconDrawData.M_IconSizePixels <= 0.0f || not IsValid(IconTexture))
@@ -266,11 +266,11 @@ void UW_MiniMap::DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawDat
 		ESlateDrawEffect::None,
 		FMath::DegreesToRadians(IconDrawData.M_RotationDegrees),
 		TOptional<FVector2D>(IconSize * 0.5f),
-		ERotationSpace::RelativeToElement,
+		FSlateDrawElement::RelativeToElement,
 		FLinearColor::White);
 }
 
-FSlateBrush* UW_MiniMap::GetCustomMiniMapIconBrush(UTexture2D* Texture) const
+FSlateBrush* UW_MiniMap::GetCustomMiniMapIconBrush(UTexture2D* Texture)
 {
 	if (not IsValid(Texture))
 	{
