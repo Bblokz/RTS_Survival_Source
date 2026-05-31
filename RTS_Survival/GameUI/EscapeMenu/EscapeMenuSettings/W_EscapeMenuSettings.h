@@ -143,6 +143,9 @@ struct FEscapeMenuSettingsGameplayText
 	FText M_HideActionButtonHotkeysLabelText = FText::FromString(TEXT("SETTINGS_HIDE_ACTION_BUTTON_HOTKEYS_LABEL"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_HoverRangeIndicatorLabelText = FText::FromString(TEXT("<Text_Armor>Show unit range on Hover</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_OverwriteAllPlayerHpBarLabelText = FText::FromString(TEXT("SETTINGS_HP_BAR_OVERWRITE_PLAYER_LABEL"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
@@ -429,6 +432,7 @@ private:
 
 	bool GetIsValidTextGameplayHeader() const;
 	bool GetIsValidTextHideActionButtonHotkeysLabel() const;
+	bool GetIsValidHoverRangeIndicatorText() const;
 	bool GetIsValidTextOverwriteAllPlayerHpBarLabel() const;
 	bool GetIsValidTextPlayerTankHpBarLabel() const;
 	bool GetIsValidTextPlayerSquadHpBarLabel() const;
@@ -456,6 +460,7 @@ private:
 	bool GetIsValidComboEnemyAircraftHpBarStrat() const;
 
 	bool GetIsValidCheckHideActionButtonHotkeys() const;
+	bool GetIsValidCheckUnitRangeOnHover() const;
 
 	bool GetIsValidButtonApply() const;
 	bool GetIsValidButtonSetDefaults() const;
@@ -560,6 +565,9 @@ private:
 
 	UFUNCTION()
 	void HandleHideActionButtonHotkeysChanged(bool bIsChecked);
+
+	UFUNCTION()
+	void HandleCheckUnitRangeOnHoverChanged(bool bIsChecked);
 
 	UFUNCTION()
 	void HandleOverwriteAllPlayerHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
@@ -1120,6 +1128,14 @@ private:
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextHideActionButtonHotkeysLabel = nullptr;
 
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_HoverRangeIndicatorText in the Widget Blueprint.
+	 * @note Designers may style the label, but C++ owns the runtime text value for localization.
+	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_HoverRangeIndicatorText = nullptr;
+
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<URichTextBlock> M_TextOverwriteAllPlayerHpBarLabel = nullptr;
 
@@ -1195,6 +1211,14 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckHideActionButtonHotkeys = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a CheckBox named M_CheckUnitRangeOnHover in the Widget Blueprint.
+	 * @note Designers may style and wrap the checkbox, but C++ binds callbacks and sets the checked state.
+	 * @note The bound widget must exist, keep this name, and remain a CheckBox for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UCheckBox> M_CheckUnitRangeOnHover = nullptr;
 
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboOverwriteAllPlayerHpBarStrat = nullptr;

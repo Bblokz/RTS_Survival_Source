@@ -96,6 +96,9 @@ public:
 	/** @brief Returns whether action button hotkeys should be hidden in the action UI. */
 	bool GetHideActionButtonHotkeys() const;
 
+	/** @brief Returns whether hovering long enough over an actor should show its weapon range. */
+	bool GetCheckUnitRangeOnHover() const;
+
 	/** @brief Writes the master volume value before clamping and saving. */
 	void SetMasterVolume(const float NewMasterVolume);
 
@@ -131,6 +134,9 @@ public:
 
 	/** @brief Writes the setting that hides action button hotkeys in the action UI. */
 	void SetHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys);
+
+	/** @brief Writes the unit hover range indicator setting. */
+	void SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover);
 
 	/** @brief Returns the saved player health bar visibility override. */
 	ERTSPlayerHealthBarVisibilityStrategy GetOverwriteAllPlayerHpBarStrat() const;
@@ -253,6 +259,9 @@ private:
 
 	UPROPERTY(config)
 	bool bM_HideActionButtonHotkeys = false;
+
+	UPROPERTY(config)
+	bool bM_CheckUnitRangeOnHover = true;
 
 	UPROPERTY(config)
 	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;

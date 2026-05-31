@@ -429,6 +429,20 @@ public:
      */
 	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
     static void AttachRTSRadiusToActor(const UObject* WorldContextObject, int32 ID, AActor* TargetActor, FVector RelativeOffset);
+
+	/**
+	 * @brief Attach a radius while keeping it upright; only target yaw is inherited.
+	 * @param WorldContextObject Context object to get the world.
+	 * @param ID The id returned by CreateRTSRadius.
+	 * @param TargetActor Actor to follow for location and yaw.
+	 * @param RelativeOffset Offset applied as relative location while attached.
+	 */
+	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
+	static void AttachRTSRadiusToActorYawOnly(
+		const UObject* WorldContextObject,
+		int32 ID,
+		AActor* TargetActor,
+		FVector RelativeOffset);
 	
 	/**
 	 * @brief Hide and return the pooled actor with a given id to the pool.

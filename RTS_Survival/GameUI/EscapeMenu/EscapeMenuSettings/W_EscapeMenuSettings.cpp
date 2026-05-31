@@ -481,6 +481,11 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 		return;
 	}
 
+	if (not GetAreGameplayTextWidgetsValid())
+	{
+		return;
+	}
+
 	if (not GetAreFooterTextWidgetsValid())
 	{
 		return;
@@ -515,6 +520,7 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 
 	M_TextGameplayHeader->SetText(M_GameplayText.M_HeaderText);
 	M_TextHideActionButtonHotkeysLabel->SetText(M_GameplayText.M_HideActionButtonHotkeysLabelText);
+	M_HoverRangeIndicatorText->SetText(M_GameplayText.M_HoverRangeIndicatorLabelText);
 	M_TextOverwriteAllPlayerHpBarLabel->SetText(M_GameplayText.M_OverwriteAllPlayerHpBarLabelText);
 	M_TextPlayerTankHpBarLabel->SetText(M_GameplayText.M_PlayerTankHpBarLabelText);
 	M_TextPlayerSquadHpBarLabel->SetText(M_GameplayText.M_PlayerSquadHpBarLabelText);
@@ -668,6 +674,7 @@ void UW_EscapeMenuSettings::InitialiseGameplayControls(const FRTSGameplaySetting
 	}
 
 	M_CheckHideActionButtonHotkeys->SetIsChecked(GameplaySettings.bM_HideActionButtonHotkeys);
+	M_CheckUnitRangeOnHover->SetIsChecked(GameplaySettings.bM_CheckUnitRangeOnHover);
 	SetPlayerHealthBarStrategySelection(M_ComboOverwriteAllPlayerHpBarStrat, GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
 	SetPlayerHealthBarStrategySelection(M_ComboPlayerTankHpBarStrat, GameplaySettings.M_PlayerTankHpBarStrat);
 	SetPlayerHealthBarStrategySelection(M_ComboPlayerSquadHpBarStrat, GameplaySettings.M_PlayerSquadHpBarStrat);
@@ -1067,6 +1074,9 @@ void UW_EscapeMenuSettings::BindGameplaySettingCallbacks()
 {
 	M_CheckHideActionButtonHotkeys->OnCheckStateChanged.RemoveAll(this);
 	M_CheckHideActionButtonHotkeys->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleHideActionButtonHotkeysChanged);
+
+	M_CheckUnitRangeOnHover->OnCheckStateChanged.RemoveAll(this);
+	M_CheckUnitRangeOnHover->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleCheckUnitRangeOnHoverChanged);
 
 	M_ComboOverwriteAllPlayerHpBarStrat->OnSelectionChanged.RemoveAll(this);
 	M_ComboOverwriteAllPlayerHpBarStrat->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleOverwriteAllPlayerHpBarStratChanged);
@@ -2081,6 +2091,22 @@ bool UW_EscapeMenuSettings::GetIsValidTextHideActionButtonHotkeysLabel() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidHoverRangeIndicatorText() const
+{
+	if (not IsValid(M_HoverRangeIndicatorText))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_HoverRangeIndicatorText"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidHoverRangeIndicatorText"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidTextOverwriteAllPlayerHpBarLabel() const
 {
 	if (not IsValid(M_TextOverwriteAllPlayerHpBarLabel))
@@ -2345,6 +2371,22 @@ bool UW_EscapeMenuSettings::GetIsValidCheckHideActionButtonHotkeys() const
 			this,
 			TEXT("M_CheckHideActionButtonHotkeys"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidCheckHideActionButtonHotkeys"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidCheckUnitRangeOnHover() const
+{
+	if (not IsValid(M_CheckUnitRangeOnHover))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_CheckUnitRangeOnHover"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidCheckUnitRangeOnHover"),
 			this
 		);
 		return false;
@@ -2758,6 +2800,11 @@ bool UW_EscapeMenuSettings::GetAreGameplayWidgetsValid() const
 		return false;
 	}
 
+	if (not GetIsValidCheckUnitRangeOnHover())
+	{
+		return false;
+	}
+
 	return GetAreGameplayComboWidgetsValid();
 }
 
@@ -3009,6 +3056,11 @@ bool UW_EscapeMenuSettings::GetAreGameplayTextWidgetsValid() const
 	}
 
 	if (not GetIsValidTextHideActionButtonHotkeysLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidHoverRangeIndicatorText())
 	{
 		return false;
 	}
@@ -3853,6 +3905,26 @@ void UW_EscapeMenuSettings::HandleHideActionButtonHotkeysChanged(const bool bIsC
 	}
 
 	M_SettingsSubsystem->SetPendingHideActionButtonHotkeys(bIsChecked);
+}
+
+void UW_EscapeMenuSettings::HandleCheckUnitRangeOnHoverChanged(const bool bIsChecked)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidCheckUnitRangeOnHover())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingCheckUnitRangeOnHover(bIsChecked);
 }
 
 void UW_EscapeMenuSettings::HandleOverwriteAllPlayerHpBarStratChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)

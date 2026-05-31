@@ -25,6 +25,7 @@ namespace RTSSettingsMenuSubsystemPrivate
 	constexpr bool bDefaultVSyncEnabled = false;
 	constexpr bool bDefaultInvertYAxis = false;
 	constexpr bool bDefaultHideActionButtonHotkeys = false;
+	constexpr bool bDefaultCheckUnitRangeOnHover = true;
 
 	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::Fullscreen;
 	const ERTSScalabilityQuality DefaultScalabilityQuality = ERTSScalabilityQuality::Epic;
@@ -282,6 +283,11 @@ void URTSSettingsMenuSubsystem::SetPendingHideActionButtonHotkeys(const bool bNe
 	M_PendingSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = bNewHideActionButtonHotkeys;
 }
 
+void URTSSettingsMenuSubsystem::SetPendingCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover)
+{
+	M_PendingSettings.M_GameplaySettings.bM_CheckUnitRangeOnHover = bNewCheckUnitRangeOnHover;
+}
+
 void URTSSettingsMenuSubsystem::SetPendingOverwriteAllPlayerHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
 {
 	M_PendingSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = NewStrategy;
@@ -421,6 +427,7 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 	DefaultSettings.M_ControlSettings.M_CameraPanSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier;
 
 	DefaultSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = RTSSettingsMenuSubsystemPrivate::bDefaultHideActionButtonHotkeys;
+	DefaultSettings.M_GameplaySettings.bM_CheckUnitRangeOnHover = RTSSettingsMenuSubsystemPrivate::bDefaultCheckUnitRangeOnHover;
 	DefaultSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
 	DefaultSettings.M_GameplaySettings.M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
 	DefaultSettings.M_GameplaySettings.M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
@@ -708,6 +715,24 @@ void URTSSettingsMenuSubsystem::ApplyGameplaySettingsDiff(
 		}
 	}
 
+	if (PreviousSettings.bM_CheckUnitRangeOnHover != CurrentSettings.bM_CheckUnitRangeOnHover)
+	{
+		UWorld* const World = GetWorld();
+		if (World != nullptr)
+		{
+			for (FConstPlayerControllerIterator ControllerIterator = World->GetPlayerControllerIterator(); ControllerIterator; ++ControllerIterator)
+			{
+				ACPPController* const RtsPlayerController = Cast<ACPPController>(ControllerIterator->Get());
+				if (RtsPlayerController == nullptr)
+				{
+					continue;
+				}
+
+				RtsPlayerController->ApplyHoverRangeIndicatorSettingChanged(CurrentSettings.bM_CheckUnitRangeOnHover);
+			}
+		}
+	}
+
 	UGameUnitManager* const GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	if (not IsValid(GameUnitManager))
 	{
@@ -893,6 +918,7 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_ControlSettings.M_CameraMovementSpeedMultiplier = GameUserSettings.GetCameraMovementSpeedMultiplier();
 	Snapshot.M_ControlSettings.M_CameraPanSpeedMultiplier = GameUserSettings.GetCameraPanSpeedMultiplier();
 	Snapshot.M_GameplaySettings.bM_HideActionButtonHotkeys = GameUserSettings.GetHideActionButtonHotkeys();
+	Snapshot.M_GameplaySettings.bM_CheckUnitRangeOnHover = GameUserSettings.GetCheckUnitRangeOnHover();
 	Snapshot.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = GameUserSettings.GetOverwriteAllPlayerHpBarStrat();
 	Snapshot.M_GameplaySettings.M_PlayerTankHpBarStrat = GameUserSettings.GetPlayerTankHpBarStrat();
 	Snapshot.M_GameplaySettings.M_PlayerSquadHpBarStrat = GameUserSettings.GetPlayerSquadHpBarStrat();
@@ -935,6 +961,7 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetCameraMovementSpeedMultiplier(SnapshotToApply.M_ControlSettings.M_CameraMovementSpeedMultiplier);
 	GameUserSettingsToApply.SetCameraPanSpeedMultiplier(SnapshotToApply.M_ControlSettings.M_CameraPanSpeedMultiplier);
 	GameUserSettingsToApply.SetHideActionButtonHotkeys(SnapshotToApply.M_GameplaySettings.bM_HideActionButtonHotkeys);
+	GameUserSettingsToApply.SetCheckUnitRangeOnHover(SnapshotToApply.M_GameplaySettings.bM_CheckUnitRangeOnHover);
 	GameUserSettingsToApply.SetOverwriteAllPlayerHpBarStrat(SnapshotToApply.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
 	GameUserSettingsToApply.SetPlayerTankHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerTankHpBarStrat);
 	GameUserSettingsToApply.SetPlayerSquadHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerSquadHpBarStrat);

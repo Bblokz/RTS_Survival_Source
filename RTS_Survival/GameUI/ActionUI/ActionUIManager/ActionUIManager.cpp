@@ -793,9 +793,9 @@ void UActionUIManager::CreateWeaponRangeRadius(AActor* OwnerActor, const float W
 		URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(OwnerActor, WeaponRangeRadiusActorIndex, TurretYawLimit);
 	}
 	const FVector RadiusOffset = FVector(0.f, 0.f, 25.f);
-	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(OwnerActor,
-	                                                     WeaponRangeRadiusActorIndex,
-	                                                     OwnerActor, RadiusOffset);
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActorYawOnly(OwnerActor,
+	                                                            WeaponRangeRadiusActorIndex,
+	                                                            OwnerActor, RadiusOffset);
 }
 
 
