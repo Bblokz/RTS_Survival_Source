@@ -201,10 +201,37 @@ const TArray<FRTSMinimapIconDrawData>& AFowManager::GetMiniMapIconDrawData() con
 	return M_CachedMiniMapIconDrawData;
 }
 
-const TArray<FRTSMinimapCustomIconDrawData>& AFowManager::GetCustomMiniMapIconDrawData()
+const TArray<FRTSMinimapCustomIconDrawData>& AFowManager::GetCustomMiniMapIconDrawData() const
+{
+	return M_CachedCustomMiniMapIconDrawData;
+}
+
+void AFowManager::RefreshCustomMiniMapIconDrawDataForMiniMap()
 {
 	RefreshCustomMiniMapIconDrawDataCache();
-	return M_CachedCustomMiniMapIconDrawData;
+}
+
+void AFowManager::AppendCustomMiniMapIconBrushData(TArray<FRTSMinimapIconBrushData>& OutBrushData) const
+{
+	if (not GetIsValidMinimapIconDataAsset())
+	{
+		return;
+	}
+
+	OutBrushData.Reserve(OutBrushData.Num() + M_MinimapIconDataAsset->M_MinimapIcons.Num());
+	for (const TPair<EMinimapIconType, FMinimapIcon>& MinimapIconPair : M_MinimapIconDataAsset->M_MinimapIcons)
+	{
+		const EMinimapIconType IconType = MinimapIconPair.Key;
+		const FMinimapIcon& MinimapIcon = MinimapIconPair.Value;
+		if (IconType == EMinimapIconType::None || not IsValid(MinimapIcon.M_Texture))
+		{
+			continue;
+		}
+
+		FRTSMinimapIconBrushData& NewBrushData = OutBrushData.AddDefaulted_GetRef();
+		NewBrushData.M_IconType = IconType;
+		NewBrushData.M_Texture = MinimapIcon.M_Texture;
+	}
 }
 
 FName AFowManager::AddCustomMiniMapIcon(const FName IconId,
@@ -362,6 +389,7 @@ void AFowManager::Tick(float DeltaTime)
 	AskUpdateEnemyVision();
 	AskReadBack();
 	RefreshMiniMapIconDrawDataCache();
+	RefreshCustomMiniMapIconDrawDataCache();
 }
 
 bool AFowManager::GetIsActiveParticipantUnique(UFowComp* FowComp) const
@@ -591,7 +619,7 @@ void AFowManager::AppendCustomMiniMapIconDrawData(const FFowManagerCustomMinimap
 	NewIcon.M_UV = IconUV;
 	NewIcon.M_IconSizePixels = MinimapIcon->M_SizeXY;
 	NewIcon.M_RotationDegrees = GetCustomMinimapIconRotationDegrees(CustomIcon.M_WorldRotation);
-	NewIcon.M_Texture = MinimapIcon->M_Texture;
+	NewIcon.M_IconType = CustomIcon.M_IconType;
 }
 
 bool AFowManager::UpdateCustomMinimapIconAttachedActorTransform(FFowManagerCustomMinimapIcon& CustomIcon) const

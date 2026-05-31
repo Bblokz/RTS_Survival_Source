@@ -128,7 +128,9 @@ public:
 	inline float GetMiniMapLargeIconSizePixels() const { return MiniMapLargeIconSizePixels; }
 	FLinearColor GetMiniMapIconColorValue(const ERTSMinimapIconColor IconColor) const;
 	const TArray<FRTSMinimapIconDrawData>& GetMiniMapIconDrawData() const;
-	const TArray<FRTSMinimapCustomIconDrawData>& GetCustomMiniMapIconDrawData();
+	const TArray<FRTSMinimapCustomIconDrawData>& GetCustomMiniMapIconDrawData() const;
+	void RefreshCustomMiniMapIconDrawDataForMiniMap();
+	void AppendCustomMiniMapIconBrushData(TArray<FRTSMinimapIconBrushData>& OutBrushData) const;
 
 	/**
 	 * @brief Adds an always-visible texture icon at a fixed world location.
