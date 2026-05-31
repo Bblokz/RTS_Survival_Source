@@ -111,6 +111,13 @@ class UInputMappingContext;
 class UMissionCinematicTakeOverSession;
 class UW_HoldToSkip;
 
+
+struct FHoverWeaponRangeRadiusData
+{
+	float M_WeaponRange = 0.0f;
+	float M_TurretYawLimit = 0.0f;
+};
+
 USTRUCT(BlueprintType)
 struct FPauseGameState
 {
@@ -512,6 +519,7 @@ public:
 	void SetIsPlayerInArchive(const bool bIsInArchive);
 
 	UMainGameUI* GetMainMenuUI() const { return M_MainGameUI; }
+	void ApplyHoverRangeIndicatorSettingChanged(bool bNewCheckUnitRangeOnHover);
 
 	// Keeps track of callbacks that need to be invoked when the main menu is loaded.
 	// In case the menu is already loaded, the callback is invoked immediately.
@@ -1685,15 +1693,21 @@ private:
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();
 	void UpdateHoverWeaponRangeRadiusForActor(AActor* NewHoveredActor);
-	void CreateHoverWeaponRangeRadius(AActor* HoveredActor, float WeaponRange);
+	void CreateHoverWeaponRangeRadius(AActor* HoveredActor, const FHoverWeaponRangeRadiusData& WeaponRangeData);
 	void HideHoverWeaponRangeRadius();
-	bool TryGetMaxHoverWeaponRange(const AActor* HoveredActor, float& OutWeaponRange) const;
-	bool TryGetMaxTankWeaponRange(const ATankMaster* TankMaster, float& OutWeaponRange) const;
+	bool TryGetMaxHoverWeaponRange(const AActor* HoveredActor, FHoverWeaponRangeRadiusData& OutWeaponRangeData) const;
+	bool TryGetMaxTankWeaponRange(const ATankMaster* TankMaster, FHoverWeaponRangeRadiusData& OutWeaponRangeData) const;
 	bool TryGetMaxBuildingExpansionWeaponRange(
 		const ABuildingExpansion* BuildingExpansion,
-		float& OutWeaponRange) const;
-	bool TryGetSquadUnitWeaponRange(const ASquadUnit* SquadUnit, float& OutWeaponRange) const;
-	void TryUpdateMaxRangeFromWeapons(const TArray<UWeaponState*>& Weapons, float& InOutWeaponRange) const;
+		FHoverWeaponRangeRadiusData& OutWeaponRangeData) const;
+	bool TryGetSquadUnitWeaponRange(const ASquadUnit* SquadUnit, FHoverWeaponRangeRadiusData& OutWeaponRangeData) const;
+	void TryUpdateMaxRangeFromWeapons(
+		const TArray<UWeaponState*>& Weapons,
+		FHoverWeaponRangeRadiusData& InOutWeaponRangeData) const;
+	void TryUpdateHoverWeaponRangeDataFromWeapon(
+		const UWeaponState* WeaponState,
+		FHoverWeaponRangeRadiusData& InOutWeaponRangeData) const;
+	bool GetShouldShowHoverWeaponRangeRadius() const;
 	bool GetIsValidHoverWidget();
 	void OnActorHovered(AActor* HoveredActor, const bool bIsHovered) const;
 	// The new actor may be null; which causes the previous outlined actor to no longer be outlined.

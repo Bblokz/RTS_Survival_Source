@@ -104,6 +104,11 @@ bool URTSGameUserSettings::GetHideActionButtonHotkeys() const
 	return bM_HideActionButtonHotkeys;
 }
 
+bool URTSGameUserSettings::GetCheckUnitRangeOnHover() const
+{
+	return bM_CheckUnitRangeOnHover;
+}
+
 void URTSGameUserSettings::SetMasterVolume(const float NewMasterVolume)
 {
 	M_MasterVolume = NewMasterVolume;
@@ -172,6 +177,11 @@ void URTSGameUserSettings::SetCameraPanSpeedMultiplier(const float NewCameraPanS
 void URTSGameUserSettings::SetHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys)
 {
 	bM_HideActionButtonHotkeys = bNewHideActionButtonHotkeys;
+}
+
+void URTSGameUserSettings::SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover)
+{
+	bM_CheckUnitRangeOnHover = bNewCheckUnitRangeOnHover;
 }
 
 ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetOverwriteAllPlayerHpBarStrat() const

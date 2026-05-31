@@ -147,6 +147,9 @@ struct FRTSGameplaySettings
 	bool bM_HideActionButtonHotkeys = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	bool bM_CheckUnitRangeOnHover = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
 	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
@@ -268,6 +271,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingHideActionButtonHotkeys(bool bNewHideActionButtonHotkeys);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingCheckUnitRangeOnHover(bool bNewCheckUnitRangeOnHover);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingOverwriteAllPlayerHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);
