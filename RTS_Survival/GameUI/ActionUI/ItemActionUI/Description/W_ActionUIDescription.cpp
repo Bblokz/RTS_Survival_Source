@@ -7,6 +7,13 @@
 #include "Components/RichTextBlock.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/GameUI/CostWidget/W_CostDisplay.h"
+#include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ResearchTechnologyAbilityComponent/ResearchTechnologyAbilityComp.h"
+#include "RTS_Survival/TechTree/Technologies/Technologies.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 void UW_ActionUIDescription::SetCostsForAbility(const TMap<ERTSResourceType, int32>& ResourceCosts) const
@@ -39,7 +46,17 @@ void UW_ActionUIDescription::SetupDescription(const EAbilityID Ability, const in
 	{
 		return;
 	}
-	// todo catch ability == tech then call the override description for tech.
+	if (Ability == EAbilityID::IdResearchTechnology)
+	{
+		OnOverrideDescriptionForTechnology(
+			Ability,
+			CustomType,
+			DataTableText_Title,
+			DataTableText_Description,
+			Cast<UTexture2D>(DataTable_Icon));
+		return;
+	}
+
 	SetDataToTextAndImage(
 		DataTableText_Title,
 		DataTableText_Description,
@@ -107,14 +124,60 @@ void UW_ActionUIDescription::OnOverrideDescriptionForTechnology(const EAbilityID
                                                                 const FText& DataTableText_Description,
                                                                 TObjectPtr<UTexture2D> DataTable_Icon)
 {
-	if(EnsureIsValidActionUIManager())
+	if (Ability != EAbilityID::IdResearchTechnology)
 	{
-		TWeakInterfacePtr<ICommands> PrimarySelectedUnit = M_ActionUIManager->GetPrimarySelectedICommands();
-		if(not PrimarySelectedUnit.IsValid())
-		{
-			RTSFunctionLibrary::ReportError("No valid primary selected unit in OnOverrideDescriptionForTechnology");
-			return;
-		}
-		// do things with the primary selected unit.
+		SetDataToTextAndImage(DataTableText_Title, DataTableText_Description, DataTable_Icon);
+		return;
 	}
+
+	if (not EnsureIsValidActionUIManager())
+	{
+		SetDataToTextAndImage(DataTableText_Title, DataTableText_Description, DataTable_Icon);
+		return;
+	}
+
+	TWeakInterfacePtr<ICommands> PrimarySelectedUnit = M_ActionUIManager->GetPrimarySelectedICommands();
+	if (not PrimarySelectedUnit.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("No valid primary selected unit in OnOverrideDescriptionForTechnology");
+		SetDataToTextAndImage(DataTableText_Title, DataTableText_Description, DataTable_Icon);
+		return;
+	}
+
+	AActor* PrimarySelectedActor = PrimarySelectedUnit->GetOwnerActor();
+	const ETechnology Technology = static_cast<ETechnology>(CustomType);
+	const UResearchTechnologyAbilityComp* ResearchTechnologyComp =
+		FAbilityHelpers::GetResearchTechnologyAbilityCompOfType(Technology, PrimarySelectedActor);
+	if (not IsValid(ResearchTechnologyComp))
+	{
+		SetDataToTextAndImage(DataTableText_Title, DataTableText_Description, DataTable_Icon);
+		return;
+	}
+
+	UPlayerTechManager* PlayerTechManager = FRTS_Statics::GetPlayerTechManager(PrimarySelectedActor);
+	if (not IsValid(PlayerTechManager))
+	{
+		SetDataToTextAndImage(DataTableText_Title, DataTableText_Description, DataTable_Icon);
+		return;
+	}
+
+	const TArray<ETechnology> MissingRequiredTechnologies =
+		PlayerTechManager->GetMissingRequiredTechnologies(ResearchTechnologyComp->GetRequiredTechnologies());
+
+	if (MissingRequiredTechnologies.IsEmpty())
+	{
+		SetDataToTextAndImage(DataTableText_Title, DataTableText_Description, DataTable_Icon);
+		return;
+	}
+
+	FString OverrideDescription = "<Text_sBad>Required:</>";
+	for (const ETechnology RequiredTechnology : ResearchTechnologyComp->GetRequiredTechnologies())
+	{
+		OverrideDescription += "\n";
+		OverrideDescription += FRTSRichTextConverter::MakeRTSRich(
+			Global_GetTechDisplayName(RequiredTechnology),
+			ERTSRichText::Text_Armor);
+	}
+
+	SetDataToTextAndImage(DataTableText_Title, FText::FromString(OverrideDescription), DataTable_Icon);
 }

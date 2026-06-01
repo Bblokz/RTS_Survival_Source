@@ -13,6 +13,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionTypes/FieldConstructionTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ResearchTechnologyAbilityComponent/ResearchTechnologyAbilityComp.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitAbilityEntry.generated.h"
@@ -197,6 +198,51 @@ bool GetCanExecuteDetachTow(AActor* Actor);
 		return nullptr;
 	}
 
+
+	inline bool GetHasResearchTechnologyAbility(
+		const TArray<FUnitAbilityEntry>& UnitAbilities,
+		const ETechnology Technology,
+		FUnitAbilityEntry& OutAbilityOfResearchTechnology)
+	{
+		const int32 CustomDataForTechnology = static_cast<int32>(Technology);
+		for (const FUnitAbilityEntry& AbilityEntry : UnitAbilities)
+		{
+			if (AbilityEntry.AbilityId == EAbilityID::IdResearchTechnology
+				&& AbilityEntry.CustomType == CustomDataForTechnology)
+			{
+				OutAbilityOfResearchTechnology = AbilityEntry;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	inline UResearchTechnologyAbilityComp* GetResearchTechnologyAbilityCompOfType(
+		const ETechnology Technology, const AActor* Actor)
+	{
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+
+		TArray<UResearchTechnologyAbilityComp*> ResearchTechnologyComps;
+		Actor->GetComponents<UResearchTechnologyAbilityComp>(ResearchTechnologyComps);
+		for (UResearchTechnologyAbilityComp* ResearchTechnologyComp : ResearchTechnologyComps)
+		{
+			if (not IsValid(ResearchTechnologyComp))
+			{
+				continue;
+			}
+
+			if (ResearchTechnologyComp->GetTechnology() == Technology)
+			{
+				return ResearchTechnologyComp;
+			}
+		}
+
+		return nullptr;
+	}
 
 	inline bool GetHasModeAbility(const TArray<FUnitAbilityEntry>& UnitAbilities,
 	                              const EModeAbilityType ModeAbility,

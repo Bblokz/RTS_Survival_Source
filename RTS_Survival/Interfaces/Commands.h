@@ -12,6 +12,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
+#include "RTS_Survival/TechTree/Technologies/Technologies.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
@@ -20,6 +21,7 @@
 
 struct FUnitCost;
 class UActionUIManager;
+class UPlayerTechManager;
 class ACPPResourceMaster;
 class AItemsMaster;
 class UHarvester;
@@ -43,6 +45,7 @@ enum class ECommandQueueError : uint8
 	NotEnoughRadixite,
 	NotEnoughMetal,
 	NotEnoughVehicleParts,
+	MissingTechRequirement,
 };
 
 /**
@@ -109,6 +112,11 @@ public:
 	ETowedActorTarget GetTowActorAbilitySubtype() const
 	{
 		return static_cast<ETowedActorTarget>(CustomType);
+	}
+
+	ETechnology GetResearchTechnologySubtype() const
+	{
+		return static_cast<ETechnology>(CustomType);
 	}
 
 	FQueueCommand()
@@ -182,6 +190,7 @@ public:
 
 	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
 	bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
+	bool SwapAbility(const EAbilityID OldAbility, int32 OldCustomType, const FUnitAbilityEntry& NewAbility);
 
 	/**
 	 *
@@ -194,6 +203,7 @@ public:
 	bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
+	bool RemoveAbility(const EAbilityID AbilityToRemove, int32 CustomType);
 
 	/**
 	 * @brief: Set up the CommandData with the owner of this CommandData.
@@ -481,6 +491,7 @@ public:
 	bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex = INDEX_NONE);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
+	bool RemoveAbility(const EAbilityID AbilityToRemove, int32 CustomType);
 
 	/**
 	 * @brief: Swaps the new ability in the ability array for the old ability if found.
@@ -490,6 +501,7 @@ public:
 	 */
 	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
 	bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
+	bool SwapAbility(const EAbilityID OldAbility, int32 OldCustomType, const FUnitAbilityEntry& NewAbility);
 
 
 	bool HasAbility(const EAbilityID AbilityToCheck);
@@ -582,6 +594,18 @@ public:
 	virtual ECommandQueueError ActivateModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle);
 
 	virtual ECommandQueueError DisableModeAbility(const EModeAbilityType ModeAbilityType, const bool bSetUnitToIdle);
+
+	/**
+	 * @brief Queues instant technology research if the unit exposes the matching technology subtype.
+	 * @param Technology Technology subtype on the command-card entry.
+	 * @param RequiredTechnologies Technologies that must already be researched.
+	 * @param bSetUnitToIdle Whether the unit should clear previous commands before researching.
+	 * @return NoError only when requirements pass and the command could be queued.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError ResearchTechnology(ETechnology Technology,
+	                                            const TArray<ETechnology>& RequiredTechnologies,
+	                                            bool bSetUnitToIdle);
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
@@ -1006,6 +1030,9 @@ protected:
 	virtual void TerminateFieldConstructionCommand(EFieldConstructionType FieldConstructionType,
 	                                               AActor* StaticPreviewActor);
 
+	virtual void ExecuteResearchTechnologyCommand(ETechnology Technology);
+	virtual void TerminateResearchTechnologyCommand(ETechnology Technology);
+
 	virtual void NoQueue_ExecuteSetResourceConversionEnabled(const bool bEnabled);
 	/**
 	 * @brief Allows for custom unit-specific logic when the unit is reset for a new command.
@@ -1037,6 +1064,8 @@ protected:
 	void ResetRotateTowardsFinalMovementRotation();
 
 private:
+	bool GetAreTechnologyRequirementsMet(const TArray<ETechnology>& RequiredTechnologies) const;
+	UPlayerTechManager* GetPlayerTechManagerForOwner() const;
 	// Called on DoneExecutingCommand.
 	void TerminateCommand(EAbilityID AbilityToKill);
 

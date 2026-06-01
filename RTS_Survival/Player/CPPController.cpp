@@ -16,6 +16,7 @@
 #include "PlayerAimAbilitiy/PlayerAimAbility.h"
 #include "PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ResearchTechnologyAbilityComponent/ResearchTechnologyAbilityComp.h"
 #include "PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "PlayerControlGroupManager/PlayerControlGroupManager.h"
 #include "PlayerError/PlayerError.h"
@@ -4213,6 +4214,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdFieldConstruction:
 		this->DirectActionButtonFieldConstruction(static_cast<EFieldConstructionType>(ActiveAbilityEntry.CustomType));
 		break;
+	case EAbilityID::IdResearchTechnology:
+		this->DirectActionButtonResearchTechnology(static_cast<ETechnology>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdExitCargo:
 		if constexpr (DeveloperSettings::Debugging::GAction_UI_Compile_DebugSymbols)
 		{
@@ -4918,6 +4922,43 @@ void ACPPController::DirectActionButtonReinforce()
 	if (CommandsExe > 0)
 	{
 		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ReinforcementsHaveArrived, true, false);
+	}
+}
+
+void ACPPController::DirectActionButtonResearchTechnology(const ETechnology Technology)
+{
+	EnsureSelectionsAreRTSValid();
+
+	AActor* PrimarySelectedUnit = GetPrimarySelectedUnit();
+	if (not IsValid(PrimarySelectedUnit))
+	{
+		return;
+	}
+
+	ICommands* PrimarySelectedCommands = Cast<ICommands>(PrimarySelectedUnit);
+	if (PrimarySelectedCommands == nullptr)
+	{
+		return;
+	}
+
+	const UResearchTechnologyAbilityComp* ResearchTechnologyComp =
+		FAbilityHelpers::GetResearchTechnologyAbilityCompOfType(Technology, PrimarySelectedUnit);
+	if (not IsValid(ResearchTechnologyComp))
+	{
+		return;
+	}
+
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+	const ECommandQueueError CommandQueueError = PrimarySelectedCommands->ResearchTechnology(
+		Technology,
+		ResearchTechnologyComp->GetRequiredTechnologies(),
+		bResetCommandQueueFirst);
+
+	if (CommandQueueError == ECommandQueueError::NoError)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
+			false);
 	}
 }
 

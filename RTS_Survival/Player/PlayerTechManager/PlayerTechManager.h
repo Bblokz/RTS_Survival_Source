@@ -16,7 +16,9 @@ enum class ERTSResourceType : uint8;
 
 
 /**
- * 
+ * @brief Owned by the player controller to track researched technologies and apply their effects.
+ *
+ * Gameplay systems query this manager before allowing tech-gated actions or displaying tech requirements.
  */
 UCLASS()
 class RTS_SURVIVAL_API UPlayerTechManager : public UActorComponent
@@ -25,6 +27,8 @@ class RTS_SURVIVAL_API UPlayerTechManager : public UActorComponent
 
 public:
 	inline bool HasTechResearched(const ETechnology Tech) const { return M_ResearchedTechs.Contains(Tech); }
+	TArray<ETechnology> GetMissingRequiredTechnologies(const TArray<ETechnology>& RequiredTechnologies) const;
+	bool HasAllRequiredTechnologies(const TArray<ETechnology>& RequiredTechnologies) const;
 	void OnTechResearched(const ETechnology Tech);
 
 	void InitTechsInManager(ACPPController* Controller);
