@@ -9,6 +9,7 @@
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
@@ -619,6 +620,8 @@ bool UCommandData::GetIsAbilityEntryOnCooldown(
 
 void UCommandData::OnCommandInQueueCancelled(const FQueueCommand& CancelledCommand)
 {
+	RefundCommand(CancelledCommand);
+
 	if (CancelledCommand.CommandType == EAbilityID::IdFieldConstruction)
 	{
 		// If we had a field construction command cancelled, we need to remove any static preview meshes related to it.
@@ -997,14 +1000,14 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 
 void UCommandData::ClearCommands(const ECommandQueueClearReason Reason)
 {
-	const bool bRefundCurrentAndFutureCommands = (Reason == ECommandQueueClearReason::Cancelled ||
+	const bool bRefundCommandsThatHaveNotStarted = (Reason == ECommandQueueClearReason::Cancelled ||
 		Reason == ECommandQueueClearReason::ReplacedByImmediateCommand || Reason ==
 		ECommandQueueClearReason::OwnerDestroyed);
 
-	if (bRefundCurrentAndFutureCommands)
+	if (bRefundCommandsThatHaveNotStarted)
 	{
 		// Those abilities that are planned that cost resources are refunded to the player resource manager.
-		RefundCurrentAndFutureCommands();
+		RefundCommandsThatHaveNotStarted();
 	}
 	if (NumCommands > 0)
 	{
@@ -1041,31 +1044,47 @@ ECommandQueueError UCommandData::PayForAbilityCosts(const EAbilityID AbilityId,
 	{
 		return ECommandQueueError::NoError;
 	}
-	switch (M_PlayerResourceManager->GetCanPayForCost(AbilityCosts.ResourceCosts))
+	const EPlayerError PaymentError = M_PlayerResourceManager->GetCanPayForCost(AbilityCosts.ResourceCosts);
+	ECommandQueueError CommandQueueError = ECommandQueueError::NoError;
+	switch (PaymentError)
 	{
 	case EPlayerError::Error_NotEnoughRadixite:
-		return ECommandQueueError::NotEnoughRadixite;
+		CommandQueueError = ECommandQueueError::NotEnoughRadixite;
+		break;
 	case EPlayerError::Error_NotEnoughMetal:
-		return ECommandQueueError::NotEnoughMetal;
+		CommandQueueError = ECommandQueueError::NotEnoughMetal;
+		break;
 	case EPlayerError::Error_NotEnoughVehicleParts:
-		return ECommandQueueError::NotEnoughVehicleParts;
+		CommandQueueError = ECommandQueueError::NotEnoughVehicleParts;
+		break;
 	default:
 		break;
 	}
-	M_PlayerResourceManager->PayForCosts(AbilityCosts.ResourceCosts);
+
+	if (CommandQueueError != ECommandQueueError::NoError)
+	{
+		if (ACPPController* PlayerController = Cast<ACPPController>(M_PlayerResourceManager->GetOwner()))
+		{
+			PlayerController->DisplayErrorMessage(PaymentError);
+		}
+
+		return CommandQueueError;
+	}
+
+	if (not M_PlayerResourceManager->PayForCosts(AbilityCosts.ResourceCosts))
+	{
+		return ECommandQueueError::NotEnoughRadixite;
+	}
+
 	return ECommandQueueError::NoError;
 }
 
-void UCommandData::RefundCurrentAndFutureCommands() const
+void UCommandData::RefundCommandsThatHaveNotStarted() const
 {
-	int32 Index = CurrentIndex;
-	while (Index < NumCommands)
+	const int32 FirstPendingCommandIndex = CurrentIndex < 0 ? 0 : CurrentIndex + 1;
+	for (int32 CommandIndex = FirstPendingCommandIndex; CommandIndex < NumCommands; CommandIndex++)
 	{
-		if (Index >= 0)
-		{
-			RefundCommand(M_TCommands[Index]);
-		}
-		Index++;
+		RefundCommand(M_TCommands[CommandIndex]);
 	}
 }
 

@@ -60,7 +60,7 @@ void UW_ItemActionUI::OnActionUIHover(const bool bIsHover) const
 {
 	if (GetIsValidActionUIManager())
 	{
-		M_ActionUIManager->OnHoverActionUIItem(bIsHover);
+		M_ActionUIManager->OnHoverActionUIItem(bIsHover, M_Ability, M_CustomType);
 	}
 }
 

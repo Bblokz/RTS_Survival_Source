@@ -591,6 +591,12 @@ void ACPPController::SetupInputComponent()
 
 void ACPPController::DisplayErrorMessage(const EPlayerError Error)
 {
+	const EAnnouncerVoiceLineType AnnouncerVoiceLine = FRTS_VoiceLineHelpers::GetAnnouncerForPlayerError(Error);
+	if (AnnouncerVoiceLine != EAnnouncerVoiceLineType::None)
+	{
+		PlayAnnouncerVoiceLine(AnnouncerVoiceLine, true, true);
+	}
+
 	switch (Error)
 	{
 	case EPlayerError::Error_None:
