@@ -90,9 +90,9 @@ bool UCommandData::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEn
 	return false;
 }
 
-bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
+bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex, const FUnitCost& Costs)
 {
-	return AddAbility(FAbilityHelpers::CreateAbilityEntryFromId(NewAbility), AtIndex);
+	return AddAbility(FAbilityHelpers::CreateAbilityEntryFromId(NewAbility, Costs), AtIndex);
 }
 
 bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex)
@@ -1368,14 +1368,14 @@ void ICommands::SetUnitAbilitiesRunTime(const TArray<EAbilityID>& Abilities)
 	SetUnitAbilitiesRunTime(FAbilityHelpers::ConvertAbilityIdsToEntries(Abilities));
 }
 
-bool ICommands::AddAbility(const EAbilityID NewAbility, const int32 AtIndex)
+bool ICommands::AddAbility(const EAbilityID NewAbility, const int32 AtIndex, const FUnitCost& Costs)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
 	if (not UnitCommandData)
 	{
 		return false;
 	}
-	const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex);
+	const bool bAdded = UnitCommandData->AddAbility(NewAbility, AtIndex, Costs);
 	UnitCommandData->UpdateActionUI();
 	return bAdded;
 }
