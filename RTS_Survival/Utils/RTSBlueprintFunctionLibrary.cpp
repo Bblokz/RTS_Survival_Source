@@ -1299,6 +1299,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_LargePTRS()
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_LargePTRS));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_LargeMixBasic()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_LargeMixBasic));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_RedHammer()
 {
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHammer));
@@ -1307,6 +1312,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_RedHammer()
 FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_RedHamerPTRS()
 {
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_RedHamerPTRS));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_LargeMixT2()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_LargeMixT2));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_ToxicGuard()

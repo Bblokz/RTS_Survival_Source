@@ -388,6 +388,8 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_Kvarc77 UMETA(DisplayName = "Rus Laser Cyborg Squad"),
 	Squad_Rus_Tucha12T UMETA(DisplayName = "Rus Fedrov Cyborg Squad"),
 	Squad_Rus_CortexOfficer UMETA(DisplayName = "Rus Cortex Officer: heavily armored cyborg"),
+	Squad_Rus_LargeMixBasic UMETA(DisplayName = "Rus Large Mix Basic Squad"),
+	Squad_Rus_LargeMixT2 UMETA(DisplayName = "Rus Large Mix T2 Squad"),
 };
 
 
@@ -402,7 +404,9 @@ static bool Global_GetIsAntiTankSquad(const ESquadSubtype SquadSubtype)
 	case ESquadSubtype::Squad_Rus_Zis_76MM:
 	case ESquadSubtype::Squad_Rus_Okhotnik:
 	case ESquadSubtype::Squad_Rus_LargePTRS:
+	case ESquadSubtype::Squad_Rus_LargeMixBasic:
 	case ESquadSubtype::Squad_Rus_RedHamerPTRS:
+	case ESquadSubtype::Squad_Rus_LargeMixT2:
 		return true;
 	default:
 		return false;
@@ -515,6 +519,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "RedHammer Squad";
 	case ESquadSubtype::Squad_Rus_RedHamerPTRS:
 		return "RedHamerPTRS Squad";
+	case ESquadSubtype::Squad_Rus_LargeMixT2:
+		return "Large Mix T2 Squad";
 	case ESquadSubtype::Squad_Rus_ToxicGuard:
 		return "Toxic Guard Squad";
 	case ESquadSubtype::Squad_Rus_GhostsOfStalingrad:
@@ -527,6 +533,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Okhotnik Squad";
 	case ESquadSubtype::Squad_Rus_LargePTRS:
 		return "Large PTRS Squad";
+	case ESquadSubtype::Squad_Rus_LargeMixBasic:
+		return "Large Mix Basic Squad";
 	case ESquadSubtype::Squad_Rus_Kvarc77:
 		return "Kvarc 77 Squad";
 	case ESquadSubtype::Squad_Ger_SniperTeam:
