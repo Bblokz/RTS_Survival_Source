@@ -5,6 +5,7 @@
 
 #include "Components/Image.h"
 #include "Components/RichTextBlock.h"
+#include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/GameUI/CostWidget/W_CostDisplay.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -23,6 +24,13 @@ void UW_ActionUIDescription::SetCostsForAbility(const TMap<ERTSResourceType, int
 	M_CostDisplay->SetupCost(ResourceCosts);
 }
 
+void UW_ActionUIDescription::InitActionUIDescription(UActionUIManager* ActionUIManager)
+{
+	M_ActionUIManager = ActionUIManager;
+	(void)EnsureIsValidActionUIManager();
+}
+
+
 void UW_ActionUIDescription::SetupDescription(const EAbilityID Ability, const int32 CustomType,
                                               const FText& DataTableText_Title, const FText& DataTableText_Description,
                                               UTexture* DataTable_Icon)
@@ -38,6 +46,21 @@ void UW_ActionUIDescription::SetupDescription(const EAbilityID Ability, const in
 		DataTable_Icon);
 }
 
+
+bool UW_ActionUIDescription::EnsureIsValidActionUIManager() const
+{
+	if(not M_ActionUIManager.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ActionUIManager"),
+			TEXT("UW_ActionUIDescription::EnsureIsValidActionUIManager"),
+			this
+		);
+		return false;
+	}
+	return true;
+}
 
 bool UW_ActionUIDescription::EnsureIsValidCostDisplay() const
 {
@@ -84,4 +107,14 @@ void UW_ActionUIDescription::OnOverrideDescriptionForTechnology(const EAbilityID
                                                                 const FText& DataTableText_Description,
                                                                 TObjectPtr<UTexture2D> DataTable_Icon)
 {
+	if(EnsureIsValidActionUIManager())
+	{
+		TWeakInterfacePtr<ICommands> PrimarySelectedUnit = M_ActionUIManager->GetPrimarySelectedICommands();
+		if(not PrimarySelectedUnit.IsValid())
+		{
+			RTSFunctionLibrary::ReportError("No valid primary selected unit in OnOverrideDescriptionForTechnology");
+			return;
+		}
+		// do things with the primary selected unit.
+	}
 }

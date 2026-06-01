@@ -120,7 +120,8 @@ enum class EAnnouncerVoiceLineType : uint8
 	clickedActorCannotTowUnitDuetoHavingEnoughCargoCapacity,
 	clickedActorCannotBeTowed,
 	PrimaryActorCannotTow,
-	VehicleWillTowClickedActor
+	VehicleWillTowClickedActor,
+	ResearchComplete,
 };
 
 USTRUCT(BlueprintType)

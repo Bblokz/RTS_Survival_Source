@@ -126,11 +126,17 @@ void UActionUIManager::InitActionUIManager(
 	if (GetIsValidActionUIDescriptionWidget())
 	{
 		SetActionUIDescriptionWidgetVisibility(false);
+		M_ActionUIDescriptionWidget->InitActionUIDescription(this);
 	}
 	M_PlayerController = PlayerController;
 	M_AmmoDescriptionWidget = AmmoDescriptionWidget;
 
 	InitBehaviourUI(MainGameUI, PlayerController, BehaviourUIWidgets);
+}
+
+TWeakInterfacePtr<ICommands> UActionUIManager::GetPrimarySelectedICommands() const
+{
+	return M_PrimarySelectedICommands;
 }
 
 void UActionUIManager::SetActionUIVisibility(const bool bShowActionUI) const

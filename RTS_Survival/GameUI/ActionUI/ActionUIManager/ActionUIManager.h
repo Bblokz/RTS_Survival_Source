@@ -56,6 +56,8 @@ public:
 		ActionUIContainerWidgets, UW_SelectedUnitDescription* SelectedUnitDescriptionWidget, UW_ActionUIDescription*
 		ActionUIDescriptionWidget, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
 
+	TWeakInterfacePtr<ICommands> GetPrimarySelectedICommands() const;
+
 	void SetActionUIVisibility(const bool bShowActionUI) const;
 	void SetActionButtonHotkeysHidden(const bool bHideActionButtonHotkeys) const;
 	void HideAllHoverInfoWidgets() const;

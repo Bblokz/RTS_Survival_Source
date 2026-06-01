@@ -8,6 +8,7 @@
 
 #include "W_ActionUIDescription.generated.h"
 
+class UActionUIManager;
 enum class EAbilityID : uint8;
 class UImage;
 class URichTextBlock;
@@ -24,6 +25,8 @@ class RTS_SURVIVAL_API UW_ActionUIDescription : public UUserWidget
 public:
 	UFUNCTION(BlueprintCallable)
 	void SetCostsForAbility(const TMap<ERTSResourceType, int32>& ResourceCosts) const;
+
+	void InitActionUIDescription(UActionUIManager* ActionUIManager);
 
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
@@ -47,6 +50,10 @@ protected:
 		const FText& DataTableText_Title,
 		const FText& DataTableText_Description,
 		UTexture* DataTable_Icon);
+
+	UPROPERTY()
+	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
+	bool EnsureIsValidActionUIManager() const;
 
 	bool EnsureIsValidCostDisplay() const;
 
