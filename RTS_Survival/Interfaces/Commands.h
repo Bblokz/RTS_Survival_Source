@@ -18,6 +18,7 @@
 #include "UObject/Interface.h"
 #include "Commands.generated.h"
 
+struct FUnitCost;
 class UActionUIManager;
 class ACPPResourceMaster;
 class AItemsMaster;
@@ -39,6 +40,9 @@ enum class ECommandQueueError : uint8
 	CommandDataInvalid,
 	AbilityOnCooldown,
 	AbilityNotInCastRange,
+	NotEnoughRadixite,
+	NotEnoughMetal,
+	NotEnoughVehicleParts,
 };
 
 /**
@@ -117,6 +121,17 @@ public:
 	}
 };
 
+
+UENUM()
+enum class ECommandQueueClearReason : uint8
+{
+	QueueCompleted,
+	Cancelled,
+	ReplacedByImmediateCommand,
+	QueueDisabled,
+	OwnerDestroyed,
+};
+
 /**
 * @brief: Commands are added using AddAbilityToCommands(EAbilityID) if m_bStopAddingCommands is false
 * then the ability will be added to this array.
@@ -162,6 +177,8 @@ public:
 	TArray<EAbilityID> GetAbilityIds(const bool bExcludeNoAbility = false) const;
 
 	void SetAbilities(const TArray<FUnitAbilityEntry>& Abilities);
+
+	void SetPlayerResourceManger(UPlayerResourceManager* PlayerResourceManager);
 
 	bool SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility);
 	bool SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry& NewAbility);
@@ -219,7 +236,14 @@ public:
 private:
 	// The manager that updates the ability UI for this unit.
 	// If set the unit is primary selected.
+	UPROPERTY()
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
+
+	UPROPERTY()
+	TWeakObjectPtr<UPlayerResourceManager> M_PlayerResourceManager;
+	[[nodiscard]] bool EnsureIsValidPlayerResourceManager() const;
+
+	
 
 	const FQueueCommand* GetCurrentQueuedCommand() const;
 
@@ -268,7 +292,12 @@ private:
 	/**
 	 * Clears the command queue and resets indexes.
 	 */
-	void ClearCommands();
+	void ClearCommands(const ECommandQueueClearReason Reason);
+
+	ECommandQueueError PayForAbilityCosts(const EAbilityID AbilityId,
+	                                      const int32 Subtype) const;
+	void RefundCurrentAndFutureCommands() const;
+	void RefundCommand(const FQueueCommand& CommandToRefund) const;
 
 	/**
 	 * @return If the queue is active and we optionally check for no Patrol commands
@@ -397,7 +426,7 @@ public:
 
 	int32 GetConstructionAbilityCount();
 
-	
+	FUnitCost GetAbilityCosts(const EAbilityID Ability, const int32 Subtype);
 	EAbilityID GetCurrentActiveCommand();
 
 	

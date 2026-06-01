@@ -45,6 +45,9 @@ struct FUnitAbilityEntry
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 CooldownRemaining = 0;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FUnitCost Costs = FUnitCost();
 };
 
 UENUM()

@@ -9,6 +9,7 @@
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
+#include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
@@ -42,7 +43,7 @@ UCommandData::UCommandData(const FObjectInitializer& ObjectInitializer)
 void UCommandData::BeginDestroy()
 {
 	StopAbilityCooldownTimer();
-	ClearCommands();
+	ClearCommands(ECommandQueueClearReason::OwnerDestroyed);
 	UObject::BeginDestroy();
 }
 
@@ -58,6 +59,13 @@ void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 	}
 	M_Abilities = ValidAbilities;
 }
+
+void UCommandData::SetPlayerResourceManger(UPlayerResourceManager* PlayerResourceManager)
+{
+	M_PlayerResourceManager = PlayerResourceManager;
+	(void)EnsureIsValidPlayerResourceManager();
+}
+
 
 TArray<EAbilityID> UCommandData::GetAbilityIds(const bool bExcludeNoAbility) const
 {
@@ -339,7 +347,7 @@ bool UCommandData::GetHasQueuedMovementCommandAfterActive() const
 
 bool UCommandData::GetIsCurrentCommandAMovementCommand() const
 {
-	if(CurrentIndex < 0 || CurrentIndex >= NumCommands)
+	if (CurrentIndex < 0 || CurrentIndex >= NumCommands)
 	{
 		return false;
 	}
@@ -421,6 +429,17 @@ bool UCommandData::StartCooldownOnAbility(const EAbilityID AbilityID, const int3
 			return true;
 		}
 	}
+	return false;
+}
+
+bool UCommandData::EnsureIsValidPlayerResourceManager() const
+{
+	if (M_PlayerResourceManager.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportError(
+		"Player resource manager is not valid in UCommandData. This is required for certain commands to function properly.");
 	return false;
 }
 
@@ -665,6 +684,10 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	{
 		return QueueError;
 	}
+	if (const ECommandQueueError QueueError = PayForAbilityCosts(Ability, CustomType); QueueError != ECommandQueueError::NoError)
+	{
+		return QueueError;
+	}
 	SetRotationFlagForFinalMovementCommand(Ability, Rotation);
 	if (bM_IsSpawning)
 	{
@@ -718,7 +741,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		CurrentIndex++;
 		if (CurrentIndex >= NumCommands)
 		{
-			ClearCommands();
+			ClearCommands(ECommandQueueClearReason::QueueCompleted);
 			if constexpr (DeveloperSettings::Debugging::GCommands_Compile_DebugSymbols)
 			{
 				RTSFunctionLibrary::PrintString("No valid next command index; all done!", FColor::Blue);
@@ -972,8 +995,17 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 }
 
 
-void UCommandData::ClearCommands()
+void UCommandData::ClearCommands(const ECommandQueueClearReason Reason)
 {
+	const bool bRefundCurrentAndFutureCommands = (Reason == ECommandQueueClearReason::Cancelled ||
+		Reason == ECommandQueueClearReason::ReplacedByImmediateCommand || Reason ==
+		ECommandQueueClearReason::OwnerDestroyed);
+
+	if (bRefundCurrentAndFutureCommands)
+	{
+		// Those abilities that are planned that cost resources are refunded to the player resource manager.
+		RefundCurrentAndFutureCommands();
+	}
 	if (NumCommands > 0)
 	{
 		bM_IsCommandQueueEnabled = true;
@@ -995,6 +1027,60 @@ void UCommandData::ClearCommands()
 	}
 	NumCommands = 0;
 	CurrentIndex = -1;
+}
+
+ECommandQueueError UCommandData::PayForAbilityCosts(const EAbilityID AbilityId,
+                                                    const int32 Subtype) const
+{
+	if (not M_Owner || not EnsureIsValidPlayerResourceManager())
+	{
+		return ECommandQueueError::NotEnoughRadixite;
+	}
+	const FUnitCost AbilityCosts = M_Owner->GetAbilityCosts(AbilityId, Subtype);
+	if (AbilityCosts.IsEmpty())
+	{
+		return ECommandQueueError::NoError;
+	}
+	switch (M_PlayerResourceManager->GetCanPayForCost(AbilityCosts.ResourceCosts))
+	{
+	case EPlayerError::Error_NotEnoughRadixite:
+		return ECommandQueueError::NotEnoughRadixite;
+	case EPlayerError::Error_NotEnoughMetal:
+		return ECommandQueueError::NotEnoughMetal;
+	case EPlayerError::Error_NotEnoughVehicleParts:
+		return ECommandQueueError::NotEnoughVehicleParts;
+	default:
+		break;
+	}
+	M_PlayerResourceManager->PayForCosts(AbilityCosts.ResourceCosts);
+	return ECommandQueueError::NoError;
+}
+
+void UCommandData::RefundCurrentAndFutureCommands() const
+{
+	int32 Index = CurrentIndex;
+	while (Index < NumCommands)
+	{
+		if (Index >= 0)
+		{
+			RefundCommand(M_TCommands[Index]);
+		}
+		Index++;
+	}
+}
+
+void UCommandData::RefundCommand(const FQueueCommand& CommandToRefund) const
+{
+	if (not M_Owner || not EnsureIsValidPlayerResourceManager())
+	{
+		return;
+	}
+	const FUnitCost AbilityCosts = M_Owner->GetAbilityCosts(CommandToRefund.CommandType, CommandToRefund.CustomType);
+	if (AbilityCosts.IsEmpty())
+	{
+		return;
+	}
+	M_PlayerResourceManager->RefundCosts(AbilityCosts);
 }
 
 ECommandQueueError UCommandData::IsQueueActiveAndNoPatrol() const
@@ -1157,6 +1243,21 @@ int32 ICommands::GetConstructionAbilityCount()
 		}
 	}
 	return Count;
+}
+
+FUnitCost ICommands::GetAbilityCosts(const EAbilityID Ability, const int32 Subtype)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if(not UnitCommandData)
+	{
+		return FUnitCost();
+	}
+	FUnitAbilityEntry* Entry =  UnitCommandData->GetAbilityEntryOfCustomType(Ability, Subtype);
+	if(not Entry)
+	{
+		return FUnitCost();
+	}
+	return Entry->Costs;
 }
 
 EAbilityID ICommands::GetCurrentActiveCommand()
@@ -1362,6 +1463,7 @@ ECommandQueueError ICommands::MoveToLocation(
 	}
 	if (bSetUnitToIdle)
 	{
+		// Takes into account the previous ability (may be movement related, in which case velocity will not be reset)
 		PrepareForImmediateMovementCommand(UnitCommandData);
 	}
 	// By default this is false which means that the vehicle reversing to the location will completely disregard the
@@ -2700,7 +2802,7 @@ void ICommands::SetUnitToIdle()
 	{
 		TerminateActiveCommand(UnitCommandData);
 		// Clear command queue.
-		UnitCommandData->ClearCommands();
+		UnitCommandData->ClearCommands(ECommandQueueClearReason::Cancelled);
 		// Custom reset logic that is unit-specific.
 		SetUnitToIdleSpecificLogic();
 	}
@@ -2731,7 +2833,7 @@ void ICommands::PrepareForImmediateMovementCommand(UCommandData* UnitCommandData
 	}
 
 	TerminateActiveMovementCommandForMovementReplacement(UnitCommandData);
-	UnitCommandData->ClearCommands();
+	UnitCommandData->ClearCommands(ECommandQueueClearReason::ReplacedByImmediateCommand);
 	SetUnitToIdleSpecificLogic();
 }
 

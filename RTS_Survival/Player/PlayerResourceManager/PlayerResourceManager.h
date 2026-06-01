@@ -117,6 +117,7 @@ public:
 	 * @return Whether all cost resources could be added back to the player's supply.
 	 */
 	bool RefundCosts(const TMap<ERTSResourceType, int32>& Costs);
+	bool RefundCosts(const FUnitCost& UnitCost);
 
 	/**
 	 * @brief no resource checking -> instant reduce of resources. 

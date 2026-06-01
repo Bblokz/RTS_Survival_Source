@@ -1,4 +1,3 @@
-// W_MiniMap.h
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
@@ -89,7 +88,6 @@ private:
 
 	mutable bool bM_HasReportedMissingFowManager = false;
 
-	UPROPERTY()
 	FSlateRoundedBoxBrush M_MinimapIconBrush = FSlateRoundedBoxBrush(FLinearColor::White);
 
 	UPROPERTY()

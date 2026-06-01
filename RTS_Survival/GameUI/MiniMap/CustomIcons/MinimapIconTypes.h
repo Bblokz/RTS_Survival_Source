@@ -13,9 +13,8 @@ enum class EMinimapIconType : uint8
 	None UMETA(DisplayName = "None"),
 	Objective UMETA(DisplayName = "Objective"),
 	AttackTarget UMETA(DisplayName = "Attack Target"),
-	DefendTarget UMETA(DisplayName = "Defend Target"),
-	MoveTarget UMETA(DisplayName = "Move Target"),
-	ResourceTarget UMETA(DisplayName = "Resource Target"),
+	AttackArrow UMETA(DisplayName = "Attack Arrow"),
+	EnemyBoss UMETA(DisplayName = "Enemy Boss"),
 	Warning UMETA(DisplayName = "Warning"),
 };
 

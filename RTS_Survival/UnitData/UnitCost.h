@@ -44,6 +44,11 @@ struct FUnitCost
 	{
 	}
 
+	bool IsEmpty() const
+	{
+		return ResourceCosts.Num() == 0;
+	}
+
 	FUnitCost(std::initializer_list<FResourceCostPair> ResourceCostList, float InTimeCost = 0.0f)
 	{
 		for (const FResourceCostPair& Pair : ResourceCostList)

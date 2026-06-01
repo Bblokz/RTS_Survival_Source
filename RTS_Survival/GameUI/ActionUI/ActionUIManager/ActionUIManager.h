@@ -113,7 +113,6 @@ private:
 	TObjectPtr<UMainGameUI> M_MainGameUI;
 	bool GetIsValidMainGameUI() const;
 
-
 	// Container with all weapon UI items.
 	UPROPERTY()
 	TArray<TObjectPtr<UW_WeaponItem>> M_TWeaponItems;

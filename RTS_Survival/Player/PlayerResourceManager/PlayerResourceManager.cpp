@@ -418,6 +418,11 @@ bool UPlayerResourceManager::RefundCosts(const TMap<ERTSResourceType, int32>& Co
 	return !bFailedToAddAll;
 }
 
+bool UPlayerResourceManager::RefundCosts(const FUnitCost& UnitCost)
+{
+	return RefundCosts(UnitCost.ResourceCosts);
+}
+
 void UPlayerResourceManager::PayForCostsNoCheck(const TMap<ERTSResourceType, int32>& Costs)
 {
 	for (const auto EachCost : Costs)
