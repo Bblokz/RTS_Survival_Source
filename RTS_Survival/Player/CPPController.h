@@ -1367,6 +1367,7 @@ private:
 	void DirectActionButtonReinforce();
 
 	void DirectActionButtonFieldConstruction(const EFieldConstructionType ConstructionType);
+	void DirectActionButtonResearchTechnology(ETechnology Technology);
 
 	// Some units have an UAttachedRockets component that can be used to fire rockets.
 	void DirectionActionButtonFireRockets();

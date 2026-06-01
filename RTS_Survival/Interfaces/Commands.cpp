@@ -11,6 +11,7 @@
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
+#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
@@ -20,6 +21,7 @@
 #include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ResearchTechnologyAbilityComponent/ResearchTechnologyAbilityComp.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -90,6 +92,24 @@ bool UCommandData::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEn
 	return false;
 }
 
+bool UCommandData::SwapAbility(const EAbilityID OldAbility, const int32 OldCustomType,
+                               const FUnitAbilityEntry& NewAbility)
+{
+	const int32 Index = M_Abilities.IndexOfByPredicate(
+		[OldAbility, OldCustomType](const FUnitAbilityEntry& AbilityEntry)
+		{
+			return AbilityEntry.AbilityId == OldAbility && AbilityEntry.CustomType == OldCustomType;
+		});
+
+	if (Index == INDEX_NONE)
+	{
+		return false;
+	}
+
+	M_Abilities[Index] = NewAbility;
+	return true;
+}
+
 bool UCommandData::AddAbility(const EAbilityID NewAbility, const int32 AtIndex, const FUnitCost& Costs)
 {
 	return AddAbility(FAbilityHelpers::CreateAbilityEntryFromId(NewAbility, Costs), AtIndex);
@@ -101,21 +121,21 @@ bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 A
 	{
 		return false;
 	}
-	if (GetAbilityIndexById(NewAbility.AbilityId) != INDEX_NONE)
-	{
-		if (FUnitAbilityEntry* Entry = GetAbilityEntry(NewAbility.AbilityId); Entry && Entry->CustomType == NewAbility.
-			CustomType)
+	const FUnitAbilityEntry* DuplicateAbilityEntry = M_Abilities.FindByPredicate(
+		[NewAbility](const FUnitAbilityEntry& AbilityEntry)
 		{
-			const FString CustomTypeAsBehaviourAbilityString =
-				UEnum::GetValueAsString(static_cast<EBehaviourAbilityType>(NewAbility.CustomType));
-			RTSFunctionLibrary::ReportError(
-				TEXT("Attempted to add an ability that already exists: ") + Global_GetAbilityIDAsString(
-					NewAbility.AbilityId) +
-				TEXT(" in UCommandData::AddAbility") +
-				"Custom type: " + FString::FromInt(NewAbility.CustomType)
-				+ "\n As behaviour custom type: " + CustomTypeAsBehaviourAbilityString);
-			return false;
-		}
+			return AbilityEntry.AbilityId == NewAbility.AbilityId
+					&& AbilityEntry.CustomType == NewAbility.CustomType;
+		});
+
+	if (DuplicateAbilityEntry != nullptr)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Attempted to add an ability that already exists: ")
+			+ Global_GetAbilityIDAsString(NewAbility.AbilityId)
+			+ TEXT(" in UCommandData::AddAbility")
+			+ TEXT(" Custom type: ") + FString::FromInt(NewAbility.CustomType));
+		return false;
 	}
 
 	if (AtIndex == INDEX_NONE || AtIndex < 0)
@@ -175,6 +195,33 @@ bool UCommandData::RemoveAbility(const EAbilityID AbilityToRemove)
 	RTSFunctionLibrary::ReportError(
 		TEXT("Attempted to remove an ability that does not exist: ") + Global_GetAbilityIDAsString(AbilityToRemove) +
 		TEXT(" in UCommandData::RemoveAbility"));
+	return false;
+}
+
+bool UCommandData::RemoveAbility(const EAbilityID AbilityToRemove, const int32 CustomType)
+{
+	if (AbilityToRemove == EAbilityID::IdNoAbility)
+	{
+		return false;
+	}
+
+	const int32 Index = M_Abilities.IndexOfByPredicate(
+		[AbilityToRemove, CustomType](const FUnitAbilityEntry& AbilityEntry)
+		{
+			return AbilityEntry.AbilityId == AbilityToRemove && AbilityEntry.CustomType == CustomType;
+		});
+
+	if (Index != INDEX_NONE)
+	{
+		M_Abilities[Index] = FUnitAbilityEntry();
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		TEXT("Attempted to remove an ability subtype that does not exist: ")
+		+ Global_GetAbilityIDAsString(AbilityToRemove)
+		+ TEXT(" with custom type: ") + FString::FromInt(CustomType)
+		+ TEXT(" in UCommandData::RemoveAbility"));
 	return false;
 }
 
@@ -532,7 +579,8 @@ bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID Abil
 		|| (AbilityId == EAbilityID::IdCancelAimAbility)
 		|| (AbilityId == EAbilityID::IdAttachedWeapon)
 		|| (AbilityId == EAbilityID::IdSwapTurret)
-		|| (AbilityId == EAbilityID::IdTowActor);
+		|| (AbilityId == EAbilityID::IdTowActor)
+		|| (AbilityId == EAbilityID::IdResearchTechnology);
 }
 
 FUnitAbilityEntry* UCommandData::GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand)
@@ -585,6 +633,11 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 	if (QueuedCommand.CommandType == EAbilityID::IdTowActor)
 	{
 		return " with tow subtype: " + UEnum::GetValueAsString(QueuedCommand.GetTowActorAbilitySubtype());
+	}
+
+	if (QueuedCommand.CommandType == EAbilityID::IdResearchTechnology)
+	{
+		return " with technology: " + UEnum::GetValueAsString(QueuedCommand.GetResearchTechnologySubtype());
 	}
 
 	return FString{};
@@ -988,6 +1041,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
 		{
 			M_Owner->ExecuteRegisterUnitAsBlackboardIdleCommand();
+		}
+		break;
+	case EAbilityID::IdResearchTechnology:
+		{
+			M_Owner->ExecuteResearchTechnologyCommand(Cmd.GetResearchTechnologySubtype());
 		}
 		break;
 	default:
@@ -1410,6 +1468,19 @@ bool ICommands::RemoveAbility(const EAbilityID AbilityToRemove)
 	return bAbilityRemoved;
 }
 
+bool ICommands::RemoveAbility(const EAbilityID AbilityToRemove, const int32 CustomType)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+
+	const bool bAbilityRemoved = UnitCommandData->RemoveAbility(AbilityToRemove, CustomType);
+	UnitCommandData->UpdateActionUI();
+	return bAbilityRemoved;
+}
+
 bool ICommands::SwapAbility(const EAbilityID OldAbility, const EAbilityID NewAbility)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -1430,6 +1501,20 @@ bool ICommands::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEntry
 		return false;
 	}
 	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, NewAbility);
+	UnitCommandData->UpdateActionUI();
+	return bIsAbilitySwapped;
+}
+
+bool ICommands::SwapAbility(const EAbilityID OldAbility, const int32 OldCustomType,
+                            const FUnitAbilityEntry& NewAbility)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return false;
+	}
+
+	const bool bIsAbilitySwapped = UnitCommandData->SwapAbility(OldAbility, OldCustomType, NewAbility);
 	UnitCommandData->UpdateActionUI();
 	return bIsAbilitySwapped;
 }
@@ -1651,6 +1736,59 @@ ECommandQueueError ICommands::ActivateBehaviourAbility(const EBehaviourAbilityTy
 	}
 	UnitCommandData->ExecuteBehaviourAbility(BehaviourAbility, true);
 	return ECommandQueueError::NoError;
+}
+
+ECommandQueueError ICommands::ResearchTechnology(const ETechnology Technology,
+                                                  const TArray<ETechnology>& RequiredTechnologies,
+                                                  const bool bSetUnitToIdle)
+{
+	if (Technology == ETechnology::Tech_NONE)
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	FUnitAbilityEntry ResearchTechnologyAbilityEntry;
+	if (not FAbilityHelpers::GetHasResearchTechnologyAbility(
+		UnitCommandData->GetAbilities(),
+		Technology,
+		ResearchTechnologyAbilityEntry))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (not GetAreTechnologyRequirementsMet(RequiredTechnologies))
+	{
+		return ECommandQueueError::MissingTechRequirement;
+	}
+
+	UPlayerTechManager* PlayerTechManager = GetPlayerTechManagerForOwner();
+	if (not IsValid(PlayerTechManager))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	if (PlayerTechManager->HasTechResearched(Technology))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdResearchTechnology,
+		FVector::ZeroVector,
+		/*TargetActor=*/nullptr,
+		/*Rotation=*/FRotator::ZeroRotator,
+		static_cast<int32>(Technology));
 }
 
 ECommandQueueError ICommands::FieldConstruction(const EFieldConstructionType FieldConstruction,
@@ -2795,6 +2933,36 @@ void ICommands::TerminateFieldConstructionCommand(EFieldConstructionType FieldCo
 {
 }
 
+void ICommands::ExecuteResearchTechnologyCommand(const ETechnology Technology)
+{
+	UPlayerTechManager* PlayerTechManager = GetPlayerTechManagerForOwner();
+	if (not IsValid(PlayerTechManager))
+	{
+		DoneExecutingCommand(EAbilityID::IdResearchTechnology);
+		return;
+	}
+
+	PlayerTechManager->OnTechResearched(Technology);
+
+	if (ACPPController* PlayerController = FRTS_Statics::GetRTSController(GetOwnerActor()))
+	{
+		PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ResearchComplete, true, false);
+	}
+
+	if (UResearchTechnologyAbilityComp* ResearchTechnologyComp =
+		FAbilityHelpers::GetResearchTechnologyAbilityCompOfType(Technology, GetOwnerActor()))
+	{
+		ResearchTechnologyComp->TechResearchComplete(Technology);
+	}
+
+	DoneExecutingCommand(EAbilityID::IdResearchTechnology);
+}
+
+void ICommands::TerminateResearchTechnologyCommand(const ETechnology Technology)
+{
+	static_cast<void>(Technology);
+}
+
 void ICommands::NoQueue_ExecuteSetResourceConversionEnabled(const bool bEnabled)
 {
 }
@@ -3277,6 +3445,23 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
 		TerminateRegisterUnitAsBlackboardIdleCommand();
 		break;
+	case EAbilityID::IdResearchTechnology:
+		{
+			UCommandData* CommandData = GetIsValidCommandData();
+			if (not CommandData)
+			{
+				return;
+			}
+
+			const FQueueCommand* CurrentCommand = CommandData->GetCurrentQueuedCommand();
+			if (CurrentCommand == nullptr)
+			{
+				return;
+			}
+
+			TerminateResearchTechnologyCommand(CurrentCommand->GetResearchTechnologySubtype());
+		}
+		break;
 	case EAbilityID::IdApplyBehaviour:
 		// No terminate; behaviour auto expires.
 		break;
@@ -3306,6 +3491,28 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 			"\n for command: " + Global_GetAbilityIDAsString(AbilityToKill));
 		break;
 	}
+}
+
+bool ICommands::GetAreTechnologyRequirementsMet(const TArray<ETechnology>& RequiredTechnologies) const
+{
+	UPlayerTechManager* PlayerTechManager = GetPlayerTechManagerForOwner();
+	if (not IsValid(PlayerTechManager))
+	{
+		return false;
+	}
+
+	return PlayerTechManager->HasAllRequiredTechnologies(RequiredTechnologies);
+}
+
+UPlayerTechManager* ICommands::GetPlayerTechManagerForOwner() const
+{
+	AActor* OwnerActor = const_cast<ICommands*>(this)->GetOwnerActor();
+	if (not IsValid(OwnerActor))
+	{
+		return nullptr;
+	}
+
+	return FRTS_Statics::GetPlayerTechManager(OwnerActor);
 }
 
 ECommandQueueError ICommands::GetIsAbilityOnCommandCardAndNotOnCooldown(const EAbilityID AbilityToCheck)

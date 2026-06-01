@@ -8,6 +8,28 @@
 #include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
+TArray<ETechnology> UPlayerTechManager::GetMissingRequiredTechnologies(
+	const TArray<ETechnology>& RequiredTechnologies) const
+{
+	TArray<ETechnology> MissingRequiredTechnologies;
+	for (const ETechnology RequiredTechnology : RequiredTechnologies)
+	{
+		if (HasTechResearched(RequiredTechnology))
+		{
+			continue;
+		}
+
+		MissingRequiredTechnologies.Add(RequiredTechnology);
+	}
+
+	return MissingRequiredTechnologies;
+}
+
+bool UPlayerTechManager::HasAllRequiredTechnologies(const TArray<ETechnology>& RequiredTechnologies) const
+{
+	return GetMissingRequiredTechnologies(RequiredTechnologies).IsEmpty();
+}
+
 void UPlayerTechManager::OnTechResearched(ETechnology Tech)
 {
 	M_ResearchedTechs.Add(Tech);

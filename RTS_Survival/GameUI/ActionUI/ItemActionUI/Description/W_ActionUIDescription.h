@@ -62,10 +62,18 @@ private:
 		const FText& DataTableText_Title,
 		const FText& DataTableText_Description,
 		UTexture* DataTable_Icon) const;
+	/**
+	 * @brief Keeps technology hover text useful by replacing the description only while requirements are unmet.
+	 * @param Ability Ability id from the hovered action button.
+	 * @param CustomType Technology subtype encoded on the hovered ability entry.
+	 * @param DataTableText_Title Normal title from the action UI data table.
+	 * @param DataTableText_Description Normal description from the action UI data table.
+	 * @param DataTable_Icon Normal icon from the action UI data table.
+	 */
 	void OnOverrideDescriptionForTechnology(
 		const EAbilityID Ability,
 		const int32 CustomType,
-	                      const FText& DataTableText_Title,
-	                      const FText& DataTableText_Description,
-	                      TObjectPtr<UTexture2D> DataTable_Icon);
+		const FText& DataTableText_Title,
+		const FText& DataTableText_Description,
+		TObjectPtr<UTexture2D> DataTable_Icon);
 };
