@@ -828,17 +828,13 @@ void ATrackedTankMaster::HandleVoiceLineOnLevelUp() const
 	{
 		return;
 	}
-	const bool bIsPrimarySelected = GetIsValidPlayerControler()
-		                                ? PlayerController->GetPrimarySelectedUnit() == this
-		                                : false;
-	if (bIsPrimarySelected)
+	if (GetIsSelected())
 	{
-		GetSpatialVoiceLinePlayer()->PlayVoiceLineOverRadio(ERTSVoiceLine::UnitPromoted, true, true);
+		GetSpatialVoiceLinePlayer()->PlayVoiceLineOverRadio(ERTSVoiceLine::UnitPromoted, true, false);
+		return;
 	}
-	else
-	{
-		GetSpatialVoiceLinePlayer()->PlaySpatialVoiceLine(ERTSVoiceLine::UnitPromoted, GetActorLocation(), true);
-	}
+
+	GetSpatialVoiceLinePlayer()->PlaySpatialVoiceLine(ERTSVoiceLine::UnitPromoted, GetActorLocation(), true);
 }
 
 void ATrackedTankMaster::BeginPlay_SetupExperienceComponent()

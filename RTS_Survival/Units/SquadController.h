@@ -846,6 +846,7 @@ protected:
 	UPROPERTY()
 	USpatialVoiceLinePlayer* M_SpatialVoiceLinePlayer;
 	bool GetIsValidSpatialVoiceLinePlayer() const;
+	bool GetHasSelectedSquadUnit() const;
 	
 	UPROPERTY()
 	UFowComp* M_FowComponent;

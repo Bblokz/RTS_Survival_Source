@@ -1228,17 +1228,13 @@ void ASquadController::OnUnitLevelUp(const int32 Level, const EVeterancyIconSet 
 	{
 		return;
 	}
-	const bool bIsPrimarySelected = GetIsValidPlayerController()
-		                                ? PlayerController->GetPrimarySelectedUnit() == this
-		                                : false;
-	if (bIsPrimarySelected)
+	if (GetHasSelectedSquadUnit())
 	{
-		M_SpatialVoiceLinePlayer->PlayVoiceLineOverRadio(ERTSVoiceLine::UnitPromoted, true, true);
+		M_SpatialVoiceLinePlayer->PlayVoiceLineOverRadio(ERTSVoiceLine::UnitPromoted, true, false);
+		return;
 	}
-	else
-	{
-		M_SpatialVoiceLinePlayer->PlaySpatialVoiceLine(ERTSVoiceLine::UnitPromoted, GetActorLocation(), true);
-	}
+
+	M_SpatialVoiceLinePlayer->PlaySpatialVoiceLine(ERTSVoiceLine::UnitPromoted, GetActorLocation(), true);
 }
 
 void ASquadController::OnSquadSubtypeSet(
@@ -2131,6 +2127,24 @@ bool ASquadController::GetIsValidSpatialVoiceLinePlayer() const
 		return false;
 	}
 	return true;
+}
+
+bool ASquadController::GetHasSelectedSquadUnit() const
+{
+	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		if (SquadUnit->GetIsSelected())
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool ASquadController::GetIsValidFowComponent() const
