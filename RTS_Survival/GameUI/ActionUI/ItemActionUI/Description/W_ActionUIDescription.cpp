@@ -8,7 +8,7 @@
 
 void UW_ActionUIDescription::SetCostsForAbility(const TMap<ERTSResourceType, int32>& ResourceCosts) const
 {
-	if(not EnsureIsValidCostDisplay())
+	if (not EnsureIsValidCostDisplay())
 	{
 		return;
 	}
@@ -17,10 +17,16 @@ void UW_ActionUIDescription::SetCostsForAbility(const TMap<ERTSResourceType, int
 
 bool UW_ActionUIDescription::EnsureIsValidCostDisplay() const
 {
-	if(not IsValid(M_CostDisplay))
+	if (IsValid(M_CostDisplay))
 	{
-		RTSFunctionLibrary::ReportError("UW_ActionUIDescription has an invalid cost display reference. Please check the widget blueprint.");
-		return false;
+		return true;
 	}
-	return true;
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_CostDisplay"),
+		TEXT("UW_ActionUIDescription::EnsureIsValidCostDisplay"),
+		this
+	);
+	return false;
 }

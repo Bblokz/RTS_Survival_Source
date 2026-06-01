@@ -11,6 +11,7 @@ class UW_SelectedUnitInfo;
 class UW_ItemActionUI;
 class UW_WeaponDescription;
 class UW_WeaponItem;
+class UW_ActionUIDescription;
 
 USTRUCT(Blueprintable)
 struct FInit_WeaponUI
@@ -53,7 +54,7 @@ struct FInit_ActionUI
 	UW_SelectedUnitDescription* SelectedUnitDescription = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	UUserWidget* ActionUIDescription = nullptr;
+	UW_ActionUIDescription* ActionUIDescription = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TArray<UW_ItemActionUI*> ActionUIElementsInMenu = {};

@@ -13,6 +13,7 @@
 
 #include "ActionUIManager.generated.h"
 
+class UW_ActionUIDescription;
 class UW_OnHoverAmmoDescription;
 class UW_SelectedUnitDescription;
 enum class EWeaponShellType : uint8;
@@ -36,6 +37,9 @@ class UMainGameUI;
 class UW_WeaponItem;
 class UBehaviourComp;
 
+/**
+ * @brief Coordinates selected-unit action widgets and hover details for the main game UI.
+ */
 UCLASS()
 class RTS_SURVIVAL_API UActionUIManager : public UObject
 {
@@ -49,7 +53,7 @@ public:
 		ACPPController* PlayerController,
 		UW_SelectedUnitInfo* SelectedUnitInfo,
 		const TObjectPtr<UW_AmmoPicker>& AmmoPicker, UW_WeaponDescription* WeaponDescription, FActionUIContainer
-		ActionUIContainerWidgets, UW_SelectedUnitDescription* SelectedUnitDescriptionWidget, UUserWidget*
+		ActionUIContainerWidgets, UW_SelectedUnitDescription* SelectedUnitDescriptionWidget, UW_ActionUIDescription*
 		ActionUIDescriptionWidget, FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget);
 
 	void SetActionUIVisibility(const bool bShowActionUI) const;
@@ -57,7 +61,10 @@ public:
 	void HideAllHoverInfoWidgets() const;
 	void HideAmmoPicker() const;
 
-	void OnHoverActionUIItem(const bool bIsHover) const;
+	void OnHoverActionUIItem(
+		const bool bIsHover,
+		const EAbilityID HoveredAbility,
+		const int32 HoveredAbilitySubtype) const;
 	void OnHoverSelectedUnitInfo(const bool bIsHover)const;
 	void OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange, const float TurretYawLimit);
 	void OnClickedWeaponItemToAmmoPick();
@@ -128,9 +135,10 @@ private:
 	void SetSelectedUnitDescriptionVisibility(const bool bVisible) const;
 
 	UPROPERTY()
-	TObjectPtr<UUserWidget> M_ActionUIDescriptionWidget;
+	TObjectPtr<UW_ActionUIDescription> M_ActionUIDescriptionWidget;
 	bool GetIsValidActionUIDescriptionWidget() const;
 	void SetActionUIDescriptionWidgetVisibility(const bool bVisible) const;
+	void SetActionUIDescriptionCostsForAbility(const EAbilityID Ability, const int32 AbilitySubtype) const;
 
 	UPROPERTY()
 	UW_OnHoverAmmoDescription * M_AmmoDescriptionWidget;

@@ -296,7 +296,7 @@ private:
 
 	ECommandQueueError PayForAbilityCosts(const EAbilityID AbilityId,
 	                                      const int32 Subtype) const;
-	void RefundCurrentAndFutureCommands() const;
+	void RefundCommandsThatHaveNotStarted() const;
 	void RefundCommand(const FQueueCommand& CommandToRefund) const;
 
 	/**

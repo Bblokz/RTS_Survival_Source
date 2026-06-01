@@ -11,6 +11,7 @@
 #include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/W_SelectedUnitInfo.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/AmmoButton/W_AmmoButton.h"
 #include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/UnitDescriptionItem/W_SelectedUnitDescription.h"
+#include "RTS_Survival/GameUI/ActionUI/ItemActionUI/Description/W_ActionUIDescription.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/OnHoverAmmoDescription/W_OnHoverAmmoDescription.h"
 
 #include "RTS_Survival/Player/CPPController.h"
@@ -40,7 +41,7 @@ void UActionUIManager::InitActionUIManager(
 	FActionUIContainer
 	ActionUIContainerWidgets,
 	UW_SelectedUnitDescription* SelectedUnitDescriptionWidget,
-	UUserWidget* ActionUIDescriptionWidget,
+	UW_ActionUIDescription* ActionUIDescriptionWidget,
 	FInit_BehaviourUI BehaviourUIWidgets, UW_OnHoverAmmoDescription* AmmoDescriptionWidget)
 {
 	if (TWeaponUIItemsInMenu.Num() == 0)
@@ -168,13 +169,24 @@ void UActionUIManager::HideAmmoPicker() const
 	M_AmmoPicker->SetAmmoPickerVisibility(false);
 }
 
-void UActionUIManager::OnHoverActionUIItem(const bool bIsHover) const
+void UActionUIManager::OnHoverActionUIItem(
+	const bool bIsHover,
+	const EAbilityID HoveredAbility,
+	const int32 HoveredAbilitySubtype) const
 {
 	if (not GetIsValidMainGameUI())
 	{
 		return;
 	}
+
 	M_MainGameUI->OnHoverActionUIItem(bIsHover);
+	SetActionUIDescriptionWidgetVisibility(bIsHover);
+	if (not bIsHover)
+	{
+		return;
+	}
+
+	SetActionUIDescriptionCostsForAbility(HoveredAbility, HoveredAbilitySubtype);
 }
 
 void UActionUIManager::OnHoverSelectedUnitInfo(const bool bIsHover) const
@@ -236,8 +248,8 @@ bool UActionUIManager::GetIsValidActionUIDescriptionWidget() const
 {
 	if (not IsValid(M_ActionUIDescriptionWidget))
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-			this, "M_ActionUIDescriptionWidget", "GetIsValidActionUIDescriptionWidget");
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this, TEXT("M_ActionUIDescriptionWidget"), TEXT("GetIsValidActionUIDescriptionWidget"), this);
 		return false;
 	}
 	return true;
@@ -251,6 +263,25 @@ void UActionUIManager::SetActionUIDescriptionWidgetVisibility(const bool bVisibl
 	}
 	const ESlateVisibility NewVisibility = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden;
 	M_ActionUIDescriptionWidget->SetVisibility(NewVisibility);
+}
+
+void UActionUIManager::SetActionUIDescriptionCostsForAbility(
+	const EAbilityID Ability,
+	const int32 AbilitySubtype) const
+{
+	if (not GetIsValidActionUIDescriptionWidget())
+	{
+		return;
+	}
+
+	if (not M_PrimarySelectedICommands.IsValid())
+	{
+		M_ActionUIDescriptionWidget->SetCostsForAbility({});
+		return;
+	}
+
+	const FUnitCost AbilityCosts = M_PrimarySelectedICommands->GetAbilityCosts(Ability, AbilitySubtype);
+	M_ActionUIDescriptionWidget->SetCostsForAbility(AbilityCosts.ResourceCosts);
 }
 
 bool UActionUIManager::GetIsValidAmmoDescriptionWidget() const
