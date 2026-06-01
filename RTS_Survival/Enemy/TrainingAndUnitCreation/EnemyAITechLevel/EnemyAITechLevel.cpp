@@ -45,8 +45,10 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 	};
 	Tier2Options.TrainableSquadSubtypes = {
 	ESquadSubtype::Squad_Rus_LargePTRS,
+	ESquadSubtype::Squad_Rus_LargeMixBasic,
 	ESquadSubtype::Squad_Rus_RedHammer,
 	ESquadSubtype::Squad_Rus_RedHamerPTRS,
+	ESquadSubtype::Squad_Rus_LargeMixT2,
 	ESquadSubtype::Squad_Rus_ToxicGuard};
 	Tier2Options.TrainableTankSubtypes = {
 		ETankSubtype::Tank_T34_85,

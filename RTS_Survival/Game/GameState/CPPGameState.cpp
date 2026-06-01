@@ -7869,6 +7869,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Okhotnik, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_LargePTRS, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_LargeMixBasic, SquadData);
 
 
 	// --------------------------------------------------
@@ -7890,6 +7891,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_RedHammer, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_RedHamerPTRS, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_LargeMixT2, SquadData);
 
 	// uses same armor as T1 hazmat but has more health.
 	SquadData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::HazmatInfantryHealth + 50;
