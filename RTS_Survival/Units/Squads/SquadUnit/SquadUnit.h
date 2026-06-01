@@ -273,7 +273,7 @@ public:
 
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
 
-	void OnWeaponKilledTarget() const;
+	void OnWeaponKilledTarget(AActor* KilledActor) const;
 	void OnWeaponFire();
 	void OnProjectileHit(const bool bBounced);
 

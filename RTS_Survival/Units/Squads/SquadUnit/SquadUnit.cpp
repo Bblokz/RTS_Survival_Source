@@ -436,12 +436,11 @@ void ASquadUnit::Force_TerminateMovement()
 
 TObjectPtr<ASquadController> ASquadUnit::GetSquadControllerChecked() const
 {
-	if (!IsValid(M_SquadController))
+	if (not GetIsValidSquadController())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController",
-		                                                      "ASquadUnit::GetSquadControllerChecked");
 		return nullptr;
 	}
+
 	return M_SquadController;
 }
 
@@ -570,22 +569,27 @@ void ASquadUnit::GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const
 	}
 }
 
-void ASquadUnit::OnWeaponKilledTarget() const
+void ASquadUnit::OnWeaponKilledTarget(AActor* KilledActor) const
 {
+	if (GetIsValidSquadController())
+	{
+		M_SquadController->OnSquadUnitKilledActor(KilledActor);
+	}
+
 	if (not GetIsValidSpatialVoiceLinePlayer())
 	{
 		return;
 	}
+
 	if (GetIsSelected())
 	{
 		// If selected; Queue the voice line to play over radio.
 		SpatialVoiceLinePlayer->PlayVoiceLineOverRadio(ERTSVoiceLine::EnemyDestroyed, false, true);
+		return;
 	}
-	else
-	{
-		// If not selected; play the voice line spatial. Stop any other spatial audio.
-		SpatialVoiceLinePlayer->PlaySpatialVoiceLine(ERTSVoiceLine::EnemyDestroyed, GetActorLocation(), false);
-	}
+
+	// If not selected; play the voice line spatial. Stop any other spatial audio.
+	SpatialVoiceLinePlayer->PlaySpatialVoiceLine(ERTSVoiceLine::EnemyDestroyed, GetActorLocation(), false);
 }
 
 void ASquadUnit::OnWeaponFire()
@@ -1073,13 +1077,14 @@ void ASquadUnit::SetOwningPlayerAndStartFow(const int32 NewOwningPlayer, const f
 
 bool ASquadUnit::GetIsValidSquadController() const
 {
-	if (!IsValid(M_SquadController))
+	if (IsValid(M_SquadController))
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController",
-		                                                      "ASquadUnit::GetIsValidSquadController");
-		return false;
+		return true;
 	}
-	return true;
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController",
+	                                                      "ASquadUnit::GetIsValidSquadController");
+	return false;
 }
 
 bool ASquadUnit::GetIsValidAISquadUnit()

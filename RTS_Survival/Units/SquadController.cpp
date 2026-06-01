@@ -498,6 +498,11 @@ void ASquadController::PlaySquadUnitLostVoiceLine()
 	PlayerController->PlayVoiceLine(this, ERTSVoiceLine::SquadUnitLost, true, false);
 }
 
+void ASquadController::OnSquadUnitKilledActor(AActor* KilledActor) const
+{
+	IExpOnKilledActor(KilledActor);
+}
+
 void ASquadController::SetSquadSelected(const bool bIsSelected)
 {
 	EnsureSquadUnitsValid();

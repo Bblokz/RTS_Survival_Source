@@ -311,6 +311,7 @@ public:
 	FOnSquadFullyLoaded OnSquadFullyLoaded;
 
 	void PlaySquadUnitLostVoiceLine();
+	void OnSquadUnitKilledActor(AActor* KilledActor) const;
 
 	// Updates the decal and selection logic for the squad units their selection components.
 	void SetSquadSelected(const bool bIsSelected);
