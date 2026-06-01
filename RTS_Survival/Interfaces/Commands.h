@@ -187,9 +187,10 @@ public:
 	 *
 	 * @param NewAbility Ability to add.
 	 * @param AtIndex Optional: provide a specific index to add the ability to.
+	 * @param Costs Optional: costs stored on the ability entry for UI and queue payment.
 	 * @return Whether we could add the ability to an empty slot in the array.
 	 */
-	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex);
+	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex, const FUnitCost& Costs = FUnitCost());
 	bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);
@@ -473,9 +474,10 @@ public:
 	 * 
 	 * @param NewAbility Ability to add. 
 	 * @param AtIndex Optional: provide a specific index to add the ability to.
+	 * @param Costs Optional: costs stored on the ability entry for UI and queue payment.
 	 * @return Whether we could add the ability to an empty slot in the array. 
 	 */
-	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE);
+	bool AddAbility(const EAbilityID NewAbility, const int32 AtIndex = INDEX_NONE, const FUnitCost& Costs = FUnitCost());
 	bool AddAbility(const FUnitAbilityEntry& NewAbility, const int32 AtIndex = INDEX_NONE);
 	/** @return Whether the ability could be successfully removed */
 	bool RemoveAbility(const EAbilityID AbilityToRemove);

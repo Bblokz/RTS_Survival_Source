@@ -6,6 +6,7 @@
 #include "NiagaraSystem.h"
 #include "Components/ActorComponent.h"
 #include "TimerManager.h"
+#include "RTS_Survival/UnitData/UnitCost.h"
 #include "FieldConstructionData/FieldConstructionData.h"
 #include "FieldConstructionTypes/FieldConstructionTypes.h"
 #include "FieldConstructionAbilityComponent.generated.h"
@@ -35,6 +36,10 @@ struct FFieldConstructionAbilitySettings
 	// How long the ability is on cooldown after use. (does not affect behaviour duration)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Cooldown = 0;
+
+	// Resources paid when the field construction command is queued.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FUnitCost Costs = FUnitCost();
 
 	// How long the field construction takes.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
