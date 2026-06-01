@@ -478,7 +478,7 @@ void AInfantryWeaponMaster::CheckTargetKilled(AActor* KilledActor)
 		// Also called when target out of sight to move closer.
 		M_OwningSquadUnit->OnSpecificTargetDestroyedOrInvisible();
 		// Called when a weapon kills the target only.
-		M_OwningSquadUnit->OnWeaponKilledTarget();
+		M_OwningSquadUnit->OnWeaponKilledTarget(KilledActor);
 	}
 	SetAutoEngageTargets(false);
 }
