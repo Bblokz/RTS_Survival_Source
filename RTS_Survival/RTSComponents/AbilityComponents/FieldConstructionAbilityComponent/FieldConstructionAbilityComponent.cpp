@@ -151,6 +151,7 @@ void UFieldConstructionAbilityComponent::AddAbilityToCommands()
 	FUnitAbilityEntry NewAbility;
 	NewAbility.AbilityId = EAbilityID::IdFieldConstruction;
 	NewAbility.CooldownDuration = FieldConstructionAbilitySettings.Cooldown;
+	NewAbility.Costs = FieldConstructionAbilitySettings.Costs;
 	NewAbility.CustomType = static_cast<int32>(FieldConstructionAbilitySettings.FieldConstructionType);
 
 	M_OwningSquadController->AddAbility(NewAbility, FieldConstructionAbilitySettings.PreferredAbilityIndex);

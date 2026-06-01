@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/UnitData/UnitCost.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/ApplyBehaviourAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/BehaviourAbilityTypes/BehaviourAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
@@ -61,10 +62,11 @@ enum class EAttachedRocketAbilityType
 
 namespace FAbilityHelpers
 {
-	inline FUnitAbilityEntry CreateAbilityEntryFromId(const EAbilityID AbilityId)
+	inline FUnitAbilityEntry CreateAbilityEntryFromId(const EAbilityID AbilityId, const FUnitCost& Costs = FUnitCost())
 	{
 		FUnitAbilityEntry AbilityEntry;
 		AbilityEntry.AbilityId = AbilityId;
+		AbilityEntry.Costs = Costs;
 		return AbilityEntry;
 	}
 /**
