@@ -685,19 +685,14 @@ public:
 	static FTrainingOption GetPlayerSpecialArmoredCar(UObject* WorldContext);
 	// Sdkfz with rockets for break through; sdkfz 250 for strike division.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetPlayerGerArmoredCarTransport250_251Mortar(UObject* WorldContext);
-	// Returns panzer IV H for break through; panzer III M otherwise.
+	static FTrainingOption GetPlayerGerArmoredCar250_251Mortar(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetGerPlayerLightMediumTank(UObject* WorldContext);
-	// Panzer IV F for break through; panzer III J for strike division.
+	static FTrainingOption GetPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetPlayerGerLightMediumTank(UObject* WorldContext);
-	// Returns panzer IV H for break through; panzer III M otherwise.
+	static FTrainingOption GetPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(UObject* WorldContext);
+	// Returns panzer IV H rockets for break through; panzer III M otherwise.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetGerPlayerMediumTank(UObject* WorldContext);
-	// Returns panzer IV H for break through; panzer III M otherwise.
-	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetPlayerGerMediumTank(UObject* WorldContext);
+	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
@@ -706,6 +701,16 @@ public:
 	static FTrainingOption GetPlayerJaguarOrPanzerIVG(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerGerJaguarOrPanzerIVG(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerGerMediumTankDestroyer_StugIII_OrMarder(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerFlak88_Or_PanzerIV_Rail(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerLightTankDestroyer_PZjager_PzJagerLaser(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerHeavyTank_Tiger_Panther(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerAdvancedHeavyTank_TigerII_PantherII(UObject* WorldContext);
 
 
 	// Game instance helpers.

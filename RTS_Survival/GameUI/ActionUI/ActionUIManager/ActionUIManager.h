@@ -137,6 +137,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<UW_ActionUIDescription> M_ActionUIDescriptionWidget;
 	bool GetIsValidActionUIDescriptionWidget() const;
+	void HandleHoverActionUIDescription();
 	void SetActionUIDescriptionWidgetVisibility(const bool bVisible) const;
 	void SetActionUIDescriptionCostsForAbility(const EAbilityID Ability, const int32 AbilitySubtype) const;
 

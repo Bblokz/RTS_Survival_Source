@@ -1037,7 +1037,7 @@ ECommandQueueError UCommandData::PayForAbilityCosts(const EAbilityID AbilityId,
 {
 	if (not M_Owner || not EnsureIsValidPlayerResourceManager())
 	{
-		return ECommandQueueError::NotEnoughRadixite;
+		return ECommandQueueError::NoError;
 	}
 	const FUnitCost AbilityCosts = M_Owner->GetAbilityCosts(AbilityId, Subtype);
 	if (AbilityCosts.IsEmpty())
@@ -1326,6 +1326,12 @@ void ICommands::InitAbilityArray(const TArray<FUnitAbilityEntry>& Abilities)
 	if (UCommandData* UnitCommandData = GetIsValidCommandData())
 	{
 		UnitCommandData->SetAbilities(Abilities);
+		if(not IsValid(GetOwnerActor()))
+		{
+				RTSFunctionLibrary::ReportError("ICommands::InitAbilityArray - Owner Actor is not valid");
+			return;
+		}
+		UnitCommandData->SetPlayerResourceManger(FRTS_Statics::GetPlayerResourceManager(GetOwnerActor()));
 	}
 }
 

@@ -4310,6 +4310,7 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		break;
 	case EAbilityID::IdMove:
 		this->ActionButtonMove(ClickedLocation);
+		break;
 	case EAbilityID::IdReverseMove:
 		this->ActionButtonReverse(ClickedLocation);
 		break;

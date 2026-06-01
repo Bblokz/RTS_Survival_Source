@@ -1997,7 +1997,7 @@ void UMissionBase::SpawnPlayerLightMediumVehicle(const FVector SpawnLocation, co
 
 void UMissionBase::SpawnPlayerMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
-	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank(this);
+	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),

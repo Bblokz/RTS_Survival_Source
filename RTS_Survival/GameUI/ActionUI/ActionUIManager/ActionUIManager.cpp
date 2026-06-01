@@ -255,6 +255,7 @@ bool UActionUIManager::GetIsValidActionUIDescriptionWidget() const
 	return true;
 }
 
+
 void UActionUIManager::SetActionUIDescriptionWidgetVisibility(const bool bVisible) const
 {
 	if (not GetIsValidActionUIDescriptionWidget())
