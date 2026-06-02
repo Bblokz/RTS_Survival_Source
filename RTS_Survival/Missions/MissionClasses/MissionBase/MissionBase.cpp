@@ -179,7 +179,8 @@ int32 UMissionBase::DoesPlayerHaveAnyBuildingExpansionsOfType(
 	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	if (not IsValid(GameUnitManager))
 	{
-		RTSFunctionLibrary::ReportError("Mission failed checking building expansions by type because game unit manager is invalid.");
+		RTSFunctionLibrary::ReportError(
+			"Mission failed checking building expansions by type because game unit manager is invalid.");
 		return 0;
 	}
 
@@ -192,7 +193,8 @@ int32 UMissionBase::DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraf
 	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	if (not IsValid(GameUnitManager))
 	{
-		RTSFunctionLibrary::ReportError("Mission failed checking aircraft by type because game unit manager is invalid.");
+		RTSFunctionLibrary::ReportError(
+			"Mission failed checking aircraft by type because game unit manager is invalid.");
 		return 0;
 	}
 
@@ -201,12 +203,12 @@ int32 UMissionBase::DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraf
 }
 
 ATriggerArea* UMissionBase::CreateTriggerAreaSphere(const FVector& Location,
-                                                     const FRotator& Rotation,
-                                                     const FVector& Scale,
-                                                     const ETriggerOverlapLogic TriggerOverlapLogic,
-                                                     const float DelayBetweenCallbacks,
-                                                     const int32 MaxCallbacks,
-                                                     const int32 TriggerId)
+                                                    const FRotator& Rotation,
+                                                    const FVector& Scale,
+                                                    const ETriggerOverlapLogic TriggerOverlapLogic,
+                                                    const float DelayBetweenCallbacks,
+                                                    const int32 MaxCallbacks,
+                                                    const int32 TriggerId)
 {
 	if (not GetIsValidMissionManager())
 	{
@@ -226,12 +228,12 @@ ATriggerArea* UMissionBase::CreateTriggerAreaSphere(const FVector& Location,
 }
 
 ATriggerArea* UMissionBase::CreateTriggerAreaRectangle(const FVector& Location,
-                                                        const FRotator& Rotation,
-                                                        const FVector& Scale,
-                                                        const ETriggerOverlapLogic TriggerOverlapLogic,
-                                                        const float DelayBetweenCallbacks,
-                                                        const int32 MaxCallbacks,
-                                                        const int32 TriggerId)
+                                                       const FRotator& Rotation,
+                                                       const FVector& Scale,
+                                                       const ETriggerOverlapLogic TriggerOverlapLogic,
+                                                       const float DelayBetweenCallbacks,
+                                                       const int32 MaxCallbacks,
+                                                       const int32 TriggerId)
 {
 	if (not GetIsValidMissionManager())
 	{
@@ -538,7 +540,7 @@ TArray<FTrainingOption> UMissionBase::GetTrainingOptionsDifficultyAdjusted(TArra
 
 ERTSFaction UMissionBase::GetPlayerFaction() const
 {
-	if(not GetIsValidMissionManager())
+	if (not GetIsValidMissionManager())
 	{
 		return ERTSFaction::GerStrikeDivision;
 	}
@@ -810,18 +812,20 @@ bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) 
 
 		if (not ApplyCinematicAudioVolumesFromMissionSettings())
 		{
-			RTSFunctionLibrary::ReportError("Mission cinematic take over failed! Could not apply cinematic audio settings.");
+			RTSFunctionLibrary::ReportError(
+				"Mission cinematic take over failed! Could not apply cinematic audio settings.");
 			return false;
 		}
 	}
 	else if (not RestoreCinematicAudioVolumes())
 	{
-		RTSFunctionLibrary::ReportError("Mission cinematic take over failed! Could not restore cinematic audio settings.");
+		RTSFunctionLibrary::ReportError(
+			"Mission cinematic take over failed! Could not restore cinematic audio settings.");
 		return false;
 	}
 	// Weird bug; when hiding and showing this cause the mission manager to be layed over the main menu?
 	M_MissionManager->SetMissionWidgetManagerVisibility(not bCinematicStarted);
-	
+
 
 	const bool bCinematicTakeOverSucceeded = PlayerController->OnCinematicTakeOver(bCinematicStarted);
 	if (not bCinematicTakeOverSucceeded)
@@ -893,7 +897,8 @@ bool UMissionBase::ApplyCinematicAudioVolumesFromMissionSettings() const
 	const URTSGameUserSettings* const GameUserSettings = URTSGameUserSettings::Get();
 	if (GameUserSettings == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not cache audio settings because URTSGameUserSettings was invalid."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not cache audio settings because URTSGameUserSettings was invalid."));
 		return false;
 	}
 
@@ -907,7 +912,8 @@ bool UMissionBase::ApplyCinematicAudioVolumesFromMissionSettings() const
 	M_CinematicAudioRuntimeState.bM_OverrodeVoicelinesVolume = false;
 	M_CinematicAudioRuntimeState.bM_OverrodeVfxVolume = false;
 
-	if (bShouldOverrideVoicelines && not ApplyAudioVolumeOverride(ERTSAudioType::Voicelines, M_CinematicTakeOverVoicelinesVolume))
+	if (bShouldOverrideVoicelines && not ApplyAudioVolumeOverride(ERTSAudioType::Voicelines,
+	                                                              M_CinematicTakeOverVoicelinesVolume))
 	{
 		return false;
 	}
@@ -932,12 +938,14 @@ bool UMissionBase::RestoreCinematicAudioVolumes() const
 
 	if (not M_CinematicAudioRuntimeState.bM_AudioVolumesAreCached)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission cinematic audio override restore failed because no cached values were available."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission cinematic audio override restore failed because no cached values were available."));
 		return false;
 	}
 
 	if (M_CinematicAudioRuntimeState.bM_OverrodeVoicelinesVolume
-		&& not ApplyAudioVolumeOverride(ERTSAudioType::Voicelines, M_CinematicAudioRuntimeState.M_CachedVoicelinesVolume))
+		&& not ApplyAudioVolumeOverride(ERTSAudioType::Voicelines,
+		                                M_CinematicAudioRuntimeState.M_CachedVoicelinesVolume))
 	{
 		return false;
 	}
@@ -960,47 +968,54 @@ bool UMissionBase::ApplyAudioVolumeOverride(const ERTSAudioType AudioType, const
 	UWorld* const World = GetWorld();
 	if (World == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because World is invalid."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not apply audio volume override because World is invalid."));
 		return false;
 	}
 
 	const URTSAudioDeveloperSettings* const AudioSettings = GetDefault<URTSAudioDeveloperSettings>();
 	if (AudioSettings == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because URTSAudioDeveloperSettings was invalid."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not apply audio volume override because URTSAudioDeveloperSettings was invalid."));
 		return false;
 	}
 
 	if (AudioSettings->UserSettingsSoundMix.IsNull())
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because UserSettingsSoundMix was not configured."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not apply audio volume override because UserSettingsSoundMix was not configured."));
 		return false;
 	}
 
 	const TSoftObjectPtr<USoundClass>* const FoundSoundClass = AudioSettings->SoundClassesByType.Find(AudioType);
 	if (FoundSoundClass == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the sound class mapping is missing."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not apply audio volume override because the sound class mapping is missing."));
 		return false;
 	}
 
 	if (FoundSoundClass->IsNull())
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the mapped sound class was null."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not apply audio volume override because the mapped sound class was null."));
 		return false;
 	}
 
 	USoundMix* const SettingsSoundMix = AudioSettings->UserSettingsSoundMix.LoadSynchronous();
 	if (SettingsSoundMix == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the settings sound mix failed to load."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not apply audio volume override because the settings sound mix failed to load."));
 		return false;
 	}
 
 	USoundClass* const SoundClassToOverride = FoundSoundClass->LoadSynchronous();
 	if (SoundClassToOverride == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Mission could not apply audio volume override because the sound class failed to load."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("Mission could not apply audio volume override because the sound class failed to load."));
 		return false;
 	}
 
@@ -1190,7 +1205,8 @@ void UMissionBase::Tracking_ClearState()
 	M_MissionTrackingRuntimeState = FMissionTrackingRuntimeState();
 }
 
-bool UMissionBase::Tracking_ConfigureActors(const EMissionTrackingType TrackingType, const TArray<AActor*>& ActorsToTrack)
+bool UMissionBase::Tracking_ConfigureActors(const EMissionTrackingType TrackingType,
+                                            const TArray<AActor*>& ActorsToTrack)
 {
 	M_TrackedActors.Reserve(ActorsToTrack.Num());
 	M_TrackingHasCountedInvalid.SetNum(ActorsToTrack.Num());
@@ -1246,7 +1262,8 @@ void UMissionBase::Tracking_ConfigureActorDestroyedAtIndex(AActor* ActorToTrack,
 	Tracking_RegisterActorDestroyedCallback(ActorToTrack);
 }
 
-void UMissionBase::Tracking_RegisterDestructableCallbacks(ADestructableEnvActor* DestructableActor, const int32 TrackingIndex)
+void UMissionBase::Tracking_RegisterDestructableCallbacks(ADestructableEnvActor* DestructableActor,
+                                                          const int32 TrackingIndex)
 {
 	if (not IsValid(DestructableActor))
 	{
@@ -1409,7 +1426,8 @@ FText UMissionBase::Tracking_BuildTitleText() const
 	const FString CurrentCountAsText = FString::FromInt(M_MissionTrackingRuntimeState.CurrentCount);
 	const FString MaxCountAsText = FString::FromInt(M_MissionTrackingRuntimeState.MaxCount);
 	const FString CountText = CurrentCountAsText + M_MissionTrackingRuntimeState.Partitive + MaxCountAsText;
-	const FString RichCountText = FRTSRichTextConverter::MakeRTSRich(CountText, M_MissionTrackingRuntimeState.RichCountType);
+	const FString RichCountText = FRTSRichTextConverter::MakeRTSRich(
+		CountText, M_MissionTrackingRuntimeState.RichCountType);
 
 	FString FinalTitleText;
 	if (not M_MissionTrackingRuntimeState.Prefix.IsEmpty())
@@ -1509,7 +1527,7 @@ void UMissionBase::RegisterCallbackOnTankDies(ATankMaster* Tank)
 
 void UMissionBase::RegisterCallbackOnBXPDies(ABuildingExpansion* BuildingExpansion)
 {
-	if(not EnsureBxpIsValid(BuildingExpansion))
+	if (not EnsureBxpIsValid(BuildingExpansion))
 	{
 		return;
 	}
@@ -1567,8 +1585,8 @@ void UMissionBase::RegisterCallBackOnPickUpWeapon(ASquadController* SquadControl
 }
 
 void UMissionBase::RegisterCallBackOnAbilityOnCoolDown(const EAbilityID AbilityId,
-                                                        int32 CustomType,
-                                                        TScriptInterface<ICommands> Commands)
+                                                       int32 CustomType,
+                                                       TScriptInterface<ICommands> Commands)
 {
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -1584,7 +1602,8 @@ void UMissionBase::RegisterCallBackOnAbilityOnCoolDown(const EAbilityID AbilityI
 
 	if (not IsValid(Commands.GetObject()) || Commands.GetInterface() == nullptr)
 	{
-		RTSFunctionLibrary::ReportError("Mission failed to register ability cooldown callback because commands is invalid.");
+		RTSFunctionLibrary::ReportError(
+			"Mission failed to register ability cooldown callback because commands is invalid.");
 		return;
 	}
 
@@ -1984,10 +2003,11 @@ void UMissionBase::SpawnPlayerCommandVehicle(const FVector SpawnLocation, const 
 		SpawnRotation);
 }
 
-void UMissionBase::SpawnPlayerLightMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
+void UMissionBase::SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(const FVector SpawnLocation,
+                                                                 const FRotator SpawnRotation)
 {
 	const FTrainingOption PlayerLightMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::
-		GetGerPlayerLightMediumTank(this);
+		GetPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(this);
 	AsyncSpawnActorAtLocation(
 		PlayerLightMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),
@@ -1995,9 +2015,10 @@ void UMissionBase::SpawnPlayerLightMediumVehicle(const FVector SpawnLocation, co
 		SpawnRotation);
 }
 
-void UMissionBase::SpawnPlayerMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation)
+void UMissionBase::SpawnGerPlayerMediumTank_IIIM_Or_PZIVH(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
-	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(this);
+	const FTrainingOption PlayerMediumVehicleTrainingOption =
+		URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),
@@ -2007,8 +2028,8 @@ void UMissionBase::SpawnPlayerMediumVehicle(const FVector SpawnLocation, const F
 
 void UMissionBase::SpawnPlayerPZIIIAAOrPZ38Rail(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
-	
-	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetPlayerPanzerIIIAAOrRail38T(this);
+	const FTrainingOption PlayerMediumVehicleTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerPanzerIIIAAOrRail38T(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),
@@ -2018,7 +2039,8 @@ void UMissionBase::SpawnPlayerPZIIIAAOrPZ38Rail(const FVector SpawnLocation, con
 
 void UMissionBase::SpawnPlayerJaguarOrPzIVG(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
-	const FTrainingOption PlayerMediumVehicleTrainingOption = URTSBlueprintFunctionLibrary::GetPlayerJaguarOrPanzerIVG(this);
+	const FTrainingOption PlayerMediumVehicleTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerJaguarOrPanzerIVG(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),
@@ -2337,7 +2359,7 @@ bool UMissionBase::EnsureBxpIsValid(const TObjectPtr<ABuildingExpansion>& BXP) c
 	}
 	RTSFunctionLibrary::ReportError("For mission : " + GetName() +
 		" Building expansion is not valid!");
-	return false;		
+	return false;
 }
 
 bool UMissionBase::EnsureSquadIsValid(const TObjectPtr<ASquadController>& SquadController) const
@@ -2459,7 +2481,7 @@ FTrainingOption UMissionBase::SelectMixOptionPerDifficultySeeded(
 	const FSeededDifficultyMixPool BrutalAndIronManMix) const
 {
 	const FTrainingOption FallbackOption = FTrainingOption(EAllUnitType::UNType_Squad,
-    		                                                       static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin));
+	                                                       static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin));
 	if (not GetIsValidMissionManager())
 	{
 		return FallbackOption;

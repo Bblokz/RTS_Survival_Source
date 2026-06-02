@@ -701,10 +701,10 @@ protected:
 	void SpawnPlayerCommandVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
-	void SpawnPlayerLightMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
+	void SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(const FVector SpawnLocation, const FRotator SpawnRotation);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
-	void SpawnPlayerMediumVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
+	void SpawnGerPlayerMediumTank_IIIM_Or_PZIVH(const FVector SpawnLocation, const FRotator SpawnRotation);
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnPlayerPZIIIAAOrPZ38Rail(const FVector SpawnLocation, const FRotator SpawnRotation);
