@@ -92,7 +92,6 @@ enum class
 	Ashmaker11 UMETA(DisplayName = "ashmaker 11 (Light-Medium Flame Thrower)"),
 	Flamm15 UMETA(DisplayName = "Flamm 15 (Medium Flame Thrower)"),
 
-
 	// German small calibre
 	KwK38_T_37MM UMETA(DisplayName = "KwK38 t 37MM (PZ 38(t))"),
 	KwK39_1_50MM UMETA(DisplayName = "KwK39/1 50MM (PZ III M)"),
