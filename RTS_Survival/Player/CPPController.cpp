@@ -58,6 +58,7 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/BuildRadiusComp/BuildRadiusComp.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
@@ -74,8 +75,10 @@
 #include "RTS_Survival/Utils/RTSDebugBreak/RTSDebugBreak.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "SelectionHelpers/PlayerSelectionHelpers.h"
 #include "StartGameProfileManager/PlayerProfileLoader.h"
@@ -277,6 +280,127 @@ AActor* ACPPController::GetPrimarySelectedUnit() const
 		return nullptr;
 	}
 	return M_GameUIController->GetPrimarySelectedUnit();
+}
+
+void ACPPController::RequestShellTypeChangeForSelection(
+	const EWeaponName WeaponName,
+	const EWeaponShellType NewShellType)
+{
+	EnsureSelectionsAreRTSValid();
+
+	const TArray<AActor*> SelectedActors = GetSelectedActorsForShellTypePropagation();
+	for (AActor* SelectedActor : SelectedActors)
+	{
+		ApplyShellTypeChangeToSelectedActorWeapons(SelectedActor, WeaponName, NewShellType);
+	}
+}
+
+TArray<AActor*> ACPPController::GetSelectedActorsForShellTypePropagation() const
+{
+	TArray<AActor*> SelectedActors;
+	SelectedActors.Reserve(
+		TSelectedPawnMasters.Num() + TSelectedSquadControllers.Num() + TSelectedActorsMasters.Num() + 1);
+
+	if (GetIsValidGameUIController())
+	{
+		SelectedActors.AddUnique(M_GameUIController->GetPrimarySelectedUnit());
+	}
+
+	for (ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
+	{
+		SelectedActors.AddUnique(SelectedPawn);
+	}
+
+	for (ASquadController* SelectedSquad : TSelectedSquadControllers)
+	{
+		SelectedActors.AddUnique(SelectedSquad);
+	}
+
+	for (ASelectableActorObjectsMaster* SelectedActor : TSelectedActorsMasters)
+	{
+		SelectedActors.AddUnique(SelectedActor);
+	}
+
+	SelectedActors.RemoveAll([](const AActor* SelectedActor)
+	{
+		return not IsValid(SelectedActor);
+	});
+	return SelectedActors;
+}
+
+void ACPPController::ApplyShellTypeChangeToSelectedActorWeapons(
+	AActor* SelectedActor,
+	const EWeaponName WeaponName,
+	const EWeaponShellType NewShellType) const
+{
+	if (not IsValid(SelectedActor))
+	{
+		return;
+	}
+
+	if (const ATankMaster* Tank = Cast<ATankMaster>(SelectedActor); IsValid(Tank))
+	{
+		ApplyShellTypeChangeToMatchingWeapons(
+			FRTSWeaponHelpers::GetWeaponsMountedOnTank(Tank),
+			WeaponName,
+			NewShellType);
+		return;
+	}
+
+	if (const AAircraftMaster* Aircraft = Cast<AAircraftMaster>(SelectedActor); IsValid(Aircraft))
+	{
+		UBombComponent* BombComponent = nullptr;
+		ApplyShellTypeChangeToMatchingWeapons(
+			FRTSWeaponHelpers::GetWeaponsMountedOnAircraft(Aircraft, BombComponent),
+			WeaponName,
+			NewShellType);
+		return;
+	}
+
+	if (ASquadController* SquadController = Cast<ASquadController>(SelectedActor); IsValid(SquadController))
+	{
+		ApplyShellTypeChangeToMatchingWeapons(
+			SquadController->GetWeaponsOfSquad(),
+			WeaponName,
+			NewShellType);
+		return;
+	}
+
+	if (const ABuildingExpansion* BuildingExpansion = Cast<ABuildingExpansion>(SelectedActor);
+		IsValid(BuildingExpansion))
+	{
+		ApplyShellTypeChangeToMatchingWeapons(
+			FRTSWeaponHelpers::GetWeaponsMountedOnBxp(BuildingExpansion),
+			WeaponName,
+			NewShellType);
+	}
+}
+
+void ACPPController::ApplyShellTypeChangeToMatchingWeapons(
+	const TArray<UWeaponState*>& Weapons,
+	const EWeaponName WeaponName,
+	const EWeaponShellType NewShellType) const
+{
+	for (UWeaponState* WeaponState : Weapons)
+	{
+		if (not IsValid(WeaponState))
+		{
+			continue;
+		}
+
+		const FWeaponData& WeaponData = WeaponState->GetRawWeaponData();
+		if (WeaponData.WeaponName != WeaponName)
+		{
+			continue;
+		}
+
+		if (not WeaponData.ShellTypes.Contains(NewShellType))
+		{
+			continue;
+		}
+
+		WeaponState->ChangeWeaponShellType(NewShellType);
+	}
 }
 
 

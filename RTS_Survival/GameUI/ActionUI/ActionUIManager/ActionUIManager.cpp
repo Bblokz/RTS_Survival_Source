@@ -330,17 +330,48 @@ bool UActionUIManager::GetIsValidAmmoPicker() const
 	return true;
 }
 
-void UActionUIManager::OnShellTypeSelected(const EWeaponShellType SelectedShellType) const
+void UActionUIManager::OnShellTypeSelected(
+	const EWeaponShellType SelectedShellType,
+	const EWeaponName WeaponName) const
 {
 	if (not GetIsValidLastSelectedActor() || not GetIsValidPlayerController())
 	{
 		return;
 	}
+
+	M_PlayerController->RequestShellTypeChangeForSelection(WeaponName, SelectedShellType);
+	UpdateMatchingDisplayedWeaponItemsShellIcon(WeaponName, SelectedShellType);
 	M_PlayerController->PlayVoiceLine(M_LastSelectedActor.Get(), GetVoiceLineForShell(SelectedShellType), false, true);
 	if (GetIsValidBehaviourContainer())
 	{
 		// After picking ammo the ammo picker is no longer visible and we can show the behaviour container again.
 		BehaviourContainer->OnAmmoPickerVisiblityChange(false);
+	}
+}
+
+void UActionUIManager::UpdateMatchingDisplayedWeaponItemsShellIcon(
+	const EWeaponName WeaponName,
+	const EWeaponShellType SelectedShellType) const
+{
+	for (UW_WeaponItem* WeaponItem : M_TWeaponItems)
+	{
+		if (not IsValid(WeaponItem))
+		{
+			continue;
+		}
+
+		EWeaponName DisplayedWeaponName = EWeaponName::DEFAULT_WEAPON;
+		if (not WeaponItem->TryGetLoadedWeaponName(DisplayedWeaponName))
+		{
+			continue;
+		}
+
+		if (DisplayedWeaponName != WeaponName)
+		{
+			continue;
+		}
+
+		WeaponItem->UpdateAmmoIconForSelectedShellType(SelectedShellType);
 	}
 }
 

@@ -103,7 +103,6 @@ void UW_AmmoPicker::OnShellTypeSelected(const EWeaponShellType SelectedShellType
 		return;
 	}
 	M_ActiveWeaponItem->OnNewShellTypeSelected(SelectedShellType);
-	M_ActionUIManager->OnShellTypeSelected(SelectedShellType);
 }
 
 void UW_AmmoPicker::OnAmmoButtonHovered(const EWeaponShellType HoveredShellType, const bool bIsHovering) const
