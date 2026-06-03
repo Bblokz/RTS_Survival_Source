@@ -704,7 +704,7 @@ protected:
 	void SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(const FVector SpawnLocation, const FRotator SpawnRotation);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
-	void SpawnGerPlayerMediumTank_IIIM_Or_PZIVH(const FVector SpawnLocation, const FRotator SpawnRotation);
+	void SpawnPlayerMediumTank_IIIM_Or_PZIVH(const FVector SpawnLocation, const FRotator SpawnRotation);
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnPlayerPZIIIAAOrPZ38Rail(const FVector SpawnLocation, const FRotator SpawnRotation);
