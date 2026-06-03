@@ -57,13 +57,28 @@ void UW_WeaponItem::SetupWidgetForBombComponent(UBombComponent* BombComp)
 
 void UW_WeaponItem::OnNewShellTypeSelected(const EWeaponShellType NewShellType)
 {
+	if (not GetIsValidLoadedWeaponState() || not GetIsValidActionUIManager())
+	{
+		return;
+	}
+
+	const EWeaponName WeaponName = M_LoadedWeaponState->GetRawWeaponData().WeaponName;
+	M_ActionUIManager->OnShellTypeSelected(NewShellType, WeaponName);
+}
+
+bool UW_WeaponItem::TryGetLoadedWeaponName(EWeaponName& OutWeaponName) const
+{
 	if (not IsValid(M_LoadedWeaponState))
 	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this,
-		                                             "M_LoadedWeaponState",
-		                                             "OnAmmoTypeChanged");
+		return false;
 	}
-	M_LoadedWeaponState->ChangeWeaponShellType(NewShellType);
+
+	OutWeaponName = M_LoadedWeaponState->GetRawWeaponData().WeaponName;
+	return true;
+}
+
+void UW_WeaponItem::UpdateAmmoIconForSelectedShellType(const EWeaponShellType NewShellType)
+{
 	OnUpdateAmmoIconForWeapon(NewShellType);
 }
 
@@ -141,6 +156,20 @@ bool UW_WeaponItem::EnsureIsValidAmmoBorder() const
 		return false;
 	}
 	return true;
+}
+
+bool UW_WeaponItem::GetIsValidLoadedWeaponState() const
+{
+	if (IsValid(M_LoadedWeaponState))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_LoadedWeaponState",
+		"GetIsValidLoadedWeaponState");
+	return false;
 }
 
 void UW_WeaponItem::SetupAmmoIcon(const EWeaponDescriptionType WeaponDescriptionType,

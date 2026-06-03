@@ -17,6 +17,7 @@ class UW_ActionUIDescription;
 class UW_OnHoverAmmoDescription;
 class UW_SelectedUnitDescription;
 enum class EWeaponShellType : uint8;
+enum class EWeaponName : uint8;
 enum class EVeterancyIconSet : uint8;
 class ATankMaster;
 enum class ESquadSubtype : uint8;
@@ -71,7 +72,7 @@ public:
 	void OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange, const float TurretYawLimit);
 	void OnClickedWeaponItemToAmmoPick();
 
-	void OnShellTypeSelected(const EWeaponShellType SelectedShellType) const;
+	void OnShellTypeSelected(const EWeaponShellType SelectedShellType, const EWeaponName WeaponName) const;
 	void OnShellTypeHovered(const EWeaponShellType HoveredShellType, const bool bIsHovering) const;
 
 	void RequestUpdateAbilityUIForPrimary(ICommands* RequestingUnit);
@@ -147,6 +148,9 @@ private:
 	UW_OnHoverAmmoDescription * M_AmmoDescriptionWidget;
 	bool GetIsValidAmmoDescriptionWidget() const;
 	void SetAmmoDescriptionWidgetVisibility(const bool bVisible, const EWeaponShellType ShellTypeToDisplayDetailsFor) const;
+	void UpdateMatchingDisplayedWeaponItemsShellIcon(
+		const EWeaponName WeaponName,
+		const EWeaponShellType SelectedShellType) const;
 
 	UPROPERTY()
 	UW_AmmoPicker* M_AmmoPicker;

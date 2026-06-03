@@ -55,12 +55,16 @@
 #include "CPPController.generated.h"
 
 class UTowedActorComponent;
+class AAircraftMaster;
+class UBombComponent;
 class UPlayerOutlineComponent;
 class APlayerAimAbility;
 class UAttachedWeaponAbilityComponent;
 class ATankMaster;
 class UHullWeaponComponent;
 class UWeaponState;
+enum class EWeaponName : uint8;
+enum class EWeaponShellType : uint8;
 class UPlayerPortraitManager;
 class UW_Portrait;
 struct FNomadicPreviewAttachments;
@@ -296,6 +300,15 @@ public:
 	void InitPortrait(UW_Portrait* PortraitWidget) const;
 
 	AActor* GetPrimarySelectedUnit() const;
+
+	/**
+	 * @brief Applies an ammo selection to every selected unit with the same weapon identifier.
+	 * @param WeaponName The weapon identifier copied from the clicked weapon item.
+	 * @param NewShellType The shell type selected from the ammo picker.
+	 */
+	void RequestShellTypeChangeForSelection(
+		const EWeaponName WeaponName,
+		const EWeaponShellType NewShellType);
 
 	/**
 	 * @brief Capture a screenshot of the current game viewport at its current size.
@@ -1769,6 +1782,16 @@ private:
 	bool PauseGame_GetIsGameLocked() const;
 	bool PauseGame_GetIsPauseBlockedByCinematic() const;
 
+
+	TArray<AActor*> GetSelectedActorsForShellTypePropagation() const;
+	void ApplyShellTypeChangeToSelectedActorWeapons(
+		AActor* SelectedActor,
+		const EWeaponName WeaponName,
+		const EWeaponShellType NewShellType) const;
+	void ApplyShellTypeChangeToMatchingWeapons(
+		const TArray<UWeaponState*>& Weapons,
+		const EWeaponName WeaponName,
+		const EWeaponShellType NewShellType) const;
 
 	void DebugPlayerSelection(const FString& Message, const FColor& Color = FColor::Blue) const;
 

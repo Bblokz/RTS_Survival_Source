@@ -44,6 +44,8 @@ public:
 	 * @param NewShellType The new shell type. 
 	 */
 	void OnNewShellTypeSelected(const EWeaponShellType NewShellType);
+	bool TryGetLoadedWeaponName(EWeaponName& OutWeaponName) const;
+	void UpdateAmmoIconForSelectedShellType(const EWeaponShellType NewShellType);
 
 protected:
 	// When hovering on the weapon item this widget will display weapon data.
@@ -84,6 +86,7 @@ private:
 
 	bool EnsureIsValidWeaponDescription();
 	bool EnsureIsValidAmmoBorder() const;
+	bool GetIsValidLoadedWeaponState() const;
 
 	void SetupAmmoIcon(EWeaponDescriptionType WeaponDescriptionType, const EWeaponShellType WeaponShellType, const int32
 	                   AmountOfShellsAvailable);
