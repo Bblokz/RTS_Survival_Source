@@ -33,7 +33,7 @@ struct FSelectionData
 };
 
 /**
- * 
+ * @brief Spawned by the player controller to keep gameplay selection state synchronized with the main HUD.
  */
 UCLASS()
 class RTS_SURVIVAL_API AGameUIController : public AActor
@@ -255,7 +255,7 @@ private:
 	void GetActionUIParamsNomadic(
 		FActionUIParameters& OutGameUIParameters,
 		AActor* PrimaryUnit,
-		EAbilityID CurrentAbility) const;
+		EAbilityID CurrentAbility);
 
 	/**
 	 * @brief Go over the nomadic's status to derive what button we should display for converting building/vehicle.
@@ -264,7 +264,7 @@ private:
 	 * @return The status of the button.
 	 */
 	EActionUINomadicButton GetButtonStateFromTruck(const ANomadicVehicle* NomadicVehicle,
-	                                               EAbilityID CurrentAbility) const;
+	                                               EAbilityID CurrentAbility);
 
 	/**
 	 * 
@@ -274,7 +274,7 @@ private:
 	 */
 	void GetTrainingUIParametersForType(
 		FActionUIParameters& OutGameUIParameters,
-		AActor* PrimaryUnit) const;
+		AActor* PrimaryUnit);
 
 	/**
 	 * @brief Set up the weapon UI for the primary selected unit.
@@ -324,6 +324,7 @@ private:
 		const int32 Subtype) const;
 
 	bool GetIsValidMainGameUI();
+	bool GetIsValidPlayerController() const;
 
         TArray<FUnitAbilityEntry> M_AbilityArrayWithEmptyAbilities;
 
@@ -339,7 +340,7 @@ private:
 	 */
         TArray<FUnitAbilityEntry> GetPrimaryUnitAbilities(AActor* PrimarySelectedUnit) const;
 
-	void EnsureProvidedArraysAreValid(
+	bool EnsureProvidedArraysAreValid(
 		TArray<ASelectablePawnMaster*>* TPlayerSelectedPawnMasters,
 		TArray<ASquadController*>* TPlayerSelectedSquadControllers,
 		TArray<ASelectableActorObjectsMaster*>* TPlayerSelectedActors);

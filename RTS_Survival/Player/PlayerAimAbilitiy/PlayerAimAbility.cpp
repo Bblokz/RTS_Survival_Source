@@ -114,16 +114,18 @@ bool APlayerAimAbility::GetIsValidAimMeshComponent() const
 bool APlayerAimAbility::GetIsValidMaterialForAimType(const EPlayerAimAbilityTypes AimType,
                                                      UMaterialInterface*& OutMaterial)
 {
-	if (not MaterialPerAbilityAim.Contains(AimType))
+	UMaterialInterface* const* FoundMaterial = MaterialPerAbilityAim.Find(AimType);
+	if (FoundMaterial && IsValid(*FoundMaterial))
 	{
-		const FString TypeName = UEnum::GetValueAsString(AimType);
-		RTSFunctionLibrary::ReportError("APlayerAimAbility::GetIsValidMaterialForAimType"
-			"No material found for given AimType!"
-			"\n type: " + TypeName);
-		return false;
+		OutMaterial = *FoundMaterial;
+		return true;
 	}
-	OutMaterial = MaterialPerAbilityAim[AimType];
-	return true;
+
+	const FString TypeName = UEnum::GetValueAsString(AimType);
+	RTSFunctionLibrary::ReportError("APlayerAimAbility::GetIsValidMaterialForAimType"
+		"No valid material found for given AimType!"
+		"\n type: " + TypeName);
+	return false;
 }
 
 bool APlayerAimAbility::GetIsValidPlayerController() const
@@ -240,7 +242,7 @@ void APlayerAimAbility::SetMaterialParameter(const float Radius, const EPlayerAi
 	}
 
 	UMaterialInterface* Material = AimMeshComponent->GetMaterial(0);
-	if (!Material)
+	if (not Material)
 	{
 		RTSFunctionLibrary::ReportError(
 			"APlayerAimAbility::SetMaterialParameter - No material found on AimMeshComponent.");
@@ -248,10 +250,10 @@ void APlayerAimAbility::SetMaterialParameter(const float Radius, const EPlayerAi
 	}
 
 	UMaterialInstanceDynamic* DynamicMaterial = Cast<UMaterialInstanceDynamic>(Material);
-	if (!DynamicMaterial)
+	if (not DynamicMaterial)
 	{
 		DynamicMaterial = AimMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-		if (!DynamicMaterial)
+		if (not DynamicMaterial)
 		{
 			RTSFunctionLibrary::ReportError(
 				"APlayerAimAbility::SetMaterialParameter - Failed to create dynamic material instance.");
