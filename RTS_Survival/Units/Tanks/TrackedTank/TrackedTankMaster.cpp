@@ -773,11 +773,13 @@ void ATrackedTankMaster::SetupEngineGasSoundComponent()
 		return;
 	}
 
+	// Fixed: Removed RF_Transactional and the Template argument
 	M_EngineGasSoundComponent = NewObject<UAudioComponent>(
 		this,
+		UAudioComponent::StaticClass(), // Explicit class type
 		EngineGasSoundComponentName,
-		RF_Transactional,
-		M_EngineSoundComponent);
+		RF_NoFlags); 
+
 	if (not GetIsValidEngineGasSoundComponent())
 	{
 		return;
@@ -785,7 +787,6 @@ void ATrackedTankMaster::SetupEngineGasSoundComponent()
 
 	M_EngineGasSoundComponent->SetSound(nullptr);
 	M_EngineGasSoundComponent->SetBoolParameter(EngineGasSoundLoopingParam, false);
-	// This component is dedicated to one-shot start effects, so it never auto-starts or overlaps itself.
 	M_EngineGasSoundComponent->bAutoActivate = false;
 	M_EngineGasSoundComponent->bAutoDestroy = false;
 	M_EngineGasSoundComponent->bCanPlayMultipleInstances = false;
@@ -808,10 +809,9 @@ void ATrackedTankMaster::SetupEngineGasSoundComponent()
 			FAttachmentTransformRules::KeepRelativeTransform);
 	}
 
-	AddInstanceComponent(M_EngineGasSoundComponent);
+	// Fixed: Removed AddInstanceComponent
 	M_EngineGasSoundComponent->RegisterComponent();
 }
-
 void ATrackedTankMaster::PlayEngineGasSoundEffect() const
 {
 	if (not GetIsValidEngineGasSound() or not GetIsValidEngineGasSoundComponent())
@@ -923,12 +923,7 @@ bool ATrackedTankMaster::GetIsValidEngineSoundComponent() const
 	{
 		return true;
 	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		TEXT("M_EngineSoundComponent"),
-		TEXT("GetIsValidEngineSoundComponent"),
-		this);
+	// No error spam.
 	return false;
 }
 
