@@ -83,7 +83,7 @@ USavePlayerProfile* FRTS_Profile::LoadPlayerProfile()
 {
     USavePlayerProfile* LoadedProfile = LoadProfileFromSlot(M_SaveSlotName, M_UserIndex);
 
-    if (!LoadedProfile)
+    if (not LoadedProfile)
     {
         RTSFunctionLibrary::ReportError(TEXT("No saved profile found in LoadPlayerProfile."));
 
@@ -134,7 +134,7 @@ FPlayerCardSaveData FRTS_Profile::BuildPlayerCardSaveData(
 
 void FRTS_Profile::ProfileValidator(USavePlayerProfile* Profile)
 {
-	if (!Profile)
+	if (not Profile)
 	{
 		RTSFunctionLibrary::PrintToLog(TEXT("ProfileValidator called with a null profile."));
 		return;
@@ -200,7 +200,7 @@ void FRTS_Profile::ProfileValidator(USavePlayerProfile* Profile)
 
 USavePlayerProfile* FRTS_Profile::GetTestProfile()
 {
-	if (!M_TestPlayerProfile.IsValid())
+	if (not M_TestPlayerProfile.IsValid())
 	{
 		InitializeTestProfile();
 	}
@@ -246,7 +246,7 @@ bool FRTS_Profile::RestoreBackupSave(const FString& BackupSavePath, const FStrin
 
 bool FRTS_Profile::SavePlayerProfile(USavePlayerProfile* InPlayerProfile)
 {
-    if (!InPlayerProfile)
+    if (not InPlayerProfile)
     {
         RTSFunctionLibrary::ReportError(TEXT("Invalid player profile provided to SavePlayerProfile."));
         return false;
@@ -254,7 +254,7 @@ bool FRTS_Profile::SavePlayerProfile(USavePlayerProfile* InPlayerProfile)
 
     // Attempt to save the game to the main slot
     const bool bSuccess = UGameplayStatics::SaveGameToSlot(InPlayerProfile, M_SaveSlotName, M_UserIndex);
-    if (!bSuccess)
+    if (not bSuccess)
     {
         RTSFunctionLibrary::ReportError(TEXT("Failed to save player profile in SavePlayerProfile."));
         return false;
@@ -278,7 +278,7 @@ bool FRTS_Profile::SavePlayerProfile(USavePlayerProfile* InPlayerProfile)
 
 bool FRTS_Profile::CreateBackupSave(USavePlayerProfile* InPlayerProfile)
 {
-    if (!InPlayerProfile)
+    if (not InPlayerProfile)
     {
         RTSFunctionLibrary::ReportError(TEXT("Invalid player profile provided to CreateBackupSave."));
         return false;
@@ -286,7 +286,7 @@ bool FRTS_Profile::CreateBackupSave(USavePlayerProfile* InPlayerProfile)
 
     // Save the game to the backup slot
     const bool bSuccess = UGameplayStatics::SaveGameToSlot(InPlayerProfile, M_BackupSaveSlotName, M_UserIndex);
-    if (!bSuccess)
+    if (not bSuccess)
     {
         RTSFunctionLibrary::ReportError(TEXT("Failed to save backup profile in CreateBackupSave."));
         return false;
@@ -299,9 +299,9 @@ bool FRTS_Profile::CreateBackupSave(USavePlayerProfile* InPlayerProfile)
 bool FRTS_Profile::EnsureBackupDirectoryExists(const FString& BackupDirectory)
 {
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	if (!PlatformFile.DirectoryExists(*BackupDirectory))
+	if (not PlatformFile.DirectoryExists(*BackupDirectory))
 	{
-		if (!PlatformFile.CreateDirectory(*BackupDirectory))
+		if (not PlatformFile.CreateDirectory(*BackupDirectory))
 		{
 			RTSFunctionLibrary::ReportError(TEXT("Failed to create backup directory."));
 			return false;
@@ -313,7 +313,7 @@ bool FRTS_Profile::EnsureBackupDirectoryExists(const FString& BackupDirectory)
 
 void FRTS_Profile::DebugPrintProfile(const USavePlayerProfile* InPlayerProfile, bool bUseErrorFunction)
 {
-	if (!InPlayerProfile)
+	if (not InPlayerProfile)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("DebugPrintProfile called with invalid player profile."));
 		return;
@@ -484,7 +484,7 @@ void FRTS_Profile::InitializeTestProfile()
 
 
 	const auto TestProfile = TStrongObjectPtr<USavePlayerProfile>(NewObject<USavePlayerProfile>());
-	if (!TestProfile || !TestProfile.IsValid())
+	if (not TestProfile || not TestProfile.IsValid())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to create new player TEST profile in FRTS_Profile."
 			"\n NULL or INVALID TStrongObjectPtr<USavePlayerProfile>"));
@@ -509,7 +509,7 @@ bool FRTS_Profile::SaveNewPlayerProfile(
 	USavePlayerProfile* NewProfile = Cast<USavePlayerProfile>(
 		UGameplayStatics::CreateSaveGameObject(USavePlayerProfile::StaticClass()));
 
-	if (!NewProfile)
+	if (not NewProfile)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to create new player profile in SaveNewPlayerProfile."));
 		return false;
@@ -528,6 +528,5 @@ bool FRTS_Profile::SaveNewPlayerProfile(
 	DebugPrintProfile(NewProfile, true);
 
 	// Save the profile using the existing SavePlayerProfile function
-	SavePlayerProfile(NewProfile);
-	return true;
+	return SavePlayerProfile(NewProfile);
 }

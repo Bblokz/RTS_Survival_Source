@@ -38,6 +38,12 @@ void UW_NomadicLayout::InitNomadicLayout(const TArray<FNomadicBuildingLayoutData
 
 	if (not IsValid(M_BuildingLayoutWidget))
 	{
+		if (GetWorld() == nullptr)
+		{
+			RTSFunctionLibrary::ReportError("Could not create building layout widget in NomadicLayout because world is invalid");
+			return;
+		}
+
 		M_BuildingLayoutWidget = CreateWidget<UW_NomadicLayoutBuilding>(
 			GetWorld(), BuildingLayoutClass);
 		if (not IsValid(M_BuildingLayoutWidget))
@@ -67,15 +73,13 @@ bool UW_NomadicLayout::CheckLayoutsFilled(uint32& OutEmptySlots,
 			continue;
 		}
 		RTSFunctionLibrary::PrintToLog("for layout amount of non empty cards:" + FString::FromInt(EachLayout.Cards.Num()), false);
-		const uint32 EmptySlots = EachLayout.Slots - EachLayout.Cards.Num();
-		if (EmptySlots && InCardsLeftPerLayout.Contains(LayoutType))
+		const int32 EmptySlots = FMath::Max(EachLayout.Slots - EachLayout.Cards.Num(), 0);
+		const TArray<ERTSCard>* CardsLeftForLayout = InCardsLeftPerLayout.Find(LayoutType);
+		if (EmptySlots > 0 && CardsLeftForLayout != nullptr && CardsLeftForLayout->Num() > 0)
 		{
-			if (InCardsLeftPerLayout[LayoutType].Num() > 0)
-			{
-				OutEmptySlots += EmptySlots;
-				OutUnfilledLayouts.Add(LayoutType);
-				bAllFilled = false;
-			}
+			OutEmptySlots += EmptySlots;
+			OutUnfilledLayouts.Add(LayoutType);
+			bAllFilled = false;
 		}
 	}
 	AppendSelectedCardsFromLayouts(OutSelectedCards);

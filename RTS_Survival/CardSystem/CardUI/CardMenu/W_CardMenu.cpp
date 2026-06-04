@@ -4,6 +4,8 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/WidgetSwitcher.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 #include "RTS_Survival/CardSystem/CardUI/CardHolderWidget/W_CardHolder.h"
 #include "RTS_Survival/CardSystem/CardUI/CardScollBox/W_CardScrollBox.h"
 #include "RTS_Survival/CardSystem/CardUI/CardSounds/CardSounds.h"
@@ -24,6 +26,16 @@ void UW_CardMenu::NativeConstruct()
 {
 	Super::NativeConstruct();
 	M_CurrentLayoutProfile = ELayoutProfileWidgets::Widgets_StartUnits;
+}
+
+void UW_CardMenu::NativeDestruct()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HoverSoundCooldownTimer);
+	}
+
+	Super::NativeDestruct();
 }
 
 void UW_CardMenu::NativeOnInitialized()
@@ -790,15 +802,7 @@ void UW_CardMenu::PlayRTSCardSound(const ECardSound Sound)
 	switch (Sound)
 	{
 	case ECardSound::Sound_Hover:
-		if (bCanPlayHoverSound)
-		{
-			Play2DSound(Sound);
-			bCanPlayHoverSound = false;
-
-			// Set a timer to re-enable hover sound after 0.5 seconds
-			GetWorld()->GetTimerManager().SetTimer(
-				HoverSoundCooldownTimer, this, &UW_CardMenu::ResetHoverSoundCooldown, 0.8f, false);
-		}
+		PlayHoverSound();
 		break;
 
 	case ECardSound::Sound_StartDrag:
@@ -817,6 +821,28 @@ void UW_CardMenu::PlayRTSCardSound(const ECardSound Sound)
 UW_CardScrollBox* UW_CardMenu::GetCardScrollBox() const
 {
 	return M_CardScrollBox;
+}
+
+void UW_CardMenu::PlayHoverSound()
+{
+	if (not bCanPlayHoverSound)
+	{
+		return;
+	}
+
+	Play2DSound(ECardSound::Sound_Hover);
+	bCanPlayHoverSound = false;
+
+	UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		bCanPlayHoverSound = true;
+		return;
+	}
+
+	// Set a timer to re-enable hover sound after 0.5 seconds
+	World->GetTimerManager().SetTimer(
+		HoverSoundCooldownTimer, this, &UW_CardMenu::ResetHoverSoundCooldown, 0.8f, false);
 }
 
 void UW_CardMenu::Play2DSound(const ECardSound Sound)

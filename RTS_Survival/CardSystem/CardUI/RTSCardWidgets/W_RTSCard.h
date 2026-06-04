@@ -40,7 +40,7 @@ struct FRTSCardData
 };
 
 /**
- * 
+ * @brief Used by card holders and the scroll box to display one draggable card slot.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_RTSCard : public UUserWidget
@@ -53,7 +53,7 @@ public:
 	ETechnology GetTechnology() const { return M_CardData.Technology; }
 
 	FTrainingOption GetUnitToCreate() const { return M_CardData.UnitToCreate; }
-	bool GetIsLeftSide() const { return bIsLeftSide; }
+	bool GetIsLeftSide() const { return bM_IsLeftSide; }
 
 	FTrainingOption GetTrainngOption() const { return M_CardData.TrainingOption; }
 
@@ -73,7 +73,7 @@ public:
 	void InitializeCard(const ERTSCard NewCard);
 
 	/** Set whether this card uses the left or right side cardvierwer. */
-	void SetIsLeftSide(const bool bIsLeft) { bIsLeftSide = bIsLeft; }
+	void SetIsLeftSide(const bool bIsLeft) { bM_IsLeftSide = bIsLeft; }
 
 	void SetCardMenu(const TObjectPtr<UW_CardMenu>& NewCardMenu) ;
 
@@ -107,14 +107,14 @@ private:
 	void OnHovered(const bool bIsHovering);
 
 	UPROPERTY()
-	ERTSCard M_RTSCard;
+	ERTSCard M_RTSCard = ERTSCard::Card_Empty;
 
 	// Initialized with data from the datatable after InitializeCard is called.
 	UPROPERTY()
 	FRTSCardData M_CardData;
 
 	UPROPERTY()
-	bool bIsLeftSide;
+	bool bM_IsLeftSide = false;
 
 	UPROPERTY()
 	TWeakObjectPtr<UW_CardMenu> M_CardMenu;

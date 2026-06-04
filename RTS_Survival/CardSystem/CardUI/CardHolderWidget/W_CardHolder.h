@@ -13,7 +13,7 @@ class UW_RTSCard;
 class UScrollBox;
 enum class ECardType : uint8;
 /**
- * 
+ * @brief Used by the card menu to display a fixed set of selected card slots.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_CardHolder : public UUserWidget, public ICardHolder
@@ -47,7 +47,7 @@ private:
 	TSet<ECardType> M_CardTypeToHold;
 
 	UPROPERTY()
-	int32 M_MaxCardsToHold;
+	int32 M_MaxCardsToHold = 0;
 
 	bool GetIsValidCardHolder() const;
 
@@ -56,7 +56,7 @@ private:
 
 	UW_RTSCard* CreateCardWidgetInHolder(const ERTSCard& CardType,
 	                                     const TObjectPtr<UW_CardMenu> InCardMenu,
-	                                     const bool bIsLeftSide, const TSet<ECardType>& AllowedCardTypes);
+	                                     const TSet<ECardType>& AllowedCardTypes);
 
 
 

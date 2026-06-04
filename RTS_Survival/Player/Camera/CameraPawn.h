@@ -65,6 +65,7 @@ protected:
 
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ReferenceCasts")
 	void InitCameraPawn(UCameraComponent* NewCameraComponent);
@@ -94,7 +95,8 @@ private:
 	void OnMainMenuLoaded();
 
 	void DrawCameraOnMiniMap();
-
+	bool GetIsValidMiniMap() const;
+	bool GetIsValidFowManager() const;
 
 	UPROPERTY()
 	FViewportProjections M_ViewportProjections;

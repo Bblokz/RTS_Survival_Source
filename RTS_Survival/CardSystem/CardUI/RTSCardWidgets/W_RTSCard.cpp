@@ -62,7 +62,7 @@ void UW_RTSCard::OnHovered(const bool bIsHovering)
 	{
 		return;
 	}
-	M_CardMenu->OnCardHovered(bIsHovering, M_RTSCard, bIsLeftSide);
+	M_CardMenu->OnCardHovered(bIsHovering, M_RTSCard, bM_IsLeftSide);
 }
 
 void UW_RTSCard::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -145,7 +145,7 @@ bool UW_RTSCard::GetIsValidCardMenu() const
 		return true;
 	}
 
-	if (!bDidErrorReport)
+	if (not bDidErrorReport)
 	{
 		RTSFunctionLibrary::ReportError("The provided card menu is not valid in UW_RTSCard::GetIsValidCardMenu.");
 		bDidErrorReport = true;
