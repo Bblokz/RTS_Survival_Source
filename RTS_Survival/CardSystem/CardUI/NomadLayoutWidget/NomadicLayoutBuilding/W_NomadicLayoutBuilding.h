@@ -14,7 +14,7 @@ class UScrollBox;
 class UW_RTSCard;
 struct FNomadicBuildingLayoutData;
 /**
- * 
+ * @brief Used by the nomadic layout to show one building training-card row.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_NomadicLayoutBuilding : public UUserWidget, public ICardHolder
@@ -63,9 +63,10 @@ private:
 	 * @param InCardClass The class bp derived, that is used to create the card.
 	 * @param InCardMenu
 	 * @param bIsLeftSide
+	 * @return True when both widget wrappers were created and added to the scroll box.
 	 * @pre The card scroll box is valid and so is the card class.
 	 */
-	void CreateCardOfType(ERTSCard Type, TSubclassOf<UW_RTSCard> InCardClass, TObjectPtr<UW_CardMenu> InCardMenu,
+	bool CreateCardOfType(ERTSCard Type, TSubclassOf<UW_RTSCard> InCardClass, TObjectPtr<UW_CardMenu> InCardMenu,
 	                      const bool bIsLeftSide);
 
 	UPROPERTY()

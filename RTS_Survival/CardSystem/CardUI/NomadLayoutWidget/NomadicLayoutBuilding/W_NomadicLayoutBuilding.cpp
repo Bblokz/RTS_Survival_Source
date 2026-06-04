@@ -21,13 +21,13 @@ void UW_NomadicLayoutBuilding::InitNomadicLayoutBuilding(const FNomadicBuildingL
 	{
 		return;
 	}
-	if(BuildingData.Slots == 0 || BuildingData.Slots > 100)
+	if (BuildingData.Slots == 0 || BuildingData.Slots > 100)
 	{
 		RTSFunctionLibrary::ReportError("Cannot initialize Nomadic Layout Building, BuildingData.Slots is invalid"
 								  "\n Amount of slots attempted to create: " + FString::FromInt(BuildingData.Slots));
 		return;
 	}
-	if(BuildingData.BuildingType == ENomadicLayoutBuildingType::Building_None)
+	if (BuildingData.BuildingType == ENomadicLayoutBuildingType::Building_None)
 	{
 		RTSFunctionLibrary::ReportError("Cannot initialize Nomadic Layout Building, BuildingData.BuildingType is invalid"
 								  "\n BuildingType attempted to create: Building_NONE");
@@ -42,12 +42,20 @@ void UW_NomadicLayoutBuilding::InitNomadicLayoutBuilding(const FNomadicBuildingL
 	M_BuildingType = BuildingData.BuildingType;
 	for (const auto EachCardType : BuildingData.Cards)
 	{
+		if (M_CardsInScrollBox.Num() >= M_Slots)
+		{
+			break;
+		}
+
 		CreateCardOfType(EachCardType, InCardClass, CardMenu, bIsLeftSide);
 	}
 	// Create empty cards as long as we have not reached the maximum amount of cards
 	while (M_CardsInScrollBox.Num() < M_Slots)
 	{
-		CreateCardOfType(ERTSCard::Card_Empty, InCardClass, CardMenu, bIsLeftSide);
+		if (not CreateCardOfType(ERTSCard::Card_Empty, InCardClass, CardMenu, bIsLeftSide))
+		{
+			break;
+		}
 	}
 	SetupAllowedCardsFromBuildingType(M_BuildingType);
 	// Update visuals in blueprint event.
@@ -68,9 +76,9 @@ TArray<TPair<ERTSCard, ECardType>> UW_NomadicLayoutBuilding::GetNonEmptyCardsHel
 {
 	TArray<TPair<ERTSCard, ECardType>> NonEmptyCards;
 	TPair<ERTSCard, ECardType> Pair;
-	for(auto EachCard: M_CardsInScrollBox)
+	for (auto EachCard : M_CardsInScrollBox)
 	{
-		if(IsValid(EachCard) && EachCard->GetCard() != ERTSCard::Card_Empty)
+		if (IsValid(EachCard) && EachCard->GetCard() != ERTSCard::Card_Empty)
 		{
 			Pair.Value = EachCard->GetCardType();
 			Pair.Key = EachCard->GetCard();
@@ -83,9 +91,9 @@ TArray<TPair<ERTSCard, ECardType>> UW_NomadicLayoutBuilding::GetNonEmptyCardsHel
 TArray<UW_RTSCard*> UW_NomadicLayoutBuilding::GetSelectedCards()
 {
 	TArray<UW_RTSCard*> SelectedCards;
-	for(auto EachCard: M_CardsInScrollBox)
+	for (auto EachCard : M_CardsInScrollBox)
 	{
-		if(IsValid(EachCard) && EachCard->GetCard() != ERTSCard::Card_Empty)
+		if (IsValid(EachCard) && EachCard->GetCard() != ERTSCard::Card_Empty)
 		{
 			SelectedCards.Add(EachCard);
 		}
@@ -95,7 +103,7 @@ TArray<UW_RTSCard*> UW_NomadicLayoutBuilding::GetSelectedCards()
 
 ECardType UW_NomadicLayoutBuilding::GetCardType() const
 {
-	if(M_AllowedCardTypes.Num() !=0)
+	if (M_AllowedCardTypes.Num() != 0)
 	{
 		return M_AllowedCardTypes.Array()[0];
 	}
@@ -109,11 +117,11 @@ FNomadicBuildingLayoutData UW_NomadicLayoutBuilding::GetBuildingLayoutData() con
 	FNomadicBuildingLayoutData BuildingData;
 	BuildingData.BuildingType = M_BuildingType;
 	BuildingData.Slots = M_Slots;
-	for(auto EachCard: M_CardsInScrollBox)
+	for (auto EachCard : M_CardsInScrollBox)
 	{
-		if(IsValid(EachCard))
+		if (IsValid(EachCard))
 		{
-			if(EachCard->GetCard() == ERTSCard::Card_Empty)
+			if (EachCard->GetCard() == ERTSCard::Card_Empty)
 			{
 				continue;
 			}
@@ -124,16 +132,23 @@ FNomadicBuildingLayoutData UW_NomadicLayoutBuilding::GetBuildingLayoutData() con
 	
 }
 
-void UW_NomadicLayoutBuilding::CreateCardOfType(const ERTSCard Type, const TSubclassOf<UW_RTSCard> InCardClass, TObjectPtr<UW_CardMenu> InCardMenu, const bool
+bool UW_NomadicLayoutBuilding::CreateCardOfType(const ERTSCard Type, const TSubclassOf<UW_RTSCard> InCardClass, TObjectPtr<UW_CardMenu> InCardMenu, const bool
                                                 bIsLeftSide)
 {
 	// Create the card widget
+	if (GetWorld() == nullptr || not IsValid(InCardClass))
+	{
+		RTSFunctionLibrary::ReportError("Cannot create card widget in UW_NomadicLayoutBuilding because world or card class is invalid."
+			"\n for card type: " + Global_GetCardAsString(Type));
+		return false;
+	}
+
 	UW_RTSCard* CardWidget = CreateWidget<UW_RTSCard>(GetWorld(), InCardClass);
 	if (not IsValid(CardWidget))
 	{
 		RTSFunctionLibrary::ReportError("Failed to create card widget in UW_NomadicLayoutBuilding"
 			"\n for card type: " + Global_GetCardAsString(Type));
-		return;
+		return false;
 	}
 
 	// Initialize the card widget with the card data
@@ -149,7 +164,7 @@ void UW_NomadicLayoutBuilding::CreateCardOfType(const ERTSCard Type, const TSubc
 	{
 		RTSFunctionLibrary::ReportError("Failed to create ScaleBox in UW_NomadicLayoutBuilding"
 			"\n for card type: " + Global_GetCardAsString(Type));
-		return;
+		return false;
 	}
 	ScaleBox->SetStretch(EStretch::UserSpecified);
 	ScaleBox->SetUserSpecifiedScale(CardsScale);
@@ -157,11 +172,13 @@ void UW_NomadicLayoutBuilding::CreateCardOfType(const ERTSCard Type, const TSubc
 	ScaleBox->AddChild(CardWidget);
 	CardScrollBox->AddChild(ScaleBox);
 	M_CardsInScrollBox.Add(CardWidget);
+	return true;
 }
 
 void UW_NomadicLayoutBuilding::SetupAllowedCardsFromBuildingType(const ENomadicLayoutBuildingType BuildingType)
 {
-	switch (BuildingType) {
+	switch (BuildingType)
+	{
 	case ENomadicLayoutBuildingType::Building_None:
 		M_AllowedCardTypes = {ECardType::Empty};
 		break;

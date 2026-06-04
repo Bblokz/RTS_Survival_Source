@@ -134,6 +134,7 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 	virtual void NativeOnInitialized() override;
 
 	/**
@@ -356,6 +357,7 @@ private:
 	 * @note This function is called internally by PlayRTSCardSound to handle actual sound playback.
 	 */
 	void Play2DSound(ECardSound Sound);
+	void PlayHoverSound();
 
 	/**
 	 * @brief Resets the cooldown for playing hover sounds, allowing them to be played again.

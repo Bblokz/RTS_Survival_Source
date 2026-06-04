@@ -3,6 +3,7 @@
 
 #include "CameraPawn.h"
 
+#include "Engine/World.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/Image.h"
 #include "Kismet/GameplayStatics.h"
@@ -53,18 +54,27 @@ void ACameraPawn::BeginPlay()
 	);
 }
 
+void ACameraPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (GetIsValidMiniMap())
+	{
+		M_MiniMap->OnMiniMapClicked.RemoveDynamic(this, &ACameraPawn::HandleMiniMapClick);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void ACameraPawn::InitCameraPawn(UCameraComponent* NewCameraComponent)
 {
-	if (IsValid(NewCameraComponent))
-	{
-		M_CameraComponent = NewCameraComponent;
-	}
-	else
+	if (not IsValid(NewCameraComponent))
 	{
 		RTSFunctionLibrary::ReportNullErrorComponent(this,
 		                                             "CameraComponent",
 		                                             "ACameraPawn::InitCameraPawn");
+		return;
 	}
+
+	M_CameraComponent = NewCameraComponent;
 }
 
 void ACameraPawn::OnMainMenuLoaded()
@@ -78,9 +88,14 @@ void ACameraPawn::OnMainMenuLoaded()
 		return;
 	}
 	M_MiniMap = MainMenu->GetIsValidMiniMap();
+	if (not GetIsValidMiniMap())
+	{
+		return;
+	}
 
 	// Bind click events
-    	M_MiniMap->OnMiniMapClicked.AddDynamic(this, &ACameraPawn::HandleMiniMapClick);
+	M_MiniMap->OnMiniMapClicked.RemoveDynamic(this, &ACameraPawn::HandleMiniMapClick);
+	M_MiniMap->OnMiniMapClicked.AddDynamic(this, &ACameraPawn::HandleMiniMapClick);
 	// Set the landscape plane at 0,0 100 z and normal 0,0,1
 	M_LandscapePlane = FPlane(FVector(0, 0, 100), FVector(0, 0, 1));
 	bM_UpdateMiniMapWithCamera = true;
@@ -88,12 +103,18 @@ void ACameraPawn::OnMainMenuLoaded()
 
 void ACameraPawn::DrawCameraOnMiniMap()
 {
-	if (not IsValid(M_PlayerController) || not IsValid(M_MiniMap) || not IsValid(M_FowManager) || not IsValid(
+	if (not IsValid(M_PlayerController) || not GetIsValidMiniMap() || not GetIsValidFowManager() || not IsValid(
 		M_SpringArmComponent))
 	{
 		return;
 	}
-	UMaterialInstanceDynamic* DynamicMatInstance = M_MiniMap->GetIsValidMiniMapImg()->GetDynamicMaterial();
+	UImage* MiniMapImage = M_MiniMap->GetIsValidMiniMapImg();
+	if (not IsValid(MiniMapImage))
+	{
+		return;
+	}
+
+	UMaterialInstanceDynamic* DynamicMatInstance = MiniMapImage->GetDynamicMaterial();
 	if (not DynamicMatInstance)
 	{
 		return;
@@ -154,14 +175,22 @@ FVector2D ACameraPawn::GetMiniMapLocationRelativeToFow(const float SpringArmLeng
 	FVector2D MiniMapLocation = FVector2D(0, 0);
 	float TangetIntersect = 0.0f;
 	bProjectionSuccessful = false;
+	if (MapExtent <= UE_SMALL_NUMBER)
+	{
+		return MiniMapLocation;
+	}
+
 	FVector Intersection;
 	FVector ProjectedWorldPostion, ProjectedWorldDirection;
 	/**
 	 * World position: where the pixel (top left in this case) projects into world space.
 	 * "If i shoot a ray from this pixel from camera pov it starts here  and goes in this direction" 
 	 */
-	(void)UGameplayStatics::DeprojectScreenToWorld(M_PlayerController, ScreenPositionToProject, ProjectedWorldPostion,
-	                                               ProjectedWorldDirection);
+	if (not UGameplayStatics::DeprojectScreenToWorld(M_PlayerController, ScreenPositionToProject, ProjectedWorldPostion,
+	                                               ProjectedWorldDirection))
+	{
+		return MiniMapLocation;
+	}
 	const FVector ProjectionToLandscapeEnd = ProjectedWorldPostion + (ProjectedWorldDirection * SpringArmLength);
 	// Where does our camera ray through the pixel hit the landscape height in world space?
 	if (UKismetMathLibrary::LinePlaneIntersection(ProjectedWorldPostion, ProjectionToLandscapeEnd, M_LandscapePlane,
@@ -179,6 +208,38 @@ FVector2D ACameraPawn::GetMiniMapLocationRelativeToFow(const float SpringArmLeng
 		bProjectionSuccessful = true;
 	}
 	return MiniMapLocation;
+}
+
+bool ACameraPawn::GetIsValidMiniMap() const
+{
+	if (IsValid(M_MiniMap))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_MiniMap",
+		"GetIsValidMiniMap",
+		this
+	);
+	return false;
+}
+
+bool ACameraPawn::GetIsValidFowManager() const
+{
+	if (IsValid(M_FowManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_FowManager",
+		"GetIsValidFowManager",
+		this
+	);
+	return false;
 }
 
 void ACameraPawn::Tick(float DeltaTime)
@@ -203,7 +264,7 @@ FVector ACameraPawn::GetCameraGroundPosition_Implementation()
 
 void ACameraPawn::HandleMiniMapClick(FVector2D LocalClickUV)
 {
-	if (not IsValid(M_MiniMap) || not IsValid(M_FowManager))
+	if (not GetIsValidMiniMap() || not GetIsValidFowManager())
 	{
 		return;
 	}
@@ -211,6 +272,10 @@ void ACameraPawn::HandleMiniMapClick(FVector2D LocalClickUV)
 	// Undo UV→projection normalization:
 	const FVector FowOrigin = M_FowManager->GetActorLocation();
 	const float MapExtent = M_FowManager->GetMapExtent() * 2.0f;
+	if (MapExtent <= UE_SMALL_NUMBER)
+	{
+		return;
+	}
 	const FVector2D OffsetUV = LocalClickUV - FVector2D(0.5f, 0.5f);
 	const FVector WorldXY = FowOrigin +
 							FVector(OffsetUV.X * MapExtent, OffsetUV.Y * MapExtent, 0.0f);
@@ -221,7 +286,13 @@ void ACameraPawn::HandleMiniMapClick(FVector2D LocalClickUV)
 
 	FHitResult Hit;
 	FCollisionQueryParams Params(NAME_None, false, this);
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return;
+	}
+
+	if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
 	{
 		const FVector HitLoc = Hit.ImpactPoint;
 		const FVector Curr   = GetActorLocation();

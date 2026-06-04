@@ -8,6 +8,7 @@
 #include "Components/ScrollBox.h"
 #include "RTS_Survival/CardSystem/CardUI/CardMenu/W_CardMenu.h"
 #include "RTS_Survival/CardSystem/CardUI/RTSCardWidgets/W_RTSCard.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 TSet<ECardType> UW_CardHolder::GetCardTypesAllowed() const
 {
@@ -46,9 +47,7 @@ void UW_CardHolder::SetupCardHolder(
 		{
 			break;
 		}
-		if (UW_RTSCard* CardWidget = CreateCardWidgetInHolder(EachCardType, InCardMenu,
-		                                                      AllowedCardTypes.Contains(ECardType::StartingUnit),
-		                                                      AllowedCardTypes))
+		if (UW_RTSCard* CardWidget = CreateCardWidgetInHolder(EachCardType, InCardMenu, AllowedCardTypes))
 		{
 			M_Cards.Add(CardWidget);
 		}
@@ -56,9 +55,7 @@ void UW_CardHolder::SetupCardHolder(
 	// Create empty cards as long as we have not reached the maximum amount of cards
 	while (M_Cards.Num() < M_MaxCardsToHold)
 	{
-		if (UW_RTSCard* CardWidget = CreateCardWidgetInHolder(ERTSCard::Card_Empty, InCardMenu,
-		                                                      AllowedCardTypes.Contains(ECardType::StartingUnit),
-		                                                      AllowedCardTypes))
+		if (UW_RTSCard* CardWidget = CreateCardWidgetInHolder(ERTSCard::Card_Empty, InCardMenu, AllowedCardTypes))
 		{
 			M_Cards.Add(CardWidget);
 		}
@@ -74,9 +71,15 @@ TArray<TPair<ERTSCard, ECardType>> UW_CardHolder::GetNonEmptyCardsHeld()
 
 	for (const UW_RTSCard* CardWidget : M_Cards)
 	{
+		if (not IsValid(CardWidget))
+		{
+			RTSFunctionLibrary::ReportError("Invalid card widget in UW_CardHolder::GetNonEmptyCardsHeld.");
+			continue;
+		}
+
 		// RTSlog the card type for any card
 		RTSFunctionLibrary::PrintToLog("card type in GetNonEmptyCardsHeld: " + Global_GetCardAsString(CardWidget->GetCard()), false);
-		if (CardWidget && CardWidget->GetCard() != ERTSCard::Card_Empty)
+		if (CardWidget->GetCard() != ERTSCard::Card_Empty)
 		{
 			NonEmptyCards.Add(CardWidget->GetCard());
 		}
@@ -115,15 +118,22 @@ TArray<UW_RTSCard*> UW_CardHolder::GetSelectedCards()
 }
 
 UW_RTSCard* UW_CardHolder::CreateCardWidgetInHolder(const ERTSCard& CardType, const TObjectPtr<UW_CardMenu> InCardMenu,
-                                                    const bool bIsLeftSide, const TSet<ECardType>& AllowedCardTypes)
+                                                    const TSet<ECardType>& AllowedCardTypes)
 {
 	if (not GetIsValidCardHolder())
 	{
 		return nullptr;
 	}
+	if (GetWorld() == nullptr || not IsValid(M_BlueprintCardClass))
+	{
+		RTSFunctionLibrary::ReportError("Cannot create card widget in UW_CardHolder because world or card class is invalid."
+			"\n for card type: " + Global_GetCardAsString(CardType));
+		return nullptr;
+	}
+
 	// Create the card widget
 	UW_RTSCard* CardWidget = CreateWidget<UW_RTSCard>(GetWorld(), M_BlueprintCardClass);
-	if (!IsValid(CardWidget))
+	if (not IsValid(CardWidget))
 	{
 		RTSFunctionLibrary::ReportError("Failed to create card widget in UW_CardHolder"
 			"\n for card type: " + Global_GetCardAsString(CardType));

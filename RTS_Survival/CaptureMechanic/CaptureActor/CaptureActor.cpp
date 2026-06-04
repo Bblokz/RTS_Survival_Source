@@ -29,6 +29,15 @@ void ACaptureActor::BeginPlay()
 	BeginPlay_ApplyCapturableHealthBarCustomization();
 }
 
+void ACaptureActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_CaptureTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
 
 void ACaptureActor::BeginPlay_ResolveHealthComponent()
 {
@@ -50,7 +59,7 @@ void ACaptureActor::BeginPlay_ApplyCapturableHealthBarCustomization()
 	TWeakObjectPtr<ACaptureActor> WeakThis(this);
 	auto HpLambda = [WeakThis](UHealthComponent* HpCompInitialized) -> void
 	{
-		if (not WeakThis.IsValid())
+		if (not WeakThis.IsValid() || not IsValid(HpCompInitialized))
 		{
 			return;
 		}

@@ -149,7 +149,7 @@ void UW_CardScrollBox::OnSortByRarity()
 	for (int32 i = 0; i < NumCards; ++i)
 	{
 		UW_RTSCard* Card = M_CardsInScrollBox[i];
-		if (!IsValid(Card))
+		if (not IsValid(Card))
 		{
 			continue;
 		}
@@ -180,6 +180,12 @@ void UW_CardScrollBox::OnSortByType()
     }
     EnsureCardArrayIsValid();
 
+    if (SortTypeOrder.IsEmpty())
+    {
+        RTSFunctionLibrary::ReportError("Cannot sort cards by type because SortTypeOrder is empty.");
+        return;
+    }
+
     // Advance the sort index to cycle through types
     CurrentTypeSortIndex = (CurrentTypeSortIndex + 1) % SortTypeOrder.Num();
 
@@ -203,8 +209,14 @@ void UW_CardScrollBox::OnSortByType()
         int32 IndexB = SortTypeOrder.Find(TypeB);
 
         // If type not found (e.g., Invalid or Empty), place it at the end
-        if (IndexA == INDEX_NONE) IndexA = NumTypes;
-        if (IndexB == INDEX_NONE) IndexB = NumTypes;
+        if (IndexA == INDEX_NONE)
+        {
+            IndexA = NumTypes;
+        }
+        if (IndexB == INDEX_NONE)
+        {
+            IndexB = NumTypes;
+        }
 
         // Compute adjusted indices relative to CurrentTypeSortIndex
         int32 AdjustedIndexA = (IndexA - CurrentTypeSortIndex + NumTypes) % NumTypes;
@@ -225,7 +237,7 @@ void UW_CardScrollBox::OnSortByType()
     for (int32 i = 0; i < NumCards; ++i)
     {
         UW_RTSCard* Card = M_CardsInScrollBox[i];
-        if (!IsValid(Card))
+        if (not IsValid(Card))
         {
             continue;
         }
@@ -307,7 +319,7 @@ UHorizontalBox* UW_CardScrollBox::GetVacantHorizontalBox(int32& OutIndexInHzBox)
 		return nullptr;
 	}
 	UHorizontalBox* LastBox = M_HorizontalBoxes.IsEmpty() ? nullptr : M_HorizontalBoxes.Last();
-	if (!IsValid(LastBox) || LastBox->GetChildrenCount() >= 9)
+	if (not IsValid(LastBox) || LastBox->GetChildrenCount() >= 9)
 	{
 		UHorizontalBox* NewBox = NewObject<UHorizontalBox>(this);
 		if (IsValid(NewBox))
@@ -401,7 +413,7 @@ void UW_CardScrollBox::UpdateCardWidgetsInScrollBox()
 
 	for (UW_RTSCard* Card : M_CardsInScrollBox)
 	{
-		if (!IsValid(Card))
+		if (not IsValid(Card))
 		{
 			continue;
 		}
@@ -410,7 +422,7 @@ void UW_CardScrollBox::UpdateCardWidgetsInScrollBox()
 		if (CurrentHorizontalBox == nullptr || CardsInCurrentRow >= MaxCardsPerRow)
 		{
 			CurrentHorizontalBox = NewObject<UHorizontalBox>(this);
-			if (!IsValid(CurrentHorizontalBox))
+			if (not IsValid(CurrentHorizontalBox))
 			{
 				RTSFunctionLibrary::ReportError("Failed to create HorizontalBox in UpdateCardWidgetsInScrollBox");
 				continue;
@@ -422,7 +434,7 @@ void UW_CardScrollBox::UpdateCardWidgetsInScrollBox()
 
 		// Wrap the card in a ScaleBox
 		UScaleBox* ScaleBox = NewObject<UScaleBox>(this);
-		if (!IsValid(ScaleBox))
+		if (not IsValid(ScaleBox))
 		{
 			RTSFunctionLibrary::ReportError("Failed to create ScaleBox in UpdateCardWidgetsInScrollBox");
 			continue;
@@ -471,13 +483,20 @@ void UW_CardScrollBox::EnsureCardArrayIsValid()
 
 void UW_CardScrollBox::CreateNewCardWidget(const ERTSCard CardType)
 {
+	if (GetWorld() == nullptr || not IsValid(M_BlueprintCardClass))
+	{
+		RTSFunctionLibrary::ReportError("Cannot create card widget in UW_CardScrollBox because world or card class is invalid."
+			"\n for card type: " + Global_GetCardAsString(CardType));
+		return;
+	}
+
 	// Create the card widget
 	UW_RTSCard* CardWidget = CreateWidget<UW_RTSCard>(GetWorld(), M_BlueprintCardClass);
-	if (!IsValid(CardWidget))
+	if (not IsValid(CardWidget))
 	{
 		RTSFunctionLibrary::ReportError("Failed to create card widget in UW_CardScrollBox"
 			"\n for card type: " + Global_GetCardAsString(CardType));
-		return;;
+		return;
 	}
 
 	// Initialize the card widget with the card data
@@ -491,7 +510,7 @@ void UW_CardScrollBox::CreateNewCardWidget(const ERTSCard CardType)
 	{
 		RTSFunctionLibrary::ReportError("Failed to create ScaleBox in UW_CardScrollBox"
 			"\n for card type: " + Global_GetCardAsString(CardType));
-		return;;
+		return;
 	}
 	ScaleBox->SetStretch(EStretch::UserSpecified);
 	ScaleBox->SetUserSpecifiedScale(-1.5f);

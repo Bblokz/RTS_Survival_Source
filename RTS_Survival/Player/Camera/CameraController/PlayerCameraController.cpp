@@ -3,9 +3,11 @@
 #include "PlayerCameraController.h"
 
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Player/Camera/CameraPawn.h"
@@ -17,7 +19,7 @@ UPlayerCameraController::UPlayerCameraController(): M_PlayerCamera(nullptr), M_S
                                                     M_CameraMovementSpeedMultiplier(RTSGameUserSettingsRanges::DefaultCameraMovementSpeedMultiplier),
                                                     bM_IsPlayerInTechTreeOrArchive(false),
                                                     M_BaseCameraZoomLevel(0),
-                                                    CurrentMove(), MoveStartLocation()
+                                                    M_CurrentMove(), M_MoveStartLocation()
 {
 	EdgeScrollSpeedX = 0.0f;
 	EdgeScrollSpeedY = 0.0f;
@@ -378,7 +380,7 @@ void UPlayerCameraController::GetViewportSizeAndMouse(
 	bool& bOutIsMouseInViewport) const
 {
 	// Ensure we have a valid viewport
-	if (!GEngine || !GEngine->GameViewport)
+	if (GEngine == nullptr || GEngine->GameViewport == nullptr || GetWorld() == nullptr)
 	{
 		OutScreenX = OutScreenY = OutMouseX = OutMouseY = 0.0f;
 		bOutIsMouseInViewport = false;
@@ -468,25 +470,32 @@ void UPlayerCameraController::MoveCameraOverTime(const FMovePlayerCamera& NewMov
 		AdjustedMove.TimeCameraInputDisabled = AdjustedMove.TimeToMove;
 	}
 	// If a move is already in progress, add this move to the queue.
-	if (bIsCameraMoving)
+	if (bM_IsCameraMoving)
 	{
-		CameraMoveQueue.Add(AdjustedMove);
+		M_CameraMoveQueue.Add(AdjustedMove);
 	}
 	else
 	{
 		// Start the move immediately.
 		UGameplayStatics::PlaySound2D(this, AdjustedMove.MoveSound, 1.0f,
 		                              1.0f, 0.0f);
-		bIsCameraMoving = true;
-		CurrentMove = AdjustedMove;
-		MoveStartLocation = M_PlayerCamera->GetActorLocation();
-		MoveStartTime = M_PlayerCamera->GetWorld()->GetTimeSeconds();
+		bM_IsCameraMoving = true;
+		M_CurrentMove = AdjustedMove;
+		UWorld* World = M_PlayerCamera->GetWorld();
+		if (World == nullptr)
+		{
+			bM_IsCameraMoving = false;
+			return;
+		}
+
+		M_MoveStartLocation = M_PlayerCamera->GetActorLocation();
+		M_MoveStartTime = World->GetTimeSeconds();
 		// The move duration is the max of TimeToMove and TimeCameraInputDisabled.
-		MoveDuration = FMath::Max(CurrentMove.TimeToMove, CurrentMove.TimeCameraInputDisabled);
+		M_MoveDuration = FMath::Max(M_CurrentMove.TimeToMove, M_CurrentMove.TimeCameraInputDisabled);
 		// Start the timer; when it completes, consider the move finished.
-		M_PlayerCamera->GetWorld()->GetTimerManager().SetTimer(MoveCameraTimerHandle, this,
+		World->GetTimerManager().SetTimer(M_MoveCameraTimerHandle, this,
 		                                                       &UPlayerCameraController::OnCameraMoveComplete,
-		                                                       MoveDuration,
+		                                                       M_MoveDuration,
 		                                                       false);
 	}
 }
@@ -496,14 +505,14 @@ void UPlayerCameraController::OnCameraMoveComplete()
 	// Ensure the camera is exactly at the target location.
 	if (GetIsValidCameraPawn())
 	{
-		TryMoveCameraToLocation(CurrentMove.MoveToLocation);
+		TryMoveCameraToLocation(M_CurrentMove.MoveToLocation);
 	}
-	bIsCameraMoving = false;
+	bM_IsCameraMoving = false;
 	// If there is a queued move, start it.
-	if (CameraMoveQueue.Num() > 0)
+	if (M_CameraMoveQueue.Num() > 0)
 	{
-		FMovePlayerCamera NextMove = CameraMoveQueue[0];
-		CameraMoveQueue.RemoveAt(0);
+		FMovePlayerCamera NextMove = M_CameraMoveQueue[0];
+		M_CameraMoveQueue.RemoveAt(0);
 		MoveCameraOverTime(NextMove);
 	}
 }
@@ -514,17 +523,35 @@ void UPlayerCameraController::PostInitProperties()
 	SetComponentTickEnabled(true);
 }
 
+void UPlayerCameraController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_MoveCameraTimerHandle);
+	}
+
+	M_CameraMoveQueue.Empty();
+	bM_IsCameraMoving = false;
+	Super::EndPlay(EndPlayReason);
+}
+
 void UPlayerCameraController::TickComponent(float DeltaTime, ELevelTick TickType,
                                             FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// Process camera movement over time.
-	if (bIsCameraMoving && GetIsValidCameraPawn())
+	UWorld* World = GetWorld();
+	if (World == nullptr)
 	{
-		float ElapsedTime = GetWorld()->GetTimeSeconds() - MoveStartTime;
-		float Alpha = (MoveDuration > 0.0f) ? FMath::Clamp(ElapsedTime / MoveDuration, 0.0f, 1.0f) : 1.0f;
-		FVector NewLocation = FMath::Lerp(MoveStartLocation, CurrentMove.MoveToLocation, Alpha);
+		return;
+	}
+
+	// Process camera movement over time.
+	if (bM_IsCameraMoving && GetIsValidCameraPawn())
+	{
+		float ElapsedTime = World->GetTimeSeconds() - M_MoveStartTime;
+		float Alpha = (M_MoveDuration > 0.0f) ? FMath::Clamp(ElapsedTime / M_MoveDuration, 0.0f, 1.0f) : 1.0f;
+		FVector NewLocation = FMath::Lerp(M_MoveStartLocation, M_CurrentMove.MoveToLocation, Alpha);
 		TryMoveCameraToLocation(NewLocation);
 	}
 	EdgeScroll(DeltaTime);

@@ -162,6 +162,7 @@ public:
 
 
 	virtual void PostInitProperties() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 
@@ -185,13 +186,15 @@ private:
 	bool bM_IsPlayerInTechTreeOrArchive;
 	float M_BaseCameraZoomLevel;
 
-	TArray<FMovePlayerCamera> CameraMoveQueue;
-	bool bIsCameraMoving = false;
-	FMovePlayerCamera CurrentMove;
-	FVector MoveStartLocation;
-	float MoveStartTime = 0.0f;
-	float MoveDuration = 0.0f;
-	FTimerHandle MoveCameraTimerHandle;
+	UPROPERTY()
+	TArray<FMovePlayerCamera> M_CameraMoveQueue;
+	bool bM_IsCameraMoving = false;
+	UPROPERTY()
+	FMovePlayerCamera M_CurrentMove;
+	FVector M_MoveStartLocation;
+	float M_MoveStartTime = 0.0f;
+	float M_MoveDuration = 0.0f;
+	FTimerHandle M_MoveCameraTimerHandle;
 
 	// Callback when the current move is complete.
 	void OnCameraMoveComplete();
