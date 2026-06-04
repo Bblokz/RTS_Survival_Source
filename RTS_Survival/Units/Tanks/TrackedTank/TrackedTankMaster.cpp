@@ -5,6 +5,7 @@
 
 #include "TrackedAnimationInstance.h"
 #include "Components/AudioComponent.h"
+#include "Sound/SoundBase.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "TimerManager.h"
 #include "PathFollowingComponent/TrackPathFollowingComponent.h"
@@ -136,16 +137,7 @@ void ATrackedTankMaster::OnRTSUnitSpawned(const bool bSetDisabled, const float T
 void ATrackedTankMaster::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	if (UAudioComponent* Audio = FindComponentByClass<UAudioComponent>())
-	{
-		M_EngineSoundComponent = Audio;
-		if (UWorld* World = GetWorld())
-		{
-			M_EngineSoundDel.BindUObject(this, &ATrackedTankMaster::UpdateEngineSound);
-			World->GetTimerManager().SetTimer(M_EngineSoundHandle, M_EngineSoundDel,
-			                                  DeveloperSettings::Optimization::UpdateEngineSoundsInterval, true);
-		}
-	}
+	PostInitializeComponents_SetupEngineSounds();
 	M_DigInComponent = FindComponentByClass<UDigInComponent>();
 	M_AttachedRockets = FindComponentByClass<UAttachedRockets>();
 	if (not GetIsValidDigInComponent())
@@ -404,6 +396,8 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& Tar
 	const bool bIsMovingNow = GetVelocity().SizeSquared2D() > FMath::Square(MovingSpeedThresholdUnitsPerSecond);
 	const bool bIsMovementChainTransition = CommandData->GetHasPreviousMovementCommandBeforeActive();
 	const bool bShouldSkipNavSettleDelay = bIsMovingNow || bIsMovementChainTransition;
+	const bool bHadPendingStationaryQueuedMove =
+		M_QueuedMoveState.bM_HasPendingQueuedMove && M_QueuedMoveState.bM_IsStationaryWhenQueued;
 
 	M_QueuedMoveState.M_TargetLocation = TargetLocation;
 	M_QueuedMoveState.bM_HasPendingQueuedMove = true;
@@ -422,6 +416,11 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& Tar
 
 	if (M_QueuedMoveState.bM_IsStationaryWhenQueued)
 	{
+		if (not bHadPendingStationaryQueuedMove)
+		{
+			PlayEngineGasSoundEffect();
+		}
+
 		constexpr float NavSettleDelaySeconds = 0.4f;
 		GetWorld()->GetTimerManager().SetTimer(
 			M_DeferredTrackedMoveHandle,
@@ -723,11 +722,107 @@ void ATrackedTankMaster::WallGotDestroyedForceBreakCover()
 
 void ATrackedTankMaster::UpdateEngineSound() const
 {
-	if (IsValid(M_EngineSoundComponent) && IsValid(ChassisMesh))
+	if (not GetIsValidEngineSoundComponent() or not IsValid(ChassisMesh))
 	{
-		const float Speed = ChassisMesh->GetBoneLinearVelocity(NAME_None).Length();
-		M_EngineSoundComponent->SetFloatParameter(AudioSpeedParam, Speed);
+		return;
 	}
+
+	const float Speed = ChassisMesh->GetBoneLinearVelocity(NAME_None).Length();
+	M_EngineSoundComponent->SetFloatParameter(AudioSpeedParam, Speed);
+}
+
+void ATrackedTankMaster::PostInitializeComponents_SetupEngineSounds()
+{
+	UAudioComponent* const EngineSoundComponent = FindComponentByClass<UAudioComponent>();
+	if (not IsValid(EngineSoundComponent))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			TEXT("M_EngineSoundComponent"),
+			TEXT("PostInitializeComponents_SetupEngineSounds"),
+			this);
+		return;
+	}
+
+	M_EngineSoundComponent = EngineSoundComponent;
+	SetupEngineGasSoundComponent();
+
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	M_EngineSoundDel.BindUObject(this, &ATrackedTankMaster::UpdateEngineSound);
+	World->GetTimerManager().SetTimer(
+		M_EngineSoundHandle,
+		M_EngineSoundDel,
+		DeveloperSettings::Optimization::UpdateEngineSoundsInterval,
+		true);
+}
+
+void ATrackedTankMaster::SetupEngineGasSoundComponent()
+{
+	if (not GetIsValidEngineSoundComponent())
+	{
+		return;
+	}
+
+	if (M_EngineGasSoundComponent != nullptr)
+	{
+		return;
+	}
+
+	M_EngineGasSoundComponent = NewObject<UAudioComponent>(
+		this,
+		EngineGasSoundComponentName,
+		RF_Transactional,
+		M_EngineSoundComponent);
+	if (not GetIsValidEngineGasSoundComponent())
+	{
+		return;
+	}
+
+	M_EngineGasSoundComponent->SetSound(nullptr);
+	M_EngineGasSoundComponent->SetBoolParameter(EngineGasSoundLoopingParam, false);
+	// This component is dedicated to one-shot start effects, so it never auto-starts or overlaps itself.
+	M_EngineGasSoundComponent->bAutoActivate = false;
+	M_EngineGasSoundComponent->bAutoDestroy = false;
+	M_EngineGasSoundComponent->bCanPlayMultipleInstances = false;
+	M_EngineGasSoundComponent->AttenuationSettings = M_EngineSoundComponent->AttenuationSettings;
+	M_EngineGasSoundComponent->bOverrideAttenuation = M_EngineSoundComponent->bOverrideAttenuation;
+	M_EngineGasSoundComponent->AttenuationOverrides = M_EngineSoundComponent->AttenuationOverrides;
+	M_EngineGasSoundComponent->SetRelativeTransform(M_EngineSoundComponent->GetRelativeTransform());
+
+	if (USceneComponent* const EngineSoundParent = M_EngineSoundComponent->GetAttachParent())
+	{
+		M_EngineGasSoundComponent->AttachToComponent(
+			EngineSoundParent,
+			FAttachmentTransformRules::KeepRelativeTransform,
+			M_EngineSoundComponent->GetAttachSocketName());
+	}
+	else if (USceneComponent* const RootSceneComponent = GetRootComponent())
+	{
+		M_EngineGasSoundComponent->AttachToComponent(
+			RootSceneComponent,
+			FAttachmentTransformRules::KeepRelativeTransform);
+	}
+
+	AddInstanceComponent(M_EngineGasSoundComponent);
+	M_EngineGasSoundComponent->RegisterComponent();
+}
+
+void ATrackedTankMaster::PlayEngineGasSoundEffect() const
+{
+	if (not GetIsValidEngineGasSound() or not GetIsValidEngineGasSoundComponent())
+	{
+		return;
+	}
+
+	M_EngineGasSoundComponent->Stop();
+	M_EngineGasSoundComponent->SetSound(M_EngineGasSound);
+	M_EngineGasSoundComponent->SetBoolParameter(EngineGasSoundLoopingParam, false);
+	M_EngineGasSoundComponent->Play();
 }
 
 void ATrackedTankMaster::OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const
@@ -818,6 +913,51 @@ bool ATrackedTankMaster::GetIsValidTankAnimationBP() const
 		this,
 		"TankAnimationBP",
 		"GetIsValidTankAnimationBP",
+		this);
+	return false;
+}
+
+bool ATrackedTankMaster::GetIsValidEngineSoundComponent() const
+{
+	if (IsValid(M_EngineSoundComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_EngineSoundComponent"),
+		TEXT("GetIsValidEngineSoundComponent"),
+		this);
+	return false;
+}
+
+bool ATrackedTankMaster::GetIsValidEngineGasSoundComponent() const
+{
+	if (IsValid(M_EngineGasSoundComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_EngineGasSoundComponent"),
+		TEXT("GetIsValidEngineGasSoundComponent"),
+		this);
+	return false;
+}
+
+bool ATrackedTankMaster::GetIsValidEngineGasSound() const
+{
+	if (IsValid(M_EngineGasSound))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_EngineGasSound"),
+		TEXT("GetIsValidEngineGasSound"),
 		this);
 	return false;
 }
