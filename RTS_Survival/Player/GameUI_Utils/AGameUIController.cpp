@@ -168,18 +168,20 @@ void AGameUIController::RebuildGameUIHierarchy(
 	M_UniqueSubTypeIDToSelectionData.Empty();
 	M_ActiveGameUIArrayIndex = 0;
 
-	EnsureProvidedArraysAreValid(
+	if (not EnsureProvidedArraysAreValid(
 		TPlayerSelectedPawnMasters,
 		TPlayerSelectedSquadControllers,
-		TPlayerSelectedActors
-	);
+		TPlayerSelectedActors))
+	{
+		return;
+	}
 
 	auto CollectUnitSubTypes = [&](auto* SelectedUnits)
 	{
 		for (auto* EachUnit : *SelectedUnits)
 		{
 			const URTSComponent* RTSComp = EachUnit->GetRTSComponent();
-			if (!RTSComp)
+			if (not RTSComp)
 			{
 				continue;
 			}
@@ -190,7 +192,7 @@ void AGameUIController::RebuildGameUIHierarchy(
 
 			uint32 UnitSubTypeID = GetUniqueUnitSubtypeID(UnitType, SubTypeValue);
 
-			if (!M_SelectedUniqueSubTypeIDs.Contains(UnitSubTypeID))
+			if (not M_SelectedUniqueSubTypeIDs.Contains(UnitSubTypeID))
 			{
 				FSelectionData SelectionData;
 				SelectionData.SelectionPriority = SelectionPriority;
@@ -265,10 +267,13 @@ void AGameUIController::OnlyRebuildSelectionUI(TArray<ASelectablePawnMaster*>* T
                                                TArray<ASquadController*>* TPlayerSelectedSquadControllers,
                                                TArray<ASelectableActorObjectsMaster*>* TPlayerSelectedActors)
 {
-	EnsureProvidedArraysAreValid(
+	if (not EnsureProvidedArraysAreValid(
 		TPlayerSelectedPawnMasters,
 		TPlayerSelectedSquadControllers,
-		TPlayerSelectedActors);
+		TPlayerSelectedActors))
+	{
+		return;
+	}
 	PushSelectionPanelState(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors);
 }
 
@@ -277,10 +282,13 @@ void AGameUIController::TabThroughGameUIHierarchy(TArray<ASelectablePawnMaster*>
                                                   TArray<ASelectableActorObjectsMaster*>* TPlayerSelectedActors)
 {
 	IncrementGameUI_Index();
-	EnsureProvidedArraysAreValid(
+	if (not EnsureProvidedArraysAreValid(
 		TPlayerSelectedPawnMasters,
 		TPlayerSelectedSquadControllers,
-		TPlayerSelectedActors);
+		TPlayerSelectedActors))
+	{
+		return;
+	}
 	// Updates the UI state 
 	CalculatePropagateGameUIState(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors);
 	PushSelectionPanelState(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors);
@@ -293,7 +301,10 @@ bool AGameUIController::TryAdvancePrimaryToUnitType(
 	TArray<ASquadController*>* TPlayerSelectedSquadControllers,
 	TArray<ASelectableActorObjectsMaster*>* TPlayerSelectedActors, AActor* OverwritePrimaryActor)
 {
-	EnsureProvidedArraysAreValid(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors);
+	if (not EnsureProvidedArraysAreValid(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors))
+	{
+		return false;
+	}
 
 	// No hierarchy => nothing to tab through.
 	if (M_THierarchyGameUI.IsEmpty())
@@ -312,7 +323,7 @@ bool AGameUIController::TryAdvancePrimaryToUnitType(
 			break;
 		}
 	}
-	if (!bDesiredExists)
+	if (not bDesiredExists)
 	{
 		RTSFunctionLibrary::ReportError(
 			FString::Printf(TEXT("TryAdvancePrimaryToUnitType: type %s not found in hierarchy."),
@@ -430,7 +441,7 @@ void AGameUIController::CalculatePropagateGameUIState(
 	}
 
 	// Query current ability from the primary unit if it supports ICommands.
-	if (PrimaryUnit && PrimaryUnit->GetClass()->ImplementsInterface(UCommands::StaticClass()))
+	if (IsValid(PrimaryUnit) && PrimaryUnit->GetClass()->ImplementsInterface(UCommands::StaticClass()))
 	{
 		if (ICommands* CommandsInterface = Cast<ICommands>(PrimaryUnit))
 		{
@@ -447,6 +458,11 @@ void AGameUIController::CalculatePropagateGameUIState(
 			Global_GetUnitTypeString(PrimarySelectedUnitType) + " is primary selected.");
 	}
 
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+
 	// Fill parameters (this maps UnitSubtype -> per-type subtype enums and sets visibility flags).
 	GetGameUIParametersForType(ActionUIParameters, PrimarySelectedUnitType, PrimaryUnit, CurrentAbility, UnitSubtype);
 
@@ -461,7 +477,7 @@ bool AGameUIController::TryApplyOverwritePrimarySelectedUnit(
 	int32& InOutRawSubtype,
 	AActor*& OutPrimaryUnit) const
 {
-	if (!IsValid(OverwritePrimarySelectedUnit))
+	if (not IsValid(OverwritePrimarySelectedUnit))
 	{
 		return false;
 	}
@@ -520,22 +536,30 @@ void AGameUIController::GetGameUIParametersForType(
 void AGameUIController::GetActionUIParamsNomadic(
 	FActionUIParameters& OutGameUIParameters,
 	AActor* PrimaryUnit,
-	EAbilityID CurrentAbility) const
+	EAbilityID CurrentAbility)
 {
 	OutGameUIParameters.bShowBuildingUI = true;
-	if (ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(PrimaryUnit))
+	ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(PrimaryUnit);
+	if (not IsValid(NomadicVehicle))
 	{
-		OutGameUIParameters.NomadicButtonState = GetButtonStateFromTruck(NomadicVehicle, CurrentAbility);
-		// Update the BuildingExpansionUI; note that this is a separate UI function that needs to be executed before
-		// we update the whole action UI with Playercontroller:UpdateActionUI
-		// as otherwise the bxp options are not initialised correctly. 
-		M_PlayerController->GetMainMenuUI()->InitBuildingExpansionUIForNewUnit(NomadicVehicle);
+		return;
 	}
+
+	OutGameUIParameters.NomadicButtonState = GetButtonStateFromTruck(NomadicVehicle, CurrentAbility);
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+
+	// Update the BuildingExpansionUI; note that this is a separate UI function that needs to be executed before
+	// we update the whole action UI with Playercontroller:UpdateActionUI
+	// as otherwise the bxp options are not initialised correctly.
+	M_MainGameUI->InitBuildingExpansionUIForNewUnit(NomadicVehicle);
 }
 
 EActionUINomadicButton AGameUIController::GetButtonStateFromTruck(
 	const ANomadicVehicle* NomadicVehicle,
-	EAbilityID CurrentAbility) const
+	EAbilityID CurrentAbility)
 {
 	EActionUINomadicButton NomadicButtonState = EActionUINomadicButton::EAUI_ShowConvertToBuilding;
 	if (NomadicVehicle)
@@ -574,9 +598,9 @@ EActionUINomadicButton AGameUIController::GetButtonStateFromTruck(
 
 void AGameUIController::GetTrainingUIParametersForType(
 	FActionUIParameters& OutGameUIParameters,
-	AActor* PrimaryUnit) const
+	AActor* PrimaryUnit)
 {
-	if (!IsValid(M_PlayerController) || !IsValid(M_PlayerController->GetMainMenuUI()))
+	if (not GetIsValidMainGameUI())
 	{
 		return;
 	}
@@ -591,7 +615,7 @@ void AGameUIController::GetTrainingUIParametersForType(
 				if (TrainerComponent->GetTrainingOptions().Num() > 0)
 				{
 					const bool bIsAbleToTrain = TrainerComponent->GetIsAbleToTrain();
-					M_PlayerController->GetMainMenuUI()->SetupTrainingUIForNewTrainer(TrainerComponent, bIsAbleToTrain);
+					M_MainGameUI->SetupTrainingUIForNewTrainer(TrainerComponent, bIsAbleToTrain);
 					OutGameUIParameters.bShowTrainingUI = bIsAbleToTrain;
 					bValidTrainerSelected = true;
 				}
@@ -601,7 +625,7 @@ void AGameUIController::GetTrainingUIParametersForType(
 	if (not bValidTrainerSelected)
 	{
 		// Reset primary selected trainer.
-		M_PlayerController->GetMainMenuUI()->SetupTrainingUIForNewTrainer(nullptr, false);
+		M_MainGameUI->SetupTrainingUIForNewTrainer(nullptr, false);
 	}
 }
 
@@ -673,13 +697,35 @@ bool AGameUIController::GetIsValidMainGameUI()
 	{
 		return true;
 	}
-	if (IsValid(M_PlayerController) && IsValid(M_PlayerController->GetMainMenuUI()))
+
+	if (not GetIsValidPlayerController())
+	{
+		return false;
+	}
+
+	if (IsValid(M_PlayerController->GetMainMenuUI()))
 	{
 		M_MainGameUI = M_PlayerController->GetMainMenuUI();
 		return true;
 	}
+
 	RTSFunctionLibrary::ReportError("Player controller or MainGameUI is null for AGameUIController"
 		"\n @function: GetISValidMainGameUI");
+	return false;
+}
+
+bool AGameUIController::GetIsValidPlayerController() const
+{
+	if (IsValid(M_PlayerController))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_PlayerController",
+		"GetIsValidPlayerController",
+		this);
 	return false;
 }
 
@@ -726,11 +772,18 @@ TArray<FUnitAbilityEntry> AGameUIController::GetPrimaryUnitAbilities(
 	return UnitCommands->GetUnitAbilityEntries();
 }
 
-void AGameUIController::EnsureProvidedArraysAreValid(
+bool AGameUIController::EnsureProvidedArraysAreValid(
 	TArray<ASelectablePawnMaster*>* TPlayerSelectedPawnMasters,
 	TArray<ASquadController*>* TPlayerSelectedSquadControllers,
 	TArray<ASelectableActorObjectsMaster*>* TPlayerSelectedActors)
 {
+	if (not TPlayerSelectedPawnMasters || not TPlayerSelectedSquadControllers || not TPlayerSelectedActors)
+	{
+		RTSFunctionLibrary::ReportError(
+			"AGameUIController::EnsureProvidedArraysAreValid received a null selection array pointer.");
+		return false;
+	}
+
 	// 1) Clean up the array of ASelectablePawnMaster pointers
 	if (TPlayerSelectedPawnMasters)
 	{
@@ -776,6 +829,7 @@ void AGameUIController::EnsureProvidedArraysAreValid(
 		}
 		*TPlayerSelectedActors = MoveTemp(ValidActors);
 	}
+	return true;
 }
 
 void AGameUIController::PushSelectionPanelState(
@@ -793,12 +847,15 @@ void AGameUIController::PushSelectionPanelState(
 
 	const bool bHasOverWritePrimary = IsValid(OverWritePrimarySelectedUnit);
 
-	if (!GetIsValidMainGameUI())
+	if (not GetIsValidMainGameUI())
 	{
 		return;
 	}
 
-	EnsureProvidedArraysAreValid(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors);
+	if (not EnsureProvidedArraysAreValid(TPlayerSelectedPawnMasters, TPlayerSelectedSquadControllers, TPlayerSelectedActors))
+	{
+		return;
+	}
 
 	TArray<SelectionUIRebuilder::FFlatEntry> Flat;
 	Flat.Reserve(
@@ -808,21 +865,21 @@ void AGameUIController::PushSelectionPanelState(
 
 	auto AppendFrom = [this, &Flat](auto* Arr)
 	{
-		if (!Arr) { return; }
+		if (not Arr) { return; }
 		for (int32 i = 0; i < Arr->Num(); ++i)
 		{
 			AActor* Each = (*Arr)[i];
-			if (!IsValid(Each))
+			if (not IsValid(Each))
 			{
 				continue;
 			}
 			FTrainingOption UnitID{};
-			if (!SelectionUIRebuilder::TryBuildUnitIDFromActor(Each, UnitID))
+			if (not SelectionUIRebuilder::TryBuildUnitIDFromActor(Each, UnitID))
 			{
 				continue;
 			}
 			const URTSComponent* RTS = Cast<URTSComponent>(Each->GetComponentByClass(URTSComponent::StaticClass()));
-			if (!RTS)
+			if (not RTS)
 			{
 				continue;
 			}
@@ -914,7 +971,7 @@ void AGameUIController::PushSelectionPanelState(
 			else
 			{
 				// No overwrite: first encountered in this bucket is primary.
-				if (!bPrimaryTileMarked)
+				if (not bPrimaryTileMarked)
 				{
 					S.WidgetType = ESelectedWidgetType::PrimarySelected;
 					bPrimaryTileMarked = true;
@@ -934,7 +991,7 @@ void AGameUIController::PushSelectionPanelState(
 	}
 
 	// Safety: if nothing marked (e.g. empty bucket), pick first of bucket.
-	if (!bPrimaryTileMarked)
+	if (not bPrimaryTileMarked)
 	{
 		for (int32 i = 0; i < Flat.Num(); ++i)
 		{
@@ -1031,13 +1088,13 @@ void AGameUIController::Debug_PrintSelectedUnits(
 
 bool AGameUIController::Debug_TryGetDisplayNameFromActor(const AActor* InActor, FString& OutDisplayName) const
 {
-	if (!IsValid(InActor))
+	if (not IsValid(InActor))
 	{
 		return false;
 	}
 
 	const URTSComponent* RTS = Cast<URTSComponent>(InActor->GetComponentByClass(URTSComponent::StaticClass()));
-	if (!RTS)
+	if (not RTS)
 	{
 		return false;
 	}
@@ -1056,7 +1113,7 @@ void AGameUIController::EnsurePrimarySelectedSameTypeCacheIsValid()
 
 	for (auto It = M_PrimarySameTypeCache.CreateIterator(); It; ++It)
 	{
-		if (!It->IsValid())
+		if (not It->IsValid())
 		{
 			It.RemoveCurrent();
 		}
@@ -1085,6 +1142,11 @@ AActor* AGameUIController::GetPrimarySelectedUnit(
 	auto GetSelected = [ActiveUnitSubTypeID, this, &OutUnitSubtype](auto& SelectedUnits) -> AActor* {
 		for (auto* EachUnit : SelectedUnits)
 		{
+			if (not IsValid(EachUnit))
+			{
+				continue;
+			}
+
 			URTSComponent* RTSComp = EachUnit->GetRTSComponent();
 			if (RTSComp)
 			{

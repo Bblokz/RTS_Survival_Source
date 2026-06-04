@@ -22,7 +22,7 @@ void UPlayerPortraitManager::InitPortraitManager(
 	M_AudioController = AudioControllerForVoiceLines;
 
 	// Ensure we start in a hidden state if the widget is valid.
-	if (M_PortraitWidget.IsValid())
+	if (GetIsValidPortraitWidget())
 	{
 		M_PortraitWidget->HidePortrait();
 	}
@@ -57,7 +57,12 @@ void UPlayerPortraitManager::PlayPortrait(
 void UPlayerPortraitManager::BeginPlay()
 {
 	Super::BeginPlay();
+}
 
+void UPlayerPortraitManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	StopCurrentPortraitPlayback();
+	Super::EndPlay(EndPlayReason);
 }
 
 void UPlayerPortraitManager::StopCurrentPortraitPlayback()
@@ -168,8 +173,10 @@ void UPlayerPortraitManager::StartNextPortraitFromQueue()
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
+		bM_IsPortraitPlaying = false;
 		RTSFunctionLibrary::ReportError(
 			"UPlayerPortraitManager::StartNextPortraitFromQueue - World is null, cannot start timer.");
+		M_PortraitWidget->HidePortrait();
 		return;
 	}
 
@@ -185,11 +192,13 @@ void UPlayerPortraitManager::StartNextPortraitFromQueue()
 void UPlayerPortraitManager::OnCurrentPortraitFinished()
 {
 	UWorld* World = GetWorld();
-	if (IsValid(World))
+	if (not IsValid(World))
 	{
-		World->GetTimerManager().ClearTimer(M_CurrentPortraitTimerHandle);
+		bM_IsPortraitPlaying = false;
+		return;
 	}
 
+	World->GetTimerManager().ClearTimer(M_CurrentPortraitTimerHandle);
 	bM_IsPortraitPlaying = false;
 
 	StartNextPortraitFromQueue();

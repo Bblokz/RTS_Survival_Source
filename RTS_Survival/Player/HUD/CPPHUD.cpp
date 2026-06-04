@@ -7,13 +7,20 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
 FVector2D ACPPHUD::GetMousePosition2D() const
 {
-	float PosX;
-	float PosY;
-	GetOwningPlayerController()->GetMousePosition(PosX, PosY);
+	APlayerController* OwningPlayerController = GetValidOwningPlayerController();
+	if (not IsValid(OwningPlayerController))
+	{
+		return FVector2D::ZeroVector;
+	}
+
+	float PosX = 0.0f;
+	float PosY = 0.0f;
+	OwningPlayerController->GetMousePosition(PosX, PosY);
 	return FVector2D(PosX, PosY);
 }
 
@@ -25,7 +32,16 @@ void ACPPHUD::GetAllSelectableUnitsOnScreen(
 {
 	int32 ViewportWidth = 0;
 	int32 ViewportHeight = 0;
-	GetOwningPlayerController()->GetViewportSize(ViewportWidth, ViewportHeight);
+	APlayerController* OwningPlayerController = GetValidOwningPlayerController();
+	if (not IsValid(OwningPlayerController))
+	{
+		OutSquadUnits.Reset();
+		OutSelectableActors.Reset();
+		OutSelectablePawns.Reset();
+		return;
+	}
+
+	OwningPlayerController->GetViewportSize(ViewportWidth, ViewportHeight);
 	if (ViewportWidth <= 0 || ViewportHeight <= 0)
 	{
 		OutSquadUnits.Reset();
@@ -85,7 +101,7 @@ void ACPPHUD::GetSquadUnitsInSelectionRectangle(const FVector2D& FirstPoint,
 		const FVector BoxExtents = EachActorBounds.GetExtent();
 
 		// Check if actor is in view frustum.
-		if (!IsInViewFrustum(BoxCenter))
+		if (not IsInViewFrustum(BoxCenter))
 		{
 			continue; // Skip if not in view.
 		}
@@ -95,7 +111,7 @@ void ACPPHUD::GetSquadUnitsInSelectionRectangle(const FVector2D& FirstPoint,
 		for (uint8 BoundsPointItr = 0; BoundsPointItr < 8; BoundsPointItr++)
 		{
 			FVector2D ScreenLocation;
-			if (GetOwningPlayerController()->ProjectWorldLocationToScreen(
+			if (ProjectWorldLocationToScreenSafely(
 				BoxCenter + (BoundsPointMapping[BoundsPointItr] * BoxExtents), ScreenLocation))
 			{
 				ActorBox2D += ScreenLocation;
@@ -168,7 +184,7 @@ void ACPPHUD::GetSelectableActorsInRectangle(const FVector2D& FirstPoint, const 
 		const FVector BoxExtents = EachActorBounds.GetExtent();
 
 		// Check if actor is in view frustum.
-		if (!IsInViewFrustum(BoxCenter))
+		if (not IsInViewFrustum(BoxCenter))
 		{
 			continue; // Skip if not in view.
 		}
@@ -178,7 +194,7 @@ void ACPPHUD::GetSelectableActorsInRectangle(const FVector2D& FirstPoint, const 
 		for (uint8 BoundsPointItr = 0; BoundsPointItr < 8; BoundsPointItr++)
 		{
 			FVector2D ScreenLocation;
-			if (GetOwningPlayerController()->ProjectWorldLocationToScreen(
+			if (ProjectWorldLocationToScreenSafely(
 				BoxCenter + (BoundsPointMapping[BoundsPointItr] * BoxExtents), ScreenLocation))
 			{
 				ActorBox2D += ScreenLocation;
@@ -187,7 +203,7 @@ void ACPPHUD::GetSelectableActorsInRectangle(const FVector2D& FirstPoint, const 
 
 		// Check for selection conditions.
 		if (EachActor->GetSelectionComponent()->GetCanBeSelected() && EachActor->GetRTSComponent()->GetOwningPlayer() ==
-			1 && !EachActor->bIsHidden)
+			1 && not EachActor->bIsHidden)
 		{
 			if (bActorMustBeFullyEnclosed)
 			{
@@ -249,7 +265,7 @@ void ACPPHUD::GetSelectablePawnsInRectangle(const FVector2D& FirstPoint,
 		const FVector BoxExtents = EachActorBounds.GetExtent();
 
 		// Check if actor is in view frustum.
-		if (!IsInViewFrustum(BoxCenter))
+		if (not IsInViewFrustum(BoxCenter))
 		{
 			continue; // Skip if not in view.
 		}
@@ -259,7 +275,7 @@ void ACPPHUD::GetSelectablePawnsInRectangle(const FVector2D& FirstPoint,
 		for (uint8 BoundsPointItr = 0; BoundsPointItr < 8; BoundsPointItr++)
 		{
 			FVector2D ScreenLocation;
-			if (GetOwningPlayerController()->ProjectWorldLocationToScreen(
+			if (ProjectWorldLocationToScreenSafely(
 				BoxCenter + (BoundsPointMapping[BoundsPointItr] * BoxExtents), ScreenLocation))
 			{
 				ActorBox2D += ScreenLocation;
@@ -268,7 +284,7 @@ void ACPPHUD::GetSelectablePawnsInRectangle(const FVector2D& FirstPoint,
 
 		// Check for selection conditions.
 		if ((EachActor->GetSelectionComponent()->GetCanBeSelected() && EachActor->GetRTSComponent()->GetOwningPlayer()
-			== 1) && !EachActor->GetIsHidden())
+			== 1) && not EachActor->GetIsHidden())
 		{
 			if (bActorMustBeFullyEnclosed)
 			{
@@ -290,17 +306,62 @@ void ACPPHUD::GetSelectablePawnsInRectangle(const FVector2D& FirstPoint,
 
 bool ACPPHUD::IsInViewFrustum(const FVector& ObjectLocation) const
 {
-	const FVector CameraLocation = GetOwningPlayerController()->PlayerCameraManager->GetCameraLocation();
-	const FVector CameraForward = GetOwningPlayerController()->PlayerCameraManager->GetActorForwardVector();
+	const APlayerController* OwningPlayerController = GetValidOwningPlayerController();
+	if (not IsValid(OwningPlayerController) || not IsValid(OwningPlayerController->PlayerCameraManager))
+	{
+		return false;
+	}
+
+	const FVector CameraLocation = OwningPlayerController->PlayerCameraManager->GetCameraLocation();
+	const FVector CameraForward = OwningPlayerController->PlayerCameraManager->GetActorForwardVector();
 	const FVector DirectionToObject = (ObjectLocation - CameraLocation).GetSafeNormal();
 
 	// Check if the dot product is above a certain threshold (e.g., 0.0)
 	return FVector::DotProduct(CameraForward, DirectionToObject) > 0.0f;
 }
 
+bool ACPPHUD::ProjectWorldLocationToScreenSafely(const FVector& WorldLocation, FVector2D& OutScreenLocation) const
+{
+	APlayerController* OwningPlayerController = GetValidOwningPlayerController();
+	if (not IsValid(OwningPlayerController))
+	{
+		return false;
+	}
+
+	return OwningPlayerController->ProjectWorldLocationToScreen(WorldLocation, OutScreenLocation);
+}
+
+APlayerController* ACPPHUD::GetValidOwningPlayerController() const
+{
+	APlayerController* OwningPlayerController = GetOwningPlayerController();
+	if (IsValid(OwningPlayerController))
+	{
+		return OwningPlayerController;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"ACPPHUD::GetValidOwningPlayerController - owning player controller is null.");
+	return nullptr;
+}
+
+bool ACPPHUD::GetIsValidPlayerController() const
+{
+	if (IsValid(PLayerController))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"PLayerController",
+		"GetIsValidPlayerController",
+		this);
+	return false;
+}
+
 void ACPPHUD::DrawHUD()
 {
-	if (not IsValid(PLayerController))
+	if (not GetIsValidPlayerController())
 	{
 		return;
 	}
@@ -327,6 +388,12 @@ void ACPPHUD::OnSelectionEnded(const FVector2D MarqueeEndPoint)
 {
 	if (not bM_CancelSelection)
 	{
+		if (not GetIsValidPlayerController())
+		{
+			ResetMarqueeForNextDraw();
+			return;
+		}
+
 		FLinearColor GreenColor = FLinearColor::Green;
 		GreenColor.A = 0.4f;
 
@@ -360,7 +427,7 @@ void ACPPHUD::ResetMarqueeForNextDraw()
 
 void ACPPHUD::StartSelection()
 {
-	if (!bM_StartSelecting)
+	if (not bM_StartSelecting)
 	{
 		M_InitialPoint = GetMousePosition2D();
 		bM_StartSelecting = true;

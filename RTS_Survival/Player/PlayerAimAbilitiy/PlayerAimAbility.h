@@ -32,7 +32,7 @@ protected:
 	virtual void BeginPlay() override;
 
 	UPROPERTY(BlueprintReadOnly)
-	UStaticMeshComponent* AimMeshComponent;
+	TObjectPtr<UStaticMeshComponent> AimMeshComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	TMap<EPlayerAimAbilityTypes, UMaterialInterface*> MaterialPerAbilityAim;

@@ -14,7 +14,7 @@ class RTS_SURVIVAL_API ACPPController;
 class RTS_SURVIVAL_API ASelectableActorObjectsMaster;
 class RTS_SURVIVAL_API ASelectablePawnMaster;
 /**
- * 
+ * @brief Used by the player controller to draw marquee selection and collect selectable actors under it.
  */
 UCLASS()
 class RTS_SURVIVAL_API ACPPHUD : public AHUD
@@ -23,7 +23,7 @@ class RTS_SURVIVAL_API ACPPHUD : public AHUD
 
 public:
 	UPROPERTY(BlueprintReadWrite)
-	ACPPController* PLayerController;
+	TObjectPtr<ACPPController> PLayerController;
 
 	/**
 	 * @brief Collects all selectable friendly units whose selection bounds intersect the current viewport.
@@ -104,6 +104,9 @@ private:
 		TArray<ASelectablePawnMaster*>& OutActors,
 		bool bActorMustBeFullyEnclosed);
 	bool IsInViewFrustum(const FVector& ObjectLocation) const;
+	bool ProjectWorldLocationToScreenSafely(const FVector& WorldLocation, FVector2D& OutScreenLocation) const;
+	APlayerController* GetValidOwningPlayerController() const;
+	bool GetIsValidPlayerController() const;
 
 	virtual void DrawHUD() override;
 	void OnSelectionEnded(const FVector2D MarqueeEndPoint);
