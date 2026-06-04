@@ -435,7 +435,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnemyDirectControlComponent> M_EnemyDirectControlComponent;
 
+	UPROPERTY()
 	TArray<TWeakObjectPtr<ATankMaster>> M_Tanks;
+
+	UPROPERTY()
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 
 	bool GetIsValidFormationController() const;

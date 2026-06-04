@@ -419,14 +419,20 @@ void UEnemyFormationController::CheckFormations()
 	CleanupInvalidFormations();
 
 	// Early-out if nothing left
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
 	if (M_ActiveFormations.Num() == 0)
 	{
-		GetWorld()->GetTimerManager().ClearTimer(M_FormationCheckTimerHandle);
+		World->GetTimerManager().ClearTimer(M_FormationCheckTimerHandle);
 		return;
 	}
 
 	// Then  idle→teleport→reorder logic on the survivors:
-	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World);
 	// May delete formations in this loop; so snapshot keys first and re-fetch live data each iteration.
 	TArray<int32> FormationIDs;
 	M_ActiveFormations.GetKeys(FormationIDs);
@@ -1386,7 +1392,8 @@ void UEnemyFormationController::InitWaypointsAndDirections(FFormationData& OutFo
 
 void UEnemyFormationController::SaveNewFormation(const FFormationData& NewFormation)
 {
-	if (not GetWorld())
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
 	{
 		return;
 	}
@@ -1405,7 +1412,7 @@ void UEnemyFormationController::SaveNewFormation(const FFormationData& NewFormat
 					WeakThis->CheckFormations();
 				}
 			});
-		GetWorld()->GetTimerManager().SetTimer(M_FormationCheckTimerHandle, TimerDelegate, EnemyFormationCheckInterval,
+		World->GetTimerManager().SetTimer(M_FormationCheckTimerHandle, TimerDelegate, EnemyFormationCheckInterval,
 		                                       true);
 	}
 }
@@ -1638,6 +1645,15 @@ void UEnemyFormationController::OnCompleteFormationReached(FFormationData* Forma
 		OnFormationReachedFinalDestination(Formation);
 		return;
 	}
+
+	if (not Formation->FormationWaypointDirections.IsValidIndex(Formation->CurrentWaypointIndex))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Formation reached a waypoint index without a matching waypoint direction."));
+		OnFormationReachedFinalDestination(Formation);
+		return;
+	}
+
 	const FVector& NextWaypoint = Formation->FormationWaypoints[Formation->CurrentWaypointIndex];
 	const FRotator& NextWaypointDirection = Formation->FormationWaypointDirections[Formation->CurrentWaypointIndex];
 	for (auto& EachUnit : Formation->FormationUnits)
@@ -1652,9 +1668,20 @@ void UEnemyFormationController::OnCompleteFormationReached(FFormationData* Forma
 
 void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationData* Formation)
 {
+	if (Formation == nullptr)
+	{
+		return;
+	}
+
 	if (M_ActiveFormations.Num() == 0)
 	{
-		GetWorld()->GetTimerManager().ClearTimer(M_FormationCheckTimerHandle);
+		UWorld* World = GetWorld();
+		if (not IsValid(World))
+		{
+			return;
+		}
+
+		World->GetTimerManager().ClearTimer(M_FormationCheckTimerHandle);
 	}
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
@@ -1662,8 +1689,14 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 	}
 	RegisterValidFormationUnitsAsIdle(*Formation);
 	int32 InvalidUnitsInFormation = 0;
-	for (auto EachUnit : Formation->FormationUnits)
+	for (const FFormationUnitData& EachUnit : Formation->FormationUnits)
 	{
+		if (not EachUnit.IsValidFormationUnit())
+		{
+			InvalidUnitsInFormation++;
+			continue;
+		}
+
 		AActor* UnitAsActor = EachUnit.Unit->GetOwnerActor();
 		if (RTSFunctionLibrary::RTSIsValid(UnitAsActor))
 		{
@@ -1766,9 +1799,9 @@ void UEnemyFormationController::StartFormationMovement(FFormationData& Formation
 		// we’ve already torn this formation down
 		return;
 	}
-	if (AliveFormation->FormationWaypoints.IsEmpty())
+	if (AliveFormation->FormationWaypoints.IsEmpty() || AliveFormation->FormationWaypointDirections.IsEmpty())
 	{
-		// remove this formation as no valid waypoitns found.
+		// remove this formation as no valid waypoints or directions were found.
 
 		M_ActiveFormations.Remove(Formation.FormationID);
 		return;

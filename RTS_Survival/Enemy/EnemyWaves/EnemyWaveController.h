@@ -178,6 +178,7 @@ protected:
 
 private:
 
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 	// Cached navigation system for attack move wave projections.
 	UPROPERTY()
@@ -252,6 +253,7 @@ private:
 		TArray<ATankMaster*>& OutTankMasters,
 		TArray<ASquadController*>& OutSquadControllers, const TArray<AActor*>& InWaveActors) const;
 
+	UPROPERTY()
 	TWeakObjectPtr<ARTSAsyncSpawner> M_AsyncSpawner;
 	bool GetIsValidAsyncSpawner();
 

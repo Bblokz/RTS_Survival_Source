@@ -42,6 +42,7 @@ public:
 		const float MaxTimeWaitTillCounterAttack);
 
 private:
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
 	// Tracks active retreat waves and their timers for counterattacks.

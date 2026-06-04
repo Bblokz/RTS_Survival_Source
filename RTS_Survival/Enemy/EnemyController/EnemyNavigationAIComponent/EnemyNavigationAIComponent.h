@@ -99,6 +99,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
 	UPROPERTY()

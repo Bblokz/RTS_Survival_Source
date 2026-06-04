@@ -455,6 +455,11 @@ void UStochasticDecisionTree::DefendBase_MoveTanksToDefensePositions(
 	const int32 MaxOrderIndex = FMath::Min(PickedTanks.TankMasters.Num(), PickedDefensePositions.Num()) - 1;
 	for (int32 OrderIndex = 0; OrderIndex <= MaxOrderIndex; ++OrderIndex)
 	{
+		if (not PickedTanks.TankMasters[OrderIndex].IsValid())
+		{
+			continue;
+		}
+
 		IssueDefendBaseTankOrders(PickedTanks.TankMasters[OrderIndex].Get(), PickedDefensePositions[OrderIndex]);
 	}
 }
@@ -1350,13 +1355,24 @@ void UStochasticDecisionTree::DebugPoint(const FVector& Point, const float Radiu
 void UStochasticDecisionTree::DebugPickedUnitsAndWayPoints(const FBlackboardIdleUnitsResult& Picked,
                                                            TArray<FVector> Waypoints)
 {
+	if (Waypoints.IsEmpty())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
 	for (auto EachSquad : Picked.SquadControllers)
 	{
 		if (not EachSquad)
 		{
 			continue;
 		}
-		DrawDebugLine(GetWorld(), EachSquad->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
+		DrawDebugLine(World, EachSquad->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
 	}
 	for (auto EachTank : Picked.TankMasters)
 	{
@@ -1364,12 +1380,12 @@ void UStochasticDecisionTree::DebugPickedUnitsAndWayPoints(const FBlackboardIdle
 		{
 			continue;
 		}
-		DrawDebugLine(GetWorld(), EachTank->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
+		DrawDebugLine(World, EachTank->GetActorLocation(), Waypoints[0], FColor::Green, false, 20.f, 0, 2.f);
 	}
 	// Now draw the path with thickness 8.
 	for (int i = 0; i < Waypoints.Num() - 1; i++)
 	{
-		DrawDebugLine(GetWorld(), Waypoints[i], Waypoints[i + 1], FColor::Blue, false, 20.f, 0, 8.f);
+		DrawDebugLine(World, Waypoints[i], Waypoints[i + 1], FColor::Blue, false, 20.f, 0, 8.f);
 	}
 }
 

@@ -133,6 +133,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 	bool EnsureEnemyControllerIsValid();
 	void CacheGenerationSeedFromGameInstance();

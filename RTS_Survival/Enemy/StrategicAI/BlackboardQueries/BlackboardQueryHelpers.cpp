@@ -358,8 +358,13 @@ TArray<FVector> BlackboardQueries::GetRandomLocationsOfIdleUnits(
 		const int32 PickedIdleUnitIndex = RemainingIdleUnitIndices[RandomRemainingIndex];
 		RemainingIdleUnitIndices.RemoveAtSwap(RandomRemainingIndex, 1, EAllowShrinking::No);
 
-		const FVector IdleUnitLocation = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex].Get()->
-			GetActorLocation();
+		const TWeakObjectPtr<AActor>& PickedIdleUnit = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex];
+		if (not PickedIdleUnit.IsValid())
+		{
+			continue;
+		}
+
+		const FVector IdleUnitLocation = PickedIdleUnit->GetActorLocation();
 		if (SeenLocations.Contains(IdleUnitLocation))
 		{
 			continue;
