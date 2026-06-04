@@ -12,6 +12,8 @@
 #include "TrackedTankMaster.generated.h"
 
 class UAttachedRockets;
+class UAudioComponent;
+class USoundBase;
 class RTS_SURVIVAL_API UChassisAnimInstance;
 class RTS_SURVIVAL_API UTrackPhysicsMovement;
 
@@ -236,16 +238,28 @@ private:
 	TObjectPtr<UDigInComponent> M_DigInComponent;
 
 	UPROPERTY()
-	UAudioComponent* M_EngineSoundComponent;
+	TObjectPtr<UAudioComponent> M_EngineSoundComponent = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> M_EngineGasSoundComponent = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tank|Audio")
+	TObjectPtr<USoundBase> M_EngineGasSound = nullptr;
 
 	// Possibly set in derived blueprint for tanks that have the ability to fire rockets.
 	UPROPERTY()
 	TObjectPtr<UAttachedRockets> M_AttachedRockets;
 
 	inline static const FName AudioSpeedParam = "Speed";
+	inline static const FName EngineGasSoundComponentName = TEXT("EngineGasSound");
+	inline static const FName EngineGasSoundLoopingParam = TEXT("Looping");
 
 	UFUNCTION()
 	void UpdateEngineSound() const;
+
+	void PostInitializeComponents_SetupEngineSounds();
+	void SetupEngineGasSoundComponent();
+	void PlayEngineGasSoundEffect() const;
 
 	UPROPERTY()
 	FTimerHandle M_EngineSoundHandle;
@@ -273,6 +287,9 @@ private:
 	bool GetIsValidTrackPhysicsMovement() const;
 	bool GetIsValidAITankController();
 	bool GetIsValidTankAnimationBP() const;
+	bool GetIsValidEngineSoundComponent() const;
+	bool GetIsValidEngineGasSoundComponent() const;
+	bool GetIsValidEngineGasSound() const;
 
 	/**
 	 * @brief Preserves stable path quality for first move while preventing repeated chain delays that reintroduce COL stutter.

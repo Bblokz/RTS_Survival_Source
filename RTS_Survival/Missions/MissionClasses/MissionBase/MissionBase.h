@@ -701,6 +701,17 @@ protected:
 	void SpawnPlayerCommandVehicle(const FVector SpawnLocation, const FRotator SpawnRotation);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerSpecialArmoredCar(const FVector SpawnLocation, const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerGerArmoredCar250_251Mortar(const FVector SpawnLocation, const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(
+		const FVector SpawnLocation,
+		const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(const FVector SpawnLocation, const FRotator SpawnRotation);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
@@ -711,6 +722,27 @@ protected:
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnPlayerJaguarOrPzIVG(const FVector SpawnLocation, const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerGerMediumTankDestroyer_StugIII_OrMarder(
+		const FVector SpawnLocation,
+		const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerFlak88_Or_PanzerIV_Rail(const FVector SpawnLocation, const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerLightTankDestroyer_PZjager_PzJagerLaser(
+		const FVector SpawnLocation,
+		const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerHeavyTank_Tiger_Panther(const FVector SpawnLocation, const FRotator SpawnRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
+	void SpawnPlayerAdvancedHeavyTank_TigerII_PantherII(
+		const FVector SpawnLocation,
+		const FRotator SpawnRotation);
 
 	/**
 	 * @brief Spawns a tank and team-weapon squad asynchronously and links tow once both are ready.

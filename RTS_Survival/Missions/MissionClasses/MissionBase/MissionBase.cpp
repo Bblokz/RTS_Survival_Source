@@ -2003,6 +2003,41 @@ void UMissionBase::SpawnPlayerCommandVehicle(const FVector SpawnLocation, const 
 		SpawnRotation);
 }
 
+void UMissionBase::SpawnPlayerSpecialArmoredCar(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerSpecialArmoredCarTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerSpecialArmoredCar(this);
+	AsyncSpawnActorAtLocation(
+		PlayerSpecialArmoredCarTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerGerArmoredCar250_251Mortar(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerArmoredCarTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerGerArmoredCar250_251Mortar(this);
+	AsyncSpawnActorAtLocation(
+		PlayerArmoredCarTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(
+	const FVector SpawnLocation,
+	const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerArmoredCarTankDestroyerTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(this);
+	AsyncSpawnActorAtLocation(
+		PlayerArmoredCarTankDestroyerTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
 void UMissionBase::SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(const FVector SpawnLocation,
                                                                  const FRotator SpawnRotation)
 {
@@ -2043,6 +2078,67 @@ void UMissionBase::SpawnPlayerJaguarOrPzIVG(const FVector SpawnLocation, const F
 		URTSBlueprintFunctionLibrary::GetPlayerJaguarOrPanzerIVG(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerGerMediumTankDestroyer_StugIII_OrMarder(
+	const FVector SpawnLocation,
+	const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerMediumTankDestroyerTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerGerMediumTankDestroyer_StugIII_OrMarder(this);
+	AsyncSpawnActorAtLocation(
+		PlayerMediumTankDestroyerTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerFlak88_Or_PanzerIV_Rail(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerFlak88OrPanzerIVRailTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerFlak88_Or_PanzerIV_Rail(this);
+	AsyncSpawnActorAtLocation(
+		PlayerFlak88OrPanzerIVRailTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerLightTankDestroyer_PZjager_PzJagerLaser(
+	const FVector SpawnLocation,
+	const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerLightTankDestroyerTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerLightTankDestroyer_PZjager_PzJagerLaser(this);
+	AsyncSpawnActorAtLocation(
+		PlayerLightTankDestroyerTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerHeavyTank_Tiger_Panther(const FVector SpawnLocation, const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerHeavyTankTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerHeavyTank_Tiger_Panther(this);
+	AsyncSpawnActorAtLocation(
+		PlayerHeavyTankTrainingOption,
+		GetNextAsyncSpawnId(),
+		SpawnLocation,
+		SpawnRotation);
+}
+
+void UMissionBase::SpawnPlayerAdvancedHeavyTank_TigerII_PantherII(
+	const FVector SpawnLocation,
+	const FRotator SpawnRotation)
+{
+	const FTrainingOption PlayerAdvancedHeavyTankTrainingOption =
+		URTSBlueprintFunctionLibrary::GetPlayerAdvancedHeavyTank_TigerII_PantherII(this);
+	AsyncSpawnActorAtLocation(
+		PlayerAdvancedHeavyTankTrainingOption,
 		GetNextAsyncSpawnId(),
 		SpawnLocation,
 		SpawnRotation);
