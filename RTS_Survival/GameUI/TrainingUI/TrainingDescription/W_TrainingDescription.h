@@ -70,6 +70,7 @@ protected:
 
 	
 
+	UPROPERTY()
 	TWeakObjectPtr<UPlayerResourceManager> M_PlayerResourceManager;
 	bool GetIsValidPlayerResourceManager() const;
 

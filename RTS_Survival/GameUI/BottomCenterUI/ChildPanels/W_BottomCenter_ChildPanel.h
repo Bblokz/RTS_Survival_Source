@@ -23,6 +23,7 @@ public:
 	
 
 protected:
+	UPROPERTY()
 	TWeakObjectPtr<UW_BottomCenterUI> M_ParentWidget;
 	bool EnsureValidParent()const;
 	

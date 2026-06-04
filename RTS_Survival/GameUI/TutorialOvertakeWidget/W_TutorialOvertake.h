@@ -26,8 +26,10 @@ protected:
 	void OnClickedContinue();
 
 private:
+	UPROPERTY()
 	TWeakObjectPtr<UMainGameUI> M_MainGameUI;
 	bool EnsureMainGameUIIsValid()const;
+	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	bool EnsurePlayerControllerIsValid() const;
 };

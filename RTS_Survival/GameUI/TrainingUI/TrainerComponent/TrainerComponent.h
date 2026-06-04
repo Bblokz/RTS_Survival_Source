@@ -290,6 +290,7 @@ private:
 	 */
 	void PropagateSpawnedActorToTrainer(FTrainingQueueItem FinishedItem);
 
+	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	bool GetIsValidPlayerController() const;
 
@@ -345,11 +346,13 @@ private:
 	FVector GetValidSpawnPoint(const FVector& DesiredPoint) const;
 
 	// The progressbar that can be used by the training component.
+	UPROPERTY()
 	TWeakObjectPtr<UTimeProgressBarWidget> M_OwnerProgressBar;
 
 	bool GetIsValidProgressionBar() const;
 
 
+	UPROPERTY()
 	TWeakObjectPtr<UPlayerResourceManager> M_PlayerResourceManager;
 	bool GetIsValidPlayerResourceManager() const;
 

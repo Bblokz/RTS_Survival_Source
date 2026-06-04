@@ -39,12 +39,14 @@ namespace
 	{
 		const int32 SafeStart = FMath::Clamp(Start, 0, Slots.Num());
 		const int32 SafeEnd = FMath::Clamp(End, 0, Slots.Num());
-		for (int32 i = SafeStart; i < SafeEnd; ++i)
+		for (int32 SlotIndex = SafeStart; SlotIndex < SafeEnd; ++SlotIndex)
 		{
-			if (IsValid(Slots[i]))
+			if (not IsValid(Slots[SlotIndex]))
 			{
-				Slots[i]->SetVisibility(NewVis);
+				continue;
 			}
+
+			Slots[SlotIndex]->SetVisibility(NewVis);
 		}
 	}
 
@@ -57,15 +59,15 @@ namespace
 		const bool bHasFreeSockets)
 	{
 		const int32 Count = FMath::Min3(UsedCount, SectionOptions.Num(), Slots.Num());
-		for (int32 i = 0; i < Count; ++i)
+		for (int32 SlotIndex = 0; SlotIndex < Count; ++SlotIndex)
 		{
-			UW_OptionBuildingExpansion* const Slot = Slots[i];
+			UW_OptionBuildingExpansion* const Slot = Slots[SlotIndex];
 			if (not IsValid(Slot))
 			{
 				RTSFunctionLibrary::ReportError("Invalid UW_OptionBuildingExpansion slot while populating section.");
 				continue;
 			}
-			const FBxpOptionData& Data = SectionOptions[i];
+			const FBxpOptionData& Data = SectionOptions[SlotIndex];
 			const bool bHasBxpOfType = BxpOwner ? BxpOwner->HasBxpItemOfType(Data.ExpansionType) : false;
 
 			Slot->SetVisibility(ESlateVisibility::Visible);

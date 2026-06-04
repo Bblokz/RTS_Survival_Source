@@ -13,29 +13,29 @@ void UW_AmmoPicker::OnClickedWeaponItemToAmmoPick(
 	UW_WeaponItem* WeaponItem,
 	const TArray<EWeaponShellType>& ShellTypesToPickFrom)
 {
-	if (!IsValid(WeaponItem) || ShellTypesToPickFrom.Num() <= 1)
+	if (not IsValid(WeaponItem) || ShellTypesToPickFrom.Num() <= 1)
 	{
 		return;
 	}
-	if (GetIsValidActionUIManager())
+	if (not GetIsValidActionUIManager())
 	{
-		M_ActionUIManager->OnClickedWeaponItemToAmmoPick();
+		return;
 	}
+
+	M_ActionUIManager->OnClickedWeaponItemToAmmoPick();
 	SetAmmoPickerVisibility(true);
 	M_ActiveWeaponItem = WeaponItem;
 	for (const auto EachAmmoBtn : M_AmmoButtons)
 	{
-		if (IsValid(EachAmmoBtn))
+		if (not IsValid(EachAmmoBtn))
 		{
-			if (ShellTypesToPickFrom.Contains(EachAmmoBtn->GetShellType()))
-			{
-				EachAmmoBtn->SetVisibility(ESlateVisibility::Visible);
-			}
-			else
-			{
-				EachAmmoBtn->SetVisibility(ESlateVisibility::Collapsed);
-			}
+			continue;
 		}
+
+		EachAmmoBtn->SetVisibility(
+			ShellTypesToPickFrom.Contains(EachAmmoBtn->GetShellType())
+				? ESlateVisibility::Visible
+				: ESlateVisibility::Collapsed);
 	}
 }
 
@@ -51,25 +51,25 @@ void UW_AmmoPicker::InitAmmoPicker(const TArray<UW_AmmoButton*>& AmmoButtons)
 		EWeaponShellType::Shell_AP, EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_APHEBC,
 		EWeaponShellType::Shell_HE, EWeaponShellType::Shell_APCR, EWeaponShellType::Shell_HEAT
 	};
-	if (ShellTypes.Num() > AmmoButtons.Num())
+	if (ShellTypes.Num() > M_AmmoButtons.Num())
 	{
 		RTSFunctionLibrary::ReportError("The amount of ammo types is greater than the amount of ammo buttons, "
 			"cannot init picker for all ammo types."
 			"@ function: UW_AmmoPicker::InitAmmoPicker");
 		return;
 	}
-	for (int i = 0; i < ShellTypes.Num(); i++)
+	for (int32 ShellTypeIndex = 0; ShellTypeIndex < ShellTypes.Num(); ++ShellTypeIndex)
 	{
-		if (IsValid(M_AmmoButtons[i]))
+		if (not IsValid(M_AmmoButtons[ShellTypeIndex]))
 		{
-			M_AmmoButtons[i]->InitAmmoButton(ShellTypes[i], this);
+			RTSFunctionLibrary::ReportNullErrorComponent(
+				this,
+				"M_AmmoButtons[ShellTypeIndex]",
+				"InitAmmoPicker");
+			continue;
 		}
-		else
-		{
-			RTSFunctionLibrary::ReportNullErrorComponent(this,
-			                                             "M_AmmoButtons[i]",
-			                                             "InitAmmoPicker");
-		}
+
+		M_AmmoButtons[ShellTypeIndex]->InitAmmoButton(ShellTypes[ShellTypeIndex], this);
 	}
 }
 
@@ -79,19 +79,27 @@ bool UW_AmmoPicker::GetIsValidActionUIManager() const
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportError("No valid action UI manager found, cannot set up ammo picker."
-		"\n At function UW_AmmoPicker::GetIsValidActionUIManager");
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_ActionUIManager"),
+		TEXT("UW_AmmoPicker::GetIsValidActionUIManager"),
+		this);
 	return false;
 }
 
 bool UW_AmmoPicker::GetIsValidActiveWeaponItem() const
 {
-	if (IsValid(M_ActiveWeaponItem))
+	if (M_ActiveWeaponItem.IsValid())
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportError("No valid active weapon item found, cannot set up ammo picker."
-		"\n At function UW_AmmoPicker::GetIsValidActiveWeaponItem");
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_ActiveWeaponItem"),
+		TEXT("UW_AmmoPicker::GetIsValidActiveWeaponItem"),
+		this);
 	return false;
 }
 

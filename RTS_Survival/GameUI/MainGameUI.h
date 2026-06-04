@@ -435,6 +435,7 @@ private:
 	UTechTree* M_TechTree;
 
 	// Contains all missions.
+	UPROPERTY()
 	TWeakObjectPtr<UW_MissionWidgetManager> M_MissionManagerWidget;
 
 	UPROPERTY()
