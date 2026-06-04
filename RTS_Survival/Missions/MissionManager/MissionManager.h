@@ -411,6 +411,7 @@ private:
 	UPROPERTY(Transient)
 	TSet<FTopLevelAssetPath> M_CompletedMissionClassPaths;
 
+	UPROPERTY()
 	TSubclassOf<UW_MissionWidgetManager> M_WidgetManagerClass;
 
 	void InitMissionManagerWidget();

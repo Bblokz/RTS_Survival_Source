@@ -1060,12 +1060,12 @@ AActor* UMissionBase::FindActorInRange(
 	const bool bFindClosest, const bool bFindPlayerUnits)
 {
 	// 1) Validate pointers
-	if (!GetIsValidMissionManager())
+	if (not GetIsValidMissionManager())
 	{
 		return nullptr;
 	}
 	UWorld* World = M_MissionManager->GetWorld();
-	if (!World)
+	if (not World)
 	{
 		return nullptr;
 	}
@@ -1096,7 +1096,7 @@ AActor* UMissionBase::FindActorInRange(
 		QueryParams
 	);
 
-	if (!bGotHits || Hits.Num() == 0)
+	if (not bGotHits || Hits.Num() == 0)
 	{
 		return nullptr;
 	}
@@ -1107,12 +1107,12 @@ AActor* UMissionBase::FindActorInRange(
 	for (const FOverlapResult& R : Hits)
 	{
 		AActor* HitActor = R.GetActor();
-		if (!HitActor)
+		if (not IsValid(HitActor))
 		{
 			continue;
 		}
 
-		if (ActorClass && !HitActor->IsA(ActorClass))
+		if (ActorClass && not HitActor->IsA(ActorClass))
 		{
 			continue;
 		}
@@ -1716,25 +1716,33 @@ void UMissionBase::DestroyActorsInRange(
 )
 {
 	UWorld* World = GetWorld();
-	if (!World || ActorClasses.Num() == 0)
+	if (not World || ActorClasses.Num() == 0)
+	{
 		return;
+	}
 
 	const float RangeSq = Range * Range;
 	for (const TSubclassOf<AActor>& Class : ActorClasses)
 	{
-		if (!*Class)
+		if (not *Class)
+		{
 			continue;
+		}
 
 		TArray<AActor*> FoundActors;
 		UGameplayStatics::GetAllActorsOfClass(World, Class, FoundActors);
 
 		for (AActor* Actor : FoundActors)
 		{
-			if (!Actor)
+			if (not IsValid(Actor))
+			{
 				continue;
+			}
 
 			if ((Actor->GetActorLocation() - Location).SizeSquared() > RangeSq)
+			{
 				continue;
+			}
 
 			Actor->Destroy();
 		}
@@ -2646,7 +2654,9 @@ FTrainingOption UMissionBase::SelectSeededOptionFromMixPool(
 	}
 
 	const int32 Seed = GetMissionManagerChecked()->GetGenerationSeed();
-	const int32 SelectedIndex = Seed % ValidOptions.Num();
+	const int32 SelectedIndex = static_cast<int32>(
+		static_cast<uint32>(Seed) % static_cast<uint32>(ValidOptions.Num())
+	);
 	return ValidOptions[SelectedIndex];
 }
 

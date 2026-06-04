@@ -5,13 +5,14 @@
 
 UW_Mission* UW_MissionWidgetManager::GetFreeMissionWidget()
 {
-	for(const auto EachWidget : M_MissionWidgets)
+	for (UW_Mission* EachWidget : M_MissionWidgets)
 	{
-		if(not EnsureMissionWidgetIsValid(EachWidget))
+		if (not EnsureMissionWidgetIsValid(EachWidget))
 		{
 			continue;
 		}
-		if(EachWidget->GetIsFreeWidget())
+
+		if (EachWidget->GetIsFreeWidget())
 		{
 			return EachWidget;
 		}
@@ -22,22 +23,24 @@ UW_Mission* UW_MissionWidgetManager::GetFreeMissionWidget()
 void UW_MissionWidgetManager::InitMissionWidgetReferences(const TArray<UW_Mission*> MissionWidgets)
 {
 	M_MissionWidgets = MissionWidgets;
-	for(const auto EachWidget : M_MissionWidgets)
+	for (UW_Mission* EachWidget : M_MissionWidgets)
 	{
-		if(not EnsureMissionWidgetIsValid(EachWidget))
+		if (not EnsureMissionWidgetIsValid(EachWidget))
 		{
 			continue;
 		}
+
 		EachWidget->MarkWidgetAsFree();
 	}
 }
 
-bool UW_MissionWidgetManager::EnsureMissionWidgetIsValid(UW_Mission* MissionWidget) const
+bool UW_MissionWidgetManager::EnsureMissionWidgetIsValid(const UW_Mission* MissionWidget) const
 {
-	if(not M_MissionWidgets.Contains(MissionWidget))
+	if (IsValid(MissionWidget))
 	{
-		RTSFunctionLibrary::ReportError("Invalid mission widget on mission widget manager.");
-		return false;
+		return true;
 	}
-	return true;
+
+	RTSFunctionLibrary::ReportError("Invalid mission widget on mission widget manager.");
+	return false;
 }

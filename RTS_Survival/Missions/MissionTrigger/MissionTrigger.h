@@ -40,6 +40,7 @@ protected:
     AMissionManager* GetMissionManagerCheckedFromTrigger() const;
 
 private:
+    UPROPERTY()
     TWeakObjectPtr<UMissionBase> M_Mission;
 
     bool GetIsValidMission() const;

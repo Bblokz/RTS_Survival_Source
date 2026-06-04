@@ -1597,8 +1597,10 @@ FTrainingOption AMissionManager::SelectSeededTankOption(const TArray<ETankSubtyp
 		return Option;
 	}
 
-	// Use the GenerationSeed to determine the index
-	int32 Index = GetGenerationSeed() % TankOptions.Num();
+	// Use the GenerationSeed to determine the index. Cast to uint32 so negative seeds stay in bounds.
+	const int32 Index = static_cast<int32>(
+		static_cast<uint32>(GetGenerationSeed()) % static_cast<uint32>(TankOptions.Num())
+	);
 
 	// Return the selected option
 	Option.SubtypeValue = static_cast<uint8>(TankOptions[Index]);
@@ -1616,8 +1618,10 @@ FTrainingOption AMissionManager::SelectSeededSquadOption(const TArray<ESquadSubt
 		return Option;
 	}
 
-	// Use the GenerationSeed to determine the index
-	int32 Index = GetGenerationSeed() % SquadOptions.Num();
+	// Use the GenerationSeed to determine the index. Cast to uint32 so negative seeds stay in bounds.
+	const int32 Index = static_cast<int32>(
+		static_cast<uint32>(GetGenerationSeed()) % static_cast<uint32>(SquadOptions.Num())
+	);
 
 	// Return the selected option
 	Option.SubtypeValue = static_cast<uint8>(SquadOptions[Index]);

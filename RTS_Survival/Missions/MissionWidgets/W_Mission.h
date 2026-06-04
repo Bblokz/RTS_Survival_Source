@@ -65,6 +65,7 @@ private:
 	UPROPERTY()
 	EMissionWidgetState M_WidgetState;
 
+	UPROPERTY()
 	TWeakObjectPtr<UMissionBase> M_AssociatedMission;
 
 	// In-use (allocated in list) vs free (pooled).

@@ -89,6 +89,11 @@ int32 UMissionScheduler::ScheduleCallback(
 		}
 
 		Callback.Execute();
+		if (not IsValid(CallbackOwner))
+		{
+			return INDEX_NONE;
+		}
+
 		if (not bRepeatForever)
 		{
 			RemainingExecutions--;
