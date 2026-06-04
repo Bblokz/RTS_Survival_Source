@@ -297,7 +297,16 @@ void AProjectile::SetupProjectileForNewLaunch(
 	M_ProjectileOwner = NewProjectileOwner;
 	OnNewDamageType(DamageType);
 	M_OwningPlayer = OwningPlayer;
-	M_Range = Range;
+	// NOTE: this cannot be applied on the weapon itself as it would provide misleading info to the player
+	// (turret range is limited)
+	if (bCanArmorOverPenetrate)
+	{
+		M_Range = Range * DeveloperSettings::GameBalance::Weapons::RailGun::RailGunProjectileRangeMlt;
+	}
+	else
+	{
+		M_Range = Range * DeveloperSettings::GameBalance::Weapons::Projectiles::DefaultProjectileRangeMlt;
+	}
 	M_FullDamage = Damage;
 	M_ArmorPen = ArmorPen;
 	M_ArmorPenAtMaxRange = ArmorPenMaxRange;

@@ -692,7 +692,7 @@ public:
 	static FTrainingOption GetPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(UObject* WorldContext);
 	// Returns panzer IV H rockets for break through; panzer III M otherwise.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext);
+	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")

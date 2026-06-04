@@ -576,15 +576,15 @@ namespace DeveloperSettings
 		namespace Ranges
 		{
 			// How much further weapon trace is allowed to fly than its range; flight range = weapon range * this mlt.
-			inline constexpr float TraceSimulationRangeMlt = 1.5f;
+			inline constexpr float TraceSimulationRangeMlt = 2.25f;
 			inline constexpr float GameRangeMlt = 0.5f;
-			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(7000.f * GameRangeMlt);
-			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(7500.f * GameRangeMlt);
-			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
+			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
+			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);
+			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
 
-			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
-			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9600.f * GameRangeMlt);
-			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(8800.f * GameRangeMlt);
+			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
+			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9800.f * GameRangeMlt);
+			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(9200.f * GameRangeMlt);
 			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
 			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(10000.f * GameRangeMlt);
 			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(13000.f * GameRangeMlt);
@@ -632,7 +632,7 @@ namespace DeveloperSettings
 				inline constexpr float T2TankVisionRadius = 4500.f;
 				inline constexpr float T3TankVisionRadius = 5000.f;
 				inline constexpr float SuperHeavyTankVision = 5000.f;
-				inline constexpr float TrainVisionRadius = 7000.f;
+				inline constexpr float TrainVisionRadius = 12000.f;
 
 				inline constexpr float InfantryVisionRadius = 4500.f;
 				inline constexpr float MachineGunTeamWeaponVisionRadius = 5000.f;
@@ -730,6 +730,8 @@ namespace DeveloperSettings
 				inline constexpr float DamageBonusMlt = 3;
 				// Percentage bonus to apply to the base cannon range for rail gun variants.
 				inline constexpr float RangeBonusPercentage = 20.f;
+				//  range mlt applied only rail gun weapon projectiles to be able to over-pen near max range. 
+				inline constexpr float RailGunProjectileRangeMlt = 2;
 				// What the projectile speed is multiplied with after Over penetration.
 				inline constexpr float OverPenProjectileSpeedMlt = 0.33f;
 			}
@@ -802,6 +804,10 @@ namespace DeveloperSettings
 
 			namespace Projectiles
 			{
+				// Range bonus applied to projectiles to fly beyond the aim radius of the weapon
+				inline constexpr float DefaultProjectileRangeMlt = 1.67f;
+				// Range bonus applied to projectiles from trace weapons to fly beyond the aim radius of the weapon
+				inline constexpr float DefaultTraceRangeMlt = 1.67f;
 				// Armor pen of projectile gets divided by this after a bounce.
 				inline constexpr float AmorPenBounceDivider = 4.f;
 				inline constexpr int MaxBouncesPerProjectile = 3;
@@ -1421,7 +1427,7 @@ namespace DeveloperSettings
 		inline constexpr float MinZoomLimit = 300.f;
 		// corresponds with 8500 range in the game (weapon on left side engaging weapon just visible on right side)
 		// inline constexpr float MaxZoomLimit = 4200.f;
-		inline constexpr float MaxZoomLimit = 4900.f;
+		inline constexpr float MaxZoomLimit = 4800.f;
 		inline constexpr float ZoomForPlayerStartOverview = 10000.f;
 		inline constexpr float DefaultTerrainHeight = 110.f;
 		inline constexpr float ZoomSpeed = 150.f;
@@ -1565,9 +1571,9 @@ namespace DeveloperSettings
 		constexpr bool GArchProjectile_Compile_DebugSymbols = false;
 		// Reinforcement provider and ability debug draws.
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
-		constexpr bool GPathFollowing_Compile_DebugSymbols = true;
-		constexpr bool GRTSNavAgents_Compile_DebugSymbols = true;
-		constexpr bool GPathFindingCosts_Compile_DebugSymbols = true;
+		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
+		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
+		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
 		// Wheel Animation
@@ -1576,7 +1582,7 @@ namespace DeveloperSettings
 		constexpr bool GPlayerClickAndAction_Compile_DebugSymbols = false;
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting
-		constexpr bool GHarvestResources_Compile_DebugSymbols = true;
+		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
 		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Resistances_Compile_DebugSymbols = false;

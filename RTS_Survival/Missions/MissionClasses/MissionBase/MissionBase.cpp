@@ -2015,10 +2015,10 @@ void UMissionBase::SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(const FVector S
 		SpawnRotation);
 }
 
-void UMissionBase::SpawnPlayerMediumTank_IIIM_Or_PZIVH(const FVector SpawnLocation, const FRotator SpawnRotation)
+void UMissionBase::SpawnPlayerMediumTank_IIIM_Or_PZIVRockets(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
 	const FTrainingOption PlayerMediumVehicleTrainingOption =
-		URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(this);
+		URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),

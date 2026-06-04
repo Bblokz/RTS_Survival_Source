@@ -1653,7 +1653,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( BasicSmallArmsRange* 1.33, 10);
 	WeaponData.ArmorPen = 10.f;
 	WeaponData.ArmorPenMaxRange = 8.f;
 	WeaponData.MagCapacity = 20;
@@ -1677,7 +1677,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( BasicSmallArmsRange* 1.15, 10);
 	WeaponData.ArmorPen = 12.f;
 	WeaponData.ArmorPenMaxRange = 8.f;
 	WeaponData.MagCapacity = 30;
@@ -1876,7 +1876,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = SniperDamage;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = SmallArmsRifleRange;
+	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::SmallArmsSniperRange;
 	WeaponData.ArmorPen = 14.f;
 	WeaponData.ArmorPenMaxRange = 11.f;
 	WeaponData.MagCapacity = 5;
@@ -1924,7 +1924,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre + 20.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = SmallArmsRifleRange;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( SmallArmsRifleRange * 1.1, 10);
 	WeaponData.ArmorPen = 18.f;
 	WeaponData.ArmorPenMaxRange = 15.f;
 	WeaponData.MagCapacity = 10;
@@ -1996,7 +1996,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre - 5.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( SmallArmsRifleRange * 1.1, 10);
 	WeaponData.ArmorPen = 9.f;
 	WeaponData.ArmorPenMaxRange = 6.f;
 	WeaponData.MagCapacity = 7;
@@ -2044,7 +2044,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre + 4;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( BasicSmallArmsRange* 1.33, 10);
 	WeaponData.ArmorPen = 11.f;
 	WeaponData.ArmorPenMaxRange = 9.f;
 	WeaponData.MagCapacity = 40;
@@ -2139,7 +2139,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( BasicSmallArmsRange* 1.2, 10);
 	WeaponData.ArmorPen = 12.f;
 	WeaponData.ArmorPenMaxRange = 8.f;
 	WeaponData.MagCapacity = 50;
@@ -2214,7 +2214,7 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = 13.f * DamagePerMM;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf( BasicSmallArmsRange* 1.2, 10);
 	WeaponData.ArmorPen = 27.f;
 	WeaponData.ArmorPenMaxRange = 20.f;
 	WeaponData.MagCapacity = 200;

@@ -1472,7 +1472,7 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerLightMediumTank_PZIII_J_O
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1));
 }
 
-FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext)
+FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
