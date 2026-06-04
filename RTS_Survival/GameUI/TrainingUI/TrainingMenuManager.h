@@ -223,6 +223,7 @@ ETrainingItemStatus CheckRequirement(
 
 	static FTrainingWidgetState M_EmptyTrainingOptionState;
 
+	UPROPERTY()
 	TWeakObjectPtr<UPlayerResourceManager> M_PlayerResourceManager;
 	bool GetIsValidPlayerResourceManager() const;
 	void Init_SetupPlayerResourceManager(const UObject* WorldContextObject,

@@ -159,6 +159,7 @@ private:
 	UPROPERTY()
 	UMaterialInstanceDynamic* M_DMI_DamagePoint = nullptr;
 
+	UPROPERTY()
 	TWeakObjectPtr<UHealthComponent> M_OwningHealthComponent = nullptr;
 
 	bool GetIsValidOwningHealthComp() const;

@@ -33,6 +33,7 @@ protected:
 private:
 	// ---- Tracked source ----
 	/** Weak ref so UI does not keep gameplay component alive. */
+	UPROPERTY()
 	TWeakObjectPtr<UBombComponent> M_TrackedBombComponent = nullptr;
 
 	/** Handle to unbind the delegate cleanly. */

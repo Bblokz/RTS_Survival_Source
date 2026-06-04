@@ -19,8 +19,7 @@ class RTS_SURVIVAL_API UW_AmmoPicker : public UUserWidget
 	GENERATED_BODY()
 
 public:
-
-/**
+	/**
 	 * @brief Sets up the ammo picker for the weapon item.
 	 * @param WeaponItem The weapon item that was clicked.
 	 * @param ShellTypesToPickFrom The shell types that the weapon item can use.
@@ -49,11 +48,11 @@ private:
 
 	// The weapon item that was clicked and populated the ammo picker.
 	UPROPERTY()
-	UW_WeaponItem* M_ActiveWeaponItem;
+	TWeakObjectPtr<UW_WeaponItem> M_ActiveWeaponItem;
 
 	UPROPERTY()
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
 	
-	bool GetIsValidActionUIManager()const;
-	bool GetIsValidActiveWeaponItem()const;
+	bool GetIsValidActionUIManager() const;
+	bool GetIsValidActiveWeaponItem() const;
 };

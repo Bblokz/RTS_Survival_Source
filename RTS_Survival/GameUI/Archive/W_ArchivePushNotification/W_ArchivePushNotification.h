@@ -26,6 +26,7 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnClickedNotification();
 private:
+	UPROPERTY()
 	TWeakObjectPtr<UW_ArchiveNotificationHolder> M_NotificationHolder;
 	bool GetIsValidNotificationHolder() const;
 };

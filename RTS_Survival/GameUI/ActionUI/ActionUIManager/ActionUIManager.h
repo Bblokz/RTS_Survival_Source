@@ -156,9 +156,11 @@ private:
 	UW_AmmoPicker* M_AmmoPicker;
 	bool GetIsValidAmmoPicker() const;
 
+	UPROPERTY()
 	TWeakObjectPtr<AActor> M_LastSelectedActor;
 	bool GetIsValidLastSelectedActor() const;
 
+	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	bool GetIsValidPlayerController() const;
 

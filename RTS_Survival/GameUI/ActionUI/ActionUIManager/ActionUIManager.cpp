@@ -53,7 +53,7 @@ void UActionUIManager::InitActionUIManager(
 	}
 	for (const auto EachWeaponUIElm : TWeaponUIItemsInMenu)
 	{
-		if (!IsValid(EachWeaponUIElm))
+		if (not IsValid(EachWeaponUIElm))
 		{
 			RTSFunctionLibrary::ReportErrorVariableNotInitialised(
 				this,
@@ -101,16 +101,25 @@ void UActionUIManager::InitActionUIManager(
 		                                                  "ActionUIElements", "InitActionUIManager");
 	}
 	M_TActionUI_Items = ActionUIElementsInMenu;
-	for (int i = 0; i < M_TActionUI_Items.Num(); ++i)
+	for (int32 ActionItemIndex = 0; ActionItemIndex < M_TActionUI_Items.Num(); ++ActionItemIndex)
 	{
-		M_TActionUI_Items[i]->InitActionUIElement(PlayerController, i, this);
+		if (not IsValid(M_TActionUI_Items[ActionItemIndex]))
+		{
+			RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+				this,
+				"M_TActionUI_Items[ActionItemIndex]",
+				"InitActionUIManager");
+			continue;
+		}
+
+		M_TActionUI_Items[ActionItemIndex]->InitActionUIElement(PlayerController, ActionItemIndex, this);
 	}
 	const URTSGameUserSettings* const GameUserSettings = URTSGameUserSettings::Get();
 	if (GameUserSettings != nullptr)
 	{
 		SetActionButtonHotkeysHidden(GameUserSettings->GetHideActionButtonHotkeys());
 	}
-	if (!IsValid(SelectedUnitInfo))
+	if (not IsValid(SelectedUnitInfo))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this,
 		                                                  "SelectedUnitInfo", "InitActionUIManager");
@@ -627,12 +636,14 @@ bool UActionUIManager::PropagateWeaponDataToUI(TArray<UWeaponState*> WeaponState
 			M_TWeaponItems[ItemsPopulated]->SetVisibility(ESlateVisibility::Visible);
 		}
 	}
-	for (int i = ItemsPopulated; i < M_TWeaponItems.Num(); ++i)
+	for (int32 WeaponItemIndex = ItemsPopulated; WeaponItemIndex < M_TWeaponItems.Num(); ++WeaponItemIndex)
 	{
-		if (IsValid(M_TWeaponItems[i]))
+		if (not IsValid(M_TWeaponItems[WeaponItemIndex]))
 		{
-			M_TWeaponItems[i]->SetVisibility(ESlateVisibility::Hidden);
+			continue;
 		}
+
+		M_TWeaponItems[WeaponItemIndex]->SetVisibility(ESlateVisibility::Hidden);
 	}
 	return ItemsPopulated > 0;
 }
@@ -888,7 +899,7 @@ void UActionUIManager::RefreshBehaviourUIForComponent(UBehaviourComp* BehaviourC
 void UActionUIManager::SetupBehaviourUIForSelectedActor(AActor* SelectedActor)
 {
 	UBehaviourComp* PreviousBehaviourComponent = M_SelectedBehaviourComponent.Get();
-	if (PreviousBehaviourComponent != nullptr)
+	if (IsValid(PreviousBehaviourComponent))
 	{
 		PreviousBehaviourComponent->RegisterActionUIManager(nullptr);
 		M_SelectedBehaviourComponent.Reset();

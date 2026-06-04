@@ -60,6 +60,7 @@ private:
 	// If no notifications remain this widget will collapse.
 	void RemoveNotification(UW_ArchivePushNotification* NotificationWidget);
 
+	UPROPERTY()
 	TWeakObjectPtr<UMainGameUI> M_MainGameUI;
 
 	// Validates M_MainGameUI and reports once in a centralized spot.
