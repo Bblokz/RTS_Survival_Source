@@ -911,6 +911,7 @@ protected:
 		const FSeededDifficultyMixPool BrutalAndIronManMix
 	) const;
 private:
+	UPROPERTY()
 	TWeakObjectPtr<AMissionManager> M_MissionManager;
 
 	// Used so mission cleanup can always cancel every task this mission created.
@@ -921,6 +922,7 @@ private:
 
 	void CleanUp_TimerHandles(const UWorld* World);
 
+	UPROPERTY()
 	TWeakObjectPtr<UW_Mission> M_MissionWidget;
 
 	bool GetHasValidTrigger() const;
@@ -941,6 +943,7 @@ private:
 	// Added to when delay spawning.
 	TArray<FTimerHandle> M_DelaySpawnTimerHandles;
 
+	UPROPERTY()
 	TWeakObjectPtr<ARTSAsyncSpawner> M_RTSAsyncSpawner;
 	bool EnsureValidRTSSpawner();
 
@@ -958,6 +961,7 @@ private:
 	TMap<int32, FRotator> M_MapIdToRotation;
 
 
+	UPROPERTY()
 	TWeakObjectPtr<UPlayerCameraController> M_PlayerCameraController;
 
 	void SetCameraControllerReference();

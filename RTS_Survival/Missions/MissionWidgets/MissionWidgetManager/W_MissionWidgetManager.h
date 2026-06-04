@@ -26,7 +26,7 @@ private:
 	UPROPERTY()
 	TArray<UW_Mission*> M_MissionWidgets;
 
-	bool EnsureMissionWidgetIsValid(UW_Mission* MissionWidget) const;
+	bool EnsureMissionWidgetIsValid(const UW_Mission* MissionWidget) const;
 
 		
 };
