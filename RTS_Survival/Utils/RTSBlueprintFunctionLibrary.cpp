@@ -1487,6 +1487,22 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZI
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext)
+{
+	
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_M));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets));
+}
+
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext)
 {

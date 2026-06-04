@@ -694,6 +694,8 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerGerPanzerIIIAAOrRail38T(UObject* WorldContext);
