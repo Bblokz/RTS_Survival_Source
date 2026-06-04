@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 
 #include "EnergyComp.h"
@@ -369,7 +369,24 @@ void UEnergyComp::ApplyMaterialsForCurrentEnergyState()
 
 bool UEnergyComp::GetIsOwnerBehaviourComponentValid() const
 {
-	return M_OwnerBehaviourComponent.IsValid();
+	if (M_OwnerBehaviourComponent.IsValid())
+	{
+		return true;
+	}
+
+	if (GetIsShuttingDown())
+	{
+		return false;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_OwnerBehaviourComponent"),
+		TEXT("GetIsOwnerBehaviourComponentValid"),
+		this
+	);
+
+	return false;
 }
 
 bool UEnergyComp::GetIsValidLowEnergyMaterial() const

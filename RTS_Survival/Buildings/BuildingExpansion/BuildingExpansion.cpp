@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "BuildingExpansion.h"
@@ -1304,7 +1304,13 @@ void ABuildingExpansion::OnTurretTargetDestroyed(ACPPTurretsMaster* CallingTurre
 		                                             "ABuildingExpansion::OnTurretTargetDestroyed");
 		return;
 	}
-	if (UnitCommandData->GetCurrentActiveCommand() == EAbilityID::IdAttack)
+	const UCommandData* CommandData = GetIsValidCommandData();
+	if (CommandData == nullptr)
+	{
+		return;
+	}
+
+	if (CommandData->GetCurrentActiveCommand() == EAbilityID::IdAttack)
 	{
 		if (DidKillTargetActorOrTargetNoLongerValid(M_TargetActor, DestroyedActor))
 		{
@@ -1327,7 +1333,13 @@ void ABuildingExpansion::OnHullWeaponKilledActor(UHullWeaponComponent* CallingHu
 	{
 		return;
 	}
-	if (UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack)
+	const UCommandData* CommandData = GetIsValidCommandData();
+	if (CommandData == nullptr)
+	{
+		return;
+	}
+
+	if (CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack)
 	{
 		if (M_TargetActor == DestroyedActor)
 		{

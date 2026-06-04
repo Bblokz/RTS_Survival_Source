@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "BuildingExpansionOwnerComp.h"
@@ -30,8 +30,19 @@ void UBuildingExpansionOwnerComp::UpdateMainGameUIWithStatusChanges(const int In
 	{
 		return;
 	}
+	UMainGameUI* MainGameUI = M_PlayerController->GetMainMenuUI();
+	if (not IsValid(MainGameUI))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("MainGameUI"),
+			TEXT("UpdateMainGameUIWithStatusChanges"),
+			this);
+		return;
+	}
+
 	AActor* ComponentImplementingActor = GetOwner();
-	M_PlayerController->GetMainMenuUI()->RequestUpdateSpecificBuildingExpansionItem(ComponentImplementingActor,
+	MainGameUI->RequestUpdateSpecificBuildingExpansionItem(ComponentImplementingActor,
 		NewType, NewStatus, ConstructionRules, IndexBExpansion);
 }
 

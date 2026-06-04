@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "BuildingExpansionOwner.h"
@@ -259,9 +259,20 @@ void IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned(
 			continue;
 		}
 		const int32 BxpIndex = BxpItemIndices[i];
+		if (not BuildingExpansionData.M_TBuildingExpansionItems.IsValidIndex(BxpIndex))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Invalid building expansion index in batch spawned data."
+				"\n Index: " + FString::FromInt(BxpIndex) +
+				"\n Expansion count: " + FString::FromInt(BuildingExpansionData.M_TBuildingExpansionItems.Num()) +
+				"\n See IBuildingExpansionOwner::BatchBxp_OnInstantPlacementBxpsSpawned");
+			Bxp->Destroy();
+			continue;
+		}
+
 		const FBxpOptionData& BxpTypeAndConstructionRules = BxpTypesAndConstructionRules[i];
 		PlayerController->OnBxpSpawnedAsync_InstantPlacement(
-			SpawnedBxps[i],
+			Bxp,
 			OwnerSmartPointer,
 			BxpTypeAndConstructionRules,
 			BxpIndex);
@@ -276,15 +287,24 @@ void IBuildingExpansionOwner::OnBuildingExpansionCreated(
 	const bool bIsUnpackedExpansion,
 	const TScriptInterface<IBuildingExpansionOwner>& OwnerScriptInterface)
 {
-	// Get location of actor implementing this interface.
-	const AActor* Owner = Cast<AActor>(this);
-
 	if (not RTSFunctionLibrary::RTSIsValid(BuildingExpansion))
 	{
 		RTSFunctionLibrary::ReportError(
-			"Failed to spawn building expansion of owner: " + Owner->GetName() +
+			"Failed to spawn building expansion of owner: " + GetOwnerName() +
 			"\n Cannot init array entry at OnBuildingExpansionCreated."
 			"\n as bxp is invalid or null");
+		return;
+	}
+
+	UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
+	if (not BuildingExpansionData.M_TBuildingExpansionItems.IsValidIndex(BuildingExpansionIndex))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid building expansion index when creating expansion for owner: " + GetOwnerName() +
+			"\n Index: " + FString::FromInt(BuildingExpansionIndex) +
+			"\n Expansion count: " + FString::FromInt(BuildingExpansionData.M_TBuildingExpansionItems.Num()) +
+			"\n See IBuildingExpansionOwner::OnBuildingExpansionCreated");
+		BuildingExpansion->Destroy();
 		return;
 	}
 
@@ -580,10 +600,12 @@ void IBuildingExpansionOwner::StartPackUpAllExpansions(const float TotalOwnerPac
 	for (const auto [Expansion, ExpansionType, ExpansionStatus, ConstructionRules] : BuildingExpansionData.
 	     M_TBuildingExpansionItems)
 	{
-		if (Expansion)
+		if (not IsValid(Expansion))
 		{
-			Expansion->StartPackUpBuildingExpansion(TotalOwnerPackUpTime);
+			continue;
 		}
+
+		Expansion->StartPackUpBuildingExpansion(TotalOwnerPackUpTime);
 	}
 }
 
@@ -592,10 +614,12 @@ void IBuildingExpansionOwner::CancelPackUpExpansions() const
 	UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
 	for (const auto EachExpElm : BuildingExpansionData.M_TBuildingExpansionItems)
 	{
-		if (EachExpElm.Expansion)
+		if (not IsValid(EachExpElm.Expansion))
 		{
-			EachExpElm.Expansion->CancelPackUpBuildingExpansion();
+			continue;
 		}
+
+		EachExpElm.Expansion->CancelPackUpBuildingExpansion();
 	}
 }
 
@@ -604,10 +628,12 @@ void IBuildingExpansionOwner::FinishPackUpAllExpansions() const
 	UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
 	for (const auto EachExpElm : BuildingExpansionData.M_TBuildingExpansionItems)
 	{
-		if (EachExpElm.Expansion)
+		if (not IsValid(EachExpElm.Expansion))
 		{
-			EachExpElm.Expansion->FinishPackUpExpansion();
+			continue;
 		}
+
+		EachExpElm.Expansion->FinishPackUpExpansion();
 	}
 }
 
