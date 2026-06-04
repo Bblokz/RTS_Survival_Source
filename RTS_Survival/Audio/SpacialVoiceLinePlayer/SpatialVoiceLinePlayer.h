@@ -9,6 +9,8 @@
 
 enum class ERTSVoiceLine : uint8;
 class ACPPController;
+class UAudioComponent;
+class USoundAttenuation;
 
 /**
  * @brief Plays 3D “spatial” voice lines for units the local player controls.
@@ -62,12 +64,13 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/**
-     * @brief Roll a random test against the per-line probability.
-     * @param VoiceLineType  The type of spatial line being requested.
-     * @return true if the random roll passes and the line may proceed.
-     */
+	 * @brief Roll a random test against the per-line probability.
+	 * @param VoiceLineType  The type of spatial line being requested.
+	 * @return true if the random roll passes and the line may proceed.
+	 */
 	virtual bool ShouldPlaySpatialVoiceLine(ERTSVoiceLine VoiceLineType) const;
 
 	virtual float GetBaseIntervalBetweenSpatialVoiceLines(float& OutFluxPercentage) const;
@@ -75,7 +78,7 @@ protected:
 	/** Check that this component should play spatial audio (owner owned by local player). */
 	virtual bool BeginPlay_CheckEnabledForSpatialAudio();
 
-	virtual void OverrideAttenuation(UAudioComponent* AudioComp) const ;
+	virtual void OverrideAttenuation(UAudioComponent* AudioComp) const;
 	
 	/** Disable all spatial audio if not owned by player. */
 	bool bIsEnabledForSpatialAudio = false;
@@ -83,11 +86,11 @@ protected:
 	// If the owning player is 1 this is the attenuation settings that will be used.
 	// Can be left null in which case the default attenuation from the player controller is used.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	USoundAttenuation* PlayerSoundUnitAttenuationSettings;
+	TObjectPtr<USoundAttenuation> PlayerSoundUnitAttenuationSettings = nullptr;
 	// If the owning player is 2 this is the attenuation settings that will be used.
 	// Can be left null in which case the default attenuation from the player controller is used.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	USoundAttenuation* EnemySoundUnitAttenuationSettings;
+	TObjectPtr<USoundAttenuation> EnemySoundUnitAttenuationSettings = nullptr;
 
 private:
 	/** True while waiting out the “spam” cooldown interval. */
@@ -96,6 +99,7 @@ private:
 	void HandleNewSpatialAudio(UAudioComponent* SpatialAudio);
 
 	/** Reference to the player’s controller for routing the play call. */
+	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 
 	/** Handle for the spam‐cooldown timer. */
@@ -109,7 +113,7 @@ private:
 	void BeginPlay_SetupControllerReference();
 
 	/** Ensure the cached controller pointer is still valid. */
-	bool EnsureControllerIsValid() const;
+	bool GetIsValidPlayerController() const;
 
 	/** Called when the cooldown period expires, allowing next play. */
 	void ResetSpatialCooldown();
@@ -117,6 +121,9 @@ private:
 	// Populated with reference to the last created audio component for spatial audio if that could be played.
 	UPROPERTY()
 	TWeakObjectPtr<UAudioComponent> M_LastSpacialAudio;
+
+	bool GetIsValidOwnerForAudioRequest(const FString& FunctionName) const;
+	UWorld* GetValidWorldForTimer(const FString& FunctionName) const;
 
 	/**
 	 * @brief After the stagger delay, actually invoke the controller’s spatial play.
@@ -137,9 +144,17 @@ private:
 
 
 	void BeginPlay_ReportErrorIfnoAttenuation() const;
+
+	/**
+	 * @brief Builds the owner type label only for attenuation setup diagnostics.
+	 * @param Owner Actor that owns this component.
+	 * @param bOutValidOwnerType true when a valid RTS component supplied the display name.
+	 * @return Display name used in the attenuation error report.
+	 */
+	FString GetOwnerTypeNameForAttenuationError(AActor* Owner, bool& bOutValidOwnerType) const;
 	
 	// Set depending on the owning player.
 	UPROPERTY()
-	USoundAttenuation* OverrideAttenuationSettings = nullptr;
+	TObjectPtr<USoundAttenuation> OverrideAttenuationSettings = nullptr;
 
 };

@@ -8,6 +8,7 @@
 #include "TimerManager.h"
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 
 using namespace DeveloperSettings::GamePlay::Audio;
 
@@ -23,21 +24,36 @@ void USpatialVoiceLinePlayer::BeginPlay()
 
 	BeginPlay_SetupAttenuationOverride();
 	BeginPlay_ReportErrorIfnoAttenuation();
-	if (BeginPlay_CheckEnabledForSpatialAudio())
+	if (not BeginPlay_CheckEnabledForSpatialAudio())
 	{
-		BeginPlay_SetupControllerReference();
+		return;
 	}
+
+	BeginPlay_SetupControllerReference();
+}
+
+void USpatialVoiceLinePlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(TimerHandle_SpatialCooldown);
+		World->GetTimerManager().ClearTimer(TimerHandle_SpatialStagger);
+	}
+
+	M_LastSpacialAudio.Reset();
+	M_PlayerController.Reset();
+	Super::EndPlay(EndPlayReason);
 }
 
 bool USpatialVoiceLinePlayer::BeginPlay_CheckEnabledForSpatialAudio()
 {
-	const AActor* Owner = GetOwner();
-	if (!Owner)
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
 	{
 		return false;
 	}
 	const URTSComponent* RTSComp = Owner->FindComponentByClass<URTSComponent>();
-	if (!RTSComp)
+	if (not IsValid(RTSComp))
 	{
 		return false;
 	}
@@ -49,12 +65,12 @@ bool USpatialVoiceLinePlayer::BeginPlay_CheckEnabledForSpatialAudio()
 
 void USpatialVoiceLinePlayer::OverrideAttenuation(UAudioComponent* AudioComp) const
 {
-	if (!IsValid(AudioComp))
+	if (not IsValid(AudioComp))
 	{
 		return;
 	}
 
-	if (OverrideAttenuationSettings)
+	if (IsValid(OverrideAttenuationSettings))
 	{
 		AudioComp->AttenuationSettings = OverrideAttenuationSettings;
 	}
@@ -66,23 +82,57 @@ void USpatialVoiceLinePlayer::BeginPlay_SetupControllerReference()
 	M_PlayerController = FRTS_Statics::GetRTSController(this);
 }
 
-bool USpatialVoiceLinePlayer::EnsureControllerIsValid() const
+bool USpatialVoiceLinePlayer::GetIsValidPlayerController() const
 {
-	if (!M_PlayerController.IsValid())
+	if (M_PlayerController.IsValid())
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("No valid controller found for spatial voice line player; ")
-			TEXT("component likely on a non-owned unit."));
-		return false;
+		return true;
 	}
-	return true;
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_PlayerController"),
+		TEXT("GetIsValidPlayerController"),
+		this);
+	return false;
+}
+
+bool USpatialVoiceLinePlayer::GetIsValidOwnerForAudioRequest(const FString& FunctionName) const
+{
+	if (IsValid(GetOwner()))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("Owner"),
+		FunctionName,
+		this);
+	return false;
+}
+
+UWorld* USpatialVoiceLinePlayer::GetValidWorldForTimer(const FString& FunctionName) const
+{
+	UWorld* World = GetWorld();
+	if (IsValid(World))
+	{
+		return World;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("World"),
+		FunctionName,
+		this);
+	return nullptr;
 }
 
 void USpatialVoiceLinePlayer::PlaySpatialVoiceLine(
 	ERTSVoiceLine VoiceLineType,
 	const FVector& Location, const bool bIgnorePlayerCooldown)
 {
-	if (not bIsEnabledForSpatialAudio || bIsOnSpatialCooldown || not EnsureControllerIsValid())
+	if (not bIsEnabledForSpatialAudio || bIsOnSpatialCooldown || not GetIsValidPlayerController())
 	{
 		return;
 	}
@@ -96,14 +146,20 @@ void USpatialVoiceLinePlayer::PlaySpatialVoiceLine(
 	Debug_SpatialAllowed(VoiceLineType, Location);
 
 	// 1) Start spam cooldown immediately
-	float FluxPct = 0.f;
-	const float Base = GetBaseIntervalBetweenSpatialVoiceLines(FluxPct);
-	const float RandPct = FMath::FRandRange(-FluxPct, FluxPct);
-	const float Multi = 1.f + RandPct * 0.01f;
-	const float CooldownTime = Base * Multi;
+	UWorld* World = GetValidWorldForTimer(TEXT("PlaySpatialVoiceLine"));
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	float FluxPercentage = 0.f;
+	const float BaseInterval = GetBaseIntervalBetweenSpatialVoiceLines(FluxPercentage);
+	const float RandomPercentage = FMath::FRandRange(-FluxPercentage, FluxPercentage);
+	const float CooldownMultiplier = 1.f + RandomPercentage * 0.01f;
+	const float CooldownTime = FMath::Max(0.01f, BaseInterval * CooldownMultiplier);
 
 	bIsOnSpatialCooldown = true;
-	GetWorld()->GetTimerManager().SetTimer(
+	World->GetTimerManager().SetTimer(
 		TimerHandle_SpatialCooldown,
 		this,
 		&USpatialVoiceLinePlayer::ResetSpatialCooldown,
@@ -124,7 +180,7 @@ void USpatialVoiceLinePlayer::ForcePlaySpatialVoiceLine(
 	const ERTSVoiceLine VoiceLineType,
 	const FVector& Location)
 {
-	if (not bIsEnabledForSpatialAudio || not EnsureControllerIsValid())
+	if (not bIsEnabledForSpatialAudio || not GetIsValidPlayerController())
 	{
 		return;
 	}
@@ -146,7 +202,7 @@ void USpatialVoiceLinePlayer::ForcePlaySpatialVoiceLine(
 void USpatialVoiceLinePlayer::HandleNewSpatialAudio(UAudioComponent* SpatialAudio)
 {
 	// Only save the weak reference to the spatial audio if it could actually be played.
-	if (!SpatialAudio)
+	if (not IsValid(SpatialAudio))
 	{
 		return;
 	}
@@ -156,13 +212,13 @@ void USpatialVoiceLinePlayer::HandleNewSpatialAudio(UAudioComponent* SpatialAudi
 	// Apply per-unit overrides (attenuation / concurrency) on the pooled component.
 	OverrideAttenuation(SpatialAudio);
 
-		SpatialAudio->Play(0.f);
+	SpatialAudio->Play(0.f);
 }
 
 void USpatialVoiceLinePlayer::PlayVoiceLineOverRadio(const ERTSVoiceLine VoiceLineType, const bool bForcePlay,
                                                      const bool bQueueIfNotPlayed) const
 {
-	if (not EnsureControllerIsValid() || not bIsEnabledForSpatialAudio)
+	if (not GetIsValidPlayerController() || not bIsEnabledForSpatialAudio || not GetIsValidOwnerForAudioRequest(TEXT("PlayVoiceLineOverRadio")))
 	{
 		return;
 	}
@@ -184,7 +240,7 @@ UAudioComponent* USpatialVoiceLinePlayer::ExecuteSpatialVoiceLine(
 	const FVector& Location,
 	const bool bIgnorePlayerCooldown)
 {
-	if (not EnsureControllerIsValid())
+	if (not GetIsValidPlayerController() || not GetIsValidOwnerForAudioRequest(TEXT("ExecuteSpatialVoiceLine")))
 	{
 		return nullptr;
 	}
@@ -298,16 +354,16 @@ void USpatialVoiceLinePlayer::Debug_ForceSpatialAudio(const ERTSVoiceLine& Voice
 void USpatialVoiceLinePlayer::BeginPlay_SetupAttenuationOverride()
 {
 	
-	if(not IsValid(GetOwner()))
+	if (not IsValid(GetOwner()))
 	{
 		return;
 	}
 	const URTSComponent* RTSComp = GetOwner()->FindComponentByClass<URTSComponent>();
-	if(not IsValid(RTSComp))
+	if (not IsValid(RTSComp))
 	{
 		return;
 	}
-	if(RTSComp->GetOwningPlayer() > 0 )
+	if (RTSComp->GetOwningPlayer() > 0)
 	{
 		OverrideAttenuationSettings = PlayerSoundUnitAttenuationSettings;
 	}
@@ -317,36 +373,49 @@ void USpatialVoiceLinePlayer::BeginPlay_SetupAttenuationOverride()
 	}
 }
 
+FString USpatialVoiceLinePlayer::GetOwnerTypeNameForAttenuationError(
+	AActor* Owner,
+	bool& bOutValidOwnerType) const
+{
+	bOutValidOwnerType = false;
+
+	ASquadUnit* OwningSquadUnit = Cast<ASquadUnit>(Owner);
+	if (IsValid(OwningSquadUnit) && IsValid(OwningSquadUnit->GetRTSComponent()))
+	{
+		return OwningSquadUnit->GetRTSComponent()->GetDisplayName(bOutValidOwnerType);
+	}
+
+	ATankMaster* OwningTank = Cast<ATankMaster>(Owner);
+	if (IsValid(OwningTank) && IsValid(OwningTank->GetRTSComponent()))
+	{
+		return OwningTank->GetRTSComponent()->GetDisplayName(bOutValidOwnerType);
+	}
+
+	return TEXT("Unknown Type");
+}
+
 void USpatialVoiceLinePlayer::BeginPlay_ReportErrorIfnoAttenuation() const
 {
-	if(not OverrideAttenuationSettings)
+	if (IsValid(OverrideAttenuationSettings))
 	{
-		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : TEXT("Unknown Owner");
-				bool bValid = false;
-		FString OwnerType = "Unknown Type";
-		if(GetOwner())
-		{
-			ASquadUnit* OwningSquadUnit = Cast<ASquadUnit>(GetOwner());
-			if(OwningSquadUnit && OwningSquadUnit->GetRTSComponent())
-			{
-				OwnerType = OwningSquadUnit->GetRTSComponent()->GetDisplayName(bValid);	
-			}
-			else
-			{
-				ATankMaster* OwningTank = Cast<ATankMaster>(GetOwner());
-				if(OwningTank && OwningTank->GetRTSComponent())
-				{
-					OwnerType = OwningTank->GetRTSComponent()->GetDisplayName(bValid);
-				}
-			}
-			
-		}
-		if(not bValid)
-		{
-			OwnerType = "RTSCOMPONENT INVALID NAME";
-		}
-		RTSFunctionLibrary::ReportError(
-			TEXT("No spatial attenuation settings set on SpatialVoiceLinePlayer component on ")
-			+ OwnerName + "\n Type: " + OwnerType);
+		return;
 	}
+
+	AActor* Owner = GetOwner();
+	const FString OwnerName = IsValid(Owner) ? Owner->GetName() : TEXT("Unknown Owner");
+	bool bValidOwnerType = false;
+	FString OwnerType = TEXT("Unknown Type");
+	if (IsValid(Owner))
+	{
+		OwnerType = GetOwnerTypeNameForAttenuationError(Owner, bValidOwnerType);
+	}
+
+	if (not bValidOwnerType)
+	{
+		OwnerType = TEXT("RTSCOMPONENT INVALID NAME");
+	}
+
+	RTSFunctionLibrary::ReportError(
+		TEXT("No spatial attenuation settings set on SpatialVoiceLinePlayer component on ")
+		+ OwnerName + TEXT("\n Type: ") + OwnerType);
 }

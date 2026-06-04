@@ -21,6 +21,13 @@ void USquadUnitSpatialVoiceLinePlayer::BeginPlay()
 	BeginPlay_SetupOwnerAsSquadUnit();
 }
 
+void USquadUnitSpatialVoiceLinePlayer::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	StopIdleVoiceLineTimer();
+	M_OwningSquadUnit.Reset();
+	Super::EndPlay(EndPlayReason);
+}
+
 bool USquadUnitSpatialVoiceLinePlayer::ShouldPlaySpatialVoiceLine(ERTSVoiceLine VoiceLineType) const
 {
 	
@@ -52,31 +59,37 @@ float USquadUnitSpatialVoiceLinePlayer::GetBaseIntervalBetweenSpatialVoiceLines(
 bool USquadUnitSpatialVoiceLinePlayer::BeginPlay_CheckEnabledForSpatialAudio()
 {
 	bIsEnabledForSpatialAudio = false;
-	if(not IsValid(GetOwner()))
+	if (not IsValid(GetOwner()))
 	{
 		return bIsEnabledForSpatialAudio;
 	}
 	URTSComponent* RTSComp = GetOwner()->FindComponentByClass<URTSComponent>();
-	if(not IsValid(RTSComp))
+	if (not IsValid(RTSComp))
 	{
 		return bIsEnabledForSpatialAudio;
 	}
 	// Enable for both player and enemy.
-	if(RTSComp->GetOwningPlayer() > 0 )
+	if (RTSComp->GetOwningPlayer() > 0)
 	{
 		bIsEnabledForSpatialAudio = true;
 	}
-		return bIsEnabledForSpatialAudio;
+	return bIsEnabledForSpatialAudio;
 }
 
 void USquadUnitSpatialVoiceLinePlayer::OnSquadSet_SetupIdleVoiceLineCheck()
 {
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || not GetIsValidOwningSquadUnit())
+	{
+		return;
+	}
+
 	constexpr float Base = DeveloperSettings::GamePlay::Audio::SquadUnits::TimeBetweenIdleVoiceLines;
 	constexpr float FluxPct = DeveloperSettings::GamePlay::Audio::SquadUnits::FluxPercentageIntervalBetweenSpatialVoiceLines;
 	const float RandPct = FMath::FRandRange(-FluxPct, FluxPct);
 	const float Multi = 1.f + RandPct * 0.01f;
-	const float CooldownTime = Base * Multi * GetSquadIndex();
-	GetWorld()->GetTimerManager().SetTimer(
+	const float CooldownTime = FMath::Max(0.01f, Base * Multi * GetSquadIndex());
+	World->GetTimerManager().SetTimer(
 		M_SquadIdleTimer,
 		this,
 		&USquadUnitSpatialVoiceLinePlayer::CheckPlayIdleOrCombatVoiceLine,
@@ -86,34 +99,32 @@ void USquadUnitSpatialVoiceLinePlayer::OnSquadSet_SetupIdleVoiceLineCheck()
 
 void USquadUnitSpatialVoiceLinePlayer::BeginPlay_SetupOwnerAsSquadUnit()
 {
-	if(not IsValid(GetOwner()))
+	if (not IsValid(GetOwner()))
 	{
 		return;
 	}
 	ASquadUnit* SquadUnit = Cast<ASquadUnit>(GetOwner());
 	M_OwningSquadUnit = SquadUnit;
-	if(not M_OwningSquadUnit.IsValid())
+	if (not GetIsValidOwningSquadUnit())
 	{
-		RTSFunctionLibrary::ReportError(
-			TEXT("USquadUnitSpatialVoiceLinePlayer is not attached to a ASquadUnit! ")
-			TEXT("Spatial voice lines will not function properly."));
+		return;
 	}
 }
 
 
 void USquadUnitSpatialVoiceLinePlayer::CheckPlayIdleOrCombatVoiceLine()
 {
-	if(not M_OwningSquadUnit.IsValid())
+	if (not GetIsValidOwningSquadUnit())
 	{
 		StopIdleVoiceLineTimer();
 		return;
 	}
 	const bool bIsInCombat = M_OwningSquadUnit->GetIsUnitInCombat();
-	if(M_OwningSquadUnit->GetIsUnitIdle() && not bIsInCombat)
+	if (M_OwningSquadUnit->GetIsUnitIdle() && not bIsInCombat)
 	{
 		PlaySpatialVoiceLine(ERTSVoiceLine::IdleTalk, M_OwningSquadUnit->GetActorLocation(), false);
 	}
-	else if(bIsInCombat)
+	else if (bIsInCombat)
 	{
 		PlaySpatialVoiceLine(ERTSVoiceLine::InCombatTalk, M_OwningSquadUnit->GetActorLocation(), false);
 	}
@@ -121,19 +132,34 @@ void USquadUnitSpatialVoiceLinePlayer::CheckPlayIdleOrCombatVoiceLine()
 
 void USquadUnitSpatialVoiceLinePlayer::StopIdleVoiceLineTimer()
 {
-	if(UWorld* World = GetWorld())
+	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_SquadIdleTimer);
 	}
 }
 
+bool USquadUnitSpatialVoiceLinePlayer::GetIsValidOwningSquadUnit() const
+{
+	if (M_OwningSquadUnit.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_OwningSquadUnit"),
+		TEXT("GetIsValidOwningSquadUnit"),
+		this);
+	return false;
+}
+
 int32 USquadUnitSpatialVoiceLinePlayer::GetSquadIndex() const
 {
-	if(not M_OwningSquadUnit.IsValid())
+	if (not GetIsValidOwningSquadUnit())
 	{
 		return 1;
 	}
-	if(M_OwningSquadUnit->GetSquadControllerChecked())
+	if (M_OwningSquadUnit->GetSquadControllerChecked())
 	{
 		return M_OwningSquadUnit->GetSquadControllerChecked()->GetSquadUnitIndex(M_OwningSquadUnit.Get());
 	}

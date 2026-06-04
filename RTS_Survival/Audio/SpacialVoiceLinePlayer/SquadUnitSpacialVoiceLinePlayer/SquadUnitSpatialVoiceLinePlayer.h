@@ -9,6 +9,10 @@
 
 class ASquadUnit;
 
+/**
+ * @brief Extends spatial voice playback for squad units that schedule idle and combat chatter.
+ * The owning squad unit calls OnSquadSet_SetupIdleVoiceLineCheck after squad membership is assigned.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API USquadUnitSpatialVoiceLinePlayer : public USpatialVoiceLinePlayer
 {
@@ -24,6 +28,7 @@ public:
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	virtual bool ShouldPlaySpatialVoiceLine(ERTSVoiceLine VoiceLineType) const override;
 
@@ -39,11 +44,12 @@ private:
 
 	void CheckPlayIdleOrCombatVoiceLine();
 	void StopIdleVoiceLineTimer();
+	bool GetIsValidOwningSquadUnit() const;
 
 	UPROPERTY()
 	TWeakObjectPtr<ASquadUnit> M_OwningSquadUnit = nullptr;
 
-	int32 GetSquadIndex()const;
+	int32 GetSquadIndex() const;
 	
 	
 };

@@ -214,12 +214,12 @@ void FRTS_VoiceLineHelpers::PlayUnitDeathVoiceLineOnRadio(AActor* UnitThatDied, 
 		return;
 	}
 	URTSComponent* RTSComponent = UnitThatDied->FindComponentByClass<URTSComponent>();
-	if (not RTSComponent || RTSComponent->GetOwningPlayer() != 1)
+	if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() != 1)
 	{
 		return;
 	}
 	ACPPController* PlayerController = FRTS_Statics::GetRTSController(UnitThatDied);
-	if (not PlayerController)
+	if (not IsValid(PlayerController))
 	{
 		return;
 	}

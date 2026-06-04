@@ -63,7 +63,7 @@ void FVoiceLineData::ValidateVoiceLines()
 	TArray<USoundBase*> ValidVoiceLines;
 	for (auto EachVoiceLine : VoiceLines)
 	{
-		if (!IsValid(EachVoiceLine))
+		if (not IsValid(EachVoiceLine))
 		{
 			RTSFunctionLibrary::ReportError("Invalid VoiceLine in FVoiceLineData ");
 			continue;
@@ -95,6 +95,7 @@ bool FVoiceLineData::EnsureVoiceLineIndexIsValid(int32& Index) const
 
 bool FUnitVoiceLinesData::GetVoiceLinesForType(const ERTSVoiceLine VoiceLineType, FVoiceLineData*& OutVoiceLines)
 {
+	OutVoiceLines = nullptr;
 	if (FVoiceLineData* Found = VoiceLines.Find(VoiceLineType))
 	{
 		OutVoiceLines = Found;
@@ -113,6 +114,7 @@ bool FUnitVoiceLinesData::GetVoiceLinesForType(const ERTSVoiceLine VoiceLineType
 bool FAnnouncerVoiceLineData::GetVoiceLinesForType(const EAnnouncerVoiceLineType VoiceLineType,
                                                    FVoiceLineData*& OutVoiceLines)
 {
+	OutVoiceLines = nullptr;
 	if (FVoiceLineData* Found = VoiceLines.Find(VoiceLineType))
 	{
 		OutVoiceLines = Found;
