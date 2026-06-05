@@ -790,6 +790,8 @@ void ATrackedTankMaster::SetupEngineGasSoundComponent()
 	M_EngineGasSoundComponent->bAutoActivate = false;
 	M_EngineGasSoundComponent->bAutoDestroy = false;
 	M_EngineGasSoundComponent->bCanPlayMultipleInstances = false;
+	M_EngineGasSoundComponent->bAllowSpatialization = true;
+	M_EngineGasSoundComponent->SetUISound(false);
 	M_EngineGasSoundComponent->AttenuationSettings = M_EngineSoundComponent->AttenuationSettings;
 	M_EngineGasSoundComponent->bOverrideAttenuation = M_EngineSoundComponent->bOverrideAttenuation;
 	M_EngineGasSoundComponent->AttenuationOverrides = M_EngineSoundComponent->AttenuationOverrides;
