@@ -956,7 +956,7 @@ void UHarvester::AsyncOnReceivedDropOffs(const TArray<TWeakObjectPtr<UResourceDr
 	}
 	for (auto EachDropOff : DropOffs)
 	{
-		if (!EachDropOff.IsValid() || !EachDropOff->GetIsDropOffActive())
+		if (not EachDropOff.IsValid() || not EachDropOff->GetIsDropOffActive())
 		{
 			continue;
 		}
@@ -968,8 +968,14 @@ void UHarvester::AsyncOnReceivedDropOffs(const TArray<TWeakObjectPtr<UResourceDr
 		HarvestAIExecuteAction(EHarvesterAIAction::MoveToDropOff);
 		return;
 	}
-		OnNoDropOffsFound_DisplayMessage();		
-	
+
+	if (TryClearIgnoredDropOffsForImmediateRetry())
+	{
+		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
+		return;
+	}
+
+	OnNoDropOffsFound_DisplayMessage();
 	HarvestDebug("No valid drop-off available; terminate harvest command", FColor::Red);
 	HarvestAIExecuteAction(EHarvesterAIAction::FinishHarvestCommand);
 }
@@ -1301,6 +1307,19 @@ void UHarvester::ClearHarvestBlacklists()
 	M_TeleportedOnce_Resource.Empty();
 	M_TeleportedOnce_DropOff.Empty();
 	HarvestDebug("Cleared harvester blacklists & teleport markers", FColor::Cyan);
+}
+
+bool UHarvester::TryClearIgnoredDropOffsForImmediateRetry()
+{
+	if (M_DropOffBlacklist.IsEmpty())
+	{
+		return false;
+	}
+
+	M_DropOffBlacklist.Empty();
+	M_TeleportedOnce_DropOff.Empty();
+	HarvestDebug("Cleared ignored drop-offs and retrying drop-off search immediately", FColor::Cyan);
+	return true;
 }
 
 bool UHarvester::ConsumeTeleportAllowanceOrBlacklist(const EHarvesterAIAction ActionGroup)
