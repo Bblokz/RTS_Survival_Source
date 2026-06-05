@@ -374,6 +374,9 @@ private:
 	 */
 	void ClearHarvestBlacklists();
 
+	/** @return Whether ignored drop-offs were cleared so the harvester can immediately retry. */
+	bool TryClearIgnoredDropOffsForImmediateRetry();
+
 	/**
 	 * @brief Consume the teleport allowance for the current goal, or blacklist if we already teleported once.
 	 * @param ActionGroup The context (resource vs drop-off).
