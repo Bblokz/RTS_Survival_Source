@@ -464,6 +464,7 @@ private:
 	FRotator M_RotateToDirection;
 
 	void BeginPlay_SetupCollisionVsBuildings();
+	void BeginPlay_SetFactionFlagPrimitiveDataIndex();
 
 	// the derived bp has already set the correct tank subtype before c++ begin play.
 	void BeginPlay_SetupData();

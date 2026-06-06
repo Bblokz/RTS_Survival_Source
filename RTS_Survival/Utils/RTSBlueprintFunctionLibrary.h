@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/CardSystem/ERTSCard/ERTSCard.h"
 #include "RTS_Survival/Game/GameState/GameDecalManager/GameDecalManager.h"
@@ -163,6 +164,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	static UPlayerPortraitManager* BP_GetPlayerPortraitManager(const UObject* WorldContextObject);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	static ERTSFaction GetPlayerFactionFromGameInst(const UObject* WorldContextObject);
 
 
 	/** 
@@ -690,6 +694,8 @@ public:
 	static FTrainingOption GetPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerTankDestroyerOrRail_PzjagerL_Or_PZ38Rail(UObject* WorldContext);
 	// Returns panzer IV H rockets for break through; panzer III M otherwise.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(UObject* WorldContext);
@@ -718,6 +724,8 @@ public:
 	// Game instance helpers.
 	TSoftObjectPtr<UWorld> GetRTSMapToLoad(const UObject* WorldContextObject);
 	void SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad);
+	
+	// 
 
 	/**
 	 * @brief Adds an always-visible minimap texture icon through the active FOW manager.

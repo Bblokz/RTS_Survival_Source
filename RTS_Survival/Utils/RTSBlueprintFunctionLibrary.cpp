@@ -131,6 +131,16 @@ UPlayerPortraitManager* URTSBlueprintFunctionLibrary::BP_GetPlayerPortraitManage
 	return FRTS_Statics::GetPlayerPortraitManager(WorldContextObject);
 }
 
+ERTSFaction URTSBlueprintFunctionLibrary::GetPlayerFactionFromGameInst(const UObject* WorldContextObject)
+{
+	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(WorldContextObject);
+	if (not GameInstance)
+	{
+		return ERTSFaction::NotInitialised;
+	}
+	return GameInstance->GetPlayerFaction();
+}
+
 FText URTSBlueprintFunctionLibrary::BP_FixArmorTagSpacing(const FText& SourceText)
 {
 	// Convert to mutable string
@@ -182,8 +192,8 @@ FText URTSBlueprintFunctionLibrary::BP_FixArmorTagSpacing(const FText& SourceTex
 }
 
 UNavigationPath* URTSBlueprintFunctionLibrary::BP_CombineNavigationPath(UObject* WorldContextObject,
-                                                                         const UNavigationPath* PathA,
-                                                                         const UNavigationPath* PathB)
+                                                                        const UNavigationPath* PathA,
+                                                                        const UNavigationPath* PathB)
 {
 	if (not IsValid(WorldContextObject))
 	{
@@ -1442,7 +1452,6 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerArmoredCar250_251Morta
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(UObject* WorldContext)
 {
-	
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
 	{
@@ -1472,6 +1481,21 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerLightMediumTank_PZIII_J_O
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerTankDestroyerOrRail_PzjagerL_Or_PZ38Rail(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
@@ -1489,7 +1513,6 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZI
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext)
 {
-	
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
 	{
@@ -1576,14 +1599,13 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerFlak88_Or_PanzerIV_Rail(U
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerLightTankDestroyer_PZjager_PzJagerLaser(UObject* WorldContext)
 {
-	
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
 	{
 	case ERTSFaction::NotInitialised:
 	case ERTSFaction::GerStrikeDivision:
 	case ERTSFaction::GerItalianFaction:
-	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser));
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser));
 	case ERTSFaction::GerBreakthroughDoctrine:
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager));
 	}
@@ -1598,7 +1620,7 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerHeavyTank_Tiger_Panther(U
 	case ERTSFaction::NotInitialised:
 	case ERTSFaction::GerStrikeDivision:
 	case ERTSFaction::GerItalianFaction:
-	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherD));
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherD));
 	case ERTSFaction::GerBreakthroughDoctrine:
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_TigerH1));
 	}
@@ -1613,7 +1635,7 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerAdvancedHeavyTank_TigerII
 	case ERTSFaction::NotInitialised:
 	case ERTSFaction::GerStrikeDivision:
 	case ERTSFaction::GerItalianFaction:
-	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherII));
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherII));
 	case ERTSFaction::GerBreakthroughDoctrine:
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KingTiger));
 	}
@@ -1622,12 +1644,12 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerAdvancedHeavyTank_TigerII
 
 TSoftObjectPtr<UWorld> URTSBlueprintFunctionLibrary::GetRTSMapToLoad(const UObject* WorldContextObject)
 {
-	if(not IsValid(WorldContextObject))
+	if (not IsValid(WorldContextObject))
 	{
 		return nullptr;
 	}
 	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(WorldContextObject);
-	if(not IsValid(GameInstance))
+	if (not IsValid(GameInstance))
 	{
 		return nullptr;
 	}
@@ -1636,15 +1658,14 @@ TSoftObjectPtr<UWorld> URTSBlueprintFunctionLibrary::GetRTSMapToLoad(const UObje
 
 void URTSBlueprintFunctionLibrary::SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad)
 {
-	
-	if(not IsValid(WorldContextObject))
+	if (not IsValid(WorldContextObject))
 	{
-		return ;
+		return;
 	}
 	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(WorldContextObject);
-	if(not IsValid(GameInstance))
+	if (not IsValid(GameInstance))
 	{
-		return ;
+		return;
 	}
 	GameInstance->SetMapToLoad(MapToLoad);
 }
@@ -1756,8 +1777,8 @@ FText URTSBlueprintFunctionLibrary::BP_GetRichTextTextFromDataTableText(const FT
 
 ATankMaster* URTSBlueprintFunctionLibrary::GetPlayerCommandVehicle(const UObject* WorldContextObject)
 {
-	const UGameUnitManager* UnitManager=  FRTS_Statics::GetGameUnitManager(WorldContextObject);
-	if(not IsValid(UnitManager))
+	const UGameUnitManager* UnitManager = FRTS_Statics::GetGameUnitManager(WorldContextObject);
+	if (not IsValid(UnitManager))
 	{
 		return nullptr;
 	}
@@ -1766,8 +1787,8 @@ ATankMaster* URTSBlueprintFunctionLibrary::GetPlayerCommandVehicle(const UObject
 
 ANomadicVehicle* URTSBlueprintFunctionLibrary::GetPlayerHQ(const UObject* WorldContextObject)
 {
-	const UGameUnitManager* UnitManager=  FRTS_Statics::GetGameUnitManager(WorldContextObject);
-	if(not IsValid(UnitManager))
+	const UGameUnitManager* UnitManager = FRTS_Statics::GetGameUnitManager(WorldContextObject);
+	if (not IsValid(UnitManager))
 	{
 		return nullptr;
 	}

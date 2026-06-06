@@ -178,13 +178,13 @@ ACameraPawn* FRTS_Statics::GetPlayerCameraPawn(const UObject* WorldContextObject
 
 bool FRTS_Statics::AreMutationsOn(const UObject* WorldContextObject)
 {
-	const AMissionManager* MissionManager = GetGameMissionManager(WorldContextObject);
-	if (not IsValid(MissionManager))
+	const URTSGameInstance* GameInstance = GetRTSGameInstance(WorldContextObject);
+	if (not IsValid(GameInstance))
 	{
 		return false;
 	}
 
-	return MissionManager->GetCurrentGameDifficulty().bUseMutations;
+	return GameInstance->GetSelectedGameDifficulty().bUseMutations;
 }
 
 ACPPGameState* FRTS_Statics::GetGameState(const UObject* WorldContextObject)

@@ -880,7 +880,7 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
-	BeginPlay_InitGameDifficultyAndSettings();
+	BeginPlay_CheckForDifficultyOverrideWithWidget();
 }
 
 void AMissionManager::PostInitializeComponents()
@@ -895,6 +895,10 @@ void AMissionManager::PostInitializeComponents()
 		}
 		GameInstance->SetPlayerFaction(PlayerFactionBackupData.PlayerFaction);
 	}
+	
+	SetFactionAndCampaignGenerationSettingsWithGameInstance();
+	SetGameDifficultyWithGameInstance();
+	
 }
 
 void AMissionManager::InitMissionSounds(const FMissionSoundSettings MissionSettings)
@@ -1032,13 +1036,11 @@ void AMissionManager::SetMissionManagerWidget(UW_MissionWidgetManager* MissionMa
 	M_MissionWidgetManager = MissionManagerWidget;
 }
 
-void AMissionManager::BeginPlay_InitGameDifficultyAndSettings()
+void AMissionManager::BeginPlay_CheckForDifficultyOverrideWithWidget() const
 {
-	SetFactionAndCampaignGenerationSettingsWithGameInstance();
 	if (not bSetGameDifficultyWithWidget)
 	{
-		// The Game instance will determine the difficulty set.
-		SetGameDifficultyWithGameInstance();
+		// The Game instance will have determined the difficulty set at post init.
 		return;
 	}
 
@@ -1054,7 +1056,7 @@ void AMissionManager::BeginPlay_InitGameDifficultyAndSettings()
 		return;
 	}
 
-	const int32 DifficultyWidgetZOrder = 100;
+	constexpr int32 DifficultyWidgetZOrder = 100;
 	UW_GameDifficultyPicker* DifficultyPickerWidget = CreateWidget<UW_GameDifficultyPicker>(
 		M_PlayerController.Get(), M_GameDifficultyPickerWidgetClass);
 	if (not IsValid(DifficultyPickerWidget))

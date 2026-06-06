@@ -40,6 +40,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "RTS_Survival/FactionSystem/FactionFlags/FRTS_FactionFlags.h"
 
 namespace TankTowHelpers
 {
@@ -403,6 +404,7 @@ void ATankMaster::BeginPlay()
 	BeginPlay_SetupData();
 
 	BeginPlay_SetupCollisionVsBuildings();
+	BeginPlay_SetFactionFlagPrimitiveDataIndex();
 
 	M_TankStartGameAction.OnBeginPlay();
 }
@@ -1415,6 +1417,11 @@ void ATankMaster::BeginPlay_SetupCollisionVsBuildings()
 		const ECollisionResponse Response = RTSComponent->GetOwningPlayer() == 1 ? ECR_Ignore : ECR_Overlap;
 		FRTS_CollisionSetup::ForceBuildingPlacementResponseOnActor(this, Response, /*bRecurseAttachedActors=*/true);
 	}
+}
+
+void ATankMaster::BeginPlay_SetFactionFlagPrimitiveDataIndex()
+{
+	FRTS_FactionFlags::SetupFactionFlagsForActorPrimitives(this);
 }
 
 bool ATankMaster::GetIsValidHullWeapon(const UHullWeaponComponent* HullWeapon) const

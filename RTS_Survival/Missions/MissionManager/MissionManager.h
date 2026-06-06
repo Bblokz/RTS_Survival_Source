@@ -429,7 +429,7 @@ private:
 	TObjectPtr<UMissionTriggerVolumesManager> M_MissionTriggerVolumesManager;
 
 	void BeginPlay_InitPlayerController();
-	void BeginPlay_InitGameDifficultyAndSettings();
+	void BeginPlay_CheckForDifficultyOverrideWithWidget() const;
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
 	bool EnsureValidPlayerController() const;

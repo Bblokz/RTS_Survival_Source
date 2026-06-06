@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/EnemyWorldPersonality.h/EnemyWorldPersonality.h"
 #include "RTSGameInstancePIEDeveloperSettings.generated.h"
@@ -32,4 +33,8 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="PIE Startup", meta=(ClampMin="1"))
 	int32 DifficultyPercentage = 150;
+	
+	UPROPERTY(Config, EditAnywhere, Category="PIE Startup")
+	ERTSFaction PlayerFaction = ERTSFaction::GerBreakthroughDoctrine;
+	
 };

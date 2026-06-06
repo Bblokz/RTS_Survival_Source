@@ -59,6 +59,10 @@ void URTSGameInstance::ApplyPIEStartupOverrides()
 	PIEGameDifficulty.DifficultyPercentage = PIEStartupSettings->DifficultyPercentage;
 	PIEGameDifficulty.bIsInitialized = true;
 	SetSelectedGameDifficulty(PIEGameDifficulty);
+	
+	SetPlayerFaction(PIEStartupSettings->PlayerFaction);
+	
+	
 #endif
 }
 
