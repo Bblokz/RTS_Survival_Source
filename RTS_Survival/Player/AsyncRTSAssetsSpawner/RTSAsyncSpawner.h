@@ -187,6 +187,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	virtual void PostInitializeComponents() override;
 
 
@@ -403,27 +405,26 @@ private:
 
 
 	//--------------------------- BATCH BXP LOADING ------------------------------------
-	
 
-    // Counter for assigning unique IDs to each batch request.
-    int32 M_NextInstantPlacementRequestId = 0;
+	// Counter for assigning unique IDs to each batch request.
+	int32 M_NextInstantPlacementRequestId = 0;
 
-    // All outstanding “instant-placement” requests, keyed by that ID.
-    TMap<int32, FInstantPlacementBxpBatch> M_InstantPlacementRequests = {};
+	// All outstanding “instant-placement” requests, keyed by that ID.
+	TMap<int32, FInstantPlacementBxpBatch> M_InstantPlacementRequests = {};
 
-    // Called when a batch’s async load finishes.
-    void OnBatchBxpLoadComplete(int32 RequestId);
+	// Called when a batch’s async load finishes.
+	void OnBatchBxpLoadComplete(int32 RequestId);
 
 	// Extracts and removes the batch struct for a given RequestId.
-    FInstantPlacementBxpBatch ExtractAndRemoveBatch(int32 RequestId);
-    
-    // Attempts to resolve the class & spawn one Bxp, or returns nullptr.
-    // Logs any errors along the way.
-    ABuildingExpansion* BatchBxp_TryResolveAndSpawnBxp(EBuildingExpansionType Type) const;
-    
-    // Helper to look up the soft‐class and resolve it to UClass*
-    UClass* ResolveExpansionClass(EBuildingExpansionType Type) const;
-    
-    // Helper to actually SpawnActor<AActor> and cast to ABuildingExpansion.
-    ABuildingExpansion* BatchBxp_SpawnExpansionActor(UClass* Cls) const;
+	bool ExtractAndRemoveBatch(int32 RequestId, FInstantPlacementBxpBatch& OutBatch);
+
+	// Attempts to resolve the class & spawn one Bxp, or returns nullptr.
+	// Logs any errors along the way.
+	ABuildingExpansion* BatchBxp_TryResolveAndSpawnBxp(EBuildingExpansionType Type) const;
+
+	// Helper to look up the soft‐class and resolve it to UClass*
+	UClass* ResolveExpansionClass(EBuildingExpansionType Type) const;
+
+	// Helper to actually SpawnActor<AActor> and cast to ABuildingExpansion.
+	ABuildingExpansion* BatchBxp_SpawnExpansionActor(UClass* Cls) const;
 };
