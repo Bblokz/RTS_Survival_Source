@@ -11,6 +11,11 @@
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/AsyncBxpLoadingType/AsyncBxpLoadingType.h"
 
 
+namespace
+{
+	constexpr int32 MaxBuildingExpansionSlots = 128;
+}
+
 FString IBuildingExpansionOwner::GetOwnerName() const
 {
 	if (const AActor* OwnerActor = Cast<AActor>(this))
@@ -512,6 +517,17 @@ void IBuildingExpansionOwner::InitBuildingExpansionOptions(
 	const int NewAmountBuildingExpansions,
 	const TArray<FBxpOptionData> NewUnlockedBuildingExpansionTypes)
 {
+	if (NewAmountBuildingExpansions < 0 || NewAmountBuildingExpansions > MaxBuildingExpansionSlots)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid amount of building expansion slots."
+			"\n See IBuildingExpansionOwner::InitBuildingExpansionOptions"
+			"\n Owner: " + GetOwnerName() +
+			"\n Requested Slots: " + FString::FromInt(NewAmountBuildingExpansions) +
+			"\n Max Slots: " + FString::FromInt(MaxBuildingExpansionSlots));
+		return;
+	}
+
 	UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
 	BuildingExpansionData.M_TUnlockedBuildingExpansionTypes = NewUnlockedBuildingExpansionTypes;
 
