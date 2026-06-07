@@ -5,7 +5,7 @@
 #include "CaptureInterface.generated.h"
 
 // This class does not need to be modified.
-UINTERFACE()
+UINTERFACE(NotBlueprintable)
 class UCaptureInterface : public UInterface
 {
 	GENERATED_BODY()
