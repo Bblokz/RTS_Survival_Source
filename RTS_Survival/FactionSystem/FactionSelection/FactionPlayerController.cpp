@@ -4,6 +4,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Components/AudioComponent.h"
+#include "FactionBanner/FactionBanner.h"
 #include "FactionUnitPreview.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/FactionSystem/Factions/Factions.h"
@@ -29,6 +30,7 @@ void AFactionPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	BeginPlay_InitFactionBanners();
 	InitFactionPopup();
 	InitPreviewReferences();
 
@@ -115,6 +117,12 @@ void AFactionPlayerController::StopAnnouncementSound()
 	{
 		M_AnnouncementAudioComponent->Stop();
 	}
+}
+
+void AFactionPlayerController::HandleFactionSelectionChanged(const ERTSFaction SelectedFaction)
+{
+	M_SelectedFaction = SelectedFaction;
+	NotifyFactionBannersOfFactionChange();
 }
 
 void AFactionPlayerController::HandleLaunchCampaignRequested(const ERTSFaction SelectedFaction)
@@ -339,6 +347,45 @@ void AFactionPlayerController::InitFactionWorldGenerationSettings()
 	WorldGenerationSettings->AddToViewport();
 	WorldGenerationSettings->SetFactionPlayerController(this);
 	M_FactionWorldGenerationSettings = WorldGenerationSettings;
+}
+
+void AFactionPlayerController::BeginPlay_InitFactionBanners()
+{
+	M_FactionBanners.Reset();
+
+	TArray<AActor*> FoundBannerActors;
+	UGameplayStatics::GetAllActorsOfClass(this, AFactionBanner::StaticClass(), FoundBannerActors);
+
+	for (AActor* FoundBannerActor : FoundBannerActors)
+	{
+		AFactionBanner* FactionBanner = Cast<AFactionBanner>(FoundBannerActor);
+		if (not IsValid(FactionBanner))
+		{
+			continue;
+		}
+
+		M_FactionBanners.Add(FactionBanner);
+	}
+}
+
+void AFactionPlayerController::NotifyFactionBannersOfFactionChange()
+{
+	for (int32 BannerIndex = M_FactionBanners.Num() - 1; BannerIndex >= 0; --BannerIndex)
+	{
+		if (not M_FactionBanners.IsValidIndex(BannerIndex))
+		{
+			continue;
+		}
+
+		AFactionBanner* FactionBanner = M_FactionBanners[BannerIndex].Get();
+		if (not IsValid(FactionBanner))
+		{
+			M_FactionBanners.RemoveAt(BannerIndex);
+			continue;
+		}
+
+		FactionBanner->BP_OnFactionChanged(M_SelectedFaction);
+	}
 }
 
 void AFactionPlayerController::InitPreviewReferences()

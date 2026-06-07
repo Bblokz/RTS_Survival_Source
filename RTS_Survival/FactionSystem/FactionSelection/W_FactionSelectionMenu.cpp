@@ -227,6 +227,7 @@ void UW_FactionSelectionMenu::SelectFaction(
 		return;
 	}
 
+	M_FactionPlayerController->HandleFactionSelectionChanged(M_SelectedFaction);
 	M_FactionPlayerController->StopAnnouncementSound();
 
 	const bool bShouldPlayAudio = bForceAudio || not bHasPlayedAudio;

@@ -10,6 +10,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "FactionPlayerController.generated.h"
 
+class AFactionBanner;
 class AFactionUnitPreview;
 class ARTSAsyncSpawner;
 class ICommands;
@@ -95,6 +96,7 @@ public:
 	void SpawnPreviewForTrainingOption(const FTrainingOption& TrainingOption);
 	void PlayAnnouncementSound(USoundBase* AnnouncementSound);
 	void StopAnnouncementSound();
+	void HandleFactionSelectionChanged(const ERTSFaction SelectedFaction);
 	void HandleLaunchCampaignRequested(const ERTSFaction SelectedFaction);
 	void HandleFactionDifficultyChosen(const int32 DifficultyPercentage, const ERTSGameDifficulty SelectedDifficulty);
 	void HandleWorldGenerationBackRequested();
@@ -143,6 +145,9 @@ private:
 	TWeakObjectPtr<AFactionUnitPreview> M_FactionUnitPreview;
 
 	UPROPERTY()
+	TArray<TWeakObjectPtr<AFactionBanner>> M_FactionBanners;
+
+	UPROPERTY()
 	TWeakObjectPtr<ARTSAsyncSpawner> M_RTSAsyncSpawner;
 
 	UPROPERTY()
@@ -170,7 +175,9 @@ private:
 	void InitFactionSelectionMenu();
 	void InitFactionDifficultyPicker();
 	void InitFactionWorldGenerationSettings();
+	void BeginPlay_InitFactionBanners();
 	void InitPreviewReferences();
+	void NotifyFactionBannersOfFactionChange();
 	void InitInputModeForWidget(UUserWidget* WidgetToFocus);
 	/**
 	 * @brief Captures the async spawn completion to update preview state and start idle actions.
