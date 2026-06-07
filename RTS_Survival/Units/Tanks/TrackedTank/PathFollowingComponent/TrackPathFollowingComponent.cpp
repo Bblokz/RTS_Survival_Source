@@ -673,8 +673,9 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			InWorldDebug += "Cur Vs Des speed: " + FString::SanitizeFloat(M_CurrentSpeed) + " / " +
 				FString::SanitizeFloat(DesiredSpeed) + "\n";
 			InWorldDebug += "Agent Radius: " + FString::SanitizeFloat(Properties.AgentRadius) + "\n";
-			const FString NavDataStr = NavData.IsNull() ? "Any" : NavData.ToString();
-			InWorldDebug += "NavData: " + NavDataStr + "\n";
+			// Add acceptance radius (current)
+			InWorldDebug += "Acceptance Radius: " + FString::SanitizeFloat(AcceptanceRadius) + "\n";
+			InWorldDebug += "Goal Radius: " + FString::SanitizeFloat(VehicleGoalAcceptanceRadius) + "\n";
 			// Add steering:
 			InWorldDebug += "Steering Input: " + FString::SanitizeFloat(M_LastSteeringInput) + "\n";
 			// Add throttle:

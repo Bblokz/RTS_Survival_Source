@@ -234,9 +234,6 @@ protected:
 	virtual void OnUnitIdleAndNoNewCommands() override final;
 	virtual void TerminateMoveCommand() override;
 
-
-
-
 	// Static Mesh for the building representation
 	UPROPERTY()
 	UStaticMeshComponent* BuildingMeshComponent;
