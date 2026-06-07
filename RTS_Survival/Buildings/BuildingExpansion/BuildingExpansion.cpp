@@ -495,6 +495,11 @@ int32 ABuildingExpansion::GetOwningPlayer()
 
 FRotator ABuildingExpansion::GetOwnerRotation() const
 {
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return GetActorRotation();
+	}
+
 	return BuildingMeshComponent->GetComponentRotation();
 }
 
@@ -1108,6 +1113,12 @@ void ABuildingExpansion::StartAnimationTimer(const float Interval, const bool bS
 		return;
 	}
 	World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+	if (Interval <= 0.f)
+	{
+		FinishReapplyingMaterials();
+		return;
+	}
+
 	World->GetTimerManager().SetTimer(MaterialReapplyTimerHandle, this,
 	                                  &ABuildingExpansion::ApplyCachedMaterials,
 	                                  Interval, true);
