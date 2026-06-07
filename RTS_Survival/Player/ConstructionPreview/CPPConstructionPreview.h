@@ -248,6 +248,7 @@ private:
 	UWidgetComponent* M_PreviewStatsWidgetComponent;
 
 	bool EnsureIsValidPreviewMesh() const;
+	bool EnsureIsValidPreviewStaticMesh() const;
 	bool EnsureIsValidPreviewStatsWidget() const;
 	bool EnsureIsValidPreviewStatsWidgetComponent() const;
 	bool GetIsValidPlayerController() const;

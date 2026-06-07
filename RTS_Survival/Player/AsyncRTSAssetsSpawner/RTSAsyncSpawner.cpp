@@ -51,6 +51,29 @@ void ARTSAsyncSpawner::BeginPlay()
 	Super::BeginPlay();
 }
 
+void ARTSAsyncSpawner::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	CancelActiveLoadRequest(EAsyncRequestType::AReq_Bxp);
+	CancelActiveLoadRequest(EAsyncRequestType::AReq_Training);
+
+	for (TPair<int32, FInstantPlacementBxpBatch>& BatchRequest : M_InstantPlacementRequests)
+	{
+		if (BatchRequest.Value.Handle.IsValid() && not BatchRequest.Value.Handle->HasLoadCompleted())
+		{
+			BatchRequest.Value.Handle->CancelHandle();
+		}
+	}
+	M_InstantPlacementRequests.Empty();
+	M_SpawnCallbacks.Empty();
+
+	FAsyncOptionQueueItem QueueItem;
+	while (M_TrainingQueue.Dequeue(QueueItem))
+	{
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void ARTSAsyncSpawner::PostInitializeComponents()
 {
 	M_TrainingOptionMap.Empty();
@@ -349,10 +372,24 @@ void ARTSAsyncSpawner::OnAsyncBxpLoadComplete(
 		                           BxpLoadingType);
 		return;
 	}
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Async Asset Spawner: world is invalid while spawning building expansion: " + Global_GetBxpTypeEnumAsString(
+				BuildingExpansionTypeData.ExpansionType));
+		OnBuildingExpansionSpawned(nullptr,
+		                           BuildingExpansionOwner,
+		                           BuildingExpansionTypeData,
+		                           ExpansionSlotIndex,
+		                           BxpLoadingType);
+		return;
+	}
+
 	// Spawn the building expansion actor at the current location of this spawner
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(
+	AActor* SpawnedActor = World->SpawnActor<AActor>(
 		AssetClass, GetActorLocation(), FRotator::ZeroRotator, SpawnParams);
 
 	// If the actor was spawned successfully, notify the player controller
@@ -665,9 +702,10 @@ void ARTSAsyncSpawner::LoadNextTrainingOptionInQueue()
 	const auto [TrainingOption, TrainerComponent] = *M_TrainingQueue.Peek();
 	M_TrainingQueue.Pop();
 
-	if (!IsSpawnOptionValid(TrainingOption, TrainerComponent))
+	if (not IsSpawnOptionValid(TrainingOption, TrainerComponent))
 	{
 		LoadNextTrainingOptionInQueue();
+		return;
 	}
 
 	if (M_TrainingOptionMap.Contains(TrainingOption))
@@ -718,7 +756,7 @@ bool ARTSAsyncSpawner::IsSpawnOptionValid(
 	const FTrainingOption TrainingOption,
 	const TWeakObjectPtr<UTrainerComponent> TrainerComponent) const
 {
-	if (!TrainerComponent.IsValid())
+	if (not TrainerComponent.IsValid())
 	{
 		RTSFunctionLibrary::ReportError("Cannot spawn training option async for null owner!"
 			"\n at function SpawnNextTrainingOption in RTSAsyncSpawner.cpp"
@@ -774,6 +812,15 @@ void ARTSAsyncSpawner::OnTrainingOptionSpawned(
 	TWeakObjectPtr<UTrainerComponent> TrainerComponent,
 	const FTrainingOption& TrainingOption) const
 {
+	if (not TrainerComponent.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("Could not notify invalid trainer component that training option spawned!"
+			"\n at function OnTrainingOptionSpawned in RTSAsyncSpawner.cpp"
+			"\n TrainingOption: " + TrainingOption.GetTrainingName());
+		return;
+	}
+
+	UTrainerComponent* StrongTrainerComponent = TrainerComponent.Get();
 	if (IsValid(SpawnedActor))
 	{
 		if (IRTSUnit* RTSUnit = Cast<IRTSUnit>(SpawnedActor))
@@ -785,11 +832,11 @@ void ARTSAsyncSpawner::OnTrainingOptionSpawned(
 			RTSFunctionLibrary::ReportError("Could not cast spawned actor to RTS UNIT!"
 				"\n No Onspawn disable logic is set."
 				"Spawned actor: " + SpawnedActor->GetName()
-				+ "Trainer component: " + TrainerComponent->GetName());
+				+ "Trainer component: " + StrongTrainerComponent->GetName());
 		}
 	}
 	// Teleports the spawned actor to the training socket.
-	TrainerComponent->OnOptionSpawned(SpawnedActor, TrainingOption);
+	StrongTrainerComponent->OnOptionSpawned(SpawnedActor, TrainingOption);
 }
 
 AActor* ARTSAsyncSpawner::AttemptSpawnAsset(const FSoftObjectPath& AssetPath) const
@@ -870,9 +917,15 @@ void ARTSAsyncSpawner::AsyncBatchLoadInstantPlaceExpansions(
 void ARTSAsyncSpawner::OnBatchBxpLoadComplete(const int32 RequestId)
 {
 	// pull out & remove
-	auto Batch = ExtractAndRemoveBatch(RequestId);
+	FInstantPlacementBxpBatch Batch;
+	if (not ExtractAndRemoveBatch(RequestId, Batch))
+	{
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("Instant-placement batch request %d was missing when async load completed."), RequestId));
+		return;
+	}
 
-	if (!Batch.Owner)
+	if (not Batch.Owner)
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("Instant‐placement batch canceled: owner no longer valid."));
@@ -900,16 +953,22 @@ void ARTSAsyncSpawner::OnBatchBxpLoadComplete(const int32 RequestId)
 }
 
 
-FInstantPlacementBxpBatch ARTSAsyncSpawner::ExtractAndRemoveBatch(int32 RequestId)
+bool ARTSAsyncSpawner::ExtractAndRemoveBatch(const int32 RequestId, FInstantPlacementBxpBatch& OutBatch)
 {
-	FInstantPlacementBxpBatch Batch = M_InstantPlacementRequests.FindChecked(RequestId);
+	FInstantPlacementBxpBatch* Batch = M_InstantPlacementRequests.Find(RequestId);
+	if (not Batch)
+	{
+		return false;
+	}
+
+	OutBatch = MoveTemp(*Batch);
 	M_InstantPlacementRequests.Remove(RequestId);
-	return Batch;
+	return true;
 }
 
 UClass* ARTSAsyncSpawner::ResolveExpansionClass(EBuildingExpansionType Type) const
 {
-	if (!BuildingExpansionMap.Contains(Type))
+	if (not BuildingExpansionMap.Contains(Type))
 	{
 		RTSFunctionLibrary::ReportError(
 			FString::Printf(TEXT("No mapping for expansion type %d"), int(Type)));
@@ -922,18 +981,34 @@ UClass* ARTSAsyncSpawner::ResolveExpansionClass(EBuildingExpansionType Type) con
 
 ABuildingExpansion* ARTSAsyncSpawner::BatchBxp_SpawnExpansionActor(UClass* Cls) const
 {
-	if (!Cls) return nullptr;
-	FActorSpawnParameters P;
-	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (auto* A = GetWorld()->SpawnActor<AActor>(Cls, GetActorLocation(), FRotator::ZeroRotator, P))
-		return Cast<ABuildingExpansion>(A);
-	return nullptr;
+	if (not IsValid(Cls))
+	{
+		return nullptr;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ARTSAsyncSpawner::BatchBxp_SpawnExpansionActor failed because world is invalid."));
+		return nullptr;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AActor* SpawnedActor = World->SpawnActor<AActor>(Cls, GetActorLocation(), FRotator::ZeroRotator, SpawnParams);
+	if (not IsValid(SpawnedActor))
+	{
+		return nullptr;
+	}
+
+	return Cast<ABuildingExpansion>(SpawnedActor);
 }
 
 ABuildingExpansion* ARTSAsyncSpawner::BatchBxp_TryResolveAndSpawnBxp(EBuildingExpansionType Type) const
 {
 	UClass* Cls = ResolveExpansionClass(Type);
-	if (!Cls)
+	if (not Cls)
 	{
 		RTSFunctionLibrary::ReportError(
 			FString::Printf(TEXT("Failed to resolve class for type %d"), int(Type)));
@@ -941,7 +1016,7 @@ ABuildingExpansion* ARTSAsyncSpawner::BatchBxp_TryResolveAndSpawnBxp(EBuildingEx
 	}
 
 	auto* Bxp = BatchBxp_SpawnExpansionActor(Cls);
-	if (!Bxp)
+	if (not Bxp)
 	{
 		RTSFunctionLibrary::ReportError(
 			FString::Printf(TEXT("Failed to spawn Bxp for type %d"), int(Type)));

@@ -992,15 +992,23 @@ void ACPPConstructionPreview::DestroySocketWidgets()
 
 void ACPPConstructionPreview::CreateGridOverlay()
 {
-	if (!IsValid(M_GridOverlayClass))
+	if (not IsValid(M_GridOverlayClass))
 	{
 		RTSFunctionLibrary::ReportError(
 			"M_GridOverlayClass is null in CreateGridOverlay in CPPConstructionPreview.cpp\n Actor: " + GetName());
 		return;
 	}
 
-	M_GridOverlay = GetWorld()->SpawnActor<ABuildingGridOverlay>(M_GridOverlayClass);
-	if (!EnsureIsValidGridOverlay())
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(
+			"World is null in CreateGridOverlay in CPPConstructionPreview.cpp\n Actor: " + GetName());
+		return;
+	}
+
+	M_GridOverlay = World->SpawnActor<ABuildingGridOverlay>(M_GridOverlayClass);
+	if (not EnsureIsValidGridOverlay())
 	{
 		return;
 	}
@@ -1139,7 +1147,7 @@ void ACPPConstructionPreview::RotatePreviewStatsToCamera() const
 
 bool ACPPConstructionPreview::IsSlopeValid(const FVector& Location)
 {
-	if (not EnsureIsValidPreviewMesh())
+	if (not EnsureIsValidPreviewMesh() || not EnsureIsValidPreviewStaticMesh())
 	{
 		return false;
 	}
@@ -1163,7 +1171,7 @@ bool ACPPConstructionPreview::IsSlopeValid(const FVector& Location)
 	}
 
 	// The sockets are not found, we fall back to the box extend of the preview mesh.
-	if (!bSocketsFound)
+	if (not bSocketsFound)
 	{
 		TraceStartPoints.Empty();
 		FVector BoxExtent = PreviewMesh->GetStaticMesh()->GetBounds().GetBox().GetExtent();
@@ -1269,7 +1277,9 @@ void ACPPConstructionPreview::UpdatePreviewMaterial(bool bIsValidLocation)
 
 void ACPPConstructionPreview::MoveWidgetToMeshHeight() const
 {
-	if (not EnsureIsValidPreviewMesh() || not EnsureIsValidPreviewStatsWidgetComponent())
+	if (not EnsureIsValidPreviewMesh()
+		|| not EnsureIsValidPreviewStaticMesh()
+		|| not EnsureIsValidPreviewStatsWidgetComponent())
 	{
 		return;
 	}
@@ -1345,6 +1355,27 @@ bool ACPPConstructionPreview::EnsureIsValidPreviewMesh() const
 		                                             "ACPPConstructionPreview::EnsureIsValidPreviewMesh");
 		return false;
 	}
+	return true;
+}
+
+bool ACPPConstructionPreview::EnsureIsValidPreviewStaticMesh() const
+{
+	if (not EnsureIsValidPreviewMesh())
+	{
+		return false;
+	}
+
+	if (not IsValid(PreviewMesh->GetStaticMesh()))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"PreviewMesh->StaticMesh",
+			"EnsureIsValidPreviewStaticMesh",
+			this
+		);
+		return false;
+	}
+
 	return true;
 }
 
