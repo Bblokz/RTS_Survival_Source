@@ -5853,11 +5853,11 @@ bool ACPPController::NomadicConvertToBuilding(
 						&& NomadicVehicle->GetPreviewMesh() == CPPConstructionPreviewRef->GetPreviewMesh())
 					{
 						// Order the vehicle to move and build.
-						NomadicVehicle->CreateBuildingAtLocation(BuildingLocation, BuildingRotation, false);
-						// Create a static preview and set the reference on the vehicle.
-						NomadicVehicle->SetStaticPreviewMesh(
-							CPPConstructionPreviewRef->CreateStaticMeshActor(BuildingRotation, NomadicVehicle));
-						bFoundTruckForConstruction = true;
+						bFoundTruckForConstruction = TryAssignNomadicBuildingCommand(
+							NomadicVehicle,
+							BuildingLocation,
+							BuildingRotation,
+							false);
 						break;
 					}
 				}
@@ -5870,28 +5870,28 @@ bool ACPPController::NomadicConvertToBuilding(
 					// Check if the mesh of this vehicle is the same as the one we are building.
 					&& NomadicVehicle->GetPreviewMesh() == CPPConstructionPreviewRef->GetPreviewMesh())
 				{
-					NomadicVehicle->CreateBuildingAtLocation(BuildingLocation, BuildingRotation, true);
-					// Create a static preview and set the reference on the vehicle.
-					NomadicVehicle->SetStaticPreviewMesh(
-						CPPConstructionPreviewRef->CreateStaticMeshActor(BuildingRotation, NomadicVehicle));
-					bFoundTruckForConstruction = true;
+					bFoundTruckForConstruction = TryAssignNomadicBuildingCommand(
+						NomadicVehicle,
+						BuildingLocation,
+						BuildingRotation,
+						true);
 					break;
 				}
 			}
 		}
 	}
-	if (!bIsHoldingShift)
+	if (not bIsHoldingShift)
 	{
 		if (GetIsValidCommandTypeDecoder())
 		{
 			M_CommandTypeDecoder->ResetAllPlacementEffects();
 		}
-		if (!bFoundTruckForConstruction)
+		if (not bFoundTruckForConstruction)
 		{
 			DisplayErrorMessage(EPlayerError::Error_NoFreeTruckAvailable);
 		}
 	}
-	else if (!bFoundTruckForConstruction)
+	else if (not bFoundTruckForConstruction)
 	{
 		DisplayErrorMessage(EPlayerError::Error_CannotStackBuildingAbilities);
 	}
@@ -5899,6 +5899,42 @@ bool ACPPController::NomadicConvertToBuilding(
 	// Or no truck was available. In Both cases we cancel the preview and deactivate building preview mode
 	// as the command is propagated to a truck or cannot be executed.
 	return bFoundTruckForConstruction;
+}
+
+
+bool ACPPController::TryAssignNomadicBuildingCommand(
+	ANomadicVehicle* NomadicVehicle,
+	const FVector& BuildingLocation,
+	const FRotator& BuildingRotation,
+	const bool bSetUnitToIdle) const
+{
+	if (not IsValid(NomadicVehicle) || not GetIsValidConstructionPreview())
+	{
+		return false;
+	}
+
+	AStaticPreviewMesh* StaticPreviewMesh = CPPConstructionPreviewRef->CreateStaticMeshActor(
+		BuildingRotation,
+		NomadicVehicle);
+	if (not IsValid(StaticPreviewMesh))
+	{
+		return false;
+	}
+
+	// The create-building command can execute immediately when the truck is already within MoveTo acceptance radius.
+	// Cache the static preview before queueing so StartBuildingConstruction can consume its transform synchronously.
+	NomadicVehicle->SetStaticPreviewMesh(StaticPreviewMesh);
+	const ECommandQueueError Error = NomadicVehicle->CreateBuildingAtLocation(
+		BuildingLocation,
+		BuildingRotation,
+		bSetUnitToIdle);
+	if (Error == ECommandQueueError::NoError)
+	{
+		return true;
+	}
+
+	NomadicVehicle->SetStaticPreviewMesh(nullptr);
+	return false;
 }
 
 
