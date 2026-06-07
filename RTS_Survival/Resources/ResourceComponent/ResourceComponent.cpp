@@ -30,7 +30,10 @@ UResourceComponent::UResourceComponent()
 	// ...
 }
 
-void UResourceComponent::RegisterOccupiedLocation(const FHarvestLocation& HarvestingPosition, const bool bIsOccupied)
+void UResourceComponent::RegisterOccupiedLocation(
+	const FHarvestLocation& HarvestingPosition,
+	const bool bIsOccupied,
+	UHarvester* RequestingHarvester)
 {
 	if (not M_IsHarvestLocationDirectionTaken.Contains(HarvestingPosition.Direction))
 	{
@@ -42,7 +45,38 @@ void UResourceComponent::RegisterOccupiedLocation(const FHarvestLocation& Harves
 			"\n Resource: " + OwnerName);
 		return;
 	}
-	M_IsHarvestLocationDirectionTaken[HarvestingPosition.Direction] = bIsOccupied;
+
+	if (bIsOccupied)
+	{
+		if (not IsValid(RequestingHarvester))
+		{
+			RTSFunctionLibrary::ReportError("Cannot reserve a harvest location without a valid harvester."
+				"\n at function RegisterOccupiedLocation in ResourceComponent.cpp.");
+			return;
+		}
+
+		for (auto& EachOccupant : M_HarvestLocationOccupants)
+		{
+			if (EachOccupant.Value.Get() == RequestingHarvester)
+			{
+				M_IsHarvestLocationDirectionTaken[EachOccupant.Key] = false;
+				EachOccupant.Value = nullptr;
+			}
+		}
+
+		M_IsHarvestLocationDirectionTaken[HarvestingPosition.Direction] = true;
+		M_HarvestLocationOccupants.FindOrAdd(HarvestingPosition.Direction) = RequestingHarvester;
+		return;
+	}
+
+	const TWeakObjectPtr<UHarvester>* CurrentOccupant = M_HarvestLocationOccupants.Find(HarvestingPosition.Direction);
+	if (CurrentOccupant && CurrentOccupant->IsValid() && CurrentOccupant->Get() != RequestingHarvester)
+	{
+		return;
+	}
+
+	M_IsHarvestLocationDirectionTaken[HarvestingPosition.Direction] = false;
+	M_HarvestLocationOccupants.Remove(HarvestingPosition.Direction);
 }
 
 
@@ -104,8 +138,8 @@ bool UResourceComponent::GetHarvestLocationClosestTo(const FVector& HarvesterLoc
                                                      UHarvester* RequestingHarvester,
                                                      const float HarvesterRadius, FHarvestLocation& OutHarvestLocation)
 {
-	TArray<EHarvestLocationDirection> VacantDirections = GetVacantDirections();
-	TArray<FHarvestLocation> PositionsFree = GenerateHarvestLocations(HarvesterRadius, GetVacantDirections(),
+	const TArray<EHarvestLocationDirection> VacantDirections = GetVacantDirections(RequestingHarvester);
+	TArray<FHarvestLocation> PositionsFree = GenerateHarvestLocations(HarvesterRadius, VacantDirections,
 	                                                                  HarvesterLocation);
 	if (PositionsFree.Num() == 0)
 	{
@@ -266,12 +300,15 @@ void UResourceComponent::InitializeDirectionVectors()
 }
 
 
-TArray<EHarvestLocationDirection> UResourceComponent::GetVacantDirections() const
+TArray<EHarvestLocationDirection> UResourceComponent::GetVacantDirections(const UHarvester* RequestingHarvester) const
 {
 	TArray<EHarvestLocationDirection> VacantDirections;
-	for (auto EachDirection : M_IsHarvestLocationDirectionTaken)
+	for (const auto EachDirection : M_IsHarvestLocationDirectionTaken)
 	{
-		if (not EachDirection.Value)
+		const TWeakObjectPtr<UHarvester>* CurrentOccupant = M_HarvestLocationOccupants.Find(EachDirection.Key);
+		const bool bHasValidOccupant = CurrentOccupant && CurrentOccupant->IsValid();
+		const bool bIsOccupiedByRequester = CurrentOccupant && CurrentOccupant->Get() == RequestingHarvester;
+		if (not EachDirection.Value || not bHasValidOccupant || bIsOccupiedByRequester)
 		{
 			VacantDirections.Add(EachDirection.Key);
 		}
@@ -360,16 +397,16 @@ FVector UResourceComponent::GetResourceLocationNotThreadSafe()
 
 bool UResourceComponent::IsResourceFullyOccupiedByHarvesters() const
 {
-	bool bIsFullyOccupied = true;
-	for(const auto EachHarvestDirection : M_IsHarvestLocationDirectionTaken)
+	for (const auto EachHarvestDirection : M_IsHarvestLocationDirectionTaken)
 	{
-		if(not EachHarvestDirection.Value)
+		const TWeakObjectPtr<UHarvester>* CurrentOccupant = M_HarvestLocationOccupants.Find(EachHarvestDirection.Key);
+		const bool bHasValidOccupant = CurrentOccupant && CurrentOccupant->IsValid();
+		if (not EachHarvestDirection.Value || not bHasValidOccupant)
 		{
-			bIsFullyOccupied = false;
-			break;
+			return false;
 		}
 	}
-	return bIsFullyOccupied;
+	return true;
 }
 
 
@@ -378,7 +415,9 @@ int32 UResourceComponent::GetCurrentHarvesters() const
 	int32 Count = 0;
 	for (const auto EachHarvestDirection : M_IsHarvestLocationDirectionTaken)
 	{
-		if (EachHarvestDirection.Value)
+		const TWeakObjectPtr<UHarvester>* CurrentOccupant = M_HarvestLocationOccupants.Find(EachHarvestDirection.Key);
+		const bool bHasValidOccupant = CurrentOccupant && CurrentOccupant->IsValid();
+		if (EachHarvestDirection.Value && bHasValidOccupant)
 		{
 			Count++;
 		}
