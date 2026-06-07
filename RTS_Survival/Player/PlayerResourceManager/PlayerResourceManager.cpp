@@ -299,29 +299,20 @@ void UPlayerResourceManager::RefundBxp(const EBuildingExpansionType BxpType)
 
 bool UPlayerResourceManager::PayForBxp(const EBuildingExpansionType BxpType)
 {
-	if (!GetIsValidPlayerController())
+	if (not GetIsValidPlayerController())
 	{
 		return false;
 	}
-	FBxpData BxpData = URTSBlueprintFunctionLibrary::BP_GetPlayerBxpData(BxpType, this);
-	EPlayerError Error = GetCanPayForCost(BxpData.Cost.ResourceCosts);
-	if (Error == EPlayerError::Error_None)
+
+	const FBxpData BxpData = URTSBlueprintFunctionLibrary::BP_GetPlayerBxpData(BxpType, this);
+	const EPlayerError Error = GetCanPayForCost(BxpData.Cost.ResourceCosts);
+	if (Error != EPlayerError::Error_None)
 	{
-		if (BxpData.EnergySupply < 0)
-		{
-			if (GetHasEnoughEnergy(FMath::Abs(BxpData.EnergySupply)))
-			{
-				PayForCosts(BxpData.Cost.ResourceCosts);
-				return true;
-			}
-			M_PlayerController->DisplayErrorMessage(EPlayerError::Error_NotEnoughEnergy);
-			return false;
-		}
-		PayForCosts(BxpData.Cost.ResourceCosts);
-		return true;
+		M_PlayerController->DisplayErrorMessage(Error);
+		return false;
 	}
-	M_PlayerController->DisplayErrorMessage(Error);
-	return false;
+
+	return PayForCosts(BxpData.Cost.ResourceCosts);
 }
 
 EPlayerError UPlayerResourceManager::GetCanPayForCost(const TMap<ERTSResourceType, int32>& Cost) const
