@@ -1,5 +1,6 @@
 #include "Resource.h"
 
+#include "DrawDebugHelpers.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -94,12 +95,98 @@ void ACPPResourceMaster::PostInitializeComponents()
 	Super::PostInitializeComponents();
 }
 
+void ACPPResourceMaster::BeginPlay()
+{
+	Super::BeginPlay();
+
+	BeginPlay_InitDebugShowOccupyingHarvesters();
+}
+
+void ACPPResourceMaster::BeginPlay_InitDebugShowOccupyingHarvesters()
+{
+	if constexpr (DeveloperSettings::Debugging::ResourcesShowOccupyingHarvesters)
+	{
+		if (not GetIsValidResourceComponent())
+		{
+			return;
+		}
+
+		UWorld* World = GetWorld();
+		if (not IsValid(World))
+		{
+			return;
+		}
+
+		constexpr float DebugOccupyingHarvestersTimerInterval = 1.f;
+		const TWeakObjectPtr<ACPPResourceMaster> WeakResourceMaster(this);
+		FTimerDelegate TimerDelegateDebugOccupyingHarvesters;
+		TimerDelegateDebugOccupyingHarvesters.BindLambda([WeakResourceMaster]()
+		{
+			if (not WeakResourceMaster.IsValid())
+			{
+				return;
+			}
+
+			WeakResourceMaster->DebugShowOccupyingHarvesters();
+		});
+
+		World->GetTimerManager().SetTimer(
+			M_TimerHandleDebugOccupyingHarvesters,
+			TimerDelegateDebugOccupyingHarvesters,
+			DebugOccupyingHarvestersTimerInterval,
+			true
+		);
+	}
+}
+
+void ACPPResourceMaster::DebugShowOccupyingHarvesters() const
+{
+	if (not GetIsValidResourceComponent())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	constexpr float DebugTextZOffset = 600.f;
+	constexpr float DebugTextDuration = 1.f;
+	const FVector DebugLocation = GetActorLocation() + FVector(0.f, 0.f, DebugTextZOffset);
+	const FString DebugString = FString::Printf(
+		TEXT("Harvesters: %d/%d"),
+		ResourceComponent->GetCurrentHarvesters(),
+		ResourceComponent->GetMaxHarvesters()
+	);
+
+	DrawDebugString(World, DebugLocation, DebugString, nullptr, FColor::Green, DebugTextDuration, false);
+}
+
+bool ACPPResourceMaster::GetIsValidResourceComponent() const
+{
+	if (IsValid(ResourceComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"ResourceComponent",
+		"GetIsValidResourceComponent",
+		this
+	);
+
+	return false;
+}
+
 int32 ACPPResourceMaster::GenerateResourceAttachments(FResourceAttachmentsSetup AttachmentsSetup)
 {
 	ERTSResourceType ResourceTypeDebug = ERTSResourceType::Resource_None;
 	int32 AmountSocketsFound = 0;
 	int32 AmountMeshesCreated = 0;
-	if (IsValid(ResourceComponent))
+	if (GetIsValidResourceComponent())
 	{
 		ResourceTypeDebug = ResourceComponent->ResourceType;
 	}
@@ -119,7 +206,7 @@ int32 ACPPResourceMaster::GenerateResourceAttachments(FResourceAttachmentsSetup 
 			for (const UStaticMeshSocket* Socket : StaticMesh->Sockets)
 			{
 				const bool IsHarvesterLocationSocket = Socket->SocketName.ToString().Contains("Harvest");
-				if (IsValid(Socket) && Socket->SocketName.ToString() != "Core" && !IsHarvesterLocationSocket)
+				if (IsValid(Socket) && Socket->SocketName.ToString() != "Core" && not IsHarvesterLocationSocket)
 				{
 					Sockets.Add(Socket->SocketName.ToString());
 				}
@@ -130,7 +217,7 @@ int32 ACPPResourceMaster::GenerateResourceAttachments(FResourceAttachmentsSetup 
 			M_AmountOfAttachedMeshes = FMath::RandRange(AttachmentsSetup.MinAmountAttachments,
 			                                            AttachmentsSetup.MaxAmountAttachments);
 
-			for (int32 i = 0; i < M_AmountOfAttachedMeshes && !Sockets.IsEmpty(); ++i)
+			for (int32 i = 0; i < M_AmountOfAttachedMeshes && not Sockets.IsEmpty(); ++i)
 			{
 				// Pick a random attachable resource mesh
 				UStaticMesh* RandomMesh = AttachmentsSetup.AttachableResourceMeshes[FMath::RandRange(
