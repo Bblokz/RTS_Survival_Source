@@ -40,8 +40,12 @@ public:
 	 * @brief When bIsOccupied is false the location is freed up for other harvesters to use.
 	 * @param HarvestingPosition The location the harvester is planning to harvest from.
 	 * @param bIsOccupied Whether the harvester is still using the location.
+	 * @param RequestingHarvester The harvester reserving or releasing the location.
 	 */
-	void RegisterOccupiedLocation(const FHarvestLocation& HarvestingPosition, const bool bIsOccupied);
+	void RegisterOccupiedLocation(
+		const FHarvestLocation& HarvestingPosition,
+		const bool bIsOccupied,
+		UHarvester* RequestingHarvester);
 
 	UFUNCTION(BlueprintCallable, notblueprintable)
 	inline bool StillContainsResources() const { return TotalAmount > 0; }
@@ -58,7 +62,7 @@ public:
 	 * @brief Gets all currently vacant harvest directions and computes harvest locations for them based on
 	 * resource postion + radius * direction where radius + ResourceInnerRadius + HarvesterRadius.
 	 * @param HarvesterLocation The location of the harvester.
-	 * @param RequestingHarvester The harvester that is requesting the location.
+	 * @param RequestingHarvester The harvester requesting a location, so its own reservation can be reused.
 	 * @param HarvesterRadius The radius of the harvester.
 	 * @param OutHarvestLocation The location to harvest from.
 	 *
@@ -157,6 +161,10 @@ private:
 
 	// Keeps track of which directions are occupied by harvesters.
 	TMap<EHarvestLocationDirection, bool> M_IsHarvestLocationDirectionTaken;
+
+	// Tracks the harvester that reserved each direction so stale or mismatched releases cannot block resources.
+	UPROPERTY()
+	TMap<EHarvestLocationDirection, TWeakObjectPtr<UHarvester>> M_HarvestLocationOccupants;
 	// Keeps track of the direction vectors for each direction that is allowed on this resource for
 	// generating harvesting positions.
 	TMap<EHarvestLocationDirection, FVector> M_DirectionVectors;
@@ -164,7 +172,7 @@ private:
 	void InitializeDirectionVectors();
 
 	/** @return All the directions possible on this resource that are marked as vacant. */
-	TArray<EHarvestLocationDirection> GetVacantDirections() const;
+	TArray<EHarvestLocationDirection> GetVacantDirections(const UHarvester* RequestingHarvester) const;
 
 	TArray<FHarvestLocation> GenerateHarvestLocations(const float HarvesterRadius,
 	                                                  const TArray<EHarvestLocationDirection>& PositionDirections,

@@ -113,7 +113,7 @@ private:
 	void HarvestAIExecuteAction(EHarvesterAIAction Action);
 
 	// Calls DoneExecutingCommand(EAbilityID::IdHarvestResource) on the owner to finish the harvest command.
-	void FinishHarvestCommand() const;
+	void FinishHarvestCommand();
 
 	void FinishReturnCargoCommand() const;
 
@@ -328,8 +328,11 @@ private:
 		}
 	}
 
-	// Reset the occupied harvesting location on the target resource.
+	// Reset the occupied harvesting location on the resource that owns the reservation.
 	void ResetHarvesterLocation();
+
+	UPROPERTY()
+	TWeakObjectPtr<UResourceComponent> M_OccupiedResource;
 
 	void OnCargoNotFullAfterHarvesting();
 

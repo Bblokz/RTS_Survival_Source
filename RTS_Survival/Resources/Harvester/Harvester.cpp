@@ -202,10 +202,11 @@ void UHarvester::ResetHarvesterLocation()
 	{
 		return;
 	}
-	if (TargetResource.IsValid())
+	if (M_OccupiedResource.IsValid())
 	{
-		TargetResource->RegisterOccupiedLocation(M_OccupiedHarvestingLocation, false);
+		M_OccupiedResource->RegisterOccupiedLocation(M_OccupiedHarvestingLocation, false, this);
 	}
+	M_OccupiedResource = nullptr;
 	M_OccupiedHarvestingLocation.Direction = EHarvestLocationDirection::INVALID;
 	M_OccupiedHarvestingLocation.Location = FVector::ZeroVector;
 }
@@ -367,6 +368,7 @@ void UHarvester::AsyncOnReceiveResourceForIdle(TArray<TWeakObjectPtr<UResourceCo
 
 void UHarvester::ExecuteHarvestResourceCommand(UResourceComponent* NewTargetResource)
 {
+	ResetHarvesterLocation();
 	ResetHarvesterTargets();
 	if (CheckHasOtherCargo(NewTargetResource))
 	{
@@ -399,8 +401,9 @@ void UHarvester::ExecuteReturnCargoCommand()
 	HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
 }
 
-void UHarvester::FinishHarvestCommand() const
+void UHarvester::FinishHarvestCommand()
 {
+	ResetHarvesterLocation();
 	if (M_CommandOwner.IsValid())
 	{
 		M_CommandOwner->DoneExecutingCommand(EAbilityID::IdHarvestResource);
@@ -529,6 +532,7 @@ void UHarvester::BeginPlay()
 
 void UHarvester::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	ResetHarvesterLocation();
 	Super::EndPlay(EndPlayReason);
 	if (const UWorld* World = GetWorld())
 	{
@@ -748,13 +752,16 @@ void UHarvester::HarvestAIAction_MoveToTargetResource()
 			HarvestDebug("Successfully made request to move to resource", FColor::Green);
 			PathFollowingComponent->OnRequestFinished.AddUObject(
 				this, &UHarvester::OnMoveToTargetResourceFinished);
-			TargetResource->RegisterOccupiedLocation(M_OccupiedHarvestingLocation, true);
+			TargetResource->RegisterOccupiedLocation(M_OccupiedHarvestingLocation, true, this);
+			M_OccupiedResource = TargetResource;
 			return;
 		}
 	}
 	else if ((FVector::Distance(HarvesterLocation, M_OccupiedHarvestingLocation.Location) < M_ResourceAcceptanceRadius))
 	{
 		HarvestDebug("Move request to resource failed but Harvester is close enough!", FColor::Orange);
+		TargetResource->RegisterOccupiedLocation(M_OccupiedHarvestingLocation, true, this);
+		M_OccupiedResource = TargetResource;
 		OnMoveToTargetResourceFinished(FAIRequestID(), FPathFollowingResult(EPathFollowingResult::Success));
 		return;
 	}
@@ -807,11 +814,12 @@ void UHarvester::OnMoveToTargetResourceFinished(FAIRequestID RequestID, const FP
 		}
 		else
 		{
-			// NEW: Try a real unstuck first (to a projected midpoint), not immediate teleport.
+			// Try a real unstuck first (to a projected midpoint), not immediate teleport.
+			const FVector GoalLocation = M_OccupiedHarvestingLocation.Location;
 			ResetHarvesterLocation(); // free the spot before trying recovery
 			HarvestDebug("Move to resource failed; attempt UNSTUCK (no instant teleport)", FColor::Orange);
 			UnstuckHarvesterTowardsLocation(GetHarvesterLocation(),
-			                                M_OccupiedHarvestingLocation.Location,
+			                                GoalLocation,
 			                                EHarvesterAIAction::MoveToResource);
 			return;
 		}
@@ -819,10 +827,11 @@ void UHarvester::OnMoveToTargetResourceFinished(FAIRequestID RequestID, const FP
 
 	if (not GetIsHarvesterCloseEnoughToGoal(M_OccupiedHarvestingLocation.Location))
 	{
+		const FVector GoalLocation = M_OccupiedHarvestingLocation.Location;
 		ResetHarvesterLocation(); // free the spot before trying recovery
 		HarvestDebug("Move to resource reported success but harvester is not close enough; re-attempt movement", FColor::Orange);
 		UnstuckHarvesterTowardsLocation(GetHarvesterLocation(),
-		                                M_OccupiedHarvestingLocation.Location,
+		                                GoalLocation,
 		                                EHarvesterAIAction::MoveToResource);
 		return;
 	}
@@ -1074,6 +1083,7 @@ void UHarvester::HarvestAIAction_HarvestTargetResource()
 	{
 		HarvestDebug("On harvesting resource: no valid resource, find new one...", FColor::Orange);
 		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindResource);
+		return;
 	}
 
 	const int32 AmountHarvested = TargetResource->HarvestResource(SpaceLeftForTargetResource());
