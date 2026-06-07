@@ -1501,6 +1501,19 @@ private:
 	 */
 	bool NomadicConvertToBuilding(const FVector& BuildingLocation);
 
+	/**
+	 * @brief Caches the static preview before queueing so instant create-building execution has placement data.
+	 * @param NomadicVehicle The truck that will receive the command.
+	 * @param BuildingLocation The location to build the building at.
+	 * @param BuildingRotation The rotation to use for the building and preview.
+	 * @param bSetUnitToIdle Whether the command should replace the current queue.
+	 * @return True if the command was queued and owns the static preview.
+	 */
+	bool TryAssignNomadicBuildingCommand(
+		ANomadicVehicle* NomadicVehicle,
+		const FVector& BuildingLocation,
+		const FRotator& BuildingRotation,
+		const bool bSetUnitToIdle) const;
 
 	void OnBxpSpawnedAsync_CheckInstantPlacement_ResetAsyncRequest(
 		ABuildingExpansion* SpawnedBxp,
