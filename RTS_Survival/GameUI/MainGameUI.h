@@ -420,6 +420,9 @@ private:
 	TObjectPtr<UW_BottomCenterUI> M_BottomCenterUI;
 
 	bool GetIsValidBottomCenterUI() const;
+	bool GetIsValidItemBuildingExpansionWidgetAtIndex(int32 Index) const;
+	bool GetIsValidOptionBuildingExpansionWidgetAtIndex(int32 Index) const;
+	bool GetIsValidResourceWidgetAtIndex(const TArray<UW_PlayerResource*>& ResourceWidgets, int32 Index) const;
 
 	TScriptInterface<IBuildingExpansionOwner> GetPrimaryAsBxpOwner() const;
 
