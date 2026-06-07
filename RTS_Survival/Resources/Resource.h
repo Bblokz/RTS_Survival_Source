@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TimerManager.h"
 #include "ResourceSceneSetup/ResourceSceneSetup.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageOwner.h"
@@ -46,6 +47,9 @@ struct FResourceAttachmentsSetup
 class RTS_SURVIVAL_API ACPPController;
 
 
+/**
+ * @brief Used by map resource blueprints to expose harvestable resources and resource storage callbacks.
+ */
 UCLASS()
 class RTS_SURVIVAL_API ACPPResourceMaster : public ADestructableEnvActor, public IResourceStorageOwner
 {
@@ -54,7 +58,7 @@ class RTS_SURVIVAL_API ACPPResourceMaster : public ADestructableEnvActor, public
 public:
 	ACPPResourceMaster(const FObjectInitializer& ObjectInitializer);
 
-	inline UResourceComponent* GetResourceComponent() { return ResourceComponent; }
+	inline UResourceComponent* GetResourceComponent() const { return ResourceComponent; }
 
 	virtual void OnResourceStorageChanged(int32 PercentageResourcesFilled, const ERTSResourceType ResourceType) override;
 	virtual void OnResourceStorageEmpty() override;
@@ -72,9 +76,10 @@ protected:
 	void BP_OnResourceStorageEmpty();
 	
 	virtual void PostInitializeComponents() override;
+	virtual void BeginPlay() override;
 
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	UResourceComponent* ResourceComponent;
+	TObjectPtr<UResourceComponent> ResourceComponent;
 
 	/**
 	 * Generates attachments as provided by the setup. Note that the sockets are found automatically.
@@ -129,6 +134,11 @@ private:
 
 	int32 M_AmountOfAttachedMeshes;
 
-void OnResourceStorageChangedNoMeshes(int32 PercentageResourcesFilled);
+	FTimerHandle M_TimerHandleDebugOccupyingHarvesters;
+
+	void BeginPlay_InitDebugShowOccupyingHarvesters();
+	void DebugShowOccupyingHarvesters() const;
+	bool GetIsValidResourceComponent() const;
+	void OnResourceStorageChangedNoMeshes(int32 PercentageResourcesFilled);
 
 };

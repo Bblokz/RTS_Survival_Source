@@ -1583,6 +1583,7 @@ namespace DeveloperSettings
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting
 		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
+		constexpr bool ResourcesShowOccupyingHarvesters = false;
 		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Resistances_Compile_DebugSymbols = false;
