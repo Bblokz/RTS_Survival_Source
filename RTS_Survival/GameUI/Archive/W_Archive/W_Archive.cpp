@@ -37,6 +37,12 @@ void UW_Archive::AddArchiveItem(const ERTSArchiveItem NewItem, const FTrainingOp
 		return;
 	}
 	const ERTSArchiveType NewSortType = AddArchiveWidgetToScrollBox(NewArchiveItem, NewItem, OptionalUnit, SortingPriority);
+	if (NewSortType == ERTSArchiveType::None)
+	{
+		OnFailedToCreateArchiveItem();
+		return;
+	}
+
 	// Ensure the type of the new item is at the top of the list.
 	SortForType(NewSortType);
 }
@@ -94,9 +100,8 @@ void UW_Archive::SortForType(const ERTSArchiveType SortingType)
 		return A.SortingPriority > B.SortingPriority;
 	});
 
-	if (!ArchiveScrollBox)
+	if (not GetIsValidArchiveScrollBox())
 	{
-		RTSFunctionLibrary::ReportError(TEXT("SortForType: ArchiveScrollBox is null."));
 		return;
 	}
 
@@ -188,28 +193,39 @@ UW_ArchiveItem* UW_Archive::CreateNewArchiveItem()
 }
 
 ERTSArchiveType UW_Archive::AddArchiveWidgetToScrollBox(
-    UW_ArchiveItem* ArchiveItemWidget,
-    const ERTSArchiveItem ItemType,
-    const FTrainingOption UnitType,
-    const int32 SortingPriority)
+	UW_ArchiveItem* ArchiveItemWidget,
+	const ERTSArchiveItem ItemType,
+	const FTrainingOption UnitType,
+	const int32 SortingPriority)
 {
-    const ERTSArchiveType ArchiveSortingType = ArchiveItemWidget->SetupArchiveItem(ItemType, UnitType);
+	if (not IsValid(ArchiveItemWidget))
+	{
+		RTSFunctionLibrary::ReportError("Archive item widget is invalid in AddArchiveWidgetToScrollBox.");
+		return ERTSArchiveType::None;
+	}
 
-    const FArchiveItemData NewData = { ArchiveItemWidget, ArchiveSortingType, SortingPriority };
-    M_ArchiveItems.Add(NewData);
+	if (not GetIsValidArchiveScrollBox())
+	{
+		return ERTSArchiveType::None;
+	}
 
-    // Add to scroll box
-    ArchiveScrollBox->AddChild(ArchiveItemWidget);
+	const ERTSArchiveType ArchiveSortingType = ArchiveItemWidget->SetupArchiveItem(ItemType, UnitType);
 
-    // Get the slot and apply layout settings
-    if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(ArchiveItemWidget->Slot))
-    {
-        ScrollSlot->SetHorizontalAlignment(HAlign_Center);
-        ScrollSlot->SetVerticalAlignment(VAlign_Center);
-        ScrollSlot->SetPadding(FMargin(0.0f, 25.0f, 0.0f, 0.0f));
-    }
+	const FArchiveItemData NewData = {ArchiveItemWidget, ArchiveSortingType, SortingPriority};
+	M_ArchiveItems.Add(NewData);
 
-    return ArchiveSortingType;
+	// Add to scroll box
+	ArchiveScrollBox->AddChild(ArchiveItemWidget);
+
+	// Get the slot and apply layout settings
+	if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(ArchiveItemWidget->Slot))
+	{
+		ScrollSlot->SetHorizontalAlignment(HAlign_Center);
+		ScrollSlot->SetVerticalAlignment(VAlign_Center);
+		ScrollSlot->SetPadding(FMargin(0.0f, 25.0f, 0.0f, 0.0f));
+	}
+
+	return ArchiveSortingType;
 }
 
 
@@ -222,6 +238,23 @@ bool UW_Archive::GetIsValidArchiveItemClass() const
 	RTSFunctionLibrary::ReportError(
 		"Invalid ArchiveItemClass for archive manager,"
 		"\n Ensure that the class is set in derived blueprint defaults!");
+	return false;
+}
+
+
+bool UW_Archive::GetIsValidArchiveScrollBox() const
+{
+	if (IsValid(ArchiveScrollBox))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"ArchiveScrollBox",
+		"GetIsValidArchiveScrollBox",
+		this
+	);
 	return false;
 }
 

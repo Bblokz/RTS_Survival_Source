@@ -279,6 +279,11 @@ void UMainGameUI::OnTruckConverted(
 	{
 		for (int IndexInScrollBar = 0; IndexInScrollBar < M_TItemBuildingExpansionWidgets.Num(); ++IndexInScrollBar)
 		{
+			if (not GetIsValidItemBuildingExpansionWidgetAtIndex(IndexInScrollBar))
+			{
+				continue;
+			}
+
 			// Enable the item.
 			M_TItemBuildingExpansionWidgets[IndexInScrollBar]->EnableDisableItem(bConvertedToBuilding);
 		}
@@ -304,16 +309,14 @@ void UMainGameUI::RequestUpdateSpecificBuildingExpansionItem(
 	if (PrimarySelectedActor && RequestingActor == PrimarySelectedActor)
 	{
 		// check if index is valid.
-		if (IndexExpansionSlot >= 0 && IndexExpansionSlot < M_TItemBuildingExpansionWidgets.Num())
+		if (not GetIsValidItemBuildingExpansionWidgetAtIndex(IndexExpansionSlot))
 		{
-			// Update the widget with the new status.
-			M_TItemBuildingExpansionWidgets[IndexExpansionSlot]->UpdateItemBuildingExpansionData(
-				BuildingExpansionType, BuildingExpansionStatus, ConstructionRules);
+			return;
 		}
-		else
-		{
-			RTSFunctionLibrary::ReportError("IndexExpansionSlot is invalid!");
-		}
+
+		// Update the widget with the new status.
+		M_TItemBuildingExpansionWidgets[IndexExpansionSlot]->UpdateItemBuildingExpansionData(
+			BuildingExpansionType, BuildingExpansionStatus, ConstructionRules);
 	}
 }
 
@@ -459,11 +462,21 @@ void UMainGameUI::InitMainGameUI_InitBuildingUI(UW_BottomCenterUI* NewBottomCent
 		// Init the Buidling Expansion items.
 		for (int i = 0; i < M_TItemBuildingExpansionWidgets.Num(); ++i)
 		{
+			if (not GetIsValidItemBuildingExpansionWidgetAtIndex(i))
+			{
+				continue;
+			}
+
 			M_TItemBuildingExpansionWidgets[i]->InitW_ItemBuildingExpansion(this, i);
 		}
 		// Init the Buidling Expansion options.
 		for (int i = 0; i < M_TOptionsBuildingExpansionWidgets.Num(); ++i)
 		{
+			if (not GetIsValidOptionBuildingExpansionWidgetAtIndex(i))
+			{
+				continue;
+			}
+
 			M_TOptionsBuildingExpansionWidgets[i]->InitW_OptionBuildingExpansion(this, i);
 		}
 	}
@@ -571,6 +584,75 @@ bool UMainGameUI::GetIsValidBottomCenterUI() const
 	return true;
 }
 
+
+bool UMainGameUI::GetIsValidItemBuildingExpansionWidgetAtIndex(const int32 Index) const
+{
+	if (not M_TItemBuildingExpansionWidgets.IsValidIndex(Index))
+	{
+		RTSFunctionLibrary::ReportError("Item building expansion widget index is out of bounds."
+			"\n see UMainGameUI::GetIsValidItemBuildingExpansionWidgetAtIndex."
+			"\n Index: " + FString::FromInt(Index) +
+			"\n Widgets available: " + FString::FromInt(M_TItemBuildingExpansionWidgets.Num()));
+		return false;
+	}
+
+	if (IsValid(M_TItemBuildingExpansionWidgets[Index]))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("Item building expansion widget is invalid."
+		"\n see UMainGameUI::GetIsValidItemBuildingExpansionWidgetAtIndex."
+		"\n Index: " + FString::FromInt(Index));
+	return false;
+}
+
+bool UMainGameUI::GetIsValidOptionBuildingExpansionWidgetAtIndex(const int32 Index) const
+{
+	if (not M_TOptionsBuildingExpansionWidgets.IsValidIndex(Index))
+	{
+		RTSFunctionLibrary::ReportError("Option building expansion widget index is out of bounds."
+			"\n see UMainGameUI::GetIsValidOptionBuildingExpansionWidgetAtIndex."
+			"\n Index: " + FString::FromInt(Index) +
+			"\n Widgets available: " + FString::FromInt(M_TOptionsBuildingExpansionWidgets.Num()));
+		return false;
+	}
+
+	if (IsValid(M_TOptionsBuildingExpansionWidgets[Index]))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("Option building expansion widget is invalid."
+		"\n see UMainGameUI::GetIsValidOptionBuildingExpansionWidgetAtIndex."
+		"\n Index: " + FString::FromInt(Index));
+	return false;
+}
+
+bool UMainGameUI::GetIsValidResourceWidgetAtIndex(
+	const TArray<UW_PlayerResource*>& ResourceWidgets,
+	const int32 Index) const
+{
+	if (not ResourceWidgets.IsValidIndex(Index))
+	{
+		RTSFunctionLibrary::ReportError("Player resource widget index is out of bounds."
+			"\n see UMainGameUI::GetIsValidResourceWidgetAtIndex."
+			"\n Index: " + FString::FromInt(Index) +
+			"\n Widgets available: " + FString::FromInt(ResourceWidgets.Num()));
+		return false;
+	}
+
+	if (IsValid(ResourceWidgets[Index]))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("Player resource widget is invalid."
+		"\n see UMainGameUI::GetIsValidResourceWidgetAtIndex."
+		"\n Index: " + FString::FromInt(Index));
+	return false;
+}
+
 TScriptInterface<IBuildingExpansionOwner> UMainGameUI::GetPrimaryAsBxpOwner() const
 {
 	if (not IsValid(PrimarySelectedActor))
@@ -646,6 +728,11 @@ void UMainGameUI::SetupBuildingExpansionItems(
 	for (const auto& [Expansion, ExpansionType, ExpansionStatus, BxpConstructionRules] : TBuildingExpansions)
 	{
 		++IndexInScrollBar;
+		if (not GetIsValidItemBuildingExpansionWidgetAtIndex(IndexInScrollBar))
+		{
+			continue;
+		}
+
 		// Show the item.
 		M_TItemBuildingExpansionWidgets[IndexInScrollBar]->SetVisibility(ESlateVisibility::Visible);
 		// Update this item widget with the new data also updates the UI in the blueprint.
@@ -657,6 +744,11 @@ void UMainGameUI::SetupBuildingExpansionItems(
 	// Hide the rest of the items.
 	for (int i = IndexInScrollBar + 1; i < M_TItemBuildingExpansionWidgets.Num(); ++i)
 	{
+		if (not GetIsValidItemBuildingExpansionWidgetAtIndex(i))
+		{
+			continue;
+		}
+
 		M_TItemBuildingExpansionWidgets[i]->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
@@ -1024,6 +1116,11 @@ void UMainGameUI::SetupResources(
 	{
 		for (int i = 0; i < TResourceWidgets.Num(); ++i)
 		{
+			if (not GetIsValidResourceWidgetAtIndex(TResourceWidgets, i))
+			{
+				continue;
+			}
+
 			TResourceWidgets[i]->InitUwPlayerResource(PlayerResourceManager, ResourcesLeftToRight[i]);
 		}
 	}

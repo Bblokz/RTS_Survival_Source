@@ -88,6 +88,7 @@ private:
 		SortingPriority);
 
 	bool GetIsValidArchiveItemClass() const;
+	bool GetIsValidArchiveScrollBox() const;
 
 	// data of items currently stored.
 	UPROPERTY()

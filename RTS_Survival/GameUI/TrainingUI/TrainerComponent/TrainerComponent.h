@@ -217,6 +217,7 @@ private:
 	/** @brief Validity helpers with error reporting. */
 	bool GetIsValidRallyPointActor() const;
 	bool GetIsValidSelectionComponent() const;
+	FString GetOwnerNameForError() const;
 
 	void OnSpawnedActorCheckForSquadController(AActor* SpawnedActor, const FVector& SpawnLocation) const;
 

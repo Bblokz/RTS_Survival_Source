@@ -188,17 +188,18 @@ void UTrainingMenuManager::InitTrainingManager(
 	UW_TrainingRequirement* TrainingRequirementWidget, UW_TrainingDescription* TrainingDescription)
 {
 	InitAllGameTrainingOptions();
-	DeveloperSettings::GamePlay::Training::MaxTrainingOptions = TrainingItemsInMenu.Num();
+	M_TTrainingMenuWidgets.Reset();
 	for (int i = 0; i < TrainingItemsInMenu.Num(); i++)
 	{
-		if (!IsValid(TrainingItemsInMenu[i]))
+		if (not IsValid(TrainingItemsInMenu[i]))
 		{
 			RTSFunctionLibrary::ReportError("Training item in menu is nullptr or not valid."
 				"at function UTrainingMenuManager::InitTrainingManager.");
 			continue;
 		}
 		// Initialize the training item.
-		TrainingItemsInMenu[i]->InitW_TrainingItem(this, i);
+		const int32 TrainingWidgetIndex = M_TTrainingMenuWidgets.Num();
+		TrainingItemsInMenu[i]->InitW_TrainingItem(this, TrainingWidgetIndex);
 		M_TTrainingMenuWidgets.Add(TrainingItemsInMenu[i]);
 	}
 	if (IsValid(MainGameUI))
@@ -2632,27 +2633,34 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 			WidgetState.bIsSecondRequirementMet,
 			WidgetState.bIsFirstRequirementMet);
 
-		M_TTrainingMenuWidgets[WidgetIndex]->UpdateTrainingItem(WidgetState);
-		UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[WidgetIndex], WidgetState);
-		WidgetIndex++;
-		if (WidgetIndex >= DeveloperSettings::GamePlay::Training::MaxTrainingOptions)
+		if (not GetWidgetIndexInBounds(WidgetIndex))
 		{
 			RTSFunctionLibrary::ReportError("Too many training options for the UI."
 				"\n see UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue."
-				"\n Max options: " + FString::FromInt(DeveloperSettings::GamePlay::Training::MaxTrainingOptions) +
+				"\n Available widgets: " + FString::FromInt(M_TTrainingMenuWidgets.Num()) +
 				"\n Primary name selected: " + M_PrimarySelectedTrainer->GetName());
 			break;
 		}
+
+		M_TTrainingMenuWidgets[WidgetIndex]->UpdateTrainingItem(WidgetState);
+		UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[WidgetIndex], WidgetState);
+		WidgetIndex++;
 	}
 	// Set the rest of the widgets to empty state.
-	for (int32 i = WidgetIndex; i < DeveloperSettings::GamePlay::Training::MaxTrainingOptions; i++)
+	for (int32 i = WidgetIndex; i < M_TTrainingMenuWidgets.Num(); i++)
 	{
+		if (not GetWidgetIndexInBounds(i))
+		{
+			continue;
+		}
+
 		M_TTrainingMenuWidgets[i]->UpdateTrainingItem(M_EmptyTrainingOptionState);
 		UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[i], M_EmptyTrainingOptionState);
 	}
 	// Check if there is an active item.
-	if (ActiveItemIndex != INDEX_NONE && ActiveItemIndex <
-		DeveloperSettings::GamePlay::Training::MaxTrainingOptions)
+	if (ActiveItemIndex != INDEX_NONE
+		&& GetWidgetIndexInBounds(ActiveItemIndex)
+		&& TrainingOptions.IsValidIndex(ActiveItemIndex))
 	{
 		const bool bSetClockToPausedState = M_PrimarySelectedTrainer->GetIsPaused() || bIsPausedByResourceInsufficiency;
 		StartClockOnTrainingItem(ActiveItemIndex, TimeRemaining, TrainingOptions[ActiveItemIndex],
@@ -2742,12 +2750,13 @@ ETrainingItemStatus UTrainingMenuManager::CheckRequirement(
 
 bool UTrainingMenuManager::GetWidgetIndexInBounds(const int32 Index) const
 {
-	const bool bIsInBounds = (Index >= 0 && Index < DeveloperSettings::GamePlay::Training::MaxTrainingOptions);
+	const bool bIsInBounds = M_TTrainingMenuWidgets.IsValidIndex(Index);
 	if (not bIsInBounds)
 	{
 		RTSFunctionLibrary::ReportError("Widget index out of bounds."
 			"\n see UTrainingMenuManager::GetWidgetIndexInBounds."
-			"\n Index: " + FString::FromInt(Index));
+			"\n Index: " + FString::FromInt(Index) +
+			"\n Widgets available: " + FString::FromInt(M_TTrainingMenuWidgets.Num()));
 	}
 	return bIsInBounds;
 }

@@ -114,7 +114,7 @@ void UTrainerComponent::InitUTrainerComponent(
 				+ FString::FromInt(Options.Num()) + " options provided."
 				+ " Max options: " + FString::FromInt(
 					DeveloperSettings::GamePlay::Training::MaxTrainingOptions) +
-				"Owner name: " + GetOwner()->GetName());
+				"Owner name: " + GetOwnerNameForError());
 			break;
 		}
 	}
@@ -181,7 +181,7 @@ void UTrainerComponent::SetIsPrimarySelectedTraining(
 		else
 		{
 			RTSFunctionLibrary::ReportError("TrainingMenuManager is not valid when attempting to set"
-				"Trainer component as primary selected: " + GetOwner()->GetName() +
+				"Trainer component as primary selected: " + GetOwnerNameForError() +
 				"\n The trainer component cannot update the UI now."
 				"See function UTrainerComponent::SetIsPrimarySelectedTraining");
 		}
@@ -321,7 +321,7 @@ bool UTrainerComponent::GetSpawnTransform(FTransform& OutTransform) const
 		RTSFunctionLibrary::ReportError(
 			"Spawn socket does not exist on training mesh."
 			"\n in function UTrainerComponent::GetSpawnTransform"
-			"\n Trainer component at: " + GetOwner()->GetName() +
+			"\n Trainer component at: " + GetOwnerNameForError() +
 			"socket name: " + M_TrainerSettings.SpawnSocketName.ToString());
 		return false;
 	}
@@ -396,7 +396,7 @@ bool UTrainerComponent::GetIsValidPlayerResourceManager() const
 	{
 		return true;
 	}
-	const FString Owner = IsValid(GetOwner()) ? GetOwner()->GetName() : "nullptr";
+	const FString Owner = GetOwnerNameForError();
 	RTSFunctionLibrary::ReportError("PlayerResourceManager is not valid when attempting to access it."
 		"\n in function UTrainerComponent::GetIsValidPlayerResourceManager"
 		"\n Owner: " + Owner);
@@ -504,7 +504,7 @@ bool UTrainerComponent::RemoveLastInstanceOfTypeFromQueue(const FTrainingOption&
 	}
 	if (not M_TrainingEnabled.bIsQueueOnPause)
 	{
-		const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "nullptr";
+		const FString OwnerName = GetOwnerNameForError();
 		RTSFunctionLibrary::ReportError("Attempted to remove item from queue while the queue is not paused."
 			"\n this is note supported."
 			"\n Training comp: " + GetName() +
@@ -801,7 +801,7 @@ bool UTrainerComponent::EnsureActiveItemIsValid(const FTrainingQueueItem* const 
 	{
 		return true;
 	}
-	const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "nullptr";
+	const FString OwnerName = GetOwnerNameForError();
 	RTSFunctionLibrary::ReportError("Active item is not valid when checking if it is valid."
 		"\n in function UTrainerComponent::EnsureActiveItemIsValid"
 		"\n Trainer component at: " + OwnerName);
@@ -920,7 +920,7 @@ void UTrainerComponent::MakeActorReadyForSpawn(AActor* ActorToMakeReady) const
 		ActorToMakeReady->GetName(),
 		"IRTSUnit",
 		"UTrainerComponent::MakeActorReadyForSpawn"
-		"\n Training component at: " + (IsValid(GetOwner()) ? GetOwner()->GetName() : FString("UnknownOwner")));
+		"\n Training component at: " + GetOwnerNameForError());
 }
 
 
@@ -928,7 +928,7 @@ bool UTrainerComponent::GetIsValidOwningTrainer() const
 {
 	if (not M_OwningTrainer.IsValid())
 	{
-		const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "nullptr";
+		const FString OwnerName = GetOwnerNameForError();
 		RTSFunctionLibrary::ReportError("Owning trainer is not valid when attempting to access it."
 			"\n in function UTrainerComponent::GetIsValidOwningTrainer"
 			"\n Owner: " + OwnerName);
@@ -1085,7 +1085,7 @@ void UTrainerComponent::SpawnRallyPointActorIfNeeded(TSubclassOf<ARTSRallyPointA
 	{
 		RTSFunctionLibrary::ReportError(
 			"RallyPointActorClass not provided to TrainerComponent::InitUTrainerComponent on "
-			+ (IsValid(GetOwner()) ? GetOwner()->GetName() : FString("UnknownOwner")));
+			+ GetOwnerNameForError());
 		return;
 	}
 
@@ -1171,6 +1171,17 @@ bool UTrainerComponent::GetIsValidSelectionComponent() const
 	return false;
 }
 
+
+FString UTrainerComponent::GetOwnerNameForError() const
+{
+	if (IsValid(GetOwner()))
+	{
+		return GetOwner()->GetName();
+	}
+
+	return TEXT("nullptr");
+}
+
 void UTrainerComponent::OnSpawnedActorCheckForSquadController(AActor* SpawnedActor, const FVector& SpawnLocation) const
 {
 	if (not IsValid(SpawnedActor))
@@ -1211,7 +1222,7 @@ bool UTrainerComponent::EnsureIsPrimarySelected() const
 {
 	if (not IsValid(M_TrainingMenuManager))
 	{
-		const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "nullptr";
+		const FString OwnerName = GetOwnerNameForError();
 		RTSFunctionLibrary::ReportError("Trainer component is not primary selected, cannot update UI."
 			"\n in function UTrainerComponent::EnsureIsPrimarySelected"
 			"\n Trainer with Owner: " + OwnerName);
@@ -1298,7 +1309,7 @@ void UTrainerComponent::DebugPrintQueueLayout()
 
 		// 3) Component & owner names
 		Debug += FString::Printf(TEXT("Component: %s\n"), *GetName());
-		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : TEXT("None");
+		const FString OwnerName = GetOwnerNameForError();
 		Debug += FString::Printf(TEXT("Owner    : %s\n\n"), *OwnerName);
 
 		// Print it all at once
