@@ -303,6 +303,7 @@ private:
 	 * We make use of the delta time passed (calculated in tick)
 	 */
 	void PerformAsyncLineTrace();
+	void ResetAsyncTraceState();
 
 	void StartFlightTimers(const float ExpectedFlightTime);
 
@@ -310,7 +311,7 @@ private:
 	* @brief The callback function for the async trace.
 	* Calculates armor pen values and handles the hit actor.
 	*/
-	void OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum);
+	void OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum, const int32 TraceRequestId);
 
 	void PlayDescentSound(USoundBase* DescentSound,
 	                      USoundAttenuation* DescentAttenuation,
@@ -609,7 +610,12 @@ private:
 	// Start point used by async trace to sweep the full travelled segment between trace dispatches.
 	FVector M_LastTraceLocation = FVector::ZeroVector;
 
+	// Used to ignore stale async callbacks after dormancy or relaunch state changes.
+	int32 M_TraceRequestId = 0;
+
 	bool bM_HasLastTraceLocation = false;
+
+	bool bM_TraceInFlight = false;
 
 	// To ensure that a projectile cannot trigger a voice line after a bounce.
 	bool bM_AlreadyNotified = false;

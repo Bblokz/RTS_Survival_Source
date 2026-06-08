@@ -358,6 +358,8 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
 
+		ResetAsyncTraceState();
+
 		World->GetTimerManager().SetTimer(M_ExplosionTimerHandle, this, &AProjectile::HandleTimedExplosion,
 		                                  ExpectedFlightTime, false);
 		const float LineTraceInterval = DeveloperSettings::Optimization::ProjectileTraceInterval;
@@ -1191,6 +1193,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 	}
+	ResetAsyncTraceState();
 	StopDescentSound();
 }
 
@@ -1206,6 +1209,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 	}
+	ResetAsyncTraceState();
 	StopDescentSound();
 }
 
@@ -1292,6 +1296,7 @@ void AProjectile::SetProjectileDormant()
 
 void AProjectile::OnProjectileDormant()
 {
+	ResetAsyncTraceState();
 	if (not GetIsValidProjectileMovement() || not GetIsValidProjectileManager())
 	{
 		return;
@@ -1365,6 +1370,11 @@ void AProjectile::PerformAsyncLineTrace()
 		return;
 	}
 
+	if (bM_TraceInFlight)
+	{
+		return;
+	}
+
 	if (not bM_HasLastTraceLocation)
 	{
 		M_LastTraceLocation = GetActorLocation();
@@ -1388,8 +1398,20 @@ void AProjectile::PerformAsyncLineTrace()
 	TraceParams.bReturnPhysicalMaterial = true;
 	TraceParams.AddIgnoredActors(M_ActorsToIgnore);
 
+	const int32 TraceRequestId = ++M_TraceRequestId;
+	bM_TraceInFlight = true;
+	const TWeakObjectPtr<AProjectile> WeakThis(this);
 	FTraceDelegate TraceDelegate;
-	TraceDelegate.BindUObject(this, &AProjectile::OnAsyncTraceComplete);
+	TraceDelegate.BindLambda(
+		[WeakThis, TraceRequestId](const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->OnAsyncTraceComplete(TraceHandle, TraceDatum, TraceRequestId);
+		});
 
 	World->AsyncLineTraceByChannel(
 		EAsyncTraceType::Single,
@@ -1402,8 +1424,23 @@ void AProjectile::PerformAsyncLineTrace()
 	);
 }
 
-void AProjectile::OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum)
+void AProjectile::ResetAsyncTraceState()
 {
+	++M_TraceRequestId;
+	bM_TraceInFlight = false;
+	bM_HasLastTraceLocation = false;
+	M_LastTraceLocation = FVector::ZeroVector;
+}
+
+void AProjectile::OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum,
+                                       const int32 TraceRequestId)
+{
+	if (TraceRequestId != M_TraceRequestId)
+	{
+		return;
+	}
+
+	bM_TraceInFlight = false;
 	if (TraceDatum.OutHits.Num() == 0)
 	{
 		return;
