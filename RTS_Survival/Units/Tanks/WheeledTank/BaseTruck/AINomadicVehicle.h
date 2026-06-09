@@ -38,7 +38,9 @@ protected:
 
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility) override;
-	virtual void OnQueuedMovementFailed(const EAbilityID FailedMovementAbility) override;
+	virtual void OnQueuedMovementFailed(
+		const EAbilityID FailedMovementAbility,
+		const EPathFollowingResult::Type FailedMovementResultCode) override;
 	virtual void OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility) override;
 
 private:

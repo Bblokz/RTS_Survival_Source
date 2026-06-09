@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
 #include "VehicleAI/VehicleAIController.h"
@@ -90,7 +91,9 @@ protected:
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
 	virtual void OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility);
-	virtual void OnQueuedMovementFailed(const EAbilityID FailedMovementAbility);
+	virtual void OnQueuedMovementFailed(
+		const EAbilityID FailedMovementAbility,
+		const EPathFollowingResult::Type FailedMovementResultCode);
 
 	
 	TArray<FVector> TLocationsToDestination;

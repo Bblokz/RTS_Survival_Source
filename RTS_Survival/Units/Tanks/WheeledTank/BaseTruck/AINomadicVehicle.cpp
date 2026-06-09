@@ -67,11 +67,13 @@ void AAINomadicVehicle::OnQueuedMovementCompleted(const EAbilityID CompletedMove
 	NomadicVehicle->OnMoveToBuildingLocationSucceeded();
 }
 
-void AAINomadicVehicle::OnQueuedMovementFailed(const EAbilityID FailedMovementAbility)
+void AAINomadicVehicle::OnQueuedMovementFailed(
+	const EAbilityID FailedMovementAbility,
+	const EPathFollowingResult::Type FailedMovementResultCode)
 {
 	if (FailedMovementAbility != EAbilityID::IdCreateBuilding)
 	{
-		Super::OnQueuedMovementFailed(FailedMovementAbility);
+		Super::OnQueuedMovementFailed(FailedMovementAbility, FailedMovementResultCode);
 		return;
 	}
 
@@ -82,6 +84,14 @@ void AAINomadicVehicle::OnQueuedMovementFailed(const EAbilityID FailedMovementAb
 			"GetPawn()",
 			"ANomadicVehicle",
 			"AAINomadicVehicle::OnQueuedMovementFailed");
+		return;
+	}
+
+	if (FailedMovementResultCode == EPathFollowingResult::Invalid)
+	{
+		// TODO: Review this Unreal edge case later: MoveTo returns AlreadyAtGoal for same-location construction,
+		// but OnMoveCompleted can report Invalid before the nomadic build flow sees success.
+		NomadicVehicle->OnMoveToBuildingLocationSucceeded();
 		return;
 	}
 

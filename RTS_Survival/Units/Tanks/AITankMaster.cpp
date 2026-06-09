@@ -138,7 +138,7 @@ void AAITankMaster::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowing
 		return;
 	}
 
-	OnQueuedMovementFailed(QueuedMovementAbility);
+	OnQueuedMovementFailed(QueuedMovementAbility, Result.Code);
 }
 
 void AAITankMaster::OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility)
@@ -151,8 +151,12 @@ void AAITankMaster::OnQueuedMovementCompleted(const EAbilityID CompletedMovement
 	ControlledTank->DoneExecutingCommand(CompletedMovementAbility);
 }
 
-void AAITankMaster::OnQueuedMovementFailed(const EAbilityID FailedMovementAbility)
+void AAITankMaster::OnQueuedMovementFailed(
+	const EAbilityID FailedMovementAbility,
+	const EPathFollowingResult::Type FailedMovementResultCode)
 {
+	(void)FailedMovementAbility;
+	(void)FailedMovementResultCode;
 }
 
 void AAITankMaster::OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility)
