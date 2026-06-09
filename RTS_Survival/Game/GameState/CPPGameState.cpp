@@ -4579,8 +4579,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost - 25},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost - 25}
+		{ERTSResourceType::Resource_Radixite, 300}
 	});
 	TankData.Abilities = BasicHarvesterTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();

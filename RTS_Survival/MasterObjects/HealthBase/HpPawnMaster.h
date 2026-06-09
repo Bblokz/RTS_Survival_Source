@@ -102,7 +102,7 @@ protected:
 		FCollapseFX CollapseFX);
 
 	UFUNCTION(BlueprintImplementableEvent)
-	void BP_OnUnitDies();
+	void BP_OnUnitDies(ERTSDeathType DeathType);
 
 
 	bool GetIsValidHealthComponent() const;

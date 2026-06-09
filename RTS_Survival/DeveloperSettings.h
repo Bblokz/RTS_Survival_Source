@@ -139,26 +139,26 @@ namespace DeveloperSettings
 
 		namespace BuildingTime
 		{
-			inline constexpr float GameBuildingTimeMlt = 0.1;
-			inline constexpr float HQVehicleConversionTime = 8 * GameBuildingTimeMlt;
-			inline constexpr float HQBuildingAnimationTime = 10 * GameBuildingTimeMlt;
-			inline constexpr float HQPackUpTime = 30 * GameBuildingTimeMlt;
-			inline constexpr float T1TruckVehicleConversionTime = 5 * GameBuildingTimeMlt;
+			inline constexpr float GameBuildingTimeMlt = 1;
+			inline constexpr float HQVehicleConversionTime = 3 * GameBuildingTimeMlt;
+			inline constexpr float HQBuildingAnimationTime = 7 * GameBuildingTimeMlt;
+			inline constexpr float HQPackUpTime = 10 * GameBuildingTimeMlt;
+			inline constexpr float T1TruckVehicleConversionTime = 3 * GameBuildingTimeMlt;
 			inline constexpr float T1TruckVehiclePackUpTime = 10 * GameBuildingTimeMlt;
-			inline constexpr float BarracksBuildingAnimationTime = 20 * GameBuildingTimeMlt;
-			inline constexpr float T1ResourceStorageAnimationTime = 20 * GameBuildingTimeMlt;
-			inline constexpr float MechanizedDepotAnimationTime = 30 * GameBuildingTimeMlt;
-			inline constexpr float LightTankFactoryBuildingAnimationTime = 30 * GameBuildingTimeMlt;
+			inline constexpr float BarracksBuildingAnimationTime = 6 * GameBuildingTimeMlt;
+			inline constexpr float T1ResourceStorageAnimationTime = 6 * GameBuildingTimeMlt;
+			inline constexpr float MechanizedDepotAnimationTime = 6 * GameBuildingTimeMlt;
+			inline constexpr float LightTankFactoryBuildingAnimationTime = 10 * GameBuildingTimeMlt;
 
 			// Nomadic T2 Building times.
-			inline constexpr float T2TruckVehicleConversionTime = 8 * GameBuildingTimeMlt;
+			inline constexpr float T2TruckVehicleConversionTime = 4 * GameBuildingTimeMlt;
 			inline constexpr float T2TruckVehiclePackUpTime = 15 * GameBuildingTimeMlt;
-			inline constexpr float T2CommunicationCenterBuildingAnimationTime = 40 * GameBuildingTimeMlt;
-			inline constexpr float T2MedTankFactoryBuildingAnimationTime = 40 * GameBuildingTimeMlt;
+			inline constexpr float T2CommunicationCenterBuildingAnimationTime = 20 * GameBuildingTimeMlt;
+			inline constexpr float T2MedTankFactoryBuildingAnimationTime = 20 * GameBuildingTimeMlt;
 			// Nomadic T3 Building times.
-			inline constexpr float T3TruckVehicleConversionTime = 10 * GameBuildingTimeMlt;
-			inline constexpr float T3TruckVehiclePackUpTime = 20 * GameBuildingTimeMlt;
-			inline constexpr float T3ExperimentalUnitsFactoryBuildingAnimationTime = 50 * GameBuildingTimeMlt;
+			inline constexpr float T3TruckVehicleConversionTime = 4 * GameBuildingTimeMlt;
+			inline constexpr float T3TruckVehiclePackUpTime = 15 * GameBuildingTimeMlt;
+			inline constexpr float T3ExperimentalUnitsFactoryBuildingAnimationTime = 25 * GameBuildingTimeMlt;
 
 
 			// Dig in walls building time settings.
@@ -184,105 +184,101 @@ namespace DeveloperSettings
 
 		namespace TrainingTime
 		{
-			inline constexpr float GameTimeMlt = 0.2;
+			inline constexpr float GameTimeMlt = 1;
 			// Infantry Training Times.
 			inline constexpr int32 BasicInfantryTrainingTime = RoundToNearestMultipleOf(
-				20.f * GameTimeMlt, 2);
+				12.f * GameTimeMlt, 2);
 			inline constexpr int32 ArmoredInfantryTrainingTime = RoundToNearestMultipleOf(
-				25.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 T2EngineersTrainingTime = RoundToNearestMultipleOf(
-				30.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 T2InfantryTrainingTime = RoundToNearestMultipleOf(
-				40.f * GameTimeMlt, 2);
+				20.f * GameTimeMlt, 2);
 			inline constexpr int32 EliteInfantryTrainingTime = RoundToNearestMultipleOf(
-				60.f * GameTimeMlt, 2);
+				30.f * GameTimeMlt, 2);
 
 			// Team weapon squad training times.
 			inline constexpr int32 MachineGunTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				25.f * GameTimeMlt, 2);
+				12.f * GameTimeMlt, 2);
 			inline constexpr int32 MediumAntiTankGunTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				50.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 HeavyAntiTankGunTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				65.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 MediumMortarTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				45.f * GameTimeMlt, 2);
+				12.f * GameTimeMlt, 2);
 			inline constexpr int32 HeavyMortarTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				55.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 MediumFlakTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				50.f * GameTimeMlt, 2);
+				20.f * GameTimeMlt, 2);
 			inline constexpr int32 HeavyFlakTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				70.f * GameTimeMlt, 2);
+				20.f * GameTimeMlt, 2);
 			inline constexpr int32 MediumArtilleryTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				70.f * GameTimeMlt, 2);
+				25.f * GameTimeMlt, 2);
 			inline constexpr int32 HeavyArtilleryTeamWeaponTrainingTime = RoundToNearestMultipleOf(
-				90.f * GameTimeMlt, 2);
+				25.f * GameTimeMlt, 2);
 
 			// Harvester Training Time.
 			inline constexpr int32 HarvesterTrainingTime = RoundToNearestMultipleOf(
-				15.f * GameTimeMlt, 2);
+				10.f * GameTimeMlt, 2);
 
 			// Tank Training Times.
 			inline constexpr int32 LightTankTrainingTime = RoundToNearestMultipleOf(
-				30.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 LightTankDestroyerTrainingTime = RoundToNearestMultipleOf(
-				25.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 LightMediumTankTrainingTime = RoundToNearestMultipleOf(
-				45.f * GameTimeMlt, 2);
+				20.f * GameTimeMlt, 2);
 			inline constexpr int32 MediumTankTrainingTime = RoundToNearestMultipleOf(
-				60.f * GameTimeMlt, 2);
+				25.f * GameTimeMlt, 2);
 			inline constexpr int32 MediumTankDestroyerTrainingTime = RoundToNearestMultipleOf(
-				50.f * GameTimeMlt, 2);
+				25.f * GameTimeMlt, 2);
 			inline constexpr int32 T2HeavyTankTrainingTime = RoundToNearestMultipleOf(
-				80.f * GameTimeMlt, 2);
+				30.f * GameTimeMlt, 2);
 			inline constexpr int32 T3HeavyTankTrainingTime = RoundToNearestMultipleOf(
-				90.f * GameTimeMlt, 2);
+				35.f * GameTimeMlt, 2);
 			inline constexpr int32 T3MediumTankTrainingTime = RoundToNearestMultipleOf(
-				70.f * GameTimeMlt, 2);
+				30.f * GameTimeMlt, 2);
 			// Like PZ V_III or V_IV
 			inline constexpr int32 T3SpecialMediumTankTrainingTime = RoundToNearestMultipleOf(
-				85.f * GameTimeMlt, 2);
+				35.f * GameTimeMlt, 2);
 			inline constexpr int32 T3MediumTankDestroyerTrainingTime = RoundToNearestMultipleOf(
-				60.f * GameTimeMlt, 2);
+				35.f * GameTimeMlt, 2);
 			inline constexpr int32 SuperHeavyTankTrainingTime = RoundToNearestMultipleOf(
-				120.f * GameTimeMlt, 2);
+				45.f * GameTimeMlt, 2);
 
 			// Aircraft training time.
 			inline constexpr int32 BasicAircaftTrainingTime = RoundToNearestMultipleOf(
-				45.f * GameTimeMlt, 2);
+				30.f * GameTimeMlt, 2);
 			inline constexpr int32 SpecialistAircaftTrainingTime = RoundToNearestMultipleOf(
-				65.f * GameTimeMlt, 2);
+				45.f * GameTimeMlt, 2);
 
 			// Armored Car Training Times.
 			inline constexpr int32 ArmoredCarTrainingTime = RoundToNearestMultipleOf(
-				20.f * GameTimeMlt, 2);
+				12.f * GameTimeMlt, 2);
 			inline constexpr int32 ArmoredCarMediumCalibreTrainingTime = RoundToNearestMultipleOf(
-				30.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 
 			// Nomadic Training Times.
 			inline constexpr int32 NomadicT1PowerPlantTrainingTime = RoundToNearestMultipleOf(
 				10.f * GameTimeMlt, 2);
 			inline constexpr int32 NomadicT1RefineryTrainingTime = RoundToNearestMultipleOf(
-				20.f * GameTimeMlt, 2);
+				15.f * GameTimeMlt, 2);
 			inline constexpr int32 NomadicT1BarracksTrainingTime = RoundToNearestMultipleOf(
 				15.f * GameTimeMlt, 2);
 			inline constexpr int32 NomadicT1VehicleFactoryTrainingTime = RoundToNearestMultipleOf(
-				20.f * GameTimeMlt, 2);
+				18.f * GameTimeMlt, 2);
 			inline constexpr int32 NomadicT1MechanizedDepotTrainingTime = RoundToNearestMultipleOf(
-				20.f * GameTimeMlt, 2);
+				18.f * GameTimeMlt, 2);
 
 			// Nomadic T2
-			inline constexpr int32 NomadicT2CommunicationCenterTrainingTime =
-				RoundToNearestMultipleOf(35.f * GameTimeMlt, 2);
-			inline constexpr int32 NomadicT2ArmoryTrainingTime = RoundToNearestMultipleOf(
-				30.f * GameTimeMlt, 2);
-			inline constexpr int32 NomadicT2MedFactoryTrainingTime = RoundToNearestMultipleOf(
-				30.f * GameTimeMlt, 2);
-			inline constexpr int32 NomadicT3ExperimentalUnitsFactoryTrainingTime = RoundToNearestMultipleOf(
-				45.f * GameTimeMlt, 2);
+			inline constexpr int32 NomadicT2CommunicationCenterTrainingTime = 22.f * GameTimeMlt;
+			inline constexpr int32 NomadicT2ArmoryTrainingTime = 22.f * GameTimeMlt;
+			inline constexpr int32 NomadicT2MedFactoryTrainingTime = 22.f * GameTimeMlt;
+			inline constexpr int32 NomadicT3ExperimentalUnitsFactoryTrainingTime = 30.f * GameTimeMlt;
 
 			// Bxp Training Times.
 			inline constexpr int32 T1BxpBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
-			inline constexpr int32 BxpT2BuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
+			inline constexpr int32 BxpT2BuildTime = RoundToNearestMultipleOf(25.f * GameTimeMlt, 2);
 		}
 
 
@@ -296,7 +292,7 @@ namespace DeveloperSettings
 			// ----------------------------------
 			inline constexpr float GameCostMlt = 1;
 			inline constexpr int32 LightTankRadixiteCost = RoundToNearestMultipleOfFive(
-				static_cast<int32>(150 * GameCostMlt));
+				static_cast<int32>(200 * GameCostMlt));
 			inline constexpr int32 LightTankVehiclePartsCost = RoundToNearestMultipleOfFive(
 				static_cast<int32>(50 * GameCostMlt));
 			// todo ammo and fuel costs.
@@ -577,7 +573,7 @@ namespace DeveloperSettings
 		{
 			// How much further weapon trace is allowed to fly than its range; flight range = weapon range * this mlt.
 			inline constexpr float TraceSimulationRangeMlt = 2.25f;
-			inline constexpr float GameRangeMlt = 0.5f;
+			inline constexpr float GameRangeMlt = 0.4f;
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);
 			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
@@ -586,16 +582,16 @@ namespace DeveloperSettings
 			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9800.f * GameRangeMlt);
 			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(9200.f * GameRangeMlt);
 			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
-			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(10000.f * GameRangeMlt);
-			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(13000.f * GameRangeMlt);
+			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(9200.f * GameRangeMlt);
+			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
 
 			// Medium artillery range ~105 mm howitzers
-			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(15000.f * GameRangeMlt);
-			inline constexpr float MediumArtilleryRange = 18000.f * GameRangeMlt;
-			inline constexpr float HeavyArtilleryRange = 22000.f * GameRangeMlt;
+			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(14000.f * GameRangeMlt);
+			inline constexpr float MediumArtilleryRange = 17000.f * GameRangeMlt;
+			inline constexpr float HeavyArtilleryRange = 19000.f * GameRangeMlt;
 
 			// Static artillery range  /  howitzers
-			inline constexpr float HowitzerArtilleryRange = 24000.f * GameRangeMlt;
+			inline constexpr float HowitzerArtilleryRange = 22000.f * GameRangeMlt;
 
 			// Laser weapons
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);
@@ -896,21 +892,21 @@ namespace DeveloperSettings
 			// Nomadic Trucks Health settings.
 
 			// The most durable nomadic vehicle.
-			inline constexpr float NomadicHQTruckHealth = RoundToNearestMultipleOfFive(5000 * OverallHealthMlt);
+			inline constexpr float NomadicHQTruckHealth = RoundToNearestMultipleOfFive(7000 * OverallHealthMlt);
 			// More health in base mode; takes 10 heavy tank shots to destroy.
-			inline constexpr float NomadicHQBuildingHealth = RoundToNearestMultipleOfFive(10000 * OverallHealthMlt);
-			inline constexpr float T1NomadicTruckHealth = RoundToNearestMultipleOfFive(800 * OverallHealthMlt);
-			inline constexpr float T1NomadicBuildingHealth = RoundToNearestMultipleOfFive(4000 * OverallHealthMlt);
-			inline constexpr float T2NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
-			inline constexpr float T2NomadicBuildingHealth = RoundToNearestMultipleOfFive(6000 * OverallHealthMlt);
-			inline constexpr float T3NomadicTruckHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
-			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive(8000 * OverallHealthMlt);
+			inline constexpr float NomadicHQBuildingHealth = RoundToNearestMultipleOfFive(12000 * OverallHealthMlt);
+			inline constexpr float T1NomadicTruckHealth = RoundToNearestMultipleOfFive(1600 * OverallHealthMlt);
+			inline constexpr float T1NomadicBuildingHealth = RoundToNearestMultipleOfFive(5000 * OverallHealthMlt);
+			inline constexpr float T2NomadicTruckHealth = RoundToNearestMultipleOfFive(4000 * OverallHealthMlt);
+			inline constexpr float T2NomadicBuildingHealth = RoundToNearestMultipleOfFive(9000 * OverallHealthMlt);
+			inline constexpr float T3NomadicTruckHealth = RoundToNearestMultipleOfFive(5000 * OverallHealthMlt);
+			inline constexpr float T3NomadicBuildingHealth = RoundToNearestMultipleOfFive(10000 * OverallHealthMlt);
 
 			// Building expansions health settings.
-			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(700 * OverallHealthMlt);
-			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
-			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
-			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2500 * OverallHealthMlt);
+			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
+			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1300 * OverallHealthMlt);
+			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
+			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
 			inline constexpr float T3BxpBunkerHealth = RoundToNearestMultipleOfFive(1600 * OverallHealthMlt);
 			inline constexpr float BxpHeavyBunkerHealth = RoundToNearestMultipleOfFive(2400 * OverallHealthMlt);
@@ -1317,7 +1313,7 @@ namespace DeveloperSettings
 		{
 			// The amount of cm we subtract from the max range of the turret to obtain a radius within which we
 			// search for a valid target.
-			inline constexpr float RangeMargin = 200.f;
+			inline constexpr float RangeMargin = 201.f;
 			// Base time between idle turret animations.
 			inline constexpr float RotateAnimationInterval = 15.f;
 			inline constexpr float RotateAnimationFlux = 3.f;
@@ -1572,7 +1568,7 @@ namespace DeveloperSettings
 		// Reinforcement provider and ability debug draws.
 		constexpr bool GReinforcementAbility_Compile_DebugSymbols = false;
 		constexpr bool GPathFollowing_Compile_DebugSymbols = false;
-		constexpr bool GRTSNavAgents_Compile_DebugSymbols = true;
+		constexpr bool GRTSNavAgents_Compile_DebugSymbols = false;
 		constexpr bool GPathFindingCosts_Compile_DebugSymbols = false;
 		// Track animation
 		constexpr bool GVehicle_Track_Animation_Compile_DebugSymbols = false;
@@ -1584,7 +1580,7 @@ namespace DeveloperSettings
 		// Harvesting
 		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
 		constexpr bool ResourcesShowOccupyingHarvesters = false;
-		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
+		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = true;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Resistances_Compile_DebugSymbols = false;
 		constexpr bool GSquadUnit_Weapons_Compile_DebugSymbols = false;

@@ -370,7 +370,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 
 		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
 			ItemID,
-			HarvesterTrainingTime * 10,
+			HarvesterTrainingTime ,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_PzI_Harvester,
 			ENomadicSubtype::Nomadic_None,

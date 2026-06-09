@@ -1573,16 +1573,18 @@ void AProjectile::SpawnExplosionHandleAOE(const FVector& Location, const FRotato
 void AProjectile::SpawnBounce(const FVector& Location, const FRotator& BounceDirection) const
 {
 	// Forward to owner’s pooled bounce player (VFX + SFX).
-	if (M_ProjectileOwner)
+	const bool bValidOwner = IsValid(M_ProjectileOwner);
+	if (bValidOwner)
 	{
-		M_ProjectileOwner->CreateWeaponNonPenVfx(Location, BounceDirection);
-		return;
+		M_ProjectileOwner->CreateWeaponNonPenVfx(Location, BounceDirection, false);
 	}
 
-	// Fallback: keep the old behavior if owner is missing.
 	if (UWorld* World = GetWorld())
 	{
-		PlayNiagaraAt(World, M_BounceVfx, Location, BounceDirection, M_BounceScale);
+		if (not bValidOwner)
+		{
+			PlayNiagaraAt(World, M_BounceVfx, Location, BounceDirection, M_BounceScale);
+		}
 		PlaySoundAt(World, M_BounceSound, Location, FRotator::ZeroRotator, M_ImpactAttenuation, M_ImpactConcurrency);
 	}
 }

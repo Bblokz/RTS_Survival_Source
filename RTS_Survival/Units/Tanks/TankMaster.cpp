@@ -440,7 +440,7 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 	OnUnitDies_DisableWeapons();
 	// Before bp event as the bp event may destroy the actor immediately.
 	OnUnitDies.Broadcast();
-	BP_OnUnitDies();
+	BP_OnUnitDies(DeathType);
 }
 
 void ATankMaster::CheckIfUpsideDown()

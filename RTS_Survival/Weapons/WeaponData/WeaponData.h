@@ -743,8 +743,9 @@ protected:
 	 * Creates a bounce vfx of the provided weaponVFX.
 	 * @param HitLocation Where the bounce occurred
 	 * @param BounceNormal The normal of the surface the weapon bounced off.
+	 * @param bHandleSound
 	 */
-	void CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal);
+	void CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal, bool bHandleSound);
 
 	UPROPERTY()
 	FWeaponVFX M_WeaponVfx;

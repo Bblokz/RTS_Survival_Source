@@ -1,6 +1,7 @@
 ﻿#include "RTSVoicelines.h"
 #include "Algo/RandomShuffle.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 USoundBase* FVoiceLineData::GetVoiceLine()
@@ -95,6 +96,10 @@ bool FVoiceLineData::EnsureVoiceLineIndexIsValid(int32& Index) const
 
 bool FUnitVoiceLinesData::GetVoiceLinesForType(const ERTSVoiceLine VoiceLineType, FVoiceLineData*& OutVoiceLines)
 {
+	if (VoiceLineType == ERTSVoiceLine::None)
+	{
+		
+	}
 	if (FVoiceLineData* Found = VoiceLines.Find(VoiceLineType))
 	{
 		OutVoiceLines = Found;

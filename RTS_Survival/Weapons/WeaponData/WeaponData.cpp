@@ -1414,12 +1414,13 @@ void UWeaponState::CreateWeaponImpact(const FVector& HitLocation, const ERTSSurf
 }
 
 
-void UWeaponState::CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal)
+void UWeaponState::CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal, const bool bHandleSound)
 {
 	if (not IsValid(World))
 	{
 		return;
 	}
+	USoundBase* SoundAsset = bHandleSound ? M_WeaponVfx.BounceSound: nullptr;
 
 	// Route through the same pool. For consistency we pass the provided normal/rotator.
 	M_ImpactPool.PlayBounce(
@@ -1427,7 +1428,7 @@ void UWeaponState::CreateWeaponNonPenVfx(const FVector& HitLocation, const FRota
 		BounceNormal,
 		M_WeaponVfx.BounceEffect,
 		M_WeaponVfx.BounceScale,
-		M_WeaponVfx.BounceSound,
+		SoundAsset,
 		// If we use the HE overwrite then we set a special param to scale the bounce depending on the calibre.
 		M_WeaponVfx.ShellSpecificVfxOverwrites.GetIsUsingHeBounceOverwrite());
 }
@@ -1992,7 +1993,7 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
 	}
 	// Trace bounce.
 	OutEndLocation = TraceHit.ImpactPoint;
-	CreateWeaponNonPenVfx(TraceHit.ImpactPoint, ImpactRotation);
+	CreateWeaponNonPenVfx(TraceHit.ImpactPoint, ImpactRotation, true);
 }
 
 void UWeaponStateTrace::OnAsyncTraceNoHit(const FVector& TraceEnd)
