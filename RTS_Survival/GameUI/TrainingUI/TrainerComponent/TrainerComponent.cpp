@@ -19,6 +19,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/QueueHelpers/RTSQueueHelpers.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
+#include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
 
 UTrainerComponent::UTrainerComponent()
 	: M_TTrainingOptions{},
@@ -864,12 +865,15 @@ void UTrainerComponent::PropagateSpawnedActorToTrainer(const FTrainingQueueItem 
 			"\n We destroy the spawned actor"
 			"\n Completed item: " + FinishedItem.ItemID.GetTrainingName());
 		DestroySpawnedActor();
+		return;
 	}
 
-	if (FinishedItem.AsyncRequestState == Async_TrainingSpawned && IsValid(M_SpawnedActor))
+	AActor* TrainedActor = M_SpawnedActor;
+	if (FinishedItem.AsyncRequestState == Async_TrainingSpawned && IsValid(TrainedActor))
 	{
-		MakeActorReadyForSpawn(M_SpawnedActor);
-		M_OwningTrainer->OnTrainingComplete(FinishedItem.ItemID, M_SpawnedActor);
+		MakeActorReadyForSpawn(TrainedActor);
+		PlayTrainingCompletedVoiceLine(TrainedActor);
+		M_OwningTrainer->OnTrainingComplete(FinishedItem.ItemID, TrainedActor);
 		M_SpawnedActor = nullptr;
 		return;
 	}
@@ -921,6 +925,37 @@ void UTrainerComponent::MakeActorReadyForSpawn(AActor* ActorToMakeReady) const
 		"IRTSUnit",
 		"UTrainerComponent::MakeActorReadyForSpawn"
 		"\n Training component at: " + GetOwnerNameForError());
+}
+
+
+void UTrainerComponent::PlayTrainingCompletedVoiceLine(const AActor* TrainedActor) const
+{
+	if (M_TrainerSettings.bIsEnemyTrainer)
+	{
+		return;
+	}
+
+	if (not IsValid(TrainedActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Training completed voice line could not play because the trained actor is invalid."
+			"\n in function UTrainerComponent::PlayTrainingCompletedVoiceLine"
+			"\n Training component at: " + GetOwnerNameForError());
+		return;
+	}
+
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	constexpr bool bForcePlay = true;
+	constexpr bool bQueueIfNotPlayed = true;
+	M_PlayerController->PlayVoiceLine(
+		TrainedActor,
+		ERTSVoiceLine::OnUnitTrained,
+		bForcePlay,
+		bQueueIfNotPlayed);
 }
 
 
