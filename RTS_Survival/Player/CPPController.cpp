@@ -791,6 +791,17 @@ float ACPPController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType Voice
 	                                                       bInterruptRegularVoiceLines);
 }
 
+void ACPPController::PlayCustomAnnouncerVoiceLine(USoundBase* CustomVoiceLineSound,
+                                                  const bool bQueueIfNotPlayed) const
+{
+	if (not GetIsValidPlayerAudioController())
+	{
+		return;
+	}
+
+	M_PlayerAudioController->PlayCustomAnnouncerVoiceLine(CustomVoiceLineSound, bQueueIfNotPlayed);
+}
+
 void ACPPController::SetSuppressRegularVoiceLines(const bool bSuppress)
 {
 	if (not GetIsValidPlayerAudioController())

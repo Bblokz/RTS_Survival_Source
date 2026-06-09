@@ -74,6 +74,7 @@ struct FPlayerRotationArrowSettings;
 enum class ERTSPauseGameOptions : uint8;
 enum class ERTSVoiceLine : uint8;
 class UPlayerAudioController;
+class USoundBase;
 struct FMainMenuUICallbacks;
 class UW_ChoosePlayerStartLocation;
 class ALandscapedeformManager;
@@ -389,6 +390,13 @@ public:
 	/** @return How long the announcer vl takes (if valid)*/
 	float PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType VoiceLineType, bool bQueueIfNotPlayed = false,
 	                             bool bInterruptRegularVoiceLines = false) const;
+
+	/**
+	 * @brief Route custom announcer assets through the central player audio controller.
+	 * @param CustomVoiceLineSound The sound asset that should play as an announcer line.
+	 * @param bQueueIfNotPlayed Queue the line if a higher-priority custom announcer line is already playing.
+	 */
+	void PlayCustomAnnouncerVoiceLine(USoundBase* CustomVoiceLineSound, bool bQueueIfNotPlayed) const;
 
 	// Suppresses all voice lines except the PlayCustomAnnouncer voicelines.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Audio")
