@@ -36,7 +36,7 @@ ANomadicVehicle::ANomadicVehicle(const FObjectInitializer& ObjectInitializer)
 	  M_PreviewMesh(NULL),
 	  M_BuildingMesh(NULL),
 	  M_NomadStatus(ENomadStatus::Truck),
-	  M_StaticPreviewMesh(NULL),
+	  M_StaticPreviewMesh(nullptr),
 	  M_BuildingTransform(FTransform::Identity),
 	  M_ConstructionAnimationMaterial(NULL),
 	  M_ConstructionMontageTime(20.f),
@@ -98,11 +98,22 @@ static void DebugFreeSockets(TArray<UStaticMeshSocket*> FreeSockets)
 
 void ANomadicVehicle::SetStaticPreviewMesh(AStaticPreviewMesh* NewStaticPreviewMesh)
 {
-	if (IsValid(M_StaticPreviewMesh))
-	{
-		M_StaticPreviewMesh->Destroy();
-	}
+	DestroyStaticPreviewMesh();
 	M_StaticPreviewMesh = NewStaticPreviewMesh;
+}
+
+void ANomadicVehicle::DestroyStaticPreviewMesh()
+{
+	if (not IsValid(M_StaticPreviewMesh))
+	{
+		M_StaticPreviewMesh = nullptr;
+		return;
+	}
+
+	M_StaticPreviewMesh->SetActorEnableCollision(false);
+	M_StaticPreviewMesh->SetActorHiddenInGame(true);
+	M_StaticPreviewMesh->Destroy();
+	M_StaticPreviewMesh = nullptr;
 }
 
 UBuildingExpansionOwnerComp& ANomadicVehicle::GetBuildingExpansionData() const
@@ -138,6 +149,11 @@ void ANomadicVehicle::UnitDies(const ERTSDeathType DeathType)
 	{
 		// no double calls.
 		return;
+	}
+	DestroyStaticPreviewMesh();
+	if (IsValid(PlayerController))
+	{
+		PlayerController->StopNomadicPreviewPlacementForDestroyedVehicle(this);
 	}
 	DestroyAllBuildingAttachments();
 	if (GetIsValidAircraftOwnerComp())
@@ -353,6 +369,11 @@ void ANomadicVehicle::BeginDestroy()
 	{
 		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
 		World->GetTimerManager().ClearTimer(ConvertToVehicleTimerHandle);
+	}
+	DestroyStaticPreviewMesh();
+	if (IsValid(PlayerController))
+	{
+		PlayerController->StopNomadicPreviewPlacementForDestroyedVehicle(this);
 	}
 	DestroyAllBuildingAttachments();
 	Super::BeginDestroy();
@@ -579,10 +600,7 @@ void ANomadicVehicle::OnTruckMontageFinished()
 		BuildingMeshComponent->SetWorldRotation(M_BuildingTransform.Rotator());
 
 		// Cleanup preview mesh as now the collision of the building mesh will take over.
-		if (IsValid(M_StaticPreviewMesh))
-		{
-			M_StaticPreviewMesh->Destroy();
-		}
+		DestroyStaticPreviewMesh();
 
 		// Show the building mesh.
 		BuildingMeshComponent->SetStaticMesh(M_BuildingMesh);
@@ -749,13 +767,7 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 		case ENomadStatus::Truck:
 			RTSFunctionLibrary::PrintString("terminate building command as truck");
 			AINomadicVehicle->StopBehaviourTree();
-			if (M_StaticPreviewMesh)
-			{
-				M_StaticPreviewMesh->SetActorEnableCollision(false);
-				M_StaticPreviewMesh->SetActorHiddenInGame(true);
-				M_StaticPreviewMesh->Destroy();
-				M_StaticPreviewMesh = nullptr;
-			}
+			DestroyStaticPreviewMesh();
 			break;
 		case ENomadStatus::CreatingBuildingRotating:
 			// Note that BT and static preview are already stopped/destroyed.

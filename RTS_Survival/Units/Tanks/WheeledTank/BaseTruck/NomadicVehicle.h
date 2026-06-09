@@ -480,6 +480,8 @@ private:
 	void RestoreResourceStorageVisualisation();
 
 
+	void DestroyStaticPreviewMesh();
+
 	// The mesh used as building preview.
 	UPROPERTY()
 	UStaticMesh* M_PreviewMesh;
@@ -494,7 +496,7 @@ private:
 
 	// A reference to the static preview that is placed when the building location is determined.
 	UPROPERTY()
-	AStaticPreviewMesh* M_StaticPreviewMesh;
+	TObjectPtr<AStaticPreviewMesh> M_StaticPreviewMesh;
 
 	// The transform of the preview mesh used to place the building.
 	UPROPERTY()

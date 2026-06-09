@@ -1176,6 +1176,23 @@ void ACPPController::ConstructBuilding(AActor* RequestingActor)
 	}
 }
 
+void ACPPController::StopNomadicPreviewPlacementForDestroyedVehicle(const ANomadicVehicle* DestroyedNomadicVehicle)
+{
+	if (DestroyedNomadicVehicle == nullptr)
+	{
+		return;
+	}
+
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::NomadicPreviewMode
+		|| M_NomadicVehicleSelectedForBuilding != DestroyedNomadicVehicle)
+	{
+		return;
+	}
+
+	M_NomadicVehicleSelectedForBuilding = nullptr;
+	StopPreviewAndBuildingMode(false);
+}
+
 void ACPPController::ConvertBackToVehicle(AActor* RequestingActor)
 {
 	if (RequestingActor)
