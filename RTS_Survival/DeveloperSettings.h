@@ -1192,13 +1192,6 @@ namespace DeveloperSettings
 				};
 			}
 
-			namespace Anouncer
-			{
-				// How fast the player resource manager checks for resource updates, note that trainer queues tick every sec.
-				inline constexpr float ResourceWatcherUpdateInterval = 1.f;
-				// How much resource difference between resource watcher snapshots are divided by to obtain the resource tick audio speed.
-				inline constexpr float ResourceWatcherAudioSpeedDivider = 15;
-			}
 		}
 
 		namespace Formation

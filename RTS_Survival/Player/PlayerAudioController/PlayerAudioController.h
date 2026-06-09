@@ -89,32 +89,6 @@ struct FQueuedAnnouncerVoiceLine
 };
 
 USTRUCT()
-struct FResourceTickSettings
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	USoundBase* M_ResourceTickSound = nullptr;
-
-	UPROPERTY()
-	FTimerHandle M_ResourceTickSoundInitHandle;
-
-	// Name of the parameter inside the resource‐tick sound cue’s modulator
-	UPROPERTY()
-	FName M_ResourceTickParamName = NAME_None;
-
-	// Current value of the resource‐tick parameter
-	UPROPERTY()
-	float M_ResourceTickSpeed = 0.f;
-	// Max value of the resource‐tick parameter
-	UPROPERTY()
-	float M_ResourceTickMaxSpeed = 1.f;
-
-	UPROPERTY()
-	float M_ResourceTickInitSpeed = 1.f;
-};
-
-USTRUCT()
 struct FCurrentVoiceLineState
 {
 	GENERATED_BODY()
@@ -168,6 +142,9 @@ private:
 	EAnnouncerVoiceLineType M_CurrentAnnouncerVoiceLineType = EAnnouncerVoiceLineType::None;
 };
 
+/**
+ * @brief Used by the player controller to centralize voice-line and announcer playback.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UPlayerAudioController : public UActorComponent
 {
@@ -264,12 +241,6 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitAnnouncerVoiceLines(FAnnouncerVoiceLineData AnnouncerVoiceLines);
 
-	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	void InitResourceTickSound(USoundBase* ResourceTickSound, const FName& ResourceTickName,
-	                           const float ResourceTickMaxSpeed, const float
-	                           InitResourceTickSpeed);
-
-	void PlayResourceTickSound(const bool bPlay, const float IntensityRequested);
 
 protected:
 	// Called when the game starts
@@ -309,15 +280,6 @@ private:
 
 	bool GetIsValidVoiceLineAudioComp() const;
 
-
-	/** The audio component we spawn on BeginPlay()
-	 * this component plays the resource spending tick sound*/
-	UPROPERTY()
-	UAudioComponent* M_ResourceTickAudioComponent = nullptr;
-
-	FResourceTickSettings ResourceTickSettings;
-
-	bool GetIsValidResourceAudioComponent() const;
 
 
 	/** All voice‐line data, keyed by unit type */
@@ -444,9 +406,6 @@ void AdjustVoiceLineForExpandedNomadic(const AActor* ValidPrimarySelectedUnit,
 	/** Per-type cooldown end times for spatial lines. */
 	UPROPERTY()
 	TMap<ERTSVoiceLine, float> M_SpatialCooldownEndTimes;
-
-	void OnValidResourceSound() const;
-	void NoValidTickSound_SetTimer();
 
 	// === Pooled spatial audio state ===
 

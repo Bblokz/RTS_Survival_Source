@@ -10,7 +10,6 @@
 #include "RTS_Survival/UnitData/UnitCost.h"
 #include "PlayerResourceManager.generated.h"
 
-class UPlayerAudioController;
 struct FTrainingOption;
 class ANomadicVehicle;
 class UResourceDropOff;
@@ -256,24 +255,6 @@ private:
 
 	void ReportInvalidDataError(const FTrainingOption& TrainingOption) const;
 
-	// To play resource tick sound.
-	TWeakObjectPtr<UPlayerAudioController> M_PlayerAudioController;
-	bool GetIsValidPlayerAudioController() const;
-	void BeginPlay_InitPlayerAudioController();
-	void ResourceWatcher();
-	UPROPERTY()
-	FTimerHandle M_ResourceWatchTimer;
-
-	void BeginPlay_InitResourceWatcher();
-
-	TMap<ERTSResourceType, int32> M_LastResourceSnapShot;
-	const TArray<ERTSResourceType> M_ResourcesToWatch = {
-		ERTSResourceType::Resource_Radixite, ERTSResourceType::Resource_Metal,
-		ERTSResourceType::Resource_VehicleParts
-	};
-
-	// Will only prompt the resource tick audio component to start again if it was stopped before.
-	void PlayResourceTickSound(const bool bPlay, const float IntensityRequested) const;
 
 	void BeginPlay_InitResourceFullCheckTimerManager();
 	FTimerHandle M_ResourceFullCheckTimerManager;
