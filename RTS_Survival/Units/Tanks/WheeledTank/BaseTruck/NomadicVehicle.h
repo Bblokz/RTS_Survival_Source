@@ -152,6 +152,9 @@ public:
 
 	void SetAINomadicVehicle(AAINomadicVehicle* NewAINomadicVehicle);
 
+	void OnMoveToBuildingLocationSucceeded();
+	void OnMoveToBuildingLocationFailed();
+
 	// from IBuidling Expansion owner.
 	virtual UStaticMeshComponent* GetAttachToMeshComponent() const override final;
 	virtual TArray<UStaticMeshSocket*> GetFreeSocketList(const int32 ExpansionSlotToIgnore) const override final;
@@ -259,7 +262,7 @@ protected:
 	virtual void TerminateConvertToVehicleCommand() override final;
 
 	/**
-	 * @brief Executes the create building command in the blueprint by activating BT.
+	 * @brief Legacy blueprint hook kept for compatibility with old setup; C++ now owns the move-to-building step.
 	 * @param BuildingLocation The location to place the building.
 	 * @param BuildingRotation The Rotation to place the building with.
 	 */
@@ -379,6 +382,19 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
 	AAINomadicVehicle* AINomadicVehicle;
+
+	bool GetIsValidAINomadicVehicle() const;
+	void MoveToBuildingLocationForConstruction();
+	void CancelBuildingConstructionAfterMoveFailure();
+
+	UPROPERTY()
+	FVector M_PendingBuildingLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	FRotator M_PendingBuildingRotation = FRotator::ZeroRotator;
+
+	UPROPERTY()
+	int32 M_BuildingMoveFailureCount = 0;
 
 	UFUNCTION(BlueprintImplementableEvent, Category="OnSpawn")
 	void BPOnRTSUnitSpawned(const bool bSetDisabled);
