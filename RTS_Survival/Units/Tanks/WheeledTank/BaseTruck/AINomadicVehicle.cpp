@@ -22,6 +22,18 @@ void AAINomadicVehicle::StopBehaviourTree()
 	}
 }
 
+bool AAINomadicVehicle::GetIsControlledPawnAtBuildingLocation() const
+{
+	const APawn* ControlledPawn = GetPawn();
+	if (not IsValid(ControlledPawn))
+	{
+		return false;
+	}
+
+	return FVector::DistSquared2D(ControlledPawn->GetActorLocation(), M_BuildingLocation)
+		<= FMath::Square(ConstructionAcceptanceRad);
+}
+
 
 // Called when the game starts or when spawned
 void AAINomadicVehicle::BeginPlay()
@@ -87,15 +99,21 @@ void AAINomadicVehicle::OnQueuedMovementFailed(
 		return;
 	}
 
-	if (FailedMovementResultCode == EPathFollowingResult::Invalid)
+	if (FailedMovementResultCode != EPathFollowingResult::Invalid)
 	{
-		// TODO: Review this Unreal edge case later: MoveTo returns AlreadyAtGoal for same-location construction,
-		// but OnMoveCompleted can report Invalid before the nomadic build flow sees success.
-		NomadicVehicle->OnMoveToBuildingLocationSucceeded();
+		NomadicVehicle->OnMoveToBuildingLocationFailed();
 		return;
 	}
 
-	NomadicVehicle->OnMoveToBuildingLocationFailed();
+	if (not GetIsControlledPawnAtBuildingLocation())
+	{
+		NomadicVehicle->OnMoveToBuildingLocationFailed();
+		return;
+	}
+
+	// TODO: Review this Unreal edge case later: MoveTo returns AlreadyAtGoal for same-location construction,
+	// but OnMoveCompleted can report Invalid before the nomadic build flow sees success.
+	NomadicVehicle->OnMoveToBuildingLocationSucceeded();
 }
 
 void AAINomadicVehicle::OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility)

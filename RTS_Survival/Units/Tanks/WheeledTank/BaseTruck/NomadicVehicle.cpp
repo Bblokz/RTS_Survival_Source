@@ -1457,6 +1457,12 @@ void ANomadicVehicle::MoveToBuildingLocationForConstruction()
 	}
 
 	AINomadicVehicle->SetBuildingLocation(M_PendingBuildingLocation);
+	if (AINomadicVehicle->GetIsControlledPawnAtBuildingLocation())
+	{
+		OnMoveToBuildingLocationSucceeded();
+		return;
+	}
+
 	ExecuteTrackedMoveWithNavSettleDelayForAbility(
 		M_PendingBuildingLocation,
 		false,
