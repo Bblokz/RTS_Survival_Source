@@ -10,7 +10,6 @@
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
-#include "RTS_Survival/Player/PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
@@ -45,38 +44,6 @@ UPlayerResourceManager::UPlayerResourceManager()
 	M_PlayerResources.Add(ERTSResourceType::Blueprint_Construction, FRTSResourceStorage{0, 0});
 }
 
-void UPlayerResourceManager::BeginPlay_InitResourceWatcher()
-{
-	using DeveloperSettings::GamePlay::Audio::Anouncer::ResourceWatcherUpdateInterval;
-
-	if (UWorld* World = GetWorld())
-	{
-		for (const auto EachWatchResource : M_ResourcesToWatch)
-		{
-			if (M_PlayerResources.Contains(EachWatchResource))
-			{
-				M_LastResourceSnapShot.Add(EachWatchResource, M_PlayerResources[EachWatchResource].Amount);
-			}
-			else
-			{
-				RTSFunctionLibrary::ReportError("Failed to setup resource watcher for resource: " +
-					Global_GetResourceTypeAsString(EachWatchResource) +
-					"\n See function BeginPlay_InitResourceWatcher in PlayerResourceManager.cpp.");
-			}
-		}
-		World->GetTimerManager().SetTimer(M_ResourceWatchTimer, this,
-		                                  &UPlayerResourceManager::ResourceWatcher, ResourceWatcherUpdateInterval,
-		                                  true);
-	}
-}
-
-void UPlayerResourceManager::PlayResourceTickSound(const bool bPlay, const float IntensityRequested) const
-{
-	if (GetIsValidPlayerAudioController())
-	{
-		M_PlayerAudioController->PlayResourceTickSound(bPlay, IntensityRequested);
-	}
-}
 
 void UPlayerResourceManager::BeginPlay_InitResourceFullCheckTimerManager()
 {
@@ -694,9 +661,7 @@ void UPlayerResourceManager::BeginPlay()
 {
 	Super::BeginPlay();
 	GetIsValidPlayerController();
-	BeginPlay_InitPlayerAudioController();
 	BeginPlay_InitResourceFullCheckTimerManager();
-	BeginPlay_InitResourceWatcher();
 }
 
 void UPlayerResourceManager::UpdateEnergySupplyWithComponent(UEnergyComp* EnergyComponent, const bool bRegister)
@@ -1018,52 +983,4 @@ void UPlayerResourceManager::ReportInvalidDataError(const FTrainingOption& Train
 	const FString ErrorMessage = "Invalid data for training option: " + UnitType + " " + SubType +
 		"\n See function ReportInvalidDataError in PlayerResourceManager.cpp.";
 	RTSFunctionLibrary::ReportError(ErrorMessage);
-}
-
-bool UPlayerResourceManager::GetIsValidPlayerAudioController() const
-{
-	if (not M_PlayerAudioController.IsValid())
-	{
-		const FString Name = GetName();
-		const FString OwnerName = IsValid(GetOwner()) ? GetOwner()->GetName() : "NullPtr";
-		RTSFunctionLibrary::ReportError("Invalid M_PlayerAudioController "
-			"\n For PlayerResourceManager: " + Name + "Of Owner: " + OwnerName);
-		return false;
-	}
-
-	return true;
-}
-
-void UPlayerResourceManager::BeginPlay_InitPlayerAudioController()
-{
-	M_PlayerAudioController = FRTS_Statics::GetPlayerAudioController(this);
-	// Validity test.
-	(void)GetIsValidPlayerAudioController();
-}
-
-void UPlayerResourceManager::ResourceWatcher()
-{
-	using DeveloperSettings::GamePlay::Audio::Anouncer::ResourceWatcherAudioSpeedDivider;
-	int32 TotalDifference = 0;
-	int32 Difference = 0;
-	for (auto EachResourceToWatch : M_ResourcesToWatch)
-	{
-		if (M_PlayerResources.Contains(EachResourceToWatch))
-		{
-			Difference = M_PlayerResources[EachResourceToWatch].Amount - M_LastResourceSnapShot[EachResourceToWatch];
-			if (Difference < 0)
-			{
-				TotalDifference += FMath::Abs(Difference);
-			}
-			M_LastResourceSnapShot[EachResourceToWatch] = M_PlayerResources[EachResourceToWatch].Amount;
-		}
-	}
-	if (TotalDifference > 1)
-	{
-		PlayResourceTickSound(true, TotalDifference / ResourceWatcherAudioSpeedDivider);
-	}
-	else
-	{
-		PlayResourceTickSound(false, 0);
-	}
 }

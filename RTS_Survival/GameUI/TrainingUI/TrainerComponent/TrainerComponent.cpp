@@ -739,7 +739,7 @@ bool UTrainerComponent::GetCanPayForItemTick(
 	const FTrainingQueueItem* const ActiveQueueItem,
 	TMap<ERTSResourceType, int32>& OutCalculatedTickCost) const
 {
-	if (!GetIsValidPlayerResourceManager() || !EnsureActiveItemIsValid(ActiveQueueItem))
+	if (not GetIsValidPlayerResourceManager() || not EnsureActiveItemIsValid(ActiveQueueItem))
 	{
 		return false;
 	}
@@ -764,8 +764,7 @@ bool UTrainerComponent::GetCanPayForItemTick(
 		OutCalculatedTickCost.Add(Resource, CostThisTick);
 	}
 
-	// Check if player can pay exactly this tick's cost
-	// Stop any resource ticking if insufficient.
+	// Check if player can pay exactly this tick's cost.
 	return M_PlayerResourceManager->GetCanPayForCost(OutCalculatedTickCost) == EPlayerError::Error_None;
 }
 
@@ -774,13 +773,12 @@ bool UTrainerComponent::PayForItemTick(
 	FTrainingQueueItem* const ActiveQueueItem,
 	const TMap<ERTSResourceType, int32>& TickCost) const
 {
-	if (!GetIsValidPlayerResourceManager() || !EnsureActiveItemIsValid(ActiveQueueItem))
+	if (not GetIsValidPlayerResourceManager() || not EnsureActiveItemIsValid(ActiveQueueItem))
 	{
 		return false;
 	}
 
-	// Consume resources (we've already validated availability)
-	// Play resource tick audio.
+	// Consume resources (we've already validated availability).
 	M_PlayerResourceManager->PayForCostsNoCheck(TickCost);
 
 	// Subtract the paid cost from the item's remaining cost map

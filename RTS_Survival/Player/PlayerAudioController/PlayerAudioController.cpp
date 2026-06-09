@@ -33,18 +33,6 @@ void UPlayerAudioController::BeginPlay()
 		M_VoiceLineAudioComponent->OnAudioFinished.AddDynamic(
 			this, &UPlayerAudioController::HandleAudioFinished
 		);
-		M_ResourceTickAudioComponent = NewObject<UAudioComponent>(Owner);
-		M_ResourceTickAudioComponent->SetupAttachment(Owner->GetRootComponent());
-		M_ResourceTickAudioComponent->RegisterComponent();
-		M_ResourceTickAudioComponent->bAutoActivate = false; // don’t start until spending begins
-		if (IsValid(ResourceTickSettings.M_ResourceTickSound))
-		{
-			M_ResourceTickAudioComponent->SetSound(ResourceTickSettings.M_ResourceTickSound);
-		}
-		else
-		{
-			NoValidTickSound_SetTimer();
-		}
 	}
 	BeginPlay_InitSpatialAudioPool();
 }
@@ -123,10 +111,10 @@ float UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineTy
 		PlayAnnouncerLineAs2DSound(Type);
 		return 0 ;
 	}
-	if (not GetIsValidResourceAudioComponent())
+	if (not GetIsValidVoiceLineAudioComp())
 	{
 		RTSFunctionLibrary::ReportError(
-			"PlayerAudioController cannot play announcer voice lines without a valid resource audio component.");
+			"PlayerAudioController cannot play announcer voice lines without a valid voice line audio component.");
 		return 0;
 	}
 
@@ -405,51 +393,6 @@ void UPlayerAudioController::InitAnnouncerVoiceLines(const FAnnouncerVoiceLineDa
 	M_AnnouncerVoiceLineData = AnnouncerVoiceLines;
 }
 
-void UPlayerAudioController::InitResourceTickSound(USoundBase* ResourceTickSound, const FName& ResourceTickName,
-                                                   const float ResourceTickMaxSpeed,
-                                                   const float InitResourceTickSpeed)
-{
-	if (not IsValid(ResourceTickSound))
-	{
-		RTSFunctionLibrary::ReportError("no valid tick sound provided for player audio component "
-			"\n On function InitResourceTickSound");
-		return;
-	}
-	ResourceTickSettings.M_ResourceTickInitSpeed = InitResourceTickSpeed;
-	ResourceTickSettings.M_ResourceTickSound = ResourceTickSound;
-	ResourceTickSettings.M_ResourceTickParamName = ResourceTickName;
-	ResourceTickSettings.M_ResourceTickMaxSpeed = ResourceTickMaxSpeed;
-}
-
-void UPlayerAudioController::PlayResourceTickSound(const bool bPlay, const float IntensityRequested)
-{
-	if (not GetIsValidResourceAudioComponent())
-	{
-		return;
-	}
-
-	if (bPlay)
-	{
-		RTSFunctionLibrary::PrintString("Intensity: " + FString::SanitizeFloat(IntensityRequested), FColor::Purple, 15);
-		const float Intensity = FMath::Clamp(IntensityRequested, ResourceTickSettings.M_ResourceTickInitSpeed,
-		                                     ResourceTickSettings.M_ResourceTickMaxSpeed);
-		M_ResourceTickAudioComponent->SetFloatParameter(
-			ResourceTickSettings.M_ResourceTickParamName,
-			Intensity);
-		if (M_ResourceTickAudioComponent->IsPlaying())
-		{
-			return;
-		}
-		M_ResourceTickAudioComponent->Play();
-	}
-	else if (M_ResourceTickAudioComponent->IsPlaying())
-	{
-		M_ResourceTickAudioComponent->Stop();
-		// Reset tick audio for next time.
-		ResourceTickSettings.M_ResourceTickSpeed = ResourceTickSettings.M_ResourceTickInitSpeed;
-	}
-}
-
 
 void UPlayerAudioController::PlayAudio(USoundBase* VoiceLine,
                                        const ERTSVoiceLine VoiceLineType,
@@ -569,16 +512,6 @@ bool UPlayerAudioController::GetIsValidVoiceLineAudioComp() const
 	return false;
 }
 
-bool UPlayerAudioController::GetIsValidResourceAudioComponent() const
-{
-	if (IsValid(M_ResourceTickAudioComponent))
-	{
-		return true;
-	}
-	RTSFunctionLibrary::ReportError("No valid resource tick audio component on player audio controller!"
-		"\n See: UPlayerAudioController::GetIsValidResourceAudioComponent() for more details.");
-	return false;
-}
 
 float UPlayerAudioController::GetRTSVoiceLineEndTimeAfterCooldown(const ERTSVoiceLine VoiceLineType,
                                                                   const USoundBase* ValidVoiceLine,
@@ -894,49 +827,6 @@ UAudioComponent* UPlayerAudioController::SpawnSpatialVoiceLineOneShot(
 	return AudioComp;
 }
 
-void UPlayerAudioController::OnValidResourceSound() const
-{
-	if (GetIsValidResourceAudioComponent())
-	{
-		M_ResourceTickAudioComponent->SetSound(ResourceTickSettings.M_ResourceTickSound);
-		// Set basic intensity.
-		M_ResourceTickAudioComponent->SetFloatParameter(
-			ResourceTickSettings.M_ResourceTickParamName,
-			ResourceTickSettings.M_ResourceTickInitSpeed
-		);
-	}
-}
-
-void UPlayerAudioController::NoValidTickSound_SetTimer()
-{
-	// Wait for the resource tick sound to be set.
-	TWeakObjectPtr<UPlayerAudioController> WeakThis(this);
-	auto CheckTickSound = [WeakThis]()-> void
-	{
-		if (WeakThis.IsValid() && WeakThis->ResourceTickSettings.M_ResourceTickSound)
-		{
-			WeakThis->OnValidResourceSound();
-			if (const UWorld* World = WeakThis->GetWorld())
-			{
-				World->GetTimerManager().ClearTimer(WeakThis->ResourceTickSettings.M_ResourceTickSoundInitHandle);
-			}
-			return;
-		}
-		if (WeakThis.IsValid())
-		{
-			RTSFunctionLibrary::ReportError(
-				"Still no valid Resource tick sound set on PlayerAudioController trying again in 1 second.");
-		}
-	};
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(
-			ResourceTickSettings.M_ResourceTickSoundInitHandle,
-			FTimerDelegate::CreateLambda(CheckTickSound),
-			1.0f, true
-		);
-	}
-}
 
 void UPlayerAudioController::BeginPlay_InitSpatialAudioPool()
 {
