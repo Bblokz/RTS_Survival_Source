@@ -762,15 +762,16 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 		CancelPendingTrackedMove();
 		AINomadicVehicle->SetQueuedMovementCompletionAbility(EAbilityID::IdNoAbility);
 		AINomadicVehicle->StopMovement();
+		// The static preview remains hidden but collision-enabled while the truck is rotating or playing
+		// its montage, so every create-building cancellation must remove it before returning to truck mode.
+		DestroyStaticPreviewMesh();
 		switch (M_NomadStatus)
 		{
 		case ENomadStatus::Truck:
 			RTSFunctionLibrary::PrintString("terminate building command as truck");
 			AINomadicVehicle->StopBehaviourTree();
-			DestroyStaticPreviewMesh();
 			break;
 		case ENomadStatus::CreatingBuildingRotating:
-			// Note that BT and static preview are already stopped/destroyed.
 			StopRotating();
 			RTSFunctionLibrary::PrintString("terminate building command as ROTATING creating building");
 			M_NomadStatus = ENomadStatus::Truck;
