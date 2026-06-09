@@ -38,6 +38,7 @@ namespace BxpHelpers
 			using namespace BxpHelpers;
 			using namespace DeveloperSettings::GameBalance::TrainingTime;
 			using namespace DeveloperSettings::GameBalance::UnitCosts;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 			using namespace DeveloperSettings::GameBalance::UnitHealth;
 			FBxpData BxpData;
@@ -47,9 +48,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 700* GameCostMlt)},
+					Ger37mmCaptureBunker_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 300* GameCostMlt)},
+					Ger37mmCaptureBunker_Metal},
 			});
 			BxpData.EnergySupply = 0;
 			BxpData.Abilities = ArmedBxpAbilities;
@@ -62,9 +63,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 700* GameCostMlt)},
+					GerTurretCaptureBunker_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 300* GameCostMlt)},
+					GerTurretCaptureBunker_Metal},
 			});
 			BxpData.EnergySupply = 0;
 			BxpData.Abilities = ArmedBxpAbilities;
@@ -77,6 +78,7 @@ namespace BxpHelpers
 			using namespace BxpHelpers;
 			using namespace DeveloperSettings::GameBalance::TrainingTime;
 			using namespace DeveloperSettings::GameBalance::UnitCosts;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 			using namespace DeveloperSettings::GameBalance::UnitHealth;
 			FBxpData BxpData;
@@ -87,9 +89,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 200* GameCostMlt)},
+					GerRefConverter_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 100* GameCostMlt)},
+					GerRefConverter_Metal},
 			});
 			BxpData.EnergySupply = 10;
 			BxpData.Abilities = NotArmedBxpAbilities;
@@ -102,6 +104,7 @@ namespace BxpHelpers
 			using namespace BxpHelpers;
 			using namespace DeveloperSettings::GameBalance::TrainingTime;
 			using namespace DeveloperSettings::GameBalance::UnitCosts;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 			using namespace DeveloperSettings::GameBalance::UnitHealth;
 			FBxpData BxpData;
@@ -112,9 +115,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 200* GameCostMlt)},
+					GerBarracksRadixReactor_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 200* GameCostMlt)},
+					GerBarracksRadixReactor_Metal},
 			});
 			BxpData.EnergySupply = 8;
 			BxpData.Abilities = NotArmedBxpAbilities;
@@ -126,9 +129,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 150* GameCostMlt)},
+					GerBarracksFuelCell_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 150* GameCostMlt)},
+					GerBarracksFuelCell_Metal},
 			});
 			BxpData.EnergySupply = 5;
 			BxpData.Abilities = NotArmedBxpAbilities;
@@ -140,6 +143,7 @@ namespace BxpHelpers
 			using namespace BxpHelpers;
 			using namespace DeveloperSettings::GameBalance::TrainingTime;
 			using namespace DeveloperSettings::GameBalance::UnitCosts;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 			using namespace DeveloperSettings::GameBalance::UnitHealth;
 
@@ -151,9 +155,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 300* GameCostMlt)},
+					GerHQHarvester_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 150* GameCostMlt)},
+					GerHQHarvester_Metal},
 			});
 			BxpData.EnergySupply = 0;
 			BxpData.Abilities = NotArmedBxpAbilities;
@@ -167,9 +171,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 200* GameCostMlt)},
+					GerHQRadar_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 180* GameCostMlt)},
+					GerHQRadar_Metal},
 			});
 			BxpData.EnergySupply = -5;
 			BxpData.Abilities = NotArmedBxpAbilities;
@@ -182,9 +186,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 150* GameCostMlt)},
+					GerHQPlatform_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 75* GameCostMlt)},
+					GerHQPlatform_Metal},
 			});
 			BxpData.EnergySupply = -5;
 			BxpData.Abilities = ArmedBxpAbilities;
@@ -197,9 +201,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 200* GameCostMlt)},
+					GerHQTower_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 75* GameCostMlt)},
+					GerHQTower_Metal},
 			});
 			BxpData.EnergySupply = -8;
 			BxpData.Abilities = ArmedBxpAbilities;
@@ -212,9 +216,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = T1BxpVisionRadius;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 300* GameCostMlt)},
+					GerHQRepairBay_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 150* GameCostMlt)},
+					GerHQRepairBay_Metal},
 			});
 			BxpData.EnergySupply = -5;
 			BxpData.Abilities = NotArmedBxpAbilities;
@@ -226,6 +230,7 @@ namespace BxpHelpers
 			using namespace BxpHelpers;
 			using namespace DeveloperSettings::GameBalance::TrainingTime;
 			using namespace DeveloperSettings::GameBalance::UnitCosts;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 			using namespace DeveloperSettings::GameBalance::UnitHealth;
 
@@ -238,9 +243,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = 100;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 300* GameCostMlt)},
+					GerLFactoryRadixiteReactor_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 300* GameCostMlt)},
+					GerLFactoryRadixiteReactor_Metal},
 			});
 			BxpData.EnergySupply = 10;
 			BxpData.Abilities = NotArmedBxpAbilities;
@@ -252,9 +257,9 @@ namespace BxpHelpers
 			BxpData.VisionRadius = 100;
 			BxpData.Cost = FUnitCost({
 				{ERTSResourceType::Resource_Radixite,
-					RoundToNearestMultipleOfFive( 200* GameCostMlt)},
+					GerLFactoryFuelStorage_Radixite},
 				{ERTSResourceType::Resource_Metal,
-					RoundToNearestMultipleOfFive( 200* GameCostMlt)},
+					GerLFactoryFuelStorage_Metal},
 			});
 			BxpData.EnergySupply = 5;
 			BxpData.Abilities = NotArmedBxpAbilities;

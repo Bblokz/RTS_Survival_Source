@@ -6500,6 +6500,7 @@ void ACPPGameState::InitAllGameBxpData()
 {
 	using namespace DeveloperSettings::GameBalance::TrainingTime;
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
 
@@ -6534,8 +6535,8 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.VisionRadius = T1BxpVisionRadius;
 	BxpData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, BxpT1DefensiveRadixiteCost},
-		{ERTSResourceType::Resource_Metal, BxpT1DefensiveMetalCost}
+		{ERTSResourceType::Resource_Radixite, Ger37mmFlak_Radixite},
+		{ERTSResourceType::Resource_Metal, Ger37mmFlak_Metal}
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_37mmFlak, BxpData);
@@ -6544,8 +6545,8 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.5, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, BxpT1DefensiveRadixiteCost * 3},
-		{ERTSResourceType::Resource_Metal, BxpT1DefensiveMetalCost * 4}
+		{ERTSResourceType::Resource_Radixite, Ger88mmFlak_Radixite},
+		{ERTSResourceType::Resource_Metal, Ger88mmFlak_Metal}
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.VisionRadius = T2BxpVisionRadius;
@@ -6553,8 +6554,8 @@ void ACPPGameState::InitAllGameBxpData()
 
 	BxpData.ConstructionTime = T1BxpBuildTime;
 	BxpData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, BxpT1UtilityRadixiteCost},
-		{ERTSResourceType::Resource_Metal, BxpT1UtilityMetalCost}
+		{ERTSResourceType::Resource_Radixite, SolarSmall_Radixite},
+		{ERTSResourceType::Resource_Metal, SolarSmall_Metal}
 	});
 	BxpData.Abilities = NotArmedBxpAbilities;
 	BxpData.VisionRadius = T1BxpVisionRadius;
@@ -6564,8 +6565,8 @@ void ACPPGameState::InitAllGameBxpData()
 
 	BxpData.ConstructionTime = T1BxpBuildTime * 2;
 	BxpData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, BxpT1UtilityRadixiteCost + 75},
-		{ERTSResourceType::Resource_Metal, BxpT1UtilityMetalCost + 50}
+		{ERTSResourceType::Resource_Radixite, SolarLarge_Radixite},
+		{ERTSResourceType::Resource_Metal, SolarLarge_Metal}
 	});
 	BxpData.Abilities = NotArmedBxpAbilities;
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.25, 10);
@@ -6575,8 +6576,8 @@ void ACPPGameState::InitAllGameBxpData()
 
 	BxpData.ConstructionTime = BxpT2BuildTime;
 	BxpData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, BxpT2DefensiveRadixiteCost},
-		{ERTSResourceType::Resource_Metal, BxpT2DefensiveMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerPak38_Radixite},
+		{ERTSResourceType::Resource_Metal, GerPak38_Metal}
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.VisionRadius = T2BxpVisionRadius;
@@ -6589,9 +6590,9 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(BxpT2BunkerRadixiteCost * 4, 5)
+			GerFlakBunker_Radixite
 		},
-		{ERTSResourceType::Resource_Metal, RTSFunctionLibrary::RoundToNearestMultipleOf(HeavyBunkerMetalCost * 2, 5)}
+		{ERTSResourceType::Resource_Metal, GerFlakBunker_Metal}
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	BxpData.VisionRadius = T2BxpVisionRadius;
@@ -6604,8 +6605,8 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.75, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, BxpT2DefensiveRadixiteCost + 200},
-		{ERTSResourceType::Resource_Metal, BxpT2DefensiveMetalCost + 75}
+		{ERTSResourceType::Resource_Radixite, GerLeFH150mm_Radixite},
+		{ERTSResourceType::Resource_Metal, GerLeFH150mm_Metal}
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_LeFH_150mm, BxpData);
@@ -6621,12 +6622,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(NomadicT1VehicleFactoryRadixiteCost * 4),
-			                                             10)
+			RusFactory_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(NomadicT1VehicleFactoryMetalCost * 4), 10)
+			RusFactory_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6637,6 +6637,10 @@ void ACPPGameState::InitAllGameBxpData()
 	// -----------------------------------------------------------------------
 	// ---------------------- GER MARDER STUG FACTORY -----------------------
 	// -----------------------------------------------------------------------
+	BxpData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, GerMarderStugFactory_Radixite},
+		{ERTSResourceType::Resource_Metal, GerMarderStugFactory_Metal}
+	});
 	BxpData.Abilities = NotArmedBxpAbilities;
 	BxpData.Health = GerMarderStugFactoryHealth;
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
@@ -6650,12 +6654,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(NomadicT1VehicleFactoryRadixiteCost * 7),
-			                                             10)
+			RusPlatformFactory_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(NomadicT1VehicleFactoryMetalCost * 7), 10)
+			RusPlatformFactory_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6671,11 +6674,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(T1StorageBuildingRadixite * 3), 10)
+			RusResearchCenter_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(T1StorageBuildingMetal * 3), 10)
+			RusResearchCenter_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6691,11 +6694,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(T1StorageBuildingRadixite * 3), 10)
+			RusCoolingTowers_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(T1StorageBuildingMetal * 3), 10)
+			RusCoolingTowers_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6711,11 +6714,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 1.5), 10)
+			RusBarracks_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 1.5), 10)
+			RusBarracks_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6731,11 +6734,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 1.33), 10)
+			RusBunkerMG_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 1.25), 10)
+			RusBunkerMG_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6751,11 +6754,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 1.8), 10)
+			RusGuardTower_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 1.8), 10)
+			RusGuardTower_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6772,11 +6775,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 2), 10)
+			RusBoforsPosition_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 2), 10)
+			RusBoforsPosition_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6792,11 +6795,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 1), 10)
+			RusWall_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 2), 10)
+			RusWall_Metal
 		},
 	});
 	BxpData.Abilities = NotArmedBxpAbilities;
@@ -6817,11 +6820,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 1), 10)
+			RusAmmoStorage_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 1), 10)
+			RusAmmoStorage_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6837,11 +6840,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 1), 10)
+			RusFuelStorage1_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 1), 10)
+			RusFuelStorage1_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6858,11 +6861,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveRadixiteCost * 2), 10)
+			RusFuelStorage2_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT1DefensiveMetalCost * 2), 10)
+			RusFuelStorage2_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6877,11 +6880,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerRadixiteCost - 600), 10)
+			RusBunker05_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerMetalCost - 350), 10)
+			RusBunker05_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6895,11 +6898,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerRadixiteCost - 200), 10)
+			RusBunker05WithTurrets_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerMetalCost - 100), 10)
+			RusBunker05WithTurrets_Metal
 		},
 	});
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth, 10);
@@ -6913,11 +6916,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerRadixiteCost), 10)
+			RusBunker02ZIS_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerMetalCost), 10)
+			RusBunker02ZIS_Metal
 		},
 	});
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth, 10);
@@ -6930,11 +6933,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerRadixiteCost * 1.5), 20)
+			RusBunker02_204MM_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(HeavyBunkerMetalCost * 1.33), 20)
+			RusBunker02_204MM_Metal
 		},
 	});
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth + 200, 10);
@@ -6949,11 +6952,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT2BunkerRadixiteCost), 10)
+			RusLongCamoBunker_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT2BunkerMetalCost * 1.1), 10)
+			RusLongCamoBunker_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -6970,11 +6973,11 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT2BunkerRadixiteCost * 1.3), 10)
+			RusDomeBunker_Radixite
 		},
 		{
 			ERTSResourceType::Resource_Metal,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(static_cast<int32>(BxpT2BunkerMetalCost * 1.2), 10)
+			RusDomeBunker_Metal
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
@@ -7008,6 +7011,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	});
 
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::Nomadics;
 	using namespace DeveloperSettings::GameBalance::BuildingRadii;
 	using namespace DeveloperSettings::GameBalance::BuildingTime;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::BuildingVision;
@@ -7026,8 +7030,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger HQ----------------------------
 	NomadicData.Abilities = NomadicWithWeaponsAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, 100},
-		{ERTSResourceType::Resource_VehicleParts, 100}
+		{ERTSResourceType::Resource_Radixite, GerHq_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, GerHq_VehicleParts}
 	});
 	NomadicData.EnergySupply = HqEnergySupply;
 	// Expansion radius is for BXPs that are freely placed, building radius is for other buildings.
@@ -7094,8 +7098,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Gamma Facility----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicSolarFarmRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicSolarFarmMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerGammaFacility_Radixite},
+		{ERTSResourceType::Resource_Metal, GerGammaFacility_Metal}
 	});
 	NomadicData.EnergySupply = T1EnergyBuildingSupply;
 	NomadicData.ExpansionRadius = T1BuildingRadius - 200;
@@ -7130,8 +7134,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Refinery----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T1StorageBuildingRadixite},
-		{ERTSResourceType::Resource_Metal, T1StorageBuildingMetal}
+		{ERTSResourceType::Resource_Radixite, GerRefinery_Radixite},
+		{ERTSResourceType::Resource_Metal, GerRefinery_Metal}
 	});
 	NomadicData.EnergySupply = T1ResourceStorageBuildingSupply;
 	NomadicData.ExpansionRadius = T1BuildingRadius - 200;
@@ -7166,8 +7170,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Metal Vault----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Metal, T1StorageBuildingRadixite},
-		{ERTSResourceType::Resource_Metal, T1StorageBuildingMetal}
+		{ERTSResourceType::Resource_Metal, GerMetalVault_Radixite},
+		{ERTSResourceType::Resource_Metal, GerMetalVault_Metal}
 	});
 	NomadicData.EnergySupply = T1ResourceStorageBuildingSupply;
 	NomadicData.ExpansionRadius = T1BuildingRadius - 200;
@@ -7203,8 +7207,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Barracks----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicBarracksRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicBarracksMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerBarracks_Radixite},
+		{ERTSResourceType::Resource_Metal, GerBarracks_Metal}
 	});
 	NomadicData.EnergySupply = T1BarracksSupply;
 	NomadicData.ExpansionRadius = T1ExpansionRadius;
@@ -7255,8 +7259,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Mechanized Depot----------------------------
 	NomadicData.Abilities = NomadicWithWeaponsAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicMechanizedDepotRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicMechanizedDepotMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerMechanizedDepot_Radixite},
+		{ERTSResourceType::Resource_Metal, GerMechanizedDepot_Metal}
 	});
 	NomadicData.EnergySupply = T1MechanizedDepotSupply;
 	NomadicData.ExpansionRadius = T1ExpansionRadius;
@@ -7296,8 +7300,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Light Steel Forge----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicT1VehicleFactoryRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicT1VehicleFactoryMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerLightSteelForge_Radixite},
+		{ERTSResourceType::Resource_Metal, GerLightSteelForge_Metal}
 	});
 	NomadicData.EnergySupply = T1VehicleFactorySupply;
 	NomadicData.ExpansionRadius = T1ExpansionRadius + 100;
@@ -7343,8 +7347,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Communication Center----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicT2CommunicationCenterRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicT2CommunicationCenterMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerCommunicationCenter_Radixite},
+		{ERTSResourceType::Resource_Metal, GerCommunicationCenter_Metal}
 	});
 	NomadicData.EnergySupply = T2CommunicationCenterSupply;
 	// Expansion radius is for BXPs that are freely placed, building radius is for other buildings.
@@ -7378,8 +7382,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------Nomadic Ger Armory----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicT2ArmoryRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicT2ArmoryMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerArmory_Radixite},
+		{ERTSResourceType::Resource_Metal, GerArmory_Metal}
 	});
 	NomadicData.EnergySupply = T2ArmorySupply;
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
@@ -7412,8 +7416,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------T2 Nomadic Ger Medium Tank Factory----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicT2MedFactoryRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicT2MedFactoryRadixiteCost}
+		{ERTSResourceType::Resource_Radixite, GerMedTankFactory_Radixite},
+		{ERTSResourceType::Resource_Metal, GerMedTankFactory_Metal}
 	});
 	NomadicData.EnergySupply = T2VehicleFactorySupply;
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
@@ -7485,8 +7489,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------T2 Nomadic Ger Airbase----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicT2AirbaseRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicT2AirbaseMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerAirbase_Radixite},
+		{ERTSResourceType::Resource_Metal, GerAirbase_Metal}
 	});
 	NomadicData.EnergySupply = T2AirPadSupply;
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
@@ -7526,8 +7530,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	// ---------------------------------T3 Nomadic Ger Experimental Units Factory----------------------------
 	NomadicData.Abilities = BasicNomadicAbilities;
 	NomadicData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, NomadicT3ExperimentalUnitsFactoryRadixiteCost},
-		{ERTSResourceType::Resource_Metal, NomadicT3ExperimentalUnitsFactoryMetalCost}
+		{ERTSResourceType::Resource_Radixite, GerExperimentalUnitsFactory_Radixite},
+		{ERTSResourceType::Resource_Metal, GerExperimentalUnitsFactory_Metal}
 	});
 	NomadicData.EnergySupply = T3ExperimentalUnitsFactorySupply;
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
