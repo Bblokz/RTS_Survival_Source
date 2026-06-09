@@ -3862,26 +3862,36 @@ uint32 ACPPController::IssueOrderHarvestResource(ACPPResourceMaster* Resource,
                                                  ECommandType& OutCommand,
                                                  const FVector& ClickedLocation)
 {
-	uint32 AmountCommandsExe = 0;
 	OutIssuedAbility = EAbilityID::IdHarvestResource;
 	OutCommand = ECommandType::HarvestResource;
+
+	if (not RTSFunctionLibrary::RTSIsValid(Resource))
+	{
+		OutCommand = ECommandType::Movement;
+		OutIssuedAbility = EAbilityID::IdMove;
+		return MoveUnitsToLocation(ClickedLocation);
+	}
+
+	uint32 AmountCommandsExe = 0;
 	for (const auto EachPawn : TSelectedPawnMasters)
 	{
-		if (EachPawn->GetIsHarvester())
+		if (not EachPawn->GetIsHarvester())
 		{
-			AmountCommandsExe += EachPawn->HarvestResource(Resource, !bIsHoldingShift) ==
-				ECommandQueueError::NoError;
+			continue;
 		}
+
+		AmountCommandsExe += EachPawn->HarvestResource(Resource, not bIsHoldingShift) == ECommandQueueError::NoError;
 	}
+
 	if (AmountCommandsExe > 0)
 	{
 		return AmountCommandsExe;
 	}
+
 	// No harvesters selected, move to resource instead.
 	OutCommand = ECommandType::Movement;
 	OutIssuedAbility = EAbilityID::IdMove;
-	AmountCommandsExe = MoveUnitsToLocation(ClickedLocation);
-	return AmountCommandsExe;
+	return MoveUnitsToLocation(ClickedLocation);
 }
 
 uint32 ACPPController::IssueOrderPickUpItem(AItemsMaster* PickupItem, EAbilityID& OutIssuedAbility,
@@ -4492,7 +4502,7 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		this->ActionButtonRotateTowards(ClickedLocation);
 		break;
 	case EAbilityID::IdHarvestResource:
-		RTSFunctionLibrary::DisplayNotification(FText::FromString("TODO harvest button implementation."));
+		ActionButtonHarvestResource(ClickedActor, ClickedLocation);
 		break;
 	case EAbilityID::IdRepair:
 		ActionButtonRepair(ClickedActor);
@@ -4870,6 +4880,18 @@ void ACPPController::ActionButtonReverse(const FVector ReverseLocation)
 	}
 }
 
+
+void ACPPController::ActionButtonHarvestResource(AActor* ClickedActor, const FVector& ClickedLocation)
+{
+	ACPPResourceMaster* Resource = Cast<ACPPResourceMaster>(ClickedActor);
+	EAbilityID AbilityActivated = EAbilityID::IdHarvestResource;
+	ECommandType CommandType = ECommandType::HarvestResource;
+	const uint32 CommandsExe = IssueOrderHarvestResource(Resource, AbilityActivated, CommandType, ClickedLocation);
+	const bool bResetAllPlacementEffects = not bIsHoldingShift;
+	constexpr bool bForcePlayVoiceLine = false;
+	CreateVfxAndVoiceLineForIssuedCommand(
+		bResetAllPlacementEffects, CommandsExe, ClickedLocation, CommandType, AbilityActivated, bForcePlayVoiceLine);
+}
 
 void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation)
 {
@@ -5606,7 +5628,7 @@ void ACPPController::DirectActionButtonReturnCargo()
 	{
 		if (EachPawn->GetIsHarvester())
 		{
-			CommandsExe += EachPawn->ReturnCargo(!bIsHoldingShift) == ECommandQueueError::NoError;
+			CommandsExe += EachPawn->ReturnCargo(not bIsHoldingShift) == ECommandQueueError::NoError;
 		}
 	}
 	if (CommandsExe > 0)

@@ -65,7 +65,8 @@ enum class ERTSVoiceLine : uint8
 	ExitPosition,
 	FallBackToHQ,
 	ExpandedNomadic,
-	OnUnitTrained,	
+	OnUnitTrained,
+	ReturnCargo,
 };
 
 UENUM(Blueprintable)
