@@ -353,6 +353,179 @@ namespace DeveloperSettings
 			inline constexpr int32 ArmoredCarMediumCalibreVehiclePartsCost = RoundToNearestMultipleOfFive(
 				static_cast<int32>(80 * GameCostMlt));
 
+			namespace ArmoredCars
+			{
+				inline constexpr int32 Puma_Radixite = 180;
+				inline constexpr int32 Puma_VehicleParts = 80;
+				inline constexpr int32 FlamePuma_Radixite = 180;
+				inline constexpr int32 FlamePuma_VehicleParts = 80;
+				inline constexpr int32 Panzerwerfer_Radixite = 234;
+				inline constexpr int32 Panzerwerfer_VehicleParts = 144;
+				inline constexpr int32 Sdkfz232_3_Radixite = 230;
+				inline constexpr int32 Sdkfz232_3_VehicleParts = 105;
+				inline constexpr int32 Sdkfz250_Radixite = 100;
+				inline constexpr int32 Sdkfz250_VehicleParts = 40;
+				inline constexpr int32 Sdkfz9_37mm_Radixite = 100;
+				inline constexpr int32 Sdkfz9_37mm_VehicleParts = 40;
+				inline constexpr int32 Sdkfz251_22_Radixite = 225;
+				inline constexpr int32 Sdkfz251_22_VehicleParts = 90;
+				inline constexpr int32 Sdkfz251_Mortar_Radixite = 150;
+				inline constexpr int32 Sdkfz251_Mortar_VehicleParts = 53;
+				inline constexpr int32 Sdkfz251_Transport_Radixite = 130;
+				inline constexpr int32 Sdkfz251_Transport_VehicleParts = 40;
+				inline constexpr int32 Sdkfz231_Radixite = 100;
+				inline constexpr int32 Sdkfz231_VehicleParts = 40;
+				inline constexpr int32 Sdkfz251_PzIV_Radixite = 130;
+				inline constexpr int32 Sdkfz251_PzIV_VehicleParts = 65;
+			}
+
+			namespace LightTanks
+			{
+				inline constexpr int32 Pz38t_Radixite = 250;
+				inline constexpr int32 Pz38t_VehicleParts = 50;
+				inline constexpr int32 Pz38t_R_Radixite = 375;
+				inline constexpr int32 Pz38t_R_VehicleParts = 90;
+				inline constexpr int32 Pz38t_RailGun_Radixite = 200;
+				inline constexpr int32 Pz38t_RailGun_VehicleParts = 100;
+				inline constexpr int32 PzIIF_Radixite = 200;
+				inline constexpr int32 PzIIF_VehicleParts = 50;
+				inline constexpr int32 PzIIFlame_Radixite = 200;
+				inline constexpr int32 PzIIFlame_VehicleParts = 75;
+				inline constexpr int32 PzIHarvester_Radixite = 300;
+				inline constexpr int32 Sdkfz140_Radixite = 225;
+				inline constexpr int32 Sdkfz140_VehicleParts = 70;
+				inline constexpr int32 PzJager_Radixite = 100;
+				inline constexpr int32 PzJager_VehicleParts = 30;
+				inline constexpr int32 PzJagerLaser_Radixite = 100;
+				inline constexpr int32 PzJagerLaser_VehicleParts = 45;
+				inline constexpr int32 Marder_Radixite = 180;
+				inline constexpr int32 Marder_VehicleParts = 80;
+				inline constexpr int32 PzI15cm_Radixite = 125;
+				inline constexpr int32 PzI15cm_VehicleParts = 70;
+				inline constexpr int32 Hetzer_Radixite = 200;
+				inline constexpr int32 Hetzer_VehicleParts = 100;
+			}
+
+			namespace MediumTanks
+			{
+				inline constexpr int32 PzIIIJ_Radixite = 250;
+				inline constexpr int32 PzIIIJ_VehicleParts = 100;
+				inline constexpr int32 PzIIIAA_Radixite = 325;
+				inline constexpr int32 PzIIIAA_VehicleParts = 125;
+				inline constexpr int32 PzIIIJCommander_Radixite = 250;
+				inline constexpr int32 PzIIIJCommander_VehicleParts = 100;
+				inline constexpr int32 PzIIIM_Radixite = 400;
+				inline constexpr int32 PzIIIM_VehicleParts = 200;
+				inline constexpr int32 PzIIIFlamm_Radixite = 400;
+				inline constexpr int32 PzIIIFlamm_VehicleParts = 300;
+				inline constexpr int32 PzIVG_Radixite = 400;
+				inline constexpr int32 PzIVG_VehicleParts = 200;
+				inline constexpr int32 PzIVH_Radixite = 500;
+				inline constexpr int32 PzIVH_VehicleParts = 300;
+				inline constexpr int32 PzIVRockets_Radixite = 600;
+				inline constexpr int32 PzIVRockets_VehicleParts = 350;
+				inline constexpr int32 PzIVF1_Radixite = 275;
+				inline constexpr int32 PzIVF1_VehicleParts = 150;
+				inline constexpr int32 PzIVF1Commander_Radixite = 275;
+				inline constexpr int32 PzIVF1Commander_VehicleParts = 150;
+				inline constexpr int32 Jaguar_Radixite = 550;
+				inline constexpr int32 Jaguar_VehicleParts = 300;
+				inline constexpr int32 Brumbar_Radixite = 550;
+				inline constexpr int32 Brumbar_VehicleParts = 400;
+				inline constexpr int32 Stug_Radixite = 300;
+				inline constexpr int32 Stug_VehicleParts = 125;
+			}
+
+			namespace HeavyTanks
+			{
+				inline constexpr int32 JagdPanther_Radixite = 500;
+				inline constexpr int32 JagdPanther_VehicleParts = 300;
+				inline constexpr int32 Maus_Radixite = 1500;
+				inline constexpr int32 Maus_VehicleParts = 1000;
+				inline constexpr int32 E100_Radixite = 1500;
+				inline constexpr int32 E100_VehicleParts = 1000;
+				inline constexpr int32 PantherG_Radixite = 600;
+				inline constexpr int32 PantherG_VehicleParts = 350;
+				inline constexpr int32 PanzerV_IV_Radixite = 900;
+				inline constexpr int32 PanzerV_IV_VehicleParts = 400;
+				inline constexpr int32 PanzerV_III_Radixite = 900;
+				inline constexpr int32 PanzerV_III_VehicleParts = 400;
+				inline constexpr int32 PantherD_Radixite = 900;
+				inline constexpr int32 PantherD_VehicleParts = 400;
+				inline constexpr int32 PantherII_Radixite = 900;
+				inline constexpr int32 PantherII_VehicleParts = 600;
+				inline constexpr int32 Tiger_Radixite = 900;
+				inline constexpr int32 Tiger_VehicleParts = 450;
+				inline constexpr int32 TigerRail_Radixite = 900;
+				inline constexpr int32 TigerRail_VehicleParts = 700;
+				inline constexpr int32 SturmTiger_Radixite = 1350;
+				inline constexpr int32 SturmTiger_VehicleParts = 600;
+				inline constexpr int32 KingTiger_Radixite = 1300;
+				inline constexpr int32 KingTiger_VehicleParts = 650;
+				inline constexpr int32 JagdTiger_Radixite = 1300;
+				inline constexpr int32 JagdTiger_VehicleParts = 850;
+				inline constexpr int32 Tiger105_Radixite = 1500;
+				inline constexpr int32 Tiger105_VehicleParts = 750;
+			}
+
+			namespace Infantry
+			{
+				inline constexpr int32 Scavengers_Radixite = 250;
+				inline constexpr int32 Jager_Radixite = 200;
+				inline constexpr int32 SteelFistAssaultSquad_Radixite = 200;
+				inline constexpr int32 SteelFistAssaultSquad_Metal = 100;
+				inline constexpr int32 Gebirgsjagerin_Radixite = 200;
+				inline constexpr int32 Vultures_Radixite = 525;
+				inline constexpr int32 Vultures_Metal = 100;
+				inline constexpr int32 SniperTeam_Radixite = 650;
+				inline constexpr int32 SniperTeam_Metal = 150;
+				inline constexpr int32 FeuerSturm_Radixite = 500;
+				inline constexpr int32 FeuerSturm_Metal = 200;
+				inline constexpr int32 SturmPionieren_Radixite = 400;
+				inline constexpr int32 SturmPionieren_Metal = 200;
+				inline constexpr int32 PanzerGrenadiere_Radixite = 675;
+				inline constexpr int32 PanzerGrenadiere_Metal = 200;
+				inline constexpr int32 SturmKommandos_Radixite = 800;
+				inline constexpr int32 SturmKommandos_Metal = 200;
+				inline constexpr int32 LightBringers_Radixite = 800;
+				inline constexpr int32 LightBringers_Metal = 200;
+				inline constexpr int32 IronStorm_Radixite = 700;
+				inline constexpr int32 IronStorm_Metal = 300;
+			}
+
+			namespace TeamWeapons
+			{
+				inline constexpr int32 LmgSquad_Radixite = 300;
+				inline constexpr int32 PaK38_Radixite = 450;
+				inline constexpr int32 PaK38_Metal = 180;
+				inline constexpr int32 PaK40_Radixite = 450;
+				inline constexpr int32 PaK40_Metal = 180;
+				inline constexpr int32 GrW42_80mm_Radixite = 425;
+				inline constexpr int32 GrW42_80mm_Metal = 140;
+				inline constexpr int32 Flak37mm_Radixite = 500;
+				inline constexpr int32 Flak37mm_Metal = 220;
+				inline constexpr int32 Flak88mm_Radixite = 500;
+				inline constexpr int32 Flak88mm_Metal = 220;
+				inline constexpr int32 LefH18_Radixite = 600;
+				inline constexpr int32 LefH18_Metal = 260;
+				inline constexpr int32 Morser210mm_Radixite = 800;
+				inline constexpr int32 Morser210mm_Metal = 410;
+				inline constexpr int32 SFH18_150mm_Radixite = 600;
+				inline constexpr int32 SFH18_150mm_Metal = 260;
+				inline constexpr int32 Nebelwerfer_Radixite = 600;
+				inline constexpr int32 Nebelwerfer_Metal = 260;
+			}
+
+			namespace Aircraft
+			{
+				inline constexpr int32 Bf109_Radixite = 600;
+				inline constexpr int32 Bf109_VehicleParts = 225;
+				inline constexpr int32 Ju87_Radixite = 600;
+				inline constexpr int32 Ju87_VehicleParts = 250;
+				inline constexpr int32 Me410_Radixite = 800;
+				inline constexpr int32 Me410_VehicleParts = 300;
+			}
+
 			// ----------------------------------
 			// ------ Infantry Costs ------------
 			// ----------------------------------
