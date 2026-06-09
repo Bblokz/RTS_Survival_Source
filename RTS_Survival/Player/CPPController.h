@@ -1341,6 +1341,13 @@ private:
 
 	void ActionButtonRepair(AActor* ClickedActor);
 
+	/**
+	 * @brief Reuses the controller harvest order path so button-issued harvest commands get matching feedback.
+	 * @param ClickedActor Resource actor selected by the second click.
+	 * @param ClickedLocation Backup movement and feedback location.
+	 */
+	void ActionButtonHarvestResource(AActor* ClickedActor, const FVector& ClickedLocation);
+
 	/** @return Amount of issued orders*/
 	int32 IssueOrderRepairToAllSelectedUnits(AActor* ClickedActor);
 

@@ -52,7 +52,7 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 	case EAbilityID::IdHarvestResource:
 		return ERTSVoiceLine::Harvest;
 	case EAbilityID::IdReturnCargo:
-		return ERTSVoiceLine::Confirm;
+		return ERTSVoiceLine::ReturnCargo;
 	case EAbilityID::IdPickupItem:
 		return ERTSVoiceLine::Pickup;
 	case EAbilityID::IdScavenge:
@@ -164,6 +164,7 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetStressedVoiceLineVersion(const ERTSVoice
 	case ERTSVoiceLine::ExitPosition:
 	case ERTSVoiceLine::Pickup:
 	case ERTSVoiceLine::Harvest:
+	case ERTSVoiceLine::ReturnCargo:
 		return ERTSVoiceLine::ConfirmStressed;
 
 	// Already stressed or no stressed variant
