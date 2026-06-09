@@ -381,6 +381,18 @@ void ATrackedTankMaster::TerminateReverseCommandForMovementReplacement()
 
 void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& TargetLocation, const bool bIsReverse)
 {
+	ExecuteTrackedMoveWithNavSettleDelayForAbility(
+		TargetLocation,
+		bIsReverse,
+		bIsReverse ? EAbilityID::IdReverseMove : EAbilityID::IdMove);
+}
+
+void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelayForAbility(
+	const FVector& TargetLocation,
+	const bool bIsReverse,
+	const EAbilityID CompletionAbility,
+	const float GoalAcceptanceRadiusOverride)
+{
 	if (not GetIsValidAITankController())
 	{
 		return;
@@ -402,6 +414,8 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& Tar
 	M_QueuedMoveState.M_TargetLocation = TargetLocation;
 	M_QueuedMoveState.bM_HasPendingQueuedMove = true;
 	M_QueuedMoveState.bM_IsReverse = bIsReverse;
+	M_QueuedMoveState.M_CompletionAbility = CompletionAbility;
+	M_QueuedMoveState.M_GoalAcceptanceRadiusOverride = GoalAcceptanceRadiusOverride;
 	M_QueuedMoveState.bM_IsStationaryWhenQueued = not bShouldSkipNavSettleDelay;
 	// NOTE: This is the authoritative coalescing point for queued tracked moves.
 	// Any later command issued before the timer fires overwrites these fields by design.
@@ -441,10 +455,17 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred()
 		return;
 	}
 
-	ExecuteTrackedMoveNow(M_QueuedMoveState.M_TargetLocation, M_QueuedMoveState.bM_IsReverse);
+	const FVector TargetLocation = M_QueuedMoveState.M_TargetLocation;
+	const bool bIsReverse = M_QueuedMoveState.bM_IsReverse;
+	const EAbilityID CompletionAbility = M_QueuedMoveState.M_CompletionAbility;
+	const float GoalAcceptanceRadiusOverride = M_QueuedMoveState.M_GoalAcceptanceRadiusOverride;
 	M_QueuedMoveState.bM_HasPendingQueuedMove = false;
-	// NOTE: Pending flag is cleared only after the request is consumed by ExecuteTrackedMoveNow,
-	// so delayed callbacks cannot double-issue movement for the same queued state snapshot.
+	// NOTE: Pending flag is cleared before issuing so failure callbacks can safely enqueue a retry.
+	ExecuteTrackedMoveNow(
+		TargetLocation,
+		bIsReverse,
+		CompletionAbility,
+		GoalAcceptanceRadiusOverride);
 }
 
 void ATrackedTankMaster::ResetTrackedReversePathFollowing()
@@ -495,7 +516,11 @@ void ATrackedTankMaster::CancelPendingTrackedMove()
 	World->GetTimerManager().ClearTimer(M_DeferredTrackedMoveHandle);
 }
 
-void ATrackedTankMaster::ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse)
+void ATrackedTankMaster::ExecuteTrackedMoveNow(
+	const FVector& TargetLocation,
+	const bool bIsReverse,
+	const EAbilityID CompletionAbility,
+	const float GoalAcceptanceRadiusOverride)
 {
 	if (not GetIsValidAITankController())
 	{
@@ -509,8 +534,14 @@ void ATrackedTankMaster::ExecuteTrackedMoveNow(const FVector& TargetLocation, co
 	}
 
 	AITankController->SetMoveToLocation(TargetLocation);
-	AITankController->SetQueuedMovementCompletionAbility(bIsReverse ? EAbilityID::IdReverseMove : EAbilityID::IdMove);
-	AITankController->MoveToLocationWithGoalAcceptance(TargetLocation);
+	AITankController->SetQueuedMovementCompletionAbility(CompletionAbility);
+	if (not AITankController->MoveToLocationWithGoalAcceptance(TargetLocation, GoalAcceptanceRadiusOverride))
+	{
+		AITankController->SetQueuedMovementCompletionAbility(EAbilityID::IdNoAbility);
+		AITankController->OnQueuedMovementRequestFailed(CompletionAbility);
+		return;
+	}
+
 	bWasLastMovementReverse = bIsReverse;
 }
 

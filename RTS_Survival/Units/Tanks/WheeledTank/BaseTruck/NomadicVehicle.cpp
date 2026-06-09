@@ -473,7 +473,11 @@ void ANomadicVehicle::ExecuteCreateBuildingCommand(const FVector BuildingLocatio
 	{
 		RTSNavCollision->EnableAffectNavmesh(false);
 	}
-	CreateBuildingAtLocationBP(BuildingLocation, BuildingRotation);
+
+	M_PendingBuildingLocation = BuildingLocation;
+	M_PendingBuildingRotation = BuildingRotation;
+	M_BuildingMoveFailureCount = 0;
+	MoveToBuildingLocationForConstruction();
 }
 
 UEnergyComp* ANomadicVehicle::GetEnergyComp() const
@@ -493,29 +497,33 @@ float ANomadicVehicle::GetBuildingRadius() const
 // Step 1
 void ANomadicVehicle::StartBuildingConstruction()
 {
-	if (IsValid(M_StaticPreviewMesh) && IsValid(AINomadicVehicle) && IsValid(ChassisMesh))
-	{
-		OnNomadConvertToBuilding.Broadcast();
-		M_NomadStatus = ENomadStatus::CreatingBuildingRotating;
-		// Save the preview transform.
-		M_BuildingTransform = M_StaticPreviewMesh->GetTransform();
-		// Destroy after start mesh animation as we need the preview mesh to block other buildings.
-		M_StaticPreviewMesh->SetActorHiddenInGame(true);
-		AINomadicVehicle->StopBehaviourTree();
-		// teleport to the building location.
-		FHitResult HitResult;
-		ChassisMesh->SetWorldLocation(M_BuildingTransform.GetLocation(), false, &HitResult,
-		                              ETeleportType::TeleportPhysics);
-		// Standalone rotation without command queue.
-		ExecuteRotateTowardsCommand(M_BuildingTransform.Rotator(), false);
-	}
-	else
+	if (not GetIsValidAINomadicVehicle() || not IsValid(ChassisMesh))
 	{
 		RTSFunctionLibrary::ReportNullErrorComponent(
 			this,
-			"M_StaticPreviewMesh, AINomadicVehicle or ChassisMesh",
+			"AINomadicVehicle or ChassisMesh",
 			"ANomadicVehicle::StartBuildingConstruction");
+		return;
 	}
+
+	OnNomadConvertToBuilding.Broadcast();
+	M_NomadStatus = ENomadStatus::CreatingBuildingRotating;
+	// Save the preview transform.
+	M_BuildingTransform = IsValid(M_StaticPreviewMesh)
+		? M_StaticPreviewMesh->GetTransform()
+		: FTransform(M_PendingBuildingRotation, M_PendingBuildingLocation);
+	// Destroy after start mesh animation as we need the preview mesh to block other buildings.
+	if (IsValid(M_StaticPreviewMesh))
+	{
+		M_StaticPreviewMesh->SetActorHiddenInGame(true);
+	}
+	AINomadicVehicle->StopBehaviourTree();
+	// teleport to the building location.
+	FHitResult HitResult;
+	ChassisMesh->SetWorldLocation(M_BuildingTransform.GetLocation(), false, &HitResult,
+	                              ETeleportType::TeleportPhysics);
+	// Standalone rotation without command queue.
+	ExecuteRotateTowardsCommand(M_BuildingTransform.Rotator(), false);
 }
 
 float ANomadicVehicle::GetBxpExpansionRange() const
@@ -730,9 +738,12 @@ void ANomadicVehicle::OnFinishedConvertToBuilding_UnpackAirbase()
 void ANomadicVehicle::TerminateCreateBuildingCommand()
 {
 	Super::TerminateCreateBuildingCommand();
-	if (IsValid(PlayerController) && IsValid(M_ConversionProgressBar) && IsValid(AINomadicVehicle))
+	if (IsValid(PlayerController) && IsValid(M_ConversionProgressBar) && GetIsValidAINomadicVehicle())
 	{
 		M_ConversionProgressBar->StopProgressBar();
+		CancelPendingTrackedMove();
+		AINomadicVehicle->SetQueuedMovementCompletionAbility(EAbilityID::IdNoAbility);
+		AINomadicVehicle->StopMovement();
 		switch (M_NomadStatus)
 		{
 		case ENomadStatus::Truck:
@@ -1416,11 +1427,68 @@ void ANomadicVehicle::SetAINomadicVehicle(AAINomadicVehicle* NewAINomadicVehicle
 	if (IsValid(NewAINomadicVehicle))
 	{
 		AINomadicVehicle = NewAINomadicVehicle;
+		return;
 	}
-	else
+
+	RTSFunctionLibrary::ReportNullErrorInitialisation(this, "AINomadicVehicle", "SetAINomadicVehicle");
+}
+
+bool ANomadicVehicle::GetIsValidAINomadicVehicle() const
+{
+	if (IsValid(AINomadicVehicle))
 	{
-		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "AINomadicVehicle", "SetAINomadicVehicle");
+		return true;
 	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"AINomadicVehicle",
+		"GetIsValidAINomadicVehicle",
+		this);
+	return false;
+}
+
+void ANomadicVehicle::MoveToBuildingLocationForConstruction()
+{
+	if (not GetIsValidAINomadicVehicle())
+	{
+		CancelBuildingConstructionAfterMoveFailure();
+		return;
+	}
+
+	AINomadicVehicle->SetBuildingLocation(M_PendingBuildingLocation);
+	ExecuteTrackedMoveWithNavSettleDelayForAbility(
+		M_PendingBuildingLocation,
+		false,
+		EAbilityID::IdCreateBuilding,
+		AINomadicVehicle->GetConstructionAcceptanceRad());
+}
+
+void ANomadicVehicle::OnMoveToBuildingLocationSucceeded()
+{
+	M_BuildingMoveFailureCount = 0;
+	StartBuildingConstruction();
+}
+
+void ANomadicVehicle::OnMoveToBuildingLocationFailed()
+{
+	constexpr int32 MaxBuildingMoveFailuresBeforeCancel = 2;
+	M_BuildingMoveFailureCount++;
+	if (M_BuildingMoveFailureCount < MaxBuildingMoveFailuresBeforeCancel)
+	{
+		MoveToBuildingLocationForConstruction();
+		return;
+	}
+
+	CancelBuildingConstructionAfterMoveFailure();
+}
+
+void ANomadicVehicle::CancelBuildingConstructionAfterMoveFailure()
+{
+	RTSFunctionLibrary::ReportError(
+		"Nomadic vehicle failed to move to its building construction location twice; cancelling construction."
+		"\n Nomadic vehicle: " + GetName());
+	SetUnitToIdle();
 }
 
 UStaticMeshComponent* ANomadicVehicle::GetAttachToMeshComponent() const
