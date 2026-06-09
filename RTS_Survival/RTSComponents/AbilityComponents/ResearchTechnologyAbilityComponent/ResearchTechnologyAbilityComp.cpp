@@ -3,8 +3,10 @@
 #include "ResearchTechnologyAbilityComp.h"
 
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 UResearchTechnologyAbilityComp::UResearchTechnologyAbilityComp()
 {
@@ -28,6 +30,8 @@ void UResearchTechnologyAbilityComp::TechResearchComplete(const ETechnology Comp
 	{
 		return;
 	}
+
+	PlayCompletedAnnouncerVoiceLine();
 
 	if (M_NextFollowUpTechnologyIndex >= ResearchTechnologyAbilitySettings.FollowUpTechnologies.Num())
 	{
@@ -135,6 +139,29 @@ void UResearchTechnologyAbilityComp::AddAbilityToCommands()
 	M_OwnerCommandsInterface->AddAbility(
 		CreateCurrentAbilityEntry(),
 		ResearchTechnologyAbilitySettings.PreferredAbilityIndex);
+}
+
+void UResearchTechnologyAbilityComp::PlayCompletedAnnouncerVoiceLine()
+{
+	if (ResearchTechnologyAbilitySettings.CompletedAnnouncerVoiceLines.VoiceLines.IsEmpty())
+	{
+		return;
+	}
+
+	USoundBase* CompletedAnnouncerVoiceLine =
+		ResearchTechnologyAbilitySettings.CompletedAnnouncerVoiceLines.GetVoiceLine();
+	if (not IsValid(CompletedAnnouncerVoiceLine))
+	{
+		return;
+	}
+
+	ACPPController* PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return;
+	}
+
+	PlayerController->PlayCustomAnnouncerVoiceLine(CompletedAnnouncerVoiceLine, true);
 }
 
 void UResearchTechnologyAbilityComp::SwapToNextTechnology(const ETechnology CompletedTechnology)
