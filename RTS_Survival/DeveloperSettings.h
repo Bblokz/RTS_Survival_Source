@@ -729,6 +729,116 @@ namespace DeveloperSettings
 			inline constexpr int32 HeavyBunkerMetalCost = RoundToNearestMultipleOfFive(
 				static_cast<int32>(750 * GameCostMlt));
 
+			namespace Nomadics
+			{
+				inline constexpr int32 GerHq_Radixite = 100;
+				inline constexpr int32 GerHq_VehicleParts = 100;
+				inline constexpr int32 GerGammaFacility_Radixite = 200;
+				inline constexpr int32 GerGammaFacility_Metal = 100;
+				inline constexpr int32 GerRefinery_Radixite = 250;
+				inline constexpr int32 GerRefinery_Metal = 125;
+				inline constexpr int32 GerMetalVault_Radixite = 250;
+				inline constexpr int32 GerMetalVault_Metal = 125;
+				inline constexpr int32 GerBarracks_Radixite = 300;
+				inline constexpr int32 GerBarracks_Metal = 150;
+				inline constexpr int32 GerMechanizedDepot_Radixite = 350;
+				inline constexpr int32 GerMechanizedDepot_Metal = 200;
+				inline constexpr int32 GerLightSteelForge_Radixite = 500;
+				inline constexpr int32 GerLightSteelForge_Metal = 250;
+				inline constexpr int32 GerCommunicationCenter_Radixite = 600;
+				inline constexpr int32 GerCommunicationCenter_Metal = 300;
+				inline constexpr int32 GerArmory_Radixite = 350;
+				inline constexpr int32 GerArmory_Metal = 250;
+				inline constexpr int32 GerMedTankFactory_Radixite = 600;
+				inline constexpr int32 GerMedTankFactory_Metal = 600;
+				inline constexpr int32 GerTrainingCentre_Radixite = 0;
+				inline constexpr int32 GerTrainingCentre_Metal = 0;
+				inline constexpr int32 GerAirbase_Radixite = 800;
+				inline constexpr int32 GerAirbase_Metal = 500;
+				inline constexpr int32 GerExperimentalUnitsFactory_Radixite = 1000;
+				inline constexpr int32 GerExperimentalUnitsFactory_Metal = 500;
+			}
+
+			namespace Bxps
+			{
+				inline constexpr int32 Ger37mmFlak_Radixite = 140;
+				inline constexpr int32 Ger37mmFlak_Metal = 80;
+				inline constexpr int32 Ger88mmFlak_Radixite = 420;
+				inline constexpr int32 Ger88mmFlak_Metal = 320;
+				inline constexpr int32 SolarSmall_Radixite = 80;
+				inline constexpr int32 SolarSmall_Metal = 40;
+				inline constexpr int32 SolarLarge_Radixite = 155;
+				inline constexpr int32 SolarLarge_Metal = 90;
+				inline constexpr int32 GerPak38_Radixite = 250;
+				inline constexpr int32 GerPak38_Metal = 150;
+				inline constexpr int32 GerFlakBunker_Radixite = 1600;
+				inline constexpr int32 GerFlakBunker_Metal = 1500;
+				inline constexpr int32 GerLeFH150mm_Radixite = 450;
+				inline constexpr int32 GerLeFH150mm_Metal = 225;
+				inline constexpr int32 Ger37mmCaptureBunker_Radixite = 700;
+				inline constexpr int32 Ger37mmCaptureBunker_Metal = 300;
+				inline constexpr int32 GerTurretCaptureBunker_Radixite = 700;
+				inline constexpr int32 GerTurretCaptureBunker_Metal = 300;
+				inline constexpr int32 GerRefConverter_Radixite = 200;
+				inline constexpr int32 GerRefConverter_Metal = 100;
+				inline constexpr int32 GerBarracksRadixReactor_Radixite = 200;
+				inline constexpr int32 GerBarracksRadixReactor_Metal = 200;
+				inline constexpr int32 GerBarracksFuelCell_Radixite = 150;
+				inline constexpr int32 GerBarracksFuelCell_Metal = 150;
+				inline constexpr int32 GerHQHarvester_Radixite = 300;
+				inline constexpr int32 GerHQHarvester_Metal = 150;
+				inline constexpr int32 GerHQRadar_Radixite = 200;
+				inline constexpr int32 GerHQRadar_Metal = 180;
+				inline constexpr int32 GerHQPlatform_Radixite = 150;
+				inline constexpr int32 GerHQPlatform_Metal = 75;
+				inline constexpr int32 GerHQTower_Radixite = 200;
+				inline constexpr int32 GerHQTower_Metal = 75;
+				inline constexpr int32 GerHQRepairBay_Radixite = 300;
+				inline constexpr int32 GerHQRepairBay_Metal = 150;
+				inline constexpr int32 GerLFactoryRadixiteReactor_Radixite = 300;
+				inline constexpr int32 GerLFactoryRadixiteReactor_Metal = 300;
+				inline constexpr int32 GerLFactoryFuelStorage_Radixite = 200;
+				inline constexpr int32 GerLFactoryFuelStorage_Metal = 200;
+				inline constexpr int32 RusFactory_Radixite = 2000;
+				inline constexpr int32 RusFactory_Metal = 1000;
+				inline constexpr int32 GerMarderStugFactory_Radixite = 2000;
+				inline constexpr int32 GerMarderStugFactory_Metal = 1000;
+				inline constexpr int32 RusPlatformFactory_Radixite = 3500;
+				inline constexpr int32 RusPlatformFactory_Metal = 1750;
+				inline constexpr int32 RusResearchCenter_Radixite = 750;
+				inline constexpr int32 RusResearchCenter_Metal = 370;
+				inline constexpr int32 RusCoolingTowers_Radixite = 750;
+				inline constexpr int32 RusCoolingTowers_Metal = 370;
+				inline constexpr int32 RusBarracks_Radixite = 210;
+				inline constexpr int32 RusBarracks_Metal = 120;
+				inline constexpr int32 RusBunkerMG_Radixite = 180;
+				inline constexpr int32 RusBunkerMG_Metal = 100;
+				inline constexpr int32 RusGuardTower_Radixite = 250;
+				inline constexpr int32 RusGuardTower_Metal = 140;
+				inline constexpr int32 RusBoforsPosition_Radixite = 280;
+				inline constexpr int32 RusBoforsPosition_Metal = 160;
+				inline constexpr int32 RusWall_Radixite = 140;
+				inline constexpr int32 RusWall_Metal = 160;
+				inline constexpr int32 RusAmmoStorage_Radixite = 140;
+				inline constexpr int32 RusAmmoStorage_Metal = 80;
+				inline constexpr int32 RusFuelStorage1_Radixite = 140;
+				inline constexpr int32 RusFuelStorage1_Metal = 80;
+				inline constexpr int32 RusFuelStorage2_Radixite = 280;
+				inline constexpr int32 RusFuelStorage2_Metal = 160;
+				inline constexpr int32 RusBunker05_Radixite = 600;
+				inline constexpr int32 RusBunker05_Metal = 400;
+				inline constexpr int32 RusBunker05WithTurrets_Radixite = 1000;
+				inline constexpr int32 RusBunker05WithTurrets_Metal = 650;
+				inline constexpr int32 RusBunker02ZIS_Radixite = 1200;
+				inline constexpr int32 RusBunker02ZIS_Metal = 750;
+				inline constexpr int32 RusBunker02_204MM_Radixite = 1800;
+				inline constexpr int32 RusBunker02_204MM_Metal = 980;
+				inline constexpr int32 RusLongCamoBunker_Radixite = 400;
+				inline constexpr int32 RusLongCamoBunker_Metal = 220;
+				inline constexpr int32 RusDomeBunker_Radixite = 520;
+				inline constexpr int32 RusDomeBunker_Metal = 240;
+			}
+
 			// ----------------------------------
 			// ------ Aircraft Costs-----------------
 			// ----------------------------------
