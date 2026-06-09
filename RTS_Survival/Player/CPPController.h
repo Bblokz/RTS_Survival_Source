@@ -563,6 +563,12 @@ public:
 	void ConstructBuilding(AActor* RequestingActor);
 
 	/**
+	 * @brief Stops the active nomadic placement preview when its source vehicle is gone.
+	 * @param DestroyedNomadicVehicle The vehicle that can no longer own the active preview.
+	 */
+	void StopNomadicPreviewPlacementForDestroyedVehicle(const ANomadicVehicle* DestroyedNomadicVehicle);
+
+	/**
 	 * @brief Instructs the actor to convert to vehicle if it is a nomadic vehicle.
 	 * @param RequestingActor The vehicle that requested the conversion.
 	 */
