@@ -4107,6 +4107,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 {
 	// --- bring developer settings into scope via using (no local constexpr mirrors)
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::ArmoredCars;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
 
@@ -4161,8 +4162,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Puma_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Puma_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4183,8 +4184,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.8f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, FlamePuma_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, FlamePuma_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4193,9 +4194,6 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	// Panzerwerfer
 	{
-		const float PanzerwerferRadixiteCostMlt = 1.3f;
-		const float PanzerwerferVehiclePartsCostMlt = 1.8f;
-
 		TankData.MaxHealth = LightTankHealthBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 30;
@@ -4206,12 +4204,10 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 2.f, 5);
 		TankData.Cost = FUnitCost({
 			{
-				ERTSResourceType::Resource_Radixite, FMath::RoundToInt(
-					ArmoredCarMediumCalibreRadixiteCost * PanzerwerferRadixiteCostMlt)
+				ERTSResourceType::Resource_Radixite, Panzerwerfer_Radixite
 			},
 			{
-				ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
-					ArmoredCarMediumCalibreVehiclePartsCost * PanzerwerferVehiclePartsCostMlt)
+				ERTSResourceType::Resource_VehicleParts, Panzerwerfer_VehicleParts
 			}
 		});
 		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
@@ -4230,8 +4226,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost + 50},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost + 25}
+		{ERTSResourceType::Resource_Radixite, Sdkfz232_3_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Sdkfz232_3_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4248,8 +4244,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = BaseArmoredCarExp;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Sdkfz250_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Sdkfz250_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4267,8 +4263,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, 100},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Sdkfz9_37mm_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Sdkfz9_37mm_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4285,8 +4281,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.3f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarRadixiteCost + 125},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost + 50}
+		{ERTSResourceType::Resource_Radixite, Sdkfz251_22_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Sdkfz251_22_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4295,9 +4291,6 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	// Sd.Kfz. 251 (Mortar)
 	{
-		const float MortarRadixiteCostMlt = 1.45f;
-		const float MortarVehiclePartsCostMlt = 1.33f;
-
 		TankData.MaxHealth = ArmoredCarHealthBase + 150;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40;
@@ -4308,13 +4301,10 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.3f, 5);
 		TankData.Cost = FUnitCost({
 			{
-				ERTSResourceType::Resource_Radixite, RTSFunctionLibrary::RoundToNearestMultipleOf(
-					FMath::RoundToInt(ArmoredCarRadixiteCost * MortarRadixiteCostMlt),
-					10)
+				ERTSResourceType::Resource_Radixite, Sdkfz251_Mortar_Radixite
 			},
 			{
-				ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
-					ArmoredCarVehiclePartsCost * MortarVehiclePartsCostMlt)
+				ERTSResourceType::Resource_VehicleParts, Sdkfz251_Mortar_VehicleParts
 			}
 		});
 		TankData.ExperienceLevels = GetArmoredCarExpLevels();
@@ -4325,8 +4315,6 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	// Sd.Kfz. 251 (Transport)
 	{
-		const float TransportRadixiteCostMlt = 1.3f;
-
 		TankData.MaxHealth = ArmoredCarHealthBase + 150;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40;
@@ -4336,8 +4324,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.VisionRadius = ArmoredCarVisionRadius;
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.1f, 5);
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, FMath::RoundToInt(ArmoredCarRadixiteCost * TransportRadixiteCostMlt)},
-			{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost}
+			{ERTSResourceType::Resource_Radixite, Sdkfz251_Transport_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Sdkfz251_Transport_VehicleParts}
 		});
 		TankData.ExperienceLevels = GetArmoredCarExpLevels();
 		TankData.ExperienceMultiplier = 1.0f;
@@ -4355,8 +4343,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = BaseArmoredCarExp;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Sdkfz231_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Sdkfz231_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4373,8 +4361,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.3f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost - 50},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost - 15}
+		{ERTSResourceType::Resource_Radixite, Sdkfz251_PzIV_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Sdkfz251_PzIV_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4394,8 +4382,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Puma_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Puma_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4412,8 +4400,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.VisionRadius = ArmoredCarVisionRadius;
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 1.2f, 5);
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArmoredCarMediumCalibreRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, ArmoredCarMediumCalibreVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Puma_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Puma_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
 	TankData.ExperienceMultiplier = 1.0f;
@@ -4424,6 +4412,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 void ACPPGameState::InitAllGameLightTankData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::LightTanks;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
@@ -4474,8 +4463,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost + 50},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Pz38t_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIF_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4485,11 +4474,6 @@ void ACPPGameState::InitAllGameLightTankData()
 
 	// Pz 38(t) R
 	{
-		const float Panzer38TRRadixiteCostMlt = 1.5f;
-		const float Panzer38TRVehiclePartsCostMlt = 1.8f;
-		const int32 Panzer38TBaseRadixiteCost = LightTankRadixiteCost + 50;
-		const int32 Panzer38TBaseVehiclePartsCost = LightTankVehiclePartsCost;
-
 		TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40;
@@ -4498,14 +4482,8 @@ void ACPPGameState::InitAllGameLightTankData()
 		TankData.VehicleReverseSpeedKmh = 8;
 		TankData.VisionRadius = T1TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{
-				ERTSResourceType::Resource_Radixite, FMath::RoundToInt(
-					Panzer38TBaseRadixiteCost * Panzer38TRRadixiteCostMlt)
-			},
-			{
-				ERTSResourceType::Resource_VehicleParts, FMath::RoundToInt(
-					Panzer38TBaseVehiclePartsCost * Panzer38TRVehiclePartsCostMlt)
-			}
+			{ERTSResourceType::Resource_Radixite, Pz38t_R_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Pz38t_R_VehicleParts}
 		});
 		TankData.Abilities = BasicTankAbilities;
 		// Special vehicle
@@ -4525,8 +4503,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, LightMediumTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Pz38t_RailGun_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Pz38t_RailGun_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4543,8 +4521,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 7;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzIIF_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIF_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4561,8 +4539,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 7;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankVehiclePartsCost * 1.5f, 5)}
+		{ERTSResourceType::Resource_Radixite, PzIIF_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIFlame_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4579,7 +4557,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, 300}
+		{ERTSResourceType::Resource_Radixite, PzIHarvester_Radixite}
 	});
 	TankData.Abilities = BasicHarvesterTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4596,8 +4574,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 11;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost + 25},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost + 20}
+		{ERTSResourceType::Resource_Radixite, Sdkfz140_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Sdkfz140_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetArmoredCarExpLevels();
@@ -4614,8 +4592,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankDestroyerRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, LightTankDestroyerVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzJager_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzJager_VehicleParts}
 	});
 	TankData.Abilities = BasicTankDestroyerAbilities;
 	TankData.ExperienceLevels = GetLightTankDestroyerExpLevels();
@@ -4624,8 +4602,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzJager, TankData);
 
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankDestroyerRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankDestroyerVehiclePartsCost * 1.5f, 5)}
+		{ERTSResourceType::Resource_Radixite, PzJagerLaser_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzJagerLaser_VehicleParts}
 	});
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzJagerLaser, TankData);
 
@@ -4638,8 +4616,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankDestroyerRadixiteCost + 80},
-		{ERTSResourceType::Resource_VehicleParts, LightTankDestroyerVehiclePartsCost + 50}
+		{ERTSResourceType::Resource_Radixite, Marder_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Marder_VehicleParts}
 	});
 	TankData.Abilities = BasicTankDestroyerAbilities;
 	TankData.ExperienceLevels = GetLightTankDestroyerExpLevels();
@@ -4656,8 +4634,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankDestroyerRadixiteCost + 25},
-		{ERTSResourceType::Resource_VehicleParts, LightTankDestroyerVehiclePartsCost + 40}
+		{ERTSResourceType::Resource_Radixite, PzI15cm_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzI15cm_VehicleParts}
 	});
 	TankData.Abilities = BasicTankDestroyerAbilities;
 	TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
@@ -4674,8 +4652,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankDestroyerRadixiteCost + 100},
-		{ERTSResourceType::Resource_VehicleParts, LightTankDestroyerVehiclePartsCost + 70}
+		{ERTSResourceType::Resource_Radixite, Hetzer_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Hetzer_VehicleParts}
 	});
 	TankData.Abilities = TankAbilitiesWithRockets;
 	TankData.ExperienceLevels = GetLightTankDestroyerExpLevels();
@@ -4694,8 +4672,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 30;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost - 50},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost - 10}
+		{ERTSResourceType::Resource_Radixite, PzIIF_Radixite - 50},
+		{ERTSResourceType::Resource_VehicleParts, PzIIF_VehicleParts - 10}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4712,8 +4690,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 30;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost - 25},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzIIF_Radixite - 25},
+		{ERTSResourceType::Resource_VehicleParts, PzIIF_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4730,8 +4708,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 7;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzIIF_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIF_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4748,8 +4726,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.VehicleReverseSpeedKmh = 20;
 	TankData.VisionRadius = T1TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost + 50},
-		{ERTSResourceType::Resource_VehicleParts, LightTankVehiclePartsCost + 25}
+		{ERTSResourceType::Resource_Radixite, Pz38t_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIF_VehicleParts + 25}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightTankExpLevels();
@@ -4761,10 +4739,10 @@ void ACPPGameState::InitAllGameLightTankData()
 	{
 		const float T70FMetalCostMultiplier = 1.3f;
 		const int32 T70FVehiclePartsCost =
-			FMath::RoundToInt((LightTankVehiclePartsCost + 25) * T70FMetalCostMultiplier);
+			FMath::RoundToInt((PzIIF_VehicleParts + 25) * T70FMetalCostMultiplier);
 
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, LightTankRadixiteCost + 50},
+			{ERTSResourceType::Resource_Radixite, Pz38t_Radixite},
 			{ERTSResourceType::Resource_VehicleParts, T70FVehiclePartsCost}
 		});
 		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
@@ -4792,8 +4770,8 @@ void ACPPGameState::InitAllGameLightTankData()
 		TankData.VehicleReverseSpeedKmh = Su76ReverseSpeedKmh;
 		TankData.VisionRadius = OpenTopVehicleVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, LightTankDestroyerRadixiteCost + Su76RadixiteCostOffset},
-			{ERTSResourceType::Resource_VehicleParts, LightTankDestroyerVehiclePartsCost + Su76VehiclePartsCostOffset}
+			{ERTSResourceType::Resource_Radixite, PzJager_Radixite + Su76RadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, PzJager_VehicleParts + Su76VehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetLightTankDestroyerExpLevels();
@@ -4806,6 +4784,7 @@ void ACPPGameState::InitAllGameLightTankData()
 void ACPPGameState::InitAllGameMediumTankData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::MediumTanks;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
 
@@ -4853,8 +4832,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightMediumTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, LightMediumTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzIIIJ_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIJ_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
@@ -4871,8 +4850,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightMediumTankRadixiteCost + 100},
-		{ERTSResourceType::Resource_VehicleParts, LightMediumTankVehiclePartsCost + 150}
+		{ERTSResourceType::Resource_Radixite, PzIIIAA_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIAA_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
@@ -4889,8 +4868,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightMediumTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, LightMediumTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzIIIJCommander_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIJCommander_VehicleParts}
 	});
 	TankData.Abilities = TankAbilitiesWithRockets;
 	TankData.ExperienceLevels = GetCommandTankExpLevels();
@@ -4907,8 +4886,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -4926,8 +4905,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 200},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 100}
+		{ERTSResourceType::Resource_Radixite, PzIIIFlamm_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIFlamm_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
@@ -4944,8 +4923,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PzIVG_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIVG_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -4957,8 +4936,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// PZ IV H; railgun vehicle.
 	TankData.TurretRotationSpeed = 18;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 100},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 100}
+		{ERTSResourceType::Resource_Radixite, PzIVH_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIVH_VehicleParts}
 	});
 	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * 2.f, 5);
@@ -4967,8 +4946,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// PZ IV Rockets
 	TankData.TurretRotationSpeed = 18;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 200},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 150}
+		{ERTSResourceType::Resource_Radixite, PzIVRockets_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIVRockets_VehicleParts}
 	});
 	TankData.Abilities = TankAbilitiesWithRockets;
 	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
@@ -4984,8 +4963,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost - 125},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost - 50}
+		{ERTSResourceType::Resource_Radixite, PzIVF1_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIVF1_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
@@ -5002,8 +4981,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost - 125},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost - 50}
+		{ERTSResourceType::Resource_Radixite, PzIVF1Commander_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIVF1Commander_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetCommandTankExpLevels();
@@ -5020,8 +4999,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 20;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 150},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 100}
+		{ERTSResourceType::Resource_Radixite, Jaguar_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIVH_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
@@ -5038,8 +5017,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 150},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 200}
+		{ERTSResourceType::Resource_Radixite, Jaguar_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Brumbar_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
@@ -5056,8 +5035,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankDestroyerRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankDestroyerVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Stug_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Stug_VehicleParts}
 	});
 	TankData.Abilities = BasicTankDestroyerAbilities;
 	TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
@@ -5076,8 +5055,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 18;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost - 50},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost - 10}
+		{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite - 50},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts - 10}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -5098,8 +5077,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.VehicleReverseSpeedKmh = 18;
 		TankData.VisionRadius = T2TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + T34AaRadixiteCostOffset},
-			{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + T34AaVehiclePartsCostOffset}
+			{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite + T34AaRadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + T34AaVehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankAbilities;
 		TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -5122,8 +5101,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.VehicleReverseSpeedKmh = 18;
 		TankData.VisionRadius = T2TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + T34_76_L_RadixiteCostOffset},
-			{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + T34_76_L_VehiclePartsCostOffset}
+			{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite + T34_76_L_RadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + T34_76_L_VehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankAbilities;
 		TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
@@ -5142,8 +5121,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 18;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 100},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 50}
+		{ERTSResourceType::Resource_Radixite, PzIVH_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + 50}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -5160,8 +5139,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 18;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 150},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 75}
+		{ERTSResourceType::Resource_Radixite, Jaguar_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + 75}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -5178,8 +5157,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MediumTankRadixiteCost + 250},
-		{ERTSResourceType::Resource_VehicleParts, MediumTankVehiclePartsCost + 125}
+		{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite + 250},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + 125}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -5218,8 +5197,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.VehicleReverseSpeedKmh = SuMediumTankDestroyerReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, MediumTankDestroyerRadixiteCost},
-			{ERTSResourceType::Resource_VehicleParts, MediumTankDestroyerVehiclePartsCost}
+			{ERTSResourceType::Resource_Radixite, Stug_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Stug_VehicleParts}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
@@ -5238,11 +5217,11 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.Cost = FUnitCost({
 			{
 				ERTSResourceType::Resource_Radixite,
-				MediumTankDestroyerRadixiteCost + Su85LaserRadixiteCostOffset
+				Stug_Radixite + Su85LaserRadixiteCostOffset
 			},
 			{
 				ERTSResourceType::Resource_VehicleParts,
-				MediumTankDestroyerVehiclePartsCost + Su85LaserVehiclePartsCostOffset
+				Stug_VehicleParts + Su85LaserVehiclePartsCostOffset
 			}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
@@ -5260,8 +5239,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.VehicleReverseSpeedKmh = SuMediumTankDestroyerReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, MediumTankDestroyerRadixiteCost + Su100RadixiteCostOffset},
-			{ERTSResourceType::Resource_VehicleParts, MediumTankDestroyerVehiclePartsCost + Su100VehiclePartsCostOffset}
+			{ERTSResourceType::Resource_Radixite, Stug_Radixite + Su100RadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, Stug_VehicleParts + Su100VehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
@@ -5278,8 +5257,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.VehicleReverseSpeedKmh = Su122ReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, MediumTankDestroyerRadixiteCost + Su122RadixiteCostOffset},
-			{ERTSResourceType::Resource_VehicleParts, MediumTankDestroyerVehiclePartsCost + Su122VehiclePartsCostOffset}
+			{ERTSResourceType::Resource_Radixite, Stug_Radixite + Su122RadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, Stug_VehicleParts + Su122VehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
@@ -5298,9 +5277,9 @@ void ACPPGameState::InitAllGameMediumTankData()
 		const float T44LaserCostMlt = 2.0f;
 		const float T44LaserExpWorthMlt = 3.5f;
 		const int32 T44LaserCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			T3MediumTankRadixiteCost * T44LaserCostMlt, 10);
+			PantherG_Radixite * T44LaserCostMlt, 10);
 		const int32 T44LaserVehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			T3MediumTankVehiclePartsCost * T44LaserCostMlt, 10);
+			PantherG_VehicleParts * T44LaserCostMlt, 10);
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
@@ -5325,6 +5304,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 void ACPPGameState::InitAllGameHeavyTankData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitCosts;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::HeavyTanks;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
 
@@ -5373,8 +5353,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 11;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3MediumTankDestroyerRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, T3MediumTankDestroyerVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, JagdPanther_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, JagdPanther_VehicleParts}
 	});
 	TankData.Abilities = FAbilityHelpers::SwapAtIdForNewEntry(TankAbilitiesWithRockets, EAbilityID::IdFireRockets,
 	                                                          FAbilityHelpers::GetRocketAbilityEntry(
@@ -5393,8 +5373,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 5;
 	TankData.VisionRadius = SuperHeavyTankVision;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, SuperHeavyTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Maus_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Maus_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
@@ -5407,6 +5387,10 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.TurretRotationSpeed = 12;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, E100_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, E100_VehicleParts}
+	});
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_E100, TankData);
 
 	// Panther G
@@ -5418,8 +5402,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3MediumTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, T3MediumTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, PantherG_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PantherG_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5433,11 +5417,11 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		PzV_IV.Cost = FUnitCost({
 			{
 				ERTSResourceType::Resource_Radixite,
-				RTSFunctionLibrary::RoundToNearestMultipleOf(T3MediumTankRadixiteCost * 1.5f, 5)
+				PanzerV_IV_Radixite
 			},
 			{
 				ERTSResourceType::Resource_VehicleParts,
-				RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankVehiclePartsCost * 2.0f, 5)
+				PanzerV_IV_VehicleParts
 			}
 		});
 		TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
@@ -5445,12 +5429,20 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PanzerV_IV, PzV_IV);
 
 		FTankData PzV_III = PzV_IV;
+		PzV_III.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, PanzerV_III_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, PanzerV_III_VehicleParts}
+		});
 		PzV_III.TurretRotationSpeed = 25;
 		TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
 		TankData.ExperienceWorth = BxpHelpers::RoundToNearestMultipleOfFive(BaseHeavyTankExp * 2.f);
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PanzerV_III, PzV_III);
 
 		FTankData PantherD = PzV_IV;
+		PantherD.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, PantherD_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, PantherD_VehicleParts}
+		});
 		PantherD.TurretRotationSpeed = 12;
 		TankData.ExperienceLevels = GetHeavyTankExpLevels();
 		TankData.ExperienceWorth = BaseHeavyTankExp;
@@ -5466,8 +5458,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 20;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3MediumTankRadixiteCost + 300},
-		{ERTSResourceType::Resource_VehicleParts, T3MediumTankVehiclePartsCost + 250}
+		{ERTSResourceType::Resource_Radixite, PantherII_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, PantherII_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5484,8 +5476,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Tiger_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Tiger_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5496,11 +5488,9 @@ void ACPPGameState::InitAllGameHeavyTankData()
 
 	// Tiger Rail (same as Tiger H1 with increased metal cost)
 	{
-		const int32 TigerRailMetalCostIncrease = 250;
-
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost},
-			{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + TigerRailMetalCostIncrease}
+			{ERTSResourceType::Resource_Radixite, Tiger_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, TigerRail_VehicleParts}
 		});
 
 		TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
@@ -5521,11 +5511,11 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.Cost = FUnitCost({
 		{
 			ERTSResourceType::Resource_Radixite,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankRadixiteCost * 1.5, 25)
+			SturmTiger_Radixite
 		},
 		{
 			ERTSResourceType::Resource_VehicleParts,
-			RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankVehiclePartsCost * 1.33, 25)
+			SturmTiger_VehicleParts
 		}
 	});
 	TankData.Abilities = BasicTankAbilities;
@@ -5543,8 +5533,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost + 400},
-		{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + 200}
+		{ERTSResourceType::Resource_Radixite, KingTiger_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, KingTiger_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5561,8 +5551,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost + 400},
-		{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + 400}
+		{ERTSResourceType::Resource_Radixite, KingTiger_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, JagdTiger_VehicleParts}
 	});
 	TankData.Abilities = BasicTankDestroyerAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5579,8 +5569,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost + 600},
-		{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + 300}
+		{ERTSResourceType::Resource_Radixite, Tiger105_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Tiger105_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5725,8 +5715,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 10;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Tiger_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Tiger_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5743,8 +5733,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 10;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T3HeavyTankRadixiteCost + 200},
-		{ERTSResourceType::Resource_VehicleParts, T3HeavyTankVehiclePartsCost + 200}
+		{ERTSResourceType::Resource_Radixite, Tiger_Radixite + 200},
+		{ERTSResourceType::Resource_VehicleParts, KingTiger_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetHeavyTankExpLevels();
@@ -5761,8 +5751,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 9;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, SuperHeavyTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Maus_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Maus_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
@@ -5781,8 +5771,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 9;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, SuperHeavyTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Maus_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Maus_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
@@ -5799,8 +5789,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, SuperHeavyTankRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, SuperHeavyTankVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Maus_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Maus_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();
@@ -5811,9 +5801,9 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// SU-152 (heavy tank destroyer)
 	{
 		const int32 Su152RadixiteCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			(T3MediumTankDestroyerRadixiteCost + MediumTankDestroyerRadixiteCost) * 0.5f, 10);
+			(JagdPanther_Radixite + Stug_Radixite) * 0.5f, 10);
 		const int32 Su152VehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			(T3MediumTankDestroyerVehiclePartsCost + MediumTankDestroyerVehiclePartsCost) * 0.5f, 10);
+			(JagdPanther_VehicleParts + Stug_VehicleParts) * 0.5f, 10);
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
@@ -5935,13 +5925,10 @@ void ACPPGameState::InitAllGameTrainData()
 
 void ACPPGameState::InitAllGameAircraftData()
 {
-	using DeveloperSettings::GameBalance::UnitCosts::FighterRadixiteCost;
-	using DeveloperSettings::GameBalance::UnitCosts::FighterVehiclePartsCost;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::Aircraft;
 	using DeveloperSettings::GameBalance::VisionRadii::UnitVision::AircraftVisionRadius;
 	using DeveloperSettings::GameBalance::UnitHealth::FighterHealth;
 	using DeveloperSettings::GameBalance::Experience::BaseAircraftExp;
-	using DeveloperSettings::GameBalance::UnitCosts::AttackAircraftRadixiteCost;
-	using DeveloperSettings::GameBalance::UnitCosts::AttackAircraftVehiclePartsCost;
 
 
 	// Start with ability no owner; when the owner is set the return to base ability will automatically be swapped with it.
@@ -5958,8 +5945,8 @@ void ACPPGameState::InitAllGameAircraftData()
 
 	AircraftData.Abilities = BasicAircraftAbilities;
 	AircraftData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, FighterRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, FighterVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Bf109_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Bf109_VehicleParts}
 	});
 	AircraftData.MaxHealth = FighterHealth;
 	AircraftData.ResistancesAndDamageMlt =
@@ -5972,8 +5959,8 @@ void ACPPGameState::InitAllGameAircraftData()
 
 	AircraftData.Abilities = BasicAircraftAbilities;
 	AircraftData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, AttackAircraftRadixiteCost - 200},
-		{ERTSResourceType::Resource_VehicleParts, AttackAircraftVehiclePartsCost - 50}
+		{ERTSResourceType::Resource_Radixite, Ju87_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Ju87_VehicleParts}
 	});
 	AircraftData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::AttackAircraftHealth;
 	AircraftData.ResistancesAndDamageMlt =
@@ -5987,8 +5974,8 @@ void ACPPGameState::InitAllGameAircraftData()
 
 	AircraftData.Abilities = BasicAircraftAbilities;
 	AircraftData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, AttackAircraftRadixiteCost},
-		{ERTSResourceType::Resource_VehicleParts, AttackAircraftVehiclePartsCost}
+		{ERTSResourceType::Resource_Radixite, Me410_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Me410_VehicleParts}
 	});
 	AircraftData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::AttackAircraftHealth;
 	AircraftData.ResistancesAndDamageMlt =
@@ -7585,6 +7572,7 @@ void ACPPGameState::InitAllGameNomadicData()
 void ACPPGameState::InitAllGameSquadData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::Infantry;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
 
 	using DeveloperSettings::GameBalance::InfantrySettings::BasicInfantrySpeed;
@@ -7622,7 +7610,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ScavengersRadixiteCost}
+		{ERTSResourceType::Resource_Radixite, Scavengers_Radixite}
 	});
 	SquadData.Abilities = BasicScavengerAbilities;
 	SquadData.ExperienceWorth = BaseInfantryExp;
@@ -7636,7 +7624,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, JagerRadixiteCost}
+		{ERTSResourceType::Resource_Radixite, Jager_Radixite}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
@@ -7651,8 +7639,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, 200},
-		{ERTSResourceType::Resource_Metal, 100}
+		{ERTSResourceType::Resource_Radixite, SteelFistAssaultSquad_Radixite},
+		{ERTSResourceType::Resource_Metal, SteelFistAssaultSquad_Metal}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceWorth = BaseInfantryExp + 5;
@@ -7667,7 +7655,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, BasicSniperRadixiteCost}
+		{ERTSResourceType::Resource_Radixite, Gebirgsjagerin_Radixite}
 	});
 	SquadData.Abilities = BasicScavengerAbilities;
 	SquadData.ExperienceWorth = BaseInfantryExp;
@@ -7687,8 +7675,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, VulturesFg42RadixiteCost},
-		{ERTSResourceType::Resource_Metal, VulturesFg42MetalCost}
+		{ERTSResourceType::Resource_Radixite, Vultures_Radixite},
+		{ERTSResourceType::Resource_Metal, Vultures_Metal}
 	});
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
@@ -7701,8 +7689,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = FastInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, SniperTeamRadixiteCost},
-		{ERTSResourceType::Resource_Metal, SniperTeamMetalCost}
+		{ERTSResourceType::Resource_Radixite, SniperTeam_Radixite},
+		{ERTSResourceType::Resource_Metal, SniperTeam_Metal}
 	});
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
@@ -7719,8 +7707,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T2FeuerStormRadixiteCosts},
-		{ERTSResourceType::Resource_Metal, T2FeuerStormMetalCosts},
+		{ERTSResourceType::Resource_Radixite, FeuerSturm_Radixite},
+		{ERTSResourceType::Resource_Metal, FeuerSturm_Metal},
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
@@ -7736,8 +7724,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T2SturmPioneerRadixiteCosts},
-		{ERTSResourceType::Resource_Metal, T2SturmPioneerMetalCosts},
+		{ERTSResourceType::Resource_Radixite, SturmPionieren_Radixite},
+		{ERTSResourceType::Resource_Metal, SturmPionieren_Metal},
 	});
 	SquadData.Abilities = BasicScavengerAbilities;
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
@@ -7756,8 +7744,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, PanzerGrenadierRadixiteCosts},
-		{ERTSResourceType::Resource_Metal, PanzerGrenadierMetalCosts}
+		{ERTSResourceType::Resource_Radixite, PanzerGrenadiere_Radixite},
+		{ERTSResourceType::Resource_Metal, PanzerGrenadiere_Metal}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
@@ -7774,8 +7762,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
 		{
-			{ERTSResourceType::Resource_Radixite, SturmkommandoRadixiteCost},
-			{ERTSResourceType::Resource_Metal, SturmkommandoMetalCost}
+			{ERTSResourceType::Resource_Radixite, SturmKommandos_Radixite},
+			{ERTSResourceType::Resource_Metal, SturmKommandos_Metal}
 		}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
@@ -7792,8 +7780,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, LightBringersRadixiteCosts},
-		{ERTSResourceType::Resource_Metal, LightBringersMetalCosts}
+		{ERTSResourceType::Resource_Radixite, LightBringers_Radixite},
+		{ERTSResourceType::Resource_Metal, LightBringers_Metal}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
@@ -7809,8 +7797,8 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, EliteInfantryRadixiteCost},
-		{ERTSResourceType::Resource_Metal, EliteInfantryMetalCost}
+		{ERTSResourceType::Resource_Radixite, IronStorm_Radixite},
+		{ERTSResourceType::Resource_Metal, IronStorm_Metal}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
@@ -7987,6 +7975,7 @@ void ACPPGameState::InitAllGameSquadData()
 void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::TeamWeapons;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
@@ -8008,8 +7997,8 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = AntiTankGunTeamWeaponVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, AntiTankGunTeamWeaponRadixiteCost},
-		{ERTSResourceType::Resource_Metal, AntiTankGunTeamWeaponMetalCost}
+		{ERTSResourceType::Resource_Radixite, PaK38_Radixite},
+		{ERTSResourceType::Resource_Metal, PaK38_Metal}
 	});
 	SquadData.Abilities = TeamWeaponAbilities;
 	SquadData.ExperienceWorth = ArmoredInfantryExp;
@@ -8017,6 +8006,10 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 	SquadData.ExperienceMultiplier = 1.0f;
 
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK38, SquadData);
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, PaK40_Radixite},
+		{ERTSResourceType::Resource_Metal, PaK40_Metal}
+	});
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK40, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_57MM, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_76MM, SquadData);
@@ -8025,6 +8018,7 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 void ACPPGameState::InitAllGameMortarTWSquadData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::TeamWeapons;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
@@ -8045,8 +8039,8 @@ void ACPPGameState::InitAllGameMortarTWSquadData()
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = MortarTeamWeaponVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MortarTeamWeaponRadixiteCost},
-		{ERTSResourceType::Resource_Metal, MortarTeamWeaponMetalCost}
+		{ERTSResourceType::Resource_Radixite, GrW42_80mm_Radixite},
+		{ERTSResourceType::Resource_Metal, GrW42_80mm_Metal}
 	});
 	SquadData.Abilities = TeamWeaponAbilities;
 	SquadData.ExperienceWorth = BaseInfantryExp;
@@ -8061,6 +8055,7 @@ void ACPPGameState::InitAllGameMortarTWSquadData()
 void ACPPGameState::InitAllGameFlakTWSquadData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::TeamWeapons;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
@@ -8082,8 +8077,8 @@ void ACPPGameState::InitAllGameFlakTWSquadData()
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = FlakTeamWeaponVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, FlakTeamWeaponRadixiteCost},
-		{ERTSResourceType::Resource_Metal, FlakTeamWeaponMetalCost}
+		{ERTSResourceType::Resource_Radixite, Flak37mm_Radixite},
+		{ERTSResourceType::Resource_Metal, Flak37mm_Metal}
 	});
 	SquadData.Abilities = TeamWeaponAbilities;
 	SquadData.ExperienceWorth = ArmoredInfantryExp;
@@ -8091,6 +8086,10 @@ void ACPPGameState::InitAllGameFlakTWSquadData()
 	SquadData.ExperienceMultiplier = 1.0f;
 
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_37mmFlak, SquadData);
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Flak88mm_Radixite},
+		{ERTSResourceType::Resource_Metal, Flak88mm_Metal}
+	});
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_88mmFlak, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Bofors, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_KS30_130MM, SquadData);
@@ -8099,6 +8098,7 @@ void ACPPGameState::InitAllGameFlakTWSquadData()
 void ACPPGameState::InitAllGameArtilleryTWSquadData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::TeamWeapons;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
@@ -8120,8 +8120,8 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 	SquadData.MaxAcceleration = SlowInfantryAcceleration;
 	SquadData.VisionRadius = ArtilleryTeamWeaponVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArtilleryTeamWeaponRadixiteCost},
-		{ERTSResourceType::Resource_Metal, ArtilleryTeamWeaponMetalCost}
+		{ERTSResourceType::Resource_Radixite, LefH18_Radixite},
+		{ERTSResourceType::Resource_Metal, LefH18_Metal}
 	});
 	SquadData.Abilities = TeamWeaponAbilities;
 	SquadData.ExperienceWorth = EliteInfantryExp;
@@ -8130,16 +8130,22 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LefH18, SquadData);
 
-	constexpr int32 MorserAdditionalRadixiteCost = 200;
-	constexpr int32 MorserAdditionalMetalCost = 150;
 	FSquadData MorserSquadData = SquadData;
 	MorserSquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, ArtilleryTeamWeaponRadixiteCost + MorserAdditionalRadixiteCost},
-		{ERTSResourceType::Resource_Metal, ArtilleryTeamWeaponMetalCost + MorserAdditionalMetalCost}
+		{ERTSResourceType::Resource_Radixite, Morser210mm_Radixite},
+		{ERTSResourceType::Resource_Metal, Morser210mm_Metal}
 	});
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_210MM_Morser, MorserSquadData);
 
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, SFH18_150mm_Radixite},
+		{ERTSResourceType::Resource_Metal, SFH18_150mm_Metal}
+	});
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SFH18_150mm, SquadData);
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Nebelwerfer_Radixite},
+		{ERTSResourceType::Resource_Metal, Nebelwerfer_Metal}
+	});
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Nebelwerfer, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_M1938_122mm, SquadData);
 }
@@ -8147,6 +8153,7 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 void ACPPGameState::InitAllGameMachineGunTWSquadData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	using namespace DeveloperSettings::GameBalance::UnitCosts::TeamWeapons;
 	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::UnitVision;
 	using namespace DeveloperSettings::GameBalance::Experience;
@@ -8167,7 +8174,7 @@ void ACPPGameState::InitAllGameMachineGunTWSquadData()
 	SquadData.MaxAcceleration = BasicInfantryAcceleration;
 	SquadData.VisionRadius = MachineGunTeamWeaponVisionRadius;
 	SquadData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, MachineGunTeamWeaponRadixiteCost}
+		{ERTSResourceType::Resource_Radixite, LmgSquad_Radixite}
 	});
 	SquadData.Abilities = TeamWeaponAbilities;
 	SquadData.ExperienceWorth = BaseInfantryExp;
