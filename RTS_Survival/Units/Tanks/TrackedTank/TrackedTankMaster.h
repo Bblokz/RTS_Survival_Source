@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Interfaces/RTSInterface/RTSUnit.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInUnit/DigInUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -32,6 +33,10 @@ struct FTrackedTankQueuedMoveState
 	bool bM_HasPendingQueuedMove = false;
 	// Preserves whether the pending request should complete as reverse movement semantics.
 	bool bM_IsReverse = false;
+	// Completes the command that owns this movement after the controller reports success.
+	EAbilityID M_CompletionAbility = EAbilityID::IdNoAbility;
+	// Optional request radius for movement commands that need a non-default acceptance radius.
+	float M_GoalAcceptanceRadiusOverride = -1.f;
 	// Captures whether request began from near-stationary speed to decide if nav-settle delay should be applied.
 	bool bM_IsStationaryWhenQueued = true;
 };
@@ -291,6 +296,7 @@ private:
 	bool GetIsValidEngineGasSoundComponent() const;
 	bool GetIsValidEngineGasSound() const;
 
+protected:
 	/**
 	 * @brief Preserves stable path quality for first move while preventing repeated chain delays that reintroduce COL stutter.
 	 * @param TargetLocation Requested move destination.
@@ -298,6 +304,19 @@ private:
 	 * @note A stationary start uses nav-settle delay, but chained movement while already moving skips full delay.
 	 */
 	void ExecuteTrackedMoveWithNavSettleDelay(const FVector& TargetLocation, const bool bIsReverse);
+
+	/**
+	 * @brief Uses tracked tank move issuing for commands that need custom completion or acceptance.
+	 * @param TargetLocation Requested move destination.
+	 * @param bIsReverse Whether the queued request should keep reverse path-follow mode.
+	 * @param CompletionAbility Command completed when path following succeeds.
+	 * @param GoalAcceptanceRadiusOverride Acceptance radius used instead of the path component default.
+	 */
+	void ExecuteTrackedMoveWithNavSettleDelayForAbility(
+		const FVector& TargetLocation,
+		const bool bIsReverse,
+		const EAbilityID CompletionAbility,
+		const float GoalAcceptanceRadiusOverride = -1.f);
 
 	/**
 	 * @brief Keeps timer callback logic isolated so deferred issue always reuses the same request state gate.
@@ -311,7 +330,11 @@ private:
 	 * @param bIsReverse Whether completion should map to reverse movement semantics.
 	 * @note Always set queued movement completion ability before issuing controller move request.
 	 */
-	void ExecuteTrackedMoveNow(const FVector& TargetLocation, const bool bIsReverse);
+	void ExecuteTrackedMoveNow(
+		const FVector& TargetLocation,
+		const bool bIsReverse,
+		const EAbilityID CompletionAbility,
+		const float GoalAcceptanceRadiusOverride);
 
 	/**
 	 * @brief Resets reverse path-following only during full reverse termination.

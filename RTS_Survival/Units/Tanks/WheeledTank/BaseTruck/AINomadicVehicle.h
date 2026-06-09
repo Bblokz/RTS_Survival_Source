@@ -6,6 +6,9 @@
 #include "RTS_Survival/Units/Tanks/TrackedTank/AI/AITrackTank.h"
 #include "AINomadicVehicle.generated.h"
 
+/**
+ * @brief Controller used by nomadic vehicles to route tank movement completion into construction flow.
+ */
 UCLASS()
 class RTS_SURVIVAL_API AAINomadicVehicle : public AAITrackTank
 {
@@ -34,6 +37,9 @@ protected:
 	float ConstructionAcceptanceRad = 100.0f;
 
 	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility) override;
+	virtual void OnQueuedMovementFailed(const EAbilityID FailedMovementAbility) override;
+	virtual void OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility) override;
 
 private:
 	// Location to place the building; needed in behaviour tree.

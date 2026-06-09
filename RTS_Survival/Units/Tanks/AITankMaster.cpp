@@ -52,22 +52,25 @@ void AAITankMaster::StopMovement()
 }
 
 
-void AAITankMaster::MoveToLocationWithGoalAcceptance(const FVector Location)
+bool AAITankMaster::MoveToLocationWithGoalAcceptance(
+	const FVector Location,
+	const float GoalAcceptanceRadiusOverride)
 {
 	if (not GetIsValidVehiclePathComp())
 	{
-		return;
+		return false;
 	}
 
-	const float GoalAcceptanceRadius = m_VehiclePathComp->GetGoalAcceptanceRadius();
-	TryMoveToLocationWithOffNavRecovery(Location, GoalAcceptanceRadius);
+	const float GoalAcceptanceRadius = GoalAcceptanceRadiusOverride >= 0.f
+		? GoalAcceptanceRadiusOverride
+		: m_VehiclePathComp->GetGoalAcceptanceRadius();
+	return TryMoveToLocationWithOffNavRecovery(Location, GoalAcceptanceRadius);
 }
 
 void AAITankMaster::SetQueuedMovementCompletionAbility(const EAbilityID CompletionAbility)
 {
 	M_QueuedMovementCompletionAbility = CompletionAbility;
-	bM_HasQueuedMovementCompletionAbility = CompletionAbility == EAbilityID::IdMove
-		|| CompletionAbility == EAbilityID::IdReverseMove;
+	bM_HasQueuedMovementCompletionAbility = CompletionAbility != EAbilityID::IdNoAbility;
 }
 
 void AAITankMaster::SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress)
@@ -120,22 +123,40 @@ void AAITankMaster::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowing
 		DebugPathFollowingResult(Result);
 	}
 
-	if (Result.Code != EPathFollowingResult::Success || not bM_HasQueuedMovementCompletionAbility)
+	if (not bM_HasQueuedMovementCompletionAbility)
 	{
 		return;
 	}
 
-	if (not GetIsValidControlledTank())
-	{
-		bM_HasQueuedMovementCompletionAbility = false;
-		M_QueuedMovementCompletionAbility = EAbilityID::IdNoAbility;
-		return;
-	}
-
-	const EAbilityID CompletedMovementAbility = M_QueuedMovementCompletionAbility;
+	const EAbilityID QueuedMovementAbility = M_QueuedMovementCompletionAbility;
 	bM_HasQueuedMovementCompletionAbility = false;
 	M_QueuedMovementCompletionAbility = EAbilityID::IdNoAbility;
+
+	if (Result.Code == EPathFollowingResult::Success)
+	{
+		OnQueuedMovementCompleted(QueuedMovementAbility);
+		return;
+	}
+
+	OnQueuedMovementFailed(QueuedMovementAbility);
+}
+
+void AAITankMaster::OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility)
+{
+	if (not GetIsValidControlledTank())
+	{
+		return;
+	}
+
 	ControlledTank->DoneExecutingCommand(CompletedMovementAbility);
+}
+
+void AAITankMaster::OnQueuedMovementFailed(const EAbilityID FailedMovementAbility)
+{
+}
+
+void AAITankMaster::OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility)
+{
 }
 
 void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query,

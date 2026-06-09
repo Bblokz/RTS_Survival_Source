@@ -44,3 +44,67 @@ void AAINomadicVehicle::OnPossess(APawn* InPawn)
 			"AAINomadicVehicle::OnPossess");
 	}
 }
+
+
+void AAINomadicVehicle::OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility)
+{
+	if (CompletedMovementAbility != EAbilityID::IdCreateBuilding)
+	{
+		Super::OnQueuedMovementCompleted(CompletedMovementAbility);
+		return;
+	}
+
+	ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(GetPawn());
+	if (not IsValid(NomadicVehicle))
+	{
+		RTSFunctionLibrary::ReportFailedCastError(
+			"GetPawn()",
+			"ANomadicVehicle",
+			"AAINomadicVehicle::OnQueuedMovementCompleted");
+		return;
+	}
+
+	NomadicVehicle->OnMoveToBuildingLocationSucceeded();
+}
+
+void AAINomadicVehicle::OnQueuedMovementFailed(const EAbilityID FailedMovementAbility)
+{
+	if (FailedMovementAbility != EAbilityID::IdCreateBuilding)
+	{
+		Super::OnQueuedMovementFailed(FailedMovementAbility);
+		return;
+	}
+
+	ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(GetPawn());
+	if (not IsValid(NomadicVehicle))
+	{
+		RTSFunctionLibrary::ReportFailedCastError(
+			"GetPawn()",
+			"ANomadicVehicle",
+			"AAINomadicVehicle::OnQueuedMovementFailed");
+		return;
+	}
+
+	NomadicVehicle->OnMoveToBuildingLocationFailed();
+}
+
+void AAINomadicVehicle::OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility)
+{
+	if (FailedMovementAbility != EAbilityID::IdCreateBuilding)
+	{
+		Super::OnQueuedMovementRequestFailed(FailedMovementAbility);
+		return;
+	}
+
+	ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(GetPawn());
+	if (not IsValid(NomadicVehicle))
+	{
+		RTSFunctionLibrary::ReportFailedCastError(
+			"GetPawn()",
+			"ANomadicVehicle",
+			"AAINomadicVehicle::OnQueuedMovementRequestFailed");
+		return;
+	}
+
+	NomadicVehicle->OnMoveToBuildingLocationFailed();
+}
