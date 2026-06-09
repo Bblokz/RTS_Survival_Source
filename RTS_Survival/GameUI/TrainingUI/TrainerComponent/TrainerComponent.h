@@ -304,6 +304,7 @@ private:
 	AActor* M_SpawnedActor;
 
 	void MakeActorReadyForSpawn(AActor* ActorToMakeReady) const;
+	void PlayTrainingCompletedVoiceLine(const AActor* TrainedActor) const;
 
 	/**
 	 * @brief If the M_TrainingMenuManager is set we are primary selected and need to update the UI.
