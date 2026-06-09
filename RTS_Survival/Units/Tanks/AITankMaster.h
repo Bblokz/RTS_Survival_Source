@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
 #include "VehicleAI/VehicleAIController.h"
@@ -66,7 +67,7 @@ public:
 	 * @param Location Destination used for the active move request.
 	 * @note Direct controller move requests need explicit queue-completion wiring in OnMoveCompleted.
 	 */
-	void MoveToLocationWithGoalAcceptance(const FVector Location);
+	bool MoveToLocationWithGoalAcceptance(const FVector Location, const float GoalAcceptanceRadiusOverride = -1.f);
 
 	/**
 	 * @brief Stores which movement ability should be completed when the controller reports success.
@@ -79,6 +80,8 @@ public:
 	void SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress);
 
 	virtual void SetDefaultQueryFilter(const TSubclassOf<UNavigationQueryFilter> NewDefaultFilter) override final;
+
+	virtual void OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility);
 protected:
 
 	virtual void OnPossess(APawn* InPawn) override;
@@ -86,6 +89,11 @@ protected:
 	virtual void BeginPlay() override;
 
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+
+	virtual void OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility);
+	virtual void OnQueuedMovementFailed(
+		const EAbilityID FailedMovementAbility,
+		const EPathFollowingResult::Type FailedMovementResultCode);
 
 	
 	TArray<FVector> TLocationsToDestination;
