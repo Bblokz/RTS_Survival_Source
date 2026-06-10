@@ -354,6 +354,17 @@ void ANomadicVehicle::BeginPlay()
 		// Hide the cargo UI before it is setup (cargo UI is setup after we convert to building)
 		HideCargoUI();
 	}
+	CheckForUpgrades();
+}
+
+void ANomadicVehicle::CheckForUpgrades()
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	RTSComponent->OnNomadicInitializedLookingForUpgrades(this);
 }
 
 void ANomadicVehicle::BeginDestroy()

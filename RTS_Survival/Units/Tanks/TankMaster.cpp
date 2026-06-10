@@ -407,6 +407,20 @@ void ATankMaster::BeginPlay()
 	BeginPlay_SetFactionFlagPrimitiveDataIndex();
 
 	M_TankStartGameAction.OnBeginPlay();
+	if (GetIsValidRTSComponent() && RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank)
+	{
+		CheckForUpgrades();
+	}
+}
+
+void ATankMaster::CheckForUpgrades()
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	RTSComponent->OnTankInitializedLookingForUpgrades(this);
 }
 
 void ATankMaster::BeginDestroy()

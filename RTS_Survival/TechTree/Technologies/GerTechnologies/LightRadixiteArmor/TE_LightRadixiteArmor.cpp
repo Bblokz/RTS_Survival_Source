@@ -1,102 +1,103 @@
 ﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
-
 #include "TE_LightRadixiteArmor.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
-void UTE_LightRadixiteArmor::ApplyTechnologyEffect(const UObject* WorldContextObject)
+TArray<ETankSubtype> UTE_LightRadixiteArmor::GetTanksToApplyTo_Internal() const
 {
-	RTSFunctionLibrary::PrintString("apply light radixite armor effect");
-	Super::ApplyTechnologyEffect(WorldContextObject);
+	TArray<ETankSubtype> CombinedSubtypes = TanksToApplyTo;
+	for (const ETankSubtype TankSubtype : Panzer38TSubtypes)
+	{
+		CombinedSubtypes.AddUnique(TankSubtype);
+	}
+	for (const ETankSubtype TankSubtype : PanzerIISubtypes)
+	{
+		CombinedSubtypes.AddUnique(TankSubtype);
+	}
+	for (const ETankSubtype TankSubtype : Sdkfz140Subtypes)
+	{
+		CombinedSubtypes.AddUnique(TankSubtype);
+	}
+	return CombinedSubtypes;
 }
 
-TSet<TSubclassOf<AActor>> UTE_LightRadixiteArmor::GetTargetActorClasses() const
+void UTE_LightRadixiteArmor::ApplyOnTank_Internal(ATankMaster* Tank)
 {
-	return {Panzer38TClass, PanzerIIClass, Sdkfz140Class};
-}
-
-void UTE_LightRadixiteArmor::OnApplyEffectToActor(AActor* ValidActor)
-{
-	FString ErrorMessage;
-
-	ATankMaster* Tank = Cast<ATankMaster>(ValidActor);
-	if (!Tank)
+	if (not IsValid(Tank))
 	{
-		ErrorMessage = "ValidActor is not an ATankMaster: " + (ValidActor ? ValidActor->GetName() : "Null ValidActor") +
-			"\n";
-	}
-	else if (!Panzer38TRadixiteMesh || !PanzerIIRadixiteMesh)
-	{
-		ErrorMessage = "one of the radixite meshes is null in UTE_LightRadixiteArmor\n";
-	}
-	else
-	{
-		if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
-		{
-			RTSFunctionLibrary::PrintString("Applying light Radixite armor to " + Tank->GetName());
-		}
-
-		UMeshComponent* TankMesh = Tank->GetTankMesh();
-		if (!IsValid(TankMesh))
-		{
-			ErrorMessage = "Invalid or null TankMesh in " + Tank->GetName() + "\n";
-		}
-		else
-		{
-			UStaticMeshComponent* RadixiteArmorMeshComp = NewObject<UStaticMeshComponent>(Tank);
-			if (!RadixiteArmorMeshComp)
-			{
-				ErrorMessage = "Failed to create RadixiteArmorMeshComp for " + Tank->GetName() + "\n";
-			}
-			else
-			{
-				// Set and configure the Radixite armor mesh
-				UStaticMesh* MeshToApply = GetMeshToApply(Tank);
-				if (!MeshToApply)
-				{
-					ErrorMessage = "Failed to get mesh to apply for " + Tank->GetName() + "\n";
-				}
-				else
-				{
-					RadixiteArmorMeshComp->SetStaticMesh(MeshToApply);
-					RadixiteArmorMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-					RadixiteArmorMeshComp->
-						AttachToComponent(TankMesh, FAttachmentTransformRules::KeepRelativeTransform);
-					RadixiteArmorMeshComp->RegisterComponent();
-					RadixiteArmorMeshComp->SetRelativeTransform(FTransform::Identity);
-					ImproveArmor(Tank);
-				}
-			}
-		}
+		return;
 	}
 
-	// Print the accumulated error message, if any
-	if (!ErrorMessage.IsEmpty())
+	const URTSComponent* RTSComponent = Tank->GetRTSComponent();
+	if (not IsValid(RTSComponent))
 	{
-		RTSFunctionLibrary::ReportError(ErrorMessage);
+		return;
+	}
+
+	UStaticMesh* MeshToApply = GetMeshToApply(RTSComponent->GetSubtypeAsTankSubtype());
+	if (not IsValid(MeshToApply))
+	{
+		RTSFunctionLibrary::ReportError("Failed to get radixite mesh to apply for " + Tank->GetName());
+		return;
+	}
+
+	UMeshComponent* TankMesh = Tank->GetTankMesh();
+	if (not IsValid(TankMesh))
+	{
+		RTSFunctionLibrary::ReportError("Invalid or null TankMesh in " + Tank->GetName());
+		return;
+	}
+
+	UStaticMeshComponent* RadixiteArmorMeshComp = NewObject<UStaticMeshComponent>(Tank);
+	if (not IsValid(RadixiteArmorMeshComp))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create RadixiteArmorMeshComp for " + Tank->GetName());
+		return;
+	}
+
+	RadixiteArmorMeshComp->SetStaticMesh(MeshToApply);
+	RadixiteArmorMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RadixiteArmorMeshComp->AttachToComponent(TankMesh, FAttachmentTransformRules::KeepRelativeTransform);
+	RadixiteArmorMeshComp->RegisterComponent();
+	RadixiteArmorMeshComp->SetRelativeTransform(FTransform::Identity);
+	ImproveArmor(Tank);
+
+	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
+	{
+		RTSFunctionLibrary::PrintString("Applying light Radixite armor to " + Tank->GetName());
 	}
 }
 
-UStaticMesh* UTE_LightRadixiteArmor::GetMeshToApply(AActor* ValidActor) const
+UStaticMesh* UTE_LightRadixiteArmor::GetMeshToApply(const ETankSubtype TankSubtype) const
 {
-	if (ValidActor->IsA(Panzer38TClass))
+	if (Panzer38TSubtypes.Contains(TankSubtype))
 	{
 		return Panzer38TRadixiteMesh;
 	}
-	if (ValidActor->IsA(PanzerIIClass))
+	if (PanzerIISubtypes.Contains(TankSubtype))
 	{
 		return PanzerIIRadixiteMesh;
 	}
-	return Sdkfz140RadixiteMesh;
+	if (Sdkfz140Subtypes.Contains(TankSubtype))
+	{
+		return Sdkfz140RadixiteMesh;
+	}
+	return nullptr;
 }
 
-void UTE_LightRadixiteArmor::ImproveArmor(ATankMaster* ValidTank)
+void UTE_LightRadixiteArmor::ImproveArmor(ATankMaster* ValidTank) const
 {
-	for (auto EachArmor : ValidTank->GetTankArmor())
+	if (not IsValid(ValidTank))
+	{
+		return;
+	}
+
+	for (UArmor* EachArmor : ValidTank->GetTankArmor())
 	{
 		if (IsValid(EachArmor) && IsArmorTypeToAdjust(EachArmor->GetArmorPlateType()))
 		{
@@ -107,13 +108,13 @@ void UTE_LightRadixiteArmor::ImproveArmor(ATankMaster* ValidTank)
 
 bool UTE_LightRadixiteArmor::IsArmorTypeToAdjust(const EArmorPlate ArmorPlate)
 {
-	if (ArmorPlate == EArmorPlate::Plate_Front || ArmorPlate == EArmorPlate::Plate_SideLeft || ArmorPlate ==
-		EArmorPlate::Plate_SideRight || ArmorPlate == EArmorPlate::Turret_Front || ArmorPlate ==
-		EArmorPlate::Turret_Mantlet
-		|| ArmorPlate == EArmorPlate::Plate_FrontLowerGlacis || ArmorPlate == EArmorPlate::Plate_FrontUpperGlacis ||
-		ArmorPlate == EArmorPlate::Plate_SideLowerLeft || ArmorPlate == EArmorPlate::Plate_SideLowerRight)
-	{
-		return true;
-	}
-	return false;
+	return ArmorPlate == EArmorPlate::Plate_Front ||
+		ArmorPlate == EArmorPlate::Plate_SideLeft ||
+		ArmorPlate == EArmorPlate::Plate_SideRight ||
+		ArmorPlate == EArmorPlate::Turret_Front ||
+		ArmorPlate == EArmorPlate::Turret_Mantlet ||
+		ArmorPlate == EArmorPlate::Plate_FrontLowerGlacis ||
+		ArmorPlate == EArmorPlate::Plate_FrontUpperGlacis ||
+		ArmorPlate == EArmorPlate::Plate_SideLowerLeft ||
+		ArmorPlate == EArmorPlate::Plate_SideLowerRight;
 }

@@ -3257,6 +3257,7 @@ void ASquadController::InitSquadData()
 	SquadDataCallbacks.SetDataLoaded(true);
 	SquadDataCallbacks.OnSquadDataReady.Broadcast();
 	M_SquadLoadingStatus.bM_HasInitializedData = true;
+	CheckForUpgrades();
 	if (not bM_HasBroadcastSquadFullyLoaded)
 	{
 		bM_HasBroadcastSquadFullyLoaded = true;
@@ -3569,6 +3570,16 @@ void ASquadController::OnAllSquadUnitsLoaded()
 	{
 		InitSquadData();
 	}
+}
+
+void ASquadController::CheckForUpgrades()
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	RTSComponent->OnSquadInitializedLookingForUpgrades(this);
 }
 
 void ASquadController::UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const

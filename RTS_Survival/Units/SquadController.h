@@ -680,6 +680,7 @@ protected:
 	virtual void OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedClass);
 
 	virtual void OnAllSquadUnitsLoaded();
+	virtual void CheckForUpgrades();
 	
 	void UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const;
 	/**

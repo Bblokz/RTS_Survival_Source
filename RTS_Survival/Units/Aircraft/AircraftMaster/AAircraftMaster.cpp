@@ -63,6 +63,17 @@ void AAircraftMaster::BeginPlay()
 	BeginPlay_InitAircraft();
 	// Make sure the aircraft weapon knows if we are airborne or landed.
 	BeginPlay_PropagateStateToWpAndAnimInst();
+	CheckForUpgrades();
+}
+
+void AAircraftMaster::CheckForUpgrades()
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	GetRTSComponent()->OnAircraftInitializedLookingForUpgrades(this);
 }
 
 void AAircraftMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)

@@ -8,9 +8,15 @@
 #include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "RTS_Survival/TechTree/Technologies/Technologies.h"
 #include "RTSComponent.generated.h"
 
 
+class AAircraftMaster;
+class ABuildingExpansion;
+class ANomadicVehicle;
+class ASquadController;
+class ATankMaster;
 class UTacticalAIComp;
 DECLARE_MULTICAST_DELEGATE(FOnSubTypeInitialized);
 class RTS_SURVIVAL_API ACPPGameState;
@@ -100,6 +106,15 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetSelectionPriority(const int32 NewSelectionPriority);
 
+	bool HasTechnologyApplied(const ETechnology Technology) const;
+	void AddAppliedTechnology(const ETechnology Technology);
+
+	void OnTankInitializedLookingForUpgrades(ATankMaster* Tank);
+	void OnNomadicInitializedLookingForUpgrades(ANomadicVehicle* Nomadic);
+	void OnSquadInitializedLookingForUpgrades(ASquadController* Squad);
+	void OnBuildingExpansionInitializedLookingForUpgrades(ABuildingExpansion* BuildingExpansion);
+	void OnAircraftInitializedLookingForUpgrades(AAircraftMaster* Aircraft);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	int32 SelectionPriority = 0;
@@ -147,6 +162,10 @@ private:
 
 	// Can be converted to an enum subtype to provide more information about this unit.
 	uint8 M_UnitSubType;
+
+	UPROPERTY()
+	TArray<ETechnology> M_TechAppliedToUnit;
+
 
 	// Goes through the UPROPERTYs and checks if they are set in the derived blueprint.
 	void CheckExposedUVariables();

@@ -2,11 +2,15 @@
 
 
 #include "RTSComponent.h"
+#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/UnitTests/TestTurrets/ATestTurretOwner.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "TacticalAIComponents/TacticalAISquad/EnemySquadTacticalAI.h"
 #include "TacticalAIComponents/TacticalAITank/EnemyTankTacticalAI.h"
@@ -94,7 +98,7 @@ void URTSComponent::DeregisterFromGameState() const
 	{
 		AActor* ParentActor = GetOwner();
 		ACPPGameState* GameState = Cast<ACPPGameState>(World->GetGameState());
-		UGameUnitManager* GameUnitManager = NULL;
+		UGameUnitManager* GameUnitManager = nullptr;
 		if (IsValid(GameState))
 		{
 			GameUnitManager = GameState->GetGameUnitManager();
@@ -224,7 +228,7 @@ void URTSComponent::BeginPlay()
 
 	if (bAddToGameState)
 	{
-		if (!OwningPlayer == 0)
+		if (OwningPlayer != 0)
 		{
 			(void)AddUnitToGameState();
 		}
@@ -255,7 +259,7 @@ void URTSComponent::ChangeOwningPlayer(const uint8 NewOwningPlayer)
 		if (const UWorld* World = GetWorld())
 		{
 			ACPPGameState* GameState = Cast<ACPPGameState>(World->GetGameState());
-			UGameUnitManager* GameUnitManager = NULL;
+			UGameUnitManager* GameUnitManager = nullptr;
 			if (IsValid(GameState))
 			{
 				GameUnitManager = GameState->GetGameUnitManager();
@@ -420,3 +424,78 @@ void URTSComponent::CreateSquadTacticalAIAtOwner()
 	}
 }
 
+
+bool URTSComponent::HasTechnologyApplied(const ETechnology Technology) const
+{
+	return M_TechAppliedToUnit.Contains(Technology);
+}
+
+void URTSComponent::AddAppliedTechnology(const ETechnology Technology)
+{
+	M_TechAppliedToUnit.AddUnique(Technology);
+}
+
+void URTSComponent::OnTankInitializedLookingForUpgrades(ATankMaster* Tank)
+{
+	if (OwningPlayer != UPlayerTechManager::PlayerTechOwnerIndex || not IsValid(Tank))
+	{
+		return;
+	}
+
+	if (UPlayerTechManager* PlayerTechManager = FRTS_Statics::GetPlayerTechManager(this))
+	{
+		PlayerTechManager->CheckTechsToApplyToTank(Tank);
+	}
+}
+
+void URTSComponent::OnNomadicInitializedLookingForUpgrades(ANomadicVehicle* Nomadic)
+{
+	if (OwningPlayer != UPlayerTechManager::PlayerTechOwnerIndex || not IsValid(Nomadic))
+	{
+		return;
+	}
+
+	if (UPlayerTechManager* PlayerTechManager = FRTS_Statics::GetPlayerTechManager(this))
+	{
+		PlayerTechManager->CheckTechsToApplyToNomadic(Nomadic);
+	}
+}
+
+void URTSComponent::OnSquadInitializedLookingForUpgrades(ASquadController* Squad)
+{
+	if (OwningPlayer != UPlayerTechManager::PlayerTechOwnerIndex || not IsValid(Squad))
+	{
+		return;
+	}
+
+	if (UPlayerTechManager* PlayerTechManager = FRTS_Statics::GetPlayerTechManager(this))
+	{
+		PlayerTechManager->CheckTechsToApplyToSquad(Squad);
+	}
+}
+
+void URTSComponent::OnBuildingExpansionInitializedLookingForUpgrades(ABuildingExpansion* BuildingExpansion)
+{
+	if (OwningPlayer != UPlayerTechManager::PlayerTechOwnerIndex || not IsValid(BuildingExpansion))
+	{
+		return;
+	}
+
+	if (UPlayerTechManager* PlayerTechManager = FRTS_Statics::GetPlayerTechManager(this))
+	{
+		PlayerTechManager->CheckTechsToApplyToBuildingExpansion(BuildingExpansion);
+	}
+}
+
+void URTSComponent::OnAircraftInitializedLookingForUpgrades(AAircraftMaster* Aircraft)
+{
+	if (OwningPlayer != UPlayerTechManager::PlayerTechOwnerIndex || not IsValid(Aircraft))
+	{
+		return;
+	}
+
+	if (UPlayerTechManager* PlayerTechManager = FRTS_Statics::GetPlayerTechManager(this))
+	{
+		PlayerTechManager->CheckTechsToApplyToAircraft(Aircraft);
+	}
+}
