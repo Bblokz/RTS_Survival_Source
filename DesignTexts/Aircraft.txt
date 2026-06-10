@@ -5,11 +5,11 @@ because tech effects only do a single actor iterator to find actors to affect wh
 We are going the make the RTS component which can identify units with their  enum class EAllUnitType : uint8 and
 subtype combination the central component to see if a unit is eligable for an upgrade. we are also not going ot use actor iterators
 but instead rely on the unit manager to find units. We are also going to store which ETechnology was researched on the rts component
-for idempotence. We are also going to implement logic on TankMasters, SquadControllers and BuildingExpansions to call on their RTS component
+for idempotence. We are also going to implement logic on TankMasters, SquadControllers, NomadicVehicles, aircraft and BuildingExpansions to call on their RTS component
 to look for technologies that apply to them.
 
 so important is that; the technologies will NOT affect the data in the game state but are applied individually on top after
-the unit is loaded.
+the unit is loaded!
 
 First the UTechnologyEffect:
 instead of a get actor classes set which we want to get from them define new functions:
@@ -26,7 +26,8 @@ idem squads,
 idem buildingexpansions
 idem aircraft
 
-a
+by default they will all return empty arrays.
+make sure that in protected blueprint friendly arrays are set up the  designer can add subtype entries to, to find the unit to affect.
 
 make sure each of these is wrapped in a public non virtual one that calls this virtual one to have the technology do its specific
 unit alterations and after that it will call OnTechAppliedToActor which is also virtual; this one is called for each specific apply functions
@@ -37,17 +38,30 @@ There also needs to be UBehaviourClass (subclass of it) that can be specified on
 then in the base functions of the apply of each type, try to get  the behaviour component on that Tank, nomadic, etc 
 and if valid add behaviour with  that class. if no class is set in the technology; no error reporting just ignore this part in that case.
 
-
+On specific Technology classes that already exist and you need to refactor:
 because behaviours will then be supported to make changes for the technologies you can refactor the turret weapon upgrade base and derived techs to
 just that; rely on the behaviour to make the actual changes to the turrets of the units. (behaviours can already discriminate against
 weapon calibre and so that logic of affected weapons is no longer needed in those technologies)
-
 idem for infantry weapon upgrades; rely on the behaviour to make the changes. Do comment that above the class in both cases.
 
 
-by default they will all return empty arrays.
-make sure that in protected blueprint friendly arrays are set up the  designer can add subtype entries to, to find the unit to affect.
+DO make sure to correctly refactor the 
+class RTS_SURVIVAL_API UTE_LightRadixiteArmor : public UTechnologyEffect
+to still do its specific work for the different types of actors but instead of  	/** The class of tanks to search for */
+                                                                                	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+                                                                                	TSubclassOf<AActor> Panzer38TClass;
+                                                                                
+                                                                                	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+                                                                                	TSubclassOf<AActor> PanzerIIClass;
+                                                                                
+                                                                                	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+                                                                                	TSubclassOf<AActor> Sdkfz140Class;
+                                                                                
+make each of these arrays of etanksubtypes (there are mutliple panzer II types that will use this same armor upgrade)
+and make sure those are used to find out which of hte tanks we apply it on use which of the armor.                                                                                
 
+
+Moving on to the refactor of tech researching:
 here is how the new tech research will need to work:
 after loading the technology asset on OnTechResearched; only then add the enum to the M_ResearchedTechs (so units that are created
 while this is loading and after their initialization call for checking for tech do not have the issue of not finding their technology)
@@ -57,6 +71,34 @@ call on game unit manager ApplyTechToTanksOfPlayer which takes in the tech objec
 1 because the player tech manager is owned by player 1 only.
 then it will go through the player tanks and for each that matches the tanksubtype it will call ApplyOnTank on that tech object, with that tank)
 arrays that are empty do not call their unit manager apply function.
+
+after they are applied then all units that were fully intialized and hence in the unit manager now have the upgrade applied to them
+and their rts component updated to refelct that (due to the public func called that wraps the specific implementation together with te rts component
+update function)
+
+- Finally also add the loaded Tech object to a set of researched technologies which will be a UPROPERTY for the GC.
+This set will be used by units that are created after the research and are looking for techs to apply to themselves.
+
+now on how it will work for new units that are created at runtime while a tech may already have been researched:
+for tank masters; these are fully initialized and ready at the end of begin play in there call  a new protected virtual function 
+called CheckForUpgrades which in tank master base class will: on their RTS component call OnTankInitializedLookingForUpgrades, on nomadic vehicles override this and call
+OnNomadicInitializedLookingForUpgrades
+for squads add one that is only called after the squad is fully initialized (Very important, not at beginplay as squad units load async!)
+for building expansions call it at the end of void ABuildingExpansion::InitBuildingExpansion
+for aircraft call it at the end of void AAircraftMaster::BeginPlay()
+
+on the rts component's various upgrade check functions were we now have the pointer to the specific unit call a specific helper from a set
+of new public helpers on the player tech manager that you have to create, but only if the owning player is 1.
+for tanks it will be  CheckTechsToApplyToTank which will go through the set of researched technologies, compare the tanksubtype against tank subtypes supported
+of that tech object and if it matches call the public version of apply to tank with the tank that was looking for upgrades.
+idem for all other types.
+
+Implement all of this, for all the different types and refactor all technology logic in the game to now work exactly as i described here.
+You have to implement this completely; no half work.
+follow the coding standard.
+
+
+
 
 
 
