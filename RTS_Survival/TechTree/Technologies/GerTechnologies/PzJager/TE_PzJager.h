@@ -4,20 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
-#include "TE_PzJager.generated.h"!
+#include "TE_PzJager.generated.h"
+
+class ATankMaster;
 
 /**
- * 
+ * @brief PzJager technology hook; designers can add subtype targets and behaviour in the data asset.
  */
 UCLASS()
 class RTS_SURVIVAL_API UTE_PzJager : public UTechnologyEffect
 {
 	GENERATED_BODY()
 
-public:
-	virtual void ApplyTechnologyEffect(const UObject* WorldContextObject) override;
-
-
 protected:
-	virtual void OnApplyEffectToActor(AActor* ValidActor) override;
+	virtual void ApplyOnTank_Internal(ATankMaster* Tank) override;
 };

@@ -166,6 +166,7 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void BeginPlay() override;
+	virtual void CheckForUpgrades();
 
 	virtual void BeginDestroy() override;
 	virtual void UnitDies(const ERTSDeathType DeathType) override;

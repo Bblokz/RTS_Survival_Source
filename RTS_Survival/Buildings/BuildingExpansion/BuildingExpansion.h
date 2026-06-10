@@ -134,6 +134,7 @@ protected:
 	UBehaviourComp* BehaviourComponent;
 	
 	bool GetIsValidBehaviourComponent() const;
+	virtual void CheckForUpgrades();
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void VerticalDestruction(

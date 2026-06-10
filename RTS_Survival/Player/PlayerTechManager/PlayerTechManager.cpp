@@ -1,11 +1,18 @@
 ﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
-
 #include "PlayerTechManager.h"
 
 #include "Engine/AssetManager.h"
+#include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 TArray<ETechnology> UPlayerTechManager::GetMissingRequiredTechnologies(
@@ -32,77 +39,188 @@ bool UPlayerTechManager::HasAllRequiredTechnologies(const TArray<ETechnology>& R
 
 void UPlayerTechManager::OnTechResearched(ETechnology Tech)
 {
-	M_ResearchedTechs.Add(Tech);
+	if (M_ResearchedTechs.Contains(Tech) || M_TechnologiesWaitingForEffectLoad.Contains(Tech))
+	{
+		return;
+	}
+
 	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		const FString TechName = UEnum::GetValueAsString(Tech);
 		RTSFunctionLibrary::PrintString("Technology researched: " + TechName);
 	}
 
-	// Find the soft reference to the effect class
-	if (const TSoftClassPtr<UTechnologyEffect>* EffectClassPtr = M_TechnologyEffectsMap.Find(Tech))
-	{
-		if (EffectClassPtr->IsValid())
-		{
-			// Class asset is already loaded
-			UClass* EffectClass = EffectClassPtr->Get();
-			if (EffectClass)
-			{
-				// Create an instance of the class
-				UTechnologyEffect* TechEffect = NewObject<UTechnologyEffect>(this, EffectClass);
-				if (TechEffect)
-				{
-					TechEffect->ApplyTechnologyEffect(GetWorld());
-				}
-				else
-				{
-					RTSFunctionLibrary::ReportError(
-						"Failed to create technology effect instance for " + UEnum::GetValueAsString(Tech));
-				}
-			}
-			else
-			{
-				RTSFunctionLibrary::ReportError(
-					"Failed to get technology effect class for " + UEnum::GetValueAsString(Tech));
-			}
-		}
-		else
-		{
-			// Class asset is not loaded, load it asynchronously
-			FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
-			// Ensure that the Tech parameter is captured correctly
-			FSoftObjectPath AssetPath = EffectClassPtr->ToSoftObjectPath();
-			Streamable.RequestAsyncLoad(
-				AssetPath,
-				FStreamableDelegate::CreateUObject(this, &UPlayerTechManager::OnTechnologyEffectLoaded, Tech));
-		}
-	}
-	else
+	const TSoftClassPtr<UTechnologyEffect>* EffectClassPtr = M_TechnologyEffectsMap.Find(Tech);
+	if (EffectClassPtr == nullptr)
 	{
 		RTSFunctionLibrary::ReportError(
 			"The technology effect for " + UEnum::GetValueAsString(Tech) +
 			" is not found in the TechnologyEffectsMap.\nAdd the effect to the map in the PlayerTechManager actor component.");
+		return;
+	}
+
+	if (EffectClassPtr->IsValid())
+	{
+		RegisterAndApplyLoadedTechnology(Tech, NewObject<UTechnologyEffect>(this, EffectClassPtr->Get()));
+		return;
+	}
+
+	M_TechnologiesWaitingForEffectLoad.Add(Tech);
+	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
+	Streamable.RequestAsyncLoad(
+		EffectClassPtr->ToSoftObjectPath(),
+		FStreamableDelegate::CreateUObject(this, &UPlayerTechManager::OnTechnologyEffectLoaded, Tech));
+}
+
+void UPlayerTechManager::CheckTechsToApplyToTank(ATankMaster* Tank) const
+{
+	if (not IsValid(Tank))
+	{
+		return;
+	}
+
+	const URTSComponent* RTSComponent = Tank->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+
+	if (RTSComponent->GetUnitType() != EAllUnitType::UNType_Tank)
+	{
+		return;
+	}
+
+	const ETankSubtype TankSubtype = RTSComponent->GetSubtypeAsTankSubtype();
+	for (UTechnologyEffect* TechEffect : M_ResearchedTechnologyEffects)
+	{
+		if (IsValid(TechEffect) && TechEffect->GetTanksToApplyTo().Contains(TankSubtype))
+		{
+			TechEffect->ApplyOnTank(Tank);
+		}
+	}
+}
+
+void UPlayerTechManager::CheckTechsToApplyToNomadic(ANomadicVehicle* Nomadic) const
+{
+	if (not IsValid(Nomadic))
+	{
+		return;
+	}
+
+	const URTSComponent* RTSComponent = Nomadic->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+
+	if (RTSComponent->GetUnitType() != EAllUnitType::UNType_Nomadic)
+	{
+		return;
+	}
+
+	const ENomadicSubtype NomadicSubtype = RTSComponent->GetSubtypeAsNomadicSubtype();
+	for (UTechnologyEffect* TechEffect : M_ResearchedTechnologyEffects)
+	{
+		if (IsValid(TechEffect) && TechEffect->GetNomadicsToApplyTo().Contains(NomadicSubtype))
+		{
+			TechEffect->ApplyOnNomadic(Nomadic);
+		}
+	}
+}
+
+void UPlayerTechManager::CheckTechsToApplyToSquad(ASquadController* Squad) const
+{
+	if (not IsValid(Squad))
+	{
+		return;
+	}
+
+	const URTSComponent* RTSComponent = Squad->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+
+	if (RTSComponent->GetUnitType() != EAllUnitType::UNType_Squad)
+	{
+		return;
+	}
+
+	const ESquadSubtype SquadSubtype = RTSComponent->GetSubtypeAsSquadSubtype();
+	for (UTechnologyEffect* TechEffect : M_ResearchedTechnologyEffects)
+	{
+		if (IsValid(TechEffect) && TechEffect->GetSquadsToApplyTo().Contains(SquadSubtype))
+		{
+			TechEffect->ApplyOnSquad(Squad);
+		}
+	}
+}
+
+void UPlayerTechManager::CheckTechsToApplyToBuildingExpansion(ABuildingExpansion* BuildingExpansion) const
+{
+	if (not IsValid(BuildingExpansion))
+	{
+		return;
+	}
+
+	const URTSComponent* RTSComponent = BuildingExpansion->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+
+	if (RTSComponent->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
+	{
+		return;
+	}
+
+	const EBuildingExpansionType BxpSubtype = RTSComponent->GetSubtypeAsBxpSubtype();
+	for (UTechnologyEffect* TechEffect : M_ResearchedTechnologyEffects)
+	{
+		if (IsValid(TechEffect) && TechEffect->GetBuildingExpansionsToApplyTo().Contains(BxpSubtype))
+		{
+			TechEffect->ApplyOnBuildingExpansion(BuildingExpansion);
+		}
+	}
+}
+
+void UPlayerTechManager::CheckTechsToApplyToAircraft(AAircraftMaster* Aircraft) const
+{
+	if (not IsValid(Aircraft))
+	{
+		return;
+	}
+
+	const URTSComponent* RTSComponent = Aircraft->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+
+	if (RTSComponent->GetUnitType() != EAllUnitType::UNType_Aircraft)
+	{
+		return;
+	}
+
+	const EAircraftSubtype AircraftSubtype = RTSComponent->GetSubtypeAsAircraftSubtype();
+	for (UTechnologyEffect* TechEffect : M_ResearchedTechnologyEffects)
+	{
+		if (IsValid(TechEffect) && TechEffect->GetAircraftToApplyTo().Contains(AircraftSubtype))
+		{
+			TechEffect->ApplyOnAircraft(Aircraft);
+		}
 	}
 }
 
 void UPlayerTechManager::InitTechsInManager(ACPPController* Controller)
 {
-	if (IsValid(Controller))
+	if (not IsValid(Controller))
 	{
-		M_TechnologyEffectsMap = Controller->GetTechnologyEffectsMap();
-		if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
-		{
-			for (auto EachTech : M_TechnologyEffectsMap)
-			{
-				FString TechName = UEnum::GetValueAsString(EachTech.Key);
-				FString TechEffect = EachTech.Value.IsValid() ? EachTech.Value->GetName() : "INVALID";
-				RTSFunctionLibrary::PrintString("Technology: " + TechName + " Effect: " + TechEffect);
-			}
-		}
-
+		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "Controller", "InitTechsInManager");
 		return;
 	}
-	RTSFunctionLibrary::ReportNullErrorInitialisation(this, "Controller", "InitTechsInManager");
+
+	M_TechnologyEffectsMap = Controller->GetTechnologyEffectsMap();
 }
 
 void UPlayerTechManager::BeginPlay()
@@ -112,41 +230,77 @@ void UPlayerTechManager::BeginPlay()
 
 void UPlayerTechManager::OnTechnologyEffectLoaded(ETechnology Tech)
 {
-	// Find the soft reference to the effect class
-	if (const TSoftClassPtr<UTechnologyEffect>* EffectClassPtr = M_TechnologyEffectsMap.Find(Tech))
+	M_TechnologiesWaitingForEffectLoad.Remove(Tech);
+	const TSoftClassPtr<UTechnologyEffect>* EffectClassPtr = M_TechnologyEffectsMap.Find(Tech);
+	if (EffectClassPtr == nullptr || not EffectClassPtr->IsValid())
 	{
-		if (EffectClassPtr->IsValid())
-		{
-			UClass* EffectClass = EffectClassPtr->Get();
-			if (EffectClass)
-			{
-				// Create an instance of the class
-				UTechnologyEffect* TechEffect = NewObject<UTechnologyEffect>(this, EffectClass);
-				if (TechEffect)
-				{
-					TechEffect->ApplyTechnologyEffect(GetWorld());
-					return;
-				}
-				RTSFunctionLibrary::ReportError(
-					"Failed to create technology effect instance for " + UEnum::GetValueAsString(Tech));
-			}
-			else
-			{
-				RTSFunctionLibrary::ReportError(
-					"Failed to get technology effect class after loading for " + UEnum::GetValueAsString(Tech));
-			}
-		}
-		else
-		{
-			RTSFunctionLibrary::ReportError(
-				"Technology effect class for " + UEnum::GetValueAsString(Tech) +
-				" is still not loaded after async load.");
-		}
+		RTSFunctionLibrary::ReportError("Technology effect class for " + UEnum::GetValueAsString(Tech) +
+			" is not loaded after async load.");
+		return;
 	}
-	else
+
+	RegisterAndApplyLoadedTechnology(Tech, NewObject<UTechnologyEffect>(this, EffectClassPtr->Get()));
+}
+
+void UPlayerTechManager::RegisterAndApplyLoadedTechnology(ETechnology Tech, UTechnologyEffect* TechEffect)
+{
+	if (M_ResearchedTechs.Contains(Tech))
 	{
-		RTSFunctionLibrary::ReportError(
-			"The technology effect for " + UEnum::GetValueAsString(Tech) +
-			" is not found in the TechnologyEffectsMap.");
+		return;
+	}
+
+	if (not IsValid(TechEffect))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create technology effect instance for " + UEnum::GetValueAsString(Tech));
+		return;
+	}
+
+	TechEffect->SetTechnology(Tech);
+	M_ResearchedTechs.Add(Tech);
+	M_ResearchedTechnologyEffects.Add(TechEffect);
+	ApplyTechnologyToCurrentUnits(TechEffect);
+}
+
+void UPlayerTechManager::ApplyTechnologyToCurrentUnits(UTechnologyEffect* TechEffect) const
+{
+	if (not IsValid(TechEffect))
+	{
+		return;
+	}
+
+	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		return;
+	}
+
+	const TArray<ETankSubtype> TankSubtypes = TechEffect->GetTanksToApplyTo();
+	if (not TankSubtypes.IsEmpty())
+	{
+		GameUnitManager->ApplyTechToTanksOfPlayer(TechEffect, TankSubtypes, PlayerTechOwnerIndex);
+	}
+
+	const TArray<ENomadicSubtype> NomadicSubtypes = TechEffect->GetNomadicsToApplyTo();
+	if (not NomadicSubtypes.IsEmpty())
+	{
+		GameUnitManager->ApplyTechToNomadicsOfPlayer(TechEffect, NomadicSubtypes, PlayerTechOwnerIndex);
+	}
+
+	const TArray<ESquadSubtype> SquadSubtypes = TechEffect->GetSquadsToApplyTo();
+	if (not SquadSubtypes.IsEmpty())
+	{
+		GameUnitManager->ApplyTechToSquadsOfPlayer(TechEffect, SquadSubtypes, PlayerTechOwnerIndex);
+	}
+
+	const TArray<EBuildingExpansionType> BxpSubtypes = TechEffect->GetBuildingExpansionsToApplyTo();
+	if (not BxpSubtypes.IsEmpty())
+	{
+		GameUnitManager->ApplyTechToBuildingExpansionsOfPlayer(TechEffect, BxpSubtypes, PlayerTechOwnerIndex);
+	}
+
+	const TArray<EAircraftSubtype> AircraftSubtypes = TechEffect->GetAircraftToApplyTo();
+	if (not AircraftSubtypes.IsEmpty())
+	{
+		GameUnitManager->ApplyTechToAircraftOfPlayer(TechEffect, AircraftSubtypes, PlayerTechOwnerIndex);
 	}
 }

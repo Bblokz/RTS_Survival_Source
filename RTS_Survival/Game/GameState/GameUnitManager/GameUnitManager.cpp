@@ -2,6 +2,7 @@
 
 
 #include "GameUnitManager.h"
+#include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
 
 #include "GetTargetUnitThread/GetAsyncTarget.h"
 #include "RTS_Survival/DeveloperSettings.h"
@@ -1755,4 +1756,153 @@ TPair<ETargetPreference, FVector> UGameUnitManager::CreatePair(const FVector& Ac
                                                                const ETargetPreference& Preference)
 {
 	return {Preference, ActorLocation};
+}
+
+void UGameUnitManager::ApplyTechToTanksOfPlayer(
+	UTechnologyEffect* TechEffect,
+	const TArray<ETankSubtype>& TankSubtypes,
+	const uint8 Player) const
+{
+	if (not IsValid(TechEffect))
+	{
+		return;
+	}
+
+	const TArray<ATankMaster*>& Tanks = Player == 1 ? M_TankMastersAlivePlayer : M_TankMastersAliveEnemy;
+	for (ATankMaster* Tank : Tanks)
+	{
+		if (not IsValid(Tank))
+		{
+			continue;
+		}
+
+		const URTSComponent* RTSComponent = Tank->GetRTSComponent();
+		if (IsValid(RTSComponent) &&
+			RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank &&
+			TankSubtypes.Contains(RTSComponent->GetSubtypeAsTankSubtype()))
+		{
+			TechEffect->ApplyOnTank(Tank);
+		}
+	}
+}
+
+void UGameUnitManager::ApplyTechToNomadicsOfPlayer(
+	UTechnologyEffect* TechEffect,
+	const TArray<ENomadicSubtype>& NomadicSubtypes,
+	const uint8 Player) const
+{
+	if (not IsValid(TechEffect))
+	{
+		return;
+	}
+
+	const TArray<ATankMaster*>& Tanks = Player == 1 ? M_TankMastersAlivePlayer : M_TankMastersAliveEnemy;
+	for (ATankMaster* Tank : Tanks)
+	{
+		ANomadicVehicle* Nomadic = Cast<ANomadicVehicle>(Tank);
+		if (not IsValid(Nomadic))
+		{
+			continue;
+		}
+
+		const URTSComponent* RTSComponent = Nomadic->GetRTSComponent();
+		if (IsValid(RTSComponent) &&
+			RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic &&
+			NomadicSubtypes.Contains(RTSComponent->GetSubtypeAsNomadicSubtype()))
+		{
+			TechEffect->ApplyOnNomadic(Nomadic);
+		}
+	}
+}
+
+void UGameUnitManager::ApplyTechToSquadsOfPlayer(
+	UTechnologyEffect* TechEffect,
+	const TArray<ESquadSubtype>& SquadSubtypes,
+	const uint8 Player) const
+{
+	if (not IsValid(TechEffect))
+	{
+		return;
+	}
+
+	const TArray<ASquadUnit*>& SquadUnits = Player == 1 ? M_SquadUnitAlivePlayer : M_SquadUnitsAliveEnemy;
+	TSet<ASquadController*> ProcessedSquads;
+	for (ASquadUnit* SquadUnit : SquadUnits)
+	{
+		if (not IsValid(SquadUnit))
+		{
+			continue;
+		}
+
+		ASquadController* Squad = SquadUnit->GetSquadControllerChecked();
+		if (not IsValid(Squad) || ProcessedSquads.Contains(Squad))
+		{
+			continue;
+		}
+
+		ProcessedSquads.Add(Squad);
+		const URTSComponent* RTSComponent = Squad->GetRTSComponent();
+		if (IsValid(RTSComponent) &&
+			RTSComponent->GetUnitType() == EAllUnitType::UNType_Squad &&
+			SquadSubtypes.Contains(RTSComponent->GetSubtypeAsSquadSubtype()))
+		{
+			TechEffect->ApplyOnSquad(Squad);
+		}
+	}
+}
+
+void UGameUnitManager::ApplyTechToBuildingExpansionsOfPlayer(
+	UTechnologyEffect* TechEffect,
+	const TArray<EBuildingExpansionType>& BxpSubtypes,
+	const uint8 Player) const
+{
+	if (not IsValid(TechEffect))
+	{
+		return;
+	}
+
+	const TArray<ABuildingExpansion*>& BuildingExpansions = Player == 1 ? M_BxpAlivePlayer : M_BxpAliveEnemy;
+	for (ABuildingExpansion* BuildingExpansion : BuildingExpansions)
+	{
+		if (not IsValid(BuildingExpansion))
+		{
+			continue;
+		}
+
+		const URTSComponent* RTSComponent = BuildingExpansion->GetRTSComponent();
+		if (IsValid(RTSComponent) &&
+			RTSComponent->GetUnitType() == EAllUnitType::UNType_BuildingExpansion &&
+			BxpSubtypes.Contains(RTSComponent->GetSubtypeAsBxpSubtype()))
+		{
+			TechEffect->ApplyOnBuildingExpansion(BuildingExpansion);
+		}
+	}
+}
+
+void UGameUnitManager::ApplyTechToAircraftOfPlayer(
+	UTechnologyEffect* TechEffect,
+	const TArray<EAircraftSubtype>& AircraftSubtypes,
+	const uint8 Player) const
+{
+	if (not IsValid(TechEffect))
+	{
+		return;
+	}
+
+	const TArray<AAircraftMaster*>& AircraftUnits = Player == 1 ? M_AircraftMastersAlivePlayer : M_AircraftMastersAliveEnemy;
+	for (AAircraftMaster* Aircraft : AircraftUnits)
+	{
+		if (not IsValid(Aircraft))
+		{
+			continue;
+		}
+
+		const URTSComponent* RTSComponent = Aircraft->GetRTSComponent();
+		if (IsValid(RTSComponent) &&
+			RTSComponent->GetUnitType() == EAllUnitType::UNType_Aircraft &&
+			AircraftSubtypes.Contains(RTSComponent->GetSubtypeAsAircraftSubtype()))
+		{
+			TechEffect->ApplyOnAircraft(Aircraft);
+		}
+	}
 }

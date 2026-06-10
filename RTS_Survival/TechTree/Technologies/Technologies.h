@@ -5,8 +5,8 @@
 #include "Technologies.generated.h"
 // How to add a new technology:
 // 1. Create a new enum value in ETechnology and define a matching name in GLOBAL_GetTechAsString.
-// 2. Create a new class that inherits from UTechnologyEffect and implement the ApplyTechnologyEffect method,
-// the OnApplyEffectToActor method and the GetTargetActorClasses method.
+// 2. Create a new class that inherits from UTechnologyEffect and configure/override subtype target arrays.
+// Implement the per-unit ApplyOn..._Internal function for custom logic.
 // 3. Add a new data entry in the DT_[faction]_Technologies datatable.
 // 4. Derive a TEBP_Technology from the created cpp class and setup the properties.
 // 5. VERY IMPORTANT: in the blueprint player controller class, add a new entry to the map from ETechnology to TEBP_Technology.

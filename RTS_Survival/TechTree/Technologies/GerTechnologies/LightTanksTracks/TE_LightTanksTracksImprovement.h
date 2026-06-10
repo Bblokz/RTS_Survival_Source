@@ -4,31 +4,22 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
-#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "TE_LightTanksTracksImprovement.generated.h"
 
+class ATankMaster;
+
 /**
- * 
+ * @brief Applies mobility changes directly to eligible loaded tanks after the tech manager matches subtypes.
  */
 UCLASS()
 class RTS_SURVIVAL_API UTE_LightTanksTracksImprovement : public UTechnologyEffect
 {
 	GENERATED_BODY()
 
-public:
-	virtual void ApplyTechnologyEffect(const UObject* WorldContextObject) override;
-
-
 protected:
-	virtual void OnApplyEffectToActor(AActor* ValidActor) override;
-	void UpgradeGameStateOfTank(const ATankMaster* ValidTank) const;
-
-	virtual TSet<TSubclassOf<AActor>> GetTargetActorClasses() const override;
+	virtual void ApplyOnTank_Internal(ATankMaster* Tank) override;
 
 private:
-	UPROPERTY(EditDefaultsOnly, Category = "Affected Units")
-	TArray<TSubclassOf<AActor>> AffectedUnits;
-
 	UPROPERTY(EditDefaultsOnly, Category = "Effect")
 	float MaxSpeedMlt = 1.15f;
 

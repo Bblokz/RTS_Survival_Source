@@ -222,6 +222,7 @@ protected:
 	FNomadicCargoSettings CargoSettings;
 
 	virtual void BeginPlay() override;
+	virtual void CheckForUpgrades() override;
 	virtual void BeginDestroy() override;
 	virtual void PostInitializeComponents() override;
 

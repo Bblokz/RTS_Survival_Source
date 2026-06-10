@@ -836,6 +836,17 @@ void ABuildingExpansion::InitBuildingExpansion(
 	{
 		OnBxpStandAlone();
 	}
+	CheckForUpgrades();
+}
+
+void ABuildingExpansion::CheckForUpgrades()
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	GetRTSComponent()->OnBuildingExpansionInitializedLookingForUpgrades(this);
 }
 
 void ABuildingExpansion::OnFinishedExpansionConstruction()

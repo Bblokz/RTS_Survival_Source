@@ -11,6 +11,8 @@
 #include "GameUnitManager.generated.h"
 
 class AAircraftMaster;
+class ANomadicVehicle;
+class UTechnologyEffect;
 enum class EAircraftSubtype : uint8;
 enum class EBuildingExpansionType : uint8;
 enum class ESquadSubtype : uint8;
@@ -159,6 +161,12 @@ public:
 	 * @param Player The player that owns the tanks
 	 */
 	TArray<ATankMaster*> GetPlayerTanks(const uint8 Player) const;
+
+	void ApplyTechToTanksOfPlayer(UTechnologyEffect* TechEffect, const TArray<ETankSubtype>& TankSubtypes, uint8 Player) const;
+	void ApplyTechToNomadicsOfPlayer(UTechnologyEffect* TechEffect, const TArray<ENomadicSubtype>& NomadicSubtypes, uint8 Player) const;
+	void ApplyTechToSquadsOfPlayer(UTechnologyEffect* TechEffect, const TArray<ESquadSubtype>& SquadSubtypes, uint8 Player) const;
+	void ApplyTechToBuildingExpansionsOfPlayer(UTechnologyEffect* TechEffect, const TArray<EBuildingExpansionType>& BxpSubtypes, uint8 Player) const;
+	void ApplyTechToAircraftOfPlayer(UTechnologyEffect* TechEffect, const TArray<EAircraftSubtype>& AircraftSubtypes, uint8 Player) const;
 
 	int32 GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const;
 	int32 GetPlayerTankCountOfTypes(const uint8 Player, const TArray<ETankSubtype>& TankTypes) const;
