@@ -72,9 +72,10 @@ UFUNCTION(BlueprintCallable , NotBlueprintable)
 	/**
 	 * Propagates the amount of health after reaching a certain threshold.
 	 * @param PercentageLeft Enum level of percentage health that is left.
+	 * @param bIsHealing Whether the unit was damaged or healed to reach that level.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, Category="HealthComponent")
-	void Bp_OnHealthChanged(const EHealthLevel PercentageLeft);
+	void Bp_OnHealthChanged(const EHealthLevel PercentageLeft, bool bIsHealing);
 
 protected:
 	// Contains Health and primitive armor values.

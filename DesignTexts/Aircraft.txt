@@ -1,8 +1,62 @@
-﻿You need to add a new feature to the mission manager that is callable from the mission base.
-it will concern making choices for which arrays of units to spawn depending on the campaign generation seed.
+﻿You are a c++ expert and pefectionist and will execute a big refactor on how technologies work in this game.
 
-here is what i want:
-esentially the function call will get an array of FSeededChoices where each FSeededChoices has multiple choices;
-a choice is itself a struct containing an array of FseededOptions which contains all the options the seeding can select from.an array of  FVectors and associated soft object ptrs to AActors, those concern actors that do not need to 
-an FSeededOption has
-be spawned through the async spanwer but rather are spawned asynchronously through calling the assetloader directly
+The goal is to fix the issue of units not getting tech effects if they are created after the research is completed
+because tech effects only do a single actor iterator to find actors to affect when researched.
+We are going the make the RTS component which can identify units with their  enum class EAllUnitType : uint8 and
+subtype combination the central component to see if a unit is eligable for an upgrade. we are also not going ot use actor iterators
+but instead rely on the unit manager to find units. We are also going to store which ETechnology was researched on the rts component
+for idempotence. We are also going to implement logic on TankMasters, SquadControllers and BuildingExpansions to call on their RTS component
+to look for technologies that apply to them.
+
+so important is that; the technologies will NOT affect the data in the game state but are applied individually on top after
+the unit is loaded.
+
+First the UTechnologyEffect:
+instead of a get actor classes set which we want to get from them define new functions:
+GetNomadicsToApplyTo which will return an Array of ENomadicSubtype
+GetTanksToApply to which wil return an array of ETankSubtype
+idem for squad subtpe and
+idem for EBuildingExpansionType
+and idem for EAircraftSubtype
+
+also the technology will have virtual functions for Applying, one for each unit so:
+ApplyOnTank taking in an ATankMaster*
+ApplyOnNomadic taking in ANomadicVehicle
+idem squads,
+idem buildingexpansions
+idem aircraft
+
+a
+
+make sure each of these is wrapped in a public non virtual one that calls this virtual one to have the technology do its specific
+unit alterations and after that it will call OnTechAppliedToActor which is also virtual; this one is called for each specific apply functions
+and all it will do in the base iteration is get the unit's RTScomponent and add the technology enum to its TechAppliedToUnit array so we know in the future that
+this tech was already applied.
+
+There also needs to be UBehaviourClass (subclass of it) that can be specified on the behaviour (protected ,bp friendly again)
+then in the base functions of the apply of each type, try to get  the behaviour component on that Tank, nomadic, etc 
+and if valid add behaviour with  that class. if no class is set in the technology; no error reporting just ignore this part in that case.
+
+
+because behaviours will then be supported to make changes for the technologies you can refactor the turret weapon upgrade base and derived techs to
+just that; rely on the behaviour to make the actual changes to the turrets of the units. (behaviours can already discriminate against
+weapon calibre and so that logic of affected weapons is no longer needed in those technologies)
+
+idem for infantry weapon upgrades; rely on the behaviour to make the changes. Do comment that above the class in both cases.
+
+
+by default they will all return empty arrays.
+make sure that in protected blueprint friendly arrays are set up the  designer can add subtype entries to, to find the unit to affect.
+
+here is how the new tech research will need to work:
+after loading the technology asset on OnTechResearched; only then add the enum to the M_ResearchedTechs (so units that are created
+while this is loading and after their initialization call for checking for tech do not have the issue of not finding their technology)
+when the tech object is loaded:
+- go through each of its arrays of units to apply it to if an array is not empty lets say TankMaster array is not empty then
+call on game unit manager ApplyTechToTanksOfPlayer which takes in the tech object, the array of tanksubtypes, and the owning player in this case
+1 because the player tech manager is owned by player 1 only.
+then it will go through the player tanks and for each that matches the tanksubtype it will call ApplyOnTank on that tech object, with that tank)
+arrays that are empty do not call their unit manager apply function.
+
+
+

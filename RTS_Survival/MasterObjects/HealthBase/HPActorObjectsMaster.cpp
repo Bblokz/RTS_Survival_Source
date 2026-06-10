@@ -65,7 +65,7 @@ float AHPActorObjectsMaster::TakeDamage(
 
 void AHPActorObjectsMaster::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
 {
-	Bp_OnHealthChanged(PercentageLeft);
+	Bp_OnHealthChanged(PercentageLeft, bIsHealing);
 }
 
 bool AHPActorObjectsMaster::GetIsValidHealthComponent() const

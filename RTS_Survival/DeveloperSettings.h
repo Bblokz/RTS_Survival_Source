@@ -860,6 +860,7 @@ namespace DeveloperSettings
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);
 			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
+			inline constexpr float AircraftSmallArmsRange= RoundToNearestMultipleOfFive(12000.f * GameRangeMlt);
 
 			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
 			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9800.f * GameRangeMlt);

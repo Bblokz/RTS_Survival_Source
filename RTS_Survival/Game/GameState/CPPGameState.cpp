@@ -2471,7 +2471,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::AircraftSmallArmsRange;
 	WeaponData.ArmorPen = 24;
 	WeaponData.ArmorPenMaxRange = 14;
 	WeaponData.MagCapacity = 600;
@@ -5277,9 +5277,9 @@ void ACPPGameState::InitAllGameMediumTankData()
 		const float T44LaserCostMlt = 2.0f;
 		const float T44LaserExpWorthMlt = 3.5f;
 		const int32 T44LaserCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			PantherG_Radixite * T44LaserCostMlt, 10);
+			HeavyTanks::PantherG_Radixite * T44LaserCostMlt, 10);
 		const int32 T44LaserVehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			PantherG_VehicleParts * T44LaserCostMlt, 10);
+			HeavyTanks::PantherG_VehicleParts * T44LaserCostMlt, 10);
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
@@ -5801,9 +5801,9 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// SU-152 (heavy tank destroyer)
 	{
 		const int32 Su152RadixiteCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			(JagdPanther_Radixite + Stug_Radixite) * 0.5f, 10);
+			(JagdPanther_Radixite + MediumTanks::Stug_Radixite) * 0.5f, 10);
 		const int32 Su152VehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			(JagdPanther_VehicleParts + Stug_VehicleParts) * 0.5f, 10);
+			(JagdPanther_VehicleParts + MediumTanks::Stug_VehicleParts) * 0.5f, 10);
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
@@ -7103,7 +7103,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	});
 	NomadicData.EnergySupply = T1EnergyBuildingSupply;
 	NomadicData.ExpansionRadius = T1BuildingRadius - 200;
-	NomadicData.BuildRadius = T1BuildingRadius;
+	NomadicData.BuildRadius = 3300;
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 		AsEconomic(EBuildingExpansionType::BXT_SolarSmall),
