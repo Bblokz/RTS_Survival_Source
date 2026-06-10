@@ -349,6 +349,8 @@ void ABuildingExpansion::PostInitializeComponents()
 	UBehaviourComp* BehaviourComp = FindComponentByClass<UBehaviourComp>();
 	BehaviourComponent = BehaviourComp;
 	(void)GetIsValidBehaviourComponent();
+	BP_PostInit_SetupRTSSubtype();
+	PostInit_SetupAbilities();
 }
 
 void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -1402,25 +1404,13 @@ void ABuildingExpansion::OnInitBuildingExpansion_SetupCollision(const bool bLetB
 	                                                     bLetBuildingComponentAffectNavmesh);
 }
 
-void ABuildingExpansion::BeginPlay_NextFrameInitAbilities()
+void ABuildingExpansion::PostInit_SetupAbilities()
 {
-	UWorld* World = GetWorld();
-	if (not World)
-	{
-		return;
-	}
-	TWeakObjectPtr<ABuildingExpansion> WeakThis(this);
-	auto SetAbilitiesLambda = [WeakThis]()-> void
-	{
-		if (not WeakThis.IsValid() || not WeakThis.Get()->GetIsValidRTSComponent())
-		{
-			return;
-		}
-		URTSComponent* RTSComp = WeakThis.Get()->GetRTSComponent();
+		URTSComponent* RTSComp = GetRTSComponent();
 		if (RTSComp->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
 		{
 			RTSFunctionLibrary::ReportError(
-				"Cannot init abililties for building expansion: " + WeakThis.Get()->GetName() +
+				"Cannot init abililties for building expansion: " + GetName() +
 				"\n Building expansion is not of type BuildingExpansion. \n Ensure the building expansion is spawned correctly.");
 			return;
 		}
@@ -1429,27 +1419,23 @@ void ABuildingExpansion::BeginPlay_NextFrameInitAbilities()
 		if (RTSComp->GetOwningPlayer() == 1)
 		{
 			const FBxpData BxpData = FRTS_Statics::BP_GetPlayerBxpData(MyBxpType,
-			                                                           WeakThis.Get(), bIsValidData);
-			WeakThis.Get()->InitAbilityArray(BxpData.Abilities);
+			                                                           this, bIsValidData);
+			InitAbilityArray(BxpData.Abilities);
 		}
 		else
 		{
 			const FBxpData BxpData = FRTS_Statics::BP_GetEnemyBxpData(MyBxpType,
-			                                                          WeakThis.Get(), bIsValidData);
-			WeakThis.Get()->InitAbilityArray(BxpData.Abilities);
+			                                                          this, bIsValidData);
+			InitAbilityArray(BxpData.Abilities);
 		}
 		if (not bIsValidData)
 		{
 			RTSFunctionLibrary::ReportError("Could not get valid data for buiding expansion when setting the abilities"
 				"\n in function ABuildingExpansion::BeginPlay_NextFrameInitAbilities"
-				"\n for expansion: " + WeakThis.Get()->GetName() +
+				"\n for expansion: " + GetName() +
 				"\n Ensure the data is set correctly in the GameState");
 		}
-	};
-	FTimerDelegate TimerDelegate;
-	TimerDelegate.BindLambda(SetAbilitiesLambda);
-	// Fire next frame.
-	World->GetTimerManager().SetTimerForNextTick(TimerDelegate);
+
 }
 
 void ABuildingExpansion::DebugDisplayMessage(const FString& Message) const

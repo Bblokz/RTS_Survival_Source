@@ -2946,7 +2946,7 @@ void ICommands::ExecuteResearchTechnologyCommand(const ETechnology Technology)
 
 	if (ACPPController* PlayerController = FRTS_Statics::GetRTSController(GetOwnerActor()))
 	{
-		PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ResearchComplete, true, false);
+		(void)PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ResearchComplete, true, false);
 	}
 
 	if (UResearchTechnologyAbilityComp* ResearchTechnologyComp =

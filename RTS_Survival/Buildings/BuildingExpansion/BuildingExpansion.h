@@ -44,6 +44,7 @@ DECLARE_MULTICAST_DELEGATE(FOnBxpCancelledPackingUp);
  * These slots are stored in a TArray in the building expansion owner component called UBuildingExpansionOwnerComp.
  * To interact with this component accross multiple different derived actor classes we use the IBuildingExpansionOwner interface.
  *
+ *@note Ensure the rts subtype is set on the bxp with the post init event
  * @note Bxps are spawned async using the ARTSAsyncSpawner class.
  * @note The previewmesh is loaded sync with game thread.
  */
@@ -129,6 +130,9 @@ protected:
 
 	UFUNCTION(BlueprintCallable,NotBlueprintable)
 	void SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> Primitives);
+	
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_PostInit_SetupRTSSubtype();
 	
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Reference")
 	UBehaviourComp* BehaviourComponent;
@@ -478,7 +482,7 @@ private:
 	void OnHullWeaponKilledActor(UHullWeaponComponent* CallingHullWeapon, AActor* DestroyedActor);
 
 	void OnInitBuildingExpansion_SetupCollision(const bool bLetBuildingComponentAffectNavmesh) const;
-	void BeginPlay_NextFrameInitAbilities();
+	void PostInit_SetupAbilities();
 
 	void DebugDisplayMessage(const FString& Message) const;
 
