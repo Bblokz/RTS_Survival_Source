@@ -23,6 +23,11 @@
 
 const float VerticalTextAircraftZOffset = 150.f;
 
+namespace
+{
+	constexpr float LandedAircraftVisionRadiusMultiplier = 0.2f;
+}
+
 AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
 	: ASelectablePawnMaster(ObjectInitializer)
 {
@@ -92,6 +97,7 @@ void AAircraftMaster::PostInitializeComponents()
 		// Do not use the function as we wait for references to be set before propagating the state.
 		/** @See BeginPlay_PropagateStateToWpAndAnimInst */
 		M_LandedState = EAircraftLandingState::Landed;
+		UpdateFowVisionRadiusForLandedState();
 	}
 	else
 	{
@@ -99,6 +105,7 @@ void AAircraftMaster::PostInitializeComponents()
 		/** @See BeginPlay_PropagateStateToWpAndAnimInst */
 		M_LandedState = EAircraftLandingState::Airborne;
 		M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+		UpdateFowVisionRadiusForLandedState();
 	}
 
 	// was: M_MovementState = EAircraftMovementState::Idle;
@@ -733,6 +740,7 @@ void AAircraftMaster::PostInit_InitWeaponInitAnim()
 void AAircraftMaster::UpdateLandedState(const EAircraftLandingState NewState)
 {
 	M_LandedState = NewState;
+	UpdateFowVisionRadiusForLandedState();
 	UpdateAircraftWeaponWithLandedState();
 	UpdateAircraftAnimationWithLandedState();
 }
@@ -1400,10 +1408,7 @@ void AAircraftMaster::BeginPlay_InitAircraft()
 	const FAircraftData AircraftData = GameState->GetAircraftDataOfPlayer(AircraftSubtype, OwningPlayer);
 	UnitCommandData->SetAbilities(AircraftData.Abilities);
 
-	if (FowComponent)
-	{
-		FowComponent->SetVisionRadius(AircraftData.VisionRadius);
-	}
+	SetFullVisionRadius(AircraftData.VisionRadius);
 	if (HealthComponent)
 	{
 		HealthComponent->InitHealthAndResistance(AircraftData.ResistancesAndDamageMlt, AircraftData.MaxHealth);
@@ -1565,6 +1570,51 @@ bool AAircraftMaster::EnsureAircraftWeaponIsValid() const
 	return true;
 }
 
+
+bool AAircraftMaster::EnsureFowComponentIsValid() const
+{
+	if (not IsValid(FowComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			this,
+			"FowComponent",
+			"AAircraftMaster::EnsureFowComponentIsValid");
+		return false;
+	}
+
+	return true;
+}
+
+void AAircraftMaster::SetFullVisionRadius(const float NewFullVisionRadius)
+{
+	M_FullVisionRadius = NewFullVisionRadius;
+	UpdateFowVisionRadiusForLandedState();
+}
+
+void AAircraftMaster::UpdateFowVisionRadiusForLandedState() const
+{
+	if (M_FullVisionRadius <= 0.f)
+	{
+		return;
+	}
+
+	if (not EnsureFowComponentIsValid())
+	{
+		return;
+	}
+
+	FowComponent->SetVisionRadius(GetVisionRadiusForCurrentLandedState());
+}
+
+float AAircraftMaster::GetVisionRadiusForCurrentLandedState() const
+{
+	if (M_LandedState == EAircraftLandingState::Landed)
+	{
+		return M_FullVisionRadius * LandedAircraftVisionRadiusMultiplier;
+	}
+
+	return M_FullVisionRadius;
+}
 
 void AAircraftMaster::UpdateAircraftWeaponWithLandedState() const
 {

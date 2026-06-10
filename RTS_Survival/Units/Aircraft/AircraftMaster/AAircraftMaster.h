@@ -272,8 +272,23 @@ private:
 	/** @brief Authoritative vertical/landing phase (tick routing + anim/weapon gating). */
 	EAircraftLandingState M_LandedState = EAircraftLandingState::None;
 
-	/** @brief Update phase and propagate to weapons/anim to keep them consistent. */
+	/** @brief Update phase and propagate to FOW/weapons/anim to keep them consistent. */
 	void UpdateLandedState(const EAircraftLandingState NewState);
+
+	/** @brief Full airborne vision radius from aircraft data, cached so landed state can temporarily scale it. */
+	float M_FullVisionRadius = 0.f;
+
+	/** @return Whether the inherited FOW component exists; reports setup errors otherwise. */
+	bool EnsureFowComponentIsValid() const;
+
+	/** @brief Cache the aircraft data vision radius and immediately apply the radius for the current landed state. */
+	void SetFullVisionRadius(const float NewFullVisionRadius);
+
+	/** @brief Apply the current landed-state FOW radius without changing the cached full radius. */
+	void UpdateFowVisionRadiusForLandedState() const;
+
+	/** @return Full radius while airborne/taking off; reduced radius only once fully landed. */
+	float GetVisionRadiusForCurrentLandedState() const;
 
 	/** @brief High-level horizontal move/attack/idle mode. */
 	EAircraftMovementState M_MovementState = EAircraftMovementState::None;
