@@ -14,6 +14,33 @@ class ICommands;
 class USoundBase;
 struct FUnitAbilityEntry;
 
+/**
+ * @brief Edited inline on a research component to define one step in a nested research chain.
+ */
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
+class RTS_SURVIVAL_API UResearchTechnologyAbilityTechnologyData : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ETechnology Technology = ETechnology::Tech_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<ETechnology> RequiredTechnologies;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FUnitCost Costs = FUnitCost();
+
+	// Designers can nest follow-up research entries as deeply as this command-card slot should progress.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced)
+	TArray<TObjectPtr<UResearchTechnologyAbilityTechnologyData>> FollowUpTechnologies;
+
+	// Optional custom announcer lines for this technology; empty means use only the generic completion line.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVoiceLineData CompletedAnnouncerVoiceLines;
+};
+
 USTRUCT(Blueprintable)
 struct FResearchTechnologyAbilitySettings
 {
@@ -24,21 +51,15 @@ struct FResearchTechnologyAbilitySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 PreferredAbilityIndex = INDEX_NONE;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced)
+	TObjectPtr<UResearchTechnologyAbilityTechnologyData> TechnologyData = nullptr;
+};
+
+struct FResearchTechnologyAbilityTechnologyRuntimeData
+{
 	ETechnology Technology = ETechnology::Tech_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<ETechnology> RequiredTechnologies;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FUnitCost Costs = FUnitCost();
-
-	// Ordered chain of technology abilities this component exposes after the current tech completes.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<ETechnology> FollowUpTechnologies;
-
-	// Optional custom announcer lines for this technology; empty means use only the generic completion line.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVoiceLineData CompletedAnnouncerVoiceLines;
 };
 
@@ -56,8 +77,12 @@ class RTS_SURVIVAL_API UResearchTechnologyAbilityComp : public UActorComponent
 public:
 	UResearchTechnologyAbilityComp();
 
-	ETechnology GetTechnology() const { return M_CurrentTechnology; }
-	const TArray<ETechnology>& GetRequiredTechnologies() const { return M_CurrentRequiredTechnologies; }
+	ETechnology GetTechnology() const { return M_CurrentTechnologyData.Technology; }
+	const TArray<ETechnology>& GetRequiredTechnologies() const { return M_CurrentTechnologyData.RequiredTechnologies; }
+	const TArray<ETechnology>& GetRequiredTechnologiesForCurrentTechnology() const
+	{
+		return GetRequiredTechnologies();
+	}
 
 	void TechResearchComplete(ETechnology CompletedTechnology);
 
@@ -72,10 +97,16 @@ private:
 	void BeginPlay_InitRuntimeSettings();
 	void BeginPlay_InitValidateSettings() const;
 	void BeginPlay_InitAddAbility();
+	void BeginPlay_InitAddAbilityToCommandsNextTick();
 	void AddAbilityToSquad(ASquadController* Squad);
 	void AddAbilityToCommands();
 	void PlayCompletedAnnouncerVoiceLine();
 	void SwapToNextTechnology(ETechnology CompletedTechnology);
+	void BuildOrderedTechnologyEntries(
+		const UResearchTechnologyAbilityTechnologyData* TechnologyData,
+		TArray<FResearchTechnologyAbilityTechnologyRuntimeData>& OutTechnologyEntries) const;
+	FResearchTechnologyAbilityTechnologyRuntimeData CreateRuntimeTechnologyData(
+		const UResearchTechnologyAbilityTechnologyData& TechnologyData) const;
 	FUnitAbilityEntry CreateCurrentAbilityEntry() const;
 
 	bool GetIsValidOwnerCommandsInterface() const;
@@ -83,7 +114,7 @@ private:
 	UPROPERTY()
 	TScriptInterface<ICommands> M_OwnerCommandsInterface;
 
-	ETechnology M_CurrentTechnology = ETechnology::Tech_NONE;
-	TArray<ETechnology> M_CurrentRequiredTechnologies;
-	int32 M_NextFollowUpTechnologyIndex = 0;
+	FResearchTechnologyAbilityTechnologyRuntimeData M_CurrentTechnologyData;
+	TArray<FResearchTechnologyAbilityTechnologyRuntimeData> M_OrderedTechnologyEntries;
+	int32 M_CurrentTechnologyIndex = INDEX_NONE;
 };
