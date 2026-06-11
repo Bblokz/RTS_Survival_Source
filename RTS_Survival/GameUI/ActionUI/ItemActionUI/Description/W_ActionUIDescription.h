@@ -14,6 +14,7 @@ class UImage;
 class URichTextBlock;
 class ICommands;
 class UW_CostDisplay;
+enum class ETechnology : uint8;
 /**
  * @brief Used by action-button hover UI to display metadata shared by every action description blueprint.
  */
@@ -62,6 +63,10 @@ private:
 		const FText& DataTableText_Title,
 		const FText& DataTableText_Description,
 		UTexture* DataTable_Icon) const;
+	void SetImageFromDataTableIcon(UTexture* DataTable_Icon) const;
+	FText ConvertEscapedNewLinesForDescription(const FText& DataTableText_Description) const;
+	FText CreateMissingTechRequirementsDescription(
+		const TArray<ETechnology>& MissingRequiredTechnologies) const;
 	/**
 	 * @brief Keeps technology hover text useful by replacing the description only while requirements are unmet.
 	 * @param Ability Ability id from the hovered action button.
