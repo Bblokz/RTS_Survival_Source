@@ -333,6 +333,7 @@ public:
 	TArray<ASquadUnit*> GetSquadUnitsChecked();
 
 	virtual bool GetIsScavenger() override;
+	float GetScavengeRewardMultiplier() const;
 	virtual bool GetIsRepairUnit() override;
 	virtual float GetUnitRepairRadius() override;
 

@@ -11,6 +11,7 @@
 
 UScavengerComponent::UScavengerComponent()
 	: ScavengeTimeDivider(1)
+	  , ScavengeRewardMultiplier(1)
 	  , ScavengeEquipment(nullptr)
 	  , M_ScavengeState(EScavengeState::None)
 {
@@ -107,6 +108,11 @@ void UScavengerComponent::UpdateOwnerBlockScavengeObjects(const bool bBlock) con
 EScavengeState UScavengerComponent::GetScavengeState() const
 {
 	return M_ScavengeState;
+}
+
+float UScavengerComponent::GetScavengeRewardMultiplier() const
+{
+	return ScavengeRewardMultiplier;
 }
 
 void UScavengerComponent::SetSquadOwner(ASquadUnit* OwnerUnit)

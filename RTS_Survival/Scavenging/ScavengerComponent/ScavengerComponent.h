@@ -76,10 +76,16 @@ public:
 
 	void MoveToLocationComplete();
 
+	float GetScavengeRewardMultiplier() const;
+
 protected:
 	// Divides the time on the scavengable object to determine the time it takes to scavenge.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
 	float ScavengeTimeDivider;
+
+	// Multiplies rewards from the object this component scavenges. Squad units are expected to share this value.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge", meta = (ClampMin = "0.0"))
+	float ScavengeRewardMultiplier;
 
 	// The equipment that the scavenger uses.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Scavenge")
