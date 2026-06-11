@@ -1894,7 +1894,7 @@ void ASquadUnit::OnScavengeStart(UStaticMesh* ScavengeEquipment, const FName Sca
                                  const TObjectPtr<AScavengeableObject>
                                  & ScaveObj, const TObjectPtr<UNiagaraSystem>& Effect, const FName EffectSocket)
 {
-	if (!IsValid(ScaveObj))
+	if (not IsValid(ScaveObj))
 	{
 		RTSFunctionLibrary::ReportError("Scav object is not valid in OnScavengeStart."
 			"\n squad unit: " + GetName());
@@ -1914,11 +1914,13 @@ void ASquadUnit::OnScavengeStart(UStaticMesh* ScavengeEquipment, const FName Sca
 	SetActorRotation(LookAt);
 	// create the equipment mesh if valid and attach at socket name to the mesh of the unit.
 	// Start timer on scav comp, if already done this will do nothing (done by other squad unit)
-	ScaveObj->StartScavengeTimer(GetSquadControllerChecked());
-	if (IsValid(AnimBp_SquadUnit))
+	ScaveObj->StartScavengeTimer(GetSquadControllerChecked(), TotalScavengeTime);
+	if (not IsValid(AnimBp_SquadUnit))
 	{
-		AnimBp_SquadUnit->PlayWeldingMontage();
+		return;
 	}
+
+	AnimBp_SquadUnit->PlayWeldingMontage();
 }
 
 void ASquadUnit::OnScavengeStart_SetupScavengeEquipmentMesh(UStaticMesh* ScavengeEquipment,

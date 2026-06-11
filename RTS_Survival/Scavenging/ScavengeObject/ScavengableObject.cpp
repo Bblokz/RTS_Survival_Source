@@ -23,7 +23,8 @@ AScavengeableObject::AScavengeableObject(const FObjectInitializer& ObjectInitial
 	PrimaryActorTick.bStartWithTickEnabled = false;
 }
 
-void AScavengeableObject::StartScavengeTimer(const TObjectPtr<ASquadController> ScavengingSquadController)
+void AScavengeableObject::StartScavengeTimer(const TObjectPtr<ASquadController> ScavengingSquadController,
+                                             const float ScavengeDuration)
 {
 	if (not StartScavTimer_EnsureAliveScavObj(ScavengingSquadController))
 	{
@@ -43,7 +44,7 @@ void AScavengeableObject::StartScavengeTimer(const TObjectPtr<ASquadController> 
 	// Calculate remaining scavenge time
 	if (M_ScavengeTimeLeft <= 0.0f)
 	{
-		M_ScavengeTimeLeft = ScavengeTime;
+		M_ScavengeTimeLeft = ScavengeDuration;
 	}
 
 	// Start the scavenging timer
