@@ -5133,6 +5133,11 @@ void ACPPController::DirectActionButtonResearchTechnology(const ETechnology Tech
 		PlayVoiceLineForPrimarySelected(
 			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
 			false);
+		return;
+	}
+	if (CommandQueueError == ECommandQueueError::MissingTechRequirement && GetIsValidPlayerAudioController())
+	{
+		M_PlayerAudioController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::TechnologyRequired);
 	}
 }
 
