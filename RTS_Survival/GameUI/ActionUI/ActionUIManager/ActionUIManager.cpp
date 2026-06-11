@@ -113,7 +113,7 @@ void UActionUIManager::InitActionUIManager(
 			continue;
 		}
 
-		M_TActionUI_Items[ActionItemIndex]->InitActionUIElement(PlayerController, ActionItemIndex, this);
+		M_TActionUI_Items[ActionItemIndex]->InitActionUIElement(PlayerController, ActionItemIndex, this, ActionUIDescriptionWidget);
 	}
 	const URTSGameUserSettings* const GameUserSettings = URTSGameUserSettings::Get();
 	if (GameUserSettings != nullptr)

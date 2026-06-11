@@ -123,6 +123,7 @@ enum class EAnnouncerVoiceLineType : uint8
 	PrimaryActorCannotTow,
 	VehicleWillTowClickedActor,
 	ResearchComplete,
+	TechnologyRequired,
 };
 
 USTRUCT(BlueprintType)

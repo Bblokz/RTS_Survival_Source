@@ -7,6 +7,7 @@
 #include "RTS_Survival/Player/Abilities.h"
 #include "W_ItemActionUI.generated.h"
 
+class UW_ActionUIDescription;
 class UW_HotKey;
 class UActionUIManager;
 class UTextBlock;
@@ -41,10 +42,12 @@ public:
 	 * @param PlayerController Owning player controller for input mapping access.
 	 * @param IndexActionUIElm Index of this action UI slot.
 	 * @param ActionUIManager Manager that owns the action UI elements.
+	 * @param ActionUIDescription
 	 */
 	void InitActionUIElement(
 		ACPPController* PlayerController,
-		const int32 IndexActionUIElm, UActionUIManager* ActionUIManager);
+		const int32 IndexActionUIElm, UActionUIManager* ActionUIManager,
+		UW_ActionUIDescription* ActionUIDescription);
 
 	void SetActionButtonHotkeyHidden(const bool bHideActionButtonHotkey) const;
 
@@ -90,6 +93,9 @@ protected:
 	void UpdateButtonWithGlobalSlateStyle();
 
 	virtual void NativeDestruct() override;
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	UW_ActionUIDescription* GetActionUIDescription() const;
 
 private:
 	EAbilityID M_Ability;
@@ -97,6 +103,9 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
+	
+	UPROPERTY()
+	TWeakObjectPtr<UW_ActionUIDescription> M_ActionUIDescription;
 
 	int32 M_Index = 0;
 

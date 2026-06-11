@@ -34,7 +34,7 @@ protected:
 	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UImage> M_ActionItemImage;
-
+	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<URichTextBlock> M_AbilityDescription;
 	

@@ -20,7 +20,7 @@ void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility, const int3
 
 void UW_ItemActionUI::InitActionUIElement(
 	ACPPController* PlayerController,
-	const int32 IndexActionUIElm, UActionUIManager* ActionUIManager)
+	const int32 IndexActionUIElm, UActionUIManager* ActionUIManager, UW_ActionUIDescription* ActionUIDescription)
 {	
 	if (not IsValid(PlayerController))
 	{
@@ -31,6 +31,7 @@ void UW_ItemActionUI::InitActionUIElement(
 	M_Index = IndexActionUIElm;
 	M_PlayerController = PlayerController;
 	M_ActionUIManager = ActionUIManager;
+	M_ActionUIDescription = ActionUIDescription;
 
 	CacheHotkeyProviderSubsystem();
 	UpdateHotkeyFromProvider();
@@ -105,6 +106,16 @@ void UW_ItemActionUI::NativeDestruct()
 {
 	UnbindHotkeyUpdateDelegate();
 	Super::NativeDestruct();
+}
+
+UW_ActionUIDescription* UW_ItemActionUI::GetActionUIDescription() const
+{
+	if (M_ActionUIDescription.IsValid())
+	{
+		return M_ActionUIDescription.Get();
+	}
+	RTSFunctionLibrary::ReportError("No valid action Ui description for item: " + GetName());
+	return nullptr;
 }
 
 void UW_ItemActionUI::UpdateButtonWithGlobalSlateStyle()
