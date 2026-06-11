@@ -9,6 +9,17 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace LightRadixiteArmorTechnologySettings
+{
+	constexpr float ArmorValueMultiplier = 1.15f;
+}
+
+UTE_LightRadixiteArmor::UTE_LightRadixiteArmor()
+	: M_ArmorValueMultiplier(LightRadixiteArmorTechnologySettings::ArmorValueMultiplier)
+{
+	Technology = ETechnology::Tech_LightTank_RadixiteArmor;
+}
+
 TArray<ETankSubtype> UTE_LightRadixiteArmor::GetTanksToApplyTo_Internal() const
 {
 	TArray<ETankSubtype> CombinedSubtypes = TanksToApplyTo;
@@ -98,12 +109,17 @@ void UTE_LightRadixiteArmor::ImproveArmor(ATankMaster* ValidTank) const
 		return;
 	}
 
-	UArmorCalculation* ArmorComponent = Cast<UArmorCalculation> (ValidTank->GetComponentByClass(UArmorCalculation::StaticClass()));
-	if (IsValid(ArmorComponent))
+	UArmorCalculation* ArmorComponent = ValidTank->FindComponentByClass<UArmorCalculation>();
+	if (not IsValid(ArmorComponent))
 	{
-		// todo go through all armor FArmorSettings of each of the components on UArmorCalculation* ArmorComponent
-		// and improve the armor if the type matches IsArmorTypeToAdjust.
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			ValidTank,
+			"ArmorComponent",
+			"UTE_LightRadixiteArmor::ImproveArmor");
+		return;
 	}
+
+	ArmorComponent->ApplyArmorValueMultiplierToMatchingPlates(IsArmorTypeToAdjust, M_ArmorValueMultiplier);
 }
 
 bool UTE_LightRadixiteArmor::IsArmorTypeToAdjust(const EArmorPlate ArmorPlate)
