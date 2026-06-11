@@ -137,6 +137,9 @@ public:
 
 	float GetTotalConvertToVehicleTime() const { return M_ConvertToVehicleTime; }
 
+	/** @brief Applies building-only health upgrades immediately when deployed, otherwise stores them for conversion. */
+	void ApplyBuildingHealthMultiplier(const float HealthMultiplier);
+
 	/**
 	 * @brief overwrite from IBuildingExpansionOwner.
 	 * @return Whether the building is in a state in which expanding is possible.
@@ -427,6 +430,7 @@ protected:
 	                            FResistanceAndDamageReductionData BuildingHealthData,
 	                            const float TruckMaxHealth,
 	                            const float BuildingMaxHealth);
+
 private:
 
 	FResistanceAndDamageReductionData M_TruckHealthData;
