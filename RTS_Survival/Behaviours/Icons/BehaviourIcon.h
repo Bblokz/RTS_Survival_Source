@@ -63,5 +63,7 @@ enum class EBehaviourIcon : uint8
 	TechScavengingReward,
 	TechAutoCannonAPCRRounds,
 	TechBarrier,
-	AutoLoader
+	AutoLoader,
+	TechHarvesterCapacity,
+	TechHarvesterSpeed
 };

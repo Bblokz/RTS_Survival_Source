@@ -44,6 +44,46 @@ TWeakObjectPtr<UResourceComponent> UHarvester::GetTargetResource() const
 	return TargetResource;
 }
 
+void UHarvester::UpgradeCapacityForResource(const int32 ExtraCapacity, const ERTSResourceType ResourceType)
+{
+	if (ExtraCapacity <= 0)
+	{
+		return;
+	}
+
+	for (const ERTSResourceType AllowedResource : M_AllowedResources)
+	{
+		if (AllowedResource != ResourceType)
+		{
+			continue;
+		}
+
+		FHarvesterCargoSlot* CargoSlot = M_CargoSpace.Find(ResourceType);
+		if (CargoSlot == nullptr)
+		{
+			return;
+		}
+
+		CargoSlot->MaxCapacity += ExtraCapacity;
+		return;
+	}
+}
+
+void UHarvester::UpgradeCapcityForResource(const int32 ExtraCapacity, const ERTSResourceType ResourceType)
+{
+	UpgradeCapacityForResource(ExtraCapacity, ResourceType);
+}
+
+void UHarvester::UpgradeHarvestingAnimationPlayRate(const float NewHarvestingAnimationPlayRate)
+{
+	if (NewHarvestingAnimationPlayRate <= 0.f)
+	{
+		return;
+	}
+
+	HarvestingAnimationPlayRate = NewHarvestingAnimationPlayRate;
+}
+
 int32 UHarvester::GetDropOffAmount()
 {
 	if (M_CargoSpace.Contains(M_TargetResourceType))
