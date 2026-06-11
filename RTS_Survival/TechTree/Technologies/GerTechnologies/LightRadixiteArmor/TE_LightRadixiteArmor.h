@@ -41,6 +41,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Technology|Radixite Armor")
 	float ArmorValueMlt = 1.15f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Technology|Spalliners")
+	float M_HealthMultiplier = 1.1;
+	
 
 private:
 	UStaticMesh* GetMeshToApply(const ETankSubtype TankSubtype) const;

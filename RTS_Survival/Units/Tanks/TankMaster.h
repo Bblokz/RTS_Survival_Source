@@ -144,8 +144,6 @@ public:
 	inline TArray<ACPPTurretsMaster*> GetTurrets() const { return Turrets; };
 	inline TArray<UHullWeaponComponent*> GetHullWeapons() const { return HullWeapons; }
 
-	inline TArray<UArmor*> GetTankArmor() const { return M_TankArmor; }
-
 	virtual ERTSNavAgents GetRTSNavAgentType() const override { return NavAgentType; }
 
 	// -----Start overwrite cargo interface-----
@@ -544,9 +542,6 @@ private:
 	// For adjusting the rotation.
 	FTimerHandle TimerHandle_CheckIfUpsideDown;
 
-	// Contains all the armor components that are setup in blueprints.
-	UPROPERTY()
-	TArray<UArmor*> M_TankArmor;
 
 	UPROPERTY()
 	FTankStartGameAction M_TankStartGameAction;

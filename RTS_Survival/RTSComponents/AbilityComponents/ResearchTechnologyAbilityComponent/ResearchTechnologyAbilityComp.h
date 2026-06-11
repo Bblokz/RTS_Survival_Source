@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/TechTree/Technologies/Technologies.h"
 #include "RTS_Survival/UnitData/UnitCost.h"
 #include "ResearchTechnologyAbilityComp.generated.h"
@@ -90,10 +91,12 @@ protected:
 	virtual void BeginPlay() override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FResearchTechnologyAbilitySettings ResearchTechnologyAbilitySettings;
-
+	TMap<ERTSFaction, FResearchTechnologyAbilitySettings> TechAbilitySettingsPerFaction;
+	
 private:
+	FResearchTechnologyAbilitySettings M_FactionChosenTechAbilitySettings;
 	void RefreshOwnerReferences();
+	void BeginPlay_SetActiveTechAbilityForFaction();
 	void BeginPlay_InitRuntimeSettings();
 	void BeginPlay_InitValidateSettings() const;
 	void BeginPlay_InitAddAbility();

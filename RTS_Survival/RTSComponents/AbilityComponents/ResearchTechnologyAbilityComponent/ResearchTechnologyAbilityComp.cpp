@@ -19,6 +19,7 @@ void UResearchTechnologyAbilityComp::BeginPlay()
 	Super::BeginPlay();
 
 	RefreshOwnerReferences();
+	BeginPlay_SetActiveTechAbilityForFaction();
 	BeginPlay_InitRuntimeSettings();
 	BeginPlay_InitValidateSettings();
 	BeginPlay_InitAddAbility();
@@ -51,10 +52,32 @@ void UResearchTechnologyAbilityComp::RefreshOwnerReferences()
 	M_OwnerCommandsInterface.SetObject(CommandsInterface != nullptr ? Owner : nullptr);
 }
 
+void UResearchTechnologyAbilityComp::BeginPlay_SetActiveTechAbilityForFaction()
+{
+	ERTSFaction PlayerFaction  = FRTS_Statics::GetPlayerFaction(this);
+	if (PlayerFaction == ERTSFaction::NotInitialised)
+	{
+		const FString SafeOwnerName = IsValid(GetOwner())? GetOwner()->GetName() : "NULL";
+		RTSFunctionLibrary::ReportError("No Initialized faction for player cannot determine faction research abilities, for: " + SafeOwnerName);
+		return ;
+	}
+	if (TechAbilitySettingsPerFaction.Contains(PlayerFaction))
+	{
+		M_FactionChosenTechAbilitySettings = TechAbilitySettingsPerFaction[PlayerFaction];
+	}
+	else
+	{
+		const FString SafeOwnerName = IsValid(GetOwner())? GetOwner()->GetName() : "NULL";
+		RTSFunctionLibrary::ReportError("There was not faction research setup for the faction: " + UEnum::GetValueAsString(PlayerFaction) +
+			"\n For owner: " + SafeOwnerName);
+	}
+}
+
+
 void UResearchTechnologyAbilityComp::BeginPlay_InitRuntimeSettings()
 {
 	M_OrderedTechnologyEntries.Reset();
-	BuildOrderedTechnologyEntries(ResearchTechnologyAbilitySettings.TechnologyData, M_OrderedTechnologyEntries);
+	BuildOrderedTechnologyEntries(M_FactionChosenTechAbilitySettings.TechnologyData, M_OrderedTechnologyEntries);
 
 	M_CurrentTechnologyIndex = M_OrderedTechnologyEntries.IsEmpty() ? INDEX_NONE : 0;
 	M_CurrentTechnologyData = M_CurrentTechnologyIndex == INDEX_NONE
@@ -64,13 +87,13 @@ void UResearchTechnologyAbilityComp::BeginPlay_InitRuntimeSettings()
 
 void UResearchTechnologyAbilityComp::BeginPlay_InitValidateSettings() const
 {
-	if (not IsValid(ResearchTechnologyAbilitySettings.TechnologyData))
+	if (not IsValid(M_FactionChosenTechAbilitySettings.TechnologyData))
 	{
 		RTSFunctionLibrary::ReportError("Research technology ability has no technology data configured.");
 		return;
 	}
 
-	if (ResearchTechnologyAbilitySettings.TechnologyData->Technology == ETechnology::Tech_NONE)
+	if (M_FactionChosenTechAbilitySettings.TechnologyData->Technology == ETechnology::Tech_NONE)
 	{
 		RTSFunctionLibrary::ReportError("Research technology ability has Tech_NONE configured.");
 	}
@@ -145,7 +168,7 @@ void UResearchTechnologyAbilityComp::AddAbilityToCommands()
 
 	M_OwnerCommandsInterface->AddAbility(
 		CreateCurrentAbilityEntry(),
-		ResearchTechnologyAbilitySettings.PreferredAbilityIndex);
+		M_FactionChosenTechAbilitySettings.PreferredAbilityIndex);
 }
 
 void UResearchTechnologyAbilityComp::PlayCompletedAnnouncerVoiceLine()

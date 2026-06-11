@@ -5,6 +5,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -97,12 +98,11 @@ void UTE_LightRadixiteArmor::ImproveArmor(ATankMaster* ValidTank) const
 		return;
 	}
 
-	for (UArmor* EachArmor : ValidTank->GetTankArmor())
+	UArmorCalculation* ArmorComponent = Cast<UArmorCalculation> (ValidTank->GetComponentByClass(UArmorCalculation::StaticClass()));
+	if (IsValid(ArmorComponent))
 	{
-		if (IsValid(EachArmor) && IsArmorTypeToAdjust(EachArmor->GetArmorPlateType()))
-		{
-			EachArmor->SetRawArmorValue(EachArmor->GetRawArmorValue() * ArmorValueMlt);
-		}
+		// todo go through all armor FArmorSettings of each of the components on UArmorCalculation* ArmorComponent
+		// and improve the armor if the type matches IsArmorTypeToAdjust.
 	}
 }
 
