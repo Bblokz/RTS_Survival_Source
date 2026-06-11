@@ -4,6 +4,11 @@
 
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
+UBehaviourAddShellTypes::UBehaviourAddShellTypes()
+{
+	BehaviourLifeTime = EBehaviourLifeTime::Permanent;
+}
+
 void UBehaviourAddShellTypes::ApplyBehaviourToWeapon(UWeaponState* WeaponState)
 {
 	if (WeaponState == nullptr)

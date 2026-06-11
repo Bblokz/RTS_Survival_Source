@@ -28,6 +28,9 @@ class RTS_SURVIVAL_API UBehaviourAddShellTypes : public UBehaviourWeapon
 {
 	GENERATED_BODY()
 
+public:
+	UBehaviourAddShellTypes();
+
 protected:
 	virtual void ApplyBehaviourToWeapon(UWeaponState* WeaponState) override;
 	virtual void RemoveBehaviourFromWeapon(UWeaponState* WeaponState) override;
