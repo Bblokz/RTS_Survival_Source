@@ -66,7 +66,7 @@ void UW_ActionUIDescription::SetupDescription(const EAbilityID Ability, const in
 
 bool UW_ActionUIDescription::EnsureIsValidActionUIManager() const
 {
-	if(not M_ActionUIManager.IsValid())
+	if (not M_ActionUIManager.IsValid())
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
@@ -98,25 +98,50 @@ bool UW_ActionUIDescription::EnsureIsValidCostDisplay() const
 void UW_ActionUIDescription::SetDataToTextAndImage(const FText& DataTableText_Title,
                                                    const FText& DataTableText_Description, UTexture* DataTable_Icon) const
 {
+	SetImageFromDataTableIcon(DataTable_Icon);
+	M_AbilityDescription->SetText(ConvertEscapedNewLinesForDescription(DataTableText_Description));
+	M_AbilityTitle->SetText(DataTableText_Title);
+}
+
+void UW_ActionUIDescription::SetImageFromDataTableIcon(UTexture* DataTable_Icon) const
+{
 	if (not IsValid(DataTable_Icon))
 	{
 		RTSFunctionLibrary::PrintString("Invalid texture provided for action UI description; ignoring.");
+		return;
 	}
-	else
+
+	UTexture2D* DataTable_Icon_Cast = Cast<UTexture2D>(DataTable_Icon);
+	if (not IsValid(DataTable_Icon_Cast))
 	{
-		UTexture2D* DataTable_Icon_Cast = Cast<UTexture2D>(DataTable_Icon);
-		if (not IsValid(DataTable_Icon_Cast))
-		{
-			RTSFunctionLibrary::PrintString(
-				"Texture provided for action UI description is not a UTexture2D; (CAST FAILURE) ignoring.");
-		}
-		else
-		{
-			M_ActionItemImage->SetBrushFromTexture(DataTable_Icon_Cast);
-		}
+		RTSFunctionLibrary::PrintString(
+			"Texture provided for action UI description is not a UTexture2D; (CAST FAILURE) ignoring.");
+		return;
 	}
-	M_AbilityDescription->SetText(DataTableText_Description);
-	M_AbilityTitle->SetText(DataTableText_Title);
+
+	M_ActionItemImage->SetBrushFromTexture(DataTable_Icon_Cast);
+}
+
+FText UW_ActionUIDescription::ConvertEscapedNewLinesForDescription(const FText& DataTableText_Description) const
+{
+	FString DescriptionString = DataTableText_Description.ToString();
+	DescriptionString.ReplaceInline(TEXT("\\n"), TEXT("\n"));
+	return FText::FromString(DescriptionString);
+}
+
+FText UW_ActionUIDescription::CreateMissingTechRequirementsDescription(
+	const TArray<ETechnology>& MissingRequiredTechnologies) const
+{
+	FString OverrideDescription = TEXT("<Text_sBad>Missing tech requirements:</>");
+	for (const ETechnology MissingRequiredTechnology : MissingRequiredTechnologies)
+	{
+		OverrideDescription += TEXT("\n");
+		OverrideDescription += FRTSRichTextConverter::MakeRTSRich(
+			Global_GetTechDisplayName(MissingRequiredTechnology),
+			ERTSRichText::Text_Armor);
+	}
+
+	return FText::FromString(OverrideDescription);
 }
 
 void UW_ActionUIDescription::OnOverrideDescriptionForTechnology(const EAbilityID Ability, const int32 CustomType,
@@ -162,7 +187,8 @@ void UW_ActionUIDescription::OnOverrideDescriptionForTechnology(const EAbilityID
 	}
 
 	const TArray<ETechnology> MissingRequiredTechnologies =
-		PlayerTechManager->GetMissingRequiredTechnologies(ResearchTechnologyComp->GetRequiredTechnologies());
+		PlayerTechManager->GetMissingRequiredTechnologies(
+			ResearchTechnologyComp->GetRequiredTechnologiesForCurrentTechnology());
 
 	if (MissingRequiredTechnologies.IsEmpty())
 	{
@@ -170,14 +196,8 @@ void UW_ActionUIDescription::OnOverrideDescriptionForTechnology(const EAbilityID
 		return;
 	}
 
-	FString OverrideDescription = "<Text_sBad>Required:</>";
-	for (const ETechnology RequiredTechnology : ResearchTechnologyComp->GetRequiredTechnologies())
-	{
-		OverrideDescription += "\n";
-		OverrideDescription += FRTSRichTextConverter::MakeRTSRich(
-			Global_GetTechDisplayName(RequiredTechnology),
-			ERTSRichText::Text_Armor);
-	}
-
-	SetDataToTextAndImage(DataTableText_Title, FText::FromString(OverrideDescription), DataTable_Icon);
+	SetDataToTextAndImage(
+		DataTableText_Title,
+		CreateMissingTechRequirementsDescription(MissingRequiredTechnologies),
+		DataTable_Icon);
 }

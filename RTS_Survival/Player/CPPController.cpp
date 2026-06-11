@@ -5125,7 +5125,7 @@ void ACPPController::DirectActionButtonResearchTechnology(const ETechnology Tech
 	const bool bResetCommandQueueFirst = not bIsHoldingShift;
 	const ECommandQueueError CommandQueueError = PrimarySelectedCommands->ResearchTechnology(
 		Technology,
-		ResearchTechnologyComp->GetRequiredTechnologies(),
+		ResearchTechnologyComp->GetRequiredTechnologiesForCurrentTechnology(),
 		bResetCommandQueueFirst);
 
 	if (CommandQueueError == ECommandQueueError::NoError)
