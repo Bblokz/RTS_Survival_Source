@@ -66,8 +66,12 @@ class RTS_SURVIVAL_API AScavengeableObject : public ADestructableEnvActor
 public:
 	AScavengeableObject(const FObjectInitializer& ObjectInitializer);
 
-	/** Starts the scavenge timer and progress bar */
-	void StartScavengeTimer(TObjectPtr<ASquadController> ScavengingSquadController);
+	/**
+	 * @brief Starts the scavenge timer and progress bar using the squad-specific duration.
+	 * @param ScavengingSquadController Squad receiving the reward when scavenging completes.
+	 * @param ScavengeDuration Scavenge duration after squad/component speed modifiers.
+	 */
+	void StartScavengeTimer(TObjectPtr<ASquadController> ScavengingSquadController, float ScavengeDuration);
 
 	/** Pauses the scavenging process */
 	void PauseScavenging(const TObjectPtr<ASquadController>& RequestingSquadController);

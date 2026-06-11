@@ -1773,7 +1773,7 @@ ECommandQueueError ICommands::ResearchTechnology(const ETechnology Technology,
 		return ECommandQueueError::CommandDataInvalid;
 	}
 
-	if (PlayerTechManager->HasTechResearched(Technology))
+	if (PlayerTechManager->GetIsTechnologyResearchedOrPending(Technology))
 	{
 		return ECommandQueueError::AbilityNotAllowed;
 	}
@@ -2942,19 +2942,11 @@ void ICommands::ExecuteResearchTechnologyCommand(const ETechnology Technology)
 		return;
 	}
 
+	// The tech manager is the single post-research authority: it blocks duplicates, applies effects,
+	// plays component-defined custom voice lines, and tells all research command cards to prune themselves.
 	PlayerTechManager->OnTechResearched(Technology);
 
-	if (ACPPController* PlayerController = FRTS_Statics::GetRTSController(GetOwnerActor()))
-	{
-		(void)PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ResearchComplete, true, false);
-	}
-
-	if (UResearchTechnologyAbilityComp* ResearchTechnologyComp =
-		FAbilityHelpers::GetResearchTechnologyAbilityCompOfType(Technology, GetOwnerActor()))
-	{
-		ResearchTechnologyComp->TechResearchComplete(Technology);
-	}
-
+	// Do not play the generic research-complete line here; tech audio must come from component custom lines.
 	DoneExecutingCommand(EAbilityID::IdResearchTechnology);
 }
 

@@ -60,6 +60,7 @@ enum class EBehaviourIcon : uint8
 	RadixiteArmor,
 	TechLightVehicleTracks,
 	TechScavengingSpeed,
+	TechScavengingReward,
 	TechAutoCannonAPCRRounds,
 	AutoLoader,
 	
