@@ -108,6 +108,10 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
 	TWeakObjectPtr<UResourceComponent> TargetResource;
+	
+	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
+	float HarvestingAnimationPlayRate  =1.f;
+	
 
 private:
 	void HarvestAIExecuteAction(EHarvesterAIAction Action);
