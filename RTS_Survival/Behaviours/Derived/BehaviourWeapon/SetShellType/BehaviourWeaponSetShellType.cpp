@@ -6,6 +6,7 @@
 
 UBehaviourWeaponSetShellType::UBehaviourWeaponSetShellType()
 {
+	BehaviourLifeTime = EBehaviourLifeTime::Permanent;
 	BehaviourStackRule = EBehaviourStackRule::Exclusive;
 }
 
