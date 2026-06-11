@@ -144,6 +144,17 @@ private:
 	void SetActionUIDescriptionWidgetVisibility(const bool bVisible) const;
 	void SetActionUIDescriptionCostsForAbility(const EAbilityID Ability, const int32 AbilitySubtype) const;
 
+	/**
+	 * @brief Allows dynamic reinforce pricing to override static ability-entry costs.
+	 * Other abilities return false so the generic ability cost lookup still runs.
+	 * @param Ability Ability currently shown in the hover description.
+	 * @param OutAbilityCosts Set to the current reinforce cost only when an override exists.
+	 * @return True when the cost was resolved by the reinforcement component.
+	 */
+	bool TryGetActionUIDescriptionCostsForReinforceAbility(
+		const EAbilityID Ability,
+		FUnitCost& OutAbilityCosts) const;
+
 	UPROPERTY()
 	UW_OnHoverAmmoDescription * M_AmmoDescriptionWidget;
 	bool GetIsValidAmmoDescriptionWidget() const;

@@ -24,6 +24,7 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Squads/Reinforcement/SquadReinforcementComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
@@ -290,14 +291,41 @@ void UActionUIManager::SetActionUIDescriptionCostsForAbility(
 		return;
 	}
 
-	if (not M_PrimarySelectedICommands.IsValid())
+	if (not GetIsCurrentPrimarySelectedValid())
 	{
 		M_ActionUIDescriptionWidget->SetCostsForAbility({});
 		return;
 	}
 
-	const FUnitCost AbilityCosts = M_PrimarySelectedICommands->GetAbilityCosts(Ability, AbilitySubtype);
+	FUnitCost AbilityCosts;
+	if (not TryGetActionUIDescriptionCostsForReinforceAbility(Ability, AbilityCosts))
+	{
+		AbilityCosts = M_PrimarySelectedICommands->GetAbilityCosts(Ability, AbilitySubtype);
+	}
+
 	M_ActionUIDescriptionWidget->SetCostsForAbility(AbilityCosts.ResourceCosts);
+}
+
+bool UActionUIManager::TryGetActionUIDescriptionCostsForReinforceAbility(
+	const EAbilityID Ability,
+	FUnitCost& OutAbilityCosts) const
+{
+	if (Ability != EAbilityID::IdReinforceSquad)
+	{
+		return false;
+	}
+
+	const AActor* OwnerActor = M_PrimarySelectedICommands->GetOwnerActor();
+	const USquadReinforcementComponent* ReinforcementComponent = IsValid(OwnerActor)
+		? OwnerActor->FindComponentByClass<USquadReinforcementComponent>()
+		: nullptr;
+	if (not IsValid(ReinforcementComponent))
+	{
+		return false;
+	}
+
+	OutAbilityCosts = ReinforcementComponent->GetCurrentReinforcementCostForDisplay();
+	return true;
 }
 
 bool UActionUIManager::GetIsValidAmmoDescriptionWidget() const
