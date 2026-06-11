@@ -82,25 +82,25 @@ FUnitCost USquadReinforcementComponent::GetCurrentReinforcementCostForDisplay() 
 	return ReinforcementCost;
 }
 
-void USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementPoint)
+bool USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementPoint)
 {
 	TArray<TSubclassOf<ASquadUnit>> MissingUnitClasses;
 	FVector ReinforcementLocation = FVector::ZeroVector;
 	if (not CanProcessReinforcement(ReinforcementPoint, MissingUnitClasses, ReinforcementLocation))
 	{
-		return;
+		return false;
 	}
 
 	const int32 MissingUnitCount = MissingUnitClasses.Num();
 	TMap<ERTSResourceType, int32> ReinforcementCost;
 	if (not TryResolveReinforcementCost(MissingUnitCount, ReinforcementCost))
 	{
-		return;
+		return false;
 	}
 
 	if (not TryPayReinforcementCost(ReinforcementCost))
 	{
-		return;
+		return false;
 	}
 
 	const float ReinforcementTime = CalculateReinforcementTime(MissingUnitCount);
@@ -113,6 +113,13 @@ void USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementP
 		DrawReinforcementDebugString(DebugText, ReinforcementLocation + FVector::UpVector * 120.0f);
 		DrawReinforcementDebugSphere(ReinforcementLocation, 85.0f, FColor::Cyan);
 	}
+
+	if (ACPPController* PlayerController = FRTS_Statics::GetRTSController(this))
+	{
+		PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ReinforcementsHaveArrived, true, false);
+	}
+
+	return true;
 }
 
 void USquadReinforcementComponent::BeginPlay_InitSquadDataSnapshot()

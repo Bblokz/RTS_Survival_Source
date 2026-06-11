@@ -68,8 +68,9 @@ public:
 	/**
 	 * @brief Reinforce missing units at the provided reinforcement point.
 	 * @param ReinforcementPoint Point that provides the spawn location.
+	 * @return True when the reinforcement request was paid for and scheduled.
 	 */
-	void Reinforce(UReinforcementPoint* ReinforcementPoint);
+	bool Reinforce(UReinforcementPoint* ReinforcementPoint);
 
 	/** @return Current missing-squad-member reinforcement cost for UI display. */
 	FUnitCost GetCurrentReinforcementCostForDisplay() const;
