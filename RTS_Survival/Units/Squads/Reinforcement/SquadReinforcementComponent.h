@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
+#include "RTS_Survival/UnitData/UnitCost.h"
 #include "TimerManager.h"
 #include "SquadReinforcementComponent.generated.h"
 
@@ -70,6 +71,9 @@ public:
 	 */
 	void Reinforce(UReinforcementPoint* ReinforcementPoint);
 
+	/** @return Current missing-squad-member reinforcement cost for UI display. */
+	FUnitCost GetCurrentReinforcementCostForDisplay() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -106,7 +110,7 @@ private:
 	 * @param OutCost Computed resource cost rounded up to multiples of five.
 	 * @return True when cost data could be resolved.
 	 */
-	bool TryResolveReinforcementCost(const int32 MissingUnits, TMap<ERTSResourceType, int32>& OutCost);
+	bool TryResolveReinforcementCost(const int32 MissingUnits, TMap<ERTSResourceType, int32>& OutCost) const;
 
 	/**
 	 * @brief Attempt to pay the computed reinforcement cost.
@@ -114,6 +118,7 @@ private:
 	 * @return True when payment succeeds.
 	 */
 	bool TryPayReinforcementCost(const TMap<ERTSResourceType, int32>& ReinforcementCost) const;
+	bool TryResolveCurrentReinforcementCost(TMap<ERTSResourceType, int32>& OutCost) const;
 
 	bool TryGetResourceManager(UPlayerResourceManager*& OutManager) const;
 	bool TryGetTrainingMenuManager(UTrainingMenuManager*& OutMenuManager) const;

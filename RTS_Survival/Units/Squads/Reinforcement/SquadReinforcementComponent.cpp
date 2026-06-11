@@ -75,6 +75,13 @@ void USquadReinforcementComponent::NotifySquadMembershipChanged()
 	RefreshReinforcementAbility();
 }
 
+FUnitCost USquadReinforcementComponent::GetCurrentReinforcementCostForDisplay() const
+{
+	FUnitCost ReinforcementCost;
+	TryResolveCurrentReinforcementCost(ReinforcementCost.ResourceCosts);
+	return ReinforcementCost;
+}
+
 void USquadReinforcementComponent::Reinforce(UReinforcementPoint* ReinforcementPoint)
 {
 	TArray<TSubclassOf<ASquadUnit>> MissingUnitClasses;
@@ -370,7 +377,7 @@ bool USquadReinforcementComponent::GetIsReinforcementAllowed(UReinforcementPoint
 }
 
 bool USquadReinforcementComponent::TryResolveReinforcementCost(const int32 MissingUnits,
-                                                               TMap<ERTSResourceType, int32>& OutCost)
+                                                               TMap<ERTSResourceType, int32>& OutCost) const
 {
 	if (MissingUnits <= 0)
 	{
@@ -407,6 +414,18 @@ bool USquadReinforcementComponent::TryResolveReinforcementCost(const int32 Missi
 		}
 	}
 	return OutCost.Num() > 0;
+}
+
+bool USquadReinforcementComponent::TryResolveCurrentReinforcementCost(TMap<ERTSResourceType, int32>& OutCost) const
+{
+	OutCost.Reset();
+	TArray<TSubclassOf<ASquadUnit>> MissingUnitClasses;
+	if (not GetMissingUnitClasses(MissingUnitClasses))
+	{
+		return false;
+	}
+
+	return TryResolveReinforcementCost(MissingUnitClasses.Num(), OutCost);
 }
 
 bool USquadReinforcementComponent::TryPayReinforcementCost(const TMap<ERTSResourceType, int32>& ReinforcementCost) const
