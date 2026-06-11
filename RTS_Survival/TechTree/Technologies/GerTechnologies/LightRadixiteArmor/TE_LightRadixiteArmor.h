@@ -17,6 +17,9 @@ class RTS_SURVIVAL_API UTE_LightRadixiteArmor : public UTechnologyEffect
 {
 	GENERATED_BODY()
 
+public:
+	UTE_LightRadixiteArmor();
+
 protected:
 	virtual TArray<ETankSubtype> GetTanksToApplyTo_Internal() const override;
 	virtual void ApplyOnTank_Internal(ATankMaster* Tank) override;
@@ -39,14 +42,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Technology|Radixite Armor")
 	UStaticMesh* Sdkfz140RadixiteMesh = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Technology|Radixite Armor")
-	float ArmorValueMlt = 1.15f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Technology|Spalliners")
-	float M_HealthMultiplier = 1.1;
-	
-
 private:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Technology|Radixite Armor",
+		meta = (FormerlySerializedAs = "ArmorValueMlt", AllowPrivateAccess = "true"))
+	float M_ArmorValueMultiplier;
+
 	UStaticMesh* GetMeshToApply(const ETankSubtype TankSubtype) const;
 	void ImproveArmor(ATankMaster* ValidTank) const;
 	static bool IsArmorTypeToAdjust(EArmorPlate ArmorPlate);

@@ -56,6 +56,100 @@ float UArmorCalculation::GetRearArmor() const
 	return M_RearArmor;
 }
 
+void UArmorCalculation::ApplyArmorValueMultiplierToMatchingPlates(
+	bool (*ShouldAdjustArmorPlate)(EArmorPlate),
+	const float ArmorValueMultiplier)
+{
+	if (ShouldAdjustArmorPlate == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ApplyArmorValueMultiplierToMatchingPlates: ShouldAdjustArmorPlate is null"));
+		return;
+	}
+
+	if (ArmorValueMultiplier <= 0.0f)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("ApplyArmorValueMultiplierToMatchingPlates: ArmorValueMultiplier must be positive"));
+		return;
+	}
+
+	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings0, ShouldAdjustArmorPlate, ArmorValueMultiplier);
+	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings1, ShouldAdjustArmorPlate, ArmorValueMultiplier);
+	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings2, ShouldAdjustArmorPlate, ArmorValueMultiplier);
+	RefreshRearArmorCache();
+}
+
+void UArmorCalculation::ApplyArmorValueMultiplierToArmorSettings(
+	FArmorSettings* ArmorSettings,
+	bool (*ShouldAdjustArmorPlate)(EArmorPlate),
+	const float ArmorValueMultiplier)
+{
+	if (ArmorSettings == nullptr)
+	{
+		return;
+	}
+
+	for (int32 ArmorPlateIndex = 0;
+	     ArmorPlateIndex < DeveloperSettings::GameBalance::Weapons::MaxArmorPlatesPerMesh;
+	     ArmorPlateIndex++)
+	{
+		FArmorSettings& ArmorSetting = ArmorSettings[ArmorPlateIndex];
+		if (ArmorSetting.ArmorValue <= 0.0f)
+		{
+			continue;
+		}
+
+		if (not ShouldAdjustArmorPlate(ArmorSetting.ArmorType))
+		{
+			continue;
+		}
+
+		ArmorSetting.ArmorValue *= ArmorValueMultiplier;
+	}
+}
+
+void UArmorCalculation::RefreshRearArmorCache()
+{
+	M_RearArmor = 0.0f;
+
+	if (TryRefreshRearArmorCacheFromSettings(M_ArmorSetup.ArmorSettings0))
+	{
+		return;
+	}
+
+	if (TryRefreshRearArmorCacheFromSettings(M_ArmorSetup.ArmorSettings1))
+	{
+		return;
+	}
+
+	TryRefreshRearArmorCacheFromSettings(M_ArmorSetup.ArmorSettings2);
+}
+
+bool UArmorCalculation::TryRefreshRearArmorCacheFromSettings(const FArmorSettings* ArmorSettings)
+{
+	if (ArmorSettings == nullptr)
+	{
+		return false;
+	}
+
+	for (int32 ArmorPlateIndex = 0;
+	     ArmorPlateIndex < DeveloperSettings::GameBalance::Weapons::MaxArmorPlatesPerMesh;
+	     ArmorPlateIndex++)
+	{
+		const FArmorSettings& ArmorSetting = ArmorSettings[ArmorPlateIndex];
+		if (not GetIsRearHullArmor(ArmorSetting.ArmorType))
+		{
+			continue;
+		}
+
+		M_RearArmor = ArmorSetting.ArmorValue;
+		return true;
+	}
+
+	return false;
+}
+
 void UArmorCalculation::BeginPlay()
 {
 	Super::BeginPlay();

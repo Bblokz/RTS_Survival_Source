@@ -61,6 +61,9 @@ struct FArmorSetup
 	UMeshComponent* MeshWithArmor2 = nullptr;
 };
 
+/**
+ * @brief Register tank mesh armour plates here so weapon hits can resolve armour from the impacted mesh.
+ */
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UArmorCalculation : public UActorComponent
 {
@@ -83,6 +86,14 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ArmorSettings")
 	void InitArmorCalculation(UMeshComponent* MeshWithArmor, TArray<FArmorSettings> ArmorSettingsForMesh,
 	                          const uint8 PlayerOwningArmor);
+
+	/**
+	 * @brief Applies researched armour changes directly to the stored plate data so later hit calculations use them.
+	 * @param ShouldAdjustArmorPlate Predicate used by technology effects to keep plate selection in one place.
+	 * @param ArmorValueMultiplier Multiplier applied once to every matching registered plate.
+	 */
+	void ApplyArmorValueMultiplierToMatchingPlates(bool (*ShouldAdjustArmorPlate)(EArmorPlate),
+	                                             float ArmorValueMultiplier);
 
 	/**
 	 * Calculates the effective armor at the hit location.
@@ -153,6 +164,13 @@ private:
 	// Helper: Adjusts the given ArmorValue by the impact angle.
 	// The OutPenetrationAdjustment (input as a base value) is modified by an exponential decay factor.
 	float GetArmorAtAngle(float ArmorValue, float AngleDegrees, float& OutPenetrationAdjustment) const;
+
+	static void ApplyArmorValueMultiplierToArmorSettings(FArmorSettings* ArmorSettings,
+	                                                    bool (*ShouldAdjustArmorPlate)(EArmorPlate),
+	                                                    float ArmorValueMultiplier);
+
+	void RefreshRearArmorCache();
+	bool TryRefreshRearArmorCacheFromSettings(const FArmorSettings* ArmorSettings);
 
 	// Helper: Identifies which registered mesh corresponds to the hit component.
 	bool IdentifyHitMesh(const UPrimitiveComponent* HitComponent, const FArmorSettings*& OutSelectedArmorSettings,
