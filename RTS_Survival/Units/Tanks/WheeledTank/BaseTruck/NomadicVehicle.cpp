@@ -1775,6 +1775,29 @@ void ANomadicVehicle::SetupNomadicHealthData(FResistanceAndDamageReductionData T
 	M_BuildingMaxHealth = BuildingMaxHealth;
 }
 
+void ANomadicVehicle::ApplyBuildingHealthMultiplier(const float HealthMultiplier)
+{
+	if (HealthMultiplier <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid building health multiplier in ANomadicVehicle::ApplyBuildingHealthMultiplier"
+			"\n Vehicle: " + GetName());
+		return;
+	}
+
+	M_BuildingMaxHealth *= HealthMultiplier;
+	if (M_NomadStatus != ENomadStatus::Building)
+	{
+		return;
+	}
+
+	if (not GetIsValidHealthComponent())
+	{
+		return;
+	}
+
+	HealthComponent->SetMaxHealth(M_BuildingMaxHealth);
+}
 
 void ANomadicVehicle::UpdateResourceVisualsForType(const ERTSResourceType ResourceType,
                                                    const int32 PercentageResourcesFilled)
