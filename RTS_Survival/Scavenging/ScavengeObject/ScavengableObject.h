@@ -225,6 +225,7 @@ private:
 
 	// Reward the player with resources.
 	void RandomRewardPlayer();
+	int32 CalculateMultipliedRoundedScavengeReward(ERTSResourceType ResourceType, int32 BaseReward) const;
 
 	// Asynchronously loads the reward widget class and creates the reward widget component.
 	// If the widget is already loaded we create instantly.
@@ -253,6 +254,8 @@ private:
 	// Contains the types and amounts of resources the player received through scavenging.
 	UPROPERTY()
 	TMap<ERTSResourceType, int32> M_PlayerResourceAmountRewards;
+
+	float M_ActiveScavengeRewardMultiplier = 1.f;
 
 	// --------------------------
 	// ------ Scavenge Mesh ----

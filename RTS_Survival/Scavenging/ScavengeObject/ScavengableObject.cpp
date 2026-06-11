@@ -37,6 +37,9 @@ void AScavengeableObject::StartScavengeTimer(const TObjectPtr<ASquadController> 
 
 	// Save the scavenging squad
 	M_ScavengingSquad = ScavengingSquadController;
+	M_ActiveScavengeRewardMultiplier = IsValid(ScavengingSquadController)
+		                                    ? ScavengingSquadController->GetScavengeRewardMultiplier()
+		                                    : 1.f;
 	// Calculate remaining scavenge time
 	if (M_ScavengeTimeLeft <= 0.0f)
 	{
@@ -390,21 +393,28 @@ void AScavengeableObject::RandomRewardPlayer()
 		return;
 	}
 	bool bDidGetAnyReward = false;
-	for (auto& EachReward : ScavengeResources)
+	for (const auto& EachReward : ScavengeResources)
 	{
 		const ERTSResourceType ResourceType = EachReward.Key;
-		FScavengeAmount& RewardInfo = EachReward.Value;
+		const FScavengeAmount& RewardInfo = EachReward.Value;
 
-		int32 Reward = RewardInfo.bIsSetAmount
-			               ? RewardInfo.SetAmount
-			               : FMath::RandRange(RewardInfo.Min, RewardInfo.Max);
+		const int32 BaseReward = RewardInfo.bIsSetAmount
+			                         ? RewardInfo.SetAmount
+			                         : FMath::RandRange(RewardInfo.Min, RewardInfo.Max);
 
 		// Check if the player will get the reward.
-		const bool GetReward = RewardInfo.Chance == 100 || FMath::RandRange(0, 100) <= RewardInfo.Chance;
-		if (not GetReward)
+		const bool bGetReward = RewardInfo.Chance == 100 || FMath::RandRange(0, 100) <= RewardInfo.Chance;
+		if (not bGetReward)
 		{
 			continue;
 		}
+
+		const int32 Reward = CalculateMultipliedRoundedScavengeReward(ResourceType, BaseReward);
+		if (Reward <= 0)
+		{
+			continue;
+		}
+
 		bDidGetAnyReward = true;
 		PlayerResourceManager->AddResource(ResourceType, Reward);
 		// fill in map.
@@ -423,6 +433,20 @@ void AScavengeableObject::RandomRewardPlayer()
 	{
 		PlayRewardSound();
 	}
+}
+
+int32 AScavengeableObject::CalculateMultipliedRoundedScavengeReward(
+	const ERTSResourceType ResourceType,
+	const int32 BaseReward) const
+{
+	const float MultipliedReward = BaseReward * M_ActiveScavengeRewardMultiplier;
+	if (GetIsResourceOfBlueprintType(ResourceType))
+	{
+		return FMath::RoundToInt(MultipliedReward);
+	}
+
+	constexpr int32 ResourceRewardRoundMultiple = 5;
+	return FMath::RoundToInt(MultipliedReward / ResourceRewardRoundMultiple) * ResourceRewardRoundMultiple;
 }
 
 void AScavengeableObject::AsyncLoadAndCreateRewardWidget()

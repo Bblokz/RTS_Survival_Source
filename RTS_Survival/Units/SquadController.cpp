@@ -589,6 +589,25 @@ bool ASquadController::GetIsScavenger()
 	return false;
 }
 
+float ASquadController::GetScavengeRewardMultiplier() const
+{
+	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+
+		const UScavengerComponent* ScavengerComponent = SquadUnit->GetScavengerComponent();
+		if (IsValid(ScavengerComponent))
+		{
+			return ScavengerComponent->GetScavengeRewardMultiplier();
+		}
+	}
+
+	return 1.f;
+}
+
 bool ASquadController::GetIsRepairUnit()
 {
 	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
