@@ -576,20 +576,6 @@ void ATankMaster::RemoveTurret(ACPPTurretsMaster* TurretToRemove)
 	Turrets.RemoveSingleSwap(TurretToRemove);
 }
 
-void ATankMaster::ChildBpSetupArmor(TArray<UArmor*> MyArmorSetup)
-{
-	for (auto EachElm : MyArmorSetup)
-	{
-		if (IsValid(EachElm))
-		{
-			M_TankArmor.Add(EachElm);
-		}
-	}
-	for (auto EachValidArmor : M_TankArmor)
-	{
-	}
-}
-
 void ATankMaster::SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshToSetup, const bool bIsHarvester) const
 {
 	(void)bIsHarvester;

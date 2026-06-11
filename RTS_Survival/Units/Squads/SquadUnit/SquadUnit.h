@@ -284,6 +284,7 @@ public:
 
 	void SetNoDeathVoiceLineOnDeath();
 
+	UScavengerComponent* GetScavengerComponent() const { return M_ScavengerComponent; }
 	
 
 protected:
@@ -450,7 +451,6 @@ protected:
 	bool GetHasValidRepairComp() const;
 
 	/** Gets the scavenger component */
-	UScavengerComponent* GetScavengerComponent() const { return M_ScavengerComponent; }
 	URepairComponent* GetRepairComponent() const { return M_RepairComponent; }
 
 	/** Terminates scavenging */

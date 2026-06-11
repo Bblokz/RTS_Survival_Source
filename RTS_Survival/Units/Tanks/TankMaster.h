@@ -226,12 +226,6 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	inline void SetupHullWeapon(UHullWeaponComponent* NewHullWeapon) { HullWeapons.Add(NewHullWeapon); }
 
-	/**
-	 * @brief Setup the armor of this tank by providing all the armor components.
-	 * @param MyArmorSetup The array of armor components.
-	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	void ChildBpSetupArmor(TArray<UArmor*> MyArmorSetup);
 
 	/**
 	 * @brief Sets up the collision for the mesh attached to the tracks.
