@@ -21,6 +21,8 @@ enum class ETechnology: uint8
 	Tech_Barricades,
 	Tech_LongRangeCalibration,
 	Tech_Spalliners,
+	Tech_ScavengingSpeed UMETA(DisplayName = "Scavenging Speed"),
+	Tech_ScavengingReward UMETA(DisplayName = "Scavenging Reward"),
 };
 
 static FString Global_GetTechAsString(const ETechnology Tech)
@@ -41,6 +43,10 @@ static FString Global_GetTechAsString(const ETechnology Tech)
 		return "Tech_LongRangeCalibration";
 	case ETechnology::Tech_Spalliners:
 		return "Tech_Spalliners";
+	case ETechnology::Tech_ScavengingSpeed:
+		return "Tech_ScavengingSpeed";
+	case ETechnology::Tech_ScavengingReward:
+		return "Tech_ScavengingReward";
 	default: break;
 	}
 	return "Tech_NONE";
@@ -64,6 +70,10 @@ static FString Global_GetTechDisplayName(const ETechnology Tech)
 			return "Long Range Calibration";
 		case ETechnology::Tech_Spalliners:
 			return "Spalliners";
+		case ETechnology::Tech_ScavengingSpeed:
+			return "Scavenging Speed";
+		case ETechnology::Tech_ScavengingReward:
+			return "Scavenging Reward";
 		default:
 			return "None";
 	}

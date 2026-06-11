@@ -9,6 +9,11 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace ScavengerComponentSettings
+{
+	constexpr float MinimumValidMultiplier = 0.f;
+}
+
 UScavengerComponent::UScavengerComponent()
 	: ScavengeTimeDivider(1)
 	  , ScavengeRewardMultiplier(1)
@@ -113,6 +118,30 @@ EScavengeState UScavengerComponent::GetScavengeState() const
 float UScavengerComponent::GetScavengeRewardMultiplier() const
 {
 	return ScavengeRewardMultiplier;
+}
+
+void UScavengerComponent::ApplyScavengeSpeedMultiplier(const float ScavengeSpeedMultiplier)
+{
+	if (ScavengeSpeedMultiplier <= ScavengerComponentSettings::MinimumValidMultiplier)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid scavenging speed multiplier in UScavengerComponent::ApplyScavengeSpeedMultiplier");
+		return;
+	}
+
+	ScavengeTimeDivider *= ScavengeSpeedMultiplier;
+}
+
+void UScavengerComponent::ApplyScavengeRewardMultiplier(const float RewardMultiplier)
+{
+	if (RewardMultiplier <= ScavengerComponentSettings::MinimumValidMultiplier)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid scavenging reward multiplier in UScavengerComponent::ApplyScavengeRewardMultiplier");
+		return;
+	}
+
+	ScavengeRewardMultiplier *= RewardMultiplier;
 }
 
 void UScavengerComponent::SetSquadOwner(ASquadUnit* OwnerUnit)

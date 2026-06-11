@@ -77,6 +77,8 @@ public:
 	void MoveToLocationComplete();
 
 	float GetScavengeRewardMultiplier() const;
+	void ApplyScavengeSpeedMultiplier(float ScavengeSpeedMultiplier);
+	void ApplyScavengeRewardMultiplier(float RewardMultiplier);
 
 protected:
 	// Divides the time on the scavengable object to determine the time it takes to scavenge.
