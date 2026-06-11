@@ -7,6 +7,7 @@
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ResearchTechnologyAbilityComponent/ResearchTechnologyAbilityComp.h"
 #include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -37,9 +38,33 @@ bool UPlayerTechManager::HasAllRequiredTechnologies(const TArray<ETechnology>& R
 	return GetMissingRequiredTechnologies(RequiredTechnologies).IsEmpty();
 }
 
+bool UPlayerTechManager::GetIsTechnologyResearchedOrPending(const ETechnology Tech) const
+{
+	return M_ResearchedTechs.Contains(Tech) || M_TechnologiesWaitingForEffectLoad.Contains(Tech);
+}
+
+void UPlayerTechManager::RegisterResearchTechnologyAbilityComp(
+	UResearchTechnologyAbilityComp* ResearchTechnologyAbilityComp)
+{
+	if (not IsValid(ResearchTechnologyAbilityComp))
+	{
+		return;
+	}
+
+	RemoveInvalidResearchTechnologyAbilityComps();
+	M_ResearchTechnologyAbilityComps.AddUnique(
+		TWeakObjectPtr<UResearchTechnologyAbilityComp>(ResearchTechnologyAbilityComp));
+
+	const TArray<ETechnology> ResearchedAndPendingTechnologies = GetResearchedAndPendingTechnologies();
+	for (const ETechnology ResearchedTechnology : ResearchedAndPendingTechnologies)
+	{
+		ResearchTechnologyAbilityComp->AccountForResearchedTechnology(ResearchedTechnology);
+	}
+}
+
 void UPlayerTechManager::OnTechResearched(ETechnology Tech)
 {
-	if (M_ResearchedTechs.Contains(Tech) || M_TechnologiesWaitingForEffectLoad.Contains(Tech))
+	if (GetIsTechnologyResearchedOrPending(Tech))
 	{
 		return;
 	}
@@ -62,14 +87,63 @@ void UPlayerTechManager::OnTechResearched(ETechnology Tech)
 	if (EffectClassPtr->IsValid())
 	{
 		RegisterAndApplyLoadedTechnology(Tech, NewObject<UTechnologyEffect>(this, EffectClassPtr->Get()));
+		if (M_ResearchedTechs.Contains(Tech))
+		{
+			NotifyResearchTechnologyAbilityComps(Tech);
+		}
 		return;
 	}
 
 	M_TechnologiesWaitingForEffectLoad.Add(Tech);
+	NotifyResearchTechnologyAbilityComps(Tech);
 	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
 	Streamable.RequestAsyncLoad(
 		EffectClassPtr->ToSoftObjectPath(),
 		FStreamableDelegate::CreateUObject(this, &UPlayerTechManager::OnTechnologyEffectLoaded, Tech));
+}
+
+void UPlayerTechManager::NotifyResearchTechnologyAbilityComps(const ETechnology Tech)
+{
+	RemoveInvalidResearchTechnologyAbilityComps();
+	const TArray<TWeakObjectPtr<UResearchTechnologyAbilityComp>> RegisteredResearchTechnologyAbilityComps =
+		M_ResearchTechnologyAbilityComps;
+	bool bHasPlayedCustomAnnouncerVoiceLine = false;
+	for (const TWeakObjectPtr<UResearchTechnologyAbilityComp>& ResearchTechnologyAbilityComp :
+		 RegisteredResearchTechnologyAbilityComps)
+	{
+		if (not ResearchTechnologyAbilityComp.IsValid())
+		{
+			continue;
+		}
+
+		if (not bHasPlayedCustomAnnouncerVoiceLine)
+		{
+			bHasPlayedCustomAnnouncerVoiceLine =
+				ResearchTechnologyAbilityComp->TryPlayCompletedAnnouncerVoiceLine(Tech);
+		}
+
+		ResearchTechnologyAbilityComp->AccountForResearchedTechnology(Tech);
+	}
+}
+
+void UPlayerTechManager::RemoveInvalidResearchTechnologyAbilityComps()
+{
+	M_ResearchTechnologyAbilityComps.RemoveAll(
+		[](const TWeakObjectPtr<UResearchTechnologyAbilityComp>& ResearchTechnologyAbilityComp)
+		{
+			return not ResearchTechnologyAbilityComp.IsValid();
+		});
+}
+
+TArray<ETechnology> UPlayerTechManager::GetResearchedAndPendingTechnologies() const
+{
+	TArray<ETechnology> ResearchedAndPendingTechnologies = M_ResearchedTechs.Array();
+	for (const ETechnology PendingTechnology : M_TechnologiesWaitingForEffectLoad)
+	{
+		ResearchedAndPendingTechnologies.AddUnique(PendingTechnology);
+	}
+
+	return ResearchedAndPendingTechnologies;
 }
 
 void UPlayerTechManager::CheckTechsToApplyToTank(ATankMaster* Tank) const

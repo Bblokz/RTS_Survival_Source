@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -22,19 +23,35 @@ void UResearchTechnologyAbilityComp::BeginPlay()
 	BeginPlay_SetActiveTechAbilityForFaction();
 	BeginPlay_InitRuntimeSettings();
 	BeginPlay_InitValidateSettings();
+	BeginPlay_RegisterAtPlayerTechManager();
 	BeginPlay_InitAddAbility();
 }
 
 void UResearchTechnologyAbilityComp::TechResearchComplete(const ETechnology CompletedTechnology)
 {
-	if (CompletedTechnology != M_CurrentTechnologyData.Technology)
+	AccountForResearchedTechnology(CompletedTechnology);
+}
+
+void UResearchTechnologyAbilityComp::AccountForResearchedTechnology(const ETechnology ResearchedTechnology)
+{
+	if (ResearchedTechnology == ETechnology::Tech_NONE)
 	{
 		return;
 	}
 
-	PlayCompletedAnnouncerVoiceLine();
+	const int32 ResearchedTechnologyIndex = FindOrderedTechnologyIndex(ResearchedTechnology);
+	if (ResearchedTechnologyIndex == INDEX_NONE)
+	{
+		return;
+	}
 
-	SwapToNextTechnology(CompletedTechnology);
+	if (ResearchedTechnologyIndex == M_CurrentTechnologyIndex)
+	{
+		SwapToNextTechnology(ResearchedTechnology);
+		return;
+	}
+
+	RemoveResearchedTechnologyFromQueuedEntries(ResearchedTechnology, ResearchedTechnologyIndex);
 }
 
 void UResearchTechnologyAbilityComp::RefreshOwnerReferences()
@@ -44,12 +61,15 @@ void UResearchTechnologyAbilityComp::RefreshOwnerReferences()
 	{
 		M_OwnerCommandsInterface.SetInterface(nullptr);
 		M_OwnerCommandsInterface.SetObject(nullptr);
+		M_PlayerTechManager = nullptr;
 		return;
 	}
 
 	ICommands* CommandsInterface = Cast<ICommands>(Owner);
 	M_OwnerCommandsInterface.SetInterface(CommandsInterface);
 	M_OwnerCommandsInterface.SetObject(CommandsInterface != nullptr ? Owner : nullptr);
+
+	M_PlayerTechManager = FRTS_Statics::GetPlayerTechManager(this);
 }
 
 void UResearchTechnologyAbilityComp::BeginPlay_SetActiveTechAbilityForFaction()
@@ -97,6 +117,21 @@ void UResearchTechnologyAbilityComp::BeginPlay_InitValidateSettings() const
 	{
 		RTSFunctionLibrary::ReportError("Research technology ability has Tech_NONE configured.");
 	}
+}
+
+void UResearchTechnologyAbilityComp::BeginPlay_RegisterAtPlayerTechManager()
+{
+	if (M_CurrentTechnologyData.Technology == ETechnology::Tech_NONE)
+	{
+		return;
+	}
+
+	if (not GetIsValidPlayerTechManager())
+	{
+		return;
+	}
+
+	M_PlayerTechManager->RegisterResearchTechnologyAbilityComp(this);
 }
 
 void UResearchTechnologyAbilityComp::BeginPlay_InitAddAbility()
@@ -166,41 +201,42 @@ void UResearchTechnologyAbilityComp::AddAbilityToCommands()
 		return;
 	}
 
-	M_OwnerCommandsInterface->AddAbility(
+	bM_HasAddedAbilityToCommands = M_OwnerCommandsInterface->AddAbility(
 		CreateCurrentAbilityEntry(),
 		M_FactionChosenTechAbilitySettings.PreferredAbilityIndex);
 }
 
-void UResearchTechnologyAbilityComp::PlayCompletedAnnouncerVoiceLine()
+bool UResearchTechnologyAbilityComp::TryPlayCompletedAnnouncerVoiceLine(const ETechnology CompletedTechnology)
 {
+	if (CompletedTechnology != M_CurrentTechnologyData.Technology)
+	{
+		return false;
+	}
+
 	if (M_CurrentTechnologyData.CompletedAnnouncerVoiceLines.VoiceLines.IsEmpty())
 	{
-		return;
+		return false;
 	}
 
 	USoundBase* CompletedAnnouncerVoiceLine =
 		M_CurrentTechnologyData.CompletedAnnouncerVoiceLines.GetVoiceLine();
 	if (not IsValid(CompletedAnnouncerVoiceLine))
 	{
-		return;
+		return false;
 	}
 
 	ACPPController* PlayerController = FRTS_Statics::GetRTSController(this);
 	if (not IsValid(PlayerController))
 	{
-		return;
+		return false;
 	}
 
 	PlayerController->PlayCustomAnnouncerVoiceLine(CompletedAnnouncerVoiceLine, true);
+	return true;
 }
 
 void UResearchTechnologyAbilityComp::SwapToNextTechnology(const ETechnology CompletedTechnology)
 {
-	if (not GetIsValidOwnerCommandsInterface())
-	{
-		return;
-	}
-
 	for (int32 NextTechnologyIndex = M_CurrentTechnologyIndex + 1;
 		 NextTechnologyIndex < M_OrderedTechnologyEntries.Num();
 		 ++NextTechnologyIndex)
@@ -214,16 +250,70 @@ void UResearchTechnologyAbilityComp::SwapToNextTechnology(const ETechnology Comp
 
 		M_CurrentTechnologyIndex = NextTechnologyIndex;
 		M_CurrentTechnologyData = NextTechnologyData;
-		M_OwnerCommandsInterface->SwapAbility(
-			EAbilityID::IdResearchTechnology,
-			static_cast<int32>(CompletedTechnology),
-			CreateCurrentAbilityEntry());
+		UpdateCommandCardForResearchedCurrentTechnology(CompletedTechnology);
 		return;
 	}
 
-	M_OwnerCommandsInterface->RemoveAbility(
+	M_CurrentTechnologyIndex = INDEX_NONE;
+	M_CurrentTechnologyData = FResearchTechnologyAbilityTechnologyRuntimeData();
+	UpdateCommandCardForResearchedCurrentTechnology(CompletedTechnology);
+}
+
+void UResearchTechnologyAbilityComp::RemoveResearchedTechnologyFromQueuedEntries(
+	const ETechnology ResearchedTechnology,
+	const int32 ResearchedTechnologyIndex)
+{
+	if (ResearchedTechnologyIndex < 0 || ResearchedTechnologyIndex >= M_OrderedTechnologyEntries.Num())
+	{
+		return;
+	}
+
+	M_OrderedTechnologyEntries.RemoveAt(ResearchedTechnologyIndex);
+	if (ResearchedTechnologyIndex < M_CurrentTechnologyIndex)
+	{
+		--M_CurrentTechnologyIndex;
+	}
+
+	if (M_CurrentTechnologyData.Technology == ResearchedTechnology)
+	{
+		M_CurrentTechnologyIndex = FindOrderedTechnologyIndex(ResearchedTechnology);
+	}
+}
+
+int32 UResearchTechnologyAbilityComp::FindOrderedTechnologyIndex(const ETechnology Technology) const
+{
+	return M_OrderedTechnologyEntries.IndexOfByPredicate(
+		[Technology](const FResearchTechnologyAbilityTechnologyRuntimeData& TechnologyData)
+		{
+			return TechnologyData.Technology == Technology;
+		});
+}
+
+void UResearchTechnologyAbilityComp::UpdateCommandCardForResearchedCurrentTechnology(
+	const ETechnology CompletedTechnology)
+{
+	if (not bM_HasAddedAbilityToCommands)
+	{
+		return;
+	}
+
+	if (not GetIsValidOwnerCommandsInterface())
+	{
+		return;
+	}
+
+	if (M_CurrentTechnologyData.Technology == ETechnology::Tech_NONE)
+	{
+		bM_HasAddedAbilityToCommands = not M_OwnerCommandsInterface->RemoveAbility(
+			EAbilityID::IdResearchTechnology,
+			static_cast<int32>(CompletedTechnology));
+		return;
+	}
+
+	bM_HasAddedAbilityToCommands = M_OwnerCommandsInterface->SwapAbility(
 		EAbilityID::IdResearchTechnology,
-		static_cast<int32>(CompletedTechnology));
+		static_cast<int32>(CompletedTechnology),
+		CreateCurrentAbilityEntry());
 }
 
 void UResearchTechnologyAbilityComp::BuildOrderedTechnologyEntries(
@@ -281,6 +371,27 @@ bool UResearchTechnologyAbilityComp::GetIsValidOwnerCommandsInterface() const
 		this,
 		"M_OwnerCommandsInterface",
 		"GetIsValidOwnerCommandsInterface",
+		this);
+	return false;
+}
+
+bool UResearchTechnologyAbilityComp::GetIsValidPlayerTechManager() const
+{
+	if (IsValid(M_PlayerTechManager))
+	{
+		return true;
+	}
+
+	const_cast<UResearchTechnologyAbilityComp*>(this)->RefreshOwnerReferences();
+	if (IsValid(M_PlayerTechManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_PlayerTechManager",
+		"GetIsValidPlayerTechManager",
 		this);
 	return false;
 }
