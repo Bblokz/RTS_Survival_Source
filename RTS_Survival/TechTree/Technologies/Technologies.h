@@ -21,6 +21,7 @@ enum class ETechnology: uint8
 	Tech_Barricades,
 	Tech_LongRangeCalibration,
 	Tech_Spalliners,
+	Tech_AutoLoader,
 };
 
 static FString Global_GetTechAsString(const ETechnology Tech)
@@ -41,6 +42,8 @@ static FString Global_GetTechAsString(const ETechnology Tech)
 		return "Tech_LongRangeCalibration";
 	case ETechnology::Tech_Spalliners:
 		return "Tech_Spalliners";
+	case ETechnology::Tech_AutoLoader:
+		return "Tech_AutoLoader";
 	default: break;
 	}
 	return "Tech_NONE";
@@ -64,6 +67,8 @@ static FString Global_GetTechDisplayName(const ETechnology Tech)
 			return "Long Range Calibration";
 		case ETechnology::Tech_Spalliners:
 			return "Spalliners";
+		case ETechnology::Tech_AutoLoader:
+			return "Auto Loader";
 		default:
 			return "None";
 	}

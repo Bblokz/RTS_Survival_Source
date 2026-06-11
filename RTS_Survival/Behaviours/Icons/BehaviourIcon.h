@@ -61,5 +61,6 @@ enum class EBehaviourIcon : uint8
 	TechLightVehicleTracks,
 	TechScavengingSpeed,
 	TechAutoCannonAPCRRounds,
+	AutoLoader,
 	
 };
