@@ -58,6 +58,7 @@ public:
 
 	FFlameThrowerSettings GetFlameSettings() const { return M_FlameSettings; }
 	FFlameThrowerSettings* GetFlameSettingsForChange();
+	void SetFlameColor(const FLinearColor& NewFlameColor);
 	void ApplyFlameColorFromSettings();
 
 protected:

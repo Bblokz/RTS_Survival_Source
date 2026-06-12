@@ -62,6 +62,12 @@ static FString Global_GetTechAsString(const ETechnology Tech)
 		return "Tech_HarvesterSpeed";
 	case ETechnology::Tech_RepairUpgrade:
 		return "Tech_RepairUpgrade";
+	case ETechnology::Tech_AutoCannonDamage:
+		return "Tech_AutoCannonDamage";
+	case ETechnology::Tech_FlameRange:
+		return "Tech_FlameRange";
+	case ETechnology::Tech_FlameDamage:
+		return "Tech_FlameDamage";
 	default: break;
 	}
 	return "Tech_NONE";
@@ -97,6 +103,12 @@ static FString Global_GetTechDisplayName(const ETechnology Tech)
 			return "Harvester Speed";
 		case ETechnology::Tech_RepairUpgrade:
 			return "Repair Upgrade";
+		case ETechnology::Tech_AutoCannonDamage:
+			return "Auto Cannon Damage";
+		case ETechnology::Tech_FlameRange:
+			return "Flame Range";
+		case ETechnology::Tech_FlameDamage:
+			return "Flame Damage";
 		default:
 			return "None";
 	}

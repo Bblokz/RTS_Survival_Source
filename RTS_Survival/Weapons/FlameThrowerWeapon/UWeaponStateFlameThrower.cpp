@@ -62,6 +62,12 @@ FFlameThrowerSettings* UWeaponStateFlameThrower::GetFlameSettingsForChange()
 	return &M_FlameSettings;
 }
 
+void UWeaponStateFlameThrower::SetFlameColor(const FLinearColor& NewFlameColor)
+{
+	M_FlameSettings.Color = NewFlameColor;
+	ApplyFlameColorFromSettings();
+}
+
 void UWeaponStateFlameThrower::ApplyFlameColorFromSettings()
 {
 	UpdateFlameParam_Color(M_FlameSettings.Color);
@@ -69,7 +75,7 @@ void UWeaponStateFlameThrower::ApplyFlameColorFromSettings()
 
 bool UWeaponStateFlameThrower::EnsureFlameEffectIsValid() const
 {
-	if (!IsValid(M_FlameSettings.FlameEffect))
+	if (not IsValid(M_FlameSettings.FlameEffect))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Flamethrower has invalid FlameEffect Niagara system!"));
 		return false;
@@ -79,7 +85,7 @@ bool UWeaponStateFlameThrower::EnsureFlameEffectIsValid() const
 
 bool UWeaponStateFlameThrower::EnsureFlameSystemIsValid() const
 {
-	if (!IsValid(M_FlameSystem))
+	if (not IsValid(M_FlameSystem))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Flamethrower Niagara component was not set up!"));
 		return false;
@@ -89,11 +95,11 @@ bool UWeaponStateFlameThrower::EnsureFlameSystemIsValid() const
 
 void UWeaponStateFlameThrower::SetupFlameSystem()
 {
-	if (!EnsureFlameEffectIsValid())
+	if (not EnsureFlameEffectIsValid())
 	{
 		return;
 	}
-	if (!IsValid(MeshComponent) || FireSocketName.IsNone() || !WeaponOwner)
+	if (not IsValid(MeshComponent) || FireSocketName.IsNone() || not WeaponOwner)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Flamethrower cannot setup Niagara: invalid mesh/socket/owner."));
 		return;
@@ -125,7 +131,7 @@ void UWeaponStateFlameThrower::SetupFlameSystem()
 
 void UWeaponStateFlameThrower::InitFlameParamsStatic() const
 {
-	if (!EnsureFlameSystemIsValid())
+	if (not EnsureFlameSystemIsValid())
 	{
 		return;
 	}
@@ -142,7 +148,7 @@ void UWeaponStateFlameThrower::InitFlameParamsStatic() const
 
 void UWeaponStateFlameThrower::StartFlameVfx(const float Duration) const
 {
-	if (!EnsureFlameSystemIsValid())
+	if (not EnsureFlameSystemIsValid())
 	{
 		return;
 	}
@@ -158,7 +164,7 @@ void UWeaponStateFlameThrower::StartFlameVfx(const float Duration) const
 
 void UWeaponStateFlameThrower::StopFlameVfx() const
 {
-	if (!EnsureFlameSystemIsValid())
+	if (not EnsureFlameSystemIsValid())
 	{
 		return;
 	}
@@ -168,7 +174,7 @@ void UWeaponStateFlameThrower::StopFlameVfx() const
 
 void UWeaponStateFlameThrower::UpdateFlameParam_Color(const FLinearColor& NewColor) const
 {
-	if (!EnsureFlameSystemIsValid())
+	if (not EnsureFlameSystemIsValid())
 	{
 		return;
 	}
@@ -177,7 +183,7 @@ void UWeaponStateFlameThrower::UpdateFlameParam_Color(const FLinearColor& NewCol
 
 void UWeaponStateFlameThrower::UpdateFlameParam_Range(const float NewRange) const
 {
-	if (!EnsureFlameSystemIsValid())
+	if (not EnsureFlameSystemIsValid())
 	{
 		return;
 	}
@@ -187,7 +193,7 @@ void UWeaponStateFlameThrower::UpdateFlameParam_Range(const float NewRange) cons
 
 void UWeaponStateFlameThrower::UpdateFlameParam_Duration(const float NewDuration) const
 {
-	if (!EnsureFlameSystemIsValid())
+	if (not EnsureFlameSystemIsValid())
 	{
 		return;
 	}
@@ -196,7 +202,7 @@ void UWeaponStateFlameThrower::UpdateFlameParam_Duration(const float NewDuration
 
 void UWeaponStateFlameThrower::UpdateFlameParam_ConeAngle(const float NewConeAngle) const
 {
-	if (!EnsureFlameSystemIsValid())
+	if (not EnsureFlameSystemIsValid())
 	{
 		return;
 	}
