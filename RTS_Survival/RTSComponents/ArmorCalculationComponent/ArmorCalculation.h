@@ -89,11 +89,12 @@ public:
 
 	/**
 	 * @brief Applies researched armour changes directly to the stored plate data so later hit calculations use them.
-	 * @param ShouldAdjustArmorPlate Predicate used by technology effects to keep plate selection in one place.
+	 * @param ArmorPlatesToAdjust Plate types that should receive the multiplier.
 	 * @param ArmorValueMultiplier Multiplier applied once to every matching registered plate.
 	 */
-	void ApplyArmorValueMultiplierToMatchingPlates(bool (*ShouldAdjustArmorPlate)(EArmorPlate),
-	                                             float ArmorValueMultiplier);
+	void ApplyArmorValueMultiplierToMatchingPlates(
+		const TArray<EArmorPlate>& ArmorPlatesToAdjust,
+		float ArmorValueMultiplier);
 
 	/**
 	 * Calculates the effective armor at the hit location.
@@ -165,9 +166,10 @@ private:
 	// The OutPenetrationAdjustment (input as a base value) is modified by an exponential decay factor.
 	float GetArmorAtAngle(float ArmorValue, float AngleDegrees, float& OutPenetrationAdjustment) const;
 
-	static void ApplyArmorValueMultiplierToArmorSettings(FArmorSettings* ArmorSettings,
-	                                                    bool (*ShouldAdjustArmorPlate)(EArmorPlate),
-	                                                    float ArmorValueMultiplier);
+	static void ApplyArmorValueMultiplierToArmorSettings(
+		FArmorSettings* ArmorSettings,
+		const TArray<EArmorPlate>& ArmorPlatesToAdjust,
+		float ArmorValueMultiplier);
 
 	void RefreshRearArmorCache();
 	bool TryRefreshRearArmorCacheFromSettings(const FArmorSettings* ArmorSettings);

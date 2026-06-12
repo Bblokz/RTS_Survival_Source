@@ -5,13 +5,25 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
-#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/TechTree/Technologies/TechHelpers/RTSTechHelpers.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace LightRadixiteArmorTechnologySettings
 {
 	constexpr float ArmorValueMultiplier = 1.15f;
+
+	const TArray<EArmorPlate> ArmorPlatesToAdjust = {
+		EArmorPlate::Plate_Front,
+		EArmorPlate::Plate_SideLeft,
+		EArmorPlate::Plate_SideRight,
+		EArmorPlate::Turret_Front,
+		EArmorPlate::Turret_Mantlet,
+		EArmorPlate::Plate_FrontLowerGlacis,
+		EArmorPlate::Plate_FrontUpperGlacis,
+		EArmorPlate::Plate_SideLowerLeft,
+		EArmorPlate::Plate_SideLowerRight
+	};
 }
 
 UTE_LightRadixiteArmor::UTE_LightRadixiteArmor()
@@ -77,7 +89,10 @@ void UTE_LightRadixiteArmor::ApplyOnTank_Internal(ATankMaster* Tank)
 	RadixiteArmorMeshComp->AttachToComponent(TankMesh, FAttachmentTransformRules::KeepRelativeTransform);
 	RadixiteArmorMeshComp->RegisterComponent();
 	RadixiteArmorMeshComp->SetRelativeTransform(FTransform::Identity);
-	ImproveArmor(Tank);
+	RTSTechHelpers::ApplyArmorValueMultiplierToMatchingPlates(
+		Tank,
+		LightRadixiteArmorTechnologySettings::ArmorPlatesToAdjust,
+		M_ArmorValueMultiplier);
 
 	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
@@ -100,37 +115,4 @@ UStaticMesh* UTE_LightRadixiteArmor::GetMeshToApply(const ETankSubtype TankSubty
 		return Sdkfz140RadixiteMesh;
 	}
 	return nullptr;
-}
-
-void UTE_LightRadixiteArmor::ImproveArmor(ATankMaster* ValidTank) const
-{
-	if (not IsValid(ValidTank))
-	{
-		return;
-	}
-
-	UArmorCalculation* ArmorComponent = ValidTank->FindComponentByClass<UArmorCalculation>();
-	if (not IsValid(ArmorComponent))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(
-			ValidTank,
-			"ArmorComponent",
-			"UTE_LightRadixiteArmor::ImproveArmor");
-		return;
-	}
-
-	ArmorComponent->ApplyArmorValueMultiplierToMatchingPlates(IsArmorTypeToAdjust, M_ArmorValueMultiplier);
-}
-
-bool UTE_LightRadixiteArmor::IsArmorTypeToAdjust(const EArmorPlate ArmorPlate)
-{
-	return ArmorPlate == EArmorPlate::Plate_Front ||
-		ArmorPlate == EArmorPlate::Plate_SideLeft ||
-		ArmorPlate == EArmorPlate::Plate_SideRight ||
-		ArmorPlate == EArmorPlate::Turret_Front ||
-		ArmorPlate == EArmorPlate::Turret_Mantlet ||
-		ArmorPlate == EArmorPlate::Plate_FrontLowerGlacis ||
-		ArmorPlate == EArmorPlate::Plate_FrontUpperGlacis ||
-		ArmorPlate == EArmorPlate::Plate_SideLowerLeft ||
-		ArmorPlate == EArmorPlate::Plate_SideLowerRight;
 }

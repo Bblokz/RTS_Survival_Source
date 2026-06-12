@@ -3,7 +3,7 @@
 #include "TE_Spalliners.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
-#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/TechTree/Technologies/TechHelpers/RTSTechHelpers.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -41,17 +41,10 @@ void UTE_Spalliners::ApplyOnTank_Internal(ATankMaster* Tank)
 		return;
 	}
 
-	UHealthComponent* HealthComponent = Tank->GetHealthComponent();
-	if (not IsValid(HealthComponent))
+	if (not RTSTechHelpers::ApplyMaxHealthMultiplier(Tank, M_HealthMultiplier))
 	{
-		RTSFunctionLibrary::ReportNullErrorComponent(
-			Tank,
-			"HealthComponent",
-			"UTE_Spalliners::ApplyOnTank_Internal");
 		return;
 	}
-
-	HealthComponent->SetMaxHealth(HealthComponent->GetMaxHealth() * M_HealthMultiplier);
 	if constexpr (DeveloperSettings::Debugging::GTechTree_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Applying spalliners health boost to " + Tank->GetName());
