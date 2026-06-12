@@ -54,6 +54,12 @@ void URepairComponent::TerminateRepair()
 	StopRepairAnimation();
 }
 
+
+void URepairComponent::ApplyRepairMultiplier(const float RepairMultiplier)
+{
+	RepairMlt *= RepairMultiplier;
+}
+
 void URepairComponent::OnFinishedMovementForRepairAbility()
 {
 	if (not FRTSRepairHelpers::GetIsUnitValidForRepairs(M_RepairTarget) || not GetIsValidOwnerSquadUnit())
@@ -82,9 +88,8 @@ void URepairComponent::BeginPlay()
 
 void URepairComponent::AddRepairEquipment()
 {
-	if (!GetIsValidOwnerSquadUnit())
+	if (not GetIsValidOwnerSquadUnit())
 	{
-		RTSFunctionLibrary::ReportError("Cannot add repair equipment: invalid owner unit.");
 		return;
 	}
 
@@ -135,7 +140,7 @@ void URepairComponent::AddRepairEquipment()
 
 void URepairComponent::PlayRepairAnimation() const
 {
-	if(not IsValid(M_RepairTarget) || not IsValid(M_OwnerSquadUnit))
+	if (not GetIsValidRepairTarget() || not GetIsValidOwnerSquadUnit())
 	{
 		return;
 	}
@@ -156,7 +161,7 @@ void URepairComponent::PlayRepairAnimation() const
 
 void URepairComponent::StopRepairAnimation() const
 {
-	if(not IsValid(M_OwnerSquadUnit))
+	if (not GetIsValidOwnerSquadUnit())
 	{
 		return;
 	}
@@ -170,9 +175,8 @@ void URepairComponent::StopRepairAnimation() const
 
 void URepairComponent::RemoveRepairEquipment()
 {
-	if (!GetIsValidOwnerSquadUnit())
+	if (not GetIsValidOwnerSquadUnit())
 	{
-		RTSFunctionLibrary::ReportError("Cannot remove repair equipment: invalid owner unit.");
 		return;
 	}
 
@@ -228,12 +232,36 @@ void URepairComponent::MoveToRepairLocation_SetStatus()
 
 bool URepairComponent::GetIsValidOwnerSquadUnit() const
 {
-	if (not IsValid(M_OwnerSquadUnit))
+	if (IsValid(M_OwnerSquadUnit))
 	{
-		RTSFunctionLibrary::ReportError("Invalid squad unit owner for repair component!");
-		return false;
+		return true;
 	}
-	return true;
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_OwnerSquadUnit",
+		"GetIsValidOwnerSquadUnit",
+		this
+	);
+
+	return false;
+}
+
+bool URepairComponent::GetIsValidRepairTarget() const
+{
+	if (IsValid(M_RepairTarget))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_RepairTarget",
+		"GetIsValidRepairTarget",
+		this
+	);
+
+	return false;
 }
 
 void URepairComponent::OnRepairUnitNotValidForRepairs() const
@@ -250,7 +278,7 @@ void URepairComponent::OnRepairUnitNotValidForRepairs() const
 
 FString URepairComponent::CheckRepairOffsetValidText() const
 {
-	const FString OwnerName = IsValid(M_OwnerSquadUnit)
+	const FString OwnerName = GetIsValidOwnerSquadUnit()
 		                          ? M_OwnerSquadUnit->GetName()
 		                          : "Unknown Squad Unit";
 	const FString Message = "Repair offset is nearly zero for"
@@ -262,7 +290,7 @@ float URepairComponent::EnsureValidAcceptanceRadius()
 {
 	if (RepairAcceptanceRadius <= KINDA_SMALL_NUMBER)
 	{
-		const FString OwenerName = IsValid(M_OwnerSquadUnit)
+		const FString OwenerName = GetIsValidOwnerSquadUnit()
 			                           ? M_OwnerSquadUnit->GetName()
 			                           : "Unknown Squad Unit";
 		RTSFunctionLibrary::ReportError(

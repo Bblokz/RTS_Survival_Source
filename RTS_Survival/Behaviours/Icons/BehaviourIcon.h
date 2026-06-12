@@ -65,6 +65,7 @@ enum class EBehaviourIcon : uint8
 	TechAutoLoader,
 	TechHarvesterCapacity,
 	TechHarvesterSpeed,
+	TechRepairUpgrade,
 	TechSpallLiners,
 	TechAutoCannonDamage,
 };
