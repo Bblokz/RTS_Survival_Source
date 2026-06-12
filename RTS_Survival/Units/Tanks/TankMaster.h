@@ -17,6 +17,7 @@
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "TankMaster.generated.h"
 
+class UHullWeaponComponent;
 class UTankEnergyComponent;
 class URTSOptimizer;
 class UDigInComponent;
