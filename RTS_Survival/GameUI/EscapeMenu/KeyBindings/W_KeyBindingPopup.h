@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/EscapeMenuKeyBindingButtonSounds.h"
 
 #include "W_KeyBindingPopup.generated.h"
 
@@ -39,6 +40,7 @@ public:
 	void ShowChordedActionUnboundMessage(const FString& ChordedActionName);
 	void ShowUnboundActionsWarning(const FString& WarningText);
 	void ClosePopup();
+	void SetButtonSounds(const FEscapeMenuKeyBindingButtonSounds& NewButtonSounds);
 
 	UW_EscapeMenuKeyBindingEntry* GetKeyBindingEntry() const;
 	FOnKeyBindingPopupUnbindRequested& OnUnbindRequested();
@@ -62,6 +64,7 @@ private:
 
 	bool SetBindingContext(ACPPController* NewPlayerController, UInputAction* ActionToBind, const FKey& CurrentKey);
 	void SetTitleText(const FString& TitleText);
+	void PlayButtonSound(USoundBase* SoundToPlay);
 
 	UFUNCTION()
 	void HandleUnderstoodClicked();
@@ -109,6 +112,9 @@ private:
 	TObjectPtr<UInputAction> M_ActionToBind = nullptr;
 
 	FKey M_CurrentKey;
+
+	UPROPERTY(Transient)
+	FEscapeMenuKeyBindingButtonSounds M_ButtonSounds;
 
 	bool bM_HasBindingContext = false;
 	bool bM_ShouldReturnToEntryOnUnderstood = false;
