@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/EscapeMenuKeyBindingButtonSounds.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 
 #include "W_EscapeMenuKeyBindings.generated.h"
@@ -18,6 +19,7 @@ class UW_KeyBindingPopup;
 class UInputAction;
 class URTSHotkeyProviderSubsystem;
 class UW_HotKey;
+class USoundBase;
 
 USTRUCT(BlueprintType)
 struct FEscapeMenuKeyBindingEntryData
@@ -72,6 +74,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "KeyBindings")
 	TSubclassOf<UW_KeyBindingPopup> M_KeyBindingPopupClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "KeyBindings|Audio", meta = (AllowPrivateAccess = "true"))
+	FEscapeMenuKeyBindingButtonSounds M_ButtonSounds;
+
 private:
 	void BindButtonCallbacks();
 	void BindBackButton();
@@ -86,6 +91,8 @@ private:
 
 	void HandleActionButtonClicked(const int32 ActionButtonIndex);
 	void HandleControlGroupButtonClicked(const int32 ControlGroupIndex);
+	void PlayButtonSound(USoundBase* SoundToPlay);
+	void ApplyButtonSoundsToKeyBindingPopup();
 
 	void OpenKeyBindingPopupForActionName(const FName& ActionName);
 	void UpdateKeyBindingEntryForAction(const FName& ActionName, const FKey& NewKey);

@@ -124,6 +124,11 @@ void UW_KeyBindingPopup::ClosePopup()
 	RemoveFromParent();
 }
 
+void UW_KeyBindingPopup::SetButtonSounds(const FEscapeMenuKeyBindingButtonSounds& NewButtonSounds)
+{
+	M_ButtonSounds = NewButtonSounds;
+}
+
 UW_EscapeMenuKeyBindingEntry* UW_KeyBindingPopup::GetKeyBindingEntry() const
 {
 	return M_KeyBindingEntry;
@@ -249,6 +254,16 @@ void UW_KeyBindingPopup::SetTitleText(const FString& TitleText)
 	M_Title->SetText(FText::FromString(TitleText));
 }
 
+void UW_KeyBindingPopup::PlayButtonSound(USoundBase* SoundToPlay)
+{
+	if (not IsValid(SoundToPlay))
+	{
+		return;
+	}
+
+	PlaySound(SoundToPlay);
+}
+
 bool UW_KeyBindingPopup::GetIsValidUnderstoodButton() const
 {
 	if (IsValid(M_UnderstoodButton))
@@ -347,6 +362,8 @@ bool UW_KeyBindingPopup::GetIsValidActionToBind() const
 
 void UW_KeyBindingPopup::HandleUnderstoodClicked()
 {
+	PlayButtonSound(M_ButtonSounds.PopupUnderstoodButtonSound);
+
 	if (bM_ShouldReturnToEntryOnUnderstood && bM_HasBindingContext)
 	{
 		SetTitleText(KeyBindingPopupConstants::TryDifferentBindingTitle);
@@ -360,6 +377,8 @@ void UW_KeyBindingPopup::HandleUnderstoodClicked()
 
 void UW_KeyBindingPopup::HandleUnbindClicked()
 {
+	PlayButtonSound(M_ButtonSounds.PopupUnbindButtonSound);
+
 	if (not bM_HasBindingContext || not GetIsValidActionToBind() || not M_CurrentKey.IsValid())
 	{
 		return;
@@ -370,10 +389,12 @@ void UW_KeyBindingPopup::HandleUnbindClicked()
 
 void UW_KeyBindingPopup::HandleConfirmExitClicked()
 {
+	PlayButtonSound(M_ButtonSounds.PopupConfirmExitButtonSound);
 	M_OnConfirmExitRequested.Broadcast();
 }
 
 void UW_KeyBindingPopup::HandleCancelExitClicked()
 {
+	PlayButtonSound(M_ButtonSounds.PopupCancelExitButtonSound);
 	M_OnCancelExitRequested.Broadcast();
 }

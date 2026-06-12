@@ -523,6 +523,8 @@ void UW_EscapeMenuKeyBindings::InitializeHotkeyBindings()
 
 void UW_EscapeMenuKeyBindings::HandleActionButtonClicked(const int32 ActionButtonIndex)
 {
+	PlayButtonSound(M_ButtonSounds.ActionButtonSound);
+
 	const int32 ActionNameIndex = GetActionButtonActionIndex(ActionButtonIndex);
 	const FString ActionName = FString::Printf(
 		TEXT("%s%d"),
@@ -534,6 +536,8 @@ void UW_EscapeMenuKeyBindings::HandleActionButtonClicked(const int32 ActionButto
 
 void UW_EscapeMenuKeyBindings::HandleControlGroupButtonClicked(const int32 ControlGroupIndex)
 {
+	PlayButtonSound(M_ButtonSounds.ControlGroupButtonSound);
+
 	const int32 ControlGroupActionIndex = GetControlGroupActionIndex(ControlGroupIndex);
 	const FString ActionName = FString::Printf(
 		TEXT("%s%d"),
@@ -541,6 +545,26 @@ void UW_EscapeMenuKeyBindings::HandleControlGroupButtonClicked(const int32 Contr
 		ControlGroupActionIndex
 	);
 	OpenKeyBindingPopupForActionName(FName(*ActionName));
+}
+
+void UW_EscapeMenuKeyBindings::PlayButtonSound(USoundBase* SoundToPlay)
+{
+	if (not IsValid(SoundToPlay))
+	{
+		return;
+	}
+
+	PlaySound(SoundToPlay);
+}
+
+void UW_EscapeMenuKeyBindings::ApplyButtonSoundsToKeyBindingPopup()
+{
+	if (M_KeyBindingPopup == nullptr)
+	{
+		return;
+	}
+
+	M_KeyBindingPopup->SetButtonSounds(M_ButtonSounds);
 }
 
 void UW_EscapeMenuKeyBindings::CacheHotkeyProviderSubsystem()
@@ -880,6 +904,7 @@ void UW_EscapeMenuKeyBindings::OpenKeyBindingPopupForActionName(const FName& Act
 	}
 
 	M_KeyBindingPopup->SetupPopup(M_PlayerController.Get(), ActionToBind, CurrentKey);
+	ApplyButtonSoundsToKeyBindingPopup();
 	M_KeyBindingPopup->AddToViewport(EscapeMenuKeyBindingsConstants::PopupZOrder);
 	BindKeyBindingPopupCallbacks();
 
@@ -934,6 +959,7 @@ void UW_EscapeMenuKeyBindings::EnsureKeyBindingPopupVisible()
 		return;
 	}
 
+	ApplyButtonSoundsToKeyBindingPopup();
 	M_KeyBindingPopup->AddToViewport(EscapeMenuKeyBindingsConstants::PopupZOrder);
 	BindKeyBindingPopupCallbacks();
 }
@@ -1468,6 +1494,8 @@ bool UW_EscapeMenuKeyBindings::GetIsValidControlGroupHotKey(const int32 ControlG
 
 void UW_EscapeMenuKeyBindings::HandleBackClicked()
 {
+	PlayButtonSound(M_ButtonSounds.BackButtonSound);
+
 	if (not GetIsValidMainGameUI())
 	{
 		return;
