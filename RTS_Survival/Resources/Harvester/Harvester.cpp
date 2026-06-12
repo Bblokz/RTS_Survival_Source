@@ -84,6 +84,11 @@ void UHarvester::UpgradeHarvestingAnimationPlayRate(const float NewHarvestingAni
 	HarvestingAnimationPlayRate = NewHarvestingAnimationPlayRate;
 }
 
+float UHarvester::GetHarvestAnimationPlayRate() const
+{
+	return HarvestingAnimationPlayRate;
+}
+
 int32 UHarvester::GetDropOffAmount()
 {
 	if (M_CargoSpace.Contains(M_TargetResourceType))

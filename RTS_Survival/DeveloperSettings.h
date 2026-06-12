@@ -78,7 +78,7 @@ namespace DeveloperSettings
 			inline constexpr int32 MetalVaultMetalStorage = 800;
 			inline constexpr int32 MetalVaultVehiclePartsStorage = 400;
 
-			inline constexpr float ScavengeTimePer70Parts = 14.f;
+			inline constexpr float ScavengeTimePer70Parts = 28.f;
 			inline constexpr int32 PercentageVehiclePartsFromDestroyedVehicleMin = 40;
 			inline constexpr int32 PercentageVehiclePartsFromDestroyedVehicleMax = 70;
 			inline const FVector2D VehiclePartsFromDestroyedVehicleMltRange = FVector2D(

@@ -98,6 +98,8 @@ public:
 	void UpgradeCapcityForResource(int32 ExtraCapacity, ERTSResourceType ResourceType);
 
 	void UpgradeHarvestingAnimationPlayRate(float NewHarvestingAnimationPlayRate);
+	
+	float GetHarvestAnimationPlayRate() const;
 
 protected:
 	// Called when the game starts
