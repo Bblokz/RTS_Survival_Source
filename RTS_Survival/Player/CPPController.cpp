@@ -5086,17 +5086,12 @@ void ACPPController::DirectActionButtonDigIn()
 void ACPPController::DirectActionButtonReinforce()
 {
 	EnsureSelectionsAreRTSValid();
-	int32 CommandsExe = 0;
 	for (const auto EachSquad : TSelectedSquadControllers)
 	{
-		CommandsExe += EachSquad->Reinforce(!bIsHoldingShift) == ECommandQueueError::NoError;
+		EachSquad->Reinforce(!bIsHoldingShift);
 	}
 	PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdReinforceSquad),
 	                                false);
-	if (CommandsExe > 0)
-	{
-		PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ReinforcementsHaveArrived, true, false);
-	}
 }
 
 void ACPPController::DirectActionButtonResearchTechnology(const ETechnology Technology)
