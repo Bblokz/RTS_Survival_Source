@@ -24,6 +24,8 @@ enum class ETechnology: uint8
 	Tech_AutoLoader,
 	Tech_ScavengingSpeed UMETA(DisplayName = "Scavenging Speed"),
 	Tech_ScavengingReward UMETA(DisplayName = "Scavenging Reward"),
+	Tech_HarvesterCapacity UMETA(DisplayName = "Harvester Capacity"),
+	Tech_HarvesterSpeed UMETA(DisplayName = "Harvester Speed"),
 };
 
 static FString Global_GetTechAsString(const ETechnology Tech)
@@ -50,6 +52,10 @@ static FString Global_GetTechAsString(const ETechnology Tech)
 		return "Tech_ScavengingSpeed";
 	case ETechnology::Tech_ScavengingReward:
 		return "Tech_ScavengingReward";
+	case ETechnology::Tech_HarvesterCapacity:
+		return "Tech_HarvesterCapacity";
+	case ETechnology::Tech_HarvesterSpeed:
+		return "Tech_HarvesterSpeed";
 	default: break;
 	}
 	return "Tech_NONE";
@@ -79,6 +85,10 @@ static FString Global_GetTechDisplayName(const ETechnology Tech)
 			return "Scavenging Speed";
 		case ETechnology::Tech_ScavengingReward:
 			return "Scavenging Reward";
+		case ETechnology::Tech_HarvesterCapacity:
+			return "Harvester Capacity";
+		case ETechnology::Tech_HarvesterSpeed:
+			return "Harvester Speed";
 		default:
 			return "None";
 	}

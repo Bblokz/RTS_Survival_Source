@@ -29,6 +29,9 @@ class UPlayerResourceManager;
 class UAsyncFindClosestDropOff;
 
 
+/**
+ * @brief Component used by harvester units to run harvesting commands and manage their resource cargo.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable, BlueprintType)
 class RTS_SURVIVAL_API UHarvester : public UActorComponent
 {
@@ -84,6 +87,18 @@ public:
 	 */
 	int32 GetMaxCapacityForTargetResource(int32& OutCurrentAmount, ERTSResourceType& OutResource) const;
 
+	/**
+	 * @brief Increases one configured cargo slot after a researched tech is applied.
+	 * @param ExtraCapacity How much capacity to add.
+	 * @param ResourceType Which existing harvester resource slot receives the increase.
+	 */
+	void UpgradeCapacityForResource(int32 ExtraCapacity, ERTSResourceType ResourceType);
+
+	// Kept for tech setup code that still uses the historical misspelling.
+	void UpgradeCapcityForResource(int32 ExtraCapacity, ERTSResourceType ResourceType);
+
+	void UpgradeHarvestingAnimationPlayRate(float NewHarvestingAnimationPlayRate);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -110,7 +125,7 @@ protected:
 	TWeakObjectPtr<UResourceComponent> TargetResource;
 	
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
-	float HarvestingAnimationPlayRate  =1.f;
+	float HarvestingAnimationPlayRate = 1.f;
 	
 
 private:
