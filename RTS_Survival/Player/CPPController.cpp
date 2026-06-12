@@ -4,7 +4,10 @@
 
 #include "Abilities.h"
 #include "InputAction.h"
+#include "EnhancedInputSubsystems.h"
+#include "EnhancedInputSubsystemInterface.h"
 #include "InputMappingContext.h"
+#include "InputTriggers.h"
 #include "AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "Camera/CameraPawn.h"
 #include "Camera/CameraController/PlayerCameraController.h"
@@ -575,6 +578,128 @@ UInputMappingContext* ACPPController::GetDefaultInputMappingContext() const
 	return M_DefaultInputMappingContext;
 }
 
+UInputMappingContext* ACPPController::GetChordedActionInputMappingContext() const
+{
+	if (not GetIsValidChordedActionInputMappingContext())
+	{
+		return nullptr;
+	}
+
+	return M_ChordedActionInputMappingContext;
+}
+
+FRTSModifierHotkey ACPPController::GetChordedHotkeyForAction(const FName& ActionName) const
+{
+	UInputAction* Action = FindInputActionByName(M_ChordedActionInputMappingContext, ActionName);
+	if (not IsValid(Action))
+	{
+		return {};
+	}
+
+	const FEnhancedActionKeyMapping* Mapping = FindActionMapping(M_ChordedActionInputMappingContext, Action);
+	if (Mapping == nullptr)
+	{
+		return {};
+	}
+
+	FRTSModifierHotkey Hotkey;
+	TryGetChordedHotkeyFromMapping(*Mapping, Hotkey);
+	return Hotkey;
+}
+
+FText ACPPController::GetChordedHotkeyDisplayTextForAction(const FName& ActionName) const
+{
+	return RTSHotkeyTypes::GetChordedHotkeyDisplayText(GetChordedHotkeyForAction(ActionName));
+}
+
+bool ACPPController::ChangeChordedKeyBinding(UInputAction* ActionToRebind, const FRTSModifierHotkey& NewHotkey)
+{
+	if (not GetIsValidChordedActionInputMappingContext())
+	{
+		return false;
+	}
+
+	if (not IsValid(ActionToRebind))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ChangeChordedKeyBinding received an invalid action reference."));
+		return false;
+	}
+
+	if (not NewHotkey.GetIsValid())
+	{
+		return false;
+	}
+
+	UInputAction* ModifierAction = FindInputActionByName(
+		M_ChordedActionInputMappingContext,
+		RTSHotkeyTypes::GetModifierActionName(NewHotkey.Modifier));
+	if (not IsValid(ModifierAction))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ChangeChordedKeyBinding could not find the modifier input action."));
+		return false;
+	}
+
+	FEnhancedActionKeyMapping* ExistingMapping = FindMutableActionMapping(M_ChordedActionInputMappingContext, ActionToRebind);
+	FEnhancedActionKeyMapping* MappingToUpdate = ExistingMapping;
+	if (MappingToUpdate == nullptr)
+	{
+		MappingToUpdate = &M_ChordedActionInputMappingContext->MapKey(ActionToRebind, NewHotkey.Key);
+	}
+
+	constexpr float ChordedActionActuationThreshold = 0.1f;
+	ActionToRebind->Triggers.RemoveAll(
+		[](const TObjectPtr<UInputTrigger>& Trigger)
+		{
+			return IsValid(Cast<UInputTriggerChordAction>(Trigger));
+		});
+
+	UInputTriggerChordAction* ChordTrigger = NewObject<UInputTriggerChordAction>(ActionToRebind);
+	ChordTrigger->ChordAction = ModifierAction;
+	ChordTrigger->ActuationThreshold = ChordedActionActuationThreshold;
+	ActionToRebind->Triggers.Add(ChordTrigger);
+	ActionToRebind->bConsumeInput = true;
+
+	MappingToUpdate->Key = NewHotkey.Key;
+	MappingToUpdate->Triggers.Reset();
+
+	RequestEnhancedInputMappingsRebuild();
+	SaveChordedKeyBindingOverride(ActionToRebind, NewHotkey);
+	NotifyHotkeyProviderChordedActionChanged(ActionToRebind);
+	return true;
+}
+
+void ACPPController::UnbindChordedKeyBinding(UInputAction* ActionToUnbind)
+{
+	if (not GetIsValidChordedActionInputMappingContext())
+	{
+		return;
+	}
+
+	if (not IsValid(ActionToUnbind))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UnbindChordedKeyBinding received an invalid action reference."));
+		return;
+	}
+
+	FEnhancedActionKeyMapping* CurrentMapping = FindMutableActionMapping(M_ChordedActionInputMappingContext, ActionToUnbind);
+	if (CurrentMapping != nullptr)
+	{
+		CurrentMapping->Key = FKey();
+	}
+
+	RequestEnhancedInputMappingsRebuild();
+
+	if (URTSGameUserSettings* GameUserSettings = URTSGameUserSettings::GetMutable())
+	{
+		GameUserSettings->SaveChordedKeyBindingOverride(
+			M_ChordedActionInputMappingContext->GetFName(),
+			ActionToUnbind->GetFName(),
+			{});
+	}
+
+	NotifyHotkeyProviderChordedActionChanged(ActionToUnbind);
+}
+
 void ACPPController::ChangeKeyBinding(UInputAction* ActionToRebind, const FKey OldKey, const FKey NewKey)
 {
 	if (not GetIsValidDefaultInputMappingContext())
@@ -595,6 +720,7 @@ void ACPPController::ChangeKeyBinding(UInputAction* ActionToRebind, const FKey O
 
 	M_DefaultInputMappingContext->UnmapKey(ActionToRebind, OldKey);
 	M_DefaultInputMappingContext->MapKey(ActionToRebind, NewKey);
+	SaveSingleKeyBindingOverride(M_DefaultInputMappingContext, ActionToRebind, NewKey);
 
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
@@ -625,6 +751,7 @@ void ACPPController::UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey B
 	}
 
 	M_DefaultInputMappingContext->UnmapKey(ActionToUnbind, BoundKey);
+	SaveSingleKeyBindingOverride(M_DefaultInputMappingContext, ActionToUnbind, FKey());
 
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
@@ -634,6 +761,23 @@ void ACPPController::UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey B
 			HotkeyProviderSubsystem->HandleKeyBindingChanged(ActionToUnbind);
 		}
 	}
+}
+
+void ACPPController::OnNomadicExpansionShortCut()
+{
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+
+	AActor* SelectedActor = M_MainGameUI->PrimarySelectedActor;
+	if (not IsValid(SelectedActor))
+	{
+		return;
+	}
+
+	ConstructBuilding(SelectedActor);
+	M_MainGameUI->RequestShowCancelBuilding(SelectedActor);
 }
 
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
@@ -1547,6 +1691,7 @@ void ACPPController::BeginPlay()
 	BeginPlay_SetupOutlineRules();
 	BeginPlay_SetupPlayerAimAbility();
 	BeginPlay_InitEscapeMenuHelper();
+	BeginPlay_ApplySavedKeyBindings();
 }
 
 void ACPPController::BeginPlay_InitEscapeMenuHelper()
@@ -6719,6 +6864,260 @@ void ACPPController::ClearActiveMissionCinematicTakeOverSession(
 	M_ActiveMissionCinematicTakeOverSession = nullptr;
 }
 
+void ACPPController::BeginPlay_ApplySavedKeyBindings()
+{
+	ApplySavedKeyBindingsForContext(M_DefaultInputMappingContext);
+	ApplySavedChordedKeyBindings();
+}
+
+void ACPPController::ApplySavedKeyBindingsForContext(UInputMappingContext* MappingContext)
+{
+	if (not IsValid(MappingContext))
+	{
+		return;
+	}
+
+	const URTSGameUserSettings* GameUserSettings = URTSGameUserSettings::Get();
+	if (GameUserSettings == nullptr)
+	{
+		return;
+	}
+
+	const TArray<FRTSSavedKeyBinding> SavedKeyBindings = GameUserSettings->GetSavedKeyBindings();
+	for (const FRTSSavedKeyBinding& SavedBinding : SavedKeyBindings)
+	{
+		if (SavedBinding.ContextName != MappingContext->GetFName())
+		{
+			continue;
+		}
+
+		UInputAction* Action = FindInputActionByName(MappingContext, SavedBinding.ActionName);
+		if (not IsValid(Action))
+		{
+			continue;
+		}
+
+		const FEnhancedActionKeyMapping* Mapping = FindActionMapping(MappingContext, Action);
+		if (Mapping != nullptr && Mapping->Key.IsValid())
+		{
+			MappingContext->UnmapKey(Action, Mapping->Key);
+		}
+
+		if (SavedBinding.Key.IsValid())
+		{
+			MappingContext->MapKey(Action, SavedBinding.Key);
+		}
+	}
+}
+
+void ACPPController::ApplySavedChordedKeyBindings()
+{
+	if (not GetIsValidChordedActionInputMappingContext())
+	{
+		return;
+	}
+
+	const URTSGameUserSettings* GameUserSettings = URTSGameUserSettings::Get();
+	if (GameUserSettings == nullptr)
+	{
+		return;
+	}
+
+	const TArray<FRTSSavedChordedKeyBinding> SavedChordedBindings = GameUserSettings->GetSavedChordedKeyBindings();
+	for (const FRTSSavedChordedKeyBinding& SavedBinding : SavedChordedBindings)
+	{
+		if (SavedBinding.ContextName != M_ChordedActionInputMappingContext->GetFName())
+		{
+			continue;
+		}
+
+		UInputAction* Action = FindInputActionByName(M_ChordedActionInputMappingContext, SavedBinding.ActionName);
+		if (not IsValid(Action))
+		{
+			continue;
+		}
+
+		if (SavedBinding.Hotkey.GetIsValid())
+		{
+			ChangeChordedKeyBinding(Action, SavedBinding.Hotkey);
+			continue;
+		}
+
+		UnbindChordedKeyBinding(Action);
+	}
+}
+
+UInputAction* ACPPController::FindInputActionByName(UInputMappingContext* MappingContext, const FName& ActionName) const
+{
+	if (not IsValid(MappingContext))
+	{
+		return nullptr;
+	}
+
+	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+	{
+		if (not IsValid(Mapping.Action))
+		{
+			continue;
+		}
+
+		if (Mapping.Action->GetFName() == ActionName)
+		{
+			return const_cast<UInputAction*>(Mapping.Action.Get());
+		}
+	}
+
+	return nullptr;
+}
+
+FEnhancedActionKeyMapping* ACPPController::FindMutableActionMapping(
+	UInputMappingContext* MappingContext, UInputAction* Action) const
+{
+	return const_cast<FEnhancedActionKeyMapping*>(FindActionMapping(MappingContext, Action));
+}
+
+const FEnhancedActionKeyMapping* ACPPController::FindActionMapping(
+	UInputMappingContext* MappingContext, const UInputAction* Action) const
+{
+	if (not IsValid(MappingContext) || not IsValid(Action))
+	{
+		return nullptr;
+	}
+
+	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+	{
+		if (Mapping.Action.Get() == Action)
+		{
+			return &Mapping;
+		}
+	}
+
+	return nullptr;
+}
+
+bool ACPPController::TryGetChordedHotkeyFromMapping(
+	const FEnhancedActionKeyMapping& Mapping, FRTSModifierHotkey& OutHotkey) const
+{
+	if (not Mapping.Key.IsValid())
+	{
+		return false;
+	}
+
+	const auto TryApplyTrigger = [&OutHotkey, &Mapping](const UInputTrigger* Trigger)
+	{
+		const UInputTriggerChordAction* ChordTrigger = Cast<UInputTriggerChordAction>(Trigger);
+		if (not IsValid(ChordTrigger) || not IsValid(ChordTrigger->ChordAction))
+		{
+			return false;
+		}
+
+		const ERTSHotkeyModifier Modifier = RTSHotkeyTypes::GetModifierFromActionName(
+			ChordTrigger->ChordAction->GetFName());
+		if (Modifier == ERTSHotkeyModifier::Invalid)
+		{
+			return false;
+		}
+
+		OutHotkey.Modifier = Modifier;
+		OutHotkey.Key = Mapping.Key;
+		return true;
+	};
+
+	for (const TObjectPtr<UInputTrigger>& Trigger : Mapping.Triggers)
+	{
+		if (TryApplyTrigger(Trigger))
+		{
+			return true;
+		}
+	}
+
+	if (IsValid(Mapping.Action))
+	{
+		for (const TObjectPtr<UInputTrigger>& Trigger : Mapping.Action->Triggers)
+		{
+			if (TryApplyTrigger(Trigger))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+void ACPPController::SaveSingleKeyBindingOverride(
+	UInputMappingContext* MappingContext, UInputAction* Action, const FKey& NewKey) const
+{
+	if (not IsValid(MappingContext) || not IsValid(Action))
+	{
+		return;
+	}
+
+	if (URTSGameUserSettings* GameUserSettings = URTSGameUserSettings::GetMutable())
+	{
+		GameUserSettings->SaveKeyBindingOverride(MappingContext->GetFName(), Action->GetFName(), NewKey);
+	}
+}
+
+void ACPPController::SaveChordedKeyBindingOverride(UInputAction* Action, const FRTSModifierHotkey& NewHotkey) const
+{
+	if (not IsValid(M_ChordedActionInputMappingContext) || not IsValid(Action))
+	{
+		return;
+	}
+
+	if (URTSGameUserSettings* GameUserSettings = URTSGameUserSettings::GetMutable())
+	{
+		GameUserSettings->SaveChordedKeyBindingOverride(
+			M_ChordedActionInputMappingContext->GetFName(),
+			Action->GetFName(),
+			NewHotkey);
+	}
+}
+
+void ACPPController::NotifyHotkeyProviderSingleActionChanged(UInputAction* Action) const
+{
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+	{
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		{
+			HotkeyProviderSubsystem->HandleKeyBindingChanged(Action);
+		}
+	}
+}
+
+void ACPPController::NotifyHotkeyProviderChordedActionChanged(UInputAction* Action) const
+{
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+	{
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		{
+			HotkeyProviderSubsystem->HandleChordedKeyBindingChanged(Action);
+		}
+	}
+}
+
+void ACPPController::RequestEnhancedInputMappingsRebuild() const
+{
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (not IsValid(LocalPlayer))
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* EnhancedInputSubsystem =
+		LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+	if (not IsValid(EnhancedInputSubsystem))
+	{
+		return;
+	}
+
+	FModifyContextOptions RebuildOptions;
+	EnhancedInputSubsystem->RequestRebuildControlMappings(
+		RebuildOptions,
+		EInputMappingRebuildType::RebuildWithFlush);
+}
+
 bool ACPPController::GetIsValidDefaultInputMappingContext() const
 {
 	if (IsValid(M_DefaultInputMappingContext))
@@ -6730,6 +7129,22 @@ bool ACPPController::GetIsValidDefaultInputMappingContext() const
 		this,
 		TEXT("M_DefaultInputMappingContext"),
 		TEXT("ACPPController::GetIsValidDefaultInputMappingContext"),
+		this
+	);
+	return false;
+}
+
+bool ACPPController::GetIsValidChordedActionInputMappingContext() const
+{
+	if (IsValid(M_ChordedActionInputMappingContext))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_ChordedActionInputMappingContext"),
+		TEXT("ACPPController::GetIsValidChordedActionInputMappingContext"),
 		this
 	);
 	return false;

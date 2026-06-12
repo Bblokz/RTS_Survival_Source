@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 
 #include "W_EscapeMenuKeyBindings.generated.h"
 
@@ -11,6 +12,7 @@ class UEditableTextBox;
 class UMainGameUI;
 class UScrollBox;
 class UW_EscapeMenuKeyBindingEntry;
+class UW_EscapeMenuChordedKeyBindingEntry;
 class UInputMappingContext;
 class UW_KeyBindingPopup;
 class UInputAction;
@@ -19,12 +21,21 @@ class UW_HotKey;
 
 USTRUCT(BlueprintType)
 struct FEscapeMenuKeyBindingEntryData
-
 {
 	GENERATED_BODY()
 
 	UPROPERTY()
 	TObjectPtr<UW_EscapeMenuKeyBindingEntry> EntryWidget = nullptr;
+	FString ActionDisplayName;
+};
+
+USTRUCT(BlueprintType)
+struct FEscapeMenuChordedKeyBindingEntryData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UW_EscapeMenuChordedKeyBindingEntry> EntryWidget = nullptr;
 	FString ActionDisplayName;
 };
 
@@ -56,6 +67,9 @@ protected:
 	TSubclassOf<UW_EscapeMenuKeyBindingEntry> M_KeyBindingEntryClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "KeyBindings")
+	TSubclassOf<UW_EscapeMenuChordedKeyBindingEntry> M_ChordedKeyBindingEntryClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "KeyBindings")
 	TSubclassOf<UW_KeyBindingPopup> M_KeyBindingPopupClass;
 
 private:
@@ -65,6 +79,8 @@ private:
 	void BindActionButtons();
 	void BindControlGroupButtons();
 	void BuildKeyBindingEntries();
+	void BuildDefaultKeyBindingEntries(UInputMappingContext* MappingContext);
+	void BuildChordedKeyBindingEntries(UInputMappingContext* MappingContext);
 	void ApplySearchFilter(const FString& SearchText);
 	void InitializeHotkeyBindings();
 
@@ -73,6 +89,7 @@ private:
 
 	void OpenKeyBindingPopupForActionName(const FName& ActionName);
 	void UpdateKeyBindingEntryForAction(const FName& ActionName, const FKey& NewKey);
+	void UpdateChordedKeyBindingEntryForAction(const FName& ActionName, const FRTSModifierHotkey& NewHotkey);
 	void EnsureKeyBindingPopupVisible();
 	void CloseKeyBindingPopup();
 	void BindKeyBindingPopupCallbacks();
@@ -97,19 +114,26 @@ private:
 	int32 GetControlGroupActionIndex(const int32 ControlGroupIndex) const;
 
 	FName GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const;
+	FName GetDefaultCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const;
+	FName GetControlGroupConflictForChordedHotkey(const FRTSModifierHotkey& ProposedHotkey) const;
+	FName GetChordedCollisionActionName(const FName& ActionName, const FRTSModifierHotkey& ProposedHotkey) const;
+	TArray<FName> GetChordedActionsBlockedByControlGroupKey(const FKey& ProposedKey) const;
 	FString GetActionDisplayName(const FName& ActionName) const;
 	bool GetIsSpecialBindingAction(const FName& ActionName) const;
 	bool ValidateSpecialBinding(UInputAction* ActionToBind, const FKey& ProposedKey);
+	bool ValidateChordedBinding(UInputAction* ActionToBind, const FRTSModifierHotkey& ProposedHotkey);
 
 	UInputAction* GetInputActionByName(const FName& ActionName) const;
 	FKey GetCurrentKeyForAction(const FName& ActionName) const;
 
 	UInputMappingContext* GetDefaultMappingContext() const;
+	UInputMappingContext* GetChordedActionMappingContext() const;
 
 	bool GetIsValidPlayerController() const;
 	bool GetIsValidMainGameUI() const;
 	bool GetIsValidKeyBindingsList() const;
 	bool GetIsValidKeyBindingEntryClass() const;
+	bool GetIsValidChordedKeyBindingEntryClass() const;
 	bool GetIsValidKeyBindingPopupClass() const;
 	bool GetIsValidButtonBack() const;
 	bool GetIsValidSearchKeyBar() const;
@@ -176,6 +200,7 @@ private:
 	void HandleControlGroupButton10Clicked();
 
 	void HandleKeyBindingUpdated(UInputAction* ActionToBind, const FKey& NewKey);
+	void HandleChordedKeyBindingUpdated(UInputAction* ActionToBind, const FRTSModifierHotkey& NewHotkey);
 	void HandlePopupUnbindRequested(UInputAction* ActionToUnbind, const FKey& CurrentKey);
 	void HandlePopupConfirmExitRequested();
 	void HandlePopupCancelExitRequested();
@@ -307,9 +332,17 @@ private:
 	TMap<FName, TWeakObjectPtr<UInputAction>> M_ActionNameToAction;
 
 	TMap<FName, FKey> M_SpecialActionKeyBindings;
+	TMap<FName, FKey> M_DefaultActionKeyBindings;
+	TMap<FName, FRTSModifierHotkey> M_ChordedActionKeyBindings;
 
 	UPROPERTY(Transient)
 	TArray<FEscapeMenuKeyBindingEntryData> M_KeyBindingEntries;
+
+	UPROPERTY(Transient)
+	TMap<FName, TObjectPtr<UW_EscapeMenuChordedKeyBindingEntry>> M_ActionNameToChordedEntry;
+
+	UPROPERTY(Transient)
+	TArray<FEscapeMenuChordedKeyBindingEntryData> M_ChordedKeyBindingEntries;
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<URTSHotkeyProviderSubsystem> M_HotkeyProviderSubsystem;
@@ -318,4 +351,5 @@ private:
 	FDelegateHandle M_ControlGroupHotkeyHandle;
 
 	bool bM_HasConstructed = false;
+	bool bM_KeepPopupOpenAfterNextBindingUpdate = false;
 };

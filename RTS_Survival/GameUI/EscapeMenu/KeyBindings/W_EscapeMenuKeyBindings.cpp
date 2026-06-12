@@ -6,6 +6,8 @@
 #include "Engine/LocalPlayer.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "InputTriggers.h"
+#include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/W_EscapeMenuChordedKeyBindingEntry.h"
 #include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/W_EscapeMenuKeyBindingEntry.h"
 #include "RTS_Survival/GameUI/EscapeMenu/KeyBindings/W_KeyBindingPopup.h"
 #include "RTS_Survival/GameUI/Hotkey/W_HotKey.h"
@@ -311,8 +313,28 @@ void UW_EscapeMenuKeyBindings::BuildKeyBindingEntries()
 	M_KeyBindingsList->ClearChildren();
 	M_ActionNameToEntry.Reset();
 	M_ActionNameToAction.Reset();
+	M_ActionNameToChordedEntry.Reset();
 	M_SpecialActionKeyBindings.Reset();
+	M_DefaultActionKeyBindings.Reset();
+	M_ChordedActionKeyBindings.Reset();
 	M_KeyBindingEntries.Reset();
+	M_ChordedKeyBindingEntries.Reset();
+
+	BuildDefaultKeyBindingEntries(MappingContext);
+	BuildChordedKeyBindingEntries(GetChordedActionMappingContext());
+
+	if (GetIsValidSearchKeyBar())
+	{
+		ApplySearchFilter(M_SearchKeyBar->GetText().ToString());
+	}
+}
+
+void UW_EscapeMenuKeyBindings::BuildDefaultKeyBindingEntries(UInputMappingContext* MappingContext)
+{
+	if (MappingContext == nullptr)
+	{
+		return;
+	}
 
 	const TArray<FEnhancedActionKeyMapping>& Mappings = MappingContext->GetMappings();
 	for (const FEnhancedActionKeyMapping& Mapping : Mappings)
@@ -343,12 +365,13 @@ void UW_EscapeMenuKeyBindings::BuildKeyBindingEntries()
 		const FName ActionName = ActionToBind->GetFName();
 		M_ActionNameToEntry.Add(ActionName, EntryWidget);
 		M_ActionNameToAction.Add(ActionName, ActionToBind);
+		M_DefaultActionKeyBindings.Add(ActionName, Mapping.Key);
 
+		EntryWidget->SetKeyBindingValidationDelegate(
+			FKeyBindingValidationDelegate::CreateUObject(this, &UW_EscapeMenuKeyBindings::ValidateSpecialBinding)
+		);
 		if (GetIsSpecialBindingAction(ActionName))
 		{
-			EntryWidget->SetKeyBindingValidationDelegate(
-				FKeyBindingValidationDelegate::CreateUObject(this, &UW_EscapeMenuKeyBindings::ValidateSpecialBinding)
-			);
 			M_SpecialActionKeyBindings.Add(ActionName, Mapping.Key);
 		}
 
@@ -356,9 +379,97 @@ void UW_EscapeMenuKeyBindings::BuildKeyBindingEntries()
 		M_KeyBindingEntries.Add({EntryWidget, EntryWidget->GetActionDisplayName()});
 	}
 
-	if (GetIsValidSearchKeyBar())
+}
+
+void UW_EscapeMenuKeyBindings::BuildChordedKeyBindingEntries(UInputMappingContext* MappingContext)
+{
+	if (MappingContext == nullptr || not GetIsValidChordedKeyBindingEntryClass())
 	{
-		ApplySearchFilter(M_SearchKeyBar->GetText().ToString());
+		return;
+	}
+
+	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+	{
+		if (not Mapping.Action)
+		{
+			continue;
+		}
+
+		UInputAction* ActionToBind = const_cast<UInputAction*>(Mapping.Action.Get());
+		const FName ActionName = ActionToBind->GetFName();
+		if (RTSHotkeyTypes::GetIsModifierActionName(ActionName))
+		{
+			continue;
+		}
+
+		FRTSModifierHotkey CurrentHotkey;
+		const auto TryApplyTrigger = [&CurrentHotkey, &Mapping](const UInputTrigger* Trigger)
+		{
+			const UInputTriggerChordAction* ChordTrigger = Cast<UInputTriggerChordAction>(Trigger);
+			if (not IsValid(ChordTrigger) || not IsValid(ChordTrigger->ChordAction))
+			{
+				return false;
+			}
+
+			CurrentHotkey.Modifier = RTSHotkeyTypes::GetModifierFromActionName(ChordTrigger->ChordAction->GetFName());
+			CurrentHotkey.Key = Mapping.Key;
+			return CurrentHotkey.Modifier != ERTSHotkeyModifier::Invalid;
+		};
+
+		for (const TObjectPtr<UInputTrigger>& Trigger : Mapping.Triggers)
+		{
+			if (TryApplyTrigger(Trigger))
+			{
+				break;
+			}
+		}
+
+		if (CurrentHotkey.Modifier == ERTSHotkeyModifier::Invalid)
+		{
+			for (const TObjectPtr<UInputTrigger>& Trigger : ActionToBind->Triggers)
+			{
+				if (TryApplyTrigger(Trigger))
+				{
+					break;
+				}
+			}
+		}
+
+		if (CurrentHotkey.Modifier == ERTSHotkeyModifier::Invalid)
+		{
+			continue;
+		}
+
+		if (not GetIsValidPlayerController())
+		{
+			return;
+		}
+
+		UW_EscapeMenuChordedKeyBindingEntry* EntryWidget = CreateWidget<UW_EscapeMenuChordedKeyBindingEntry>(
+			M_PlayerController.Get(),
+			M_ChordedKeyBindingEntryClass);
+		if (EntryWidget == nullptr)
+		{
+			continue;
+		}
+
+		EntryWidget->SetupEntry(M_PlayerController.Get(), ActionToBind, CurrentHotkey);
+		EntryWidget->SetKeyBindingValidationDelegate(
+			FChordedKeyBindingValidationDelegate::CreateUObject(
+				this,
+				&UW_EscapeMenuKeyBindings::ValidateChordedBinding));
+		EntryWidget->OnChordedKeyBindingUpdated().AddUObject(
+			this,
+			&UW_EscapeMenuKeyBindings::HandleChordedKeyBindingUpdated);
+
+		M_ActionNameToChordedEntry.Add(ActionName, EntryWidget);
+		M_ActionNameToAction.Add(ActionName, ActionToBind);
+		if (CurrentHotkey.GetIsValid())
+		{
+			M_ChordedActionKeyBindings.Add(ActionName, CurrentHotkey);
+		}
+		M_KeyBindingsList->AddChild(EntryWidget);
+		M_ChordedKeyBindingEntries.Add({EntryWidget, EntryWidget->GetActionDisplayName()});
 	}
 }
 
@@ -368,6 +479,18 @@ void UW_EscapeMenuKeyBindings::ApplySearchFilter(const FString& SearchText)
 	const bool bHasSearchText = not SearchTextLower.IsEmpty();
 
 	for (const FEscapeMenuKeyBindingEntryData& EntryData : M_KeyBindingEntries)
+	{
+		if (not IsValid(EntryData.EntryWidget))
+		{
+			continue;
+		}
+
+		const bool bMatches = not bHasSearchText
+			|| EntryData.ActionDisplayName.ToLower().Contains(SearchTextLower);
+		EntryData.EntryWidget->SetVisibility(bMatches ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+
+	for (const FEscapeMenuChordedKeyBindingEntryData& EntryData : M_ChordedKeyBindingEntries)
 	{
 		if (not IsValid(EntryData.EntryWidget))
 		{
@@ -781,6 +904,18 @@ void UW_EscapeMenuKeyBindings::UpdateKeyBindingEntryForAction(const FName& Actio
 	(*FoundEntry)->UpdateKeyBinding(NewKey);
 }
 
+void UW_EscapeMenuKeyBindings::UpdateChordedKeyBindingEntryForAction(
+	const FName& ActionName, const FRTSModifierHotkey& NewHotkey)
+{
+	TObjectPtr<UW_EscapeMenuChordedKeyBindingEntry>* FoundEntry = M_ActionNameToChordedEntry.Find(ActionName);
+	if (FoundEntry == nullptr || not IsValid(*FoundEntry))
+	{
+		return;
+	}
+
+	(*FoundEntry)->UpdateKeyBinding(NewHotkey);
+}
+
 void UW_EscapeMenuKeyBindings::EnsureKeyBindingPopupVisible()
 {
 	if (not GetIsValidPlayerController() || not GetIsValidKeyBindingPopupClass())
@@ -894,7 +1029,12 @@ bool UW_EscapeMenuKeyBindings::TryGetFirstUnboundActionName(FName& OutActionName
 
 FName UW_EscapeMenuKeyBindings::GetCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const
 {
-	for (const TPair<FName, FKey>& Pair : M_SpecialActionKeyBindings)
+	return GetDefaultCollisionActionName(ActionName, ProposedKey);
+}
+
+FName UW_EscapeMenuKeyBindings::GetDefaultCollisionActionName(const FName& ActionName, const FKey& ProposedKey) const
+{
+	for (const TPair<FName, FKey>& Pair : M_DefaultActionKeyBindings)
 	{
 		if (Pair.Key == ActionName)
 		{
@@ -908,6 +1048,72 @@ FName UW_EscapeMenuKeyBindings::GetCollisionActionName(const FName& ActionName, 
 	}
 
 	return NAME_None;
+}
+
+FName UW_EscapeMenuKeyBindings::GetControlGroupConflictForChordedHotkey(
+	const FRTSModifierHotkey& ProposedHotkey) const
+{
+	const bool bUsesControlGroupModifier = ProposedHotkey.Modifier == ERTSHotkeyModifier::Control
+		|| ProposedHotkey.Modifier == ERTSHotkeyModifier::Shift;
+	if (not bUsesControlGroupModifier)
+	{
+		return NAME_None;
+	}
+
+	for (const TPair<FName, FKey>& Pair : M_DefaultActionKeyBindings)
+	{
+		if (not RTSHotkeyTypes::GetIsControlGroupActionName(Pair.Key))
+		{
+			continue;
+		}
+
+		if (Pair.Value == ProposedHotkey.Key)
+		{
+			return Pair.Key;
+		}
+	}
+
+	return NAME_None;
+}
+
+FName UW_EscapeMenuKeyBindings::GetChordedCollisionActionName(
+	const FName& ActionName, const FRTSModifierHotkey& ProposedHotkey) const
+{
+	for (const TPair<FName, FRTSModifierHotkey>& Pair : M_ChordedActionKeyBindings)
+	{
+		if (Pair.Key == ActionName)
+		{
+			continue;
+		}
+
+		if (Pair.Value == ProposedHotkey)
+		{
+			return Pair.Key;
+		}
+	}
+
+	return NAME_None;
+}
+
+TArray<FName> UW_EscapeMenuKeyBindings::GetChordedActionsBlockedByControlGroupKey(const FKey& ProposedKey) const
+{
+	TArray<FName> BlockedActions;
+	for (const TPair<FName, FRTSModifierHotkey>& Pair : M_ChordedActionKeyBindings)
+	{
+		const bool bUsesControlGroupModifier = Pair.Value.Modifier == ERTSHotkeyModifier::Control
+			|| Pair.Value.Modifier == ERTSHotkeyModifier::Shift;
+		if (not bUsesControlGroupModifier)
+		{
+			continue;
+		}
+
+		if (Pair.Value.Key == ProposedKey)
+		{
+			BlockedActions.Add(Pair.Key);
+		}
+	}
+
+	return BlockedActions;
 }
 
 FString UW_EscapeMenuKeyBindings::GetActionDisplayName(const FName& ActionName) const
@@ -943,26 +1149,100 @@ bool UW_EscapeMenuKeyBindings::ValidateSpecialBinding(UInputAction* ActionToBind
 	}
 
 	const FName ActionName = ActionToBind->GetFName();
-	const FName CollisionActionName = GetCollisionActionName(ActionName, ProposedKey);
-	if (CollisionActionName.IsNone())
+	const FName CollisionActionName = GetDefaultCollisionActionName(ActionName, ProposedKey);
+	if (not CollisionActionName.IsNone())
+	{
+		EnsureKeyBindingPopupVisible();
+		if (M_KeyBindingPopup != nullptr)
+		{
+			const FKey CurrentKey = GetCurrentKeyForAction(ActionName);
+			M_KeyBindingPopup->SetupPopup(M_PlayerController.Get(), ActionToBind, CurrentKey);
+			M_KeyBindingPopup->ShowCollisionMessage(GetActionDisplayName(CollisionActionName));
+		}
+		return false;
+	}
+
+	if (not RTSHotkeyTypes::GetIsControlGroupActionName(ActionName))
 	{
 		return true;
 	}
 
-	const FKey CurrentKey = GetCurrentKeyForAction(ActionName);
-	if (not CurrentKey.IsValid())
+	const TArray<FName> BlockedChordedActions = GetChordedActionsBlockedByControlGroupKey(ProposedKey);
+	for (const FName& BlockedActionName : BlockedChordedActions)
 	{
-		RTSFunctionLibrary::ReportError("Key binding conflict handling failed to find the current binding.");
+		UInputAction* ChordedAction = GetInputActionByName(BlockedActionName);
+		if (IsValid(ChordedAction) && GetIsValidPlayerController())
+		{
+			M_PlayerController->UnbindChordedKeyBinding(ChordedAction);
+		}
+		M_ChordedActionKeyBindings.Remove(BlockedActionName);
+		UpdateChordedKeyBindingEntryForAction(BlockedActionName, {});
+	}
+
+	if (BlockedChordedActions.Num() > 0)
+	{
+		EnsureKeyBindingPopupVisible();
+		if (M_KeyBindingPopup != nullptr)
+		{
+			const FKey CurrentKey = GetCurrentKeyForAction(ActionName);
+			M_KeyBindingPopup->SetupPopup(M_PlayerController.Get(), ActionToBind, CurrentKey);
+			M_KeyBindingPopup->ShowChordedActionUnboundMessage(GetActionDisplayName(BlockedChordedActions[0]));
+			bM_KeepPopupOpenAfterNextBindingUpdate = true;
+		}
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuKeyBindings::ValidateChordedBinding(
+	UInputAction* ActionToBind, const FRTSModifierHotkey& ProposedHotkey)
+{
+	if (not IsValid(ActionToBind))
+	{
+		RTSFunctionLibrary::ReportError("Chorded key binding validation received an invalid input action reference.");
 		return false;
+	}
+
+	if (not ProposedHotkey.GetIsValid() || ProposedHotkey.Key.IsMouseButton() || ProposedHotkey.Key.IsGamepadKey())
+	{
+		return false;
+	}
+
+	if ((ProposedHotkey.Modifier == ERTSHotkeyModifier::Control
+		|| ProposedHotkey.Modifier == ERTSHotkeyModifier::Shift)
+		&& RTSHotkeyTypes::GetIsNumberKey(ProposedHotkey.Key))
+	{
+		EnsureKeyBindingPopupVisible();
+		if (M_KeyBindingPopup != nullptr)
+		{
+			M_KeyBindingPopup->ShowCollisionMessage(TEXT("Control group number semantics"));
+		}
+		return false;
+	}
+
+	const FName ActionName = ActionToBind->GetFName();
+	const FName ChordedCollisionActionName = GetChordedCollisionActionName(ActionName, ProposedHotkey);
+	if (not ChordedCollisionActionName.IsNone())
+	{
+		EnsureKeyBindingPopupVisible();
+		if (M_KeyBindingPopup != nullptr)
+		{
+			M_KeyBindingPopup->ShowCollisionMessage(GetActionDisplayName(ChordedCollisionActionName));
+		}
+		return false;
+	}
+
+	const FName ControlGroupConflict = GetControlGroupConflictForChordedHotkey(ProposedHotkey);
+	if (ControlGroupConflict.IsNone())
+	{
+		return true;
 	}
 
 	EnsureKeyBindingPopupVisible();
 	if (M_KeyBindingPopup != nullptr)
 	{
-		M_KeyBindingPopup->SetupPopup(M_PlayerController.Get(), ActionToBind, CurrentKey);
-		M_KeyBindingPopup->ShowCollisionMessage(GetActionDisplayName(CollisionActionName));
+		M_KeyBindingPopup->ShowCollisionMessage(GetActionDisplayName(ControlGroupConflict));
 	}
-
 	return false;
 }
 
@@ -979,7 +1259,7 @@ UInputAction* UW_EscapeMenuKeyBindings::GetInputActionByName(const FName& Action
 
 FKey UW_EscapeMenuKeyBindings::GetCurrentKeyForAction(const FName& ActionName) const
 {
-	const FKey* FoundKey = M_SpecialActionKeyBindings.Find(ActionName);
+	const FKey* FoundKey = M_DefaultActionKeyBindings.Find(ActionName);
 	if (FoundKey != nullptr)
 	{
 		return *FoundKey;
@@ -996,6 +1276,16 @@ UInputMappingContext* UW_EscapeMenuKeyBindings::GetDefaultMappingContext() const
 	}
 
 	return M_PlayerController->GetDefaultInputMappingContext();
+}
+
+UInputMappingContext* UW_EscapeMenuKeyBindings::GetChordedActionMappingContext() const
+{
+	if (not GetIsValidPlayerController())
+	{
+		return nullptr;
+	}
+
+	return M_PlayerController->GetChordedActionInputMappingContext();
 }
 
 bool UW_EscapeMenuKeyBindings::GetIsValidPlayerController() const
@@ -1057,6 +1347,22 @@ bool UW_EscapeMenuKeyBindings::GetIsValidKeyBindingEntryClass() const
 		this,
 		TEXT("M_KeyBindingEntryClass"),
 		TEXT("UW_EscapeMenuKeyBindings::GetIsValidKeyBindingEntryClass"),
+		this
+	);
+	return false;
+}
+
+bool UW_EscapeMenuKeyBindings::GetIsValidChordedKeyBindingEntryClass() const
+{
+	if (M_ChordedKeyBindingEntryClass)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_ChordedKeyBindingEntryClass"),
+		TEXT("UW_EscapeMenuKeyBindings::GetIsValidChordedKeyBindingEntryClass"),
 		this
 	);
 	return false;
@@ -1348,6 +1654,15 @@ void UW_EscapeMenuKeyBindings::HandleKeyBindingUpdated(UInputAction* ActionToBin
 	}
 
 	const FName ActionName = ActionToBind->GetFName();
+	if (NewKey.IsValid())
+	{
+		M_DefaultActionKeyBindings.Add(ActionName, NewKey);
+	}
+	else
+	{
+		M_DefaultActionKeyBindings.Remove(ActionName);
+	}
+
 	if (GetIsSpecialBindingAction(ActionName))
 	{
 		if (NewKey.IsValid())
@@ -1362,10 +1677,38 @@ void UW_EscapeMenuKeyBindings::HandleKeyBindingUpdated(UInputAction* ActionToBin
 
 	UpdateKeyBindingEntryForAction(ActionName, NewKey);
 
+	if (bM_KeepPopupOpenAfterNextBindingUpdate)
+	{
+		bM_KeepPopupOpenAfterNextBindingUpdate = false;
+		return;
+	}
+
 	if (M_KeyBindingPopup != nullptr && M_KeyBindingPopup->IsInViewport())
 	{
 		M_KeyBindingPopup->ClosePopup();
 	}
+}
+
+void UW_EscapeMenuKeyBindings::HandleChordedKeyBindingUpdated(
+	UInputAction* ActionToBind, const FRTSModifierHotkey& NewHotkey)
+{
+	if (not IsValid(ActionToBind))
+	{
+		RTSFunctionLibrary::ReportError("Chorded key binding update received an invalid input action reference.");
+		return;
+	}
+
+	const FName ActionName = ActionToBind->GetFName();
+	if (NewHotkey.GetIsValid())
+	{
+		M_ChordedActionKeyBindings.Add(ActionName, NewHotkey);
+	}
+	else
+	{
+		M_ChordedActionKeyBindings.Remove(ActionName);
+	}
+
+	UpdateChordedKeyBindingEntryForAction(ActionName, NewHotkey);
 }
 
 void UW_EscapeMenuKeyBindings::HandlePopupUnbindRequested(UInputAction* ActionToUnbind, const FKey& CurrentKey)

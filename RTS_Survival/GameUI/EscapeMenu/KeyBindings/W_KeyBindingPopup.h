@@ -36,6 +36,7 @@ public:
 
 	void ShowBindingEntry();
 	void ShowCollisionMessage(const FString& CollidingActionName);
+	void ShowChordedActionUnboundMessage(const FString& ChordedActionName);
 	void ShowUnboundActionsWarning(const FString& WarningText);
 	void ClosePopup();
 

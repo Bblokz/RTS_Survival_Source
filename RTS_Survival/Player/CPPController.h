@@ -52,6 +52,7 @@
 #include "SelectionHelpers/SelectionChangeAction.h"
 
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "CPPController.generated.h"
 
 class UTowedActorComponent;
@@ -112,6 +113,7 @@ class RTS_SURVIVAL_API ASelectablePawnMaster;
 class RTS_SURVIVAL_API ASelectableActorObjectsMaster;
 class RTS_SURVIVAL_API UPlayerProfileLoader;
 class UInputAction;
+struct FEnhancedActionKeyMapping;
 class UInputMappingContext;
 class UMissionCinematicTakeOverSession;
 class UW_HoldToSkip;
@@ -344,6 +346,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	UInputMappingContext* GetDefaultInputMappingContext() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	UInputMappingContext* GetChordedActionInputMappingContext() const;
+
+	FRTSModifierHotkey GetChordedHotkeyForAction(const FName& ActionName) const;
+	FText GetChordedHotkeyDisplayTextForAction(const FName& ActionName) const;
+
+	/**
+	 * @brief Updates a chorded action while preserving its IMC row so unbound actions stay editable.
+	 * @param ActionToRebind Chorded action whose modifier/key pair should change.
+	 * @param NewHotkey New modifier/key pair to apply to the chorded mapping.
+	 * @return True when the mapping and trigger were updated.
+	 */
+	bool ChangeChordedKeyBinding(UInputAction* ActionToRebind, const FRTSModifierHotkey& NewHotkey);
+
+	void UnbindChordedKeyBinding(UInputAction* ActionToUnbind);
+
 	/**
 	 * @brief Updates a single action binding so UI-driven remaps can take effect immediately.
 	 * @param ActionToRebind Action whose key mapping should change.
@@ -357,6 +375,9 @@ public:
 	 * @param BoundKey The key currently mapped to the action.
 	 */
 	void UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey BoundKey);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Input")
+	void OnNomadicExpansionShortCut();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;
@@ -875,6 +896,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> M_DefaultInputMappingContext = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputMappingContext> M_ChordedActionInputMappingContext = nullptr;
 
 	// Start Location of secondary click.
 	FVector M_SecondaryStartMouseProjectedLocation;
@@ -1703,6 +1727,19 @@ private:
 	bool TryHandleEscapeMenuActionButtonActive();
 	bool TryHandleEscapeMenuRotationArrowActive();
 	[[nodiscard]] bool GetIsValidDefaultInputMappingContext() const;
+	[[nodiscard]] bool GetIsValidChordedActionInputMappingContext() const;
+	void BeginPlay_ApplySavedKeyBindings();
+	void ApplySavedKeyBindingsForContext(UInputMappingContext* MappingContext);
+	void ApplySavedChordedKeyBindings();
+	UInputAction* FindInputActionByName(UInputMappingContext* MappingContext, const FName& ActionName) const;
+	FEnhancedActionKeyMapping* FindMutableActionMapping(UInputMappingContext* MappingContext, UInputAction* Action) const;
+	const FEnhancedActionKeyMapping* FindActionMapping(UInputMappingContext* MappingContext, const UInputAction* Action) const;
+	bool TryGetChordedHotkeyFromMapping(const FEnhancedActionKeyMapping& Mapping, FRTSModifierHotkey& OutHotkey) const;
+	void SaveSingleKeyBindingOverride(UInputMappingContext* MappingContext, UInputAction* Action, const FKey& NewKey) const;
+	void SaveChordedKeyBindingOverride(UInputAction* Action, const FRTSModifierHotkey& NewHotkey) const;
+	void NotifyHotkeyProviderSingleActionChanged(UInputAction* Action) const;
+	void NotifyHotkeyProviderChordedActionChanged(UInputAction* Action) const;
+	void RequestEnhancedInputMappingsRebuild() const;
 
 	void InitFowManager();
 

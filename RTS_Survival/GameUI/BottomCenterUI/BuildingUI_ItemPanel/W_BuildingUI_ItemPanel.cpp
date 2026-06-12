@@ -4,6 +4,10 @@
 #include "W_BuildingUI_ItemPanel.h"
 
 #include "Components/Button.h"
+#include "Engine/LocalPlayer.h"
+#include "RTS_Survival/GameUI/Hotkey/W_HotKey.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "RTS_Survival/GameUI/BottomCenterUI/BottomCenterUIPanel/W_BottomCenterUI.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -145,3 +149,121 @@ bool UW_BuildingUI_ItemPanel::GetIsValidCancelVehicleConversionButton() const
 
 
 
+
+void UW_BuildingUI_ItemPanel::NativeConstruct()
+{
+	Super::NativeConstruct();
+	CacheHotkeyProviderSubsystem();
+	UpdateNomadicExpansionHotkey();
+	BindHotkeyUpdateDelegate();
+}
+
+void UW_BuildingUI_ItemPanel::NativeDestruct()
+{
+	UnbindHotkeyUpdateDelegate();
+	Super::NativeDestruct();
+}
+
+void UW_BuildingUI_ItemPanel::CacheHotkeyProviderSubsystem()
+{
+	ULocalPlayer* OwningLocalPlayer = GetOwningLocalPlayer();
+	if (not IsValid(OwningLocalPlayer))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UW_BuildingUI_ItemPanel could not resolve owning local player."));
+		return;
+	}
+
+	URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = OwningLocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>();
+	if (not IsValid(HotkeyProviderSubsystem))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UW_BuildingUI_ItemPanel could not resolve hotkey provider subsystem."));
+		return;
+	}
+
+	M_HotkeyProviderSubsystem = HotkeyProviderSubsystem;
+}
+
+void UW_BuildingUI_ItemPanel::BindHotkeyUpdateDelegate()
+{
+	if (not GetIsValidHotkeyProviderSubsystem())
+	{
+		return;
+	}
+
+	M_ChordedActionHotkeyHandle = M_HotkeyProviderSubsystem->OnChordedActionHotkeyUpdated().AddUObject(
+		this,
+		&UW_BuildingUI_ItemPanel::HandleChordedActionHotkeyUpdated);
+}
+
+void UW_BuildingUI_ItemPanel::UnbindHotkeyUpdateDelegate()
+{
+	if (not GetIsValidHotkeyProviderSubsystem())
+	{
+		return;
+	}
+
+	if (M_ChordedActionHotkeyHandle.IsValid())
+	{
+		M_HotkeyProviderSubsystem->OnChordedActionHotkeyUpdated().Remove(M_ChordedActionHotkeyHandle);
+		M_ChordedActionHotkeyHandle.Reset();
+	}
+}
+
+void UW_BuildingUI_ItemPanel::UpdateNomadicExpansionHotkey()
+{
+	if (not GetIsValidHotkeyProviderSubsystem() || not GetIsValidNomadicExpansionHotkey())
+	{
+		return;
+	}
+
+	const FText HotkeyText = M_HotkeyProviderSubsystem->GetDisplayKeyForChordedAction(
+		RTSHotkeyTypes::NomadicExpansionActionName);
+	M_Hotkey_NomadicExpansion->SetKeyText(HotkeyText);
+}
+
+void UW_BuildingUI_ItemPanel::HandleChordedActionHotkeyUpdated(const FName ActionName, const FText& HotkeyText)
+{
+	if (ActionName != RTSHotkeyTypes::NomadicExpansionActionName)
+	{
+		return;
+	}
+
+	if (not GetIsValidNomadicExpansionHotkey())
+	{
+		return;
+	}
+
+	M_Hotkey_NomadicExpansion->SetKeyText(HotkeyText);
+}
+
+bool UW_BuildingUI_ItemPanel::GetIsValidNomadicExpansionHotkey() const
+{
+	if (IsValid(M_Hotkey_NomadicExpansion))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_Hotkey_NomadicExpansion"),
+		TEXT("UW_BuildingUI_ItemPanel::GetIsValidNomadicExpansionHotkey"),
+		this
+	);
+	return false;
+}
+
+bool UW_BuildingUI_ItemPanel::GetIsValidHotkeyProviderSubsystem() const
+{
+	if (M_HotkeyProviderSubsystem.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_HotkeyProviderSubsystem"),
+		TEXT("UW_BuildingUI_ItemPanel::GetIsValidHotkeyProviderSubsystem"),
+		this
+	);
+	return false;
+}
