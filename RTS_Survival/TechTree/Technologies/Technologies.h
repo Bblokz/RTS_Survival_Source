@@ -27,7 +27,9 @@ enum class ETechnology: uint8
 	Tech_HarvesterCapacity UMETA(DisplayName = "Harvester Capacity"),
 	Tech_HarvesterSpeed UMETA(DisplayName = "Harvester Speed"),
 	Tech_RepairUpgrade UMETA(DisplayName = "Repair Upgrade"),
-	Tech_AutoCannonDamage
+	Tech_AutoCannonDamage,
+	Tech_FlameRange,
+	Tech_FlameDamage
 };
 
 static FString Global_GetTechAsString(const ETechnology Tech)

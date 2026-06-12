@@ -68,4 +68,6 @@ enum class EBehaviourIcon : uint8
 	TechRepairUpgrade,
 	TechSpallLiners,
 	TechAutoCannonDamage,
+	TechFlameRange,
+	TechFlameDamage,
 };

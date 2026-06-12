@@ -2890,7 +2890,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ArmorPenMaxRange = 62;
 	WeaponData.MagCapacity = 1;
 	WeaponData.ReloadSpeed = 4;
-	WeaponData.BaseCooldown = 0;
+	WeaponData.BaseCooldown = 0.5;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 80;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
@@ -2915,7 +2915,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ArmorPenMaxRange = 62;
 	WeaponData.MagCapacity = 1;
 	WeaponData.ReloadSpeed = 4;
-	WeaponData.BaseCooldown = 0;
+	WeaponData.BaseCooldown = 0.5;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 80;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
@@ -2941,7 +2941,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ArmorPenMaxRange = 83;
 	WeaponData.MagCapacity = 1;
 	WeaponData.ReloadSpeed = 3.7f;
-	WeaponData.BaseCooldown = 0;
+	WeaponData.BaseCooldown = 0.5;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 80;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
