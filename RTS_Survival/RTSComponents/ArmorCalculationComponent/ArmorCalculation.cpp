@@ -57,13 +57,13 @@ float UArmorCalculation::GetRearArmor() const
 }
 
 void UArmorCalculation::ApplyArmorValueMultiplierToMatchingPlates(
-	bool (*ShouldAdjustArmorPlate)(EArmorPlate),
+	const TArray<EArmorPlate>& ArmorPlatesToAdjust,
 	const float ArmorValueMultiplier)
 {
-	if (ShouldAdjustArmorPlate == nullptr)
+	if (ArmorPlatesToAdjust.IsEmpty())
 	{
 		RTSFunctionLibrary::ReportError(
-			TEXT("ApplyArmorValueMultiplierToMatchingPlates: ShouldAdjustArmorPlate is null"));
+			TEXT("ApplyArmorValueMultiplierToMatchingPlates: ArmorPlatesToAdjust is empty"));
 		return;
 	}
 
@@ -74,15 +74,15 @@ void UArmorCalculation::ApplyArmorValueMultiplierToMatchingPlates(
 		return;
 	}
 
-	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings0, ShouldAdjustArmorPlate, ArmorValueMultiplier);
-	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings1, ShouldAdjustArmorPlate, ArmorValueMultiplier);
-	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings2, ShouldAdjustArmorPlate, ArmorValueMultiplier);
+	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings0, ArmorPlatesToAdjust, ArmorValueMultiplier);
+	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings1, ArmorPlatesToAdjust, ArmorValueMultiplier);
+	ApplyArmorValueMultiplierToArmorSettings(M_ArmorSetup.ArmorSettings2, ArmorPlatesToAdjust, ArmorValueMultiplier);
 	RefreshRearArmorCache();
 }
 
 void UArmorCalculation::ApplyArmorValueMultiplierToArmorSettings(
 	FArmorSettings* ArmorSettings,
-	bool (*ShouldAdjustArmorPlate)(EArmorPlate),
+	const TArray<EArmorPlate>& ArmorPlatesToAdjust,
 	const float ArmorValueMultiplier)
 {
 	if (ArmorSettings == nullptr)
@@ -100,7 +100,7 @@ void UArmorCalculation::ApplyArmorValueMultiplierToArmorSettings(
 			continue;
 		}
 
-		if (not ShouldAdjustArmorPlate(ArmorSetting.ArmorType))
+		if (not ArmorPlatesToAdjust.Contains(ArmorSetting.ArmorType))
 		{
 			continue;
 		}

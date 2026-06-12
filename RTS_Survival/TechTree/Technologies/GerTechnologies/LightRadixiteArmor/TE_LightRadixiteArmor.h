@@ -6,7 +6,6 @@
 #include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
 #include "TE_LightRadixiteArmor.generated.h"
 
-enum class EArmorPlate : uint8;
 class ATankMaster;
 
 /**
@@ -48,6 +47,4 @@ private:
 	float M_ArmorValueMultiplier;
 
 	UStaticMesh* GetMeshToApply(const ETankSubtype TankSubtype) const;
-	void ImproveArmor(ATankMaster* ValidTank) const;
-	static bool IsArmorTypeToAdjust(EArmorPlate ArmorPlate);
 };
