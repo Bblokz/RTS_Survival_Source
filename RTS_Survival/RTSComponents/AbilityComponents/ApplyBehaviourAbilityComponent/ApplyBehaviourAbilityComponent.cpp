@@ -60,12 +60,27 @@ void UApplyBehaviourAbilityComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (not GetShouldSetupAbilityOnBeginPlay())
+	{
+		return;
+	}
+
+	SetupBehaviourAbilityFromCurrentSettings();
+}
+
+bool UApplyBehaviourAbilityComponent::GetShouldSetupAbilityOnBeginPlay() const
+{
+	return true;
+}
+
+void UApplyBehaviourAbilityComponent::SetupBehaviourAbilityFromCurrentSettings()
+{
 	RefreshOwnerReferences();
 	// Error checks.
 	(void)GetIsValidOwnerCommandsInterface();
 	(void)GetIsValidOwnerBehaviourComponent();
-	BeginPlay_CheckSettings();
-	BeginPlay_AddAbility();
+	CheckSettings();
+	AddAbility();
 }
 
 void UApplyBehaviourAbilityComponent::RefreshOwnerReferences()
@@ -152,7 +167,7 @@ bool UApplyBehaviourAbilityComponent::GetIsValidBehaviourApplied() const
 	return false;
 }
 
-void UApplyBehaviourAbilityComponent::BeginPlay_CheckSettings() const
+void UApplyBehaviourAbilityComponent::CheckSettings() const
 {
 	(void)GetIsValidBehaviourApplied();
 	if (BehaviourAbilitySettings.Cooldown <= 0)
@@ -174,7 +189,7 @@ void UApplyBehaviourAbilityComponent::AddAbilityToCommands()
 	M_OwnerCommandsInterface->AddAbility(NewAbility, BehaviourAbilitySettings.PreferredAbilityIndex);
 }
 
-void UApplyBehaviourAbilityComponent::BeginPlay_AddAbility()
+void UApplyBehaviourAbilityComponent::AddAbility()
 {
 	if (not GetOwner())
 	{

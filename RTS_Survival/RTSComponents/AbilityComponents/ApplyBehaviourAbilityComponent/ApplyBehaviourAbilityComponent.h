@@ -13,7 +13,7 @@ class ICommands;
 class UBehaviourComp;
 enum class EBehaviourAbilityType : uint8;
 
-USTRUCT(Blueprintable)
+USTRUCT(BlueprintType)
 struct FApplyBehaviourAbilitySettings
 {
 	GENERATED_BODY()
@@ -66,7 +66,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FApplyBehaviourAbilitySettings BehaviourAbilitySettings;
 
-private:
+	virtual bool GetShouldSetupAbilityOnBeginPlay() const;
+	void SetupBehaviourAbilityFromCurrentSettings();
 	void RefreshOwnerReferences();
 
 	UPROPERTY()
@@ -79,9 +80,8 @@ private:
 
 	FString GetDebugName() const;
 	bool GetIsValidBehaviourApplied() const;
-	void BeginPlay_CheckSettings() const;
-
-	void BeginPlay_AddAbility();
+	void CheckSettings() const;
+	void AddAbility();
 	void AddAbilityToSquad(ASquadController* Squad);
 	void AddAbilityToCommands();
 	
