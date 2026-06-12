@@ -10,6 +10,9 @@
 #include "RepairComponent.generated.h"
 
 
+/**
+ * @brief Added to repair-capable squad units so repair commands can move, animate, and heal targets over time.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URepairComponent : public UActorComponent
 {
@@ -31,6 +34,8 @@ public:
 	void TerminateRepair();
 
 	void OnFinishedMovementForRepairAbility();
+
+	void ApplyRepairMultiplier(const float RepairMultiplier);
 
 protected:
 	// Called when the game starts
@@ -92,6 +97,7 @@ private:
 
 	// Checks whether the owner squad unit pointer is valid.
 	bool GetIsValidOwnerSquadUnit() const;
+	bool GetIsValidRepairTarget() const;
 
 	void OnRepairUnitNotValidForRepairs() const;
 	FString CheckRepairOffsetValidText() const;
