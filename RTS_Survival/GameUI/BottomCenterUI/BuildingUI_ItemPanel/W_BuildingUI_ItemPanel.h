@@ -47,6 +47,8 @@ public:
 
 	void DetermineNomadicButton(const EActionUINomadicButton NomadicButtonState,
 	                            ENomadicSubtype NomadicSubtype);
+	
+	void SimulateClickNomadicExpandButton();
 
 
 	TArray<UW_ItemBuildingExpansion*> GetBxpItems() const;
@@ -113,6 +115,8 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<URTSHotkeyProviderSubsystem> M_HotkeyProviderSubsystem;
+	
+	EActionUINomadicButton M_LastBuildingButtonState;
 
 	FDelegateHandle M_ChordedActionHotkeyHandle;
 };
