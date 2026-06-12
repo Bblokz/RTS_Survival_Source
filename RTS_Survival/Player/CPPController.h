@@ -1741,6 +1741,7 @@ private:
 	void SaveChordedKeyBindingOverride(UInputAction* Action, const FRTSModifierHotkey& NewHotkey) const;
 	void NotifyHotkeyProviderSingleActionChanged(UInputAction* Action) const;
 	void NotifyHotkeyProviderChordedActionChanged(UInputAction* Action) const;
+	void RequestEnhancedInputMappingsRebuild() const;
 
 	void InitFowManager();
 

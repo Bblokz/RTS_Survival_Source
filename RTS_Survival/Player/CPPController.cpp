@@ -4,6 +4,8 @@
 
 #include "Abilities.h"
 #include "InputAction.h"
+#include "EnhancedInputSubsystems.h"
+#include "EnhancedInputSubsystemInterface.h"
 #include "InputMappingContext.h"
 #include "InputTriggers.h"
 #include "AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -651,18 +653,23 @@ bool ACPPController::ChangeChordedKeyBinding(UInputAction* ActionToRebind, const
 		MappingToUpdate = &M_ChordedActionInputMappingContext->MapKey(ActionToRebind, NewHotkey.Key);
 	}
 
+	constexpr float ChordedActionActuationThreshold = 0.1f;
 	ActionToRebind->Triggers.RemoveAll(
 		[](const TObjectPtr<UInputTrigger>& Trigger)
 		{
 			return IsValid(Cast<UInputTriggerChordAction>(Trigger));
 		});
 
+	UInputTriggerChordAction* ChordTrigger = NewObject<UInputTriggerChordAction>(ActionToRebind);
+	ChordTrigger->ChordAction = ModifierAction;
+	ChordTrigger->ActuationThreshold = ChordedActionActuationThreshold;
+	ActionToRebind->Triggers.Add(ChordTrigger);
+	ActionToRebind->bConsumeInput = true;
+
 	MappingToUpdate->Key = NewHotkey.Key;
 	MappingToUpdate->Triggers.Reset();
-	UInputTriggerChordAction* ChordTrigger = NewObject<UInputTriggerChordAction>(M_ChordedActionInputMappingContext);
-	ChordTrigger->ChordAction = ModifierAction;
-	MappingToUpdate->Triggers.Add(ChordTrigger);
 
+	RequestEnhancedInputMappingsRebuild();
 	SaveChordedKeyBindingOverride(ActionToRebind, NewHotkey);
 	NotifyHotkeyProviderChordedActionChanged(ActionToRebind);
 	return true;
@@ -686,6 +693,8 @@ void ACPPController::UnbindChordedKeyBinding(UInputAction* ActionToUnbind)
 	{
 		CurrentMapping->Key = FKey();
 	}
+
+	RequestEnhancedInputMappingsRebuild();
 
 	if (URTSGameUserSettings* GameUserSettings = URTSGameUserSettings::GetMutable())
 	{
@@ -7097,6 +7106,27 @@ void ACPPController::NotifyHotkeyProviderChordedActionChanged(UInputAction* Acti
 			HotkeyProviderSubsystem->HandleChordedKeyBindingChanged(Action);
 		}
 	}
+}
+
+void ACPPController::RequestEnhancedInputMappingsRebuild() const
+{
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (not IsValid(LocalPlayer))
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* EnhancedInputSubsystem =
+		LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+	if (not IsValid(EnhancedInputSubsystem))
+	{
+		return;
+	}
+
+	FModifyContextOptions RebuildOptions;
+	EnhancedInputSubsystem->RequestRebuildControlMappings(
+		RebuildOptions,
+		EInputMappingRebuildType::RebuildWithFlush);
 }
 
 bool ACPPController::GetIsValidDefaultInputMappingContext() const
