@@ -105,7 +105,11 @@ void UW_BottomCenterUI::InitBottomCenterUI(UMainGameUI* MainGameUI, ACPPControll
 	M_MainGameUI = MainGameUI;
 	M_PlayerController = PlayerController;
 	(void)EnsureMainGameUIIsValid();
-	(void)EnsureIsValidPlayerController();
+	if (EnsureIsValidPlayerController() && EnsureIsValidChildPanels())
+	{
+		// Set reference for hotkeys.
+		M_PlayerController->InitBuildingUI_ItemPanel(BuildingUI_ItemPanel);
+	}
 	if(EnsureIsValidSelectionPanel())
 	{
 		SelectionPanel->InitMainGameUI(PlayerController);

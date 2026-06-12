@@ -49,6 +49,7 @@ void UW_BuildingUI_ItemPanel::DetermineNomadicButton(const EActionUINomadicButto
 {
 	// Init the correct convert to building and convert to truck button brushes using the data table row of the type.
 	BP_SetNomadicButtonStyleForType(NomadicSubtype);
+	M_LastBuildingButtonState = NomadicButtonState;
 	switch (NomadicButtonState)
 	{
 	case EActionUINomadicButton::EAUI_ShowConvertToBuilding:
@@ -64,6 +65,24 @@ void UW_BuildingUI_ItemPanel::DetermineNomadicButton(const EActionUINomadicButto
 		ShowCancelVehicleConversion();
 		break;
 	}
+}
+
+void UW_BuildingUI_ItemPanel::SimulateClickNomadicExpandButton()
+{
+	switch (M_LastBuildingButtonState) {
+	case EActionUINomadicButton::EAUI_ShowConvertToBuilding:
+		OnClickedCreateBuildingButton();
+		break;
+	case EActionUINomadicButton::EAUI_ShowCancelBuilding:
+		OnClickedCancelBuildingButton();
+		break;
+	case EActionUINomadicButton::EAUI_ShowConvertToVehicle:
+		OnClickedCancelVehicleConversionButton();
+		break;
+	case EActionUINomadicButton::EAUI_ShowCancelVehicleConversion:
+		OnClickedCancelVehicleConversionButton();
+		break;
+	}	
 }
 
 TArray<UW_ItemBuildingExpansion*> UW_BuildingUI_ItemPanel::GetBxpItems() const

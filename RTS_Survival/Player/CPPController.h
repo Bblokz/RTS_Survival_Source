@@ -55,6 +55,7 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "CPPController.generated.h"
 
+class UW_BuildingUI_ItemPanel;
 class UTowedActorComponent;
 class AAircraftMaster;
 class UBombComponent;
@@ -301,6 +302,7 @@ public:
 	ACPPController();
 
 	void InitPortrait(UW_Portrait* PortraitWidget) const;
+	void InitBuildingUI_ItemPanel(UW_BuildingUI_ItemPanel* Panel);
 
 	AActor* GetPrimarySelectedUnit() const;
 
@@ -1871,4 +1873,12 @@ private:
 
 	// Blocks pause input while cinematic takeover is active.
 	bool bM_IsCinematicTakeOverActive = false;
+	
+
+	// For hotkeys related to nomadic expansion and BXPs on that nomadic.
+	// Set through public setter at the init of the parent widget of the building UI item panel.
+	UPROPERTY()
+	TWeakObjectPtr<UW_BuildingUI_ItemPanel> M_BuildingUI_ItemPanel;
+	
+	bool EnsureIsValidBuildingUI_ItemPanel()const;
 };

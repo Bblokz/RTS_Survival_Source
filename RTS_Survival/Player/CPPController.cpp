@@ -39,6 +39,7 @@
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/GameUI/BottomCenterUI/BuildingUI_ItemPanel/W_BuildingUI_ItemPanel.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
@@ -274,6 +275,12 @@ void ACPPController::InitPortrait(UW_Portrait* PortraitWidget) const
 		return;
 	}
 	M_PlayerPortraitManager->InitPortraitManager(PortraitWidget, GetPlayerAudioController());
+}
+
+void ACPPController::InitBuildingUI_ItemPanel(UW_BuildingUI_ItemPanel* Panel)
+{
+	M_BuildingUI_ItemPanel = Panel;
+	(void)EnsureIsValidBuildingUI_ItemPanel();
 }
 
 AActor* ACPPController::GetPrimarySelectedUnit() const
@@ -765,19 +772,12 @@ void ACPPController::UnbindKeyBinding(UInputAction* ActionToUnbind, const FKey B
 
 void ACPPController::OnNomadicExpansionShortCut()
 {
-	if (not GetIsValidMainGameUI())
+	if (not EnsureIsValidBuildingUI_ItemPanel())
 	{
 		return;
 	}
-
-	AActor* SelectedActor = M_MainGameUI->PrimarySelectedActor;
-	if (not IsValid(SelectedActor))
-	{
-		return;
-	}
-
-	ConstructBuilding(SelectedActor);
-	M_MainGameUI->RequestShowCancelBuilding(SelectedActor);
+	M_BuildingUI_ItemPanel->SimulateClickNomadicExpandButton();
+	
 }
 
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
@@ -6348,6 +6348,17 @@ void ACPPController::DebugPlayerSelection(const FString& Message, const FColor& 
 	{
 		RTSFunctionLibrary::PrintString(Message, Color);
 	}
+}
+
+bool ACPPController::EnsureIsValidBuildingUI_ItemPanel() const
+{
+	if (not M_BuildingUI_ItemPanel.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("no valid buidling UI item on cpp controller for"
+								  "hotkeys!");
+		return false;
+	}
+	return true;
 }
 
 void ACPPController::StopPreviewAndBuildingMode(const bool bIsPlacedSuccessfully)
