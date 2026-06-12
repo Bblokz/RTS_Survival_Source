@@ -199,6 +199,9 @@ public:
 
 	bool GetIsUnitIdle() const;
 	bool GetIsUnitInCombat( )const;
+	
+	/** Gets the scavenger component */
+	URepairComponent* GetRepairComponent() const { return M_RepairComponent; }
 
 	inline AInfantryWeaponMaster* GetInfantryWeapon() const { return M_InfantryWeapon; }
 	inline  USquadUnitAnimInstance * GetAnimBP_SquadUnit() const { return AnimBp_SquadUnit; }
@@ -450,8 +453,6 @@ protected:
 	bool GetHasValidScavengerComp() const;
 	bool GetHasValidRepairComp() const;
 
-	/** Gets the scavenger component */
-	URepairComponent* GetRepairComponent() const { return M_RepairComponent; }
 
 	/** Terminates scavenging */
 	void TerminateScavenging();
