@@ -57,13 +57,14 @@ enum class EBehaviourIcon : uint8
 	TankVeterancy4,
 	TankVeterancy5,
 	VehicleStunned,
-	RadixiteArmor,
+	TechRadixiteArmor,
 	TechLightVehicleTracks,
 	TechScavengingSpeed,
 	TechScavengingReward,
-	TechAutoCannonAPCRRounds,
 	TechBarrier,
-	AutoLoader,
+	TechAutoLoader,
 	TechHarvesterCapacity,
-	TechHarvesterSpeed
+	TechHarvesterSpeed,
+	TechSpallLiners,
+	TechAutoCannonDamage,
 };

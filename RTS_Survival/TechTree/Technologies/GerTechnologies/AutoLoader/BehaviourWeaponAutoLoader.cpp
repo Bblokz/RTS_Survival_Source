@@ -11,7 +11,7 @@ namespace BehaviourWeaponAutoLoaderSettings
 UBehaviourWeaponAutoLoader::UBehaviourWeaponAutoLoader()
 {
 	BehaviourLifeTime = EBehaviourLifeTime::Permanent;
-	BehaviourIcon = EBehaviourIcon::AutoLoader;
+	BehaviourIcon = EBehaviourIcon::TechAutoLoader;
 	M_TitleText = "Auto Loader";
 	M_DisplayText = "Reload rate increased by 100% and magazine capacity increased by 2.";
 	BehaviourWeaponMultipliers.ReloadSpeedMlt =
