@@ -6,6 +6,7 @@
 #include "Engine/LocalPlayer.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "InputTriggers.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -39,6 +40,27 @@ FText URTSHotkeyProviderSubsystem::GetDisplayKeyForControlGroupSlot(const int32 
 	return GetDisplayKeyForAction(Action);
 }
 
+FText URTSHotkeyProviderSubsystem::GetDisplayKeyForChordedAction(const FName& ActionName) const
+{
+	UInputMappingContext* MappingContext = GetChordedActionMappingContext();
+	if (MappingContext == nullptr)
+	{
+		return FText::GetEmpty();
+	}
+
+	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+	{
+		if (not IsValid(Mapping.Action) || Mapping.Action->GetFName() != ActionName)
+		{
+			continue;
+		}
+
+		return GetDisplayKeyForChordedAction(Mapping.Action.Get());
+	}
+
+	return FText::GetEmpty();
+}
+
 FOnActionSlotHotkeyUpdated& URTSHotkeyProviderSubsystem::OnActionSlotHotkeyUpdated()
 {
 	return M_OnActionSlotHotkeyUpdated;
@@ -47,6 +69,11 @@ FOnActionSlotHotkeyUpdated& URTSHotkeyProviderSubsystem::OnActionSlotHotkeyUpdat
 FOnControlGroupHotkeyUpdated& URTSHotkeyProviderSubsystem::OnControlGroupHotkeyUpdated()
 {
 	return M_OnControlGroupHotkeyUpdated;
+}
+
+FOnChordedActionHotkeyUpdated& URTSHotkeyProviderSubsystem::OnChordedActionHotkeyUpdated()
+{
+	return M_OnChordedActionHotkeyUpdated;
 }
 
 void URTSHotkeyProviderSubsystem::HandleKeyBindingChanged(UInputAction* UpdatedAction)
@@ -61,6 +88,18 @@ void URTSHotkeyProviderSubsystem::HandleKeyBindingChanged(UInputAction* UpdatedA
 	BroadcastControlGroupHotkeysForAction(UpdatedAction);
 }
 
+void URTSHotkeyProviderSubsystem::HandleChordedKeyBindingChanged(UInputAction* UpdatedAction)
+{
+	if (not IsValid(UpdatedAction))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Hotkey provider received an invalid chorded input action update."));
+		return;
+	}
+
+	const FName ActionName = UpdatedAction->GetFName();
+	M_OnChordedActionHotkeyUpdated.Broadcast(ActionName, GetDisplayKeyForChordedAction(UpdatedAction));
+}
+
 void URTSHotkeyProviderSubsystem::RefreshAllHotkeys()
 {
 	for (int32 ActionSlotIndex = 0; ActionSlotIndex < RTSHotkeyProviderConstants::MaxActionSlots; ++ActionSlotIndex)
@@ -73,6 +112,28 @@ void URTSHotkeyProviderSubsystem::RefreshAllHotkeys()
 	     ++ControlGroupIndex)
 	{
 		BroadcastControlGroupHotkey(ControlGroupIndex);
+	}
+
+	UInputMappingContext* ChordedMappingContext = GetChordedActionMappingContext();
+	if (ChordedMappingContext == nullptr)
+	{
+		return;
+	}
+
+	for (const FEnhancedActionKeyMapping& Mapping : ChordedMappingContext->GetMappings())
+	{
+		if (not IsValid(Mapping.Action))
+		{
+			continue;
+		}
+
+		const FName ActionName = Mapping.Action->GetFName();
+		if (RTSHotkeyTypes::GetIsModifierActionName(ActionName))
+		{
+			continue;
+		}
+
+		M_OnChordedActionHotkeyUpdated.Broadcast(ActionName, GetDisplayKeyForChordedAction(Mapping.Action.Get()));
 	}
 }
 
@@ -108,6 +169,40 @@ UInputMappingContext* URTSHotkeyProviderSubsystem::GetDefaultMappingContext() co
 	}
 
 	return RtsController->GetDefaultInputMappingContext();
+}
+
+UInputMappingContext* URTSHotkeyProviderSubsystem::GetChordedActionMappingContext() const
+{
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (not IsValid(LocalPlayer))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Hotkey provider failed to resolve local player for chorded mapping context."));
+		return nullptr;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Hotkey provider failed to resolve world for chorded mapping context."));
+		return nullptr;
+	}
+
+	APlayerController* PlayerController = LocalPlayer->GetPlayerController(World);
+	if (not IsValid(PlayerController))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Hotkey provider failed to resolve player controller for chorded mappings."));
+		return nullptr;
+	}
+
+	const ACPPController* RtsController = Cast<ACPPController>(PlayerController);
+	if (not IsValid(RtsController))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Hotkey provider failed to resolve RTS controller for chorded mappings."));
+		return nullptr;
+	}
+
+	return RtsController->GetChordedActionInputMappingContext();
 }
 
 UInputAction* URTSHotkeyProviderSubsystem::FindActionByName(const FName& ActionName) const
@@ -211,6 +306,86 @@ FText URTSHotkeyProviderSubsystem::GetDisplayKeyForAction(const UInputAction* Ac
 	}
 
 	return PrimaryKey.IsValid() ? PrimaryKey.GetDisplayName() : FText::GetEmpty();
+}
+
+FText URTSHotkeyProviderSubsystem::GetDisplayKeyForChordedAction(const UInputAction* Action) const
+{
+	if (not IsValid(Action))
+	{
+		return FText::GetEmpty();
+	}
+
+	UInputMappingContext* MappingContext = GetChordedActionMappingContext();
+	if (MappingContext == nullptr)
+	{
+		return FText::GetEmpty();
+	}
+
+	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+	{
+		if (Mapping.Action.Get() != Action)
+		{
+			continue;
+		}
+
+		FRTSModifierHotkey Hotkey;
+		if (TryGetChordedHotkeyFromMapping(Mapping, Hotkey))
+		{
+			return RTSHotkeyTypes::GetChordedHotkeyDisplayText(Hotkey);
+		}
+	}
+
+	return FText::GetEmpty();
+}
+
+bool URTSHotkeyProviderSubsystem::TryGetChordedHotkeyFromMapping(
+	const FEnhancedActionKeyMapping& Mapping, FRTSModifierHotkey& OutHotkey) const
+{
+	if (not Mapping.Key.IsValid())
+	{
+		return false;
+	}
+
+	const auto TryApplyTrigger = [&OutHotkey, &Mapping](const UInputTrigger* Trigger)
+	{
+		const UInputTriggerChordAction* ChordTrigger = Cast<UInputTriggerChordAction>(Trigger);
+		if (not IsValid(ChordTrigger) || not IsValid(ChordTrigger->ChordAction))
+		{
+			return false;
+		}
+
+		const ERTSHotkeyModifier Modifier = RTSHotkeyTypes::GetModifierFromActionName(
+			ChordTrigger->ChordAction->GetFName());
+		if (Modifier == ERTSHotkeyModifier::Invalid)
+		{
+			return false;
+		}
+
+		OutHotkey.Modifier = Modifier;
+		OutHotkey.Key = Mapping.Key;
+		return true;
+	};
+
+	for (const TObjectPtr<UInputTrigger>& Trigger : Mapping.Triggers)
+	{
+		if (TryApplyTrigger(Trigger))
+		{
+			return true;
+		}
+	}
+
+	if (IsValid(Mapping.Action))
+	{
+		for (const TObjectPtr<UInputTrigger>& Trigger : Mapping.Action->Triggers)
+		{
+			if (TryApplyTrigger(Trigger))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 void URTSHotkeyProviderSubsystem::BroadcastActionSlotHotkey(const int32 ActionSlotIndex)

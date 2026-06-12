@@ -4,6 +4,7 @@
 #include "GameFramework/GameUserSettings.h"
 #include "Scalability.h"
 #include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 
 #include "RTSGameUserSettings.generated.h"
 
@@ -42,6 +43,7 @@ public:
 	 * This does not force a disk reload; it returns the in-memory instance.
 	 */
 	static const URTSGameUserSettings* Get();
+	static URTSGameUserSettings* GetMutable();
 
 	/**
 	 * @brief Pulls settings from config and normalizes them before the UI reads them.
@@ -137,6 +139,34 @@ public:
 
 	/** @brief Writes the unit hover range indicator setting. */
 	void SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover);
+
+
+	/** @brief Returns saved single-key overrides so controllers can restore remaps during startup. */
+	const TArray<FRTSSavedKeyBinding>& GetSavedKeyBindings() const;
+
+	/** @brief Returns saved chorded overrides so controllers can restore modifier hotkeys during startup. */
+	const TArray<FRTSSavedChordedKeyBinding>& GetSavedChordedKeyBindings() const;
+
+	/**
+	 * @brief Stores the last chosen single key for an action in a specific editable context.
+	 * @param ContextName Mapping context asset name used to avoid applying overrides to the wrong IMC.
+	 * @param ActionName Input action asset name being persisted.
+	 * @param Key New key to restore; invalid means the action stays unbound.
+	 */
+	void SaveKeyBindingOverride(const FName& ContextName, const FName& ActionName, const FKey& Key);
+
+	void RemoveKeyBindingOverride(const FName& ContextName, const FName& ActionName);
+
+	/**
+	 * @brief Stores the last chosen modifier chord for an action in a specific editable context.
+	 * @param ContextName Mapping context asset name used to avoid applying overrides to the wrong IMC.
+	 * @param ActionName Input action asset name being persisted.
+	 * @param Hotkey Modifier/key pair to restore; invalid means the action stays unbound.
+	 */
+	void SaveChordedKeyBindingOverride(
+		const FName& ContextName, const FName& ActionName, const FRTSModifierHotkey& Hotkey);
+
+	void RemoveChordedKeyBindingOverride(const FName& ContextName, const FName& ActionName);
 
 	/** @brief Returns the saved player health bar visibility override. */
 	ERTSPlayerHealthBarVisibilityStrategy GetOverwriteAllPlayerHpBarStrat() const;
@@ -262,6 +292,12 @@ private:
 
 	UPROPERTY(config)
 	bool bM_CheckUnitRangeOnHover = true;
+
+	UPROPERTY(config)
+	TArray<FRTSSavedKeyBinding> M_SavedKeyBindings;
+
+	UPROPERTY(config)
+	TArray<FRTSSavedChordedKeyBinding> M_SavedChordedKeyBindings;
 
 	UPROPERTY(config)
 	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;

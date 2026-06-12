@@ -13,6 +13,7 @@ namespace KeyBindingPopupConstants
 	const TCHAR* ChangeBindingTitle = TEXT("<Text_Title>Change Key Binding</>");
 	const TCHAR* ConflictBindingTitle = TEXT("<Text_BadTitle>Conflicting Key Binding</>");
 	const TCHAR* TryDifferentBindingTitle = TEXT("<Text_Title>Try Different Key</>");
+	const TCHAR* ChordedActionUnboundTitle = TEXT("<Text_Title>Chorded Hotkey Unbound</>");
 	const TCHAR* UnboundActionsTitle = TEXT("<Text_BadTitle>Unbound Actions</>");
 	constexpr int32 BindingEntrySwitcherIndex = 0;
 	constexpr int32 CollisionSwitcherIndex = 1;
@@ -86,6 +87,24 @@ void UW_KeyBindingPopup::ShowCollisionMessage(const FString& CollidingActionName
 	SetTitleText(KeyBindingPopupConstants::ConflictBindingTitle);
 	M_PopupSwitcher->SetActiveWidgetIndex(KeyBindingPopupConstants::CollisionSwitcherIndex);
 	bM_ShouldReturnToEntryOnUnderstood = bM_HasBindingContext;
+}
+
+void UW_KeyBindingPopup::ShowChordedActionUnboundMessage(const FString& ChordedActionName)
+{
+	if (not GetIsValidPopupSwitcher() || not GetIsValidConflictText())
+	{
+		return;
+	}
+
+	const FString MessageText =
+		TEXT("<Text_Bad14>")
+		+ ChordedActionName
+		+ TEXT(" was unbound because Control/Shift plus this control group key would break control group semantics.</>");
+
+	M_ConflictText->SetText(FText::FromString(MessageText));
+	SetTitleText(KeyBindingPopupConstants::ChordedActionUnboundTitle);
+	M_PopupSwitcher->SetActiveWidgetIndex(KeyBindingPopupConstants::CollisionSwitcherIndex);
+	bM_ShouldReturnToEntryOnUnderstood = false;
 }
 
 void UW_KeyBindingPopup::ShowUnboundActionsWarning(const FString& WarningText)

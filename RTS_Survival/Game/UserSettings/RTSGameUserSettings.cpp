@@ -26,6 +26,25 @@ const URTSGameUserSettings* URTSGameUserSettings::Get()
 	return RTSSettings;
 }
 
+URTSGameUserSettings* URTSGameUserSettings::GetMutable()
+{
+	UGameUserSettings* const BaseSettings = UGameUserSettings::GetGameUserSettings();
+	if (BaseSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UGameUserSettings::GetGameUserSettings returned null."));
+		return nullptr;
+	}
+
+	URTSGameUserSettings* const RTSSettings = Cast<URTSGameUserSettings>(BaseSettings);
+	if (RTSSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("GameUserSettings is not an instance of URTSGameUserSettings."));
+		return nullptr;
+	}
+
+	return RTSSettings;
+}
+
 void URTSGameUserSettings::LoadSettings(const bool bForceReload)
 {
 	Super::LoadSettings(bForceReload);
@@ -182,6 +201,60 @@ void URTSGameUserSettings::SetHideActionButtonHotkeys(const bool bNewHideActionB
 void URTSGameUserSettings::SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover)
 {
 	bM_CheckUnitRangeOnHover = bNewCheckUnitRangeOnHover;
+}
+
+
+const TArray<FRTSSavedKeyBinding>& URTSGameUserSettings::GetSavedKeyBindings() const
+{
+	return M_SavedKeyBindings;
+}
+
+const TArray<FRTSSavedChordedKeyBinding>& URTSGameUserSettings::GetSavedChordedKeyBindings() const
+{
+	return M_SavedChordedKeyBindings;
+}
+
+void URTSGameUserSettings::SaveKeyBindingOverride(const FName& ContextName, const FName& ActionName, const FKey& Key)
+{
+	RemoveKeyBindingOverride(ContextName, ActionName);
+
+	FRTSSavedKeyBinding NewBinding;
+	NewBinding.ContextName = ContextName;
+	NewBinding.ActionName = ActionName;
+	NewBinding.Key = Key;
+	M_SavedKeyBindings.Add(NewBinding);
+	SaveSettings();
+}
+
+void URTSGameUserSettings::RemoveKeyBindingOverride(const FName& ContextName, const FName& ActionName)
+{
+	M_SavedKeyBindings.RemoveAll(
+		[ContextName, ActionName](const FRTSSavedKeyBinding& SavedBinding)
+		{
+			return SavedBinding.ContextName == ContextName && SavedBinding.ActionName == ActionName;
+		});
+}
+
+void URTSGameUserSettings::SaveChordedKeyBindingOverride(
+	const FName& ContextName, const FName& ActionName, const FRTSModifierHotkey& Hotkey)
+{
+	RemoveChordedKeyBindingOverride(ContextName, ActionName);
+
+	FRTSSavedChordedKeyBinding NewBinding;
+	NewBinding.ContextName = ContextName;
+	NewBinding.ActionName = ActionName;
+	NewBinding.Hotkey = Hotkey;
+	M_SavedChordedKeyBindings.Add(NewBinding);
+	SaveSettings();
+}
+
+void URTSGameUserSettings::RemoveChordedKeyBindingOverride(const FName& ContextName, const FName& ActionName)
+{
+	M_SavedChordedKeyBindings.RemoveAll(
+		[ContextName, ActionName](const FRTSSavedChordedKeyBinding& SavedBinding)
+		{
+			return SavedBinding.ContextName == ContextName && SavedBinding.ActionName == ActionName;
+		});
 }
 
 ERTSPlayerHealthBarVisibilityStrategy URTSGameUserSettings::GetOverwriteAllPlayerHpBarStrat() const

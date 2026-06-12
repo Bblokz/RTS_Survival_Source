@@ -10,12 +10,14 @@
 #include "W_BuildingUI_ItemPanel.generated.h"
 
 class UW_ItemBuildingExpansion;
+class UW_HotKey;
+class URTSHotkeyProviderSubsystem;
 enum class EActionUINomadicButton : uint8;
 class UW_BottomCenterUI;
 class ACPPController;
 class UButton;
 /**
- * 
+ * @brief Panel used by the bottom-center UI to expose nomadic building controls and their shortcut labels.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_BuildingUI_ItemPanel : public UW_BottomCenter_ChildPanel
@@ -87,12 +89,30 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnClickedCancelVehicleConversionButton();
 
+	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UW_HotKey> M_Hotkey_NomadicExpansion = nullptr;
+
 private:
 	bool GetIsValidCreateBuildingButton() const;
 	bool GetIsValidCancelBuildingButton() const;
 	bool GetIsValidConvertToVehicleButton() const;
 	bool GetIsValidCancelVehicleConversionButton() const;
+	bool GetIsValidNomadicExpansionHotkey() const;
+	bool GetIsValidHotkeyProviderSubsystem() const;
+	void CacheHotkeyProviderSubsystem();
+	void BindHotkeyUpdateDelegate();
+	void UnbindHotkeyUpdateDelegate();
+	void UpdateNomadicExpansionHotkey();
+	void HandleChordedActionHotkeyUpdated(const FName ActionName, const FText& HotkeyText);
 
 	UPROPERTY()
 	TArray<UW_ItemBuildingExpansion*> M_BxpItems;
+
+	UPROPERTY()
+	TWeakObjectPtr<URTSHotkeyProviderSubsystem> M_HotkeyProviderSubsystem;
+
+	FDelegateHandle M_ChordedActionHotkeyHandle;
 };
