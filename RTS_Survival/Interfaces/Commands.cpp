@@ -66,7 +66,6 @@ void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 void UCommandData::SetPlayerResourceManger(UPlayerResourceManager* PlayerResourceManager)
 {
 	M_PlayerResourceManager = PlayerResourceManager;
-	(void)EnsureIsValidPlayerResourceManager();
 }
 
 
@@ -486,6 +485,14 @@ bool UCommandData::EnsureIsValidPlayerResourceManager() const
 	{
 		return true;
 	}
+
+	const AActor* OwnerActor = M_Owner ? M_Owner->GetOwnerActor() : nullptr;
+	if (UPlayerResourceManager* PlayerResourceManager = FRTS_Statics::GetPlayerResourceManager(OwnerActor))
+	{
+		const_cast<UCommandData*>(this)->M_PlayerResourceManager = PlayerResourceManager;
+		return true;
+	}
+
 	RTSFunctionLibrary::ReportError(
 		"Player resource manager is not valid in UCommandData. This is required for certain commands to function properly.");
 	return false;
@@ -1381,16 +1388,20 @@ void ICommands::SetIsSpawning(const bool bIsSpawning)
 
 void ICommands::InitAbilityArray(const TArray<FUnitAbilityEntry>& Abilities)
 {
-	if (UCommandData* UnitCommandData = GetIsValidCommandData())
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
 	{
-		UnitCommandData->SetAbilities(Abilities);
-		if(not IsValid(GetOwnerActor()))
-		{
-				RTSFunctionLibrary::ReportError("ICommands::InitAbilityArray - Owner Actor is not valid");
-			return;
-		}
-		UnitCommandData->SetPlayerResourceManger(FRTS_Statics::GetPlayerResourceManager(GetOwnerActor()));
+		return;
 	}
+
+	UnitCommandData->SetAbilities(Abilities);
+	if (not IsValid(GetOwnerActor()))
+	{
+		RTSFunctionLibrary::ReportError("ICommands::InitAbilityArray - Owner Actor is not valid");
+		return;
+	}
+
+	UnitCommandData->SetPlayerResourceManger(FRTS_Statics::GetPlayerResourceManager(GetOwnerActor()));
 }
 
 void ICommands::InitAbilityArray(const TArray<EAbilityID>& Abilities)
