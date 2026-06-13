@@ -21,11 +21,20 @@ void UEnemyTankTacticalAI::OnUnitInCombat()
 	{
 		return;
 	}
-	const float CurrentTime = GetWorld()->GetTimeSeconds();
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const float CurrentTime = World->GetTimeSeconds();
 	if (CurrentTime - M_LastTacticalCombatActionTime < M_TacticalCombatInterval)
 	{
 		return;
 	}
+
+	M_LastTacticalCombatActionTime = CurrentTime;
 	if(IsOwnerIdle())
 	{
 		OnTankIdleInCombat();	
@@ -62,6 +71,12 @@ ACPPTurretsMaster* UEnemyTankTacticalAI::SetOrGetTurret()
 	{
 		return M_TankTurret.Get();
 	}
+
+	if (not GetIsValidTankOwner())
+	{
+		return nullptr;
+	}
+
 	TArray<ACPPTurretsMaster*> Turrets = M_TankOwner->GetTurrets();
 	if (Turrets.IsEmpty())
 	{

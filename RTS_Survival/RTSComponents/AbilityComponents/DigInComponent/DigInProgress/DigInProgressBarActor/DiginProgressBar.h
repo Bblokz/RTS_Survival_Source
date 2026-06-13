@@ -50,11 +50,11 @@ public:
 private:
     /** Root component to hold the widget */
     UPROPERTY(VisibleDefaultsOnly)
-    USceneComponent* SceneRoot;
+    TObjectPtr<USceneComponent> SceneRoot;
 
     /** The world-space widget component that hosts UW_DigInProgress */
     UPROPERTY(VisibleAnywhere)
-    UWidgetComponent* ProgressWidgetComponent;
+    TObjectPtr<UWidgetComponent> ProgressWidgetComponent;
 
     /** The UUserWidget subclass (should be UW_DigInProgress or derived) */
     TSubclassOf<UW_DigInProgress> WidgetClass;

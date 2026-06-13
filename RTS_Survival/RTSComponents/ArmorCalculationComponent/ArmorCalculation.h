@@ -54,11 +54,11 @@ struct FArmorSetup
 	FArmorSettings ArmorSettings2[MaxArmorPlatesPerMesh];
 
 	UPROPERTY()
-	UMeshComponent* MeshWithArmor0 = nullptr;
+	TObjectPtr<UMeshComponent> MeshWithArmor0 = nullptr;
 	UPROPERTY()
-	UMeshComponent* MeshWithArmor1 = nullptr;
+	TObjectPtr<UMeshComponent> MeshWithArmor1 = nullptr;
 	UPROPERTY()
-	UMeshComponent* MeshWithArmor2 = nullptr;
+	TObjectPtr<UMeshComponent> MeshWithArmor2 = nullptr;
 };
 
 /**

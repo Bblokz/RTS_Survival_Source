@@ -202,10 +202,10 @@ private:
 	bool GetIsValidCommandsInterface() const;
 
 	UPROPERTY()
-	TArray<AStaticPreviewMesh*> M_StaticPreviewsWaitingForConstruction;
+	TArray<TObjectPtr<AStaticPreviewMesh>> M_StaticPreviewsWaitingForConstruction;
 
 	UPROPERTY()
-	ASquadController* M_OwningSquadController = nullptr;
+	TObjectPtr<ASquadController> M_OwningSquadController = nullptr;
 	bool GetIsValidSquadController() const;
 	bool GetIsValidPreviewActor() const;
 	bool GetIsValidSpawnedConstruction() const;
@@ -269,5 +269,5 @@ private:
 	void StopConstructionProgressBar();
 
 	UPROPERTY()
-	AFieldConstruction* M_FieldConstructionInProgress = nullptr;
+	TObjectPtr<AFieldConstruction> M_FieldConstructionInProgress = nullptr;
 };

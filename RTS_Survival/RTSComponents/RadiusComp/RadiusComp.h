@@ -79,7 +79,7 @@ private:
 
 	/** The static mesh used to display the radius. */
 	UPROPERTY()
-	UStaticMesh* M_RadiusMesh;
+	TObjectPtr<UStaticMesh> M_RadiusMesh;
 
 	/** The desired radius to display. */
 	float M_Radius;

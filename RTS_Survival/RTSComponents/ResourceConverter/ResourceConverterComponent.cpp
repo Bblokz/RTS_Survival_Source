@@ -303,8 +303,13 @@ bool UResourceConverterComponent::TryApplyAllDeltasAtomic(
 	// Apply all via AddResource (negative deltas subtract).
 	for (const ERTSResourceType Key : Keys)
 	{
-		const int32 Delta = Deltas[Key];
-		if (not M_PlayerResourceManager.Get()->AddResource(Key, Delta))
+		const int32* Delta = Deltas.Find(Key);
+		if (Delta == nullptr)
+		{
+			RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Missing resource delta while applying deltas."));
+			return false;
+		}
+		if (not M_PlayerResourceManager.Get()->AddResource(Key, *Delta))
 		{
 			RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: AddResource failed while applying deltas."));
 			return false;
@@ -341,9 +346,15 @@ void UResourceConverterComponent::ShowResourceTextAtOwner(const TMap<ERTSResourc
 	// Single or double resource text using your pooled manager API.  
 	if (Keys.Num() == 1)
 	{
+		const int32* ResourceDelta = DisplayMap.Find(Keys[0]);
+		if (ResourceDelta == nullptr)
+		{
+			return;
+		}
+
 		FRTSVerticalSingleResourceTextSettings S;
 		S.ResourceType = Keys[0];
-		S.AddOrSubtractAmount = DisplayMap[Keys[0]];
+		S.AddOrSubtractAmount = *ResourceDelta;
 
 		(void)M_AnimatedTextManager->ShowSingleAnimatedResourceText(
 			S,
@@ -356,11 +367,18 @@ void UResourceConverterComponent::ShowResourceTextAtOwner(const TMap<ERTSResourc
 	}
 	else if (Keys.Num() >= 2)
 	{
+		const int32* FirstResourceDelta = DisplayMap.Find(Keys[0]);
+		const int32* SecondResourceDelta = DisplayMap.Find(Keys[1]);
+		if (FirstResourceDelta == nullptr || SecondResourceDelta == nullptr)
+		{
+			return;
+		}
+
 		FRTSVerticalDoubleResourceTextSettings D;
 		D.ResourceType1 = Keys[0];
-		D.AddOrSubtractAmount1 = DisplayMap[Keys[0]];
+		D.AddOrSubtractAmount1 = *FirstResourceDelta;
 		D.ResourceType2 = Keys[1];
-		D.AddOrSubtractAmount2 = DisplayMap[Keys[1]];
+		D.AddOrSubtractAmount2 = *SecondResourceDelta;
 
 		(void)M_AnimatedTextManager->ShowDoubleAnimatedResourceText(
 			D,
@@ -464,7 +482,16 @@ void UResourceConverterComponent::Init_SetupOptionalTickAudioComponent()
 		M_OnTickAudioComponent->ConcurrencySet.Add(M_Settings.OnTickConcurrency);
 	}
 
-	M_OnTickAudioComponent->SetupAttachment(Owner->GetRootComponent());
+	USceneComponent* RootComponent = Owner->GetRootComponent();
+	if (not IsValid(RootComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Owner root component is invalid while creating tick audio component."));
+		M_OnTickAudioComponent->DestroyComponent();
+		M_OnTickAudioComponent = nullptr;
+		return;
+	}
+
+	M_OnTickAudioComponent->SetupAttachment(RootComponent);
 	M_OnTickAudioComponent->SetRelativeLocation(M_Settings.VerticalText.TextOffset);
 	M_OnTickAudioComponent->RegisterComponent();
 }

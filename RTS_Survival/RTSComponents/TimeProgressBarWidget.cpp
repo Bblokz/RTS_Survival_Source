@@ -18,10 +18,15 @@ void UTimeProgressBarWidget::NativeConstruct()
 
 void UTimeProgressBarWidget::ResumeFromPause()
 {
+	if (not IsValid(M_World))
+	{
+		return;
+	}
+
 	const float CurrentTime = M_World->GetTimeSeconds();
 	M_PauseState.M_TotalPausedDuration += CurrentTime - M_PauseState.M_PausedTime;
 	M_PauseState.bIsPaused = false;
-	if(M_PauseState.bM_WasHiddenByPause)
+	if (M_PauseState.bM_WasHiddenByPause)
 	{
 		SetVisibility(ESlateVisibility::Visible);
 		M_PauseState.bM_WasHiddenByPause = false;
@@ -35,6 +40,12 @@ void UTimeProgressBarWidget::ResumeFromPause()
 
 void UTimeProgressBarWidget::StartNewProgressBar(const float Time)
 {
+	if (Time <= 0.f || not IsValid(M_World) || not IsValid(M_ProgressBar) || not IsValid(M_ProgressText))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("TimeProgressBarWidget: Cannot start progress bar with invalid time or widgets."));
+		return;
+	}
+
 	// Starting new progress bar
 	M_TotalTime = Time;
 	M_ProgressBar->SetVisibility(ESlateVisibility::Visible);
@@ -58,6 +69,12 @@ void UTimeProgressBarWidget::InitTimeProgressComponent(
 		Font.Size = 30;
 		M_ProgressText->SetFont(Font);
 	}
+	if (not IsValid(M_ProgressBar) || not IsValid(M_ProgressText))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("TimeProgressBarWidget: Bound progress widgets are invalid."));
+		return;
+	}
+
 	M_ProgressBar->SetVisibility(ESlateVisibility::Hidden);
 	M_ProgressBar->SetPercent(0.0f);
 	M_ProgressText->SetVisibility(ESlateVisibility::Hidden);
@@ -106,11 +123,18 @@ void UTimeProgressBarWidget::PauseProgressBar(const bool bHideBarWhilePaused)
 
 void UTimeProgressBarWidget::ResetProgressBarKeepVisible()
 {
-	if (M_World)
+	if (IsValid(M_World))
 	{
 		M_World->GetTimerManager().ClearTimer(M_ProgressUpdateHandle);
 		M_World->GetTimerManager().ClearTimer(M_BarRotationHandle);
 	}
+
+	if (not IsValid(M_ProgressBar) || not IsValid(M_ProgressText))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("TimeProgressBarWidget: Cannot reset invalid progress widgets."));
+		return;
+	}
+
 	// Total reset and keep visible.
 	M_TotalTime = 0;
 	M_ProgressBar->SetVisibility(ESlateVisibility::Visible);
@@ -125,7 +149,7 @@ void UTimeProgressBarWidget::ResetProgressBarKeepVisible()
 
 void UTimeProgressBarWidget::StopProgressBar()
 {
-	if (M_World)
+	if (IsValid(M_World))
 	{
 		M_World->GetTimerManager().ClearTimer(M_ProgressUpdateHandle);
 		M_World->GetTimerManager().ClearTimer(M_BarRotationHandle);
@@ -133,12 +157,18 @@ void UTimeProgressBarWidget::StopProgressBar()
 	else
 	{
 		M_World = GetWorld();
-		if (M_World)
+		if (IsValid(M_World))
 		{
 			M_World->GetTimerManager().ClearTimer(M_ProgressUpdateHandle);
 			M_World->GetTimerManager().ClearTimer(M_BarRotationHandle);
 		}
 	}
+
+	if (not IsValid(M_ProgressBar) || not IsValid(M_ProgressText))
+	{
+		return;
+	}
+
 	M_ProgressBar->SetVisibility(ESlateVisibility::Hidden);
 	M_ProgressText->SetVisibility(ESlateVisibility::Hidden);
 	M_PauseState.bIsPaused = false;
@@ -147,7 +177,7 @@ void UTimeProgressBarWidget::StopProgressBar()
 
 float UTimeProgressBarWidget::GetTimeElapsed() const
 {
-	if (M_World)
+	if (IsValid(M_World))
 	{
 		float CurrentTime = M_World->GetTimeSeconds();
 		float ElapsedTime = CurrentTime - M_StartTime - M_PauseState.M_TotalPausedDuration;
@@ -158,17 +188,27 @@ float UTimeProgressBarWidget::GetTimeElapsed() const
 
 void UTimeProgressBarWidget::SetLocalLocation(const FVector& NewLocation) const
 {
+	if (not GetIsValidWidgetComp())
+	{
+		return;
+	}
+
 	M_WidgetComponent->SetRelativeLocation(NewLocation);
 }
 
 FVector UTimeProgressBarWidget::GetLocalLocation() const
 {
+	if (not GetIsValidWidgetComp())
+	{
+		return FVector::ZeroVector;
+	}
+
 	return M_WidgetComponent->GetRelativeLocation();
 }
 
 void UTimeProgressBarWidget::UpdateProgressBar()
 {
-	if (not M_World)
+	if (not IsValid(M_World) || M_TotalTime <= 0.f || not IsValid(M_ProgressBar) || not IsValid(M_ProgressText))
 	{
 		return;
 	}

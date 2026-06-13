@@ -58,7 +58,7 @@ protected:
 	TSoftObjectPtr<UStaticMesh> RocketMesh = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Frame")
-	UMaterialInterface* Optional_RocketMaterial = nullptr;
+	TObjectPtr<UMaterialInterface> Optional_RocketMaterial = nullptr;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Rockets")
 	FVector LocalRocketOffsetPerSocket = FVector::ZeroVector;
@@ -67,17 +67,17 @@ protected:
 	int32 MaxRockets = 5;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Launch")
-	USoundBase* RocketLaunchSound;
+	TObjectPtr<USoundBase> RocketLaunchSound;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Launch")
-	USoundAttenuation* RocketLaunchSoundAttenuation = nullptr;
+	TObjectPtr<USoundAttenuation> RocketLaunchSoundAttenuation = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Launch")
-	USoundConcurrency* RocketLaunchSoundConcurrency = nullptr;
+	TObjectPtr<USoundConcurrency> RocketLaunchSoundConcurrency = nullptr;
 
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Launch")
-	UNiagaraSystem* RocketLaunchEffect = nullptr;
+	TObjectPtr<UNiagaraSystem> RocketLaunchEffect = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Launch")
 	FVector LaunchScale = FVector(1.0f, 1.0f, 1.0f);
@@ -89,26 +89,26 @@ protected:
 	FVector ImpactScale = FVector(1.0f, 1.0f, 1.0f);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Impact")
-	USoundAttenuation* ImpactAttenuation = nullptr;
+	TObjectPtr<USoundAttenuation> ImpactAttenuation = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Impact")
-	USoundConcurrency* ImpactConcurrency = nullptr;
+	TObjectPtr<USoundConcurrency> ImpactConcurrency = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Impact")
-	UNiagaraSystem* BounceEffect = nullptr;
+	TObjectPtr<UNiagaraSystem> BounceEffect = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Impact")
-	USoundCue* BounceSound = nullptr;
+	TObjectPtr<USoundCue> BounceSound = nullptr;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Impact")
 	FVector BounceScale = FVector(1.0f, 1.0f, 1.0f);
 
 private:
 	TWeakInterfacePtr<ICommands> M_Owner;
 	UPROPERTY()
-	UStaticMeshComponent* M_FrameMeshComponent = nullptr;
+	TObjectPtr<UStaticMeshComponent> M_FrameMeshComponent = nullptr;
 	bool EnsureFrameMeshCompIsValid()const;
 	UPROPERTY()
-	URTSHidableInstancedStaticMeshComponent* M_RocketsInstances = nullptr;
+	TObjectPtr<URTSHidableInstancedStaticMeshComponent> M_RocketsInstances = nullptr;
 	bool EnsureRocketInstancerIsValid() const;
 
 	UPROPERTY()
