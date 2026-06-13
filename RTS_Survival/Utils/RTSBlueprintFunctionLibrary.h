@@ -482,6 +482,21 @@ public:
 		const FVector& OriginalLocation,
 		const FVector2D MinMaxXYOffset, bool& bWasSuccessful);
 
+	/**
+	 * @brief Projects caller-chosen payload points with explicit extent so gameplay code can avoid hard-coded nav settings.
+	 * @param WorldContext Context used to locate the active navigation system.
+	 * @param Location Desired world location before projection.
+	 * @param ProjectionExtent Navigation query extent to use for projection.
+	 * @param bWasSuccessful Whether the returned location came from the navmesh.
+	 * @return Projected location when successful; otherwise the original desired location.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="UnitData")
+	static FVector RTSProjectLocationToNavigation(
+		const UObject* WorldContext,
+		const FVector& Location,
+		const FVector& ProjectionExtent,
+		bool& bWasSuccessful);
+
 
 	/**
 	 * Appends two arrays of UMaterialInterface pointers and returns the merged array.
