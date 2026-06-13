@@ -615,6 +615,13 @@ FVector& AInfantryWeaponMaster::GetTargetLocation(const int32 WeaponIndex)
 	return M_TargetingData.GetActiveTargetLocation();
 }
 
+
+AActor* AInfantryWeaponMaster::GetTargetActor(const int32 WeaponIndex) const
+{
+	(void)WeaponIndex;
+	return M_TargetingData.GetTargetActor();
+}
+
 bool AInfantryWeaponMaster::AllowWeaponToReload(const int32 /*WeaponIndex*/) const
 {
 	return true;
@@ -878,6 +885,44 @@ void AInfantryWeaponMaster::SetupMultiProjectileWeapon(FInitWeaponStateMultiProj
 		MultiProjectileState.MinBurstAmount,
 		MultiProjectileState.CreateShellCasingOnEveryRandomBurst);
 	WeaponState = MultiProjectile;
+	SetupRange();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(WeaponState, M_ProjectileManager.Get());
+	}
+}
+
+
+void AInfantryWeaponMaster::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters)
+{
+	SetOwningPlayer(HomingMissileParameters.OwningPlayer);
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for homing missile weapon: " + GetName());
+		return;
+	}
+	const int32 WeaponIndex = 0;
+	UWeaponStateHomingMissile* HomingMissile = NewObject<UWeaponStateHomingMissile>(this);
+	HomingMissile->InitHomingMissileWeapon(
+		HomingMissileParameters.OwningPlayer,
+		WeaponIndex,
+		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.WeaponBurstMode,
+		HomingMissileParameters.WeaponOwner,
+		HomingMissileParameters.MeshComponent,
+		HomingMissileParameters.FireSocketName,
+		World,
+		HomingMissileParameters.ProjectileSystem,
+		HomingMissileParameters.WeaponVFX,
+		HomingMissileParameters.WeaponShellCase,
+		HomingMissileParameters.HomingMissileSettings,
+		HomingMissileParameters.BurstCooldown,
+		HomingMissileParameters.SingleBurstAmountMaxBurstAmount,
+		HomingMissileParameters.MinBurstAmount,
+		HomingMissileParameters.CreateShellCasingOnEveryRandomBurst);
+	WeaponState = HomingMissile;
 	SetupRange();
 
 	if (M_ProjectileManager.IsValid())

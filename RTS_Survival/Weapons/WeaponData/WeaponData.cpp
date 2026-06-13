@@ -3137,6 +3137,130 @@ void UWeaponStateRocketProjectile::FireProjectileWithShellAdjustedStats(const FW
 	}
 }
 
+void UWeaponStateHomingMissile::InitHomingMissileWeapon(
+	const int32 NewOwningPlayer,
+	const int32 NewWeaponIndex,
+	const EWeaponName NewWeaponName,
+	const EWeaponFireMode NewWeaponBurstMode,
+	TScriptInterface<IWeaponOwner> NewWeaponOwner,
+	UMeshComponent* NewMeshComponent,
+	const FName NewFireSocketName,
+	UWorld* NewWorld,
+	const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+	FWeaponVFX NewWeaponVFX,
+	FWeaponShellCase NewWeaponShellCase,
+	const FHomingMissileWeaponSettings& NewHomingMissileSettings,
+	const float NewBurstCooldown,
+	const int32 NewSingleBurstAmountMaxBurstAmount,
+	const int32 NewMinBurstAmount,
+	const bool bNewCreateShellCasingOnEveryRandomBurst)
+{
+	M_HomingMissileSettings = NewHomingMissileSettings;
+	InitRocketProjectileWeapon(
+		NewOwningPlayer,
+		NewWeaponIndex,
+		NewWeaponName,
+		NewWeaponBurstMode,
+		NewWeaponOwner,
+		NewMeshComponent,
+		NewFireSocketName,
+		NewWorld,
+		ProjectileNiagaraSystem,
+		NewWeaponVFX,
+		NewWeaponShellCase,
+		NewHomingMissileSettings.RocketSettings,
+		NewBurstCooldown,
+		NewSingleBurstAmountMaxBurstAmount,
+		NewMinBurstAmount,
+		bNewCreateShellCasingOnEveryRandomBurst);
+}
+
+void UWeaponStateHomingMissile::FireProjectile(const FVector& TargetLocationRaw)
+{
+	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+	if (not ProjectileManager)
+	{
+		return;
+	}
+
+	const FRocketLaunchSocketData LaunchData = GetRocketLaunchSocketData(true);
+	const FVector LaunchLocation = LaunchData.LaunchLocation;
+	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+		TargetLocationRaw,
+		WeaponData.Accuracy);
+	FVector LaunchDirection = (TargetLocation - LaunchLocation).GetSafeNormal();
+	if (LaunchDirection.IsNearlyZero())
+	{
+		LaunchDirection = LaunchData.ForwardVector.GetSafeNormal();
+	}
+
+	AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
+	if (not IsValid(SpawnedProjectile))
+	{
+		ReportErrorForWeapon("HOMING MISSILE weapon failed to get dormant projectile from pool manager.");
+		return;
+	}
+
+	AActor* TargetActor = WeaponOwner ? WeaponOwner->GetTargetActor(WeaponIndex) : nullptr;
+	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP)
+		|| (WeaponData.ShellType == EWeaponShellType::Shell_APHE)
+		|| (WeaponData.ShellType == EWeaponShellType::Shell_Railgun);
+	const bool bIsFireShell = WeaponData.ShellType == EWeaponShellType::Shell_Fire;
+	const FWeaponData ShellAdjustedData = (not bIsAPShell && not bIsFireShell)
+		                                      ? GLOBAL_GetWeaponDataForShellType(WeaponData)
+		                                      : WeaponData;
+	FireProjectileWithShellAdjustedStats(
+		ShellAdjustedData,
+		SpawnedProjectile,
+		LaunchLocation,
+		LaunchDirection.Rotation(),
+		TargetLocation,
+		TargetActor);
+}
+
+void UWeaponStateHomingMissile::FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+                                                                     AProjectile* Projectile,
+                                                                     const FVector& LaunchLocation,
+                                                                     const FRotator& LaunchRotation,
+                                                                     const FVector& TargetLocation,
+                                                                     AActor* TargetActor)
+{
+	constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	const float PenAdjustedWithGameFlux = FMath::RandRange(ShellAdjustedData.ArmorPen * PenFluxFactorLow,
+	                                                       ShellAdjustedData.ArmorPen * PenFluxFactorHigh);
+	const float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorLow,
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorHigh);
+
+	FProjectileVfxSettings ProjectileVfxSettings;
+	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
+	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
+	ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
+
+	Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
+	                                        ShellAdjustedData.BaseDamage, PenAdjustedWithGameFlux,
+	                                        PenMaxRangeAdjustedWithGameFlux,
+	                                        ShellAdjustedData.ShrapnelParticles, ShellAdjustedData.ShrapnelRange,
+	                                        ShellAdjustedData.ShrapnelDamage, ShellAdjustedData.ShrapnelPen,
+	                                        OwningPlayer, M_WeaponVfx.SurfaceImpactEffects, M_WeaponVfx.BounceEffect,
+	                                        M_WeaponVfx.BounceSound, M_WeaponVfx.ImpactScale, M_WeaponVfx.BounceScale,
+	                                        ShellAdjustedData.ProjectileMovementSpeed, LaunchLocation, LaunchRotation,
+	                                        M_WeaponVfx.ImpactAttenuation, M_WeaponVfx.ImpactConcurrency,
+	                                        ProjectileVfxSettings, WeaponData.ShellType, ActorsToIgnore,
+	                                        ShellAdjustedData.WeaponCalibre);
+	Projectile->SetupHomingMissileLaunch(
+		LaunchLocation,
+		TargetActor,
+		TargetLocation,
+		ShellAdjustedData.ProjectileMovementSpeed,
+		M_HomingMissileSettings);
+	if (M_HomingMissileSettings.RocketSettings.RocketMesh)
+	{
+		Projectile->SetupAttachedRocketMesh(M_HomingMissileSettings.RocketSettings.RocketMesh);
+	}
+}
+
 void UVerticalRocketWeaponState::InitVerticalRocketWeapon(
 	const int32 NewOwningPlayer,
 	const int32 NewWeaponIndex,

@@ -143,6 +143,13 @@ FVector& UHullWeaponComponent::GetTargetLocation(const int32 WeaponIndex)
 	return M_TargetingData.GetActiveTargetLocation();
 }
 
+
+AActor* UHullWeaponComponent::GetTargetActor(const int32 WeaponIndex) const
+{
+	(void)WeaponIndex;
+	return M_TargetingData.GetTargetActor();
+}
+
 bool UHullWeaponComponent::AllowWeaponToReload(const int32 WeaponIndex) const
 {
 	return true;
@@ -499,6 +506,42 @@ void UHullWeaponComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProje
 	if (M_ProjectileManager.IsValid())
 	{
 		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(MultiProjectile, M_ProjectileManager.Get());
+	}
+}
+
+
+void UHullWeaponComponent::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters)
+{
+	SetOwningPlayer(HomingMissileParameters.OwningPlayer);
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateHomingMissile* HomingMissile = NewObject<UWeaponStateHomingMissile>(this);
+	HomingMissile->InitHomingMissileWeapon(
+		HomingMissileParameters.OwningPlayer,
+		WeaponIndex,
+		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.WeaponBurstMode,
+		HomingMissileParameters.WeaponOwner,
+		HomingMissileParameters.MeshComponent,
+		HomingMissileParameters.FireSocketName,
+		M_WorldSpawnedIn,
+		HomingMissileParameters.ProjectileSystem,
+		HomingMissileParameters.WeaponVFX,
+		HomingMissileParameters.WeaponShellCase,
+		HomingMissileParameters.HomingMissileSettings,
+		HomingMissileParameters.BurstCooldown,
+		HomingMissileParameters.SingleBurstAmountMaxBurstAmount,
+		HomingMissileParameters.MinBurstAmount,
+		HomingMissileParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(HomingMissile);
+	UpdateHullWeaponRangeBasedOnWeapons();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(HomingMissile, M_ProjectileManager.Get());
 	}
 }
 

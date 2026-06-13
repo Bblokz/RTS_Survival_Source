@@ -246,7 +246,8 @@ protected:
 	 * TargetPitch variable and therefore this implementation is final.
 	 */
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) override final;
-	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override final;
+	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override;
+	virtual AActor* GetTargetActor(const int32 WeaponIndex) const override final;
 
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 
@@ -305,6 +306,9 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 
