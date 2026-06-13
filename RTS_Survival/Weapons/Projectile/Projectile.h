@@ -66,6 +66,12 @@ struct FProjectileHomingMissileRuntimeState
 
 	UPROPERTY()
 	float M_ExpectedFlightSeconds = 0.0f;
+
+	UPROPERTY()
+	float M_DirectHomingSwitchPathAlpha = 1.0f;
+
+	UPROPERTY()
+	bool bM_UseDirectHoming = false;
 };
 
 /**
@@ -464,6 +470,10 @@ private:
 	                                             const float Stage2ArcTime);
 	void TransitionVerticalRocketToStraight(const FVector& TargetLocation, const float Stage2StraightSpeed);
 	void UpdateHomingMissileCourse();
+	void PrepareDirectHomingSwitchThreshold();
+	void TrySwitchHomingMissileToDirectHoming(const FVector& TargetLocation);
+	bool GetCanHomingMissileSwitchToDirectHoming() const;
+	bool GetIsHomingMissileTooFarOff(const FVector& TargetLocation) const;
 	FVector BuildHomingMissileDesiredDirection(const FVector& TargetLocation) const;
 	FVector BuildBezierHomingDesiredDirection(const FVector& TargetLocation) const;
 	float GetHomingMissileTimerIntervalSeconds() const;
