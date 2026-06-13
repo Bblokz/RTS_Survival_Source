@@ -1,6 +1,10 @@
 #include "VTOLDropshipAircraft.h"
 
+#include "Components/SkeletalMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
+#include "RTS_Survival/Units/Aircraft/AircraftAnimInstance/AircraftAnimInstance.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Units/Aircraft/VTOLDropship/VTOLDropshipDeliveryComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -11,6 +15,8 @@ namespace VTOLDropshipAircraftConstants
 {
 	constexpr float ReachedLocationTolerance = 1.f;
 	constexpr float MinVerticalMoveSpeed = 1.f;
+	constexpr float MinVerticalAcceleration = 1.f;
+	constexpr float MinVerticalDeceleration = 1.f;
 	// Requested exact projection extent for payload placement near the dropship pad.
 	constexpr float PayloadNavigationProjectionExtent = 2.f;
 }
@@ -50,6 +56,12 @@ void AVTOLDropshipAircraft::StartDeliveryRun(const FTransform& StartTransform, c
 	SetActorHiddenInGame(false);
 	SetActorEnableCollision(true);
 	ForceNeverSelectable();
+	M_CurrentVerticalSpeed = 0.f;
+	if (UAircraftAnimInstance* AnimInstance = GetVTOLDropshipAnimInstance())
+	{
+		AnimInstance->OnStartLanding(
+			GetEstimatedVerticalTravelTime(M_LandingTransform.GetLocation().Z, M_DescentMovementSettings));
+	}
 }
 
 
@@ -80,9 +92,9 @@ void AVTOLDropshipAircraft::AbortDeliveryAndDestroyAfterAscent()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_LandedTimerHandle);
+		ClearResourcePolishTimers();
 	}
-	M_DropshipState = EVTOLDropshipAircraftState::Ascending;
-	ForceNeverSelectable();
+	StartVtoPrepOrAscent();
 }
 
 void AVTOLDropshipAircraft::DestroyCachedAircraft()
@@ -101,6 +113,7 @@ void AVTOLDropshipAircraft::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_LandedTimerHandle);
+		ClearResourcePolishTimers();
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -188,7 +201,7 @@ void AVTOLDropshipAircraft::ForceNeverSelectable() const
 
 void AVTOLDropshipAircraft::TickDescending(const float DeltaSeconds)
 {
-	MoveVerticallyTowardTargetZ(DeltaSeconds, M_LandingTransform.GetLocation().Z);
+	MoveVerticallyTowardTargetZ(DeltaSeconds, M_LandingTransform.GetLocation().Z, M_DescentMovementSettings);
 	const float DistanceToLandingZ = FMath::Abs(GetActorLocation().Z - M_LandingTransform.GetLocation().Z);
 	if (DistanceToLandingZ > VTOLDropshipAircraftConstants::ReachedLocationTolerance)
 	{
@@ -199,7 +212,7 @@ void AVTOLDropshipAircraft::TickDescending(const float DeltaSeconds)
 
 void AVTOLDropshipAircraft::TickAscending(const float DeltaSeconds)
 {
-	MoveVerticallyTowardTargetZ(DeltaSeconds, M_StartTransform.GetLocation().Z);
+	MoveVerticallyTowardTargetZ(DeltaSeconds, M_StartTransform.GetLocation().Z, M_AscentMovementSettings);
 	const float DistanceToStartZ = FMath::Abs(GetActorLocation().Z - M_StartTransform.GetLocation().Z);
 	if (DistanceToStartZ > VTOLDropshipAircraftConstants::ReachedLocationTolerance)
 	{
@@ -208,10 +221,24 @@ void AVTOLDropshipAircraft::TickAscending(const float DeltaSeconds)
 	OnAscentFinished();
 }
 
-void AVTOLDropshipAircraft::MoveVerticallyTowardTargetZ(const float DeltaSeconds, const float TargetZ)
+void AVTOLDropshipAircraft::MoveVerticallyTowardTargetZ(
+	const float DeltaSeconds,
+	const float TargetZ,
+	const FVTOLDropshipVerticalMovementSettings& MovementSettings)
 {
 	const FVector LandingLocation = M_LandingTransform.GetLocation();
-	const float NewZ = FMath::FInterpConstantTo(GetActorLocation().Z, TargetZ, DeltaSeconds, GetSafeVerticalMoveSpeed());
+	const float CurrentZ = GetActorLocation().Z;
+	const float DistanceToTarget = FMath::Abs(TargetZ - CurrentZ);
+	const float SafeDeceleration = GetSafeVerticalDeceleration(MovementSettings);
+	const float StoppingDistance = FMath::Square(M_CurrentVerticalSpeed) / (2.f * SafeDeceleration);
+	const float TargetSpeed = StoppingDistance >= DistanceToTarget
+		? 0.f
+		: GetSafeVerticalMoveSpeed(MovementSettings);
+	const float SpeedChangeRate = TargetSpeed > M_CurrentVerticalSpeed
+		? GetSafeVerticalAcceleration(MovementSettings)
+		: SafeDeceleration;
+	M_CurrentVerticalSpeed = FMath::FInterpConstantTo(M_CurrentVerticalSpeed, TargetSpeed, DeltaSeconds, SpeedChangeRate);
+	const float NewZ = FMath::FInterpConstantTo(CurrentZ, TargetZ, DeltaSeconds, M_CurrentVerticalSpeed);
 	SetActorLocation(FVector(LandingLocation.X, LandingLocation.Y, NewZ));
 	SetActorRotation(M_LandingTransform.Rotator());
 }
@@ -219,7 +246,12 @@ void AVTOLDropshipAircraft::MoveVerticallyTowardTargetZ(const float DeltaSeconds
 void AVTOLDropshipAircraft::OnTouchdown()
 {
 	SetActorTransform(M_LandingTransform);
+	M_CurrentVerticalSpeed = 0.f;
 	M_DropshipState = EVTOLDropshipAircraftState::Landed;
+	if (UAircraftAnimInstance* AnimInstance = GetVTOLDropshipAnimInstance())
+	{
+		AnimInstance->OnLandingComplete();
+	}
 	if (not bM_DeliveredPayloadThisRun && not bM_DestroyAfterAscent)
 	{
 		DeliverResources();
@@ -248,8 +280,47 @@ void AVTOLDropshipAircraft::OnTouchdown()
 
 void AVTOLDropshipAircraft::OnLandedDurationFinished()
 {
+	StartVtoPrepOrAscent();
+}
+
+void AVTOLDropshipAircraft::StartVtoPrepOrAscent()
+{
+	const float SafeVtoPrepTime = FMath::Max(0.f, M_VtoPrepTime);
+	if (SafeVtoPrepTime <= 0.f)
+	{
+		StartAscentAfterPrep();
+		return;
+	}
+
+	M_DropshipState = EVTOLDropshipAircraftState::PreparingVto;
+	if (UAircraftAnimInstance* AnimInstance = GetVTOLDropshipAnimInstance())
+	{
+		AnimInstance->OnPrepareVto(SafeVtoPrepTime);
+	}
+
+	FTimerDelegate VtoPrepTimerDelegate;
+	TWeakObjectPtr<AVTOLDropshipAircraft> WeakDropshipAircraft(this);
+	VtoPrepTimerDelegate.BindLambda([WeakDropshipAircraft]()
+	{
+		if (not WeakDropshipAircraft.IsValid())
+		{
+			return;
+		}
+		WeakDropshipAircraft->StartAscentAfterPrep();
+	});
+	GetWorldTimerManager().SetTimer(M_LandedTimerHandle, VtoPrepTimerDelegate, SafeVtoPrepTime, false);
+}
+
+void AVTOLDropshipAircraft::StartAscentAfterPrep()
+{
+	M_CurrentVerticalSpeed = 0.f;
 	M_DropshipState = EVTOLDropshipAircraftState::Ascending;
 	ForceNeverSelectable();
+	if (UAircraftAnimInstance* AnimInstance = GetVTOLDropshipAnimInstance())
+	{
+		AnimInstance->OnVtoStart(
+			GetEstimatedVerticalTravelTime(M_StartTransform.GetLocation().Z, M_AscentMovementSettings));
+	}
 }
 
 void AVTOLDropshipAircraft::OnAscentFinished()
@@ -276,7 +347,7 @@ void AVTOLDropshipAircraft::CacheAtStartLocation()
 	ForceNeverSelectable();
 }
 
-void AVTOLDropshipAircraft::DeliverResources() const
+void AVTOLDropshipAircraft::DeliverResources()
 {
 	if (M_Payload.M_DeliveryResources.IsEmpty())
 	{
@@ -288,6 +359,39 @@ void AVTOLDropshipAircraft::DeliverResources() const
 	{
 		RTSFunctionLibrary::ReportError("PlayerResourceManager not valid for VTOL dropship delivery on " + GetName());
 		return;
+	}
+
+	int32 ResourcePolishIndex = 0;
+	for (const TPair<ERTSResourceType, int32>& DeliveredResource : M_Payload.M_DeliveryResources.ResourceCosts)
+	{
+		if (DeliveredResource.Value <= 0)
+		{
+			continue;
+		}
+
+		FTimerHandle ResourcePolishTimerHandle;
+		const float PolishDelay = FMath::Max(0.f, M_ResourceDeliveryPolishSettings.DelayBetweenResourcePolish) * ResourcePolishIndex;
+		TWeakObjectPtr<AVTOLDropshipAircraft> WeakDropshipAircraft(this);
+		FTimerDelegate ResourcePolishTimerDelegate;
+		ResourcePolishTimerDelegate.BindLambda(
+			[WeakDropshipAircraft, ResourceType = DeliveredResource.Key, ResourceAmount = DeliveredResource.Value]()
+		{
+			if (not WeakDropshipAircraft.IsValid())
+			{
+				return;
+			}
+			WeakDropshipAircraft->ShowDeliveredResourcePolish(ResourceType, ResourceAmount);
+		});
+		if (PolishDelay <= 0.f)
+		{
+			ResourcePolishTimerDelegate.ExecuteIfBound();
+		}
+		else
+		{
+			GetWorldTimerManager().SetTimer(ResourcePolishTimerHandle, ResourcePolishTimerDelegate, PolishDelay, false);
+			M_ResourcePolishTimerHandles.Add(ResourcePolishTimerHandle);
+		}
+		++ResourcePolishIndex;
 	}
 
 	const bool bAddedAllResources = PlayerResourceManager->RefundCosts(M_Payload.M_DeliveryResources);
@@ -410,9 +514,88 @@ float AVTOLDropshipAircraft::GetPayloadRingRadius(const int32 ActorAmount) const
 	return M_Payload.M_ActorSpawnSpacing / (2.f * FMath::Sin(HalfAngleBetweenActors));
 }
 
-float AVTOLDropshipAircraft::GetSafeVerticalMoveSpeed() const
+void AVTOLDropshipAircraft::ShowDeliveredResourcePolish(const ERTSResourceType ResourceType, const int32 ResourceAmount)
 {
-	return FMath::Max(M_VerticalMoveSpeed, VTOLDropshipAircraftConstants::MinVerticalMoveSpeed);
+	FRTSVerticalSingleResourceTextSettings ResourceTextSettings;
+	ResourceTextSettings.ResourceType = ResourceType;
+	ResourceTextSettings.AddOrSubtractAmount = ResourceAmount;
+
+	if (IsValid(M_ResourceDeliveryPolishSettings.DeliveredResourceSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			M_ResourceDeliveryPolishSettings.DeliveredResourceSound,
+			GetActorLocation(),
+			1.f,
+			1.f,
+			0.f,
+			M_ResourceDeliveryPolishSettings.DeliveredResourceSoundAttenuation,
+			M_ResourceDeliveryPolishSettings.DeliveredResourceSoundConcurrency);
+	}
+
+	UAnimatedTextWidgetPoolManager* AnimatedTextManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+	if (not IsValid(AnimatedTextManager))
+	{
+		RTSFunctionLibrary::ReportError("AnimatedTextManager not valid for VTOL dropship delivery on " + GetName());
+		return;
+	}
+
+	(void)AnimatedTextManager->ShowSingleAnimatedResourceText(
+		ResourceTextSettings,
+		GetActorLocation() + M_ResourceDeliveryPolishSettings.VerticalTextOffset,
+		M_ResourceDeliveryPolishSettings.bAutoWrap,
+		M_ResourceDeliveryPolishSettings.WrapAt,
+		M_ResourceDeliveryPolishSettings.Justification,
+		M_ResourceDeliveryPolishSettings.VerticalTextSettings);
+}
+
+void AVTOLDropshipAircraft::ClearResourcePolishTimers()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		M_ResourcePolishTimerHandles.Reset();
+		return;
+	}
+
+	for (FTimerHandle& ResourcePolishTimerHandle : M_ResourcePolishTimerHandles)
+	{
+		World->GetTimerManager().ClearTimer(ResourcePolishTimerHandle);
+	}
+	M_ResourcePolishTimerHandles.Reset();
+}
+
+float AVTOLDropshipAircraft::GetEstimatedVerticalTravelTime(
+	const float TargetZ,
+	const FVTOLDropshipVerticalMovementSettings& MovementSettings) const
+{
+	const float DistanceToTarget = FMath::Abs(TargetZ - GetActorLocation().Z);
+	return DistanceToTarget / GetSafeVerticalMoveSpeed(MovementSettings);
+}
+
+UAircraftAnimInstance* AVTOLDropshipAircraft::GetVTOLDropshipAnimInstance() const
+{
+	USkeletalMeshComponent* AircraftMesh = FindComponentByClass<USkeletalMeshComponent>();
+	if (not IsValid(AircraftMesh))
+	{
+		return nullptr;
+	}
+	return Cast<UAircraftAnimInstance>(AircraftMesh->GetAnimInstance());
+}
+
+float AVTOLDropshipAircraft::GetSafeVerticalMoveSpeed(const FVTOLDropshipVerticalMovementSettings& MovementSettings) const
+{
+	return FMath::Max(MovementSettings.MaxSpeed, VTOLDropshipAircraftConstants::MinVerticalMoveSpeed);
+}
+
+float AVTOLDropshipAircraft::GetSafeVerticalAcceleration(const FVTOLDropshipVerticalMovementSettings& MovementSettings) const
+{
+	return FMath::Max(MovementSettings.Acceleration, VTOLDropshipAircraftConstants::MinVerticalAcceleration);
+}
+
+float AVTOLDropshipAircraft::GetSafeVerticalDeceleration(const FVTOLDropshipVerticalMovementSettings& MovementSettings) const
+{
+	return FMath::Max(MovementSettings.Deceleration, VTOLDropshipAircraftConstants::MinVerticalDeceleration);
 }
 
 bool AVTOLDropshipAircraft::TryProjectPayloadLocationToNavigation(
