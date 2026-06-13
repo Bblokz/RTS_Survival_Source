@@ -35,7 +35,7 @@ struct FTurretSwapTimingProgressSettings
 	FString BarText = TEXT("Swapping turret");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="SwapTurret|TimingProgress")
-	UMaterialInterface* OldTurretMaterialOverride = nullptr;
+	TObjectPtr<UMaterialInterface> OldTurretMaterialOverride = nullptr;
 
 	static constexpr float BarScaleMlt = 0.1f;
 };
@@ -129,7 +129,7 @@ private:
 	bool GetIsValidSwapTurretClass() const;
 
 	UPROPERTY()
-	UChildActorComponent* M_TurretChildActorComponent = nullptr;
+	TObjectPtr<UChildActorComponent> M_TurretChildActorComponent = nullptr;
 
 	UPROPERTY()
 	TScriptInterface<ICommands> M_OwnerCommandsInterface;

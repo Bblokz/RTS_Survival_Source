@@ -130,7 +130,7 @@ private:
 	ERTSOptimizationDistance GetOptimizationDistanceToCamera() const;
 
 	UPROPERTY()
-	ACPPController* M_PlayerController = nullptr;
+	TObjectPtr<ACPPController> M_PlayerController = nullptr;
 
 	void BeginPlay_SetPlayerController();
 	void BeginPlay_SetupComponentReferences();

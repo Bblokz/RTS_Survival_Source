@@ -82,11 +82,11 @@ struct FGrenadeComponentSettings
 
 	// Mesh override used by the grenade actor when thrown.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
-	UStaticMesh* GrenadeMesh = nullptr;
+	TObjectPtr<UStaticMesh> GrenadeMesh = nullptr;
 
 	// Sound effect played when the grenade explodes.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades|SoundHandling")
-	USoundBase* ExplosionSound = nullptr;
+	TObjectPtr<USoundBase> ExplosionSound = nullptr;
 
 	// Attenuation settings used for the grenade explosion sound.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades|SoundHandling")
@@ -98,7 +98,7 @@ struct FGrenadeComponentSettings
 
 	// Niagara effect spawned at the explosion location.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
-	UNiagaraSystem* ExplosionEffect = nullptr;
+	TObjectPtr<UNiagaraSystem> ExplosionEffect = nullptr;
 
 	// Scale applied to the grenade explosion Niagara effect.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
