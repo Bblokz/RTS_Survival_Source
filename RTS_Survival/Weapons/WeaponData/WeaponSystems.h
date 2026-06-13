@@ -95,6 +95,7 @@ enum class
 	// German small calibre
 	KwK38_T_37MM UMETA(DisplayName = "KwK38 t 37MM (PZ 38(t))"),
 	KwK39_1_50MM UMETA(DisplayName = "KwK39/1 50MM (PZ III M)"),
+	KwK39_Rockets UMETA(DisplayName = "KwK39 Rockets (PZ III M)"),
 	KwK39_1_50MM_Puma UMETA(DisplayName = "KwK39/1 50MM (Puma)"),
 	KwK42_L_50MM UMETA(DisplayName = "KwK L/42 L 50MM (PZ III J)"),
 	KwK37_F_50MM UMETA(DisplayName = "KwK37 75MM (PZ II FLAMM)"),
