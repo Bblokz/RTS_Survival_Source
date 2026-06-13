@@ -2,9 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/UnitData/UnitCost.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "VTOLDropshipAircraft.generated.h"
 
+class UAnimatedTextWidgetPoolManager;
+class USoundAttenuation;
+class USoundBase;
+class USoundConcurrency;
 class UVTOLDropshipDeliveryComponent;
 
 UENUM()
@@ -15,6 +20,56 @@ enum class EVTOLDropshipAircraftState : uint8
 	Landed,
 	Ascending,
 	Cached,
+	PreparingVto,
+};
+
+
+USTRUCT(BlueprintType)
+struct FVTOLDropshipVerticalMovementSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship")
+	float MaxSpeed = 1000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship")
+	float Acceleration = 2000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship")
+	float Deceleration = 2000.f;
+};
+
+USTRUCT(BlueprintType)
+struct FVTOLDropshipResourceDeliveryPolishSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	FRTSVerticalAnimTextSettings VerticalTextSettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	FVector VerticalTextOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	bool bAutoWrap = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	float WrapAt = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	TEnumAsByte<ETextJustify::Type> Justification = ETextJustify::Center;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	float DelayBetweenResourcePolish = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	TObjectPtr<USoundBase> DeliveredResourceSound = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	TObjectPtr<USoundAttenuation> DeliveredResourceSoundAttenuation = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship|Resource Polish")
+	TObjectPtr<USoundConcurrency> DeliveredResourceSoundConcurrency = nullptr;
 };
 
 USTRUCT()
@@ -125,32 +180,56 @@ private:
 	UPROPERTY()
 	FTimerHandle M_LandedTimerHandle;
 
+	UPROPERTY()
+	TArray<FTimerHandle> M_ResourcePolishTimerHandles;
+
 	FTransform M_StartTransform = FTransform::Identity;
 	FTransform M_LandingTransform = FTransform::Identity;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship", meta=(AllowPrivateAccess="true"))
-	float M_VerticalMoveSpeed = 1000.f;
+	FVTOLDropshipVerticalMovementSettings M_DescentMovementSettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship", meta=(AllowPrivateAccess="true"))
+	FVTOLDropshipVerticalMovementSettings M_AscentMovementSettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship", meta=(AllowPrivateAccess="true"))
+	float M_VtoPrepTime = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="VTOL Dropship", meta=(AllowPrivateAccess="true"))
+	FVTOLDropshipResourceDeliveryPolishSettings M_ResourceDeliveryPolishSettings;
 
 	float M_LandedDuration = 0.f;
+	float M_CurrentVerticalSpeed = 0.f;
 	bool bM_DestroyAfterAscent = false;
 	bool bM_DeliveredPayloadThisRun = false;
 
 	void ForceNeverSelectable() const;
 	void TickDescending(float DeltaSeconds);
 	void TickAscending(float DeltaSeconds);
-	void MoveVerticallyTowardTargetZ(float DeltaSeconds, float TargetZ);
+	void MoveVerticallyTowardTargetZ(
+		float DeltaSeconds,
+		float TargetZ,
+		const FVTOLDropshipVerticalMovementSettings& MovementSettings);
 	void OnTouchdown();
 	void OnLandedDurationFinished();
+	void StartVtoPrepOrAscent();
+	void StartAscentAfterPrep();
 	void OnAscentFinished();
 	void CacheAtStartLocation();
-	void DeliverResources() const;
+	void DeliverResources();
+	void ShowDeliveredResourcePolish(ERTSResourceType ResourceType, int32 ResourceAmount);
+	void ClearResourcePolishTimers();
+	float GetEstimatedVerticalTravelTime(float TargetZ, const FVTOLDropshipVerticalMovementSettings& MovementSettings) const;
+	UAircraftAnimInstance* GetVTOLDropshipAnimInstance() const;
 	void CachePayloadActorClasses();
 	bool TryLoadPayloadActorClass(const TSoftClassPtr<AActor>& ActorClassSoftPtr, TSubclassOf<AActor>& OutActorClass) const;
 	void SpawnPayloadActors() const;
 	void SpawnPayloadActor(TSubclassOf<AActor> ActorClass, const FTransform& SpawnTransform) const;
 	bool TryGetPayloadSpawnLocation(int32 ActorIndex, int32 ActorAmount, FVector& OutSpawnLocation) const;
 	float GetPayloadRingRadius(int32 ActorAmount) const;
-	float GetSafeVerticalMoveSpeed() const;
+	float GetSafeVerticalMoveSpeed(const FVTOLDropshipVerticalMovementSettings& MovementSettings) const;
+	float GetSafeVerticalAcceleration(const FVTOLDropshipVerticalMovementSettings& MovementSettings) const;
+	float GetSafeVerticalDeceleration(const FVTOLDropshipVerticalMovementSettings& MovementSettings) const;
 	bool TryProjectPayloadLocationToNavigation(const FVector& DesiredLocation, FVector& OutProjectedLocation) const;
 	bool GetIsValidOwningDeliveryComponent() const;
 };
