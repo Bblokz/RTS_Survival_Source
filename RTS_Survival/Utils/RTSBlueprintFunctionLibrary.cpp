@@ -1015,24 +1015,36 @@ FVector URTSBlueprintFunctionLibrary::RTSGetLocationAtRandomOffsetProjected(cons
 	}
 	const float Offset = FMath::FRandRange(MinMaxXYOffset.X, MinMaxXYOffset.Y);
 	const float OffsetY = FMath::FRandRange(MinMaxXYOffset.X, MinMaxXYOffset.Y);
+	const FVector Location = OriginalLocation + FVector(Offset, OffsetY, 0.f);
+	const FVector ProjectionExtent(500, 500, 1.f);
+	return RTSProjectLocationToNavigation(WorldContext, Location, ProjectionExtent, bWasSuccessful);
+}
+
+FVector URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+	const UObject* WorldContext,
+	const FVector& Location,
+	const FVector& ProjectionExtent,
+	bool& bWasSuccessful)
+{
+	bWasSuccessful = false;
+	if (not IsValid(WorldContext))
+	{
+		return Location;
+	}
 
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(WorldContext->GetWorld());
 	if (not NavSys)
 	{
-		return OriginalLocation;
+		return Location;
 	}
+
 	FNavLocation ProjectedLocation;
-	const FVector ProjectionExtent(500, 500, 1.f);
-
-	const FVector Location = OriginalLocation + FVector(Offset, OffsetY, 0.f);
-
 	if (NavSys->ProjectPointToNavigation(Location, ProjectedLocation, ProjectionExtent))
 	{
-		// Successfully projected onto navmesh
 		bWasSuccessful = true;
 		return ProjectedLocation.Location;
 	}
-	return OriginalLocation;
+	return Location;
 }
 
 TArray<UMaterialInterface*> URTSBlueprintFunctionLibrary::BP_AppendMaterialArray(

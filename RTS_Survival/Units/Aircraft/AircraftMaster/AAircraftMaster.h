@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "AircraftCommandsData/AircraftCommandsData.h"
@@ -44,11 +44,11 @@ UCLASS()
 class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterface, public IRTSUnit
 {
 	GENERATED_BODY()
+
+public:
 	AAircraftMaster(const FObjectInitializer& ObjectInitializer);
 
 	friend class UAircraftOwnerComp;
-
-public:
 
 	/**
 	 * @brief Switch to a new airbase: leave current owner safely, become idle, then route toward the new owner.
