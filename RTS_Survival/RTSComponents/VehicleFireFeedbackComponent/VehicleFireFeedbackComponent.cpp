@@ -136,13 +136,9 @@ bool UVehicleFireFeedbackComponent::GetIsValidHullMesh() const
 	{
 		return true;
 	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		"M_HullMesh",
-		"GetIsValidHullMesh",
-		GetOwner());
+	// IMPORTANT: do not error report as not all vehicles have this hull mesh!!
 	return false;
+
 }
 
 bool UVehicleFireFeedbackComponent::GetIsValidTrackRootMesh() const

@@ -422,11 +422,7 @@ bool UVTOLDropshipDeliveryComponent::GetIsValidConfiguration() const
 		RTSFunctionLibrary::ReportError("VTOL dropship delivery socket name is none on " + GetName());
 		return false;
 	}
-	if (not M_RuntimeState.M_LandingSocketMesh->DoesSocketExist(M_DeliveryConfig.M_LandingSocketName))
-	{
-		RTSFunctionLibrary::ReportError("VTOL dropship delivery socket does not exist on " + GetName());
-		return false;
-	}
+	// Do not check for socket yet; mesh may not be available!
 	if (M_DeliveryConfig.M_StartHeightOffset <= 0.f)
 	{
 		RTSFunctionLibrary::ReportError("VTOL dropship start height offset must be above zero on " + GetName());
