@@ -130,6 +130,13 @@ FVector& UAircraftWeapon::GetTargetLocation(const int32 WeaponIndex)
 	return M_TargetingData.GetActiveTargetLocation();	
 }
 
+
+AActor* UAircraftWeapon::GetTargetActor(const int32 WeaponIndex) const
+{
+	(void)WeaponIndex;
+	return M_TargetingData.GetTargetActor();
+}
+
 bool UAircraftWeapon::AllowWeaponToReload(const int32 /*WeaponIndex*/) const
 {
 	if (M_LandedState == EAircraftLandingState::Landed)
@@ -336,6 +343,46 @@ void UAircraftWeapon::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjecti
 	if (GetIsProjectileManagerLoaded())
 	{
 		RocketProjectile->SetupProjectileManager(M_ProjectileManager.Get());
+	}
+}
+
+
+void UAircraftWeapon::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters)
+{
+	SetOwningPlayer(HomingMissileParameters.OwningPlayer);
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for homing missile weapon: " + GetName());
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateHomingMissile* HomingMissile = NewObject<UWeaponStateHomingMissile>(this);
+	HomingMissile->InitHomingMissileWeapon(
+		HomingMissileParameters.OwningPlayer,
+		WeaponIndex,
+		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.WeaponBurstMode,
+		HomingMissileParameters.WeaponOwner,
+		HomingMissileParameters.MeshComponent,
+		HomingMissileParameters.FireSocketName,
+		World,
+		HomingMissileParameters.ProjectileSystem,
+		HomingMissileParameters.WeaponVFX,
+		HomingMissileParameters.WeaponShellCase,
+		HomingMissileParameters.HomingMissileSettings,
+		HomingMissileParameters.BurstCooldown,
+		HomingMissileParameters.SingleBurstAmountMaxBurstAmount,
+		HomingMissileParameters.MinBurstAmount,
+		HomingMissileParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(HomingMissile);
+	HomingMissile->SetIsAircraftWeapon(true);
+	UpdateRangeBasedOnWeapons();
+	M_WeaponIndexToSocket.Add(WeaponIndex, HomingMissileParameters.FireSocketName);
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(HomingMissile, M_ProjectileManager.Get());
 	}
 }
 

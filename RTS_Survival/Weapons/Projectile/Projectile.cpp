@@ -354,6 +354,7 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
@@ -730,6 +731,158 @@ void AProjectile::TransitionVerticalRocketToStraight(const FVector& TargetLocati
 	M_ProjectileMovement->Velocity = StraightDirection * Stage2StraightSpeed;
 }
 
+void AProjectile::SetupHomingMissileLaunch(const FVector& LaunchLocation,
+                                           AActor* TargetActor,
+                                           const FVector& FallbackTargetLocation,
+                                           const float ProjectileSpeed,
+                                           const FHomingMissileWeaponSettings& HomingSettings)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	constexpr int32 MotionTypeCount = 3;
+	M_HomingMissileRuntimeState.M_Settings = HomingSettings;
+	M_HomingMissileRuntimeState.M_MotionType = static_cast<EHomingMissileMotionType>(
+		FMath::RandRange(0, MotionTypeCount - 1));
+	M_HomingMissileRuntimeState.M_Target = TargetActor;
+	M_HomingMissileRuntimeState.M_FallbackTargetLocation = FallbackTargetLocation;
+	M_HomingMissileRuntimeState.M_Speed = FMath::Max(
+		ProjectileSpeed * HomingSettings.HomingSpeedMultiplier,
+		KINDA_SMALL_NUMBER);
+	M_HomingMissileRuntimeState.M_LaunchLocation = LaunchLocation;
+	M_HomingMissileRuntimeState.M_ExpectedFlightSeconds = M_Range / M_HomingMissileRuntimeState.M_Speed;
+	M_HomingMissileRuntimeState.M_ElapsedSeconds = 0.0f;
+
+	const FVector InitialTargetLocation = IsValid(TargetActor)
+		                                      ? TargetActor->GetActorLocation()
+		                                      : FallbackTargetLocation;
+	const FVector InitialDirection = (InitialTargetLocation - LaunchLocation).GetSafeNormal();
+	if (InitialDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	M_HomingMissileRuntimeState.M_BezierControlPoint = LaunchLocation
+		+ InitialDirection * HomingSettings.BezierSettings.ControlPointForwardDistance
+		+ FVector::CrossProduct(InitialDirection, FVector::UpVector).GetSafeNormal()
+		* HomingSettings.BezierSettings.ControlPointSideOffset
+		+ FVector::UpVector * HomingSettings.BezierSettings.ControlPointUpOffset;
+
+	SetActorLocation(LaunchLocation);
+	SetActorRotation(InitialDirection.Rotation());
+	M_ProjectileMovement->Activate();
+	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
+	M_ProjectileMovement->Velocity = InitialDirection * M_HomingMissileRuntimeState.M_Speed;
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	StartFlightTimers(M_HomingMissileRuntimeState.M_ExpectedFlightSeconds);
+
+	World->GetTimerManager().SetTimer(
+		M_HomingMissileTimerHandle,
+		this,
+		&AProjectile::UpdateHomingMissileCourse,
+		GetHomingMissileTimerIntervalSeconds(),
+		true);
+}
+
+void AProjectile::UpdateHomingMissileCourse()
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	M_HomingMissileRuntimeState.M_ElapsedSeconds += GetHomingMissileTimerIntervalSeconds();
+	AActor* HomingTarget = M_HomingMissileRuntimeState.M_Target.Get();
+	const FVector TargetLocation = IsValid(HomingTarget)
+		                               ? HomingTarget->GetActorLocation()
+		                               : M_HomingMissileRuntimeState.M_FallbackTargetLocation;
+	const FVector DesiredDirection = BuildHomingMissileDesiredDirection(TargetLocation);
+	if (DesiredDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	const FVector CurrentDirection = M_ProjectileMovement->Velocity.GetSafeNormal();
+	const FVector BlendedDirection = FMath::Lerp(
+		CurrentDirection,
+		DesiredDirection,
+		FMath::Clamp(M_HomingMissileRuntimeState.M_Settings.TurnResponsiveness, 0.0f, 1.0f)).GetSafeNormal();
+	SetActorRotation(BlendedDirection.Rotation());
+	M_ProjectileMovement->Velocity = BlendedDirection * M_HomingMissileRuntimeState.M_Speed;
+}
+
+FVector AProjectile::BuildHomingMissileDesiredDirection(const FVector& TargetLocation) const
+{
+	const FVector ToTarget = (TargetLocation - GetActorLocation()).GetSafeNormal();
+	if (M_HomingMissileRuntimeState.M_MotionType == EHomingMissileMotionType::Bezier)
+	{
+		return BuildBezierHomingDesiredDirection(TargetLocation);
+	}
+
+	if (M_HomingMissileRuntimeState.M_MotionType == EHomingMissileMotionType::Wave)
+	{
+		const FVector SideVector = FVector::CrossProduct(ToTarget, FVector::UpVector).GetSafeNormal();
+		const float WaveOffset = FMath::Sin(
+			                         M_HomingMissileRuntimeState.M_ElapsedSeconds
+			                         * M_HomingMissileRuntimeState.M_Settings.WaveSettings.Frequency)
+			* M_HomingMissileRuntimeState.M_Settings.WaveSettings.Amplitude;
+		return (ToTarget * M_HomingMissileRuntimeState.M_Settings.WaveSettings.ForwardBlend + SideVector * WaveOffset).
+			GetSafeNormal();
+	}
+
+	const FVector OrbitAxis = FVector::CrossProduct(ToTarget, FVector::UpVector).GetSafeNormal();
+	const float AngleRadians = FMath::DegreesToRadians(
+		M_HomingMissileRuntimeState.M_ElapsedSeconds
+		* M_HomingMissileRuntimeState.M_Settings.SphericalSettings.OrbitSpeedDegrees);
+	const FVector OrbitOffset = (OrbitAxis * FMath::Cos(AngleRadians) + FVector::UpVector * FMath::Sin(AngleRadians))
+		* M_HomingMissileRuntimeState.M_Settings.SphericalSettings.OrbitRadius;
+	return (ToTarget * M_HomingMissileRuntimeState.M_Settings.SphericalSettings.ForwardBlend + OrbitOffset).
+		GetSafeNormal();
+}
+
+FVector AProjectile::BuildBezierHomingDesiredDirection(const FVector& TargetLocation) const
+{
+	constexpr float BezierLookAheadAlpha = 0.08f;
+	const float SafeExpectedFlightSeconds = FMath::Max(
+		M_HomingMissileRuntimeState.M_ExpectedFlightSeconds,
+		KINDA_SMALL_NUMBER);
+	const float PathAlpha = FMath::Clamp(
+		(M_HomingMissileRuntimeState.M_ElapsedSeconds / SafeExpectedFlightSeconds) + BezierLookAheadAlpha,
+		0.0f,
+		1.0f);
+	const FVector FirstSegmentPoint = FMath::Lerp(
+		M_HomingMissileRuntimeState.M_LaunchLocation,
+		M_HomingMissileRuntimeState.M_BezierControlPoint,
+		PathAlpha);
+	const FVector SecondSegmentPoint = FMath::Lerp(
+		M_HomingMissileRuntimeState.M_BezierControlPoint,
+		TargetLocation,
+		PathAlpha);
+	const FVector DesiredPathPoint = FMath::Lerp(FirstSegmentPoint, SecondSegmentPoint, PathAlpha);
+	return (DesiredPathPoint - GetActorLocation()).GetSafeNormal();
+}
+
+float AProjectile::GetHomingMissileTimerIntervalSeconds() const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return KINDA_SMALL_NUMBER;
+	}
+
+	constexpr float MinimumExpectedFrameSeconds = 1.0f / 120.0f;
+	const float SafeFrameSeconds = FMath::Max(World->GetDeltaSeconds(), MinimumExpectedFrameSeconds);
+	return SafeFrameSeconds * FMath::Max(M_HomingMissileRuntimeState.M_Settings.RetargetEveryTicks, 1);
+}
+
 void AProjectile::ScheduleVerticalRocketTransitions(const FVector& TargetLocation,
                                                     const float Stage2ArcDistanceSetting,
                                                     const FVector& Stage2ArcHeightOffset,
@@ -758,6 +911,7 @@ void AProjectile::ScheduleVerticalRocketTransitions(const FVector& TargetLocatio
 
 	World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 	World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+	World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	const TWeakObjectPtr<AProjectile> WeakThis(this);
 	World->GetTimerManager().SetTimer(
 		M_RocketSwingTimerHandle,
@@ -963,6 +1117,7 @@ void AProjectile::TransitionRocketSwingToStraight(const FVector& TargetLocation,
 	{
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	}
 
 	const FVector CurrentLocation = GetActorLocation();
@@ -991,6 +1146,7 @@ void AProjectile::ScheduleRocketSwingTransition(const FVector& TargetLocation,
 	{
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 		TWeakObjectPtr<AProjectile> WeakThis(this);
 		World->GetTimerManager().SetTimer(
 			M_RocketSwingTimerHandle,
@@ -1192,6 +1348,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	}
 	ResetAsyncTraceState();
 	StopDescentSound();
@@ -1208,6 +1365,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	}
 	ResetAsyncTraceState();
 	StopDescentSound();
@@ -1314,6 +1472,7 @@ void AProjectile::OnProjectileDormant()
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	}
 	M_ProjectilePoolSettings.ProjectileManager->OnTankProjectileDormant(M_ProjectilePoolSettings.ProjectileIndex);
 }

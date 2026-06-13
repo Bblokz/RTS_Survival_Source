@@ -15,6 +15,7 @@ struct FInitWeaponStateArchProjectile;
 struct FInitWeaponStateSplitterArchProjectile;
 struct FInitWeaponStateRocketProjectile;
 struct FInitWeaponStateVerticalRocketProjectile;
+struct FInitWeaponStateHomingMissile;
 struct FWeaponData;
 class ASquadController;
 class UWeaponState;
@@ -48,6 +49,7 @@ class RTS_SURVIVAL_API IWeaponOwner
 	friend class RTS_SURVIVAL_API UWeaponStateArchProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateSplitterArchProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateRocketProjectile;
+	friend class RTS_SURVIVAL_API UWeaponStateHomingMissile;
 	friend class RTS_SURVIVAL_API UVerticalRocketWeaponState;
 	friend class RTS_SURVIVAL_API UWeaponStateLaser;
 	friend class RTS_SURVIVAL_API UWeaponStateMultiHitLaser;
@@ -77,6 +79,7 @@ protected:
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) = 0;
 
 	virtual FVector& GetTargetLocation(const int32 WeaponIndex) = 0;
+	virtual AActor* GetTargetActor(const int32 WeaponIndex) const = 0;
 
 	// Can be set to return false if you want to manually order when weapons will be reloaded.
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const = 0;
@@ -121,6 +124,9 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) = 0;
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) = 0;
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)=0;

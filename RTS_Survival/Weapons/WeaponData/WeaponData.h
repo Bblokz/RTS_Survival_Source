@@ -1540,6 +1540,95 @@ struct FInitWeaponStateRocketProjectile : public FInitWeaponStateProjectile
 	FRocketWeaponSettings RocketSettings;
 };
 
+UENUM(BlueprintType)
+enum class EHomingMissileMotionType : uint8
+{
+	Spherical,
+	Bezier,
+	Wave
+};
+
+USTRUCT(BlueprintType)
+struct FHomingMissileSphericalSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float OrbitRadius = 350.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float OrbitSpeedDegrees = 180.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float ForwardBlend = 0.7f;
+};
+
+USTRUCT(BlueprintType)
+struct FHomingMissileBezierSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float ControlPointForwardDistance = 650.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float ControlPointSideOffset = 450.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float ControlPointUpOffset = 250.0f;
+};
+
+USTRUCT(BlueprintType)
+struct FHomingMissileWaveSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float Amplitude = 260.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float Frequency = 2.5f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float ForwardBlend = 0.85f;
+};
+
+USTRUCT(BlueprintType)
+struct FHomingMissileWeaponSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FRocketWeaponSettings RocketSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FHomingMissileSphericalSettings SphericalSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FHomingMissileBezierSettings BezierSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FHomingMissileWaveSettings WaveSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="1", UIMin="1"))
+	int32 RetargetEveryTicks = 3;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.1", UIMin="0.1"))
+	float HomingSpeedMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
+	float TurnResponsiveness = 0.28f;
+};
+
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateHomingMissile : public FInitWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FHomingMissileWeaponSettings HomingMissileSettings;
+};
+
 USTRUCT(Blueprintable, BlueprintType)
 struct FVerticalRocketWeaponSettings
 {
@@ -1691,7 +1780,6 @@ protected:
 		const FVector& ForwardVector,
 		const bool bCreateShellCase = true) override;
 
-private:
 	struct FRocketLaunchSocketData
 	{
 		FName SocketName = NAME_None;
@@ -1704,7 +1792,7 @@ private:
 
 	int32 M_NextRocketSocketIndex = 0;
 
-	void FireProjectile(const FVector& TargetLocation);
+	virtual void FireProjectile(const FVector& TargetLocation);
 
 	FRocketLaunchSocketData GetRocketLaunchSocketData(const bool bAdvanceSocketIndex);
 
@@ -1721,6 +1809,75 @@ private:
 	                                                      const FVector& LaunchLocation,
 	                                                      const FRotator& LaunchRotation,
 	                                                      const FVector& TargetLocation);
+};
+
+/**
+ * @brief Weapon state that launches rocket projectiles which retarget an actor during flight.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UWeaponStateHomingMissile : public UWeaponStateRocketProjectile
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Keeps homing missile setup data-driven while reusing the rocket weapon launch pipeline.
+	 * @param NewOwningPlayer Player index owning the weapon.
+	 * @param NewWeaponIndex Weapon array index on the owner.
+	 * @param NewWeaponName Identifier for this weapon.
+	 * @param NewWeaponBurstMode Burst mode configuration.
+	 * @param NewWeaponOwner Interface used to read current target data and dispatch weapon callbacks.
+	 * @param NewMeshComponent Mesh used to anchor the fire socket.
+	 * @param NewFireSocketName Fallback socket used when rocket settings do not provide socket overrides.
+	 * @param NewWorld World context used by projectile pooling and VFX.
+	 * @param ProjectileNiagaraSystem Niagara system used for the projectile VFX.
+	 * @param NewWeaponVFX VFX configuration for impact, bounce, and launch feedback.
+	 * @param NewWeaponShellCase Shell casing configuration shared with other projectile weapons.
+	 * @param NewHomingMissileSettings Homing path and rocket mesh tuning for the launched projectile.
+	 * @param NewBurstCooldown Cooldown between burst shots.
+	 * @param NewSingleBurstAmountMaxBurstAmount Maximum burst count for burst fire modes.
+	 * @param NewMinBurstAmount Minimum burst count for random burst fire.
+	 * @param bNewCreateShellCasingOnEveryRandomBurst Should spawn shell casing each random burst shot.
+	 */
+	void InitHomingMissileWeapon(
+		const int32 NewOwningPlayer,
+		const int32 NewWeaponIndex,
+		const EWeaponName NewWeaponName,
+		const EWeaponFireMode NewWeaponBurstMode,
+		TScriptInterface<IWeaponOwner> NewWeaponOwner,
+		UMeshComponent* NewMeshComponent,
+		const FName NewFireSocketName,
+		UWorld* NewWorld,
+		const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+		FWeaponVFX NewWeaponVFX,
+		FWeaponShellCase NewWeaponShellCase,
+		const FHomingMissileWeaponSettings& NewHomingMissileSettings,
+		const float NewBurstCooldown = 0.0f,
+		const int32 NewSingleBurstAmountMaxBurstAmount = 0,
+		const int32 NewMinBurstAmount = 0,
+		const bool bNewCreateShellCasingOnEveryRandomBurst = false);
+
+private:
+	UPROPERTY()
+	FHomingMissileWeaponSettings M_HomingMissileSettings;
+
+	virtual void FireProjectile(const FVector& TargetLocation) override;
+
+	/**
+	 * @brief Applies shell-adjusted combat data before handing homing movement setup to the projectile.
+	 * @param ShellAdjustedData Damage, AOE, range, and VFX calibre data after shell conversion.
+	 * @param Projectile Pooled projectile that will receive the launch and homing setup.
+	 * @param LaunchLocation Location the missile starts from.
+	 * @param LaunchRotation Initial facing direction used before homing takes over.
+	 * @param TargetLocation Fallback target location for destroyed or missing actor targets.
+	 * @param TargetActor Actor target used for in-flight retargeting when still valid.
+	 */
+	FORCEINLINE void FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+	                                                      AProjectile* Projectile,
+	                                                      const FVector& LaunchLocation,
+	                                                      const FRotator& LaunchRotation,
+	                                                      const FVector& TargetLocation,
+	                                                      AActor* TargetActor);
 };
 
 /**

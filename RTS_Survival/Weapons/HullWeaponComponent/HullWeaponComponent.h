@@ -87,6 +87,7 @@ protected:
 	virtual void OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, const float NewRange) override;
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) override final;
 	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override;
+	virtual AActor* GetTargetActor(const int32 WeaponIndex) const override;
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override final;
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre) override final;
@@ -121,6 +122,9 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 

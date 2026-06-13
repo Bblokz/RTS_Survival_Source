@@ -33,6 +33,40 @@ class UWeaponStateProjectile;
 class URTSCameraShakeSubsystem;
 struct FRocketWeaponSettings;
 struct FVerticalRocketWeaponSettings;
+struct FHomingMissileWeaponSettings;
+
+USTRUCT()
+struct FProjectileHomingMissileRuntimeState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_Target;
+
+	UPROPERTY()
+	FHomingMissileWeaponSettings M_Settings;
+
+	UPROPERTY()
+	EHomingMissileMotionType M_MotionType = EHomingMissileMotionType::Spherical;
+
+	UPROPERTY()
+	FVector M_FallbackTargetLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	FVector M_BezierControlPoint = FVector::ZeroVector;
+
+	UPROPERTY()
+	FVector M_LaunchLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	float M_Speed = 0.0f;
+
+	UPROPERTY()
+	float M_ElapsedSeconds = 0.0f;
+
+	UPROPERTY()
+	float M_ExpectedFlightSeconds = 0.0f;
+};
 
 /**
  * Collision of the projectile works by performing async traces
@@ -132,6 +166,20 @@ public:
 	                               const FVector& TargetLocation,
 	                               const float ProjectileSpeed,
 	                               const FVerticalRocketWeaponSettings& VerticalRocketSettings);
+
+	/**
+	 * @brief Starts actor-target homing after the pooled projectile was initialized with normal damage data.
+	 * @param LaunchLocation Initial missile location from the selected rocket socket.
+	 * @param TargetActor Actor to chase; fallback location is used if the actor is invalid or destroyed.
+	 * @param FallbackTargetLocation Last known/aimed location used when no live actor target is available.
+	 * @param ProjectileSpeed Base speed from shell-adjusted weapon data before homing multipliers.
+	 * @param HomingSettings Designer tuning for update cadence, turn blend, and possible motion profiles.
+	 */
+	void SetupHomingMissileLaunch(const FVector& LaunchLocation,
+	                              AActor* TargetActor,
+	                              const FVector& FallbackTargetLocation,
+	                              float ProjectileSpeed,
+	                              const FHomingMissileWeaponSettings& HomingSettings);
 
 	// Called by abilities using attach rockets to change the mesh on the rocket VFX.
 	void SetupAttachedRocketMesh(UStaticMesh* RocketMesh);
@@ -415,6 +463,10 @@ private:
 	                                             const float Stage2StraightSpeed,
 	                                             const float Stage2ArcTime);
 	void TransitionVerticalRocketToStraight(const FVector& TargetLocation, const float Stage2StraightSpeed);
+	void UpdateHomingMissileCourse();
+	FVector BuildHomingMissileDesiredDirection(const FVector& TargetLocation) const;
+	FVector BuildBezierHomingDesiredDirection(const FVector& TargetLocation) const;
+	float GetHomingMissileTimerIntervalSeconds() const;
 
 	/**
 	 * @brief Straight-line fallback when no arcing parameters can be computed.
@@ -598,6 +650,12 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_VerticalRocketStraightTimerHandle;
+
+	UPROPERTY()
+	FTimerHandle M_HomingMissileTimerHandle;
+
+	UPROPERTY()
+	FProjectileHomingMissileRuntimeState M_HomingMissileRuntimeState;
 
 	UPROPERTY()
 	TWeakObjectPtr<UAudioComponent> M_DescentAudioComponent;
