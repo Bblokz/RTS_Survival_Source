@@ -1553,12 +1553,24 @@ struct FHomingMissileSphericalSettings
 {
 	GENERATED_BODY()
 
+	/**
+	 * Distance of the visible orbit away from the direct target line.
+	 * Raise this when the missile should visibly spiral wider; lower it when the missile is missing because the orbit pulls too far away.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float OrbitRadius = 350.0f;
 
+	/**
+	 * How quickly the missile rotates around the direct target line, in degrees per second.
+	 * Higher values create tighter-looking spinning motion; lower values make the orbit easier to read and less erratic.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float OrbitSpeedDegrees = 180.0f;
 
+	/**
+	 * Weight of the direct target direction compared to the orbit offset.
+	 * Increase this when missiles need to correct harder toward enemies; decrease it when the spherical motion should be more dramatic.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float ForwardBlend = 0.7f;
 };
@@ -1568,12 +1580,24 @@ struct FHomingMissileBezierSettings
 {
 	GENERATED_BODY()
 
+	/**
+	 * How far in front of the launch direction the curve control point is placed.
+	 * Higher values stretch the curve forward before it bends to the enemy; lower values make the missile turn toward the target sooner.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float ControlPointForwardDistance = 650.0f;
 
+	/**
+	 * Sideways distance of the curve control point from the direct launch-to-target line.
+	 * Increase for a wider arcing shot; decrease when the missile overshoots because the side bend is too strong.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float ControlPointSideOffset = 450.0f;
 
+	/**
+	 * Vertical height added to the curve control point.
+	 * Increase for a lofted missile silhouette; decrease when the missile climbs too much and cannot recover in time.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float ControlPointUpOffset = 250.0f;
 };
@@ -1583,12 +1607,24 @@ struct FHomingMissileWaveSettings
 {
 	GENERATED_BODY()
 
+	/**
+	 * Size of the side-to-side wave offset away from the direct target line.
+	 * Raise this for a stronger swerving silhouette; lower it if the missile visually drifts too far from enemies.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float Amplitude = 260.0f;
 
+	/**
+	 * How often the missile completes wave oscillations while it is flying.
+	 * Higher values make the path wiggle faster; lower values create slower and broader side-to-side motion.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float Frequency = 2.5f;
 
+	/**
+	 * Weight of the direct target direction compared to the wave offset.
+	 * Increase this to keep wave missiles more reliable; decrease it when the wave motion should remain more pronounced.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float ForwardBlend = 0.85f;
 };
@@ -1618,6 +1654,13 @@ struct FHomingMissileWeaponSettings
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
 	float TurnResponsiveness = 0.28f;
+
+	/**
+	 * Randomized midpoint window where Bezier and spherical missiles may override into direct homing if too far off.
+	 * A value of 10 samples once at launch between roughly 40% and 60% expected flight progress; wave missiles ignore it.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", ClampMax="50.0", UIMin="0.0", UIMax="50.0", Units="Percent"))
+	float DirectHomingSwitchMidpointWindowPercent = 10.0f;
 };
 
 USTRUCT(Blueprintable, BlueprintType)
