@@ -754,6 +754,8 @@ void AProjectile::SetupHomingMissileLaunch(const FVector& LaunchLocation,
 	M_HomingMissileRuntimeState.M_LaunchLocation = LaunchLocation;
 	M_HomingMissileRuntimeState.M_ExpectedFlightSeconds = M_Range / M_HomingMissileRuntimeState.M_Speed;
 	M_HomingMissileRuntimeState.M_ElapsedSeconds = 0.0f;
+	M_HomingMissileRuntimeState.bM_UseDirectHoming = false;
+	PrepareDirectHomingSwitchThreshold();
 
 	const FVector InitialTargetLocation = IsValid(TargetActor)
 		                                      ? TargetActor->GetActorLocation()
@@ -804,24 +806,98 @@ void AProjectile::UpdateHomingMissileCourse()
 	const FVector TargetLocation = IsValid(HomingTarget)
 		                               ? HomingTarget->GetActorLocation()
 		                               : M_HomingMissileRuntimeState.M_FallbackTargetLocation;
+	TrySwitchHomingMissileToDirectHoming(TargetLocation);
 	const FVector DesiredDirection = BuildHomingMissileDesiredDirection(TargetLocation);
 	if (DesiredDirection.IsNearlyZero())
 	{
 		return;
 	}
 
-	const FVector CurrentDirection = M_ProjectileMovement->Velocity.GetSafeNormal();
-	const FVector BlendedDirection = FMath::Lerp(
-		CurrentDirection,
-		DesiredDirection,
-		FMath::Clamp(M_HomingMissileRuntimeState.M_Settings.TurnResponsiveness, 0.0f, 1.0f)).GetSafeNormal();
-	SetActorRotation(BlendedDirection.Rotation());
-	M_ProjectileMovement->Velocity = BlendedDirection * M_HomingMissileRuntimeState.M_Speed;
+	FVector NewDirection = DesiredDirection;
+	if (not M_HomingMissileRuntimeState.bM_UseDirectHoming)
+	{
+		const FVector CurrentDirection = M_ProjectileMovement->Velocity.GetSafeNormal();
+		NewDirection = FMath::Lerp(
+			CurrentDirection,
+			DesiredDirection,
+			FMath::Clamp(M_HomingMissileRuntimeState.M_Settings.TurnResponsiveness, 0.0f, 1.0f)).GetSafeNormal();
+	}
+
+	SetActorRotation(NewDirection.Rotation());
+	M_ProjectileMovement->Velocity = NewDirection * M_HomingMissileRuntimeState.M_Speed;
+}
+
+void AProjectile::PrepareDirectHomingSwitchThreshold()
+{
+	if (not GetCanHomingMissileSwitchToDirectHoming())
+	{
+		M_HomingMissileRuntimeState.M_DirectHomingSwitchPathAlpha = 1.0f;
+		return;
+	}
+
+	constexpr float MidpointPathAlpha = 0.5f;
+	constexpr float PercentToAlpha = 0.01f;
+	const float WindowAlpha = FMath::Clamp(
+		M_HomingMissileRuntimeState.M_Settings.DirectHomingSwitchMidpointWindowPercent,
+		0.0f,
+		50.0f) * PercentToAlpha;
+	M_HomingMissileRuntimeState.M_DirectHomingSwitchPathAlpha = FMath::FRandRange(
+		MidpointPathAlpha - WindowAlpha,
+		MidpointPathAlpha + WindowAlpha);
+}
+
+void AProjectile::TrySwitchHomingMissileToDirectHoming(const FVector& TargetLocation)
+{
+	if (M_HomingMissileRuntimeState.bM_UseDirectHoming)
+	{
+		return;
+	}
+
+	if (not GetCanHomingMissileSwitchToDirectHoming())
+	{
+		return;
+	}
+
+	const float SafeExpectedFlightSeconds = FMath::Max(
+		M_HomingMissileRuntimeState.M_ExpectedFlightSeconds,
+		KINDA_SMALL_NUMBER);
+	const float CurrentPathAlpha = M_HomingMissileRuntimeState.M_ElapsedSeconds / SafeExpectedFlightSeconds;
+	if (CurrentPathAlpha < M_HomingMissileRuntimeState.M_DirectHomingSwitchPathAlpha)
+	{
+		return;
+	}
+
+	if (not GetIsHomingMissileTooFarOff(TargetLocation))
+	{
+		return;
+	}
+
+	M_HomingMissileRuntimeState.bM_UseDirectHoming = true;
+}
+
+bool AProjectile::GetCanHomingMissileSwitchToDirectHoming() const
+{
+	return M_HomingMissileRuntimeState.M_MotionType == EHomingMissileMotionType::Bezier
+		|| M_HomingMissileRuntimeState.M_MotionType == EHomingMissileMotionType::Spherical;
+}
+
+bool AProjectile::GetIsHomingMissileTooFarOff(const FVector& TargetLocation) const
+{
+	const float RemainingFlightSeconds = FMath::Max(
+		M_HomingMissileRuntimeState.M_ExpectedFlightSeconds - M_HomingMissileRuntimeState.M_ElapsedSeconds,
+		0.0f);
+	const float ExpectedRemainingDistance = M_HomingMissileRuntimeState.M_Speed * RemainingFlightSeconds;
+	return FVector::DistSquared(GetActorLocation(), TargetLocation) > FMath::Square(ExpectedRemainingDistance);
 }
 
 FVector AProjectile::BuildHomingMissileDesiredDirection(const FVector& TargetLocation) const
 {
 	const FVector ToTarget = (TargetLocation - GetActorLocation()).GetSafeNormal();
+	if (M_HomingMissileRuntimeState.bM_UseDirectHoming)
+	{
+		return ToTarget;
+	}
+
 	if (M_HomingMissileRuntimeState.M_MotionType == EHomingMissileMotionType::Bezier)
 	{
 		return BuildBezierHomingDesiredDirection(TargetLocation);
