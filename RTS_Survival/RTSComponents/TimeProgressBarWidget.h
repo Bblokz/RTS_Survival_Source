@@ -65,14 +65,14 @@ private:
     void StartNewProgressBar(const float Time);
     // Bound automatically to the UMG widget by name.
     UPROPERTY(meta = (BindWidget))
-    UProgressBar* M_ProgressBar;
+    TObjectPtr<UProgressBar> M_ProgressBar = nullptr;
 
     // Bound automatically to the UMG widget by name.
     UPROPERTY(meta = (BindWidget))
-    UTextBlock* M_ProgressText;
+    TObjectPtr<UTextBlock> M_ProgressText = nullptr;
 
     // Total time for the progress bar to complete
-    float M_TotalTime;
+    float M_TotalTime = 0.f;
 
     // Timer handle for progress bar update
     FTimerHandle M_ProgressUpdateHandle;
@@ -82,10 +82,10 @@ private:
 
     // World spawned in
     UPROPERTY()
-    UWorld* M_World;
+    TObjectPtr<UWorld> M_World = nullptr;
 
     // Time when the progress bar started
-    float M_StartTime;
+    float M_StartTime = 0.f;
 
     FPauseStateTimedProgressBar M_PauseState;
 
@@ -98,7 +98,7 @@ private:
     // Reference to the bar widget as component on the owner of the TimeProgressBarWidget.
     // This is used for offsets.
     UPROPERTY()
-    UWidgetComponent* M_WidgetComponent;
+    TObjectPtr<UWidgetComponent> M_WidgetComponent = nullptr;
 
     bool GetIsValidWidgetComp()const;
 

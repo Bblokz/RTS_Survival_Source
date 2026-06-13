@@ -51,7 +51,7 @@ public:
 
 	void OnUnitHoverChange(const bool bHovered) const;
 
-	inline UBoxComponent* GetSelectionArea() const { return M_SelectionArea;}
+	inline UBoxComponent* GetSelectionArea() const { return M_SelectionArea.Get();}
 
 	UFUNCTION(BlueprintCallable)
 	inline bool GetIsSelected() const {return bM_IsSelected;}
@@ -99,7 +99,7 @@ public:
 	void SetDecalRelativeLocation(const FVector NewLocation);
 	void UpdateDecalScale(const FVector NewScale);
 
-	UDecalComponent* GetSelectedDecal() const {return M_SelectedDecalRef;}
+	UDecalComponent* GetSelectedDecal() const {return M_SelectedDecalRef.Get();}
 	
 
 protected:
@@ -117,10 +117,10 @@ protected:
 		UDecalComponent* NewSelectedDecal);
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Material")
-	UMaterialInterface* SelectedMaterial;
+	TObjectPtr<UMaterialInterface> SelectedMaterial = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Material")
-	UMaterialInterface* DeselectedMaterial;
+	TObjectPtr<UMaterialInterface> DeselectedMaterial = nullptr;
 
 	
 private:
@@ -146,11 +146,11 @@ private:
 
 	// Set with init function; area in which the unit can be selected.
 	UPROPERTY()
-	UBoxComponent* M_SelectionArea;
+	TObjectPtr<UBoxComponent> M_SelectionArea = nullptr;
 	
 	// Set with init function; the decal that is visible when the unit is selected.
 	UPROPERTY()
-	UDecalComponent* M_SelectedDecalRef;
+	TObjectPtr<UDecalComponent> M_SelectedDecalRef = nullptr;
 	
 		
 };

@@ -55,10 +55,12 @@ void USelectionComponent::OnUnitHoverChange(const bool bHovered) const
 
 void USelectionComponent::SetDecalRelativeLocation(const FVector NewLocation)
 {
-	if (IsValid(M_SelectedDecalRef))
+	if (not IsValid(M_SelectedDecalRef))
 	{
-		M_SelectedDecalRef->SetRelativeLocation(NewLocation, false, nullptr, ETeleportType::TeleportPhysics);
+		return;
 	}
+
+	M_SelectedDecalRef->SetRelativeLocation(NewLocation, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 
@@ -83,9 +85,15 @@ void USelectionComponent::SetDeselectedDecalSetting(const bool bNewUseDeselected
 		}
 		else
 		{
+			UWorld* World = GetWorld();
+			if (not IsValid(World))
+			{
+				return;
+			}
+
 			// set timer; wait 2 seconds for the init call.
 			FTimerHandle RecheckTimerHandle;
-			GetWorld()->GetTimerManager().SetTimer(
+			World->GetTimerManager().SetTimer(
 				RecheckTimerHandle,
 				FTimerDelegate::CreateWeakLambda(this, [WeakSelectionComponent = TWeakObjectPtr<USelectionComponent>(this), bNewUseDeselectedDecal]()
 				{
@@ -109,11 +117,13 @@ void USelectionComponent::SetDeselectedDecalSetting(const bool bNewUseDeselected
 
 void USelectionComponent::UpdateSelectionArea(const FVector& NewSize, const FVector& NewPosition) const
 {
-	if (IsValid(M_SelectionArea))
+	if (not IsValid(M_SelectionArea))
 	{
-		M_SelectionArea->SetRelativeScale3D(NewSize);
-		M_SelectionArea->SetRelativeLocation(NewPosition);
+		return;
 	}
+
+	M_SelectionArea->SetRelativeScale3D(NewSize);
+	M_SelectionArea->SetRelativeLocation(NewPosition);
 }
 
 void USelectionComponent::SetUnitSelected()
@@ -132,11 +142,13 @@ void USelectionComponent::SetUnitDeselected()
 
 void USelectionComponent::HideDecals()
 {
-	if (IsValid(M_SelectedDecalRef))
+	if (not IsValid(M_SelectedDecalRef))
 	{
-		M_SelectedDecalRef->SetVisibility(false, false);
-		M_SelectedDecalRef->SetHiddenInGame(true, false);
+		return;
 	}
+
+	M_SelectedDecalRef->SetVisibility(false, false);
+	M_SelectedDecalRef->SetHiddenInGame(true, false);
 }
 
 void USelectionComponent::UpdateSelectionMaterials(UMaterialInterface* NewSelectedMaterial,
@@ -162,15 +174,17 @@ void USelectionComponent::UpdateSelectionMaterials(UMaterialInterface* NewSelect
 
 TPair<UMaterialInterface*, UMaterialInterface*> USelectionComponent::GetMaterials() const
 {
-	return TPair<UMaterialInterface*, UMaterialInterface*>(SelectedMaterial, DeselectedMaterial);
+	return TPair<UMaterialInterface*, UMaterialInterface*>(SelectedMaterial.Get(), DeselectedMaterial.Get());
 }
 
 void USelectionComponent::UpdateDecalScale(const FVector NewScale)
 {
-	if (IsValid(M_SelectedDecalRef))
+	if (not IsValid(M_SelectedDecalRef))
 	{
-		M_SelectedDecalRef->SetRelativeScale3D(NewScale);
+		return;
 	}
+
+	M_SelectedDecalRef->SetRelativeScale3D(NewScale);
 }
 
 
@@ -178,6 +192,8 @@ void USelectionComponent::UpdateDecalScale(const FVector NewScale)
 void USelectionComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	AActor* Owner = GetOwner();
+	const FString OwnerName = IsValid(Owner) ? Owner->GetName() : TEXT("nullptr");
 	if (AGameStateBase* GameStateBase = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr)
 	{
 		if (ACPPGameState* GameState = Cast<ACPPGameState>(GameStateBase))
@@ -186,12 +202,12 @@ void USelectionComponent::BeginPlay()
 		}
 		else
 		{
-			RTSFunctionLibrary::ReportError("GameState is not of type ACPPGameState in " + GetOwner()->GetName());
+			RTSFunctionLibrary::ReportError("GameState is not of type ACPPGameState in " + OwnerName);
 		}
 	}
 	else
 	{
-		RTSFunctionLibrary::ReportError("GameState is nullptr in " + GetOwner()->GetName());
+		RTSFunctionLibrary::ReportError("GameState is nullptr in " + OwnerName);
 	}
 }
 
@@ -215,7 +231,9 @@ void USelectionComponent::InitSelectionComponent(
 	}
 	else
 	{
-		RTSFunctionLibrary::ReportError("selection area was not set on " + GetOwner()->GetName());
+		const AActor* Owner = GetOwner();
+		const FString OwnerName = IsValid(Owner) ? Owner->GetName() : TEXT("nullptr");
+		RTSFunctionLibrary::ReportError("selection area was not set on " + OwnerName);
 	}
 	if (NewSelectedDecal)
 	{
@@ -223,26 +241,34 @@ void USelectionComponent::InitSelectionComponent(
 	}
 	else
 	{
-		RTSFunctionLibrary::ReportError("selected decal was not set on " + GetOwner()->GetName());
+		const AActor* Owner = GetOwner();
+		const FString OwnerName = IsValid(Owner) ? Owner->GetName() : TEXT("nullptr");
+		RTSFunctionLibrary::ReportError("selected decal was not set on " + OwnerName);
 	}
 	if (!SelectedMaterial)
 	{
-		RTSFunctionLibrary::ReportError("No selected material was set on " + GetOwner()->GetName());
+		const AActor* Owner = GetOwner();
+		const FString OwnerName = IsValid(Owner) ? Owner->GetName() : TEXT("nullptr");
+		RTSFunctionLibrary::ReportError("No selected material was set on " + OwnerName);
 	}
 	if (!DeselectedMaterial)
 	{
-		RTSFunctionLibrary::ReportError("No deselected material was set on " + GetOwner()->GetName());
+		const AActor* Owner = GetOwner();
+		const FString OwnerName = IsValid(Owner) ? Owner->GetName() : TEXT("nullptr");
+		RTSFunctionLibrary::ReportError("No deselected material was set on " + OwnerName);
 	}
 }
 
 void USelectionComponent::SetDecalSelected() const
 {
-	if (IsValid(M_SelectedDecalRef))
+	if (not IsValid(M_SelectedDecalRef) || not IsValid(SelectedMaterial))
 	{
-		M_SelectedDecalRef->SetVisibility(true, false);
-		M_SelectedDecalRef->SetHiddenInGame(false, false);
-		M_SelectedDecalRef->SetMaterial(0, SelectedMaterial);
+		return;
 	}
+
+	M_SelectedDecalRef->SetVisibility(true, false);
+	M_SelectedDecalRef->SetHiddenInGame(false, false);
+	M_SelectedDecalRef->SetMaterial(0, SelectedMaterial);
 }
 
 void USelectionComponent::SetDecalDeselected() const
@@ -251,7 +277,7 @@ void USelectionComponent::SetDecalDeselected() const
 	{
 		return;
 	}
-	if (bM_UseDeselectDecal)
+	if (bM_UseDeselectDecal && IsValid(DeselectedMaterial))
 	{
 		M_SelectedDecalRef->SetVisibility(true, false);
 		M_SelectedDecalRef->SetHiddenInGame(false, false);

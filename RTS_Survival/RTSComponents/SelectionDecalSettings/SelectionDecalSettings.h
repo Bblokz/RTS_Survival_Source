@@ -14,9 +14,9 @@ struct FSelectionDecalSettings
 	GENERATED_BODY()
 public:
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	mutable UMaterialInterface* State2_SelectionDecalMat = nullptr;
+	mutable TObjectPtr<UMaterialInterface> State2_SelectionDecalMat = nullptr;
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	mutable UMaterialInterface* Sate2_DeselectionDecalMat = nullptr;
+	mutable TObjectPtr<UMaterialInterface> Sate2_DeselectionDecalMat = nullptr;
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	FVector State1_SelectionDecalSize = FVector(1.0f, 1.0f, 1.0f);
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)

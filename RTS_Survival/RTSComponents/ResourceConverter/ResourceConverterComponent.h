@@ -85,15 +85,15 @@ struct FResourceConverterSettings
 
 	/** Optional: sound played when a tick succeeds. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Resource Converter|Audio")
-	USoundBase* OnTickSound = nullptr;
+	TObjectPtr<USoundBase> OnTickSound = nullptr;
 
 	/** Optional attenuation. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Resource Converter|Audio")
-	USoundAttenuation* OnTickAttenuation = nullptr;
+	TObjectPtr<USoundAttenuation> OnTickAttenuation = nullptr;
 
 	/** Optional concurrency. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Resource Converter|Audio")
-	USoundConcurrency* OnTickConcurrency = nullptr;
+	TObjectPtr<USoundConcurrency> OnTickConcurrency = nullptr;
 
 };
 

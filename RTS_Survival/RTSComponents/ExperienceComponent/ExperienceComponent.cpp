@@ -18,6 +18,12 @@ URTSExperienceComp::URTSExperienceComp()
 
 void URTSExperienceComp::ReceiveExperience(const float Amount)
 {
+	if (M_UnitExperience.Levels.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ExperienceComponent: Cannot receive experience because no levels are configured."));
+		return;
+	}
+
 	Debug_Experience("Level pre receive exp: " + FString::FromInt(M_UnitExperience.M_CurrentLevel));
 	M_UnitExperience.M_CumulativeExperience += Amount * M_UnitExperience.M_ExperienceMultiplier;
 
@@ -92,6 +98,12 @@ void URTSExperienceComp::UpdateExperienceUI() const
 		return;
 	}
 
+	if (M_UnitExperience.Levels.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ExperienceComponent: Cannot update experience UI because no levels are configured."));
+		return;
+	}
+
 	float ExpPercentage = 0.f;
 	const int32 CumulativeExp = M_UnitExperience.M_CumulativeExperience;
 	int32 ExpNeededForNextLevel = 0.f;
@@ -105,6 +117,12 @@ void URTSExperienceComp::UpdateExperienceUI() const
 		}
 		else
 		{
+			if (not M_UnitExperience.Levels.IsValidIndex(0) || M_UnitExperience.Levels[0].CumulativeExperienceNeeded <= 0)
+			{
+				RTSFunctionLibrary::ReportError(TEXT("ExperienceComponent: First experience level is invalid."));
+				return;
+			}
+
 			ExpPercentage = static_cast<float>(CumulativeExp) / static_cast<float>(M_UnitExperience.Levels[0].
 				CumulativeExperienceNeeded);
 			ExpNeededForNextLevel = M_UnitExperience.Levels[0].CumulativeExperienceNeeded;
@@ -289,6 +307,14 @@ AActor* URTSExperienceComp::GetOwnerActor() const
 float URTSExperienceComp::GetPercentageProgressToNextLevel(int32& OutExpNeededNextLevel,
                                                            const int32 InCumulativeExp) const
 {
+	if (not M_UnitExperience.Levels.IsValidIndex(M_UnitExperience.M_CurrentLevel) ||
+		not M_UnitExperience.Levels.IsValidIndex(M_UnitExperience.M_CurrentLevel + 1))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ExperienceComponent: Invalid experience level index while calculating progress."));
+		OutExpNeededNextLevel = InCumulativeExp;
+		return 0.f;
+	}
+
 	const int32 CurrentLevelCumulative = M_UnitExperience.Levels[M_UnitExperience.M_CurrentLevel].
 		CumulativeExperienceNeeded;
 	const float NextLevelCumulative = M_UnitExperience.Levels[M_UnitExperience.M_CurrentLevel + 1].

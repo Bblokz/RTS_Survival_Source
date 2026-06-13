@@ -46,7 +46,7 @@ protected:
 	TArray<TSoftObjectPtr<UStaticMesh>> WallMeshOptions;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	UMaterialInstance* ConstructionMaterial;
+	TObjectPtr<UMaterialInstance> ConstructionMaterial;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="DigInWall|ProgressBar")
 	TSubclassOf<UW_DigInProgress> ProgressBarWidgetClass;
@@ -61,7 +61,7 @@ protected:
 	void BP_OnUnitDies();
 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
-	UStaticMeshComponent* WallMeshComponent;
+	TObjectPtr<UStaticMeshComponent> WallMeshComponent;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UStaticMesh* GetChosenMesh() { return M_ChosenMesh; }
@@ -93,7 +93,7 @@ private:
 
 	bool EnsureConstructionMaterialIsValid() const;
 	UPROPERTY()
-	UMaterialInterface* M_WallMaterial;
+	TObjectPtr<UMaterialInterface> M_WallMaterial;
 
 
 	bool EnsureWallMaterialIsValid() const;
