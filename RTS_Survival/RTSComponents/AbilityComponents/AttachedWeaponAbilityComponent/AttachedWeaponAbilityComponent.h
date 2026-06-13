@@ -155,6 +155,7 @@ protected:
 	virtual void OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, const float NewRange) override;
 	virtual FVector& GetFireDirection(const int32 WeaponIndex) override final;
 	virtual FVector& GetTargetLocation(const int32 WeaponIndex) override;
+	virtual AActor* GetTargetActor(const int32 WeaponIndex) const override;
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override;
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre) override;
@@ -190,6 +191,7 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
+	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState) override;
@@ -231,6 +233,7 @@ private:
 	void ProcessPendingRailgunWeapons();
 	void ProcessPendingRocketWeapons();
 	void ProcessPendingVerticalRocketWeapons();
+	void ProcessPendingHomingMissileWeapons();
 	void ProcessPendingMultiProjectileWeapons();
 	void ProcessPendingArchProjectileWeapons();
 	void ProcessPendingSplitterArchProjectileWeapons();
@@ -251,6 +254,7 @@ private:
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateArchProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateSplitterArchProjectile& WeaponParameters, const FString& FunctionName);
+	bool TryPrepareWeaponParameters(FInitWeaponStateHomingMissile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateLaser& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiHitLaser& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateFlameThrower& WeaponParameters, const FString& FunctionName);
@@ -273,6 +277,7 @@ private:
 	void SetupVerticalRocketProjectileWeaponInternal(const FInitWeaponStateVerticalRocketProjectile& VerticalRocketProjectileParameters);
 	void SetupMultiProjectileWeaponInternal(const FInitWeaponStateMultiProjectile& MultiProjectileState);
 	void SetupArchProjectileWeaponInternal(const FInitWeaponStateArchProjectile& ArchProjParameters);
+	void SetupHomingMissileWeaponInternal(const FInitWeaponStateHomingMissile& HomingMissileParameters);
 	void SetupSplitterArchProjectileWeaponInternal(
 		const FInitWeaponStateSplitterArchProjectile& SplitterArchProjParameters);
 
@@ -288,6 +293,7 @@ private:
 	void CacheWeaponOwnerInParameters(FInitWeaponStateLaser& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateMultiHitLaser& WeaponParameters);
 	void CacheWeaponOwnerInParameters(FInitWeaponStateFlameThrower& WeaponParameters);
+	void CacheWeaponOwnerInParameters(FInitWeaponStateHomingMissile& WeaponParameters);
 
 	UPROPERTY()
 	TScriptInterface<ICommands> M_OwnerCommandsInterface;
@@ -308,6 +314,7 @@ private:
 	TArray<FInitWeaponStateMultiProjectile> M_PendingMultiProjectileWeapons;
 	TArray<FInitWeaponStateArchProjectile> M_PendingArchProjectileWeapons;
 	TArray<FInitWeaponStateSplitterArchProjectile> M_PendingSplitterArchProjectileWeapons;
+	TArray<FInitWeaponStateHomingMissile> M_PendingHomingMissileWeapons;
 
 	EAttachedWeaponAbilityMeshSetup M_WeaponMeshSetupState = EAttachedWeaponAbilityMeshSetup::Uninitialized;
 

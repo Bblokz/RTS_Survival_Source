@@ -304,6 +304,12 @@ FVector& UAttachedWeaponAbilityComponent::GetTargetLocation(const int32 WeaponIn
 	return M_TargetingData.GetActiveTargetLocation();
 }
 
+AActor* UAttachedWeaponAbilityComponent::GetTargetActor(const int32 WeaponIndex) const
+{
+	(void)WeaponIndex;
+	return M_TargetingData.GetTargetActor();
+}
+
 bool UAttachedWeaponAbilityComponent::AllowWeaponToReload(const int32 WeaponIndex) const
 {
 	return true;
@@ -466,6 +472,19 @@ void UAttachedWeaponAbilityComponent::SetupVerticalRocketProjectileWeapon(
 		return;
 	}
 	SetupVerticalRocketProjectileWeaponInternal(VerticalRocketProjectileParameters);
+}
+
+void UAttachedWeaponAbilityComponent::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters)
+{
+	if (not TryPrepareWeaponParameters(HomingMissileParameters, "SetupHomingMissileWeapon"))
+	{
+		if (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::Uninitialized)
+		{
+			M_PendingHomingMissileWeapons.Add(HomingMissileParameters);
+		}
+		return;
+	}
+	SetupHomingMissileWeaponInternal(HomingMissileParameters);
 }
 
 void UAttachedWeaponAbilityComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)
@@ -730,6 +749,7 @@ void UAttachedWeaponAbilityComponent::ProcessPendingWeaponSetups()
 	ProcessPendingMultiProjectileWeapons();
 	ProcessPendingArchProjectileWeapons();
 	ProcessPendingSplitterArchProjectileWeapons();
+	ProcessPendingHomingMissileWeapons();
 }
 
 void UAttachedWeaponAbilityComponent::ProcessPendingDirectHitWeapons()
@@ -901,6 +921,19 @@ void UAttachedWeaponAbilityComponent::ProcessPendingSplitterArchProjectileWeapon
 	M_PendingSplitterArchProjectileWeapons.Reset();
 }
 
+void UAttachedWeaponAbilityComponent::ProcessPendingHomingMissileWeapons()
+{
+	for (const FInitWeaponStateHomingMissile& PendingHomingMissile : M_PendingHomingMissileWeapons)
+	{
+		FInitWeaponStateHomingMissile Parameters = PendingHomingMissile;
+		if (TryPrepareWeaponParameters(Parameters, "ProcessPendingHomingMissileWeapons"))
+		{
+			SetupHomingMissileWeaponInternal(Parameters);
+		}
+	}
+	M_PendingHomingMissileWeapons.Reset();
+}
+
 void UAttachedWeaponAbilityComponent::ReportMissingInit(const FString& SetupFunctionName) const
 {
 	RTSFunctionLibrary::ReportError(
@@ -1049,6 +1082,25 @@ bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStat
 
 bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStateSplitterArchProjectile& WeaponParameters,
                                                                  const FString& FunctionName)
+{
+	CacheWeaponOwnerInParameters(WeaponParameters);
+
+	if (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::Uninitialized)
+	{
+		ReportMissingInit(FunctionName);
+		return false;
+	}
+
+	UMeshComponent* MeshComponent = WeaponParameters.MeshComponent;
+	const bool bMeshReady = (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::ExistingMesh)
+		? PrepareExistingMeshParameters(MeshComponent, FunctionName)
+		: PrepareSpawnedMeshParameters(MeshComponent, FunctionName);
+	WeaponParameters.MeshComponent = MeshComponent;
+	return bMeshReady;
+}
+
+bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStateHomingMissile& WeaponParameters,
+                                                               const FString& FunctionName)
 {
 	CacheWeaponOwnerInParameters(WeaponParameters);
 
@@ -1554,6 +1606,38 @@ void UAttachedWeaponAbilityComponent::SetupSplitterArchProjectileWeaponInternal(
 	SetupProjectileManagerIfReady(SplitterWeapon);
 }
 
+void UAttachedWeaponAbilityComponent::SetupHomingMissileWeaponInternal(
+	const FInitWeaponStateHomingMissile& HomingMissileParameters)
+{
+	const int32 WeaponIndex = M_AttachedWeapons.Num();
+	M_OwningPlayer = HomingMissileParameters.OwningPlayer;
+	M_TargetingData.InitTargetStruct(M_OwningPlayer);
+
+	UWeaponStateHomingMissile* HomingMissile = NewObject<UWeaponStateHomingMissile>(this);
+	HomingMissile->InitHomingMissileWeapon(
+		HomingMissileParameters.OwningPlayer,
+		WeaponIndex,
+		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.WeaponBurstMode,
+		HomingMissileParameters.WeaponOwner,
+		HomingMissileParameters.MeshComponent,
+		HomingMissileParameters.FireSocketName,
+		GetWorld(),
+		HomingMissileParameters.ProjectileSystem,
+		HomingMissileParameters.WeaponVFX,
+		HomingMissileParameters.WeaponShellCase,
+		HomingMissileParameters.HomingMissileSettings,
+		HomingMissileParameters.BurstCooldown,
+		HomingMissileParameters.SingleBurstAmountMaxBurstAmount,
+		HomingMissileParameters.MinBurstAmount,
+		HomingMissileParameters.CreateShellCasingOnEveryRandomBurst);
+
+	M_AttachedWeapons.Add(HomingMissile);
+	OverwriteData(HomingMissile);
+	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(HomingMissile);
+}
+
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
@@ -1610,6 +1694,11 @@ void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponSt
 }
 
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateFlameThrower& WeaponParameters)
+{
+	WeaponParameters.WeaponOwner = this;
+}
+
+void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateHomingMissile& WeaponParameters)
 {
 	WeaponParameters.WeaponOwner = this;
 }
