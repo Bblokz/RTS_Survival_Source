@@ -936,6 +936,11 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	WeaponDataToUpgrade->Accuracy -= CurrentBehaviourAttributes.Accuracy;
 	WeaponDataToUpgrade->MagCapacity -= CurrentBehaviourAttributes.MagSize;
 	WeaponDataToUpgrade->BaseCooldown -= CurrentBehaviourAttributes.BaseCooldown;
+	WeaponDataToUpgrade->TNTExplosiveGrams -= CurrentBehaviourAttributes.TnTGrams;
+	WeaponDataToUpgrade->ShrapnelRange -= CurrentBehaviourAttributes.ShrapnelRange;
+	WeaponDataToUpgrade->ShrapnelDamage -= CurrentBehaviourAttributes.ShrapnelDamage;
+	WeaponDataToUpgrade->ShrapnelParticles -= CurrentBehaviourAttributes.ShrapnelParticles;
+	WeaponDataToUpgrade->ShrapnelPen -= CurrentBehaviourAttributes.ShrapnelPen;
 
 	if (bAddUpgrade)
 	{
@@ -948,6 +953,13 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 		CurrentBehaviourAttributes.Accuracy += BehaviourWeaponAttributes.Accuracy;
 		CurrentBehaviourAttributes.MagSize += BehaviourWeaponAttributes.MagSize;
 		CurrentBehaviourAttributes.BaseCooldown += BehaviourWeaponAttributes.BaseCooldown;
+		CurrentBehaviourAttributes.TnTGrams += BehaviourWeaponAttributes.TnTGrams;
+		CurrentBehaviourAttributes.ShrapnelRange += BehaviourWeaponAttributes.ShrapnelRange;
+		CurrentBehaviourAttributes.ShrapnelDamage += BehaviourWeaponAttributes.ShrapnelDamage;
+		CurrentBehaviourAttributes.ShrapnelParticles += BehaviourWeaponAttributes.ShrapnelParticles;
+		CurrentBehaviourAttributes.ShrapnelPen += BehaviourWeaponAttributes.ShrapnelPen;
+		CurrentBehaviourAttributes.FlameAngle += BehaviourWeaponAttributes.FlameAngle;
+		CurrentBehaviourAttributes.DamageTicks += BehaviourWeaponAttributes.DamageTicks;
 	}
 	else
 	{
@@ -960,6 +972,13 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 		CurrentBehaviourAttributes.Accuracy -= BehaviourWeaponAttributes.Accuracy;
 		CurrentBehaviourAttributes.MagSize -= BehaviourWeaponAttributes.MagSize;
 		CurrentBehaviourAttributes.BaseCooldown -= BehaviourWeaponAttributes.BaseCooldown;
+		CurrentBehaviourAttributes.TnTGrams -= BehaviourWeaponAttributes.TnTGrams;
+		CurrentBehaviourAttributes.ShrapnelRange -= BehaviourWeaponAttributes.ShrapnelRange;
+		CurrentBehaviourAttributes.ShrapnelDamage -= BehaviourWeaponAttributes.ShrapnelDamage;
+		CurrentBehaviourAttributes.ShrapnelParticles -= BehaviourWeaponAttributes.ShrapnelParticles;
+		CurrentBehaviourAttributes.ShrapnelPen -= BehaviourWeaponAttributes.ShrapnelPen;
+		CurrentBehaviourAttributes.FlameAngle -= BehaviourWeaponAttributes.FlameAngle;
+		CurrentBehaviourAttributes.DamageTicks -= BehaviourWeaponAttributes.DamageTicks;
 	}
 
 	WeaponDataToUpgrade->BaseDamage += CurrentBehaviourAttributes.Damage;
@@ -971,6 +990,11 @@ void UWeaponState::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttr
 	WeaponDataToUpgrade->Accuracy += CurrentBehaviourAttributes.Accuracy;
 	WeaponDataToUpgrade->MagCapacity += CurrentBehaviourAttributes.MagSize;
 	WeaponDataToUpgrade->BaseCooldown += CurrentBehaviourAttributes.BaseCooldown;
+	WeaponDataToUpgrade->TNTExplosiveGrams += CurrentBehaviourAttributes.TnTGrams;
+	WeaponDataToUpgrade->ShrapnelRange += CurrentBehaviourAttributes.ShrapnelRange;
+	WeaponDataToUpgrade->ShrapnelDamage += CurrentBehaviourAttributes.ShrapnelDamage;
+	WeaponDataToUpgrade->ShrapnelParticles += CurrentBehaviourAttributes.ShrapnelParticles;
+	WeaponDataToUpgrade->ShrapnelPen += CurrentBehaviourAttributes.ShrapnelPen;
 
 	if (bShouldNotifyRangeChange && WeaponOwner.GetInterface())
 	{

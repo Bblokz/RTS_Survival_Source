@@ -8,6 +8,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "Engine/World.h"
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
+#include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 namespace BehaviourWeaponConstants
@@ -213,10 +214,24 @@ FBehaviourWeaponAttributes UBehaviourWeapon::CalculateBehaviourAttributesWithMul
 	                   CalculatedAttributes.ShrapnelParticles);
 	ApplyFloatMultiplier(WeaponData->ShrapnelPen, BehaviourWeaponMultipliers.ShrapnelPenMlt,
 	                     CalculatedAttributes.ShrapnelPen);
-	ApplyFloatMultiplier(CalculatedAttributes.FlameAngle, BehaviourWeaponMultipliers.FlameAngleMlt,
-	                     CalculatedAttributes.FlameAngle);
-	ApplyIntMultiplier(CalculatedAttributes.DamageTicks, BehaviourWeaponMultipliers.DamageTicksMlt,
-	                   CalculatedAttributes.DamageTicks);
+	if (const UWeaponStateFlameThrower* FlameThrower = Cast<UWeaponStateFlameThrower>(WeaponState))
+	{
+		using DeveloperSettings::GameBalance::Weapons::FlameWeapons::FlameConeAngleUnit;
+
+		const FFlameThrowerSettings FlameSettings = FlameThrower->GetFlameSettings();
+		const float FlameAngle = static_cast<float>(FlameSettings.ConeAngleMlt) * FlameConeAngleUnit * 2.0f;
+		ApplyFloatMultiplier(FlameAngle, BehaviourWeaponMultipliers.FlameAngleMlt, CalculatedAttributes.FlameAngle);
+		ApplyIntMultiplier(static_cast<float>(FlameSettings.FlameIterations),
+		                   BehaviourWeaponMultipliers.DamageTicksMlt,
+		                   CalculatedAttributes.DamageTicks);
+	}
+	else
+	{
+		ApplyFloatMultiplier(CalculatedAttributes.FlameAngle, BehaviourWeaponMultipliers.FlameAngleMlt,
+		                     CalculatedAttributes.FlameAngle);
+		ApplyIntMultiplier(CalculatedAttributes.DamageTicks, BehaviourWeaponMultipliers.DamageTicksMlt,
+		                   CalculatedAttributes.DamageTicks);
+	}
 
 	return CalculatedAttributes;
 }

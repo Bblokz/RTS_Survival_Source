@@ -73,6 +73,24 @@ void UWeaponStateFlameThrower::ApplyFlameColorFromSettings()
 	UpdateFlameParam_Color(M_FlameSettings.Color);
 }
 
+void UWeaponStateFlameThrower::Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes,
+                                       const bool bAddUpgrade)
+{
+	const FBehaviourWeaponAttributes PreviousBehaviourAttributes = WeaponData.BehaviourAttributes;
+
+	Super::Upgrade(BehaviourWeaponAttributes, bAddUpgrade);
+
+	const FBehaviourWeaponAttributes& CurrentBehaviourAttributes = WeaponData.BehaviourAttributes;
+	M_FlameSettings.FlameIterations = FMath::Clamp(
+		M_FlameSettings.FlameIterations - PreviousBehaviourAttributes.DamageTicks
+		+ CurrentBehaviourAttributes.DamageTicks,
+		1,
+		10
+	);
+
+	UpdateFlameParam_Range(WeaponData.Range);
+}
+
 bool UWeaponStateFlameThrower::EnsureFlameEffectIsValid() const
 {
 	if (not IsValid(M_FlameSettings.FlameEffect))
