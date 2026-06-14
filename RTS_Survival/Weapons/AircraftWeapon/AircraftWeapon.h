@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -40,6 +40,7 @@ public:
 
 	void AllWeaponsStopFire(const bool bStopReload, const bool bStopCoolDown);
 	void AllWeaponsFire(AActor* TargetActor);
+	void AllWeaponsFireAtLocation(const FVector& TargetLocation);
 
 	float GetTotalReloadTimeOfWeapons();
 

@@ -1,4 +1,4 @@
-﻿#include "AircraftCommandsData.h"
+#include "AircraftCommandsData.h"
 
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -32,6 +32,9 @@ FVector FAAircraftMoveData::GetTargetPoint() const
 
 void FAAircraftAttackData::Reset()
 {
+	TargetActor = nullptr;
+	TargetLocation = FVector::ZeroVector;
+	bM_IsAttackGround = false;
 	Path.Reset();
 }
 
@@ -52,6 +55,17 @@ void FAAircraftAttackData::StartPathFinding(const FVector& StartPoint, const FRo
 	Path.CreateAttackPath(
 		StartPoint, StartRotation,
 		TargetActor->GetActorLocation(),
+		BezierCurveSettings, AttackMoveSettings, DeadZoneSettings);
+}
+
+void FAAircraftAttackData::StartPathFindingToLocation(const FVector& StartPoint, const FRotator& StartRotation,
+                                                       const FAircraftBezierCurveSettings& BezierCurveSettings,
+                                                       const FAircraftAttackMoveSettings& AttackMoveSettings, const
+                                                       FAircraftDeadZone DeadZoneSettings)
+{
+	Path.CreateAttackPath(
+		StartPoint, StartRotation,
+		TargetLocation,
 		BezierCurveSettings, AttackMoveSettings, DeadZoneSettings);
 }
 

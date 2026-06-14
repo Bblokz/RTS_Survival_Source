@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 
 #include "CoreMinimal.h"
@@ -72,11 +72,22 @@ struct FAAircraftAttackData
 	UPROPERTY()
 	TObjectPtr<AActor> TargetActor;
 
+	UPROPERTY()
+	FVector TargetLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	bool bM_IsAttackGround = false;
+
 	void Reset();
 
 	bool IsTargetActorVisible(const uint8 OwningPlayer) const;
 
 	void StartPathFinding(
+		const FVector& StartPoint, const FRotator& StartRotation,
+		const FAircraftBezierCurveSettings& BezierCurveSettings, const FAircraftAttackMoveSettings& AttackMoveSettings, const
+		FAircraftDeadZone DeadZoneSettings);
+
+	void StartPathFindingToLocation(
 		const FVector& StartPoint, const FRotator& StartRotation,
 		const FAircraftBezierCurveSettings& BezierCurveSettings, const FAircraftAttackMoveSettings& AttackMoveSettings, const
 		FAircraftDeadZone DeadZoneSettings);
@@ -111,6 +122,7 @@ enum class EPostLiftOffAction : uint8
 	Idle,
 	Move,
 	Attack,
+	AttackGround,
 	// Set if the aircraft was landed while the player assigned it a new owner.
 	// The new owner will then be set post Lift-off and the data in the old owner will be cleared post Lift-off.
 	ChangeOwner

@@ -1,4 +1,4 @@
-﻿#include "BombActor.h"
+#include "BombActor.h"
 
 #include "NiagaraFunctionLibrary.h"
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
@@ -127,6 +127,50 @@ void ABombActor::ActivateBomb(const FTransform& LaunchTransform, const TWeakObje
 	}
 }
 
+void ABombActor::ActivateBombAtLocation(const FTransform& LaunchTransform, const FVector& TargetLocation)
+{
+	if (not M_bIsDormant)
+	{
+		RTSFunctionLibrary::ReportError("ActivateBombAtLocation called but already active: " + GetName());
+		return;
+	}
+
+	SetActorTransform(LaunchTransform);
+	SetActorScale3D(M_BombSettings.M_BombScale);
+
+	M_bIsDormant = false;
+	SetActorHiddenInGame(false);
+
+	if (M_ProjectileMovementComp)
+	{
+		M_ProjectileMovementComp->SetUpdatedComponent(M_BombMeshComp);
+		M_ProjectileMovementComp->ProjectileGravityScale = M_GravityFallSpeedMlt;
+		M_ProjectileMovementComp->StopMovementImmediately();
+		M_ProjectileMovementComp->InitialSpeed = M_InitialSpeed;
+		M_ProjectileMovementComp->MaxSpeed = 0.f;
+		M_ProjectileMovementComp->Activate(true);
+
+		const FVector ForwardVel = GetActorForwardVector() * M_InitialSpeed;
+		M_ProjectileMovementComp->Velocity = ComputeNudgedVelocityXYToLocation(
+			ForwardVel,
+			GetActorLocation(),
+			TargetLocation);
+	}
+
+	if (const UWorld* W = GetWorld())
+	{
+		M_LastTraceTime = W->GetTimeSeconds();
+		W->GetTimerManager().SetTimer(
+			M_TraceTimerHandle,
+			this,
+			&ABombActor::PreformAsyncLineTrace,
+			0.2f,
+			true,
+			0.05f
+		);
+	}
+}
+
 float ABombActor::ComputeNudgeAlpha(const float PlanarDist) const
 {
 	// Max possible alpha (hard cap)
@@ -162,12 +206,18 @@ float ABombActor::ComputeNudgeAlpha(const float PlanarDist) const
 
 FVector ABombActor::ComputeNudgedVelocityXY(const FVector& BaseVel, const FVector& StartLoc, const TWeakObjectPtr<AActor> TargetActor) const
 {
-	if (!TargetActor.IsValid())
+	if (not TargetActor.IsValid())
 	{
 		return BaseVel;
 	}
 
 	const FVector TargetLoc = TargetActor->GetActorLocation();
+	return ComputeNudgedVelocityXYToLocation(BaseVel, StartLoc, TargetLoc);
+}
+
+FVector ABombActor::ComputeNudgedVelocityXYToLocation(const FVector& BaseVel, const FVector& StartLoc,
+                                                      const FVector& TargetLoc) const
+{
 	const float PlanarDist  = FVector::Dist2D(StartLoc, TargetLoc);
 	if (PlanarDist < 1.f)
 	{
@@ -186,7 +236,7 @@ FVector ABombActor::ComputeNudgedVelocityXY(const FVector& BaseVel, const FVecto
 		StartLoc, TargetLoc, M_InitialSpeed, GravityZ, /*bPreferLowArc=*/true, bSolvedWithFixedSpeed);
 
 	// 2) Fallback: exact time-based solution (adjusts speed as needed) → guaranteed hit path
-	if (!bSolvedWithFixedSpeed)
+	if (not bSolvedWithFixedSpeed)
 	{
 		const float t = SuggestFlightTime(StartLoc, TargetLoc, M_InitialSpeed);
 		IdealVel = SolveBallisticVelocity_ByTime(StartLoc, TargetLoc, t, GravityZ);

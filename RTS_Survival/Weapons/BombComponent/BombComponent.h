@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -53,6 +53,7 @@ public:
 	void OnBombKilledActor(AActor* ActorKilled);
 
 	void StartThrowingBombs(AActor* TargetActor);
+	void StartThrowingBombsAtLocation(const FVector& TargetLocation);
 	void StopThrowingBombs();
 
 protected:
@@ -95,6 +96,8 @@ private:
 	void CreateLaunchSound() const;
 
 	TWeakObjectPtr<AActor> M_TargetActor = nullptr;
+	FVector M_TargetLocation = FVector::ZeroVector;
+	bool bM_IsTargetingGround = false;
 
 	int32 M_ActiveEntries = -1;
 

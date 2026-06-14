@@ -1,4 +1,4 @@
-﻿#include "AAircraftMaster.h"
+#include "AAircraftMaster.h"
 
 #include "RTS_Survival/Units/Aircraft/AircaftHelpers/FRTSAircraftHelpers.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMovement/AircraftMovement.h"
@@ -296,6 +296,36 @@ void AAircraftMaster::ExecuteAttackCommand(AActor* TargetActor)
 	StartAttackActor();
 }
 
+
+void AAircraftMaster::ExecuteAttackGroundCommand(const FVector GroundLocation)
+{
+	Super::ExecuteAttackGroundCommand(GroundLocation);
+	if (GroundLocation.IsNearlyZero())
+	{
+		DoneExecutingCommand(EAbilityID::IdAttackGround);
+		return;
+	}
+	M_AircraftAttackData.TargetActor = nullptr;
+	M_AircraftAttackData.TargetLocation = GroundLocation;
+	M_AircraftAttackData.bM_IsAttackGround = true;
+
+	if (M_LandedState != EAircraftLandingState::Airborne)
+	{
+		M_PendingPostLiftOffAction.Set(EPostLiftOffAction::AttackGround);
+		if (M_LandedState == EAircraftLandingState::Landed)
+		{
+			TakeOffFromGroundOrOwner();
+		}
+		return;
+	}
+
+	StartAttackGround();
+}
+
+void AAircraftMaster::TerminateAttackGroundCommand()
+{
+	TerminateAttackCommand();
+}
 
 void AAircraftMaster::TerminateAttackCommand()
 {
@@ -864,6 +894,26 @@ FVector AAircraftMaster::OnMoveStartGetLocationAndRotation(
 	return OutLocation;
 }
 
+void AAircraftMaster::StartAttackGround()
+{
+	FRotator StartRotation;
+	const FVector StartLocation = OnMoveStartGetLocationAndRotation(StartRotation, GetActorLocation(),
+	                                                                GetActorRotation());
+	M_MovementState = EAircraftMovementState::AttackMove;
+	M_AircraftMovement->MaxSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
+	M_AircraftMovement->Acceleration = M_AircraftMovementSettings.Acceleration;
+	M_AircraftMovement->Deceleration = M_AircraftMovementSettings.Deceleration;
+	M_AircraftAttackData.StartPathFindingToLocation(StartLocation, StartRotation,
+	                                                M_AircraftMovementSettings.BezierCurveSettings,
+	                                                M_AircraftMovementSettings.AttackMoveSettings,
+	                                                M_AircraftMovementSettings.DeadZoneSettings);
+	constexpr int32 TargetPointIndex = 1;
+	if (M_AircraftAttackData.Path.PathPoints.IsValidIndex(TargetPointIndex))
+	{
+		AttackMove_IssueActionForNewTargetPoint(M_AircraftAttackData.Path.PathPoints[TargetPointIndex]);
+	}
+}
+
 void AAircraftMaster::StartAttackActor()
 {
 	if (not GetIsValidRTSComponent())
@@ -905,6 +955,10 @@ void AAircraftMaster::IssuePostLifOffAction()
 
 	case EPostLiftOffAction::Attack:
 		StartAttackActor();
+		break;
+
+	case EPostLiftOffAction::AttackGround:
+		StartAttackGround();
 		break;
 
 	case EPostLiftOffAction::ChangeOwner:
@@ -1235,7 +1289,14 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 		StartWeaponFire();
 		break;
 	case EAirPathPointType::GetOutOfDive:
-		StartBombThrowing(M_AircraftAttackData.TargetActor);
+		if (M_AircraftAttackData.bM_IsAttackGround)
+		{
+			StartBombThrowingAtLocation(M_AircraftAttackData.TargetLocation);
+		}
+		else
+		{
+			StartBombThrowing(M_AircraftAttackData.TargetActor);
+		}
 		break;
 	}
 	StopIssuedActionForNewType(NewPointType);
@@ -1278,6 +1339,11 @@ void AAircraftMaster::FireAttachedWeapons() const
 	{
 		return;
 	}
+	if (M_AircraftAttackData.bM_IsAttackGround)
+	{
+		M_AircraftWeapon->AllWeaponsFireAtLocation(M_AircraftAttackData.TargetLocation);
+		return;
+	}
 	M_AircraftWeapon->AllWeaponsFire(M_AircraftAttackData.TargetActor);
 }
 
@@ -1288,6 +1354,16 @@ void AAircraftMaster::StartBombThrowing(AActor* TargetActor)
 		return;
 	}
 	M_AircraftBombComponent->StartThrowingBombs(TargetActor);
+	IssuedActionsState.bM_AreBombsActive = true;
+}
+
+void AAircraftMaster::StartBombThrowingAtLocation(const FVector& TargetLocation)
+{
+	if (not IsValidBombComponent())
+	{
+		return;
+	}
+	M_AircraftBombComponent->StartThrowingBombsAtLocation(TargetLocation);
 	IssuedActionsState.bM_AreBombsActive = true;
 }
 
@@ -1324,6 +1400,11 @@ void AAircraftMaster::OnAttackMoveCompleted()
 	FRTSAircraftHelpers::AircraftDebug("Attack Move path completed", FColor::Green);
 	if (not GetIsValidRTSComponent())
 	{
+		return;
+	}
+	if (M_AircraftAttackData.bM_IsAttackGround)
+	{
+		StartAttackGround();
 		return;
 	}
 	if (not M_AircraftAttackData.IsTargetActorVisible(RTSComponent->GetOwningPlayer()))
