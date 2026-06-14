@@ -752,14 +752,16 @@ void AProjectile::SetupHomingMissileLaunch(const FVector& LaunchLocation,
 		ProjectileSpeed * HomingSettings.HomingSpeedMultiplier,
 		KINDA_SMALL_NUMBER);
 	M_HomingMissileRuntimeState.M_LaunchLocation = LaunchLocation;
-	M_HomingMissileRuntimeState.M_ExpectedFlightSeconds = M_Range / M_HomingMissileRuntimeState.M_Speed;
 	M_HomingMissileRuntimeState.M_ElapsedSeconds = 0.0f;
 	M_HomingMissileRuntimeState.bM_UseDirectHoming = false;
-	PrepareDirectHomingSwitchThreshold();
 
 	const FVector InitialTargetLocation = IsValid(TargetActor)
 		                                      ? TargetActor->GetActorLocation()
 		                                      : FallbackTargetLocation;
+	const float InitialTargetDistance = FVector::Distance(LaunchLocation, InitialTargetLocation);
+	M_HomingMissileRuntimeState.M_ExpectedFlightSeconds = InitialTargetDistance / M_HomingMissileRuntimeState.M_Speed;
+	PrepareDirectHomingSwitchThreshold();
+
 	const FVector InitialDirection = (InitialTargetLocation - LaunchLocation).GetSafeNormal();
 	if (InitialDirection.IsNearlyZero())
 	{
@@ -910,8 +912,12 @@ FVector AProjectile::BuildHomingMissileDesiredDirection(const FVector& TargetLoc
 			                         M_HomingMissileRuntimeState.M_ElapsedSeconds
 			                         * M_HomingMissileRuntimeState.M_Settings.WaveSettings.Frequency)
 			* M_HomingMissileRuntimeState.M_Settings.WaveSettings.Amplitude;
-		return (ToTarget * M_HomingMissileRuntimeState.M_Settings.WaveSettings.ForwardBlend + SideVector * WaveOffset).
-			GetSafeNormal();
+		const FVector WaveTargetLocation = TargetLocation + SideVector * WaveOffset;
+		const FVector WaveDirection = (WaveTargetLocation - GetActorLocation()).GetSafeNormal();
+		return FMath::Lerp(
+			WaveDirection,
+			ToTarget,
+			M_HomingMissileRuntimeState.M_Settings.WaveSettings.ForwardBlend).GetSafeNormal();
 	}
 
 	const FVector OrbitAxis = FVector::CrossProduct(ToTarget, FVector::UpVector).GetSafeNormal();
@@ -920,8 +926,12 @@ FVector AProjectile::BuildHomingMissileDesiredDirection(const FVector& TargetLoc
 		* M_HomingMissileRuntimeState.M_Settings.SphericalSettings.OrbitSpeedDegrees);
 	const FVector OrbitOffset = (OrbitAxis * FMath::Cos(AngleRadians) + FVector::UpVector * FMath::Sin(AngleRadians))
 		* M_HomingMissileRuntimeState.M_Settings.SphericalSettings.OrbitRadius;
-	return (ToTarget * M_HomingMissileRuntimeState.M_Settings.SphericalSettings.ForwardBlend + OrbitOffset).
-		GetSafeNormal();
+	const FVector OrbitTargetLocation = TargetLocation + OrbitOffset;
+	const FVector OrbitDirection = (OrbitTargetLocation - GetActorLocation()).GetSafeNormal();
+	return FMath::Lerp(
+		OrbitDirection,
+		ToTarget,
+		M_HomingMissileRuntimeState.M_Settings.SphericalSettings.ForwardBlend).GetSafeNormal();
 }
 
 FVector AProjectile::BuildBezierHomingDesiredDirection(const FVector& TargetLocation) const
