@@ -1,4 +1,4 @@
-﻿
+
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "AircraftWeapon.h"
@@ -637,7 +637,6 @@ void UAircraftWeapon::AllWeaponsStopFire(const bool bStopReload, const bool bSto
 
 void UAircraftWeapon::AllWeaponsFire(AActor* TargetActor)
 {
-	// Store target in struct; weapons still receive nullptr for ground if caller passes nullptr.
 	M_TargetingData.SetTargetActor(TargetActor);
 
 	for (const auto EachWeapon : M_TWeapons)
@@ -646,7 +645,21 @@ void UAircraftWeapon::AllWeaponsFire(AActor* TargetActor)
 		{
 			continue;
 		}
-			EachWeapon->Fire(M_TargetingData.GetActiveTargetLocation());
+		EachWeapon->Fire(M_TargetingData.GetActiveTargetLocation());
+	}
+}
+
+void UAircraftWeapon::AllWeaponsFireAtLocation(const FVector& TargetLocation)
+{
+	M_TargetingData.SetTargetGround(TargetLocation);
+
+	for (const auto EachWeapon : M_TWeapons)
+	{
+		if (not GetIsValidWeapon(EachWeapon))
+		{
+			continue;
+		}
+		EachWeapon->Fire(M_TargetingData.GetActiveTargetLocation());
 	}
 }
 

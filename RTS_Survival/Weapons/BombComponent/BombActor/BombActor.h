@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "BombSettings/BombSettings.h"
@@ -21,6 +21,7 @@ public:
 
 	// Call this to “drop” the bomb: starts movement + trace timer
 	void ActivateBomb(const FTransform& LaunchTransform, TWeakObjectPtr<AActor> TargetActor);
+	void ActivateBombAtLocation(const FTransform& LaunchTransform, const FVector& TargetLocation);
 
 	// Initialize mesh, owner, gravity scale, etc.
 	void InitBombActor(const FWeaponData& NewWeaponData,
@@ -46,6 +47,8 @@ private:
 	// Computes velocity blended toward target in XY, preserving Z from base velocity
 	FVector ComputeNudgedVelocityXY(const FVector& BaseVel, const FVector& StartLoc,
 	                                TWeakObjectPtr<AActor> TargetActor) const;
+	FVector ComputeNudgedVelocityXYToLocation(const FVector& BaseVel, const FVector& StartLoc,
+	                                           const FVector& TargetLocation) const;
 
 	// Distance/accuracy → blend factor [0..1]
 	float ComputeNudgeAlpha(float PlanarDist) const;

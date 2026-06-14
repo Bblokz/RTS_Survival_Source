@@ -198,6 +198,12 @@ protected:
 	/** @brief User Attack command; same queueing semantics as Move, but pathing targets an actor. */
 	virtual void ExecuteAttackCommand(AActor* TargetActor) override;
 
+	/** @brief User Attack Ground command; queues or starts an attack run against a fixed world location. */
+	virtual void ExecuteAttackGroundCommand(const FVector GroundLocation) override;
+
+	/** @brief Cancel user Attack Ground using the same cleanup as actor attacks. */
+	virtual void TerminateAttackGroundCommand() override;
+
 	/** @brief Cancel user Attack, stop fire/bombs if active, and restore Idle if we were mid-path. */
 	virtual void TerminateAttackCommand() override;
 
@@ -473,6 +479,9 @@ private:
 	/** @brief Begin attack pathing against a visible target (dives/out-of-dives emit weapon/bomb actions). */
 	void StartAttackActor();
 
+	/** @brief Begin attack pathing against the cached ground target location. */
+	void StartAttackGround();
+
 	/** @brief Per-frame homing for attack path; manages action handoff on point type changes. */
 	void Tick_AttackMove(float DeltaTime);
 
@@ -493,6 +502,9 @@ private:
 
 	/** @brief Start bomb throwing for the current attack target. */
 	void StartBombThrowing(AActor* TargetActor);
+
+	/** @brief Start bomb throwing for the current attack ground location. */
+	void StartBombThrowingAtLocation(const FVector& TargetLocation);
 
 	/** @brief Stop weapon fire and update state. */
 	void StopWeaponFire();

@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "BombComponent.h"
@@ -215,8 +215,18 @@ void UBombComponent::OnBombKilledActor(AActor* ActorKilled)
 void UBombComponent::StartThrowingBombs(AActor* TargetActor)
 {
 	M_TargetActor = TargetActor;
+	bM_IsTargetingGround = false;
 	StartBombs_InitTimer();
 	// Instantly fire the first bombs.
+	BombInterval();
+}
+
+void UBombComponent::StartThrowingBombsAtLocation(const FVector& TargetLocation)
+{
+	M_TargetActor = nullptr;
+	M_TargetLocation = TargetLocation;
+	bM_IsTargetingGround = true;
+	StartBombs_InitTimer();
 	BombInterval();
 }
 
@@ -321,7 +331,14 @@ void UBombComponent::ThrowBombFromEntry(FBombBayEntry* Entry)
 	}
 
 	M_BombInstances->SetInstanceHidden(Entry->GetBombInstancerIndex(), /*bHide=*/true);
-	Bomb->ActivateBomb(LaunchTransform, M_TargetActor);
+	if (bM_IsTargetingGround)
+	{
+		Bomb->ActivateBombAtLocation(LaunchTransform, M_TargetLocation);
+	}
+	else
+	{
+		Bomb->ActivateBomb(LaunchTransform, M_TargetActor);
+	}
 	Entry->SetBombArmed(false);
 	--M_ActiveEntries;
 	OnMagConsumed.Broadcast(M_ActiveEntries);
