@@ -605,14 +605,14 @@ public:
 
 	inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
 
-	FWeaponData* GetWeaponDataToUpgrade();
+	virtual FWeaponData* GetWeaponDataToUpgrade();
 
 	/**
 	 * @brief Apply or remove behaviour-driven weapon attribute modifications.
 	 * @param BehaviourWeaponAttributes Incoming attribute deltas provided by a behaviour.
 	 * @param bAddUpgrade When true apply the upgrade, otherwise remove it.
 	 */
-	void Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade = true);
+	virtual void Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade = true);
 
 	/** @return The weapon data of this weapon, values adjusted for the type of selected shell. */
 	FWeaponData GetWeaponDataAdjustedForShellType() const;

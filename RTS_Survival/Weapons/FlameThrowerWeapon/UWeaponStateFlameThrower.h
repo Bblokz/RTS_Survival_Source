@@ -60,6 +60,7 @@ public:
 	FFlameThrowerSettings* GetFlameSettingsForChange();
 	void SetFlameColor(const FLinearColor& NewFlameColor);
 	void ApplyFlameColorFromSettings();
+	virtual void Upgrade(const FBehaviourWeaponAttributes& BehaviourWeaponAttributes, const bool bAddUpgrade = true) override;
 
 protected:
 	// Drives the timed trace schedule; CreateLaunchVfx handles visuals/audio start/stop.

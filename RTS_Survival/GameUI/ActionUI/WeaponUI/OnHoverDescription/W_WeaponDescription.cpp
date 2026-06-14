@@ -515,15 +515,25 @@ FString UW_WeaponDescription::LeftFlameText() const
 
 	LeftText += Line_CalibreMM();
 
+	ERTSRichText TextTypeBuffAdjusted = WeaponDescriptionLayout::NormalText;
+	if (WeaponDescription.BehaviourAttributes.Damage > 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::BuffedText;
+	}
+	if (WeaponDescription.BehaviourAttributes.Damage < 0)
+	{
+		TextTypeBuffAdjusted = WeaponDescriptionLayout::DeBuffText;
+	}
+
 	// Full cone damage (sum of rays) per tick
 	LeftText += TEXT("Full Cone Damage: ")
-		+ GetNumberRich(WeaponDescription.BaseDamage * WeaponDescription.FlameRays, 0, ERTSRichText::Text_Armor)
+		+ GetNumberRich(WeaponDescription.BaseDamage * WeaponDescription.FlameRays, 0, TextTypeBuffAdjusted)
 		+ GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
 		+ TEXT("\n");
 
 	// Partial (single ray) per tick
 	LeftText += TEXT("Partial Damage: ")
-		+ GetNumberRich(WeaponDescription.BaseDamage, 0, ERTSRichText::Text_Armor)
+		+ GetNumberRich(WeaponDescription.BaseDamage, 0, TextTypeBuffAdjusted)
 		+ GetRTSRich(TEXT("/tick"), ERTSRichText::Text_DescriptionHelper)
 		+ TEXT("\n");
 
