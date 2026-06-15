@@ -95,7 +95,7 @@ enum class
 	// German small calibre
 	KwK38_T_37MM UMETA(DisplayName = "KwK38 t 37MM (PZ 38(t))"),
 	KwK39_1_50MM UMETA(DisplayName = "KwK39/1 50MM (PZ III M)"),
-	KwK39_Rockets UMETA(DisplayName = "KwK39 Rockets (PZ III M)"),
+	KwK39_Rockets UMETA(DisplayName = "20mm Rockets"),
 	KwK39_1_50MM_Puma UMETA(DisplayName = "KwK39/1 50MM (Puma)"),
 	KwK42_L_50MM UMETA(DisplayName = "KwK L/42 L 50MM (PZ III J)"),
 	KwK37_F_50MM UMETA(DisplayName = "KwK37 75MM (PZ II FLAMM)"),
@@ -264,6 +264,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Pak38_50MM: return "Pak 38";
 	case EWeaponName::Kwk30_20MM_sdkfz231: return "KwK 30";
 	case EWeaponName::KwK39_1_50MM: return "KwK 39/1";
+	case EWeaponName::KwK39_Rockets: return "20mm Rockets";
 	case EWeaponName::KwK39_1_50MM_Puma: return "Kwk 39/1";
 	case EWeaponName::KwK42_75MM: return "KwK 42";
 	case EWeaponName::KwK43_88MM: return "KwK 43";
@@ -560,6 +561,8 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 		return 100;
 	case EWeaponName::DEFAULT_WEAPON:
 		return 98;
+	case EWeaponName::KwK39_Rockets:
+		return 1;
 
 	// ---------------------------------------------------------------------
 	// Everything else: not handheld / not infantry.
@@ -584,6 +587,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "KwK38_T_37MM";
 	case EWeaponName::KwK39_1_50MM:
 		return "KwK39_1_50MM";
+	case EWeaponName::KwK39_Rockets:
+		return "KwK39_Rockets";
 	case EWeaponName::KwK39_1_50MM_Puma:
 		return "KwK39_1_50MM_Puma";
 	case EWeaponName::KwK42_L_50MM:

@@ -2951,6 +2951,28 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK39_1_50MM, WeaponData);
 
+	WeaponData.WeaponName = EWeaponName::KwK39_Rockets;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_HEAT};
+	WeaponData.WeaponCalibre = 20.f;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = 50.f;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumCannonRange;
+	WeaponData.ArmorPen = 75.f;
+	WeaponData.ArmorPenMaxRange = 65.f;
+	WeaponData.MagCapacity = 4;
+	WeaponData.ReloadSpeed = 8.f;
+	WeaponData.BaseCooldown = 0.25f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 80;
+	WeaponData.ShrapnelRange = 180.f;
+	WeaponData.ShrapnelDamage = 20.f;
+	WeaponData.ShrapnelParticles = 35;
+	WeaponData.ShrapnelPen = 0.f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK39_Rockets, WeaponData);
 
 	WeaponData.WeaponName = EWeaponName::PanzerRifle_50mm;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
