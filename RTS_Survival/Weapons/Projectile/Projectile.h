@@ -678,6 +678,9 @@ private:
 	// Start point used by async trace to sweep the full travelled segment between trace dispatches.
 	FVector M_LastTraceLocation = FVector::ZeroVector;
 
+	// Homing missiles use a visible rocket body, so sweep a small radius instead of a ray to avoid tunneling past armor.
+	float M_ProjectileTraceRadius = 0.0f;
+
 	// Used to ignore stale async callbacks after dormancy or relaunch state changes.
 	int32 M_TraceRequestId = 0;
 

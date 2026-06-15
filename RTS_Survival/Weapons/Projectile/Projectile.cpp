@@ -328,6 +328,7 @@ void AProjectile::SetupProjectileForNewLaunch(
 	M_ActorsToIgnore.Empty();
 	M_ActorsToIgnore = ActorsToIgnore;
 	M_WeaponCalibre = WeaponCalibre;
+	M_ProjectileTraceRadius = 0.0f;
 
 	OnRestartProjectile(LaunchLocation, LaunchRotation, ProjectileSpeed);
 	SetupNiagaraWithPrjVfxSettings(ProjectileVfxSettings);
@@ -779,6 +780,11 @@ void AProjectile::SetupHomingMissileLaunch(const FVector& LaunchLocation,
 	M_ProjectileMovement->Activate();
 	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
 	M_ProjectileMovement->Velocity = InitialDirection * M_HomingMissileRuntimeState.M_Speed;
+	constexpr float MinimumHomingMissileTraceRadius = 12.0f;
+	constexpr float MillimetersToCentimeters = 0.1f;
+	M_ProjectileTraceRadius = FMath::Max(
+		MinimumHomingMissileTraceRadius,
+		static_cast<float>(M_WeaponCalibre) * MillimetersToCentimeters);
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -786,7 +792,10 @@ void AProjectile::SetupHomingMissileLaunch(const FVector& LaunchLocation,
 		return;
 	}
 
-	StartFlightTimers(M_HomingMissileRuntimeState.M_ExpectedFlightSeconds);
+	const float HomingMissileMaximumFlightSeconds = M_Range / M_HomingMissileRuntimeState.M_Speed;
+	StartFlightTimers(FMath::Max(
+		M_HomingMissileRuntimeState.M_ExpectedFlightSeconds,
+		HomingMissileMaximumFlightSeconds));
 
 	World->GetTimerManager().SetTimer(
 		M_HomingMissileTimerHandle,
@@ -1657,6 +1666,22 @@ void AProjectile::PerformAsyncLineTrace()
 
 			WeakThis->OnAsyncTraceComplete(TraceHandle, TraceDatum, TraceRequestId);
 		});
+
+	if (M_ProjectileTraceRadius > 0.0f)
+	{
+		World->AsyncSweepByChannel(
+			EAsyncTraceType::Single,
+			StartLocation,
+			EndLocation,
+			FQuat::Identity,
+			M_TraceChannel,
+			FCollisionShape::MakeSphere(M_ProjectileTraceRadius),
+			TraceParams,
+			FCollisionResponseParams::DefaultResponseParam,
+			&TraceDelegate
+		);
+		return;
+	}
 
 	World->AsyncLineTraceByChannel(
 		EAsyncTraceType::Single,
