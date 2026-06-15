@@ -15,6 +15,7 @@
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
+#include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/Missions/Defeat/RTSDefeatType.h"
 #include "MissionManager.generated.h"
 
@@ -68,6 +69,12 @@ struct FPlayerFactionBackupData
 	// Only show if bSetFactionManually is true
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup", meta=(EditCondition="bSetFactionManually"))
 	ERTSFaction PlayerFaction = ERTSFaction::NotInitialised;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Commander Backup")
+	bool bSetCommanderManually = false;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup", meta=(EditCondition="bSetFactionManually"))
+	ERTSCommander PlayerCommander = ERTSCommander::BalancedCommander;
 	
 };
 
@@ -201,6 +208,8 @@ public:
 	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSFaction GetPlayerFaction() const;
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	ERTSCommander GetPlayerCommander() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FRTSGameDifficulty GetCurrentGameDifficulty() const;
 	UW_Mission* OnMissionRequestSetupWidget(UMissionBase* RequestingMission);
@@ -375,6 +384,9 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
+	
+	void PostInit_CheckOverrideFaction() const;
+	void PostInit_CheckOverrideCommander() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
 	bool bSetGameDifficultyWithWidget = false;

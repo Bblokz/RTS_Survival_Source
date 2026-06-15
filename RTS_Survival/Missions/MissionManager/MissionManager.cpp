@@ -284,6 +284,17 @@ ERTSFaction AMissionManager::GetPlayerFaction() const
 	return M_PlayerFaction;
 }
 
+ERTSCommander AMissionManager::GetPlayerCommander() const
+{
+	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not IsValid(GameInstance))
+	{
+		RTSFunctionLibrary::ReportError("no valid game instance in GetPlayerCommander");
+		return ERTSCommander();
+	}
+	return GameInstance->GetPlayerCommander();
+}
+
 FRTSGameDifficulty AMissionManager::GetCurrentGameDifficulty() const
 {
 	if (not M_GameDifficulty.bIsInitialized)
@@ -886,19 +897,40 @@ void AMissionManager::BeginPlay()
 void AMissionManager::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	if (PlayerFactionBackupData.bSetFactionManually)
-	{
-		URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
-		if (not GameInstance)
-		{
-			return;
-		}
-		GameInstance->SetPlayerFaction(PlayerFactionBackupData.PlayerFaction);
-	}
-	
+	PostInit_CheckOverrideFaction();
+	PostInit_CheckOverrideCommander();
+
 	SetFactionAndCampaignGenerationSettingsWithGameInstance();
 	SetGameDifficultyWithGameInstance();
-	
+}
+
+void AMissionManager::PostInit_CheckOverrideFaction() const
+{
+	if (not PlayerFactionBackupData.bSetFactionManually)
+	{
+		return;
+	}
+	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+
+	if (not GameInstance)
+	{
+		return;
+	}
+	GameInstance->SetPlayerFaction(PlayerFactionBackupData.PlayerFaction);
+}
+
+void AMissionManager::PostInit_CheckOverrideCommander() const
+{
+	if (not PlayerFactionBackupData.bSetCommanderManually)
+	{
+		return;
+	}
+	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not GameInstance)
+	{
+		return;
+	}
+	GameInstance->SetPlayerCommander(PlayerFactionBackupData.PlayerCommander);
 }
 
 void AMissionManager::InitMissionSounds(const FMissionSoundSettings MissionSettings)
@@ -1178,7 +1210,6 @@ void AMissionManager::SetGameDifficultyWithGameInstance()
 	}
 	M_GameDifficulty = GameDifficulty;
 	PropagateGameDifficultyToEnemyStrategicAI(M_GameDifficulty);
-	
 }
 
 void AMissionManager::RemoveActiveMission(UMissionBase* Mission)
@@ -1957,7 +1988,7 @@ void AMissionManager::SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE
 
 void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDifficulty& GameDifficulty) const
 {
-	AEnemyController* EnemyAIController =  FRTS_Statics::GetEnemyController(this);
+	AEnemyController* EnemyAIController = FRTS_Statics::GetEnemyController(this);
 	if (not EnsureEnemyControllerIsValid(EnemyAIController))
 	{
 		return;
@@ -1965,8 +1996,9 @@ void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDi
 	UEnemyStrategicAIComponent* const StrategicAIComponent = EnemyAIController->GetEnemyStrategicAIComponent();
 	if (not IsValid(StrategicAIComponent))
 	{
-		RTSFunctionLibrary::ReportError("Failed to propagate the game difficulty to the enemy AI controller's blackboard"
-								  "as its strategic AI component is invalid!!");
+		RTSFunctionLibrary::ReportError(
+			"Failed to propagate the game difficulty to the enemy AI controller's blackboard"
+			"as its strategic AI component is invalid!!");
 		return;
 	}
 

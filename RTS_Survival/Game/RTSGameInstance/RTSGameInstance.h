@@ -9,6 +9,7 @@
 #include "RTSGameInstance.generated.h"
 
 
+enum class ERTSCommander : uint8;
 enum class ERTSFaction : uint8;
 class URTSMusicManager;
 class USoundClass;
@@ -49,7 +50,9 @@ public:
 	void SetSelectedGameDifficulty(const FRTSGameDifficulty& Difficulty) { M_SelectedGameDifficulty = Difficulty; }
 	FRTSGameDifficulty GetSelectedGameDifficulty() const { return M_SelectedGameDifficulty; }
 	void SetPlayerFaction(const ERTSFaction Faction) { M_PlayerFaction = Faction; }
+	void SetPlayerCommander(const ERTSCommander Commander) { M_PlayerCommander = Commander; }
 	ERTSFaction GetPlayerFaction() const ;
+	ERTSCommander GetPlayerCommander() const ;
 
 protected:
     // Called on init when the music manager is setup and needs to be initialized.
@@ -91,6 +94,7 @@ private:
 	FCampaignGenerationSettings M_CampaignGenerationSettings;
 	FRTSGameDifficulty M_SelectedGameDifficulty;
 	ERTSFaction M_PlayerFaction;
+	ERTSCommander M_PlayerCommander;
 	// Keeps track of what map to load next.
 	FRTSGameInstMapToLoad M_MapToLoad;
 

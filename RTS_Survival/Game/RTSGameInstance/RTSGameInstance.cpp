@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
+#include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Sound/SoundClass.h"
@@ -115,6 +116,17 @@ ERTSFaction URTSGameInstance::GetPlayerFaction() const
 		return ERTSFaction::GerStrikeDivision;
 	}
 	return M_PlayerFaction;
+}
+
+ERTSCommander URTSGameInstance::GetPlayerCommander() const
+{
+	if (M_PlayerCommander == ERTSCommander::NoCommander )
+	{
+		RTSFunctionLibrary::ReportError("No commander was set in game instance while it was requested!!"
+								  "Failed to Load PIE settings?");
+		return ERTSCommander::NoCommander;
+	}
+	return M_PlayerCommander;
 }
 
 void URTSGameInstance::Shutdown()
