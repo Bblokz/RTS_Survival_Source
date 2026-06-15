@@ -73,7 +73,7 @@ struct FPlayerFactionBackupData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Commander Backup")
 	bool bSetCommanderManually = false;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup", meta=(EditCondition="bSetFactionManually"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup", meta=(EditCondition="bSetCommanderManually"))
 	ERTSCommander PlayerCommander = ERTSCommander::BalancedCommander;
 	
 };

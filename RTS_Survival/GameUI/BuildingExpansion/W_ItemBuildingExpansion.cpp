@@ -45,6 +45,11 @@ void UW_ItemBuildingExpansion::EnableDisableItem(const bool bEnabled)
 	}
 }
 
+void UW_ItemBuildingExpansion::SimulatedClickedBxpItem()
+{
+	OnClickedItemBuildingExpansion();
+}
+
 
 void UW_ItemBuildingExpansion::OnClickedItemBuildingExpansion() const
 {

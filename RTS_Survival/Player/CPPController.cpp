@@ -780,6 +780,15 @@ void ACPPController::OnNomadicExpansionShortCut()
 	
 }
 
+void ACPPController::OnBxpShortCut(const int32 BxpIndex)
+{
+	if (not EnsureIsValidBuildingUI_ItemPanel())
+	{
+		return;
+	}
+	M_BuildingUI_ItemPanel->SimulateClickBuildingExpansion(BxpIndex);
+}
+
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
 {
 	return M_PlayerPortraitManager;

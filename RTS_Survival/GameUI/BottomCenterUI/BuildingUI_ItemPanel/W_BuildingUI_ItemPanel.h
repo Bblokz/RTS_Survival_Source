@@ -49,6 +49,7 @@ public:
 	                            ENomadicSubtype NomadicSubtype);
 	
 	void SimulateClickNomadicExpandButton();
+	void SimulateClickBuildingExpansion(const int32 Index);
 
 
 	TArray<UW_ItemBuildingExpansion*> GetBxpItems() const;

@@ -9,6 +9,7 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "RTS_Survival/GameUI/BottomCenterUI/BottomCenterUIPanel/W_BottomCenterUI.h"
+#include "RTS_Survival/GameUI/BuildingExpansion/W_ItemBuildingExpansion.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
@@ -83,6 +84,24 @@ void UW_BuildingUI_ItemPanel::SimulateClickNomadicExpandButton()
 		OnClickedCancelVehicleConversionButton();
 		break;
 	}	
+}
+
+void UW_BuildingUI_ItemPanel::SimulateClickBuildingExpansion(const int32 Index)
+{
+	if (not M_BxpItems.IsValidIndex(Index))
+	{
+		RTSFunctionLibrary::ReportError("Invalid bxp item index through simulation (chorded action triggered on player controller"
+								  "index provided: "
+		  "\n  " +  FString::FromInt(Index)
+		  + "\n while amount bxp items: " + FString::FromInt(M_BxpItems.Num()));
+		return;
+	}
+	UW_ItemBuildingExpansion* Item =  M_BxpItems[Index];
+	if (not IsValid(Item))
+	{
+		return;
+	}
+	Item->SimulatedClickedBxpItem();
 }
 
 TArray<UW_ItemBuildingExpansion*> UW_BuildingUI_ItemPanel::GetBxpItems() const

@@ -55,6 +55,8 @@ public:
 	 * @param bEnabled Determines if the button is enabled.
 	 */
 	void EnableDisableItem(const bool bEnabled);
+	
+	void SimulatedClickedBxpItem();
 
 protected:
 	

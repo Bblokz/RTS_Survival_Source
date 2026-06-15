@@ -62,6 +62,7 @@ void URTSGameInstance::ApplyPIEStartupOverrides()
 	SetSelectedGameDifficulty(PIEGameDifficulty);
 	
 	SetPlayerFaction(PIEStartupSettings->PlayerFaction);
+	SetPlayerCommander(PIEStartupSettings->PlayerCommander);
 	
 	
 #endif

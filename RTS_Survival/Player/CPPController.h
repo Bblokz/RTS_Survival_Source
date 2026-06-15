@@ -380,6 +380,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Input")
 	void OnNomadicExpansionShortCut();
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Input")
+	void OnBxpShortCut(int32 BxpIndex);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;
