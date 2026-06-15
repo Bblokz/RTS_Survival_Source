@@ -130,6 +130,9 @@ static ESquadWeaponIcon Global_GetWeaponIconForWeapon(const EWeaponName WeaponNa
 	case EWeaponName::PTRS_X_Tishina:
 		return ESquadWeaponIcon::AutomatedPTRS;
 
+	case EWeaponName::KwK39_Rockets:
+		return ESquadWeaponIcon::None;
+
 	// Default case for weapons without specific icons
 	default:
 		return ESquadWeaponIcon::None;
