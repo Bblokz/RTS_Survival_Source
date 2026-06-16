@@ -2373,7 +2373,7 @@ void AAircraftMaster::Strafe_OnDiveRecoveryStarted()
 	}
 
 	M_StrafeState.bM_IsLerpingStrafePoint = false;
-	M_StrafeState.NextRunStartLocation = M_AircraftAttackData.TargetLocation;
+	M_StrafeState.NextRunStartLocation = M_StrafeState.StrafeStartLocation;
 	M_StrafeState.bM_IsFirstAttackRun = false;
 }
 
