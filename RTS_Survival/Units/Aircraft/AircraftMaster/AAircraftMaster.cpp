@@ -78,6 +78,7 @@ void AAircraftMaster::CheckForUpgrades()
 
 void AAircraftMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	Strafe_ClearTimer();
 	ReloadManager.OnAircraftDied(this);
 	if (M_AircraftOwner.IsValid())
 	{
@@ -225,6 +226,7 @@ void AAircraftMaster::Tick(float DeltaTime)
 	}
 	if (M_MovementState == EAircraftMovementState::AttackMove)
 	{
+		Strafe_TickTargetLocation(DeltaTime);
 		Tick_AttackMove(DeltaTime);
 		return;
 	}
@@ -329,6 +331,7 @@ void AAircraftMaster::TerminateAttackGroundCommand()
 
 void AAircraftMaster::TerminateAttackCommand()
 {
+	Strafe_StopAndRestoreSettings();
 	// Cancel any queued attack 
 	M_AircraftAttackData.Reset();
 	M_PendingPostLiftOffAction.Reset();
@@ -342,6 +345,7 @@ void AAircraftMaster::TerminateAttackCommand()
 
 void AAircraftMaster::ExecuteReturnToBase()
 {
+	Strafe_StopAndRestoreSettings();
 	Super::ExecuteReturnToBase();
 
 	// If we’re in the “prep takeoff” window, cancel it and stay landed.
@@ -1286,9 +1290,11 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 	case EAirPathPointType::Bezier:
 		break;
 	case EAirPathPointType::AttackDive:
+		Strafe_OnAttackDiveStarted();
 		StartWeaponFire();
 		break;
 	case EAirPathPointType::GetOutOfDive:
+		Strafe_OnDiveRecoveryStarted();
 		if (M_AircraftAttackData.bM_IsAttackGround)
 		{
 			StartBombThrowingAtLocation(M_AircraftAttackData.TargetLocation);
@@ -1404,6 +1410,7 @@ void AAircraftMaster::OnAttackMoveCompleted()
 	}
 	if (M_AircraftAttackData.bM_IsAttackGround)
 	{
+		Strafe_PrepareNextAttackRun();
 		StartAttackGround();
 		return;
 	}
@@ -2197,4 +2204,183 @@ void AAircraftMaster::CancelReturnToBase_VtoBackToAirborne()
 		                                       M_AircraftLandedData.TargetAirborneHeight);
 		DrawDebugSphere(GetWorld(), TargetLocation, 50.f, 12, FColor::Cyan, false, 20.f, 0, 1.f);
 	}
+}
+
+void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircraftSettings,
+                                     const FAircraftAttackMoveSettings& OverrideAttackMoveSettings)
+{
+	Strafe_ClearTimer();
+	M_PreStrafeAttackMoveSettings = M_AircraftMovementSettings.AttackMoveSettings;
+	M_AircraftMovementSettings.AttackMoveSettings = OverrideAttackMoveSettings;
+
+	M_StrafeState.StrafeStartLocation = StrafeAircraftSettings.StrafeStartLocation;
+	M_StrafeState.StrafeEndLocation = StrafeAircraftSettings.StrafeEndLocation;
+	M_StrafeState.PostStrafeMoveToLocation = StrafeAircraftSettings.PostStrafeMoveToLocation;
+	M_StrafeState.StrafePointTotalLerpTime = FMath::Max(0.f, StrafeAircraftSettings.StrafePointTotalLerpTime);
+	M_StrafeState.CurrentLerpTime = 0.f;
+	M_StrafeState.bM_IsStrafing = true;
+	M_StrafeState.bM_IsLerpingStrafePoint = false;
+	M_StrafeState.bM_ShouldReverseNextRun = false;
+
+	M_AircraftAttackData.TargetActor = nullptr;
+	M_AircraftAttackData.TargetLocation = M_StrafeState.StrafeStartLocation;
+	M_AircraftAttackData.bM_IsAttackGround = true;
+
+	Strafe_StartTimer(StrafeAircraftSettings.TotalStrafeTime);
+
+	if (M_LandedState != EAircraftLandingState::Airborne)
+	{
+		M_PendingPostLiftOffAction.Set(EPostLiftOffAction::AttackGround);
+		if (M_LandedState == EAircraftLandingState::Landed)
+		{
+			TakeOffFromGroundOrOwner();
+		}
+		return;
+	}
+
+	StartAttackGround();
+}
+
+void AAircraftMaster::Strafe_StartTimer(const float TotalStrafeTime)
+{
+	if (not GetWorld())
+	{
+		return;
+	}
+
+	TWeakObjectPtr<AAircraftMaster> WeakAircraft(this);
+	FTimerDelegate StrafeTimerDelegate;
+	StrafeTimerDelegate.BindLambda([WeakAircraft]()
+	{
+		AAircraftMaster* StrongAircraft = WeakAircraft.Get();
+		if (not IsValid(StrongAircraft))
+		{
+			return;
+		}
+
+		StrongAircraft->Strafe_OnTimerFinished();
+	});
+
+	GetWorld()->GetTimerManager().SetTimer(
+		M_StrafeState.StrafeTimerHandle,
+		StrafeTimerDelegate,
+		TotalStrafeTime,
+		false);
+}
+
+void AAircraftMaster::Strafe_OnTimerFinished()
+{
+	const FVector PostStrafeMoveToLocation = M_StrafeState.PostStrafeMoveToLocation;
+	TerminateAttackCommand();
+	ExecuteMoveCommand(PostStrafeMoveToLocation);
+}
+
+void AAircraftMaster::Strafe_TickTargetLocation(const float DeltaTime)
+{
+	if (not M_StrafeState.bM_IsStrafing || not M_StrafeState.bM_IsLerpingStrafePoint)
+	{
+		return;
+	}
+
+	if (M_StrafeState.StrafePointTotalLerpTime <= KINDA_SMALL_NUMBER)
+	{
+		M_AircraftAttackData.TargetLocation = M_StrafeState.ActiveLerpEndLocation;
+		Strafe_UpdateWeaponTargetLocation();
+		M_StrafeState.bM_IsLerpingStrafePoint = false;
+		return;
+	}
+
+	M_StrafeState.CurrentLerpTime = FMath::Min(
+		M_StrafeState.CurrentLerpTime + DeltaTime,
+		M_StrafeState.StrafePointTotalLerpTime);
+	const float LerpAlpha = M_StrafeState.CurrentLerpTime / M_StrafeState.StrafePointTotalLerpTime;
+	M_AircraftAttackData.TargetLocation = FMath::Lerp(
+		M_StrafeState.ActiveLerpStartLocation,
+		M_StrafeState.ActiveLerpEndLocation,
+		LerpAlpha);
+	Strafe_UpdateWeaponTargetLocation();
+
+	if (LerpAlpha >= 1.f)
+	{
+		M_StrafeState.bM_IsLerpingStrafePoint = false;
+	}
+}
+
+void AAircraftMaster::Strafe_UpdateWeaponTargetLocation() const
+{
+	if (not IssuedActionsState.bM_AreWeaponsActive)
+	{
+		return;
+	}
+
+	if (not EnsureAircraftWeaponIsValid())
+	{
+		return;
+	}
+
+	M_AircraftWeapon->UpdateGroundTargetLocation(M_AircraftAttackData.TargetLocation);
+}
+
+void AAircraftMaster::Strafe_OnAttackDiveStarted()
+{
+	if (not M_StrafeState.bM_IsStrafing)
+	{
+		return;
+	}
+
+	M_StrafeState.ActiveLerpStartLocation = M_StrafeState.bM_ShouldReverseNextRun
+		? M_StrafeState.StrafeEndLocation
+		: M_StrafeState.StrafeStartLocation;
+	M_StrafeState.ActiveLerpEndLocation = M_StrafeState.bM_ShouldReverseNextRun
+		? M_StrafeState.StrafeStartLocation
+		: M_StrafeState.StrafeEndLocation;
+	M_StrafeState.CurrentLerpTime = 0.f;
+	M_StrafeState.bM_IsLerpingStrafePoint = true;
+	M_AircraftAttackData.TargetLocation = M_StrafeState.ActiveLerpStartLocation;
+}
+
+void AAircraftMaster::Strafe_OnDiveRecoveryStarted()
+{
+	if (not M_StrafeState.bM_IsStrafing)
+	{
+		return;
+	}
+
+	M_StrafeState.bM_IsLerpingStrafePoint = false;
+	M_StrafeState.bM_ShouldReverseNextRun = not M_StrafeState.bM_ShouldReverseNextRun;
+}
+
+void AAircraftMaster::Strafe_PrepareNextAttackRun()
+{
+	if (not M_StrafeState.bM_IsStrafing)
+	{
+		return;
+	}
+
+	M_AircraftAttackData.TargetLocation = M_StrafeState.bM_ShouldReverseNextRun
+		? M_StrafeState.StrafeEndLocation
+		: M_StrafeState.StrafeStartLocation;
+}
+
+void AAircraftMaster::Strafe_StopAndRestoreSettings()
+{
+	if (not M_StrafeState.bM_IsStrafing)
+	{
+		return;
+	}
+
+	Strafe_ClearTimer();
+	M_AircraftMovementSettings.AttackMoveSettings = M_PreStrafeAttackMoveSettings;
+	M_StrafeState.ResetRuntime();
+}
+
+void AAircraftMaster::Strafe_ClearTimer()
+{
+	if (not GetWorld())
+	{
+		return;
+	}
+
+	GetWorld()->GetTimerManager().ClearTimer(M_StrafeState.StrafeTimerHandle);
+	M_StrafeState.StrafeTimerHandle.Invalidate();
 }

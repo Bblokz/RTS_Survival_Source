@@ -663,6 +663,11 @@ void UAircraftWeapon::AllWeaponsFireAtLocation(const FVector& TargetLocation)
 	}
 }
 
+void UAircraftWeapon::UpdateGroundTargetLocation(const FVector& TargetLocation)
+{
+	M_TargetingData.SetTargetGround(TargetLocation);
+}
+
 
 float UAircraftWeapon::GetTotalReloadTimeOfWeapons()
 {
