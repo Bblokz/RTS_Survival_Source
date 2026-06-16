@@ -25,7 +25,7 @@ class RTS_SURVIVAL_API UGlobalAbility : public UObject
 	
 	virtual void ActivateAbility();
 	
-	virtual void OnClickedAbilityLocation(const FVector& TargetLocation);
+	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation);
 	
 private:
 	UPROPERTY(Transient)

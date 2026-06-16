@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include "RTS_Survival/GlobalAbilitySystem/GlobalAbility/GlobalAbility.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "GlobalAbilitySetDataAsset.generated.h"
 
 UCLASS(BlueprintType)
