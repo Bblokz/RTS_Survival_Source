@@ -168,6 +168,17 @@ public:
 	void ApplyTechToBuildingExpansionsOfPlayer(UTechnologyEffect* TechEffect, const TArray<EBuildingExpansionType>& BxpSubtypes, uint8 Player) const;
 	void ApplyTechToAircraftOfPlayer(UTechnologyEffect* TechEffect, const TArray<EAircraftSubtype>& AircraftSubtypes, uint8 Player) const;
 
+	bool GetHasPlayerTankOfType(ETankSubtype TankSubtype) const;
+	bool GetHasPlayerSquadOfType(ESquadSubtype SquadSubtype) const;
+	bool GetHasPlayerNomadicOfType(ENomadicSubtype NomadicSubtype) const;
+	bool GetHasPlayerBxpOfType(EBuildingExpansionType BxpSubtype) const;
+	bool GetHasPlayerAircraftOfType(EAircraftSubtype AircraftSubtype) const;
+	bool GetHasEnemyTankOfType(ETankSubtype TankSubtype) const;
+	bool GetHasEnemySquadOfType(ESquadSubtype SquadSubtype) const;
+	bool GetHasEnemyNomadicOfType(ENomadicSubtype NomadicSubtype) const;
+	bool GetHasEnemyBxpOfType(EBuildingExpansionType BxpSubtype) const;
+	bool GetHasEnemyAircraftOfType(EAircraftSubtype AircraftSubtype) const;
+
 	int32 GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const;
 	int32 GetPlayerTankCountOfTypes(const uint8 Player, const TArray<ETankSubtype>& TankTypes) const;
 	int32 GetPlayerBxpTotalCountOfTypes(const uint8 Player, const TArray<EBuildingExpansionType>& BxpTypes) const;
@@ -284,6 +295,45 @@ private:
 
 	UPROPERTY()
 	TArray<AActor*> M_ActorsAliveEnemy;
+
+	void IncrementTankOrNomadicCounter(ATankMaster* Tank, uint8 Player);
+	void DecrementTankOrNomadicCounter(ATankMaster* Tank, uint8 Player);
+	void IncrementSquadCounter(ASquadUnit* SquadUnit, uint8 Player);
+	void DecrementSquadCounter(ASquadUnit* SquadUnit, uint8 Player);
+	void IncrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
+	void DecrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
+	void IncrementAircraftCounter(AAircraftMaster* Aircraft, uint8 Player);
+	void DecrementAircraftCounter(AAircraftMaster* Aircraft, uint8 Player);
+
+	UPROPERTY()
+	TMap<ETankSubtype, int32> M_PlayerHasTankOfType;
+
+	UPROPERTY()
+	TMap<ETankSubtype, int32> M_EnemyHasTankOfType;
+
+	UPROPERTY()
+	TMap<ESquadSubtype, int32> M_PlayerHasSquadOfType;
+
+	UPROPERTY()
+	TMap<ESquadSubtype, int32> M_EnemyHasSquadOfType;
+
+	UPROPERTY()
+	TMap<ENomadicSubtype, int32> M_PlayerHasNomadicOfType;
+
+	UPROPERTY()
+	TMap<ENomadicSubtype, int32> M_EnemyHasNomadicOfType;
+
+	UPROPERTY()
+	TMap<EBuildingExpansionType, int32> M_PlayerHasBxpOfType;
+
+	UPROPERTY()
+	TMap<EBuildingExpansionType, int32> M_EnemyHasBxpOfType;
+
+	UPROPERTY()
+	TMap<EAircraftSubtype, int32> M_PlayerHasAircraftOfType;
+
+	UPROPERTY()
+	TMap<EAircraftSubtype, int32> M_EnemyHasAircraftOfType;
 
 	// -------------- ASYNC TARGET FINDING ---------------
 
