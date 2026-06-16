@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "W_GlobalAbilityPanel.generated.h"
 
+class UGlobalAbility;
 class UW_GA_Item;
 /**
  * 
@@ -14,6 +15,9 @@ UCLASS()
 class RTS_SURVIVAL_API UW_GlobalAbilityPanel : public UUserWidget
 {
 	GENERATED_BODY()
+	
+	public:
+	void InitWithLoadedAbilities(TArray<TObjectPtr<UGlobalAbility>> LoadedAbilities);
 	
 	protected:
 	virtual void NativeOnInitialized() override;

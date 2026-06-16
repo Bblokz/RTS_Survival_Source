@@ -35,3 +35,17 @@ struct FGlobalAbilityRequirements
 	FTrainingOption RequiredUnit = FTrainingOption();
 	
 };
+
+USTRUCT(BlueprintType)
+struct FGlobalAbilityAimSettings
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EPlayerAimAbilityTypes AimType = EPlayerAimAbilityTypes::None;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float AimRadius = 500.f;
+};
+
+	
+	

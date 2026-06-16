@@ -11,6 +11,15 @@ void UW_GA_Item::SetupGa_Item(const TWeakObjectPtr<UGlobalAbility> GlobalAbility
 	(void)EnsureIsValidAbility();
 }
 
+void UW_GA_Item::OnClickedAbilityButton()
+{
+	if (not EnsureIsValidAbility())
+	{
+		return;
+	}
+	M_GlobalAbility->abil
+}
+
 bool UW_GA_Item::EnsureIsValidAbility()
 {
 	if (not M_GlobalAbility.IsValid())

@@ -109,6 +109,7 @@ public:
 	 * @param StrafeAircraftSettings Defines the strafe endpoints, duration, and post-strafe move.
 	 * @param OverrideAttackMoveSettings Attack path tuning used only while the timed strafe is active.
 	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void StrafeLocation(const FStrafeAircraftSettings& StrafeAircraftSettings,
 	                    const FAircraftAttackMoveSettings& OverrideAttackMoveSettings);
 

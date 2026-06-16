@@ -55,6 +55,7 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "CPPController.generated.h"
 
+class UGlobalAbilitiesManager;
 class UW_BuildingUI_ItemPanel;
 class UTowedActorComponent;
 class AAircraftMaster;
@@ -1645,6 +1646,8 @@ private:
 	TObjectPtr<UPlayerControlGroupManager> M_PlayerControlGroupManager;
 
 	UPROPERTY()
+	TObjectPtr<UGlobalAbilitiesManager> M_PlayerGlobabilitiesManager;
+	UPROPERTY()
 	TObjectPtr<UPlayerStartLocationManager> M_PlayerStartLocationManager;
 
 	bool GetIsValidCommandTypeDecoder();
@@ -1663,6 +1666,7 @@ private:
 	bool GetIsValidFormationController();
 	bool GetIsValidPlayerControlGroupManager();
 	bool GetIsValidPlayerTechManager();
+	bool GetIsValidPlayerGlobalAbiliesManager();
 
 	FNomadicPreviewAttachments GetNomadicPreviewAttachments(const ANomadicVehicle* NomadicVehicleToExpand) const;
 

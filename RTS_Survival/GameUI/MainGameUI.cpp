@@ -38,6 +38,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "TrainingUI/TrainingDescription/W_TrainingDescription.h"
 #include "RTS_Survival/GameUI/Archive/W_ArchiveNotificationHolder/W_ArchiveNotificationHolder.h"
+#include "RTS_Survival/GlobalAbilitySystem/UI/GlobalAbilityPanel/W_GlobalAbilityPanel.h"
 #include "RTS_Survival/Utils/RTSInputModeDefaults.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
@@ -93,6 +94,15 @@ void UMainGameUI::SetMainMenuVisiblity(const bool bVisible)
 	{
 		M_MissionManagerWidget->SetVisibility(NewVisibility);
 	}
+}
+
+TWeakObjectPtr<UW_GlobalAbilityPanel> UMainGameUI::GetGlobalAbilityPanel()
+{
+	if (EnsureGlobalAbilityPanelIsValid())
+	{
+		return GlobalAbilityPanel;
+	}
+	return nullptr;
 }
 
 void UMainGameUI::SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager)
@@ -1351,6 +1361,17 @@ void UMainGameUI::OnCloseTechTree()
 
 	M_PlayerController->SetIsPlayerInTechTree(false);
 	SetMainMenuVisiblity(true);
+}
+
+bool UMainGameUI::EnsureGlobalAbilityPanelIsValid() const
+{
+	if (not IsValid(GlobalAbilityPanel))
+	{
+		RTSFunctionLibrary::ReportError("GlobalAbilityPanel is not valid in MainGameUI!"
+			"\n at function EnsureGlobalAbilityPanelIsValid in MainGameUI.cpp");
+		return false;
+	}
+	return true;
 }
 
 void UMainGameUI::OnOpenArchive()

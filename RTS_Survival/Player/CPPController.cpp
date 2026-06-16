@@ -42,6 +42,7 @@
 #include "RTS_Survival/GameUI/BottomCenterUI/BuildingUI_ItemPanel/W_BuildingUI_ItemPanel.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
@@ -254,6 +255,7 @@ ACPPController::ACPPController()
 	M_PlayerAudioController = CreateDefaultSubobject<UPlayerAudioController>(TEXT("PlayerAudioController"));
 	M_PlayerPortraitManager = CreateDefaultSubobject<UPlayerPortraitManager>(TEXT("PlayerPortraitManager"));
 	M_PlayerOutlineComponent = CreateDefaultSubobject<UPlayerOutlineComponent>(TEXT("PlayerOutlineComponent"));
+	M_PlayerGlobabilitiesManager = CreateDefaultSubobject<UGlobalAbilitiesManager>(TEXT("PlayerGlobalAbilitiesManager"));
 
 
 	CheatClass = URTSCheatManager::StaticClass();
@@ -6597,6 +6599,17 @@ bool ACPPController::GetIsValidPlayerTechManager()
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerTechManager",
 	                                                      "GetIsValidPlayerTechManager", this);
 	return false;
+}
+
+bool ACPPController::GetIsValidPlayerGlobalAbiliesManager()
+{
+	if (not IsValid(M_PlayerGlobabilitiesManager))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerGlobabilitiesManager",
+		                                                      "GetIsValidPlayerGlobalAbiliesManager", this);
+		return false;
+	}
+	return true;
 }
 
 FNomadicPreviewAttachments ACPPController::GetNomadicPreviewAttachments(
