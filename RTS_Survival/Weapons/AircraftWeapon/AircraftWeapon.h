@@ -41,6 +41,7 @@ public:
 	void AllWeaponsStopFire(const bool bStopReload, const bool bStopCoolDown);
 	void AllWeaponsFire(AActor* TargetActor);
 	void AllWeaponsFireAtLocation(const FVector& TargetLocation);
+	void UpdateGroundTargetLocation(const FVector& TargetLocation);
 
 	float GetTotalReloadTimeOfWeapons();
 
