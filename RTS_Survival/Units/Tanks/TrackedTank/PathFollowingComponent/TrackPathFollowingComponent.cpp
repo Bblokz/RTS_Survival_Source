@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 
 #include "TrackPathFollowingComponent.h"
@@ -556,7 +556,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			M_LastSteeringInput = Steering;
 			M_LastThrottleInput = 0.f;
 			UpdateVehicle(/*Throttle*/0.f, /*CurrentSpeed*/M_CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/
-			              Steering);
+			                          Steering);
 			return;
 		}
 	}
@@ -1318,23 +1318,13 @@ FVector UTrackPathFollowingComponent::FindTeleportLocation()
 	const FVector Direction = (VehicleCurrentDestination - StartLocation).GetSafeNormal();
 	const FVector EndLocation = StartLocation + (Direction * TeleportDistance);
 
-	FHitResult HitResult;
-	FCollisionQueryParams CollisionParams;
-	CollisionParams.AddIgnoredActor(ControlledPawn);
-
-	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility,
-	                                                 CollisionParams);
-
-	if (not bHit)
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (NavSys)
 	{
-		UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-		if (NavSys)
+		FNavLocation NavLocation;
+		if (NavSys->ProjectPointToNavigation(EndLocation, NavLocation, FVector(500.f, 500.f, 500.f)))
 		{
-			FNavLocation NavLocation;
-			if (NavSys->ProjectPointToNavigation(EndLocation, NavLocation, FVector(100.f, 100.f, 100.f)))
-			{
-				return NavLocation.Location + FVector(0.f, 0.f, TeleportUnstuckZOffset);
-			}
+			return NavLocation.Location + FVector(0.f, 0.f, TeleportUnstuckZOffset);
 		}
 	}
 
