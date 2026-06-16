@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -685,8 +685,6 @@ private:
 	// Counter for extra stuck checking.
 	float M_TimeAtLowSpeed = 0.f;
 
-	// To switch between teleporting and generating a stuck location to navigate to.
-	bool bM_TeleportedLastStuck = false;
 
 	bool bSnapToSpline;
 
