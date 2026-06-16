@@ -17,6 +17,6 @@ void UGlobalAbility::ActivateAbility()
 	
 }
 
-void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation)
+void UGlobalAbility::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
 }

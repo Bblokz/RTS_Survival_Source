@@ -556,7 +556,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			M_LastSteeringInput = Steering;
 			M_LastThrottleInput = 0.f;
 			UpdateVehicle(/*Throttle*/0.f, /*CurrentSpeed*/M_CurrentSpeed, DeltaTime, /*Brake*/0.f, /*Steering*/
-			              Steering);
+			                          Steering);
 			return;
 		}
 	}
@@ -1279,64 +1279,52 @@ bool UTrackPathFollowingComponent::VisibilityTrace(const FVector& Start, const F
 
 FVector UTrackPathFollowingComponent::TeleportOrCalculateUnstuckDestination(const FVector& MoveFocus)
 {
-	if (not bM_TeleportedLastStuck)
+	if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 	{
+		RTSFunctionLibrary::PrintString("Attempting to teleport vehicle to get unstuck!");
+	}
+
+	// Attempt to find a teleport location
+	const FVector TeleportLocation = FindTeleportLocation();
+
+	if (not TeleportLocation.IsNearlyZero())
+	{
+		// Teleport the vehicle to the new location
+		ControlledPawn->SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::TeleportPhysics);
+
+		// Draw a debug sphere at the teleport location
 		if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
 		{
-			RTSFunctionLibrary::PrintString("Attempting to teleport vehicle to get unstuck!");
+			DrawDebugSphere(GetWorld(), TeleportLocation, 50.f, 12, FColor::Red, false, 5.f);
 		}
-		// Attempt to find a teleport location
-		FVector TeleportLocation = FindTeleportLocation();
 
-		if (not TeleportLocation.IsNearlyZero())
-		{
-			// Teleport the vehicle to the new location
-			ControlledPawn->SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::TeleportPhysics);
+		// Vehicle is no longer stuck
+		ResetStuck();
 
-			// Draw a debug sphere at the teleport location
-			if constexpr (DeveloperSettings::Debugging::GPathFollowing_Compile_DebugSymbols)
-			{
-				DrawDebugSphere(GetWorld(), TeleportLocation, 50.f, 12, FColor::Red, false, 5.f);
-			}
-
-			// Vehicle is no longer stuck
-			ResetStuck();
-
-			bM_TeleportedLastStuck = not bM_TeleportedLastStuck;
-
-			// Return the current location as we've already teleported
-			return ControlledPawn->GetActorLocation();
-		}
+		// Return the current location as we've already teleported
+		return ControlledPawn->GetActorLocation();
 	}
-	bM_TeleportedLastStuck = not bM_TeleportedLastStuck;
-	// Teleportation either failed or we teleported last time.
+
+	// Teleportation failed, so keep the previous side/back movement fallback.
 	return GetUnstuckLocation(MoveFocus);
 }
 
 FVector UTrackPathFollowingComponent::FindTeleportLocation()
 {
+	constexpr float TeleportUnstuckZOffset = 80.f;
+
 	const FVector StartLocation = ControlledPawn->GetActorLocation();
 	// Calculate direction vector to the destination
 	const FVector Direction = (VehicleCurrentDestination - StartLocation).GetSafeNormal();
 	const FVector EndLocation = StartLocation + (Direction * TeleportDistance);
 
-	FHitResult HitResult;
-	FCollisionQueryParams CollisionParams;
-	CollisionParams.AddIgnoredActor(ControlledPawn);
-
-	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility,
-	                                                 CollisionParams);
-
-	if (not bHit)
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (NavSys)
 	{
-		UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-		if (NavSys)
+		FNavLocation NavLocation;
+		if (NavSys->ProjectPointToNavigation(EndLocation, NavLocation, FVector(500.f, 500.f, 500.f)))
 		{
-			FNavLocation NavLocation;
-			if (NavSys->ProjectPointToNavigation(EndLocation, NavLocation, FVector(100.f, 100.f, 100.f)))
-			{
-				return NavLocation.Location;
-			}
+			return NavLocation.Location + FVector(0.f, 0.f, TeleportUnstuckZOffset);
 		}
 	}
 

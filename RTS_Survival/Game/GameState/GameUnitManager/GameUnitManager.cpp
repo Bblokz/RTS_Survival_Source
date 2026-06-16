@@ -1171,7 +1171,7 @@ void UGameUnitManager::DecrementTankOrNomadicCounter(ATankMaster* Tank, const ui
 
 void UGameUnitManager::IncrementSquadCounter(ASquadUnit* SquadUnit, const uint8 Player)
 {
-	if (not IsValid(SquadUnit) || not IsValid(SquadUnit->RTSComponent))
+	if (not IsValid(SquadUnit) || not IsValid(SquadUnit->GetRTSComponent()))
 	{
 		return;
 	}
@@ -1179,12 +1179,12 @@ void UGameUnitManager::IncrementSquadCounter(ASquadUnit* SquadUnit, const uint8 
 	TMap<ESquadSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasSquadOfType
 		: M_EnemyHasSquadOfType;
-	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, SquadUnit->RTSComponent->GetSubtypeAsSquadSubtype());
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, SquadUnit->GetRTSComponent()->GetSubtypeAsSquadSubtype());
 }
 
 void UGameUnitManager::DecrementSquadCounter(ASquadUnit* SquadUnit, const uint8 Player)
 {
-	if (not IsValid(SquadUnit) || not IsValid(SquadUnit->RTSComponent))
+	if (not IsValid(SquadUnit) || not IsValid(SquadUnit->GetRTSComponent()))
 	{
 		return;
 	}
@@ -1192,7 +1192,7 @@ void UGameUnitManager::DecrementSquadCounter(ASquadUnit* SquadUnit, const uint8 
 	TMap<ESquadSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasSquadOfType
 		: M_EnemyHasSquadOfType;
-	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, SquadUnit->RTSComponent->GetSubtypeAsSquadSubtype(), TEXT("Squad subtype counter"));
+	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, SquadUnit->GetRTSComponent()->GetSubtypeAsSquadSubtype(), TEXT("Squad subtype counter"));
 }
 
 void UGameUnitManager::IncrementBxpCounter(ABuildingExpansion* Bxp, const uint8 Player)

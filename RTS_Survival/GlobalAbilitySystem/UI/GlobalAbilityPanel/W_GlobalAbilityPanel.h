@@ -18,6 +18,14 @@ class RTS_SURVIVAL_API UW_GlobalAbilityPanel : public UUserWidget
 	protected:
 	virtual void NativeOnInitialized() override;
 	
-	UPROPERTY(EditDefaultsOnly, blueprintReadOnly)
-	TSubclassOf<UW_GA_Item> AbilityWidgetClass;
+	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UW_GA_Item> GlobalAbility_1;
+	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UW_GA_Item> GlobalAbility_2;
+	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UW_GA_Item> GlobalAbility_3;
+	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UW_GA_Item> GlobalAbility_4;
+	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UW_GA_Item> GlobalAbility_5;
 };
