@@ -37,11 +37,14 @@
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/GameUI/BottomCenterUI/BuildingUI_ItemPanel/W_BuildingUI_ItemPanel.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
+#include "RTS_Survival/GlobalAbilitySystem/DevSettings/CommanderSettings.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
@@ -292,6 +295,24 @@ AActor* ACPPController::GetPrimarySelectedUnit() const
 		return nullptr;
 	}
 	return M_GameUIController->GetPrimarySelectedUnit();
+}
+
+void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,
+                                             const FGlobalAbilitySoundSettings& SoundSettings, UGlobalAbility* AbilityActivated)
+{
+	if (not GetIsValidPlayerAudioController() || not IsValid(AbilityActivated))
+	{
+		return;
+	}
+	if (IsValid(SoundSettings.AnnouncerSoundOnActivate))
+	{
+		GetPlayerAudioController()->PlayCustomAnnouncerVoiceLine(SoundSettings.AnnouncerSoundOnActivate, false);	
+	}
+	if (IsValid(SoundSettings.Sound2DOnActivate))
+	{
+		GetPlayerAudioController()->PlayCustomOneShot2DSound(SoundSettings.Sound2DOnActivate);
+	}
+	// todo activate the primary click context and setup aim ability with provided settings.
 }
 
 void ACPPController::RequestShellTypeChangeForSelection(
@@ -7243,6 +7264,34 @@ void ACPPController::OnHitEscape()
 	}
 
 	OpenEscapeMenu();
+}
+
+void ACPPController::OnMainMenuWidgetCreated(UMainGameUI* MainMenuWidget)
+{
+	InitializeGlobalAbilityManager(MainMenuWidget);
+}
+
+void ACPPController::InitializeGlobalAbilityManager(UMainGameUI* MainMenu)
+{
+	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	const UCommanderSettings* CommanderDevSettings = UCommanderSettings::Get();
+	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not GetIsValidPlayerGlobalAbiliesManager() || not GameInstance || not IsValid(CommanderDevSettings))
+	{
+		return;
+	}
+	ERTSCommander Commander  =  GameInstance->GetPlayerCommander();
+	FRTSCommanderSettings CommanderSettings =  CommanderDevSettings->GetCommanderSettingsForType(Commander)			;
+	
+	
+	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
+		1,
+		CommanderSettings.GlobalAbilities,
+		MainMenu->GetGlobalAbilityPanel(),
+		M_PlayerResourceManager,
+		GameUnitManager,
+		M_PlayerTechManager
+		);
 }
 
 void ACPPController::DeactivateActionButton()

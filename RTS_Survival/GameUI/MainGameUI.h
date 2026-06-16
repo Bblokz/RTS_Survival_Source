@@ -21,6 +21,7 @@
 #include "TrainingUI/TrainingMenuManager.h"
 #include "MainGameUI.generated.h"
 
+class UW_GA_Description;
 class UW_GlobalAbilityPanel;
 struct FSelectedUnitsWidgetState;
 struct FInit_ActionUI;
@@ -172,7 +173,7 @@ class RTS_SURVIVAL_API UMainGameUI : public UUserWidget, public IRTSUIElement
 public:
 	void OpenTechTree();
 	void SetMainMenuVisiblity(const bool bVisible);
-	TWeakObjectPtr<UW_GlobalAbilityPanel> GetGlobalAbilityPanel();
+	TObjectPtr<UW_GlobalAbilityPanel> GetGlobalAbilityPanel();
 	void SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager);
 	UW_MissionWidgetManager* GetMissionManagerWidget() const;
 	/** @reutrn Whether the left click was consumed to close an open option menu. */
@@ -340,6 +341,10 @@ protected:
 	UPROPERTY(meta=(BindWidget))
 	TObjectPtr<UW_GlobalAbilityPanel> GlobalAbilityPanel;
 	bool EnsureGlobalAbilityPanelIsValid()const;
+	
+	UPROPERTY(meta=(BindWidget))
+	
+	
 
 	UPROPERTY(meta=(BindWidget))
 	UCanvasPanel* MainUICanvas;

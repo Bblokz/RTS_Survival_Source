@@ -90,6 +90,16 @@ void UPlayerAudioController::PlayVoiceLine(const AActor* PrimarySelectedUnit,
 	PlayAudio(VoiceLine, VoiceLineType, bForcePlay, bQueueIfNotPlayed);
 }
 
+void UPlayerAudioController::PlayCustomOneShot2DSound(TObjectPtr<USoundBase> Sound)
+{
+	if (not IsValid(Sound))
+	{
+		return;
+	}
+	// todo create 2d sound that auto destroys and play the sound on that component.
+	
+}
+
 float UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType Type,
                                                      const bool bQueueIfNotPlayed,
                                                      const bool InterruptRegularVoiceLines)

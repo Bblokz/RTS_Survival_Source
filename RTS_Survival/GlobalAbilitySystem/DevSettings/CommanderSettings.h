@@ -19,6 +19,15 @@ class RTS_SURVIVAL_API UCommanderSettings : public UDeveloperSettings
 	
 	UCommanderSettings();
 	
+	FRTSCommanderSettings GetCommanderSettingsForType(const ERTSCommander CommanderType) const;
+	
+	
+	/** Convenience accessor. */
+	static const UCommanderSettings* Get()
+	{
+		return GetDefault<UCommanderSettings>();
+	}
+	
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Data")
 	TMap<ERTSCommander, FRTSCommanderSettings> CommanderSettingsByType;
 };

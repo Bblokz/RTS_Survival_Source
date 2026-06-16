@@ -96,7 +96,7 @@ void UMainGameUI::SetMainMenuVisiblity(const bool bVisible)
 	}
 }
 
-TWeakObjectPtr<UW_GlobalAbilityPanel> UMainGameUI::GetGlobalAbilityPanel()
+TObjectPtr<UW_GlobalAbilityPanel> UMainGameUI::GetGlobalAbilityPanel()
 {
 	if (EnsureGlobalAbilityPanelIsValid())
 	{

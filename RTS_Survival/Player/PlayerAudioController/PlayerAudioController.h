@@ -163,6 +163,8 @@ public:
 	 */
 	void PlayVoiceLine(const AActor* PrimarySelectedUnit, ERTSVoiceLine VoiceLineType, bool bForcePlay = false,
 	                   bool bQueueIfNotPlayed = false);
+	
+	void PlayCustomOneShot2DSound(TObjectPtr<USoundBase> Sound);
 
 	/**
 	 * 

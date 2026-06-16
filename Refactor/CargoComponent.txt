@@ -1,1 +1,70 @@
-﻿You are going to implement a massive very 
+﻿you are a c++ expert and perfectionist.
+You are going to fully implement a large system i already started for the global abilities in this game.
+Make sure to read through the relevant files so you understand the intent of the structure of the system
+before proceeding to implement the rest.
+
+for this system we make use of 2 developer settings:
+1.  class RTS_SURVIVAL_API UCommanderSettings : public UDeveloperSettings where the abiilty enums are stored for each
+type of commander the  playe has picked. 
+the commander enum itself is stored on the game instance and will be loaded from there in the cpp controller (see later)
+2. class RTS_SURVIVAL_API URTSGlobalAbilitySettings : public UDeveloperSettings
+in here we store a soft object pointer to the data asset with all the data for all the global abilities.
+
+There is a globa abilities manager object called class RTS_SURVIVAL_API UGlobalAbilitiesManager : public UActorComponent whcih
+is added to the player controller and will be in charge of checking the unit and tech requirements for the abilities on the player.
+because we intennt to also use this manager on the enemy controller but the enemy controller does not make
+use of such requirements so keep that in mind.
+
+the following things have to be implemented end to end by you:
+1:
+after the creation of the main game ui whcih contains the ability panel this funciton will be called from blueprints via OnMainMenuWidgetCreated
+void ACPPController::InitializeGlobalAbilityManager(UMainGameUI* MainMenu)
+from there all info is already provided to InitGlobalAbilitiesManager.
+You need to implement LoadGlobalAbilities where we want to copy uobject each global ability associated with the each enum 
+value in our array. This is because in the class RTS_SURVIVAL_API UGlobalAbilitySetDataAsset : public UDataAsset we have
+stored templates of objects so do not directly use those objects but make sure exact copies are made for our manager to use.
+
+then after those are all loaded make suer to init the ability panel and all the items with their respective loaded ability object. and keep the objects
+on the aiblity manager as UPROPERTY TObjects as we do here: 	GlobalAbilities = AbilitiesLoadedCopyUObjects;
+
+make sure every object gets all the references it needs to work properly and verify that that is done.
+
+2: The Clicking of an item of a global ability by the player and handeling it. First the ability will be 'activated' during which 
+custom sounds saved in the ability can be played on the player controller and the player controller needs a new function that checks in RegularPrimaryClick whether 
+  we are actually handling an active glboal ability, if we are then the primary click needs to be routed to the 	
+void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation)
+ on
+  the global ability where the location is the clicked loccation.
+You also need to implement the cancellation of the global ability; stopping its aim, when the player secondary clicks while the ability is active.
+ Essentially; we will first
+activate the abiltiy, and save a weak reference on the cpp controller to it. then the (optional) sounds will be played and the
+aim ability will be set; extend void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings to make sure all of that will work properly.
+Then when the void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation) is called make sure to check all the requirements
+and if all are good then make sure the player resource manager pays for the cost (if applicable) and then call
+the execute of the ability on it.
+
+3. the hover logic. There is a specific hover widget which will be poplulated with the UI settings of the abilty
+that is hovered. the hover and click functionality will come from the global ability item widget's blueprint.
+ensure that if the ability is on cooldown that then we disable its button.
+if the ability has an unmet tech requirement then that goes first and set the descriptin with Required Tech: <tech_name> use sBad114 with the
+URTSRichTextConverter.
+and save the original tint of the button and instead now set a grey tint to show it is not available.
+for uint requiremetn not met (second priority) we use the same sBad and Required Unit : where we place the unit display name after that.
+4. Make sure the abiltiy manager if owned by player 1 runs a custom timer every second that calculates the cooldowns
+of those abilties on cooldon and that verifies the requirements of each ability using the player tech and game unit managers.
+also make sure that if during this requirement check cycle we find out that the ability is avaialbe again we restore the original tint!
+if only not available due to cooldown make it sbad14  with text On Cooldown : < time left>
+
+5 Make sure that we save the original tint of the button of the ability item but make sure it is set to grey tint
+in case one  of the requirements is not met so it is clear to the palyer that the ability is not available.
+always restore the original tint in case the ability becomes available again.
+
+also make sure to collapse the description widget by default in void UGlobalAbilitiesManager::InitGlobalAbilitiesManager(const int32 OwningPlayer
+and ensure it is visible when hovered, but collapsesd again on on hover.
+make sure we do not show it if ANY global abilty is in the active state. e.g. waiting on player click!
+
+
+Implement all of this end to end correctly and surgically. Review your work after you are done and catch any bugs. Also verify
+whether everything I described will work as intended.
+
+

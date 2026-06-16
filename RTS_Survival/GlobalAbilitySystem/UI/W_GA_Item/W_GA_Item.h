@@ -7,6 +7,7 @@
 #include "Components/Button.h"
 #include "W_GA_Item.generated.h"
 
+class UGlobalAbilitiesManager;
 class UW_HotKey;
 class UGlobalAbility;
 /**
@@ -18,7 +19,10 @@ class RTS_SURVIVAL_API UW_GA_Item : public UUserWidget
 	GENERATED_BODY()
 	
 	public:
-	void SetupGa_Item(TWeakObjectPtr<UGlobalAbility> GlobalAbility);
+	void SetupGa_Item(TWeakObjectPtr<UGlobalAbility> GlobalAbility, 
+		UGlobalAbilitiesManager* GlobalAbilityManager);
+	
+	void OnAbilityHovered(UGlobalAbility* HoveredAbility, const bool bIsHover);
 	
 	protected:
 	
@@ -27,13 +31,19 @@ class RTS_SURVIVAL_API UW_GA_Item : public UUserWidget
 	
 	UPROPERTY( BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_HotKey> HotkeyWidget;
-	
+
 	UFUNCTION( BlueprintCallable, NotBlueprintable)
 	void OnClickedAbilityButton();
+	
+	UFUNCTION( BlueprintCallable, NotBlueprintable)
+	void OnHoveredAbilityButton(const bool bIsHover);
 	
 private:
 	UPROPERTY()
 	TWeakObjectPtr<UGlobalAbility> M_GlobalAbility;
 	[[nodiscard]] bool EnsureIsValidAbility();
 	
+	UPROPERTY()
+	TWeakObjectPtr<UGlobalAbilitiesManager> M_GlobalAbilityManager;
+	[[nodiscard]] bool EnsureIsValidAbilityManager();
 };

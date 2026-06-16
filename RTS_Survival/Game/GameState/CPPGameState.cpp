@@ -2476,7 +2476,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ArmorPenMaxRange = 14;
 	WeaponData.MagCapacity = 600;
 	WeaponData.ReloadSpeed = 6;
-	WeaponData.BaseCooldown = 0.4;
+	WeaponData.BaseCooldown = 0.2;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 60;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
@@ -2858,7 +2858,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::BasicSmallArmsRange; // preserved from original
+	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::AircraftSmallArmsRange;
 	WeaponData.ArmorPen = 101;
 	WeaponData.ArmorPenMaxRange = 83;
 	WeaponData.MagCapacity = 22;

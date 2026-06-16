@@ -8,6 +8,7 @@
 #include "GlobalAbilitiesManager.generated.h"
 
 
+class UW_GA_Description;
 class UGameUnitManager;
 struct FTrainingOption;
 class UPlayerResourceManager;
@@ -35,6 +36,9 @@ public:
 	bool QueryRequirementForAbility(TObjectPtr<UGlobalAbility> Ability) const;
 	bool QueryCostsForAbility(TObjectPtr<UGlobalAbility> Ability) const;
 	
+	void OnHoveredAbilityButton(UGlobalAbility* HoveredAbility, const bool bIsHover);
+	void OnClickedAbilityButton(UGlobalAbility* ClickedAbility);
+	
 protected:
 	
 	
@@ -46,6 +50,10 @@ protected:
 	UPROPERTY()
 	TWeakObjectPtr<UW_GlobalAbilityPanel> Mw_GlobalAbilityPanel;
 	[[nodiscard]] bool EnsureIsValidGlobalAbilityPanel()const;
+	
+	UPROPERTY()
+	TWeakObjectPtr<UW_GA_Description> Mw_GA_Description;
+	[[nodiscard]] bool EnsureIsValidGlobalAbilityDescription()const;
 	
 	UPROPERTY()
 	TWeakObjectPtr<UPlayerTechManager> M_PlayerTechManager;
@@ -65,6 +73,7 @@ protected:
 	void InitAbilityPanel(TArray<TObjectPtr<UGlobalAbility>> LoadedAbilities);
 
 	void CheckRequirements() const;
+	// Returns true if the player has this unit.
 	bool CheckDoesPlayerHaveUnit(const FTrainingOption& UnitId)const;
 	
 	UPROPERTY()

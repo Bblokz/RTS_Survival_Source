@@ -40,6 +40,7 @@
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Player/Abilities.h"
@@ -55,6 +56,9 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "CPPController.generated.h"
 
+enum class EGlobalAbility : uint8;
+struct FGlobalAbilitySoundSettings;
+struct FGlobalAbilityAimSettings;
 class UGlobalAbilitiesManager;
 class UW_BuildingUI_ItemPanel;
 class UTowedActorComponent;
@@ -306,6 +310,10 @@ public:
 	void InitBuildingUI_ItemPanel(UW_BuildingUI_ItemPanel* Panel);
 
 	AActor* GetPrimarySelectedUnit() const;
+	
+	// ------------------ Global ability system ----------------------
+	void OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,
+	                             const FGlobalAbilitySoundSettings& SoundSettings, UGlobalAbility* AbilityActivated);
 
 	/**
 	 * @brief Applies an ammo selection to every selected unit with the same weapon identifier.
@@ -800,6 +808,10 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "EscapeMenu")
 	void OnHitEscape();
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void OnMainMenuWidgetCreated(UMainGameUI* MainMenuWidget);
+	void InitializeGlobalAbilityManager(UMainGameUI* MainMenu);
 
 	// Keeps  track of an array of landscape deform components to write radii to a render target.
 	UPROPERTY()

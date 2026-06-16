@@ -6,6 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "W_GlobalAbilityPanel.generated.h"
 
+class UGlobalAbilitiesManager;
+class UW_GA_Description;
 class UGlobalAbility;
 class UW_GA_Item;
 /**
@@ -17,7 +19,10 @@ class RTS_SURVIVAL_API UW_GlobalAbilityPanel : public UUserWidget
 	GENERATED_BODY()
 	
 	public:
-	void InitWithLoadedAbilities(TArray<TObjectPtr<UGlobalAbility>> LoadedAbilities);
+	void InitWithLoadedAbilities(TArray<TObjectPtr<UGlobalAbility>> LoadedAbilities,
+		UGlobalAbilitiesManager* Manager);
+	
+	UW_GA_Description* GetDescription() const {return Description;}
 	
 	protected:
 	virtual void NativeOnInitialized() override;
@@ -32,4 +37,8 @@ class RTS_SURVIVAL_API UW_GlobalAbilityPanel : public UUserWidget
 	TObjectPtr<UW_GA_Item> GlobalAbility_4;
 	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_GA_Item> GlobalAbility_5;
+	
+	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UW_GA_Description> Description;
+	
 };
