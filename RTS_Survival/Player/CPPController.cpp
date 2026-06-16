@@ -300,19 +300,57 @@ AActor* ACPPController::GetPrimarySelectedUnit() const
 void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,
                                              const FGlobalAbilitySoundSettings& SoundSettings, UGlobalAbility* AbilityActivated)
 {
-	if (not GetIsValidPlayerAudioController() || not IsValid(AbilityActivated))
+	if (not IsValid(AbilityActivated))
 	{
 		return;
 	}
-	if (IsValid(SoundSettings.AnnouncerSoundOnActivate))
+	if (GetIsValidPlayerAudioController())
 	{
-		GetPlayerAudioController()->PlayCustomAnnouncerVoiceLine(SoundSettings.AnnouncerSoundOnActivate, false);	
+		if (IsValid(SoundSettings.AnnouncerSoundOnActivate))
+		{
+			GetPlayerAudioController()->PlayCustomAnnouncerVoiceLine(SoundSettings.AnnouncerSoundOnActivate, false);
+		}
+		if (IsValid(SoundSettings.Sound2DOnActivate))
+		{
+			GetPlayerAudioController()->PlayCustomOneShot2DSound(SoundSettings.Sound2DOnActivate);
+		}
 	}
-	if (IsValid(SoundSettings.Sound2DOnActivate))
+	M_ActiveGlobalAbility = AbilityActivated;
+	if (GetIsValidPlayerAimAbilityActor())
 	{
-		GetPlayerAudioController()->PlayCustomOneShot2DSound(SoundSettings.Sound2DOnActivate);
+		M_PlayerAimAbility->ShowGlobalAbilityRadius(AimSettings.AimRadius, AimSettings.AimType);
 	}
-	// todo activate the primary click context and setup aim ability with provided settings.
+}
+
+bool ACPPController::TryHandleActiveGlobalAbilityPrimaryClick(const FVector& ClickedLocation)
+{
+	if (not M_ActiveGlobalAbility.IsValid())
+	{
+		return false;
+	}
+	UGlobalAbility* ActiveGlobalAbility = M_ActiveGlobalAbility.Get();
+	M_ActiveGlobalAbility.Reset();
+	if (GetIsValidPlayerAimAbilityActor())
+	{
+		M_PlayerAimAbility->HideRadius();
+	}
+	ActiveGlobalAbility->OnClickedAbilityLocation(ClickedLocation);
+	return true;
+}
+
+bool ACPPController::TryCancelActiveGlobalAbility()
+{
+	if (not M_ActiveGlobalAbility.IsValid())
+	{
+		return false;
+	}
+	M_ActiveGlobalAbility.Get()->CancelAbilityActivation();
+	M_ActiveGlobalAbility.Reset();
+	if (GetIsValidPlayerAimAbilityActor())
+	{
+		M_PlayerAimAbility->HideRadius();
+	}
+	return true;
 }
 
 void ACPPController::RequestShellTypeChangeForSelection(
@@ -1864,6 +1902,10 @@ float ACPPController::GetCameraPitchLimit()
 
 void ACPPController::SecondaryClickStart()
 {
+	if (TryCancelActiveGlobalAbility())
+	{
+		return;
+	}
 	// This captures the primary click for formation widget creation.
 	M_PrimaryClickContext = ERTSPrimaryClickContext::SecondaryActive;
 	// Get current mouse position in screen space.
@@ -2269,6 +2311,11 @@ void ACPPController::RegularPrimaryClick()
 	AActor* ClickedActor = HitUnderCursor.GetActor();
 	ChangeClickedActorIfIsChildActor(ClickedActor);
 	FVector ClickedLocation = HitUnderCursor.Location;
+
+	if (TryHandleActiveGlobalAbilityPrimaryClick(ClickedLocation))
+	{
+		return;
+	}
 
 	if (not IsAnyUnitSelected())
 	{

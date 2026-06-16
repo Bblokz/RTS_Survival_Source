@@ -79,4 +79,8 @@ private:
 	bool IsBlockedByRequirements();
 	bool IsBlockedByCosts();
 	bool IsBlockedByCooldown();
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<ACPPController> M_PlayerController;
+	[[nodiscard]] bool EnsureIsValidPlayerController() const;
 };

@@ -25,6 +25,7 @@ public:
 		const EAbilityID MainAbility,
 		const int32 AbilitySubType, AActor* PrimarySelectedActor);
 	void HideRadius();
+	void ShowGlobalAbilityRadius(const float Radius, const EPlayerAimAbilityTypes AimType);
 	[[nodiscard]] bool IsPlayerAimActive() const { return bM_IsPlayerAimActive; }
 
 protected:

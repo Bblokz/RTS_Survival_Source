@@ -13,7 +13,7 @@ class RTS_SURVIVAL_API UGlobalAbilitySetDataAsset : public UDataAsset
 	GENERATED_BODY()
 
 public:
-	TObjectPtr<UObject> GetGLobalAbilityForTypeAsCopyFromTemplate(const EGlobalAbility Type);
+	TObjectPtr<UGlobalAbility> GetGLobalAbilityForTypeAsCopyFromTemplate(const EGlobalAbility Type);
 
 private:
 	// Do not use directly; always copy uobjects on it.

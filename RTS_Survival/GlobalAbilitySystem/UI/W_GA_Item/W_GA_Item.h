@@ -23,6 +23,8 @@ class RTS_SURVIVAL_API UW_GA_Item : public UUserWidget
 		UGlobalAbilitiesManager* GlobalAbilityManager);
 	
 	void OnAbilityHovered(UGlobalAbility* HoveredAbility, const bool bIsHover);
+	void SetAbilityAvailable(const bool bIsEnabled, const bool bUseGreyTint);
+	UGlobalAbility* GetLoadedAbility() const { return M_GlobalAbility.Get(); }
 	
 	protected:
 	
@@ -46,4 +48,7 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UGlobalAbilitiesManager> M_GlobalAbilityManager;
 	[[nodiscard]] bool EnsureIsValidAbilityManager();
+
+	FButtonStyle M_OriginalButtonStyle;
+	bool bM_HasOriginalButtonStyle = false;
 };

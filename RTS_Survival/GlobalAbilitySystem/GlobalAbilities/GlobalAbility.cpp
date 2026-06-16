@@ -4,6 +4,8 @@
 #include "GlobalAbility.h"
 
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
+#include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UGlobalAbility::UGlobalAbility()
 {
@@ -15,6 +17,7 @@ void UGlobalAbility::InitGlobalAbility(const int32 OwningPlayer,
 {
 	M_OwningPlayer = OwningPlayer;
 	M_GlobalAbilitiesManager = GlobalAbilitiesManager;
+	M_PlayerController = PlayerController;
 	(void)EnsureIsValidGlobalAbilityManager();
 }
 
@@ -34,8 +37,19 @@ void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation)
 	{
 		return;
 	}
-	// see if the ability can actually be executed given the requirements using the manager.
-	
+	if (IsBlocked())
+	{
+		CancelAbilityActivation();
+		return;
+	}
+	if (IsOwnedByPlayer() && not M_GlobalAbilitiesManager.Get()->TryPayForAbility(this))
+	{
+		CancelAbilityActivation();
+		return;
+	}
+	ExecuteAbilityAtLocation(TargetLocation);
+	M_AbilityState = EGlobalAbilityState::NotActivated;
+	M_GlobalAbilitiesManager.Get()->OnAbilityFinishedExecuting(this);
 }
 
 void UGlobalAbility::ActivateAbility()
@@ -49,7 +63,11 @@ void UGlobalAbility::ActivateAbility()
 	{
 		return;
 	}
-	// todo if owned by player 1; 
+	M_AbilityState = EGlobalAbilityState::Activated;
+	if (IsOwnedByPlayer() && EnsureIsValidPlayerController())
+	{
+		M_PlayerController.Get()->OnGlobaAbilityActivated(M_AimSettings, M_AbilitySoundSettings, this);
+	}
 }
 
 void UGlobalAbility::ExecuteAbilityAtLocation(const FVector& TargetLocation)
@@ -96,7 +114,7 @@ bool UGlobalAbility::IsBlockedByRequirements()
 	{
 		return true;
 	}
-	return M_GlobalAbilitiesManager->QueryRequirementForAbility(this);
+	return not M_GlobalAbilitiesManager.Get()->QueryRequirementForAbility(this);
 }
 
 bool UGlobalAbility::IsBlockedByCosts()
@@ -110,7 +128,22 @@ bool UGlobalAbility::IsBlockedByCosts()
 	{
 		return true;
 	}
-	return M_GlobalAbilitiesManager->QueryCostsForAbility(this);
+	return not M_GlobalAbilitiesManager.Get()->QueryCostsForAbility(this);
+}
+
+bool UGlobalAbility::EnsureIsValidPlayerController() const
+{
+	if (M_PlayerController.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_PlayerController"),
+		TEXT("UGlobalAbility::EnsureIsValidPlayerController"),
+		this
+	);
+	return false;
 }
 
 bool UGlobalAbility::IsBlockedByCooldown()
