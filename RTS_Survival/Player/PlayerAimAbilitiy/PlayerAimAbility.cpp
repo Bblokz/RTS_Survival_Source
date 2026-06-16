@@ -77,6 +77,31 @@ void APlayerAimAbility::DetermineShowAimRadiusForAbility(const EAbilityID MainAb
 	}
 }
 
+void APlayerAimAbility::ShowGlobalAbilityRadius(const float Radius, const EPlayerAimAbilityTypes AimType)
+{
+	if (not GetIsValidAimMeshComponent())
+	{
+		return;
+	}
+	if (Radius <= 1.f || AimType == EPlayerAimAbilityTypes::None)
+	{
+		HideRadius();
+		return;
+	}
+	UMaterialInterface* AimMaterial = nullptr;
+	if (not GetIsValidMaterialForAimType(AimType, AimMaterial))
+	{
+		HideRadius();
+		return;
+	}
+	bM_IsPlayerAimActive = true;
+	SetActorHiddenInGame(false);
+	const float ScaleValue = Radius / UnitsPerScale;
+	SetActorScale3D(FVector(ScaleValue, ScaleValue, 1));
+	AimMeshComponent->SetMaterial(0, AimMaterial);
+	SetMaterialParameter(Radius, AimType);
+}
+
 void APlayerAimAbility::HideRadius()
 {
 	bM_IsPlayerAimActive = false;

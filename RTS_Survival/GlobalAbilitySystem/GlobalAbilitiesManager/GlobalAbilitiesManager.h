@@ -9,6 +9,7 @@
 
 
 class UW_GA_Description;
+class UW_GA_Item;
 class UGameUnitManager;
 struct FTrainingOption;
 class UPlayerResourceManager;
@@ -38,6 +39,9 @@ public:
 	
 	void OnHoveredAbilityButton(UGlobalAbility* HoveredAbility, const bool bIsHover);
 	void OnClickedAbilityButton(UGlobalAbility* ClickedAbility);
+	void OnAbilityFinishedExecuting(UGlobalAbility* Ability);
+	bool TryPayForAbility(UGlobalAbility* Ability) const;
+	bool GetHasActiveAbility() const;
 	
 protected:
 	
@@ -48,11 +52,11 @@ protected:
 	bool IsPlayerAbilityManager() const;
 	
 	UPROPERTY()
-	TWeakObjectPtr<UW_GlobalAbilityPanel> Mw_GlobalAbilityPanel;
+	TWeakObjectPtr<UW_GlobalAbilityPanel> M_GlobalAbilityPanel;
 	[[nodiscard]] bool EnsureIsValidGlobalAbilityPanel()const;
 	
 	UPROPERTY()
-	TWeakObjectPtr<UW_GA_Description> Mw_GA_Description;
+	TWeakObjectPtr<UW_GA_Description> M_GA_Description;
 	[[nodiscard]] bool EnsureIsValidGlobalAbilityDescription()const;
 	
 	UPROPERTY()
@@ -72,11 +76,23 @@ protected:
 	
 	void InitAbilityPanel(TArray<TObjectPtr<UGlobalAbility>> LoadedAbilities);
 
-	void CheckRequirements() const;
+	void CheckRequirements();
+	void StartPlayerRequirementTimer();
+	void UpdateAbilityAvailability(UGlobalAbility* Ability);
+	void UpdateAbilityItemAvailability(const UGlobalAbility* Ability, const bool bIsEnabled, const bool bUseGreyTint) const;
+	FText GetHoverDescriptionForAbility(const UGlobalAbility* Ability) const;
+	FString GetUnitRequirementDisplayName(const FTrainingOption& UnitId) const;
 	// Returns true if the player has this unit.
 	bool CheckDoesPlayerHaveUnit(const FTrainingOption& UnitId)const;
+	bool CheckDoesPlayerHaveSquad(const FTrainingOption& UnitId) const;
+	bool CheckDoesPlayerHaveTank(const FTrainingOption& UnitId) const;
+	bool CheckDoesPlayerHaveNomadic(const FTrainingOption& UnitId) const;
+	bool CheckDoesPlayerHaveBuildingExpansion(const FTrainingOption& UnitId) const;
+	bool CheckDoesPlayerHaveAircraft(const FTrainingOption& UnitId) const;
 	
 	UPROPERTY()
-	TArray<UGlobalAbility*> GlobalAbilities;
+	TArray<TObjectPtr<UGlobalAbility>> M_GlobalAbilities;
+
+	FTimerHandle M_CheckRequirementsTimerHandle;
 
 };

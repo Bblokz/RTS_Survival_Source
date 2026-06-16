@@ -314,6 +314,8 @@ public:
 	// ------------------ Global ability system ----------------------
 	void OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,
 	                             const FGlobalAbilitySoundSettings& SoundSettings, UGlobalAbility* AbilityActivated);
+	bool TryHandleActiveGlobalAbilityPrimaryClick(const FVector& ClickedLocation);
+	bool TryCancelActiveGlobalAbility();
 
 	/**
 	 * @brief Applies an ammo selection to every selected unit with the same weapon identifier.
@@ -1049,6 +1051,9 @@ private:
 	ERTSPrimaryClickContext M_PrimaryClickContext;
 
 	void RegularPrimaryClick();
+
+	UPROPERTY()
+	TWeakObjectPtr<UGlobalAbility> M_ActiveGlobalAbility;
 
 	// Clicked primary when secondary is held down, opens the formation widget.
 	void PrimaryClickWhileSecondaryActive();

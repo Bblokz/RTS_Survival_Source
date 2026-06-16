@@ -23,6 +23,7 @@ class RTS_SURVIVAL_API UW_GlobalAbilityPanel : public UUserWidget
 		UGlobalAbilitiesManager* Manager);
 	
 	UW_GA_Description* GetDescription() const {return Description;}
+	TArray<UW_GA_Item*> GetAbilityItems() const;
 	
 	protected:
 	virtual void NativeOnInitialized() override;
