@@ -540,7 +540,7 @@ private:
 		FVector StrafeEndLocation = FVector::ZeroVector;
 		FVector ActiveLerpStartLocation = FVector::ZeroVector;
 		FVector ActiveLerpEndLocation = FVector::ZeroVector;
-		// Updated at recovery start so the next attack run begins from the last point weapons/bombs targeted.
+		// Reset at recovery start so repeated custom strafes keep engaging the authored target instead of drifting.
 		FVector NextRunStartLocation = FVector::ZeroVector;
 		FVector PostStrafeMoveToLocation = FVector::ZeroVector;
 		float StrafePointTotalLerpTime = 0.f;
