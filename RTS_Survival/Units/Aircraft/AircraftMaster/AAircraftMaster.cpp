@@ -2217,10 +2217,14 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 	M_StrafeState.StrafeEndLocation = StrafeAircraftSettings.StrafeEndLocation;
 	M_StrafeState.PostStrafeMoveToLocation = StrafeAircraftSettings.PostStrafeMoveToLocation;
 	M_StrafeState.StrafePointTotalLerpTime = FMath::Max(0.f, StrafeAircraftSettings.StrafePointTotalLerpTime);
+	M_StrafeState.StrafePointDistance = FVector::Dist2D(
+		M_StrafeState.StrafeStartLocation,
+		M_StrafeState.StrafeEndLocation);
+	M_StrafeState.NextRunStartLocation = M_StrafeState.StrafeStartLocation;
 	M_StrafeState.CurrentLerpTime = 0.f;
 	M_StrafeState.bM_IsStrafing = true;
 	M_StrafeState.bM_IsLerpingStrafePoint = false;
-	M_StrafeState.bM_ShouldReverseNextRun = false;
+	M_StrafeState.bM_IsFirstAttackRun = true;
 
 	M_AircraftAttackData.TargetActor = nullptr;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.StrafeStartLocation;
@@ -2321,6 +2325,30 @@ void AAircraftMaster::Strafe_UpdateWeaponTargetLocation() const
 	M_AircraftWeapon->UpdateGroundTargetLocation(M_AircraftAttackData.TargetLocation);
 }
 
+FVector AAircraftMaster::Strafe_GetOrientedEndLocation(const FVector& CurrentTargetLocation) const
+{
+	FVector ForwardDirection = GetActorForwardVector();
+	ForwardDirection.Z = 0.f;
+
+	if (ForwardDirection.Normalize())
+	{
+		FVector OrientedEndLocation = CurrentTargetLocation + ForwardDirection * M_StrafeState.StrafePointDistance;
+		OrientedEndLocation.Z = CurrentTargetLocation.Z;
+		return OrientedEndLocation;
+	}
+
+	FVector OriginalStrafeDirection = M_StrafeState.StrafeEndLocation - M_StrafeState.StrafeStartLocation;
+	OriginalStrafeDirection.Z = 0.f;
+	if (OriginalStrafeDirection.Normalize())
+	{
+		FVector FallbackEndLocation = CurrentTargetLocation + OriginalStrafeDirection * M_StrafeState.StrafePointDistance;
+		FallbackEndLocation.Z = CurrentTargetLocation.Z;
+		return FallbackEndLocation;
+	}
+
+	return CurrentTargetLocation;
+}
+
 void AAircraftMaster::Strafe_OnAttackDiveStarted()
 {
 	if (not M_StrafeState.bM_IsStrafing)
@@ -2328,12 +2356,10 @@ void AAircraftMaster::Strafe_OnAttackDiveStarted()
 		return;
 	}
 
-	M_StrafeState.ActiveLerpStartLocation = M_StrafeState.bM_ShouldReverseNextRun
+	M_StrafeState.ActiveLerpStartLocation = M_StrafeState.NextRunStartLocation;
+	M_StrafeState.ActiveLerpEndLocation = M_StrafeState.bM_IsFirstAttackRun
 		? M_StrafeState.StrafeEndLocation
-		: M_StrafeState.StrafeStartLocation;
-	M_StrafeState.ActiveLerpEndLocation = M_StrafeState.bM_ShouldReverseNextRun
-		? M_StrafeState.StrafeStartLocation
-		: M_StrafeState.StrafeEndLocation;
+		: Strafe_GetOrientedEndLocation(M_StrafeState.ActiveLerpStartLocation);
 	M_StrafeState.CurrentLerpTime = 0.f;
 	M_StrafeState.bM_IsLerpingStrafePoint = true;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.ActiveLerpStartLocation;
@@ -2347,7 +2373,8 @@ void AAircraftMaster::Strafe_OnDiveRecoveryStarted()
 	}
 
 	M_StrafeState.bM_IsLerpingStrafePoint = false;
-	M_StrafeState.bM_ShouldReverseNextRun = not M_StrafeState.bM_ShouldReverseNextRun;
+	M_StrafeState.NextRunStartLocation = M_AircraftAttackData.TargetLocation;
+	M_StrafeState.bM_IsFirstAttackRun = false;
 }
 
 void AAircraftMaster::Strafe_PrepareNextAttackRun()
@@ -2357,9 +2384,7 @@ void AAircraftMaster::Strafe_PrepareNextAttackRun()
 		return;
 	}
 
-	M_AircraftAttackData.TargetLocation = M_StrafeState.bM_ShouldReverseNextRun
-		? M_StrafeState.StrafeEndLocation
-		: M_StrafeState.StrafeStartLocation;
+	M_AircraftAttackData.TargetLocation = M_StrafeState.NextRunStartLocation;
 }
 
 void AAircraftMaster::Strafe_StopAndRestoreSettings()

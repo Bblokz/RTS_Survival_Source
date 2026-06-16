@@ -109,7 +109,6 @@ public:
 	 * @param StrafeAircraftSettings Defines the strafe endpoints, duration, and post-strafe move.
 	 * @param OverrideAttackMoveSettings Attack path tuning used only while the timed strafe is active.
 	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void StrafeLocation(const FStrafeAircraftSettings& StrafeAircraftSettings,
 	                    const FAircraftAttackMoveSettings& OverrideAttackMoveSettings);
 
@@ -540,12 +539,16 @@ private:
 		FVector StrafeEndLocation = FVector::ZeroVector;
 		FVector ActiveLerpStartLocation = FVector::ZeroVector;
 		FVector ActiveLerpEndLocation = FVector::ZeroVector;
+		// Updated at recovery start so the next attack run begins from the last point weapons/bombs targeted.
+		FVector NextRunStartLocation = FVector::ZeroVector;
 		FVector PostStrafeMoveToLocation = FVector::ZeroVector;
 		float StrafePointTotalLerpTime = 0.f;
 		float CurrentLerpTime = 0.f;
+		// Cached from the ordered lane and reused for orientation-based follow-up runs.
+		float StrafePointDistance = 0.f;
 		bool bM_IsStrafing = false;
 		bool bM_IsLerpingStrafePoint = false;
-		bool bM_ShouldReverseNextRun = false;
+		bool bM_IsFirstAttackRun = true;
 		FTimerHandle StrafeTimerHandle;
 
 		void ResetRuntime()
@@ -553,7 +556,7 @@ private:
 			CurrentLerpTime = 0.f;
 			bM_IsStrafing = false;
 			bM_IsLerpingStrafePoint = false;
-			bM_ShouldReverseNextRun = false;
+			bM_IsFirstAttackRun = true;
 			StrafeTimerHandle.Invalidate();
 		}
 	};
@@ -565,6 +568,7 @@ private:
 	void Strafe_OnTimerFinished();
 	void Strafe_TickTargetLocation(const float DeltaTime);
 	void Strafe_UpdateWeaponTargetLocation() const;
+	FVector Strafe_GetOrientedEndLocation(const FVector& CurrentTargetLocation) const;
 	void Strafe_OnAttackDiveStarted();
 	void Strafe_OnDiveRecoveryStarted();
 	void Strafe_PrepareNextAttackRun();
