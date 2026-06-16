@@ -142,6 +142,43 @@ namespace GameUnitManagerDetailedState
 	}
 }
 
+
+namespace GameUnitManagerUnitTypeCounters
+{
+	constexpr uint8 PlayerIndex = 1;
+
+	template <typename TSubtype>
+	void IncrementCounter(TMap<TSubtype, int32>& Counters, const TSubtype Subtype)
+	{
+		int32& Count = Counters.FindOrAdd(Subtype);
+		++Count;
+	}
+
+	template <typename TSubtype>
+	void DecrementCounter(
+		TMap<TSubtype, int32>& Counters,
+		const TSubtype Subtype,
+		const TCHAR* CounterName)
+	{
+		int32& Count = Counters.FindOrAdd(Subtype);
+		--Count;
+		if (Count >= 0)
+		{
+			return;
+		}
+
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("%s became lower than zero in UGameUnitManager. A unit was removed twice or was not added before removal."),
+			CounterName));
+	}
+
+	template <typename TSubtype>
+	bool GetHasUnitOfType(const TMap<TSubtype, int32>& Counters, const TSubtype Subtype)
+	{
+		return Counters.FindRef(Subtype) > 0;
+	}
+}
+
 namespace GameUnitManagerHealthBarVisibility
 {
 	bool TryGetPlayerVisibilityStrategy(
@@ -745,21 +782,25 @@ void UGameUnitManager::AddSquadUnitForPlayer(ASquadUnit* SquadUnit, const uint8 
 	// De-dup from both sides first, and notify removals if this was a move.
 	if (M_SquadUnitsAliveEnemy.Remove(SquadUnit) > 0)
 	{
+		DecrementSquadCounter(SquadUnit, 2);
 		GameUnitDelegates.NotifySquad(2, SquadUnit, false);
 	}
 	if (M_SquadUnitAlivePlayer.Remove(SquadUnit) > 0)
 	{
+		DecrementSquadCounter(SquadUnit, 1);
 		GameUnitDelegates.NotifySquad(1, SquadUnit, false);
 	}
 
 	if (Player == 1)
 	{
 		M_SquadUnitAlivePlayer.Add(SquadUnit);
+		IncrementSquadCounter(SquadUnit, 1);
 		GameUnitDelegates.NotifySquad(1, SquadUnit, true);
 		return;
 	}
 
 	M_SquadUnitsAliveEnemy.Add(SquadUnit);
+	IncrementSquadCounter(SquadUnit, Player);
 	GameUnitDelegates.NotifySquad(Player, SquadUnit, true);
 }
 
@@ -778,15 +819,23 @@ void UGameUnitManager::RemoveSquadUnitForPlayer(ASquadUnit* SquadUnit, const uin
 	{
 		if (M_SquadUnitAlivePlayer.Remove(SquadUnit) > 0)
 		{
+			DecrementSquadCounter(SquadUnit, 1);
 			GameUnitDelegates.NotifySquad(1, SquadUnit, false);
+			return;
 		}
+
+		DecrementSquadCounter(SquadUnit, 1);
 		return;
 	}
 
 	if (M_SquadUnitsAliveEnemy.Remove(SquadUnit) > 0)
 	{
+		DecrementSquadCounter(SquadUnit, Player);
 		GameUnitDelegates.NotifySquad(Player, SquadUnit, false);
+		return;
 	}
+
+	DecrementSquadCounter(SquadUnit, Player);
 }
 
 void UGameUnitManager::AddTankForPlayer(ATankMaster* Tank, const uint8 Player)
@@ -803,21 +852,25 @@ void UGameUnitManager::AddTankForPlayer(ATankMaster* Tank, const uint8 Player)
 	// De-dup + notify removal for prior ownership.
 	if (M_TankMastersAliveEnemy.Remove(Tank) > 0)
 	{
+		DecrementTankOrNomadicCounter(Tank, 2);
 		GameUnitDelegates.NotifyTank(2, Tank, false);
 	}
 	if (M_TankMastersAlivePlayer.Remove(Tank) > 0)
 	{
+		DecrementTankOrNomadicCounter(Tank, 1);
 		GameUnitDelegates.NotifyTank(1, Tank, false);
 	}
 
 	if (Player == 1)
 	{
 		M_TankMastersAlivePlayer.Add(Tank);
+		IncrementTankOrNomadicCounter(Tank, 1);
 		GameUnitDelegates.NotifyTank(1, Tank, true);
 		return;
 	}
 
 	M_TankMastersAliveEnemy.Add(Tank);
+	IncrementTankOrNomadicCounter(Tank, Player);
 	GameUnitDelegates.NotifyTank(Player, Tank, true);
 }
 
@@ -836,15 +889,23 @@ void UGameUnitManager::RemoveTankForPlayer(ATankMaster* Tank, const uint8 Player
 	{
 		if (M_TankMastersAlivePlayer.Remove(Tank) > 0)
 		{
+			DecrementTankOrNomadicCounter(Tank, 1);
 			GameUnitDelegates.NotifyTank(1, Tank, false);
+			return;
 		}
+
+		DecrementTankOrNomadicCounter(Tank, 1);
 		return;
 	}
 
 	if (M_TankMastersAliveEnemy.Remove(Tank) > 0)
 	{
+		DecrementTankOrNomadicCounter(Tank, Player);
 		GameUnitDelegates.NotifyTank(Player, Tank, false);
+		return;
 	}
+
+	DecrementTankOrNomadicCounter(Tank, Player);
 }
 
 bool UGameUnitManager::AddAircraftForPlayer(AAircraftMaster* Aircraft, const uint8 Player)
@@ -857,10 +918,12 @@ bool UGameUnitManager::AddAircraftForPlayer(AAircraftMaster* Aircraft, const uin
 	// De-dup from both arrays and notify prior removal if needed.
 	if (M_AircraftMastersAliveEnemy.Remove(Aircraft) > 0)
 	{
+		DecrementAircraftCounter(Aircraft, 2);
 		GameUnitDelegates.NotifyAircraft(2, Aircraft, false);
 	}
 	if (M_AircraftMastersAlivePlayer.Remove(Aircraft) > 0)
 	{
+		DecrementAircraftCounter(Aircraft, 1);
 		GameUnitDelegates.NotifyAircraft(1, Aircraft, false);
 	}
 
@@ -871,6 +934,7 @@ bool UGameUnitManager::AddAircraftForPlayer(AAircraftMaster* Aircraft, const uin
 			return false;
 		}
 		M_AircraftMastersAlivePlayer.Add(Aircraft);
+		IncrementAircraftCounter(Aircraft, 1);
 		GameUnitDelegates.NotifyAircraft(1, Aircraft, true);
 		return true;
 	}
@@ -880,6 +944,7 @@ bool UGameUnitManager::AddAircraftForPlayer(AAircraftMaster* Aircraft, const uin
 		return false;
 	}
 	M_AircraftMastersAliveEnemy.Add(Aircraft);
+	IncrementAircraftCounter(Aircraft, Player);
 	GameUnitDelegates.NotifyAircraft(Player, Aircraft, true);
 	return true;
 }
@@ -895,17 +960,21 @@ bool UGameUnitManager::RemoveAircraftForPlayer(AAircraftMaster* Aircraft, const 
 	{
 		if (M_AircraftMastersAlivePlayer.Remove(Aircraft) > 0)
 		{
+			DecrementAircraftCounter(Aircraft, 1);
 			GameUnitDelegates.NotifyAircraft(1, Aircraft, false);
 			return true;
 		}
+		DecrementAircraftCounter(Aircraft, 1);
 		return false;
 	}
 
 	if (M_AircraftMastersAliveEnemy.Remove(Aircraft) > 0)
 	{
+		DecrementAircraftCounter(Aircraft, Player);
 		GameUnitDelegates.NotifyAircraft(Player, Aircraft, false);
 		return true;
 	}
+	DecrementAircraftCounter(Aircraft, Player);
 	return false;
 }
 
@@ -919,10 +988,12 @@ bool UGameUnitManager::AddBxpForPlayer(ABuildingExpansion* Bxp, const uint8 Play
 	// De-dup on both sides and notify prior removal if this is effectively a move.
 	if (M_BxpAliveEnemy.Remove(Bxp) > 0)
 	{
+		DecrementBxpCounter(Bxp, 2);
 		GameUnitDelegates.NotifyBxp(2, Bxp, false);
 	}
 	if (M_BxpAlivePlayer.Remove(Bxp) > 0)
 	{
+		DecrementBxpCounter(Bxp, 1);
 		GameUnitDelegates.NotifyBxp(1, Bxp, false);
 	}
 
@@ -933,6 +1004,7 @@ bool UGameUnitManager::AddBxpForPlayer(ABuildingExpansion* Bxp, const uint8 Play
 			return false;
 		}
 		M_BxpAlivePlayer.Add(Bxp);
+		IncrementBxpCounter(Bxp, 1);
 		GameUnitDelegates.NotifyBxp(1, Bxp, true);
 		return true;
 	}
@@ -942,6 +1014,7 @@ bool UGameUnitManager::AddBxpForPlayer(ABuildingExpansion* Bxp, const uint8 Play
 		return false;
 	}
 	M_BxpAliveEnemy.Add(Bxp);
+	IncrementBxpCounter(Bxp, Player);
 	GameUnitDelegates.NotifyBxp(Player, Bxp, true);
 	return true;
 }
@@ -957,17 +1030,21 @@ bool UGameUnitManager::RemoveBxpForPlayer(ABuildingExpansion* Bxp, const uint8 P
 	{
 		if (M_BxpAlivePlayer.Remove(Bxp) > 0)
 		{
+			DecrementBxpCounter(Bxp, 1);
 			GameUnitDelegates.NotifyBxp(1, Bxp, false);
 			return true;
 		}
+		DecrementBxpCounter(Bxp, 1);
 		return false;
 	}
 
 	if (M_BxpAliveEnemy.Remove(Bxp) > 0)
 	{
+		DecrementBxpCounter(Bxp, Player);
 		GameUnitDelegates.NotifyBxp(Player, Bxp, false);
 		return true;
 	}
+	DecrementBxpCounter(Bxp, Player);
 	return false;
 }
 
@@ -1030,6 +1107,194 @@ TArray<ATankMaster*> UGameUnitManager::GetPlayerTanks(const uint8 Player) const
 		return M_TankMastersAlivePlayer;
 	}
 	return M_TankMastersAliveEnemy;
+}
+
+
+
+void UGameUnitManager::IncrementTankOrNomadicCounter(ATankMaster* Tank, const uint8 Player)
+{
+	if (not IsValid(Tank))
+	{
+		return;
+	}
+
+	URTSComponent* const RTSComponent = Tank->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		RTSFunctionLibrary::ReportError("Tank has no valid RTSComponent in IncrementTankOrNomadicCounter.");
+		return;
+	}
+
+	if (RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic)
+	{
+		TMap<ENomadicSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+			? M_PlayerHasNomadicOfType
+			: M_EnemyHasNomadicOfType;
+		GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, RTSComponent->GetSubtypeAsNomadicSubtype());
+		return;
+	}
+
+	TMap<ETankSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasTankOfType
+		: M_EnemyHasTankOfType;
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, RTSComponent->GetSubtypeAsTankSubtype());
+}
+
+void UGameUnitManager::DecrementTankOrNomadicCounter(ATankMaster* Tank, const uint8 Player)
+{
+	if (not IsValid(Tank))
+	{
+		return;
+	}
+
+	URTSComponent* const RTSComponent = Tank->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		RTSFunctionLibrary::ReportError("Tank has no valid RTSComponent in DecrementTankOrNomadicCounter.");
+		return;
+	}
+
+	if (RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic)
+	{
+		TMap<ENomadicSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+			? M_PlayerHasNomadicOfType
+			: M_EnemyHasNomadicOfType;
+		GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, RTSComponent->GetSubtypeAsNomadicSubtype(), TEXT("Nomadic subtype counter"));
+		return;
+	}
+
+	TMap<ETankSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasTankOfType
+		: M_EnemyHasTankOfType;
+	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, RTSComponent->GetSubtypeAsTankSubtype(), TEXT("Tank subtype counter"));
+}
+
+void UGameUnitManager::IncrementSquadCounter(ASquadUnit* SquadUnit, const uint8 Player)
+{
+	if (not IsValid(SquadUnit) || not IsValid(SquadUnit->RTSComponent))
+	{
+		return;
+	}
+
+	TMap<ESquadSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasSquadOfType
+		: M_EnemyHasSquadOfType;
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, SquadUnit->RTSComponent->GetSubtypeAsSquadSubtype());
+}
+
+void UGameUnitManager::DecrementSquadCounter(ASquadUnit* SquadUnit, const uint8 Player)
+{
+	if (not IsValid(SquadUnit) || not IsValid(SquadUnit->RTSComponent))
+	{
+		return;
+	}
+
+	TMap<ESquadSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasSquadOfType
+		: M_EnemyHasSquadOfType;
+	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, SquadUnit->RTSComponent->GetSubtypeAsSquadSubtype(), TEXT("Squad subtype counter"));
+}
+
+void UGameUnitManager::IncrementBxpCounter(ABuildingExpansion* Bxp, const uint8 Player)
+{
+	if (not IsValid(Bxp) || not IsValid(Bxp->GetRTSComponent()))
+	{
+		return;
+	}
+
+	TMap<EBuildingExpansionType, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasBxpOfType
+		: M_EnemyHasBxpOfType;
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, Bxp->GetRTSComponent()->GetSubtypeAsBxpSubtype());
+}
+
+void UGameUnitManager::DecrementBxpCounter(ABuildingExpansion* Bxp, const uint8 Player)
+{
+	if (not IsValid(Bxp) || not IsValid(Bxp->GetRTSComponent()))
+	{
+		return;
+	}
+
+	TMap<EBuildingExpansionType, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasBxpOfType
+		: M_EnemyHasBxpOfType;
+	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, Bxp->GetRTSComponent()->GetSubtypeAsBxpSubtype(), TEXT("BXP subtype counter"));
+}
+
+void UGameUnitManager::IncrementAircraftCounter(AAircraftMaster* Aircraft, const uint8 Player)
+{
+	if (not IsValid(Aircraft) || not IsValid(Aircraft->GetRTSComponent()))
+	{
+		return;
+	}
+
+	TMap<EAircraftSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasAircraftOfType
+		: M_EnemyHasAircraftOfType;
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, Aircraft->GetRTSComponent()->GetSubtypeAsAircraftSubtype());
+}
+
+void UGameUnitManager::DecrementAircraftCounter(AAircraftMaster* Aircraft, const uint8 Player)
+{
+	if (not IsValid(Aircraft) || not IsValid(Aircraft->GetRTSComponent()))
+	{
+		return;
+	}
+
+	TMap<EAircraftSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		? M_PlayerHasAircraftOfType
+		: M_EnemyHasAircraftOfType;
+	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, Aircraft->GetRTSComponent()->GetSubtypeAsAircraftSubtype(), TEXT("Aircraft subtype counter"));
+}
+
+bool UGameUnitManager::GetHasPlayerTankOfType(const ETankSubtype TankSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_PlayerHasTankOfType, TankSubtype);
+}
+
+bool UGameUnitManager::GetHasPlayerSquadOfType(const ESquadSubtype SquadSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_PlayerHasSquadOfType, SquadSubtype);
+}
+
+bool UGameUnitManager::GetHasPlayerNomadicOfType(const ENomadicSubtype NomadicSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_PlayerHasNomadicOfType, NomadicSubtype);
+}
+
+bool UGameUnitManager::GetHasPlayerBxpOfType(const EBuildingExpansionType BxpSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_PlayerHasBxpOfType, BxpSubtype);
+}
+
+bool UGameUnitManager::GetHasPlayerAircraftOfType(const EAircraftSubtype AircraftSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_PlayerHasAircraftOfType, AircraftSubtype);
+}
+
+bool UGameUnitManager::GetHasEnemyTankOfType(const ETankSubtype TankSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_EnemyHasTankOfType, TankSubtype);
+}
+
+bool UGameUnitManager::GetHasEnemySquadOfType(const ESquadSubtype SquadSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_EnemyHasSquadOfType, SquadSubtype);
+}
+
+bool UGameUnitManager::GetHasEnemyNomadicOfType(const ENomadicSubtype NomadicSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_EnemyHasNomadicOfType, NomadicSubtype);
+}
+
+bool UGameUnitManager::GetHasEnemyBxpOfType(const EBuildingExpansionType BxpSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_EnemyHasBxpOfType, BxpSubtype);
+}
+
+bool UGameUnitManager::GetHasEnemyAircraftOfType(const EAircraftSubtype AircraftSubtype) const
+{
+	return GameUnitManagerUnitTypeCounters::GetHasUnitOfType(M_EnemyHasAircraftOfType, AircraftSubtype);
 }
 
 int32 UGameUnitManager::GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const
