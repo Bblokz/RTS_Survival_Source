@@ -241,7 +241,7 @@ void URTSCameraShakeSubsystem::TryPlayAggregatedShake(const float CurrentTimeSec
 		RTSGameUserSettingsRanges::MaxCameraShakeMultiplier
 	);
 	const float ScaledIntensity = AggregatedIntensity * Settings->M_GlobalIntensityMultiplier * UserShakeMultiplier;
-	const float ClampedIntensity = FMath::Clamp(ScaledIntensity, 0.0f, 2.0f);
+	const float ClampedIntensity = FMath::Clamp(ScaledIntensity, 0.0f, 30.0f);
 	if (ClampedIntensity <= 0.0f)
 	{
 		return;
