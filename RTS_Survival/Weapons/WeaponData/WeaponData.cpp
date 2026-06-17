@@ -764,11 +764,11 @@ void FWeaponImpactPool::Activate(
 
 // ===== END FWeaponShellCase ======================================================
 
-UWeaponState::UWeaponState(): WeaponIndex(0), WeaponHitType(), TraceChannel(),
-                              FireModeFunc(nullptr),
-                              World(nullptr),
-                              OwningPlayer(0),
-                              M_WeaponName(), M_WeaponFireMode()
+UWeaponState::UWeaponState() : WeaponIndex(0), WeaponHitType(), TraceChannel(),
+                               FireModeFunc(nullptr),
+                               World(nullptr),
+                               OwningPlayer(0),
+                               M_WeaponName(), M_WeaponFireMode()
 {
 }
 
@@ -1438,13 +1438,14 @@ void UWeaponState::CreateWeaponImpact(const FVector& HitLocation, const ERTSSurf
 }
 
 
-void UWeaponState::CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal, const bool bHandleSound)
+void UWeaponState::CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal,
+                                         const bool bHandleSound)
 {
 	if (not IsValid(World))
 	{
 		return;
 	}
-	USoundBase* SoundAsset = bHandleSound ? M_WeaponVfx.BounceSound: nullptr;
+	USoundBase* SoundAsset = bHandleSound ? M_WeaponVfx.BounceSound : nullptr;
 
 	// Route through the same pool. For consistency we pass the provided normal/rotator.
 	M_ImpactPool.PlayBounce(
@@ -2168,15 +2169,19 @@ void UWeaponStateProjectile::FireWeaponSystem()
 		return;
 	}
 
-	if (IsWeaponLargeEnoughForCameraShake() && GetIsValidCameraShakeSubsystem() &&
-		GetIsValidOwningActorOptimizationComponent())
+	if (IsWeaponLargeEnoughForCameraShake() && GetIsValidCameraShakeSubsystem())
 	{
 		FRTSCameraShakeRequest ShakeRequest;
 		ShakeRequest.M_EventType = ERTSCameraShakeEventType::WeaponFire;
 		ShakeRequest.M_CalibreMm = FMath::RoundToInt(WeaponData.WeaponCalibre);
 		ShakeRequest.M_WorldLocation = GetLaunchAndForwardVector().Key;
-		ShakeRequest.bM_HasOptimizationDistanceHint = true;
-		ShakeRequest.M_OptimizationDistanceHint = M_OwningActorOptimizationComponent->GetCurrentOptimizationDistance();
+		const bool bValidOptimizationComp = M_OwningActorOptimizationComponent.IsValid();
+		ShakeRequest.bM_HasOptimizationDistanceHint = bValidOptimizationComp;
+		if (bValidOptimizationComp)
+		{
+			ShakeRequest.M_OptimizationDistanceHint = M_OwningActorOptimizationComponent->
+				GetCurrentOptimizationDistance();
+		}
 		M_CameraShakeSubsystem->RequestWeaponFireShake(ShakeRequest);
 	}
 
