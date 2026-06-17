@@ -88,6 +88,10 @@ int32 UGlobalAbility::GetOwningPlayer() const
 	return M_OwningPlayer;
 }
 
+void UGlobalAbility::OnInit(AActor* WorldContextActor)
+{
+}
+
 bool UGlobalAbility::IsOwnedByPlayer() const
 {
 	return M_OwningPlayer == 1;

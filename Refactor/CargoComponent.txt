@@ -147,7 +147,11 @@ Very important notes;
  
 
 
+You are going to implement a new derived global ability template called GA_AircraftStrafe
+It will need blueprint-friendly setting structs for:
+an FTrainingOption AicraftToSpawn
 
+a FStrafeAircraftSettings which will partially be filled out automatically by the target position.
 
 
 

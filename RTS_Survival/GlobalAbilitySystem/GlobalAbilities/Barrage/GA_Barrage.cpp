@@ -19,7 +19,7 @@ void UGA_Barrage::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 		return;
 	}
 
-	SetupCallbackToProjectileManager();
+	SetupCallbackToProjectileManager(nullptr);
 }
 
 void UGA_Barrage::BeginDestroy()
@@ -28,14 +28,29 @@ void UGA_Barrage::BeginDestroy()
 	Super::BeginDestroy();
 }
 
-void UGA_Barrage::SetupCallbackToProjectileManager()
+void UGA_Barrage::OnInit(AActor* WorldContextActor)
+{
+	Super::OnInit(WorldContextActor);
+	if (IsValid(WorldContextActor))
+	{
+		SetupCallbackToProjectileManager(WorldContextActor);
+	}
+	else
+	{
+		SetupCallbackToProjectileManager(nullptr);
+	}
+}
+
+void UGA_Barrage::SetupCallbackToProjectileManager(const AActor* WorldContextObject)
 {
 	if (bM_IsWaitingForProjectileManager)
 	{
 		return;
 	}
 
-	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	ACPPGameState* GameState = IsValid(WorldContextObject)
+		                           ? FRTS_Statics::GetGameState(WorldContextObject)
+		                           : FRTS_Statics::GetGameState(this);
 	if (not GameState)
 	{
 		return;
@@ -160,7 +175,7 @@ FVector UGA_Barrage::BuildLaunchLocation(const FVector& TargetLocation) const
 FWeaponData UGA_Barrage::BuildVariedWeaponData() const
 {
 	FWeaponData VariedWeaponData = M_WeaponData;
-	if (not M_BarrageSettings.bVariattionWeaponCalibre)
+	if (not M_BarrageSettings.bVariationWeaponCalibre)
 	{
 		return VariedWeaponData;
 	}

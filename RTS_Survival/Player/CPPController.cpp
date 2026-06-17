@@ -44,6 +44,7 @@
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/CommanderSettings.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"

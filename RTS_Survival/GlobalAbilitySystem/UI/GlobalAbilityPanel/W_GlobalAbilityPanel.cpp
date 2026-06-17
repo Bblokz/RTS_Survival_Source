@@ -4,6 +4,7 @@
 #include "W_GlobalAbilityPanel.h"
 
 #include "Components/Widget.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/W_GA_Description/W_GA_Description.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/W_GA_Item/W_GA_Item.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"

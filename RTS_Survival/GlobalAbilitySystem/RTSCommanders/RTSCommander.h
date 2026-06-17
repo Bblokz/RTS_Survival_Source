@@ -19,5 +19,6 @@ struct FRTSCommanderSettings
 	
 	FRTSCommanderSettings();
 	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<EGlobalAbility> GlobalAbilities;
 };

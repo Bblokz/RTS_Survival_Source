@@ -10,7 +10,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "CommanderSettings"))
 class RTS_SURVIVAL_API UCommanderSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()

@@ -28,13 +28,13 @@ void UW_GA_Item::OnAbilityHovered(UGlobalAbility* HoveredAbility, const bool bIs
 	M_GlobalAbilityManager.Get()->OnHoveredAbilityButton(HoveredAbility, bIsHover);
 }
 
-void UW_GA_Item::SetAbilityAvailable(const bool bIsEnabled, const bool bUseGreyTint)
+void UW_GA_Item::SetAbilityAvailable(const bool bIsGaEnabled, const bool bUseGreyTint) const
 {
 	if (not IsValid(AbilityButton))
 	{
 		return;
 	}
-	AbilityButton->SetIsEnabled(bIsEnabled);
+	AbilityButton->SetIsEnabled(bIsGaEnabled);
 	if (not bUseGreyTint && bM_HasOriginalButtonStyle)
 	{
 		AbilityButton->SetStyle(M_OriginalButtonStyle);

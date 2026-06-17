@@ -5,7 +5,7 @@
 #include "Engine/DeveloperSettings.h"
 #include "RTSGlobalAbilitySettings.generated.h"
 
-UCLASS(Config = Game, DefaultConfig)
+UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "GlobalAbilitySettings"))
 class RTS_SURVIVAL_API URTSGlobalAbilitySettings : public UDeveloperSettings
 {
 	GENERATED_BODY()

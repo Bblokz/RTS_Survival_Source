@@ -40,7 +40,6 @@
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
-#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Player/Abilities.h"
@@ -56,6 +55,7 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "CPPController.generated.h"
 
+class UGlobalAbility;
 enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
 struct FGlobalAbilityAimSettings;

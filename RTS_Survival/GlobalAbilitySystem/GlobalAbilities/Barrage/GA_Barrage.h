@@ -38,7 +38,7 @@ struct FBarrageSettings
 	float Radius = 800.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bVariattionWeaponCalibre = false;
+	bool bVariationWeaponCalibre = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float OnVariationMinMlt = 0.85f;
@@ -61,8 +61,10 @@ class RTS_SURVIVAL_API UGA_Barrage : public UGlobalAbility
 public:
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation) override;
 
-protected:
 	virtual void BeginDestroy() override;
+	
+protected:
+	virtual void OnInit(AActor* WorldContextActor) override;
 
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
@@ -92,7 +94,7 @@ private:
 	UPROPERTY(Transient)
 	bool bM_IsWaitingForProjectileManager = false;
 
-	void SetupCallbackToProjectileManager();
+	void SetupCallbackToProjectileManager(const AActor* WorldContextObject);
 	void OnProjectileManagerLoaded(const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager);
 	bool GetIsValidProjectileManager() const;
 	void StartBarrage(const FVector& TargetLocation);

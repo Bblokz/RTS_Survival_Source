@@ -343,10 +343,6 @@ protected:
 	bool EnsureGlobalAbilityPanelIsValid()const;
 	
 	UPROPERTY(meta=(BindWidget))
-	
-	
-
-	UPROPERTY(meta=(BindWidget))
 	UCanvasPanel* MainUICanvas;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TechTree")
