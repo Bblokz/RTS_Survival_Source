@@ -66,14 +66,14 @@ public:
 	 * Raising this value makes all calibres feel lighter; lowering makes more events saturate faster.
 	 */
 	UPROPERTY(Config, EditAnywhere, Category="Camera Shake|Thresholds", meta=(ClampMin="1", UIMin="1"))
-	int32 M_MaxCalibreForNormalizationMm = 160;
+	int32 M_MaxCalibreForNormalizationMm = 90;
 
 	/**
 	 * @brief Distance in centimetres where events can always shake regardless of in-view requirement.
 	 * This protects local readability for very nearby heavy fire even during camera pans.
 	 */
 	UPROPERTY(Config, EditAnywhere, Category="Camera Shake|Distance", meta=(ClampMin="0.0", UIMin="0.0"))
-	float M_AlwaysShakeDistanceCm = 1800.0f;
+	float M_AlwaysShakeDistanceCm = 4000.0f;
 
 	/**
 	 * @brief Base maximum distance in centimetres for shake eligibility before calibre scaling.

@@ -1,6 +1,7 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 #include "PlayerAudioController.h"
 
+#include "PCGCommon.h"
 #include "Components/AudioComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
@@ -12,10 +13,12 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
+#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 UPlayerAudioController::UPlayerAudioController()
 {
@@ -1285,19 +1288,13 @@ FVector UPlayerAudioController::GetListenerLocationForOffMapAudio() const
 
 FVector UPlayerAudioController::GetBattlefieldCenterForOffMapAudio() const
 {
-	const UWorld* World = GetWorld();
-	if (not IsValid(World))
+	AFowManager* FowManager =  FRTS_Statics::GetFowManager(this);
+	if (not IsValid(FowManager))
 	{
 		return GetListenerLocationForOffMapAudio();
 	}
-
-	const AGameStateBase* GameState = World->GetGameState();
-	if (not IsValid(GameState))
-	{
-		return GetListenerLocationForOffMapAudio();
-	}
-
-	return GameState->GetActorLocation();
+	return FowManager->GetActorLocation();
+		
 }
 
 void UPlayerAudioController::Init_SpawnOffMapAbilityAudioPool(const int32 PoolSize)
@@ -1486,7 +1483,7 @@ void UPlayerAudioController::ConfigureOffMapAbilityAudioComponent(UAudioComponen
 	AudioComponent->SetLowPassFilterEnabled(true);
 	AudioComponent->SetLowPassFilterFrequency(M_OffMapAbilityAudioSettings.LowPassFilterFrequency);
 	AudioComponent->AttenuationSettings = M_OffMapAbilityAudioSettings.Attenuation;
-	AudioComponent->ConcurrencySettings = M_OffMapAbilityAudioSettings.Concurrency;
+	AudioComponent->ConcurrencySet.Add( M_OffMapAbilityAudioSettings.Concurrency);
 	AudioComponent->SourceEffectChain = M_OffMapAbilityAudioSettings.SourceEffectChain;
 }
 
