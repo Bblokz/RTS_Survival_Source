@@ -68,3 +68,87 @@ Implement all of this end to end correctly and surgically. Review your work afte
 whether everything I described will work as intended.
 
 
+We currently have the architecture of global abilities set up to create templates in a data asset that are loaded through a 
+developer settings.
+see UCLASS(Abstract, BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
+    class RTS_SURVIVAL_API UGlobalAbility : public UObject
+    
+I now want you to create the first derived global ability called GA_Barrage place it in its Barrage directory under GlobaAbilities.
+Here is what it will need:
+a struct with the barrage settings:
+float min height start
+float max height start
+int32 AmountShells
+int32 BurstAmount
+float MinTimeBetweenBurst
+float MaxTimeBetweenBurst
+float Radius
+bool bVariattionWeaponCalibre
+float OnVariationMinMlt
+float OnVariationMaxMlt
+a FProjectileVfxSettings
+
+it will also need an struct FWeaponData so the designer can fill out the damage, callibre etc of the shells.
+and a struct FWeaponVFX to set the sound and vfx design.
+
+it will also need a new blueprint-friendly struct that can be set on this template by the designer called
+FBarrageProjectileMover:
+float ProjectilArcSpeed
+float ProjectileLinearSpeed
+float ArcStrength
+
+Now this ability will work a bit like an arc projectile weapon in the sense that it will have to make use of the same projectile pool
+and make sure those projectiles are set to dormant after use.
+ You will need to create a separate function on the projectile to work with this type of global ability.
+ So make it gets access to the projectiles manager; like how turrets do:void ACPPTurretsMaster::SetupCallbackToProjectileManager()
+{
+ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+if (not GameState)
+{
+	return;
+}
+TWeakObjectPtr<ACPPTurretsMaster> WeakThis(this);
+auto Callback = [WeakThis](const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager)-> void
+{
+	if (not WeakThis.IsValid())
+	{
+		return;
+	}
+	WeakThis->OnProjectileManagerLoaded(ProjectileManager);
+};
+GameState->RegisterCallbackForSmallArmsProjectileMgr(Callback, this);
+
+What it needs to do on execute;
+wait if needed till its projectile manager is loaded.
+then using the projectile manager; it will create burst amount of shells
+for each a random location within the radius of the ability around the provided target location with a z-offset
+randomly in float min height start
+            float max height start
+it will determine a mlt in the OnVariation mlt min max if that bool for variation is set to true.
+then multiply the damage from the FWeaponData, the calibre and the armor pen with that multiplier before providing it to
+the projectile that will be used for this multiplier to obtain the variation.
+
+make sure the projectile is provided with all the weapon data and all the vfx needed on its custom launch function specifically
+for barrage abilities.
+How the flight path will go:
+prior to launching the projectile calculate its aim point (this is NOT the final point nessecarily of the projectile as it
+may fly further down that this but it is the point at which the arc of the projectile from its starting position will be aimed)
+this aim point will be a random point in the XY plane within the ability's radius around the TargetLocation.
+the path the projectile will take from its random start position should be a bit of an arc depending on how strong the ArcStrenght is in
+FBarrageProjectileMover. The stronger the arc strength the more of a bow the projectile should take to get to that aim point.
+also make sure to lerp between the liner and arc speed depending on how far in the arc the projectile is; the further in the arc
+the stronger the arc speed should weigh.
+
+Very important notes;
+-Ensure the owning player is provided correctly so the projectil will use the correct collison settings and not hit player units if fired by the player.
+-Ensure the projectile can potentially fly further than its XY plane aim point; this is just a point it will go through but it may collide later or earlier.
+-Ensure the projectiles are correctly made dormant after use.
+ 
+ 
+
+
+
+
+
+
+
