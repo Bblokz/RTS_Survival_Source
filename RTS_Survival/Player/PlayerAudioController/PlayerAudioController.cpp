@@ -1,9 +1,12 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 #include "PlayerAudioController.h"
 
 #include "Components/AudioComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundEffectSource.h"
 #include "RTS_Survival/Audio/Pooling/RTSPooledAudio.h"
 #include "RTS_Survival/Audio/Settings/RTSSpatialAudioSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -35,10 +38,12 @@ void UPlayerAudioController::BeginPlay()
 		);
 	}
 	BeginPlay_InitSpatialAudioPool();
+	BeginPlay_InitOffMapAbilityAudioPool();
 }
 
 void UPlayerAudioController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	EndPlay_ShutdownOffMapAbilityAudioPool();
 	EndPlay_ShutdownSpatialAudioPool();
 
 	Super::EndPlay(EndPlayReason);
@@ -53,6 +58,7 @@ void UPlayerAudioController::TickComponent(
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	Tick_UpdateSpatialAudioPool(DeltaTime);
+	Tick_UpdateOffMapAbilityAudioPool(DeltaTime);
 }
 
 
@@ -98,6 +104,24 @@ void UPlayerAudioController::PlayCustomOneShot2DSound(TObjectPtr<USoundBase> Sou
 	}
 	// todo create 2d sound that auto destroys and play the sound on that component.
 	
+}
+
+void UPlayerAudioController::PlayOffMapAbilitySound(USoundBase* Sound)
+{
+	if (not IsValid(Sound))
+	{
+		return;
+	}
+
+	UAudioComponent* AudioComponent = AcquireOffMapAbilityAudioComponent();
+	if (not IsValid(AudioComponent))
+	{
+		DebugAudioController(TEXT("Off-map ability audio pool exhausted."));
+		return;
+	}
+
+	ConfigureOffMapAbilityAudioComponent(AudioComponent, Sound);
+	PlayConfiguredOffMapAbilityAudioComponent(AudioComponent);
 }
 
 float UPlayerAudioController::PlayAnnouncerVoiceLine(const EAnnouncerVoiceLineType Type,
@@ -1181,6 +1205,306 @@ UAudioComponent* UPlayerAudioController::AcquirePooledSpatialAudioComponent(cons
 
 	return Instance.Component;
 }
+
+void UPlayerAudioController::BeginPlay_InitOffMapAbilityAudioPool()
+{
+	BeginPlay_CacheOffMapAbilityAudioSourceLocation();
+	Init_CreateSpatialAudioPoolOwner();
+	if (not GetIsValidSpatialAudioPoolOwner())
+	{
+		return;
+	}
+
+	const int32 PoolSize = FMath::Max(M_OffMapAbilityAudioSettings.PoolSize, 1);
+	Init_SpawnOffMapAbilityAudioPool(PoolSize);
+}
+
+void UPlayerAudioController::BeginPlay_CacheOffMapAbilityAudioSourceLocation()
+{
+	M_OffMapAbilityAudioSourceLocation = BuildOffMapAbilityAudioSourceLocation();
+}
+
+FVector UPlayerAudioController::BuildOffMapAbilityAudioSourceLocation() const
+{
+	const FVector PlayerStartLocation = GetPlayerStartLocationForOffMapAudio();
+	const FVector BattlefieldCenter = GetBattlefieldCenterForOffMapAudio();
+	const FVector ListenerLocation = GetListenerLocationForOffMapAudio();
+	FVector DirectionFromBattlefieldToPlayerStart = PlayerStartLocation - BattlefieldCenter;
+	DirectionFromBattlefieldToPlayerStart.Z = 0.0f;
+
+	if (DirectionFromBattlefieldToPlayerStart.IsNearlyZero() && IsValid(GetOwner()))
+	{
+		DirectionFromBattlefieldToPlayerStart = GetOwner()->GetActorForwardVector();
+	}
+	if (DirectionFromBattlefieldToPlayerStart.IsNearlyZero())
+	{
+		DirectionFromBattlefieldToPlayerStart = FVector::ForwardVector;
+	}
+
+	DirectionFromBattlefieldToPlayerStart.Normalize();
+	return ListenerLocation + DirectionFromBattlefieldToPlayerStart * M_OffMapAbilityAudioSettings.OffMapDistance;
+}
+
+FVector UPlayerAudioController::GetPlayerStartLocationForOffMapAudio() const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return GetListenerLocationForOffMapAudio();
+	}
+
+	TArray<AActor*> PlayerStarts;
+	UGameplayStatics::GetAllActorsOfClass(World, APlayerStart::StaticClass(), PlayerStarts);
+	if (PlayerStarts.Num() <= 0 || not IsValid(PlayerStarts[0]))
+	{
+		return GetListenerLocationForOffMapAudio();
+	}
+
+	return PlayerStarts[0]->GetActorLocation();
+}
+
+FVector UPlayerAudioController::GetListenerLocationForOffMapAudio() const
+{
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return FVector::ZeroVector;
+	}
+
+	const APlayerController* PlayerController = Cast<APlayerController>(Owner);
+	if (not IsValid(PlayerController))
+	{
+		return Owner->GetActorLocation();
+	}
+
+	FVector ViewLocation = FVector::ZeroVector;
+	FRotator ViewRotation = FRotator::ZeroRotator;
+	PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+	return ViewLocation;
+}
+
+FVector UPlayerAudioController::GetBattlefieldCenterForOffMapAudio() const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return GetListenerLocationForOffMapAudio();
+	}
+
+	const AGameStateBase* GameState = World->GetGameState();
+	if (not IsValid(GameState))
+	{
+		return GetListenerLocationForOffMapAudio();
+	}
+
+	return GameState->GetActorLocation();
+}
+
+void UPlayerAudioController::Init_SpawnOffMapAbilityAudioPool(const int32 PoolSize)
+{
+	if (not GetIsValidSpatialAudioPoolOwner())
+	{
+		return;
+	}
+
+	M_OffMapAbilityAudioPoolInstances.SetNum(PoolSize, EAllowShrinking::No);
+	M_OffMapAbilityAudioFreeList.Reset();
+	M_OffMapAbilityAudioFreeList.Reserve(PoolSize);
+	M_OffMapAbilityAudioActiveList.Reset();
+	M_OffMapAbilityAudioActiveList.Reserve(PoolSize);
+
+	USceneComponent* RootComponent = M_SpatialAudioPoolOwner->GetRootComponent();
+	for (int32 PoolIndex = 0; PoolIndex < PoolSize; ++PoolIndex)
+	{
+		UAudioComponent* AudioComponent = NewObject<UAudioComponent>(M_SpatialAudioPoolOwner);
+		if (not IsValid(AudioComponent))
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("Off-map ability audio pool failed to create UAudioComponent for pool index %d."), PoolIndex));
+			continue;
+		}
+
+		AudioComponent->bAutoActivate = false;
+		AudioComponent->bAutoDestroy = false;
+		AudioComponent->bStopWhenOwnerDestroyed = true;
+		AudioComponent->SetUISound(false);
+		if (IsValid(RootComponent))
+		{
+			AudioComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+		}
+		AudioComponent->RegisterComponent();
+
+		FRTSPooledSpatialAudioInstance NewInstance;
+		NewInstance.Component = AudioComponent;
+		M_OffMapAbilityAudioPoolInstances[PoolIndex] = NewInstance;
+		M_OffMapAbilityAudioFreeList.Add(PoolIndex);
+	}
+}
+
+void UPlayerAudioController::EndPlay_ShutdownOffMapAbilityAudioPool()
+{
+	for (FRTSPooledSpatialAudioInstance& Instance : M_OffMapAbilityAudioPoolInstances)
+	{
+		if (IsValid(Instance.Component))
+		{
+			Instance.Component->Stop();
+			Instance.Component->DestroyComponent();
+		}
+	}
+	M_OffMapAbilityAudioPoolInstances.Empty();
+	M_OffMapAbilityAudioFreeList.Reset();
+	M_OffMapAbilityAudioActiveList.Reset();
+}
+
+void UPlayerAudioController::Tick_UpdateOffMapAbilityAudioPool(const float DeltaTime)
+{
+	if (M_OffMapAbilityAudioActiveList.Num() == 0)
+	{
+		return;
+	}
+
+	for (int32 ActiveListIndex = M_OffMapAbilityAudioActiveList.Num() - 1; ActiveListIndex >= 0; --ActiveListIndex)
+	{
+		const int32 PoolIndex = M_OffMapAbilityAudioActiveList[ActiveListIndex];
+		if (not M_OffMapAbilityAudioPoolInstances.IsValidIndex(PoolIndex))
+		{
+			M_OffMapAbilityAudioActiveList.RemoveAtSwap(ActiveListIndex, 1, EAllowShrinking::No);
+			continue;
+		}
+
+		const FRTSPooledSpatialAudioInstance& PooledInstance = M_OffMapAbilityAudioPoolInstances[PoolIndex];
+		if (PooledInstance.bIsActive && IsValid(PooledInstance.Component) && PooledInstance.Component->IsPlaying())
+		{
+			continue;
+		}
+
+		MarkOffMapAbilityAudioIndexDormant(PoolIndex);
+	}
+}
+
+UAudioComponent* UPlayerAudioController::AcquireOffMapAbilityAudioComponent()
+{
+	const int32 PoolIndex = AllocateOffMapAbilityAudioIndex();
+	if (PoolIndex == INDEX_NONE || not M_OffMapAbilityAudioPoolInstances.IsValidIndex(PoolIndex))
+	{
+		return nullptr;
+	}
+
+	FRTSPooledSpatialAudioInstance& Instance = M_OffMapAbilityAudioPoolInstances[PoolIndex];
+	if (not IsValid(Instance.Component))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Off-map ability audio pool entry has invalid UAudioComponent."));
+		return nullptr;
+	}
+
+	Instance.bIsActive = true;
+	Instance.StartTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (M_OffMapAbilityAudioActiveList.Find(PoolIndex) == INDEX_NONE)
+	{
+		M_OffMapAbilityAudioActiveList.Add(PoolIndex);
+	}
+	return Instance.Component;
+}
+
+int32 UPlayerAudioController::AllocateOffMapAbilityAudioIndex()
+{
+	if (M_OffMapAbilityAudioFreeList.Num() > 0)
+	{
+		return M_OffMapAbilityAudioFreeList.Pop(EAllowShrinking::No);
+	}
+
+	return FindOldestActiveOffMapAbilityAudioIndex();
+}
+
+int32 UPlayerAudioController::FindOldestActiveOffMapAbilityAudioIndex() const
+{
+	int32 OldestIndex = INDEX_NONE;
+	float OldestTime = TNumericLimits<float>::Max();
+	for (const int32 PoolIndex : M_OffMapAbilityAudioActiveList)
+	{
+		if (not M_OffMapAbilityAudioPoolInstances.IsValidIndex(PoolIndex))
+		{
+			continue;
+		}
+
+		const FRTSPooledSpatialAudioInstance& Instance = M_OffMapAbilityAudioPoolInstances[PoolIndex];
+		if (not Instance.bIsActive || Instance.StartTimeSeconds < 0.0f)
+		{
+			continue;
+		}
+		if (Instance.StartTimeSeconds >= OldestTime)
+		{
+			continue;
+		}
+
+		OldestTime = Instance.StartTimeSeconds;
+		OldestIndex = PoolIndex;
+	}
+	return OldestIndex;
+}
+
+void UPlayerAudioController::MarkOffMapAbilityAudioIndexDormant(const int32 Index)
+{
+	if (not M_OffMapAbilityAudioPoolInstances.IsValidIndex(Index))
+	{
+		return;
+	}
+
+	FRTSPooledSpatialAudioInstance& Instance = M_OffMapAbilityAudioPoolInstances[Index];
+	Instance.bIsActive = false;
+	Instance.StartTimeSeconds = -1.0f;
+	if (IsValid(Instance.Component))
+	{
+		Instance.Component->Stop();
+		Instance.Component->SetSound(nullptr);
+	}
+
+	const int32 ActiveIndex = M_OffMapAbilityAudioActiveList.Find(Index);
+	if (ActiveIndex != INDEX_NONE)
+	{
+		M_OffMapAbilityAudioActiveList.RemoveAtSwap(ActiveIndex, 1, EAllowShrinking::No);
+	}
+	if (M_OffMapAbilityAudioFreeList.Find(Index) == INDEX_NONE)
+	{
+		M_OffMapAbilityAudioFreeList.Add(Index);
+	}
+}
+
+void UPlayerAudioController::ConfigureOffMapAbilityAudioComponent(UAudioComponent* AudioComponent, USoundBase* Sound) const
+{
+	if (not IsValid(AudioComponent) || not IsValid(Sound))
+	{
+		return;
+	}
+
+	const float PitchMin = FMath::Min(M_OffMapAbilityAudioSettings.PitchMin, M_OffMapAbilityAudioSettings.PitchMax);
+	const float PitchMax = FMath::Max(M_OffMapAbilityAudioSettings.PitchMin, M_OffMapAbilityAudioSettings.PitchMax);
+	AudioComponent->SetSound(Sound);
+	AudioComponent->SetWorldLocation(M_OffMapAbilityAudioSourceLocation);
+	AudioComponent->SetVolumeMultiplier(M_OffMapAbilityAudioSettings.VolumeMultiplier);
+	AudioComponent->SetPitchMultiplier(FMath::RandRange(PitchMin, PitchMax));
+	AudioComponent->SetLowPassFilterEnabled(true);
+	AudioComponent->SetLowPassFilterFrequency(M_OffMapAbilityAudioSettings.LowPassFilterFrequency);
+	AudioComponent->AttenuationSettings = M_OffMapAbilityAudioSettings.Attenuation;
+	AudioComponent->ConcurrencySettings = M_OffMapAbilityAudioSettings.Concurrency;
+	AudioComponent->SourceEffectChain = M_OffMapAbilityAudioSettings.SourceEffectChain;
+}
+
+void UPlayerAudioController::PlayConfiguredOffMapAbilityAudioComponent(UAudioComponent* AudioComponent)
+{
+	if (not IsValid(AudioComponent))
+	{
+		return;
+	}
+
+	const float MinDelay = FMath::Min(M_OffMapAbilityAudioSettings.MinPropagationDelay,
+	                                M_OffMapAbilityAudioSettings.MaxPropagationDelay);
+	const float MaxDelay = FMath::Max(M_OffMapAbilityAudioSettings.MinPropagationDelay,
+	                                M_OffMapAbilityAudioSettings.MaxPropagationDelay);
+	const float Delay = FMath::RandRange(MinDelay, MaxDelay);
+	AudioComponent->Play(Delay);
+}
+
 
 bool UPlayerAudioController::GetHasToPlayAnnouncerLineAs2DSound(const EAnnouncerVoiceLineType Type) const
 {

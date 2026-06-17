@@ -1,10 +1,11 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "GA_Barrage.h"
 
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Player/PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/Weapons/Projectile/Projectile.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 
@@ -144,10 +145,12 @@ void UGA_Barrage::FireSingleShell()
 	const FVector AimPoint = BuildRandomPointInRadius(M_PendingTargetLocation);
 	const FRotator LaunchRotation = (AimPoint - LaunchLocation).Rotation();
 	const TArray<AActor*> ActorsToIgnore;
+	const FWeaponVFX WeaponVfxForShellLaunch = BuildWeaponVfxForShellLaunch();
+	PlayOffMapLaunchSoundIfRequested();
 
 	Projectile->SetupBarrageProjectileForNewLaunch(
 		VariedWeaponData,
-		M_WeaponVfx,
+		WeaponVfxForShellLaunch,
 		ProjectileVfxSettings,
 		M_ProjectileMover,
 		GetOwningPlayer(),
@@ -157,6 +160,50 @@ void UGA_Barrage::FireSingleShell()
 		ActorsToIgnore);
 
 	++M_ShellsLaunched;
+}
+
+FWeaponVFX UGA_Barrage::BuildWeaponVfxForShellLaunch() const
+{
+	FWeaponVFX WeaponVfxForShellLaunch = M_WeaponVfx;
+	if (not M_BarrageSettings.bUseOffMapLaunchSound)
+	{
+		return WeaponVfxForShellLaunch;
+	}
+
+	WeaponVfxForShellLaunch.LaunchSound = nullptr;
+	return WeaponVfxForShellLaunch;
+}
+
+void UGA_Barrage::PlayOffMapLaunchSoundIfRequested() const
+{
+	if (not M_BarrageSettings.bUseOffMapLaunchSound)
+	{
+		return;
+	}
+
+	USoundBase* LaunchSound = GetOffMapLaunchSound();
+	if (not IsValid(LaunchSound))
+	{
+		return;
+	}
+
+	UPlayerAudioController* PlayerAudioController = FRTS_Statics::GetPlayerAudioController(this);
+	if (not IsValid(PlayerAudioController))
+	{
+		return;
+	}
+
+	PlayerAudioController->PlayOffMapAbilitySound(LaunchSound);
+}
+
+USoundBase* UGA_Barrage::GetOffMapLaunchSound() const
+{
+	if (IsValid(M_BarrageSettings.OffMapLaunchSound))
+	{
+		return M_BarrageSettings.OffMapLaunchSound;
+	}
+
+	return M_WeaponVfx.LaunchSound;
 }
 
 FVector UGA_Barrage::BuildRandomPointInRadius(const FVector& CenterLocation) const
