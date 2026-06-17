@@ -11,6 +11,15 @@ UGlobalAbility::UGlobalAbility()
 {
 }
 
+UWorld* UGlobalAbility::GetWorld() const
+{
+	if (M_PlayerController.Get() != nullptr)
+	{
+		return M_PlayerController.Get()->GetWorld();
+	}
+	return Super::GetWorld();
+}
+
 void UGlobalAbility::InitGlobalAbility(const int32 OwningPlayer,
                                        TWeakObjectPtr<UGlobalAbilitiesManager> GlobalAbilitiesManager,
                                        ACPPController* PlayerController)
@@ -72,6 +81,11 @@ void UGlobalAbility::ActivateAbility()
 
 void UGlobalAbility::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
+}
+
+int32 UGlobalAbility::GetOwningPlayer() const
+{
+	return M_OwningPlayer;
 }
 
 bool UGlobalAbility::IsOwnedByPlayer() const

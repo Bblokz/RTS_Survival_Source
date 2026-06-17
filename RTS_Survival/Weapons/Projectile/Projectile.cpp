@@ -344,6 +344,164 @@ void AProjectile::SetupProjectileForNewLaunch(
 	StartFlightTimers(M_Range / ProjectileSpeed);
 }
 
+
+void AProjectile::SetupBarrageProjectileForNewLaunch(
+	const FWeaponData& WeaponData,
+	const FWeaponVFX& WeaponVfx,
+	const FProjectileVfxSettings& ProjectileVfxSettings,
+	const FBarrageProjectileMover& ProjectileMover,
+	const int32 OwningPlayer,
+	const FVector& LaunchLocation,
+	const FRotator& LaunchRotation,
+	const FVector& AimPoint,
+	const TArray<AActor*>& ActorsToIgnore)
+{
+	const float SafeLinearSpeed = FMath::Max(ProjectileMover.ProjectileLinearSpeed, 1.0f);
+	ApplyBarrageProjectileLaunchData(WeaponData, WeaponVfx, ActorsToIgnore, OwningPlayer);
+	OnRestartProjectile(LaunchLocation, LaunchRotation, SafeLinearSpeed);
+	M_ProjectileSpawn = GetActorLocation();
+	SetupNiagaraWithPrjVfxSettings(ProjectileVfxSettings);
+	SetupTraceChannel(OwningPlayer);
+	SpawnBarrageLaunchEffects(WeaponVfx, LaunchLocation, LaunchRotation);
+	StartFlightTimers(M_Range / SafeLinearSpeed);
+	StartBarrageProjectileGuidance(LaunchLocation, AimPoint, ProjectileMover);
+}
+
+void AProjectile::ApplyBarrageProjectileLaunchData(
+	const FWeaponData& WeaponData,
+	const FWeaponVFX& WeaponVfx,
+	const TArray<AActor*>& ActorsToIgnore,
+	const int32 OwningPlayer)
+{
+	M_ShellType = WeaponData.ShellType;
+	M_ProjectileOwner = nullptr;
+	OnNewDamageType(WeaponData.DamageType);
+	M_OwningPlayer = OwningPlayer;
+	M_Range = WeaponData.Range * DeveloperSettings::GameBalance::Weapons::Projectiles::DefaultProjectileRangeMlt;
+	M_FullDamage = WeaponData.BaseDamage;
+	M_ArmorPen = WeaponData.ArmorPen;
+	M_ArmorPenAtMaxRange = WeaponData.ArmorPenMaxRange;
+	bM_CanArmorOverPenetrate = false;
+	M_PostPenArmorPenCarryOver = 0.0f;
+	M_FloorArmorPenPercentageNeededAllowOverpen = 0.0f;
+	M_ShrapnelParticles = WeaponData.ShrapnelParticles;
+	M_ShrapnelRange = WeaponData.ShrapnelRange;
+	M_ShrapnelDamage = WeaponData.ShrapnelDamage;
+	M_ShrapnelArmorPen = WeaponData.ShrapnelPen;
+	M_ImpactVfx = WeaponVfx.SurfaceImpactEffects;
+	M_ImpactScale = WeaponVfx.ImpactScale;
+	M_BounceSound = WeaponVfx.BounceSound;
+	M_BounceVfx = WeaponVfx.BounceEffect;
+	M_BounceScale = WeaponVfx.BounceScale;
+	M_ImpactAttenuation = WeaponVfx.ImpactAttenuation;
+	M_ImpactConcurrency = WeaponVfx.ImpactConcurrency;
+	M_ActorsToIgnore = ActorsToIgnore;
+	M_WeaponCalibre = FMath::RoundToInt(WeaponData.WeaponCalibre);
+	M_ProjectileTraceRadius = 0.0f;
+	M_MaxBounces = DeveloperSettings::GameBalance::Weapons::Projectiles::MaxBouncesPerProjectile;
+	bM_AlreadyNotified = false;
+}
+
+void AProjectile::SpawnBarrageLaunchEffects(
+	const FWeaponVFX& WeaponVfx,
+	const FVector& LaunchLocation,
+	const FRotator& LaunchRotation) const
+{
+	if (IsValid(WeaponVfx.LaunchSound))
+	{
+		UGameplayStatics::SpawnSoundAtLocation(
+			this,
+			WeaponVfx.LaunchSound,
+			LaunchLocation,
+			LaunchRotation,
+			1.0f,
+			1.0f,
+			0.0f,
+			WeaponVfx.LaunchAttenuation,
+			WeaponVfx.LaunchConcurrency);
+	}
+	if (not IsValid(WeaponVfx.LaunchEffectSettings.LaunchEffect))
+	{
+		return;
+	}
+	UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		this,
+		WeaponVfx.LaunchEffectSettings.LaunchEffect,
+		LaunchLocation,
+		LaunchRotation,
+		WeaponVfx.LaunchScale);
+}
+
+void AProjectile::StartBarrageProjectileGuidance(
+	const FVector& LaunchLocation,
+	const FVector& AimPoint,
+	const FBarrageProjectileMover& ProjectileMover)
+{
+	M_BarrageProjectileRuntimeState.LaunchLocation = LaunchLocation;
+	M_BarrageProjectileRuntimeState.AimPoint = AimPoint;
+	M_BarrageProjectileRuntimeState.ProjectileMover = ProjectileMover;
+	UpdateBarrageProjectileCourse();
+
+	if (UWorld* World = GetWorld())
+	{
+		constexpr float BarrageUpdateIntervalSeconds = 0.05f;
+		World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
+		TWeakObjectPtr<AProjectile> WeakThis(this);
+		World->GetTimerManager().SetTimer(
+			M_BarrageProjectileTimerHandle,
+			[WeakThis]()
+			{
+				if (not WeakThis.IsValid())
+				{
+					return;
+				}
+				WeakThis->UpdateBarrageProjectileCourse();
+			},
+			BarrageUpdateIntervalSeconds,
+			true);
+	}
+}
+
+void AProjectile::UpdateBarrageProjectileCourse()
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	const FVector LaunchLocation = M_BarrageProjectileRuntimeState.LaunchLocation;
+	const FVector AimPoint = M_BarrageProjectileRuntimeState.AimPoint;
+	const FVector LaunchToAim = AimPoint - LaunchLocation;
+	const FVector CurrentFromLaunch = GetActorLocation() - LaunchLocation;
+	const float PathLengthSquared = LaunchToAim.SizeSquared();
+	if (PathLengthSquared <= UE_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const float PathAlpha = FVector::DotProduct(CurrentFromLaunch, LaunchToAim) / PathLengthSquared;
+	if (PathAlpha >= 1.0f)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
+		}
+		return;
+	}
+
+	const float ClampedAlpha = FMath::Clamp(PathAlpha, 0.0f, 1.0f);
+	const float ArcWeight = FMath::Sin(ClampedAlpha * PI);
+	const float Speed = FMath::Lerp(
+		M_BarrageProjectileRuntimeState.ProjectileMover.ProjectileLinearSpeed,
+		M_BarrageProjectileRuntimeState.ProjectileMover.ProjectileArcSpeed,
+		ArcWeight);
+	const FVector StraightDirection = (AimPoint - GetActorLocation()).GetSafeNormal();
+	const FVector ArcOffset = FVector::UpVector * M_BarrageProjectileRuntimeState.ProjectileMover.ArcStrength * ArcWeight;
+	const FVector DesiredDirection = (StraightDirection + ArcOffset).GetSafeNormal();
+	M_ProjectileMovement->Velocity = DesiredDirection * FMath::Max(Speed, 1.0f);
+	SetActorRotation(M_ProjectileMovement->Velocity.Rotation());
+}
+
 void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 {
 	if (ExpectedFlightTime <= 0.0f)
@@ -356,6 +514,7 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
+		World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 		World->GetTimerManager().ClearTimer(M_DescentSoundTimerHandle);
@@ -1007,6 +1166,7 @@ void AProjectile::ScheduleVerticalRocketTransitions(const FVector& TargetLocatio
 	World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 	World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 	World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
+	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	const TWeakObjectPtr<AProjectile> WeakThis(this);
 	World->GetTimerManager().SetTimer(
 		M_RocketSwingTimerHandle,
@@ -1213,6 +1373,7 @@ void AProjectile::TransitionRocketSwingToStraight(const FVector& TargetLocation,
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
+	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
 
 	const FVector CurrentLocation = GetActorLocation();
@@ -1242,6 +1403,7 @@ void AProjectile::ScheduleRocketSwingTransition(const FVector& TargetLocation,
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
+		World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 		TWeakObjectPtr<AProjectile> WeakThis(this);
 		World->GetTimerManager().SetTimer(
 			M_RocketSwingTimerHandle,
@@ -1444,6 +1606,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
+	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
 	ResetAsyncTraceState();
 	StopDescentSound();
@@ -1461,6 +1624,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
+	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
 	ResetAsyncTraceState();
 	StopDescentSound();
@@ -1568,6 +1732,7 @@ void AProjectile::OnProjectileDormant()
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
+	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
 	M_ProjectilePoolSettings.ProjectileManager->OnTankProjectileDormant(M_ProjectilePoolSettings.ProjectileIndex);
 }

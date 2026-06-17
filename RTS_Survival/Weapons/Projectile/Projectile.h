@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "NiagaraSystem.h"
 #include "Components/BoxComponent.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/Barrage/BarrageProjectileMover.h"
 #include "Engine/DamageEvents.h"
 #include "ProjectileVfxSettings/ProjectileVfxSettings.h"
 #include "RTS_Survival/DeveloperSettings.h"
@@ -34,6 +35,22 @@ class URTSCameraShakeSubsystem;
 struct FRocketWeaponSettings;
 struct FVerticalRocketWeaponSettings;
 struct FHomingMissileWeaponSettings;
+
+
+USTRUCT()
+struct FBarrageProjectileRuntimeState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FVector LaunchLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	FVector AimPoint = FVector::ZeroVector;
+
+	UPROPERTY()
+	FBarrageProjectileMover ProjectileMover;
+};
 
 USTRUCT()
 struct FProjectileHomingMissileRuntimeState
@@ -122,6 +139,29 @@ public:
 		const bool bCanArmorOverPenetrate = false,
 		const float PostPenArmorPenCarryOver = 0.0f,
 		const float FloorArmorPenPercentageNeededAllowOverpen = 0.0f);
+
+	/**
+	 * @brief Initializes a pooled projectile for global barrage shots so the aim point is a path guide, not a hard stop.
+	 * @param WeaponData Shell damage data after barrage variation has been applied.
+	 * @param WeaponVfx Impact and bounce effects used by the shell.
+	 * @param ProjectileVfxSettings Niagara projectile settings used while in flight.
+	 * @param ProjectileMover Designer movement settings for the arcing pass through the aim point.
+	 * @param OwningPlayer Player id used for collision filtering.
+	 * @param LaunchLocation World-space start location above the barrage area.
+	 * @param LaunchRotation Initial rotation toward the chosen aim point.
+	 * @param AimPoint XY aim point the shell should pass through before continuing.
+	 * @param ActorsToIgnore Actors excluded from projectile traces.
+	 */
+	void SetupBarrageProjectileForNewLaunch(
+		const FWeaponData& WeaponData,
+		const FWeaponVFX& WeaponVfx,
+		const FProjectileVfxSettings& ProjectileVfxSettings,
+		const FBarrageProjectileMover& ProjectileMover,
+		const int32 OwningPlayer,
+		const FVector& LaunchLocation,
+		const FRotator& LaunchRotation,
+		const FVector& AimPoint,
+		const TArray<AActor*>& ActorsToIgnore);
 
 	/**
 	 * @brief Launches the pooled projectile along an arced path using the provided arch settings.
@@ -469,6 +509,40 @@ private:
 	                                             const float Stage2StraightSpeed,
 	                                             const float Stage2ArcTime);
 	void TransitionVerticalRocketToStraight(const FVector& TargetLocation, const float Stage2StraightSpeed);
+	/**
+	 * @brief Copies barrage data into pooled projectile state before movement starts.
+	 * @param WeaponData Damage values already adjusted for barrage variation.
+	 * @param WeaponVfx Effects kept alive through UPROPERTY projectile members.
+	 * @param ActorsToIgnore Snapshot of trace ignores for this launch.
+	 * @param OwningPlayer Player id used by collision channel setup.
+	 */
+	void ApplyBarrageProjectileLaunchData(
+		const FWeaponData& WeaponData,
+		const FWeaponVFX& WeaponVfx,
+		const TArray<AActor*>& ActorsToIgnore,
+		const int32 OwningPlayer);
+	/**
+	 * @brief Spawns launch-only effects without storing raw component pointers.
+	 * @param WeaponVfx Designer VFX settings whose assets are GC-visible through caller data.
+	 * @param LaunchLocation World-space effect location.
+	 * @param LaunchRotation Direction used by one-shot launch VFX.
+	 */
+	void SpawnBarrageLaunchEffects(
+		const FWeaponVFX& WeaponVfx,
+		const FVector& LaunchLocation,
+		const FRotator& LaunchRotation) const;
+	/**
+	 * @brief Starts weak-pointer timer steering so pooled projectiles cannot call into destroyed actors.
+	 * @param LaunchLocation Start point used to calculate progress through the aim point.
+	 * @param AimPoint Guide point the shell should pass through, not stop at.
+	 * @param ProjectileMover Designer speed and arc blend settings.
+	 */
+	void StartBarrageProjectileGuidance(
+		const FVector& LaunchLocation,
+		const FVector& AimPoint,
+		const FBarrageProjectileMover& ProjectileMover);
+
+	void UpdateBarrageProjectileCourse();
 	void UpdateHomingMissileCourse();
 	void PrepareDirectHomingSwitchThreshold();
 	void TrySwitchHomingMissileToDirectHoming(const FVector& TargetLocation);
@@ -665,7 +739,13 @@ private:
 	FTimerHandle M_HomingMissileTimerHandle;
 
 	UPROPERTY()
+	FTimerHandle M_BarrageProjectileTimerHandle;
+
+	UPROPERTY()
 	FProjectileHomingMissileRuntimeState M_HomingMissileRuntimeState;
+
+	UPROPERTY()
+	FBarrageProjectileRuntimeState M_BarrageProjectileRuntimeState;
 
 	UPROPERTY()
 	TWeakObjectPtr<UAudioComponent> M_DescentAudioComponent;

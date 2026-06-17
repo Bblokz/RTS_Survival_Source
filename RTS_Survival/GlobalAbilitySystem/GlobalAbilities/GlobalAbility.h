@@ -32,6 +32,8 @@ class RTS_SURVIVAL_API UGlobalAbility : public UObject
 public:
 	UGlobalAbility();
 
+	virtual UWorld* GetWorld() const override;
+
 	void InitGlobalAbility(const int32 OwningPlayer, TWeakObjectPtr<UGlobalAbilitiesManager> GlobalAbilitiesManager,
 	                       ACPPController*
 	                       PlayerController);
@@ -45,6 +47,7 @@ public:
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation);
 
 protected:
+	int32 GetOwningPlayer() const;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EGlobalAbility M_AbilityType;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
