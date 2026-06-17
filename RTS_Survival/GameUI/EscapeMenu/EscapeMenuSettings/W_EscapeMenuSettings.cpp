@@ -225,6 +225,11 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 		M_SliderRanges.M_CameraPanSpeedMultiplierMin,
 		M_SliderRanges.M_CameraPanSpeedMultiplierMax
 	);
+	SetSliderRange(
+		M_SliderCameraShakeMultiplier,
+		M_SliderRanges.M_CameraShakeMultiplierMin,
+		M_SliderRanges.M_CameraShakeMultiplierMax
+	);
 	SetSliderRange(M_SliderMasterVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderMusicVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderSfxVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
@@ -516,6 +521,8 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 	M_TextMouseSensitivityLabel->SetText(M_ControlsText.M_MouseSensitivityLabelText);
 	M_TextCameraMovementSpeedMultiplierLabel->SetText(M_ControlsText.M_CameraMovementSpeedMultiplierLabelText);
 	M_TextCameraPanSpeedMultiplierLabel->SetText(M_ControlsText.M_CameraPanSpeedMultiplierLabelText);
+	M_TextCameraShakeEnabledLabel->SetText(M_ControlsText.M_CameraShakeEnabledLabelText);
+	M_TextCameraShakeMultiplierLabel->SetText(M_ControlsText.M_CameraShakeMultiplierLabelText);
 	M_TextInvertYAxisLabel->SetText(M_ControlsText.M_InvertYAxisLabelText);
 
 	M_TextGameplayHeader->SetText(M_GameplayText.M_HeaderText);
@@ -663,6 +670,14 @@ void UW_EscapeMenuSettings::InitialiseControlSettingsControls(const FRTSControlS
 		M_SliderRanges.M_CameraPanSpeedMultiplierMax
 	);
 	M_SliderCameraPanSpeedMultiplier->SetValue(ClampedCameraPanSpeedMultiplier);
+
+	const float ClampedCameraShakeMultiplier = FMath::Clamp(
+		ControlSettings.M_CameraShakeMultiplier,
+		M_SliderRanges.M_CameraShakeMultiplierMin,
+		M_SliderRanges.M_CameraShakeMultiplierMax
+	);
+	M_CheckCameraShakeEnabled->SetIsChecked(ControlSettings.bM_CameraShakeEnabled);
+	M_SliderCameraShakeMultiplier->SetValue(ClampedCameraShakeMultiplier);
 	M_CheckInvertYAxis->SetIsChecked(ControlSettings.bM_InvertYAxis);
 }
 
@@ -1065,6 +1080,12 @@ void UW_EscapeMenuSettings::BindControlSettingCallbacks()
 
 	M_SliderCameraPanSpeedMultiplier->OnValueChanged.RemoveAll(this);
 	M_SliderCameraPanSpeedMultiplier->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleCameraPanSpeedMultiplierChanged);
+
+	M_CheckCameraShakeEnabled->OnCheckStateChanged.RemoveAll(this);
+	M_CheckCameraShakeEnabled->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleCameraShakeEnabledChanged);
+
+	M_SliderCameraShakeMultiplier->OnValueChanged.RemoveAll(this);
+	M_SliderCameraShakeMultiplier->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleCameraShakeMultiplierChanged);
 
 	M_CheckInvertYAxis->OnCheckStateChanged.RemoveAll(this);
 	M_CheckInvertYAxis->OnCheckStateChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleInvertYAxisChanged);
@@ -2043,6 +2064,38 @@ bool UW_EscapeMenuSettings::GetIsValidTextCameraPanSpeedMultiplierLabel() const
 	return true;
 }
 
+bool UW_EscapeMenuSettings::GetIsValidTextCameraShakeEnabledLabel() const
+{
+	if (not IsValid(M_TextCameraShakeEnabledLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextCameraShakeEnabledLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextCameraShakeEnabledLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextCameraShakeMultiplierLabel() const
+{
+	if (not IsValid(M_TextCameraShakeMultiplierLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextCameraShakeMultiplierLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextCameraShakeMultiplierLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool UW_EscapeMenuSettings::GetIsValidTextInvertYAxisLabel() const
 {
 	if (not IsValid(M_TextInvertYAxisLabel))
@@ -2339,6 +2392,38 @@ bool UW_EscapeMenuSettings::GetIsValidSliderCameraPanSpeedMultiplier() const
 			this,
 			TEXT("M_SliderCameraPanSpeedMultiplier"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidSliderCameraPanSpeedMultiplier"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidCheckCameraShakeEnabled() const
+{
+	if (not IsValid(M_CheckCameraShakeEnabled))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_CheckCameraShakeEnabled"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidCheckCameraShakeEnabled"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderCameraShakeMultiplier() const
+{
+	if (not IsValid(M_SliderCameraShakeMultiplier))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderCameraShakeMultiplier"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderCameraShakeMultiplier"),
 			this
 		);
 		return false;
@@ -3045,6 +3130,16 @@ bool UW_EscapeMenuSettings::GetAreControlsTextWidgetsValid() const
 		return false;
 	}
 
+	if (not GetIsValidTextCameraShakeEnabledLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextCameraShakeMultiplierLabel())
+	{
+		return false;
+	}
+
 	return GetIsValidTextInvertYAxisLabel();
 }
 
@@ -3236,6 +3331,16 @@ bool UW_EscapeMenuSettings::GetAreControlSettingsWidgetsValid() const
 	}
 
 	if (not GetIsValidSliderCameraPanSpeedMultiplier())
+	{
+		return false;
+	}
+
+	if (not GetIsValidCheckCameraShakeEnabled())
+	{
+		return false;
+	}
+
+	if (not GetIsValidSliderCameraShakeMultiplier())
 	{
 		return false;
 	}
@@ -3865,6 +3970,52 @@ void UW_EscapeMenuSettings::HandleCameraPanSpeedMultiplierChanged(const float Ne
 	}
 
 	M_PlayerController->SetCameraPanSpeedMultiplier(ScaledMultiplier);
+}
+
+void UW_EscapeMenuSettings::HandleCameraShakeEnabledChanged(const bool bIsChecked)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidCheckCameraShakeEnabled())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingCameraShakeEnabled(bIsChecked);
+}
+
+void UW_EscapeMenuSettings::HandleCameraShakeMultiplierChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidSliderCameraShakeMultiplier())
+	{
+		return;
+	}
+
+	const float ScaledMultiplier = EscapeMenuSettingsValueHelpers::GetScaledSliderValue(
+		M_SliderCameraShakeMultiplier,
+		NewValue,
+		M_SliderRanges.M_CameraShakeMultiplierMin,
+		M_SliderRanges.M_CameraShakeMultiplierMax
+	);
+	M_SettingsSubsystem->SetPendingCameraShakeMultiplier(ScaledMultiplier);
 }
 
 void UW_EscapeMenuSettings::HandleInvertYAxisChanged(const bool bIsChecked)

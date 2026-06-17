@@ -7,6 +7,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/Camera/CameraPawn.h"
 #include "RTS_Survival/Camera/Settings/RTSCameraShakeDeveloperSettings.h"
+#include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace RTSCameraShakeConstants
@@ -228,7 +229,18 @@ void URTSCameraShakeSubsystem::TryPlayAggregatedShake(const float CurrentTimeSec
 		return;
 	}
 
-	const float ScaledIntensity = AggregatedIntensity * Settings->M_GlobalIntensityMultiplier;
+	const URTSGameUserSettings* GameUserSettings = URTSGameUserSettings::Get();
+	if (GameUserSettings == nullptr || not GameUserSettings->GetCameraShakeEnabled())
+	{
+		return;
+	}
+
+	const float UserShakeMultiplier = FMath::Clamp(
+		GameUserSettings->GetCameraShakeMultiplier(),
+		RTSGameUserSettingsRanges::MinCameraShakeMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraShakeMultiplier
+	);
+	const float ScaledIntensity = AggregatedIntensity * Settings->M_GlobalIntensityMultiplier * UserShakeMultiplier;
 	const float ClampedIntensity = FMath::Clamp(ScaledIntensity, 0.0f, 2.0f);
 	if (ClampedIntensity <= 0.0f)
 	{

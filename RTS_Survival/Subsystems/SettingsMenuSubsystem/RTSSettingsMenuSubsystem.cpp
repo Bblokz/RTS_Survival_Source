@@ -278,6 +278,21 @@ void URTSSettingsMenuSubsystem::SetPendingCameraPanSpeedMultiplier(const float N
 	M_PendingSettings.M_ControlSettings.M_CameraPanSpeedMultiplier = ClampedMultiplier;
 }
 
+void URTSSettingsMenuSubsystem::SetPendingCameraShakeEnabled(const bool bNewCameraShakeEnabled)
+{
+	M_PendingSettings.M_ControlSettings.bM_CameraShakeEnabled = bNewCameraShakeEnabled;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingCameraShakeMultiplier(const float NewCameraShakeMultiplier)
+{
+	const float ClampedMultiplier = FMath::Clamp(
+		NewCameraShakeMultiplier,
+		RTSGameUserSettingsRanges::MinCameraShakeMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraShakeMultiplier
+	);
+	M_PendingSettings.M_ControlSettings.M_CameraShakeMultiplier = ClampedMultiplier;
+}
+
 void URTSSettingsMenuSubsystem::SetPendingHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys)
 {
 	M_PendingSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = bNewHideActionButtonHotkeys;
@@ -425,6 +440,8 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 	DefaultSettings.M_ControlSettings.bM_InvertYAxis = RTSSettingsMenuSubsystemPrivate::bDefaultInvertYAxis;
 	DefaultSettings.M_ControlSettings.M_CameraMovementSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraMovementSpeedMultiplier;
 	DefaultSettings.M_ControlSettings.M_CameraPanSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier;
+	DefaultSettings.M_ControlSettings.bM_CameraShakeEnabled = true;
+	DefaultSettings.M_ControlSettings.M_CameraShakeMultiplier = RTSGameUserSettingsRanges::DefaultCameraShakeMultiplier;
 
 	DefaultSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = RTSSettingsMenuSubsystemPrivate::bDefaultHideActionButtonHotkeys;
 	DefaultSettings.M_GameplaySettings.bM_CheckUnitRangeOnHover = RTSSettingsMenuSubsystemPrivate::bDefaultCheckUnitRangeOnHover;
@@ -917,6 +934,8 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_ControlSettings.bM_InvertYAxis = GameUserSettings.GetInvertYAxis();
 	Snapshot.M_ControlSettings.M_CameraMovementSpeedMultiplier = GameUserSettings.GetCameraMovementSpeedMultiplier();
 	Snapshot.M_ControlSettings.M_CameraPanSpeedMultiplier = GameUserSettings.GetCameraPanSpeedMultiplier();
+	Snapshot.M_ControlSettings.bM_CameraShakeEnabled = GameUserSettings.GetCameraShakeEnabled();
+	Snapshot.M_ControlSettings.M_CameraShakeMultiplier = GameUserSettings.GetCameraShakeMultiplier();
 	Snapshot.M_GameplaySettings.bM_HideActionButtonHotkeys = GameUserSettings.GetHideActionButtonHotkeys();
 	Snapshot.M_GameplaySettings.bM_CheckUnitRangeOnHover = GameUserSettings.GetCheckUnitRangeOnHover();
 	Snapshot.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = GameUserSettings.GetOverwriteAllPlayerHpBarStrat();
@@ -960,6 +979,8 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetInvertYAxis(SnapshotToApply.M_ControlSettings.bM_InvertYAxis);
 	GameUserSettingsToApply.SetCameraMovementSpeedMultiplier(SnapshotToApply.M_ControlSettings.M_CameraMovementSpeedMultiplier);
 	GameUserSettingsToApply.SetCameraPanSpeedMultiplier(SnapshotToApply.M_ControlSettings.M_CameraPanSpeedMultiplier);
+	GameUserSettingsToApply.SetCameraShakeEnabled(SnapshotToApply.M_ControlSettings.bM_CameraShakeEnabled);
+	GameUserSettingsToApply.SetCameraShakeMultiplier(SnapshotToApply.M_ControlSettings.M_CameraShakeMultiplier);
 	GameUserSettingsToApply.SetHideActionButtonHotkeys(SnapshotToApply.M_GameplaySettings.bM_HideActionButtonHotkeys);
 	GameUserSettingsToApply.SetCheckUnitRangeOnHover(SnapshotToApply.M_GameplaySettings.bM_CheckUnitRangeOnHover);
 	GameUserSettingsToApply.SetOverwriteAllPlayerHpBarStrat(SnapshotToApply.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
