@@ -136,6 +136,12 @@ struct FRTSControlSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
 	float M_CameraPanSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
+	bool bM_CameraShakeEnabled = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Controls")
+	float M_CameraShakeMultiplier = RTSGameUserSettingsRanges::DefaultCameraShakeMultiplier;
 };
 
 USTRUCT(BlueprintType)
@@ -268,6 +274,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingCameraPanSpeedMultiplier(float NewCameraPanSpeedMultiplier);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingCameraShakeEnabled(bool bNewCameraShakeEnabled);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingCameraShakeMultiplier(float NewCameraShakeMultiplier);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingHideActionButtonHotkeys(bool bNewHideActionButtonHotkeys);

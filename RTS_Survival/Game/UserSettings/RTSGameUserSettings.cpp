@@ -118,6 +118,16 @@ float URTSGameUserSettings::GetCameraPanSpeedMultiplier() const
 	return M_CameraPanSpeedMultiplier;
 }
 
+bool URTSGameUserSettings::GetCameraShakeEnabled() const
+{
+	return bM_CameraShakeEnabled;
+}
+
+float URTSGameUserSettings::GetCameraShakeMultiplier() const
+{
+	return M_CameraShakeMultiplier;
+}
+
 bool URTSGameUserSettings::GetHideActionButtonHotkeys() const
 {
 	return bM_HideActionButtonHotkeys;
@@ -190,6 +200,17 @@ void URTSGameUserSettings::SetCameraMovementSpeedMultiplier(const float NewCamer
 void URTSGameUserSettings::SetCameraPanSpeedMultiplier(const float NewCameraPanSpeedMultiplier)
 {
 	M_CameraPanSpeedMultiplier = NewCameraPanSpeedMultiplier;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetCameraShakeEnabled(const bool bNewCameraShakeEnabled)
+{
+	bM_CameraShakeEnabled = bNewCameraShakeEnabled;
+}
+
+void URTSGameUserSettings::SetCameraShakeMultiplier(const float NewCameraShakeMultiplier)
+{
+	M_CameraShakeMultiplier = NewCameraShakeMultiplier;
 	ApplyCustomSettingClamps();
 }
 
@@ -469,6 +490,17 @@ void URTSGameUserSettings::ApplyCustomSettingClamps()
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Camera pan speed multiplier was out of range and has been clamped."));
 		M_CameraPanSpeedMultiplier = ClampedCameraPanSpeedMultiplier;
+	}
+
+	const float ClampedCameraShakeMultiplier = FMath::Clamp(
+		M_CameraShakeMultiplier,
+		RTSGameUserSettingsRanges::MinCameraShakeMultiplier,
+		RTSGameUserSettingsRanges::MaxCameraShakeMultiplier
+	);
+	if (not FMath::IsNearlyEqual(ClampedCameraShakeMultiplier, M_CameraShakeMultiplier))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Camera shake multiplier was out of range and has been clamped."));
+		M_CameraShakeMultiplier = ClampedCameraShakeMultiplier;
 	}
 
 	const float CurrentFrameRateLimit = GetFrameRateLimit();

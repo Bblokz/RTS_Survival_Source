@@ -123,6 +123,12 @@ struct FEscapeMenuSettingsControlsText
 	FText M_CameraPanSpeedMultiplierLabelText = FText::FromString(TEXT("SETTINGS_CAMERA_PAN_SPEED_MULTIPLIER_LABEL"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_CameraShakeEnabledLabelText = FText::FromString(TEXT("SETTINGS_CAMERA_SHAKE_ENABLED_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_CameraShakeMultiplierLabelText = FText::FromString(TEXT("SETTINGS_CAMERA_SHAKE_MULTIPLIER_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_InvertYAxisLabelText = FText::FromString(TEXT("SETTINGS_INVERT_Y_AXIS_LABEL"));
 };
 
@@ -238,6 +244,12 @@ struct FEscapeMenuSettingsSliderRanges
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
 	float M_CameraPanSpeedMultiplierMax = RTSGameUserSettingsRanges::MaxCameraPanSpeedMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
+	float M_CameraShakeMultiplierMin = RTSGameUserSettingsRanges::MinCameraShakeMultiplier;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Sliders")
+	float M_CameraShakeMultiplierMax = RTSGameUserSettingsRanges::MaxCameraShakeMultiplier;
 };
 
 struct FEscapeMenuSettingsSectionButtonPadding
@@ -424,10 +436,14 @@ private:
 	bool GetIsValidTextMouseSensitivityLabel() const;
 	bool GetIsValidTextCameraMovementSpeedMultiplierLabel() const;
 	bool GetIsValidTextCameraPanSpeedMultiplierLabel() const;
+	bool GetIsValidTextCameraShakeEnabledLabel() const;
+	bool GetIsValidTextCameraShakeMultiplierLabel() const;
 	bool GetIsValidTextInvertYAxisLabel() const;
 	bool GetIsValidSliderMouseSensitivity() const;
 	bool GetIsValidSliderCameraMovementSpeedMultiplier() const;
 	bool GetIsValidSliderCameraPanSpeedMultiplier() const;
+	bool GetIsValidCheckCameraShakeEnabled() const;
+	bool GetIsValidSliderCameraShakeMultiplier() const;
 	bool GetIsValidCheckInvertYAxis() const;
 
 	bool GetIsValidTextGameplayHeader() const;
@@ -559,6 +575,12 @@ private:
 
 	UFUNCTION()
 	void HandleCameraPanSpeedMultiplierChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleCameraShakeEnabledChanged(bool bIsChecked);
+
+	UFUNCTION()
+	void HandleCameraShakeMultiplierChanged(float NewValue);
 
 	UFUNCTION()
 	void HandleInvertYAxisChanged(bool bIsChecked);
@@ -1105,6 +1127,18 @@ private:
 	TObjectPtr<URichTextBlock> M_TextCameraPanSpeedMultiplierLabel = nullptr;
 
 	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextCameraShakeEnabledLabel in the Widget Blueprint.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextCameraShakeEnabledLabel = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a RichTextBlock named M_TextCameraShakeMultiplierLabel in the Widget Blueprint.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextCameraShakeMultiplierLabel = nullptr;
+
+	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextInvertYAxisLabel in the Widget Blueprint.
 	 * @note Designers may style or wrap the label, but C++ updates the label text at runtime.
 	 * @note The bound widget must exist, keep this name, and remain a RichTextBlock for updates.
@@ -1195,6 +1229,18 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderCameraPanSpeedMultiplier = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a CheckBox named M_CheckCameraShakeEnabled in the Widget Blueprint.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UCheckBox> M_CheckCameraShakeEnabled = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderCameraShakeMultiplier in the Widget Blueprint.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderCameraShakeMultiplier = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a CheckBox named M_CheckInvertYAxis in the Widget Blueprint.

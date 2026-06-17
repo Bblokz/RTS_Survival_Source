@@ -25,6 +25,10 @@ namespace RTSGameUserSettingsRanges
 	constexpr float MinCameraPanSpeedMultiplier = 0.5f;
 	constexpr float MaxCameraPanSpeedMultiplier = 2.0f;
 	constexpr float DefaultCameraPanSpeedMultiplier = 1.0f;
+
+	constexpr float MinCameraShakeMultiplier = 0.1f;
+	constexpr float MaxCameraShakeMultiplier = 5.0f;
+	constexpr float DefaultCameraShakeMultiplier = 1.0f;
 }
 
 /**
@@ -95,6 +99,12 @@ public:
 	/** @brief Returns the camera pan speed multiplier stored in the settings menu. */
 	float GetCameraPanSpeedMultiplier() const;
 
+	/** @brief Returns whether runtime camera shake should be played. */
+	bool GetCameraShakeEnabled() const;
+
+	/** @brief Returns the user camera shake intensity multiplier stored in the settings menu. */
+	float GetCameraShakeMultiplier() const;
+
 	/** @brief Returns whether action button hotkeys should be hidden in the action UI. */
 	bool GetHideActionButtonHotkeys() const;
 
@@ -133,6 +143,12 @@ public:
 
 	/** @brief Writes the camera pan speed multiplier before clamping and saving. */
 	void SetCameraPanSpeedMultiplier(const float NewCameraPanSpeedMultiplier);
+
+	/** @brief Writes whether runtime camera shake should be played. */
+	void SetCameraShakeEnabled(bool bNewCameraShakeEnabled);
+
+	/** @brief Writes the camera shake intensity multiplier before clamping and saving. */
+	void SetCameraShakeMultiplier(float NewCameraShakeMultiplier);
 
 	/** @brief Writes the setting that hides action button hotkeys in the action UI. */
 	void SetHideActionButtonHotkeys(const bool bNewHideActionButtonHotkeys);
@@ -286,6 +302,12 @@ private:
 
 	UPROPERTY(config)
 	float M_CameraPanSpeedMultiplier = RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier;
+
+	UPROPERTY(config)
+	bool bM_CameraShakeEnabled = true;
+
+	UPROPERTY(config)
+	float M_CameraShakeMultiplier = RTSGameUserSettingsRanges::DefaultCameraShakeMultiplier;
 
 	UPROPERTY(config)
 	bool bM_HideActionButtonHotkeys = false;
