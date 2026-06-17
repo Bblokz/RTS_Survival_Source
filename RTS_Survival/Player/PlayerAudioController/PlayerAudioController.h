@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -12,6 +12,49 @@
 #include "RTS_Survival/Audio/Settings/RTSSpatialAudioSettings.h"
 
 #include "PlayerAudioController.generated.h"
+
+class USoundAttenuation;
+class USoundConcurrency;
+class USoundEffectSourcePresetChain;
+
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FOffMapAbilityAudioSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	int32 PoolSize = 6;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	float OffMapDistance = 12000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	float VolumeMultiplier = 0.65f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	float PitchMin = 0.88f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	float PitchMax = 0.98f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	float LowPassFilterFrequency = 1800.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	float MinPropagationDelay = 0.05f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	float MaxPropagationDelay = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	TObjectPtr<USoundAttenuation> Attenuation = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	TObjectPtr<USoundConcurrency> Concurrency = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio")
+	TObjectPtr<USoundEffectSourcePresetChain> SourceEffectChain = nullptr;
+};
 
 /**
  * @brief Internal per-instance data for pooled spatial audio.
@@ -165,6 +208,7 @@ public:
 	                   bool bQueueIfNotPlayed = false);
 	
 	void PlayCustomOneShot2DSound(TObjectPtr<USoundBase> Sound);
+	void PlayOffMapAbilitySound(USoundBase* Sound);
 
 	/**
 	 * 
@@ -467,6 +511,33 @@ void AdjustVoiceLineForExpandedNomadic(const AActor* ValidPrimarySelectedUnit,
 	 * @return A pooled audio component or nullptr when no free component is available.
 	 */
 	UAudioComponent* AcquirePooledSpatialAudioComponent(const bool bIsForceRequest);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Off Map Ability Audio", meta=(AllowPrivateAccess="true"))
+	FOffMapAbilityAudioSettings M_OffMapAbilityAudioSettings;
+
+	UPROPERTY()
+	TArray<FRTSPooledSpatialAudioInstance> M_OffMapAbilityAudioPoolInstances;
+
+	TArray<int32> M_OffMapAbilityAudioFreeList;
+	TArray<int32> M_OffMapAbilityAudioActiveList;
+
+	FVector M_OffMapAbilityAudioSourceLocation = FVector::ZeroVector;
+
+	void BeginPlay_InitOffMapAbilityAudioPool();
+	void BeginPlay_CacheOffMapAbilityAudioSourceLocation();
+	FVector BuildOffMapAbilityAudioSourceLocation() const;
+	FVector GetPlayerStartLocationForOffMapAudio() const;
+	FVector GetListenerLocationForOffMapAudio() const;
+	FVector GetBattlefieldCenterForOffMapAudio() const;
+	void Init_SpawnOffMapAbilityAudioPool(const int32 PoolSize);
+	void EndPlay_ShutdownOffMapAbilityAudioPool();
+	void Tick_UpdateOffMapAbilityAudioPool(const float DeltaTime);
+	UAudioComponent* AcquireOffMapAbilityAudioComponent();
+	int32 AllocateOffMapAbilityAudioIndex();
+	int32 FindOldestActiveOffMapAbilityAudioIndex() const;
+	void MarkOffMapAbilityAudioIndexDormant(const int32 Index);
+	void ConfigureOffMapAbilityAudioComponent(UAudioComponent* AudioComponent, USoundBase* Sound) const;
+	void PlayConfiguredOffMapAbilityAudioComponent(UAudioComponent* AudioComponent);
 
 	bool GetHasToPlayAnnouncerLineAs2DSound(EAnnouncerVoiceLineType Type) const;
 	void PlayAnnouncerLineAs2DSound(EAnnouncerVoiceLineType Type);

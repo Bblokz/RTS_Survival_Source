@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -10,6 +10,7 @@
 #include "GA_Barrage.generated.h"
 
 class ASmallArmsProjectileManager;
+class USoundBase;
 
 USTRUCT(BlueprintType)
 struct FBarrageSettings
@@ -48,6 +49,12 @@ struct FBarrageSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FProjectileVfxSettings ProjectileVfxSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bUseOffMapLaunchSound = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<USoundBase> OffMapLaunchSound = nullptr;
 };
 
 /**
@@ -98,6 +105,9 @@ private:
 	void StartBarrage(const FVector& TargetLocation);
 	void FireNextBurst();
 	void FireSingleShell();
+	FWeaponVFX BuildWeaponVfxForShellLaunch() const;
+	void PlayOffMapLaunchSoundIfRequested() const;
+	USoundBase* GetOffMapLaunchSound() const;
 	FVector BuildRandomPointInRadius(const FVector& CenterLocation) const;
 	FVector BuildLaunchLocation(const FVector& TargetLocation) const;
 	FWeaponData BuildVariedWeaponData() const;
