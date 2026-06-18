@@ -2,6 +2,7 @@
 
 #include "GA_AircraftBombing.h"
 
+#include "TimerManager.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
@@ -83,8 +84,7 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 
 	M_SpawnedAircraft = SpawnedAircraft;
 	const FVector CarpetEndLocation = BuildCarpetEndLocation(StartLocation, TargetLocation);
-	SpawnedAircraft->CarpetBombing(StartLocation, CarpetEndLocation, RetreatLocation);
-	StartForcedRetreatTimer();
+	QueueCarpetBombingOrderForNextFrame(SpawnedAircraft, StartLocation, CarpetEndLocation, RetreatLocation);
 }
 
 AAircraftMaster* UGA_AircraftBombing::SpawnAircraftAtStartLocation(UClass* AircraftClass, const FVector& StartLocation) const
@@ -112,6 +112,54 @@ FVector UGA_AircraftBombing::BuildCarpetEndLocation(const FVector& StartLocation
 	FVector CarpetEndLocation = StartLocation + Direction * M_AircraftBombingSettings.CarpetBombingLength;
 	CarpetEndLocation.Z = StartLocation.Z;
 	return CarpetEndLocation;
+}
+
+void UGA_AircraftBombing::QueueCarpetBombingOrderForNextFrame(
+	AAircraftMaster* SpawnedAircraft,
+	const FVector& StartLocation,
+	const FVector& CarpetEndLocation,
+	const FVector& RetreatLocation)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || not IsValid(SpawnedAircraft))
+	{
+		return;
+	}
+
+	TWeakObjectPtr<UGA_AircraftBombing> WeakThis(this);
+	TWeakObjectPtr<AAircraftMaster> WeakSpawnedAircraft(SpawnedAircraft);
+	World->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateLambda(
+			[WeakThis, WeakSpawnedAircraft, StartLocation, CarpetEndLocation, RetreatLocation]()
+			{
+				if (not WeakThis.IsValid() || not WeakSpawnedAircraft.IsValid())
+				{
+					return;
+				}
+
+				UGA_AircraftBombing* StrongThis = WeakThis.Get();
+				AAircraftMaster* StrongSpawnedAircraft = WeakSpawnedAircraft.Get();
+				StrongThis->IssueCarpetBombingOrder(
+					StrongSpawnedAircraft,
+					StartLocation,
+					CarpetEndLocation,
+					RetreatLocation);
+			}));
+}
+
+void UGA_AircraftBombing::IssueCarpetBombingOrder(
+	AAircraftMaster* SpawnedAircraft,
+	const FVector& StartLocation,
+	const FVector& CarpetEndLocation,
+	const FVector& RetreatLocation)
+{
+	if (not IsValid(SpawnedAircraft))
+	{
+		return;
+	}
+
+	SpawnedAircraft->CarpetBombing(StartLocation, CarpetEndLocation, RetreatLocation);
+	StartForcedRetreatTimer();
 }
 
 void UGA_AircraftBombing::StartForcedRetreatTimer()
@@ -143,7 +191,7 @@ void UGA_AircraftBombing::StartForcedRetreatTimer()
 void UGA_AircraftBombing::OnForcedRetreatTimerFinished()
 {
 	M_ForcedRetreatTimerHandle.Invalidate();
-	if (not GetIsValidSpawnedAircraftForForcedRetreat() || not GetIsValidGlobalAbilityManager())
+	if (not GetIsValidSpawnedAircraft() || not GetIsValidGlobalAbilityManager())
 	{
 		return;
 	}
@@ -153,7 +201,7 @@ void UGA_AircraftBombing::OnForcedRetreatTimerFinished()
 	M_SpawnedAircraft->CarpetBombing_RetreatAndDestroy(RetreatLocation);
 }
 
-bool UGA_AircraftBombing::GetIsValidSpawnedAircraftForForcedRetreat() const
+bool UGA_AircraftBombing::GetIsValidSpawnedAircraft() const
 {
 	if (M_SpawnedAircraft.IsValid())
 	{
@@ -163,7 +211,7 @@ bool UGA_AircraftBombing::GetIsValidSpawnedAircraftForForcedRetreat() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		"M_SpawnedAircraft",
-		"GetIsValidSpawnedAircraftForForcedRetreat",
+		"GetIsValidSpawnedAircraft",
 		this
 	);
 

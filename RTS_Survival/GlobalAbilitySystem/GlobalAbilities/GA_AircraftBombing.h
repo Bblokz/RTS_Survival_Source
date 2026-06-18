@@ -60,8 +60,18 @@ private:
 		const FVector& RetreatLocation);
 	AAircraftMaster* SpawnAircraftAtStartLocation(UClass* AircraftClass, const FVector& StartLocation) const;
 	FVector BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const;
+	void QueueCarpetBombingOrderForNextFrame(
+		AAircraftMaster* SpawnedAircraft,
+		const FVector& StartLocation,
+		const FVector& CarpetEndLocation,
+		const FVector& RetreatLocation);
+	void IssueCarpetBombingOrder(
+		AAircraftMaster* SpawnedAircraft,
+		const FVector& StartLocation,
+		const FVector& CarpetEndLocation,
+		const FVector& RetreatLocation);
 	void StartForcedRetreatTimer();
 	void OnForcedRetreatTimerFinished();
-	bool GetIsValidSpawnedAircraftForForcedRetreat() const;
+	bool GetIsValidSpawnedAircraft() const;
 	void ClearForcedRetreatTimer();
 };
