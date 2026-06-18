@@ -206,18 +206,19 @@ void UGlobalAbilitiesManager::OnClickedAbilityButton(UGlobalAbility* ClickedAbil
 FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* Requester,
                                                                  const FVector& TargetLocation) const
 {
-	FVector SpawnLocation; 
-	if (TryGenerateLocationOnAircraftEdgeLine(
-		M_SpawnSetings.AircraftStartLocation,
-		M_SpawnSetings.Fow_ManagerPosition,
-		M_SpawnSetings.PlayerStartLocation,
-		M_SpawnSetings.MapExtent / 2,
-		M_SpawnSetings.AircratHeightStart, 
-		SpawnLocation))
-	{
-		return SpawnLocation;
-	}
-	return M_SpawnSetings.AircraftStartLocation;
+	return TargetLocation - FVector(5000, 0, 0) + FVector(0, 0, M_SpawnSetings.AircratHeightStart);
+	// FVector SpawnLocation; 
+	// if (TryGenerateLocationOnAircraftEdgeLine(
+	// 	M_SpawnSetings.AircraftStartLocation,
+	// 	M_SpawnSetings.Fow_ManagerPosition,
+	// 	M_SpawnSetings.PlayerStartLocation,
+	// 	M_SpawnSetings.MapExtent / 2,
+	// 	M_SpawnSetings.AircratHeightStart, 
+	// 	SpawnLocation))
+	// {
+	// 	return SpawnLocation;
+	// }
+	// return M_SpawnSetings.AircraftStartLocation;
 }
 
 FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject* Requester,
