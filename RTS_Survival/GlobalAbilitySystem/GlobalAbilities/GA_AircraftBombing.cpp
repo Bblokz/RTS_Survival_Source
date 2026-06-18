@@ -97,7 +97,18 @@ AAircraftMaster* UGA_AircraftBombing::SpawnAircraftAtStartLocation(UClass* Aircr
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	return World->SpawnActor<AAircraftMaster>(AircraftClass, StartLocation, FRotator::ZeroRotator, SpawnParameters);
+	AAircraftMaster* SpawnedAircraft = World->SpawnActor<AAircraftMaster>(
+		AircraftClass,
+		StartLocation,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	if (not IsValid(SpawnedAircraft))
+	{
+		return nullptr;
+	}
+
+	SpawnedAircraft->SpawnDefaultController();
+	return SpawnedAircraft;
 }
 
 FVector UGA_AircraftBombing::BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const
