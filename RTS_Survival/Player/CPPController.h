@@ -812,8 +812,7 @@ protected:
 	void OnHitEscape();
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	void OnMainMenuWidgetCreated(UMainGameUI* MainMenuWidget);
-	void InitializeGlobalAbilityManager(UMainGameUI* MainMenu);
+	void SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, float AircraftHeightStart, FVector PlayerStartLocation);
 
 	// Keeps  track of an array of landscape deform components to write radii to a render target.
 	UPROPERTY()

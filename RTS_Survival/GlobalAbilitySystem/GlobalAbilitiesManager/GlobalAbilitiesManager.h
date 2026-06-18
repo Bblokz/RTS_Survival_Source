@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GlobalAbility_SpawnSettings.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "GlobalAbilitiesManager.generated.h"
@@ -29,7 +30,10 @@ public:
 	void InitGlobalAbilitiesManager(const int32 OwningPlayer,
 	                                const TArray<EGlobalAbility>& GlobalAbilities,
 	                                UW_GlobalAbilityPanel* W_GlobalAbilityPanel, TObjectPtr<UPlayerResourceManager> PlayerResourceMgr, TObjectPtr<
-	                                UGameUnitManager> GameUnitMgr, TObjectPtr<UPlayerTechManager> PlayerTechMgr);
+		                                UGameUnitManager> GameUnitMgr, TObjectPtr<UPlayerTechManager> PlayerTechMgr, const FVector& PlayerStartLocation, float
+	                                AircraftHeight);
+	
+	void SetupSpawnSettings(const FVector& PlayerStart, float AircraftHeightStart);
 
 	// Called when the game starts
 	virtual void BeginPlay()  override;
@@ -49,6 +53,7 @@ protected:
 	
 	
 	private:
+	FGlobalAbility_SpawnSettings M_SpawnSetings;
 	UPROPERTY()
 	int32 M_OwningPlayer;
 	bool IsPlayerAbilityManager() const;
@@ -97,4 +102,9 @@ protected:
 
 	FTimerHandle M_CheckRequirementsTimerHandle;
 
+	bool TryGenerateLocationOnAircraftEdgeLine(const FVector& AircraftEdgeCenterLocation,
+													const FVector& FowManagerPosition, const FVector& PlayerStart,
+													float SpawnLineHalfLength, float AircraftHeightStart,
+													FVector& OutSpawnLocation) const;
+	
 };

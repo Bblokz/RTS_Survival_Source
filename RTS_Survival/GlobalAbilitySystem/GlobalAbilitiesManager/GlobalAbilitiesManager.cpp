@@ -19,6 +19,8 @@
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
+#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 
 // Sets default values for this component's properties
@@ -26,21 +28,22 @@ UGlobalAbilitiesManager::UGlobalAbilitiesManager()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
-
 }
 
 void UGlobalAbilitiesManager::InitGlobalAbilitiesManager(const int32 OwningPlayer,
                                                          const TArray<EGlobalAbility>& GlobalAbilities,
                                                          UW_GlobalAbilityPanel* W_GlobalAbilityPanel,
-                                                         TObjectPtr<UPlayerResourceManager> PlayerResourceMgr, 
+                                                         TObjectPtr<UPlayerResourceManager> PlayerResourceMgr,
                                                          TObjectPtr<UGameUnitManager> GameUnitMgr,
-                                                         TObjectPtr<UPlayerTechManager> PlayerTechMgr)
+                                                         TObjectPtr<UPlayerTechManager> PlayerTechMgr,
+                                                         const FVector& PlayerStartLocation,
+                                                         const float AircraftHeight)
 {
 	M_OwningPlayer = OwningPlayer;
 	// Only the player will have to check for requirements and resources.
 	if (IsPlayerAbilityManager())
 	{
-		M_GlobalAbilityPanel= W_GlobalAbilityPanel;
+		M_GlobalAbilityPanel = W_GlobalAbilityPanel;
 		if (EnsureIsValidGlobalAbilityPanel())
 		{
 			M_GA_Description = M_GlobalAbilityPanel.Get()->GetDescription();
@@ -49,7 +52,7 @@ void UGlobalAbilitiesManager::InitGlobalAbilitiesManager(const int32 OwningPlaye
 				M_GA_Description.Get()->HideDescription();
 			}
 		}
-		
+
 		M_PlayerResourceManager = PlayerResourceMgr;
 		M_GameUnitManager = GameUnitMgr;
 		M_PlayerTechManager = PlayerTechMgr;
@@ -58,16 +61,72 @@ void UGlobalAbilitiesManager::InitGlobalAbilitiesManager(const int32 OwningPlaye
 		(void)EnsureIsValidGameUnitManager();
 	}
 	LoadGlobalAbilities(GlobalAbilities);
-	
+	SetupSpawnSettings(PlayerStartLocation, AircraftHeight);
 }
 
+void UGlobalAbilitiesManager::SetupSpawnSettings(const FVector& PlayerStart,
+                                                 const float AircraftHeightStart)
+{
+	M_SpawnSetings.AircraftStartLocation = PlayerStart;
+	M_SpawnSetings.AircratHeightStart = AircraftHeightStart;
+
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(this);
+	if (!IsValid(FowManager))
+	{
+		return;
+	}
+
+	M_SpawnSetings.MapExtent = FowManager->GetMapExtent();
+	M_SpawnSetings.Fow_ManagerPosition = FowManager->GetActorLocation();
+
+	const FVector DirectionToPlayerStart =
+		(PlayerStart - M_SpawnSetings.Fow_ManagerPosition).GetSafeNormal();
+
+	M_SpawnSetings.AircraftStartLocation =
+		M_SpawnSetings.Fow_ManagerPosition + DirectionToPlayerStart * M_SpawnSetings.MapExtent;
+}
+
+bool UGlobalAbilitiesManager::TryGenerateLocationOnAircraftEdgeLine(
+	const FVector& AircraftEdgeCenterLocation,
+	const FVector& FowManagerPosition,
+	const FVector& PlayerStart,
+	const float SpawnLineHalfLength,
+	const float AircraftHeightStart,
+	FVector& OutSpawnLocation) const
+{
+	FVector DirectionFromFowToPlayer = PlayerStart - FowManagerPosition;
+	DirectionFromFowToPlayer.Z = 0.0f;
+
+	if (DirectionFromFowToPlayer.IsNearlyZero())
+	{
+		return false;
+	}
+
+	const FVector DirectionFromFowToPlayerNormalized = DirectionFromFowToPlayer.GetSafeNormal();
+
+	const FVector PerpendicularDirection = FVector(
+		-DirectionFromFowToPlayerNormalized.Y,
+		DirectionFromFowToPlayerNormalized.X,
+		0.0f
+	);
+
+	const float RandomDistanceAlongEdge = FMath::FRandRange(
+		-SpawnLineHalfLength,
+		SpawnLineHalfLength
+	);
+
+	OutSpawnLocation =
+		AircraftEdgeCenterLocation + PerpendicularDirection * RandomDistanceAlongEdge;
+
+	OutSpawnLocation.Z = AircraftHeightStart;
+
+	return true;
+}
 
 
 void UGlobalAbilitiesManager::BeginPlay()
 {
 	Super::BeginPlay();
-
-	
 }
 
 bool UGlobalAbilitiesManager::QueryRequirementForAbility(TObjectPtr<UGlobalAbility> Ability) const
@@ -89,7 +148,7 @@ bool UGlobalAbilitiesManager::QueryRequirementForAbility(TObjectPtr<UGlobalAbili
 	}
 	if (not Ability->M_AbilityRequirements.RequiredUnit.IsNone())
 	{
-		return CheckDoesPlayerHaveUnit(Ability->M_AbilityRequirements.RequiredUnit);	
+		return CheckDoesPlayerHaveUnit(Ability->M_AbilityRequirements.RequiredUnit);
 	}
 	// No requirements.
 	return true;
@@ -97,7 +156,6 @@ bool UGlobalAbilitiesManager::QueryRequirementForAbility(TObjectPtr<UGlobalAbili
 
 bool UGlobalAbilitiesManager::QueryCostsForAbility(TObjectPtr<UGlobalAbility> Ability) const
 {
-	
 	if (not IsValid(Ability))
 	{
 		return false;
@@ -106,7 +164,7 @@ bool UGlobalAbilitiesManager::QueryCostsForAbility(TObjectPtr<UGlobalAbility> Ab
 	{
 		return false;
 	}
-	EPlayerError Error =  M_PlayerResourceManager.Get()->GetCanPayForCost(Ability->M_AbilityCosts.Costs.ResourceCosts);
+	EPlayerError Error = M_PlayerResourceManager.Get()->GetCanPayForCost(Ability->M_AbilityCosts.Costs.ResourceCosts);
 	if (Error != EPlayerError::Error_None)
 	{
 		return false;
@@ -145,16 +203,38 @@ void UGlobalAbilitiesManager::OnClickedAbilityButton(UGlobalAbility* ClickedAbil
 }
 
 
-FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* Requester, const FVector& TargetLocation) const
+FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* Requester,
+                                                                 const FVector& TargetLocation) const
 {
-	RTSFunctionLibrary::ReportError(TEXT("TODO: Implement UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation for GA_AircraftBombing."));
-	return TargetLocation;
+	FVector SpawnLocation; 
+	if (TryGenerateLocationOnAircraftEdgeLine(
+		M_SpawnSetings.AircraftStartLocation,
+		M_SpawnSetings.Fow_ManagerPosition,
+		M_SpawnSetings.PlayerStartLocation,
+		M_SpawnSetings.MapExtent / 2,
+		M_SpawnSetings.AircratHeightStart, 
+		SpawnLocation))
+	{
+		return SpawnLocation;
+	}
+	return M_SpawnSetings.AircraftStartLocation;
 }
 
-FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject* Requester, const FVector& TargetLocation) const
+FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject* Requester,
+                                                                   const FVector& TargetLocation) const
 {
-	RTSFunctionLibrary::ReportError(TEXT("TODO: Implement UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation for GA_AircraftBombing."));
-	return TargetLocation;
+	FVector SpawnLocation; 
+	if (TryGenerateLocationOnAircraftEdgeLine(
+		M_SpawnSetings.AircraftStartLocation,
+		M_SpawnSetings.Fow_ManagerPosition,
+		M_SpawnSetings.PlayerStartLocation,
+		M_SpawnSetings.MapExtent / 2,
+		M_SpawnSetings.AircratHeightStart, 
+		SpawnLocation))
+	{
+		return SpawnLocation;
+	}
+	return M_SpawnSetings.AircraftStartLocation;
 }
 
 bool UGlobalAbilitiesManager::IsPlayerAbilityManager() const
@@ -333,7 +413,8 @@ void UGlobalAbilitiesManager::UpdateAbilityAvailability(UGlobalAbility* Ability)
 		not bMeetsRequirements);
 }
 
-void UGlobalAbilitiesManager::UpdateAbilityItemAvailability(const UGlobalAbility* Ability, const bool bIsEnabled, const bool bUseGreyTint) const
+void UGlobalAbilitiesManager::UpdateAbilityItemAvailability(const UGlobalAbility* Ability, const bool bIsEnabled,
+                                                            const bool bUseGreyTint) const
 {
 	if (not EnsureIsValidGlobalAbilityPanel())
 	{
@@ -359,14 +440,16 @@ FText UGlobalAbilitiesManager::GetHoverDescriptionForAbility(const UGlobalAbilit
 		&& not M_PlayerTechManager.Get()->HasTechResearched(Ability->M_AbilityRequirements.RequiredTechnology))
 	{
 		return FText::FromString(FRTSRichTextConverter::MakeRTSRich(
-			FString(TEXT("Required Tech: ")) + Global_GetTechDisplayName(Ability->M_AbilityRequirements.RequiredTechnology),
+			FString(TEXT("Required Tech: ")) + Global_GetTechDisplayName(
+				Ability->M_AbilityRequirements.RequiredTechnology),
 			ERTSRichText::Text_Bad14));
 	}
 	if (not Ability->M_AbilityRequirements.RequiredUnit.IsNone()
 		&& not CheckDoesPlayerHaveUnit(Ability->M_AbilityRequirements.RequiredUnit))
 	{
 		return FText::FromString(FRTSRichTextConverter::MakeRTSRich(
-			FString(TEXT("Required Unit: ")) + GetUnitRequirementDisplayName(Ability->M_AbilityRequirements.RequiredUnit),
+			FString(TEXT("Required Unit: ")) + GetUnitRequirementDisplayName(
+				Ability->M_AbilityRequirements.RequiredUnit),
 			ERTSRichText::Text_Bad14));
 	}
 	if (Ability->M_AbilityCosts.CoolDownRemaining > 0)
@@ -484,4 +567,3 @@ bool UGlobalAbilitiesManager::CheckDoesPlayerHaveAircraft(const FTrainingOption&
 	const EAircraftSubtype AircraftSubtype = static_cast<EAircraftSubtype>(UnitId.SubtypeValue);
 	return M_GameUnitManager.Get()->GetHasPlayerAircraftOfType(AircraftSubtype);
 }
-

@@ -259,7 +259,8 @@ ACPPController::ACPPController()
 	M_PlayerAudioController = CreateDefaultSubobject<UPlayerAudioController>(TEXT("PlayerAudioController"));
 	M_PlayerPortraitManager = CreateDefaultSubobject<UPlayerPortraitManager>(TEXT("PlayerPortraitManager"));
 	M_PlayerOutlineComponent = CreateDefaultSubobject<UPlayerOutlineComponent>(TEXT("PlayerOutlineComponent"));
-	M_PlayerGlobabilitiesManager = CreateDefaultSubobject<UGlobalAbilitiesManager>(TEXT("PlayerGlobalAbilitiesManager"));
+	M_PlayerGlobabilitiesManager = CreateDefaultSubobject<
+		UGlobalAbilitiesManager>(TEXT("PlayerGlobalAbilitiesManager"));
 
 
 	CheatClass = URTSCheatManager::StaticClass();
@@ -299,7 +300,8 @@ AActor* ACPPController::GetPrimarySelectedUnit() const
 }
 
 void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,
-                                             const FGlobalAbilitySoundSettings& SoundSettings, UGlobalAbility* AbilityActivated)
+                                             const FGlobalAbilitySoundSettings& SoundSettings,
+                                             UGlobalAbility* AbilityActivated)
 {
 	if (not IsValid(AbilityActivated))
 	{
@@ -708,7 +710,8 @@ bool ACPPController::ChangeChordedKeyBinding(UInputAction* ActionToRebind, const
 		return false;
 	}
 
-	FEnhancedActionKeyMapping* ExistingMapping = FindMutableActionMapping(M_ChordedActionInputMappingContext, ActionToRebind);
+	FEnhancedActionKeyMapping* ExistingMapping = FindMutableActionMapping(
+		M_ChordedActionInputMappingContext, ActionToRebind);
 	FEnhancedActionKeyMapping* MappingToUpdate = ExistingMapping;
 	if (MappingToUpdate == nullptr)
 	{
@@ -750,7 +753,8 @@ void ACPPController::UnbindChordedKeyBinding(UInputAction* ActionToUnbind)
 		return;
 	}
 
-	FEnhancedActionKeyMapping* CurrentMapping = FindMutableActionMapping(M_ChordedActionInputMappingContext, ActionToUnbind);
+	FEnhancedActionKeyMapping* CurrentMapping = FindMutableActionMapping(
+		M_ChordedActionInputMappingContext, ActionToUnbind);
 	if (CurrentMapping != nullptr)
 	{
 		CurrentMapping->Key = FKey();
@@ -839,7 +843,6 @@ void ACPPController::OnNomadicExpansionShortCut()
 		return;
 	}
 	M_BuildingUI_ItemPanel->SimulateClickNomadicExpandButton();
-	
 }
 
 void ACPPController::OnBxpShortCut(const int32 BxpIndex)
@@ -5962,7 +5965,7 @@ bool ACPPController::TryPlaceBuilding(FVector& ClickedLocation)
 		return PlaceBxpIfAsyncLoaded(ClickedLocation);
 	case EPlayerBuildingPreviewMode::FieldConstructionPreviewMode:
 		OnPlaceFieldConstructionAtLocation(ClickedLocation);
-	// Make sure to reset exclusion candidates for a new construction order.
+		// Make sure to reset exclusion candidates for a new construction order.
 		M_FieldConstructionCandidate.Reset();
 		return true;
 	default:
@@ -6435,7 +6438,7 @@ bool ACPPController::EnsureIsValidBuildingUI_ItemPanel() const
 	if (not M_BuildingUI_ItemPanel.IsValid())
 	{
 		RTSFunctionLibrary::ReportError("no valid buidling UI item on cpp controller for"
-								  "hotkeys!");
+			"hotkeys!");
 		return false;
 	}
 	return true;
@@ -7181,7 +7184,8 @@ void ACPPController::NotifyHotkeyProviderSingleActionChanged(UInputAction* Actio
 {
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
-		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<
+			URTSHotkeyProviderSubsystem>())
 		{
 			HotkeyProviderSubsystem->HandleKeyBindingChanged(Action);
 		}
@@ -7192,7 +7196,8 @@ void ACPPController::NotifyHotkeyProviderChordedActionChanged(UInputAction* Acti
 {
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
-		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>())
+		if (URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = LocalPlayer->GetSubsystem<
+			URTSHotkeyProviderSubsystem>())
 		{
 			HotkeyProviderSubsystem->HandleChordedKeyBindingChanged(Action);
 		}
@@ -7314,12 +7319,8 @@ void ACPPController::OnHitEscape()
 	OpenEscapeMenu();
 }
 
-void ACPPController::OnMainMenuWidgetCreated(UMainGameUI* MainMenuWidget)
-{
-	InitializeGlobalAbilityManager(MainMenuWidget);
-}
-
-void ACPPController::InitializeGlobalAbilityManager(UMainGameUI* MainMenu)
+void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, const float AircraftHeightStart,
+                                               const FVector PlayerStartLocation)
 {
 	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	const UCommanderSettings* CommanderDevSettings = UCommanderSettings::Get();
@@ -7328,18 +7329,20 @@ void ACPPController::InitializeGlobalAbilityManager(UMainGameUI* MainMenu)
 	{
 		return;
 	}
-	ERTSCommander Commander  =  GameInstance->GetPlayerCommander();
-	FRTSCommanderSettings CommanderSettings =  CommanderDevSettings->GetCommanderSettingsForType(Commander)			;
-	
-	
+	ERTSCommander Commander = GameInstance->GetPlayerCommander();
+	FRTSCommanderSettings CommanderSettings = CommanderDevSettings->GetCommanderSettingsForType(Commander);
+
+
 	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
 		1,
 		CommanderSettings.GlobalAbilities,
-		MainMenu->GetGlobalAbilityPanel(),
+		MainMenuWidget->GetGlobalAbilityPanel(),
 		M_PlayerResourceManager,
 		GameUnitManager,
-		M_PlayerTechManager
-		);
+		M_PlayerTechManager,
+		PlayerStartLocation,
+		AircraftHeightStart
+	);
 }
 
 void ACPPController::DeactivateActionButton()
@@ -7541,8 +7544,8 @@ void ACPPController::CreateHoverWeaponRangeRadius(
 
 	const bool bUseArcRadius = WeaponRangeData.M_TurretYawLimit > 0.0f;
 	const ERTSRadiusType RadiusType = bUseArcRadius
-		? ERTSRadiusType::FullCircle_TeamWeaponArc
-		: ERTSRadiusType::FUllCircle_Weaponrange;
+		                                  ? ERTSRadiusType::FullCircle_TeamWeaponArc
+		                                  : ERTSRadiusType::FUllCircle_Weaponrange;
 	M_HoverWeaponRangeRadiusActorIndex = URTSBlueprintFunctionLibrary::CreateRTSRadius(
 		this,
 		HoveredActor->GetActorLocation(),
@@ -7932,6 +7935,9 @@ void ACPPController::InitPlayerStartLocation(const FVector& SpawnCenter, const b
 	if (not GetIsGameWithChoosingStartingLocation())
 	{
 		StartGameAtLocation(SpawnCenter, bDoNotLoadPlayerProfileUnits);
+	}
+	if (GetIsValidPlayerGlobalAbiliesManager())
+	{
 	}
 }
 
