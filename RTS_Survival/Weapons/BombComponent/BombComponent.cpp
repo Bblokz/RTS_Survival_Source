@@ -230,6 +230,11 @@ void UBombComponent::StartThrowingBombsAtLocation(const FVector& TargetLocation)
 	BombInterval();
 }
 
+void UBombComponent::UpdateGroundTargetLocation(const FVector& TargetLocation)
+{
+	M_TargetLocation = TargetLocation;
+}
+
 void UBombComponent::StopThrowingBombs()
 {
 	KillBombTimer();

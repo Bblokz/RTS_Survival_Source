@@ -97,6 +97,16 @@ bool UGlobalAbility::IsOwnedByPlayer() const
 	return M_OwningPlayer == 1;
 }
 
+bool UGlobalAbility::GetIsValidGlobalAbilityManager() const
+{
+	return EnsureIsValidGlobalAbilityManager();
+}
+
+UGlobalAbilitiesManager* UGlobalAbility::GetGlobalAbilityManager() const
+{
+	return M_GlobalAbilitiesManager.Get();
+}
+
 bool UGlobalAbility::EnsureIsValidGlobalAbilityManager() const
 {
 	if (not M_GlobalAbilitiesManager.IsValid())

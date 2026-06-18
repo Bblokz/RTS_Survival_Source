@@ -9,6 +9,7 @@
 #include "GlobalAbility.generated.h"
 
 class ACPPController;
+class UGlobalAbilitiesManager;
 
 UENUM(blueprintType)
 enum class EGlobalAbilityState : uint8
@@ -52,6 +53,8 @@ protected:
 	int32 GetOwningPlayer() const;
 	// For custom per ability logic on init.
 	virtual void OnInit(AActor* WorldContextActor);
+	[[nodiscard]] bool GetIsValidGlobalAbilityManager() const;
+	UGlobalAbilitiesManager* GetGlobalAbilityManager() const;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EGlobalAbility M_AbilityType;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

@@ -54,6 +54,8 @@ public:
 
 	void StartThrowingBombs(AActor* TargetActor);
 	void StartThrowingBombsAtLocation(const FVector& TargetLocation);
+	void UpdateGroundTargetLocation(const FVector& TargetLocation);
+	int32 GetActiveBombCount() const { return M_ActiveEntries; }
 	void StopThrowingBombs();
 
 protected:

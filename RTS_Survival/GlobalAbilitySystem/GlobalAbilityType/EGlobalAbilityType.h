@@ -12,5 +12,6 @@ enum class EGlobalAbility : uint8
 	GA_Me410Airstrike,
 	GA_InfantryDrop,
 	GA_HarvesterDrop,
-	GA_Barrage
+	GA_Barrage,
+	GA_AircraftBombing
 };
