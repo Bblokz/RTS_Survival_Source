@@ -4,13 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
-#include "GA_AircraftBombing.generated.h"
+#include "RTS_Survival/Units/Aircraft/AircraftState/AircraftState.h"
+#include "GA_AircraftStrafing.generated.h"
 
 class AAircraftMaster;
 struct FStreamableHandle;
 
 USTRUCT(BlueprintType)
-struct FAircraftBombingSettings
+struct FAircraftStrafingGlobalAbilitySettings
 {
 	GENERATED_BODY()
 
@@ -18,17 +19,23 @@ struct FAircraftBombingSettings
 	TSoftClassPtr<AAircraftMaster> AircraftClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float TimeUntilForcedRetreat = 30.0f;
+	float StrafeLength = 3000.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CarpetBombingLength = 3000.0f;
+	float StrafePointTotalLerpTime = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TotalStrafeTime = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FAircraftAttackMoveSettings AttackMoveSettings;
 };
 
 /**
- * @brief Template ability used by designers to spawn an aircraft and command a timed carpet-bombing run.
+ * @brief Template ability used by designers to spawn an aircraft and command a strafing run.
  */
 UCLASS(BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
-class RTS_SURVIVAL_API UGA_AircraftBombing : public UGlobalAbility
+class RTS_SURVIVAL_API UGA_AircraftStrafing : public UGlobalAbility
 {
 	GENERATED_BODY()
 
@@ -38,13 +45,7 @@ public:
 
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	FAircraftBombingSettings M_AircraftBombingSettings;
-
-	UPROPERTY(Transient)
-	TWeakObjectPtr<AAircraftMaster> M_SpawnedAircraft;
-
-	UPROPERTY(Transient)
-	FTimerHandle M_ForcedRetreatTimerHandle;
+	FAircraftStrafingGlobalAbilitySettings M_AircraftStrafingSettings;
 
 	// Keeps the async aircraft class load request alive until the callback can safely spawn the aircraft.
 	TSharedPtr<FStreamableHandle> M_AircraftClassLoadHandle;
@@ -52,25 +53,22 @@ private:
 	void RequestSpawnAircraftAtStartLocationAsync(
 		const FVector& StartLocation,
 		const FVector& TargetLocation,
-		const FVector& RetreatLocation);
+		const FVector& PostStrafeMoveToLocation);
 	void OnAircraftClassLoaded(
 		const TSoftClassPtr<AAircraftMaster>& AircraftClassToLoad,
 		const FVector& StartLocation,
 		const FVector& TargetLocation,
-		const FVector& RetreatLocation);
-	FVector BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const;
-	void QueueCarpetBombingOrderForNextFrame(
+		const FVector& PostStrafeMoveToLocation);
+	FVector BuildStrafeEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const;
+	FVector BuildPostStrafeMoveToLocation(const FVector& TargetLocation) const;
+	void QueueStrafeOrderForNextFrame(
 		AAircraftMaster* SpawnedAircraft,
 		const FVector& StartLocation,
-		const FVector& CarpetEndLocation,
-		const FVector& RetreatLocation);
-	void IssueCarpetBombingOrder(
+		const FVector& StrafeEndLocation,
+		const FVector& PostStrafeMoveToLocation);
+	void IssueStrafeOrder(
 		AAircraftMaster* SpawnedAircraft,
 		const FVector& StartLocation,
-		const FVector& CarpetEndLocation,
-		const FVector& RetreatLocation);
-	void StartForcedRetreatTimer();
-	void OnForcedRetreatTimerFinished();
-	bool GetIsValidSpawnedAircraft() const;
-	void ClearForcedRetreatTimer();
+		const FVector& StrafeEndLocation,
+		const FVector& PostStrafeMoveToLocation) const;
 };
