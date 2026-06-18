@@ -7,6 +7,7 @@
 #include "GA_AircraftBombing.generated.h"
 
 class AAircraftMaster;
+struct FStreamableHandle;
 
 USTRUCT(BlueprintType)
 struct FAircraftBombingSettings
@@ -45,10 +46,22 @@ private:
 	UPROPERTY(Transient)
 	FTimerHandle M_ForcedRetreatTimerHandle;
 
-	AAircraftMaster* SpawnAircraftAtStartLocation(const FVector& StartLocation) const;
+	// Keeps the async aircraft class load request alive until the callback can safely spawn the aircraft.
+	TSharedPtr<FStreamableHandle> M_AircraftClassLoadHandle;
+
+	void RequestSpawnAircraftAtStartLocationAsync(
+		const FVector& StartLocation,
+		const FVector& TargetLocation,
+		const FVector& RetreatLocation);
+	void OnAircraftClassLoaded(
+		const TSoftClassPtr<AAircraftMaster>& AircraftClassToLoad,
+		const FVector& StartLocation,
+		const FVector& TargetLocation,
+		const FVector& RetreatLocation);
+	AAircraftMaster* SpawnAircraftAtStartLocation(UClass* AircraftClass, const FVector& StartLocation) const;
 	FVector BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const;
 	void StartForcedRetreatTimer();
 	void OnForcedRetreatTimerFinished();
-	bool HasSpawnedAircraftForForcedRetreat() const;
+	bool GetIsValidSpawnedAircraftForForcedRetreat() const;
 	void ClearForcedRetreatTimer();
 };
