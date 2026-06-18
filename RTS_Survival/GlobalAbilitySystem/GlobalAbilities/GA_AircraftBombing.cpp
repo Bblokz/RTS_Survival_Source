@@ -5,6 +5,7 @@
 #include "TimerManager.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -76,7 +77,7 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 		return;
 	}
 
-	AAircraftMaster* SpawnedAircraft = SpawnAircraftAtStartLocation(AircraftClass, StartLocation);
+	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(this, AircraftClass, StartLocation);
 	if (not IsValid(SpawnedAircraft))
 	{
 		return;
@@ -87,42 +88,12 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 	QueueCarpetBombingOrderForNextFrame(SpawnedAircraft, StartLocation, CarpetEndLocation, RetreatLocation);
 }
 
-AAircraftMaster* UGA_AircraftBombing::SpawnAircraftAtStartLocation(UClass* AircraftClass, const FVector& StartLocation) const
-{
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return nullptr;
-	}
-
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AAircraftMaster* SpawnedAircraft = World->SpawnActor<AAircraftMaster>(
-		AircraftClass,
-		StartLocation,
-		FRotator::ZeroRotator,
-		SpawnParameters);
-	if (not IsValid(SpawnedAircraft))
-	{
-		return nullptr;
-	}
-
-	SpawnedAircraft->SpawnDefaultController();
-	return SpawnedAircraft;
-}
-
 FVector UGA_AircraftBombing::BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const
 {
-	FVector Direction = TargetLocation - StartLocation;
-	Direction.Z = 0.0f;
-	if (not Direction.Normalize())
-	{
-		return StartLocation;
-	}
-
-	FVector CarpetEndLocation = StartLocation + Direction * M_AircraftBombingSettings.CarpetBombingLength;
-	CarpetEndLocation.Z = StartLocation.Z;
-	return CarpetEndLocation;
+	return GlobalAbilityHelpers::BuildAircraftRunEndLocation(
+		StartLocation,
+		TargetLocation,
+		M_AircraftBombingSettings.CarpetBombingLength);
 }
 
 void UGA_AircraftBombing::QueueCarpetBombingOrderForNextFrame(
