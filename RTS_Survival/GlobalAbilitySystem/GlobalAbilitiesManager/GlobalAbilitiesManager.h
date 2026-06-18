@@ -42,6 +42,8 @@ public:
 	void OnAbilityFinishedExecuting(UGlobalAbility* Ability);
 	bool TryPayForAbility(UGlobalAbility* Ability) const;
 	bool GetHasActiveAbility() const;
+	FVector GetAircraftBombingSpawnLocation(const UObject* Requester, const FVector& TargetLocation) const;
+	FVector GetAircraftBombingRetreatLocation(const UObject* Requester, const FVector& TargetLocation) const;
 	
 protected:
 	

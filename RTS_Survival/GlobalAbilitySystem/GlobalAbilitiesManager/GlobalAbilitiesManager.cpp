@@ -144,6 +144,19 @@ void UGlobalAbilitiesManager::OnClickedAbilityButton(UGlobalAbility* ClickedAbil
 	}
 }
 
+
+FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* Requester, const FVector& TargetLocation) const
+{
+	RTSFunctionLibrary::ReportError(TEXT("TODO: Implement UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation for GA_AircraftBombing."));
+	return TargetLocation;
+}
+
+FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject* Requester, const FVector& TargetLocation) const
+{
+	RTSFunctionLibrary::ReportError(TEXT("TODO: Implement UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation for GA_AircraftBombing."));
+	return TargetLocation;
+}
+
 bool UGlobalAbilitiesManager::IsPlayerAbilityManager() const
 {
 	return M_OwningPlayer == 1;

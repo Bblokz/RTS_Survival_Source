@@ -221,6 +221,7 @@ void AAircraftMaster::Tick(float DeltaTime)
 	}
 	if (M_MovementState == EAircraftMovementState::MovingTo)
 	{
+		CarpetBombing_UpdateBombTargetLocation();
 		Tick_MoveTo(DeltaTime);
 		return;
 	}
@@ -803,6 +804,12 @@ void AAircraftMaster::OnMoveCompleted()
 	if (M_AircraftReturnData.TargetOwner.IsValid() && M_AircraftReturnData.bNavigatingToSocket)
 	{
 		OnReturnToBase_MoveCompleted();
+		return;
+	}
+
+	if (M_CarpetBombingState.Phase != EAircraftCarpetBombingPhase::Inactive)
+	{
+		CarpetBombing_HandleMoveCompleted();
 		return;
 	}
 
@@ -2408,4 +2415,140 @@ void AAircraftMaster::Strafe_ClearTimer()
 
 	GetWorld()->GetTimerManager().ClearTimer(M_StrafeState.StrafeTimerHandle);
 	M_StrafeState.StrafeTimerHandle.Invalidate();
+}
+
+void AAircraftMaster::CarpetBombing(
+	const FVector& StartCarpetLocation,
+	const FVector& EndCarpetLocation,
+	const FVector& RetreatLocation)
+{
+	StopBombThrowing();
+	Strafe_StopAndRestoreSettings();
+	M_CarpetBombingState.StartCarpetLocation = StartCarpetLocation;
+	M_CarpetBombingState.EndCarpetLocation = EndCarpetLocation;
+	M_CarpetBombingState.RetreatLocation = RetreatLocation;
+	M_CarpetBombingState.Phase = EAircraftCarpetBombingPhase::MovingToStart;
+	CarpetBombing_MoveToLocation(StartCarpetLocation);
+}
+
+void AAircraftMaster::CarpetBombing_RetreatAndDestroy(const FVector& RetreatLocation)
+{
+	StopBombThrowing();
+	M_CarpetBombingState.RetreatLocation = RetreatLocation;
+	M_CarpetBombingState.Phase = EAircraftCarpetBombingPhase::Retreating;
+	CarpetBombing_MoveToLocation(RetreatLocation);
+}
+
+void AAircraftMaster::CarpetBombing_MoveToLocation(const FVector& TargetLocation)
+{
+	const FVector FlightTarget(TargetLocation.X, TargetLocation.Y, GetMoveToZValue());
+	M_AircraftMoveData.SetTargetPoint(FlightTarget);
+
+	if (M_LandedState != EAircraftLandingState::Airborne)
+	{
+		M_PendingPostLiftOffAction.Set(EPostLiftOffAction::Move);
+		if (M_LandedState == EAircraftLandingState::Landed)
+		{
+			TakeOffFromGroundOrOwner();
+		}
+		return;
+	}
+
+	StartMoveTo();
+}
+
+void AAircraftMaster::CarpetBombing_StartRunToEnd()
+{
+	if (not CarpetBombing_HasBombsRemaining())
+	{
+		CarpetBombing_RetreatAndDestroy(M_CarpetBombingState.RetreatLocation);
+		return;
+	}
+
+	M_CarpetBombingState.Phase = EAircraftCarpetBombingPhase::BombingToEnd;
+	StartBombThrowingAtLocation(GetActorLocation() - FVector(0.0f, 0.0f, M_AircraftMovementSettings.TakeOffHeight));
+	CarpetBombing_MoveToLocation(M_CarpetBombingState.EndCarpetLocation);
+}
+
+void AAircraftMaster::CarpetBombing_StartRunToStart()
+{
+	if (not CarpetBombing_HasBombsRemaining())
+	{
+		CarpetBombing_RetreatAndDestroy(M_CarpetBombingState.RetreatLocation);
+		return;
+	}
+
+	M_CarpetBombingState.Phase = EAircraftCarpetBombingPhase::BombingToStart;
+	StartBombThrowingAtLocation(GetActorLocation() - FVector(0.0f, 0.0f, M_AircraftMovementSettings.TakeOffHeight));
+	CarpetBombing_MoveToLocation(M_CarpetBombingState.StartCarpetLocation);
+}
+
+void AAircraftMaster::CarpetBombing_HandleMoveCompleted()
+{
+	switch (M_CarpetBombingState.Phase)
+	{
+	case EAircraftCarpetBombingPhase::MovingToStart:
+		CarpetBombing_StartRunToEnd();
+		break;
+	case EAircraftCarpetBombingPhase::BombingToEnd:
+		CarpetBombing_HandleCompletedRunToEnd();
+		break;
+	case EAircraftCarpetBombingPhase::BombingToStart:
+		CarpetBombing_HandleCompletedRunToStart();
+		break;
+	case EAircraftCarpetBombingPhase::Retreating:
+		M_CarpetBombingState.ResetRuntime();
+		Destroy();
+		break;
+	case EAircraftCarpetBombingPhase::Inactive:
+		break;
+	}
+}
+
+void AAircraftMaster::CarpetBombing_HandleCompletedRunToEnd()
+{
+	StopBombThrowing();
+	if (not CarpetBombing_HasBombsRemaining())
+	{
+		CarpetBombing_RetreatAndDestroy(M_CarpetBombingState.RetreatLocation);
+		return;
+	}
+
+	CarpetBombing_StartRunToStart();
+}
+
+void AAircraftMaster::CarpetBombing_HandleCompletedRunToStart()
+{
+	StopBombThrowing();
+	if (not CarpetBombing_HasBombsRemaining())
+	{
+		CarpetBombing_RetreatAndDestroy(M_CarpetBombingState.RetreatLocation);
+		return;
+	}
+
+	CarpetBombing_StartRunToEnd();
+}
+
+void AAircraftMaster::CarpetBombing_UpdateBombTargetLocation() const
+{
+	const bool bIsBombing = M_CarpetBombingState.Phase == EAircraftCarpetBombingPhase::BombingToEnd
+		|| M_CarpetBombingState.Phase == EAircraftCarpetBombingPhase::BombingToStart;
+	if (not bIsBombing || not IsValidBombComponent())
+	{
+		return;
+	}
+
+	FVector MovingBombTargetLocation = GetActorLocation();
+	MovingBombTargetLocation.Z -= M_AircraftMovementSettings.TakeOffHeight;
+	M_AircraftBombComponent->UpdateGroundTargetLocation(MovingBombTargetLocation);
+}
+
+bool AAircraftMaster::CarpetBombing_HasBombsRemaining() const
+{
+	if (not IsValidBombComponent())
+	{
+		return false;
+	}
+
+	return M_AircraftBombComponent->GetActiveBombCount() > 0;
 }

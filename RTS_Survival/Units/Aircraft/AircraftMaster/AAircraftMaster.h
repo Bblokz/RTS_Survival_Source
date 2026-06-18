@@ -113,6 +113,18 @@ public:
 	void StrafeLocation(const FStrafeAircraftSettings& StrafeAircraftSettings,
 	                    const FAircraftAttackMoveSettings& OverrideAttackMoveSettings);
 
+	/**
+	 * @brief Starts a one-off carpet run without entering the regular attack/strafe state machines.
+	 * @param StartCarpetLocation First point the aircraft reaches before releasing bombs.
+	 * @param EndCarpetLocation Opposite run endpoint used while bombs target the aircraft ground projection.
+	 * @param RetreatLocation Final point where the aircraft destroys itself after bombing.
+	 */
+	UFUNCTION(BlueprintCallable)
+	void CarpetBombing(const FVector& StartCarpetLocation, const FVector& EndCarpetLocation, const FVector& RetreatLocation);
+
+	UFUNCTION(BlueprintCallable)
+	void CarpetBombing_RetreatAndDestroy(const FVector& RetreatLocation);
+
 private:
 	/**
 	 * @brief Owner-agnostic VTO entry point (extracted) so owners can grant lift-off exactly when doors are open.
@@ -562,6 +574,30 @@ private:
 		}
 	};
 
+	enum class EAircraftCarpetBombingPhase : uint8
+	{
+		Inactive,
+		MovingToStart,
+		BombingToEnd,
+		BombingToStart,
+		Retreating
+	};
+
+	struct FAircraftCarpetBombingState
+	{
+		FVector StartCarpetLocation = FVector::ZeroVector;
+		FVector EndCarpetLocation = FVector::ZeroVector;
+		FVector RetreatLocation = FVector::ZeroVector;
+		EAircraftCarpetBombingPhase Phase = EAircraftCarpetBombingPhase::Inactive;
+
+		void ResetRuntime()
+		{
+			Phase = EAircraftCarpetBombingPhase::Inactive;
+		}
+	};
+
+	FAircraftCarpetBombingState M_CarpetBombingState;
+
 	FAircraftStrafeState M_StrafeState;
 	FAircraftAttackMoveSettings M_PreStrafeAttackMoveSettings;
 
@@ -575,6 +611,14 @@ private:
 	void Strafe_PrepareNextAttackRun();
 	void Strafe_StopAndRestoreSettings();
 	void Strafe_ClearTimer();
+	void CarpetBombing_MoveToLocation(const FVector& TargetLocation);
+	void CarpetBombing_StartRunToEnd();
+	void CarpetBombing_StartRunToStart();
+	void CarpetBombing_HandleMoveCompleted();
+	void CarpetBombing_HandleCompletedRunToEnd();
+	void CarpetBombing_HandleCompletedRunToStart();
+	void CarpetBombing_UpdateBombTargetLocation() const;
+	bool CarpetBombing_HasBombsRemaining() const;
 
 	// -------------------------------------------------------------
 	// ----------------------- Strafe END -----------------------
