@@ -39,7 +39,6 @@ AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
 }
 
 
-
 void AAircraftMaster::OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo)
 {
 	if (bSetDisabled)
@@ -60,7 +59,7 @@ void AAircraftMaster::BeginPlay()
 	// Will set the subtype.
 	BP_BeginplayInitAircraft();
 	// After the bp has set the type.
-	BeginPlay_InitAircraft();
+	BeginPlay_InitAircraft(GetBombOverrideMeshComp());
 	// Make sure the aircraft weapon knows if we are airborne or landed.
 	BeginPlay_PropagateStateToWpAndAnimInst();
 	CheckForUpgrades();
@@ -74,6 +73,12 @@ void AAircraftMaster::CheckForUpgrades()
 	}
 
 	GetRTSComponent()->OnAircraftInitializedLookingForUpgrades(this);
+}
+
+UMeshComponent* AAircraftMaster::GetBombOverrideMeshComp()
+{
+	// Return null by default so the aircraft skeletal mesh is used instead.
+	return nullptr;
 }
 
 void AAircraftMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -651,14 +656,14 @@ void AAircraftMaster::OnOwnerStartPackingUp(const UAircraftOwnerComp* OwnerPacki
 		// No post lift off action; the aircraft will entry idle when lift off is complete.
 		// Could have been set to changed owner for which we are now performing the landing.
 		M_PendingPostLiftOffAction.Reset();
-	// To terminate return to base. Which will VTO back to airborne.
+		// To terminate return to base. Which will VTO back to airborne.
 		SetUnitToIdle();
 		break;
 	case EAircraftLandingState::VerticalLanding:
 		// No post lift off action; the aircraft will entry idle when lift off is complete.
 		// Could have been set to changed owner for which we are now performing the landing.
 		M_PendingPostLiftOffAction.Reset();
-	// To terminate return to base. Which will VTO back to airborne.
+		// To terminate return to base. Which will VTO back to airborne.
 		SetUnitToIdle();
 		break;
 	}
@@ -1501,7 +1506,7 @@ void AAircraftMaster::OnPointOvershot_AdjustFutureRotation(
 	InFutureTargetPoint.Roll = Roll + Rot.Roll;
 }
 
-void AAircraftMaster::BeginPlay_InitAircraft()
+void AAircraftMaster::BeginPlay_InitAircraft(UMeshComponent* OverrideBombComponentMesh)
 {
 	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
 	if (not GameState || not GetIsValidRTSComponent())
@@ -1529,7 +1534,14 @@ void AAircraftMaster::BeginPlay_InitAircraft()
 	}
 	if (IsValidBombComponent())
 	{
-		M_AircraftBombComponent->InitBombComponent(M_AircraftMesh, RTSComponent->GetOwningPlayer());
+		if (IsValid(OverrideBombComponentMesh))
+		{
+			M_AircraftBombComponent->InitBombComponent(OverrideBombComponentMesh, RTSComponent->GetOwningPlayer());
+		}
+		else
+		{
+			M_AircraftBombComponent->InitBombComponent(M_AircraftMesh, RTSComponent->GetOwningPlayer());
+		}
 	}
 }
 
@@ -2348,7 +2360,8 @@ FVector AAircraftMaster::Strafe_GetOrientedEndLocation(const FVector& CurrentTar
 	OriginalStrafeDirection.Z = 0.f;
 	if (OriginalStrafeDirection.Normalize())
 	{
-		FVector FallbackEndLocation = CurrentTargetLocation + OriginalStrafeDirection * M_StrafeState.StrafePointDistance;
+		FVector FallbackEndLocation = CurrentTargetLocation + OriginalStrafeDirection * M_StrafeState.
+			StrafePointDistance;
 		FallbackEndLocation.Z = CurrentTargetLocation.Z;
 		return FallbackEndLocation;
 	}
@@ -2365,8 +2378,8 @@ void AAircraftMaster::Strafe_OnAttackDiveStarted()
 
 	M_StrafeState.ActiveLerpStartLocation = M_StrafeState.NextRunStartLocation;
 	M_StrafeState.ActiveLerpEndLocation = M_StrafeState.bM_IsFirstAttackRun
-		? M_StrafeState.StrafeEndLocation
-		: Strafe_GetOrientedEndLocation(M_StrafeState.ActiveLerpStartLocation);
+		                                      ? M_StrafeState.StrafeEndLocation
+		                                      : Strafe_GetOrientedEndLocation(M_StrafeState.ActiveLerpStartLocation);
 	M_StrafeState.CurrentLerpTime = 0.f;
 	M_StrafeState.bM_IsLerpingStrafePoint = true;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.ActiveLerpStartLocation;
@@ -2424,6 +2437,7 @@ void AAircraftMaster::CarpetBombing(
 {
 	StopBombThrowing();
 	Strafe_StopAndRestoreSettings();
+	DrawDebugSphere(GetWorld(), StartCarpetLocation, 1000, 16, FColor::Red, false, 30, 1, 1);
 	M_CarpetBombingState.StartCarpetLocation = StartCarpetLocation;
 	M_CarpetBombingState.EndCarpetLocation = EndCarpetLocation;
 	M_CarpetBombingState.RetreatLocation = RetreatLocation;
