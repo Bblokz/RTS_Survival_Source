@@ -166,8 +166,8 @@ private:
 protected:
 	virtual void BeginPlay() override;
 	virtual void CheckForUpgrades();
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, BlueprintPure, Category = "Bomb")
-	UMeshComponent* GetBombOverrideMeshComp() const;
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent,  Category = "Bomb")
+	UMeshComponent* GetBombOverrideMeshComp();
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
 	virtual void PostInitializeComponents() override;
