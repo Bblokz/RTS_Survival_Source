@@ -75,10 +75,11 @@ void AAircraftMaster::CheckForUpgrades()
 	GetRTSComponent()->OnAircraftInitializedLookingForUpgrades(this);
 }
 
-UMeshComponent* AAircraftMaster::GetBombOverrideMeshComp()
+UMeshComponent* AAircraftMaster::GetBombOverrideMeshComp_Implementation() const
 {
 	// Return null by default so the aircraft skeletal mesh is used instead.
 	return nullptr;
+	
 }
 
 void AAircraftMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
