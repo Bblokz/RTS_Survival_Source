@@ -423,6 +423,7 @@ enum class EAircraftSubtype : uint8
 	Aircraft_Ju87 UMETA(DisplayName = "Aircraft Ju 87"),
 	Aircraft_Me410 UMETA(DisplayName = "Aircraft Me 410"),
 	Aircraft_Ju390B UMETA(DisplayName = "Aircraft Ju 390B"),
+	Aircraft_Ju390B_500Gr UMETA(DisplayName = "Aircraft Ju 390B 500Gr"),
 	Aircraft_PE8 UMETA(DisplayName = "Aircraft PE-8"),
 	Aircraft_PE8_4x1000 UMETA(DisplayName = "Aircraft PE-8 4x1000"),
 	Aircraft_PE8_1x3000 UMETA(DisplayName = "Aircraft PE-8 1x3000"),
