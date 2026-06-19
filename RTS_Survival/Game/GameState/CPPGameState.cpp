@@ -646,9 +646,9 @@ void ACPPGameState::SetupBreakThroughTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Ju87)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Me410)),
-		FTrainingOption(),
-		FTrainingOption(),
-		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Ju390B)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Horten229)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Yak)),
 		FTrainingOption(),
 		FTrainingOption()
 	};
@@ -735,9 +735,9 @@ void ACPPGameState::SetupStrikeDivisionTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Ju87)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Me410)),
-		FTrainingOption(),
-		FTrainingOption(),
-		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Ju390B)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Horten229)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Yak)),
 		FTrainingOption(),
 		FTrainingOption()
 	};
@@ -5949,7 +5949,9 @@ void ACPPGameState::InitAllGameAircraftData()
 {
 	using namespace DeveloperSettings::GameBalance::UnitCosts::Aircraft;
 	using DeveloperSettings::GameBalance::VisionRadii::UnitVision::AircraftVisionRadius;
+	using DeveloperSettings::GameBalance::UnitHealth::AttackAircraftHealth;
 	using DeveloperSettings::GameBalance::UnitHealth::FighterHealth;
+	using DeveloperSettings::GameBalance::UnitHealth::HeavyBomberHealth;
 	using DeveloperSettings::GameBalance::Experience::BaseAircraftExp;
 
 
@@ -5963,51 +5965,47 @@ void ACPPGameState::InitAllGameAircraftData()
 		EAbilityID::IdNoAbility,
 	});
 
-	FAircraftData AircraftData;
+	const auto AddAircraftData = [&](
+		const EAircraftSubtype AircraftSubtype,
+		const int32 RadixiteCost,
+		const int32 VehiclePartsCost,
+		const float MaxHealth)
+	{
+		FAircraftData AircraftData;
+		AircraftData.Abilities = BasicAircraftAbilities;
+		AircraftData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, RadixiteCost},
+			{ERTSResourceType::Resource_VehicleParts, VehiclePartsCost}
+		});
+		AircraftData.MaxHealth = MaxHealth;
+		AircraftData.ResistancesAndDamageMlt =
+			FUnitResistanceDataHelpers::GetILightArmorResistances(AircraftData.MaxHealth);
+		AircraftData.ExperienceLevels = GetFighterExpLevels();
+		AircraftData.ExperienceWorth = BaseAircraftExp;
+		AircraftData.ExperienceMultiplier = 1.0;
+		AircraftData.VisionRadius = AircraftVisionRadius;
+		M_TPlayerAircraftDataHashMap.Add(AircraftSubtype, AircraftData);
+	};
 
-	AircraftData.Abilities = BasicAircraftAbilities;
-	AircraftData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, Bf109_Radixite},
-		{ERTSResourceType::Resource_VehicleParts, Bf109_VehicleParts}
-	});
-	AircraftData.MaxHealth = FighterHealth;
-	AircraftData.ResistancesAndDamageMlt =
-		FUnitResistanceDataHelpers::GetILightArmorResistances(AircraftData.MaxHealth);
-	AircraftData.ExperienceLevels = GetFighterExpLevels();
-	AircraftData.ExperienceWorth = BaseAircraftExp;
-	AircraftData.ExperienceMultiplier = 1.0;
-	AircraftData.VisionRadius = AircraftVisionRadius;
-	M_TPlayerAircraftDataHashMap.Add(EAircraftSubtype::Aircraft_Bf109, AircraftData);
+	const float FighterAttackAircraftHealth = (FighterHealth + AttackAircraftHealth) / 2.0f;
 
-	AircraftData.Abilities = BasicAircraftAbilities;
-	AircraftData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, Ju87_Radixite},
-		{ERTSResourceType::Resource_VehicleParts, Ju87_VehicleParts}
-	});
-	AircraftData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::AttackAircraftHealth;
-	AircraftData.ResistancesAndDamageMlt =
-		FUnitResistanceDataHelpers::GetILightArmorResistances(AircraftData.MaxHealth);
-	AircraftData.ExperienceLevels = GetFighterExpLevels();
-	AircraftData.ExperienceWorth = BaseAircraftExp;
-	AircraftData.ExperienceMultiplier = 1.0;
-	AircraftData.VisionRadius = AircraftVisionRadius;
-	M_TPlayerAircraftDataHashMap.Add(EAircraftSubtype::Aircraft_Ju87, AircraftData);
-
-
-	AircraftData.Abilities = BasicAircraftAbilities;
-	AircraftData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, Me410_Radixite},
-		{ERTSResourceType::Resource_VehicleParts, Me410_VehicleParts}
-	});
-	AircraftData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::AttackAircraftHealth;
-	AircraftData.ResistancesAndDamageMlt =
-		FUnitResistanceDataHelpers::GetILightArmorResistances(AircraftData.MaxHealth);
-	AircraftData.ExperienceLevels = GetFighterExpLevels();
-	AircraftData.ExperienceWorth = BaseAircraftExp;
-	AircraftData.ExperienceMultiplier = 1.0;
-	AircraftData.VisionRadius = AircraftVisionRadius;
-	M_TPlayerAircraftDataHashMap.Add(EAircraftSubtype::Aircraft_Me410, AircraftData);
-
+	AddAircraftData(EAircraftSubtype::Aircraft_Bf109, Bf109_Radixite, Bf109_VehicleParts, FighterHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_Ju87, Ju87_Radixite, Ju87_VehicleParts, AttackAircraftHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_Me410, Me410_Radixite, Me410_VehicleParts, AttackAircraftHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_Ju390B, Ju390B_Radixite, Ju390B_VehicleParts, HeavyBomberHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_PE8, PE8_Radixite, PE8_VehicleParts, HeavyBomberHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_PE2, PE2_Radixite, PE2_VehicleParts, AttackAircraftHealth);
+	AddAircraftData(
+		EAircraftSubtype::Aircraft_Horten229,
+		Horten229_Radixite,
+		Horten229_VehicleParts,
+		FighterAttackAircraftHealth);
+	AddAircraftData(
+		EAircraftSubtype::Aircraft_Sturmovic,
+		Sturmovic_Radixite,
+		Sturmovic_VehicleParts,
+		FighterAttackAircraftHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_Yak, Yak_Radixite, Yak_VehicleParts, FighterHealth);
 
 	// Ensure the enemy has the same aircraft data.
 	M_TEnemyAircraftDataHashMap = M_TPlayerAircraftDataHashMap;
@@ -7530,6 +7528,9 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Ju87)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Me410)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_PE8)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_PE2)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Sturmovic)),
 	};
 
 	NomadicData.BuildingAnimationTime = T2MedTankFactoryBuildingAnimationTime;

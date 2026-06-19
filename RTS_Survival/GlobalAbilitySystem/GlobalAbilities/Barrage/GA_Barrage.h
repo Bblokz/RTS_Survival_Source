@@ -55,6 +55,9 @@ struct FBarrageSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<USoundBase> OffMapLaunchSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TimeBetweenOffMapSoundAndStart = 0.0f;
 };
 
 /**
@@ -99,6 +102,9 @@ private:
 	FTimerHandle M_BurstTimerHandle;
 
 	UPROPERTY(Transient)
+	TArray<FTimerHandle> M_ShellLaunchTimerHandles;
+
+	UPROPERTY(Transient)
 	bool bM_IsWaitingForProjectileManager = false;
 
 	void SetupCallbackToProjectileManager(const AActor* WorldContextObject);
@@ -107,6 +113,9 @@ private:
 	void StartBarrage(const FVector& TargetLocation);
 	void FireNextBurst();
 	void FireSingleShell();
+	void LaunchSingleShell();
+	bool GetShouldDelayShellLaunchForOffMapSound() const;
+	void ScheduleDelayedShellLaunch();
 	FWeaponVFX BuildWeaponVfxForShellLaunch() const;
 	void PlayOffMapLaunchSoundIfRequested() const;
 	USoundBase* GetOffMapLaunchSound() const;
@@ -115,6 +124,7 @@ private:
 	FWeaponData BuildVariedWeaponData() const;
 	void ScheduleNextBurst();
 	void ClearBurstTimer();
+	void ClearShellLaunchTimers();
 	void ResetBarrageRuntimeState();
 	bool HasCachedProjectileManager() const;
 };
