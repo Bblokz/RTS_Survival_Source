@@ -5994,6 +5994,8 @@ void ACPPGameState::InitAllGameAircraftData()
 	AddAircraftData(EAircraftSubtype::Aircraft_Me410, Me410_Radixite, Me410_VehicleParts, AttackAircraftHealth);
 	AddAircraftData(EAircraftSubtype::Aircraft_Ju390B, Ju390B_Radixite, Ju390B_VehicleParts, HeavyBomberHealth);
 	AddAircraftData(EAircraftSubtype::Aircraft_PE8, PE8_Radixite, PE8_VehicleParts, HeavyBomberHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_PE8_4x1000, PE8_Radixite, PE8_VehicleParts, HeavyBomberHealth);
+	AddAircraftData(EAircraftSubtype::Aircraft_PE8_1x3000, PE8_Radixite, PE8_VehicleParts, HeavyBomberHealth);
 	AddAircraftData(EAircraftSubtype::Aircraft_PE2, PE2_Radixite, PE2_VehicleParts, AttackAircraftHealth);
 	AddAircraftData(
 		EAircraftSubtype::Aircraft_Horten229,
@@ -7529,6 +7531,8 @@ void ACPPGameState::InitAllGameNomadicData()
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Me410)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_PE8)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_PE8_4x1000)),
+		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_PE8_1x3000)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_PE2)),
 		FTrainingOption(EAllUnitType::UNType_Aircraft, static_cast<uint8>(EAircraftSubtype::Aircraft_Sturmovic)),
 	};
