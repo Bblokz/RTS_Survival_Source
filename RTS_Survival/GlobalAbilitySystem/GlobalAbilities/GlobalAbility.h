@@ -48,6 +48,7 @@ public:
 	virtual void ActivateAbility();
 
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation);
+	EGlobalAbility GetAbilityType() const;
 
 protected:
 	int32 GetOwningPlayer() const;

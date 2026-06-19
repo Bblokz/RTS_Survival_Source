@@ -13,10 +13,16 @@ UGlobalAbility::UGlobalAbility()
 
 UWorld* UGlobalAbility::GetWorld() const
 {
-	if (M_PlayerController.Get() != nullptr)
+	if (M_PlayerController.IsValid())
 	{
 		return M_PlayerController.Get()->GetWorld();
 	}
+
+	if (M_GlobalAbilitiesManager.IsValid())
+	{
+		return M_GlobalAbilitiesManager.Get()->GetWorld();
+	}
+
 	return Super::GetWorld();
 }
 
@@ -83,6 +89,11 @@ void UGlobalAbility::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
 }
 
+EGlobalAbility UGlobalAbility::GetAbilityType() const
+{
+	return M_AbilityType;
+}
+
 int32 UGlobalAbility::GetOwningPlayer() const
 {
 	return M_OwningPlayer;
@@ -133,11 +144,6 @@ bool UGlobalAbility::IsBlocked()
 
 bool UGlobalAbility::IsBlockedByRequirements()
 {
-	if (not IsOwnedByPlayer())
-	{
-		// Enemy controller does not use requirements.
-		return false;
-	}
 	if (not EnsureIsValidGlobalAbilityManager())
 	{
 		return true;
@@ -176,10 +182,5 @@ bool UGlobalAbility::EnsureIsValidPlayerController() const
 
 bool UGlobalAbility::IsBlockedByCooldown()
 {
-	if (not IsOwnedByPlayer())
-	{
-		// Enemy controller does not use cooldown.
-		return false;
-	}
 	return M_AbilityCosts.CoolDownRemaining > 0;
 }

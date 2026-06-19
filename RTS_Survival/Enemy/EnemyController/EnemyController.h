@@ -11,6 +11,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "EnemyController.generated.h"
 
 
@@ -378,6 +379,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
 
+	UGlobalAbilitiesManager* GetEnemyGlobalAbilitiesManager() const;
+	const FEnemyGlobalAbilityAISettings& GetEnemyGlobalAbilityAISettings() const;
+
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyFieldConstructionComponent* GetEnemyFieldConstructionComponent() const;
@@ -410,9 +414,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Settings")
 	FEnemyLevelTraining M_EnemyLevelTraining;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Global Abilities")
+	TArray<FEnemyGlobalAbilityLoadoutEntry> M_EnemyGlobalAbilityLoadout;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Global Abilities")
+	FEnemyGlobalAbilityAISettings M_EnemyGlobalAbilityAISettings;
+
 private:
 	void BeginPlay_InitStochasticDecisionTree();
 	void BeginPlay_MoveAISettingsToStrategicAIBlackboard() const;
+	void BeginPlay_InitEnemyGlobalAbilities();
 
 	UPROPERTY()
 	TObjectPtr<UEnemyFormationController> M_FormationController;
@@ -435,6 +446,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnemyDirectControlComponent> M_EnemyDirectControlComponent;
 
+	UPROPERTY()
+	TObjectPtr<UGlobalAbilitiesManager> M_EnemyGlobalAbilitiesManager;
+
 	TArray<TWeakObjectPtr<ATankMaster>> M_Tanks;
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 
@@ -445,6 +459,7 @@ private:
 	bool GetIsValidEnemyStrategicAIComponent() const;
 	bool GetIsValidEnemyRetreatController() const;
 	bool GetIsValidEnemyDirectControlComponent() const;
+	bool GetIsValidEnemyGlobalAbilitiesManager() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 	float GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt = 0) const;

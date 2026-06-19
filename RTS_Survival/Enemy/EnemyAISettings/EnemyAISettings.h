@@ -37,6 +37,10 @@ namespace EnemyAISettings
 		// How often the enemy AI gets new training points depending on the setting in the EnemyController
 		// Ensure this is a multiple of 60 as the training points are calculated per minute.
 		inline float UpdateEnemyTrainingPoints_Interval = 60.f* DEV_AI_ThinkTimers_Scaling;
+		// Fallback cadence for the enemy global ability think step when the map settings are invalid.
+		inline constexpr float UpdateEnemyGlobalAbility_Interval = 1.f;
+		// Keeps designer-authored enemy global ability thinking from running every strategic loop frame.
+		inline constexpr float MinimumEnemyGlobalAbility_Interval = 0.01f;
 	}
 
 	namespace UnitTraining
