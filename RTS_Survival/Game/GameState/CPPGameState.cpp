@@ -1229,7 +1229,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = GetAccuracy(250);
-	WeaponData.ShrapnelRange = GetShrapnelRange(250);
+	WeaponData.ShrapnelRange = 500;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(250);
 	WeaponData.ShrapnelPen = GetShrapnelPen(250);
@@ -1244,7 +1244,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(500);
 	WeaponData.Accuracy = GetAccuracy(500);
-	WeaponData.ShrapnelRange = GetShrapnelRange(500);
+	WeaponData.ShrapnelRange = 900;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(500);
 	WeaponData.ShrapnelPen = GetShrapnelPen(500);
@@ -1258,7 +1258,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(400);
 	WeaponData.Accuracy = GetAccuracy(400);
-	WeaponData.ShrapnelRange = GetShrapnelRange(400);
+	WeaponData.ShrapnelRange = 700;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(400);
 	WeaponData.ShrapnelPen = GetShrapnelPen(400);
@@ -1272,7 +1272,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(1000);
 	WeaponData.Accuracy = GetAccuracy(1000);
-	WeaponData.ShrapnelRange = GetShrapnelRange(1000);
+	WeaponData.ShrapnelRange = 1800;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(1000);
 	WeaponData.ShrapnelPen = GetShrapnelPen(1000);
@@ -1286,7 +1286,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(700);
 	WeaponData.Accuracy = GetAccuracy(700);
-	WeaponData.ShrapnelRange = GetShrapnelRange(700);
+	WeaponData.ShrapnelRange = 1200;;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(700);
 	WeaponData.ShrapnelPen = GetShrapnelPen(700);
@@ -1300,7 +1300,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(800);
 	WeaponData.Accuracy = GetAccuracy(800);
-	WeaponData.ShrapnelRange = GetShrapnelRange(800);
+	WeaponData.ShrapnelRange = 1450;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(800);
 	WeaponData.ShrapnelPen = GetShrapnelPen(800);
@@ -1314,7 +1314,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(1500);
 	WeaponData.Accuracy = GetAccuracy(1500);
-	WeaponData.ShrapnelRange = GetShrapnelRange(1500);
+	WeaponData.ShrapnelRange = 2500;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(1500);
 	WeaponData.ShrapnelPen = GetShrapnelPen(1500);
@@ -1328,7 +1328,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(2000);
 	WeaponData.Accuracy = GetAccuracy(2000);
-	WeaponData.ShrapnelRange = GetShrapnelRange(2000);
+	WeaponData.ShrapnelRange = 3500;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(2000);
 	WeaponData.ShrapnelPen = GetShrapnelPen(2000);
@@ -1342,7 +1342,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(3000);
 	WeaponData.Accuracy = GetAccuracy(3000);
-	WeaponData.ShrapnelRange = GetShrapnelRange(3000);
+	WeaponData.ShrapnelRange =4500; 
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(3000);
 	WeaponData.ShrapnelPen = GetShrapnelPen(3000);
@@ -1356,7 +1356,7 @@ void ACPPGameState::InitAllGameBombWeapons()
 	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
 	WeaponData.ReloadSpeed = GetReloadSpeed(5000);
 	WeaponData.Accuracy = GetAccuracy(5000);
-	WeaponData.ShrapnelRange = GetShrapnelRange(5000);
+	WeaponData.ShrapnelRange = 4500;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = GetShrapnelParticles(5000);
 	WeaponData.ShrapnelPen = GetShrapnelPen(5000);
