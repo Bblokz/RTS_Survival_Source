@@ -16,7 +16,7 @@ struct FAircraftStrafingGlobalAbilitySettings
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSoftClassPtr<AAircraftMaster> AircraftClass;
+	TArray<TSoftClassPtr<AAircraftMaster>> AircraftClasses;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float StrafeLength = 3000.0f;
@@ -47,10 +47,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FAircraftStrafingGlobalAbilitySettings M_AircraftStrafingSettings;
 
-	// Keeps the async aircraft class load request alive until the callback can safely spawn the aircraft.
-	TSharedPtr<FStreamableHandle> M_AircraftClassLoadHandle;
+	// Keeps async aircraft class load requests alive until their callbacks can safely spawn the aircraft.
+	TArray<TSharedPtr<FStreamableHandle>> M_AircraftClassLoadHandles;
 
+	void RequestSpawnAircraftAtStartLocationsAsync(const FVector& TargetLocation);
 	void RequestSpawnAircraftAtStartLocationAsync(
+		const TSoftClassPtr<AAircraftMaster>& AircraftClassToLoad,
 		const FVector& StartLocation,
 		const FVector& TargetLocation,
 		const FVector& PostStrafeMoveToLocation);

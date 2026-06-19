@@ -18,32 +18,59 @@ void UGA_AircraftStrafing::ExecuteAbilityAtLocation(const FVector& TargetLocatio
 		return;
 	}
 
-	UGlobalAbilitiesManager* GlobalAbilitiesManager = GetGlobalAbilityManager();
-	const FVector StartLocation = GlobalAbilitiesManager->GetAircraftBombingSpawnLocation(this, TargetLocation);
-	const FVector PostStrafeMoveToLocation = BuildPostStrafeMoveToLocation(TargetLocation);
-	RequestSpawnAircraftAtStartLocationAsync(StartLocation, TargetLocation, PostStrafeMoveToLocation);
+	M_AircraftClassLoadHandles.Reset();
+	RequestSpawnAircraftAtStartLocationsAsync(TargetLocation);
 }
 
 void UGA_AircraftStrafing::BeginDestroy()
 {
-	M_AircraftClassLoadHandle.Reset();
+	M_AircraftClassLoadHandles.Reset();
 	Super::BeginDestroy();
 }
 
+void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationsAsync(const FVector& TargetLocation)
+{
+	if (M_AircraftStrafingSettings.AircraftClasses.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing has no aircraft classes configured."));
+		return;
+	}
+
+	int32 ValidAircraftClassCount = 0;
+	for (const TSoftClassPtr<AAircraftMaster>& AircraftClassToLoad : M_AircraftStrafingSettings.AircraftClasses)
+	{
+		if (AircraftClassToLoad.IsNull())
+		{
+			continue;
+		}
+
+		++ValidAircraftClassCount;
+		UGlobalAbilitiesManager* GlobalAbilitiesManager = GetGlobalAbilityManager();
+		const FVector StartLocation = GlobalAbilitiesManager->GetAircraftBombingSpawnLocation(this, TargetLocation);
+		const FVector PostStrafeMoveToLocation = BuildPostStrafeMoveToLocation(TargetLocation);
+		RequestSpawnAircraftAtStartLocationAsync(
+			AircraftClassToLoad,
+			StartLocation,
+			TargetLocation,
+			PostStrafeMoveToLocation);
+	}
+
+	if (ValidAircraftClassCount > 0)
+	{
+		return;
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing has no valid aircraft classes configured."));
+}
+
 void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationAsync(
+	const TSoftClassPtr<AAircraftMaster>& AircraftClassToLoad,
 	const FVector& StartLocation,
 	const FVector& TargetLocation,
 	const FVector& PostStrafeMoveToLocation)
 {
-	const TSoftClassPtr<AAircraftMaster> AircraftClassToLoad = M_AircraftStrafingSettings.AircraftClass;
-	if (AircraftClassToLoad.IsNull())
-	{
-		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing has no aircraft class configured."));
-		return;
-	}
-
 	TWeakObjectPtr<UGA_AircraftStrafing> WeakThis(this);
-	M_AircraftClassLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+	TSharedPtr<FStreamableHandle> AircraftClassLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
 		AircraftClassToLoad.ToSoftObjectPath(),
 		FStreamableDelegate::CreateLambda(
 			[WeakThis, AircraftClassToLoad, StartLocation, TargetLocation, PostStrafeMoveToLocation]()
@@ -61,6 +88,7 @@ void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationAsync(
 					PostStrafeMoveToLocation);
 			})
 	);
+	M_AircraftClassLoadHandles.Add(AircraftClassLoadHandle);
 }
 
 void UGA_AircraftStrafing::OnAircraftClassLoaded(
@@ -69,7 +97,6 @@ void UGA_AircraftStrafing::OnAircraftClassLoaded(
 	const FVector& TargetLocation,
 	const FVector& PostStrafeMoveToLocation)
 {
-	M_AircraftClassLoadHandle.Reset();
 	UClass* AircraftClass = AircraftClassToLoad.Get();
 	if (not IsValid(AircraftClass))
 	{
