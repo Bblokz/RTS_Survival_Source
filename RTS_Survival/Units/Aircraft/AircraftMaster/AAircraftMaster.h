@@ -606,6 +606,9 @@ private:
 	void Strafe_TickTargetLocation(const float DeltaTime);
 	void Strafe_UpdateWeaponTargetLocation() const;
 	FVector Strafe_GetOrientedEndLocation(const FVector& CurrentTargetLocation) const;
+	FVector Strafe_GetNextRunEndLocation() const;
+	void Strafe_StartAttackRun();
+	void IssuePostLiftOffAttackGroundAction();
 	void Strafe_OnAttackDiveStarted();
 	void Strafe_OnDiveRecoveryStarted();
 	void Strafe_PrepareNextAttackRun();

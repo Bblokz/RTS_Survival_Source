@@ -58,7 +58,6 @@ private:
 		const FVector& StartLocation,
 		const FVector& TargetLocation,
 		const FVector& RetreatLocation);
-	AAircraftMaster* SpawnAircraftAtStartLocation(UClass* AircraftClass, const FVector& StartLocation) const;
 	FVector BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const;
 	void QueueCarpetBombingOrderForNextFrame(
 		AAircraftMaster* SpawnedAircraft,
