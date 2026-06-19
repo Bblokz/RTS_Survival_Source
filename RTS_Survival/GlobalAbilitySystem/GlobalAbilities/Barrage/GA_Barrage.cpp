@@ -26,20 +26,20 @@ void UGA_Barrage::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 void UGA_Barrage::BeginDestroy()
 {
 	ClearBurstTimer();
+	ClearShellLaunchTimers();
 	Super::BeginDestroy();
 }
 
 void UGA_Barrage::OnInit(AActor* WorldContextActor)
 {
 	Super::OnInit(WorldContextActor);
-	if (IsValid(WorldContextActor))
-	{
-		SetupCallbackToProjectileManager(WorldContextActor);
-	}
-	else
+	if (not IsValid(WorldContextActor))
 	{
 		SetupCallbackToProjectileManager(nullptr);
+		return;
 	}
+
+	SetupCallbackToProjectileManager(WorldContextActor);
 }
 
 void UGA_Barrage::SetupCallbackToProjectileManager(const AActor* WorldContextObject)
@@ -130,6 +130,27 @@ void UGA_Barrage::FireNextBurst()
 
 void UGA_Barrage::FireSingleShell()
 {
+	PlayOffMapLaunchSoundIfRequested();
+
+	if (GetShouldDelayShellLaunchForOffMapSound())
+	{
+		ScheduleDelayedShellLaunch();
+	}
+	else
+	{
+		LaunchSingleShell();
+	}
+
+	++M_ShellsLaunched;
+}
+
+void UGA_Barrage::LaunchSingleShell()
+{
+	if (not GetIsValidProjectileManager())
+	{
+		return;
+	}
+
 	AProjectile* Projectile = M_ProjectileManager.Get()->GetDormantTankProjectile();
 	if (not IsValid(Projectile))
 	{
@@ -146,7 +167,6 @@ void UGA_Barrage::FireSingleShell()
 	const FRotator LaunchRotation = (AimPoint - LaunchLocation).Rotation();
 	const TArray<AActor*> ActorsToIgnore;
 	const FWeaponVFX WeaponVfxForShellLaunch = BuildWeaponVfxForShellLaunch();
-	PlayOffMapLaunchSoundIfRequested();
 
 	Projectile->SetupBarrageProjectileForNewLaunch(
 		VariedWeaponData,
@@ -158,8 +178,38 @@ void UGA_Barrage::FireSingleShell()
 		LaunchRotation,
 		AimPoint,
 		ActorsToIgnore);
+}
 
-	++M_ShellsLaunched;
+bool UGA_Barrage::GetShouldDelayShellLaunchForOffMapSound() const
+{
+	return M_BarrageSettings.bUseOffMapLaunchSound
+		&& IsValid(GetOffMapLaunchSound())
+		&& M_BarrageSettings.TimeBetweenOffMapSoundAndStart > 0.0f;
+}
+
+void UGA_Barrage::ScheduleDelayedShellLaunch()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		LaunchSingleShell();
+		return;
+	}
+
+	TWeakObjectPtr<UGA_Barrage> WeakThis(this);
+	FTimerHandle& ShellLaunchTimerHandle = M_ShellLaunchTimerHandles.AddDefaulted_GetRef();
+	World->GetTimerManager().SetTimer(
+		ShellLaunchTimerHandle,
+		[WeakThis]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->LaunchSingleShell();
+		},
+		M_BarrageSettings.TimeBetweenOffMapSoundAndStart,
+		false);
 }
 
 FWeaponVFX UGA_Barrage::BuildWeaponVfxForShellLaunch() const
@@ -275,9 +325,26 @@ void UGA_Barrage::ClearBurstTimer()
 	World->GetTimerManager().ClearTimer(M_BurstTimerHandle);
 }
 
+void UGA_Barrage::ClearShellLaunchTimers()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		M_ShellLaunchTimerHandles.Reset();
+		return;
+	}
+
+	for (FTimerHandle& ShellLaunchTimerHandle : M_ShellLaunchTimerHandles)
+	{
+		World->GetTimerManager().ClearTimer(ShellLaunchTimerHandle);
+	}
+	M_ShellLaunchTimerHandles.Reset();
+}
+
 void UGA_Barrage::ResetBarrageRuntimeState()
 {
 	ClearBurstTimer();
+	ClearShellLaunchTimers();
 	M_ShellsLaunched = 0;
 }
 
