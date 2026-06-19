@@ -1753,11 +1753,23 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 void UTrainingMenuManager::InitAllGameAircraftTrainingOptions()
 {
 	using namespace DeveloperSettings::GameBalance::TrainingTime;
-	// Train JU 87
+	const TArray<EAircraftSubtype> AircraftSubtypes = {
+		EAircraftSubtype::Aircraft_Ju87,
+		EAircraftSubtype::Aircraft_Me410,
+		EAircraftSubtype::Aircraft_Bf109,
+		EAircraftSubtype::Aircraft_Ju390B,
+		EAircraftSubtype::Aircraft_PE8,
+		EAircraftSubtype::Aircraft_PE2,
+		EAircraftSubtype::Aircraft_Horten229,
+		EAircraftSubtype::Aircraft_Sturmovic,
+		EAircraftSubtype::Aircraft_Yak
+	};
+
+	for (const EAircraftSubtype AircraftSubtype : AircraftSubtypes)
 	{
 		FTrainingOption ItemID = FTrainingOption(
 			EAllUnitType::UNType_Aircraft,
-			static_cast<uint8>(EAircraftSubtype::Aircraft_Ju87)
+			static_cast<uint8>(AircraftSubtype)
 		);
 
 		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
@@ -1767,45 +1779,7 @@ void UTrainingMenuManager::InitAllGameAircraftTrainingOptions()
 			ETankSubtype::Tank_None,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None,
-			EAircraftSubtype::Aircraft_Ju87,
-			FRTS_RequirementHelpers::CreateVacantAirPadRequirement(GetTransientPackage())
-		);
-		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
-	}
-	// Train ME410 
-	{
-		FTrainingOption ItemID = FTrainingOption(
-			EAllUnitType::UNType_Aircraft,
-			static_cast<uint8>(EAircraftSubtype::Aircraft_Me410)
-		);
-
-		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
-			ItemID,
-			BasicAircaftTrainingTime,
-			EAllUnitType::UNType_Aircraft,
-			ETankSubtype::Tank_None,
-			ENomadicSubtype::Nomadic_None,
-			ESquadSubtype::Squad_None,
-			EAircraftSubtype::Aircraft_Me410,
-			FRTS_RequirementHelpers::CreateVacantAirPadRequirement(GetTransientPackage())
-		);
-		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
-	}
-	// Train bf109 
-	{
-		FTrainingOption ItemID = FTrainingOption(
-			EAllUnitType::UNType_Aircraft,
-			static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109)
-		);
-
-		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
-			ItemID,
-			BasicAircaftTrainingTime,
-			EAllUnitType::UNType_Aircraft,
-			ETankSubtype::Tank_None,
-			ENomadicSubtype::Nomadic_None,
-			ESquadSubtype::Squad_None,
-			EAircraftSubtype::Aircraft_Bf109,
+			AircraftSubtype,
 			FRTS_RequirementHelpers::CreateVacantAirPadRequirement(GetTransientPackage())
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);

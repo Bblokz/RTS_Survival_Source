@@ -166,6 +166,8 @@ private:
 protected:
 	virtual void BeginPlay() override;
 	virtual void CheckForUpgrades();
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, BlueprintPure, Category = "Bomb")
+	UMeshComponent* GetBombOverrideMeshComp() const;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
 	virtual void PostInitializeComponents() override;
@@ -632,7 +634,7 @@ private:
 	// -------------------------------------------------------------
 
 	/** @brief BP and data pulls to finalize gameplay setup after BeginPlay. */
-	void BeginPlay_InitAircraft();
+	void BeginPlay_InitAircraft(UMeshComponent* OverrideBombComponentMesh);
 
 	/** @brief Push initial LandedState into weapons/anim to keep them consistent on spawn. */
 	void BeginPlay_PropagateStateToWpAndAnimInst() const;

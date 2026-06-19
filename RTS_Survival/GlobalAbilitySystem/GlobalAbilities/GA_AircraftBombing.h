@@ -61,12 +61,12 @@ private:
 	FVector BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const;
 	void QueueCarpetBombingOrderForNextFrame(
 		AAircraftMaster* SpawnedAircraft,
-		const FVector& StartLocation,
+		const FVector& StartCarpetLocation,
 		const FVector& CarpetEndLocation,
 		const FVector& RetreatLocation);
 	void IssueCarpetBombingOrder(
 		AAircraftMaster* SpawnedAircraft,
-		const FVector& StartLocation,
+		const FVector& StartCarpetLocation,
 		const FVector& CarpetEndLocation,
 		const FVector& RetreatLocation);
 	void StartForcedRetreatTimer();

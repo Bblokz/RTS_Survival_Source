@@ -422,6 +422,12 @@ enum class EAircraftSubtype : uint8
 	Aircraft_Bf109 UMETA(DisplayName = "Aircraft Bf 109"),
 	Aircraft_Ju87 UMETA(DisplayName = "Aircraft Ju 87"),
 	Aircraft_Me410 UMETA(DisplayName = "Aircraft Me 410"),
+	Aircraft_Ju390B UMETA(DisplayName = "Aircraft Ju 390B"),
+	Aircraft_PE8 UMETA(DisplayName = "Aircraft PE-8"),
+	Aircraft_PE2 UMETA(DisplayName = "Aircraft PE-2"),
+	Aircraft_Horten229 UMETA(DisplayName = "Aircraft Horten 229"),
+	Aircraft_Sturmovic UMETA(DisplayName = "Aircraft Sturmovic"),
+	Aircraft_Yak UMETA(DisplayName = "Aircraft Yak"),
 };
 
 

@@ -85,7 +85,7 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 
 	M_SpawnedAircraft = SpawnedAircraft;
 	const FVector CarpetEndLocation = BuildCarpetEndLocation(StartLocation, TargetLocation);
-	QueueCarpetBombingOrderForNextFrame(SpawnedAircraft, StartLocation, CarpetEndLocation, RetreatLocation);
+	QueueCarpetBombingOrderForNextFrame(SpawnedAircraft, TargetLocation, CarpetEndLocation, RetreatLocation);
 }
 
 FVector UGA_AircraftBombing::BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const
@@ -98,7 +98,7 @@ FVector UGA_AircraftBombing::BuildCarpetEndLocation(const FVector& StartLocation
 
 void UGA_AircraftBombing::QueueCarpetBombingOrderForNextFrame(
 	AAircraftMaster* SpawnedAircraft,
-	const FVector& StartLocation,
+	const FVector& StartCarpetLocation,
 	const FVector& CarpetEndLocation,
 	const FVector& RetreatLocation)
 {
@@ -112,7 +112,7 @@ void UGA_AircraftBombing::QueueCarpetBombingOrderForNextFrame(
 	TWeakObjectPtr<AAircraftMaster> WeakSpawnedAircraft(SpawnedAircraft);
 	World->GetTimerManager().SetTimerForNextTick(
 		FTimerDelegate::CreateLambda(
-			[WeakThis, WeakSpawnedAircraft, StartLocation, CarpetEndLocation, RetreatLocation]()
+			[WeakThis, WeakSpawnedAircraft, StartCarpetLocation, CarpetEndLocation, RetreatLocation]()
 			{
 				if (not WeakThis.IsValid() || not WeakSpawnedAircraft.IsValid())
 				{
@@ -123,7 +123,7 @@ void UGA_AircraftBombing::QueueCarpetBombingOrderForNextFrame(
 				AAircraftMaster* StrongSpawnedAircraft = WeakSpawnedAircraft.Get();
 				StrongThis->IssueCarpetBombingOrder(
 					StrongSpawnedAircraft,
-					StartLocation,
+					StartCarpetLocation,
 					CarpetEndLocation,
 					RetreatLocation);
 			}));
@@ -131,7 +131,7 @@ void UGA_AircraftBombing::QueueCarpetBombingOrderForNextFrame(
 
 void UGA_AircraftBombing::IssueCarpetBombingOrder(
 	AAircraftMaster* SpawnedAircraft,
-	const FVector& StartLocation,
+	const FVector& StartCarpetLocation,
 	const FVector& CarpetEndLocation,
 	const FVector& RetreatLocation)
 {
@@ -140,7 +140,7 @@ void UGA_AircraftBombing::IssueCarpetBombingOrder(
 		return;
 	}
 
-	SpawnedAircraft->CarpetBombing(StartLocation, CarpetEndLocation, RetreatLocation);
+	SpawnedAircraft->CarpetBombing(StartCarpetLocation, CarpetEndLocation, RetreatLocation);
 	StartForcedRetreatTimer();
 }
 
