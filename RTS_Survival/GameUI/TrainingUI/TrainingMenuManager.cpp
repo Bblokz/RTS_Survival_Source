@@ -1759,6 +1759,8 @@ void UTrainingMenuManager::InitAllGameAircraftTrainingOptions()
 		EAircraftSubtype::Aircraft_Bf109,
 		EAircraftSubtype::Aircraft_Ju390B,
 		EAircraftSubtype::Aircraft_PE8,
+		EAircraftSubtype::Aircraft_PE8_4x1000,
+		EAircraftSubtype::Aircraft_PE8_1x3000,
 		EAircraftSubtype::Aircraft_PE2,
 		EAircraftSubtype::Aircraft_Horten229,
 		EAircraftSubtype::Aircraft_Sturmovic,
