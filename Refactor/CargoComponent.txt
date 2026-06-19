@@ -1,158 +1,37 @@
 ﻿you are a c++ expert and perfectionist.
-You are going to fully implement a large system i already started for the global abilities in this game.
-Make sure to read through the relevant files so you understand the intent of the structure of the system
-before proceeding to implement the rest.
+You are going to futher setup and complete the global ability system for the Enemy controller.
+Here is how i want it to work:
+the global abilities for the enemy contorller will be integrated with the strategic ai component of the enemy in there it needs
+to get its own thinkstep timer.
 
-for this system we make use of 2 developer settings:
-1.  class RTS_SURVIVAL_API UCommanderSettings : public UDeveloperSettings where the abiilty enums are stored for each
-type of commander the  playe has picked. 
-the commander enum itself is stored on the game instance and will be loaded from there in the cpp controller (see later)
-2. class RTS_SURVIVAL_API URTSGlobalAbilitySettings : public UDeveloperSettings
-in here we store a soft object pointer to the data asset with all the data for all the global abilities.
+I also want an additional settings struct that will contain more general rules/ settings for this enemy ai global abilty system:
+for now add to it float TimeTillAllowHeavyCarpetBombing
+and float TimeTillAllowBarrages
 
-There is a globa abilities manager object called class RTS_SURVIVAL_API UGlobalAbilitiesManager : public UActorComponent whcih
-is added to the player controller and will be in charge of checking the unit and tech requirements for the abilities on the player.
-because we intennt to also use this manager on the enemy controller but the enemy controller does not make
-use of such requirements so keep that in mind.
+very important:
+1. the enemy global ability component does not make use of ai (is for CPU only)
+2. owning player == 1 is the player otherwise it is enemy. I think parts are already setup that if it was not owned by the player
+we ignore cooldown, unit and tech requiremetns but we want to ensure that only tech requirements are ignored, unit requirements
+must work and be setup that they either check the player units in the game unit manager or the enemy units.
+cooldowns will also need to work for enemy global abilities.
 
-the following things have to be implemented end to end by you:
-1:
-after the creation of the main game ui whcih contains the ability panel this funciton will be called from blueprints via OnMainMenuWidgetCreated
-void ACPPController::InitializeGlobalAbilityManager(UMainGameUI* MainMenu)
-from there all info is already provided to InitGlobalAbilitiesManager.
-You need to implement LoadGlobalAbilities where we want to copy uobject each global ability associated with the each enum 
-value in our array. This is because in the class RTS_SURVIVAL_API UGlobalAbilitySetDataAsset : public UDataAsset we have
-stored templates of objects so do not directly use those objects but make sure exact copies are made for our manager to use.
+for the player the set of abilities that is setup is determined by the player's commander for the enemy controller i want
+control per map so make sure there is a panel on the enemy controller that is editable anywere, bp friendly so i can specify 
+which global abilty enum values the enemy on that map will have access to.
+also add for each of those entries a boolean bool bStartOnCooldown = false and float CooldownTimeOverride = 0
+if CooldownTimeOverride is less than zero or zero we ignore it but otherwise it will have to overwrite the cooldown the global ability gets
+by default.
+Make sure that the enemy global ability component will only setup the abilities as per those specified.
 
-then after those are all loaded make suer to init the ability panel and all the items with their respective loaded ability object. and keep the objects
-on the aiblity manager as UPROPERTY TObjects as we do here: 	GlobalAbilities = AbilitiesLoadedCopyUObjects;
+in the think step it will decided whether to use an ability, first see which abilities at that frame are available (not blocked by unit
+requirements not blocked by cooldown) after those are found. we will divide them up into ReinforcementAbilities, Barrages,  LightMediumAirStrikes and HeavyCarpetBombing.
+(make sure to only concider the soviet barrages, airdrops and attacks with soviet planes)
+then we see if certain buckets will not be allowed to be picked;
+for ReinforcementAbilities check if the blackboard has any CurrentBaseDefensePositions (make this a helper for later easy expansion for this bucket rule)
+for barrages check TimeTillAllowBarrages is over and check if we have any CurrentLocationsUnderPlayerAttack or enemey heavy tank positions in AgreggatedHeavyTankFlankingResults
+for LightMediumAirStrikes check if we have CurrentPlayerUnitBulkLocations
+for HeavyCarpetBombing check  TimeTillAllowHeavyCarpetBombing is over and if we have any CurrentPlayerUnitBulkLocations
 
-make sure every object gets all the references it needs to work properly and verify that that is done.
-
-2: The Clicking of an item of a global ability by the player and handeling it. First the ability will be 'activated' during which 
-custom sounds saved in the ability can be played on the player controller and the player controller needs a new function that checks in RegularPrimaryClick whether 
-  we are actually handling an active glboal ability, if we are then the primary click needs to be routed to the 	
-void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation)
- on
-  the global ability where the location is the clicked loccation.
-You also need to implement the cancellation of the global ability; stopping its aim, when the player secondary clicks while the ability is active.
- Essentially; we will first
-activate the abiltiy, and save a weak reference on the cpp controller to it. then the (optional) sounds will be played and the
-aim ability will be set; extend void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings to make sure all of that will work properly.
-Then when the void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation) is called make sure to check all the requirements
-and if all are good then make sure the player resource manager pays for the cost (if applicable) and then call
-the execute of the ability on it.
-
-3. the hover logic. There is a specific hover widget which will be poplulated with the UI settings of the abilty
-that is hovered. the hover and click functionality will come from the global ability item widget's blueprint.
-ensure that if the ability is on cooldown that then we disable its button.
-if the ability has an unmet tech requirement then that goes first and set the descriptin with Required Tech: <tech_name> use sBad114 with the
-URTSRichTextConverter.
-and save the original tint of the button and instead now set a grey tint to show it is not available.
-for uint requiremetn not met (second priority) we use the same sBad and Required Unit : where we place the unit display name after that.
-4. Make sure the abiltiy manager if owned by player 1 runs a custom timer every second that calculates the cooldowns
-of those abilties on cooldon and that verifies the requirements of each ability using the player tech and game unit managers.
-also make sure that if during this requirement check cycle we find out that the ability is avaialbe again we restore the original tint!
-if only not available due to cooldown make it sbad14  with text On Cooldown : < time left>
-
-5 Make sure that we save the original tint of the button of the ability item but make sure it is set to grey tint
-in case one  of the requirements is not met so it is clear to the palyer that the ability is not available.
-always restore the original tint in case the ability becomes available again.
-
-also make sure to collapse the description widget by default in void UGlobalAbilitiesManager::InitGlobalAbilitiesManager(const int32 OwningPlayer
-and ensure it is visible when hovered, but collapsesd again on on hover.
-make sure we do not show it if ANY global abilty is in the active state. e.g. waiting on player click!
-
-
-Implement all of this end to end correctly and surgically. Review your work after you are done and catch any bugs. Also verify
-whether everything I described will work as intended.
-
-
-We currently have the architecture of global abilities set up to create templates in a data asset that are loaded through a 
-developer settings.
-see UCLASS(Abstract, BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
-    class RTS_SURVIVAL_API UGlobalAbility : public UObject
-    
-I now want you to create the first derived global ability called GA_Barrage place it in its Barrage directory under GlobaAbilities.
-Here is what it will need:
-a struct with the barrage settings:
-float min height start
-float max height start
-int32 AmountShells
-int32 BurstAmount
-float MinTimeBetweenBurst
-float MaxTimeBetweenBurst
-float Radius
-bool bVariattionWeaponCalibre
-float OnVariationMinMlt
-float OnVariationMaxMlt
-a FProjectileVfxSettings
-
-it will also need an struct FWeaponData so the designer can fill out the damage, callibre etc of the shells.
-and a struct FWeaponVFX to set the sound and vfx design.
-
-it will also need a new blueprint-friendly struct that can be set on this template by the designer called
-FBarrageProjectileMover:
-float ProjectilArcSpeed
-float ProjectileLinearSpeed
-float ArcStrength
-
-Now this ability will work a bit like an arc projectile weapon in the sense that it will have to make use of the same projectile pool
-and make sure those projectiles are set to dormant after use.
- You will need to create a separate function on the projectile to work with this type of global ability.
- So make it gets access to the projectiles manager; like how turrets do:void ACPPTurretsMaster::SetupCallbackToProjectileManager()
-{
-ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
-if (not GameState)
-{
-	return;
-}
-TWeakObjectPtr<ACPPTurretsMaster> WeakThis(this);
-auto Callback = [WeakThis](const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager)-> void
-{
-	if (not WeakThis.IsValid())
-	{
-		return;
-	}
-	WeakThis->OnProjectileManagerLoaded(ProjectileManager);
-};
-GameState->RegisterCallbackForSmallArmsProjectileMgr(Callback, this);
-
-What it needs to do on execute;
-wait if needed till its projectile manager is loaded.
-then using the projectile manager; it will create burst amount of shells
-for each a random location within the radius of the ability around the provided target location with a z-offset
-randomly in float min height start
-            float max height start
-it will determine a mlt in the OnVariation mlt min max if that bool for variation is set to true.
-then multiply the damage from the FWeaponData, the calibre and the armor pen with that multiplier before providing it to
-the projectile that will be used for this multiplier to obtain the variation.
-
-make sure the projectile is provided with all the weapon data and all the vfx needed on its custom launch function specifically
-for barrage abilities.
-How the flight path will go:
-prior to launching the projectile calculate its aim point (this is NOT the final point nessecarily of the projectile as it
-may fly further down that this but it is the point at which the arc of the projectile from its starting position will be aimed)
-this aim point will be a random point in the XY plane within the ability's radius around the TargetLocation.
-the path the projectile will take from its random start position should be a bit of an arc depending on how strong the ArcStrenght is in
-FBarrageProjectileMover. The stronger the arc strength the more of a bow the projectile should take to get to that aim point.
-also make sure to lerp between the liner and arc speed depending on how far in the arc the projectile is; the further in the arc
-the stronger the arc speed should weigh.
-
-Very important notes;
--Ensure the owning player is provided correctly so the projectil will use the correct collison settings and not hit player units if fired by the player.
--Ensure the projectile can potentially fly further than its XY plane aim point; this is just a point it will go through but it may collide later or earlier.
--Ensure the projectiles are correctly made dormant after use.
- 
- 
-
-
-You are going to implement a new derived global ability template called GA_AircraftStrafe
-It will need blueprint-friendly setting structs for:
-an FTrainingOption AicraftToSpawn
-
-a FStrafeAircraftSettings which will partially be filled out automatically by the target position.
-
-
-
-
+after picking (if any picking was possible) then execute the ability on one 
+of the locations logical for its bucket (see hte requiremetns, pick at random one of the positions that was concidered on the blackboard)
+again add helpers for each bucket type of global ability here for easy expansion later.
