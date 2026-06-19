@@ -524,6 +524,18 @@ namespace DeveloperSettings
 				inline constexpr int32 Ju87_VehicleParts = 250;
 				inline constexpr int32 Me410_Radixite = 800;
 				inline constexpr int32 Me410_VehicleParts = 300;
+				inline constexpr int32 Ju390B_Radixite = 1000;
+				inline constexpr int32 Ju390B_VehicleParts = 400;
+				inline constexpr int32 PE8_Radixite = 1000;
+				inline constexpr int32 PE8_VehicleParts = 400;
+				inline constexpr int32 PE2_Radixite = 800;
+				inline constexpr int32 PE2_VehicleParts = 300;
+				inline constexpr int32 Horten229_Radixite = 700;
+				inline constexpr int32 Horten229_VehicleParts = 275;
+				inline constexpr int32 Sturmovic_Radixite = 700;
+				inline constexpr int32 Sturmovic_VehicleParts = 275;
+				inline constexpr int32 Yak_Radixite = 600;
+				inline constexpr int32 Yak_VehicleParts = 225;
 			}
 
 			// ----------------------------------
@@ -1213,6 +1225,7 @@ namespace DeveloperSettings
 			// Aircraft Health settings.
 			inline constexpr float FighterHealth = RoundToNearestMultipleOfFive(800.f * OverallHealthMlt);
 			inline constexpr float AttackAircraftHealth = RoundToNearestMultipleOfFive(800.f * OverallHealthMlt);
+			inline constexpr float HeavyBomberHealth = 1500.f;
 		}
 
 		namespace UnitResistances
