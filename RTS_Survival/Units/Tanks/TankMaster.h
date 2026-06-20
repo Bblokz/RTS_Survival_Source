@@ -116,6 +116,8 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
+	
+	ETargetPreference GetTargetPreference();							
 
 	// Controller is set with OnPosses on AITankMaster.
 	void SetAIController(AAITankMaster* NewController) { AITankController = NewController; }
@@ -144,6 +146,7 @@ public:
 
 	inline TArray<ACPPTurretsMaster*> GetTurrets() const { return Turrets; };
 	inline TArray<UHullWeaponComponent*> GetHullWeapons() const { return HullWeapons; }
+	float GetVehicleHighestWeaponRange()const;
 
 	virtual ERTSNavAgents GetRTSNavAgentType() const override { return NavAgentType; }
 

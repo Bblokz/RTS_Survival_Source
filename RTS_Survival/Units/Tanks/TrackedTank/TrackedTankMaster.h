@@ -57,6 +57,7 @@ class RTS_SURVIVAL_API ATrackedTankMaster : public ATankMaster, public IVehicleA
 
 public:
 	ATrackedTankMaster(const FObjectInitializer& ObjectInitializer);
+	TObjectPtr<UDigInComponent> GetDigInComponent() const { return M_DigInComponent; }
 
 	virtual void UpdateVehicle_Implementation(
 		float TargetAngle,

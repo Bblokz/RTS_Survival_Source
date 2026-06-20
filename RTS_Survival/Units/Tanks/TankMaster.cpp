@@ -284,6 +284,11 @@ ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 		TEXT("RTSOptimizer"));
 }
 
+ETargetPreference ATankMaster::GetTargetPreference()
+{
+	
+}
+
 
 USkeletalMeshComponent* ATankMaster::GetTankMesh() const
 {
@@ -312,6 +317,23 @@ void ATankMaster::OnHealthChanged(const EHealthLevel PercentageLeft, const bool 
 {
 	// Calls bp event.
 	Super::OnHealthChanged(PercentageLeft, bIsHealing);
+}
+
+float ATankMaster::GetVehicleHighestWeaponRange() const
+{
+	float Range = -1;
+	for (auto EachTurret : Turrets)
+	{
+		if (not IsValid(EachTurret))
+		{
+			continue;
+		}
+		if (EachTurret->GetMaxWeaponRange() > Range)
+		{
+			Range = EachTurret->GetMaxWeaponRange();
+		}
+	}
+	return Range;
 }
 
 void ATankMaster::OnSquadRegistered(ASquadController* SquadController)

@@ -22,6 +22,7 @@ class RTS_SURVIVAL_API UAircraftWeapon : public UActorComponent, public IWeaponO
 public:
 	// Sets default values for this component's properties
 	UAircraftWeapon();
+	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
 
 	void InitAircraftWeaponComponent(
 		AAircraftMaster* AircraftOwner,
@@ -55,6 +56,11 @@ public:
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
+	
+	// Determines for which type of actor target the turret will filter first.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Target")
+	ETargetPreference TargetPreference;
+	
 
 	// Start I Weapon owner interface.
 	virtual void OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon) override;

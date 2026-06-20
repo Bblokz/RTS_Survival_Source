@@ -37,7 +37,7 @@ class UWeaponOwner : public UInterface
 class RTS_SURVIVAL_API IWeaponOwner
 {
 	GENERATED_BODY()
-	
+public:	
 
 	// To not bloat public interface with functions that are only used by the weapon system, we put them in protected.
 	friend class RTS_SURVIVAL_API UWeaponState;
@@ -61,6 +61,8 @@ class RTS_SURVIVAL_API IWeaponOwner
 	virtual void ForceSetAllWeaponsFullyReloaded() = 0;
 	/** If the owner of the weapon is a type of embedded turret with yaw limitations then this will return a non zero value. */
 	virtual float GetTurretYawLimit() const = 0;
+	
+	virtual ETargetPreference GetTargetPreference() const = 0;
 	
 
 protected:

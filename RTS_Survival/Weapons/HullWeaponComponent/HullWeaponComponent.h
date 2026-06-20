@@ -43,6 +43,9 @@ public:
 	UHullWeaponComponent();
 
 	void SetOwningPlayer(const int32 PlayerIndex);
+	
+	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
+	
 
 
 	/**

@@ -130,6 +130,8 @@ class RTS_SURVIVAL_API ACPPTurretsMaster : public ACPPWeaponsMaster, public IWea
 public:
 	// Public c-tor needed for call hierarchy with derived classes.
 	ACPPTurretsMaster();
+	
+	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
 
 	/**
 	 * @brief Sets this turret to automatically engage targets in range.
