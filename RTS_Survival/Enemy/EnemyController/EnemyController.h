@@ -416,6 +416,13 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Global Abilities")
 	TArray<FEnemyGlobalAbilityLoadoutEntry> M_EnemyGlobalAbilityLoadout;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Global Abilities")
+	float EnemyAircraftHeight = 2200;
+	
+	// If this is not set to a non-zero vector the global ability manager will use the enemy controller's location instead.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Global Abilities")
+	FVector OverrideEnemyStartPosition = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Global Abilities")
 	FEnemyGlobalAbilityAISettings M_EnemyGlobalAbilityAISettings;

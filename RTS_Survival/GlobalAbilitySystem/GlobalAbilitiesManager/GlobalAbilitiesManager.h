@@ -14,7 +14,7 @@ struct FEnemyGlobalAbilityAISettings
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float ThinkStepInterval = 1.0f;
+	float ThinkStepInterval = 8.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float TimeTillAllowHeavyCarpetBombing = 0.0f;

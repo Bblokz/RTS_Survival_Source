@@ -35,3 +35,13 @@ for HeavyCarpetBombing check  TimeTillAllowHeavyCarpetBombing is over and if we 
 after picking (if any picking was possible) then execute the ability on one 
 of the locations logical for its bucket (see hte requiremetns, pick at random one of the positions that was concidered on the blackboard)
 again add helpers for each bucket type of global ability here for easy expansion later.
+
+
+you are a c++ expert and perfectionist.
+You are going to define a new type of global ability (UGlobalAbility) derived class called
+UGA_AircraftDrop. The idea is that I can provide an array of squad subtypes and tank subtypes on that ability's settings
+struct as well as the class of aircraft to use for dropping and then it will automatically determine how many aircraft need spawning.
+ Because we will also have a setting int32 AmountInfantryPerAircraft int32 AmountTanksPerAircraft and we make sure that aircraft can
+ either hold only tanks or only infantry.
+ Also a setting float TankZOffsetFromAircraft.
+ 

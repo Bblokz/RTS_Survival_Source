@@ -751,6 +751,7 @@ void AEnemyController::BeginPlay_InitEnemyGlobalAbilities()
 		}
 	}
 
+	FVector StartPositionForAbilities = OverrideEnemyStartPosition.IsNearlyZero() ?  GetActorLocation() : OverrideEnemyStartPosition;
 	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	M_EnemyGlobalAbilitiesManager->InitGlobalAbilitiesManager(
 		2,
@@ -759,8 +760,8 @@ void AEnemyController::BeginPlay_InitEnemyGlobalAbilities()
 		nullptr,
 		GameUnitManager,
 		nullptr,
-		GetActorLocation(),
-		0.0f);
+		StartPositionForAbilities,
+		EnemyAircraftHeight);
 
 	for (const FEnemyGlobalAbilityLoadoutEntry& LoadoutEntry : M_EnemyGlobalAbilityLoadout)
 	{
