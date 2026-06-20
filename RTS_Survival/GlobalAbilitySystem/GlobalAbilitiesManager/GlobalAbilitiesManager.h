@@ -35,7 +35,7 @@ struct FEnemyGlobalAbilityLoadoutEntry
 	bool bStartOnCooldown = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CooldownTimeOverride = 0.0f;
+	int32 CooldownTimeOverride = 0;
 };
 
 
@@ -78,7 +78,6 @@ public:
 	bool QueryCostsForAbility(const UGlobalAbility* Ability) const;
 	bool QueryCooldownForAbility(const UGlobalAbility* Ability) const;
 	void TickGlobalAbilityCooldowns();
-	void TickGlobalAbilityCooldowns(float CooldownDeltaSeconds);
 	void ApplyCooldownOverride(UGlobalAbility* Ability, const FEnemyGlobalAbilityLoadoutEntry& LoadoutEntry);
 	UGlobalAbility* FindLoadedAbilityByType(EGlobalAbility AbilityType) const;
 	TArray<UGlobalAbility*> GetAvailableEnemyGlobalAbilities() const;

@@ -652,24 +652,11 @@ UGlobalAbility* UGlobalAbilitiesManager::FindLoadedAbilityByType(const EGlobalAb
 
 void UGlobalAbilitiesManager::TickGlobalAbilityCooldowns()
 {
-	TickGlobalAbilityCooldowns(1.0f);
-}
-
-void UGlobalAbilitiesManager::TickGlobalAbilityCooldowns(const float CooldownDeltaSeconds)
-{
-	const int32 CooldownTickAmount = FMath::FloorToInt(FMath::Max(0.0f, CooldownDeltaSeconds));
-	if (CooldownTickAmount <= 0)
-	{
-		return;
-	}
-
 	for (UGlobalAbility* Ability : M_GlobalAbilities)
 	{
 		if (IsValid(Ability) && Ability->M_AbilityCosts.CoolDownRemaining > 0)
 		{
-			Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(
-				0,
-				Ability->M_AbilityCosts.CoolDownRemaining - CooldownTickAmount);
+			Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(0, Ability->M_AbilityCosts.CoolDownRemaining - 1);
 		}
 	}
 }
@@ -683,9 +670,9 @@ void UGlobalAbilitiesManager::ApplyCooldownOverride(
 		return;
 	}
 
-	if (LoadoutEntry.CooldownTimeOverride > 0.0f)
+	if (LoadoutEntry.CooldownTimeOverride > 0)
 	{
-		Ability->M_AbilityCosts.CoolDownTime = FMath::RoundToInt(LoadoutEntry.CooldownTimeOverride);
+		Ability->M_AbilityCosts.CoolDownTime = LoadoutEntry.CooldownTimeOverride;
 	}
 
 	if (LoadoutEntry.bStartOnCooldown)

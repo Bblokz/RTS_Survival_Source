@@ -1590,17 +1590,7 @@ void UEnemyStrategicAIComponent::EnemyGlobalAbility_ThinkStep()
 		return;
 	}
 
-	const float CooldownDeltaSeconds = FMath::Max(
-		M_EnemyGlobalAbilityThinkTimer.ThinkingInterval,
-		GetWorld()->GetTimeSeconds() - M_EnemyGlobalAbilityThinkTimer.LastTimeThought);
-	M_EnemyGlobalAbilityCooldownTickRemainderSeconds += CooldownDeltaSeconds;
-	const float CooldownTickSeconds = FMath::FloorToFloat(M_EnemyGlobalAbilityCooldownTickRemainderSeconds);
-	if (CooldownTickSeconds > 0.0f)
-	{
-		GlobalAbilitiesManager->TickGlobalAbilityCooldowns(CooldownTickSeconds);
-		M_EnemyGlobalAbilityCooldownTickRemainderSeconds -= CooldownTickSeconds;
-	}
-
+	GlobalAbilitiesManager->TickGlobalAbilityCooldowns();
 	UGlobalAbility* AbilityToExecute = nullptr;
 	FVector TargetLocation = FVector::ZeroVector;
 	if (not TryPickEnemyGlobalAbilityAndTarget(AbilityToExecute, TargetLocation))

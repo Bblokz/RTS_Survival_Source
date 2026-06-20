@@ -436,8 +436,6 @@ private:
 
 	FAIThinkingTimerData M_EnemyGlobalAbilityThinkTimer;
 	float M_EnemyGlobalAbilityAIStartTimeSeconds = 0.0f;
-	// Preserves sub-second think intervals so integer cooldowns still tick at real elapsed seconds.
-	float M_EnemyGlobalAbilityCooldownTickRemainderSeconds = 0.0f;
 	float GetEnemyGlobalAbilityThinkStepInterval() const;
 	void EnemyGlobalAbility_ThinkStep();
 	bool IsEnemyReinforcementAbility(EGlobalAbility AbilityType) const;

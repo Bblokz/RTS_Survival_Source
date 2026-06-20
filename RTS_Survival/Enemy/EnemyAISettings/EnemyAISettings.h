@@ -40,7 +40,7 @@ namespace EnemyAISettings
 		// Fallback cadence for the enemy global ability think step when the map settings are invalid.
 		inline constexpr float UpdateEnemyGlobalAbility_Interval = 1.f;
 		// Keeps designer-authored enemy global ability thinking from running every strategic loop frame.
-		inline constexpr float MinimumEnemyGlobalAbility_Interval = 0.01f;
+		inline constexpr float MinimumEnemyGlobalAbility_Interval = 1.f;
 	}
 
 	namespace UnitTraining
