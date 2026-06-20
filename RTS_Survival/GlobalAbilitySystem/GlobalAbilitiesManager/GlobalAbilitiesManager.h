@@ -8,6 +8,36 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "GlobalAbilitiesManager.generated.h"
 
+USTRUCT(BlueprintType)
+struct FEnemyGlobalAbilityAISettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ThinkStepInterval = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TimeTillAllowHeavyCarpetBombing = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TimeTillAllowBarrages = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct FEnemyGlobalAbilityLoadoutEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EGlobalAbility AbilityType = EGlobalAbility::GA_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bStartOnCooldown = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 CooldownTimeOverride = 0;
+};
+
 
 class UW_GA_Description;
 class UW_GA_Item;
@@ -38,8 +68,20 @@ public:
 	// Called when the game starts
 	virtual void BeginPlay()  override;
 	
-	bool QueryRequirementForAbility(TObjectPtr<UGlobalAbility> Ability) const;
-	bool QueryCostsForAbility(TObjectPtr<UGlobalAbility> Ability) const;
+	bool IsPlayerAbilityManager() const;
+	bool IsEnemyAbilityManager() const;
+	bool QueryRequirementForAbility(const UGlobalAbility* Ability) const;
+	bool QueryUnitRequirementForAbility(const UGlobalAbility* Ability) const;
+	bool QueryPlayerUnitRequirementForAbility(const FTrainingOption& RequiredUnit) const;
+	bool QueryEnemyUnitRequirementForAbility(const FTrainingOption& RequiredUnit) const;
+	bool QueryTechnologyRequirementForAbility(const UGlobalAbility* Ability) const;
+	bool QueryCostsForAbility(const UGlobalAbility* Ability) const;
+	bool QueryCooldownForAbility(const UGlobalAbility* Ability) const;
+	void TickGlobalAbilityCooldowns();
+	void ApplyCooldownOverride(UGlobalAbility* Ability, const FEnemyGlobalAbilityLoadoutEntry& LoadoutEntry);
+	UGlobalAbility* FindLoadedAbilityByType(EGlobalAbility AbilityType) const;
+	TArray<UGlobalAbility*> GetAvailableEnemyGlobalAbilities() const;
+	bool TryExecuteAbilityAtLocation(UGlobalAbility* Ability, const FVector& TargetLocation);
 	
 	void OnHoveredAbilityButton(UGlobalAbility* HoveredAbility, const bool bIsHover);
 	void OnClickedAbilityButton(UGlobalAbility* ClickedAbility);
@@ -48,15 +90,11 @@ public:
 	bool GetHasActiveAbility() const;
 	FVector GetAircraftBombingSpawnLocation(const UObject* Requester, const FVector& TargetLocation) const;
 	FVector GetAircraftBombingRetreatLocation(const UObject* Requester, const FVector& TargetLocation) const;
-	
-protected:
-	
-	
-	private:
+
+private:
 	FGlobalAbility_SpawnSettings M_SpawnSetings;
 	UPROPERTY()
 	int32 M_OwningPlayer;
-	bool IsPlayerAbilityManager() const;
 	
 	UPROPERTY()
 	TWeakObjectPtr<UW_GlobalAbilityPanel> M_GlobalAbilityPanel;
@@ -91,11 +129,17 @@ protected:
 	FString GetUnitRequirementDisplayName(const FTrainingOption& UnitId) const;
 	// Returns true if the player has this unit.
 	bool CheckDoesPlayerHaveUnit(const FTrainingOption& UnitId)const;
+	bool CheckDoesEnemyHaveUnit(const FTrainingOption& UnitId) const;
 	bool CheckDoesPlayerHaveSquad(const FTrainingOption& UnitId) const;
 	bool CheckDoesPlayerHaveTank(const FTrainingOption& UnitId) const;
 	bool CheckDoesPlayerHaveNomadic(const FTrainingOption& UnitId) const;
 	bool CheckDoesPlayerHaveBuildingExpansion(const FTrainingOption& UnitId) const;
 	bool CheckDoesPlayerHaveAircraft(const FTrainingOption& UnitId) const;
+	bool CheckDoesEnemyHaveSquad(const FTrainingOption& UnitId) const;
+	bool CheckDoesEnemyHaveTank(const FTrainingOption& UnitId) const;
+	bool CheckDoesEnemyHaveNomadic(const FTrainingOption& UnitId) const;
+	bool CheckDoesEnemyHaveBuildingExpansion(const FTrainingOption& UnitId) const;
+	bool CheckDoesEnemyHaveAircraft(const FTrainingOption& UnitId) const;
 	
 	UPROPERTY()
 	TArray<TObjectPtr<UGlobalAbility>> M_GlobalAbilities;

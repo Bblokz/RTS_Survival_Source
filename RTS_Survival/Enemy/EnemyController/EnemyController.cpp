@@ -106,6 +106,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_EnemyRetreatController = CreateDefaultSubobject<UEnemyRetreatController>(TEXT("EnemyRetreatController"));
 	M_EnemyDirectControlComponent = CreateDefaultSubobject<UEnemyDirectControlComponent>(
 		TEXT("EnemyDirectControlComponent"));
+	M_EnemyGlobalAbilitiesManager = CreateDefaultSubobject<UGlobalAbilitiesManager>(TEXT("EnemyGlobalAbilitiesManager"));
 	CacheGenerationSeedFromGameInstance();
 	if (M_FormationController)
 	{
@@ -724,6 +725,7 @@ void AEnemyController::BeginPlay()
 	CacheGenerationSeedFromGameInstance();
 	BeginPlay_MoveAISettingsToStrategicAIBlackboard();
 	BeginPlay_InitStochasticDecisionTree();
+	BeginPlay_InitEnemyGlobalAbilities();
 	if (M_EnemyStrategicAIComponent)
 	{
 		M_EnemyStrategicAIComponent->InitStrategicAIComponent(this, M_StochasticDecisionTree);
@@ -731,6 +733,41 @@ void AEnemyController::BeginPlay()
 	
 }
 
+
+void AEnemyController::BeginPlay_InitEnemyGlobalAbilities()
+{
+	if (not GetIsValidEnemyGlobalAbilitiesManager())
+	{
+		return;
+	}
+
+	TArray<EGlobalAbility> AbilityTypes;
+	AbilityTypes.Reserve(M_EnemyGlobalAbilityLoadout.Num());
+	for (const FEnemyGlobalAbilityLoadoutEntry& LoadoutEntry : M_EnemyGlobalAbilityLoadout)
+	{
+		if (LoadoutEntry.AbilityType != EGlobalAbility::GA_None)
+		{
+			AbilityTypes.Add(LoadoutEntry.AbilityType);
+		}
+	}
+
+	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	M_EnemyGlobalAbilitiesManager->InitGlobalAbilitiesManager(
+		2,
+		AbilityTypes,
+		nullptr,
+		nullptr,
+		GameUnitManager,
+		nullptr,
+		GetActorLocation(),
+		0.0f);
+
+	for (const FEnemyGlobalAbilityLoadoutEntry& LoadoutEntry : M_EnemyGlobalAbilityLoadout)
+	{
+		UGlobalAbility* Ability = M_EnemyGlobalAbilitiesManager->FindLoadedAbilityByType(LoadoutEntry.AbilityType);
+		M_EnemyGlobalAbilitiesManager->ApplyCooldownOverride(Ability, LoadoutEntry);
+	}
+}
 
 void AEnemyController::PostInitializeComponents()
 {
@@ -977,4 +1014,34 @@ TArray<AActor*> AEnemyController::GetAllFormationActorsByUnitType(const bool bGe
 	}
 
 	return ValidFormationActors;
+}
+
+UGlobalAbilitiesManager* AEnemyController::GetEnemyGlobalAbilitiesManager() const
+{
+	if (not GetIsValidEnemyGlobalAbilitiesManager())
+	{
+		return nullptr;
+	}
+
+	return M_EnemyGlobalAbilitiesManager;
+}
+
+const FEnemyGlobalAbilityAISettings& AEnemyController::GetEnemyGlobalAbilityAISettings() const
+{
+	return M_EnemyGlobalAbilityAISettings;
+}
+
+bool AEnemyController::GetIsValidEnemyGlobalAbilitiesManager() const
+{
+	if (IsValid(M_EnemyGlobalAbilitiesManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_EnemyGlobalAbilitiesManager"),
+		TEXT("AEnemyController::GetIsValidEnemyGlobalAbilitiesManager"),
+		this);
+	return false;
 }

@@ -40,7 +40,8 @@ void UGlobalAbilitiesManager::InitGlobalAbilitiesManager(const int32 OwningPlaye
                                                          const float AircraftHeight)
 {
 	M_OwningPlayer = OwningPlayer;
-	// Only the player will have to check for requirements and resources.
+	// Player and enemy ability managers both need unit requirement checks.
+	M_GameUnitManager = GameUnitMgr;
 	if (IsPlayerAbilityManager())
 	{
 		M_GlobalAbilityPanel = W_GlobalAbilityPanel;
@@ -54,7 +55,6 @@ void UGlobalAbilitiesManager::InitGlobalAbilitiesManager(const int32 OwningPlaye
 		}
 
 		M_PlayerResourceManager = PlayerResourceMgr;
-		M_GameUnitManager = GameUnitMgr;
 		M_PlayerTechManager = PlayerTechMgr;
 		(void)EnsureIsValidPlayerResourceManager();
 		(void)EnsureIsValidPlayerTechManager();
@@ -130,47 +130,106 @@ void UGlobalAbilitiesManager::BeginPlay()
 	Super::BeginPlay();
 }
 
-bool UGlobalAbilitiesManager::QueryRequirementForAbility(TObjectPtr<UGlobalAbility> Ability) const
+bool UGlobalAbilitiesManager::QueryRequirementForAbility(const UGlobalAbility* Ability) const
 {
 	if (not IsValid(Ability))
 	{
 		return false;
 	}
-	if (not EnsureIsValidPlayerTechManager() || not EnsureIsValidGameUnitManager())
-	{
-		return false;
-	}
-	if (Ability->M_AbilityRequirements.RequiredTechnology != ETechnology::Tech_NONE)
-	{
-		if (not M_PlayerTechManager.Get()->HasTechResearched(Ability->M_AbilityRequirements.RequiredTechnology))
-		{
-			return false;
-		}
-	}
-	if (not Ability->M_AbilityRequirements.RequiredUnit.IsNone())
-	{
-		return CheckDoesPlayerHaveUnit(Ability->M_AbilityRequirements.RequiredUnit);
-	}
-	// No requirements.
-	return true;
+
+	return QueryTechnologyRequirementForAbility(Ability) && QueryUnitRequirementForAbility(Ability);
 }
 
-bool UGlobalAbilitiesManager::QueryCostsForAbility(TObjectPtr<UGlobalAbility> Ability) const
+bool UGlobalAbilitiesManager::QueryUnitRequirementForAbility(const UGlobalAbility* Ability) const
 {
 	if (not IsValid(Ability))
 	{
 		return false;
 	}
+
+	const FTrainingOption& RequiredUnit = Ability->M_AbilityRequirements.RequiredUnit;
+	if (RequiredUnit.IsNone())
+	{
+		return true;
+	}
+
+	if (IsEnemyAbilityManager())
+	{
+		return QueryEnemyUnitRequirementForAbility(RequiredUnit);
+	}
+
+	return QueryPlayerUnitRequirementForAbility(RequiredUnit);
+}
+
+bool UGlobalAbilitiesManager::QueryPlayerUnitRequirementForAbility(const FTrainingOption& RequiredUnit) const
+{
+	if (not EnsureIsValidGameUnitManager())
+	{
+		return false;
+	}
+
+	return CheckDoesPlayerHaveUnit(RequiredUnit);
+}
+
+bool UGlobalAbilitiesManager::QueryEnemyUnitRequirementForAbility(const FTrainingOption& RequiredUnit) const
+{
+	if (not EnsureIsValidGameUnitManager())
+	{
+		return false;
+	}
+
+	return CheckDoesEnemyHaveUnit(RequiredUnit);
+}
+
+bool UGlobalAbilitiesManager::QueryTechnologyRequirementForAbility(const UGlobalAbility* Ability) const
+{
+	if (not IsValid(Ability))
+	{
+		return false;
+	}
+
+	if (IsEnemyAbilityManager())
+	{
+		return true;
+	}
+
+	if (Ability->M_AbilityRequirements.RequiredTechnology == ETechnology::Tech_NONE)
+	{
+		return true;
+	}
+
+	if (not EnsureIsValidPlayerTechManager())
+	{
+		return false;
+	}
+
+	return M_PlayerTechManager.Get()->HasTechResearched(Ability->M_AbilityRequirements.RequiredTechnology);
+}
+
+bool UGlobalAbilitiesManager::QueryCostsForAbility(const UGlobalAbility* Ability) const
+{
+	if (not IsValid(Ability))
+	{
+		return false;
+	}
+
+	if (IsEnemyAbilityManager())
+	{
+		return true;
+	}
+
 	if (not EnsureIsValidPlayerResourceManager())
 	{
 		return false;
 	}
-	EPlayerError Error = M_PlayerResourceManager.Get()->GetCanPayForCost(Ability->M_AbilityCosts.Costs.ResourceCosts);
-	if (Error != EPlayerError::Error_None)
-	{
-		return false;
-	}
-	return true;
+
+	const EPlayerError Error = M_PlayerResourceManager.Get()->GetCanPayForCost(Ability->M_AbilityCosts.Costs.ResourceCosts);
+	return Error == EPlayerError::Error_None;
+}
+
+bool UGlobalAbilitiesManager::QueryCooldownForAbility(const UGlobalAbility* Ability) const
+{
+	return IsValid(Ability) && Ability->M_AbilityCosts.CoolDownRemaining <= 0;
 }
 
 void UGlobalAbilitiesManager::OnHoveredAbilityButton(UGlobalAbility* HoveredAbility, const bool bIsHover)
@@ -245,6 +304,11 @@ FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject
 bool UGlobalAbilitiesManager::IsPlayerAbilityManager() const
 {
 	return M_OwningPlayer == 1;
+}
+
+bool UGlobalAbilitiesManager::IsEnemyAbilityManager() const
+{
+	return not IsPlayerAbilityManager();
 }
 
 bool UGlobalAbilitiesManager::EnsureIsValidGlobalAbilityPanel() const
@@ -411,7 +475,7 @@ void UGlobalAbilitiesManager::UpdateAbilityAvailability(UGlobalAbility* Ability)
 	}
 	const bool bMeetsRequirements = QueryRequirementForAbility(Ability);
 	const bool bCanPayCost = QueryCostsForAbility(Ability);
-	const bool bIsOnCooldown = Ability->M_AbilityCosts.CoolDownRemaining > 0;
+	const bool bIsOnCooldown = not QueryCooldownForAbility(Ability);
 	UpdateAbilityItemAvailability(
 		Ability,
 		bMeetsRequirements && bCanPayCost && not bIsOnCooldown,
@@ -571,4 +635,135 @@ bool UGlobalAbilitiesManager::CheckDoesPlayerHaveAircraft(const FTrainingOption&
 {
 	const EAircraftSubtype AircraftSubtype = static_cast<EAircraftSubtype>(UnitId.SubtypeValue);
 	return M_GameUnitManager.Get()->GetHasPlayerAircraftOfType(AircraftSubtype);
+}
+
+UGlobalAbility* UGlobalAbilitiesManager::FindLoadedAbilityByType(const EGlobalAbility AbilityType) const
+{
+	for (UGlobalAbility* Ability : M_GlobalAbilities)
+	{
+		if (IsValid(Ability) && Ability->M_AbilityType == AbilityType)
+		{
+			return Ability;
+		}
+	}
+
+	return nullptr;
+}
+
+void UGlobalAbilitiesManager::TickGlobalAbilityCooldowns()
+{
+	for (UGlobalAbility* Ability : M_GlobalAbilities)
+	{
+		if (IsValid(Ability) && Ability->M_AbilityCosts.CoolDownRemaining > 0)
+		{
+			Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(0, Ability->M_AbilityCosts.CoolDownRemaining - 1);
+		}
+	}
+}
+
+void UGlobalAbilitiesManager::ApplyCooldownOverride(
+	UGlobalAbility* Ability,
+	const FEnemyGlobalAbilityLoadoutEntry& LoadoutEntry)
+{
+	if (not IsValid(Ability))
+	{
+		return;
+	}
+
+	if (LoadoutEntry.CooldownTimeOverride > 0)
+	{
+		Ability->M_AbilityCosts.CoolDownTime = LoadoutEntry.CooldownTimeOverride;
+	}
+
+	if (LoadoutEntry.bStartOnCooldown)
+	{
+		Ability->M_AbilityCosts.CoolDownRemaining = Ability->M_AbilityCosts.CoolDownTime;
+	}
+}
+
+TArray<UGlobalAbility*> UGlobalAbilitiesManager::GetAvailableEnemyGlobalAbilities() const
+{
+	TArray<UGlobalAbility*> AvailableAbilities;
+	if (not IsEnemyAbilityManager())
+	{
+		return AvailableAbilities;
+	}
+
+	for (UGlobalAbility* Ability : M_GlobalAbilities)
+	{
+		if (QueryRequirementForAbility(Ability) && QueryCooldownForAbility(Ability))
+		{
+			AvailableAbilities.Add(Ability);
+		}
+	}
+
+	return AvailableAbilities;
+}
+
+bool UGlobalAbilitiesManager::TryExecuteAbilityAtLocation(UGlobalAbility* Ability, const FVector& TargetLocation)
+{
+	if (not IsValid(Ability) || not QueryRequirementForAbility(Ability) || not QueryCooldownForAbility(Ability))
+	{
+		return false;
+	}
+
+	if (IsPlayerAbilityManager() && not TryPayForAbility(Ability))
+	{
+		return false;
+	}
+
+	Ability->ExecuteAbilityAtLocation(TargetLocation);
+	OnAbilityFinishedExecuting(Ability);
+	return true;
+}
+
+bool UGlobalAbilitiesManager::CheckDoesEnemyHaveUnit(const FTrainingOption& UnitId) const
+{
+	switch (UnitId.UnitType)
+	{
+	case EAllUnitType::UNType_None:
+	case EAllUnitType::UNType_Harvester:
+		return true;
+	case EAllUnitType::UNType_Squad:
+		return CheckDoesEnemyHaveSquad(UnitId);
+	case EAllUnitType::UNType_Tank:
+		return CheckDoesEnemyHaveTank(UnitId);
+	case EAllUnitType::UNType_Nomadic:
+		return CheckDoesEnemyHaveNomadic(UnitId);
+	case EAllUnitType::UNType_BuildingExpansion:
+		return CheckDoesEnemyHaveBuildingExpansion(UnitId);
+	case EAllUnitType::UNType_Aircraft:
+		return CheckDoesEnemyHaveAircraft(UnitId);
+	}
+	return true;
+}
+
+bool UGlobalAbilitiesManager::CheckDoesEnemyHaveSquad(const FTrainingOption& UnitId) const
+{
+	const ESquadSubtype SquadSubtype = static_cast<ESquadSubtype>(UnitId.SubtypeValue);
+	return M_GameUnitManager.Get()->GetHasEnemySquadOfType(SquadSubtype);
+}
+
+bool UGlobalAbilitiesManager::CheckDoesEnemyHaveTank(const FTrainingOption& UnitId) const
+{
+	const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitId.SubtypeValue);
+	return M_GameUnitManager.Get()->GetHasEnemyTankOfType(TankSubtype);
+}
+
+bool UGlobalAbilitiesManager::CheckDoesEnemyHaveNomadic(const FTrainingOption& UnitId) const
+{
+	const ENomadicSubtype NomadicSubtype = static_cast<ENomadicSubtype>(UnitId.SubtypeValue);
+	return M_GameUnitManager.Get()->GetHasEnemyNomadicOfType(NomadicSubtype);
+}
+
+bool UGlobalAbilitiesManager::CheckDoesEnemyHaveBuildingExpansion(const FTrainingOption& UnitId) const
+{
+	const EBuildingExpansionType BuildingExpansionSubtype = static_cast<EBuildingExpansionType>(UnitId.SubtypeValue);
+	return M_GameUnitManager.Get()->GetHasEnemyBxpOfType(BuildingExpansionSubtype);
+}
+
+bool UGlobalAbilitiesManager::CheckDoesEnemyHaveAircraft(const FTrainingOption& UnitId) const
+{
+	const EAircraftSubtype AircraftSubtype = static_cast<EAircraftSubtype>(UnitId.SubtypeValue);
+	return M_GameUnitManager.Get()->GetHasEnemyAircraftOfType(AircraftSubtype);
 }

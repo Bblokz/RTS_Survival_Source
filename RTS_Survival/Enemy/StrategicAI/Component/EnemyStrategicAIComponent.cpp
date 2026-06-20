@@ -12,6 +12,8 @@
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticHelpers/StochasticHelpers.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyTrainingHelpers/EnemyTrainingHelpers.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
@@ -170,6 +172,8 @@ bool UEnemyStrategicAIComponent::GetIsAllowedUnitTraining() const
 
 void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now)
 {
+	M_AIThinkTimers.Reset();
+
 	M_AIBaseLocationThinkTimer.LastTimeThought = Now;
 	M_AIBaseLocationThinkTimer.ThinkingInterval = EnemyAISettings::ThinkingTimers::UpdateAIBaseLocations_Interval;
 	M_AIBaseLocationThinkTimer.ThinkStepDelegate.BindUObject(
@@ -231,6 +235,13 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 	M_TrainingPointsThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep);
 	M_AIThinkTimers.Add(&M_TrainingPointsThinkTimer);
+
+	M_EnemyGlobalAbilityAIStartTimeSeconds = Now;
+	M_EnemyGlobalAbilityThinkTimer.LastTimeThought = Now;
+	M_EnemyGlobalAbilityThinkTimer.ThinkingInterval = GetEnemyGlobalAbilityThinkStepInterval();
+	M_EnemyGlobalAbilityThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::EnemyGlobalAbility_ThinkStep);
+	M_AIThinkTimers.Add(&M_EnemyGlobalAbilityThinkTimer);
 }
 
 void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
@@ -1546,4 +1557,252 @@ void UEnemyStrategicAIComponent::DebugFlankingPositiions() const
 				                EnemyAISettings::Debugging::FlankLocationColor, false, 2.f, 0, 5.f);
 			}
 	}
+}
+
+float UEnemyStrategicAIComponent::GetEnemyGlobalAbilityThinkStepInterval() const
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return EnemyAISettings::ThinkingTimers::UpdateEnemyGlobalAbility_Interval;
+	}
+
+	const FEnemyGlobalAbilityAISettings& Settings = M_EnemyController.Get()->GetEnemyGlobalAbilityAISettings();
+	if (Settings.ThinkStepInterval <= 0.0f)
+	{
+		return EnemyAISettings::ThinkingTimers::UpdateEnemyGlobalAbility_Interval;
+	}
+
+	return FMath::Max(
+		Settings.ThinkStepInterval,
+		EnemyAISettings::ThinkingTimers::MinimumEnemyGlobalAbility_Interval);
+}
+
+void UEnemyStrategicAIComponent::EnemyGlobalAbility_ThinkStep()
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+
+	UGlobalAbilitiesManager* GlobalAbilitiesManager = M_EnemyController.Get()->GetEnemyGlobalAbilitiesManager();
+	if (not IsValid(GlobalAbilitiesManager))
+	{
+		return;
+	}
+
+	GlobalAbilitiesManager->TickGlobalAbilityCooldowns();
+	UGlobalAbility* AbilityToExecute = nullptr;
+	FVector TargetLocation = FVector::ZeroVector;
+	if (not TryPickEnemyGlobalAbilityAndTarget(AbilityToExecute, TargetLocation))
+	{
+		return;
+	}
+
+	GlobalAbilitiesManager->TryExecuteAbilityAtLocation(AbilityToExecute, TargetLocation);
+}
+
+bool UEnemyStrategicAIComponent::TryPickEnemyGlobalAbilityAndTarget(
+	UGlobalAbility*& OutAbility,
+	FVector& OutTargetLocation) const
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return false;
+	}
+
+	const UGlobalAbilitiesManager* GlobalAbilitiesManager = M_EnemyController.Get()->GetEnemyGlobalAbilitiesManager();
+	if (not IsValid(GlobalAbilitiesManager))
+	{
+		return false;
+	}
+
+	const TArray<UGlobalAbility*> AvailableAbilities = GlobalAbilitiesManager->GetAvailableEnemyGlobalAbilities();
+	TArray<TTuple<UGlobalAbility*, FVector>> AbilityTargetPairs;
+	const auto AddBucketPairs = [this, &AvailableAbilities, &AbilityTargetPairs](
+		const TArray<FVector>& TargetLocations,
+		bool (UEnemyStrategicAIComponent::*Predicate)(EGlobalAbility) const)
+	{
+		TArray<UGlobalAbility*> BucketAbilities;
+		AddAbilityBucketOptions(AvailableAbilities, BucketAbilities, Predicate);
+		for (UGlobalAbility* BucketAbility : BucketAbilities)
+		{
+			for (const FVector& TargetLocation : TargetLocations)
+			{
+				AbilityTargetPairs.Emplace(BucketAbility, TargetLocation);
+			}
+		}
+	};
+
+	if (GetCanUseReinforcementAbilities())
+	{
+		AddBucketPairs(
+			GetReinforcementAbilityTargetLocations(),
+			&UEnemyStrategicAIComponent::IsEnemyReinforcementAbility);
+	}
+	if (GetCanUseBarrages())
+	{
+		AddBucketPairs(GetBarrageTargetLocations(), &UEnemyStrategicAIComponent::IsEnemyBarrageAbility);
+	}
+	if (GetCanUseLightMediumAirStrikes())
+	{
+		AddBucketPairs(
+			GetLightMediumAirStrikeTargetLocations(),
+			&UEnemyStrategicAIComponent::IsEnemyLightMediumAirStrikeAbility);
+	}
+	if (GetCanUseHeavyCarpetBombing())
+	{
+		AddBucketPairs(
+			GetHeavyCarpetBombingTargetLocations(),
+			&UEnemyStrategicAIComponent::IsEnemyHeavyCarpetBombingAbility);
+	}
+
+	if (AbilityTargetPairs.IsEmpty())
+	{
+		return false;
+	}
+
+	const TTuple<UGlobalAbility*, FVector>& PickedPair = AbilityTargetPairs[GetSeededIndex(AbilityTargetPairs.Num())];
+	OutAbility = PickedPair.Get<0>();
+	OutTargetLocation = PickedPair.Get<1>();
+	return IsValid(OutAbility) && not OutTargetLocation.IsNearlyZero();
+}
+
+void UEnemyStrategicAIComponent::AddAbilityBucketOptions(
+	const TArray<UGlobalAbility*>& AvailableAbilities,
+	TArray<UGlobalAbility*>& OutBucket,
+	bool (UEnemyStrategicAIComponent::*Predicate)(EGlobalAbility) const) const
+{
+	for (UGlobalAbility* Ability : AvailableAbilities)
+	{
+		if (IsValid(Ability) && (this->*Predicate)(Ability->GetAbilityType()))
+		{
+			OutBucket.Add(Ability);
+		}
+	}
+}
+
+bool UEnemyStrategicAIComponent::IsEnemyReinforcementAbility(const EGlobalAbility AbilityType) const
+{
+	return AbilityType == EGlobalAbility::GA_SovietT34Drop
+		|| AbilityType == EGlobalAbility::GA_SovietT34DropVariation
+		|| AbilityType == EGlobalAbility::GA_SovietInfantryDrop
+		|| AbilityType == EGlobalAbility::GA_SovietHeavyTankDrop
+		|| AbilityType == EGlobalAbility::GA_SovietHeavyTankDropVariation;
+}
+
+bool UEnemyStrategicAIComponent::IsEnemyBarrageAbility(const EGlobalAbility AbilityType) const
+{
+	return AbilityType == EGlobalAbility::GA_SovietSmallBarrage
+		|| AbilityType == EGlobalAbility::GA_SovietLargeBarrage
+		|| AbilityType == EGlobalAbility::GA_SovietLargeBarrageVariation;
+}
+
+bool UEnemyStrategicAIComponent::IsEnemyLightMediumAirStrikeAbility(const EGlobalAbility AbilityType) const
+{
+	return AbilityType == EGlobalAbility::GA_2xPE2Strafing
+		|| AbilityType == EGlobalAbility::GA_4xPE2Strafing;
+}
+
+bool UEnemyStrategicAIComponent::IsEnemyHeavyCarpetBombingAbility(const EGlobalAbility AbilityType) const
+{
+	return AbilityType == EGlobalAbility::GA_HeavyCarpet_PE8_500Gr
+		|| AbilityType == EGlobalAbility::GA_HeavyCarpet_PE8_1000Gr
+		|| AbilityType == EGlobalAbility::GA_HeavyCarpet_PE8_3000Gr;
+}
+
+bool UEnemyStrategicAIComponent::GetCanUseReinforcementAbilities() const
+{
+	return not M_Blackboard.CurrentBaseDefensePositions.IsEmpty();
+}
+
+bool UEnemyStrategicAIComponent::GetCanUseBarrages() const
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return false;
+	}
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	const FEnemyGlobalAbilityAISettings& Settings = M_EnemyController.Get()->GetEnemyGlobalAbilityAISettings();
+	return World->GetTimeSeconds() - M_EnemyGlobalAbilityAIStartTimeSeconds >= Settings.TimeTillAllowBarrages
+		&& not GetBarrageTargetLocations().IsEmpty();
+}
+
+bool UEnemyStrategicAIComponent::GetCanUseLightMediumAirStrikes() const
+{
+	return not M_Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks.IsEmpty();
+}
+
+bool UEnemyStrategicAIComponent::GetCanUseHeavyCarpetBombing() const
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return false;
+	}
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	const FEnemyGlobalAbilityAISettings& Settings = M_EnemyController.Get()->GetEnemyGlobalAbilityAISettings();
+	return World->GetTimeSeconds() - M_EnemyGlobalAbilityAIStartTimeSeconds >= Settings.TimeTillAllowHeavyCarpetBombing
+		&& not M_Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks.IsEmpty();
+}
+
+TArray<FVector> UEnemyStrategicAIComponent::GetReinforcementAbilityTargetLocations() const
+{
+	TArray<FVector> Locations;
+	Locations.Reserve(M_Blackboard.CurrentBaseDefensePositions.Num());
+	for (const FDefensePositions& DefensePosition : M_Blackboard.CurrentBaseDefensePositions)
+	{
+		if (not DefensePosition.Location.IsNearlyZero())
+		{
+			Locations.Add(DefensePosition.Location);
+		}
+	}
+	return Locations;
+}
+
+TArray<FVector> UEnemyStrategicAIComponent::GetBarrageTargetLocations() const
+{
+	TArray<FVector> Locations;
+	for (const FPlayerAttackLocationEvaluation& AttackLocation : M_Blackboard.CurrentLocationsUnderPlayerAttack.LocationsUnderAttack)
+	{
+		if (not AttackLocation.LocationUnderAttack.IsNearlyZero())
+		{
+			Locations.Add(AttackLocation.LocationUnderAttack);
+		}
+	}
+	for (const FResultClosestFlankableEnemyHeavy& FlankingResult : M_Blackboard.AgreggatedHeavyTankFlankingResults)
+	{
+		for (const FWeakActorLocations& HeavyTankLocations : FlankingResult.FlankLocationsAroundHeavyTank)
+		{
+			if (HeavyTankLocations.Actor.IsValid())
+			{
+				Locations.Add(HeavyTankLocations.Actor.Get()->GetActorLocation());
+			}
+		}
+	}
+	return Locations;
+}
+
+TArray<FVector> UEnemyStrategicAIComponent::GetLightMediumAirStrikeTargetLocations() const
+{
+	TArray<FVector> Locations;
+	for (const FPlayerUnitBulkLocation& PlayerUnitBulk : M_Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+	{
+		if (not PlayerUnitBulk.BulkLocation.IsNearlyZero())
+		{
+			Locations.Add(PlayerUnitBulk.BulkLocation);
+		}
+	}
+	return Locations;
+}
+
+TArray<FVector> UEnemyStrategicAIComponent::GetHeavyCarpetBombingTargetLocations() const
+{
+	return GetLightMediumAirStrikeTargetLocations();
 }

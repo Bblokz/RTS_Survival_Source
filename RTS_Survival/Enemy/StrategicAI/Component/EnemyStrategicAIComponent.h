@@ -8,8 +8,11 @@
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/StrategicTrainingState/StrategicTrainingState.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "EnemyStrategicAIComponent.generated.h"
 
+class UGlobalAbility;
+class UGlobalAbilitiesManager;
 class UGameUnitManager;
 class UStochasticDecisionTree;
 class UStrategicAISubAction;
@@ -430,6 +433,25 @@ private:
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 	void StartStrategicAIThinkingTimer();
 	void StopStrategicAIThinkingTimer();
+
+	FAIThinkingTimerData M_EnemyGlobalAbilityThinkTimer;
+	float M_EnemyGlobalAbilityAIStartTimeSeconds = 0.0f;
+	float GetEnemyGlobalAbilityThinkStepInterval() const;
+	void EnemyGlobalAbility_ThinkStep();
+	bool IsEnemyReinforcementAbility(EGlobalAbility AbilityType) const;
+	bool IsEnemyBarrageAbility(EGlobalAbility AbilityType) const;
+	bool IsEnemyLightMediumAirStrikeAbility(EGlobalAbility AbilityType) const;
+	bool IsEnemyHeavyCarpetBombingAbility(EGlobalAbility AbilityType) const;
+	bool GetCanUseReinforcementAbilities() const;
+	bool GetCanUseBarrages() const;
+	bool GetCanUseLightMediumAirStrikes() const;
+	bool GetCanUseHeavyCarpetBombing() const;
+	TArray<FVector> GetReinforcementAbilityTargetLocations() const;
+	TArray<FVector> GetBarrageTargetLocations() const;
+	TArray<FVector> GetLightMediumAirStrikeTargetLocations() const;
+	TArray<FVector> GetHeavyCarpetBombingTargetLocations() const;
+	bool TryPickEnemyGlobalAbilityAndTarget(UGlobalAbility*& OutAbility, FVector& OutTargetLocation) const;
+	void AddAbilityBucketOptions(const TArray<UGlobalAbility*>& AvailableAbilities, TArray<UGlobalAbility*>& OutBucket, bool (UEnemyStrategicAIComponent::*Predicate)(EGlobalAbility) const) const;
 
 	void StrategicAiThinkingLoop();
 	void ProcessStrategicAIRequests();
