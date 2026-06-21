@@ -42,6 +42,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/FactionSystem/FactionFlags/FRTS_FactionFlags.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSEngagementStance.h"
 
 namespace TankTowHelpers
 {
@@ -296,6 +297,21 @@ ETargetPreference ATankMaster::GetTargetPreference()
 		return EachTurret->GetTargetPreference();
 	}
 	return ETargetPreference::None;
+}
+
+void ATankMaster::SetTargetPreferenceForAllWeapons(const ETargetPreference NewPreference)
+{
+	
+}
+
+void ATankMaster::SetEngagementStance(const ERTSEngagementStance NewStance)
+{
+	
+}
+
+ERTSEngagementStance ATankMaster::GetEngagementStance() const
+{
+	return ERTSEngagementStance::Stance_None;
 }
 
 

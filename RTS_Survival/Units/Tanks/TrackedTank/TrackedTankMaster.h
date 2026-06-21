@@ -59,6 +59,9 @@ class RTS_SURVIVAL_API ATrackedTankMaster : public ATankMaster, public IVehicleA
 public:
 	ATrackedTankMaster(const FObjectInitializer& ObjectInitializer);
 	TObjectPtr<UDigInComponent> GetDigInComponent() const { return M_DigInComponent; }
+	
+	virtual ERTSEngagementStance GetEngagementStance() const override final;
+	virtual void SetEngagementStance(const ERTSEngagementStance NewStance) override final;
 
 	virtual void UpdateVehicle_Implementation(
 		float TargetAngle,

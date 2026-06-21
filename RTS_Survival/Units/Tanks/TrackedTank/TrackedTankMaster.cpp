@@ -38,6 +38,24 @@ ATrackedTankMaster::ATrackedTankMaster(const FObjectInitializer& ObjectInitializ
 		URTSOverlapEvasionComponent>(TEXT("RTSOverlapEvasionComponent"));
 }
 
+ERTSEngagementStance ATrackedTankMaster::GetEngagementStance() const
+{
+	if (not GetIsValidTargetAcquisition())
+	{
+		return ERTSEngagementStance::Stance_None;
+	}
+	return M_TargetAcquisition->GetEngagementStance();
+}
+
+void ATrackedTankMaster::SetEngagementStance(const ERTSEngagementStance NewStance)
+{
+	if (not GetIsValidTargetAcquisition())
+	{
+		return;
+	}
+	M_TargetAcquisition->SetEngagementStance(NewStance);
+}
+
 void ATrackedTankMaster::UpdateVehicle_Implementation(
 	float TargetAngle,
 	float DestinationDistance,

@@ -9,6 +9,7 @@
 #include "Engine/StreamableManager.h"
 #include "Engine/AssetManager.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/Interfaces/RTSInterface/RTSUnit.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
@@ -18,6 +19,7 @@
 #include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
+enum class ERTSEngagementStance;
 enum class EVeterancyIconSet : uint8;
 class USquadTargetAcquisition;
 class UFowComp;
@@ -268,6 +270,12 @@ public:
 	friend class RTS_SURVIVAL_API UFieldConstructionAbilityComponent;
 	friend class RTS_SURVIVAL_API USquadAimAbilityComponent;
 	ASquadController();
+	
+	ETargetPreference GetSquadTargetPreference() const;
+	
+	void SetEngagementStance(const ERTSEngagementStance NewStance);
+	ERTSEngagementStance GetEngagementStance() const;
+	
 
 	virtual bool GetIsSquadUnit() override final;
 

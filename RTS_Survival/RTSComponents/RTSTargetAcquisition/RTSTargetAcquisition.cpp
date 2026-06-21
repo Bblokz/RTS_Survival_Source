@@ -63,6 +63,11 @@ void URTSTargetAcquisition::OnUnitIdleAndNoNewCommands()
 {
 }
 
+ERTSEngagementStance URTSTargetAcquisition::GetEngagementStance() const
+{
+	return EngagementStance;
+}
+
 void URTSTargetAcquisition::SetEngagementStance(const ERTSEngagementStance NewStance)
 {
 	if (NewStance == EngagementStance)

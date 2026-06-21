@@ -12,6 +12,7 @@
 
 #include "AAircraftMaster.generated.h"
 
+enum class ERTSEngagementStance;
 enum class ETargetPreference : uint8;
 struct FRTSVerticalAnimTextSettings;
 struct FAircraftReloadManager;
@@ -50,6 +51,11 @@ class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterfac
 
 public:
 	AAircraftMaster(const FObjectInitializer& ObjectInitializer);
+	
+	ETargetPreference GetAircraftTargetPreference() const;
+	
+	void SetEngagementStance(const ERTSEngagementStance NewStance);
+	ERTSEngagementStance GetEngagementStance() const;
 
 	friend class UAircraftOwnerComp;
 
@@ -95,7 +101,6 @@ public:
 	 */
 	TArray<UWeaponState*> GetAllAircraftWeapons() const;
 	float GetHighestAircraftWeaponRange() const;
-	ETargetPreference GetAircraftTargetPreference() const;
 	bool GetIsIdleAndAirborne() const;
 	bool GetIsAircraftAirborne() const;
 

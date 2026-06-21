@@ -402,6 +402,24 @@ ASquadController::ASquadController(): PlayerController(nullptr), RTSComponent(nu
 	PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
+ETargetPreference ASquadController::GetSquadTargetPreference() const
+{
+}
+
+void ASquadController::SetEngagementStance(const ERTSEngagementStance NewStance)
+{
+	
+}
+
+ERTSEngagementStance ASquadController::GetEngagementStance() const
+{
+	if (not GetIsValidTargetAcquisition())
+	{
+		return ERTSEngagementStance::Stance_None;
+	}
+	return M_TargetAcquisition->Ge
+}
+
 bool ASquadController::GetIsSquadUnit()
 {
 	return true;
