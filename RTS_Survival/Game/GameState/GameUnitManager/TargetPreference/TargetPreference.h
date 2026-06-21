@@ -8,7 +8,8 @@ enum class ETargetPreference : uint8
 	Infantry,
 	Tank,
 	Building,
-	Other
+	Other,
+	Aircraft
 };
 
 static FString Global_GetTargetPreferenceAsString(const ETargetPreference Preference)
@@ -25,6 +26,8 @@ static FString Global_GetTargetPreferenceAsString(const ETargetPreference Prefer
 		return "Building";
 	case ETargetPreference::Other:
 		return "Other";
+	case ETargetPreference::Aircraft:
+		return "Aircraft";
 	}
 	return "None";
 }

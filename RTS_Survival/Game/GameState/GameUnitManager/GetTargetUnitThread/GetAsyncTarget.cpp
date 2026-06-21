@@ -115,104 +115,116 @@ void FGetAsyncTarget::AddTargetRequest(
 	M_RequestQueue.Enqueue(MoveTemp(NewRequest));
 }
 
+namespace
+{
+	bool GetCanUseActorForTargetRequest(
+		const ETargetPreference ActorType,
+		const ETargetPreference RequestTargetPreference)
+	{
+		if (ActorType != ETargetPreference::Aircraft)
+		{
+			return true;
+		}
+
+		return RequestTargetPreference == ETargetPreference::Aircraft;
+	}
+}
+
 void FGetAsyncTarget::ProcessTargetRequests()
 {
-    FTargetRequest Request;
-    while (M_RequestQueue.Dequeue(Request))
-    {
-        // Determine which actor data map to search based on the owning player.
-        // If OwningPlayer == 1 (player), search M_EnemyActorData.
-        // If OwningPlayer != 1 (enemy), search M_PlayerActorData.
-        TMap<uint32, TPair<ETargetPreference, FVector>>* ActorDataMap = nullptr;
+	FTargetRequest Request;
+	while (M_RequestQueue.Dequeue(Request))
+	{
+		// Determine which actor data map to search based on the owning player.
+		// If OwningPlayer == 1 (player), search M_EnemyActorData.
+		// If OwningPlayer != 1 (enemy), search M_PlayerActorData.
+		const TMap<uint32, TPair<ETargetPreference, FVector>>* ActorDataMap = Request.OwningPlayer == 1
+			? &M_EnemyActorData
+			: &M_PlayerActorData;
 
-        if (Request.OwningPlayer == 1)
-        {
-            // The request is from the player; search enemy data.
-            ActorDataMap = &M_EnemyActorData;
-        }
-        else
-        {
-            // The request is from an enemy; search player data.
-            ActorDataMap = &M_PlayerActorData;
-        }
+		// Arrays to store actors within range, categorized by preference.
+		TArray<TPair<float, uint32>> PreferredTargets;
+		TArray<TPair<float, uint32>> OtherTargets;
 
-        // Arrays to store actors within range, categorized by preference.
-        TArray<TPair<float, uint32>> PreferredTargets;
-        TArray<TPair<float, uint32>> OtherTargets;
+		// Iterate through the actor data map to find actors within range.
+		for (const auto& Pair : *ActorDataMap)
+		{
+			const uint32 ActorID = Pair.Key;
+			const TPair<ETargetPreference, FVector>& ActorInfo = Pair.Value;
+			const ETargetPreference ActorType = ActorInfo.Key;
+			const FVector& ActorLocation = ActorInfo.Value;
 
-        // Iterate through the actor data map to find actors within range.
-        for (const auto& Pair : *ActorDataMap)
-        {
-            uint32 ActorID = Pair.Key;
-            const TPair<ETargetPreference, FVector>& ActorInfo = Pair.Value;
-            const ETargetPreference ActorType = ActorInfo.Key;
-            const FVector& ActorLocation = ActorInfo.Value;
+			if (not GetCanUseActorForTargetRequest(ActorType, Request.TargetPreference))
+			{
+				continue;
+			}
 
-            float Distance = FVector::Dist(Request.SearchLocation, ActorLocation);
-            if (Distance <= Request.SearchRadius)
-            {
-                // Categorize actors based on the requested target preference.
-                if (ActorType == Request.TargetPreference)
-                {
-                    PreferredTargets.Emplace(Distance, ActorID);
-                }
-                else
-                {
-                    OtherTargets.Emplace(Distance, ActorID);
-                }
-            }
-        }
+			const float Distance = FVector::Dist(Request.SearchLocation, ActorLocation);
+			if (Distance > Request.SearchRadius)
+			{
+				continue;
+			}
 
-        // Sort both arrays based on distance to prioritize closer targets.
-        PreferredTargets.Sort([](const TPair<float, uint32>& A, const TPair<float, uint32>& B)
-        {
-            return A.Key < B.Key;
-        });
+			// Categorize actors based on the requested target preference.
+			if (ActorType == Request.TargetPreference)
+			{
+				PreferredTargets.Emplace(Distance, ActorID);
+				continue;
+			}
 
-        OtherTargets.Sort([](const TPair<float, uint32>& A, const TPair<float, uint32>& B)
-        {
-            return A.Key < B.Key;
-        });
+			OtherTargets.Emplace(Distance, ActorID);
+		}
 
-        // Collect the top N targets, filling from preferred targets first.
-        TArray<uint32> ClosestActorIDs;
-        int32 RemainingTargets = Request.NumTargets;
+		// Sort both arrays based on distance to prioritize closer targets.
+		PreferredTargets.Sort([](const TPair<float, uint32>& Left, const TPair<float, uint32>& Right)
+		{
+			return Left.Key < Right.Key;
+		});
 
-        // Add actors from PreferredTargets.
-        for (const auto& Target : PreferredTargets)
-        {
-            ClosestActorIDs.Add(Target.Value);
-            RemainingTargets--;
-            if (RemainingTargets <= 0)
-            {
-                break;
-            }
-        }
+		OtherTargets.Sort([](const TPair<float, uint32>& Left, const TPair<float, uint32>& Right)
+		{
+			return Left.Key < Right.Key;
+		});
 
-        // If more targets are needed, add actors from OtherTargets.
-        if (RemainingTargets > 0)
-        {
-            for (const auto& Target : OtherTargets)
-            {
-                ClosestActorIDs.Add(Target.Value);
-                RemainingTargets--;
-                if (RemainingTargets <= 0)
-                {
-                    break;
-                }
-            }
-        }
+		// Collect the top N targets, filling from preferred targets first.
+		TArray<uint32> ClosestActorIDs;
+		int32 RemainingTargets = Request.NumTargets;
 
-        // Capture the callback and IDs for use in the game thread.
-        TFunction<void(const TArray<uint32>&)> Callback = MoveTemp(Request.Callback);
+		// Add actors from PreferredTargets.
+		for (const auto& Target : PreferredTargets)
+		{
+			ClosestActorIDs.Add(Target.Value);
+			RemainingTargets--;
+			if (RemainingTargets <= 0)
+			{
+				break;
+			}
+		}
 
-        // Invoke the callback on the game thread with the collected target IDs.
-        AsyncTask(ENamedThreads::GameThread,
-                  [Callback = MoveTemp(Callback), ClosestActorIDs = MoveTemp(ClosestActorIDs)]()
-                  {
-                      Callback(ClosestActorIDs);
-                  });
-    }
+		// If more targets are needed, add actors from OtherTargets.
+		if (RemainingTargets > 0)
+		{
+			for (const auto& Target : OtherTargets)
+			{
+				ClosestActorIDs.Add(Target.Value);
+				RemainingTargets--;
+				if (RemainingTargets <= 0)
+				{
+					break;
+				}
+			}
+		}
+
+		// Capture the callback and IDs for use in the game thread.
+		TFunction<void(const TArray<uint32>&)> Callback = MoveTemp(Request.Callback);
+
+		// Invoke the callback on the game thread with the collected target IDs.
+		AsyncTask(ENamedThreads::GameThread,
+			[Callback = MoveTemp(Callback), ClosestActorIDs = MoveTemp(ClosestActorIDs)]()
+			{
+				Callback(ClosestActorIDs);
+			});
+	}
 }
 
 void FGetAsyncTarget::ProcessStrategicAIRequests()
