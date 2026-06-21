@@ -85,6 +85,7 @@ public:
 
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
 	virtual float GetTurretYawLimit() const override;
+	virtual ETargetPreference GetTargetPreference() const override { return TargetPreference; }
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Weapon")

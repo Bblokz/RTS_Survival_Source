@@ -473,6 +473,11 @@ float ATeamWeaponController::GetTeamWeaponArc() const
 	return M_TeamWeapon->GetTeamWeaponConfig().M_YawArc.M_MaxYaw;
 }
 
+float ATeamWeaponController::GetSquadRange()
+{
+	return FMath::Max(Super::GetSquadRange(), GetTeamWeaponRange());
+}
+
 float ATeamWeaponController::GetTeamWeaponRange() const
 {
 	if(not GetIsValidTeamWeapon())

@@ -19,6 +19,7 @@
 #include "SquadController.generated.h"
 
 enum class EVeterancyIconSet : uint8;
+class USquadTargetAcquisition;
 class UFowComp;
 class USpatialVoiceLinePlayer;
 class UBehaviourComp;
@@ -274,6 +275,7 @@ public:
 
 
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad();
+	virtual float GetSquadRange();
 
 	virtual bool GetIsUnitInCombat() const override;
 
@@ -644,6 +646,10 @@ protected:
 	/** Cargo manager component for this squad. */
 	UPROPERTY()
 	TObjectPtr<UCargoSquad> CargoSquad;
+
+	UPROPERTY()
+	TObjectPtr<USquadTargetAcquisition> M_TargetAcquisition;
+	bool GetIsValidTargetAcquisition() const;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UFieldConstructionAbilityComponent>> M_FieldConstructionAbilities;

@@ -4,6 +4,7 @@
 #include "RTS_Survival/Units/Aircraft/AircraftMovement/AircraftMovement.h"
 #include "Components/DecalComponent.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/AircraftTargetAcquisition/AircraftTargetAcquisition.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
@@ -62,6 +63,10 @@ void AAircraftMaster::BeginPlay()
 	BeginPlay_InitAircraft(GetBombOverrideMeshComp());
 	// Make sure the aircraft weapon knows if we are airborne or landed.
 	BeginPlay_PropagateStateToWpAndAnimInst();
+	if (ensure(GetIsValidTargetAcquisition()))
+	{
+		M_TargetAcquisition->Activate();
+	}
 	CheckForUpgrades();
 }
 
@@ -109,6 +114,8 @@ void AAircraftMaster::PostInitializeComponents()
 	// Will setup selection component and fow component.
 	Super::PostInitializeComponents();
 	M_AircraftMesh = FindComponentByClass<USkeletalMeshComponent>();
+	M_TargetAcquisition = FindComponentByClass<UAircraftTargetAcquisition>();
+	(void)GetIsValidTargetAcquisition();
 
 	if (M_AircraftMovementSettings.bM_StartedAsLanded)
 	{
@@ -434,6 +441,48 @@ TArray<UWeaponState*> AAircraftMaster::GetAllAircraftWeapons() const
 		}
 	}
 	return MyValidWeapons;
+}
+
+float AAircraftMaster::GetHighestAircraftWeaponRange() const
+{
+	float HighestRange = 0.f;
+	for (const UWeaponState* WeaponState : GetAllAircraftWeapons())
+	{
+		if (IsValid(WeaponState))
+		{
+			HighestRange = FMath::Max(HighestRange, WeaponState->GetWeaponRangeBehaviourAdjusted());
+		}
+	}
+	return HighestRange;
+}
+
+ETargetPreference AAircraftMaster::GetAircraftTargetPreference() const
+{
+	if (not EnsureAircraftWeaponIsValid())
+	{
+		return ETargetPreference::None;
+	}
+	return M_AircraftWeapon->GetTargetPreference();
+}
+
+bool AAircraftMaster::GetIsIdleAndAirborne() const
+{
+	return M_MovementState == EAircraftMovementState::Idle && GetIsAircraftAirborne();
+}
+
+bool AAircraftMaster::GetIsAircraftAirborne() const
+{
+	return M_LandedState == EAircraftLandingState::Airborne;
+}
+
+bool AAircraftMaster::GetIsValidTargetAcquisition() const
+{
+	if (IsValid(M_TargetAcquisition))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TargetAcquisition", "AAircraftMaster::GetIsValidTargetAcquisition", this);
+	return false;
 }
 
 UBombComponent* AAircraftMaster::GetBombComponent() const

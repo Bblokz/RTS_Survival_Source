@@ -12,9 +12,11 @@
 
 #include "AAircraftMaster.generated.h"
 
+enum class ETargetPreference : uint8;
 struct FRTSVerticalAnimTextSettings;
 struct FAircraftReloadManager;
 class UAircraftAnimInstance;
+class UAircraftTargetAcquisition;
 class UAircraftWeapon;
 class UAircraftMovement;
 // forward declare
@@ -92,6 +94,10 @@ public:
 	 * @return Valid weapon state pointers only (invalid entries are filtered out).
 	 */
 	TArray<UWeaponState*> GetAllAircraftWeapons() const;
+	float GetHighestAircraftWeaponRange() const;
+	ETargetPreference GetAircraftTargetPreference() const;
+	bool GetIsIdleAndAirborne() const;
+	bool GetIsAircraftAirborne() const;
 
 	/** @return Bomb component if present; allows attack-path points to arm/disarm bombs. */
 	UBombComponent* GetBombComponent() const;
@@ -252,6 +258,10 @@ protected:
 	/** @brief Weapon component driving attached guns and their fire logic. */
 	UPROPERTY(BlueprintReadOnly)
 	TObjectPtr<UAircraftWeapon> M_AircraftWeapon;
+
+	UPROPERTY()
+	TObjectPtr<UAircraftTargetAcquisition> M_TargetAcquisition;
+	bool GetIsValidTargetAcquisition() const;
 
 
 	// ----------------- START EXPERIENCE INTERFACE -----------------

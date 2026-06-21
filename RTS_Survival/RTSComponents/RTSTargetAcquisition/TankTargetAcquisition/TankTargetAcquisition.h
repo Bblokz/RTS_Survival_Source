@@ -23,12 +23,15 @@ protected:
 	virtual void BeginPlay() override;
 	
 	virtual void IssueAttackClosestVisibleTargetInAggroRange(AActor* TargetActor) override;
-	virtual ETargetPreference GetTargetPreference() override;
+	virtual ETargetPreference GetOwnerTargetPreference() const override;
+	virtual float GetOwnerRange() const override;
 	virtual bool CanAggroEnemies() const override;
 	
 	
 	private:
+	UPROPERTY()
 	TWeakObjectPtr<ATrackedTankMaster> M_OwningTank;
 	[[nodiscard]]bool EnsureIsValidOwningTank()const;
+	void OnDigIn_Debugging() const;
 
 };
