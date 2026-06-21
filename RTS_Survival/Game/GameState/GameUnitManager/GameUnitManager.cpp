@@ -1785,6 +1785,7 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 	TArray<ASquadUnit*>* TargetSquadUnits;
 	TArray<AActor*>* OtherTargetActors;
 	TArray<ABuildingExpansion*>* TargetBxps;
+	TArray<AAircraftMaster*>* TargetAircraft;
 	TMap<uint32, AActor*>* CurrentActorIDMapping;
 
 	// If we are checking player units then the enemy is player 2 (CPU)
@@ -1797,6 +1798,7 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		TargetSquadUnits = &M_SquadUnitAlivePlayer;
 		OtherTargetActors = &M_ActorsAlivePlayer;
 		TargetBxps = &M_BxpAlivePlayer;
+		TargetAircraft = &M_AircraftMastersAlivePlayer;
 		CurrentActorIDMapping = &M_PlayerActorIDToActorMap;
 	}
 	else
@@ -1805,6 +1807,7 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		TargetSquadUnits = &M_SquadUnitsAliveEnemy;
 		OtherTargetActors = &M_ActorsAliveEnemy;
 		TargetBxps = &M_BxpAliveEnemy;
+		TargetAircraft = &M_AircraftMastersAliveEnemy;
 		CurrentActorIDMapping = &M_EnemyActorIDToActorMap;
 	}
 
@@ -1843,6 +1846,18 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		const uint32 ActorID = EachSquadUnit->GetUniqueID();
 		CurrentActorIDMapping->Add(ActorID, EachSquadUnit);
 		OutActorData.Add({ActorID, CreatePair(EachSquadUnit->GetActorLocation(), ETargetPreference::Infantry)});
+	}
+
+	// Aircraft
+	for (AAircraftMaster* EachAircraft : *TargetAircraft)
+	{
+		if (not RTSFunctionLibrary::RTSIsVisibleTarget(EachAircraft, EnemyOfCheckedUnit))
+		{
+			continue;
+		}
+		const uint32 ActorID = EachAircraft->GetUniqueID();
+		CurrentActorIDMapping->Add(ActorID, EachAircraft);
+		OutActorData.Add({ActorID, CreatePair(EachAircraft->GetActorLocation(), ETargetPreference::Aircraft)});
 	}
 
 	//  BXPs
