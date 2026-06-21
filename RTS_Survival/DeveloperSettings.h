@@ -878,7 +878,7 @@ namespace DeveloperSettings
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);
 			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
-			inline constexpr float AircraftSmallArmsRange= RoundToNearestMultipleOfFive(8000);
+			inline constexpr float AircraftSmallArmsRange = RoundToNearestMultipleOfFive(8000);
 
 			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
 			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9800.f * GameRangeMlt);
@@ -953,6 +953,23 @@ namespace DeveloperSettings
 
 		namespace Weapons
 		{
+			namespace ImpactAOE
+			{
+				/**
+				 * @brief Designer-facing bounds for AoE damage falloff caused by shrapnel particle count.
+				 *
+				 * The final falloff exponent blends between these values:
+				 * - Fewer shrapnel particles use a value closer to Max, causing sharper center-focused damage.
+				 * - More shrapnel particles use a value closer to Min, causing flatter damage across the AoE.
+				 *
+				 * Lower values make edge damage stronger and the AoE feel more even.
+				 * Higher values make damage drop off faster toward the edge.
+				 * If you only make MaxExponent higher, you make the falloff harsher mostly for low shrapnel particle counts.
+				 */
+				inline constexpr float AOEMinParticlesScaleDamageFallOffExponent = 0.5;
+				inline constexpr float AOEMaxParticlesScaleDamageFallOffExponent = 3;
+			}
+
 			namespace FlameWeapons
 			{
 				// How often the flame weapon does traces for dealing damage; how long one flame duration tick is.
@@ -1494,7 +1511,6 @@ namespace DeveloperSettings
 					{ERTSVoiceLine::EnemyDestroyed, 1.f},
 				};
 			}
-
 		}
 
 		namespace Formation
@@ -1855,8 +1871,8 @@ namespace DeveloperSettings
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;
-		constexpr bool GTargetAcquisition_Compile_DebugSymbols = false;
-		constexpr bool GAOELibrary_Compile_DebugSymbols = false;
+		constexpr bool GTargetAcquisition_Compile_DebugSymbols = true;
+		constexpr bool GAOELibrary_Compile_DebugSymbols = true;
 		// Damage taken on actors
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
 		// ICommands.

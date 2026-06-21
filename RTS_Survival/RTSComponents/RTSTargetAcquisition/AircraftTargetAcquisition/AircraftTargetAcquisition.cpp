@@ -33,7 +33,7 @@ ETargetPreference UAircraftTargetAcquisition::GetOwnerTargetPreference() const
 
 bool UAircraftTargetAcquisition::CanAggroEnemies() const
 {
-	if (not GetIsValidOwningAircraft())
+	if (not GetIsValidOwningAircraft() || not M_OwningAircraft->GetIsUnitIdle())
 	{
 		return false;
 	}
@@ -45,6 +45,7 @@ bool UAircraftTargetAcquisition::CanAggroEnemies() const
 		}
 		return false;
 	}
+	// Separate idle movement state check.
 	if (not M_OwningAircraft->GetIsIdleAndAirborne())
 	{
 		return false;

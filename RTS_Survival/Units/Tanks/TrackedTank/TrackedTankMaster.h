@@ -71,6 +71,9 @@ public:
 		float CalculatedSteering) override final;
 
 	virtual void SetRTSOverlapEvasionEnabled(const bool bEnabled) override;
+	
+	// Used to determine if the vehicle can aggro by target acquistion component.
+	bool DoesVehicleHaveAnyWeapons()const;
 
 	virtual void OnFinishedPathFollowing() override;
 

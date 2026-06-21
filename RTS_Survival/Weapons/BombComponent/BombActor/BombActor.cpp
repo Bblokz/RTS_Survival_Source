@@ -367,11 +367,12 @@ void ABombActor::HandleAoe(const FVector& HitLocation, AActor* PrimaryHitActor)
 		ActorsToIgnore.Add(PrimaryHitActor);
 	}
 
+	using namespace DeveloperSettings::GameBalance::Weapons::ImpactAOE;
 	const float MaxArmorDamaged = M_WeaponData.ShrapnelPen * 1.5f;
 	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(
 		M_WeaponData.ShrapnelParticles,
-		3.0f,
-		0.5f);
+		AOEMaxParticlesScaleDamageFallOffExponent,
+		AOEMinParticlesScaleDamageFallOffExponent);
 	const ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == 1
 		? ETriggerOverlapLogic::OverlapEnemy
 		: ETriggerOverlapLogic::OverlapPlayer;

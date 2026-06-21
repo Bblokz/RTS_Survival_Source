@@ -121,6 +121,8 @@ public:
 
 	void ExecuteAttachedWeaponAbility(const FVector& TargetLocation);
 	void StopAttachedWeaponAbilityFire();
+	
+	virtual ETargetPreference GetTargetPreference() const override final;
 
 	EAttachWeaponAbilitySubType GetAttachedWeaponAbilityType() const;
 	EPlayerAimAbilityTypes GetAimAssistType() const;
@@ -149,6 +151,11 @@ public:
 protected:
 	virtual void PostInitProperties() override;
 	virtual void BeginPlay() override;
+	
+	// Determines for which type of actor target the turret will filter first.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Target")
+	ETargetPreference TargetPreference;
+	
 
 	// ---- Begin Override IWeaponOwner ----
 	virtual void OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon) override;

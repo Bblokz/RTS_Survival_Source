@@ -242,7 +242,7 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 					if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
 					{
 						DrawDebugString(HitActor->GetWorld(), HitActor->GetActorLocation() + FVector(0, 0, 100),
-						                FString::Printf(TEXT("No Armor dmg: %.1f"), DamageToApply), nullptr,
+						                FString::Printf(TEXT("No Armor found, dmg: %.1f"), DamageToApply), nullptr,
 							FColor::White, 5.f);
 					}
 					ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
@@ -255,19 +255,25 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 					SafeFullArmorPen,
 					SafeMaxArmorPen,
 					SafeArmorPenFalloff);
-				if (ArmorDamageMultiplier <= 0.f)
-				{
-					continue;
-				}
+
 				const float AdjustedDamage = DamageToApply * ArmorDamageMultiplier;
+
 				if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
 				{
-					DrawDebugString(HitActor->GetWorld(), HitActor->GetActorLocation() + FVector(0, 0, 100),
-					                FString::Printf(
-						                TEXT("Rear Armor: %.1f, Multiplier: %.2f \n damage: %.2f"), RearArmor, ArmorDamageMultiplier, DamageToApply),
-					                nullptr, FColor::White, 5.f);
+					DrawDebugString(
+						HitActor->GetWorld(),
+						HitActor->GetActorLocation() + FVector(0.f, 0.f, 100.f),
+						FString::Printf(
+							TEXT("Rear Armor: %.1f | dmg x%.2f | %.1f -> %.1f"),
+							RearArmor,
+							ArmorDamageMultiplier,
+							DamageToApply,
+							AdjustedDamage),
+						nullptr,
+						FColor::White,
+						5.f);
 				}
-				
+
 				if (AdjustedDamage <= 0.f)
 				{
 					continue;

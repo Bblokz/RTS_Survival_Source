@@ -41,6 +41,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/FactionSystem/FactionFlags/FRTS_FactionFlags.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 
 namespace TankTowHelpers
 {
@@ -286,7 +287,15 @@ ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 
 ETargetPreference ATankMaster::GetTargetPreference()
 {
-	
+	for (const auto EachTurret : Turrets)
+	{
+		if (not IsValid(EachTurret))
+		{
+			continue;
+		}
+		return EachTurret->GetTargetPreference();
+	}
+	return ETargetPreference::None;
 }
 
 

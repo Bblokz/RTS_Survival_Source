@@ -42,7 +42,7 @@ ETargetPreference USquadTargetAcquisition::GetOwnerTargetPreference() const
 
 bool USquadTargetAcquisition::CanAggroEnemies() const
 {
-	if (not GetIsValidOwningSquad())
+	if (not GetIsValidOwningSquad() || not M_OwningSquad->GetIsUnitIdle())
 	{
 		return false;
 	}

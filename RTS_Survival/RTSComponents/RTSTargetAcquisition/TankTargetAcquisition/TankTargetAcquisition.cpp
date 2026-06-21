@@ -66,7 +66,8 @@ float UTankTargetAcquisition::GetOwnerRange() const
 
 bool UTankTargetAcquisition::CanAggroEnemies() const
 {
-	if (not EnsureIsValidOwningTank() || not M_OwningTank->GetIsUnitIdle())
+	if (not EnsureIsValidOwningTank() || not M_OwningTank->GetIsUnitIdle()
+		|| not M_OwningTank->DoesVehicleHaveAnyWeapons())
 	{
 		return false;
 	}
@@ -108,7 +109,7 @@ void UTankTargetAcquisition::OnDigIn_Debugging() const
 	DrawDebugString(
 		GetWorld(),
 		OwnerActor->GetActorLocation()
-			+ FVector(0.f, 0.f, TankTargetAcquisitionDebug::CannotAggroDigInZOffset),
+		+ FVector(0.f, 0.f, TankTargetAcquisitionDebug::CannotAggroDigInZOffset),
 		TEXT("Cannot aggro due to dig in"),
 		nullptr,
 		FColor::Orange,

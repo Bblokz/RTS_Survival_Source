@@ -16,6 +16,7 @@
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 
 FAttachedWeaponAbilitySettings::FAttachedWeaponAbilitySettings()
 	: WeaponAbilityType(EAttachWeaponAbilitySubType::Pz38AttachedMortarDefault)
@@ -32,6 +33,8 @@ UAttachedWeaponAbilityComponent::UAttachedWeaponAbilityComponent()
 	: M_AttachedWeaponAbilitySettings()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	TargetPreference = ETargetPreference::None;
+	
 }
 
 void UAttachedWeaponAbilityComponent::PostInitProperties()
@@ -85,6 +88,11 @@ void UAttachedWeaponAbilityComponent::StopAttachedWeaponAbilityFire()
 	ClearFireTimers();
 	StopAllWeaponsFire();
 	M_FireState.bM_IsFiring = false;
+}
+
+ETargetPreference UAttachedWeaponAbilityComponent::GetTargetPreference() const
+{
+	return TargetPreference;
 }
 
 EAttachWeaponAbilitySubType UAttachedWeaponAbilityComponent::GetAttachedWeaponAbilityType() const

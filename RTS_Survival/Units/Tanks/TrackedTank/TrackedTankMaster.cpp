@@ -69,6 +69,11 @@ void ATrackedTankMaster::SetRTSOverlapEvasionEnabled(const bool bEnabled)
 	RTSOverlapEvasionComponent->SetOverlapEvasionEnabled(bEnabled);
 }
 
+bool ATrackedTankMaster::DoesVehicleHaveAnyWeapons() const
+{
+	return not (Turrets.IsEmpty() || HullWeapons.IsEmpty());
+}
+
 void ATrackedTankMaster::OnFinishedPathFollowing()
 {
 	if (not GetIsValidTrackPhysicsMovement())
@@ -832,7 +837,7 @@ void ATrackedTankMaster::SetupEngineGasSoundComponent()
 		this,
 		UAudioComponent::StaticClass(), // Explicit class type
 		EngineGasSoundComponentName,
-		RF_NoFlags); 
+		RF_NoFlags);
 
 	if (not GetIsValidEngineGasSoundComponent())
 	{
@@ -868,6 +873,7 @@ void ATrackedTankMaster::SetupEngineGasSoundComponent()
 	// Fixed: Removed AddInstanceComponent
 	M_EngineGasSoundComponent->RegisterComponent();
 }
+
 void ATrackedTankMaster::PlayEngineGasSoundEffect() const
 {
 	if (not GetIsValidEngineGasSound() or not GetIsValidEngineGasSoundComponent())

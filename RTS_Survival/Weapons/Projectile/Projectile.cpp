@@ -2493,11 +2493,14 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 	{
 		return;
 	}
+	using namespace DeveloperSettings::GameBalance::Weapons::ImpactAOE;
 	TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
 	ActorsToIgnore.Add(HitActor);
 	const float MaxArmorDamaged = M_ShrapnelArmorPen * 1.5;
 	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(
-		M_ShrapnelParticles, 3, 0.5);
+		M_ShrapnelParticles,
+	AOEMaxParticlesScaleDamageFallOffExponent,
+	AOEMinParticlesScaleDamageFallOffExponent);
 	if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(HitLocation, this, "AOE FallOff = " + FString::SanitizeFloat(DamageFallOff));
