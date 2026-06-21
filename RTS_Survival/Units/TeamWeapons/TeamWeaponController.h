@@ -152,6 +152,7 @@ public:
 	void OnControlledTeamWeaponDied();
 	float GetTeamWeaponArc() const;
 	float GetTeamWeaponRange()const;
+	virtual float GetSquadRange() override;
 	bool PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	bool GetHasControlledTeamWeapon() const;
 	UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport();

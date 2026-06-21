@@ -18,6 +18,8 @@
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/SquadTargetAcquisition/SquadTargetAcquisition.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
@@ -554,6 +556,29 @@ bool ASquadController::GetIsValidSquadHealthComponent() const
 		return false;
 	}
 	return true;
+}
+
+float ASquadController::GetSquadRange()
+{
+	float HighestRange = 0.f;
+	for (const UWeaponState* WeaponState : GetWeaponsOfSquad())
+	{
+		if (IsValid(WeaponState))
+		{
+			HighestRange = FMath::Max(HighestRange, WeaponState->GetWeaponRangeBehaviourAdjusted());
+		}
+	}
+	return HighestRange;
+}
+
+bool ASquadController::GetIsValidTargetAcquisition() const
+{
+	if (IsValid(M_TargetAcquisition))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TargetAcquisition", "ASquadController::GetIsValidTargetAcquisition", this);
+	return false;
 }
 
 TArray<ASquadUnit*> ASquadController::GetSquadUnitsChecked()
@@ -1334,6 +1359,9 @@ void ASquadController::PostInitializeComponents()
 		RTSFunctionLibrary::ReportError("The outer on this CommandData is not set to this object."
 			"\n ASquadController::PostInitializeComponents");
 	}
+
+	M_TargetAcquisition = FindComponentByClass<USquadTargetAcquisition>();
+	(void)GetIsValidTargetAcquisition();
 
 	PostInitializeComponents_SetupGrenadeComponent();
 	PostInitializeComponent_SetupFieldConstructionAbilities();
@@ -3588,6 +3616,10 @@ void ASquadController::OnAllSquadUnitsLoaded()
 	if (not M_SquadLoadingStatus.bM_HasInitializedData)
 	{
 		InitSquadData();
+	}
+	if (ensure(GetIsValidTargetAcquisition()))
+	{
+		M_TargetAcquisition->Activate();
 	}
 }
 

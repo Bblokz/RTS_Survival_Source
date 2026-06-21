@@ -12,6 +12,7 @@
 #include "TrackPhysicsMovementComp/TrackPhysicsMovement.h"
 #include "TrackedTankMaster.generated.h"
 
+class UTankTargetAcquisition;
 class UAttachedRockets;
 class UAudioComponent;
 class USoundBase;
@@ -121,6 +122,10 @@ protected:
 	// ----------------- START EXPERIENCE INTERFACE -----------------
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
 	TObjectPtr<URTSExperienceComp> ExperienceComponent;
+
+	UPROPERTY()
+	TObjectPtr<UTankTargetAcquisition> M_TargetAcquisition;
+	bool GetIsValidTargetAcquisition() const;
 	
 
 	virtual URTSExperienceComp* GetExperienceComponent() const override final;

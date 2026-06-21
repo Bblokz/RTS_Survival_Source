@@ -19,6 +19,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInComponent.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
 #include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/TankTargetAcquisition/TankTargetAcquisition.h"
 #include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -140,6 +141,8 @@ void ATrackedTankMaster::PostInitializeComponents()
 	PostInitializeComponents_SetupEngineSounds();
 	M_DigInComponent = FindComponentByClass<UDigInComponent>();
 	M_AttachedRockets = FindComponentByClass<UAttachedRockets>();
+	M_TargetAcquisition = FindComponentByClass<UTankTargetAcquisition>();
+	(void)GetIsValidTargetAcquisition();
 	if (not GetIsValidDigInComponent())
 	{
 		return;
@@ -152,6 +155,10 @@ void ATrackedTankMaster::BeginPlay()
 	Super::BeginPlay();
 	// Needs the proper Owning player to set which is why we cannot do this in post initialize components!
 	BeginPlay_SetupExperienceComponent();
+	if (ensure(GetIsValidTargetAcquisition()))
+	{
+		M_TargetAcquisition->Activate();
+	}
 }
 
 void ATrackedTankMaster::BeginDestroy()
@@ -234,6 +241,22 @@ bool ATrackedTankMaster::EnsureRTSOverlapEvasionComponent() const
 		return false;
 	}
 	return true;
+}
+
+bool ATrackedTankMaster::GetIsValidTargetAcquisition() const
+{
+	if (IsValid(M_TargetAcquisition))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_TargetAcquisition",
+		"ATrackedTankMaster::GetIsValidTargetAcquisition",
+		this
+	);
+	return false;
 }
 
 URTSExperienceComp* ATrackedTankMaster::GetExperienceComponent() const

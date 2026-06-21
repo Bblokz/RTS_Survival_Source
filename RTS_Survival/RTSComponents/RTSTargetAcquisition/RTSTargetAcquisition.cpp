@@ -3,9 +3,29 @@
 
 #include "RTSTargetAcquisition.h"
 
+#include "DrawDebugHelpers.h"
+
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+
+namespace RTSTargetAcquisitionDebug
+{
+	constexpr float DebugStringZOffset = 600.f;
+	constexpr float DebugStringDuration = 6.f;
+
+	FString GetStanceDebugString(const ERTSEngagementStance Stance)
+	{
+		switch (Stance)
+		{
+		case ERTSEngagementStance::Stance_HoldPosition: return TEXT("Hold Position");
+		case ERTSEngagementStance::Stance_Aggressive: return TEXT("Aggressive");
+		default: return TEXT("None");
+		}
+	}
+}
+
 
 bool URTSTargetAcquisition::EnsureIsValidGameUnitManager() const
 {
@@ -50,6 +70,10 @@ void URTSTargetAcquisition::SetEngagementStance(const ERTSEngagementStance NewSt
 		return;
 	}
 	EngagementStance = NewStance;
+	if constexpr (DeveloperSettings::Debugging::GTargetAcquisition_Compile_DebugSymbols)
+	{
+		DebugDrawAggroSearchState(GetOwnerRange() + GetAddedAggroRangeForOwningPlayer());
+	}
 	if (IsAggroTimerAllowed())
 	{
 		StartAggroTimer();
@@ -213,9 +237,18 @@ void URTSTargetAcquisition::StartAggroTimer()
 		{
 			return;
 		}
-		const float Range = StrongThis->GetOwnerRange();
+		const float Range = StrongThis->GetOwnerRange() + StrongThis->GetAddedAggroRangeForOwningPlayer();
 		const ETargetPreference TargetPref = StrongThis->GetOwnerTargetPreference();
-		WeakThis->SearchForClosestTarget(
+		if (not StrongThis->IsAggroTimerAllowed())
+		{
+			StrongThis->StopAggroTimer();
+			return;
+		}
+		if constexpr (DeveloperSettings::Debugging::GTargetAcquisition_Compile_DebugSymbols)
+		{
+			StrongThis->DebugDrawAggroSearchState(Range);
+		}
+		StrongThis->SearchForClosestTarget(
 			OwnerLocation,
 			Range,
 			TargetPref
@@ -254,4 +287,40 @@ void URTSTargetAcquisition::BeginPlay_InitRTSComponent()
 	}
 	M_OwnerRTSComponent = Cast<URTSComponent>(TargetActor->GetComponentByClass(URTSComponent::StaticClass()));
 	(void)EnsureIsValidRTSComponent();
+}
+
+void URTSTargetAcquisition::DebugDrawAggroSearchState(const float AggroRange) const
+{
+	const AActor* OwnerActor = GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		return;
+	}
+
+	const FString DebugString = FString::Printf(
+		TEXT("Stance: %s\nAggro Range: %.0f"),
+		*RTSTargetAcquisitionDebug::GetStanceDebugString(EngagementStance),
+		AggroRange
+	);
+	const FVector DebugLocation = OwnerActor->GetActorLocation()
+		+ FVector(0.f, 0.f, RTSTargetAcquisitionDebug::DebugStringZOffset);
+	DrawDebugString(
+		GetWorld(),
+		DebugLocation,
+		DebugString,
+		nullptr,
+		FColor::Cyan,
+		RTSTargetAcquisitionDebug::DebugStringDuration,
+		false
+	);
+}
+
+float URTSTargetAcquisition::GetAddedAggroRangeForOwningPlayer() const
+{
+	if (GetOwningPlayer() == 1)
+	{
+		return DeveloperSettings::TargetAcquisition::AddedAggroRange;
+	}
+
+	return DeveloperSettings::TargetAcquisition::AddedAggroEnemyRange;
 }

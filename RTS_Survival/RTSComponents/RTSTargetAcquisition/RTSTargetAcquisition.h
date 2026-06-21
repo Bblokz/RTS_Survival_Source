@@ -85,4 +85,7 @@ private:
 	                            
 	);
 
+	void DebugDrawAggroSearchState(const float AggroRange) const;
+	float GetAddedAggroRangeForOwningPlayer() const;
+
 };

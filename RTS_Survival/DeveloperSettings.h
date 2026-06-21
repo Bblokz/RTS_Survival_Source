@@ -66,6 +66,12 @@ namespace DeveloperSettings
 		inline constexpr float AsyncGetResourceThreadUpdateInterval = 0.25f;
 	}
 
+	namespace TargetAcquisition
+	{
+		inline constexpr float AddedAggroRange = 2500.f;
+		inline constexpr float AddedAggroEnemyRange = 3500.f;
+	}
+
 	namespace GameBalance
 	{
 		namespace Resources
@@ -1849,6 +1855,7 @@ namespace DeveloperSettings
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;
+		constexpr bool GTargetAcquisition_Compile_DebugSymbols = false;
 		constexpr bool GAOELibrary_Compile_DebugSymbols = false;
 		// Damage taken on actors
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
