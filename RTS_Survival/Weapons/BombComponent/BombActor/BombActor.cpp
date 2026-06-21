@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
+#include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 ABombActor::ABombActor()
@@ -334,6 +335,7 @@ void ABombActor::OnHitActor(
 {
 	SpawnExplosion(HitLocation, HitSurface);
 	HitActor = FRTSWeaponHelpers::GetHitActorAdjustedForChildActorComponents(HitActor);
+	HandleAoe(HitLocation, HitActor);
 	if (not HitActor)
 	{
 		return;
@@ -349,6 +351,43 @@ void ABombActor::OnHitActor(
 			M_Owner->OnBombKilledActor(HitActor);
 		}
 	}
+}
+
+
+void ABombActor::HandleAoe(const FVector& HitLocation, AActor* PrimaryHitActor)
+{
+	if (M_WeaponData.ShrapnelRange <= 0.0f)
+	{
+		return;
+	}
+
+	TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
+	if (IsValid(PrimaryHitActor))
+	{
+		ActorsToIgnore.Add(PrimaryHitActor);
+	}
+
+	const float MaxArmorDamaged = M_WeaponData.ShrapnelPen * 1.5f;
+	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(
+		M_WeaponData.ShrapnelParticles,
+		3.0f,
+		0.5f);
+	const ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == 1
+		? ETriggerOverlapLogic::OverlapEnemy
+		: ETriggerOverlapLogic::OverlapPlayer;
+
+	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+		this,
+		HitLocation,
+		M_WeaponData.ShrapnelRange,
+		M_WeaponData.ShrapnelDamage,
+		DamageFallOff,
+		M_WeaponData.ShrapnelPen,
+		1.0f,
+		MaxArmorDamaged,
+		M_WeaponData.DamageType,
+		OverlapLogic,
+		ActorsToIgnore);
 }
 
 void ABombActor::SpawnExplosion(const FVector& Location, const ERTSSurfaceType HitSurface) const

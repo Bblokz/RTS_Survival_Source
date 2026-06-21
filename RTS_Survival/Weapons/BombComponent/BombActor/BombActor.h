@@ -10,6 +10,9 @@
 struct FBombFXSettings;
 class UBombComponent;
 
+/**
+ * @brief Pooled bomb actor used by bomb bays to trace impacts and apply explosion damage.
+ */
 UCLASS()
 class RTS_SURVIVAL_API ABombActor : public AActor
 {
@@ -96,6 +99,7 @@ private:
 	TSubclassOf<UDamageType> M_DamageType;
 
 	void SpawnExplosion(const FVector& Location, const ERTSSurfaceType HitSurface) const;
+	void HandleAoe(const FVector& HitLocation, AActor* PrimaryHitActor);
 
 	// ----------------------------- BALISTICS CALCULATIONS -----------------------------------
 	// Try to compute a ballistic v0 that hits target using a fixed speed (M_InitialSpeed).
