@@ -123,6 +123,7 @@ public:
 	void StopAttachedWeaponAbilityFire();
 	
 	virtual ETargetPreference GetTargetPreference() const override final;
+	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
 
 	EAttachWeaponAbilitySubType GetAttachedWeaponAbilityType() const;
 	EPlayerAimAbilityTypes GetAimAssistType() const;

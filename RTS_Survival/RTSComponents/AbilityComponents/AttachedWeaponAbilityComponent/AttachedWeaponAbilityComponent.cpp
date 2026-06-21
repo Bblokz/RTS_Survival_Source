@@ -95,6 +95,18 @@ ETargetPreference UAttachedWeaponAbilityComponent::GetTargetPreference() const
 	return TargetPreference;
 }
 
+void UAttachedWeaponAbilityComponent::SetTargetPreference(const ETargetPreference NewTargetPreference)
+{
+	if (TargetPreference == ETargetPreference::Aircraft)
+	{
+		// Special case used to identify that this turret can attack air; no change possible.	
+		return;
+	}
+	TargetPreference = NewTargetPreference;
+	
+}
+
+
 EAttachWeaponAbilitySubType UAttachedWeaponAbilityComponent::GetAttachedWeaponAbilityType() const
 {
 	return M_AttachedWeaponAbilitySettings.WeaponAbilityType;

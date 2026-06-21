@@ -53,6 +53,7 @@ public:
 	AAircraftMaster(const FObjectInitializer& ObjectInitializer);
 	
 	ETargetPreference GetAircraftTargetPreference() const;
+	void SetTargetPreference(const ETargetPreference TargetPreference) const;
 	
 	void SetEngagementStance(const ERTSEngagementStance NewStance);
 	ERTSEngagementStance GetEngagementStance() const;

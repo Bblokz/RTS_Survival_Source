@@ -8,7 +8,6 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 
@@ -31,13 +30,8 @@ ETargetPreference USquadTargetAcquisition::GetOwnerTargetPreference() const
 	{
 		return ETargetPreference::None;
 	}
+	return M_OwningSquad->GetSquadTargetPreference();
 
-	const TArray<ASquadUnit*> SquadUnits = M_OwningSquad->GetSquadUnitsChecked();
-	if (SquadUnits.IsEmpty() || not IsValid(SquadUnits[0]) || not IsValid(SquadUnits[0]->GetInfantryWeapon()))
-	{
-		return ETargetPreference::None;
-	}
-	return SquadUnits[0]->GetInfantryWeapon()->GetTargetPreference();
 }
 
 bool USquadTargetAcquisition::CanAggroEnemies() const

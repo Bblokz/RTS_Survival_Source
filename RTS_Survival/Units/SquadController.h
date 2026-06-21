@@ -271,9 +271,10 @@ public:
 	friend class RTS_SURVIVAL_API USquadAimAbilityComponent;
 	ASquadController();
 	
-	ETargetPreference GetSquadTargetPreference() const;
+	ETargetPreference GetSquadTargetPreference();
+	virtual void SetTargetPreference(const ETargetPreference TargetPreference);
 	
-	void SetEngagementStance(const ERTSEngagementStance NewStance);
+	void SetEngagementStance(const ERTSEngagementStance NewStance) const;
 	ERTSEngagementStance GetEngagementStance() const;
 	
 

@@ -155,6 +155,7 @@ public:
 	virtual float GetSquadRange() override;
 	bool PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	bool GetHasControlledTeamWeapon() const;
+	void SetTargetPreference(const ETargetPreference TargetPreference) override;
 	UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport();
 	const UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport() const;
 	virtual bool GetSquadAlreadyHasTeamWeapon() const override;

@@ -41,6 +41,16 @@ ACPPTurretsMaster::ACPPTurretsMaster()
 	// Defaults covered by struct default members.
 }
 
+void ACPPTurretsMaster::SetTargetPreference(const ETargetPreference NewTargetPreference)
+{
+	if (TargetPreference == ETargetPreference::Aircraft)
+	{
+		// Special case used to identify that this turret can attack air; no change possible.	
+		return;
+	}
+	TargetPreference = NewTargetPreference;
+}
+
 void ACPPTurretsMaster::SetAutoEngageTargets(const bool bUseLastTarget)
 {
 	M_WeaponAIState = EWeaponAIState::AutoEngage;

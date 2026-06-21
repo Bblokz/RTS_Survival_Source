@@ -23,6 +23,7 @@ public:
 	// Sets default values for this component's properties
 	UAircraftWeapon();
 	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
+	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
 
 	void InitAircraftWeaponComponent(
 		AAircraftMaster* AircraftOwner,

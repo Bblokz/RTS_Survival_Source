@@ -465,6 +465,33 @@ ETargetPreference AAircraftMaster::GetAircraftTargetPreference() const
 	return M_AircraftWeapon->GetTargetPreference();
 }
 
+void AAircraftMaster::SetTargetPreference(const ETargetPreference TargetPreference) const
+{
+	if (not EnsureAircraftWeaponIsValid())
+	{
+	return;	
+	}
+	M_AircraftWeapon->SetTargetPreference(TargetPreference);
+}
+
+void AAircraftMaster::SetEngagementStance(const ERTSEngagementStance NewStance)
+{
+	if (not GetIsValidTargetAcquisition())
+	{
+		return ;
+	}
+	M_TargetAcquisition->SetEngagementStance(NewStance);
+}
+
+ERTSEngagementStance AAircraftMaster::GetEngagementStance() const
+{
+	if (not GetIsValidTargetAcquisition())
+	{
+		return ERTSEngagementStance::Stance_HoldPosition;
+	}
+	return M_TargetAcquisition->GetEngagementStance();
+}
+
 bool AAircraftMaster::GetIsIdleAndAirborne() const
 {
 	return M_MovementState == EAircraftMovementState::Idle && GetIsAircraftAirborne();

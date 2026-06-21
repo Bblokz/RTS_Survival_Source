@@ -5,8 +5,12 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Border.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSEngagementStance.h"
 #include "W_SelectedUnitInfo.generated.h"
 
+enum class ERTSEngagementStance : uint8;
+enum class ETargetPreference : uint8;
 enum class EBuildingExpansionType : uint8;
 class UActionUIManager;
 enum class EVeterancyIconSet : uint8;
@@ -33,6 +37,7 @@ public:
 		const float CurrentHp,
 		const ENomadicSubtype NomadicSubtype,
 		const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype, const EBuildingExpansionType BxpSubtype);
+	void SetupTargetPrefAndAgroStanceForNewUnit(AActor* SelectedActor);
 
 	void InitSelectedUnitInfo(UW_SelectedUnitDescription* UnitDesc, UActionUIManager* ActionUIManager);
 
@@ -77,11 +82,25 @@ protected:
 	TObjectPtr<UBorder> UnitInfoBorder;
 
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	
+	void UpdateTargetPreference(const ETargetPreference TargetPreference); 
+	void UpdateAggroStance(const ERTSEngagementStance CurrentAggroStance);
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_UpdateTargetPreference(const ETargetPreference TargetPreference);
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_UpdateAgroStance(const ERTSEngagementStance AggroStance);
 private:
+	
 	bool EnsureIsValidUnitDescription() const;
+	
+	ERTSEngagementStance RotateAggroStance(const ERTSEngagementStance CurrentAggroStance) const;
+	ETargetPreference RotateTargetPreference(const ETargetPreference TargetPreference) const;
 
 	UPROPERTY()
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
+	
+	ETargetPreference LastTargetPreference = ETargetPreference::Infantry;
+	ERTSEngagementStance LastEngagedStance = ERTSEngagementStance::Stance_HoldPosition;
 
 	bool bM_IsInitialized = false;
 

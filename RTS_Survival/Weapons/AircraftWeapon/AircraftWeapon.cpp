@@ -22,6 +22,17 @@ UAircraftWeapon::UAircraftWeapon()
 	M_LandedState = EAircraftLandingState::Landed;
 }
 
+void UAircraftWeapon::SetTargetPreference(const ETargetPreference NewTargetPreference)
+{
+	if (TargetPreference == ETargetPreference::Aircraft)
+	{
+		// Special case used to identify that this turret can attack air; no change possible.	
+		return;
+	}
+	TargetPreference = NewTargetPreference;
+	
+}
+
 void UAircraftWeapon::InitAircraftWeaponComponent(AAircraftMaster* AircraftOwner, UMeshComponent* AircraftWeaponMesh)
 {
 	M_AircraftOwner = AircraftOwner;

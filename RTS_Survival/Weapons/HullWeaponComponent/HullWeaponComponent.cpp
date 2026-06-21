@@ -31,6 +31,17 @@ void UHullWeaponComponent::SetOwningPlayer(const int32 PlayerIndex)
 	M_TargetingData.InitTargetStruct(M_OwningPlayer);
 }
 
+void UHullWeaponComponent::SetTargetPreference(const ETargetPreference NewTargetPreference)
+{
+	if (TargetPreference == ETargetPreference::Aircraft)
+	{
+		// Special case used to identify that this turret can attack air; no change possible.	
+		return;
+	}
+	TargetPreference = NewTargetPreference;
+	
+}
+
 void UHullWeaponComponent::SetAutoEngageTargets(const bool bUseLastTarget)
 {
 	M_WeaponAIState = EWeaponAIState::AutoEngage;

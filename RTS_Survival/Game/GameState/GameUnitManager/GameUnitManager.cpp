@@ -1821,7 +1821,9 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		{
 			continue;
 		}
-		AddActorData(EnemyOfCheckedUnit, Actor, CurrentActorIDMapping, OutActorData);
+		const uint32 ActorID = Actor->GetUniqueID();
+		CurrentActorIDMapping->Add(ActorID, Actor);
+		OutActorData.Add({ActorID, CreatePair(Actor->GetActorLocation(), ETargetPreference::Building)});
 	}
 
 	// Tanks
@@ -1867,8 +1869,9 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		{
 			continue;
 		}
-		// Route through generic AddActorData so preference can be derived (defaults to Building).
-		AddActorData(EnemyOfCheckedUnit, EachBxp, CurrentActorIDMapping, OutActorData);
+		const uint32 ActorID = EachBxp->GetUniqueID();
+		CurrentActorIDMapping->Add(ActorID, EachBxp);
+		OutActorData.Add({ActorID, CreatePair(EachBxp->GetActorLocation(), ETargetPreference::Building)});
 	}
 
 	if constexpr (DeveloperSettings::Debugging::GAsyncTargetFinding_Compile_DebugSymbols)
@@ -1878,25 +1881,6 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 			TEXT("Amount of ") + Owner + TEXT(" possible targetable units ") + FString::FromInt(OutActorData.Num()),
 			FColor::Purple);
 	}
-}
-
-void UGameUnitManager::AddActorData(const int32 EnemyOfActor,
-                                    AActor* Actor,
-                                    TMap<uint32, AActor*>* CurrentActorIDMapping,
-                                    TMap<uint32, TPair<ETargetPreference, FVector>>& OutActorData)
-{
-	ETargetPreference Preference = ETargetPreference::Building;
-	uint32 ActorID = Actor->GetUniqueID();
-	// todo for tests only
-	if (AHpPawnMaster* HpPawnMaster = Cast<AHpPawnMaster>(Actor); IsValid(HpPawnMaster))
-	{
-		Preference = HpPawnMaster->GetTargetPreference();
-	}
-	CurrentActorIDMapping->Add(ActorID, Actor);
-	OutActorData.Add({
-		ActorID, CreatePair(Actor->GetActorLocation(),
-		                    Preference)
-	});
 }
 
 AActor* UGameUnitManager::FindTankUnitOfPlayer(const ETankSubtype TankSubtype, const int32 OwningPlayer) const

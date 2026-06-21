@@ -596,6 +596,17 @@ float AInfantryWeaponMaster::GetTurretYawLimit() const
 	return 0.f;
 }
 
+void AInfantryWeaponMaster::SetTargetPreference(const ETargetPreference NewTargetPreference)
+{
+	if (TargetPreference == ETargetPreference::Aircraft)
+	{
+		// Special case used to identify that this turret can attack air; no change possible.	
+		return;
+	}
+	TargetPreference = NewTargetPreference;
+	
+}
+
 void AInfantryWeaponMaster::OnWeaponAdded(const int32 /*WeaponIndex*/, UWeaponState* /*Weapon*/)
 {
 }

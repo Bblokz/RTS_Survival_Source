@@ -132,6 +132,7 @@ public:
 	ACPPTurretsMaster();
 	
 	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
+	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
 
 	/**
 	 * @brief Sets this turret to automatically engage targets in range.

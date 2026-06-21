@@ -511,6 +511,7 @@ bool UActionUIManager::SetUpActionUIForSelectedActor(
 		float HealthPercentage = SetupHealthComponent(SelectedActor, MaxHp, CurrentHp);
 		M_SelectedUnitInfo->SetupUnitInfoForNewUnit(PrimaryUnitType, HealthPercentage, MaxHp, CurrentHp, NomadicSubtype,
 		                                            TankSubtype, SquadSubtype, BxpSubtype);
+		M_SelectedUnitInfo->agro
 		M_SelectedUnitInfo->SetupUnitDescriptionForNewUnit(SelectedActor,
 		                                                   PrimaryUnitType,
 		                                                   NomadicSubtype,

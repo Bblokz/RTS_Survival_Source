@@ -63,6 +63,7 @@ public:
 	virtual float GetTurretYawLimit() const = 0;
 	
 	virtual ETargetPreference GetTargetPreference() const = 0;
+	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) = 0;
 	
 
 protected:

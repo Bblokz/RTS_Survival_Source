@@ -114,19 +114,20 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 	friend struct FMissionTowTeamWeaponSpawnState;
 	friend class RTS_SURVIVAL_API UBehVehicleStunned;
 
-
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
-	
-	ETargetPreference GetTargetPreference();							
+
+	ETargetPreference GetTargetPreference();
 	void SetTargetPreferenceForAllWeapons(const ETargetPreference NewPreference);
-	
+
+	// virtual because TargetAcquistion component on tracked tank
 	virtual void SetEngagementStance(const ERTSEngagementStance NewStance);
+	// virtual because TargetAcquistion component on tracked tank
 	virtual ERTSEngagementStance GetEngagementStance() const;
 
 	// Controller is set with OnPosses on AITankMaster.
 	void SetAIController(AAITankMaster* NewController) { AITankController = NewController; }
-	
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="TankMaster")
 	inline AAITankMaster* GetAIController() const { return AITankController; };
 
@@ -151,7 +152,7 @@ public:
 
 	inline TArray<ACPPTurretsMaster*> GetTurrets() const { return Turrets; };
 	inline TArray<UHullWeaponComponent*> GetHullWeapons() const { return HullWeapons; }
-	float GetVehicleHighestWeaponRange()const;
+	float GetVehicleHighestWeaponRange() const;
 
 	virtual ERTSNavAgents GetRTSNavAgentType() const override { return NavAgentType; }
 
@@ -167,7 +168,6 @@ public:
 	// For mission programming.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void ChangeAbilityCooldown(const EAbilityID AbilityId, const float NewCooldown, const int32 Subtype);
-	
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -312,8 +312,10 @@ protected:
 	virtual void ExecuteAimAbilityCommand(const FVector TargetLocation, const EAimAbilityType AimAbilityType) override;
 	virtual void TerminateAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
 	virtual void ExecuteAttachedWeaponAbilityCommand(const FVector TargetLocation,
-	                                                 const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override;
-	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override;
+	                                                 const EAttachWeaponAbilitySubType
+	                                                 AttachedWeaponAbilityType) override;
+	virtual void
+	TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override;
 	virtual void ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override;
 	virtual void TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override;
 	virtual void ExecuteCancelAimAbilityCommand(const EAimAbilityType AimAbilityType) override;
@@ -451,9 +453,8 @@ protected:
 	bool GetIsValidSpatialVoiceLinePlayer() const;
 
 	virtual EAnnouncerVoiceLineType OverrideAnnouncerDeathVoiceLine(const EAnnouncerVoiceLineType OriginalLine) const;
-	
-	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds);
 
+	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds);
 
 private:
 	// Whether the vehicle is currently Turning.
@@ -482,22 +483,22 @@ private:
 
 	void ExecuteTowActorCommand_TowVehicle(AActor* TowTargetActor, UTowedActorComponent* TowedActorComponent);
 	void ExecuteTowActorCommand_TowTeamWeapon(class ATeamWeapon* TeamWeaponActor,
-	                                        class ATeamWeaponController* TeamWeaponController,
-	                                        UTowedActorComponent* TowedActorComponent);
+	                                          class ATeamWeaponController* TeamWeaponController,
+	                                          UTowedActorComponent* TowedActorComponent);
 	bool TryTowTeamWeapon_Internal(class ATeamWeapon* TeamWeaponActor,
-	                              class ATeamWeaponController* TeamWeaponController,
-	                              UTowedActorComponent* TowedActorComponent,
-	                              const bool bDoneExecutingCommandAfterTow);
+	                               class ATeamWeaponController* TeamWeaponController,
+	                               UTowedActorComponent* TowedActorComponent,
+	                               const bool bDoneExecutingCommandAfterTow);
 	bool ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(const AActor* TowTargetActor,
-	                                                       const UVehicleTowComponent* VehicleTowComp) const;
+	                                                        const UVehicleTowComponent* VehicleTowComp) const;
 	bool ExecuteDetachTowCommand_TryDetachSelfFromTow();
 	void ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor, UTowedActorComponent* TowedActorComponent);
 	void ExecuteDetachTowCommand_DetachTowedTeamWeapon(class ATeamWeaponController* TeamWeaponController);
 	void CleanupTowRelationshipsOnDeath();
 	bool GetTowTargetData(AActor* TowTargetActor, const ETowedActorTarget TowSubtype,
-	                    UTowedActorComponent*& OutTowedActorComponent,
-	                    class ATeamWeapon*& OutTeamWeaponActor,
-	                    class ATeamWeaponController*& OutTeamWeaponController) const;
+	                      UTowedActorComponent*& OutTowedActorComponent,
+	                      class ATeamWeapon*& OutTeamWeaponActor,
+	                      class ATeamWeaponController*& OutTeamWeaponController) const;
 	bool GetIsValidVehicleTowComponentNoReport() const;
 	bool GetIsValidTowedActorComponentNoReport() const;
 
@@ -567,6 +568,4 @@ private:
 
 	void ApplyMovementBehaviours();
 	void RemoveMovementBehaviours();
-
-	
 };

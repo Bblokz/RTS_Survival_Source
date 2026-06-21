@@ -511,6 +511,16 @@ bool ATeamWeaponController::GetHasControlledTeamWeapon() const
 	return M_TeamWeapon != nullptr && not bM_IsTeamWeaponAbandoned;
 }
 
+void ATeamWeaponController::SetTargetPreference(const ETargetPreference TargetPreference)
+{
+	// Sets on squad unit's weapons.
+	Super::SetTargetPreference(TargetPreference);
+	if (GetIsValidTeamWeapon())
+	{
+		M_TeamWeapon->SetTargetPreference(TargetPreference);
+	}
+}
+
 UTowedActorComponent* ATeamWeaponController::GetControlledTeamWeaponTowedActorComponentNoReport()
 {
 	if (not GetHasControlledTeamWeapon())

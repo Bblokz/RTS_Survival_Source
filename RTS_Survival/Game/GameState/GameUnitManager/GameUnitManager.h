@@ -396,16 +396,6 @@ private:
 	AActor* FindNomadicUnitOfPlayer(const ENomadicSubtype NomadicSubtype, const int32 OwningPlayer) const;
 	AActor* FindBxpUnitOfPlayer(const EBuildingExpansionType BxpSubtype, const int32 OwningPlayer) const;
 
-	/**
-	 * @brief Adds the actor data of the given actor to the provided map.
-	 * @post the ID mapping now contains the actor ID and the actor.
-	 * @post the OutActorData now contains the actor data.
-	 * @pre The actor is visible.
-	 */
-	void AddActorData(const int32 EnemyOfActor,
-	                  AActor* Actor,
-	                  TMap<uint32, AActor*>* CurrentActorIDMapping,
-	                  TMap<uint32, TPair<ETargetPreference, FVector>>& OutActorData);
 };
 
 template <typename T>

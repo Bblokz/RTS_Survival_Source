@@ -45,6 +45,7 @@ public:
 	void SetOwningPlayer(const int32 PlayerIndex);
 	
 	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
+	virtaal void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
 	
 
 

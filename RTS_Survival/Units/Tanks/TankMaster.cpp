@@ -301,7 +301,22 @@ ETargetPreference ATankMaster::GetTargetPreference()
 
 void ATankMaster::SetTargetPreferenceForAllWeapons(const ETargetPreference NewPreference)
 {
-	
+	for (auto EachTurret : Turrets)
+	{
+		if (not IsValid(EachTurret))
+		{
+			continue;
+		}
+		EachTurret->SetTargetPreference(NewPreference);
+	}
+	for (auto EachHullWeapon : HullWeapons)
+	{
+		if (not IsValid(EachHullWeapon))
+		{
+			continue;
+		}
+		EachHullWeapon->SetTargetPreference(NewPreference);
+	}
 }
 
 void ATankMaster::SetEngagementStance(const ERTSEngagementStance NewStance)
