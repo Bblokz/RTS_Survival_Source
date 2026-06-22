@@ -5,6 +5,7 @@
 #include "Components/DecalComponent.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/AircraftTargetAcquisition/AircraftTargetAcquisition.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
@@ -16,6 +17,8 @@
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/Units/Aircraft/AircraftAnimInstance/AircraftAnimInstance.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
+#include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -835,6 +838,7 @@ void AAircraftMaster::OnVtoCompleted(const float TargetZ)
 
 	FRTSAircraftHelpers::AircraftDebug(TEXT("Vertical Takeoff Complete"), FColor::Green);
 	IssuePostLifOffAction();
+	AircraftDrop_OnVtoCompleted();
 	BP_OnVtoCompleted();
 }
 
@@ -892,6 +896,13 @@ void AAircraftMaster::OnMoveCompleted()
 	if (M_CarpetBombingState.Phase != EAircraftCarpetBombingPhase::Inactive)
 	{
 		CarpetBombing_HandleMoveCompleted();
+		return;
+	}
+
+	if (M_AircraftDropRequest.State == EAircraftDropRequestState::MovingToDropLocation ||
+		M_AircraftDropRequest.State == EAircraftDropRequestState::Retreating)
+	{
+		AircraftDrop_OnMoveCompleted();
 		return;
 	}
 
@@ -2026,8 +2037,13 @@ void AAircraftMaster::OnLandingFinish()
 		M_AnimInstAircraft->OnLandingComplete();
 	}
 
+	AircraftDrop_OnLanded();
+
 	// Done with the Return-To-Base command
-	DoneExecutingCommand(EAbilityID::IdReturnToBase);
+	if (M_AircraftDropRequest.State == EAircraftDropRequestState::Inactive)
+	{
+		DoneExecutingCommand(EAbilityID::IdReturnToBase);
+	}
 }
 
 void AAircraftMaster::Tick_VerticalLanding(float DeltaTime)
@@ -2673,4 +2689,203 @@ bool AAircraftMaster::CarpetBombing_HasBombsRemaining() const
 	}
 
 	return M_AircraftBombComponent->GetActiveBombCount() > 0;
+}
+
+void AAircraftMaster::OrderAircraftDrop(const FAircraftDropRequest& DropRequest)
+{
+	if (DropRequest.PayloadType == EAircraftDropPayloadType::Tank && not DropRequest.AttachedTank.IsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("AAircraftMaster::OrderAircraftDrop tank request has no loaded tank."));
+		return;
+	}
+
+	M_AircraftDropRequest = DropRequest;
+	M_AircraftDropRequest.State = EAircraftDropRequestState::MovingToDropLocation;
+	AircraftDrop_AttachTank();
+	AircraftDrop_MoveToDropLocation();
+}
+
+void AAircraftMaster::AircraftDrop_MoveToDropLocation()
+{
+	const FVector FlightTarget(
+		M_AircraftDropRequest.ExecuteLocation.X,
+		M_AircraftDropRequest.ExecuteLocation.Y,
+		GetActorLocation().Z);
+	M_AircraftLandedData.TargetAirborneHeight = FlightTarget.Z;
+	M_AircraftMoveData.SetTargetPoint(FlightTarget);
+	StartMoveTo();
+}
+
+void AAircraftMaster::AircraftDrop_OnMoveCompleted()
+{
+	if (M_AircraftDropRequest.State == EAircraftDropRequestState::Retreating)
+	{
+		Destroy();
+		return;
+	}
+
+	M_AircraftDropRequest.State = EAircraftDropRequestState::VerticalLanding;
+	const float TankLandingOffset = M_AircraftDropRequest.PayloadType == EAircraftDropPayloadType::Tank
+		? FMath::Abs(M_AircraftDropRequest.TankAttachZOffset)
+		: 0.0f;
+	M_AircraftLandedData.LandedPosition = M_AircraftDropRequest.ExecuteLocation + FVector(0.0f, 0.0f, TankLandingOffset);
+	M_AircraftLandedData.LandedRotation = GetActorRotation();
+	StartVerticalLanding();
+}
+
+void AAircraftMaster::AircraftDrop_OnLanded()
+{
+	if (M_AircraftDropRequest.State != EAircraftDropRequestState::VerticalLanding)
+	{
+		return;
+	}
+
+	M_AircraftDropRequest.State = EAircraftDropRequestState::LandedWaiting;
+	AircraftDrop_DetachTank();
+	AircraftDrop_SpawnSquads();
+	AircraftDrop_PlayDropOffSound();
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		AircraftDrop_OnStayLandedFinished();
+		return;
+	}
+
+	const float SafeStayLandedTime = FMath::Max(0.0f, M_AircraftDropRequest.HowLongStayLanded);
+	TWeakObjectPtr<AAircraftMaster> WeakThis(this);
+	World->GetTimerManager().SetTimer(
+		M_AircraftDropStayLandedTimerHandle,
+		[WeakThis]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->AircraftDrop_OnStayLandedFinished();
+		},
+		SafeStayLandedTime,
+		false);
+}
+
+void AAircraftMaster::AircraftDrop_OnStayLandedFinished()
+{
+	M_AircraftDropStayLandedTimerHandle.Invalidate();
+	M_AircraftDropRequest.State = EAircraftDropRequestState::VerticalTakeOff;
+	StartVto();
+}
+
+void AAircraftMaster::AircraftDrop_OnVtoCompleted()
+{
+	if (M_AircraftDropRequest.State != EAircraftDropRequestState::VerticalTakeOff)
+	{
+		return;
+	}
+
+	M_AircraftDropRequest.State = EAircraftDropRequestState::Retreating;
+	M_AircraftMoveData.SetTargetPoint(M_AircraftDropRequest.RetreatLocation);
+	StartMoveTo();
+}
+
+void AAircraftMaster::AircraftDrop_SpawnSquads() const
+{
+	if (M_AircraftDropRequest.PayloadType != EAircraftDropPayloadType::Infantry)
+	{
+		return;
+	}
+
+	for (int32 SquadIndex = 0; SquadIndex < M_AircraftDropRequest.SquadSubtypes.Num(); ++SquadIndex)
+	{
+		AircraftDrop_SpawnSquad(M_AircraftDropRequest.SquadSubtypes[SquadIndex], SquadIndex);
+	}
+}
+
+void AAircraftMaster::AircraftDrop_SpawnSquad(const ESquadSubtype SquadSubtype, const int32 SquadIndex) const
+{
+	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
+	if (not IsValid(AsyncSpawner) || SquadSubtype == ESquadSubtype::Squad_None)
+	{
+		return;
+	}
+
+	const FTrainingOption SquadTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+	AsyncSpawner->AsyncSpawnOptionAtLocation(
+		SquadTrainingOption,
+		AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex),
+		const_cast<AAircraftMaster*>(this),
+		SquadIndex,
+		[](const FTrainingOption&, AActor*, const int32) {},
+		FRotator::ZeroRotator);
+}
+
+void AAircraftMaster::AircraftDrop_AttachTank()
+{
+	if (M_AircraftDropRequest.PayloadType != EAircraftDropPayloadType::Tank ||
+		not M_AircraftDropRequest.AttachedTank.IsValid())
+	{
+		return;
+	}
+
+	ATankMaster* Tank = M_AircraftDropRequest.AttachedTank.Get();
+	if (USelectionComponent* TankSelectionComponent = Tank->GetSelectionComponent())
+	{
+		TankSelectionComponent->SetCanBeSelected(false);
+	}
+	Tank->SetTurretsDisabled();
+	Tank->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+	Tank->SetActorRelativeLocation(FVector(0.0f, 0.0f, M_AircraftDropRequest.TankAttachZOffset));
+}
+
+void AAircraftMaster::AircraftDrop_DetachTank()
+{
+	if (not M_AircraftDropRequest.AttachedTank.IsValid())
+	{
+		return;
+	}
+
+	ATankMaster* Tank = M_AircraftDropRequest.AttachedTank.Get();
+	Tank->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	Tank->SetActorLocation(M_AircraftDropRequest.ExecuteLocation);
+	Tank->EnableWeaponsAfterAircraftDrop();
+	if (USelectionComponent* TankSelectionComponent = Tank->GetSelectionComponent())
+	{
+		TankSelectionComponent->SetCanBeSelected(true);
+	}
+}
+
+void AAircraftMaster::AircraftDrop_PlayDropOffSound() const
+{
+	if (not IsValid(M_AircraftDropRequest.DropOffSound))
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySoundAtLocation(
+		this,
+		M_AircraftDropRequest.DropOffSound,
+		M_AircraftDropRequest.ExecuteLocation,
+		FRotator::ZeroRotator,
+		1.0f,
+		1.0f,
+		0.0f,
+		M_AircraftDropRequest.DropOffSoundAttenuation,
+		M_AircraftDropRequest.DropOffSoundConcurrency);
+}
+
+FVector AAircraftMaster::AircraftDrop_GetProjectedSquadSpawnLocation(const int32 SquadIndex) const
+{
+	const float Angle = static_cast<float>(SquadIndex) * 2.0f * PI /
+		FMath::Max(1, M_AircraftDropRequest.SquadSubtypes.Num());
+	const FVector DesiredLocation = M_AircraftDropRequest.ExecuteLocation + FVector(
+		FMath::Cos(Angle) * M_AircraftDropRequest.RadiusSpawnSquads,
+		FMath::Sin(Angle) * M_AircraftDropRequest.RadiusSpawnSquads,
+		0.0f);
+
+	bool bWasProjected = false;
+	return URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+		this,
+		DesiredLocation,
+		FVector(2.0f, 2.0f, 2.0f),
+		bWasProjected);
 }

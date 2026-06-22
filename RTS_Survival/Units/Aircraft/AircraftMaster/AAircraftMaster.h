@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AircraftCommandsData/AircraftCommandsData.h"
 #include "FStrafeAircraftSettings/FStrafeAircraftSettings.h"
+#include "AircraftDropTypes.h"
 #include "RTS_Survival/Interfaces/RTSInterface/RTSUnit.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
@@ -136,6 +137,12 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void CarpetBombing_RetreatAndDestroy(const FVector& RetreatLocation);
+
+	/**
+	 * @brief Orders this aircraft through the one-shot global-ability drop pipeline without affecting regular commands.
+	 * @param DropRequest Payload, landing, stay, spawn, and retreat data owned by this drop run.
+	 */
+	void OrderAircraftDrop(const FAircraftDropRequest& DropRequest);
 
 private:
 	/**
@@ -615,6 +622,20 @@ private:
 	};
 
 	FAircraftCarpetBombingState M_CarpetBombingState;
+
+	FAircraftDropRequest M_AircraftDropRequest;
+	FTimerHandle M_AircraftDropStayLandedTimerHandle;
+	void AircraftDrop_MoveToDropLocation();
+	void AircraftDrop_OnMoveCompleted();
+	void AircraftDrop_OnLanded();
+	void AircraftDrop_OnStayLandedFinished();
+	void AircraftDrop_OnVtoCompleted();
+	void AircraftDrop_SpawnSquads() const;
+	void AircraftDrop_SpawnSquad(ESquadSubtype SquadSubtype, int32 SquadIndex) const;
+	void AircraftDrop_AttachTank();
+	void AircraftDrop_DetachTank();
+	void AircraftDrop_PlayDropOffSound() const;
+	FVector AircraftDrop_GetProjectedSquadSpawnLocation(int32 SquadIndex) const;
 
 	FAircraftStrafeState M_StrafeState;
 	FAircraftAttackMoveSettings M_PreStrafeAttackMoveSettings;

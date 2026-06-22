@@ -171,6 +171,9 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void ChangeAbilityCooldown(const EAbilityID AbilityId, const float NewCooldown, const int32 Subtype);
 
+	/** @brief Restores turret and hull weapon auto-engage after temporary aircraft transport disabling. */
+	void EnableWeaponsAfterAircraftDrop();
+
 protected:
 	virtual void Tick(float DeltaSeconds) override;
 
