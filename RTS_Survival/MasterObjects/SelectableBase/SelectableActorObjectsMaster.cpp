@@ -30,6 +30,15 @@ bool ASelectableActorObjectsMaster::GetIsUnitInCombat() const
 	return RTSComponent->GetIsUnitInCombat();
 }
 
+void ASelectableActorObjectsMaster::PropagateNewAggroStance(const ERTSAggroBehaviour NewStance)
+{
+	
+}
+
+void ASelectableActorObjectsMaster::PropagateNewTargetPreference(const ETargetPreference TargetPreference)
+{
+}
+
 void ASelectableActorObjectsMaster::SetUnitSelected(const bool bIsSelected) const
 {
 	if (not GetIsValidSelectionComponent())

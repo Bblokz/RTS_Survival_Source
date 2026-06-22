@@ -42,6 +42,16 @@ AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
 	M_AircraftWeapon = CreateDefaultSubobject<UAircraftWeapon>(TEXT("AircraftWeapon"));
 }
 
+void AAircraftMaster::PropagateNewAggroStance(const ERTSAggroBehaviour NewStance)
+{
+	SetAggroStance(NewStance);
+}
+
+void AAircraftMaster::PropagateNewTargetPreference(const ETargetPreference TargetPreference)
+{
+	SetTargetPreference(TargetPreference);
+}
+
 
 void AAircraftMaster::OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo)
 {
@@ -68,7 +78,7 @@ void AAircraftMaster::BeginPlay()
 	BeginPlay_PropagateStateToWpAndAnimInst();
 	if (ensure(GetIsValidTargetAcquisition()))
 	{
-		M_TargetAcquisition->Activate();
+		M_TargetAcquisition->ActivateAcquisition();
 	}
 	CheckForUpgrades();
 }
@@ -477,7 +487,7 @@ void AAircraftMaster::SetTargetPreference(const ETargetPreference TargetPreferen
 	M_AircraftWeapon->SetTargetPreference(TargetPreference);
 }
 
-void AAircraftMaster::SetEngagementStance(const ERTSAggroBehaviour NewStance)
+void AAircraftMaster::SetAggroStance(const ERTSAggroBehaviour NewStance)
 {
 	if (not GetIsValidTargetAcquisition())
 	{

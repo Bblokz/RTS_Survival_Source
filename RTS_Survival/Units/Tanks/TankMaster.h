@@ -173,6 +173,10 @@ public:
 
 	/** @brief Restores turret and hull weapon auto-engage after temporary aircraft transport disabling. */
 	void EnableWeaponsAfterAircraftDrop();
+	
+	UFUNCTION(BlueprintCallable, Category="Turrets")
+	void SetTurretsDisabled();
+	
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -212,8 +216,6 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Turrets")
 	void SetTurretsToAutoEngage(const bool bUseLastTarget);
 
-	UFUNCTION(BlueprintCallable, Category="Turrets")
-	void SetTurretsDisabled();
 
 	// The turrets mounted on this tank.
 	UPROPERTY()

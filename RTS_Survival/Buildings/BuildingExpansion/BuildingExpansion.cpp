@@ -31,7 +31,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
-ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializer):
+ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializer) :
 	Super(ObjectInitializer),
 	BuildingMeshComponent(nullptr),
 	M_ConstructionMesh(nullptr),
@@ -61,6 +61,36 @@ ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializ
 void ABuildingExpansion::GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const
 {
 	OutLocalOffsets = AimOffsetPoints;
+}
+
+void ABuildingExpansion::PropagateNewTargetPreference(const ETargetPreference TargetPreference)
+{
+	for (auto EachTurret : M_TTurrets)
+	{
+		if (not EachTurret.IsValid())
+		{
+			continue;
+		}
+		EachTurret->SetTargetPreference(TargetPreference);
+	}
+}
+
+ETargetPreference ABuildingExpansion::GetTargetPreference() const
+{
+	if (M_TTurrets.IsEmpty())
+	{
+		return ETargetPreference::None;
+	}
+
+	for (auto EachTurret : M_TTurrets)
+	{
+		if (not EachTurret.IsValid())
+		{
+			continue;
+		}
+		return EachTurret->GetTargetPreference();
+	}
+	return ETargetPreference::None;
 }
 
 void ABuildingExpansion::OnBuildingExpansionCreatedByOwner(const TScriptInterface<IBuildingExpansionOwner>& NewOwner,
@@ -235,7 +265,7 @@ TArray<ACPPTurretsMaster*> ABuildingExpansion::GetTurrets() const
 
 void ABuildingExpansion::AddAdditionalHealth(const float AddedHp, const float AddedDamageReduction) const
 {
-	if(not GetIsValidHealthComponent())
+	if (not GetIsValidHealthComponent())
 	{
 		return;
 	}
@@ -244,7 +274,7 @@ void ABuildingExpansion::AddAdditionalHealth(const float AddedHp, const float Ad
 
 void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> Primitives)
 {
-	for(auto EachPrimitive : Primitives)
+	for (auto EachPrimitive : Primitives)
 	{
 		if (not IsValid(EachPrimitive))
 		{
@@ -254,7 +284,6 @@ void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> P
 		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
 		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_LANDSCAPE, ECR_Overlap);
 		EachPrimitive->SetCollisionObjectType(COLLISION_OBJ_PLAYER);
-	
 	}
 }
 
@@ -749,13 +778,13 @@ void ABuildingExpansion::InitBuildingExpansion(
 	const bool bLetBuildingMeshAffectNavMesh)
 {
 	const FBxpData MyData = GetBxpData(NewBuildingExpansionType);
-	if(GetIsValidRTSComponent())
+	if (GetIsValidRTSComponent())
 	{
 		RTSComponent->SetUnitSubtype(ENomadicSubtype::Nomadic_None,
-			 ETankSubtype::Tank_None,
-			 ESquadSubtype::Squad_None,
-			 NewBuildingExpansionType,
-			 EAircraftSubtype::Aircarft_None);
+		                             ETankSubtype::Tank_None,
+		                             ESquadSubtype::Squad_None,
+		                             NewBuildingExpansionType,
+		                             EAircraftSubtype::Aircarft_None);
 	}
 	if (GetIsValidFowComponent())
 	{
@@ -1406,36 +1435,35 @@ void ABuildingExpansion::OnInitBuildingExpansion_SetupCollision(const bool bLetB
 
 void ABuildingExpansion::PostInit_SetupAbilities()
 {
-		URTSComponent* RTSComp = GetRTSComponent();
-		if (RTSComp->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
-		{
-			RTSFunctionLibrary::ReportError(
-				"Cannot init abililties for building expansion: " + GetName() +
-				"\n Building expansion is not of type BuildingExpansion. \n Ensure the building expansion is spawned correctly.");
-			return;
-		}
-		bool bIsValidData = false;
-		const EBuildingExpansionType MyBxpType = RTSComp->GetSubtypeAsBxpSubtype();
-		if (RTSComp->GetOwningPlayer() == 1)
-		{
-			const FBxpData BxpData = FRTS_Statics::BP_GetPlayerBxpData(MyBxpType,
-			                                                           this, bIsValidData);
-			InitAbilityArray(BxpData.Abilities);
-		}
-		else
-		{
-			const FBxpData BxpData = FRTS_Statics::BP_GetEnemyBxpData(MyBxpType,
-			                                                          this, bIsValidData);
-			InitAbilityArray(BxpData.Abilities);
-		}
-		if (not bIsValidData)
-		{
-			RTSFunctionLibrary::ReportError("Could not get valid data for buiding expansion when setting the abilities"
-				"\n in function ABuildingExpansion::BeginPlay_NextFrameInitAbilities"
-				"\n for expansion: " + GetName() +
-				"\n Ensure the data is set correctly in the GameState");
-		}
-
+	URTSComponent* RTSComp = GetRTSComponent();
+	if (RTSComp->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot init abililties for building expansion: " + GetName() +
+			"\n Building expansion is not of type BuildingExpansion. \n Ensure the building expansion is spawned correctly.");
+		return;
+	}
+	bool bIsValidData = false;
+	const EBuildingExpansionType MyBxpType = RTSComp->GetSubtypeAsBxpSubtype();
+	if (RTSComp->GetOwningPlayer() == 1)
+	{
+		const FBxpData BxpData = FRTS_Statics::BP_GetPlayerBxpData(MyBxpType,
+		                                                           this, bIsValidData);
+		InitAbilityArray(BxpData.Abilities);
+	}
+	else
+	{
+		const FBxpData BxpData = FRTS_Statics::BP_GetEnemyBxpData(MyBxpType,
+		                                                          this, bIsValidData);
+		InitAbilityArray(BxpData.Abilities);
+	}
+	if (not bIsValidData)
+	{
+		RTSFunctionLibrary::ReportError("Could not get valid data for buiding expansion when setting the abilities"
+			"\n in function ABuildingExpansion::BeginPlay_NextFrameInitAbilities"
+			"\n for expansion: " + GetName() +
+			"\n Ensure the data is set correctly in the GameState");
+	}
 }
 
 void ABuildingExpansion::DebugDisplayMessage(const FString& Message) const
@@ -1447,7 +1475,7 @@ void ABuildingExpansion::DebugDisplayMessage(const FString& Message) const
 }
 
 void ABuildingExpansion::AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& CollapseParameters,
-	UNiagaraSystem* AttachSystem)
+                                                  UNiagaraSystem* AttachSystem)
 {
 	if (not IsValid(AttachSystem))
 	{

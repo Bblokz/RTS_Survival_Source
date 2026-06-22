@@ -312,7 +312,8 @@ public:
 
 	AActor* GetPrimarySelectedUnit() const;
 	
-	void PropagateEngagementStanceToAllUnits(const ERTSAggroBehaviour NewStance);
+	void PropagateAggroToAllUnits(const ERTSAggroBehaviour NewStance);
+	void PropagateTargetPreferenceToAllUnits(const ETargetPreference TargetPreference);
 	
 	// ------------------ Global ability system ----------------------
 	void OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,

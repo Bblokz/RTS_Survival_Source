@@ -299,16 +299,37 @@ AActor* ACPPController::GetPrimarySelectedUnit() const
 	return M_GameUIController->GetPrimarySelectedUnit();
 }
 
-void ACPPController::PropagateEngagementStanceToAllUnits(const ERTSAggroBehaviour NewStance)
+void ACPPController::PropagateAggroToAllUnits(const ERTSAggroBehaviour NewStance)
 {
 	EnsureSelectionsAreRTSValid();
 	for (auto EachSquad : TSelectedSquadControllers)
 	{
-		
+		EachSquad->SetAggroStance(NewStance);
 	}
 	for (auto EachSelectedPawn : TSelectedPawnMasters)
 	{
-		
+		EachSelectedPawn->PropagateNewAggroStance(NewStance);
+	}
+	for (auto EachSelectedActors : TSelectedActorsMasters)
+	{
+		EachSelectedActors->PropagateNewAggroStance(NewStance);
+	}
+}
+
+void ACPPController::PropagateTargetPreferenceToAllUnits(const ETargetPreference TargetPreference)
+{
+	EnsureSelectionsAreRTSValid();
+	for (auto EachSquad : TSelectedSquadControllers)
+	{
+		EachSquad->SetTargetPreference(TargetPreference);
+	}
+	for (auto EachSelectedPawn : TSelectedPawnMasters)
+	{
+		EachSelectedPawn->PropagateNewTargetPreference(TargetPreference);
+	}
+	for (auto EachSelectedActors : TSelectedActorsMasters)
+	{
+		EachSelectedActors->PropagateNewTargetPreference(TargetPreference);
 	}
 }
 

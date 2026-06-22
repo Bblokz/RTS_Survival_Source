@@ -600,7 +600,7 @@ void AInfantryWeaponMaster::SetTargetPreference(const ETargetPreference NewTarge
 {
 	if (TargetPreference == ETargetPreference::Aircraft)
 	{
-		// Special case used to identify that this turret can attack air; no change possible.	
+		// Special case used to identify that this weapon can attack air; no change possible.	
 		return;
 	}
 	TargetPreference = NewTargetPreference;

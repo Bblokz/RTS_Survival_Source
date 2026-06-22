@@ -13,7 +13,7 @@
 
 #include "AAircraftMaster.generated.h"
 
-enum class ERTSAggroBehaviour;
+enum class ERTSAggroBehaviour :uint8;
 enum class ETargetPreference : uint8;
 struct FRTSVerticalAnimTextSettings;
 struct FAircraftReloadManager;
@@ -53,10 +53,14 @@ class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterfac
 public:
 	AAircraftMaster(const FObjectInitializer& ObjectInitializer);
 	
+	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) final;
+	virtual void PropagateNewTargetPreference(const ETargetPreference TargetPreference) final;
+	
+	
 	ETargetPreference GetAircraftTargetPreference() const;
 	void SetTargetPreference(const ETargetPreference TargetPreference) const;
 	
-	void SetEngagementStance(const ERTSAggroBehaviour NewStance);
+	void SetAggroStance(const ERTSAggroBehaviour NewStance);
 	ERTSAggroBehaviour GetEngagementStance() const;
 
 	friend class UAircraftOwnerComp;

@@ -423,7 +423,7 @@ void ASquadController::SetTargetPreference(const ETargetPreference TargetPrefere
 	}
 }
 
-void ASquadController::SetEngagementStance(const ERTSAggroBehaviour NewStance) const
+void ASquadController::SetAggroStance(const ERTSAggroBehaviour NewStance) const
 {
 	if (not GetIsValidTargetAcquisition())
 	{
@@ -3658,7 +3658,7 @@ void ASquadController::OnAllSquadUnitsLoaded()
 	}
 	if (ensure(GetIsValidTargetAcquisition()))
 	{
-		M_TargetAcquisition->Activate();
+		M_TargetAcquisition->ActivateAcquisition();
 	}
 }
 

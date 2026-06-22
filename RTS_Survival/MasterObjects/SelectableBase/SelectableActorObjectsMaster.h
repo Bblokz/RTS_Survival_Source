@@ -10,6 +10,8 @@
 #include "SelectableActorObjectsMaster.generated.h"
 
 
+enum class ETargetPreference : uint8;
+enum class ERTSAggroBehaviour :uint8;
 class UFowComp;
 class ACPPController;
 class RTS_SURVIVAL_API USelectionComponent;
@@ -25,6 +27,10 @@ public:
 	ASelectableActorObjectsMaster(const FObjectInitializer& ObjectInitializer);
 
 	virtual bool GetIsUnitInCombat() const override;
+	
+	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) ;
+	virtual void PropagateNewTargetPreference(const ETargetPreference TargetPreference);
+	
 
 	
 	// Updates selection logic on the component which also updates the selection decal.

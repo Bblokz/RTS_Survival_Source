@@ -89,7 +89,7 @@ void URTSTargetAcquisition::SetEngagementStance(const ERTSAggroBehaviour NewStan
 	}
 }
 
-void URTSTargetAcquisition::Activate()
+void URTSTargetAcquisition::ActivateAcquisition()
 {
 	if (IsAggroTimerAllowed())
 	{

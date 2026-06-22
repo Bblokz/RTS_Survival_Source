@@ -27,7 +27,7 @@ public:
 	ERTSAggroBehaviour GetEngagementStance()const;
 	void SetEngagementStance(const ERTSAggroBehaviour NewStance);
 	// Called by the owner when the owner is fully Initialized and ready to make use of TargetAcquisition
-	void Activate();
+	void ActivateAcquisition();
 	
 
 protected:

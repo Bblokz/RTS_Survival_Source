@@ -180,7 +180,7 @@ void ATrackedTankMaster::BeginPlay()
 	BeginPlay_SetupExperienceComponent();
 	if (ensure(GetIsValidTargetAcquisition()))
 	{
-		M_TargetAcquisition->Activate();
+		M_TargetAcquisition->ActivateAcquisition();
 	}
 }
 

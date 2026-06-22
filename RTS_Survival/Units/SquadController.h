@@ -19,7 +19,7 @@
 #include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
-enum class ERTSAggroBehaviour;
+enum class ERTSAggroBehaviour :uint8;
 enum class EVeterancyIconSet : uint8;
 class USquadTargetAcquisition;
 class UFowComp;
@@ -274,7 +274,7 @@ public:
 	ETargetPreference GetSquadTargetPreference();
 	virtual void SetTargetPreference(const ETargetPreference TargetPreference);
 	
-	void SetEngagementStance(const ERTSAggroBehaviour NewStance) const;
+	void SetAggroStance(const ERTSAggroBehaviour NewStance) const;
 	ERTSAggroBehaviour GetEngagementStance() const;
 	
 

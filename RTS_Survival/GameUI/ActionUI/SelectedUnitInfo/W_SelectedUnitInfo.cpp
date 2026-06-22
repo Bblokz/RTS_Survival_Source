@@ -104,12 +104,30 @@ void UW_SelectedUnitInfo::UpdateAggroStance(const ERTSAggroBehaviour CurrentAggr
 
 void UW_SelectedUnitInfo::OnClickedAggroStanceButton()
 {
+	if (not EnsureIsValidActionUIManager() || not IsValid(M_ActionUIManager->GetPlayerController()))
+	{
+		return;
+	}
+	
 	ERTSAggroBehaviour NewStance = RotateAggroStance(LastEngagedStance);
+	M_ActionUIManager->GetPlayerController()->PropagateAggroToAllUnits(LastEngagedStance);
 	
 }
 
 void UW_SelectedUnitInfo::OnClickedTargetPreferenceButton()
 {
+	if (not EnsureIsValidActionUIManager() || not IsValid(M_ActionUIManager->GetPlayerController()))
+	{
+		return;
+	}
+	ETargetPreference NewPreference = RotateTargetPreference(LastTargetPreference);
+	if (NewPreference == ETargetPreference::Aircraft)
+	{
+		// Special case identifying units that can hit air do not propagate this to other units as it may
+		// introduce AA units which are not AA.
+		return;
+	}
+	M_ActionUIManager->GetPlayerController()->PropagateTargetPreferenceToAllUnits(NewPreference);
 }
 
 bool UW_SelectedUnitInfo::EnsureIsValidUnitDescription() const
@@ -136,9 +154,6 @@ ETargetPreference UW_SelectedUnitInfo::RotateTargetPreference(const ETargetPrefe
 {
 	switch (TargetPreference)
 	{
-		if (TargetPreference == ETargetPreference::Aircraft)
-		{
-		}
 	case ETargetPreference::None:
 		return ETargetPreference::Infantry;
 	case ETargetPreference::Infantry:

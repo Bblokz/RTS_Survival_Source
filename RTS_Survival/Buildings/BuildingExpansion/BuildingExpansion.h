@@ -60,7 +60,9 @@ public:
 	ABuildingExpansion(FObjectInitializer const& ObjectInitializer);
 
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
-
+	
+	virtual void PropagateNewTargetPreference(const ETargetPreference TargetPreference) override;
+	ETargetPreference GetTargetPreference()const;
 		
 
 	// Called when the construction finished.
