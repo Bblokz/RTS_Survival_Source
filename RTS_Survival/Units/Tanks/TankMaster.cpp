@@ -610,6 +610,11 @@ void ATankMaster::SetTurretsToAutoEngage(const bool bUseLastTarget)
 	}
 }
 
+void ATankMaster::EnableWeaponsAfterAircraftDrop()
+{
+	SetTurretsToAutoEngage(false);
+}
+
 void ATankMaster::SetTurretsDisabled()
 {
 	for (const auto EachTurret : Turrets)
