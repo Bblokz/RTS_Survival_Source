@@ -3,7 +3,7 @@
 
 #include "W_SelectedUnitInfo.h"
 
-#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSEngagementStance.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UnitDescriptionItem/W_SelectedUnitDescription.h"
@@ -17,10 +17,17 @@ void UW_SelectedUnitInfo::SetupTargetPrefAndAgroStanceForNewUnit(AActor* Selecte
 	if (ATankMaster* Tank = Cast<ATankMaster>(SelectedActor); IsValid(Tank))
 	{
 		UpdateTargetPreference(Tank->GetTargetPreference());
+		UpdateAggroStance(Tank->GetEngagementStance());
 	}
 	if (AAircraftMaster* Aircraft = Cast<AAircraftMaster>(SelectedActor); IsValid(Aircraft))
 	{
 		UpdateTargetPreference(Aircraft->GetTargetPreference());
+		UpdateAggroStance(Aircraft->GetEngagementStance());
+	}
+	if (ASquadController* SquadController = Cast<ASquadController>(SelectedActor); IsValid(SquadController))
+	{
+		UpdateTargetPreference(SquadController->GetSquadTargetPreference());
+		UpdateAggroStance(SquadController->GetEngagementStance());
 	}
 }
 
@@ -88,12 +95,22 @@ void UW_SelectedUnitInfo::UpdateTargetPreference(const ETargetPreference TargetP
 	BP_UpdateTargetPreference(TargetPreference);
 }
 
-void UW_SelectedUnitInfo::UpdateAggroStance(const ERTSEngagementStance CurrentAggroStance)
+void UW_SelectedUnitInfo::UpdateAggroStance(const ERTSAggroBehaviour CurrentAggroStance)
 {
 	LastEngagedStance = CurrentAggroStance;
 	BP_UpdateAgroStance(CurrentAggroStance);
 }
 
+
+void UW_SelectedUnitInfo::OnClickedAggroStanceButton()
+{
+	ERTSAggroBehaviour NewStance = RotateAggroStance(LastEngagedStance);
+	
+}
+
+void UW_SelectedUnitInfo::OnClickedTargetPreferenceButton()
+{
+}
 
 bool UW_SelectedUnitInfo::EnsureIsValidUnitDescription() const
 {
@@ -106,13 +123,13 @@ bool UW_SelectedUnitInfo::EnsureIsValidUnitDescription() const
 	return true;
 }
 
-ERTSEngagementStance UW_SelectedUnitInfo::RotateAggroStance(const ERTSEngagementStance CurrentAggroStance) const
+ERTSAggroBehaviour UW_SelectedUnitInfo::RotateAggroStance(const ERTSAggroBehaviour CurrentAggroStance) const
 {
-	if (CurrentAggroStance == ERTSEngagementStance::Stance_HoldPosition)
+	if (CurrentAggroStance == ERTSAggroBehaviour::Stance_HoldPosition)
 	{
-		return ERTSEngagementStance::Stance_Aggressive;
+		return ERTSAggroBehaviour::Stance_Aggressive;
 	}
-	return ERTSEngagementStance::Stance_HoldPosition;
+	return ERTSAggroBehaviour::Stance_HoldPosition;
 }
 
 ETargetPreference UW_SelectedUnitInfo::RotateTargetPreference(const ETargetPreference TargetPreference) const

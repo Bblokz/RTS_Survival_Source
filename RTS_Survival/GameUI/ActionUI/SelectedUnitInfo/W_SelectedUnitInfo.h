@@ -6,10 +6,10 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/Border.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
-#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSEngagementStance.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "W_SelectedUnitInfo.generated.h"
 
-enum class ERTSEngagementStance : uint8;
+enum class ERTSAggroBehaviour : uint8;
 enum class ETargetPreference : uint8;
 enum class EBuildingExpansionType : uint8;
 class UActionUIManager;
@@ -84,23 +84,27 @@ protected:
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
 	void UpdateTargetPreference(const ETargetPreference TargetPreference); 
-	void UpdateAggroStance(const ERTSEngagementStance CurrentAggroStance);
+	void UpdateAggroStance(const ERTSAggroBehaviour CurrentAggroStance);
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_UpdateTargetPreference(const ETargetPreference TargetPreference);
 	UFUNCTION(BlueprintImplementableEvent)
-	void BP_UpdateAgroStance(const ERTSEngagementStance AggroStance);
+	void BP_UpdateAgroStance(const ERTSAggroBehaviour AggroStance);
+	UFUNCTION(blueprintCallable, NotBlueprintable) 
+	void OnClickedAggroStanceButton();
+	UFUNCTION(blueprintCallable, NotBlueprintable) 
+	void OnClickedTargetPreferenceButton();
 private:
 	
 	bool EnsureIsValidUnitDescription() const;
 	
-	ERTSEngagementStance RotateAggroStance(const ERTSEngagementStance CurrentAggroStance) const;
+	ERTSAggroBehaviour RotateAggroStance(const ERTSAggroBehaviour CurrentAggroStance) const;
 	ETargetPreference RotateTargetPreference(const ETargetPreference TargetPreference) const;
 
 	UPROPERTY()
 	TWeakObjectPtr<UActionUIManager> M_ActionUIManager;
 	
 	ETargetPreference LastTargetPreference = ETargetPreference::Infantry;
-	ERTSEngagementStance LastEngagedStance = ERTSEngagementStance::Stance_HoldPosition;
+	ERTSAggroBehaviour LastEngagedStance = ERTSAggroBehaviour::Stance_HoldPosition;
 
 	bool bM_IsInitialized = false;
 

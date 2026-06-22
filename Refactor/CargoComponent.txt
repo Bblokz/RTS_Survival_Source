@@ -1,47 +1,50 @@
 ﻿you are a c++ expert and perfectionist.
-You are going to futher setup and complete the global ability system for the Enemy controller.
-Here is how i want it to work:
-the global abilities for the enemy contorller will be integrated with the strategic ai component of the enemy in there it needs
-to get its own thinkstep timer.
-
-I also want an additional settings struct that will contain more general rules/ settings for this enemy ai global abilty system:
-for now add to it float TimeTillAllowHeavyCarpetBombing
-and float TimeTillAllowBarrages
-
-very important:
-1. the enemy global ability component does not make use of ai (is for CPU only)
-2. owning player == 1 is the player otherwise it is enemy. I think parts are already setup that if it was not owned by the player
-we ignore cooldown, unit and tech requiremetns but we want to ensure that only tech requirements are ignored, unit requirements
-must work and be setup that they either check the player units in the game unit manager or the enemy units.
-cooldowns will also need to work for enemy global abilities.
-
-for the player the set of abilities that is setup is determined by the player's commander for the enemy controller i want
-control per map so make sure there is a panel on the enemy controller that is editable anywere, bp friendly so i can specify 
-which global abilty enum values the enemy on that map will have access to.
-also add for each of those entries a boolean bool bStartOnCooldown = false and float CooldownTimeOverride = 0
-if CooldownTimeOverride is less than zero or zero we ignore it but otherwise it will have to overwrite the cooldown the global ability gets
-by default.
-Make sure that the enemy global ability component will only setup the abilities as per those specified.
-
-in the think step it will decided whether to use an ability, first see which abilities at that frame are available (not blocked by unit
-requirements not blocked by cooldown) after those are found. we will divide them up into ReinforcementAbilities, Barrages,  LightMediumAirStrikes and HeavyCarpetBombing.
-(make sure to only concider the soviet barrages, airdrops and attacks with soviet planes)
-then we see if certain buckets will not be allowed to be picked;
-for ReinforcementAbilities check if the blackboard has any CurrentBaseDefensePositions (make this a helper for later easy expansion for this bucket rule)
-for barrages check TimeTillAllowBarrages is over and check if we have any CurrentLocationsUnderPlayerAttack or enemey heavy tank positions in AgreggatedHeavyTankFlankingResults
-for LightMediumAirStrikes check if we have CurrentPlayerUnitBulkLocations
-for HeavyCarpetBombing check  TimeTillAllowHeavyCarpetBombing is over and if we have any CurrentPlayerUnitBulkLocations
-
-after picking (if any picking was possible) then execute the ability on one 
-of the locations logical for its bucket (see hte requiremetns, pick at random one of the positions that was concidered on the blackboard)
-again add helpers for each bucket type of global ability here for easy expansion later.
-
-
-you are a c++ expert and perfectionist.
 You are going to define a new type of global ability (UGlobalAbility) derived class called
 UGA_AircraftDrop. The idea is that I can provide an array of squad subtypes and tank subtypes on that ability's settings
 struct as well as the class of aircraft to use for dropping and then it will automatically determine how many aircraft need spawning.
- Because we will also have a setting int32 AmountInfantryPerAircraft int32 AmountTanksPerAircraft and we make sure that aircraft can
+ Because we will also have a setting int32 AmountInfantryPerAircraft while for the tanks we will always allow only
+  1 per aircraft. and we make sure that aircraft can
  either hold only tanks or only infantry.
- Also a setting float TankZOffsetFromAircraft.
+ Also a setting float z offset per tank will used for how far below or above the location of the aircraft the tank will be attached.
+ float HowLongStayLanded
+ float RadiusSpawnSquads
+ 
+ We already have two aircraft classes;
+ AAircraftMaster and AVTOLDropshipAircraft the dropship one is already used for buildings and works a bit differently; it only vtols
+ up and down to a drop postion at a building. I want you to implement the AircraftDrop functionality on the AAircraftMaster,
+ with a single public function that takes in FAircraftDropRequest. which will also have an enum in it to track the state.
+ 
+ the settings struct for this ability:
+ aircraft class soft ptr
+ tarray of pairs <tank subtypes, float PairTankWithOffset
+ tarray of squad subtypes
+ 
+ 
+ how it needs to work:
+ after the player executes the ability at a location;
+ determine how many aircraft to spawn with calculating how many tanks we need + # infantry / # infantry per aircraft and use the soft class aircraft to spawn from the settings struct
+ determine a spawn location for each individual aircraft like we also do for the other aircraft global abilities.
+ and async spawn the aircraft at their positions.
+ async load the needed tanks. for the aircraft that need squads do no loading now; those squads will be loaded once the VTOL aircraft touches the ground
+ when a tank is loaded set it to not selectable, set its turrets to be disabled as well as its hull weapons to be disabled.
+ attach it to the spawned aircraft for it, with its offset or wait for the aircraft to spawn and attach then.
+ 
+ once an aircraft is spawned:
+ if it is a tank aircraft wait for the tank to be attached first, for infantry aircraft do the next step immediatly;
+ order the aircraft the drop with the FAircraftDropRequest with all the required parameters to:
+ first order a move to the execute location wtih z set to the aircraft spawn height. Once reached:
+ then Vertical Land at the execute location (with regular z) in here make sure the aircraft fully Vertical Lands
+ to exact that z position if it is infantry only and that z postion + abs(its tank offset) ((tank offset should always be negative so ensure
+ to use abs))
+ once it landed:
+stay for  HowLongStayLanded and if infantry aircraft
+for each squad to load async load them and pick a point in circle with radius  RadiusSpawnSquads and project that to
+the navmesh with the RTSFunctionLIbrary helpers using an extend of 2.f
+ and spawn the squad at that location.
+ 
+ after HowLongStayLanded take off again and after fully taken off and airborne move to the
+ calculated aircraft retreat location (see how we do this with other global abilities iwth aircraft)
+ 
+ It is important that you make sure that all of the existing aircraft logic will still work and is not affected by this new functionality.
+ 
  

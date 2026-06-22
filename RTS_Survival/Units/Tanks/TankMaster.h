@@ -17,7 +17,7 @@
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "TankMaster.generated.h"
 
-enum class ERTSEngagementStance : uint8;
+enum class ERTSAggroBehaviour : uint8;
 class UHullWeaponComponent;
 class UTankEnergyComponent;
 class URTSOptimizer;
@@ -117,13 +117,15 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
 
+	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) final;
+	virtual void PropagateNewTargetPreference(const ETargetPreference TargetPreference) final;
 	ETargetPreference GetTargetPreference();
 	void SetTargetPreferenceForAllWeapons(const ETargetPreference NewPreference);
 
 	// virtual because TargetAcquistion component on tracked tank
-	virtual void SetEngagementStance(const ERTSEngagementStance NewStance);
+	virtual void SetAggroStance(const ERTSAggroBehaviour NewStance);
 	// virtual because TargetAcquistion component on tracked tank
-	virtual ERTSEngagementStance GetEngagementStance() const;
+	virtual ERTSAggroBehaviour GetEngagementStance() const;
 
 	// Controller is set with OnPosses on AITankMaster.
 	void SetAIController(AAITankMaster* NewController) { AITankController = NewController; }

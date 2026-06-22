@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "RTSEngagementStance/RTSEngagementStance.h"
+#include "RTSEngagementStance/RTSAggroBehaviour.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTSTargetAcquisition.generated.h"
 
@@ -24,8 +24,8 @@ public:
 	
 	virtual void OnUnitIdleAndNoNewCommands();
 	
-	ERTSEngagementStance GetEngagementStance()const;
-	void SetEngagementStance(const ERTSEngagementStance NewStance);
+	ERTSAggroBehaviour GetEngagementStance()const;
+	void SetEngagementStance(const ERTSAggroBehaviour NewStance);
 	// Called by the owner when the owner is fully Initialized and ready to make use of TargetAcquisition
 	void Activate();
 	
@@ -40,7 +40,7 @@ protected:
 	virtual float GetOwnerRange()const;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	ERTSEngagementStance EngagementStance = ERTSEngagementStance::Stance_HoldPosition;
+	ERTSAggroBehaviour EngagementStance = ERTSAggroBehaviour::Stance_HoldPosition;
 	
 	// Called when the game starts
 	virtual void BeginPlay() override;

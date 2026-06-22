@@ -113,6 +113,8 @@ public:
 
 	void UpdateExperienceBar(const float ExperiencePercentage, const int32 CumulativeExp, const int32 ExpNeededForNextLevel, const int32
 	                         CurrentLevel, const int32 MaxLevel, const EVeterancyIconSet VeterancyIconSet) const;
+	
+	ACPPController* GetPlayerController() const;
 
 private:
 	UPROPERTY()

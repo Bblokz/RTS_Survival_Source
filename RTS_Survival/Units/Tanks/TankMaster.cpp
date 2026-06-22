@@ -42,12 +42,12 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/FactionSystem/FactionFlags/FRTS_FactionFlags.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
-#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSEngagementStance.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 
 namespace TankTowHelpers
 {
 	bool TryGetLandscapeSnapLocation(const UWorld* World, const AActor* ActorToIgnore, const FVector& CurrentLocation,
-	                                FVector& OutLocation)
+	                                 FVector& OutLocation)
 	{
 		if (not IsValid(World))
 		{
@@ -286,6 +286,16 @@ ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 		TEXT("RTSOptimizer"));
 }
 
+void ATankMaster::PropagateNewAggroStance(const ERTSAggroBehaviour NewStance)
+{
+	SetAggroStance(NewStance);
+}
+
+void ATankMaster::PropagateNewTargetPreference(const ETargetPreference TargetPreference)
+{
+	SetTargetPreferenceForAllWeapons(TargetPreference);
+}
+
 ETargetPreference ATankMaster::GetTargetPreference()
 {
 	for (const auto EachTurret : Turrets)
@@ -319,14 +329,13 @@ void ATankMaster::SetTargetPreferenceForAllWeapons(const ETargetPreference NewPr
 	}
 }
 
-void ATankMaster::SetEngagementStance(const ERTSEngagementStance NewStance)
+void ATankMaster::SetAggroStance(const ERTSAggroBehaviour NewStance)
 {
-	
 }
 
-ERTSEngagementStance ATankMaster::GetEngagementStance() const
+ERTSAggroBehaviour ATankMaster::GetEngagementStance() const
 {
-	return ERTSEngagementStance::Stance_None;
+	return ERTSAggroBehaviour::Stance_None;
 }
 
 
@@ -1714,10 +1723,11 @@ void ATankMaster::ExecuteDetachTowCommand()
 bool ATankMaster::ExecuteDetachTowCommand_TryDetachSelfFromTow()
 {
 	const bool bHasValidTowComp = GetIsValidVehicleTowComponentNoReport();
-	if (not GetIsValidTowedActorComponentNoReport() || M_TowedActorComponent->IsTowFree() || not GetIsValidVehicleTowComponent())
+	if (not GetIsValidTowedActorComponentNoReport() || M_TowedActorComponent->IsTowFree() || not
+		GetIsValidVehicleTowComponent())
 	{
 		// If we do have a valid tow comp then the towed comp (of the towed actor) is no longer valid so make sure we reset the ability.
-		if(bHasValidTowComp)
+		if (bHasValidTowComp)
 		{
 			M_VehicleTowComponent->SwapAbilityToTow();
 		}
@@ -1741,11 +1751,13 @@ bool ATankMaster::ExecuteDetachTowCommand_TryDetachSelfFromTow()
 	return true;
 }
 
-void ATankMaster::ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor, UTowedActorComponent* TowedActorComponent)
+void ATankMaster::ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor,
+                                                             UTowedActorComponent* TowedActorComponent)
 {
 	TowedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	FVector LandscapeSnapLocation = FVector::ZeroVector;
-	if (TankTowHelpers::TryGetLandscapeSnapLocation(GetWorld(), TowedActor, TowedActor->GetActorLocation(), LandscapeSnapLocation))
+	if (TankTowHelpers::TryGetLandscapeSnapLocation(GetWorld(), TowedActor, TowedActor->GetActorLocation(),
+	                                                LandscapeSnapLocation))
 	{
 		TowedActor->SetActorLocation(LandscapeSnapLocation);
 	}
@@ -1758,7 +1770,6 @@ void ATankMaster::ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor,
 	TowedActorComponent->ClearTowRelationship();
 	M_VehicleTowComponent->ClearTowRelationship();
 	M_VehicleTowComponent->SwapAbilityToTow();
-
 }
 
 void ATankMaster::ExecuteDetachTowCommand_DetachTowedTeamWeapon(ATeamWeaponController* TeamWeaponController)
@@ -1766,7 +1777,6 @@ void ATankMaster::ExecuteDetachTowCommand_DetachTowedTeamWeapon(ATeamWeaponContr
 	TeamWeaponController->ExecuteDetachTowCommand();
 	M_VehicleTowComponent->ClearTowRelationship();
 	M_VehicleTowComponent->SwapAbilityToTow();
-
 }
 
 void ATankMaster::CleanupTowRelationshipsOnDeath()
@@ -1804,10 +1814,10 @@ void ATankMaster::ChangeAbilityCooldown(const EAbilityID AbilityId, const float 
 {
 	FUnitAbilityEntry NewAbility;
 	NewAbility.AbilityId = AbilityId;
-	NewAbility.CustomType= Subtype;
+	NewAbility.CustomType = Subtype;
 	NewAbility.CooldownDuration = NewCooldown;
 	NewAbility.CooldownRemaining = 0.f;
-	
+
 	SwapAbility(AbilityId, NewAbility);
 }
 

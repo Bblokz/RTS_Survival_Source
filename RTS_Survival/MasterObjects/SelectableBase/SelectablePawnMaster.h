@@ -8,6 +8,7 @@
 #include "SelectablePawnMaster.generated.h"
 
 
+enum class ERTSAggroBehaviour : uint8;
 // Forward declaration.
 enum class EAbilityID : uint8;
 class RTS_SURVIVAL_API ACPPController;
@@ -35,6 +36,9 @@ public:
 	ASelectablePawnMaster(const FObjectInitializer& ObjectInitializer);
 
 	virtual bool GetIsUnitInCombat() const override;
+	
+	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) ;
+	virtual void PropagateNewTargetPreference(const ETargetPreference TargetPreference);
 
 	// Contains references to selectionBox, decals and associated flags.
 	UFUNCTION(BlueprintCallable)

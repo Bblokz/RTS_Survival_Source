@@ -299,6 +299,20 @@ AActor* ACPPController::GetPrimarySelectedUnit() const
 	return M_GameUIController->GetPrimarySelectedUnit();
 }
 
+void ACPPController::PropagateEngagementStanceToAllUnits(const ERTSAggroBehaviour NewStance)
+{
+	EnsureSelectionsAreRTSValid();
+	for (auto EachSquad : TSelectedSquadControllers)
+	{
+		
+	}
+	for (auto EachSelectedPawn : TSelectedPawnMasters)
+	{
+		
+	}
+}
+
+
 void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,
                                              const FGlobalAbilitySoundSettings& SoundSettings,
                                              UGlobalAbility* AbilityActivated)

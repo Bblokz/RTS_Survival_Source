@@ -3,10 +3,10 @@
 #include "CoreMinimal.h"
 
 
-#include "RTSEngagementStance.generated.h"
+#include "RTSAggroBehaviour.generated.h"
 
 UENUM()
-enum class ERTSEngagementStance : uint8
+enum class ERTSAggroBehaviour : uint8
 {
 	Stance_None,
 	// Will not move out of attack range to find targets.

@@ -423,7 +423,7 @@ void ASquadController::SetTargetPreference(const ETargetPreference TargetPrefere
 	}
 }
 
-void ASquadController::SetEngagementStance(const ERTSEngagementStance NewStance) const
+void ASquadController::SetEngagementStance(const ERTSAggroBehaviour NewStance) const
 {
 	if (not GetIsValidTargetAcquisition())
 	{
@@ -432,11 +432,11 @@ void ASquadController::SetEngagementStance(const ERTSEngagementStance NewStance)
 	return M_TargetAcquisition->SetEngagementStance(NewStance);
 }
 
-ERTSEngagementStance ASquadController::GetEngagementStance() const
+ERTSAggroBehaviour ASquadController::GetEngagementStance() const
 {
 	if (not GetIsValidTargetAcquisition())
 	{
-		return ERTSEngagementStance::Stance_None;
+		return ERTSAggroBehaviour::Stance_None;
 	}
 	return M_TargetAcquisition->GetEngagementStance();
 }

@@ -474,7 +474,7 @@ void AAircraftMaster::SetTargetPreference(const ETargetPreference TargetPreferen
 	M_AircraftWeapon->SetTargetPreference(TargetPreference);
 }
 
-void AAircraftMaster::SetEngagementStance(const ERTSEngagementStance NewStance)
+void AAircraftMaster::SetEngagementStance(const ERTSAggroBehaviour NewStance)
 {
 	if (not GetIsValidTargetAcquisition())
 	{
@@ -483,11 +483,11 @@ void AAircraftMaster::SetEngagementStance(const ERTSEngagementStance NewStance)
 	M_TargetAcquisition->SetEngagementStance(NewStance);
 }
 
-ERTSEngagementStance AAircraftMaster::GetEngagementStance() const
+ERTSAggroBehaviour AAircraftMaster::GetEngagementStance() const
 {
 	if (not GetIsValidTargetAcquisition())
 	{
-		return ERTSEngagementStance::Stance_HoldPosition;
+		return ERTSAggroBehaviour::Stance_HoldPosition;
 	}
 	return M_TargetAcquisition->GetEngagementStance();
 }

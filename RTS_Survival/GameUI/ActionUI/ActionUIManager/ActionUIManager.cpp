@@ -511,7 +511,7 @@ bool UActionUIManager::SetUpActionUIForSelectedActor(
 		float HealthPercentage = SetupHealthComponent(SelectedActor, MaxHp, CurrentHp);
 		M_SelectedUnitInfo->SetupUnitInfoForNewUnit(PrimaryUnitType, HealthPercentage, MaxHp, CurrentHp, NomadicSubtype,
 		                                            TankSubtype, SquadSubtype, BxpSubtype);
-		M_SelectedUnitInfo->agro
+		M_SelectedUnitInfo->SetupTargetPrefAndAgroStanceForNewUnit( SelectedActor);
 		M_SelectedUnitInfo->SetupUnitDescriptionForNewUnit(SelectedActor,
 		                                                   PrimaryUnitType,
 		                                                   NomadicSubtype,
@@ -543,6 +543,16 @@ void UActionUIManager::UpdateExperienceBar(
 		M_SelectedUnitInfo->UpdateExperienceBar(ExperiencePercentage, CumulativeExp, ExpNeededForNextLevel,
 		                                        CurrentLevel, MaxLevel, VeterancyIconSet);
 	}
+}
+
+ACPPController* UActionUIManager::GetPlayerController() const
+{
+	if (M_PlayerController.IsValid())
+	{
+		return M_PlayerController.Get();
+	}
+	return nullptr;
+		
 }
 
 bool UActionUIManager::GetIsValidSelectedUnitInfo() const

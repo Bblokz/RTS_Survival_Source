@@ -24,6 +24,16 @@ bool ASelectablePawnMaster::GetIsUnitInCombat() const
 	return RTSComponent->GetIsUnitInCombat();
 }
 
+void ASelectablePawnMaster::PropagateNewAggroStance(const ERTSAggroBehaviour NewStance)
+{
+	
+}
+
+void ASelectablePawnMaster::PropagateNewTargetPreference(const ETargetPreference TargetPreference)
+{
+	
+}
+
 void ASelectablePawnMaster::SetUnitSelected(const bool bIsSelected) const
 {
 	if (not GetIsValidSelectionComponent())

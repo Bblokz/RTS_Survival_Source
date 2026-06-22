@@ -55,6 +55,7 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "CPPController.generated.h"
 
+enum class ERTSAggroBehaviour : uint8;
 class UGlobalAbility;
 enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
@@ -310,6 +311,8 @@ public:
 	void InitBuildingUI_ItemPanel(UW_BuildingUI_ItemPanel* Panel);
 
 	AActor* GetPrimarySelectedUnit() const;
+	
+	void PropagateEngagementStanceToAllUnits(const ERTSAggroBehaviour NewStance);
 	
 	// ------------------ Global ability system ----------------------
 	void OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& AimSettings,

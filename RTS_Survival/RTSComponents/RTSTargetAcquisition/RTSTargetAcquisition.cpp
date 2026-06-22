@@ -15,12 +15,12 @@ namespace RTSTargetAcquisitionDebug
 	constexpr float DebugStringZOffset = 600.f;
 	constexpr float DebugStringDuration = 6.f;
 
-	FString GetStanceDebugString(const ERTSEngagementStance Stance)
+	FString GetStanceDebugString(const ERTSAggroBehaviour Stance)
 	{
 		switch (Stance)
 		{
-		case ERTSEngagementStance::Stance_HoldPosition: return TEXT("Hold Position");
-		case ERTSEngagementStance::Stance_Aggressive: return TEXT("Aggressive");
+		case ERTSAggroBehaviour::Stance_HoldPosition: return TEXT("Hold Position");
+		case ERTSAggroBehaviour::Stance_Aggressive: return TEXT("Aggressive");
 		default: return TEXT("None");
 		}
 	}
@@ -63,12 +63,12 @@ void URTSTargetAcquisition::OnUnitIdleAndNoNewCommands()
 {
 }
 
-ERTSEngagementStance URTSTargetAcquisition::GetEngagementStance() const
+ERTSAggroBehaviour URTSTargetAcquisition::GetEngagementStance() const
 {
 	return EngagementStance;
 }
 
-void URTSTargetAcquisition::SetEngagementStance(const ERTSEngagementStance NewStance)
+void URTSTargetAcquisition::SetEngagementStance(const ERTSAggroBehaviour NewStance)
 {
 	if (NewStance == EngagementStance)
 	{
@@ -195,7 +195,7 @@ bool URTSTargetAcquisition::GetOwnerAsICommands(ICommands*& OwnerICommands) cons
 
 bool URTSTargetAcquisition::CanAggroEnemies() const
 {
-	if (EngagementStance == ERTSEngagementStance::Stance_Aggressive)
+	if (EngagementStance == ERTSAggroBehaviour::Stance_Aggressive)
 	{
 		return true;
 	}
@@ -209,7 +209,7 @@ float URTSTargetAcquisition::GetOwnerRange() const
 
 bool URTSTargetAcquisition::IsAggroTimerAllowed() const
 {
-	if (EngagementStance == ERTSEngagementStance::Stance_Aggressive)
+	if (EngagementStance == ERTSAggroBehaviour::Stance_Aggressive)
 	{
 		return true;
 	}

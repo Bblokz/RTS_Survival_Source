@@ -12,7 +12,7 @@
 
 #include "AAircraftMaster.generated.h"
 
-enum class ERTSEngagementStance;
+enum class ERTSAggroBehaviour;
 enum class ETargetPreference : uint8;
 struct FRTSVerticalAnimTextSettings;
 struct FAircraftReloadManager;
@@ -55,8 +55,8 @@ public:
 	ETargetPreference GetAircraftTargetPreference() const;
 	void SetTargetPreference(const ETargetPreference TargetPreference) const;
 	
-	void SetEngagementStance(const ERTSEngagementStance NewStance);
-	ERTSEngagementStance GetEngagementStance() const;
+	void SetEngagementStance(const ERTSAggroBehaviour NewStance);
+	ERTSAggroBehaviour GetEngagementStance() const;
 
 	friend class UAircraftOwnerComp;
 

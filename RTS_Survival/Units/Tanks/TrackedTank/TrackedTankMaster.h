@@ -60,8 +60,8 @@ public:
 	ATrackedTankMaster(const FObjectInitializer& ObjectInitializer);
 	TObjectPtr<UDigInComponent> GetDigInComponent() const { return M_DigInComponent; }
 	
-	virtual ERTSEngagementStance GetEngagementStance() const override final;
-	virtual void SetEngagementStance(const ERTSEngagementStance NewStance) override final;
+	virtual ERTSAggroBehaviour GetEngagementStance() const override final;
+	virtual void SetAggroStance(const ERTSAggroBehaviour NewStance) override final;
 
 	virtual void UpdateVehicle_Implementation(
 		float TargetAngle,
