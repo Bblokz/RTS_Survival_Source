@@ -5521,8 +5521,21 @@ void ACPPController::DirectActionButtonExitCargo()
 	// so we issue it to selected squads.
 	for (ASquadController* EachSquad : TSelectedSquadControllers)
 	{
-		if (!RTSFunctionLibrary::RTSIsValid(EachSquad)) { continue; }
+		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
+		{
+			continue;
+		}
 		CommandsExe += (EachSquad->ExitCargo(bResetQueue) == ECommandQueueError::NoError);
+	}
+
+	for (ASelectablePawnMaster* EachPawn : TSelectedPawnMasters)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachPawn))
+		{
+			continue;
+		}
+
+		CommandsExe += EachPawn->ExitCargo(bResetQueue) == ECommandQueueError::NoError;
 	}
 
 	// Optional VO feedback if something actually executed.

@@ -350,6 +350,7 @@ protected:
 
 	virtual void ExecuteReturnCargoCommand() override final;
 	virtual void TerminateReturnCargoCommand() override final;
+	virtual void ExecuteExitCargoCommand() override final;
 
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype) override;
 	virtual void TerminateTowActorCommand() override;

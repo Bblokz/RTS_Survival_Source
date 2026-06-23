@@ -15,6 +15,7 @@ class UPrimitiveComponent;
 class UCargo;
 class ASquadUnit;
 class ASquadController;
+class ATankMaster;
 
 /**
  * @brief Tracks how many squads may occupy this cargo and who is currently inside.
@@ -230,6 +231,9 @@ public:
 	 */
 	void OnSquadExited(ASquadController* SquadController, const TArray<ASquadUnit*>& Units);
 
+	/** @brief Immediately exits every squad currently registered in this cargo. */
+	void ExitAllSquads();
+
 	/**
 	 * @brief Validate the cached cargo mesh.
 	 * @return true if the mesh pointer is valid; logs an error and returns false otherwise.
@@ -310,6 +314,9 @@ private:
 	void SweepInvalidSquadSlots();
 
 	void RegisterSquadAtVacancy(ASquadController* Squad, const bool bRegister);
+	void AddExitCargoAbilityToTankOwner() const;
+	void RemoveExitCargoAbilityFromTankOwner() const;
+	ATankMaster* GetTankOwner() const;
 
 	void BeginPlay_SetOwnerInterface();
 
@@ -346,6 +353,10 @@ private:
         void OnOwnerDies_DetachIfAttachedToOwner(ASquadUnit* Unit);
         void ApplyDamageToSquadUnits(ASquadController* SquadController, const int32 DamagePercent) const;
         float CalculateDamageAmountForUnit(UHealthComponent* HealthComponent, const int32 DamagePercent) const;
+
+	// Index where tank cargo owners should show ExitCargo while squads are inside.
+	UPROPERTY(EditDefaultsOnly, Category="Cargo|Abilities")
+	int32 M_PreferredExitCargoAbilityIndex = 11;
 
 	// Interval in seconds for automatic seat reshuffle; <= 0 disables reshuffle entirely.
 	UPROPERTY(EditDefaultsOnly, Category="Cargo|Optimisation")
