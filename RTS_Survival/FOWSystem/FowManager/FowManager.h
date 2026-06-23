@@ -387,6 +387,23 @@ private:
 	 */
 	void UpdateDrawBuffer();
 
+	FVector BuildFowDrawBufferEntry(UFowComp& FowComponent, const AActor& OwnerActor) const;
+
+	FIntPoint GetFowDrawCellKey(const FVector& WorldLocation) const;
+
+	/**
+	 * @brief Keeps one vision draw entry per render-target cell so overlapping units cannot race on the GPU.
+	 *
+	 * @param CellKey Quantized render-target cell used as the stable overlap bucket.
+	 * @param DrawBufferEntry Candidate world location with vision radius stored in Z.
+	 * @param CellKeyToDrawBufferIndex Lookup for the current draw-buffer slot owned by each cell.
+	 */
+	void AddOrReplaceDrawBufferEntryForCell(const FIntPoint& CellKey,
+	                                        const FVector& DrawBufferEntry,
+	                                        TMap<FIntPoint, int32>& CellKeyToDrawBufferIndex);
+
+	bool GetIsValidNiagaraDraw() const;
+
 	/**
 	 * @brief Pushes playable bounds to the player camera controller and retries for a short window if needed.
 	 *
