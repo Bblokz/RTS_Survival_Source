@@ -22,6 +22,7 @@
 #include "Sound/SoundCue.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/DeveloperSettings/RTSGameInstancePIEDeveloperSettings.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 
 void FMissionSeededSpawnBatchState::Init(UMissionBase* Mission, const int32 CallbackID)
 {
@@ -357,6 +358,29 @@ UW_MissionTimer* AMissionManager::CreateAndInitMissionTimerWidget(TSubclassOf<UW
 	MissionTimerWidget->AddToViewport(MissionTimerWidgetZOrder);
 	MissionTimerWidget->InitMissionTimer(TimerText, TimerInSeconds, LifetimeSettings);
 	return MissionTimerWidget;
+}
+
+void AMissionManager::ExecuteGlobalAbility(UGlobalAbility* GlobalAbility, const int32 OwningPlayer,
+                                           FVector ExecuteLocation)
+{
+	if (not IsValid(GlobalAbility))
+	{
+		RTSFunctionLibrary::ReportError("Global Ability is invalid, see Execute global ability on mission manager");
+	}
+	UGlobalAbilitiesManager* AbilitiesManager = nullptr;
+	ACPPController* PlayerController = FRTS_Statics::GetRTSController(this);
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	if (OwningPlayer == 1 && IsValid(PlayerController))
+	{
+		AbilitiesManager = PlayerController->GetGlobalAbilitiesManager();
+	}
+	else if (IsValid(EnemyController))
+	{
+		AbilitiesManager = EnemyController->GetGlobalAbilitiesManager();
+	}
+	M_GlobalAbilityOneShots.Add(GlobalAbility);
+	GlobalAbility->InitGlobalAbility(OwningPlayer, AbilitiesManager, PlayerController);
+	GlobalAbility->ExecuteAbilityAtLocation(ExecuteLocation);
 }
 
 void AMissionManager::PlaySound2DForMission(USoundBase* SoundToPlay) const

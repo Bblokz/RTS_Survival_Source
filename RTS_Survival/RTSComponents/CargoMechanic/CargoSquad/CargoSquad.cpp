@@ -358,6 +358,7 @@ bool UCargoSquad::AbilityRequiresOutside(const EAbilityID Ability)
 	case EAbilityID::IdEnterCargo:
 	case EAbilityID::IdExitCargo:
 	case EAbilityID::IdAttack:
+	case EAbilityID::IdAttackGround:
 	case EAbilityID::IdSwitchWeapon:
 	case EAbilityID::IdIdle:
 		return false;

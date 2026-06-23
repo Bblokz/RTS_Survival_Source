@@ -45,6 +45,7 @@ public:
 	AEnemyController(const FObjectInitializer& ObjectInitializer);
 
 	UStochasticDecisionTree* GetStrategicDecisionTree();
+	UGlobalAbilitiesManager* GetGlobalAbilitiesManager();
 
 	// This is used to evaluate whether the AI can use its decision tree to manually control units that are 'idle' on the blackboard
 	// which makes them eligible for strategic AI commands that take direct control of units.

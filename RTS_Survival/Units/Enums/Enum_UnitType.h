@@ -607,6 +607,10 @@ static FString Global_GetTankDisplayName(ETankSubtype TankSubtype)
 	{
 		return "sdkfz-251";
 	}
+	if (TankSubtype == ETankSubtype::Tank_PzIII_J_Commander || TankSubtype == ETankSubtype::Tank_PzIV_F1_Commander)
+	{
+		return "commander";
+	}
 
 	// Use StaticEnum to retrieve the UEnum* for ETankSubtype
 	static UEnum* EnumPtr = StaticEnum<ETankSubtype>();

@@ -290,6 +290,11 @@ void ACPPController::InitBuildingUI_ItemPanel(UW_BuildingUI_ItemPanel* Panel)
 	(void)EnsureIsValidBuildingUI_ItemPanel();
 }
 
+UGlobalAbilitiesManager* ACPPController::GetGlobalAbilitiesManager() const
+{
+	return M_PlayerGlobabilitiesManager;
+}
+
 AActor* ACPPController::GetPrimarySelectedUnit() const
 {
 	if (not GetIsValidGameUIController())

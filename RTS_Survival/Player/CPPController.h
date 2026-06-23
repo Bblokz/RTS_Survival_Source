@@ -309,6 +309,8 @@ public:
 
 	void InitPortrait(UW_Portrait* PortraitWidget) const;
 	void InitBuildingUI_ItemPanel(UW_BuildingUI_ItemPanel* Panel);
+	
+	UGlobalAbilitiesManager* GetGlobalAbilitiesManager() const;
 
 	AActor* GetPrimarySelectedUnit() const;
 	

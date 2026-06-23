@@ -111,6 +111,7 @@ void UW_SelectedUnitInfo::OnClickedAggroStanceButton()
 	
 	ERTSAggroBehaviour NewStance = RotateAggroStance(LastEngagedStance);
 	M_ActionUIManager->GetPlayerController()->PropagateAggroToAllUnits(LastEngagedStance);
+	UpdateAggroStance(NewStance);
 	
 }
 
@@ -128,6 +129,7 @@ void UW_SelectedUnitInfo::OnClickedTargetPreferenceButton()
 		return;
 	}
 	M_ActionUIManager->GetPlayerController()->PropagateTargetPreferenceToAllUnits(NewPreference);
+	UpdateTargetPreference(NewPreference);
 }
 
 bool UW_SelectedUnitInfo::EnsureIsValidUnitDescription() const

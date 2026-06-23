@@ -907,9 +907,9 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 void ASquadController::OnSquadUnitOutOfRange(const FVector& TargetLocation)
 {
 	// If one unit is out of range, ensure we're allowed to move (exit cargo if needed) and move everyone closer.
-	if (IsValid(CargoSquad))
+	if (IsValid(CargoSquad) && CargoSquad->GetIsInsideCargo())
 	{
-		CargoSquad->CheckCargoState(EAbilityID::IdNoAbility_MoveCloserToTarget);
+		return;
 	}
 
 	FVector ProjectedLocation = ProjectLocationOnNavMesh(TargetLocation, 500, true);

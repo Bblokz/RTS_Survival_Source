@@ -20,6 +20,7 @@
 #include "MissionManager.generated.h"
 
 
+class UGlobalAbility;
 class UW_Mission;
 class UW_MissionTimer;
 struct FMissionWidgetState;
@@ -219,6 +220,11 @@ public:
 	                                                 float TimerInSeconds,
 	                                                 const FMissionTimerLifetimeSettings& LifetimeSettings);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void ExecuteGlobalAbility(UGlobalAbility* GlobalAbility,
+		const int32 OwningPlayer,
+		FVector ExecuteLocation);
+	
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlaySound2DForMission(USoundBase* SoundToPlay) const;
 	/**
 	 * @brief Routes mission callback scheduling to the dedicated scheduler component.
@@ -413,6 +419,8 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
+	UPROPERTY()
+	TArray<TObjectPtr< UGlobalAbility>> M_GlobalAbilityOneShots;
 	// All missions that are currently active.
 	// Missions provided by the blueprint edit anywhere array.
 	UPROPERTY()

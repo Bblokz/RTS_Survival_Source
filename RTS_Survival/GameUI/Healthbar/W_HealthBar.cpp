@@ -224,11 +224,6 @@ void UW_HealthBar::ApplyCustomization() const
 			const FLinearColor& Color = GetColorGradientForHeath(1.0);
 			M_HealthBarImage->SetColorAndOpacity(Color);
 		}
-		if (M_UnitNameText)
-		{
-			const FLinearColor& Color = GetColorGradientForHeath(1.0);
-			M_UnitNameText->SetColorAndOpacity(Color);
-		}
 	}
 	else
 	{

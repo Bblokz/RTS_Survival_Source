@@ -136,6 +136,11 @@ UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
 	return M_StochasticDecisionTree;
 }
 
+UGlobalAbilitiesManager* AEnemyController::GetGlobalAbilitiesManager()
+{
+	return M_EnemyGlobalAbilitiesManager;
+}
+
 void AEnemyController::SetAllowDirectControlStochasticDecisionTree(const bool bAllow)
 {
 	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
