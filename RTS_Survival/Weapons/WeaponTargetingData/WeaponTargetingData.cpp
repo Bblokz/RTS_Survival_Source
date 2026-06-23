@@ -79,6 +79,12 @@ void FWeaponTargetingData::ResetTarget()
 	M_ActiveTargetLocation = FVector::ZeroVector;
 }
 
+FVector& FWeaponTargetingData::GetActiveTargetLocation()
+{
+	RecomputeActiveWorldLocation();
+	return M_ActiveTargetLocation;
+}
+
 bool FWeaponTargetingData::GetIsTargetValid() const
 {
 	// Ground targeting is always valid as far as this struct is concerned.
@@ -169,14 +175,16 @@ void FWeaponTargetingData::RecomputeActiveWorldLocation()
 
 void FWeaponTargetingData::RecomputeActorTargetLocationWithCurrentAimOffset()
 {
-	if (GetIsValidTargetActor())
+	if (not GetIsValidTargetActor())
 	{
-		const FTransform T = M_TargetActor->GetActorTransform();
-		const FVector Local = M_LocalAimOffsets.IsValidIndex(M_SelectedIndex)
-			                      ? M_LocalAimOffsets[M_SelectedIndex]
-			                      : FallBackOffsetInvalidIndex;
-		M_ActiveTargetLocation = T.TransformPosition(Local); // handles scale/mirror safely
+		return;
 	}
+
+	const FTransform TargetTransform = M_TargetActor->GetActorTransform();
+	const FVector LocalAimOffset = M_LocalAimOffsets.IsValidIndex(M_SelectedIndex)
+			                            ? M_LocalAimOffsets[M_SelectedIndex]
+			                            : M_FallbackOffsetInvalidIndex;
+	M_ActiveTargetLocation = TargetTransform.TransformPosition(LocalAimOffset); // handles scale/mirror safely
 }
 
 void FWeaponTargetingData::RerollSwitchThreshold()

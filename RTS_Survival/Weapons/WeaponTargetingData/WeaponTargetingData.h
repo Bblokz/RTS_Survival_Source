@@ -24,10 +24,10 @@ enum class ETargetMode : uint8
  * @brief Lightweight, cache-friendly targeting core shared by all weapons.
  * - Supports Actor/Ground/None via ETargetMode.
  * - Caches exactly 4 local aim offsets once when a new Actor target is set.
- * - Exposes a cached world-space ActiveTargetLocation for hot paths.
+ * - Exposes the current world-space ActiveTargetLocation for hot paths.
  * - Provides TickAimSelection() to rotate the selected aim point after N requests.
  * @note InitTargetStruct: call whenever/after owning player is known (or changes).
- * @note SetTargetActor / SetTargetGround: set the active target; struct caches offsets/world loc.
+ * @note SetTargetActor / SetTargetGround: set the active target; actor target reads refresh from current world loc.
  */
 USTRUCT()
 struct FWeaponTargetingData
@@ -38,11 +38,11 @@ public:
 	FWeaponTargetingData();
 
 	/**
-     * @brief Check if the given killed actor equals the current actor target.
-     * @param KilledActor The actor that was reported as killed.
-     * @return true if Mode==Actor and the current target actor equals KilledActor, false otherwise.
-     */
-    bool WasKilledActorCurrentTarget(const AActor* KilledActor) const;
+	 * @brief Check if the given killed actor equals the current actor target.
+	 * @param KilledActor The actor that was reported as killed.
+	 * @return true if Mode==Actor and the current target actor equals KilledActor, false otherwise.
+	 */
+	bool WasKilledActorCurrentTarget(const AActor* KilledActor) const;
 
 	/** @brief Initialize or re-initialize with owning player index and (re)seed switching threshold. */
 	void InitTargetStruct(const int32 OwningPlayer);
@@ -69,8 +69,8 @@ public:
 	 */
 	void TickAimSelection();
 
-	/** @return Cached world-space target location for aiming. */
-	FVector& GetActiveTargetLocation()  { return M_ActiveTargetLocation; }
+	/** @return Current world-space target location for aiming. */
+	FVector& GetActiveTargetLocation();
 
 	/** @return Raw actor pointer if Mode==Actor and still valid; otherwise nullptr. */
 	AActor* GetTargetActor() const { return M_TargetActor.Get(); }
@@ -85,7 +85,7 @@ private:
 	void LoadAimOffsetsFromActor(AActor* Target);
 	void UseFallbackAimOffsets();
 	void RecomputeActiveWorldLocation();
-	inline void RecomputeActorTargetLocationWithCurrentAimOffset();
+	void RecomputeActorTargetLocationWithCurrentAimOffset();
 	void RerollSwitchThreshold();
 	bool GetIsValidTargetActor() const;
 
@@ -105,7 +105,7 @@ private:
 	UPROPERTY()
 	FVector M_GroundWorldLocation = FVector::ZeroVector;
 
-	/** Cached world-space aim point for hot reads. */
+	/** Current world-space aim point for hot reads. */
 	UPROPERTY()
 	FVector M_ActiveTargetLocation = FVector::ZeroVector;
 
@@ -124,7 +124,7 @@ private:
 	int32 M_SwitchCounter = 0;
 	int32 M_TargetCallCountSwitchAim = 30; // randomized in InitTargetStruct()
 
-	FVector FallBackOffsetInvalidIndex = FVector(0,0,150);
+	FVector M_FallbackOffsetInvalidIndex = FVector(0, 0, 150);
 
 	// Overrun guard for very long sessions
 	static constexpr int32 M_MaxCounterBeforeReset = 1000000;
