@@ -39,6 +39,7 @@ public:
 	
 	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) ;
 	virtual void PropagateNewTargetPreference(const ETargetPreference TargetPreference);
+	void SetUnitSelectable(const bool bIsSelectable);
 
 	// Contains references to selectionBox, decals and associated flags.
 	UFUNCTION(BlueprintCallable)

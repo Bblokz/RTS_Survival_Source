@@ -34,6 +34,15 @@ void ASelectablePawnMaster::PropagateNewTargetPreference(const ETargetPreference
 	
 }
 
+void ASelectablePawnMaster::SetUnitSelectable(const bool bIsSelectable)
+{
+	if (not GetIsValidSelectionComponent())
+	{
+		return;
+	}
+	SelectionComponent->SetCanBeSelected(bIsSelectable);
+}
+
 void ASelectablePawnMaster::SetUnitSelected(const bool bIsSelected) const
 {
 	if (not GetIsValidSelectionComponent())

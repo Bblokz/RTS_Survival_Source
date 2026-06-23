@@ -3,6 +3,8 @@
 
 #include "GlobalAbility.h"
 
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -87,6 +89,7 @@ void UGlobalAbility::ActivateAbility()
 
 void UGlobalAbility::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
+	CreateMarker(TargetLocation);
 }
 
 EGlobalAbility UGlobalAbility::GetAbilityType() const
@@ -102,6 +105,76 @@ int32 UGlobalAbility::GetOwningPlayer() const
 void UGlobalAbility::OnInit(AActor* WorldContextActor)
 {
 }
+
+void UGlobalAbility::BeginDestroy()
+{
+	UWorld* World  =GetWorld();
+	if (IsValid(World))
+	{
+		World->GetTimerManager().ClearTimer(M_SpawnedMarkerTimer);
+	}
+	if (IsValid(M_SpawnedMarkerEffect))
+	{
+		DestroyMarker();
+	}
+	
+	UObject::BeginDestroy();
+	
+}
+
+void UGlobalAbility::CreateMarker(const FVector& ExecuteLocation)
+{
+	if (not IsValid(M_AbilityMarker.MarkerEffect)
+		|| (M_AbilityMarker.EffectTotalTime <= 0))
+	{
+		// not all abilities use markers.
+		return;
+	}
+	// Spawns, plays once, and completely deletes itself from memory when finished
+	M_SpawnedMarkerEffect =  UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		GetWorld(), 
+		M_AbilityMarker.MarkerEffect, 
+		ExecuteLocation, // World Position
+		FRotator::ZeroRotator, // World Rotation
+		FVector(1.0f), // Scale
+		false, // bAutoDestroy 
+		true // bAutoActivate
+	);
+	UWorld* World  =GetWorld();
+	if (IsValid(M_SpawnedMarkerEffect) && World)
+	{
+		OnValidMarkerSpawned();
+		TWeakObjectPtr<UGlobalAbility> WeakThis(this);
+		FTimerDelegate TimderDel;
+		auto Lambda = [WeakThis]()->void
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			TObjectPtr<UGlobalAbility> StrongThis = WeakThis.Get();
+			StrongThis->DestroyMarker();
+		};
+		TimderDel.BindLambda(Lambda);
+		World->GetTimerManager().SetTimer(M_SpawnedMarkerTimer, TimderDel, M_AbilityMarker.EffectTotalTime, false);
+	}
+}
+
+void UGlobalAbility::OnValidMarkerSpawned()
+{
+	M_SpawnedMarkerEffect->SetColorParameter("MarkerColor", M_AbilityMarker.MarkerColor);
+}
+
+void UGlobalAbility::DestroyMarker()
+{
+	if (not IsValid(M_SpawnedMarkerEffect))
+	{
+		return;
+	}
+	M_SpawnedMarkerEffect->DestroyComponent();
+	M_SpawnedMarkerEffect = nullptr;
+}
+
 
 bool UGlobalAbility::IsOwnedByPlayer() const
 {

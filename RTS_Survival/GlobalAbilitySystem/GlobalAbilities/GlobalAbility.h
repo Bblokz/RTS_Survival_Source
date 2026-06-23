@@ -76,9 +76,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGlobalAbilityMarker M_AbilityMarker;
 	
+	virtual void BeginDestroy() override;
+	
 private:
 	UPROPERTY(Transient)
 	int32 M_OwningPlayer = INDEX_NONE;
+	
+	void CreateMarker(const FVector& ExecuteLocation);
+	void OnValidMarkerSpawned();
+	void DestroyMarker();
+	
+	UPROPERTY()
+	UNiagaraComponent* M_SpawnedMarkerEffect = nullptr;
+	FTimerHandle M_SpawnedMarkerTimer;
 
 	bool IsOwnedByPlayer() const;
 

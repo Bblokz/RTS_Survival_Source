@@ -47,6 +47,8 @@ void UGA_AircraftDrop::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 
 			WeakThis->OnAircraftClassLoaded(AircraftClassToLoad, TargetLocation);
 		}));
+	Super::ExecuteAbilityAtLocation(TargetLocation);
+	
 }
 
 void UGA_AircraftDrop::BeginDestroy()
@@ -190,7 +192,7 @@ void UGA_AircraftDrop::SpawnSquadDropAircraft(
 	{
 		return;
 	}
-
+	SpawnedAircraft->SetUnitSelectable(false);
 	SpawnedAircraft->OrderAircraftDrop(DropRequest);
 }
 

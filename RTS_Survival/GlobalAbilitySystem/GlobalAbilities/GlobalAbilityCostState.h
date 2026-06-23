@@ -79,7 +79,7 @@ struct FGlobalAbilityMarker
 	UNiagaraSystem* MarkerEffect = nullptr;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FLinearColor EffectColor = FLinearColor::Red;
+	FLinearColor MarkerColor = FLinearColor::Red;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float EffectTotalTime = 15.f;

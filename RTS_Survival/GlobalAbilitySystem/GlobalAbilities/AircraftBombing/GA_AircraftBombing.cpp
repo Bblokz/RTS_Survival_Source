@@ -21,7 +21,9 @@ void UGA_AircraftBombing::ExecuteAbilityAtLocation(const FVector& TargetLocation
 	const FVector StartLocation = GlobalAbilitiesManager->GetAircraftBombingSpawnLocation(this, TargetLocation);
 	const FVector RetreatLocation = GlobalAbilitiesManager->GetAircraftBombingRetreatLocation(this, TargetLocation);
 	RequestSpawnAircraftAtStartLocationAsync(StartLocation, TargetLocation, RetreatLocation);
+	Super::ExecuteAbilityAtLocation(TargetLocation);
 }
+
 
 void UGA_AircraftBombing::BeginDestroy()
 {
@@ -84,6 +86,7 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 	}
 
 	M_SpawnedAircraft = SpawnedAircraft;
+	SpawnedAircraft->SetUnitSelectable(false);
 	const FVector CarpetEndLocation = BuildCarpetEndLocation(StartLocation, TargetLocation);
 	QueueCarpetBombingOrderForNextFrame(SpawnedAircraft, TargetLocation, CarpetEndLocation, RetreatLocation);
 }

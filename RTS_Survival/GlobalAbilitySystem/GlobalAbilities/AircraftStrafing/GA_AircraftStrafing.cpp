@@ -20,6 +20,7 @@ void UGA_AircraftStrafing::ExecuteAbilityAtLocation(const FVector& TargetLocatio
 
 	M_AircraftClassLoadHandles.Reset();
 	RequestSpawnAircraftAtStartLocationsAsync(TargetLocation);
+	Super::ExecuteAbilityAtLocation(TargetLocation);
 }
 
 void UGA_AircraftStrafing::BeginDestroy()
@@ -111,6 +112,7 @@ void UGA_AircraftStrafing::OnAircraftClassLoaded(
 	}
 
 	const FVector StrafeEndLocation = BuildStrafeEndLocation(StartLocation, TargetLocation);
+	SpawnedAircraft->SetUnitSelectable(false);
 	QueueStrafeOrderForNextFrame(SpawnedAircraft, TargetLocation, StrafeEndLocation, PostStrafeMoveToLocation);
 }
 
