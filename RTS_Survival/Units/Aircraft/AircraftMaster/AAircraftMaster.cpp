@@ -2740,6 +2740,7 @@ void AAircraftMaster::AircraftDrop_OnMoveCompleted()
 		: 0.0f;
 	M_AircraftLandedData.LandedPosition = M_AircraftDropRequest.ExecuteLocation + FVector(0.0f, 0.0f, TankLandingOffset);
 	M_AircraftLandedData.LandedRotation = GetActorRotation();
+	M_AircraftLandedData.LandedRotation.Roll = 0.0f;
 	StartVerticalLanding();
 }
 

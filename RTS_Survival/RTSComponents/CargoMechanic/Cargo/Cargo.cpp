@@ -13,6 +13,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 
 TArray<FName> FCargoSocketOccupancy::GetEmptySockets() const
@@ -325,6 +326,9 @@ void UCargo::OnSquadEntered(ASquadController* SquadController)
 	{
 		return;
 	}
+
+	AddExitCargoAbilityToTankOwner();
+
 	const int32 SlotIndex = AssignSlotForSquad(SquadController);
 	if (SlotIndex != INDEX_NONE)
 	{
@@ -350,6 +354,34 @@ void UCargo::OnSquadExited(ASquadController* SquadController, const TArray<ASqua
 
 	// And unregister the squad from vacancy state.
 	RegisterSquadAtVacancy(SquadController, false);
+}
+
+void UCargo::ExitAllSquads()
+{
+	if (M_VacancyState.M_InsideSquads.Num() == 0)
+	{
+		return;
+	}
+
+	const TArray<TObjectPtr<ASquadController>> InsideSquadsSnapshot = M_VacancyState.M_InsideSquads.Array();
+	for (const TObjectPtr<ASquadController>& SquadPtr : InsideSquadsSnapshot)
+	{
+		ASquadController* const SquadController = SquadPtr.Get();
+		if (not IsValid(SquadController))
+		{
+			continue;
+		}
+
+		UCargoSquad* const CargoSquad = SquadController->FindComponentByClass<UCargoSquad>();
+		if (not IsValid(CargoSquad))
+		{
+			RTSFunctionLibrary::ReportNullErrorComponent(
+				SquadController, "CargoSquad", "UCargo::ExitAllSquads");
+			continue;
+		}
+
+		CargoSquad->ExitCargoImmediate(/*bSwapAbilities=*/true);
+	}
 }
 
 FTransform UCargo::GetSocketWorldTransform(const FName& SocketName) const
@@ -689,6 +721,7 @@ void UCargo::RegisterSquadAtVacancy(ASquadController* Squad, const bool bRegiste
 	if (OldCount > 0 && M_VacancyState.M_CurrentSquads == 0)
 	{
 		StopSeatShuffleTimer();
+		RemoveExitCargoAbilityFromTankOwner();
 	}
 
 	// Only fire OnCargoEmpty when transitioning from non-empty to empty.
@@ -696,6 +729,33 @@ void UCargo::RegisterSquadAtVacancy(ASquadController* Squad, const bool bRegiste
 	{
 		M_CargoOwner->OnCargoEmpty();
 	}
+}
+
+void UCargo::AddExitCargoAbilityToTankOwner() const
+{
+	ATankMaster* const TankOwner = GetTankOwner();
+	if (not IsValid(TankOwner) || TankOwner->HasAbility(EAbilityID::IdExitCargo))
+	{
+		return;
+	}
+
+	TankOwner->AddAbility(EAbilityID::IdExitCargo, M_PreferredExitCargoAbilityIndex);
+}
+
+void UCargo::RemoveExitCargoAbilityFromTankOwner() const
+{
+	ATankMaster* const TankOwner = GetTankOwner();
+	if (not IsValid(TankOwner) || not TankOwner->HasAbility(EAbilityID::IdExitCargo))
+	{
+		return;
+	}
+
+	TankOwner->RemoveAbility(EAbilityID::IdExitCargo);
+}
+
+ATankMaster* UCargo::GetTankOwner() const
+{
+	return Cast<ATankMaster>(GetOwner());
 }
 
 void UCargo::BeginPlay_SetOwnerInterface()
