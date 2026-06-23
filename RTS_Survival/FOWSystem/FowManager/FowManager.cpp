@@ -735,27 +735,96 @@ void AFowManager::AddPassiveFowParticipant(UFowComp* FowComp)
 
 void AFowManager::UpdateDrawBuffer()
 {
-	if (not IsValid(NiagaraDraw))
+	if (not GetIsValidNiagaraDraw())
 	{
 		OnInvalidNiagaraDraw();
 		return;
 	}
-	int32 Index = 0;
+
+	M_DrawBuffer.Reset();
+	M_DrawBuffer.Reserve(M_ActiveFowComponents.Num());
+
+	TMap<FIntPoint, int32> CellKeyToDrawBufferIndex;
+	CellKeyToDrawBufferIndex.Reserve(M_ActiveFowComponents.Num());
 	for (const TWeakObjectPtr<UFowComp>& EachComp : M_ActiveFowComponents)
 	{
-		AActor* const OwnerActor = EachComp->GetOwner();
+		UFowComp* const FowComponent = EachComp.Get();
+		AActor* const OwnerActor = FowComponent->GetOwner();
 		const FVector OwnerWorldLocation = OwnerActor->GetActorLocation();
-		FVector Location = OwnerWorldLocation;
-		const float VisionRadius = EachComp->GetVisionRadius();
-		// Save the vision radius in the z component.
-		Location.Z = VisionRadius;
-		EachComp->CacheMiniMapWorldLocation(OwnerWorldLocation);
-		EachComp->SetShouldDrawMiniMapIcon(not OwnerActor->IsHidden());
-		M_DrawBuffer[Index] = Location;
-		Index++;
+		const FVector DrawBufferEntry = BuildFowDrawBufferEntry(*FowComponent, *OwnerActor);
+		const FIntPoint CellKey = GetFowDrawCellKey(OwnerWorldLocation);
+		AddOrReplaceDrawBufferEntryForCell(CellKey, DrawBufferEntry, CellKeyToDrawBufferIndex);
 	}
+
 	UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector(
 		NiagaraDraw, FName(*NiagaraDrawBufferName), M_DrawBuffer);
+}
+
+FVector AFowManager::BuildFowDrawBufferEntry(UFowComp& FowComponent, const AActor& OwnerActor) const
+{
+	const FVector OwnerWorldLocation = OwnerActor.GetActorLocation();
+	FVector DrawBufferEntry = OwnerWorldLocation;
+	// Save the vision radius in the z component.
+	DrawBufferEntry.Z = FowComponent.GetVisionRadius();
+	FowComponent.CacheMiniMapWorldLocation(OwnerWorldLocation);
+	FowComponent.SetShouldDrawMiniMapIcon(not OwnerActor.IsHidden());
+	return DrawBufferEntry;
+}
+
+FIntPoint AFowManager::GetFowDrawCellKey(const FVector& WorldLocation) const
+{
+	const float MapSize = MapExtent * 2.0f;
+	if (MapSize <= 0.0f or RenderTargetSize <= 0)
+	{
+		return FIntPoint(
+			FMath::RoundToInt32(WorldLocation.X),
+			FMath::RoundToInt32(WorldLocation.Y));
+	}
+
+	const FVector RelativeLocation = WorldLocation - GetActorLocation();
+	const float PixelX = ((RelativeLocation.X / MapSize) + 0.5f) * static_cast<float>(RenderTargetSize);
+	const float PixelY = ((RelativeLocation.Y / MapSize) + 0.5f) * static_cast<float>(RenderTargetSize);
+	return FIntPoint(FMath::FloorToInt32(PixelX), FMath::FloorToInt32(PixelY));
+}
+
+void AFowManager::AddOrReplaceDrawBufferEntryForCell(const FIntPoint& CellKey,
+                                                     const FVector& DrawBufferEntry,
+                                                     TMap<FIntPoint, int32>& CellKeyToDrawBufferIndex)
+{
+	const int32* const ExistingDrawBufferIndex = CellKeyToDrawBufferIndex.Find(CellKey);
+	if (ExistingDrawBufferIndex == nullptr)
+	{
+		CellKeyToDrawBufferIndex.Add(CellKey, M_DrawBuffer.Add(DrawBufferEntry));
+		return;
+	}
+
+	if (not M_DrawBuffer.IsValidIndex(*ExistingDrawBufferIndex))
+	{
+		return;
+	}
+
+	FVector& ExistingDrawBufferEntry = M_DrawBuffer[*ExistingDrawBufferIndex];
+	if (DrawBufferEntry.Z <= ExistingDrawBufferEntry.Z)
+	{
+		return;
+	}
+
+	ExistingDrawBufferEntry = DrawBufferEntry;
+}
+
+bool AFowManager::GetIsValidNiagaraDraw() const
+{
+	if (IsValid(NiagaraDraw))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"NiagaraDraw",
+		"GetIsValidNiagaraDraw",
+		this);
+	return false;
 }
 
 void AFowManager::AskUpdateEnemyVision()
@@ -895,10 +964,6 @@ void AFowManager::OnReceivedEnemyVisionUpdate(const TArray<FBasicParticleData>& 
 
 void AFowManager::OnInvalidNiagaraDraw()
 {
-	RTSFunctionLibrary::ReportError("FOW manager does not have a valid niagara draw component, "
-		"cannot update draw buffer!"
-		"\n See function: AFowManager::UpdateDrawBuffer()"
-		"\n Active fow components will be cleared!");
 	M_ActiveFowComponents.Empty();
 	RefreshMiniMapIconDrawDataCache();
 	StopFow();
