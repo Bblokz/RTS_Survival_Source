@@ -52,6 +52,9 @@ struct FAircraftDropGlobalAbilitySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
 	float RadiusSpawnSquads = 600.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
+	float BetweenAircraftRectangleOffset = 1000.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<USoundBase> DropOffSound = nullptr;
 
@@ -83,12 +86,12 @@ private:
 	void OnAircraftClassLoaded(TSoftClassPtr<AAircraftMaster> AircraftClassToLoad, FVector TargetLocation);
 	void SpawnTankDropAircraft(
 		UClass* AircraftClass,
-		const FVector& TargetLocation,
+		const FVector& ExecuteLocation,
 		const FAircraftDropTankWithOffset& TankWithOffset,
 		int32 AircraftIndex) const;
 	void SpawnSquadDropAircraft(
 		UClass* AircraftClass,
-		const FVector& TargetLocation,
+		const FVector& ExecuteLocation,
 		const TArray<ESquadSubtype>& Squads,
 		int32 AircraftIndex) const;
 	FAircraftDropRequest BuildBaseDropRequest(
@@ -96,4 +99,17 @@ private:
 		EAircraftDropPayloadType PayloadType,
 		int32 AircraftIndex) const;
 	FVector BuildAircraftSpawnLocation(const FVector& TargetLocation, int32 AircraftIndex) const;
+	/**
+	 * @brief Keeps multi-aircraft drops from stacking while preserving the first requested landing point.
+	 * @param TargetLocation Exact designer/player execute point used by the first aircraft.
+	 * @param AircraftIndex Spawn order of the aircraft in this drop request.
+	 * @param UsedExecuteLocations Locations already reserved by earlier aircraft in this drop.
+	 * @return TargetLocation for the first aircraft, otherwise the first projected unique formation location.
+	 */
+	FVector BuildAircraftExecuteLocation(
+		const FVector& TargetLocation,
+		int32 AircraftIndex,
+		TArray<FVector>& UsedExecuteLocations) const;
+	FVector BuildAircraftRectangleFormationLocation(const FVector& TargetLocation, int32 FormationIndex) const;
+	bool GetIsExecuteLocationAlreadyUsed(const FVector& ExecuteLocation, const TArray<FVector>& UsedExecuteLocations) const;
 };

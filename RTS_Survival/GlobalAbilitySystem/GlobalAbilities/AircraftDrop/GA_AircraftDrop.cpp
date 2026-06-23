@@ -15,6 +15,10 @@
 namespace
 {
 	constexpr float AircraftDropSpacing = 450.0f;
+	constexpr int32 AircraftFormationWidth = 2;
+	constexpr int32 MaxAircraftFormationProjectionAttempts = 64;
+	constexpr float AircraftDropProjectionScale = 7.0f;
+	constexpr float AircraftExecuteLocationDuplicateToleranceSquared = 1.0f;
 }
 
 void UGA_AircraftDrop::ExecuteAbilityAtLocation(const FVector& TargetLocation)
@@ -64,6 +68,7 @@ void UGA_AircraftDrop::OnAircraftClassLoaded(
 	}
 
 	int32 AircraftIndex = 0;
+	TArray<FVector> UsedExecuteLocations;
 	for (const FAircraftDropTankWithOffset& TankWithOffset : M_AircraftDropSettings.TanksWithOffsets)
 	{
 		if (TankWithOffset.TankSubtype == ETankSubtype::Tank_None)
@@ -71,7 +76,8 @@ void UGA_AircraftDrop::OnAircraftClassLoaded(
 			continue;
 		}
 
-		SpawnTankDropAircraft(AircraftClass, TargetLocation, TankWithOffset, AircraftIndex);
+		const FVector ExecuteLocation = BuildAircraftExecuteLocation(TargetLocation, AircraftIndex, UsedExecuteLocations);
+		SpawnTankDropAircraft(AircraftClass, ExecuteLocation, TankWithOffset, AircraftIndex);
 		++AircraftIndex;
 	}
 
@@ -97,24 +103,25 @@ void UGA_AircraftDrop::OnAircraftClassLoaded(
 			continue;
 		}
 
-		SpawnSquadDropAircraft(AircraftClass, TargetLocation, SquadsForAircraft, AircraftIndex);
+		const FVector ExecuteLocation = BuildAircraftExecuteLocation(TargetLocation, AircraftIndex, UsedExecuteLocations);
+		SpawnSquadDropAircraft(AircraftClass, ExecuteLocation, SquadsForAircraft, AircraftIndex);
 		++AircraftIndex;
 	}
 }
 
 void UGA_AircraftDrop::SpawnTankDropAircraft(
 	UClass* AircraftClass,
-	const FVector& TargetLocation,
+	const FVector& ExecuteLocation,
 	const FAircraftDropTankWithOffset& TankWithOffset,
 	const int32 AircraftIndex) const
 {
 	FAircraftDropRequest DropRequest = BuildBaseDropRequest(
-		TargetLocation,
+		ExecuteLocation,
 		EAircraftDropPayloadType::Tank,
 		AircraftIndex);
 	DropRequest.TankAttachZOffset = TankWithOffset.TankAttachZOffset;
 
-	const FVector SpawnLocation = BuildAircraftSpawnLocation(TargetLocation, AircraftIndex);
+	const FVector SpawnLocation = BuildAircraftSpawnLocation(ExecuteLocation, AircraftIndex);
 	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(
 		this,
 		AircraftClass,
@@ -164,17 +171,17 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 
 void UGA_AircraftDrop::SpawnSquadDropAircraft(
 	UClass* AircraftClass,
-	const FVector& TargetLocation,
+	const FVector& ExecuteLocation,
 	const TArray<ESquadSubtype>& Squads,
 	const int32 AircraftIndex) const
 {
 	FAircraftDropRequest DropRequest = BuildBaseDropRequest(
-		TargetLocation,
+		ExecuteLocation,
 		EAircraftDropPayloadType::Infantry,
 		AircraftIndex);
 	DropRequest.SquadSubtypes = Squads;
 
-	const FVector SpawnLocation = BuildAircraftSpawnLocation(TargetLocation, AircraftIndex);
+	const FVector SpawnLocation = BuildAircraftSpawnLocation(ExecuteLocation, AircraftIndex);
 	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(
 		this,
 		AircraftClass,
@@ -213,4 +220,73 @@ FVector UGA_AircraftDrop::BuildAircraftSpawnLocation(const FVector& TargetLocati
 	FVector SpawnLocation = GetGlobalAbilityManager()->GetAircraftBombingSpawnLocation(this, TargetLocation);
 	SpawnLocation.Y += AircraftDropSpacing * static_cast<float>(AircraftIndex);
 	return SpawnLocation;
+}
+
+FVector UGA_AircraftDrop::BuildAircraftExecuteLocation(
+	const FVector& TargetLocation,
+	const int32 AircraftIndex,
+	TArray<FVector>& UsedExecuteLocations) const
+{
+	if (AircraftIndex == 0)
+	{
+		UsedExecuteLocations.Add(TargetLocation);
+		return TargetLocation;
+	}
+
+	const int32 FirstFormationIndex = AircraftIndex - 1;
+	for (int32 AttemptIndex = 0; AttemptIndex < MaxAircraftFormationProjectionAttempts; ++AttemptIndex)
+	{
+		const FVector CandidateLocation = BuildAircraftRectangleFormationLocation(
+			TargetLocation,
+			FirstFormationIndex + AttemptIndex);
+		bool bProjectionSucceeded = false;
+		const FVector ProjectedLocation = RTSFunctionLibrary::GetLocationProjected(
+			this,
+			CandidateLocation,
+			true,
+			bProjectionSucceeded,
+			AircraftDropProjectionScale);
+
+		if (not bProjectionSucceeded || GetIsExecuteLocationAlreadyUsed(ProjectedLocation, UsedExecuteLocations))
+		{
+			continue;
+		}
+
+		UsedExecuteLocations.Add(ProjectedLocation);
+		return ProjectedLocation;
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftDrop failed to project a unique aircraft drop location."));
+	UsedExecuteLocations.Add(TargetLocation);
+	return TargetLocation;
+}
+
+FVector UGA_AircraftDrop::BuildAircraftRectangleFormationLocation(
+	const FVector& TargetLocation,
+	const int32 FormationIndex) const
+{
+	const float BetweenAircraftOffset = M_AircraftDropSettings.BetweenAircraftRectangleOffset;
+	const int32 RowIndex = FormationIndex / AircraftFormationWidth + 1;
+	const int32 ColumnIndex = FormationIndex % AircraftFormationWidth;
+	const float ColumnSide = ColumnIndex == 0 ? -1.0f : 1.0f;
+
+	FVector FormationLocation = TargetLocation;
+	FormationLocation.X += static_cast<float>(RowIndex) * BetweenAircraftOffset;
+	FormationLocation.Y += ColumnSide * BetweenAircraftOffset * 0.5f;
+	return FormationLocation;
+}
+
+bool UGA_AircraftDrop::GetIsExecuteLocationAlreadyUsed(
+	const FVector& ExecuteLocation,
+	const TArray<FVector>& UsedExecuteLocations) const
+{
+	for (const FVector& UsedExecuteLocation : UsedExecuteLocations)
+	{
+		if (FVector::DistSquared2D(ExecuteLocation, UsedExecuteLocation) <= AircraftExecuteLocationDuplicateToleranceSquared)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
