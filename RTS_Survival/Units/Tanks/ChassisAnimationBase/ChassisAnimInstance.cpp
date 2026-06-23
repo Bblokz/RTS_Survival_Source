@@ -14,7 +14,6 @@ void UChassisAnimInstance::SetMovementParameters(const float NewSpeed, const flo
 	bM_IsMovingForward = bIsMovingForward;
 
 	PlayRate = Speed / AnimationSpeedDivider;
-
 }
 
 void UChassisAnimInstance::SetChassisAnimToStationaryRotation(const bool bRotateToRight)
@@ -25,6 +24,11 @@ void UChassisAnimInstance::SetChassisAnimToStationaryRotation(const bool bRotate
 void UChassisAnimInstance::SetChassisAnimToIdle()
 {
 	// Derived Wheeled Or Track anim instances set the correct animation enum.
+	if (IsValid(M_TrackParticleComponent))
+	{
+		M_TrackParticleComponent->Deactivate();
+		M_TrackParticleComponent->SetVisibility(false);
+	}
 }
 
 void UChassisAnimInstance::NativeBeginPlay()
@@ -37,12 +41,11 @@ void UChassisAnimInstance::NativeBeginPlay()
 		World->GetTimerManager().SetTimer(M_VfxHandle, M_VfxDel,
 		                                  DeveloperSettings::Optimization::UpdateChassisVFXInterval, true);
 	}
-	
 }
 
 void UChassisAnimInstance::BeginDestroy()
 {
-	if(const UWorld* World = GetWorld())
+	if (const UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_VfxHandle);
 	}
@@ -50,19 +53,20 @@ void UChassisAnimInstance::BeginDestroy()
 }
 
 void UChassisAnimInstance::SetupParticleVFX(UNiagaraComponent* ChassisSmokeComponent,
-                                            UNiagaraComponent* ExhaustParticleComponent, float MaxExhaustPlayRate, float MinExhaustPlayRate)
+                                            UNiagaraComponent* ExhaustParticleComponent, float MaxExhaustPlayRate,
+                                            float MinExhaustPlayRate)
 {
-	if(not IsValid(ChassisSmokeComponent) || not IsValid(ExhaustParticleComponent))
+	if (not IsValid(ChassisSmokeComponent) || not IsValid(ExhaustParticleComponent))
 	{
-		FString OwnerName  = IsValid(GetOwningActor()) ? GetOwningActor()->GetName() : "NULL";
+		FString OwnerName = IsValid(GetOwningActor()) ? GetOwningActor()->GetName() : "NULL";
 		RTSFunctionLibrary::ReportError("Invalid ChassisSMokeComponent or ExhaustParticleComponent provided for Chassis"
-								  "anim instance: " + GetName() + " on actor: " + OwnerName);
+			"anim instance: " + GetName() + " on actor: " + OwnerName);
 	}
-	if(MaxExhaustPlayRate <=0 )
+	if (MaxExhaustPlayRate <= 0)
 	{
 		MaxExhaustPlayRate = 2;
 	}
-	if(MinExhaustPlayRate <=0 )
+	if (MinExhaustPlayRate <= 0)
 	{
 		MinExhaustPlayRate = 1;
 	}
@@ -70,8 +74,6 @@ void UChassisAnimInstance::SetupParticleVFX(UNiagaraComponent* ChassisSmokeCompo
 	M_ExhaustParticleComponent = ExhaustParticleComponent;
 	M_MaxExhaustPlayRate = MaxExhaustPlayRate;
 	M_MinExhaustPlayRate = MinExhaustPlayRate;
-	
-	
 }
 
 
@@ -83,6 +85,7 @@ void UChassisAnimInstance::UpdateTrackVFX()
 		{
 			// stop the niagara system from rendering (speed too low)
 			M_TrackParticleComponent->Deactivate();
+			M_TrackParticleComponent->SetVisibility(false);
 		}
 		else
 		{

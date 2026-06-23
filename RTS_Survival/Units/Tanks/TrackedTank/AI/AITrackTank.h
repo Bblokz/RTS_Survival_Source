@@ -22,6 +22,8 @@ public:
 
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	
+	virtual void StopMovement() override;
 
 protected:
 	// Called when the game starts or when spawned

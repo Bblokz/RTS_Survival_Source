@@ -895,6 +895,7 @@ void ATankMaster::SetUnitToIdleSpecificLogic()
 
 void ATankMaster::TerminateAttackCommand()
 {
+	
 	for (const auto EachTurret : Turrets)
 	{
 		if (CheckTurretIsValid(EachTurret))
@@ -903,6 +904,16 @@ void ATankMaster::TerminateAttackCommand()
 			EachTurret->SetAutoEngageTargets(true);
 		}
 	}
+	if (not GetWasMovingForTargettedActor())
+	{
+		// no need to kill movement.
+		return;
+	}
+	bM_HasTurretOutOfRangeMoveRequest = false;
+	
+	// Re-enable the nav collision and stops movements in derived trackedTank as well as stops tracks animations there.
+	OnCancelMovementToGetInRangeOfTurret();
+	
 }
 
 void ATankMaster::TerminateMoveCommand()
@@ -1116,25 +1127,30 @@ void ATankMaster::OnTurretOutOfRange(
 
 void ATankMaster::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
-	bM_HasTurretOutOfRangeMoveRequest = false;
 
 	if (not GetIsValidAIController())
 	{
 		return;
 	}
 
-	const bool bIsIdle = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdIdle;
-	const bool bCanStopForTurret = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack || bIsIdle;
-	if (not bCanStopForTurret)
+	if (not GetWasMovingForTargettedActor())
 	{
+		// no need to kill movement.
 		return;
 	}
+	bM_HasTurretOutOfRangeMoveRequest = false;
+	
+	// Re-enable the nav collision and stops movements in derived trackedTank as well as stops tracks animations there.
+	OnCancelMovementToGetInRangeOfTurret();
+}
 
+void ATankMaster::OnCancelMovementToGetInRangeOfTurret()
+{
 	if (GetIsValidRTSNavCollision())
 	{
 		RTSNavCollision->EnableAffectNavmesh(true);
 	}
-	AITankController->StopMovement();
+	
 }
 
 void ATankMaster::OnMountedWeaponTargetDestroyed(ACPPTurretsMaster* CallingTurret,
@@ -1501,6 +1517,18 @@ bool ATankMaster::GetIsValidRTSNavCollision() const
 		"RTSNavCollision",
 		"ATankMaster::GetIsValidRTSNavCollision");
 	return false;
+}
+
+bool ATankMaster::GetWasMovingForTargettedActor() const
+{
+	if (not bM_HasTurretOutOfRangeMoveRequest)
+	{
+		return false;
+	}
+	const bool bIsIdle = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdIdle;
+	const bool bWasAttacking = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack || UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttackGround;
+	return bIsIdle || bWasAttacking;
+	
 }
 
 void ATankMaster::BeginPlay_SetupCollisionVsBuildings()

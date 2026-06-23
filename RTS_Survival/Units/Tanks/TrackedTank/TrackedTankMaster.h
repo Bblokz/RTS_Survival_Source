@@ -359,6 +359,8 @@ protected:
 	 * Used when no movement command follows and the tank really should stop.
 	 */
 	void FullyStopTrackedMovementCommand();
+	
+	virtual void OnCancelMovementToGetInRangeOfTurret() final;
 
 	void CancelPendingTrackedMove();
 

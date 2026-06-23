@@ -71,6 +71,8 @@ void UTrackedAnimationInstance::SetChassisAnimToIdle()
 		Speed = 0;
 		PlayRate = 0;
 	}
+	// Disables the track particle effect.
+	Super::SetChassisAnimToIdle();
 }
 
 void UTrackedAnimationInstance::SetChassisAnimToStationaryRotation(const bool bRotateToRight)

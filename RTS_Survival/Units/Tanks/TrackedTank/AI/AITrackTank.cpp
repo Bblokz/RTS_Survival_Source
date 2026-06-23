@@ -56,3 +56,8 @@ void AAITrackTank::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
+
+void AAITrackTank::StopMovement()
+{
+	Super::StopMovement();
+}

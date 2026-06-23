@@ -549,6 +549,13 @@ void ATrackedTankMaster::FullyStopTrackedMovementCommand()
 	TankAnimationBP->SetChassisAnimToIdle();
 }
 
+void ATrackedTankMaster::OnCancelMovementToGetInRangeOfTurret()
+{
+	// Re-enables the nav collision.
+	Super::OnCancelMovementToGetInRangeOfTurret();
+	FullyStopTrackedMovementCommand();
+}
+
 void ATrackedTankMaster::CancelPendingTrackedMove()
 {
 	M_QueuedMoveState.bM_HasPendingQueuedMove = false;

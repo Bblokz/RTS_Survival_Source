@@ -401,7 +401,9 @@ protected:
 	 * @param CallingTurret The turret that is in range.
      * @note This is an ITurretOwner function. 
 	 */
-	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override;
+	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override ;
+	
+	virtual void OnCancelMovementToGetInRangeOfTurret();
 
 	/**
 	 * @brief Called when a turret killed the target given.
@@ -473,6 +475,8 @@ private:
 
 	// The direction the mesh needs to face.
 	FRotator M_RotateToDirection;
+	
+	bool GetWasMovingForTargettedActor()const;
 
 	void BeginPlay_SetupCollisionVsBuildings();
 	void BeginPlay_SetFactionFlagPrimitiveDataIndex();
