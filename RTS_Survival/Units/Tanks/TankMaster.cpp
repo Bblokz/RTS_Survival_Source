@@ -391,6 +391,10 @@ void ATankMaster::OnSquadRegistered(ASquadController* SquadController)
 
 void ATankMaster::OnCargoEmpty()
 {
+	if (HasAbility(EAbilityID::IdExitCargo))
+	{
+		RemoveAbility(EAbilityID::IdExitCargo);
+	}
 }
 
 void ATankMaster::GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const
@@ -849,6 +853,19 @@ void ATankMaster::TerminateReturnCargoCommand()
 	// nothing to do only called if return cargo failed on the harvester component which only happens if a cargo command was queued
 	// then the harvester already dropped resources, cancelled the harvesting command at a point with no resources in cargo and only
 	// then attempts to return cargo through this command!
+}
+
+void ATankMaster::ExecuteExitCargoCommand()
+{
+	UCargo* const CargoComponent = FindComponentByClass<UCargo>();
+	if (not IsValid(CargoComponent))
+	{
+		DoneExecutingCommand(EAbilityID::IdExitCargo);
+		return;
+	}
+
+	CargoComponent->ExitAllSquads();
+	DoneExecutingCommand(EAbilityID::IdExitCargo);
 }
 
 void ATankMaster::OnResourceStorageChanged(int32 PercentageResourcesLeft, const ERTSResourceType ResourceType)
