@@ -70,3 +70,17 @@ struct FGlobalAbilityUISettings
 	FText Description = FText::FromString("Ability Description");
 	
 };
+
+USTRUCT(BlueprintType)
+struct FGlobalAbilityMarker
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UNiagaraSystem* MarkerEffect = nullptr;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLinearColor EffectColor = FLinearColor::Red;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float EffectTotalTime = 15.f;
+};

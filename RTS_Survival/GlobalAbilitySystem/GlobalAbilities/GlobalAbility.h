@@ -72,7 +72,10 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGlobalAbilityUISettings M_UISettings;
-
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGlobalAbilityMarker M_AbilityMarker;
+	
 private:
 	UPROPERTY(Transient)
 	int32 M_OwningPlayer = INDEX_NONE;
