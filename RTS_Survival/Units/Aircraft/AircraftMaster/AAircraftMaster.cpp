@@ -311,6 +311,8 @@ void AAircraftMaster::ExecuteAttackCommand(AActor* TargetActor)
 {
 	Super::ExecuteAttackCommand(TargetActor);
 	M_AircraftAttackData.TargetActor = TargetActor;
+	M_AircraftAttackData.TargetLocation = FVector::ZeroVector;
+	M_AircraftAttackData.bM_IsAttackGround = false;
 
 	if (M_LandedState != EAircraftLandingState::Airborne)
 	{
