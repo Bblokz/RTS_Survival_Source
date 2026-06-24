@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -10,6 +10,7 @@
 
 class ACPPController;
 class UGlobalAbilitiesManager;
+class UNiagaraComponent;
 
 UENUM(blueprintType)
 enum class EGlobalAbilityState : uint8
@@ -83,12 +84,14 @@ private:
 	int32 M_OwningPlayer = INDEX_NONE;
 	
 	void CreateMarker(const FVector& ExecuteLocation);
-	void OnValidMarkerSpawned();
-	void DestroyMarker();
-	
-	UPROPERTY()
-	UNiagaraComponent* M_SpawnedMarkerEffect = nullptr;
-	FTimerHandle M_SpawnedMarkerTimer;
+	void OnValidMarkerSpawned(UNiagaraComponent* MarkerEffect);
+	void DestroyMarker(UNiagaraComponent* MarkerEffect);
+	void DestroyAllMarkers();
+	void RemoveTrackedMarker(UNiagaraComponent* MarkerEffect);
+
+	// Multiple mission-triggered executions can overlap, so every marker must be tracked until its own cleanup timer fires.
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UNiagaraComponent>> M_SpawnedMarkerEffects;
 
 	bool IsOwnedByPlayer() const;
 
