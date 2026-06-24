@@ -24,8 +24,11 @@ struct FMissionLostAllUnitsGlobalAbilityCheck
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced, Category = "Mission|Reinforcement")
-	TObjectPtr<UGlobalAbility> M_GlobalAbility = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement")
+	TSubclassOf<UGlobalAbility> M_GlobalAbilityClass;
+	
+	UPROPERTY()
+	TObjectPtr<UGlobalAbility> M_GlobalAbility;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement")
 	EReinforcementAirdropLocation M_AirdropLocation = EReinforcementAirdropLocation::NotSet;
@@ -33,16 +36,21 @@ struct FMissionLostAllUnitsGlobalAbilityCheck
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement")
 	EAllUnitType M_UnitType = EAllUnitType::UNType_None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement", meta = (EditCondition = "M_UnitType == EAllUnitType::UNType_Squad", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement",
+		meta = (EditCondition = "M_UnitType == EAllUnitType::UNType_Squad", EditConditionHides))
 	ESquadSubtype M_SquadSubtype = ESquadSubtype::Squad_None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement", meta = (EditCondition = "M_UnitType == EAllUnitType::UNType_Tank", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement",
+		meta = (EditCondition = "M_UnitType == EAllUnitType::UNType_Tank", EditConditionHides))
 	ETankSubtype M_TankSubtype = ETankSubtype::Tank_None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement", meta = (EditCondition = "M_UnitType == EAllUnitType::UNType_Nomadic", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement",
+		meta = (EditCondition = "M_UnitType == EAllUnitType::UNType_Nomadic", EditConditionHides))
 	ENomadicSubtype M_NomadicSubtype = ENomadicSubtype::Nomadic_None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement", meta = (EditCondition = "M_AirdropLocation == EReinforcementAirdropLocation::OverrideLocation", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement",
+		meta = (EditCondition = "M_AirdropLocation == EReinforcementAirdropLocation::OverrideLocation",
+			EditConditionHides))
 	FVector M_OverrideLocation = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement")

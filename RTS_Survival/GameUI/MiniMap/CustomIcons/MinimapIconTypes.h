@@ -16,6 +16,7 @@ enum class EMinimapIconType : uint8
 	AttackArrow UMETA(DisplayName = "Attack Arrow"),
 	EnemyBoss UMETA(DisplayName = "Enemy Boss"),
 	Warning UMETA(DisplayName = "Warning"),
+	Scavenge,
 };
 
 USTRUCT(BlueprintType)

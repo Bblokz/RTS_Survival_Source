@@ -7,6 +7,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 UGlobalAbility::UGlobalAbility()
@@ -91,6 +92,14 @@ void UGlobalAbility::ActivateAbility()
 void UGlobalAbility::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
 	CreateMarker(TargetLocation);
+	if (IsOwnedByPlayer() && EnsureIsValidPlayerController() && IsValid(M_AbilitySoundSettings.Sound2DOnExecute))
+	{
+		UPlayerAudioController* PlayerAudioController = M_PlayerController->GetPlayerAudioController();
+		if (IsValid(PlayerAudioController))
+		{
+			PlayerAudioController->PlayCustomOneShot2DSound(M_AbilitySoundSettings.Sound2DOnExecute);
+		}
+	}
 }
 
 EGlobalAbility UGlobalAbility::GetAbilityType() const

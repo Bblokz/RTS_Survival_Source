@@ -21,7 +21,6 @@ class RTS_SURVIVAL_API UCommanderSettings : public UDeveloperSettings
 	
 	FRTSCommanderSettings GetCommanderSettingsForType(const ERTSCommander CommanderType) const;
 	
-	
 	/** Convenience accessor. */
 	static const UCommanderSettings* Get()
 	{

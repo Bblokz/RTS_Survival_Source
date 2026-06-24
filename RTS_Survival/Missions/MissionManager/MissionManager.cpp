@@ -281,6 +281,18 @@ void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) con
 
 void AMissionManager::AddOnAllUnitsLostOfTypeGlobalAbility(FMissionLostAllUnitsGlobalAbilityCheck GlobalAbilityCheck)
 {
+	if (not IsValid(GlobalAbilityCheck.M_GlobalAbilityClass))
+	{
+		return;
+	}
+	UGlobalAbility* GlobalAbility = NewObject<UGlobalAbility>(this, GlobalAbilityCheck.M_GlobalAbilityClass);
+	if (not IsValid(GlobalAbility))
+	{
+		RTSFunctionLibrary::ReportError("GlobalAbility is invalid. FAILED TO CREATE in Mission Manager");
+	}
+	GlobalAbilityCheck.M_GlobalAbility = GlobalAbility;
+	// Optional: Call an initialization function if your ability requires it
+	// GlobalAbility->InitializeAbility(); 
 	M_LostAllUnitsGlobalAbilityChecks.Add(GlobalAbilityCheck);
 }
 
@@ -1138,7 +1150,8 @@ bool AMissionManager::TryGetLostAllUnitsLocationByType(
 		LocationActor = GameUnitManager->GetPlayerHQ();
 		break;
 	default:
-		RTSFunctionLibrary::ReportError("Lost all units global ability check has no valid airdrop location configured.");
+		RTSFunctionLibrary::ReportError(
+			"Lost all units global ability check has no valid airdrop location configured.");
 		return false;
 	}
 
@@ -1172,7 +1185,8 @@ bool AMissionManager::TryGetFallbackPlayerTankLocation(FVector& OutLocation) con
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportError("Lost all units global ability check could not resolve a player fallback tank location.");
+	RTSFunctionLibrary::ReportError(
+		"Lost all units global ability check could not resolve a player fallback tank location.");
 	return false;
 }
 
