@@ -6,7 +6,6 @@
 #include "GlobalAbilityCostState.generated.h"
 
 enum class ETechnology : uint8;
-class UNiagaraSystem;
 
 USTRUCT(BlueprintType)
 struct FGLobalAbilityCostState
@@ -77,7 +76,7 @@ struct FGlobalAbilityMarker
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UNiagaraSystem> MarkerEffect = nullptr;
+	UNiagaraSystem* MarkerEffect = nullptr;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FLinearColor MarkerColor = FLinearColor::Red;
