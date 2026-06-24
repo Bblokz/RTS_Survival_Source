@@ -26,6 +26,7 @@
 #include "NavigationSystem.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 
 void FMissionSeededSpawnBatchState::Init(UMissionBase* Mission, const int32 CallbackID)
 {
@@ -276,6 +277,11 @@ void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) con
 	// 	M_MissionWidgetManager->RemoveFromParent();
 	// 	M_MissionWidgetManager->AddToViewport(0);
 	// }
+}
+
+void AMissionManager::AddOnAllUnitsLostOfTypeGlobalAbility(FMissionLostAllUnitsGlobalAbilityCheck GlobalAbilityCheck)
+{
+	M_LostAllUnitsGlobalAbilityChecks.Add(GlobalAbilityCheck);
 }
 
 ERTSFaction AMissionManager::GetPlayerFaction() const
@@ -1193,7 +1199,7 @@ bool AMissionManager::TryProjectLostAllUnitsGlobalAbilityLocation(
 	}
 
 	FNavLocation ProjectedLocation;
-	constexpr float ProjectionExtentValue = 5.f;
+	constexpr float ProjectionExtentValue = 500.f;
 	const FVector ProjectionExtent(ProjectionExtentValue);
 	if (not NavSys->ProjectPointToNavigation(Location, ProjectedLocation, ProjectionExtent))
 	{

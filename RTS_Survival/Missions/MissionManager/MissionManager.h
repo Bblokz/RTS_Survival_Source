@@ -208,6 +208,9 @@ public:
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
 	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
+	
+	UFUNCTION(BlueprintCallable ,NotBlueprintable, Category="Global Abilities")
+	void AddOnAllUnitsLostOfTypeGlobalAbility(FMissionLostAllUnitsGlobalAbilityCheck GlobalAbilityCheck);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSFaction GetPlayerFaction() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
@@ -317,8 +320,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources")
 	FMissionStartingResources M_MissionStartingResources;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement")
-	TArray<FMissionLostAllUnitsGlobalAbilityCheck> M_LostAllUnitsGlobalAbilityChecks;
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
@@ -425,6 +426,10 @@ protected:
 
 	// Optional: Tick to update missions if needed.
 	virtual void Tick(float DeltaSeconds) override;
+	
+	UPROPERTY( BlueprintReadOnly, Category = "GlobalAbilities")
+	TArray<FMissionLostAllUnitsGlobalAbilityCheck> M_LostAllUnitsGlobalAbilityChecks;
+	
 
 private:
 	UPROPERTY()
