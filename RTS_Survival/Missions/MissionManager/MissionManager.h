@@ -384,6 +384,7 @@ public:
 	void RemoveAllMissionTriggerAreasForMission(UMissionBase* Mission);
 
 	void OnMainGameUIReadyAndInitialized(UW_MissionWidgetManager* MissionManagerWidget);
+	bool GetShouldHideGlobalAbilitiesForPlayer() const { return bHideGlobalAbilitiesForPlayer; }
 	
 
 protected:
@@ -405,6 +406,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Defeat")
 	TSubclassOf<UW_Defeat> M_DefeatWidgetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
+	bool bHideGlobalAbilitiesForPlayer = false;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);
@@ -452,6 +456,7 @@ private:
 	void BeginPlay_CheckForDifficultyOverrideWithWidget() const;
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
+	void HidePlayerGlobalAbilityPanelIfNeeded() const;
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
 	bool GetIsValidMissionTriggerVolumesManager() const;

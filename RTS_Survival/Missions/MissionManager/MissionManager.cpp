@@ -1062,6 +1062,7 @@ void AMissionManager::OnMainGameUIReadyAndInitialized(UW_MissionWidgetManager* M
 		return;
 	}
 	SetMissionManagerWidget(MissionManagerWidget);
+	HidePlayerGlobalAbilityPanelIfNeeded();
 	StartConfiguredMissionsIfNeeded();
 }
 
@@ -1090,6 +1091,29 @@ void AMissionManager::StartConfiguredMissionsIfNeeded()
 void AMissionManager::SetMissionManagerWidget(UW_MissionWidgetManager* MissionManagerWidget)
 {
 	M_MissionWidgetManager = MissionManagerWidget;
+}
+
+void AMissionManager::HidePlayerGlobalAbilityPanelIfNeeded() const
+{
+	if (not bHideGlobalAbilitiesForPlayer)
+	{
+		return;
+	}
+
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	UMainGameUI* MainGameUI = M_PlayerController.Get()->GetMainMenuUI();
+	if (not IsValid(MainGameUI))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Could not hide global abilities because the main game UI is not valid."));
+		return;
+	}
+
+	MainGameUI->HideGlobalAbilityPanelForMission();
 }
 
 void AMissionManager::BeginPlay_CheckForDifficultyOverrideWithWidget() const

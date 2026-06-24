@@ -174,6 +174,7 @@ public:
 	void OpenTechTree();
 	void SetMainMenuVisiblity(const bool bVisible);
 	TObjectPtr<UW_GlobalAbilityPanel> GetGlobalAbilityPanel();
+	void HideGlobalAbilityPanelForMission() const;
 	void SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager);
 	UW_MissionWidgetManager* GetMissionManagerWidget() const;
 	/** @reutrn Whether the left click was consumed to close an open option menu. */
