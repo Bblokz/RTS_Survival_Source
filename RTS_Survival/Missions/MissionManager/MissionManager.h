@@ -10,6 +10,7 @@
 #include "MissionCargoSquadWithVehicleSpawnState.h"
 #include "MissionSpawnCommandQueueState.h"
 #include "MissionTowTeamWeaponSpawnState.h"
+#include "MissionLostAllUnitsGlobalAbilityCheck.h"
 #include "MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Enemy/EnemyAIBehaviour/EnemyAIBehaviour.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
@@ -316,6 +317,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Starting Resources")
 	FMissionStartingResources M_MissionStartingResources;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Reinforcement")
+	TArray<FMissionLostAllUnitsGlobalAbilityCheck> M_LostAllUnitsGlobalAbilityChecks;
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category = "Seeded Selection")
 	FTrainingOption SelectSeededTankOption(const TArray<ETankSubtype>& TankOptions);
@@ -533,6 +537,19 @@ private:
 	void RegisterTrackedEnemyActor(AActor* EnemyActor);
 	void UnregisterTrackedEnemyActor(AActor* EnemyActor);
 	void RemoveCompletedEnemyUnitDestroyedCallbacks();
+
+	void TickLostAllUnitsGlobalAbilityChecks();
+	void TickLostAllUnitsGlobalAbilityCheck(FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck);
+	bool GetHasPlayerUnitsForLostAllUnitsCheck(const FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck) const;
+	bool TryGetLostAllUnitsGlobalAbilityLocation(const FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck, FVector& OutLocation) const;
+	bool TryGetLostAllUnitsLocationByType(const EReinforcementAirdropLocation AirdropLocation, FVector& OutLocation) const;
+	bool TryGetFallbackPlayerTankLocation(FVector& OutLocation) const;
+	FVector AddLostAllUnitsCheckOffset(const FVector& Location, const FVector2D& XYOffset) const;
+	bool TryProjectLostAllUnitsGlobalAbilityLocation(const FVector& Location, FVector& OutProjectedLocation) const;
+	void ExecuteLostAllUnitsGlobalAbility(FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck, const FVector& ExecuteLocation);
+
+	UFUNCTION()
+	void OnLostAllUnitsGlobalAbilityEnded(UGlobalAbility* GlobalAbility);
 
 	UFUNCTION()
 	void OnTrackedEnemyActorDestroyed(AActor* DestroyedActor);

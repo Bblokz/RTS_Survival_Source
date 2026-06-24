@@ -23,6 +23,9 @@
 #include "TimerManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/DeveloperSettings/RTSGameInstancePIEDeveloperSettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
+#include "NavigationSystem.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 
 void FMissionSeededSpawnBatchState::Init(UMissionBase* Mission, const int32 CallbackID)
 {
@@ -1024,6 +1027,226 @@ void AMissionManager::Tick(float DeltaSeconds)
 	RemoveFinishedCargoVehicleSpawnRequests();
 	RemoveFinishedSpawnCommandQueueRequests();
 	RemoveCompletedEnemyUnitDestroyedCallbacks();
+	TickLostAllUnitsGlobalAbilityChecks();
+}
+
+
+void AMissionManager::TickLostAllUnitsGlobalAbilityChecks()
+{
+	for (int32 CheckIndex = M_LostAllUnitsGlobalAbilityChecks.Num() - 1; CheckIndex >= 0; --CheckIndex)
+	{
+		TickLostAllUnitsGlobalAbilityCheck(M_LostAllUnitsGlobalAbilityChecks[CheckIndex]);
+	}
+}
+
+void AMissionManager::TickLostAllUnitsGlobalAbilityCheck(
+	FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck)
+{
+	if (LostAllUnitsCheck.bM_IsExecutingGlobalAbility)
+	{
+		return;
+	}
+
+	if (not IsValid(LostAllUnitsCheck.M_GlobalAbility))
+	{
+		RTSFunctionLibrary::ReportError("Lost all units global ability check has no valid global ability.");
+		return;
+	}
+
+	if (GetHasPlayerUnitsForLostAllUnitsCheck(LostAllUnitsCheck))
+	{
+		return;
+	}
+
+	FVector ExecuteLocation = FVector::ZeroVector;
+	if (not TryGetLostAllUnitsGlobalAbilityLocation(LostAllUnitsCheck, ExecuteLocation))
+	{
+		return;
+	}
+
+	ExecuteLostAllUnitsGlobalAbility(LostAllUnitsCheck, ExecuteLocation);
+}
+
+bool AMissionManager::GetHasPlayerUnitsForLostAllUnitsCheck(
+	const FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck) const
+{
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError("Lost all units global ability check could not get the game unit manager.");
+		return true;
+	}
+
+	switch (LostAllUnitsCheck.M_UnitType)
+	{
+	case EAllUnitType::UNType_Squad:
+		return GameUnitManager->GetHasPlayerSquadOfType(LostAllUnitsCheck.M_SquadSubtype);
+	case EAllUnitType::UNType_Tank:
+		return GameUnitManager->GetHasPlayerTankOfType(LostAllUnitsCheck.M_TankSubtype);
+	case EAllUnitType::UNType_Nomadic:
+		return GameUnitManager->GetHasPlayerNomadicOfType(LostAllUnitsCheck.M_NomadicSubtype);
+	default:
+		RTSFunctionLibrary::ReportError("Lost all units global ability check has no supported unit type configured.");
+		return true;
+	}
+}
+
+bool AMissionManager::TryGetLostAllUnitsGlobalAbilityLocation(
+	const FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck,
+	FVector& OutLocation) const
+{
+	FVector TargetLocation = FVector::ZeroVector;
+	if (LostAllUnitsCheck.M_AirdropLocation == EReinforcementAirdropLocation::OverrideLocation)
+	{
+		TargetLocation = LostAllUnitsCheck.M_OverrideLocation;
+		return TryProjectLostAllUnitsGlobalAbilityLocation(TargetLocation, OutLocation);
+	}
+
+	if (not TryGetLostAllUnitsLocationByType(LostAllUnitsCheck.M_AirdropLocation, TargetLocation))
+	{
+		return false;
+	}
+
+	TargetLocation = AddLostAllUnitsCheckOffset(TargetLocation, LostAllUnitsCheck.M_XYOffset);
+	return TryProjectLostAllUnitsGlobalAbilityLocation(TargetLocation, OutLocation);
+}
+
+bool AMissionManager::TryGetLostAllUnitsLocationByType(
+	const EReinforcementAirdropLocation AirdropLocation,
+	FVector& OutLocation) const
+{
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError("Lost all units global ability location could not get the game unit manager.");
+		return false;
+	}
+
+	AActor* LocationActor = nullptr;
+	switch (AirdropLocation)
+	{
+	case EReinforcementAirdropLocation::CommanderVehicleLocation:
+		LocationActor = GameUnitManager->GetPlayerCommandVehicle();
+		break;
+	case EReinforcementAirdropLocation::HQLocation:
+		LocationActor = GameUnitManager->GetPlayerHQ();
+		break;
+	default:
+		RTSFunctionLibrary::ReportError("Lost all units global ability check has no valid airdrop location configured.");
+		return false;
+	}
+
+	if (IsValid(LocationActor))
+	{
+		OutLocation = LocationActor->GetActorLocation();
+		return true;
+	}
+
+	return TryGetFallbackPlayerTankLocation(OutLocation);
+}
+
+bool AMissionManager::TryGetFallbackPlayerTankLocation(FVector& OutLocation) const
+{
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError("Lost all units global ability fallback could not get the game unit manager.");
+		return false;
+	}
+
+	const TArray<ATankMaster*> PlayerTanks = GameUnitManager->GetPlayerTanks(1);
+	for (const ATankMaster* PlayerTank : PlayerTanks)
+	{
+		if (not IsValid(PlayerTank))
+		{
+			continue;
+		}
+
+		OutLocation = PlayerTank->GetActorLocation();
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError("Lost all units global ability check could not resolve a player fallback tank location.");
+	return false;
+}
+
+FVector AMissionManager::AddLostAllUnitsCheckOffset(const FVector& Location, const FVector2D& XYOffset) const
+{
+	return Location + FVector(XYOffset.X, XYOffset.Y, 0.f);
+}
+
+bool AMissionManager::TryProjectLostAllUnitsGlobalAbilityLocation(
+	const FVector& Location,
+	FVector& OutProjectedLocation) const
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World);
+	if (not IsValid(NavSys))
+	{
+		RTSFunctionLibrary::ReportError("Lost all units global ability check could not get navigation system.");
+		return false;
+	}
+
+	FNavLocation ProjectedLocation;
+	constexpr float ProjectionExtentValue = 5.f;
+	const FVector ProjectionExtent(ProjectionExtentValue);
+	if (not NavSys->ProjectPointToNavigation(Location, ProjectedLocation, ProjectionExtent))
+	{
+		RTSFunctionLibrary::ReportError("Lost all units global ability check could not project location to navmesh.");
+		return false;
+	}
+
+	OutProjectedLocation = ProjectedLocation.Location;
+	return true;
+}
+
+void AMissionManager::ExecuteLostAllUnitsGlobalAbility(
+	FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck,
+	const FVector& ExecuteLocation)
+{
+	UGlobalAbility* GlobalAbility = LostAllUnitsCheck.M_GlobalAbility;
+	if (not IsValid(GlobalAbility))
+	{
+		RTSFunctionLibrary::ReportError("Lost all units global ability became invalid before execution.");
+		return;
+	}
+
+	LostAllUnitsCheck.bM_IsExecutingGlobalAbility = true;
+	GlobalAbility->OnGlobalAbilityEnded.RemoveAll(this);
+	GlobalAbility->OnGlobalAbilityEnded.AddUObject(this, &AMissionManager::OnLostAllUnitsGlobalAbilityEnded);
+	ExecuteGlobalAbility(GlobalAbility, 1, ExecuteLocation);
+}
+
+void AMissionManager::OnLostAllUnitsGlobalAbilityEnded(UGlobalAbility* GlobalAbility)
+{
+	if (not IsValid(GlobalAbility))
+	{
+		return;
+	}
+
+	for (int32 CheckIndex = M_LostAllUnitsGlobalAbilityChecks.Num() - 1; CheckIndex >= 0; --CheckIndex)
+	{
+		FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck = M_LostAllUnitsGlobalAbilityChecks[CheckIndex];
+		if (LostAllUnitsCheck.M_GlobalAbility != GlobalAbility)
+		{
+			continue;
+		}
+
+		GlobalAbility->OnGlobalAbilityEnded.RemoveAll(this);
+		M_GlobalAbilityOneShots.Remove(GlobalAbility);
+		if (LostAllUnitsCheck.bM_RenablePostGAComplete)
+		{
+			LostAllUnitsCheck.bM_IsExecutingGlobalAbility = false;
+			continue;
+		}
+
+		M_LostAllUnitsGlobalAbilityChecks.RemoveAt(CheckIndex);
+	}
 }
 
 void AMissionManager::InitMissionManagerWidget()
