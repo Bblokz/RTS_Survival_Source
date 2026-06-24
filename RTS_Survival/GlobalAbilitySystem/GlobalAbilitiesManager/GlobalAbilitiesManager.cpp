@@ -130,6 +130,13 @@ void UGlobalAbilitiesManager::BeginPlay()
 	Super::BeginPlay();
 }
 
+void UGlobalAbilitiesManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ClearPlayerRequirementTimer();
+	ReleaseLoadedAbilities();
+	Super::EndPlay(EndPlayReason);
+}
+
 bool UGlobalAbilitiesManager::QueryRequirementForAbility(const UGlobalAbility* Ability) const
 {
 	if (not IsValid(Ability))
@@ -455,6 +462,37 @@ void UGlobalAbilitiesManager::StartPlayerRequirementTimer()
 		true);
 }
 
+void UGlobalAbilitiesManager::ClearPlayerRequirementTimer()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		M_CheckRequirementsTimerHandle.Invalidate();
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_CheckRequirementsTimerHandle);
+	M_CheckRequirementsTimerHandle.Invalidate();
+}
+
+void UGlobalAbilitiesManager::ReleaseLoadedAbilities()
+{
+	for (UGlobalAbility* Ability : M_GlobalAbilities)
+	{
+		if (IsValid(Ability))
+		{
+			Ability->CancelAbilityActivation();
+		}
+	}
+
+	M_GlobalAbilities.Reset();
+	M_GlobalAbilityPanel.Reset();
+	M_GA_Description.Reset();
+	M_PlayerTechManager.Reset();
+	M_PlayerResourceManager.Reset();
+	M_GameUnitManager.Reset();
+}
+
 void UGlobalAbilitiesManager::CheckRequirements()
 {
 	for (UGlobalAbility* Ability : M_GlobalAbilities)
@@ -505,6 +543,12 @@ FText UGlobalAbilitiesManager::GetHoverDescriptionForAbility(const UGlobalAbilit
 	{
 		return FText::GetEmpty();
 	}
+	if (Ability->M_AbilityRequirements.RequiredTechnology != ETechnology::Tech_NONE
+		&& not EnsureIsValidPlayerTechManager())
+	{
+		return FText::GetEmpty();
+	}
+
 	if (Ability->M_AbilityRequirements.RequiredTechnology != ETechnology::Tech_NONE
 		&& not M_PlayerTechManager.Get()->HasTechResearched(Ability->M_AbilityRequirements.RequiredTechnology))
 	{

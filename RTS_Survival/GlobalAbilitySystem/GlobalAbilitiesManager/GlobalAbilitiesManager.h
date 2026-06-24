@@ -66,7 +66,8 @@ public:
 	void SetupSpawnSettings(const FVector& PlayerStart, float AircraftHeightStart);
 
 	// Called when the game starts
-	virtual void BeginPlay()  override;
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	bool IsPlayerAbilityManager() const;
 	bool IsEnemyAbilityManager() const;
@@ -123,6 +124,8 @@ private:
 
 	void CheckRequirements();
 	void StartPlayerRequirementTimer();
+	void ClearPlayerRequirementTimer();
+	void ReleaseLoadedAbilities();
 	void UpdateAbilityAvailability(UGlobalAbility* Ability);
 	void UpdateAbilityItemAvailability(const UGlobalAbility* Ability, const bool bIsEnabled, const bool bUseGreyTint) const;
 	FText GetHoverDescriptionForAbility(const UGlobalAbility* Ability) const;
