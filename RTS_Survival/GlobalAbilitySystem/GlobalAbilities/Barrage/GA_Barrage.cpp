@@ -11,6 +11,7 @@
 
 void UGA_Barrage::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
+	ResetAbilityEndedBroadcast();
 	ResetBarrageRuntimeState();
 	M_PendingTargetLocation = TargetLocation;
 
@@ -104,6 +105,12 @@ bool UGA_Barrage::GetIsValidProjectileManager() const
 void UGA_Barrage::StartBarrage(const FVector& TargetLocation)
 {
 	M_PendingTargetLocation = TargetLocation;
+	if (M_BarrageSettings.AmountShells <= 0)
+	{
+		BroadcastAbilityEnded();
+		return;
+	}
+
 	FireNextBurst();
 }
 
@@ -132,6 +139,8 @@ void UGA_Barrage::FireSingleShell()
 {
 	PlayOffMapLaunchSoundIfRequested();
 
+	++M_ShellsLaunched;
+
 	if (GetShouldDelayShellLaunchForOffMapSound())
 	{
 		ScheduleDelayedShellLaunch();
@@ -140,14 +149,13 @@ void UGA_Barrage::FireSingleShell()
 	{
 		LaunchSingleShell();
 	}
-
-	++M_ShellsLaunched;
 }
 
 void UGA_Barrage::LaunchSingleShell()
 {
 	if (not GetIsValidProjectileManager())
 	{
+		NotifyShellLaunchFinished();
 		return;
 	}
 
@@ -155,6 +163,7 @@ void UGA_Barrage::LaunchSingleShell()
 	if (not IsValid(Projectile))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_Barrage failed to obtain a dormant projectile."));
+		NotifyShellLaunchFinished();
 		return;
 	}
 
@@ -178,6 +187,28 @@ void UGA_Barrage::LaunchSingleShell()
 		LaunchRotation,
 		AimPoint,
 		ActorsToIgnore);
+	NotifyShellLaunchFinished();
+}
+
+void UGA_Barrage::NotifyShellLaunchFinished()
+{
+	++M_ShellsActuallyLaunched;
+	BroadcastBarrageFinishedIfNeeded();
+}
+
+void UGA_Barrage::BroadcastBarrageFinishedIfNeeded()
+{
+	if (M_ShellsLaunched < M_BarrageSettings.AmountShells)
+	{
+		return;
+	}
+
+	if (M_ShellsActuallyLaunched < M_BarrageSettings.AmountShells)
+	{
+		return;
+	}
+
+	BroadcastAbilityEnded();
 }
 
 bool UGA_Barrage::GetShouldDelayShellLaunchForOffMapSound() const
@@ -346,6 +377,7 @@ void UGA_Barrage::ResetBarrageRuntimeState()
 	ClearBurstTimer();
 	ClearShellLaunchTimers();
 	M_ShellsLaunched = 0;
+	M_ShellsActuallyLaunched = 0;
 }
 
 bool UGA_Barrage::HasCachedProjectileManager() const

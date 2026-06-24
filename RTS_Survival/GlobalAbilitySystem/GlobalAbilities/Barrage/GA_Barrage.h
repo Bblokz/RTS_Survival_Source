@@ -99,6 +99,9 @@ private:
 	int32 M_ShellsLaunched = 0;
 
 	UPROPERTY(Transient)
+	int32 M_ShellsActuallyLaunched = 0;
+
+	UPROPERTY(Transient)
 	FTimerHandle M_BurstTimerHandle;
 
 	UPROPERTY(Transient)
@@ -114,6 +117,8 @@ private:
 	void FireNextBurst();
 	void FireSingleShell();
 	void LaunchSingleShell();
+	void NotifyShellLaunchFinished();
+	void BroadcastBarrageFinishedIfNeeded();
 	bool GetShouldDelayShellLaunchForOffMapSound() const;
 	void ScheduleDelayedShellLaunch();
 	FWeaponVFX BuildWeaponVfxForShellLaunch() const;

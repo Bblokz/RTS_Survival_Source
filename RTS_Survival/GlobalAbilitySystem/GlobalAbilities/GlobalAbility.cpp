@@ -64,6 +64,7 @@ void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation)
 		CancelAbilityActivation();
 		return;
 	}
+	ResetAbilityEndedBroadcast();
 	ExecuteAbilityAtLocation(TargetLocation);
 	M_AbilityState = EGlobalAbilityState::NotActivated;
 	M_GlobalAbilitiesManager.Get()->OnAbilityFinishedExecuting(this);
@@ -220,6 +221,22 @@ bool UGlobalAbility::GetIsValidGlobalAbilityManager() const
 UGlobalAbilitiesManager* UGlobalAbility::GetGlobalAbilityManager() const
 {
 	return M_GlobalAbilitiesManager.Get();
+}
+
+void UGlobalAbility::BroadcastAbilityEnded()
+{
+	if (bM_HasBroadcastAbilityEnded)
+	{
+		return;
+	}
+
+	bM_HasBroadcastAbilityEnded = true;
+	OnGlobalAbilityEnded.Broadcast(this);
+}
+
+void UGlobalAbility::ResetAbilityEndedBroadcast()
+{
+	bM_HasBroadcastAbilityEnded = false;
 }
 
 bool UGlobalAbility::EnsureIsValidGlobalAbilityManager() const

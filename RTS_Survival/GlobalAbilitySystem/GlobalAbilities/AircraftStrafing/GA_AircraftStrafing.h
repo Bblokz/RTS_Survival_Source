@@ -50,6 +50,12 @@ private:
 	// Keeps async aircraft class load requests alive until their callbacks can safely spawn the aircraft.
 	TArray<TSharedPtr<FStreamableHandle>> M_AircraftClassLoadHandles;
 
+	UPROPERTY(Transient)
+	int32 M_PendingAircraftLoadCount = 0;
+
+	UPROPERTY(Transient)
+	int32 M_ActiveAircraftCount = 0;
+
 	void RequestSpawnAircraftAtStartLocationsAsync(const FVector& TargetLocation);
 	void RequestSpawnAircraftAtStartLocationAsync(
 		const TSoftClassPtr<AAircraftMaster>& AircraftClassToLoad,
@@ -73,4 +79,8 @@ private:
 		const FVector& StartLocation,
 		const FVector& StrafeEndLocation,
 		const FVector& PostStrafeMoveToLocation) const;
+
+	UFUNCTION()
+	void OnSpawnedAircraftDestroyed(AActor* DestroyedActor);
+	void BroadcastStrafingFinishedIfNeeded();
 };

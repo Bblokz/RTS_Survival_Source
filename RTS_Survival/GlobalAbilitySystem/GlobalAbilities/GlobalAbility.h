@@ -11,6 +11,9 @@
 class ACPPController;
 class UGlobalAbilitiesManager;
 class UNiagaraComponent;
+class UGlobalAbility;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnGlobalAbilityEnded, UGlobalAbility*);
 
 UENUM(blueprintType)
 enum class EGlobalAbilityState : uint8
@@ -51,12 +54,16 @@ public:
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation);
 	EGlobalAbility GetAbilityType() const;
 
+	FOnGlobalAbilityEnded OnGlobalAbilityEnded;
+
 protected:
 	int32 GetOwningPlayer() const;
 	// For custom per ability logic on init.
 	virtual void OnInit(AActor* WorldContextActor);
 	[[nodiscard]] bool GetIsValidGlobalAbilityManager() const;
 	UGlobalAbilitiesManager* GetGlobalAbilityManager() const;
+	void BroadcastAbilityEnded();
+	void ResetAbilityEndedBroadcast();
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EGlobalAbility M_AbilityType;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -109,5 +116,8 @@ private:
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ACPPController> M_PlayerController;
+
+	UPROPERTY(Transient)
+	bool bM_HasBroadcastAbilityEnded = false;
 	[[nodiscard]] bool EnsureIsValidPlayerController() const;
 };

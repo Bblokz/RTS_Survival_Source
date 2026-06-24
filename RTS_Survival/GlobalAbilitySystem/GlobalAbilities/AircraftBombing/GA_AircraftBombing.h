@@ -71,6 +71,9 @@ private:
 		const FVector& RetreatLocation);
 	void StartForcedRetreatTimer();
 	void OnForcedRetreatTimerFinished();
+
+	UFUNCTION()
+	void OnSpawnedAircraftDestroyed(AActor* DestroyedActor);
 	bool GetIsValidSpawnedAircraft() const;
 	void ClearForcedRetreatTimer();
 };

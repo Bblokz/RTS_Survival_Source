@@ -12,6 +12,8 @@
 
 void UGA_AircraftBombing::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
+	ResetAbilityEndedBroadcast();
+
 	if (not GetIsValidGlobalAbilityManager())
 	{
 		return;
@@ -41,6 +43,7 @@ void UGA_AircraftBombing::RequestSpawnAircraftAtStartLocationAsync(
 	if (AircraftClassToLoad.IsNull())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftBombing has no aircraft class configured."));
+		BroadcastAbilityEnded();
 		return;
 	}
 
@@ -76,16 +79,19 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 	if (not IsValid(AircraftClass))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftBombing failed to async load a valid aircraft class."));
+		BroadcastAbilityEnded();
 		return;
 	}
 
 	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(this, AircraftClass, StartLocation);
 	if (not IsValid(SpawnedAircraft))
 	{
+		BroadcastAbilityEnded();
 		return;
 	}
 
 	M_SpawnedAircraft = SpawnedAircraft;
+	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftBombing::OnSpawnedAircraftDestroyed);
 	SpawnedAircraft->SetUnitSelectable(false);
 	const FVector CarpetEndLocation = BuildCarpetEndLocation(StartLocation, TargetLocation);
 	QueueCarpetBombingOrderForNextFrame(SpawnedAircraft, TargetLocation, CarpetEndLocation, RetreatLocation);
@@ -140,6 +146,7 @@ void UGA_AircraftBombing::IssueCarpetBombingOrder(
 {
 	if (not IsValid(SpawnedAircraft))
 	{
+		BroadcastAbilityEnded();
 		return;
 	}
 
@@ -184,6 +191,13 @@ void UGA_AircraftBombing::OnForcedRetreatTimerFinished()
 	const FVector TargetLocation = M_SpawnedAircraft->GetActorLocation();
 	const FVector RetreatLocation = GetGlobalAbilityManager()->GetAircraftBombingRetreatLocation(this, TargetLocation);
 	M_SpawnedAircraft->CarpetBombing_RetreatAndDestroy(RetreatLocation);
+}
+
+void UGA_AircraftBombing::OnSpawnedAircraftDestroyed(AActor* DestroyedActor)
+{
+	M_SpawnedAircraft.Reset();
+	ClearForcedRetreatTimer();
+	BroadcastAbilityEnded();
 }
 
 bool UGA_AircraftBombing::GetIsValidSpawnedAircraft() const

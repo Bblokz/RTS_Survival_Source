@@ -13,12 +13,16 @@
 
 void UGA_AircraftStrafing::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
+	ResetAbilityEndedBroadcast();
+
 	if (not GetIsValidGlobalAbilityManager())
 	{
 		return;
 	}
 
 	M_AircraftClassLoadHandles.Reset();
+	M_PendingAircraftLoadCount = 0;
+	M_ActiveAircraftCount = 0;
 	RequestSpawnAircraftAtStartLocationsAsync(TargetLocation);
 	Super::ExecuteAbilityAtLocation(TargetLocation);
 }
@@ -34,6 +38,7 @@ void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationsAsync(const FVect
 	if (M_AircraftStrafingSettings.AircraftClasses.IsEmpty())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing has no aircraft classes configured."));
+		BroadcastAbilityEnded();
 		return;
 	}
 
@@ -46,6 +51,7 @@ void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationsAsync(const FVect
 		}
 
 		++ValidAircraftClassCount;
+		++M_PendingAircraftLoadCount;
 		UGlobalAbilitiesManager* GlobalAbilitiesManager = GetGlobalAbilityManager();
 		const FVector StartLocation = GlobalAbilitiesManager->GetAircraftBombingSpawnLocation(this, TargetLocation);
 		const FVector PostStrafeMoveToLocation = BuildPostStrafeMoveToLocation(TargetLocation);
@@ -62,6 +68,7 @@ void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationsAsync(const FVect
 	}
 
 	RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing has no valid aircraft classes configured."));
+	BroadcastAbilityEnded();
 }
 
 void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationAsync(
@@ -98,19 +105,25 @@ void UGA_AircraftStrafing::OnAircraftClassLoaded(
 	const FVector& TargetLocation,
 	const FVector& PostStrafeMoveToLocation)
 {
+	--M_PendingAircraftLoadCount;
+
 	UClass* AircraftClass = AircraftClassToLoad.Get();
 	if (not IsValid(AircraftClass))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing failed to async load a valid aircraft class."));
+		BroadcastStrafingFinishedIfNeeded();
 		return;
 	}
 
 	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(this, AircraftClass, StartLocation);
 	if (not IsValid(SpawnedAircraft))
 	{
+		BroadcastStrafingFinishedIfNeeded();
 		return;
 	}
 
+	++M_ActiveAircraftCount;
+	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftStrafing::OnSpawnedAircraftDestroyed);
 	const FVector StrafeEndLocation = BuildStrafeEndLocation(StartLocation, TargetLocation);
 	SpawnedAircraft->SetUnitSelectable(false);
 	QueueStrafeOrderForNextFrame(SpawnedAircraft, TargetLocation, StrafeEndLocation, PostStrafeMoveToLocation);
@@ -186,4 +199,25 @@ void UGA_AircraftStrafing::IssueStrafeOrder(
 		M_AircraftStrafingSettings.TotalStrafeTime,
 		PostStrafeMoveToLocation);
 	SpawnedAircraft->StrafeLocation(StrafeAircraftSettings, M_AircraftStrafingSettings.AttackMoveSettings);
+}
+
+void UGA_AircraftStrafing::OnSpawnedAircraftDestroyed(AActor* DestroyedActor)
+{
+	M_ActiveAircraftCount = FMath::Max(0, M_ActiveAircraftCount - 1);
+	BroadcastStrafingFinishedIfNeeded();
+}
+
+void UGA_AircraftStrafing::BroadcastStrafingFinishedIfNeeded()
+{
+	if (M_PendingAircraftLoadCount > 0)
+	{
+		return;
+	}
+
+	if (M_ActiveAircraftCount > 0)
+	{
+		return;
+	}
+
+	BroadcastAbilityEnded();
 }

@@ -83,17 +83,20 @@ private:
 
 	TSharedPtr<FStreamableHandle> M_AircraftClassLoadHandle;
 
+	UPROPERTY(Transient)
+	int32 M_ActiveAircraftCount = 0;
+
 	void OnAircraftClassLoaded(TSoftClassPtr<AAircraftMaster> AircraftClassToLoad, FVector TargetLocation);
 	void SpawnTankDropAircraft(
 		UClass* AircraftClass,
 		const FVector& ExecuteLocation,
 		const FAircraftDropTankWithOffset& TankWithOffset,
-		int32 AircraftIndex) const;
+		int32 AircraftIndex);
 	void SpawnSquadDropAircraft(
 		UClass* AircraftClass,
 		const FVector& ExecuteLocation,
 		const TArray<ESquadSubtype>& Squads,
-		int32 AircraftIndex) const;
+		int32 AircraftIndex);
 	FAircraftDropRequest BuildBaseDropRequest(
 		const FVector& TargetLocation,
 		EAircraftDropPayloadType PayloadType,
@@ -112,4 +115,8 @@ private:
 		TArray<FVector>& UsedExecuteLocations) const;
 	FVector BuildAircraftRectangleFormationLocation(const FVector& TargetLocation, int32 FormationIndex) const;
 	bool GetIsExecuteLocationAlreadyUsed(const FVector& ExecuteLocation, const TArray<FVector>& UsedExecuteLocations) const;
+
+	UFUNCTION()
+	void OnSpawnedAircraftDestroyed(AActor* DestroyedActor);
+	void BroadcastDropFinishedIfNeeded();
 };
