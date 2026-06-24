@@ -910,6 +910,13 @@ void AAircraftMaster::OnMoveCompleted()
 		return;
 	}
 
+	if (M_StrafeState.bM_IsRetreatingToDestroy)
+	{
+		M_StrafeState.bM_IsRetreatingToDestroy = false;
+		Destroy();
+		return;
+	}
+
 	if (M_AircraftDropRequest.State == EAircraftDropRequestState::MovingToDropLocation ||
 		M_AircraftDropRequest.State == EAircraftDropRequestState::Retreating)
 	{
@@ -1533,8 +1540,7 @@ void AAircraftMaster::OnAttackMoveCompleted()
 	}
 	if (M_StrafeState.bM_IsStrafing)
 	{
-		Strafe_PrepareNextAttackRun();
-		Strafe_StartAttackRun();
+		Strafe_CompleteInitialRunAndEnableAggro();
 		return;
 	}
 	if (M_AircraftAttackData.bM_IsAttackGround)
@@ -2365,6 +2371,7 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 	M_StrafeState.bM_IsStrafing = true;
 	M_StrafeState.bM_IsLerpingStrafePoint = false;
 	M_StrafeState.bM_IsFirstAttackRun = true;
+	M_StrafeState.bM_IsRetreatingToDestroy = false;
 
 	M_AircraftAttackData.TargetActor = nullptr;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.StrafeStartLocation;
@@ -2415,7 +2422,9 @@ void AAircraftMaster::Strafe_StartTimer(const float TotalStrafeTime)
 void AAircraftMaster::Strafe_OnTimerFinished()
 {
 	const FVector PostStrafeMoveToLocation = M_StrafeState.PostStrafeMoveToLocation;
-	TerminateAttackCommand();
+	StopWeaponFire();
+	Strafe_StopAndRestoreSettings();
+	M_StrafeState.bM_IsRetreatingToDestroy = true;
 	ExecuteMoveCommand(PostStrafeMoveToLocation);
 }
 
@@ -2541,6 +2550,16 @@ void AAircraftMaster::Strafe_PrepareNextAttackRun()
 	}
 
 	M_AircraftAttackData.TargetLocation = M_StrafeState.NextRunStartLocation;
+}
+
+void AAircraftMaster::Strafe_CompleteInitialRunAndEnableAggro()
+{
+	StopWeaponFire();
+	M_AircraftMovementSettings.AttackMoveSettings = M_PreStrafeAttackMoveSettings;
+	M_StrafeState.bM_IsStrafing = false;
+	M_StrafeState.bM_IsLerpingStrafePoint = false;
+	SetMovementToIdle();
+	SetAggroStance(ERTSAggroBehaviour::Stance_Aggressive);
 }
 
 void AAircraftMaster::Strafe_StopAndRestoreSettings()
