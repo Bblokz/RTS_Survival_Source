@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "TrackPhysicsMovement.h"
@@ -22,8 +22,6 @@ namespace TrackPhysicsMovementConstants
 	constexpr float GroundTraceSingleHitCurrentNormalBlendAlpha = 0.7f;
 	/** @brief Number of consecutive failed trace frames that may still reuse the last valid ground sample. */
 	constexpr int32 GroundTraceFailureHoldFrames = 6;
-	/** @brief Upper bound used to normalize slope angle when applying exponential correction damping. */
-	constexpr float SlopeAngleNormalizationMaxDegrees = 90.0f;
 	/** @brief Preserve the small deadzone roll-bias used by the previous fallback implementation. */
 	constexpr float DeadzoneFallbackAngularVelocityXDegrees = -1.0f;
 }
@@ -380,26 +378,13 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 	const FVector& DesiredPlanarVelocity,
 	const FVector& GroundNormal) const
 {
-	const float GroundUpDot = FMath::Clamp(FVector::DotProduct(GroundNormal, FVector::UpVector), -1.0f, 1.0f);
-	const float SlopeAngleDegrees = FMath::RadiansToDegrees(FMath::Acos(GroundUpDot));
-	const float NormalizedSlopeAngle = FMath::Clamp(
-		SlopeAngleDegrees / TrackPhysicsMovementConstants::SlopeAngleNormalizationMaxDegrees,
-		0.0f,
-		1.0f);
-	const float SlopeCorrectionScale = FMath::Exp(
-		-M_RuntimeTrackPhysicsMovementTuningSnapshot.SlopeCorrectionExpDamping * NormalizedSlopeAngle);
-	const float SlopeAdjustedVelocityCorrectionGain =
-		M_RuntimeTrackPhysicsMovementTuningSnapshot.VelocityCorrectionGain * SlopeCorrectionScale;
-	const float SlopeAdjustedMaxCorrectionAcceleration =
-		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration * SlopeCorrectionScale;
-
 	const FVector CurrentLinearVelocity = RigidBody->V();
 	const float TankMass = RigidBody->M();
 	const FVector VelocityError = DesiredPlanarVelocity - CurrentLinearVelocity;
 	const FVector VelocityCorrectionAcceleration =
-		VelocityError * SlopeAdjustedVelocityCorrectionGain;
+		VelocityError * M_RuntimeTrackPhysicsMovementTuningSnapshot.VelocityCorrectionGain;
 	const FVector ClampedVelocityCorrectionAcceleration = VelocityCorrectionAcceleration.GetClampedToMaxSize(
-		SlopeAdjustedMaxCorrectionAcceleration);
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration);
 
 	const FVector RightDirection = RigidBody->R().GetRightVector();
 	const FVector PlanarRightDirection = FVector::VectorPlaneProject(RightDirection, GroundNormal).GetSafeNormal();

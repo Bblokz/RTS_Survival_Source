@@ -591,6 +591,7 @@ private:
 		bool bM_IsStrafing = false;
 		bool bM_IsLerpingStrafePoint = false;
 		bool bM_IsFirstAttackRun = true;
+		bool bM_IsRetreatingToDestroy = false;
 		FTimerHandle StrafeTimerHandle;
 
 		void ResetRuntime()
@@ -655,6 +656,7 @@ private:
 	void Strafe_OnAttackDiveStarted();
 	void Strafe_OnDiveRecoveryStarted();
 	void Strafe_PrepareNextAttackRun();
+	void Strafe_CompleteInitialRunAndEnableAggro();
 	void Strafe_StopAndRestoreSettings();
 	void Strafe_ClearTimer();
 	void CarpetBombing_MoveToLocation(const FVector& TargetLocation);

@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -104,15 +104,6 @@ struct FTrackPhysicsMovementTuning
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
 	float MinimumYawInertia = 1.0f;
-
-	/**
-	 * @brief Raise when slope transitions still feel too responsive; lower when uphill/downhill control becomes too weak.
-	 *
-	 * @note Scales both velocity-correction gain and max correction acceleration by Exp(-Scale * NormalizedSlopeAngle).
-	 * @note Higher values exponentially reduce correction authority on steeper ground so gravity remains more visible.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="TrackPhysics|StrategyB")
-	float SlopeCorrectionExpDamping = 0.0f;
 };
 
 /**
@@ -192,7 +183,7 @@ private:
 		FVector& OutGroundNormal) const;
 
 	/**
-	 * @brief Applies bounded longitudinal correction and lateral damping so steering stays controlled without skating.
+	 * @brief Applies bounded longitudinal correction and lateral damping without reducing uphill drive authority.
 	 * @param RigidBody Async rigid body handle used to read current velocity.
 	 * @param DesiredPlanarVelocity Ground-aligned velocity intent generated from throttle.
 	 * @param GroundNormal Ground normal used to keep damping parallel to terrain.
