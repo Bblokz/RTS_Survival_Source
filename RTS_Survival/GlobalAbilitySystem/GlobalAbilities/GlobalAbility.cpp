@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 
 #include "GlobalAbility.h"
@@ -108,18 +108,8 @@ void UGlobalAbility::OnInit(AActor* WorldContextActor)
 
 void UGlobalAbility::BeginDestroy()
 {
-	UWorld* World  =GetWorld();
-	if (IsValid(World))
-	{
-		World->GetTimerManager().ClearTimer(M_SpawnedMarkerTimer);
-	}
-	if (IsValid(M_SpawnedMarkerEffect))
-	{
-		DestroyMarker();
-	}
-	
+	DestroyAllMarkers();
 	UObject::BeginDestroy();
-	
 }
 
 void UGlobalAbility::CreateMarker(const FVector& ExecuteLocation)
@@ -130,51 +120,92 @@ void UGlobalAbility::CreateMarker(const FVector& ExecuteLocation)
 		// not all abilities use markers.
 		return;
 	}
-	// Spawns, plays once, and completely deletes itself from memory when finished
-	M_SpawnedMarkerEffect =  UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		GetWorld(), 
-		M_AbilityMarker.MarkerEffect, 
-		ExecuteLocation, // World Position
-		FRotator::ZeroRotator, // World Rotation
-		FVector(1.0f), // Scale
-		false, // bAutoDestroy 
-		true // bAutoActivate
-	);
-	UWorld* World  =GetWorld();
-	if (IsValid(M_SpawnedMarkerEffect) && World)
-	{
-		OnValidMarkerSpawned();
-		TWeakObjectPtr<UGlobalAbility> WeakThis(this);
-		FTimerDelegate TimderDel;
-		auto Lambda = [WeakThis]()->void
-		{
-			if (not WeakThis.IsValid())
-			{
-				return;
-			}
-			TObjectPtr<UGlobalAbility> StrongThis = WeakThis.Get();
-			StrongThis->DestroyMarker();
-		};
-		TimderDel.BindLambda(Lambda);
-		World->GetTimerManager().SetTimer(M_SpawnedMarkerTimer, TimderDel, M_AbilityMarker.EffectTotalTime, false);
-	}
-}
 
-void UGlobalAbility::OnValidMarkerSpawned()
-{
-	M_SpawnedMarkerEffect->SetColorParameter("MarkerColor", M_AbilityMarker.MarkerColor);
-}
-
-void UGlobalAbility::DestroyMarker()
-{
-	if (not IsValid(M_SpawnedMarkerEffect))
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
 	{
 		return;
 	}
-	M_SpawnedMarkerEffect->DestroyComponent();
-	M_SpawnedMarkerEffect = nullptr;
+
+	// Spawns, plays once, and is explicitly removed by a per-marker timer so overlapping ability executions cannot orphan it.
+	UNiagaraComponent* SpawnedMarkerEffect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		World,
+		M_AbilityMarker.MarkerEffect,
+		ExecuteLocation, // World Position
+		FRotator::ZeroRotator, // World Rotation
+		FVector(1.0f), // Scale
+		false, // bAutoDestroy
+		true // bAutoActivate
+	);
+	if (not IsValid(SpawnedMarkerEffect))
+	{
+		return;
+	}
+
+	M_SpawnedMarkerEffects.Add(SpawnedMarkerEffect);
+	OnValidMarkerSpawned(SpawnedMarkerEffect);
+
+	TWeakObjectPtr<UGlobalAbility> WeakThis(this);
+	TWeakObjectPtr<UNiagaraComponent> WeakMarkerEffect(SpawnedMarkerEffect);
+	FTimerDelegate TimerDelegate;
+	TimerDelegate.BindLambda([WeakThis, WeakMarkerEffect]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		UGlobalAbility* StrongThis = WeakThis.Get();
+		StrongThis->DestroyMarker(WeakMarkerEffect.Get());
+	});
+
+	FTimerHandle MarkerTimerHandle;
+	World->GetTimerManager().SetTimer(MarkerTimerHandle, TimerDelegate, M_AbilityMarker.EffectTotalTime, false);
 }
 
+void UGlobalAbility::OnValidMarkerSpawned(UNiagaraComponent* MarkerEffect)
+{
+	if (not IsValid(MarkerEffect))
+	{
+		return;
+	}
+
+	MarkerEffect->SetColorParameter("MarkerColor", M_AbilityMarker.MarkerColor);
+}
+
+void UGlobalAbility::DestroyMarker(UNiagaraComponent* MarkerEffect)
+{
+	if (not IsValid(MarkerEffect))
+	{
+		RemoveTrackedMarker(MarkerEffect);
+		return;
+	}
+
+	MarkerEffect->DestroyComponent();
+	RemoveTrackedMarker(MarkerEffect);
+}
+
+void UGlobalAbility::DestroyAllMarkers()
+{
+	for (int32 MarkerIndex = M_SpawnedMarkerEffects.Num() - 1; MarkerIndex >= 0; --MarkerIndex)
+	{
+		UNiagaraComponent* MarkerEffect = M_SpawnedMarkerEffects[MarkerIndex];
+		if (IsValid(MarkerEffect))
+		{
+			MarkerEffect->DestroyComponent();
+		}
+	}
+
+	M_SpawnedMarkerEffects.Empty();
+}
+
+void UGlobalAbility::RemoveTrackedMarker(UNiagaraComponent* MarkerEffect)
+{
+	M_SpawnedMarkerEffects.RemoveAll([MarkerEffect](const TObjectPtr<UNiagaraComponent>& TrackedMarkerEffect)
+	{
+		return not IsValid(TrackedMarkerEffect) || TrackedMarkerEffect == MarkerEffect;
+	});
+}
 
 bool UGlobalAbility::IsOwnedByPlayer() const
 {
