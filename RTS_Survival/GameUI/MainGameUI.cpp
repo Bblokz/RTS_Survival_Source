@@ -105,6 +105,16 @@ TObjectPtr<UW_GlobalAbilityPanel> UMainGameUI::GetGlobalAbilityPanel()
 	return nullptr;
 }
 
+void UMainGameUI::HideGlobalAbilityPanelForMission() const
+{
+	if (not EnsureGlobalAbilityPanelIsValid())
+	{
+		return;
+	}
+
+	GlobalAbilityPanel->SetVisibility(ESlateVisibility::Collapsed);
+}
+
 void UMainGameUI::SetMissionWidgetManagerForMissionManager(UW_MissionWidgetManager* MissionWidgetManager)
 {
 	if (not IsValid(MissionWidgetManager))

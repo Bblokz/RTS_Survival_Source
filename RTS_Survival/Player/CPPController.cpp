@@ -7378,10 +7378,19 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 	const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	const UCommanderSettings* CommanderDevSettings = UCommanderSettings::Get();
 	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
-	if (not GetIsValidPlayerGlobalAbiliesManager() || not GameInstance || not IsValid(CommanderDevSettings))
+	if (not GetIsValidPlayerGlobalAbiliesManager() || not GameInstance || not IsValid(CommanderDevSettings)
+		|| not IsValid(MainMenuWidget))
 	{
 		return;
 	}
+
+	const AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
+	if (IsValid(MissionManager) && MissionManager->GetShouldHideGlobalAbilitiesForPlayer())
+	{
+		MainMenuWidget->HideGlobalAbilityPanelForMission();
+		return;
+	}
+
 	ERTSCommander Commander = GameInstance->GetPlayerCommander();
 	FRTSCommanderSettings CommanderSettings = CommanderDevSettings->GetCommanderSettingsForType(Commander);
 
