@@ -23,15 +23,20 @@ namespace
 
 void UGA_AircraftDrop::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
+	ResetAbilityEndedBroadcast();
+
 	if (not GetIsValidGlobalAbilityManager())
 	{
 		return;
 	}
 
+	M_ActiveAircraftCount = 0;
+
 	const TSoftClassPtr<AAircraftMaster> AircraftClassToLoad = M_AircraftDropSettings.AircraftClass;
 	if (AircraftClassToLoad.IsNull())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftDrop has no aircraft class configured."));
+		BroadcastAbilityEnded();
 		return;
 	}
 
@@ -66,6 +71,7 @@ void UGA_AircraftDrop::OnAircraftClassLoaded(
 	if (not IsValid(AircraftClass))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftDrop failed to async load a valid aircraft class."));
+		BroadcastDropFinishedIfNeeded();
 		return;
 	}
 
@@ -109,13 +115,15 @@ void UGA_AircraftDrop::OnAircraftClassLoaded(
 		SpawnSquadDropAircraft(AircraftClass, ExecuteLocation, SquadsForAircraft, AircraftIndex);
 		++AircraftIndex;
 	}
+
+	BroadcastDropFinishedIfNeeded();
 }
 
 void UGA_AircraftDrop::SpawnTankDropAircraft(
 	UClass* AircraftClass,
 	const FVector& ExecuteLocation,
 	const FAircraftDropTankWithOffset& TankWithOffset,
-	const int32 AircraftIndex) const
+	const int32 AircraftIndex)
 {
 	FAircraftDropRequest DropRequest = BuildBaseDropRequest(
 		ExecuteLocation,
@@ -132,6 +140,9 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 	{
 		return;
 	}
+
+	++M_ActiveAircraftCount;
+	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftDrop::OnSpawnedAircraftDestroyed);
 
 	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
 	if (not IsValid(AsyncSpawner))
@@ -175,7 +186,7 @@ void UGA_AircraftDrop::SpawnSquadDropAircraft(
 	UClass* AircraftClass,
 	const FVector& ExecuteLocation,
 	const TArray<ESquadSubtype>& Squads,
-	const int32 AircraftIndex) const
+	const int32 AircraftIndex)
 {
 	FAircraftDropRequest DropRequest = BuildBaseDropRequest(
 		ExecuteLocation,
@@ -192,6 +203,8 @@ void UGA_AircraftDrop::SpawnSquadDropAircraft(
 	{
 		return;
 	}
+	++M_ActiveAircraftCount;
+	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftDrop::OnSpawnedAircraftDestroyed);
 	SpawnedAircraft->SetUnitSelectable(false);
 	SpawnedAircraft->OrderAircraftDrop(DropRequest);
 }
@@ -291,4 +304,25 @@ bool UGA_AircraftDrop::GetIsExecuteLocationAlreadyUsed(
 	}
 
 	return false;
+}
+
+void UGA_AircraftDrop::OnSpawnedAircraftDestroyed(AActor* DestroyedActor)
+{
+	M_ActiveAircraftCount = FMath::Max(0, M_ActiveAircraftCount - 1);
+	BroadcastDropFinishedIfNeeded();
+}
+
+void UGA_AircraftDrop::BroadcastDropFinishedIfNeeded()
+{
+	if (M_AircraftClassLoadHandle.IsValid())
+	{
+		return;
+	}
+
+	if (M_ActiveAircraftCount > 0)
+	{
+		return;
+	}
+
+	BroadcastAbilityEnded();
 }
