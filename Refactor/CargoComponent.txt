@@ -1,50 +1,39 @@
-﻿you are a c++ expert and perfectionist.
-You are going to define a new type of global ability (UGlobalAbility) derived class called
-UGA_AircraftDrop. The idea is that I can provide an array of squad subtypes and tank subtypes on that ability's settings
-struct as well as the class of aircraft to use for dropping and then it will automatically determine how many aircraft need spawning.
- Because we will also have a setting int32 AmountInfantryPerAircraft while for the tanks we will always allow only
-  1 per aircraft. and we make sure that aircraft can
- either hold only tanks or only infantry.
- Also a setting float z offset per tank will used for how far below or above the location of the aircraft the tank will be attached.
- float HowLongStayLanded
- float RadiusSpawnSquads
- 
- We already have two aircraft classes;
- AAircraftMaster and AVTOLDropshipAircraft the dropship one is already used for buildings and works a bit differently; it only vtols
- up and down to a drop postion at a building. I want you to implement the AircraftDrop functionality on the AAircraftMaster,
- with a single public function that takes in FAircraftDropRequest. which will also have an enum in it to track the state.
- 
- the settings struct for this ability:
- aircraft class soft ptr
- tarray of pairs <tank subtypes, float PairTankWithOffset
- tarray of squad subtypes
- 
- 
- how it needs to work:
- after the player executes the ability at a location;
- determine how many aircraft to spawn with calculating how many tanks we need + # infantry / # infantry per aircraft and use the soft class aircraft to spawn from the settings struct
- determine a spawn location for each individual aircraft like we also do for the other aircraft global abilities.
- and async spawn the aircraft at their positions.
- async load the needed tanks. for the aircraft that need squads do no loading now; those squads will be loaded once the VTOL aircraft touches the ground
- when a tank is loaded set it to not selectable, set its turrets to be disabled as well as its hull weapons to be disabled.
- attach it to the spawned aircraft for it, with its offset or wait for the aircraft to spawn and attach then.
- 
- once an aircraft is spawned:
- if it is a tank aircraft wait for the tank to be attached first, for infantry aircraft do the next step immediatly;
- order the aircraft the drop with the FAircraftDropRequest with all the required parameters to:
- first order a move to the execute location wtih z set to the aircraft spawn height. Once reached:
- then Vertical Land at the execute location (with regular z) in here make sure the aircraft fully Vertical Lands
- to exact that z position if it is infantry only and that z postion + abs(its tank offset) ((tank offset should always be negative so ensure
- to use abs))
- once it landed:
-stay for  HowLongStayLanded and if infantry aircraft
-for each squad to load async load them and pick a point in circle with radius  RadiusSpawnSquads and project that to
-the navmesh with the RTSFunctionLIbrary helpers using an extend of 2.f
- and spawn the squad at that location.
- 
- after HowLongStayLanded take off again and after fully taken off and airborne move to the
- calculated aircraft retreat location (see how we do this with other global abilities iwth aircraft)
- 
- It is important that you make sure that all of the existing aircraft logic will still work and is not affected by this new functionality.
- 
- 
+﻿You are a c++ expert and perfectionist.
+You are going to add new logic to the mission manager to support a certain check system that will, when the check find it is allowed
+execute a global abiltiy that is provided with it (save all of its state of this particular check in a struct all GC safe, but in a way it does not
+clutter the mission manager too much)
+
+New ticking logic for mission manager:
+Global Ability On lost all units of type
+
+first define in its own file; maybe together with the struct that holds state for one of these checks;
+EReinforcementAirdropLocation
+NotSet,
+OverrideLocation,
+CommanderVehicleLocation,
+HQLocation
+
+THis feature will issue a global abilty provided for it and execute it either at the override location or otherwise at the location
+of the command vehicle of the player or their HQ with some offset in those cases in XY to not be on top.
+it will be set up with either a
+ESquadsubtype or Etanksubtype or Enomadic subtype
+to check, what it will do:
+0) make sure the global ability is initialized.
+1) in tick check with the game unit manager if the player still has any of the unit(s) of the provided subtype.
+if yes nothing happens
+2) the momeent the player has non remaining of the unit we execute the abiltiy at either the ovrride location or
+at the HQ or commander position with some XY offset which needs to be a setting.
+
+if we do HQ or commander position make sure that after retreiving those positions we add the XY offset.
+if these are not available pick the location of any tank owned by the player and add the offset to that and continue with that as 
+the location.
+project the target location to the navmesh with the rts funtion library and extent 5 and use that location for the provided global ability.
+execute the provided global ability at the location.
+
+make sure  to bind to the OnGlobalAbilityEnded before executing safely.
+
+also add a setting for this called bool bRenablePostGAComplete which is default set to false.
+While the ability is executing the tick check for this instance is always paused ; does nothing regardless of
+bRenablePostGAComplete.
+once the abiltiy lets this tick check know it is done executing and bRenablePostGAComplete is false then remove the abilty and this tick
+check entirly else if bRenablePostGAComplete is true; renable the tick check and the whole thing works again like before.

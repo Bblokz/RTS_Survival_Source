@@ -68,5 +68,8 @@ struct FAircraftDropRequest
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<USoundConcurrency> DropOffSoundConcurrency = nullptr;
 
+	UPROPERTY()
 	TWeakObjectPtr<ATankMaster> AttachedTank;
+	
+	float AttachedTankVisionRadius = 0.0f;
 };

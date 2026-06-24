@@ -35,6 +35,7 @@ public:
 
 	ASelectablePawnMaster(const FObjectInitializer& ObjectInitializer);
 
+	UFowComp* GetFowComponent() const { return FowComponent; };
 	virtual bool GetIsUnitInCombat() const override;
 	
 	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) ;

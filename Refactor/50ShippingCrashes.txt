@@ -1,0 +1,169 @@
+﻿1–10: Most common ownership and lifetime failures
+
+1. Persistent UObject* member missing UPROPERTY.
+The GC cannot see the reference, so the target may be collected while the raw pointer remains non-null. Store persistent owning references as UPROPERTY() TObjectPtr<T>; use TWeakObjectPtr<T> when the member must not retain the object.
+
+2. Raw this or raw UObject* captured by an asynchronous lambda.
+The task completes after the object, world, or subsystem has been destroyed. Capture a TWeakObjectPtr, pin it at execution time, and return immediately if pinning fails.
+
+3. UObject references hidden in a non-reflected container or native struct.
+Typical examples are an unmarked TArray<UObject*>, a nested native struct, or a custom variant that UHT cannot inspect. Make the container reflected and use TObjectPtr, or explicitly report every strong reference through AddReferencedObjects.
+
+4. A NewObject result exists only in a local or raw pointer.
+The code expects the object to survive future frames, but nothing in the reachable graph retains it. Assign it immediately to a reflected owner, use a scoped TStrongObjectPtr, or register it through FGCObject.
+
+5. A TObjectPtr copied into a lambda is assumed to become a GC root.
+The original reflected member may be strong, but the lambda capture is not a UPROPERTY. Epic explicitly notes that TObjectPtr is GC-safe only as a property, while TStrongObjectPtr affects GC even in lambda captures. Prefer weak capture plus pinning for delayed work.
+
+6. TWeakObjectPtr is dereferenced without validation at the point of use.
+Checking during assignment or one frame earlier is insufficient. Call Get() once and validate the result, or pin to a TStrongObjectPtr when the object must remain alive through the operation.
+
+7. A validity check is separated from the actual use by a task, frame, or callback.
+This is a lifetime time-of-check/time-of-use bug: the object was valid when queued but dead when executed. Move validation into the callback and pin there rather than carrying a previously validated raw pointer.
+
+8. Destroyed Actors or components are checked only against nullptr.
+An Actor can be pending destruction but still physically allocated and held by other strong references. Use IsValid, weak pointers, and teardown state rather than treating non-null as usable.
+
+9. A UGameInstance or game-instance subsystem strongly retains world Actors.
+The Game Instance survives map loads, while Actors and components belong to a particular World. A reflected strong reference can keep the old World graph alive, producing travel leaks, stale callbacks, or later crashes. Store weak references and clear all world-bound state during world cleanup.
+
+10. A static or global raw UObject pointer survives GC or map travel.
+Static storage is not automatically part of the GC reference graph. Replace it with a reflected subsystem member, a weak reference, or a deliberately scoped strong reference, depending on ownership.
+
+11–20: Custom ownership, rooting, components, and caches
+
+11. A non-UObject manager stores raw UObject pointers.
+A plain C++ manager cannot use UPROPERTY, so its references are invisible unless it derives from FGCObject and reports them, or stores deliberate TStrongObjectPtr instances.
+
+12. FGCObject::AddReferencedObjects misses one reference path.
+Common omissions include map keys, map values, nested arrays, optional values, inherited state, or newly added members. Treat the function as a manually maintained ownership schema and test every container branch.
+
+13. FGCObject registration lifetime does not match the native owner.
+Registering too late exposes an initial GC window; unregistering while callbacks still access the object exposes a final window. Copying or moving custom referencers can also leave registration associated with unexpected state.
+
+14. An object is created with the wrong Outer or lifetime domain.
+This is especially dangerous in pools, world-independent managers, and reusable components. The Outer must match the intended lifetime, but the object must also have a real tracked reference. Epic has previously documented a Shipping-only pooled-component failure where the wrong Outer allowed GC and a debug strong reference masked it.
+
+15. Runtime-created components or subobjects are not retained correctly.
+A component is constructed and perhaps registered, but no reflected owner retains it, or the owner itself is about to die. Keep the component in a UPROPERTY() TObjectPtr, use the correct owner/Outer, register it through the appropriate Actor API, and explicitly reverse those operations during teardown.
+
+16. AddToRoot is not paired with RemoveFromRoot.
+Rooting prevents the object and its descendants from being collected. Forgotten roots produce permanent leaks, module-shutdown hazards, retained Worlds, and eventual out-of-memory crashes.
+
+17. A rooted or engine-lifetime object strongly references a World or Actor.
+The root itself is intentional, but its outgoing references accidentally retain an entire level graph. Root only the smallest necessary object and avoid world-bound strong references from root-lifetime services.
+
+18. TStrongObjectPtr is stored inside a UObject or forms a self-cycle.
+Unlike ordinary unreachable reflected cycles, a TStrongObjectPtr can make the target permanently uncollectable and is harder to diagnose with normal reference tools. Use reflected TObjectPtr members inside UObjects.
+
+19. TSharedPtr, TUniquePtr, or delete is used to own a UObject.
+UObjects are owned by Unreal’s object and GC system, not ordinary C++ smart-pointer destruction. Shared pointers are appropriate for non-UObject data; never manually delete a live UObject.
+
+20. A cache uses strong references where weak references were intended.
+The cache silently becomes an owner, retaining assets, Worlds, Actors, or components indefinitely. Use TWeakObjectPtr for non-owning caches and prune invalid entries at controlled points.
+
+21–30: Containers, threading, incremental GC, and asset residency
+
+21. TWeakObjectPtr is used as a TMap key or TSet element.
+Epic documents this as unsupported. Use TObjectKey for identity-based keys, remember that it does not retain the object, and remove entries when their associated weak values become stale.
+
+22. A raw interface pointer is cached without retaining or validating its UObject.
+An IMyInterface* can outlive the UObject that implements it. Use TScriptInterface for reflected strong ownership or TWeakInterfacePtr for non-owning access.
+
+23. A worker thread directly dereferences a UObject or TObjectPtr.
+The game thread owns most UObject state, and GC may run while the worker uses the pointer. Epic recommends weak-pointer pinning for worker access and warns against direct TObjectPtr access unless the target is guaranteed rooted.
+
+24. Worker threads modify UObject references while GC is scanning.
+Reference graph mutation can race reachability analysis. Avoid worker-side UObject ownership changes, marshal changes to the game thread, and keep native worker data separate from UObject state.
+
+25. Incremental reachability is enabled while raw UPROPERTY UObject pointers remain.
+Incremental GC relies on the write barriers provided by reflected TObjectPtr assignments. Epic warns that raw property pointers can allow an object to be reclaimed too early.
+
+26. Incremental reachability is combined with worker-thread UObject mutation.
+Epic currently documents incremental reachability as experimental and not fully thread-safe; under some conditions, worker-manipulated objects can be collected prematurely. Do not enable it blindly in a multithreaded shipping target.
+
+27. A render, physics, audio, or other thread proxy retains a raw UObject pointer.
+The proxy can run after the game-thread object has been collected. Copy immutable native/POD state into the proxy and use fences or resource-lifetime mechanisms when destruction must wait for another thread.
+
+28. An asynchronous operation completes after its owner or World has ended.
+The callback itself might run on the game thread and still be unsafe because the logical lifetime has ended. Associate requests with a cancellation token or generation ID, weakly capture the receiver, and reject completions from the wrong World/session generation.
+
+29. An async-load callback captures the requesting UObject as a raw pointer.
+The asset load can finish after travel or teardown. Capture a weak requester, validate the current World/session, and only then install a strong asset reference.
+
+30. A loaded asset is retained only by a soft or raw reference.
+TSoftObjectPtr tracks the disk path but does not affect GC. After loading, store a reflected strong reference for the required residency interval, or keep the appropriate asset-management load ownership active.
+
+31–40: Delegates, timers, teardown, and destruction order
+
+31. BindRaw targets an object whose lifetime can end before the delegate.
+BindRaw has no lifetime tracking, and Epic explicitly describes execution after deletion as unsafe. Use BindUObject, BindSP, or explicit unbinding backed by a provable lifetime contract.
+
+32. BindLambda captures a raw UObject or this.
+A lambda is just a functor; capturing a pointer does not add UObject lifetime tracking. Capture weakly and validate inside the lambda, or use BindUObject when binding a UObject member directly.
+
+33. Multicast delegate, ticker, HTTP, online, or subsystem handles are not removed.
+The event source outlives the listener and invokes stale state during shutdown or travel. Store each registration handle and remove it in the earliest applicable teardown phase, not only in the destructor.
+
+34. A timer lambda is assumed to auto-cancel when the captured Actor dies.
+Automatic cancellation applies to timers associated with the object being called. A generic lambda/functor is not automatically made safe merely because it captures an Actor. Keep a timer handle, clear it explicitly, and weakly capture UObject state.
+
+35. SetTimerForNextTick, latent work, or a coroutine crosses teardown.
+SetTimerForNextTick does not provide a timer handle, so cancellation options are limited. Any unhandleable deferred callback must use weak ownership and verify that the World or operation generation is still current.
+
+36. MarkAsGarbage or ConditionalBeginDestroy is used as an ownership shortcut.
+The object may still have callbacks, thread work, or references that assume it is usable. Stop producers, unbind callbacks, release ownership, and let normal GC determine destruction rather than forcing lifecycle transitions prematurely.
+
+37. Gameplay cleanup occurs only in the destructor or FinishDestroy.
+By that point, other gameplay objects and systems may already be unavailable. Cancel timers, delegates, tasks, and world interactions in EndPlay or the subsystem’s deinitialization phase; reserve destruction methods for native resources and final memory cleanup.
+
+38. A lifecycle override breaks the base-class teardown contract.
+Common forms are omitting a required Super call, unbinding after the base class has invalidated dependencies, or releasing resources before another thread has finished. Audit the required call order for EndPlay, Deinitialize, BeginDestroy, IsReadyForFinishDestroy, and FinishDestroy.
+
+39. Cleanup is implemented only in OnDestroyed.
+OnDestroyed does not cover every removal path. Epic recommends EndPlay, which also runs for travel, streaming-level unload, PIE termination, lifetime expiry, and shutdown.
+
+40. EndPlay is assumed to mean permanent object destruction.
+With streaming configurations that do not immediately force GC, a quickly reloaded sublevel can reuse the same Actor instance with old local state. Make EndPlay reversible and ensure initialization fully resets state if the Actor returns.
+
+41–50: Cooked-build differences, hidden references, and GC protocol violations
+
+41. An asset is referenced only by an arbitrary string or dynamically constructed path.
+The cook cannot reliably discover the dependency, so the asset exists in the Editor but is absent in the packaged build. Use TSoftObjectPtr, FSoftObjectPath, Primary Assets, asset bundles, or explicit cook rules.
+
+42. TSoftObjectPtr::Get() is assumed to load the object.
+Get() returns the object only when it is already resident. Explicitly load synchronously or asynchronously and handle failure before dereferencing.
+
+43. A Primary Asset is unloaded while consumers hold only weak or raw references.
+Unloading permits GC when no other strong reference remains. Define a clear residency owner and do not unload until every active consumer has released its use.
+
+44. Runtime code references an editor-only Actor, property, or content asset.
+Editor-only Actors can produce null references in cooked builds, and excluding editor content can remove resources that appeared valid during PIE. Treat editor-only boundaries as compile- and cook-time API boundaries.
+
+45. A CDO, default subobject, or class-lifetime singleton stores a runtime World object.
+The long-lived default object becomes an accidental root path into a particular World, or later returns an object belonging to a previous PIE instance or map. Never write per-session Actors, Worlds, or components into class-default state.
+
+46. Reflected members are conditionally compiled with incorrect preprocessor guards.
+UHT supports only limited preprocessing around reflected declarations. Different editor, server, client, or Shipping layouts can produce missing properties, serialization mismatches, or null references. Keep reflected layout stable and use the supported editor-only guards deliberately.
+
+47. check or checkSlow contains side effects or is the only validity guard.
+Checks are normally absent from Shipping, so the operation inside the expression may never happen, or execution may continue without the Development-only guard. Use ordinary control flow for required validation and verify when an expression must execute in all configurations.
+
+48. Editor or debug tooling accidentally supplies a strong reference.
+Opening an asset, inspecting it, previewing it, or enabling debug state can keep it alive and hide missing ownership. Epic has documented this exact pattern: a debug strong reference masked a Shipping-only GC issue. Test from a fresh process without open editors or debug helpers.
+
+49. Custom serialization or type erasure hides a UObject reference.
+Examples include storing addresses in void*, integer handles, custom blobs, native unions, or custom serializers that do not expose references to the collector. UObject references must remain discoverable through properties or explicit FReferenceCollector reporting.
+
+50. UObject creation, destruction, renaming, or forced GC occurs while UObject hash structures are being iterated.
+This can invalidate or rehash the data being traversed and lead to fatal errors or memory corruption. Defer object graph mutations until iteration finishes and never force collection from an unsafe callback. Epic’s issue tracker explicitly warns against creating UObjects or collecting while UObject hash tables are being iterated.
+
+Shipping gate that catches the majority
+
+Run the following in a cooked Test build and, separately, a real Shipping build:
+
+Repeatedly travel between representative maps, unload and reload streaming levels, disconnect/reconnect network sessions, and return to the main menu.
+During the loop, spawn and destroy pooled Actors/components, start and cancel async loads, fire timers and delegates, then trigger GC.
+In an internal stress build, use gc.ForceCollectGarbageEveryFrame=1, gc.GarbageReferenceTrackingEnabled=2, gc.VerifyNoUnreachableObjects=1, and, when testing incremental GC specifically, gc.ContinuousIncrementalGC=1 and delayed reachability iterations.
+Temporarily build an internal Shipping repro with USE_CHECKS_IN_SHIPPING=1; never rely on that setting as the production fix.
+Treat every crash inside GC, delegate execution, timer dispatch, or object destruction as potentially downstream of an earlier ownership violation. Start investigation from the object’s owning reference path, callback registrations, World generation, thread ownership, and cook dependency—not just the final access violation.

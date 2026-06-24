@@ -4,6 +4,7 @@
 #include "TankMaster.h"
 
 #include "AITankMaster.h"
+#include "Components/AudioComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
@@ -284,6 +285,30 @@ ATankMaster::ATankMaster(const FObjectInitializer& ObjectInitializer)
 		TEXT("SpatialVoiceLinePlayer"));
 	M_OptimizationComponent = CreateDefaultSubobject<URTSOptimizer>(
 		TEXT("RTSOptimizer"));
+}
+
+void ATankMaster::SetAudioCompsDisabled(const bool bDisable)
+{
+	const TSet<UActorComponent*> Components = GetComponents();
+	for (auto EachComp : Components)
+	{
+		if (not IsValid(EachComp))
+		{
+			continue;
+		}
+		UAudioComponent* AudioComp = Cast<UAudioComponent>(EachComp);
+		if (not AudioComp)
+		{
+			continue;
+		}
+		if (bDisable)
+		{
+			AudioComp->Deactivate();
+
+			continue;
+		}
+		AudioComp->Activate();
+	}
 }
 
 void ATankMaster::PropagateNewAggroStance(const ERTSAggroBehaviour NewStance)
@@ -895,7 +920,6 @@ void ATankMaster::SetUnitToIdleSpecificLogic()
 
 void ATankMaster::TerminateAttackCommand()
 {
-	
 	for (const auto EachTurret : Turrets)
 	{
 		if (CheckTurretIsValid(EachTurret))
@@ -910,10 +934,9 @@ void ATankMaster::TerminateAttackCommand()
 		return;
 	}
 	bM_HasTurretOutOfRangeMoveRequest = false;
-	
+
 	// Re-enable the nav collision and stops movements in derived trackedTank as well as stops tracks animations there.
 	OnCancelMovementToGetInRangeOfTurret();
-	
 }
 
 void ATankMaster::TerminateMoveCommand()
@@ -1127,7 +1150,6 @@ void ATankMaster::OnTurretOutOfRange(
 
 void ATankMaster::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
-
 	if (not GetIsValidAIController())
 	{
 		return;
@@ -1139,7 +1161,7 @@ void ATankMaster::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 		return;
 	}
 	bM_HasTurretOutOfRangeMoveRequest = false;
-	
+
 	// Re-enable the nav collision and stops movements in derived trackedTank as well as stops tracks animations there.
 	OnCancelMovementToGetInRangeOfTurret();
 }
@@ -1150,7 +1172,6 @@ void ATankMaster::OnCancelMovementToGetInRangeOfTurret()
 	{
 		RTSNavCollision->EnableAffectNavmesh(true);
 	}
-	
 }
 
 void ATankMaster::OnMountedWeaponTargetDestroyed(ACPPTurretsMaster* CallingTurret,
@@ -1526,9 +1547,9 @@ bool ATankMaster::GetWasMovingForTargettedActor() const
 		return false;
 	}
 	const bool bIsIdle = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdIdle;
-	const bool bWasAttacking = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack || UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttackGround;
+	const bool bWasAttacking = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack ||
+		UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttackGround;
 	return bIsIdle || bWasAttacking;
-	
 }
 
 void ATankMaster::BeginPlay_SetupCollisionVsBuildings()

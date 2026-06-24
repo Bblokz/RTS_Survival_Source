@@ -28,6 +28,8 @@ void UChassisAnimInstance::SetChassisAnimToIdle()
 	{
 		M_TrackParticleComponent->Deactivate();
 		M_TrackParticleComponent->SetVisibility(false);
+		M_TrackParticleComponent->
+			SetVariableFloat(FName("XSmokeSpeedMultiplier"), 0);
 	}
 }
 
@@ -86,6 +88,8 @@ void UChassisAnimInstance::UpdateTrackVFX()
 			// stop the niagara system from rendering (speed too low)
 			M_TrackParticleComponent->Deactivate();
 			M_TrackParticleComponent->SetVisibility(false);
+			M_TrackParticleComponent->
+				SetVariableFloat(FName("XSmokeSpeedMultiplier"), 0);
 		}
 		else
 		{

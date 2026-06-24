@@ -116,6 +116,8 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
+	
+	void SetAudioCompsDisabled(const bool bDisable);
 
 	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) final;
 	virtual void PropagateNewTargetPreference(const ETargetPreference TargetPreference) final;

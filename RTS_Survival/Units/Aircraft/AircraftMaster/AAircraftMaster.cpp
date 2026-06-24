@@ -1,5 +1,6 @@
 #include "AAircraftMaster.h"
 
+#include "Components/AudioComponent.h"
 #include "RTS_Survival/Units/Aircraft/AircaftHelpers/FRTSAircraftHelpers.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMovement/AircraftMovement.h"
 #include "Components/DecalComponent.h"
@@ -97,7 +98,6 @@ UMeshComponent* AAircraftMaster::GetBombOverrideMeshComp_Implementation()
 {
 	// Return null by default so the aircraft skeletal mesh is used instead.
 	return nullptr;
-	
 }
 
 void AAircraftMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -482,7 +482,7 @@ void AAircraftMaster::SetTargetPreference(const ETargetPreference TargetPreferen
 {
 	if (not EnsureAircraftWeaponIsValid())
 	{
-	return;	
+		return;
 	}
 	M_AircraftWeapon->SetTargetPreference(TargetPreference);
 }
@@ -491,7 +491,7 @@ void AAircraftMaster::SetAggroStance(const ERTSAggroBehaviour NewStance)
 {
 	if (not GetIsValidTargetAcquisition())
 	{
-		return ;
+		return;
 	}
 	M_TargetAcquisition->SetEngagementStance(NewStance);
 }
@@ -521,7 +521,8 @@ bool AAircraftMaster::GetIsValidTargetAcquisition() const
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TargetAcquisition", "AAircraftMaster::GetIsValidTargetAcquisition", this);
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TargetAcquisition",
+	                                                      "AAircraftMaster::GetIsValidTargetAcquisition", this);
 	return false;
 }
 
@@ -1027,6 +1028,7 @@ void AAircraftMaster::StartAttackGround()
 		AttackMove_IssueActionForNewTargetPoint(M_AircraftAttackData.Path.PathPoints[TargetPointIndex]);
 	}
 }
+
 void AAircraftMaster::IssuePostLiftOffAttackGroundAction()
 {
 	if (M_StrafeState.bM_IsStrafing)
@@ -2491,8 +2493,8 @@ FVector AAircraftMaster::Strafe_GetOrientedEndLocation(const FVector& CurrentTar
 FVector AAircraftMaster::Strafe_GetNextRunEndLocation() const
 {
 	return M_StrafeState.bM_IsFirstAttackRun
-		? M_StrafeState.StrafeEndLocation
-		: Strafe_GetOrientedEndLocation(M_StrafeState.NextRunStartLocation);
+		       ? M_StrafeState.StrafeEndLocation
+		       : Strafe_GetOrientedEndLocation(M_StrafeState.NextRunStartLocation);
 }
 
 void AAircraftMaster::Strafe_StartAttackRun()
@@ -2736,9 +2738,10 @@ void AAircraftMaster::AircraftDrop_OnMoveCompleted()
 
 	M_AircraftDropRequest.State = EAircraftDropRequestState::VerticalLanding;
 	const float TankLandingOffset = M_AircraftDropRequest.PayloadType == EAircraftDropPayloadType::Tank
-		? FMath::Abs(M_AircraftDropRequest.TankAttachZOffset)
-		: 0.0f;
-	M_AircraftLandedData.LandedPosition = M_AircraftDropRequest.ExecuteLocation + FVector(0.0f, 0.0f, TankLandingOffset);
+		                                ? FMath::Abs(M_AircraftDropRequest.TankAttachZOffset)
+		                                : 0.0f;
+	M_AircraftLandedData.LandedPosition = M_AircraftDropRequest.ExecuteLocation +
+		FVector(0.0f, 0.0f, TankLandingOffset);
 	M_AircraftLandedData.LandedRotation = GetActorRotation();
 	M_AircraftLandedData.LandedRotation.Roll = 0.0f;
 	StartVerticalLanding();
@@ -2826,7 +2829,9 @@ void AAircraftMaster::AircraftDrop_SpawnSquad(const ESquadSubtype SquadSubtype, 
 		AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex),
 		const_cast<AAircraftMaster*>(this),
 		SquadIndex,
-		[](const FTrainingOption&, AActor*, const int32) {},
+		[](const FTrainingOption&, AActor*, const int32)
+		{
+		},
 		FRotator::ZeroRotator);
 }
 
@@ -2844,6 +2849,18 @@ void AAircraftMaster::AircraftDrop_AttachTank()
 		TankSelectionComponent->SetCanBeSelected(false);
 	}
 	Tank->SetTurretsDisabled();
+	if (IsValid(Tank->GetTankMesh()))
+	{
+		Tank->GetTankMesh()->SetSimulatePhysics(false);
+	}
+	Tank->SetAudioCompsDisabled(true);
+	UFowComp* MyFow = GetFowComponent();
+	if (IsValid(Tank->GetFowComponent()) && IsValid(MyFow))
+	{
+		M_AircraftDropRequest.AttachedTankVisionRadius = Tank->GetFowComponent()->GetVisionRadius();
+		Tank->GetFowComponent()->SetVisionRadius(MyFow->GetVisionRadius());
+	}
+
 	Tank->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 	Tank->SetActorRelativeLocation(FVector(0.0f, 0.0f, M_AircraftDropRequest.TankAttachZOffset));
 }
@@ -2856,8 +2873,18 @@ void AAircraftMaster::AircraftDrop_DetachTank()
 	}
 
 	ATankMaster* Tank = M_AircraftDropRequest.AttachedTank.Get();
+	Tank->SetAudioCompsDisabled(false);
 	Tank->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	Tank->SetActorLocation(M_AircraftDropRequest.ExecuteLocation);
+	if (IsValid(Tank->GetTankMesh()))
+	{
+		Tank->GetTankMesh()->SetSimulatePhysics(true);
+	}
+	if (IsValid(Tank->GetFowComponent()))
+	{
+		Tank->GetFowComponent()->SetVisionRadius(M_AircraftDropRequest.AttachedTankVisionRadius);
+	}
+
 	Tank->EnableWeaponsAfterAircraftDrop();
 	if (USelectionComponent* TankSelectionComponent = Tank->GetSelectionComponent())
 	{
