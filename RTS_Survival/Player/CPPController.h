@@ -1753,6 +1753,7 @@ private:
 	bool GetIsValidHoldToSkipWidgetClass() const;
 	void SetActiveMissionCinematicTakeOverSession(UMissionCinematicTakeOverSession* CinematicSession);
 	void ClearActiveMissionCinematicTakeOverSession(const UMissionCinematicTakeOverSession* CinematicSession);
+	void SetCameraShakeDisabledForCinematicTakeOver(const bool bCinematicTakeOverActive) const;
 	bool TryHandleEscapeMenuBuildingModeActive();
 	bool TryHandleEscapeMenuActionButtonActive();
 	bool TryHandleEscapeMenuRotationArrowActive();
