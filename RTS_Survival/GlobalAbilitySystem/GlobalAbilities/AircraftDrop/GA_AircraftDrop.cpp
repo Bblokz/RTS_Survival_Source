@@ -143,6 +143,7 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 
 	++M_ActiveAircraftCount;
 	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftDrop::OnSpawnedAircraftDestroyed);
+	SpawnedAircraft->SetUnitSelectable(false);
 
 	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
 	if (not IsValid(AsyncSpawner))
