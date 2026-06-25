@@ -159,6 +159,13 @@ void UTrackPhysicsMovement::OnPathFollowingFinished()
 	M_IsFollowingPath.Store(false);
 	M_CurrentThrottle.Store(0.0f);
 	M_CurrentSteeringInDeg.Store(0.0f);
+
+	if (not GetIsValidTankAnimationBP())
+	{
+		return;
+	}
+
+	M_TankAnimationBP->SetChassisAnimToIdle();
 }
 
 // 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_PhysicsMovement);
