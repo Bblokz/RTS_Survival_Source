@@ -12,6 +12,7 @@
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionLostAllUnitsGlobalAbilityCheck.h"
 #include "MissionScheduler/MissionScheduler.h"
+#include "RTS_Survival/Music/RTSMusicTypes.h"
 #include "RTS_Survival/Enemy/EnemyAIBehaviour/EnemyAIBehaviour.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -32,6 +33,7 @@ class UW_MissionWidgetManager;
 class UMissionBase;
 class UW_GameDifficultyPicker;
 class UW_Defeat;
+class UW_Victory;
 class AActor;
 class UObject;
 class AEnemyController;
@@ -338,6 +340,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Defeat")
 	void TriggerDefeat(const ERTSDefeatType DefeatType);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Victory")
+	void TriggerVictory(bool bShowBackToMenu);
 	void CallBackOnMissionWhenEnemyUnitsDestroyed(
 		const EEnemyUnitQueryType EnemyUnitQueryType,
 		TWeakObjectPtr<UMissionBase> Mission,
@@ -412,6 +417,15 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Defeat")
 	TSubclassOf<UW_Defeat> M_DefeatWidgetClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Victory")
+	TSubclassOf<UW_Victory> M_VictoryWidgetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Victory")
+	TSoftObjectPtr<UWorld> M_MapToLoadOnContinueVictory;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Victory")
+	TSoftObjectPtr<UWorld> M_MenuLevelToLoadOnVictory;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
 	bool bHideGlobalAbilitiesForPlayer = false;
 
@@ -480,10 +494,19 @@ private:
 	UPROPERTY()
 	TObjectPtr<UW_Defeat> M_DefeatWidget;
 
+	UPROPERTY()
+	TObjectPtr<UW_Victory> M_VictoryWidget;
+
 	void TriggerDefeat_LostHQ();
 	void TriggerDefeat_LockPauseAndShowWidget();
 	void TriggerDefeat_ShowDefeatWidget();
 	bool GetIsValidDefeatWidgetClass() const;
+	void TriggerVictory_LockPausePlayMusicAndShowWidget(bool bShowBackToMenu);
+	void TriggerVictory_ShowVictoryWidget(bool bShowBackToMenu);
+	bool GetIsValidVictoryWidgetClass() const;
+	bool GetIsValidMapToLoadOnContinueVictory() const;
+	bool GetIsValidMenuLevelToLoadOnVictory() const;
+	void PlayEndStateMusic(ERTSMusicType MusicType) const;
 
 
 	bool EnsureMissionIsValid(UMissionBase* Mission);

@@ -13,6 +13,8 @@
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
 #include "RTS_Survival/Missions/Defeat/W_Defeat.h"
+#include "RTS_Survival/Missions/Victory/W_Victory.h"
+#include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -2312,6 +2314,7 @@ void AMissionManager::TriggerDefeat(const ERTSDefeatType DefeatType)
 		return;
 	}
 
+	PlayEndStateMusic(ERTSMusicType::Defeat);
 	TriggerDefeat_LockPauseAndShowWidget();
 }
 
@@ -2367,6 +2370,7 @@ void AMissionManager::TriggerDefeat_LockPauseAndShowWidget()
 		return;
 	}
 
+	PlayEndStateMusic(ERTSMusicType::Defeat);
 	M_PlayerController->PauseAndLockGame(true);
 	TriggerDefeat_ShowDefeatWidget();
 }
@@ -2418,6 +2422,134 @@ bool AMissionManager::GetIsValidDefeatWidgetClass() const
 		this
 	);
 	return false;
+}
+
+void AMissionManager::TriggerVictory(const bool bShowBackToMenu)
+{
+	TriggerVictory_LockPausePlayMusicAndShowWidget(bShowBackToMenu);
+}
+
+void AMissionManager::TriggerVictory_LockPausePlayMusicAndShowWidget(const bool bShowBackToMenu)
+{
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	PlayEndStateMusic(ERTSMusicType::Victory);
+	M_PlayerController->PauseAndLockGame(true);
+	TriggerVictory_ShowVictoryWidget(bShowBackToMenu);
+}
+
+void AMissionManager::TriggerVictory_ShowVictoryWidget(const bool bShowBackToMenu)
+{
+	if (not EnsureValidPlayerController())
+	{
+		return;
+	}
+
+	if (not GetIsValidMapToLoadOnContinueVictory())
+	{
+		return;
+	}
+
+	if (bShowBackToMenu && not GetIsValidMenuLevelToLoadOnVictory())
+	{
+		return;
+	}
+
+	if (not M_VictoryWidget)
+	{
+		if (not GetIsValidVictoryWidgetClass())
+		{
+			return;
+		}
+
+		UW_Victory* CreatedVictoryWidget = CreateWidget<UW_Victory>(M_PlayerController.Get(), M_VictoryWidgetClass);
+		if (not IsValid(CreatedVictoryWidget))
+		{
+			RTSFunctionLibrary::ReportError("Mission manager failed to create victory widget from M_VictoryWidgetClass.");
+			return;
+		}
+
+		M_VictoryWidget = CreatedVictoryWidget;
+	}
+
+	M_VictoryWidget->TriggerVictory(M_MapToLoadOnContinueVictory, M_MenuLevelToLoadOnVictory, bShowBackToMenu);
+	if (M_VictoryWidget->IsInViewport())
+	{
+		return;
+	}
+
+	constexpr int32 VictoryWidgetZOrder = 300;
+	M_VictoryWidget->AddToViewport(VictoryWidgetZOrder);
+}
+
+bool AMissionManager::GetIsValidVictoryWidgetClass() const
+{
+	if (M_VictoryWidgetClass)
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_VictoryWidgetClass",
+		"GetIsValidVictoryWidgetClass",
+		this
+	);
+	return false;
+}
+
+bool AMissionManager::GetIsValidMapToLoadOnContinueVictory() const
+{
+	if (not M_MapToLoadOnContinueVictory.IsNull())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_MapToLoadOnContinueVictory",
+		"GetIsValidMapToLoadOnContinueVictory",
+		this
+	);
+	return false;
+}
+
+bool AMissionManager::GetIsValidMenuLevelToLoadOnVictory() const
+{
+	if (not M_MenuLevelToLoadOnVictory.IsNull())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_MenuLevelToLoadOnVictory",
+		"GetIsValidMenuLevelToLoadOnVictory",
+		this
+	);
+	return false;
+}
+
+void AMissionManager::PlayEndStateMusic(const ERTSMusicType MusicType) const
+{
+	const URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager failed to play end state music because game instance is invalid.");
+		return;
+	}
+
+	URTSMusicManager* MusicManager = RTSGameInstance->GetMusicManager();
+	if (not IsValid(MusicManager))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager failed to play end state music because music manager is invalid.");
+		return;
+	}
+
+	MusicManager->PlayNewMusicTracks(MusicType);
 }
 
 int32 AMissionManager::GetGenerationSeed()

@@ -120,6 +120,9 @@ private:
     /** @brief Spawns a new audio component for SoundToPlay. */
     bool SetupAudioComponent(USoundBase* SoundToPlay);
 
+    /** @brief Keeps music audible when gameplay is paused by end-state menus. */
+    void ConfigureAudioComponentForPausedPlayback() const;
+
     /** @brief Called when a track finishes playing. */
     UFUNCTION()
     void OnTrackFinished();
