@@ -7860,6 +7860,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_HazmatEngineers, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_HazmatBazooka, SquadData);
 
 	SquadData.MaxHealth = BasicInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
