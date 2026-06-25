@@ -39,7 +39,7 @@ void URTSMusicManager::PlayNewMusicTracks(
     {
         return;
     }
-    if(M_CurrentMusicType == NewMusicType && M_AudioComponent->IsPlaying())
+    if (M_CurrentMusicType == NewMusicType && M_AudioComponent->IsPlaying())
     {
         // If the same music type is requested, we can just return.
         return;
@@ -246,11 +246,23 @@ bool URTSMusicManager::SetupAudioComponent(USoundBase* SoundToPlay)
         return false;
     }
 
+    ConfigureAudioComponentForPausedPlayback();
     M_AudioComponent->OnAudioFinished.AddDynamic(
         this,
         &URTSMusicManager::OnTrackFinished
     );
     return true;
+}
+
+void URTSMusicManager::ConfigureAudioComponentForPausedPlayback() const
+{
+    if (not EnsureValidAudioComponent())
+    {
+        return;
+    }
+
+    M_AudioComponent->SetUISound(true);
+    M_AudioComponent->SetTickableWhenPaused(true);
 }
 
 
@@ -297,7 +309,7 @@ void URTSMusicManager::PlayTrack(const int32 TrackIndex) const
     }
 
     const FRTSMusicTypes* DefPtr = FindMusicDef(M_CurrentMusicType);
-    if (not DefPtr || !DefPtr->MusicTracks.IsValidIndex(TrackIndex))
+    if (not DefPtr || not DefPtr->MusicTracks.IsValidIndex(TrackIndex))
     {
         return;
     }
