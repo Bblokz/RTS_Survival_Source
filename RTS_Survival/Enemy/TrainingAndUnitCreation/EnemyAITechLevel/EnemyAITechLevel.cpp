@@ -11,6 +11,7 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 	};
 	BasicInfantryOptions.TrainableSquadSubtypes = {
 		ESquadSubtype::Squad_Rus_HazmatEngineers,
+		ESquadSubtype::Squad_Rus_HazmatBazooka,
 		ESquadSubtype::Squad_Rus_Mosin,
 		ESquadSubtype::Squad_Rus_Okhotnik
 	};
