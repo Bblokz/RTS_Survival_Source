@@ -33,18 +33,25 @@ void URTSCameraShakeSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	M_RequestTimesSeconds.Reset();
 	M_AggregationWindowStartTimeSeconds = -1.0f;
 	M_LastHeavyShakeTimeSeconds = -1000.0f;
+	bM_IsCinematicTakeOverActive = false;
 }
 
 void URTSCameraShakeSubsystem::Deinitialize()
 {
 	M_PendingRequests.Reset();
 	M_RequestTimesSeconds.Reset();
+	bM_IsCinematicTakeOverActive = false;
 	Super::Deinitialize();
 }
 
 void URTSCameraShakeSubsystem::Tick(const float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	if (bM_IsCinematicTakeOverActive)
+	{
+		ResetAggregationWindow();
+		return;
+	}
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -72,8 +79,31 @@ void URTSCameraShakeSubsystem::RequestExplosionShake(const FRTSCameraShakeReques
 	QueueRequest(Request, Request.M_EventType == ERTSCameraShakeEventType::Explosion);
 }
 
+void URTSCameraShakeSubsystem::SetCinematicTakeOverActive(const bool bNewCinematicTakeOverActive)
+{
+	bM_IsCinematicTakeOverActive = bNewCinematicTakeOverActive;
+	if (not bM_IsCinematicTakeOverActive)
+	{
+		return;
+	}
+
+	ResetAggregationWindow();
+	APlayerController* PlayerController = GetPrimaryPlayerController();
+	if (not IsValid(PlayerController) || not IsValid(PlayerController->PlayerCameraManager))
+	{
+		return;
+	}
+
+	PlayerController->PlayerCameraManager->StopAllCameraShakes(true);
+}
+
 void URTSCameraShakeSubsystem::QueueRequest(const FRTSCameraShakeRequest& Request, const bool bAllowEventType)
 {
+	if (bM_IsCinematicTakeOverActive)
+	{
+		return;
+	}
+
 	if (not bAllowEventType)
 	{
 		return;

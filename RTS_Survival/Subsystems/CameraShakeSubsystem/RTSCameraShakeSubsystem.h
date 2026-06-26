@@ -66,6 +66,8 @@ public:
 	 */
 	void RequestExplosionShake(const FRTSCameraShakeRequest& Request);
 
+	void SetCinematicTakeOverActive(const bool bNewCinematicTakeOverActive);
+
 private:
 	UPROPERTY()
 	TArray<FRTSCameraShakeRequest> M_PendingRequests;
@@ -75,6 +77,7 @@ private:
 
 	float M_AggregationWindowStartTimeSeconds = -1.0f;
 	float M_LastHeavyShakeTimeSeconds = -1000.0f;
+	bool bM_IsCinematicTakeOverActive = false;
 
 	void QueueRequest(const FRTSCameraShakeRequest& Request, const bool bAllowEventType);
 	void Tick_PruneRequestRateWindow(const float CurrentTimeSeconds);
