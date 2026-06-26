@@ -63,6 +63,7 @@
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
 #include "RTS_Survival/StartLocation/PlayerStartLocationMngr/PlayerStartLocationManager.h"
+#include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/BuildRadiusComp/BuildRadiusComp.h"
@@ -938,10 +939,27 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 	M_MainGameUI->SetMainMenuVisiblity(bMakeGameUIVisible);
 
 	M_PlayerCameraController->SetCameraMovementDisabled(bLockCamera);
+	SetCameraShakeDisabledForCinematicTakeOver(bStartCinematic);
 	SetSuppressRegularVoiceLines(bStartCinematic);
 	return true;
 }
 
+void ACPPController::SetCameraShakeDisabledForCinematicTakeOver(const bool bCinematicTakeOverActive) const
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	URTSCameraShakeSubsystem* CameraShakeSubsystem = World->GetSubsystem<URTSCameraShakeSubsystem>();
+	if (not IsValid(CameraShakeSubsystem))
+	{
+		return;
+	}
+
+	CameraShakeSubsystem->SetCinematicTakeOverActive(bCinematicTakeOverActive);
+}
 
 void ACPPController::Tick(float DeltaTime)
 {

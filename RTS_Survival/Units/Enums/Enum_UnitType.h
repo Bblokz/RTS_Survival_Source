@@ -376,6 +376,7 @@ enum class ESquadSubtype: uint8
 
 	// Russian barracks squads.
 	Squad_Rus_HazmatEngineers UMETA(DisplayName = "Rus Hazmat Engineers"),
+	Squad_Rus_HazmatBazooka UMETA(DisplayName = "Rus Hazmat Bazooka"),
 	Squad_Rus_Mosin UMETA(DisplayName = "Rus Mosin Squad"),
 	Squad_Rus_Okhotnik UMETA(DisplayName = "Rus PTRS Squad (hunter)"),
 	Squad_Rus_LargePTRS UMETA(DisplayName = "Rus Large PTRS Squad"),
@@ -538,6 +539,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Tucha 12T Squad";
 	case ESquadSubtype::Squad_Rus_HazmatEngineers:
 		return "Hazmat Engineers";
+	case ESquadSubtype::Squad_Rus_HazmatBazooka:
+		return "Hazmat Bazooka";
 	case ESquadSubtype::Squad_Rus_Okhotnik:
 		return "Okhotnik Squad";
 	case ESquadSubtype::Squad_Rus_LargePTRS:

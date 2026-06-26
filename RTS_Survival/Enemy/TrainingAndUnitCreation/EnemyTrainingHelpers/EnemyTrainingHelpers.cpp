@@ -25,6 +25,7 @@ int32 EnemyTrainingHelpers::GetSquadTrainingPointCost(const ESquadSubtype SquadT
 	case ESquadSubtype::Squad_Rus_Mosin:
 		return 3;
 	case ESquadSubtype::Squad_Rus_HazmatEngineers:
+	case ESquadSubtype::Squad_Rus_HazmatBazooka:
 	case ESquadSubtype::Squad_Rus_Okhotnik:
 		return 4;
 	case ESquadSubtype::Squad_Rus_LargePTRS:
