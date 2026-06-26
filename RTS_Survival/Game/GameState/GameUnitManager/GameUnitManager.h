@@ -266,6 +266,7 @@ private:
 	UPROPERTY()
 	TArray<ASquadUnit*> M_SquadUnitAlivePlayer;
 
+
 	/** @brief contains all SquadUnits currently alive, for the enemy player. */
 	UPROPERTY()
 	TArray<ASquadUnit*> M_SquadUnitsAliveEnemy;

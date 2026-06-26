@@ -440,11 +440,13 @@ namespace DeveloperSettings
 				inline constexpr int32 Brumbar_VehicleParts = 400;
 				inline constexpr int32 Stug_Radixite = 300;
 				inline constexpr int32 Stug_VehicleParts = 125;
+				inline constexpr int32 E25_Radixite = 450;
+				inline constexpr int32 E25_VehicleParts = 200;
 			}
 
 			namespace HeavyTanks
 			{
-				inline constexpr int32 JagdPanther_Radixite = 500;
+				inline constexpr int32 JagdPanther_Radixite = 600;
 				inline constexpr int32 JagdPanther_VehicleParts = 300;
 				inline constexpr int32 Maus_Radixite = 1500;
 				inline constexpr int32 Maus_VehicleParts = 1000;

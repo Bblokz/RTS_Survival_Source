@@ -5067,6 +5067,16 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceWorth = BaseMediumTankExp;
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Stug, TankData);
+	
+	// E-25 T3 tank destroyer
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, E25_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, E25_VehicleParts}
+	});
+	TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
+	TankData.ExperienceWorth = BaseHeavyTankExp;
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_E25, TankData);
 
 	// ------------------------------- RUS Medium Tanks -------------------------------
 

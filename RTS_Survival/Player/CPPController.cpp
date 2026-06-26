@@ -7384,13 +7384,6 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 		return;
 	}
 
-	const AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
-	if (IsValid(MissionManager) && MissionManager->GetShouldHideGlobalAbilitiesForPlayer())
-	{
-		MainMenuWidget->HideGlobalAbilityPanelForMission();
-		return;
-	}
-
 	ERTSCommander Commander = GameInstance->GetPlayerCommander();
 	FRTSCommanderSettings CommanderSettings = CommanderDevSettings->GetCommanderSettingsForType(Commander);
 
@@ -7405,6 +7398,13 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 		PlayerStartLocation,
 		AircraftHeightStart
 	);
+	const AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
+	if (IsValid(MissionManager) && MissionManager->GetShouldHideGlobalAbilitiesForPlayer())
+	{
+		MainMenuWidget->HideGlobalAbilityPanelForMission();
+		return;
+	}
+	
 }
 
 void ACPPController::DeactivateActionButton()
