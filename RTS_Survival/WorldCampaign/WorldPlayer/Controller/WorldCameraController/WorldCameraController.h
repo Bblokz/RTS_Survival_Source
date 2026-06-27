@@ -59,6 +59,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera|PlayableBounds")
 	void RemoveAllAdditionalCameraBounds();
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|EdgeScroll", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float EdgeScrollingPercentage = 0.97f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|EdgeScroll", meta = (ClampMin = "0.0"))
+	float EdgeScrollingSpeedMlt = 1.0f;
+
 private:
 	struct FWorldCameraAxisInputState
 	{
@@ -149,9 +155,6 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	float M_XYSpeed = 800.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Camera|EdgeScroll")
-	float M_EdgeScrollSoftZone = 0.30f;
 
 	UPROPERTY(EditAnywhere, Category = "Camera|EdgeScroll")
 	float M_EdgeScrollHardZone = 0.025f;

@@ -383,53 +383,56 @@ void UWorldCameraController::UpdateEdgeScroll(const float DeltaTime)
 		return;
 	}
 
+	constexpr float MaxEdgeScrollStartZone = 0.5f;
 	const float NormalizedMouseX = MouseX / ScreenX;
 	const float NormalizedMouseY = MouseY / ScreenY;
-	const float ZoneSpan = FMath::Max(M_EdgeScrollSoftZone - M_EdgeScrollHardZone, KINDA_SMALL_NUMBER);
+	const float EdgeScrollStartZone = FMath::Clamp(1.0f - EdgeScrollingPercentage, KINDA_SMALL_NUMBER, MaxEdgeScrollStartZone);
+	const float EdgeScrollHardZone = FMath::Min(M_EdgeScrollHardZone, EdgeScrollStartZone);
+	const float ZoneSpan = FMath::Max(EdgeScrollStartZone - EdgeScrollHardZone, KINDA_SMALL_NUMBER);
 	int32 DirectionX = 0;
 	int32 DirectionY = 0;
 	float StrengthX = 0.0f;
 	float StrengthY = 0.0f;
-	if (NormalizedMouseX <= M_EdgeScrollHardZone)
+	if (NormalizedMouseX <= EdgeScrollHardZone)
 	{
 		DirectionX = -1;
 		StrengthX = 1.0f;
 	}
-	else if (NormalizedMouseX <= M_EdgeScrollSoftZone)
+	else if (NormalizedMouseX <= EdgeScrollStartZone)
 	{
 		DirectionX = -1;
-		StrengthX = FMath::Clamp((M_EdgeScrollSoftZone - NormalizedMouseX) / ZoneSpan, 0.0f, 1.0f);
+		StrengthX = FMath::Clamp((EdgeScrollStartZone - NormalizedMouseX) / ZoneSpan, 0.0f, 1.0f);
 	}
-	else if (NormalizedMouseX >= 1.0f - M_EdgeScrollHardZone)
+	else if (NormalizedMouseX >= 1.0f - EdgeScrollHardZone)
 	{
 		DirectionX = 1;
 		StrengthX = 1.0f;
 	}
-	else if (NormalizedMouseX >= 1.0f - M_EdgeScrollSoftZone)
+	else if (NormalizedMouseX >= 1.0f - EdgeScrollStartZone)
 	{
 		DirectionX = 1;
-		StrengthX = FMath::Clamp((NormalizedMouseX - (1.0f - M_EdgeScrollSoftZone)) / ZoneSpan, 0.0f, 1.0f);
+		StrengthX = FMath::Clamp((NormalizedMouseX - (1.0f - EdgeScrollStartZone)) / ZoneSpan, 0.0f, 1.0f);
 	}
 
-	if (NormalizedMouseY <= M_EdgeScrollHardZone)
+	if (NormalizedMouseY <= EdgeScrollHardZone)
 	{
 		DirectionY = 1;
 		StrengthY = 1.0f;
 	}
-	else if (NormalizedMouseY <= M_EdgeScrollSoftZone)
+	else if (NormalizedMouseY <= EdgeScrollStartZone)
 	{
 		DirectionY = 1;
-		StrengthY = FMath::Clamp((M_EdgeScrollSoftZone - NormalizedMouseY) / ZoneSpan, 0.0f, 1.0f);
+		StrengthY = FMath::Clamp((EdgeScrollStartZone - NormalizedMouseY) / ZoneSpan, 0.0f, 1.0f);
 	}
-	else if (NormalizedMouseY >= 1.0f - M_EdgeScrollHardZone)
+	else if (NormalizedMouseY >= 1.0f - EdgeScrollHardZone)
 	{
 		DirectionY = -1;
 		StrengthY = 1.0f;
 	}
-	else if (NormalizedMouseY >= 1.0f - M_EdgeScrollSoftZone)
+	else if (NormalizedMouseY >= 1.0f - EdgeScrollStartZone)
 	{
 		DirectionY = -1;
-		StrengthY = FMath::Clamp((NormalizedMouseY - (1.0f - M_EdgeScrollSoftZone)) / ZoneSpan, 0.0f, 1.0f);
+		StrengthY = FMath::Clamp((NormalizedMouseY - (1.0f - EdgeScrollStartZone)) / ZoneSpan, 0.0f, 1.0f);
 	}
 
 	M_EdgeScrollAccelX = DirectionX != 0
@@ -444,8 +447,8 @@ void UWorldCameraController::UpdateEdgeScroll(const float DeltaTime)
 	}
 
 	const FVector WorldDelta = GetWorldDeltaFromLocalXY(
-		DirectionY * M_XYSpeed * M_EdgeScrollAccelY * StrengthY * DeltaTime,
-		DirectionX * M_XYSpeed * M_EdgeScrollAccelX * StrengthX * DeltaTime);
+		DirectionY * M_XYSpeed * EdgeScrollingSpeedMlt * M_EdgeScrollAccelY * StrengthY * DeltaTime,
+		DirectionX * M_XYSpeed * EdgeScrollingSpeedMlt * M_EdgeScrollAccelX * StrengthX * DeltaTime);
 	TryMoveCameraByWorldDelta(WorldDelta);
 }
 

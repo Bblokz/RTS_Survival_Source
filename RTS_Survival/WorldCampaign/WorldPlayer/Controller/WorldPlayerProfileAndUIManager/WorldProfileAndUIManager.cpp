@@ -67,9 +67,14 @@ void UWorldProfileAndUIManager::BeginPlay()
 
 bool UWorldProfileAndUIManager::GetIsValidWorldMenu() const
 {
-	if (not M_WorldMenu.IsValid())
+	if (not IsValid(M_WorldMenu))
 	{
-		RTSFunctionLibrary::ReportError("world menu is not valid for the world profile and UI manager!");
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_WorldMenu"),
+			TEXT("GetIsValidWorldMenu"),
+			this
+		);
 		return false;
 	}
 	return true;
@@ -77,9 +82,14 @@ bool UWorldProfileAndUIManager::GetIsValidWorldMenu() const
 
 bool UWorldProfileAndUIManager::GetIsValidPlayerController() const
 {
-	if(not M_PlayerController.IsValid())
+	if (not M_PlayerController.IsValid())
 	{
-		RTSFunctionLibrary::ReportError("player controller is not valid for the world profile and UI manager!");
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_PlayerController"),
+			TEXT("GetIsValidPlayerController"),
+			this
+		);
 		return false;
 	}
 	return true;

@@ -281,10 +281,14 @@ void AWorldPlayerController::WorldSetupComplete_MovePlayerToHQ()
 	{
 		return;
 	}
+
 	FMovePlayerCamera MoveRequest;
 	MoveRequest.MoveToLocation = FRTS_WorldStatics::GetPlayerHQWorldLocation(this);
+<<<<<<< HEAD
 	MoveRequest.TimeCameraInputDisabled = 2.f;
 	MoveRequest.TimeToMove = 2.f;
+=======
+>>>>>>> 5b4f251c58bca1fd86d0601a8ef691a39fc7d91e
 	M_WorldCameraController->MoveCameraTo(MoveRequest);
 }
 
