@@ -10,6 +10,7 @@
 
 class USpringArmComponent;
 class AActor;
+class AWorldPlayerController;
 
 /**
  * @brief Component used by the world campaign controller to route Blueprint input
@@ -79,6 +80,7 @@ private:
 		float M_ElapsedTime = 0.0f;
 		float M_TotalTime = 0.0f;
 		bool bM_IsMoveActive = false;
+		bool bM_IgnoreBoundaryConstraints = false;
 	};
 
 	void BeginPlay_InitCameraCarrier();
@@ -87,6 +89,7 @@ private:
 	void UpdateMoveToLocation(const float DeltaTime);
 	void UpdateAxisMovement(const float DeltaTime);
 	void UpdateEdgeScroll(const float DeltaTime);
+	void UpdateBoundarySafety();
 
 	bool GetIsValidCameraCarrierActor() const;
 	bool GetIsValidSpringArmComponent() const;
@@ -99,6 +102,9 @@ private:
 		bool& bOutIsMouseInViewport) const;
 	FVector GetWorldDeltaFromLocalXY(float LocalForwardValue, float LocalRightValue) const;
 	bool GetCanMoveCameraToLocation(const FVector& TargetCameraLocation) const;
+	FVector GetConstrainedCameraLocation(const FVector& TargetCameraLocation) const;
+	bool GetIsCameraOutsideBoundaries() const;
+	void StartSafetyMoveToPlayerHQ();
 	bool GetAreAllPlaneConstraintsSatisfied(
 		const FVector& TargetCameraLocation,
 		const TArray<FPlayerCameraBoundaryPlaneConstraint>& PlaneConstraints) const;
@@ -173,6 +179,7 @@ private:
 
 	float M_CameraInputDisabledRemainingSeconds = 0.0f;
 	bool bM_IsCameraMovementDisabled = false;
+	bool bM_IsSafetyMoveToPlayerHQActive = false;
 
 	// Flattened constraints from all additional submissions, rebuilt only when registrations change.
 	UPROPERTY()
