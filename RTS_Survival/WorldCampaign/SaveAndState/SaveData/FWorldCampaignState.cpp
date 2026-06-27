@@ -2,7 +2,125 @@
 
 #include "RTS_Survival/WorldCampaign/SaveAndState/SaveData/FWorldCampaignState.h"
 
+namespace
+{
+	bool GetDoesContainInvalidAnchorKey(const TArray<FWorldCampaignAnchorSaveData>& Anchors)
+	{
+		for (const FWorldCampaignAnchorSaveData& AnchorSaveData : Anchors)
+		{
+			if (not AnchorSaveData.AnchorKey.IsValid())
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool GetDoesContainDuplicateAnchorKey(const TArray<FWorldCampaignAnchorSaveData>& Anchors)
+	{
+		TSet<FGuid> AnchorKeys;
+		AnchorKeys.Reserve(Anchors.Num());
+		for (const FWorldCampaignAnchorSaveData& AnchorSaveData : Anchors)
+		{
+			const int32 AnchorKeyCountBeforeAdd = AnchorKeys.Num();
+			AnchorKeys.Add(AnchorSaveData.AnchorKey);
+			if (AnchorKeys.Num() == AnchorKeyCountBeforeAdd)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool GetDoesContainDuplicateGuid(const TArray<FGuid>& AnchorKeys)
+	{
+		TSet<FGuid> UniqueAnchorKeys;
+		UniqueAnchorKeys.Reserve(AnchorKeys.Num());
+		for (const FGuid& AnchorKey : AnchorKeys)
+		{
+			const int32 AnchorKeyCountBeforeAdd = UniqueAnchorKeys.Num();
+			UniqueAnchorKeys.Add(AnchorKey);
+			if (UniqueAnchorKeys.Num() == AnchorKeyCountBeforeAdd)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool GetDoesReferenceMissingAnchor(const TArray<FGuid>& AnchorKeys, const TSet<FGuid>& ValidAnchorKeys)
+	{
+		for (const FGuid& AnchorKey : AnchorKeys)
+		{
+			if (not ValidAnchorKeys.Contains(AnchorKey))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	TSet<FGuid> BuildValidAnchorKeys(const TArray<FWorldCampaignAnchorSaveData>& Anchors)
+	{
+		TSet<FGuid> AnchorKeys;
+		AnchorKeys.Reserve(Anchors.Num());
+		for (const FWorldCampaignAnchorSaveData& AnchorSaveData : Anchors)
+		{
+			AnchorKeys.Add(AnchorSaveData.AnchorKey);
+		}
+
+		return AnchorKeys;
+	}
+}
+
 bool FWorldCampaignState::GetIsValidForRestore() const
 {
-	return Anchors.Num() > 0;
+	if (Anchors.Num() == 0)
+	{
+		return false;
+	}
+
+	if (GetDoesContainInvalidAnchorKey(Anchors) || GetDoesContainDuplicateAnchorKey(Anchors))
+	{
+		return false;
+	}
+
+	const TSet<FGuid> ValidAnchorKeys = BuildValidAnchorKeys(Anchors);
+	if (PlayerHQAnchorKey.IsValid() && not ValidAnchorKeys.Contains(PlayerHQAnchorKey))
+	{
+		return false;
+	}
+
+	if (EnemyHQAnchorKey.IsValid() && not ValidAnchorKeys.Contains(EnemyHQAnchorKey))
+	{
+		return false;
+	}
+
+	for (const FWorldCampaignConnectionSaveData& Connection : Connections)
+	{
+		if (Connection.ConnectedAnchorKeys.Num() < 2)
+		{
+			return false;
+		}
+
+		if (GetDoesContainDuplicateGuid(Connection.ConnectedAnchorKeys)
+			|| GetDoesReferenceMissingAnchor(Connection.ConnectedAnchorKeys, ValidAnchorKeys))
+		{
+			return false;
+		}
+	}
+
+	for (const FWorldCampaignMapItemSaveData& MapItem : MapItems)
+	{
+		if (not ValidAnchorKeys.Contains(MapItem.AnchorKey))
+		{
+			return false;
+		}
+	}
+
+	return true;
 }

@@ -36,6 +36,11 @@ bool UWorldStateAndSaveManager::SaveCampaignState()
 {
 	const FPlayerProfileSaveData PlayerSaveState = AggregatePlayerSaveState();
 	const FWorldCampaignState WorldCampaignState = AggregateWorldCampaignState();
+	if (not WorldCampaignState.GetIsValidForRestore())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot save world campaign state because anchor keys are invalid."));
+		return false;
+	}
 
 	if (not SaveMainCampaignSlot(WorldCampaignState, PlayerSaveState))
 	{
