@@ -186,6 +186,7 @@ void AWorldPlayerController::BeginPlay_SetupWorldMenu()
 	{
 		return;
 	}
+	M_WorldProfileAndUIManager->SetupWorldMenu(this);
 	UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
 		this,
 		nullptr,
