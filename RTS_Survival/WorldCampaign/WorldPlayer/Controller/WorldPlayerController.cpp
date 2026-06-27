@@ -12,12 +12,14 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
+#include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 
 AWorldPlayerController::AWorldPlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
 	M_PlayerWorldOutliner = CreateDefaultSubobject<UPlayerWorldOutliner>(TEXT("PlayerWorldOutliner"));
+	M_WorldStateAndSaveManager = CreateDefaultSubobject<UWorldStateAndSaveManager>(TEXT("WorldStateAndSaveManager"));
 }
 
 void AWorldPlayerController::PostInitializeComponents()
@@ -30,7 +32,7 @@ void AWorldPlayerController::PostInitializeComponents()
 void AWorldPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	Beginplay_SetupWorldGenerator();
+	BeginPlay_SetupWorldGenerator();
 	BeginPlay_SetupWorldMenu();
 	BeginPlay_GenerateOrLoadWorld();
 }
@@ -152,7 +154,7 @@ bool AWorldPlayerController::GetIsValidPlayerWorldOutliner() const
 	return false;
 }
 
-void AWorldPlayerController::Beginplay_SetupWorldGenerator()
+void AWorldPlayerController::BeginPlay_SetupWorldGenerator()
 {
 	UWorld* World = GetWorld();
 	if (not World)
@@ -164,7 +166,7 @@ void AWorldPlayerController::Beginplay_SetupWorldGenerator()
 	for (TActorIterator<AGeneratorWorldCampaign> It(World); It; ++It)
 	{
 		WorldGenerator = *It;
-		if (WorldGenerator)
+		if (IsValid(WorldGenerator))
 		{
 			break;
 		}
@@ -172,7 +174,7 @@ void AWorldPlayerController::Beginplay_SetupWorldGenerator()
 	if (not IsValid(WorldGenerator))
 	{
 		RTSFunctionLibrary::ReportError("did not find a valid world generator."
-			"for the Beginplay_HandleWorldGeneration in WorldPlayerController");
+			"for BeginPlay_SetupWorldGenerator in WorldPlayerController");
 		return;
 	}
 	M_WorldGenerator = WorldGenerator;
@@ -200,6 +202,17 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 	{
 		return;
 	}
+
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
+
 	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	if (not GameInstance)
 	{
@@ -207,26 +220,37 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 			"GameInstance not valid in WorldPlayerController::BeginPlay_InitWorldGeneratorWithGameInstance");
 		return;
 	}
+
 	const FCampaignGenerationSettings CampaignSettings = GameInstance->GetCampaignGenerationSettings();
 	const FRTSGameDifficulty SelectedDifficulty = GameInstance->GetSelectedGameDifficulty();
-	ERTSFaction PlayerFaction = GameInstance->GetPlayerFaction();
-	// Starts world generation if needed because of the settings.
-	// todo need to handle loading a saved world here later.
+	const ERTSFaction PlayerFaction = GameInstance->GetPlayerFaction();
+	M_CampaignSettings = CampaignSettings;
+	M_SelectedDifficulty = SelectedDifficulty;
+	M_PlayerFaction = PlayerFaction;
+
 	M_WorldGenerator->InitializeWorldGenerator(
 		this,
 		CampaignSettings,
 		SelectedDifficulty
 	);
-	M_CampaignSettings = CampaignSettings;
-	M_SelectedDifficulty = SelectedDifficulty;
+
 	if (CampaignSettings.bNeedsToGenerateCampaign)
 	{
-		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(PlayerFaction);
+		M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
+		const FPlayerProfileSaveData PlayerProfileSaveData = M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(PlayerFaction);
+		M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
+		return;
 	}
-	else
+
+	FWorldCampaignState LoadedWorldCampaignState;
+	FPlayerProfileSaveData LoadedPlayerProfileSaveData;
+	if (not M_WorldStateAndSaveManager->LoadCampaignState(LoadedWorldCampaignState, LoadedPlayerProfileSaveData))
 	{
-		// todo in case the world was loaded from save we probably want to provide a const ref to the player profile data here later.
+		return;
 	}
+
+	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
+	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
 }
 
 bool AWorldPlayerController::GetIsValidWorldProfileAndUIManager() const
@@ -242,6 +266,22 @@ bool AWorldPlayerController::GetIsValidWorldProfileAndUIManager() const
 		return false;
 	}
 	return true;
+}
+
+bool AWorldPlayerController::GetIsValidWorldStateAndSaveManager() const
+{
+	if (IsValid(M_WorldStateAndSaveManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldStateAndSaveManager"),
+		TEXT("GetIsValidWorldStateAndSaveManager"),
+		this
+	);
+	return false;
 }
 
 bool AWorldPlayerController::GetIsValidWorldGenerator() const

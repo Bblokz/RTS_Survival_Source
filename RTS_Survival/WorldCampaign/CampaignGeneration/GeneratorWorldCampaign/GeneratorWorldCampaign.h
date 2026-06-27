@@ -16,6 +16,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/NeutralItemPlacementRules.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/PlayerHQPlacementRules.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/WorldCampaignCountDifficultyTuning.h"
+#include "RTS_Survival/WorldCampaign/SaveAndState/SaveData/FWorldCampaignState.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/WorldCampaignPlacementFailurePolicy.h"
 #include "GeneratorWorldCampaign.generated.h"
 
@@ -464,7 +465,9 @@ public:
 	float GetDebugRangeOffset() const { return WorldCampaignDebugDefaults::ConnectionDrawHeightOffset; }
 	float GetDebugDisplaySeconds() const { return WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds; }
 	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
-	const FWorldCampaignPlacementState & GetPlacementState() const { return M_PlacementState; }
+	const FWorldCampaignPlacementState& GetPlacementState() const { return M_PlacementState; }
+	FWorldCampaignState BuildWorldCampaignStateFromCurrentGeneration() const;
+	void RestoreWorldStateFromSave(const FWorldCampaignState& WorldCampaignState);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
 		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
@@ -736,6 +739,19 @@ private:
 	                                      const TArray<TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>>&
 	                                      CompanionPromotions,
 	                                      FCampaignGenerationStepTransaction& OutMicroTransaction);
+
+	void AddSavedAnchorsAndMapItems(FWorldCampaignState& WorldCampaignState) const;
+	void AddSavedConnections(FWorldCampaignState& WorldCampaignState) const;
+	void RestoreSavedAnchors(const FWorldCampaignState& WorldCampaignState,
+	                         TMap<FGuid, TObjectPtr<AAnchorPoint>>& OutAnchorsByKey,
+	                         TArray<TObjectPtr<AAnchorPoint>>& OutRestoredAnchors);
+	void RestoreSavedConnections(const FWorldCampaignState& WorldCampaignState,
+	                             const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey);
+	void RestoreSavedMapItems(const FWorldCampaignState& WorldCampaignState,
+	                          const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey);
+	void ApplyRestoredPlacementState(const FWorldCampaignState& WorldCampaignState,
+	                                const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey,
+	                                const TArray<TObjectPtr<AAnchorPoint>>& RestoredAnchors);
 
 	bool ExecuteAllStepsWithBacktracking();
 	bool CanExecuteStep(ECampaignGenerationStep CompletedStep) const;
