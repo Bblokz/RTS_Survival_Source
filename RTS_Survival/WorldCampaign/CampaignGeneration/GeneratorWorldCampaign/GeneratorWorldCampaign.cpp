@@ -398,6 +398,78 @@ namespace
 		return AnchorPtr ? AnchorPtr->Get() : nullptr;
 	}
 
+	bool TryGetAnchorForVirtualRealization(const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                      const FGuid& AnchorKey,
+	                                      const TCHAR* ErrorMessage,
+	                                      AAnchorPoint*& OutAnchorPoint)
+	{
+		OutAnchorPoint = FindAnchorByKey(AnchorLookup, AnchorKey);
+		if (IsValid(OutAnchorPoint))
+		{
+			return true;
+		}
+
+		RTSFunctionLibrary::ReportError(ErrorMessage);
+		return false;
+	}
+
+	bool TryRealizeEnemyPlacement(const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                              const TPair<FGuid, EMapEnemyItem>& EnemyPlacement)
+	{
+		AAnchorPoint* AnchorPoint = nullptr;
+		if (not TryGetAnchorForVirtualRealization(
+			AnchorLookup,
+			EnemyPlacement.Key,
+			TEXT("Virtual layout realization failed: enemy item anchor is invalid."),
+			AnchorPoint))
+		{
+			return false;
+		}
+
+		AWorldMapObject* PromotedObject = AnchorPoint->OnEnemyItemPromotion(
+			EnemyPlacement.Value,
+			ECampaignGenerationStep::Finished);
+		return IsValid(PromotedObject);
+	}
+
+	bool TryRealizeNeutralPlacement(const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                const TPair<FGuid, EMapNeutralObjectType>& NeutralPlacement)
+	{
+		AAnchorPoint* AnchorPoint = nullptr;
+		if (not TryGetAnchorForVirtualRealization(
+			AnchorLookup,
+			NeutralPlacement.Key,
+			TEXT("Virtual layout realization failed: neutral item anchor is invalid."),
+			AnchorPoint))
+		{
+			return false;
+		}
+
+		AWorldMapObject* PromotedObject = AnchorPoint->OnNeutralItemPromotion(
+			NeutralPlacement.Value,
+			ECampaignGenerationStep::Finished);
+		return IsValid(PromotedObject);
+	}
+
+	bool TryRealizeMissionPlacement(const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
+	                                const TPair<FGuid, EMapMission>& MissionPlacement)
+	{
+		AAnchorPoint* AnchorPoint = nullptr;
+		if (not TryGetAnchorForVirtualRealization(
+			AnchorLookup,
+			MissionPlacement.Key,
+			TEXT("Virtual layout realization failed: mission anchor is invalid."),
+			AnchorPoint))
+		{
+			return false;
+		}
+
+		AWorldMapObject* PromotedObject = AnchorPoint->OnMissionPromotion(
+			MissionPlacement.Value,
+			ECampaignGenerationStep::Finished);
+		return IsValid(PromotedObject);
+	}
+
 	void RemovePromotedWorldObjectsForAnchorKeys(const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors,
 	                                             const TSet<FGuid>& AnchorKeys)
 	{
@@ -3416,7 +3488,8 @@ namespace
 	                          FWorldCampaignPlacementState& InOutPlacementState,
 	                          FWorldCampaignDerivedData& InOutDerivedData,
 	                          FCampaignGenerationStepTransaction& InOutTransaction,
-	                          FFailSafePlacementTotals& InOutTotals)
+	                          FFailSafePlacementTotals& InOutTotals,
+	                          const bool bDeferWorldObjectPromotion)
 	{
 		AAnchorPoint* AnchorPoint = AnchorEntry.AnchorPoint.Get();
 		if (not IsValid(AnchorPoint))
@@ -3432,6 +3505,12 @@ namespace
 			InOutPlacementState.EnemyItemsByAnchorKey.Add(AnchorKey, Item.EnemyType);
 			int32& PlacedCount = InOutDerivedData.EnemyItemPlacedCounts.FindOrAdd(Item.EnemyType);
 			PlacedCount++;
+			if (bDeferWorldObjectPromotion)
+			{
+				InOutTotals.EnemyPlaced++;
+				return true;
+			}
+
 			SpawnedObject = AnchorPoint->OnEnemyItemPromotion(Item.EnemyType, FailedStep);
 			if (not IsValid(SpawnedObject))
 			{
@@ -3453,6 +3532,12 @@ namespace
 			InOutPlacementState.NeutralItemsByAnchorKey.Add(AnchorKey, Item.NeutralType);
 			int32& PlacedCount = InOutDerivedData.NeutralItemPlacedCounts.FindOrAdd(Item.NeutralType);
 			PlacedCount++;
+			if (bDeferWorldObjectPromotion)
+			{
+				InOutTotals.NeutralPlaced++;
+				return true;
+			}
+
 			SpawnedObject = AnchorPoint->OnNeutralItemPromotion(Item.NeutralType, FailedStep);
 			if (not IsValid(SpawnedObject))
 			{
@@ -3474,6 +3559,12 @@ namespace
 			InOutPlacementState.MissionsByAnchorKey.Add(AnchorKey, Item.MissionType);
 			int32& PlacedCount = InOutDerivedData.MissionPlacedCounts.FindOrAdd(Item.MissionType);
 			PlacedCount++;
+			if (bDeferWorldObjectPromotion)
+			{
+				InOutTotals.MissionPlaced++;
+				return true;
+			}
+
 			SpawnedObject = AnchorPoint->OnMissionPromotion(Item.MissionType, FailedStep);
 			if (not IsValid(SpawnedObject))
 			{
@@ -3549,6 +3640,7 @@ namespace
 	                                   FFailSafePlacementTotals& InOutTotals,
 	                                   TMap<EFailSafeItemKind, TArray<FVector2D>>& InOutPlacedByKind,
 	                                   const float MinSameKindXYSpacing,
+	                                   const bool bDeferWorldObjectPromotion,
 	                                   TArray<FFailSafeItem>& OutRemainingItems)
 	{
 		OutRemainingItems.Reset();
@@ -3571,7 +3663,7 @@ namespace
 				}
 
 				if (not TryPlaceFailSafeItem(Item, Candidate, FailedStep, InOutPlacementState, InOutDerivedData,
-				                             InOutTransaction, InOutTotals))
+				                             InOutTransaction, InOutTotals, bDeferWorldObjectPromotion))
 				{
 					continue;
 				}
@@ -3596,7 +3688,8 @@ namespace
 	                                 FWorldCampaignPlacementState& InOutPlacementState,
 	                                 FWorldCampaignDerivedData& InOutDerivedData,
 	                                 FCampaignGenerationStepTransaction& InOutTransaction,
-	                                 FFailSafePlacementTotals& InOutTotals)
+	                                 FFailSafePlacementTotals& InOutTotals,
+	                                 const bool bDeferWorldObjectPromotion)
 	{
 		if (RemainingItems.Num() == 0)
 		{
@@ -3627,7 +3720,7 @@ namespace
 			{
 				const FEmptyAnchorDistance& Candidate = ShuffledAnchors[AnchorIndex];
 				if (TryPlaceFailSafeItem(Item, Candidate, FailedStep, InOutPlacementState, InOutDerivedData,
-				                         InOutTransaction, InOutTotals))
+				                         InOutTransaction, InOutTotals, bDeferWorldObjectPromotion))
 				{
 					AnchorIndex++;
 					bPlaced = true;
@@ -4031,7 +4124,8 @@ namespace
 	                                const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
 	                                FWorldCampaignPlacementState& InOutPlacementState,
 	                                FWorldCampaignDerivedData& InOutDerivedData,
-	                                FCampaignGenerationStepTransaction& InOutFailSafeTransaction)
+	                                FCampaignGenerationStepTransaction& InOutFailSafeTransaction,
+	                                const bool bDeferWorldObjectPromotion)
 	{
 		AAnchorPoint* AnchorA = FindAnchorByKey(AnchorLookup, SwapCandidate.AnchorKeyA);
 		AAnchorPoint* AnchorB = FindAnchorByKey(AnchorLookup, SwapCandidate.AnchorKeyB);
@@ -4045,6 +4139,10 @@ namespace
 
 		InOutPlacementState.EnemyItemsByAnchorKey.Add(SwapCandidate.AnchorKeyA, SwapCandidate.EnemyTypeB);
 		InOutPlacementState.EnemyItemsByAnchorKey.Add(SwapCandidate.AnchorKeyB, SwapCandidate.EnemyTypeA);
+		if (bDeferWorldObjectPromotion)
+		{
+			return true;
+		}
 
 		AnchorA->RemovePromotedWorldObject();
 		AnchorB->RemovePromotedWorldObject();
@@ -4084,7 +4182,8 @@ namespace
 	                                            GetFailSafeMinDistanceForEnemy,
 	                                            FWorldCampaignPlacementState& InOutPlacementState,
 	                                            FWorldCampaignDerivedData& InOutDerivedData,
-	                                            FCampaignGenerationStepTransaction& InOutFailSafeTransaction)
+	                                            FCampaignGenerationStepTransaction& InOutFailSafeTransaction,
+	                                            const bool bDeferWorldObjectPromotion)
 	{
 		const int32 SwapBudget = FMath::Max(0, FailurePolicy.TimeoutFailSafeEnemyDeclusterSwapBudget);
 		if (SwapBudget == 0)
@@ -4122,7 +4221,8 @@ namespace
 			}
 
 			if (TryApplyEnemyDeclusterSwap(FailedStep, BestSwap, AnchorLookup, InOutPlacementState,
-			                               InOutDerivedData, InOutFailSafeTransaction))
+			                               InOutDerivedData, InOutFailSafeTransaction,
+			                               bDeferWorldObjectPromotion))
 			{
 				AppliedSwaps++;
 				continue;
@@ -5415,6 +5515,11 @@ bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction&
 		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Player HQ"), FColor::Green);
 	}
 
+	if (GetShouldDeferWorldObjectPromotion())
+	{
+		return true;
+	}
+
 	AWorldMapObject* SpawnedObject = AnchorPoint->OnPlayerItemPromotion(EMapPlayerItem::PlayerHQ,
 	                                                                    ECampaignGenerationStep::PlayerHQPlaced);
 	if (not IsValid(SpawnedObject))
@@ -5531,6 +5636,11 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 		DebugNotifyAnchorPicked(AnchorPoint, TEXT("Enemy HQ"), FColor::Red);
 	}
 
+	if (GetShouldDeferWorldObjectPromotion())
+	{
+		return true;
+	}
+
 	AWorldMapObject* SpawnedObject = AnchorPoint->OnEnemyItemPromotion(EMapEnemyItem::EnemyHQ,
 	                                                                   ECampaignGenerationStep::EnemyHQPlaced);
 	if (not IsValid(SpawnedObject))
@@ -5580,6 +5690,11 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyWall(FCampaignGenerationStepTrans
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Compile_DebugSymbols)
 	{
 		DebugNotifyAnchorPicked(SelectedCandidate.AnchorPoint, TEXT("Enemy Wall"), FColor::Orange);
+	}
+
+	if (GetShouldDeferWorldObjectPromotion())
+	{
+		return true;
 	}
 
 	AWorldMapObject* SpawnedObject = SelectedCandidate.AnchorPoint->OnEnemyItemPromotion(
@@ -5803,6 +5918,11 @@ bool AGeneratorWorldCampaign::TryFinalizeMissionMicroPlacement(
 		}
 	}
 
+	if (GetShouldDeferWorldObjectPromotion())
+	{
+		return true;
+	}
+
 	AWorldMapObject* SpawnedMissionObject = Promotion.Key->OnMissionPromotion(
 		Promotion.Value,
 		ECampaignGenerationStep::MissionsPlaced);
@@ -5875,6 +5995,11 @@ bool AGeneratorWorldCampaign::ExecutePlaceSingleEnemyObject(EMapEnemyItem EnemyT
 
 	M_PlacementState = WorkingPlacementState;
 	M_DerivedData = WorkingDerivedData;
+
+	if (GetShouldDeferWorldObjectPromotion())
+	{
+		return true;
+	}
 
 	AWorldMapObject* SpawnedObject = Promotion.Key->OnEnemyItemPromotion(
 		Promotion.Value,
@@ -5994,6 +6119,11 @@ bool AGeneratorWorldCampaign::ExecutePlaceNeutralObjects(FCampaignGenerationStep
 
 	M_PlacementState = WorkingPlacementState;
 	M_DerivedData = WorkingDerivedData;
+	if (GetShouldDeferWorldObjectPromotion())
+	{
+		return true;
+	}
+
 	for (const TPair<TObjectPtr<AAnchorPoint>, EMapNeutralObjectType>& Promotion : Promotions)
 	{
 		if (not IsValid(Promotion.Key))
@@ -6091,8 +6221,77 @@ bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransa
 	return true;
 }
 
+
+bool AGeneratorWorldCampaign::GetShouldDeferWorldObjectPromotion() const
+{
+	return bM_DeferWorldObjectPromotionDuringBacktracking;
+}
+
+bool AGeneratorWorldCampaign::RealizeVirtualPlacementState()
+{
+	const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(M_PlacementState.CachedAnchors);
+	if (M_PlacementState.PlayerHQAnchorKey.IsValid())
+	{
+		AAnchorPoint* PlayerHQAnchor = nullptr;
+		if (not TryGetAnchorForVirtualRealization(
+			AnchorLookup,
+			M_PlacementState.PlayerHQAnchorKey,
+			TEXT("Virtual layout realization failed: player HQ anchor is invalid."),
+			PlayerHQAnchor))
+		{
+			return false;
+		}
+
+		AWorldMapObject* PromotedObject = PlayerHQAnchor->OnPlayerItemPromotion(
+			EMapPlayerItem::PlayerHQ,
+			ECampaignGenerationStep::Finished);
+		if (not IsValid(PromotedObject))
+		{
+			return false;
+		}
+	}
+
+	if (M_PlacementState.EnemyHQAnchorKey.IsValid())
+	{
+		const TPair<FGuid, EMapEnemyItem> EnemyHQPlacement(
+			M_PlacementState.EnemyHQAnchorKey,
+			EMapEnemyItem::EnemyHQ);
+		if (not TryRealizeEnemyPlacement(AnchorLookup, EnemyHQPlacement))
+		{
+			return false;
+		}
+	}
+
+	for (const TPair<FGuid, EMapEnemyItem>& EnemyPlacement : M_PlacementState.EnemyItemsByAnchorKey)
+	{
+		if (not TryRealizeEnemyPlacement(AnchorLookup, EnemyPlacement))
+		{
+			return false;
+		}
+	}
+
+	for (const TPair<FGuid, EMapNeutralObjectType>& NeutralPlacement : M_PlacementState.NeutralItemsByAnchorKey)
+	{
+		if (not TryRealizeNeutralPlacement(AnchorLookup, NeutralPlacement))
+		{
+			return false;
+		}
+	}
+
+	for (const TPair<FGuid, EMapMission>& MissionPlacement : M_PlacementState.MissionsByAnchorKey)
+	{
+		if (not TryRealizeMissionPlacement(AnchorLookup, MissionPlacement))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 {
+	bM_DeferWorldObjectPromotionDuringBacktracking = true;
 	if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
 	{
 		if (GetIsValidCampaignDebugger())
@@ -6144,6 +6343,7 @@ bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 			StepFunction = &AGeneratorWorldCampaign::ExecutePlaceMissions;
 			break;
 		default:
+			bM_DeferWorldObjectPromotionDuringBacktracking = false;
 			return false;
 		}
 
@@ -6165,8 +6365,15 @@ bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()
 				}
 			}
 
+			bM_DeferWorldObjectPromotionDuringBacktracking = false;
 			return false;
 		}
+	}
+
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	if (not RealizeVirtualPlacementState())
+	{
+		return false;
 	}
 
 	M_GenerationStep = ECampaignGenerationStep::Finished;
@@ -6424,9 +6631,11 @@ bool AGeneratorWorldCampaign::TryApplyTimeoutFailSafePlacement(const ECampaignGe
 	TMap<EFailSafeItemKind, TArray<FVector2D>> PlacedByKind;
 	AssignFailSafeItemsByDistance(ItemsToPlace, bHasValidPlayerHQAnchor, FailedStep, EmptyAnchors, M_PlacementState,
 	                              M_DerivedData, FailSafeTransaction, Totals, PlacedByKind,
-	                              M_PlacementFailurePolicy.TimeoutFailSafeMinSameKindXYSpacing, RemainingItems);
+	                              M_PlacementFailurePolicy.TimeoutFailSafeMinSameKindXYSpacing,
+	                              GetShouldDeferWorldObjectPromotion(), RemainingItems);
 	AssignFailSafeItemsFallback(RemainingItems, FailedStep, M_PlacementFailurePolicy, M_PlacementState.SeedUsed,
-	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals);
+	                            EmptyAnchors, M_PlacementState, M_DerivedData, FailSafeTransaction, Totals,
+	                            GetShouldDeferWorldObjectPromotion());
 	ApplyTimeoutFailSafeEnemyDeclusterSwaps(
 		FailedStep,
 		M_PlacementFailurePolicy,
@@ -6436,9 +6645,10 @@ bool AGeneratorWorldCampaign::TryApplyTimeoutFailSafePlacement(const ECampaignGe
 		},
 		M_PlacementState,
 		M_DerivedData,
-		FailSafeTransaction);
+		FailSafeTransaction,
+		GetShouldDeferWorldObjectPromotion());
 
-	if (FailSafeTransaction.SpawnedActors.Num() > 0)
+	if (FailSafeTransaction.SpawnedActors.Num() > 0 || GetShouldDeferWorldObjectPromotion())
 	{
 		M_StepTransactions.Add(FailSafeTransaction);
 	}
