@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "CoreMinimal.h"
 #include "RTS_Survival/Game/GameState/GameResourceManager/GetTargetResourceThread/FGetAsyncResource.h"
 
@@ -17,6 +17,7 @@ enum class ERTSResourceRichText : uint8
 	Ammo,
 	Blueprint,
 	DisplayAmount,
+	CommanderExp,
 };
 
 
@@ -51,6 +52,7 @@ enum class ERTSRichText : uint8
 	Text_Error,
 	Text_GoodTitle,
 	Text_BadTitle,
+	LBadTitle,
 	Text_Bad14,
 	Text_NewBad,
 	Text_NewGood,
@@ -110,6 +112,8 @@ private:
 			return "<Blueprint>";
 		case ERTSResourceRichText::DisplayAmount:
 			return "<DisplayAmount>";
+		case ERTSResourceRichText::CommanderExp:
+			return "<CommanderExp>";
 		default:
 			return "";
 		}
@@ -171,6 +175,8 @@ private:
 			return "<Text_GoodTitle>";
 		case ERTSRichText::Text_BadTitle:
 			return "<Text_BadTitle>";
+		case ERTSRichText::LBadTitle:
+			return "<Text_LBadTitle>";
 		case ERTSRichText::Text_Bad14:
 			return "<Text_Bad14>";
 		case ERTSRichText::Text_NewBad:
@@ -179,22 +185,22 @@ private:
 			return "<Text_NewGood>";
 		case ERTSRichText::Text_Exp:
 			return "<Text_Exp>";
-			case ERTSRichText::Text_Seats:
-				return "<Text_Seats>";
+		case ERTSRichText::Text_Seats:
+			return "<Text_Seats>";
 		case ERTSRichText::Text_Cursive:
 			return "<Text_Cursive>";
-			case ERTSRichText::Text_GBeh:
-				return "<Text_GBeh>";
-			case ERTSRichText::Text_BBeh:
-				return "<Text_BBeh>";
+		case ERTSRichText::Text_GBeh:
+			return "<Text_GBeh>";
+		case ERTSRichText::Text_BBeh:
+			return "<Text_BBeh>";
 		case ERTSRichText::Text_sGBeh:
 			return "<Text_sGBeh>";
-			case ERTSRichText::Text_sBBeh:
-				return "<Text_sBBeh>";
-			case ERTSRichText::Text_sExp:
-				return "<Text_sExp>";
-			case ERTSRichText::Text_sArmor:
-				return "<Text_sArmor>";
+		case ERTSRichText::Text_sBBeh:
+			return "<Text_sBBeh>";
+		case ERTSRichText::Text_sExp:
+			return "<Text_sExp>";
+		case ERTSRichText::Text_sArmor:
+			return "<Text_sArmor>";
 		default:
 			return "";
 		}
