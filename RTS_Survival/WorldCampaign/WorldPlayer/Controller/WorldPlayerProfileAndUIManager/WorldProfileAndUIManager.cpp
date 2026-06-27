@@ -32,15 +32,28 @@ void UWorldProfileAndUIManager::SetupWorldMenu(AWorldPlayerController* PlayerCon
 	M_WorldMenu->AddToViewport();
 }
 
-void UWorldProfileAndUIManager::OnSetupUIForNewCampaign(ERTSFaction PlayerFaction)
+FPlayerProfileSaveData UWorldProfileAndUIManager::OnSetupUIForNewCampaign(ERTSFaction PlayerFaction)
+{
+	FPlayerProfileSaveData PlayerProfileSaveData;
+	PlayerProfileSaveData.PlayerFaction = PlayerFaction;
+	PlayerProfileSaveData.PlayerData = GetDefaultPlayerDataForFaction(PlayerFaction);
+	if (not GetIsValidWorldMenu())
+	{
+		return PlayerProfileSaveData;
+	}
+
+	M_WorldMenu->SetupUIForPlayerProfile(PlayerProfileSaveData.PlayerData);
+	return PlayerProfileSaveData;
+}
+
+void UWorldProfileAndUIManager::SetupUIForLoadedCampaign(const FPlayerProfileSaveData& PlayerProfileSaveData)
 {
 	if (not GetIsValidWorldMenu())
 	{
 		return;
 	}
 
-	const FPlayerData DefaultPlayerData = GetDefaultPlayerDataForFaction(PlayerFaction);
-	M_WorldMenu->SetupUIForPlayerProfile(DefaultPlayerData);
+	M_WorldMenu->SetupUIForPlayerProfile(PlayerProfileSaveData.PlayerData);
 }
 
 

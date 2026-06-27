@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/WorldCampaign/SaveSystem/Defaults/FPlayerFactionDefaultProfiles.h"
+#include "RTS_Survival/WorldCampaign/PlayerProfile/FPlayerProfileSaveData.h"
 #include "WorldProfileAndUIManager.generated.h"
 
 
@@ -25,7 +26,8 @@ public:
 	UWorldProfileAndUIManager();
 
 	void SetupWorldMenu(AWorldPlayerController* PlayerController);
-	void OnSetupUIForNewCampaign(ERTSFaction PlayerFaction);
+	FPlayerProfileSaveData OnSetupUIForNewCampaign(ERTSFaction PlayerFaction);
+	void SetupUIForLoadedCampaign(const FPlayerProfileSaveData& PlayerProfileSaveData);
 
 protected:
 	// Called when the game starts

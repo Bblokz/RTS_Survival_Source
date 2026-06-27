@@ -11,6 +11,10 @@
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldPlayerObject/WorldPlayerObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Boundary/WorldSplineBoundary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
@@ -4300,7 +4304,262 @@ void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* W
 	RTSFunctionLibrary::DisplayNotification("No campaign generation requested for this map, is this a save?");
 }
 
+FWorldCampaignState AGeneratorWorldCampaign::BuildWorldCampaignStateFromCurrentGeneration() const
+{
+	FWorldCampaignState WorldCampaignState;
+	WorldCampaignState.GenerationStep = M_GenerationStep;
+	WorldCampaignState.PlayerHQAnchorKey = M_PlacementState.PlayerHQAnchorKey;
+	WorldCampaignState.EnemyHQAnchorKey = M_PlacementState.EnemyHQAnchorKey;
+	AddSavedAnchorsAndMapItems(WorldCampaignState);
+	AddSavedConnections(WorldCampaignState);
+	return WorldCampaignState;
+}
+
+void AGeneratorWorldCampaign::RestoreWorldStateFromSave(const FWorldCampaignState& WorldCampaignState)
+{
+	EraseAllGeneration();
+	if (not WorldCampaignState.GetIsValidForRestore())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot restore world campaign state because the save data is invalid."));
+		return;
+	}
+
+	if (not IsValid(GetWorld()))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot restore world campaign state because the world is invalid."));
+		return;
+	}
+
+	TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorsByKey;
+	TArray<TObjectPtr<AAnchorPoint>> RestoredAnchors;
+	RestoreSavedAnchors(WorldCampaignState, AnchorsByKey, RestoredAnchors);
+	RestoreSavedConnections(WorldCampaignState, AnchorsByKey);
+	RestoreSavedMapItems(WorldCampaignState, AnchorsByKey);
+	ApplyRestoredPlacementState(WorldCampaignState, AnchorsByKey, RestoredAnchors);
+}
+
+void AGeneratorWorldCampaign::AddSavedAnchorsAndMapItems(FWorldCampaignState& WorldCampaignState) const
+{
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		FWorldCampaignAnchorSaveData AnchorSaveData;
+		AnchorSaveData.AnchorKey = AnchorPoint->GetAnchorKey();
+		AnchorSaveData.Transform = AnchorPoint->GetActorTransform();
+		WorldCampaignState.Anchors.Add(AnchorSaveData);
+
+		AWorldMapObject* PromotedWorldObject = AnchorPoint->GetPromotedWorldObject();
+		if (not IsValid(PromotedWorldObject))
+		{
+			continue;
+		}
+
+		FWorldCampaignMapItemSaveData MapItemSaveData;
+		MapItemSaveData.AnchorKey = AnchorPoint->GetAnchorKey();
+		if (const AWorldEnemyObject* EnemyObject = Cast<AWorldEnemyObject>(PromotedWorldObject))
+		{
+			MapItemSaveData.MapItemType = EMapItemType::EnemyItem;
+			MapItemSaveData.EnemyItemType = EnemyObject->GetEnemyItemType();
+		}
+		else if (const AWorldMissionObject* MissionObject = Cast<AWorldMissionObject>(PromotedWorldObject))
+		{
+			MapItemSaveData.MapItemType = EMapItemType::Mission;
+			MapItemSaveData.MissionType = MissionObject->GetMissionType();
+		}
+		else if (const AWorldNeutralObject* NeutralObject = Cast<AWorldNeutralObject>(PromotedWorldObject))
+		{
+			MapItemSaveData.MapItemType = EMapItemType::NeutralItem;
+			MapItemSaveData.NeutralObjectType = NeutralObject->GetNeutralObjectType();
+		}
+		else if (const AWorldPlayerObject* PlayerObject = Cast<AWorldPlayerObject>(PromotedWorldObject))
+		{
+			MapItemSaveData.MapItemType = EMapItemType::PlayerItem;
+			MapItemSaveData.PlayerItemType = PlayerObject->GetPlayerItemType();
+		}
+
+		if (MapItemSaveData.MapItemType != EMapItemType::None)
+		{
+			WorldCampaignState.MapItems.Add(MapItemSaveData);
+		}
+	}
+}
+
+void AGeneratorWorldCampaign::AddSavedConnections(FWorldCampaignState& WorldCampaignState) const
+{
+	for (const TObjectPtr<AConnection>& Connection : M_PlacementState.CachedConnections)
+	{
+		if (not IsValid(Connection))
+		{
+			continue;
+		}
+
+		FWorldCampaignConnectionSaveData ConnectionSaveData;
+		ConnectionSaveData.bM_IsThreeWayConnection = Connection->GetIsThreeWayConnection();
+		ConnectionSaveData.JunctionLocation = Connection->GetJunctionLocation();
+		for (const TObjectPtr<AAnchorPoint>& ConnectedAnchor : Connection->GetConnectedAnchors())
+		{
+			if (not IsValid(ConnectedAnchor))
+			{
+				continue;
+			}
+
+			ConnectionSaveData.ConnectedAnchorKeys.Add(ConnectedAnchor->GetAnchorKey());
+		}
+
+		if (ConnectionSaveData.ConnectedAnchorKeys.Num() >= 2)
+		{
+			WorldCampaignState.Connections.Add(ConnectionSaveData);
+		}
+	}
+}
+
+void AGeneratorWorldCampaign::RestoreSavedAnchors(const FWorldCampaignState& WorldCampaignState,
+                                                  TMap<FGuid, TObjectPtr<AAnchorPoint>>& OutAnchorsByKey,
+                                                  TArray<TObjectPtr<AAnchorPoint>>& OutRestoredAnchors)
+{
+	UWorld* World = GetWorld();
+	const UWorldCampaignSettings* WorldCampaignSettings = UWorldCampaignSettings::Get();
+	TSubclassOf<AAnchorPoint> AnchorClass = M_AnchorPointGenerationSettings.M_GeneratedAnchorPointClass;
+	if (not IsValid(AnchorClass.Get()))
+	{
+		AnchorClass = AAnchorPoint::StaticClass();
+	}
+
+	for (const FWorldCampaignAnchorSaveData& AnchorSaveData : WorldCampaignState.Anchors)
+	{
+		if (not AnchorSaveData.AnchorKey.IsValid())
+		{
+			continue;
+		}
+
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = this;
+		AAnchorPoint* SpawnedAnchor = World->SpawnActor<AAnchorPoint>(AnchorClass, AnchorSaveData.Transform, SpawnParameters);
+		if (not IsValid(SpawnedAnchor))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Failed to restore saved campaign anchor."));
+			continue;
+		}
+
+		SpawnedAnchor->SetAnchorKey(AnchorSaveData.AnchorKey, true);
+		SpawnedAnchor->InitializeCampaignSettings(WorldCampaignSettings);
+		SpawnedAnchor->Tags.AddUnique(GeneratedAnchorTag);
+		OutAnchorsByKey.Add(AnchorSaveData.AnchorKey, SpawnedAnchor);
+		OutRestoredAnchors.Add(SpawnedAnchor);
+	}
+}
+
+void AGeneratorWorldCampaign::RestoreSavedConnections(const FWorldCampaignState& WorldCampaignState,
+                                                       const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey)
+{
+	UWorld* World = GetWorld();
+	TSubclassOf<AConnection> ConnectionClass = M_ConnectionClass;
+	if (not IsValid(ConnectionClass.Get()))
+	{
+		ConnectionClass = AConnection::StaticClass();
+	}
+
+	M_GeneratedConnections.Reset();
+	for (const FWorldCampaignConnectionSaveData& ConnectionSaveData : WorldCampaignState.Connections)
+	{
+		if (ConnectionSaveData.ConnectedAnchorKeys.Num() < 2)
+		{
+			continue;
+		}
+
+		TObjectPtr<AAnchorPoint> const* AnchorA = AnchorsByKey.Find(ConnectionSaveData.ConnectedAnchorKeys[0]);
+		TObjectPtr<AAnchorPoint> const* AnchorB = AnchorsByKey.Find(ConnectionSaveData.ConnectedAnchorKeys[1]);
+		if (not AnchorA || not AnchorB || not IsValid(AnchorA->Get()) || not IsValid(AnchorB->Get()))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Failed to restore saved campaign connection because an anchor is missing."));
+			continue;
+		}
+
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = this;
+		AConnection* SpawnedConnection = World->SpawnActor<AConnection>(ConnectionClass, FTransform::Identity, SpawnParameters);
+		if (not IsValid(SpawnedConnection))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Failed to restore saved campaign connection."));
+			continue;
+		}
+
+		SpawnedConnection->InitializeConnection(AnchorA->Get(), AnchorB->Get());
+		RegisterConnectionOnAnchors(SpawnedConnection, AnchorA->Get(), AnchorB->Get());
+		if (ConnectionSaveData.bM_IsThreeWayConnection && ConnectionSaveData.ConnectedAnchorKeys.IsValidIndex(2))
+		{
+			TObjectPtr<AAnchorPoint> const* ThirdAnchor = AnchorsByKey.Find(ConnectionSaveData.ConnectedAnchorKeys[2]);
+			if (ThirdAnchor && IsValid(ThirdAnchor->Get()) && SpawnedConnection->TryAddThirdAnchor(ThirdAnchor->Get()))
+			{
+				RegisterThirdAnchorOnConnection(SpawnedConnection, ThirdAnchor->Get());
+			}
+		}
+
+		M_GeneratedConnections.Add(SpawnedConnection);
+	}
+}
+
+void AGeneratorWorldCampaign::RestoreSavedMapItems(const FWorldCampaignState& WorldCampaignState,
+                                                   const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey)
+{
+	for (const FWorldCampaignMapItemSaveData& MapItemSaveData : WorldCampaignState.MapItems)
+	{
+		TObjectPtr<AAnchorPoint> const* AnchorPoint = AnchorsByKey.Find(MapItemSaveData.AnchorKey);
+		if (not AnchorPoint || not IsValid(AnchorPoint->Get()))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Failed to restore saved campaign map item because the anchor is missing."));
+			continue;
+		}
+
+		switch (MapItemSaveData.MapItemType)
+		{
+		case EMapItemType::EnemyItem:
+			AnchorPoint->Get()->OnEnemyItemPromotion(MapItemSaveData.EnemyItemType, ECampaignGenerationStep::Finished);
+			M_PlacementState.EnemyItemsByAnchorKey.Add(MapItemSaveData.AnchorKey, MapItemSaveData.EnemyItemType);
+			M_DerivedData.EnemyItemPlacedCounts.FindOrAdd(MapItemSaveData.EnemyItemType)++;
+			break;
+		case EMapItemType::Mission:
+			AnchorPoint->Get()->OnMissionPromotion(MapItemSaveData.MissionType, ECampaignGenerationStep::Finished);
+			M_PlacementState.MissionsByAnchorKey.Add(MapItemSaveData.AnchorKey, MapItemSaveData.MissionType);
+			break;
+		case EMapItemType::NeutralItem:
+			AnchorPoint->Get()->OnNeutralItemPromotion(MapItemSaveData.NeutralObjectType, ECampaignGenerationStep::Finished);
+			M_PlacementState.NeutralItemsByAnchorKey.Add(MapItemSaveData.AnchorKey, MapItemSaveData.NeutralObjectType);
+			break;
+		case EMapItemType::PlayerItem:
+			AnchorPoint->Get()->OnPlayerItemPromotion(MapItemSaveData.PlayerItemType, ECampaignGenerationStep::Finished);
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+void AGeneratorWorldCampaign::ApplyRestoredPlacementState(const FWorldCampaignState& WorldCampaignState,
+                                                          const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey,
+                                                          const TArray<TObjectPtr<AAnchorPoint>>& RestoredAnchors)
+{
+	CacheGeneratedState(RestoredAnchors);
+	M_PlacementState.PlayerHQAnchorKey = WorldCampaignState.PlayerHQAnchorKey;
+	M_PlacementState.EnemyHQAnchorKey = WorldCampaignState.EnemyHQAnchorKey;
+	if (TObjectPtr<AAnchorPoint> const* PlayerHQAnchor = AnchorsByKey.Find(WorldCampaignState.PlayerHQAnchorKey))
+	{
+		M_PlacementState.PlayerHQAnchor = PlayerHQAnchor->Get();
+	}
+	if (TObjectPtr<AAnchorPoint> const* EnemyHQAnchor = AnchorsByKey.Find(WorldCampaignState.EnemyHQAnchorKey))
+	{
+		M_PlacementState.EnemyHQAnchor = EnemyHQAnchor->Get();
+	}
+	M_GenerationStep = WorldCampaignState.GenerationStep;
+}
+
+
 #if WITH_EDITOR
+
 void AGeneratorWorldCampaign::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);

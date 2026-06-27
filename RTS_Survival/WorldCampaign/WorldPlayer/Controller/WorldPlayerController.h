@@ -9,6 +9,7 @@
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
 #include "WorldPlayerController.generated.h"
 
+class UWorldStateAndSaveManager;
 class UWorldProfileAndUIManager;
 enum class ERTSFaction : uint8;
 class AGeneratorWorldCampaign;
@@ -66,7 +67,7 @@ private:
 	bool GetIsValidWorldCameraController() const;
 	bool GetIsValidPlayerWorldOutliner() const;
 
-	void Beginplay_SetupWorldGenerator();
+	void BeginPlay_SetupWorldGenerator();
 	void BeginPlay_SetupWorldMenu();
 	// Generates the new world with the settings from the game instance if needed.
 	// returns whether a full new world was generated.
@@ -85,8 +86,13 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AGeneratorWorldCampaign> M_WorldGenerator;
 	bool GetIsValidWorldGenerator() const;
-FCampaignGenerationSettings M_CampaignSettings ;
-	FRTSGameDifficulty M_SelectedDifficulty ;
-	ERTSFaction M_PlayerFaction ;
+
+	UPROPERTY()
+	TObjectPtr<UWorldStateAndSaveManager> M_WorldStateAndSaveManager = nullptr;
+	bool GetIsValidWorldStateAndSaveManager() const;
+
+	FCampaignGenerationSettings M_CampaignSettings;
+	FRTSGameDifficulty M_SelectedDifficulty;
+	ERTSFaction M_PlayerFaction;
 	
 };
