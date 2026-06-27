@@ -22,7 +22,17 @@
 
 namespace
 {
+	/**
+	 * @brief Per-step retry ceiling that prevents one generation phase from retrying forever.
+	 * A step attempt is incremented each time a specific step fails and enters HandleStepFailure.
+	 * When exceeded, timeout fail-safe placement can run for supported steps before generation is aborted.
+	 */
 	constexpr int32 MaxStepAttempts = 7000;
+	/**
+	 * @brief Whole-generation retry ceiling shared by every step in the current generation run.
+	 * This catches cross-step backtracking loops where no single step reaches MaxStepAttempts on its own.
+	 * When exceeded, timeout fail-safe placement can run for supported steps before generation is aborted.
+	 */
 	constexpr int32 MaxTotalAttempts = 8000;
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr int32 MaxRelaxationAttempts = 3;
@@ -6510,9 +6520,8 @@ EPlacementFailurePolicy AGeneratorWorldCampaign::GetFailurePolicyForStep(ECampai
 	}
 }
 
-int32 AGeneratorWorldCampaign::GetMicroUndoDepthForFailure(ECampaignGenerationStep FailedStep,
-                                                           int32 FailedStepAttemptIndex,
-                                                           int32 TrailingMicroTransactions) const
+int32 AGeneratorWorldCampaign::GetDesiredMicroUndoDepthForFailure(ECampaignGenerationStep FailedStep,
+                                                                   int32 FailedStepAttemptIndex) const
 {
 	if (FailedStep != ECampaignGenerationStep::EnemyObjectsPlaced
 		&& FailedStep != ECampaignGenerationStep::MissionsPlaced)
@@ -6523,8 +6532,21 @@ int32 AGeneratorWorldCampaign::GetMicroUndoDepthForFailure(ECampaignGenerationSt
 	const int32 MinimumWindow = 1;
 	const int32 MinimumDepth = 1;
 	const int32 Window = FMath::Max(MinimumWindow, M_PlacementFailurePolicy.EscalationAttempts);
-	const int32 Depth = MinimumDepth + (FailedStepAttemptIndex / Window);
-	return FMath::Clamp(Depth, MinimumDepth, TrailingMicroTransactions);
+	return MinimumDepth + (FailedStepAttemptIndex / Window);
+}
+
+int32 AGeneratorWorldCampaign::GetMicroUndoDepthForFailure(ECampaignGenerationStep FailedStep,
+                                                           int32 FailedStepAttemptIndex,
+                                                           int32 TrailingMicroTransactions) const
+{
+	if (TrailingMicroTransactions <= 0)
+	{
+		return 0;
+	}
+
+	const int32 MinimumDepth = 1;
+	const int32 DesiredDepth = GetDesiredMicroUndoDepthForFailure(FailedStep, FailedStepAttemptIndex);
+	return FMath::Clamp(DesiredDepth, MinimumDepth, TrailingMicroTransactions);
 }
 
 float AGeneratorWorldCampaign::GetFailSafeMinDistanceForEnemy(const EMapEnemyItem EnemyType) const
@@ -6694,9 +6716,10 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 
 	const int32 AttemptIndex = GetStepAttemptIndex(FailedStep);
 	const int32 TrailingMicroTransactions = CountTrailingMicroTransactionsForStep(FailedStep);
-	if (TrailingMicroTransactions > 0
+	const bool bCanUndoMicroTransactions = TrailingMicroTransactions > 0
 		&& (FailedStep == ECampaignGenerationStep::EnemyObjectsPlaced
-			|| FailedStep == ECampaignGenerationStep::MissionsPlaced))
+			|| FailedStep == ECampaignGenerationStep::MissionsPlaced);
+	if (bCanUndoMicroTransactions)
 	{
 		if constexpr (DeveloperSettings::Debugging::GCampaignBacktracking_Report_Compile_DebugSymbols)
 		{
@@ -6704,6 +6727,7 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 			M_Report_CurrentFailureStep = FailedStep;
 		}
 
+		const int32 DesiredMicroUndoDepth = GetDesiredMicroUndoDepthForFailure(FailedStep, AttemptIndex);
 		const int32 UndoDepth = GetMicroUndoDepthForFailure(FailedStep, AttemptIndex, TrailingMicroTransactions);
 		for (int32 UndoIndex = 0; UndoIndex < UndoDepth; ++UndoIndex)
 		{
@@ -6721,13 +6745,18 @@ bool AGeneratorWorldCampaign::HandleStepFailure(ECampaignGenerationStep FailedSt
 			M_Report_CurrentFailureStep = ECampaignGenerationStep::NotStarted;
 		}
 
-		InOutStepIndex = StepOrder.IndexOfByKey(FailedStep);
-		if (InOutStepIndex == INDEX_NONE)
+		// If there was enough micro history to satisfy the requested depth, retry the same step.
+		// Otherwise, continue into the macro backtracking path because this micro level is exhausted.
+		if (DesiredMicroUndoDepth <= TrailingMicroTransactions)
 		{
-			InOutStepIndex = 0;
-		}
+			InOutStepIndex = StepOrder.IndexOfByKey(FailedStep);
+			if (InOutStepIndex == INDEX_NONE)
+			{
+				InOutStepIndex = 0;
+			}
 
-		return true;
+			return true;
+		}
 	}
 
 	if (FailurePolicy == EPlacementFailurePolicy::BreakDistanceRules_ThenBackTrack

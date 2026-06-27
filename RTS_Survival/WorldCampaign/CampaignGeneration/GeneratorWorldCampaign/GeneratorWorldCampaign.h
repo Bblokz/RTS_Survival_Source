@@ -764,6 +764,13 @@ private:
 	void ResetStepAttemptsFrom(ECampaignGenerationStep CompletedStep);
 	EPlacementFailurePolicy GetFailurePolicyForStep(ECampaignGenerationStep FailedStep) const;
 	/**
+	 * @brief Calculates the requested micro undo depth before clamping to available history.
+	 * @param FailedStep Step that failed and may support micro backtracking.
+	 * @param FailedStepAttemptIndex Attempt index for the failed step after increment.
+	 * @return Requested undo depth, or 0 when the failed step has no micro transaction support.
+	 */
+	int32 GetDesiredMicroUndoDepthForFailure(ECampaignGenerationStep FailedStep, int32 FailedStepAttemptIndex) const;
+	/**
 	 * @brief Calculates how far micro backtracking should escalate to escape deterministic thrashing.
 	 * @param FailedStep Step that failed and triggered micro backtracking.
 	 * @param FailedStepAttemptIndex Attempt index for the failed step after increment.
