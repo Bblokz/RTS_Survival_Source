@@ -8,6 +8,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
+#include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 
 UWorldCameraController::UWorldCameraController()
 {
@@ -32,6 +34,7 @@ void UWorldCameraController::TickComponent(float DeltaTime, ELevelTick TickType,
 	UpdateMoveToLocation(DeltaTime);
 	UpdateAxisMovement(DeltaTime);
 	UpdateEdgeScroll(DeltaTime);
+	UpdateBoundarySafety();
 }
 
 void UWorldCameraController::SetIsCameraMovementDisabled(const bool bIsDisabled)
@@ -126,6 +129,7 @@ void UWorldCameraController::MoveCameraTo(const FMovePlayerCamera& MoveRequest)
 	{
 		TryMoveCameraToLocation(MoveRequest.MoveToLocation);
 		M_MoveState.bM_IsMoveActive = false;
+		M_MoveState.bM_IgnoreBoundaryConstraints = false;
 		return;
 	}
 
@@ -134,6 +138,7 @@ void UWorldCameraController::MoveCameraTo(const FMovePlayerCamera& MoveRequest)
 	M_MoveState.M_ElapsedTime = 0.0f;
 	M_MoveState.M_TotalTime = MoveRequest.TimeToMove;
 	M_MoveState.bM_IsMoveActive = true;
+	M_MoveState.bM_IgnoreBoundaryConstraints = false;
 }
 
 
@@ -282,18 +287,36 @@ void UWorldCameraController::UpdateMoveToLocation(const float DeltaTime)
 	{
 		TryMoveCameraToLocation(M_MoveState.M_TargetLocation);
 		M_MoveState.bM_IsMoveActive = false;
+		M_MoveState.bM_IgnoreBoundaryConstraints = false;
+		bM_IsSafetyMoveToPlayerHQActive = false;
 		return;
 	}
 
 	M_MoveState.M_ElapsedTime += DeltaTime;
 	const float Alpha = FMath::Clamp(M_MoveState.M_ElapsedTime / M_MoveState.M_TotalTime, 0.0f, 1.0f);
 	const FVector NewLocation = FMath::Lerp(M_MoveState.M_StartLocation, M_MoveState.M_TargetLocation, Alpha);
-	TryMoveCameraToLocation(NewLocation);
+	if (M_MoveState.bM_IgnoreBoundaryConstraints)
+	{
+		CameraCarrier->SetActorLocation(NewLocation, true);
+	}
+	else
+	{
+		TryMoveCameraToLocation(NewLocation);
+	}
 
 	if (Alpha >= 1.0f)
 	{
-		TryMoveCameraToLocation(M_MoveState.M_TargetLocation);
+		if (M_MoveState.bM_IgnoreBoundaryConstraints)
+		{
+			CameraCarrier->SetActorLocation(M_MoveState.M_TargetLocation, true);
+		}
+		else
+		{
+			TryMoveCameraToLocation(M_MoveState.M_TargetLocation);
+		}
 		M_MoveState.bM_IsMoveActive = false;
+		M_MoveState.bM_IgnoreBoundaryConstraints = false;
+		bM_IsSafetyMoveToPlayerHQActive = false;
 	}
 }
 
@@ -452,6 +475,16 @@ void UWorldCameraController::UpdateEdgeScroll(const float DeltaTime)
 	TryMoveCameraByWorldDelta(WorldDelta);
 }
 
+void UWorldCameraController::UpdateBoundarySafety()
+{
+	if (bM_IsSafetyMoveToPlayerHQActive || not GetIsCameraOutsideBoundaries())
+	{
+		return;
+	}
+
+	StartSafetyMoveToPlayerHQ();
+}
+
 void UWorldCameraController::GetViewportSizeAndMouse(
 	float& OutScreenX,
 	float& OutScreenY,
@@ -495,6 +528,84 @@ FVector UWorldCameraController::GetWorldDeltaFromLocalXY(const float LocalForwar
 bool UWorldCameraController::GetCanMoveCameraToLocation(const FVector& TargetCameraLocation) const
 {
 	return GetAreAllPlaneConstraintsSatisfied(TargetCameraLocation, M_CachedAdditionalPlaneConstraints);
+}
+
+FVector UWorldCameraController::GetConstrainedCameraLocation(const FVector& TargetCameraLocation) const
+{
+	constexpr float PlaneSignedDistanceTolerance = 0.1f;
+	FVector ConstrainedLocation = TargetCameraLocation;
+	for (const FPlayerCameraBoundaryPlaneConstraint& Constraint : M_CachedAdditionalPlaneConstraints)
+	{
+		if (Constraint.bM_HasSpanLimit)
+		{
+			const float SpanAxisValue = FVector::DotProduct(ConstrainedLocation, Constraint.M_SpanAxis);
+			if (SpanAxisValue < Constraint.M_SpanAxisMin - PlaneSignedDistanceTolerance
+				|| SpanAxisValue > Constraint.M_SpanAxisMax + PlaneSignedDistanceTolerance)
+			{
+				continue;
+			}
+		}
+
+		const FVector Difference = ConstrainedLocation - Constraint.M_PlaneOrigin;
+		const float SignedDistance = FVector::DotProduct(Difference, Constraint.M_PlaneNormal);
+		if (Constraint.bM_AllowPositiveSide && SignedDistance < 0.0f)
+		{
+			ConstrainedLocation -= Constraint.M_PlaneNormal * SignedDistance;
+			continue;
+		}
+		if (not Constraint.bM_AllowPositiveSide && SignedDistance > 0.0f)
+		{
+			ConstrainedLocation -= Constraint.M_PlaneNormal * SignedDistance;
+		}
+	}
+
+	return ConstrainedLocation;
+}
+
+bool UWorldCameraController::GetIsCameraOutsideBoundaries() const
+{
+	if (M_CachedAdditionalPlaneConstraints.IsEmpty())
+	{
+		return false;
+	}
+	if (not GetIsValidCameraCarrierActor())
+	{
+		return false;
+	}
+
+	const AActor* const CameraCarrier = M_CameraCarrierActor.Get();
+	return not GetCanMoveCameraToLocation(CameraCarrier->GetActorLocation());
+}
+
+void UWorldCameraController::StartSafetyMoveToPlayerHQ()
+{
+	if (bM_IsSafetyMoveToPlayerHQActive || not GetIsValidCameraCarrierActor())
+	{
+		return;
+	}
+
+	AWorldPlayerController* const WorldPlayerController = Cast<AWorldPlayerController>(GetOwner());
+	if (not IsValid(WorldPlayerController))
+	{
+		RTSFunctionLibrary::ReportError("World camera safety move needs an AWorldPlayerController owner."
+			"\n See function: UWorldCameraController::StartSafetyMoveToPlayerHQ()");
+		return;
+	}
+
+	constexpr float SafetyMoveDurationSeconds = 2.0f;
+	constexpr float SafetyInputDisabledSeconds = 2.0f;
+	AActor* const CameraCarrier = M_CameraCarrierActor.Get();
+	M_MoveState.M_StartLocation = CameraCarrier->GetActorLocation();
+	M_MoveState.M_TargetLocation = FRTS_WorldStatics::GetPlayerHQWorldLocation(WorldPlayerController);
+	M_MoveState.M_ElapsedTime = 0.0f;
+	M_MoveState.M_TotalTime = SafetyMoveDurationSeconds;
+	M_MoveState.bM_IsMoveActive = true;
+	M_MoveState.bM_IgnoreBoundaryConstraints = true;
+	M_CameraInputDisabledRemainingSeconds = FMath::Max(
+		M_CameraInputDisabledRemainingSeconds,
+		SafetyInputDisabledSeconds
+	);
+	bM_IsSafetyMoveToPlayerHQActive = true;
 }
 
 bool UWorldCameraController::GetAreAllPlaneConstraintsSatisfied(
@@ -731,12 +842,9 @@ void UWorldCameraController::TryMoveCameraByWorldDelta(const FVector& WorldDelta
 	FVector HorizontalWorldDelta = WorldDelta;
 	HorizontalWorldDelta.Z = 0.0f;
 	const FVector TargetLocation = CameraCarrier->GetActorLocation() + HorizontalWorldDelta;
-	if (not GetCanMoveCameraToLocation(TargetLocation))
-	{
-		return;
-	}
-
-	CameraCarrier->AddActorWorldOffset(HorizontalWorldDelta, true);
+	const FVector ConstrainedLocation = GetConstrainedCameraLocation(TargetLocation);
+	const FVector ConstrainedDelta = ConstrainedLocation - CameraCarrier->GetActorLocation();
+	CameraCarrier->AddActorWorldOffset(ConstrainedDelta, true);
 }
 
 void UWorldCameraController::TryMoveCameraToLocation(const FVector& TargetCameraLocation) const
@@ -749,10 +857,9 @@ void UWorldCameraController::TryMoveCameraToLocation(const FVector& TargetCamera
 	AActor* const CameraCarrier = M_CameraCarrierActor.Get();
 	FVector BoundaryCheckLocation = TargetCameraLocation;
 	BoundaryCheckLocation.Z = CameraCarrier->GetActorLocation().Z;
-	if (not GetCanMoveCameraToLocation(BoundaryCheckLocation))
-	{
-		return;
-	}
-
-	CameraCarrier->SetActorLocation(TargetCameraLocation, true);
+	const FVector ConstrainedBoundaryLocation = GetConstrainedCameraLocation(BoundaryCheckLocation);
+	FVector ConstrainedTargetLocation = TargetCameraLocation;
+	ConstrainedTargetLocation.X = ConstrainedBoundaryLocation.X;
+	ConstrainedTargetLocation.Y = ConstrainedBoundaryLocation.Y;
+	CameraCarrier->SetActorLocation(ConstrainedTargetLocation, true);
 }
