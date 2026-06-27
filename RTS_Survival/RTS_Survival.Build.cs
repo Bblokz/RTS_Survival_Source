@@ -31,7 +31,10 @@ public class RTS_Survival : ModuleRules
 			"MovieScene",
 			"UMG",
 			// Needed for UGameMapsSettings (EngineSettings/GameMapsSettings.h) used to read the project's default map when exiting to main menu.
-			"EngineSettings"
+			"EngineSettings",
+			// Saviour runtime headers expose JSON types and use JsonObjectConverter.
+			"Json",
+			"JsonUtilities"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
@@ -45,7 +48,6 @@ public class RTS_Survival : ModuleRules
 			"EnhancedInput",
 			// Saviour-added:
 			"GameFeatures",
-			"JsonUtilities",
 			"GameplayAbilities",
 			"CustomizableObject"
 		});
