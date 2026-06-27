@@ -700,6 +700,8 @@ private:
 	bool GetIsMissionExcludedFromPlacement(EMapMission MissionType) const;
 	TArray<EMapMission> BuildMissionPlacementPlanFiltered() const;
 	void RollbackMicroPlacementAndDestroyActors(FCampaignGenerationStepTransaction& InOutTransaction);
+	bool GetShouldDeferWorldObjectPromotion() const;
+	bool RealizeVirtualPlacementState();
 	/**
 	 * @brief Selects one enemy placement while preserving deterministic ordering for micro steps.
 	 * @param EnemyTypeToPlace Enemy item type to place.
@@ -1067,6 +1069,16 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
 		meta = (AllowPrivateAccess = "true"))
 	int32 M_TotalAttemptCount = 0;
+
+	/**
+	 * @note Used in: ExecuteAllStepsWithBacktracking.
+	 * @note Why: Keeps backtracking after anchor generation fully virtual by deferring expensive map-object actors.
+	 * @note Technical: Manual editor step buttons leave this false so intermediate steps can still visualize actors.
+	 * @note Notes: Final realization promotes actors once the full layout reaches Finished.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
+		meta = (AllowPrivateAccess = "true"))
+	bool bM_DeferWorldObjectPromotionDuringBacktracking = false;
 
 	/**
 	 * @note Used in: ConnectionsCreated.
