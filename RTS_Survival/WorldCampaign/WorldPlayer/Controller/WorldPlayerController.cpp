@@ -13,6 +13,7 @@
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
+#include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 
 AWorldPlayerController::AWorldPlayerController()
 {
@@ -278,9 +279,10 @@ void AWorldPlayerController::WorldSetupComplete_MovePlayerToHQ()
 	{
 		return;
 	}
+
 	FMovePlayerCamera MoveRequest;
-	MoveRequest.MoveToLocation
-	M_WorldCameraController->MoveCameraTo()
+	MoveRequest.MoveToLocation = FRTS_WorldStatics::GetPlayerHQWorldLocation(this);
+	M_WorldCameraController->MoveCameraTo(MoveRequest);
 }
 
 bool AWorldPlayerController::GetIsValidWorldProfileAndUIManager() const

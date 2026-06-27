@@ -38,7 +38,7 @@ protected:
 
 private:
 	UPROPERTY()
-	TWeakObjectPtr<UW_WorldMenu> M_WorldMenu;
+	TObjectPtr<UW_WorldMenu> M_WorldMenu = nullptr;
 	bool GetIsValidWorldMenu() const;
 	UPROPERTY()
 	TWeakObjectPtr<AWorldPlayerController> M_PlayerController;
