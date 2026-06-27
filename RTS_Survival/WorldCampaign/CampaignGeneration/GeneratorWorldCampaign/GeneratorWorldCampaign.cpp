@@ -4347,8 +4347,14 @@ void AGeneratorWorldCampaign::AddSavedAnchorsAndMapItems(FWorldCampaignState& Wo
 			continue;
 		}
 
+		const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+		if (not AnchorKey.IsValid())
+		{
+			RTSFunctionLibrary::ReportError(TEXT("World campaign anchor has an invalid save key."));
+		}
+
 		FWorldCampaignAnchorSaveData AnchorSaveData;
-		AnchorSaveData.AnchorKey = AnchorPoint->GetAnchorKey();
+		AnchorSaveData.AnchorKey = AnchorKey;
 		AnchorSaveData.Transform = AnchorPoint->GetActorTransform();
 		WorldCampaignState.Anchors.Add(AnchorSaveData);
 
@@ -4359,7 +4365,7 @@ void AGeneratorWorldCampaign::AddSavedAnchorsAndMapItems(FWorldCampaignState& Wo
 		}
 
 		FWorldCampaignMapItemSaveData MapItemSaveData;
-		MapItemSaveData.AnchorKey = AnchorPoint->GetAnchorKey();
+		MapItemSaveData.AnchorKey = AnchorKey;
 		if (const AWorldEnemyObject* EnemyObject = Cast<AWorldEnemyObject>(PromotedWorldObject))
 		{
 			MapItemSaveData.MapItemType = EMapItemType::EnemyItem;
@@ -4407,7 +4413,13 @@ void AGeneratorWorldCampaign::AddSavedConnections(FWorldCampaignState& WorldCamp
 				continue;
 			}
 
-			ConnectionSaveData.ConnectedAnchorKeys.Add(ConnectedAnchor->GetAnchorKey());
+			const FGuid AnchorKey = ConnectedAnchor->GetAnchorKey();
+			if (not AnchorKey.IsValid())
+			{
+				RTSFunctionLibrary::ReportError(TEXT("World campaign connection endpoint has an invalid anchor save key."));
+			}
+
+			ConnectionSaveData.ConnectedAnchorKeys.Add(AnchorKey);
 		}
 
 		if (ConnectionSaveData.ConnectedAnchorKeys.Num() >= 2)
