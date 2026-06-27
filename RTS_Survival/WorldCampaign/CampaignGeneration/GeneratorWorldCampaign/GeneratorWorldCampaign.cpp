@@ -27,13 +27,13 @@ namespace
 	 * A step attempt is incremented each time a specific step fails and enters HandleStepFailure.
 	 * When exceeded, timeout fail-safe placement can run for supported steps before generation is aborted.
 	 */
-	constexpr int32 MaxStepAttempts = 7000;
+	constexpr int32 MaxStepAttempts = 15000;
 	/**
 	 * @brief Whole-generation retry ceiling shared by every step in the current generation run.
 	 * This catches cross-step backtracking loops where no single step reaches MaxStepAttempts on its own.
 	 * When exceeded, timeout fail-safe placement can run for supported steps before generation is aborted.
 	 */
-	constexpr int32 MaxTotalAttempts = 8000;
+	constexpr int32 MaxTotalAttempts = 100000;
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr int32 MaxRelaxationAttempts = 3;
 	constexpr int32 RelaxedHopDistanceMax = TNumericLimits<int32>::Max();
