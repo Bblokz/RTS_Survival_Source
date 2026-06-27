@@ -32,9 +32,9 @@ public class RTS_Survival : ModuleRules
 			"UMG",
 			// Needed for UGameMapsSettings (EngineSettings/GameMapsSettings.h) used to read the project's default map when exiting to main menu.
 			"EngineSettings",
-			// Saviour runtime headers expose JSON types and use JsonObjectConverter.
-			"Json",
-			"JsonUtilities"
+			//// Saviour runtime headers expose JSON types and use JsonObjectConverter.
+			//"Json",
+			//"JsonUtilities"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
@@ -46,10 +46,10 @@ public class RTS_Survival : ModuleRules
 			"ProtoAnimatedText",
 			"RHI", 
 			"EnhancedInput",
-			// Saviour-added:
-			"GameFeatures",
-			"GameplayAbilities",
-			"CustomizableObject"
+			//// Saviour-added:
+			//"GameFeatures",
+			//"GameplayAbilities",
+			//"CustomizableObject"
 		});
 
 		// Uncomment if you are using online features
