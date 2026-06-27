@@ -21,7 +21,7 @@ struct FWorldCampaignPlacementFailurePolicy
 	 * the generator escalates by also undoing one more previous micro transaction.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Placement Rules|Failure Policy",
-		meta = (ClampMin = "1", ClampMax = "1024",
+		meta = (ClampMin = "1", ClampMax = "9096",
 			ToolTip = "Micro-transaction escalation window. After this many failed micro-undo retries at the current depth, the generator escalates by also undoing one more previous micro transaction."))
 	int32 EscalationAttempts = 32;
 

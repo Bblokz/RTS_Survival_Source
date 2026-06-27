@@ -22,6 +22,24 @@ AWorldPlayerController::AWorldPlayerController()
 	M_WorldStateAndSaveManager = CreateDefaultSubobject<UWorldStateAndSaveManager>(TEXT("WorldStateAndSaveManager"));
 }
 
+AGeneratorWorldCampaign* AWorldPlayerController::GetWorldGenerator() const
+{
+	if (not M_WorldGenerator.IsValid())
+	{
+		return nullptr;
+	}
+	return M_WorldGenerator.Get();
+}
+
+UWorldStateAndSaveManager* AWorldPlayerController::GetWorldStateAndSaveManager() const
+{
+	if (not IsValid(M_WorldStateAndSaveManager))
+	{
+		return nullptr;
+	}
+	return M_WorldStateAndSaveManager;
+}
+
 void AWorldPlayerController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -34,6 +52,7 @@ void AWorldPlayerController::BeginPlay()
 	Super::BeginPlay();
 	BeginPlay_SetupWorldGenerator();
 	BeginPlay_SetupWorldMenu();
+	BeginPlay_GameState_Faction_CampaignSettings();
 	BeginPlay_GenerateOrLoadWorld();
 }
 
@@ -193,27 +212,12 @@ void AWorldPlayerController::BeginPlay_SetupWorldMenu()
 		EMouseLockMode::LockAlways,
 		false,
 		false
-		);
+	);
 	bShowMouseCursor = true;
 }
 
-void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
+void AWorldPlayerController::BeginPlay_GameState_Faction_CampaignSettings()
 {
-	if (not GetIsValidWorldProfileAndUIManager())
-	{
-		return;
-	}
-
-	if (not GetIsValidWorldGenerator())
-	{
-		return;
-	}
-
-	if (not GetIsValidWorldStateAndSaveManager())
-	{
-		return;
-	}
-
 	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
 	if (not GameInstance)
 	{
@@ -228,17 +232,27 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 	M_CampaignSettings = CampaignSettings;
 	M_SelectedDifficulty = SelectedDifficulty;
 	M_PlayerFaction = PlayerFaction;
+}
+
+void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
+{
+	if (not GetIsValidWorldProfileAndUIManager() || not GetIsValidWorldGenerator() || not
+		GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
 
 	M_WorldGenerator->InitializeWorldGenerator(
 		this,
-		CampaignSettings,
-		SelectedDifficulty
+		M_CampaignSettings,
+		M_SelectedDifficulty
 	);
 
-	if (CampaignSettings.bNeedsToGenerateCampaign)
+	if (M_CampaignSettings.bNeedsToGenerateCampaign)
 	{
 		M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
-		const FPlayerProfileSaveData PlayerProfileSaveData = M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(PlayerFaction);
+		const FPlayerProfileSaveData PlayerProfileSaveData = M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(
+			M_PlayerFaction);
 		M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
 		return;
 	}
@@ -252,6 +266,21 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 
 	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
 	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
+}
+
+void AWorldPlayerController::OnInitialWorldSetupComplete()
+{
+}
+
+void AWorldPlayerController::WorldSetupComplete_MovePlayerToHQ()
+{
+	if (not GetIsValidWorldCameraController())
+	{
+		return;
+	}
+	FMovePlayerCamera MoveRequest;
+	MoveRequest.MoveToLocation
+	M_WorldCameraController->MoveCameraTo()
 }
 
 bool AWorldPlayerController::GetIsValidWorldProfileAndUIManager() const

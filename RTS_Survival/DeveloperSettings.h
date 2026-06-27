@@ -1851,8 +1851,8 @@ namespace DeveloperSettings
 	{
 		constexpr bool GNomadicSkeletalAttachments_Compile_DebugSymbols = false;
 		constexpr bool GCampaignConnectionGeneration_Compile_DebugSymbols = false;
-		constexpr bool GCampaignBacktracking_Report_Compile_DebugSymbols = false;
-		constexpr bool GCampaignBacktracking_Compile_DebugSymbols = false;
+		constexpr bool GCampaignBacktracking_Report_Compile_DebugSymbols = true;
+		constexpr bool GCampaignBacktracking_Compile_DebugSymbols = true;
 		// Overlap logic; tanks evasion.
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;
@@ -1873,8 +1873,8 @@ namespace DeveloperSettings
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;
-		constexpr bool GTargetAcquisition_Compile_DebugSymbols = true;
-		constexpr bool GAOELibrary_Compile_DebugSymbols = true;
+		constexpr bool GTargetAcquisition_Compile_DebugSymbols = false;
+		constexpr bool GAOELibrary_Compile_DebugSymbols = false;
 		// Damage taken on actors
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
 		// ICommands.
@@ -1895,7 +1895,7 @@ namespace DeveloperSettings
 		// Harvesting
 		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
 		constexpr bool ResourcesShowOccupyingHarvesters = false;
-		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = true;
+		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Resistances_Compile_DebugSymbols = false;
 		constexpr bool GSquadUnit_Weapons_Compile_DebugSymbols = false;

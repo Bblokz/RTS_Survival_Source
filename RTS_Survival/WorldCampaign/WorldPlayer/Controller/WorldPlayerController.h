@@ -32,6 +32,9 @@ class RTS_SURVIVAL_API AWorldPlayerController : public APlayerController
 	GENERATED_BODY()
 public:
 	AWorldPlayerController();
+	
+	AGeneratorWorldCampaign* GetWorldGenerator()const;
+	UWorldStateAndSaveManager* GetWorldStateAndSaveManager()const;
 
 	UFUNCTION(BlueprintCallable)
 	void SetIsWorldCameraMovementDisabled(bool bIsDisabled);
@@ -69,9 +72,14 @@ private:
 
 	void BeginPlay_SetupWorldGenerator();
 	void BeginPlay_SetupWorldMenu();
+	void BeginPlay_GameState_Faction_CampaignSettings();
 	// Generates the new world with the settings from the game instance if needed.
 	// returns whether a full new world was generated.
 	void BeginPlay_GenerateOrLoadWorld();
+	
+	void OnInitialWorldSetupComplete();
+	
+	void WorldSetupComplete_MovePlayerToHQ();
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldCameraController> M_WorldCameraController;
