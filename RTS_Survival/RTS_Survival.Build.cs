@@ -42,7 +42,12 @@ public class RTS_Survival : ModuleRules
 			"SlateCore",
 			"ProtoAnimatedText",
 			"RHI", 
-			"EnhancedInput"
+			"EnhancedInput",
+			// Saviour-added:
+			"GameFeatures",
+			"JsonUtilities",
+			"GameplayAbilities",
+			"CustomizableObject"
 		});
 
 		// Uncomment if you are using online features
