@@ -66,6 +66,15 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
+	/** @brief called on single Primary click */
+	UFUNCTION(BlueprintCallable)
+	void PrimaryClick();
+	
+	/** @brief called on end secondary button click*/
+	UFUNCTION(BlueprintCallable)
+	void SecondaryClick();
+
+	
 private:
 	bool GetIsValidWorldCameraController() const;
 	bool GetIsValidPlayerWorldOutliner() const;

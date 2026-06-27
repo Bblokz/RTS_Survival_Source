@@ -73,6 +73,16 @@ void AWorldPlayerController::Tick(float DeltaTime)
 	M_PlayerWorldOutliner->OnPlayerTick(HitActor, HitResultCursorProjection.Location);
 }
 
+void AWorldPlayerController::PrimaryClick()
+{
+	
+}
+
+void AWorldPlayerController::SecondaryClick()
+{
+	
+}
+
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)
 {
 	if (not GetIsValidWorldCameraController())
@@ -284,11 +294,8 @@ void AWorldPlayerController::WorldSetupComplete_MovePlayerToHQ()
 
 	FMovePlayerCamera MoveRequest;
 	MoveRequest.MoveToLocation = FRTS_WorldStatics::GetPlayerHQWorldLocation(this);
-<<<<<<< HEAD
 	MoveRequest.TimeCameraInputDisabled = 2.f;
 	MoveRequest.TimeToMove = 2.f;
-=======
->>>>>>> 5b4f251c58bca1fd86d0601a8ef691a39fc7d91e
 	M_WorldCameraController->MoveCameraTo(MoveRequest);
 }
 

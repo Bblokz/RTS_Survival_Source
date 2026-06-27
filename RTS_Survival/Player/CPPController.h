@@ -902,7 +902,7 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void SecondaryClick();
 
-	/** @brief called on single rightclick */
+	/** @brief called on single Primary click */
 	UFUNCTION(BlueprintCallable)
 	void PrimaryClick();
 
