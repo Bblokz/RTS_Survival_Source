@@ -13,6 +13,7 @@
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
+#include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 
 AWorldPlayerController::AWorldPlayerController()
 {
@@ -54,6 +55,7 @@ void AWorldPlayerController::BeginPlay()
 	BeginPlay_SetupWorldMenu();
 	BeginPlay_GameState_Faction_CampaignSettings();
 	BeginPlay_GenerateOrLoadWorld();
+	OnInitialWorldSetupComplete();
 }
 
 void AWorldPlayerController::Tick(float DeltaTime)
@@ -270,6 +272,7 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 
 void AWorldPlayerController::OnInitialWorldSetupComplete()
 {
+	WorldSetupComplete_MovePlayerToHQ();
 }
 
 void AWorldPlayerController::WorldSetupComplete_MovePlayerToHQ()
@@ -279,8 +282,10 @@ void AWorldPlayerController::WorldSetupComplete_MovePlayerToHQ()
 		return;
 	}
 	FMovePlayerCamera MoveRequest;
-	MoveRequest.MoveToLocation
-	M_WorldCameraController->MoveCameraTo()
+	MoveRequest.MoveToLocation = FRTS_WorldStatics::GetPlayerHQWorldLocation(this);
+	MoveRequest.TimeCameraInputDisabled = 2.f;
+	MoveRequest.TimeToMove = 2.f;
+	M_WorldCameraController->MoveCameraTo(MoveRequest);
 }
 
 bool AWorldPlayerController::GetIsValidWorldProfileAndUIManager() const
