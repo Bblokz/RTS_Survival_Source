@@ -4,6 +4,7 @@
 #include "WorldPlayerController.h"
 
 #include "EngineUtils.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "WorldPlayerOutliner/PlayerWorldOutliner.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -183,11 +184,13 @@ void AWorldPlayerController::BeginPlay_SetupWorldMenu()
 	{
 		return;
 	}
-	M_WorldProfileAndUIManager->SetupWorldMenu(this);
-	FInputModeGameAndUI NewInputMode;
-	NewInputMode.SetHideCursorDuringCapture(false);
-	NewInputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-	SetInputMode(NewInputMode);
+	UWidgetBlueprintLibrary::SetInputMode_GameAndUIEx(
+		this,
+		nullptr,
+		EMouseLockMode::LockAlways,
+		false,
+		false
+		);
 	bShowMouseCursor = true;
 }
 

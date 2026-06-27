@@ -15,7 +15,6 @@ UPlayerWorldOutliner::UPlayerWorldOutliner()
 
 void UPlayerWorldOutliner::OnPlayerTick(AActor* HitActor, const FVector& HitLocation)
 {
-	(void)HitLocation;
 
 	if (not IsValid(HitActor))
 	{
