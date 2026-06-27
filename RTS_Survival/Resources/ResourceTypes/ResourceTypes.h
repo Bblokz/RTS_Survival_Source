@@ -16,6 +16,7 @@ enum class ERTSResourceType: uint8
 	Resource_VehicleParts UMETA(DisplayName = "VehicleParts"),
 	Resource_Fuel UMETA(DisplayName = "Fuel"),
 	Resource_Ammo UMETA(DisplayName = "Ammo"),
+	CommanderExp UMETA(DisplayName = "Commander Exp"),
 	Blueprint_Weapon UMETA(DisplayName = "WeaponBlueprint"),
 	Blueprint_Vehicle UMETA(DisplayName = "VehicleBlueprint"),
 	Blueprint_Energy UMETA(DisplayName = "EnergyBlueprint"),
@@ -31,6 +32,7 @@ static bool GetIsResourceOfBlueprintType(const ERTSResourceType ResourceType)
 	case ERTSResourceType::Resource_VehicleParts:
 	case ERTSResourceType::Resource_Fuel:
 	case ERTSResourceType::Resource_Ammo:
+	case ERTSResourceType::CommanderExp:
 		return false;
 		break;
 	case ERTSResourceType::Blueprint_Weapon:
@@ -56,6 +58,8 @@ static FString Global_GetResourceTypeAsString(const ERTSResourceType ResourceTyp
 		return "Resource_Fuel";
 	case ERTSResourceType::Resource_Ammo:
 		return "Resource_Ammo";
+	case ERTSResourceType::CommanderExp:
+		return "CommanderExp";
 	case ERTSResourceType::Blueprint_Weapon:
 		return "Blueprint_Weapon";
 	case ERTSResourceType::Blueprint_Vehicle:
@@ -84,6 +88,8 @@ static FString Global_GetResourceTypeDisplayString(const ERTSResourceType Resour
 		return "Fuel";
 	case ERTSResourceType::Resource_Ammo:
 		return "Ammo";
+	case ERTSResourceType::CommanderExp:
+		return "CommanderExp";
 	case ERTSResourceType::Blueprint_Weapon:
 		return "Weapon Blueprint";
 	case ERTSResourceType::Blueprint_Vehicle:

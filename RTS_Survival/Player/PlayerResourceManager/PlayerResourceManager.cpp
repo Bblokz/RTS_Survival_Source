@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 
 #include "PlayerResourceManager.h"
@@ -38,6 +38,7 @@ UPlayerResourceManager::UPlayerResourceManager()
 	M_PlayerResources.Add(ERTSResourceType::Resource_VehicleParts, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Resource_Fuel, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Resource_Ammo, FRTSResourceStorage{0, 0});
+	M_PlayerResources.Add(ERTSResourceType::CommanderExp, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Blueprint_Weapon, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Blueprint_Vehicle, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Blueprint_Energy, FRTSResourceStorage{0, 0});
@@ -142,6 +143,8 @@ void UPlayerResourceManager::ResourceFullAnnounce(const ERTSResourceType Resourc
 	case ERTSResourceType::Resource_Fuel:
 		break;
 	case ERTSResourceType::Resource_Ammo:
+		break;
+	case ERTSResourceType::CommanderExp:
 		break;
 	case ERTSResourceType::Blueprint_Weapon:
 		break;

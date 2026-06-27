@@ -1,4 +1,4 @@
-﻿#include "FRTSRichTextConverter.h"
+#include "FRTSRichTextConverter.h"
 
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
@@ -19,6 +19,8 @@ ERTSResourceRichText FRTSRichTextConverter::ConvertResourceToRichTextType(const 
 		return ERTSResourceRichText::Yellow;
 	case ERTSResourceType::Resource_Ammo:
 		return ERTSResourceRichText::Ammo;
+	case ERTSResourceType::CommanderExp:
+		return ERTSResourceRichText::CommanderExp;
 	case ERTSResourceType::Blueprint_Weapon:
 	case ERTSResourceType::Blueprint_Vehicle:
 	case ERTSResourceType::Blueprint_Energy:
@@ -45,6 +47,8 @@ ERTSRichText FRTSRichTextConverter::ConvertResourceToRTSRichText(const ERTSResou
 		break;
 	case ERTSResourceType::Resource_Ammo:
 		break;
+	case ERTSResourceType::CommanderExp:
+		return ERTSRichText::Text_Exp;
 	case ERTSResourceType::Blueprint_Weapon:
 		break;
 	case ERTSResourceType::Blueprint_Vehicle:
@@ -114,6 +118,8 @@ FString FRTSRichTextConverter::GetResourceRichImage(const ERTSResourceType Resou
 		return "<img id=\"Ammo\"/>";
 	case ERTSResourceType::Resource_Fuel:
 		return "<img id=\"Fuel\"/>";
+	case ERTSResourceType::CommanderExp:
+		return "<img id=\"CommanderExp\"/>";
 	case ERTSResourceType::Blueprint_Vehicle:
 		return "<img id=\"VehicleBlueprint\"/>";
 	case ERTSResourceType::Blueprint_Weapon:
