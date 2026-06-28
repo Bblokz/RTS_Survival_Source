@@ -20,6 +20,8 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 		return;
 	}
 	M_MenuFocusState = NewFocus;
+	SetAuxiliaryMapItemsWidgetsVisibility(false);
+	
 	switch (NewFocus)
 	{
 	case EWorldUIFocusState::None:
@@ -27,7 +29,6 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 		break;
 	case EWorldUIFocusState::CommandPerks:
 		SetMissionDescVisibility(false);
-		SetAuxiliaryMapItemsWidgetsVisibility(false);
 		SetPerkMenuVisibility(true);
 		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
@@ -37,8 +38,6 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 	case EWorldUIFocusState::World:
 		SetPerkMenuVisibility(false);
 		SetMissionDescVisibility(false);
-		SetAuxiliaryMapItemsWidgetsVisibility(false);
-
 		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
 	case EWorldUIFocusState::Archive:
