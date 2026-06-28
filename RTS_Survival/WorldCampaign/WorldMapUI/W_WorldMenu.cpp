@@ -81,6 +81,12 @@ void UW_WorldMenu::SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveD
 	ArchiveMenu->SetupArchiveWithPlayerProfileSaveData(PlayerProfileSaveData.ArchiveData);
 }
 
+void UW_WorldMenu::NativeOnInitialized()
+{
+	MissionMapItemDesc->InitCardViewer(RewardCardsViewer);
+	Super::NativeOnInitialized();
+}
+
 void UW_WorldMenu::UpdateUISwitch(const int32 FullUIIndex) const
 {
 	if (FullUISwitcher)

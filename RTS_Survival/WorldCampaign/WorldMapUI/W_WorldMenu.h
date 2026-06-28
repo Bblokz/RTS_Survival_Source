@@ -54,6 +54,8 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FWorldMenuSettings MenuSettings;
+	
+	virtual void NativeOnInitialized() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_WorldUIHeader> WorldUIHeader;

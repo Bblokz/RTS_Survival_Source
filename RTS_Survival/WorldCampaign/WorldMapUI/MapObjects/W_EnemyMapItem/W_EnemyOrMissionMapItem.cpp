@@ -5,7 +5,7 @@
 
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
-void UW_EnemyOrMissionMapItem::Init(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer)
+void UW_EnemyOrMissionMapItem::InitCardViewer(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer)
 {
 	M_RewardCardsViewer = RewardCardsViewer;
 	(void)EnsureIsValidRewardCardsViewer();

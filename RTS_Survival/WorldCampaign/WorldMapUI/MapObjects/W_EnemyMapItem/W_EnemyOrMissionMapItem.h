@@ -20,7 +20,8 @@ class RTS_SURVIVAL_API UW_EnemyOrMissionMapItem : public UUserWidget
 {
 	GENERATED_BODY()
 	
-	void Init(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer);
+public:
+	void InitCardViewer(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer);
 
 	void SetupEnemyWidget(const FEnemyOrMissionMapItemUIData& UIData,
 	                      const FPrimaryReward& PrimaryReward,
