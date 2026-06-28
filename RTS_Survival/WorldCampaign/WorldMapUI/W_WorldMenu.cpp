@@ -5,6 +5,7 @@
 
 #include "ArmyLayout/ArmyLayoutMenu/W_ArmyMenuLayout.h"
 #include "MapObjects/W_EnemyMapItem/W_EnemyOrMissionMapItem.h"
+#include "MapObjects/W_EnemyMapItem/StrengthEstimation/W_StrengthEstimation.h"
 #include "MapObjects/W_MissionReward/W_RewardCardsViewer/W_RewardCardsViewer.h"
 #include "PerkSystem/PerkMenu/W_WorldPerkMenu.h"
 #include "RTS_Survival/CardSystem/CardUI/CardMenu/W_CardMenu.h"
@@ -26,7 +27,7 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 		break;
 	case EWorldUIFocusState::CommandPerks:
 		SetMissionDescVisibility(false);
-		SetRewardCardsVisibility(false);
+		SetAuxiliaryMapItemsWidgetsVisibility(false);
 		SetPerkMenuVisibility(true);
 		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
@@ -36,7 +37,7 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 	case EWorldUIFocusState::World:
 		SetPerkMenuVisibility(false);
 		SetMissionDescVisibility(false);
-		SetRewardCardsVisibility(false);
+		SetAuxiliaryMapItemsWidgetsVisibility(false);
 
 		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
@@ -83,7 +84,7 @@ void UW_WorldMenu::SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveD
 
 void UW_WorldMenu::NativeOnInitialized()
 {
-	MissionMapItemDesc->InitCardViewer(RewardCardsViewer);
+	MissionMapItemDesc->InitAuxiliaryWidgets(RewardCardsViewer, StrengthEstimation);
 	Super::NativeOnInitialized();
 }
 
@@ -115,14 +116,18 @@ void UW_WorldMenu::SetMissionDescVisibility(const bool bVisible) const
 	MissionMapItemDesc->SetVisibility(NewVis);
 }
 
-void UW_WorldMenu::SetRewardCardsVisibility(const bool bVisible) const
+void UW_WorldMenu::SetAuxiliaryMapItemsWidgetsVisibility(const bool bVisible) const
 {
-	if (not RewardCardsViewer)
-	{
-		return;
-	}
 	const ESlateVisibility NewVis = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
-	RewardCardsViewer->SetVisibility(NewVis);
+
+	if (RewardCardsViewer)
+	{
+		RewardCardsViewer->SetVisibility(NewVis);
+	}
+	if (StrengthEstimation)
+	{
+		StrengthEstimation->SetVisibility(NewVis);
+	}
 }
 
 bool UW_WorldMenu::GetIsValidPlayerController() const

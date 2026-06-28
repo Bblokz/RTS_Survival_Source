@@ -12,6 +12,7 @@
 #include "W_WorldMenu.generated.h"
 
 
+class UW_StrengthEstimation;
 class UW_EnemyOrMissionMapItem;
 class UW_RewardCardsViewer;
 class UW_CardMenu;
@@ -77,6 +78,9 @@ protected:
 	
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_RewardCardsViewer> RewardCardsViewer;
+	
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
+	 TObjectPtr<UW_StrengthEstimation> StrengthEstimation;
 
 private:
 	UPROPERTY()
@@ -85,7 +89,7 @@ private:
 	void UpdateUISwitch(const int32 FullUIIndex) const;
 	void SetPerkMenuVisibility(const bool bVisible) const;
 	void SetMissionDescVisibility(const bool bVisible)const;
-	void SetRewardCardsVisibility(const bool bVisible)const;
+	void SetAuxiliaryMapItemsWidgetsVisibility(const bool bVisible)const;
 	UPROPERTY()
 	TWeakObjectPtr<AWorldPlayerController> M_PlayerController;
 	bool GetIsValidPlayerController() const;

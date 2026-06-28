@@ -9,6 +9,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/RewardStructs/FMissionRewardStructs.h"
 #include "W_EnemyOrMissionMapItem.generated.h"
 
+class UW_StrengthEstimation;
 class UW_RewardCardsViewer;
 struct FEnemyOrMissionMapItemUIData;
 class UW_MissionReward;
@@ -21,7 +22,7 @@ class RTS_SURVIVAL_API UW_EnemyOrMissionMapItem : public UUserWidget
 	GENERATED_BODY()
 	
 public:
-	void InitCardViewer(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer);
+	void InitAuxiliaryWidgets(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer, TWeakObjectPtr<UW_StrengthEstimation> StrengthEstimator);
 
 	void SetupEnemyWidget(const FEnemyOrMissionMapItemUIData& UIData,
 	                      const FPrimaryReward& PrimaryReward,
@@ -67,6 +68,11 @@ protected:
 	
 	private:
 	UPROPERTY()
-	TWeakObjectPtr<UW_RewardCardsViewer> M_RewardCardsViewer	;
+	TWeakObjectPtr<UW_RewardCardsViewer> M_RewardCardsViewer;
 	[[nodiscard]] bool EnsureIsValidRewardCardsViewer() const;
+	
+	UPROPERTY()
+	TWeakObjectPtr<UW_StrengthEstimation> M_StrengthEstimation;
+	[[nodiscard]] bool EnsureIsValidStrengthEstimation() const;
+	
 };

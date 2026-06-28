@@ -131,8 +131,7 @@ void AWorldPlayerController::PrimaryClick_Regular()
 
 void AWorldPlayerController::OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj)
 {
-	mission
-	}
+}
 
 void AWorldPlayerController::OnClicked_MissionMapObj(AWorldMissionObject* MissionMapObj)
 {

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/StrengthEstimation/DataAndUtils/RTSStrengthEstimationTypes.h"
 
 #include "FEnemyMapItemUIData.generated.h"
 
@@ -21,4 +22,5 @@ struct FEnemyOrMissionMapItemUIData
 		"<Text_BadTitle>-</> <Text_Bad14>Enemy strength increases by 20%</>\n"
 		"<Text_BadTitle>-</> <Text_Bad14>CRD will attempt to reinforce the position with extra divisions</>"
 	));
+	FRTSStrengthEstimationRichTextMessage StrengthEstimation;
 };
