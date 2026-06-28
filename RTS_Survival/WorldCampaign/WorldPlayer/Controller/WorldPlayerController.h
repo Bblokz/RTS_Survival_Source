@@ -20,6 +20,7 @@ enum class ERTSFaction : uint8;
 class AGeneratorWorldCampaign;
 class UWorldCameraController;
 class UPlayerWorldOutliner;
+class AWorldFowManager;
 
 /**
  * @brief Controller used by the world campaign Blueprint to route Enhanced Input
@@ -98,6 +99,8 @@ private:
 	// Generates the new world with the settings from the game instance if needed.
 	// returns whether a full new world was generated.
 	void BeginPlay_GenerateOrLoadWorld();
+	void BeginPlay_SpawnWorldFowManager();
+	bool GetCanPrimaryClickActor(AActor* ClickedActor) const;
 
 	void OnInitialWorldSetupComplete();
 
@@ -120,6 +123,12 @@ private:
 	UPROPERTY()
 	TObjectPtr<UWorldStateAndSaveManager> M_WorldStateAndSaveManager = nullptr;
 	bool GetIsValidWorldStateAndSaveManager() const;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW Cloud", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AWorldFowManager> WorldFowManagerClass;
+
+	UPROPERTY()
+	TWeakObjectPtr<AWorldFowManager> M_WorldFowManager;
 
 	FCampaignGenerationSettings M_CampaignSettings;
 	FRTSGameDifficulty M_SelectedDifficulty;

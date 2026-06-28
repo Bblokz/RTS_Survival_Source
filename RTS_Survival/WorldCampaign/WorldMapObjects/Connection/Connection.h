@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
 #include "Connection.generated.h"
 
 class AAnchorPoint;
@@ -12,12 +13,14 @@ class AAnchorPoint;
  * @brief Connection actors are spawned by the campaign generator to link anchor points on the world map.
  */
 UCLASS()
-class RTS_SURVIVAL_API AConnection : public AActor
+class RTS_SURVIVAL_API AConnection : public AActor, public IWorldFowParticipant
 {
 	GENERATED_BODY()
 
 public:
 	AConnection();
+
+	virtual void PostInitializeComponents() override;
 
 	void InitializeConnection(AAnchorPoint* AnchorA, AAnchorPoint* AnchorB);
 	bool TryAddThirdAnchor(AAnchorPoint* AnchorPoint);
@@ -28,6 +31,7 @@ public:
 
 	void DebugDrawBaseConnection(const FColor& Color, float Duration) const;
 	void DebugDrawThirdConnection(const FColor& Color, float Duration) const;
+	virtual UWorldMapFowComponent* GetFowComponent() const override { return M_WorldMapFowComponent.Get(); }
 
 private:
 	void SetConnectedAnchors(AAnchorPoint* AnchorA, AAnchorPoint* AnchorB);

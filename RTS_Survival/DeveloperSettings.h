@@ -1853,6 +1853,7 @@ namespace DeveloperSettings
 		constexpr bool GCampaignConnectionGeneration_Compile_DebugSymbols = false;
 		constexpr bool GCampaignBacktracking_Report_Compile_DebugSymbols = true;
 		constexpr bool GCampaignBacktracking_Compile_DebugSymbols = true;
+		constexpr bool GWorldFow_Compile_DebugSymbols = false;
 		// Overlap logic; tanks evasion.
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;

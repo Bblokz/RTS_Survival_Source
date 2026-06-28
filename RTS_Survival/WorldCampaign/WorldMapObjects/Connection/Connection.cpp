@@ -1,5 +1,6 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
 #include "DrawDebugHelpers.h"
@@ -8,6 +9,12 @@
 AConnection::AConnection()
 {
 	PrimaryActorTick.bCanEverTick = false;
+}
+
+void AConnection::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	M_WorldMapFowComponent = FindComponentByClass<UWorldMapFowComponent>();
 }
 
 void AConnection::InitializeConnection(AAnchorPoint* AnchorA, AAnchorPoint* AnchorB)

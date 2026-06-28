@@ -1,5 +1,6 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
@@ -7,6 +8,12 @@
 AWorldMapObject::AWorldMapObject()
 {
 	PrimaryActorTick.bCanEverTick = false;
+}
+
+void AWorldMapObject::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	M_WorldMapFowComponent = FindComponentByClass<UWorldMapFowComponent>();
 }
 
 void AWorldMapObject::InitializeForAnchor(AAnchorPoint* AnchorPoint)

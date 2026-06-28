@@ -1,5 +1,6 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 
 #include "DrawDebugHelpers.h"
@@ -45,6 +46,12 @@ namespace
 AAnchorPoint::AAnchorPoint()
 {
 	PrimaryActorTick.bCanEverTick = false;
+}
+
+void AAnchorPoint::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	M_WorldMapFowComponent = FindComponentByClass<UWorldMapFowComponent>();
 }
 
 void AAnchorPoint::OnConstruction(const FTransform& Transform)
