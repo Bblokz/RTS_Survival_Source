@@ -3,7 +3,26 @@
 
 #include "W_EnemyOrMissionMapItem.h"
 
-void UW_EnemyOrMissionMapItem::SetupEnemyWidget(const FEnemyOrMissionMapItemUIData& UIData,
-	const FPrimaryReward& PrimaryReward, const FSecondaryReward& SecondaryReward)
+#include "RTS_Survival/Utils/HFunctionLibary.h"
+
+void UW_EnemyOrMissionMapItem::Init(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer)
 {
+	M_RewardCardsViewer = RewardCardsViewer;
+	(void)EnsureIsValidRewardCardsViewer();
+}
+
+void UW_EnemyOrMissionMapItem::SetupEnemyWidget(const FEnemyOrMissionMapItemUIData& UIData,
+                                                const FPrimaryReward& PrimaryReward, const FSecondaryReward& SecondaryReward)
+{
+}
+
+bool UW_EnemyOrMissionMapItem::EnsureIsValidRewardCardsViewer() const
+{
+	if (not M_RewardCardsViewer.IsValid())
+	{
+		RTSFunctionLibrary::ReportError("No valid reward card viewer to display the reward cards in more detail!");
+		return false;
+	}
+	return true;
+	
 }

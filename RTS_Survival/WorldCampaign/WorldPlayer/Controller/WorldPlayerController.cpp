@@ -7,12 +7,17 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "WorldPlayerOutliner/PlayerWorldOutliner.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldPlayerObject/WorldPlayerObject.h"
 #include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 
 AWorldPlayerController::AWorldPlayerController()
@@ -75,12 +80,77 @@ void AWorldPlayerController::Tick(float DeltaTime)
 
 void AWorldPlayerController::PrimaryClick()
 {
-	
+	switch (M_PrimaryClickContext)
+	{
+	case None:
+		PrimaryClick_Regular();
+		break;
+	case MissionItemActive:
+		PrimaryClick_ActiveMissionItem();
+		break;
+	}
 }
 
 void AWorldPlayerController::SecondaryClick()
 {
+}
+
+void AWorldPlayerController::PrimaryClick_Regular()
+{
+	FHitResult HitUnderCursor;
+	if (not GetHitResultUnderCursor(ECC_Visibility, false, HitUnderCursor))
+	{
+		return;
+	}
+	AActor* ClickedActor = HitUnderCursor.GetActor();
+	if (not IsValid(ClickedActor))
+	{
+		return;
+	}
+	if (ClickedActor->IsA(AWorldEnemyObject::StaticClass()))
+	{
+		OnClicked_EnemyMapObj(Cast<AWorldEnemyObject>(ClickedActor));	
+		return;
+	}
+	if (ClickedActor->IsA(AWorldMissionObject::StaticClass()))
+	{
+		OnClicked_MissionMapObj(Cast<AWorldMissionObject>(ClickedActor));	
+		return;
+	}
+	if (ClickedActor->IsA(AWorldPlayerObject::StaticClass()))
+	{
+		OnClicked_PlayerMapObj(Cast<AWorldPlayerObject>(ClickedActor));	
+		return;
+	}
+	if (ClickedActor->IsA(AWorldNeutralObject::StaticClass()))
+	{
+		OnClicked_NeutralMapObj(Cast<AWorldNeutralObject>(ClickedActor));	
+		return;
+	}
+}
+
+void AWorldPlayerController::OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj)
+{
+	mission
+	}
+
+void AWorldPlayerController::OnClicked_MissionMapObj(AWorldMissionObject* MissionMapObj)
+{
 	
+}
+
+void AWorldPlayerController::OnClicked_PlayerMapObj(AWorldPlayerObject* PlayerMapObj)
+{
+	
+}
+
+void AWorldPlayerController::OnClicked_NeutralMapObj(AWorldNeutralObject* NeutralMapObj)
+{
+	
+}
+
+void AWorldPlayerController::PrimaryClick_ActiveMissionItem()
+{
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)

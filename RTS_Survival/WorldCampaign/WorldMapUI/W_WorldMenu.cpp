@@ -4,6 +4,8 @@
 #include "W_WorldMenu.h"
 
 #include "ArmyLayout/ArmyLayoutMenu/W_ArmyMenuLayout.h"
+#include "MapObjects/W_EnemyMapItem/W_EnemyOrMissionMapItem.h"
+#include "MapObjects/W_MissionReward/W_RewardCardsViewer/W_RewardCardsViewer.h"
 #include "PerkSystem/PerkMenu/W_WorldPerkMenu.h"
 #include "RTS_Survival/CardSystem/CardUI/CardMenu/W_CardMenu.h"
 #include "RTS_Survival/GameUI/Archive/W_Archive/W_Archive.h"
@@ -23,6 +25,8 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 		RTSFunctionLibrary::ReportError("Set None focus for world UI focus state!");
 		break;
 	case EWorldUIFocusState::CommandPerks:
+		SetMissionDescVisibility(false);
+		SetRewardCardsVisibility(false);
 		SetPerkMenuVisibility(true);
 		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
@@ -31,6 +35,9 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 		break;
 	case EWorldUIFocusState::World:
 		SetPerkMenuVisibility(false);
+		SetMissionDescVisibility(false);
+		SetRewardCardsVisibility(false);
+
 		UpdateUISwitch(MenuSettings.PerkWorldFullUI_Index);
 		break;
 	case EWorldUIFocusState::Archive:
@@ -48,7 +55,7 @@ void UW_WorldMenu::OnPlayerExitsArchive()
 }
 
 void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController,
-	UWorldProfileAndUIManager* PlayerProfileUIManager)
+                                 UWorldProfileAndUIManager* PlayerProfileUIManager)
 {
 	M_PlayerController = WorldPlayerController;
 	(void)GetIsValidPlayerController();
@@ -58,13 +65,15 @@ void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController,
 	InitMenu_InitHeader();
 	InitMenu_InitPerkUI();
 	InitMenu_InitCardMenu();
+	UpdateMenuForNewFocus(EWorldUIFocusState::World);
 }
 
 void UW_WorldMenu::SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveData)
 {
-	if(not ArchiveMenu || not PerkMenu || not CardMenu )
+	if (not ArchiveMenu || not PerkMenu || not CardMenu)
 	{
-		RTSFunctionLibrary::ReportError("One of the world menu subwidgets is not valid, cannot setup world menu with player profile data.");
+		RTSFunctionLibrary::ReportError(
+			"One of the world menu subwidgets is not valid, cannot setup world menu with player profile data.");
 		return;
 	}
 	PerkMenu->SetupUIWithPlayerProfile(PlayerProfileSaveData.PerkData);
@@ -90,9 +99,29 @@ void UW_WorldMenu::SetPerkMenuVisibility(const bool bVisible) const
 	}
 }
 
+void UW_WorldMenu::SetMissionDescVisibility(const bool bVisible) const
+{
+	if (not MissionMapItemDesc)
+	{
+		return;
+	}
+	const ESlateVisibility NewVis = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+	MissionMapItemDesc->SetVisibility(NewVis);
+}
+
+void UW_WorldMenu::SetRewardCardsVisibility(const bool bVisible) const
+{
+	if (not RewardCardsViewer)
+	{
+		return;
+	}
+	const ESlateVisibility NewVis = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+	RewardCardsViewer->SetVisibility(NewVis);
+}
+
 bool UW_WorldMenu::GetIsValidPlayerController() const
 {
-	if(not M_PlayerController.IsValid())
+	if (not M_PlayerController.IsValid())
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
@@ -102,12 +131,12 @@ bool UW_WorldMenu::GetIsValidPlayerController() const
 		);
 		return false;
 	}
-	return true;	
+	return true;
 }
 
 void UW_WorldMenu::InitMenu_InitArchive()
 {
-	if(not ArchiveMenu)
+	if (not ArchiveMenu)
 	{
 		return;
 	}
@@ -116,7 +145,7 @@ void UW_WorldMenu::InitMenu_InitArchive()
 
 void UW_WorldMenu::InitMenu_InitHeader()
 {
-	if(not WorldUIHeader)
+	if (not WorldUIHeader)
 	{
 		return;
 	}
@@ -125,7 +154,7 @@ void UW_WorldMenu::InitMenu_InitHeader()
 
 void UW_WorldMenu::InitMenu_InitPerkUI()
 {
-	if(not PerkMenu)
+	if (not PerkMenu)
 	{
 		return;
 	}
@@ -134,7 +163,7 @@ void UW_WorldMenu::InitMenu_InitPerkUI()
 
 void UW_WorldMenu::InitMenu_InitCardMenu()
 {
-	if(not CardMenu)
+	if (not CardMenu)
 	{
 		return;
 	}
@@ -143,7 +172,7 @@ void UW_WorldMenu::InitMenu_InitCardMenu()
 
 bool UW_WorldMenu::GetIsValidProfileAndUIManager() const
 {
-	if(not M_PlayerProfileAndUIManager.IsValid())
+	if (not M_PlayerProfileAndUIManager.IsValid())
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
@@ -155,5 +184,3 @@ bool UW_WorldMenu::GetIsValidProfileAndUIManager() const
 	}
 	return true;
 }
-
-

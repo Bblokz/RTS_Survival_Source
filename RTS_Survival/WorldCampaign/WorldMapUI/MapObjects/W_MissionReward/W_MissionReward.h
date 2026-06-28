@@ -30,8 +30,6 @@ protected:
 	UW_RTSCard* BP_RTS_Card_3  = nullptr;
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	UW_RTSCard* BP_RTS_Card_4  = nullptr;
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UW_RTSCard* BP_RTS_Card_5  = nullptr;
 	
 	// By default has <DisplayAmount>+200</><img id="Radixite"/><Radixite>Radixite</>
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))

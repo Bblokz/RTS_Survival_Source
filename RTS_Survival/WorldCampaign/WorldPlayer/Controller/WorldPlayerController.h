@@ -7,8 +7,13 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
+#include "WorldPrimaryClickContext/WorldPrimaryClickContext.h"
 #include "WorldPlayerController.generated.h"
 
+class AWorldNeutralObject;
+class AWorldPlayerObject;
+class AWorldMissionObject;
+class AWorldEnemyObject;
 class UWorldStateAndSaveManager;
 class UWorldProfileAndUIManager;
 enum class ERTSFaction : uint8;
@@ -30,11 +35,12 @@ UCLASS()
 class RTS_SURVIVAL_API AWorldPlayerController : public APlayerController
 {
 	GENERATED_BODY()
+
 public:
 	AWorldPlayerController();
-	
-	AGeneratorWorldCampaign* GetWorldGenerator()const;
-	UWorldStateAndSaveManager* GetWorldStateAndSaveManager()const;
+
+	AGeneratorWorldCampaign* GetWorldGenerator() const;
+	UWorldStateAndSaveManager* GetWorldStateAndSaveManager() const;
 
 	UFUNCTION(BlueprintCallable)
 	void SetIsWorldCameraMovementDisabled(bool bIsDisabled);
@@ -69,13 +75,19 @@ protected:
 	/** @brief called on single Primary click */
 	UFUNCTION(BlueprintCallable)
 	void PrimaryClick();
-	
+
 	/** @brief called on end secondary button click*/
 	UFUNCTION(BlueprintCallable)
 	void SecondaryClick();
 
-	
 private:
+	EWorldPrimaryClickContext M_PrimaryClickContext = EWorldPrimaryClickContext::None;
+	void PrimaryClick_Regular();
+	void OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj);
+	void OnClicked_MissionMapObj(AWorldMissionObject* MissionMapObj);
+	void OnClicked_PlayerMapObj(AWorldPlayerObject* PlayerMapObj);
+	void OnClicked_NeutralMapObj(AWorldNeutralObject* NeutralMapObj);
+	void PrimaryClick_ActiveMissionItem();
 	bool GetIsValidWorldCameraController() const;
 	bool GetIsValidPlayerWorldOutliner() const;
 
@@ -85,9 +97,9 @@ private:
 	// Generates the new world with the settings from the game instance if needed.
 	// returns whether a full new world was generated.
 	void BeginPlay_GenerateOrLoadWorld();
-	
+
 	void OnInitialWorldSetupComplete();
-	
+
 	void WorldSetupComplete_MovePlayerToHQ();
 
 	UPROPERTY()
@@ -111,5 +123,4 @@ private:
 	FCampaignGenerationSettings M_CampaignSettings;
 	FRTSGameDifficulty M_SelectedDifficulty;
 	ERTSFaction M_PlayerFaction;
-	
 };

@@ -9,6 +9,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/RewardStructs/FMissionRewardStructs.h"
 #include "W_EnemyOrMissionMapItem.generated.h"
 
+class UW_RewardCardsViewer;
 struct FEnemyOrMissionMapItemUIData;
 class UW_MissionReward;
 /**
@@ -18,6 +19,8 @@ UCLASS()
 class RTS_SURVIVAL_API UW_EnemyOrMissionMapItem : public UUserWidget
 {
 	GENERATED_BODY()
+	
+	void Init(TWeakObjectPtr<UW_RewardCardsViewer> RewardCardsViewer);
 
 	void SetupEnemyWidget(const FEnemyOrMissionMapItemUIData& UIData,
 	                      const FPrimaryReward& PrimaryReward,
@@ -60,4 +63,9 @@ protected:
 	//<Text_BadTitle>-</> <Text_Bad14>CRD will attempt to reinforce the position with extra divisions</>
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	URichTextBlock* M_OnDefeatRichText;
+	
+	private:
+	UPROPERTY()
+	TWeakObjectPtr<UW_RewardCardsViewer> M_RewardCardsViewer	;
+	[[nodiscard]] bool EnsureIsValidRewardCardsViewer() const;
 };

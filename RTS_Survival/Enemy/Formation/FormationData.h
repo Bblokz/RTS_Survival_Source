@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
+#include "RTS_Survival/Interfaces/Commands.h"
 
 #include "FormationData.generated.h"
 
 class UEnemyFormationController;
-class ICommands;
 
 USTRUCT()
 struct FFormationUnitData
