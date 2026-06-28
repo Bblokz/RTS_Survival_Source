@@ -17,6 +17,9 @@ class UW_EnemyOrMissionMapItem;
 class UW_RewardCardsViewer;
 class UW_CardMenu;
 class AWorldPlayerController;
+struct FEnemyOrMissionMapItemUIData;
+struct FPrimaryReward;
+struct FSecondaryReward;
 
 USTRUCT(BlueprintType)
 struct FWorldMenuSettings
@@ -51,6 +54,16 @@ public:
 
 	void InitWorldMenu(AWorldPlayerController* WorldPlayerController, UWorldProfileAndUIManager* PlayerProfileUIManager);
 	void SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveData);
+	/**
+	 * @brief Opens the compact map-item panel from controller-selected world actors.
+	 * @param UIData Text and strength data authored on the clicked world map object.
+	 * @param PrimaryReward Rewards shown immediately and used by the card preview.
+	 * @param SecondaryReward Optional follow-up reward data shown in the reward panel.
+	 */
+	void ShowMissionMapItemDesc(const FEnemyOrMissionMapItemUIData& UIData,
+	                            const FPrimaryReward& PrimaryReward,
+	                            const FSecondaryReward& SecondaryReward) const;
+	void CollapseMissionMapItemDesc() const;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)

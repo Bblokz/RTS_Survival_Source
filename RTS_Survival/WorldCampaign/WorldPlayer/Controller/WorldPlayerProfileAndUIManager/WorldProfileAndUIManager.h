@@ -28,6 +28,7 @@ public:
 	void SetupWorldMenu(AWorldPlayerController* PlayerController);
 	FPlayerProfileSaveData OnSetupUIForNewCampaign(ERTSFaction PlayerFaction);
 	void SetupUIForLoadedCampaign(const FPlayerProfileSaveData& PlayerProfileSaveData);
+	UW_WorldMenu* GetWorldMenu() const;
 
 protected:
 	// Called when the game starts

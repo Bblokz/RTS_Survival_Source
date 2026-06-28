@@ -21,6 +21,11 @@ void UW_StrengthEstimation::SetupStrengthEstimation(
 	M_TotalRichText->SetText(FormattedStrengthEstimationMessage.TotalRichText);
 }
 
+void UW_StrengthEstimation::ShowVisibleAnimation()
+{
+	BP_ShowVisibleAnimation();
+}
+
 bool UW_StrengthEstimation::GetIsValidEstimationsRichText() const
 {
 	if (IsValid(M_EstimationsRichText))

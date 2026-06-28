@@ -57,6 +57,16 @@ void UWorldProfileAndUIManager::SetupUIForLoadedCampaign(const FPlayerProfileSav
 }
 
 
+UW_WorldMenu* UWorldProfileAndUIManager::GetWorldMenu() const
+{
+	if (not GetIsValidWorldMenu())
+	{
+		return nullptr;
+	}
+
+	return M_WorldMenu;
+}
+
 // Called when the game starts
 void UWorldProfileAndUIManager::BeginPlay()
 {

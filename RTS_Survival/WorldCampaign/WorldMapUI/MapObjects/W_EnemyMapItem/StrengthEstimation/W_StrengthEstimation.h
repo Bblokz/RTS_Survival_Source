@@ -15,8 +15,12 @@ class RTS_SURVIVAL_API UW_StrengthEstimation : public UUserWidget
 public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Strength Estimation")
 	void SetupStrengthEstimation(const FRTSStrengthEstimationRichTextMessage& StrengthEstimationMessage);
+	void ShowVisibleAnimation();
 
 protected:
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Map Item")
+	void BP_ShowVisibleAnimation();
+
 	// By default contains <Text_NewBad>20%</>
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	URichTextBlock* M_EstimationsRichText = nullptr;

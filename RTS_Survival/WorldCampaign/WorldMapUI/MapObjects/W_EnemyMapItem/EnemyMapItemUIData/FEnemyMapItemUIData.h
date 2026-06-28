@@ -5,7 +5,7 @@
 
 #include "FEnemyMapItemUIData.generated.h"
 
-USTRUCT(blueprintType, Blueprintable)
+USTRUCT(BlueprintType, Blueprintable)
 struct FEnemyOrMissionMapItemUIData
 {
 	GENERATED_BODY()
@@ -13,6 +13,8 @@ struct FEnemyOrMissionMapItemUIData
 	FText TitleText = FText::FromString("<Text_LBadTitle>CRD Factory</>");
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FText StrengthPercentageText = FText::FromString("<Text_NewBad>20%</>");
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FText DescriptionText = FText::FromString("<Text_Armor>This CRD Base periodically produces light vehicles which reinforce nearby CRD elements.</>");
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FText PrimaryObjectiveText = FText::FromString("<Text_Armor>Destroy the factory.</>");
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
@@ -22,5 +24,6 @@ struct FEnemyOrMissionMapItemUIData
 		"<Text_BadTitle>-</> <Text_Bad14>Enemy strength increases by 20%</>\n"
 		"<Text_BadTitle>-</> <Text_Bad14>CRD will attempt to reinforce the position with extra divisions</>"
 	));
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FRTSStrengthEstimationRichTextMessage StrengthEstimation;
 };

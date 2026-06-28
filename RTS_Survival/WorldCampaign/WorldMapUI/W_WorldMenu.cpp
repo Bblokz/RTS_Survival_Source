@@ -69,6 +69,25 @@ void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController,
 	UpdateMenuForNewFocus(EWorldUIFocusState::World);
 }
 
+void UW_WorldMenu::ShowMissionMapItemDesc(const FEnemyOrMissionMapItemUIData& UIData,
+                                             const FPrimaryReward& PrimaryReward,
+                                             const FSecondaryReward& SecondaryReward) const
+{
+	if (not MissionMapItemDesc)
+	{
+		return;
+	}
+
+	MissionMapItemDesc->SetupEnemyWidget(UIData, PrimaryReward, SecondaryReward);
+	SetMissionDescVisibility(true);
+}
+
+void UW_WorldMenu::CollapseMissionMapItemDesc() const
+{
+	SetMissionDescVisibility(false);
+	SetAuxiliaryMapItemsWidgetsVisibility(false);
+}
+
 void UW_WorldMenu::SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveData)
 {
 	if (not ArchiveMenu || not PerkMenu || not CardMenu)
@@ -84,8 +103,14 @@ void UW_WorldMenu::SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveD
 
 void UW_WorldMenu::NativeOnInitialized()
 {
-	MissionMapItemDesc->InitAuxiliaryWidgets(RewardCardsViewer, StrengthEstimation);
 	Super::NativeOnInitialized();
+
+	if (not MissionMapItemDesc)
+	{
+		return;
+	}
+
+	MissionMapItemDesc->InitAuxiliaryWidgets(RewardCardsViewer, StrengthEstimation);
 }
 
 void UW_WorldMenu::UpdateUISwitch(const int32 FullUIIndex) const
@@ -114,6 +139,10 @@ void UW_WorldMenu::SetMissionDescVisibility(const bool bVisible) const
 	}
 	const ESlateVisibility NewVis = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
 	MissionMapItemDesc->SetVisibility(NewVis);
+	if (bVisible)
+	{
+		MissionMapItemDesc->ShowVisibleAnimation();
+	}
 }
 
 void UW_WorldMenu::SetAuxiliaryMapItemsWidgetsVisibility(const bool bVisible) const
