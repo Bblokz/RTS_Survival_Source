@@ -68,6 +68,9 @@ private:
 	void EnsureAnchorKeyIsInitialized();
 	bool GetIsValidWorldCampaignSettings() const;
 
+	UPROPERTY()
+	TWeakObjectPtr<UWorldMapFowComponent> M_WorldMapFowComponent;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
 	FGuid M_AnchorKey;
 

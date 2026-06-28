@@ -30,6 +30,9 @@ public:
 	virtual UWorldMapFowComponent* GetFowComponent() const override { return M_WorldMapFowComponent.Get(); }
 
 private:
+	UPROPERTY()
+	TWeakObjectPtr<UWorldMapFowComponent> M_WorldMapFowComponent;
+
 	UPROPERTY(VisibleAnywhere, Category = "World Campaign|World Objects", meta = (AllowPrivateAccess = "true"))
 	TWeakObjectPtr<AAnchorPoint> M_OwningAnchor;
 

@@ -47,8 +47,8 @@ private:
 	bool GetIsValidWorldGenerator() const;
 	bool GetIsValidWorldFowCloud() const;
 	void CacheCloudActor();
-	void ResetCampaignActorsToNotVisible();
-	void ApplyInitialRevealRules();
+	void InitializeMissingCampaignActorStates();
+	void ApplyRevealRulesFromVisibleAnchors();
 	void ApplyWorldObjectStates();
 	void ApplyConnectionStates();
 	void RebuildMaskTexture();
@@ -59,6 +59,7 @@ private:
 	void SetAnchorState(AAnchorPoint* AnchorPoint, EWorldMapFowState NewState);
 	void SetObjectState(AWorldMapObject* WorldMapObject, EWorldMapFowState NewState);
 	void SetConnectionState(AConnection* Connection, EWorldMapFowState NewState);
+	void StampConnectionSegment(const AConnection* Connection, const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor);
 	void StampCircle(const FVector& WorldLocation, float Radius, float Falloff, int32 ChannelIndex);
 	void StampLine(const FVector& Start, const FVector& End, float Width, float Falloff, int32 ChannelIndex);
 	void WriteMaskPixelChannel(FColor& Pixel, int32 ChannelIndex, uint8 Value) const;
