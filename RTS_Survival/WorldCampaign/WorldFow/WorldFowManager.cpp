@@ -49,8 +49,8 @@ void AWorldFowManager::UpdateFowFromCurrentWorldState()
 		return;
 	}
 
-	ResetCampaignActorsToNotVisible();
-	ApplyInitialRevealRules();
+	InitializeMissingCampaignActorStates();
+	ApplyRevealRulesFromVisibleAnchors();
 	ApplyWorldObjectStates();
 	ApplyConnectionStates();
 	if (not GetIsValidWorldFowCloud())
@@ -93,7 +93,12 @@ void AWorldFowManager::Debug_HideAll()
 			return;
 		}
 
-		ResetCampaignActorsToNotVisible();
+		const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+		InitializeMissingCampaignActorStates();
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+		{
+			SetAnchorState(AnchorPoint, EWorldMapFowState::NotVisible);
+		}
 		ApplyWorldObjectStates();
 		ApplyConnectionStates();
 		RebuildMaskTexture();
@@ -148,12 +153,21 @@ void AWorldFowManager::CacheCloudActor()
 	}
 }
 
-void AWorldFowManager::ResetCampaignActorsToNotVisible()
+void AWorldFowManager::InitializeMissingCampaignActorStates()
 {
-	M_AnchorStates.Reset();
 	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
 	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		if (M_AnchorStates.Contains(AnchorPoint))
+		{
+			continue;
+		}
+
 		SetAnchorState(AnchorPoint, EWorldMapFowState::NotVisible);
 	}
 
@@ -163,20 +177,34 @@ void AWorldFowManager::ResetCampaignActorsToNotVisible()
 	}
 }
 
-void AWorldFowManager::ApplyInitialRevealRules()
+void AWorldFowManager::ApplyRevealRulesFromVisibleAnchors()
 {
 	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
 	AAnchorPoint* PlayerHQAnchor = PlacementState.PlayerHQAnchor;
-	if (not IsValid(PlayerHQAnchor))
+	if (IsValid(PlayerHQAnchor))
 	{
-		return;
+		SetAnchorState(PlayerHQAnchor, EWorldMapFowState::Visible);
 	}
 
-	SetAnchorState(PlayerHQAnchor, EWorldMapFowState::Visible);
-	const TArray<TObjectPtr<AAnchorPoint>>& NeighborAnchors = PlayerHQAnchor->GetNeighborAnchors();
-	for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : NeighborAnchors)
+	TArray<AAnchorPoint*> VisibleAnchors;
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
 	{
-		SetAnchorState(NeighborAnchor, EWorldMapFowState::Explorable);
+		if (IsValid(AnchorPoint) && GetAnchorState(AnchorPoint) == EWorldMapFowState::Visible)
+		{
+			VisibleAnchors.Add(AnchorPoint);
+		}
+	}
+
+	for (AAnchorPoint* VisibleAnchor : VisibleAnchors)
+	{
+		const TArray<TObjectPtr<AAnchorPoint>>& NeighborAnchors = VisibleAnchor->GetNeighborAnchors();
+		for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : NeighborAnchors)
+		{
+			if (GetAnchorState(NeighborAnchor) == EWorldMapFowState::NotVisible)
+			{
+				SetAnchorState(NeighborAnchor, EWorldMapFowState::Explorable);
+			}
+		}
 	}
 }
 
@@ -252,25 +280,13 @@ void AWorldFowManager::StampConnectionsToMask()
 		}
 
 		const TArray<TObjectPtr<AAnchorPoint>>& ConnectedAnchors = Connection->GetConnectedAnchors();
-		if (ConnectedAnchors.Num() < 2 || not IsValid(ConnectedAnchors[0]) || not IsValid(ConnectedAnchors[1]))
-		{
-			continue;
-		}
+		StampConnectionSegment(Connection, ConnectedAnchors.IsValidIndex(0) ? ConnectedAnchors[0].Get() : nullptr,
+			ConnectedAnchors.IsValidIndex(1) ? ConnectedAnchors[1].Get() : nullptr);
 
-		UWorldMapFowComponent* FowComponent = Connection->GetFowComponent();
-		const int32 ChannelIndex = GetMaskChannelForComponent(FowComponent);
-		if (ChannelIndex == WorldFowMaskConstants::NoMaskChannelIndex)
+		if (ConnectedAnchors.IsValidIndex(2))
 		{
-			continue;
+			StampConnectionSegment(Connection, ConnectedAnchors[2].Get(), nullptr);
 		}
-
-		StampLine(
-			ConnectedAnchors[0]->GetActorLocation(),
-			ConnectedAnchors[1]->GetActorLocation(),
-			FowComponent->GetConnectionCorridorWidthForCurrentState(),
-			FowComponent->GetRevealFalloffForCurrentState(),
-			ChannelIndex
-		);
 	}
 }
 
@@ -402,6 +418,33 @@ void AWorldFowManager::SetConnectionState(AConnection* Connection, const EWorldM
 	}
 
 	FowComponent->SetCurrentFowState(NewState);
+}
+
+void AWorldFowManager::StampConnectionSegment(
+	const AConnection* Connection,
+	const AAnchorPoint* StartAnchor,
+	const AAnchorPoint* EndAnchor)
+{
+	if (not IsValid(Connection) || not IsValid(StartAnchor))
+	{
+		return;
+	}
+
+	const UWorldMapFowComponent* FowComponent = Connection->GetFowComponent();
+	const int32 ChannelIndex = GetMaskChannelForComponent(FowComponent);
+	if (ChannelIndex == WorldFowMaskConstants::NoMaskChannelIndex)
+	{
+		return;
+	}
+
+	const FVector SegmentEnd = IsValid(EndAnchor) ? EndAnchor->GetActorLocation() : Connection->GetJunctionLocation();
+	StampLine(
+		StartAnchor->GetActorLocation(),
+		SegmentEnd,
+		FowComponent->GetConnectionCorridorWidthForCurrentState(),
+		FowComponent->GetRevealFalloffForCurrentState(),
+		ChannelIndex
+	);
 }
 
 void AWorldFowManager::StampCircle(

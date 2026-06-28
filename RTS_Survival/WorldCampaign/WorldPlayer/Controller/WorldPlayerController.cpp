@@ -421,7 +421,7 @@ void AWorldPlayerController::BeginPlay_SpawnWorldFowManager()
 		return;
 	}
 
-	if (not IsValid(WorldFowManagerClass))
+	if (not IsValid(M_WorldFowManagerClass))
 	{
 		return;
 	}
@@ -432,7 +432,7 @@ void AWorldPlayerController::BeginPlay_SpawnWorldFowManager()
 		return;
 	}
 
-	AWorldFowManager* SpawnedManager = World->SpawnActor<AWorldFowManager>(WorldFowManagerClass);
+	AWorldFowManager* SpawnedManager = World->SpawnActor<AWorldFowManager>(M_WorldFowManagerClass);
 	if (not IsValid(SpawnedManager))
 	{
 		return;

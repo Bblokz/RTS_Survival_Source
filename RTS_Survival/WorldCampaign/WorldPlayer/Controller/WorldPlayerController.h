@@ -124,8 +124,8 @@ private:
 	TObjectPtr<UWorldStateAndSaveManager> M_WorldStateAndSaveManager = nullptr;
 	bool GetIsValidWorldStateAndSaveManager() const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW Cloud", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<AWorldFowManager> WorldFowManagerClass;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW Cloud", meta = (AllowPrivateAccess = "true", DisplayName = "WorldFowManagerClass"))
+	TSubclassOf<AWorldFowManager> M_WorldFowManagerClass;
 
 	UPROPERTY()
 	TWeakObjectPtr<AWorldFowManager> M_WorldFowManager;

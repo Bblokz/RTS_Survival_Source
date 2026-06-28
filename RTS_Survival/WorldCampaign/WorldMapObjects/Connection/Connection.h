@@ -38,6 +38,9 @@ private:
 	FVector GetAnchorLocationSafe(const AAnchorPoint* AnchorPoint) const;
 	FVector GetProjectedPointOnBaseSegment(const FVector& AnchorLocation) const;
 
+	UPROPERTY()
+	TWeakObjectPtr<UWorldMapFowComponent> M_WorldMapFowComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<AAnchorPoint>> M_ConnectedAnchors;
 
