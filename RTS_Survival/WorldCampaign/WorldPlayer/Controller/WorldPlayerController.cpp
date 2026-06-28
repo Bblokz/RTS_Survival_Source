@@ -13,6 +13,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
@@ -100,11 +101,13 @@ void AWorldPlayerController::PrimaryClick_Regular()
 	FHitResult HitUnderCursor;
 	if (not GetHitResultUnderCursor(ECC_Visibility, false, HitUnderCursor))
 	{
+		CollapseMissionMapItemDesc();
 		return;
 	}
 	AActor* ClickedActor = HitUnderCursor.GetActor();
 	if (not IsValid(ClickedActor))
 	{
+		CollapseMissionMapItemDesc();
 		return;
 	}
 	if (ClickedActor->IsA(AWorldEnemyObject::StaticClass()))
@@ -127,29 +130,82 @@ void AWorldPlayerController::PrimaryClick_Regular()
 		OnClicked_NeutralMapObj(Cast<AWorldNeutralObject>(ClickedActor));	
 		return;
 	}
+	CollapseMissionMapItemDesc();
 }
 
 void AWorldPlayerController::OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj)
 {
+	if (not IsValid(EnemyMapObj) || not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
+
+	UW_WorldMenu* WorldMenu = M_WorldProfileAndUIManager->GetWorldMenu();
+	if (not IsValid(WorldMenu))
+	{
+		return;
+	}
+
+	WorldMenu->ShowMissionMapItemDesc(
+		EnemyMapObj->GetMapItemUIData(),
+		EnemyMapObj->GetPrimaryReward(),
+		EnemyMapObj->GetSecondaryReward()
+	);
+	M_PrimaryClickContext = EWorldPrimaryClickContext::MissionItemActive;
 }
 
 void AWorldPlayerController::OnClicked_MissionMapObj(AWorldMissionObject* MissionMapObj)
 {
-	
+	if (not IsValid(MissionMapObj) || not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
+
+	UW_WorldMenu* WorldMenu = M_WorldProfileAndUIManager->GetWorldMenu();
+	if (not IsValid(WorldMenu))
+	{
+		return;
+	}
+
+	WorldMenu->ShowMissionMapItemDesc(
+		MissionMapObj->GetMapItemUIData(),
+		MissionMapObj->GetPrimaryReward(),
+		MissionMapObj->GetSecondaryReward()
+	);
+	M_PrimaryClickContext = EWorldPrimaryClickContext::MissionItemActive;
 }
 
 void AWorldPlayerController::OnClicked_PlayerMapObj(AWorldPlayerObject* PlayerMapObj)
 {
-	
+	CollapseMissionMapItemDesc();
 }
 
 void AWorldPlayerController::OnClicked_NeutralMapObj(AWorldNeutralObject* NeutralMapObj)
 {
-	
+	CollapseMissionMapItemDesc();
 }
 
 void AWorldPlayerController::PrimaryClick_ActiveMissionItem()
 {
+	M_PrimaryClickContext = EWorldPrimaryClickContext::None;
+	PrimaryClick_Regular();
+}
+
+void AWorldPlayerController::CollapseMissionMapItemDesc()
+{
+	M_PrimaryClickContext = EWorldPrimaryClickContext::None;
+	if (not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
+
+	UW_WorldMenu* WorldMenu = M_WorldProfileAndUIManager->GetWorldMenu();
+	if (not IsValid(WorldMenu))
+	{
+		return;
+	}
+
+	WorldMenu->CollapseMissionMapItemDesc();
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)

@@ -88,6 +88,7 @@ private:
 	void OnClicked_PlayerMapObj(AWorldPlayerObject* PlayerMapObj);
 	void OnClicked_NeutralMapObj(AWorldNeutralObject* NeutralMapObj);
 	void PrimaryClick_ActiveMissionItem();
+	void CollapseMissionMapItemDesc();
 	bool GetIsValidWorldCameraController() const;
 	bool GetIsValidPlayerWorldOutliner() const;
 
