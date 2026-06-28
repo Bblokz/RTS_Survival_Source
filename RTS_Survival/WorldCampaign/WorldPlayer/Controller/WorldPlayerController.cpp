@@ -20,6 +20,8 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldPlayerObject/WorldPlayerObject.h"
 #include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFowManager.h"
 
 AWorldPlayerController::AWorldPlayerController()
 {
@@ -61,6 +63,7 @@ void AWorldPlayerController::BeginPlay()
 	BeginPlay_SetupWorldMenu();
 	BeginPlay_GameState_Faction_CampaignSettings();
 	BeginPlay_GenerateOrLoadWorld();
+	BeginPlay_SpawnWorldFowManager();
 	OnInitialWorldSetupComplete();
 }
 
@@ -106,6 +109,11 @@ void AWorldPlayerController::PrimaryClick_Regular()
 	}
 	AActor* ClickedActor = HitUnderCursor.GetActor();
 	if (not IsValid(ClickedActor))
+	{
+		CollapseMissionMapItemDesc();
+		return;
+	}
+	if (not GetCanPrimaryClickActor(ClickedActor))
 	{
 		CollapseMissionMapItemDesc();
 		return;
@@ -403,6 +411,51 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 
 	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
 	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
+}
+
+
+void AWorldPlayerController::BeginPlay_SpawnWorldFowManager()
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	if (not IsValid(WorldFowManagerClass))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	AWorldFowManager* SpawnedManager = World->SpawnActor<AWorldFowManager>(WorldFowManagerClass);
+	if (not IsValid(SpawnedManager))
+	{
+		return;
+	}
+
+	M_WorldFowManager = SpawnedManager;
+	SpawnedManager->InitializeWorldFow(this, M_WorldGenerator.Get());
+}
+
+bool AWorldPlayerController::GetCanPrimaryClickActor(AActor* ClickedActor) const
+{
+	if (not IsValid(ClickedActor))
+	{
+		return false;
+	}
+
+	if (not ClickedActor->GetClass()->ImplementsInterface(UWorldFowParticipant::StaticClass()))
+	{
+		return true;
+	}
+
+	const IWorldFowParticipant* FowParticipant = Cast<IWorldFowParticipant>(ClickedActor);
+	return FowParticipant != nullptr && FowParticipant->GetCanPrimaryClickInteract();
 }
 
 void AWorldPlayerController::OnInitialWorldSetupComplete()

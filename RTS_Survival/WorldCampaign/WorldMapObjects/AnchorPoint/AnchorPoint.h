@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
@@ -19,7 +20,7 @@ class UWorldCampaignSettings;
  * @brief Anchor actors are placed on the campaign map and serve as stable nodes for generated connections.
  */
 UCLASS()
-class RTS_SURVIVAL_API AAnchorPoint : public AActor
+class RTS_SURVIVAL_API AAnchorPoint : public AActor, public IWorldFowParticipant
 {
 	GENERATED_BODY()
 
@@ -28,6 +29,7 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostLoad() override;
+	virtual void PostInitializeComponents() override;
 
 	FGuid GetAnchorKey() const { return M_AnchorKey; }
 
@@ -60,6 +62,7 @@ public:
 	void RemovePromotedWorldObject();
 	bool GetHasPromotedWorldObject() const;
 	AWorldMapObject* GetPromotedWorldObject() const;
+	virtual UWorldMapFowComponent* GetFowComponent() const override { return M_WorldMapFowComponent.Get(); }
 
 private:
 	void EnsureAnchorKeyIsInitialized();

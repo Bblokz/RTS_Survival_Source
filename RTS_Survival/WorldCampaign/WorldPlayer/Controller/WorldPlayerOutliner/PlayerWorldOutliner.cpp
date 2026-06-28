@@ -6,6 +6,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
 
 UPlayerWorldOutliner::UPlayerWorldOutliner()
 {
@@ -20,6 +21,16 @@ void UPlayerWorldOutliner::OnPlayerTick(AActor* HitActor, const FVector& HitLoca
 	{
 		ResetOutlineOnPreviousActor();
 		return;
+	}
+
+	if (HitActor->GetClass()->ImplementsInterface(UWorldFowParticipant::StaticClass()))
+	{
+		const IWorldFowParticipant* FowParticipant = Cast<IWorldFowParticipant>(HitActor);
+		if (FowParticipant == nullptr || not FowParticipant->GetCanBeOutlined())
+		{
+			ResetOutlineOnPreviousActor();
+			return;
+		}
 	}
 
 	const ERTSOutLineTypes OutlineType = GetOutlineTypeForActor(HitActor);
