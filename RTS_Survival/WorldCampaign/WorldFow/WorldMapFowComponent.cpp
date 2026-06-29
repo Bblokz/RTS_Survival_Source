@@ -5,9 +5,6 @@
 UWorldMapFowComponent::UWorldMapFowComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-	M_ExplorableSettings.bM_WritesExplorableMask = true;
-	M_VisibleSettings.bM_WritesVisibleMask = true;
-	M_POIVisibleSettings.bM_WritesPOIMask = true;
 	M_POIVisibleSettings.M_RevealRadius = M_POIRevealRadius;
 	M_POIVisibleSettings.M_RevealFalloff = M_POIRevealFalloff;
 }
@@ -27,9 +24,21 @@ bool UWorldMapFowComponent::GetCanBeOutlinedForCurrentState() const
 	return M_CurrentFowState == EWorldMapFowState::Explorable || M_CurrentFowState == EWorldMapFowState::Visible || M_CurrentFowState == EWorldMapFowState::POIVisible;
 }
 
-bool UWorldMapFowComponent::GetWritesVisibleMaskForCurrentState() const { return GetSettingsForState(M_CurrentFowState).bM_WritesVisibleMask; }
-bool UWorldMapFowComponent::GetWritesExplorableMaskForCurrentState() const { return GetSettingsForState(M_CurrentFowState).bM_WritesExplorableMask; }
-bool UWorldMapFowComponent::GetWritesPOIMaskForCurrentState() const { return GetSettingsForState(M_CurrentFowState).bM_WritesPOIMask; }
+bool UWorldMapFowComponent::GetWritesVisibleMaskForCurrentState() const
+{
+	return M_CurrentFowState == EWorldMapFowState::Visible;
+}
+
+bool UWorldMapFowComponent::GetWritesExplorableMaskForCurrentState() const
+{
+	return M_CurrentFowState == EWorldMapFowState::Explorable;
+}
+
+bool UWorldMapFowComponent::GetWritesPOIMaskForCurrentState() const
+{
+	return M_CurrentFowState == EWorldMapFowState::POIVisible;
+}
+
 float UWorldMapFowComponent::GetRevealRadiusForCurrentState() const { return GetRevealRadiusForState(M_CurrentFowState); }
 float UWorldMapFowComponent::GetRevealRadiusForState(const EWorldMapFowState State) const { return GetSettingsForState(State).M_RevealRadius; }
 float UWorldMapFowComponent::GetRevealFalloffForCurrentState() const { return GetSettingsForState(M_CurrentFowState).M_RevealFalloff; }
