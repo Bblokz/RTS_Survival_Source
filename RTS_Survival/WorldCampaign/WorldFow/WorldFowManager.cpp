@@ -43,6 +43,18 @@ void AWorldFowManager::InitializeWorldFow(
 	UpdateFowFromCurrentWorldState();
 }
 
+void AWorldFowManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	M_WorldPlayerController.Reset();
+	M_WorldGenerator.Reset();
+	M_WorldFowCloud.Reset();
+	M_MaskTexture = nullptr;
+	M_MaskPixels.Empty();
+	M_AnchorStates.Empty();
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void AWorldFowManager::UpdateFowFromCurrentWorldState()
 {
 	if (not GetIsValidWorldGenerator())
@@ -156,6 +168,8 @@ void AWorldFowManager::CacheCloudActor()
 
 void AWorldFowManager::InitializeMissingCampaignActorStates()
 {
+	RemoveStaleAnchorStates();
+
 	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
 	{
@@ -164,7 +178,7 @@ void AWorldFowManager::InitializeMissingCampaignActorStates()
 			continue;
 		}
 
-		if (M_AnchorStates.Contains(AnchorPoint))
+		if (M_AnchorStates.Contains(TObjectKey<const AAnchorPoint>(AnchorPoint)))
 		{
 			continue;
 		}
@@ -175,6 +189,28 @@ void AWorldFowManager::InitializeMissingCampaignActorStates()
 	for (const TObjectPtr<AConnection>& Connection : PlacementState.CachedConnections)
 	{
 		SetConnectionState(Connection, EWorldMapFowState::NotVisible);
+	}
+}
+
+void AWorldFowManager::RemoveStaleAnchorStates()
+{
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	TSet<TObjectKey<const AAnchorPoint>> CurrentAnchorKeys;
+	CurrentAnchorKeys.Reserve(PlacementState.CachedAnchors.Num());
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		if (IsValid(AnchorPoint))
+		{
+			CurrentAnchorKeys.Add(TObjectKey<const AAnchorPoint>(AnchorPoint.Get()));
+		}
+	}
+
+	for (auto AnchorStateIterator = M_AnchorStates.CreateIterator(); AnchorStateIterator; ++AnchorStateIterator)
+	{
+		if (not CurrentAnchorKeys.Contains(AnchorStateIterator.Key()))
+		{
+			AnchorStateIterator.RemoveCurrent();
+		}
 	}
 }
 
@@ -373,7 +409,7 @@ void AWorldFowManager::SetAnchorState(AAnchorPoint* AnchorPoint, const EWorldMap
 		return;
 	}
 
-	M_AnchorStates.FindOrAdd(AnchorPoint) = NewState;
+	M_AnchorStates.FindOrAdd(TObjectKey<const AAnchorPoint>(AnchorPoint)) = NewState;
 	UWorldMapFowComponent* FowComponent = AnchorPoint->GetFowComponent();
 	if (not IsValid(FowComponent))
 	{
@@ -578,7 +614,7 @@ int32 AWorldFowManager::GetPixelRadius(const float WorldRadius) const
 
 EWorldMapFowState AWorldFowManager::GetAnchorState(const AAnchorPoint* AnchorPoint) const
 {
-	const EWorldMapFowState* FoundState = M_AnchorStates.Find(AnchorPoint);
+	const EWorldMapFowState* FoundState = M_AnchorStates.Find(TObjectKey<const AAnchorPoint>(AnchorPoint));
 	if (FoundState == nullptr)
 	{
 		return EWorldMapFowState::NotVisible;
