@@ -3,6 +3,7 @@
 #include "WorldFowManager.h"
 
 #include "Components/MeshComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -14,6 +15,18 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
+
+namespace WorldFowDebugConstants
+{
+	constexpr float WorldStringDurationSeconds = 10.f;
+	constexpr float WorldStringZOffset = 25.f;
+	const FColor VisibleColor = FColor::Green;
+	const FColor ExplorableColor = FColor::Yellow;
+	const FColor POIVisibleColor = FColor::Cyan;
+	const FColor HiddenColor = FColor::Red;
+}
 
 namespace WorldFowMaskConstants
 {
@@ -119,6 +132,56 @@ void AWorldFowManager::Debug_HideAll()
 	}
 }
 
+void AWorldFowManager::Debug_AllExplorableConnections()
+{
+	Debug_DrawRadiusForConnections(EWorldMapFowState::Explorable);
+}
+
+void AWorldFowManager::Debug_AllVisibleConnections()
+{
+	Debug_DrawRadiusForConnections(EWorldMapFowState::Visible);
+}
+
+void AWorldFowManager::Debug_AllExplorableAnchors()
+{
+	Debug_DrawRadiusForAnchors(EWorldMapFowState::Explorable);
+}
+
+void AWorldFowManager::Debug_AllExplorableEnemyObjects()
+{
+	Debug_DrawRadiusForWorldObjects(EWorldMapFowState::Explorable, AWorldEnemyObject::StaticClass());
+}
+
+void AWorldFowManager::Debug_AllVisibleEnemyObjects()
+{
+	Debug_DrawRadiusForWorldObjects(EWorldMapFowState::Visible, AWorldEnemyObject::StaticClass());
+}
+
+void AWorldFowManager::Debug_AllExplorableMissionObjects()
+{
+	Debug_DrawRadiusForWorldObjects(EWorldMapFowState::Explorable, AWorldMissionObject::StaticClass());
+}
+
+void AWorldFowManager::Debug_AllVisibleMissionObjects()
+{
+	Debug_DrawRadiusForWorldObjects(EWorldMapFowState::Visible, AWorldMissionObject::StaticClass());
+}
+
+void AWorldFowManager::Debug_AllConnectionsState()
+{
+	Debug_DrawStateForConnections();
+}
+
+void AWorldFowManager::Debug_AllAnchorsState()
+{
+	Debug_DrawStateForAnchors();
+}
+
+void AWorldFowManager::Debug_AllEnemyObjectsState()
+{
+	Debug_DrawStateForWorldObjects(AWorldEnemyObject::StaticClass());
+}
+
 bool AWorldFowManager::GetIsValidWorldGenerator() const
 {
 	if (M_WorldGenerator.IsValid())
@@ -149,6 +212,264 @@ bool AWorldFowManager::GetIsValidWorldFowCloud() const
 		this
 	);
 	return false;
+}
+
+void AWorldFowManager::Debug_DrawRadiusForConnections(const EWorldMapFowState DebugState) const
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AConnection>& Connection : PlacementState.CachedConnections)
+	{
+		if (not IsValid(Connection) || GetConnectionStateFromConnectedAnchors(Connection) != DebugState)
+		{
+			continue;
+		}
+
+		const UWorldMapFowComponent* FowComponent = Connection->GetFowComponent();
+		if (not IsValid(FowComponent))
+		{
+			continue;
+		}
+
+		const FString DebugText = FString::Printf(
+			TEXT("%s radius: %.0f"),
+			*Debug_GetTextForState(DebugState),
+			FowComponent->GetConnectionCorridorWidthForState(DebugState)
+		);
+		Debug_DrawWorldString(Debug_GetConnectionTextLocation(Connection), DebugText, Debug_GetColorForState(DebugState));
+	}
+}
+
+void AWorldFowManager::Debug_DrawRadiusForAnchors(const EWorldMapFowState DebugState) const
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint) || GetAnchorState(AnchorPoint) != DebugState)
+		{
+			continue;
+		}
+
+		const UWorldMapFowComponent* FowComponent = AnchorPoint->GetFowComponent();
+		if (not IsValid(FowComponent))
+		{
+			continue;
+		}
+
+		const FString DebugText = FString::Printf(
+			TEXT("%s radius: %.0f"),
+			*Debug_GetTextForState(DebugState),
+			FowComponent->GetRevealRadiusForState(DebugState)
+		);
+		Debug_DrawWorldString(AnchorPoint->GetActorLocation(), DebugText, Debug_GetColorForState(DebugState));
+	}
+}
+
+void AWorldFowManager::Debug_DrawRadiusForWorldObjects(
+	const EWorldMapFowState DebugState,
+	UClass* WorldObjectClass) const
+{
+	if (not GetIsValidWorldGenerator() || not IsValid(WorldObjectClass))
+	{
+		return;
+	}
+
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		AWorldMapObject* WorldMapObject = AnchorPoint->GetPromotedWorldObject();
+		if (not IsValid(WorldMapObject) || not WorldMapObject->IsA(WorldObjectClass))
+		{
+			continue;
+		}
+
+		const UWorldMapFowComponent* FowComponent = WorldMapObject->GetFowComponent();
+		if (not IsValid(FowComponent) || FowComponent->GetCurrentFowState() != DebugState)
+		{
+			continue;
+		}
+
+		const FString DebugText = FString::Printf(
+			TEXT("%s radius: %.0f"),
+			*Debug_GetTextForState(DebugState),
+			FowComponent->GetRevealRadiusForState(DebugState)
+		);
+		Debug_DrawWorldString(WorldMapObject->GetActorLocation(), DebugText, Debug_GetColorForState(DebugState));
+	}
+}
+
+void AWorldFowManager::Debug_DrawStateForConnections() const
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AConnection>& Connection : PlacementState.CachedConnections)
+	{
+		if (not IsValid(Connection))
+		{
+			continue;
+		}
+
+		const EWorldMapFowState ConnectionState = GetConnectionStateFromConnectedAnchors(Connection);
+		Debug_DrawWorldString(
+			Debug_GetConnectionTextLocation(Connection),
+			Debug_GetTextForState(ConnectionState),
+			Debug_GetColorForState(ConnectionState)
+		);
+	}
+}
+
+void AWorldFowManager::Debug_DrawStateForAnchors() const
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		const EWorldMapFowState AnchorState = GetAnchorState(AnchorPoint);
+		Debug_DrawWorldString(
+			AnchorPoint->GetActorLocation(),
+			Debug_GetTextForState(AnchorState),
+			Debug_GetColorForState(AnchorState)
+		);
+	}
+}
+
+void AWorldFowManager::Debug_DrawStateForWorldObjects(UClass* WorldObjectClass) const
+{
+	if (not GetIsValidWorldGenerator() || not IsValid(WorldObjectClass))
+	{
+		return;
+	}
+
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		AWorldMapObject* WorldMapObject = AnchorPoint->GetPromotedWorldObject();
+		if (not IsValid(WorldMapObject) || not WorldMapObject->IsA(WorldObjectClass))
+		{
+			continue;
+		}
+
+		const UWorldMapFowComponent* FowComponent = WorldMapObject->GetFowComponent();
+		if (not IsValid(FowComponent))
+		{
+			continue;
+		}
+
+		const EWorldMapFowState ObjectState = FowComponent->GetCurrentFowState();
+		Debug_DrawWorldString(
+			WorldMapObject->GetActorLocation(),
+			Debug_GetTextForState(ObjectState),
+			Debug_GetColorForState(ObjectState)
+		);
+	}
+}
+
+void AWorldFowManager::Debug_DrawWorldString(
+	const FVector& WorldLocation,
+	const FString& DebugText,
+	const FColor& Color) const
+{
+	DrawDebugString(
+		GetWorld(),
+		WorldLocation + FVector(0.f, 0.f, WorldFowDebugConstants::WorldStringZOffset),
+		DebugText,
+		nullptr,
+		Color,
+		WorldFowDebugConstants::WorldStringDurationSeconds,
+		true
+	);
+}
+
+FVector AWorldFowManager::Debug_GetConnectionTextLocation(const AConnection* Connection) const
+{
+	if (not IsValid(Connection))
+	{
+		return FVector::ZeroVector;
+	}
+
+	if (Connection->GetIsThreeWayConnection())
+	{
+		return Connection->GetJunctionLocation();
+	}
+
+	const TArray<TObjectPtr<AAnchorPoint>>& ConnectedAnchors = Connection->GetConnectedAnchors();
+	if (not ConnectedAnchors.IsValidIndex(0) || not ConnectedAnchors.IsValidIndex(1))
+	{
+		return Connection->GetActorLocation();
+	}
+
+	const AAnchorPoint* StartAnchor = ConnectedAnchors[0];
+	const AAnchorPoint* EndAnchor = ConnectedAnchors[1];
+	if (not IsValid(StartAnchor) || not IsValid(EndAnchor))
+	{
+		return Connection->GetActorLocation();
+	}
+
+	return (StartAnchor->GetActorLocation() + EndAnchor->GetActorLocation()) * 0.5f;
+}
+
+FColor AWorldFowManager::Debug_GetColorForState(const EWorldMapFowState State) const
+{
+	switch (State)
+	{
+	case EWorldMapFowState::Visible:
+		return WorldFowDebugConstants::VisibleColor;
+	case EWorldMapFowState::Explorable:
+		return WorldFowDebugConstants::ExplorableColor;
+	case EWorldMapFowState::POIVisible:
+		return WorldFowDebugConstants::POIVisibleColor;
+	case EWorldMapFowState::NotVisible:
+	default:
+		return WorldFowDebugConstants::HiddenColor;
+	}
+}
+
+FString AWorldFowManager::Debug_GetTextForState(const EWorldMapFowState State) const
+{
+	switch (State)
+	{
+	case EWorldMapFowState::Visible:
+		return TEXT("Visible");
+	case EWorldMapFowState::Explorable:
+		return TEXT("Explorable");
+	case EWorldMapFowState::POIVisible:
+		return TEXT("POI");
+	case EWorldMapFowState::NotVisible:
+	default:
+		return TEXT("Hidden");
+	}
 }
 
 void AWorldFowManager::CacheCloudActor()

@@ -30,9 +30,11 @@ bool UWorldMapFowComponent::GetCanBeOutlinedForCurrentState() const
 bool UWorldMapFowComponent::GetWritesVisibleMaskForCurrentState() const { return GetSettingsForState(M_CurrentFowState).bM_WritesVisibleMask; }
 bool UWorldMapFowComponent::GetWritesExplorableMaskForCurrentState() const { return GetSettingsForState(M_CurrentFowState).bM_WritesExplorableMask; }
 bool UWorldMapFowComponent::GetWritesPOIMaskForCurrentState() const { return GetSettingsForState(M_CurrentFowState).bM_WritesPOIMask; }
-float UWorldMapFowComponent::GetRevealRadiusForCurrentState() const { return GetSettingsForState(M_CurrentFowState).M_RevealRadius; }
+float UWorldMapFowComponent::GetRevealRadiusForCurrentState() const { return GetRevealRadiusForState(M_CurrentFowState); }
+float UWorldMapFowComponent::GetRevealRadiusForState(const EWorldMapFowState State) const { return GetSettingsForState(State).M_RevealRadius; }
 float UWorldMapFowComponent::GetRevealFalloffForCurrentState() const { return GetSettingsForState(M_CurrentFowState).M_RevealFalloff; }
-float UWorldMapFowComponent::GetConnectionCorridorWidthForCurrentState() const { return GetSettingsForState(M_CurrentFowState).M_ConnectionCorridorWidth; }
+float UWorldMapFowComponent::GetConnectionCorridorWidthForCurrentState() const { return GetConnectionCorridorWidthForState(M_CurrentFowState); }
+float UWorldMapFowComponent::GetConnectionCorridorWidthForState(const EWorldMapFowState State) const { return GetSettingsForState(State).M_ConnectionCorridorWidth; }
 
 FVector UWorldMapFowComponent::GetPOIRevealOrigin() const
 {
