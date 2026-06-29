@@ -15,3 +15,9 @@ FVector2D AWorldFowCloud::GetMapSizeXY() const
 	GetActorBounds(false, Origin, BoxExtent);
 	return FVector2D(BoxExtent.X * 2.f, BoxExtent.Y * 2.f);
 }
+
+void AWorldFowCloud::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	M_CloudMeshComponent = FindComponentByClass<UStaticMeshComponent>();
+}

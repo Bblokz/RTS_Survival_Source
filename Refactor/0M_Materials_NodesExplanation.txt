@@ -1,0 +1,19 @@
+﻿first give me the full mathematical formula for quick overview.
+
+Then give me detailed flow of the nodes where you use this style:
+
+Say you want me to Add(Fow, Res)
+
+Then use
+
+Fow -> A --
+
+               -----> Add(A, B)
+
+Res -> B --
+
+
+
+it is very important you use that -> semnatics to show me which variables / constants go into which inputs 
+as inputs have default names and this makes it clear. look up on the web 
+if you are not sure what a certain input is called of a certain node.

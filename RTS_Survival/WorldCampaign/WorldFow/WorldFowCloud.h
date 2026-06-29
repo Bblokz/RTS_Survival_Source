@@ -19,7 +19,10 @@ public:
 	AWorldFowCloud();
 	FVector2D GetMapSizeXY() const;
 	UMeshComponent* GetCloudMeshComponent() const { return M_CloudMeshComponent; }
-private:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW Cloud", meta = (AllowPrivateAccess = "true"))
+	
+	virtual void PostInitializeComponents() override;
+	
+	protected:
+	UPROPERTY( BlueprintReadWrite)
 	TObjectPtr<UMeshComponent> M_CloudMeshComponent = nullptr;
 };
