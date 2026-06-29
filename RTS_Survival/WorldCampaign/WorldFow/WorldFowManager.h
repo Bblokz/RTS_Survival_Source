@@ -62,6 +62,7 @@ private:
 	void StampConnectionSegment(const AConnection* Connection, const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor);
 	void StampCircle(const FVector& WorldLocation, float Radius, float Falloff, int32 ChannelIndex);
 	void StampLine(const FVector& Start, const FVector& End, float Width, float Falloff, int32 ChannelIndex);
+	int32 GetLineRasterizationSampleCount(const FVector& Start, const FVector& End) const;
 	void WriteMaskPixelChannel(FColor& Pixel, int32 ChannelIndex, uint8 Value) const;
 	int32 GetMaskChannelForComponent(const UWorldMapFowComponent* FowComponent) const;
 	int32 GetPixelRadius(float WorldRadius) const;
@@ -95,4 +96,8 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW|Debug", meta = (AllowPrivateAccess = "true"))
 	bool bM_EnableWorldFowDebug = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|FOW",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.1", UIMin = "0.1", DisplayName = "LinerasterizationSamplingMlt"))
+	float M_LineRasterizationSamplingMlt = 1.0f;
 };
