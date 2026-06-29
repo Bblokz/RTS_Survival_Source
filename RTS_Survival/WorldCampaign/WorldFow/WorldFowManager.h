@@ -44,12 +44,52 @@ public:
 	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
 	void Debug_HideAll();
 
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllExplorableConnections();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllVisibleConnections();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllExplorableAnchors();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllExplorableEnemyObjects();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllVisibleEnemyObjects();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllExplorableMissionObjects();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllVisibleMissionObjects();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllConnectionsState();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllAnchorsState();
+
+	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
+	void Debug_AllEnemyObjectsState();
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	bool GetIsValidWorldGenerator() const;
 	bool GetIsValidWorldFowCloud() const;
+	void Debug_DrawRadiusForConnections(EWorldMapFowState DebugState) const;
+	void Debug_DrawRadiusForAnchors(EWorldMapFowState DebugState) const;
+	void Debug_DrawRadiusForWorldObjects(EWorldMapFowState DebugState, UClass* WorldObjectClass) const;
+	void Debug_DrawStateForConnections() const;
+	void Debug_DrawStateForAnchors() const;
+	void Debug_DrawStateForWorldObjects(UClass* WorldObjectClass) const;
+	void Debug_DrawWorldString(const FVector& WorldLocation, const FString& DebugText, const FColor& Color) const;
+	FVector Debug_GetConnectionTextLocation(const AConnection* Connection) const;
+	FColor Debug_GetColorForState(EWorldMapFowState State) const;
+	FString Debug_GetTextForState(EWorldMapFowState State) const;
 	void CacheCloudActor();
 	void InitializeMissingCampaignActorStates();
 	void RemoveStaleAnchorStates();

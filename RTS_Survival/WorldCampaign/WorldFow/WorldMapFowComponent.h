@@ -27,8 +27,10 @@ public:
 	bool GetWritesExplorableMaskForCurrentState() const;
 	bool GetWritesPOIMaskForCurrentState() const;
 	float GetRevealRadiusForCurrentState() const;
+	float GetRevealRadiusForState(EWorldMapFowState State) const;
 	float GetRevealFalloffForCurrentState() const;
 	float GetConnectionCorridorWidthForCurrentState() const;
+	float GetConnectionCorridorWidthForState(EWorldMapFowState State) const;
 	bool GetCanBecomePOIVisible() const { return bM_CanBecomePOIVisible; }
 	float GetPOIRevealRadius() const { return M_POIRevealRadius; }
 	float GetPOIRevealFalloff() const { return M_POIRevealFalloff; }
