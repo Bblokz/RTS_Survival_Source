@@ -16,6 +16,7 @@ class AWorldMissionObject;
 class AWorldEnemyObject;
 class UWorldStateAndSaveManager;
 class UWorldProfileAndUIManager;
+class UW_WorldGenerationLoadingScreen;
 enum class ERTSFaction : uint8;
 class AGeneratorWorldCampaign;
 class UWorldCameraController;
@@ -42,6 +43,10 @@ public:
 
 	AGeneratorWorldCampaign* GetWorldGenerator() const;
 	UWorldStateAndSaveManager* GetWorldStateAndSaveManager() const;
+	void ShowWorldGenerationLoadingScreen();
+	void UpdateWorldGenerationLoadingScreen(float ProgressPercent, const FString& StepDescription);
+	void HideWorldGenerationLoadingScreen();
+	void OnWorldGenerationFinished();
 
 	UFUNCTION(BlueprintCallable)
 	void SetIsWorldCameraMovementDisabled(bool bIsDisabled);
@@ -98,7 +103,7 @@ private:
 	void BeginPlay_GameState_Faction_CampaignSettings();
 	// Generates the new world with the settings from the game instance if needed.
 	// returns whether a full new world was generated.
-	void BeginPlay_GenerateOrLoadWorld();
+	bool BeginPlay_GenerateOrLoadWorld();
 	void BeginPlay_SpawnWorldFowManager();
 	bool GetCanPrimaryClickActor(AActor* ClickedActor) const;
 
@@ -129,6 +134,12 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AWorldFowManager> M_WorldFowManager;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Generation", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UW_WorldGenerationLoadingScreen> M_WorldGenerationLoadingScreenClass;
+
+	UPROPERTY()
+	TObjectPtr<UW_WorldGenerationLoadingScreen> M_WorldGenerationLoadingScreen = nullptr;
 
 	FCampaignGenerationSettings M_CampaignSettings;
 	FRTSGameDifficulty M_SelectedDifficulty;

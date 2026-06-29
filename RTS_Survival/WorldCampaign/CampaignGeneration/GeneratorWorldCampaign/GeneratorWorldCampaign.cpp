@@ -3,7 +3,9 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 
 #include "Algo/Sort.h"
+#include "Async/Async.h"
 #include "DrawDebugHelpers.h"
+#include "TimerManager.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "EngineUtils.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -4389,6 +4391,12 @@ void AGeneratorWorldCampaign::PostInitializeComponents()
 	ApplyDebuggerSettingsToComponent();
 }
 
+void AGeneratorWorldCampaign::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	CancelAsyncWorldGeneration();
+	Super::EndPlay(EndPlayReason);
+}
+
 void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* WorldPlayerController,
                                                        const FCampaignGenerationSettings CampaignGenerationSettings,
                                                        const FRTSGameDifficulty DifficultySettings)
@@ -4722,7 +4730,8 @@ void AGeneratorWorldCampaign::PlaceHQStep()
 		return;
 	}
 
-	ExecuteStepWithTransaction(ECampaignGenerationStep::PlayerHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceHQ);
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	StartAsyncEditorStep(ECampaignGenerationStep::PlayerHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceHQ);
 }
 
 void AGeneratorWorldCampaign::PlaceEnemyHQStep()
@@ -4733,7 +4742,8 @@ void AGeneratorWorldCampaign::PlaceEnemyHQStep()
 		return;
 	}
 
-	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ);
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	StartAsyncEditorStep(ECampaignGenerationStep::EnemyHQPlaced, &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ);
 }
 
 void AGeneratorWorldCampaign::PlaceEnemyWallStep()
@@ -4744,8 +4754,8 @@ void AGeneratorWorldCampaign::PlaceEnemyWallStep()
 		return;
 	}
 
-	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyWallPlaced,
-	                           &AGeneratorWorldCampaign::ExecutePlaceEnemyWall);
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	StartAsyncEditorStep(ECampaignGenerationStep::EnemyWallPlaced, &AGeneratorWorldCampaign::ExecutePlaceEnemyWall);
 }
 
 void AGeneratorWorldCampaign::PlaceEnemyObjectsStep()
@@ -4756,8 +4766,8 @@ void AGeneratorWorldCampaign::PlaceEnemyObjectsStep()
 		return;
 	}
 
-	ExecuteStepWithTransaction(ECampaignGenerationStep::EnemyObjectsPlaced,
-	                           &AGeneratorWorldCampaign::ExecutePlaceEnemyObjects);
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	StartAsyncEditorStep(ECampaignGenerationStep::EnemyObjectsPlaced, &AGeneratorWorldCampaign::ExecutePlaceEnemyObjects);
 }
 
 void AGeneratorWorldCampaign::PlaceNeutralObjectsStep()
@@ -4768,8 +4778,9 @@ void AGeneratorWorldCampaign::PlaceNeutralObjectsStep()
 		return;
 	}
 
-	ExecuteStepWithTransaction(ECampaignGenerationStep::NeutralObjectsPlaced,
-	                           &AGeneratorWorldCampaign::ExecutePlaceNeutralObjects);
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	StartAsyncEditorStep(ECampaignGenerationStep::NeutralObjectsPlaced,
+	                     &AGeneratorWorldCampaign::ExecutePlaceNeutralObjects);
 }
 
 void AGeneratorWorldCampaign::PlaceMissionsStep()
@@ -4780,21 +4791,19 @@ void AGeneratorWorldCampaign::PlaceMissionsStep()
 		return;
 	}
 
-	ExecuteStepWithTransaction(ECampaignGenerationStep::MissionsPlaced, &AGeneratorWorldCampaign::ExecutePlaceMissions);
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	StartAsyncEditorStep(ECampaignGenerationStep::MissionsPlaced, &AGeneratorWorldCampaign::ExecutePlaceMissions);
 }
 
 void AGeneratorWorldCampaign::ExecuteAllSteps()
 {
-	if (M_GenerationStep != ECampaignGenerationStep::NotStarted)
-	{
-		EraseAllGeneration();
-	}
-
-	ExecuteAllStepsWithBacktracking();
+	EraseAllGeneration();
+	ExecuteAllStepsWithAsyncBacktracking(true);
 }
 
 void AGeneratorWorldCampaign::EraseAllGeneration()
 {
+	CancelAsyncWorldGeneration();
 	for (const FCampaignGenerationStepTransaction& Transaction : M_StepTransactions)
 	{
 		for (const TObjectPtr<AActor>& SpawnedActor : Transaction.SpawnedActors)
@@ -5083,6 +5092,22 @@ bool AGeneratorWorldCampaign::GetIsValidPlayerHQAnchor() const
 	}
 
 	return true;
+}
+
+bool AGeneratorWorldCampaign::GetIsValidWorldPlayerController() const
+{
+	if (M_WorldPlayerController.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldPlayerController"),
+		TEXT("AGeneratorWorldCampaign::GetIsValidWorldPlayerController"),
+		this
+	);
+	return false;
 }
 
 bool AGeneratorWorldCampaign::GetIsValidEnemyHQAnchor() const
@@ -6298,6 +6323,350 @@ bool AGeneratorWorldCampaign::RealizeVirtualPlacementState()
 	}
 
 	return true;
+}
+
+bool AGeneratorWorldCampaign::ExecuteAllStepsWithAsyncBacktracking(const bool bShowLoadingScreen)
+{
+	if (bM_AsyncWorldGenerationInFlight)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("World generation async request ignored because generation is already running."));
+		return false;
+	}
+
+	if (bShowLoadingScreen && GetIsValidWorldPlayerController())
+	{
+		M_WorldPlayerController->ShowWorldGenerationLoadingScreen();
+		NotifyWorldGenerationLoadingProgress(0.f, TEXT("Preparing the campaign map"));
+	}
+
+	bM_DeferWorldObjectPromotionDuringBacktracking = true;
+	if (not ExecuteStepWithTransaction(ECampaignGenerationStep::AnchorPointsGenerated,
+	                                   &AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints))
+	{
+		bM_DeferWorldObjectPromotionDuringBacktracking = false;
+		if (bShowLoadingScreen && GetIsValidWorldPlayerController())
+		{
+			M_WorldPlayerController->HideWorldGenerationLoadingScreen();
+		}
+		return false;
+	}
+
+	if (bShowLoadingScreen)
+	{
+		NotifyWorldGenerationLoadingProgress(2.f, TEXT("Placing campaign anchors"));
+	}
+
+	if (not ExecuteStepWithTransaction(ECampaignGenerationStep::ConnectionsCreated,
+	                                   &AGeneratorWorldCampaign::ExecuteCreateConnections))
+	{
+		bM_DeferWorldObjectPromotionDuringBacktracking = false;
+		if (bShowLoadingScreen && GetIsValidWorldPlayerController())
+		{
+			M_WorldPlayerController->HideWorldGenerationLoadingScreen();
+		}
+		return false;
+	}
+
+	if (bShowLoadingScreen)
+	{
+		NotifyWorldGenerationLoadingProgress(4.f, TEXT("Connecting campaign routes"));
+		StartWorldGenerationLoadingTimer();
+	}
+
+	BuildPureGenerationSnapshot();
+	return StartAsyncGenerationContinuation(bShowLoadingScreen);
+}
+
+bool AGeneratorWorldCampaign::StartAsyncGenerationContinuation(const bool bShowLoadingScreen)
+{
+	if (bM_AsyncWorldGenerationInFlight)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("World generation async continuation ignored because generation is already running."));
+		return false;
+	}
+
+	bM_AsyncWorldGenerationInFlight = true;
+	M_AsyncWorldGenerationRequestSerial++;
+	const int32 RequestSerial = M_AsyncWorldGenerationRequestSerial;
+	const TWeakObjectPtr<AGeneratorWorldCampaign> WeakThis(this);
+	Async(EAsyncExecution::ThreadHiPri, [WeakThis, bShowLoadingScreen, RequestSerial]()
+	{
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, bShowLoadingScreen, RequestSerial]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			if (not WeakThis->GetIsCurrentAsyncWorldGenerationRequest(RequestSerial))
+			{
+				return;
+			}
+
+			WeakThis->OnAsyncGenerationContinuationReady(bShowLoadingScreen);
+		});
+	});
+
+	return true;
+}
+
+void AGeneratorWorldCampaign::OnAsyncGenerationContinuationReady(const bool bShowLoadingScreen)
+{
+	const bool bGenerationSucceeded = ExecuteRemainingStepsWithBacktracking();
+	bM_AsyncWorldGenerationInFlight = false;
+	StopWorldGenerationLoadingTimer();
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	if (not bGenerationSucceeded)
+	{
+		if (bShowLoadingScreen && GetIsValidWorldPlayerController())
+		{
+			M_WorldPlayerController->HideWorldGenerationLoadingScreen();
+		}
+		return;
+	}
+
+	if (not RealizeVirtualPlacementState())
+	{
+		if (bShowLoadingScreen && GetIsValidWorldPlayerController())
+		{
+			M_WorldPlayerController->HideWorldGenerationLoadingScreen();
+		}
+		return;
+	}
+
+	M_GenerationStep = ECampaignGenerationStep::Finished;
+	NotifyWorldGenerationLoadingProgress(100.f, TEXT("World generation complete"));
+	if (bShowLoadingScreen && GetIsValidWorldPlayerController())
+	{
+		M_WorldPlayerController->OnWorldGenerationFinished();
+		M_WorldPlayerController->HideWorldGenerationLoadingScreen();
+	}
+}
+
+bool AGeneratorWorldCampaign::ExecuteRemainingStepsWithBacktracking()
+{
+	TArray<ECampaignGenerationStep> StepOrder;
+	StepOrder.Add(ECampaignGenerationStep::AnchorPointsGenerated);
+	StepOrder.Add(ECampaignGenerationStep::ConnectionsCreated);
+	StepOrder.Add(ECampaignGenerationStep::PlayerHQPlaced);
+	StepOrder.Add(ECampaignGenerationStep::EnemyHQPlaced);
+	StepOrder.Add(ECampaignGenerationStep::EnemyWallPlaced);
+	StepOrder.Add(ECampaignGenerationStep::EnemyObjectsPlaced);
+	StepOrder.Add(ECampaignGenerationStep::NeutralObjectsPlaced);
+	StepOrder.Add(ECampaignGenerationStep::MissionsPlaced);
+
+	int32 StepIndex = StepOrder.IndexOfByKey(GetNextStep(M_GenerationStep));
+	if (StepIndex == INDEX_NONE)
+	{
+		StepIndex = 0;
+	}
+	while (StepIndex < StepOrder.Num())
+	{
+		const ECampaignGenerationStep StepToExecute = StepOrder[StepIndex];
+		bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&) = nullptr;
+		if (not GetBacktrackingStepFunction(StepToExecute, StepFunction))
+		{
+			return false;
+		}
+
+		const bool bDidExecute = ExecuteStepWithTransaction(StepToExecute, StepFunction);
+		if (bDidExecute)
+		{
+			StepIndex++;
+			continue;
+		}
+
+		if (not HandleStepFailure(StepToExecute, StepIndex, StepOrder))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::GetBacktrackingStepFunction(
+	const ECampaignGenerationStep StepToExecute,
+	bool (AGeneratorWorldCampaign::*&OutStepFunction)(FCampaignGenerationStepTransaction&)) const
+{
+	switch (StepToExecute)
+	{
+	case ECampaignGenerationStep::AnchorPointsGenerated:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints;
+		return true;
+	case ECampaignGenerationStep::ConnectionsCreated:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecuteCreateConnections;
+		return true;
+	case ECampaignGenerationStep::PlayerHQPlaced:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecutePlaceHQ;
+		return true;
+	case ECampaignGenerationStep::EnemyHQPlaced:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyHQ;
+		return true;
+	case ECampaignGenerationStep::EnemyWallPlaced:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyWall;
+		return true;
+	case ECampaignGenerationStep::EnemyObjectsPlaced:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecutePlaceEnemyObjects;
+		return true;
+	case ECampaignGenerationStep::NeutralObjectsPlaced:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecutePlaceNeutralObjects;
+		return true;
+	case ECampaignGenerationStep::MissionsPlaced:
+		OutStepFunction = &AGeneratorWorldCampaign::ExecutePlaceMissions;
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool AGeneratorWorldCampaign::StartAsyncEditorStep(
+	const ECampaignGenerationStep CompletedStep,
+	bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&))
+{
+	if (bM_AsyncWorldGenerationInFlight)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("World generation editor step ignored because async generation is already running."));
+		return false;
+	}
+
+	bM_AsyncWorldGenerationInFlight = true;
+	M_AsyncWorldGenerationRequestSerial++;
+	const int32 RequestSerial = M_AsyncWorldGenerationRequestSerial;
+	const TWeakObjectPtr<AGeneratorWorldCampaign> WeakThis(this);
+	Async(EAsyncExecution::ThreadHiPri, [WeakThis, CompletedStep, StepFunction, RequestSerial]()
+	{
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, CompletedStep, StepFunction, RequestSerial]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			if (not WeakThis->GetIsCurrentAsyncWorldGenerationRequest(RequestSerial))
+			{
+				return;
+			}
+
+			WeakThis->OnAsyncEditorStepReady(CompletedStep, StepFunction);
+		});
+	});
+
+	return true;
+}
+
+void AGeneratorWorldCampaign::OnAsyncEditorStepReady(
+	const ECampaignGenerationStep CompletedStep,
+	bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&))
+{
+	ExecuteStepWithTransaction(CompletedStep, StepFunction);
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	bM_AsyncWorldGenerationInFlight = false;
+}
+
+void AGeneratorWorldCampaign::CancelAsyncWorldGeneration()
+{
+	M_AsyncWorldGenerationRequestSerial++;
+	bM_AsyncWorldGenerationInFlight = false;
+	bM_DeferWorldObjectPromotionDuringBacktracking = false;
+	StopWorldGenerationLoadingTimer();
+	if (M_WorldPlayerController.IsValid())
+	{
+		M_WorldPlayerController->HideWorldGenerationLoadingScreen();
+	}
+}
+
+bool AGeneratorWorldCampaign::GetIsCurrentAsyncWorldGenerationRequest(const int32 RequestSerial) const
+{
+	return bM_AsyncWorldGenerationInFlight && RequestSerial == M_AsyncWorldGenerationRequestSerial;
+}
+
+FWorldCampaignPureGenerationSnapshot AGeneratorWorldCampaign::BuildPureGenerationSnapshot() const
+{
+	FWorldCampaignPureGenerationSnapshot GenerationSnapshot;
+	GenerationSnapshot.SeedUsed = M_PlacementState.SeedUsed;
+	GenerationSnapshot.CountAndDifficultyTuning = M_CountAndDifficultyTuning;
+	GenerationSnapshot.PlacementFailurePolicy = M_PlacementFailurePolicy;
+	GenerationSnapshot.MissionPlacementPlan = BuildMissionPlacementPlanFiltered();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		FWorldCampaignPureAnchorSnapshot AnchorSnapshot;
+		AnchorSnapshot.AnchorKey = AnchorPoint->GetAnchorKey();
+		AnchorSnapshot.Location = AnchorPoint->GetActorLocation();
+		for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : AnchorPoint->GetNeighborAnchors())
+		{
+			if (IsValid(NeighborAnchor))
+			{
+				AnchorSnapshot.NeighborAnchorKeys.Add(NeighborAnchor->GetAnchorKey());
+			}
+		}
+
+		GenerationSnapshot.Anchors.Add(AnchorSnapshot);
+	}
+
+	return GenerationSnapshot;
+}
+
+void AGeneratorWorldCampaign::NotifyWorldGenerationLoadingProgress(const float ProgressPercent,
+                                                                   const FString& StepDescription) const
+{
+	if (not GetIsValidWorldPlayerController())
+	{
+		return;
+	}
+
+	M_WorldPlayerController->UpdateWorldGenerationLoadingScreen(ProgressPercent, StepDescription);
+}
+
+void AGeneratorWorldCampaign::StartWorldGenerationLoadingTimer()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	constexpr float SecondsPerMinute = 60.f;
+	constexpr float RemainingPercent = 96.f;
+	constexpr float LoadingDurationMinutes = 10.f;
+	constexpr float TimerInterval = LoadingDurationMinutes * SecondsPerMinute / RemainingPercent;
+	M_WorldGenerationLoadingPercent = 4;
+	World->GetTimerManager().SetTimer(
+		M_WorldGenerationLoadingTimerHandle,
+		this,
+		&AGeneratorWorldCampaign::TickWorldGenerationLoadingProgress,
+		TimerInterval,
+		true);
+}
+
+void AGeneratorWorldCampaign::StopWorldGenerationLoadingTimer()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_WorldGenerationLoadingTimerHandle);
+}
+
+void AGeneratorWorldCampaign::TickWorldGenerationLoadingProgress()
+{
+	constexpr int32 MaxProgressBeforeComplete = 99;
+	if (M_WorldGenerationLoadingPercent >= MaxProgressBeforeComplete)
+	{
+		return;
+	}
+
+	M_WorldGenerationLoadingPercent++;
+	NotifyWorldGenerationLoadingProgress(
+		static_cast<float>(M_WorldGenerationLoadingPercent),
+		TEXT("Calculating virtual campaign layout"));
 }
 
 bool AGeneratorWorldCampaign::ExecuteAllStepsWithBacktracking()

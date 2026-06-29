@@ -14,6 +14,7 @@
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/WorldGenerationLoadingScreen/W_WorldGenerationLoadingScreen.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
@@ -49,6 +50,75 @@ UWorldStateAndSaveManager* AWorldPlayerController::GetWorldStateAndSaveManager()
 	return M_WorldStateAndSaveManager;
 }
 
+void AWorldPlayerController::ShowWorldGenerationLoadingScreen()
+{
+	if (IsValid(M_WorldGenerationLoadingScreen))
+	{
+		M_WorldGenerationLoadingScreen->SetGenerationProgress(0.f, TEXT("Preparing world generation"));
+		return;
+	}
+
+	if (not IsValid(M_WorldGenerationLoadingScreenClass))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			TEXT("M_WorldGenerationLoadingScreenClass"),
+			TEXT("ShowWorldGenerationLoadingScreen"),
+			this
+		);
+		return;
+	}
+
+	M_WorldGenerationLoadingScreen = CreateWidget<UW_WorldGenerationLoadingScreen>(
+		this,
+		M_WorldGenerationLoadingScreenClass);
+	if (not IsValid(M_WorldGenerationLoadingScreen))
+	{
+		return;
+	}
+
+	M_WorldGenerationLoadingScreen->AddToViewport();
+	M_WorldGenerationLoadingScreen->SetGenerationProgress(0.f, TEXT("Preparing world generation"));
+}
+
+void AWorldPlayerController::UpdateWorldGenerationLoadingScreen(const float ProgressPercent,
+                                                                const FString& StepDescription)
+{
+	if (not IsValid(M_WorldGenerationLoadingScreen))
+	{
+		return;
+	}
+
+	M_WorldGenerationLoadingScreen->SetGenerationProgress(ProgressPercent, StepDescription);
+}
+
+void AWorldPlayerController::HideWorldGenerationLoadingScreen()
+{
+	if (not IsValid(M_WorldGenerationLoadingScreen))
+	{
+		return;
+	}
+
+	M_WorldGenerationLoadingScreen->RemoveFromParent();
+	M_WorldGenerationLoadingScreen = nullptr;
+}
+
+void AWorldPlayerController::OnWorldGenerationFinished()
+{
+	if (not GetIsValidWorldGenerator() || not GetIsValidWorldProfileAndUIManager() || not
+		GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
+
+	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
+	const FPlayerProfileSaveData PlayerProfileSaveData = M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(
+		M_PlayerFaction);
+	M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
+	BeginPlay_SpawnWorldFowManager();
+	OnInitialWorldSetupComplete();
+}
+
 void AWorldPlayerController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -62,7 +132,11 @@ void AWorldPlayerController::BeginPlay()
 	BeginPlay_SetupWorldGenerator();
 	BeginPlay_SetupWorldMenu();
 	BeginPlay_GameState_Faction_CampaignSettings();
-	BeginPlay_GenerateOrLoadWorld();
+	if (not BeginPlay_GenerateOrLoadWorld())
+	{
+		return;
+	}
+
 	BeginPlay_SpawnWorldFowManager();
 	OnInitialWorldSetupComplete();
 }
@@ -379,12 +453,12 @@ void AWorldPlayerController::BeginPlay_GameState_Faction_CampaignSettings()
 	M_PlayerFaction = PlayerFaction;
 }
 
-void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
+bool AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 {
 	if (not GetIsValidWorldProfileAndUIManager() || not GetIsValidWorldGenerator() || not
 		GetIsValidWorldStateAndSaveManager())
 	{
-		return;
+		return false;
 	}
 
 	M_WorldGenerator->InitializeWorldGenerator(
@@ -395,22 +469,19 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 
 	if (M_CampaignSettings.bNeedsToGenerateCampaign)
 	{
-		M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
-		const FPlayerProfileSaveData PlayerProfileSaveData = M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(
-			M_PlayerFaction);
-		M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
-		return;
+		return false;
 	}
 
 	FWorldCampaignState LoadedWorldCampaignState;
 	FPlayerProfileSaveData LoadedPlayerProfileSaveData;
 	if (not M_WorldStateAndSaveManager->LoadCampaignState(LoadedWorldCampaignState, LoadedPlayerProfileSaveData))
 	{
-		return;
+		return false;
 	}
 
 	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
 	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
+	return true;
 }
 
 
