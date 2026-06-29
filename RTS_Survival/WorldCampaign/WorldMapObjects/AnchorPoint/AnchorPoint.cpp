@@ -1,7 +1,7 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
+#include "AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
-#include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"

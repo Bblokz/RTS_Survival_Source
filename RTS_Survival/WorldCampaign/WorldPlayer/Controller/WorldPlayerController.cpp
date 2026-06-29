@@ -416,12 +416,7 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 
 void AWorldPlayerController::BeginPlay_SpawnWorldFowManager()
 {
-	if (not GetIsValidWorldGenerator())
-	{
-		return;
-	}
-
-	if (not IsValid(M_WorldFowManagerClass))
+	if (not GetIsValidWorldGenerator() ||not IsValid(M_WorldFowManagerClass ))
 	{
 		return;
 	}

@@ -82,6 +82,7 @@ private:
 	TObjectPtr<UTexture2D> M_MaskTexture = nullptr;
 
 	TArray<FColor> M_MaskPixels;
+	UPROPERTY()
 	TMap<const AAnchorPoint*, EWorldMapFowState> M_AnchorStates;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW", meta = (AllowPrivateAccess = "true"))
