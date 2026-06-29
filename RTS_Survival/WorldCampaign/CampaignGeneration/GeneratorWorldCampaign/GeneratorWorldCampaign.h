@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "TimerManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
@@ -284,6 +285,46 @@ struct FEmptyAnchorDistance
 	float DistanceSquared = 0.f;
 };
 
+enum class EWorldCampaignPurePlacementKind : uint8
+{
+	Enemy,
+	Neutral,
+	Mission
+};
+
+struct FWorldCampaignPureAnchorSnapshot
+{
+	FGuid AnchorKey;
+	FVector2D Location = FVector2D::ZeroVector;
+	TArray<FGuid> NeighborAnchorKeys;
+};
+
+struct FWorldCampaignPurePlacementRequest
+{
+	EWorldCampaignPurePlacementKind PlacementKind = EWorldCampaignPurePlacementKind::Enemy;
+	EMapEnemyItem EnemyType = EMapEnemyItem::None;
+	EMapNeutralObjectType NeutralType = EMapNeutralObjectType::None;
+	EMapMission MissionType = EMapMission::None;
+};
+
+struct FWorldCampaignPureGenerationSnapshot
+{
+	int32 SeedUsed = 0;
+	TArray<FWorldCampaignPureAnchorSnapshot> Anchors;
+	TArray<FWorldCampaignPurePlacementRequest> PlacementRequests;
+};
+
+struct FWorldCampaignPureGenerationResult
+{
+	bool bSucceeded = false;
+	bool bUsedFailSafe = false;
+	FGuid PlayerHQAnchorKey;
+	FGuid EnemyHQAnchorKey;
+	TMap<FGuid, EMapEnemyItem> EnemyItemPlacementsByAnchorKey;
+	TMap<FGuid, EMapNeutralObjectType> NeutralPlacementsByAnchorKey;
+	TMap<FGuid, EMapMission> MissionPlacementsByAnchorKey;
+};
+
 USTRUCT(BlueprintType)
 struct FCampaignGenerationStepTransaction
 {
@@ -456,6 +497,7 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	void InitializeWorldGenerator(
 		AWorldPlayerController* WorldPlayerController,
@@ -647,6 +689,7 @@ public:
 
 private:
 	void ApplyDebuggerSettingsToComponent();
+	bool GetIsValidWorldPlayerController() const;
 	bool GetIsValidPlayerHQAnchor() const;
 	bool GetIsValidEnemyHQAnchor() const;
 
@@ -756,6 +799,27 @@ private:
 	                                const TArray<TObjectPtr<AAnchorPoint>>& RestoredAnchors);
 
 	bool ExecuteAllStepsWithBacktracking();
+	bool ExecuteAllStepsWithAsyncBacktracking(bool bShowLoadingScreen);
+	FWorldCampaignPureGenerationSnapshot BuildPureGenerationSnapshot() const;
+	bool StartAsyncGenerationContinuation(bool bShowLoadingScreen);
+	void OnAsyncGenerationContinuationReady(const FWorldCampaignPureGenerationResult& GenerationResult,
+	                                        bool bShowLoadingScreen);
+	static FWorldCampaignPureGenerationResult RunPureDataBacktracking(
+		const FWorldCampaignPureGenerationSnapshot& GenerationSnapshot);
+	void ApplyPureGenerationResult(const FWorldCampaignPureGenerationResult& GenerationResult);
+	bool GetBacktrackingStepFunction(ECampaignGenerationStep StepToExecute,
+	                                 bool (AGeneratorWorldCampaign::*&OutStepFunction)(
+		                                 FCampaignGenerationStepTransaction&)) const;
+	bool StartAsyncEditorStep(ECampaignGenerationStep CompletedStep,
+	                          bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&));
+	void OnAsyncEditorStepReady(ECampaignGenerationStep CompletedStep,
+	                            bool (AGeneratorWorldCampaign::*StepFunction)(FCampaignGenerationStepTransaction&));
+	void CancelAsyncWorldGeneration();
+	bool GetIsCurrentAsyncWorldGenerationRequest(int32 RequestSerial) const;
+	void NotifyWorldGenerationLoadingProgress(float ProgressPercent, const FString& StepDescription) const;
+	void StartWorldGenerationLoadingTimer();
+	void StopWorldGenerationLoadingTimer();
+	void TickWorldGenerationLoadingProgress();
 	bool CanExecuteStep(ECampaignGenerationStep CompletedStep) const;
 	ECampaignGenerationStep GetPrerequisiteStep(ECampaignGenerationStep CompletedStep) const;
 	ECampaignGenerationStep GetNextStep(ECampaignGenerationStep CurrentStep) const;
@@ -1086,6 +1150,11 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation",
 		meta = (AllowPrivateAccess = "true"))
 	bool bM_DeferWorldObjectPromotionDuringBacktracking = false;
+
+	FTimerHandle M_WorldGenerationLoadingTimerHandle;
+	int32 M_WorldGenerationLoadingPercent = 4;
+	bool bM_AsyncWorldGenerationInFlight = false;
+	int32 M_AsyncWorldGenerationRequestSerial = 0;
 
 	/**
 	 * @note Used in: ConnectionsCreated.
