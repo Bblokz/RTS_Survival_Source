@@ -27,13 +27,4 @@ struct FWorldMapFowStateSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW")
 	float M_ConnectionCorridorWidth = 450.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW")
-	bool bM_WritesVisibleMask = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW")
-	bool bM_WritesExplorableMask = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW")
-	bool bM_WritesPOIMask = false;
 };
