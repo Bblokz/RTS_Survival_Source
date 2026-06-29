@@ -21,7 +21,8 @@ namespace WorldFowMaskConstants
 	constexpr int32 ExplorableChannelIndex = 1;
 	constexpr int32 POIChannelIndex = 2;
 	constexpr int32 NoMaskChannelIndex = -1;
-	constexpr int32 ConnectionStampSteps = 64;
+	constexpr int32 MinimumLineRasterizationSamples = 32;
+	constexpr int32 MaximumLineRasterizationSamples = 128;
 	constexpr int32 MinimumMaskResolution = 8;
 	constexpr float HalfUVOffset = 0.5f;
 }
@@ -495,11 +496,27 @@ void AWorldFowManager::StampLine(
 	const float Falloff,
 	const int32 ChannelIndex)
 {
-	for (int32 StepIndex = 0; StepIndex <= WorldFowMaskConstants::ConnectionStampSteps; ++StepIndex)
+	const int32 LineRasterizationSampleCount = GetLineRasterizationSampleCount(Start, End);
+	for (int32 StepIndex = 0; StepIndex <= LineRasterizationSampleCount; ++StepIndex)
 	{
-		const float Alpha = static_cast<float>(StepIndex) / WorldFowMaskConstants::ConnectionStampSteps;
+		const float Alpha = static_cast<float>(StepIndex) / LineRasterizationSampleCount;
 		StampCircle(FMath::Lerp(Start, End, Alpha), Width, Falloff, ChannelIndex);
 	}
+}
+
+int32 AWorldFowManager::GetLineRasterizationSampleCount(const FVector& Start, const FVector& End) const
+{
+	const float CorridorLength = FVector::Dist2D(Start, End);
+	const FVector2D MapSize = GetIsValidWorldFowCloud() ? M_WorldFowCloud->GetMapSizeXY() : FVector2D::ZeroVector;
+	const float MapDiagonal = FMath::Max(1.0f, MapSize.Size());
+	const float LengthAlpha = FMath::Clamp(CorridorLength / MapDiagonal, 0.0f, 1.0f);
+	const float BaseSampleCount = FMath::Lerp(
+		static_cast<float>(WorldFowMaskConstants::MinimumLineRasterizationSamples),
+		static_cast<float>(WorldFowMaskConstants::MaximumLineRasterizationSamples),
+		LengthAlpha
+	);
+
+	return FMath::Max(1, FMath::RoundToInt(BaseSampleCount * FMath::Max(0.0f, M_LineRasterizationSamplingMlt)));
 }
 
 void AWorldFowManager::WriteMaskPixelChannel(FColor& Pixel, const int32 ChannelIndex, const uint8 Value) const
