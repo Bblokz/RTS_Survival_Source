@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "WorldMapFowTypes.h"
+#include "UObject/ObjectKey.h"
 #include "WorldFowManager.generated.h"
 
 class AAnchorPoint;
@@ -43,11 +44,15 @@ public:
 	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
 	void Debug_HideAll();
 
+protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
 	bool GetIsValidWorldGenerator() const;
 	bool GetIsValidWorldFowCloud() const;
 	void CacheCloudActor();
 	void InitializeMissingCampaignActorStates();
+	void RemoveStaleAnchorStates();
 	void ApplyRevealRulesFromVisibleAnchors();
 	void ApplyWorldObjectStates();
 	void ApplyConnectionStates();
@@ -83,8 +88,7 @@ private:
 	TObjectPtr<UTexture2D> M_MaskTexture = nullptr;
 
 	TArray<FColor> M_MaskPixels;
-	UPROPERTY()
-	TMap<const AAnchorPoint*, EWorldMapFowState> M_AnchorStates;
+	TMap<TObjectKey<const AAnchorPoint>, EWorldMapFowState> M_AnchorStates;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW", meta = (AllowPrivateAccess = "true"))
 	int32 M_MaskResolution = 512;
