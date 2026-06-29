@@ -21,7 +21,7 @@
 namespace WorldFowDebugConstants
 {
 	constexpr float WorldStringDurationSeconds = 10.f;
-	constexpr float WorldStringZOffset = 25.f;
+	constexpr float WorldStringZOffset = 250.f;
 	const FColor VisibleColor = FColor::Green;
 	const FColor ExplorableColor = FColor::Yellow;
 	const FColor POIVisibleColor = FColor::Cyan;
