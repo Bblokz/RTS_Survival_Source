@@ -24,6 +24,7 @@ void AWorldMapObject::InitializeForAnchor(AAnchorPoint* AnchorPoint)
 		return;
 	}
 
+	SetActorTransform(AnchorPoint->GetActorTransform());
 	M_OwningAnchor = AnchorPoint;
 	M_AnchorKey = AnchorPoint->GetAnchorKey();
 }

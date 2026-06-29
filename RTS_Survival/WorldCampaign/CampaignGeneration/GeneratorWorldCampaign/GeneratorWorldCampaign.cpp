@@ -4831,6 +4831,7 @@ void AGeneratorWorldCampaign::EraseAllGeneration()
 
 			if (AnchorPoint->Tags.Contains(GeneratedAnchorTag))
 			{
+				AnchorPoint->RemovePromotedWorldObject();
 				AnchorPoint->Destroy();
 			}
 		}

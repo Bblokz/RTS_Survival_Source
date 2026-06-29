@@ -220,6 +220,7 @@ AWorldMapObject* AAnchorPoint::OnEnemyItemPromotion(EMapEnemyItem EnemyItemType,
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AWorldEnemyObject* SpawnedObject = World->SpawnActor<AWorldEnemyObject>(*EnemyClass, GetActorTransform(),
 	                                                                        SpawnParameters);
 	if (not IsValid(SpawnedObject))
@@ -267,6 +268,7 @@ AWorldMapObject* AAnchorPoint::OnNeutralItemPromotion(EMapNeutralObjectType Neut
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AWorldNeutralObject* SpawnedObject = World->SpawnActor<AWorldNeutralObject>(*NeutralClass, GetActorTransform(),
 	                                                                            SpawnParameters);
 	if (not IsValid(SpawnedObject))
@@ -313,6 +315,7 @@ AWorldMapObject* AAnchorPoint::OnMissionPromotion(EMapMission MissionType, ECamp
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AWorldMissionObject* SpawnedObject = World->SpawnActor<AWorldMissionObject>(*MissionClass, GetActorTransform(),
 	                                                                            SpawnParameters);
 	if (not IsValid(SpawnedObject))
@@ -360,6 +363,7 @@ AWorldMapObject* AAnchorPoint::OnPlayerItemPromotion(EMapPlayerItem PlayerItemTy
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AWorldPlayerObject* SpawnedObject = World->SpawnActor<AWorldPlayerObject>(*PlayerClass, GetActorTransform(),
 	                                                                          SpawnParameters);
 	if (not IsValid(SpawnedObject))
