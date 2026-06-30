@@ -8,6 +8,8 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 
 namespace WorldCampaignPruningHelper
 {
@@ -21,6 +23,14 @@ namespace WorldCampaignPruningHelper
 			AAnchorPoint* AnchorA = nullptr;
 			AAnchorPoint* AnchorB = nullptr;
 			float Weight = 0.f;
+		};
+
+		struct FPlayerHQRelayCandidate
+		{
+			AAnchorPoint* Anchor = nullptr;
+			float TargetDistanceSquared = TNumericLimits<float>::Max();
+			float HQDistanceSquared = 0.f;
+			float LateralDistanceSquared = TNumericLimits<float>::Max();
 		};
 
 		struct FPruningGraph
@@ -342,6 +352,344 @@ namespace WorldCampaignPruningHelper
 			InOutEdgeKeys.Add(EdgeKey);
 		}
 
+		TSet<FString> BuildContractedEdgeKeys(const TArray<FContractedEdge>& ContractedEdges)
+		{
+			TSet<FString> EdgeKeys;
+			EdgeKeys.Reserve(ContractedEdges.Num());
+			for (const FContractedEdge& ContractedEdge : ContractedEdges)
+			{
+				const FString EdgeKey = BuildEdgeKey(ContractedEdge.AnchorA, ContractedEdge.AnchorB);
+				if (EdgeKey.IsEmpty())
+				{
+					continue;
+				}
+
+				EdgeKeys.Add(EdgeKey);
+			}
+
+			return EdgeKeys;
+		}
+
+		FVector2D GetAnchorLocationXY(const AAnchorPoint* AnchorPoint)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				return FVector2D::ZeroVector;
+			}
+
+			const FVector AnchorLocation = AnchorPoint->GetActorLocation();
+			return FVector2D(AnchorLocation.X, AnchorLocation.Y);
+		}
+
+		float GetAnchorDistanceSquaredXY(const AAnchorPoint* AnchorA, const AAnchorPoint* AnchorB)
+		{
+			return FVector2D::DistSquared(GetAnchorLocationXY(AnchorA), GetAnchorLocationXY(AnchorB));
+		}
+
+		float GetLateralDistanceSquaredToSegmentXY(
+			const FVector2D& Point,
+			const FVector2D& SegmentStart,
+			const FVector2D& SegmentEnd)
+		{
+			const FVector2D SegmentVector = SegmentEnd - SegmentStart;
+			const float SegmentLengthSquared = SegmentVector.SizeSquared();
+			if (SegmentLengthSquared <= KINDA_SMALL_NUMBER)
+			{
+				return FVector2D::DistSquared(Point, SegmentStart);
+			}
+
+			const FVector2D PointVector = Point - SegmentStart;
+			const float Projection = FVector2D::DotProduct(PointVector, SegmentVector) / SegmentLengthSquared;
+			const float ClampedProjection = FMath::Clamp(Projection, 0.f, 1.f);
+			const FVector2D ProjectedPoint = SegmentStart + SegmentVector * ClampedProjection;
+			return FVector2D::DistSquared(Point, ProjectedPoint);
+		}
+
+		bool GetIsMissionOrEnemyAnchor(const AAnchorPoint* AnchorPoint)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				return false;
+			}
+
+			const AWorldMapObject* PromotedWorldObject = AnchorPoint->GetPromotedWorldObject();
+			return IsValid(Cast<AWorldMissionObject>(PromotedWorldObject))
+				|| IsValid(Cast<AWorldEnemyObject>(PromotedWorldObject));
+		}
+
+		AAnchorPoint* GetPlayerHQDirectEdgeTarget(
+			const FContractedEdge& ContractedEdge,
+			const AAnchorPoint* PlayerHQAnchor)
+		{
+			if (not IsValid(PlayerHQAnchor))
+			{
+				return nullptr;
+			}
+
+			if (ContractedEdge.AnchorA == PlayerHQAnchor)
+			{
+				return ContractedEdge.AnchorB;
+			}
+
+			if (ContractedEdge.AnchorB == PlayerHQAnchor)
+			{
+				return ContractedEdge.AnchorA;
+			}
+
+			return nullptr;
+		}
+
+		TMap<FGuid, TArray<FGuid>> BuildContractedNeighborKeysByAnchorKey(
+			const TArray<FContractedEdge>& ContractedEdges,
+			const FString& EdgeKeyToIgnore)
+		{
+			TMap<FGuid, TArray<FGuid>> NeighborKeysByAnchorKey;
+			for (const FContractedEdge& ContractedEdge : ContractedEdges)
+			{
+				if (not IsValid(ContractedEdge.AnchorA) || not IsValid(ContractedEdge.AnchorB))
+				{
+					continue;
+				}
+
+				const FString EdgeKey = BuildEdgeKey(ContractedEdge.AnchorA, ContractedEdge.AnchorB);
+				if (not EdgeKeyToIgnore.IsEmpty() && EdgeKey == EdgeKeyToIgnore)
+				{
+					continue;
+				}
+
+				AddNeighborKey(
+					NeighborKeysByAnchorKey,
+					ContractedEdge.AnchorA->GetAnchorKey(),
+					ContractedEdge.AnchorB->GetAnchorKey());
+				AddNeighborKey(
+					NeighborKeysByAnchorKey,
+					ContractedEdge.AnchorB->GetAnchorKey(),
+					ContractedEdge.AnchorA->GetAnchorKey());
+			}
+
+			return NeighborKeysByAnchorKey;
+		}
+
+		TSet<FGuid> BuildReachableAnchorKeysFromNeighborMap(
+			const TMap<FGuid, TArray<FGuid>>& NeighborKeysByAnchorKey,
+			const FGuid& StartAnchorKey)
+		{
+			TSet<FGuid> ReachableAnchorKeys;
+			if (not StartAnchorKey.IsValid())
+			{
+				return ReachableAnchorKeys;
+			}
+
+			TQueue<FGuid> AnchorQueue;
+			AnchorQueue.Enqueue(StartAnchorKey);
+			ReachableAnchorKeys.Add(StartAnchorKey);
+
+			while (not AnchorQueue.IsEmpty())
+			{
+				FGuid CurrentAnchorKey;
+				AnchorQueue.Dequeue(CurrentAnchorKey);
+				const TArray<FGuid>* NeighborKeys = NeighborKeysByAnchorKey.Find(CurrentAnchorKey);
+				if (NeighborKeys == nullptr)
+				{
+					continue;
+				}
+
+				for (const FGuid& NeighborKey : *NeighborKeys)
+				{
+					if (ReachableAnchorKeys.Contains(NeighborKey))
+					{
+						continue;
+					}
+
+					ReachableAnchorKeys.Add(NeighborKey);
+					AnchorQueue.Enqueue(NeighborKey);
+				}
+			}
+
+			return ReachableAnchorKeys;
+		}
+
+		TSet<FGuid> BuildReachableContractedAnchorKeys(
+			const TArray<FContractedEdge>& ContractedEdges,
+			const FGuid& StartAnchorKey,
+			const FString& EdgeKeyToIgnore)
+		{
+			const TMap<FGuid, TArray<FGuid>> NeighborKeysByAnchorKey =
+				BuildContractedNeighborKeysByAnchorKey(ContractedEdges, EdgeKeyToIgnore);
+			return BuildReachableAnchorKeysFromNeighborMap(NeighborKeysByAnchorKey, StartAnchorKey);
+		}
+
+		bool GetIsCandidateBetweenPlayerHQAndTarget(
+			const AAnchorPoint* PlayerHQAnchor,
+			const AAnchorPoint* TargetAnchor,
+			const AAnchorPoint* CandidateAnchor)
+		{
+			const FVector2D HQLocationXY = GetAnchorLocationXY(PlayerHQAnchor);
+			const FVector2D TargetLocationXY = GetAnchorLocationXY(TargetAnchor);
+			const FVector2D CandidateLocationXY = GetAnchorLocationXY(CandidateAnchor);
+			const FVector2D HQToTarget = TargetLocationXY - HQLocationXY;
+			const FVector2D HQToCandidate = CandidateLocationXY - HQLocationXY;
+			const float TargetDistanceSquared = HQToTarget.SizeSquared();
+			if (TargetDistanceSquared <= KINDA_SMALL_NUMBER)
+			{
+				return false;
+			}
+
+			const float CandidateProjection = FVector2D::DotProduct(HQToCandidate, HQToTarget);
+			return CandidateProjection > KINDA_SMALL_NUMBER
+				&& CandidateProjection + KINDA_SMALL_NUMBER < TargetDistanceSquared;
+		}
+
+		bool GetCanUsePlayerHQRelayAnchor(
+			const AAnchorPoint* PlayerHQAnchor,
+			const AAnchorPoint* TargetAnchor,
+			const AAnchorPoint* CandidateAnchor,
+			const TSet<FGuid>& ReachableAnchorKeysWithoutDirectEdge)
+		{
+			if (not IsValid(PlayerHQAnchor) || not IsValid(TargetAnchor) || not IsValid(CandidateAnchor))
+			{
+				return false;
+			}
+
+			if (CandidateAnchor == PlayerHQAnchor || CandidateAnchor == TargetAnchor)
+			{
+				return false;
+			}
+
+			if (not ReachableAnchorKeysWithoutDirectEdge.Contains(CandidateAnchor->GetAnchorKey()))
+			{
+				return false;
+			}
+
+			if (not GetIsMissionOrEnemyAnchor(CandidateAnchor))
+			{
+				return false;
+			}
+
+			const float TargetHQDistanceSquared = GetAnchorDistanceSquaredXY(PlayerHQAnchor, TargetAnchor);
+			const float CandidateHQDistanceSquared = GetAnchorDistanceSquaredXY(PlayerHQAnchor, CandidateAnchor);
+			if (CandidateHQDistanceSquared + KINDA_SMALL_NUMBER >= TargetHQDistanceSquared)
+			{
+				return false;
+			}
+
+			const float CandidateTargetDistanceSquared = GetAnchorDistanceSquaredXY(CandidateAnchor, TargetAnchor);
+			if (CandidateTargetDistanceSquared + KINDA_SMALL_NUMBER >= TargetHQDistanceSquared)
+			{
+				return false;
+			}
+
+			return GetIsCandidateBetweenPlayerHQAndTarget(PlayerHQAnchor, TargetAnchor, CandidateAnchor);
+		}
+
+		bool GetShouldReplaceBestRelayCandidate(
+			const FPlayerHQRelayCandidate& Candidate,
+			const FPlayerHQRelayCandidate& BestCandidate)
+		{
+			if (not IsValid(BestCandidate.Anchor))
+			{
+				return true;
+			}
+
+			if (Candidate.TargetDistanceSquared != BestCandidate.TargetDistanceSquared)
+			{
+				return Candidate.TargetDistanceSquared < BestCandidate.TargetDistanceSquared;
+			}
+
+			if (Candidate.HQDistanceSquared != BestCandidate.HQDistanceSquared)
+			{
+				return Candidate.HQDistanceSquared > BestCandidate.HQDistanceSquared;
+			}
+
+			if (Candidate.LateralDistanceSquared != BestCandidate.LateralDistanceSquared)
+			{
+				return Candidate.LateralDistanceSquared < BestCandidate.LateralDistanceSquared;
+			}
+
+			return AAnchorPoint::IsAnchorKeyLess(
+				Candidate.Anchor->GetAnchorKey(),
+				BestCandidate.Anchor->GetAnchorKey());
+		}
+
+		AAnchorPoint* FindBestPlayerHQRelayAnchor(
+			const FPruningGraph& Graph,
+			const AAnchorPoint* PlayerHQAnchor,
+			const AAnchorPoint* TargetAnchor,
+			const TSet<FGuid>& ReachableAnchorKeysWithoutDirectEdge)
+		{
+			FPlayerHQRelayCandidate BestCandidate;
+			for (const TPair<FGuid, TObjectPtr<AAnchorPoint>>& AnchorPair : Graph.KeptAnchorsByKey)
+			{
+				AAnchorPoint* CandidateAnchor = AnchorPair.Value.Get();
+				if (not GetCanUsePlayerHQRelayAnchor(
+					PlayerHQAnchor,
+					TargetAnchor,
+					CandidateAnchor,
+					ReachableAnchorKeysWithoutDirectEdge))
+				{
+					continue;
+				}
+
+				FPlayerHQRelayCandidate Candidate;
+				Candidate.Anchor = CandidateAnchor;
+				Candidate.TargetDistanceSquared = GetAnchorDistanceSquaredXY(CandidateAnchor, TargetAnchor);
+				Candidate.HQDistanceSquared = GetAnchorDistanceSquaredXY(PlayerHQAnchor, CandidateAnchor);
+				Candidate.LateralDistanceSquared = GetLateralDistanceSquaredToSegmentXY(
+					GetAnchorLocationXY(CandidateAnchor),
+					GetAnchorLocationXY(PlayerHQAnchor),
+					GetAnchorLocationXY(TargetAnchor));
+				if (GetShouldReplaceBestRelayCandidate(Candidate, BestCandidate))
+				{
+					BestCandidate = Candidate;
+				}
+			}
+
+			return BestCandidate.Anchor;
+		}
+
+		void RefinePlayerHQDirectEdgesThroughCloserAnchors(
+			FPruningGraph& InOutGraph,
+			const AAnchorPoint* PlayerHQAnchor)
+		{
+			if (not IsValid(PlayerHQAnchor))
+			{
+				return;
+			}
+
+			const FGuid PlayerHQAnchorKey = PlayerHQAnchor->GetAnchorKey();
+			TSet<FString> EdgeKeys = BuildContractedEdgeKeys(InOutGraph.ContractedEdges);
+			for (int32 EdgeIndex = 0; EdgeIndex < InOutGraph.ContractedEdges.Num(); EdgeIndex++)
+			{
+				FContractedEdge& ContractedEdge = InOutGraph.ContractedEdges[EdgeIndex];
+				AAnchorPoint* TargetAnchor = GetPlayerHQDirectEdgeTarget(ContractedEdge, PlayerHQAnchor);
+				if (not IsValid(TargetAnchor))
+				{
+					continue;
+				}
+
+				const FString DirectEdgeKey = BuildEdgeKey(PlayerHQAnchor, TargetAnchor);
+				const TSet<FGuid> ReachableAnchorKeysWithoutDirectEdge =
+					BuildReachableContractedAnchorKeys(
+						InOutGraph.ContractedEdges,
+						PlayerHQAnchorKey,
+						DirectEdgeKey);
+				AAnchorPoint* RelayAnchor = FindBestPlayerHQRelayAnchor(
+					InOutGraph,
+					PlayerHQAnchor,
+					TargetAnchor,
+					ReachableAnchorKeysWithoutDirectEdge);
+				if (not IsValid(RelayAnchor))
+				{
+					continue;
+				}
+
+				InOutGraph.ContractedEdges.RemoveAt(EdgeIndex);
+				EdgeKeys.Remove(DirectEdgeKey);
+				AddContractedEdge(InOutGraph, EdgeKeys, RelayAnchor, TargetAnchor);
+				EdgeIndex--;
+			}
+		}
+
 		void AddDirectKeptAnchorEdges(FPruningGraph& InOutGraph, TSet<FString>& InOutEdgeKeys)
 		{
 			for (const TPair<FGuid, TObjectPtr<AAnchorPoint>>& AnchorPair : InOutGraph.KeptAnchorsByKey)
@@ -544,11 +892,12 @@ namespace WorldCampaignPruningHelper
 			}
 		}
 
-		void BuildContractedEdges(FPruningGraph& InOutGraph)
+		void BuildContractedEdges(FPruningGraph& InOutGraph, const AAnchorPoint* PlayerHQAnchor)
 		{
 			TSet<FString> EdgeKeys;
 			AddDirectKeptAnchorEdges(InOutGraph, EdgeKeys);
 			AddEmptyComponentContractedEdges(InOutGraph, EdgeKeys);
+			RefinePlayerHQDirectEdgesThroughCloserAnchors(InOutGraph, PlayerHQAnchor);
 		}
 
 		TSubclassOf<AConnection> GetConnectionClassToSpawn(const FWorldCampaignPruningContext& Context)
@@ -1037,7 +1386,7 @@ namespace WorldCampaignPruningHelper
 
 		CompactInvalidGraphEntries(Context, Result);
 		FPruningGraph Graph = BuildPruningGraph(Context);
-		BuildContractedEdges(Graph);
+		BuildContractedEdges(Graph, Context.PlayerHQAnchor);
 
 		DestroyOldConnections(Context, Result);
 		DestroyEmptyAnchors(Context, Graph, Result);
