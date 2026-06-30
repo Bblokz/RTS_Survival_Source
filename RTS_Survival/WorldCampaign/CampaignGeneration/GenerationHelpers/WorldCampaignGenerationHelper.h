@@ -86,7 +86,7 @@ namespace CampaignGenerationHelper
     			return;
     		}
     
-    		// Fisher–Yates shuffle driven by FRandomStream (deterministic for a given seed).
+    		// Fisher-Yates shuffle driven by FRandomStream (deterministic for a given seed).
     		for (int32 LastIndex = ElementCount - 1; LastIndex > 0; --LastIndex)
     		{
     			const int32 SwapIndex = RandomStream.RandRange(0, LastIndex);

@@ -4,8 +4,8 @@
 
 #include "Containers/Queue.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
@@ -14,30 +14,22 @@ namespace WorldCampaignPruningHelper
 	namespace
 	{
 		constexpr float HalfValue = 0.5f;
-		constexpr int32 LeafNeighborCountMax = 1;
-		constexpr int32 ChainNeighborCount = 2;
 		constexpr int32 MinConnectionAnchorCount = 2;
-		constexpr int32 MaxUniqueGuidAttempts = 16;
 
-		const FName GeneratedAnchorTag(TEXT("WC_GeneratedAnchor"));
-		const FName RepairAnchorTag(TEXT("WC_PruneRepairAnchor"));
-
-		struct FAnchorPair
+		struct FContractedEdge
 		{
 			AAnchorPoint* AnchorA = nullptr;
 			AAnchorPoint* AnchorB = nullptr;
+			float Weight = 0.f;
 		};
 
-		struct FClosestRepairPair
+		struct FPruningGraph
 		{
-			AAnchorPoint* ReachableAnchor = nullptr;
-			AAnchorPoint* UnreachableAnchor = nullptr;
-			float DistanceSquared = TNumericLimits<float>::Max();
-
-			bool GetIsValid() const
-			{
-				return IsValid(ReachableAnchor) && IsValid(UnreachableAnchor);
-			}
+			TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorsByKey;
+			TMap<FGuid, TArray<FGuid>> NeighborKeysByAnchorKey;
+			TSet<FGuid> KeptAnchorKeys;
+			TMap<FGuid, TObjectPtr<AAnchorPoint>> KeptAnchorsByKey;
+			TArray<FContractedEdge> ContractedEdges;
 		};
 
 		bool GetIsValidContext(const FWorldCampaignPruningContext& Context)
@@ -69,6 +61,21 @@ namespace WorldCampaignPruningHelper
 			}
 
 			return true;
+		}
+
+		bool GetIsGameplayAnchor(const AAnchorPoint* AnchorPoint, const TSet<FGuid>& GameplayAnchorKeys)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				return false;
+			}
+
+			if (GameplayAnchorKeys.Contains(AnchorPoint->GetAnchorKey()))
+			{
+				return true;
+			}
+
+			return AnchorPoint->GetHasPromotedWorldObject();
 		}
 
 		bool ContainsAnchor(const TArray<TObjectPtr<AAnchorPoint>>& Anchors, const AAnchorPoint* AnchorToFind)
@@ -120,6 +127,23 @@ namespace WorldCampaignPruningHelper
 			return AnchorKeys;
 		}
 
+		TSet<AConnection*> BuildConnectionSet(const TArray<TObjectPtr<AConnection>>& Connections)
+		{
+			TSet<AConnection*> ConnectionSet;
+			ConnectionSet.Reserve(Connections.Num());
+			for (const TObjectPtr<AConnection>& Connection : Connections)
+			{
+				if (not IsValid(Connection))
+				{
+					continue;
+				}
+
+				ConnectionSet.Add(Connection.Get());
+			}
+
+			return ConnectionSet;
+		}
+
 		TArray<TObjectPtr<AAnchorPoint>> GetValidConnectedAnchors(
 			const AConnection* Connection,
 			const TSet<FGuid>& CachedAnchorKeys)
@@ -164,268 +188,367 @@ namespace WorldCampaignPruningHelper
 			AnchorB->AddConnection(Connection, AnchorA);
 		}
 
-		TArray<TObjectPtr<AAnchorPoint>> BuildValidUniqueNeighbors(const AAnchorPoint* AnchorPoint)
+		void AddNeighborKey(TMap<FGuid, TArray<FGuid>>& InOutNeighborKeysByAnchorKey,
+		                    const FGuid& AnchorKey,
+		                    const FGuid& NeighborKey)
 		{
-			TArray<TObjectPtr<AAnchorPoint>> NeighborAnchors;
-			if (not IsValid(AnchorPoint))
+			if (not AnchorKey.IsValid() || not NeighborKey.IsValid() || AnchorKey == NeighborKey)
 			{
-				return NeighborAnchors;
+				return;
 			}
 
-			for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : AnchorPoint->GetNeighborAnchors())
-			{
-				AddUniqueAnchor(NeighborAnchors, NeighborAnchor.Get());
-			}
-
-			return NeighborAnchors;
+			TArray<FGuid>& NeighborKeys = InOutNeighborKeysByAnchorKey.FindOrAdd(AnchorKey);
+			NeighborKeys.AddUnique(NeighborKey);
 		}
 
-		bool GetIsGameplayAnchor(const AAnchorPoint* AnchorPoint, const TSet<FGuid>& GameplayAnchorKeys)
-		{
-			if (not IsValid(AnchorPoint))
-			{
-				return false;
-			}
-
-			if (GameplayAnchorKeys.Contains(AnchorPoint->GetAnchorKey()))
-			{
-				return true;
-			}
-
-			return AnchorPoint->GetHasPromotedWorldObject();
-		}
-
-		bool GetIsPrunableEmptyAnchor(const AAnchorPoint* AnchorPoint, const TSet<FGuid>& GameplayAnchorKeys)
-		{
-			if (not IsValid(AnchorPoint))
-			{
-				return false;
-			}
-
-			if (AnchorPoint->Tags.Contains(RepairAnchorTag))
-			{
-				return false;
-			}
-
-			return not GetIsGameplayAnchor(AnchorPoint, GameplayAnchorKeys);
-		}
-
-		bool TryFindFirstPrunableLeafAnchor(
-			const FWorldCampaignPruningContext& Context,
-			AAnchorPoint*& OutAnchorPoint)
-		{
-			OutAnchorPoint = nullptr;
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
-			{
-				if (not GetIsPrunableEmptyAnchor(AnchorPoint.Get(), Context.GameplayAnchorKeys))
-				{
-					continue;
-				}
-
-				const TArray<TObjectPtr<AAnchorPoint>> NeighborAnchors = BuildValidUniqueNeighbors(AnchorPoint.Get());
-				if (NeighborAnchors.Num() > LeafNeighborCountMax)
-				{
-					continue;
-				}
-
-				OutAnchorPoint = AnchorPoint.Get();
-				return true;
-			}
-
-			return false;
-		}
-
-		bool TryFindFirstPrunableChainAnchor(
-			const FWorldCampaignPruningContext& Context,
-			AAnchorPoint*& OutAnchorPoint,
-			FAnchorPair& OutNeighborPair)
-		{
-			OutAnchorPoint = nullptr;
-			OutNeighborPair = FAnchorPair();
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
-			{
-				if (not GetIsPrunableEmptyAnchor(AnchorPoint.Get(), Context.GameplayAnchorKeys))
-				{
-					continue;
-				}
-
-				const TArray<TObjectPtr<AAnchorPoint>> NeighborAnchors = BuildValidUniqueNeighbors(AnchorPoint.Get());
-				if (NeighborAnchors.Num() != ChainNeighborCount)
-				{
-					continue;
-				}
-
-				OutAnchorPoint = AnchorPoint.Get();
-				OutNeighborPair.AnchorA = NeighborAnchors[0].Get();
-				OutNeighborPair.AnchorB = NeighborAnchors[1].Get();
-				return IsValid(OutNeighborPair.AnchorA) && IsValid(OutNeighborPair.AnchorB);
-			}
-
-			return false;
-		}
-
-		bool GetConnectionTouchesAnchorKeys(const AConnection* Connection, const TSet<FGuid>& AnchorKeys)
-		{
-			if (not IsValid(Connection))
-			{
-				return false;
-			}
-
-			for (const TObjectPtr<AAnchorPoint>& ConnectedAnchor : Connection->GetConnectedAnchors())
-			{
-				if (not IsValid(ConnectedAnchor))
-				{
-					continue;
-				}
-
-				if (AnchorKeys.Contains(ConnectedAnchor->GetAnchorKey()))
-				{
-					return true;
-				}
-			}
-
-			return false;
-		}
-
-		void AddConnectionsTouchingAnchorKeys(
-			const TArray<TObjectPtr<AConnection>>& Connections,
-			const TSet<FGuid>& AnchorKeys,
-			TArray<AConnection*>& OutConnections)
-		{
-			for (const TObjectPtr<AConnection>& Connection : Connections)
-			{
-				if (not GetConnectionTouchesAnchorKeys(Connection.Get(), AnchorKeys))
-				{
-					continue;
-				}
-
-				OutConnections.AddUnique(Connection.Get());
-			}
-		}
-
-		void RemoveDestroyedConnectionsFromArray(
-			TArray<TObjectPtr<AConnection>>& Connections,
-			const TArray<AConnection*>& ConnectionsToDestroy)
-		{
-			Connections.RemoveAll([&ConnectionsToDestroy](const TObjectPtr<AConnection>& Connection)
-			{
-				return not IsValid(Connection) || ConnectionsToDestroy.Contains(Connection.Get());
-			});
-		}
-
-		void DestroyConnectionsTouchingAnchorKeys(
-			const TSet<FGuid>& AnchorKeys,
-			const FWorldCampaignPruningContext& Context,
-			FWorldCampaignPruningResult& InOutResult)
-		{
-			TArray<AConnection*> ConnectionsToDestroy;
-			AddConnectionsTouchingAnchorKeys(*Context.CachedConnections, AnchorKeys, ConnectionsToDestroy);
-			AddConnectionsTouchingAnchorKeys(*Context.GeneratedConnections, AnchorKeys, ConnectionsToDestroy);
-
-			for (AConnection* Connection : ConnectionsToDestroy)
-			{
-				if (not IsValid(Connection))
-				{
-					continue;
-				}
-
-				Connection->Destroy();
-				InOutResult.DestroyedConnections++;
-				InOutResult.bDidChange = true;
-			}
-
-			RemoveDestroyedConnectionsFromArray(*Context.CachedConnections, ConnectionsToDestroy);
-			RemoveDestroyedConnectionsFromArray(*Context.GeneratedConnections, ConnectionsToDestroy);
-		}
-
-		void RemoveDestroyedAnchorsFromArray(
-			TArray<TObjectPtr<AAnchorPoint>>& Anchors,
-			const TSet<FGuid>& AnchorKeysToDestroy)
-		{
-			Anchors.RemoveAll([&AnchorKeysToDestroy](const TObjectPtr<AAnchorPoint>& AnchorPoint)
-			{
-				if (not IsValid(AnchorPoint))
-				{
-					return true;
-				}
-
-				return AnchorKeysToDestroy.Contains(AnchorPoint->GetAnchorKey());
-			});
-		}
-
-		void DestroyAnchorsByKey(
-			const TSet<FGuid>& AnchorKeysToDestroy,
-			const FWorldCampaignPruningContext& Context,
-			FWorldCampaignPruningResult& InOutResult)
-		{
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
-			{
-				if (not IsValid(AnchorPoint))
-				{
-					continue;
-				}
-
-				if (not AnchorKeysToDestroy.Contains(AnchorPoint->GetAnchorKey()))
-				{
-					continue;
-				}
-
-				AnchorPoint->RemovePromotedWorldObject();
-				AnchorPoint->Destroy();
-				InOutResult.DestroyedEmptyAnchors++;
-				InOutResult.bDidChange = true;
-			}
-
-			RemoveDestroyedAnchorsFromArray(*Context.CachedAnchors, AnchorKeysToDestroy);
-		}
-
-		bool GetConnectionContainsBothAnchors(
-			const AConnection* Connection,
-			const AAnchorPoint* AnchorA,
-			const AAnchorPoint* AnchorB)
-		{
-			if (not IsValid(Connection) || not IsValid(AnchorA) || not IsValid(AnchorB))
-			{
-				return false;
-			}
-
-			bool bContainsAnchorA = false;
-			bool bContainsAnchorB = false;
-			for (const TObjectPtr<AAnchorPoint>& ConnectedAnchor : Connection->GetConnectedAnchors())
-			{
-				if (ConnectedAnchor.Get() == AnchorA)
-				{
-					bContainsAnchorA = true;
-				}
-
-				if (ConnectedAnchor.Get() == AnchorB)
-				{
-					bContainsAnchorB = true;
-				}
-			}
-
-			return bContainsAnchorA && bContainsAnchorB;
-		}
-
-		bool GetHasConnectionBetween(
-			const AAnchorPoint* AnchorA,
-			const AAnchorPoint* AnchorB,
-			const TArray<TObjectPtr<AConnection>>& Connections)
+		void AddGraphConnection(FPruningGraph& InOutGraph, AAnchorPoint* AnchorA, AAnchorPoint* AnchorB)
 		{
 			if (not IsValid(AnchorA) || not IsValid(AnchorB) || AnchorA == AnchorB)
 			{
+				return;
+			}
+
+			const FGuid AnchorKeyA = AnchorA->GetAnchorKey();
+			const FGuid AnchorKeyB = AnchorB->GetAnchorKey();
+			AddNeighborKey(InOutGraph.NeighborKeysByAnchorKey, AnchorKeyA, AnchorKeyB);
+			AddNeighborKey(InOutGraph.NeighborKeysByAnchorKey, AnchorKeyB, AnchorKeyA);
+		}
+
+		void BuildPruningGraphAnchors(const FWorldCampaignPruningContext& Context, FPruningGraph& OutGraph)
+		{
+			OutGraph.AnchorsByKey.Reset();
+			OutGraph.KeptAnchorKeys.Reset();
+			OutGraph.KeptAnchorsByKey.Reset();
+			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
+			{
+				if (not IsValid(AnchorPoint))
+				{
+					continue;
+				}
+
+				const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+				if (not AnchorKey.IsValid())
+				{
+					continue;
+				}
+
+				OutGraph.AnchorsByKey.Add(AnchorKey, AnchorPoint);
+				OutGraph.NeighborKeysByAnchorKey.FindOrAdd(AnchorKey);
+				if (not GetIsGameplayAnchor(AnchorPoint.Get(), Context.GameplayAnchorKeys))
+				{
+					continue;
+				}
+
+				OutGraph.KeptAnchorKeys.Add(AnchorKey);
+				OutGraph.KeptAnchorsByKey.Add(AnchorKey, AnchorPoint);
+			}
+		}
+
+		void BuildPruningGraphConnections(const FWorldCampaignPruningContext& Context, FPruningGraph& OutGraph)
+		{
+			const TSet<FGuid> CachedAnchorKeys = BuildAnchorKeySet(*Context.CachedAnchors);
+			for (const TObjectPtr<AConnection>& Connection : *Context.CachedConnections)
+			{
+				const TArray<TObjectPtr<AAnchorPoint>> ConnectedAnchors =
+					GetValidConnectedAnchors(Connection.Get(), CachedAnchorKeys);
+				for (int32 AnchorIndex = 0; AnchorIndex < ConnectedAnchors.Num(); AnchorIndex++)
+				{
+					for (int32 OtherAnchorIndex = AnchorIndex + 1;
+					     OtherAnchorIndex < ConnectedAnchors.Num();
+					     OtherAnchorIndex++)
+					{
+						AddGraphConnection(
+							OutGraph,
+							ConnectedAnchors[AnchorIndex].Get(),
+							ConnectedAnchors[OtherAnchorIndex].Get());
+					}
+				}
+			}
+		}
+
+		FPruningGraph BuildPruningGraph(const FWorldCampaignPruningContext& Context)
+		{
+			FPruningGraph Graph;
+			BuildPruningGraphAnchors(Context, Graph);
+			BuildPruningGraphConnections(Context, Graph);
+			return Graph;
+		}
+
+		bool GetShouldEdgeSortBefore(const FContractedEdge& Left, const FContractedEdge& Right)
+		{
+			if (Left.Weight != Right.Weight)
+			{
+				return Left.Weight < Right.Weight;
+			}
+
+			const FGuid LeftKeyA = IsValid(Left.AnchorA) ? Left.AnchorA->GetAnchorKey() : FGuid();
+			const FGuid LeftKeyB = IsValid(Left.AnchorB) ? Left.AnchorB->GetAnchorKey() : FGuid();
+			const FGuid RightKeyA = IsValid(Right.AnchorA) ? Right.AnchorA->GetAnchorKey() : FGuid();
+			const FGuid RightKeyB = IsValid(Right.AnchorB) ? Right.AnchorB->GetAnchorKey() : FGuid();
+			if (AAnchorPoint::IsAnchorKeyLess(LeftKeyA, RightKeyA))
+			{
 				return true;
 			}
 
-			for (const TObjectPtr<AConnection>& Connection : Connections)
+			if (AAnchorPoint::IsAnchorKeyLess(RightKeyA, LeftKeyA))
 			{
-				if (GetConnectionContainsBothAnchors(Connection.Get(), AnchorA, AnchorB))
+				return false;
+			}
+
+			return AAnchorPoint::IsAnchorKeyLess(LeftKeyB, RightKeyB);
+		}
+
+		FString BuildEdgeKey(const AAnchorPoint* AnchorA, const AAnchorPoint* AnchorB)
+		{
+			if (not IsValid(AnchorA) || not IsValid(AnchorB))
+			{
+				return FString();
+			}
+
+			FGuid AnchorKeyA = AnchorA->GetAnchorKey();
+			FGuid AnchorKeyB = AnchorB->GetAnchorKey();
+			if (AAnchorPoint::IsAnchorKeyLess(AnchorKeyB, AnchorKeyA))
+			{
+				Swap(AnchorKeyA, AnchorKeyB);
+			}
+
+			return AnchorKeyA.ToString(EGuidFormats::DigitsWithHyphens)
+				+ TEXT("|")
+				+ AnchorKeyB.ToString(EGuidFormats::DigitsWithHyphens);
+		}
+
+		void AddContractedEdge(
+			FPruningGraph& InOutGraph,
+			TSet<FString>& InOutEdgeKeys,
+			AAnchorPoint* AnchorA,
+			AAnchorPoint* AnchorB)
+		{
+			if (not IsValid(AnchorA) || not IsValid(AnchorB) || AnchorA == AnchorB)
+			{
+				return;
+			}
+
+			const FString EdgeKey = BuildEdgeKey(AnchorA, AnchorB);
+			if (EdgeKey.IsEmpty() || InOutEdgeKeys.Contains(EdgeKey))
+			{
+				return;
+			}
+
+			FContractedEdge ContractedEdge;
+			ContractedEdge.AnchorA = AnchorA;
+			ContractedEdge.AnchorB = AnchorB;
+			ContractedEdge.Weight = FVector::DistSquared(AnchorA->GetActorLocation(), AnchorB->GetActorLocation());
+			InOutGraph.ContractedEdges.Add(ContractedEdge);
+			InOutEdgeKeys.Add(EdgeKey);
+		}
+
+		void AddDirectKeptAnchorEdges(FPruningGraph& InOutGraph, TSet<FString>& InOutEdgeKeys)
+		{
+			for (const TPair<FGuid, TObjectPtr<AAnchorPoint>>& AnchorPair : InOutGraph.KeptAnchorsByKey)
+			{
+				const TArray<FGuid>* NeighborKeys = InOutGraph.NeighborKeysByAnchorKey.Find(AnchorPair.Key);
+				if (NeighborKeys == nullptr)
 				{
-					return true;
+					continue;
+				}
+
+				for (const FGuid& NeighborKey : *NeighborKeys)
+				{
+					if (not InOutGraph.KeptAnchorKeys.Contains(NeighborKey))
+					{
+						continue;
+					}
+
+					TObjectPtr<AAnchorPoint>* NeighborAnchor = InOutGraph.KeptAnchorsByKey.Find(NeighborKey);
+					if (NeighborAnchor == nullptr)
+					{
+						continue;
+					}
+
+					AddContractedEdge(InOutGraph, InOutEdgeKeys, AnchorPair.Value.Get(), NeighborAnchor->Get());
+				}
+			}
+		}
+
+		void BuildEmptyComponent(
+			const FGuid& StartAnchorKey,
+			const FPruningGraph& Graph,
+			TSet<FGuid>& InOutVisitedEmptyAnchorKeys,
+			TArray<FGuid>& OutEmptyAnchorKeys,
+			TArray<TObjectPtr<AAnchorPoint>>& OutBoundaryKeptAnchors)
+		{
+			TQueue<FGuid> AnchorQueue;
+			AnchorQueue.Enqueue(StartAnchorKey);
+			InOutVisitedEmptyAnchorKeys.Add(StartAnchorKey);
+
+			while (not AnchorQueue.IsEmpty())
+			{
+				FGuid CurrentAnchorKey;
+				AnchorQueue.Dequeue(CurrentAnchorKey);
+				OutEmptyAnchorKeys.Add(CurrentAnchorKey);
+
+				const TArray<FGuid>* NeighborKeys = Graph.NeighborKeysByAnchorKey.Find(CurrentAnchorKey);
+				if (NeighborKeys == nullptr)
+				{
+					continue;
+				}
+
+				for (const FGuid& NeighborKey : *NeighborKeys)
+				{
+					if (Graph.KeptAnchorKeys.Contains(NeighborKey))
+					{
+						const TObjectPtr<AAnchorPoint>* BoundaryAnchor = Graph.KeptAnchorsByKey.Find(NeighborKey);
+						if (BoundaryAnchor != nullptr)
+						{
+							AddUniqueAnchor(OutBoundaryKeptAnchors, BoundaryAnchor->Get());
+						}
+
+						continue;
+					}
+
+					if (InOutVisitedEmptyAnchorKeys.Contains(NeighborKey))
+					{
+						continue;
+					}
+
+					InOutVisitedEmptyAnchorKeys.Add(NeighborKey);
+					AnchorQueue.Enqueue(NeighborKey);
+				}
+			}
+		}
+
+		TArray<FContractedEdge> BuildBoundaryCandidateEdges(
+			const TArray<TObjectPtr<AAnchorPoint>>& BoundaryKeptAnchors)
+		{
+			TArray<FContractedEdge> CandidateEdges;
+			for (int32 AnchorIndex = 0; AnchorIndex < BoundaryKeptAnchors.Num(); AnchorIndex++)
+			{
+				AAnchorPoint* AnchorA = BoundaryKeptAnchors[AnchorIndex].Get();
+				if (not IsValid(AnchorA))
+				{
+					continue;
+				}
+
+				for (int32 OtherAnchorIndex = AnchorIndex + 1;
+				     OtherAnchorIndex < BoundaryKeptAnchors.Num();
+				     OtherAnchorIndex++)
+				{
+					AAnchorPoint* AnchorB = BoundaryKeptAnchors[OtherAnchorIndex].Get();
+					if (not IsValid(AnchorB))
+					{
+						continue;
+					}
+
+					FContractedEdge CandidateEdge;
+					CandidateEdge.AnchorA = AnchorA;
+					CandidateEdge.AnchorB = AnchorB;
+					CandidateEdge.Weight = FVector::DistSquared(AnchorA->GetActorLocation(), AnchorB->GetActorLocation());
+					CandidateEdges.Add(CandidateEdge);
 				}
 			}
 
-			return false;
+			CandidateEdges.Sort([](const FContractedEdge& Left, const FContractedEdge& Right)
+			{
+				return GetShouldEdgeSortBefore(Left, Right);
+			});
+			return CandidateEdges;
+		}
+
+		FGuid FindDisjointSetRoot(TMap<FGuid, FGuid>& InOutParentByAnchorKey, const FGuid& AnchorKey)
+		{
+			FGuid* ParentKey = InOutParentByAnchorKey.Find(AnchorKey);
+			if (ParentKey == nullptr || *ParentKey == AnchorKey)
+			{
+				return AnchorKey;
+			}
+
+			const FGuid RootKey = FindDisjointSetRoot(InOutParentByAnchorKey, *ParentKey);
+			InOutParentByAnchorKey.Add(AnchorKey, RootKey);
+			return RootKey;
+		}
+
+		bool TryUnionDisjointSet(TMap<FGuid, FGuid>& InOutParentByAnchorKey, const FGuid& AnchorKeyA, const FGuid& AnchorKeyB)
+		{
+			const FGuid RootKeyA = FindDisjointSetRoot(InOutParentByAnchorKey, AnchorKeyA);
+			const FGuid RootKeyB = FindDisjointSetRoot(InOutParentByAnchorKey, AnchorKeyB);
+			if (RootKeyA == RootKeyB)
+			{
+				return false;
+			}
+
+			InOutParentByAnchorKey.Add(RootKeyB, RootKeyA);
+			return true;
+		}
+
+		void AddBoundaryMinimumSpanningTreeEdges(
+			FPruningGraph& InOutGraph,
+			TSet<FString>& InOutEdgeKeys,
+			const TArray<TObjectPtr<AAnchorPoint>>& BoundaryKeptAnchors)
+		{
+			if (BoundaryKeptAnchors.Num() < 2)
+			{
+				return;
+			}
+
+			TMap<FGuid, FGuid> ParentByAnchorKey;
+			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : BoundaryKeptAnchors)
+			{
+				if (not IsValid(AnchorPoint))
+				{
+					continue;
+				}
+
+				ParentByAnchorKey.Add(AnchorPoint->GetAnchorKey(), AnchorPoint->GetAnchorKey());
+			}
+
+			const TArray<FContractedEdge> CandidateEdges = BuildBoundaryCandidateEdges(BoundaryKeptAnchors);
+			for (const FContractedEdge& CandidateEdge : CandidateEdges)
+			{
+				if (not IsValid(CandidateEdge.AnchorA) || not IsValid(CandidateEdge.AnchorB))
+				{
+					continue;
+				}
+
+				if (not TryUnionDisjointSet(
+					ParentByAnchorKey,
+					CandidateEdge.AnchorA->GetAnchorKey(),
+					CandidateEdge.AnchorB->GetAnchorKey()))
+				{
+					continue;
+				}
+
+				AddContractedEdge(InOutGraph, InOutEdgeKeys, CandidateEdge.AnchorA, CandidateEdge.AnchorB);
+			}
+		}
+
+		void AddEmptyComponentContractedEdges(FPruningGraph& InOutGraph, TSet<FString>& InOutEdgeKeys)
+		{
+			TSet<FGuid> VisitedEmptyAnchorKeys;
+			for (const TPair<FGuid, TObjectPtr<AAnchorPoint>>& AnchorPair : InOutGraph.AnchorsByKey)
+			{
+				if (InOutGraph.KeptAnchorKeys.Contains(AnchorPair.Key)
+					|| VisitedEmptyAnchorKeys.Contains(AnchorPair.Key))
+				{
+					continue;
+				}
+
+				TArray<FGuid> EmptyAnchorKeys;
+				TArray<TObjectPtr<AAnchorPoint>> BoundaryKeptAnchors;
+				BuildEmptyComponent(
+					AnchorPair.Key,
+					InOutGraph,
+					VisitedEmptyAnchorKeys,
+					EmptyAnchorKeys,
+					BoundaryKeptAnchors);
+				AddBoundaryMinimumSpanningTreeEdges(InOutGraph, InOutEdgeKeys, BoundaryKeptAnchors);
+			}
+		}
+
+		void BuildContractedEdges(FPruningGraph& InOutGraph)
+		{
+			TSet<FString> EdgeKeys;
+			AddDirectKeptAnchorEdges(InOutGraph, EdgeKeys);
+			AddEmptyComponentContractedEdges(InOutGraph, EdgeKeys);
 		}
 
 		TSubclassOf<AConnection> GetConnectionClassToSpawn(const FWorldCampaignPruningContext& Context)
@@ -472,207 +595,184 @@ namespace WorldCampaignPruningHelper
 			return SpawnedConnection;
 		}
 
-		void CreateConnectionIfMissing(
-			const FWorldCampaignPruningContext& Context,
-			AAnchorPoint* AnchorA,
-			AAnchorPoint* AnchorB,
-			FWorldCampaignPruningResult& InOutResult)
-		{
-			if (GetHasConnectionBetween(AnchorA, AnchorB, *Context.CachedConnections))
-			{
-				return;
-			}
-
-			SpawnConnectionBetweenAnchors(Context, AnchorA, AnchorB, InOutResult);
-		}
-
-		TSet<FGuid> BuildSingleAnchorKeySet(const AAnchorPoint* AnchorPoint)
-		{
-			TSet<FGuid> AnchorKeys;
-			if (not IsValid(AnchorPoint))
-			{
-				return AnchorKeys;
-			}
-
-			AnchorKeys.Add(AnchorPoint->GetAnchorKey());
-			return AnchorKeys;
-		}
-
-		bool PruneFirstEmptyLeafAnchor(
+		void DestroyOldConnections(
 			const FWorldCampaignPruningContext& Context,
 			FWorldCampaignPruningResult& InOutResult)
 		{
-			AAnchorPoint* AnchorToPrune = nullptr;
-			if (not TryFindFirstPrunableLeafAnchor(Context, AnchorToPrune))
+			TArray<AConnection*> ConnectionsToDestroy;
+			for (const TObjectPtr<AConnection>& Connection : *Context.CachedConnections)
 			{
-				return false;
-			}
-
-			const TSet<FGuid> AnchorKeysToPrune = BuildSingleAnchorKeySet(AnchorToPrune);
-			DestroyConnectionsTouchingAnchorKeys(AnchorKeysToPrune, Context, InOutResult);
-			DestroyAnchorsByKey(AnchorKeysToPrune, Context, InOutResult);
-			RebuildAnchorConnectionReferences(*Context.CachedAnchors, *Context.CachedConnections);
-			return true;
-		}
-
-		bool ContractFirstEmptyChainAnchor(
-			const FWorldCampaignPruningContext& Context,
-			FWorldCampaignPruningResult& InOutResult)
-		{
-			AAnchorPoint* AnchorToPrune = nullptr;
-			FAnchorPair NeighborPair;
-			if (not TryFindFirstPrunableChainAnchor(Context, AnchorToPrune, NeighborPair))
-			{
-				return false;
-			}
-
-			const TSet<FGuid> AnchorKeysToPrune = BuildSingleAnchorKeySet(AnchorToPrune);
-			DestroyConnectionsTouchingAnchorKeys(AnchorKeysToPrune, Context, InOutResult);
-			DestroyAnchorsByKey(AnchorKeysToPrune, Context, InOutResult);
-			CreateConnectionIfMissing(Context, NeighborPair.AnchorA, NeighborPair.AnchorB, InOutResult);
-			RebuildAnchorConnectionReferences(*Context.CachedAnchors, *Context.CachedConnections);
-			return true;
-		}
-
-		void BuildComponentFromAnchor(
-			AAnchorPoint* StartAnchor,
-			TSet<FGuid>& InOutVisitedAnchorKeys,
-			TArray<TObjectPtr<AAnchorPoint>>& OutComponent)
-		{
-			if (not IsValid(StartAnchor))
-			{
-				return;
-			}
-
-			TQueue<AAnchorPoint*> AnchorQueue;
-			AnchorQueue.Enqueue(StartAnchor);
-			InOutVisitedAnchorKeys.Add(StartAnchor->GetAnchorKey());
-
-			while (not AnchorQueue.IsEmpty())
-			{
-				AAnchorPoint* CurrentAnchor = nullptr;
-				AnchorQueue.Dequeue(CurrentAnchor);
-				if (not IsValid(CurrentAnchor))
+				if (not IsValid(Connection))
 				{
 					continue;
 				}
 
-				OutComponent.Add(CurrentAnchor);
-				const TArray<TObjectPtr<AAnchorPoint>> NeighborAnchors = BuildValidUniqueNeighbors(CurrentAnchor);
-				for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : NeighborAnchors)
-				{
-					if (not IsValid(NeighborAnchor))
-					{
-						continue;
-					}
-
-					const FGuid NeighborKey = NeighborAnchor->GetAnchorKey();
-					if (InOutVisitedAnchorKeys.Contains(NeighborKey))
-					{
-						continue;
-					}
-
-					InOutVisitedAnchorKeys.Add(NeighborKey);
-					AnchorQueue.Enqueue(NeighborAnchor.Get());
-				}
+				ConnectionsToDestroy.AddUnique(Connection.Get());
 			}
+
+			for (const TObjectPtr<AConnection>& Connection : *Context.GeneratedConnections)
+			{
+				if (not IsValid(Connection))
+				{
+					continue;
+				}
+
+				ConnectionsToDestroy.AddUnique(Connection.Get());
+			}
+
+			for (AConnection* Connection : ConnectionsToDestroy)
+			{
+				if (not IsValid(Connection))
+				{
+					continue;
+				}
+
+				Connection->Destroy();
+				InOutResult.DestroyedConnections++;
+				InOutResult.bDidChange = true;
+			}
+
+			Context.CachedConnections->Reset();
+			Context.GeneratedConnections->Reset();
 		}
 
-		bool GetComponentHasGameplayAnchor(
-			const TArray<TObjectPtr<AAnchorPoint>>& Component,
-			const TSet<FGuid>& GameplayAnchorKeys)
+		void DestroyEmptyAnchors(
+			const FWorldCampaignPruningContext& Context,
+			const FPruningGraph& Graph,
+			FWorldCampaignPruningResult& InOutResult)
 		{
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : Component)
+			for (const TPair<FGuid, TObjectPtr<AAnchorPoint>>& AnchorPair : Graph.AnchorsByKey)
 			{
-				if (GetIsGameplayAnchor(AnchorPoint.Get(), GameplayAnchorKeys))
+				if (Graph.KeptAnchorKeys.Contains(AnchorPair.Key))
+				{
+					continue;
+				}
+
+				AAnchorPoint* AnchorPoint = AnchorPair.Value.Get();
+				if (not IsValid(AnchorPoint))
+				{
+					continue;
+				}
+
+				AnchorPoint->RemovePromotedWorldObject();
+				AnchorPoint->Destroy();
+				InOutResult.DestroyedEmptyAnchors++;
+				InOutResult.bDidChange = true;
+			}
+
+			Context.CachedAnchors->Reset();
+			for (const TPair<FGuid, TObjectPtr<AAnchorPoint>>& KeptAnchorPair : Graph.KeptAnchorsByKey)
+			{
+				if (not IsValid(KeptAnchorPair.Value))
+				{
+					continue;
+				}
+
+				Context.CachedAnchors->Add(KeptAnchorPair.Value);
+			}
+
+			Context.CachedAnchors->Sort([](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
+			{
+				if (not IsValid(Left))
+				{
+					return false;
+				}
+
+				if (not IsValid(Right))
 				{
 					return true;
 				}
-			}
 
-			return false;
+				return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
+			});
 		}
 
-		TSet<FGuid> BuildAnchorKeySetFromComponent(const TArray<TObjectPtr<AAnchorPoint>>& Component)
+		void DestroyGeneratedEmptyAnchorsOutsideGraph(
+			const FWorldCampaignPruningContext& Context,
+			const FPruningGraph& Graph,
+			FWorldCampaignPruningResult& InOutResult)
 		{
-			TSet<FGuid> AnchorKeys;
-			AnchorKeys.Reserve(Component.Num());
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : Component)
+			if (Context.GeneratedAnchorTag.IsNone())
 			{
+				return;
+			}
+
+			for (TActorIterator<AAnchorPoint> AnchorIterator(Context.World); AnchorIterator; ++AnchorIterator)
+			{
+				AAnchorPoint* AnchorPoint = *AnchorIterator;
 				if (not IsValid(AnchorPoint))
 				{
 					continue;
 				}
 
-				AnchorKeys.Add(AnchorPoint->GetAnchorKey());
-			}
+				if (Graph.KeptAnchorKeys.Contains(AnchorPoint->GetAnchorKey()))
+				{
+					continue;
+				}
 
-			return AnchorKeys;
+				if (AnchorPoint->GetHasPromotedWorldObject())
+				{
+					continue;
+				}
+
+				if (not AnchorPoint->Tags.Contains(Context.GeneratedAnchorTag))
+				{
+					continue;
+				}
+
+				AnchorPoint->Destroy();
+				InOutResult.DestroyedEmptyAnchors++;
+				InOutResult.bDidChange = true;
+			}
 		}
 
-		bool PruneFirstEmptyComponentWithoutGameplay(
+		void SpawnContractedConnections(
+			const FWorldCampaignPruningContext& Context,
+			const FPruningGraph& Graph,
+			FWorldCampaignPruningResult& InOutResult)
+		{
+			TArray<FContractedEdge> ContractedEdges = Graph.ContractedEdges;
+			ContractedEdges.Sort([](const FContractedEdge& Left, const FContractedEdge& Right)
+			{
+				return GetShouldEdgeSortBefore(Left, Right);
+			});
+
+			for (const FContractedEdge& ContractedEdge : ContractedEdges)
+			{
+				SpawnConnectionBetweenAnchors(Context, ContractedEdge.AnchorA, ContractedEdge.AnchorB, InOutResult);
+			}
+		}
+
+		void DestroyStaleOwnedConnectionsOutsideGraph(
 			const FWorldCampaignPruningContext& Context,
 			FWorldCampaignPruningResult& InOutResult)
 		{
-			TSet<FGuid> VisitedAnchorKeys;
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
+			const TSet<AConnection*> CachedConnectionSet = BuildConnectionSet(*Context.CachedConnections);
+			for (TActorIterator<AConnection> ConnectionIterator(Context.World); ConnectionIterator; ++ConnectionIterator)
 			{
-				if (not IsValid(AnchorPoint))
+				AConnection* Connection = *ConnectionIterator;
+				if (not IsValid(Connection))
 				{
 					continue;
 				}
 
-				const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
-				if (VisitedAnchorKeys.Contains(AnchorKey))
+				if (Connection->GetOwner() != Context.Owner)
 				{
 					continue;
 				}
 
-				TArray<TObjectPtr<AAnchorPoint>> Component;
-				BuildComponentFromAnchor(AnchorPoint.Get(), VisitedAnchorKeys, Component);
-				if (Component.Num() == 0 || GetComponentHasGameplayAnchor(Component, Context.GameplayAnchorKeys))
+				if (CachedConnectionSet.Contains(Connection))
 				{
 					continue;
 				}
 
-				const TSet<FGuid> AnchorKeysToPrune = BuildAnchorKeySetFromComponent(Component);
-				DestroyConnectionsTouchingAnchorKeys(AnchorKeysToPrune, Context, InOutResult);
-				DestroyAnchorsByKey(AnchorKeysToPrune, Context, InOutResult);
-				RebuildAnchorConnectionReferences(*Context.CachedAnchors, *Context.CachedConnections);
-				return true;
-			}
-
-			return false;
-		}
-
-		void PruneEmptyAnchors(
-			const FWorldCampaignPruningContext& Context,
-			FWorldCampaignPruningResult& InOutResult)
-		{
-			bool bDidPruneAnchor = true;
-			while (bDidPruneAnchor)
-			{
-				bDidPruneAnchor = false;
-				if (PruneFirstEmptyLeafAnchor(Context, InOutResult))
-				{
-					bDidPruneAnchor = true;
-					continue;
-				}
-
-				if (ContractFirstEmptyChainAnchor(Context, InOutResult))
-				{
-					bDidPruneAnchor = true;
-				}
-			}
-
-			bool bDidPruneEmptyComponent = true;
-			while (bDidPruneEmptyComponent)
-			{
-				bDidPruneEmptyComponent = PruneFirstEmptyComponentWithoutGameplay(Context, InOutResult);
+				Connection->Destroy();
+				InOutResult.DestroyedConnections++;
+				InOutResult.bDidChange = true;
 			}
 		}
 
-		TSet<FGuid> BuildReachableAnchorKeys(const AAnchorPoint* PlayerHQAnchor)
+		TSet<FGuid> BuildReachableKeptAnchorKeys(const AAnchorPoint* PlayerHQAnchor)
 		{
 			TSet<FGuid> ReachableAnchorKeys;
 			if (not IsValid(PlayerHQAnchor))
@@ -693,7 +793,7 @@ namespace WorldCampaignPruningHelper
 					continue;
 				}
 
-				const TArray<TObjectPtr<AAnchorPoint>> NeighborAnchors = BuildValidUniqueNeighbors(CurrentAnchor);
+				const TArray<TObjectPtr<AAnchorPoint>>& NeighborAnchors = CurrentAnchor->GetNeighborAnchors();
 				for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : NeighborAnchors)
 				{
 					if (not IsValid(NeighborAnchor))
@@ -715,27 +815,13 @@ namespace WorldCampaignPruningHelper
 			return ReachableAnchorKeys;
 		}
 
-		int32 CountGameplayAnchors(const FWorldCampaignPruningContext& Context)
-		{
-			int32 GameplayAnchorCount = 0;
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
-			{
-				if (GetIsGameplayAnchor(AnchorPoint.Get(), Context.GameplayAnchorKeys))
-				{
-					GameplayAnchorCount++;
-				}
-			}
-
-			return GameplayAnchorCount;
-		}
-
-		bool GetAreAllGameplayAnchorsReachable(
-			const FWorldCampaignPruningContext& Context,
+		bool GetAreAllKeptAnchorsReachable(
+			const TArray<TObjectPtr<AAnchorPoint>>& KeptAnchors,
 			const TSet<FGuid>& ReachableAnchorKeys)
 		{
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
+			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : KeptAnchors)
 			{
-				if (not GetIsGameplayAnchor(AnchorPoint.Get(), Context.GameplayAnchorKeys))
+				if (not IsValid(AnchorPoint))
 				{
 					continue;
 				}
@@ -751,270 +837,113 @@ namespace WorldCampaignPruningHelper
 			return true;
 		}
 
-		TArray<TObjectPtr<AAnchorPoint>> BuildReachableGameplayAnchors(
-			const FWorldCampaignPruningContext& Context,
-			const TSet<FGuid>& ReachableAnchorKeys)
+		AAnchorPoint* FindClosestReachableAnchor(
+			const TArray<TObjectPtr<AAnchorPoint>>& KeptAnchors,
+			const TSet<FGuid>& ReachableAnchorKeys,
+			const AAnchorPoint* TargetAnchor)
 		{
-			TArray<TObjectPtr<AAnchorPoint>> ReachableGameplayAnchors;
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
+			AAnchorPoint* ClosestAnchor = nullptr;
+			float ClosestDistanceSquared = TNumericLimits<float>::Max();
+			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : KeptAnchors)
 			{
-				if (not GetIsGameplayAnchor(AnchorPoint.Get(), Context.GameplayAnchorKeys))
+				if (not IsValid(AnchorPoint) || not ReachableAnchorKeys.Contains(AnchorPoint->GetAnchorKey()))
 				{
 					continue;
 				}
 
-				if (ReachableAnchorKeys.Contains(AnchorPoint->GetAnchorKey()))
+				const float DistanceSquared = FVector::DistSquared(
+					AnchorPoint->GetActorLocation(),
+					TargetAnchor->GetActorLocation());
+				if (DistanceSquared >= ClosestDistanceSquared)
 				{
-					ReachableGameplayAnchors.Add(AnchorPoint);
+					continue;
 				}
+
+				ClosestAnchor = AnchorPoint.Get();
+				ClosestDistanceSquared = DistanceSquared;
 			}
 
-			return ReachableGameplayAnchors;
+			return ClosestAnchor;
 		}
 
-		TArray<TArray<TObjectPtr<AAnchorPoint>>> BuildUnreachableGameplayIslands(
-			const FWorldCampaignPruningContext& Context,
+		AAnchorPoint* FindClosestUnreachableAnchor(
+			const TArray<TObjectPtr<AAnchorPoint>>& KeptAnchors,
 			const TSet<FGuid>& ReachableAnchorKeys)
 		{
-			TArray<TArray<TObjectPtr<AAnchorPoint>>> Islands;
-			TSet<FGuid> VisitedAnchorKeys = ReachableAnchorKeys;
-			for (const TObjectPtr<AAnchorPoint>& AnchorPoint : *Context.CachedAnchors)
+			AAnchorPoint* ClosestUnreachableAnchor = nullptr;
+			AAnchorPoint* ClosestReachableAnchor = nullptr;
+			float ClosestDistanceSquared = TNumericLimits<float>::Max();
+			for (const TObjectPtr<AAnchorPoint>& UnreachableAnchor : KeptAnchors)
 			{
-				if (not GetIsGameplayAnchor(AnchorPoint.Get(), Context.GameplayAnchorKeys))
+				if (not IsValid(UnreachableAnchor)
+					|| ReachableAnchorKeys.Contains(UnreachableAnchor->GetAnchorKey()))
 				{
 					continue;
 				}
 
-				const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
-				if (ReachableAnchorKeys.Contains(AnchorKey) || VisitedAnchorKeys.Contains(AnchorKey))
-				{
-					continue;
-				}
-
-				TArray<TObjectPtr<AAnchorPoint>> Component;
-				BuildComponentFromAnchor(AnchorPoint.Get(), VisitedAnchorKeys, Component);
-
-				TArray<TObjectPtr<AAnchorPoint>> GameplayIsland;
-				for (const TObjectPtr<AAnchorPoint>& ComponentAnchor : Component)
-				{
-					if (not GetIsGameplayAnchor(ComponentAnchor.Get(), Context.GameplayAnchorKeys))
-					{
-						continue;
-					}
-
-					GameplayIsland.Add(ComponentAnchor);
-				}
-
-				if (GameplayIsland.Num() > 0)
-				{
-					Islands.Add(GameplayIsland);
-				}
-			}
-
-			return Islands;
-		}
-
-		FClosestRepairPair FindClosestRepairPairForIsland(
-			const TArray<TObjectPtr<AAnchorPoint>>& ReachableGameplayAnchors,
-			const TArray<TObjectPtr<AAnchorPoint>>& GameplayIsland)
-		{
-			FClosestRepairPair ClosestPair;
-			for (const TObjectPtr<AAnchorPoint>& ReachableAnchor : ReachableGameplayAnchors)
-			{
+				AAnchorPoint* ReachableAnchor = FindClosestReachableAnchor(
+					KeptAnchors,
+					ReachableAnchorKeys,
+					UnreachableAnchor.Get());
 				if (not IsValid(ReachableAnchor))
 				{
 					continue;
 				}
 
-				for (const TObjectPtr<AAnchorPoint>& UnreachableAnchor : GameplayIsland)
-				{
-					if (not IsValid(UnreachableAnchor))
-					{
-						continue;
-					}
-
-					const float DistanceSquared = FVector::DistSquared(
-						ReachableAnchor->GetActorLocation(),
-						UnreachableAnchor->GetActorLocation());
-					if (DistanceSquared >= ClosestPair.DistanceSquared)
-					{
-						continue;
-					}
-
-					ClosestPair.ReachableAnchor = ReachableAnchor.Get();
-					ClosestPair.UnreachableAnchor = UnreachableAnchor.Get();
-					ClosestPair.DistanceSquared = DistanceSquared;
-				}
-			}
-
-			return ClosestPair;
-		}
-
-		FClosestRepairPair FindClosestRepairPair(
-			const FWorldCampaignPruningContext& Context,
-			const TSet<FGuid>& ReachableAnchorKeys,
-			const TArray<TArray<TObjectPtr<AAnchorPoint>>>& Islands)
-		{
-			const TArray<TObjectPtr<AAnchorPoint>> ReachableGameplayAnchors =
-				BuildReachableGameplayAnchors(Context, ReachableAnchorKeys);
-
-			FClosestRepairPair ClosestPair;
-			for (const TArray<TObjectPtr<AAnchorPoint>>& Island : Islands)
-			{
-				const FClosestRepairPair IslandPair =
-					FindClosestRepairPairForIsland(ReachableGameplayAnchors, Island);
-				if (not IslandPair.GetIsValid())
+				const float DistanceSquared = FVector::DistSquared(
+					ReachableAnchor->GetActorLocation(),
+					UnreachableAnchor->GetActorLocation());
+				if (DistanceSquared >= ClosestDistanceSquared)
 				{
 					continue;
 				}
 
-				if (IslandPair.DistanceSquared >= ClosestPair.DistanceSquared)
-				{
-					continue;
-				}
-
-				ClosestPair = IslandPair;
+				ClosestReachableAnchor = ReachableAnchor;
+				ClosestUnreachableAnchor = UnreachableAnchor.Get();
+				ClosestDistanceSquared = DistanceSquared;
 			}
 
-			return ClosestPair;
+			return IsValid(ClosestReachableAnchor) ? ClosestUnreachableAnchor : nullptr;
 		}
 
-		TSubclassOf<AAnchorPoint> GetAnchorClassToSpawn(const FWorldCampaignPruningContext& Context)
-		{
-			if (not IsValid(Context.AnchorClass.Get()))
-			{
-				return AAnchorPoint::StaticClass();
-			}
-
-			return Context.AnchorClass;
-		}
-
-		FGuid BuildUniqueRepairAnchorKey(const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors)
-		{
-			const TSet<FGuid> ExistingAnchorKeys = BuildAnchorKeySet(CachedAnchors);
-			for (int32 AttemptIndex = 0; AttemptIndex < MaxUniqueGuidAttempts; AttemptIndex++)
-			{
-				const FGuid CandidateKey = FGuid::NewGuid();
-				if (CandidateKey.IsValid() && not ExistingAnchorKeys.Contains(CandidateKey))
-				{
-					return CandidateKey;
-				}
-			}
-
-			return FGuid::NewGuid();
-		}
-
-		AAnchorPoint* SpawnRepairAnchor(
-			const FWorldCampaignPruningContext& Context,
-			const FClosestRepairPair& RepairPair,
-			FWorldCampaignPruningResult& InOutResult)
-		{
-			if (not RepairPair.GetIsValid())
-			{
-				return nullptr;
-			}
-
-			const FVector SpawnLocation =
-				(RepairPair.ReachableAnchor->GetActorLocation() + RepairPair.UnreachableAnchor->GetActorLocation())
-				* HalfValue;
-			const FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
-
-			FActorSpawnParameters SpawnParameters;
-			SpawnParameters.Owner = Context.Owner;
-			AAnchorPoint* SpawnedAnchor = Context.World->SpawnActor<AAnchorPoint>(
-				GetAnchorClassToSpawn(Context),
-				SpawnTransform,
-				SpawnParameters);
-			if (not IsValid(SpawnedAnchor))
-			{
-				RTSFunctionLibrary::ReportError(TEXT("World campaign pruning failed to spawn a repair anchor."));
-				return nullptr;
-			}
-
-			SpawnedAnchor->SetAnchorKey(BuildUniqueRepairAnchorKey(*Context.CachedAnchors), true);
-			SpawnedAnchor->InitializeCampaignSettings(Context.CampaignSettings);
-			SpawnedAnchor->Tags.AddUnique(GeneratedAnchorTag);
-			SpawnedAnchor->Tags.AddUnique(RepairAnchorTag);
-			Context.CachedAnchors->Add(SpawnedAnchor);
-
-			InOutResult.SpawnedRepairAnchors++;
-			InOutResult.bDidChange = true;
-			return SpawnedAnchor;
-		}
-
-		bool RepairClosestUnreachableIsland(
-			const FWorldCampaignPruningContext& Context,
-			const TSet<FGuid>& ReachableAnchorKeys,
-			const TArray<TArray<TObjectPtr<AAnchorPoint>>>& Islands,
-			FWorldCampaignPruningResult& InOutResult)
-		{
-			const FClosestRepairPair RepairPair = FindClosestRepairPair(Context, ReachableAnchorKeys, Islands);
-			if (not RepairPair.GetIsValid())
-			{
-				RTSFunctionLibrary::ReportError(
-					TEXT("World campaign pruning failed to find a reachable gameplay anchor for repair."));
-				return false;
-			}
-
-			AAnchorPoint* RepairAnchor = SpawnRepairAnchor(Context, RepairPair, InOutResult);
-			if (not IsValid(RepairAnchor))
-			{
-				return false;
-			}
-
-			AConnection* FirstConnection = SpawnConnectionBetweenAnchors(
-				Context,
-				RepairPair.ReachableAnchor,
-				RepairAnchor,
-				InOutResult);
-			AConnection* SecondConnection = SpawnConnectionBetweenAnchors(
-				Context,
-				RepairAnchor,
-				RepairPair.UnreachableAnchor,
-				InOutResult);
-			if (not IsValid(FirstConnection) || not IsValid(SecondConnection))
-			{
-				return false;
-			}
-
-			RebuildAnchorConnectionReferences(*Context.CachedAnchors, *Context.CachedConnections);
-			return true;
-		}
-
-		void RepairGameplayReachability(
+		void RepairKeptAnchorReachability(
 			const FWorldCampaignPruningContext& Context,
 			FWorldCampaignPruningResult& InOutResult)
 		{
-			const int32 GameplayAnchorCount = CountGameplayAnchors(Context);
-			if (GameplayAnchorCount <= 1)
-			{
-				return;
-			}
-
-			for (int32 RepairIndex = 0; RepairIndex < GameplayAnchorCount; RepairIndex++)
+			const int32 MaxRepairAttempts = Context.CachedAnchors->Num();
+			for (int32 RepairAttempt = 0; RepairAttempt < MaxRepairAttempts; RepairAttempt++)
 			{
 				RebuildAnchorConnectionReferences(*Context.CachedAnchors, *Context.CachedConnections);
-				const TSet<FGuid> ReachableAnchorKeys = BuildReachableAnchorKeys(Context.PlayerHQAnchor);
-				if (GetAreAllGameplayAnchorsReachable(Context, ReachableAnchorKeys))
+				const TSet<FGuid> ReachableAnchorKeys = BuildReachableKeptAnchorKeys(Context.PlayerHQAnchor);
+				if (GetAreAllKeptAnchorsReachable(*Context.CachedAnchors, ReachableAnchorKeys))
 				{
 					return;
 				}
 
-				const TArray<TArray<TObjectPtr<AAnchorPoint>>> Islands =
-					BuildUnreachableGameplayIslands(Context, ReachableAnchorKeys);
-				if (Islands.Num() == 0)
+				AAnchorPoint* UnreachableAnchor = FindClosestUnreachableAnchor(*Context.CachedAnchors, ReachableAnchorKeys);
+				if (not IsValid(UnreachableAnchor))
 				{
+					RTSFunctionLibrary::ReportError(
+						TEXT("World campaign pruning failed to find an unreachable anchor for repair."));
 					return;
 				}
 
-				if (not RepairClosestUnreachableIsland(Context, ReachableAnchorKeys, Islands, InOutResult))
+				AAnchorPoint* ReachableAnchor = FindClosestReachableAnchor(
+					*Context.CachedAnchors,
+					ReachableAnchorKeys,
+					UnreachableAnchor);
+				if (not IsValid(ReachableAnchor))
 				{
+					RTSFunctionLibrary::ReportError(
+						TEXT("World campaign pruning failed to find a reachable anchor for repair."));
 					return;
 				}
+
+				SpawnConnectionBetweenAnchors(Context, ReachableAnchor, UnreachableAnchor, InOutResult);
 			}
 
 			RTSFunctionLibrary::ReportError(
-				TEXT("World campaign pruning stopped before all gameplay anchors became reachable."));
+				TEXT("World campaign pruning stopped before all kept anchors became reachable."));
 		}
 
 		void CompactInvalidGraphEntries(
@@ -1107,9 +1036,16 @@ namespace WorldCampaignPruningHelper
 		}
 
 		CompactInvalidGraphEntries(Context, Result);
+		FPruningGraph Graph = BuildPruningGraph(Context);
+		BuildContractedEdges(Graph);
+
+		DestroyOldConnections(Context, Result);
+		DestroyEmptyAnchors(Context, Graph, Result);
+		DestroyGeneratedEmptyAnchorsOutsideGraph(Context, Graph, Result);
+		SpawnContractedConnections(Context, Graph, Result);
 		RebuildAnchorConnectionReferences(*Context.CachedAnchors, *Context.CachedConnections);
-		PruneEmptyAnchors(Context, Result);
-		RepairGameplayReachability(Context, Result);
+		RepairKeptAnchorReachability(Context, Result);
+		DestroyStaleOwnedConnectionsOutsideGraph(Context, Result);
 		CompactInvalidGraphEntries(Context, Result);
 		RebuildAnchorConnectionReferences(*Context.CachedAnchors, *Context.CachedConnections);
 		return Result;

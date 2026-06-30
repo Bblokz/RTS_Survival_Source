@@ -57,6 +57,7 @@ namespace
 	using CampaignGenerationHelper::GetHopPreferenceWeight;
 	using CampaignGenerationHelper::GetIsSwappableEnemyType;
 	using CampaignGenerationHelper::GetOverrideMissionPreferenceScore;
+	using CampaignGenerationHelper::GetTopologyPreferenceScore;
 	using CampaignGenerationHelper::HasMinimumAdjacentMatches;
 
 	struct FRuleRelaxationState
@@ -395,21 +396,6 @@ namespace
 	{
 		const int32* CachedDistance = HopDistancesByAnchorKey.Find(AnchorKey);
 		return CachedDistance ? *CachedDistance : INDEX_NONE;
-	}
-
-	float GetTopologyPreferenceScore(ETopologySearchStrategy Preference, float Value)
-	{
-		if (Preference == ETopologySearchStrategy::PreferMax)
-		{
-			return Value;
-		}
-
-		if (Preference == ETopologySearchStrategy::PreferMin)
-		{
-			return -Value;
-		}
-
-		return 0.f;
 	}
 
 	FRuleRelaxationState GetRelaxationState(EPlacementFailurePolicy Policy, int32 AttemptIndex)

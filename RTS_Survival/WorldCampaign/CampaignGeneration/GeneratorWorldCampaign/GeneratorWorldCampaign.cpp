@@ -11,6 +11,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "TimerManager.h"
 #include "EngineUtils.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Debugging/WorldCampaignDebugger.h"
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
@@ -40,6 +41,7 @@ namespace
 	 * When exceeded, timeout fail-safe placement can run for supported steps before generation is aborted.
 	 */
 	constexpr int32 MaxTotalAttempts = 100000;
+	constexpr int32 MaxPruningValidationAsyncSetupPasses = 16;
 	constexpr int32 AttemptSeedMultiplier = 13;
 	constexpr int32 MaxRelaxationAttempts = 3;
 	constexpr int32 RelaxedHopDistanceMax = TNumericLimits<int32>::Max();
@@ -4801,9 +4803,8 @@ void AGeneratorWorldCampaign::PruneUnusedAnchorsAndRepairConnectivity()
 	PruningContext.World = GetWorld();
 	PruningContext.Owner = this;
 	PruningContext.PlayerHQAnchor = M_PlacementState.PlayerHQAnchor;
-	PruningContext.AnchorClass = M_AnchorPointGenerationSettings.M_GeneratedAnchorPointClass;
 	PruningContext.ConnectionClass = M_ConnectionClass;
-	PruningContext.CampaignSettings = UWorldCampaignSettings::Get();
+	PruningContext.GeneratedAnchorTag = GeneratedAnchorTag;
 	PruningContext.GameplayAnchorKeys = BuildGameplayAnchorKeysForPruning();
 	PruningContext.CachedAnchors = &M_PlacementState.CachedAnchors;
 	PruningContext.CachedConnections = &M_PlacementState.CachedConnections;
@@ -4811,6 +4812,7 @@ void AGeneratorWorldCampaign::PruneUnusedAnchorsAndRepairConnectivity()
 
 	const WorldCampaignPruningHelper::FWorldCampaignPruningResult PruningResult =
 		WorldCampaignPruningHelper::PruneUnusedAnchorsAndRepairConnectivity(PruningContext);
+	RemovePrunedPlacementStateEntries();
 	if (not PruningResult.bDidChange)
 	{
 		RefreshCampaignGraphAfterPruning();
@@ -4819,6 +4821,52 @@ void AGeneratorWorldCampaign::PruneUnusedAnchorsAndRepairConnectivity()
 
 	RefreshCampaignGraphAfterPruning();
 	RefreshConnectionTransactionAfterPruning();
+}
+
+bool AGeneratorWorldCampaign::GenerateAndValidatePrunedWorldForSeed(const int32 Seed, FString& OutFailureReason)
+{
+	const FScopedRTSModalDialogSuppression DialogSuppression;
+	EraseAllGeneration();
+	M_CountAndDifficultyTuning.Seed = Seed;
+
+	FString PlacementFailureReason;
+	if (not GenerateWorldWithAsyncPlacementForPruningValidation(PlacementFailureReason))
+	{
+		OutFailureReason = FString::Printf(
+			TEXT("generation failed for seed %d: %s"),
+			Seed,
+			*PlacementFailureReason);
+		return false;
+	}
+
+	PruneUnusedAnchorsAndRepairConnectivity();
+	if (ValidateCurrentPrunedWorld(OutFailureReason))
+	{
+		return true;
+	}
+
+	OutFailureReason = FString::Printf(TEXT("seed %d failed pruning validation: %s"), Seed, *OutFailureReason);
+	return false;
+}
+
+bool AGeneratorWorldCampaign::ValidateCurrentPrunedWorld(FString& OutFailureReason) const
+{
+	if (not GetPrunedCachedAnchorsHaveOnlyGameplay(OutFailureReason))
+	{
+		return false;
+	}
+
+	if (not GetPrunedConnectionsAreValid(OutFailureReason))
+	{
+		return false;
+	}
+
+	if (not GetPrunedWorldActorsMatchCachedGraph(OutFailureReason))
+	{
+		return false;
+	}
+
+	return GetPrunedAnchorsReachableFromPlayerHQ(OutFailureReason);
 }
 
 void AGeneratorWorldCampaign::AddSavedAnchorsAndMapItems(FWorldCampaignState& WorldCampaignState) const
@@ -8611,34 +8659,64 @@ void AGeneratorWorldCampaign::ClearDerivedData()
 	M_DerivedData = FWorldCampaignDerivedData();
 }
 
+bool AGeneratorWorldCampaign::GenerateWorldWithAsyncPlacementForPruningValidation(FString& OutFailureReason)
+{
+	for (int32 SetupPassIndex = 0;
+	     SetupPassIndex < MaxPruningValidationAsyncSetupPasses;
+	     SetupPassIndex++)
+	{
+		if (not ExecuteGameThreadSetupStepsBeforeAsyncPlacement())
+		{
+			OutFailureReason = TEXT("game-thread setup failed before async placement.");
+			return false;
+		}
+
+		FWorldCampaignPlacementSnapshot Snapshot;
+		if (not BuildPlacementSnapshot(Snapshot))
+		{
+			OutFailureReason = TEXT("could not build async placement snapshot.");
+			return false;
+		}
+
+		FWorldCampaignPlacementResult Result = WorldCampaignAsyncPlacement::SolvePlacement(Snapshot);
+		ReportPlacementDebugEvents(Result);
+		M_TotalAttemptCount += Result.WorkerTotalAttemptCount;
+		M_StepAttemptIndices = Result.StepAttemptIndicesAtEnd;
+
+		if (Result.bRequiresGameThreadBacktrack)
+		{
+			if (not ApplyAsyncPlacementGameThreadBacktrack(Result))
+			{
+				OutFailureReason = TEXT("async placement requested game-thread backtracking that could not be applied.");
+				return false;
+			}
+
+			continue;
+		}
+
+		if (not Result.bSucceeded)
+		{
+			OutFailureReason = Result.FailureReason;
+			return false;
+		}
+
+		if (not ApplyPlacementResultToWorld(Result))
+		{
+			OutFailureReason = TEXT("async placement result could not be applied to world actors.");
+			return false;
+		}
+
+		M_GenerationStep = ECampaignGenerationStep::Finished;
+		return true;
+	}
+
+	OutFailureReason = TEXT("async placement exceeded the pruning validation setup-backtrack pass limit.");
+	return false;
+}
+
 TSet<FGuid> AGeneratorWorldCampaign::BuildGameplayAnchorKeysForPruning() const
 {
 	TSet<FGuid> GameplayAnchorKeys;
-	if (M_PlacementState.PlayerHQAnchorKey.IsValid())
-	{
-		GameplayAnchorKeys.Add(M_PlacementState.PlayerHQAnchorKey);
-	}
-
-	if (M_PlacementState.EnemyHQAnchorKey.IsValid())
-	{
-		GameplayAnchorKeys.Add(M_PlacementState.EnemyHQAnchorKey);
-	}
-
-	for (const TPair<FGuid, EMapEnemyItem>& EnemyItemByAnchorKey : M_PlacementState.EnemyItemsByAnchorKey)
-	{
-		GameplayAnchorKeys.Add(EnemyItemByAnchorKey.Key);
-	}
-
-	for (const TPair<FGuid, EMapNeutralObjectType>& NeutralItemByAnchorKey : M_PlacementState.NeutralItemsByAnchorKey)
-	{
-		GameplayAnchorKeys.Add(NeutralItemByAnchorKey.Key);
-	}
-
-	for (const TPair<FGuid, EMapMission>& MissionByAnchorKey : M_PlacementState.MissionsByAnchorKey)
-	{
-		GameplayAnchorKeys.Add(MissionByAnchorKey.Key);
-	}
-
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
 	{
 		if (not IsValid(AnchorPoint) || not AnchorPoint->GetHasPromotedWorldObject())
@@ -8650,6 +8728,55 @@ TSet<FGuid> AGeneratorWorldCampaign::BuildGameplayAnchorKeysForPruning() const
 	}
 
 	return GameplayAnchorKeys;
+}
+
+void AGeneratorWorldCampaign::RemovePrunedPlacementStateEntries()
+{
+	TSet<FGuid> CachedAnchorKeys;
+	CachedAnchorKeys.Reserve(M_PlacementState.CachedAnchors.Num());
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		CachedAnchorKeys.Add(AnchorPoint->GetAnchorKey());
+	}
+
+	for (auto EnemyItemIterator = M_PlacementState.EnemyItemsByAnchorKey.CreateIterator();
+	     EnemyItemIterator;
+	     ++EnemyItemIterator)
+	{
+		if (CachedAnchorKeys.Contains(EnemyItemIterator.Key()))
+		{
+			continue;
+		}
+
+		EnemyItemIterator.RemoveCurrent();
+	}
+
+	for (auto NeutralItemIterator = M_PlacementState.NeutralItemsByAnchorKey.CreateIterator();
+	     NeutralItemIterator;
+	     ++NeutralItemIterator)
+	{
+		if (CachedAnchorKeys.Contains(NeutralItemIterator.Key()))
+		{
+			continue;
+		}
+
+		NeutralItemIterator.RemoveCurrent();
+	}
+
+	for (auto MissionIterator = M_PlacementState.MissionsByAnchorKey.CreateIterator(); MissionIterator; ++MissionIterator)
+	{
+		if (CachedAnchorKeys.Contains(MissionIterator.Key()))
+		{
+			continue;
+		}
+
+		MissionIterator.RemoveCurrent();
+	}
 }
 
 void AGeneratorWorldCampaign::RefreshCampaignGraphAfterPruning()
@@ -8680,6 +8807,242 @@ void AGeneratorWorldCampaign::RefreshConnectionTransactionAfterPruning()
 
 		Transaction.SpawnedConnections = M_GeneratedConnections;
 	}
+}
+
+bool AGeneratorWorldCampaign::GetPrunedCachedAnchorsHaveOnlyGameplay(FString& OutFailureReason) const
+{
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			OutFailureReason = TEXT("cached anchors contain an invalid anchor pointer.");
+			return false;
+		}
+
+		const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+		if (AnchorPoint->GetHasPromotedWorldObject())
+		{
+			continue;
+		}
+
+		OutFailureReason = FString::Printf(
+			TEXT("cached anchor %s has no gameplay object after pruning."),
+			*AnchorKey.ToString());
+		return false;
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::GetPrunedConnectionsAreValid(FString& OutFailureReason) const
+{
+	TSet<FGuid> CachedAnchorKeys;
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		CachedAnchorKeys.Add(AnchorPoint->GetAnchorKey());
+	}
+
+	for (const TObjectPtr<AConnection>& Connection : M_PlacementState.CachedConnections)
+	{
+		if (not IsValid(Connection))
+		{
+			OutFailureReason = TEXT("cached connections contain an invalid connection pointer.");
+			return false;
+		}
+
+		const TArray<TObjectPtr<AAnchorPoint>>& ConnectedAnchors = Connection->GetConnectedAnchors();
+		if (ConnectedAnchors.Num() != 2)
+		{
+			OutFailureReason = TEXT("pruned connections must directly connect exactly two kept anchors.");
+			return false;
+		}
+
+		for (const TObjectPtr<AAnchorPoint>& ConnectedAnchor : ConnectedAnchors)
+		{
+			if (not IsValid(ConnectedAnchor) || not CachedAnchorKeys.Contains(ConnectedAnchor->GetAnchorKey()))
+			{
+				OutFailureReason = TEXT("pruned connection references an anchor outside the cached pruned graph.");
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+TSet<FGuid> AGeneratorWorldCampaign::BuildPrunedCachedAnchorKeys() const
+{
+	TSet<FGuid> CachedAnchorKeys;
+	CachedAnchorKeys.Reserve(M_PlacementState.CachedAnchors.Num());
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		CachedAnchorKeys.Add(AnchorPoint->GetAnchorKey());
+	}
+
+	return CachedAnchorKeys;
+}
+
+TSet<const AConnection*> AGeneratorWorldCampaign::BuildPrunedCachedConnectionSet() const
+{
+	TSet<const AConnection*> CachedConnections;
+	CachedConnections.Reserve(M_PlacementState.CachedConnections.Num());
+	for (const TObjectPtr<AConnection>& Connection : M_PlacementState.CachedConnections)
+	{
+		if (not IsValid(Connection))
+		{
+			continue;
+		}
+
+		CachedConnections.Add(Connection.Get());
+	}
+
+	return CachedConnections;
+}
+
+bool AGeneratorWorldCampaign::GetPrunedWorldActorsMatchCachedGraph(FString& OutFailureReason) const
+{
+	if (not IsValid(GetWorld()))
+	{
+		OutFailureReason = TEXT("world is invalid while validating pruned actors.");
+		return false;
+	}
+
+	const TSet<FGuid> CachedAnchorKeys = BuildPrunedCachedAnchorKeys();
+	if (not GetPrunedAnchorActorsMatchCachedGraph(CachedAnchorKeys, OutFailureReason))
+	{
+		return false;
+	}
+
+	const TSet<const AConnection*> CachedConnections = BuildPrunedCachedConnectionSet();
+	return GetPrunedConnectionActorsMatchCachedGraph(CachedConnections, OutFailureReason);
+}
+
+bool AGeneratorWorldCampaign::GetPrunedAnchorActorsMatchCachedGraph(
+	const TSet<FGuid>& CachedAnchorKeys,
+	FString& OutFailureReason) const
+{
+	for (TActorIterator<AAnchorPoint> AnchorIterator(GetWorld()); AnchorIterator; ++AnchorIterator)
+	{
+		const AAnchorPoint* AnchorPoint = *AnchorIterator;
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		if (CachedAnchorKeys.Contains(AnchorPoint->GetAnchorKey()))
+		{
+			continue;
+		}
+
+		if (AnchorPoint->GetHasPromotedWorldObject())
+		{
+			OutFailureReason = FString::Printf(
+				TEXT("promoted anchor actor %s exists outside the pruned cached graph."),
+				*AnchorPoint->GetName());
+			return false;
+		}
+
+		if (AnchorPoint->Tags.Contains(GeneratedAnchorTag))
+		{
+			OutFailureReason = FString::Printf(
+				TEXT("generated empty anchor actor %s still exists after pruning."),
+				*AnchorPoint->GetName());
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::GetPrunedConnectionActorsMatchCachedGraph(
+	const TSet<const AConnection*>& CachedConnections,
+	FString& OutFailureReason) const
+{
+	for (TActorIterator<AConnection> ConnectionIterator(GetWorld()); ConnectionIterator; ++ConnectionIterator)
+	{
+		const AConnection* Connection = *ConnectionIterator;
+		if (not IsValid(Connection) || Connection->GetOwner() != this)
+		{
+			continue;
+		}
+
+		if (CachedConnections.Contains(Connection))
+		{
+			continue;
+		}
+
+		OutFailureReason = FString::Printf(
+			TEXT("generator-owned connection actor %s exists outside the pruned cached graph."),
+			*Connection->GetName());
+		return false;
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::GetPrunedAnchorsReachableFromPlayerHQ(FString& OutFailureReason) const
+{
+	if (not IsValid(M_PlacementState.PlayerHQAnchor))
+	{
+		OutFailureReason = TEXT("player HQ anchor is invalid after pruning.");
+		return false;
+	}
+
+	TQueue<AAnchorPoint*> AnchorQueue;
+	TSet<FGuid> ReachableAnchorKeys;
+	AnchorQueue.Enqueue(M_PlacementState.PlayerHQAnchor);
+	ReachableAnchorKeys.Add(M_PlacementState.PlayerHQAnchor->GetAnchorKey());
+
+	while (not AnchorQueue.IsEmpty())
+	{
+		AAnchorPoint* CurrentAnchor = nullptr;
+		AnchorQueue.Dequeue(CurrentAnchor);
+		if (not IsValid(CurrentAnchor))
+		{
+			continue;
+		}
+
+		for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : CurrentAnchor->GetNeighborAnchors())
+		{
+			if (not IsValid(NeighborAnchor) || ReachableAnchorKeys.Contains(NeighborAnchor->GetAnchorKey()))
+			{
+				continue;
+			}
+
+			ReachableAnchorKeys.Add(NeighborAnchor->GetAnchorKey());
+			AnchorQueue.Enqueue(NeighborAnchor.Get());
+		}
+	}
+
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		if (ReachableAnchorKeys.Contains(AnchorPoint->GetAnchorKey()))
+		{
+			continue;
+		}
+
+		OutFailureReason = FString::Printf(
+			TEXT("cached anchor %s is not reachable from Player HQ after pruning."),
+			*AnchorPoint->GetAnchorKey().ToString());
+		return false;
+	}
+
+	return true;
 }
 
 void AGeneratorWorldCampaign::CacheAnchorConnectionDegrees()
@@ -9574,12 +9937,121 @@ namespace
 		}
 
 		UE_LOG(LogTemp, Error,
-		       TEXT("World campaign placement parity validation failed: %s"),
+	       TEXT("World campaign placement parity validation failed: %s"),
+	       *FailureReason);
+	}
+
+	void LogWorldCampaignPruningValidationResult(AGeneratorWorldCampaign* Generator, const int32 Seed)
+	{
+		if (not IsValid(Generator))
+		{
+			UE_LOG(LogTemp, Error, TEXT("World campaign pruning validation failed: invalid generator."));
+			return;
+		}
+
+		FString FailureReason;
+		if (Generator->GenerateAndValidatePrunedWorldForSeed(Seed, FailureReason))
+		{
+			UE_LOG(LogTemp, Display,
+			       TEXT("World campaign pruning validation passed for seed %d."),
+			       Seed);
+			return;
+		}
+
+		UE_LOG(LogTemp, Error,
+		       TEXT("World campaign pruning validation failed: %s"),
 		       *FailureReason);
+	}
+
+	bool GetShouldRequestExitAfterWorldCampaignValidation(const TArray<FString>& Args)
+	{
+		for (const FString& Arg : Args)
+		{
+			FString NormalizedArg = Arg;
+			NormalizedArg.ReplaceInline(TEXT(";"), TEXT(""));
+			if (NormalizedArg.Equals(TEXT("Quit"), ESearchCase::IgnoreCase)
+				|| NormalizedArg.Equals(TEXT("Exit"), ESearchCase::IgnoreCase))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void RequestExitAfterWorldCampaignValidationIfNeeded(const bool bShouldRequestExit)
+	{
+		if (not bShouldRequestExit)
+		{
+			return;
+		}
+
+		FPlatformMisc::RequestExit(false);
+	}
+
+	void ValidateWorldCampaignPruningCommand(const TArray<FString>& Args, UWorld* World)
+	{
+		const bool bShouldRequestExit = GetShouldRequestExitAfterWorldCampaignValidation(Args);
+		if (not IsValid(World))
+		{
+			UE_LOG(LogTemp, Error, TEXT("World campaign pruning validation failed: invalid world."));
+			RequestExitAfterWorldCampaignValidationIfNeeded(bShouldRequestExit);
+			return;
+		}
+
+		AGeneratorWorldCampaign* Generator = nullptr;
+		for (TActorIterator<AGeneratorWorldCampaign> GeneratorIterator(World); GeneratorIterator; ++GeneratorIterator)
+		{
+			Generator = *GeneratorIterator;
+			break;
+		}
+
+		if (not IsValid(Generator))
+		{
+			UE_LOG(LogTemp, Error, TEXT("World campaign pruning validation failed: no generator found."));
+			RequestExitAfterWorldCampaignValidationIfNeeded(bShouldRequestExit);
+			return;
+		}
+
+		int32 Seed = 0;
+		if (Args.Num() >= 1)
+		{
+			Seed = FCString::Atoi(*Args[0]);
+		}
+
+		AWorldPlayerController* WorldPlayerController = nullptr;
+		for (TActorIterator<AWorldPlayerController> ControllerIterator(World); ControllerIterator; ++ControllerIterator)
+		{
+			WorldPlayerController = *ControllerIterator;
+			break;
+		}
+
+		URTSGameInstance* GameInstance = World->GetGameInstance<URTSGameInstance>();
+		if (not IsValid(WorldPlayerController) || not IsValid(GameInstance))
+		{
+			LogWorldCampaignPruningValidationResult(Generator, Seed);
+			RequestExitAfterWorldCampaignValidationIfNeeded(bShouldRequestExit);
+			return;
+		}
+
+		FCampaignGenerationSettings CampaignSettings = GameInstance->GetCampaignGenerationSettings();
+		CampaignSettings.GenerationSeed = Seed;
+		Generator->InitializeWorldGenerator(
+			WorldPlayerController,
+			CampaignSettings,
+			GameInstance->GetSelectedGameDifficulty());
+
+		LogWorldCampaignPruningValidationResult(Generator, Seed);
+		RequestExitAfterWorldCampaignValidationIfNeeded(bShouldRequestExit);
 	}
 
 	static FAutoConsoleCommandWithWorldAndArgs GValidateWorldCampaignPlacementParityCommand(
 		TEXT("RTS.WorldCampaign.ValidatePlacementParity"),
 		TEXT("Validates synchronous placement against async snapshot placement. Args: [FirstSeed] [SeedCount]."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ValidateWorldCampaignPlacementParityCommand));
+
+	static FAutoConsoleCommandWithWorldAndArgs GValidateWorldCampaignPruningCommand(
+		TEXT("RTS.WorldCampaign.ValidatePruning"),
+		TEXT("Generates one campaign seed, prunes unused anchors, and validates pruned graph invariants. Args: [Seed]."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ValidateWorldCampaignPruningCommand));
 }

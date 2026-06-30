@@ -9,7 +9,6 @@ class AActor;
 class AAnchorPoint;
 class AConnection;
 class UWorld;
-class UWorldCampaignSettings;
 
 namespace WorldCampaignPruningHelper
 {
@@ -18,9 +17,8 @@ namespace WorldCampaignPruningHelper
 		UWorld* World = nullptr;
 		AActor* Owner = nullptr;
 		AAnchorPoint* PlayerHQAnchor = nullptr;
-		TSubclassOf<AAnchorPoint> AnchorClass;
 		TSubclassOf<AConnection> ConnectionClass;
-		const UWorldCampaignSettings* CampaignSettings = nullptr;
+		FName GeneratedAnchorTag;
 		TSet<FGuid> GameplayAnchorKeys;
 		TArray<TObjectPtr<AAnchorPoint>>* CachedAnchors = nullptr;
 		TArray<TObjectPtr<AConnection>>* CachedConnections = nullptr;
@@ -32,7 +30,6 @@ namespace WorldCampaignPruningHelper
 		bool bDidChange = false;
 		int32 DestroyedEmptyAnchors = 0;
 		int32 DestroyedConnections = 0;
-		int32 SpawnedRepairAnchors = 0;
 		int32 SpawnedConnections = 0;
 	};
 

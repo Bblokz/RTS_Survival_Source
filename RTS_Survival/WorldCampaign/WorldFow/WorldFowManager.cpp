@@ -520,10 +520,12 @@ void AWorldFowManager::RemoveStaleAnchorStates()
 	CurrentAnchorKeys.Reserve(PlacementState.CachedAnchors.Num());
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
 	{
-		if (IsValid(AnchorPoint))
+		if (not IsValid(AnchorPoint))
 		{
-			CurrentAnchorKeys.Add(TObjectKey<const AAnchorPoint>(AnchorPoint.Get()));
+			continue;
 		}
+
+		CurrentAnchorKeys.Add(TObjectKey<const AAnchorPoint>(AnchorPoint.Get()));
 	}
 
 	for (auto AnchorStateIterator = M_AnchorStates.CreateIterator(); AnchorStateIterator; ++AnchorStateIterator)
@@ -539,15 +541,22 @@ void AWorldFowManager::ApplyRevealRulesFromVisibleAnchors()
 {
 	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
 	AAnchorPoint* PlayerHQAnchor = PlacementState.PlayerHQAnchor;
-	if (IsValid(PlayerHQAnchor))
+	if (not IsValid(PlayerHQAnchor))
 	{
-		SetAnchorState(PlayerHQAnchor, EWorldMapFowState::Visible);
+		return;
 	}
+
+	SetAnchorState(PlayerHQAnchor, EWorldMapFowState::Visible);
 
 	TArray<AAnchorPoint*> VisibleAnchors;
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
 	{
-		if (IsValid(AnchorPoint) && GetAnchorState(AnchorPoint) == EWorldMapFowState::Visible)
+		if (not IsValid(AnchorPoint))
+		{
+			continue;
+		}
+
+		if (GetAnchorState(AnchorPoint) == EWorldMapFowState::Visible)
 		{
 			VisibleAnchors.Add(AnchorPoint);
 		}

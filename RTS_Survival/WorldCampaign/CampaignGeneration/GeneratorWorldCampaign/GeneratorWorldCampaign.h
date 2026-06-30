@@ -479,6 +479,21 @@ public:
 	 */
 	bool ValidateAsyncPlacementParityForSeedRange(int32 FirstSeed, int32 SeedCount, FString& OutFailureReason);
 
+	/**
+	 * @brief Generates one campaign, prunes it, and verifies only reachable gameplay anchors remain.
+	 * @param Seed Seed used for the validation generation.
+	 * @param OutFailureReason First pruning invariant failure if validation fails.
+	 * @return true when pruning leaves no empty anchors and all kept anchors are reachable from Player HQ.
+	 */
+	bool GenerateAndValidatePrunedWorldForSeed(int32 Seed, FString& OutFailureReason);
+
+	/**
+	 * @brief Validates the currently pruned world graph without regenerating it.
+	 * @param OutFailureReason First pruning invariant failure if validation fails.
+	 * @return true when cached anchors and connections match the pruned gameplay-only graph invariants.
+	 */
+	bool ValidateCurrentPrunedWorld(FString& OutFailureReason) const;
+
 	float GetDebugRangeOffset() const { return WorldCampaignDebugDefaults::ConnectionDrawHeightOffset; }
 	float GetDebugDisplaySeconds() const { return WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds; }
 	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
@@ -1346,9 +1361,21 @@ private:
 
 	void ClearPlacementState();
 	void ClearDerivedData();
+	bool GenerateWorldWithAsyncPlacementForPruningValidation(FString& OutFailureReason);
 	TSet<FGuid> BuildGameplayAnchorKeysForPruning() const;
+	void RemovePrunedPlacementStateEntries();
 	void RefreshCampaignGraphAfterPruning();
 	void RefreshConnectionTransactionAfterPruning();
+	bool GetPrunedCachedAnchorsHaveOnlyGameplay(FString& OutFailureReason) const;
+	bool GetPrunedConnectionsAreValid(FString& OutFailureReason) const;
+	TSet<FGuid> BuildPrunedCachedAnchorKeys() const;
+	TSet<const AConnection*> BuildPrunedCachedConnectionSet() const;
+	bool GetPrunedWorldActorsMatchCachedGraph(FString& OutFailureReason) const;
+	bool GetPrunedAnchorActorsMatchCachedGraph(const TSet<FGuid>& CachedAnchorKeys,
+	                                           FString& OutFailureReason) const;
+	bool GetPrunedConnectionActorsMatchCachedGraph(const TSet<const AConnection*>& CachedConnections,
+	                                               FString& OutFailureReason) const;
+	bool GetPrunedAnchorsReachableFromPlayerHQ(FString& OutFailureReason) const;
 	void CacheAnchorConnectionDegrees();
 	void BuildChokepointScoresCache(const AAnchorPoint* OptionalHQAnchor);
 
