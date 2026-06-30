@@ -237,6 +237,11 @@ namespace WorldCampaignAsyncPlacement
 		FString FailureReason;
 		ECampaignGenerationStep GameThreadBacktrackFailedStep = ECampaignGenerationStep::NotStarted;
 		int32 GameThreadTransactionsToUndo = 0;
+		int32 WorkerPlacementAttemptCount = 0;
+		int32 WorkerBacktrackCount = 0;
+		int32 WorkerMicroBacktrackCount = 0;
+		int32 WorkerMacroBacktrackCount = 0;
+		int32 WorkerSetupBacktrackRequestCount = 0;
 		int32 WorkerTotalAttemptCount = 0;
 		TMap<ECampaignGenerationStep, int32> StepAttemptIndicesAtEnd;
 		FGuid PlayerHQAnchorKey;
@@ -260,6 +265,11 @@ namespace WorldCampaignAsyncPlacement
 		ECampaignGenerationStep LastFailedStep = ECampaignGenerationStep::NotStarted;
 		int32 TotalAttemptCount = 0;
 		int32 WorkerAttemptDelta = 0;
+		int32 WorkerPlacementAttemptCount = 0;
+		int32 WorkerBacktrackCount = 0;
+		int32 WorkerMicroBacktrackCount = 0;
+		int32 WorkerMacroBacktrackCount = 0;
+		int32 WorkerSetupBacktrackRequestCount = 0;
 		int32 CurrentStepAttemptCount = 0;
 		int32 TransactionCount = 0;
 		int32 EnemyMicroPlacedCount = 0;

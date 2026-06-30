@@ -534,6 +534,11 @@ namespace
 		int32 MissionMicroPlacedCount = 0;
 		int32 InitialTotalAttemptCount = 0;
 		int32 TotalAttemptCount = 0;
+		int32 WorkerPlacementAttemptCount = 0;
+		int32 WorkerBacktrackCount = 0;
+		int32 WorkerMicroBacktrackCount = 0;
+		int32 WorkerMacroBacktrackCount = 0;
+		int32 WorkerSetupBacktrackRequestCount = 0;
 		ECampaignGenerationStep GenerationStep = ECampaignGenerationStep::ConnectionsCreated;
 		bool bRequiresGameThreadBacktrack = false;
 		ECampaignGenerationStep GameThreadBacktrackFailedStep = ECampaignGenerationStep::NotStarted;
@@ -556,6 +561,11 @@ namespace
 			MissionMicroPlacedCount = 0;
 			InitialTotalAttemptCount = 0;
 			TotalAttemptCount = 0;
+			WorkerPlacementAttemptCount = 0;
+			WorkerBacktrackCount = 0;
+			WorkerMicroBacktrackCount = 0;
+			WorkerMacroBacktrackCount = 0;
+			WorkerSetupBacktrackRequestCount = 0;
 			GenerationStep = ECampaignGenerationStep::ConnectionsCreated;
 			bRequiresGameThreadBacktrack = false;
 			GameThreadBacktrackFailedStep = ECampaignGenerationStep::NotStarted;
@@ -669,6 +679,11 @@ namespace
 			Progress->CurrentStep = CurrentStep;
 			Progress->TotalAttemptCount = TotalAttemptCount;
 			Progress->WorkerAttemptDelta = FMath::Max(0, TotalAttemptCount - InitialTotalAttemptCount);
+			Progress->WorkerPlacementAttemptCount = WorkerPlacementAttemptCount;
+			Progress->WorkerBacktrackCount = WorkerBacktrackCount;
+			Progress->WorkerMicroBacktrackCount = WorkerMicroBacktrackCount;
+			Progress->WorkerMacroBacktrackCount = WorkerMacroBacktrackCount;
+			Progress->WorkerSetupBacktrackRequestCount = WorkerSetupBacktrackRequestCount;
 			Progress->CurrentStepAttemptCount = GetStepAttemptIndex(CurrentStep);
 			Progress->TransactionCount = Transactions.Num();
 			Progress->EnemyMicroPlacedCount = EnemyMicroPlacedCount;
@@ -721,6 +736,11 @@ namespace
 			Result.bRequiresGameThreadBacktrack = bRequiresGameThreadBacktrack;
 			Result.GameThreadBacktrackFailedStep = GameThreadBacktrackFailedStep;
 			Result.GameThreadTransactionsToUndo = GameThreadTransactionsToUndo;
+			Result.WorkerPlacementAttemptCount = WorkerPlacementAttemptCount;
+			Result.WorkerBacktrackCount = WorkerBacktrackCount;
+			Result.WorkerMicroBacktrackCount = WorkerMicroBacktrackCount;
+			Result.WorkerMacroBacktrackCount = WorkerMacroBacktrackCount;
+			Result.WorkerSetupBacktrackRequestCount = WorkerSetupBacktrackRequestCount;
 			Result.WorkerTotalAttemptCount = FMath::Max(0, TotalAttemptCount - InitialTotalAttemptCount);
 			Result.StepAttemptIndicesAtEnd = StepAttemptIndices;
 			Result.EnemyItemsByAnchorKey = State.EnemyItemsByAnchorKey;
@@ -1268,6 +1288,11 @@ namespace
 			StepAttemptIndices.Add(CompletedStep, GetStepAttemptIndex(CompletedStep) + 1);
 		}
 
+		void RecordPlacementAttempt()
+		{
+			WorkerPlacementAttemptCount++;
+		}
+
 		void ResetStepAttemptsFrom(const ECampaignGenerationStep CompletedStep)
 		{
 			ECampaignGenerationStep StepToReset = GetNextStep(CompletedStep);
@@ -1452,6 +1477,9 @@ namespace
 			{
 				UndoLastTransaction();
 			}
+
+			WorkerBacktrackCount += UndoDepth;
+			WorkerMicroBacktrackCount += UndoDepth;
 			UpdateProgress(TEXT("Applied micro backtracking"), FailedStep);
 
 			if (DesiredMicroUndoDepth > TrailingMicroTransactions)
@@ -1482,11 +1510,15 @@ namespace
 				UndoLastTransaction();
 			}
 
+			WorkerBacktrackCount += UndoCount;
+			WorkerMacroBacktrackCount += UndoCount;
+
 			if (TransactionsToUndo > UndoCount)
 			{
 				bRequiresGameThreadBacktrack = true;
 				GameThreadBacktrackFailedStep = FailedStep;
 				GameThreadTransactionsToUndo = TransactionsToUndo - UndoCount;
+				WorkerSetupBacktrackRequestCount++;
 				AddDebugEvent(FailedStep, FString::Printf(
 					              TEXT(
 						              "Async placement snapshot exhausted; requesting %d game-thread setup transaction undo(s)."),
@@ -1763,6 +1795,7 @@ namespace
 
 		bool ExecutePlaceHQ()
 		{
+			RecordPlacementAttempt();
 			if (AnchorIndicesInSnapshotOrder.Num() == 0)
 			{
 				AddDebugEvent(ECampaignGenerationStep::PlayerHQPlaced, TEXT("Player HQ failed: no anchors."));
@@ -1847,6 +1880,7 @@ namespace
 
 		bool ExecutePlaceEnemyHQ()
 		{
+			RecordPlacementAttempt();
 			if (not IsAnchorCached(State.PlayerHQAnchorIndex) || AnchorIndicesInSnapshotOrder.Num() == 0)
 			{
 				AddDebugEvent(ECampaignGenerationStep::EnemyHQPlaced, TEXT("Enemy HQ failed: prerequisites missing."));
@@ -1940,6 +1974,7 @@ namespace
 
 		bool ExecutePlaceEnemyWall()
 		{
+			RecordPlacementAttempt();
 			if (not IsAnchorCached(State.EnemyHQAnchorIndex) || Snapshot->EnemyWallPlacementRules.AnchorCandidateIndices.
 			                                                            Num() == 0)
 			{
@@ -2134,6 +2169,7 @@ namespace
 			OutLastSelectedAnchorKey = FGuid();
 			for (int32 PlacementIndex = 0; PlacementIndex < RequiredCount; PlacementIndex++)
 			{
+				RecordPlacementAttempt();
 				const int32 ExistingCount = DerivedData.EnemyItemPlacedCounts.FindRef(EnemyType);
 				FEnemyItemPlacementRules EffectiveRules = BuildEffectiveEnemyRules(Ruleset, ExistingCount);
 				ApplyEnemyRuleRelaxation(RelaxationState, EffectiveRules);
@@ -2366,6 +2402,7 @@ namespace
 		{
 			for (int32 PlacementIndex = 0; PlacementIndex < RequiredCount; PlacementIndex++)
 			{
+				RecordPlacementAttempt();
 				const int32 ExistingCount = DerivedData.NeutralItemPlacedCounts.FindRef(NeutralType);
 				FNeutralItemPlacementRules EffectiveRules = BaseRules;
 				ApplyNeutralRuleRelaxation(RelaxationState, EffectiveRules);
@@ -2680,6 +2717,7 @@ namespace
 				return false;
 			}
 
+			RecordPlacementAttempt();
 			if (not TrySelectMissionPlacementCandidate(MissionType, MissionIndex, AttemptIndex, RelaxationState,
 			                                           EffectiveRules, SelectionSettings, OutSelectedCandidate))
 			{

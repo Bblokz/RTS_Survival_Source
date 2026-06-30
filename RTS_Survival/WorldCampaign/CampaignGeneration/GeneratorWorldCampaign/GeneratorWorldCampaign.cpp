@@ -60,6 +60,7 @@ namespace
 	constexpr int32 PlayerHQForcePlacementSeedOffset = 4021;
 	constexpr int32 EnemyHQForcePlacementSeedOffset = 4027;
 	const FName GeneratedAnchorTag(TEXT("WC_GeneratedAnchor"));
+	const TCHAR* const RepairedAnchorKeyPrefix = TEXT("WorldCampaign.RepairedAnchorKey");
 	constexpr uint64 Mix64Increment = 0x9E3779B97F4A7C15ull;
 	constexpr uint64 Mix64MultiplierA = 0xBF58476D1CE4E5B9ull;
 	constexpr uint64 Mix64MultiplierB = 0x94D049BB133111EBull;
@@ -73,6 +74,7 @@ namespace
 	constexpr uint64 HashCombineSaltE = 0xF1357AEA2E62A9C5ull;
 	constexpr uint64 AnchorKeySeedSaltA = 0xA9B4C3D2E1F0ABCDull;
 	constexpr uint64 AnchorKeySeedSaltB = 0x1D2C3B4A59687766ull;
+	constexpr uint64 RepairedAnchorKeySeedSalt = 0x7658B42D9F13C0EAull;
 	constexpr uint64 Lower32BitMask = 0xFFFFFFFFull;
 	const TCHAR* const WorldCampaignSeedOverrideArgument = TEXT("RTSWorldCampaignSeed=");
 
@@ -94,6 +96,20 @@ namespace
 		TObjectPtr<AAnchorPoint> AnchorPoint = nullptr;
 		float DistanceSquared = 0.f;
 		FGuid AnchorKey;
+	};
+
+	struct FAnchorKeyRepairSource
+	{
+		TMap<FGuid, int32> AnchorKeyCounts;
+		TArray<TObjectPtr<AAnchorPoint>> SortedAnchors;
+	};
+
+	struct FAnchorKeyRepairPlan
+	{
+		TSet<FGuid> UsedAnchorKeys;
+		TArray<TObjectPtr<AAnchorPoint>> AnchorsNeedingKeyRepair;
+		int32 MissingKeyCount = 0;
+		int32 DuplicateKeyCount = 0;
 	};
 
 	struct FPlacementCandidate
@@ -123,47 +139,133 @@ namespace
 		return Left.CandidateOrder < Right.CandidateOrder;
 	}
 
-	TMap<const AAnchorPoint*, int32> BuildAnchorSourceOrderLookup(
-		const TArray<TObjectPtr<AAnchorPoint>>& AnchorCandidates)
+	void SortAnchorsByDeterministicOrder(TArray<TObjectPtr<AAnchorPoint>>& InOutAnchors)
 	{
-		TMap<const AAnchorPoint*, int32> SourceOrderByAnchor;
-		SourceOrderByAnchor.Reserve(AnchorCandidates.Num());
-		for (int32 CandidateIndex = 0; CandidateIndex < AnchorCandidates.Num(); CandidateIndex++)
+		Algo::Sort(InOutAnchors, [](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
 		{
-			if (IsValid(AnchorCandidates[CandidateIndex]))
+			return AAnchorPoint::IsDeterministicAnchorOrderLess(Left.Get(), Right.Get());
+		});
+	}
+
+	FGuid BuildRepairedAnchorKey(const AAnchorPoint* AnchorPoint, int32 RepairOrdinal, int32 CollisionOrdinal)
+	{
+		const FString KeySource = FString::Printf(
+			TEXT("%s|%s|RepairOrdinal=%d|CollisionOrdinal=%d"),
+			RepairedAnchorKeyPrefix,
+			*AAnchorPoint::BuildStableIdentityString(AnchorPoint),
+			RepairOrdinal,
+			CollisionOrdinal);
+		return FGuid::NewDeterministicGuid(KeySource, RepairedAnchorKeySeedSalt);
+	}
+
+	FGuid BuildUniqueRepairedAnchorKey(const AAnchorPoint* AnchorPoint, int32 RepairOrdinal,
+	                                   const TSet<FGuid>& UsedAnchorKeys)
+	{
+		int32 CollisionOrdinal = 0;
+		FGuid RepairedAnchorKey = BuildRepairedAnchorKey(AnchorPoint, RepairOrdinal, CollisionOrdinal);
+		while (not RepairedAnchorKey.IsValid() || UsedAnchorKeys.Contains(RepairedAnchorKey))
+		{
+			CollisionOrdinal++;
+			RepairedAnchorKey = BuildRepairedAnchorKey(AnchorPoint, RepairOrdinal, CollisionOrdinal);
+		}
+
+		return RepairedAnchorKey;
+	}
+
+	FAnchorKeyRepairSource BuildAnchorKeyRepairSource(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints)
+	{
+		FAnchorKeyRepairSource RepairSource;
+		RepairSource.SortedAnchors.Reserve(AnchorPoints.Num());
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : AnchorPoints)
+		{
+			if (not IsValid(AnchorPoint))
 			{
-				SourceOrderByAnchor.FindOrAdd(AnchorCandidates[CandidateIndex].Get(), CandidateIndex);
+				continue;
+			}
+
+			RepairSource.SortedAnchors.Add(AnchorPoint);
+			const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+			if (AnchorKey.IsValid())
+			{
+				RepairSource.AnchorKeyCounts.FindOrAdd(AnchorKey)++;
 			}
 		}
 
-		return SourceOrderByAnchor;
+		SortAnchorsByDeterministicOrder(RepairSource.SortedAnchors);
+		return RepairSource;
 	}
 
-	void SortAnchorsByKeyAndSourceOrder(TArray<TObjectPtr<AAnchorPoint>>& InOutCandidates,
-	                                    const TMap<const AAnchorPoint*, int32>& SourceOrderByAnchor)
+	void AddAnchorToRepairPlan(const TObjectPtr<AAnchorPoint>& AnchorPoint,
+	                           const FAnchorKeyRepairSource& RepairSource,
+	                           TSet<FGuid>& InOutKeptDuplicateAnchorKeys,
+	                           FAnchorKeyRepairPlan& InOutRepairPlan)
 	{
-		Algo::Sort(InOutCandidates, [&SourceOrderByAnchor](const TObjectPtr<AAnchorPoint>& Left,
-		                                                   const TObjectPtr<AAnchorPoint>& Right)
+		const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
+		if (not AnchorKey.IsValid())
 		{
-			if (not IsValid(Left))
+			InOutRepairPlan.MissingKeyCount++;
+			InOutRepairPlan.AnchorsNeedingKeyRepair.Add(AnchorPoint);
+			return;
+		}
+
+		if (RepairSource.AnchorKeyCounts.FindRef(AnchorKey) <= 1)
+		{
+			InOutRepairPlan.UsedAnchorKeys.Add(AnchorKey);
+			return;
+		}
+
+		if (not InOutKeptDuplicateAnchorKeys.Contains(AnchorKey))
+		{
+			InOutKeptDuplicateAnchorKeys.Add(AnchorKey);
+			InOutRepairPlan.UsedAnchorKeys.Add(AnchorKey);
+			return;
+		}
+
+		InOutRepairPlan.DuplicateKeyCount++;
+		InOutRepairPlan.AnchorsNeedingKeyRepair.Add(AnchorPoint);
+	}
+
+	FAnchorKeyRepairPlan BuildAnchorKeyRepairPlan(const FAnchorKeyRepairSource& RepairSource)
+	{
+		FAnchorKeyRepairPlan RepairPlan;
+		TSet<FGuid> KeptDuplicateAnchorKeys;
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : RepairSource.SortedAnchors)
+		{
+			AddAnchorToRepairPlan(AnchorPoint, RepairSource, KeptDuplicateAnchorKeys, RepairPlan);
+		}
+
+		return RepairPlan;
+	}
+
+	void ApplyAnchorKeyRepairPlan(FAnchorKeyRepairPlan& InOutRepairPlan)
+	{
+		for (int32 RepairIndex = 0; RepairIndex < InOutRepairPlan.AnchorsNeedingKeyRepair.Num(); RepairIndex++)
+		{
+			AAnchorPoint* AnchorPoint = InOutRepairPlan.AnchorsNeedingKeyRepair[RepairIndex].Get();
+			if (not IsValid(AnchorPoint))
 			{
-				return false;
+				continue;
 			}
 
-			if (not IsValid(Right))
-			{
-				return true;
-			}
+			const FGuid RepairedAnchorKey =
+				BuildUniqueRepairedAnchorKey(AnchorPoint, RepairIndex, InOutRepairPlan.UsedAnchorKeys);
+			AnchorPoint->SetAnchorKey(RepairedAnchorKey, true);
+			InOutRepairPlan.UsedAnchorKeys.Add(RepairedAnchorKey);
+		}
+	}
 
-			const FGuid LeftKey = Left->GetAnchorKey();
-			const FGuid RightKey = Right->GetAnchorKey();
-			if (LeftKey != RightKey)
-			{
-				return AAnchorPoint::IsAnchorKeyLess(LeftKey, RightKey);
-			}
+	void LogAnchorKeyRepairPlan(const FAnchorKeyRepairPlan& RepairPlan)
+	{
+		if (RepairPlan.AnchorsNeedingKeyRepair.Num() == 0)
+		{
+			return;
+		}
 
-			return SourceOrderByAnchor.FindRef(Left.Get()) < SourceOrderByAnchor.FindRef(Right.Get());
-		});
+		UE_LOG(LogRTS, Warning,
+		       TEXT("World campaign repaired %d anchor key(s) before connection generation. Missing=%d Duplicate=%d."),
+		       RepairPlan.AnchorsNeedingKeyRepair.Num(),
+		       RepairPlan.MissingKeyCount,
+		       RepairPlan.DuplicateKeyCount);
 	}
 
 	int32 GetCampaignGenerationSeedWithCommandLineOverride(const int32 SettingsSeed)
@@ -219,6 +321,11 @@ namespace
 		ECampaignGenerationStep LastFailedStep = ECampaignGenerationStep::NotStarted;
 		int32 TotalAttemptCount = 0;
 		int32 WorkerAttemptDelta = 0;
+		int32 WorkerPlacementAttemptCount = 0;
+		int32 WorkerBacktrackCount = 0;
+		int32 WorkerMicroBacktrackCount = 0;
+		int32 WorkerMacroBacktrackCount = 0;
+		int32 WorkerSetupBacktrackRequestCount = 0;
 		int32 CurrentStepAttemptCount = 0;
 		int32 TransactionCount = 0;
 		int32 EnemyMicroPlacedCount = 0;
@@ -630,6 +737,11 @@ namespace
 		OutState.LastFailedStep = Progress.LastFailedStep;
 		OutState.TotalAttemptCount = Progress.TotalAttemptCount;
 		OutState.WorkerAttemptDelta = Progress.WorkerAttemptDelta;
+		OutState.WorkerPlacementAttemptCount = Progress.WorkerPlacementAttemptCount;
+		OutState.WorkerBacktrackCount = Progress.WorkerBacktrackCount;
+		OutState.WorkerMicroBacktrackCount = Progress.WorkerMicroBacktrackCount;
+		OutState.WorkerMacroBacktrackCount = Progress.WorkerMacroBacktrackCount;
+		OutState.WorkerSetupBacktrackRequestCount = Progress.WorkerSetupBacktrackRequestCount;
 		OutState.CurrentStepAttemptCount = Progress.CurrentStepAttemptCount;
 		OutState.TransactionCount = Progress.TransactionCount;
 		OutState.EnemyMicroPlacedCount = Progress.EnemyMicroPlacedCount;
@@ -648,7 +760,7 @@ namespace
 	{
 		UE_LOG(LogRTS, Warning,
 		       TEXT(
-			       "Async world campaign placement still running after %.1fs. Phase='%s', Step=%s, LastFailed=%s, TotalAttempts=%d, WorkerAttempts=%d, StepAttempts=%d, Transactions=%d, EnemyMicro=%d, MissionMicro=%d, NeutralType=%d, NeutralEvaluated=%d, NeutralCandidates=%d, NeutralRejectedOccupied=%d, NeutralRejectedNoHop=%d, NeutralRejectedHopBand=%d, NeutralRejectedSpacing=%d."
+			       "Async world campaign placement still running after %.1fs. Phase='%s', Step=%s, LastFailed=%s, FailureRetries=%d, WorkerFailureRetries=%d, PlacementAttempts=%d, Backtracks=%d, MicroBacktracks=%d, MacroBacktracks=%d, SetupBacktrackRequests=%d, StepAttempts=%d, Transactions=%d, EnemyMicro=%d, MissionMicro=%d, NeutralType=%d, NeutralEvaluated=%d, NeutralCandidates=%d, NeutralRejectedOccupied=%d, NeutralRejectedNoHop=%d, NeutralRejectedHopBand=%d, NeutralRejectedSpacing=%d."
 		       ),
 		       ElapsedSeconds,
 		       *ProgressState.Phase,
@@ -656,6 +768,11 @@ namespace
 		       *GetCampaignGenerationStepName(ProgressState.LastFailedStep),
 		       ProgressState.TotalAttemptCount,
 		       ProgressState.WorkerAttemptDelta,
+		       ProgressState.WorkerPlacementAttemptCount,
+		       ProgressState.WorkerBacktrackCount,
+		       ProgressState.WorkerMicroBacktrackCount,
+		       ProgressState.WorkerMacroBacktrackCount,
+		       ProgressState.WorkerSetupBacktrackRequestCount,
 		       ProgressState.CurrentStepAttemptCount,
 		       ProgressState.TransactionCount,
 		       ProgressState.EnemyMicroPlacedCount,
@@ -4481,6 +4598,32 @@ namespace
 		LogParityPlacementMap(Prefix, TEXT("Mission"), Result.MissionsByAnchorKey);
 	}
 
+	void LogAsyncPlacementResultSummary(const TCHAR* Context, const int32 Seed, const int32 SetupPassIndex,
+	                                    const FWorldCampaignPlacementResult& Result)
+	{
+		UE_LOG(LogTemp, Display,
+		       TEXT(
+			       "World campaign async placement summary: Context=%s Seed=%d SetupPass=%d Succeeded=%s FailureRetries=%d PlacementAttempts=%d Backtracks=%d MicroBacktracks=%d MacroBacktracks=%d SetupBacktrackRequests=%d SetupTransactionsToUndo=%d StepFailureRetries(PlayerHQ/EnemyHQ/Wall/Enemy/Neutral/Mission)=%d/%d/%d/%d/%d/%d."
+		       ),
+		       Context,
+		       Seed,
+		       SetupPassIndex,
+		       Result.bSucceeded ? TEXT("true") : TEXT("false"),
+		       Result.WorkerTotalAttemptCount,
+		       Result.WorkerPlacementAttemptCount,
+		       Result.WorkerBacktrackCount,
+		       Result.WorkerMicroBacktrackCount,
+		       Result.WorkerMacroBacktrackCount,
+		       Result.WorkerSetupBacktrackRequestCount,
+		       Result.GameThreadTransactionsToUndo,
+		       Result.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::PlayerHQPlaced),
+		       Result.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::EnemyHQPlaced),
+		       Result.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::EnemyWallPlaced),
+		       Result.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::EnemyObjectsPlaced),
+		       Result.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::NeutralObjectsPlaced),
+		       Result.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::MissionsPlaced));
+	}
+
 	template <typename KeyType, typename ValueType, typename KeyStringFunctionType>
 	bool GetParityMapMatches(const TMap<KeyType, ValueType>& SynchronousMap,
 	                         const TMap<KeyType, ValueType>& AsyncMap,
@@ -5880,20 +6023,7 @@ void AGeneratorWorldCampaign::GatherSortedExistingAnchors(
 		OutSortedExistingAnchors.Add(AnchorPoint);
 	}
 
-	OutSortedExistingAnchors.Sort([](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
-	{
-		if (not IsValid(Left))
-		{
-			return false;
-		}
-
-		if (not IsValid(Right))
-		{
-			return true;
-		}
-
-		return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
-	});
+	SortAnchorsByDeterministicOrder(OutSortedExistingAnchors);
 }
 
 FRandomStream AGeneratorWorldCampaign::CreateAnchorPointRandomStream(int32 AttemptIndex) const
@@ -5955,20 +6085,8 @@ bool AGeneratorWorldCampaign::PrepareAnchorsForConnectionGeneration(TArray<TObje
 		return false;
 	}
 
-	Algo::Sort(OutAnchorPoints, [](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
-	{
-		if (not IsValid(Left))
-		{
-			return false;
-		}
-
-		if (not IsValid(Right))
-		{
-			return true;
-		}
-
-		return AAnchorPoint::IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
-	});
+	NormalizeAnchorKeysForConnectionGeneration(OutAnchorPoints);
+	SortAnchorsByDeterministicOrder(OutAnchorPoints);
 
 	const UWorldCampaignSettings* CampaignSettings = UWorldCampaignSettings::Get();
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : OutAnchorPoints)
@@ -5984,6 +6102,15 @@ bool AGeneratorWorldCampaign::PrepareAnchorsForConnectionGeneration(TArray<TObje
 	}
 
 	return true;
+}
+
+void AGeneratorWorldCampaign::NormalizeAnchorKeysForConnectionGeneration(
+	TArray<TObjectPtr<AAnchorPoint>>& InOutAnchorPoints) const
+{
+	const FAnchorKeyRepairSource RepairSource = BuildAnchorKeyRepairSource(InOutAnchorPoints);
+	FAnchorKeyRepairPlan RepairPlan = BuildAnchorKeyRepairPlan(RepairSource);
+	ApplyAnchorKeyRepairPlan(RepairPlan);
+	LogAnchorKeyRepairPlan(RepairPlan);
 }
 
 void AGeneratorWorldCampaign::GenerateConnectionsForAnchors(const TArray<TObjectPtr<AAnchorPoint>>& AnchorPoints,
@@ -6268,10 +6395,9 @@ void AGeneratorWorldCampaign::SortEnemyHQCandidatesByPreference(
 	TArray<TObjectPtr<AAnchorPoint>>& InOutCandidates) const
 {
 	const bool bPreferMax = M_EnemyHQPlacementRules.AnchorDegreePreference == ETopologySearchStrategy::PreferMax;
-	const TMap<const AAnchorPoint*, int32> SourceOrderByAnchor = BuildAnchorSourceOrderLookup(InOutCandidates);
 
-	Algo::Sort(InOutCandidates, [this, bPreferMax, &SourceOrderByAnchor](const TObjectPtr<AAnchorPoint>& Left,
-	                                                                     const TObjectPtr<AAnchorPoint>& Right)
+	Algo::Sort(InOutCandidates, [this, bPreferMax](const TObjectPtr<AAnchorPoint>& Left,
+	                                               const TObjectPtr<AAnchorPoint>& Right)
 	{
 		if (not IsValid(Left))
 		{
@@ -6290,14 +6416,7 @@ void AGeneratorWorldCampaign::SortEnemyHQCandidatesByPreference(
 			return bPreferMax ? LeftDegree > RightDegree : LeftDegree < RightDegree;
 		}
 
-		const FGuid LeftKey = Left->GetAnchorKey();
-		const FGuid RightKey = Right->GetAnchorKey();
-		if (LeftKey != RightKey)
-		{
-			return AAnchorPoint::IsAnchorKeyLess(LeftKey, RightKey);
-		}
-
-		return SourceOrderByAnchor.FindRef(Left.Get()) < SourceOrderByAnchor.FindRef(Right.Get());
+		return AAnchorPoint::IsDeterministicAnchorOrderLess(Left.Get(), Right.Get());
 	});
 }
 
@@ -7619,7 +7738,9 @@ bool AGeneratorWorldCampaign::ValidateAsyncPlacementParityForCurrentSetup_Intern
 	       FPlatformTime::Seconds() - SyncStartTime);
 	LogPlacementParityResult(TEXT("sync"), SynchronousResult);
 	UE_LOG(LogTemp, Display,
-	       TEXT("World campaign placement parity: sync attempts total=%d enemyStep=%d neutralStep=%d missionStep=%d."),
+	       TEXT(
+		       "World campaign placement parity: sync failure retries total=%d enemyStep=%d neutralStep=%d missionStep=%d."
+	       ),
 	       SynchronousResult.WorkerTotalAttemptCount,
 	       SynchronousResult.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::EnemyObjectsPlaced),
 	       SynchronousResult.StepAttemptIndicesAtEnd.FindRef(ECampaignGenerationStep::NeutralObjectsPlaced),
@@ -7629,9 +7750,10 @@ bool AGeneratorWorldCampaign::ValidateAsyncPlacementParityForCurrentSetup_Intern
 	UE_LOG(LogTemp, Display, TEXT("World campaign placement parity: async snapshot solve started."));
 	const FWorldCampaignPlacementResult AsyncResult = WorldCampaignAsyncPlacement::SolvePlacement(Snapshot);
 	UE_LOG(LogTemp, Display,
-	       TEXT("World campaign placement parity: async snapshot solve finished in %.2fs with %d worker attempts."),
+	       TEXT("World campaign placement parity: async snapshot solve finished in %.2fs with %d failure retries."),
 	       FPlatformTime::Seconds() - AsyncStartTime,
 	       AsyncResult.WorkerTotalAttemptCount);
+	LogAsyncPlacementResultSummary(TEXT("ParityAsync"), Snapshot.SeedUsed, 1, AsyncResult);
 	LogPlacementParityResult(TEXT("async"), AsyncResult);
 	if (AsyncResult.bRequiresGameThreadBacktrack)
 	{
@@ -8685,6 +8807,8 @@ bool AGeneratorWorldCampaign::GenerateWorldWithAsyncPlacementForPruningValidatio
 		}
 
 		FWorldCampaignPlacementResult Result = WorldCampaignAsyncPlacement::SolvePlacement(Snapshot);
+		LogAsyncPlacementResultSummary(TEXT("PruningValidation"), M_CountAndDifficultyTuning.Seed,
+		                               SetupPassIndex + 1, Result);
 		ReportPlacementDebugEvents(Result);
 		M_TotalAttemptCount += Result.WorkerTotalAttemptCount;
 		M_StepAttemptIndices = Result.StepAttemptIndicesAtEnd;
@@ -9258,7 +9382,6 @@ bool AGeneratorWorldCampaign::BuildHQAnchorCandidates(const TArray<TObjectPtr<AA
 {
 	OutCandidates.Reset();
 	OutCandidates.Reserve(CandidateSource.Num());
-	const TMap<const AAnchorPoint*, int32> SourceOrderByAnchor = BuildAnchorSourceOrderLookup(CandidateSource);
 
 	for (int32 SourceIndex = 0; SourceIndex < CandidateSource.Num(); SourceIndex++)
 	{
@@ -9292,7 +9415,7 @@ bool AGeneratorWorldCampaign::BuildHQAnchorCandidates(const TArray<TObjectPtr<AA
 		return false;
 	}
 
-	SortAnchorsByKeyAndSourceOrder(OutCandidates, SourceOrderByAnchor);
+	SortAnchorsByDeterministicOrder(OutCandidates);
 
 	return true;
 }

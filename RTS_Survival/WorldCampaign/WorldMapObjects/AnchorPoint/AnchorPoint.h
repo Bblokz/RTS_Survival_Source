@@ -49,6 +49,14 @@ public:
 	void SortNeighborsByKey();
 
 	static bool IsAnchorKeyLess(const FGuid& Left, const FGuid& Right);
+	static FString BuildStableIdentityString(const AAnchorPoint* AnchorPoint);
+	/**
+	 * @brief Orders anchors by saved key, then stable editor/runtime identity, to keep generation deterministic.
+	 * @param Left Anchor that may appear before Right.
+	 * @param Right Anchor that may appear after Left.
+	 * @return true when Left should be processed first.
+	 */
+	static bool IsDeterministicAnchorOrderLess(const AAnchorPoint* Left, const AAnchorPoint* Right);
 
 	void DebugDrawConnectionTo(const AAnchorPoint* OtherAnchor, const FColor& Color, float Duration) const;
 

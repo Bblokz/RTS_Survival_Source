@@ -15,6 +15,48 @@
 
 namespace
 {
+	constexpr double AnchorStableIdentityPrecision = 100.0;
+	constexpr uint64 MissingAnchorKeySeed = 0x4B8D7C6A5E3F2910ull;
+	const TCHAR* const PiePackagePrefix = TEXT("UEDPIE_");
+
+	int64 QuantizeStableIdentityValue(double Value)
+	{
+		return FMath::RoundToInt64(Value * AnchorStableIdentityPrecision);
+	}
+
+	void StripPiePackagePrefixes(FString& InOutPath)
+	{
+		int32 PrefixIndex = InOutPath.Find(PiePackagePrefix, ESearchCase::CaseSensitive);
+		while (PrefixIndex != INDEX_NONE)
+		{
+			int32 ScanIndex = PrefixIndex + FCString::Strlen(PiePackagePrefix);
+			while (ScanIndex < InOutPath.Len() && FChar::IsDigit(InOutPath[ScanIndex]))
+			{
+				ScanIndex++;
+			}
+
+			if (ScanIndex >= InOutPath.Len() || InOutPath[ScanIndex] != TCHAR('_'))
+			{
+				return;
+			}
+
+			InOutPath.RemoveAt(PrefixIndex, ScanIndex - PrefixIndex + 1, EAllowShrinking::No);
+			PrefixIndex = InOutPath.Find(PiePackagePrefix, ESearchCase::CaseSensitive);
+		}
+	}
+
+	FString BuildStableAnchorPath(const AAnchorPoint* AnchorPoint)
+	{
+		if (not IsValid(AnchorPoint))
+		{
+			return TEXT("InvalidAnchorPath");
+		}
+
+		FString AnchorPath = AnchorPoint->GetPathName();
+		StripPiePackagePrefixes(AnchorPath);
+		return AnchorPath;
+	}
+
 	FString GetGenerationStepName(ECampaignGenerationStep GenerationStep)
 	{
 		const UEnum* StepEnum = StaticEnum<ECampaignGenerationStep>();
@@ -131,17 +173,7 @@ void AAnchorPoint::SortNeighborsByKey()
 {
 	M_NeighborAnchors.Sort([](const TObjectPtr<AAnchorPoint>& Left, const TObjectPtr<AAnchorPoint>& Right)
 	{
-		if (not IsValid(Left))
-		{
-			return false;
-		}
-
-		if (not IsValid(Right))
-		{
-			return true;
-		}
-
-		return IsAnchorKeyLess(Left->GetAnchorKey(), Right->GetAnchorKey());
+		return IsDeterministicAnchorOrderLess(Left.Get(), Right.Get());
 	});
 }
 
@@ -163,6 +195,61 @@ bool AAnchorPoint::IsAnchorKeyLess(const FGuid& Left, const FGuid& Right)
 	}
 
 	return Left.D < Right.D;
+}
+
+FString AAnchorPoint::BuildStableIdentityString(const AAnchorPoint* AnchorPoint)
+{
+	if (not IsValid(AnchorPoint))
+	{
+		return TEXT("InvalidAnchor");
+	}
+
+	const FVector Location = AnchorPoint->GetActorLocation();
+	const FRotator Rotation = AnchorPoint->GetActorRotation();
+	const FVector Scale = AnchorPoint->GetActorScale3D();
+	return FString::Printf(
+		TEXT("%s|%s|%s|L=%lld,%lld,%lld|R=%lld,%lld,%lld|S=%lld,%lld,%lld"),
+		*BuildStableAnchorPath(AnchorPoint),
+		*AnchorPoint->GetActorNameOrLabel(),
+		*AnchorPoint->GetClass()->GetPathName(),
+		QuantizeStableIdentityValue(Location.X),
+		QuantizeStableIdentityValue(Location.Y),
+		QuantizeStableIdentityValue(Location.Z),
+		QuantizeStableIdentityValue(Rotation.Pitch),
+		QuantizeStableIdentityValue(Rotation.Yaw),
+		QuantizeStableIdentityValue(Rotation.Roll),
+		QuantizeStableIdentityValue(Scale.X),
+		QuantizeStableIdentityValue(Scale.Y),
+		QuantizeStableIdentityValue(Scale.Z));
+}
+
+bool AAnchorPoint::IsDeterministicAnchorOrderLess(const AAnchorPoint* Left, const AAnchorPoint* Right)
+{
+	if (not IsValid(Left))
+	{
+		return false;
+	}
+
+	if (not IsValid(Right))
+	{
+		return true;
+	}
+
+	const FGuid LeftKey = Left->GetAnchorKey();
+	const FGuid RightKey = Right->GetAnchorKey();
+	if (LeftKey.IsValid() != RightKey.IsValid())
+	{
+		return LeftKey.IsValid();
+	}
+
+	if (LeftKey != RightKey)
+	{
+		return IsAnchorKeyLess(LeftKey, RightKey);
+	}
+
+	const FString LeftStableIdentity = BuildStableIdentityString(Left);
+	const FString RightStableIdentity = BuildStableIdentityString(Right);
+	return LeftStableIdentity.Compare(RightStableIdentity, ESearchCase::CaseSensitive) < 0;
 }
 
 void AAnchorPoint::DebugDrawConnectionTo(const AAnchorPoint* OtherAnchor, const FColor& Color, float Duration) const
@@ -413,7 +500,7 @@ void AAnchorPoint::EnsureAnchorKeyIsInitialized()
 		return;
 	}
 
-	M_AnchorKey = FGuid::NewGuid();
+	M_AnchorKey = FGuid::NewDeterministicGuid(BuildStableIdentityString(this), MissingAnchorKeySeed);
 }
 
 bool AAnchorPoint::GetIsValidWorldCampaignSettings() const

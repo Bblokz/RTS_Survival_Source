@@ -1416,6 +1416,7 @@ private:
 	 * @return true when there are enough valid anchors to continue.
 	 */
 	bool PrepareAnchorsForConnectionGeneration(TArray<TObjectPtr<AAnchorPoint>>& OutAnchorPoints);
+	void NormalizeAnchorKeysForConnectionGeneration(TArray<TObjectPtr<AAnchorPoint>>& InOutAnchorPoints) const;
 
 	/**
 	 * @brief Runs the connection generation phases with deterministic shuffle per attempt.
