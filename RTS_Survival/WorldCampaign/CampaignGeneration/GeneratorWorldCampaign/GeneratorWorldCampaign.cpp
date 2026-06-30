@@ -4973,6 +4973,7 @@ void AGeneratorWorldCampaign::StartWorldGeneration()
 		return;
 	}
 
+	M_WorldPlayerController->UpdateAsyncWorldGenerationWidget_AnchorPlacementStarted();
 	ExecuteAllSteps();
 }
 
@@ -5405,6 +5406,16 @@ bool AGeneratorWorldCampaign::ExecuteGameThreadSetupStepsBeforeAsyncPlacement()
 
 		if (ExecuteStepWithTransaction(StepToExecute, StepFunction))
 		{
+			if (StepToExecute == ECampaignGenerationStep::AnchorPointsGenerated && M_WorldPlayerController.IsValid())
+			{
+				M_WorldPlayerController->UpdateAsyncWorldGenerationWidget_AnchorPlacementComplete();
+			}
+
+			if (StepToExecute == ECampaignGenerationStep::ConnectionsCreated && M_WorldPlayerController.IsValid())
+			{
+				M_WorldPlayerController->UpdateAsyncWorldGenerationWidget_ConnectionGenerationComplete();
+			}
+
 			StepIndex++;
 			continue;
 		}
@@ -7641,6 +7652,11 @@ void AGeneratorWorldCampaign::HandleAsyncPlacementCompleted(FWorldCampaignPlacem
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Async placement failed while applying result to the world."));
 		return;
+	}
+
+	if (M_WorldPlayerController.IsValid())
+	{
+		M_WorldPlayerController->UpdateAsyncWorldGenerationWidget_AsyncGenerationComplete();
 	}
 
 	M_GenerationStep = ECampaignGenerationStep::Finished;
