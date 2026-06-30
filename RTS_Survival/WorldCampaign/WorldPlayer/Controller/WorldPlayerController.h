@@ -96,9 +96,25 @@ private:
 	void BeginPlay_SetupWorldGenerator();
 	void BeginPlay_SetupWorldMenu();
 	void BeginPlay_GameState_Faction_CampaignSettings();
-	// Generates the new world with the settings from the game instance if needed.
-	// returns whether a full new world was generated.
+
+	/**
+	 * @brief Starts campaign generation or restores a saved campaign.
+	 * @note FOW and camera setup must wait until this path has fully completed.
+	 */
 	void BeginPlay_GenerateOrLoadWorld();
+
+	/**
+	 * @brief Finishes new-campaign save/UI setup after async generation is complete.
+	 * @note Bound before generation starts so immediate and async completion both land here.
+	 */
+	void OnGeneratedCampaignFinished();
+
+	/**
+	 * @brief Runs world systems that require generated campaign actors to exist.
+	 * @note Guards against duplicate setup if callbacks and load paths race during BeginPlay.
+	 */
+	void CompleteInitialWorldSetupAfterCampaignReady();
+
 	void BeginPlay_SpawnWorldFowManager();
 	bool GetCanPrimaryClickActor(AActor* ClickedActor) const;
 
@@ -133,4 +149,5 @@ private:
 	FCampaignGenerationSettings M_CampaignSettings;
 	FRTSGameDifficulty M_SelectedDifficulty;
 	ERTSFaction M_PlayerFaction;
+	bool bM_HasCompletedInitialWorldSetup = false;
 };

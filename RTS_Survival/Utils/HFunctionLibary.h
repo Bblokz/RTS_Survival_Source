@@ -18,9 +18,9 @@ public:
 	~RTSFunctionLibrary();
 
 	static void PrintString(const FString& StringToPrint = "",
-	                        FColor Color = FColor::White, const float Time = 8);
+							FColor Color = FColor::White, const float Time = 8);
 	static void PrintString(const FVector& Location, const UObject* WorldContextObject,
-	                        const FString& StringToPrint = "", FColor Color = FColor::White, const float Time = 8);
+							const FString& StringToPrint = "", FColor Color = FColor::White, const float Time = 8);
 	static void Print(UObject* ObjectWeprint);
 	static void NullWarning(FString VariableName);
 
@@ -91,6 +91,9 @@ public:
 	 * @param ResetErrorSuppression Whether the error is critical and should stop the game.
 	 */
 	static void ReportError(FString Text, const bool ResetErrorSuppression = false);
+	// Used by unattended validation tools that must log errors without blocking on editor dialogs.
+	static void PushModalDialogSuppression();
+	static void PopModalDialogSuppression();
 
 	static void ReportWarning(FString Text);
 

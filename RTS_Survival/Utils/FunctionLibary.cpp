@@ -18,6 +18,11 @@
 class ARecastNavMesh;
 DEFINE_LOG_CATEGORY(LogRTS);
 
+namespace
+{
+	bool bGRTSErrorDialogSuppressedByUser = false;
+	int32 GRTSModalDialogSuppressionDepth = 0;
+}
 
 RTSFunctionLibrary::RTSFunctionLibrary()
 {
@@ -153,15 +158,23 @@ void RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(const UObject*
 
 void RTSFunctionLibrary::ReportError(FString Text, const bool ResetErrorSuppression)
 {
-	static bool bSuppressError;
 	if (ResetErrorSuppression)
 	{
-		bSuppressError = false;
+		bGRTSErrorDialogSuppressedByUser = false;
 	}
-	if (bSuppressError)
+	if (bGRTSErrorDialogSuppressedByUser)
 	{
 		return;
-	};
+	}
+
+#if WITH_EDITOR
+	if (GRTSModalDialogSuppressionDepth > 0)
+	{
+		UE_LOG(LogRTS, Error, TEXT("%s"), *Text);
+		return;
+	}
+#endif
+
 	FString StackTrace;
 	StackTrace += Text;
 	StackTrace += "\n\nStack Trace:\n";
@@ -201,7 +214,7 @@ void RTSFunctionLibrary::ReportError(FString Text, const bool ResetErrorSuppress
 	if (ReturnType == EAppReturnType::Yes)
 	{
 		// Suppress the errors so we can exit the game.
-		bSuppressError = true;
+		bGRTSErrorDialogSuppressedByUser = true;
 	}
 
 
@@ -216,6 +229,16 @@ void RTSFunctionLibrary::ReportError(FString Text, const bool ResetErrorSuppress
 #endif
 }
 
+void RTSFunctionLibrary::PushModalDialogSuppression()
+{
+	GRTSModalDialogSuppressionDepth++;
+}
+
+void RTSFunctionLibrary::PopModalDialogSuppression()
+{
+	GRTSModalDialogSuppressionDepth = FMath::Max(0, GRTSModalDialogSuppressionDepth - 1);
+}
+
 void RTSFunctionLibrary::ReportWarning(FString Text)
 {
 	PrintString("WARNING: " + Text, FColor::Red);
@@ -224,6 +247,11 @@ void RTSFunctionLibrary::ReportWarning(FString Text)
 void RTSFunctionLibrary::DisplayNotification(const FText& Text)
 {
 #if WITH_EDITOR
+	if (GRTSModalDialogSuppressionDepth > 0)
+	{
+		UE_LOG(LogRTS, Display, TEXT("%s"), *Text.ToString());
+		return;
+	}
 
 	EAppReturnType::Type ReturnType = FMessageDialog::Open(EAppMsgType::Type::Ok, Text);
 #endif
@@ -232,6 +260,11 @@ void RTSFunctionLibrary::DisplayNotification(const FText& Text)
 void RTSFunctionLibrary::DisplayNotification(const FString& Text)
 {
 #if WITH_EDITOR
+	if (GRTSModalDialogSuppressionDepth > 0)
+	{
+		UE_LOG(LogRTS, Display, TEXT("%s"), *Text);
+		return;
+	}
 
 	EAppReturnType::Type ReturnType = FMessageDialog::Open(EAppMsgType::Type::Ok, FText::FromString(Text));
 #endif

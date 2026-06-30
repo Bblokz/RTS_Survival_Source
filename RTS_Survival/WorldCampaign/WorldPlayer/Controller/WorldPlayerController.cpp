@@ -63,8 +63,6 @@ void AWorldPlayerController::BeginPlay()
 	BeginPlay_SetupWorldMenu();
 	BeginPlay_GameState_Faction_CampaignSettings();
 	BeginPlay_GenerateOrLoadWorld();
-	BeginPlay_SpawnWorldFowManager();
-	OnInitialWorldSetupComplete();
 }
 
 void AWorldPlayerController::Tick(float DeltaTime)
@@ -387,6 +385,12 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 		return;
 	}
 
+	if (M_CampaignSettings.bNeedsToGenerateCampaign)
+	{
+		M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
+		M_WorldGenerator->OnGenerationFinished().AddUObject(this, &AWorldPlayerController::OnGeneratedCampaignFinished);
+	}
+
 	M_WorldGenerator->InitializeWorldGenerator(
 		this,
 		M_CampaignSettings,
@@ -395,10 +399,11 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 
 	if (M_CampaignSettings.bNeedsToGenerateCampaign)
 	{
-		M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
-		const FPlayerProfileSaveData PlayerProfileSaveData = M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(
-			M_PlayerFaction);
-		M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
+		if (M_WorldGenerator->GetIsGenerationFinished())
+		{
+			OnGeneratedCampaignFinished();
+		}
+
 		return;
 	}
 
@@ -411,12 +416,41 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 
 	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
 	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
+	CompleteInitialWorldSetupAfterCampaignReady();
 }
 
+void AWorldPlayerController::OnGeneratedCampaignFinished()
+{
+	if (not GetIsValidWorldProfileAndUIManager()
+		|| not GetIsValidWorldGenerator()
+		|| not GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
+
+	M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
+	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
+	const FPlayerProfileSaveData PlayerProfileSaveData =
+		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);
+	M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
+	CompleteInitialWorldSetupAfterCampaignReady();
+}
+
+void AWorldPlayerController::CompleteInitialWorldSetupAfterCampaignReady()
+{
+	if (bM_HasCompletedInitialWorldSetup)
+	{
+		return;
+	}
+
+	bM_HasCompletedInitialWorldSetup = true;
+	BeginPlay_SpawnWorldFowManager();
+	OnInitialWorldSetupComplete();
+}
 
 void AWorldPlayerController::BeginPlay_SpawnWorldFowManager()
 {
-	if (not GetIsValidWorldGenerator() ||not IsValid(M_WorldFowManagerClass ))
+	if (not GetIsValidWorldGenerator() || not IsValid(M_WorldFowManagerClass))
 	{
 		return;
 	}
