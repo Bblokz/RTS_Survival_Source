@@ -5414,13 +5414,19 @@ void AGeneratorWorldCampaign::DebugDrawAllConnections() const
 		return;
 	}
 
-	const TArray<TObjectPtr<AConnection>>* ConnectionsToDraw = &M_GeneratedConnections;
-	if (ConnectionsToDraw->Num() == 0)
+	TArray<TWeakObjectPtr<AConnection>> ConnectionsToDraw;
+	for (TActorIterator<AConnection> ConnectionIterator(World); ConnectionIterator; ++ConnectionIterator)
 	{
-		ConnectionsToDraw = &M_PlacementState.CachedConnections;
+		AConnection* Connection = *ConnectionIterator;
+		if (not IsValid(Connection))
+		{
+			continue;
+		}
+
+		ConnectionsToDraw.Add(Connection);
 	}
 
-	if (ConnectionsToDraw->Num() == 0)
+	if (ConnectionsToDraw.Num() == 0)
 	{
 		return;
 	}
@@ -5429,9 +5435,9 @@ void AGeneratorWorldCampaign::DebugDrawAllConnections() const
 	const FColor BaseConnectionColor = FColor::Cyan;
 	const FColor ThreeWayConnectionColor = FColor::Yellow;
 
-	for (const TObjectPtr<AConnection>& Connection : *ConnectionsToDraw)
+	for (const TWeakObjectPtr<AConnection>& Connection : ConnectionsToDraw)
 	{
-		DrawDebugConnectionForActor(World, Connection, HeightOffset, BaseConnectionColor, ThreeWayConnectionColor);
+		DrawDebugConnectionForActor(World, Connection.Get(), HeightOffset, BaseConnectionColor, ThreeWayConnectionColor);
 	}
 }
 

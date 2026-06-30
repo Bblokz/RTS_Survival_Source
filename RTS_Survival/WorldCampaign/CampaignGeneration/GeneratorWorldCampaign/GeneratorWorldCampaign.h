@@ -686,7 +686,7 @@ public:
 		meta = (DisplayPriority = 10))
 	void ExecuteAllSteps();
 
-	UFUNCTION(CallInEditor, Category = "01 - World Campaign|Debugging",
+	UFUNCTION(CallInEditor, Exec, Category = "01 - World Campaign|Debugging",
 		meta = (DisplayPriority = 1))
 	void DebugDrawAllConnections() const;
 
