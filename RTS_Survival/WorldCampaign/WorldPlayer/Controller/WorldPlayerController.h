@@ -21,6 +21,7 @@ class AGeneratorWorldCampaign;
 class UWorldCameraController;
 class UPlayerWorldOutliner;
 class AWorldFowManager;
+class UW_AsyncWorldGeneration;
 
 /**
  * @brief Controller used by the world campaign Blueprint to route Enhanced Input
@@ -67,6 +68,13 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable)
 	void WorldCamera_MoveTo(const FMovePlayerCamera& MoveRequest);
+
+	void ShowAsyncWorldGenerationWidget();
+	void HideAsyncWorldGenerationWidget();
+	void UpdateAsyncWorldGenerationWidget_AnchorPlacementStarted();
+	void UpdateAsyncWorldGenerationWidget_AnchorPlacementComplete();
+	void UpdateAsyncWorldGenerationWidget_ConnectionGenerationComplete();
+	void UpdateAsyncWorldGenerationWidget_AsyncGenerationComplete();
 
 protected:
 	virtual void PostInitializeComponents() override;
@@ -128,6 +136,11 @@ private:
 	void OnInitialWorldSetupComplete();
 
 	void WorldSetupComplete_MovePlayerToHQ();
+	void StartAsyncWorldGenerationProgressTimer();
+	void StopAsyncWorldGenerationProgressTimer();
+	void UpdateAsyncWorldGenerationTimedProgress();
+	void SetAsyncWorldGenerationWidgetProgress(const FText& DescriptionText, float PercentageValue);
+	bool GetIsValidAsyncWorldGenerationWidget() const;
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldCameraController> M_WorldCameraController;
@@ -152,6 +165,15 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AWorldFowManager> M_WorldFowManager;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Async Generation", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UW_AsyncWorldGeneration> M_AsyncWorldGenerationWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UW_AsyncWorldGeneration> M_AsyncWorldGenerationWidget = nullptr;
+
+	FTimerHandle M_AsyncWorldGenerationProgressTimerHandle;
+	float M_AsyncWorldGenerationProgressElapsedSeconds = 0.f;
 
 	FCampaignGenerationSettings M_CampaignSettings;
 	FRTSGameDifficulty M_SelectedDifficulty;
