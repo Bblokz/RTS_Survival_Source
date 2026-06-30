@@ -62,7 +62,13 @@ void AWorldPlayerController::BeginPlay()
 	BeginPlay_SetupWorldGenerator();
 	BeginPlay_SetupWorldMenu();
 	BeginPlay_GameState_Faction_CampaignSettings();
-	BeginPlay_GenerateOrLoadWorld();
+	BeginPlay_InitializeWorldGenerator();
+	if (M_CampaignSettings.bNeedsToGenerateCampaign)
+	{
+		BeginPlay_GenerateNewWorld();
+		return;
+	}
+	BeginPlay_LoadSavedWorld();
 }
 
 void AWorldPlayerController::Tick(float DeltaTime)
@@ -377,18 +383,11 @@ void AWorldPlayerController::BeginPlay_GameState_Faction_CampaignSettings()
 	M_PlayerFaction = PlayerFaction;
 }
 
-void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
+void AWorldPlayerController::BeginPlay_InitializeWorldGenerator()
 {
-	if (not GetIsValidWorldProfileAndUIManager() || not GetIsValidWorldGenerator() || not
-		GetIsValidWorldStateAndSaveManager())
+	if (not GetIsValidWorldGenerator())
 	{
 		return;
-	}
-
-	if (M_CampaignSettings.bNeedsToGenerateCampaign)
-	{
-		M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
-		M_WorldGenerator->OnGenerationFinished().AddUObject(this, &AWorldPlayerController::OnGeneratedCampaignFinished);
 	}
 
 	M_WorldGenerator->InitializeWorldGenerator(
@@ -396,14 +395,30 @@ void AWorldPlayerController::BeginPlay_GenerateOrLoadWorld()
 		M_CampaignSettings,
 		M_SelectedDifficulty
 	);
+}
 
-	if (M_CampaignSettings.bNeedsToGenerateCampaign)
+void AWorldPlayerController::BeginPlay_GenerateNewWorld()
+{
+	if (not GetIsValidWorldProfileAndUIManager() || not GetIsValidWorldGenerator() || not
+		GetIsValidWorldStateAndSaveManager())
 	{
-		if (M_WorldGenerator->GetIsGenerationFinished())
-		{
-			OnGeneratedCampaignFinished();
-		}
+		return;
+	}
 
+	M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
+	M_WorldGenerator->OnGenerationFinished().AddUObject(this, &AWorldPlayerController::OnGeneratedCampaignFinished);
+	M_WorldGenerator->StartWorldGeneration();
+	if (M_WorldGenerator->GetIsGenerationFinished() && not bM_HasCompletedInitialWorldSetup)
+	{
+		OnGeneratedCampaignFinished();
+	}
+}
+
+void AWorldPlayerController::BeginPlay_LoadSavedWorld()
+{
+	if (not GetIsValidWorldProfileAndUIManager() || not GetIsValidWorldGenerator() || not
+		GetIsValidWorldStateAndSaveManager())
+	{
 		return;
 	}
 

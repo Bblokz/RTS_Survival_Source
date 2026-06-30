@@ -466,6 +466,11 @@ public:
 		FCampaignGenerationSettings CampaignGenerationSettings, FRTSGameDifficulty DifficultySettings);
 
 	/**
+	 * @brief Starts campaign generation after InitializeWorldGenerator has supplied runtime settings.
+	 */
+	void StartWorldGeneration();
+
+	/**
 	 * @brief Validates parity without world promotion so seed-range checks can run unattended.
 	 * @param FirstSeed First deterministic seed to validate.
 	 * @param SeedCount Number of sequential seeds to validate.

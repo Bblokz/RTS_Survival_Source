@@ -96,12 +96,19 @@ private:
 	void BeginPlay_SetupWorldGenerator();
 	void BeginPlay_SetupWorldMenu();
 	void BeginPlay_GameState_Faction_CampaignSettings();
+	void BeginPlay_InitializeWorldGenerator();
 
 	/**
-	 * @brief Starts campaign generation or restores a saved campaign.
+	 * @brief Starts new-campaign generation after the generator has been initialized.
 	 * @note FOW and camera setup must wait until this path has fully completed.
 	 */
-	void BeginPlay_GenerateOrLoadWorld();
+	void BeginPlay_GenerateNewWorld();
+
+	/**
+	 * @brief Restores saved campaign actors and player UI from the active campaign save.
+	 * @note FOW and camera setup must wait until this path has fully completed.
+	 */
+	void BeginPlay_LoadSavedWorld();
 
 	/**
 	 * @brief Finishes new-campaign save/UI setup after async generation is complete.

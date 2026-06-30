@@ -4963,12 +4963,17 @@ void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* W
 	{
 		M_CountAndDifficultyTuning.DifficultyPercentage += M_CountAndDifficultyTuning.AddedDifficultyPercentage;
 	}
-	if (CampaignGenerationSettings.bNeedsToGenerateCampaign)
+}
+
+void AGeneratorWorldCampaign::StartWorldGeneration()
+{
+	if (not M_WorldPlayerController.IsValid())
 	{
-		ExecuteAllSteps();
+		RTSFunctionLibrary::ReportError(TEXT("StartWorldGeneration called before InitializeWorldGenerator."));
 		return;
 	}
-	RTSFunctionLibrary::DisplayNotification("No campaign generation requested for this map, is this a save?");
+
+	ExecuteAllSteps();
 }
 
 FWorldCampaignState AGeneratorWorldCampaign::BuildWorldCampaignStateFromCurrentGeneration() const
