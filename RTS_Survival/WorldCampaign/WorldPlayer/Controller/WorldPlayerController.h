@@ -75,6 +75,7 @@ public:
 	void UpdateAsyncWorldGenerationWidget_AnchorPlacementComplete();
 	void UpdateAsyncWorldGenerationWidget_ConnectionGenerationComplete();
 	void UpdateAsyncWorldGenerationWidget_AsyncGenerationComplete();
+	void UpdateAsyncWorldGenerationWidget_PruningCompleted();
 
 protected:
 	virtual void PostInitializeComponents() override;
@@ -122,7 +123,7 @@ private:
 	 * @brief Finishes new-campaign save/UI setup after async generation is complete.
 	 * @note Bound before generation starts so immediate and async completion both land here.
 	 */
-	void OnGeneratedCampaignFinished();
+	void OnGeneratedCampaignAsyncWorkFinished();
 
 	/**
 	 * @brief Runs world systems that require generated campaign actors to exist.

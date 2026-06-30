@@ -2,6 +2,8 @@
 
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/WorldCampaignAsyncPlacement.h"
 
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
+
 namespace WorldCampaignAsyncPlacement
 {
 using FWorldCampaignPlayerHQPlacementRulesSnapshot = FPlayerHQPlacementRulesSnapshot;
@@ -44,8 +46,18 @@ namespace
 	constexpr uint64 HashCombineSaltD = 0x91E10DA5C79E7B1Dull;
 	constexpr uint64 HashCombineSaltE = 0xF1357AEA2E62A9C5ull;
 	constexpr int32 NoRequiredItems = 0;
-	constexpr float FailSafeEnemyDeclusterRadius = 6000.f;
-	constexpr float FailSafeEnemyDeclusterRadiusSquared = FailSafeEnemyDeclusterRadius * FailSafeEnemyDeclusterRadius;
+
+	using CampaignGenerationHelper::AddChokepointPathContribution;
+	using CampaignGenerationHelper::BuildCanonicalFailedEnemyDeclusterSwapPairKey;
+	using CampaignGenerationHelper::BuildImpactedEnemyDeclusterAnchorKeys;
+	using CampaignGenerationHelper::ComputeEnemyLocalDensity;
+	using CampaignGenerationHelper::ComputeImpactedEnemyDeclusterDensitySum;
+	using CampaignGenerationHelper::GetEnemyPreferenceScore;
+	using CampaignGenerationHelper::GetEnemyWallPreferenceScore;
+	using CampaignGenerationHelper::GetHopPreferenceWeight;
+	using CampaignGenerationHelper::GetIsSwappableEnemyType;
+	using CampaignGenerationHelper::GetOverrideMissionPreferenceScore;
+	using CampaignGenerationHelper::HasMinimumAdjacentMatches;
 
 	struct FRuleRelaxationState
 	{

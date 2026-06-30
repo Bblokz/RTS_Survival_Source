@@ -32,6 +32,7 @@ namespace WorldPlayerAsyncGenerationUIConstants
 	constexpr float AnchorPlacementCompletePercentage = 2.f;
 	constexpr float ConnectionGenerationCompletePercentage = 4.f;
 	constexpr float AsyncGenerationCompletePercentage = 80.f;
+	constexpr float PruningCompletedPercentage= 90.f;
 	constexpr float TimedProgressTargetSeconds = 720.f;
 	constexpr float TimedProgressIntervalSeconds = 1.f;
 }
@@ -420,11 +421,11 @@ void AWorldPlayerController::BeginPlay_GenerateNewWorld()
 
 	ShowAsyncWorldGenerationWidget();
 	M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
-	M_WorldGenerator->OnGenerationFinished().AddUObject(this, &AWorldPlayerController::OnGeneratedCampaignFinished);
+	M_WorldGenerator->OnGenerationFinished().AddUObject(this, &AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished);
 	M_WorldGenerator->StartWorldGeneration();
 	if (M_WorldGenerator->GetIsGenerationFinished() && not bM_HasCompletedInitialWorldSetup)
 	{
-		OnGeneratedCampaignFinished();
+		OnGeneratedCampaignAsyncWorkFinished();
 	}
 }
 
@@ -448,7 +449,7 @@ void AWorldPlayerController::BeginPlay_LoadSavedWorld()
 	CompleteInitialWorldSetupAfterCampaignReady();
 }
 
-void AWorldPlayerController::OnGeneratedCampaignFinished()
+void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 {
 	if (not GetIsValidWorldProfileAndUIManager()
 		|| not GetIsValidWorldGenerator()
@@ -458,6 +459,8 @@ void AWorldPlayerController::OnGeneratedCampaignFinished()
 	}
 
 	M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
+	M_WorldGenerator->PruneUnusedAnchorsAndRepairConnectivity();
+	UpdateAsyncWorldGenerationWidget_PruningCompleted();
 	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
 	const FPlayerProfileSaveData PlayerProfileSaveData =
 		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);
@@ -574,7 +577,7 @@ void AWorldPlayerController::HideAsyncWorldGenerationWidget()
 
 void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_AnchorPlacementStarted()
 {
-	const FText DescriptionText = FText::FromString(TEXT("<Armor>Placing World Anchors</>"));
+	const FText DescriptionText = FText::FromString(TEXT("Placing World Anchors"));
 	SetAsyncWorldGenerationWidgetProgress(
 		DescriptionText,
 		WorldPlayerAsyncGenerationUIConstants::AnchorPlacementStartedPercentage
@@ -583,7 +586,7 @@ void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_AnchorPlacementSta
 
 void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_AnchorPlacementComplete()
 {
-	const FText DescriptionText = FText::FromString(TEXT("<Armor>Generating Edges</>"));
+	const FText DescriptionText = FText::FromString(TEXT("Generating Edges"));
 	SetAsyncWorldGenerationWidgetProgress(
 		DescriptionText,
 		WorldPlayerAsyncGenerationUIConstants::AnchorPlacementCompletePercentage
@@ -592,7 +595,7 @@ void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_AnchorPlacementCom
 
 void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_ConnectionGenerationComplete()
 {
-	const FText DescriptionText = FText::FromString(TEXT("<Armor>Generating World with Backtracking</>"));
+	const FText DescriptionText = FText::FromString(TEXT("Generating World with Backtracking"));
 	SetAsyncWorldGenerationWidgetProgress(
 		DescriptionText,
 		WorldPlayerAsyncGenerationUIConstants::ConnectionGenerationCompletePercentage
@@ -603,10 +606,20 @@ void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_ConnectionGenerati
 void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_AsyncGenerationComplete()
 {
 	StopAsyncWorldGenerationProgressTimer();
-	const FText DescriptionText = FText::FromString(TEXT("<Armor>Generating World with Backtracking</>"));
+	const FText DescriptionText = FText::FromString(TEXT("Pruning unused anchor points..."));
 	SetAsyncWorldGenerationWidgetProgress(
 		DescriptionText,
 		WorldPlayerAsyncGenerationUIConstants::AsyncGenerationCompletePercentage
+	);
+}
+
+void AWorldPlayerController::UpdateAsyncWorldGenerationWidget_PruningCompleted()
+{
+	
+	const FText DescriptionText = FText::FromString(TEXT("Finalizing World"));
+	SetAsyncWorldGenerationWidgetProgress(
+		DescriptionText,
+		WorldPlayerAsyncGenerationUIConstants::PruningCompletedPercentage
 	);
 }
 
@@ -652,7 +665,7 @@ void AWorldPlayerController::UpdateAsyncWorldGenerationTimedProgress()
 		WorldPlayerAsyncGenerationUIConstants::AsyncGenerationCompletePercentage,
 		ProgressAlpha
 	);
-	const FText DescriptionText = FText::FromString(TEXT("<Armor>Generating World with Backtracking</>"));
+	const FText DescriptionText = FText::FromString(TEXT("  Generating World with Backtracking</>"));
 	SetAsyncWorldGenerationWidgetProgress(DescriptionText, PercentageValue);
 	if (ProgressAlpha >= 1.f)
 	{

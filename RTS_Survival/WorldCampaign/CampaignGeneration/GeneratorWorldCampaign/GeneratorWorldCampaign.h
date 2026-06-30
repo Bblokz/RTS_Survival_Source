@@ -487,6 +487,11 @@ public:
 	void RestoreWorldStateFromSave(const FWorldCampaignState& WorldCampaignState);
 
 	/**
+	 * @brief Removes unused empty anchors after generation while preserving gameplay-object reachability from HQ.
+	 */
+	void PruneUnusedAnchorsAndRepairConnectivity();
+
+	/**
 	 * @brief Broadcasts after campaign generation has reached Finished and world actors are realized.
 	 * @note BeginPlay systems that need generated anchors/items should wait for this signal.
 	 */
@@ -1341,6 +1346,9 @@ private:
 
 	void ClearPlacementState();
 	void ClearDerivedData();
+	TSet<FGuid> BuildGameplayAnchorKeysForPruning() const;
+	void RefreshCampaignGraphAfterPruning();
+	void RefreshConnectionTransactionAfterPruning();
 	void CacheAnchorConnectionDegrees();
 	void BuildChokepointScoresCache(const AAnchorPoint* OptionalHQAnchor);
 

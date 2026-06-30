@@ -6,6 +6,7 @@
 #include "Components/RichTextBlock.h"
 #include "Engine/World.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 
 namespace AsyncWorldGenerationWidgetConstants
 {
@@ -33,9 +34,9 @@ void UW_AsyncWorldGeneration::SetGenerationProgress(const FText& DescriptionText
 {
 	const float ClampedPercentage = FMath::Clamp(PercentageValue, 0.f, 100.f);
 	const FString PercentageString = FString::Printf(TEXT("%s%.0f%%%s"),
-	                                               *AsyncWorldGenerationWidgetConstants::ArmorOpenTag,
-	                                               ClampedPercentage,
-	                                               *AsyncWorldGenerationWidgetConstants::ArmorCloseTag);
+	                                                 *AsyncWorldGenerationWidgetConstants::ArmorOpenTag,
+	                                                 ClampedPercentage,
+	                                                 *AsyncWorldGenerationWidgetConstants::ArmorCloseTag);
 
 	if (GetIsValidPercentage())
 	{
@@ -86,8 +87,11 @@ void UW_AsyncWorldGeneration::UpdateLoadingText()
 {
 	if (GetIsValidLoading())
 	{
-		Loading->SetText(FText::FromString(
-			FString::Printf(TEXT("Loading%s"), *FString::ChrN(M_LoadingDotCount, TEXT('.')))
+		const FString LoadingFormatted = FString::Printf(
+			TEXT("Loading%s"), *FString::ChrN(M_LoadingDotCount, TEXT('.')));
+		Loading->SetText(FText::FromString(FRTSRichTextConverter::MakeRTSRich(
+				LoadingFormatted, ERTSRichText::Text_Armor
+			)
 		));
 	}
 

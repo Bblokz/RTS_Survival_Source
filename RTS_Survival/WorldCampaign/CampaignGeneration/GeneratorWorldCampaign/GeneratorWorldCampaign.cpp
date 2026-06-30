@@ -15,6 +15,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Debugging/WorldCampaignDebugger.h"
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignPruningHelper.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
@@ -72,6 +73,19 @@ namespace
 	constexpr uint64 AnchorKeySeedSaltB = 0x1D2C3B4A59687766ull;
 	constexpr uint64 Lower32BitMask = 0xFFFFFFFFull;
 	const TCHAR* const WorldCampaignSeedOverrideArgument = TEXT("RTSWorldCampaignSeed=");
+
+	using CampaignGenerationHelper::AddChokepointPathContribution;
+	using CampaignGenerationHelper::BuildCanonicalFailedEnemyDeclusterSwapPairKey;
+	using CampaignGenerationHelper::BuildImpactedEnemyDeclusterAnchorKeys;
+	using CampaignGenerationHelper::ComputeEnemyLocalDensity;
+	using CampaignGenerationHelper::ComputeImpactedEnemyDeclusterDensitySum;
+	using CampaignGenerationHelper::GetEnemyPreferenceScore;
+	using CampaignGenerationHelper::GetEnemyWallPreferenceScore;
+	using CampaignGenerationHelper::GetHopPreferenceWeight;
+	using CampaignGenerationHelper::GetIsSwappableEnemyType;
+	using CampaignGenerationHelper::GetOverrideMissionPreferenceScore;
+	using CampaignGenerationHelper::GetTopologyPreferenceScore;
+	using CampaignGenerationHelper::HasMinimumAdjacentMatches;
 
 	struct FAnchorCandidate
 	{
@@ -218,8 +232,6 @@ namespace
 
 	constexpr float SegmentIntersectionTolerance = 0.01f;
 	constexpr int32 NoRequiredItems = 0;
-	constexpr float FailSafeEnemyDeclusterRadius = 6000.f;
-	constexpr float FailSafeEnemyDeclusterRadiusSquared = FailSafeEnemyDeclusterRadius * FailSafeEnemyDeclusterRadius;
 
 	uint64 Mix64(uint64 Value)
 	{
@@ -337,15 +349,6 @@ namespace
 		}
 
 		return TargetHop;
-	}
-
-	int32 GetHopPreferenceWeight(const int32 EffectiveMaxWeight,
-	                             const int32 EffectiveFalloff,
-	                             const int32 CandidateHopDistance,
-	                             const int32 TargetHopDistance)
-	{
-		const int32 Delta = FMath::Abs(CandidateHopDistance - TargetHopDistance);
-		return FMath::Max(1, EffectiveMaxWeight - Delta * EffectiveFalloff);
 	}
 
 	int32 SelectMissionCandidateIndexDeterministic(const TArray<FPlacementCandidate>& Candidates,
@@ -1320,22 +1323,6 @@ namespace
 		return BuildPathFromPredecessors(StartKey, TargetKey, PredecessorByKey, OutPathKeys);
 	}
 
-	void AddChokepointPathContribution(const TArray<FGuid>& PathKeys, TMap<FGuid, float>& InOutScores)
-	{
-		constexpr int32 MinPathNodes = 3;
-		if (PathKeys.Num() < MinPathNodes)
-		{
-			return;
-		}
-
-		for (int32 Index = 1; Index < PathKeys.Num() - 1; Index++)
-		{
-			const float ExistingScore = InOutScores.FindRef(PathKeys[Index]);
-			InOutScores.Add(PathKeys[Index], ExistingScore + 1.f);
-		}
-	}
-
-
 	TArray<EMapNeutralObjectType> GetSortedNeutralTypes(const TMap<EMapNeutralObjectType, int32>& NeutralItemCounts)
 	{
 		TArray<EMapNeutralObjectType> NeutralTypes;
@@ -1348,90 +1335,11 @@ namespace
 	}
 
 
-	float GetEnemyPreferenceScore(EEnemyTopologySearchStrategy Preference, int32 ConnectionDegree,
-	                              float ChokepointScore, int32 HopDistanceFromEnemyHQ,
-	                              int32 MinHopsFromEnemyHQ, int32 MaxHopsFromEnemyHQ)
-	{
-		switch (Preference)
-		{
-		case EEnemyTopologySearchStrategy::PreferLowDegree:
-			return -static_cast<float>(ConnectionDegree);
-		case EEnemyTopologySearchStrategy::PreferHighDegree:
-			return static_cast<float>(ConnectionDegree);
-		case EEnemyTopologySearchStrategy::PreferChokepoints:
-			return ChokepointScore;
-		case EEnemyTopologySearchStrategy::PreferDeadEnds:
-			return ConnectionDegree == 1 ? 1.f : 0.f;
-		case EEnemyTopologySearchStrategy::PreferNearMinBound:
-			return -FMath::Abs(static_cast<float>(HopDistanceFromEnemyHQ - MinHopsFromEnemyHQ));
-		case EEnemyTopologySearchStrategy::PreferNearMaxBound:
-			return -FMath::Abs(static_cast<float>(HopDistanceFromEnemyHQ - MaxHopsFromEnemyHQ));
-		case EEnemyTopologySearchStrategy::None:
-		default:
-			return 0.f;
-		}
-	}
-
-	float GetEnemyWallPreferenceScore(EEnemyTopologySearchStrategy Preference, int32 ConnectionDegree,
-	                                  float ChokepointScore)
-	{
-		switch (Preference)
-		{
-		case EEnemyTopologySearchStrategy::PreferLowDegree:
-			return -static_cast<float>(ConnectionDegree);
-		case EEnemyTopologySearchStrategy::PreferHighDegree:
-			return static_cast<float>(ConnectionDegree);
-		case EEnemyTopologySearchStrategy::PreferDeadEnds:
-			return ConnectionDegree == 1 ? 1.f : 0.f;
-		case EEnemyTopologySearchStrategy::PreferChokepoints:
-			return ChokepointScore;
-		case EEnemyTopologySearchStrategy::PreferNearMinBound:
-		case EEnemyTopologySearchStrategy::PreferNearMaxBound:
-		case EEnemyTopologySearchStrategy::None:
-		default:
-			return 0.f;
-		}
-	}
-
-	float GetTopologyPreferenceScore(ETopologySearchStrategy Preference, float Value)
-	{
-		if (Preference == ETopologySearchStrategy::PreferMax)
-		{
-			return Value;
-		}
-
-		if (Preference == ETopologySearchStrategy::PreferMin)
-		{
-			return -Value;
-		}
-
-		return 0.f;
-	}
-
 	bool HasNeutralTypeAtAnchor(const FWorldCampaignPlacementState& PlacementState, const FGuid& AnchorKey,
 	                            EMapNeutralObjectType RequiredNeutralType)
 	{
 		const EMapNeutralObjectType* NeutralType = PlacementState.NeutralItemsByAnchorKey.Find(AnchorKey);
 		return NeutralType && *NeutralType == RequiredNeutralType;
-	}
-
-	bool HasMinimumAdjacentMatches(const TArray<int32>& HopDistances, int32 RequiredCount)
-	{
-		int32 MatchingCount = 0;
-		for (const int32 HopDistance : HopDistances)
-		{
-			if (HopDistance != INDEX_NONE)
-			{
-				MatchingCount++;
-			}
-
-			if (MatchingCount >= RequiredCount)
-			{
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	TArray<FGuid> BuildSortedMissionAnchorKeys(const FWorldCampaignPlacementState& PlacementState)
@@ -2617,19 +2525,6 @@ namespace
 
 		PreferenceScore += GetTopologyPreferenceScore(EffectiveRules.ConnectionPreference,
 		                                              static_cast<float>(ConnectionDegree));
-		return PreferenceScore;
-	}
-
-	float GetOverrideMissionPreferenceScore(ETopologySearchStrategy OverrideConnectionPreference,
-	                                        ETopologySearchStrategy OverrideHopsPreference,
-	                                        int32 ConnectionDegree,
-	                                        int32 HopDistanceFromHQ)
-	{
-		float PreferenceScore = 0.f;
-		PreferenceScore += GetTopologyPreferenceScore(OverrideConnectionPreference,
-		                                              static_cast<float>(ConnectionDegree));
-		PreferenceScore += GetTopologyPreferenceScore(OverrideHopsPreference,
-		                                              static_cast<float>(HopDistanceFromHQ));
 		return PreferenceScore;
 	}
 
@@ -4175,13 +4070,6 @@ namespace
 		return TotalRequired;
 	}
 
-	bool GetIsSwappableEnemyType(const EMapEnemyItem EnemyType)
-	{
-		return EnemyType != EMapEnemyItem::EnemyHQ
-			&& EnemyType != EMapEnemyItem::EnemyWall
-			&& EnemyType != EMapEnemyItem::None;
-	}
-
 	bool TryGetAnchorLocationXY(const FGuid& AnchorKey,
 	                            const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorLookup,
 	                            FVector2D& OutLocationXY)
@@ -4217,80 +4105,6 @@ namespace
 		});
 	}
 
-	int32 ComputeEnemyLocalDensity(const FGuid& TargetAnchorKey,
-	                               const EMapEnemyItem TargetEnemyType,
-	                               const FVector2D& TargetLocationXY,
-	                               const TMap<FGuid, EMapEnemyItem>& EnemyTypesByAnchorKey,
-	                               const TMap<FGuid, FVector2D>& AnchorLocationsByKey)
-	{
-		int32 LocalDensity = 0;
-		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : EnemyTypesByAnchorKey)
-		{
-			if (EnemyPair.Key == TargetAnchorKey || EnemyPair.Value != TargetEnemyType)
-			{
-				continue;
-			}
-
-			const FVector2D* OtherLocationXY = AnchorLocationsByKey.Find(EnemyPair.Key);
-			if (OtherLocationXY == nullptr)
-			{
-				continue;
-			}
-
-			if (FVector2D::DistSquared(TargetLocationXY, *OtherLocationXY) <= FailSafeEnemyDeclusterRadiusSquared)
-			{
-				LocalDensity++;
-			}
-		}
-
-		return LocalDensity;
-	}
-
-	FString BuildCanonicalFailedEnemyDeclusterSwapPairKey(const FGuid& AnchorKeyA, const FGuid& AnchorKeyB)
-	{
-		FGuid CanonicalAnchorKeyA = AnchorKeyA;
-		FGuid CanonicalAnchorKeyB = AnchorKeyB;
-		if (AAnchorPoint::IsAnchorKeyLess(CanonicalAnchorKeyB, CanonicalAnchorKeyA))
-		{
-			Swap(CanonicalAnchorKeyA, CanonicalAnchorKeyB);
-		}
-
-		return CanonicalAnchorKeyA.ToString(EGuidFormats::DigitsWithHyphens)
-			+ TEXT("|")
-			+ CanonicalAnchorKeyB.ToString(EGuidFormats::DigitsWithHyphens);
-	}
-
-	void BuildImpactedEnemyDeclusterAnchorKeys(const FGuid& AnchorKeyA,
-	                                           const FGuid& AnchorKeyB,
-	                                           const TArray<TPair<FGuid, EMapEnemyItem>>& SortedSwappableAnchors,
-	                                           const TMap<FGuid, FVector2D>& AnchorLocationsByKey,
-	                                           TArray<FGuid>& OutImpactedAnchorKeys)
-	{
-		OutImpactedAnchorKeys.Reset();
-		const FVector2D* AnchorLocationA = AnchorLocationsByKey.Find(AnchorKeyA);
-		const FVector2D* AnchorLocationB = AnchorLocationsByKey.Find(AnchorKeyB);
-		if (AnchorLocationA == nullptr || AnchorLocationB == nullptr)
-		{
-			return;
-		}
-
-		for (const TPair<FGuid, EMapEnemyItem>& EnemyPair : SortedSwappableAnchors)
-		{
-			const FVector2D* CandidateLocation = AnchorLocationsByKey.Find(EnemyPair.Key);
-			if (CandidateLocation == nullptr)
-			{
-				continue;
-			}
-
-			if (FVector2D::DistSquared(*CandidateLocation, *AnchorLocationA) <= FailSafeEnemyDeclusterRadiusSquared
-				|| FVector2D::DistSquared(*CandidateLocation, *AnchorLocationB) <= FailSafeEnemyDeclusterRadiusSquared)
-			{
-				OutImpactedAnchorKeys.Add(EnemyPair.Key);
-			}
-		}
-	}
-
-
 	void AddSpawnedActorToFailSafeTransactionIfValid(AWorldMapObject* SpawnedActor,
 	                                                 FCampaignGenerationStepTransaction& InOutFailSafeTransaction)
 	{
@@ -4300,36 +4114,6 @@ namespace
 		}
 
 		InOutFailSafeTransaction.SpawnedActors.Add(SpawnedActor);
-	}
-
-	int32 ComputeImpactedEnemyDeclusterDensitySum(const TArray<FGuid>& ImpactedAnchorKeys,
-	                                              const TMap<FGuid, EMapEnemyItem>& EnemyTypesByAnchorKey,
-	                                              const TMap<FGuid, FVector2D>& AnchorLocationsByKey)
-	{
-		int32 DensitySum = 0;
-		for (const FGuid& ImpactedAnchorKey : ImpactedAnchorKeys)
-		{
-			const EMapEnemyItem* EnemyType = EnemyTypesByAnchorKey.Find(ImpactedAnchorKey);
-			if (EnemyType == nullptr || not GetIsSwappableEnemyType(*EnemyType))
-			{
-				continue;
-			}
-
-			const FVector2D* AnchorLocationXY = AnchorLocationsByKey.Find(ImpactedAnchorKey);
-			if (AnchorLocationXY == nullptr)
-			{
-				continue;
-			}
-
-			DensitySum += ComputeEnemyLocalDensity(
-				ImpactedAnchorKey,
-				*EnemyType,
-				*AnchorLocationXY,
-				EnemyTypesByAnchorKey,
-				AnchorLocationsByKey);
-		}
-
-		return DensitySum;
 	}
 
 	bool GetPassesEnemyTypeHQDistance(const AAnchorPoint* PlayerHQAnchor, const AAnchorPoint* CandidateAnchor,
@@ -5009,6 +4793,32 @@ void AGeneratorWorldCampaign::RestoreWorldStateFromSave(const FWorldCampaignStat
 	RestoreSavedConnections(WorldCampaignState, AnchorsByKey);
 	RestoreSavedMapItems(WorldCampaignState, AnchorsByKey);
 	ApplyRestoredPlacementState(WorldCampaignState, AnchorsByKey, RestoredAnchors);
+}
+
+void AGeneratorWorldCampaign::PruneUnusedAnchorsAndRepairConnectivity()
+{
+	WorldCampaignPruningHelper::FWorldCampaignPruningContext PruningContext;
+	PruningContext.World = GetWorld();
+	PruningContext.Owner = this;
+	PruningContext.PlayerHQAnchor = M_PlacementState.PlayerHQAnchor;
+	PruningContext.AnchorClass = M_AnchorPointGenerationSettings.M_GeneratedAnchorPointClass;
+	PruningContext.ConnectionClass = M_ConnectionClass;
+	PruningContext.CampaignSettings = UWorldCampaignSettings::Get();
+	PruningContext.GameplayAnchorKeys = BuildGameplayAnchorKeysForPruning();
+	PruningContext.CachedAnchors = &M_PlacementState.CachedAnchors;
+	PruningContext.CachedConnections = &M_PlacementState.CachedConnections;
+	PruningContext.GeneratedConnections = &M_GeneratedConnections;
+
+	const WorldCampaignPruningHelper::FWorldCampaignPruningResult PruningResult =
+		WorldCampaignPruningHelper::PruneUnusedAnchorsAndRepairConnectivity(PruningContext);
+	if (not PruningResult.bDidChange)
+	{
+		RefreshCampaignGraphAfterPruning();
+		return;
+	}
+
+	RefreshCampaignGraphAfterPruning();
+	RefreshConnectionTransactionAfterPruning();
 }
 
 void AGeneratorWorldCampaign::AddSavedAnchorsAndMapItems(FWorldCampaignState& WorldCampaignState) const
@@ -8799,6 +8609,77 @@ void AGeneratorWorldCampaign::ClearPlacementState()
 void AGeneratorWorldCampaign::ClearDerivedData()
 {
 	M_DerivedData = FWorldCampaignDerivedData();
+}
+
+TSet<FGuid> AGeneratorWorldCampaign::BuildGameplayAnchorKeysForPruning() const
+{
+	TSet<FGuid> GameplayAnchorKeys;
+	if (M_PlacementState.PlayerHQAnchorKey.IsValid())
+	{
+		GameplayAnchorKeys.Add(M_PlacementState.PlayerHQAnchorKey);
+	}
+
+	if (M_PlacementState.EnemyHQAnchorKey.IsValid())
+	{
+		GameplayAnchorKeys.Add(M_PlacementState.EnemyHQAnchorKey);
+	}
+
+	for (const TPair<FGuid, EMapEnemyItem>& EnemyItemByAnchorKey : M_PlacementState.EnemyItemsByAnchorKey)
+	{
+		GameplayAnchorKeys.Add(EnemyItemByAnchorKey.Key);
+	}
+
+	for (const TPair<FGuid, EMapNeutralObjectType>& NeutralItemByAnchorKey : M_PlacementState.NeutralItemsByAnchorKey)
+	{
+		GameplayAnchorKeys.Add(NeutralItemByAnchorKey.Key);
+	}
+
+	for (const TPair<FGuid, EMapMission>& MissionByAnchorKey : M_PlacementState.MissionsByAnchorKey)
+	{
+		GameplayAnchorKeys.Add(MissionByAnchorKey.Key);
+	}
+
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : M_PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint) || not AnchorPoint->GetHasPromotedWorldObject())
+		{
+			continue;
+		}
+
+		GameplayAnchorKeys.Add(AnchorPoint->GetAnchorKey());
+	}
+
+	return GameplayAnchorKeys;
+}
+
+void AGeneratorWorldCampaign::RefreshCampaignGraphAfterPruning()
+{
+	WorldCampaignPruningHelper::RebuildAnchorConnectionReferences(
+		M_PlacementState.CachedAnchors,
+		M_PlacementState.CachedConnections);
+	M_GeneratedConnections = M_PlacementState.CachedConnections;
+
+	CacheAnchorConnectionDegrees();
+	CampaignGenerationHelper::BuildHopDistanceCache(
+		M_PlacementState.PlayerHQAnchor,
+		M_DerivedData.PlayerHQHopDistancesByAnchorKey);
+	CampaignGenerationHelper::BuildHopDistanceCache(
+		M_PlacementState.EnemyHQAnchor,
+		M_DerivedData.EnemyHQHopDistancesByAnchorKey);
+	BuildChokepointScoresCache(M_PlacementState.PlayerHQAnchor);
+}
+
+void AGeneratorWorldCampaign::RefreshConnectionTransactionAfterPruning()
+{
+	for (FCampaignGenerationStepTransaction& Transaction : M_StepTransactions)
+	{
+		if (Transaction.CompletedStep != ECampaignGenerationStep::ConnectionsCreated)
+		{
+			continue;
+		}
+
+		Transaction.SpawnedConnections = M_GeneratedConnections;
+	}
 }
 
 void AGeneratorWorldCampaign::CacheAnchorConnectionDegrees()
