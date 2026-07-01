@@ -6,6 +6,7 @@
 #include "EnemyMapItemUIData/FEnemyMapItemUIData.h"
 #include "StrengthEstimation/W_StrengthEstimation.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/W_MissionReward.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/W_RewardCardsViewer/W_RewardCardsViewer.h"
 
@@ -29,14 +30,15 @@ void UW_EnemyOrMissionMapItem::SetupEnemyWidget(const FEnemyOrMissionMapItemUIDa
 	SetTextIfValid(M_PrimaryObjDesc, UIData.PrimaryObjectiveText);
 	SetTextIfValid(M_SecondaryObjDesc, UIData.SecondaryObjectiveText);
 	SetTextIfValid(M_OnDefeatRichText, UIData.OnDefeatText);
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(this);
 
 	if (GetIsValidMissionReward())
 	{
-		W_BP_MissionReward->SetupReward(PrimaryReward, SecondaryReward);
+		W_BP_MissionReward->SetupReward(PrimaryReward, SecondaryReward, PlayerFaction);
 	}
 	if (EnsureIsValidRewardCardsViewer())
 	{
-		M_RewardCardsViewer->SetupCardViewer(PrimaryReward.CardRewards);
+		M_RewardCardsViewer->SetupCardViewer(PrimaryReward.GetCardRewardsForFaction(PlayerFaction));
 	}
 	if (EnsureIsValidStrengthEstimation())
 	{

@@ -28,9 +28,11 @@ namespace
 	}
 }
 
-void UW_MissionReward::SetupReward(const FPrimaryReward& PrimaryReward, const FSecondaryReward& SecondaryReward)
+void UW_MissionReward::SetupReward(const FPrimaryReward& PrimaryReward,
+                                   const FSecondaryReward& SecondaryReward,
+                                   const ERTSFaction PlayerFaction)
 {
-	SetupRewardCards(PrimaryReward.CardRewards);
+	SetupRewardCards(PrimaryReward.GetCardRewardsForFaction(PlayerFaction));
 
 	if (IsValid(M_RadixiteBonusRichText))
 	{
@@ -46,7 +48,7 @@ void UW_MissionReward::SetupReward(const FPrimaryReward& PrimaryReward, const FS
 	}
 	if (IsValid(M_SecondaryBonuses))
 	{
-		M_SecondaryBonuses->SetText(BuildBlueprintText(SecondaryReward.Blueprints));
+		M_SecondaryBonuses->SetText(BuildBlueprintText(SecondaryReward.SecondaryReward));
 	}
 }
 

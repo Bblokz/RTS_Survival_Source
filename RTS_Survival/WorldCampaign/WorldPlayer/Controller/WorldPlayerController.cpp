@@ -446,7 +446,7 @@ void AWorldPlayerController::BeginPlay_LoadSavedWorld()
 
 	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
 	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
-	CompleteInitialWorldSetupAfterCampaignReady();
+	OnAllWorldObjectsAndTheirDataReady();
 }
 
 void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
@@ -461,14 +461,25 @@ void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 	M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
 	M_WorldGenerator->PruneUnusedAnchorsAndRepairConnectivity();
 	UpdateAsyncWorldGenerationWidget_PruningCompleted();
+	LoadWorldDataIntoObjects();
 	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
 	const FPlayerProfileSaveData PlayerProfileSaveData =
 		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);
 	M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
-	CompleteInitialWorldSetupAfterCampaignReady();
+	OnAllWorldObjectsAndTheirDataReady();
 }
 
-void AWorldPlayerController::CompleteInitialWorldSetupAfterCampaignReady()
+void AWorldPlayerController::LoadWorldDataIntoObjects()
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	M_WorldGenerator->LoadWorldDataIntoObjects();
+}
+
+void AWorldPlayerController::OnAllWorldObjectsAndTheirDataReady()
 {
 	if (bM_HasCompletedInitialWorldSetup)
 	{

@@ -70,7 +70,7 @@ void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController,
 
 void UW_WorldMenu::ShowMissionMapItemDesc(const FEnemyOrMissionMapItemUIData& UIData,
                                              const FPrimaryReward& PrimaryReward,
-                                             const FSecondaryReward& SecondaryReward) const
+                                             const FSecondaryReward& SecondaryReward)
 {
 	if (not MissionMapItemDesc)
 	{
@@ -79,6 +79,7 @@ void UW_WorldMenu::ShowMissionMapItemDesc(const FEnemyOrMissionMapItemUIData& UI
 
 	MissionMapItemDesc->SetupEnemyWidget(UIData, PrimaryReward, SecondaryReward);
 	SetMissionDescVisibility(true);
+	BP_OnMissionClicked(UIData);
 }
 
 void UW_WorldMenu::CollapseMissionMapItemDesc() const

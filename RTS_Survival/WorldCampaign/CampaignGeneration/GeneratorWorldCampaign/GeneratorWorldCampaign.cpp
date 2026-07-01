@@ -25,6 +25,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Boundary/WorldSplineBoundary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
+#include "RTS_Survival/WorldCampaign/WorldData/WorldDataComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
 namespace
@@ -4851,6 +4852,7 @@ void AGeneratorWorldCampaign::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
+	M_WorldDataComponent = FindComponentByClass<UWorldDataComponent>();
 	ApplyDebuggerSettingsToComponent();
 }
 
@@ -4868,6 +4870,16 @@ FWorldCampaignGenerationFinishedDelegate& AGeneratorWorldCampaign::OnGenerationF
 bool AGeneratorWorldCampaign::GetIsGenerationFinished() const
 {
 	return M_GenerationStep == ECampaignGenerationStep::Finished;
+}
+
+void AGeneratorWorldCampaign::LoadWorldDataIntoObjects()
+{
+	if (not GetIsValidWorldDataComponent())
+	{
+		return;
+	}
+
+	M_WorldDataComponent->LoadWorldDataIntoObjects(this);
 }
 
 void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* WorldPlayerController,
@@ -5856,6 +5868,22 @@ bool AGeneratorWorldCampaign::GetIsValidCampaignDebugger() const
 	}
 
 	return true;
+}
+
+bool AGeneratorWorldCampaign::GetIsValidWorldDataComponent() const
+{
+	if (IsValid(M_WorldDataComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldDataComponent"),
+		TEXT("AGeneratorWorldCampaign::GetIsValidWorldDataComponent"),
+		this
+	);
+	return false;
 }
 
 UWorldCampaignDebugger* AGeneratorWorldCampaign::GetCampaignDebugger() const

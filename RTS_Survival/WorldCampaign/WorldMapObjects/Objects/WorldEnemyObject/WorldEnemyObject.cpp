@@ -7,3 +7,17 @@ void AWorldEnemyObject::InitializeForAnchorWithEnemyItem(AAnchorPoint* AnchorPoi
 	AWorldMapObject::InitializeForAnchor(AnchorPoint);
 	M_EnemyItemType = EnemyItemType;
 }
+
+void AWorldEnemyObject::SetPrimaryReward(const FPrimaryReward& PrimaryReward)
+{
+	M_PrimaryReward = PrimaryReward;
+}
+
+void AWorldEnemyObject::SetSecondaryObjectiveData(const EBonusObjective BonusObjective,
+                                                  const FText& SecondaryObjectiveText,
+                                                  const FSecondaryReward& SecondaryReward)
+{
+	M_BonusObjective = BonusObjective;
+	M_MapItemUIData.SecondaryObjectiveText = SecondaryObjectiveText;
+	M_SecondaryReward = SecondaryReward;
+}

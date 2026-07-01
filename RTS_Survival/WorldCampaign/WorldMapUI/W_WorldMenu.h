@@ -62,10 +62,12 @@ public:
 	 */
 	void ShowMissionMapItemDesc(const FEnemyOrMissionMapItemUIData& UIData,
 	                            const FPrimaryReward& PrimaryReward,
-	                            const FSecondaryReward& SecondaryReward) const;
+	                            const FSecondaryReward& SecondaryReward);
 	void CollapseMissionMapItemDesc() const;
 
 protected:
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnMissionClicked(const FEnemyOrMissionMapItemUIData& InData);
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	FWorldMenuSettings MenuSettings;
 	

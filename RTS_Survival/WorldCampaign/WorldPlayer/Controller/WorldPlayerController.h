@@ -125,11 +125,13 @@ private:
 	 */
 	void OnGeneratedCampaignAsyncWorkFinished();
 
+	void LoadWorldDataIntoObjects();
+
 	/**
 	 * @brief Runs world systems that require generated campaign actors to exist.
 	 * @note Guards against duplicate setup if callbacks and load paths race during BeginPlay.
 	 */
-	void CompleteInitialWorldSetupAfterCampaignReady();
+	void OnAllWorldObjectsAndTheirDataReady();
 
 	void BeginPlay_SpawnWorldFowManager();
 	bool GetCanPrimaryClickActor(AActor* ClickedActor) const;

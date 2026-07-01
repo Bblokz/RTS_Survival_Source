@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapItemType.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/StrengthEstimation/DataAndUtils/RTSStrengthEstimationTypes.h"
 
 #include "FEnemyMapItemUIData.generated.h"
@@ -26,4 +27,7 @@ struct FEnemyOrMissionMapItemUIData
 	));
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FRTSStrengthEstimationRichTextMessage StrengthEstimation;
+	// What type of object the player clicked.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	EMapItemType Type = EMapItemType::Empty;
 };

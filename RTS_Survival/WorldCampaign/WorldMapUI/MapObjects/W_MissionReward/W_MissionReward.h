@@ -24,8 +24,11 @@ public:
 	 * @brief Refreshes all reward rows from clicked map-object reward data.
 	 * @param PrimaryReward Rewards shown immediately and used by card slots.
 	 * @param SecondaryReward Optional follow-up reward data shown separately.
+	 * @param PlayerFaction Faction used to choose the card rewards.
 	 */
-	void SetupReward(const FPrimaryReward& PrimaryReward, const FSecondaryReward& SecondaryReward);
+	void SetupReward(const FPrimaryReward& PrimaryReward,
+	                 const FSecondaryReward& SecondaryReward,
+	                 ERTSFaction PlayerFaction);
 	FMissionRewardHoverDelegate& OnMissionRewardHovered() { return M_OnMissionRewardHovered; }
 	FMissionRewardHoverDelegate& OnMissionRewardUnhovered() { return M_OnMissionRewardUnhovered; }
 	

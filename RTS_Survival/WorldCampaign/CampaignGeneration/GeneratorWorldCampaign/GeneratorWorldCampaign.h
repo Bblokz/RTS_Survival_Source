@@ -27,6 +27,7 @@ class AAnchorPoint;
 class AConnection;
 class AWorldSplineBoundary;
 class UWorldCampaignDebugger;
+class UWorldDataComponent;
 
 namespace WorldCampaignDebugDefaults
 {
@@ -498,6 +499,7 @@ public:
 	float GetDebugDisplaySeconds() const { return WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds; }
 	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
 	const FWorldCampaignPlacementState& GetPlacementState() const { return M_PlacementState; }
+	void LoadWorldDataIntoObjects();
 	FWorldCampaignState BuildWorldCampaignStateFromCurrentGeneration() const;
 	void RestoreWorldStateFromSave(const FWorldCampaignState& WorldCampaignState);
 
@@ -732,6 +734,7 @@ private:
 	void ApplyDebuggerSettingsToComponent();
 	bool GetIsValidPlayerHQAnchor() const;
 	bool GetIsValidEnemyHQAnchor() const;
+	bool GetIsValidWorldDataComponent() const;
 
 	/**
 	 * @brief Wraps step execution so undo data is recorded for backtracking.
@@ -1924,6 +1927,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UWorldCampaignDebugger> M_WorldCampaignDebugger;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWorldDataComponent> M_WorldDataComponent = nullptr;
 
 	// Tracks when undo operations are attributed to backtracking failures for reporting.
 	bool bM_Report_UndoContextActive = false;
