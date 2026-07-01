@@ -117,6 +117,33 @@ void AWorldPlayerController::SecondaryClick()
 {
 }
 
+void AWorldPlayerController::PlayTurn(const EWorldTurnType TurnType)
+{
+	if (TurnType == EWorldTurnType::Enemy)
+	{
+		EnemyTurn();
+	}
+	else
+	{
+		PlayerTurn();
+	}
+}
+
+void AWorldPlayerController::PlayerTurn()
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	M_WorldGenerator->AdjustDifficutlyPercentagesForInfluencers(M_SelectedDifficulty.DifficultyLevel);
+}
+
+void AWorldPlayerController::EnemyTurn()
+{
+	PlayerTurn();
+}
+
 void AWorldPlayerController::PrimaryClick_Regular()
 {
 	FHitResult HitUnderCursor;
@@ -462,6 +489,7 @@ void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 	M_WorldGenerator->PruneUnusedAnchorsAndRepairConnectivity();
 	UpdateAsyncWorldGenerationWidget_PruningCompleted();
 	LoadWorldDataIntoObjects();
+	M_WorldGenerator->InitMapObjectsBaseDifficulty(M_SelectedDifficulty.DifficultyLevel);
 	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
 	const FPlayerProfileSaveData PlayerProfileSaveData =
 		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);
@@ -534,6 +562,7 @@ bool AWorldPlayerController::GetCanPrimaryClickActor(AActor* ClickedActor) const
 void AWorldPlayerController::OnInitialWorldSetupComplete()
 {
 	WorldSetupComplete_MovePlayerToHQ();
+	PlayTurn(EWorldTurnType::Enemy);
 }
 
 void AWorldPlayerController::WorldSetupComplete_MovePlayerToHQ()

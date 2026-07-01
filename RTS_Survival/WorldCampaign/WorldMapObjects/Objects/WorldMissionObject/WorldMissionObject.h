@@ -24,6 +24,15 @@ public:
 	const FEnemyOrMissionMapItemUIData& GetMapItemUIData() const { return M_MapItemUIData; }
 	const FPrimaryReward& GetPrimaryReward() const { return M_PrimaryReward; }
 	const FSecondaryReward& GetSecondaryReward() const { return M_SecondaryReward; }
+	void SetBaseDifficultyInfluenceReason(const FRTSStrengthEstimationInfluenceReason& InfluenceReason);
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Difficulty")
+	int32 GetBaseDifficultyPercentage() const;
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Difficulty")
+	void SetBaseDifficultyPercentage(int32 DifficultyPercentage);
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Difficulty")
+	void AddBaseDifficultyPercentage(int32 AddedDifficultyPercentage);
+	void ResetAuxiliaryDifficultyInfluenceReasons();
+	void AddAuxiliaryDifficultyInfluenceReason(const FRTSStrengthEstimationInfluenceReason& InfluenceReason);
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "World Campaign|World Objects", meta = (AllowPrivateAccess = "true"))
@@ -32,9 +41,19 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Map Item", meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))
 	FEnemyOrMissionMapItemUIData M_MapItemUIData;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty",
+		meta = (AllowPrivateAccess = "true"))
+	FRTSStrengthEstimationInfluenceReason M_BaseDifficultyInfluenceReason;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty",
+		meta = (AllowPrivateAccess = "true"))
+	TArray<FRTSStrengthEstimationInfluenceReason> M_AuxiliaryDifficultyInfluenceReasons;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Map Item", meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))
 	FPrimaryReward M_PrimaryReward;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Map Item", meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))
 	FSecondaryReward M_SecondaryReward;
+
+	void RebuildDifficultyInfluenceReasons();
 };

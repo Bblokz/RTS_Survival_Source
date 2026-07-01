@@ -25,4 +25,5 @@ enum class ERTSRadiusType : uint8
 	Fullcircle_HealAura	          UMETA(DisplayName="FullCircle_HealAura"),
 	FullCircle_PulseRepair          UMETA(DisplayName="FullCircle_PulseRepair"),
 	FullCircle_TeamWeaponArc    UMETA(DisplayName="FullCircle_TeamWeaponArc"),
+	FullCircle_DifficultyRadius
 };

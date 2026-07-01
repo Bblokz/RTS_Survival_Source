@@ -26,6 +26,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Boundary/WorldSplineBoundary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 #include "RTS_Survival/WorldCampaign/WorldData/WorldDataComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyInfluence.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
 namespace
@@ -91,6 +92,188 @@ namespace
 	using CampaignGenerationHelper::GetOverrideMissionPreferenceScore;
 	using CampaignGenerationHelper::GetTopologyPreferenceScore;
 	using CampaignGenerationHelper::HasMinimumAdjacentMatches;
+
+	struct FWorldDifficultyMapObjects
+	{
+		TArray<AWorldEnemyObject*> EnemyObjects;
+		TArray<AWorldMissionObject*> MissionObjects;
+	};
+
+	FWorldDifficultyMapObjects BuildWorldDifficultyMapObjects(
+		const FWorldCampaignPlacementState& PlacementState)
+	{
+		FWorldDifficultyMapObjects MapObjects;
+		MapObjects.EnemyObjects.Reserve(PlacementState.EnemyItemsByAnchorKey.Num());
+		MapObjects.MissionObjects.Reserve(PlacementState.MissionsByAnchorKey.Num());
+
+		for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+		{
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
+
+			AWorldMapObject* PromotedWorldObject = AnchorPoint->GetPromotedWorldObject();
+			if (not IsValid(PromotedWorldObject))
+			{
+				continue;
+			}
+
+			if (AWorldEnemyObject* EnemyObject = Cast<AWorldEnemyObject>(PromotedWorldObject))
+			{
+				MapObjects.EnemyObjects.Add(EnemyObject);
+				continue;
+			}
+
+			if (AWorldMissionObject* MissionObject = Cast<AWorldMissionObject>(PromotedWorldObject))
+			{
+				MapObjects.MissionObjects.Add(MissionObject);
+			}
+		}
+
+		return MapObjects;
+	}
+
+	bool GetIsWithinXYRadius(const FVector& SourceLocation,
+	                         const FVector& TargetLocation,
+	                         const float XYRadius)
+	{
+		if (XYRadius <= 0.f)
+		{
+			return false;
+		}
+
+		const FVector2D SourceXY(SourceLocation.X, SourceLocation.Y);
+		const FVector2D TargetXY(TargetLocation.X, TargetLocation.Y);
+		return FVector2D::DistSquared(SourceXY, TargetXY) <= FMath::Square(XYRadius);
+	}
+
+	void ResetAuxiliaryDifficultyInfluenceReasons(const FWorldDifficultyMapObjects& MapObjects)
+	{
+		for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
+		{
+			if (not IsValid(EnemyObject))
+			{
+				continue;
+			}
+
+			EnemyObject->ResetAuxiliaryDifficultyInfluenceReasons();
+		}
+
+		for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
+		{
+			if (not IsValid(MissionObject))
+			{
+				continue;
+			}
+
+			MissionObject->ResetAuxiliaryDifficultyInfluenceReasons();
+		}
+	}
+
+	bool GetCanApplyDifficultyInfluenceToTarget(const AWorldMapObject* SourceObject,
+	                                            const AWorldMapObject* TargetObject,
+	                                            const float XYRadius)
+	{
+		if (not IsValid(SourceObject) || not IsValid(TargetObject))
+		{
+			return false;
+		}
+
+		if (SourceObject == TargetObject)
+		{
+			return false;
+		}
+
+		return GetIsWithinXYRadius(SourceObject->GetActorLocation(), TargetObject->GetActorLocation(), XYRadius);
+	}
+
+	void ApplyDifficultyInfluenceToEnemyTargets(
+		const AWorldMapObject* SourceObject,
+		const FRTSStrengthEstimationInfluenceReason& InfluenceReason,
+		const float XYRadius,
+		const TArray<AWorldEnemyObject*>& EnemyObjects)
+	{
+		for (AWorldEnemyObject* EnemyObject : EnemyObjects)
+		{
+			if (not GetCanApplyDifficultyInfluenceToTarget(SourceObject, EnemyObject, XYRadius))
+			{
+				continue;
+			}
+
+			EnemyObject->AddAuxiliaryDifficultyInfluenceReason(InfluenceReason);
+		}
+	}
+
+	void ApplyDifficultyInfluenceToMissionTargets(
+		const AWorldMapObject* SourceObject,
+		const FRTSStrengthEstimationInfluenceReason& InfluenceReason,
+		const float XYRadius,
+		const TArray<AWorldMissionObject*>& MissionObjects)
+	{
+		for (AWorldMissionObject* MissionObject : MissionObjects)
+		{
+			if (not GetCanApplyDifficultyInfluenceToTarget(SourceObject, MissionObject, XYRadius))
+			{
+				continue;
+			}
+
+			MissionObject->AddAuxiliaryDifficultyInfluenceReason(InfluenceReason);
+		}
+	}
+
+	void ApplyDifficultyInfluenceToTargets(const AWorldMapObject* SourceObject,
+	                                       const UWorldDifficultyInfluence& DifficultyInfluence,
+	                                       const FWorldDifficultyMapObjects& MapObjects,
+	                                       const ERTSGameDifficulty GameDifficulty)
+	{
+		const FRTSStrengthEstimationInfluenceReason InfluenceReason =
+			DifficultyInfluence.BuildInfluenceReason(GameDifficulty);
+		if (not InfluenceReason.GetHasInfluence())
+		{
+			return;
+		}
+
+		const float XYRadius = DifficultyInfluence.GetXYRadius();
+		ApplyDifficultyInfluenceToEnemyTargets(SourceObject, InfluenceReason, XYRadius, MapObjects.EnemyObjects);
+		ApplyDifficultyInfluenceToMissionTargets(SourceObject, InfluenceReason, XYRadius, MapObjects.MissionObjects);
+	}
+
+	void ApplyDifficultyInfluencersFromSource(AWorldMapObject* SourceObject,
+	                                          const FWorldDifficultyMapObjects& MapObjects,
+	                                          const ERTSGameDifficulty GameDifficulty)
+	{
+		if (not IsValid(SourceObject))
+		{
+			return;
+		}
+
+		TArray<UWorldDifficultyInfluence*> DifficultyInfluences;
+		SourceObject->GetComponents<UWorldDifficultyInfluence>(DifficultyInfluences);
+		for (const UWorldDifficultyInfluence* DifficultyInfluence : DifficultyInfluences)
+		{
+			if (not IsValid(DifficultyInfluence))
+			{
+				continue;
+			}
+
+			ApplyDifficultyInfluenceToTargets(SourceObject, *DifficultyInfluence, MapObjects, GameDifficulty);
+		}
+	}
+
+	void ApplyDifficultyInfluencers(const FWorldDifficultyMapObjects& MapObjects,
+	                                const ERTSGameDifficulty GameDifficulty)
+	{
+		for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
+		{
+			ApplyDifficultyInfluencersFromSource(EnemyObject, MapObjects, GameDifficulty);
+		}
+
+		for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
+		{
+			ApplyDifficultyInfluencersFromSource(MissionObject, MapObjects, GameDifficulty);
+		}
+	}
 
 	struct FAnchorCandidate
 	{
@@ -4882,6 +5065,53 @@ void AGeneratorWorldCampaign::LoadWorldDataIntoObjects()
 	M_WorldDataComponent->LoadWorldDataIntoObjects(this);
 }
 
+void AGeneratorWorldCampaign::InitMapObjectsBaseDifficulty(const ERTSGameDifficulty GameDifficulty)
+{
+	if (not GetIsValidWorldDataComponent())
+	{
+		return;
+	}
+
+	const FWorldDifficultyMapObjects MapObjects = BuildWorldDifficultyMapObjects(M_PlacementState);
+	for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
+	{
+		if (not IsValid(EnemyObject))
+		{
+			continue;
+		}
+
+		FRTSStrengthEstimationInfluenceReason BaseDifficultyReason;
+		M_WorldDataComponent->TryBuildEnemyBaseDifficultyReason(
+			EnemyObject->GetEnemyItemType(),
+			GameDifficulty,
+			BaseDifficultyReason);
+		EnemyObject->SetBaseDifficultyInfluenceReason(BaseDifficultyReason);
+	}
+
+	for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
+	{
+		if (not IsValid(MissionObject))
+		{
+			continue;
+		}
+
+		FRTSStrengthEstimationInfluenceReason BaseDifficultyReason;
+		M_WorldDataComponent->TryBuildMissionBaseDifficultyReason(
+			MissionObject->GetMissionType(),
+			GameDifficulty,
+			BaseDifficultyReason);
+		MissionObject->SetBaseDifficultyInfluenceReason(BaseDifficultyReason);
+	}
+}
+
+void AGeneratorWorldCampaign::AdjustDifficutlyPercentagesForInfluencers(
+	const ERTSGameDifficulty GameDifficulty)
+{
+	const FWorldDifficultyMapObjects MapObjects = BuildWorldDifficultyMapObjects(M_PlacementState);
+	ResetAuxiliaryDifficultyInfluenceReasons(MapObjects);
+	ApplyDifficultyInfluencers(MapObjects, GameDifficulty);
+}
+
 void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* WorldPlayerController,
                                                        const FCampaignGenerationSettings CampaignGenerationSettings,
                                                        const FRTSGameDifficulty DifficultySettings)
@@ -5056,11 +5286,13 @@ void AGeneratorWorldCampaign::AddSavedAnchorsAndMapItems(FWorldCampaignState& Wo
 		{
 			MapItemSaveData.MapItemType = EMapItemType::EnemyItem;
 			MapItemSaveData.EnemyItemType = EnemyObject->GetEnemyItemType();
+			MapItemSaveData.BaseDifficulty = EnemyObject->GetBaseDifficultyPercentage();
 		}
 		else if (const AWorldMissionObject* MissionObject = Cast<AWorldMissionObject>(PromotedWorldObject))
 		{
 			MapItemSaveData.MapItemType = EMapItemType::Mission;
 			MapItemSaveData.MissionType = MissionObject->GetMissionType();
+			MapItemSaveData.BaseDifficulty = MissionObject->GetBaseDifficultyPercentage();
 		}
 		else if (const AWorldNeutralObject* NeutralObject = Cast<AWorldNeutralObject>(PromotedWorldObject))
 		{
@@ -5221,12 +5453,20 @@ void AGeneratorWorldCampaign::RestoreSavedMapItems(const FWorldCampaignState& Wo
 		switch (MapItemSaveData.MapItemType)
 		{
 		case EMapItemType::EnemyItem:
-			AnchorPoint->Get()->OnEnemyItemPromotion(MapItemSaveData.EnemyItemType, ECampaignGenerationStep::Finished);
+			if (AWorldEnemyObject* EnemyObject = Cast<AWorldEnemyObject>(
+				AnchorPoint->Get()->OnEnemyItemPromotion(MapItemSaveData.EnemyItemType, ECampaignGenerationStep::Finished)))
+			{
+				EnemyObject->SetBaseDifficultyPercentage(FMath::RoundToInt(MapItemSaveData.BaseDifficulty));
+			}
 			M_PlacementState.EnemyItemsByAnchorKey.Add(MapItemSaveData.AnchorKey, MapItemSaveData.EnemyItemType);
 			M_DerivedData.EnemyItemPlacedCounts.FindOrAdd(MapItemSaveData.EnemyItemType)++;
 			break;
 		case EMapItemType::Mission:
-			AnchorPoint->Get()->OnMissionPromotion(MapItemSaveData.MissionType, ECampaignGenerationStep::Finished);
+			if (AWorldMissionObject* MissionObject = Cast<AWorldMissionObject>(
+				AnchorPoint->Get()->OnMissionPromotion(MapItemSaveData.MissionType, ECampaignGenerationStep::Finished)))
+			{
+				MissionObject->SetBaseDifficultyPercentage(FMath::RoundToInt(MapItemSaveData.BaseDifficulty));
+			}
 			M_PlacementState.MissionsByAnchorKey.Add(MapItemSaveData.AnchorKey, MapItemSaveData.MissionType);
 			break;
 		case EMapItemType::NeutralItem:

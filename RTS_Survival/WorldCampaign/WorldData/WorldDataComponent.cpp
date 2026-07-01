@@ -8,12 +8,14 @@
 #include "RTS_Survival/WorldCampaign/WorldData/WorldData.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/StrengthEstimation/DataAndUtils/RTSStrengthEstimationTypes.h"
 
 namespace
 {
 	constexpr int32 EnemyPrimaryRewardSeedOffset = 24103;
 	constexpr int32 EnemyTypeSeedMultiplier = 97;
 	constexpr int32 EnemyBonusObjectiveSeedOffset = 24107;
+	const TCHAR BaseDifficultyReasonText[] = TEXT("<Text_NewBad>Base Difficulty</>");
 
 	struct FEnemyPrimaryRewardRuntimePool
 	{
@@ -186,6 +188,45 @@ namespace
 			);
 		}
 	}
+
+	FString GetEnumValueName(const UEnum* Enum, const int64 EnumValue, const TCHAR* FallbackName)
+	{
+		if (not IsValid(Enum))
+		{
+			return FString(FallbackName);
+		}
+
+		return Enum->GetNameStringByValue(EnumValue);
+	}
+
+	FRTSStrengthEstimationInfluenceReason BuildBaseDifficultyReason(const int32 DifficultyPercentage)
+	{
+		return FRTSStrengthEstimationInfluenceReason(
+			FText::FromString(FString(BaseDifficultyReasonText)),
+			DifficultyPercentage);
+	}
+
+	void ReportMissingMissionBaseDifficulty(const EMapMission MissionType)
+	{
+		const FString MissionName = GetEnumValueName(
+			StaticEnum<EMapMission>(),
+			static_cast<int64>(MissionType),
+			TEXT("UnknownMission"));
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("WorldData missing base difficulty percentage for mission type %s."),
+			                *MissionName));
+	}
+
+	void ReportMissingEnemyBaseDifficulty(const EMapEnemyItem EnemyItemType)
+	{
+		const FString EnemyName = GetEnumValueName(
+			StaticEnum<EMapEnemyItem>(),
+			static_cast<int64>(EnemyItemType),
+			TEXT("UnknownEnemyItem"));
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("WorldData missing base difficulty percentage for enemy item type %s."),
+			                *EnemyName));
+	}
 }
 
 UWorldDataComponent::UWorldDataComponent()
@@ -203,18 +244,70 @@ void UWorldDataComponent::LoadWorldDataIntoObjects(AGeneratorWorldCampaign* Worl
 	ApplyEnemyRewardDataIntoObjects(*M_WorldData, *WorldGenerator);
 }
 
-bool UWorldDataComponent::GetIsValidWorldData() const
+bool UWorldDataComponent::TryBuildMissionBaseDifficultyReason(
+	const EMapMission MissionType,
+	const ERTSGameDifficulty GameDifficulty,
+	FRTSStrengthEstimationInfluenceReason& OutInfluenceReason) const
 {
-	if (IsValid(M_WorldData))
+	OutInfluenceReason = BuildBaseDifficultyReason(0);
+	if (not GetIsValidWorldData())
+	{
+		return false;
+	}
+
+	int32 DifficultyPercentage = 0;
+	const bool bFoundDifficultyPercentage = M_WorldData->TryGetMissionBaseDifficultyPercentage(
+		MissionType,
+		GameDifficulty,
+		DifficultyPercentage);
+	OutInfluenceReason = BuildBaseDifficultyReason(DifficultyPercentage);
+	if (bFoundDifficultyPercentage)
 	{
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		TEXT("M_WorldData"),
-		TEXT("GetIsValidWorldData"),
-		this
-	);
+	ReportMissingMissionBaseDifficulty(MissionType);
 	return false;
+}
+
+bool UWorldDataComponent::TryBuildEnemyBaseDifficultyReason(
+	const EMapEnemyItem EnemyItemType,
+	const ERTSGameDifficulty GameDifficulty,
+	FRTSStrengthEstimationInfluenceReason& OutInfluenceReason) const
+{
+	OutInfluenceReason = BuildBaseDifficultyReason(0);
+	if (not GetIsValidWorldData())
+	{
+		return false;
+	}
+
+	int32 DifficultyPercentage = 0;
+	const bool bFoundDifficultyPercentage = M_WorldData->TryGetEnemyBaseDifficultyPercentage(
+		EnemyItemType,
+		GameDifficulty,
+		DifficultyPercentage);
+	OutInfluenceReason = BuildBaseDifficultyReason(DifficultyPercentage);
+	if (bFoundDifficultyPercentage)
+	{
+		return true;
+	}
+
+	ReportMissingEnemyBaseDifficulty(EnemyItemType);
+	return false;
+}
+
+bool UWorldDataComponent::GetIsValidWorldData() const
+{
+	if (not IsValid(M_WorldData))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_WorldData"),
+			TEXT("GetIsValidWorldData"),
+			this
+		);
+		return false;
+	}
+
+	return true;
 }

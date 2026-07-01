@@ -6,6 +6,8 @@
 #include "Engine/DataAsset.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/BonusObjectives/BonusObjectives.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyTypes.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/RewardStructs/FMissionRewardStructs.h"
 #include "WorldData.generated.h"
 
@@ -52,6 +54,12 @@ class RTS_SURVIVAL_API UWorldData : public UDataAsset
 
 public:
 	const FWorldDataEnemyPrimaryRewardPool* FindEnemyPrimaryRewardPool(EMapEnemyItem EnemyItemType) const;
+	bool TryGetMissionBaseDifficultyPercentage(EMapMission MissionType,
+	                                           ERTSGameDifficulty GameDifficulty,
+	                                           int32& OutDifficultyPercentage) const;
+	bool TryGetEnemyBaseDifficultyPercentage(EMapEnemyItem EnemyItemType,
+	                                         ERTSGameDifficulty GameDifficulty,
+	                                         int32& OutDifficultyPercentage) const;
 	const TArray<FWorldDataBonusObjectiveDefinition>& GetBonusObjectiveDefinitions() const
 	{
 		return M_BonusObjectiveDefinitions;
@@ -65,4 +73,20 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Bonus Objectives",
 		meta = (AllowPrivateAccess = "true"))
 	TArray<FWorldDataBonusObjectiveDefinition> M_BonusObjectiveDefinitions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty|Missions",
+		meta = (AllowPrivateAccess = "true"))
+	TMap<EMapMission, int32> M_BaseDifficultyPercentageByMission;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty|Missions",
+		meta = (AllowPrivateAccess = "true"))
+	FRTSPerDifficultyMlt M_MissionBaseDifficultyMlt;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty|Enemy Objects",
+		meta = (AllowPrivateAccess = "true"))
+	TMap<EMapEnemyItem, int32> M_BaseDifficultyPercentageByEnemyItem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty|Enemy Objects",
+		meta = (AllowPrivateAccess = "true"))
+	FRTSPerDifficultyMlt M_EnemyBaseDifficultyMlt;
 };

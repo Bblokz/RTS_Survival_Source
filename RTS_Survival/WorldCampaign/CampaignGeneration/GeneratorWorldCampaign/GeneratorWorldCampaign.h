@@ -500,6 +500,8 @@ public:
 	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
 	const FWorldCampaignPlacementState& GetPlacementState() const { return M_PlacementState; }
 	void LoadWorldDataIntoObjects();
+	void InitMapObjectsBaseDifficulty(ERTSGameDifficulty GameDifficulty);
+	void AdjustDifficutlyPercentagesForInfluencers(ERTSGameDifficulty GameDifficulty);
 	FWorldCampaignState BuildWorldCampaignStateFromCurrentGeneration() const;
 	void RestoreWorldStateFromSave(const FWorldCampaignState& WorldCampaignState);
 

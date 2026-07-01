@@ -8,6 +8,10 @@
 
 class AGeneratorWorldCampaign;
 class UWorldData;
+enum class EMapEnemyItem : uint8;
+enum class EMapMission : uint8;
+enum class ERTSGameDifficulty : uint8;
+struct FRTSStrengthEstimationInfluenceReason;
 
 /**
  * @brief Component placed on the world generator to load designer campaign data into generated map objects.
@@ -21,6 +25,12 @@ public:
 	UWorldDataComponent();
 
 	void LoadWorldDataIntoObjects(AGeneratorWorldCampaign* WorldGenerator) const;
+	bool TryBuildMissionBaseDifficultyReason(EMapMission MissionType,
+	                                         ERTSGameDifficulty GameDifficulty,
+	                                         FRTSStrengthEstimationInfluenceReason& OutInfluenceReason) const;
+	bool TryBuildEnemyBaseDifficultyReason(EMapEnemyItem EnemyItemType,
+	                                       ERTSGameDifficulty GameDifficulty,
+	                                       FRTSStrengthEstimationInfluenceReason& OutInfluenceReason) const;
 
 private:
 	bool GetIsValidWorldData() const;

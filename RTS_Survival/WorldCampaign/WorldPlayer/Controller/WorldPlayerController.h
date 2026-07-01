@@ -7,6 +7,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Turn/WorldTurnType.h"
 #include "WorldPrimaryClickContext/WorldPrimaryClickContext.h"
 #include "WorldPlayerController.generated.h"
 
@@ -92,6 +93,9 @@ protected:
 
 private:
 	EWorldPrimaryClickContext M_PrimaryClickContext = EWorldPrimaryClickContext::None;
+	void PlayTurn(const EWorldTurnType TurnType); 
+	void PlayerTurn();
+	void EnemyTurn();
 	void PrimaryClick_Regular();
 	void OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj);
 	void OnClicked_MissionMapObj(AWorldMissionObject* MissionMapObj);

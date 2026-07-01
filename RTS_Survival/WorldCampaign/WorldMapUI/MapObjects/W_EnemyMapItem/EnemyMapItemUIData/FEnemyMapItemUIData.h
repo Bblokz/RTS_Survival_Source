@@ -12,7 +12,7 @@ struct FEnemyOrMissionMapItemUIData
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FText TitleText = FText::FromString("<Text_LBadTitle>CRD Factory</>");
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	FText StrengthPercentageText = FText::FromString("<Text_NewBad>20%</>");
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FText DescriptionText = FText::FromString("<Text_Armor>This CRD Base periodically produces light vehicles which reinforce nearby CRD elements.</>");
@@ -25,9 +25,14 @@ struct FEnemyOrMissionMapItemUIData
 		"<Text_BadTitle>-</> <Text_Bad14>Enemy strength increases by 20%</>\n"
 		"<Text_BadTitle>-</> <Text_Bad14>CRD will attempt to reinforce the position with extra divisions</>"
 	));
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
 	FRTSStrengthEstimationRichTextMessage StrengthEstimation;
 	// What type of object the player clicked.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	EMapItemType Type = EMapItemType::Empty;
+
+	void ResetStrengthEstimation();
+	void SetStrengthInfluenceReasons(const TArray<FRTSStrengthEstimationInfluenceReason>& InfluenceReasons);
+	void AddStrengthInfluenceReason(const FRTSStrengthEstimationInfluenceReason& InfluenceReason);
+	void RefreshStrengthPercentageText();
 };

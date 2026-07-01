@@ -15,3 +15,37 @@ const FWorldDataEnemyPrimaryRewardPool* UWorldData::FindEnemyPrimaryRewardPool(
 
 	return nullptr;
 }
+
+bool UWorldData::TryGetMissionBaseDifficultyPercentage(const EMapMission MissionType,
+                                                       const ERTSGameDifficulty GameDifficulty,
+                                                       int32& OutDifficultyPercentage) const
+{
+	const int32* BaseDifficultyPercentage = M_BaseDifficultyPercentageByMission.Find(MissionType);
+	if (BaseDifficultyPercentage == nullptr)
+	{
+		OutDifficultyPercentage = 0;
+		return false;
+	}
+
+	OutDifficultyPercentage = M_MissionBaseDifficultyMlt.ApplyToPercentage(
+		*BaseDifficultyPercentage,
+		GameDifficulty);
+	return true;
+}
+
+bool UWorldData::TryGetEnemyBaseDifficultyPercentage(const EMapEnemyItem EnemyItemType,
+                                                     const ERTSGameDifficulty GameDifficulty,
+                                                     int32& OutDifficultyPercentage) const
+{
+	const int32* BaseDifficultyPercentage = M_BaseDifficultyPercentageByEnemyItem.Find(EnemyItemType);
+	if (BaseDifficultyPercentage == nullptr)
+	{
+		OutDifficultyPercentage = 0;
+		return false;
+	}
+
+	OutDifficultyPercentage = M_EnemyBaseDifficultyMlt.ApplyToPercentage(
+		*BaseDifficultyPercentage,
+		GameDifficulty);
+	return true;
+}
