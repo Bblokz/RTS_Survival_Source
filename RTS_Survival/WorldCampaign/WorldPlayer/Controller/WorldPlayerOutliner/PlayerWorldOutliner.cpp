@@ -7,6 +7,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyInfluence.h"
 
 UPlayerWorldOutliner::UPlayerWorldOutliner()
 {
@@ -42,6 +43,7 @@ void UPlayerWorldOutliner::OnPlayerTick(AActor* HitActor, const FVector& HitLoca
 
 	ResetOutlineIfActorChanged(HitActor);
 	SetOutLineOnActor(HitActor, OutlineType);
+	SetHoverDifficultyInfluenceRadiiOnActor(HitActor);
 	M_OutlinedActor = HitActor;
 }
 
@@ -72,7 +74,7 @@ ERTSOutLineTypes UPlayerWorldOutliner::GetOutlineTypeForActor(const AActor* Acto
 
 void UPlayerWorldOutliner::ResetOutlineOnPreviousActor()
 {
-	const AActor* OutlinedActor = M_OutlinedActor.Get();
+	AActor* OutlinedActor = M_OutlinedActor.Get();
 	if (not IsValid(OutlinedActor))
 	{
 		M_OutlinedActor = nullptr;
@@ -80,6 +82,7 @@ void UPlayerWorldOutliner::ResetOutlineOnPreviousActor()
 	}
 
 	ResetActorOutline(OutlinedActor);
+	ResetHoverDifficultyInfluenceRadiiOnActor(OutlinedActor);
 	M_OutlinedActor = nullptr;
 }
 
@@ -91,7 +94,7 @@ void UPlayerWorldOutliner::ResetOutlineIfActorChanged(const AActor* NewActor)
 		return;
 	}
 
-	const AActor* OutlinedActor = M_OutlinedActor.Get();
+	AActor* OutlinedActor = M_OutlinedActor.Get();
 	if (not IsValid(OutlinedActor))
 	{
 		return;
@@ -100,8 +103,19 @@ void UPlayerWorldOutliner::ResetOutlineIfActorChanged(const AActor* NewActor)
 	if (OutlinedActor != NewActor)
 	{
 		ResetActorOutline(OutlinedActor);
+		ResetHoverDifficultyInfluenceRadiiOnActor(OutlinedActor);
 		M_OutlinedActor = nullptr;
 	}
+}
+
+void UPlayerWorldOutliner::SetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const
+{
+	UWorldDifficultyInfluence::ShowHoverRadiiOnActor(Actor);
+}
+
+void UPlayerWorldOutliner::ResetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const
+{
+	UWorldDifficultyInfluence::HideHoverRadiiOnActor(Actor);
 }
 
 void UPlayerWorldOutliner::SetOutLineOnActor(const AActor* ActorToOutLine, const ERTSOutLineTypes OutLineType) const

@@ -96,13 +96,15 @@ private:
 	void PlayTurn(const EWorldTurnType TurnType); 
 	void PlayerTurn();
 	void EnemyTurn();
-	void PrimaryClick_Regular();
+	bool PrimaryClick_Regular();
 	void OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj);
 	void OnClicked_MissionMapObj(AWorldMissionObject* MissionMapObj);
 	void OnClicked_PlayerMapObj(AWorldPlayerObject* PlayerMapObj);
 	void OnClicked_NeutralMapObj(AWorldNeutralObject* NeutralMapObj);
 	void PrimaryClick_ActiveMissionItem();
 	void CollapseMissionMapItemDesc();
+	void ShowClickedDifficultyInfluenceRadiiForActor(AActor* Actor);
+	void HideClickedDifficultyInfluenceRadii();
 	bool GetIsValidWorldCameraController() const;
 	bool GetIsValidPlayerWorldOutliner() const;
 
@@ -162,6 +164,9 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AGeneratorWorldCampaign> M_WorldGenerator;
 	bool GetIsValidWorldGenerator() const;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_ClickedDifficultyInfluenceRadiusActor;
 
 	UPROPERTY()
 	TObjectPtr<UWorldStateAndSaveManager> M_WorldStateAndSaveManager = nullptr;

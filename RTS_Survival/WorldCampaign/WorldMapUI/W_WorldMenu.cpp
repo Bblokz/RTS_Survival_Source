@@ -148,6 +148,8 @@ void UW_WorldMenu::SetMissionDescVisibility(const bool bVisible) const
 void UW_WorldMenu::SetAuxiliaryMapItemsWidgetsVisibility(const bool bVisible) const
 {
 	const ESlateVisibility NewVis = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+	const ESlateVisibility StrengthEstimationVisibility =
+		bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed;
 
 	if (RewardCardsViewer)
 	{
@@ -155,7 +157,7 @@ void UW_WorldMenu::SetAuxiliaryMapItemsWidgetsVisibility(const bool bVisible) co
 	}
 	if (StrengthEstimation)
 	{
-		StrengthEstimation->SetVisibility(NewVis);
+		StrengthEstimation->SetVisibility(StrengthEstimationVisibility);
 	}
 }
 

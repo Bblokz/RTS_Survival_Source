@@ -18,6 +18,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/AsyncWorldGeneration/W_AsyncWorldGeneration.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyInfluence.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
@@ -144,46 +145,46 @@ void AWorldPlayerController::EnemyTurn()
 	PlayerTurn();
 }
 
-void AWorldPlayerController::PrimaryClick_Regular()
+bool AWorldPlayerController::PrimaryClick_Regular()
 {
 	FHitResult HitUnderCursor;
 	if (not GetHitResultUnderCursor(ECC_Visibility, false, HitUnderCursor))
 	{
 		CollapseMissionMapItemDesc();
-		return;
+		return true;
 	}
 	AActor* ClickedActor = HitUnderCursor.GetActor();
 	if (not IsValid(ClickedActor))
 	{
 		CollapseMissionMapItemDesc();
-		return;
+		return true;
 	}
 	if (not GetCanPrimaryClickActor(ClickedActor))
 	{
-		CollapseMissionMapItemDesc();
-		return;
+		return false;
 	}
 	if (ClickedActor->IsA(AWorldEnemyObject::StaticClass()))
 	{
 		OnClicked_EnemyMapObj(Cast<AWorldEnemyObject>(ClickedActor));	
-		return;
+		return true;
 	}
 	if (ClickedActor->IsA(AWorldMissionObject::StaticClass()))
 	{
 		OnClicked_MissionMapObj(Cast<AWorldMissionObject>(ClickedActor));	
-		return;
+		return true;
 	}
 	if (ClickedActor->IsA(AWorldPlayerObject::StaticClass()))
 	{
 		OnClicked_PlayerMapObj(Cast<AWorldPlayerObject>(ClickedActor));	
-		return;
+		return true;
 	}
 	if (ClickedActor->IsA(AWorldNeutralObject::StaticClass()))
 	{
 		OnClicked_NeutralMapObj(Cast<AWorldNeutralObject>(ClickedActor));	
-		return;
+		return true;
 	}
 	CollapseMissionMapItemDesc();
+	return true;
 }
 
 void AWorldPlayerController::OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj)
@@ -204,6 +205,7 @@ void AWorldPlayerController::OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapOb
 		EnemyMapObj->GetPrimaryReward(),
 		EnemyMapObj->GetSecondaryReward()
 	);
+	ShowClickedDifficultyInfluenceRadiiForActor(EnemyMapObj);
 	M_PrimaryClickContext = EWorldPrimaryClickContext::MissionItemActive;
 }
 
@@ -225,6 +227,7 @@ void AWorldPlayerController::OnClicked_MissionMapObj(AWorldMissionObject* Missio
 		MissionMapObj->GetPrimaryReward(),
 		MissionMapObj->GetSecondaryReward()
 	);
+	ShowClickedDifficultyInfluenceRadiiForActor(MissionMapObj);
 	M_PrimaryClickContext = EWorldPrimaryClickContext::MissionItemActive;
 }
 
@@ -240,13 +243,20 @@ void AWorldPlayerController::OnClicked_NeutralMapObj(AWorldNeutralObject* Neutra
 
 void AWorldPlayerController::PrimaryClick_ActiveMissionItem()
 {
+	const EWorldPrimaryClickContext PreviousPrimaryClickContext = M_PrimaryClickContext;
 	M_PrimaryClickContext = EWorldPrimaryClickContext::None;
-	PrimaryClick_Regular();
+	if (PrimaryClick_Regular())
+	{
+		return;
+	}
+
+	M_PrimaryClickContext = PreviousPrimaryClickContext;
 }
 
 void AWorldPlayerController::CollapseMissionMapItemDesc()
 {
 	M_PrimaryClickContext = EWorldPrimaryClickContext::None;
+	HideClickedDifficultyInfluenceRadii();
 	if (not GetIsValidWorldProfileAndUIManager())
 	{
 		return;
@@ -259,6 +269,35 @@ void AWorldPlayerController::CollapseMissionMapItemDesc()
 	}
 
 	WorldMenu->CollapseMissionMapItemDesc();
+}
+
+void AWorldPlayerController::ShowClickedDifficultyInfluenceRadiiForActor(AActor* Actor)
+{
+	if (not IsValid(Actor))
+	{
+		HideClickedDifficultyInfluenceRadii();
+		return;
+	}
+
+	AActor* ClickedDifficultyInfluenceRadiusActor = M_ClickedDifficultyInfluenceRadiusActor.Get();
+	if (IsValid(ClickedDifficultyInfluenceRadiusActor) && ClickedDifficultyInfluenceRadiusActor != Actor)
+	{
+		UWorldDifficultyInfluence::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
+	}
+
+	M_ClickedDifficultyInfluenceRadiusActor = Actor;
+	UWorldDifficultyInfluence::ShowSelectedRadiiOnActor(Actor);
+}
+
+void AWorldPlayerController::HideClickedDifficultyInfluenceRadii()
+{
+	AActor* ClickedDifficultyInfluenceRadiusActor = M_ClickedDifficultyInfluenceRadiusActor.Get();
+	if (IsValid(ClickedDifficultyInfluenceRadiusActor))
+	{
+		UWorldDifficultyInfluence::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
+	}
+
+	M_ClickedDifficultyInfluenceRadiusActor = nullptr;
 }
 
 void AWorldPlayerController::SetIsWorldCameraMovementDisabled(const bool bIsDisabled)

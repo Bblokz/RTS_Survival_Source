@@ -73,7 +73,7 @@ void UW_EnemyOrMissionMapItem::OnStrengthButtonHovered()
 	{
 		return;
 	}
-	M_StrengthEstimation->SetVisibility(ESlateVisibility::Visible);
+	M_StrengthEstimation->SetVisibility(ESlateVisibility::HitTestInvisible);
 	M_StrengthEstimation->ShowVisibleAnimation();
 }
 
