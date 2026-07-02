@@ -105,6 +105,7 @@ bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Typ
 	case ERTSRadiusType::Fullcircle_HealAura:
 	case ERTSRadiusType::FullCircle_PulseRepair:
 	case ERTSRadiusType::FullCircle_TeamWeaponArc:
+	case ERTSRadiusType::FullCircle_DifficultyRadius:
 		return true;
 	default:
 		return false;
@@ -326,6 +327,11 @@ void URTSRadiusPoolSubsystem::HideRTSRadiusById(const int32 ID)
 	ReleaseById_Internal(ID, /*bSilentIfMissing*/ false);
 }
 
+bool URTSRadiusPoolSubsystem::GetIsRTSRadiusIdActive(const int32 ID) const
+{
+	const APooledRadiusActor* RadiusActor = FindPooledActorById(ID);
+	return IsValid(RadiusActor) && RadiusActor->GetIsInUse();
+}
 
 void URTSRadiusPoolSubsystem::UpdateRTSRadiusArc(const int32 ID, const float ArcAngle)
 {

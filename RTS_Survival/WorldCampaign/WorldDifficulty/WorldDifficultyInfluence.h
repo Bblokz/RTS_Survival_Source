@@ -9,6 +9,9 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/StrengthEstimation/DataAndUtils/RTSStrengthEstimationTypes.h"
 #include "WorldDifficultyInfluence.generated.h"
 
+class AActor;
+class URTSRadiusPoolSubsystem;
+
 /**
  * @brief Blueprint-friendly settings for one world-map difficulty influence radius.
  */
@@ -48,14 +51,39 @@ class RTS_SURVIVAL_API UWorldDifficultyInfluence : public UActorComponent
 
 public:
 	UWorldDifficultyInfluence();
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	int32 GetDifficultyInfluencePercent(ERTSGameDifficulty GameDifficulty) const;
 	FRTSStrengthEstimationInfluenceReason BuildInfluenceReason(ERTSGameDifficulty GameDifficulty) const;
 	float GetXYRadius() const { return M_Settings.XYRadius; }
 	ERTSRadiusType GetRadiusType() const { return M_Settings.RadiusType; }
+	void ShowHoverRadius();
+	void HideHoverRadius();
+	void ShowSelectedRadius();
+	void HideSelectedRadius();
+	void HideAllRadii();
+
+	static void ShowHoverRadiiOnActor(AActor* Actor);
+	static void HideHoverRadiiOnActor(AActor* Actor);
+	static void ShowSelectedRadiiOnActor(AActor* Actor);
+	static void HideSelectedRadiiOnActor(AActor* Actor);
 
 private:
+	static constexpr int32 InvalidRadiusId = -1;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty Influence",
 		meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))
 	FWorldDifficultyInfluenceSettings M_Settings;
+
+	UPROPERTY()
+	TWeakObjectPtr<class URTSRadiusPoolSubsystem> M_RadiusPoolSubsystem;
+
+	int32 M_HoverRadiusId = InvalidRadiusId;
+	int32 M_SelectedRadiusId = InvalidRadiusId;
+
+	bool GetIsValidRadiusPoolSubsystem();
+	URTSRadiusPoolSubsystem* GetRadiusPoolSubsystem();
+	int32 CreateRadius();
+	bool GetIsRadiusActive(int32 RadiusId);
+	void HideRadiusById(int32& RadiusId);
 };

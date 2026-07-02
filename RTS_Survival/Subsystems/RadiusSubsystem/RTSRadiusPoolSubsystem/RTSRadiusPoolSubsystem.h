@@ -60,6 +60,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
 	void HideRTSRadiusById(int32 ID);
 
+	bool GetIsRTSRadiusIdActive(int32 ID) const;
+
 	/**
 	 * @brief Attach an active pooled radius actor to another actor with a relative offset.
 	 * @param ID           The id returned by CreateRTSRadius.

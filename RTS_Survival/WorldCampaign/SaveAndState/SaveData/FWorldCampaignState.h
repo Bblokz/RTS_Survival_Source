@@ -85,7 +85,7 @@ struct RTS_SURVIVAL_API FWorldCampaignState
 	GENERATED_BODY()
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
-	int32 CurrentTurn = 1;
+	int32 CurrentTurn = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	ECampaignGenerationStep GenerationStep = ECampaignGenerationStep::Finished;
