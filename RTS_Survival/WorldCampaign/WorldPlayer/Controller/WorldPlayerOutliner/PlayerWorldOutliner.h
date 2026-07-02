@@ -31,6 +31,8 @@ private:
 	ERTSOutLineTypes GetOutlineTypeForActor(const AActor* Actor) const;
 	void ResetOutlineOnPreviousActor();
 	void ResetOutlineIfActorChanged(const AActor* NewActor);
+	void SetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const;
+	void ResetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const;
 	void SetOutLineOnActor(const AActor* ActorToOutLine, ERTSOutLineTypes OutLineType) const;
 	void ResetActorOutline(const AActor* ActorToReset) const;
 
