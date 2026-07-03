@@ -19,6 +19,8 @@ ERTSResourceRichText FRTSRichTextConverter::ConvertResourceToRichTextType(const 
 		return ERTSResourceRichText::Yellow;
 	case ERTSResourceType::Resource_Ammo:
 		return ERTSResourceRichText::Ammo;
+	case ERTSResourceType::Resource_Intel:
+		return ERTSResourceRichText::Intel;
 	case ERTSResourceType::CommanderExp:
 		return ERTSResourceRichText::CommanderExp;
 	case ERTSResourceType::Blueprint_Weapon:
@@ -47,6 +49,8 @@ ERTSRichText FRTSRichTextConverter::ConvertResourceToRTSRichText(const ERTSResou
 		break;
 	case ERTSResourceType::Resource_Ammo:
 		break;
+	case ERTSResourceType::Resource_Intel:
+		return ERTSRichText::Text_Intel;
 	case ERTSResourceType::CommanderExp:
 		return ERTSRichText::Text_Exp;
 	case ERTSResourceType::Blueprint_Weapon:
@@ -118,6 +122,8 @@ FString FRTSRichTextConverter::GetResourceRichImage(const ERTSResourceType Resou
 		return "<img id=\"Ammo\"/>";
 	case ERTSResourceType::Resource_Fuel:
 		return "<img id=\"Fuel\"/>";
+	case ERTSResourceType::Resource_Intel:
+		return "<img id=\"Intel\"/>";
 	case ERTSResourceType::CommanderExp:
 		return "<img id=\"CommanderExp\"/>";
 	case ERTSResourceType::Blueprint_Vehicle:

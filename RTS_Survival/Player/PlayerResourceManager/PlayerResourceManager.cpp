@@ -38,6 +38,7 @@ UPlayerResourceManager::UPlayerResourceManager()
 	M_PlayerResources.Add(ERTSResourceType::Resource_VehicleParts, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Resource_Fuel, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Resource_Ammo, FRTSResourceStorage{0, 0});
+	M_PlayerResources.Add(ERTSResourceType::Resource_Intel, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::CommanderExp, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Blueprint_Weapon, FRTSResourceStorage{0, 0});
 	M_PlayerResources.Add(ERTSResourceType::Blueprint_Vehicle, FRTSResourceStorage{0, 0});
@@ -143,6 +144,8 @@ void UPlayerResourceManager::ResourceFullAnnounce(const ERTSResourceType Resourc
 	case ERTSResourceType::Resource_Fuel:
 		break;
 	case ERTSResourceType::Resource_Ammo:
+		break;
+	case ERTSResourceType::Resource_Intel:
 		break;
 	case ERTSResourceType::CommanderExp:
 		break;
@@ -323,6 +326,8 @@ EPlayerError UPlayerResourceManager::GetCanPayForCost(const TMap<ERTSResourceTyp
 			return EPlayerError::Error_NotEnoughtFuel;
 		case ERTSResourceType::Resource_Ammo:
 			return EPlayerError::Error_NotENoughAmmo;
+		case ERTSResourceType::Resource_Intel:
+			return EPlayerError::Error_NotEnoughIntel;
 		case ERTSResourceType::Blueprint_Weapon:
 			return EPlayerError::Error_NotEnoughWeaponBlueprints;
 		case ERTSResourceType::Blueprint_Vehicle:
